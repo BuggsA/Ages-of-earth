@@ -8,13 +8,17 @@ export const RES: readonly Res[] = ['food', 'wood', 'stone', 'gold'];
 export type Cost = Partial<Record<Res, number>>;
 export type Stock = Record<Res, number>;
 
-export type UnitType = 'citizen' | 'infantry' | 'ranged' | 'cavalry' | 'siege' | 'priest' | 'hero';
+export type UnitType =
+  | 'citizen' | 'infantry' | 'ranged' | 'cavalry' | 'siege' | 'priest' | 'hero'
+  | 'fisher' | 'warship' | 'transport' | 'fighter' | 'bomber';
+/** How a unit gets about: on foot, on the water, or in the air. */
+export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
   | 'towncenter' | 'house' | 'storehouse' | 'farm' | 'barracks' | 'range' | 'stable' | 'tower'
-  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate';
+  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield';
 export type Difficulty = 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
-export type MapType = 'continental' | 'highlands' | 'lakes' | 'forest' | 'plains';
+export type MapType = 'continental' | 'highlands' | 'lakes' | 'forest' | 'plains' | 'sea';
 /** Conquest: destroy every rival town. Regicide: each people has a King; lose them and you lose. Deathmatch: start rich. */
 export type GameMode = 'conquest' | 'regicide' | 'deathmatch';
 export type Stance = 'aggressive' | 'defensive' | 'stand';
@@ -22,7 +26,8 @@ export type CivId = 'egyptians' | 'greeks' | 'romans' | 'mongols' | 'chinese' | 
 export type TechId =
   | 'forging' | 'ironCasting' | 'blastFurnace' | 'fletching' | 'bodkin' | 'scaleArmor' | 'chainMail' | 'plateArmor'
   | 'wheelbarrow' | 'handcart' | 'axes' | 'saws' | 'picks' | 'shafts' | 'plow' | 'irrigation' | 'masonry'
-  | 'conscription' | 'husbandry' | 'theology' | 'chemistry';
+  | 'conscription' | 'husbandry' | 'theology' | 'chemistry'
+  | 'gillnets' | 'shipwright' | 'rifling' | 'steamEngine' | 'aviation';
 
 /** Tile ground. Water and rock can't be walked or built on. */
 export const T_GRASS = 0;
@@ -38,6 +43,8 @@ export const R_STONE = 3;
 export const R_GOLD = 4;
 /** A hunted animal, to be butchered for food. */
 export const R_MEAT = 5;
+/** A shoal of fish in the water, for fishing boats. */
+export const R_FISH = 6;
 
 /** Why a tile can't be walked: bits of `block`. */
 export const B_TERRAIN = 1;
@@ -75,10 +82,14 @@ export type Order =
   /** A priest turning an enemy to your side: `done` ticks of chanting so far. */
   | { k: 'convert'; target: number; done: number }
   /** A priest tending a wounded friend. */
-  | { k: 'heal'; target: number };
+  | { k: 'heal'; target: number }
+  /** Walk to the shore by a transport ship and go aboard. */
+  | { k: 'board'; target: number }
+  /** A transport sailing to a shore to put its passengers ashore there. */
+  | { k: 'unload'; x: number; y: number };
 
 /** What a unit is visibly doing, for the renderer's animation. */
-export type Act = 'idle' | 'walk' | 'attack' | 'chop' | 'mine' | 'forage' | 'farm' | 'build' | 'chant';
+export type Act = 'idle' | 'walk' | 'attack' | 'chop' | 'mine' | 'forage' | 'farm' | 'build' | 'chant' | 'fish';
 
 export interface Unit {
   id: number;
@@ -101,8 +112,10 @@ export interface Unit {
   /** Where it stood when it last came to rest (defensive units return here). */
   guardX: number;
   guardY: number;
-  /** The building it is sheltering in, or 0. */
+  /** The building it is sheltering in (or the transport it rides), or 0. */
   inside: number;
+  /** A transport's passengers. */
+  cargo: number[];
   /** Waypoints as [x0, y0, x1, y1, ...], or null when not walking a route. */
   path: number[] | null;
   pathI: number;
@@ -202,7 +215,7 @@ export interface Animal {
 export interface Shot {
   id: number;
   owner: number;
-  kind: 'stone' | 'arrow' | 'bolt' | 'bullet' | 'spear' | 'boulder' | 'ball';
+  kind: 'stone' | 'arrow' | 'bolt' | 'bullet' | 'spear' | 'boulder' | 'ball' | 'bomb';
   /** Where it was loosed from, and the target it flies at. */
   x0: number;
   y0: number;
@@ -219,6 +232,8 @@ export interface Shot {
   from: UnitType | null;
   /** Shot at an animal (a hunter's spear). */
   animal: boolean;
+  /** Fired from an aircraft (for drawing it from the sky). */
+  fromAir?: boolean;
 }
 
 export interface PlayerStats {
@@ -356,6 +371,10 @@ export interface AiMemory {
   unitTurn: number;
   /** Tick the town bell was rung, or -1. */
   bell: number;
+  /** Tick it last looked for a dock site and found none (so it doesn't look every turn). */
+  dockless?: number;
+  /** Tick its bombers last set out. */
+  sortie?: number;
 }
 
 /** Orders that can be given with Shift held to queue them after the current one. */
@@ -373,6 +392,10 @@ export type Command =
   | ({ t: 'hunt'; p: number; ids: number[]; target: number } & Queued)
   | ({ t: 'convert'; p: number; ids: number[]; target: number } & Queued)
   | ({ t: 'garrison'; p: number; ids: number[]; target: number } & Queued)
+  /** Go aboard a transport ship. */
+  | ({ t: 'board'; p: number; ids: number[]; target: number } & Queued)
+  /** Transports: sail to the shore nearest a point and put everyone ashore. */
+  | ({ t: 'unload'; p: number; ids: number[]; x: number; y: number } & Queued)
   | { t: 'ungarrison'; p: number; building: number }
   | { t: 'bell'; p: number; ring: boolean }
   | { t: 'stance'; p: number; ids: number[]; stance: Stance }

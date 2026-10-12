@@ -1,6 +1,6 @@
-import { lineClear, walkable } from './grid';
+import { AIR, NAVAL, lineClear, walkable } from './grid';
 import type { GameState, Goal } from './types';
-import { B_GATE } from './types';
+import { B_GATE, B_TERRAIN, T_WATER } from './types';
 
 /**
  * Grid pathfinding: A* over tiles with eight directions (no cutting past blocked corners), then the
@@ -240,7 +240,9 @@ function field(s: GameState, key: string, seeds: number[], team: number): Field 
   const dist = new Int32Array(n).fill(FAR);
   // Walkability once, as bytes, for the inner loop.
   const open = new Uint8Array(n);
-  for (let i = 0; i < n; i++) open[i] = s.block[i] === 0 || (s.block[i] === B_GATE && s.gateTeam[i] === team && team >= 0) ? 1 : 0;
+  if (team === NAVAL) for (let i = 0; i < n; i++) open[i] = s.block[i] === B_TERRAIN && s.terrain[i] === T_WATER ? 1 : 0;
+  else if (team === AIR) open.fill(1);
+  else for (let i = 0; i < n; i++) open[i] = s.block[i] === 0 || (s.block[i] === B_GATE && s.gateTeam[i] === team && team >= 0) ? 1 : 0;
   for (const b of buckets) b.length = 0;
   let pending = 0;
   for (const t of seeds) {

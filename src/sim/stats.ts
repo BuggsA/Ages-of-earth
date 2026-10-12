@@ -73,7 +73,18 @@ export function statsFor(s: GameState, owner: number, type: UnitType): UnitStats
     st.attack *= m.siegeAttack;
     if (st.range > 0) st.range += m.siegeRange;
   }
-  if (base.cls !== 'citizen' && base.cls !== 'priest') {
+  if (base.cls === 'ship') {
+    st.hp = Math.round(st.hp * m.shipHp);
+    if (st.range > 0) {
+      st.range += m.shipRange;
+      st.sight = Math.max(st.sight, st.range + 1);
+    }
+  }
+  if (base.cls === 'fighter' || base.cls === 'bomber') {
+    st.speed *= m.airSpeed;
+    st.hp = Math.round(st.hp * m.airHp);
+  }
+  if (base.cls !== 'citizen' && base.cls !== 'priest' && type !== 'fisher') {
     st.time *= m.militaryTrain;
     if (base.cls === 'ranged') st.time *= m.rangedTrain;
   }

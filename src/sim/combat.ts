@@ -1,13 +1,13 @@
-import { AURA, BONUS, BUILDINGS, DEER, TICK_HZ, secs, type UnitStats } from './data';
+import { AURA, BONUS, BUILDINGS, DEER, TICK_HZ, domainOf, secs, type UnitStats } from './data';
 import { distToRect } from './grid';
 import type { Spatial } from './spatial';
 import { modsOf, statsFor } from './stats';
 import type { Animal, Building, Ent, GameState, Shot, Unit } from './types';
-import { isEnemy, radiusOf, statsOf } from './world';
+import { canHit, isEnemy, radiusOf, statsOf } from './world';
 
 /** Blows, shots, towers, the damage triangle, splash and the hunt. */
 
-const SHOT_SPEED: Record<Shot['kind'], number> = { stone: 10, arrow: 13, bolt: 15, bullet: 32, spear: 9, boulder: 8, ball: 20 };
+const SHOT_SPEED: Record<Shot['kind'], number> = { stone: 10, arrow: 13, bolt: 15, bullet: 32, spear: 9, boulder: 8, ball: 20, bomb: 6 };
 
 /** Whether a peace treaty still holds (no fighting between players). */
 export const peace = (s: GameState) => s.tick < s.peaceUntil;
@@ -50,7 +50,7 @@ export function hurt(s: GameState, target: Ent, damage: number, by: number, atta
     return;
   }
   // Soldiers standing about answer whoever hits them (if their stance lets them move).
-  if (attacker && target.kind === 'unit' && target.type !== 'citizen' && target.type !== 'priest' && target.order.k === 'idle' && attacker.hp > 0 && target.stance !== 'stand') {
+  if (attacker && target.kind === 'unit' && target.type !== 'citizen' && target.type !== 'priest' && target.order.k === 'idle' && attacker.hp > 0 && target.stance !== 'stand' && canHit(s, target, attacker)) {
     target.order = { k: 'attack', target: attacker.id, auto: true, then: null };
   }
 }
@@ -78,6 +78,7 @@ export function strike(s: GameState, u: Unit, t: Ent): void {
       splash: st.splash ?? 0,
       from: u.type,
       animal: false,
+      fromAir: domainOf(u.type) === 'air',
     });
     s.events.push({ k: 'swing', id: u.id, target: t.id, x: u.x, y: u.y, owner: u.owner, ranged: true, type: u.type });
     s.events.push({ k: 'shot', owner: u.owner, kind: st.shot, x: u.x, y: u.y });
@@ -139,7 +140,8 @@ export function updateShots(s: GameState, sp: Spatial, hitAnimal: (a: Animal, da
       s.events.push({ k: 'splash', x: sh.tx, y: sh.ty, owner: sh.owner, kind: sh.kind });
       const st = sh.from ? statsFor(s, sh.owner, sh.from) : null;
       sp.near(sh.tx, sh.ty, sh.splash + 0.5, (o) => {
-        if (o === t || o.hp <= 0 || !isEnemy(s, sh.owner, o.owner)) return;
+        // Blasts on the ground don't reach aircraft.
+        if (o === t || o.hp <= 0 || !isEnemy(s, sh.owner, o.owner) || domainOf(o.type) === 'air') return;
         const dx = o.x - sh.tx;
         const dy = o.y - sh.ty;
         if (dx * dx + dy * dy > sh.splash * sh.splash) return;

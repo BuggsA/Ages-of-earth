@@ -1,11 +1,11 @@
-import { BUILDINGS, EPOCHS, LAST_EPOCH, MARKET, RES_LABEL, TECHS, UNITS, unitEpoch, unitStats } from './data';
+import { BUILDINGS, EPOCHS, LAST_EPOCH, MARKET, RES_LABEL, TECHS, UNITS, domainOf, unitEpoch, unitStats } from './data';
 import { peace } from './combat';
 import { placeProblem, stampBuilding, walkable } from './grid';
-import { buildingCostFor, statsFor, techCostFor, techProblem } from './stats';
+import { buildingCostFor, techCostFor, techProblem } from './stats';
 import type { Building, BuildingType, Command, Cost, GameState, Order, Player, Unit } from './types';
-import { RES, R_NONE } from './types';
-import { RES_OF_TILE, freeFarm, garrisonRoom, giveOrder, setOrder, ungarrison } from './units';
-import { isEnemy, pay, placeBuilding, refund } from './world';
+import { RES, R_FISH, R_NONE } from './types';
+import { RES_OF_TILE, cargoRoom, freeFarm, garrisonRoom, giveOrder, setOrder, ungarrison } from './units';
+import { canHit, isEnemy, pay, placeBuilding, refund } from './world';
 
 /**
  * Everything a player can do, as plain data. A person's clicks and the computer opponent both go
@@ -171,8 +171,13 @@ export function applyCommand(s: GameState, c: Command): void {
   switch (c.t) {
     case 'move': {
       const units = myUnits(s, c.p, c.ids);
-      for (const spot of formation(s, units, c.x, c.y)) {
-        giveOrder(spot.u, { k: 'move', x: spot.x, y: spot.y, amove: !!c.amove && !peace(s), started: false }, c.queue);
+      // Soldiers, ships and aircraft each keep their own formation.
+      for (const dom of ['land', 'water', 'air'] as const) {
+        const group = units.filter((u) => domainOf(u.type) === dom);
+        if (!group.length) continue;
+        for (const spot of formation(s, group, c.x, c.y)) {
+          giveOrder(spot.u, { k: 'move', x: spot.x, y: spot.y, amove: !!c.amove && !peace(s), started: false }, c.queue);
+        }
       }
       break;
     }
@@ -188,10 +193,11 @@ export function applyCommand(s: GameState, c: Command): void {
       if (peace(s)) return refuse(s, c.p, `The peace treaty holds for ${Math.ceil((s.peaceUntil - s.tick) / 20)} more seconds`);
       for (const u of units) {
         if (u.type === 'priest') {
-          if (t.kind === 'unit') giveOrder(u, { k: 'convert', target: t.id, done: 0 }, c.queue);
+          if (t.kind === 'unit' && domainOf(t.type) === 'land') giveOrder(u, { k: 'convert', target: t.id, done: 0 }, c.queue);
           continue;
         }
-        if (statsFor(s, c.p, u.type).buildingsOnly && t.kind === 'unit' && t.type !== 'siege') continue;
+        // Swords can't reach a ship or an aircraft, nor a ram a soldier.
+        if (!canHit(s, u, t)) continue;
         giveOrder(u, { k: 'attack', target: t.id, auto: false, then: null }, c.queue);
       }
       break;
@@ -200,9 +206,10 @@ export function applyCommand(s: GameState, c: Command): void {
       const kind = s.res[c.tile];
       if (c.tile < 0 || c.tile >= s.w * s.h || kind === R_NONE) return;
       const units = myUnits(s, c.p, c.ids);
-      const citizens = units.filter((u) => u.type === 'citizen');
-      for (const u of citizens) giveOrder(u, { k: 'gather', tile: c.tile, res: RES_OF_TILE[kind], phase: 'go' }, c.queue);
-      const others = units.filter((u) => u.type !== 'citizen');
+      // Citizens work the land; fishing boats fish.
+      const workers = units.filter((u) => (kind === R_FISH ? u.type === 'fisher' : u.type === 'citizen'));
+      for (const u of workers) giveOrder(u, { k: 'gather', tile: c.tile, res: RES_OF_TILE[kind], phase: 'go' }, c.queue);
+      const others = units.filter((u) => !workers.includes(u));
       if (others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: (c.tile % s.w) + 0.5, y: Math.floor(c.tile / s.w) + 0.5, queue: c.queue });
       break;
     }
@@ -230,6 +237,10 @@ export function applyCommand(s: GameState, c: Command): void {
       const shelters = !!BUILDINGS[b.type].garrison && b.built;
       const movers: Unit[] = [];
       for (const u of units) {
+        if (u.type === 'fisher' && b.type === 'dock' && b.built && u.carry > 0) {
+          giveOrder(u, { k: 'deliver' }, c.queue);
+          continue;
+        }
         if (u.type === 'citizen') {
           if (!b.built) {
             assignBuilders([u], b, !!c.queue);
@@ -247,7 +258,7 @@ export function applyCommand(s: GameState, c: Command): void {
             continue;
           }
         }
-        if (shelters && u.type !== 'siege' && garrisonRoom(b) > 0) giveOrder(u, { k: 'garrison', target: b.id }, c.queue);
+        if (shelters && u.type !== 'siege' && domainOf(u.type) === 'land' && garrisonRoom(b) > 0) giveOrder(u, { k: 'garrison', target: b.id }, c.queue);
         else movers.push(u);
       }
       if (movers.length) applyCommand(s, { t: 'move', p: c.p, ids: movers.map((u) => u.id), x: b.x, y: b.y + b.size / 2 + 1, queue: c.queue });
@@ -256,9 +267,31 @@ export function applyCommand(s: GameState, c: Command): void {
     case 'garrison': {
       const b = myBuilding(s, c.p, c.target);
       if (!b || !b.built || !BUILDINGS[b.type].garrison) return;
-      for (const u of myUnits(s, c.p, c.ids)) if (u.type !== 'siege') giveOrder(u, { k: 'garrison', target: b.id }, c.queue);
+      for (const u of myUnits(s, c.p, c.ids)) if (u.type !== 'siege' && domainOf(u.type) === 'land') giveOrder(u, { k: 'garrison', target: b.id }, c.queue);
       break;
     }
+    case 'board': {
+      const ship = s.byId.get(c.target);
+      if (!ship || ship.kind !== 'unit' || ship.owner !== c.p || ship.type !== 'transport' || ship.hp <= 0) return;
+      const riders = myUnits(s, c.p, c.ids).filter((u) => domainOf(u.type) === 'land');
+      if (!riders.length) return;
+      if (cargoRoom(s, ship) < riders.length) refuse(s, c.p, `Room aboard for ${Math.max(0, cargoRoom(s, ship))} more`);
+      for (const u of riders.slice(0, Math.max(0, cargoRoom(s, ship)))) giveOrder(u, { k: 'board', target: ship.id }, c.queue);
+      // An idle ship comes in to the shore nearest them to pick them up.
+      if (ship.order.k === 'idle') {
+        let cx = 0;
+        let cy = 0;
+        for (const u of riders) {
+          cx += u.x;
+          cy += u.y;
+        }
+        setOrder(ship, { k: 'move', x: cx / riders.length, y: cy / riders.length, amove: false, started: false });
+      }
+      break;
+    }
+    case 'unload':
+      for (const u of myUnits(s, c.p, c.ids)) if (u.type === 'transport' && u.cargo.length) giveOrder(u, { k: 'unload', x: c.x, y: c.y }, c.queue);
+      break;
     case 'ungarrison': {
       const b = myBuilding(s, c.p, c.building);
       if (b) ungarrison(s, b);

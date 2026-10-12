@@ -1,5 +1,5 @@
-import { BUILDINGS, POP_MAX, type UnitStats } from './data';
-import { distToRect, nearestWalkable, stampBuilding, walkable } from './grid';
+import { BUILDINGS, POP_MAX, domainOf, type UnitStats } from './data';
+import { AIR, NAVAL, distToRect, nearestWalkable, stampBuilding, walkable } from './grid';
 import { buildingMaxHp, statsFor } from './stats';
 import type { Building, BuildingType, Cost, Ent, GameState, Goal, Player, Unit, UnitType } from './types';
 import { RES } from './types';
@@ -16,6 +16,27 @@ export function maxHp(s: GameState, e: Ent): number {
 
 /** The team a player is on (gates open for their own team). */
 export const teamOf = (s: GameState, owner: number) => s.players[owner].team;
+
+/** How a unit passes over tiles, for the tile tests and routes: its team on foot, or NAVAL, or AIR. */
+export function passOf(s: GameState, u: Unit): number {
+  const d = domainOf(u.type);
+  return d === 'water' ? NAVAL : d === 'air' ? AIR : s.players[u.owner].team;
+}
+
+/**
+ * Whether a unit can fight a target at all: only missiles reach ships and aircraft (and of those, not
+ * siege or bombers at aircraft); rams go only for buildings and siege; unarmed units fight nothing.
+ */
+export function canHit(s: GameState, u: Unit, t: Ent): boolean {
+  const st = statsOf(s, u);
+  if (st.attack <= 0) return false;
+  if (t.kind === 'building') return true;
+  if (st.buildingsOnly) return t.type === 'siege';
+  const d = domainOf(t.type);
+  if (d === 'air') return st.range > 0 && st.cls !== 'siege' && st.cls !== 'bomber';
+  if (d === 'water') return st.range > 0;
+  return true;
+}
 
 export function radiusOf(s: GameState, e: Ent): number {
   return e.kind === 'unit' ? statsOf(s, e).radius : e.size / 2;
@@ -66,6 +87,7 @@ export function spawnUnit(s: GameState, owner: number, type: UnitType, x: number
     stuck: 0,
     miss: 0,
     resume: null,
+    cargo: [],
     act: 'idle',
     swing: -999,
     hurt: -999,
@@ -103,10 +125,25 @@ export function placeBuilding(s: GameState, owner: number, type: BuildingType, t
     hurt: -999,
     born: s.tick,
   };
+  if (type === 'dock') b.dir = waterSide(s, tx, ty, size);
   s.ents.push(b);
   s.byId.set(b.id, b);
   stampBuilding(s, b, true);
   return b;
+}
+
+/** Which side of a footprint has the most open water: 0 south (+y), 1 east (+x), 2 north, 3 west. */
+export function waterSide(s: GameState, tx: number, ty: number, size: number): number {
+  const counts = [0, 0, 0, 0];
+  for (let k = -1; k <= size; k++) {
+    if (walkable(s, tx + k, ty + size, NAVAL)) counts[0]++;
+    if (walkable(s, tx + size, ty + k, NAVAL)) counts[1]++;
+    if (walkable(s, tx + k, ty - 1, NAVAL)) counts[2]++;
+    if (walkable(s, tx - 1, ty + k, NAVAL)) counts[3]++;
+  }
+  let best = 0;
+  for (let d = 1; d < 4; d++) if (counts[d] > counts[best]) best = d;
+  return best;
 }
 
 /** Units, buildings and capacity are counted again every tick. */
@@ -124,8 +161,8 @@ export function countPop(s: GameState): void {
   for (const p of s.players) p.cap = Math.min(POP_MAX, p.cap);
 }
 
-/** A walkable spot beside a building, on the side nearest to a point. */
-export function exitSpot(s: GameState, b: Building, towardX: number, towardY: number): { x: number; y: number } {
+/** A walkable spot beside a building, on the side nearest to a point (open water, for ships from a dock). */
+export function exitSpot(s: GameState, b: Building, towardX: number, towardY: number, pass = s.players[b.owner].team): { x: number; y: number } {
   let best: { x: number; y: number } | null = null;
   let bestD = Infinity;
   for (let ring = 0; ring < 6 && !best; ring++) {
@@ -136,7 +173,7 @@ export function exitSpot(s: GameState, b: Building, towardX: number, towardY: nu
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
         if (x !== x0 && x !== x1 && y !== y0 && y !== y1) continue;
-        if (!walkable(s, x, y, s.players[b.owner].team)) continue;
+        if (!walkable(s, x, y, pass)) continue;
         const dx = x + 0.5 - towardX;
         const dy = y + 0.5 - towardY;
         const d = dx * dx + dy * dy;
@@ -148,16 +185,17 @@ export function exitSpot(s: GameState, b: Building, towardX: number, towardY: nu
     }
   }
   if (best) return best;
-  const t = nearestWalkable(s, b.x, b.y + b.size, 20);
+  const t = nearestWalkable(s, b.x, b.y + b.size, 20, pass);
   return t >= 0 ? { x: (t % s.w) + 0.5, y: Math.floor(t / s.w) + 0.5 } : { x: b.x, y: b.y + b.size / 2 + 0.5 };
 }
 
-/** The nearest finished building of a player's that takes this resource. */
-export function nearestDrop(s: GameState, owner: number, res: string, x: number, y: number): Building | null {
+/** The nearest finished building of a player's that takes this resource (for boats, a dock). */
+export function nearestDrop(s: GameState, owner: number, res: string, x: number, y: number, naval = false): Building | null {
   let best: Building | null = null;
   let bestD = Infinity;
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.owner !== owner || !e.built || e.hp <= 0) continue;
+    if (naval !== (e.type === 'dock')) continue;
     if (!BUILDINGS[e.type].drop.includes(res as never)) continue;
     const d = distToRect(x, y, e);
     if (d < bestD) {

@@ -1,12 +1,12 @@
-import { AI_LEVELS, BUILDINGS, CARRY, DEER, DT, EPOCH_GATHER_BONUS, GATHER, PRIEST, secs } from './data';
+import { AI_LEVELS, BUILDINGS, CARRY, DEER, DT, EPOCH_GATHER_BONUS, FISH_CARRY, GATHER, MILITARY, PRIEST, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
-import { clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
+import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
 import type { Spatial } from './spatial';
 import { buildTimeFor, modsOf } from './stats';
 import type { Act, Animal, Building, Ent, GameState, Goal, Order, Res, Unit } from './types';
-import { R_BERRY, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
-import { exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, radiusOf, statsOf, teamOf } from './world';
+import { R_BERRY, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
+import { canHit, exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, passOf, radiusOf, statsOf, teamOf } from './world';
 
 /**
  * What units do each tick: follow their order (walk, gather and carry, farm, build, hunt, fight, heal,
@@ -22,9 +22,9 @@ const PATH_BUDGET = 60000;
 /** Defensive units chase no farther than this from where they stood. */
 const LEASH = 7;
 
-export const RES_OF_TILE: Record<number, Res> = { [R_TREE]: 'wood', [R_BERRY]: 'food', [R_STONE]: 'stone', [R_GOLD]: 'gold', [R_MEAT]: 'food' };
-const ACT_OF_TILE: Record<number, Act> = { [R_TREE]: 'chop', [R_BERRY]: 'forage', [R_STONE]: 'mine', [R_GOLD]: 'mine', [R_MEAT]: 'forage' };
-const RATE_OF_TILE: Record<number, number> = { [R_TREE]: GATHER.tree, [R_BERRY]: GATHER.berry, [R_STONE]: GATHER.stone, [R_GOLD]: GATHER.gold, [R_MEAT]: GATHER.meat };
+export const RES_OF_TILE: Record<number, Res> = { [R_TREE]: 'wood', [R_BERRY]: 'food', [R_STONE]: 'stone', [R_GOLD]: 'gold', [R_MEAT]: 'food', [R_FISH]: 'food' };
+const ACT_OF_TILE: Record<number, Act> = { [R_TREE]: 'chop', [R_BERRY]: 'forage', [R_STONE]: 'mine', [R_GOLD]: 'mine', [R_MEAT]: 'forage', [R_FISH]: 'fish' };
+const RATE_OF_TILE: Record<number, number> = { [R_TREE]: GATHER.tree, [R_BERRY]: GATHER.berry, [R_STONE]: GATHER.stone, [R_GOLD]: GATHER.gold, [R_MEAT]: GATHER.meat, [R_FISH]: GATHER.fish };
 
 export function setOrder(u: Unit, order: Order): void {
   u.order = order;
@@ -86,14 +86,16 @@ function gatherRate(s: GameState, u: Unit, kind: number | 'farm'): number {
   const ai = p.ai ? AI_LEVELS[p.ai].gather : 1;
   const base = kind === 'farm' ? GATHER.farm : RATE_OF_TILE[kind];
   const mod =
-    kind === 'farm' ? m.farm : kind === R_TREE ? m.wood : kind === R_STONE || kind === R_GOLD ? m.mine : kind === R_MEAT ? m.hunt * m.forage : m.forage;
+    kind === 'farm' ? m.farm : kind === R_TREE ? m.wood : kind === R_STONE || kind === R_GOLD ? m.mine : kind === R_MEAT ? m.hunt * m.forage : kind === R_FISH ? m.fish : m.forage;
   return base * mod * (1 + p.epoch * EPOCH_GATHER_BONUS) * ai;
 }
 
-const carryCap = (s: GameState, u: Unit) => CARRY[s.players[u.owner].epoch] + modsOf(s, u.owner).carry;
+const carryCap = (s: GameState, u: Unit) =>
+  u.type === 'fisher' ? FISH_CARRY[s.players[u.owner].epoch] : CARRY[s.players[u.owner].epoch] + modsOf(s, u.owner).carry;
 
-/** The nearest tile of a resource near a point that a citizen could stand beside, or -1. */
+/** The nearest tile of a resource near a point that a citizen (or, for fish, a boat) could reach, or -1. */
 export function findResource(s: GameState, kind: number, x: number, y: number, maxR: number): number {
+  const pass = kind === R_FISH ? NAVAL : -1;
   const cx = Math.floor(x);
   const cy = Math.floor(y);
   let best = -1;
@@ -108,7 +110,7 @@ export function findResource(s: GameState, kind: number, x: number, y: number, m
         const i = ty * s.w + tx;
         if (s.res[i] !== kind) continue;
         let open = false;
-        for (let oy = -1; oy <= 1 && !open; oy++) for (let ox = -1; ox <= 1; ox++) if ((ox || oy) && walkable(s, tx + ox, ty + oy)) open = true;
+        for (let oy = -1; oy <= 1 && !open; oy++) for (let ox = -1; ox <= 1; ox++) if ((ox || oy) && walkable(s, tx + ox, ty + oy, pass)) open = true;
         if (!open) continue;
         const ddx = tx + 0.5 - x;
         const ddy = ty + 0.5 - y;
@@ -140,7 +142,7 @@ function dropOff(s: GameState, u: Unit): 'done' | 'going' | 'none' {
   if (!u.carryRes || u.carry <= 0) return 'done';
   // On the way: the route ends beside the drop site, so look again only now and then (in case it fell).
   if (walking(u) && (s.tick + u.id) % 20 !== 0) return 'going';
-  const drop = nearestDrop(s, u.owner, u.carryRes, u.x, u.y);
+  const drop = nearestDrop(s, u.owner, u.carryRes, u.x, u.y, u.type === 'fisher');
   if (!drop) return 'none';
   const r = statsOf(s, u).radius;
   if (distToRect(u.x, u.y, drop) - r <= REACH) {
@@ -173,11 +175,11 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
   }
   const kind = s.res[o.tile];
   if (kind === R_NONE || RES_OF_TILE[kind] !== o.res) {
-    // Run out: the next one nearby of the same kind (game first, then berries, for food).
-    const wants = o.res === 'wood' ? [R_TREE] : o.res === 'food' ? [R_MEAT, R_BERRY] : o.res === 'stone' ? [R_STONE] : [R_GOLD];
+    // Run out: the next one nearby of the same kind (game first, then berries, for food; boats fish).
+    const wants = u.type === 'fisher' ? [R_FISH] : o.res === 'wood' ? [R_TREE] : o.res === 'food' ? [R_MEAT, R_BERRY] : o.res === 'stone' ? [R_STONE] : [R_GOLD];
     let next = -1;
     for (const want of wants) {
-      next = findResource(s, want, (o.tile % s.w) + 0.5, Math.floor(o.tile / s.w) + 0.5, want === R_MEAT ? 5 : 8);
+      next = findResource(s, want, (o.tile % s.w) + 0.5, Math.floor(o.tile / s.w) + 0.5, want === R_MEAT ? 5 : want === R_FISH ? 12 : 8);
       if (next >= 0) break;
     }
     if (next >= 0) {
@@ -404,8 +406,9 @@ function buildStep(s: GameState, u: Unit, o: Extract<Order, { k: 'build' }>): vo
 function findTarget(s: GameState, sp: Spatial, u: Unit, r: number, buildings: boolean): Ent | null {
   if (peace(s)) return null;
   const st = statsOf(s, u);
+  if (st.attack <= 0) return null;
   if (!st.buildingsOnly) {
-    const t = nearestEnemyUnit(s, sp, u.owner, u.x, u.y, r);
+    const t = nearestEnemyUnit(s, sp, u.owner, u.x, u.y, r, (o) => canHit(s, u, o));
     if (t || !buildings) return t;
   }
   if (!buildings && !st.buildingsOnly) return null;
@@ -442,7 +445,7 @@ function attackStep(s: GameState, sp: Spatial, u: Unit, o: Extract<Order, { k: '
     } else done();
     return;
   }
-  if (st.buildingsOnly && t.kind === 'unit' && t.type !== 'siege') {
+  if (!canHit(s, u, t)) {
     done();
     return;
   }
@@ -470,7 +473,7 @@ function attackStep(s: GameState, sp: Spatial, u: Unit, o: Extract<Order, { k: '
       const dx = u.x - t.x;
       const dy = u.y - t.y;
       const l = Math.sqrt(dx * dx + dy * dy) || 1;
-      if (!walking(u)) goTo(u, goalForPoint(s, u.x + (dx / l) * 3, u.y + (dy / l) * 3, teamOf(s, u.owner)));
+      if (!walking(u)) goTo(u, goalForPoint(s, u.x + (dx / l) * 3, u.y + (dy / l) * 3, passOf(s, u)));
       return;
     }
     if (walking(u)) stopWalking(u);
@@ -487,22 +490,29 @@ function attackStep(s: GameState, sp: Spatial, u: Unit, o: Extract<Order, { k: '
     return;
   }
   // Chase: straight at it when close and clear, otherwise by route, refreshed as it moves.
-  const team = teamOf(s, u.owner);
+  const team = passOf(s, u);
   const tr = radiusOf(s, t);
-  if (t.kind === 'unit' && d < 2.5 && lineClear(s, u.x, u.y, t.x, t.y, team)) {
+  if (t.kind === 'unit' && (d < 2.5 || team === AIR) && lineClear(s, u.x, u.y, t.x, t.y, team)) {
     u.path = [t.x - u.fx * tr * 0.5, t.y - u.fy * tr * 0.5];
     u.pathI = 0;
     u.wantPath = false;
     u.goal = goalForPoint(s, t.x, t.y, team);
     return;
   }
-  const g = t.kind === 'building' ? goalForBuilding(t) : chaseGoal(t, st.range);
+  // Archers and ships close in only as far as their reach; others go right up to a building.
+  const g = t.kind === 'building' ? (st.range > 1.5 ? reachGoal(t, st.range) : goalForBuilding(t)) : chaseGoal(t, st.range);
   const moved = u.goal ? Math.abs(u.goal.px - g.px) + Math.abs(u.goal.py - g.py) : 99;
   if (walking(u) && moved > 1.5 && s.tick - u.pathTick > 10) {
     goTo(u, g);
     return;
   }
   if (!approach(u, g)) done();
+}
+
+/** Anywhere within most of a missile's reach of a building. */
+function reachGoal(b: Building, range: number): Goal {
+  const r = Math.max(1, Math.floor(range * 0.7));
+  return { x0: b.tx - r, y0: b.ty - r, x1: b.tx + b.size - 1 + r, y1: b.ty + b.size - 1 + r, px: b.x, py: b.y };
 }
 
 function chaseGoal(t: Unit, range: number): Goal {
@@ -525,7 +535,7 @@ export function garrisonRoom(b: Building): number {
 
 function garrisonStep(s: GameState, u: Unit, o: Extract<Order, { k: 'garrison' }>): void {
   const b = s.byId.get(o.target);
-  if (!b || b.kind !== 'building' || b.hp <= 0 || !b.built || b.owner !== u.owner || garrisonRoom(b) <= 0 || u.type === 'siege') {
+  if (!b || b.kind !== 'building' || b.hp <= 0 || !b.built || b.owner !== u.owner || garrisonRoom(b) <= 0 || u.type === 'siege' || domainOf(u.type) !== 'land') {
     setOrder(u, { k: 'idle' });
     return;
   }
@@ -590,8 +600,7 @@ function huntStep(s: GameState, u: Unit, o: Extract<Order, { k: 'hunt' }>): void
     }
     return;
   }
-  const team = teamOf(s, u.owner);
-  const g = goalForPoint(s, a.x, a.y, team);
+  const g = goalForPoint(s, a.x, a.y, passOf(s, u));
   const moved = u.goal ? Math.abs(u.goal.px - g.px) + Math.abs(u.goal.py - g.py) : 99;
   if (walking(u) && moved > 1.5 && s.tick - u.pathTick > 15) {
     goTo(u, g);
@@ -688,6 +697,161 @@ function woundedNear(s: GameState, sp: Spatial, u: Unit, r: number): Unit | null
   return best;
 }
 
+// ---- Transports ------------------------------------------------------------------------------------
+
+/** Room left aboard a transport. */
+export function cargoRoom(s: GameState, ship: Unit): number {
+  return (statsOf(s, ship).capacity ?? 0) - ship.cargo.length;
+}
+
+/** Walk to the shore by a transport and step aboard. */
+function boardStep(s: GameState, u: Unit, o: Extract<Order, { k: 'board' }>): void {
+  const t = s.byId.get(o.target);
+  if (!t || t.kind !== 'unit' || t.hp <= 0 || t.owner !== u.owner || t.type !== 'transport' || domainOf(u.type) !== 'land' || cargoRoom(s, t) <= 0) {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  const dx = t.x - u.x;
+  const dy = t.y - u.y;
+  if (Math.sqrt(dx * dx + dy * dy) <= statsOf(s, t).radius + statsOf(s, u).radius + 1.2) {
+    stopWalking(u);
+    u.inside = t.id;
+    u.x = t.x;
+    u.y = t.y;
+    u.px = u.x;
+    u.py = u.y;
+    t.cargo.push(u.id);
+    setOrder(u, { k: 'idle' });
+    s.events.push({ k: 'garrison', owner: u.owner, building: t.id, inside: true });
+    return;
+  }
+  // The shore nearest the ship, aimed afresh as it moves; once there, wait for it to come in.
+  const g = goalForPoint(s, t.x, t.y, passOf(s, u));
+  const gx = g.px - u.x;
+  const gy = g.py - u.y;
+  if (gx * gx + gy * gy < 1.5 * 1.5) {
+    if (walking(u)) stopWalking(u);
+    face(u, t.x, t.y);
+    return;
+  }
+  const moved = u.goal ? Math.abs(u.goal.px - g.px) + Math.abs(u.goal.py - g.py) : 99;
+  if (walking(u) && moved > 1.5 && s.tick - u.pathTick > 10) {
+    goTo(u, g);
+    return;
+  }
+  if (!approach(u, g)) setOrder(u, { k: 'idle' });
+}
+
+/** The open water nearest a point with land beside it, where a transport can put people ashore. */
+export function coastNear(s: GameState, x: number, y: number, maxR = 14): { x: number; y: number } | null {
+  const cx = Math.floor(x);
+  const cy = Math.floor(y);
+  let best: { x: number; y: number } | null = null;
+  let bestD = Infinity;
+  for (let r = 0; r <= maxR; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const tx = cx + dx;
+        const ty = cy + dy;
+        if (!walkable(s, tx, ty, NAVAL)) continue;
+        let land = false;
+        for (let oy = -1; oy <= 1 && !land; oy++) for (let ox = -1; ox <= 1; ox++) if ((ox || oy) && walkable(s, tx + ox, ty + oy)) land = true;
+        if (!land) continue;
+        const ddx = tx + 0.5 - x;
+        const ddy = ty + 0.5 - y;
+        const d = ddx * ddx + ddy * ddy;
+        if (d < bestD) {
+          bestD = d;
+          best = { x: tx + 0.5, y: ty + 0.5 };
+        }
+      }
+    }
+    if (best) return best;
+  }
+  return null;
+}
+
+/** Everyone off a transport, onto the land beside it. Returns how many got off. */
+export function unloadAll(s: GameState, ship: Unit): number {
+  if (!ship.cargo.length) return 0;
+  // Land tiles near the ship, nearest first.
+  const spots: { x: number; y: number; d: number }[] = [];
+  const cx = Math.floor(ship.x);
+  const cy = Math.floor(ship.y);
+  for (let dy = -2; dy <= 2; dy++) {
+    for (let dx = -2; dx <= 2; dx++) {
+      const tx = cx + dx;
+      const ty = cy + dy;
+      if (!walkable(s, tx, ty, teamOf(s, ship.owner))) continue;
+      const ex = tx + 0.5 - ship.x;
+      const ey = ty + 0.5 - ship.y;
+      spots.push({ x: tx + 0.5, y: ty + 0.5, d: ex * ex + ey * ey });
+    }
+  }
+  if (!spots.length) return 0;
+  spots.sort((a, b) => a.d - b.d || a.x - b.x || a.y - b.y);
+  let n = 0;
+  for (const id of ship.cargo) {
+    const u = s.byId.get(id);
+    if (!u || u.kind !== 'unit') continue;
+    const at = spots[n % Math.min(spots.length, 4)];
+    u.inside = 0;
+    u.x = at.x + ((n % 3) - 1) * 0.22;
+    u.y = at.y + ((Math.floor(n / 3) % 3) - 1) * 0.22;
+    u.px = u.x;
+    u.py = u.y;
+    u.guardX = u.x;
+    u.guardY = u.y;
+    setOrder(u, { k: 'idle' });
+    n++;
+  }
+  ship.cargo = [];
+  s.events.push({ k: 'garrison', owner: ship.owner, building: ship.id, inside: false });
+  return n;
+}
+
+/** A transport sails to the shore nearest a point and lands everyone there. */
+function unloadStep(s: GameState, u: Unit, o: Extract<Order, { k: 'unload' }>): void {
+  if (!u.cargo.length) {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  const coast = coastNear(s, o.x, o.y);
+  if (!coast) {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  const dx = coast.x - u.x;
+  const dy = coast.y - u.y;
+  if (dx * dx + dy * dy <= 1.6 * 1.6) {
+    stopWalking(u);
+    if (unloadAll(s, u) > 0) setOrder(u, { k: 'idle' });
+    else if (!approach(u, goalForPoint(s, coast.x, coast.y, NAVAL))) setOrder(u, { k: 'idle' });
+    return;
+  }
+  if (!approach(u, goalForPoint(s, coast.x, coast.y, NAVAL))) {
+    // Couldn't get there: land them wherever we are, if there is shore here.
+    unloadAll(s, u);
+    setOrder(u, { k: 'idle' });
+  }
+}
+
+/** Passengers ride along (so they see what the ship sees, and fall with it). */
+export function carryCargo(s: GameState): void {
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.type !== 'transport' || !e.cargo.length) continue;
+    for (const id of e.cargo) {
+      const u = s.byId.get(id);
+      if (!u || u.kind !== 'unit') continue;
+      u.x = e.x;
+      u.y = e.y;
+      u.px = e.x;
+      u.py = e.y;
+    }
+  }
+}
+
 // ---- The decision each tick ------------------------------------------------------------------------
 
 /** One unit's decision for this tick. */
@@ -698,7 +862,7 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
   // Next in line, once the current order is done.
   if (u.order.k === 'idle' && u.queue.length) setOrder(u, u.queue.shift()!);
   const o = u.order;
-  const military = u.type !== 'citizen' && u.type !== 'priest';
+  const military = MILITARY.includes(u.type);
   switch (o.k) {
     case 'idle':
       u.guardX = u.x;
@@ -716,7 +880,7 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
     case 'move':
       if (!o.started) {
         o.started = true;
-        goTo(u, goalForPoint(s, o.x, o.y, teamOf(s, u.owner)));
+        goTo(u, goalForPoint(s, o.x, o.y, passOf(s, u)));
       }
       if (o.amove && military && (s.tick + u.id) % 6 === 0) {
         const t = findTarget(s, sp, u, statsOf(s, u).sight, true);
@@ -754,6 +918,12 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
     case 'heal':
       healStep(s, u, o);
       break;
+    case 'board':
+      boardStep(s, u, o);
+      break;
+    case 'unload':
+      unloadStep(s, u, o);
+      break;
   }
 }
 
@@ -764,7 +934,7 @@ export function routeUnits(s: GameState): void {
     if (e.kind !== 'unit' || !e.wantPath || e.hp <= 0 || !e.goal || e.inside) continue;
     if (budget <= 0) break;
     const g = e.goal;
-    const team = teamOf(s, e.owner);
+    const team = passOf(s, e);
     e.pathTick = s.tick;
     e.wantPath = false;
     e.pathI = 0;
@@ -814,8 +984,9 @@ export function separate(s: GameState, sp: Spatial): void {
   for (const u of s.ents) {
     if (u.kind !== 'unit' || u.hp <= 0 || u.inside) continue;
     const ru = statsOf(s, u).radius;
-    sp.near(u.x, u.y, 1, (o) => {
-      if (o.id <= u.id || o.hp <= 0) return;
+    const dom = domainOf(u.type);
+    sp.near(u.x, u.y, 1.2, (o) => {
+      if (o.id <= u.id || o.hp <= 0 || domainOf(o.type) !== dom) return;
       const ro = statsOf(s, o).radius;
       const r = ru + ro;
       let dx = o.x - u.x;
@@ -847,9 +1018,11 @@ export function separate(s: GameState, sp: Spatial): void {
 export function collide(s: GameState, u: Unit): void {
   if (u.inside) return;
   const r = statsOf(s, u).radius;
-  const team = teamOf(s, u.owner);
+  const team = passOf(s, u);
   u.x = Math.max(r, Math.min(s.w - r, u.x));
   u.y = Math.max(r, Math.min(s.h - r, u.y));
+  // Aircraft fly over everything.
+  if (team === AIR) return;
   const cx = Math.floor(u.x);
   const cy = Math.floor(u.y);
   if (!walkable(s, cx, cy, team)) {
@@ -885,7 +1058,7 @@ export function collide(s: GameState, u: Unit): void {
 
 /** Notice units that keep walking into a wall, and route them again. */
 export function checkStuck(s: GameState, u: Unit): void {
-  if (!u.path) {
+  if (!u.path || domainOf(u.type) === 'air') {
     u.stuck = 0;
     return;
   }

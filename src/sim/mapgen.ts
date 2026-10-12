@@ -1,7 +1,7 @@
 import { AMOUNT, MAP_SIZES } from './data';
 import { fbm, mulberry32, type Rng } from './rng';
 import type { MapSize, MapType } from './types';
-import { B_RES, B_TERRAIN, R_BERRY, R_GOLD, R_NONE, R_STONE, R_TREE, T_GRASS, T_ROCK, T_SAND, T_WATER } from './types';
+import { B_RES, B_TERRAIN, R_BERRY, R_FISH, R_GOLD, R_NONE, R_STONE, R_TREE, T_GRASS, T_ROCK, T_SAND, T_WATER } from './types';
 
 /**
  * World generation: rolling grassland with lakes, rocky ridges and woods (more or less of each by map
@@ -28,7 +28,11 @@ const RECIPES: Record<MapType, Recipe> = {
   lakes: { water: 0.43, rockE: 0.68, ridge: 0.66, relief: 0.9, forest: 0.62, forest2: 0.58, scatter: 0.9, herds: 1, berries: 1 },
   forest: { water: 0.3, rockE: 0.62, ridge: 0.62, relief: 1, forest: 0.48, forest2: 0.45, scatter: 0.78, herds: 0.8, berries: 1 },
   plains: { water: 0.27, rockE: 0.72, ridge: 0.7, relief: 0.6, forest: 0.72, forest2: 0.69, scatter: 0.95, herds: 2, berries: 1.6 },
+  sea: { water: 0.3, rockE: 0.72, ridge: 0.7, relief: 0.8, forest: 0.6, forest2: 0.56, scatter: 0.88, herds: 1, berries: 1 },
 };
+
+/** How much of the middle of the map an inland sea takes (as a fraction of the map's width). */
+const SEA_RADIUS = 0.25;
 
 export interface MapData {
   w: number;
@@ -111,6 +115,15 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
       let e = fbm(x / 24, y / 24, salt, 4);
       const ridge = fbm(x / 13, y / 13, salt + 7, 3);
       const d = startDist(x, y);
+      if (type === 'sea') {
+        // A great sea in the middle with a ragged coast, and dry land all round it.
+        const cx = x + 0.5 - w / 2;
+        const cy = y + 0.5 - h / 2;
+        const r = Math.sqrt(cx * cx + cy * cy) / w;
+        const coast = SEA_RADIUS + (fbm(x / 10, y / 10, salt + 61, 2) - 0.5) * 0.08;
+        if (r < coast) e = Math.min(e, WL - 0.02 - (coast - r) * 1.5);
+        else e = Math.max(e, WL + 0.03 + (r - coast) * 0.4);
+      }
       // Starting spots are kept as open, middling ground.
       const keep = d < 12 ? 1 : d < 20 ? (20 - d) / 8 : 0;
       e = e * (1 - keep) + 0.5 * keep;
@@ -402,6 +415,90 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
         }
       }
     }
+  }
+
+  // Fish: shoals in open water near a shore, in lakes and seas big enough to sail (and some near every
+  // start where there is such water). They use their own dice, so the rest of the land is unchanged.
+  const frng = mulberry32(seed ^ 0x5eaf15);
+  const body = new Int32Array(w * h).fill(-1);
+  const bodySize: number[] = [];
+  for (let i = 0; i < w * h; i++) {
+    if (terrain[i] !== T_WATER || body[i] >= 0) continue;
+    const id = bodySize.length;
+    let count = 0;
+    const queue = [i];
+    body[i] = id;
+    for (let q = 0; q < queue.length; q++) {
+      const c = queue[q];
+      count++;
+      const cx = c % w;
+      const cy = (c - cx) / w;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = cx + dx;
+        const ny = cy + dy;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const ni = ny * w + nx;
+        if (terrain[ni] !== T_WATER || body[ni] >= 0) continue;
+        body[ni] = id;
+        queue.push(ni);
+      }
+    }
+    bodySize.push(count);
+  }
+  const landNear = (x: number, y: number, r: number) => {
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx >= 0 && ny >= 0 && nx < w && ny < h && terrain[ny * w + nx] !== T_WATER) return true;
+    }
+    return false;
+  };
+  /** A water tile fit for a shoal: in big water, not hugging the shore, but near one. */
+  const fishable = (x: number, y: number) => {
+    if (x < 2 || y < 2 || x >= w - 2 || y >= h - 2) return false;
+    const i = y * w + x;
+    if (terrain[i] !== T_WATER || res[i] !== R_NONE || bodySize[body[i]] < 60) return false;
+    return !landNear(x, y, 1) && landNear(x, y, 4);
+  };
+  const shoal = (cx: number, cy: number, count: number) => {
+    let placed = 0;
+    for (let k = 0; k < count * 8 && placed < count; k++) {
+      const x = cx + Math.floor(frng() * 5) - 2;
+      const y = cy + Math.floor(frng() * 5) - 2;
+      if (!fishable(x, y)) continue;
+      // Shoals keep a tile apart so boats can get between them.
+      let crowded = false;
+      for (let dy = -1; dy <= 1 && !crowded; dy++) for (let dx = -1; dx <= 1; dx++) if (res[(y + dy) * w + x + dx] === R_FISH) crowded = true;
+      if (crowded) continue;
+      res[y * w + x] = R_FISH;
+      amount[y * w + x] = AMOUNT.fish;
+      placed++;
+    }
+    return placed;
+  };
+  // Near every start, if there is sailable water within reach: the nearest fit spot.
+  for (const st of starts) {
+    let best = -1;
+    let bestD = 26 * 26;
+    for (let y = Math.max(0, st.y - 26); y < Math.min(h, st.y + 26); y++) {
+      for (let x = Math.max(0, st.x - 26); x < Math.min(w, st.x + 26); x++) {
+        if (!fishable(x, y)) continue;
+        const d = (x - st.x) * (x - st.x) + (y - st.y) * (y - st.y);
+        if (d < bestD) {
+          bestD = d;
+          best = y * w + x;
+        }
+      }
+    }
+    if (best >= 0) shoal(best % w, Math.floor(best / w), 4);
+  }
+  // And scattered over the open water.
+  const shoals = Math.round((n / (type === 'sea' ? 7 : 22)) * more);
+  for (let k = 0, guard = 0; k < shoals && guard < shoals * 60; guard++) {
+    const x = 2 + Math.floor(frng() * (w - 4));
+    const y = 2 + Math.floor(frng() * (h - 4));
+    if (!fishable(x, y)) continue;
+    if (shoal(x, y, 2 + Math.floor(frng() * 2)) > 0) k++;
   }
 
   // Resources nobody could stand next to are cleared away.

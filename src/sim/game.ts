@@ -2,14 +2,14 @@ import { aiStep } from './ai';
 import { hitAnimal, spawnAnimal, updateAnimals } from './animals';
 import { buildingGuns, updateShots } from './combat';
 import { applyCommand } from './commands';
-import { AURA, CIV_IDS, DEATHMATCH_RES, EPOCHS, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
-import { stampBuilding } from './grid';
+import { AURA, CIV_IDS, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
+import { AIR, NAVAL, stampBuilding } from './grid';
 import { generateMap } from './mapgen';
 import { Spatial } from './spatial';
 import { modsOf, statsFor } from './stats';
 import type { Building, CivId, Command, Difficulty, GameMode, GameState, MapSize, MapType, Player } from './types';
-import { RES, R_NONE } from './types';
-import { RES_OF_TILE, checkStuck, collide, routeUnits, separate, setOrder, think, ungarrison, walk } from './units';
+import { RES, R_FISH, R_NONE } from './types';
+import { RES_OF_TILE, carryCargo, checkStuck, collide, findResource, routeUnits, separate, setOrder, think, ungarrison, walk } from './units';
 import { updateVision } from './vision';
 import { countPop, exitSpot, maxHp, placeBuilding, spawnUnit } from './world';
 
@@ -226,15 +226,23 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
   }
   b.queue.shift();
   const toward = b.rally ?? { x: s.w / 2, y: s.h / 2 };
-  const spot = exitSpot(s, b, toward.x, toward.y);
+  const domain = domainOf(unit);
+  // Ships put out onto the water by their dock; aircraft take off from anywhere about the field.
+  const spot = exitSpot(s, b, toward.x, toward.y, domain === 'water' ? NAVAL : domain === 'air' ? AIR : undefined);
   const u = spawnUnit(s, p.id, unit, spot.x, spot.y);
   p.pop++;
   p.stats.trained++;
   s.events.push({ k: 'trained', id: u.id, owner: p.id, type: unit });
+  const fishing = (t: number) => u.type === 'fisher' && t >= 0 && s.res[t] === R_FISH;
+  const working = (t: number) => u.type === 'citizen' && t >= 0 && s.res[t] !== R_NONE && s.res[t] !== R_FISH;
   if (b.rally) {
     const t = b.rally.tile;
-    if (t >= 0 && u.type === 'citizen' && s.res[t] !== R_NONE) setOrder(u, { k: 'gather', tile: t, res: RES_OF_TILE[s.res[t]], phase: 'go' });
+    if (working(t) || fishing(t)) setOrder(u, { k: 'gather', tile: t, res: RES_OF_TILE[s.res[t]], phase: 'go' });
     else setOrder(u, { k: 'move', x: b.rally.x, y: b.rally.y, amove: false, started: false });
+  } else if (u.type === 'fisher') {
+    // Fishing boats go straight to the nearest shoal.
+    const t = findResource(s, R_FISH, b.x, b.y, 16);
+    if (t >= 0) setOrder(u, { k: 'gather', tile: t, res: 'food', phase: 'go' });
   }
 }
 
@@ -255,6 +263,11 @@ function auras(s: GameState, sp: Spatial): void {
 }
 
 function removeDead(s: GameState): void {
+  // Passengers go down with their ship.
+  for (const e of s.ents) if (e.kind === 'unit' && e.hp <= 0 && e.cargo.length) for (const id of e.cargo) {
+    const c = s.byId.get(id);
+    if (c) c.hp = 0;
+  }
   let any = false;
   for (const e of s.ents) {
     if (e.hp > 0) continue;
@@ -270,6 +283,7 @@ function removeDead(s: GameState): void {
       if (e.inside) {
         const b = s.byId.get(e.inside);
         if (b && b.kind === 'building') b.garrison = b.garrison.filter((id) => id !== e.id);
+        else if (b && b.kind === 'unit') b.cargo = b.cargo.filter((id) => id !== e.id);
       }
       s.events.push({ k: 'die', id: e.id, owner: e.owner, type: e.type, x: e.x, y: e.y, building: false, size: 1, epoch: p.epoch, fx: e.fx, fy: e.fy });
     }
@@ -357,6 +371,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
     collide(s, e);
     checkStuck(s, e);
   }
+  carryCargo(s);
   updateShots(s, sp, (a, damage, x, y) => hitAnimal(s, a, damage, x, y));
   removeDead(s);
   if (s.tick % 4 === 0) updateVision(s);

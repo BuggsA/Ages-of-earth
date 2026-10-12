@@ -24,6 +24,7 @@ const STYLES: Style[] = [
   { wall: '#dbb07e', wall2: '#c99a66', roof: '#bb5f37', roof2: '#a24c2a', trim: '#f0e4c8', base: '#b9a58a', post: '#8a6a44', window: '#3a2b20' },
   { wall: '#ece4d2', wall2: '#a9a397', roof: '#56616f', roof2: '#47515d', trim: '#4a3426', base: '#9a948a', post: '#4a3426', window: '#2c3440' },
   { wall: '#b45c42', wall2: '#efe8da', roof: '#713c2d', roof2: '#5c3024', trim: '#f2ece0', base: '#8d8579', post: '#4a3426', window: '#3b4a5a' },
+  { wall: '#8a3c2c', wall2: '#d8d0c0', roof: '#4a5058', roof2: '#3a4048', trim: '#e8e2d4', base: '#7a756c', post: '#3a3a3e', window: '#2c3440' },
 ];
 
 const TEAM = '#f4f4f4';
@@ -355,7 +356,7 @@ function stable(k: Kit, e: number, st: Style): void {
   const wall = e >= 2 ? st.wall : st.wall2;
   k.box(2.7, 0.7, 1.3, wall, 0, 0, -0.65);
   if (e === 2) for (const x of [-1.3, -0.65, 0, 0.65, 1.3]) k.box(0.05, 0.7, 1.32, st.trim, x, 0, -0.65);
-  if (e === 3) k.box(2.76, 0.06, 1.36, st.trim, 0, 0.7, -0.65);
+  if (e >= 3) k.box(2.76, 0.06, 1.36, st.trim, 0, 0.7, -0.65);
   k.prism(2.85, 0.6, 1.6, st.roof, 0, 0.7, -0.55);
   for (let i = 0; i < 4; i++) {
     const x = -1.0 + i * 0.66;
@@ -421,7 +422,7 @@ function forge(k: Kit, e: number, st: Style): void {
   pad(k, 3, st.base);
   const wall = e >= 2 ? STONE : st.wall;
   // A smithy with a roaring furnace, a tall chimney and an anvil out front.
-  k.box(2.3, 0.95, 1.3, e === 3 ? st.wall : wall, -0.2, 0, -0.6);
+  k.box(2.3, 0.95, 1.3, e >= 3 ? st.wall : wall, -0.2, 0, -0.6);
   if (e === 2) for (const x of [-1.2, -0.6, 0, 0.6, 0.8]) k.box(0.05, 0.95, 1.32, st.trim, x, 0, -0.6);
   k.box(2.36, 0.06, 1.36, st.trim, -0.2, 0.95, -0.6);
   if (e === 1 || e === 0) k.box(2.3, 0.1, 1.3, st.roof, -0.2, 1.0, -0.6);
@@ -432,9 +433,9 @@ function forge(k: Kit, e: number, st: Style): void {
   k.box(0.7, 0.4, 0.5, '#5a4c40', 0.8, 0, 0.1);
   k.glow(k.box(0.36, 0.16, 0.06, '#ff7a2a', 0.8, 0.12, 0.36));
   // The chimney.
-  k.box(0.42, 2.0, 0.42, e === 3 ? st.wall : STONE, 0.95, 0, -0.75);
+  k.box(0.42, 2.0, 0.42, e >= 3 ? st.wall : STONE, 0.95, 0, -0.75);
   k.box(0.5, 0.1, 0.5, '#5a544c', 0.95, 2.0, -0.75);
-  if (e === 3) {
+  if (e >= 3) {
     k.box(0.32, 1.7, 0.32, st.wall, -1.0, 0.9, -0.85);
     k.box(0.4, 0.08, 0.4, '#5a544c', -1.0, 2.6, -0.85);
   }
@@ -483,7 +484,7 @@ function workshop(k: Kit, e: number, st: Style): void {
   jib.rotation.x = 0.35;
   k.cyl(0.006, 0.006, 0.7, 3, '#d8d0b8', -1.1, 0.85, 0.2);
   k.box(0.16, 0.16, 0.16, STONE, -1.1, 0.7, 0.2);
-  if (e === 3) {
+  if (e >= 3) {
     k.cyl(0.09, 0.1, 0.12, 8, IRON_DARK, 0.6, 0, 0.5);
     k.cyl(0.06, 0.07, 0.6, 8, IRON_DARK, 0.6, 0.1, 0.75).rotation.x = Math.PI / 2;
   }
@@ -564,7 +565,7 @@ function market(k: Kit, e: number, st: Style): void {
   if (e >= 2) {
     // A covered market hall on arches behind the stalls.
     k.box(2.6, 0.12, 1.2, st.wall2, 0, 0.95, -0.75);
-    for (const x of [-1.2, -0.4, 0.4, 1.2]) for (const z of [-1.25, -0.25]) k.box(0.18, 0.95, 0.18, e === 3 ? st.wall2 : STONE, x, 0, z);
+    for (const x of [-1.2, -0.4, 0.4, 1.2]) for (const z of [-1.25, -0.25]) k.box(0.18, 0.95, 0.18, e >= 3 ? st.wall2 : STONE, x, 0, z);
     k.box(2.6, 0.7, 1.2, st.wall, 0, 1.07, -0.75);
     if (e === 2) for (const x of [-1.0, -0.5, 0, 0.5, 1.0]) k.box(0.05, 0.7, 1.22, st.trim, x, 1.07, -0.75);
     k.prism(2.7, 0.6, 1.35, st.roof, 0, 1.77, -0.75);
@@ -591,6 +592,10 @@ function market(k: Kit, e: number, st: Style): void {
 // ---- Wonder ----------------------------------------------------------------------------------------
 
 function wonder(k: Kit, e: number, st: Style): void {
+  if (e >= 4) {
+    ironTower(k, st);
+    return;
+  }
   pad(k, 5, st.base);
   if (e === 0) {
     // A great henge: two rings of standing stones with lintels round an altar fire.
@@ -735,7 +740,7 @@ function wall(k: Kit, e: number, st: Style, mask: number): void {
       const oz = dx !== 0 ? side * 0.18 : 0;
       k.box(dx ? 0.12 : 0.08, 0.16, dz ? 0.12 : 0.08, c, dx * 0.32 + ox, top, dz * 0.32 + oz);
     }
-    if (e === 3) k.box(dx ? 0.5 : 0.46, 0.05, dz ? 0.5 : 0.46, st.trim, dx * 0.25, top * 0.35, dz * 0.25);
+    if (e >= 3) k.box(dx ? 0.5 : 0.46, 0.05, dz ? 0.5 : 0.46, st.trim, dx * 0.25, top * 0.35, dz * 0.25);
   }
 }
 
@@ -768,8 +773,134 @@ function gate(k: Kit, e: number, st: Style): void {
   if (e >= 2) banner(k, 0.72, h + 0.06, 0, 0.6, 0.8);
 }
 
+// ---- Dock ------------------------------------------------------------------------------------------
+
+/** A dock on the shore: a building on land and a pier out over the water (+z; turned to face the water). */
+function dock(k: Kit, e: number, st: Style): void {
+  pad(k, 3, st.base);
+  const deck = e >= 3 ? '#6e5a44' : WOOD;
+  // The pier, on posts, reaching out over the water.
+  k.box(1.1, 0.08, 1.9, deck, 0.4, 0.12, 1.55);
+  for (const x of [-0.1, 0.9]) for (let i = 0; i < 4; i++) k.cyl(0.05, 0.05, 0.6, 5, e >= 3 ? '#3a3a3e' : st.post, x, -0.45, 0.8 + i * 0.6);
+  for (let i = 0; i < 3; i++) k.cyl(0.05, 0.06, 0.14, 6, e >= 4 ? '#2b2b2e' : st.post, 0.95, 0.2, 0.9 + i * 0.6);
+  if (e === 0) {
+    // Reed huts, nets drying on a frame, a canoe on the bank.
+    hut(k, st, -0.6, -0.5, 0.55, 0.5);
+    for (const x of [-1.2, -0.4]) k.cyl(0.025, 0.025, 0.55, 4, st.post, x, 0, 0.6);
+    k.box(0.85, 0.3, 0.02, '#d8d0b8', -0.8, 0.22, 0.6);
+    k.box(0.2, 0.06, 0.8, '#6e4f33', 0.9, 0.0, -0.8);
+  } else {
+    // A boathouse or warehouse by the water.
+    const wall = e === 1 ? st.wall : e === 2 ? st.wall : st.wall;
+    k.box(1.6, e >= 3 ? 1.1 : 0.85, 1.4, wall, -0.55, 0, -0.55);
+    if (e === 2) for (const x of [-1.3, -0.8, -0.3, 0.2]) k.box(0.05, 0.85, 1.42, st.trim, x, 0, -0.55);
+    k.box(1.66, 0.06, 1.46, st.trim, -0.55, e >= 3 ? 1.1 : 0.85, -0.55);
+    if (e === 1) k.box(1.6, 0.08, 1.4, st.roof, -0.55, 0.91, -0.55);
+    else k.prism(1.7, 0.55, 1.5, st.roof, -0.55, e >= 3 ? 1.16 : 0.91, -0.55);
+    k.box(0.5, 0.6, 0.04, '#3a2b20', -0.55, 0, 0.16);
+    window(k, st, -1.05, 0.45, 0.16);
+    k.team(k.box(1.62, 0.08, 0.04, TEAM, -0.55, e >= 3 ? 0.98 : 0.72, 0.17));
+    // A crane over the pier for later epochs.
+    if (e >= 2) {
+      const iron = e >= 4;
+      k.cyl(0.05, 0.06, 1.4, 6, iron ? '#3a3e44' : WOOD, 0.9, 0.12, 0.6);
+      const jib = k.box(0.05, 0.05, 1.0, iron ? '#3a3e44' : WOOD, 0.9, 1.35, 1.0);
+      jib.rotation.x = 0.25;
+      k.cyl(0.006, 0.006, 0.6, 3, '#d8d0b8', 0.9, 0.85, 1.42);
+      k.box(0.18, 0.14, 0.18, '#8a6440', 0.9, 0.7, 1.42);
+    }
+  }
+  // Barrels and a coil of rope; a team flag at the pier's end.
+  for (const [x, z] of [[0.15, 0.2], [0.35, 0.3]]) k.cyl(0.1, 0.09, 0.22, 8, '#8a6440', x, 0.0, z);
+  k.cyl(0.02, 0.02, 0.8, 4, '#5b4330', 0.0, 0.2, 2.35);
+  k.team(k.box(0.012, 0.18, 0.28, TEAM, 0, 0.78, 2.49));
+}
+
+// ---- Airfield --------------------------------------------------------------------------------------
+
+function airfield(k: Kit, _e: number, st: Style): void {
+  // A grass strip with a painted runway, a hangar with a curved roof, a control tower and a windsock.
+  k.box(3.9, 0.05, 3.9, '#7f9a5a', 0, -0.02, 0);
+  k.box(3.7, 0.03, 0.9, '#8d8a80', 0, 0.02, 1.2);
+  for (let i = 0; i < 6; i++) k.box(0.3, 0.012, 0.06, '#f2ece0', -1.5 + i * 0.6, 0.05, 1.2);
+  // The hangar: a half-barrel roof over brick ends, doors open.
+  const roof = k.cyl(0.85, 0.85, 1.8, 14, '#6a7078', -0.6, 0, -0.75);
+  roof.rotation.z = Math.PI / 2;
+  roof.position.set(-0.6, 0.1, -0.75);
+  roof.scale.set(1, 1, 0.9);
+  k.box(1.8, 0.12, 1.6, st.base, -0.6, -0.02, -0.75);
+  k.box(0.05, 0.75, 1.5, st.wall, -1.5, 0, -0.75);
+  k.box(0.05, 0.75, 1.5, st.wall, 0.3, 0, -0.75);
+  k.box(1.0, 0.6, 0.02, '#1d1e24', -0.6, 0, 0.08);
+  k.team(k.box(1.84, 0.12, 0.04, TEAM, -0.6, 0.78, 0.0));
+  // Control tower.
+  k.box(0.5, 1.3, 0.5, st.wall, 1.25, 0, -1.2);
+  k.box(0.62, 0.3, 0.62, '#9ec2d8', 1.25, 1.3, -1.2);
+  k.box(0.68, 0.06, 0.68, st.trim, 1.25, 1.6, -1.2);
+  k.glow(k.sphere(0.05, '#ff5a4a', 1.25, 1.75, -1.2));
+  // Windsock in team colors, fuel drums.
+  k.cyl(0.02, 0.02, 1.1, 4, '#d8d8d8', 1.7, 0, 0.3);
+  const sock = k.team(k.cone(0.08, 0.4, 8, TEAM, 1.7, 0.95, 0.5));
+  sock.rotation.x = -Math.PI / 2 - 0.2;
+  sock.position.set(1.7, 1.0, 0.52);
+  for (const [x, z] of [[1.0, -0.2], [1.2, -0.25], [1.1, -0.05]]) k.cyl(0.1, 0.1, 0.26, 8, '#5a6450', x, 0, z);
+}
+
+// ---- Industrial touches ----------------------------------------------------------------------------
+
+/** A factory chimney (and its soot band) on a corner, for workshops of the Industrial Age. */
+function smokestack(k: Kit, x: number, z: number, h: number): void {
+  k.cyl(0.13, 0.18, h, 10, '#7a3a2c', x, 0, z);
+  k.box(0.32, 0.08, 0.32, '#2b2b2e', x, h - 0.08, z);
+}
+
+const STACKS: Partial<Record<BuildingType, [number, number, number]>> = {
+  forge: [1.1, -1.1, 2.6],
+  workshop: [1.2, -1.15, 2.4],
+  storehouse: [0.7, -0.7, 1.7],
+  barracks: [-1.15, -1.15, 2.2],
+  market: [1.2, -1.2, 2.2],
+  towncenter: [1.6, -1.6, 2.8],
+};
+
+/** The Eiffel-like wonder of the Industrial Age: a lattice tower of iron on four legs. */
+function ironTower(k: Kit, st: Style): void {
+  pad(k, 5, st.base);
+  const iron = '#6b5a48';
+  // Four legs leaning in, braced by arches and platforms.
+  for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    const leg = k.box(0.28, 2.4, 0.28, iron, sx * 1.4, 0, sz * 1.4);
+    leg.rotation.z = sx * 0.35;
+    leg.rotation.x = -sz * 0.35;
+    leg.position.set(sx * 1.0, 1.15, sz * 1.0);
+    for (let i = 0; i < 4; i++) {
+      const brace = k.box(0.04, 0.6, 0.04, '#5a4a3a', sx * (1.35 - i * 0.18), 0.1 + i * 0.5, sz * (1.35 - i * 0.18));
+      brace.rotation.z = sx * 0.9;
+    }
+  }
+  k.box(2.1, 0.14, 2.1, iron, 0, 2.2, 0);
+  k.team(k.box(2.14, 0.06, 2.14, TEAM, 0, 2.34, 0));
+  // The tapering middle and top.
+  k.cyl(0.45, 0.85, 2.0, 4, iron, 0, 2.34, 0).rotation.y = Math.PI / 4;
+  k.box(0.9, 0.1, 0.9, iron, 0, 4.34, 0);
+  k.cyl(0.12, 0.38, 1.6, 4, iron, 0, 4.44, 0).rotation.y = Math.PI / 4;
+  k.cyl(0.03, 0.05, 0.6, 6, iron, 0, 6.04, 0);
+  k.glow(k.sphere(0.09, '#ffd36b', 0, 6.66, 0));
+  k.team(k.box(0.012, 0.22, 0.34, TEAM, 0, 6.25, 0.18));
+  // Arches between the legs.
+  for (let i = 0; i < 4; i++) {
+    const a = k.cyl(0.85, 0.85, 0.12, 12, '#7a6a58', 0, 0.9, 0);
+    a.rotation.x = Math.PI / 2;
+    a.rotation.z = (i * Math.PI) / 2;
+    a.scale.set(1, 1, 0.3);
+    a.position.set(i === 0 ? 0 : i === 2 ? 0 : (i === 1 ? 1.25 : -1.25), 0.9, i === 0 ? 1.25 : i === 2 ? -1.25 : 0);
+    a.rotation.y = i % 2 ? Math.PI / 2 : 0;
+  }
+  for (const [x, z] of [[-2.1, 2.1], [2.1, 2.1]]) banner(k, x, 0, z, 1.6, 1.2);
+}
+
 const MAKERS: Record<Exclude<BuildingType, 'wall'>, (k: Kit, e: number, st: Style) => void> = {
-  towncenter, house, storehouse, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate,
+  towncenter, house, storehouse, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield,
 };
 
 const cache = new Map<string, THREE.BufferGeometry>();
@@ -782,6 +913,8 @@ export function buildingGeometry(type: BuildingType, epoch: number, color: strin
     const k = new Kit();
     if (type === 'wall') wall(k, epoch, STYLES[epoch], variant);
     else MAKERS[type](k, epoch, STYLES[epoch]);
+    const stack = STACKS[type];
+    if (epoch >= 4 && stack) smokestack(k, stack[0], stack[1], stack[2]);
     g = bake(k.root, color);
     cache.set(key, g);
   }

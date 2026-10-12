@@ -1,12 +1,15 @@
 import * as THREE from 'three';
-import { TICK_HZ, unitStats } from '../sim/data';
+import { TICK_HZ, domainOf, unitStats } from '../sim/data';
 import type { GameState, Unit, UnitType } from '../sim/types';
 import { unitMaterial } from './materials';
 import { heightAt } from './terrain';
 import { deerGeometry, unitGeometry } from './unitModels';
+import { WATER_Y } from './water';
 
 /** Units are drawn a little larger than their footprint in the rules, so they read well from above. */
 export const UNIT_SCALE = 1.3;
+/** How high aircraft fly above the ground. */
+export const AIR_ALT = 3.2;
 
 const WHITE = new THREE.Color('#ffffff');
 
@@ -23,6 +26,10 @@ interface Anim {
   lastX: number;
   lastY: number;
   speed: number;
+  /** Aircraft: how far into a holding circle (0 flying straight, 1 circling). */
+  circle: number;
+  /** Aircraft: how much it is banking. */
+  bank: number;
 }
 
 interface Corpse {
@@ -151,7 +158,7 @@ export class UnitsView {
       seen.add(an.id);
       let a = this.deerAnims.get(an.id);
       if (!a) {
-        a = { yaw: Math.atan2(an.fx, an.fy), phase: an.id, lastX: x, lastY: y, speed: 0 };
+        a = { yaw: Math.atan2(an.fx, an.fy), phase: an.id, lastX: x, lastY: y, speed: 0, circle: 0, bank: 0 };
         this.deerAnims.set(an.id, a);
       }
       const mdx = x - a.lastX;
@@ -234,7 +241,7 @@ export class UnitsView {
       const y = u.py + (u.y - u.py) * alpha;
       let a = this.anims.get(u.id);
       if (!a) {
-        a = { yaw: Math.atan2(u.fx, u.fy), phase: (u.id * 1.7) % 6.28, lastX: x, lastY: y, speed: 0 };
+        a = { yaw: Math.atan2(u.fx, u.fy), phase: (u.id * 1.7) % 6.28, lastX: x, lastY: y, speed: 0, circle: 0, bank: 0 };
         this.anims.set(u.id, a);
       }
       const mdx = x - a.lastX;
@@ -304,21 +311,61 @@ export class UnitsView {
           if (!walking) bob = Math.sin(time * 1.6 + ph) * 0.004;
       }
 
-      const gy = heightAt(s, x, y);
+      let gy = heightAt(s, x, y);
+      let dx = x;
+      let dz = y;
+      let yaw = a.yaw;
+      let roll = 0;
+      let pitch = 0;
+      let lift = mounted ? 0.62 : engine ? 0.35 : 0.42;
+      const dom = domainOf(u.type);
+      if (dom === 'water') {
+        // Afloat: riding the swell, oars sweeping, paddle wheels churning, nets dipping.
+        gy = WATER_Y - 0.02 + Math.sin(time * 1.4 + ph) * 0.025;
+        roll = Math.sin(time * 1.1 + ph) * 0.05;
+        pitch = Math.sin(time * 0.9 + ph * 1.3) * 0.03;
+        const paddles = u.type === 'transport' && epoch >= 4;
+        const rowed = (u.type === 'warship' || u.type === 'transport') && epoch <= 1;
+        leg = paddles ? a.phase % (Math.PI * 2) : rowed && walking ? Math.sin(a.phase * 0.6) * 0.45 : 0;
+        arm = u.type === 'fisher' && u.act === 'fish' ? 0.25 + Math.sin(time * 1.8 + ph) * 0.25 : u.type === 'warship' && since >= 0 && since < 0.4 ? -0.1 * (1 - since / 0.4) : 0;
+        bob = 0;
+        lift = 0.3;
+      } else if (dom === 'air') {
+        // Aloft: straight on the move, a wide holding circle when waiting or over a target.
+        const hold = a.speed < 0.8;
+        a.circle = Math.max(0, Math.min(1, a.circle + (hold ? dt : -dt * 2)));
+        const th = time * 0.9 + u.id;
+        const R = 1.3 * a.circle;
+        dx = x + Math.sin(th) * R;
+        dz = y + Math.cos(th) * R;
+        const orbitYaw = Math.atan2(Math.cos(th), -Math.sin(th));
+        let dy = orbitYaw - a.yaw;
+        while (dy > Math.PI) dy -= Math.PI * 2;
+        while (dy < -Math.PI) dy += Math.PI * 2;
+        yaw = a.yaw + dy * a.circle;
+        a.bank += (Math.max(-0.6, Math.min(0.6, -d * 3)) - a.bank) * Math.min(1, dt * 4);
+        roll = a.bank - 0.4 * a.circle;
+        pitch = -0.03;
+        gy = Math.max(gy, WATER_Y) + AIR_ALT + Math.sin(time * 1.2 + ph) * 0.06;
+        leg = 0;
+        arm = 0;
+        bob = 0;
+        lift = 0;
+      }
       const b = this.batch(u.type, epoch);
       const i = b.count++;
-      this.e.set(0, a.yaw, 0);
+      this.e.set(pitch, yaw, roll);
       this.q.setFromEuler(this.e);
-      this.p.set(x, gy, y);
+      this.p.set(dx, gy, dz);
       const k = mounted ? UNIT_SCALE * 0.88 : engine ? UNIT_SCALE * 1.1 : UNIT_SCALE;
       this.m.compose(this.p, this.q, this.sc.set(k, k, k));
       b.mesh.setMatrixAt(i, this.m);
       b.mesh.setColorAt(i, this.colors[u.owner]);
       b.anim.setXYZ(i, leg, arm, bob);
-      this.drawn.set(u.id, new THREE.Vector3(x, gy, y));
+      this.drawn.set(u.id, new THREE.Vector3(dx, gy, dz));
 
       // Where it lands on screen, for picking.
-      this.v.set(x, gy + (mounted ? 0.62 : engine ? 0.35 : 0.42), y).project(camera);
+      this.v.set(dx, gy + lift, dz).project(camera);
       if (this.v.z < 1) {
         const sx = ((this.v.x + 1) / 2) * width;
         const sy = ((1 - this.v.y) / 2) * height;
@@ -338,14 +385,30 @@ export class UnitsView {
       const sink = c.age > 7 ? (c.age - 7) * 0.2 : 0;
       const b = this.batch(c.type, c.epoch);
       const i = b.count++;
-      this.e.set(0, c.yaw, c.side * ease * (Math.PI / 2 - 0.15));
-      this.q.setFromEuler(this.e);
-      this.p.set(c.x, heightAt(s, c.x, c.y) + 0.04 - sink, c.y);
+      const dom = domainOf(c.type);
+      if (dom === 'water') {
+        // A ship lists, then goes down.
+        const t = Math.min(1, c.age / 4);
+        this.e.set(t * 0.5, c.yaw, c.side * t * 0.7);
+        this.q.setFromEuler(this.e);
+        this.p.set(c.x, WATER_Y - 0.02 - t * t * 0.9, c.y);
+      } else if (dom === 'air') {
+        // An aircraft spins down and lies wrecked.
+        const t = Math.min(1, c.age / 1.4);
+        const ground = Math.max(heightAt(s, c.x, c.y), WATER_Y);
+        this.e.set(t * 0.6, c.yaw + c.age * 2.5 * (1 - t), c.side * t * 0.5);
+        this.q.setFromEuler(this.e);
+        this.p.set(c.x + Math.sin(c.yaw) * t * 1.2, ground + AIR_ALT * (1 - t * t) + 0.08 - sink, c.y + Math.cos(c.yaw) * t * 1.2);
+      } else {
+        this.e.set(0, c.yaw, c.side * ease * (Math.PI / 2 - 0.15));
+        this.q.setFromEuler(this.e);
+        this.p.set(c.x, heightAt(s, c.x, c.y) + 0.04 - sink, c.y);
+      }
       const k = c.mounted ? UNIT_SCALE * 0.88 : UNIT_SCALE;
       this.m.compose(this.p, this.q, this.sc.set(k, k, k));
       b.mesh.setMatrixAt(i, this.m);
       b.mesh.setColorAt(i, c.color);
-      b.anim.setXYZ(i, 0, -0.4 * ease, 0);
+      b.anim.setXYZ(i, 0, dom === 'land' ? -0.4 * ease : 0, 0);
     }
     this.corpses = keep;
 

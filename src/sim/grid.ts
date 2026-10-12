@@ -1,20 +1,42 @@
 import { BUILDINGS } from './data';
 import type { Building, BuildingType, GameState } from './types';
-import { B_BUILDING, B_GATE, B_RES, R_NONE, T_ROCK, T_WATER } from './types';
+import { B_BUILDING, B_GATE, B_RES, B_TERRAIN, R_NONE, T_ROCK, T_WATER } from './types';
 
 /** Tile helpers shared by the rules, the pathfinder and the computer opponent. */
 
 export const inBounds = (s: GameState, x: number, y: number) => x >= 0 && y >= 0 && x < s.w && y < s.h;
 
 /**
- * Whether a tile can be walked: nothing on it, or a gate of the walker's team (`team` -1 for "anyone",
- * which no gate lets through).
+ * How a unit passes, as the `team` argument of the tile tests: a team number for people on foot (their
+ * own gates let them through), -1 for "on foot, anyone" (no gate lets them through), NAVAL for ships
+ * (open water only) and AIR for aircraft (anywhere on the map).
+ */
+export const NAVAL = -2;
+export const AIR = -3;
+
+/**
+ * Whether a tile can be crossed: on foot, nothing on it (or a gate of the walker's team); by ship, open
+ * water with no fish shoal; by air, anywhere.
  */
 export function walkable(s: GameState, x: number, y: number, team = -1): boolean {
   if (x < 0 || y < 0 || x >= s.w || y >= s.h) return false;
   const i = y * s.w + x;
   const b = s.block[i];
+  if (team === NAVAL) return b === B_TERRAIN && s.terrain[i] === T_WATER;
+  if (team === AIR) return true;
   return b === 0 || (b === B_GATE && team >= 0 && s.gateTeam[i] === team);
+}
+
+/** Open water tiles beside a footprint (a dock needs some). */
+export function shoreWater(s: GameState, tx: number, ty: number, size: number): number {
+  let n = 0;
+  for (let y = ty - 1; y <= ty + size; y++) {
+    for (let x = tx - 1; x <= tx + size; x++) {
+      if (x >= tx && x < tx + size && y >= ty && y < ty + size) continue;
+      if (walkable(s, x, y, NAVAL)) n++;
+    }
+  }
+  return n;
 }
 
 export function cornerHeight(s: GameState, x: number, y: number): number {
@@ -37,7 +59,7 @@ export function groundAt(s: GameState, x: number, y: number): number {
   return a * (1 - fx) * (1 - fy) + b * fx * (1 - fy) + c * (1 - fx) * fy + d * fx * fy;
 }
 
-export type PlaceProblem = null | 'edge' | 'water' | 'rock' | 'blocked' | 'slope';
+export type PlaceProblem = null | 'edge' | 'water' | 'rock' | 'blocked' | 'slope' | 'shore';
 
 /** Whether a building of this type could go with its top-left corner on this tile. */
 export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: number, ignoreUnits = true, owner = -1): PlaceProblem {
@@ -62,8 +84,9 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
       hi = Math.max(hi, h);
     }
   }
-  // Walls follow the land; everything else wants it fairly level.
-  if (hi - lo > (type === 'wall' || type === 'gate' ? 2.2 : 1.1)) return 'slope';
+  // Walls follow the land (and docks the shore); everything else wants it fairly level.
+  if (hi - lo > (type === 'wall' || type === 'gate' || type === 'dock' ? 2.2 : 1.1)) return 'slope';
+  if (BUILDINGS[type].shore && shoreWater(s, tx, ty, n) < 3) return 'shore';
   void ignoreUnits;
   return null;
 }

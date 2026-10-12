@@ -85,6 +85,7 @@ function citizen(epoch: number): Kit {
     { legs: SKIN, torso: LINEN, belt: TEAM },
     { legs: '#6b5a48', torso: '#8c7a5a', belt: TEAM },
     { legs: '#5a5f6b', torso: LINEN, belt: TEAM },
+    { legs: '#454952', torso: '#8a7a64', belt: TEAM },
   ];
   const o = outfits[epoch];
   const b = person(k, { legs: o.legs, torso: o.torso });
@@ -95,6 +96,11 @@ function citizen(epoch: number): Kit {
   } else if (epoch === 3) {
     k.cyl(0.11, 0.11, 0.015, 10, '#5a4632', 0, 0.54, 0);
     k.team(k.cyl(0.055, 0.065, 0.06, 8, TEAM, 0, 0.55, 0));
+  } else if (epoch >= 4) {
+    // A flat cap and a team neckerchief.
+    k.cyl(0.072, 0.078, 0.035, 10, '#3a3a40', 0, 0.54, 0);
+    k.box(0.1, 0.012, 0.06, '#3a3a40', 0, 0.545, 0.06);
+    k.team(k.box(0.12, 0.03, 0.08, TEAM, 0, 0.41, 0.02));
   } else if (epoch === 1) {
     hairOrHat(k, 0);
     k.team(k.cyl(0.07, 0.07, 0.02, 8, TEAM, 0, 0.53, 0));
@@ -112,8 +118,25 @@ function citizen(epoch: number): Kit {
 
 // ---- Infantry --------------------------------------------------------------------------------------
 
+function rifle(kk: Kit, g: THREE.Group, bayonet: boolean): void {
+  kk.box(0.025, 0.03, 0.4, WOOD, 0, 0.03, 0.08, g);
+  kk.cyl(0.008, 0.008, 0.3, 5, IRON, 0, 0.05, 0.38, g).rotation.x = Math.PI / 2;
+  if (bayonet) kk.cone(0.01, 0.12, 4, STEEL, 0, 0.05, 0.58, g).rotation.x = Math.PI / 2;
+}
+
 function infantry(epoch: number): Kit {
   const k = new Kit();
+  if (epoch >= 4) {
+    // Fusilier: team coatee, white cross-belts, a tall shako with a plume, rifle and bayonet.
+    const b = person(k, { legs: '#2e3038', torso: TEAM, torsoTeam: true, belt: LINEN });
+    k.box(0.02, 0.22, 0.12, LINEN, 0, 0.22, 0.0).rotation.z = 0.7;
+    k.box(0.02, 0.22, 0.12, LINEN, 0, 0.22, 0.0).rotation.z = -0.7;
+    k.cyl(0.07, 0.065, 0.13, 10, '#1d1e24', 0, 0.53, 0);
+    k.box(0.11, 0.01, 0.05, '#1d1e24', 0, 0.53, 0.06);
+    k.team(k.sphere(0.022, TEAM, 0, 0.68, 0.04));
+    held(b, (kk, g) => rifle(kk, g, true), SHOULDER - 0.18, 0.35);
+    return k;
+  }
   if (epoch === 0) {
     // Clubman: furs, a team war-paint band, a heavy club.
     const b = person(k, { legs: SKIN, torso: FUR_DARK });
@@ -179,6 +202,16 @@ function bow(kk: Kit, g: THREE.Group, color: string): void {
 
 function ranged(epoch: number): Kit {
   const k = new Kit();
+  if (epoch >= 4) {
+    // Rifleman: team tunic, a kepi, bandolier, rifle at the shoulder.
+    const b = person(k, { legs: '#5a5446', torso: TEAM, torsoTeam: true, belt: LEATHER });
+    k.box(0.02, 0.24, 0.12, LEATHER, 0, 0.21, 0.0).rotation.z = 0.65;
+    const kepi = k.cyl(0.06, 0.07, 0.08, 10, '#3a3e34', 0, 0.53, -0.005);
+    kepi.rotation.x = -0.15;
+    k.box(0.1, 0.012, 0.05, '#1d1e24', 0, 0.535, 0.06);
+    held(b, (kk, g) => rifle(kk, g, false), SHOULDER - 0.18, 1.5);
+    return k;
+  }
   if (epoch === 0) {
     // Slinger: furs, team headband, a sling and a pouch of stones.
     const b = person(k, { legs: SKIN, torso: FUR, belt: TEAM });
@@ -287,6 +320,20 @@ function cavalry(epoch: number): Kit {
     }, SHOULDER - 0.3, 1.3);
     return k;
   }
+  if (epoch >= 4) {
+    // Hussar: a bay horse, a team dolman with gold frogging, a fur busby, a curved saber.
+    const saddle = horse(k, '#6e4426', { color: TEAM, team: true });
+    const rider = k.group(0, saddle, -0.03);
+    const b = person(k, { legs: '#e8e2d0', torso: TEAM, torsoTeam: true, at: rider, y: -0.12, mounted: true });
+    for (let i = 0; i < 3; i++) k.box(0.18, 0.012, 0.12, GOLD, 0, -0.02 + i * 0.05, 0.002, rider);
+    k.cyl(0.07, 0.075, 0.14, 10, '#2b2420', 0, 0.32, 0, rider);
+    k.team(k.box(0.03, 0.08, 0.06, TEAM, 0.05, 0.4, -0.04, rider));
+    held(b, (kk, g) => {
+      kk.box(0.012, 0.34, 0.03, STEEL, 0, 0.0, 0.02, g).rotation.x = 0.25;
+      kk.box(0.05, 0.015, 0.02, GOLD, 0, -0.04, 0, g);
+    }, SHOULDER - 0.3, 0.9);
+    return k;
+  }
   // Cuirassier: a black horse, team saddle cloth, steel cuirass, plumed helmet, saber.
   const saddle = horse(k, '#2e2622', { color: TEAM, team: true });
   const rider = k.group(0, saddle, -0.03);
@@ -344,6 +391,20 @@ function siege(epoch: number): Kit {
     k.team(k.box(0.01, 0.12, 0.18, TEAM, 0.22, 0.58, -0.24));
     return k;
   }
+  if (epoch >= 4) {
+    // Field gun: tall spoked wheels, a steel shield, a long rifled barrel, the trail behind.
+    wheel(k, -0.27, 0.02, 0.24, '#4a3a2c');
+    wheel(k, 0.27, 0.02, 0.24, '#4a3a2c');
+    k.box(0.12, 0.08, 0.75, '#4a4f45', 0, 0.12, -0.3).rotation.x = -0.18;
+    k.box(0.5, 0.36, 0.03, '#5d6455', 0, 0.2, 0.14);
+    k.team(k.box(0.5, 0.05, 0.035, TEAM, 0, 0.5, 0.14));
+    const gun = k.limb(k.group(0, 0, 0), RIG_ARM, 0.32, 0.05);
+    const tube = k.cyl(0.04, 0.055, 0.85, 10, '#3f4247', 0, 0.32, 0.3, gun);
+    tube.rotation.x = Math.PI / 2 - 0.08;
+    tube.position.set(0, 0.34, 0.3);
+    k.cyl(0.07, 0.07, 0.2, 8, '#3f4247', 0, 0.32, -0.05, gun).rotation.x = Math.PI / 2;
+    return k;
+  }
   // Bombard: a great iron barrel on a two-wheeled carriage, a team flag.
   wheel(k, -0.26, 0.05, 0.2, '#5b4330');
   wheel(k, 0.26, 0.05, 0.2, '#5b4330');
@@ -364,7 +425,7 @@ function siege(epoch: number): Kit {
 
 function priest(epoch: number): Kit {
   const k = new Kit();
-  const robe = epoch <= 1 ? '#f2ecdc' : epoch === 2 ? '#7a5a3a' : '#f4f0e6';
+  const robe = epoch <= 1 ? '#f2ecdc' : epoch === 2 ? '#7a5a3a' : epoch === 3 ? '#f4f0e6' : '#26262c';
   // Feet peep out under a long robe; the robe sways as one with the body.
   const legA = k.limb(k.group(0, 0, 0), RIG_LEG_A, HIP, 0);
   k.box(0.07, 0.05, 0.1, BOOT, -0.045, 0, 0.02, legA);
@@ -382,15 +443,21 @@ function priest(epoch: number): Kit {
   } else if (epoch === 2) {
     k.sphere(0.075, robe, 0, 0.52, -0.02).scale.set(1, 0.9, 1.05);
     k.team(k.box(0.18, 0.025, 0.12, TEAM, 0, 0.27, 0));
-  } else {
+  } else if (epoch === 3) {
     k.cone(0.06, 0.17, 4, TEAM, 0, 0.55, 0);
     k.team(k.cone(0.065, 0.17, 4, TEAM, 0, 0.55, 0));
     k.box(0.02, 0.1, 0.006, '#e2b23c', 0, 0.58, 0.04);
+  } else {
+    // Missionary: a black coat, white collar and a wide-brimmed hat.
+    k.box(0.08, 0.025, 0.04, '#f4f0e6', 0, 0.42, 0.05);
+    k.cyl(0.13, 0.13, 0.012, 12, '#1a1a1e', 0, 0.55, 0);
+    k.cyl(0.06, 0.065, 0.06, 10, '#1a1a1e', 0, 0.555, 0);
+    k.team(k.cyl(0.066, 0.066, 0.015, 10, TEAM, 0, 0.56, 0));
   }
   const g = k.group(0.12, SHOULDER - 0.18, 0.03, arm);
   g.rotation.x = 0.3;
-  k.cyl(0.012, 0.012, 0.62, 4, epoch === 2 ? WOOD : '#e2b23c', 0, -0.25, 0, g);
-  if (epoch === 2) {
+  k.cyl(0.012, 0.012, 0.62, 4, epoch === 2 || epoch >= 4 ? WOOD : '#e2b23c', 0, -0.25, 0, g);
+  if (epoch === 2 || epoch >= 4) {
     k.box(0.12, 0.02, 0.02, WOOD, 0, 0.28, 0, g);
   } else k.glow(k.octa(0.045, '#ffe08a', 0, 0.4, 0, g));
   return k;
@@ -429,8 +496,8 @@ function hero(epoch: number): Kit {
     });
     return k;
   }
-  // Mounted heroes: a paladin on a white horse, a general on a black one.
-  const saddle = horse(k, epoch === 2 ? '#ecebe6' : '#2a2421', { color: TEAM, team: true });
+  // Mounted heroes: a paladin on a white horse, a general on a black one, a field marshal on a grey.
+  const saddle = horse(k, epoch === 2 ? '#ecebe6' : epoch === 3 ? '#2a2421' : '#8f8f8f', { color: TEAM, team: true });
   k.box(0.24, 0.03, 0.48, GOLD, 0, saddle - 0.2, -0.01);
   const rider = k.group(0, saddle, -0.03);
   if (epoch === 2) {
@@ -441,6 +508,20 @@ function hero(epoch: number): Kit {
     held(b, (kk, g) => {
       kk.box(0.02, 0.4, 0.035, '#f2f2f2', 0, 0.1, 0, g);
       kk.box(0.09, 0.02, 0.03, GOLD, 0, -0.08, 0, g);
+    }, SHOULDER - 0.3, 1.0);
+    return k;
+  }
+  if (epoch >= 4) {
+    // Field Marshal: a team greatcoat, a gold sash, a peaked cap, a baton.
+    const b = person(k, { legs: '#2e3038', torso: TEAM, torsoTeam: true, at: rider, y: -0.12, mounted: true });
+    k.box(0.19, 0.03, 0.12, GOLD, 0, 0.12, 0.002, rider).rotation.z = 0.5;
+    for (const x of [-0.1, 0.1]) k.box(0.06, 0.02, 0.07, GOLD, x, 0.3, 0, rider);
+    k.cyl(0.075, 0.07, 0.05, 10, '#2a2c34', 0, 0.38, 0, rider);
+    k.box(0.1, 0.012, 0.06, '#1a1a1e', 0, 0.38, 0.06, rider);
+    k.glow(k.box(0.05, 0.02, 0.01, GOLD, 0, 0.4, 0.075, rider));
+    held(b, (kk, g) => {
+      kk.cyl(0.015, 0.015, 0.16, 6, '#c8302a', 0, 0.02, 0, g);
+      kk.cyl(0.018, 0.018, 0.02, 6, GOLD, 0, 0.1, 0, g);
     }, SHOULDER - 0.3, 1.0);
     return k;
   }
@@ -457,7 +538,235 @@ function hero(epoch: number): Kit {
   return k;
 }
 
-const MAKERS: Record<UnitType, (epoch: number) => Kit> = { citizen, infantry, ranged, cavalry, siege, priest, hero };
+// ---- Ships -----------------------------------------------------------------------------------------
+
+/** A hull: a long bowl below a deck, the waterline at y = 0 (models face +z). */
+function hull(k: Kit, L: number, W: number, H: number, color: string, deck: string, y = 0.06): void {
+  const bowl = k.dome(0.5, color, 0, y, 0);
+  bowl.rotation.x = Math.PI;
+  bowl.scale.set(W, H * 2, L);
+  k.cyl(0.5, 0.5, 0.03, 16, deck, 0, y - 0.015, 0).scale.set(W, 1, L);
+}
+
+/** A mast with a square sail across the ship (team colored, or plain with a team band). */
+function mast(k: Kit, z: number, h: number, sailW: number, team = true, y = 0.06): void {
+  k.cyl(0.018, 0.022, h, 5, WOOD, 0, y, z);
+  k.box(sailW + 0.06, 0.02, 0.02, WOOD, 0, y + h * 0.85, z);
+  const sail = k.box(sailW, h * 0.5, 0.015, team ? TEAM : '#efe8d8', 0, y + h * 0.33, z + 0.015);
+  if (team) k.team(sail);
+  else k.team(k.box(sailW, 0.05, 0.018, TEAM, 0, y + h * 0.55, z + 0.016));
+}
+
+/** A bank of oars along one side, each a limb that sweeps fore and aft. */
+function oars(k: Kit, side: number, n: number, L: number, W: number): void {
+  for (let i = 0; i < n; i++) {
+    const z = -L * 0.3 + (i / Math.max(1, n - 1)) * L * 0.6;
+    const g = k.limb(k.group(0, 0, 0), i % 2 ? RIG_LEG_B : RIG_LEG_A, 0.08, z);
+    const oar = k.box(0.25, 0.012, 0.018, WOOD, side * (W / 2 + 0.1), 0.02, z, g);
+    oar.rotation.z = side * -0.45;
+  }
+}
+
+/** Something that fishes: a pole or boom that dips (the arm). */
+function net(k: Kit, z: number, len: number, y = 0.1): void {
+  const g = k.limb(k.group(0, 0, 0), RIG_ARM, y, z);
+  const pole = k.box(0.015, 0.015, len, WOOD, 0.1, y + 0.1, z + len / 2, g);
+  pole.rotation.x = -0.35;
+  k.box(0.12, 0.08, 0.01, '#d8d0b8', 0.1, y - 0.05 + 0.1, z + len * 0.95, g).rotation.x = -0.35;
+}
+
+function fisher(epoch: number): Kit {
+  const k = new Kit();
+  if (epoch === 0) {
+    // A dugout canoe: a fisher with a line, a team cloth at the bow.
+    hull(k, 0.85, 0.2, 0.08, '#6e4f33', '#8a6440', 0.04);
+    const b = person(k, { legs: SKIN, torso: FUR, y: -0.12 });
+    void b;
+    k.team(k.box(0.1, 0.06, 0.02, TEAM, 0, 0.06, 0.38));
+    net(k, 0.1, 0.4, 0.15);
+    return k;
+  }
+  if (epoch === 1) {
+    // A reed boat with a small square sail.
+    hull(k, 1.0, 0.3, 0.1, '#c8b46a', '#a89458');
+    for (let i = 0; i < 4; i++) k.box(0.31, 0.012, 0.012, '#8a7a40', 0, 0.065, -0.3 + i * 0.2);
+    mast(k, 0.05, 0.6, 0.3);
+    net(k, -0.1, 0.45);
+    return k;
+  }
+  if (epoch === 4) {
+    // A steam trawler: a steel hull, wheelhouse, smokestack with a team band, a net derrick.
+    hull(k, 1.25, 0.36, 0.14, '#3c4046', '#8a7a64', 0.08);
+    k.box(0.36, 0.05, 1.0, '#a8402e', 0, 0.0, 0);
+    k.box(0.26, 0.2, 0.3, '#e8e2d0', 0, 0.08, 0.15);
+    k.box(0.28, 0.03, 0.32, '#3c4046', 0, 0.28, 0.15);
+    k.cyl(0.05, 0.055, 0.32, 8, '#2b2b2e', 0, 0.08, -0.05);
+    k.team(k.cyl(0.056, 0.056, 0.06, 8, TEAM, 0, 0.3, -0.05));
+    net(k, -0.35, 0.5, 0.14);
+    return k;
+  }
+  // A wooden fishing boat with a mast (a cog, then a sloop with a big sail).
+  hull(k, 1.1, 0.34, 0.12, epoch === 2 ? '#6e4f33' : '#5a4430', '#9a7448');
+  mast(k, 0.08, epoch === 2 ? 0.7 : 0.85, epoch === 2 ? 0.34 : 0.4, epoch === 2);
+  net(k, -0.3, 0.5);
+  for (let i = 0; i < 2; i++) k.cyl(0.05, 0.045, 0.08, 6, '#8a6440', -0.08 + i * 0.12, 0.06, -0.38);
+  return k;
+}
+
+function warship(epoch: number): Kit {
+  const k = new Kit();
+  if (epoch <= 1) {
+    // A trireme: a long narrow hull, a bronze ram, three banks of oars, team shields and sail.
+    hull(k, 1.6, 0.34, 0.14, '#5b4330', '#8a6440');
+    k.cone(0.05, 0.22, 6, BRONZE, 0, 0.0, 0.8).rotation.x = Math.PI / 2;
+    for (const side of [-1, 1]) {
+      oars(k, side, 7, 1.6, 0.34);
+      for (let i = 0; i < 6; i++) k.team(k.cyl(0.04, 0.04, 0.012, 8, TEAM, side * 0.17, 0.1, -0.45 + i * 0.18)).rotation.z = Math.PI / 2;
+    }
+    mast(k, 0.05, 0.8, 0.5);
+    k.box(0.2, 0.1, 0.2, '#6e4f33', 0, 0.06, -0.62);
+    return k;
+  }
+  if (epoch === 2) {
+    // A war cog: a stout hull with castles fore and aft, crenellated, a big team sail.
+    hull(k, 1.4, 0.48, 0.18, '#5a4430', '#9a7448');
+    for (const z of [0.5, -0.5]) {
+      k.box(0.46, 0.18, 0.32, '#6e4f33', 0, 0.06, z);
+      for (const x of [-0.18, 0, 0.18]) k.box(0.07, 0.06, 0.07, '#6e4f33', x, 0.24, z + 0.12);
+    }
+    mast(k, 0, 1.05, 0.6);
+    k.team(k.box(0.012, 0.1, 0.18, TEAM, 0, 1.12, 0.08));
+    return k;
+  }
+  if (epoch === 3) {
+    // A galleon: three masts of sails with team crosses, a high stern castle, gun ports.
+    hull(k, 1.7, 0.5, 0.2, '#4a3426', '#8a6a46');
+    k.box(0.5, 0.12, 1.3, '#4a3426', 0, 0.06, -0.05);
+    k.box(0.48, 0.24, 0.4, '#5a4030', 0, 0.06, -0.62);
+    for (let i = 0; i < 5; i++) for (const x of [-0.26, 0.26]) k.box(0.02, 0.05, 0.06, '#1d1d1d', x, 0.1, -0.45 + i * 0.22);
+    k.box(0.5, 0.025, 1.3, GOLD, 0, 0.16, -0.05);
+    for (const [z, h, w] of [[0.45, 0.95, 0.42], [0, 1.2, 0.56], [-0.42, 0.95, 0.4]] as const) {
+      mast(k, z, h, w, false, 0.18);
+      k.team(k.box(0.06, w * 0.6, 0.02, TEAM, 0, 0.18 + h * 0.33 + 0.02, z + 0.02));
+    }
+    k.cyl(0.012, 0.012, 0.5, 4, WOOD, 0, 0.18, 0.8).rotation.x = 1.0;
+    return k;
+  }
+  // An ironclad: a low armored hull, a central turret with two guns, a smokestack.
+  hull(k, 1.7, 0.46, 0.16, '#3a3e44', '#5a5e64', 0.08);
+  k.box(0.46, 0.06, 1.2, '#2e3236', 0, 0.02, -0.05);
+  k.box(0.3, 0.12, 0.42, '#4a4e54', 0, 0.08, -0.45);
+  const turret = k.limb(k.group(0, 0, 0), RIG_ARM, 0.22, 0.25);
+  k.cyl(0.16, 0.17, 0.14, 10, '#4a4e54', 0, 0.08, 0.25, turret);
+  for (const x of [-0.05, 0.05]) {
+    const g = k.cyl(0.022, 0.026, 0.42, 8, '#2b2b2e', x, 0.15, 0.45, turret);
+    g.rotation.x = Math.PI / 2;
+    g.position.set(x, 0.16, 0.45);
+  }
+  k.cyl(0.07, 0.075, 0.4, 8, '#2b2b2e', 0, 0.12, -0.12);
+  k.team(k.cyl(0.076, 0.076, 0.07, 8, TEAM, 0, 0.42, -0.12));
+  k.cyl(0.012, 0.012, 0.55, 4, '#2b2b2e', 0, 0.12, -0.62);
+  k.team(k.box(0.012, 0.1, 0.16, TEAM, 0, 0.56, -0.54));
+  return k;
+}
+
+function transport(epoch: number): Kit {
+  const k = new Kit();
+  if (epoch <= 1) {
+    // A transport galley: a broad hull, oars, a team sail, crates and amphorae on deck.
+    hull(k, 1.4, 0.5, 0.16, '#6e4f33', '#9a7448');
+    for (const side of [-1, 1]) oars(k, side, 5, 1.4, 0.5);
+    mast(k, 0.15, 0.8, 0.5);
+    for (let i = 0; i < 3; i++) k.box(0.14, 0.1, 0.14, '#a07a50', -0.12 + (i % 2) * 0.22, 0.06, -0.15 - i * 0.14);
+    return k;
+  }
+  if (epoch === 4) {
+    // A paddle steamer: a white superstructure, a tall stack, wheels that churn.
+    hull(k, 1.6, 0.5, 0.16, '#2e3236', '#9a8a6a', 0.08);
+    k.box(0.4, 0.18, 0.9, '#efe8da', 0, 0.08, -0.05);
+    k.box(0.44, 0.03, 0.94, '#3a3e44', 0, 0.26, -0.05);
+    for (let i = 0; i < 5; i++) for (const x of [-0.205, 0.205]) k.box(0.01, 0.06, 0.08, '#3b4a5a', x, 0.15, -0.4 + i * 0.18);
+    k.cyl(0.07, 0.075, 0.5, 8, '#2b2b2e', 0, 0.29, 0.05);
+    k.team(k.cyl(0.076, 0.076, 0.08, 8, TEAM, 0, 0.7, 0.05));
+    for (const side of [-1, 1]) {
+      // The wheel turns about the axle along x: a limb spun round and round.
+      const g = k.limb(k.group(0, 0, 0), RIG_LEG_A, 0.1, 0.0);
+      const rim = k.cyl(0.2, 0.2, 0.08, 12, '#a8402e', side * 0.3, 0.1, 0, g);
+      rim.rotation.z = Math.PI / 2;
+      rim.position.set(side * 0.3, 0.1, 0);
+      for (let i = 0; i < 4; i++) k.box(0.085, 0.4, 0.04, '#5a3a2a', side * 0.3, -0.1, 0, g).rotation.x = (i * Math.PI) / 4;
+      k.team(k.box(0.04, 0.12, 0.3, TEAM, side * 0.35, 0.12, 0));
+    }
+    return k;
+  }
+  // A transport cog or fluyt: a round-bellied hull, one or two masts, a hatch and cargo.
+  hull(k, 1.5, 0.56, 0.2, '#5a4430', '#9a7448');
+  k.box(0.54, 0.1, 1.1, '#5a4430', 0, 0.06, 0);
+  k.box(0.3, 0.04, 0.4, '#3a2a1e', 0, 0.16, 0.05);
+  mast(k, 0.3, 1.0, 0.55);
+  if (epoch === 3) mast(k, -0.35, 0.8, 0.45, false, 0.16);
+  return k;
+}
+
+// ---- Aircraft --------------------------------------------------------------------------------------
+
+/** A blur of propeller at a point, facing forward. */
+function prop(k: Kit, x: number, y: number, z: number, r: number): void {
+  k.cyl(0.03, 0.03, 0.05, 6, '#2b2b2e', x, y - 0.025, z).rotation.x = Math.PI / 2;
+  const disc = k.cyl(r, r, 0.006, 16, '#d8d4c8', x, y - 0.003, z + 0.03);
+  disc.rotation.x = Math.PI / 2;
+  disc.position.set(x, y, z + 0.03);
+}
+
+function fighter(_epoch: number): Kit {
+  const k = new Kit();
+  // A biplane: canvas fuselage, team upper wing and tail, struts, a goggled pilot.
+  const body = '#7a7c52';
+  k.box(0.14, 0.13, 0.7, body, 0, -0.065, 0);
+  const cowl = k.cyl(0.085, 0.08, 0.1, 10, '#3a3a3e', 0, 0, 0.36);
+  cowl.rotation.x = Math.PI / 2;
+  cowl.position.set(0, 0, 0.36);
+  prop(k, 0, 0, 0.42, 0.2);
+  k.box(1.0, 0.02, 0.2, body, 0, -0.08, 0.12);
+  k.team(k.box(1.06, 0.02, 0.2, TEAM, 0, 0.14, 0.14));
+  for (const x of [-0.32, 0.32]) for (const z of [0.07, 0.19]) k.box(0.012, 0.22, 0.012, '#3a2a1e', x, -0.07, z);
+  for (const x of [-0.42, 0.42]) k.team(k.cyl(0.05, 0.05, 0.022, 10, TEAM, x, -0.075, 0.12));
+  k.box(0.36, 0.015, 0.1, body, 0, -0.02, -0.32);
+  k.team(k.box(0.015, 0.13, 0.12, TEAM, 0, -0.01, -0.33));
+  k.sphere(0.045, SKIN, 0, 0.04, 0.0);
+  k.box(0.08, 0.02, 0.02, '#2b2b2e', 0, 0.05, 0.035);
+  for (const x of [-0.08, 0.08]) {
+    k.box(0.01, 0.1, 0.01, '#2b2b2e', x, -0.2, 0.18);
+    k.cyl(0.035, 0.035, 0.02, 8, '#1d1d1d', x, -0.22, 0.18).rotation.z = Math.PI / 2;
+  }
+  return k;
+}
+
+function bomber(_epoch: number): Kit {
+  const k = new Kit();
+  // A big twin-engined biplane: long fuselage, glazed nose, two engines, a rack of bombs.
+  const body = '#5e6250';
+  k.box(0.2, 0.18, 1.05, body, 0, -0.09, 0);
+  k.box(0.16, 0.1, 0.14, '#9ec2d8', 0, -0.05, 0.56);
+  k.box(1.6, 0.025, 0.26, body, 0, -0.11, 0.08);
+  k.team(k.box(1.66, 0.025, 0.26, TEAM, 0, 0.2, 0.1));
+  for (const x of [-0.55, -0.25, 0.25, 0.55]) for (const z of [0.0, 0.18]) k.box(0.014, 0.3, 0.014, '#3a2a1e', x, -0.1, z);
+  for (const x of [-0.38, 0.38]) {
+    const nac = k.cyl(0.07, 0.06, 0.32, 10, '#3a3a3e', x, -0.1, 0.12);
+    nac.rotation.x = Math.PI / 2;
+    nac.position.set(x, -0.1, 0.16);
+    prop(k, x, -0.1, 0.33, 0.2);
+    k.team(k.cyl(0.07, 0.07, 0.03, 10, TEAM, x * 1.6, 0.2, 0.1));
+  }
+  k.box(0.6, 0.02, 0.16, body, 0, -0.02, -0.5);
+  for (const x of [-0.2, 0.2]) k.team(k.box(0.015, 0.16, 0.16, TEAM, x, -0.02, -0.52));
+  for (const z of [-0.08, 0.08]) k.sphere(0.05, '#2b2b2e', 0, -0.22, z).scale.set(0.8, 0.8, 2);
+  k.sphere(0.045, SKIN, 0, 0.04, 0.35);
+  return k;
+}
+
+const MAKERS: Record<UnitType, (epoch: number) => Kit> = { citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, fighter, bomber };
+
 
 // ---- Deer ------------------------------------------------------------------------------------------
 

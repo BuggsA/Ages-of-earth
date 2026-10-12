@@ -153,6 +153,8 @@ export class BuildingsView {
     const wall = k.type === 'wall';
     const body = new THREE.Mesh(buildingGeometry(k.type, k.epoch, this.colors[k.owner] ?? '#ffffff', wall ? k.variant : 0), bakedMaterial);
     if (k.type === 'gate' && k.variant) body.rotation.y = Math.PI / 2;
+    // A dock's pier reaches out over the water.
+    if (k.type === 'dock') body.rotation.y = (k.variant * Math.PI) / 2;
     body.castShadow = k.type !== 'farm';
     body.receiveShadow = true;
     group.add(body);
@@ -202,7 +204,7 @@ const plinthMaterial = inject(new THREE.MeshStandardMaterial({ color: '#8d7a62',
 
 const HEIGHT: Record<BuildingType, number> = {
   towncenter: 2.9, house: 1.5, storehouse: 1.3, farm: 0.4, barracks: 2.0, range: 1.4, stable: 1.4, tower: 3.4,
-  forge: 2.1, workshop: 1.7, temple: 2.6, market: 1.6, wonder: 4.6, wall: 1.3, gate: 1.8,
+  forge: 2.1, workshop: 1.7, temple: 2.6, market: 1.6, wonder: 4.6, wall: 1.3, gate: 1.8, dock: 1.5, airfield: 1.8,
 };
 
 /** Which neighboring tiles hold the same owner's wall or gate. */
@@ -233,6 +235,6 @@ function snapshot(s: GameState, b: Building): Known {
     epoch: s.players[b.owner].epoch,
     built: b.built,
     progress: b.progress,
-    variant: b.type === 'wall' ? wallMask(s, b) : b.type === 'gate' ? b.dir : 0,
+    variant: b.type === 'wall' ? wallMask(s, b) : b.type === 'gate' || b.type === 'dock' ? b.dir : 0,
   };
 }

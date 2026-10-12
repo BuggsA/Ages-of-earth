@@ -1,9 +1,9 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { AI_LEVELS, BUILDINGS, COUNTER, EPOCHS, LAST_EPOCH, MARKET, POP_MAX, TECHS, secs, unitEpoch, unitStats } from './data';
-import { distToRect, placeProblem, walkable } from './grid';
+import { NAVAL, distToRect, placeProblem, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem } from './stats';
 import type { AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Player, Res, TechId, Unit, UnitType } from './types';
-import { RES, R_BERRY, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
+import { RES, R_BERRY, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { findResource, freeFarm } from './units';
 import { isEnemy } from './world';
 
@@ -44,16 +44,18 @@ const SHARE: Record<Res, number>[] = [
   { food: 0.42, wood: 0.34, gold: 0.15, stone: 0.09 },
   { food: 0.4, wood: 0.3, gold: 0.23, stone: 0.07 },
   { food: 0.38, wood: 0.3, gold: 0.26, stone: 0.06 },
+  { food: 0.36, wood: 0.3, gold: 0.28, stone: 0.06 },
 ];
 /** Citizens wanted before advancing out of each epoch. */
-const ADVANCE_AT = [11, 17, 22];
+const ADVANCE_AT = [11, 17, 22, 28];
 const TILE_OF: Record<Res, number> = { food: R_BERRY, wood: R_TREE, stone: R_STONE, gold: R_GOLD };
 /** Technologies in the order the opponent wants them (economy first). */
 const TECH_ORDER: TechId[] = [
   'plow', 'axes', 'wheelbarrow', 'picks', 'forging', 'scaleArmor', 'fletching', 'husbandry', 'irrigation', 'saws', 'shafts', 'handcart',
   'ironCasting', 'chainMail', 'bodkin', 'masonry', 'theology', 'conscription', 'blastFurnace', 'plateArmor', 'chemistry',
+  'gillnets', 'shipwright', 'steamEngine', 'rifling', 'aviation',
 ];
-const ECONOMY: TechId[] = ['plow', 'axes', 'wheelbarrow', 'picks', 'irrigation', 'saws', 'shafts', 'handcart'];
+const ECONOMY: TechId[] = ['plow', 'axes', 'wheelbarrow', 'picks', 'irrigation', 'saws', 'shafts', 'handcart', 'gillnets', 'steamEngine'];
 
 export function aiStep(s: GameState): void {
   for (const p of s.players) {
@@ -70,6 +72,10 @@ interface View {
   citizens: Unit[];
   army: Unit[];
   priests: Unit[];
+  fishers: Unit[];
+  /** Warships and transports. */
+  navy: Unit[];
+  planes: Unit[];
   buildings: Building[];
   home: { x: number; y: number };
   tc: Building | null;
@@ -90,19 +96,25 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   const citizens: Unit[] = [];
   const army: Unit[] = [];
   const priests: Unit[] = [];
+  const fishers: Unit[] = [];
+  const navy: Unit[] = [];
+  const planes: Unit[] = [];
   const buildings: Building[] = [];
   let king: Unit | null = null;
   for (const e of s.ents) {
     if (e.owner !== p.id || e.hp <= 0) continue;
     if (e.kind === 'unit' && s.kings[p.id] === e.id) king = e;
-    else if (e.kind === 'unit') (e.type === 'citizen' ? citizens : e.type === 'priest' ? priests : army).push(e);
-    else buildings.push(e);
+    else if (e.kind === 'unit') {
+      const list =
+        e.type === 'citizen' ? citizens : e.type === 'priest' ? priests : e.type === 'fisher' ? fishers : e.type === 'warship' || e.type === 'transport' ? navy : e.type === 'fighter' || e.type === 'bomber' ? planes : army;
+      list.push(e);
+    } else buildings.push(e);
   }
   const tc = buildings.find((b) => b.type === 'towncenter' && b.built) ?? null;
   // A King stays out of harm's way, sheltered in the Town Center.
   if (king && tc && !king.inside && king.order.k !== 'garrison') applyCommand(s, { t: 'garrison', p: p.id, ids: [king.id], target: tc.id });
   const home = tc ? { x: tc.x, y: tc.y } : { x: p.startX, y: p.startY };
-  const v: View = { p, citizens, army, priests, buildings, home, tc, budget: { ...p.res } };
+  const v: View = { p, citizens, army, priests, fishers, navy, planes, buildings, home, tc, budget: { ...p.res } };
   const issue = (c: Command) => applyCommand(s, c);
 
   // People first: a growing town pays for everything else.
@@ -128,11 +140,22 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
     spend(v, cost);
   }
 
+  // In the age of flight, save up for an airfield before anything smaller takes the wood.
+  if (L.clever && p.epoch >= 4 && citizens.length >= 24 && !buildings.some((b) => b.type === 'airfield')) {
+    const cost = buildingCostFor(s, p.id, 'airfield');
+    const recent = s.tick - (mem.ordered.airfield ?? -99999) < secs(40);
+    const spot = !recent && afford(v, cost) ? findSpot(s, 'airfield', home.x, home.y, 6, 22) : null;
+    if (!spot || !construct(s, v, mem, 'airfield', spot, 3, issue)) spend(v, cost);
+  }
+
   townBell(s, v, mem, issue);
   research(s, v, citizens.length >= wantCitizens - 2, issue);
   trade(s, v, issue);
   planBuildings(s, v, mem, issue);
   assignCitizens(s, v, issue);
+  // Ships and aircraft are few and dear: they get first call on the treasury.
+  seafaring(s, v, mem, issue);
+  airforce(s, v, mem, issue);
   military(s, v, mem, issue);
   priestly(s, v, mem, issue);
 }
@@ -199,6 +222,67 @@ export function findSpot(s: GameState, type: BuildingType, x: number, y: number,
     }
   }
   return null;
+}
+
+/** How much open water joins a tile (counted up to `cap`). */
+function waterReach(s: GameState, start: number, cap: number): number {
+  const seen = new Set<number>([start]);
+  const queue = [start];
+  for (let q = 0; q < queue.length && seen.size < cap; q++) {
+    const i = queue[q];
+    const x = i % s.w;
+    const y = (i - x) / s.w;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx;
+      const ny = y + dy;
+      const ni = ny * s.w + nx;
+      if (seen.has(ni) || !walkable(s, nx, ny, NAVAL)) continue;
+      seen.add(ni);
+      queue.push(ni);
+    }
+  }
+  return seen.size;
+}
+
+/** A spot for a dock on a shore near a point, on water big enough to sail, as close to fish as may be. */
+export function findDockSpot(s: GameState, x: number, y: number, maxR: number): { tx: number; ty: number } | null {
+  let best: { tx: number; ty: number } | null = null;
+  let bestScore = Infinity;
+  const fish: number[] = [];
+  for (let ty = Math.max(0, Math.floor(y) - maxR - 6); ty < Math.min(s.h, y + maxR + 6); ty++) {
+    for (let tx = Math.max(0, Math.floor(x) - maxR - 6); tx < Math.min(s.w, x + maxR + 6); tx++) if (s.res[ty * s.w + tx] === R_FISH) fish.push(ty * s.w + tx);
+  }
+  for (let ty = Math.floor(y) - maxR; ty <= y + maxR; ty++) {
+    for (let tx = Math.floor(x) - maxR; tx <= x + maxR; tx++) {
+      if (placeProblem(s, 'dock', tx, ty)) continue;
+      const cx = tx + 1.5;
+      const cy = ty + 1.5;
+      const home = Math.sqrt((cx - x) * (cx - x) + (cy - y) * (cy - y));
+      if (home > maxR) continue;
+      let near = 99;
+      for (const f of fish) {
+        const fx = (f % s.w) + 0.5 - cx;
+        const fy = Math.floor(f / s.w) + 0.5 - cy;
+        near = Math.min(near, Math.sqrt(fx * fx + fy * fy));
+      }
+      const score = home + near * 0.8;
+      if (score >= bestScore) continue;
+      // The water beside it must be more than a pond.
+      let water = -1;
+      for (let k = -1; k <= 3 && water < 0; k++) {
+        for (const [wx, wy] of [[tx + k, ty - 1], [tx + k, ty + 3], [tx - 1, ty + k], [tx + 3, ty + k]]) {
+          if (walkable(s, wx, wy, NAVAL)) {
+            water = wy * s.w + wx;
+            break;
+          }
+        }
+      }
+      if (water < 0 || waterReach(s, water, 80) < 80) continue;
+      bestScore = score;
+      best = { tx, ty };
+    }
+  }
+  return best;
 }
 
 /** The ring of tiles around a footprint has no buildings or resources on it (so nothing gets walled in). */
@@ -303,6 +387,14 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
 
   const n = v.citizens.length;
   const clever = L.clever;
+
+  // A dock, where there is fish and water to sail near home.
+  if (n >= 9 && count(v, 'dock') === 0 && !recently('dock', 40) && s.tick - (mem.dockless ?? -99999) > secs(120)) {
+    const spot = findDockSpot(s, home.x, home.y, 24);
+    if (!spot) mem.dockless = s.tick;
+    else if (construct(s, v, mem, 'dock', spot, 2, issue)) return;
+  }
+
   const want: [BuildingType, boolean][] = [
     ['barracks', n >= 8 && count(v, 'barracks') === 0],
     ['range', n >= 12 && count(v, 'range') === 0],
@@ -324,7 +416,7 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   }
 
   // A wonder, when rich in the last epoch.
-  if (clever && p.epoch >= LAST_EPOCH && count(v, 'wonder') === 0 && !recently('wonder', 60)) {
+  if (clever && p.epoch >= 3 && count(v, 'wonder') === 0 && !recently('wonder', 60)) {
     const cost = buildingCostFor(s, p.id, 'wonder');
     if (RES.every((r) => !cost[r] || v.budget[r] >= cost[r]! + 200)) {
       const spot = findSpot(s, 'wonder', home.x, home.y, 6, 20);
@@ -518,6 +610,119 @@ function enemyHome(s: GameState, p: Player): { x: number; y: number } {
   return foe ? { x: foe.startX, y: foe.startY } : { x: s.w / 2, y: s.h / 2 };
 }
 
+// ---- Ships and aircraft ----------------------------------------------------------------------------
+
+/** Fishing boats on the shoals, and a fleet to guard them and raid the enemy's. */
+function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  const L = AI_LEVELS[p.ai!];
+  const dock = v.buildings.find((b) => b.type === 'dock' && b.built);
+  if (!dock) return;
+  // Fishing boats: as many as there are shoals near the dock, up to a few.
+  const shoals = countFish(s, dock.x, dock.y, 14);
+  const wantBoats = Math.min(shoals, 2 + p.epoch, L.clever ? 6 : 4);
+  const queued = (u: UnitType) => dock.queue.filter((q) => q.unit === u).length;
+  if (v.fishers.length + queued('fisher') < wantBoats && dock.queue.length < 2) {
+    const cost = unitStats('fisher', p.epoch).cost;
+    if (afford(v, cost)) {
+      issue({ t: 'train', p: p.id, building: dock.id, unit: 'fisher' });
+      spend(v, cost);
+    }
+  }
+  for (const f of v.fishers) {
+    if (f.order.k !== 'idle') continue;
+    const t = findResource(s, R_FISH, f.x, f.y, 18);
+    if (t >= 0) issue({ t: 'gather', p: p.id, ids: [f.id], tile: t });
+  }
+  // Warships: once the Bronze Age opens them, if the enemy has boats or the map is mostly sea.
+  if (!L.clever || p.epoch < 1) return;
+  const enemyShips = s.ents.filter((e): e is Unit => e.kind === 'unit' && e.hp > 0 && isEnemy(s, p.id, e.owner) && (e.type === 'warship' || e.type === 'fisher' || e.type === 'transport') && p.vis[Math.floor(e.y) * s.w + Math.floor(e.x)] === 1);
+  const warships = v.navy.filter((u) => u.type === 'warship');
+  const wantShips = s.mapType === 'sea' ? Math.min(2 + p.epoch, 6) : enemyShips.length ? Math.min(2 + Math.floor(enemyShips.length / 2), 5) : 0;
+  if (warships.length + queued('warship') < wantShips && dock.queue.length < 2 && v.army.length >= 3) {
+    const cost = unitStats('warship', p.epoch).cost;
+    if (afford(v, cost)) {
+      issue({ t: 'train', p: p.id, building: dock.id, unit: 'warship' });
+      spend(v, cost);
+    } else if (warships.length < 2) spend(v, cost);
+  }
+  const idle = warships.filter((u) => u.order.k === 'idle');
+  if (!idle.length) return;
+  // Raid when the army attacks (or when there's a fleet to sink in sight); otherwise guard the dock.
+  const prey = enemyShips[0] ?? (mem.attacking ? enemyDock(s, p) : null);
+  if (prey && idle.length >= Math.min(2, warships.length)) issue({ t: 'move', p: p.id, ids: idle.map((u) => u.id), x: prey.x, y: prey.y, amove: true });
+  else {
+    const far = idle.filter((u) => (u.x - dock.x) * (u.x - dock.x) + (u.y - dock.y) * (u.y - dock.y) > 100);
+    if (far.length) issue({ t: 'move', p: p.id, ids: far.map((u) => u.id), x: dock.x, y: dock.y });
+  }
+}
+
+function countFish(s: GameState, x: number, y: number, r: number): number {
+  let n = 0;
+  for (let ty = Math.max(0, Math.floor(y - r)); ty <= Math.min(s.h - 1, y + r); ty++) {
+    for (let tx = Math.max(0, Math.floor(x - r)); tx <= Math.min(s.w - 1, x + r); tx++) if (s.res[ty * s.w + tx] === R_FISH) n++;
+  }
+  return n;
+}
+
+/** The enemy's dock it knows of, if any. */
+function enemyDock(s: GameState, p: Player): Building | null {
+  for (const e of s.ents) if (e.kind === 'building' && e.type === 'dock' && e.hp > 0 && isEnemy(s, p.id, e.owner) && p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) return e;
+  return null;
+}
+
+/** Fighters to keep the sky clear, bombers to break the enemy's town. */
+function airforce(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  const field = v.buildings.find((b) => b.type === 'airfield' && b.built);
+  if (!field) return;
+  const fighters = v.planes.filter((u) => u.type === 'fighter');
+  const bombers = v.planes.filter((u) => u.type === 'bomber');
+  if (field.queue.length < 2 && v.army.length >= 3) {
+    const unit: UnitType = fighters.length < Math.max(2, bombers.length) ? 'fighter' : 'bomber';
+    if ((unit === 'fighter' ? fighters.length : bombers.length) < 4 + mem.wave) {
+      const cost = unitStats(unit, p.epoch).cost;
+      // Paid for now, or (for the first few) saved up for while the army waits its turn.
+      if (afford(v, cost)) {
+        issue({ t: 'train', p: p.id, building: field.id, unit });
+        spend(v, cost);
+      } else if (v.planes.length < 3) spend(v, cost);
+    }
+  }
+  // Fighters chase enemy aircraft near home, else fly with the attack.
+  const enemyAir = s.ents.find((e): e is Unit => e.kind === 'unit' && e.hp > 0 && (e.type === 'fighter' || e.type === 'bomber') && isEnemy(s, p.id, e.owner) && (e.x - v.home.x) * (e.x - v.home.x) + (e.y - v.home.y) * (e.y - v.home.y) < 30 * 30);
+  const freeFighters = fighters.filter((u) => u.order.k === 'idle');
+  if (enemyAir && freeFighters.length) issue({ t: 'attack', p: p.id, ids: freeFighters.map((u) => u.id), target: enemyAir.id });
+  // Bombers set out in a group against the enemy's town when the army attacks, or every couple of minutes.
+  const ready = bombers.filter((u) => u.order.k === 'idle');
+  if (ready.length >= 2 && (mem.attacking || s.tick - (mem.sortie ?? 0) > secs(120)) && s.tick >= s.peaceUntil) {
+    const target = enemyTarget(s, p);
+    if (target) {
+      issue({ t: 'attack', p: p.id, ids: ready.map((u) => u.id), target: target.id });
+      if (!enemyAir && freeFighters.length) issue({ t: 'move', p: p.id, ids: freeFighters.map((u) => u.id), x: target.x, y: target.y, amove: true });
+      mem.sortie = s.tick;
+    }
+  }
+}
+
+/** A building of the enemy's worth bombing: their nearest Town Center, or any building known. */
+function enemyTarget(s: GameState, p: Player): Building | null {
+  let best: Building | null = null;
+  let bestD = Infinity;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner) || !p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
+    if (e.type === 'wall' || e.type === 'gate' || e.type === 'farm') continue;
+    const dx = e.x - p.startX;
+    const dy = e.y - p.startY;
+    const d = dx * dx + dy * dy + (e.type === 'wonder' ? -1e6 : e.type === 'towncenter' ? -400 : 0);
+    if (d < bestD) {
+      bestD = d;
+      best = e;
+    }
+  }
+  return best;
+}
+
 function pickUnit(v: View, mem: AiMemory, building: Building): UnitType | null {
   const trains = BUILDINGS[building.type].trains.filter((t) => t !== 'citizen' && t !== 'hero' && unitEpoch(t) <= v.p.epoch);
   if (!trains.length) return null;
@@ -594,7 +799,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   for (const b of v.buildings) {
     if (!b.built || b.queue.length >= Math.min(2, MAX_QUEUE) || keepCitizensGrowing) continue;
     const trains = BUILDINGS[b.type].trains;
-    if (!trains.length || trains.includes('citizen')) continue;
+    if (!trains.length || trains.includes('citizen') || b.type === 'dock' || b.type === 'airfield') continue;
     let unit: UnitType | null;
     if (b.type === 'workshop') unit = siege < (p.epoch >= 2 ? 3 : 2) && v.army.length >= 6 ? 'siege' : null;
     else if (b.type === 'temple') unit = v.priests.length < 2 && v.army.length >= 6 ? 'priest' : null;
