@@ -4,6 +4,12 @@ A real-time strategy game in the browser, in the spirit of Empire Earth and Age 
 
 What players love most about the classics, and where to find it here, is written up in [docs/design-notes.md](docs/design-notes.md).
 
+| | |
+|---|---|
+| ![A Bronze Age town with a ziggurat wonder](docs/screenshots/town-bronze.jpg) | ![The same town in the Gunpowder Age](docs/screenshots/town-gunpowder.jpg) |
+| ![A Middle Ages town: cathedral wonder, church, market, forge, walls](docs/screenshots/town-middle-ages.jpg) | ![Two armies clash; a catapult's boulder lands](docs/screenshots/battle.jpg) |
+| ![Dragging out a palisade](docs/screenshots/walls.jpg) | ![An online room](docs/screenshots/online-lobby.jpg) |
+
 ## What's in it
 
 - **Four epochs.** Stone, Bronze, Middle Ages and Gunpowder. Advancing costs food, wood, gold and stone and takes time at the Town Center. When you advance, every unit re-arms (clubman to spearman to pikeman to halberdier) and every building is rebuilt in the new style, keeping its share of health.
