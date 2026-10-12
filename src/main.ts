@@ -776,6 +776,29 @@ function cursorFor(s: GameState): string {
 
 let cursorTimer = 0;
 
+/**
+ * Laptops differ a lot: if the game runs below about 30 frames a second for a while on High, step
+ * down to Medium (and from there to Low), once each, and say so.
+ */
+const fps = { time: 0, frames: 0, stepped: 0 };
+function watchFrameRate(dt: number): void {
+  if (document.hidden || paused || fps.stepped >= 2) return;
+  fps.time += dt;
+  fps.frames++;
+  if (fps.time < 6) return;
+  const rate = fps.frames / fps.time;
+  fps.time = 0;
+  fps.frames = 0;
+  if (rate >= 28) return;
+  const q = view.qualityName;
+  const next: QualityName | null = q === 'high' ? 'medium' : q === 'medium' ? 'low' : null;
+  if (!next) return;
+  fps.stepped++;
+  view.setQuality(next);
+  qualitySel.value = next;
+  hud.toast(`Graphics set to ${QUALITY[next].label} for a smoother game (change it in the Menu)`, 'info');
+}
+
 function frame(now: number): void {
   // A frame stamp can be a hair earlier than the clock read at start-up: never step backward.
   const dt = Math.max(0, Math.min(0.1, (now - lastFrame) / 1000));
@@ -846,6 +869,7 @@ function frame(now: number): void {
       ghost: placing && placeAt ? { type: placing, ...placeAt } : null,
       rallyOf: selection.size === 1 ? [...selection][0] : null,
     });
+    if (mode === 'play') watchFrameRate(dt);
     if (mode !== 'title') {
       hudTimer -= dt;
       if (hudTimer <= 0) {

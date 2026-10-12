@@ -95,6 +95,20 @@ describe('the economy', () => {
     expect(p.res.wood).toBe(250 - BUILDINGS.house.cost.wood!);
   });
 
+  it('builders go back to the work they were pulled off', () => {
+    const s = solo();
+    const p = s.players[0];
+    const tc = tcOf(s, 0);
+    const [a, b] = citizens(s, 0);
+    const tree = findResource(s, R_TREE, p.startX, p.startY, 30);
+    run(s, 20, [{ t: 'gather', p: 0, ids: [a.id, b.id], tile: tree }]);
+    const at = findSpot(s, 'house', tc.x, tc.y, 4, 12)!;
+    run(s, 40, [{ t: 'build', p: 0, ids: [a.id], type: 'house', tx: at.tx, ty: at.ty }]);
+    expect(mine(s, 0).some((e) => e.kind === 'building' && e.type === 'house' && e.built)).toBe(true);
+    expect(a.order.k).toBe('gather');
+    expect(a.order.k === 'gather' && a.order.res).toBe('wood');
+  });
+
   it('a farm feeds whoever works it, without running out', () => {
     const s = solo();
     const p = s.players[0];

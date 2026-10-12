@@ -156,7 +156,14 @@ export function applyCommand(s: GameState, c: Command): void {
       pay(p, def.cost);
       const b = placeBuilding(s, c.p, c.type, c.tx, c.ty, false);
       s.events.push({ k: 'placed', id: b.id, owner: c.p, type: c.type });
-      for (const u of myUnits(s, c.p, c.ids)) if (u.type === 'citizen') setOrder(u, { k: 'build', target: b.id });
+      for (const u of myUnits(s, c.p, c.ids)) {
+        if (u.type !== 'citizen') continue;
+        // Remember the work they were doing, to go back to it once the building is up.
+        const o = u.order;
+        const back = o.k === 'gather' ? { ...o, phase: 'go' as const } : o.k === 'farm' ? { ...o, phase: 'go' as const } : o.k === 'build' ? u.resume : null;
+        setOrder(u, { k: 'build', target: b.id });
+        u.resume = back;
+      }
       break;
     }
     case 'train': {

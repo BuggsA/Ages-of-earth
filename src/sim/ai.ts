@@ -119,8 +119,11 @@ function think(s: GameState, p: Player, mem: Memory): void {
     }
   }
 
-  // Epochs: once there are enough people, set the cost aside (so the army doesn't eat it) and advance.
-  const wantEpoch = p.epoch < LAST_EPOCH && !advancing && citizens.length >= ADVANCE_AT[p.epoch] && s.tick > secs(150 + p.epoch * 150);
+  // Epochs: once there are enough people, set the cost aside (so the army doesn't eat it) and advance;
+  // but when an attack is due and the army is short of it, soldiers come first.
+  const waveSize = L.wave + mem.wave * L.waveGrowth;
+  const armyFirst = s.tick > secs(L.firstAttack - 150) && army.length < waveSize && !mem.attacking;
+  const wantEpoch = p.epoch < LAST_EPOCH && !advancing && !armyFirst && citizens.length >= ADVANCE_AT[p.epoch] && s.tick > secs(150 + p.epoch * 150);
   if (wantEpoch) {
     const cost = EPOCHS[p.epoch + 1].cost;
     if (tc && tc.queue.length === 0 && afford(v, cost)) issue({ t: 'advance', p: p.id, building: tc.id });

@@ -97,6 +97,17 @@ export function createGame(setup: GameSetup): GameState {
   }
   countPop(s);
   updateVision(s);
+  // Everyone knows the lie of the land around home.
+  for (const p of s.players) {
+    for (let y = p.startY - 18; y <= p.startY + 18; y++) {
+      for (let x = p.startX - 18; x <= p.startX + 18; x++) {
+        if (x < 0 || y < 0 || x >= s.w || y >= s.h) continue;
+        const dx = x + 0.5 - p.startX;
+        const dy = y + 0.5 - p.startY;
+        if (dx * dx + dy * dy <= 18 * 18) p.seen[y * s.w + x] = 1;
+      }
+    }
+  }
   return s;
 }
 

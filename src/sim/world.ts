@@ -56,6 +56,7 @@ export function spawnUnit(s: GameState, owner: number, type: UnitType, x: number
     frac: 0,
     stuck: 0,
     miss: 0,
+    resume: null,
     act: 'idle',
     swing: -999,
     hurt: -999,

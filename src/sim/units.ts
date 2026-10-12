@@ -303,8 +303,19 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
     }
   }
   if (next) {
+    const back = u.resume;
     setOrder(u, { k: 'build', target: next.id });
+    u.resume = back;
     return;
+  }
+  // Back to the work they were pulled off, if any.
+  if (u.resume) {
+    const back = u.resume;
+    u.resume = null;
+    if (back.k === 'gather' || back.k === 'farm') {
+      setOrder(u, back);
+      return;
+    }
   }
   if (b.type === 'storehouse') {
     // Work whatever lies closest to the new storehouse.

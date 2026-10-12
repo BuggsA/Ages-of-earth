@@ -170,9 +170,9 @@ export interface AiLevel {
 }
 
 export const AI_LEVELS: Record<Difficulty, AiLevel> = {
-  easy: { label: 'Easy', gather: 0.8, citizens: 16, firstAttack: 540, wave: 6, waveGrowth: 3, think: 1.5, towers: 0 },
-  normal: { label: 'Normal', gather: 1, citizens: 24, firstAttack: 390, wave: 8, waveGrowth: 4, think: 1, towers: 1 },
-  hard: { label: 'Hard', gather: 1.15, citizens: 32, firstAttack: 300, wave: 10, waveGrowth: 5, think: 0.5, towers: 2 },
+  easy: { label: 'Easy', gather: 0.8, citizens: 16, firstAttack: 720, wave: 6, waveGrowth: 3, think: 1.5, towers: 0 },
+  normal: { label: 'Normal', gather: 1, citizens: 24, firstAttack: 480, wave: 8, waveGrowth: 4, think: 1, towers: 1 },
+  hard: { label: 'Hard', gather: 1.15, citizens: 32, firstAttack: 330, wave: 9, waveGrowth: 5, think: 0.5, towers: 2 },
 };
 
 export const PLAYER_COLORS = ['#2f7fe0', '#e0473a', '#e8b630', '#3aa35a'];

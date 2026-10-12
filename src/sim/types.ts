@@ -90,6 +90,8 @@ export interface Unit {
   stuck: number;
   /** Walks that ended without reaching what the order needed; the order is given up after a few. */
   miss: number;
+  /** The gathering or farming a citizen was pulled off to build, to go back to afterward. */
+  resume: Order | null;
   act: Act;
   /** Tick of the last swing or shot (for the strike animation). */
   swing: number;
