@@ -39,6 +39,23 @@ export function updateVision(s: GameState): void {
       p.seen[i] = 1;
     }
   }
+  // Allies share what they see.
+  for (let a = 0; a < s.players.length; a++) {
+    const pa = s.players[a];
+    for (let b = a + 1; b < s.players.length; b++) {
+      const pb = s.players[b];
+      if (pa.team !== pb.team) continue;
+      const n = pa.vis.length;
+      for (let i = 0; i < n; i++) {
+        const v = pa.vis[i] | pb.vis[i];
+        pa.vis[i] = v;
+        pb.vis[i] = v;
+        const sn = pa.seen[i] | pb.seen[i];
+        pa.seen[i] = sn;
+        pb.seen[i] = sn;
+      }
+    }
+  }
 }
 
 /** Whether a player sees a point now. */

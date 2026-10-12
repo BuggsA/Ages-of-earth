@@ -308,7 +308,7 @@ export class Hud {
     const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}`;
     const html = `<div class="sel-portrait"><img src="${unitPicture(u.type, p.epoch, p.color)}" alt=""></div>
       <div class="sel-info">
-        <div class="sel-name">${st.name}</div>
+        <div class="sel-name">${s.kings.includes(u.id) ? `👑 King (${st.name})` : st.name}</div>
         <div class="sel-sub">${mine ? status : `<span class="swatch" style="background:${p.color}"></span>${p.name}`}</div>
         ${hpBar(u.hp, st.hp, frac)}
         <div class="stats">
@@ -598,6 +598,7 @@ function resHint(r: string): string {
 }
 
 export function nameOf(s: GameState, e: Ent): string {
+  if (e.kind === 'unit' && s.kings.includes(e.id)) return 'King';
   return e.kind === 'unit' ? statsFor(s, e.owner, e.type).name : BUILDINGS[e.type].name;
 }
 

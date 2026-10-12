@@ -82,6 +82,14 @@ kbd {
 .setup .wide { grid-column: 1 / -1; }
 .civ-blurb { grid-column: 1 / -1; font-size: 13px; font-weight: 700; color: var(--ink); opacity: 0.85; min-height: 18px; }
 .title-buttons { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.title-links { display: flex; gap: 16px; justify-content: center; margin-top: 10px; }
+.link { font: 800 13px 'Nunito', sans-serif; color: var(--gold-2); background: none; border: none; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; padding: 2px; }
+.replay-bar {
+  position: absolute; top: 48px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; align-items: center; padding: 6px 10px; border-radius: 12px;
+  background: rgba(20, 24, 34, 0.92); border: 1px solid var(--edge); box-shadow: var(--shadow);
+}
+.replay-bar .rb-title { font: 800 14px 'Cinzel', serif; color: var(--gold); margin-right: 4px; }
+.replay-bar select { font: 700 13px 'Nunito', sans-serif; color: var(--ink); background: #1b2030; border: 1px solid var(--edge-soft); border-radius: 8px; padding: 4px; }
 .seed-row { display: flex; gap: 6px; }
 .seed-row input { flex: 1; min-width: 0; }
 .howto { margin-top: 16px; text-align: left; color: var(--muted); }
@@ -185,6 +193,39 @@ kbd {
 .tooltip .cost span { display: flex; align-items: center; gap: 3px; font-weight: 900; }
 .tooltip .cost span.short { color: var(--bad); }
 .tooltip .hint { color: var(--muted); font-weight: 600; }
+
+/* Online */
+#online { z-index: 20; }
+.online-card h2 { margin: 0 0 6px; font: 800 30px 'Cinzel', serif; color: var(--gold); }
+.online-card h3 { margin: 0 0 8px; font: 800 15px 'Cinzel', serif; color: var(--gold-2); }
+.online-card.wide { width: min(720px, calc(100% - 32px)); }
+.online-card .code { letter-spacing: 4px; color: var(--ink); }
+.online-card .field { display: grid; gap: 4px; text-align: left; font-size: 13px; font-weight: 800; color: var(--muted); margin: 10px 0; }
+.online-card input, .online-card select {
+  font: 700 14px 'Nunito', sans-serif; color: var(--ink); background: #1b2030; border: 1px solid var(--edge-soft); border-radius: 8px; padding: 6px 8px; min-width: 0;
+}
+.online-card select:disabled { opacity: 0.75; }
+.online-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0 16px; }
+.online-choices .choice { padding: 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); }
+.lobby-error { margin: 8px 0; padding: 8px 10px; border-radius: 8px; background: rgba(120, 24, 18, 0.6); border: 1px solid var(--bad); color: #ffd0c8; font-weight: 800; font-size: 14px; }
+.share { display: flex; gap: 6px; margin: 6px 0 12px; }
+.share input { flex: 1; font-size: 13px; }
+.seats { width: 100%; border-collapse: collapse; margin-bottom: 8px; font-weight: 800; font-size: 14px; }
+.seats th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; padding: 4px; }
+.seats td { padding: 4px; border-top: 1px solid rgba(255, 255, 255, 0.06); text-align: left; }
+.seats select { width: 100%; }
+.add-ai { text-align: left; margin-bottom: 12px; }
+.online-card .setup { grid-template-columns: repeat(5, 1fr); }
+.lobby-chat { text-align: left; margin-bottom: 14px; }
+.lobby-chat .lines { height: 90px; overflow-y: auto; padding: 6px 8px; border-radius: 8px; background: rgba(0, 0, 0, 0.25); font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+.lobby-chat input { width: 100%; box-sizing: border-box; }
+#chat { position: absolute; left: 10px; bottom: 214px; width: 380px; pointer-events: none; }
+#hud > #chat { pointer-events: none; }
+#chat-lines { display: flex; flex-direction: column; gap: 3px; margin-bottom: 6px; }
+.chat-line { padding: 3px 9px; border-radius: 7px; background: rgba(16, 19, 27, 0.78); font-size: 14px; font-weight: 700; align-self: flex-start; transition: opacity 1.2s; }
+.chat-line.old { opacity: 0; }
+#chat-input { pointer-events: auto; width: 100%; box-sizing: border-box; font: 700 14px 'Nunito', sans-serif; color: var(--ink); background: rgba(16, 19, 27, 0.92); border: 1px solid var(--gold); border-radius: 8px; padding: 7px 10px; }
+body.online .tip-box { bottom: 330px; }
 
 /* Tips */
 .tip-box {

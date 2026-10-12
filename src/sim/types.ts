@@ -15,6 +15,8 @@ export type BuildingType =
 export type Difficulty = 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
 export type MapType = 'continental' | 'highlands' | 'lakes' | 'forest' | 'plains';
+/** Conquest: destroy every rival town. Regicide: each people has a King; lose them and you lose. Deathmatch: start rich. */
+export type GameMode = 'conquest' | 'regicide' | 'deathmatch';
 export type Stance = 'aggressive' | 'defensive' | 'stand';
 export type CivId = 'egyptians' | 'greeks' | 'romans' | 'mongols' | 'chinese' | 'britons';
 export type TechId =
@@ -292,6 +294,7 @@ export type GameEvent =
   | { k: 'defeated'; owner: number }
   | { k: 'over'; winner: number; how: 'conquest' | 'wonder' | 'resign' }
   | { k: 'refused'; owner: number; why: string }
+  | { k: 'left'; owner: number }
   | { k: 'shot'; owner: number; kind: Shot['kind']; x: number; y: number };
 
 export interface GameState {
@@ -299,6 +302,9 @@ export interface GameState {
   seed: number;
   size: MapSize;
   mapType: MapType;
+  mode: GameMode;
+  /** Regicide: each player's King (a unit id), or 0. */
+  kings: number[];
   w: number;
   h: number;
   /** Per tile: T_GRASS, T_SAND, T_WATER or T_ROCK. */
@@ -378,4 +384,6 @@ export type Command =
   | { t: 'trade'; p: number; res: 'food' | 'wood' | 'stone'; buy: boolean }
   | { t: 'stop'; p: number; ids: number[] }
   | { t: 'delete'; p: number; ids: number[] }
-  | { t: 'resign'; p: number };
+  | { t: 'resign'; p: number }
+  /** A player left an online match: the computer takes over their people. */
+  | { t: 'leave'; p: number };

@@ -18,6 +18,7 @@ const game = (o: Partial<GameSetup> & { civs?: CivId[] } = {}): GameState =>
     startEpoch: o.startEpoch,
     peaceMinutes: o.peaceMinutes,
     wonderSeconds: o.wonderSeconds,
+    mode: o.mode,
     players: o.players ?? [
       { name: 'A', ai: null, civ: o.civs?.[0] ?? 'romans' },
       { name: 'B', ai: null, civ: o.civs?.[1] ?? 'romans' },
@@ -328,5 +329,74 @@ describe('saving', () => {
     }
     expect(t.tick).toBe(s.tick);
     expect(checksum(t)).toBe(checksum(s));
+  });
+});
+
+describe('gates in walls', () => {
+  it('a gate can be set into your own wall, replacing the pieces it covers, but not into a rival’s', () => {
+    const s = game({ startEpoch: 1 });
+    const p = s.players[0];
+    p.res.stone = 1000;
+    // A clear 5×5 patch, with a wall across its middle.
+    const at = findSpot(s, 'wonder', p.startX, p.startY, 6, 20)!;
+    const y = at.ty + 2;
+    const x0 = at.tx;
+    for (let x = x0; x < x0 + 5; x++) placeBuilding(s, 0, 'wall', x, y, true);
+    const before = s.ents.filter((e) => e.kind === 'building' && e.type === 'wall').length;
+    const c = s.ents.find((e): e is Unit => e.kind === 'unit' && e.owner === 0 && e.type === 'citizen')!;
+    step(s, [{ t: 'build', p: 0, ids: [c.id], type: 'gate', tx: x0 + 2, ty: y }]);
+    const gate = s.ents.find((e): e is Building => e.kind === 'building' && e.type === 'gate');
+    expect(gate).toBeTruthy();
+    expect(gate!.dir).toBe(0);
+    expect(s.ents.filter((e) => e.kind === 'building' && e.type === 'wall').length).toBe(before - 2);
+    // The rival can't put a gate in our wall.
+    s.players[1].res.stone = 1000;
+    step(s, [{ t: 'build', p: 1, ids: [], type: 'gate', tx: x0, ty: y }]);
+    expect(s.ents.filter((e) => e.kind === 'building' && e.type === 'gate').length).toBe(1);
+  });
+});
+
+describe('game modes', () => {
+  it('regicide: each people has a King, who cannot be converted, and losing them loses the match', () => {
+    const s = game({ mode: 'regicide' });
+    expect(s.kings.every((id) => id > 0)).toBe(true);
+    const king = s.byId.get(s.kings[1]) as Unit;
+    expect(king.type).toBe('hero');
+    // A King doesn't count against the one-hero limit.
+    rich(s, 1);
+    run(s, 1, [{ t: 'train', p: 1, building: tcOf(s, 1).id, unit: 'hero' }]);
+    expect(tcOf(s, 1).queue.some((q) => q.unit === 'hero')).toBe(true);
+    king.hp = 0;
+    run(s, 3);
+    expect(s.over).toBe(true);
+    expect(s.winner).toBe(s.players[0].team);
+  });
+
+  it('deathmatch: everyone starts rich', () => {
+    const s = game({ mode: 'deathmatch' });
+    expect(s.players.every((p) => p.res.food >= 10000 && p.res.gold >= 10000)).toBe(true);
+  });
+});
+
+describe('allies', () => {
+  it('allies see what each other see; rivals do not', () => {
+    const s = game({ players: [
+      { name: 'A', ai: null, team: 1 },
+      { name: 'B', ai: null, team: 1 },
+      { name: 'C', ai: null, team: 2 },
+    ] });
+    run(s, 1);
+    const b = s.players[1];
+    const at = Math.floor(b.startY) * s.w + Math.floor(b.startX);
+    expect(s.players[0].vis[at]).toBe(1);
+    expect(s.players[2].vis[at]).toBe(0);
+  });
+
+  it('a player who leaves an online match is taken over by the computer', () => {
+    const s = game();
+    run(s, 1, [{ t: 'leave', p: 1 }]);
+    expect(s.players[1].ai).toBe('normal');
+    run(s, 60);
+    expect(citizens(s, 1).some((u) => u.order.k !== 'idle')).toBe(true);
   });
 });

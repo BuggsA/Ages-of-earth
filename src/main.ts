@@ -1,17 +1,21 @@
 import './ui/style.css';
+import { Music } from './audio/music';
 import { sound, type SoundName } from './audio/sound';
 import { CameraRig } from './render/camera';
 import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { wallLine } from './sim/commands';
 import { BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, TECHS, TICK_HZ, unitStats } from './sim/data';
-import { createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
+import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
 import { placeProblem } from './sim/grid';
 import { findSpot } from './sim/ai';
 import { placeBuilding, spawnUnit } from './sim/world';
-import type { BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameState, HistoryPoint, MapSize, MapType, Unit } from './sim/types';
+import type { BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, MapSize, MapType, Unit } from './sim/types';
 import { R_NONE } from './sim/types';
+import { NetClient, newRoomCode, saveName, savedName } from './net/client';
+import { HASH_EVERY, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
 import { deserialize, serialize } from './sim/save';
+import { Lobby } from './ui/lobby';
 import { Hud, nameOf } from './ui/hud';
 import { Minimap } from './ui/minimap';
 import { Tips } from './ui/tips';
@@ -29,6 +33,20 @@ const world = $('world');
 const view = new View(world);
 const minimap = new Minimap($('minimap') as HTMLCanvasElement);
 const tips = new Tips();
+const music = new Music();
+/** The style of music wanted now (it starts once the browser lets sound play). */
+let musicEpoch = 2;
+sound.onReady = (ctx, out) => {
+  music.attach(ctx, out);
+  music.start(musicEpoch);
+};
+function playMusic(epoch: number): void {
+  musicEpoch = epoch;
+  if (music.attached) {
+    music.start(epoch);
+    music.setEpoch(epoch);
+  }
+}
 
 type Mode = 'title' | 'play' | 'over';
 let mode: Mode = 'title';
@@ -79,9 +97,162 @@ const hud = new Hud({
 });
 
 function issue(c: Command): void {
-  if (mode !== 'play') return;
-  pending.push(c);
+  if (mode !== 'play' || watching) return;
+  if (online && net) net.send({ t: 'cmd', c });
+  else pending.push(c);
 }
+
+// ---- Online ----------------------------------------------------------------------------------------
+
+/** In an online match: the room's line, the turns received so far and how far they reach unbroken. */
+let net: NetClient | null = null;
+let online = false;
+let netTurns: Command[][] = [];
+let netReach = 0;
+let netPaused = false;
+
+const lobby = new Lobby(
+  {
+    create: async (name) => {
+      saveName(name);
+      lobby.showConnecting('…');
+      try {
+        connectRoom(await newRoomCode(), name);
+      } catch {
+        lobby.showEntry('', 'Could not reach the game server. Online play needs the game served by its Worker (see the README).');
+      }
+    },
+    join: (code, name) => {
+      saveName(name);
+      connectRoom(code, name);
+    },
+    leave: () => leaveOnline(),
+    send: (m) => net?.send(m),
+  },
+  () => savedName(),
+);
+
+function connectRoom(code: string, name: string): void {
+  net?.close();
+  lobby.showConnecting(code);
+  const n = new NetClient(code, name);
+  net = n;
+  n.onMessage = (m) => net === n && onNet(m);
+  n.onClosed = (why) => {
+    if (net !== n) return;
+    net = null;
+    if (online && mode !== 'title') {
+      hud.banner('Disconnected', why, 6000);
+      online = false;
+      mode = 'over';
+    } else lobby.showEntry(code, why);
+  };
+  n.onStatus = (st) => {
+    if (online && st === 'retrying') hud.toast('Connection lost: reconnecting…', 'alert');
+  };
+  n.connect();
+  history.replaceState(null, '', `?room=${code}`);
+}
+
+function leaveOnline(): void {
+  if (net && online && game && !game.over) net.send({ t: 'cmd', c: { t: 'leave', p: viewer } });
+  net?.close();
+  net = null;
+  online = false;
+  lobby.hide();
+  history.replaceState(null, '', location.pathname);
+  $('title').classList.remove('hidden');
+}
+
+function onNet(m: ServerMsg): void {
+  switch (m.t) {
+    case 'lobby':
+      if (!m.lobby.started && mode === 'title') {
+        $('title').classList.add('hidden');
+        lobby.showRoom(m.lobby, m.you);
+      }
+      break;
+    case 'start':
+      startOnline(m.match, m.you);
+      break;
+    case 'turn':
+      netTurns[m.n] = m.c;
+      while (netTurns[netReach] !== undefined) netReach++;
+      break;
+    case 'catchup':
+      netTurns = m.turns.slice();
+      netReach = netTurns.length;
+      break;
+    case 'paused':
+      netPaused = m.on;
+      $('paused').classList.toggle('hidden', !m.on);
+      $('pause-btn').innerHTML = m.on ? PLAY_ICON : PAUSE_ICON;
+      if (m.by) hud.toast(`${m.by} ${m.on ? 'paused' : 'resumed'} the game`, 'info');
+      break;
+    case 'chat':
+      if (online && mode !== 'title') chatLine(m.from, m.color, m.text);
+      else lobby.addChat(m.from, m.color, m.text);
+      break;
+    case 'desync':
+      hud.banner('Out of step', 'This browser and the others no longer agree. Reload the page to rejoin.', 8000);
+      break;
+    case 'error':
+      if (online && mode !== 'title') hud.toast(m.why, 'bad');
+      else lobby.showError(m.why);
+      break;
+  }
+}
+
+function startOnline(match: MatchStart, you: number): void {
+  const players: PlayerSetup[] = match.seats.map((seat, i) => ({
+    name: seat.kind === 'ai' ? `${LEADERS[match.civs[i]]}` : seat.name,
+    ai: seat.kind === 'ai' ? (seat.level ?? 'normal') : null,
+    color: PLAYER_COLORS[seat.color],
+    team: seat.team,
+    civ: match.civs[i],
+  }));
+  netTurns = [];
+  netReach = 0;
+  netPaused = false;
+  online = true;
+  lobby.hide();
+  startMatch({ ...match.setup, players }, undefined, you);
+}
+
+/** A line of chat, shown over the game for a while. */
+function chatLine(from: string, color: number, text: string): void {
+  const box = $('chat-lines');
+  const div = document.createElement('div');
+  div.className = 'chat-line';
+  const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+  div.innerHTML = from ? `<b style="color:${PLAYER_COLORS[color] ?? '#fff'}">${esc(from)}:</b> ${esc(text)}` : `<i>${esc(text)}</i>`;
+  box.appendChild(div);
+  while (box.children.length > 6) box.firstChild!.remove();
+  setTimeout(() => div.classList.add('old'), 12000);
+  if (from) play('click');
+}
+
+function openChat(): void {
+  const input = $<HTMLInputElement>('chat-input');
+  input.classList.remove('hidden');
+  input.focus();
+}
+
+$('chat-input').addEventListener('keydown', (e) => {
+  const input = e.target as HTMLInputElement;
+  e.stopPropagation();
+  if (e.key === 'Enter') {
+    const text = input.value.trim();
+    if (text && net) net.send({ t: 'chat', text });
+    input.value = '';
+    input.classList.add('hidden');
+    input.blur();
+  } else if (e.key === 'Escape') {
+    input.value = '';
+    input.classList.add('hidden');
+    input.blur();
+  }
+});
 
 function play(name: SoundName, pan = 0, gain = 1): void {
   sound.play(name, { pan, gain });
@@ -95,7 +266,7 @@ function newSeed(): number {
   return 1 + Math.floor(Math.random() * 999999);
 }
 
-function startAttract(): void {
+function startAttract(skipAhead = true): void {
   mode = 'title';
   const seed = newSeed();
   const maps = Object.keys(MAP_TYPES) as MapType[];
@@ -106,8 +277,9 @@ function startAttract(): void {
   view.rig.zoom(1.05);
   minimap.setup(game);
   // Skip ahead so there is a town to look at.
-  for (let i = 0; i < TICK_HZ * 150; i++) step(game);
+  if (skipAhead) for (let i = 0; i < TICK_HZ * 150; i++) step(game);
   attractT = 0;
+  playMusic(2);
 }
 
 /** Leaders for the computer's peoples. */
@@ -138,13 +310,24 @@ function setupFromTitle(seed: number): GameSetup {
     players,
     startEpoch: Number(val('opt-epoch')),
     peaceMinutes: Number(val('opt-peace')),
+    mode: val('opt-mode') as GameMode,
   };
 }
 
-function startMatch(setup: GameSetup, saved?: GameState): void {
+function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   lastSetup = setup;
+  if (!online) {
+    net?.close();
+    net = null;
+  }
   game = saved ?? createGame(setup);
-  viewer = 0;
+  viewer = seat;
+  record = [];
+  if (!watchingNext) {
+    watching = null;
+    $('replay-bar').classList.add('hidden');
+  }
+  watchingNext = false;
   mode = 'play';
   pending = [];
   selection = new Set();
@@ -166,9 +349,11 @@ function startMatch(setup: GameSetup, saved?: GameState): void {
   $('paused').classList.add('hidden');
   const me = game.players[viewer];
   const rivals = game.players.filter((p) => p.team !== me.team).map((p) => `${p.name} of the ${CIVS[p.civ].name}`);
-  if (!saved) hud.banner(EPOCHS[me.epoch].name, `You lead the ${CIVS[me.civ].name}. Facing ${rivals.join(', ')}.`, 5200);
+  const goal = game.mode === 'regicide' ? ' Keep your King alive: shelter them in the Town Center.' : game.mode === 'deathmatch' ? ' Everyone starts rich: build fast.' : '';
+  if (!saved) hud.banner(EPOCHS[me.epoch].name, `You lead the ${CIVS[me.civ].name}. Facing ${rivals.join(', ')}.${goal}`, 6000);
   else hud.banner('Welcome back', `${EPOCHS[me.epoch].name}, ${fmtClock(game.tick)} into the match.`, 3200);
   sound.startAmbience();
+  playMusic(me.epoch);
   // Start with the Town Center in view and selected.
   const tc = game.ents.find((e) => e.kind === 'building' && e.owner === viewer && e.type === 'towncenter');
   if (tc) {
@@ -176,6 +361,9 @@ function startMatch(setup: GameSetup, saved?: GameState): void {
     view.rig.focus(tc.x, tc.y + 3, true);
   }
   tips.start(saved ? 9999 : 0);
+  $('chat-lines').innerHTML = '';
+  document.body.classList.toggle('online', online);
+  if (online) chatLine('', 0, 'Online match: press Enter to chat.');
 }
 
 const fmtClock = (ticks: number) => {
@@ -185,6 +373,12 @@ const fmtClock = (ticks: number) => {
 
 function toTitle(): void {
   autosave(true);
+  if (watching) {
+    watching = null;
+    $('replay-bar').classList.add('hidden');
+  }
+  if (online || net) leaveOnline();
+  document.body.classList.remove('online');
   tips.hide();
   $('hud').classList.add('hidden');
   $('modal').classList.add('hidden');
@@ -198,7 +392,7 @@ const SAVE_KEY = 'ages-save';
 
 function saveGame(s: GameState, setup: GameSetup): boolean {
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, setup, at: Date.now(), state: serialize(s) }));
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, setup, at: Date.now(), state: serialize(s), record }));
     showContinue();
     return true;
   } catch {
@@ -206,13 +400,13 @@ function saveGame(s: GameState, setup: GameSetup): boolean {
   }
 }
 
-function loadGame(): { setup: GameSetup; state: GameState } | null {
+function loadGame(): { setup: GameSetup; state: GameState; record: [number, Command[]][] } | null {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     const saved = JSON.parse(raw);
     if (saved.v !== 1) return null;
-    return { setup: saved.setup, state: deserialize(saved.state) };
+    return { setup: saved.setup, state: deserialize(saved.state), record: Array.isArray(saved.record) ? saved.record : [] };
   } catch {
     return null;
   }
@@ -246,7 +440,7 @@ function showContinue(): void {
 /** Keep a save as the match goes, and when the page is hidden or closed. */
 let autosaveAt = 0;
 function autosave(force = false): void {
-  if (!game || mode !== 'play' || !lastSetup || game.over) return;
+  if (!game || mode !== 'play' || !lastSetup || game.over || online || watching) return;
   if (!force && game.tick < autosaveAt) return;
   autosaveAt = game.tick + TICK_HZ * 60;
   saveGame(game, lastSetup);
@@ -255,6 +449,167 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) autosave(true);
 });
 window.addEventListener('pagehide', () => autosave(true));
+
+// ---- Replays --------------------------------------------------------------------------------------
+
+declare const __BUILD__: string;
+
+/** A recorded match: how it was set up and every command, by the tick it took effect. */
+interface ReplayFile {
+  v: 1;
+  build: string;
+  date: number;
+  setup: GameSetup;
+  viewer: number;
+  end: number;
+  cmds: [number, Command[]][];
+}
+
+const REPLAY_KEY = 'ages-replay';
+/** Commands of this match so far, for its replay. */
+let record: [number, Command[]][] = [];
+let watching: { file: ReplayFile; at: Map<number, Command[]>; speed: number } | null = null;
+let watchingNext = false;
+
+function replayOf(s: GameState): ReplayFile | null {
+  if (!lastSetup) return null;
+  return { v: 1, build: __BUILD__, date: Date.now(), setup: lastSetup, viewer, end: s.tick, cmds: record };
+}
+
+/** Keep the last match's replay in the browser (if it fits). */
+function keepReplay(s: GameState): void {
+  const r = replayOf(s);
+  if (!r) return;
+  try {
+    localStorage.setItem(REPLAY_KEY, JSON.stringify(r));
+  } catch {
+    /* Too big for storage: it can still be downloaded from the end screen. */
+  }
+  showReplayButton();
+}
+
+function downloadReplay(s: GameState): void {
+  const r = replayOf(s);
+  if (!r) return;
+  const blob = new Blob([JSON.stringify(r)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const d = new Date(r.date);
+  a.download = `ages-of-earth-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+function showReplayButton(): void {
+  let has = false;
+  try {
+    has = !!localStorage.getItem(REPLAY_KEY);
+  } catch {
+    has = false;
+  }
+  $('replay-last-btn').classList.toggle('hidden', !has);
+}
+
+function watchReplay(file: ReplayFile): void {
+  if (!file || file.v !== 1 || !file.setup || !Array.isArray(file.cmds)) {
+    hud.toast('That is not a replay file', 'bad');
+    return;
+  }
+  online = false;
+  watching = { file, at: new Map(file.cmds), speed: 1 };
+  watchingNext = true;
+  startMatch(file.setup, undefined, file.viewer);
+  tips.hide();
+  view.revealAll();
+  $('replay-bar').classList.remove('hidden');
+  replayBar();
+  hud.banner('Replay', file.build !== __BUILD__ ? 'Recorded with another version of the game: it may not play out the same.' : `${new Date(file.date).toLocaleString()}`, 4000);
+}
+
+/** Play a replay's commands at the chosen speed. */
+function stepReplay(s: GameState, dt: number): void {
+  const w = watching!;
+  if (paused || s.tick >= w.file.end) return;
+  acc += dt * w.speed;
+  let n = 0;
+  while (acc >= DT && n < 40 && s.tick < w.file.end) {
+    step(s, w.at.get(s.tick) ?? []);
+    view.events(s, s.events);
+    for (const ev of s.events) if (ev.k === 'epoch') hud.toast(`${s.players[ev.owner].name} reached the ${EPOCHS[ev.epoch].name}`, 'info');
+    acc -= DT;
+    n++;
+  }
+  if (n === 40) acc = 0;
+  if (s.tick >= w.file.end) hud.banner('End of the replay', '', 4000);
+}
+
+/** Jump ahead (without the sights and sounds on the way). */
+function skipReplay(seconds: number): void {
+  const s = game;
+  const w = watching;
+  if (!s || !w) return;
+  const to = Math.min(w.file.end, s.tick + seconds * TICK_HZ);
+  while (s.tick < to) step(s, w.at.get(s.tick) ?? []);
+  view.events(s, [{ k: 'depleted', tile: 0 }]);
+}
+
+function replayBar(): void {
+  const w = watching;
+  const s = game;
+  if (!w || !s) return;
+  const views = [`<option value="-1">Everything</option>`, ...s.players.map((p, i) => `<option value="${i}">${p.name}'s eyes</option>`)].join('');
+  $('replay-bar').innerHTML = `<span class="rb-title">Replay</span>
+    <button class="tb-btn" data-rb="pause">${paused ? '▶' : '⏸'}</button>
+    ${[1, 2, 4, 8].map((k) => `<button class="tb-btn ${w.speed === k ? 'alert' : ''}" data-rb="speed" data-k="${k}">${k}×</button>`).join('')}
+    <button class="tb-btn" data-rb="skip" title="Jump ahead a minute">+1 min</button>
+    <select id="rb-view">${views}</select>
+    <button class="tb-btn" data-rb="exit">Exit</button>`;
+}
+
+$('replay-bar').addEventListener('click', (e) => {
+  const b = (e.target as HTMLElement).closest<HTMLElement>('[data-rb]');
+  if (!b || !watching) return;
+  switch (b.dataset.rb) {
+    case 'pause':
+      togglePause();
+      break;
+    case 'speed':
+      watching.speed = Number(b.dataset.k);
+      break;
+    case 'skip':
+      skipReplay(60);
+      break;
+    case 'exit':
+      toTitle();
+      return;
+  }
+  replayBar();
+});
+$('replay-bar').addEventListener('change', (e) => {
+  const sel = e.target as HTMLSelectElement;
+  if (sel.id !== 'rb-view' || !game) return;
+  const v = Number(sel.value);
+  if (v < 0) view.setViewer(game, viewer, true);
+  else {
+    viewer = v;
+    view.setViewer(game, v, false);
+    setSelection([]);
+  }
+});
+
+const replayInput = document.createElement('input');
+replayInput.type = 'file';
+replayInput.accept = '.json,application/json';
+replayInput.addEventListener('change', async () => {
+  const f = replayInput.files?.[0];
+  replayInput.value = '';
+  if (!f) return;
+  try {
+    watchReplay(JSON.parse(await f.text()));
+  } catch {
+    hud.toast('Could not read that replay', 'bad');
+  }
+});
 
 // ---- Title screen ----------------------------------------------------------------------------------
 
@@ -273,6 +628,7 @@ const civBlurb = () => {
 };
 civSel.addEventListener('change', civBlurb);
 showContinue();
+showReplayButton();
 mapSel.addEventListener('change', civBlurb);
 civBlurb();
 const qualitySel = $<HTMLSelectElement>('opt-quality');
@@ -294,6 +650,7 @@ document.addEventListener('click', (e) => {
       if (saved) {
         sound.play('click');
         startMatch(saved.setup, saved.state);
+        record = saved.record;
       } else hud.toast('The saved game could not be read', 'bad');
       break;
     }
@@ -332,6 +689,25 @@ document.addEventListener('click', (e) => {
       break;
     case 'quit':
       toTitle();
+      break;
+    case 'replay-last':
+      try {
+        const raw = localStorage.getItem(REPLAY_KEY);
+        if (raw) watchReplay(JSON.parse(raw));
+      } catch {
+        hud.toast('Could not read the last replay', 'bad');
+      }
+      break;
+    case 'replay-open':
+      replayInput.click();
+      break;
+    case 'replay-save':
+      if (game) downloadReplay(game);
+      break;
+    case 'online':
+      sound.play('click');
+      $('title').classList.add('hidden');
+      lobby.showEntry();
       break;
     case 'resign':
       issue({ t: 'resign', p: viewer });
@@ -453,6 +829,7 @@ function order(clientX: number, clientY: number, forceAttack = false, queue = fa
       issue({ t: 'attack', p: viewer, ids, target: t.id, queue: q });
       view.marker(s, t.x, t.y, true);
       play(units.every((u) => u.type === 'priest') ? 'chant' : 'attack');
+      ack('attack');
       return;
     }
     if (t.kind === 'building' && t.owner === viewer) {
@@ -470,11 +847,13 @@ function order(clientX: number, clientY: number, forceAttack = false, queue = fa
     issue({ t: 'gather', p: viewer, ids, tile: pk.tile, queue: q });
     view.marker(s, (pk.tile % s.w) + 0.5, Math.floor(pk.tile / s.w) + 0.5, false);
     play('move');
+    ack('move');
     return;
   }
   issue({ t: 'move', p: viewer, ids, x: pk.x, y: pk.y, amove: forceAttack, queue: q });
   view.marker(s, pk.x, pk.y, forceAttack);
   play(forceAttack ? 'attack' : 'move');
+  ack(forceAttack ? 'attack' : 'move');
 }
 
 /** Shelter the selection in the building under the pointer. */
@@ -491,6 +870,12 @@ function garrisonAt(clientX: number, clientY: number, queue: boolean): void {
   issue({ t: 'garrison', p: viewer, ids: selectedUnits(s).map((u) => u.id), target: b.id, queue: queue || undefined });
   view.marker(s, b.x, b.y, false);
   play('move');
+}
+
+/** A gate faces along the wall it joins: across, unless wall stands at its left or right. */
+function gateTurned(s: GameState, tx: number, ty: number): boolean {
+  const at = (x: number, y: number) => x >= 0 && y >= 0 && x < s.w && y < s.h && !!s.bldAt[y * s.w + x];
+  return !(at(tx - 1, ty) || at(tx + 2, ty));
 }
 
 /** The tiles of a planned wall, and whether each can be built. */
@@ -524,7 +909,7 @@ function updatePlacement(clientX: number, clientY: number): void {
   // Only on ground the player has seen.
   let seen = true;
   for (let y = ty; y < ty + n && seen; y++) for (let x = tx; x < tx + n; x++) if (x < 0 || y < 0 || x >= s.w || y >= s.h || !s.players[viewer].seen[y * s.w + x]) seen = false;
-  placeAt = { tx, ty, ok: seen && !placeProblem(s, placing, tx, ty) };
+  placeAt = { tx, ty, ok: seen && !placeProblem(s, placing, tx, ty, true, viewer) };
 }
 
 function placeHere(shift: boolean): void {
@@ -665,7 +1050,10 @@ canvas.addEventListener('pointerup', (e) => {
     const own = ids.filter((id) => s.byId.get(id)?.owner === viewer);
     const pick = own.length ? own : ids.slice(0, 1);
     if (pick.length || !e.shiftKey) setSelection(pick, e.shiftKey);
-    if (pick.length) play('select');
+    if (pick.length) {
+      play('select');
+      ack('select');
+    }
   } else clickSelect(e.clientX, e.clientY, e.shiftKey, e.ctrlKey);
   boxStart = null;
   boxing = false;
@@ -698,6 +1086,7 @@ function clickSelect(x: number, y: number, shift: boolean, ctrl: boolean): void 
     });
     setSelection(same, shift);
     play('select');
+    ack('select');
     return;
   }
   if (shift && selection.has(e.id)) {
@@ -712,6 +1101,17 @@ function clickSelect(x: number, y: number, shift: boolean, ctrl: boolean): void 
   });
   setSelection([e.id], shift && !mixed && e.kind === 'unit');
   play(e.kind === 'building' ? 'selectBuilding' : 'select');
+  if (e.kind === 'unit' && e.owner === viewer) ack('select');
+}
+
+/** The selected units answer (one voice for the group). */
+function ack(mood: 'select' | 'move' | 'attack'): void {
+  const s = game;
+  if (!s || watching) return;
+  const u = selectedUnits(s)[0];
+  if (!u) return;
+  const who = u.type === 'citizen' ? 'citizen' : u.type === 'priest' ? 'priest' : u.type === 'hero' ? 'hero' : u.type === 'siege' ? 'engineer' : 'soldier';
+  sound.speak(who, mood, u.id);
 }
 
 canvas.addEventListener(
@@ -806,6 +1206,11 @@ window.addEventListener('keydown', (e) => {
     openMenu();
     return;
   }
+  if (k === 'Enter' && online) {
+    e.preventDefault();
+    openChat();
+    return;
+  }
   // The command card first: its letters change with the selection.
   if (!e.ctrlKey && !e.metaKey && hud.hotkey(k === 'Delete' ? 'DELETE' : k)) {
     e.preventDefault();
@@ -868,12 +1273,20 @@ const PLAY_ICON = '<svg viewBox="0 0 16 16" width="12" height="12"><path d="M4 2
 $('pause-btn').innerHTML = PAUSE_ICON;
 
 function togglePause(): void {
+  if (online) {
+    net?.send({ t: 'pause', on: !netPaused });
+    return;
+  }
   paused = !paused;
   $('paused').classList.toggle('hidden', !paused);
   $('pause-btn').innerHTML = paused ? PLAY_ICON : PAUSE_ICON;
 }
 
 function cycleSpeed(d: number): void {
+  if (online) {
+    hud.toast('Online matches run at normal speed', 'info');
+    return;
+  }
   speedIdx = Math.max(0, Math.min(SPEEDS.length - 1, speedIdx + d));
   hud.toast(`Speed ${SPEEDS[speedIdx]}×`, 'info');
   refreshHud();
@@ -895,14 +1308,15 @@ function openMenu(): void {
       <label>Graphics <select id="menu-quality">${(Object.keys(QUALITY) as QualityName[]).map((q) => `<option value="${q}" ${q === view.qualityName ? 'selected' : ''}>${QUALITY[q].label}</option>`).join('')}</select></label>
       <label>Effects volume <input id="menu-vol" type="range" min="0" max="1" step="0.05" value="${sound.settings.volume}"></label>
       <label>Wind and birds <input id="menu-amb" type="range" min="0" max="1" step="0.05" value="${sound.settings.ambience}"></label>
+      <label>Music <input id="menu-music" type="range" min="0" max="1" step="0.05" value="${sound.settings.music}"></label>
       <label>Tips for new players <input id="menu-tips" type="checkbox" ${tips.enabled ? 'checked' : ''}></label>
     </div>
     <div class="row">
-      <button class="btn wide" data-act="save">Save game</button>
+      ${online ? `<div class="hint">Online room ${net?.code ?? ''} · ${net?.rtt ?? 0} ms</div>` : `<button class="btn wide" data-act="save">Save game</button>
       <button class="btn wide" data-act="restart">Restart this map</button>
-      <button class="btn wide" data-act="new-map">New map</button>
+      <button class="btn wide" data-act="new-map">New map</button>`}
       <button class="btn wide" data-act="resign">Resign</button>
-      <button class="btn wide" data-act="quit">Quit to title</button>
+      <button class="btn wide" data-act="quit">${online ? 'Leave the match' : 'Quit to title'}</button>
     </div></div>`;
   m.classList.remove('hidden');
   $<HTMLSelectElement>('menu-quality').addEventListener('change', (e) => {
@@ -912,6 +1326,7 @@ function openMenu(): void {
   });
   $<HTMLInputElement>('menu-vol').addEventListener('input', (e) => sound.set({ volume: Number((e.target as HTMLInputElement).value) }));
   $<HTMLInputElement>('menu-amb').addEventListener('input', (e) => sound.set({ ambience: Number((e.target as HTMLInputElement).value) }));
+  $<HTMLInputElement>('menu-music').addEventListener('input', (e) => sound.set({ music: Number((e.target as HTMLInputElement).value) }));
   $<HTMLInputElement>('menu-tips').addEventListener('change', (e) => (tips.enabled = (e.target as HTMLInputElement).checked));
   play('open');
 }
@@ -953,6 +1368,7 @@ function timeline(s: GameState, metric: Metric): string {
 
 function showEnd(s: GameState, won: boolean, how: 'conquest' | 'wonder' | 'resign' = 'conquest'): void {
   mode = 'over';
+  keepReplay(s);
   const m = $('modal');
   const mins = Math.floor(s.tick / TICK_HZ / 60);
   const rows = s.players
@@ -968,7 +1384,8 @@ function showEnd(s: GameState, won: boolean, how: 'conquest' | 'wonder' | 'resig
     <table class="end-stats"><tr><th></th><th>Score</th><th>Epoch</th><th>Gathered</th><th>Trained</th><th>Built</th><th>Techs</th><th>Kills</th><th>Lost</th></tr>${rows}</table>
     <div class="row">
       <button class="btn wide" data-act="watch">Look around</button>
-      <button class="btn wide primary" data-act="new-map">Play again</button>
+      <button class="btn wide" data-act="replay-save">Download the replay</button>
+      ${online ? '' : '<button class="btn wide primary" data-act="new-map">Play again</button>'}
       <button class="btn wide" data-act="quit">Quit to title</button>
     </div></div>`;
   m.querySelector('.chart-tabs')!.addEventListener('click', (e) => {
@@ -999,10 +1416,15 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         if (ev.owner === viewer) {
           hud.banner(EPOCHS[ev.epoch].name, EPOCHS[ev.epoch].blurb, 4500);
           play('epoch');
+          playMusic(ev.epoch);
         } else hud.toast(`${s.players[ev.owner].name} has reached the ${EPOCHS[ev.epoch].name}`, 'info');
+        break;
+      case 'hit':
+        if (view.sees(ev.x, ev.y)) music.stir(0.012);
         break;
       case 'alert':
         if (ev.owner === viewer) {
+          music.stir(0.5);
           lastAlert = { x: ev.x, y: ev.y };
           hud.toast(ev.building ? 'A building is under attack! (Space to look)' : 'You are under attack! (Space to look)', 'alert');
           play('alert');
@@ -1023,6 +1445,9 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         break;
       case 'researched':
         if (ev.owner === viewer) hud.toast(`${TECHS[ev.tech].name} researched`, 'good');
+        break;
+      case 'left':
+        hud.toast(`${s.players[ev.owner].name} has left: the computer leads their people now`, 'info');
         break;
       case 'converted':
         if (ev.to === viewer) hud.toast('A priest has won an enemy over to your side', 'good');
@@ -1108,6 +1533,42 @@ function watchFrameRate(dt: number): void {
   hud.toast(`Graphics set to ${QUALITY[next].label} for a smoother game (change it in the Menu)`, 'info');
 }
 
+/**
+ * Play the turns the room has sent: in step with the clock while up to date, and as fast as the frame
+ * allows while behind (after a stall, or when rejoining a match under way).
+ */
+function stepOnline(s: GameState, dt: number): void {
+  // Paused, the room sends no more turns; the ones already here are still played.
+  const reach = netReach * TURN_TICKS;
+  acc += dt;
+  const t0 = performance.now();
+  let replaying = false;
+  while (s.tick < reach) {
+    const behind = reach - s.tick;
+    if (behind > 6) {
+      // Behind: catch up within a slice of the frame.
+      if (performance.now() - t0 > 30) break;
+    } else {
+      if (acc < DT) break;
+      acc -= DT;
+    }
+    const cmds = s.tick % TURN_TICKS === 0 ? (netTurns[s.tick / TURN_TICKS] ?? []) : [];
+    if (cmds.length) record.push([s.tick, cmds]);
+    step(s, cmds);
+    if (behind > 60) {
+      replaying = true;
+      // Fast-forwarding: only what matters to the outcome.
+      const key = s.events.filter((e) => e.k === 'over' || e.k === 'defeated');
+      if (key.length) onEvents(s, key);
+    } else onEvents(s, s.events);
+    if (s.tick % (TURN_TICKS * HASH_EVERY) === 0 && net) net.send({ t: 'hash', n: s.tick / TURN_TICKS, h: checksum(s) });
+    if (mode === 'title') return;
+  }
+  if (replaying) view.events(s, [{ k: 'depleted', tile: 0 }]);
+  // Waiting on the room: don't bank time to burn later.
+  if (s.tick >= reach) acc = Math.min(acc, DT);
+}
+
 function frame(now: number): void {
   // A frame stamp can be a hair earlier than the clock read at start-up: never step backward.
   const dt = Math.max(0, Math.min(0.1, (now - lastFrame) / 1000));
@@ -1151,10 +1612,13 @@ function frame(now: number): void {
       }
       if (px || pz) view.rig.pan(px * sp, pz * sp);
 
-      if (!paused && mode === 'play') {
+      if (online) stepOnline(s, dt);
+      else if (watching) stepReplay(s, dt);
+      else if (!paused && mode === 'play') {
         acc += dt * SPEEDS[speedIdx];
         let n = 0;
         while (acc >= DT && n < 6) {
+          if (pending.length) record.push([s.tick, pending]);
           step(s, pending);
           pending = [];
           onEvents(s, s.events);
@@ -1162,31 +1626,37 @@ function frame(now: number): void {
           n++;
         }
         if (n === 6) acc = 0;
-      } else if (mode === 'over') {
-        // After the end the world keeps going for a look around.
+      } else if (mode === 'over' && !s.over && !paused) {
+        // Out of the match while others fight on: the world keeps going for a look around.
         acc += dt;
-        while (acc >= DT) {
+        let n = 0;
+        while (acc >= DT && n < 6) {
+          step(s);
+          view.events(s, s.events);
           acc -= DT;
+          n++;
         }
+        if (n === 6) acc = 0;
       }
     }
-    const alpha = mode === 'play' && !paused ? Math.min(1, acc / DT) : 1;
+    const alpha = (mode === 'play' && !paused) || online ? Math.min(1, acc / DT) : 1;
     pruneSelection(s);
     view.frame(s, alpha, dt, {
       ids: selection,
       allBars: altHeld,
-      ghost: placing && placing !== 'wall' && placeAt ? { type: placing, ...placeAt } : null,
+      ghost: placing && placing !== 'wall' && placeAt ? { type: placing, ...placeAt, turn: placing === 'gate' && gateTurned(s, placeAt.tx, placeAt.ty) } : null,
       rallyOf: selection.size === 1 ? [...selection][0] : null,
       wall: wallPlan(s),
     });
     if (mode === 'play') watchFrameRate(dt);
+    if (online && net && mode !== 'title') $('clock').title = `Online · ${net.rtt} ms`;
     if (mode !== 'title') {
       hudTimer -= dt;
       if (hudTimer <= 0) {
         hudTimer = 0.12;
         refreshHud();
       }
-      if (mode === 'play' && !paused) {
+      if (mode === 'play' && !paused && !watching) {
         tips.update(s, viewer, dt);
         autosave();
       }
@@ -1213,6 +1683,11 @@ function frame(now: number): void {
   },
   view,
   sound,
+  /** The match's checksum, and the state of the online line (testing). */
+  checksum: () => (game ? checksum(game) : 0),
+  get netInfo() {
+    return { online, reach: netReach, paused: netPaused, rtt: net?.rtt ?? -1, viewer };
+  },
   /** What the interface is doing (testing). */
   get ui() {
     return { placing, targetMode, wallDrag, placeAt, selection: [...selection], buildMenu: hud.buildMenu, pending: pending.length };
@@ -1261,6 +1736,10 @@ function frame(now: number): void {
 };
 
 $('loading').classList.add('hidden');
-$('title').classList.remove('hidden');
-startAttract();
+// A shared room link: straight into the room (or back into a match after a reload).
+const roomCode = new URLSearchParams(location.search).get('room')?.toUpperCase() ?? '';
+startAttract(roomCode.length !== 5);
+if (roomCode.length === 5 && savedName()) connectRoom(roomCode, savedName());
+else if (roomCode.length === 5) lobby.showEntry(roomCode);
+else $('title').classList.remove('hidden');
 requestAnimationFrame(frame);

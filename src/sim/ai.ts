@@ -91,12 +91,16 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   const army: Unit[] = [];
   const priests: Unit[] = [];
   const buildings: Building[] = [];
+  let king: Unit | null = null;
   for (const e of s.ents) {
     if (e.owner !== p.id || e.hp <= 0) continue;
-    if (e.kind === 'unit') (e.type === 'citizen' ? citizens : e.type === 'priest' ? priests : army).push(e);
+    if (e.kind === 'unit' && s.kings[p.id] === e.id) king = e;
+    else if (e.kind === 'unit') (e.type === 'citizen' ? citizens : e.type === 'priest' ? priests : army).push(e);
     else buildings.push(e);
   }
   const tc = buildings.find((b) => b.type === 'towncenter' && b.built) ?? null;
+  // A King stays out of harm's way, sheltered in the Town Center.
+  if (king && tc && !king.inside && king.order.k !== 'garrison') applyCommand(s, { t: 'garrison', p: p.id, ids: [king.id], target: tc.id });
   const home = tc ? { x: tc.x, y: tc.y } : { x: p.startX, y: p.startY };
   const v: View = { p, citizens, army, priests, buildings, home, tc, budget: { ...p.res } };
   const issue = (c: Command) => applyCommand(s, c);
@@ -483,15 +487,27 @@ function nearestDropTo(v: View, u: Unit): { x: number; y: number } {
 
 // ---- Army ------------------------------------------------------------------------------------------
 
-/** Where to strike: an enemy wonder first (it must fall), then the nearest Town Center. */
+/** Where to strike: an enemy wonder first (it must fall), then a King (or where one shelters), then the nearest Town Center. */
 function enemyHome(s: GameState, p: Player): { x: number; y: number } {
   let best: { x: number; y: number } | null = null;
   let bestD = Infinity;
+  for (const id of s.kings) {
+    const k = id ? s.byId.get(id) : undefined;
+    if (!k || k.kind !== 'unit' || k.inside || !isEnemy(s, p.id, k.owner)) continue;
+    const kx = k.x - p.startX;
+    const ky = k.y - p.startY;
+    const d = kx * kx + ky * ky - 5e5;
+    if (d < bestD) {
+      bestD = d;
+      best = { x: k.x, y: k.y };
+    }
+  }
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
     const dx = e.x - p.startX;
     const dy = e.y - p.startY;
-    const d = dx * dx + dy * dy + (e.type === 'wonder' ? -1e6 : e.type === 'towncenter' ? 0 : e.type === 'wall' || e.type === 'gate' ? 1e5 : 400);
+    const shelter = s.mode === 'regicide' && e.garrison.some((id) => s.kings.includes(id));
+    const d = dx * dx + dy * dy + (e.type === 'wonder' ? -1e6 : shelter ? -5e5 : e.type === 'towncenter' ? 0 : e.type === 'wall' || e.type === 'gate' ? 1e5 : 400);
     if (d < bestD) {
       bestD = d;
       best = { x: e.x, y: e.y };

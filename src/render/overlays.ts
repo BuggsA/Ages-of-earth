@@ -225,7 +225,7 @@ export class Overlays {
   }
 
   /** Show (or hide, with null) the building about to be placed. */
-  setGhost(s: GameState, g: { type: BuildingType; tx: number; ty: number; ok: boolean; epoch: number; color: string } | null): void {
+  setGhost(s: GameState, g: { type: BuildingType; tx: number; ty: number; ok: boolean; epoch: number; color: string; turn?: boolean } | null): void {
     if (!g) {
       this.ghost.visible = false;
       return;
@@ -242,6 +242,7 @@ export class Overlays {
     for (let y = g.ty; y <= g.ty + n; y++) for (let x = g.tx; x <= g.tx + n; x++) if (x >= 0 && y >= 0 && x <= s.w && y <= s.h) hi = Math.max(hi, s.height[y * (s.w + 1) + x]);
     this.ghost.position.set(cx, Math.max(0, hi === -Infinity ? 0 : hi), cy);
     this.ghostPad.scale.set(n, 1, n);
+    this.ghostBody.rotation.y = g.turn ? Math.PI / 2 : 0;
     (this.ghostPad.material as THREE.MeshBasicMaterial).color.set(g.ok ? '#5cff7a' : '#ff5050');
     this.ghostMat.color.set(g.ok ? '#ffffff' : '#ff8080');
     this.ghost.visible = true;

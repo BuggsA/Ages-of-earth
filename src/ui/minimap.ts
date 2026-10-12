@@ -1,5 +1,5 @@
 import type { GameState } from '../sim/types';
-import { R_BERRY, R_GOLD, R_STONE, R_TREE, T_ROCK, T_SAND, T_WATER } from '../sim/types';
+import { R_BERRY, R_GOLD, R_MEAT, R_STONE, R_TREE, T_ROCK, T_SAND, T_WATER } from '../sim/types';
 
 /**
  * The overview map: the land through the player's fog, woods and mines, the buildings they know of,
@@ -113,7 +113,7 @@ export class Minimap {
       if (res === R_TREE) [r, g, b] = tree;
       else if (res === R_GOLD) [r, g, b] = gold;
       else if (res === R_STONE) [r, g, b] = stone;
-      else if (res === R_BERRY) [r, g, b] = berry;
+      else if (res === R_BERRY || res === R_MEAT) [r, g, b] = berry;
       const k = seen ? (vis ? 1 : 0.55) : 0;
       d[i * 4] = seen ? r * k : 14;
       d[i * 4 + 1] = seen ? g * k : 22;
@@ -138,8 +138,15 @@ export class Minimap {
       ctx.fillRect(b.x * sx - half, b.y * sy - half, half * 2, half * 2);
       ctx.strokeRect(b.x * sx - half, b.y * sy - half, half * 2, half * 2);
     }
+    // Game, where the viewer can see it.
+    ctx.fillStyle = '#e8c79a';
+    for (const a of s.animals) {
+      if (!reveal && !p.vis[Math.floor(a.y) * s.w + Math.floor(a.x)]) continue;
+      const r = Math.max(1.2, sx * 0.6);
+      ctx.fillRect(a.x * sx - r, a.y * sy - r, r * 2, r * 2);
+    }
     for (const e of s.ents) {
-      if (e.kind !== 'unit' || e.hp <= 0) continue;
+      if (e.kind !== 'unit' || e.hp <= 0 || e.inside) continue;
       if (e.owner !== viewer && !reveal && !p.vis[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
       ctx.fillStyle = selected.has(e.id) ? '#ffffff' : s.players[e.owner].color;
       const r = Math.max(1.6, sx * 0.8);

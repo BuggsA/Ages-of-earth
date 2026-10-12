@@ -313,6 +313,8 @@ export const EPOCH_START_RES = [
   { food: 900, wood: 700, stone: 500, gold: 700 },
 ];
 export const START_CITIZENS = 5;
+/** Deathmatch: everyone starts rich. */
+export const DEATHMATCH_RES = { food: 20000, wood: 20000, stone: 5000, gold: 20000 };
 
 /** A finished wonder wins if it stands this long (seconds). */
 export const WONDER_SECONDS = 300;

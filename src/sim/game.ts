@@ -2,12 +2,12 @@ import { aiStep } from './ai';
 import { hitAnimal, spawnAnimal, updateAnimals } from './animals';
 import { buildingGuns, updateShots } from './combat';
 import { applyCommand } from './commands';
-import { AURA, CIV_IDS, EPOCHS, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
+import { AURA, CIV_IDS, DEATHMATCH_RES, EPOCHS, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
 import { stampBuilding } from './grid';
 import { generateMap } from './mapgen';
 import { Spatial } from './spatial';
 import { modsOf, statsFor } from './stats';
-import type { Building, CivId, Command, Difficulty, GameState, MapSize, MapType, Player } from './types';
+import type { Building, CivId, Command, Difficulty, GameMode, GameState, MapSize, MapType, Player } from './types';
 import { RES, R_NONE } from './types';
 import { RES_OF_TILE, checkStuck, collide, routeUnits, separate, setOrder, think, ungarrison, walk } from './units';
 import { updateVision } from './vision';
@@ -38,6 +38,7 @@ export interface GameSetup {
   startEpoch?: number;
   /** Minutes of peace before anyone may fight. */
   peaceMinutes?: number;
+  mode?: GameMode;
   /** Seconds a finished wonder must stand to win. */
   wonderSeconds?: number;
 }
@@ -49,11 +50,14 @@ export function createGame(setup: GameSetup): GameState {
   const map = generateMap(setup.seed, setup.size, setup.players.length, mapType);
   const n = map.w * map.h;
   const startEpoch = Math.max(0, Math.min(EPOCHS.length - 1, setup.startEpoch ?? 0));
+  const mode = setup.mode ?? 'conquest';
   const s: GameState = {
     tick: 0,
     seed: setup.seed,
     size: setup.size,
     mapType,
+    mode,
+    kings: setup.players.map(() => 0),
     w: map.w,
     h: map.h,
     terrain: map.terrain,
@@ -89,7 +93,7 @@ export function createGame(setup: GameSetup): GameState {
       civ: ps.civ ?? CIV_IDS[(setup.seed + i * 7919) % CIV_IDS.length],
       ai: ps.ai,
       team: ps.team ?? i,
-      res: { food: START_RES.food + extra.food, wood: START_RES.wood + extra.wood, stone: START_RES.stone + extra.stone, gold: START_RES.gold + extra.gold },
+      res: mode === 'deathmatch' ? { ...DEATHMATCH_RES } : { food: START_RES.food + extra.food, wood: START_RES.wood + extra.wood, stone: START_RES.stone + extra.stone, gold: START_RES.gold + extra.gold },
       epoch: startEpoch,
       techs: [],
       statsVersion: 0,
@@ -121,6 +125,14 @@ export function createGame(setup: GameSetup): GameState {
       u.py = u.y;
       u.guardX = u.x;
       u.guardY = u.y;
+    }
+  }
+  if (s.mode === 'regicide') {
+    // Each people's King starts by the Town Center.
+    for (const p of s.players) {
+      const tc = s.ents.find((e): e is Building => e.kind === 'building' && e.owner === p.id && e.type === 'towncenter')!;
+      const spot = exitSpot(s, tc, s.w - p.startX, s.h - p.startY);
+      s.kings[p.id] = spawnUnit(s, p.id, 'hero', spot.x, spot.y).id;
     }
   }
   for (const d of map.deer) spawnAnimal(s, d.x, d.y);
@@ -279,6 +291,14 @@ function checkVictory(s: GameState): void {
   }
   for (const p of s.players) {
     if (p.defeated) continue;
+    // Regicide: a people whose King has fallen is lost.
+    const king = s.kings[p.id];
+    if (king && !s.byId.has(king)) {
+      p.defeated = true;
+      for (const e of s.ents) if (e.owner === p.id) e.hp = 0;
+      s.events.push({ k: 'defeated', owner: p.id });
+      continue;
+    }
     // Fields and walls alone don't keep a people alive.
     const alive = s.ents.some((e) => e.owner === p.id && e.hp > 0 && !(e.kind === 'building' && (e.type === 'farm' || e.type === 'wall' || e.type === 'gate')));
     if (alive) continue;

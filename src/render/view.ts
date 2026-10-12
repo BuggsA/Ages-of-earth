@@ -27,7 +27,7 @@ export interface Selection {
   ids: Set<number>;
   /** Show every unit's health (while a key is held). */
   allBars: boolean;
-  ghost: { type: BuildingType; tx: number; ty: number; ok: boolean } | null;
+  ghost: { type: BuildingType; tx: number; ty: number; ok: boolean; turn?: boolean } | null;
   /** The building whose rally point to show. */
   rallyOf: number | null;
   /** A line of wall being laid out. */
@@ -174,6 +174,15 @@ export class View {
     this.chimneys.clear();
   }
 
+  /** See the match through another player's eyes, or (with `reveal`) everyone's (replays). */
+  setViewer(s: GameState, viewer: number, reveal: boolean): void {
+    this.viewer = viewer;
+    this.reveal = reveal;
+    this.buildings.clear();
+    if (reveal) this.fog?.reveal();
+    else this.fog?.snap(s.players[viewer].vis, s.players[viewer].seen);
+  }
+
   /** Lift the fog (when the match is over). */
   revealAll(): void {
     this.reveal = true;
@@ -258,6 +267,12 @@ export class View {
         const base = this.buildings.baseOf(id) ?? heightAt(s, e.x, e.y);
         rings.push({ x: e.x, y: base, z: e.y, r: (BUILDINGS[e.type].size / 2) * 1.414 + 0.05, color: e.owner === this.viewer ? own : foe, square: true });
       }
+    }
+    // Kings wear a crown of light (so you never lose track of your own).
+    for (const id of s.kings) {
+      const k = id ? s.byId.get(id) : undefined;
+      const at = k ? this.units.drawn.get(id) : undefined;
+      if (k && at) rings.push({ x: at.x, y: at.y, z: at.z, r: 0.7, color: aura, thin: true });
     }
     // Health: the selected, the recently hurt, or everyone while asked.
     const recent = s.tick - TICK_HZ * 4;

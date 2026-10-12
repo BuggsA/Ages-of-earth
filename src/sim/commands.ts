@@ -1,6 +1,6 @@
 import { BUILDINGS, EPOCHS, LAST_EPOCH, MARKET, RES_LABEL, TECHS, UNITS, unitEpoch, unitStats } from './data';
 import { peace } from './combat';
-import { placeProblem, walkable } from './grid';
+import { placeProblem, stampBuilding, walkable } from './grid';
 import { buildingCostFor, statsFor, techCostFor, techProblem } from './stats';
 import type { Building, BuildingType, Command, Cost, GameState, Order, Player, Unit } from './types';
 import { RES, R_NONE } from './types';
@@ -125,7 +125,7 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
     if (!quiet) refuse(s, p, `Needs the ${EPOCHS[def.epoch].name}`);
     return null;
   }
-  const problem = placeProblem(s, type, tx, ty);
+  const problem = placeProblem(s, type, tx, ty, true, p);
   if (problem) {
     if (!quiet) refuse(s, p, problem === 'slope' ? 'Too steep to build there' : "Can't build there");
     return null;
@@ -137,6 +137,18 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
     return null;
   }
   pay(player, cost);
+  if (type === 'gate') {
+    // Wall pieces under a new gate come down to make way for it.
+    const gone = new Set<number>();
+    for (let y = ty; y < ty + def.size; y++) for (let x = tx; x < tx + def.size; x++) if (s.bldAt[y * s.w + x]) gone.add(s.bldAt[y * s.w + x]);
+    for (const id of gone) {
+      const w = s.byId.get(id)!;
+      if (w.kind !== 'building') continue;
+      stampBuilding(s, w, false);
+      s.byId.delete(id);
+    }
+    if (gone.size) s.ents = s.ents.filter((e) => !gone.has(e.id));
+  }
   const b = placeBuilding(s, p, type, tx, ty, false);
   s.events.push({ k: 'placed', id: b.id, owner: p, type });
   return b;
@@ -427,12 +439,18 @@ export function applyCommand(s: GameState, c: Command): void {
     case 'resign':
       for (const e of s.ents) if (e.owner === c.p) e.hp = 0;
       break;
+    case 'leave':
+      if (!p.ai && !p.defeated) {
+        p.ai = 'normal';
+        s.events.push({ k: 'left', owner: c.p });
+      }
+      break;
   }
 }
 
 /** Whether a player already has a hero, alive or in training. */
 export function heroBusy(s: GameState, p: number): boolean {
-  return s.ents.some((e) => e.owner === p && ((e.kind === 'unit' && e.type === 'hero' && e.hp > 0) || (e.kind === 'building' && e.queue.some((q) => q.unit === 'hero'))));
+  return s.ents.some((e) => e.owner === p && ((e.kind === 'unit' && e.type === 'hero' && e.hp > 0 && !s.kings.includes(e.id)) || (e.kind === 'building' && e.queue.some((q) => q.unit === 'hero'))));
 }
 
 /** Whether a spot is somewhere a unit could stand (for rally points and moves). */

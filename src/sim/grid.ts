@@ -40,7 +40,7 @@ export function groundAt(s: GameState, x: number, y: number): number {
 export type PlaceProblem = null | 'edge' | 'water' | 'rock' | 'blocked' | 'slope';
 
 /** Whether a building of this type could go with its top-left corner on this tile. */
-export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: number, ignoreUnits = true): PlaceProblem {
+export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: number, ignoreUnits = true, owner = -1): PlaceProblem {
   const n = BUILDINGS[type].size;
   if (tx < 1 || ty < 1 || tx + n > s.w - 1 || ty + n > s.h - 1) return 'edge';
   let lo = Infinity;
@@ -50,7 +50,9 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
       const i = y * s.w + x;
       if (s.terrain[i] === T_WATER) return 'water';
       if (s.terrain[i] === T_ROCK) return 'rock';
-      if (s.res[i] !== R_NONE || s.bldAt[i] !== 0) return 'blocked';
+      if (s.res[i] !== R_NONE) return 'blocked';
+      // A gate may go into its owner's own wall, replacing the pieces it covers.
+      if (s.bldAt[i] !== 0 && !(type === 'gate' && ownWall(s, s.bldAt[i], owner))) return 'blocked';
     }
   }
   for (let y = ty; y <= ty + n; y++) {
@@ -64,6 +66,11 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
   if (hi - lo > (type === 'wall' || type === 'gate' ? 2.2 : 1.1)) return 'slope';
   void ignoreUnits;
   return null;
+}
+
+function ownWall(s: GameState, id: number, owner: number): boolean {
+  const b = s.byId.get(id);
+  return !!b && b.kind === 'building' && b.type === 'wall' && b.owner === owner && owner >= 0;
 }
 
 /** Mark or clear a building's footprint on the grid. */

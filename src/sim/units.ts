@@ -611,7 +611,8 @@ function convertTicks(s: GameState, priest: Unit, t: Unit): number {
 function convertStep(s: GameState, u: Unit, o: Extract<Order, { k: 'convert' }>): void {
   const t = s.byId.get(o.target);
   const st = statsOf(s, u);
-  if (!t || t.kind !== 'unit' || t.hp <= 0 || t.inside || !isEnemy(s, u.owner, t.owner) || peace(s)) {
+  // Kings never turn.
+  if (!t || t.kind !== 'unit' || t.hp <= 0 || t.inside || !isEnemy(s, u.owner, t.owner) || peace(s) || s.kings.includes(t.id)) {
     setOrder(u, { k: 'idle' });
     return;
   }

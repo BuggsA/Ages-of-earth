@@ -19,6 +19,8 @@ export interface SoundSettings {
   volume: number;
   /** Wind and birdsong, 0 to 1. */
   ambience: number;
+  /** Music, 0 to 1. */
+  music: number;
   muted: boolean;
 }
 
@@ -66,9 +68,9 @@ function loadSettings(): SoundSettings {
   try {
     const s = JSON.parse(localStorage.getItem(KEY) ?? '{}');
     const n = (v: unknown, d: number) => (typeof v === 'number' && v >= 0 && v <= 1 ? v : d);
-    return { volume: n(s.volume, 0.8), ambience: n(s.ambience, 0.6), muted: s.muted === true };
+    return { volume: n(s.volume, 0.8), ambience: n(s.ambience, 0.6), music: n(s.music, 0.5), muted: s.muted === true };
   } catch {
-    return { volume: 0.8, ambience: 0.6, muted: false };
+    return { volume: 0.8, ambience: 0.6, music: 0.5, muted: false };
   }
 }
 
@@ -82,6 +84,9 @@ export class Sound {
   private master!: GainNode;
   private sfx!: GainNode;
   private amb!: GainNode;
+  private mus!: GainNode;
+  /** Called once the audio graph exists (for the music to hook in). */
+  onReady: ((ctx: BaseAudioContext, music: GainNode) => void) | null = null;
   private noiseBuf!: AudioBuffer;
   private pinkBuf!: AudioBuffer;
   private wind: GainNode | null = null;
@@ -152,7 +157,7 @@ export class Sound {
   init(ctx: BaseAudioContext, offline = false): void {
     this.ctx = ctx;
     this.offline = offline;
-    if (offline) this.settings = { volume: 0.8, ambience: 0.6, muted: false };
+    if (offline) this.settings = { volume: 0.8, ambience: 0.6, music: 0.5, muted: false };
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -16;
     comp.knee.value = 12;
@@ -162,6 +167,7 @@ export class Sound {
     this.master = ctx.createGain();
     this.sfx = ctx.createGain();
     this.amb = ctx.createGain();
+    this.mus = ctx.createGain();
     // A small room: effects send a little into a reverb made from decaying noise.
     const verb = ctx.createConvolver();
     verb.buffer = this.impulse(1.6);
@@ -170,10 +176,16 @@ export class Sound {
     this.sfx.connect(comp);
     this.sfx.connect(send).connect(verb).connect(comp);
     this.amb.connect(comp);
+    // Music sits in the same room, a little further back.
+    const musSend = ctx.createGain();
+    musSend.gain.value = 0.35;
+    this.mus.connect(comp);
+    this.mus.connect(musSend).connect(verb);
     comp.connect(this.master).connect(ctx.destination);
     this.noiseBuf = this.whiteNoise(2);
     this.pinkBuf = this.pinkNoise(8);
     this.apply(true);
+    this.onReady?.(ctx, this.mus);
   }
 
   /** Change and remember the settings. */
@@ -196,6 +208,7 @@ export class Sound {
     // Levels measured offline: effects peak around 0.1 to 0.6, the sea sits well under them.
     to(this.sfx.gain, this.settings.volume * 2.6, 0.05);
     to(this.amb.gain, this.settings.ambience * 0.28, 0.3);
+    to(this.mus.gain, this.settings.music * 0.9, 0.3);
   }
 
   // ---- Building blocks -----------------------------------------------------------------------
@@ -523,6 +536,66 @@ export class Sound {
         this.tone(out, t + 0.05, { f: 140, to: 90, dur: 0.18, peak: 0.12 });
         break;
     }
+  }
+
+  // ---- Voices --------------------------------------------------------------------------------------
+
+  private lastVoice = 0;
+
+  /**
+   * A unit answers: a few syllables of made-up speech (a buzzing voice through two formant filters per
+   * vowel), rising like a question when picked, falling when ordered, a shout when sent to fight.
+   */
+  speak(who: 'citizen' | 'soldier' | 'priest' | 'hero' | 'engineer', mood: 'select' | 'move' | 'attack', seed = 0): void {
+    const ctx = this.ctx;
+    if (!ctx || this.settings.muted || ctx.state !== 'running') return;
+    const now = ctx.currentTime;
+    if (now - this.lastVoice < 0.45) return;
+    this.lastVoice = now;
+    const r = (k: number) => {
+      const v = Math.sin((seed + 1) * 12.9898 + k * 78.233) * 43758.5453;
+      return v - Math.floor(v);
+    };
+    // Each unit has its own voice: higher or lower, by who they are.
+    const base = who === 'citizen' ? (r(1) < 0.5 ? 205 : 135) : who === 'priest' ? 150 : who === 'hero' ? 105 : who === 'engineer' ? 125 : 118;
+    const f0 = base * (0.92 + r(2) * 0.16);
+    const VOWELS: [number, number][] = [[800, 1200], [500, 1850], [320, 2300], [520, 920], [360, 820]];
+    const n = mood === 'attack' ? 2 : 2 + Math.floor(Math.random() * 2);
+    const out = this.voice(mood === 'attack' ? 1.4 : 1, 0);
+    let t = now + 0.01;
+    for (let i = 0; i < n; i++) {
+      const len = mood === 'attack' ? 0.16 : 0.1 + Math.random() * 0.06;
+      const [f1, f2] = VOWELS[Math.floor(Math.random() * VOWELS.length)];
+      // Intonation: up for a question, down for an answer, high and hard for a battle cry.
+      const k = i / Math.max(1, n - 1);
+      const pitch = f0 * (mood === 'select' ? 1 + k * 0.25 : mood === 'attack' ? 1.35 - k * 0.1 : 1.12 - k * 0.22);
+      const src = ctx.createOscillator();
+      src.type = 'sawtooth';
+      src.frequency.setValueAtTime(pitch, t);
+      src.frequency.linearRampToValueAtTime(pitch * (mood === 'select' ? 1.06 : 0.96), t + len);
+      const env = ctx.createGain();
+      const peak = (mood === 'attack' ? 0.11 : 0.07) * (who === 'hero' ? 1.2 : 1);
+      env.gain.setValueAtTime(0.0001, t);
+      env.gain.exponentialRampToValueAtTime(peak, t + 0.02);
+      env.gain.setValueAtTime(peak, t + len - 0.03);
+      env.gain.exponentialRampToValueAtTime(0.0001, t + len);
+      for (const [f, q, g] of [[f1, 6, 1], [f2, 9, 0.5]] as const) {
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.value = f;
+        bp.Q.value = q;
+        const fg = ctx.createGain();
+        fg.gain.value = g;
+        src.connect(bp).connect(fg).connect(env);
+      }
+      env.connect(out);
+      src.start(t);
+      src.stop(t + len + 0.02);
+      // A consonant before some syllables.
+      if (i > 0 || Math.random() < 0.6) this.noise(out, t - 0.015, { dur: 0.03, filter: 'bandpass', f: 2500 + Math.random() * 2500, q: 1.5, peak: 0.05 });
+      t += len + 0.02;
+    }
+    if (who === 'soldier' || who === 'hero') this.noise(out, now, { dur: 0.08, filter: 'highpass', f: 3000, peak: mood === 'select' ? 0.03 : 0.05 });
   }
 
   // ---- Ambience ------------------------------------------------------------------------------------
