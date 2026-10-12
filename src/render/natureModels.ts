@@ -1,0 +1,138 @@
+import * as THREE from 'three';
+import { Kit, bake } from './kit';
+
+/** Trees, bushes, mines and the little things in the grass, as baked models for instancing. */
+
+const TRUNK = '#7a5636';
+
+function pine(): Kit {
+  const k = new Kit();
+  k.cyl(0.05, 0.07, 0.3, 5, TRUNK);
+  k.cone(0.34, 0.5, 7, '#2f6e3a', 0, 0.22);
+  k.cone(0.27, 0.45, 7, '#3a8445', 0, 0.48);
+  k.cone(0.18, 0.38, 7, '#479a50', 0, 0.74);
+  return k;
+}
+
+function broadleaf(): Kit {
+  const k = new Kit();
+  k.cyl(0.05, 0.075, 0.45, 5, TRUNK);
+  k.blob(0.32, '#4f9a45', 0, 0.68).scale.set(1, 0.85, 1);
+  k.blob(0.22, '#5fae4f', 0.15, 0.82, 0.08);
+  k.blob(0.2, '#468e3f', -0.14, 0.62, -0.1);
+  return k;
+}
+
+function birch(): Kit {
+  const k = new Kit();
+  k.cyl(0.035, 0.05, 0.6, 5, '#e8e4da');
+  k.box(0.072, 0.03, 0.072, '#3a3a3a', 0, 0.25);
+  k.blob(0.24, '#8cc152', 0, 0.78).scale.set(0.9, 1.2, 0.9);
+  return k;
+}
+
+function palm(): Kit {
+  const k = new Kit();
+  const trunk = k.cyl(0.035, 0.055, 0.75, 5, '#9a7a4a');
+  trunk.rotation.z = 0.12;
+  for (let f = 0; f < 6; f++) {
+    const g = k.group(0.04, 0.75, 0);
+    g.rotation.y = (f / 6) * Math.PI * 2;
+    const leaf = k.box(0.42, 0.02, 0.1, f % 2 ? '#3f9a4a' : '#55b55c', 0.2, -0.05, 0, g);
+    leaf.rotation.z = -0.35;
+  }
+  k.sphere(0.04, '#6b4a2a', 0.05, 0.72, 0.03);
+  return k;
+}
+
+/** A felled trunk and its stump, for a tree being cut. */
+function felled(): Kit {
+  const k = new Kit();
+  k.cyl(0.07, 0.075, 0.12, 6, TRUNK);
+  k.cyl(0.06, 0.06, 0.02, 6, '#d8b98a', 0, 0.12);
+  const log = k.cyl(0.055, 0.065, 0.6, 6, TRUNK, 0.35, 0.06, 0);
+  log.rotation.z = Math.PI / 2;
+  k.cone(0.2, 0.3, 6, '#3a8445', 0.72, 0.06, 0).rotation.z = -Math.PI / 2;
+  return k;
+}
+
+function berryBush(): Kit {
+  const k = new Kit();
+  k.blob(0.26, '#3f7f3a', 0, 0.18).scale.set(1.1, 0.8, 1.1);
+  k.blob(0.18, '#4b9244', 0.14, 0.26, 0.06);
+  for (let i = 0; i < 9; i++) {
+    const a = i * 2.4;
+    const r = 0.16 + (i % 3) * 0.05;
+    k.sphere(0.04, i % 2 ? '#d6304a' : '#b8203a', Math.cos(a) * r, 0.18 + (i % 4) * 0.06, Math.sin(a) * r, undefined, 5);
+  }
+  return k;
+}
+
+function stoneDeposit(): Kit {
+  const k = new Kit();
+  k.rock(0.32, '#a9a49b', 0, 0.16);
+  k.rock(0.22, '#bdb8ae', 0.25, 0.1, 0.12);
+  k.rock(0.18, '#959087', -0.22, 0.08, -0.14);
+  k.rock(0.12, '#c8c3b8', 0.05, 0.36, -0.05);
+  return k;
+}
+
+function goldDeposit(): Kit {
+  const k = new Kit();
+  k.rock(0.3, '#8a7b5c', 0, 0.15);
+  k.rock(0.2, '#7d6f52', 0.24, 0.1, 0.1);
+  for (let i = 0; i < 6; i++) {
+    const a = i * 1.7;
+    k.glow(k.octa(0.06 + (i % 3) * 0.02, i % 2 ? '#ffd24a' : '#f2b830', Math.cos(a) * 0.2, 0.22 + (i % 3) * 0.08, Math.sin(a) * 0.2));
+  }
+  return k;
+}
+
+function tuft(): Kit {
+  const k = new Kit();
+  for (let i = 0; i < 4; i++) {
+    const blade = k.cone(0.02, 0.12 + (i % 2) * 0.05, 3, i % 2 ? '#5c9e3c' : '#6fb24a', (i - 1.5) * 0.03, 0, (i % 2) * 0.02);
+    blade.rotation.z = (i - 1.5) * 0.3;
+  }
+  return k;
+}
+
+function flowers(): Kit {
+  const k = new Kit();
+  const colors = ['#f5f0e6', '#f2d34a', '#e36a8a', '#9a7ad8'];
+  for (let i = 0; i < 4; i++) {
+    const x = (i - 1.5) * 0.06;
+    const z = (i % 2) * 0.05;
+    k.cyl(0.005, 0.005, 0.08, 3, '#4f8a35', x, 0, z);
+    k.sphere(0.022, colors[i], x, 0.09, z, undefined, 5);
+  }
+  return k;
+}
+
+function pebbles(): Kit {
+  const k = new Kit();
+  k.rock(0.06, '#a39e94', 0, 0.02);
+  k.rock(0.04, '#8f8a80', 0.08, 0.01, 0.04);
+  return k;
+}
+
+function boulder(): Kit {
+  const k = new Kit();
+  k.rock(0.5, '#8d8579', 0, 0.2).scale.set(1, 0.8, 1);
+  k.rock(0.3, '#9a9286', 0.35, 0.1, 0.2);
+  return k;
+}
+
+const MAKERS = { pine, broadleaf, birch, palm, felled, berryBush, stoneDeposit, goldDeposit, tuft, flowers, pebbles, boulder };
+export type NatureKind = keyof typeof MAKERS;
+
+const cache = new Map<NatureKind, THREE.BufferGeometry>();
+
+export function natureGeometry(kind: NatureKind): THREE.BufferGeometry {
+  let g = cache.get(kind);
+  if (!g) {
+    g = bake(MAKERS[kind]().root);
+    cache.set(kind, g);
+  }
+  return g;
+}

@@ -67,15 +67,15 @@ export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
     blurb: 'Gathers food, wood, stone and gold, and builds.',
   })),
   infantry: [
-    { name: 'Clubman', cls: 'infantry', hp: 55, attack: 5, armor: 1, parmor: 0, range: 0, reload: 1.5, speed: 1.6, sight: 5, cost: { food: 50, wood: 15 }, time: 13, radius: 0.26, blurb: 'Tough foot soldier. Strong against cavalry.' },
-    { name: 'Spearman', cls: 'infantry', hp: 70, attack: 6, armor: 1, parmor: 1, range: 0, reload: 1.5, speed: 1.6, sight: 5, cost: { food: 50, wood: 25 }, time: 13, radius: 0.26, blurb: 'Spears hold off horsemen: double damage to cavalry.' },
-    { name: 'Pikeman', cls: 'infantry', hp: 90, attack: 8, armor: 2, parmor: 2, range: 0, reload: 1.5, speed: 1.6, sight: 5, cost: { food: 55, wood: 25, gold: 10 }, time: 13, radius: 0.27, blurb: 'Long pikes break knights. Weak to crossbows.' },
-    { name: 'Halberdier', cls: 'infantry', hp: 110, attack: 10, armor: 3, parmor: 3, range: 0, reload: 1.5, speed: 1.65, sight: 5, cost: { food: 60, wood: 25, gold: 15 }, time: 13, radius: 0.27, blurb: 'Heavy polearms. The bane of cuirassiers.' },
+    { name: 'Clubman', cls: 'infantry', hp: 55, attack: 4, armor: 1, parmor: 0, range: 0, reload: 1.5, speed: 1.6, sight: 5, cost: { food: 50, wood: 15 }, time: 13, radius: 0.26, blurb: 'Tough foot soldier. Strong against cavalry.' },
+    { name: 'Spearman', cls: 'infantry', hp: 70, attack: 5, armor: 1, parmor: 1, range: 0, reload: 1.5, speed: 1.6, sight: 5, cost: { food: 50, wood: 25 }, time: 13, radius: 0.26, blurb: 'Spears hold off horsemen: triple damage to cavalry.' },
+    { name: 'Pikeman', cls: 'infantry', hp: 85, attack: 6, armor: 2, parmor: 1, range: 0, reload: 1.5, speed: 1.6, sight: 5, cost: { food: 55, wood: 25, gold: 10 }, time: 13, radius: 0.27, blurb: 'Long pikes break knights. Weak to crossbows.' },
+    { name: 'Halberdier', cls: 'infantry', hp: 100, attack: 8, armor: 3, parmor: 2, range: 0, reload: 1.5, speed: 1.65, sight: 5, cost: { food: 60, wood: 25, gold: 15 }, time: 13, radius: 0.27, blurb: 'Heavy polearms. The bane of cuirassiers.' },
   ],
   ranged: [
     { name: 'Slinger', cls: 'ranged', hp: 35, attack: 4, armor: 0, parmor: 0, range: 4.5, reload: 2, speed: 1.5, sight: 7, cost: { food: 30, wood: 30 }, time: 14, radius: 0.24, shot: 'stone', blurb: 'Hurls stones from afar. Strong against infantry.' },
-    { name: 'Archer', cls: 'ranged', hp: 40, attack: 5, armor: 0, parmor: 0, range: 5.5, reload: 2, speed: 1.5, sight: 7, cost: { food: 25, wood: 45 }, time: 14, radius: 0.24, shot: 'arrow', blurb: 'Bow and arrow. Beats infantry, fears cavalry.' },
-    { name: 'Crossbowman', cls: 'ranged', hp: 50, attack: 7, armor: 0, parmor: 1, range: 6, reload: 2.2, speed: 1.5, sight: 7, cost: { wood: 45, gold: 25 }, time: 14, radius: 0.25, shot: 'bolt', blurb: 'Bolts that punch through mail.' },
+    { name: 'Archer', cls: 'ranged', hp: 45, attack: 5, armor: 0, parmor: 0, range: 5.5, reload: 2, speed: 1.5, sight: 7, cost: { food: 25, wood: 45 }, time: 14, radius: 0.24, shot: 'arrow', blurb: 'Bow and arrow. Beats infantry, fears cavalry.' },
+    { name: 'Crossbowman', cls: 'ranged', hp: 55, attack: 7, armor: 0, parmor: 1, range: 6, reload: 2.2, speed: 1.5, sight: 7, cost: { wood: 45, gold: 25 }, time: 14, radius: 0.25, shot: 'bolt', blurb: 'Bolts that punch through mail.' },
     { name: 'Musketeer', cls: 'ranged', hp: 60, attack: 12, armor: 1, parmor: 1, range: 6.5, reload: 3, speed: 1.5, sight: 7, cost: { food: 40, gold: 45 }, time: 15, radius: 0.25, shot: 'bullet', blurb: 'Smoke and thunder. Shreds infantry.' },
   ],
   cavalry: [
@@ -91,8 +91,8 @@ export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry
 /** The counter triangle: damage multiplier by attacker class against target class. */
 export const BONUS: Record<UnitClass, Record<UnitClass | 'building', number>> = {
   citizen: { citizen: 1, infantry: 1, ranged: 1, cavalry: 1, building: 0.6 },
-  infantry: { citizen: 1, infantry: 1, ranged: 1, cavalry: 2.5, building: 1.6 },
-  ranged: { citizen: 1, infantry: 1.7, ranged: 1, cavalry: 0.7, building: 0.25 },
+  infantry: { citizen: 1, infantry: 1, ranged: 1, cavalry: 3, building: 1.8 },
+  ranged: { citizen: 1, infantry: 2, ranged: 1, cavalry: 0.7, building: 0.25 },
   cavalry: { citizen: 1.3, infantry: 0.7, ranged: 2.2, cavalry: 1, building: 0.8 },
 };
 

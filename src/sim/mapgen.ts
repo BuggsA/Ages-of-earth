@@ -196,7 +196,9 @@ export function generateMap(seed: number, size: MapSize, players = 2): MapData {
       if (water === count) hgt = -0.55 - (0.34 - Math.min(0.34, e)) * 6 - detail * 0.2;
       else if (water > 0) hgt = -0.06 + detail * 0.05;
       else {
-        hgt = 0.2 + (e - 0.34) * 3.4 + (detail - 0.5) * 0.35;
+        // Rolling ground: broad swells from the elevation, smaller hummocks on top.
+        const swell = fbm(x / 11, y / 11, salt + 51, 2);
+        hgt = 0.2 + (e - 0.34) * 4.6 + (swell - 0.5) * 0.9 + (detail - 0.5) * 0.4;
         if (rock > 0) hgt += (rock / count) * (1.4 + fbm(x / 3, y / 3, salt + 41, 2) * 2.6);
       }
       height[y * W + x] = hgt;
