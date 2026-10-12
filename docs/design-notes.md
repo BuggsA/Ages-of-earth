@@ -6,7 +6,7 @@ Before adding features, I looked at what players keep praising in the games this
 
 *Empire Earth's* hook was its sweep across the ages; every Age game makes "aging up" a moment, with new units and a town that changes its look.
 
-- Four epochs, each with its own unit models and building style. Advancing gets a fanfare, a burst of light at the Town Center, a banner, and a change of music.
+- Five epochs, from the Stone Age to the Industrial Age, each with its own unit models and building style. Advancing gets a fanfare, a burst of light at the Town Center, a banner, and a change of music.
 - Every unit re-arms and every building is rebuilt in the new style the moment you advance (EE's upgrade lines, without the busywork).
 
 ## 2. Peoples that feel different
@@ -82,10 +82,17 @@ The remasters added better tutorials because the genre is daunting.
 
 - Tooltips on everything, hotkeys shown on every button, first-game tips that react to what is happening (out of room, an idle citizen, the next epoch affordable, under attack).
 
+## 12. Navies, fishing and the air
+
+Every one of these games has a navy, and the water maps are many players' favourites; Empire Earth went further and put aircraft in the sky, which players still remember it for.
+
+- Docks on the shore, fishing boats on shoals that last a long time (a second food economy that's worth defending), warships from triremes to ironclads, and transports that carry an army across the sea.
+- Boarding is the part players complain about most in the classics (units milling on the beach while the ship waits round the headland), so soldiers and ship agree on a meeting place on a shore both can reach, the crowd boards from the beach, and landed troops march on to where you clicked.
+- In the Industrial Age, an airfield with fighters and bombers. Aircraft ignore terrain and walls, so the counters matter: only missiles reach them, fighters hunt them, and bombers are slow and costly. An **Inland Sea** map makes the water the middle of the game.
+
 ## Not yet, and worth doing
 
-- **Ships and fishing** (all of these games have navies; EE also had aircraft).
-- **More epochs** (Renaissance, Industrial, Modern, as in EE).
+- **More epochs** (Atomic and Modern, as in EE), trade ships between docks, and the computer launching seaborne invasions.
 - **Unique units per people**, and AoM-style special powers.
 - **A campaign** of historical scenarios, and a **scenario editor** (EE's and AoE2's editors built huge communities).
 - **Territory and attrition** (Rise of Nations' borders), **relics or sacred sites** (AoE2 and AoE4).

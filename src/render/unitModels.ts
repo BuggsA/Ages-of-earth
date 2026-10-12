@@ -644,7 +644,9 @@ function warship(epoch: number): Kit {
     k.box(0.5, 0.12, 1.3, '#4a3426', 0, 0.06, -0.05);
     k.box(0.48, 0.24, 0.4, '#5a4030', 0, 0.06, -0.62);
     for (let i = 0; i < 5; i++) for (const x of [-0.26, 0.26]) k.box(0.02, 0.05, 0.06, '#1d1d1d', x, 0.1, -0.45 + i * 0.22);
-    k.box(0.5, 0.025, 1.3, GOLD, 0, 0.16, -0.05);
+    // A planked deck inside gilded rails.
+    k.box(0.44, 0.012, 1.24, '#9a7a52', 0, 0.18, -0.05);
+    for (const x of [-0.245, 0.245]) k.box(0.025, 0.04, 1.3, GOLD, x, 0.17, -0.05);
     for (const [z, h, w] of [[0.45, 0.95, 0.42], [0, 1.2, 0.56], [-0.42, 0.95, 0.4]] as const) {
       mast(k, z, h, w, false, 0.18);
       k.team(k.box(0.06, w * 0.6, 0.02, TEAM, 0, 0.18 + h * 0.33 + 0.02, z + 0.02));

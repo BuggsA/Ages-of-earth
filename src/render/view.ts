@@ -448,7 +448,7 @@ export class View {
           if (this.wet(s, ev.x, ev.y)) {
             // A plume of spray where a shell or bomb meets the water.
             this.effects.burst(at, { count: 22, speed: 1.2, up: 1, life: 1.2, size: 0.08, grow: 1.5, gravity: 5, drag: 0.4, colors: ['#ffffff', '#dcefff', '#b8dcf0'] });
-            this.effects.ring(at, '#ffffff', 1.4, 0.9);
+            this.effects.ring(at, '#ffffff', 0.9, 0.8);
             this.cue(ev.kind === 'bomb' ? 'explosion' : 'splashWater', ev.x, ev.y, 0.8);
             break;
           }

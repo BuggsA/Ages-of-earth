@@ -274,7 +274,8 @@ function startAttract(skipAhead = true): void {
   mode = 'title';
   const seed = newSeed();
   const maps = Object.keys(MAP_TYPES) as MapType[];
-  game = createGame({ seed, size: 'small', mapType: maps[seed % maps.length], players: [{ name: 'Azure', ai: 'normal' }, { name: 'Crimson', ai: 'hard' }] });
+  // Any map, starting in any epoch: sometimes there are galleons on the sea or biplanes overhead.
+  game = createGame({ seed, size: 'small', mapType: maps[seed % maps.length], startEpoch: Math.floor(seed / maps.length) % EPOCHS.length, players: [{ name: 'Azure', ai: 'normal' }, { name: 'Crimson', ai: 'hard' }] });
   viewer = 0;
   view.setGame(game, 0);
   view.revealAll();
