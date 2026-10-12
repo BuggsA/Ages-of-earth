@@ -1,15 +1,17 @@
 import { aiStep } from './ai';
+import { hitAnimal, spawnAnimal, updateAnimals } from './animals';
 import { buildingGuns, updateShots } from './combat';
 import { applyCommand } from './commands';
-import { EPOCHS, PLAYER_COLORS, START_CITIZENS, START_RES, buildingHp, secs, unitStats } from './data';
+import { AURA, CIV_IDS, EPOCHS, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
 import { stampBuilding } from './grid';
 import { generateMap } from './mapgen';
 import { Spatial } from './spatial';
-import type { Building, Command, Difficulty, GameState, MapSize, Player } from './types';
-import { R_NONE } from './types';
-import { RES_OF_TILE, checkStuck, collide, goTo, routeUnits, separate, setOrder, think, walk } from './units';
+import { modsOf, statsFor } from './stats';
+import type { Building, CivId, Command, Difficulty, GameState, MapSize, MapType, Player } from './types';
+import { RES, R_NONE } from './types';
+import { RES_OF_TILE, checkStuck, collide, routeUnits, separate, setOrder, think, ungarrison, walk } from './units';
 import { updateVision } from './vision';
-import { countPop, exitSpot, goalForPoint, placeBuilding, spawnUnit } from './world';
+import { countPop, exitSpot, maxHp, placeBuilding, spawnUnit } from './world';
 
 /**
  * The match: made from a seed and a list of players, then advanced one fixed tick at a time with the
@@ -23,23 +25,35 @@ export interface PlayerSetup {
   color?: string;
   ai: Difficulty | null;
   team?: number;
+  /** A civilization, or left out for one picked by the seed. */
+  civ?: CivId;
 }
 
 export interface GameSetup {
   seed: number;
   size: MapSize;
   players: PlayerSetup[];
+  mapType?: MapType;
+  /** The epoch everyone starts in (with more resources the later it is). */
+  startEpoch?: number;
+  /** Minutes of peace before anyone may fight. */
+  peaceMinutes?: number;
+  /** Seconds a finished wonder must stand to win. */
+  wonderSeconds?: number;
 }
 
 const spatials = new WeakMap<GameState, Spatial>();
 
 export function createGame(setup: GameSetup): GameState {
-  const map = generateMap(setup.seed, setup.size, setup.players.length);
+  const mapType = setup.mapType ?? 'continental';
+  const map = generateMap(setup.seed, setup.size, setup.players.length, mapType);
   const n = map.w * map.h;
+  const startEpoch = Math.max(0, Math.min(EPOCHS.length - 1, setup.startEpoch ?? 0));
   const s: GameState = {
     tick: 0,
     seed: setup.seed,
     size: setup.size,
+    mapType,
     w: map.w,
     h: map.h,
     terrain: map.terrain,
@@ -48,33 +62,44 @@ export function createGame(setup: GameSetup): GameState {
     amount: map.amount,
     block: map.block,
     bldAt: new Int32Array(n),
+    gateTeam: new Int8Array(n).fill(-1),
     blockVersion: 0,
     players: [],
     ents: [],
     byId: new Map(),
+    animals: [],
     nextId: 1,
     shots: [],
     rng: setup.seed >>> 0,
+    market: { ...MARKET.start },
+    peaceUntil: secs((setup.peaceMinutes ?? 0) * 60),
+    wonderTime: secs(setup.wonderSeconds ?? WONDER_SECONDS),
+    ai: {},
     events: [],
     winner: -1,
     over: false,
   };
   setup.players.forEach((ps, i) => {
     const start = map.starts[i];
+    const extra = EPOCH_START_RES[startEpoch];
     const p: Player = {
       id: i,
       name: ps.name,
       color: ps.color ?? PLAYER_COLORS[i % PLAYER_COLORS.length],
+      civ: ps.civ ?? CIV_IDS[(setup.seed + i * 7919) % CIV_IDS.length],
       ai: ps.ai,
       team: ps.team ?? i,
-      res: { ...START_RES },
-      epoch: 0,
+      res: { food: START_RES.food + extra.food, wood: START_RES.wood + extra.wood, stone: START_RES.stone + extra.stone, gold: START_RES.gold + extra.gold },
+      epoch: startEpoch,
+      techs: [],
+      statsVersion: 0,
       pop: 0,
       cap: 0,
       vis: new Uint8Array(n),
       seen: new Uint8Array(n),
       defeated: false,
-      stats: { gathered: 0, trained: 0, kills: 0, losses: 0, built: 0, razed: 0 },
+      stats: { gathered: 0, trained: 0, kills: 0, losses: 0, built: 0, razed: 0, converted: 0, techs: 0 },
+      history: [],
       startX: start.x,
       startY: start.y,
       alert: -9999,
@@ -86,15 +111,19 @@ export function createGame(setup: GameSetup): GameState {
     // Citizens stand in a little arc on the side facing the middle of the map.
     const mx = s.w / 2;
     const my = s.h / 2;
-    for (let k = 0; k < START_CITIZENS; k++) {
+    const count = START_CITIZENS + modsOf(s, p.id).extraCitizens;
+    for (let k = 0; k < count; k++) {
       const spot = exitSpot(s, tc, mx, my);
       const u = spawnUnit(s, p.id, 'citizen', spot.x, spot.y);
       u.x += ((k % 3) - 1) * 0.55;
       u.y += (Math.floor(k / 3) - 0.5) * 0.55;
       u.px = u.x;
       u.py = u.y;
+      u.guardX = u.x;
+      u.guardY = u.y;
     }
   }
+  for (const d of map.deer) spawnAnimal(s, d.x, d.y);
   countPop(s);
   updateVision(s);
   // Everyone knows the lie of the land around home.
@@ -120,28 +149,37 @@ function spatial(s: GameState): Spatial {
   return sp;
 }
 
-/** Into the next epoch: every unit re-arms and every building is reinforced, keeping their share of health. */
-function advanceEpoch(s: GameState, p: Player): void {
-  const from = p.epoch;
-  const to = from + 1;
+/** Change a player's stats (an epoch, a technology), keeping every unit's and building's share of health. */
+function restat(s: GameState, p: Player, change: () => void): void {
+  const before = new Map<number, number>();
+  for (const e of s.ents) if (e.owner === p.id && e.hp > 0) before.set(e.id, maxHp(s, e));
+  change();
+  p.statsVersion++;
   for (const e of s.ents) {
-    if (e.owner !== p.id || e.hp <= 0) continue;
-    if (e.kind === 'unit') {
-      const a = unitStats(e.type, from).hp;
-      const b = unitStats(e.type, to).hp;
-      e.hp = (e.hp * b) / a;
-    } else {
-      e.hp = (e.hp * buildingHp(e.type, to)) / buildingHp(e.type, from);
-    }
+    const was = before.get(e.id);
+    if (!was) continue;
+    e.hp = (e.hp * maxHp(s, e)) / was;
   }
-  p.epoch = to;
-  s.events.push({ k: 'epoch', owner: p.id, epoch: to });
+}
+
+/** Into the next epoch: every unit re-arms and every building is reinforced. */
+function advanceEpoch(s: GameState, p: Player): void {
+  restat(s, p, () => p.epoch++);
+  s.events.push({ k: 'epoch', owner: p.id, epoch: p.epoch });
 }
 
 function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
   if (!b.built) return;
   buildingGuns(s, sp, b);
   const p = s.players[b.owner];
+  // Shelter heals.
+  if (b.garrison.length && s.tick % 20 === 0) {
+    for (const id of b.garrison) {
+      const u = s.byId.get(id);
+      if (u && u.kind === 'unit') u.hp = Math.min(maxHp(s, u), u.hp + 2);
+    }
+  }
+  if (b.timer > 0) b.timer--;
   if (b.advance >= 0) {
     b.advance++;
     if (b.advance >= secs(EPOCHS[p.epoch + 1].time)) {
@@ -152,7 +190,17 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
   }
   const item = b.queue[0];
   if (!item) return;
-  const need = secs(unitStats(item.unit, p.epoch).time);
+  if (item.tech) {
+    if (++item.done < secs(TECHS[item.tech].time)) return;
+    b.queue.shift();
+    const tech = item.tech;
+    restat(s, p, () => p.techs.push(tech));
+    p.stats.techs++;
+    s.events.push({ k: 'researched', owner: p.id, tech });
+    return;
+  }
+  const unit = item.unit!;
+  const need = secs(statsFor(s, p.id, unit).time);
   if (item.done < need) {
     item.done++;
     if (item.done < need) return;
@@ -167,18 +215,30 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
   b.queue.shift();
   const toward = b.rally ?? { x: s.w / 2, y: s.h / 2 };
   const spot = exitSpot(s, b, toward.x, toward.y);
-  const u = spawnUnit(s, p.id, item.unit, spot.x, spot.y);
+  const u = spawnUnit(s, p.id, unit, spot.x, spot.y);
   p.pop++;
   p.stats.trained++;
-  s.events.push({ k: 'trained', id: u.id, owner: p.id, type: item.unit });
+  s.events.push({ k: 'trained', id: u.id, owner: p.id, type: unit });
   if (b.rally) {
     const t = b.rally.tile;
     if (t >= 0 && u.type === 'citizen' && s.res[t] !== R_NONE) setOrder(u, { k: 'gather', tile: t, res: RES_OF_TILE[s.res[t]], phase: 'go' });
-    else {
-      const g = goalForPoint(s, b.rally.x, b.rally.y);
-      setOrder(u, { k: 'move', x: g.px, y: g.py, amove: false });
-      goTo(u, g);
-    }
+    else setOrder(u, { k: 'move', x: b.rally.x, y: b.rally.y, amove: false, started: false });
+  }
+}
+
+/** Heroes inspire soldiers near them: they strike harder and slowly heal. */
+function auras(s: GameState, sp: Spatial): void {
+  if (s.tick % 5 !== 0) return;
+  for (const h of s.ents) {
+    if (h.kind !== 'unit' || h.type !== 'hero' || h.hp <= 0 || h.inside) continue;
+    sp.near(h.x, h.y, AURA.radius, (u) => {
+      if (u.owner !== h.owner || u.hp <= 0 || !MILITARY.includes(u.type)) return;
+      const dx = u.x - h.x;
+      const dy = u.y - h.y;
+      if (dx * dx + dy * dy > AURA.radius * AURA.radius) return;
+      u.aura = s.tick;
+      if (s.tick % 20 === 0) u.hp = Math.min(maxHp(s, u), u.hp + AURA.heal);
+    });
   }
 }
 
@@ -190,9 +250,15 @@ function removeDead(s: GameState): void {
     const p = s.players[e.owner];
     p.stats.losses++;
     if (e.kind === 'building') {
+      // Those inside run out before it falls.
+      ungarrison(s, e);
       stampBuilding(s, e, false);
-      s.events.push({ k: 'die', id: e.id, owner: e.owner, type: e.type, x: e.x, y: e.y, building: true, size: e.size, epoch: p.epoch, fx: 0, fy: 1 });
+      s.events.push({ k: 'die', id: e.id, owner: e.owner, type: e.type, x: e.x, y: e.y, building: true, size: e.size, epoch: p.epoch, fx: e.dir, fy: 1 });
     } else {
+      if (e.inside) {
+        const b = s.byId.get(e.inside);
+        if (b && b.kind === 'building') b.garrison = b.garrison.filter((id) => id !== e.id);
+      }
       s.events.push({ k: 'die', id: e.id, owner: e.owner, type: e.type, x: e.x, y: e.y, building: false, size: 1, epoch: p.epoch, fx: e.fx, fy: e.fy });
     }
     s.byId.delete(e.id);
@@ -201,10 +267,20 @@ function removeDead(s: GameState): void {
 }
 
 function checkVictory(s: GameState): void {
+  // A wonder that has stood long enough wins for its builder's side.
+  for (const e of s.ents) {
+    if (e.kind === 'building' && e.type === 'wonder' && e.built && e.hp > 0 && e.timer === 0) {
+      s.over = true;
+      s.winner = s.players[e.owner].team;
+      for (const p of s.players) if (p.team !== s.winner) p.defeated = true;
+      s.events.push({ k: 'over', winner: s.winner, how: 'wonder' });
+      return;
+    }
+  }
   for (const p of s.players) {
     if (p.defeated) continue;
-    // Fields alone don't keep a people alive.
-    const alive = s.ents.some((e) => e.owner === p.id && e.hp > 0 && !(e.kind === 'building' && e.type === 'farm'));
+    // Fields and walls alone don't keep a people alive.
+    const alive = s.ents.some((e) => e.owner === p.id && e.hp > 0 && !(e.kind === 'building' && (e.type === 'farm' || e.type === 'wall' || e.type === 'gate')));
     if (alive) continue;
     p.defeated = true;
     for (const e of s.ents) if (e.owner === p.id) e.hp = 0;
@@ -214,7 +290,23 @@ function checkVictory(s: GameState): void {
   if (teams.size <= 1) {
     s.over = true;
     s.winner = teams.size === 1 ? [...teams][0] : -1;
-    s.events.push({ k: 'over', winner: s.winner });
+    s.events.push({ k: 'over', winner: s.winner, how: 'conquest' });
+  }
+}
+
+/** A player's score: what they gathered, built, learned and won in battle (shown during and after the match). */
+export function scoreOf(s: GameState, p: Player): number {
+  let wonder = 0;
+  for (const e of s.ents) if (e.kind === 'building' && e.owner === p.id && e.type === 'wonder' && e.built) wonder += 500;
+  return Math.round(p.stats.gathered / 10 + p.stats.kills * 8 + p.stats.razed * 15 + p.stats.converted * 10 + p.stats.techs * 25 + p.epoch * 150 + p.stats.built * 3 + wonder);
+}
+
+/** Every 30 seconds, a note of how each player is doing, for the timeline after the match. */
+function sample(s: GameState): void {
+  for (const p of s.players) {
+    let military = 0;
+    for (const e of s.ents) if (e.kind === 'unit' && e.owner === p.id && MILITARY.includes(e.type)) military++;
+    p.history.push({ tick: s.tick, pop: p.defeated ? 0 : p.pop, military, gathered: p.stats.gathered, score: scoreOf(s, p), epoch: p.epoch });
   }
 }
 
@@ -232,44 +324,53 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
     e.px = e.x;
     e.py = e.y;
   }
+  auras(s, sp);
   for (const e of s.ents) if (e.kind === 'building' && e.hp > 0) updateBuilding(s, sp, e);
   for (const e of s.ents) if (e.kind === 'unit' && e.hp > 0) think(s, sp, e);
   routeUnits(s);
-  for (const e of s.ents) if (e.kind === 'unit' && e.hp > 0) walk(s, e);
+  for (const e of s.ents) if (e.kind === 'unit' && e.hp > 0 && !e.inside) walk(s, e);
+  updateAnimals(s);
   sp.rebuild(s);
   separate(s, sp);
   for (const e of s.ents) {
-    if (e.kind !== 'unit' || e.hp <= 0) continue;
+    if (e.kind !== 'unit' || e.hp <= 0 || e.inside) continue;
     collide(s, e);
     checkStuck(s, e);
   }
-  updateShots(s);
+  updateShots(s, sp, (a, damage, x, y) => hitAnimal(s, a, damage, x, y));
   removeDead(s);
   if (s.tick % 4 === 0) updateVision(s);
   if (s.tick % 20 === 0) checkVictory(s);
+  if (s.tick % secs(30) === 0) sample(s);
   s.tick++;
 }
 
 /** A fingerprint of the whole match, to check that two runs stayed identical. */
 export function checksum(s: GameState): number {
   let h = 2166136261;
+  const f = new Float64Array(1);
+  const u = new Uint32Array(f.buffer);
   const mix = (v: number) => {
     // Fold the float's exact bits in, so the tiniest difference shows.
-    const f = new Float64Array([v]);
-    const u = new Uint32Array(f.buffer);
+    f[0] = v;
     h = Math.imul(h ^ u[0], 16777619);
     h = Math.imul(h ^ u[1], 16777619);
   };
   mix(s.tick);
   for (const e of s.ents) {
     mix(e.id);
+    mix(e.owner);
     mix(e.hp);
     mix(e.x);
     mix(e.y);
     if (e.kind === 'unit') mix(e.carry);
     else mix(e.progress);
   }
-  for (const p of s.players) for (const r of ['food', 'wood', 'stone', 'gold'] as const) mix(p.res[r]);
+  for (const a of s.animals) {
+    mix(a.x);
+    mix(a.y);
+  }
+  for (const p of s.players) for (const r of RES) mix(p.res[r]);
   for (const sh of s.shots) mix(sh.t);
   return h >>> 0;
 }

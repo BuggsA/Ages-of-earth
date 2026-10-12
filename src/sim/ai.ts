@@ -1,45 +1,31 @@
-import { applyCommand, MAX_QUEUE } from './commands';
-import { AI_LEVELS, BUILDINGS, COUNTER, EPOCHS, LAST_EPOCH, POP_MAX, secs, unitEpoch, unitStats, type UnitClass } from './data';
+import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
+import { AI_LEVELS, BUILDINGS, COUNTER, EPOCHS, LAST_EPOCH, MARKET, POP_MAX, TECHS, secs, unitEpoch, unitStats } from './data';
 import { distToRect, placeProblem, walkable } from './grid';
-import type { Building, BuildingType, Command, Cost, GameState, Player, Res, Unit, UnitType } from './types';
-import { RES, R_BERRY, R_GOLD, R_NONE, R_STONE, R_TREE } from './types';
+import { buildingCostFor, techCostFor, techProblem } from './stats';
+import type { AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Player, Res, TechId, Unit, UnitType } from './types';
+import { RES, R_BERRY, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { findResource, freeFarm } from './units';
 import { isEnemy } from './world';
 
 /**
  * The computer opponent. It plays by the same rules and through the same commands as a person: it
- * grows its people, spreads them over food, wood, gold and stone, builds houses before it runs out of
- * room, raises barracks, ranges and stables, advances through the epochs, trains an army that counters
- * what it sees, defends its town and attacks in waves that grow over time. Difficulty sets how fast it
- * gathers, how many citizens it keeps and when and how hard it attacks.
+ * grows its people, hunts, spreads them over food, wood, gold and stone, builds houses before it runs
+ * out of room, raises barracks, ranges, stables, a forge, a temple and a siege workshop, researches
+ * better tools and weapons, trades at the market, advances through the epochs, trains a hero and an
+ * army that counters what it sees, brings priests to heal and convert and siege to break walls,
+ * rings the town bell when overrun, defends its town and attacks in waves that grow over time, and
+ * builds a wonder when it is rich (and goes all out against yours). Difficulty sets how fast it
+ * gathers, how many citizens it keeps, when and how hard it attacks and how many tricks it knows.
  *
- * It decides from the match state alone and its own small memory (kept beside the state), with its own
- * seeded dice, so it plays the same way in every browser.
+ * It decides from the match state alone and its memory (kept in the state, so a saved match plays on
+ * the same), with the match's own seeded dice, so it plays the same way in every browser.
  */
 
-interface Memory {
-  next: number;
-  wave: number;
-  attacking: boolean;
-  /** Where the army gathers between attacks. */
-  muster: { x: number; y: number } | null;
-  /** Last tick a building of each kind was ordered, so it waits for the first to go up. */
-  ordered: Partial<Record<BuildingType, number>>;
-  unitTurn: number;
-}
-
-const memories = new WeakMap<GameState, Map<number, Memory>>();
-
-function memory(s: GameState, id: number): Memory {
-  let m = memories.get(s);
-  if (!m) {
-    m = new Map();
-    memories.set(s, m);
-  }
-  let mem = m.get(id);
+function memory(s: GameState, id: number): AiMemory {
+  let mem = s.ai[id];
   if (!mem) {
-    mem = { next: 10 + id * 7, wave: 0, attacking: false, muster: null, ordered: {}, unitTurn: id };
-    m.set(id, mem);
+    mem = { next: 10 + id * 7, wave: 0, attacking: false, muster: null, ordered: {}, unitTurn: id, bell: -1 };
+    s.ai[id] = mem;
   }
   return mem;
 }
@@ -54,14 +40,20 @@ function roll(s: GameState): number {
 }
 
 const SHARE: Record<Res, number>[] = [
-  { food: 0.52, wood: 0.38, gold: 0.05, stone: 0.05 },
-  { food: 0.45, wood: 0.3, gold: 0.15, stone: 0.1 },
-  { food: 0.42, wood: 0.25, gold: 0.25, stone: 0.08 },
-  { food: 0.42, wood: 0.22, gold: 0.29, stone: 0.07 },
+  { food: 0.5, wood: 0.4, gold: 0.05, stone: 0.05 },
+  { food: 0.42, wood: 0.34, gold: 0.15, stone: 0.09 },
+  { food: 0.4, wood: 0.3, gold: 0.23, stone: 0.07 },
+  { food: 0.38, wood: 0.3, gold: 0.26, stone: 0.06 },
 ];
 /** Citizens wanted before advancing out of each epoch. */
 const ADVANCE_AT = [11, 17, 22];
 const TILE_OF: Record<Res, number> = { food: R_BERRY, wood: R_TREE, stone: R_STONE, gold: R_GOLD };
+/** Technologies in the order the opponent wants them (economy first). */
+const TECH_ORDER: TechId[] = [
+  'plow', 'axes', 'wheelbarrow', 'picks', 'forging', 'scaleArmor', 'fletching', 'husbandry', 'irrigation', 'saws', 'shafts', 'handcart',
+  'ironCasting', 'chainMail', 'bodkin', 'masonry', 'theology', 'conscription', 'blastFurnace', 'plateArmor', 'chemistry',
+];
+const ECONOMY: TechId[] = ['plow', 'axes', 'wheelbarrow', 'picks', 'irrigation', 'saws', 'shafts', 'handcart'];
 
 export function aiStep(s: GameState): void {
   for (const p of s.players) {
@@ -77,6 +69,7 @@ interface View {
   p: Player;
   citizens: Unit[];
   army: Unit[];
+  priests: Unit[];
   buildings: Building[];
   home: { x: number; y: number };
   tc: Building | null;
@@ -92,19 +85,20 @@ function spend(v: View, cost: Cost): void {
   for (const r of RES) v.budget[r] -= cost[r] ?? 0;
 }
 
-function think(s: GameState, p: Player, mem: Memory): void {
+function think(s: GameState, p: Player, mem: AiMemory): void {
   const L = AI_LEVELS[p.ai!];
   const citizens: Unit[] = [];
   const army: Unit[] = [];
+  const priests: Unit[] = [];
   const buildings: Building[] = [];
   for (const e of s.ents) {
     if (e.owner !== p.id || e.hp <= 0) continue;
-    if (e.kind === 'unit') (e.type === 'citizen' ? citizens : army).push(e);
+    if (e.kind === 'unit') (e.type === 'citizen' ? citizens : e.type === 'priest' ? priests : army).push(e);
     else buildings.push(e);
   }
   const tc = buildings.find((b) => b.type === 'towncenter' && b.built) ?? null;
   const home = tc ? { x: tc.x, y: tc.y } : { x: p.startX, y: p.startY };
-  const v: View = { p, citizens, army, buildings, home, tc, budget: { ...p.res } };
+  const v: View = { p, citizens, army, priests, buildings, home, tc, budget: { ...p.res } };
   const issue = (c: Command) => applyCommand(s, c);
 
   // People first: a growing town pays for everything else.
@@ -130,9 +124,53 @@ function think(s: GameState, p: Player, mem: Memory): void {
     spend(v, cost);
   }
 
+  townBell(s, v, mem, issue);
+  research(s, v, citizens.length >= wantCitizens - 2, issue);
+  trade(s, v, issue);
   planBuildings(s, v, mem, issue);
   assignCitizens(s, v, issue);
   military(s, v, mem, issue);
+  priestly(s, v, mem, issue);
+}
+
+// ---- Research and trade ----------------------------------------------------------------------------
+
+function research(s: GameState, v: View, peopleEnough: boolean, issue: (c: Command) => void): void {
+  const { p } = v;
+  const L = AI_LEVELS[p.ai!];
+  const order = L.clever ? TECH_ORDER : ECONOMY;
+  for (const tech of order) {
+    if (techProblem(s, p.id, tech)) continue;
+    const at = v.buildings.find((b) => b.type === TECHS[tech].at && b.built && b.queue.length === 0 && b.advance < 0);
+    if (!at) continue;
+    // The Town Center trains citizens first.
+    if (at.type === 'towncenter' && !peopleEnough && v.citizens.length < 12) continue;
+    const cost = techCostFor(s, p.id, tech);
+    // Keep something back for soldiers and the next epoch.
+    const keep: Cost = { food: 100, wood: 100, gold: 50 };
+    if (!RES.every((r) => !cost[r] || v.budget[r] >= cost[r]! + (keep[r] ?? 0))) continue;
+    issue({ t: 'research', p: p.id, building: at.id, tech });
+    spend(v, cost);
+    return;
+  }
+}
+
+function trade(s: GameState, v: View, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!AI_LEVELS[p.ai!].clever || !v.buildings.some((b) => b.type === 'market' && b.built)) return;
+  // Sell what piles up for gold; buy what is short when gold piles up.
+  for (const r of ['food', 'wood', 'stone'] as const) {
+    if (p.res[r] > 1500 && p.res.gold < 400 && s.market[r] > MARKET.min + 10) {
+      issue({ t: 'trade', p: p.id, res: r, buy: false });
+      return;
+    }
+  }
+  for (const r of ['food', 'wood'] as const) {
+    if (p.res[r] < 100 && p.res.gold > 1200 && s.market[r] < 250) {
+      issue({ t: 'trade', p: p.id, res: r, buy: true });
+      return;
+    }
+  }
 }
 
 // ---- Building --------------------------------------------------------------------------------------
@@ -144,7 +182,7 @@ export function findSpot(s: GameState, type: BuildingType, x: number, y: number,
   const cy = Math.floor(y - n / 2);
   for (let r = minR; r <= maxR; r++) {
     // Start each ring at a different side, so buildings don't all line up.
-    const start = Math.floor(roll(s) * 8 * r);
+    const start = Math.floor(roll(s) * 8 * Math.max(1, r));
     const ring: [number, number][] = [];
     for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === r) ring.push([dx, dy]);
     for (let k = 0; k < ring.length; k++) {
@@ -176,8 +214,8 @@ function laneClear(s: GameState, tx: number, ty: number, n: number, farm: boolea
 }
 
 /** Order a building with a few citizens pulled off other work (wood first, farmers last). */
-function construct(s: GameState, v: View, mem: Memory, type: BuildingType, spot: { tx: number; ty: number }, builders: number, issue: (c: Command) => void): boolean {
-  const cost = BUILDINGS[type].cost;
+function construct(s: GameState, v: View, mem: AiMemory, type: BuildingType, spot: { tx: number; ty: number }, builders: number, issue: (c: Command) => void): boolean {
+  const cost = buildingCostFor(s, v.p.id, type);
   if (!afford(v, cost)) return false;
   const cx = spot.tx + BUILDINGS[type].size / 2;
   const cy = spot.ty + BUILDINGS[type].size / 2;
@@ -189,7 +227,7 @@ function construct(s: GameState, v: View, mem: Memory, type: BuildingType, spot:
     return job * 1000 + Math.sqrt(dx * dx + dy * dy);
   };
   const crew = v.citizens
-    .filter((u) => !(u.order.k === 'farm' && u.order.phase === 'work') && u.order.k !== 'build')
+    .filter((u) => !(u.order.k === 'farm' && u.order.phase === 'work') && u.order.k !== 'build' && !u.inside)
     .sort((a, b) => rank(a) - rank(b) || a.id - b.id)
     .slice(0, builders);
   if (!crew.length) return false;
@@ -203,7 +241,7 @@ function count(v: View, type: BuildingType, builtOnly = false): number {
   return v.buildings.filter((b) => b.type === type && (!builtOnly || b.built)).length;
 }
 
-function planBuildings(s: GameState, v: View, mem: Memory, issue: (c: Command) => void): void {
+function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p, home } = v;
   const L = AI_LEVELS[p.ai!];
   const pending = v.buildings.filter((b) => !b.built);
@@ -227,7 +265,7 @@ function planBuildings(s: GameState, v: View, mem: Memory, issue: (c: Command) =
   const housesBuilding = pending.filter((b) => b.type === 'house').length;
   const room = p.cap - p.pop;
   if (p.cap < POP_MAX && room <= 3 + p.epoch * 2 && housesBuilding < (p.pop > 40 ? 2 : 1) && !recently('house', 4)) {
-    const spot = findSpot(s, 'house', home.x, home.y, 5, 16);
+    const spot = findSpot(s, 'house', home.x, home.y, 5, 22);
     if (spot) construct(s, v, mem, 'house', spot, 1, issue);
   }
   if (pending.length > 2) return;
@@ -255,25 +293,39 @@ function planBuildings(s: GameState, v: View, mem: Memory, issue: (c: Command) =
   const freeFields = v.buildings.filter((b) => b.type === 'farm' && !v.citizens.some((u) => u.order.k === 'farm' && u.order.target === b.id)).length;
   const foodWanted = Math.round(wanted(v).food) - (berries >= 0 ? 6 : 0);
   if (farms < foodWanted && freeFields < 2 && !recently('farm', 2)) {
-    const spot = findSpot(s, 'farm', home.x, home.y, 3, 14);
+    const spot = findSpot(s, 'farm', home.x, home.y, 3, 16);
     if (spot && construct(s, v, mem, 'farm', spot, 1, issue)) return;
   }
 
   const n = v.citizens.length;
+  const clever = L.clever;
   const want: [BuildingType, boolean][] = [
     ['barracks', n >= 8 && count(v, 'barracks') === 0],
     ['range', n >= 12 && count(v, 'range') === 0],
     ['stable', p.epoch >= 1 && n >= 14 && count(v, 'stable') === 0],
+    ['forge', p.epoch >= 1 && n >= 16 && count(v, 'forge') === 0],
     ['tower', p.epoch >= 1 && count(v, 'tower') < L.towers && n >= 16],
+    ['market', clever && p.epoch >= 1 && n >= 20 && count(v, 'market') === 0],
+    ['workshop', clever && p.epoch >= 2 && n >= 20 && count(v, 'workshop') === 0],
+    ['temple', clever && p.epoch >= 2 && n >= 22 && count(v, 'temple') === 0],
     ['barracks', p.epoch >= 2 && n >= 22 && count(v, 'barracks') < 2],
     ['range', p.epoch >= 2 && n >= 24 && count(v, 'range') < 2],
     ['stable', p.epoch >= 3 && n >= 26 && count(v, 'stable') < 2],
   ];
   for (const [type, ok] of want) {
     if (!ok || recently(type, 25) || BUILDINGS[type].epoch > p.epoch) continue;
-    const at = type === 'tower' ? towardEnemy(9) : towardEnemy(6);
-    const spot = findSpot(s, type, at.x, at.y, 0, 14);
+    const at = type === 'tower' ? towardEnemy(9) : type === 'market' || type === 'temple' ? home : towardEnemy(6);
+    const spot = findSpot(s, type, at.x, at.y, type === 'market' || type === 'temple' ? 6 : 0, 18);
     if (spot && construct(s, v, mem, type, spot, type === 'tower' ? 2 : 3, issue)) return;
+  }
+
+  // A wonder, when rich in the last epoch.
+  if (clever && p.epoch >= LAST_EPOCH && count(v, 'wonder') === 0 && !recently('wonder', 60)) {
+    const cost = buildingCostFor(s, p.id, 'wonder');
+    if (RES.every((r) => !cost[r] || v.budget[r] >= cost[r]! + 200)) {
+      const spot = findSpot(s, 'wonder', home.x, home.y, 6, 20);
+      if (spot) construct(s, v, mem, 'wonder', spot, 8, issue);
+    }
   }
 }
 
@@ -282,7 +334,7 @@ function planBuildings(s: GameState, v: View, mem: Memory, issue: (c: Command) =
 function jobOf(u: Unit): Res | 'build' | null {
   const o = u.order;
   if (o.k === 'gather') return o.res;
-  if (o.k === 'farm') return 'food';
+  if (o.k === 'farm' || o.k === 'hunt') return 'food';
   if (o.k === 'build') return 'build';
   return null;
 }
@@ -298,15 +350,42 @@ function wanted(v: View): Record<Res, number> {
     weight[r] = share[r] * lean;
     total += weight[r];
   }
-  const n = v.citizens.filter((u) => u.order.k !== 'build').length;
+  const n = v.citizens.filter((u) => u.order.k !== 'build' && !u.inside).length;
   const out: Record<Res, number> = { food: 0, wood: 0, gold: 0, stone: 0 };
   for (const r of RES) out[r] = (weight[r] / total) * n;
   return out;
 }
 
-/** Send a citizen to gather a resource (berries, then free fields, for food). False if there is none to be had. */
+function nearestDeer(s: GameState, x: number, y: number, r: number): Animal | null {
+  let best: Animal | null = null;
+  let bestD = r * r;
+  for (const a of s.animals) {
+    const dx = a.x - x;
+    const dy = a.y - y;
+    const d = dx * dx + dy * dy;
+    if (d < bestD) {
+      bestD = d;
+      best = a;
+    }
+  }
+  return best;
+}
+
+/** Send a citizen to gather a resource (game, berries, then free fields, for food). False if there is none to be had. */
 function sendTo(s: GameState, v: View, u: Unit, res: Res, issue: (c: Command) => void): boolean {
   if (res === 'food') {
+    const meat = findResource(s, R_MEAT, v.home.x, v.home.y, 14);
+    if (meat >= 0) {
+      issue({ t: 'gather', p: v.p.id, ids: [u.id], tile: meat });
+      return true;
+    }
+    // A few hunters while there is game close to home.
+    const hunters = v.citizens.filter((c) => c.order.k === 'hunt').length;
+    const deer = hunters < 3 ? nearestDeer(s, v.home.x, v.home.y, 16) : null;
+    if (deer) {
+      issue({ t: 'hunt', p: v.p.id, ids: [u.id], target: deer.id });
+      return true;
+    }
     const berry = findResource(s, R_BERRY, v.home.x, v.home.y, 16);
     if (berry >= 0) {
       issue({ t: 'gather', p: v.p.id, ids: [u.id], tile: berry });
@@ -338,7 +417,7 @@ function assignCitizens(s: GameState, v: View, issue: (c: Command) => void): voi
   for (const b of v.buildings) {
     if (b.built || v.citizens.some((u) => u.order.k === 'build' && u.order.target === b.id)) continue;
     const helper = v.citizens
-      .filter((u) => u.order.k === 'idle' || (u.order.k === 'gather' && u.order.res === 'wood'))
+      .filter((u) => !u.inside && (u.order.k === 'idle' || (u.order.k === 'gather' && u.order.res === 'wood')))
       .sort((a, c) => distToRect(a.x, a.y, b) - distToRect(c.x, c.y, b) || a.id - c.id)[0];
     if (helper) issue({ t: 'work', p: v.p.id, ids: [helper.id], target: b.id });
   }
@@ -355,7 +434,7 @@ function assignCitizens(s: GameState, v: View, issue: (c: Command) => void): voi
     }
     return best;
   };
-  for (const u of v.citizens.filter((c) => c.order.k === 'idle')) {
+  for (const u of v.citizens.filter((c) => c.order.k === 'idle' && !c.inside && !c.queue.length)) {
     const skip = new Set<Res>();
     for (let tries = 0; tries < 4; tries++) {
       const r = neediest(skip);
@@ -383,7 +462,7 @@ function assignCitizens(s: GameState, v: View, issue: (c: Command) => void): voi
     }
   }
   if (over && under) {
-    const mover = v.citizens.find((u) => jobOf(u) === over && u.carry <= 2 && !(u.order.k === 'farm'));
+    const mover = v.citizens.find((u) => jobOf(u) === over && u.carry <= 2 && u.order.k !== 'farm' && u.order.k !== 'hunt' && !u.inside);
     if (mover) sendTo(s, v, mover, under, issue);
   }
 }
@@ -404,6 +483,7 @@ function nearestDropTo(v: View, u: Unit): { x: number; y: number } {
 
 // ---- Army ------------------------------------------------------------------------------------------
 
+/** Where to strike: an enemy wonder first (it must fall), then the nearest Town Center. */
 function enemyHome(s: GameState, p: Player): { x: number; y: number } {
   let best: { x: number; y: number } | null = null;
   let bestD = Infinity;
@@ -411,7 +491,7 @@ function enemyHome(s: GameState, p: Player): { x: number; y: number } {
     if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
     const dx = e.x - p.startX;
     const dy = e.y - p.startY;
-    const d = dx * dx + dy * dy + (e.type === 'towncenter' ? 0 : 400);
+    const d = dx * dx + dy * dy + (e.type === 'wonder' ? -1e6 : e.type === 'towncenter' ? 0 : e.type === 'wall' || e.type === 'gate' ? 1e5 : 400);
     if (d < bestD) {
       bestD = d;
       best = { x: e.x, y: e.y };
@@ -422,23 +502,56 @@ function enemyHome(s: GameState, p: Player): { x: number; y: number } {
   return foe ? { x: foe.startX, y: foe.startY } : { x: s.w / 2, y: s.h / 2 };
 }
 
-function pickUnit(v: View, mem: Memory, building: Building): UnitType | null {
-  const trains = BUILDINGS[building.type].trains.filter((t) => t !== 'citizen' && unitEpoch(t) <= v.p.epoch);
+function pickUnit(v: View, mem: AiMemory, building: Building): UnitType | null {
+  const trains = BUILDINGS[building.type].trains.filter((t) => t !== 'citizen' && t !== 'hero' && unitEpoch(t) <= v.p.epoch);
   if (!trains.length) return null;
   return trains[mem.unitTurn++ % trains.length];
 }
 
 /** What the enemy fields most of, to counter it. */
-function enemyMix(s: GameState, p: Player): Record<Exclude<UnitClass, 'citizen'>, number> {
+function enemyMix(s: GameState, p: Player): Record<'infantry' | 'ranged' | 'cavalry', number> {
   const mix = { infantry: 0, ranged: 0, cavalry: 0 };
   for (const e of s.ents) {
-    if (e.kind !== 'unit' || e.type === 'citizen' || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
-    mix[e.type]++;
+    if (e.kind !== 'unit' || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
+    if (e.type === 'infantry' || e.type === 'ranged' || e.type === 'cavalry') mix[e.type]++;
   }
   return mix;
 }
 
-function military(s: GameState, v: View, mem: Memory, issue: (c: Command) => void): void {
+/** Enemy soldiers close to home, and the nearest of them. */
+function threatNear(s: GameState, v: View): { unit: Unit | null; count: number } {
+  let threat: Unit | null = null;
+  let threatD = Infinity;
+  let n = 0;
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !isEnemy(s, v.p.id, e.owner) || e.type === 'citizen') continue;
+    let near = Infinity;
+    for (const b of v.buildings) near = Math.min(near, distToRect(e.x, e.y, b));
+    if (near < 12) {
+      n++;
+      if (near < threatD) {
+        threatD = near;
+        threat = e;
+      }
+    }
+  }
+  return { unit: threat, count: n };
+}
+
+function townBell(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  if (!AI_LEVELS[v.p.ai!].clever || !v.tc) return;
+  const t = threatNear(s, v);
+  const defenders = v.army.filter((u) => !u.inside).length;
+  if (mem.bell < 0 && t.count >= 5 && defenders < t.count / 2) {
+    issue({ t: 'bell', p: v.p.id, ring: true });
+    mem.bell = s.tick;
+  } else if (mem.bell >= 0 && t.count === 0 && s.tick - mem.bell > secs(20)) {
+    issue({ t: 'bell', p: v.p.id, ring: false });
+    mem.bell = -1;
+  }
+}
+
+function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
   const L = AI_LEVELS[p.ai!];
   const enemy = enemyHome(s, p);
@@ -447,19 +560,33 @@ function military(s: GameState, v: View, mem: Memory, issue: (c: Command) => voi
   const dl = Math.sqrt(dx * dx + dy * dy) || 1;
   mem.muster = { x: v.home.x + (dx / dl) * 8, y: v.home.y + (dy / dl) * 8 };
 
+  // A hero to lead the army.
+  if (L.clever && v.tc && v.army.length >= 6 && !heroBusy(s, p.id) && v.tc.queue.length < 2 && v.tc.advance < 0) {
+    const cost = unitStats('hero', p.epoch).cost;
+    if (afford(v, cost)) {
+      issue({ t: 'train', p: p.id, building: v.tc.id, unit: 'hero' });
+      spend(v, cost);
+    }
+  }
+
   // Train: counter the enemy's main arm when there is one to see, otherwise take turns.
   const mix = enemyMix(s, p);
   const main = (Object.keys(mix) as (keyof typeof mix)[]).sort((a, b) => mix[b] - mix[a])[0];
   const counter = mix[main] >= 3 ? COUNTER[main] : null;
   const keepCitizensGrowing = v.citizens.length < 8;
+  const siege = v.army.filter((u) => u.type === 'siege').length;
   for (const b of v.buildings) {
     if (!b.built || b.queue.length >= Math.min(2, MAX_QUEUE) || keepCitizensGrowing) continue;
     const trains = BUILDINGS[b.type].trains;
     if (!trains.length || trains.includes('citizen')) continue;
-    let unit = counter && trains.includes(counter) && unitEpoch(counter) <= p.epoch && roll(s) < 0.7 ? counter : pickUnit(v, mem, b);
-    if (!unit) continue;
-    if (unitEpoch(unit) > p.epoch) unit = pickUnit(v, mem, b);
-    if (!unit) continue;
+    let unit: UnitType | null;
+    if (b.type === 'workshop') unit = siege < (p.epoch >= 2 ? 3 : 2) && v.army.length >= 6 ? 'siege' : null;
+    else if (b.type === 'temple') unit = v.priests.length < 2 && v.army.length >= 6 ? 'priest' : null;
+    else {
+      unit = counter && trains.includes(counter) && unitEpoch(counter) <= p.epoch && roll(s) < 0.7 ? counter : pickUnit(v, mem, b);
+      if (unit && unitEpoch(unit) > p.epoch) unit = pickUnit(v, mem, b);
+    }
+    if (!unit || unitEpoch(unit) > p.epoch) continue;
     const cost = unitStats(unit, p.epoch).cost;
     if (!afford(v, cost)) continue;
     issue({ t: 'train', p: p.id, building: b.id, unit });
@@ -468,32 +595,24 @@ function military(s: GameState, v: View, mem: Memory, issue: (c: Command) => voi
   }
 
   // Defend: enemies near home draw the whole army.
-  let threat: Unit | null = null;
-  let threatD = Infinity;
-  for (const e of s.ents) {
-    if (e.kind !== 'unit' || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
-    for (const b of v.buildings) {
-      const d = distToRect(e.x, e.y, b);
-      if (d < 12 && d < threatD) {
-        threatD = d;
-        threat = e;
-      }
-    }
-  }
+  const threat = threatNear(s, v).unit;
+  const fighters = v.army.filter((u) => !u.inside);
   if (threat) {
-    const responders = v.army.filter((u) => u.order.k !== 'attack');
+    const responders = fighters.filter((u) => u.order.k !== 'attack');
     if (responders.length) issue({ t: 'move', p: p.id, ids: responders.map((u) => u.id), x: threat.x, y: threat.y, amove: true });
     mem.attacking = false;
     return;
   }
 
-  // Attack in waves once the army is big enough; between waves, gather at the muster point.
-  const ready = v.army.filter((u) => u.order.k === 'idle' || (u.order.k === 'move' && !u.order.amove));
+  // Attack in waves once the army is big enough (at once against a wonder); between waves, gather at the muster point.
+  const ready = fighters.filter((u) => u.order.k === 'idle' || (u.order.k === 'move' && !u.order.amove));
   const waveSize = L.wave + mem.wave * L.waveGrowth;
-  const onAttack = v.army.filter((u) => u.order.k === 'attack' || (u.order.k === 'move' && u.order.amove));
+  const onAttack = fighters.filter((u) => u.order.k === 'attack' || (u.order.k === 'move' && u.order.amove));
   if (mem.attacking && onAttack.length === 0) mem.attacking = false;
-  if (s.tick >= secs(L.firstAttack) && v.army.length >= waveSize && !mem.attacking) {
-    issue({ t: 'move', p: p.id, ids: v.army.map((u) => u.id), x: enemy.x, y: enemy.y, amove: true });
+  const wonderRace = s.ents.some((e) => e.kind === 'building' && e.type === 'wonder' && e.hp > 0 && isEnemy(s, p.id, e.owner));
+  const due = s.tick >= secs(L.firstAttack) && s.tick >= s.peaceUntil;
+  if (due && !mem.attacking && (fighters.length >= waveSize || (wonderRace && fighters.length >= 4))) {
+    issue({ t: 'move', p: p.id, ids: fighters.map((u) => u.id), x: enemy.x, y: enemy.y, amove: true });
     mem.attacking = true;
     mem.wave++;
     return;
@@ -509,4 +628,47 @@ function military(s: GameState, v: View, mem: Memory, issue: (c: Command) => voi
     return ox * ox + oy * oy > 36 && u.order.k === 'idle';
   });
   if (strays.length) issue({ t: 'move', p: p.id, ids: strays.map((u) => u.id), x: mem.muster.x, y: mem.muster.y });
+}
+
+/** Priests walk with the army (healing as they go) and turn the enemy's best units. */
+function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  if (!v.priests.length) return;
+  const army = v.army.filter((u) => !u.inside && u.type !== 'siege');
+  for (const pr of v.priests) {
+    if (pr.order.k !== 'idle' || pr.cool > 0) continue;
+    // Something worth converting close by?
+    let best: Unit | null = null;
+    let bestScore = 0;
+    for (const e of s.ents) {
+      if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !isEnemy(s, v.p.id, e.owner)) continue;
+      const dx = e.x - pr.x;
+      const dy = e.y - pr.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 > 81) continue;
+      const worth = e.type === 'hero' ? 5 : e.type === 'siege' ? 4 : e.type === 'cavalry' ? 3 : 1;
+      const score = worth / (1 + d2);
+      if (score > bestScore) {
+        bestScore = score;
+        best = e;
+      }
+    }
+    if (best) {
+      issue({ t: 'convert', p: v.p.id, ids: [pr.id], target: best.id });
+      continue;
+    }
+    // Otherwise keep up with the army.
+    if (army.length) {
+      let cx = 0;
+      let cy = 0;
+      for (const a of army) {
+        cx += a.x;
+        cy += a.y;
+      }
+      cx /= army.length;
+      cy /= army.length;
+      const dx = cx - pr.x;
+      const dy = cy - pr.y;
+      if (dx * dx + dy * dy > 49) issue({ t: 'move', p: v.p.id, ids: [pr.id], x: cx, y: cy });
+    } else if (mem.muster) issue({ t: 'move', p: v.p.id, ids: [pr.id], x: mem.muster.x, y: mem.muster.y });
+  }
 }

@@ -26,7 +26,8 @@ export class Spatial {
     }
     this.head.fill(-1);
     this.units.length = 0;
-    for (const e of s.ents) if (e.kind === 'unit' && e.hp > 0) this.units.push(e);
+    // Units sheltering inside buildings are out of reach.
+    for (const e of s.ents) if (e.kind === 'unit' && e.hp > 0 && !e.inside) this.units.push(e);
     if (this.next.length < this.units.length) this.next = new Int32Array(this.units.length * 2);
     // Append at the tail so each bucket keeps id order.
     for (let k = 0; k < this.units.length; k++) {

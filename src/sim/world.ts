@@ -1,17 +1,21 @@
-import { BUILDINGS, POP_MAX, buildingHp, unitStats, type UnitStats } from './data';
+import { BUILDINGS, POP_MAX, type UnitStats } from './data';
 import { distToRect, nearestWalkable, stampBuilding, walkable } from './grid';
+import { buildingMaxHp, statsFor } from './stats';
 import type { Building, BuildingType, Cost, Ent, GameState, Goal, Player, Unit, UnitType } from './types';
 import { RES } from './types';
 
 /** Making, finding and removing units and buildings. */
 
 export function statsOf(s: GameState, u: Unit): UnitStats {
-  return unitStats(u.type, s.players[u.owner].epoch);
+  return statsFor(s, u.owner, u.type);
 }
 
 export function maxHp(s: GameState, e: Ent): number {
-  return e.kind === 'unit' ? statsOf(s, e).hp : buildingHp(e.type, s.players[e.owner].epoch);
+  return e.kind === 'unit' ? statsOf(s, e).hp : buildingMaxHp(s, e.owner, e.type);
 }
+
+/** The team a player is on (gates open for their own team). */
+export const teamOf = (s: GameState, owner: number) => s.players[owner].team;
 
 export function radiusOf(s: GameState, e: Ent): number {
   return e.kind === 'unit' ? statsOf(s, e).radius : e.size / 2;
@@ -43,8 +47,13 @@ export function spawnUnit(s: GameState, owner: number, type: UnitType, x: number
     py: y,
     fx: 0,
     fy: 1,
-    hp: unitStats(type, s.players[owner].epoch).hp,
+    hp: statsFor(s, owner, type).hp,
     order: { k: 'idle' },
+    queue: [],
+    stance: 'aggressive',
+    guardX: x,
+    guardY: y,
+    inside: 0,
     path: null,
     pathI: 0,
     goal: null,
@@ -61,6 +70,7 @@ export function spawnUnit(s: GameState, owner: number, type: UnitType, x: number
     swing: -999,
     hurt: -999,
     born: s.tick,
+    aura: -999,
   };
   s.ents.push(u);
   s.byId.set(u.id, u);
@@ -79,7 +89,7 @@ export function placeBuilding(s: GameState, owner: number, type: BuildingType, t
     size,
     x: tx + size / 2,
     y: ty + size / 2,
-    hp: built ? buildingHp(type, s.players[owner].epoch) : 1,
+    hp: built ? buildingMaxHp(s, owner, type) : 1,
     built,
     progress: built ? 1 : 0,
     queue: [],
@@ -87,6 +97,9 @@ export function placeBuilding(s: GameState, owner: number, type: BuildingType, t
     rally: null,
     cool: 0,
     farmer: 0,
+    garrison: [],
+    timer: -1,
+    dir: 0,
     hurt: -999,
     born: s.tick,
   };
@@ -123,7 +136,7 @@ export function exitSpot(s: GameState, b: Building, towardX: number, towardY: nu
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
         if (x !== x0 && x !== x1 && y !== y0 && y !== y1) continue;
-        if (!walkable(s, x, y)) continue;
+        if (!walkable(s, x, y, s.players[b.owner].team)) continue;
         const dx = x + 0.5 - towardX;
         const dy = y + 0.5 - towardY;
         const d = dx * dx + dy * dy;
@@ -166,13 +179,13 @@ export function goalForBuilding(b: Building, inside = false): Goal {
   return { x0: b.tx - 1, y0: b.ty - 1, x1: b.tx + b.size, y1: b.ty + b.size, px: b.x, py: b.y };
 }
 
-export function goalForPoint(s: GameState, x: number, y: number): Goal {
+export function goalForPoint(s: GameState, x: number, y: number, team = -1): Goal {
   let tx = Math.floor(x);
   let ty = Math.floor(y);
   let px = x;
   let py = y;
-  if (!walkable(s, tx, ty)) {
-    const t = nearestWalkable(s, x, y, 16);
+  if (!walkable(s, tx, ty, team)) {
+    const t = nearestWalkable(s, x, y, 16, team);
     if (t >= 0) {
       tx = t % s.w;
       ty = Math.floor(t / s.w);

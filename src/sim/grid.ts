@@ -1,12 +1,21 @@
 import { BUILDINGS } from './data';
 import type { Building, BuildingType, GameState } from './types';
-import { B_BUILDING, B_RES, R_NONE, T_ROCK, T_WATER } from './types';
+import { B_BUILDING, B_GATE, B_RES, R_NONE, T_ROCK, T_WATER } from './types';
 
 /** Tile helpers shared by the rules, the pathfinder and the computer opponent. */
 
 export const inBounds = (s: GameState, x: number, y: number) => x >= 0 && y >= 0 && x < s.w && y < s.h;
 
-export const walkable = (s: GameState, x: number, y: number) => inBounds(s, x, y) && s.block[y * s.w + x] === 0;
+/**
+ * Whether a tile can be walked: nothing on it, or a gate of the walker's team (`team` -1 for "anyone",
+ * which no gate lets through).
+ */
+export function walkable(s: GameState, x: number, y: number, team = -1): boolean {
+  if (x < 0 || y < 0 || x >= s.w || y >= s.h) return false;
+  const i = y * s.w + x;
+  const b = s.block[i];
+  return b === 0 || (b === B_GATE && team >= 0 && s.gateTeam[i] === team);
+}
 
 export function cornerHeight(s: GameState, x: number, y: number): number {
   return s.height[y * (s.w + 1) + x];
@@ -51,7 +60,8 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
       hi = Math.max(hi, h);
     }
   }
-  if (hi - lo > 1.1) return 'slope';
+  // Walls follow the land; everything else wants it fairly level.
+  if (hi - lo > (type === 'wall' || type === 'gate' ? 2.2 : 1.1)) return 'slope';
   void ignoreUnits;
   return null;
 }
@@ -61,11 +71,21 @@ export function stampBuilding(s: GameState, b: Building, on: boolean): void {
   const open = BUILDINGS[b.type].open;
   // Only new blockages matter to cached distance fields: an opened tile just leaves a route a little long.
   if (!open && on) s.blockVersion++;
+  const gate = b.type === 'gate';
+  const team = s.players[b.owner]?.team ?? -1;
   for (let y = b.ty; y < b.ty + b.size; y++) {
     for (let x = b.tx; x < b.tx + b.size; x++) {
       const i = y * s.w + x;
       s.bldAt[i] = on ? b.id : 0;
-      if (!open) s.block[i] = on ? s.block[i] | B_BUILDING : s.block[i] & ~B_BUILDING;
+      if (gate) {
+        // A finished gate lets its own team through; a gate site blocks everyone.
+        s.block[i] &= ~(B_BUILDING | B_GATE);
+        s.gateTeam[i] = -1;
+        if (on && b.built) {
+          s.block[i] |= B_GATE;
+          s.gateTeam[i] = team;
+        } else if (on) s.block[i] |= B_BUILDING;
+      } else if (!open) s.block[i] = on ? s.block[i] | B_BUILDING : s.block[i] & ~B_BUILDING;
     }
   }
 }
@@ -90,10 +110,10 @@ export function distToTile(px: number, py: number, tile: number, w: number): num
 }
 
 /** The nearest walkable tile to a point (searching outward in rings), or -1. */
-export function nearestWalkable(s: GameState, x: number, y: number, maxR = 12): number {
+export function nearestWalkable(s: GameState, x: number, y: number, maxR = 12, team = -1): number {
   const cx = Math.floor(x);
   const cy = Math.floor(y);
-  if (walkable(s, cx, cy)) return cy * s.w + cx;
+  if (walkable(s, cx, cy, team)) return cy * s.w + cx;
   let best = -1;
   let bestD = Infinity;
   for (let r = 1; r <= maxR; r++) {
@@ -102,7 +122,7 @@ export function nearestWalkable(s: GameState, x: number, y: number, maxR = 12): 
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
         const tx = cx + dx;
         const ty = cy + dy;
-        if (!walkable(s, tx, ty)) continue;
+        if (!walkable(s, tx, ty, team)) continue;
         const ddx = tx + 0.5 - x;
         const ddy = ty + 0.5 - y;
         const d = ddx * ddx + ddy * ddy;
@@ -126,11 +146,11 @@ export function reachableTile(s: GameState, tile: number): boolean {
 }
 
 /** Straight-line walkability between two points, through the tiles the segment touches. */
-export function lineClear(s: GameState, x0: number, y0: number, x1: number, y1: number): boolean {
+export function lineClear(s: GameState, x0: number, y0: number, x1: number, y1: number, team = -1): boolean {
   const dx = x1 - x0;
   const dy = y1 - y0;
   const len = Math.sqrt(dx * dx + dy * dy);
-  if (len < 1e-6) return walkable(s, Math.floor(x0), Math.floor(y0));
+  if (len < 1e-6) return walkable(s, Math.floor(x0), Math.floor(y0), team);
   const steps = Math.ceil(len * 3);
   // Also check a little to each side, so routes don't scrape past corners.
   const nx = (-dy / len) * 0.22;
@@ -139,9 +159,9 @@ export function lineClear(s: GameState, x0: number, y0: number, x1: number, y1: 
     const t = i / steps;
     const px = x0 + dx * t;
     const py = y0 + dy * t;
-    if (!walkable(s, Math.floor(px), Math.floor(py))) return false;
-    if (!walkable(s, Math.floor(px + nx), Math.floor(py + ny))) return false;
-    if (!walkable(s, Math.floor(px - nx), Math.floor(py - ny))) return false;
+    if (!walkable(s, Math.floor(px), Math.floor(py), team)) return false;
+    if (!walkable(s, Math.floor(px + nx), Math.floor(py + ny), team)) return false;
+    if (!walkable(s, Math.floor(px - nx), Math.floor(py - ny), team)) return false;
   }
   return true;
 }

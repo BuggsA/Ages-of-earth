@@ -29,7 +29,7 @@ describe('the world', () => {
       const s = solo(seed, 'medium');
       for (const p of s.players) {
         expect(tcOf(s, p.id)).toBeTruthy();
-        expect(citizens(s, p.id).length).toBe(START_CITIZENS);
+        expect(citizens(s, p.id).length).toBe(START_CITIZENS + (p.civ === 'chinese' ? 2 : 0));
         for (const kind of [R_BERRY, R_GOLD, R_STONE]) expect(findResource(s, kind, p.startX, p.startY, 14), `seed ${seed} kind ${kind}`).toBeGreaterThanOrEqual(0);
         expect(findResource(s, R_TREE, p.startX, p.startY, 16)).toBeGreaterThanOrEqual(0);
       }

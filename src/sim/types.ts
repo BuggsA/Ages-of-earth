@@ -1,6 +1,6 @@
 /**
  * The shapes of the simulation. Everything here is plain data advanced by `step` in fixed ticks, so the
- * same commands on the same seed always give the same match (the basis for lockstep online play later).
+ * same commands on the same seed always give the same match (the basis for lockstep online play).
  */
 
 export type Res = 'food' | 'wood' | 'stone' | 'gold';
@@ -8,10 +8,19 @@ export const RES: readonly Res[] = ['food', 'wood', 'stone', 'gold'];
 export type Cost = Partial<Record<Res, number>>;
 export type Stock = Record<Res, number>;
 
-export type UnitType = 'citizen' | 'infantry' | 'ranged' | 'cavalry';
-export type BuildingType = 'towncenter' | 'house' | 'storehouse' | 'farm' | 'barracks' | 'range' | 'stable' | 'tower';
+export type UnitType = 'citizen' | 'infantry' | 'ranged' | 'cavalry' | 'siege' | 'priest' | 'hero';
+export type BuildingType =
+  | 'towncenter' | 'house' | 'storehouse' | 'farm' | 'barracks' | 'range' | 'stable' | 'tower'
+  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate';
 export type Difficulty = 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
+export type MapType = 'continental' | 'highlands' | 'lakes' | 'forest' | 'plains';
+export type Stance = 'aggressive' | 'defensive' | 'stand';
+export type CivId = 'egyptians' | 'greeks' | 'romans' | 'mongols' | 'chinese' | 'britons';
+export type TechId =
+  | 'forging' | 'ironCasting' | 'blastFurnace' | 'fletching' | 'bodkin' | 'scaleArmor' | 'chainMail' | 'plateArmor'
+  | 'wheelbarrow' | 'handcart' | 'axes' | 'saws' | 'picks' | 'shafts' | 'plow' | 'irrigation' | 'masonry'
+  | 'conscription' | 'husbandry' | 'theology' | 'chemistry';
 
 /** Tile ground. Water and rock can't be walked or built on. */
 export const T_GRASS = 0;
@@ -25,11 +34,15 @@ export const R_TREE = 1;
 export const R_BERRY = 2;
 export const R_STONE = 3;
 export const R_GOLD = 4;
+/** A hunted animal, to be butchered for food. */
+export const R_MEAT = 5;
 
 /** Why a tile can't be walked: bits of `block`. */
 export const B_TERRAIN = 1;
 export const B_RES = 2;
 export const B_BUILDING = 4;
+/** A gate: shut to everyone but its owner's team (the tile's gate owner is in `gateOwner`). */
+export const B_GATE = 8;
 
 /** A rectangle of tiles that count as arrived, and the spot to end on in the last one. */
 export interface Goal {
@@ -44,7 +57,7 @@ export interface Goal {
 export type Order =
   | { k: 'idle' }
   /** Walk to a point. With `amove`, fight anything met on the way. */
-  | { k: 'move'; x: number; y: number; amove: boolean }
+  | { k: 'move'; x: number; y: number; amove: boolean; started: boolean }
   /** Fight a unit or building. `auto` when picked by the unit itself (it gives up sooner); `then` resumes an attack-move. */
   | { k: 'attack'; target: number; auto: boolean; then: { x: number; y: number } | null }
   /** Gather a resource tile: walk there, work it, carry the load to a drop site, and back. */
@@ -52,10 +65,18 @@ export type Order =
   | { k: 'build'; target: number }
   | { k: 'farm'; target: number; phase: 'go' | 'work' | 'drop' }
   /** Carry what is held to a drop site, then go idle. */
-  | { k: 'deliver' };
+  | { k: 'deliver' }
+  /** Walk into a building to shelter (and add arrows to its volleys). */
+  | { k: 'garrison'; target: number }
+  /** Hunt an animal; once it falls, butcher it. */
+  | { k: 'hunt'; target: number }
+  /** A priest turning an enemy to your side: `done` ticks of chanting so far. */
+  | { k: 'convert'; target: number; done: number }
+  /** A priest tending a wounded friend. */
+  | { k: 'heal'; target: number };
 
 /** What a unit is visibly doing, for the renderer's animation. */
-export type Act = 'idle' | 'walk' | 'attack' | 'chop' | 'mine' | 'forage' | 'farm' | 'build';
+export type Act = 'idle' | 'walk' | 'attack' | 'chop' | 'mine' | 'forage' | 'farm' | 'build' | 'chant';
 
 export interface Unit {
   id: number;
@@ -72,6 +93,14 @@ export interface Unit {
   fy: number;
   hp: number;
   order: Order;
+  /** Orders given with Shift, carried out in turn once the current one is done. */
+  queue: Order[];
+  stance: Stance;
+  /** Where it stood when it last came to rest (defensive units return here). */
+  guardX: number;
+  guardY: number;
+  /** The building it is sheltering in, or 0. */
+  inside: number;
   /** Waypoints as [x0, y0, x1, y1, ...], or null when not walking a route. */
   path: number[] | null;
   pathI: number;
@@ -90,7 +119,7 @@ export interface Unit {
   stuck: number;
   /** Walks that ended without reaching what the order needed; the order is given up after a few. */
   miss: number;
-  /** The gathering or farming a citizen was pulled off to build, to go back to afterward. */
+  /** The work a citizen was pulled off (to build, or by the town bell), to go back to afterward. */
   resume: Order | null;
   act: Act;
   /** Tick of the last swing or shot (for the strike animation). */
@@ -99,10 +128,13 @@ export interface Unit {
   hurt: number;
   /** Tick it was made (for the renderer's entrance). */
   born: number;
+  /** Last tick a hero's presence inspired it. */
+  aura: number;
 }
 
 export interface TrainItem {
-  unit: UnitType;
+  unit?: UnitType;
+  tech?: TechId;
   /** Ticks of work done. */
   done: number;
   /** What was paid, refunded if it is cancelled. */
@@ -132,16 +164,43 @@ export interface Building {
   cool: number;
   /** The citizen working this farm, or 0. */
   farmer: number;
+  /** Units sheltering inside. */
+  garrison: number[];
+  /** A finished wonder: ticks left before its owner wins (-1 otherwise). */
+  timer: number;
+  /** Walls run along x or y: which way this piece faces (for the model). */
+  dir: number;
   hurt: number;
   born: number;
 }
 
 export type Ent = Unit | Building;
 
+export interface Animal {
+  id: number;
+  kind: 'deer';
+  x: number;
+  y: number;
+  px: number;
+  py: number;
+  fx: number;
+  fy: number;
+  hp: number;
+  /** Grazing, wandering a little, or running away. */
+  state: 'graze' | 'walk' | 'flee';
+  /** Ticks left in this state. */
+  t: number;
+  tx: number;
+  ty: number;
+  homeX: number;
+  homeY: number;
+  hurt: number;
+}
+
 export interface Shot {
   id: number;
   owner: number;
-  kind: 'stone' | 'arrow' | 'bolt' | 'bullet';
+  kind: 'stone' | 'arrow' | 'bolt' | 'bullet' | 'spear' | 'boulder' | 'ball';
   /** Where it was loosed from, and the target it flies at. */
   x0: number;
   y0: number;
@@ -152,6 +211,12 @@ export interface Shot {
   t: number;
   dur: number;
   damage: number;
+  /** Damage spreads to enemies within this radius where it lands (catapults, cannons). */
+  splash: number;
+  /** For splash: what the shooter is (for the counter bonus on others hit). */
+  from: UnitType | null;
+  /** Shot at an animal (a hunter's spear). */
+  animal: boolean;
 }
 
 export interface PlayerStats {
@@ -161,17 +226,33 @@ export interface PlayerStats {
   losses: number;
   built: number;
   razed: number;
+  converted: number;
+  techs: number;
+}
+
+/** One sample of a player's state for the post-game timeline. */
+export interface HistoryPoint {
+  tick: number;
+  pop: number;
+  military: number;
+  gathered: number;
+  score: number;
+  epoch: number;
 }
 
 export interface Player {
   id: number;
   name: string;
   color: string;
+  civ: CivId;
   /** Controlled by the computer, at this level; null for a person. */
   ai: Difficulty | null;
   team: number;
   res: Stock;
   epoch: number;
+  techs: TechId[];
+  /** Bumped when techs or the epoch change, so cached unit stats are worked out again. */
+  statsVersion: number;
   pop: number;
   cap: number;
   /** How many of this player's eyes see each tile now. */
@@ -180,6 +261,7 @@ export interface Player {
   seen: Uint8Array;
   defeated: boolean;
   stats: PlayerStats;
+  history: HistoryPoint[];
   startX: number;
   startY: number;
   /** Tick of the last "under attack" alert, so they come at most every few seconds. */
@@ -189,8 +271,11 @@ export interface Player {
 export type GameEvent =
   | { k: 'swing'; id: number; target: number; x: number; y: number; owner: number; ranged: boolean; type: UnitType | BuildingType }
   | { k: 'hit'; target: number; x: number; y: number; damage: number; owner: number; building: boolean }
+  | { k: 'splash'; x: number; y: number; owner: number; kind: Shot['kind'] }
   | { k: 'die'; id: number; owner: number; type: UnitType | BuildingType; x: number; y: number; building: boolean; size: number; epoch: number; fx: number; fy: number }
+  | { k: 'animalDie'; id: number; x: number; y: number; fx: number; fy: number }
   | { k: 'trained'; id: number; owner: number; type: UnitType }
+  | { k: 'researched'; owner: number; tech: TechId }
   | { k: 'placed'; id: number; owner: number; type: BuildingType }
   | { k: 'built'; id: number; owner: number; type: BuildingType }
   | { k: 'epoch'; owner: number; epoch: number }
@@ -198,8 +283,14 @@ export type GameEvent =
   | { k: 'work'; id: number; owner: number; act: Act; x: number; y: number }
   | { k: 'depleted'; tile: number }
   | { k: 'alert'; owner: number; x: number; y: number; building: boolean }
+  | { k: 'converted'; id: number; from: number; to: number; x: number; y: number }
+  | { k: 'healed'; id: number; x: number; y: number }
+  | { k: 'garrison'; owner: number; building: number; inside: boolean }
+  | { k: 'bell'; owner: number; ring: boolean }
+  | { k: 'wonder'; owner: number; id: number; x: number; y: number; ticks: number }
+  | { k: 'trade'; owner: number; res: Res; buy: boolean }
   | { k: 'defeated'; owner: number }
-  | { k: 'over'; winner: number }
+  | { k: 'over'; winner: number; how: 'conquest' | 'wonder' | 'resign' }
   | { k: 'refused'; owner: number; why: string }
   | { k: 'shot'; owner: number; kind: Shot['kind']; x: number; y: number };
 
@@ -207,6 +298,7 @@ export interface GameState {
   tick: number;
   seed: number;
   size: MapSize;
+  mapType: MapType;
   w: number;
   h: number;
   /** Per tile: T_GRASS, T_SAND, T_WATER or T_ROCK. */
@@ -216,19 +308,30 @@ export interface GameState {
   /** Per tile: R_* resource and how much is left. */
   res: Uint8Array;
   amount: Int32Array;
-  /** Per tile: B_* bits; any bit means it can't be walked. */
+  /** Per tile: B_* bits; any bit but B_GATE means it can't be walked; a gate lets its owner's team through. */
   block: Uint8Array;
   /** Per tile: the building standing there (farms included), or 0. */
   bldAt: Int32Array;
+  /** Per tile: the team whose gate stands there, or -1. */
+  gateTeam: Int8Array;
   /** Bumped whenever a tile's walkability changes, so cached distance fields know to refresh. */
   blockVersion: number;
   players: Player[];
   /** Every unit and building, in the order they were made (ids rise). */
   ents: Ent[];
   byId: Map<number, Ent>;
+  animals: Animal[];
   nextId: number;
   shots: Shot[];
   rng: number;
+  /** Gold for 100 of each resource at the market; it rises as people buy and falls as they sell. */
+  market: Record<'food' | 'wood' | 'stone', number>;
+  /** No fighting between players until this tick (a peace treaty set before the match). */
+  peaceUntil: number;
+  /** Ticks a finished wonder must stand to win. */
+  wonderTime: number;
+  /** The computer opponents' memories, kept in the state so a saved match plays on the same. */
+  ai: Record<number, AiMemory>;
   /** What happened this tick, for sound and effects. Cleared at the start of every tick. */
   events: GameEvent[];
   /** -1 while the match goes on; the winning team after. */
@@ -236,17 +339,43 @@ export interface GameState {
   over: boolean;
 }
 
+export interface AiMemory {
+  next: number;
+  wave: number;
+  attacking: boolean;
+  /** Where the army gathers between attacks. */
+  muster: { x: number; y: number } | null;
+  /** Last tick a building of each kind was ordered, so it waits for the first to go up. */
+  ordered: Partial<Record<BuildingType, number>>;
+  unitTurn: number;
+  /** Tick the town bell was rung, or -1. */
+  bell: number;
+}
+
+/** Orders that can be given with Shift held to queue them after the current one. */
+type Queued = { queue?: boolean };
+
 export type Command =
-  | { t: 'move'; p: number; ids: number[]; x: number; y: number; amove?: boolean }
-  | { t: 'attack'; p: number; ids: number[]; target: number }
-  | { t: 'gather'; p: number; ids: number[]; tile: number }
-  /** Right-click on your own building: help build it, farm it, or drop off resources there. */
-  | { t: 'work'; p: number; ids: number[]; target: number }
-  | { t: 'build'; p: number; ids: number[]; type: BuildingType; tx: number; ty: number }
+  | ({ t: 'move'; p: number; ids: number[]; x: number; y: number; amove?: boolean } & Queued)
+  | ({ t: 'attack'; p: number; ids: number[]; target: number } & Queued)
+  | ({ t: 'gather'; p: number; ids: number[]; tile: number } & Queued)
+  /** Right-click on your own building: help build it, farm it, drop off resources there or shelter in it. */
+  | ({ t: 'work'; p: number; ids: number[]; target: number } & Queued)
+  | ({ t: 'build'; p: number; ids: number[]; type: BuildingType; tx: number; ty: number } & Queued)
+  /** A line of wall from one tile to another (gates go in with `type: 'gate'` one at a time). */
+  | ({ t: 'wall'; p: number; ids: number[]; x0: number; y0: number; x1: number; y1: number } & Queued)
+  | ({ t: 'hunt'; p: number; ids: number[]; target: number } & Queued)
+  | ({ t: 'convert'; p: number; ids: number[]; target: number } & Queued)
+  | ({ t: 'garrison'; p: number; ids: number[]; target: number } & Queued)
+  | { t: 'ungarrison'; p: number; building: number }
+  | { t: 'bell'; p: number; ring: boolean }
+  | { t: 'stance'; p: number; ids: number[]; stance: Stance }
   | { t: 'train'; p: number; building: number; unit: UnitType }
+  | { t: 'research'; p: number; building: number; tech: TechId }
   | { t: 'cancel'; p: number; building: number; index: number }
   | { t: 'advance'; p: number; building: number }
   | { t: 'rally'; p: number; building: number; x: number; y: number }
+  | { t: 'trade'; p: number; res: 'food' | 'wood' | 'stone'; buy: boolean }
   | { t: 'stop'; p: number; ids: number[] }
   | { t: 'delete'; p: number; ids: number[] }
   | { t: 'resign'; p: number };

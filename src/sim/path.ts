@@ -1,5 +1,6 @@
 import { lineClear, walkable } from './grid';
 import type { GameState, Goal } from './types';
+import { B_GATE } from './types';
 
 /**
  * Grid pathfinding: A* over tiles with eight directions (no cutting past blocked corners), then the
@@ -57,7 +58,7 @@ export interface PathResult {
 }
 
 /** Find a route from a point to a goal rectangle. */
-export function findPath(s: GameState, sx: number, sy: number, goal: Goal, limit = 8000): PathResult {
+export function findPath(s: GameState, sx: number, sy: number, goal: Goal, limit = 8000, team = -1): PathResult {
   const w = s.w;
   ensure(s.w * s.h);
   gen++;
@@ -139,8 +140,8 @@ export function findPath(s: GameState, sx: number, sy: number, goal: Goal, limit
       const dy = DIRS[d][1];
       const nx = cx + dx;
       const ny = cy + dy;
-      if (!walkable(s, nx, ny)) continue;
-      if (dx !== 0 && dy !== 0 && (!walkable(s, cx + dx, cy) || !walkable(s, cx, cy + dy))) continue;
+      if (!walkable(s, nx, ny, team)) continue;
+      if (dx !== 0 && dy !== 0 && (!walkable(s, cx + dx, cy, team) || !walkable(s, cx, cy + dy, team))) continue;
       const ni = ny * w + nx;
       if (closed[ni] === gen) continue;
       const ng = gc + DIRS[d][2];
@@ -170,24 +171,24 @@ export function findPath(s: GameState, sx: number, sy: number, goal: Goal, limit
     pts[pts.length - 2] = px;
     pts[pts.length - 1] = py;
   }
-  return { points: smooth(s, sx, sy, pts), complete: found >= 0, cost };
+  return { points: smooth(s, sx, sy, pts, team), complete: found >= 0, cost };
 }
 
 /** Pull a stair-step route taut: keep only the waypoints where the straight view ahead is blocked. */
-function smooth(s: GameState, sx: number, sy: number, pts: number[]): number[] {
+function smooth(s: GameState, sx: number, sy: number, pts: number[], team: number): number[] {
   const n = pts.length / 2;
   if (n <= 1) return pts;
   const out: number[] = [];
   let ax = sx;
   let ay = sy;
   // Standing inside something (pushed into a new foundation): step to the first open tile before cutting corners.
-  if (!walkable(s, Math.floor(sx), Math.floor(sy))) {
+  if (!walkable(s, Math.floor(sx), Math.floor(sy), team)) {
     out.push(pts[2], pts[3]);
     ax = pts[2];
     ay = pts[3];
   }
   for (let i = out.length ? 2 : 1; i < n; i++) {
-    if (lineClear(s, ax, ay, pts[i * 2], pts[i * 2 + 1])) continue;
+    if (lineClear(s, ax, ay, pts[i * 2], pts[i * 2 + 1], team)) continue;
     const px = pts[(i - 1) * 2];
     const py = pts[(i - 1) * 2 + 1];
     out.push(px, py);
@@ -224,7 +225,7 @@ const buckets: number[][] = Array.from({ length: 8 }, () => []);
 /** Set when the last `field` call had to grow a new field (it counts against the tick's route budget). */
 let freshField = false;
 
-function field(s: GameState, key: string, seeds: number[]): Field {
+function field(s: GameState, key: string, seeds: number[], team: number): Field {
   freshField = false;
   let cache = fieldCache.get(s);
   if (!cache) {
@@ -239,7 +240,7 @@ function field(s: GameState, key: string, seeds: number[]): Field {
   const dist = new Int32Array(n).fill(FAR);
   // Walkability once, as bytes, for the inner loop.
   const open = new Uint8Array(n);
-  for (let i = 0; i < n; i++) open[i] = s.block[i] === 0 ? 1 : 0;
+  for (let i = 0; i < n; i++) open[i] = s.block[i] === 0 || (s.block[i] === B_GATE && s.gateTeam[i] === team && team >= 0) ? 1 : 0;
   for (const b of buckets) b.length = 0;
   let pending = 0;
   for (const t of seeds) {
@@ -291,7 +292,7 @@ function field(s: GameState, key: string, seeds: number[]): Field {
 }
 
 /** Tiles of a goal to grow a field from: the goal rectangle's walkable tiles (a 4×4 block around a point goal). */
-function fieldSeeds(s: GameState, g: Goal): { key: string; seeds: number[]; exact: boolean } {
+function fieldSeeds(s: GameState, g: Goal, team: number): { key: string; seeds: number[]; exact: boolean } {
   const small = g.x0 === g.x1 && g.y0 === g.y1;
   let x0 = g.x0;
   let y0 = g.y0;
@@ -305,22 +306,22 @@ function fieldSeeds(s: GameState, g: Goal): { key: string; seeds: number[]; exac
     y1 = y0 + 3;
   }
   const seeds: number[] = [];
-  for (let y = Math.max(0, y0); y <= Math.min(s.h - 1, y1); y++) for (let x = Math.max(0, x0); x <= Math.min(s.w - 1, x1); x++) if (walkable(s, x, y)) seeds.push(y * s.w + x);
-  if (!seeds.length && small && walkable(s, g.x0, g.y0)) seeds.push(g.y0 * s.w + g.x0);
-  return { key: `${x0},${y0},${x1},${y1}`, seeds, exact: !small };
+  for (let y = Math.max(0, y0); y <= Math.min(s.h - 1, y1); y++) for (let x = Math.max(0, x0); x <= Math.min(s.w - 1, x1); x++) if (walkable(s, x, y, team)) seeds.push(y * s.w + x);
+  if (!seeds.length && small && walkable(s, g.x0, g.y0, team)) seeds.push(g.y0 * s.w + g.x0);
+  return { key: `${team}:${x0},${y0},${x1},${y1}`, seeds, exact: !small };
 }
 
 /**
  * A route to a goal: plain A* for short trips, and for long ones a walk down a shared distance field
  * followed by a short A* for the last stretch.
  */
-export function findRoute(s: GameState, sx: number, sy: number, goal: Goal, limit: number): PathResult {
+export function findRoute(s: GameState, sx: number, sy: number, goal: Goal, limit: number, team = -1): PathResult {
   const tx = Math.max(0, Math.min(s.w - 1, Math.floor(sx)));
   const ty = Math.max(0, Math.min(s.h - 1, Math.floor(sy)));
-  if (hToGoal(tx, ty, goal) < 22) return findPath(s, sx, sy, goal, limit);
-  const { key, seeds, exact } = fieldSeeds(s, goal);
-  if (!seeds.length) return findPath(s, sx, sy, goal, limit);
-  const f = field(s, key, seeds);
+  if (hToGoal(tx, ty, goal) < 22) return findPath(s, sx, sy, goal, limit, team);
+  const { key, seeds, exact } = fieldSeeds(s, goal, team);
+  if (!seeds.length) return findPath(s, sx, sy, goal, limit, team);
+  const f = field(s, key, seeds, team);
   const fieldCost = freshField ? (s.w * s.h) >> 2 : 50;
   const w = s.w;
   let cur = ty * w + tx;
@@ -335,7 +336,7 @@ export function findRoute(s: GameState, sx: number, sy: number, goal: Goal, limi
       if (f.dist[ni] < (best < 0 ? FAR : f.dist[best])) best = ni;
     }
     // Not connected to the goal at all: get as close as A* can.
-    if (best < 0) return findPath(s, sx, sy, goal, limit);
+    if (best < 0) return findPath(s, sx, sy, goal, limit, team);
     cur = best;
   }
   const tiles = [cur];
@@ -352,7 +353,7 @@ export function findRoute(s: GameState, sx: number, sy: number, goal: Goal, limi
       const nx = cx + dx;
       const ny = cy + dy;
       if (nx < 0 || ny < 0 || nx >= w || ny >= s.h) continue;
-      if (dx !== 0 && dy !== 0 && (!walkable(s, cx + dx, cy) || !walkable(s, cx, cy + dy))) continue;
+      if (dx !== 0 && dy !== 0 && (!walkable(s, cx + dx, cy, team) || !walkable(s, cx, cy + dy, team))) continue;
       const ni = ny * w + nx;
       if (f.dist[ni] < nd) {
         nd = f.dist[ni];
@@ -370,10 +371,10 @@ export function findRoute(s: GameState, sx: number, sy: number, goal: Goal, limi
   const ey = Math.floor(cur / w);
   if (!exact || complete) {
     // The last stretch to the exact spot.
-    const tail = findPath(s, ex + 0.5, ey + 0.5, goal, 3000);
+    const tail = findPath(s, ex + 0.5, ey + 0.5, goal, 3000, team);
     complete = tail.complete;
-    const smoothHead = smooth(s, sx, sy, pts);
+    const smoothHead = smooth(s, sx, sy, pts, team);
     return { points: [...smoothHead, ...tail.points], complete, cost: fieldCost + tail.cost };
   }
-  return { points: smooth(s, sx, sy, pts), complete, cost: fieldCost };
+  return { points: smooth(s, sx, sy, pts, team), complete, cost: fieldCost };
 }

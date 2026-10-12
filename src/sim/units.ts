@@ -1,15 +1,16 @@
-import { AI_LEVELS, BUILDINGS, CARRY, DT, EPOCH_GATHER_BONUS, GATHER, buildingHp, secs } from './data';
-import { gap, nearestEnemyUnit, strike } from './combat';
-import { clearResource, distToRect, distToTile, lineClear, nearestWalkable, walkable } from './grid';
+import { AI_LEVELS, BUILDINGS, CARRY, DEER, DT, EPOCH_GATHER_BONUS, GATHER, PRIEST, secs } from './data';
+import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
+import { clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
 import type { Spatial } from './spatial';
-import type { Act, Building, Ent, GameState, Goal, Order, Res, Unit } from './types';
-import { R_BERRY, R_GOLD, R_NONE, R_STONE, R_TREE } from './types';
-import { goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, radiusOf, statsOf } from './world';
+import { buildTimeFor, modsOf } from './stats';
+import type { Act, Animal, Building, Ent, GameState, Goal, Order, Res, Unit } from './types';
+import { R_BERRY, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
+import { exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, radiusOf, statsOf, teamOf } from './world';
 
 /**
- * What units do each tick: follow their order (walk, gather and carry, farm, build, fight), then walk
- * their route, then get nudged apart from each other and out of walls.
+ * What units do each tick: follow their order (walk, gather and carry, farm, build, hunt, fight, heal,
+ * convert, take shelter), then walk their route, then get nudged apart from each other and out of walls.
  */
 
 /** Edge-to-edge distance that counts as touching, for work and drop-offs. */
@@ -18,10 +19,12 @@ const REACH = 0.4;
 const MAX_MISS = 4;
 /** Node budget for routes per tick; the rest wait for the next tick. */
 const PATH_BUDGET = 60000;
+/** Defensive units chase no farther than this from where they stood. */
+const LEASH = 7;
 
-export const RES_OF_TILE: Record<number, Res> = { [R_TREE]: 'wood', [R_BERRY]: 'food', [R_STONE]: 'stone', [R_GOLD]: 'gold' };
-const ACT_OF_TILE: Record<number, Act> = { [R_TREE]: 'chop', [R_BERRY]: 'forage', [R_STONE]: 'mine', [R_GOLD]: 'mine' };
-const RATE_OF_TILE: Record<number, number> = { [R_TREE]: GATHER.tree, [R_BERRY]: GATHER.berry, [R_STONE]: GATHER.stone, [R_GOLD]: GATHER.gold };
+export const RES_OF_TILE: Record<number, Res> = { [R_TREE]: 'wood', [R_BERRY]: 'food', [R_STONE]: 'stone', [R_GOLD]: 'gold', [R_MEAT]: 'food' };
+const ACT_OF_TILE: Record<number, Act> = { [R_TREE]: 'chop', [R_BERRY]: 'forage', [R_STONE]: 'mine', [R_GOLD]: 'mine', [R_MEAT]: 'forage' };
+const RATE_OF_TILE: Record<number, number> = { [R_TREE]: GATHER.tree, [R_BERRY]: GATHER.berry, [R_STONE]: GATHER.stone, [R_GOLD]: GATHER.gold, [R_MEAT]: GATHER.meat };
 
 export function setOrder(u: Unit, order: Order): void {
   u.order = order;
@@ -30,6 +33,16 @@ export function setOrder(u: Unit, order: Order): void {
   u.wantPath = false;
   u.stuck = 0;
   u.miss = 0;
+}
+
+/** Give an order now, or (with `queue`) after the ones already lined up. */
+export function giveOrder(u: Unit, order: Order, queue = false): void {
+  if (queue && (u.order.k !== 'idle' || u.queue.length)) {
+    u.queue.push(order);
+    return;
+  }
+  u.queue = [];
+  setOrder(u, order);
 }
 
 export function goTo(u: Unit, goal: Goal): void {
@@ -67,11 +80,17 @@ function face(u: Unit, x: number, y: number): void {
   }
 }
 
-function gatherRate(s: GameState, u: Unit, base: number): number {
+function gatherRate(s: GameState, u: Unit, kind: number | 'farm'): number {
   const p = s.players[u.owner];
+  const m = modsOf(s, u.owner);
   const ai = p.ai ? AI_LEVELS[p.ai].gather : 1;
-  return base * (1 + p.epoch * EPOCH_GATHER_BONUS) * ai;
+  const base = kind === 'farm' ? GATHER.farm : RATE_OF_TILE[kind];
+  const mod =
+    kind === 'farm' ? m.farm : kind === R_TREE ? m.wood : kind === R_STONE || kind === R_GOLD ? m.mine : kind === R_MEAT ? m.hunt * m.forage : m.forage;
+  return base * mod * (1 + p.epoch * EPOCH_GATHER_BONUS) * ai;
 }
+
+const carryCap = (s: GameState, u: Unit) => CARRY[s.players[u.owner].epoch] + modsOf(s, u.owner).carry;
 
 /** The nearest tile of a resource near a point that a citizen could stand beside, or -1. */
 export function findResource(s: GameState, kind: number, x: number, y: number, maxR: number): number {
@@ -116,7 +135,7 @@ function deposit(s: GameState, u: Unit, at: Building): void {
   u.carry = 0;
 }
 
-/** Head for the nearest drop site and empty the basket there. Returns true once delivered. */
+/** Head for the nearest drop site and empty the basket there. */
 function dropOff(s: GameState, u: Unit): 'done' | 'going' | 'none' {
   if (!u.carryRes || u.carry <= 0) return 'done';
   // On the way: the route ends beside the drop site, so look again only now and then (in case it fell).
@@ -143,7 +162,7 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
     u.frac = 0;
     u.carryRes = o.res;
   }
-  const cap = CARRY[s.players[u.owner].epoch];
+  const cap = carryCap(s, u);
   if (o.phase === 'drop') {
     const r = dropOff(s, u);
     if (r === 'done') {
@@ -154,9 +173,13 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
   }
   const kind = s.res[o.tile];
   if (kind === R_NONE || RES_OF_TILE[kind] !== o.res) {
-    // Run out: the next one nearby of the same kind.
-    const want = o.res === 'wood' ? R_TREE : o.res === 'food' ? R_BERRY : o.res === 'stone' ? R_STONE : R_GOLD;
-    const next = findResource(s, want, (o.tile % s.w) + 0.5, Math.floor(o.tile / s.w) + 0.5, 8);
+    // Run out: the next one nearby of the same kind (game first, then berries, for food).
+    const wants = o.res === 'wood' ? [R_TREE] : o.res === 'food' ? [R_MEAT, R_BERRY] : o.res === 'stone' ? [R_STONE] : [R_GOLD];
+    let next = -1;
+    for (const want of wants) {
+      next = findResource(s, want, (o.tile % s.w) + 0.5, Math.floor(o.tile / s.w) + 0.5, want === R_MEAT ? 5 : 8);
+      if (next >= 0) break;
+    }
     if (next >= 0) {
       o.tile = next;
       o.phase = 'go';
@@ -174,7 +197,7 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
     u.miss = 0;
     face(u, tx, ty);
     u.act = ACT_OF_TILE[kind];
-    u.frac += gatherRate(s, u, RATE_OF_TILE[kind]) * DT;
+    u.frac += gatherRate(s, u, kind) * DT;
     while (u.frac >= 1 && u.carry < cap && s.amount[o.tile] > 0) {
       u.frac -= 1;
       u.carry++;
@@ -243,13 +266,13 @@ function farmStep(s: GameState, u: Unit, o: Extract<Order, { k: 'farm' }>): void
     o.phase = 'work';
     u.miss = 0;
     u.act = 'farm';
-    u.frac += gatherRate(s, u, GATHER.farm) * DT;
+    u.frac += gatherRate(s, u, 'farm') * DT;
     while (u.frac >= 1) {
       u.frac -= 1;
       u.carry++;
     }
     workEvent(s, u, 'farm', u.x, u.y);
-    if (u.carry >= CARRY[s.players[u.owner].epoch]) {
+    if (u.carry >= carryCap(s, u)) {
       u.frac = 0;
       o.phase = 'drop';
     }
@@ -265,9 +288,7 @@ export function freeFarm(s: GameState, owner: number, x: number, y: number, r: n
   let bestD = r;
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.type !== 'farm' || e.owner !== owner || e.hp <= 0) continue;
-    const holder = e.farmer ? s.byId.get(e.farmer) : undefined;
-    const taken = holder && holder.hp > 0 && holder.kind === 'unit' && holder.order.k === 'farm' && holder.order.target === e.id;
-    if (taken) continue;
+    if (farmTaken(s, e)) continue;
     const d = distToRect(x, y, e);
     if (d < bestD) {
       bestD = d;
@@ -277,23 +298,39 @@ export function freeFarm(s: GameState, owner: number, x: number, y: number, r: n
   return best;
 }
 
+function farmTaken(s: GameState, f: Building): boolean {
+  const holder = f.farmer ? s.byId.get(f.farmer) : undefined;
+  return !!holder && holder.hp > 0 && holder.kind === 'unit' && holder.order.k === 'farm' && holder.order.target === f.id;
+}
+
 export function completeBuilding(s: GameState, b: Building): void {
   b.built = true;
   b.progress = 1;
-  b.hp = Math.min(b.hp, buildingHp(b.type, s.players[b.owner].epoch));
+  b.hp = Math.min(b.hp, maxHp(s, b));
   s.players[b.owner].stats.built++;
+  // A finished gate opens for its own side.
+  if (b.type === 'gate') stampBuilding(s, b, true);
+  if (b.type === 'wonder') {
+    b.timer = s.wonderTime;
+    s.events.push({ k: 'wonder', owner: b.owner, id: b.id, x: b.x, y: b.y, ticks: b.timer });
+  }
   s.events.push({ k: 'built', id: b.id, owner: b.owner, type: b.type });
 }
 
 /** What a builder does once the building is up. */
 function afterBuilding(s: GameState, u: Unit, b: Building): void {
-  if (b.type === 'farm' && !freeFarmTaken(s, b)) {
+  if (b.type === 'farm' && !farmTaken(s, b) && !u.queue.length) {
     setOrder(u, { k: 'farm', target: b.id, phase: 'go' });
     return;
   }
-  // Help with other foundations nearby.
+  // Orders lined up with Shift come first.
+  if (u.queue.length) {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  // Help with other foundations nearby (a wall goes up piece by piece).
   let next: Building | null = null;
-  let bestD = 14;
+  let bestD = b.type === 'wall' || b.type === 'gate' ? 4 : 14;
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.owner !== u.owner || e.built || e.hp <= 0) continue;
     const d = distToRect(u.x, u.y, e);
@@ -338,14 +375,9 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
   setOrder(u, { k: 'idle' });
 }
 
-function freeFarmTaken(s: GameState, f: Building): boolean {
-  const holder = f.farmer ? s.byId.get(f.farmer) : undefined;
-  return !!holder && holder.hp > 0 && holder.kind === 'unit' && holder.order.k === 'farm' && holder.order.target === f.id;
-}
-
 function buildStep(s: GameState, u: Unit, o: Extract<Order, { k: 'build' }>): void {
   const b = s.byId.get(o.target);
-  if (!b || b.kind !== 'building' || b.hp <= 0) {
+  if (!b || b.kind !== 'building' || b.hp <= 0 || b.owner !== u.owner) {
     setOrder(u, { k: 'idle' });
     return;
   }
@@ -358,7 +390,7 @@ function buildStep(s: GameState, u: Unit, o: Extract<Order, { k: 'build' }>): vo
     if (walking(u)) stopWalking(u);
     face(u, b.x, b.y);
     u.act = 'build';
-    const step = DT / BUILDINGS[b.type].time;
+    const step = DT / buildTimeFor(s, u.owner, b.type);
     b.progress = Math.min(1, b.progress + step);
     b.hp = Math.min(maxHp(s, b), b.hp + maxHp(s, b) * step);
     workEvent(s, u, 'build', u.x, u.y);
@@ -368,15 +400,22 @@ function buildStep(s: GameState, u: Unit, o: Extract<Order, { k: 'build' }>): vo
   if (!approach(u, goalForBuilding(b, BUILDINGS[b.type].open))) setOrder(u, { k: 'idle' });
 }
 
-/** An enemy to pick a fight with near a unit: units first, buildings when on the attack. */
+/** An enemy to pick a fight with near a unit: units first, buildings when on the attack (rams: buildings only). */
 function findTarget(s: GameState, sp: Spatial, u: Unit, r: number, buildings: boolean): Ent | null {
-  const t = nearestEnemyUnit(s, sp, u.owner, u.x, u.y, r);
-  if (t || !buildings) return t;
+  if (peace(s)) return null;
+  const st = statsOf(s, u);
+  if (!st.buildingsOnly) {
+    const t = nearestEnemyUnit(s, sp, u.owner, u.x, u.y, r);
+    if (t || !buildings) return t;
+  }
+  if (!buildings && !st.buildingsOnly) return null;
   let best: Building | null = null;
   let bestD = r;
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, u.owner, e.owner)) continue;
-    const d = distToRect(u.x, u.y, e);
+    // Walls only matter when they are in the way.
+    const wall = e.type === 'wall' || e.type === 'gate';
+    const d = distToRect(u.x, u.y, e) + (wall ? 3 : 0);
     if (d < bestD) {
       bestD = d;
       best = e;
@@ -389,14 +428,13 @@ function attackStep(s: GameState, sp: Spatial, u: Unit, o: Extract<Order, { k: '
   const t = s.byId.get(o.target);
   const st = statsOf(s, u);
   const done = () => {
-    if (o.then) {
-      setOrder(u, { k: 'move', x: o.then.x, y: o.then.y, amove: true });
-      goTo(u, goalForPoint(s, o.then.x, o.then.y));
-    } else setOrder(u, { k: 'idle' });
+    if (o.then) setOrder(u, { k: 'move', x: o.then.x, y: o.then.y, amove: true, started: false });
+    else if (u.stance === 'defensive') setOrder(u, { k: 'move', x: u.guardX, y: u.guardY, amove: false, started: false });
+    else setOrder(u, { k: 'idle' });
   };
-  if (!t || t.hp <= 0 || (t.kind === 'building' && !isEnemy(s, u.owner, t.owner) && t.owner !== u.owner)) {
-    // The target fell: pick the next one close by if this was a fight already joined.
-    const next = u.type !== 'citizen' ? findTarget(s, sp, u, st.sight, !!o.then) : null;
+  if (!t || t.hp <= 0 || (t.kind === 'unit' && t.inside) || !isEnemy(s, u.owner, t.owner) || peace(s)) {
+    // The target fell (or changed sides): pick the next one close by if this was a fight already joined.
+    const next = u.type !== 'citizen' && !peace(s) ? findTarget(s, sp, u, st.sight, !!o.then) : null;
     if (next) {
       o.target = next.id;
       o.auto = true;
@@ -404,12 +442,37 @@ function attackStep(s: GameState, sp: Spatial, u: Unit, o: Extract<Order, { k: '
     } else done();
     return;
   }
+  if (st.buildingsOnly && t.kind === 'unit' && t.type !== 'siege') {
+    done();
+    return;
+  }
   const d = gap(s, u, t);
   if (o.auto && d > st.sight * 1.8) {
     done();
     return;
   }
+  // Defensive units don't stray far; units standing their ground don't move at all.
+  if (o.auto && u.stance === 'defensive') {
+    const gx = u.x - u.guardX;
+    const gy = u.y - u.guardY;
+    if (gx * gx + gy * gy > LEASH * LEASH) {
+      done();
+      return;
+    }
+  }
   if (d <= st.range + 0.15) {
+    if (st.minRange && d < st.minRange) {
+      // Too close to shoot: back off if allowed, else wait.
+      if (u.stance === 'stand' || o.auto) {
+        done();
+        return;
+      }
+      const dx = u.x - t.x;
+      const dy = u.y - t.y;
+      const l = Math.sqrt(dx * dx + dy * dy) || 1;
+      if (!walking(u)) goTo(u, goalForPoint(s, u.x + (dx / l) * 3, u.y + (dy / l) * 3, teamOf(s, u.owner)));
+      return;
+    }
     if (walking(u)) stopWalking(u);
     face(u, t.x, t.y);
     u.act = 'attack';
@@ -419,16 +482,21 @@ function attackStep(s: GameState, sp: Spatial, u: Unit, o: Extract<Order, { k: '
     }
     return;
   }
+  if (u.stance === 'stand' && o.auto) {
+    done();
+    return;
+  }
   // Chase: straight at it when close and clear, otherwise by route, refreshed as it moves.
+  const team = teamOf(s, u.owner);
   const tr = radiusOf(s, t);
-  if (t.kind === 'unit' && d < 2.5 && lineClear(s, u.x, u.y, t.x, t.y)) {
+  if (t.kind === 'unit' && d < 2.5 && lineClear(s, u.x, u.y, t.x, t.y, team)) {
     u.path = [t.x - u.fx * tr * 0.5, t.y - u.fy * tr * 0.5];
     u.pathI = 0;
     u.wantPath = false;
-    u.goal = goalForPoint(s, t.x, t.y);
+    u.goal = goalForPoint(s, t.x, t.y, team);
     return;
   }
-  const g = t.kind === 'building' ? goalForBuilding(t) : chaseGoal(s, u, t, st.range);
+  const g = t.kind === 'building' ? goalForBuilding(t) : chaseGoal(t, st.range);
   const moved = u.goal ? Math.abs(u.goal.px - g.px) + Math.abs(u.goal.py - g.py) : 99;
   if (walking(u) && moved > 1.5 && s.tick - u.pathTick > 10) {
     goTo(u, g);
@@ -437,12 +505,10 @@ function attackStep(s: GameState, sp: Spatial, u: Unit, o: Extract<Order, { k: '
   if (!approach(u, g)) done();
 }
 
-function chaseGoal(s: GameState, u: Unit, t: Unit, range: number): Goal {
+function chaseGoal(t: Unit, range: number): Goal {
   const tx = Math.floor(t.x);
   const ty = Math.floor(t.y);
   const r = Math.max(1, Math.floor(range * 0.7));
-  void s;
-  void u;
   return { x0: tx - r, y0: ty - r, x1: tx + r, y1: ty + r, px: t.x, py: t.y };
 }
 
@@ -451,20 +517,205 @@ function deliverStep(s: GameState, u: Unit): void {
   if (r !== 'going') setOrder(u, { k: 'idle' });
 }
 
+// ---- Shelter ---------------------------------------------------------------------------------------
+
+export function garrisonRoom(b: Building): number {
+  return (BUILDINGS[b.type].garrison ?? 0) - b.garrison.length;
+}
+
+function garrisonStep(s: GameState, u: Unit, o: Extract<Order, { k: 'garrison' }>): void {
+  const b = s.byId.get(o.target);
+  if (!b || b.kind !== 'building' || b.hp <= 0 || !b.built || b.owner !== u.owner || garrisonRoom(b) <= 0 || u.type === 'siege') {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  if (distToRect(u.x, u.y, b) - statsOf(s, u).radius <= REACH + 0.2) {
+    stopWalking(u);
+    u.inside = b.id;
+    u.x = b.x;
+    u.y = b.y;
+    u.px = u.x;
+    u.py = u.y;
+    b.garrison.push(u.id);
+    setOrder(u, { k: 'idle' });
+    s.events.push({ k: 'garrison', owner: u.owner, building: b.id, inside: true });
+    return;
+  }
+  if (!approach(u, goalForBuilding(b))) setOrder(u, { k: 'idle' });
+}
+
+/** Everyone out of a building, beside it, and back to whatever the bell pulled them off. */
+export function ungarrison(s: GameState, b: Building): void {
+  if (!b.garrison.length) return;
+  for (const id of b.garrison) {
+    const u = s.byId.get(id);
+    if (!u || u.kind !== 'unit') continue;
+    const spot = exitSpot(s, b, b.x + (u.id % 3) - 1, b.y + b.size);
+    u.inside = 0;
+    u.x = spot.x + ((u.id % 5) - 2) * 0.12;
+    u.y = spot.y + ((u.id % 3) - 1) * 0.12;
+    u.px = u.x;
+    u.py = u.y;
+    if (u.resume) {
+      const back = u.resume;
+      u.resume = null;
+      setOrder(u, back);
+    } else setOrder(u, { k: 'idle' });
+  }
+  b.garrison = [];
+  s.events.push({ k: 'garrison', owner: b.owner, building: b.id, inside: false });
+}
+
+// ---- The hunt --------------------------------------------------------------------------------------
+
+function huntStep(s: GameState, u: Unit, o: Extract<Order, { k: 'hunt' }>): void {
+  const a = s.animals.find((x) => x.id === o.target);
+  if (!a || a.hp <= 0) {
+    // It fell: butcher it (or the nearest carcass).
+    const meat = findResource(s, R_MEAT, u.x, u.y, 6);
+    if (meat >= 0) setOrder(u, { k: 'gather', tile: meat, res: 'food', phase: 'go' });
+    else setOrder(u, { k: 'idle' });
+    return;
+  }
+  const dx = a.x - u.x;
+  const dy = a.y - u.y;
+  const d = Math.sqrt(dx * dx + dy * dy);
+  if (d <= DEER.spear) {
+    if (walking(u)) stopWalking(u);
+    face(u, a.x, a.y);
+    u.act = 'attack';
+    if (u.cool <= 0) {
+      throwSpear(s, u, a);
+      u.cool = secs(1.5);
+    }
+    return;
+  }
+  const team = teamOf(s, u.owner);
+  const g = goalForPoint(s, a.x, a.y, team);
+  const moved = u.goal ? Math.abs(u.goal.px - g.px) + Math.abs(u.goal.py - g.py) : 99;
+  if (walking(u) && moved > 1.5 && s.tick - u.pathTick > 15) {
+    goTo(u, g);
+    return;
+  }
+  if (!approach(u, g)) setOrder(u, { k: 'idle' });
+}
+
+// ---- Priests ---------------------------------------------------------------------------------------
+
+/** How long a conversion takes for this target, in ticks (heavier units resist longer). */
+function convertTicks(s: GameState, priest: Unit, t: Unit): number {
+  const hard = t.type === 'hero' ? 3 : t.type === 'cavalry' || t.type === 'siege' ? 1.5 : t.type === 'priest' ? 2 : 1;
+  return secs((PRIEST.convert * hard) / modsOf(s, priest.owner).priest);
+}
+
+function convertStep(s: GameState, u: Unit, o: Extract<Order, { k: 'convert' }>): void {
+  const t = s.byId.get(o.target);
+  const st = statsOf(s, u);
+  if (!t || t.kind !== 'unit' || t.hp <= 0 || t.inside || !isEnemy(s, u.owner, t.owner) || peace(s)) {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  if (u.cool > 0) {
+    // Resting after the last conversion.
+    if (walking(u)) stopWalking(u);
+    return;
+  }
+  const d = gap(s, u, t);
+  if (d <= st.range) {
+    if (walking(u)) stopWalking(u);
+    face(u, t.x, t.y);
+    u.act = 'chant';
+    o.done++;
+    if (o.done >= convertTicks(s, u, t)) {
+      // It joins us: its orders are forgotten.
+      const from = t.owner;
+      t.owner = u.owner;
+      t.queue = [];
+      t.inside = 0;
+      setOrder(t, { k: 'idle' });
+      t.resume = null;
+      s.players[u.owner].stats.converted++;
+      s.events.push({ k: 'converted', id: t.id, from, to: u.owner, x: t.x, y: t.y });
+      u.cool = secs(PRIEST.rest);
+      setOrder(u, { k: 'idle' });
+    }
+    return;
+  }
+  const g = chaseGoal(t, st.range);
+  const moved = u.goal ? Math.abs(u.goal.px - g.px) + Math.abs(u.goal.py - g.py) : 99;
+  if (walking(u) && moved > 1.5 && s.tick - u.pathTick > 10) {
+    goTo(u, g);
+    return;
+  }
+  if (!approach(u, g)) setOrder(u, { k: 'idle' });
+}
+
+function healStep(s: GameState, u: Unit, o: Extract<Order, { k: 'heal' }>): void {
+  const t = s.byId.get(o.target);
+  if (!t || t.kind !== 'unit' || t.hp <= 0 || t.inside || t.owner !== u.owner || t.hp >= maxHp(s, t) || t.type === 'siege') {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  const st = statsOf(s, u);
+  const d = gap(s, u, t);
+  if (d <= st.range * 0.6) {
+    if (walking(u)) stopWalking(u);
+    face(u, t.x, t.y);
+    u.act = 'chant';
+    t.hp = Math.min(maxHp(s, t), t.hp + PRIEST.heal * modsOf(s, u.owner).priest * DT);
+    if ((s.tick + u.id) % 30 === 0) s.events.push({ k: 'healed', id: t.id, x: t.x, y: t.y });
+    return;
+  }
+  if (!approach(u, chaseGoal(t, st.range * 0.5))) setOrder(u, { k: 'idle' });
+}
+
+/** A wounded friend for an idle priest to tend, nearest first. */
+function woundedNear(s: GameState, sp: Spatial, u: Unit, r: number): Unit | null {
+  let best: Unit | null = null;
+  let bestD = r * r;
+  sp.near(u.x, u.y, r, (o) => {
+    if (o === u || o.owner !== u.owner || o.hp <= 0 || o.type === 'siege' || o.hp >= maxHp(s, o)) return;
+    const dx = o.x - u.x;
+    const dy = o.y - u.y;
+    const d = dx * dx + dy * dy;
+    if (d < bestD) {
+      bestD = d;
+      best = o;
+    }
+  });
+  return best;
+}
+
+// ---- The decision each tick ------------------------------------------------------------------------
+
 /** One unit's decision for this tick. */
 export function think(s: GameState, sp: Spatial, u: Unit): void {
   u.act = 'idle';
   if (u.cool > 0) u.cool--;
+  if (u.inside) return;
+  // Next in line, once the current order is done.
+  if (u.order.k === 'idle' && u.queue.length) setOrder(u, u.queue.shift()!);
   const o = u.order;
-  const military = u.type !== 'citizen';
+  const military = u.type !== 'citizen' && u.type !== 'priest';
   switch (o.k) {
     case 'idle':
+      u.guardX = u.x;
+      u.guardY = u.y;
       if (military && (s.tick + u.id) % 8 === 0) {
-        const t = findTarget(s, sp, u, statsOf(s, u).sight, false);
+        const st = statsOf(s, u);
+        const reach = u.stance === 'stand' ? st.range + st.radius + 0.6 : st.sight;
+        const t = findTarget(s, sp, u, reach, !!st.buildingsOnly);
         if (t) setOrder(u, { k: 'attack', target: t.id, auto: true, then: null });
+      } else if (u.type === 'priest' && (s.tick + u.id) % 10 === 0 && u.cool <= 0) {
+        const w = woundedNear(s, sp, u, statsOf(s, u).sight);
+        if (w) setOrder(u, { k: 'heal', target: w.id });
       }
       break;
     case 'move':
+      if (!o.started) {
+        o.started = true;
+        goTo(u, goalForPoint(s, o.x, o.y, teamOf(s, u.owner)));
+      }
       if (o.amove && military && (s.tick + u.id) % 6 === 0) {
         const t = findTarget(s, sp, u, statsOf(s, u).sight, true);
         if (t) {
@@ -489,6 +740,18 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
     case 'deliver':
       deliverStep(s, u);
       break;
+    case 'garrison':
+      garrisonStep(s, u, o);
+      break;
+    case 'hunt':
+      huntStep(s, u, o);
+      break;
+    case 'convert':
+      convertStep(s, u, o);
+      break;
+    case 'heal':
+      healStep(s, u, o);
+      break;
   }
 }
 
@@ -496,19 +759,20 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
 export function routeUnits(s: GameState): void {
   let budget = PATH_BUDGET;
   for (const e of s.ents) {
-    if (e.kind !== 'unit' || !e.wantPath || e.hp <= 0 || !e.goal) continue;
+    if (e.kind !== 'unit' || !e.wantPath || e.hp <= 0 || !e.goal || e.inside) continue;
     if (budget <= 0) break;
     const g = e.goal;
+    const team = teamOf(s, e.owner);
     e.pathTick = s.tick;
     e.wantPath = false;
     e.pathI = 0;
     const inGoal = (x: number, y: number) => x >= g.x0 && x <= g.x1 && y >= g.y0 && y <= g.y1;
-    if (inGoal(Math.floor(g.px), Math.floor(g.py)) && walkable(s, Math.floor(g.px), Math.floor(g.py)) && lineClear(s, e.x, e.y, g.px, g.py)) {
+    if (inGoal(Math.floor(g.px), Math.floor(g.py)) && walkable(s, Math.floor(g.px), Math.floor(g.py), team) && lineClear(s, e.x, e.y, g.px, g.py, team)) {
       e.path = [g.px, g.py];
       budget -= 4;
       continue;
     }
-    const r = findRoute(s, e.x, e.y, g, Math.min(12000, Math.max(800, budget)));
+    const r = findRoute(s, e.x, e.y, g, Math.min(12000, Math.max(800, budget)), team);
     budget -= r.cost;
     e.path = r.points.length ? r.points : null;
   }
@@ -546,7 +810,7 @@ export function walk(s: GameState, u: Unit): void {
 /** Push overlapping units apart (workers and fighters hold their ground; walkers flow around). */
 export function separate(s: GameState, sp: Spatial): void {
   for (const u of s.ents) {
-    if (u.kind !== 'unit' || u.hp <= 0) continue;
+    if (u.kind !== 'unit' || u.hp <= 0 || u.inside) continue;
     const ru = statsOf(s, u).radius;
     sp.near(u.x, u.y, 1, (o) => {
       if (o.id <= u.id || o.hp <= 0) return;
@@ -569,24 +833,26 @@ export function separate(s: GameState, sp: Spatial): void {
       const wu = firm(u);
       const wo = firm(o);
       const tot = wu + wo;
-      u.x -= (dx / d) * push * (wu / tot) * 2 * 0.5;
-      u.y -= (dy / d) * push * (wu / tot) * 2 * 0.5;
-      o.x += (dx / d) * push * (wo / tot) * 2 * 0.5;
-      o.y += (dy / d) * push * (wo / tot) * 2 * 0.5;
+      u.x -= (dx / d) * push * (wu / tot);
+      u.y -= (dy / d) * push * (wu / tot);
+      o.x += (dx / d) * push * (wo / tot);
+      o.y += (dy / d) * push * (wo / tot);
     });
   }
 }
 
-/** Keep units out of water, rock, resources and buildings, sliding along their edges. */
+/** Keep units out of water, rock, resources and buildings (but through their own gates), sliding along edges. */
 export function collide(s: GameState, u: Unit): void {
+  if (u.inside) return;
   const r = statsOf(s, u).radius;
+  const team = teamOf(s, u.owner);
   u.x = Math.max(r, Math.min(s.w - r, u.x));
   u.y = Math.max(r, Math.min(s.h - r, u.y));
   const cx = Math.floor(u.x);
   const cy = Math.floor(u.y);
-  if (!walkable(s, cx, cy)) {
+  if (!walkable(s, cx, cy, team)) {
     // Inside something (a new foundation, a pushed crowd): out to the nearest open tile.
-    const t = nearestWalkable(s, u.x, u.y, 8);
+    const t = nearestWalkable(s, u.x, u.y, 8, team);
     if (t >= 0) {
       const tx = t % s.w;
       const ty = Math.floor(t / s.w);
@@ -600,7 +866,7 @@ export function collide(s: GameState, u: Unit): void {
       if (!dx && !dy) continue;
       const tx = cx + dx;
       const ty = cy + dy;
-      if (walkable(s, tx, ty)) continue;
+      if (walkable(s, tx, ty, team)) continue;
       // Closest point of that tile to the unit.
       const qx = Math.max(tx, Math.min(tx + 1, u.x));
       const qy = Math.max(ty, Math.min(ty + 1, u.y));
@@ -639,3 +905,5 @@ export function checkStuck(s: GameState, u: Unit): void {
     u.path = null;
   }
 }
+
+export type { Animal };

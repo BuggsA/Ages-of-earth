@@ -1,19 +1,28 @@
-import { BONUS, BUILDINGS, TICK_HZ, secs, unitStats, type UnitStats } from './data';
+import { AURA, BONUS, BUILDINGS, DEER, TICK_HZ, secs, type UnitStats } from './data';
 import { distToRect } from './grid';
 import type { Spatial } from './spatial';
-import type { Building, Ent, GameState, Shot, Unit } from './types';
+import { modsOf, statsFor } from './stats';
+import type { Animal, Building, Ent, GameState, Shot, Unit } from './types';
 import { isEnemy, radiusOf, statsOf } from './world';
 
-/** Blows, shots, towers and the damage triangle. */
+/** Blows, shots, towers, the damage triangle, splash and the hunt. */
 
-const SHOT_SPEED: Record<Shot['kind'], number> = { stone: 10, arrow: 13, bolt: 15, bullet: 32 };
+const SHOT_SPEED: Record<Shot['kind'], number> = { stone: 10, arrow: 13, bolt: 15, bullet: 32, spear: 9, boulder: 8, ball: 20 };
 
-/** Damage of one blow or shot after the counter bonus and armor. */
-export function damageOf(st: UnitStats, target: Ent, s: GameState, ranged: boolean): number {
-  if (target.kind === 'building') return Math.max(1, st.attack * BONUS[st.cls].building);
+/** Whether a peace treaty still holds (no fighting between players). */
+export const peace = (s: GameState) => s.tick < s.peaceUntil;
+
+/** Damage of one blow or shot after the counter bonus, a hero's inspiration and armor. */
+export function damageOf(s: GameState, attacker: Unit | null, st: UnitStats, target: Ent, ranged: boolean): number {
+  const inspired = attacker && s.tick - attacker.aura <= 2 ? AURA.attack : 1;
+  if (target.kind === 'building') {
+    // Walls shrug off all but siege and heavy blows.
+    const wall = target.type === 'wall' || target.type === 'gate' ? (st.cls === 'siege' ? 1.2 : st.cls === 'infantry' || st.cls === 'hero' ? 0.5 : 0.15) : 1;
+    return Math.max(1, st.attack * BONUS[st.cls].building * inspired * wall);
+  }
   const ts = statsOf(s, target);
   const armor = ranged ? ts.parmor : ts.armor;
-  return Math.max(1, st.attack * BONUS[st.cls][ts.cls] - armor);
+  return Math.max(1, st.attack * BONUS[st.cls][ts.cls] * inspired - armor);
 }
 
 /** Edge-to-edge distance between a unit and anything. */
@@ -40,8 +49,8 @@ export function hurt(s: GameState, target: Ent, damage: number, by: number, atta
     if (target.kind === 'building') s.players[by].stats.razed++;
     return;
   }
-  // Soldiers standing about answer whoever hits them.
-  if (attacker && target.kind === 'unit' && target.type !== 'citizen' && target.order.k === 'idle' && attacker.hp > 0) {
+  // Soldiers standing about answer whoever hits them (if their stance lets them move).
+  if (attacker && target.kind === 'unit' && target.type !== 'citizen' && target.type !== 'priest' && target.order.k === 'idle' && attacker.hp > 0 && target.stance !== 'stand') {
     target.order = { k: 'attack', target: attacker.id, auto: true, then: null };
   }
 }
@@ -65,41 +74,88 @@ export function strike(s: GameState, u: Unit, t: Ent): void {
       ty: t.y,
       t: 0,
       dur: Math.max(2, Math.ceil((d / SHOT_SPEED[st.shot]) * TICK_HZ)),
-      damage: damageOf(st, t, s, true),
+      damage: damageOf(s, u, st, t, true),
+      splash: st.splash ?? 0,
+      from: u.type,
+      animal: false,
     });
     s.events.push({ k: 'swing', id: u.id, target: t.id, x: u.x, y: u.y, owner: u.owner, ranged: true, type: u.type });
     s.events.push({ k: 'shot', owner: u.owner, kind: st.shot, x: u.x, y: u.y });
     return;
   }
   s.events.push({ k: 'swing', id: u.id, target: t.id, x: u.x, y: u.y, owner: u.owner, ranged: false, type: u.type });
-  hurt(s, t, damageOf(st, t, s, false), u.owner, u);
+  hurt(s, t, damageOf(s, u, st, t, false), u.owner, u);
 }
 
-/** Move shots along; those that arrive hit their target if it still stands. */
-export function updateShots(s: GameState): void {
+/** A hunter's spear at an animal. */
+export function throwSpear(s: GameState, u: Unit, a: Animal): void {
+  u.swing = s.tick;
+  const dx = a.x - u.x;
+  const dy = a.y - u.y;
+  const d = Math.sqrt(dx * dx + dy * dy);
+  s.shots.push({
+    id: s.nextId++,
+    owner: u.owner,
+    kind: 'spear',
+    x0: u.x,
+    y0: u.y,
+    target: a.id,
+    tx: a.x,
+    ty: a.y,
+    t: 0,
+    dur: Math.max(2, Math.ceil((d / SHOT_SPEED.spear) * TICK_HZ)),
+    damage: DEER.spearDamage,
+    splash: 0,
+    from: u.type,
+    animal: true,
+  });
+  s.events.push({ k: 'shot', owner: u.owner, kind: 'spear', x: u.x, y: u.y });
+}
+
+/** Move shots along; those that arrive hit their target if it still stands, and splash around. */
+export function updateShots(s: GameState, sp: Spatial, hitAnimal: (a: Animal, damage: number, fromX: number, fromY: number) => void): void {
   const keep: Shot[] = [];
   for (const sh of s.shots) {
     sh.t++;
-    const t = s.byId.get(sh.target);
+    const t = sh.animal ? undefined : s.byId.get(sh.target);
+    const a = sh.animal ? s.animals.find((x) => x.id === sh.target) : undefined;
     if (t && t.hp > 0) {
       sh.tx = t.x;
       sh.ty = t.y;
+    } else if (a && a.hp > 0) {
+      sh.tx = a.x;
+      sh.ty = a.y;
     }
     if (sh.t < sh.dur) {
       keep.push(sh);
       continue;
     }
+    if (a && a.hp > 0) {
+      hitAnimal(a, sh.damage, sh.x0, sh.y0);
+      continue;
+    }
     if (t && t.hp > 0) hurt(s, t, sh.damage, sh.owner, null);
+    if (sh.splash > 0) {
+      s.events.push({ k: 'splash', x: sh.tx, y: sh.ty, owner: sh.owner, kind: sh.kind });
+      const st = sh.from ? statsFor(s, sh.owner, sh.from) : null;
+      sp.near(sh.tx, sh.ty, sh.splash + 0.5, (o) => {
+        if (o === t || o.hp <= 0 || !isEnemy(s, sh.owner, o.owner)) return;
+        const dx = o.x - sh.tx;
+        const dy = o.y - sh.ty;
+        if (dx * dx + dy * dy > sh.splash * sh.splash) return;
+        hurt(s, o, st ? damageOf(s, null, st, o, true) * 0.6 : sh.damage * 0.5, sh.owner, null);
+      });
+    }
   }
   s.shots = keep;
 }
 
 /** The nearest enemy unit within a radius of a point, or null. */
-export function nearestEnemyUnit(s: GameState, sp: Spatial, owner: number, x: number, y: number, r: number): Unit | null {
+export function nearestEnemyUnit(s: GameState, sp: Spatial, owner: number, x: number, y: number, r: number, filter?: (u: Unit) => boolean): Unit | null {
   let best: Unit | null = null;
   let bestD = r * r;
   sp.near(x, y, r, (o) => {
-    if (o.hp <= 0 || !isEnemy(s, owner, o.owner)) return;
+    if (o.hp <= 0 || !isEnemy(s, owner, o.owner) || (filter && !filter(o))) return;
     const dx = o.x - x;
     const dy = o.y - y;
     const d = dx * dx + dy * dy;
@@ -111,35 +167,52 @@ export function nearestEnemyUnit(s: GameState, sp: Spatial, owner: number, x: nu
   return best;
 }
 
-/** Town Centers and towers shoot at the nearest enemy in range. */
+/** Town Centers and towers shoot at the nearest enemies in range, one more arrow for each unit sheltering inside. */
 export function buildingGuns(s: GameState, sp: Spatial, b: Building): void {
   const g = BUILDINGS[b.type].guns;
-  if (!g || !b.built) return;
+  if (!g || !b.built || peace(s)) return;
   if (b.cool > 0) {
     b.cool--;
     return;
   }
   const epoch = s.players[b.owner].epoch;
-  const reach = g.range + b.size / 2;
+  const m = modsOf(s, b.owner);
+  const reach = g.range + m.range + b.size / 2;
   const t = nearestEnemyUnit(s, sp, b.owner, b.x, b.y, reach);
   if (!t) return;
-  const ts = unitStats(t.type, s.players[t.owner].epoch);
-  const dx = t.x - b.x;
-  const dy = t.y - b.y;
-  const d = Math.sqrt(dx * dx + dy * dy);
   b.cool = secs(g.reload);
-  s.shots.push({
-    id: s.nextId++,
-    owner: b.owner,
-    kind: 'arrow',
-    x0: b.x,
-    y0: b.y,
-    target: t.id,
-    tx: t.x,
-    ty: t.y,
-    t: 0,
-    dur: Math.max(2, Math.ceil((d / SHOT_SPEED.arrow) * TICK_HZ)),
-    damage: Math.max(1, g.damage * (1 + epoch * 0.2) - ts.parmor),
+  const arrows = 1 + Math.min(10, b.garrison.length);
+  // Extra arrows go to others nearby when there are any, so a volley spreads over a crowd.
+  const others: Unit[] = [];
+  if (arrows > 1) sp.near(b.x, b.y, reach, (o) => {
+    if (o !== t && o.hp > 0 && isEnemy(s, b.owner, o.owner)) {
+      const dx = o.x - b.x;
+      const dy = o.y - b.y;
+      if (dx * dx + dy * dy <= reach * reach) others.push(o);
+    }
   });
+  for (let k = 0; k < arrows; k++) {
+    const target = k === 0 || !others.length ? t : others[(k - 1) % others.length];
+    const ts = statsOf(s, target);
+    const dx = target.x - b.x;
+    const dy = target.y - b.y;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    s.shots.push({
+      id: s.nextId++,
+      owner: b.owner,
+      kind: 'arrow',
+      x0: b.x,
+      y0: b.y,
+      target: target.id,
+      tx: target.x,
+      ty: target.y,
+      t: -k,
+      dur: Math.max(2, Math.ceil((d / SHOT_SPEED.arrow) * TICK_HZ)),
+      damage: Math.max(1, (g.damage + m.rangedAttack) * (1 + epoch * 0.2) - ts.parmor),
+      splash: 0,
+      from: null,
+      animal: false,
+    });
+  }
   s.events.push({ k: 'shot', owner: b.owner, kind: 'arrow', x: b.x, y: b.y });
 }

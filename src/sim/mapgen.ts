@@ -1,13 +1,34 @@
 import { AMOUNT, MAP_SIZES } from './data';
 import { fbm, mulberry32, type Rng } from './rng';
-import type { MapSize } from './types';
+import type { MapSize, MapType } from './types';
 import { B_RES, B_TERRAIN, R_BERRY, R_GOLD, R_NONE, R_STONE, R_TREE, T_GRASS, T_ROCK, T_SAND, T_WATER } from './types';
 
 /**
- * World generation: rolling grassland with lakes, rocky ridges and woods, and two starting spots that
- * are flat, open and fair: each gets berries, a gold mine, a stone quarry and a wood line at the same
- * distances. Only integer hashing and arithmetic are used, so every browser builds the same world.
+ * World generation: rolling grassland with lakes, rocky ridges and woods (more or less of each by map
+ * type), and starting spots for two to four players that are flat, open and fair: each gets berries, a
+ * herd of deer, gold, stone and a wood line at the same distances. Only integer hashing and arithmetic
+ * are used, so every browser builds the same world.
  */
+
+interface Recipe {
+  water: number;
+  rockE: number;
+  ridge: number;
+  relief: number;
+  forest: number;
+  forest2: number;
+  scatter: number;
+  herds: number;
+  berries: number;
+}
+
+const RECIPES: Record<MapType, Recipe> = {
+  continental: { water: 0.34, rockE: 0.6, ridge: 0.6, relief: 1, forest: 0.6, forest2: 0.56, scatter: 0.88, herds: 1, berries: 1 },
+  highlands: { water: 0.26, rockE: 0.53, ridge: 0.55, relief: 1.7, forest: 0.62, forest2: 0.58, scatter: 0.9, herds: 1, berries: 1 },
+  lakes: { water: 0.43, rockE: 0.68, ridge: 0.66, relief: 0.9, forest: 0.62, forest2: 0.58, scatter: 0.9, herds: 1, berries: 1 },
+  forest: { water: 0.3, rockE: 0.62, ridge: 0.62, relief: 1, forest: 0.48, forest2: 0.45, scatter: 0.78, herds: 0.8, berries: 1 },
+  plains: { water: 0.27, rockE: 0.72, ridge: 0.7, relief: 0.6, forest: 0.72, forest2: 0.69, scatter: 0.95, herds: 2, berries: 1.6 },
+};
 
 export interface MapData {
   w: number;
@@ -18,6 +39,8 @@ export interface MapData {
   amount: Int32Array;
   block: Uint8Array;
   starts: { x: number; y: number }[];
+  /** Where deer graze at the start. */
+  deer: { x: number; y: number }[];
 }
 
 const DIR8 = [
@@ -32,7 +55,9 @@ function shuffle<T>(rng: Rng, a: T[]): T[] {
   return a;
 }
 
-export function generateMap(seed: number, size: MapSize, players = 2): MapData {
+export function generateMap(seed: number, size: MapSize, players = 2, type: MapType = 'continental'): MapData {
+  const R = RECIPES[type];
+  const WL = R.water;
   const n = MAP_SIZES[size].n;
   const w = n;
   const h = n;
@@ -42,13 +67,24 @@ export function generateMap(seed: number, size: MapSize, players = 2): MapData {
   const amount = new Int32Array(w * h);
   const salt = Math.floor(rng() * 100000);
 
-  // Starting spots: across a diagonal or straight across, chosen by the seed.
-  const layouts = [
-    [[-0.31, -0.31], [0.31, 0.31]],
-    [[-0.31, 0.31], [0.31, -0.31]],
-    [[-0.36, 0], [0.36, 0]],
-    [[0, -0.36], [0, 0.36]],
-  ];
+  // Starting spots: two across a diagonal or straight across, three in a triangle, four in the corners.
+  const layouts: number[][][] =
+    players <= 2
+      ? [
+          [[-0.31, -0.31], [0.31, 0.31]],
+          [[-0.31, 0.31], [0.31, -0.31]],
+          [[-0.36, 0], [0.36, 0]],
+          [[0, -0.36], [0, 0.36]],
+        ]
+      : players === 3
+        ? [
+            [[0, -0.35], [0.303, 0.175], [-0.303, 0.175]],
+            [[0, 0.35], [-0.303, -0.175], [0.303, -0.175]],
+          ]
+        : [
+            [[-0.32, -0.32], [0.32, -0.32], [0.32, 0.32], [-0.32, 0.32]],
+            [[-0.36, 0], [0, -0.36], [0.36, 0], [0, 0.36]],
+          ];
   const layout = layouts[Math.floor(rng() * layouts.length)];
   const flip = rng() < 0.5;
   const starts = layout.slice(0, players).map(([ox, oy]) => ({
@@ -79,8 +115,8 @@ export function generateMap(seed: number, size: MapSize, players = 2): MapData {
       const keep = d < 12 ? 1 : d < 20 ? (20 - d) / 8 : 0;
       e = e * (1 - keep) + 0.5 * keep;
       elev[i] = e;
-      if (e < 0.34) terrain[i] = T_WATER;
-      else if (e > 0.6 && ridge > 0.6 && keep === 0) terrain[i] = T_ROCK;
+      if (e < WL) terrain[i] = T_WATER;
+      else if (e > R.rockE && ridge > R.ridge && keep === 0) terrain[i] = T_ROCK;
       else terrain[i] = T_GRASS;
     }
   }
@@ -124,7 +160,7 @@ export function generateMap(seed: number, size: MapSize, players = 2): MapData {
           const i = y * w + x;
           if (!passable(i)) {
             terrain[i] = T_GRASS;
-            elev[i] = Math.max(elev[i], 0.36);
+            elev[i] = Math.max(elev[i], WL + 0.02);
           }
         }
       }
@@ -193,12 +229,12 @@ export function generateMap(seed: number, size: MapSize, players = 2): MapData {
       e /= count;
       const detail = fbm(x / 5, y / 5, salt + 31, 2);
       let hgt: number;
-      if (water === count) hgt = -0.55 - (0.34 - Math.min(0.34, e)) * 6 - detail * 0.2;
+      if (water === count) hgt = -0.55 - (WL - Math.min(WL, e)) * 6 - detail * 0.2;
       else if (water > 0) hgt = -0.06 + detail * 0.05;
       else {
         // Rolling ground: broad swells from the elevation, smaller hummocks on top.
         const swell = fbm(x / 11, y / 11, salt + 51, 2);
-        hgt = 0.2 + (e - 0.34) * 4.6 + (swell - 0.5) * 0.9 + (detail - 0.5) * 0.4;
+        hgt = 0.2 + ((e - WL) * 4.6 + (swell - 0.5) * 0.9) * R.relief + (detail - 0.5) * 0.4;
         if (rock > 0) hgt += (rock / count) * (1.4 + fbm(x / 3, y / 3, salt + 41, 2) * 2.6);
       }
       height[y * W + x] = hgt;
@@ -252,8 +288,8 @@ export function generateMap(seed: number, size: MapSize, players = 2): MapData {
       const f = fbm(x / 9, y / 9, salt + 3, 3);
       const d = startDist(x, y);
       if (d < 10) continue;
-      if ((f > 0.6 || (f > 0.56 && fbm(x / 3, y / 3, salt + 13, 2) > 0.6)) && free(x, y, 10)) put(x, y, R_TREE);
-      else if (fbm(x / 2, y / 2, salt + 17, 1) > 0.88 && free(x, y, 8)) put(x, y, R_TREE);
+      if ((f > R.forest || (f > R.forest2 && fbm(x / 3, y / 3, salt + 13, 2) > 0.6)) && free(x, y, 10)) put(x, y, R_TREE);
+      else if (fbm(x / 2, y / 2, salt + 17, 1) > R.scatter && free(x, y, 8)) put(x, y, R_TREE);
     }
   }
 
@@ -281,6 +317,33 @@ export function generateMap(seed: number, size: MapSize, players = 2): MapData {
     }
   }
 
+  // More players, more to go round.
+  const more = 0.6 + players * 0.2;
+  // Deer: a herd near every start, more out in the wild.
+  const deer: { x: number; y: number }[] = [];
+  const herd = (cx: number, cy: number, count: number) => {
+    let placed = 0;
+    for (let k = 0; k < count * 6 && placed < count; k++) {
+      const x = cx + Math.floor(rng() * 5) - 2;
+      const y = cy + Math.floor(rng() * 5) - 2;
+      if (!free(x, y, 6)) continue;
+      if (deer.some((d) => d.x === x + 0.5 && d.y === y + 0.5)) continue;
+      deer.push({ x: x + 0.5, y: y + 0.5 });
+      placed++;
+    }
+  };
+  for (const st of starts) {
+    const d = DIR8[order[4 % 8]];
+    herd(Math.round(st.x + d[0] * 13), Math.round(st.y + d[1] * 13), 4);
+  }
+  for (let k = 0, guard = 0; k < Math.round((n / 30) * R.herds * more) && guard < 200; guard++) {
+    const x = 6 + Math.floor(rng() * (w - 12));
+    const y = 6 + Math.floor(rng() * (h - 12));
+    if (startDist(x, y) < 18 || !free(x, y, 18)) continue;
+    herd(x, y, 3 + Math.floor(rng() * 3));
+    k++;
+  }
+
   // More to fight over in the open.
   const extra = (kind: number, count: number, tiles: number) => {
     for (let k = 0, guard = 0; k < count && guard < count * 40; guard++) {
@@ -290,9 +353,9 @@ export function generateMap(seed: number, size: MapSize, players = 2): MapData {
       if (cluster(x, y, kind, tiles, 16) > 0) k++;
     }
   };
-  extra(R_GOLD, Math.round(n / 22), 4);
-  extra(R_STONE, Math.round(n / 28), 4);
-  extra(R_BERRY, Math.round(n / 26), 6);
+  extra(R_GOLD, Math.round((n / 22) * more), 4);
+  extra(R_STONE, Math.round((n / 28) * more), 4);
+  extra(R_BERRY, Math.round((n / 26) * more * R.berries), 6);
 
   // Woods can wall players off from each other too: cut a road through wherever they do.
   for (let k = 1; k < starts.length; k++) {
@@ -348,5 +411,5 @@ export function generateMap(seed: number, size: MapSize, players = 2): MapData {
     if (res[i] !== R_NONE) block[i] |= B_RES;
   }
 
-  return { w, h, terrain, height, res, amount, block, starts };
+  return { w, h, terrain, height, res, amount, block, starts, deer };
 }
