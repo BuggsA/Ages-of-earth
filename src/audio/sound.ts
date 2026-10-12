@@ -208,7 +208,7 @@ export class Sound {
     // Levels measured offline: effects peak around 0.1 to 0.6, the sea sits well under them.
     to(this.sfx.gain, this.settings.volume * 2.6, 0.05);
     to(this.amb.gain, this.settings.ambience * 0.28, 0.3);
-    to(this.mus.gain, this.settings.music * 0.9, 0.3);
+    to(this.mus.gain, this.settings.music * 0.5, 0.3);
   }
 
   // ---- Building blocks -----------------------------------------------------------------------
@@ -540,7 +540,7 @@ export class Sound {
 
   // ---- Voices --------------------------------------------------------------------------------------
 
-  private lastVoice = 0;
+  private lastVoice = -1;
 
   /**
    * A unit answers: a few syllables of made-up speech (a buzzing voice through two formant filters per
@@ -562,7 +562,7 @@ export class Sound {
     const VOWELS: [number, number][] = [[800, 1200], [500, 1850], [320, 2300], [520, 920], [360, 820]];
     const n = mood === 'attack' ? 2 : 2 + Math.floor(Math.random() * 2);
     const out = this.voice(mood === 'attack' ? 1.4 : 1, 0);
-    let t = now + 0.01;
+    let t = now + 0.03;
     for (let i = 0; i < n; i++) {
       const len = mood === 'attack' ? 0.16 : 0.1 + Math.random() * 0.06;
       const [f1, f2] = VOWELS[Math.floor(Math.random() * VOWELS.length)];

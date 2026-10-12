@@ -468,7 +468,7 @@ interface ReplayFile {
 const REPLAY_KEY = 'ages-replay';
 /** Commands of this match so far, for its replay. */
 let record: [number, Command[]][] = [];
-let watching: { file: ReplayFile; at: Map<number, Command[]>; speed: number } | null = null;
+let watching: { file: ReplayFile; at: Map<number, Command[]>; speed: number; all: boolean } | null = null;
 let watchingNext = false;
 
 function replayOf(s: GameState): ReplayFile | null {
@@ -516,7 +516,7 @@ function watchReplay(file: ReplayFile): void {
     return;
   }
   online = false;
-  watching = { file, at: new Map(file.cmds), speed: 1 };
+  watching = { file, at: new Map(file.cmds), speed: 1, all: true };
   watchingNext = true;
   startMatch(file.setup, undefined, file.viewer);
   tips.hide();
@@ -559,7 +559,7 @@ function replayBar(): void {
   if (!w || !s) return;
   const views = [`<option value="-1">Everything</option>`, ...s.players.map((p, i) => `<option value="${i}">${p.name}'s eyes</option>`)].join('');
   $('replay-bar').innerHTML = `<span class="rb-title">Replay</span>
-    <button class="tb-btn" data-rb="pause">${paused ? '▶' : '⏸'}</button>
+    <button class="tb-btn" data-rb="pause">${paused ? PLAY_ICON : PAUSE_ICON}</button>
     ${[1, 2, 4, 8].map((k) => `<button class="tb-btn ${w.speed === k ? 'alert' : ''}" data-rb="speed" data-k="${k}">${k}×</button>`).join('')}
     <button class="tb-btn" data-rb="skip" title="Jump ahead a minute">+1 min</button>
     <select id="rb-view">${views}</select>
@@ -589,6 +589,7 @@ $('replay-bar').addEventListener('change', (e) => {
   const sel = e.target as HTMLSelectElement;
   if (sel.id !== 'rb-view' || !game) return;
   const v = Number(sel.value);
+  if (watching) watching.all = v < 0;
   if (v < 0) view.setViewer(game, viewer, true);
   else {
     viewer = v;
@@ -1663,7 +1664,7 @@ function frame(now: number): void {
       mapTimer -= dt;
       if (mapTimer <= 0) {
         mapTimer = 0.2;
-        minimap.draw(s, viewer, mode === 'over', [...view.knownBuildings()], view.rig.footprint(), selection);
+        minimap.draw(s, viewer, mode === 'over' || !!watching?.all, [...view.knownBuildings()], view.rig.footprint(), selection);
       }
       cursorTimer -= dt;
       if (cursorTimer <= 0) {
