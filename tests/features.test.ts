@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { findSpot } from '../src/sim/ai';
 import { BUILDINGS, DEER, MARKET, TECHS, TICK_HZ, unitStats } from '../src/sim/data';
-import { createGame, step, type GameSetup } from '../src/sim/game';
+import { checksum, createGame, step, type GameSetup } from '../src/sim/game';
 import { findRoute } from '../src/sim/path';
+import { deserialize, serialize } from '../src/sim/save';
 import { statsFor } from '../src/sim/stats';
 import type { Building, CivId, Command, GameState, Unit } from '../src/sim/types';
 import { R_MEAT, R_TREE } from '../src/sim/types';
@@ -312,5 +313,20 @@ describe('match options', () => {
     s.tick = s.peaceUntil;
     run(s, 15, [{ t: 'attack', p: 0, ids: [a.id], target: b.id }]);
     expect(b.hp).toBeLessThan(statsFor(s, 1, 'infantry').hp);
+  });
+});
+
+describe('saving', () => {
+  it('a saved match, loaded, plays on exactly as the original', { timeout: 60000 }, () => {
+    const s = createGame({ seed: 77, size: 'small', players: [{ name: 'A', ai: 'hard' }, { name: 'B', ai: 'normal' }] });
+    for (let i = 0; i < TICK_HZ * 240; i++) step(s);
+    const t = deserialize(serialize(s));
+    expect(checksum(t)).toBe(checksum(s));
+    for (let i = 0; i < TICK_HZ * 180; i++) {
+      step(s);
+      step(t);
+    }
+    expect(t.tick).toBe(s.tick);
+    expect(checksum(t)).toBe(checksum(s));
   });
 });

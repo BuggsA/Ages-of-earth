@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { BuildingType } from '../sim/types';
-import { Kit, bake } from './kit';
+import { Kit, bake, rnd } from './kit';
 
 /**
  * Every building in every epoch: Stone Age thatch, hide and wattle; Bronze Age mudbrick and terracotta;
@@ -409,17 +409,379 @@ function tower(k: Kit, e: number, st: Style): void {
   banner(k, 0, 2.6, 0, 0.8, 0.8);
 }
 
-const MAKERS: Record<BuildingType, (k: Kit, e: number, st: Style) => void> = { towncenter, house, storehouse, farm, barracks, range, stable, tower };
+// ---- Forge -----------------------------------------------------------------------------------------
+
+function anvil(k: Kit, x: number, z: number): void {
+  k.box(0.12, 0.18, 0.12, '#4a3a2c', x, 0, z);
+  k.box(0.26, 0.08, 0.12, IRON_DARK, x, 0.18, z);
+  k.cone(0.05, 0.1, 4, IRON_DARK, x + 0.16, 0.2, z).rotation.z = -Math.PI / 2;
+}
+
+function forge(k: Kit, e: number, st: Style): void {
+  pad(k, 3, st.base);
+  const wall = e >= 2 ? STONE : st.wall;
+  // A smithy with a roaring furnace, a tall chimney and an anvil out front.
+  k.box(2.3, 0.95, 1.3, e === 3 ? st.wall : wall, -0.2, 0, -0.6);
+  if (e === 2) for (const x of [-1.2, -0.6, 0, 0.6, 0.8]) k.box(0.05, 0.95, 1.32, st.trim, x, 0, -0.6);
+  k.box(2.36, 0.06, 1.36, st.trim, -0.2, 0.95, -0.6);
+  if (e === 1 || e === 0) k.box(2.3, 0.1, 1.3, st.roof, -0.2, 1.0, -0.6);
+  else k.prism(2.4, 0.6, 1.45, st.roof, -0.2, 1.0, -0.6);
+  // Open-fronted forge under a lean-to.
+  k.box(1.0, 0.08, 0.8, st.roof2, 0.8, 0.85, 0.35);
+  for (const x of [0.35, 1.25]) k.cyl(0.05, 0.05, 0.85, 6, st.post, x, 0, 0.72);
+  k.box(0.7, 0.4, 0.5, '#5a4c40', 0.8, 0, 0.1);
+  k.glow(k.box(0.36, 0.16, 0.06, '#ff7a2a', 0.8, 0.12, 0.36));
+  // The chimney.
+  k.box(0.42, 2.0, 0.42, e === 3 ? st.wall : STONE, 0.95, 0, -0.75);
+  k.box(0.5, 0.1, 0.5, '#5a544c', 0.95, 2.0, -0.75);
+  if (e === 3) {
+    k.box(0.32, 1.7, 0.32, st.wall, -1.0, 0.9, -0.85);
+    k.box(0.4, 0.08, 0.4, '#5a544c', -1.0, 2.6, -0.85);
+  }
+  k.glow(k.box(0.3, 0.04, 0.3, '#ff9a3c', 0.95, 2.06, -0.75));
+  anvil(k, 0.2, 0.7);
+  // A rack of finished blades and a quench barrel.
+  k.box(0.04, 0.5, 0.5, WOOD, -1.25, 0, 0.45);
+  for (let i = 0; i < 3; i++) k.box(0.02, 0.42, 0.05, '#c8ccd0', -1.22, 0.08, 0.3 + i * 0.15);
+  k.cyl(0.14, 0.12, 0.3, 8, WOOD, -0.6, 0, 0.8);
+  k.cyl(0.12, 0.12, 0.02, 8, '#4a7090', -0.6, 0.3, 0.8);
+  window(k, st, -0.6, 0.45, 0.06);
+  k.box(0.36, 0.55, 0.04, '#3a2b20', -0.15, 0, 0.06);
+  k.team(k.box(2.38, 0.08, 0.04, TEAM, -0.2, 0.86, 0.08));
+  banner(k, -1.3, 0, 1.3, 1.2);
+}
+
+// ---- Siege workshop --------------------------------------------------------------------------------
+
+function workshop(k: Kit, e: number, st: Style): void {
+  pad(k, 3, st.base);
+  // A great open shed on heavy posts, a half-built engine inside and a crane over the yard.
+  const post = e >= 2 ? st.trim : st.post;
+  for (const x of [-1.25, -0.4, 0.45, 1.25]) for (const z of [-1.2, 0.1]) k.cyl(0.07, 0.08, 1.1, 6, post, x, 0, z);
+  k.box(2.6, 0.9, 0.08, e >= 2 ? STONE : st.wall, 0, 0, -1.25);
+  if (e <= 1) k.box(2.75, 0.1, 1.55, st.roof, 0, 1.1, -0.55);
+  else k.prism(2.8, 0.6, 1.7, st.roof, 0, 1.1, -0.55);
+  // The engine on the stocks: a frame on wheels.
+  for (const x of [-0.6, 0.4]) {
+    for (const z of [-0.95, -0.15]) {
+      const w = k.cyl(0.16, 0.16, 0.06, 10, '#5b4330', x, 0.16, z);
+      w.rotation.x = Math.PI / 2;
+      w.position.y = 0.16;
+    }
+  }
+  k.box(1.3, 0.1, 0.7, WOOD, -0.1, 0.26, -0.55);
+  const arm = k.box(0.08, 0.08, 1.2, '#8a6440', -0.1, 0.36, -0.55);
+  arm.rotation.x = -0.6;
+  k.box(0.12, 0.5, 0.12, WOOD, -0.1, 0.36, -0.55);
+  // Timber and a crane.
+  for (let i = 0; i < 3; i++) {
+    const log = k.cyl(0.08, 0.08, 0.9, 6, '#8a6440', 0.9, 0.08 + i * 0.15, 0.85 - (i % 2) * 0.08);
+    log.rotation.z = Math.PI / 2;
+  }
+  k.cyl(0.05, 0.06, 1.7, 5, WOOD, -1.1, 0, 1.0);
+  const jib = k.box(0.05, 0.05, 1.1, WOOD, -1.1, 1.55, 0.6);
+  jib.rotation.x = 0.35;
+  k.cyl(0.006, 0.006, 0.7, 3, '#d8d0b8', -1.1, 0.85, 0.2);
+  k.box(0.16, 0.16, 0.16, STONE, -1.1, 0.7, 0.2);
+  if (e === 3) {
+    k.cyl(0.09, 0.1, 0.12, 8, IRON_DARK, 0.6, 0, 0.5);
+    k.cyl(0.06, 0.07, 0.6, 8, IRON_DARK, 0.6, 0.1, 0.75).rotation.x = Math.PI / 2;
+  }
+  k.team(k.box(2.82, 0.06, 0.06, TEAM, 0, 1.08, 0.2));
+  banner(k, 1.3, 0, 1.3, 1.3);
+}
+
+// ---- Temple ----------------------------------------------------------------------------------------
+
+function temple(k: Kit, e: number, st: Style): void {
+  pad(k, 3, st.base);
+  if (e <= 1) {
+    // A stepped platform, a columned shrine and a pediment, a sacred fire before it.
+    k.box(2.7, 0.15, 2.3, st.trim, 0, 0, -0.1);
+    k.box(2.45, 0.15, 2.05, st.trim, 0, 0.15, -0.1);
+    k.box(1.7, 0.9, 1.2, st.wall, 0, 0.3, -0.35);
+    for (let i = 0; i < 6; i++) {
+      k.cyl(0.07, 0.08, 0.95, 8, '#f2ead8', -1.0 + i * 0.4, 0.3, 0.65);
+      k.cyl(0.07, 0.08, 0.95, 8, '#f2ead8', -1.0 + i * 0.4, 0.3, -1.0);
+    }
+    k.box(2.3, 0.14, 1.95, '#f2ead8', 0, 1.25, -0.17);
+    k.prism(2.3, 0.45, 2.0, st.roof, 0, 1.39, -0.17);
+    k.team(k.box(2.32, 0.06, 0.04, TEAM, 0, 1.3, 0.81));
+    k.cyl(0.14, 0.16, 0.3, 8, '#8d7a62', 0, 0, 1.25);
+    k.glow(k.cone(0.1, 0.24, 5, '#ffb24a', 0, 0.3, 1.25));
+    banner(k, -1.25, 0, 1.25, 1.4);
+    banner(k, 1.25, 0, 1.25, 1.4);
+    return;
+  }
+  if (e === 2) {
+    // A stone church with a long nave, a bell tower and a spire.
+    k.box(1.4, 1.1, 2.4, STONE, 0.3, 0, -0.1);
+    k.prism(2.5, 0.8, 1.55, st.roof, 0.3, 1.1, -0.1).rotation.y = Math.PI / 2;
+    k.box(0.8, 2.0, 0.8, STONE, -0.9, 0, 0.6);
+    k.box(0.86, 0.08, 0.86, '#8f897f', -0.9, 2.0, 0.6);
+    k.cone(0.55, 1.2, 4, st.roof, -0.9, 2.08, 0.6).rotation.y = Math.PI / 4;
+    k.box(0.04, 0.5, 0.04, '#e2b23c', -0.9, 3.25, 0.6);
+    k.box(0.24, 0.04, 0.04, '#e2b23c', -0.9, 3.55, 0.6);
+    k.cyl(0.24, 0.24, 0.04, 12, '#c8a040', 0.3, 0.8, 1.11).rotation.x = Math.PI / 2;
+    k.glow(k.cyl(0.17, 0.17, 0.05, 12, '#7ab0ff', 0.3, 0.8, 1.11)).rotation.x = Math.PI / 2;
+    for (const z of [-0.8, -0.2, 0.4]) window(k, st, 1.01, 0.55, z, 0.12, 0.34, true, true);
+    k.box(0.36, 0.6, 0.04, '#3a2b20', 0.3, 0, 1.1);
+    k.team(k.box(0.5, 0.36, 0.02, TEAM, -0.9, 1.3, 1.01));
+    banner(k, 1.3, 0, 1.3, 1.2);
+    return;
+  }
+  // A domed church of brick and white stone with a portico and a bell tower.
+  k.box(2.0, 1.2, 1.9, st.wall2, 0.1, 0, -0.3);
+  k.box(2.06, 0.08, 1.96, st.trim, 0.1, 1.2, -0.3);
+  k.cyl(0.62, 0.66, 0.4, 12, st.wall2, 0.1, 1.28, -0.3);
+  k.dome(0.64, '#5f8a8a', 0.1, 1.68, -0.3);
+  k.cyl(0.02, 0.02, 0.4, 4, '#e2b23c', 0.1, 2.3, -0.3);
+  k.box(0.2, 0.03, 0.03, '#e2b23c', 0.1, 2.55, -0.3);
+  for (let i = 0; i < 4; i++) k.cyl(0.06, 0.06, 0.95, 8, st.wall2, -0.5 + i * 0.4, 0, 0.9);
+  k.box(1.5, 0.1, 0.55, st.trim, 0.1, 0.95, 0.72);
+  k.prism(1.5, 0.35, 0.6, st.wall2, 0.1, 1.05, 0.72);
+  k.box(0.6, 2.1, 0.6, st.wall, -1.05, 0, -1.0);
+  k.box(0.66, 0.06, 0.66, st.trim, -1.05, 2.1, -1.0);
+  k.cone(0.4, 0.7, 4, st.roof, -1.05, 2.16, -1.0).rotation.y = Math.PI / 4;
+  for (const x of [-0.5, 0.7]) window(k, st, x, 0.5, 0.66, 0.16, 0.36);
+  k.box(0.4, 0.7, 0.04, '#3a2b20', 0.1, 0, 0.66);
+  k.team(k.box(1.52, 0.06, 0.04, TEAM, 0.1, 1.0, 1.0));
+  banner(k, 1.3, 0, 1.3, 1.3);
+}
+
+// ---- Market ----------------------------------------------------------------------------------------
+
+function stall(k: Kit, st: Style, x: number, z: number, goods: string): void {
+  for (const [dx, dz] of [[-0.3, -0.25], [0.3, -0.25], [-0.3, 0.25], [0.3, 0.25]]) k.cyl(0.025, 0.025, 0.6, 4, st.post, x + dx, 0, z + dz);
+  const awn = k.team(k.box(0.75, 0.04, 0.66, TEAM, x, 0.6, z));
+  awn.rotation.x = -0.15;
+  k.box(0.65, 0.3, 0.3, WOOD, x, 0, z - 0.1);
+  for (let i = 0; i < 3; i++) k.sphere(0.07, goods, x - 0.18 + i * 0.18, 0.36, z - 0.1);
+}
+
+function market(k: Kit, e: number, st: Style): void {
+  pad(k, 3, st.base);
+  if (e >= 2) {
+    // A covered market hall on arches behind the stalls.
+    k.box(2.6, 0.12, 1.2, st.wall2, 0, 0.95, -0.75);
+    for (const x of [-1.2, -0.4, 0.4, 1.2]) for (const z of [-1.25, -0.25]) k.box(0.18, 0.95, 0.18, e === 3 ? st.wall2 : STONE, x, 0, z);
+    k.box(2.6, 0.7, 1.2, st.wall, 0, 1.07, -0.75);
+    if (e === 2) for (const x of [-1.0, -0.5, 0, 0.5, 1.0]) k.box(0.05, 0.7, 1.22, st.trim, x, 1.07, -0.75);
+    k.prism(2.7, 0.6, 1.35, st.roof, 0, 1.77, -0.75);
+    for (const x of [-0.8, 0, 0.8]) window(k, st, x, 1.3, -0.14);
+    k.box(0.6, 0.35, 0.4, '#8a6440', -0.6, 0, -0.8);
+    k.box(0.4, 0.3, 0.3, '#a07a50', 0.6, 0, -0.75);
+  } else {
+    k.box(2.6, 0.7, 0.9, st.wall, 0, 0, -0.95);
+    k.box(2.7, 0.07, 1.0, st.trim, 0, 0.7, -0.95);
+    k.box(2.6, 0.08, 0.5, st.roof, 0, 0.66, -0.35);
+    for (let i = 0; i < 4; i++) k.cyl(0.04, 0.05, 0.66, 6, st.trim, -1.1 + i * 0.73, 0, -0.15);
+  }
+  stall(k, st, -0.85, 0.55, '#d8c048');
+  stall(k, st, 0.85, 0.55, '#c84a3a');
+  stall(k, st, 0, 1.0, '#7aa848');
+  // Barrels, sacks and a cart.
+  for (const [x, z] of [[1.3, -0.1], [1.15, 0.05]]) k.cyl(0.12, 0.1, 0.28, 8, '#8a6440', x, 0, z);
+  k.sphere(0.13, '#d8c08a', -1.3, 0.1, 0.0).scale.set(1, 0.8, 1);
+  k.sphere(0.12, '#c8b07a', -1.15, 0.09, 0.15).scale.set(1, 0.8, 1);
+  k.sphere(0.1, '#e2b23c', 0.0, 0.35, 0.95);
+  banner(k, 1.35, 0, 1.35, 1.3);
+}
+
+// ---- Wonder ----------------------------------------------------------------------------------------
+
+function wonder(k: Kit, e: number, st: Style): void {
+  pad(k, 5, st.base);
+  if (e === 0) {
+    // A great henge: two rings of standing stones with lintels round an altar fire.
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2;
+      const x = Math.cos(a) * 2.0;
+      const z = Math.sin(a) * 2.0;
+      const s = k.box(0.32, 1.5, 0.22, '#a8a294', x, 0, z);
+      s.rotation.y = -a;
+      if (i % 2 === 0) {
+        const b = (i + 1) / 14;
+        const l = k.box(0.95, 0.2, 0.24, '#9a9488', Math.cos(b * Math.PI * 2) * 2.0, 1.5, Math.sin(b * Math.PI * 2) * 2.0);
+        l.rotation.y = -b * Math.PI * 2 + Math.PI / 2;
+      }
+    }
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2 + 0.3;
+      k.box(0.36, 2.1, 0.26, '#b0aa9c', Math.cos(a) * 1.05, 0, Math.sin(a) * 1.05).rotation.y = -a;
+    }
+    k.box(0.8, 0.3, 0.5, '#8f897f', 0, 0, 0);
+    k.glow(k.cone(0.2, 0.4, 6, '#ffb24a', 0, 0.3, 0));
+    k.team(k.box(0.82, 0.08, 0.52, TEAM, 0, 0.22, 0));
+    return;
+  }
+  if (e === 1) {
+    // A ziggurat: terraces of mudbrick up to a shrine of gold, a long stair up the front.
+    const tiers = [[4.4, 0.7], [3.5, 0.65], [2.6, 0.6], [1.7, 0.55]];
+    let y = 0;
+    for (let i = 0; i < tiers.length; i++) {
+      const [w, h] = tiers[i];
+      k.box(w, h, w, i % 2 ? st.wall2 : st.wall, 0, y, -0.1);
+      k.box(w + 0.06, 0.06, w + 0.06, st.trim, 0, y + h - 0.03, -0.1);
+      if (i < 3) k.team(k.box(w + 0.04, 0.1, w + 0.04, TEAM, 0, y + h * 0.5, -0.1));
+      y += h;
+    }
+    k.box(0.9, 0.7, 0.9, '#e2b23c', 0, y, -0.1);
+    k.pyramid(1.1, 0.5, 1.1, '#e8c050', 0, y + 0.7, -0.1);
+    k.glow(k.octa(0.14, LIGHT, 0, y + 1.4, -0.1));
+    // The great stair.
+    for (let i = 0; i < 10; i++) k.box(0.8, 0.25, 0.25, st.trim, 0, i * 0.25, 2.25 - i * 0.24);
+    for (const x of [-2.2, 2.2]) torch(k, x, 0, 2.2);
+    banner(k, -1.4, y - 0.55, 1.1, 1.0, 1.1);
+    banner(k, 1.4, y - 0.55, 1.1, 1.0, 1.1);
+    return;
+  }
+  if (e === 2) {
+    // A cathedral: a tall nave, transepts, twin spires and a great rose window.
+    k.box(1.8, 2.0, 4.2, STONE, 0, 0, -0.2);
+    k.prism(4.2, 1.2, 2.0, st.roof, 0, 2.0, -0.2).rotation.y = Math.PI / 2;
+    k.box(4.0, 1.7, 1.2, STONE, 0, 0, -0.8);
+    k.prism(4.0, 1.0, 1.4, st.roof, 0, 1.7, -0.8);
+    for (const x of [-0.75, 0.75]) {
+      k.box(0.8, 3.2, 0.8, STONE, x, 0, 1.6);
+      k.box(0.86, 0.1, 0.86, '#8f897f', x, 3.2, 1.6);
+      k.cone(0.5, 1.6, 4, st.roof, x, 3.3, 1.6).rotation.y = Math.PI / 4;
+      k.sphere(0.05, '#e2b23c', x, 4.95, 1.6);
+    }
+    k.cyl(0.42, 0.42, 0.05, 16, '#c8a040', 0, 2.0, 2.02).rotation.x = Math.PI / 2;
+    k.glow(k.cyl(0.34, 0.34, 0.06, 16, '#7ab0ff', 0, 2.0, 2.02)).rotation.x = Math.PI / 2;
+    // Flying buttresses down the sides.
+    for (const z of [-1.8, -0.2]) for (const x of [-1.25, 1.25]) {
+      k.box(0.2, 1.5, 0.3, STONE, x, 0, z);
+      const fly = k.box(0.08, 0.08, 0.7, '#8f897f', x * 0.82, 1.6, z);
+      fly.rotation.y = Math.PI / 2;
+      fly.rotation.x = x > 0 ? 0.6 : -0.6;
+    }
+    for (let i = 0; i < 4; i++) for (const x of [-0.91, 0.91]) window(k, st, x, 0.8, -1.6 + i * 0.9, 0.18, 0.6, true, true);
+    k.box(0.6, 1.0, 0.04, '#3a2b20', 0, 0, 2.01);
+    k.team(k.box(0.5, 0.7, 0.02, TEAM, -0.75, 2.1, 2.01));
+    k.team(k.box(0.5, 0.7, 0.02, TEAM, 0.75, 2.1, 2.01));
+    banner(k, -2.1, 0, 2.1, 1.6, 1.2);
+    banner(k, 2.1, 0, 2.1, 1.6, 1.2);
+    return;
+  }
+  // A domed palace: colonnaded wings around a great drum and dome, a lantern of gold on top.
+  k.box(4.4, 1.3, 2.2, st.wall2, 0, 0, -0.6);
+  k.box(4.5, 0.1, 2.3, st.trim, 0, 1.3, -0.6);
+  for (let i = 0; i < 10; i++) k.cyl(0.08, 0.08, 1.3, 8, st.wall2, -2.0 + i * 0.444, 0, 0.62);
+  k.box(4.5, 0.14, 0.4, st.trim, 0, 1.3, 0.62);
+  k.box(1.8, 0.12, 0.9, st.trim, 0, 0, 1.0);
+  for (let i = 0; i < 6; i++) k.cyl(0.09, 0.09, 1.6, 8, '#f6f0dc', -0.75 + i * 0.3, 0.12, 1.3);
+  k.prism(1.9, 0.55, 0.8, '#f6f0dc', 0, 1.72, 1.15);
+  k.cyl(1.0, 1.05, 0.9, 16, st.wall2, 0, 1.4, -0.6);
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    k.cyl(0.05, 0.05, 0.9, 6, '#f6f0dc', Math.cos(a) * 1.07, 1.4, -0.6 + Math.sin(a) * 1.07);
+  }
+  k.dome(1.0, '#6f9a96', 0, 2.3, -0.6);
+  k.cyl(0.18, 0.2, 0.5, 8, '#f6f0dc', 0, 3.25, -0.6);
+  k.glow(k.sphere(0.12, '#ffd36b', 0, 3.85, -0.6));
+  for (const x of [-1.7, -1.1, 1.1, 1.7]) window(k, st, x, 0.5, 0.52, 0.18, 0.4);
+  k.team(k.box(4.52, 0.08, 0.06, TEAM, 0, 1.2, 0.83));
+  banner(k, -2.2, 0, 2.2, 1.8, 1.3);
+  banner(k, 2.2, 0, 2.2, 1.8, 1.3);
+  k.cyl(0.03, 0.03, 0.9, 5, '#e8e2d0', 0, 3.95, -0.6);
+  k.team(k.box(0.02, 0.28, 0.42, TEAM, 0, 4.5, -0.39));
+}
+
+// ---- Walls and gates -------------------------------------------------------------------------------
+
+/** Directions a wall piece reaches toward its neighbors: 1 east (+x), 2 south (+z), 4 west, 8 north. */
+const ARMS: [number, number, number][] = [[1, 1, 0], [2, 0, 1], [4, -1, 0], [8, 0, -1]];
+
+function wall(k: Kit, e: number, st: Style, mask: number): void {
+  const straight = mask === 5 || mask === 10;
+  if (e === 0) {
+    // A palisade of sharpened logs.
+    const logs = (x: number, z: number) => {
+      const h = 1.0 + rnd(x * 7, z * 7, 3) * 0.2;
+      k.cyl(0.085, 0.09, h, 6, '#7a5636', x, 0, z);
+      k.cone(0.085, 0.18, 6, '#8a6440', x, h, z);
+    };
+    logs(0, 0);
+    for (const [bit, dx, dz] of ARMS) {
+      if (!(mask & bit)) continue;
+      for (const t of [0.17, 0.34]) logs(dx * t, dz * t);
+      k.box(Math.abs(dx) * 0.5 + 0.06, 0.06, Math.abs(dz) * 0.5 + 0.06, '#5b4330', dx * 0.25, 0.55, dz * 0.25);
+    }
+    if (!mask) for (const [dx, dz] of [[0.17, 0], [-0.17, 0]]) logs(dx, dz);
+    k.team(k.box(0.2, 0.08, 0.2, TEAM, 0, 0.42, 0));
+    return;
+  }
+  // Dressed stone (mudbrick in the Bronze Age) with a walkway and crenellations.
+  const c = e === 1 ? st.wall : STONE;
+  const top = e === 1 ? 1.0 : 1.2;
+  const post = straight ? 0.5 : 0.62;
+  const ph = straight ? top : top + 0.25;
+  k.box(post, ph, post, c, 0, 0, 0);
+  k.box(post + 0.06, 0.06, post + 0.06, e === 1 ? st.trim : '#8f897f', 0, ph, 0);
+  if (!straight) {
+    for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) k.box(0.14, 0.16, 0.14, c, x * (post / 2 - 0.07), ph + 0.06, z * (post / 2 - 0.07));
+    k.team(k.box(post + 0.02, 0.1, post + 0.02, TEAM, 0, ph - 0.3, 0));
+  }
+  for (const [bit, dx, dz] of ARMS) {
+    if (!(mask & bit)) continue;
+    const w = Math.abs(dx) * 0.5 + Math.abs(dz) * 0.44;
+    const d = Math.abs(dz) * 0.5 + Math.abs(dx) * 0.44;
+    k.box(w, top, d, c, dx * 0.25, 0, dz * 0.25);
+    // Merlons along both edges.
+    for (const side of [-1, 1]) {
+      const ox = dz !== 0 ? side * 0.18 : 0;
+      const oz = dx !== 0 ? side * 0.18 : 0;
+      k.box(dx ? 0.12 : 0.08, 0.16, dz ? 0.12 : 0.08, c, dx * 0.32 + ox, top, dz * 0.32 + oz);
+    }
+    if (e === 3) k.box(dx ? 0.5 : 0.46, 0.05, dz ? 0.5 : 0.46, st.trim, dx * 0.25, top * 0.35, dz * 0.25);
+  }
+}
+
+function gate(k: Kit, e: number, st: Style): void {
+  // Two towers either side of a passage along z, with doors standing open for friends.
+  const c = e === 0 ? '#7a5636' : e === 1 ? st.wall : STONE;
+  const h = e === 0 ? 1.3 : 1.6;
+  for (const x of [-0.72, 0.72]) {
+    if (e === 0) {
+      for (const dx of [-0.17, 0, 0.17]) for (const dz of [-0.17, 0.17]) {
+        k.cyl(0.09, 0.09, h, 6, c, x + dx, 0, dz);
+        k.cone(0.09, 0.18, 6, '#8a6440', x + dx, h, dz);
+      }
+    } else {
+      k.box(0.56, h, 0.8, c, x, 0, 0);
+      k.box(0.62, 0.06, 0.86, e === 1 ? st.trim : '#8f897f', x, h, 0);
+      for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) k.box(0.13, 0.16, 0.13, c, x + dx * 0.21, h + 0.06, dz * 0.33);
+    }
+    // Wall stubs meeting the neighbors.
+    k.box(0.3, e === 0 ? 1.0 : h - 0.4, 0.44, c, x * 1.2, 0, 0);
+  }
+  // The lintel and the open doors.
+  k.box(1.0, 0.3, 0.5, e === 0 ? '#6b4b2f' : c, 0, h - 0.3, 0);
+  k.team(k.box(0.7, 0.2, 0.02, TEAM, 0, h - 0.25, 0.26));
+  k.team(k.box(0.7, 0.2, 0.02, TEAM, 0, h - 0.25, -0.26));
+  for (const x of [-0.42, 0.42]) {
+    const door = k.box(0.04, h - 0.4, 0.44, '#5b4330', x, 0, 0.3);
+    door.rotation.y = x > 0 ? 0.3 : -0.3;
+  }
+  if (e >= 2) banner(k, 0.72, h + 0.06, 0, 0.6, 0.8);
+}
+
+const MAKERS: Record<Exclude<BuildingType, 'wall'>, (k: Kit, e: number, st: Style) => void> = {
+  towncenter, house, storehouse, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate,
+};
 
 const cache = new Map<string, THREE.BufferGeometry>();
 
-/** The baked model of a building in an epoch, in a player's color. */
-export function buildingGeometry(type: BuildingType, epoch: number, color: string): THREE.BufferGeometry {
-  const key = `${type}:${epoch}:${color}`;
+/** The baked model of a building in an epoch, in a player's color (`variant`: which way a wall piece joins its neighbors). */
+export function buildingGeometry(type: BuildingType, epoch: number, color: string, variant = 0): THREE.BufferGeometry {
+  const key = `${type}:${epoch}:${color}:${variant}`;
   let g = cache.get(key);
   if (!g) {
     const k = new Kit();
-    MAKERS[type](k, epoch, STYLES[epoch]);
+    if (type === 'wall') wall(k, epoch, STYLES[epoch], variant);
+    else MAKERS[type](k, epoch, STYLES[epoch]);
     g = bake(k.root, color);
     cache.set(key, g);
   }

@@ -3,14 +3,18 @@ import { sound, type SoundName } from './audio/sound';
 import { CameraRig } from './render/camera';
 import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
-import { BUILDINGS, DT, EPOCHS, PLAYER_COLORS, TICK_HZ, unitStats } from './sim/data';
-import { createGame, step } from './sim/game';
+import { wallLine } from './sim/commands';
+import { BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, TECHS, TICK_HZ, unitStats } from './sim/data';
+import { createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
 import { placeProblem } from './sim/grid';
-import { spawnUnit } from './sim/world';
-import type { BuildingType, Command, Difficulty, Ent, GameEvent, GameState, MapSize, Unit } from './sim/types';
+import { findSpot } from './sim/ai';
+import { placeBuilding, spawnUnit } from './sim/world';
+import type { BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameState, HistoryPoint, MapSize, MapType, Unit } from './sim/types';
 import { R_NONE } from './sim/types';
+import { deserialize, serialize } from './sim/save';
 import { Hud, nameOf } from './ui/hud';
 import { Minimap } from './ui/minimap';
+import { Tips } from './ui/tips';
 
 /**
  * The game in the browser: a title screen over a live match between two computer players, then a
@@ -24,6 +28,7 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 const world = $('world');
 const view = new View(world);
 const minimap = new Minimap($('minimap') as HTMLCanvasElement);
+const tips = new Tips();
 
 type Mode = 'title' | 'play' | 'over';
 let mode: Mode = 'title';
@@ -34,7 +39,10 @@ let selection = new Set<number>();
 let selectedTile: number | null = null;
 let placing: BuildingType | null = null;
 let placeAt: { tx: number; ty: number; ok: boolean } | null = null;
-let amoveMode = false;
+/** A wall being dragged out, from tile to tile. */
+let wallDrag: { x0: number; y0: number; x1: number; y1: number } | null = null;
+/** The next left click picks a target: where to attack-move, or a building to shelter in. */
+let targetMode: 'amove' | 'garrison' | null = null;
 let paused = false;
 const SPEEDS = [1, 1.5, 2, 3];
 let speedIdx = 0;
@@ -47,17 +55,22 @@ let lastFrame = performance.now();
 let hudTimer = 0;
 let mapTimer = 0;
 let attractT = 0;
-let lastSetup: { diff: Difficulty; size: MapSize; seed: number; color: number } | null = null;
+let lastSetup: GameSetup | null = null;
 
 const hud = new Hud({
   issue: (c) => issue(c),
   place: (type) => {
     placing = type;
-    amoveMode = false;
+    wallDrag = null;
+    targetMode = null;
     sound.play('click');
   },
   attackMove: () => {
-    amoveMode = true;
+    targetMode = 'amove';
+    placing = null;
+  },
+  garrisonMode: () => {
+    targetMode = 'garrison';
     placing = null;
   },
   select: (ids) => setSelection(ids),
@@ -85,7 +98,8 @@ function newSeed(): number {
 function startAttract(): void {
   mode = 'title';
   const seed = newSeed();
-  game = createGame({ seed, size: 'small', players: [{ name: 'Azure', ai: 'normal' }, { name: 'Crimson', ai: 'hard' }] });
+  const maps = Object.keys(MAP_TYPES) as MapType[];
+  game = createGame({ seed, size: 'small', mapType: maps[seed % maps.length], players: [{ name: 'Azure', ai: 'normal' }, { name: 'Crimson', ai: 'hard' }] });
   viewer = 0;
   view.setGame(game, 0);
   view.revealAll();
@@ -96,25 +110,48 @@ function startAttract(): void {
   attractT = 0;
 }
 
-function startMatch(diff: Difficulty, size: MapSize, seed: number, color: number): void {
-  lastSetup = { diff, size, seed, color };
-  const colors = [...PLAYER_COLORS];
-  const rival = color === 1 ? 0 : 1;
-  game = createGame({
+/** Leaders for the computer's peoples. */
+const LEADERS: Record<CivId, string> = { egyptians: 'Hatshepsut', greeks: 'Pericles', romans: 'Augustus', mongols: 'Genghis', chinese: 'Wu Zetian', britons: 'Boudica' };
+
+/** A match from the title screen's choices. */
+function setupFromTitle(seed: number): GameSetup {
+  const val = (id: string) => $<HTMLSelectElement>(id).value;
+  const diff = val('opt-diff') as Difficulty;
+  const foes = Number(val('opt-foes'));
+  const ally = val('opt-teams') === 'ally' && foes >= 2;
+  const color = Number(val('opt-color'));
+  const civChoice = val('opt-civ');
+  const civ: CivId = civChoice === 'random' ? CIV_IDS[Math.floor(Math.random() * CIV_IDS.length)] : (civChoice as CivId);
+  const colors = [PLAYER_COLORS[color], ...PLAYER_COLORS.filter((_, i) => i !== color)];
+  // Rivals each get a different people where possible.
+  const others = CIV_IDS.filter((c) => c !== civ).sort(() => Math.random() - 0.5);
+  const players: PlayerSetup[] = [{ name: 'You', ai: null, color: colors[0], team: 0, civ }];
+  for (let i = 0; i < foes; i++) {
+    const c = others[i % others.length];
+    const friend = ally && i === 0;
+    players.push({ name: `${LEADERS[c]}${friend ? ' (ally)' : ''}`, ai: diff, color: colors[i + 1], team: friend ? 0 : ally ? 1 : i + 1, civ: c });
+  }
+  return {
     seed,
-    size,
-    players: [
-      { name: 'You', ai: null, color: colors[color] },
-      { name: 'Rival', ai: diff, color: colors[rival] },
-    ],
-  });
+    size: val('opt-size') as MapSize,
+    mapType: val('opt-map') as MapType,
+    players,
+    startEpoch: Number(val('opt-epoch')),
+    peaceMinutes: Number(val('opt-peace')),
+  };
+}
+
+function startMatch(setup: GameSetup, saved?: GameState): void {
+  lastSetup = setup;
+  game = saved ?? createGame(setup);
   viewer = 0;
   mode = 'play';
   pending = [];
   selection = new Set();
   selectedTile = null;
   placing = null;
-  amoveMode = false;
+  wallDrag = null;
+  targetMode = null;
   paused = false;
   speedIdx = 0;
   groups.clear();
@@ -127,26 +164,117 @@ function startMatch(diff: Difficulty, size: MapSize, seed: number, color: number
   $('hud').classList.remove('hidden');
   $('modal').classList.add('hidden');
   $('paused').classList.add('hidden');
-  hud.banner(EPOCHS[0].name, 'Gather food and wood, build houses, grow your town.', 4200);
+  const me = game.players[viewer];
+  const rivals = game.players.filter((p) => p.team !== me.team).map((p) => `${p.name} of the ${CIVS[p.civ].name}`);
+  if (!saved) hud.banner(EPOCHS[me.epoch].name, `You lead the ${CIVS[me.civ].name}. Facing ${rivals.join(', ')}.`, 5200);
+  else hud.banner('Welcome back', `${EPOCHS[me.epoch].name}, ${fmtClock(game.tick)} into the match.`, 3200);
   sound.startAmbience();
   // Start with the Town Center in view and selected.
-  const tc = game.ents.find((e) => e.kind === 'building' && e.owner === viewer);
-  if (tc) setSelection([tc.id]);
+  const tc = game.ents.find((e) => e.kind === 'building' && e.owner === viewer && e.type === 'towncenter');
+  if (tc) {
+    setSelection([tc.id]);
+    view.rig.focus(tc.x, tc.y + 3, true);
+  }
+  tips.start(saved ? 9999 : 0);
 }
 
+const fmtClock = (ticks: number) => {
+  const sec = Math.floor(ticks / TICK_HZ);
+  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+};
+
 function toTitle(): void {
+  autosave(true);
+  tips.hide();
   $('hud').classList.add('hidden');
   $('modal').classList.add('hidden');
   $('title').classList.remove('hidden');
   startAttract();
 }
 
+// ---- Saving ----------------------------------------------------------------------------------------
+
+const SAVE_KEY = 'ages-save';
+
+function saveGame(s: GameState, setup: GameSetup): boolean {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, setup, at: Date.now(), state: serialize(s) }));
+    showContinue();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function loadGame(): { setup: GameSetup; state: GameState } | null {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const saved = JSON.parse(raw);
+    if (saved.v !== 1) return null;
+    return { setup: saved.setup, state: deserialize(saved.state) };
+  } catch {
+    return null;
+  }
+}
+
+function clearSave(): void {
+  try {
+    localStorage.removeItem(SAVE_KEY);
+  } catch {
+    /* Nothing to clear. */
+  }
+  showContinue();
+}
+
+function showContinue(): void {
+  let info = '';
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (raw) {
+      const at = Number(JSON.parse(raw.slice(0, 2000).replace(/,"state".*$/, '}')).at);
+      info = at ? new Date(at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'saved game';
+    }
+  } catch {
+    info = '';
+  }
+  const btn = $('continue-btn');
+  btn.classList.toggle('hidden', !info);
+  btn.textContent = `Continue (${info})`;
+}
+
+/** Keep a save as the match goes, and when the page is hidden or closed. */
+let autosaveAt = 0;
+function autosave(force = false): void {
+  if (!game || mode !== 'play' || !lastSetup || game.over) return;
+  if (!force && game.tick < autosaveAt) return;
+  autosaveAt = game.tick + TICK_HZ * 60;
+  saveGame(game, lastSetup);
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) autosave(true);
+});
+window.addEventListener('pagehide', () => autosave(true));
+
 // ---- Title screen ----------------------------------------------------------------------------------
 
 const seedInput = $<HTMLInputElement>('opt-seed');
 seedInput.value = String(newSeed());
 const colorSel = $<HTMLSelectElement>('opt-color');
-colorSel.innerHTML = ['Blue', 'Red', 'Gold', 'Green'].map((n, i) => `<option value="${i}">${n}</option>`).join('');
+colorSel.innerHTML = ['Blue', 'Red', 'Gold', 'Green', 'Purple', 'Orange'].map((n, i) => `<option value="${i}">${n}</option>`).join('');
+const civSel = $<HTMLSelectElement>('opt-civ');
+civSel.innerHTML = `<option value="random">Random</option>` + CIV_IDS.map((c) => `<option value="${c}">${CIVS[c].name}</option>`).join('');
+const mapSel = $<HTMLSelectElement>('opt-map');
+mapSel.innerHTML = (Object.keys(MAP_TYPES) as MapType[]).map((m) => `<option value="${m}">${MAP_TYPES[m].label}</option>`).join('');
+const civBlurb = () => {
+  const c = civSel.value;
+  const m = MAP_TYPES[mapSel.value as MapType];
+  $('civ-blurb').innerHTML = `${c === 'random' ? 'A people chosen at random.' : `<b>${CIVS[c as CivId].name}:</b> ${CIVS[c as CivId].blurb.split(': ').slice(1).join(': ') || CIVS[c as CivId].blurb}`}<br><b>${m.label}:</b> ${m.blurb}`;
+};
+civSel.addEventListener('change', civBlurb);
+showContinue();
+mapSel.addEventListener('change', civBlurb);
+civBlurb();
 const qualitySel = $<HTMLSelectElement>('opt-quality');
 qualitySel.value = view.qualityName;
 qualitySel.addEventListener('change', () => view.setQuality(qualitySel.value as QualityName));
@@ -159,7 +287,21 @@ document.addEventListener('click', (e) => {
   switch (act) {
     case 'start':
       sound.play('click');
-      startMatch($<HTMLSelectElement>('opt-diff').value as Difficulty, $<HTMLSelectElement>('opt-size').value as MapSize, Number(seedInput.value) || newSeed(), Number(colorSel.value));
+      startMatch(setupFromTitle(Number(seedInput.value) || newSeed()));
+      break;
+    case 'continue': {
+      const saved = loadGame();
+      if (saved) {
+        sound.play('click');
+        startMatch(saved.setup, saved.state);
+      } else hud.toast('The saved game could not be read', 'bad');
+      break;
+    }
+    case 'save':
+      if (game && mode === 'play' && lastSetup) {
+        hud.toast(saveGame(game, lastSetup) ? 'Game saved' : 'Could not save (browser storage is full or off)', 'info');
+        closeModal();
+      }
       break;
     case 'reroll':
       seedInput.value = String(newSeed());
@@ -183,10 +325,10 @@ document.addEventListener('click', (e) => {
       closeModal();
       break;
     case 'restart':
-      if (lastSetup) startMatch(lastSetup.diff, lastSetup.size, lastSetup.seed, lastSetup.color);
+      if (lastSetup) startMatch(lastSetup);
       break;
     case 'new-map':
-      if (lastSetup) startMatch(lastSetup.diff, lastSetup.size, newSeed(), lastSetup.color);
+      if (lastSetup) startMatch({ ...lastSetup, seed: newSeed() });
       break;
     case 'quit':
       toTitle();
@@ -210,7 +352,7 @@ function setSelection(ids: number[], add = false): void {
   for (const id of ids) next.add(id);
   selection = next;
   selectedTile = null;
-  hud.buildMenu = false;
+  hud.buildMenu = null;
   refreshHud();
 }
 
@@ -258,20 +400,33 @@ function selectHome(): void {
   play('selectBuilding');
 }
 
+/** Every soldier, wherever they are (not citizens, priests or those sheltering). */
+function selectArmy(): void {
+  if (!game) return;
+  const army = game.ents.filter((e): e is Unit => e.kind === 'unit' && e.owner === viewer && e.hp > 0 && !e.inside && MILITARY.includes(e.type));
+  if (!army.length) {
+    hud.toast('You have no army yet', 'info');
+    return;
+  }
+  setSelection(army.map((u) => u.id));
+  play('select');
+}
+
 // ---- Orders ----------------------------------------------------------------------------------------
 
-function order(clientX: number, clientY: number, forceAttack = false): void {
+function order(clientX: number, clientY: number, forceAttack = false, queue = false): void {
   const s = game;
   if (!s || mode !== 'play') return;
-  const units = selectedUnits(s);
+  const units = selectedUnits(s).filter((u) => !u.inside);
   const pk = view.pick(clientX, clientY);
   if (!pk) return;
   const ids = units.map((u) => u.id);
+  const q = queue || undefined;
   if (!units.length) {
     // A building of yours: set where its trainees gather.
     const b = [...selection].map((id) => s.byId.get(id)).find((e) => e && e.kind === 'building' && e.owner === viewer);
     if (b) {
-      const at = pk.kind === 'ground' ? pk : pk.kind === 'resource' ? { x: (pk.tile % s.w) + 0.5, y: Math.floor(pk.tile / s.w) + 0.5 } : (() => {
+      const at = pk.kind === 'ground' ? pk : pk.kind === 'resource' ? { x: (pk.tile % s.w) + 0.5, y: Math.floor(pk.tile / s.w) + 0.5 } : pk.kind === 'animal' ? null : (() => {
         const t = s.byId.get(pk.id);
         return t ? { x: t.x, y: t.y } : null;
       })();
@@ -283,35 +438,72 @@ function order(clientX: number, clientY: number, forceAttack = false): void {
     }
     return;
   }
+  if (pk.kind === 'animal') {
+    const a = s.animals.find((x) => x.id === pk.id);
+    if (!a) return;
+    issue({ t: 'hunt', p: viewer, ids, target: a.id, queue: q });
+    view.marker(s, a.x, a.y, true);
+    play('move');
+    return;
+  }
   if (pk.kind === 'unit' || pk.kind === 'building') {
     const t = s.byId.get(pk.id);
     if (!t) return;
-    if (t.owner !== viewer) {
-      issue({ t: 'attack', p: viewer, ids, target: t.id });
+    if (t.owner !== viewer && s.players[t.owner].team !== s.players[viewer].team) {
+      issue({ t: 'attack', p: viewer, ids, target: t.id, queue: q });
       view.marker(s, t.x, t.y, true);
-      play('attack');
+      play(units.every((u) => u.type === 'priest') ? 'chant' : 'attack');
       return;
     }
-    if (t.kind === 'building') {
-      issue({ t: 'work', p: viewer, ids, target: t.id });
+    if (t.kind === 'building' && t.owner === viewer) {
+      issue({ t: 'work', p: viewer, ids, target: t.id, queue: q });
       view.marker(s, t.x, t.y, false);
       play(t.built ? 'move' : 'hammer');
       return;
     }
-    issue({ t: 'move', p: viewer, ids, x: t.x, y: t.y, amove: forceAttack });
+    issue({ t: 'move', p: viewer, ids, x: t.x, y: t.y, amove: forceAttack, queue: q });
     view.marker(s, t.x, t.y, false);
     play('move');
     return;
   }
   if (pk.kind === 'resource') {
-    issue({ t: 'gather', p: viewer, ids, tile: pk.tile });
+    issue({ t: 'gather', p: viewer, ids, tile: pk.tile, queue: q });
     view.marker(s, (pk.tile % s.w) + 0.5, Math.floor(pk.tile / s.w) + 0.5, false);
     play('move');
     return;
   }
-  issue({ t: 'move', p: viewer, ids, x: pk.x, y: pk.y, amove: forceAttack });
+  issue({ t: 'move', p: viewer, ids, x: pk.x, y: pk.y, amove: forceAttack, queue: q });
   view.marker(s, pk.x, pk.y, forceAttack);
   play(forceAttack ? 'attack' : 'move');
+}
+
+/** Shelter the selection in the building under the pointer. */
+function garrisonAt(clientX: number, clientY: number, queue: boolean): void {
+  const s = game;
+  if (!s) return;
+  const pk = view.pick(clientX, clientY);
+  const b = pk && pk.kind === 'building' ? s.byId.get(pk.id) : undefined;
+  if (!b || b.kind !== 'building' || b.owner !== viewer || !BUILDINGS[b.type].garrison || !b.built) {
+    hud.toast('Pick your Town Center or a tower to shelter in', 'bad');
+    play('error');
+    return;
+  }
+  issue({ t: 'garrison', p: viewer, ids: selectedUnits(s).map((u) => u.id), target: b.id, queue: queue || undefined });
+  view.marker(s, b.x, b.y, false);
+  play('move');
+}
+
+/** The tiles of a planned wall, and whether each can be built. */
+function wallPlan(s: GameState): { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean } | null {
+  if (placing !== 'wall') return null;
+  const d = wallDrag ?? (placeAt ? { x0: placeAt.tx, y0: placeAt.ty, x1: placeAt.tx, y1: placeAt.ty } : null);
+  if (!d) return null;
+  const seen = s.players[viewer].seen;
+  const tiles = wallLine(d.x0, d.y0, d.x1, d.y1).map((t) => ({
+    ...t,
+    ok: t.x >= 0 && t.y >= 0 && t.x < s.w && t.y < s.h && !!seen[t.y * s.w + t.x] && !placeProblem(s, 'wall', t.x, t.y),
+  }));
+  return { tiles, alongY: Math.abs(d.y1 - d.y0) > Math.abs(d.x1 - d.x0) };
 }
 
 /** Where the building being placed would go under the pointer. */
@@ -344,11 +536,11 @@ function placeHere(shift: boolean): void {
     return;
   }
   const ids = selectedUnits(s).filter((u) => u.type === 'citizen').map((u) => u.id);
-  issue({ t: 'build', p: viewer, ids, type: placing, tx: placeAt.tx, ty: placeAt.ty });
+  issue({ t: 'build', p: viewer, ids, type: placing, tx: placeAt.tx, ty: placeAt.ty, queue: shift || undefined });
   if (!shift) {
     placing = null;
     placeAt = null;
-    hud.buildMenu = false;
+    hud.buildMenu = null;
   }
 }
 
@@ -379,23 +571,34 @@ canvas.addEventListener('pointerdown', (e) => {
     if (placing) {
       placing = null;
       placeAt = null;
+      wallDrag = null;
       return;
     }
-    if (amoveMode) {
-      amoveMode = false;
+    if (targetMode) {
+      targetMode = null;
       return;
     }
-    order(e.clientX, e.clientY);
+    order(e.clientX, e.clientY, false, e.shiftKey);
     return;
   }
   if (e.button !== 0) return;
+  if (placing === 'wall') {
+    updatePlacement(e.clientX, e.clientY);
+    if (placeAt) wallDrag = { x0: placeAt.tx, y0: placeAt.ty, x1: placeAt.tx, y1: placeAt.ty };
+    return;
+  }
   if (placing) {
     placeHere(e.shiftKey);
     return;
   }
-  if (amoveMode) {
-    order(e.clientX, e.clientY, true);
-    if (!e.shiftKey) amoveMode = false;
+  if (targetMode === 'amove') {
+    order(e.clientX, e.clientY, true, e.shiftKey);
+    if (!e.shiftKey) targetMode = null;
+    return;
+  }
+  if (targetMode === 'garrison') {
+    garrisonAt(e.clientX, e.clientY, e.shiftKey);
+    targetMode = null;
     return;
   }
   boxStart = { x: e.clientX, y: e.clientY };
@@ -423,6 +626,10 @@ canvas.addEventListener('pointermove', (e) => {
     }
   }
   if (placing) updatePlacement(e.clientX, e.clientY);
+  if (wallDrag && placeAt) {
+    wallDrag.x1 = placeAt.tx;
+    wallDrag.y1 = placeAt.ty;
+  }
 });
 
 canvas.addEventListener('pointerleave', () => (pointer.inside = false));
@@ -430,6 +637,25 @@ canvas.addEventListener('pointerleave', () => (pointer.inside = false));
 canvas.addEventListener('pointerup', (e) => {
   if (panDrag && (e.button === 1 || e.button === 0)) {
     panDrag = null;
+    return;
+  }
+  if (e.button === 0 && wallDrag && game) {
+    const s = game;
+    const plan = wallPlan(s);
+    const d = wallDrag;
+    wallDrag = null;
+    if (!plan || !plan.tiles.some((t) => t.ok)) {
+      hud.toast("Can't build a wall there", 'bad');
+      play('error');
+      return;
+    }
+    const ids = selectedUnits(s).filter((u) => u.type === 'citizen').map((u) => u.id);
+    issue({ t: 'wall', p: viewer, ids, x0: d.x0, y0: d.y0, x1: d.x1, y1: d.y1, queue: e.shiftKey || undefined });
+    if (!e.shiftKey) {
+      placing = null;
+      placeAt = null;
+      hud.buildMenu = null;
+    }
     return;
   }
   if (e.button !== 0 || !boxStart || !game) return;
@@ -508,8 +734,8 @@ minimap.onCommand = (x, y) => {
   if (!s || mode !== 'play') return;
   const ids = selectedUnits(s).map((u) => u.id);
   if (!ids.length) return;
-  issue({ t: 'move', p: viewer, ids, x, y, amove: amoveMode });
-  amoveMode = false;
+  issue({ t: 'move', p: viewer, ids, x, y, amove: targetMode === 'amove' });
+  targetMode = null;
   play('move');
 };
 
@@ -564,11 +790,12 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   if (k === 'Escape') {
-    if (placing || amoveMode) {
+    if (placing || targetMode) {
       placing = null;
       placeAt = null;
-      amoveMode = false;
-    } else if (hud.buildMenu) hud.buildMenu = false;
+      wallDrag = null;
+      targetMode = null;
+    } else if (hud.buildMenu) hud.buildMenu = null;
     else if (selection.size) setSelection([]);
     else openMenu();
     refreshHud();
@@ -588,6 +815,9 @@ window.addEventListener('keydown', (e) => {
   switch (k.toLowerCase()) {
     case '.':
       nextIdle();
+      break;
+    case ',':
+      selectArmy();
       break;
     case 'h':
       selectHome();
@@ -665,8 +895,10 @@ function openMenu(): void {
       <label>Graphics <select id="menu-quality">${(Object.keys(QUALITY) as QualityName[]).map((q) => `<option value="${q}" ${q === view.qualityName ? 'selected' : ''}>${QUALITY[q].label}</option>`).join('')}</select></label>
       <label>Effects volume <input id="menu-vol" type="range" min="0" max="1" step="0.05" value="${sound.settings.volume}"></label>
       <label>Wind and birds <input id="menu-amb" type="range" min="0" max="1" step="0.05" value="${sound.settings.ambience}"></label>
+      <label>Tips for new players <input id="menu-tips" type="checkbox" ${tips.enabled ? 'checked' : ''}></label>
     </div>
     <div class="row">
+      <button class="btn wide" data-act="save">Save game</button>
       <button class="btn wide" data-act="restart">Restart this map</button>
       <button class="btn wide" data-act="new-map">New map</button>
       <button class="btn wide" data-act="resign">Resign</button>
@@ -680,6 +912,7 @@ function openMenu(): void {
   });
   $<HTMLInputElement>('menu-vol').addEventListener('input', (e) => sound.set({ volume: Number((e.target as HTMLInputElement).value) }));
   $<HTMLInputElement>('menu-amb').addEventListener('input', (e) => sound.set({ ambience: Number((e.target as HTMLInputElement).value) }));
+  $<HTMLInputElement>('menu-tips').addEventListener('change', (e) => (tips.enabled = (e.target as HTMLInputElement).checked));
   play('open');
 }
 
@@ -687,23 +920,63 @@ function closeModal(): void {
   $('modal').classList.add('hidden');
 }
 
-function showEnd(s: GameState, won: boolean): void {
+type Metric = 'score' | 'pop' | 'military' | 'gathered';
+const METRICS: Record<Metric, string> = { score: 'Score', pop: 'Population', military: 'Army', gathered: 'Gathered' };
+
+/** A line per player over the match, with the epochs each reached marked. */
+function timeline(s: GameState, metric: Metric): string {
+  const W = 400;
+  const H = 150;
+  const series = s.players.map((p) => p.history);
+  const last = Math.max(1, s.tick);
+  let top = 1;
+  for (const h of series) for (const pt of h) top = Math.max(top, pt[metric]);
+  const X = (t: number) => (t / last) * (W - 10) + 5;
+  const Y = (v: number) => H - 6 - (v / top) * (H - 16);
+  const lines = s.players
+    .map((p, i) => {
+      const h: HistoryPoint[] = [{ tick: 0, pop: 0, military: 0, gathered: 0, score: 0, epoch: 0 }, ...series[i]];
+      const pts = h.map((pt) => `${X(pt.tick).toFixed(1)},${Y(pt[metric]).toFixed(1)}`).join(' ');
+      const ups = h
+        .filter((pt, j) => j > 0 && pt.epoch > h[j - 1].epoch)
+        .map((pt) => `<circle cx="${X(pt.tick).toFixed(1)}" cy="${Y(pt[metric]).toFixed(1)}" r="4" fill="${p.color}" stroke="#fff" stroke-width="1.5"><title>${p.name}: ${EPOCHS[pt.epoch].name}</title></circle>`)
+        .join('');
+      return `<polyline points="${pts}" fill="none" stroke="${p.color}" stroke-width="2.5" stroke-linejoin="round"/>${ups}`;
+    })
+    .join('');
+  const mins = Math.floor(last / TICK_HZ / 60);
+  const grid = Array.from({ length: Math.min(mins, 12) }, (_, i) => Math.round(((i + 1) * mins) / Math.min(mins, 12)))
+    .map((m) => `<line x1="${X(m * 60 * TICK_HZ)}" y1="4" x2="${X(m * 60 * TICK_HZ)}" y2="${H - 4}" stroke="rgba(255,255,255,0.07)"/>`)
+    .join('');
+  return `<svg class="timeline" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${grid}${lines}</svg>`;
+}
+
+function showEnd(s: GameState, won: boolean, how: 'conquest' | 'wonder' | 'resign' = 'conquest'): void {
   mode = 'over';
   const m = $('modal');
   const mins = Math.floor(s.tick / TICK_HZ / 60);
   const rows = s.players
     .map(
-      (p) => `<tr><td><span class="swatch" style="background:${p.color}"></span>${p.name}</td><td>${EPOCHS[p.epoch].short}</td><td>${p.stats.gathered}</td><td>${p.stats.trained}</td><td>${p.stats.built}</td><td>${p.stats.kills}</td><td>${p.stats.losses}</td></tr>`,
+      (p) => `<tr><td><span class="swatch" style="background:${p.color}"></span>${p.name}<div class="civ-tag">${CIVS[p.civ].name}</div></td><td>${scoreOf(s, p)}</td><td>${EPOCHS[p.epoch].short}</td><td>${p.stats.gathered}</td><td>${p.stats.trained}</td><td>${p.stats.built}</td><td>${p.stats.techs}</td><td>${p.stats.kills}</td><td>${p.stats.losses}</td></tr>`,
     )
     .join('');
-  m.innerHTML = `<div class="card"><h2>${won ? 'Victory!' : 'Defeat'}</h2>
-    <div class="sel-sub">${won ? 'Your rival has fallen.' : 'Your people are no more.'} The match lasted ${mins < 1 ? 'less than a minute' : `${mins} minute${mins === 1 ? '' : 's'}`}.</div>
-    <table class="end-stats"><tr><th></th><th>Epoch</th><th>Gathered</th><th>Trained</th><th>Built</th><th>Kills</th><th>Lost</th></tr>${rows}</table>
+  const why = how === 'wonder' ? (won ? 'Your Wonder stood the test of time.' : 'A rival Wonder stood the test of time.') : won ? 'Your rivals have fallen.' : 'Your people are no more.';
+  m.innerHTML = `<div class="card wide"><h2>${won ? 'Victory!' : 'Defeat'}</h2>
+    <div class="sel-sub">${why} The match lasted ${mins < 1 ? 'less than a minute' : `${mins} minute${mins === 1 ? '' : 's'}`}.</div>
+    <div class="chart-tabs">${(Object.keys(METRICS) as Metric[]).map((k) => `<button class="tab ${k === 'score' ? 'on' : ''}" data-metric="${k}">${METRICS[k]}</button>`).join('')}</div>
+    <div id="chart">${timeline(s, 'score')}</div>
+    <table class="end-stats"><tr><th></th><th>Score</th><th>Epoch</th><th>Gathered</th><th>Trained</th><th>Built</th><th>Techs</th><th>Kills</th><th>Lost</th></tr>${rows}</table>
     <div class="row">
       <button class="btn wide" data-act="watch">Look around</button>
       <button class="btn wide primary" data-act="new-map">Play again</button>
       <button class="btn wide" data-act="quit">Quit to title</button>
     </div></div>`;
+  m.querySelector('.chart-tabs')!.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>('[data-metric]');
+    if (!b) return;
+    m.querySelectorAll('.chart-tabs .tab').forEach((t) => t.classList.toggle('on', t === b));
+    $('chart').innerHTML = timeline(s, b.dataset.metric as Metric);
+  });
   m.classList.remove('hidden');
   play(won ? 'victory' : 'defeat');
   hud.banner(won ? 'Victory' : 'Defeat', '', 5000);
@@ -739,10 +1012,42 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         if (ev.owner === viewer && ev.type !== 'farm' && ev.type !== 'house') hud.toast(`${BUILDINGS[ev.type].name} built`, 'good');
         break;
       case 'defeated':
-        if (ev.owner !== viewer) hud.toast(`${s.players[ev.owner].name} has been defeated`, 'good');
+        if (ev.owner === viewer) {
+          // Out of the match (allies may fight on): the end screen, with the rest left to watch.
+          if (!s.over) {
+            clearSave();
+            showEnd(s, false, list.some((e) => e.k === 'over' && e.how === 'resign') ? 'resign' : 'conquest');
+            return;
+          }
+        } else hud.toast(`${s.players[ev.owner].name} has been defeated`, s.players[ev.owner].team === s.players[viewer].team ? 'bad' : 'good');
         break;
+      case 'researched':
+        if (ev.owner === viewer) hud.toast(`${TECHS[ev.tech].name} researched`, 'good');
+        break;
+      case 'converted':
+        if (ev.to === viewer) hud.toast('A priest has won an enemy over to your side', 'good');
+        else if (ev.from === viewer) {
+          hud.toast('One of yours has been converted by an enemy priest!', 'alert');
+          lastAlert = { x: ev.x, y: ev.y };
+        }
+        break;
+      case 'bell':
+        if (ev.owner === viewer) hud.toast(ev.ring ? 'The town bell rings: citizens run for shelter' : 'All clear: back to work', 'info');
+        break;
+      case 'wonder': {
+        const p = s.players[ev.owner];
+        const mins = Math.round(ev.ticks / TICK_HZ / 60);
+        if (ev.owner === viewer) hud.banner('Your Wonder stands', `Keep it standing ${mins} minutes and you win.`, 5000);
+        else {
+          const ally = p.team === s.players[viewer].team;
+          hud.banner(`${p.name} has built a Wonder`, ally ? `Defend it for ${mins} minutes and your side wins.` : `Destroy it within ${mins} minutes or lose.`, 5000);
+          lastAlert = { x: ev.x, y: ev.y };
+        }
+        break;
+      }
       case 'over':
-        showEnd(s, ev.winner === s.players[viewer].team);
+        clearSave();
+        showEnd(s, ev.winner === s.players[viewer].team, ev.how);
         break;
     }
   }
@@ -758,16 +1063,20 @@ function refreshHud(): void {
 
 function cursorFor(s: GameState): string {
   if (placing) return 'cur-place';
-  if (amoveMode) return 'cur-amove';
+  if (targetMode === 'amove') return 'cur-amove';
+  if (targetMode === 'garrison') return 'cur-garrison';
   if (!pointer.inside || boxing) return '';
   const units = selectedUnits(s);
   const pk: Pick | null = view.pick(pointer.x, pointer.y);
   if (!pk) return '';
+  if (pk.kind === 'animal') return units.length ? 'cur-attack' : 'cur-select';
   if (pk.kind === 'unit' || pk.kind === 'building') {
     const t = s.byId.get(pk.id) as Ent | undefined;
     if (!t) return '';
-    if (units.length && t.owner !== viewer) return 'cur-attack';
+    const foe = s.players[t.owner].team !== s.players[viewer].team;
+    if (units.length && foe) return units.every((u) => u.type === 'priest') && t.kind === 'unit' ? 'cur-convert' : 'cur-attack';
     if (units.some((u) => u.type === 'citizen') && t.kind === 'building' && t.owner === viewer && (!t.built || t.type === 'farm')) return 'cur-build';
+    if (units.length && t.kind === 'building' && t.owner === viewer && t.built && BUILDINGS[t.type].garrison) return 'cur-garrison';
     return 'cur-select';
   }
   if (pk.kind === 'resource' && units.some((u) => u.type === 'citizen')) return 'cur-gather';
@@ -866,8 +1175,9 @@ function frame(now: number): void {
     view.frame(s, alpha, dt, {
       ids: selection,
       allBars: altHeld,
-      ghost: placing && placeAt ? { type: placing, ...placeAt } : null,
+      ghost: placing && placing !== 'wall' && placeAt ? { type: placing, ...placeAt } : null,
       rallyOf: selection.size === 1 ? [...selection][0] : null,
+      wall: wallPlan(s),
     });
     if (mode === 'play') watchFrameRate(dt);
     if (mode !== 'title') {
@@ -875,6 +1185,10 @@ function frame(now: number): void {
       if (hudTimer <= 0) {
         hudTimer = 0.12;
         refreshHud();
+      }
+      if (mode === 'play' && !paused) {
+        tips.update(s, viewer, dt);
+        autosave();
       }
       mapTimer -= dt;
       if (mapTimer <= 0) {
@@ -899,6 +1213,10 @@ function frame(now: number): void {
   },
   view,
   sound,
+  /** What the interface is doing (testing). */
+  get ui() {
+    return { placing, targetMode, wallDrag, placeAt, selection: [...selection], buildMenu: hud.buildMenu, pending: pending.length };
+  },
   /** Run the rules ahead by some seconds (testing); effects are skipped. */
   fast(seconds: number) {
     if (!game) return;
@@ -915,6 +1233,24 @@ function frame(now: number): void {
   /** Jump a player to an epoch (testing). */
   setEpoch(owner: number, epoch: number) {
     if (game) game.players[owner].epoch = epoch;
+  },
+  /** Put up a finished building near a point, or near the player's start (testing). */
+  build(owner: number, type: BuildingType, x?: number, y?: number, minR = 4) {
+    if (!game) return null;
+    const p = game.players[owner];
+    const spot = findSpot(game, type, x ?? p.startX, y ?? p.startY, minR, 24);
+    return spot ? placeBuilding(game, owner, type, spot.tx, spot.ty, true).id : null;
+  },
+  /** A finished line of wall (testing). */
+  wall(owner: number, x0: number, y0: number, x1: number, y1: number) {
+    if (!game) return 0;
+    let n = 0;
+    for (const t of wallLine(x0, y0, x1, y1)) {
+      if (placeProblem(game, 'wall', t.x, t.y)) continue;
+      placeBuilding(game, owner, 'wall', t.x, t.y, true);
+      n++;
+    }
+    return n;
   },
   issue,
   select: (ids: number[]) => setSelection(ids),

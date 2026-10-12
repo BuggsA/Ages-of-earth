@@ -11,7 +11,8 @@
 export type SoundName =
   | 'click' | 'open' | 'select' | 'selectBuilding' | 'move' | 'attack' | 'strike' | 'thud' | 'hit' | 'hitBuilding' | 'bow' | 'sling' | 'musket'
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
-  | 'victory' | 'defeat' | 'error' | 'coin' | 'queue';
+  | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
+  | 'townBell' | 'allClear' | 'research' | 'wonder' | 'shelter';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -108,6 +109,7 @@ export class Sound {
   static readonly names: SoundName[] = [
     'click', 'open', 'select', 'selectBuilding', 'move', 'attack', 'strike', 'thud', 'hit', 'hitBuilding', 'bow', 'sling', 'musket', 'fall',
     'collapse', 'built', 'place', 'ready', 'readyCitizen', 'chop', 'mine', 'hammer', 'rustle', 'epoch', 'alert', 'victory', 'defeat', 'error', 'coin', 'queue',
+    'catapult', 'cannon', 'impact', 'spear', 'chant', 'convert', 'heal', 'townBell', 'allClear', 'research', 'wonder', 'shelter',
   ];
 
   /**
@@ -459,6 +461,66 @@ export class Sound {
       case 'defeat':
         [N.A4, N.F4, N.D4].forEach((f, i) => this.brass(out, t + i * 0.45, f, 0.9, 0.07));
         this.drum(out, t + 1.35, 0.2);
+        break;
+      case 'catapult':
+        // A creak of rope and timber, the thump of the arm, the whoosh of the stone.
+        this.tone(out, t, { f: 180, to: 120, type: 'sawtooth', dur: 0.18, peak: 0.05, lp: 700 });
+        this.tone(out, t + 0.15, { f: 110, to: 50, dur: 0.18, peak: 0.25 });
+        this.noise(out, t + 0.16, { dur: 0.5, filter: 'bandpass', f: 500, to: 1600, q: 1.2, peak: 0.12 });
+        break;
+      case 'cannon':
+        this.noise(out, t, { dur: 0.08, filter: 'highpass', f: 1200, peak: 0.55 });
+        this.noise(out, t, { dur: 1.3, f: 600, to: 60, peak: 0.5, attack: 0.003 });
+        this.tone(out, t, { f: 60, to: 28, dur: 0.9, peak: 0.4 });
+        break;
+      case 'impact':
+        this.noise(out, t, { dur: 0.5, f: 800, to: 120, peak: 0.35, attack: 0.004 });
+        this.tone(out, t, { f: 80, to: 36, dur: 0.4, peak: 0.3 });
+        break;
+      case 'spear':
+        this.noise(out, t, { dur: 0.2, filter: 'bandpass', f: 1300, to: 500, q: 2, peak: 0.12 });
+        break;
+      case 'chant':
+        // A low hum of voices on a fifth, swelling.
+        for (const f of [N.C3, N.G3]) this.tone(out, t, { f, type: 'sawtooth', dur: 1.1, peak: 0.035, attack: 0.3, lp: 700 });
+        this.tone(out, t, { f: N.C4, type: 'triangle', dur: 1.1, peak: 0.03, attack: 0.35 });
+        break;
+      case 'convert':
+        // A bright choir chord and chimes.
+        for (const f of [N.C4, N.E4, N.G4, N.C5]) this.tone(out, t, { f, type: 'sawtooth', dur: 1.3, peak: 0.03, attack: 0.08, lp: 1800 });
+        [N.G5, N.C6, N.E6].forEach((f, i) => this.bell(out, t + 0.1 + i * 0.09, f, 0.9, 0.05));
+        break;
+      case 'heal':
+        this.bell(out, t, N.E6, 0.5, 0.035);
+        this.bell(out, t + 0.07, N.G6, 0.5, 0.03);
+        break;
+      case 'townBell':
+        // A big bronze bell, struck three times.
+        for (let i = 0; i < 3; i++) {
+          this.bell(out, t + i * 0.55, N.C4, 1.8, 0.14);
+          this.bell(out, t + i * 0.55, N.C4 * 2.4, 1.2, 0.05);
+        }
+        break;
+      case 'allClear':
+        this.bell(out, t, N.G4, 1.2, 0.1);
+        this.bell(out, t + 0.35, N.C5, 1.6, 0.1);
+        break;
+      case 'research':
+        [N.E5, N.G5, N.B5].forEach((f, i) => this.bell(out, t + i * 0.07, f, 0.8, 0.06));
+        this.tone(out, t + 0.2, { f: N.E6, type: 'triangle', dur: 0.4, peak: 0.04 });
+        break;
+      case 'wonder':
+        for (const f of [N.C4, N.G4]) this.brass(out, t, f, 1.6, 0.07);
+        for (const f of [N.E4, N.C5]) this.brass(out, t + 0.5, f, 1.6, 0.07);
+        for (const f of [N.G4, N.D5, N.G5]) this.brass(out, t + 1.0, f, 2.2, 0.07);
+        [N.C6, N.E6, N.G6, N.C7].forEach((f, i) => this.bell(out, t + 1.1 + i * 0.12, f, 1.5, 0.05));
+        this.drum(out, t, 0.2);
+        this.drum(out, t + 0.5, 0.2);
+        this.drum(out, t + 1.0, 0.25);
+        break;
+      case 'shelter':
+        this.noise(out, t, { dur: 0.12, filter: 'bandpass', f: 500, q: 1.5, peak: 0.15 });
+        this.tone(out, t + 0.05, { f: 140, to: 90, dur: 0.18, peak: 0.12 });
         break;
     }
   }

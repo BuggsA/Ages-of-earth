@@ -25,6 +25,8 @@ export interface Known {
   epoch: number;
   built: boolean;
   progress: number;
+  /** Walls: which neighbors a piece joins (1 east, 2 south, 4 west, 8 north). Gates: 1 if the wall runs along y. */
+  variant: number;
 }
 
 interface View {
@@ -108,7 +110,7 @@ export class BuildingsView {
     }
 
     for (const [id, k] of this.known) {
-      const key = `${k.type}:${k.epoch}:${k.built ? 1 : 0}`;
+      const key = `${k.type}:${k.epoch}:${k.built ? 1 : 0}:${k.variant}`;
       let v = this.views.get(id);
       if (v && v.key !== key) {
         this.group.remove(v.group);
@@ -148,7 +150,9 @@ export class BuildingsView {
     group.userData.building = k.id;
     const base = this.baseHeight(s, k);
     group.position.set(k.x, base, k.y);
-    const body = new THREE.Mesh(buildingGeometry(k.type, k.epoch, this.colors[k.owner] ?? '#ffffff'), bakedMaterial);
+    const wall = k.type === 'wall';
+    const body = new THREE.Mesh(buildingGeometry(k.type, k.epoch, this.colors[k.owner] ?? '#ffffff', wall ? k.variant : 0), bakedMaterial);
+    if (k.type === 'gate' && k.variant) body.rotation.y = Math.PI / 2;
     body.castShadow = k.type !== 'farm';
     body.receiveShadow = true;
     group.add(body);
@@ -158,7 +162,7 @@ export class BuildingsView {
       site = new THREE.Mesh(foundationGeometry(k.size), bakedMaterial);
       site.receiveShadow = true;
       group.add(site);
-      if (k.type !== 'farm') {
+      if (k.type !== 'farm' && !wall) {
         scaffold = new THREE.Mesh(scaffoldGeometry(k.size), bakedMaterial);
         scaffold.castShadow = true;
         group.add(scaffold);
@@ -196,7 +200,25 @@ export class BuildingsView {
 
 const plinthMaterial = inject(new THREE.MeshStandardMaterial({ color: '#8d7a62', flatShading: true, roughness: 1 }), {});
 
-const HEIGHT: Record<BuildingType, number> = { towncenter: 2.9, house: 1.5, storehouse: 1.3, farm: 0.4, barracks: 2.0, range: 1.4, stable: 1.4, tower: 3.4 };
+const HEIGHT: Record<BuildingType, number> = {
+  towncenter: 2.9, house: 1.5, storehouse: 1.3, farm: 0.4, barracks: 2.0, range: 1.4, stable: 1.4, tower: 3.4,
+  forge: 2.1, workshop: 1.7, temple: 2.6, market: 1.6, wonder: 4.6, wall: 1.3, gate: 1.8,
+};
+
+/** Which neighboring tiles hold the same owner's wall or gate. */
+function wallMask(s: GameState, b: Building): number {
+  let m = 0;
+  const join = (x: number, y: number, bit: number) => {
+    if (x < 0 || y < 0 || x >= s.w || y >= s.h) return;
+    const o = s.byId.get(s.bldAt[y * s.w + x]);
+    if (o && o.kind === 'building' && o.owner === b.owner && (o.type === 'wall' || o.type === 'gate')) m |= bit;
+  };
+  join(b.tx + 1, b.ty, 1);
+  join(b.tx, b.ty + 1, 2);
+  join(b.tx - 1, b.ty, 4);
+  join(b.tx, b.ty - 1, 8);
+  return m;
+}
 
 function snapshot(s: GameState, b: Building): Known {
   return {
@@ -211,5 +233,6 @@ function snapshot(s: GameState, b: Building): Known {
     epoch: s.players[b.owner].epoch,
     built: b.built,
     progress: b.progress,
+    variant: b.type === 'wall' ? wallMask(s, b) : b.type === 'gate' ? b.dir : 0,
   };
 }

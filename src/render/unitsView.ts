@@ -3,10 +3,12 @@ import { TICK_HZ, unitStats } from '../sim/data';
 import type { GameState, Unit, UnitType } from '../sim/types';
 import { unitMaterial } from './materials';
 import { heightAt } from './terrain';
-import { unitGeometry } from './unitModels';
+import { deerGeometry, unitGeometry } from './unitModels';
 
 /** Units are drawn a little larger than their footprint in the rules, so they read well from above. */
 export const UNIT_SCALE = 1.3;
+
+const WHITE = new THREE.Color('#ffffff');
 
 /**
  * All units drawn with one instanced mesh per model (a line in an epoch). Each frame every visible unit
@@ -25,6 +27,7 @@ interface Anim {
 
 interface Corpse {
   type: UnitType;
+  mounted: boolean;
   epoch: number;
   color: THREE.Color;
   x: number;
@@ -100,6 +103,10 @@ export class UnitsView {
   readonly screen: ScreenUnit[] = [];
   /** World positions of drawn units this frame (for overlays). */
   readonly drawn = new Map<number, THREE.Vector3>();
+  /** Animals on screen this frame, for picking. */
+  readonly animalScreen: ScreenUnit[] = [];
+  private deer: Batch | null = null;
+  private deerAnims = new Map<number, Anim>();
 
   setColors(colors: string[]): void {
     this.colors = colors.map((c) => new THREE.Color(c));
@@ -119,13 +126,67 @@ export class UnitsView {
   fall(type: UnitType, epoch: number, owner: number, x: number, y: number, fx: number, fy: number, id: number): void {
     const a = this.anims.get(id);
     this.anims.delete(id);
-    this.corpses.push({ type, epoch, color: this.colors[owner] ?? new THREE.Color('#ffffff'), x, y, yaw: a ? a.yaw : Math.atan2(fx, fy), age: 0, side: id % 2 ? 1 : -1 });
+    this.corpses.push({ type, epoch, mounted: !!unitStats(type, epoch).mounted, color: this.colors[owner] ?? new THREE.Color('#ffffff'), x, y, yaw: a ? a.yaw : Math.atan2(fx, fy), age: 0, side: id % 2 ? 1 : -1 });
     if (this.corpses.length > 160) this.corpses.shift();
   }
 
   clear(): void {
     this.anims.clear();
+    this.deerAnims.clear();
     this.corpses = [];
+  }
+
+  /** Deer grazing, wandering and bolting. */
+  private animals(s: GameState, alpha: number, dt: number, time: number, visible: (x: number, y: number) => boolean, camera: THREE.Camera, width: number, height: number): void {
+    this.animalScreen.length = 0;
+    this.deer ??= new Batch(deerGeometry(), 32, this.group);
+    const b = this.deer;
+    b.count = 0;
+    b.reserve(s.animals.length);
+    const seen = new Set<number>();
+    for (const an of s.animals) {
+      const x = an.px + (an.x - an.px) * alpha;
+      const y = an.py + (an.y - an.py) * alpha;
+      if (!visible(x, y)) continue;
+      seen.add(an.id);
+      let a = this.deerAnims.get(an.id);
+      if (!a) {
+        a = { yaw: Math.atan2(an.fx, an.fy), phase: an.id, lastX: x, lastY: y, speed: 0 };
+        this.deerAnims.set(an.id, a);
+      }
+      const mdx = x - a.lastX;
+      const mdy = y - a.lastY;
+      a.speed += ((dt > 0 ? Math.sqrt(mdx * mdx + mdy * mdy) / dt : 0) - a.speed) * Math.min(1, dt * 10);
+      a.lastX = x;
+      a.lastY = y;
+      let d = Math.atan2(an.fx, an.fy) - a.yaw;
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      a.yaw += d * Math.min(1, dt * 8);
+      const running = a.speed > 0.1;
+      a.phase += dt * a.speed * 9;
+      const leg = running ? Math.sin(a.phase) * Math.min(0.9, 0.35 + a.speed * 0.2) : 0;
+      // A gentle sway while grazing; the hop of a run.
+      const bob = running ? Math.abs(Math.sin(a.phase)) * 0.04 * Math.min(1, a.speed / 2) : Math.sin(time * 0.9 + an.id) * 0.004;
+      const gy = heightAt(s, x, y);
+      const i = b.count++;
+      this.e.set(0, a.yaw, 0);
+      this.q.setFromEuler(this.e);
+      this.p.set(x, gy, y);
+      this.m.compose(this.p, this.q, this.sc.set(UNIT_SCALE, UNIT_SCALE, UNIT_SCALE));
+      b.mesh.setMatrixAt(i, this.m);
+      b.mesh.setColorAt(i, WHITE);
+      b.anim.setXYZ(i, leg, 0, bob);
+      this.v.set(x, gy + 0.35, y).project(camera);
+      if (this.v.z < 1) {
+        this.animalScreen.push({ id: an.id, sx: ((this.v.x + 1) / 2) * width, sy: ((1 - this.v.y) / 2) * height, r: Math.max(10, 400 / Math.max(1, camera.position.distanceTo(this.p))) });
+      }
+    }
+    for (const id of this.deerAnims.keys()) if (!seen.has(id)) this.deerAnims.delete(id);
+    b.mesh.count = b.count;
+    b.mesh.instanceMatrix.needsUpdate = true;
+    if (b.mesh.instanceColor) b.mesh.instanceColor.needsUpdate = true;
+    b.anim.needsUpdate = true;
   }
 
   update(
@@ -137,7 +198,9 @@ export class UnitsView {
     camera: THREE.Camera,
     width: number,
     height: number,
+    sees: (x: number, y: number) => boolean,
   ): void {
+    this.animals(s, alpha, dt, time, sees, camera, width, height);
     for (const b of this.batches.values()) b.count = 0;
     this.screen.length = 0;
     this.drawn.clear();
@@ -147,7 +210,8 @@ export class UnitsView {
     const need = new Map<string, number>();
     const show: Unit[] = [];
     for (const e of s.ents) {
-      if (e.kind !== 'unit' || e.hp <= 0 || !visible(e)) continue;
+      // Those sheltering inside a building aren't drawn.
+      if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !visible(e)) continue;
       show.push(e);
       const key = `${e.type}:${s.players[e.owner].epoch}`;
       need.set(key, (need.get(key) ?? 0) + 1);
@@ -187,16 +251,28 @@ export class UnitsView {
       a.yaw += d * Math.min(1, dt * 12);
 
       const walking = a.speed > 0.15;
-      const mounted = u.type === 'cavalry';
+      const mounted = !!st.mounted;
+      const engine = u.type === 'siege';
       a.phase += dt * (walking ? a.speed * (mounted ? 5.5 : 8.5) : 0);
       let leg = walking ? Math.sin(a.phase) * (mounted ? 0.5 : 0.6) : 0;
       let arm = 0;
-      let bob = walking ? Math.abs(Math.sin(a.phase)) * (mounted ? 0.045 : 0.025) : 0;
+      let bob = walking ? Math.abs(Math.sin(a.phase)) * (mounted ? 0.045 : engine ? 0.008 : 0.025) : 0;
       const since = (ticks - u.swing) / TICK_HZ;
       const ph = u.id * 0.77;
       switch (u.act) {
         case 'attack':
-          if (st.range > 0) {
+          if (engine) {
+            if (st.shot === 'boulder') {
+              // The arm flies up and over, then is winched back down.
+              arm = since >= 0 && since < 0.25 ? 2.2 * (since / 0.25) : since >= 0.25 && since < 3 ? 2.2 * (1 - (since - 0.25) / 2.75) : 0;
+            } else if (st.shot === 'ball') {
+              arm = since >= 0 && since < 0.5 ? -0.18 * (1 - since / 0.5) : 0;
+              bob = since >= 0 && since < 0.15 ? -0.02 : 0;
+            } else {
+              // The ram draws back and swings into the wall.
+              arm = since >= 0 && since < 1.2 ? (since < 0.8 ? -0.45 * (since / 0.8) : -0.45 + 0.75 * ((since - 0.8) / 0.4)) : 0;
+            }
+          } else if (st.range > 0) {
             // Aim, with a kick when the shot goes.
             arm = -1.45 + (since >= 0 && since < 0.2 ? (0.2 - since) * 2.5 : 0);
           } else if (since >= 0 && since < 0.55) {
@@ -218,6 +294,11 @@ export class UnitsView {
           arm = -0.7 + Math.sin(time * 4 + ph) * 0.35;
           leg = Math.sin(time * 2 + ph) * 0.08;
           break;
+        case 'chant':
+          // Staff raised high, swaying with the chant.
+          arm = -2.4 + Math.sin(time * 3 + ph) * 0.25;
+          if (!walking) bob = Math.abs(Math.sin(time * 1.5 + ph)) * 0.01;
+          break;
         default:
           arm = walking ? -leg * 0.5 : Math.sin(time * 1.3 + ph) * 0.04;
           if (!walking) bob = Math.sin(time * 1.6 + ph) * 0.004;
@@ -229,7 +310,7 @@ export class UnitsView {
       this.e.set(0, a.yaw, 0);
       this.q.setFromEuler(this.e);
       this.p.set(x, gy, y);
-      const k = mounted ? UNIT_SCALE * 0.88 : UNIT_SCALE;
+      const k = mounted ? UNIT_SCALE * 0.88 : engine ? UNIT_SCALE * 1.1 : UNIT_SCALE;
       this.m.compose(this.p, this.q, this.sc.set(k, k, k));
       b.mesh.setMatrixAt(i, this.m);
       b.mesh.setColorAt(i, this.colors[u.owner]);
@@ -237,7 +318,7 @@ export class UnitsView {
       this.drawn.set(u.id, new THREE.Vector3(x, gy, y));
 
       // Where it lands on screen, for picking.
-      this.v.set(x, gy + (mounted ? 0.62 : 0.42), y).project(camera);
+      this.v.set(x, gy + (mounted ? 0.62 : engine ? 0.35 : 0.42), y).project(camera);
       if (this.v.z < 1) {
         const sx = ((this.v.x + 1) / 2) * width;
         const sy = ((1 - this.v.y) / 2) * height;
@@ -260,7 +341,7 @@ export class UnitsView {
       this.e.set(0, c.yaw, c.side * ease * (Math.PI / 2 - 0.15));
       this.q.setFromEuler(this.e);
       this.p.set(c.x, heightAt(s, c.x, c.y) + 0.04 - sink, c.y);
-      const k = c.type === 'cavalry' ? UNIT_SCALE * 0.88 : UNIT_SCALE;
+      const k = c.mounted ? UNIT_SCALE * 0.88 : UNIT_SCALE;
       this.m.compose(this.p, this.q, this.sc.set(k, k, k));
       b.mesh.setMatrixAt(i, this.m);
       b.mesh.setColorAt(i, c.color);

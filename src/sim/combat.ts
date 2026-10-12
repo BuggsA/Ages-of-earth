@@ -14,7 +14,7 @@ export const peace = (s: GameState) => s.tick < s.peaceUntil;
 
 /** Damage of one blow or shot after the counter bonus, a hero's inspiration and armor. */
 export function damageOf(s: GameState, attacker: Unit | null, st: UnitStats, target: Ent, ranged: boolean): number {
-  const inspired = attacker && s.tick - attacker.aura <= 2 ? AURA.attack : 1;
+  const inspired = attacker && s.tick - attacker.aura < 5 ? AURA.attack : 1;
   if (target.kind === 'building') {
     // Walls shrug off all but siege and heavy blows.
     const wall = target.type === 'wall' || target.type === 'gate' ? (st.cls === 'siege' ? 1.2 : st.cls === 'infantry' || st.cls === 'hero' ? 0.5 : 0.15) : 1;

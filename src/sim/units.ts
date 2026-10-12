@@ -625,6 +625,7 @@ function convertStep(s: GameState, u: Unit, o: Extract<Order, { k: 'convert' }>)
     if (walking(u)) stopWalking(u);
     face(u, t.x, t.y);
     u.act = 'chant';
+    if (o.done % 24 === 0) s.events.push({ k: 'work', id: u.id, owner: u.owner, act: 'chant', x: t.x, y: t.y });
     o.done++;
     if (o.done >= convertTicks(s, u, t)) {
       // It joins us: its orders are forgotten.

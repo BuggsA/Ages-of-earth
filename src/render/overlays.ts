@@ -20,6 +20,8 @@ export interface RingSpec {
   r: number;
   color: THREE.Color;
   square?: boolean;
+  /** A thin line (a hero's reach), not a selection band. */
+  thin?: boolean;
 }
 
 export interface BarSpec {
@@ -32,6 +34,7 @@ export class Overlays {
   readonly group = new THREE.Group();
   private rings: THREE.InstancedMesh;
   private squares: THREE.InstancedMesh;
+  private thin: THREE.InstancedMesh;
   private barBack: THREE.InstancedMesh;
   private barFill: THREE.InstancedMesh;
   private shots = new Map<Shot['kind'], THREE.InstancedMesh>();
@@ -40,6 +43,10 @@ export class Overlays {
   private ghostPad: THREE.Mesh;
   private ghostKey = '';
   private ghostMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.6, depthWrite: false });
+  /** A line of wall being laid out: a pad and a see-through piece on each tile. */
+  private wallPads: THREE.InstancedMesh;
+  private wallBody: THREE.InstancedMesh;
+  private wallKey = '';
   private flag: THREE.Group;
   private flagCloth: THREE.Mesh;
   private m = new THREE.Matrix4();
@@ -58,10 +65,13 @@ export class Overlays {
     sq.rotateZ(Math.PI / 4);
     sq.rotateX(-Math.PI / 2);
     this.squares = new THREE.InstancedMesh(sq, mat(), 64);
+    const thin = new THREE.RingGeometry(0.985, 1, 64);
+    thin.rotateX(-Math.PI / 2);
+    this.thin = new THREE.InstancedMesh(thin, mat(), 16);
     const plane = new THREE.PlaneGeometry(1, 1);
     this.barBack = new THREE.InstancedMesh(plane, new THREE.MeshBasicMaterial({ color: '#1a1a1a', transparent: true, opacity: 0.75, depthWrite: false, fog: false }), MAX_BARS);
     this.barFill = new THREE.InstancedMesh(plane, new THREE.MeshBasicMaterial({ depthWrite: false, fog: false, toneMapped: false }), MAX_BARS);
-    for (const m of [this.rings, this.squares, this.barBack, this.barFill]) {
+    for (const m of [this.rings, this.squares, this.thin, this.barBack, this.barFill]) {
       m.count = 0;
       m.frustumCulled = false;
       m.setColorAt(0, new THREE.Color());
@@ -69,6 +79,7 @@ export class Overlays {
     }
     this.rings.renderOrder = 3;
     this.squares.renderOrder = 3;
+    this.thin.renderOrder = 3;
     this.barBack.renderOrder = 10;
     this.barFill.renderOrder = 11;
 
@@ -84,10 +95,18 @@ export class Overlays {
     stone.rock(0.045, '#8a8a84');
     const bullet = new Kit();
     bullet.glow(bullet.box(0.025, 0.025, 0.5, '#ffd27a', 0, -0.012, 0));
+    const spear = new Kit();
+    spear.box(0.022, 0.022, 0.62, '#8a6440', 0, -0.011, 0);
+    spear.cone(0.03, 0.1, 4, '#7d7a72', 0, 0, 0.35).rotation.x = Math.PI / 2;
+    const boulder = new Kit();
+    boulder.rock(0.13, '#8d8579');
+    const ball = new Kit();
+    ball.sphere(0.08, '#2b2b2e');
     const shotMat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.8 });
     const bulletMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 2.0, 1.2), toneMapped: false });
-    for (const [kind, k] of [['arrow', arrow], ['bolt', bolt], ['stone', stone], ['bullet', bullet]] as const) {
-      const mesh = new THREE.InstancedMesh(bake(k.root), kind === 'bullet' ? bulletMat : shotMat, 256);
+    for (const [kind, k] of [['arrow', arrow], ['bolt', bolt], ['stone', stone], ['bullet', bullet], ['spear', spear], ['boulder', boulder], ['ball', ball]] as const) {
+      const mesh = new THREE.InstancedMesh(bake(k.root), kind === 'bullet' ? bulletMat : shotMat, kind === 'boulder' || kind === 'ball' ? 64 : 256);
+      mesh.castShadow = kind === 'boulder' || kind === 'ball';
       mesh.count = 0;
       mesh.frustumCulled = false;
       this.shots.set(kind, mesh);
@@ -104,6 +123,15 @@ export class Overlays {
     this.ghost.visible = false;
     this.ghost.renderOrder = 5;
     this.group.add(this.ghost);
+    this.wallPads = new THREE.InstancedMesh(pad, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.38, depthWrite: false, fog: false }), 64);
+    this.wallBody = new THREE.InstancedMesh(new THREE.BufferGeometry(), this.ghostMat, 64);
+    for (const m of [this.wallPads, this.wallBody]) {
+      m.count = 0;
+      m.frustumCulled = false;
+      m.setColorAt(0, new THREE.Color());
+      m.renderOrder = 5;
+      this.group.add(m);
+    }
 
     const pole = new Kit();
     pole.cyl(0.02, 0.025, 0.9, 5, '#5b4330');
@@ -120,9 +148,10 @@ export class Overlays {
   setRings(list: RingSpec[]): void {
     let n = 0;
     let k = 0;
+    let t = 0;
     for (const r of list) {
-      const mesh = r.square ? this.squares : this.rings;
-      const i = r.square ? k++ : n++;
+      const mesh = r.square ? this.squares : r.thin ? this.thin : this.rings;
+      const i = r.square ? k++ : r.thin ? t++ : n++;
       if (i >= mesh.instanceMatrix.count) continue;
       this.p.set(r.x, r.y + 0.05, r.z);
       this.q.identity();
@@ -133,7 +162,8 @@ export class Overlays {
     }
     this.rings.count = Math.min(n, MAX_RINGS);
     this.squares.count = Math.min(k, 64);
-    for (const m of [this.rings, this.squares]) {
+    this.thin.count = Math.min(t, 16);
+    for (const m of [this.rings, this.squares, this.thin]) {
       m.instanceMatrix.needsUpdate = true;
       if (m.instanceColor) m.instanceColor.needsUpdate = true;
     }
@@ -173,12 +203,13 @@ export class Overlays {
       const y = sh.y0 + (sh.ty - sh.y0) * t;
       if (!visible(x, y)) continue;
       const dist = Math.hypot(sh.tx - sh.x0, sh.ty - sh.y0);
-      const arc = sh.kind === 'bullet' ? 0 : dist * 0.16;
+      const arc = sh.kind === 'bullet' ? 0 : sh.kind === 'boulder' ? dist * 0.32 : sh.kind === 'ball' ? dist * 0.05 : dist * 0.16;
       const g0 = heightAt(s, sh.x0, sh.y0) + 0.45;
       const g1 = heightAt(s, sh.tx, sh.ty) + 0.3;
       const h = g0 + (g1 - g0) * t + Math.sin(t * Math.PI) * arc;
       const slope = (g1 - g0) / Math.max(0.01, dist) + (Math.cos(t * Math.PI) * Math.PI * arc) / Math.max(0.01, dist);
-      const mesh = this.shots.get(sh.kind)!;
+      const mesh = this.shots.get(sh.kind);
+      if (!mesh) continue;
       const i = counts.get(sh.kind) ?? 0;
       if (i >= mesh.instanceMatrix.count) continue;
       counts.set(sh.kind, i + 1);
@@ -214,6 +245,31 @@ export class Overlays {
     (this.ghostPad.material as THREE.MeshBasicMaterial).color.set(g.ok ? '#5cff7a' : '#ff5050');
     this.ghostMat.color.set(g.ok ? '#ffffff' : '#ff8080');
     this.ghost.visible = true;
+  }
+
+  /** Show a planned line of wall (an empty list hides it). */
+  setWallGhost(s: GameState, tiles: { x: number; y: number; ok: boolean }[], epoch: number, color: string, alongY: boolean): void {
+    const key = `${epoch}:${color}:${alongY ? 1 : 0}`;
+    if (key !== this.wallKey) {
+      this.wallKey = key;
+      this.wallBody.geometry = buildingGeometry('wall', epoch, color, alongY ? 10 : 5);
+    }
+    const n = Math.min(tiles.length, 64);
+    for (let i = 0; i < n; i++) {
+      const t = tiles[i];
+      const hgt = heightAt(s, t.x + 0.5, t.y + 0.5);
+      this.m.compose(this.p.set(t.x + 0.5, hgt + 0.04, t.y + 0.5), this.q.identity(), this.sc.set(0.96, 1, 0.96));
+      this.wallPads.setMatrixAt(i, this.m);
+      this.wallPads.setColorAt(i, this.c.set(t.ok ? '#5cff7a' : '#ff5050'));
+      this.m.compose(this.p.set(t.x + 0.5, hgt, t.y + 0.5), this.q, this.sc.set(1, 1, 1));
+      this.wallBody.setMatrixAt(i, this.m);
+      this.wallBody.setColorAt(i, this.c.set(t.ok ? '#ffffff' : '#ff8080'));
+    }
+    for (const m of [this.wallPads, this.wallBody]) {
+      m.count = n;
+      m.instanceMatrix.needsUpdate = true;
+      if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    }
   }
 
   setFlag(s: GameState, at: { x: number; y: number } | null, color: string, time: number): void {

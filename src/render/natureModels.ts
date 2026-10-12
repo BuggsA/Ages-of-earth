@@ -123,7 +123,26 @@ function boulder(): Kit {
   return k;
 }
 
-const MAKERS = { pine, broadleaf, birch, palm, felled, berryBush, stoneDeposit, goldDeposit, tuft, flowers, pebbles, boulder };
+/** A felled deer lying on its side, ready to butcher. */
+function carcass(): Kit {
+  const k = new Kit();
+  const coat = '#a8703e';
+  const body = k.group(0, 0.07, 0);
+  body.rotation.z = Math.PI / 2;
+  k.box(0.13, 0.13, 0.34, coat, 0, 0, 0, body);
+  k.box(0.1, 0.03, 0.28, '#e8dcc6', -0.06, 0, 0, body);
+  for (const [z, a] of [[0.12, 0.3], [-0.12, -0.2]]) {
+    const leg = k.box(0.24, 0.035, 0.04, coat, 0.17, 0.05 + a * 0.02, z);
+    leg.rotation.y = a;
+  }
+  const head = k.box(0.07, 0.07, 0.14, coat, -0.02, 0.04, 0.26);
+  head.rotation.y = 0.4;
+  k.box(0.12, 0.012, 0.1, '#8a2a20', 0.05, 0.0, -0.05);
+  k.box(0.05, 0.012, 0.07, '#a83a2a', -0.12, 0.0, 0.08);
+  return k;
+}
+
+const MAKERS = { pine, broadleaf, birch, palm, felled, berryBush, stoneDeposit, goldDeposit, carcass, tuft, flowers, pebbles, boulder };
 export type NatureKind = keyof typeof MAKERS;
 
 const cache = new Map<NatureKind, THREE.BufferGeometry>();

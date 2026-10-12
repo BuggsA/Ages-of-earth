@@ -1,7 +1,9 @@
-import { shortfall, MAX_QUEUE } from '../sim/commands';
-import { BUILDINGS, BUILDING_TYPES, EPOCHS, LAST_EPOCH, RES_LABEL, TICK_HZ, buildingHp, secs, unitEpoch, unitStats } from '../sim/data';
-import type { Building, BuildingType, Command, Cost, Ent, GameState, Unit, UnitType } from '../sim/types';
-import { RES, R_BERRY, R_GOLD, R_STONE, R_TREE } from '../sim/types';
+import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
+import { BUILDINGS, BUILDING_TYPES, CIVS, EPOCHS, LAST_EPOCH, MARKET, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, secs, unitEpoch } from '../sim/data';
+import { scoreOf } from '../sim/game';
+import { buildingCostFor, buildingMaxHp, statsFor, techCostFor, techProblem } from '../sim/stats';
+import type { Building, BuildingType, Command, Cost, Ent, GameState, Player, Stance, TechId, Unit } from '../sim/types';
+import { RES, R_BERRY, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
 import { buildingPicture, unitPicture } from './thumbs';
 
@@ -17,6 +19,8 @@ export interface HudActions {
   place(type: BuildingType): void;
   /** Wait for a left click to attack-move to. */
   attackMove(): void;
+  /** Wait for a left click on a building to shelter in. */
+  garrisonMode(): void;
   select(ids: number[]): void;
   focus(x: number, y: number): void;
   sound(name: 'click' | 'error' | 'queue' | 'open'): void;
@@ -45,6 +49,7 @@ const ACT_WORDS: Record<string, string> = {
   forage: 'Gathering berries',
   farm: 'Farming',
   build: 'Building',
+  chant: 'Chanting',
 };
 
 function orderWords(s: GameState, u: Unit): string {
@@ -52,9 +57,9 @@ function orderWords(s: GameState, u: Unit): string {
   switch (o.k) {
     case 'gather': {
       const kind = s.res[o.tile];
-      const what = o.res === 'food' ? 'berries' : o.res === 'wood' ? 'wood' : o.res;
+      const what = o.res === 'food' ? (kind === R_MEAT ? 'meat' : 'berries') : o.res === 'wood' ? 'wood' : o.res;
       if (o.phase === 'drop') return `Carrying ${what} home`;
-      if (o.phase === 'work') return kind === R_TREE ? 'Cutting wood' : kind === R_BERRY ? 'Gathering berries' : kind === R_GOLD ? 'Mining gold' : kind === R_STONE ? 'Quarrying stone' : 'Gathering';
+      if (o.phase === 'work') return kind === R_TREE ? 'Cutting wood' : kind === R_BERRY ? 'Gathering berries' : kind === R_MEAT ? 'Butchering a deer' : kind === R_GOLD ? 'Mining gold' : kind === R_STONE ? 'Quarrying stone' : 'Gathering';
       return `Going to gather ${what}`;
     }
     case 'farm':
@@ -67,6 +72,14 @@ function orderWords(s: GameState, u: Unit): string {
       return o.amove ? 'Marching to attack' : 'Moving';
     case 'deliver':
       return 'Carrying resources home';
+    case 'hunt':
+      return 'Hunting';
+    case 'convert':
+      return u.act === 'chant' ? 'Converting' : 'Going to convert';
+    case 'heal':
+      return 'Healing';
+    case 'garrison':
+      return u.inside ? 'Sheltering inside' : 'Going to shelter';
     default:
       return ACT_WORDS[u.act] ?? 'Standing by';
   }
@@ -81,8 +94,8 @@ const fmtTime = (ticks: number) => {
 };
 
 export class Hud {
-  /** Showing the build menu for citizens. */
-  buildMenu = false;
+  /** Showing a build menu for citizens. */
+  buildMenu: 'eco' | 'mil' | null = null;
   private cmds: Cmd[] = [];
   private resEl = document.getElementById('res-bar')!;
   private epochEl = document.getElementById('epoch-chip')!;
@@ -93,6 +106,8 @@ export class Hud {
   private tipEl = document.getElementById('tooltip')!;
   private noticeEl = document.getElementById('notices')!;
   private bannerEl = document.getElementById('banner')!;
+  private timerEl = document.getElementById('timers')!;
+  private timerHtml = '';
   private selSig = '';
   private cmdSig = '';
   private topSig = '';
@@ -110,6 +125,13 @@ export class Hud {
       if (c) this.runCmd(c);
     });
     this.cmdEl.addEventListener('contextmenu', (e) => e.preventDefault());
+    this.timerEl.addEventListener('click', (e) => {
+      const t = (e.target as HTMLElement).closest<HTMLElement>('[data-focus]');
+      if (t) {
+        const [x, y] = t.dataset.focus!.split(',').map(Number);
+        this.act.focus(x, y);
+      }
+    });
     this.selEl.addEventListener('click', (e) => {
       const q = (e.target as HTMLElement).closest<HTMLElement>('[data-cancel]');
       if (q && this.state) {
@@ -186,13 +208,20 @@ export class Hud {
     const tc = s.ents.find((e): e is Building => e.kind === 'building' && e.owner === viewer && e.advance >= 0);
     const idle = s.ents.filter((e) => e.kind === 'unit' && e.owner === viewer && e.type === 'citizen' && e.order.k === 'idle').length;
     const adv = tc ? Math.floor((tc.advance / secs(EPOCHS[p.epoch + 1].time)) * 100) : -1;
-    const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${p.pop}/${p.cap}|${p.epoch}|${adv}|${idle}|${speed}`;
+    const scores = s.players.map((q) => scoreOf(s, q));
+    const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${p.pop}/${p.cap}|${p.epoch}|${adv}|${idle}|${speed}|${scores.join(',')}`;
     this.clockEl.textContent = fmtTime(s.tick);
+    this.timers(s, viewer);
     if (sig === this.topSig) return;
     this.topSig = sig;
     this.resEl.innerHTML =
       RES.map((r) => `<div class="res" data-tip="<b>${RES_LABEL[r]}</b>${resHint(r)}">${icon(r)}${Math.floor(p.res[r])}</div>`).join('') +
       `<div class="res pop ${p.pop >= p.cap ? 'full' : ''}" data-tip="<b>Population</b>People and soldiers you have, and room for. Houses add 5 each, a Town Center 10 (150 at most).">${icon('pop')}${p.pop}/${p.cap}</div>`;
+    const civ = CIVS[p.civ];
+    const board = s.players
+      .map((q, i) => `<div><span class='swatch' style='background:${q.color}'></span>${q.name}${q.defeated ? ' (out)' : ''}: ${q.id === viewer || q.team === p.team ? scores[i] : '?'}</div>`)
+      .join('');
+    this.resEl.innerHTML += `<div class="res civ" data-tip="<b>${civ.name}</b>${civ.blurb}">${civ.name}</div><div class="res score" data-tip="<b>Score</b>Gathering, fighting, building, research and epochs.${board}">⭐${scores[viewer]}</div>`;
     this.epochEl.innerHTML = tc
       ? `${EPOCHS[p.epoch].name} <span class="bar" data-tip="<b>Advancing to the ${EPOCHS[p.epoch + 1].name}</b>${adv}%"><i style="width:${adv}%"></i></span>`
       : `<span data-tip="<b>${EPOCHS[p.epoch].name}</b>${EPOCHS[p.epoch].blurb}${p.epoch < LAST_EPOCH ? `<br><span class='hint'>Advance at a Town Center.</span>` : ''}">${EPOCHS[p.epoch].name}</span>`;
@@ -201,15 +230,32 @@ export class Hud {
     document.getElementById('speed-btn')!.textContent = `${speed}×`;
   }
 
+  /** Peace time and wonder countdowns under the top bar. */
+  private timers(s: GameState, viewer: number): void {
+    const parts: string[] = [];
+    if (s.tick < s.peaceUntil) parts.push(`<div class="timer peace">🕊 Peace for ${fmtTime(s.peaceUntil - s.tick)}</div>`);
+    for (const e of s.ents) {
+      if (e.kind !== 'building' || e.type !== 'wonder' || e.timer < 0 || e.hp <= 0) continue;
+      const q = s.players[e.owner];
+      const ours = q.team === s.players[viewer].team;
+      parts.push(`<div class="timer ${ours ? 'good' : 'bad'}" data-focus="${e.x},${e.y}"><span class="swatch" style="background:${q.color}"></span>${q.id === viewer ? 'Your' : `${q.name}'s`} Wonder: ${fmtTime(e.timer)}${ours ? '' : ' (destroy it!)'}</div>`);
+    }
+    const html = parts.join('');
+    if (html !== this.timerHtml) {
+      this.timerHtml = html;
+      this.timerEl.innerHTML = html;
+    }
+  }
+
   private selection(s: GameState, viewer: number, ents: Ent[], tile: number | null): void {
     let html = '';
     let sig = '';
     if (!ents.length && tile !== null && s.res[tile]) {
       const kind = s.res[tile];
-      const name = kind === R_TREE ? 'Tree' : kind === R_BERRY ? 'Berry bush' : kind === R_GOLD ? 'Gold mine' : 'Stone quarry';
-      const res = kind === R_TREE ? 'wood' : kind === R_BERRY ? 'food' : kind === R_GOLD ? 'gold' : 'stone';
+      const name = kind === R_TREE ? 'Tree' : kind === R_BERRY ? 'Berry bush' : kind === R_MEAT ? 'Deer carcass' : kind === R_GOLD ? 'Gold mine' : 'Stone quarry';
+      const res = kind === R_TREE ? 'wood' : kind === R_BERRY || kind === R_MEAT ? 'food' : kind === R_GOLD ? 'gold' : 'stone';
       sig = `res:${tile}:${s.amount[tile]}`;
-      html = `<div class="sel-portrait"><span style="font-size:54px">${kind === R_TREE ? '🌳' : kind === R_BERRY ? '🫐' : kind === R_GOLD ? icon('gold', 64) : icon('stone', 64)}</span></div>
+      html = `<div class="sel-portrait"><span style="font-size:54px">${kind === R_TREE ? '🌳' : kind === R_BERRY ? '🫐' : kind === R_MEAT ? '🍖' : kind === R_GOLD ? icon('gold', 64) : icon('stone', 64)}</span></div>
         <div class="sel-info"><div class="sel-name">${name}</div><div class="stats"><span>${icon(res as 'wood')}${s.amount[tile]} left</span></div>
         <div class="blurb">Select citizens and right-click it to gather.</div></div>`;
     } else if (!ents.length) {
@@ -217,7 +263,8 @@ export class Hud {
       sig = `none:${p.epoch}`;
       html = `<div class="empty-sel"><div class="sel-name">${EPOCHS[p.epoch].name}</div>
         <div>Left-click to select, drag to select many. Right-click to give orders.</div>
-        <div><kbd>.</kbd> finds an idle citizen, <kbd>H</kbd> your Town Center, <kbd>B</kbd> builds with citizens selected.</div></div>`;
+        <div><kbd>.</kbd> finds an idle citizen, <kbd>,</kbd> your army, <kbd>H</kbd> your Town Center; <kbd>B</kbd> and <kbd>V</kbd> build with citizens selected.</div>
+        <div>Hold <kbd>Shift</kbd> while giving orders to queue them up.</div></div>`;
     } else if (ents.length === 1) {
       const e = ents[0];
       if (e.kind === 'unit') [html, sig] = this.unitPanel(s, viewer, e);
@@ -233,7 +280,7 @@ export class Hud {
       const items: string[] = [];
       for (const list of groups.values()) {
         for (const e of list.slice(0, 60)) {
-          const max = e.kind === 'unit' ? unitStats(e.type, s.players[e.owner].epoch).hp : buildingHp(e.type, s.players[e.owner].epoch);
+          const max = e.kind === 'unit' ? statsFor(s, e.owner, e.type).hp : buildingMaxHp(s, e.owner, e.type);
           const pic = e.kind === 'unit' ? unitPicture(e.type, s.players[e.owner].epoch, s.players[e.owner].color) : buildingPicture(e.type, s.players[e.owner].epoch, s.players[e.owner].color);
           items.push(`<div class="mitem" data-pick="${e.id}" data-tip="<b>${nameOf(s, e)}</b>Click to pick only this one; shift-click to drop it."><img src="${pic}" alt=""><div class="mhp"><i style="width:${Math.round((e.hp / max) * 100)}%"></i></div></div>`);
         }
@@ -250,23 +297,26 @@ export class Hud {
 
   private unitPanel(s: GameState, viewer: number, u: Unit): [string, string] {
     const p = s.players[u.owner];
-    const st = unitStats(u.type, p.epoch);
+    const st = statsFor(s, u.owner, u.type);
     const frac = u.hp / st.hp;
     const mine = u.owner === viewer;
-    const status = mine ? orderWords(s, u) : p.name;
+    const queued = mine && u.queue.length ? ` <span class="hint">(+${u.queue.length} queued)</span>` : '';
+    const status = mine ? orderWords(s, u) + queued : p.name;
     const carry = mine && u.carry > 0 && u.carryRes ? `<span>${icon(u.carryRes)}${u.carry}<em>carried</em></span>` : '';
-    const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}`;
+    const stance = u.type !== 'citizen' && u.type !== 'priest' && mine ? `<span data-tip="<b>Stance</b>Z aggressive, X defensive, C stand ground.">${u.stance === 'stand' ? '⚓ Stand' : u.stance === 'defensive' ? '🛡 Defend' : '🔥 Aggressive'}</span>` : '';
+    const aura = s.tick - u.aura < 5 && u.type !== 'hero' ? `<span data-tip="<b>Inspired</b>A hero nearby: hits harder and heals.">✨<em>Inspired</em></span>` : '';
+    const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}`;
     const html = `<div class="sel-portrait"><img src="${unitPicture(u.type, p.epoch, p.color)}" alt=""></div>
       <div class="sel-info">
         <div class="sel-name">${st.name}</div>
         <div class="sel-sub">${mine ? status : `<span class="swatch" style="background:${p.color}"></span>${p.name}`}</div>
         ${hpBar(u.hp, st.hp, frac)}
         <div class="stats">
-          <span data-tip="<b>Attack</b>Damage per blow or shot, before armor and the counter bonus.">⚔<em>Attack</em> ${st.attack}</span>
+          ${st.attack ? `<span data-tip="<b>Attack</b>Damage per blow or shot, before armor and the counter bonus.">⚔<em>Attack</em> ${st.attack}</span>` : ''}
           <span data-tip="<b>Armor</b>Melee / missile armor: taken off every blow or shot.">🛡<em>Armor</em> ${st.armor}/${st.parmor}</span>
           ${st.range ? `<span data-tip="<b>Range</b>How far it shoots, in tiles.">🏹<em>Range</em> ${st.range}</span>` : ''}
-          <span data-tip="<b>Speed</b>Tiles per second.">👣<em>Speed</em> ${st.speed}</span>
-          ${carry}
+          <span data-tip="<b>Speed</b>Tiles per second.">👣<em>Speed</em> ${Math.round(st.speed * 100) / 100}</span>
+          ${carry}${stance}${aura}
         </div>
         <div class="blurb">${st.blurb}</div>
       </div>`;
@@ -276,7 +326,7 @@ export class Hud {
   private buildingPanel(s: GameState, viewer: number, b: Building): [string, string] {
     const p = s.players[b.owner];
     const def = BUILDINGS[b.type];
-    const max = buildingHp(b.type, p.epoch);
+    const max = buildingMaxHp(s, b.owner, b.type);
     const mine = b.owner === viewer;
     let status = '';
     let queue = '';
@@ -284,31 +334,36 @@ export class Hud {
     else if (b.advance >= 0) {
       const pct = Math.floor((b.advance / secs(EPOCHS[p.epoch + 1].time)) * 100);
       status = `Advancing to the ${EPOCHS[p.epoch + 1].name}: ${pct}%`;
-      if (mine) queue = `<div class="queue"><div class="qitem" data-cancel="${b.id}:-1" data-tip="<b>${EPOCHS[p.epoch + 1].name}</b>Click to cancel (full refund)."><span style="display:grid;place-items:center;height:100%;font-size:22px">⏫</span><div class="prog"><i style="width:${pct}%"></i></div></div></div>`;
+      if (mine) queue = `<div class="queue"><div class="qitem" data-cancel="${b.id}:-1" data-tip="<b>${EPOCHS[p.epoch + 1].name}</b>Click to cancel (full refund)."><span class="qglyph">⏫</span><div class="prog"><i style="width:${pct}%"></i></div></div></div>`;
     } else if (b.queue.length) {
       const it = b.queue[0];
-      const need = secs(unitStats(it.unit, p.epoch).time);
+      const need = it.tech ? secs(TECHS[it.tech].time) : secs(statsFor(s, b.owner, it.unit!).time);
       const pct = Math.min(100, Math.floor((it.done / need) * 100));
-      status = `${it.done > need ? 'Waiting for room: build houses' : `Training ${unitStats(it.unit, p.epoch).name}: ${pct}%`}`;
+      status = it.tech ? `Researching ${TECHS[it.tech].name}: ${pct}%` : it.done > need ? 'Waiting for room: build houses' : `Training ${statsFor(s, b.owner, it.unit!).name}: ${pct}%`;
       if (mine)
         queue = `<div class="queue">${b.queue
           .map((q, i) => {
-            const qn = unitStats(q.unit, p.epoch);
             const qp = i === 0 ? pct : 0;
-            return `<div class="qitem" data-cancel="${b.id}:${i}" data-tip="<b>${qn.name}</b>Click to cancel (full refund)."><img src="${unitPicture(q.unit, p.epoch, p.color)}" alt=""><div class="prog"><i style="width:${qp}%"></i></div></div>`;
+            const name = q.tech ? TECHS[q.tech].name : statsFor(s, b.owner, q.unit!).name;
+            const face = q.tech ? `<span class="qglyph">${TECHS[q.tech].icon}</span>` : `<img src="${unitPicture(q.unit!, p.epoch, p.color)}" alt="">`;
+            return `<div class="qitem" data-cancel="${b.id}:${i}" data-tip="<b>${name}</b>Click to cancel (full refund).">${face}<div class="prog"><i style="width:${qp}%"></i></div></div>`;
           })
           .join('')}</div>`;
     } else if (b.type === 'farm' && b.built) {
       const f = b.farmer ? s.byId.get(b.farmer) : undefined;
       status = f && f.kind === 'unit' && f.order.k === 'farm' && f.order.target === b.id ? 'Worked by a citizen' : 'Waiting for a farmer';
-    } else status = def.drop.length ? 'Drop-off for every resource' : def.pop ? `Room for ${def.pop}` : 'Ready';
-    if (!mine) status = `<span class="swatch" style="background:${p.color}"></span>${p.name}`;
-    const sig = `b:${b.id}:${Math.ceil(b.hp)}:${status}:${b.queue.length}:${p.epoch}:${queue.length}`;
+    } else if (b.type === 'wonder' && b.timer >= 0) status = `Stands ${fmtTime(b.timer)} more for victory`;
+    else if (b.type === 'market') status = `Prices: ${(['food', 'wood', 'stone'] as const).map((r) => `${icon(r, 14)}${s.market[r]}`).join(' ')}`;
+    else status = def.drop.length ? 'Drop-off for every resource' : def.pop ? `Room for ${def.pop}` : 'Ready';
+    if (!mine) status = `<span class="swatch" style="background:${p.color}"></span>${p.name}${b.type === 'wonder' && b.timer >= 0 ? `: wins in ${fmtTime(b.timer)}` : ''}`;
+    const inside = def.garrison && b.built ? `<div class="stats"><span data-tip="<b>Sheltering</b>Units inside are safe, heal slowly and add arrows.">🏰<em>Inside</em> ${b.garrison.length}/${def.garrison}</span></div>` : '';
+    const sig = `b:${b.id}:${Math.ceil(b.hp)}:${status}:${b.queue.length}:${p.epoch}:${queue.length}:${b.garrison.length}`;
     const html = `<div class="sel-portrait"><img src="${buildingPicture(b.type, p.epoch, p.color)}" alt=""></div>
       <div class="sel-info">
         <div class="sel-name">${def.name}</div>
         <div class="sel-sub">${status}</div>
         ${hpBar(b.hp, max, b.hp / max)}
+        ${inside}
         ${queue || `<div class="blurb">${def.blurb}${def.guns ? ` Shoots ${def.guns.range} tiles.` : ''}</div>`}
       </div>`;
     return [html, sig];
@@ -321,55 +376,75 @@ export class Hud {
     const citizens = units.filter((u) => u.type === 'citizen');
     const soldiers = units.filter((u) => u.type !== 'citizen');
     const cmds: Cmd[] = [];
-    if (!citizens.length) this.buildMenu = false;
+    if (!citizens.length) this.buildMenu = null;
 
     if (citizens.length && this.buildMenu) {
       for (const type of BUILDING_TYPES) {
         const def = BUILDINGS[type];
+        if (def.menu !== this.buildMenu) continue;
         const locked = def.epoch > p.epoch;
-        const short = shortfall(p, def.cost);
+        const cost = buildingCostFor(s, viewer, type);
+        const short = shortfall(p, cost);
+        const wonderUp = type === 'wonder' && s.ents.some((e) => e.kind === 'building' && e.owner === viewer && e.type === 'wonder');
         cmds.push({
           key: def.key,
           pic: buildingPicture(type, p.epoch, p.color),
           title: def.name,
-          desc: def.blurb,
-          cost: def.cost,
-          ok: !locked && !short,
-          why: locked ? `Needs the ${EPOCHS[def.epoch].name}` : (short ?? undefined),
+          desc: def.blurb + (type === 'wall' ? ' Click and drag to lay out a line.' : ''),
+          cost,
+          ok: !locked && !short && !wonderUp,
+          why: locked ? `Needs the ${EPOCHS[def.epoch].name}` : wonderUp ? 'You already have a wonder' : (short ?? undefined),
           run: () => this.act.place(type),
         });
       }
-      cmds.push({ key: 'ESCAPE', pic: '', glyph: '↩', title: 'Back', desc: 'Back to the commands.', ok: true, run: () => (this.buildMenu = false) });
+      cmds.push({ key: 'ESCAPE', pic: '', glyph: '↩', title: 'Back', desc: 'Back to the commands.', ok: true, run: () => (this.buildMenu = null) });
     } else if (units.length) {
-      if (citizens.length) cmds.push({ key: 'B', pic: '', glyph: '🔨', title: 'Build', desc: 'Choose a building to put up with the selected citizens.', ok: true, run: () => ((this.buildMenu = true), this.act.sound('open')) });
+      if (citizens.length) {
+        cmds.push({ key: 'B', pic: '', glyph: '🏠', title: 'Build (economy)', desc: 'Houses, farms, storehouses, markets, temples, walls and wonders.', ok: true, run: () => ((this.buildMenu = 'eco'), this.act.sound('open')) });
+        cmds.push({ key: 'V', pic: '', glyph: '🛡', title: 'Build (military)', desc: 'Barracks, ranges, stables, forges, siege workshops and towers.', ok: true, run: () => ((this.buildMenu = 'mil'), this.act.sound('open')) });
+      }
       if (soldiers.length) cmds.push({ key: 'A', pic: '', glyph: '⚔', title: 'Attack-move', desc: 'Then click on the map: march there, fighting every enemy met on the way.', ok: true, run: () => this.act.attackMove() });
-      cmds.push({ key: 'S', pic: '', glyph: '✋', title: 'Stop', desc: 'Stop what they are doing.', ok: true, run: () => this.act.issue({ t: 'stop', p: viewer, ids: units.map((u) => u.id) }) });
+      cmds.push({ key: 'S', pic: '', glyph: '✋', title: 'Stop', desc: 'Stop what they are doing (and forget queued orders).', ok: true, run: () => this.act.issue({ t: 'stop', p: viewer, ids: units.map((u) => u.id) }) });
+      cmds.push({ key: 'G', pic: '', glyph: '🏰', title: 'Garrison', desc: 'Then click a Town Center or tower: shelter inside. Sheltered units are safe and add arrows.', ok: true, run: () => this.act.garrisonMode() });
+      if (soldiers.length) {
+        const stances: [string, Stance, string, string][] = [
+          ['Z', 'aggressive', '🔥', 'Aggressive: chase any enemy that comes into sight.'],
+          ['X', 'defensive', '🛡', 'Defensive: fight what comes near, but return to their post.'],
+          ['C', 'stand', '⚓', 'Stand ground: never move from the spot; strike what is in reach.'],
+        ];
+        for (const [key, stance, glyph, desc] of stances) {
+          const all = soldiers.every((u) => u.stance === stance);
+          cmds.push({ key, pic: '', glyph, title: `${stance === 'stand' ? 'Stand ground' : stance[0].toUpperCase() + stance.slice(1)} stance`, desc, ok: true, on: all, run: () => this.act.issue({ t: 'stance', p: viewer, ids: soldiers.map((u) => u.id), stance }) });
+        }
+      }
       cmds.push({ key: 'DELETE', pic: '', glyph: '💀', title: 'Delete', desc: 'Dismiss the selected units for good (Del).', ok: true, run: () => this.act.issue({ t: 'delete', p: viewer, ids: units.map((u) => u.id) }) });
     } else if (mine.length === 1 && mine[0].kind === 'building') {
       const b = mine[0];
       const def = BUILDINGS[b.type];
+      const busy = b.advance >= 0;
+      const full = b.queue.length >= MAX_QUEUE;
       if (b.built) {
-        for (const unit of def.trains) {
-          const st = unitStats(unit, p.epoch);
+        const unitKeys = b.type === 'towncenter' ? ['Q', 'E'] : ['Q', 'W', 'E'];
+        def.trains.forEach((unit, i) => {
+          const st = statsFor(s, viewer, unit);
           const locked = unitEpoch(unit) > p.epoch;
           const short = shortfall(p, st.cost);
-          const full = b.queue.length >= MAX_QUEUE;
-          const busy = b.advance >= 0;
+          const hero = unit === 'hero' && (heroBusy(s, viewer) || b.queue.some((q) => q.unit === 'hero'));
           cmds.push({
-            key: 'Q',
-            pic: unitPicture(unit as UnitType, Math.max(p.epoch, unitEpoch(unit)), p.color),
+            key: unitKeys[i],
+            pic: unitPicture(unit, Math.max(p.epoch, unitEpoch(unit)), p.color),
             title: `Train ${st.name}`,
-            desc: `${st.blurb} Takes ${st.time}s.`,
+            desc: `${st.blurb} Takes ${Math.round(st.time)}s.`,
             cost: st.cost,
-            ok: !locked && !short && !full && !busy,
-            why: locked ? `Needs the ${EPOCHS[unitEpoch(unit)].name}` : busy ? 'Busy advancing to the next epoch' : full ? 'The queue is full' : (short ?? undefined),
+            ok: !locked && !short && !full && !busy && !hero,
+            why: locked ? `Needs the ${EPOCHS[unitEpoch(unit)].name}` : busy ? 'Busy advancing to the next epoch' : hero ? 'You can lead with one hero at a time' : full ? 'The queue is full' : (short ?? undefined),
             count: b.queue.filter((q) => q.unit === unit).length || undefined,
             run: () => {
               this.act.issue({ t: 'train', p: viewer, building: b.id, unit });
               this.act.sound('queue');
             },
           });
-        }
+        });
         if (b.type === 'towncenter' && p.epoch < LAST_EPOCH) {
           const next = EPOCHS[p.epoch + 1];
           const advancing = s.ents.some((e) => e.kind === 'building' && e.owner === viewer && e.advance >= 0);
@@ -390,18 +465,84 @@ export class Hud {
             },
           });
         }
+        // Technologies: the next step of each line this building teaches.
+        const techKeys = def.trains.length ? ['A', 'S', 'D', 'F', 'G'] : ['Q', 'W', 'E', 'R', 'T'];
+        let ti = 0;
+        for (const tech of nextTechs(p, b.type)) {
+          const t = TECHS[tech];
+          const cost = techCostFor(s, viewer, tech);
+          const problem = techProblem(s, viewer, tech);
+          const queued = b.queue.some((q) => q.tech === tech);
+          const short = shortfall(p, cost);
+          cmds.push({
+            key: techKeys[ti++] ?? '',
+            pic: '',
+            glyph: t.icon,
+            title: `Research ${t.name}`,
+            desc: `${t.blurb} Takes ${Math.round(t.time)}s.`,
+            cost,
+            ok: !problem && !short && !full && !busy,
+            on: queued,
+            why: queued ? 'Being researched' : (problem ?? (busy ? 'Busy advancing to the next epoch' : full ? 'The queue is full' : (short ?? undefined))),
+            run: () => {
+              this.act.issue({ t: 'research', p: viewer, building: b.id, tech });
+              this.act.sound('queue');
+            },
+          });
+        }
+        if (b.type === 'market') {
+          const goods: ['food' | 'wood' | 'stone', string, string][] = [['food', 'Q', 'A'], ['wood', 'W', 'S'], ['stone', 'E', 'D']];
+          for (const [res, buyKey] of goods) {
+            const price = s.market[res];
+            cmds.push({
+              key: buyKey,
+              pic: '',
+              glyph: `<span class="trade">${icon(res, 22)}<b>+</b></span>`,
+              title: `Buy ${MARKET.lot} ${RES_LABEL[res].toLowerCase()}`,
+              desc: `Pay ${price} gold. Each purchase raises the price.`,
+              cost: { gold: price },
+              ok: p.res.gold >= price,
+              why: `Need ${Math.ceil(price - p.res.gold)} more gold`,
+              run: () => (this.act.issue({ t: 'trade', p: viewer, res, buy: true }), this.act.sound('click')),
+            });
+          }
+          for (const [res, , sellKey] of goods) {
+            const gets = Math.floor(s.market[res] * MARKET.sellRate);
+            cmds.push({
+              key: sellKey,
+              pic: '',
+              glyph: `<span class="trade">${icon(res, 22)}<b>−</b></span>`,
+              title: `Sell ${MARKET.lot} ${RES_LABEL[res].toLowerCase()}`,
+              desc: `Get ${gets} gold. Each sale lowers the price.`,
+              cost: { [res]: MARKET.lot },
+              ok: p.res[res] >= MARKET.lot,
+              why: `Need ${MARKET.lot} ${RES_LABEL[res].toLowerCase()} to sell`,
+              run: () => (this.act.issue({ t: 'trade', p: viewer, res, buy: false }), this.act.sound('click')),
+            });
+          }
+        }
+        if (b.type === 'towncenter') {
+          cmds.push({ key: 'R', pic: '', glyph: '🔔', title: 'Ring the town bell', desc: 'Every citizen runs to shelter in the nearest Town Center or tower, which shoot more arrows for each one inside.', ok: true, run: () => this.act.issue({ t: 'bell', p: viewer, ring: true }) });
+          const sheltering = s.ents.some((e) => e.kind === 'unit' && e.owner === viewer && e.type === 'citizen' && (e.inside || e.order.k === 'garrison'));
+          cmds.push({ key: 'T', pic: '', glyph: '🕊', title: 'All clear', desc: 'Citizens come out of shelter and go back to work.', ok: sheltering, why: 'Nobody is sheltering', run: () => this.act.issue({ t: 'bell', p: viewer, ring: false }) });
+        }
+        if (def.garrison) {
+          cmds.push({ key: 'U', pic: '', glyph: '🚪', title: 'Let them out', desc: `Everyone sheltering here comes out (${b.garrison.length}/${def.garrison}).`, ok: b.garrison.length > 0, why: 'Nobody is inside', count: b.garrison.length || undefined, run: () => this.act.issue({ t: 'ungarrison', p: viewer, building: b.id }) });
+        }
       }
       cmds.push({ key: 'DELETE', pic: '', glyph: '💀', title: b.built ? 'Delete' : 'Cancel', desc: b.built ? 'Tear this building down (Del).' : 'Give up this building site (Del). Refunded if no work was done.', ok: true, run: () => this.act.issue({ t: 'delete', p: viewer, ids: [b.id] }) });
+    } else if (mine.length > 1 && mine.every((e) => e.kind === 'building')) {
+      cmds.push({ key: 'DELETE', pic: '', glyph: '💀', title: 'Delete', desc: 'Tear these buildings down (Del).', ok: true, run: () => this.act.issue({ t: 'delete', p: viewer, ids: mine.map((e) => e.id) }) });
     }
     this.cmds = cmds;
-    const sig = cmds.map((c) => `${c.key}${c.ok ? 1 : 0}${c.count ?? ''}${c.on ? 1 : 0}${c.pic.length}`).join('|');
+    const sig = cmds.map((c) => `${c.key}${c.ok ? 1 : 0}${c.count ?? ''}${c.on ? 1 : 0}${c.pic.length}${c.title}`).join('|');
     if (sig === this.cmdSig) return;
     this.cmdSig = sig;
     this.cmdEl.innerHTML = cmds
       .map((c, i) => {
         const key = c.key === 'ESCAPE' ? 'Esc' : c.key === 'DELETE' ? 'Del' : c.key;
         const tip = `<b>${c.title}</b>${c.cost ? `<div class='cost'>${costHtml(c.cost, s.players[viewer].res).replace(/"/g, "'")}</div>` : ''}${c.desc}${!c.ok && c.why ? `<br><span style='color:#ff9a8a'>${c.why}</span>` : ''}<br><span class='hint'>Hotkey: ${key}</span>`;
-        return `<button class="cmd ${c.ok ? '' : 'off'} ${c.on ? 'on' : ''}" data-i="${i}" data-tip="${tip}">${c.pic ? `<img src="${c.pic}" alt="">` : `<span class="glyph">${c.glyph ?? ''}</span>`}<span class="key">${key}</span>${c.count ? `<span class="count">${c.count}</span>` : ''}</button>`;
+        return `<button class="cmd ${c.ok ? '' : 'off'} ${c.on ? 'on' : ''}" data-i="${i}" data-tip="${tip.replace(/"/g, '&quot;')}">${c.pic ? `<img src="${c.pic}" alt="">` : `<span class="glyph">${c.glyph ?? ''}</span>`}<span class="key">${key}</span>${c.count ? `<span class="count">${c.count}</span>` : ''}</button>`;
       })
       .join('');
   }
@@ -436,7 +577,9 @@ export class Hud {
     this.selSig = '';
     this.cmdSig = '';
     this.topSig = '';
-    this.buildMenu = false;
+    this.timerHtml = '';
+    this.timerEl.innerHTML = '';
+    this.buildMenu = null;
     this.noticeEl.innerHTML = '';
   }
 }
@@ -455,7 +598,29 @@ function resHint(r: string): string {
 }
 
 export function nameOf(s: GameState, e: Ent): string {
-  return e.kind === 'unit' ? unitStats(e.type, s.players[e.owner].epoch).name : BUILDINGS[e.type].name;
+  return e.kind === 'unit' ? statsFor(s, e.owner, e.type).name : BUILDINGS[e.type].name;
+}
+
+/** Chains of technologies: each building offers the next unresearched step of each. */
+const TECH_LINES: TechId[][] = (() => {
+  const lines: TechId[][] = [];
+  for (const id of TECH_IDS) {
+    const t = TECHS[id];
+    const line = t.needs ? lines.find((l) => l[l.length - 1] === t.needs) : undefined;
+    if (line) line.push(id);
+    else lines.push([id]);
+  }
+  return lines;
+})();
+
+function nextTechs(p: Player, at: BuildingType): TechId[] {
+  const out: TechId[] = [];
+  for (const line of TECH_LINES) {
+    if (TECHS[line[0]].at !== at) continue;
+    const next = line.find((t) => !p.techs.includes(t));
+    if (next) out.push(next);
+  }
+  return out;
 }
 
 function plural(name: string): string {

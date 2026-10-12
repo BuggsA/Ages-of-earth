@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { SoundName } from '../audio/sound';
-import { BUILDINGS, TICK_HZ, buildingHp, unitStats } from '../sim/data';
+import { AURA, BUILDINGS, TICK_HZ } from '../sim/data';
+import { buildingMaxHp, statsFor } from '../sim/stats';
 import type { BuildingType, Ent, GameEvent, GameState, Unit } from '../sim/types';
 import { R_GOLD, R_STONE } from '../sim/types';
 import { seesRect } from '../sim/vision';
@@ -29,9 +30,16 @@ export interface Selection {
   ghost: { type: BuildingType; tx: number; ty: number; ok: boolean } | null;
   /** The building whose rally point to show. */
   rallyOf: number | null;
+  /** A line of wall being laid out. */
+  wall: { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean } | null;
 }
 
-export type Pick = { kind: 'unit'; id: number } | { kind: 'building'; id: number } | { kind: 'resource'; tile: number } | { kind: 'ground'; x: number; y: number };
+export type Pick =
+  | { kind: 'unit'; id: number }
+  | { kind: 'building'; id: number }
+  | { kind: 'animal'; id: number }
+  | { kind: 'resource'; tile: number }
+  | { kind: 'ground'; x: number; y: number };
 
 const SUN_DIR = new THREE.Vector3(-0.45, 0.82, 0.38).normalize();
 
@@ -208,7 +216,7 @@ export class View {
 
     this.resources.update(s, dt);
     this.buildings.update(s, this.viewer, (b) => this.reveal || seesRect(s, this.viewer, b.tx, b.ty, b.size), dt, this.reveal);
-    this.units.update(s, alpha, dt, this.time, this.visibleUnit, this.rig.camera, this.width, this.height);
+    this.units.update(s, alpha, dt, this.time, this.visibleUnit, this.rig.camera, this.width, this.height, (x, y) => this.sees(x, y));
     this.overlays.setShots(s, alpha, (x, y) => this.sees(x, y));
     this.drawSelection(s, sel);
     this.ambient(s, dt);
@@ -226,14 +234,24 @@ export class View {
     const bars: BarSpec[] = [];
     const own = new THREE.Color('#9dff9a').multiplyScalar(1.25);
     const foe = new THREE.Color('#ff6a5a').multiplyScalar(1.25);
+    const aura = new THREE.Color('#ffd166');
+    const way = new THREE.Color('#d8ffd6');
     for (const id of sel.ids) {
       const e = s.byId.get(id);
       if (!e || e.hp <= 0) continue;
       if (e.kind === 'unit') {
         const at = this.units.drawn.get(id);
         if (!at) continue;
-        const st = unitStats(e.type, s.players[e.owner].epoch);
+        const st = statsFor(s, e.owner, e.type);
         rings.push({ x: at.x, y: at.y, z: at.z, r: st.radius + 0.12, color: e.owner === this.viewer ? own : foe });
+        // A hero's reach, and where queued orders lead.
+        if (e.type === 'hero') rings.push({ x: at.x, y: at.y, z: at.z, r: AURA.radius, color: aura, thin: true });
+        if (e.owner === this.viewer) {
+          for (const o of e.queue) {
+            if (o.k !== 'move') continue;
+            rings.push({ x: o.x, y: heightAt(s, o.x, o.y), z: o.y, r: 0.22, color: o.amove ? foe : way });
+          }
+        }
       } else {
         const known = this.buildings.known.get(id);
         if (!known) continue;
@@ -250,20 +268,21 @@ export class View {
       if (e.kind === 'unit') {
         const at = this.units.drawn.get(e.id);
         if (!at) continue;
-        const st = unitStats(e.type, s.players[e.owner].epoch);
-        bars.push({ at: this.v.set(at.x, at.y + (e.type === 'cavalry' ? 1.4 : 1.02), at.z).clone(), width: 0.55, frac: e.hp / st.hp });
+        const st = statsFor(s, e.owner, e.type);
+        bars.push({ at: this.v.set(at.x, at.y + (st.mounted ? 1.4 : e.type === 'siege' ? 1.0 : 1.02), at.z).clone(), width: e.type === 'hero' ? 0.7 : 0.55, frac: e.hp / st.hp });
       } else {
         const top = this.buildings.topOf(e.id);
         if (!top) continue;
         if (!(e.owner === this.viewer || this.reveal || seesRect(s, this.viewer, e.tx, e.ty, e.size))) continue;
         top.y += 0.35;
-        bars.push({ at: top, width: Math.min(2.2, e.size * 0.55), frac: e.hp / buildingHp(e.type, s.players[e.owner].epoch) });
+        bars.push({ at: top, width: Math.min(2.2, Math.max(0.6, e.size * 0.55)), frac: e.hp / buildingMaxHp(s, e.owner, e.type) });
       }
     }
     this.overlays.setRings(rings);
     this.overlays.setBars(bars, this.rig.camera);
     const p = s.players[this.viewer];
     this.overlays.setGhost(s, sel.ghost ? { ...sel.ghost, epoch: p.epoch, color: p.color } : null);
+    this.overlays.setWallGhost(s, sel.wall?.tiles ?? [], p.epoch, p.color, sel.wall?.alongY ?? false);
     const rb = sel.rallyOf ? s.byId.get(sel.rallyOf) : undefined;
     this.overlays.setFlag(s, rb && rb.kind === 'building' && rb.rally ? rb.rally : null, p.color, this.time);
   }
@@ -274,7 +293,7 @@ export class View {
       if (e.kind !== 'building' || e.hp <= 0 || !e.built) continue;
       if (!(e.owner === this.viewer || this.reveal || seesRect(s, this.viewer, e.tx, e.ty, e.size))) continue;
       const next = (this.chimneys.get(e.id) ?? this.time + (e.id % 7) * 0.3) - dt;
-      const max = buildingHp(e.type, s.players[e.owner].epoch);
+      const max = buildingMaxHp(s, e.owner, e.type);
       const frac = e.hp / max;
       const base = this.buildings.baseOf(e.id) ?? 0;
       if (next > this.time) {
@@ -287,6 +306,16 @@ export class View {
         this.effects.burst(at, { count: 2, speed: 0.4, up: 1, life: 0.7, size: 0.07, gravity: -1.2, drag: 1, colors: ['#ff9a3c', '#ffd166', '#e0471f'] });
         this.effects.burst(at, { count: 1, speed: 0.3, up: 1, life: 2.2, size: 0.12, grow: 3, gravity: -0.4, drag: 0.4, soft: true, colors: ['#3a3634', '#55504c'] });
         this.chimneys.set(e.id, this.time + (frac < 0.3 ? 0.12 : 0.3));
+      } else if (e.type === 'wonder' && e.timer >= 0) {
+        // A finished wonder glitters.
+        const at = new THREE.Vector3(e.x + (Math.random() - 0.5) * 4, base + 1 + Math.random() * 3, e.y + (Math.random() - 0.5) * 4);
+        this.effects.burst(at, { count: 3, speed: 0.5, up: 1, life: 1.4, size: 0.05, gravity: -0.6, colors: ['#ffd166', '#fff3c4'] });
+        this.chimneys.set(e.id, this.time + 0.25);
+      } else if (e.type === 'forge' && s.players[e.owner].epoch >= 1) {
+        const at = new THREE.Vector3(e.x + 0.95, base + 2.2, e.y - 0.75);
+        this.effects.burst(at, { count: 1, speed: 0.15, up: 1, life: 2.6, size: 0.08, grow: 4, gravity: -0.2, drag: 0.3, soft: true, colors: ['#6a6460', '#8a8480'] });
+        if (Math.random() < 0.4) this.effects.burst(at, { count: 2, speed: 0.6, up: 1, life: 0.6, size: 0.025, gravity: -0.5, colors: ['#ffb24a', '#ff7a2a'] });
+        this.chimneys.set(e.id, this.time + 0.6 + Math.random() * 0.5);
       } else if ((e.type === 'house' || e.type === 'towncenter') && s.players[e.owner].epoch >= 1) {
         const at = new THREE.Vector3(e.x + (e.type === 'house' ? 0.45 : -0.6), base + (e.type === 'house' ? 1.6 : 2.4), e.y - 0.3);
         this.effects.burst(at, { count: 1, speed: 0.12, up: 1, life: 3, size: 0.06, grow: 4, gravity: -0.12, drag: 0.3, soft: true, colors: ['#c9c6c2', '#e2dfdb'] });
@@ -310,12 +339,69 @@ export class View {
         }
         case 'swing':
           if (!this.sees(ev.x, ev.y) || ev.ranged) break;
-          this.cue(ev.type === 'citizen' ? 'thud' : 'strike', ev.x, ev.y, 0.75);
+          this.cue(ev.type === 'citizen' || ev.type === 'siege' ? 'thud' : 'strike', ev.x, ev.y, ev.type === 'siege' ? 1 : 0.75);
           break;
-        case 'shot':
+        case 'shot': {
           if (!this.sees(ev.x, ev.y)) break;
-          this.cue(ev.kind === 'bullet' ? 'musket' : ev.kind === 'stone' ? 'sling' : 'bow', ev.x, ev.y, 0.6);
-          if (ev.kind === 'bullet') this.effects.burst(this.ground(s, ev.x, ev.y, 0.5), { count: 3, speed: 0.4, up: 0.6, life: 1.4, size: 0.08, grow: 3, gravity: -0.2, drag: 1, soft: true, colors: ['#e6e2dc', '#cfcac2'] });
+          const k = ev.kind;
+          this.cue(k === 'bullet' ? 'musket' : k === 'ball' ? 'cannon' : k === 'boulder' ? 'catapult' : k === 'spear' ? 'spear' : k === 'stone' ? 'sling' : 'bow', ev.x, ev.y, k === 'ball' ? 0.9 : 0.6);
+          if (k === 'bullet' || k === 'ball') {
+            const big = k === 'ball';
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.5), { count: big ? 10 : 3, speed: big ? 0.9 : 0.4, up: 0.6, life: big ? 2.4 : 1.4, size: big ? 0.16 : 0.08, grow: 3, gravity: -0.2, drag: 1, soft: true, colors: ['#e6e2dc', '#cfcac2'] });
+            if (big) this.effects.burst(this.ground(s, ev.x, ev.y, 0.4), { count: 6, speed: 1.5, life: 0.25, size: 0.07, gravity: 0, colors: ['#ffd27a', '#ff9a3c'] });
+          }
+          break;
+        }
+        case 'splash': {
+          if (!this.sees(ev.x, ev.y)) break;
+          const at = this.ground(s, ev.x, ev.y, 0.15);
+          this.effects.burst(at, { count: 18, speed: 2, up: 0.8, life: 1.6, size: 0.18, grow: 2.5, gravity: -0.1, drag: 1.4, soft: true, colors: ['#9a8a74', '#b3a594', '#6a5e52'] });
+          this.effects.burst(at, { count: 10, speed: 2.6, up: 0.9, life: 0.9, size: 0.05, gravity: 6, drag: 0.3, colors: ['#7d7a72', '#5a4a3a'] });
+          this.effects.ring(at, '#d9c7a8', ev.kind === 'boulder' ? 2.2 : 1.6, 0.7);
+          this.cue('impact', ev.x, ev.y, 0.9);
+          break;
+        }
+        case 'animalDie':
+          if (!this.sees(ev.x, ev.y)) break;
+          this.effects.burst(this.ground(s, ev.x, ev.y, 0.1), { count: 5, speed: 0.6, up: 0.4, life: 0.8, size: 0.05, grow: 1.8, gravity: -0.1, drag: 1.5, soft: true, colors: ['#bba98a', '#d6c7aa'] });
+          this.resources.markDirty();
+          break;
+        case 'researched':
+          if (ev.owner === this.viewer) this.onCue?.('research', 0, 1);
+          break;
+        case 'converted': {
+          if (!this.sees(ev.x, ev.y) && ev.from !== this.viewer && ev.to !== this.viewer) break;
+          const at = this.ground(s, ev.x, ev.y, 0.1);
+          this.effects.ring(at, '#fff3c4', 1.4, 1.2);
+          this.effects.burst(at.clone().setY(at.y + 0.6), { count: 24, speed: 1.2, up: 1, life: 1.4, size: 0.05, gravity: -0.8, colors: ['#fff3c4', '#ffd166', '#ffffff'] });
+          this.cue('convert', ev.x, ev.y, 1);
+          break;
+        }
+        case 'healed':
+          if (!this.sees(ev.x, ev.y)) break;
+          this.effects.burst(this.ground(s, ev.x, ev.y, 0.7), { count: 3, speed: 0.3, up: 1, life: 1, size: 0.05, gravity: -0.8, colors: ['#9dff9a', '#d8ffd6'] });
+          this.cue('heal', ev.x, ev.y, 0.4);
+          break;
+        case 'garrison': {
+          const b = s.byId.get(ev.building);
+          if (b && ev.owner === this.viewer) this.cue('shelter', b.x, b.y, 0.5);
+          break;
+        }
+        case 'bell':
+          if (ev.owner === this.viewer) this.onCue?.(ev.ring ? 'townBell' : 'allClear', 0, 1);
+          break;
+        case 'wonder': {
+          const at = this.ground(s, ev.x, ev.y, 0.2);
+          if (ev.owner === this.viewer || this.sees(ev.x, ev.y)) {
+            this.effects.ring(at, '#ffd166', 7, 2);
+            this.effects.burst(at.clone().setY(at.y + 3), { count: 80, speed: 3.5, up: 0.9, life: 2.4, size: 0.08, gravity: 1.5, colors: ['#ffd166', '#fff3c4', '#ffb347'] });
+          }
+          this.onCue?.('wonder', 0, 1);
+          this.onPing?.(ev.x, ev.y, '#ffd166');
+          break;
+        }
+        case 'trade':
+          if (ev.owner === this.viewer) this.onCue?.('coin', 0, 1);
           break;
         case 'die': {
           if (!ev.building) {
@@ -384,6 +470,10 @@ export class View {
             this.effects.burst(at, { count: 2, speed: 0.6, up: 0.6, life: 0.6, size: 0.05, grow: 2, gravity: 0, drag: 1.4, soft: true, colors: ['#c9b79c'] });
             this.cue('hammer', ev.x, ev.y, 0.35);
           } else if (ev.act === 'forage' || ev.act === 'farm') this.cue('rustle', ev.x, ev.y, 0.18);
+          else if (ev.act === 'chant') {
+            this.cue('chant', ev.x, ev.y, 0.5);
+            this.effects.burst(at.clone().setY(at.y + 0.5), { count: 4, speed: 0.4, up: 1, life: 1.2, size: 0.04, gravity: -0.6, colors: ['#fff3c4', '#ffd166'] });
+          }
           break;
         }
         case 'depleted':
@@ -484,6 +574,14 @@ export class View {
       }
     }
     if (best !== null) return { kind: 'unit', id: best };
+    for (const a of this.units.animalScreen) {
+      const d = Math.hypot(a.sx - px, a.sy - py);
+      if (d < a.r * 1.3 && d < bestD) {
+        bestD = d;
+        best = a.id;
+      }
+    }
+    if (best !== null) return { kind: 'animal', id: best };
     this.raycaster.setFromCamera(this.ndc(clientX, clientY), this.rig.camera);
     const hits = this.raycaster.intersectObjects([...this.buildings.pickables(), ...this.resources.pickables()], true);
     for (const h of hits) {

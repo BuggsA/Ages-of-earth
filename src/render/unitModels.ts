@@ -301,7 +301,197 @@ function cavalry(epoch: number): Kit {
   return k;
 }
 
-const MAKERS: Record<UnitType, (epoch: number) => Kit> = { citizen, infantry, ranged, cavalry };
+// ---- Siege -----------------------------------------------------------------------------------------
+
+function wheel(k: Kit, x: number, z: number, r: number, color = WOOD): void {
+  const w = k.cyl(r, r, 0.05, 10, color, x, r, z);
+  w.rotation.z = Math.PI / 2;
+  w.position.y = r;
+  const hub = k.cyl(r * 0.3, r * 0.3, 0.07, 6, IRON, x, r, z);
+  hub.rotation.z = Math.PI / 2;
+  hub.position.y = r;
+}
+
+function siege(epoch: number): Kit {
+  const k = new Kit();
+  if (epoch <= 1) {
+    // Battering ram: a roofed frame on four wheels, a log with a bronze head swinging inside.
+    for (const [x, z] of [[-0.24, 0.26], [0.24, 0.26], [-0.24, -0.26], [0.24, -0.26]]) wheel(k, x, z, 0.11);
+    k.box(0.42, 0.06, 0.78, WOOD, 0, 0.16, 0);
+    for (const [x, z] of [[-0.19, 0.3], [0.19, 0.3], [-0.19, -0.3], [0.19, -0.3]]) k.box(0.05, 0.36, 0.05, WOOD, x, 0.2, z);
+    k.prism(0.84, 0.24, 0.52, '#8a6a46', 0, 0.56, 0);
+    k.team(k.box(0.53, 0.04, 0.86, TEAM, 0, 0.55, 0));
+    const ram = k.limb(k.group(0, 0, 0), RIG_ARM, 0.5, 0);
+    const log = k.cyl(0.07, 0.07, 0.9, 7, '#7a5636', 0, 0.36, 0.05, ram);
+    log.rotation.x = Math.PI / 2;
+    log.position.y = 0.36;
+    k.cone(0.09, 0.12, 7, BRONZE, 0, 0.36, 0.5, ram).rotation.x = Math.PI / 2;
+    return k;
+  }
+  if (epoch === 2) {
+    // Catapult: a heavy frame, a throwing arm with a sling cup, a team pennant.
+    for (const [x, z] of [[-0.26, 0.28], [0.26, 0.28], [-0.26, -0.28], [0.26, -0.28]]) wheel(k, x, z, 0.12);
+    k.box(0.5, 0.08, 0.8, WOOD, 0, 0.18, 0);
+    k.box(0.06, 0.38, 0.06, WOOD, -0.18, 0.26, 0.05);
+    k.box(0.06, 0.38, 0.06, WOOD, 0.18, 0.26, 0.05);
+    k.box(0.42, 0.06, 0.08, WOOD, 0, 0.6, 0.05);
+    const arm = k.limb(k.group(0, 0, 0), RIG_ARM, 0.3, -0.05);
+    const beam = k.box(0.07, 0.07, 0.7, '#8a6440', 0, 0.27, -0.3, arm);
+    beam.rotation.x = -0.2;
+    k.sphere(0.09, '#5b4330', 0, 0.36, -0.62, arm);
+    k.sphere(0.06, '#8a8a84', 0, 0.42, -0.62, arm);
+    k.cyl(0.015, 0.015, 0.5, 4, WOOD, 0.22, 0.2, -0.32);
+    k.team(k.box(0.01, 0.12, 0.18, TEAM, 0.22, 0.58, -0.24));
+    return k;
+  }
+  // Bombard: a great iron barrel on a two-wheeled carriage, a team flag.
+  wheel(k, -0.26, 0.05, 0.2, '#5b4330');
+  wheel(k, 0.26, 0.05, 0.2, '#5b4330');
+  k.box(0.3, 0.1, 0.8, WOOD, 0, 0.16, -0.12).rotation.x = -0.12;
+  const barrel = k.limb(k.group(0, 0, 0), RIG_ARM, 0.32, 0.05);
+  const tube = k.cyl(0.085, 0.11, 0.8, 10, '#3f4247', 0, 0.32, 0.2, barrel);
+  tube.rotation.x = Math.PI / 2 - 0.12;
+  tube.position.set(0, 0.36, 0.2);
+  k.cyl(0.12, 0.12, 0.06, 10, '#c8a040', 0, 0.3, -0.18, barrel).rotation.x = Math.PI / 2;
+  k.sphere(0.05, '#2b2b2b', 0.12, 0.08, -0.4);
+  k.sphere(0.05, '#2b2b2b', 0.17, 0.08, -0.36);
+  k.cyl(0.015, 0.015, 0.55, 4, '#5b4330', -0.2, 0.2, -0.45);
+  k.team(k.box(0.01, 0.14, 0.2, TEAM, -0.2, 0.6, -0.37));
+  return k;
+}
+
+// ---- Priests ---------------------------------------------------------------------------------------
+
+function priest(epoch: number): Kit {
+  const k = new Kit();
+  const robe = epoch <= 1 ? '#f2ecdc' : epoch === 2 ? '#7a5a3a' : '#f4f0e6';
+  // Feet peep out under a long robe; the robe sways as one with the body.
+  const legA = k.limb(k.group(0, 0, 0), RIG_LEG_A, HIP, 0);
+  k.box(0.07, 0.05, 0.1, BOOT, -0.045, 0, 0.02, legA);
+  const legB = k.limb(k.group(0, 0, 0), RIG_LEG_B, HIP, 0);
+  k.box(0.07, 0.05, 0.1, BOOT, 0.045, 0, 0.02, legB);
+  k.cyl(0.1, 0.15, 0.42, 8, robe, 0, 0.03, 0);
+  k.team(k.box(0.05, 0.36, 0.02, TEAM, 0, 0.08, 0.1));
+  k.sphere(0.066, SKIN, 0, 0.5, 0.005);
+  k.box(0.05, 0.17, 0.06, robe, -0.12, SHOULDER - 0.16, 0);
+  const arm = k.limb(k.group(0, 0, 0), RIG_ARM, SHOULDER, 0);
+  k.box(0.05, 0.17, 0.06, robe, 0.12, SHOULDER - 0.16, 0, arm);
+  if (epoch <= 1) {
+    k.cyl(0.05, 0.07, 0.12, 8, '#e2b23c', 0, 0.54, 0);
+    k.glow(k.sphere(0.03, '#ffe08a', 0, 0.68, 0));
+  } else if (epoch === 2) {
+    k.sphere(0.075, robe, 0, 0.52, -0.02).scale.set(1, 0.9, 1.05);
+    k.team(k.box(0.18, 0.025, 0.12, TEAM, 0, 0.27, 0));
+  } else {
+    k.cone(0.06, 0.17, 4, TEAM, 0, 0.55, 0);
+    k.team(k.cone(0.065, 0.17, 4, TEAM, 0, 0.55, 0));
+    k.box(0.02, 0.1, 0.006, '#e2b23c', 0, 0.58, 0.04);
+  }
+  const g = k.group(0.12, SHOULDER - 0.18, 0.03, arm);
+  g.rotation.x = 0.3;
+  k.cyl(0.012, 0.012, 0.62, 4, epoch === 2 ? WOOD : '#e2b23c', 0, -0.25, 0, g);
+  if (epoch === 2) {
+    k.box(0.12, 0.02, 0.02, WOOD, 0, 0.28, 0, g);
+  } else k.glow(k.octa(0.045, '#ffe08a', 0, 0.4, 0, g));
+  return k;
+}
+
+// ---- Heroes ----------------------------------------------------------------------------------------
+
+const GOLD = '#e2b23c';
+
+function hero(epoch: number): Kit {
+  const k = new Kit();
+  if (epoch === 0) {
+    // Chieftain: a team-colored fur cloak, a feathered crown, a great stone axe.
+    const b = person(k, { legs: SKIN, torso: FUR_DARK, belt: GOLD });
+    k.team(k.box(0.22, 0.32, 0.04, TEAM, 0, 0.14, -0.08));
+    hairOrHat(k, 0);
+    k.glow(k.cyl(0.075, 0.075, 0.03, 8, GOLD, 0, 0.55, 0));
+    for (let i = 0; i < 5; i++) k.team(k.cone(0.015, 0.12, 3, TEAM, -0.05 + i * 0.025, 0.56, -0.04)).rotation.x = -0.3;
+    held(b, (kk, g) => {
+      kk.cyl(0.016, 0.016, 0.42, 5, WOOD, 0, -0.05, 0, g);
+      kk.box(0.04, 0.12, 0.16, '#7d7a72', 0, 0.32, 0.05, g);
+    });
+    return k;
+  }
+  if (epoch === 1) {
+    // Warlord: golden cuirass, crested helmet, a team cape, sword and round shield.
+    const b = person(k, { legs: SKIN, torso: GOLD, belt: LEATHER });
+    k.team(k.box(0.22, 0.38, 0.03, TEAM, 0, 0.08, -0.08));
+    k.dome(0.078, GOLD, 0, 0.5, 0);
+    k.team(k.box(0.025, 0.08, 0.2, TEAM, 0, 0.56, -0.02));
+    const shield = k.cyl(0.12, 0.12, 0.03, 10, GOLD, -0.16, 0.25, 0.04);
+    shield.rotation.z = Math.PI / 2;
+    held(b, (kk, g) => {
+      kk.box(0.02, 0.36, 0.035, '#e8e2d0', 0, 0.1, 0, g);
+      kk.box(0.08, 0.02, 0.03, GOLD, 0, -0.06, 0, g);
+    });
+    return k;
+  }
+  // Mounted heroes: a paladin on a white horse, a general on a black one.
+  const saddle = horse(k, epoch === 2 ? '#ecebe6' : '#2a2421', { color: TEAM, team: true });
+  k.box(0.24, 0.03, 0.48, GOLD, 0, saddle - 0.2, -0.01);
+  const rider = k.group(0, saddle, -0.03);
+  if (epoch === 2) {
+    const b = person(k, { legs: GOLD, torso: GOLD, at: rider, y: -0.12, mounted: true });
+    k.team(k.box(0.22, 0.3, 0.03, TEAM, 0, 0.0, -0.08, rider));
+    k.cyl(0.072, 0.072, 0.11, 8, GOLD, 0, 0.32, 0, rider);
+    k.glow(k.cyl(0.08, 0.08, 0.03, 8, '#ffe08a', 0, 0.44, 0, rider));
+    held(b, (kk, g) => {
+      kk.box(0.02, 0.4, 0.035, '#f2f2f2', 0, 0.1, 0, g);
+      kk.box(0.09, 0.02, 0.03, GOLD, 0, -0.08, 0, g);
+    }, SHOULDER - 0.3, 1.0);
+    return k;
+  }
+  const b = person(k, { legs: '#e8e2d0', torso: TEAM, torsoTeam: true, at: rider, y: -0.12, mounted: true });
+  k.box(0.19, 0.03, 0.03, GOLD, 0, 0.29, 0.02, rider);
+  for (const x of [-0.1, 0.1]) k.box(0.06, 0.02, 0.07, GOLD, x, 0.3, 0, rider);
+  k.box(0.2, 0.05, 0.08, '#1d1d22', 0, 0.42, 0, rider).scale.set(1, 1, 0.9);
+  k.cone(0.06, 0.06, 6, '#1d1d22', 0, 0.44, 0, rider);
+  k.glow(k.sphere(0.02, GOLD, 0.06, 0.46, 0.04, rider));
+  held(b, (kk, g) => {
+    kk.box(0.012, 0.34, 0.03, '#e8e2d0', 0, 0.04, 0, g).rotation.x = 0.15;
+    kk.box(0.05, 0.015, 0.02, GOLD, 0, -0.1, 0, g);
+  }, SHOULDER - 0.3, 1.0);
+  return k;
+}
+
+const MAKERS: Record<UnitType, (epoch: number) => Kit> = { citizen, infantry, ranged, cavalry, siege, priest, hero };
+
+// ---- Deer ------------------------------------------------------------------------------------------
+
+function deer(): Kit {
+  const k = new Kit();
+  const coat = '#a8703e';
+  const LEG = 0.24;
+  for (const [x, z, rig] of [[-0.05, 0.12, RIG_LEG_A], [0.05, 0.12, RIG_LEG_B], [-0.05, -0.12, RIG_LEG_B], [0.05, -0.12, RIG_LEG_A]] as [number, number, number][]) {
+    const g = k.limb(k.group(0, 0, 0), rig, LEG, z);
+    k.box(0.035, LEG, 0.04, coat, x, 0, z, g);
+  }
+  k.box(0.13, 0.13, 0.34, coat, 0, LEG, 0);
+  k.box(0.1, 0.03, 0.28, '#e8dcc6', 0, LEG - 0.01, 0);
+  const neck = k.box(0.06, 0.18, 0.07, coat, 0, LEG + 0.08, 0.15);
+  neck.rotation.x = 0.4;
+  const head = k.box(0.07, 0.07, 0.14, coat, 0, LEG + 0.22, 0.22);
+  head.rotation.x = 0.3;
+  k.box(0.04, 0.04, 0.03, '#f2ece0', 0, LEG + 0.09, -0.18);
+  for (const x of [-0.04, 0.04]) {
+    const a = k.cyl(0.006, 0.008, 0.14, 3, '#d9c7a0', x, LEG + 0.28, 0.2);
+    a.rotation.z = x * 6;
+    const t = k.cyl(0.005, 0.005, 0.06, 3, '#d9c7a0', x * 1.6, LEG + 0.38, 0.22);
+    t.rotation.x = 0.8;
+  }
+  return k;
+}
+
+let deerGeo: THREE.BufferGeometry | null = null;
+
+/** The deer, rigged to walk and run. */
+export function deerGeometry(): THREE.BufferGeometry {
+  deerGeo ??= bake(deer().root);
+  return deerGeo;
+}
 
 const cache = new Map<string, THREE.BufferGeometry>();
 

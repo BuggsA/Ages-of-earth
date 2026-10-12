@@ -22,7 +22,26 @@
           <h1>Ages <span>of</span> Earth</h1>
           <p class="tagline">Lead your people from the Stone Age to the age of gunpowder.</p>
           <div class="setup">
-            <label>Opponent
+            <label>Your people
+              <select id="opt-civ"></select>
+            </label>
+            <label>Color
+              <select id="opt-color"></select>
+            </label>
+            <label>Opponents
+              <select id="opt-foes">
+                <option value="1" selected>1 rival</option>
+                <option value="2">2 rivals</option>
+                <option value="3">3 rivals</option>
+              </select>
+            </label>
+            <label>Teams
+              <select id="opt-teams">
+                <option value="ffa" selected>Everyone for themselves</option>
+                <option value="ally">You and a computer ally</option>
+              </select>
+            </label>
+            <label>Difficulty
               <select id="opt-diff">
                 <option value="easy">Easy</option>
                 <option value="normal" selected>Normal</option>
@@ -30,39 +49,61 @@
               </select>
             </label>
             <label>Map
+              <select id="opt-map"></select>
+            </label>
+            <label>Map size
               <select id="opt-size">
                 <option value="small">Small</option>
                 <option value="medium" selected>Medium</option>
                 <option value="large">Large</option>
               </select>
             </label>
-            <label>Color
-              <select id="opt-color"></select>
+            <label>Start in
+              <select id="opt-epoch">
+                <option value="0" selected>Stone Age</option>
+                <option value="1">Bronze Age</option>
+                <option value="2">Middle Ages</option>
+                <option value="3">Gunpowder Age</option>
+              </select>
+            </label>
+            <label>Peace treaty
+              <select id="opt-peace">
+                <option value="0" selected>None</option>
+                <option value="5">5 minutes</option>
+                <option value="10">10 minutes</option>
+                <option value="20">20 minutes</option>
+              </select>
             </label>
             <label>Map seed
               <span class="seed-row"><input id="opt-seed" type="number" min="1" /><button class="btn small" data-act="reroll" title="A new map">🎲</button></span>
             </label>
-            <label>Graphics
+            <label class="wide">Graphics
               <select id="opt-quality">
                 <option value="high">High: shadows, bloom</option>
                 <option value="medium">Medium: shadows</option>
                 <option value="low">Low: fastest</option>
               </select>
             </label>
+            <div id="civ-blurb" class="civ-blurb"></div>
           </div>
-          <button class="btn primary big" data-act="start">Play</button>
+          <div class="title-buttons">
+            <button class="btn primary big" data-act="start">Play</button>
+            <button class="btn big hidden" id="continue-btn" data-act="continue">Continue saved game</button>
+          </div>
           <details class="howto">
             <summary>How to play</summary>
             <ul>
-              <li><b>Goal:</b> destroy every building and unit of your rival before they do it to you.</li>
+              <li><b>Goal:</b> destroy every rival town (walls, farms and gates don't count), or build a Wonder and keep it standing until its countdown ends.</li>
               <li><b>Select</b> with a left click, or drag a box around units. Shift adds to the selection; double-click picks every unit of that kind on screen.</li>
-              <li><b>Command</b> with a right click: on the ground to move, on an enemy to attack, on trees, berries, stone or gold to gather, on your building site to help build, on a farm to work it.</li>
-              <li><b>Citizens</b> gather food, wood, stone and gold and carry it to your Town Center or a Storehouse. Press <kbd>B</kbd> with citizens selected to build.</li>
+              <li><b>Command</b> with a right click: on the ground to move, on an enemy to attack, on trees, berries, stone or gold to gather, on a deer to hunt it, on your building site to help build, on a farm to work it, on a Town Center or tower to shelter inside. Hold <kbd>Shift</kbd> to queue orders one after another.</li>
+              <li><b>Citizens</b> gather food, wood, stone and gold and carry it to your Town Center or a Storehouse. With citizens selected, <kbd>B</kbd> opens the town buildings and <kbd>V</kbd> the military ones. Drag to lay out a wall.</li>
+              <li><b>Technologies</b> at the Town Center, Storehouse, Forge and others make your people faster and your soldiers stronger. <b>Priests</b> heal and convert enemies; a <b>hero</b> inspires the soldiers near them. The <b>Market</b> trades goods for gold.</li>
+              <li><b>Danger?</b> Ring the town bell at the Town Center (<kbd>R</kbd>): citizens run inside and the Town Center shoots more arrows.</li>
               <li><b>Houses</b> make room for 5 more people. <b>Farms</b> never run out once the berries do.</li>
-              <li><b>The triangle:</b> infantry beat cavalry, archers beat infantry, cavalry beat archers. Mix your army.</li>
+              <li><b>The triangle:</b> infantry beat cavalry, archers beat infantry, cavalry beat archers and siege. Siege engines smash buildings. Mix your army; set stances with <kbd>Z</kbd> <kbd>X</kbd> <kbd>C</kbd>.</li>
               <li><b>Epochs:</b> at the Town Center, advance from the Stone Age to the Bronze Age, the Middle Ages and the Gunpowder Age. Every unit re-arms and every building is rebuilt in the new style.</li>
               <li><b>Camera:</b> arrow keys, the screen edges, middle-drag or Space+drag to pan; the wheel zooms; <kbd>[</kbd> and <kbd>]</kbd> turn the view and <kbd>Backspace</kbd> straightens it. Click the minimap to jump.</li>
-              <li><b>Keys:</b> <kbd>.</kbd> next idle citizen, <kbd>H</kbd> Town Center, <kbd>Ctrl</kbd>+<kbd>1</kbd>–<kbd>9</kbd> make a group and <kbd>1</kbd>–<kbd>9</kbd> recall it, <kbd>A</kbd> attack-move, <kbd>Del</kbd> delete, <kbd>P</kbd> pause, <kbd>Alt</kbd> shows all health bars, <kbd>F10</kbd> menu.</li>
+              <li><b>Keys:</b> <kbd>.</kbd> next idle citizen, <kbd>,</kbd> your whole army, <kbd>H</kbd> Town Center, <kbd>Ctrl</kbd>+<kbd>1</kbd>–<kbd>9</kbd> make a group and <kbd>1</kbd>–<kbd>9</kbd> recall it, <kbd>A</kbd> attack-move, <kbd>Del</kbd> delete, <kbd>P</kbd> pause, <kbd>Alt</kbd> shows all health bars, <kbd>F10</kbd> menu.</li>
             </ul>
           </details>
           <p class="footnote">Best on a laptop or desktop with a mouse. All sound is made live in your browser.</p>
@@ -82,6 +123,8 @@
           <button class="tb-btn" id="sound-btn" data-act="sound" title="Sound on or off (M)">🔊</button>
           <button class="tb-btn" data-act="menu" title="Menu (F10)">☰ Menu</button>
         </header>
+        <div id="timers"></div>
+        <div id="tip-box" class="tip-box hidden"></div>
         <div id="notices" aria-live="polite"></div>
         <div id="banner" class="banner"></div>
         <div id="bottom">
