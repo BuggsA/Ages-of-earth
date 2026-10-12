@@ -1,7 +1,8 @@
 /**
  * Music made as it plays, one style per epoch: a drone, hand drums and a bone flute in the Stone Age;
  * a lyre and frame drum in a desert mode in the Bronze Age; recorder and lute in the Dorian mode in the
- * Middle Ages; harpsichord and strings in the Gunpowder Age. Phrases are invented on the spot from
+ * Middle Ages; harpsichord and strings in the Gunpowder Age; a brass band with oom-pah and snare in the
+ * Industrial Age. Phrases are invented on the spot from
  * short motifs that come back with changes, with rests between sections so it never nags. When a
  * battle starts the drums come in harder.
  *
@@ -17,9 +18,9 @@ interface Style {
   scale: number[];
   /** Chords as scale degrees, one per bar, cycled. */
   chords: number[];
-  lead: 'flute' | 'pluck' | 'recorder' | 'harpsichord';
-  accomp: 'drone' | 'lyre' | 'lute' | 'strings';
-  drums: 'hand' | 'frame' | 'tabor' | 'timpani';
+  lead: 'flute' | 'pluck' | 'recorder' | 'harpsichord' | 'cornet';
+  accomp: 'drone' | 'lyre' | 'lute' | 'strings' | 'oompah';
+  drums: 'hand' | 'frame' | 'tabor' | 'timpani' | 'snare';
   /** How busy the tune is (chance of a note on each half beat). */
   density: number;
 }
@@ -29,6 +30,7 @@ const STYLES: Style[] = [
   { bpm: 76, root: 164.81, scale: [0, 1, 4, 5, 7, 8, 10], chords: [0, 0, 6, 0, 3, 3, 6, 0], lead: 'pluck', accomp: 'lyre', drums: 'frame', density: 0.4 },
   { bpm: 84, root: 146.83, scale: [0, 2, 3, 5, 7, 9, 10], chords: [0, 6, 3, 0, 0, 6, 4, 0], lead: 'recorder', accomp: 'lute', drums: 'tabor', density: 0.42 },
   { bpm: 92, root: 196.0, scale: [0, 2, 3, 5, 7, 8, 10], chords: [0, 3, 4, 0, 5, 2, 4, 0], lead: 'harpsichord', accomp: 'strings', drums: 'timpani', density: 0.5 },
+  { bpm: 104, root: 174.61, scale: [0, 2, 4, 5, 7, 9, 11], chords: [0, 3, 4, 0, 5, 3, 4, 0], lead: 'cornet', accomp: 'oompah', drums: 'snare', density: 0.48 },
 ];
 
 const LOOKAHEAD = 1.2;
@@ -61,7 +63,7 @@ export class Music {
   }
 
   start(epoch: number): void {
-    this.epoch = epoch;
+    this.epoch = Math.min(epoch, STYLES.length - 1);
     if (this.playing || !this.ctx) {
       this.playing = true;
       return;
@@ -82,6 +84,7 @@ export class Music {
   }
 
   setEpoch(epoch: number): void {
+    epoch = Math.min(epoch, STYLES.length - 1);
     if (epoch === this.epoch) return;
     this.epoch = epoch;
     // A fresh section in the new style.
@@ -132,6 +135,13 @@ export class Music {
         const len = beat * 16;
         this.pad(t, [this.freq(st, 0, -1), this.freq(st, 3, -1)], len + beat * 2, 0.05, 'sine');
         this.droneUntil = t + len;
+      }
+    } else if (st.accomp === 'oompah') {
+      // A band's bass on the strong beats, chords on the off beats.
+      const steps = resting ? 1 : 4;
+      for (let i = 0; i < steps; i++) {
+        if (i % 2 === 0) this.pad(t + i * beat, [this.freq(st, chord + (i === 2 ? 4 : 0), -2)], beat * 0.7, 0.06, 'sawtooth');
+        else this.pad(t + i * beat, [2, 4].map((k) => this.freq(st, chord + k, -1)), beat * 0.45, 0.03, 'sawtooth');
       }
     } else if (st.accomp === 'strings') {
       if (!resting || inSection === 12) this.pad(t, [0, 2, 4].map((k) => this.freq(st, chord + k, -1)), beat * 4.4, 0.035, 'sawtooth');
@@ -197,13 +207,15 @@ export class Music {
     else if (st.lead === 'harpsichord') {
       this.pluck(t, f, 0.13, 0.6, true);
       this.pluck(t, f * 2, 0.04, 0.4, true);
-    } else this.flute(t, f * (st.lead === 'recorder' ? 2 : 1), len * 0.95, st.lead === 'flute' ? 0.06 : 0.05);
+    } else if (st.lead === 'cornet') this.flute(t, f, len * 0.85, 0.045, 'sawtooth', 2.2);
+    else this.flute(t, f * (st.lead === 'recorder' ? 2 : 1), len * 0.95, st.lead === 'flute' ? 0.06 : 0.05);
   }
 
-  private flute(t: number, f: number, len: number, peak: number): void {
+  /** A breathy wind voice: a flute or recorder, or (a brighter wave, filtered) a cornet. */
+  private flute(t: number, f: number, len: number, peak: number, type: OscillatorType = 'triangle', bright = 3): void {
     const ctx = this.ctx!;
     const osc = ctx.createOscillator();
-    osc.type = 'triangle';
+    osc.type = type;
     osc.frequency.value = f;
     const vib = ctx.createOscillator();
     vib.frequency.value = 5;
@@ -212,7 +224,7 @@ export class Music {
     vib.connect(vibAmt).connect(osc.frequency);
     const lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.value = f * 3;
+    lp.frequency.value = f * bright;
     const env = ctx.createGain();
     const end = t + Math.max(0.2, len);
     env.gain.setValueAtTime(0.0001, t);
@@ -293,7 +305,7 @@ export class Music {
     const ctx = this.ctx!;
     const env = ctx.createGain();
     const osc = ctx.createOscillator();
-    const base = st.drums === 'timpani' ? 70 : st.drums === 'hand' ? 120 : 100;
+    const base = st.drums === 'timpani' ? 70 : st.drums === 'hand' ? 120 : st.drums === 'snare' ? 150 : 100;
     osc.frequency.setValueAtTime(low ? base : base * 1.8, t);
     osc.frequency.exponentialRampToValueAtTime(low ? base * 0.6 : base * 1.2, t + 0.25);
     env.gain.setValueAtTime(0.0001, t);

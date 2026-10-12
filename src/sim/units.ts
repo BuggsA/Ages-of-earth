@@ -713,7 +713,10 @@ function boardStep(s: GameState, u: Unit, o: Extract<Order, { k: 'board' }>): vo
   }
   const dx = t.x - u.x;
   const dy = t.y - u.y;
-  if (Math.sqrt(dx * dx + dy * dy) <= statsOf(s, t).radius + statsOf(s, u).radius + 1.2) {
+  const m = o.meet;
+  // With the ship in at the meeting place, those crowding the shore behind the first file climb aboard too.
+  const moored = !!m && (m.wx - t.x) * (m.wx - t.x) + (m.wy - t.y) * (m.wy - t.y) < 1.5 * 1.5;
+  if (Math.sqrt(dx * dx + dy * dy) <= statsOf(s, t).radius + statsOf(s, u).radius + (moored ? 2.6 : 1.6)) {
     stopWalking(u);
     u.inside = t.id;
     u.x = t.x;
@@ -725,13 +728,20 @@ function boardStep(s: GameState, u: Unit, o: Extract<Order, { k: 'board' }>): vo
     s.events.push({ k: 'garrison', owner: u.owner, building: t.id, inside: true });
     return;
   }
-  // The shore nearest the ship, aimed afresh as it moves; once there, wait for it to come in.
-  const g = goalForPoint(s, t.x, t.y, passOf(s, u));
+  // To the meeting place on the shore (or, without one, the shore nearest the ship); then wait for it,
+  // also when the crowd there stops them a little short.
+  const g = m ? goalForPoint(s, m.lx, m.ly, passOf(s, u)) : goalForPoint(s, t.x, t.y, passOf(s, u));
   const gx = g.px - u.x;
   const gy = g.py - u.y;
-  if (gx * gx + gy * gy < 1.5 * 1.5) {
+  const near = gx * gx + gy * gy;
+  if (near < 1.5 * 1.5 || (!walking(u) && near < 3.5 * 3.5 && u.miss > 0)) {
     if (walking(u)) stopWalking(u);
     face(u, t.x, t.y);
+    // A ship lying idle somewhere else comes in to the meeting place.
+    if (t.order.k === 'idle' && !walking(t)) {
+      const at = m ? { x: m.wx, y: m.wy } : coastNear(s, u.x, u.y, 8);
+      if (at && (at.x - t.x) * (at.x - t.x) + (at.y - t.y) * (at.y - t.y) > 1) setOrder(t, { k: 'move', x: at.x, y: at.y, amove: false, started: false });
+    }
     return;
   }
   const moved = u.goal ? Math.abs(u.goal.px - g.px) + Math.abs(u.goal.py - g.py) : 99;
@@ -739,7 +749,68 @@ function boardStep(s: GameState, u: Unit, o: Extract<Order, { k: 'board' }>): vo
     goTo(u, g);
     return;
   }
-  if (!approach(u, g)) setOrder(u, { k: 'idle' });
+  if (!approach(u, g) && near > 5 * 5) setOrder(u, { k: 'idle' });
+}
+
+/**
+ * Where a transport and people on foot near a point can meet: the shore nearest them (by walking) with
+ * water beside it that the ship can sail to. The land point is for them, the water point for the ship.
+ */
+export function landing(s: GameState, ship: Unit, x: number, y: number, team: number): { lx: number; ly: number; wx: number; wy: number } | null {
+  const w = s.w;
+  const n = w * s.h;
+  const queue = new Int32Array(n);
+  // The water the ship can reach.
+  let from = Math.floor(ship.y) * w + Math.floor(ship.x);
+  if (!walkable(s, from % w, (from - (from % w)) / w, NAVAL)) from = nearestWalkable(s, ship.x, ship.y, 4, NAVAL);
+  if (from < 0) return null;
+  const sea = new Uint8Array(n);
+  let head = 0;
+  let tail = 0;
+  sea[from] = 1;
+  queue[tail++] = from;
+  while (head < tail) {
+    const cur = queue[head++];
+    const cx = cur % w;
+    const cy = (cur - cx) / w;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const nx = cx + dx;
+        const ny = cy + dy;
+        if ((!dx && !dy) || nx < 0 || ny < 0 || nx >= w || ny >= s.h) continue;
+        const ni = ny * w + nx;
+        if (sea[ni] || !walkable(s, nx, ny, NAVAL)) continue;
+        sea[ni] = 1;
+        queue[tail++] = ni;
+      }
+    }
+  }
+  // Out from them over land, to the first shore that water touches.
+  const start = nearestWalkable(s, x, y, 12, team);
+  if (start < 0) return null;
+  const land = new Uint8Array(n);
+  head = 0;
+  tail = 0;
+  land[start] = 1;
+  queue[tail++] = start;
+  while (head < tail && head < 6000) {
+    const cur = queue[head++];
+    const cx = cur % w;
+    const cy = (cur - cx) / w;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const nx = cx + dx;
+        const ny = cy + dy;
+        if ((!dx && !dy) || nx < 0 || ny < 0 || nx >= w || ny >= s.h) continue;
+        const ni = ny * w + nx;
+        if (sea[ni]) return { lx: cx + 0.5, ly: cy + 0.5, wx: nx + 0.5, wy: ny + 0.5 };
+        if (land[ni] || !walkable(s, nx, ny, team)) continue;
+        land[ni] = 1;
+        queue[tail++] = ni;
+      }
+    }
+  }
+  return null;
 }
 
 /** The open water nearest a point with land beside it, where a transport can put people ashore. */
@@ -773,7 +844,7 @@ export function coastNear(s: GameState, x: number, y: number, maxR = 14): { x: n
 }
 
 /** Everyone off a transport, onto the land beside it. Returns how many got off. */
-export function unloadAll(s: GameState, ship: Unit): number {
+export function unloadAll(s: GameState, ship: Unit, to?: { x: number; y: number }): number {
   if (!ship.cargo.length) return 0;
   // Land tiles near the ship, nearest first.
   const spots: { x: number; y: number; d: number }[] = [];
@@ -791,6 +862,7 @@ export function unloadAll(s: GameState, ship: Unit): number {
   }
   if (!spots.length) return 0;
   spots.sort((a, b) => a.d - b.d || a.x - b.x || a.y - b.y);
+  const onward = !!to && walkable(s, Math.floor(to.x), Math.floor(to.y), teamOf(s, ship.owner)) && (to.x - spots[0].x) * (to.x - spots[0].x) + (to.y - spots[0].y) * (to.y - spots[0].y) > 2.5 * 2.5;
   let n = 0;
   for (const id of ship.cargo) {
     const u = s.byId.get(id);
@@ -804,6 +876,8 @@ export function unloadAll(s: GameState, ship: Unit): number {
     u.guardX = u.x;
     u.guardY = u.y;
     setOrder(u, { k: 'idle' });
+    // On to the place the player pointed at inland.
+    if (onward) setOrder(u, { k: 'move', x: to!.x + ((n % 3) - 1) * 0.7, y: to!.y + ((Math.floor(n / 3) % 3) - 1) * 0.7, amove: false, started: false });
     n++;
   }
   ship.cargo = [];
@@ -817,7 +891,7 @@ function unloadStep(s: GameState, u: Unit, o: Extract<Order, { k: 'unload' }>): 
     setOrder(u, { k: 'idle' });
     return;
   }
-  const coast = coastNear(s, o.x, o.y);
+  const coast = coastNear(s, o.x, o.y, 24);
   if (!coast) {
     setOrder(u, { k: 'idle' });
     return;
@@ -826,7 +900,7 @@ function unloadStep(s: GameState, u: Unit, o: Extract<Order, { k: 'unload' }>): 
   const dy = coast.y - u.y;
   if (dx * dx + dy * dy <= 1.6 * 1.6) {
     stopWalking(u);
-    if (unloadAll(s, u) > 0) setOrder(u, { k: 'idle' });
+    if (unloadAll(s, u, o) > 0) setOrder(u, { k: 'idle' });
     else if (!approach(u, goalForPoint(s, coast.x, coast.y, NAVAL))) setOrder(u, { k: 'idle' });
     return;
   }

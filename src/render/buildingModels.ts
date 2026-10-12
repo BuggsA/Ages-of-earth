@@ -779,10 +779,10 @@ function gate(k: Kit, e: number, st: Style): void {
 function dock(k: Kit, e: number, st: Style): void {
   pad(k, 3, st.base);
   const deck = e >= 3 ? '#6e5a44' : WOOD;
-  // The pier, on posts, reaching out over the water.
-  k.box(1.1, 0.08, 1.9, deck, 0.4, 0.12, 1.55);
-  for (const x of [-0.1, 0.9]) for (let i = 0; i < 4; i++) k.cyl(0.05, 0.05, 0.6, 5, e >= 3 ? '#3a3a3e' : st.post, x, -0.45, 0.8 + i * 0.6);
-  for (let i = 0; i < 3; i++) k.cyl(0.05, 0.06, 0.14, 6, e >= 4 ? '#2b2b2e' : st.post, 0.95, 0.2, 0.9 + i * 0.6);
+  // The pier, on posts, reaching a little way out over the water (ships moor alongside).
+  k.box(1.1, 0.08, 1.5, deck, 0.4, 0.12, 1.3);
+  for (const x of [-0.1, 0.9]) for (let i = 0; i < 3; i++) k.cyl(0.05, 0.05, 0.6, 5, e >= 3 ? '#3a3a3e' : st.post, x, -0.45, 0.7 + i * 0.6);
+  for (let i = 0; i < 3; i++) k.cyl(0.05, 0.06, 0.14, 6, e >= 4 ? '#2b2b2e' : st.post, 0.95, 0.2, 0.75 + i * 0.5);
   if (e === 0) {
     // Reed huts, nets drying on a frame, a canoe on the bank.
     hut(k, st, -0.6, -0.5, 0.55, 0.5);
@@ -812,8 +812,8 @@ function dock(k: Kit, e: number, st: Style): void {
   }
   // Barrels and a coil of rope; a team flag at the pier's end.
   for (const [x, z] of [[0.15, 0.2], [0.35, 0.3]]) k.cyl(0.1, 0.09, 0.22, 8, '#8a6440', x, 0.0, z);
-  k.cyl(0.02, 0.02, 0.8, 4, '#5b4330', 0.0, 0.2, 2.35);
-  k.team(k.box(0.012, 0.18, 0.28, TEAM, 0, 0.78, 2.49));
+  k.cyl(0.02, 0.02, 0.8, 4, '#5b4330', 0.0, 0.2, 1.95);
+  k.team(k.box(0.012, 0.18, 0.28, TEAM, 0, 0.78, 2.09));
 }
 
 // ---- Airfield --------------------------------------------------------------------------------------

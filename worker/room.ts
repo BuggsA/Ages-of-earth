@@ -252,7 +252,7 @@ export class Room {
     if (typeof u.seed === 'number' && u.seed >= 1 && u.seed < 1e9) this.setup.seed = Math.floor(u.seed);
     if (typeof u.size === 'string' && MAP_SIZES_FOR_ROOMS.includes(u.size)) this.setup.size = u.size;
     if (typeof u.mapType === 'string' && MAP_TYPES_FOR_ROOMS.includes(u.mapType)) this.setup.mapType = u.mapType;
-    if (typeof u.startEpoch === 'number' && u.startEpoch >= 0 && u.startEpoch <= 3) this.setup.startEpoch = Math.floor(u.startEpoch);
+    if (typeof u.startEpoch === 'number' && u.startEpoch >= 0 && u.startEpoch <= 4) this.setup.startEpoch = Math.floor(u.startEpoch);
     if (typeof u.peaceMinutes === 'number' && u.peaceMinutes >= 0 && u.peaceMinutes <= 30) this.setup.peaceMinutes = Math.floor(u.peaceMinutes);
     if (u.mode === 'conquest' || u.mode === 'regicide' || u.mode === 'deathmatch') this.setup.mode = u.mode;
   }

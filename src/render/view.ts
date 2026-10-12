@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { SoundName } from '../audio/sound';
-import { AURA, BUILDINGS, TICK_HZ } from '../sim/data';
+import { AURA, BUILDINGS, TICK_HZ, domainOf } from '../sim/data';
 import { buildingMaxHp, statsFor } from '../sim/stats';
 import type { BuildingType, Ent, GameEvent, GameState, Unit } from '../sim/types';
 import { R_GOLD, R_STONE } from '../sim/types';
@@ -14,8 +14,8 @@ import { Post, QUALITY, loadQuality, saveQuality, type QualityName } from './pos
 import { ResourcesView } from './resourcesView';
 import { Sky } from './sky';
 import { FogTexture, TerrainView, heightAt } from './terrain';
-import { UnitsView } from './unitsView';
-import { WaterView } from './water';
+import { AIR_ALT, UnitsView } from './unitsView';
+import { WATER_Y, WaterView } from './water';
 
 /**
  * The 3D view of a match through one player's eyes: lit terrain and lakes under a sky, woods and
@@ -78,6 +78,12 @@ export class View {
   private height = 1;
   private raycaster = new THREE.Raycaster();
   private chimneys = new Map<number, number>();
+  /** When each ship last left foam or smoke behind. */
+  private wakes = new Map<number, number>();
+  /** The next time an aircraft's drone may be heard. */
+  private droneAt = 0;
+  /** Things to show a moment from now (an aircraft hitting the ground). */
+  private later: { at: number; run: () => void }[] = [];
   private v = new THREE.Vector3();
 
   constructor(private container: HTMLElement) {
@@ -172,6 +178,8 @@ export class View {
     this.rig.groundAt = (x, z) => heightAt(s, x, z);
     this.rig.focus(p.startX, p.startY + 3, true);
     this.chimneys.clear();
+    this.wakes.clear();
+    this.later = [];
   }
 
   /** See the match through another player's eyes, or (with `reveal`) everyone's (replays). */
@@ -229,6 +237,7 @@ export class View {
     this.overlays.setShots(s, alpha, (x, y) => this.sees(x, y));
     this.drawSelection(s, sel);
     this.ambient(s, dt);
+    this.vessels(s);
     this.water.update(this.time, SUN_DIR, this.horizon);
     this.effects.update(dt);
     this.birds.update(this.time, dt, this.rig.target, this.rig.distance);
@@ -252,7 +261,10 @@ export class View {
         const at = this.units.drawn.get(id);
         if (!at) continue;
         const st = statsFor(s, e.owner, e.type);
-        rings.push({ x: at.x, y: at.y, z: at.z, r: st.radius + 0.12, color: e.owner === this.viewer ? own : foe });
+        // An aircraft's ring lies on the ground beneath it.
+        const ry = domainOf(e.type) === 'air' ? Math.max(WATER_Y, heightAt(s, at.x, at.z)) : at.y;
+        rings.push({ x: at.x, y: ry, z: at.z, r: st.radius + 0.12, color: e.owner === this.viewer ? own : foe });
+        if (e.cargo.length && e.owner === this.viewer) rings.push({ x: at.x, y: ry, z: at.z, r: st.radius + 0.3, color: way, thin: true });
         // A hero's reach, and where queued orders lead.
         if (e.type === 'hero') rings.push({ x: at.x, y: at.y, z: at.z, r: AURA.radius, color: aura, thin: true });
         if (e.owner === this.viewer) {
@@ -284,7 +296,9 @@ export class View {
         const at = this.units.drawn.get(e.id);
         if (!at) continue;
         const st = statsFor(s, e.owner, e.type);
-        bars.push({ at: this.v.set(at.x, at.y + (st.mounted ? 1.4 : e.type === 'siege' ? 1.0 : 1.02), at.z).clone(), width: e.type === 'hero' ? 0.7 : 0.55, frac: e.hp / st.hp });
+        const dom = domainOf(e.type);
+        const lift = dom === 'air' ? 0.55 : dom === 'water' ? (e.type === 'fisher' ? 1.1 : 1.6) : st.mounted ? 1.4 : e.type === 'siege' ? 1.0 : 1.02;
+        bars.push({ at: this.v.set(at.x, at.y + lift, at.z).clone(), width: e.type === 'hero' || dom !== 'land' ? 0.7 : 0.55, frac: e.hp / st.hp });
       } else {
         const top = this.buildings.topOf(e.id);
         if (!top) continue;
@@ -339,6 +353,63 @@ export class View {
     }
   }
 
+  /** Foam in the wake of ships under way, steamers' smoke, and the drone of aircraft overhead. */
+  private vessels(s: GameState): void {
+    for (let i = this.later.length - 1; i >= 0; i--) {
+      if (this.later[i].at > this.time) continue;
+      this.later[i].run();
+      this.later.splice(i, 1);
+    }
+    let nearPlane: { x: number; y: number; d: number } | null = null;
+    for (const e of s.ents) {
+      if (e.kind !== 'unit' || e.hp <= 0 || e.inside) continue;
+      const dom = domainOf(e.type);
+      if (dom === 'land') continue;
+      const at = this.units.drawn.get(e.id);
+      if (!at) continue;
+      if (dom === 'air') {
+        const dx = at.x - this.rig.target.x;
+        const dz = at.z - this.rig.target.z;
+        const d = dx * dx + dz * dz;
+        if (!nearPlane || d < nearPlane.d) nearPlane = { x: at.x, y: at.z, d };
+        continue;
+      }
+      const next = this.wakes.get(e.id) ?? 0;
+      if (next > this.time) continue;
+      // Only near where the player is looking.
+      const cx = at.x - this.rig.target.x;
+      const cz = at.z - this.rig.target.z;
+      const near = this.rig.distance * 1.6 + 8;
+      if (cx * cx + cz * cz > near * near) continue;
+      const moving = e.x !== e.px || e.y !== e.py;
+      const steam = s.players[e.owner].epoch >= 4;
+      const fy = Math.sqrt(e.fx * e.fx + e.fy * e.fy) || 1;
+      const bx = e.fx / fy;
+      const by = e.fy / fy;
+      if (moving) {
+        // Foam off the stern and the bow wave.
+        const stern = new THREE.Vector3(at.x - bx * 0.75, WATER_Y + 0.03, at.z - by * 0.75);
+        this.effects.burst(stern, { count: 2, speed: 0.25, up: 0.05, life: 1.6, size: 0.09, grow: 2.5, gravity: 0, drag: 1.2, soft: true, colors: ['#f4fbff', '#dcefff'] });
+        const bow = new THREE.Vector3(at.x + bx * 0.7, WATER_Y + 0.03, at.z + by * 0.7);
+        this.effects.burst(bow, { count: 1, speed: 0.35, up: 0.1, life: 0.8, size: 0.05, grow: 2, gravity: 0, drag: 1.5, soft: true, colors: ['#ffffff'] });
+      }
+      if (steam) {
+        // Coal smoke from the stack.
+        const top = e.type === 'warship' ? 0.75 : e.type === 'transport' ? 1.05 : 0.55;
+        const back = e.type === 'warship' ? -0.15 : e.type === 'transport' ? 0.07 : -0.07;
+        const stack = new THREE.Vector3(at.x + bx * back * 1.3, at.y + top, at.z + by * back * 1.3);
+        this.effects.burst(stack, { count: 1, speed: 0.15, up: 1, life: 2.6, size: 0.1, grow: 4, gravity: -0.25, drag: 0.3, soft: true, colors: ['#3e3a38', '#5a5552'] });
+      }
+      this.wakes.set(e.id, this.time + (moving ? 0.16 : 0.5));
+    }
+    for (const id of this.wakes.keys()) if (!s.byId.has(id)) this.wakes.delete(id);
+    // Now and then, the drone of the nearest aircraft.
+    if (nearPlane && this.time >= this.droneAt) {
+      this.cue('engine', nearPlane.x, nearPlane.y, 0.5);
+      this.droneAt = this.time + 1.3;
+    }
+  }
+
   /** Turn what happened this tick into sights and sounds (only what the viewer can see or hear). */
   events(s: GameState, list: GameEvent[]): void {
     for (const ev of list) {
@@ -359,6 +430,10 @@ export class View {
         case 'shot': {
           if (!this.sees(ev.x, ev.y)) break;
           const k = ev.kind;
+          if (k === 'bomb' || ev.air) {
+            this.cue(k === 'bomb' ? 'bombDrop' : 'mg', ev.x, ev.y, 0.6);
+            break;
+          }
           this.cue(k === 'bullet' ? 'musket' : k === 'ball' ? 'cannon' : k === 'boulder' ? 'catapult' : k === 'spear' ? 'spear' : k === 'stone' ? 'sling' : 'bow', ev.x, ev.y, k === 'ball' ? 0.9 : 0.6);
           if (k === 'bullet' || k === 'ball') {
             const big = k === 'ball';
@@ -370,6 +445,22 @@ export class View {
         case 'splash': {
           if (!this.sees(ev.x, ev.y)) break;
           const at = this.ground(s, ev.x, ev.y, 0.15);
+          if (this.wet(s, ev.x, ev.y)) {
+            // A plume of spray where a shell or bomb meets the water.
+            this.effects.burst(at, { count: 22, speed: 1.2, up: 1, life: 1.2, size: 0.08, grow: 1.5, gravity: 5, drag: 0.4, colors: ['#ffffff', '#dcefff', '#b8dcf0'] });
+            this.effects.ring(at, '#ffffff', 1.4, 0.9);
+            this.cue(ev.kind === 'bomb' ? 'explosion' : 'splashWater', ev.x, ev.y, 0.8);
+            break;
+          }
+          if (ev.kind === 'bomb') {
+            // A bomb: a fireball, a column of black smoke, earth thrown high.
+            this.effects.burst(at, { count: 24, speed: 2.4, up: 0.8, life: 0.7, size: 0.12, grow: 2, gravity: -1, drag: 1.2, colors: ['#ffd27a', '#ff9a3c', '#e0471f'] });
+            this.effects.burst(at, { count: 22, speed: 1.4, up: 1, life: 3.2, size: 0.22, grow: 3.5, gravity: -0.4, drag: 1, soft: true, colors: ['#2e2a28', '#4a4440', '#6a625a'] });
+            this.effects.burst(at, { count: 16, speed: 3.4, up: 1, life: 1.2, size: 0.06, gravity: 6, drag: 0.3, colors: ['#5a4a3a', '#7d7a72'] });
+            this.effects.ring(at, '#ffd27a', 2.6, 0.8);
+            this.cue('explosion', ev.x, ev.y, 1);
+            break;
+          }
           this.effects.burst(at, { count: 18, speed: 2, up: 0.8, life: 1.6, size: 0.18, grow: 2.5, gravity: -0.1, drag: 1.4, soft: true, colors: ['#9a8a74', '#b3a594', '#6a5e52'] });
           this.effects.burst(at, { count: 10, speed: 2.6, up: 0.9, life: 0.9, size: 0.05, gravity: 6, drag: 0.3, colors: ['#7d7a72', '#5a4a3a'] });
           this.effects.ring(at, '#d9c7a8', ev.kind === 'boulder' ? 2.2 : 1.6, 0.7);
@@ -399,7 +490,7 @@ export class View {
           break;
         case 'garrison': {
           const b = s.byId.get(ev.building);
-          if (b && ev.owner === this.viewer) this.cue('shelter', b.x, b.y, 0.5);
+          if (b && ev.owner === this.viewer) this.cue(b.kind === 'unit' ? 'board' : 'shelter', b.x, b.y, 0.5);
           break;
         }
         case 'bell':
@@ -421,9 +512,45 @@ export class View {
         case 'die': {
           if (!ev.building) {
             if (!this.sees(ev.x, ev.y) && ev.owner !== this.viewer) break;
-            this.units.fall(ev.type as Unit['type'], ev.epoch, ev.owner, ev.x, ev.y, ev.fx, ev.fy, ev.id);
-            this.effects.burst(this.ground(s, ev.x, ev.y, 0.1), { count: 4, speed: 0.5, up: 0.4, life: 0.8, size: 0.05, grow: 1.8, gravity: -0.1, drag: 1.5, soft: true, colors: ['#bba98a', '#d6c7aa'] });
-            this.cue('fall', ev.x, ev.y, 0.6);
+            const type = ev.type as Unit['type'];
+            const drawnAt = this.units.drawn.get(ev.id);
+            this.units.fall(type, ev.epoch, ev.owner, ev.x, ev.y, ev.fx, ev.fy, ev.id);
+            const dom = domainOf(type);
+            if (dom === 'water') {
+              // A ship breaks up: spray, splinters, a slick of smoke.
+              const at = this.ground(s, ev.x, ev.y, 0.2);
+              this.effects.burst(at, { count: 26, speed: 1.4, up: 1, life: 1.3, size: 0.08, grow: 1.5, gravity: 5, drag: 0.4, colors: ['#ffffff', '#dcefff'] });
+              this.effects.burst(at, { count: 12, speed: 1.8, up: 0.8, life: 1.4, size: 0.05, gravity: 5, drag: 0.3, colors: ['#6e4f33', '#8a6440'] });
+              this.effects.burst(at, { count: 8, speed: 0.4, up: 1, life: 3, size: 0.18, grow: 3, gravity: -0.3, drag: 0.6, soft: true, colors: ['#3a3634', '#55504c'] });
+              this.cue('splashWater', ev.x, ev.y, 0.9);
+              this.cue('collapse', ev.x, ev.y, 0.5);
+            } else if (dom === 'air') {
+              // Hit in the air: a puff of fire and smoke; it hits the ground a moment later.
+              const up = drawnAt ? drawnAt.clone() : this.ground(s, ev.x, ev.y, AIR_ALT);
+              this.effects.burst(up, { count: 14, speed: 1, up: 0.5, life: 1.6, size: 0.14, grow: 3, gravity: -0.2, drag: 0.8, soft: true, colors: ['#2e2a28', '#4a4440'] });
+              this.effects.burst(up, { count: 10, speed: 1.4, up: 0.5, life: 0.5, size: 0.07, gravity: 0, colors: ['#ffd27a', '#ff9a3c'] });
+              const yaw = Math.atan2(ev.fx, ev.fy);
+              const gx = ev.x + Math.sin(yaw) * 1.2;
+              const gz = ev.y + Math.cos(yaw) * 1.2;
+              this.later.push({
+                at: this.time + 1.35,
+                run: () => {
+                  const at = this.ground(s, gx, gz, 0.2);
+                  if (this.wet(s, gx, gz)) {
+                    this.effects.burst(at, { count: 20, speed: 1.2, up: 1, life: 1.2, size: 0.08, gravity: 5, drag: 0.4, colors: ['#ffffff', '#dcefff'] });
+                    this.cue('splashWater', gx, gz, 0.8);
+                  } else {
+                    this.effects.burst(at, { count: 18, speed: 1.8, up: 0.8, life: 0.6, size: 0.1, grow: 2, gravity: -1, colors: ['#ffd27a', '#ff9a3c', '#e0471f'] });
+                    this.effects.burst(at, { count: 12, speed: 0.8, up: 1, life: 3, size: 0.2, grow: 3, gravity: -0.3, drag: 0.8, soft: true, colors: ['#2e2a28', '#4a4440'] });
+                    this.cue('explosion', gx, gz, 0.7);
+                  }
+                },
+              });
+              this.cue('impact', ev.x, ev.y, 0.5);
+            } else {
+              this.effects.burst(this.ground(s, ev.x, ev.y, 0.1), { count: 4, speed: 0.5, up: 0.4, life: 0.8, size: 0.05, grow: 1.8, gravity: -0.1, drag: 1.5, soft: true, colors: ['#bba98a', '#d6c7aa'] });
+              this.cue('fall', ev.x, ev.y, 0.6);
+            }
           } else {
             if (!this.sees(ev.x, ev.y) && ev.owner !== this.viewer) break;
             this.buildings.ruin(s, ev.type as BuildingType, ev.x, ev.y, ev.size, ev.epoch);
@@ -457,7 +584,8 @@ export class View {
           const u = s.byId.get(ev.id);
           if (!u || ev.owner !== this.viewer) break;
           this.effects.ring(this.ground(s, u.x, u.y, 0.05), '#ffffff', 0.8, 0.6);
-          this.cue(ev.type === 'citizen' ? 'readyCitizen' : 'ready', u.x, u.y, 0.9);
+          const dom = domainOf(ev.type);
+          this.cue(dom === 'water' ? 'shipHorn' : dom === 'air' ? 'engine' : ev.type === 'citizen' ? 'readyCitizen' : 'ready', u.x, u.y, 0.9);
           break;
         }
         case 'epoch': {
@@ -484,6 +612,9 @@ export class View {
           } else if (ev.act === 'build') {
             this.effects.burst(at, { count: 2, speed: 0.6, up: 0.6, life: 0.6, size: 0.05, grow: 2, gravity: 0, drag: 1.4, soft: true, colors: ['#c9b79c'] });
             this.cue('hammer', ev.x, ev.y, 0.35);
+          } else if (ev.act === 'fish') {
+            const w = new THREE.Vector3(ev.x, WATER_Y + 0.05, ev.y);
+            this.effects.burst(w, { count: 4, speed: 0.6, up: 1, life: 0.6, size: 0.03, gravity: 4, colors: ['#ffffff', '#b8dcf0', '#c0c8cc'] });
           } else if (ev.act === 'forage' || ev.act === 'farm') this.cue('rustle', ev.x, ev.y, 0.18);
           else if (ev.act === 'chant') {
             this.cue('chant', ev.x, ev.y, 0.5);
@@ -506,9 +637,14 @@ export class View {
     if (list.some((e) => e.k === 'work' && (e.act === 'chop' || e.act === 'forage' || e.act === 'mine'))) this.resources.markDirty();
   }
 
-  /** A world point on the ground at a map position, lifted a little. */
+  /** A world point on the ground (or the water) at a map position, lifted a little. */
   private ground(s: GameState, x: number, y: number, lift: number): THREE.Vector3 {
-    return new THREE.Vector3(x, heightAt(s, x, y) + lift, y);
+    return new THREE.Vector3(x, Math.max(WATER_Y, heightAt(s, x, y)) + lift, y);
+  }
+
+  /** Whether a map point is open water. */
+  private wet(s: GameState, x: number, y: number): boolean {
+    return heightAt(s, x, y) < WATER_Y - 0.05;
   }
 
   /** Ask for a sound placed by where it happens on screen and how far from the view it is. */

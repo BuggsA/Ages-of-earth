@@ -1,4 +1,4 @@
-import { BUILDINGS, CIVS, NO_MODS, TECHS, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
+import { BUILDINGS, CIVS, EPOCHS, NO_MODS, TECHS, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
 import type { BuildingType, Cost, GameState, Player, TechId, UnitType } from './types';
 import { RES } from './types';
 
@@ -121,7 +121,7 @@ export function techProblem(s: GameState, owner: number, tech: TechId): string |
   const p = s.players[owner];
   const t = TECHS[tech];
   if (p.techs.includes(tech)) return 'Already researched';
-  if (t.epoch > p.epoch) return `Needs the ${['Stone Age', 'Bronze Age', 'Middle Ages', 'Gunpowder Age'][t.epoch]}`;
+  if (t.epoch > p.epoch) return `Needs the ${EPOCHS[t.epoch].name}`;
   if (t.needs && !p.techs.includes(t.needs)) return `Needs ${TECHS[t.needs].name} first`;
   for (const e of s.ents) if (e.kind === 'building' && e.owner === owner && e.queue.some((q) => q.tech === tech)) return 'Already being researched';
   return null;

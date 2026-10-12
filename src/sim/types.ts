@@ -84,7 +84,7 @@ export type Order =
   /** A priest tending a wounded friend. */
   | { k: 'heal'; target: number }
   /** Walk to the shore by a transport ship and go aboard. */
-  | { k: 'board'; target: number }
+  | { k: 'board'; target: number; meet?: { lx: number; ly: number; wx: number; wy: number } }
   /** A transport sailing to a shore to put its passengers ashore there. */
   | { k: 'unload'; x: number; y: number };
 
@@ -310,7 +310,7 @@ export type GameEvent =
   | { k: 'over'; winner: number; how: 'conquest' | 'wonder' | 'resign' }
   | { k: 'refused'; owner: number; why: string }
   | { k: 'left'; owner: number }
-  | { k: 'shot'; owner: number; kind: Shot['kind']; x: number; y: number };
+  | { k: 'shot'; owner: number; kind: Shot['kind']; x: number; y: number; air?: boolean };
 
 export interface GameState {
   tick: number;

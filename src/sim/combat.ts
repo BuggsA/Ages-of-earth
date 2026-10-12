@@ -73,7 +73,8 @@ export function strike(s: GameState, u: Unit, t: Ent): void {
       tx: t.x,
       ty: t.y,
       t: 0,
-      dur: Math.max(2, Math.ceil((d / SHOT_SPEED[st.shot]) * TICK_HZ)),
+      // A bomb takes a while to fall, however close it is dropped.
+      dur: Math.max(st.shot === 'bomb' ? 16 : 2, Math.ceil((d / SHOT_SPEED[st.shot]) * TICK_HZ)),
       damage: damageOf(s, u, st, t, true),
       splash: st.splash ?? 0,
       from: u.type,
@@ -81,7 +82,7 @@ export function strike(s: GameState, u: Unit, t: Ent): void {
       fromAir: domainOf(u.type) === 'air',
     });
     s.events.push({ k: 'swing', id: u.id, target: t.id, x: u.x, y: u.y, owner: u.owner, ranged: true, type: u.type });
-    s.events.push({ k: 'shot', owner: u.owner, kind: st.shot, x: u.x, y: u.y });
+    s.events.push({ k: 'shot', owner: u.owner, kind: st.shot, x: u.x, y: u.y, air: domainOf(u.type) === 'air' });
     return;
   }
   s.events.push({ k: 'swing', id: u.id, target: t.id, x: u.x, y: u.y, owner: u.owner, ranged: false, type: u.type });

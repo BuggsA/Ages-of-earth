@@ -12,7 +12,8 @@ export type SoundName =
   | 'click' | 'open' | 'select' | 'selectBuilding' | 'move' | 'attack' | 'strike' | 'thud' | 'hit' | 'hitBuilding' | 'bow' | 'sling' | 'musket'
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
-  | 'townBell' | 'allClear' | 'research' | 'wonder' | 'shelter';
+  | 'townBell' | 'allClear' | 'research' | 'wonder' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
+  | 'board';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -492,6 +493,43 @@ export class Sound {
         break;
       case 'spear':
         this.noise(out, t, { dur: 0.2, filter: 'bandpass', f: 1300, to: 500, q: 2, peak: 0.12 });
+        break;
+      case 'bombDrop':
+        // The falling whistle.
+        this.tone(out, t, { f: 1500, to: 520, dur: 0.85, peak: 0.07, attack: 0.08 });
+        break;
+      case 'explosion':
+        // A deep blast with a long rumble and debris pattering down.
+        this.noise(out, t, { dur: 0.1, filter: 'highpass', f: 900, peak: 0.6 });
+        this.noise(out, t, { dur: 2.0, f: 700, to: 50, peak: 0.6, attack: 0.003 });
+        this.tone(out, t, { f: 55, to: 24, dur: 1.4, peak: 0.5 });
+        for (let i = 0; i < 4; i++) this.noise(out, t + 0.35 + i * 0.16, { dur: 0.08, filter: 'bandpass', f: 1400 - i * 150, q: 2, peak: 0.06 });
+        break;
+      case 'mg':
+        // A short rattle of a machine gun.
+        for (let i = 0; i < 5; i++) {
+          this.noise(out, t + i * 0.07, { dur: 0.05, filter: 'highpass', f: 1500, peak: 0.25 });
+          this.tone(out, t + i * 0.07, { f: 140, to: 70, dur: 0.06, peak: 0.12 });
+        }
+        break;
+      case 'engine':
+        // A droning radial engine passing by.
+        this.tone(out, t, { f: 82, to: 70, type: 'sawtooth', dur: 1.4, peak: 0.06, attack: 0.4, lp: 420 });
+        this.tone(out, t, { f: 123, to: 104, type: 'square', dur: 1.4, peak: 0.025, attack: 0.4, lp: 600 });
+        this.noise(out, t, { dur: 1.4, f: 500, peak: 0.05, attack: 0.4 });
+        break;
+      case 'shipHorn':
+        // A ship's bell for sail, a steam whistle for steel.
+        this.bell(out, t, N.A5, 0.9, 0.08);
+        this.bell(out, t + 0.22, N.A5, 0.9, 0.06);
+        break;
+      case 'splashWater':
+        this.noise(out, t, { dur: 0.7, filter: 'bandpass', f: 1600, to: 300, q: 0.8, peak: 0.3, attack: 0.01 });
+        this.tone(out, t, { f: 160, to: 60, dur: 0.3, peak: 0.12 });
+        break;
+      case 'board':
+        // Footsteps on planking.
+        for (let i = 0; i < 3; i++) this.noise(out, t + i * 0.11, { dur: 0.06, filter: 'bandpass', f: 500, q: 2.5, peak: 0.15 });
         break;
       case 'chant':
         // A low hum of voices on a fifth, swelling.

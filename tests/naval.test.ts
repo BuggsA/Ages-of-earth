@@ -3,6 +3,7 @@ import { findDockSpot } from '../src/sim/ai';
 import { EPOCHS, TICK_HZ, domainOf } from '../src/sim/data';
 import { checksum, createGame, step, type GameSetup } from '../src/sim/game';
 import { NAVAL, nearestWalkable, placeProblem, walkable } from '../src/sim/grid';
+import { deserialize, serialize } from '../src/sim/save';
 import { coastNear } from '../src/sim/units';
 import type { Building, Command, GameState, Unit } from '../src/sim/types';
 import { R_FISH } from '../src/sim/types';
@@ -134,6 +135,23 @@ describe('transports', () => {
     expect(coastNear(s, far.x, far.y)).toBeTruthy();
   });
 
+  it('a full load meets the ship at a shore both can reach, wherever the ship lies', () => {
+    // Seeds where the shore nearest the ship was cut off from the soldiers, or the ship lay by the dock.
+    for (const seed of [5, 8, 12]) {
+      const s = game({ seed, startEpoch: 2 });
+      const p = s.players[0];
+      const d = dock(s);
+      const w = waterNear(s, d.x, d.y, 4);
+      const ship = spawnUnit(s, 0, 'transport', w.x, w.y);
+      const men = [...Array(10).keys()].map((k) => {
+        const at = landNear(s, p.startX + 3 + (k % 5) * 0.6, p.startY + 3 + Math.floor(k / 5) * 0.6);
+        return spawnUnit(s, 0, 'infantry', at.x, at.y);
+      });
+      run(s, 40, [{ t: 'board', p: 0, ids: men.map((m) => m.id), target: ship.id }]);
+      expect(ship.cargo.length).toBe(10);
+    }
+  });
+
   it('passengers go down with their ship', () => {
     const s = game({ startEpoch: 1 });
     const d = dock(s);
@@ -199,5 +217,25 @@ describe('determinism with ships and planes', () => {
       step(b);
     }
     expect(checksum(a)).toBe(checksum(b));
+  });
+
+  it('a saved sea match with ships, planes and passengers aboard plays on exactly as the original', { timeout: 60000 }, () => {
+    const s = createGame({ seed: 9, size: 'small', mapType: 'sea', startEpoch: 4, players: [{ name: 'A', ai: 'hard' }, { name: 'B', ai: 'normal' }] });
+    for (let i = 0; i < TICK_HZ * 200; i++) step(s);
+    // Put some soldiers aboard a transport too.
+    const d = dock(s);
+    const w = waterNear(s, d.x, d.y, 2);
+    const ship = spawnUnit(s, 0, 'transport', w.x, w.y);
+    const at = landNear(s, d.x, d.y, 2);
+    const man = spawnUnit(s, 0, 'infantry', at.x, at.y);
+    run(s, 25, [{ t: 'board', p: 0, ids: [man.id], target: ship.id }]);
+    expect(ship.cargo).toEqual([man.id]);
+    const t = deserialize(serialize(s));
+    for (let i = 0; i < TICK_HZ * 60; i++) {
+      step(s);
+      step(t);
+    }
+    expect(checksum(t)).toBe(checksum(s));
+    expect(t.ents.some((e) => e.kind === 'unit' && (e.type === 'fighter' || e.type === 'bomber' || e.type === 'fisher'))).toBe(true);
   });
 });

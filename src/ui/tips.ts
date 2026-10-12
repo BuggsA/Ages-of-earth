@@ -1,5 +1,6 @@
 import { BUILDINGS, EPOCHS, LAST_EPOCH } from '../sim/data';
 import type { Building, GameState, Unit } from '../sim/types';
+import { R_FISH } from '../sim/types';
 
 /**
  * Advice for a first game, one tip at a time in a corner: what to do next, given how the match is
@@ -16,6 +17,18 @@ interface Tip {
 const units = (s: GameState, me: number) => s.ents.filter((e): e is Unit => e.kind === 'unit' && e.owner === me && e.hp > 0);
 const buildings = (s: GameState, me: number) => s.ents.filter((e): e is Building => e.kind === 'building' && e.owner === me && e.hp > 0);
 const has = (s: GameState, me: number, type: Building['type']) => buildings(s, me).some((b) => b.type === type);
+/** Whether there are fish within reach of home. */
+const waterNear = (s: GameState, me: number) => {
+  const p = s.players[me];
+  for (let dy = -22; dy <= 22; dy += 2) {
+    for (let dx = -22; dx <= 22; dx += 2) {
+      const x = Math.floor(p.startX) + dx;
+      const y = Math.floor(p.startY) + dy;
+      if (x >= 0 && y >= 0 && x < s.w && y < s.h && s.res[y * s.w + x] === R_FISH) return true;
+    }
+  }
+  return false;
+};
 const secsIn = (s: GameState) => s.tick / 20;
 
 const TIPS: Tip[] = [
@@ -40,6 +53,9 @@ const TIPS: Tip[] = [
   { id: 'forge', when: (s, me) => s.players[me].epoch >= 1 && secsIn(s) > 30 && !has(s, me, 'forge'), text: `A <b>Forge</b> (<kbd>V</kbd> <kbd>R</kbd>) makes every soldier hit harder and take less damage. The <b>${BUILDINGS.market.name}</b> trades surplus goods for gold.` },
   { id: 'queue', when: (s) => secsIn(s) > 420, text: 'Hold <kbd>Shift</kbd> while giving orders to queue them: walk here, then there, then attack. <kbd>,</kbd> selects your whole army.' },
   { id: 'wonder', when: (s, me) => s.players[me].epoch >= 2, text: 'Rich? Build a <b>Wonder</b> (<kbd>B</kbd> <kbd>X</kbd>). If it stands long enough, you win, but everyone will come for it.' },
+  { id: 'dock', when: (s, me) => secsIn(s) > 150 && !has(s, me, 'dock') && waterNear(s, me), text: 'Water nearby! A <b>Dock</b> (<kbd>B</kbd> <kbd>D</kbd>) on the shore trains <b>fishing boats</b>: fish shoals feed you for a long time. Later, warships and transports.' },
+  { id: 'transport', when: (s, me) => units(s, me).some((u) => u.type === 'transport'), text: 'To cross the water, select soldiers and <b>right-click your transport</b> to board. Then select the transport and right-click a far shore to land them.' },
+  { id: 'airfield', when: (s, me) => s.players[me].epoch >= 4 && !has(s, me, 'airfield'), text: 'The Industrial Age brings flight: an <b>Airfield</b> (<kbd>V</kbd> <kbd>F</kbd>) trains fighters and bombers. Only fighters, riflemen and ironclads can shoot them down.' },
 ];
 
 const KEY = 'ages-tips';

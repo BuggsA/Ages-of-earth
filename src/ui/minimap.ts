@@ -1,5 +1,6 @@
+import { domainOf } from '../sim/data';
 import type { GameState } from '../sim/types';
-import { R_BERRY, R_GOLD, R_MEAT, R_STONE, R_TREE, T_ROCK, T_SAND, T_WATER } from '../sim/types';
+import { R_BERRY, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE, T_ROCK, T_SAND, T_WATER } from '../sim/types';
 
 /**
  * The overview map: the land through the player's fog, woods and mines, the buildings they know of,
@@ -103,6 +104,7 @@ export class Minimap {
     const gold = rgb('#ffd24a');
     const stone = rgb('#d8d3c8');
     const berry = rgb('#e0405a');
+    const fish = rgb('#8fe3f2');
     for (let i = 0; i < s.w * s.h; i++) {
       const seen = reveal || p.seen[i];
       const vis = reveal || p.vis[i];
@@ -114,6 +116,7 @@ export class Minimap {
       else if (res === R_GOLD) [r, g, b] = gold;
       else if (res === R_STONE) [r, g, b] = stone;
       else if (res === R_BERRY || res === R_MEAT) [r, g, b] = berry;
+      else if (res === R_FISH) [r, g, b] = fish;
       const k = seen ? (vis ? 1 : 0.55) : 0;
       d[i * 4] = seen ? r * k : 14;
       d[i * 4 + 1] = seen ? g * k : 22;
@@ -149,8 +152,17 @@ export class Minimap {
       if (e.kind !== 'unit' || e.hp <= 0 || e.inside) continue;
       if (e.owner !== viewer && !reveal && !p.vis[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
       ctx.fillStyle = selected.has(e.id) ? '#ffffff' : s.players[e.owner].color;
-      const r = Math.max(1.6, sx * 0.8);
-      ctx.fillRect(e.x * sx - r, e.y * sy - r, r * 2, r * 2);
+      const dom = domainOf(e.type);
+      const r = Math.max(1.6, sx * 0.8) * (dom === 'land' ? 1 : 1.35);
+      if (dom === 'air') {
+        // Aircraft: a little diamond.
+        ctx.beginPath();
+        ctx.moveTo(e.x * sx, e.y * sy - r * 1.2);
+        ctx.lineTo(e.x * sx + r * 1.2, e.y * sy);
+        ctx.lineTo(e.x * sx, e.y * sy + r * 1.2);
+        ctx.lineTo(e.x * sx - r * 1.2, e.y * sy);
+        ctx.fill();
+      } else ctx.fillRect(e.x * sx - r, e.y * sy - r, r * 2, r * 2);
     }
 
     // The camera's view.

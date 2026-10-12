@@ -142,7 +142,29 @@ function carcass(): Kit {
   return k;
 }
 
-const MAKERS = { pine, broadleaf, birch, palm, felled, berryBush, stoneDeposit, goldDeposit, carcass, tuft, flowers, pebbles, boulder };
+/** A shoal of fish at the surface: a dark patch, silver backs breaking the water, one leaping. */
+function fish(): Kit {
+  const k = new Kit();
+  k.cyl(0.46, 0.46, 0.012, 14, '#285a6e', 0, -0.012, 0);
+  k.cyl(0.3, 0.3, 0.012, 12, '#1f4a5c', 0.06, -0.008, -0.04);
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 7) * Math.PI * 2 + (i % 2) * 0.4;
+    const r = 0.12 + (i % 3) * 0.09;
+    const g = k.group(Math.sin(a) * r, 0, Math.cos(a) * r);
+    g.rotation.y = a + Math.PI / 2;
+    k.sphere(0.04, i % 3 ? '#b9c6cc' : '#8fa2aa', 0, 0.008, 0, g, 5).scale.set(0.55, 0.45, 1.9);
+    k.box(0.006, 0.035, 0.03, '#6e8088', 0, 0.03, 0.01, g);
+  }
+  // One leaps clear.
+  const j = k.group(0.22, 0.2, 0.1);
+  j.rotation.set(-0.6, 0.7, 0);
+  k.sphere(0.035, '#d8e2e6', 0, 0, 0, j, 5).scale.set(0.5, 0.6, 2);
+  k.box(0.004, 0.05, 0.03, '#9aaab0', 0, 0, -0.07, j);
+  for (let i = 0; i < 5; i++) k.sphere(0.015 + (i % 2) * 0.008, '#f4fbff', Math.sin(i * 2.3) * 0.25, 0.005, Math.cos(i * 1.7) * 0.25, undefined, 4);
+  return k;
+}
+
+const MAKERS = { pine, broadleaf, birch, palm, felled, berryBush, stoneDeposit, goldDeposit, carcass, tuft, flowers, pebbles, boulder, fish };
 export type NatureKind = keyof typeof MAKERS;
 
 const cache = new Map<NatureKind, THREE.BufferGeometry>();

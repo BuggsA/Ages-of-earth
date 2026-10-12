@@ -2,11 +2,12 @@ import * as THREE from 'three';
 import { AMOUNT } from '../sim/data';
 import { hash2 } from '../sim/rng';
 import type { GameState } from '../sim/types';
-import { R_BERRY, R_MEAT, R_STONE, R_TREE, T_SAND } from '../sim/types';
+import { R_BERRY, R_FISH, R_MEAT, R_STONE, R_TREE, T_SAND } from '../sim/types';
 import { bakedMaterial, swayMaterial } from './materials';
 import { natureGeometry, type NatureKind } from './natureModels';
 import { heightAt } from './terrain';
 import { UNIT_SCALE } from './unitsView';
+import { WATER_Y } from './water';
 
 /**
  * Woods, berry bushes, stone and gold, instanced by kind. Trees that are being cut lie felled beside
@@ -72,7 +73,7 @@ export class ResourcesView {
         const rot = hash2(tx, ty, 33) * Math.PI * 2;
         q.setFromAxisAngle(up, rot);
         const gy = heightAt(s, x, y);
-        const frac = s.amount[i] / (r === R_TREE ? AMOUNT.tree : r === R_BERRY ? AMOUNT.berry : r === R_MEAT ? AMOUNT.meat : r === R_STONE ? AMOUNT.stone : AMOUNT.gold);
+        const frac = s.amount[i] / (r === R_TREE ? AMOUNT.tree : r === R_BERRY ? AMOUNT.berry : r === R_MEAT ? AMOUNT.meat : r === R_STONE ? AMOUNT.stone : r === R_FISH ? AMOUNT.fish : AMOUNT.gold);
         if (r === R_TREE) {
           if (s.amount[i] < AMOUNT.tree) {
             add('felled', i, new THREE.Matrix4().compose(new THREE.Vector3(x, gy, y), q, new THREE.Vector3(1, 1, 1)));
@@ -81,6 +82,10 @@ export class ResourcesView {
           const sc = 0.85 + hash2(tx, ty, 34) * 0.55;
           const kind = s.terrain[i] === T_SAND ? 'palm' : TREE_KINDS[Math.floor(hash2(tx, ty, 35) * (hash2(Math.floor(tx / 6), Math.floor(ty / 6), 36) < 0.5 ? 2 : 3))];
           add(kind, i, new THREE.Matrix4().compose(new THREE.Vector3(x, gy, y), q, new THREE.Vector3(sc, sc * (0.9 + hash2(tx, ty, 37) * 0.3), sc)));
+        } else if (r === R_FISH) {
+          // A shoal thins as it is fished.
+          const sc = 1.6 * (0.6 + 0.4 * Math.max(0, Math.min(1, frac)));
+          add('fish', i, new THREE.Matrix4().compose(new THREE.Vector3(tx + 0.5, WATER_Y + 0.01, ty + 0.5), q, new THREE.Vector3(sc, sc, sc)));
         } else if (r === R_MEAT) {
           // A carcass shrinks as it is butchered.
           const sc = UNIT_SCALE * (0.6 + 0.4 * Math.max(0, Math.min(1, frac)));
@@ -101,7 +106,8 @@ export class ResourcesView {
         }
         const sway = kind !== 'felled' && kind !== 'stoneDeposit' && kind !== 'goldDeposit' && kind !== 'carcass';
         mesh = new THREE.InstancedMesh(natureGeometry(kind), sway ? swayMaterial : bakedMaterial, Math.ceil(list.length * 1.2) + 8);
-        mesh.castShadow = true;
+        // Shoals cast no shadow on the water.
+        mesh.castShadow = kind !== 'fish';
         mesh.receiveShadow = true;
         this.meshes.set(kind, mesh);
         this.group.add(mesh);

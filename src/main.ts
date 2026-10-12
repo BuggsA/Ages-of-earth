@@ -5,13 +5,13 @@ import { CameraRig } from './render/camera';
 import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { wallLine } from './sim/commands';
-import { BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, TECHS, TICK_HZ, unitStats } from './sim/data';
+import { BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, TECHS, TICK_HZ, domainOf, unitStats } from './sim/data';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
-import { placeProblem } from './sim/grid';
-import { findSpot } from './sim/ai';
+import { placeProblem, walkable } from './sim/grid';
+import { findDockSpot, findSpot } from './sim/ai';
 import { placeBuilding, spawnUnit } from './sim/world';
 import type { BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, MapSize, MapType, Unit } from './sim/types';
-import { R_NONE } from './sim/types';
+import { R_FISH, R_NONE } from './sim/types';
 import { NetClient, newRoomCode, saveName, savedName } from './net/client';
 import { HASH_EVERY, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
 import { deserialize, serialize } from './sim/save';
@@ -60,7 +60,7 @@ let placeAt: { tx: number; ty: number; ok: boolean } | null = null;
 /** A wall being dragged out, from tile to tile. */
 let wallDrag: { x0: number; y0: number; x1: number; y1: number } | null = null;
 /** The next left click picks a target: where to attack-move, or a building to shelter in. */
-let targetMode: 'amove' | 'garrison' | null = null;
+let targetMode: 'amove' | 'garrison' | 'unload' | null = null;
 let paused = false;
 const SPEEDS = [1, 1.5, 2, 3];
 let speedIdx = 0;
@@ -89,6 +89,10 @@ const hud = new Hud({
   },
   garrisonMode: () => {
     targetMode = 'garrison';
+    placing = null;
+  },
+  unloadMode: () => {
+    targetMode = 'unload';
     placing = null;
   },
   select: (ids) => setSelection(ids),
@@ -826,6 +830,8 @@ function order(clientX: number, clientY: number, forceAttack = false, queue = fa
   if (pk.kind === 'unit' || pk.kind === 'building') {
     const t = s.byId.get(pk.id);
     if (!t) return;
+    // Your own transport: those on foot go aboard.
+    if (t.kind === 'unit' && t.type === 'transport' && t.owner === viewer && board(s, units, t, q)) return;
     if (t.owner !== viewer && s.players[t.owner].team !== s.players[viewer].team) {
       issue({ t: 'attack', p: viewer, ids, target: t.id, queue: q });
       view.marker(s, t.x, t.y, true);
@@ -851,10 +857,53 @@ function order(clientX: number, clientY: number, forceAttack = false, queue = fa
     ack('move');
     return;
   }
+  // Loaded transports sent onto land put their passengers ashore there; everyone else moves.
+  const loaded = forceAttack ? [] : units.filter((u) => u.type === 'transport' && u.cargo.length);
+  if (loaded.length && walkable(s, Math.floor(pk.x), Math.floor(pk.y))) {
+    issue({ t: 'unload', p: viewer, ids: loaded.map((u) => u.id), x: pk.x, y: pk.y, queue: q });
+    const rest = ids.filter((id) => !loaded.some((u) => u.id === id));
+    if (rest.length) issue({ t: 'move', p: viewer, ids: rest, x: pk.x, y: pk.y, queue: q });
+    view.marker(s, pk.x, pk.y, false);
+    play('move');
+    ack('move');
+    return;
+  }
   issue({ t: 'move', p: viewer, ids, x: pk.x, y: pk.y, amove: forceAttack, queue: q });
   view.marker(s, pk.x, pk.y, forceAttack);
   play(forceAttack ? 'attack' : 'move');
   ack(forceAttack ? 'attack' : 'move');
+}
+
+/** Those of the selection on foot board a transport (the rest sail or fly to it). Whether any could. */
+function board(s: GameState, units: Unit[], ship: Unit, queue: true | undefined): boolean {
+  const riders = units.filter((u) => domainOf(u.type) === 'land');
+  if (!riders.length) return false;
+  const room = (unitStats('transport', s.players[viewer].epoch).capacity ?? 0) - ship.cargo.length;
+  if (room <= 0) {
+    hud.toast('That transport is full', 'bad');
+    play('error');
+    return true;
+  }
+  issue({ t: 'board', p: viewer, ids: riders.map((u) => u.id), target: ship.id, queue });
+  const rest = units.filter((u) => domainOf(u.type) !== 'land' && u.id !== ship.id).map((u) => u.id);
+  if (rest.length) issue({ t: 'move', p: viewer, ids: rest, x: ship.x, y: ship.y, queue });
+  if (riders.length > room) hud.toast(`Room for ${room} more aboard`, 'info');
+  view.marker(s, ship.x, ship.y, false);
+  play('move');
+  ack('move');
+  return true;
+}
+
+/** Sail the selected transports to a shore and land their passengers. */
+function unloadAt(clientX: number, clientY: number, queue: boolean): void {
+  const s = game;
+  if (!s) return;
+  const g = view.groundAt(clientX, clientY);
+  const ships = selectedUnits(s).filter((u) => u.type === 'transport');
+  if (!g || !ships.length) return;
+  issue({ t: 'unload', p: viewer, ids: ships.map((u) => u.id), x: g.x, y: g.y, queue: queue || undefined });
+  view.marker(s, g.x, g.y, false);
+  play('move');
 }
 
 /** Shelter the selection in the building under the pointer. */
@@ -862,9 +911,14 @@ function garrisonAt(clientX: number, clientY: number, queue: boolean): void {
   const s = game;
   if (!s) return;
   const pk = view.pick(clientX, clientY);
+  const ship = pk && pk.kind === 'unit' ? s.byId.get(pk.id) : undefined;
+  if (ship && ship.kind === 'unit' && ship.type === 'transport' && ship.owner === viewer) {
+    board(s, selectedUnits(s).filter((u) => !u.inside), ship, queue || undefined);
+    return;
+  }
   const b = pk && pk.kind === 'building' ? s.byId.get(pk.id) : undefined;
   if (!b || b.kind !== 'building' || b.owner !== viewer || !BUILDINGS[b.type].garrison || !b.built) {
-    hud.toast('Pick your Town Center or a tower to shelter in', 'bad');
+    hud.toast('Pick your Town Center or a tower to shelter in, or a transport to board', 'bad');
     play('error');
     return;
   }
@@ -984,6 +1038,11 @@ canvas.addEventListener('pointerdown', (e) => {
   }
   if (targetMode === 'garrison') {
     garrisonAt(e.clientX, e.clientY, e.shiftKey);
+    targetMode = null;
+    return;
+  }
+  if (targetMode === 'unload') {
+    unloadAt(e.clientX, e.clientY, e.shiftKey);
     targetMode = null;
     return;
   }
@@ -1111,7 +1170,7 @@ function ack(mood: 'select' | 'move' | 'attack'): void {
   if (!s || watching) return;
   const u = selectedUnits(s)[0];
   if (!u) return;
-  const who = u.type === 'citizen' ? 'citizen' : u.type === 'priest' ? 'priest' : u.type === 'hero' ? 'hero' : u.type === 'siege' ? 'engineer' : 'soldier';
+  const who = u.type === 'citizen' || u.type === 'fisher' ? 'citizen' : u.type === 'priest' ? 'priest' : u.type === 'hero' ? 'hero' : u.type === 'siege' || domainOf(u.type) !== 'land' ? 'engineer' : 'soldier';
   sound.speak(who, mood, u.id);
 }
 
@@ -1491,6 +1550,7 @@ function cursorFor(s: GameState): string {
   if (placing) return 'cur-place';
   if (targetMode === 'amove') return 'cur-amove';
   if (targetMode === 'garrison') return 'cur-garrison';
+  if (targetMode === 'unload') return 'cur-garrison';
   if (!pointer.inside || boxing) return '';
   const units = selectedUnits(s);
   const pk: Pick | null = view.pick(pointer.x, pointer.y);
@@ -1503,9 +1563,11 @@ function cursorFor(s: GameState): string {
     if (units.length && foe) return units.every((u) => u.type === 'priest') && t.kind === 'unit' ? 'cur-convert' : 'cur-attack';
     if (units.some((u) => u.type === 'citizen') && t.kind === 'building' && t.owner === viewer && (!t.built || t.type === 'farm')) return 'cur-build';
     if (units.length && t.kind === 'building' && t.owner === viewer && t.built && BUILDINGS[t.type].garrison) return 'cur-garrison';
+    if (t.kind === 'unit' && t.type === 'transport' && t.owner === viewer && units.some((u) => domainOf(u.type) === 'land')) return 'cur-garrison';
     return 'cur-select';
   }
-  if (pk.kind === 'resource' && units.some((u) => u.type === 'citizen')) return 'cur-gather';
+  if (pk.kind === 'resource' && units.some((u) => u.type === 'citizen' || (u.type === 'fisher' && s.res[pk.tile] === R_FISH))) return 'cur-gather';
+  if (pk.kind === 'ground' && units.some((u) => u.type === 'transport' && u.cargo.length) && walkable(s, Math.floor(pk.x), Math.floor(pk.y))) return 'cur-garrison';
   return '';
 }
 
@@ -1714,7 +1776,7 @@ function frame(now: number): void {
   build(owner: number, type: BuildingType, x?: number, y?: number, minR = 4) {
     if (!game) return null;
     const p = game.players[owner];
-    const spot = findSpot(game, type, x ?? p.startX, y ?? p.startY, minR, 24);
+    const spot = type === 'dock' ? findDockSpot(game, x ?? p.startX, y ?? p.startY, 30) : findSpot(game, type, x ?? p.startX, y ?? p.startY, minR, 24);
     return spot ? placeBuilding(game, owner, type, spot.tx, spot.ty, true).id : null;
   },
   /** A finished line of wall (testing). */

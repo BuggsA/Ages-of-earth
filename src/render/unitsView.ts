@@ -321,7 +321,8 @@ export class UnitsView {
       const dom = domainOf(u.type);
       if (dom === 'water') {
         // Afloat: riding the swell, oars sweeping, paddle wheels churning, nets dipping.
-        gy = WATER_Y - 0.02 + Math.sin(time * 1.4 + ph) * 0.025;
+        // Riding high enough that the hull's sides show above the water.
+        gy = WATER_Y + 0.05 + Math.sin(time * 1.4 + ph) * 0.02;
         roll = Math.sin(time * 1.1 + ph) * 0.05;
         pitch = Math.sin(time * 0.9 + ph * 1.3) * 0.03;
         const paddles = u.type === 'transport' && epoch >= 4;
@@ -391,7 +392,7 @@ export class UnitsView {
         const t = Math.min(1, c.age / 4);
         this.e.set(t * 0.5, c.yaw, c.side * t * 0.7);
         this.q.setFromEuler(this.e);
-        this.p.set(c.x, WATER_Y - 0.02 - t * t * 0.9, c.y);
+        this.p.set(c.x, WATER_Y + 0.05 - t * t * 0.95, c.y);
       } else if (dom === 'air') {
         // An aircraft spins down and lies wrecked.
         const t = Math.min(1, c.age / 1.4);

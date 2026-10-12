@@ -4,7 +4,7 @@ import { placeProblem, stampBuilding, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem } from './stats';
 import type { Building, BuildingType, Command, Cost, GameState, Order, Player, Unit } from './types';
 import { RES, R_FISH, R_NONE } from './types';
-import { RES_OF_TILE, cargoRoom, freeFarm, garrisonRoom, giveOrder, setOrder, ungarrison } from './units';
+import { RES_OF_TILE, cargoRoom, freeFarm, garrisonRoom, giveOrder, landing, setOrder, ungarrison } from './units';
 import { canHit, isEnemy, pay, placeBuilding, refund } from './world';
 
 /**
@@ -276,17 +276,16 @@ export function applyCommand(s: GameState, c: Command): void {
       const riders = myUnits(s, c.p, c.ids).filter((u) => domainOf(u.type) === 'land');
       if (!riders.length) return;
       if (cargoRoom(s, ship) < riders.length) refuse(s, c.p, `Room aboard for ${Math.max(0, cargoRoom(s, ship))} more`);
-      for (const u of riders.slice(0, Math.max(0, cargoRoom(s, ship)))) giveOrder(u, { k: 'board', target: ship.id }, c.queue);
-      // An idle ship comes in to the shore nearest them to pick them up.
-      if (ship.order.k === 'idle') {
-        let cx = 0;
-        let cy = 0;
-        for (const u of riders) {
-          cx += u.x;
-          cy += u.y;
-        }
-        setOrder(ship, { k: 'move', x: cx / riders.length, y: cy / riders.length, amove: false, started: false });
+      // They meet on the shore nearest them that the ship can sail to; an idle ship comes in to it.
+      let cx = 0;
+      let cy = 0;
+      for (const u of riders) {
+        cx += u.x;
+        cy += u.y;
       }
+      const meet = landing(s, ship, cx / riders.length, cy / riders.length, s.players[c.p].team) ?? undefined;
+      for (const u of riders.slice(0, Math.max(0, cargoRoom(s, ship)))) giveOrder(u, { k: 'board', target: ship.id, meet }, c.queue);
+      if (ship.order.k === 'idle' && meet) setOrder(ship, { k: 'move', x: meet.wx, y: meet.wy, amove: false, started: false });
       break;
     }
     case 'unload':

@@ -1,9 +1,9 @@
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
-import { BUILDINGS, BUILDING_TYPES, CIVS, EPOCHS, LAST_EPOCH, MARKET, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, secs, unitEpoch } from '../sim/data';
+import { BUILDINGS, BUILDING_TYPES, CIVS, EPOCHS, LAST_EPOCH, MARKET, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { buildingCostFor, buildingMaxHp, statsFor, techCostFor, techProblem } from '../sim/stats';
 import type { Building, BuildingType, Command, Cost, Ent, GameState, Player, Stance, TechId, Unit } from '../sim/types';
-import { RES, R_BERRY, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
+import { RES, R_BERRY, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
 import { buildingPicture, unitPicture } from './thumbs';
 
@@ -19,8 +19,10 @@ export interface HudActions {
   place(type: BuildingType): void;
   /** Wait for a left click to attack-move to. */
   attackMove(): void;
-  /** Wait for a left click on a building to shelter in. */
+  /** Wait for a left click on a building to shelter in (or a transport to board). */
   garrisonMode(): void;
+  /** Wait for a left click on a shore to land a transport's passengers. */
+  unloadMode(): void;
   select(ids: number[]): void;
   focus(x: number, y: number): void;
   sound(name: 'click' | 'error' | 'queue' | 'open'): void;
@@ -50,13 +52,16 @@ const ACT_WORDS: Record<string, string> = {
   farm: 'Farming',
   build: 'Building',
   chant: 'Chanting',
+  fish: 'Fishing',
 };
 
 function orderWords(s: GameState, u: Unit): string {
   const o = u.order;
+  if (u.inside && s.byId.get(u.inside)?.kind === 'unit') return 'Aboard a ship';
   switch (o.k) {
     case 'gather': {
       const kind = s.res[o.tile];
+      if (kind === R_FISH || u.type === 'fisher') return o.phase === 'drop' ? 'Bringing the catch to the dock' : o.phase === 'work' ? 'Fishing' : 'Sailing to the fishing grounds';
       const what = o.res === 'food' ? (kind === R_MEAT ? 'meat' : 'berries') : o.res === 'wood' ? 'wood' : o.res;
       if (o.phase === 'drop') return `Carrying ${what} home`;
       if (o.phase === 'work') return kind === R_TREE ? 'Cutting wood' : kind === R_BERRY ? 'Gathering berries' : kind === R_MEAT ? 'Butchering a deer' : kind === R_GOLD ? 'Mining gold' : kind === R_STONE ? 'Quarrying stone' : 'Gathering';
@@ -80,6 +85,10 @@ function orderWords(s: GameState, u: Unit): string {
       return 'Healing';
     case 'garrison':
       return u.inside ? 'Sheltering inside' : 'Going to shelter';
+    case 'board':
+      return 'Going aboard';
+    case 'unload':
+      return u.cargo.length ? 'Sailing to land passengers' : 'Moving';
     default:
       return ACT_WORDS[u.act] ?? 'Standing by';
   }
@@ -252,12 +261,12 @@ export class Hud {
     let sig = '';
     if (!ents.length && tile !== null && s.res[tile]) {
       const kind = s.res[tile];
-      const name = kind === R_TREE ? 'Tree' : kind === R_BERRY ? 'Berry bush' : kind === R_MEAT ? 'Deer carcass' : kind === R_GOLD ? 'Gold mine' : 'Stone quarry';
-      const res = kind === R_TREE ? 'wood' : kind === R_BERRY || kind === R_MEAT ? 'food' : kind === R_GOLD ? 'gold' : 'stone';
+      const name = kind === R_TREE ? 'Tree' : kind === R_BERRY ? 'Berry bush' : kind === R_MEAT ? 'Deer carcass' : kind === R_FISH ? 'Fish shoal' : kind === R_GOLD ? 'Gold mine' : 'Stone quarry';
+      const res = kind === R_TREE ? 'wood' : kind === R_BERRY || kind === R_MEAT || kind === R_FISH ? 'food' : kind === R_GOLD ? 'gold' : 'stone';
       sig = `res:${tile}:${s.amount[tile]}`;
-      html = `<div class="sel-portrait"><span style="font-size:54px">${kind === R_TREE ? '🌳' : kind === R_BERRY ? '🫐' : kind === R_MEAT ? '🍖' : kind === R_GOLD ? icon('gold', 64) : icon('stone', 64)}</span></div>
+      html = `<div class="sel-portrait"><span style="font-size:54px">${kind === R_TREE ? '🌳' : kind === R_BERRY ? '🫐' : kind === R_MEAT ? '🍖' : kind === R_FISH ? '🐟' : kind === R_GOLD ? icon('gold', 64) : icon('stone', 64)}</span></div>
         <div class="sel-info"><div class="sel-name">${name}</div><div class="stats"><span>${icon(res as 'wood')}${s.amount[tile]} left</span></div>
-        <div class="blurb">Select citizens and right-click it to gather.</div></div>`;
+        <div class="blurb">${kind === R_FISH ? 'Select fishing boats (from a Dock) and right-click it to fish.' : 'Select citizens and right-click it to gather.'}</div></div>`;
     } else if (!ents.length) {
       const p = s.players[viewer];
       sig = `none:${p.epoch}`;
@@ -303,9 +312,10 @@ export class Hud {
     const queued = mine && u.queue.length ? ` <span class="hint">(+${u.queue.length} queued)</span>` : '';
     const status = mine ? orderWords(s, u) + queued : p.name;
     const carry = mine && u.carry > 0 && u.carryRes ? `<span>${icon(u.carryRes)}${u.carry}<em>carried</em></span>` : '';
-    const stance = u.type !== 'citizen' && u.type !== 'priest' && mine ? `<span data-tip="<b>Stance</b>Z aggressive, X defensive, C stand ground.">${u.stance === 'stand' ? '⚓ Stand' : u.stance === 'defensive' ? '🛡 Defend' : '🔥 Aggressive'}</span>` : '';
+    const cargo = u.type === 'transport' ? `<span data-tip="<b>Aboard</b>Soldiers and citizens carried. Right-click a shore (or press U) to land them.">⛵<em>Aboard</em> ${u.cargo.length}/${st.capacity ?? 0}</span>` : '';
+    const stance = st.attack > 0 && u.type !== 'citizen' && mine ? `<span data-tip="<b>Stance</b>Z aggressive, X defensive, C stand ground.">${u.stance === 'stand' ? '⚓ Stand' : u.stance === 'defensive' ? '🛡 Defend' : '🔥 Aggressive'}</span>` : '';
     const aura = s.tick - u.aura < 5 && u.type !== 'hero' ? `<span data-tip="<b>Inspired</b>A hero nearby: hits harder and heals.">✨<em>Inspired</em></span>` : '';
-    const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}`;
+    const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}:${u.cargo.length}`;
     const html = `<div class="sel-portrait"><img src="${unitPicture(u.type, p.epoch, p.color)}" alt=""></div>
       <div class="sel-info">
         <div class="sel-name">${s.kings.includes(u.id) ? `👑 King (${st.name})` : st.name}</div>
@@ -316,7 +326,7 @@ export class Hud {
           <span data-tip="<b>Armor</b>Melee / missile armor: taken off every blow or shot.">🛡<em>Armor</em> ${st.armor}/${st.parmor}</span>
           ${st.range ? `<span data-tip="<b>Range</b>How far it shoots, in tiles.">🏹<em>Range</em> ${st.range}</span>` : ''}
           <span data-tip="<b>Speed</b>Tiles per second.">👣<em>Speed</em> ${Math.round(st.speed * 100) / 100}</span>
-          ${carry}${stance}${aura}
+          ${carry}${cargo}${stance}${aura}
         </div>
         <div class="blurb">${st.blurb}</div>
       </div>`;
@@ -354,6 +364,7 @@ export class Hud {
       status = f && f.kind === 'unit' && f.order.k === 'farm' && f.order.target === b.id ? 'Worked by a citizen' : 'Waiting for a farmer';
     } else if (b.type === 'wonder' && b.timer >= 0) status = `Stands ${fmtTime(b.timer)} more for victory`;
     else if (b.type === 'market') status = `Prices: ${(['food', 'wood', 'stone'] as const).map((r) => `${icon(r, 14)}${s.market[r]}`).join(' ')}`;
+    else if (b.type === 'dock') status = 'Fishing boats bring their catch here';
     else status = def.drop.length ? 'Drop-off for every resource' : def.pop ? `Room for ${def.pop}` : 'Ready';
     if (!mine) status = `<span class="swatch" style="background:${p.color}"></span>${p.name}${b.type === 'wonder' && b.timer >= 0 ? `: wins in ${fmtTime(b.timer)}` : ''}`;
     const inside = def.garrison && b.built ? `<div class="stats"><span data-tip="<b>Sheltering</b>Units inside are safe, heal slowly and add arrows.">🏰<em>Inside</em> ${b.garrison.length}/${def.garrison}</span></div>` : '';
@@ -374,7 +385,9 @@ export class Hud {
     const mine = ents.filter((e) => e.owner === viewer);
     const units = mine.filter((e): e is Unit => e.kind === 'unit');
     const citizens = units.filter((u) => u.type === 'citizen');
-    const soldiers = units.filter((u) => u.type !== 'citizen');
+    const soldiers = units.filter((u) => u.type !== 'citizen' && u.type !== 'fisher' && u.type !== 'transport');
+    const walkers = units.filter((u) => domainOf(u.type) === 'land');
+    const transports = units.filter((u) => u.type === 'transport');
     const cmds: Cmd[] = [];
     if (!citizens.length) this.buildMenu = null;
 
@@ -405,7 +418,12 @@ export class Hud {
       }
       if (soldiers.length) cmds.push({ key: 'A', pic: '', glyph: '⚔', title: 'Attack-move', desc: 'Then click on the map: march there, fighting every enemy met on the way.', ok: true, run: () => this.act.attackMove() });
       cmds.push({ key: 'S', pic: '', glyph: '✋', title: 'Stop', desc: 'Stop what they are doing (and forget queued orders).', ok: true, run: () => this.act.issue({ t: 'stop', p: viewer, ids: units.map((u) => u.id) }) });
-      cmds.push({ key: 'G', pic: '', glyph: '🏰', title: 'Garrison', desc: 'Then click a Town Center or tower: shelter inside. Sheltered units are safe and add arrows.', ok: true, run: () => this.act.garrisonMode() });
+      if (walkers.length) cmds.push({ key: 'G', pic: '', glyph: '🏰', title: 'Garrison / board', desc: 'Then click a Town Center or tower to shelter inside (safe, and they add arrows), or your transport to go aboard.', ok: true, run: () => this.act.garrisonMode() });
+      if (transports.length) {
+        const aboard = transports.reduce((n, t) => n + t.cargo.length, 0);
+        cmds.push({ key: 'U', pic: '', glyph: '⚓', title: 'Unload', desc: 'Then click a shore: sail there and put everyone aboard on land. (Right-clicking land does the same.)', ok: aboard > 0, why: 'Nobody is aboard', count: aboard || undefined, run: () => this.act.unloadMode() });
+        cmds.push({ key: 'Y', pic: '', glyph: '🏖', title: 'Unload here', desc: 'Land everyone aboard on the nearest shore.', ok: aboard > 0, why: 'Nobody is aboard', run: () => transports.forEach((t) => this.act.issue({ t: 'unload', p: viewer, ids: [t.id], x: t.x, y: t.y })) });
+      }
       if (soldiers.length) {
         const stances: [string, Stance, string, string][] = [
           ['Z', 'aggressive', '🔥', 'Aggressive: chase any enemy that comes into sight.'],
@@ -590,7 +608,7 @@ function hpBar(hp: number, max: number, frac: number): string {
 
 function resHint(r: string): string {
   return {
-    food: 'From berry bushes and farms. Feeds new citizens and soldiers and pays for the epochs.',
+    food: 'From berry bushes, hunting, farms and fishing. Feeds new citizens and soldiers and pays for the epochs.',
     wood: 'From trees. Buildings, bows and spears.',
     stone: 'From stone quarries. Town Centers, towers and the later epochs.',
     gold: 'From gold mines. Cavalry, later soldiers and the later epochs.',
