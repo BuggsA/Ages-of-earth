@@ -697,7 +697,7 @@ function showEnd(s: GameState, won: boolean): void {
     )
     .join('');
   m.innerHTML = `<div class="card"><h2>${won ? 'Victory!' : 'Defeat'}</h2>
-    <div class="sel-sub">${won ? 'Your rival has fallen.' : 'Your people are no more.'} The match lasted ${mins} minute${mins === 1 ? '' : 's'}.</div>
+    <div class="sel-sub">${won ? 'Your rival has fallen.' : 'Your people are no more.'} The match lasted ${mins < 1 ? 'less than a minute' : `${mins} minute${mins === 1 ? '' : 's'}`}.</div>
     <table class="end-stats"><tr><th></th><th>Epoch</th><th>Gathered</th><th>Trained</th><th>Built</th><th>Kills</th><th>Lost</th></tr>${rows}</table>
     <div class="row">
       <button class="btn wide" data-act="watch">Look around</button>
