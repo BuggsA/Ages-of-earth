@@ -24,7 +24,7 @@ export const EPOCHS: Epoch[] = [
 ];
 export const LAST_EPOCH = EPOCHS.length - 1;
 
-export type UnitClass = 'citizen' | 'infantry' | 'ranged' | 'cavalry' | 'siege' | 'priest' | 'hero' | 'ship' | 'fighter' | 'bomber';
+export type UnitClass = 'citizen' | 'infantry' | 'ranged' | 'cavalry' | 'siege' | 'priest' | 'hero' | 'ship' | 'fighter' | 'bomber' | 'trader';
 
 export interface UnitStats {
   name: string;
@@ -156,28 +156,37 @@ export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
     null,
     { name: 'Bomber', cls: 'bomber', hp: 240, attack: 40, armor: 1, parmor: 2, range: 0.6, reload: 6, speed: 3.8, sight: 9, cost: { wood: 120, gold: 260 }, time: 30, radius: 0.55, shot: 'bomb', splash: 1.6, blurb: 'Drops bombs that wreck buildings, ships and crowds. Easy prey for fighters and rifles.' },
   ],
+  // ---- On the road ----
+  trader: [
+    null,
+    { name: 'Pack Donkey', cls: 'trader', hp: 80, attack: 0, armor: 0, parmor: 1, range: 0, reload: 1, speed: 1.3, sight: 6, cost: { wood: 60, gold: 40 }, time: 20, radius: 0.32, blurb: 'Carries goods to a trading post and brings back gold: the farther its Market from the post, the more. Easy prey for cavalry.' },
+    { name: 'Ox Cart', cls: 'trader', hp: 110, attack: 0, armor: 0, parmor: 2, range: 0, reload: 1, speed: 1.3, sight: 6, cost: { wood: 70, gold: 40 }, time: 20, radius: 0.4, blurb: 'Carries goods to a trading post and brings back gold: the farther its Market from the post, the more. Easy prey for cavalry.' },
+    { name: 'Covered Wagon', cls: 'trader', hp: 140, attack: 0, armor: 1, parmor: 2, range: 0, reload: 1, speed: 1.45, sight: 7, cost: { wood: 80, gold: 50 }, time: 20, radius: 0.42, blurb: 'Carries goods to a trading post and brings back gold: the farther its Market from the post, the more. Easy prey for cavalry.' },
+    { name: 'Traction Engine', cls: 'trader', hp: 180, attack: 0, armor: 2, parmor: 3, range: 0, reload: 1, speed: 1.65, sight: 7, cost: { wood: 60, gold: 60 }, time: 20, radius: 0.45, blurb: 'Steams goods to a trading post and brings back gold: the farther its Market from the post, the more. Easy prey for cavalry.' },
+  ],
 };
 
 const DOMAINS: Partial<Record<UnitType, Domain>> = { fisher: 'water', warship: 'water', transport: 'water', fighter: 'air', bomber: 'air' };
 /** Where a unit line goes: on foot, on the water or in the air. */
 export const domainOf = (type: UnitType): Domain => DOMAINS[type] ?? 'land';
 
-export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'fighter', 'bomber'];
+export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'fighter', 'bomber', 'trader'];
 export const MILITARY: UnitType[] = ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'warship', 'fighter', 'bomber'];
 
 type Target = UnitClass | 'building';
 /** The counter triangle (and its friends): damage multiplier by attacker class against target class. */
 export const BONUS: Record<UnitClass, Record<Target, number>> = {
-  citizen: { citizen: 1, infantry: 1, ranged: 1, cavalry: 1, siege: 1.5, priest: 1, hero: 1, ship: 1, fighter: 0, bomber: 0, building: 0.6 },
-  infantry: { citizen: 1, infantry: 1, ranged: 1, cavalry: 3, siege: 2.5, priest: 1, hero: 1, ship: 1, fighter: 0, bomber: 0, building: 1.8 },
-  ranged: { citizen: 1, infantry: 2, ranged: 1, cavalry: 0.7, siege: 0.4, priest: 1.5, hero: 1, ship: 0.8, fighter: 1.5, bomber: 1.8, building: 0.25 },
-  cavalry: { citizen: 1.3, infantry: 0.7, ranged: 2.2, cavalry: 1, siege: 2, priest: 2, hero: 1, ship: 1, fighter: 0, bomber: 0, building: 0.8 },
-  siege: { citizen: 1, infantry: 1, ranged: 1, cavalry: 1, siege: 1.5, priest: 1, hero: 1, ship: 2, fighter: 0, bomber: 0, building: 4 },
-  priest: { citizen: 0, infantry: 0, ranged: 0, cavalry: 0, siege: 0, priest: 0, hero: 0, ship: 0, fighter: 0, bomber: 0, building: 0 },
-  hero: { citizen: 1.2, infantry: 1.2, ranged: 1.2, cavalry: 1.5, siege: 2, priest: 1.2, hero: 1, ship: 1, fighter: 0, bomber: 0, building: 1.5 },
-  ship: { citizen: 1, infantry: 1, ranged: 1, cavalry: 1, siege: 1.5, priest: 1, hero: 1, ship: 1.5, fighter: 1, bomber: 1.2, building: 1.6 },
-  fighter: { citizen: 0.6, infantry: 0.5, ranged: 0.5, cavalry: 0.5, siege: 0.6, priest: 0.6, hero: 0.4, ship: 0.5, fighter: 1.5, bomber: 3, building: 0.2 },
-  bomber: { citizen: 1.5, infantry: 1.2, ranged: 1.2, cavalry: 1, siege: 2, priest: 1, hero: 0.8, ship: 2.5, fighter: 0, bomber: 0, building: 3 },
+  citizen: { citizen: 1, infantry: 1, ranged: 1, cavalry: 1, siege: 1.5, priest: 1, hero: 1, ship: 1, fighter: 0, bomber: 0, building: 0.6, trader: 1 },
+  infantry: { citizen: 1, infantry: 1, ranged: 1, cavalry: 3, siege: 2.5, priest: 1, hero: 1, ship: 1, fighter: 0, bomber: 0, building: 1.8, trader: 1.2 },
+  ranged: { citizen: 1, infantry: 2, ranged: 1, cavalry: 0.7, siege: 0.4, priest: 1.5, hero: 1, ship: 0.8, fighter: 1.5, bomber: 1.8, building: 0.25, trader: 1 },
+  cavalry: { citizen: 1.3, infantry: 0.7, ranged: 2.2, cavalry: 1, siege: 2, priest: 2, hero: 1, ship: 1, fighter: 0, bomber: 0, building: 0.8, trader: 2.5 },
+  siege: { citizen: 1, infantry: 1, ranged: 1, cavalry: 1, siege: 1.5, priest: 1, hero: 1, ship: 2, fighter: 0, bomber: 0, building: 4, trader: 1.5 },
+  priest: { citizen: 0, infantry: 0, ranged: 0, cavalry: 0, siege: 0, priest: 0, hero: 0, ship: 0, fighter: 0, bomber: 0, building: 0, trader: 0 },
+  hero: { citizen: 1.2, infantry: 1.2, ranged: 1.2, cavalry: 1.5, siege: 2, priest: 1.2, hero: 1, ship: 1, fighter: 0, bomber: 0, building: 1.5, trader: 1.5 },
+  ship: { citizen: 1, infantry: 1, ranged: 1, cavalry: 1, siege: 1.5, priest: 1, hero: 1, ship: 1.5, fighter: 1, bomber: 1.2, building: 1.6, trader: 1 },
+  fighter: { citizen: 0.6, infantry: 0.5, ranged: 0.5, cavalry: 0.5, siege: 0.6, priest: 0.6, hero: 0.4, ship: 0.5, fighter: 1.5, bomber: 3, building: 0.2, trader: 0.6 },
+  bomber: { citizen: 1.5, infantry: 1.2, ranged: 1.2, cavalry: 1, siege: 2, priest: 1, hero: 0.8, ship: 2.5, fighter: 0, bomber: 0, building: 3, trader: 1.5 },
+  trader: { citizen: 0, infantry: 0, ranged: 0, cavalry: 0, siege: 0, priest: 0, hero: 0, ship: 0, fighter: 0, bomber: 0, building: 0, trader: 0 },
 };
 
 /** The best counter to each class, for the computer opponent and the tips. */
@@ -193,6 +202,15 @@ export const PRIEST = { heal: 3, convert: 7, rest: 8 };
  * relic kept in a Temple brings its owner `gold` every `every` seconds, and `score` to their score.
  */
 export const RELIC = { home: 20, fair: 3, spacing: 12, extra: { small: 1, medium: 2, large: 3 } as Record<MapSize, number>, gold: 1, every: 2, score: 60 };
+/**
+ * Trade: `posts` trading posts (by map size) stand within `edge` tiles of the map's edge (at least 3),
+ * about as far from their two nearest towns (within `fair` tiles), at least `far` of the map's width
+ * from every town and `spacing` of it from each other. A post's plaza runs `plaza` tiles each way from
+ * its center; a trader trades once within `reach` tiles of the center. A trip pays `gold` × the
+ * squared distance (in tiles) from the trader's Market to the post, `epoch` more for each epoch after
+ * the Bronze Age, at most `max`: so a long road pays more per minute, and has more road to guard.
+ */
+export const TRADE = { posts: { small: 2, medium: 2, large: 3 } as Record<MapSize, number>, edge: 9, fair: 4, far: 0.3, spacing: 0.4, plaza: 1, reach: 1.8, gold: 0.012, epoch: 0.08, max: 180 };
 
 export interface BuildingStats {
   name: string;
@@ -230,7 +248,7 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   house: { name: 'House', size: 2, hp: 600, cost: { wood: 35 }, time: 18, pop: 5, sight: 3, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'E', blurb: 'Room for 5 more people.' },
   storehouse: { name: 'Storehouse', size: 2, hp: 800, cost: { wood: 75 }, time: 22, pop: 0, sight: 4, trains: [], drop: ['food', 'wood', 'stone', 'gold'], epoch: 0, menu: 'eco', key: 'S', blurb: 'A drop-off for every resource, and better tools for gatherers. Build it by woods and mines.' },
   farm: { name: 'Farm', size: 3, hp: 300, cost: { wood: 55 }, time: 12, pop: 0, sight: 2, trains: [], drop: [], epoch: 0, open: true, menu: 'eco', key: 'F', blurb: 'Food that never runs out, worked by one citizen.' },
-  market: { name: 'Market', size: 3, hp: 1600, cost: { wood: 175 }, time: 40, pop: 0, sight: 5, trains: [], drop: [], epoch: 1, menu: 'eco', key: 'M', blurb: 'Buy and sell food, wood and stone for gold. Prices move as people trade.' },
+  market: { name: 'Market', size: 3, hp: 1600, cost: { wood: 175 }, time: 40, pop: 0, sight: 5, trains: ['trader'], drop: [], epoch: 1, menu: 'eco', key: 'M', blurb: 'Buy and sell food, wood and stone for gold (prices move as people trade), and train traders, who bring back gold from the trading posts.' },
   temple: { name: 'Temple', size: 3, hp: 1600, cost: { wood: 120, stone: 100 }, time: 40, pop: 0, sight: 6, trains: ['priest'], drop: [], epoch: 1, menu: 'eco', key: 'Y', blurb: 'Trains priests, who heal and convert.' },
   wonder: { name: 'Wonder', size: 5, hp: 4000, cost: { wood: 1000, stone: 1000, gold: 1000 }, time: 400, pop: 0, sight: 8, trains: [], drop: [], epoch: 1, menu: 'eco', key: 'X', blurb: 'The glory of your people. If it stands long enough once finished, you win.' },
   wall: { name: 'Wall', size: 1, hp: 500, cost: { wood: 3 }, costByEpoch: [{ wood: 3 }, { stone: 4 }, { stone: 4 }, { stone: 5 }, { stone: 5 }], time: 5, pop: 0, sight: 2, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'L', blurb: 'Drag to raise a line of wall: a palisade of logs in the Stone Age, stone after.' },
@@ -290,12 +308,15 @@ export interface Mods {
   shipRange: number;
   airSpeed: number;
   airHp: number;
+  traderSpeed: number;
+  tradeGold: number;
 }
 
 export const NO_MODS: Mods = {
   meleeAttack: 0, rangedAttack: 0, armor: 0, parmor: 0, range: 0, carry: 0, citizenSpeed: 1, wood: 1, mine: 1, farm: 1, forage: 1, hunt: 1,
   buildingHp: 1, buildSpeed: 1, militaryTrain: 1, rangedTrain: 1, cavalrySpeed: 1, infantryHp: 1, infantryArmor: 0, priest: 1,
   siegeAttack: 1, siegeRange: 0, techCost: 1, wonderCost: 1, extraCitizens: 0, fish: 1, shipHp: 1, shipRange: 0, airSpeed: 1, airHp: 1,
+  traderSpeed: 1, tradeGold: 1,
 };
 
 export interface Tech {
@@ -339,6 +360,8 @@ export const TECHS: Record<TechId, Tech> = {
   rifling: { name: 'Rifling', at: 'forge', epoch: 4, cost: { food: 300, gold: 250 }, time: 45, needs: 'bodkin', add: { rangedAttack: 2, range: 1 }, blurb: '+2 attack and +1 range for riflemen and towers.', icon: '🎯' },
   steamEngine: { name: 'Steam Engine', at: 'towncenter', epoch: 4, cost: { food: 400, wood: 300 }, time: 50, add: { carry: 4 }, mul: { citizenSpeed: 1.15, wood: 1.1, mine: 1.1 }, blurb: 'Citizens carry 4 more, walk 15% faster, and cut and mine 10% faster.', icon: '🚂' },
   aviation: { name: 'Aviation', at: 'airfield', epoch: 4, cost: { food: 300, gold: 300 }, time: 45, mul: { airSpeed: 1.15, airHp: 1.2 }, blurb: 'Aircraft fly 15% faster and are 20% sturdier.', icon: '✈' },
+  caravan: { name: 'Caravans', at: 'market', epoch: 2, cost: { food: 200, gold: 100 }, time: 40, mul: { traderSpeed: 1.2 }, blurb: 'Traders travel 20% faster.', icon: '🐪' },
+  banking: { name: 'Banking', at: 'market', epoch: 3, cost: { food: 300, gold: 200 }, time: 45, needs: 'caravan', mul: { tradeGold: 1.2 }, blurb: 'Every trade trip pays 20% more gold.', icon: '🏦' },
 };
 
 export const TECH_IDS = Object.keys(TECHS) as TechId[];
@@ -424,12 +447,14 @@ export interface AiLevel {
   towers: number;
   /** Uses priests, heroes, siege and the market. */
   clever: boolean;
+  /** Traders it keeps on the road from the Middle Ages (half as many in the Bronze Age). */
+  traders: number;
 }
 
 export const AI_LEVELS: Record<Difficulty, AiLevel> = {
-  easy: { label: 'Easy', gather: 0.8, citizens: 16, firstAttack: 720, wave: 6, waveGrowth: 3, think: 1.5, towers: 0, clever: false },
-  normal: { label: 'Normal', gather: 1, citizens: 24, firstAttack: 480, wave: 8, waveGrowth: 4, think: 1, towers: 1, clever: true },
-  hard: { label: 'Hard', gather: 1.15, citizens: 32, firstAttack: 330, wave: 9, waveGrowth: 5, think: 0.5, towers: 2, clever: true },
+  easy: { label: 'Easy', gather: 0.8, citizens: 16, firstAttack: 720, wave: 6, waveGrowth: 3, think: 1.5, towers: 0, clever: false, traders: 2 },
+  normal: { label: 'Normal', gather: 1, citizens: 24, firstAttack: 480, wave: 8, waveGrowth: 4, think: 1, towers: 1, clever: true, traders: 5 },
+  hard: { label: 'Hard', gather: 1.15, citizens: 32, firstAttack: 330, wave: 9, waveGrowth: 5, think: 0.5, towers: 2, clever: true, traders: 8 },
 };
 
 export const PLAYER_COLORS = ['#2f7fe0', '#e0473a', '#e8b630', '#3aa35a', '#9b59d0', '#e07a2f'];

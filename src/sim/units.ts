@@ -7,6 +7,7 @@ import { buildTimeFor, modsOf } from './stats';
 import type { Act, Animal, Building, Ent, GameState, Goal, Order, Res, Unit } from './types';
 import { R_BERRY, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { carriedBy, relicAt } from './relics';
+import { atPost, goalForPost, marketOf, nearestMarket, postAt, tripGold } from './trade';
 import { canHit, exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, passOf, radiusOf, statsOf, teamOf } from './world';
 
 /**
@@ -746,6 +747,71 @@ function relicStep(s: GameState, u: Unit, o: Extract<Order, { k: 'relic' }>): vo
   if (!approach(u, goalForPoint(s, r.x, r.y, passOf(s, u)))) setOrder(u, { k: 'idle' });
 }
 
+/**
+ * Run the road: out to the trading post, take on gold worth the distance from the Market, and back to
+ * pay it in; then out again. If the Market falls, the nearest other one will do; with none left, the
+ * trader waits with what it carries.
+ */
+function tradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>): void {
+  if (u.type !== 'trader') {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  if (o.phase === 'back') {
+    let m = marketOf(s, u.owner, o.market);
+    if (!m) {
+      m = nearestMarket(s, u.owner, u.x, u.y);
+      if (!m) {
+        s.events.push({ k: 'refused', owner: u.owner, why: 'Your trader has no Market to come home to' });
+        setOrder(u, { k: 'idle' });
+        return;
+      }
+      o.market = m.id;
+      stopWalking(u);
+    }
+    if (distToRect(u.x, u.y, m) - statsOf(s, u).radius <= REACH + 0.2) {
+      stopWalking(u);
+      if (u.carry > 0) {
+        const p = s.players[u.owner];
+        p.res.gold += u.carry;
+        p.stats.gathered += u.carry;
+        p.stats.traded += u.carry;
+        s.events.push({ k: 'caravan', id: u.id, owner: u.owner, what: 'paid', amount: u.carry, x: m.x, y: m.y });
+      }
+      u.carry = 0;
+      u.carryRes = null;
+      // Out again, unless the post is gone.
+      if (postAt(s, o.post)) o.phase = 'go';
+      else setOrder(u, { k: 'idle' });
+      return;
+    }
+    if (!approach(u, goalForBuilding(m))) setOrder(u, { k: 'idle' });
+    return;
+  }
+  const post = postAt(s, o.post);
+  if (!post) {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  if (atPost(post, u.x, u.y)) {
+    stopWalking(u);
+    // Paid by the road from home: the Market it set out from, or the nearest one to the post.
+    const m = marketOf(s, u.owner, o.market) ?? nearestMarket(s, u.owner, post.x, post.y);
+    if (!m) {
+      s.events.push({ k: 'refused', owner: u.owner, why: 'Build a Market to trade from' });
+      setOrder(u, { k: 'idle' });
+      return;
+    }
+    o.market = m.id;
+    u.carry = tripGold(s, u.owner, m, post);
+    u.carryRes = 'gold';
+    o.phase = 'back';
+    s.events.push({ k: 'caravan', id: u.id, owner: u.owner, what: 'loaded', amount: u.carry, x: post.x, y: post.y });
+    return;
+  }
+  if (!approach(u, goalForPost(post))) setOrder(u, { k: 'idle' });
+}
+
 /** A wounded friend for an idle priest to tend, nearest first. */
 function woundedNear(s: GameState, sp: Spatial, u: Unit, r: number): Unit | null {
   let best: Unit | null = null;
@@ -1066,6 +1132,9 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
       break;
     case 'relic':
       relicStep(s, u, o);
+      break;
+    case 'trade':
+      tradeStep(s, u, o);
       break;
   }
 }

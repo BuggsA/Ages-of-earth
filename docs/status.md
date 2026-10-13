@@ -16,16 +16,18 @@ The full list, with the owner's words, is `docs/rulings.md`.
 
 Everything in `README.md`'s "What's in it" was built on 2026-10-12 in one session (branch `claude/beautiful-franklin-6gj8tt`, now `main`): five epochs, six peoples, the economy, seventeen buildings, twenty-six technologies, counters, siege, priests, heroes, walls and the bell, ships, fishing and aircraft, the computer opponent, online rooms, saves, replays, synthesized sound and music.
 
+Since then: relics ([#4](https://github.com/BuggsA/Ages-of-earth/issues/4), merged in #5; save `v` 2).
+
 | Check | State |
 | --- | --- |
-| Quick tier (`npm run check`) | 64 tests, about 20 s |
+| Quick tier (`npm run check`) | 74 tests, about 20 s |
 | Slow tier (`tests/slow/`) | empty |
 | Browser checks | none automated; the first session tested by hand in headless Chromium |
 | CI (`ci`, `periodic`) | added 2026-10-13; `periodic` starts once `main` is the default branch |
 
 ## In flight
 
-- [#4](https://github.com/BuggsA/Ages-of-earth/issues/4), relics (chain 1013-1734, 1/10): branch `claude/4-relics`. Bumps the save `v` to 2.
+- [#6](https://github.com/BuggsA/Ages-of-earth/issues/6), trade: traders and trading posts (chain 1013-1734, 2/10): branch `claude/6-trade`. Bumps the save `v` to 3.
 
 - [#1](https://github.com/BuggsA/Ages-of-earth/pull/1), repairs for damaged buildings: opened before these rules, with no issue; now targets `main`. Its author couldn't run the typecheck and hadn't tried it in a browser.
 

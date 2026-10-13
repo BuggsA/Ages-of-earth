@@ -22,7 +22,8 @@ for (let i = 0; i < minutes * 60 * 20 && !s.over; i++) {
     const blds = s.ents.filter((e) => e.owner === p.id && e.kind === 'building').length;
     const res = Object.values(p.res).map(Math.floor).join('/');
     const relics = s.relics.filter((r) => r.temple && s.byId.get(r.temple)?.owner === p.id).length;
-    return `${p.name}: ${EPOCHS[p.epoch].short}, ${cit} citizens, ${units.length - cit} soldiers, ${blds} buildings, ${res}, kills ${p.stats.kills}, relics ${relics}`;
+    const traders = units.filter((u) => u.kind === 'unit' && u.type === 'trader').length;
+    return `${p.name}: ${EPOCHS[p.epoch].short}, ${cit} citizens, ${units.length - cit} soldiers, ${blds} buildings, ${res}, kills ${p.stats.kills}, relics ${relics}, traders ${traders} (${p.stats.traded} gold)`;
   });
   console.log(`min ${i / 1200}  ${line.join('  |  ')}`);
 }

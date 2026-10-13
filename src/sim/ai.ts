@@ -6,6 +6,7 @@ import type { AiMemory, Animal, Building, BuildingType, Command, Cost, GameState
 import { RES, R_BERRY, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { carriedBy } from './relics';
 import { findResource, freeFarm, nearestTemple } from './units';
+import { nearestMarket } from './trade';
 import { isEnemy } from './world';
 
 /**
@@ -54,7 +55,7 @@ const TILE_OF: Record<Res, number> = { food: R_BERRY, wood: R_TREE, stone: R_STO
 const TECH_ORDER: TechId[] = [
   'plow', 'axes', 'wheelbarrow', 'picks', 'forging', 'scaleArmor', 'fletching', 'husbandry', 'irrigation', 'saws', 'shafts', 'handcart',
   'ironCasting', 'chainMail', 'bodkin', 'masonry', 'theology', 'conscription', 'blastFurnace', 'plateArmor', 'chemistry',
-  'gillnets', 'shipwright', 'steamEngine', 'rifling', 'aviation',
+  'gillnets', 'shipwright', 'steamEngine', 'rifling', 'aviation', 'caravan', 'banking',
 ];
 const ECONOMY: TechId[] = ['plow', 'axes', 'wheelbarrow', 'picks', 'irrigation', 'saws', 'shafts', 'handcart', 'gillnets', 'steamEngine'];
 
@@ -73,6 +74,7 @@ interface View {
   citizens: Unit[];
   army: Unit[];
   priests: Unit[];
+  traders: Unit[];
   fishers: Unit[];
   /** Warships and transports. */
   navy: Unit[];
@@ -97,6 +99,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   const citizens: Unit[] = [];
   const army: Unit[] = [];
   const priests: Unit[] = [];
+  const traders: Unit[] = [];
   const fishers: Unit[] = [];
   const navy: Unit[] = [];
   const planes: Unit[] = [];
@@ -107,7 +110,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
     if (e.kind === 'unit' && s.kings[p.id] === e.id) king = e;
     else if (e.kind === 'unit') {
       const list =
-        e.type === 'citizen' ? citizens : e.type === 'priest' ? priests : e.type === 'fisher' ? fishers : e.type === 'warship' || e.type === 'transport' ? navy : e.type === 'fighter' || e.type === 'bomber' ? planes : army;
+        e.type === 'citizen' ? citizens : e.type === 'priest' ? priests : e.type === 'trader' ? traders : e.type === 'fisher' ? fishers : e.type === 'warship' || e.type === 'transport' ? navy : e.type === 'fighter' || e.type === 'bomber' ? planes : army;
       list.push(e);
     } else buildings.push(e);
   }
@@ -115,7 +118,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   // A King stays out of harm's way, sheltered in the Town Center.
   if (king && tc && !king.inside && king.order.k !== 'garrison') applyCommand(s, { t: 'garrison', p: p.id, ids: [king.id], target: tc.id });
   const home = tc ? { x: tc.x, y: tc.y } : { x: p.startX, y: p.startY };
-  const v: View = { p, citizens, army, priests, fishers, navy, planes, buildings, home, tc, budget: { ...p.res } };
+  const v: View = { p, citizens, army, priests, traders, fishers, navy, planes, buildings, home, tc, budget: { ...p.res } };
   const issue = (c: Command) => applyCommand(s, c);
 
   // People first: a growing town pays for everything else.
@@ -129,6 +132,9 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
       spend(v, cost);
     }
   }
+
+  // Traders pay for themselves: they come before the epoch's savings and the army.
+  merchants(s, v, issue);
 
   // Epochs: once there are enough people, set the cost aside (so the army doesn't eat it) and advance;
   // but when an attack is due and the army is short of it, soldiers come first.
@@ -169,6 +175,8 @@ function research(s: GameState, v: View, peopleEnough: boolean, issue: (c: Comma
   const order = L.clever ? TECH_ORDER : ECONOMY;
   for (const tech of order) {
     if (techProblem(s, p.id, tech)) continue;
+    // Trade technologies only pay with traders on the road.
+    if (TECHS[tech].at === 'market' && v.traders.length < 3) continue;
     const at = v.buildings.find((b) => b.type === TECHS[tech].at && b.built && b.queue.length === 0 && b.advance < 0);
     if (!at) continue;
     // The Town Center trains citizens first.
@@ -388,6 +396,14 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
 
   const n = v.citizens.length;
   const clever = L.clever;
+
+  // Trading posts make a Market worth saving for: set its wood aside so soldiers don't eat it.
+  if (s.posts.length && p.epoch >= 2 && n >= 18 && count(v, 'market') === 0 && !recently('market', 25)) {
+    const cost = buildingCostFor(s, p.id, 'market');
+    const spot = afford(v, cost) ? findSpot(s, 'market', home.x, home.y, 6, 18) : null;
+    if (spot && construct(s, v, mem, 'market', spot, 3, issue)) return;
+    spend(v, cost);
+  }
 
   // A dock, where there is fish and water to sail near home.
   if (n >= 9 && count(v, 'dock') === 0 && !recently('dock', 40) && s.tick - (mem.dockless ?? -99999) > secs(120)) {
@@ -750,7 +766,7 @@ function threatNear(s: GameState, v: View): { unit: Unit | null; count: number }
   let threatD = Infinity;
   let n = 0;
   for (const e of s.ents) {
-    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !isEnemy(s, v.p.id, e.owner) || e.type === 'citizen') continue;
+    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !isEnemy(s, v.p.id, e.owner) || e.type === 'citizen' || e.type === 'trader') continue;
     let near = Infinity;
     for (const b of v.buildings) near = Math.min(near, distToRect(e.x, e.y, b));
     if (near < 12) {
@@ -804,7 +820,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   for (const b of v.buildings) {
     if (!b.built || b.queue.length >= Math.min(2, MAX_QUEUE) || keepCitizensGrowing) continue;
     const trains = BUILDINGS[b.type].trains;
-    if (!trains.length || trains.includes('citizen') || b.type === 'dock' || b.type === 'airfield') continue;
+    if (!trains.length || trains.includes('citizen') || b.type === 'dock' || b.type === 'airfield' || b.type === 'market') continue;
     let unit: UnitType | null;
     if (b.type === 'workshop') unit = siege < (p.epoch >= 2 ? 3 : 2) && v.army.length >= 6 ? 'siege' : null;
     else if (b.type === 'temple') unit = v.priests.length < (v.army.length >= 6 ? 2 : 0) + (looseRelics(s) > 0 ? 1 : 0) ? 'priest' : null;
@@ -847,6 +863,15 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     // Reinforcements join the attack.
     issue({ t: 'move', p: p.id, ids: ready.map((u) => u.id), x: enemy.x, y: enemy.y, amove: true });
     return;
+  }
+  // Between waves, a few riders cut the rivals' trade roads near home.
+  if (L.clever) {
+    const riders = ready.filter((u) => u.type === 'cavalry' && u.order.k === 'idle');
+    const prey = riders.length ? enemyTrader(s, v, 30) : null;
+    if (prey) {
+      issue({ t: 'attack', p: p.id, ids: riders.slice(0, 3).map((u) => u.id), target: prey.id });
+      return;
+    }
   }
   const strays = ready.filter((u) => {
     const ox = u.x - mem.muster!.x;
@@ -942,5 +967,74 @@ function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
       const dy = cy - pr.y;
       if (dx * dx + dy * dy > 49) issue({ t: 'move', p: v.p.id, ids: [pr.id], x: cx, y: cy });
     } else if (mem.muster) issue({ t: 'move', p: v.p.id, ids: [pr.id], x: mem.muster.x, y: mem.muster.y });
+  }
+}
+
+// ---- Trade -----------------------------------------------------------------------------------------
+
+/** A rival's trader on the road within reach of home, nearest first. */
+function enemyTrader(s: GameState, v: View, r: number): Unit | null {
+  let best: Unit | null = null;
+  let bestD = r * r;
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.type !== 'trader' || e.hp <= 0 || e.inside || !isEnemy(s, v.p.id, e.owner)) continue;
+    const d = (e.x - v.home.x) * (e.x - v.home.x) + (e.y - v.home.y) * (e.y - v.home.y);
+    if (d < bestD) {
+      bestD = d;
+      best = e;
+    }
+  }
+  return best;
+}
+
+/** How close a road from one point to another passes to a third (squared). */
+function passes(ax: number, ay: number, bx: number, by: number, px: number, py: number): number {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const l = dx * dx + dy * dy;
+  const t = l > 0 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l)) : 0;
+  const qx = ax + dx * t - px;
+  const qy = ay + dy * t - py;
+  return qx * qx + qy * qy;
+}
+
+/**
+ * Traders: once there is a Market and gold to spare, keep a few on the road to the post that pays best
+ * without running past a rival's town (failing that, the one that keeps farthest from them).
+ */
+function merchants(s: GameState, v: View, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!s.posts.length || p.epoch < 1 || v.citizens.length < 18) return;
+  const market = v.buildings.find((b) => b.type === 'market' && b.built);
+  if (!market) return;
+  const L = AI_LEVELS[p.ai!];
+  const want = p.epoch >= 2 ? L.traders : Math.ceil(L.traders / 2);
+  const queued = market.queue.filter((q) => q.unit === 'trader').length;
+  if (v.traders.length + queued < want && market.queue.length < 2 && p.pop < p.cap) {
+    const cost = unitStats('trader', p.epoch).cost;
+    if (afford(v, cost)) {
+      issue({ t: 'train', p: p.id, building: market.id, unit: 'trader' });
+      spend(v, cost);
+    }
+  }
+  const idle = v.traders.filter((u) => u.order.k === 'idle' && !u.inside);
+  if (!idle.length) return;
+  const rivals = s.players.filter((o) => !o.defeated && isEnemy(s, p.id, o.id));
+  for (const u of idle) {
+    const from = nearestMarket(s, p.id, u.x, u.y) ?? market;
+    let best = -1;
+    let bestScore = -Infinity;
+    for (const post of s.posts) {
+      let clear = Infinity;
+      for (const o of rivals) clear = Math.min(clear, passes(from.x, from.y, post.x, post.y, o.startX, o.startY));
+      const d2 = (post.x - from.x) * (post.x - from.x) + (post.y - from.y) * (post.y - from.y);
+      // A safe road scores by its pay; an unsafe one only by how far it keeps from danger.
+      const score = clear >= 22 * 22 ? 1e6 + d2 : clear;
+      if (score > bestScore) {
+        bestScore = score;
+        best = post.id;
+      }
+    }
+    if (best >= 0) issue({ t: 'route', p: p.id, ids: [u.id], post: best });
   }
 }

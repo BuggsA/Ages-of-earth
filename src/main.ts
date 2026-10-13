@@ -13,6 +13,7 @@ import { placeBuilding, spawnUnit } from './sim/world';
 import type { BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, MapSize, MapType, Unit } from './sim/types';
 import { R_FISH, R_NONE } from './sim/types';
 import { carriedBy, relicAt } from './sim/relics';
+import { postAt } from './sim/trade';
 import { NetClient, newRoomCode, saveName, savedName } from './net/client';
 import { HASH_EVERY, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
 import { deserialize, serialize } from './sim/save';
@@ -58,6 +59,8 @@ let selection = new Set<number>();
 let selectedTile: number | null = null;
 /** A relic picked out with a left click, to read about. */
 let selectedRelic: number | null = null;
+/** A trading post picked out with a left click. */
+let selectedPost: number | null = null;
 let placing: BuildingType | null = null;
 let placeAt: { tx: number; ty: number; ok: boolean } | null = null;
 /** A wall being dragged out, from tile to tile. */
@@ -341,6 +344,7 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   selection = new Set();
   selectedTile = null;
   selectedRelic = null;
+  selectedPost = null;
   placing = null;
   wallDrag = null;
   targetMode = null;
@@ -398,8 +402,8 @@ function toTitle(): void {
 // ---- Saving ----------------------------------------------------------------------------------------
 
 const SAVE_KEY = 'ages-save';
-/** Bumped when the state's shape changes, so an older save is set aside instead of loading broken (2: relics). */
-const SAVE_V = 2;
+/** Bumped when the state's shape changes, so an older save is set aside instead of loading broken (2: relics; 3: trading posts). */
+const SAVE_V = 3;
 
 function saveGame(s: GameState, setup: GameSetup): boolean {
   try {
@@ -741,6 +745,7 @@ function setSelection(ids: number[], add = false): void {
   selection = next;
   selectedTile = null;
   selectedRelic = null;
+  selectedPost = null;
   hud.buildMenu = null;
   refreshHud();
 }
@@ -815,7 +820,7 @@ function order(clientX: number, clientY: number, forceAttack = false, queue = fa
     // A building of yours: set where its trainees gather.
     const b = [...selection].map((id) => s.byId.get(id)).find((e) => e && e.kind === 'building' && e.owner === viewer);
     if (b) {
-      const at = pk.kind === 'ground' ? pk : pk.kind === 'resource' ? { x: (pk.tile % s.w) + 0.5, y: Math.floor(pk.tile / s.w) + 0.5 } : pk.kind === 'animal' ? null : pk.kind === 'relic' ? (relicAt(s, pk.id) ?? null) : (() => {
+      const at = pk.kind === 'ground' ? pk : pk.kind === 'resource' ? { x: (pk.tile % s.w) + 0.5, y: Math.floor(pk.tile / s.w) + 0.5 } : pk.kind === 'animal' ? null : pk.kind === 'relic' ? (relicAt(s, pk.id) ?? null) : pk.kind === 'post' ? (postAt(s, pk.id) ?? null) : (() => {
         const t = s.byId.get(pk.id);
         return t ? { x: t.x, y: t.y } : null;
       })();
@@ -842,6 +847,16 @@ function order(clientX: number, clientY: number, forceAttack = false, queue = fa
     view.marker(s, r.x, r.y, false);
     play('move');
     ack('move');
+    return;
+  }
+  if (pk.kind === 'post') {
+    const post = postAt(s, pk.id);
+    if (!post) return;
+    if (forceAttack) issue({ t: 'move', p: viewer, ids, x: post.x, y: post.y, amove: true, queue: q });
+    else issue({ t: 'route', p: viewer, ids, post: post.id, queue: q });
+    view.marker(s, post.x, post.y, forceAttack);
+    play(forceAttack ? 'attack' : 'move');
+    ack(forceAttack ? 'attack' : 'move');
     return;
   }
   if (pk.kind === 'unit' || pk.kind === 'building') {
@@ -1157,6 +1172,13 @@ function clickSelect(x: number, y: number, shift: boolean, ctrl: boolean): void 
     play('click');
     return;
   }
+  if (pk.kind === 'post') {
+    setSelection([]);
+    selectedPost = pk.id;
+    refreshHud();
+    play('click');
+    return;
+  }
   const e = s.byId.get(pk.id);
   if (!e) return;
   const now = performance.now();
@@ -1457,7 +1479,7 @@ function showEnd(s: GameState, won: boolean, how: 'conquest' | 'wonder' | 'relic
   const mins = Math.floor(s.tick / TICK_HZ / 60);
   const rows = s.players
     .map(
-      (p) => `<tr><td><span class="swatch" style="background:${p.color}"></span>${p.name}<div class="civ-tag">${CIVS[p.civ].name}</div></td><td>${scoreOf(s, p)}</td><td>${EPOCHS[p.epoch].short}</td><td>${p.stats.gathered}</td><td>${p.stats.trained}</td><td>${p.stats.built}</td><td>${p.stats.techs}</td><td>${p.stats.kills}</td><td>${p.stats.losses}</td></tr>`,
+      (p) => `<tr><td><span class="swatch" style="background:${p.color}"></span>${p.name}<div class="civ-tag">${CIVS[p.civ].name}</div></td><td>${scoreOf(s, p)}</td><td>${EPOCHS[p.epoch].short}</td><td>${p.stats.gathered}</td><td>${p.stats.traded ?? 0}</td><td>${p.stats.trained}</td><td>${p.stats.built}</td><td>${p.stats.techs}</td><td>${p.stats.kills}</td><td>${p.stats.losses}</td></tr>`,
     )
     .join('');
   const why =
@@ -1470,7 +1492,7 @@ function showEnd(s: GameState, won: boolean, how: 'conquest' | 'wonder' | 'relic
     <div class="sel-sub">${why} The match lasted ${mins < 1 ? 'less than a minute' : `${mins} minute${mins === 1 ? '' : 's'}`}.</div>
     <div class="chart-tabs">${(Object.keys(METRICS) as Metric[]).map((k) => `<button class="tab ${k === 'score' ? 'on' : ''}" data-metric="${k}">${METRICS[k]}</button>`).join('')}</div>
     <div id="chart">${timeline(s, 'score')}</div>
-    <table class="end-stats"><tr><th></th><th>Score</th><th>Epoch</th><th>Gathered</th><th>Trained</th><th>Built</th><th>Techs</th><th>Kills</th><th>Lost</th></tr>${rows}</table>
+    <table class="end-stats"><tr><th></th><th>Score</th><th>Epoch</th><th>Gathered</th><th>Traded</th><th>Trained</th><th>Built</th><th>Techs</th><th>Kills</th><th>Lost</th></tr>${rows}</table>
     <div class="row">
       <button class="btn wide" data-act="watch">Look around</button>
       <button class="btn wide" data-act="replay-save">Download the replay</button>
@@ -1596,7 +1618,7 @@ function onEvents(s: GameState, list: GameEvent[]): void {
 function refreshHud(): void {
   if (!game || mode === 'title') return;
   pruneSelection(game);
-  hud.update(game, viewer, [...selection], SPEEDS[speedIdx], selectedTile, selectedRelic);
+  hud.update(game, viewer, [...selection], SPEEDS[speedIdx], selectedTile, selectedRelic, selectedPost);
 }
 
 function cursorFor(s: GameState): string {
@@ -1610,6 +1632,7 @@ function cursorFor(s: GameState): string {
   if (!pk) return '';
   if (pk.kind === 'animal') return units.length ? 'cur-attack' : 'cur-select';
   if (pk.kind === 'relic') return units.some((u) => u.type === 'priest' && !carriedBy(s, u)) ? 'cur-gather' : 'cur-select';
+  if (pk.kind === 'post') return units.some((u) => u.type === 'trader') ? 'cur-gather' : 'cur-select';
   if (pk.kind === 'unit' || pk.kind === 'building') {
     const t = s.byId.get(pk.id) as Ent | undefined;
     if (!t) return '';
@@ -1618,6 +1641,7 @@ function cursorFor(s: GameState): string {
     if (units.some((u) => u.type === 'citizen') && t.kind === 'building' && t.owner === viewer && (!t.built || t.type === 'farm')) return 'cur-build';
     if (units.length && t.kind === 'building' && t.owner === viewer && t.built && BUILDINGS[t.type].garrison) return 'cur-garrison';
     if (t.kind === 'building' && t.type === 'temple' && t.owner === viewer && t.built && units.some((u) => u.type === 'priest' && carriedBy(s, u))) return 'cur-gather';
+    if (t.kind === 'building' && t.type === 'market' && t.owner === viewer && t.built && units.some((u) => u.type === 'trader')) return 'cur-gather';
     if (t.kind === 'unit' && t.type === 'transport' && t.owner === viewer && units.some((u) => domainOf(u.type) === 'land')) return 'cur-garrison';
     return 'cur-select';
   }
