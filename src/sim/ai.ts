@@ -1,5 +1,5 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AI_LEVELS, BUILDINGS, COUNTER, EPOCHS, LAST_EPOCH, MARKET, POP_MAX, TECHS, secs, unitEpoch, unitStats } from './data';
+import { AI_LEVELS, BUILDINGS, COUNTER, EPOCHS, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, TECHS, secs, unitEpoch, unitStats } from './data';
 import { NAVAL, distToRect, placeProblem, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem } from './stats';
 import type { AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Player, Res, TechId, Unit, UnitType } from './types';
@@ -827,6 +827,9 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     else {
       unit = counter && trains.includes(counter) && unitEpoch(counter) <= p.epoch && roll(s) < 0.7 ? counter : pickUnit(v, mem, b);
       if (unit && unitEpoch(unit) > p.epoch) unit = pickUnit(v, mem, b);
+      // Play to the people's strength: when not countering, favour the signature line about half the time.
+      const sig = SIGNATURES[p.civ].type;
+      if (unit !== counter && sig !== 'siege' && sig !== 'priest' && trains.includes(sig) && unitEpoch(sig) <= p.epoch && roll(s) < 0.5) unit = sig;
     }
     if (!unit || unitEpoch(unit) > p.epoch) continue;
     const cost = unitStats(unit, p.epoch).cost;
