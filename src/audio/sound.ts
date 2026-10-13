@@ -11,7 +11,7 @@
 export type SoundName =
   | 'click' | 'open' | 'select' | 'selectBuilding' | 'move' | 'attack' | 'strike' | 'thud' | 'hit' | 'hitBuilding' | 'bow' | 'sling' | 'musket'
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
-  | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
+  | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
   | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid';
 
@@ -116,7 +116,7 @@ export class Sound {
     'click', 'open', 'select', 'selectBuilding', 'move', 'attack', 'strike', 'thud', 'hit', 'hitBuilding', 'bow', 'sling', 'musket', 'fall',
     'collapse', 'built', 'place', 'ready', 'readyCitizen', 'chop', 'mine', 'hammer', 'rustle', 'epoch', 'alert', 'victory', 'defeat', 'error', 'coin', 'queue',
     'catapult', 'cannon', 'impact', 'spear', 'chant', 'convert', 'heal', 'townBell', 'allClear', 'research', 'wonder', 'shelter',
-    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid',
+    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'rankUp',
   ];
 
   /**
@@ -541,6 +541,12 @@ export class Sound {
         // A bright choir chord and chimes.
         for (const f of [N.C4, N.E4, N.G4, N.C5]) this.tone(out, t, { f, type: 'sawtooth', dur: 1.3, peak: 0.03, attack: 0.08, lp: 1800 });
         [N.G5, N.C6, N.E6].forEach((f, i) => this.bell(out, t + 0.1 + i * 0.09, f, 0.9, 0.05));
+        break;
+      case 'rankUp':
+        // A bright rising fanfare: two notes and a bell.
+        this.tone(out, t, { f: N.G4, type: 'triangle', dur: 0.18, peak: 0.07, attack: 0.01 });
+        this.tone(out, t + 0.1, { f: N.C5, type: 'triangle', dur: 0.3, peak: 0.07, attack: 0.01 });
+        this.bell(out, t + 0.2, N.E6, 0.7, 0.04);
         break;
       case 'heal':
         this.bell(out, t, N.E6, 0.5, 0.035);

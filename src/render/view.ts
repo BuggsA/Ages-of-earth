@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { SoundName } from '../audio/sound';
-import { AURA, BUILDINGS, TICK_HZ, TRADE, domainOf } from '../sim/data';
+import { AURA, BUILDINGS, SIGNATURES, TICK_HZ, TRADE, domainOf } from '../sim/data';
 import { buildingMaxHp, statsFor } from '../sim/stats';
 import type { BuildingType, Ent, GameEvent, GameState, Unit } from '../sim/types';
 import { R_GOLD, R_STONE } from '../sim/types';
@@ -581,7 +581,7 @@ export class View {
             if (!this.sees(ev.x, ev.y) && ev.owner !== this.viewer) break;
             const type = ev.type as Unit['type'];
             const drawnAt = this.units.drawn.get(ev.id);
-            this.units.fall(type, ev.epoch, ev.owner, ev.x, ev.y, ev.fx, ev.fy, ev.id);
+            this.units.fall(type, ev.epoch, ev.owner, ev.x, ev.y, ev.fx, ev.fy, ev.id, SIGNATURES[s.players[ev.owner].civ].type === type ? s.players[ev.owner].civ : undefined);
             const dom = domainOf(type);
             if (dom === 'water') {
               // A ship breaks up: spray, splinters, a slick of smoke.
@@ -694,6 +694,11 @@ export class View {
           break;
         case 'deliver':
           if (ev.owner === this.viewer) this.resources.markDirty();
+          break;
+        case 'rank':
+          this.cue('rankUp', ev.x, ev.y, 0.5);
+          this.effects.burst(this.ground(s, ev.x, ev.y, 1.2), { count: 6, speed: 0.5, up: 1, life: 0.9, size: 0.05, gravity: -0.5, colors: ['#fff3c4', '#ffd24d'] });
+          if (ev.owner === this.viewer) this.onPing?.(ev.x, ev.y, '#ffd24d');
           break;
         case 'alert':
           if (ev.owner === this.viewer) this.onPing?.(ev.x, ev.y, '#ff4d4d');

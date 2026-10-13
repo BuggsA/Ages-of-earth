@@ -1,4 +1,4 @@
-import { AURA, BONUS, BUILDINGS, DEER, TICK_HZ, domainOf, secs, type UnitStats } from './data';
+import { AURA, BONUS, BUILDINGS, DEER, VETERANCY, TICK_HZ, domainOf, secs, type UnitStats } from './data';
 import { distToRect } from './grid';
 import type { Spatial } from './spatial';
 import { modsOf, statsFor } from './stats';
@@ -12,16 +12,25 @@ const SHOT_SPEED: Record<Shot['kind'], number> = { stone: 10, arrow: 13, bolt: 1
 /** Whether a peace treaty still holds (no fighting between players). */
 export const peace = (s: GameState) => s.tick < s.peaceUntil;
 
+/** A unit's veteran rank: 0 for none, up to 3. */
+export function rankOf(u: Unit): number {
+  const k = u.vet ?? 0;
+  let r = 0;
+  for (let i = 0; i < VETERANCY.kills.length; i++) if (k >= VETERANCY.kills[i]) r = i + 1;
+  return r;
+}
+
 /** Damage of one blow or shot after the counter bonus, a hero's inspiration and armor. */
 export function damageOf(s: GameState, attacker: Unit | null, st: UnitStats, target: Ent, ranged: boolean): number {
-  const inspired = attacker && s.tick - attacker.aura < 5 ? AURA.attack : 1;
+  const inspired = (attacker && s.tick - attacker.aura < 5 ? AURA.attack : 1) * (attacker && rankOf(attacker) ? VETERANCY.attack[rankOf(attacker) - 1] : 1);
   if (target.kind === 'building') {
     // Walls shrug off all but siege and heavy blows.
     const wall = target.type === 'wall' || target.type === 'gate' ? (st.cls === 'siege' ? 1.2 : st.cls === 'infantry' || st.cls === 'hero' ? 0.5 : 0.15) : 1;
     return Math.max(1, st.attack * BONUS[st.cls].building * inspired * wall);
   }
   const ts = statsOf(s, target);
-  const armor = ranged ? ts.parmor : ts.armor;
+  const rank = target.kind === 'unit' ? rankOf(target) : 0;
+  const armor = (ranged ? ts.parmor : ts.armor) + (rank ? VETERANCY.armor[rank - 1] : 0);
   return Math.max(1, st.attack * BONUS[st.cls][ts.cls] * inspired - armor);
 }
 
@@ -34,7 +43,7 @@ export function gap(s: GameState, u: Unit, t: Ent): number {
   return Math.sqrt(dx * dx + dy * dy) - r - radiusOf(s, t);
 }
 
-export function hurt(s: GameState, target: Ent, damage: number, by: number, attacker: Unit | null): void {
+export function hurt(s: GameState, target: Ent, damage: number, by: number, attacker: Unit | null, credit: Unit | null = attacker): void {
   if (target.hp <= 0) return;
   target.hp -= damage;
   target.hurt = s.tick;
@@ -47,6 +56,12 @@ export function hurt(s: GameState, target: Ent, damage: number, by: number, atta
   if (target.hp <= 0) {
     s.players[by].stats.kills++;
     if (target.kind === 'building') s.players[by].stats.razed++;
+    else if (credit && credit.hp > 0 && credit.owner === by && statsOf(s, target).cls !== 'citizen') {
+      const before = rankOf(credit);
+      credit.vet = (credit.vet ?? 0) + 1;
+      const after = rankOf(credit);
+      if (after > before) s.events.push({ k: 'rank', id: credit.id, owner: credit.owner, x: credit.x, y: credit.y, rank: after });
+    }
     return;
   }
   // Soldiers standing about answer whoever hits them (if their stance lets them move).
@@ -80,6 +95,7 @@ export function strike(s: GameState, u: Unit, t: Ent): void {
       from: u.type,
       animal: false,
       fromAir: domainOf(u.type) === 'air',
+      src: u.id,
     });
     s.events.push({ k: 'swing', id: u.id, target: t.id, x: u.x, y: u.y, owner: u.owner, ranged: true, type: u.type });
     s.events.push({ k: 'shot', owner: u.owner, kind: st.shot, x: u.x, y: u.y, air: domainOf(u.type) === 'air' });
@@ -136,7 +152,8 @@ export function updateShots(s: GameState, sp: Spatial, hitAnimal: (a: Animal, da
       hitAnimal(a, sh.damage, sh.x0, sh.y0);
       continue;
     }
-    if (t && t.hp > 0) hurt(s, t, sh.damage, sh.owner, null);
+    const shooter = sh.src ? s.byId.get(sh.src) : undefined;
+    if (t && t.hp > 0) hurt(s, t, sh.damage, sh.owner, null, shooter && shooter.kind === 'unit' ? shooter : null);
     if (sh.splash > 0) {
       s.events.push({ k: 'splash', x: sh.tx, y: sh.ty, owner: sh.owner, kind: sh.kind });
       const st = sh.from ? statsFor(s, sh.owner, sh.from) : null;

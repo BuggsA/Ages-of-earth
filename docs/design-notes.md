@@ -128,3 +128,22 @@ Agents design this game as well as build it (`AGENTS.md` §2). When you add some
 **Why it matters:** a campaign is how most people first meet an RTS, and these chapters teach the game in order: gathering and houses, then a market and a raid, then walls and towers, then siege, then the sea, then the air.
 
 **Next, if you pick it up:** the computer in `scripts/campaign.ts` only wins chapters 1 and 2, because it doesn't play toward scripted goals (it never builds walls). Teaching it to (a goal-aware mode in `ai.ts`) would prove every chapter winnable and give a "watch the computer play it" button. Chapters for relics and trade (a pilgrim road, a caravan city) would show off the newest systems. Starting relics and posts per chapter are wherever the map generator puts them; a chapter could choose to have none.
+
+## Designers' notes: signature soldiers (2026-10-13, Chain 1013-1900)
+
+Built: each of the six peoples has one unit line with its own names per epoch and a trade-off (`SIGNATURES` in `src/sim/data.ts`, applied in `statsFor`). Why I love it: it was the "unique units" idea in the notes above, done so a Mongol army *reads* differently (Mangudai: hit harder, die faster) without new models or UI. The tooltip on the people's name in the top bar lists it. Numbers changed: all new, none of the existing ones. Not seen in a browser; unit-tested only.
+Next: give each its own model tint or silhouette in `unitModels.ts`; let the computer pick its people's signature line more often; a second, epoch-locked signature (a Roman ram, a Greek hero).
+
+### Signature marks (2026-10-13, Chain 1013-1900)
+
+Built: a signature line now wears its people's mark on the field: Egyptian gold headdress and lapis collar, Greek horsehair crest, Roman cross-crest, Mongol horsetail standard, Chinese red-and-gold banner, British white plume (`signatureMark` in `src/render/unitModels.ts`; its own instanced batch per people, so no extra cost for other units). Why: the rules gave each people a different army; now you can see whose it is across the map. Not seen in a browser (headless geometry test only), so sizes and heights of marks, especially on riders and siege, may want tuning. Next: per-epoch variants of each mark, tinted cloaks, marks in the portraits.
+
+### Veterancy (2026-10-13, Chain 1013-1900)
+
+Built: soldiers who defeat enemy soldiers (citizens and buildings don't count; shooters are credited through `Shot.src`) earn Veteran, Elite and Champion ranks (`VETERANCY` in `src/sim/data.ts`: 3/8/15 kills, blows x1.1/1.2/1.3, armor +0/1/2). The selection panel shows the rank and a gold ping marks a rank-up. Why I love it: it makes a surviving army precious, so retreating and healing with priests matter, and it stacks with heroes and signature lines. Numbers are all new. Not seen in a browser; unit-tested only. Next: chevrons over veterans in `unitModels.ts`, a rank-up chime, the computer pulling back wounded veterans, priests' healing favouring them. No save bump: `vet` is optional.
+
+Chevrons and chime (2026-10-13, Chain 1013-1900, session 4): veterans now wear one to three gold unlit chevrons over their heads (`chevronGeometry` in `src/render/unitsView.ts`, one instanced mesh per rank, turned to face the camera), and a rank-up plays a new synthesized `rankUp` fanfare with a small sparkle. Look only, no rule or save change. Not seen in a browser (typecheck and tests only); the chevron height (1.5 above the ground, 1.75 mounted) is a guess to check. Next: the computer favouring its signature line, transports in computer invasions.
+
+### The computer favours its signature line (pitch, no issue), 2026-10-13, Chain 1013-1900 session 5
+
+Built: when the computer isn't countering what it sees, it now trains its people's signature line (`SIGNATURES`) about half the time wherever the building trains it, so a Mongol computer rides, a Greek one forms a shield wall. Siege and priests keep their own rules. Lane ai, `src/sim/ai.ts` only; no number or save change. Verified by a 20-minute headless match only, not balance-swept. Next: transports in computer invasions, a scenario editor.
