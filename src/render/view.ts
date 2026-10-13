@@ -695,6 +695,9 @@ export class View {
         case 'deliver':
           if (ev.owner === this.viewer) this.resources.markDirty();
           break;
+        case 'rank':
+          if (ev.owner === this.viewer) this.onPing?.(ev.x, ev.y, '#ffd24d');
+          break;
         case 'alert':
           if (ev.owner === this.viewer) this.onPing?.(ev.x, ev.y, '#ff4d4d');
           break;

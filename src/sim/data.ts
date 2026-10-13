@@ -194,6 +194,16 @@ export const COUNTER: Record<'infantry' | 'ranged' | 'cavalry', UnitType> = { in
 
 /** A hero's presence: soldiers within this many tiles strike harder and heal. */
 export const AURA = { radius: 6, attack: 1.2, heal: 1.5 };
+/**
+ * Veterancy: a soldier who defeats enemy soldiers earns ranks (Veteran, Elite, Champion). `kills` is how
+ * many it takes for each rank; a rank adds to its blows (`attack`, a multiplier) and its armor.
+ */
+export const VETERANCY = {
+  names: ['Veteran', 'Elite', 'Champion'],
+  kills: [3, 8, 15],
+  attack: [1.1, 1.2, 1.3],
+  armor: [0, 1, 2],
+};
 /** Priests: healing per second, and how long a conversion takes (seconds, before the target's toughness). */
 export const PRIEST = { heal: 3, convert: 7, rest: 8 };
 /**

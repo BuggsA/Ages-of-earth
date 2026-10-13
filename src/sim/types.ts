@@ -154,6 +154,8 @@ export interface Unit {
   born: number;
   /** Last tick a hero's presence inspired it. */
   aura: number;
+  /** Enemy soldiers it has defeated (older saves lack it). */
+  vet?: number;
 }
 
 export interface TrainItem {
@@ -270,6 +272,8 @@ export interface Shot {
   animal: boolean;
   /** Fired from an aircraft (for drawing it from the sky). */
   fromAir?: boolean;
+  /** The unit that loosed it, to credit a kill (a missing or fallen shooter earns none). */
+  src?: number;
 }
 
 export interface PlayerStats {
@@ -337,6 +341,7 @@ export type GameEvent =
   | { k: 'deliver'; owner: number; res: Res; amount: number; x: number; y: number }
   | { k: 'work'; id: number; owner: number; act: Act; x: number; y: number }
   | { k: 'depleted'; tile: number }
+  | { k: 'rank'; id: number; owner: number; x: number; y: number; rank: number }
   | { k: 'alert'; owner: number; x: number; y: number; building: boolean }
   | { k: 'converted'; id: number; from: number; to: number; x: number; y: number }
   | { k: 'healed'; id: number; x: number; y: number }
