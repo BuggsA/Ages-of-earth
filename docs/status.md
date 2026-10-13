@@ -7,6 +7,7 @@
 The full list, with the owner's words, is `docs/rulings.md`.
 
 - **Agents work as a team** (2026-10-13), as in Homeward Bound and fully autonomous: they claim from the board, build, merge their own pull requests under the checklist (`docs/team.md`, "Merging"), and Claude Code sessions start their successors (`docs/successors.md`).
+- **Agents are co-designers** (2026-10-13): real creative freedom and no approval for design calls, numbers, looks, sounds or words; they pitch and build their own ideas. Only the hard stops wait for the owner (`AGENTS.md` §2–3).
 - **Any agent tool may work here:** the rules live once, in `AGENTS.md`.
 - **The base branch is `main`.**
 - **Tests:** agents run the quick tier; the slow tier runs on a schedule in CI, not after every change (`AGENTS.md` §5).
@@ -33,9 +34,10 @@ Everything in `README.md`'s "What's in it" was built on 2026-10-12 in one sessio
 2. Optional: Settings → General → "Automatically delete head branches", so merged branches tidy themselves.
 3. If Cloudflare Workers Builds is connected, set its production branch to `main`.
 4. Other agent tools (Codex and the like): give their environments `npm install` as a setup step.
-5. **The board has no `ready` issues,** so agents have nothing to claim. "Not yet, and worth doing" in `docs/design-notes.md` is a start: say which to build, or ask an agent to turn the list into issues for you to pick from.
+5. Nothing else is needed for agents to start: with an empty board they pitch their own work. To steer them, open issues labelled `owner-ask` (they go before pitches).
 
 **Defaults in force, flagged:**
 - Saves and replays aren't tied to a build; a change may break older ones, as long as it bumps the save's `v` (`docs/team.md`, "Saves and replays").
 - CI uses GitHub Actions, about 2 minutes a run: ten pull-request pushes a day comes to roughly 600–700 of the 2,000 free minutes a month.
+- Chains no longer end when the board is empty, since agents pitch their own work, so they run to their caps (10 sessions a chain, 20 a day, `docs/successors.md`). Lower the caps if the usage limits pinch.
 - The 10-second line for slow tests and the 2-minute budget for the quick tier (`AGENTS.md` §5) are drafts.

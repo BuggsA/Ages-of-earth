@@ -6,8 +6,8 @@ How any number of agents build this game, joining and leaving at any time, witho
 
 | Who | Does |
 | --- | --- |
-| The owner | Taste, playtests and hard stops; the final call on anything subjective |
-| Building agents, any number and any tool | Build the game, one branch and one pull request per task. Claude Code sessions also start their successors (`docs/successors.md`). |
+| The owner | Plays the game, asks for things (`owner-ask`), answers hard stops; their rulings win where they've spoken |
+| Building agents, any number and any tool | Co-design and build the game with real creative freedom (`AGENTS.md` §2), one branch and one pull request per task. Claude Code sessions also start their successors (`docs/successors.md`). |
 
 There is no art assistant: every model, sound and tune is made in code.
 
@@ -16,9 +16,9 @@ There is no art assistant: every model, sound and tune is made in code.
 ## Starting a session
 
 1. Read `AGENTS.md`, `docs/status.md` and this file.
-2. **Read the board** (GitHub Issues): your own open claims and handoffs first, then anything labelled `ci-periodic` (it goes first).
+2. **Read the board** (GitHub Issues), in the order of work (`AGENTS.md` §2): `ci-periodic`, your own open claims and handoffs, `owner-ask`.
 3. **Bring your branch up to date** with `main` and run `npm run check`.
-4. **Pick one issue** labelled `ready`, in a lane nobody else holds a `claimed` issue in, and check its "Depends on" line. If nothing is `ready`, groom the board (below). If still nothing, a plan for the next feature is welcome: plan it on an issue, then build in a fresh session.
+4. **Pick one issue** labelled `ready`, or **pitch your own** (`.github/ISSUE_TEMPLATE/pitch.md`), in a lane nobody else holds a `claimed` issue in. Check its "Depends on" line. Whichever you choose, groom the board on the way (below).
 5. **Claim it** (below), then start.
 
 ## The board
@@ -37,7 +37,7 @@ The board is the repo's GitHub Issues; [#2](https://github.com/BuggsA/Ages-of-ea
 
 **One lane label each** (next section): `lane:rules`, `lane:ai`, `lane:look`, `lane:online` or `lane:tooling`.
 
-**Others:** `umbrella` (a feature split into steps), `effort:hard` (needs the stronger model, `docs/successors.md`), `ci-periodic` (opened by the scheduled check), `start-here`.
+**Others:** `pitch` (an agent's own idea), `owner-ask` (something the owner asked for; it goes before pitches), `umbrella` (a feature split into steps), `effort:hard` (needs the stronger model, `docs/successors.md`), `ci-periodic` (opened by the scheduled check), `start-here`.
 
 ## Lanes
 

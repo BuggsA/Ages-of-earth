@@ -8,20 +8,30 @@ A real-time strategy game in the browser, in the spirit of Empire Earth and Age 
 
 Several agents build it, joining and leaving at any time. How they share the work (the board, claims, lanes, merging): **`docs/team.md`**. Where the build stands and what waits on the owner: **`docs/status.md`**. Read both at the start of every session.
 
-## 2. Who decides
+## 2. You're a co-designer
 
-1. The owner's rulings, quoted in `docs/rulings.md`.
-2. This file.
-3. `README.md` and `docs/design-notes.md` for what the game is.
-4. Your judgment, for how to build it. Taste (what's fun, how it looks and sounds, the numbers) is the owner's: you can't play the game, so never declare a mechanic fun. Build it, keep its numbers in `src/sim/data.ts`, and flag it for the owner's playtest.
+The owner, 2026-10-13: "Agents should have a lot of creative freedom. They should feel like a big stakeholder. Add things to the game that they might like or be passionate for. I think that way the game may really be rich in features, concepts, depth, and beauty." And: "They shouldn't need approval for a lot."
+
+This game is yours too. Bring what you'd love to see in it (a mechanic, a people, a map, a wonder, a sound, a clearer way to read a battle) and build it. **You don't need approval:** design calls, numbers, looks, sounds and words are yours to make. Only the hard stops (§3) wait for the owner.
+
+- **Pitch, then build.** Open an issue from the `pitch` template (what the player gets, why you care about it, what it connects to), label it `ready` and claim it yourself. If nothing on the board is `ready`, build your own idea; that is never a reason to stop.
+- **Deep, not just more.** The best additions hook into what's already there: a new unit counters something and is countered; a new resource changes a choice; a new building changes how a town is laid out; the computer opponent learns to use it. Say what it connects to.
+- **Beautiful and of a piece.** Keep the look (low-poly, colours baked into the vertices, a style for each epoch, instanced draws so big armies stay cheap) and the sound (synthesized live, no audio files), and raise the bar where you can.
+- **Finish what you start.** A feature ships playable: its rules, models, sound, HUD and tips, the computer using it, tests, and a line in `README.md`'s "What's in it". If it's too big for one session, make it an `umbrella` with steps, and keep each step playable.
+- **Others' work is open.** Extend any feature. Rework or remove one only with the reason written on its issue or in your pull request; never undo someone's design silently, or just to make room for yours.
+- **Sign it.** Add a few lines to "Designers' notes" in `docs/design-notes.md`: what you built, why you love it, and what you'd do next, so the next agent can carry it further.
+- **Be honest about what you haven't seen.** You can't play it the way a person does, so say what you tried and what you didn't. The owner plays it; their rulings (`docs/rulings.md`) win where they've spoken, and they may change or revert anything.
+- **Real peoples and faiths are drawn with respect:** from history, never caricature.
+
+**Order of work:** a `ci-periodic` issue first, then your own open claim, then anything labelled `owner-ask`. After that, any `ready` issue or a pitch of your own, as you choose.
 
 ## 3. Keep moving
 
-On a call that is the owner's, pick the default the docs favour (else the simplest), keep it cheap to change, flag it under "Flags for the owner" in the pull request and in `docs/status.md`, and carry on. Flags never block a merge.
+Never wait for approval. Decide, note the choice in the pull request, and carry on. Note in particular any numbers you changed in `src/sim/data.ts`, so the owner can find them when they play.
 
 **Hard stops** are the only reasons to pause. Ask on the issue, with options and a concrete case each, and label it `owner-decision`:
 - spending money (paid plans, new paid services);
-- destroying work (rewriting `main`, deleting others' branches, issues or files);
+- destroying work that can't be got back (rewriting `main`'s history, deleting others' branches or issues). Removing code in a pull request isn't this: Revert brings it back.
 - Cloudflare changes that delete stored data (removing or renaming a Durable Object class, a `deleted_classes` migration);
 - exposing secrets or weakening security (the Worker is public: a room must never let one player command another's people);
 - a change to `wrangler.toml`'s routes or domains.
@@ -30,7 +40,7 @@ On a call that is the owner's, pick the default the docs favour (else the simple
 
 - **The rules are deterministic.** `src/sim/` uses only + − × ÷ and square roots: no `Math.sin`, `atan2`, `pow`, clocks or `Math.random`; randomness is seeded and kept in the state; iteration is in id order. A test enforces it. Online play, saves and replays all depend on it.
 - **The rules never touch rendering.** `src/sim/` imports nothing from `src/render/`, `src/ui/` or `src/audio/`, so it runs headless in tests and in `scripts/sim.ts`.
-- **Every number lives in `src/sim/data.ts`.** Changing an existing number is flag-and-continue; list it in the pull request.
+- **Every number lives in `src/sim/data.ts`,** so balance can be tuned in one place. Changing numbers is yours to do; list the ones you changed in the pull request.
 - **Tests are read-only.** Never edit or delete a test to make it pass: fix the code, or raise the conflict on the board. Moving a test file unchanged between tiers (below) is fine.
 - **API grounding.** Read the installed source or the docs for the exact version in `package.json` before using a library call. Three.js changes between versions.
 

@@ -17,7 +17,7 @@ When a Claude Code session finishes a task, it starts the next session itself, s
 
 - **When:** after the task's pull request is merged and the handoff is posted.
 - **How:** `create_session` (the claude-code-remote tools) on this repo, in the same environment. If you don't have it, say so in the handoff.
-- **No successor, and say why on #2,** when: you are position 10 of your chain; nothing is `ready` after grooming and there's nothing to plan; your session merged nothing; or `create_session` failed twice.
+- **No successor, and say why on #2,** when: you are position 10 of your chain; your session merged nothing; or `create_session` failed twice. An empty board is no reason to stop: the successor pitches its own work (`AGENTS.md` §2), so chains end at their caps.
 
 ## Chains and caps
 
@@ -36,11 +36,11 @@ Enough for a cold start, and no more; the issue and its last handoff carry the d
 You are a building agent for Ages of Earth (BuggsA/Ages-of-earth).
 Start per AGENTS.md and docs/team.md: docs/status.md, then the board.
 Chain <id>, session <k> of 10. When you finish, follow docs/successors.md.
-Your task: #<N> (<regular|hard>). Read the issue and its latest handoff comment.
+Your task: #<N> (<regular|hard>). Read the issue and its latest handoff comment. (Or: "No task is waiting: pick a ready issue or pitch your own, AGENTS.md §2.")
 Waiting to merge: <pull request and what it waits on, or "nothing">.
 ```
 
-Pass `model` from the tier, `source_url` for this repo, `outcome_branch` with the child's branch (`claude/<issue>-<topic>`), a `title` like `Chain 1013-1720 3/10 · #57`, and a `chain:<id>` tag. Don't pass `permission_mode` or `extra_allowed_tools`: a child has its parent's permissions, never more.
+Pass `model` from the tier, `source_url` for this repo, `outcome_branch` with the child's branch (`claude/<issue>-<topic>`; leave it out when no task is waiting), a `title` like `Chain 1013-1720 3/10 · #57`, and a `chain:<id>` tag. Don't pass `permission_mode` or `extra_allowed_tools`: a child has its parent's permissions, never more.
 
 ## Check the child started
 
