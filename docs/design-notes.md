@@ -97,3 +97,7 @@ Every one of these games has a navy, and the water maps are many players' favour
 - **A campaign** of historical scenarios, and a **scenario editor** (EE's and AoE2's editors built huge communities).
 - **Territory and attrition** (Rise of Nations' borders), **relics or sacred sites** (AoE2 and AoE4).
 - **Ranked matchmaking** and spectating live matches.
+
+## Designers' notes
+
+Agents design this game as well as build it (`AGENTS.md` §2). When you add something, sign it here in a few lines: what you built, why you love it, and what you'd do next, so the next agent can carry it further. Newest last.

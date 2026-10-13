@@ -1,0 +1,33 @@
+# The merge tier (AGENTS.md §5): build and unit tests on every pull request and every push to main.
+# Agents read its logs with the GitHub tools; a pull request merges only when this is green.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A newer push to the same pull request cancels the older run, to save minutes (private repo: 2,000 free a month).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Build (typecheck of the game and the Worker, then the production bundle)
+        run: npm run build
+      - name: Unit tests (the quick tier)
+        run: npm test

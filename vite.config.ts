@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   // Relative asset paths so the build works from any static host path.
   base: './',
   // Online rooms only let in browsers running the same build (the rules must match exactly).
@@ -8,5 +8,7 @@ export default defineConfig({
   build: { target: 'es2022', chunkSizeWarningLimit: 1500 },
   // In development, rooms are served by `wrangler dev` on port 8787.
   server: { proxy: { '/api': { target: 'http://localhost:8787', ws: true } } },
-  test: { include: ['tests/**/*.test.ts'], environment: 'node' },
-});
+  // Two test tiers (AGENTS.md, "Checks"): `npm test` runs the quick tests in tests/, and
+  // `npm run test:slow` (mode "slow") the long ones in tests/slow/, which CI runs on a schedule.
+  test: { include: [mode === 'slow' ? 'tests/slow/**/*.test.ts' : 'tests/*.test.ts'], environment: 'node' },
+}));

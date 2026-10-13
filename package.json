@@ -9,6 +9,9 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit && tsc --noEmit -p worker",
     "test": "vitest run",
+    "test:slow": "vitest run --mode slow --passWithNoTests",
+    "check": "npm run typecheck && npm test",
+    "check:full": "npm run build && npm test && npm run test:slow",
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {

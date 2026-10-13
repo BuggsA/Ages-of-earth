@@ -1,0 +1,53 @@
+# The full tier (AGENTS.md §5): build, unit tests and the slow tests in tests/slow/, once a day on main
+# and on demand, so agents don't run the slow tests after every change. A failure opens (or adds to) an
+# issue labelled ci-periodic and ready, which goes ahead of new features (docs/team.md).
+# GitHub runs scheduled workflows only from the default branch, so this starts once main is the default.
+name: periodic
+
+on:
+  schedule:
+    - cron: '23 6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: periodic
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  full:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Build
+        run: npm run build
+      - name: Unit tests (the quick tier)
+        run: npm test
+      - name: Slow tests (tests/slow/)
+        run: npm run test:slow
+      - name: Report the failure on the board
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          for label in ci-periodic ready lane:tooling; do gh label create "$label" --force >/dev/null; done
+          body="The periodic full check failed on \`main\` at ${GITHUB_SHA::7}: $RUN_URL
+          Read the failing step's log, then fix it or revert the pull request that caused it (AGENTS.md §5)."
+          open=$(gh issue list --label ci-periodic --state open --json number --jq '.[0].number // empty')
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --body "$body"
+          else
+            gh issue create --title "Periodic check failed on main" --label ci-periodic --label ready --label lane:tooling --body "$body"
+          fi
