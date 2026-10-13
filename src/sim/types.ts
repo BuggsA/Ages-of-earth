@@ -435,6 +435,10 @@ export interface AiMemory {
   dockless?: number;
   /** Tick its bombers last set out. */
   sortie?: number;
+  /** A sea landing under way: the transport, the soldiers aboard (or boarding) and how far along it is. */
+  landing?: { ship: number; ids: number[]; since: number; phase: 'load' | 'sail' };
+  /** Tick its last landing set out. */
+  landed?: number;
 }
 
 /** Orders that can be given with Shift held to queue them after the current one. */
