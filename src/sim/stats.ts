@@ -1,4 +1,4 @@
-import { BUILDINGS, CIVS, EPOCHS, NO_MODS, TECHS, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
+import { BUILDINGS, CIVS, SIGNATURES, EPOCHS, NO_MODS, TECHS, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
 import type { BuildingType, Cost, GameState, Player, TechId, UnitType } from './types';
 import { RES } from './types';
 
@@ -52,6 +52,13 @@ export function statsFor(s: GameState, owner: number, type: UnitType): UnitStats
   const base = unitStats(type, p.epoch);
   const m = c.mods;
   st = { ...base };
+  const sig = SIGNATURES[p.civ];
+  if (sig.type === type && base.cls !== 'citizen') {
+    st.name = sig.names[Math.min(p.epoch, sig.names.length - 1)];
+    st.blurb = `${base.blurb} ${sig.blurb}`;
+    for (const k of Object.keys(sig.add ?? {}) as (keyof NonNullable<typeof sig.add>)[]) st[k] += sig.add![k]!;
+    for (const k of Object.keys(sig.mul ?? {}) as (keyof NonNullable<typeof sig.mul>)[]) st[k] = k === 'hp' ? Math.round(st[k] * sig.mul![k]!) : st[k] * sig.mul![k]!;
+  }
   const soldier = base.cls === 'infantry' || base.cls === 'cavalry' || base.cls === 'ranged' || base.cls === 'hero';
   if (base.cls === 'infantry' || base.cls === 'cavalry' || base.cls === 'hero') st.attack += m.meleeAttack;
   if (base.cls === 'ranged') {
