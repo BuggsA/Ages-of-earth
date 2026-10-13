@@ -17,18 +17,18 @@ The full list, with the owner's words, is `docs/rulings.md`.
 
 Everything in `README.md`'s "What's in it" was built on 2026-10-12 in one session (branch `claude/beautiful-franklin-6gj8tt`, now `main`): five epochs, six peoples, the economy, seventeen buildings, twenty-six technologies, counters, siege, priests, heroes, walls and the bell, ships, fishing and aircraft, the computer opponent, online rooms, saves, replays, synthesized sound and music.
 
-Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders and trading posts (#6, merged in #10; the save `v` is 3), and **the campaign**, The Long Road (#9, from an earlier session's unmerged branch).
+Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders and trading posts (#6, merged in #10; the save `v` is 3), and **the campaign**, The Long Road (#9, merged in #11; from an earlier session's unmerged branch). The computer plays a chapter's goals, so chapters 1–5 are shown winnable (#12); chapter 6 isn't yet (#24).
 
 | Check | State |
 | --- | --- |
 | Quick tier (`npm run check`) | 83 tests, about 20 s |
-| Slow tier (`tests/slow/`) | empty |
+| Slow tier (`tests/slow/`) | `campaign-proof.test.ts`: chapters 1–5 played to a win, about 75 s |
 | Browser checks | none automated; the first session tested by hand in headless Chromium |
 | CI (`ci`, `periodic`) | added 2026-10-13; `periodic` starts once `main` is the default branch |
 
 ## In flight
 
-- [#9](https://github.com/BuggsA/Ages-of-earth/issues/9), the campaign, The Long Road (chain 1013-1734, 3/10): branch `claude/9-campaign`. No save bump: the chapter's state is optional and older saves load as before.
+- [#12](https://github.com/BuggsA/Ages-of-earth/issues/12), the computer plays the campaign's goals (chain 1013-1734, 4/10, lane ai): branch `claude/12-campaign-ai`. No save bump: the chapter's new `burned` list is optional.
 
 - [#1](https://github.com/BuggsA/Ages-of-earth/pull/1), repairs for damaged buildings: opened before these rules, with no issue; now targets `main`. Its author couldn't run the typecheck and hadn't tried it in a browser.
 
