@@ -386,6 +386,29 @@ export const CIVS: Record<CivId, Civ> = {
 
 export const CIV_IDS = Object.keys(CIVS) as CivId[];
 
+/**
+ * A people's signature soldiers: one unit line that carries their own names (one per epoch) and a
+ * trade-off in numbers. Same model and counters as the line it replaces; only the stats and names change.
+ * Cost is left alone on purpose, so training and the computer's budgeting price every line the same.
+ */
+export interface Signature {
+  type: UnitType;
+  /** One name per epoch, in place of the line's own. */
+  names: string[];
+  add?: Partial<Pick<UnitStats, 'hp' | 'attack' | 'armor' | 'parmor' | 'range' | 'sight' | 'speed'>>;
+  mul?: Partial<Pick<UnitStats, 'hp' | 'attack' | 'speed' | 'time' | 'reload'>>;
+  blurb: string;
+}
+
+export const SIGNATURES: Record<CivId, Signature> = {
+  egyptians: { type: 'priest', names: ['Priest', 'Temple Priest', 'High Priest', 'Hierophant', 'Hierophant'], add: { range: 1 }, mul: { time: 0.8 }, blurb: 'Egyptian priests chant from 1 tile farther and are trained 20% faster.' },
+  greeks: { type: 'infantry', names: ['Hoplite', 'Hoplite', 'Phalangite', 'Phalangite', 'Evzone'], add: { parmor: 1 }, mul: { speed: 0.95 }, blurb: 'Shield wall: +1 pierce armor, but 5% slower on the march.' },
+  romans: { type: 'infantry', names: ['Triarius', 'Legionary', 'Legionary', 'Centurion', 'Centurion'], add: { attack: 1, armor: 1 }, mul: { time: 1.15 }, blurb: 'Legions hit harder (+1 attack, +1 armor) but take 15% longer to train.' },
+  mongols: { type: 'cavalry', names: ['Rider', 'Horse Archer', 'Mangudai', 'Keshig', 'Keshig'], add: { attack: 2 }, mul: { hp: 0.9 }, blurb: 'Steppe riders strike hard (+2 attack) but have 10% less health.' },
+  chinese: { type: 'siege', names: ['Ram', 'Great Ram', 'Trebuchet', 'Fire Bombard', 'Rocket Gun'], mul: { attack: 1.15, reload: 0.9 }, blurb: 'Chinese engineers: siege hits 15% harder and reloads 10% faster.' },
+  britons: { type: 'ranged', names: ['Slinger', 'Yeoman', 'Longbowman', 'Longbowman', 'Redcoat'], add: { attack: 1, sight: 1 }, mul: { speed: 0.95 }, blurb: 'Yeomen of the longbow: +1 attack and sight, 5% slower afoot.' },
+};
+
 // ---- Economy ---------------------------------------------------------------------------------------
 
 export const POP_MAX = 150;
