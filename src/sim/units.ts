@@ -6,6 +6,7 @@ import type { Spatial } from './spatial';
 import { buildTimeFor, modsOf } from './stats';
 import type { Act, Animal, Building, Ent, GameState, Goal, Order, Res, Unit } from './types';
 import { R_BERRY, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
+import { carriedBy, relicAt } from './relics';
 import { canHit, exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, passOf, radiusOf, statsOf, teamOf } from './world';
 
 /**
@@ -620,8 +621,8 @@ function convertTicks(s: GameState, priest: Unit, t: Unit): number {
 function convertStep(s: GameState, u: Unit, o: Extract<Order, { k: 'convert' }>): void {
   const t = s.byId.get(o.target);
   const st = statsOf(s, u);
-  // Kings never turn.
-  if (!t || t.kind !== 'unit' || t.hp <= 0 || t.inside || !isEnemy(s, u.owner, t.owner) || peace(s) || s.kings.includes(t.id)) {
+  // Kings never turn, and a priest's hands are full with a relic.
+  if (!t || t.kind !== 'unit' || t.hp <= 0 || t.inside || !isEnemy(s, u.owner, t.owner) || peace(s) || s.kings.includes(t.id) || carriedBy(s, u)) {
     setOrder(u, { k: 'idle' });
     return;
   }
@@ -663,7 +664,7 @@ function convertStep(s: GameState, u: Unit, o: Extract<Order, { k: 'convert' }>)
 
 function healStep(s: GameState, u: Unit, o: Extract<Order, { k: 'heal' }>): void {
   const t = s.byId.get(o.target);
-  if (!t || t.kind !== 'unit' || t.hp <= 0 || t.inside || t.owner !== u.owner || t.hp >= maxHp(s, t) || t.type === 'siege') {
+  if (!t || t.kind !== 'unit' || t.hp <= 0 || t.inside || t.owner !== u.owner || t.hp >= maxHp(s, t) || t.type === 'siege' || carriedBy(s, u)) {
     setOrder(u, { k: 'idle' });
     return;
   }
@@ -678,6 +679,71 @@ function healStep(s: GameState, u: Unit, o: Extract<Order, { k: 'heal' }>): void
     return;
   }
   if (!approach(u, chaseGoal(t, st.range * 0.5))) setOrder(u, { k: 'idle' });
+}
+
+/** The nearest finished Temple of a player's, or null. */
+export function nearestTemple(s: GameState, owner: number, x: number, y: number): Building | null {
+  let best: Building | null = null;
+  let bestD = Infinity;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'temple' || e.owner !== owner || !e.built || e.hp <= 0) continue;
+    const d = distToRect(x, y, e);
+    if (d < bestD) {
+      bestD = d;
+      best = e;
+    }
+  }
+  return best;
+}
+
+/** Fetch a relic, then carry it to a Temple and leave it there. */
+function relicStep(s: GameState, u: Unit, o: Extract<Order, { k: 'relic' }>): void {
+  const r = relicAt(s, o.target);
+  if (!r || u.type !== 'priest') {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  if (r.carrier === u.id) {
+    const chosen = o.temple ? s.byId.get(o.temple) : null;
+    const b = chosen && chosen.kind === 'building' && chosen.type === 'temple' && chosen.owner === u.owner && chosen.built && chosen.hp > 0 ? chosen : nearestTemple(s, u.owner, u.x, u.y);
+    if (!b) {
+      // Nowhere to keep it yet: hold on to it.
+      s.events.push({ k: 'refused', owner: u.owner, why: 'Build a Temple to keep the relic in' });
+      setOrder(u, { k: 'idle' });
+      return;
+    }
+    if (o.temple !== b.id) {
+      // The Temple it was bound for is gone: on to the next.
+      o.temple = b.id;
+      stopWalking(u);
+    }
+    if (distToRect(u.x, u.y, b) - statsOf(s, u).radius <= REACH + 0.2) {
+      stopWalking(u);
+      r.carrier = 0;
+      r.temple = b.id;
+      r.x = b.x;
+      r.y = b.y;
+      s.events.push({ k: 'relic', id: r.id, owner: u.owner, what: 'kept', x: b.x, y: b.y });
+      setOrder(u, { k: 'idle' });
+      return;
+    }
+    if (!approach(u, goalForBuilding(b))) setOrder(u, { k: 'idle' });
+    return;
+  }
+  // Someone has it already, or these hands are full.
+  if (r.carrier || r.temple || carriedBy(s, u)) {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  const dx = r.x - u.x;
+  const dy = r.y - u.y;
+  if (dx * dx + dy * dy <= 0.8 * 0.8) {
+    stopWalking(u);
+    r.carrier = u.id;
+    s.events.push({ k: 'relic', id: r.id, owner: u.owner, what: 'taken', x: r.x, y: r.y });
+    return;
+  }
+  if (!approach(u, goalForPoint(s, r.x, r.y, passOf(s, u)))) setOrder(u, { k: 'idle' });
 }
 
 /** A wounded friend for an idle priest to tend, nearest first. */
@@ -946,7 +1012,7 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
         const reach = u.stance === 'stand' ? st.range + st.radius + 0.6 : st.sight;
         const t = findTarget(s, sp, u, reach, !!st.buildingsOnly);
         if (t) setOrder(u, { k: 'attack', target: t.id, auto: true, then: null });
-      } else if (u.type === 'priest' && (s.tick + u.id) % 10 === 0 && u.cool <= 0) {
+      } else if (u.type === 'priest' && (s.tick + u.id) % 10 === 0 && u.cool <= 0 && !carriedBy(s, u)) {
         const w = woundedNear(s, sp, u, statsOf(s, u).sight);
         if (w) setOrder(u, { k: 'heal', target: w.id });
       }
@@ -997,6 +1063,9 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
       break;
     case 'unload':
       unloadStep(s, u, o);
+      break;
+    case 'relic':
+      relicStep(s, u, o);
       break;
   }
 }

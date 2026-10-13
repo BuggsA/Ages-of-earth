@@ -187,6 +187,12 @@ export const COUNTER: Record<'infantry' | 'ranged' | 'cavalry', UnitType> = { in
 export const AURA = { radius: 6, attack: 1.2, heal: 1.5 };
 /** Priests: healing per second, and how long a conversion takes (seconds, before the target's toughness). */
 export const PRIEST = { heal: 3, convert: 7, rest: 8 };
+/**
+ * Relics: one lies out for each player, `home` tiles from their town, and `extra` more (by map size) where
+ * the land is within `fair` tiles of as far from the two nearest towns, at least `spacing` apart. A
+ * relic kept in a Temple brings its owner `gold` every `every` seconds, and `score` to their score.
+ */
+export const RELIC = { home: 20, fair: 3, spacing: 12, extra: { small: 1, medium: 2, large: 3 } as Record<MapSize, number>, gold: 1, every: 2, score: 60 };
 
 export interface BuildingStats {
   name: string;

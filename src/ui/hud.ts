@@ -1,6 +1,7 @@
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
-import { BUILDINGS, BUILDING_TYPES, CIVS, EPOCHS, LAST_EPOCH, MARKET, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { BUILDINGS, BUILDING_TYPES, CIVS, EPOCHS, LAST_EPOCH, MARKET, RELIC, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
+import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { buildingCostFor, buildingMaxHp, statsFor, techCostFor, techProblem } from '../sim/stats';
 import type { Building, BuildingType, Command, Cost, Ent, GameState, Player, Stance, TechId, Unit } from '../sim/types';
 import { RES, R_BERRY, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
@@ -89,7 +90,10 @@ function orderWords(s: GameState, u: Unit): string {
       return 'Going aboard';
     case 'unload':
       return u.cargo.length ? 'Sailing to land passengers' : 'Moving';
+    case 'relic':
+      return carriedBy(s, u) ? 'Carrying a relic to the Temple' : 'Going for a relic';
     default:
+      if (carriedBy(s, u)) return 'Holding a relic';
       return ACT_WORDS[u.act] ?? 'Standing by';
   }
 }
@@ -202,13 +206,13 @@ export class Hud {
   }
 
   /** Bring every part of the HUD up to date. */
-  update(s: GameState, viewer: number, ids: number[], speed: number, selectedTile: number | null): void {
+  update(s: GameState, viewer: number, ids: number[], speed: number, selectedTile: number | null, selectedRelic: number | null = null): void {
     this.state = s;
     this.viewer = viewer;
     this.lastIds = ids;
     this.top(s, viewer, speed);
     const ents = ids.map((id) => s.byId.get(id)).filter((e): e is Ent => !!e && e.hp > 0);
-    this.selection(s, viewer, ents, selectedTile);
+    this.selection(s, viewer, ents, selectedTile, selectedRelic);
     this.commands(s, viewer, ents);
   }
 
@@ -249,6 +253,14 @@ export class Hud {
       const ours = q.team === s.players[viewer].team;
       parts.push(`<div class="timer ${ours ? 'good' : 'bad'}" data-focus="${e.x},${e.y}"><span class="swatch" style="background:${q.color}"></span>${q.id === viewer ? 'Your' : `${q.name}'s`} Wonder: ${fmtTime(e.timer)}${ours ? '' : ' (destroy it!)'}</div>`);
     }
+    if (s.relicTeam >= 0 && s.relicTimer >= 0) {
+      const ours = s.relicTeam === s.players[viewer].team;
+      const keepers = s.players.filter((q) => q.team === s.relicTeam);
+      const who = ours ? (keepers.length > 1 ? 'Your side keeps' : 'You keep') : `${keepers.map((q) => q.name).join(' and ')} ${keepers.length > 1 ? 'keep' : 'keeps'}`;
+      const shrine = s.relics[0] ? s.byId.get(s.relics[0].temple) : undefined;
+      const focus = shrine ? ` data-focus="${shrine.x},${shrine.y}"` : '';
+      parts.push(`<div class="timer ${ours ? 'good' : 'bad'}"${focus}>⚱ ${who} every relic: ${fmtTime(s.relicTimer)}${ours ? '' : ' (take one back!)'}</div>`);
+    }
     const html = parts.join('');
     if (html !== this.timerHtml) {
       this.timerHtml = html;
@@ -256,10 +268,12 @@ export class Hud {
     }
   }
 
-  private selection(s: GameState, viewer: number, ents: Ent[], tile: number | null): void {
+  private selection(s: GameState, viewer: number, ents: Ent[], tile: number | null, relicId: number | null): void {
     let html = '';
     let sig = '';
-    if (!ents.length && tile !== null && s.res[tile]) {
+    const relic = !ents.length && relicId !== null ? relicAt(s, relicId) : undefined;
+    if (relic) [html, sig] = this.relicPanel(s, viewer, relic);
+    else if (!ents.length && tile !== null && s.res[tile]) {
       const kind = s.res[tile];
       const name = kind === R_TREE ? 'Tree' : kind === R_BERRY ? 'Berry bush' : kind === R_MEAT ? 'Deer carcass' : kind === R_FISH ? 'Fish shoal' : kind === R_GOLD ? 'Gold mine' : 'Stone quarry';
       const res = kind === R_TREE ? 'wood' : kind === R_BERRY || kind === R_MEAT || kind === R_FISH ? 'food' : kind === R_GOLD ? 'gold' : 'stone';
@@ -304,6 +318,18 @@ export class Hud {
     }
   }
 
+  private relicPanel(s: GameState, viewer: number, r: NonNullable<ReturnType<typeof relicAt>>): [string, string] {
+    const holder = r.carrier ? s.byId.get(r.carrier) : r.temple ? s.byId.get(r.temple) : undefined;
+    const q = holder ? s.players[holder.owner] : null;
+    const status = !q ? 'Lying in the open' : r.carrier ? (q.id === viewer ? 'Carried by your priest' : `Carried by ${q.name}'s priest`) : q.id === viewer ? 'Kept in your Temple' : `Kept in ${q.name}'s Temple`;
+    const perMin = Math.round((60 / RELIC.every) * RELIC.gold);
+    const html = `<div class="sel-portrait"><span style="font-size:54px">⚱</span></div>
+      <div class="sel-info"><div class="sel-name">Relic</div><div class="sel-sub">${status}</div>
+      <div class="stats"><span data-tip="<b>Gold</b>Brings in gold while kept in a Temple.">${icon('gold')}${perMin}<em>a minute</em></span><span data-tip="<b>Relics</b>How many lie on this map.">⚱<em>On the map</em> ${s.relics.length}</span></div>
+      <div class="blurb">Select a priest and right-click it to carry it to your Temple, where it brings in ${perMin} gold a minute. Keep every relic on the map for ${fmtTime(s.wonderTime)} and you win.</div></div>`;
+    return [html, `relic:${r.id}:${status}:${s.relics.length}`];
+  }
+
   private unitPanel(s: GameState, viewer: number, u: Unit): [string, string] {
     const p = s.players[u.owner];
     const st = statsFor(s, u.owner, u.type);
@@ -315,6 +341,7 @@ export class Hud {
     const cargo = u.type === 'transport' ? `<span data-tip="<b>Aboard</b>Soldiers and citizens carried. Right-click a shore (or press U) to land them.">⛵<em>Aboard</em> ${u.cargo.length}/${st.capacity ?? 0}</span>` : '';
     const stance = st.attack > 0 && u.type !== 'citizen' && mine ? `<span data-tip="<b>Stance</b>Z aggressive, X defensive, C stand ground.">${u.stance === 'stand' ? '⚓ Stand' : u.stance === 'defensive' ? '🛡 Defend' : '🔥 Aggressive'}</span>` : '';
     const aura = s.tick - u.aura < 5 && u.type !== 'hero' ? `<span data-tip="<b>Inspired</b>A hero nearby: hits harder and heals.">✨<em>Inspired</em></span>` : '';
+    const held = u.type === 'priest' && carriedBy(s, u) ? `<span data-tip="<b>Relic</b>Carried to a Temple, it brings in gold. Hands full: no healing or converting until it is set down (D).">⚱<em>Relic</em></span>` : '';
     const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}:${u.cargo.length}`;
     const html = `<div class="sel-portrait"><img src="${unitPicture(u.type, p.epoch, p.color)}" alt=""></div>
       <div class="sel-info">
@@ -326,7 +353,7 @@ export class Hud {
           <span data-tip="<b>Armor</b>Melee / missile armor: taken off every blow or shot.">🛡<em>Armor</em> ${st.armor}/${st.parmor}</span>
           ${st.range ? `<span data-tip="<b>Range</b>How far it shoots, in tiles.">🏹<em>Range</em> ${st.range}</span>` : ''}
           <span data-tip="<b>Speed</b>Tiles per second.">👣<em>Speed</em> ${Math.round(st.speed * 100) / 100}</span>
-          ${carry}${cargo}${stance}${aura}
+          ${carry}${cargo}${stance}${aura}${held}
         </div>
         <div class="blurb">${st.blurb}</div>
       </div>`;
@@ -365,8 +392,9 @@ export class Hud {
     } else if (b.type === 'wonder' && b.timer >= 0) status = `Stands ${fmtTime(b.timer)} more for victory`;
     else if (b.type === 'market') status = `Prices: ${(['food', 'wood', 'stone'] as const).map((r) => `${icon(r, 14)}${s.market[r]}`).join(' ')}`;
     else if (b.type === 'dock') status = 'Fishing boats bring their catch here';
+    else if (b.type === 'temple' && keptIn(s, b)) status = `Keeps ${keptIn(s, b)} relic${keptIn(s, b) > 1 ? 's' : ''}: ${icon('gold', 14)}${Math.round((60 / RELIC.every) * RELIC.gold * keptIn(s, b))} a minute`;
     else status = def.drop.length ? 'Drop-off for every resource' : def.pop ? `Room for ${def.pop}` : 'Ready';
-    if (!mine) status = `<span class="swatch" style="background:${p.color}"></span>${p.name}${b.type === 'wonder' && b.timer >= 0 ? `: wins in ${fmtTime(b.timer)}` : ''}`;
+    if (!mine) status = `<span class="swatch" style="background:${p.color}"></span>${p.name}${b.type === 'wonder' && b.timer >= 0 ? `: wins in ${fmtTime(b.timer)}` : ''}${b.type === 'temple' && keptIn(s, b) ? `: keeps ${keptIn(s, b)} relic${keptIn(s, b) > 1 ? 's' : ''}` : ''}`;
     const inside = def.garrison && b.built ? `<div class="stats"><span data-tip="<b>Sheltering</b>Units inside are safe, heal slowly and add arrows.">🏰<em>Inside</em> ${b.garrison.length}/${def.garrison}</span></div>` : '';
     const sig = `b:${b.id}:${Math.ceil(b.hp)}:${status}:${b.queue.length}:${p.epoch}:${queue.length}:${b.garrison.length}`;
     const html = `<div class="sel-portrait"><img src="${buildingPicture(b.type, p.epoch, p.color)}" alt=""></div>
@@ -418,6 +446,8 @@ export class Hud {
       }
       if (soldiers.length) cmds.push({ key: 'A', pic: '', glyph: '⚔', title: 'Attack-move', desc: 'Then click on the map: march there, fighting every enemy met on the way.', ok: true, run: () => this.act.attackMove() });
       cmds.push({ key: 'S', pic: '', glyph: '✋', title: 'Stop', desc: 'Stop what they are doing (and forget queued orders).', ok: true, run: () => this.act.issue({ t: 'stop', p: viewer, ids: units.map((u) => u.id) }) });
+      const holding = units.filter((u) => u.type === 'priest' && carriedBy(s, u));
+      if (holding.length) cmds.push({ key: 'D', pic: '', glyph: '⚱', title: 'Set down relic', desc: 'Lay the relic down where the priest stands, to have their hands free for healing and converting.', ok: true, run: () => this.act.issue({ t: 'dropRelic', p: viewer, ids: holding.map((u) => u.id) }) });
       if (walkers.length) cmds.push({ key: 'G', pic: '', glyph: '🏰', title: 'Garrison / board', desc: 'Then click a Town Center or tower to shelter inside (safe, and they add arrows), or your transport to go aboard.', ok: true, run: () => this.act.garrisonMode() });
       if (transports.length) {
         const aboard = transports.reduce((n, t) => n + t.cargo.length, 0);

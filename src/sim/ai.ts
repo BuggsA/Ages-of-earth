@@ -4,7 +4,8 @@ import { NAVAL, distToRect, placeProblem, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem } from './stats';
 import type { AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Player, Res, TechId, Unit, UnitType } from './types';
 import { RES, R_BERRY, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
-import { findResource, freeFarm } from './units';
+import { carriedBy } from './relics';
+import { findResource, freeFarm, nearestTemple } from './units';
 import { isEnemy } from './world';
 
 /**
@@ -400,6 +401,8 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     ['range', n >= 12 && count(v, 'range') === 0],
     ['stable', p.epoch >= 1 && n >= 14 && count(v, 'stable') === 0],
     ['forge', p.epoch >= 1 && n >= 16 && count(v, 'forge') === 0],
+    // Relics lying loose are worth a Temple early.
+    ['temple', clever && p.epoch >= 1 && n >= 16 && count(v, 'temple') === 0 && looseRelics(s) > 0],
     ['tower', p.epoch >= 1 && count(v, 'tower') < L.towers && n >= 16],
     ['market', clever && p.epoch >= 1 && n >= 20 && count(v, 'market') === 0],
     ['workshop', clever && p.epoch >= 2 && n >= 20 && count(v, 'workshop') === 0],
@@ -599,7 +602,8 @@ function enemyHome(s: GameState, p: Player): { x: number; y: number } {
     const dx = e.x - p.startX;
     const dy = e.y - p.startY;
     const shelter = s.mode === 'regicide' && e.garrison.some((id) => s.kings.includes(id));
-    const d = dx * dx + dy * dy + (e.type === 'wonder' ? -1e6 : shelter ? -5e5 : e.type === 'towncenter' ? 0 : e.type === 'wall' || e.type === 'gate' ? 1e5 : 400);
+    const shrine = e.type === 'temple' && relicRace(s, p) && s.relics.some((r) => r.temple === e.id);
+    const d = dx * dx + dy * dy + (e.type === 'wonder' || shrine ? -1e6 : shelter ? -5e5 : e.type === 'towncenter' ? 0 : e.type === 'wall' || e.type === 'gate' ? 1e5 : 400);
     if (d < bestD) {
       bestD = d;
       best = { x: e.x, y: e.y };
@@ -714,7 +718,8 @@ function enemyTarget(s: GameState, p: Player): Building | null {
     if (e.type === 'wall' || e.type === 'gate' || e.type === 'farm') continue;
     const dx = e.x - p.startX;
     const dy = e.y - p.startY;
-    const d = dx * dx + dy * dy + (e.type === 'wonder' ? -1e6 : e.type === 'towncenter' ? -400 : 0);
+    const shrine = e.type === 'temple' && relicRace(s, p) && s.relics.some((r) => r.temple === e.id);
+    const d = dx * dx + dy * dy + (e.type === 'wonder' || shrine ? -1e6 : e.type === 'towncenter' ? -400 : 0);
     if (d < bestD) {
       bestD = d;
       best = e;
@@ -802,7 +807,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     if (!trains.length || trains.includes('citizen') || b.type === 'dock' || b.type === 'airfield') continue;
     let unit: UnitType | null;
     if (b.type === 'workshop') unit = siege < (p.epoch >= 2 ? 3 : 2) && v.army.length >= 6 ? 'siege' : null;
-    else if (b.type === 'temple') unit = v.priests.length < 2 && v.army.length >= 6 ? 'priest' : null;
+    else if (b.type === 'temple') unit = v.priests.length < (v.army.length >= 6 ? 2 : 0) + (looseRelics(s) > 0 ? 1 : 0) ? 'priest' : null;
     else {
       unit = counter && trains.includes(counter) && unitEpoch(counter) <= p.epoch && roll(s) < 0.7 ? counter : pickUnit(v, mem, b);
       if (unit && unitEpoch(unit) > p.epoch) unit = pickUnit(v, mem, b);
@@ -830,7 +835,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const waveSize = L.wave + mem.wave * L.waveGrowth;
   const onAttack = fighters.filter((u) => u.order.k === 'attack' || (u.order.k === 'move' && u.order.amove));
   if (mem.attacking && onAttack.length === 0) mem.attacking = false;
-  const wonderRace = s.ents.some((e) => e.kind === 'building' && e.type === 'wonder' && e.hp > 0 && isEnemy(s, p.id, e.owner));
+  const wonderRace = s.ents.some((e) => e.kind === 'building' && e.type === 'wonder' && e.hp > 0 && isEnemy(s, p.id, e.owner)) || relicRace(s, p);
   const due = s.tick >= secs(L.firstAttack) && s.tick >= s.peaceUntil;
   if (due && !mem.attacking && (fighters.length >= waveSize || (wonderRace && fighters.length >= 4))) {
     issue({ t: 'move', p: p.id, ids: fighters.map((u) => u.id), x: enemy.x, y: enemy.y, amove: true });
@@ -851,12 +856,58 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   if (strays.length) issue({ t: 'move', p: p.id, ids: strays.map((u) => u.id), x: mem.muster.x, y: mem.muster.y });
 }
 
-/** Priests walk with the army (healing as they go) and turn the enemy's best units. */
+/** Relics on the ground, for anyone to take. */
+function looseRelics(s: GameState): number {
+  let n = 0;
+  for (const r of s.relics) if (!r.carrier && !r.temple) n++;
+  return n;
+}
+
+/** A rival side keeps every relic: their temples must fall before the countdown ends. */
+function relicRace(s: GameState, p: Player): boolean {
+  return s.relicTeam >= 0 && s.relicTeam !== p.team;
+}
+
+/**
+ * Priests bring relics home first (the nearest loose one nobody of ours is fetching), then walk with
+ * the army (healing as they go) and turn the enemy's best units.
+ */
 function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   if (!v.priests.length) return;
   const army = v.army.filter((u) => !u.inside && u.type !== 'siege');
+  const fetching = new Set<number>();
+  for (const pr of v.priests) if (pr.order.k === 'relic') fetching.add(pr.order.target);
   for (const pr of v.priests) {
-    if (pr.order.k !== 'idle' || pr.cool > 0) continue;
+    if (pr.order.k !== 'idle' || pr.inside) continue;
+    const held = carriedBy(s, pr);
+    if (held) {
+      const t = nearestTemple(s, v.p.id, pr.x, pr.y);
+      if (t) issue({ t: 'work', p: v.p.id, ids: [pr.id], target: t.id });
+      else if ((pr.x - v.home.x) * (pr.x - v.home.x) + (pr.y - v.home.y) * (pr.y - v.home.y) > 49) issue({ t: 'move', p: v.p.id, ids: [pr.id], x: v.home.x, y: v.home.y + 3 });
+      continue;
+    }
+    if (nearestTemple(s, v.p.id, pr.x, pr.y)) {
+      let relic = -1;
+      let bestD = Infinity;
+      const rivals = s.players.filter((o) => !o.defeated && isEnemy(s, v.p.id, o.id));
+      for (const r of s.relics) {
+        if (r.carrier || r.temple || fetching.has(r.id)) continue;
+        // Not from under a rival's walls.
+        const mine = (r.x - v.home.x) * (r.x - v.home.x) + (r.y - v.home.y) * (r.y - v.home.y);
+        if (rivals.some((o) => (r.x - o.startX) * (r.x - o.startX) + (r.y - o.startY) * (r.y - o.startY) < mine * 0.6)) continue;
+        const d = (r.x - pr.x) * (r.x - pr.x) + (r.y - pr.y) * (r.y - pr.y);
+        if (d < bestD) {
+          bestD = d;
+          relic = r.id;
+        }
+      }
+      if (relic >= 0) {
+        fetching.add(relic);
+        issue({ t: 'relic', p: v.p.id, ids: [pr.id], target: relic });
+        continue;
+      }
+    }
+    if (pr.cool > 0) continue;
     // Something worth converting close by?
     let best: Unit | null = null;
     let bestScore = 0;

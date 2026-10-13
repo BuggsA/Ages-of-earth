@@ -18,12 +18,14 @@ Everything in `README.md`'s "What's in it" was built on 2026-10-12 in one sessio
 
 | Check | State |
 | --- | --- |
-| Quick tier (`npm run check`) | 56 tests, about 20 s |
+| Quick tier (`npm run check`) | 64 tests, about 20 s |
 | Slow tier (`tests/slow/`) | empty |
 | Browser checks | none automated; the first session tested by hand in headless Chromium |
 | CI (`ci`, `periodic`) | added 2026-10-13; `periodic` starts once `main` is the default branch |
 
 ## In flight
+
+- [#4](https://github.com/BuggsA/Ages-of-earth/issues/4), relics (chain 1013-1734, 1/10): branch `claude/4-relics`. Bumps the save `v` to 2.
 
 - [#1](https://github.com/BuggsA/Ages-of-earth/pull/1), repairs for damaged buildings: opened before these rules, with no issue; now targets `main`. Its author couldn't run the typecheck and hadn't tried it in a browser.
 
