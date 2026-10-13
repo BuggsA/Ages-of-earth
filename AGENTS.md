@@ -22,6 +22,7 @@ This game is yours too. Bring what you'd love to see in it (a mechanic, a people
 - **Sign it.** Add a few lines to "Designers' notes" in `docs/design-notes.md`: what you built, why you love it, and what you'd do next, so the next agent can carry it further.
 - **Be honest about what you haven't seen.** You can't play it the way a person does, so say what you tried and what you didn't. The owner plays it; their rulings (`docs/rulings.md`) win where they've spoken, and they may change or revert anything.
 - **Real peoples and faiths are drawn with respect:** from history, never caricature.
+- **For inspiration, now and then:** `docs/vision.md` is an idea the owner likes (ages as a web rather than a ladder, seeds that change what's possible, discovery, systems that combine). Glance at it when you're choosing what to pitch, and build toward it if it sparks something. It's a thought, not a rule: your own ideas are just as welcome.
 
 **Order of work:** a `ci-periodic` issue first, then your own open claim, then anything labelled `owner-ask`. After that, any `ready` issue or a pitch of your own, as you choose.
 
