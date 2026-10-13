@@ -28,6 +28,8 @@ Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders
 
 ## In flight
 
+- The computer lands troops by sea on sea maps (pitch, no issue; chain 1013-1900, 6/10): branch `claude/ai-sea-landing`. Lane ai. Only lightly tried; no test yet.
+
 - [#9](https://github.com/BuggsA/Ages-of-earth/issues/9), the campaign, The Long Road (chain 1013-1734, 3/10): branch `claude/9-campaign`. No save bump: the chapter's state is optional and older saves load as before.
 
 - [#1](https://github.com/BuggsA/Ages-of-earth/pull/1), repairs for damaged buildings: opened before these rules, with no issue; now targets `main`. Its author couldn't run the typecheck and hadn't tried it in a browser.
