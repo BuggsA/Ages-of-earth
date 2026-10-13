@@ -1,4 +1,4 @@
-import { BUILDINGS } from './data';
+import { BUILDINGS, TRADE } from './data';
 import type { Building, BuildingType, GameState } from './types';
 import { B_BUILDING, B_GATE, B_RES, B_TERRAIN, R_NONE, T_ROCK, T_WATER } from './types';
 
@@ -72,7 +72,7 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
       const i = y * s.w + x;
       if (s.terrain[i] === T_WATER) return 'water';
       if (s.terrain[i] === T_ROCK) return 'rock';
-      if (s.res[i] !== R_NONE || relicOnTile(s, x, y)) return 'blocked';
+      if (s.res[i] !== R_NONE || relicOnTile(s, x, y) || postOnTile(s, x, y)) return 'blocked';
       // A gate may go into its owner's own wall, replacing the pieces it covers.
       if (s.bldAt[i] !== 0 && !(type === 'gate' && ownWall(s, s.bldAt[i], owner))) return 'blocked';
     }
@@ -94,6 +94,13 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
 /** A relic on the ground on this tile (buildings can't go over one). */
 export function relicOnTile(s: GameState, tx: number, ty: number): boolean {
   for (const r of s.relics) if (!r.carrier && !r.temple && Math.floor(r.x) === tx && Math.floor(r.y) === ty) return true;
+  return false;
+}
+
+/** A trading post whose plaza (with a tile's margin round it) covers this tile: nothing is built there. */
+export function postOnTile(s: GameState, tx: number, ty: number): boolean {
+  const r = TRADE.plaza + 1;
+  for (const p of s.posts) if (Math.abs(tx - Math.floor(p.x)) <= r && Math.abs(ty - Math.floor(p.y)) <= r) return true;
   return false;
 }
 

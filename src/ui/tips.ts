@@ -57,6 +57,11 @@ const TIPS: Tip[] = [
     when: (s, me) => s.players[me].epoch >= 1 && s.relics.some((r) => !r.carrier && !r.temple && s.players[me].seen[Math.floor(r.y) * s.w + Math.floor(r.x)] === 1),
     text: 'A golden <b>relic</b> glints out there (a gold diamond on the map). Build a <b>Temple</b> (<kbd>B</kbd> <kbd>Y</kbd>), then select a <b>priest</b> and right-click the relic: carried home, it brings in gold. Keep every relic long enough and you win.',
   },
+  {
+    id: 'trade',
+    when: (s, me) => s.players[me].epoch >= 1 && s.posts.some((t) => s.players[me].seen[Math.floor(t.y) * s.w + Math.floor(t.x)] === 1),
+    text: 'You have found a <b>trading post</b> (a camel on the map). Build a <b>Market</b> (<kbd>B</kbd> <kbd>M</kbd>), train <b>traders</b> there (<kbd>T</kbd>) and right-click the post: they bring back gold every trip, more the farther the Market. Guard the road: cavalry love to raid it.',
+  },
   { id: 'wonder', when: (s, me) => s.players[me].epoch >= 2, text: 'Rich? Build a <b>Wonder</b> (<kbd>B</kbd> <kbd>X</kbd>). If it stands long enough, you win, but everyone will come for it.' },
   { id: 'dock', when: (s, me) => secsIn(s) > 150 && !has(s, me, 'dock') && waterNear(s, me), text: 'Water nearby! A <b>Dock</b> (<kbd>B</kbd> <kbd>D</kbd>) on the shore trains <b>fishing boats</b>: fish shoals feed you for a long time. Later, warships and transports.' },
   { id: 'transport', when: (s, me) => units(s, me).some((u) => u.type === 'transport'), text: 'To cross the water, select soldiers and <b>right-click your transport</b> to board. Then select the transport and right-click a far shore to land them.' },

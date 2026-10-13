@@ -220,7 +220,7 @@ export class UnitsView {
       // Those sheltering inside a building aren't drawn.
       if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !visible(e)) continue;
       show.push(e);
-      const key = `${e.type}:${s.players[e.owner].epoch}`;
+      const key = `${e.type}:${modelEpoch(e, s.players[e.owner].epoch)}`;
       need.set(key, (need.get(key) ?? 0) + 1);
     }
     for (const c of this.corpses) {
@@ -353,7 +353,7 @@ export class UnitsView {
         bob = 0;
         lift = 0;
       }
-      const b = this.batch(u.type, epoch);
+      const b = this.batch(u.type, modelEpoch(u, epoch));
       const i = b.count++;
       this.e.set(pitch, yaw, roll);
       this.q.setFromEuler(this.e);
@@ -420,4 +420,9 @@ export class UnitsView {
       b.anim.needsUpdate = true;
     }
   }
+}
+
+/** Which model to draw: a trader heading home with gold has its own (the epoch plus 10). */
+function modelEpoch(u: Unit, epoch: number): number {
+  return u.type === 'trader' && u.carry > 0 ? epoch + 10 : epoch;
 }

@@ -21,12 +21,14 @@ Since then: **relics** (#4, merged in #5 on 2026-10-13; the save `v` is 2).
 
 | Check | State |
 | --- | --- |
-| Quick tier (`npm run check`) | 64 tests, about 20 s |
+| Quick tier (`npm run check`) | 74 tests, about 20 s |
 | Slow tier (`tests/slow/`) | empty |
 | Browser checks | none automated; the first session tested by hand in headless Chromium |
 | CI (`ci`, `periodic`) | added 2026-10-13; `periodic` starts once `main` is the default branch |
 
 ## In flight
+
+- [#6](https://github.com/BuggsA/Ages-of-earth/issues/6), trade: traders and trading posts (chain 1013-1734, 2/10): branch `claude/6-trade`. Bumps the save `v` to 3.
 
 - [#1](https://github.com/BuggsA/Ages-of-earth/pull/1), repairs for damaged buildings: opened before these rules, with no issue; now targets `main`. Its author couldn't run the typecheck and hadn't tried it in a browser.
 
