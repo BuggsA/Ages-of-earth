@@ -696,6 +696,8 @@ export class View {
           if (ev.owner === this.viewer) this.resources.markDirty();
           break;
         case 'rank':
+          this.cue('rankUp', ev.x, ev.y, 0.5);
+          this.effects.burst(this.ground(s, ev.x, ev.y, 1.2), { count: 6, speed: 0.5, up: 1, life: 0.9, size: 0.05, gravity: -0.5, colors: ['#fff3c4', '#ffd24d'] });
           if (ev.owner === this.viewer) this.onPing?.(ev.x, ev.y, '#ffd24d');
           break;
         case 'alert':

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { rankOf } from '../sim/combat';
 import { SIGNATURES, TICK_HZ, domainOf, unitStats } from '../sim/data';
 import type { CivId, GameState, Unit, UnitType } from '../sim/types';
 import { unitMaterial } from './materials';
@@ -88,6 +89,33 @@ class Batch {
   }
 }
 
+/** Gold chevrons stacked one per rank, flat and unlit, facing +Z (turned toward the camera when drawn). */
+function chevronGeometry(rank: number): THREE.BufferGeometry {
+  const pos: number[] = [];
+  const col: number[] = [];
+  const gold = new THREE.Color('#ffd24d');
+  const w = 0.2;
+  const h = 0.1;
+  const t = 0.06;
+  for (let r = 0; r < rank; r++) {
+    const y = r * 0.14;
+    const quad = (a: number[], b: number[], c: number[], d: number[]) => {
+      for (const v of [a, b, c, a, c, d]) {
+        pos.push(v[0], v[1] + y, 0);
+        col.push(gold.r, gold.g, gold.b);
+      }
+    };
+    quad([-w, 0], [0, -h], [0, -h + t], [-w, t]);
+    quad([0, -h], [w, 0], [w, t], [0, -h + t]);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  return g;
+}
+
+const chevronMaterial = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+
 export interface ScreenUnit {
   id: number;
   sx: number;
@@ -98,6 +126,15 @@ export interface ScreenUnit {
 export class UnitsView {
   readonly group = new THREE.Group();
   private batches = new Map<string, Batch>();
+  /** Rank chevrons over veterans, one instanced mesh per rank (index 0 is rank 1). */
+  private chevrons: THREE.InstancedMesh[] = [1, 2, 3].map((r) => {
+    const m = new THREE.InstancedMesh(chevronGeometry(r), chevronMaterial, 64);
+    m.frustumCulled = false;
+    m.count = 0;
+    this.group.add(m);
+    return m;
+  });
+  private chevronCount = [0, 0, 0];
   private anims = new Map<number, Anim>();
   private corpses: Corpse[] = [];
   private m = new THREE.Matrix4();
@@ -210,6 +247,7 @@ export class UnitsView {
   ): void {
     this.animals(s, alpha, dt, time, sees, camera, width, height);
     for (const b of this.batches.values()) b.count = 0;
+    this.chevronCount = [0, 0, 0];
     this.screen.length = 0;
     this.drawn.clear();
     const ticks = s.tick - 1 + alpha;
@@ -366,6 +404,25 @@ export class UnitsView {
       b.anim.setXYZ(i, leg, arm, bob);
       this.drawn.set(u.id, new THREE.Vector3(dx, gy, dz));
 
+      // Veterans wear their rank above the head.
+      const rank = u.type === 'citizen' ? 0 : rankOf(u);
+      if (rank > 0 && dom !== 'water') {
+        const ci = this.chevronCount[rank - 1]++;
+        let cm = this.chevrons[rank - 1];
+        if (ci >= cm.instanceMatrix.count) {
+          const bigger = new THREE.InstancedMesh(cm.geometry, chevronMaterial, cm.instanceMatrix.count * 2);
+          bigger.frustumCulled = false;
+          this.group.remove(cm);
+          this.group.add(bigger);
+          this.chevrons[rank - 1] = cm = bigger;
+        }
+        this.e.set(0, Math.atan2(camera.position.x - dx, camera.position.z - dz), 0);
+        this.q.setFromEuler(this.e);
+        this.p.set(dx, gy + (dom === 'air' ? 0.9 : mounted ? 1.75 : 1.5), dz);
+        this.m.compose(this.p, this.q, this.sc.set(1, 1, 1));
+        cm.setMatrixAt(ci, this.m);
+      }
+
       // Where it lands on screen, for picking.
       this.v.set(dx, gy + lift, dz).project(camera);
       if (this.v.z < 1) {
@@ -414,6 +471,10 @@ export class UnitsView {
     }
     this.corpses = keep;
 
+    this.chevrons.forEach((cm, i) => {
+      cm.count = this.chevronCount[i];
+      cm.instanceMatrix.needsUpdate = true;
+    });
     for (const b of this.batches.values()) {
       b.mesh.count = b.count;
       b.mesh.instanceMatrix.needsUpdate = true;
