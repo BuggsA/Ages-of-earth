@@ -69,8 +69,11 @@ function orderWords(s: GameState, u: Unit): string {
     }
     case 'farm':
       return o.phase === 'drop' ? 'Carrying grain home' : o.phase === 'work' ? 'Farming' : 'Going to the fields';
-    case 'build':
+    case 'build': {
+      const target = s.byId.get(o.target);
+      if (target?.kind === 'building' && target.built) return u.act === 'build' ? 'Repairing' : 'Going to repair';
       return u.act === 'build' ? 'Building' : 'Going to build';
+    }
     case 'attack':
       return u.act === 'attack' ? 'Fighting' : 'Charging';
     case 'move':
@@ -374,6 +377,7 @@ export class Hud {
         <div class="sel-name">${def.name}</div>
         <div class="sel-sub">${status}</div>
         ${hpBar(b.hp, max, b.hp / max)}
+        ${mine && b.built && b.hp < max ? `<div class="blurb">Select citizens and right-click to repair.${def.garrison ? ' Press G to shelter instead.' : ''}</div>` : ''}
         ${inside}
         ${queue || `<div class="blurb">${def.blurb}${def.guns ? ` Shoots ${def.guns.range} tiles.` : ''}</div>`}
       </div>`;

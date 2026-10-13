@@ -383,7 +383,7 @@ function buildStep(s: GameState, u: Unit, o: Extract<Order, { k: 'build' }>): vo
     setOrder(u, { k: 'idle' });
     return;
   }
-  if (b.built) {
+  if (b.built && b.hp >= maxHp(s, b)) {
     afterBuilding(s, u, b);
     return;
   }
@@ -393,10 +393,11 @@ function buildStep(s: GameState, u: Unit, o: Extract<Order, { k: 'build' }>): vo
     face(u, b.x, b.y);
     u.act = 'build';
     const step = DT / buildTimeFor(s, u.owner, b.type);
-    b.progress = Math.min(1, b.progress + step);
+    if (!b.built) b.progress = Math.min(1, b.progress + step);
     b.hp = Math.min(maxHp(s, b), b.hp + maxHp(s, b) * step);
     workEvent(s, u, 'build', u.x, u.y);
-    if (b.progress >= 1) completeBuilding(s, b);
+    // Repairs must not repeat completion events or reset a wonder's timer.
+    if (!b.built && b.progress >= 1) completeBuilding(s, b);
     return;
   }
   if (!approach(u, goalForBuilding(b, BUILDINGS[b.type].open))) setOrder(u, { k: 'idle' });

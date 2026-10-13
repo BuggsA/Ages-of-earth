@@ -5,7 +5,7 @@ import { buildingCostFor, techCostFor, techProblem } from './stats';
 import type { Building, BuildingType, Command, Cost, GameState, Order, Player, Unit } from './types';
 import { RES, R_FISH, R_NONE } from './types';
 import { RES_OF_TILE, cargoRoom, freeFarm, garrisonRoom, giveOrder, landing, setOrder, ungarrison } from './units';
-import { canHit, isEnemy, pay, placeBuilding, refund } from './world';
+import { canHit, isEnemy, maxHp, pay, placeBuilding, refund } from './world';
 
 /**
  * Everything a player can do, as plain data. A person's clicks and the computer opponent both go
@@ -242,7 +242,7 @@ export function applyCommand(s: GameState, c: Command): void {
           continue;
         }
         if (u.type === 'citizen') {
-          if (!b.built) {
+          if (!b.built || b.hp < maxHp(s, b)) {
             assignBuilders([u], b, !!c.queue);
             continue;
           }
