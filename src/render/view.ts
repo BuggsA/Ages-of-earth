@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { SoundName } from '../audio/sound';
-import { AURA, BUILDINGS, TICK_HZ, TRADE, domainOf } from '../sim/data';
+import { AURA, BUILDINGS, SIGNATURES, TICK_HZ, TRADE, domainOf } from '../sim/data';
 import { buildingMaxHp, statsFor } from '../sim/stats';
 import type { BuildingType, Ent, GameEvent, GameState, Unit } from '../sim/types';
 import { R_GOLD, R_STONE } from '../sim/types';
@@ -581,7 +581,7 @@ export class View {
             if (!this.sees(ev.x, ev.y) && ev.owner !== this.viewer) break;
             const type = ev.type as Unit['type'];
             const drawnAt = this.units.drawn.get(ev.id);
-            this.units.fall(type, ev.epoch, ev.owner, ev.x, ev.y, ev.fx, ev.fy, ev.id);
+            this.units.fall(type, ev.epoch, ev.owner, ev.x, ev.y, ev.fx, ev.fy, ev.id, SIGNATURES[s.players[ev.owner].civ].type === type ? s.players[ev.owner].civ : undefined);
             const dom = domainOf(type);
             if (dom === 'water') {
               // A ship breaks up: spray, splinters, a slick of smoke.

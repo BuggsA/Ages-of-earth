@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { TICK_HZ, domainOf, unitStats } from '../sim/data';
-import type { GameState, Unit, UnitType } from '../sim/types';
+import { SIGNATURES, TICK_HZ, domainOf, unitStats } from '../sim/data';
+import type { CivId, GameState, Unit, UnitType } from '../sim/types';
 import { unitMaterial } from './materials';
 import { heightAt } from './terrain';
 import { deerGeometry, unitGeometry } from './unitModels';
@@ -36,6 +36,7 @@ interface Corpse {
   type: UnitType;
   mounted: boolean;
   epoch: number;
+  civ?: CivId;
   color: THREE.Color;
   x: number;
   y: number;
@@ -119,21 +120,21 @@ export class UnitsView {
     this.colors = colors.map((c) => new THREE.Color(c));
   }
 
-  private batch(type: UnitType, epoch: number): Batch {
-    const key = `${type}:${epoch}`;
+  private batch(type: UnitType, epoch: number, civ?: CivId): Batch {
+    const key = `${type}:${epoch}:${civ ?? ''}`;
     let b = this.batches.get(key);
     if (!b) {
-      b = new Batch(unitGeometry(type, epoch), 64, this.group);
+      b = new Batch(unitGeometry(type, epoch, civ), 64, this.group);
       this.batches.set(key, b);
     }
     return b;
   }
 
   /** A unit died: it falls where it stood. */
-  fall(type: UnitType, epoch: number, owner: number, x: number, y: number, fx: number, fy: number, id: number): void {
+  fall(type: UnitType, epoch: number, owner: number, x: number, y: number, fx: number, fy: number, id: number, civ?: CivId): void {
     const a = this.anims.get(id);
     this.anims.delete(id);
-    this.corpses.push({ type, epoch, mounted: !!unitStats(type, epoch).mounted, color: this.colors[owner] ?? new THREE.Color('#ffffff'), x, y, yaw: a ? a.yaw : Math.atan2(fx, fy), age: 0, side: id % 2 ? 1 : -1 });
+    this.corpses.push({ type, epoch, civ, mounted: !!unitStats(type, epoch).mounted, color: this.colors[owner] ?? new THREE.Color('#ffffff'), x, y, yaw: a ? a.yaw : Math.atan2(fx, fy), age: 0, side: id % 2 ? 1 : -1 });
     if (this.corpses.length > 160) this.corpses.shift();
   }
 
@@ -220,16 +221,16 @@ export class UnitsView {
       // Those sheltering inside a building aren't drawn.
       if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !visible(e)) continue;
       show.push(e);
-      const key = `${e.type}:${modelEpoch(e, s.players[e.owner].epoch)}`;
+      const key = `${e.type}:${modelEpoch(e, s.players[e.owner].epoch)}:${markOf(s, e.type, e.owner) ?? ''}`;
       need.set(key, (need.get(key) ?? 0) + 1);
     }
     for (const c of this.corpses) {
-      const key = `${c.type}:${c.epoch}`;
+      const key = `${c.type}:${c.epoch}:${c.civ ?? ''}`;
       need.set(key, (need.get(key) ?? 0) + 1);
     }
     for (const [key, n] of need) {
-      const [type, epoch] = key.split(':');
-      this.batch(type as UnitType, Number(epoch)).reserve(n);
+      const [type, epoch, civ] = key.split(':');
+      this.batch(type as UnitType, Number(epoch), (civ || undefined) as CivId | undefined).reserve(n);
     }
 
     const seen = new Set<number>();
@@ -353,7 +354,7 @@ export class UnitsView {
         bob = 0;
         lift = 0;
       }
-      const b = this.batch(u.type, modelEpoch(u, epoch));
+      const b = this.batch(u.type, modelEpoch(u, epoch), markOf(s, u.type, u.owner));
       const i = b.count++;
       this.e.set(pitch, yaw, roll);
       this.q.setFromEuler(this.e);
@@ -384,7 +385,7 @@ export class UnitsView {
       const fall = Math.min(1, c.age / 0.45);
       const ease = fall * fall;
       const sink = c.age > 7 ? (c.age - 7) * 0.2 : 0;
-      const b = this.batch(c.type, c.epoch);
+      const b = this.batch(c.type, c.epoch, c.civ);
       const i = b.count++;
       const dom = domainOf(c.type);
       if (dom === 'water') {
@@ -423,6 +424,12 @@ export class UnitsView {
 }
 
 /** Which model to draw: a trader heading home with gold has its own (the epoch plus 10). */
+/** The people whose mark a unit wears: only a signature line carries one. */
+function markOf(s: GameState, type: UnitType, owner: number): CivId | undefined {
+  const civ = s.players[owner].civ;
+  return SIGNATURES[civ].type === type ? civ : undefined;
+}
+
 function modelEpoch(u: Unit, epoch: number): number {
   return u.type === 'trader' && u.carry > 0 ? epoch + 10 : epoch;
 }
