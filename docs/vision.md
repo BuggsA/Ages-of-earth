@@ -95,3 +95,20 @@ Evaluate new work against these questions:
 - Does seed variation change strategy without deciding the winner at generation?
 - Can an opponent recognize its effects and learn to counter it?
 - Can someone discover it through play, then teach or document what they learned?
+
+---
+
+## More of the owner's thinking: the web in detail
+
+*Added 2026-10-13 from the owner's chat with Claude Code, condensed and reworded. In the owner's words it is "Not a hard rule just an idea or inspiration." Take what sparks something.*
+
+- **Surveying.** Players can survey the land for resources. A basic survey only says whether a resource exists on this map: yes or no, with no place and no amount. A better survey, unlocked later, gives amounts, how much is left, and who holds or has mined it. Skipping surveys is a fair choice, but it risks missing the materials a unique build needs. The simple route needs no surveying at all.
+- **Scrapping.** Rare things can be salvaged into some generic value. It takes time and can't be undone. It gives a way out of a build you can't finish, and a way to deny an enemy what you can't hold.
+- **Stepping back an epoch.** A people can go back to an earlier epoch to take a fork they passed, or to collect something only that epoch offers. It costs time and resources with no refund, and advancing again costs full price after a cooldown. Units drop to their older form or are scrapped, buildings change style or go dormant, and technologies above the epoch are suspended, not lost. The computer has to learn to do this too.
+- **Crossing chains.** Doing something in one chain can open an epoch in another (a religious act might unlock an epoch elsewhere). This is an extra way in, never the only one, and the first chain has to be worth playing for itself.
+- **Windows, not just minimums.** Some requirements are open only during certain epochs. Example: farms that grow living parts instead of food need an off-route building that only the Bronze Age can raise. Rush past that window and you have to step back to get it.
+- **Hidden builds.** Some niche builds are hidden and may not even pay off, and that obscurity is part of the appeal. Players will write the wiki. So experiments must be cheap, the simulation must be honest about what happened, and seeds must be shareable so others can reproduce a find.
+- **The mainstream path always works.** On every seed there is an ordinary way to win that needs nothing hidden. Hidden content is extra upside, never a fee you must pay to compete.
+- **The web's shape.** Branches can dead-end, loop back, or rejoin further ahead (a shortcut that merges past steps you skipped). Leaving the main web can be a mistake you regret. Still open: what carries over when you branch back.
+- **No true dead ends.** From any node there is always at least one way out: back, forward or sideways, even if that exit is slow or costly. Some side exits lead into a whole other web, which is where hybrids come from.
+- **How much the player sees.** The web shouldn't be obvious. A screen outside the match keeps the parts of the web the player has found. Main branches show greyed out: visible but locked. Secret branches don't show at all until reached, and each is a web of its own, not a single shoot. Some parts may never be found.
