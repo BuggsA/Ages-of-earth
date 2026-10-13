@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { UnitType } from '../sim/types';
+import type { CivId, UnitType } from '../sim/types';
 import { Kit, RIG_ARM, RIG_LEG_A, RIG_LEG_B, bake } from './kit';
 
 /**
@@ -965,18 +965,58 @@ export function deerGeometry(): THREE.BufferGeometry {
 
 const cache = new Map<string, THREE.BufferGeometry>();
 
-/** The baked geometry of a unit line in an epoch (team parts left white for tinting). */
-export function unitGeometry(type: UnitType, epoch: number): THREE.BufferGeometry {
-  const key = `${type}:${epoch}`;
+/** How high a unit line's head (or its banner pole) reaches, where a people's mark sits. */
+const MARK_Y: Partial<Record<UnitType, number>> = { infantry: 0.5, ranged: 0.5, priest: 0.5, cavalry: 0.98, siege: 0.8 };
+
+/** A people's mark on its signature line: a crest, plume, headdress or banner, so its army reads at a glance. */
+function signatureMark(k: Kit, civ: CivId, type: UnitType): void {
+  const y = MARK_Y[type] ?? 0.5;
+  // Foot soldiers wear it on the head; siege and riders carry it on a pole behind.
+  const pole = type === 'siege' || type === 'cavalry';
+  const z = pole ? -0.2 : -0.01;
+  const top = pole ? y + 0.3 : y + 0.06;
+  if (pole) k.cyl(0.01, 0.01, 0.34, 4, WOOD, 0, y, z);
+  switch (civ) {
+    case 'egyptians':
+      k.cone(0.07, 0.14, 4, '#e0b13c', 0, top - 0.02, z);
+      k.box(0.16, 0.03, 0.03, '#2f5fa8', 0, top - 0.05, z + 0.06);
+      break;
+    case 'greeks':
+      k.box(0.03, 0.09, 0.18, '#b3282d', 0, top, z);
+      break;
+    case 'romans':
+      k.box(0.2, 0.08, 0.03, '#c0302f', 0, top, z);
+      break;
+    case 'mongols':
+      k.cone(0.045, 0.1, 5, '#22201e', 0, top, z);
+      k.blob(0.045, '#f1ece0', 0, top + 0.08, z);
+      break;
+    case 'chinese':
+      k.box(0.03, 0.14, 0.2, '#d03a2a', 0.0, top - 0.04, z);
+      k.box(0.032, 0.05, 0.08, '#f0c43a', 0.0, top - 0.01, z);
+      break;
+    case 'britons':
+      k.cone(0.03, 0.2, 4, '#f6f4ee', 0, top, z - 0.03).rotation.x = -0.5;
+      break;
+  }
+}
+
+/** The baked geometry of a unit line in an epoch (team parts left white for tinting), with a people's mark when given. */
+export function unitGeometry(type: UnitType, epoch: number, civ?: CivId): THREE.BufferGeometry {
+  const key = `${type}:${epoch}:${civ ?? ''}`;
   let g = cache.get(key);
   if (!g) {
-    g = bake(MAKERS[type](epoch).root);
+    const kit = MAKERS[type](epoch);
+    if (civ) signatureMark(kit, civ, type);
+    g = bake(kit.root);
     cache.set(key, g);
   }
   return g;
 }
 
 /** The same model with the team color baked in (for portraits). */
-export function unitGeometryColored(type: UnitType, epoch: number, color: string): THREE.BufferGeometry {
-  return bake(MAKERS[type](epoch).root, color);
+export function unitGeometryColored(type: UnitType, epoch: number, color: string, civ?: CivId): THREE.BufferGeometry {
+  const kit = MAKERS[type](epoch);
+  if (civ) signatureMark(kit, civ, type);
+  return bake(kit.root, color);
 }

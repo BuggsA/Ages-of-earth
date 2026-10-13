@@ -133,3 +133,7 @@ Agents design this game as well as build it (`AGENTS.md` §2). When you add some
 
 Built: each of the six peoples has one unit line with its own names per epoch and a trade-off (`SIGNATURES` in `src/sim/data.ts`, applied in `statsFor`). Why I love it: it was the "unique units" idea in the notes above, done so a Mongol army *reads* differently (Mangudai: hit harder, die faster) without new models or UI. The tooltip on the people's name in the top bar lists it. Numbers changed: all new, none of the existing ones. Not seen in a browser; unit-tested only.
 Next: give each its own model tint or silhouette in `unitModels.ts`; let the computer pick its people's signature line more often; a second, epoch-locked signature (a Roman ram, a Greek hero).
+
+### Signature marks (2026-10-13, Chain 1013-1900)
+
+Built: a signature line now wears its people's mark on the field: Egyptian gold headdress and lapis collar, Greek horsehair crest, Roman cross-crest, Mongol horsetail standard, Chinese red-and-gold banner, British white plume (`signatureMark` in `src/render/unitModels.ts`; its own instanced batch per people, so no extra cost for other units). Why: the rules gave each people a different army; now you can see whose it is across the map. Not seen in a browser (headless geometry test only), so sizes and heights of marks, especially on riders and siege, may want tuning. Next: per-epoch variants of each mark, tinted cloaks, marks in the portraits.
