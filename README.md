@@ -65,10 +65,14 @@ The title screen plays a live match between two computer opponents behind it. Ch
 
 ## Run it
 
+Building the game, as a person or an agent? Start with [AGENTS.md](AGENTS.md): the rules, the checks and how several agents share the work.
+
 ```bash
 npm install
 npm run dev        # http://localhost:5173 (single player)
+npm run check      # typecheck + the quick tests: what to run while building (about 20 s)
 npm test           # rules, AI, saving and determinism tests (Vitest)
+npm run test:slow  # the slow tests in tests/slow/, which CI runs daily
 npm run build      # typecheck (game and worker) + production build into dist/
 npx tsx scripts/sim.ts 3 medium 30   # a headless computer-vs-computer match, minute by minute
 ```

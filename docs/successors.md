@@ -1,0 +1,47 @@
+# Starting your successor (Claude Code only)
+
+When a Claude Code session finishes a task, it starts the next session itself, so work goes on without the owner starting each one. Other agents can't; their handoffs leave the next session to the owner. Ported from Homeward Bound on 2026-10-13 ("Full, like Homeward", `docs/rulings.md`).
+
+## Tiers
+
+| Tier | Which issues | Model | Effort |
+| --- | --- | --- | --- |
+| Regular | every issue without `effort:hard` | `claude-sonnet-5-5` | medium |
+| Hard | issues labelled `effort:hard` | `claude-opus-5-5` | high |
+
+- **`effort:hard`** is for work where a wrong answer is costly to find or undo: the deterministic rules and anything that could desync online play, saves, the pathfinding, a failure that survived one fix, a plan for a multi-step feature. Whoever writes or triages an issue adds the label, with a line saying why.
+- **The spawner picks the tier** and passes `model` to `create_session`. Effort comes from `.claude/settings.json` on `main`; `create_session` has no effort setting. In Homeward Bound one hard session reported `xhigh` instead of `high`; check it (below).
+- **Escalating:** two failed attempts at the same problem means stop. A regular session relabels the issue `effort:hard`, comments what was tried, and releases the claim. A hard session swaps it to `owner-decision` with the question, options and a concrete case for each, releases the claim, and takes another `ready` issue.
+
+## When and how
+
+- **When:** after the task's pull request is merged and the handoff is posted.
+- **How:** `create_session` (the claude-code-remote tools) on this repo, in the same environment. If you don't have it, say so in the handoff.
+- **No successor, and say why on #2,** when: you are position 10 of your chain; nothing is `ready` after grooming and there's nothing to plan; your session merged nothing; or `create_session` failed twice.
+
+## Chains and caps
+
+A chain is the run of sessions that each start the next.
+- **Position:** a session the owner starts by hand is 0; its successor is 1. **Position 10 doesn't spawn.**
+- **The id** is the UTC date and time of the chain's first spawn (`1013-1720`). Position 0 makes it up; later sessions copy it.
+- **At most two chains at once, in different lanes** (`docs/team.md`, "Lanes"). Before spawning, read the recent `Chain` comments on #2 and count the chains under two hours old that don't say "ended". Two running: don't start a third. One running in your lane: wait.
+- **At most 20 sessions spawned in a UTC day,** across all chains. Count the day's `Chain` comments on #2; at 20, say so there and stop.
+- **Log each spawn on #2:** `Chain 1013-1720, 3 of 10, lane rules: <branch> took #42 (regular), started "<child title>" for #57.` When a chain ends: `Chain 1013-1720 ended at 3 of 10: <reason>.` Don't start a new chain yourself: that's the owner's.
+
+## The prompt
+
+Enough for a cold start, and no more; the issue and its last handoff carry the details.
+
+```
+You are a building agent for Ages of Earth (BuggsA/Ages-of-earth).
+Start per AGENTS.md and docs/team.md: docs/status.md, then the board.
+Chain <id>, session <k> of 10. When you finish, follow docs/successors.md.
+Your task: #<N> (<regular|hard>). Read the issue and its latest handoff comment.
+Waiting to merge: <pull request and what it waits on, or "nothing">.
+```
+
+Pass `model` from the tier, `source_url` for this repo, `outcome_branch` with the child's branch (`claude/<issue>-<topic>`), a `title` like `Chain 1013-1720 3/10 · #57`, and a `chain:<id>` tag. Don't pass `permission_mode` or `extra_allowed_tools`: a child has its parent's permissions, never more.
+
+## Check the child started
+
+A session that ends cleanly doesn't report back. Call `get_session` on the child once and check: not failed (`status_bucket`); `session_context.model` is the tier's; `permission_mode` matches yours; the branch is the one you named; the effort is the tier's. Failed, or the wrong model or permissions: try once more, then no successor, and say so on #2. Only the effort wrong: say so on #2 and carry on.
