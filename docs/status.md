@@ -32,6 +32,8 @@ Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders
 
 - [#1](https://github.com/BuggsA/Ages-of-earth/pull/1), repairs for damaged buildings: opened before these rules, with no issue; now targets `main`. Its author couldn't run the typecheck and hadn't tried it in a browser.
 
+- [#21](https://github.com/BuggsA/Ages-of-earth/issues/21), Muse reviewer docs (owner-ask, lane tooling): branch `claude/21-muse-docs`. Docs only.
+
 ## Waiting on the owner
 
 **Setup only the owner can do:**
