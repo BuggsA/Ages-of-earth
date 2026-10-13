@@ -147,3 +147,7 @@ Chevrons and chime (2026-10-13, Chain 1013-1900, session 4): veterans now wear o
 ### The computer favours its signature line (pitch, no issue), 2026-10-13, Chain 1013-1900 session 5
 
 Built: when the computer isn't countering what it sees, it now trains its people's signature line (`SIGNATURES`) about half the time wherever the building trains it, so a Mongol computer rides, a Greek one forms a shield wall. Siege and priests keep their own rules. Lane ai, `src/sim/ai.ts` only; no number or save change. Verified by a 20-minute headless match only, not balance-swept. Next: transports in computer invasions, a scenario editor.
+
+### The computer lands by sea (pitch, no issue), 2026-10-13, Chain 1013-1900 session 6
+
+Built: on `sea` maps the clever computer trains a transport, loads up to half its idle home army, sails across the great sea and lands them by the enemy's town (`seaLanding`, `src/sim/ai.ts`). Lane ai, no number or save change. Only lightly tried: one landing completed in three headless matches; no test, no browser. Next: a test that forces a landing, escorting with warships, invasions on island maps if one is ever added, a scenario editor.
