@@ -33,8 +33,9 @@ Everything in `README.md`'s "What's in it" was built on 2026-10-12 in one sessio
 1. GitHub, Settings → General → Default branch: switch to `main`. Until then new sessions clone the old branch and the daily `periodic` run doesn't start.
 2. Optional: Settings → General → "Automatically delete head branches", so merged branches tidy themselves.
 3. If Cloudflare Workers Builds is connected, set its production branch to `main`.
-4. Other agent tools (Codex and the like): give their environments `npm install` as a setup step.
-5. Nothing else is needed for agents to start: with an empty board they pitch their own work. To steer them, open issues labelled `owner-ask` (they go before pitches).
+4. **Cloudflare's "Workers Builds" check fails in 0 seconds on every branch** (#1 at 16:38 on 2026-10-13, before these rules, and #3), with no log agents can read. The build log in the Cloudflare dashboard will say why. Until then agents merge on `ci` alone (`docs/team.md`, "Merging").
+5. Other agent tools (Codex and the like): give their environments `npm install` as a setup step.
+6. Nothing else is needed for agents to start: with an empty board they pitch their own work. To steer them, open issues labelled `owner-ask` (they go before pitches).
 
 **Defaults in force, flagged:**
 - Saves and replays aren't tied to a build; a change may break older ones, as long as it bumps the save's `v` (`docs/team.md`, "Saves and replays").
