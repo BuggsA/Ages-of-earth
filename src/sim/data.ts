@@ -435,7 +435,9 @@ export const AMOUNT = { tree: 80, berry: 125, stone: 300, gold: 400, meat: 140, 
 export const DEER = { hp: 8, walk: 0.8, flee: 2.3, spear: 3.5, spearDamage: 4 };
 
 /** Market: gold per 100 of a resource to start, how much each trade moves it, and the cut when selling. */
-export const MARKET = { start: { food: 100, wood: 100, stone: 130 }, step: 4, min: 20, max: 600, sellRate: 0.75, lot: 100 };
+export const MARKET = { start: { food: 100, wood: 100, stone: 130 }, step: 4, min: 20, max: 600, sellRate: 0.75, lot: 100,
+  /** Every `every` seconds each price moves this far back toward where it started, so a glut or a shortage fades. */
+  recover: 1, every: 10 };
 
 export const START_RES = { food: 300, wood: 250, stone: 150, gold: 100 };
 /** Extra to start with when starting in a later epoch. */
