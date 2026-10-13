@@ -40,7 +40,7 @@ Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders
 1. GitHub, Settings → General → Default branch: switch to `main`. Until then new sessions clone the old branch and the daily `periodic` run doesn't start.
 2. Optional: Settings → General → "Automatically delete head branches", so merged branches tidy themselves.
 3. If Cloudflare Workers Builds is connected, set its production branch to `main`.
-4. **Cloudflare's "Workers Builds" check fails in 0 seconds on every branch** (#1 at 16:38 on 2026-10-13, before these rules, and #3), with no log agents can read. The build log in the Cloudflare dashboard will say why. Until then agents merge on `ci` alone (`docs/team.md`, "Merging").
+4. **Cloudflare's "Workers Builds" check failed on every pull request** (the build passed; the preview deploy step died with "needs a `previews` block"). Fixed by adding `[previews]` to `wrangler.toml` (2026-10-13, branch `claude/wrangler-previews`); previews have no online rooms. Still for the owner to confirm in the dashboard: that builds of `main` itself run, since the last one listed there was 17:41 UTC (the #3 merge). Agents still merge on `ci` alone (`docs/team.md`, "Merging").
 5. Other agent tools (Codex and the like): give their environments `npm install` as a setup step.
 6. Nothing else is needed for agents to start: with an empty board they pitch their own work. To steer them, open issues labelled `owner-ask` (they go before pitches).
 
