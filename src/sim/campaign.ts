@@ -153,7 +153,7 @@ export const SCENARIOS: Scenario[] = [
     objectives: [
       { kind: 'units', type: 'siege', n: 1, text: 'Build a siege engine' },
       { kind: 'kills', n: 20, text: 'Defeat 20 enemy soldiers' },
-      { kind: 'destroy', n: 0, text: 'Destroy the rival town' },
+      { kind: 'destroy', n: 0, text: 'Burn the rival Town Center' },
       { kind: 'epoch', n: 3, bonus: true, text: 'Bonus: reach the Gunpowder Age' },
     ],
     limit: 1500,
@@ -175,7 +175,7 @@ export const SCENARIOS: Scenario[] = [
     objectives: [
       { kind: 'build', type: 'dock', n: 1, text: 'Build a Dock' },
       { kind: 'units', type: 'warship', n: 5, text: 'Command 5 warships' },
-      { kind: 'destroy', n: 0, text: 'Destroy the rival town' },
+      { kind: 'destroy', n: 0, text: 'Burn the rival Town Center' },
       { kind: 'units', type: 'transport', n: 1, bonus: true, text: 'Bonus: launch a transport ship' },
     ],
     raids: [{ at: 600, from: 1, units: [['warship', 3]], title: 'Sail ho!', text: 'Enemy galleons are standing in toward your harbour.' }],
@@ -202,7 +202,7 @@ export const SCENARIOS: Scenario[] = [
     objectives: [
       { kind: 'build', type: 'airfield', n: 1, text: 'Build an Airfield' },
       { kind: 'units', type: 'bomber', n: 4, text: 'Command 4 bombers' },
-      { kind: 'destroy', n: 0, text: 'Destroy both rival towns' },
+      { kind: 'destroy', n: 0, text: 'Burn both rival Town Centers' },
       { kind: 'kills', n: 60, bonus: true, text: 'Bonus: defeat 60 enemy units' },
     ],
     raids: [{ at: 900, from: 1, units: [['infantry', 8], ['ranged', 8], ['cavalry', 4]], title: 'The Tsar marches', text: 'A great column approaches from the west.' }],
@@ -222,6 +222,8 @@ export interface ScenarioRun {
   gifts: number;
   /** Set when the scenario is decided. */
   result: 'win' | 'lose' | null;
+  /** Rivals whose Town Center has burned (for "Burn the rival Town Center"); absent in older saves. */
+  burned?: number[];
 }
 
 export function startScenario(s: GameState, id: string): void {
@@ -259,8 +261,11 @@ export function progress(s: GameState, o: Objective, owner = 0): [number, number
       return [w ? 1 : 0, 1];
     }
     case 'destroy': {
+      // A rival town falls with its Town Center: burning it decides the chapter, with no hunt for the last house.
+      // Once burned it counts, even if they raise another.
       const foes = s.players.filter((q) => q.team !== p.team);
-      return [foes.filter((q) => q.defeated).length, foes.length];
+      const fallen = foes.filter((q) => q.defeated || s.scenario?.burned?.includes(q.id) || !s.ents.some((e) => e.kind === 'building' && e.owner === q.id && e.type === 'towncenter' && e.built && e.hp > 0));
+      return [fallen.length, foes.length];
     }
   }
 }
@@ -306,6 +311,18 @@ function spawnRaid(s: GameState, r: Raid, target: Building | undefined): void {
   }
 }
 
+/** Ticks off the goals met by now. Also called once when the match ends some other way (a conquest), so the end screen shows what was done. */
+export function markGoals(s: GameState): void {
+  const run = s.scenario;
+  const sc = run && scenarioById(run.id);
+  if (!run || !sc) return;
+  sc.objectives.forEach((o, i) => {
+    if (run.done[i] || !met(s, sc, o)) return;
+    run.done[i] = true;
+    s.events.push({ k: 'objective', index: i });
+  });
+}
+
 /** Runs every second: scripted events, objectives, and the verdict. */
 export function scenarioStep(s: GameState): void {
   const run = s.scenario;
@@ -325,11 +342,11 @@ export function scenarioStep(s: GameState): void {
     for (const r of RES) me.res[r] += g.res[r] ?? 0;
     s.events.push({ k: 'story', title: g.title, text: g.text, bad: false });
   }
-  sc.objectives.forEach((o, i) => {
-    if (run.done[i] || !met(s, sc, o)) return;
-    run.done[i] = true;
-    s.events.push({ k: 'objective', index: i });
-  });
+  for (const q of s.players) {
+    if (q.team === me.team || run.burned?.includes(q.id)) continue;
+    if (!s.ents.some((e) => e.kind === 'building' && e.owner === q.id && e.type === 'towncenter' && e.built && e.hp > 0)) (run.burned ??= []).push(q.id);
+  }
+  markGoals(s);
   if (me.defeated) {
     run.result = 'lose';
     return;
