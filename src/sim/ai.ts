@@ -912,7 +912,9 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
 
   // Defend: enemies near home draw the whole army.
   const threat = threatNear(s, v).unit;
-  const fighters = v.army.filter((u) => !u.inside);
+  // Soldiers on their way to (or aboard) a landing ship are not the land army's to command.
+  const sailing = new Set(mem.landing?.ids);
+  const fighters = v.army.filter((u) => !u.inside && !sailing.has(u.id));
   if (threat) {
     const responders = fighters.filter((u) => u.order.k !== 'attack');
     if (responders.length) issue({ t: 'move', p: p.id, ids: responders.map((u) => u.id), x: threat.x, y: threat.y, amove: true });
