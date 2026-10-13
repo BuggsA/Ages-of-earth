@@ -19,6 +19,11 @@ binding = "ASSETS"
 not_found_handling = "single-page-application"
 run_worker_first = ["/api/*"]
 
+# Cloudflare Workers Builds deploys every non-production branch with `wrangler preview`, which refuses to
+# run without this block (the build failed at the deploy step on every pull request). Empty is enough: a
+# preview serves the game but has no online rooms, because previews don't carry Durable Object bindings.
+[previews]
+
 # Online rooms: one Durable Object per room keeps the match's clock and record.
 [[durable_objects.bindings]]
 name = "ROOMS"
