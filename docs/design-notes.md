@@ -92,6 +92,8 @@ Every one of these games has a navy, and the water maps are many players' favour
 
 ## Not yet, and worth doing
 
+For a bigger idea of where the game could go, see `docs/vision.md`: an idea the owner likes, offered as inspiration rather than a plan.
+
 - **More epochs** (Atomic and Modern, as in EE), trade ships between docks, and the computer launching seaborne invasions.
 - **Unique units per people**, and AoM-style special powers.
 - **A campaign** of historical scenarios, and a **scenario editor** (EE's and AoE2's editors built huge communities).

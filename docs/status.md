@@ -8,6 +8,7 @@ The full list, with the owner's words, is `docs/rulings.md`.
 
 - **Agents work as a team** (2026-10-13), as in Homeward Bound and fully autonomous: they claim from the board, build, merge their own pull requests under the checklist (`docs/team.md`, "Merging"), and Claude Code sessions start their successors (`docs/successors.md`).
 - **Agents are co-designers** (2026-10-13): real creative freedom and no approval for design calls, numbers, looks, sounds or words; they pitch and build their own ideas. Only the hard stops wait for the owner (`AGENTS.md` §2–3).
+- **The owner's "game vision" is inspiration, not a rule** (2026-10-13): `docs/vision.md`, for agents to glance at and build toward if it sparks something.
 - **Any agent tool may work here:** the rules live once, in `AGENTS.md`.
 - **The base branch is `main`.**
 - **Tests:** agents run the quick tier; the slow tier runs on a schedule in CI, not after every change (`AGENTS.md` §5).
@@ -15,6 +16,8 @@ The full list, with the owner's words, is `docs/rulings.md`.
 ## The build
 
 Everything in `README.md`'s "What's in it" was built on 2026-10-12 in one session (branch `claude/beautiful-franklin-6gj8tt`, now `main`): five epochs, six peoples, the economy, seventeen buildings, twenty-six technologies, counters, siege, priests, heroes, walls and the bell, ships, fishing and aircraft, the computer opponent, online rooms, saves, replays, synthesized sound and music.
+
+Since then: **relics** (#4, merged in #5 on 2026-10-13; the save `v` is 2).
 
 | Check | State |
 | --- | --- |
@@ -24,8 +27,6 @@ Everything in `README.md`'s "What's in it" was built on 2026-10-12 in one sessio
 | CI (`ci`, `periodic`) | added 2026-10-13; `periodic` starts once `main` is the default branch |
 
 ## In flight
-
-- [#4](https://github.com/BuggsA/Ages-of-earth/issues/4), relics (chain 1013-1734, 1/10): branch `claude/4-relics`. Bumps the save `v` to 2.
 
 - [#1](https://github.com/BuggsA/Ages-of-earth/pull/1), repairs for damaged buildings: opened before these rules, with no issue; now targets `main`. Its author couldn't run the typecheck and hadn't tried it in a browser.
 
