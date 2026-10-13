@@ -2,10 +2,11 @@ import { aiStep } from './ai';
 import { hitAnimal, spawnAnimal, updateAnimals } from './animals';
 import { buildingGuns, updateShots } from './combat';
 import { applyCommand } from './commands';
-import { AURA, CIV_IDS, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
+import { AURA, CIV_IDS, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
 import { AIR, NAVAL, stampBuilding } from './grid';
 import { generateMap } from './mapgen';
 import { Spatial } from './spatial';
+import { updateRelics } from './relics';
 import { modsOf, statsFor } from './stats';
 import type { Building, CivId, Command, Difficulty, GameMode, GameState, MapSize, MapType, Player } from './types';
 import { RES, R_FISH, R_NONE } from './types';
@@ -72,6 +73,9 @@ export function createGame(setup: GameSetup): GameState {
     ents: [],
     byId: new Map(),
     animals: [],
+    relics: [],
+    relicTeam: -1,
+    relicTimer: -1,
     nextId: 1,
     shots: [],
     rng: setup.seed >>> 0,
@@ -136,6 +140,7 @@ export function createGame(setup: GameSetup): GameState {
     }
   }
   for (const d of map.deer) spawnAnimal(s, d.x, d.y);
+  for (const r of map.relics) s.relics.push({ id: s.nextId++, x: r.x, y: r.y, carrier: 0, temple: 0 });
   countPop(s);
   updateVision(s);
   // Everyone knows the lie of the land around home.
@@ -303,6 +308,14 @@ function checkVictory(s: GameState): void {
       return;
     }
   }
+  // So does keeping every relic for as long.
+  if (s.relicTeam >= 0 && s.relicTimer === 0) {
+    s.over = true;
+    s.winner = s.relicTeam;
+    for (const p of s.players) if (p.team !== s.winner) p.defeated = true;
+    s.events.push({ k: 'over', winner: s.winner, how: 'relics' });
+    return;
+  }
   for (const p of s.players) {
     if (p.defeated) continue;
     // Regicide: a people whose King has fallen is lost.
@@ -332,6 +345,8 @@ function checkVictory(s: GameState): void {
 export function scoreOf(s: GameState, p: Player): number {
   let wonder = 0;
   for (const e of s.ents) if (e.kind === 'building' && e.owner === p.id && e.type === 'wonder' && e.built) wonder += 500;
+  // Each relic kept in a Temple.
+  for (const r of s.relics) if (r.temple && s.byId.get(r.temple)?.owner === p.id) wonder += RELIC.score;
   return Math.round(p.stats.gathered / 10 + p.stats.kills * 8 + p.stats.razed * 15 + p.stats.converted * 10 + p.stats.techs * 25 + p.epoch * 150 + p.stats.built * 3 + wonder);
 }
 
@@ -373,6 +388,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   }
   carryCargo(s);
   updateShots(s, sp, (a, damage, x, y) => hitAnimal(s, a, damage, x, y));
+  updateRelics(s);
   removeDead(s);
   if (s.tick % 4 === 0) updateVision(s);
   if (s.tick % 20 === 0) checkVictory(s);
@@ -404,6 +420,12 @@ export function checksum(s: GameState): number {
   for (const a of s.animals) {
     mix(a.x);
     mix(a.y);
+  }
+  for (const r of s.relics) {
+    mix(r.x);
+    mix(r.y);
+    mix(r.carrier);
+    mix(r.temple);
   }
   for (const p of s.players) for (const r of RES) mix(p.res[r]);
   for (const sh of s.shots) mix(sh.t);

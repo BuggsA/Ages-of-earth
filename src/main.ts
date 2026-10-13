@@ -5,13 +5,14 @@ import { CameraRig } from './render/camera';
 import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { wallLine } from './sim/commands';
-import { BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, TECHS, TICK_HZ, domainOf, unitStats } from './sim/data';
+import { BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, RELIC, TECHS, TICK_HZ, domainOf, unitStats } from './sim/data';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
 import { placeProblem, walkable } from './sim/grid';
 import { findDockSpot, findSpot } from './sim/ai';
 import { placeBuilding, spawnUnit } from './sim/world';
 import type { BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, MapSize, MapType, Unit } from './sim/types';
 import { R_FISH, R_NONE } from './sim/types';
+import { carriedBy, relicAt } from './sim/relics';
 import { NetClient, newRoomCode, saveName, savedName } from './net/client';
 import { HASH_EVERY, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
 import { deserialize, serialize } from './sim/save';
@@ -55,6 +56,8 @@ let viewer = 0;
 let pending: Command[] = [];
 let selection = new Set<number>();
 let selectedTile: number | null = null;
+/** A relic picked out with a left click, to read about. */
+let selectedRelic: number | null = null;
 let placing: BuildingType | null = null;
 let placeAt: { tx: number; ty: number; ok: boolean } | null = null;
 /** A wall being dragged out, from tile to tile. */
@@ -337,6 +340,7 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   pending = [];
   selection = new Set();
   selectedTile = null;
+  selectedRelic = null;
   placing = null;
   wallDrag = null;
   targetMode = null;
@@ -394,10 +398,12 @@ function toTitle(): void {
 // ---- Saving ----------------------------------------------------------------------------------------
 
 const SAVE_KEY = 'ages-save';
+/** Bumped when the state's shape changes, so an older save is set aside instead of loading broken (2: relics). */
+const SAVE_V = 2;
 
 function saveGame(s: GameState, setup: GameSetup): boolean {
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, setup, at: Date.now(), state: serialize(s), record }));
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ v: SAVE_V, setup, at: Date.now(), state: serialize(s), record }));
     showContinue();
     return true;
   } catch {
@@ -410,7 +416,7 @@ function loadGame(): { setup: GameSetup; state: GameState; record: [number, Comm
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     const saved = JSON.parse(raw);
-    if (saved.v !== 1) return null;
+    if (saved.v !== SAVE_V) return null;
     return { setup: saved.setup, state: deserialize(saved.state), record: Array.isArray(saved.record) ? saved.record : [] };
   } catch {
     return null;
@@ -734,6 +740,7 @@ function setSelection(ids: number[], add = false): void {
   for (const id of ids) next.add(id);
   selection = next;
   selectedTile = null;
+  selectedRelic = null;
   hud.buildMenu = null;
   refreshHud();
 }
@@ -808,7 +815,7 @@ function order(clientX: number, clientY: number, forceAttack = false, queue = fa
     // A building of yours: set where its trainees gather.
     const b = [...selection].map((id) => s.byId.get(id)).find((e) => e && e.kind === 'building' && e.owner === viewer);
     if (b) {
-      const at = pk.kind === 'ground' ? pk : pk.kind === 'resource' ? { x: (pk.tile % s.w) + 0.5, y: Math.floor(pk.tile / s.w) + 0.5 } : pk.kind === 'animal' ? null : (() => {
+      const at = pk.kind === 'ground' ? pk : pk.kind === 'resource' ? { x: (pk.tile % s.w) + 0.5, y: Math.floor(pk.tile / s.w) + 0.5 } : pk.kind === 'animal' ? null : pk.kind === 'relic' ? (relicAt(s, pk.id) ?? null) : (() => {
         const t = s.byId.get(pk.id);
         return t ? { x: t.x, y: t.y } : null;
       })();
@@ -826,6 +833,15 @@ function order(clientX: number, clientY: number, forceAttack = false, queue = fa
     issue({ t: 'hunt', p: viewer, ids, target: a.id, queue: q });
     view.marker(s, a.x, a.y, true);
     play('move');
+    return;
+  }
+  if (pk.kind === 'relic') {
+    const r = relicAt(s, pk.id);
+    if (!r) return;
+    issue({ t: 'relic', p: viewer, ids, target: r.id, queue: q });
+    view.marker(s, r.x, r.y, false);
+    play('move');
+    ack('move');
     return;
   }
   if (pk.kind === 'unit' || pk.kind === 'building') {
@@ -1134,6 +1150,13 @@ function clickSelect(x: number, y: number, shift: boolean, ctrl: boolean): void 
     refreshHud();
     return;
   }
+  if (pk.kind === 'relic') {
+    setSelection([]);
+    selectedRelic = pk.id;
+    refreshHud();
+    play('click');
+    return;
+  }
   const e = s.byId.get(pk.id);
   if (!e) return;
   const now = performance.now();
@@ -1427,7 +1450,7 @@ function timeline(s: GameState, metric: Metric): string {
   return `<svg class="timeline" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${grid}${lines}</svg>`;
 }
 
-function showEnd(s: GameState, won: boolean, how: 'conquest' | 'wonder' | 'resign' = 'conquest'): void {
+function showEnd(s: GameState, won: boolean, how: 'conquest' | 'wonder' | 'relics' | 'resign' = 'conquest'): void {
   mode = 'over';
   keepReplay(s);
   const m = $('modal');
@@ -1437,7 +1460,12 @@ function showEnd(s: GameState, won: boolean, how: 'conquest' | 'wonder' | 'resig
       (p) => `<tr><td><span class="swatch" style="background:${p.color}"></span>${p.name}<div class="civ-tag">${CIVS[p.civ].name}</div></td><td>${scoreOf(s, p)}</td><td>${EPOCHS[p.epoch].short}</td><td>${p.stats.gathered}</td><td>${p.stats.trained}</td><td>${p.stats.built}</td><td>${p.stats.techs}</td><td>${p.stats.kills}</td><td>${p.stats.losses}</td></tr>`,
     )
     .join('');
-  const why = how === 'wonder' ? (won ? 'Your Wonder stood the test of time.' : 'A rival Wonder stood the test of time.') : won ? 'Your rivals have fallen.' : 'Your people are no more.';
+  const why =
+    how === 'wonder'
+      ? won ? 'Your Wonder stood the test of time.' : 'A rival Wonder stood the test of time.'
+      : how === 'relics'
+        ? won ? 'Every relic in the world rests in your temples.' : 'A rival kept every relic in the world.'
+        : won ? 'Your rivals have fallen.' : 'Your people are no more.';
   m.innerHTML = `<div class="card wide"><h2>${won ? 'Victory!' : 'Defeat'}</h2>
     <div class="sel-sub">${why} The match lasted ${mins < 1 ? 'less than a minute' : `${mins} minute${mins === 1 ? '' : 's'}`}.</div>
     <div class="chart-tabs">${(Object.keys(METRICS) as Metric[]).map((k) => `<button class="tab ${k === 'score' ? 'on' : ''}" data-metric="${k}">${METRICS[k]}</button>`).join('')}</div>
@@ -1531,6 +1559,30 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         }
         break;
       }
+      case 'relic':
+        if (ev.owner === viewer && ev.what === 'kept') hud.toast(`A relic rests in your Temple: +${Math.round((60 / RELIC.every) * RELIC.gold)} gold a minute`, 'good');
+        else if (ev.owner === viewer && ev.what === 'taken') hud.toast('Your priest has taken up a relic: bring it to a Temple', 'info');
+        else if (ev.owner === viewer && ev.what === 'dropped' && !list.some((e) => e.k === 'die' && e.owner === viewer)) break;
+        else if (ev.owner === viewer && ev.what === 'dropped') {
+          hud.toast('A relic has been lost! (Space to look)', 'alert');
+          lastAlert = { x: ev.x, y: ev.y };
+        }
+        break;
+      case 'relicHold': {
+        const mins = Math.round(ev.ticks / TICK_HZ / 60);
+        if (ev.team < 0) {
+          hud.toast('A relic has changed hands: the relic countdown stops', 'info');
+          break;
+        }
+        const ours = ev.team === s.players[viewer].team;
+        if (ours) hud.banner('Every relic is yours', `Keep them all ${mins} minutes and you win.`, 5000);
+        else {
+          const keepers = s.players.filter((q) => q.team === ev.team).map((q) => q.name).join(' and ');
+          hud.banner(`${keepers} ${keepers.includes(' and ') ? 'keep' : 'keeps'} every relic`, `Take one back within ${mins} minutes or lose.`, 5000);
+        }
+        play('wonder');
+        break;
+      }
       case 'over':
         clearSave();
         showEnd(s, ev.winner === s.players[viewer].team, ev.how);
@@ -1544,7 +1596,7 @@ function onEvents(s: GameState, list: GameEvent[]): void {
 function refreshHud(): void {
   if (!game || mode === 'title') return;
   pruneSelection(game);
-  hud.update(game, viewer, [...selection], SPEEDS[speedIdx], selectedTile);
+  hud.update(game, viewer, [...selection], SPEEDS[speedIdx], selectedTile, selectedRelic);
 }
 
 function cursorFor(s: GameState): string {
@@ -1557,6 +1609,7 @@ function cursorFor(s: GameState): string {
   const pk: Pick | null = view.pick(pointer.x, pointer.y);
   if (!pk) return '';
   if (pk.kind === 'animal') return units.length ? 'cur-attack' : 'cur-select';
+  if (pk.kind === 'relic') return units.some((u) => u.type === 'priest' && !carriedBy(s, u)) ? 'cur-gather' : 'cur-select';
   if (pk.kind === 'unit' || pk.kind === 'building') {
     const t = s.byId.get(pk.id) as Ent | undefined;
     if (!t) return '';
@@ -1564,6 +1617,7 @@ function cursorFor(s: GameState): string {
     if (units.length && foe) return units.every((u) => u.type === 'priest') && t.kind === 'unit' ? 'cur-convert' : 'cur-attack';
     if (units.some((u) => u.type === 'citizen') && t.kind === 'building' && t.owner === viewer && (!t.built || t.type === 'farm')) return 'cur-build';
     if (units.length && t.kind === 'building' && t.owner === viewer && t.built && BUILDINGS[t.type].garrison) return 'cur-garrison';
+    if (t.kind === 'building' && t.type === 'temple' && t.owner === viewer && t.built && units.some((u) => u.type === 'priest' && carriedBy(s, u))) return 'cur-gather';
     if (t.kind === 'unit' && t.type === 'transport' && t.owner === viewer && units.some((u) => domainOf(u.type) === 'land')) return 'cur-garrison';
     return 'cur-select';
   }

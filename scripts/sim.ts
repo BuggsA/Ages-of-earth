@@ -21,9 +21,11 @@ for (let i = 0; i < minutes * 60 * 20 && !s.over; i++) {
     const cit = units.filter((u) => u.kind === 'unit' && u.type === 'citizen').length;
     const blds = s.ents.filter((e) => e.owner === p.id && e.kind === 'building').length;
     const res = Object.values(p.res).map(Math.floor).join('/');
-    return `${p.name}: ${EPOCHS[p.epoch].short}, ${cit} citizens, ${units.length - cit} soldiers, ${blds} buildings, ${res}, kills ${p.stats.kills}`;
+    const relics = s.relics.filter((r) => r.temple && s.byId.get(r.temple)?.owner === p.id).length;
+    return `${p.name}: ${EPOCHS[p.epoch].short}, ${cit} citizens, ${units.length - cit} soldiers, ${blds} buildings, ${res}, kills ${p.stats.kills}, relics ${relics}`;
   });
   console.log(`min ${i / 1200}  ${line.join('  |  ')}`);
 }
 const won = s.winner >= 0 ? s.players[s.winner].name : 'nobody yet';
+console.log(`Relics: ${s.relics.length} on the map, ${s.relics.filter((r) => r.temple).length} kept, ${s.relics.filter((r) => r.carrier).length} carried.`);
 console.log(`Winner: ${won} after ${(s.tick / 1200).toFixed(1)} min. ${(performance.now() - t0).toFixed(0)} ms in all, worst tick ${worst.toFixed(1)} ms, checksum ${checksum(s)}.`);

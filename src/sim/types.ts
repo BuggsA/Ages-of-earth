@@ -86,7 +86,9 @@ export type Order =
   /** Walk to the shore by a transport ship and go aboard. */
   | { k: 'board'; target: number; meet?: { lx: number; ly: number; wx: number; wy: number } }
   /** A transport sailing to a shore to put its passengers ashore there. */
-  | { k: 'unload'; x: number; y: number };
+  | { k: 'unload'; x: number; y: number }
+  /** A priest fetching a relic and carrying it to a Temple (that one, or the nearest when 0). */
+  | { k: 'relic'; target: number; temple: number };
 
 /** What a unit is visibly doing, for the renderer's animation. */
 export type Act = 'idle' | 'walk' | 'attack' | 'chop' | 'mine' | 'forage' | 'farm' | 'build' | 'chant' | 'fish';
@@ -190,6 +192,21 @@ export interface Building {
 }
 
 export type Ent = Unit | Building;
+
+/**
+ * A relic: it lies on the ground, rides with the priest carrying it, or is kept in a Temple, where it
+ * brings in gold. It can't be destroyed: whoever falls carrying it, or the Temple keeping it, lets it go.
+ */
+export interface Relic {
+  id: number;
+  /** Where it is: on the ground, or where its carrier or Temple stands. */
+  x: number;
+  y: number;
+  /** The priest carrying it, or 0. */
+  carrier: number;
+  /** The Temple keeping it, or 0. */
+  temple: number;
+}
 
 export interface Animal {
   id: number;
@@ -307,7 +324,11 @@ export type GameEvent =
   | { k: 'wonder'; owner: number; id: number; x: number; y: number; ticks: number }
   | { k: 'trade'; owner: number; res: Res; buy: boolean }
   | { k: 'defeated'; owner: number }
-  | { k: 'over'; winner: number; how: 'conquest' | 'wonder' | 'resign' }
+  | { k: 'over'; winner: number; how: 'conquest' | 'wonder' | 'relics' | 'resign' }
+  /** A relic picked up, kept in a Temple, or let go where it lies. */
+  | { k: 'relic'; id: number; owner: number; what: 'taken' | 'kept' | 'dropped'; x: number; y: number }
+  /** One side now keeps every relic (its countdown starts), or no longer does (`team` -1). */
+  | { k: 'relicHold'; team: number; ticks: number }
   | { k: 'refused'; owner: number; why: string }
   | { k: 'left'; owner: number }
   | { k: 'shot'; owner: number; kind: Shot['kind']; x: number; y: number; air?: boolean };
@@ -342,6 +363,10 @@ export interface GameState {
   ents: Ent[];
   byId: Map<number, Ent>;
   animals: Animal[];
+  relics: Relic[];
+  /** The team keeping every relic in its temples, or -1; and ticks left before it wins (-1 when none). */
+  relicTeam: number;
+  relicTimer: number;
   nextId: number;
   shots: Shot[];
   rng: number;
@@ -392,6 +417,8 @@ export type Command =
   | ({ t: 'hunt'; p: number; ids: number[]; target: number } & Queued)
   | ({ t: 'convert'; p: number; ids: number[]; target: number } & Queued)
   | ({ t: 'garrison'; p: number; ids: number[]; target: number } & Queued)
+  /** Priests: fetch a relic and take it to the nearest Temple. */
+  | ({ t: 'relic'; p: number; ids: number[]; target: number } & Queued)
   /** Go aboard a transport ship. */
   | ({ t: 'board'; p: number; ids: number[]; target: number } & Queued)
   /** Transports: sail to the shore nearest a point and put everyone ashore. */
@@ -408,5 +435,7 @@ export type Command =
   | { t: 'stop'; p: number; ids: number[] }
   | { t: 'delete'; p: number; ids: number[] }
   | { t: 'resign'; p: number }
+  /** Priests set down the relics they carry, where they stand. */
+  | { t: 'dropRelic'; p: number; ids: number[] }
   /** A player left an online match: the computer takes over their people. */
   | { t: 'leave'; p: number };

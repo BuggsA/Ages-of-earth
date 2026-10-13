@@ -72,7 +72,7 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
       const i = y * s.w + x;
       if (s.terrain[i] === T_WATER) return 'water';
       if (s.terrain[i] === T_ROCK) return 'rock';
-      if (s.res[i] !== R_NONE) return 'blocked';
+      if (s.res[i] !== R_NONE || relicOnTile(s, x, y)) return 'blocked';
       // A gate may go into its owner's own wall, replacing the pieces it covers.
       if (s.bldAt[i] !== 0 && !(type === 'gate' && ownWall(s, s.bldAt[i], owner))) return 'blocked';
     }
@@ -89,6 +89,12 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
   if (BUILDINGS[type].shore && shoreWater(s, tx, ty, n) < 3) return 'shore';
   void ignoreUnits;
   return null;
+}
+
+/** A relic on the ground on this tile (buildings can't go over one). */
+export function relicOnTile(s: GameState, tx: number, ty: number): boolean {
+  for (const r of s.relics) if (!r.carrier && !r.temple && Math.floor(r.x) === tx && Math.floor(r.y) === ty) return true;
+  return false;
 }
 
 function ownWall(s: GameState, id: number, owner: number): boolean {
