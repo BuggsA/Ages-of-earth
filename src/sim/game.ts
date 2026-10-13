@@ -1,6 +1,6 @@
 import { aiStep } from './ai';
 import { hitAnimal, spawnAnimal, updateAnimals } from './animals';
-import { scenarioStep, startScenario } from './campaign';
+import { markGoals, scenarioStep, startScenario } from './campaign';
 import { buildingGuns, updateShots } from './combat';
 import { applyCommand } from './commands';
 import { AURA, CIV_IDS, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
@@ -405,7 +405,10 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   if (s.tick % 20 === 0) {
     scenarioStep(s);
     if (!s.over) checkVictory(s);
-    if (s.scenario && s.over && !s.scenario.result) s.scenario.result = s.winner === s.players[0].team ? 'win' : 'lose';
+    if (s.scenario && s.over && !s.scenario.result) {
+      markGoals(s);
+      s.scenario.result = s.winner === s.players[0].team ? 'win' : 'lose';
+    }
   }
   if (s.tick % secs(30) === 0) sample(s);
   s.tick++;
