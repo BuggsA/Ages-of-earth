@@ -86,7 +86,8 @@ export function updateRelics(s: GameState): void {
       }
     }
   }
-  const team = holder(s);
+  // In a campaign chapter the goals decide the match, so keeping every relic starts no countdown.
+  const team = s.scenario ? -1 : holder(s);
   if (team !== s.relicTeam) {
     s.relicTeam = team;
     s.relicTimer = team >= 0 ? s.wonderTime : -1;

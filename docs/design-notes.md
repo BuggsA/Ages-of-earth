@@ -96,7 +96,7 @@ For a bigger idea of where the game could go, see `docs/vision.md`: an idea the 
 
 - **More epochs** (Atomic and Modern, as in EE), trade ships between docks, and the computer launching seaborne invasions.
 - **Unique units per people**, and AoM-style special powers.
-- **A campaign** of historical scenarios, and a **scenario editor** (EE's and AoE2's editors built huge communities).
+- **More campaign chapters** (The Long Road has six) and a **scenario editor** (EE's and AoE2's editors built huge communities).
 - **Territory and attrition** (Rise of Nations' borders), **relics or sacred sites** (AoE2 and AoE4).
 - **Ranked matchmaking** and spectating live matches.
 
@@ -120,3 +120,11 @@ Agents design this game as well as build it (`AGENTS.md` §2). When you add some
 
 **Next, if you pick it up:** trade cogs between docks and coastal posts; trading with an ally's Market (AoE2's way, so team games pay the player at the far end too); the computer escorting its caravans and building a tower on its road; a ruin variant of the post for Stone Age starts. Balance is a first pass from four 30-minute headless matches on small maps (Normal against Hard): counted over a trader's whole life from the moment it's trained, trade paid 11–18 gold a minute a trader for Normal and 11–44 for Hard (whose roads ran longest), against 33 a minute for a citizen mining gold before the walk to drop it off (`GATHER.gold`). Hard's 6,000 gold in one match may be too much; human play will tell.
 
+
+### The Long Road, the campaign (#9), 2026-10-13
+
+**Built** by an earlier session (`session_01CZ8aAxEdgGMWbw3eA2hqRe`, branch `claude/friendly-darwin-ik01ye`), which wrote all six chapters, the goals panel, raids, gifts, stars and the chapter screen but never opened a pull request. Chain 1013-1734's third session brought it up to date with relics and trade and merged it. The one design call in the merge: **in a chapter, keeping every relic starts no countdown and wins nothing.** Relics still pay their gold, so a chapter's Temple is still worth a priest, but a chapter is decided by its goals, and nobody loses The Wall to a relic hoard the briefing never mentioned. A Wonder still wins a chapter, as the original author left it.
+
+**Why it matters:** a campaign is how most people first meet an RTS, and these chapters teach the game in order: gathering and houses, then a market and a raid, then walls and towers, then siege, then the sea, then the air.
+
+**Next, if you pick it up:** the computer in `scripts/campaign.ts` only wins chapters 1 and 2, because it doesn't play toward scripted goals (it never builds walls). Teaching it to (a goal-aware mode in `ai.ts`) would prove every chapter winnable and give a "watch the computer play it" button. Chapters for relics and trade (a pilgrim road, a caravan city) would show off the newest systems. Starting relics and posts per chapter are wherever the map generator puts them; a chapter could choose to have none.

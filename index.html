@@ -96,6 +96,7 @@
           </div>
           <div class="title-buttons">
             <button class="btn primary big" data-act="start">Play</button>
+            <button class="btn big" data-act="campaign">Campaign</button>
             <button class="btn big" data-act="online">Play online</button>
             <button class="btn big hidden" id="continue-btn" data-act="continue">Continue saved game</button>
           </div>
@@ -126,6 +127,7 @@
       </div>
 
       <div id="online" class="screen hidden"></div>
+      <div id="campaign" class="screen hidden"></div>
 
       <div id="hud" class="hidden">
         <header id="topbar">
@@ -141,6 +143,7 @@
           <button class="tb-btn" data-act="menu" title="Menu (F10)">☰ Menu</button>
         </header>
         <div id="timers"></div>
+        <div id="objectives" class="objectives hidden"></div>
         <div id="replay-bar" class="replay-bar hidden"></div>
         <div id="tip-box" class="tip-box hidden"></div>
         <div id="chat"><div id="chat-lines"></div><input id="chat-input" class="hidden" maxlength="200" placeholder="Say something to everyone (Enter to send, Esc to cancel)"></div>

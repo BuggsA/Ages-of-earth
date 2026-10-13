@@ -1,3 +1,5 @@
+import { scenarioById } from '../sim/campaign';
+import { objectivesHtml } from './campaignUi';
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
 import { BUILDINGS, BUILDING_TYPES, CIVS, EPOCHS, LAST_EPOCH, MARKET, RELIC, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
@@ -229,6 +231,7 @@ export class Hud {
     const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${p.pop}/${p.cap}|${p.epoch}|${adv}|${idle}|${speed}|${scores.join(',')}`;
     this.clockEl.textContent = fmtTime(s.tick);
     this.timers(s, viewer);
+    this.objectives(s);
     if (sig === this.topSig) return;
     this.topSig = sig;
     this.resEl.innerHTML =
@@ -245,6 +248,19 @@ export class Hud {
     this.idleEl.textContent = `Idle ${idle}`;
     this.idleEl.classList.toggle('alert', idle > 0);
     document.getElementById('speed-btn')!.textContent = `${speed}×`;
+  }
+
+  private objEl = document.getElementById('objectives')!;
+  private objHtml = '';
+
+  /** A campaign scenario's goals, in the corner. */
+  private objectives(s: GameState): void {
+    const sc = s.scenario ? scenarioById(s.scenario.id) : undefined;
+    const html = sc ? objectivesHtml(s, sc) : '';
+    if (html === this.objHtml) return;
+    this.objHtml = html;
+    this.objEl.innerHTML = html;
+    this.objEl.classList.toggle('hidden', !html);
   }
 
   /** Peace time and wonder countdowns under the top bar. */
