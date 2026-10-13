@@ -8,6 +8,7 @@ import { carriedBy } from './relics';
 import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple } from './units';
 import { nearestMarket } from './trade';
 import { isEnemy } from './world';
+import { progress, scenarioById } from './campaign';
 
 /**
  * The computer opponent. It plays by the same rules and through the same commands as a person: it
@@ -84,6 +85,8 @@ interface View {
   tc: Building | null;
   /** Spendable after setting aside what the next epoch costs. */
   budget: Record<Res, number>;
+  /** What a campaign chapter's goals ask of the army (only for the chapter's own seat). */
+  plan: Plan;
 }
 
 function afford(v: View, cost: Cost): boolean {
@@ -118,7 +121,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   // A King stays out of harm's way, sheltered in the Town Center.
   if (king && tc && !king.inside && king.order.k !== 'garrison') applyCommand(s, { t: 'garrison', p: p.id, ids: [king.id], target: tc.id });
   const home = tc ? { x: tc.x, y: tc.y } : { x: p.startX, y: p.startY };
-  const v: View = { p, citizens, army, priests, traders, fishers, navy, planes, buildings, home, tc, budget: { ...p.res } };
+  const v: View = { p, citizens, army, priests, traders, fishers, navy, planes, buildings, home, tc, budget: { ...p.res }, plan: NO_PLAN };
   const issue = (c: Command) => applyCommand(s, c);
 
   // People first: a growing town pays for everything else.
@@ -136,11 +139,14 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   // Traders pay for themselves: they come before the epoch's savings and the army.
   merchants(s, v, issue);
 
+  // In a campaign chapter, its goals come before the epoch's savings.
+  v.plan = chapterGoals(s, v, mem, issue);
+
   // Epochs: once there are enough people, set the cost aside (so the army doesn't eat it) and advance;
   // but when an attack is due and the army is short of it, soldiers come first.
   const waveSize = L.wave + mem.wave * L.waveGrowth;
   const armyFirst = s.tick > secs(L.firstAttack - 150) && army.length < waveSize && !mem.attacking;
-  const wantEpoch = p.epoch < LAST_EPOCH && !advancing && !armyFirst && citizens.length >= ADVANCE_AT[p.epoch] && s.tick > secs(150 + p.epoch * 150);
+  const wantEpoch = p.epoch < Math.min(LAST_EPOCH, v.plan.maxEpoch) && !advancing && !armyFirst && citizens.length >= ADVANCE_AT[p.epoch] && s.tick > secs(150 + p.epoch * 150);
   if (wantEpoch) {
     const cost = EPOCHS[p.epoch + 1].cost;
     if (tc && tc.queue.length === 0 && afford(v, cost)) issue({ t: 'advance', p: p.id, building: tc.id });
@@ -194,15 +200,17 @@ function research(s: GameState, v: View, peopleEnough: boolean, issue: (c: Comma
 function trade(s: GameState, v: View, issue: (c: Command) => void): void {
   const { p } = v;
   if (!AI_LEVELS[p.ai!].clever || !v.buildings.some((b) => b.type === 'market' && b.built)) return;
-  // Sell what piles up for gold; buy what is short when gold piles up.
+  // Sell what piles up for gold; buy what is short when gold piles up. On a chapter's clock, a smaller pile is worth selling.
+  const pile = v.plan.wave ? 600 : 1500;
   for (const r of ['food', 'wood', 'stone'] as const) {
-    if (p.res[r] > 1500 && p.res.gold < 400 && s.market[r] > MARKET.min + 10) {
+    if (p.res[r] > pile && p.res.gold < 400 && s.market[r] > MARKET.min + 10) {
       issue({ t: 'trade', p: p.id, res: r, buy: false });
       return;
     }
   }
+  const rich = v.plan.wave ? 500 : 1200;
   for (const r of ['food', 'wood'] as const) {
-    if (p.res[r] < 100 && p.res.gold > 1200 && s.market[r] < 250) {
+    if (p.res[r] < 100 && p.res.gold > rich && s.market[r] < 250) {
       issue({ t: 'trade', p: p.id, res: r, buy: true });
       return;
     }
@@ -775,8 +783,11 @@ function airforce(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   if (enemyAir && freeFighters.length) issue({ t: 'attack', p: p.id, ids: freeFighters.map((u) => u.id), target: enemyAir.id });
   // Bombers set out in a group against the enemy's town when the army attacks, or every couple of minutes.
   const ready = bombers.filter((u) => u.order.k === 'idle');
-  if (ready.length >= 2 && (mem.attacking || s.tick - (mem.sortie ?? 0) > secs(120)) && s.tick >= s.peaceUntil) {
-    const target = enemyTarget(s, p);
+  // In a chapter whose goal is a Town Center, bombers fly with the army, at it: alone they only feed the enemy's guns.
+  const goal = v.plan.target;
+  const alone = goal ? mem.attacking : mem.attacking || s.tick - (mem.sortie ?? 0) > secs(120);
+  if (ready.length >= 2 && alone && s.tick >= s.peaceUntil) {
+    const target = goal ?? enemyTarget(s, p);
     if (target) {
       issue({ t: 'attack', p: p.id, ids: ready.map((u) => u.id), target: target.id });
       if (!enemyAir && freeFighters.length) issue({ t: 'move', p: p.id, ids: freeFighters.map((u) => u.id), x: target.x, y: target.y, amove: true });
@@ -856,7 +867,7 @@ function townBell(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
 function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
   const L = AI_LEVELS[p.ai!];
-  const enemy = enemyHome(s, p);
+  const enemy = v.plan.target ?? enemyHome(s, p);
   const dx = enemy.x - v.home.x;
   const dy = enemy.y - v.home.y;
   const dl = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -882,7 +893,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     const trains = BUILDINGS[b.type].trains;
     if (!trains.length || trains.includes('citizen') || b.type === 'dock' || b.type === 'airfield' || b.type === 'market') continue;
     let unit: UnitType | null;
-    if (b.type === 'workshop') unit = siege < (p.epoch >= 2 ? 3 : 2) && v.army.length >= 6 ? 'siege' : null;
+    if (b.type === 'workshop') unit = siege < Math.max(v.plan.siege, p.epoch >= 2 ? 3 : 2) && (v.army.length >= 6 || siege < v.plan.siege) ? 'siege' : null;
     else if (b.type === 'temple') unit = v.priests.length < (v.army.length >= 6 ? 2 : 0) + (looseRelics(s) > 0 ? 1 : 0) ? 'priest' : null;
     else {
       unit = counter && trains.includes(counter) && unitEpoch(counter) <= p.epoch && roll(s) < 0.7 ? counter : pickUnit(v, mem, b);
@@ -911,18 +922,20 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
 
   // Attack in waves once the army is big enough (at once against a wonder); between waves, gather at the muster point.
   const ready = fighters.filter((u) => u.order.k === 'idle' || (u.order.k === 'move' && !u.order.amove));
-  const waveSize = L.wave + mem.wave * L.waveGrowth;
+  // A chapter's goals may set the waves instead: none while holding out, smaller and sooner when the rival town must fall.
+  const plan = v.plan;
+  const waveSize = plan.wave || L.wave + mem.wave * L.waveGrowth;
   const onAttack = fighters.filter((u) => u.order.k === 'attack' || (u.order.k === 'move' && u.order.amove));
   if (mem.attacking && onAttack.length === 0) mem.attacking = false;
   const wonderRace = s.ents.some((e) => e.kind === 'building' && e.type === 'wonder' && e.hp > 0 && isEnemy(s, p.id, e.owner)) || relicRace(s, p);
-  const due = s.tick >= secs(L.firstAttack) && s.tick >= s.peaceUntil;
-  if (due && !mem.attacking && (fighters.length >= waveSize || (wonderRace && fighters.length >= 4))) {
+  const due = !plan.hold && (plan.wave ? true : s.tick >= secs(L.firstAttack)) && s.tick >= s.peaceUntil;
+  if (due && !mem.attacking && (fighters.length >= waveSize || (wonderRace && fighters.length >= 4) || (plan.allIn && fighters.length >= 12))) {
     issue({ t: 'move', p: p.id, ids: fighters.map((u) => u.id), x: enemy.x, y: enemy.y, amove: true });
     mem.attacking = true;
     mem.wave++;
     return;
   }
-  if (mem.attacking && ready.length >= 4) {
+  if (mem.attacking && ready.length >= (plan.allIn ? 1 : 4)) {
     // Reinforcements join the attack.
     issue({ t: 'move', p: p.id, ids: ready.map((u) => u.id), x: enemy.x, y: enemy.y, amove: true });
     return;
@@ -1100,4 +1113,153 @@ function merchants(s: GameState, v: View, issue: (c: Command) => void): void {
     }
     if (best >= 0) issue({ t: 'route', p: p.id, ids: [u.id], post: best });
   }
+}
+
+// ---- Campaign goals --------------------------------------------------------------------------------
+
+/** How a chapter's goals bend the army's plans: hold at home, attack early with smaller waves, or throw everything in. */
+interface Plan {
+  hold: boolean;
+  /** Wave size when the goals want the rival town gone; 0 when they don't. */
+  wave: number;
+  allIn: boolean;
+  /** The last epoch worth reaching: a chapter's clock is better spent on its goals than on epochs it doesn't ask for. */
+  maxEpoch: number;
+  /** Siege engines to keep when there are walls and a Town Center to break. */
+  siege: number;
+  /** Where the army strikes, when the goals name a building (a rival Town Center). */
+  target: Building | null;
+}
+const NO_PLAN: Plan = { hold: false, wave: 0, allIn: false, maxEpoch: 99, siege: 0, target: null };
+
+/** What trains each unit a goal can ask for. */
+const TRAINED_AT: Partial<Record<UnitType, BuildingType>> = { siege: 'workshop', warship: 'dock', transport: 'dock', bomber: 'airfield', fighter: 'airfield', priest: 'temple', infantry: 'barracks', ranged: 'range', cavalry: 'stable' };
+
+/**
+ * When a computer plays a campaign chapter's own seat (to show a chapter can be won), it works toward
+ * the goals: raises the buildings they name, trains the units they count, holds at home while it
+ * must survive, and attacks early (then with everything as the clock runs down) when the rival town
+ * must fall. Rivals, and every ordinary match, never come here.
+ */
+function chapterGoals(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): Plan {
+  const run = s.scenario;
+  const { p } = v;
+  if (!run || run.result || p.id !== 0) return NO_PLAN;
+  const sc = scenarioById(run.id);
+  if (!sc) return NO_PLAN;
+  const recently = (type: BuildingType, sec: number) => s.tick - (mem.ordered[type] ?? -99999) < secs(sec);
+  const open = sc.objectives.filter((o, i) => !run.done[i] && (!o.bonus || o.kind === 'units' || o.kind === 'build' || o.kind === 'epoch'));
+  // Epochs only as far as a goal (a bonus one too) asks; with no epoch goals, as far as the rivals have got.
+  let maxEpoch = p.epoch;
+  for (const o of open) if (o.kind === 'epoch') maxEpoch = Math.max(maxEpoch, o.n);
+  for (const q of s.players) if (q.team !== p.team && !q.defeated) maxEpoch = Math.max(maxEpoch, q.epoch);
+  const plan: Plan = { hold: false, wave: 0, allIn: false, maxEpoch, siege: 0, target: null };
+  const enemy = enemyHome(s, p);
+  const ex = enemy.x - v.home.x;
+  const ey = enemy.y - v.home.y;
+  const el = Math.sqrt(ex * ex + ey * ey) || 1;
+  const fx = ex / el;
+  const fy = ey / el;
+  for (const o of open) {
+    const [now, goal] = progress(s, o, p.id);
+    if (o.kind === 'survive') plan.hold = true;
+    else if (o.kind === 'destroy') {
+      // Bigger waves for each rival still standing: a lone early wave into two towns only feeds them.
+      const rivals = s.players.filter((q) => q.team !== p.team && !q.defeated).length;
+      plan.wave = 10 + (rivals - 1) * 14 + mem.wave * 2;
+      plan.siege = 4;
+      plan.target = rivalTownCenter(s, p);
+      const left = sc.limit ? sc.limit - s.tick / 20 : Infinity;
+      plan.allIn = sc.limit ? left < sc.limit * 0.45 : false;
+    } else if (o.kind === 'build' && now < goal && o.type) {
+      const type = o.type as BuildingType;
+      if (BUILDINGS[type].epoch > p.epoch) continue;
+      const placed = count(v, type);
+      if (placed >= goal) continue;
+      const cost = buildingCostFor(s, p.id, type);
+      if (type === 'wall') {
+        if (recently('wall', 15)) continue;
+        // A line of wall across the way the rival comes, a little in front of the Town Center.
+        const need = goal - placed + 2;
+        const cx = v.home.x + fx * (11 + (placed > 0 ? 3 : 0));
+        const cy = v.home.y + fy * (11 + (placed > 0 ? 3 : 0));
+        const half = Math.ceil(need / 2);
+        const x0 = Math.floor(cx - fy * half);
+        const y0 = Math.floor(cy + fx * half);
+        const x1 = Math.floor(cx + fy * half);
+        const y1 = Math.floor(cy - fx * half);
+        const all = RES.every((r) => !cost[r] || v.budget[r] >= cost[r]! * need);
+        const crew = v.citizens.filter((u) => !u.inside && u.order.k !== 'build' && !(u.order.k === 'farm' && u.order.phase === 'work')).sort((a, b) => a.id - b.id).slice(0, 4);
+        if (all && crew.length) {
+          issue({ t: 'wall', p: p.id, ids: crew.map((u) => u.id), x0, y0, x1, y1 });
+          for (const r of RES) v.budget[r] -= (cost[r] ?? 0) * need;
+          mem.ordered.wall = s.tick;
+        } else for (const r of RES) v.budget[r] -= (cost[r] ?? 0) * need;
+        continue;
+      }
+      if (recently(type, 25)) {
+        spend(v, cost);
+        continue;
+      }
+      let spot: { tx: number; ty: number } | null;
+      if (type === 'dock') spot = findDockSpot(s, v.home.x, v.home.y, 30);
+      else if (type === 'tower') spot = findSpot(s, type, v.home.x + fx * 8 - fy * (placed % 2 ? 4 : -4), v.home.y + fy * 8 + fx * (placed % 2 ? 4 : -4), 0, 12);
+      else spot = findSpot(s, type, v.home.x, v.home.y, 6, 22);
+      if (!spot || !construct(s, v, mem, type, spot, type === 'tower' ? 3 : 4, issue)) spend(v, cost);
+    } else if (o.kind === 'units' && o.type) {
+      const type = o.type as UnitType;
+      if (unitEpoch(type) > p.epoch) continue;
+      const at = TRAINED_AT[type];
+      if (!at) continue;
+      const where = v.buildings.filter((b) => b.type === at && b.built);
+      if (!where.length) {
+        // Raise what trains it, unless the goal list already does.
+        if (!open.some((q) => q.kind === 'build' && q.type === at) && !count(v, at) && !recently(at, 30) && BUILDINGS[at].epoch <= p.epoch) {
+          const spot = at === 'dock' ? findDockSpot(s, v.home.x, v.home.y, 30) : findSpot(s, at, v.home.x + fx * 6, v.home.y + fy * 6, 0, 18);
+          const cost = buildingCostFor(s, p.id, at);
+          if (!spot || !construct(s, v, mem, at, spot, 4, issue)) spend(v, cost);
+        }
+        continue;
+      }
+      const cost = unitStats(type, p.epoch).cost;
+      // Dear units wait for a town that can pay for them and still grow.
+      if ((cost.wood ?? 0) + (cost.gold ?? 0) + (cost.food ?? 0) > 300 && v.citizens.length < 25) continue;
+      const queued = where.reduce((n, b) => n + b.queue.filter((q) => q.unit === type).length, 0);
+      // Keep a few spare: some will be lost before the count is reached.
+      if (now + queued >= goal + (o.bonus ? 0 : 1)) continue;
+      const b = where.sort((a, c) => a.queue.length - c.queue.length || a.id - c.id)[0];
+      if (b.queue.length < 2 && afford(v, cost) && p.pop < p.cap) {
+        issue({ t: 'train', p: p.id, building: b.id, unit: type });
+        spend(v, cost);
+      } else if (!o.bonus) spend(v, cost);
+    }
+  }
+  if (plan.wave) {
+    plan.hold = false;
+    // Food and wood piling up while the rival town stands: more places to train soldiers.
+    if (v.budget.food > 800 && v.budget.wood > 600 && v.citizens.length >= 30) {
+      for (const type of ['barracks', 'range', 'stable'] as BuildingType[]) {
+        if (count(v, type) >= 4 || recently(type, 30) || BUILDINGS[type].epoch > p.epoch) continue;
+        const spot = findSpot(s, type, v.home.x + fx * 6, v.home.y + fy * 6, 0, 20);
+        if (spot && construct(s, v, mem, type, spot, 3, issue)) break;
+      }
+    }
+  }
+  return plan;
+}
+
+/** The goal's target: the nearest standing Town Center of a rival, one not yet burned first. */
+function rivalTownCenter(s: GameState, p: Player): Building | null {
+  let best: Building | null = null;
+  let bestD = Infinity;
+  const burned = s.scenario?.burned ?? [];
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'towncenter' || !e.built || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
+    const d = (e.x - p.startX) * (e.x - p.startX) + (e.y - p.startY) * (e.y - p.startY) + (burned.includes(e.owner) ? 1e6 : 0);
+    if (d < bestD) {
+      bestD = d;
+      best = e;
+    }
+  }
+  return best;
 }
