@@ -3,6 +3,8 @@
  * same commands on the same seed always give the same match (the basis for lockstep online play).
  */
 
+import type { ScenarioRun } from './campaign';
+
 export type Res = 'food' | 'wood' | 'stone' | 'gold';
 export const RES: readonly Res[] = ['food', 'wood', 'stone', 'gold'];
 export type Cost = Partial<Record<Res, number>>;
@@ -343,13 +345,16 @@ export type GameEvent =
   | { k: 'wonder'; owner: number; id: number; x: number; y: number; ticks: number }
   | { k: 'trade'; owner: number; res: Res; buy: boolean }
   | { k: 'defeated'; owner: number }
-  | { k: 'over'; winner: number; how: 'conquest' | 'wonder' | 'relics' | 'resign' }
+  | { k: 'over'; winner: number; how: 'conquest' | 'wonder' | 'relics' | 'resign' | 'time' | 'scenario' }
   /** A relic picked up, kept in a Temple, or let go where it lies. */
   | { k: 'relic'; id: number; owner: number; what: 'taken' | 'kept' | 'dropped'; x: number; y: number }
   /** One side now keeps every relic (its countdown starts), or no longer does (`team` -1). */
   | { k: 'relicHold'; team: number; ticks: number }
   /** A trader took on its gold at a trading post (`loaded`), or paid it in at its Market (`paid`). */
   | { k: 'caravan'; id: number; owner: number; what: 'loaded' | 'paid'; amount: number; x: number; y: number }
+  /** A scenario's story beat (a raid, a gift) and an objective completed. */
+  | { k: 'story'; title: string; text: string; bad: boolean }
+  | { k: 'objective'; index: number }
   | { k: 'refused'; owner: number; why: string }
   | { k: 'left'; owner: number }
   | { k: 'shot'; owner: number; kind: Shot['kind']; x: number; y: number; air?: boolean };
@@ -403,6 +408,8 @@ export interface GameState {
   ai: Record<number, AiMemory>;
   /** What happened this tick, for sound and effects. Cleared at the start of every tick. */
   events: GameEvent[];
+  /** The campaign scenario being played, or null/absent in an ordinary match. */
+  scenario?: ScenarioRun | null;
   /** -1 while the match goes on; the winning team after. */
   winner: number;
   over: boolean;

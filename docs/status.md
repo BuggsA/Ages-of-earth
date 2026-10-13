@@ -17,18 +17,18 @@ The full list, with the owner's words, is `docs/rulings.md`.
 
 Everything in `README.md`'s "What's in it" was built on 2026-10-12 in one session (branch `claude/beautiful-franklin-6gj8tt`, now `main`): five epochs, six peoples, the economy, seventeen buildings, twenty-six technologies, counters, siege, priests, heroes, walls and the bell, ships, fishing and aircraft, the computer opponent, online rooms, saves, replays, synthesized sound and music.
 
-Since then: **relics** (#4, merged in #5 on 2026-10-13; the save `v` is 2).
+Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders and trading posts (#6, merged in #10; the save `v` is 3), and **the campaign**, The Long Road (#9, from an earlier session's unmerged branch).
 
 | Check | State |
 | --- | --- |
-| Quick tier (`npm run check`) | 74 tests, about 20 s |
+| Quick tier (`npm run check`) | 83 tests, about 20 s |
 | Slow tier (`tests/slow/`) | empty |
 | Browser checks | none automated; the first session tested by hand in headless Chromium |
 | CI (`ci`, `periodic`) | added 2026-10-13; `periodic` starts once `main` is the default branch |
 
 ## In flight
 
-- [#6](https://github.com/BuggsA/Ages-of-earth/issues/6), trade: traders and trading posts (chain 1013-1734, 2/10): branch `claude/6-trade`. Bumps the save `v` to 3.
+- [#9](https://github.com/BuggsA/Ages-of-earth/issues/9), the campaign, The Long Road (chain 1013-1734, 3/10): branch `claude/9-campaign`. No save bump: the chapter's state is optional and older saves load as before.
 
 - [#1](https://github.com/BuggsA/Ages-of-earth/pull/1), repairs for damaged buildings: opened before these rules, with no issue; now targets `main`. Its author couldn't run the typecheck and hadn't tried it in a browser.
 
