@@ -1,5 +1,6 @@
 import { aiStep } from './ai';
 import { hitAnimal, spawnAnimal, updateAnimals } from './animals';
+import { scenarioStep, startScenario } from './campaign';
 import { buildingGuns, updateShots } from './combat';
 import { applyCommand } from './commands';
 import { AURA, CIV_IDS, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
@@ -41,6 +42,8 @@ export interface GameSetup {
   mode?: GameMode;
   /** Seconds a finished wonder must stand to win. */
   wonderSeconds?: number;
+  /** A campaign scenario's id: adds its goals, raids and gifts. */
+  scenario?: string;
 }
 
 const spatials = new WeakMap<GameState, Spatial>();
@@ -82,7 +85,9 @@ export function createGame(setup: GameSetup): GameState {
     events: [],
     winner: -1,
     over: false,
+    scenario: null,
   };
+  if (setup.scenario) startScenario(s, setup.scenario);
   setup.players.forEach((ps, i) => {
     const start = map.starts[i];
     const extra = EPOCH_START_RES[startEpoch];
@@ -375,7 +380,11 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   updateShots(s, sp, (a, damage, x, y) => hitAnimal(s, a, damage, x, y));
   removeDead(s);
   if (s.tick % 4 === 0) updateVision(s);
-  if (s.tick % 20 === 0) checkVictory(s);
+  if (s.tick % 20 === 0) {
+    scenarioStep(s);
+    if (!s.over) checkVictory(s);
+    if (s.scenario && s.over && !s.scenario.result) s.scenario.result = s.winner === s.players[0].team ? 'win' : 'lose';
+  }
   if (s.tick % secs(30) === 0) sample(s);
   s.tick++;
 }

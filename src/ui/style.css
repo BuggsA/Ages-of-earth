@@ -102,7 +102,7 @@ kbd {
 #hud { position: absolute; inset: 0; pointer-events: none; }
 #hud > * { pointer-events: auto; }
 /* Overlays that only show things must never catch the mouse (an invisible banner would eat clicks). */
-#hud > #banner, #hud > #notices, #hud > #paused, #hud > #dragbox, #hud > #timers, #hud > #bottom, #hud > #tooltip { pointer-events: none; }
+#hud > #banner, #hud > #notices, #hud > #paused, #hud > #dragbox, #hud > #timers, #hud > #objectives, #hud > #bottom, #hud > #tooltip { pointer-events: none; }
 #timers .timer { pointer-events: auto; }
 #topbar {
   position: absolute; top: 0; left: 0; right: 0; height: 40px; display: flex; align-items: center; gap: 10px; padding: 0 10px;
@@ -304,3 +304,30 @@ body.online .tip-box { bottom: 330px; }
   #selection .blurb { display: none; }
   .tb-btn { padding: 5px 7px; }
 }
+
+/* Campaign */
+#campaign { pointer-events: auto; background: rgba(10, 14, 22, 0.78); }
+.camp-card { max-width: 560px; width: min(560px, 94vw); max-height: 92vh; overflow-y: auto; }
+.chapters { display: grid; gap: 8px; margin: 14px 0; }
+.chapter { display: flex; align-items: center; gap: 12px; text-align: left; padding: 10px 14px; background: #1b2030; color: var(--ink); border: 1px solid var(--edge-soft); border-radius: 10px; cursor: pointer; font-family: 'Nunito', sans-serif; }
+.chapter:hover:not(:disabled) { border-color: var(--gold); background: #232a40; }
+.chapter.locked { opacity: 0.5; cursor: not-allowed; }
+.ch-num { font: 800 24px 'Cinzel', serif; color: var(--gold); width: 28px; text-align: center; }
+.ch-body { flex: 1; display: grid; }
+.ch-body b { font-weight: 800; font-size: 17px; }
+.ch-body small { color: var(--muted); font-weight: 700; }
+.ch-stars { color: var(--muted); letter-spacing: 2px; font-size: 18px; }
+.ch-stars.won { color: var(--gold); }
+.brief { font-weight: 700; line-height: 1.5; color: var(--ink); text-align: left; margin: 12px 0; }
+.goals-h { margin: 8px 0 4px; font: 800 15px 'Cinzel', serif; color: var(--gold); text-align: left; }
+.goals { text-align: left; margin: 0 0 8px; padding-left: 22px; font-weight: 700; line-height: 1.5; }
+.goals li.bonus { color: var(--gold-2); }
+.objectives { position: absolute; top: 46px; left: 10px; max-width: 290px; padding: 8px 12px; background: rgba(14, 18, 28, 0.82); border: 1px solid var(--edge-soft); border-radius: 10px; font: 700 13px 'Nunito', sans-serif; color: var(--ink); }
+.objectives ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 3px; }
+.objectives li.done { color: #9fe08a; text-decoration: line-through; opacity: 0.8; }
+.objectives li.bonus:not(.done) { color: var(--gold-2); }
+.objectives .tick { display: inline-block; width: 18px; }
+.obj-title { font: 800 14px 'Cinzel', serif; color: var(--gold); }
+.obj-limit { margin-top: 6px; color: var(--muted); }
+.obj-limit.bad { color: var(--bad); }
+.end-stars { font-size: 38px; color: var(--gold); letter-spacing: 6px; text-align: center; margin: 4px 0 8px; }
