@@ -56,7 +56,7 @@ const TILE_OF: Record<Res, number> = { food: R_BERRY, wood: R_TREE, stone: R_STO
 const TECH_ORDER: TechId[] = [
   'plow', 'axes', 'wheelbarrow', 'picks', 'forging', 'scaleArmor', 'fletching', 'husbandry', 'irrigation', 'saws', 'shafts', 'handcart',
   'ironCasting', 'chainMail', 'bodkin', 'masonry', 'theology', 'conscription', 'blastFurnace', 'plateArmor', 'chemistry',
-  'gillnets', 'shipwright', 'steamEngine', 'rifling', 'aviation', 'caravan', 'banking',
+  'gillnets', 'shipwright', 'steamEngine', 'rifling', 'aviation', 'caravan', 'banking', 'pilgrimage',
 ];
 const ECONOMY: TechId[] = ['plow', 'axes', 'wheelbarrow', 'picks', 'irrigation', 'saws', 'shafts', 'handcart', 'gillnets', 'steamEngine'];
 
