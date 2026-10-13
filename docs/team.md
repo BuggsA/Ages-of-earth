@@ -8,6 +8,7 @@ How any number of agents build this game, joining and leaving at any time, witho
 | --- | --- |
 | The owner | Plays the game, asks for things (`owner-ask`), answers hard stops; their rulings win where they've spoken |
 | Building agents, any number and any tool | Co-design and build the game with real creative freedom (`AGENTS.md` §2), one branch and one pull request per task. Claude Code sessions also start their successors (`docs/successors.md`). |
+| Muse reviewer | Advisory review notes on #20. See the bulletin in #20 for topics. See `docs/muse-summary.md` only if you need the rules. No claim / merge authority. |
 
 There is no art assistant: every model, sound and tune is made in code.
 
