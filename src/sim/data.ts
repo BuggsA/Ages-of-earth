@@ -853,3 +853,10 @@ export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, 
  * priests and traders are exempt, and so is everyone during a peace treaty. A town centre or tower raised nearby gives a foothold (its border).
  */
 export const ATTRITION = { every: 5, deep: 9, loss: 0.02 };
+
+/**
+ * The computer reads the borders (#132 s4): a wave out in enemy land, past its own team's supply, whose
+ * soldiers have worn to under `weary` of their health on average, with no enemy within `calm` tiles, falls
+ * back to the muster to heal and regroup instead of dying to attrition. Not when it is all in, or racing a wonder.
+ */
+export const AI_RAID = { weary: 0.5, calm: 7 };

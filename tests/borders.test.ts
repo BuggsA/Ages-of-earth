@@ -59,3 +59,22 @@ describe('attrition', () => {
     expect(deep.hp).toBe(hd);
   });
 });
+
+describe('the computer reads borders', () => {
+  it('pulls back a worn wave deep in enemy land, not a healthy one or one still fighting', async () => {
+    const { wornDeep } = await import('../src/sim/ai');
+    const { spawnUnit } = await import('../src/sim/world');
+    const s = game();
+    const b = s.players[1];
+    const wave = [0, 1, 2].map((i) => spawnUnit(s, 0, 'infantry', b.startX + 4, b.startY + 4 + i));
+    expect(wornDeep(s, s.players[0], wave)).toBe(false);
+    for (const u of wave) u.hp *= 0.3;
+    expect(wornDeep(s, s.players[0], wave)).toBe(true);
+    const foe = spawnUnit(s, 1, 'infantry', b.startX + 6, b.startY + 5);
+    expect(wornDeep(s, s.players[0], wave)).toBe(false);
+    foe.hp = 0;
+    const home = [0, 1].map((i) => spawnUnit(s, 0, 'infantry', s.players[0].startX + 2, s.players[0].startY + 2 + i));
+    for (const u of home) u.hp *= 0.3;
+    expect(wornDeep(s, s.players[0], home)).toBe(false);
+  });
+});

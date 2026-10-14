@@ -1,5 +1,5 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, AI_LEVELS, AI_WEB, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, TECHS, WORKS, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_LEVELS, AI_RAID, AI_WEB, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, TECHS, WORKS, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Player, Res, Ruin, TechId, TradePost, Unit, UnitType } from './types';
@@ -9,7 +9,8 @@ import { carriedBy } from './relics';
 import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple } from './units';
 import { goalForPost, nearestMarket, portSpot, tripGold } from './trade';
 import { findRoute } from './path';
-import { isEnemy } from './world';
+import { isEnemy, maxHp } from './world';
+import { borderMap, suppliedAt } from './borders';
 import { workProblem } from './works';
 import { progress, scenarioById } from './campaign';
 
@@ -1283,6 +1284,11 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const onAttack = fighters.filter((u) => u.order.k === 'attack' || (u.order.k === 'move' && u.order.amove));
   if (mem.attacking && onAttack.length === 0) mem.attacking = false;
   const wonderRace = s.ents.some((e) => e.kind === 'building' && e.type === 'wonder' && e.hp > 0 && isEnemy(s, p.id, e.owner)) || relicRace(s, p);
+  if (mem.attacking && !plan.allIn && !wonderRace && onAttack.length && wornDeep(s, p, onAttack)) {
+    issue({ t: 'move', p: p.id, ids: fighters.map((u) => u.id), x: mem.muster.x, y: mem.muster.y });
+    mem.attacking = false;
+    return;
+  }
   const due = !plan.hold && (plan.wave ? true : s.tick >= secs(L.firstAttack)) && s.tick >= s.peaceUntil;
   if (due && !mem.attacking && (fighters.length >= waveSize || (wonderRace && fighters.length >= 4) || (plan.allIn && fighters.length >= 12))) {
     issue({ t: 'move', p: p.id, ids: fighters.map((u) => u.id), x: enemy.x, y: enemy.y, amove: true });
@@ -1326,6 +1332,28 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     return ox * ox + oy * oy > 36 && u.order.k === 'idle';
   });
   if (strays.length) issue({ t: 'move', p: p.id, ids: strays.map((u) => u.id), x: mem.muster.x, y: mem.muster.y });
+}
+
+/** A wave worn down deep in enemy land, out of reach of its own supply and clear of any fight (#132 s4). */
+export function wornDeep(s: GameState, p: Player, wave: Unit[]): boolean {
+  let hp = 0;
+  let full = 0;
+  let cx = 0;
+  let cy = 0;
+  for (const u of wave) {
+    hp += u.hp;
+    full += maxHp(s, u);
+    cx += u.x;
+    cy += u.y;
+  }
+  if (hp >= full * AI_RAID.weary) return false;
+  cx /= wave.length;
+  cy /= wave.length;
+  const own = borderMap(s);
+  const here = own[Math.floor(cy) * s.w + Math.floor(cx)];
+  if (here < 0 || !isEnemy(s, p.id, here) || suppliedAt(s, own, p.team, Math.floor(cx), Math.floor(cy))) return false;
+  const r2 = AI_RAID.calm * AI_RAID.calm;
+  return !s.ents.some((e) => e.kind === 'unit' && e.hp > 0 && !e.inside && isEnemy(s, p.id, e.owner) && (e.x - cx) * (e.x - cx) + (e.y - cy) * (e.y - cy) <= r2);
 }
 
 /** Relics on the ground, for anyone to take. */
