@@ -230,3 +230,5 @@ Built: the computer judges a trade road by the path its traders actually walk, n
 **Why I love it:** team games had no reason to trade side by side; now a Market is worth building even for the partner whose posts are far, and a raid on one trader costs the whole team. It is the "trade with an ally's Market" idea in the trade notes, in its smallest form.
 
 **Next:** let a trader choose an ally's Market as its home (AoE2's way, so far allies' roads pay by distance); the computer ally building a Market when a teammate trades. Number added: `TRADE.ally = 0.25` in `data.ts`. Unit-tested only; not seen in a browser.
+
+**Follow-up, same day:** a player with no Market of their own can now route traders from an ally's (`homeMarket` in `trade.ts`): the trader's owner is paid in full by distance from that Market and its owner takes the usual quarter. So a Market-less partner can still join the trade, and the player with the Market becomes worth protecting. Still open: the computer ally building a Market (lane ai is held until #36). Unit-tested only.
