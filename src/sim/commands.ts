@@ -1,7 +1,8 @@
-import { BUILDINGS, EPOCHS, LAST_EPOCH, MARKET, RES_LABEL, TECHS, UNITS, domainOf, unitEpoch, unitStats } from './data';
+import { BUILDINGS, EPOCHS, MARKET, RES_LABEL, TECHS, UNITS, domainOf, unitEpoch, unitStats } from './data';
 import { peace } from './combat';
 import { placeProblem, stampBuilding, walkable } from './grid';
-import { buildingCostFor, techCostFor, techProblem } from './stats';
+import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
+import { roadProblem, roadTo, trainsAt } from './ages';
 import type { Building, BuildingType, Command, Cost, GameState, Order, Player, Unit } from './types';
 import { RES, R_FISH, R_NONE } from './types';
 import { RES_OF_TILE, cargoRoom, freeFarm, garrisonRoom, giveOrder, landing, setOrder, ungarrison } from './units';
@@ -438,12 +439,11 @@ export function applyCommand(s: GameState, c: Command): void {
     case 'train': {
       const b = myBuilding(s, c.p, c.building);
       if (!b || !b.built) return;
-      const def = BUILDINGS[b.type];
-      if (!def.trains.includes(c.unit) || !UNITS[c.unit]) return;
+      if (!trainsAt(p, b.type).includes(c.unit) || !UNITS[c.unit]) return;
       if (unitEpoch(c.unit) > p.epoch) return refuse(s, c.p, `Needs the ${EPOCHS[unitEpoch(c.unit)].name}`);
       if (b.queue.length >= MAX_QUEUE) return refuse(s, c.p, 'The queue is full');
       if (c.unit === 'hero' && heroBusy(s, c.p)) return refuse(s, c.p, 'You can lead with one hero at a time');
-      const cost = unitStats(c.unit, p.epoch).cost;
+      const cost = trainCostFor(s, c.p, c.unit, b.type);
       const short = shortfall(p, cost);
       if (short) return refuse(s, c.p, short);
       pay(p, cost);
@@ -468,8 +468,10 @@ export function applyCommand(s: GameState, c: Command): void {
       const b = myBuilding(s, c.p, c.building);
       if (!b) return;
       if (c.index === -1 && b.advance >= 0) {
-        refund(p, EPOCHS[p.epoch + 1].cost);
+        const road = roadTo(p, b.advanceTo);
+        if (road) refund(p, road.cost);
         b.advance = -1;
+        delete b.advanceTo;
         return;
       }
       const item = b.queue[c.index];
@@ -481,13 +483,18 @@ export function applyCommand(s: GameState, c: Command): void {
     case 'advance': {
       const b = myBuilding(s, c.p, c.building);
       if (!b || !b.built || b.type !== 'towncenter') return;
-      if (p.epoch >= LAST_EPOCH) return;
+      const road = roadTo(p, c.to);
+      if (!road) return;
       if (s.ents.some((e) => e.kind === 'building' && e.owner === c.p && e.advance >= 0)) return refuse(s, c.p, 'Already advancing');
-      const cost = EPOCHS[p.epoch + 1].cost;
+      const problem = roadProblem(s, p, road);
+      if (problem) return refuse(s, c.p, problem);
+      const cost = road.cost;
       const short = shortfall(p, cost);
       if (short) return refuse(s, c.p, short);
       pay(p, cost);
       b.advance = 0;
+      // Without a target the Town Center follows the main road, and saves as it always has.
+      if (c.to) b.advanceTo = road.to;
       break;
     }
     case 'rally': {

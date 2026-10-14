@@ -1,4 +1,4 @@
-import type { BuildingType, CivId, Cost, Difficulty, Domain, MapSize, MapType, Res, TechId, UnitType } from './types';
+import type { AgeId, BuildingType, CivId, Cost, Difficulty, Domain, MapSize, MapType, Res, TechId, UnitType, PlayerStats } from './types';
 
 /** Every number in the game lives here. */
 
@@ -23,6 +23,79 @@ export const EPOCHS: Epoch[] = [
   { name: 'Industrial Age', short: 'Industrial', cost: { food: 1400, gold: 900, stone: 400 }, time: 80, blurb: 'Rifles, field guns, ironclads, and the first aeroplanes.' },
 ];
 export const LAST_EPOCH = EPOCHS.length - 1;
+
+/**
+ * Ages as a web (#37). An age is where a people stands; its tier is the epoch that every
+ * epoch-based number reads (unit versions, building styles and toughness, technologies, walls), so
+ * a side age's armies keep pace. The trunk is the five epochs above, the dependable road on every
+ * map; side ages branch off it, change how a people works while it stays there, and rejoin it.
+ */
+export interface Age {
+  name: string;
+  short: string;
+  tier: number;
+  blurb: string;
+  /** What changes while a people is in this age, as civilizations and technologies change things. */
+  add?: Partial<Mods>;
+  mul?: Partial<Mods>;
+  /**
+   * Soldiers hired for gold alone at a building: which lines, gold per point of their usual
+   * price (rounded to 5), and the share of their usual training time.
+   */
+  hire?: { at: BuildingType; units: UnitType[]; gold: number; time: number };
+  /** Foot, bow and horse trained the usual way cost this much more. */
+  levy?: number;
+}
+
+export const TRUNK: AgeId[] = ['stone', 'bronze', 'middle', 'gunpowder', 'industrial'];
+
+const trunkAge = (e: number): Age => ({ name: EPOCHS[e].name, short: EPOCHS[e].short, tier: e, blurb: EPOCHS[e].blurb });
+
+export const AGES: Record<AgeId, Age> = {
+  stone: trunkAge(0),
+  bronze: trunkAge(1),
+  middle: trunkAge(2),
+  gunpowder: trunkAge(3),
+  industrial: trunkAge(4),
+  merchant: {
+    name: 'Age of Merchants',
+    short: 'Merchant',
+    tier: 2,
+    blurb: 'Guilds, banks and hired swords: the Market hires soldiers for gold, trade pays more, and levies cost dear.',
+    mul: { tradeGold: 1.25 },
+    hire: { at: 'market', units: ['infantry', 'ranged', 'cavalry'], gold: 1.2, time: 0.5 },
+    levy: 1.2,
+  },
+};
+
+/** A road from one age to another, taken at a Town Center. */
+export interface Road {
+  from: AgeId;
+  to: AgeId;
+  cost: Cost;
+  time: number;
+  /** Shown at the Town Center only once the player has one of these, the clue that the road is there. */
+  clue?: BuildingType;
+  /** A deed the road needs beyond its price: a tally from the player's stats. */
+  deed?: { stat: keyof PlayerStats; n: number; text: string };
+  /** What taking it means, for the tooltip (trunk roads use the age's blurb). */
+  blurb?: string;
+}
+
+export const ROADS: Road[] = [
+  ...TRUNK.slice(1).map((to, i): Road => ({ from: TRUNK[i], to, cost: EPOCHS[i + 1].cost, time: EPOCHS[i + 1].time })),
+  {
+    from: 'bronze',
+    to: 'merchant',
+    cost: { food: 500, wood: 200, gold: 300 },
+    time: 50,
+    clue: 'market',
+    deed: { stat: 'traded', n: 400, text: 'Your traders bring home 400 gold' },
+    blurb: 'Instead of the Middle Ages: the same soldiers and technologies, but the Market hires foot, bow and horse for gold alone, in half the time; trade pays 25% more; soldiers trained the usual way cost 20% more. Only from the Bronze Age.',
+  },
+  { from: 'merchant', to: 'gunpowder', cost: { food: 800, gold: 900, stone: 100 }, time: 65, blurb: 'Rejoin the main road: the merchant fortune buys its way into gunpowder (more gold and less stone than from the Middle Ages).' },
+  { from: 'merchant', to: 'middle', cost: { food: 300, stone: 150 }, time: 30, blurb: 'Settle down: leave the merchant life for the Middle Ages, no hiring and no levy price.' },
+];
 
 export type UnitClass = 'citizen' | 'infantry' | 'ranged' | 'cavalry' | 'siege' | 'priest' | 'hero' | 'ship' | 'fighter' | 'bomber' | 'trader';
 

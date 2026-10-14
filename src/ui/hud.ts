@@ -2,11 +2,12 @@ import { scenarioById } from '../sim/campaign';
 import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
-import { VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, SIGNATURES, EPOCHS, LAST_EPOCH, MARKET, RELIC, REPAIR_SHARE, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { AGES, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, SIGNATURES, EPOCHS, MARKET, RELIC, REPAIR_SHARE, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { marketOf, nearestMarket, postAt, tripGold } from '../sim/trade';
-import { buildingCostFor, buildingMaxHp, statsFor, techCostFor, techProblem } from '../sim/stats';
+import { buildingCostFor, buildingMaxHp, statsFor, techCostFor, techProblem, trainCostFor, trainTimeFor } from '../sim/stats';
+import { ageDef, ageOf, deedProgress, isHire, mainRoad, roadKnown, roadProblem, roadTo, roadsFrom, trainsAt } from '../sim/ages';
 import type { Building, BuildingType, Command, Cost, Ent, GameState, Player, Stance, TechId, TradePost, Unit } from '../sim/types';
 import { RES, R_BERRY, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
@@ -236,9 +237,11 @@ export class Hud {
     const p = s.players[viewer];
     const tc = s.ents.find((e): e is Building => e.kind === 'building' && e.owner === viewer && e.advance >= 0);
     const idle = s.ents.filter((e) => e.kind === 'unit' && e.owner === viewer && e.type === 'citizen' && e.order.k === 'idle').length;
-    const adv = tc ? Math.floor((tc.advance / secs(EPOCHS[p.epoch + 1].time)) * 100) : -1;
+    const road = tc ? roadTo(p, tc.advanceTo) : undefined;
+    const adv = road ? Math.floor((tc!.advance / secs(road.time)) * 100) : -1;
+    const age = ageDef(p);
     const scores = s.players.map((q) => scoreOf(s, q));
-    const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${p.pop}/${p.cap}|${p.epoch}|${adv}|${idle}|${speed}|${scores.join(',')}`;
+    const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${p.pop}/${p.cap}|${ageOf(p)}|${adv}|${idle}|${speed}|${scores.join(',')}`;
     this.clockEl.textContent = fmtTime(s.tick);
     this.timers(s, viewer);
     this.objectives(s);
@@ -252,9 +255,9 @@ export class Hud {
       .map((q, i) => `<div><span class='swatch' style='background:${q.color}'></span>${q.name}${q.defeated ? ' (out)' : ''}: ${q.id === viewer || q.team === p.team ? scores[i] : '?'}</div>`)
       .join('');
     this.resEl.innerHTML += `<div class="res civ" data-tip="<b>${civ.name}</b>${civ.blurb}<br><i>${SIGNATURES[p.civ].blurb}</i>">${civ.name}</div><div class="res score" data-tip="<b>Score</b>Gathering, fighting, building, research and epochs.${board}">⭐${scores[viewer]}</div>`;
-    this.epochEl.innerHTML = tc
-      ? `${EPOCHS[p.epoch].name} <span class="bar" data-tip="<b>Advancing to the ${EPOCHS[p.epoch + 1].name}</b>${adv}%"><i style="width:${adv}%"></i></span>`
-      : `<span data-tip="<b>${EPOCHS[p.epoch].name}</b>${EPOCHS[p.epoch].blurb}${p.epoch < LAST_EPOCH ? `<br><span class='hint'>Advance at a Town Center.</span>` : ''}">${EPOCHS[p.epoch].name}</span>`;
+    this.epochEl.innerHTML = road
+      ? `${age.name} <span class="bar" data-tip="<b>Advancing to the ${AGES[road.to].name}</b>${adv}%"><i style="width:${adv}%"></i></span>`
+      : `<span data-tip="<b>${age.name}</b>${age.blurb}${mainRoad(p) ? `<br><span class='hint'>Advance at a Town Center.</span>` : ''}">${age.name}</span>`;
     this.idleEl.textContent = `Idle ${idle}`;
     this.idleEl.classList.toggle('alert', idle > 0);
     document.getElementById('speed-btn')!.textContent = `${speed}×`;
@@ -315,8 +318,8 @@ export class Hud {
         <div class="blurb">${kind === R_FISH ? 'Select fishing boats (from a Dock) and right-click it to fish.' : 'Select citizens and right-click it to gather.'}</div></div>`;
     } else if (!ents.length) {
       const p = s.players[viewer];
-      sig = `none:${p.epoch}`;
-      html = `<div class="empty-sel"><div class="sel-name">${EPOCHS[p.epoch].name}</div>
+      sig = `none:${ageOf(p)}`;
+      html = `<div class="empty-sel"><div class="sel-name">${ageDef(p).name}</div>
         <div>Left-click to select, drag to select many. Right-click to give orders.</div>
         <div><kbd>.</kbd> finds an idle citizen, <kbd>,</kbd> your army, <kbd>H</kbd> your Town Center; <kbd>B</kbd> and <kbd>V</kbd> build with citizens selected.</div>
         <div>Hold <kbd>Shift</kbd> while giving orders to queue them up.</div></div>`;
@@ -418,13 +421,14 @@ export class Hud {
     let status = '';
     let queue = '';
     if (!b.built) status = `Under construction: ${Math.floor(b.progress * 100)}%`;
-    else if (b.advance >= 0) {
-      const pct = Math.floor((b.advance / secs(EPOCHS[p.epoch + 1].time)) * 100);
-      status = `Advancing to the ${EPOCHS[p.epoch + 1].name}: ${pct}%`;
-      if (mine) queue = `<div class="queue"><div class="qitem" data-cancel="${b.id}:-1" data-tip="<b>${EPOCHS[p.epoch + 1].name}</b>Click to cancel (full refund)."><span class="qglyph">⏫</span><div class="prog"><i style="width:${pct}%"></i></div></div></div>`;
+    else if (b.advance >= 0 && roadTo(p, b.advanceTo)) {
+      const road = roadTo(p, b.advanceTo)!;
+      const pct = Math.floor((b.advance / secs(road.time)) * 100);
+      status = `Advancing to the ${AGES[road.to].name}: ${pct}%`;
+      if (mine) queue = `<div class="queue"><div class="qitem" data-cancel="${b.id}:-1" data-tip="<b>${AGES[road.to].name}</b>Click to cancel (full refund)."><span class="qglyph">⏫</span><div class="prog"><i style="width:${pct}%"></i></div></div></div>`;
     } else if (b.queue.length) {
       const it = b.queue[0];
-      const need = it.tech ? secs(TECHS[it.tech].time) : secs(statsFor(s, b.owner, it.unit!).time);
+      const need = it.tech ? secs(TECHS[it.tech].time) : secs(trainTimeFor(s, b.owner, it.unit!, b.type));
       const pct = Math.min(100, Math.floor((it.done / need) * 100));
       status = it.tech ? `Researching ${TECHS[it.tech].name}: ${pct}%` : it.done > need ? 'Waiting for room: build houses' : `Training ${statsFor(s, b.owner, it.unit!).name}: ${pct}%`;
       if (mine)
@@ -528,18 +532,25 @@ export class Hud {
       const full = b.queue.length >= MAX_QUEUE;
       if (b.built) {
         // The Market's Q W E and A S D buy and sell: its trader and technologies go on T and R F.
-        const unitKeys = b.type === 'towncenter' ? ['Q', 'E'] : b.type === 'market' ? ['T'] : ['Q', 'W', 'E'];
-        def.trains.forEach((unit, i) => {
+        // Soldiers an age hires here (the merchants' Market) go on Z X C.
+        const unitKeys = b.type === 'towncenter' ? ['Q', 'E'] : b.type === 'market' ? ['T', 'Z', 'X', 'C'] : ['Q', 'W', 'E'];
+        trainsAt(p, b.type).forEach((unit, i) => {
           const st = statsFor(s, viewer, unit);
+          const hired = isHire(p, b.type, unit);
+          const cost = trainCostFor(s, viewer, unit, b.type);
+          const time = trainTimeFor(s, viewer, unit, b.type);
+          const levied = !hired && JSON.stringify(cost) !== JSON.stringify(st.cost);
           const locked = unitEpoch(unit) > p.epoch;
-          const short = shortfall(p, st.cost);
+          const short = shortfall(p, cost);
           const hero = unit === 'hero' && (heroBusy(s, viewer) || b.queue.some((q) => q.unit === 'hero'));
           cmds.push({
             key: unitKeys[i],
             pic: unitPicture(unit, Math.max(p.epoch, unitEpoch(unit)), p.color),
-            title: `Train ${st.name}`,
-            desc: `${st.blurb} Takes ${Math.round(st.time)}s.`,
-            cost: st.cost,
+            title: `${hired ? 'Hire' : 'Train'} ${st.name}`,
+            desc: hired
+              ? `A mercenary, paid in gold alone and ready in ${Math.round(time)}s. ${st.blurb}`
+              : `${st.blurb} Takes ${Math.round(time)}s.${levied ? ` Levies cost ${Math.round((ageDef(p).levy! - 1) * 100)}% more in the ${ageDef(p).name}.` : ''}`,
+            cost,
             ok: !locked && !short && !full && !busy && !hero,
             why: locked ? `Needs the ${EPOCHS[unitEpoch(unit)].name}` : busy ? 'Busy advancing to the next epoch' : hero ? 'You can lead with one hero at a time' : full ? 'The queue is full' : (short ?? undefined),
             count: b.queue.filter((q) => q.unit === unit).length || undefined,
@@ -549,25 +560,35 @@ export class Hud {
             },
           });
         });
-        if (b.type === 'towncenter' && p.epoch < LAST_EPOCH) {
-          const next = EPOCHS[p.epoch + 1];
+        if (b.type === 'towncenter') {
+          // Every known road out of this age (#37): the main road on W, side roads on Y and X.
           const advancing = s.ents.some((e) => e.kind === 'building' && e.owner === viewer && e.advance >= 0);
-          const short = shortfall(p, next.cost);
-          cmds.push({
-            key: 'W',
-            pic: '',
-            glyph: '⏫',
-            title: `Advance to the ${next.name}`,
-            desc: `${next.blurb} Takes ${next.time}s. Every unit re-arms and every building is rebuilt in the new style.`,
-            cost: next.cost,
-            ok: !advancing && !short && b.queue.length === 0,
-            on: b.advance >= 0,
-            why: advancing ? 'Already advancing' : b.queue.length ? 'Finish training first' : (short ?? undefined),
-            run: () => {
-              this.act.issue({ t: 'advance', p: viewer, building: b.id });
-              this.act.sound('queue');
-            },
-          });
+          const main = mainRoad(p);
+          const sideKeys = ['Y', 'X'];
+          for (const road of roadsFrom(p)) {
+            if (!roadKnown(s, p, road)) continue;
+            const to = AGES[road.to];
+            const isMain = road === main;
+            const problem = roadProblem(s, p, road);
+            const short = shortfall(p, road.cost);
+            const deed = deedProgress(p, road);
+            const toward = to.tier > p.epoch ? 'Advance to' : to.tier < p.epoch ? 'Step back to' : 'Turn to';
+            cmds.push({
+              key: isMain ? 'W' : (sideKeys.shift() ?? ''),
+              pic: '',
+              glyph: isMain ? '⏫' : '🔀',
+              title: `${toward} the ${to.name}`,
+              desc: `${road.blurb ?? to.blurb}${deed ? `<br>${road.deed!.text}: ${Math.min(deed.have, deed.need)}/${deed.need}.` : ''} Takes ${road.time}s. Every unit re-arms and every building is rebuilt in the new style.`,
+              cost: road.cost,
+              ok: !advancing && !problem && !short && b.queue.length === 0,
+              on: b.advance >= 0 && roadTo(p, b.advanceTo) === road,
+              why: advancing ? 'Already advancing' : b.queue.length ? 'Finish training first' : (problem ?? short ?? undefined),
+              run: () => {
+                this.act.issue({ t: 'advance', p: viewer, building: b.id, to: road.to });
+                this.act.sound('queue');
+              },
+            });
+          }
         }
         // Technologies: the next step of each line this building teaches.
         const techKeys = b.type === 'market' ? ['R', 'F'] : def.trains.length ? ['A', 'S', 'D', 'F', 'G'] : ['Q', 'W', 'E', 'R', 'T'];
