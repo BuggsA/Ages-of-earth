@@ -93,6 +93,7 @@ npm test           # rules, AI, saving and determinism tests (Vitest)
 npm run test:slow  # the slow tests in tests/slow/, which CI runs daily
 npm run build      # typecheck (game and worker) + production build into dist/
 npx tsx scripts/sim.ts 3 medium 30   # a headless computer-vs-computer match, minute by minute
+npx tsx scripts/seed-atlas.ts --size small --bog --ruin lore,map   # find seeds with bog iron, ruins and the like (#80)
 ```
 
 Online play needs the Worker. To try it on your machine: `npm run build && npx wrangler dev`, then open http://localhost:8787 in two browser windows (one of them private, so each has its own player id). With `npm run dev` running as well, the dev server forwards `/api` to `wrangler dev`.
