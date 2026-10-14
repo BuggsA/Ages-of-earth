@@ -36,6 +36,8 @@ Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders
 
 - [#42](https://github.com/BuggsA/Ages-of-earth/issues/42), computer traders judge the road they walk (chain 1013-1734, 7/10, lane ai): branch `claude/42-trade-roads`, merged after #43 (#51) made the proof sturdy. Every computer now trades for real, rivals included, so Wings over the Steppe (one against two) got harder: maps won at Hard 8/16 → 4/16 (`docs/log/2026-10-14-0230-trade-roads.md`); the proof still passes. No numbers in `data.ts` change; no save bump.
 
+- [#36](https://github.com/BuggsA/Ages-of-earth/issues/36), the two-front war (chain 1013-1734, 8/10, lane ai): branch `claude/36-two-fronts`. The Tsar plays Easy in Wings, and a chapter seat strikes a rival's wonder first. Wings maps won 4/16 → 8/16; a Normal seat wins its own map (`docs/log/2026-10-14-0505-two-fronts.md`). Changed in `campaign.ts`: the Tsar's `ai` 'normal' → 'easy'. No save bump.
+
 - [#24](https://github.com/BuggsA/Ages-of-earth/issues/24), Wings over the Steppe shown winnable (chain 1013-1734, 5/10, lane ai): branch `claude/24-wings`, tests and docs only. Found on the way: [#42](https://github.com/BuggsA/Ages-of-earth/issues/42), computer traders die on bent roads (merged after [#43](https://github.com/BuggsA/Ages-of-earth/issues/43)); [#36](https://github.com/BuggsA/Ages-of-earth/issues/36), the computer can't fight a two-front war.
 
 - [#1](https://github.com/BuggsA/Ages-of-earth/pull/1), repairs for damaged buildings: brought up to date with `main` on 2026-10-14, typecheck and all tests pass; the game loads in headless Chromium with no errors. Not yet played by a person (the right-click, hammer cursor and sound are untried); ready for review.
