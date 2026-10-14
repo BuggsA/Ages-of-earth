@@ -100,6 +100,8 @@ export class View {
   private perches = new Perches();
   private owlLevel = 0;
   private nextHoot = 12;
+  private nextGull = 8;
+  private dayLevel = 0;
   private weather = new Weather();
   /** How far the haze lets the view reach today (1 on a clear day). */
   private reach = 1;
@@ -278,6 +280,7 @@ export class View {
     this.roosts.setDusk(l.moon, this.weather.day.kind === 'clear');
     this.perches.setNight(l.moon, this.weather.day.kind === 'clear');
     this.owls.setNight(l.moon, this.weather.day.kind === 'clear');
+    this.dayLevel = this.weather.day.kind === 'clear' ? Math.max(0, 1 - l.moon * 3) : 0;
     this.owlLevel = Owls.level(l.moon, this.weather.day.kind === 'clear');
     // Windows and torches light up as the sun sets: the old strength by day, near double by night.
     glowUniform.uGlow.value = 0.9 + 1.2 * Math.min(1, l.moon + (1 - l.sun) * 0.9 + (1 - m.sky) * 0.3);
@@ -380,6 +383,12 @@ export class View {
     if (this.owlLevel > 0.3 && this.time > this.nextHoot) {
       this.nextHoot = this.time + 18 + Math.random() * 30;
       this.onCue?.('owl', Math.random() * 1.6 - 0.8, 0.5);
+    }
+    // By day, within sight of open water, a gull now and then.
+    if (this.dayLevel > 0.3 && this.time > this.nextGull) {
+      this.nextGull = this.time + 9 + Math.random() * 16;
+      const s = this.state;
+      if (s && this.nearWater(s)) this.onCue?.('gull', Math.random() * 1.4 - 0.7, 0.45);
     }
     this.roosts.update(this.time, this.ruins.standingAt, this.rig.target, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
     this.perches.update(this.time, this.ruins.standingAt, this.rig.target, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
@@ -864,6 +873,17 @@ export class View {
   /** A world point on the ground (or the water) at a map position, lifted a little. */
   private ground(s: GameState, x: number, y: number, lift: number): THREE.Vector3 {
     return new THREE.Vector3(x, Math.max(WATER_Y, heightAt(s, x, y)) + lift, y);
+  }
+
+  /** Whether open water lies within a few tiles of the view's centre (a coast, a lake, the sea). */
+  private nearWater(s: GameState): boolean {
+    const r = Math.max(6, this.rig.distance * 0.5);
+    const { x, z } = this.rig.target;
+    for (let i = 0; i < 8; i++) {
+      const a = i * 0.785;
+      if (this.wet(s, x + Math.cos(a) * r, z + Math.sin(a) * r) || this.wet(s, x + Math.cos(a) * r * 0.5, z + Math.sin(a) * r * 0.5)) return true;
+    }
+    return this.wet(s, x, z);
   }
 
   /** Whether a map point is open water. */

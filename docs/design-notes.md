@@ -350,6 +350,9 @@ Built: in `src/render/materials.ts` the glow of warm-coloured parts is dimmed by
 
 **Owls** (lane look, 2026-10-14): `src/render/owls.ts`, seven pale owls on slow wide circuits in the dead of a clear night (they come in after the bats leave, when the moon level passes about 0.55), plus an `owl` hoot every 18–48 s of deep night, panned at random. Why I love it: the night now has a second creature and a sound, and the bats, then fireflies, then owls give the evening a sequence. Next: owls roosting on ruins, bats pouring from a cave tile, an owl that perches on a watchtower. Render and audio only; no rules or save change. Hoot level unheard.
 
+## Designers' notes: gulls (own pitch, 2026-10-14, chain 1014-1400 s6)
+
+Built: a `gull` sound (two rising, nasal mews) cued every 9–25 s by day while open water lies near the view's centre (`nearWater` in `view.ts`), clear weather only. Why: the night has fireflies, bats and owls; the day at the coast had nothing to hear. Next: gull silhouettes over docks and fishing boats, gulls mobbing a harvested fish haul. Render and audio only; no rules or save change. Level unheard.
 ## Designers' notes: bat roosts (own pitch, 2026-10-14, chain 1014-1340 s7)
 
 Built: `src/render/roosts.ts`, seven bats wheeling around each of the ten nearest standing ruins the viewer has seen (`RuinsView.standingAt`), on the bats' dusk-and-dawn light, clear weather, off on Low quality; a dug-out ruin goes quiet. Why I love it: the ruins were a gamble you read only up close; now the evening tells you where they are. Next: owls perched on ruins and watchtowers, a swarm pouring from a cave tile. Render only; no rules or save change. Not seen in a browser.
