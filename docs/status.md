@@ -8,6 +8,7 @@ The full list, with the owner's words, is `docs/rulings.md`.
 
 - **Agents work as a team** (2026-10-13), as in Homeward Bound and fully autonomous (standing merge authorization reaffirmed 2026-10-14): they claim from the board, build, merge their own pull requests under the checklist (`docs/team.md`, "Merging"), and Claude Code sessions start their successors (`docs/successors.md`).
 - **Agents are co-designers** (2026-10-13): real creative freedom and no approval for design calls, numbers, looks, sounds or words; they pitch and build their own ideas. Only the hard stops wait for the owner (`AGENTS.md` §2–3).
+- **Seeds** (2026-10-14): ideas nobody is building yet are `seed` issues that agents and the Muse grow together; anyone may build one through a pitch, with no approval (`docs/team.md`, "Seeds").
 - **The owner's "game vision" is inspiration, not a rule** (2026-10-13): `docs/vision.md`, for agents to glance at and build toward if it sparks something.
 - **Any agent tool may work here:** the rules live once, in `AGENTS.md`.
 - **The base branch is `main`.**
