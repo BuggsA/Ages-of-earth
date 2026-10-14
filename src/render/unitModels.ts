@@ -980,6 +980,84 @@ export function deerGeometry(): THREE.BufferGeometry {
   return deerGeo;
 }
 
+// ---- The wild (#171) -------------------------------------------------------------------------------
+
+/** A woolly mammoth: shaggy, high-shouldered, with long curved tusks. Its head (and tusks) lunge to gore. */
+function mammoth(): Kit {
+  const k = new Kit();
+  const wool = '#6b4527';
+  const dark = '#4a2e1a';
+  const LEG = 0.26;
+  for (const [x, z, rig] of [[-0.12, 0.17, RIG_LEG_A], [0.12, 0.17, RIG_LEG_B], [-0.12, -0.2, RIG_LEG_B], [0.12, -0.2, RIG_LEG_A]] as [number, number, number][]) {
+    const g = k.limb(k.group(0, 0, 0), rig, LEG, z);
+    k.cyl(0.06, 0.065, LEG + 0.04, 6, dark, x, 0, z, g);
+    k.cyl(0.07, 0.07, 0.03, 6, '#3a2416', x, 0, z, g);
+  }
+  // A round, shaggy body, high at the shoulders, with a skirt of long hair.
+  k.blob(0.27, wool, 0, LEG + 0.2, -0.04).scale.set(1, 0.85, 1.35);
+  k.blob(0.21, wool, 0, LEG + 0.3, 0.13).scale.set(1.05, 1, 1);
+  k.blob(0.13, dark, 0, LEG + 0.44, 0.1);
+  k.cyl(0.25, 0.27, 0.12, 8, dark, 0, LEG - 0.06, -0.02).scale.set(1, 1, 1.5);
+  k.cyl(0.015, 0.025, 0.14, 4, dark, 0, LEG + 0.12, -0.42).rotation.x = -0.5;
+  const head = k.limb(k.group(0, 0, 0), RIG_ARM, LEG + 0.3, 0.3);
+  k.blob(0.14, wool, 0, LEG + 0.3, 0.4, head).scale.set(0.95, 1.15, 0.9);
+  k.blob(0.07, dark, 0, LEG + 0.45, 0.37, head);
+  for (const x of [-0.13, 0.13]) k.blob(0.06, dark, x, LEG + 0.32, 0.34, head).scale.set(0.5, 1, 1);
+  // The trunk, in three tapering pieces curling down.
+  k.cyl(0.05, 0.045, 0.16, 6, wool, 0, LEG + 0.08, 0.5, head).rotation.x = 0.25;
+  k.cyl(0.045, 0.035, 0.14, 6, wool, 0, LEG - 0.06, 0.53, head);
+  k.cyl(0.035, 0.03, 0.08, 6, dark, 0, LEG - 0.14, 0.5, head).rotation.x = -0.5;
+  // Tusks: out, down, then up and in.
+  for (const x of [-1, 1]) {
+    const a = k.cyl(0.022, 0.026, 0.2, 5, '#efe6cf', x * 0.08, LEG + 0.08, 0.54, head);
+    a.rotation.x = 1.0;
+    a.rotation.z = -x * 0.35;
+    const b = k.cyl(0.014, 0.022, 0.18, 5, '#f4eedc', x * 0.11, LEG + 0.06, 0.68, head);
+    b.rotation.x = -0.6;
+    b.rotation.z = x * 0.5;
+  }
+  return k;
+}
+
+/** A grey wolf, lean and long-legged, with a bushy tail. Its head snaps forward to bite. */
+function wolf(): Kit {
+  const k = new Kit();
+  const coat = '#7d7a74';
+  const pale = '#c9c3b6';
+  const LEG = 0.17;
+  for (const [x, z, rig] of [[-0.04, 0.11, RIG_LEG_A], [0.04, 0.11, RIG_LEG_B], [-0.04, -0.11, RIG_LEG_B], [0.04, -0.11, RIG_LEG_A]] as [number, number, number][]) {
+    const g = k.limb(k.group(0, 0, 0), rig, LEG, z);
+    k.box(0.03, LEG, 0.035, coat, x, 0, z, g);
+  }
+  k.box(0.1, 0.1, 0.3, coat, 0, LEG, 0);
+  k.box(0.08, 0.03, 0.24, pale, 0, LEG - 0.03, 0.01);
+  k.box(0.11, 0.07, 0.1, '#5e5b56', 0, LEG + 0.07, 0.1);
+  const head = k.limb(k.group(0, 0, 0), RIG_ARM, LEG + 0.08, 0.16);
+  k.box(0.08, 0.08, 0.09, coat, 0, LEG + 0.1, 0.2, head);
+  k.box(0.045, 0.04, 0.09, pale, 0, LEG + 0.07, 0.27, head);
+  k.box(0.02, 0.02, 0.02, '#1c1a18', 0, LEG + 0.09, 0.31, head);
+  for (const x of [-0.025, 0.025]) k.cone(0.018, 0.05, 4, '#4f4c48', x, LEG + 0.16, 0.18, head);
+  // A bushy tail, carried low.
+  const tail = k.cyl(0.035, 0.02, 0.16, 5, '#6a6761', 0, LEG - 0.06, -0.22);
+  tail.rotation.x = 0.6;
+  return k;
+}
+
+let mammothGeo: THREE.BufferGeometry | null = null;
+let wolfGeo: THREE.BufferGeometry | null = null;
+
+/** The mammoth, rigged to walk and gore. */
+export function mammothGeometry(): THREE.BufferGeometry {
+  mammothGeo ??= bake(mammoth().root);
+  return mammothGeo;
+}
+
+/** The wolf, rigged to run and bite. */
+export function wolfGeometry(): THREE.BufferGeometry {
+  wolfGeo ??= bake(wolf().root);
+  return wolfGeo;
+}
+
 const cache = new Map<string, THREE.BufferGeometry>();
 
 /** How high a unit line's head (or its banner pole) reaches, where a people's mark sits. */

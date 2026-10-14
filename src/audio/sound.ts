@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -120,7 +120,7 @@ export class Sound {
     'click', 'open', 'select', 'selectBuilding', 'move', 'attack', 'strike', 'thud', 'hit', 'hitBuilding', 'bow', 'sling', 'musket', 'fall',
     'collapse', 'built', 'place', 'ready', 'readyCitizen', 'chop', 'mine', 'hammer', 'rustle', 'epoch', 'alert', 'victory', 'defeat', 'error', 'coin', 'queue',
     'catapult', 'cannon', 'impact', 'spear', 'chant', 'convert', 'heal', 'townBell', 'allClear', 'research', 'wonder', 'shelter',
-    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind', 'thunder', 'owl', 'gull', 'cricket', 'frog', 'birdsong', 'greatWork', 'beacon', 'rally',
+    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind', 'thunder', 'owl', 'gull', 'cricket', 'frog', 'birdsong', 'greatWork', 'beacon', 'rally', 'mammoth', 'howl', 'snarl',
   ];
 
   /**
@@ -597,6 +597,27 @@ export class Sound {
         this.bell(out, t, N.A3 * 2.4, 1.4, 0.04);
         for (const f of [N.A3, N.E4, N.A4, N.C5]) this.tone(out, t + 0.15, { f, type: 'sawtooth', dur: 1.8, peak: 0.028, attack: 0.4, lp: 1500 });
         [N.E5, N.A5, N.C6, N.E6].forEach((f, i) => this.bell(out, t + 0.5 + i * 0.11, f, 1.2, 0.04));
+        break;
+      case 'mammoth':
+        // The wild (#171): a mammoth's trumpet. A brassy blare that climbs and cracks, over a rumble.
+        this.tone(out, t, { f: 330, to: 620, type: 'sawtooth', dur: 0.55, peak: 0.07, attack: 0.05, lp: 2400, glide: 0.35 });
+        this.tone(out, t, { f: 495, to: 930, type: 'square', dur: 0.5, peak: 0.025, attack: 0.06, lp: 2000, glide: 0.35 });
+        this.tone(out, t + 0.5, { f: 600, to: 420, type: 'sawtooth', dur: 0.4, peak: 0.05, lp: 1800 });
+        this.noise(out, t, { dur: 0.8, filter: 'bandpass', f: 1200, q: 1.5, peak: 0.03, attack: 0.05 });
+        this.tone(out, t, { f: 60, to: 45, dur: 0.7, peak: 0.12 });
+        break;
+      case 'howl':
+        // A wolf's howl: a breathy rise, a long held note, and a falling tail.
+        this.tone(out, t, { f: 380, to: 560, dur: 0.5, peak: 0.05, attack: 0.15, glide: 0.4 });
+        this.tone(out, t + 0.45, { f: 560, to: 520, dur: 0.9, peak: 0.055, attack: 0.05 });
+        this.tone(out, t + 1.3, { f: 520, to: 330, dur: 0.6, peak: 0.045, attack: 0.02 });
+        this.noise(out, t, { dur: 1.8, filter: 'bandpass', f: 520, q: 4, peak: 0.012, attack: 0.2 });
+        break;
+      case 'snarl':
+        // A snarl and a snap of jaws.
+        this.tone(out, t, { f: 110, to: 90, type: 'sawtooth', dur: 0.22, peak: 0.07, lp: 700 });
+        this.noise(out, t, { dur: 0.2, filter: 'bandpass', f: 500, q: 1.2, peak: 0.08 });
+        this.noise(out, t + 0.18, { dur: 0.04, filter: 'highpass', f: 2200, peak: 0.12 });
         break;
       case 'owl':
         // A soft, hollow hoot-hoo: a low breathy tone that dips, a short rest, a longer fall.

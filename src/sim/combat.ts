@@ -110,8 +110,8 @@ export function strike(s: GameState, u: Unit, t: Ent): void {
   hurt(s, t, damageOf(s, u, st, t, false), u.owner, u);
 }
 
-/** A hunter's spear at an animal. */
-export function throwSpear(s: GameState, u: Unit, a: Animal): void {
+/** A hunter's spear at an animal (or a soldier's arrow, stone or shot, with its own `kind` and `damage`). */
+export function throwSpear(s: GameState, u: Unit, a: Animal, kind: Shot['kind'] = 'spear', damage: number = DEER.spearDamage): void {
   u.swing = s.tick;
   const dx = a.x - u.x;
   const dy = a.y - u.y;
@@ -119,20 +119,20 @@ export function throwSpear(s: GameState, u: Unit, a: Animal): void {
   s.shots.push({
     id: s.nextId++,
     owner: u.owner,
-    kind: 'spear',
+    kind,
     x0: u.x,
     y0: u.y,
     target: a.id,
     tx: a.x,
     ty: a.y,
     t: 0,
-    dur: Math.max(2, Math.ceil((d / SHOT_SPEED.spear) * TICK_HZ)),
-    damage: DEER.spearDamage,
+    dur: Math.max(2, Math.ceil((d / SHOT_SPEED[kind]) * TICK_HZ)),
+    damage,
     splash: 0,
     from: u.type,
     animal: true,
   });
-  s.events.push({ k: 'shot', owner: u.owner, kind: 'spear', x: u.x, y: u.y });
+  s.events.push({ k: 'shot', owner: u.owner, kind, x: u.x, y: u.y });
 }
 
 /** Move shots along; those that arrive hit their target if it still stands, and splash around. */

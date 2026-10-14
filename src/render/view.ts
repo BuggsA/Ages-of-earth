@@ -718,6 +718,15 @@ export class View {
           this.effects.ring(at, '#fff0b8', RALLY.radius * 0.6, 0.6);
           break;
         }
+        case 'wildCry':
+          // The wild (#171): a mammoth trumpets, a pack howls as it turns to fight.
+          if (this.sees(ev.x, ev.y)) this.cue(ev.kind === 'mammoth' ? 'mammoth' : 'howl', ev.x, ev.y, 1);
+          break;
+        case 'wildStrike':
+          if (!this.sees(ev.x, ev.y)) break;
+          if (ev.kind === 'wolf') this.cue('snarl', ev.x, ev.y, 0.8);
+          else this.effects.burst(this.ground(s, ev.x, ev.y, 0.2), { count: 8, speed: 1, up: 0.8, life: 0.7, size: 0.06, grow: 1.5, gravity: -0.5, drag: 1.5, soft: true, colors: ['#a08a68', '#c8b590'] });
+          break;
         case 'animalDie':
           if (!this.sees(ev.x, ev.y)) break;
           this.effects.burst(this.ground(s, ev.x, ev.y, 0.1), { count: 5, speed: 0.6, up: 0.4, life: 0.8, size: 0.05, grow: 1.8, gravity: -0.1, drag: 1.5, soft: true, colors: ['#bba98a', '#d6c7aa'] });

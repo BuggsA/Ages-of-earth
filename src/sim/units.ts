@@ -7,6 +7,7 @@ import { buildTimeFor, buildingCostFor, modsOf } from './stats';
 import type { Act, Animal, Building, Cost, Ent, GameState, Goal, Order, Res, Unit } from './types';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { carriedBy, relicAt } from './relics';
+import { animalRadius, hitAnimal } from './animals';
 import { dig, ruinAt } from './ruins';
 import { atPost, dockOf, goalForPost, homeMarket, marketOf, nearestDock, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { canHit, exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, passOf, pay, radiusOf, statsOf, teamOf } from './world';
@@ -612,8 +613,8 @@ export function ungarrison(s: GameState, b: Building): void {
 function huntStep(s: GameState, u: Unit, o: Extract<Order, { k: 'hunt' }>): void {
   const a = s.animals.find((x) => x.id === o.target);
   if (!a || a.hp <= 0) {
-    // It fell: butcher it (or the nearest carcass).
-    const meat = findResource(s, R_MEAT, u.x, u.y, 6);
+    // It fell: a citizen butchers it (or the nearest carcass); a wolf leaves nothing, and soldiers don't butcher.
+    const meat = u.type === 'citizen' && !o.fight ? findResource(s, R_MEAT, u.x, u.y, 6) : -1;
     if (meat >= 0) setOrder(u, { k: 'gather', tile: meat, res: 'food', phase: 'go' });
     else setOrder(u, { k: 'idle' });
     return;
@@ -621,13 +622,23 @@ function huntStep(s: GameState, u: Unit, o: Extract<Order, { k: 'hunt' }>): void
   const dx = a.x - u.x;
   const dy = a.y - u.y;
   const d = Math.sqrt(dx * dx + dy * dy);
-  if (d <= DEER.spear) {
+  // Citizens throw spears; soldiers (#171) shoot from their range or close in with their weapons.
+  const st = statsOf(s, u);
+  const soldier = u.type !== 'citizen';
+  const reach = !soldier ? DEER.spear : st.range > 0 ? st.range + animalRadius(a) : st.radius + animalRadius(a) + 0.35;
+  if (d <= reach) {
     if (walking(u)) stopWalking(u);
     face(u, a.x, a.y);
     u.act = 'attack';
     if (u.cool <= 0) {
-      throwSpear(s, u, a);
-      u.cool = secs(1.5);
+      if (!soldier) throwSpear(s, u, a);
+      else if (st.range > 0 && st.shot) throwSpear(s, u, a, st.shot, st.attack);
+      else {
+        u.swing = s.tick;
+        s.events.push({ k: 'swing', id: u.id, target: a.id, x: u.x, y: u.y, owner: u.owner, ranged: false, type: u.type });
+        hitAnimal(s, a, st.attack, u.x, u.y);
+      }
+      u.cool = soldier ? secs(st.reload) : secs(1.5);
     }
     return;
   }

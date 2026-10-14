@@ -1,4 +1,4 @@
-import { AMOUNT, BOG_IRON, MAP_SIZES, RELIC, RUINS, TRADE } from './data';
+import { AMOUNT, BOG_IRON, MAMMOTH, MAP_SIZES, RELIC, RUINS, TRADE, WOLF } from './data';
 import { fbm, mulberry32, type Rng } from './rng';
 import type { MapSize, MapType, RuinFind } from './types';
 import { B_RES, B_TERRAIN, R_BERRY, R_BOG, R_FISH, R_GOLD, R_NONE, R_STONE, R_TREE, T_GRASS, T_ROCK, T_SAND, T_WATER } from './types';
@@ -53,6 +53,8 @@ export interface MapData {
   bogIron: boolean;
   /** Ancient ruins (#64): where they stand (tile centers) and what lies under each. */
   ruins: { x: number; y: number; find: RuinFind }[];
+  /** The wild (#171): mammoths, and wolves by their dens. Empty on campaign maps. */
+  wild: { kind: 'mammoth' | 'wolf'; x: number; y: number }[];
 }
 
 const DIR8 = [
@@ -514,6 +516,7 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
   const posts = placePosts(seed, size, w, h, terrain, height, res, amount, starts, relics, type === 'sea');
   const bogIron = deposits && placeBogIron(seed, w, h, terrain, res, amount, starts, deer, relics, posts);
   const ruins = deposits ? placeRuins(seed, size, w, h, terrain, res, starts, deer, relics, posts) : [];
+  const wild = deposits ? placeWild(seed, size, w, h, terrain, res, starts, deer, relics, posts, ruins) : [];
 
   // Resources nobody could stand next to are cleared away.
   const block = new Uint8Array(w * h);
@@ -522,7 +525,7 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
     if (res[i] !== R_NONE) block[i] |= B_RES;
   }
 
-  return { w, h, terrain, height, res, amount, block, starts, deer, relics, posts, bogIron, ruins };
+  return { w, h, terrain, height, res, amount, block, starts, deer, relics, posts, bogIron, ruins, wild };
 }
 
 /** Where a town's people can walk to without cutting a tree (or, with `axes`, by cutting their way). */
@@ -904,4 +907,107 @@ function placeRuins(
     finds.push(...hand);
   }
   return out.map((p, k) => ({ x: p.x + 0.5, y: p.y + 0.5, find: finds[k] }));
+}
+
+/**
+ * The wild (#171). A mammoth for every town, the same distance out (`MAMMOTH.home`) in a direction of its
+ * own, and a few more out in the open; then wolf dens, each about as far from its two nearest towns,
+ * beside a patch of the wild gold where there is one. Everything stands on open ground every town can
+ * walk to. They roll their own dice and touch no tile, so the rest of the map is as it was.
+ */
+function placeWild(
+  seed: number,
+  size: MapSize,
+  w: number,
+  h: number,
+  terrain: Uint8Array,
+  res: Uint8Array,
+  starts: { x: number; y: number }[],
+  deer: { x: number; y: number }[],
+  relics: { x: number; y: number }[],
+  posts: { x: number; y: number }[],
+  ruins: { x: number; y: number }[],
+): { kind: 'mammoth' | 'wolf'; x: number; y: number }[] {
+  const rng = mulberry32(seed ^ 0x3a7e0f);
+  const land = (x: number, y: number) => x >= 2 && y >= 2 && x < w - 2 && y < h - 2 && (terrain[y * w + x] === T_GRASS || terrain[y * w + x] === T_SAND);
+  const near = (list: { x: number; y: number }[], x: number, y: number, r: number) =>
+    list.some((p) => (p.x - x - 0.5) * (p.x - x - 0.5) + (p.y - y - 0.5) * (p.y - y - 0.5) < r * r);
+  const open = (x: number, y: number, r: number) => {
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (!land(x + dx, y + dy) || res[(y + dy) * w + x + dx] !== R_NONE) return false;
+    return true;
+  };
+  const reaches = starts.map((st) => reachFrom(w, h, terrain, res, st));
+  const dists = (x: number, y: number) => starts.map((st) => Math.sqrt((x + 0.5 - st.x) * (x + 0.5 - st.x) + (y + 0.5 - st.y) * (y + 0.5 - st.y)));
+  const clear = (x: number, y: number) =>
+    open(x, y, 1) && reaches.every((r) => r[y * w + x] === 1) && !near(relics, x, y, 4) && !near(posts, x, y, TRADE.plaza + 4) && !near(ruins, x, y, 5) && !near(deer, x, y, 3);
+  const out: { kind: 'mammoth' | 'wolf'; x: number; y: number }[] = [];
+  const pick = (list: number[]): number => list[Math.floor(rng() * list.length)];
+
+  // A mammoth for every town: on a ring `home` tiles out, nearer that town than any other.
+  for (let k = 0; k < starts.length; k++) {
+    const st = starts[k];
+    const ring: number[] = [];
+    const R = MAMMOTH.home;
+    for (let y = st.y - R - 2; y <= st.y + R + 2; y++) {
+      for (let x = st.x - R - 2; x <= st.x + R + 2; x++) {
+        if (!land(x, y)) continue;
+        const ds = dists(x, y);
+        if (ds[k] < R - 1 || ds[k] > R + 1.5 || ds.some((d, j) => j !== k && d < ds[k] + 4)) continue;
+        if (!clear(x, y) || near(out, x, y, 6)) continue;
+        ring.push(y * w + x);
+      }
+    }
+    if (!ring.length) continue;
+    const i = pick(ring);
+    out.push({ kind: 'mammoth', x: (i % w) + 0.5, y: Math.floor(i / w) + 0.5 });
+  }
+
+  // Open ground out between the towns, about as far from the two nearest.
+  const between = (home: number, fair: number): number[] => {
+    const list: number[] = [];
+    for (let y = 3; y < h - 3; y++) {
+      for (let x = 3; x < w - 3; x++) {
+        if (!land(x, y)) continue;
+        const ds = dists(x, y).sort((a, b) => a - b);
+        if (ds[0] < home || (ds.length > 1 && ds[1] - ds[0] > fair)) continue;
+        if (!clear(x, y)) continue;
+        list.push(y * w + x);
+      }
+    }
+    return list;
+  };
+
+  // More mammoths in the open.
+  const wide = between(MAMMOTH.home + 5, 8);
+  for (let n = 0, guard = 0; n < MAMMOTH.extra[size] && wide.length && guard < 200; guard++) {
+    const i = pick(wide);
+    const x = i % w;
+    const y = (i - x) / w;
+    if (near(out, x, y, 12)) continue;
+    out.push({ kind: 'mammoth', x: x + 0.5, y: y + 0.5 });
+    n++;
+  }
+
+  // Wolf dens, by wild gold where some lies near enough.
+  const spots = between(WOLF.home, WOLF.fair);
+  const byGold = spots.filter((i) => {
+    const x = i % w;
+    const y = (i - x) / w;
+    for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) if (res[(y + dy) * w + x + dx] === R_GOLD) return true;
+    return false;
+  });
+  const dens: { x: number; y: number }[] = [];
+  for (const list of [byGold, spots]) {
+    for (let guard = 0; dens.length < WOLF.dens[size] && list.length && guard < 300; guard++) {
+      const i = pick(list);
+      const x = i % w;
+      const y = (i - x) / w;
+      if (near(dens, x, y, WOLF.spacing) || near(out, x, y, 8)) continue;
+      dens.push({ x: x + 0.5, y: y + 0.5 });
+    }
+  }
+  for (const d of dens) {
+    for (let k = 0; k < WOLF.pack; k++) out.push({ kind: 'wolf', x: d.x + (k - 1) * 0.6, y: d.y + (k === 1 ? 0.5 : 0) });
+  }
+  return out;
 }

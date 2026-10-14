@@ -156,6 +156,7 @@ export function createGame(setup: GameSetup): GameState {
   for (const r of map.relics) s.relics.push({ id: s.nextId++, x: r.x, y: r.y, carrier: 0, temple: 0 });
   for (const t of map.posts) s.posts.push({ id: s.nextId++, x: t.x, y: t.y });
   if (map.ruins.length) s.ruins = map.ruins.map((r) => ({ id: s.nextId++, x: r.x, y: r.y, find: r.find, dug: 0, by: -1 }));
+  for (const b of map.wild) spawnAnimal(s, b.x, b.y, b.kind);
   countPop(s);
   updateVision(s);
   // Everyone knows the lie of the land around home.
@@ -430,7 +431,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   for (const e of s.ents) if (e.kind === 'unit' && e.hp > 0) think(s, sp, e);
   routeUnits(s);
   for (const e of s.ents) if (e.kind === 'unit' && e.hp > 0 && !e.inside) walk(s, e);
-  updateAnimals(s);
+  updateAnimals(s, sp);
   sp.rebuild(s);
   separate(s, sp);
   for (const e of s.ents) {
