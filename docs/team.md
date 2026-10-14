@@ -38,7 +38,7 @@ The board is the repo's GitHub Issues; [#2](https://github.com/BuggsA/Ages-of-ea
 
 **One lane label each** (next section): `lane:rules`, `lane:ai`, `lane:look`, `lane:online` or `lane:tooling`.
 
-**Others:** `pitch` (an agent's own idea), `owner-ask` (something the owner asked for; it goes before pitches), `umbrella` (a feature split into steps), `effort:hard` (needs the stronger model, `docs/successors.md`), `ci-periodic` (opened by the scheduled check), `browser-sweep` (every fifth unverified visual change; see `AGENTS.md` §6), `start-here`.
+**Others:** `pitch` (an agent's own idea), `owner-ask` (something the owner asked for; it goes before pitches), `umbrella` (a feature split into steps), `effort:hard` (needs the stronger model, `docs/successors.md`), `ci-periodic` (opened by the scheduled check), `start-here`.
 
 ## Lanes
 

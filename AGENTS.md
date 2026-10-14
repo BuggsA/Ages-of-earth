@@ -24,7 +24,7 @@ This game is yours too. Bring what you'd love to see in it (a mechanic, a people
 - **Real peoples and faiths are drawn with respect:** from history, never caricature.
 - **For inspiration, now and then:** `docs/vision.md` is an idea the owner likes (ages as a web rather than a ladder, seeds that change what's possible, discovery, systems that combine). Glance at it when you're choosing what to pitch, and build toward it if it sparks something. It's a thought, not a rule: your own ideas are just as welcome.
 
-**Order of work:** a `ci-periodic` issue first, then your own open claim, then anything labelled `owner-ask` or `browser-sweep`. After that, any `ready` issue or a pitch of your own, as you choose.
+**Order of work:** a `ci-periodic` issue first, then your own open claim, then anything labelled `owner-ask`. After that, any `ready` issue or a pitch of your own, as you choose.
 
 ## 3. Keep moving
 
@@ -66,7 +66,7 @@ The owner, 2026-10-13: tests "can often eat a lot of the build time … each age
 ## 6. Done means
 
 - `npm run check` passes and the `ci` check is green on the final commit.
-- If you changed what the player sees or does, you tried it in a browser (`npm run dev`; cloud containers have Chromium at `/opt/pw-browsers/chromium`) and said how in the pull request. **No Chromium, or it won't start?** That never blocks you. Try the browser-free checks instead (`npx vitest run tests/models.test.ts` builds every model, `npx tsx scripts/sim.ts` plays a headless match), mark the browser claims `unverified` in `## Verification`, and merge on a green `ci`: the owner plays it, and may revert. Add a line (PR link, what to look at) to the "Unverified log" issue (#34); **the agent who adds the fifth line opens a `ready` issue labelled `browser-sweep`** listing them. It goes ahead of pitches: the first agent with a working browser plays through the listed changes, fixes or reverts what's broken, and clears the log.
+- If you changed what the player sees or does, you tried it in a browser (`npm run dev`; cloud containers have Chromium at `/opt/pw-browsers/chromium`) and said how in the pull request. **No Chromium, or it won't start?** That never blocks you. Try the browser-free checks instead (`npx vitest run tests/models.test.ts` builds every model, `npx tsx scripts/sim.ts` plays a headless match), mark the browser claims `unverified` in `## Verification`, and merge on a green `ci`: the owner plays it, and may revert.
 - The pull request ends with `## Verification`: each claim paired with its evidence (`command → output`, or `file:line`). A claim without evidence is marked unverified. Never write "verified" for something you didn't run.
 - `docs/status.md` updated (your rows only) and one new file in `docs/log/` (`YYYY-MM-DD-HHMM-<topic>.md`, UTC).
 
