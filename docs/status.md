@@ -38,6 +38,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Weather** (own pitch, lane look): a seeded day per match (clear, rain, snow, mist; storms with lightning and thunder), look and sound only, no rules or save change. Seen in headless Chromium on the title screen only; the sound levels want an ear.
 
+**Flags in the wind** (#150, own pitch, lane look): building banners and the airfield windsock stream downwind and ripple by the day's wind. Render only; shader compiles in headless Chromium (smoke passes), look in a match unseen.
+
 **Waymarks** (#154, seed #152, lane look): the minimap remembers ruins (dug or standing, by whom) and relics as last seen. UI only; browser unverified.
 
 ## Waiting on the owner

@@ -13,6 +13,9 @@ import * as THREE from 'three';
 /** How brightly glowing parts (windows, torches, lanterns) shine: dimmer by day, strong as dusk falls. */
 export const glowUniform = { uGlow: { value: 1.25 } };
 
+/** The day's wind (tiles a second, x and z), which streams banners and windsocks. */
+export const windUniform = { value: new THREE.Vector2(0.2, 0) };
+
 export const fogUniforms = {
   uFogTex: { value: null as THREE.Texture | null },
   uFogSize: { value: new THREE.Vector2(1, 1) },
@@ -62,6 +65,8 @@ export interface Inject {
   team?: boolean;
   /** Darken by fog of war. */
   fog?: boolean;
+  /** Cloth tagged by `Kit.cloth` streams downwind and ripples (banners, windsocks). */
+  flag?: boolean;
   /** Sway with the wind (trees, crops): vertices higher up move more, by `uTime`. */
   sway?: number;
 }
@@ -76,12 +81,15 @@ export function inject<T extends THREE.Material>(mat: T, o: Inject): T {
     if (o.fog !== false) Object.assign(shader.uniforms, fogUniforms);
     if (o.rig || o.team) Object.assign(shader.uniforms, glowUniform);
     if (o.sway || o.rig || o.team) shader.uniforms.uTime = timeUniform;
+    if (o.flag) shader.uniforms.uWind = windUniform;
     let vs = shader.vertexShader;
     let fs = shader.fragmentShader;
     const parsV: string[] = [];
     if (o.fog !== false) parsV.push(FOG_PARS_VERTEX);
     if (o.rig || o.team) parsV.push('attribute float aTeam;\nvarying float vGlow;');
     if (o.rig) parsV.push('attribute vec3 aRig;\nattribute vec3 aAnim;');
+    else if (o.flag) parsV.push('attribute vec3 aRig;');
+    if (o.flag) parsV.push('uniform vec2 uWind;');
     if (o.sway || o.rig || o.team) parsV.push('uniform float uTime;');
     vs = vs.replace('#include <common>', `#include <common>\n${parsV.join('\n')}`);
     if (o.rig || o.team) {
@@ -117,7 +125,7 @@ export function inject<T extends THREE.Material>(mat: T, o: Inject): T {
           float ang = 0.0;
           if (aRig.x > 0.5 && aRig.x < 1.5) ang = aAnim.x;
           else if (aRig.x > 1.5 && aRig.x < 2.5) ang = -aAnim.x;
-          else if (aRig.x > 2.5) ang = aAnim.y;
+          else if (aRig.x > 2.5 && aRig.x < 3.5) ang = aAnim.y;
           if (ang != 0.0) {
             vec2 p = transformed.yz - aRig.yz;
             float c = cos(ang);
@@ -125,6 +133,32 @@ export function inject<T extends THREE.Material>(mat: T, o: Inject): T {
             transformed.yz = aRig.yz + vec2(p.x * c - p.y * s, p.x * s + p.y * c);
           }
           transformed.y += aAnim.z;
+        }
+      `;
+    }
+    if (o.flag) {
+      begin += /* glsl */ `
+        if (aRig.x > 3.5) {
+          // Cloth: aRig.y is its length along z from the anchor aRig.z (negative when it runs the other way).
+          float f = clamp((transformed.z - aRig.z) / aRig.y, 0.0, 1.0);
+          float speed = length(uWind);
+          vec3 lw = vec3(uWind.x, 0.0, uWind.y);
+          lw = vec3(dot(modelMatrix[0].xyz, lw), dot(modelMatrix[1].xyz, lw), dot(modelMatrix[2].xyz, lw));
+          #ifdef USE_INSTANCING
+            lw = vec3(dot(instanceMatrix[0].xyz, lw), dot(instanceMatrix[1].xyz, lw), dot(instanceMatrix[2].xyz, lw));
+          #endif
+          vec2 dir = normalize(lw.xz + vec2(0.0001));
+          float run = (transformed.z - aRig.z);
+          float m = min(1.0, speed * 2.2);
+          // Swing from hanging toward the wind's line, further the harder it blows.
+          transformed.xz += (dir * abs(run) - vec2(0.0, run)) * m;
+          vec4 fw = modelMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+          #ifdef USE_INSTANCING
+            fw = modelMatrix * (instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0));
+          #endif
+          float ph = uTime * (2.5 + speed * 9.0) - f * 5.0 + fw.x * 0.9 + fw.z * 1.3;
+          transformed.y += sin(ph) * f * (0.01 + 0.05 * m) - (1.0 - m) * f * 0.1 * abs(aRig.y);
+          transformed.xz += vec2(-dir.y, dir.x) * sin(ph * 1.3 + 1.0) * f * 0.04 * m;
         }
       `;
     }
@@ -156,14 +190,14 @@ export function inject<T extends THREE.Material>(mat: T, o: Inject): T {
     fs = fs.replace('#include <opaque_fragment>', tail);
     shader.fragmentShader = fs;
   };
-  const key = `${o.rig ? 'r' : ''}${o.team ? 't' : ''}${o.fog === false ? '' : 'f'}${o.sway ?? ''}`;
+  const key = `${o.rig ? 'r' : ''}${o.flag ? 'w' : ''}${o.team ? 't' : ''}${o.fog === false ? '' : 'f'}${o.sway ?? ''}`;
   const prevKey = mat.customProgramCacheKey?.bind(mat);
   mat.customProgramCacheKey = () => `${prevKey ? prevKey() : ''}|${key}`;
   return mat;
 }
 
 /** Everything baked: vertex colors, faceted, with fog of war and glowing parts. */
-export const bakedMaterial = inject(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.85 }), { team: true });
+export const bakedMaterial = inject(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.85 }), { team: true, flag: true });
 /** Units: team colors, swinging limbs, fog of war. */
 export const unitMaterial = inject(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.8 }), { rig: true, team: true });
 /** Trees and crops sway a little in the wind. */

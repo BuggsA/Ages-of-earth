@@ -423,3 +423,7 @@ Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), n
 ## Designers' notes: the computer turns sailor (own pitch, 2026-10-14, lane ai)
 
 **Built:** a clever computer with a finished Dock takes the Middle Ages → Age of Sail road once its boats have landed the 500 fish (`turnRoad` in `src/sim/ai.ts`), if its people's coin-toss (`wants`, `AI_WEB.take`) says so, and comes ashore if its last Dock falls. No number or save change. **Why I love it:** the sea road was only for people; now a rival can quietly become a sea power. **Seen:** headless `web-walk` (6 seeds, small, 25 min): Sail@13m, @13m, @11m on three seeds, then on to Gunpowder; `tests/ai-sail.test.ts`. No win-rate comparison made. **Next:** the sailor building warships and docks more on purpose, and raiding the coast.
+
+## Designers' notes: flags in the wind (#150, 2026-10-14, chain 1014-2158 s2)
+
+**Built:** building banners and the airfield windsock stream downwind and ripple, harder in a storm, hanging limp when it's calm. A vertex-shader tag (`Kit.cloth`, `aRig.x = 4`, `flag` in `inject`) bends cloth by the shared `windUniform`, so draws stay instanced/baked. **Why I love it:** the same wind that leans smoke and rain now reads on every town. **Next:** ship sails and unit pennants (they turn, so need their heading), the aeronaut windsock (runs along x). Seen: `browser-smoke` passes with no console errors; how it looks in a match is unseen.
