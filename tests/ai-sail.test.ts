@@ -76,4 +76,20 @@ describe('the computer turns sailor', () => {
     run(s, 90, () => ageOf(s.players[0]) !== 'sail');
     expect(ageOf(s.players[0])).toBe('middle');
   });
+
+  it('keeps a small fleet once it sails, and not before', () => {
+    const fleet = (road: boolean) => {
+      const s = game();
+      s.ai[0].roads = { sail: road };
+      dock(s);
+      s.players[0].stats.fished = road ? 500 : 0;
+      s.players[0].res = { food: 700, wood: 3000, stone: 100, gold: 3000 };
+      run(s, 120, () => ageOf(s.players[0]) === 'sail');
+      s.players[0].res = { food: 100, wood: 3000, stone: 100, gold: 3000 };
+      run(s, 150, () => false);
+      return s.ents.filter((e) => e.kind === 'unit' && e.owner === 0 && e.hp > 0 && e.type === 'warship').length;
+    };
+    expect(fleet(true)).toBeGreaterThan(0);
+    expect(fleet(false)).toBe(0);
+  });
 });
