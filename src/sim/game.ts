@@ -10,7 +10,7 @@ import { Spatial } from './spatial';
 import { updateRelics } from './relics';
 import { atPost } from './trade';
 import { modsOf, trainTimeFor } from './stats';
-import { roadTo } from './ages';
+import { roadTo, surveyFinds } from './ages';
 import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, MapSize, MapType, Player } from './types';
 import { RES, R_FISH, R_NONE } from './types';
 import { RES_OF_TILE, carryCargo, checkStuck, collide, findResource, routeUnits, separate, setOrder, think, ungarrison, walk } from './units';
@@ -53,7 +53,8 @@ const spatials = new WeakMap<GameState, Spatial>();
 
 export function createGame(setup: GameSetup): GameState {
   const mapType = setup.mapType ?? 'continental';
-  const map = generateMap(setup.seed, setup.size, setup.players.length, mapType);
+  // Campaign maps are drawn as they always were: no deposits that only some seeds hold.
+  const map = generateMap(setup.seed, setup.size, setup.players.length, mapType, !setup.scenario);
   const n = map.w * map.h;
   const startEpoch = Math.max(0, Math.min(EPOCHS.length - 1, setup.startEpoch ?? 0));
   const mode = setup.mode ?? 'conquest';
@@ -82,6 +83,7 @@ export function createGame(setup: GameSetup): GameState {
     relicTeam: -1,
     relicTimer: -1,
     posts: [],
+    bogIron: map.bogIron,
     nextId: 1,
     shots: [],
     rng: setup.seed >>> 0,
@@ -114,7 +116,7 @@ export function createGame(setup: GameSetup): GameState {
       vis: new Uint8Array(n),
       seen: new Uint8Array(n),
       defeated: false,
-      stats: { gathered: 0, trained: 0, kills: 0, losses: 0, built: 0, razed: 0, converted: 0, techs: 0, traded: 0 },
+      stats: { gathered: 0, trained: 0, kills: 0, losses: 0, built: 0, razed: 0, converted: 0, techs: 0, traded: 0, iron: 0 },
       history: [],
       startX: start.x,
       startY: start.y,
@@ -234,6 +236,7 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
     restat(s, p, () => p.techs.push(tech));
     p.stats.techs++;
     s.events.push({ k: 'researched', owner: p.id, tech });
+    if (TECHS[tech].survey) s.events.push({ k: 'survey', owner: p.id, tech, found: surveyFinds(s, tech) });
     return;
   }
   const unit = item.unit!;

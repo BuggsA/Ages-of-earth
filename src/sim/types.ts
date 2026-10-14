@@ -29,9 +29,9 @@ export type TechId =
   | 'forging' | 'ironCasting' | 'blastFurnace' | 'fletching' | 'bodkin' | 'scaleArmor' | 'chainMail' | 'plateArmor'
   | 'wheelbarrow' | 'handcart' | 'axes' | 'saws' | 'picks' | 'shafts' | 'plow' | 'irrigation' | 'masonry'
   | 'conscription' | 'husbandry' | 'theology' | 'chemistry'
-  | 'gillnets' | 'shipwright' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage';
+  | 'gillnets' | 'shipwright' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'survey';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron';
 
 /** Tile ground. Water and rock can't be walked or built on. */
 export const T_GRASS = 0;
@@ -49,6 +49,8 @@ export const R_GOLD = 4;
 export const R_MEAT = 5;
 /** A shoal of fish in the water, for fishing boats. */
 export const R_FISH = 6;
+/** Bog iron (#39): ore in the wetland mud, found on some worlds and not others. Mined like gold, and paid in as gold (iron bars). */
+export const R_BOG = 7;
 
 /** Why a tile can't be walked: bits of `block`. */
 export const B_TERRAIN = 1;
@@ -74,7 +76,7 @@ export type Order =
   /** Fight a unit or building. `auto` when picked by the unit itself (it gives up sooner); `then` resumes an attack-move. */
   | { k: 'attack'; target: number; auto: boolean; then: { x: number; y: number } | null }
   /** Gather a resource tile: walk there, work it, carry the load to a drop site, and back. */
-  | { k: 'gather'; tile: number; res: Res; phase: 'go' | 'work' | 'drop' }
+  | { k: 'gather'; tile: number; res: Res; phase: 'go' | 'work' | 'drop'; bog?: boolean }
   | { k: 'build'; target: number }
   | { k: 'farm'; target: number; phase: 'go' | 'work' | 'drop' }
   /** Carry what is held to a drop site, then go idle. */
@@ -291,6 +293,8 @@ export interface PlayerStats {
   techs: number;
   /** Gold brought home by traders. */
   traded: number;
+  /** Bog iron dug (#39); absent in older saves. */
+  iron?: number;
 }
 
 /** One sample of a player's state for the post-game timeline. */
@@ -341,6 +345,8 @@ export type GameEvent =
   | { k: 'animalDie'; id: number; x: number; y: number; fx: number; fy: number }
   | { k: 'trained'; id: number; owner: number; type: UnitType }
   | { k: 'researched'; owner: number; tech: TechId }
+  /** A survey's answer (#39): whether what it looks for lies anywhere in this world. */
+  | { k: 'survey'; owner: number; tech: TechId; found: boolean }
   | { k: 'placed'; id: number; owner: number; type: BuildingType }
   | { k: 'built'; id: number; owner: number; type: BuildingType }
   | { k: 'epoch'; owner: number; epoch: number; age?: AgeId }
@@ -406,6 +412,8 @@ export interface GameState {
   relicTimer: number;
   /** The trading posts out on the map. */
   posts: TradePost[];
+  /** Whether this world holds bog iron (#39), decided by the seed; absent in older saves (none). */
+  bogIron?: boolean;
   nextId: number;
   shots: Shot[];
   rng: number;

@@ -2,7 +2,7 @@ import { BUILDINGS, EPOCHS, MARKET, RES_LABEL, TECHS, UNITS, domainOf, unitEpoch
 import { peace } from './combat';
 import { placeProblem, stampBuilding, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
-import { roadProblem, roadTo, trainsAt } from './ages';
+import { barred, roadProblem, roadTo, trainsAt } from './ages';
 import type { Building, BuildingType, Command, Cost, GameState, Order, Player, Unit } from './types';
 import { RES, R_FISH, R_NONE } from './types';
 import { RES_OF_TILE, cargoRoom, freeFarm, garrisonRoom, giveOrder, landing, setOrder, ungarrison } from './units';
@@ -441,6 +441,8 @@ export function applyCommand(s: GameState, c: Command): void {
       if (!b || !b.built) return;
       if (!trainsAt(p, b.type).includes(c.unit) || !UNITS[c.unit]) return;
       if (unitEpoch(c.unit) > p.epoch) return refuse(s, c.p, `Needs the ${EPOCHS[unitEpoch(c.unit)].name}`);
+      const no = barred(p, c.unit);
+      if (no) return refuse(s, c.p, no);
       if (b.queue.length >= MAX_QUEUE) return refuse(s, c.p, 'The queue is full');
       if (c.unit === 'hero' && heroBusy(s, c.p)) return refuse(s, c.p, 'You can lead with one hero at a time');
       const cost = trainCostFor(s, c.p, c.unit, b.type);
