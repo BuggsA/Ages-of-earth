@@ -21,9 +21,13 @@ interface Conn {
 const GRACE_MS = 30000;
 const MAX_CMDS_PER_TURN = 40;
 const MAX_MSG = 8192;
+/** People who may watch a match under way. They only receive; the room never reads a command from them. */
+const MAX_WATCHERS = 8;
 
 export class Room {
   private conns: Conn[] = [];
+  /** Watchers: seat -1, never in `seats`, `holders` or `conns`, so nothing they send can act on a player. */
+  private watchers: Conn[] = [];
   private code = '';
   private build = '';
   private seats: Seat[] = [];
@@ -51,14 +55,15 @@ export class Room {
     const cid = (url.searchParams.get('cid') ?? '').slice(0, 40);
     const name = clean(url.searchParams.get('name') ?? 'Player', 18) || 'Player';
     const build = (url.searchParams.get('build') ?? '').slice(0, 40);
+    const watch = url.searchParams.get('watch') === '1';
     const pair = new WebSocketPair();
     const [client, server] = [pair[0], pair[1]];
     server.accept();
-    this.join(server, code, cid, name, build);
+    this.join(server, code, cid, name, build, watch);
     return new Response(null, { status: 101, webSocket: client });
   }
 
-  private join(ws: WebSocket, code: string, cid: string, name: string, build: string): void {
+  private join(ws: WebSocket, code: string, cid: string, name: string, build: string, watch = false): void {
     if (!this.code) this.code = code;
     if (!this.build) this.build = build;
     const refuse = (why: string) => {
@@ -67,6 +72,7 @@ export class Room {
     };
     if (build !== this.build) return refuse('This room is running a different version of the game. Reload the page to update.');
     if (!cid) return refuse('Missing player id.');
+    if (watch) return this.watch(ws, cid, name, refuse);
     // Back again (a reload, a dropped connection)?
     let seat = this.holders.indexOf(cid);
     if (seat < 0) {
@@ -110,6 +116,27 @@ export class Room {
     this.sendLobby();
   }
 
+  /** A watcher sees the match from its first turn but can do nothing in it. */
+  private watch(ws: WebSocket, cid: string, name: string, refuse: (why: string) => void): void {
+    if (!this.started) return refuse('That match has not started yet. Ask for the room link to join it.');
+    if (this.watchers.length >= MAX_WATCHERS) return refuse('That match has all the watchers it can hold.');
+    const conn: Conn = { ws, cid, seat: -1, sent: 0 };
+    this.watchers.push(conn);
+    ws.addEventListener('message', (e) => this.message(conn, e.data));
+    ws.addEventListener('close', () => this.unwatch(conn, name));
+    ws.addEventListener('error', () => this.unwatch(conn, name));
+    this.send(conn, { t: 'start', match: { seats: this.seats, setup: this.setup, civs: this.civs }, you: -1 });
+    this.send(conn, { t: 'catchup', turns: this.turns });
+    this.send(conn, { t: 'paused', on: this.paused, by: '' });
+    this.chatSystem(`${name} is watching`);
+  }
+
+  private unwatch(conn: Conn, name: string): void {
+    if (!this.watchers.includes(conn)) return;
+    this.watchers = this.watchers.filter((c) => c !== conn);
+    this.chatSystem(`${name} stopped watching`);
+  }
+
   private nextTeam(): number {
     const used = new Set(this.seats.map((s) => s.team));
     for (let t = 1; t <= MAX_SEATS; t++) if (!used.has(t)) return t;
@@ -151,7 +178,8 @@ export class Room {
   private message(conn: Conn, data: string | ArrayBuffer): void {
     // Closing a socket is asynchronous; already queued messages from a replaced or departed
     // connection must never act on the seat now held by someone else.
-    if (!this.conns.includes(conn)) return;
+    const watcher = this.watchers.includes(conn);
+    if (!watcher && !this.conns.includes(conn)) return;
     if (typeof data !== 'string' || data.length > MAX_MSG) return;
     let m: ClientMsg;
     try {
@@ -160,6 +188,8 @@ export class Room {
       return;
     }
     if (!m || typeof m !== 'object' || typeof m.t !== 'string') return;
+    // Watchers may only ping: no commands, chat, pausing, hashes or lobby changes.
+    if (watcher && m.t !== 'ping') return;
     const isHost = conn.seat === this.host;
     switch (m.t) {
       case 'ping':
@@ -298,6 +328,7 @@ export class Room {
     this.turns.push(c);
     const msg = JSON.stringify({ t: 'turn', n, c } satisfies ServerMsg);
     for (const conn of this.conns) this.raw(conn, msg);
+    for (const conn of this.watchers) this.raw(conn, msg);
     void HASH_EVERY;
   }
 
@@ -317,6 +348,7 @@ export class Room {
   private broadcast(m: ServerMsg): void {
     const text = JSON.stringify(m);
     for (const c of this.conns) this.raw(c, text);
+    for (const c of this.watchers) this.raw(c, text);
   }
 
   private send(c: Conn, m: ServerMsg): void {

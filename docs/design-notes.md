@@ -430,3 +430,7 @@ Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), n
 ## Designers' notes: the sailor's fleet (own pitch, 2026-10-14, chain 1014-2155 s3, lane ai)
 
 **Built:** a clever computer in the Age of Sail keeps two warships even on a map with no enemy ships, and counts rival merchant ships (`cog`) as prey, so its raiding fleet answers your sea trade. **Why I love it:** the sea road made ships cheap and sturdy, and until now the computer ignored that; a trade-by-water rival now has teeth. **Seen:** `tests/ai-sail.test.ts` (fails without the change). No win-rate comparison. **Next:** escorting its own cogs, and raiding the coast with transports.
+
+## Designers' notes: watch a live match (seed #134, chain 1014-2155 s4, lane online)
+
+**Built:** a watcher joins a started room (`?watch=1`), gets the start, the catch-up and every turn, and the Worker ignores everything but their pings (`watchers` in `worker/room.ts`, apart from `conns`, so a watcher can never act on a seat). The client shows the whole map or any player's eyes, and sends nothing. **Why I love it:** you learn an opening by watching a friend play it. **Seen:** `tests/room-watch.test.ts` (refusal before the start, catch-up, no commands/pause/chat/hash, no seat, cap of 8). The browser side (Watch button, bar, banner) is unseen. **Next:** a "watch" link beside the room link, a watcher count, and a delay so a watcher can't relay a live view to a player.
