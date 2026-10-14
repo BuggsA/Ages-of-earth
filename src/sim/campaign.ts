@@ -186,7 +186,7 @@ export const SCENARIOS: Scenario[] = [
     title: 'Wings over the Steppe',
     place: 'Industrial Age · the great war',
     brief:
-      'Two empires lie between you and the sea, and the old rules of war are ending. Race through the new technologies, build an airfield and a bomber wing, and break their towns from the air while your riflemen hold the line. Win within forty-five minutes.',
+      'Two empires lie between you and the sea: the Tsar’s, crumbling from within, and the Kaiser’s, at the height of its power. The old rules of war are ending. Race through the new technologies, build an airfield and a bomber wing, and break their towns from the air while your riflemen hold the line. Win within forty-five minutes.',
     epilogue: 'From the cockpit, the empire’s capital is a smudge of smoke on the plain. The age of the horse is over.',
     setup: {
       seed: 9606,
@@ -195,7 +195,7 @@ export const SCENARIOS: Scenario[] = [
       startEpoch: 4,
       players: [
         { ...you, civ: 'mongols' },
-        { name: 'The Tsar', ai: 'normal', team: 1, civ: 'chinese' },
+        { name: 'The Tsar', ai: 'easy', team: 1, civ: 'chinese' },
         { name: 'The Kaiser', ai: 'normal', team: 2, civ: 'britons' },
       ],
     },

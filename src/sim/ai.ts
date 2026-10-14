@@ -709,6 +709,8 @@ function airforce(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   if (!field) return;
   const fighters = v.planes.filter((u) => u.type === 'fighter');
   const bombers = v.planes.filter((u) => u.type === 'bomber');
+  const goal = v.plan.target;
+  if (goal) return wing(s, v, mem, field, fighters, bombers, goal, issue);
   if (field.queue.length < 2 && v.army.length >= 3) {
     const unit: UnitType = fighters.length < Math.max(2, bombers.length) ? 'fighter' : 'bomber';
     if ((unit === 'fighter' ? fighters.length : bombers.length) < 4 + mem.wave) {
@@ -726,17 +728,58 @@ function airforce(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   if (enemyAir && freeFighters.length) issue({ t: 'attack', p: p.id, ids: freeFighters.map((u) => u.id), target: enemyAir.id });
   // Bombers set out in a group against the enemy's town when the army attacks, or every couple of minutes.
   const ready = bombers.filter((u) => u.order.k === 'idle');
-  // In a chapter whose goal is a Town Center, bombers fly with the army, at it: alone they only feed the enemy's guns.
-  const goal = v.plan.target;
-  const alone = goal ? mem.attacking : mem.attacking || s.tick - (mem.sortie ?? 0) > secs(120);
-  if (ready.length >= 2 && alone && s.tick >= s.peaceUntil) {
-    const target = goal ?? enemyTarget(s, p);
+  if (ready.length >= 2 && (mem.attacking || s.tick - (mem.sortie ?? 0) > secs(120)) && s.tick >= s.peaceUntil) {
+    const target = enemyTarget(s, p);
     if (target) {
       issue({ t: 'attack', p: p.id, ids: ready.map((u) => u.id), target: target.id });
       if (!enemyAir && freeFighters.length) issue({ t: 'move', p: p.id, ids: freeFighters.map((u) => u.id), x: target.x, y: target.y, amove: true });
       mem.sortie = s.tick;
     }
   }
+}
+
+/** Bombers a chapter's wing flies with, at the least. */
+const WING = 5;
+
+/**
+ * A chapter whose goal is a rival Town Center: a bomber wing with fighters enough to clear the sky over
+ * it (one more than the rival keeps), saved up for ahead of the army, flown at the Town Center with the
+ * army's attack. Unescorted, a wing is shot down by a pair of fighters in seconds.
+ */
+function wing(s: GameState, v: View, mem: AiMemory, field: Building, fighters: Unit[], bombers: Unit[], goal: Building, issue: (c: Command) => void): void {
+  const { p } = v;
+  const theirs = s.ents.filter((e): e is Unit => e.kind === 'unit' && e.hp > 0 && e.type === 'fighter' && e.owner === goal.owner);
+  const escort = Math.min(6, Math.max(2, theirs.length + 1));
+  if (field.queue.length < 2) {
+    const unit: UnitType | null = fighters.length < escort ? 'fighter' : bombers.length < WING + 1 ? 'bomber' : null;
+    if (unit) {
+      const cost = unitStats(unit, p.epoch).cost;
+      if (afford(v, cost)) {
+        issue({ t: 'train', p: p.id, building: field.id, unit });
+        spend(v, cost);
+      } else spend(v, cost);
+    }
+  }
+  // Fighters at home chase raiders out of the sky.
+  const enemyAir = s.ents.find((e): e is Unit => e.kind === 'unit' && e.hp > 0 && (e.type === 'fighter' || e.type === 'bomber') && isEnemy(s, p.id, e.owner) && (e.x - v.home.x) * (e.x - v.home.x) + (e.y - v.home.y) * (e.y - v.home.y) < 30 * 30);
+  const freeFighters = fighters.filter((u) => u.order.k === 'idle');
+  const readyBombers = bombers.filter((u) => u.order.k === 'idle');
+  const flying = s.tick - (mem.sortie ?? -99999) < secs(60);
+  if (enemyAir && freeFighters.length && !flying) {
+    issue({ t: 'attack', p: p.id, ids: freeFighters.map((u) => u.id), target: enemyAir.id });
+    return;
+  }
+  // With the army's attack, a full wing goes; once over the target, those that come back go again.
+  const full = readyBombers.length >= Math.min(WING, 4) && freeFighters.length >= escort;
+  if (!mem.attacking || s.tick < s.peaceUntil || !(full || (flying && readyBombers.length))) return;
+  // Fighters go first (they are faster) and take on the rival's fighters over the target, then guard it.
+  const foe = theirs.sort((a, b) => (a.x - goal.x) * (a.x - goal.x) + (a.y - goal.y) * (a.y - goal.y) - ((b.x - goal.x) * (b.x - goal.x) + (b.y - goal.y) * (b.y - goal.y)) || a.id - b.id)[0];
+  if (freeFighters.length) {
+    if (foe) issue({ t: 'attack', p: p.id, ids: freeFighters.map((u) => u.id), target: foe.id });
+    else issue({ t: 'move', p: p.id, ids: freeFighters.map((u) => u.id), x: goal.x, y: goal.y, amove: true });
+  }
+  if (readyBombers.length) issue({ t: 'attack', p: p.id, ids: readyBombers.map((u) => u.id), target: goal.id });
+  if (full) mem.sortie = s.tick;
 }
 
 /** A building of the enemy's worth bombing: their nearest Town Center, or any building known. */
@@ -847,6 +890,8 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     }
     if (!unit || unitEpoch(unit) > p.epoch) continue;
     const cost = unitStats(unit, p.epoch).cost;
+    // A chapter's Town Center to break and gold running short: gold goes to the wing and the cheapest soldiers.
+    if (v.plan.target && (cost.gold ?? 0) > 30 && v.budget.gold < 300 && unit !== counter) continue;
     if (!afford(v, cost)) continue;
     issue({ t: 'train', p: p.id, building: b.id, unit });
     spend(v, cost);
@@ -896,7 +941,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
       return;
     }
   }
-  if (mem.attacking && ready.length >= (plan.allIn ? 1 : 4)) {
+  if (mem.attacking && ready.length >= (plan.allIn ? 6 : 4)) {
     // Reinforcements join the attack.
     issue({ t: 'move', p: p.id, ids: ready.map((u) => u.id), x: enemy.x, y: enemy.y, amove: true });
     return;
@@ -1271,14 +1316,18 @@ function chapterGoals(s: GameState, v: View, mem: AiMemory, issue: (c: Command) 
   return plan;
 }
 
-/** The goal's target: the nearest standing Town Center of a rival, one not yet burned first. */
+/**
+ * The goal's target: a standing Town Center of a rival not yet burned, the strongest rival's first.
+ * With two rivals, burning the weaker one only hands the field to the stronger; striking the leader
+ * while the other rival harries them too keeps either from running away with the match.
+ */
 function rivalTownCenter(s: GameState, p: Player): Building | null {
   let best: Building | null = null;
   let bestD = Infinity;
   const burned = s.scenario?.burned ?? [];
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.type !== 'towncenter' || !e.built || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
-    const d = (e.x - p.startX) * (e.x - p.startX) + (e.y - p.startY) * (e.y - p.startY) + (burned.includes(e.owner) ? 1e6 : 0);
+    const d = (e.x - p.startX) * (e.x - p.startX) + (e.y - p.startY) * (e.y - p.startY) - s.players[e.owner].pop * 400 + (burned.includes(e.owner) ? 1e6 : 0);
     if (d < bestD) {
       bestD = d;
       best = e;
