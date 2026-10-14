@@ -858,5 +858,7 @@ export const ATTRITION = { every: 5, deep: 9, loss: 0.02 };
  * The computer reads the borders (#132 s4): a wave out in enemy land, past its own team's supply, whose
  * soldiers have worn to under `weary` of their health on average, with no enemy within `calm` tiles, falls
  * back to the muster to heal and regroup instead of dying to attrition. Not when it is all in, or racing a wonder.
+ * A clever computer with `pop` citizens also raises one forward Tower `fort` tiles toward its rival, at the edge of its own
+ * land, so its next wave has a border to fight from (#132 s5).
  */
-export const AI_RAID = { weary: 0.5, calm: 7 };
+export const AI_RAID = { weary: 0.5, calm: 7, fort: 15, pop: 24 };

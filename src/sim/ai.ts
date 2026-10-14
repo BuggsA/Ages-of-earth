@@ -678,6 +678,13 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     if (spot && construct(s, v, mem, type, spot, type === 'tower' ? 2 : 3, issue)) return;
   }
 
+  // A forward Tower at the edge of our land: a foothold, so the next wave has a border to fight from (#132 s5).
+  if (clever && p.epoch >= 1 && n >= AI_RAID.pop && !recently('tower', 60) && count(v, 'tower') >= L.towers && count(v, 'tower') < L.towers + 1) {
+    const at = towardEnemy(AI_RAID.fort);
+    const spot = findSpot(s, 'tower', at.x, at.y, 0, 5);
+    if (spot && construct(s, v, mem, 'tower', spot, 2, issue)) return;
+  }
+
   // A wonder, when rich in the last epoch.
   if (clever && p.epoch >= 3 && count(v, 'wonder') === 0 && !recently('wonder', 60)) {
     const cost = buildingCostFor(s, p.id, 'wonder');
