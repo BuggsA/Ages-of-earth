@@ -572,13 +572,15 @@ export interface Mods {
   traderSpeed: number;
   tradeGold: number;
   relicGold: number;
+  /** Extra tiles of water a trading post may lie from the sea and still be a port. */
+  portReach: number;
 }
 
 export const NO_MODS: Mods = {
   meleeAttack: 0, rangedAttack: 0, armor: 0, parmor: 0, range: 0, carry: 0, citizenSpeed: 1, wood: 1, mine: 1, farm: 1, forage: 1, hunt: 1,
   buildingHp: 1, buildSpeed: 1, militaryTrain: 1, rangedTrain: 1, cavalrySpeed: 1, infantryHp: 1, infantryArmor: 0, infantryAttack: 0, priest: 1,
   siegeAttack: 1, siegeRange: 0, techCost: 1, wonderCost: 1, extraCitizens: 0, fish: 1, shipHp: 1, shipRange: 0, airSpeed: 1, airHp: 1,
-  traderSpeed: 1, tradeGold: 1, relicGold: 1,
+  traderSpeed: 1, tradeGold: 1, relicGold: 1, portReach: 0,
 };
 
 export interface Tech {
@@ -620,6 +622,7 @@ export const TECHS: Record<TechId, Tech> = {
   theology: { name: 'Theology', at: 'temple', epoch: 2, cost: { gold: 200 }, time: 40, mul: { priest: 1.5 }, blurb: 'Priests convert and heal half again as fast.', icon: '✨' },
   chemistry: { name: 'Chemistry', at: 'workshop', epoch: 3, cost: { food: 300, gold: 200 }, time: 45, add: { siegeRange: 1 }, mul: { siegeAttack: 1.2 }, blurb: 'Siege hits 20% harder and reaches 1 tile farther.', icon: '🧪' },
   gillnets: { name: 'Gillnets', at: 'dock', epoch: 1, cost: { food: 100, wood: 100 }, time: 30, mul: { fish: 1.25 }, blurb: 'Fishing boats fish 25% faster.', icon: '🐟' },
+  lighthouse: { name: 'Lighthouse', at: 'dock', epoch: 2, cost: { wood: 200, gold: 120 }, time: 35, needs: 'gillnets', add: { portReach: 4 }, blurb: 'A beacon on the headland: trading posts up to 4 tiles farther from the water become ports for your merchant ships.', icon: '🗼' },
   shipwright: { name: 'Shipwright', at: 'dock', epoch: 2, cost: { wood: 250, gold: 150 }, time: 40, add: { shipRange: 1 }, mul: { shipHp: 1.2 }, blurb: 'Ships are 20% sturdier, and warships shoot 1 tile farther.', icon: '⚓' },
   rifling: { name: 'Rifling', at: 'forge', epoch: 4, cost: { food: 300, gold: 250 }, time: 45, needs: 'bodkin', add: { rangedAttack: 2, range: 1 }, blurb: '+2 attack and +1 range for riflemen and towers.', icon: '🎯' },
   steamEngine: { name: 'Steam Engine', at: 'towncenter', epoch: 4, cost: { food: 400, wood: 300 }, time: 50, add: { carry: 4 }, mul: { citizenSpeed: 1.15, wood: 1.1, mine: 1.1 }, blurb: 'Citizens carry 4 more, walk 15% faster, and cut and mine 10% faster.', icon: '🚂' },

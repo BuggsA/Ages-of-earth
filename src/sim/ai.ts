@@ -61,7 +61,7 @@ const TILE_OF: Record<Res, number> = { food: R_BERRY, wood: R_TREE, stone: R_STO
 const TECH_ORDER: TechId[] = [
   'plow', 'axes', 'wheelbarrow', 'picks', 'forging', 'scaleArmor', 'fletching', 'husbandry', 'irrigation', 'saws', 'shafts', 'handcart',
   'ironCasting', 'chainMail', 'bodkin', 'masonry', 'theology', 'conscription', 'blastFurnace', 'plateArmor', 'chemistry',
-  'gillnets', 'shipwright', 'steamEngine', 'rifling', 'aviation', 'caravan', 'banking', 'pilgrimage',
+  'gillnets', 'shipwright', 'lighthouse', 'steamEngine', 'rifling', 'aviation', 'caravan', 'banking', 'pilgrimage',
 ];
 /** Seconds a computer keeps its traders off a road after losing one on it. */
 const TRADER_WARY = 240;
@@ -1533,7 +1533,7 @@ function seaMerchants(s: GameState, v: View, issue: (c: Command) => void): void 
   let best: TradePost | null = null;
   let bestGold = 0;
   for (const post of s.posts) {
-    if (!portSpot(s, post)) continue;
+    if (!portSpot(s, post, p.id)) continue;
     const g = tripGold(s, p.id, dock, post, true);
     if (g > bestGold) {
       bestGold = g;
