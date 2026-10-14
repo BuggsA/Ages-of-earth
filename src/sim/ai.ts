@@ -367,12 +367,12 @@ function ironRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
 }
 
 /**
- * Whether it is bound for the merchants' age (#50): in the Bronze Age, on a map with trading posts, of a
- * mind to take that road, and with an army up to a wave (the Market's wood is the army's too). It then
- * raises its Market before it is otherwise due.
+ * Whether it is bound for the merchants' age (#50): in the Bronze Age, on a map with trading posts, and
+ * of a mind to take that road. It then raises its Market before it is otherwise due (its traders are the
+ * Bronze Age's usual few: each costs the army wood).
  */
 function merchantBound(s: GameState, v: View, mem: AiMemory): boolean {
-  return walksWeb(v) && s.posts.length > 0 && ageOf(v.p) === 'bronze' && v.army.length >= AI_LEVELS[v.p.ai!].wave && wants(s, v.p, mem, 'merchant');
+  return walksWeb(v) && s.posts.length > 0 && ageOf(v.p) === 'bronze' && wants(s, v.p, mem, 'merchant');
 }
 
 /** Whether any rival stands in this age: a people's age is on the scoreboard for all to read. */
