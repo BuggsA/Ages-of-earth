@@ -468,6 +468,8 @@ export interface AiMemory {
   caravans?: Record<number, number>;
   /** Post id → the tick a trader was last lost on the road to it, so it keeps off that road a while. */
   roadLost?: Record<number, number>;
+  /** A chapter's seat: the rival Town Center its army is striking, held while a wave is out. */
+  goal?: number;
 }
 
 /** Orders that can be given with Shift held to queue them after the current one. */

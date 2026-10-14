@@ -130,7 +130,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   // People first: a growing town pays for everything else.
   const advancing = buildings.some((b) => b.advance >= 0);
   const queuedCitizens = buildings.reduce((n, b) => n + b.queue.filter((q) => q.unit === 'citizen').length, 0);
-  const wantCitizens = Math.min(L.citizens + p.epoch * 3, 60);
+  const wantCitizens = Math.min(L.citizens + p.epoch * 3 + (AIX.includes('c') ? twoFronts(s, p) * 12 : 0), 60);
   if (tc && !advancing && citizens.length + queuedCitizens < wantCitizens && tc.queue.length < 2) {
     const cost = unitStats('citizen', p.epoch).cost;
     if (afford(v, cost)) {
@@ -1226,7 +1226,7 @@ function chapterGoals(s: GameState, v: View, mem: AiMemory, issue: (c: Command) 
       const rivals = s.players.filter((q) => q.team !== p.team && !q.defeated).length;
       plan.wave = 10 + (rivals - 1) * 14 + mem.wave * 2;
       plan.siege = 4;
-      plan.target = rivalTownCenter(s, p);
+      plan.target = AIX.includes('t') ? strikeAt(s, p, mem) : rivalTownCenter(s, p);
       const left = sc.limit ? sc.limit - s.tick / 20 : Infinity;
       plan.allIn = sc.limit ? left < sc.limit * 0.45 : false;
     } else if (o.kind === 'build' && now < goal && o.type) {
@@ -1292,6 +1292,25 @@ function chapterGoals(s: GameState, v: View, mem: AiMemory, issue: (c: Command) 
       } else if (!o.bonus) spend(v, cost);
     }
   }
+  // Two rivals: towers on the road each one comes by, so home holds while the army is away at the other.
+  if (AIX.includes('w') && twoFronts(s, p) && p.epoch >= 1 && v.citizens.length >= 20 && !recently('tower', 20)) {
+    const towers = v.buildings.filter((b) => b.type === 'tower');
+    for (const q of s.players) {
+      if (q.team === p.team || q.defeated) continue;
+      const qx = q.startX - v.home.x;
+      const qy = q.startY - v.home.y;
+      const ql = Math.sqrt(qx * qx + qy * qy) || 1;
+      const ax = v.home.x + (qx / ql) * 10;
+      const ay = v.home.y + (qy / ql) * 10;
+      const near = towers.filter((b) => (b.x - ax) * (b.x - ax) + (b.y - ay) * (b.y - ay) < 64).length;
+      if (near >= 2) continue;
+      const cost = buildingCostFor(s, p.id, 'tower');
+      const side = near ? 3 : -3;
+      const spot = afford(v, cost) ? findSpot(s, 'tower', ax - (qy / ql) * side, ay + (qx / ql) * side, 0, 6) : null;
+      if (spot) construct(s, v, mem, 'tower', spot, 3, issue);
+      break;
+    }
+  }
   if (plan.wave) {
     plan.hold = false;
     // Food and wood piling up while the rival town stands: more places to train soldiers.
@@ -1304,6 +1323,44 @@ function chapterGoals(s: GameState, v: View, mem: AiMemory, issue: (c: Command) 
     }
   }
   return plan;
+}
+
+const AIX: string = (globalThis as any).process?.env?.AIX ?? '';
+
+/** 1 when the computer plays a chapter's own seat that must burn the Town Centers of two rivals or more still standing, else 0. */
+function twoFronts(s: GameState, p: Player): number {
+  const run = s.scenario;
+  if (!run || run.result || p.id !== 0) return 0;
+  const sc = scenarioById(run.id);
+  if (!sc || !sc.objectives.some((o, i) => o.kind === 'destroy' && !run.done[i])) return 0;
+  return s.players.filter((q) => q.team !== p.team && !q.defeated && !run.burned?.includes(q.id)).length >= 2 ? 1 : 0;
+}
+
+/**
+ * The Town Center to strike with two rivals standing: the one left with the fewest soldiers at home,
+ * so the blow lands while its army is away fighting the other rival. Held while a wave is out.
+ */
+function strikeAt(s: GameState, p: Player, mem: AiMemory): Building | null {
+  const held = mem.goal ? s.byId.get(mem.goal) : undefined;
+  if (mem.attacking && held && held.kind === 'building' && held.hp > 0 && !s.scenario?.burned?.includes(held.owner)) return held;
+  let best: Building | null = null;
+  let bestD = Infinity;
+  const burned = s.scenario?.burned ?? [];
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'towncenter' || !e.built || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
+    let guard = 0;
+    for (const u of s.ents) {
+      if (u.kind !== 'unit' || u.owner !== e.owner || u.hp <= 0 || u.type === 'citizen' || u.type === 'trader' || u.type === 'fisher') continue;
+      if ((u.x - e.x) * (u.x - e.x) + (u.y - e.y) * (u.y - e.y) < 24 * 24) guard++;
+    }
+    const d = Math.sqrt((e.x - p.startX) * (e.x - p.startX) + (e.y - p.startY) * (e.y - p.startY)) + guard * 6 + (burned.includes(e.owner) ? 1e6 : 0);
+    if (d < bestD) {
+      bestD = d;
+      best = e;
+    }
+  }
+  mem.goal = best?.id;
+  return best;
 }
 
 /** The goal's target: the nearest standing Town Center of a rival, one not yet burned first. */
