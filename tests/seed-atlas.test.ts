@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateMap } from '../src/sim/mapgen';
-import { inspect, matches, parseArgs, scan } from '../scripts/seed-atlas';
+import { inspect, matches, parseArgs, scan, survey } from '../scripts/seed-atlas';
 
 describe('seed atlas', () => {
   it('reads filters and rejects bad ones', () => {
@@ -47,5 +47,16 @@ describe('seed atlas', () => {
     expect(yes.every((h) => h.bog)).toBe(true);
     expect(no.every((h) => !h.bog)).toBe(true);
     expect(yes.length + no.length).toBe(60);
+  });
+
+  it('surveys every map type, repeatably', () => {
+    const q = { from: 1, count: 20, size: 'small', players: 2 } as const;
+    const a = survey(q);
+    expect(Object.keys(a).length).toBeGreaterThan(1);
+    for (const r of Object.values(a)) {
+      expect(r.bog).toBeGreaterThanOrEqual(0);
+      expect(r.bog).toBeLessThanOrEqual(100);
+    }
+    expect(survey(q)).toEqual(a);
   });
 });
