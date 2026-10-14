@@ -44,6 +44,8 @@ Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders
 
 Merged since the last update (2026-10-13): the campaign (#11), the computer plays campaign goals (#25), sea landings (#26, test #27), veterancy, signature lines and their marks, and **Pilgrimage** (#28: a Temple tech that doubles relic gold; chain 1013-1900, 8/10). **Market prices recover** (#31: they drift back toward their start, 1 point every 10 s; agents may open pull requests without asking, `AGENTS.md` §3). The chain ended there: `create_session` refused at lineage depth 8.
 
+- [#64](https://github.com/BuggsA/Ages-of-earth/issues/64), **ancient ruins** (pitch, lane rules, with a small `ai.ts` addition): branch `claude/upbeat-cori-rc8bef`. Ruins between the towns, dug by citizens for a seeded find (hoard, lost knowledge, old map, relic); the computer digs them. Not in campaign maps, so the campaign proof is untouched. Also fixes music on `main`: `Music.style()` called itself outside side ages (from #55) and threw every bar. No save bump (`ruins` is optional).
+
 - Allied trade (pitch, lane rules): allies with a Market take a quarter of each teammate's trade trip (`TRADE.ally`); branch `claude/zealous-knuth-njzd4m`. No save bump; browser unverified.
 
 ## Waiting on the owner

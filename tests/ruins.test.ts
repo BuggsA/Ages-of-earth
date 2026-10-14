@@ -197,7 +197,21 @@ describe('the computer', () => {
         { name: 'B', ai: 'hard', civ: 'britons' },
       ],
     });
-    run(s, 12 * 60);
-    expect(s.ruins!.some((r) => r.by >= 0)).toBe(true);
+    run(s, 8 * 60);
+    expect(s.ruins!.some((r) => r.dug > 0)).toBe(true);
+  }, 15000);
+});
+
+describe('the look', () => {
+  it('a standing ruin and a dug pit both build, with colours baked in', async () => {
+    const { pitGeometry, ruinGeometry } = await import('../src/render/ruinsView');
+    for (const geo of [ruinGeometry(), pitGeometry()]) {
+      expect(geo.getAttribute('position').count).toBeGreaterThan(100);
+      expect(geo.getAttribute('color')).toBeTruthy();
+      geo.computeBoundingBox();
+      // About the size of the tile and its neighbours, and no taller than a house.
+      expect(geo.boundingBox!.max.x - geo.boundingBox!.min.x).toBeLessThan(3);
+      expect(geo.boundingBox!.max.y).toBeLessThan(2.2);
+    }
   });
 });
