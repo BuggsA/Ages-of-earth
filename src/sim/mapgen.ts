@@ -1,6 +1,6 @@
-import { AMOUNT, BOG_IRON, MAP_SIZES, RELIC, TRADE } from './data';
+import { AMOUNT, BOG_IRON, MAP_SIZES, RELIC, RUINS, TRADE } from './data';
 import { fbm, mulberry32, type Rng } from './rng';
-import type { MapSize, MapType } from './types';
+import type { MapSize, MapType, RuinFind } from './types';
 import { B_RES, B_TERRAIN, R_BERRY, R_BOG, R_FISH, R_GOLD, R_NONE, R_STONE, R_TREE, T_GRASS, T_ROCK, T_SAND, T_WATER } from './types';
 
 /**
@@ -51,6 +51,8 @@ export interface MapData {
   posts: { x: number; y: number }[];
   /** Whether this world holds bog iron (#39). */
   bogIron: boolean;
+  /** Ancient ruins (#64): where they stand (tile centers) and what lies under each. */
+  ruins: { x: number; y: number; find: RuinFind }[];
 }
 
 const DIR8 = [
@@ -65,7 +67,7 @@ function shuffle<T>(rng: Rng, a: T[]): T[] {
   return a;
 }
 
-/** `deposits` false leaves out what only some seeds hold (bog iron): campaign maps stay as they were made. */
+/** `deposits` false leaves out what only some seeds hold (bog iron, ruins): campaign maps stay as they were made. */
 export function generateMap(seed: number, size: MapSize, players = 2, type: MapType = 'continental', deposits = true): MapData {
   const R = RECIPES[type];
   const WL = R.water;
@@ -511,6 +513,7 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
   const relics = placeRelics(seed, size, w, h, terrain, res, starts);
   const posts = placePosts(seed, size, w, h, terrain, height, res, amount, starts, relics);
   const bogIron = deposits && placeBogIron(seed, w, h, terrain, res, amount, starts, deer, relics, posts);
+  const ruins = deposits ? placeRuins(seed, size, w, h, terrain, res, starts, deer, relics, posts) : [];
 
   // Resources nobody could stand next to are cleared away.
   const block = new Uint8Array(w * h);
@@ -519,7 +522,7 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
     if (res[i] !== R_NONE) block[i] |= B_RES;
   }
 
-  return { w, h, terrain, height, res, amount, block, starts, deer, relics, posts, bogIron };
+  return { w, h, terrain, height, res, amount, block, starts, deer, relics, posts, bogIron, ruins };
 }
 
 /** Where a town's people can walk to without cutting a tree (or, with `axes`, by cutting their way). */
@@ -822,4 +825,69 @@ function placeBogIron(
     }
   }
   return true;
+}
+
+/**
+ * Ancient ruins (#64), fairly: out between the towns, each about as far from its two nearest towns,
+ * well away from every town, from relics, trading posts and each other, on open ground every town can
+ * walk to. What lies under each is dealt from a shuffled hand of the four finds, so a small map's two
+ * ruins never hold the same thing. They roll their own dice and touch nothing, so the rest of the map
+ * is the same as it would be without them.
+ */
+function placeRuins(
+  seed: number,
+  size: MapSize,
+  w: number,
+  h: number,
+  terrain: Uint8Array,
+  res: Uint8Array,
+  starts: { x: number; y: number }[],
+  deer: { x: number; y: number }[],
+  relics: { x: number; y: number }[],
+  posts: { x: number; y: number }[],
+): { x: number; y: number; find: RuinFind }[] {
+  const rng = mulberry32(seed ^ 0x5a1e0b);
+  const land = (x: number, y: number) => x >= 2 && y >= 2 && x < w - 2 && y < h - 2 && (terrain[y * w + x] === T_GRASS || terrain[y * w + x] === T_SAND);
+  const near = (list: { x: number; y: number }[], x: number, y: number, r: number) =>
+    list.some((p) => (p.x - x - 0.5) * (p.x - x - 0.5) + (p.y - y - 0.5) * (p.y - y - 0.5) < r * r);
+  const open = (x: number, y: number, r: number) => {
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (!land(x + dx, y + dy) || res[(y + dy) * w + x + dx] !== R_NONE) return false;
+    return true;
+  };
+  const reaches = starts.map((st) => reachFrom(w, h, terrain, res, st));
+  const out: { x: number; y: number }[] = [];
+  const want = RUINS.count[size];
+  // Looser and looser: less even distances, then only the ruin's own tile and its neighbours clear.
+  for (let pass = 0; pass < 4 && out.length < want; pass++) {
+    const fair = RUINS.fair * (1 + pass);
+    const room = pass < 2 ? 2 : 1;
+    const candidates: number[] = [];
+    for (let y = 3; y < h - 3; y++) {
+      for (let x = 3; x < w - 3; x++) {
+        if (!open(x, y, room) || reaches.some((r) => r[y * w + x] !== 1)) continue;
+        const ds = starts.map((st) => Math.sqrt((x + 0.5 - st.x) * (x + 0.5 - st.x) + (y + 0.5 - st.y) * (y + 0.5 - st.y))).sort((a, b) => a - b);
+        if (ds[0] < RUINS.home || (ds.length > 1 && ds[1] - ds[0] > fair)) continue;
+        if (near(relics, x, y, 4) || near(posts, x, y, TRADE.plaza + 4) || near(deer, x, y, 2)) continue;
+        candidates.push(y * w + x);
+      }
+    }
+    for (let guard = 0; out.length < want && candidates.length && guard < want * 60; guard++) {
+      const i = candidates[Math.floor(rng() * candidates.length)];
+      const x = i % w;
+      const y = (i - x) / w;
+      if (out.some((p) => (p.x - x) * (p.x - x) + (p.y - y) * (p.y - y) < RUINS.spacing * RUINS.spacing)) continue;
+      out.push({ x, y });
+    }
+  }
+  // Deal the finds: a fresh shuffled hand of all four for every four ruins.
+  const finds: RuinFind[] = [];
+  while (finds.length < out.length) {
+    const hand: RuinFind[] = ['hoard', 'lore', 'map', 'relic'];
+    for (let i = hand.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [hand[i], hand[j]] = [hand[j], hand[i]];
+    }
+    finds.push(...hand);
+  }
+  return out.map((p, k) => ({ x: p.x + 0.5, y: p.y + 0.5, find: finds[k] }));
 }

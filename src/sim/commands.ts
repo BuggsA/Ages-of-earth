@@ -8,6 +8,7 @@ import { RES, R_FISH, R_NONE } from './types';
 import { RES_OF_TILE, cargoRoom, freeFarm, garrisonRoom, giveOrder, landing, setOrder, ungarrison } from './units';
 import { carriedBy, letGo, relicAt } from './relics';
 import { marketOf, nearestMarket, postAt } from './trade';
+import { ruinAt } from './ruins';
 import { canHit, isEnemy, maxHp, pay, placeBuilding, refund } from './world';
 
 /**
@@ -268,6 +269,17 @@ export function applyCommand(s: GameState, c: Command): void {
       }
       const others = units.filter((u) => u.type !== 'trader');
       if (others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: post.x, y: post.y, queue: c.queue });
+      break;
+    }
+    case 'dig': {
+      const r = ruinAt(s, c.target);
+      if (!r) return;
+      const units = myUnits(s, c.p, c.ids);
+      if (r.by >= 0) {
+        if (units.some((u) => u.type === 'citizen')) refuse(s, c.p, 'These ruins have been dug out already');
+      } else for (const u of units) if (u.type === 'citizen') giveOrder(u, { k: 'dig', target: r.id }, c.queue);
+      const others = units.filter((u) => u.type !== 'citizen');
+      if (others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: r.x, y: r.y, queue: c.queue });
       break;
     }
     case 'dropRelic':

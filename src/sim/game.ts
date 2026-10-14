@@ -15,7 +15,7 @@ import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, 
 import { RES, R_FISH, R_NONE } from './types';
 import { RES_OF_TILE, carryCargo, checkStuck, collide, findResource, routeUnits, separate, setOrder, think, ungarrison, walk } from './units';
 import { updateVision } from './vision';
-import { countPop, exitSpot, maxHp, placeBuilding, refund, spawnUnit } from './world';
+import { countPop, exitSpot, maxHp, placeBuilding, refund, restat, spawnUnit } from './world';
 
 /**
  * The match: made from a seed and a list of players, then advanced one fixed tick at a time with the
@@ -152,6 +152,7 @@ export function createGame(setup: GameSetup): GameState {
   for (const d of map.deer) spawnAnimal(s, d.x, d.y);
   for (const r of map.relics) s.relics.push({ id: s.nextId++, x: r.x, y: r.y, carrier: 0, temple: 0 });
   for (const t of map.posts) s.posts.push({ id: s.nextId++, x: t.x, y: t.y });
+  if (map.ruins.length) s.ruins = map.ruins.map((r) => ({ id: s.nextId++, x: r.x, y: r.y, find: r.find, dug: 0, by: -1 }));
   countPop(s);
   updateVision(s);
   // Everyone knows the lie of the land around home.
@@ -177,18 +178,6 @@ function spatial(s: GameState): Spatial {
   return sp;
 }
 
-/** Change a player's stats (an epoch, a technology), keeping every unit's and building's share of health. */
-function restat(s: GameState, p: Player, change: () => void): void {
-  const before = new Map<number, number>();
-  for (const e of s.ents) if (e.owner === p.id && e.hp > 0) before.set(e.id, maxHp(s, e));
-  change();
-  p.statsVersion++;
-  for (const e of s.ents) {
-    const was = before.get(e.id);
-    if (!was) continue;
-    e.hp = (e.hp * maxHp(s, e)) / was;
-  }
-}
 
 /**
  * Into another age (#37): every unit re-arms to the age's tier and every building is rebuilt in its
@@ -494,6 +483,10 @@ export function checksum(s: GameState): number {
     mix(r.y);
     mix(r.carrier);
     mix(r.temple);
+  }
+  for (const r of s.ruins ?? []) {
+    mix(r.dug);
+    mix(r.by);
   }
   for (const p of s.players) for (const r of RES) mix(p.res[r]);
   for (const sh of s.shots) mix(sh.t);
