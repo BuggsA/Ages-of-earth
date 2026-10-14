@@ -1,0 +1,100 @@
+import * as THREE from 'three';
+import { BUILDINGS, type UnitStats } from '../sim/data';
+import { modsOf, statsFor } from '../sim/stats';
+import type { BuildingType, Ent, GameState } from '../sim/types';
+import { heightAt } from './terrain';
+import { WATER_Y } from './water';
+
+/** Presentation limits, not balance: one draw call and reusable buffers even for a large army. */
+export const MAX_RANGE_GUIDES = 24;
+const SEGMENTS = 128;
+const LIFT = 0.08;
+const OUTER = new THREE.Color('#a9e9ff');
+const INNER = new THREE.Color('#ffd166');
+
+export interface RangeGuide {
+  x: number;
+  y: number;
+  reach: number;
+  minimum: number;
+}
+
+function unitReach(st: UnitStats): Pick<RangeGuide, 'reach' | 'minimum'> | null {
+  if (!st.shot || st.attack <= 0 || st.range <= 0) return null;
+  // Combat measures from the attacker's edge to the target's edge. This reference circle
+  // is where a target's NEAR EDGE can be reached; its center may be farther away.
+  return { reach: st.range + st.radius, minimum: st.minRange ? st.minRange + st.radius : 0 };
+}
+
+/** Only inspect the viewer's own, living, exposed selections. Never read a rival's private stats. */
+export function selectedRange(s: GameState, viewer: number, e: Ent): RangeGuide | null {
+  if (e.owner !== viewer || e.hp <= 0) return null;
+  if (e.kind === 'unit') {
+    if (e.inside) return null;
+    const reach = unitReach(statsFor(s, viewer, e.type));
+    return reach ? { x: e.x, y: e.y, ...reach } : null;
+  }
+  if (!e.built) return null;
+  const guns = BUILDINGS[e.type].guns;
+  return guns ? { x: e.x, y: e.y, reach: guns.range + modsOf(s, viewer).range + e.size / 2, minimum: 0 } : null;
+}
+
+/** A defense's future reach, including this player's researched range. */
+export function placementRange(s: GameState, viewer: number, type: BuildingType, tx: number, ty: number): RangeGuide | null {
+  const def = BUILDINGS[type];
+  return def.guns ? {
+    x: tx + def.size / 2, y: ty + def.size / 2,
+    reach: def.guns.range + modsOf(s, viewer).range + def.size / 2, minimum: 0,
+  } : null;
+}
+
+/** Terrain-following weapon guides: solid outer reach, broken inner dead zone. */
+export class RangeGuides {
+  readonly mesh: THREE.LineSegments;
+  private positions = new THREE.BufferAttribute(new Float32Array(MAX_RANGE_GUIDES * SEGMENTS * 4 * 3), 3);
+  private colors = new THREE.BufferAttribute(new Float32Array(MAX_RANGE_GUIDES * SEGMENTS * 4 * 3), 3);
+
+  constructor() {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', this.positions.setUsage(THREE.DynamicDrawUsage));
+    geometry.setAttribute('color', this.colors.setUsage(THREE.DynamicDrawUsage));
+    geometry.setDrawRange(0, 0);
+    this.mesh = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({
+      vertexColors: true, transparent: true, opacity: 0.85, depthWrite: false, fog: false, toneMapped: false,
+    }));
+    this.mesh.frustumCulled = false;
+    this.mesh.renderOrder = 4;
+  }
+
+  update(s: GameState, guides: readonly RangeGuide[], visible: (x: number, y: number) => boolean): void {
+    let n = 0;
+    const open = (x: number, y: number) => x >= 0 && y >= 0 && x < s.w && y < s.h && visible(x, y);
+    for (const g of guides.slice(0, MAX_RANGE_GUIDES)) {
+      for (const minimum of [false, true]) {
+        const radius = minimum ? g.minimum : g.reach;
+        if (!(radius > 0)) continue;
+        const color = minimum ? INNER : OUTER;
+        for (let i = 0; i < SEGMENTS; i++) {
+          if (minimum && i % 4 >= 2) continue;
+          const a = i * Math.PI * 2 / SEGMENTS;
+          const b = (i + 1) * Math.PI * 2 / SEGMENTS;
+          const x0 = g.x + Math.cos(a) * radius;
+          const y0 = g.y + Math.sin(a) * radius;
+          const x1 = g.x + Math.cos(b) * radius;
+          const y1 = g.y + Math.sin(b) * radius;
+          // Test the midpoint too: don't bridge a hidden tile between two visible endpoints.
+          if (!open(x0, y0) || !open(x1, y1) || !open((x0 + x1) / 2, (y0 + y1) / 2)) continue;
+          for (const [x, y] of [[x0, y0], [x1, y1]]) {
+            this.positions.setXYZ(n, x, Math.max(WATER_Y, heightAt(s, x, y)) + LIFT, y);
+            this.colors.setXYZ(n++, color.r, color.g, color.b);
+          }
+        }
+      }
+    }
+    this.mesh.geometry.setDrawRange(0, n);
+    if (n) {
+      this.positions.needsUpdate = true;
+      this.colors.needsUpdate = true;
+    }
+  }
+}
