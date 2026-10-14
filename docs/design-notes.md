@@ -441,6 +441,10 @@ Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), n
 
 **Pennants in the wind** (own pitch, lane look): ship masts carry a small team pennant and riders' and siege engines' pole banners flutter, streaming downwind through the same cloth shader as building banners (`pennant` in `src/render/unitModels.ts`; `unitMaterial` gained `flag`). **Why I love it:** a fleet at anchor now shows which way the day blows. **Next:** billowing square sails, which want a different bend than cloth along z. Render only, no save change. Seen: `browser-smoke` passes with no console errors; how it looks in a match is unseen.
 
+## Designers' notes: answering the flame (own pitch, 2026-10-14, chain 1014-2155 s8, lane ai)
+
+**Built:** a clever computer that sees a rival's beacon burning within `AI_RAID.flame` (24) tiles of one of its Towers lights that Tower's own, so a flame you light to warn your town now draws a reply from a watchful neighbour. **Why I love it:** the beacon's trade-off (warning for exposure) now has a cost you can read in play: a rival that sees your fire stirs. **Seen:** `tests/beacon.test.ts` (one test fails without the change, one checks the range). No win-rate sweep. **Next:** reading the flame to move a wave toward or away from it; a beacon relay for the computer's own chain.
+
 ### The Rallying Cry (own pitch), 2026-10-14
 
 **Built:** the hero's aura was always on and never a decision. Now R is a shout: soldiers within 8 tiles hit 30% harder, take 1 less damage and are mended for 12 seconds, then 70 seconds of rest. Clever computers call it when the lines meet.

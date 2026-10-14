@@ -12,8 +12,9 @@ import { findRoute } from './path';
 import { isEnemy, maxHp } from './world';
 import { borderMap, suppliedAt } from './borders';
 import { workProblem } from './works';
-import { beaconProblem } from './beacon';
+import { beaconProblem, lit } from './beacon';
 import { rallyProblem } from './rally';
+import { sees } from './vision';
 import { progress, scenarioById } from './campaign';
 
 /**
@@ -1210,7 +1211,7 @@ function lightBeacons(s: GameState, v: View, issue: (c: Command) => void): void 
       if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !isEnemy(s, v.p.id, e.owner) || e.type === 'citizen' || e.type === 'trader') continue;
       if (distToRect(e.x, e.y, b) < 12 && ++n >= 3) break;
     }
-    if (n >= 3) {
+    if (n >= 3 || flameNear(s, v, b)) {
       issue({ t: 'beacon', p: v.p.id, building: b.id });
       return;
     }
@@ -1232,6 +1233,17 @@ function rallyTheLine(s: GameState, v: View, issue: (c: Command) => void): void 
     }
     if (mine >= 4 && foes >= 2) issue({ t: 'cry', p: v.p.id, id: h.id });
   }
+}
+
+/** A rival's beacon that this player can see burning, within `AI_RAID.flame` tiles of the tower: its army is on the move near us, so we answer the flame. */
+function flameNear(s: GameState, v: View, tower: Building): boolean {
+  const r2 = AI_RAID.flame * AI_RAID.flame;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'tower' || e.hp <= 0 || !isEnemy(s, v.p.id, e.owner) || !lit(s, e) || !sees(s, v.p.id, e.x, e.y)) continue;
+    const dx = e.x - tower.x, dy = e.y - tower.y;
+    if (dx * dx + dy * dy <= r2) return true;
+  }
+  return false;
 }
 
 function townBell(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
