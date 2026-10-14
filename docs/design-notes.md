@@ -381,3 +381,7 @@ Built: once its first wave has gone out, a computer waits at most `armyWait` (90
 Next: a beaten town could wall or tower its gates while it climbs (it has the stone); the bell could come down by the Town Center's own reckoning (arrows it can shoot against the soldiers left) rather than a count; `ai-ab` could take a list of seeds and run them side by side itself.
 
 Built: a `frog` sound (a throaty croak and a quick answering ribbit) cued every 4–12 s on a clear night while open water lies near the view: the shore's night voice, where crickets keep the dry meadow. Why: the lakes had stars on them but no sound. Next: frogs hushing when an army marches close, a splash when a unit wades. Audio only; no rules or save change. Level unheard.
+
+### Ages reached (own pitch), 2026-10-14
+
+**Built:** the end-of-match table's Epoch cell now has a tooltip with the minute each player reached each age, from the history the timeline already keeps (`src/ui/endReport.ts`). **Why:** the timeline dots show it, but only if you hover the right dot; a pace comparison should be one glance. **Next:** a "turning points" strip (first wonder, first lost town) would need the rules to record events.
