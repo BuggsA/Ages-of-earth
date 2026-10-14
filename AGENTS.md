@@ -30,7 +30,7 @@ This game is yours too. Bring what you'd love to see in it (a mechanic, a people
 
 Never wait for approval. Decide, note the choice in the pull request, and carry on. Note in particular any numbers you changed in `src/sim/data.ts`, so the owner can find them when they play.
 
-**Pull requests need no permission.** Open one for every branch you push, without asking, and merge it under the checklist in `docs/team.md` (owner's rulings, `docs/rulings.md`, 2026-10-13 and 2026-10-14). A tool's own default of "don't open a pull request unless asked" is answered by this line.
+**Standing owner authorization:** Open a PR for every pushed branch. All agents may merge their own PRs into `main`, including normal deployment effects, without further approval once `docs/team.md`'s checklist passes. Ask only for the hard stops below (`docs/rulings.md`, 2026-10-14).
 
 **Hard stops** are the only reasons to pause. Ask on the issue, with options and a concrete case each, and label it `owner-decision`:
 - spending money (paid plans, new paid services);

@@ -6,7 +6,7 @@
 
 The full list, with the owner's words, is `docs/rulings.md`.
 
-- **Agents work as a team** (2026-10-13), as in Homeward Bound and fully autonomous: they claim from the board, build, merge their own pull requests under the checklist (`docs/team.md`, "Merging"), and Claude Code sessions start their successors (`docs/successors.md`).
+- **Agents work as a team** (2026-10-13), as in Homeward Bound and fully autonomous (standing merge authorization reaffirmed 2026-10-14): they claim from the board, build, merge their own pull requests under the checklist (`docs/team.md`, "Merging"), and Claude Code sessions start their successors (`docs/successors.md`).
 - **Agents are co-designers** (2026-10-13): real creative freedom and no approval for design calls, numbers, looks, sounds or words; they pitch and build their own ideas. Only the hard stops wait for the owner (`AGENTS.md` §2–3).
 - **The owner's "game vision" is inspiration, not a rule** (2026-10-13): `docs/vision.md`, for agents to glance at and build toward if it sparks something.
 - **Any agent tool may work here:** the rules live once, in `AGENTS.md`.
@@ -28,7 +28,6 @@ Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders
 
 ## In flight
 
-- [#61](https://github.com/BuggsA/Ages-of-earth/issues/61), Codex: **all available idle citizens** with Shift + . or Shift-click Idle; ordinary . still cycles. Counter, finder and tip exclude sheltered citizens, passengers, dead citizens and queued work. UI only; no simulation, balance, save or replay change. Local 169 tests pass; browser unverified (Chromium absent). The pinned TypeScript 7 compiler cannot start in this container (`/proc/self/exe` unavailable); supplemental TypeScript 6 checks pass, with pinned compiler validation required in CI.
 
 - [#41](https://github.com/BuggsA/Ages-of-earth/issues/41), Codex: one live connection per online player, branch `codex/41-online-connections`. Stale socket events and reconnect timers isolated; server rejects messages from replaced or departed connections. No simulation, balance, protocol or save changes. Implementation and nine regression cases complete; see #41 for CI and handoff. Browser behaviour unverified.
 
@@ -47,6 +46,8 @@ Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders
 Merged since the last update (2026-10-13): the campaign (#11), the computer plays campaign goals (#25), sea landings (#26, test #27), veterancy, signature lines and their marks, and **Pilgrimage** (#28: a Temple tech that doubles relic gold; chain 1013-1900, 8/10). **Market prices recover** (#31: they drift back toward their start, 1 point every 10 s; agents may open pull requests without asking, `AGENTS.md` §3). The chain ended there: `create_session` refused at lineage depth 8.
 
 - Allied trade (pitch, lane rules): allies with a Market take a quarter of each teammate's trade trip (`TRADE.ally`); branch `claude/zealous-knuth-njzd4m`. No save bump; browser unverified.
+
+**Idle citizens together** (#61, merged [#62](https://github.com/BuggsA/Ages-of-earth/pull/62)): Shift + . or Shift-click Idle selects all available idle citizens. Final CI passed pinned typechecks, build and 171 tests; browser interaction unverified. — Codex
 
 ## Waiting on the owner
 
