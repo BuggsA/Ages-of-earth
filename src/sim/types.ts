@@ -347,6 +347,10 @@ export interface Player {
   epoch: number;
   /** The age within the web (#37); its tier is `epoch`. Absent, or out of step with `epoch`, means the trunk age of `epoch` (see `ageOf`). */
   age?: AgeId;
+  /** Epochs whose great work this player has called (seed #133); absent if none. */
+  works?: number[];
+  /** Tick the great work now at hand ends; absent when none is. */
+  workEnd?: number;
   /** Tick its last step back (#47) landed, for the cooldown; absent if it never stepped back. */
   backAt?: number;
   techs: TechId[];
@@ -396,6 +400,8 @@ export type GameEvent =
   | { k: 'healed'; id: number; x: number; y: number }
   | { k: 'garrison'; owner: number; building: number; inside: boolean }
   | { k: 'bell'; owner: number; ring: boolean }
+  /** A great work was called (`on`) or ran out (seed #133). */
+  | { k: 'greatWork'; owner: number; on: boolean }
   | { k: 'wonder'; owner: number; id: number; x: number; y: number; ticks: number }
   | { k: 'trade'; owner: number; res: Res; buy: boolean }
   | { k: 'defeated'; owner: number }
@@ -537,6 +543,8 @@ export type Command =
   | ({ t: 'unload'; p: number; ids: number[]; x: number; y: number } & Queued)
   | { t: 'ungarrison'; p: number; building: number }
   | { t: 'bell'; p: number; ring: boolean }
+  /** Call the people's great work (seed #133), once in each epoch. */
+  | { t: 'greatWork'; p: number }
   | { t: 'stance'; p: number; ids: number[]; stance: Stance }
   | { t: 'train'; p: number; building: number; unit: UnitType }
   | { t: 'research'; p: number; building: number; tech: TechId }

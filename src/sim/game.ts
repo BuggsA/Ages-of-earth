@@ -1,4 +1,5 @@
 import { aiStep } from './ai';
+import { workStep } from './works';
 import { hitAnimal, spawnAnimal, updateAnimals } from './animals';
 import { markGoals, scenarioStep, startScenario } from './campaign';
 import { buildingGuns, updateShots } from './combat';
@@ -438,6 +439,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   carryCargo(s);
   updateShots(s, sp, (a, damage, x, y) => hitAnimal(s, a, damage, x, y));
   updateRelics(s);
+  workStep(s);
   removeDead(s);
   if (s.tick % 4 === 0) updateVision(s);
   if (s.tick % 20 === 0) {

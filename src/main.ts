@@ -5,7 +5,8 @@ import { CameraRig } from './render/camera';
 import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { wallLine } from './sim/commands';
-import { AGES, BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, RELIC, RUINS, TECHS, TICK_HZ, TRUNK, domainOf, unitStats } from './sim/data';
+import { AGES, BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, RELIC, RUINS, TECHS, TICK_HZ, TRUNK, WORKS, domainOf, unitStats } from './sim/data';
+import { isEnemy } from './sim/world';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
 import { placeProblem, walkable } from './sim/grid';
 import { findDockSpot, findSpot } from './sim/ai';
@@ -1771,6 +1772,14 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         break;
       case 'bell':
         if (ev.owner === viewer) hud.toast(ev.ring ? 'The town bell rings: citizens run for shelter' : 'All clear: back to work', 'info');
+        break;
+      case 'greatWork':
+        if (ev.owner === viewer) {
+          const w = WORKS[s.players[viewer].civ];
+          hud.toast(ev.on ? `${w.icon} ${w.name}: ${w.blurb}` : `${w.name} has run its course`, ev.on ? 'good' : 'info');
+          if (ev.on) play('greatWork');
+        } else if (ev.on && !isEnemy(s, viewer, ev.owner)) hud.toast(`${s.players[ev.owner].name} calls ${WORKS[s.players[ev.owner].civ].name}`, 'info');
+        else if (ev.on) hud.toast(`${s.players[ev.owner].name} calls ${WORKS[s.players[ev.owner].civ].name}`, 'alert');
         break;
       case 'wonder': {
         const p = s.players[ev.owner];

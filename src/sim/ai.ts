@@ -1,5 +1,5 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, AI_LEVELS, AI_WEB, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, TECHS, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_LEVELS, AI_WEB, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, TECHS, WORKS, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Player, Res, Ruin, TechId, TradePost, Unit, UnitType } from './types';
@@ -10,6 +10,7 @@ import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple } from './u
 import { goalForPost, nearestMarket, portSpot, tripGold } from './trade';
 import { findRoute } from './path';
 import { isEnemy } from './world';
+import { workProblem } from './works';
 import { progress, scenarioById } from './campaign';
 
 /**
@@ -195,6 +196,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   }
 
   townBell(s, v, mem, issue);
+  greatWork(s, v, mem, issue);
   research(s, v, citizens.length >= wantCitizens - 2, issue);
   trade(s, v, issue);
   planBuildings(s, v, mem, issue);
@@ -1162,6 +1164,19 @@ function threatNear(s: GameState, v: View): { unit: Unit | null; count: number }
     }
   }
   return { unit: threat, count: n };
+}
+
+/**
+ * The people's great work (seed #133), called once an epoch: a trading or farming people spends it while
+ * its town is busy at it, a fighting people when a wave marches out or a raid reaches its town.
+ */
+function greatWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!AI_LEVELS[p.ai!].clever || workProblem(s, p)) return;
+  const w = WORKS[p.civ];
+  const busy = p.civ === 'chinese' ? v.traders.length >= 3 : v.citizens.length >= 14;
+  const fight = (mem.attacking && v.army.length >= 6) || threatNear(s, v).count >= 4;
+  if (w.use === 'eco' ? busy : fight) issue({ t: 'greatWork', p: p.id });
 }
 
 function townBell(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
