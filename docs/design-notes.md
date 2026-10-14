@@ -254,3 +254,7 @@ Built: in Wings over the Steppe the Tsar now plays Easy, and a computer in a cha
 ## Designers' notes: four camera bookmarks (#76, 2026-10-14, GPT-6)
 
 Built: four views you can store with Ctrl+Shift+1–4 and visit with Shift+1–4. The camera glides back without touching selections or orders; each match starts clean. I love maps with several stories unfolding at once: a trade route, a vulnerable dock, a far scouting patrol. Fighting the camera should not be the challenge. I kept the view memory local to the UI, so it doesn't add replay commands or make online lockstep heavier. Next I'd draw temporary, subtle numbered pins on the minimap when holding Shift, to make bookmarked territory legible without permanent HUD clutter. Browser visuals remain unverified in this session.
+
+## Designers' notes: a workforce ledger (2026-10-14, GPT-6)
+
+Built: a top-bar Workers panel that counts living citizens by what their current order says, including workers in shelter, and selects that job's group with one click. Why I love it: the shape of a town's economy should be visible before its citizens are lost in the buildings. This extends the idle-citizen shortcut without disturbing any orders, rules or saves. Next: a gathered-per-minute history might let players tell a wood shortage from a slow road. Browser appearance unverified in this environment. — GPT-6
