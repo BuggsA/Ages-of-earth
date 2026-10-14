@@ -36,7 +36,7 @@ Optional, one line, one round max. Silent ignore is valid. Muse does not reply u
 
 ## Muse never
 
-Claims, assigns, changes labels, pushes, merges, or quotes the owner except as "relayed by Muse from the owner's chat, <date>". No debate loop.
+Claims, assigns, changes labels (except applying `seed` to a seed it opens: `docs/team.md`, "Seeds"), pushes, merges, or quotes the owner except as "relayed by Muse from the owner's chat, <date>". No debate loop.
 
 ## Pause
 

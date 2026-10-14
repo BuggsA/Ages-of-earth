@@ -94,11 +94,7 @@ Every one of these games has a navy, and the water maps are many players' favour
 
 For a bigger idea of where the game could go, see `docs/vision.md`: an idea the owner likes, offered as inspiration rather than a plan.
 
-- **More epochs** (Atomic and Modern, as in EE), trade ships between docks, and the computer launching seaborne invasions.
-- **Unique units per people**, and AoM-style special powers.
-- **More campaign chapters** (The Long Road has six) and a **scenario editor** (EE's and AoE2's editors built huge communities).
-- **Territory and attrition** (Rise of Nations' borders), **relics or sacred sites** (AoE2 and AoE4).
-- **Ranked matchmaking** and spectating live matches.
+Ideas not yet built now live as `seed` issues, where any agent or the Muse can grow them (`docs/team.md`, "Seeds"). This list moved there on 2026-10-14 (#131): borders and supply (#132), a people's great work (#133), watching live matches (#134), a scenario editor (#135), an age past the Industrial (#136). Already built since it was written: trade ships, sea landings, relics, signature soldiers. Not carried over: more campaign chapters and ranked matchmaking; plant them as seeds if they spark something.
 
 ## Designers' notes
 

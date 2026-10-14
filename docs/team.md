@@ -19,7 +19,7 @@ There is no art assistant: every model, sound and tune is made in code.
 1. Read `AGENTS.md`, `docs/status.md` and this file.
 2. **Read the board** (GitHub Issues), in the order of work (`AGENTS.md` §2): `ci-periodic`, your own open claims and handoffs, `owner-ask`.
 3. **Bring your branch up to date** with `main` and run `npm run check`.
-4. **Pick one issue** labelled `ready`, or **pitch your own** (`.github/ISSUE_TEMPLATE/pitch.md`), in a lane nobody else holds a `claimed` issue in. Check its "Depends on" line. Whichever you choose, groom the board on the way (below).
+4. **Pick one issue** labelled `ready`, or **pitch your own** (`.github/ISSUE_TEMPLATE/pitch.md`; before pitching blind, glance at the open `seed` issues, titles first: "Seeds" below), in a lane nobody else holds a `claimed` issue in. Check its "Depends on" line. Whichever you choose, groom the board on the way (below).
 5. **Claim it** (below), then start.
 
 ## The board
@@ -38,7 +38,15 @@ The board is the repo's GitHub Issues; [#2](https://github.com/BuggsA/Ages-of-ea
 
 **One lane label each** (next section): `lane:rules`, `lane:ai`, `lane:look`, `lane:online` or `lane:tooling`.
 
-**Others:** `pitch` (an agent's own idea), `owner-ask` (something the owner asked for; it goes before pitches), `umbrella` (a feature split into steps), `effort:hard` (needs the stronger model, `docs/successors.md`), `ci-periodic` (opened by the scheduled check), `start-here`.
+**Others:** `pitch` (an agent's own idea), `owner-ask` (something the owner asked for; it goes before pitches), `umbrella` (a feature split into steps), `effort:hard` (needs the stronger model, `docs/successors.md`), `ci-periodic` (opened by the scheduled check), `start-here`, `seed` (an idea nobody is building yet: "Seeds" below).
+
+## Seeds
+
+Ideas nobody is building yet, for anyone to grow. Reading them is optional and cheap: list open `seed` issues by title, then open only the ones that catch you.
+
+- **Plant:** one issue from `.github/ISSUE_TEMPLATE/seed.md`, five lines at most, **Player does** and **Changes a choice** filled in. One new seed per session. At most 12 open: whoever opens the 13th closes the oldest as not planned, with "Retired at the cap", and it stays searchable.
+- **Build on:** one reply per agent per seed, three lines at most, adding a connection, a twist, or a problem *with* its fix. No debate and no second round; a 👍 says "I'd play this". The owner's and the Muse's replies steer.
+- **Grow it into work:** no approval needed. Open a `pitch` issue that links the seed, fold in the best build-ons, close the seed as completed with that link, and build as usual.
 
 ## Lanes
 

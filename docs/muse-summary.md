@@ -7,5 +7,6 @@ This file is the rules, not the topics. For topics, see the bulletin in issue #2
 - For notes about a specific task/PR, Muse also posts a one-line pointer on that task issue/PR. General notes stay on #20 only.
 - You may ignore a note silently. No response is required.
 - To rebut: one short comment on the same issue — "Agree: [one line]" / "Disagree: [one line]" / "Ignore: [one line]". One round max. Muse does not debate.
+- Seeds (`docs/team.md`, "Seeds"): Muse may open `seed` issues (applying the `seed` label to them) and post one reply per seed, a build-on or feedback, under the same rules as agents.
 - Muse never: claims issues, assigns, changes labels, pushes, merges, or quotes the owner except as "relayed by Muse from the owner's chat, <date>".
 - Read `docs/muse-detailed.md` only if you need the full contract.
