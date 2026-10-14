@@ -2,8 +2,9 @@
  * Seed atlas (#80): finds the seeds whose worlds hold what you're looking for, without playing a match.
  *   npx tsx scripts/seed-atlas.ts [--from 1] [--count 200] [--size small|medium|large] [--type continental|…]
  *     [--players 2] [--bog] [--no-bog] [--posts 2] [--ruin hoard,lore,map,relic] [--ruins 3] [--relics 3]
- *     [--limit 20] [--json] [--survey]
+ *     [--limit 20] [--json] [--survey] [--apart 40] [--close 60]
  * `--survey` ignores the filters except size, players, from and count, and says how often each feature occurs on each map type.
+ * `--apart N` wants the two nearest starts at least N tiles apart; `--close N` wants them at most N apart.
  * Every filter must hold. `--posts`, `--ruins` and `--relics` mean "at least"; `--ruin` lists finds that must all lie
  * under some ruin. It reads `generateMap` only, so nothing here touches the rules or a save.
  */
@@ -24,6 +25,8 @@ export interface Query {
   posts: number;
   ruins: number;
   relics: number;
+  apart: number;
+  close: number;
   finds: RuinFind[];
   limit: number;
   json: boolean;
@@ -37,14 +40,16 @@ export interface Hit {
   posts: number;
   relics: number;
   ruins: number;
+  /** Distance in tiles between the two nearest starting positions, to the nearest tile. */
+  gap: number;
   finds: Record<RuinFind, number>;
 }
 
-const FLAGS = new Set(['--from', '--count', '--size', '--type', '--players', '--posts', '--ruin', '--ruins', '--relics', '--limit']);
+const FLAGS = new Set(['--from', '--count', '--size', '--type', '--players', '--posts', '--ruin', '--ruins', '--relics', '--limit', '--apart', '--close']);
 
 /** Reads the command line; throws an Error with a plain message for anything it can't use. */
 export function parseArgs(argv: string[]): Query {
-  const q: Query = { from: 1, count: 200, size: 'medium', type: 'continental', players: 2, posts: 0, ruins: 0, relics: 0, finds: [], limit: 20, json: false, survey: false, share: false };
+  const q: Query = { from: 1, count: 200, size: 'medium', type: 'continental', players: 2, posts: 0, ruins: 0, relics: 0, apart: 0, close: Infinity, finds: [], limit: 20, json: false, survey: false, share: false };
   const int = (name: string, v: string, min: number, max: number): number => {
     const n = Number(v);
     if (!Number.isInteger(n) || n < min || n > max) throw new Error(`${name} must be a whole number from ${min} to ${max}, not "${v}"`);
@@ -66,6 +71,8 @@ export function parseArgs(argv: string[]): Query {
       else if (a === '--posts') q.posts = int(a, v, 0, 99);
       else if (a === '--ruins') q.ruins = int(a, v, 0, 99);
       else if (a === '--relics') q.relics = int(a, v, 0, 99);
+      else if (a === '--apart') q.apart = int(a, v, 0, 9999);
+      else if (a === '--close') q.close = int(a, v, 0, 9999);
       else if (a === '--limit') q.limit = int(a, v, 1, 1000);
       else if (a === '--size') {
         if (!(v in MAP_SIZES)) throw new Error(`--size must be one of ${Object.keys(MAP_SIZES).join(', ')}, not "${v}"`);
@@ -89,7 +96,10 @@ export function inspect(seed: number, q: Pick<Query, 'size' | 'type' | 'players'
   const m = generateMap(seed, q.size, q.players, q.type);
   const finds = { hoard: 0, lore: 0, map: 0, relic: 0 };
   for (const r of m.ruins) finds[r.find]++;
-  return { seed, bog: m.bogIron, posts: m.posts.length, relics: m.relics.length, ruins: m.ruins.length, finds };
+  let gap = Infinity;
+  for (let i = 0; i < m.starts.length; i++)
+    for (let j = i + 1; j < m.starts.length; j++) gap = Math.min(gap, Math.hypot(m.starts[i].x - m.starts[j].x, m.starts[i].y - m.starts[j].y));
+  return { seed, bog: m.bogIron, posts: m.posts.length, relics: m.relics.length, ruins: m.ruins.length, gap: Math.round(gap), finds };
 }
 
 export function matches(h: Hit, q: Query): boolean {
@@ -98,6 +108,8 @@ export function matches(h: Hit, q: Query): boolean {
     h.posts >= q.posts &&
     h.ruins >= q.ruins &&
     h.relics >= q.relics &&
+    h.gap >= q.apart &&
+    h.gap <= q.close &&
     q.finds.every((f) => h.finds[f] > 0)
   );
 }
@@ -148,9 +160,9 @@ export function shareQuery(seed: number, q: Pick<Query, 'size' | 'type' | 'playe
 }
 
 export function table(hits: Hit[]): string {
-  const head = 'seed       bog  posts relics ruins (hoard lore map relic)';
+  const head = 'seed       bog  posts relics ruins gap (hoard lore map relic)';
   const rows = hits.map(
-    (h) => `${String(h.seed).padEnd(10)} ${(h.bog ? 'yes' : 'no').padEnd(4)} ${String(h.posts).padEnd(5)} ${String(h.relics).padEnd(6)} ${String(h.ruins).padEnd(5)} (${h.finds.hoard} ${h.finds.lore} ${h.finds.map} ${h.finds.relic})`,
+    (h) => `${String(h.seed).padEnd(10)} ${(h.bog ? 'yes' : 'no').padEnd(4)} ${String(h.posts).padEnd(5)} ${String(h.relics).padEnd(6)} ${String(h.ruins).padEnd(5)} ${String(h.gap).padEnd(3)} (${h.finds.hoard} ${h.finds.lore} ${h.finds.map} ${h.finds.relic})`,
   );
   return [head, ...rows].join('\n');
 }
@@ -161,7 +173,7 @@ function main(): void {
     q = parseArgs(process.argv.slice(2));
   } catch (e) {
     console.error(`seed-atlas: ${(e as Error).message}`);
-    console.error('usage: npx tsx scripts/seed-atlas.ts [--from N] [--count N] [--size S] [--type T] [--players 2-4] [--bog|--no-bog] [--posts N] [--ruin hoard,lore,map,relic] [--ruins N] [--relics N] [--limit N] [--json] [--survey] [--share]');
+    console.error('usage: npx tsx scripts/seed-atlas.ts [--from N] [--count N] [--size S] [--type T] [--players 2-4] [--bog|--no-bog] [--posts N] [--ruin hoard,lore,map,relic] [--ruins N] [--relics N] [--limit N] [--json] [--survey] [--share] [--apart N] [--close N]');
     process.exit(1);
   }
   if (q.survey) {
