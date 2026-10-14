@@ -14,6 +14,7 @@ What players love most about the classics, and where to find it here, is written
 
 ## What's in it
 
+- **Camera bookmarks.** Remember up to four views in a match with **Ctrl+Shift+1–4**, and return to any with **Shift+1–4**. Glance from your town to a frontier fort, trading road or landing beach without changing selected troops, orders or ordinary 1–9 control groups. Views clear when a new match starts; they aren't part of saves or replays.
 - **Weather.** Every match is played under a day chosen from its seed and its land, so everyone in an online room, a save and a replay see the same one: clear, **rain** (streaks, a grey sky, a hiss over the ambience, and in a storm lightning that lights the land and thunder that rolls in a moment later), **snow** (flakes drifting, a muffled hush) or **mist** (the horizon closes in). Highlands snow, forests rain, plains are mostly fair. The opening banner says what it is. It changes only how the land looks and sounds, never the rules: units see and shoot as far as on a clear day. Low graphics draw no rain or snow. Add `?weather=rain` (or `snow`, `mist`, `clear`) to the address to try one.
 - **Readable health bars.** Quarter marks make remaining health readable by shape as well as color; hold **Alt** to compare all health bars during a battle.
 
@@ -75,7 +76,7 @@ The title screen plays a live match between two computer opponents behind it. Ch
 | Transport | **U** then click a shore: land everyone there. **Y** land them on the nearest shore |
 | Groups | **Ctrl+1–9** makes a group, **1–9** selects it, twice looks at it; **,** selects the whole army |
 | Find | **.** next idle citizen, **Shift + .** all available idle citizens, **H** Town Center, **Space** tap looks at the last attack |
-| Camera | Arrow keys, screen edges, middle-drag or Space+drag to pan; wheel to zoom; **[** **]** turn; **Backspace** straightens |
+| Camera | Arrow keys, screen edges, middle-drag or Space+drag to pan; wheel to zoom; **[** **]** turn; **Backspace** straightens; **Ctrl+Shift+1–4** saves a view, **Shift+1–4** returns to it |
 | Other | **Alt** shows all health bars, **P** pause, **+**/**-** speed, **M** mute, **Enter** chat (online), **F10** or **Esc** menu |
 
 Citizens repair completed buildings at their construction speed; a full repair costs 40% of the building's price, paid as they work, and stops when you can't pay. Select citizens and right-click your damaged building; Shift queues repairs. Use **G** to explicitly shelter in a damaged Town Center or tower.
