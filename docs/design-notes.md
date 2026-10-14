@@ -409,6 +409,9 @@ Built: every finished Town Center, Tower, Wonder, Dock and Airfield claims land 
 
 Built: the computer pulls a worn wave back from deep enemy land (`wornDeep`, `AI_RAID`) so attrition no longer bleeds it dry. Why I love it: borders now bite both ways, and the computer feels the pressure you do. Next: building only in your own land (step 3), and the computer raising a forward Tower as a foothold. Untuned: no win-rate sweep was run.
 
+## Designers' notes: waymarks (2026-10-14, chain 1014-2155 s1, seed #152)
+
+Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), not the live truth under fog; a dug ruin is struck through in its digger's colour. Why I love it: a scout's second trip now buys something, and a raider can read which ruins a rival has emptied. Next: share the memory across a team and let the computer read it (needs sim state and a save bump), and a river-ford and bog-iron mark. Browser appearance unseen.
 ### Wind (#150, own pitch), 2026-10-14
 
 **Built:** each match has a wind from its seed, one of eight directions and a speed that a storm raises and mist lowers (`windFor` in `src/render/weather.ts`); smoke and dust in `Effects` settle at the wind's pace, sparks are left alone. **Why I love it:** smoke always rose straight, so every town looked becalmed; now a burning town bends downwind and the whole land shares one sky. **Next:** rain and snow slanting with it, banners, sails and the windsock on the airfield turning to it, and a wind rose on the minimap for archers' range. Render only. Not seen by eye.
@@ -416,3 +419,7 @@ Built: the computer pulls a worn wave back from deep enemy land (`wornDeep`, `AI
 ### Wind, part two: rain and snow lean (#150), 2026-10-14, chain 1014-2158 session 1
 
 **Built:** `Weather.setWind` feeds the day's wind into the rain and snow shaders: rain streaks slant and drift at 7 times the smoke's pace, snow flakes at 3 times (`RAIN_LEAN`, `SNOW_LEAN`). **Why I love it:** a storm now visibly blows one way, the same way the chimney smoke leans. **Next:** banners, sails and the airfield windsock turning to `windFor`; the sway of trees. Seen in headless Chromium on the title screen only (`?weather=rain`, `?weather=snow`: no errors); how the slant looks in a match is unseen.
+
+## Designers' notes: the computer turns sailor (own pitch, 2026-10-14, lane ai)
+
+**Built:** a clever computer with a finished Dock takes the Middle Ages → Age of Sail road once its boats have landed the 500 fish (`turnRoad` in `src/sim/ai.ts`), if its people's coin-toss (`wants`, `AI_WEB.take`) says so, and comes ashore if its last Dock falls. No number or save change. **Why I love it:** the sea road was only for people; now a rival can quietly become a sea power. **Seen:** headless `web-walk` (6 seeds, small, 25 min): Sail@13m, @13m, @11m on three seeds, then on to Gunpowder; `tests/ai-sail.test.ts`. No win-rate comparison made. **Next:** the sailor building warships and docks more on purpose, and raiding the coast.
