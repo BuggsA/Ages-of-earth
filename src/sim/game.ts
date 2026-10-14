@@ -3,14 +3,15 @@ import { hitAnimal, spawnAnimal, updateAnimals } from './animals';
 import { markGoals, scenarioStep, startScenario } from './campaign';
 import { buildingGuns, updateShots } from './combat';
 import { applyCommand } from './commands';
-import { AURA, CIV_IDS, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
+import { AGES, AURA, CIV_IDS, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
 import { AIR, NAVAL, stampBuilding } from './grid';
 import { generateMap } from './mapgen';
 import { Spatial } from './spatial';
 import { updateRelics } from './relics';
 import { atPost } from './trade';
-import { modsOf, statsFor } from './stats';
-import type { Building, CivId, Command, Difficulty, GameMode, GameState, MapSize, MapType, Player } from './types';
+import { modsOf, trainTimeFor } from './stats';
+import { roadTo } from './ages';
+import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, MapSize, MapType, Player } from './types';
 import { RES, R_FISH, R_NONE } from './types';
 import { RES_OF_TILE, carryCargo, checkStuck, collide, findResource, routeUnits, separate, setOrder, think, ungarrison, walk } from './units';
 import { updateVision } from './vision';
@@ -187,10 +188,13 @@ function restat(s: GameState, p: Player, change: () => void): void {
   }
 }
 
-/** Into the next epoch: every unit re-arms and every building is reinforced. */
-function advanceEpoch(s: GameState, p: Player): void {
-  restat(s, p, () => p.epoch++);
-  s.events.push({ k: 'epoch', owner: p.id, epoch: p.epoch });
+/** Into another age (#37): every unit re-arms to the age's tier and every building is reinforced. */
+function enterAge(s: GameState, p: Player, to: AgeId): void {
+  restat(s, p, () => {
+    p.epoch = AGES[to].tier;
+    p.age = to;
+  });
+  s.events.push({ k: 'epoch', owner: p.id, epoch: p.epoch, age: to });
 }
 
 function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
@@ -206,10 +210,18 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
   }
   if (b.timer > 0) b.timer--;
   if (b.advance >= 0) {
-    b.advance++;
-    if (b.advance >= secs(EPOCHS[p.epoch + 1].time)) {
+    const road = roadTo(p, b.advanceTo);
+    if (!road) {
+      // The road is gone (the age changed under it): stand down.
       b.advance = -1;
-      advanceEpoch(s, p);
+      delete b.advanceTo;
+      return;
+    }
+    b.advance++;
+    if (b.advance >= secs(road.time)) {
+      b.advance = -1;
+      delete b.advanceTo;
+      enterAge(s, p, road.to);
     }
     return;
   }
@@ -225,7 +237,7 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
     return;
   }
   const unit = item.unit!;
-  const need = secs(statsFor(s, p.id, unit).time);
+  const need = secs(trainTimeFor(s, p.id, unit, b.type));
   if (item.done < need) {
     item.done++;
     if (item.done < need) return;

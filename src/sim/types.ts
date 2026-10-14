@@ -30,6 +30,8 @@ export type TechId =
   | 'wheelbarrow' | 'handcart' | 'axes' | 'saws' | 'picks' | 'shafts' | 'plow' | 'irrigation' | 'masonry'
   | 'conscription' | 'husbandry' | 'theology' | 'chemistry'
   | 'gillnets' | 'shipwright' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage';
+/** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant';
 
 /** Tile ground. Water and rock can't be walked or built on. */
 export const T_GRASS = 0;
@@ -186,6 +188,8 @@ export interface Building {
   queue: TrainItem[];
   /** Ticks into advancing to the next epoch (Town Center), or -1. */
   advance: number;
+  /** The age it is advancing into; absent means the trunk's next epoch (and older saves). */
+  advanceTo?: AgeId;
   rally: { x: number; y: number; tile: number } | null;
   cool: number;
   /** The citizen working this farm, or 0. */
@@ -309,6 +313,8 @@ export interface Player {
   team: number;
   res: Stock;
   epoch: number;
+  /** The age within the web (#37); its tier is `epoch`. Absent, or out of step with `epoch`, means the trunk age of `epoch` (see `ageOf`). */
+  age?: AgeId;
   techs: TechId[];
   /** Bumped when techs or the epoch change, so cached unit stats are worked out again. */
   statsVersion: number;
@@ -337,7 +343,7 @@ export type GameEvent =
   | { k: 'researched'; owner: number; tech: TechId }
   | { k: 'placed'; id: number; owner: number; type: BuildingType }
   | { k: 'built'; id: number; owner: number; type: BuildingType }
-  | { k: 'epoch'; owner: number; epoch: number }
+  | { k: 'epoch'; owner: number; epoch: number; age?: AgeId }
   | { k: 'deliver'; owner: number; res: Res; amount: number; x: number; y: number }
   | { k: 'work'; id: number; owner: number; act: Act; x: number; y: number }
   | { k: 'depleted'; tile: number }
@@ -470,7 +476,8 @@ export type Command =
   | { t: 'train'; p: number; building: number; unit: UnitType }
   | { t: 'research'; p: number; building: number; tech: TechId }
   | { t: 'cancel'; p: number; building: number; index: number }
-  | { t: 'advance'; p: number; building: number }
+  /** Into the next age: `to` picks a road (#37); without it, the trunk's next epoch. */
+  | { t: 'advance'; p: number; building: number; to?: AgeId }
   | { t: 'rally'; p: number; building: number; x: number; y: number }
   | { t: 'trade'; p: number; res: 'food' | 'wood' | 'stone'; buy: boolean }
   | { t: 'stop'; p: number; ids: number[] }

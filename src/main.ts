@@ -5,7 +5,7 @@ import { CameraRig } from './render/camera';
 import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { wallLine } from './sim/commands';
-import { BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, RELIC, TECHS, TICK_HZ, domainOf, unitStats } from './sim/data';
+import { AGES, BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, RELIC, TECHS, TICK_HZ, domainOf, unitStats } from './sim/data';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
 import { placeProblem, walkable } from './sim/grid';
 import { findDockSpot, findSpot } from './sim/ai';
@@ -14,6 +14,7 @@ import type { BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode
 import { R_FISH, R_NONE } from './sim/types';
 import { carriedBy, relicAt } from './sim/relics';
 import { postAt } from './sim/trade';
+import { ageDef, roadsFrom } from './sim/ages';
 import { NetClient, newRoomCode, saveName, savedName } from './net/client';
 import { HASH_EVERY, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
 import { deserialize, serialize } from './sim/save';
@@ -44,6 +45,9 @@ sound.onReady = (ctx, out) => {
   music.attach(ctx, out);
   music.start(musicEpoch);
 };
+/** The age an `epoch` event announces (older replays carry only the epoch). */
+const ageName = (ev: { epoch: number; age?: keyof typeof AGES }) => (ev.age ? AGES[ev.age] : EPOCHS[ev.epoch]).name;
+
 function playMusic(epoch: number): void {
   musicEpoch = epoch;
   if (music.attached) {
@@ -367,8 +371,8 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   const goal = game.mode === 'regicide' ? ' Keep your King alive: shelter them in the Town Center.' : game.mode === 'deathmatch' ? ' Everyone starts rich: build fast.' : '';
   const chapter = game.scenario ? scenarioById(game.scenario.id) : undefined;
   if (!saved && chapter) hud.banner(chapter.title, chapter.place, 6000);
-  else if (!saved) hud.banner(EPOCHS[me.epoch].name, `You lead the ${CIVS[me.civ].name}. Facing ${rivals.join(', ')}.${goal}`, 6000);
-  else hud.banner('Welcome back', `${EPOCHS[me.epoch].name}, ${fmtClock(game.tick)} into the match.`, 3200);
+  else if (!saved) hud.banner(ageDef(me).name, `You lead the ${CIVS[me.civ].name}. Facing ${rivals.join(', ')}.${goal}`, 6000);
+  else hud.banner('Welcome back', `${ageDef(me).name}, ${fmtClock(game.tick)} into the match.`, 3200);
   sound.startAmbience();
   playMusic(me.epoch);
   // Start with the Town Center in view and selected.
@@ -569,7 +573,7 @@ function stepReplay(s: GameState, dt: number): void {
   while (acc >= DT && n < 40 && s.tick < w.file.end) {
     step(s, w.at.get(s.tick) ?? []);
     view.events(s, s.events);
-    for (const ev of s.events) if (ev.k === 'epoch') hud.toast(`${s.players[ev.owner].name} reached the ${EPOCHS[ev.epoch].name}`, 'info');
+    for (const ev of s.events) if (ev.k === 'epoch') hud.toast(`${s.players[ev.owner].name} reached the ${ageName(ev)}`, 'info');
     acc -= DT;
     n++;
   }
@@ -1527,7 +1531,7 @@ function showEnd(s: GameState, won: boolean, how: 'conquest' | 'wonder' | 'relic
   const mins = Math.floor(s.tick / TICK_HZ / 60);
   const rows = s.players
     .map(
-      (p) => `<tr><td><span class="swatch" style="background:${p.color}"></span>${p.name}<div class="civ-tag">${CIVS[p.civ].name}</div></td><td>${scoreOf(s, p)}</td><td>${EPOCHS[p.epoch].short}</td><td>${p.stats.gathered}</td><td>${p.stats.traded ?? 0}</td><td>${p.stats.trained}</td><td>${p.stats.built}</td><td>${p.stats.techs}</td><td>${p.stats.kills}</td><td>${p.stats.losses}</td></tr>`,
+      (p) => `<tr><td><span class="swatch" style="background:${p.color}"></span>${p.name}<div class="civ-tag">${CIVS[p.civ].name}</div></td><td>${scoreOf(s, p)}</td><td>${ageDef(p).short}</td><td>${p.stats.gathered}</td><td>${p.stats.traded ?? 0}</td><td>${p.stats.trained}</td><td>${p.stats.built}</td><td>${p.stats.techs}</td><td>${p.stats.kills}</td><td>${p.stats.losses}</td></tr>`,
     )
     .join('');
   const sc = s.scenario ? scenarioById(s.scenario.id) : undefined;
@@ -1584,10 +1588,11 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         break;
       case 'epoch':
         if (ev.owner === viewer) {
-          hud.banner(EPOCHS[ev.epoch].name, EPOCHS[ev.epoch].blurb, 4500);
+          const age = ev.age ? AGES[ev.age] : EPOCHS[ev.epoch];
+          hud.banner(age.name, age.blurb, 4500);
           play('epoch');
           playMusic(ev.epoch);
-        } else hud.toast(`${s.players[ev.owner].name} has reached the ${EPOCHS[ev.epoch].name}`, 'info');
+        } else hud.toast(`${s.players[ev.owner].name} has reached the ${ageName(ev)}`, 'info');
         break;
       case 'hit':
         if (view.sees(ev.x, ev.y)) music.stir(0.012);
@@ -1602,6 +1607,11 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         break;
       case 'built':
         if (ev.owner === viewer && ev.type !== 'farm' && ev.type !== 'house') hud.toast(`${BUILDINGS[ev.type].name} built`, 'good');
+        // The first sign of a side road (#37): its clue goes up while the road is open.
+        if (ev.owner === viewer)
+          for (const road of roadsFrom(s.players[viewer]))
+            if (road.clue === ev.type && !s.ents.some((e) => e.kind === 'building' && e.owner === viewer && e.type === ev.type && e.built && e.id !== ev.id))
+              hud.banner('Another road', `${CIVS[s.players[viewer].civ].name} talk of the ${AGES[road.to].name}. Select a Town Center to see what it takes.`, 5000);
         break;
       case 'defeated':
         if (ev.owner === viewer) {

@@ -1,4 +1,5 @@
-import { BUILDINGS, EPOCHS, LAST_EPOCH } from '../sim/data';
+import { AGES, BUILDINGS, ROADS } from '../sim/data';
+import { ageOf, deedProgress, mainRoad, roadKnown, roadsFrom } from '../sim/ages';
 import type { Building, GameState, Unit } from '../sim/types';
 import { R_FISH } from '../sim/types';
 
@@ -6,6 +7,8 @@ import { R_FISH } from '../sim/types';
  * Advice for a first game, one tip at a time in a corner: what to do next, given how the match is
  * going. Each tip shows once; the player can close them for good.
  */
+
+const MERCHANT_ROAD = ROADS.find((r) => r.to === 'merchant')!;
 
 interface Tip {
   id: string;
@@ -43,8 +46,9 @@ const TIPS: Tip[] = [
     id: 'epoch',
     when: (s, me) => {
       const p = s.players[me];
-      if (p.epoch >= LAST_EPOCH) return false;
-      const c = EPOCHS[p.epoch + 1].cost;
+      const road = mainRoad(p);
+      if (!road) return false;
+      const c = road.cost;
       return (p.res.food >= (c.food ?? 0)) && (p.res.gold >= (c.gold ?? 0)) && (p.res.wood >= (c.wood ?? 0)) && (p.res.stone >= (c.stone ?? 0));
     },
     text: 'You can afford the next epoch! Select the Town Center and press <kbd>W</kbd>. New epochs bring stronger units and new buildings.',
@@ -61,6 +65,15 @@ const TIPS: Tip[] = [
     id: 'trade',
     when: (s, me) => s.players[me].epoch >= 1 && s.posts.some((t) => s.players[me].seen[Math.floor(t.y) * s.w + Math.floor(t.x)] === 1),
     text: 'You have found a <b>trading post</b> (a camel on the map). Build a <b>Market</b> (<kbd>B</kbd> <kbd>M</kbd>), train <b>traders</b> there (<kbd>T</kbd>) and right-click the post: they bring back gold every trip, more the farther the Market. Guard the road: cavalry love to raid it.',
+  },
+  {
+    id: 'merchants',
+    // A side road (#37) just came into view: the Market is up while the Bronze Age lasts.
+    when: (s, me) => {
+      const p = s.players[me];
+      return ageOf(p) === 'bronze' && roadsFrom(p).some((r) => r.to === 'merchant' && roadKnown(s, p, r) && (deedProgress(p, r)?.have ?? 0) < r.deed!.n);
+    },
+    text: `There is another road out of the Bronze Age. Bring home ${MERCHANT_ROAD.deed!.n} gold by trade, and the Town Center (<kbd>Y</kbd>) can take your people into the <b>${AGES.merchant.name}</b> instead of the Middle Ages: the Market hires soldiers for gold, trade pays more, levies cost more. The road closes once you advance.`,
   },
   { id: 'wonder', when: (s, me) => s.players[me].epoch >= 2, text: 'Rich? Build a <b>Wonder</b> (<kbd>B</kbd> <kbd>X</kbd>). If it stands long enough, you win, but everyone will come for it.' },
   { id: 'dock', when: (s, me) => secsIn(s) > 150 && !has(s, me, 'dock') && waterNear(s, me), text: 'Water nearby! A <b>Dock</b> (<kbd>B</kbd> <kbd>D</kbd>) on the shore trains <b>fishing boats</b>: fish shoals feed you for a long time. Later, warships and transports.' },
