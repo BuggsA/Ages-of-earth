@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'gull';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -120,7 +120,7 @@ export class Sound {
     'click', 'open', 'select', 'selectBuilding', 'move', 'attack', 'strike', 'thud', 'hit', 'hitBuilding', 'bow', 'sling', 'musket', 'fall',
     'collapse', 'built', 'place', 'ready', 'readyCitizen', 'chop', 'mine', 'hammer', 'rustle', 'epoch', 'alert', 'victory', 'defeat', 'error', 'coin', 'queue',
     'catapult', 'cannon', 'impact', 'spear', 'chant', 'convert', 'heal', 'townBell', 'allClear', 'research', 'wonder', 'shelter',
-    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind', 'thunder', 'owl',
+    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind', 'thunder', 'owl', 'gull',
   ];
 
   /**
@@ -604,6 +604,12 @@ export class Sound {
         this.noise(out, t, { dur: 0.2, filter: 'bandpass', f: 400, q: 3, peak: 0.015, attack: 0.04 });
         this.tone(out, t + 0.3, { f: 400, to: 300, dur: 0.5, peak: 0.07, attack: 0.05 });
         this.noise(out, t + 0.3, { dur: 0.45, filter: 'bandpass', f: 380, q: 3, peak: 0.015, attack: 0.05 });
+        break;
+      case 'gull':
+        // A gull's mew: two rising, nasal cries that break and fall away, with a little rasp.
+        this.tone(out, t, { f: 1500, to: 2300, type: 'sawtooth', dur: 0.16, peak: 0.022, attack: 0.02, lp: 3200 });
+        this.tone(out, t + 0.2, { f: 2200, to: 1300, type: 'sawtooth', dur: 0.3, peak: 0.02, attack: 0.02, lp: 3200 });
+        this.noise(out, t + 0.02, { dur: 0.4, filter: 'bandpass', f: 2400, q: 4, peak: 0.008, attack: 0.03 });
         break;
       case 'thunder':
         // A crack that rolls away: sharp high noise, then a long low rumble that swells and sinks.
