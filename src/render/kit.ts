@@ -95,6 +95,11 @@ export class Kit {
     o.userData.cloth = [len, z];
     return o;
   }
+  /** Mark a square sail that billows with the wind: half its width, the y of its foot and its height. */
+  sail<T extends THREE.Object3D>(o: T, halfW: number, foot: number, height: number): T {
+    o.userData.sail = [halfW, foot, height];
+    return o;
+  }
   /** Mark a part as glowing (it will be bright enough to catch the bloom). */
   glow<T extends THREE.Object3D>(o: T): T {
     o.userData.glow = true;
@@ -122,7 +127,9 @@ export function bake(root: THREE.Object3D, teamColor?: string): THREE.BufferGeom
     const team = inherited(mesh, 'team') === true;
     const glow = inherited(mesh, 'glow') === true;
     const cloth = inherited(mesh, 'cloth') as [number, number] | undefined;
-    const rig = cloth ? [4, cloth[0], cloth[1]] : ((inherited(mesh, 'rig') as [number, number, number] | undefined) ?? [0, 0, 0]);
+    const sail = inherited(mesh, 'sail') as [number, number, number] | undefined;
+    // A sail packs its height into the type (5 + height); its width and foot ride in the other two.
+    const rig = sail ? [5 + sail[2], sail[0], sail[1]] : cloth ? [4, cloth[0], cloth[1]] : ((inherited(mesh, 'rig') as [number, number, number] | undefined) ?? [0, 0, 0]);
     const c = new THREE.Color(team && teamColor ? teamColor : (mesh.userData.color ?? '#ffffff'));
     const colors = new Float32Array(n * 3);
     const teams = new Float32Array(n);

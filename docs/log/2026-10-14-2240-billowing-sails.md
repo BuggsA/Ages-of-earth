@@ -1,0 +1,3 @@
+# Billowing sails (2026-10-14, chain 1014-2158 s4, lane look)
+
+Ship sails (`mast()` in `unitModels.ts`) now belly forward with the day's wind: `Kit.sail` tags a sail with its half width, foot and height; `bake` packs it into `aRig` (type 5 + height); the `flag` shader pushes vertices out along z, deepest mid-sail, pinned at the yard and corners, with a slow breathe. Render only; no rules, save or data change. Dock masts left flat (their sails sit off-centre, which the shader's u = x/halfW can't yet take). Verified: `npm run check`, `models.test.ts`, `browser-smoke` (shader compiles, no console errors). Look in a match unseen.

@@ -39,6 +39,7 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Weather** (own pitch, lane look): a seeded day per match (clear, rain, snow, mist; storms with lightning and thunder), look and sound only, no rules or save change. Seen in headless Chromium on the title screen only; the sound levels want an ear.
 
 **Flags in the wind** (#150, own pitch, lane look): building banners and the airfield windsock stream downwind and ripple by the day's wind. Render only; shader compiles in headless Chromium (smoke passes), look in a match unseen.
+**Billowing sails** (own pitch, lane look): ship sails belly out in the wind (render only). Shader compiles in headless Chromium; look in a match unseen.
 **Watch a live match** (seed #134, lane online): a watcher joins a started room, sees everything or any player's eyes, and cannot act; the Worker reads only their pings. Browser unverified.
 
 **Signal beacons** (own pitch, lane rules): a Watch Tower can light a fire (F): +7 sight for 45 s, and rivals see the ground around it; the clever computer lights one when three soldiers close in. Browser unverified; sound wants an ear; no save bump.

@@ -552,7 +552,7 @@ function hull(k: Kit, L: number, W: number, H: number, color: string, deck: stri
 function mast(k: Kit, z: number, h: number, sailW: number, team = true, y = 0.06): void {
   k.cyl(0.018, 0.022, h, 5, WOOD, 0, y, z);
   k.box(sailW + 0.06, 0.02, 0.02, WOOD, 0, y + h * 0.85, z);
-  const sail = k.box(sailW, h * 0.5, 0.015, team ? TEAM : '#efe8d8', 0, y + h * 0.33, z + 0.015);
+  const sail = k.sail(k.box(sailW, h * 0.5, 0.015, team ? TEAM : '#efe8d8', 0, y + h * 0.33, z + 0.015), sailW / 2, y + h * 0.08, h * 0.5);
   if (team) k.team(sail);
   else k.team(k.box(sailW, 0.05, 0.018, TEAM, 0, y + h * 0.55, z + 0.016));
   pennant(k, 0, y + h * 0.5 - 0.04, z, 0.1 + h * 0.12);
