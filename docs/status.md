@@ -114,3 +114,5 @@ Merged since the last update: **walking the web without losing strength** (#79):
 **Great work glow** (#141, own pitch, lane look): motes in the people's colors rise from its Town Centers while a great work runs. Render only; no rules, save or `data.ts` change. Browser unverified.
 
 **Yam Relay sight** (own pitch, lane rules): the Mongol great work also gives mounted soldiers +3 sight (`riderSight` in `Mods`, `WORKS.mongols`). No save bump. Browser unverified.
+
+**Borders** (#132 step 1, own pitch, lane look): land drawn as coloured edge lines from finished Town Centers, Towers, Wonders, Docks and Airfields (`BORDERS`); **O** toggles. Display only; no save bump. Seen only via the headless smoke run.

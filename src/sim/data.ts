@@ -839,3 +839,10 @@ export function unitEpoch(type: UnitType): number {
   return UNITS[type].findIndex((s) => s !== null);
 }
 
+
+/**
+ * Borders (#132 s1): a finished building claims the land within `radius` tiles; a tile belongs to the
+ * nearest claimant (ties go to the older building). Shown only, so far; attrition and building limits
+ * are later steps of the seed.
+ */
+export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6 };
