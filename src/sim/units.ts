@@ -1,4 +1,4 @@
-import { AI_LEVELS, BUILDINGS, CARRY, DEER, DT, EPOCH_GATHER_BONUS, FISH_CARRY, GATHER, MILITARY, PRIEST, REPAIR_SHARE, domainOf, secs } from './data';
+import { AI_LEVELS, BUILDINGS, CARRY, DEER, DT, EPOCH_GATHER_BONUS, FISH_CARRY, GATHER, MILITARY, PRIEST, REPAIR_SHARE, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
@@ -801,6 +801,17 @@ function tradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>): vo
         p.stats.gathered += u.carry;
         p.stats.traded += u.carry;
         s.events.push({ k: 'caravan', id: u.id, owner: u.owner, what: 'paid', amount: u.carry, x: m.x, y: m.y });
+        // Allies with a Market of their own take a cut of the trade passing through the alliance.
+        const cut = Math.floor(u.carry * TRADE.ally);
+        if (cut > 0) {
+          for (const q of s.players) {
+            if (q.id === u.owner || q.team !== p.team || q.defeated || !nearestMarket(s, q.id, m.x, m.y)) continue;
+            q.res.gold += cut;
+            q.stats.gathered += cut;
+            q.stats.traded += cut;
+            s.events.push({ k: 'caravan', id: u.id, owner: q.id, what: 'paid', amount: cut, x: m.x, y: m.y });
+          }
+        }
       }
       u.carry = 0;
       u.carryRes = null;
