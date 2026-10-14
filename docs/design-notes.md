@@ -385,3 +385,5 @@ Built: a `frog` sound (a throaty croak and a quick answering ribbit) cued every 
 ### Ages reached (own pitch), 2026-10-14
 
 **Built:** the end-of-match table's Epoch cell now has a tooltip with the minute each player reached each age, from the history the timeline already keeps (`src/ui/endReport.ts`). **Why:** the timeline dots show it, but only if you hover the right dot; a pace comparison should be one glance. **Next:** a "turning points" strip (first wonder, first lost town) would need the rules to record events.
+
+**Hushed nights** (own pitch, lane look, chain 1014-0320 s7): crickets and frogs fall silent while five or more soldiers (infantry, ranged, cavalry, siege) stand within 12 tiles of the view's centre and in sight (`armyNear` in `view.ts`). Why: the night's small voices now answer to the war; a quiet field means something is marching. Next: a splash when a unit wades, owls shy of battle. Audio only; no rules or save change. Not heard or seen in a browser.
