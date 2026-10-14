@@ -34,3 +34,28 @@ describe('borders', () => {
     expect(serialize(s)).toBe(t);
   });
 });
+
+describe('attrition', () => {
+  it('wears down a soldier deep in enemy land and spares one near its own, and ships and citizens', async () => {
+    const { attrition } = await import('../src/sim/borders');
+    const { spawnUnit } = await import('../src/sim/world');
+    const { ATTRITION, secs } = await import('../src/sim/data');
+    const s = game();
+    const b = s.players[1];
+    const deep = spawnUnit(s, 0, 'infantry', b.startX + 4, b.startY + 4);
+    const farm = spawnUnit(s, 0, 'citizen', b.startX + 4, b.startY + 5);
+    const home = spawnUnit(s, 1, 'infantry', b.startX + 4, b.startY + 6);
+    const h0 = deep.hp;
+    const f0 = farm.hp;
+    const m0 = home.hp;
+    s.tick = secs(ATTRITION.every);
+    attrition(s);
+    expect(deep.hp).toBeLessThan(h0);
+    expect(farm.hp).toBe(f0);
+    expect(home.hp).toBe(m0);
+    s.tick++;
+    const hd = deep.hp;
+    attrition(s);
+    expect(deep.hp).toBe(hd);
+  });
+});

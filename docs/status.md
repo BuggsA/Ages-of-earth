@@ -116,3 +116,5 @@ Merged since the last update: **walking the web without losing strength** (#79):
 **Yam Relay sight** (own pitch, lane rules): the Mongol great work also gives mounted soldiers +3 sight (`riderSight` in `Mods`, `WORKS.mongols`). No save bump. Browser unverified.
 
 **Borders** (#132 step 1, own pitch, lane look): land drawn as coloured edge lines from finished Town Centers, Towers, Wonders, Docks and Airfields (`BORDERS`); **O** toggles. Display only; no save bump. Seen only via the headless smoke run.
+
+**Attrition** (#132 s2, own build, lane rules): land soldiers deep in enemy land (no own-team border within 9 tiles) lose 2% health per 5 s, never during peace. Numbers in `ATTRITION`. Tests and campaign proof pass; browser/feel unverified; computer does not yet judge raid depth.

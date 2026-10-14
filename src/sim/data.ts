@@ -846,3 +846,10 @@ export function unitEpoch(type: UnitType): number {
  * are later steps of the seed.
  */
 export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6 };
+
+/**
+ * Attrition (#132 s2): every `every` seconds a land soldier standing in an enemy's land, with none of its
+ * own team's land within `deep` tiles, loses `loss` of its full health. Ships and aircraft, citizens,
+ * priests and traders are exempt, and so is everyone during a peace treaty. A town centre or tower raised nearby gives a foothold (its border).
+ */
+export const ATTRITION = { every: 5, deep: 9, loss: 0.02 };

@@ -11,6 +11,7 @@ import { Spatial } from './spatial';
 import { updateRelics } from './relics';
 import { atPost } from './trade';
 import { modsOf, trainTimeFor } from './stats';
+import { attrition } from './borders';
 import { barred, journeyOf, surveyFinds, trainsAt } from './ages';
 import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, MapSize, MapType, Player } from './types';
 import { RES, R_FISH, R_NONE } from './types';
@@ -439,6 +440,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   carryCargo(s);
   updateShots(s, sp, (a, damage, x, y) => hitAnimal(s, a, damage, x, y));
   updateRelics(s);
+  attrition(s);
   workStep(s);
   removeDead(s);
   if (s.tick % 4 === 0) updateVision(s);
