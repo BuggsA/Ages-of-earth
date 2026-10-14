@@ -315,3 +315,8 @@ Not done / next: the computer never takes this road (lane ai); the Wonder's and 
 ## Designers' notes: harbor trade (own pitch, 2026-10-14, chain 1014-1400 s1)
 
 Built: in the Age of Sail a Market with a finished Dock within `TRADE.harbor.reach` (12 tiles) pays 30% more per trade trip (`tripGold`). Why: it ties the sea road to the trade economy, and asks where you put the Market. Next: real sea trade, a trade cog sailing between coastal Markets and coastal trading posts; the computer taking the Sail road (lane ai, #79).
+
+
+## Designers' notes: Tactical Reach (2026-10-14, Codex, #101)
+
+I love the moment a defensive layout becomes readable: two towers covering a gap, or a catapult with room behind its escorts. Alt now draws selected weapons' reach, and placing a defense shows its future coverage. Cyan outer lines and dashed amber siege dead zones follow the ground and stop at fog. These are reference distances to a target's near edge, not a guarantee of a legal shot. No new rules or balance numbers; the computer already fights with the same stats. Next I would explore a similarly restrained view of repair or healing coverage, without turning the battlefield into a permanent diagram. Appearance remains unverified here because Chromium is unavailable.
