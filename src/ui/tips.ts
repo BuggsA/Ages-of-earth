@@ -9,6 +9,7 @@ import { R_FISH } from '../sim/types';
  */
 
 const MERCHANT_ROAD = ROADS.find((r) => r.to === 'merchant')!;
+const IRON_ROAD = ROADS.find((r) => r.to === 'iron')!;
 
 interface Tip {
   id: string;
@@ -74,6 +75,21 @@ const TIPS: Tip[] = [
       return ageOf(p) === 'bronze' && roadsFrom(p).some((r) => r.to === 'merchant' && roadKnown(s, p, r) && (deedProgress(p, r)?.have ?? 0) < r.deed!.n);
     },
     text: `There is another road out of the Bronze Age. Bring home ${MERCHANT_ROAD.deed!.n} gold by trade, and the Town Center (<kbd>Y</kbd>) can take your people into the <b>${AGES.merchant.name}</b> instead of the Middle Ages: the Market hires soldiers for gold, trade pays more, levies cost more. The road closes once you advance.`,
+  },
+  {
+    id: 'survey',
+    // Some worlds hold bog iron (#39): a cheap question at the Storehouse, asked while the Stone Age lasts.
+    when: (s, me) => !s.scenario && ageOf(s.players[me]) === 'stone' && secsIn(s) > 140 && has(s, me, 'storehouse') && !s.players[me].techs.includes('survey'),
+    text: 'Some worlds hold <b>bog iron</b> and some don\'t. A Storehouse can <b>Survey the Land</b> (🧭) for a little food and wood: the answer is yes or no, never where.',
+  },
+  {
+    id: 'iron',
+    // The survey said yes, and the Stone Age lasts: the road to the Iron Age is in view.
+    when: (s, me) => {
+      const p = s.players[me];
+      return ageOf(p) === 'stone' && roadKnown(s, p, IRON_ROAD) && (deedProgress(p, IRON_ROAD)?.have ?? 0) < IRON_ROAD.deed!.n;
+    },
+    text: `This world holds bog iron: rust-red ore in marsh mud (look on the minimap). Dig ${IRON_ROAD.deed!.n} of it, and the Town Center (<kbd>Y</kbd>) can take your people into the <b>${AGES.iron.name}</b> instead of the Bronze Age: cheap, hard-hitting foot soldiers and iron tools, but no horses until the Middle Ages.`,
   },
   { id: 'wonder', when: (s, me) => s.players[me].epoch >= 2, text: 'Rich? Build a <b>Wonder</b> (<kbd>B</kbd> <kbd>X</kbd>). If it stands long enough, you win, but everyone will come for it.' },
   { id: 'dock', when: (s, me) => secsIn(s) > 150 && !has(s, me, 'dock') && waterNear(s, me), text: 'Water nearby! A <b>Dock</b> (<kbd>B</kbd> <kbd>D</kbd>) on the shore trains <b>fishing boats</b>: fish shoals feed you for a long time. Later, warships and transports.' },

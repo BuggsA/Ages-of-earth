@@ -1626,6 +1626,21 @@ function onEvents(s: GameState, list: GameEvent[]): void {
       case 'researched':
         if (ev.owner === viewer) hud.toast(`${TECHS[ev.tech].name} researched`, 'good');
         break;
+      case 'survey':
+        // The survey's answer (#39): yes or no, never where.
+        if (ev.owner !== viewer) break;
+        if (!ev.found) hud.toast('The prospectors found no bog iron anywhere in this world', 'info');
+        else {
+          const road = roadsFrom(s.players[viewer]).find((r) => r.found === ev.tech);
+          hud.banner(
+            'Bog iron',
+            road
+              ? `There is bog iron somewhere in this world: rust-red ore in the marshes. Find it and dig it, and the Town Center can lead you into the ${AGES[road.to].name} instead of the Bronze Age.`
+              : 'There is bog iron somewhere in this world: rust-red ore in the marshes, paid in as gold. The road to the Iron Age closed with the Stone Age.',
+            6000,
+          );
+        }
+        break;
       case 'left':
         hud.toast(`${s.players[ev.owner].name} has left: the computer leads their people now`, 'info');
         break;
