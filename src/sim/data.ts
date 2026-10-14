@@ -761,6 +761,16 @@ export const EPOCH_GATHER_BONUS = 0.1;
 export const AMOUNT = { tree: 80, berry: 125, stone: 300, gold: 400, meat: 140, fish: 250, bog: 300 };
 /** Deer: health, speeds, and how far a hunter throws a spear. */
 export const DEER = { hp: 8, walk: 0.8, flee: 2.3, spear: 3.5, spearDamage: 4 };
+/**
+ * The wild (#171). A mammoth grazes `home` tiles out from every town (and `extra` more in the open): it
+ * doesn't bolt when speared but turns on whoever threw, charging and goring for `rage` seconds after its
+ * last wound, and falls as one carcass of `meat`. Wolves keep `dens` out between the towns, each by a
+ * patch of wild gold: a pack of `pack` roams `roam` tiles about its den and falls on anyone within
+ * `notice` tiles, chasing no further than `leash` from home. Bitten or gored people fight back.
+ * Speeds in tiles a second, blows every `reload` seconds, `reach` from the beast's edge.
+ */
+export const MAMMOTH = { hp: 90, walk: 0.5, charge: 1.7, gore: 8, reach: 0.5, reload: 1.8, rage: 7, roam: 2.5, meat: 600, radius: 0.55, home: 17, extra: { small: 1, medium: 2, large: 3 } as Record<MapSize, number> };
+export const WOLF = { hp: 20, walk: 0.9, run: 2.1, bite: 3, reach: 0.35, reload: 1.2, notice: 4.5, leash: 10, roam: 2.5, radius: 0.22, pack: 3, home: 22, fair: 6, spacing: 14, dens: { small: 2, medium: 3, large: 4 } as Record<MapSize, number> };
 
 /** Market: gold per 100 of a resource to start, how much each trade moves it, and the cut when selling. */
 export const MARKET = { start: { food: 100, wood: 100, stone: 130 }, step: 4, min: 20, max: 600, sellRate: 0.75, lot: 100,
@@ -892,3 +902,8 @@ export const ATTRITION = { every: 5, deep: 9, loss: 0.02 };
  * `flame`: a clever computer that sees a rival's beacon burning within this many tiles of one of its Towers lights that Tower's own.
  */
 export const AI_RAID = { weary: 0.5, calm: 7, fort: 15, pop: 24, flame: 24 };
+/**
+ * The computer and the wild (#171): once it has `mammothAt` citizens it sends a party of `party` after the
+ * mammoth within `mammothNear` tiles of home; with `pack` soldiers at hand it clears wolves within `clear`.
+ */
+export const AI_WILD = { mammothAt: 10, party: 5, mammothNear: 22, pack: 3, clear: 32 };

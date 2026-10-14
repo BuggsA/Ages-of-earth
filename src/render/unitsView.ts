@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import { rankOf } from '../sim/combat';
-import { SIGNATURES, TICK_HZ, domainOf, unitStats } from '../sim/data';
-import type { CivId, GameState, Unit, UnitType } from '../sim/types';
+import { MAMMOTH, SIGNATURES, TICK_HZ, WOLF, domainOf, unitStats } from '../sim/data';
+import type { Animal, CivId, GameState, Unit, UnitType } from '../sim/types';
 import { unitMaterial } from './materials';
 import { heightAt } from './terrain';
-import { deerGeometry, unitGeometry } from './unitModels';
+import { deerGeometry, mammothGeometry, unitGeometry, wolfGeometry } from './unitModels';
 import { WATER_Y } from './water';
 
 /** Units are drawn a little larger than their footprint in the rules, so they read well from above. */
@@ -150,7 +150,7 @@ export class UnitsView {
   readonly drawn = new Map<number, THREE.Vector3>();
   /** Animals on screen this frame, for picking. */
   readonly animalScreen: ScreenUnit[] = [];
-  private deer: Batch | null = null;
+  private beasts: Partial<Record<Animal['kind'], Batch>> = {};
   private deerAnims = new Map<number, Anim>();
 
   setColors(colors: string[]): void {
@@ -181,15 +181,18 @@ export class UnitsView {
     this.corpses = [];
   }
 
-  /** Deer grazing, wandering and bolting. */
+  /** Deer grazing, wandering and bolting; mammoths and wolves (#171) charging and biting. */
   private animals(s: GameState, alpha: number, dt: number, time: number, visible: (x: number, y: number) => boolean, camera: THREE.Camera, width: number, height: number): void {
     this.animalScreen.length = 0;
-    this.deer ??= new Batch(deerGeometry(), 32, this.group);
-    const b = this.deer;
-    b.count = 0;
-    b.reserve(s.animals.length);
+    const kinds: Animal['kind'][] = ['deer', 'mammoth', 'wolf'];
+    for (const k of kinds) {
+      const bb = (this.beasts[k] ??= new Batch(k === 'deer' ? deerGeometry() : k === 'mammoth' ? mammothGeometry() : wolfGeometry(), 32, this.group));
+      bb.count = 0;
+      bb.reserve(s.animals.length);
+    }
     const seen = new Set<number>();
     for (const an of s.animals) {
+      const b = this.beasts[an.kind]!;
       const x = an.px + (an.x - an.px) * alpha;
       const y = an.py + (an.y - an.py) * alpha;
       if (!visible(x, y)) continue;
@@ -209,7 +212,8 @@ export class UnitsView {
       while (d < -Math.PI) d += Math.PI * 2;
       a.yaw += d * Math.min(1, dt * 8);
       const running = a.speed > 0.1;
-      a.phase += dt * a.speed * 9;
+      // Big feet take slow strides; a wolf's quick ones.
+      a.phase += dt * a.speed * (an.kind === 'mammoth' ? 5 : an.kind === 'wolf' ? 12 : 9);
       const leg = running ? Math.sin(a.phase) * Math.min(0.9, 0.35 + a.speed * 0.2) : 0;
       // A gentle sway while grazing; the hop of a run.
       const bob = running ? Math.abs(Math.sin(a.phase)) * 0.04 * Math.min(1, a.speed / 2) : Math.sin(time * 0.9 + an.id) * 0.004;
@@ -221,17 +225,24 @@ export class UnitsView {
       this.m.compose(this.p, this.q, this.sc.set(UNIT_SCALE, UNIT_SCALE, UNIT_SCALE));
       b.mesh.setMatrixAt(i, this.m);
       b.mesh.setColorAt(i, WHITE);
-      b.anim.setXYZ(i, leg, 0, bob);
-      this.v.set(x, gy + 0.35, y).project(camera);
+      // A gore or a bite: the head lunges just after the blow lands, then eases back.
+      const reload = an.kind === 'mammoth' ? MAMMOTH.reload : WOLF.reload;
+      const since = an.state === 'fight' && an.cool ? reload * TICK_HZ - an.cool : 99;
+      const lunge = since < 8 ? Math.sin((since / 8) * Math.PI) * (an.kind === 'mammoth' ? -0.45 : 0.5) : 0;
+      b.anim.setXYZ(i, leg, lunge, bob);
+      this.v.set(x, gy + (an.kind === 'mammoth' ? 0.6 : 0.35), y).project(camera);
       if (this.v.z < 1) {
         this.animalScreen.push({ id: an.id, sx: ((this.v.x + 1) / 2) * width, sy: ((1 - this.v.y) / 2) * height, r: Math.max(10, 400 / Math.max(1, camera.position.distanceTo(this.p))) });
       }
     }
     for (const id of this.deerAnims.keys()) if (!seen.has(id)) this.deerAnims.delete(id);
-    b.mesh.count = b.count;
-    b.mesh.instanceMatrix.needsUpdate = true;
-    if (b.mesh.instanceColor) b.mesh.instanceColor.needsUpdate = true;
-    b.anim.needsUpdate = true;
+    for (const k of kinds) {
+      const b = this.beasts[k]!;
+      b.mesh.count = b.count;
+      b.mesh.instanceMatrix.needsUpdate = true;
+      if (b.mesh.instanceColor) b.mesh.instanceColor.needsUpdate = true;
+      b.anim.needsUpdate = true;
+    }
   }
 
   update(

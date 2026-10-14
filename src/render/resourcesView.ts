@@ -87,8 +87,8 @@ export class ResourcesView {
           const sc = 1.6 * (0.6 + 0.4 * Math.max(0, Math.min(1, frac)));
           add('fish', i, new THREE.Matrix4().compose(new THREE.Vector3(tx + 0.5, WATER_Y + 0.01, ty + 0.5), q, new THREE.Vector3(sc, sc, sc)));
         } else if (r === R_MEAT) {
-          // A carcass shrinks as it is butchered.
-          const sc = UNIT_SCALE * (0.6 + 0.4 * Math.max(0, Math.min(1, frac)));
+          // A carcass shrinks as it is butchered; a mammoth's (#171) lies the bigger for all its meat.
+          const sc = UNIT_SCALE * (0.6 + 0.4 * Math.max(0, Math.min(1, frac))) * Math.min(2, Math.max(1, Math.sqrt(frac)));
           add('carcass', i, new THREE.Matrix4().compose(new THREE.Vector3(tx + 0.5, gy, ty + 0.5), q, new THREE.Vector3(sc, sc, sc)));
         } else {
           const kind: NatureKind = r === R_BERRY ? 'berryBush' : r === R_STONE ? 'stoneDeposit' : r === R_BOG ? 'bogIron' : 'goldDeposit';

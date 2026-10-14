@@ -83,8 +83,8 @@ export type Order =
   | { k: 'deliver' }
   /** Walk into a building to shelter (and add arrows to its volleys). */
   | { k: 'garrison'; target: number }
-  /** Hunt an animal; once it falls, butcher it. */
-  | { k: 'hunt'; target: number }
+  /** Hunt an animal; once it falls, butcher it. With `fight`, a wolf fought off: nothing to butcher. */
+  | { k: 'hunt'; target: number; fight?: boolean }
   /** A priest turning an enemy to your side: `done` ticks of chanting so far. */
   | { k: 'convert'; target: number; done: number }
   /** A priest tending a wounded friend. */
@@ -267,7 +267,8 @@ export interface Ruin {
 
 export interface Animal {
   id: number;
-  kind: 'deer';
+  /** Deer bolt; mammoths and wolves (#171) fight. */
+  kind: 'deer' | 'mammoth' | 'wolf';
   x: number;
   y: number;
   px: number;
@@ -275,8 +276,8 @@ export interface Animal {
   fx: number;
   fy: number;
   hp: number;
-  /** Grazing, wandering a little, or running away. */
-  state: 'graze' | 'walk' | 'flee';
+  /** Grazing, wandering a little, running away, or (mammoths and wolves) fighting `foe`. */
+  state: 'graze' | 'walk' | 'flee' | 'fight';
   /** Ticks left in this state. */
   t: number;
   tx: number;
@@ -284,6 +285,10 @@ export interface Animal {
   homeX: number;
   homeY: number;
   hurt: number;
+  /** The unit a fighting beast is after (#171). */
+  foe?: number;
+  /** Ticks until a fighting beast can strike again. */
+  cool?: number;
 }
 
 export interface Shot {
@@ -387,7 +392,11 @@ export type GameEvent =
   | { k: 'hit'; target: number; x: number; y: number; damage: number; owner: number; building: boolean }
   | { k: 'splash'; x: number; y: number; owner: number; kind: Shot['kind'] }
   | { k: 'die'; id: number; owner: number; type: UnitType | BuildingType; x: number; y: number; building: boolean; size: number; epoch: number; fx: number; fy: number }
-  | { k: 'animalDie'; id: number; x: number; y: number; fx: number; fy: number }
+  | { k: 'animalDie'; id: number; x: number; y: number; fx: number; fy: number; kind?: Animal['kind'] }
+  /** A mammoth or wolf turns to fight (#171): its cry. */
+  | { k: 'wildCry'; id: number; kind: Animal['kind']; x: number; y: number }
+  /** A mammoth gores, or a wolf bites, someone. */
+  | { k: 'wildStrike'; id: number; kind: Animal['kind']; target: number; x: number; y: number }
   | { k: 'trained'; id: number; owner: number; type: UnitType }
   | { k: 'researched'; owner: number; tech: TechId }
   /** A survey's answer (#39): whether what it looks for lies anywhere in this world. */
@@ -401,7 +410,7 @@ export type GameEvent =
   | { k: 'work'; id: number; owner: number; act: Act; x: number; y: number }
   | { k: 'depleted'; tile: number }
   | { k: 'rank'; id: number; owner: number; x: number; y: number; rank: number }
-  | { k: 'alert'; owner: number; x: number; y: number; building: boolean }
+  | { k: 'alert'; owner: number; x: number; y: number; building: boolean; wild?: Animal['kind'] }
   | { k: 'converted'; id: number; from: number; to: number; x: number; y: number }
   | { k: 'healed'; id: number; x: number; y: number }
   | { k: 'garrison'; owner: number; building: number; inside: boolean }

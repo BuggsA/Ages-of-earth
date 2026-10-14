@@ -13,6 +13,7 @@ import { callWork, workProblem } from './works';
 import { beaconProblem, lightBeacon } from './beacon';
 import { rallyCry, rallyProblem } from './rally';
 import { canHit, isEnemy, maxHp, pay, placeBuilding, refund } from './world';
+import { fightsBeasts } from './animals';
 
 /**
  * Everything a player can do, as plain data. A person's clicks and the computer opponent both go
@@ -224,8 +225,10 @@ export function applyCommand(s: GameState, c: Command): void {
       const a = s.animals.find((x) => x.id === c.target);
       if (!a) return;
       const units = myUnits(s, c.p, c.ids);
-      for (const u of units.filter((x) => x.type === 'citizen')) giveOrder(u, { k: 'hunt', target: a.id }, c.queue);
-      const others = units.filter((u) => u.type !== 'citizen');
+      // Citizens hunt; soldiers on foot or horse (#171) can bring down a beast too.
+      const hunters = units.filter((x) => fightsBeasts(x));
+      for (const u of hunters) giveOrder(u, { k: 'hunt', target: a.id, fight: a.kind === 'wolf' }, c.queue);
+      const others = units.filter((u) => !hunters.includes(u));
       if (others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: a.x, y: a.y, queue: c.queue });
       break;
     }

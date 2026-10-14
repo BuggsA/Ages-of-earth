@@ -1,5 +1,5 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, AI_LEVELS, AI_RAID, AI_WEB, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_LEVELS, AI_RAID, AI_WEB, AI_WILD, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Player, Res, Ruin, TechId, TradePost, Unit, UnitType } from './types';
@@ -208,6 +208,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   planBuildings(s, v, mem, issue);
   excavate(s, v, mem, issue);
   assignCitizens(s, v, issue);
+  wilds(s, v, mem, issue);
   // Ships and aircraft are few and dear: they get first call on the treasury.
   seafaring(s, v, mem, issue);
   airforce(s, v, mem, issue);
@@ -738,6 +739,7 @@ function nearestDeer(s: GameState, x: number, y: number, r: number): Animal | nu
   let best: Animal | null = null;
   let bestD = r * r;
   for (const a of s.animals) {
+    if (a.kind !== 'deer') continue;
     const dx = a.x - x;
     const dy = a.y - y;
     const d = dx * dx + dy * dy;
@@ -843,6 +845,42 @@ function assignCitizens(s: GameState, v: View, issue: (c: Command) => void): voi
     const mover = v.citizens.find((u) => jobOf(u) === over && u.carry <= 2 && u.order.k !== 'farm' && u.order.k !== 'hunt' && !u.inside && !v.diggers.has(u.id));
     if (mover) sendTo(s, v, mover, under, issue);
   }
+}
+
+// ---- The wild (#171) ---------------------------------------------------------------------------------
+
+function nearestBeast(s: GameState, kind: Animal['kind'], x: number, y: number, r: number): Animal | null {
+  let best: Animal | null = null;
+  let bestD = r * r;
+  for (const a of s.animals) {
+    if (a.kind !== kind || a.hp <= 0) continue;
+    const d = (a.x - x) * (a.x - x) + (a.y - y) * (a.y - y);
+    if (d < bestD) {
+      bestD = d;
+      best = a;
+    }
+  }
+  return best;
+}
+
+/** A hunting party for the mammoth near home, and soldiers to clear the wolves near it. */
+function wilds(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const hunting = (u: Unit, kind: Animal['kind']) => u.order.k === 'hunt' && s.animals.some((a) => a.id === (u.order as { target: number }).target && a.kind === kind);
+  if (v.citizens.length >= AI_WILD.mammothAt && !v.citizens.some((u) => hunting(u, 'mammoth'))) {
+    const m = nearestBeast(s, 'mammoth', v.home.x, v.home.y, AI_WILD.mammothNear);
+    if (m && m.state !== 'fight') {
+      const party = v.citizens
+        .filter((u) => !u.inside && u.carry <= 2 && !v.diggers.has(u.id) && u.order.k === 'gather' && (u.order.res === 'food' || u.order.res === 'wood'))
+        .sort((a, b) => (a.x - m.x) * (a.x - m.x) + (a.y - m.y) * (a.y - m.y) - ((b.x - m.x) * (b.x - m.x) + (b.y - m.y) * (b.y - m.y)) || a.id - b.id)
+        .slice(0, AI_WILD.party);
+      if (party.length === AI_WILD.party) issue({ t: 'hunt', p: v.p.id, ids: party.map((u) => u.id), target: m.id });
+    }
+  }
+  if (mem.attacking || v.army.some((u) => hunting(u, 'wolf'))) return;
+  const wolf = nearestBeast(s, 'wolf', v.home.x, v.home.y, AI_WILD.clear);
+  if (!wolf) return;
+  const free = v.army.filter((u) => !u.inside && (u.order.k === 'idle' || (u.order.k === 'move' && !u.order.amove)) && u.type !== 'siege');
+  if (free.length >= AI_WILD.pack) issue({ t: 'hunt', p: v.p.id, ids: free.map((u) => u.id), target: wolf.id });
 }
 
 // ---- Ancient ruins (#64) -----------------------------------------------------------------------------

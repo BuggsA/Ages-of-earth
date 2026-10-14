@@ -158,10 +158,11 @@ export class Minimap {
       ctx.strokeRect(b.x * sx - half, b.y * sy - half, half * 2, half * 2);
     }
     // Game, where the viewer can see it.
-    ctx.fillStyle = '#e8c79a';
     for (const a of s.animals) {
       if (!reveal && !p.vis[Math.floor(a.y) * s.w + Math.floor(a.x)]) continue;
-      const r = Math.max(1.2, sx * 0.6);
+      // Deer pale; a mammoth (#171) big and brown; wolves a warning red.
+      ctx.fillStyle = a.kind === 'mammoth' ? '#9a6a3c' : a.kind === 'wolf' ? '#d2493a' : '#e8c79a';
+      const r = Math.max(1.2, sx * (a.kind === 'mammoth' ? 1.1 : 0.6));
       ctx.fillRect(a.x * sx - r, a.y * sy - r, r * 2, r * 2);
     }
     // Trading posts the viewer has found: a sand-coloured square with a dark rim and a camel-brown dot.
