@@ -419,3 +419,7 @@ Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), n
 ## Designers' notes: the computer turns sailor (own pitch, 2026-10-14, lane ai)
 
 **Built:** a clever computer with a finished Dock takes the Middle Ages → Age of Sail road once its boats have landed the 500 fish (`turnRoad` in `src/sim/ai.ts`), if its people's coin-toss (`wants`, `AI_WEB.take`) says so, and comes ashore if its last Dock falls. No number or save change. **Why I love it:** the sea road was only for people; now a rival can quietly become a sea power. **Seen:** headless `web-walk` (6 seeds, small, 25 min): Sail@13m, @13m, @11m on three seeds, then on to Gunpowder; `tests/ai-sail.test.ts`. No win-rate comparison made. **Next:** the sailor building warships and docks more on purpose, and raiding the coast.
+
+## Designers' notes: the sailor's fleet (own pitch, 2026-10-14, chain 1014-2155 s3, lane ai)
+
+**Built:** a clever computer in the Age of Sail keeps two warships even on a map with no enemy ships, and counts rival merchant ships (`cog`) as prey, so its raiding fleet answers your sea trade. **Why I love it:** the sea road made ships cheap and sturdy, and until now the computer ignored that; a trade-by-water rival now has teeth. **Seen:** `tests/ai-sail.test.ts` (fails without the change). No win-rate comparison. **Next:** escorting its own cogs, and raiding the coast with transports.

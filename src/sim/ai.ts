@@ -971,9 +971,11 @@ function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   // Warships: once the Bronze Age opens them, if the enemy has boats or the map is mostly sea.
   if (!L.clever || p.epoch < 1) return;
   seaLanding(s, v, mem, dock, issue);
-  const enemyShips = s.ents.filter((e): e is Unit => e.kind === 'unit' && e.hp > 0 && isEnemy(s, p.id, e.owner) && (e.type === 'warship' || e.type === 'fisher' || e.type === 'transport') && p.vis[Math.floor(e.y) * s.w + Math.floor(e.x)] === 1);
+  // A sailor keeps a small fleet and hunts rival merchant ships, since its ships are cheap and sturdy.
+  const sailor = ageOf(p) === 'sail';
+  const enemyShips = s.ents.filter((e): e is Unit => e.kind === 'unit' && e.hp > 0 && isEnemy(s, p.id, e.owner) && (e.type === 'warship' || e.type === 'fisher' || e.type === 'transport' || (sailor && e.type === 'cog')) && p.vis[Math.floor(e.y) * s.w + Math.floor(e.x)] === 1);
   const warships = v.navy.filter((u) => u.type === 'warship');
-  const wantShips = s.mapType === 'sea' ? Math.min(2 + p.epoch, 6) : enemyShips.length ? Math.min(2 + Math.floor(enemyShips.length / 2), 5) : 0;
+  const wantShips = s.mapType === 'sea' ? Math.min(2 + p.epoch, 6) : enemyShips.length ? Math.min(2 + Math.floor(enemyShips.length / 2), 5) : sailor ? 2 : 0;
   if (warships.length + queued('warship') < wantShips && dock.queue.length < 2 && v.army.length >= 3) {
     const cost = unitStats('warship', p.epoch).cost;
     if (afford(v, cost)) {
