@@ -79,6 +79,9 @@ Merged since the last update: **camera bookmarks** (#76, merged in #77: Ctrl+Shi
 
 **Sea trade** (own pitch, lane rules): a Dock trains merchant ships (`cog`) that sail to coastal trading posts (ports: water within `TRADE.sea.reach` of the post) and pay `TRADE.sea.mul` (1.2) over the land road; computer Normal/Hard keep 1–2. Tests in `tests/sea-trade.test.ts`; browser unverified; no save bump.
 
+**Flickering lights** (own pitch, lane look): warm glowing parts (windows, torches, braziers, lamps) flutter up to a third dimmer on their own beat, per building, in the shared material shader. Render only; no rules, save or `data.ts` change. Browser smoke test passes (shaders compile, no console errors); how it looks in a match is unseen.
 **Ports on the Inland Sea** (#106, own pitch, lane rules): on the sea map trading posts stand on the shore, so every post is a port (24/24 over 12 seeds, was 0/24); other maps unchanged. Sea Lords proof passes; browser unverified; no save bump.
 
 **Bats at dusk** (own pitch, lane look): dark wing-beating bats flit near the camera at dusk and dawn, clear weather only, off on Low. Render only; no rules or save change. Seen in headless Chromium (no errors); motion unverified by eye.
+
+**Tactical Reach** (#101, Codex, lane look): Alt shows selected owned ranged weapons' reach and dashed siege dead zones; defense placement previews future reach. Terrain-following, clipped to current vision, capped at 24 guides in one draw. No rules, balance or save changes. Quick checks pass with the documented local TS5.9 fallback; pinned compiler checked by CI. Browser appearance unverified (Chromium missing).

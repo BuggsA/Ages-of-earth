@@ -327,6 +327,11 @@ Built: in the Age of Sail a Market with a finished Dock within `TRADE.harbor.rea
 
 Built: `src/render/fireflies.ts`, a swarm of 260 blinking points in a box that follows the camera, shown on clear nights only (`l.moon`), additive green-gold. Why I love it: the night had stars on the lakes and lit windows, but the ground itself was empty; now a quiet camp feels alive. Next: flickering braziers and torches (a light that flutters), fireflies thicker near water and forest, bats at dusk. Render only; no rules or save change.
 
+
+## Designers' notes: Tactical Reach (2026-10-14, Codex, #101)
+
+I love the moment a defensive layout becomes readable: two towers covering a gap, or a catapult with room behind its escorts. Alt now draws selected weapons' reach, and placing a defense shows its future coverage. Cyan outer lines and dashed amber siege dead zones follow the ground and stop at fog. These are reference distances to a target's near edge, not a guarantee of a legal shot. No new rules or balance numbers; the computer already fights with the same stats. Next I would explore a similarly restrained view of repair or healing coverage, without turning the battlefield into a permanent diagram. Appearance remains unverified here because Chromium is unavailable.
+
 ## Designers' notes: sea trade (own pitch, 2026-10-14, chain 1014-1400 s2)
 
 Built: a Dock trains merchant ships (`cog`) that sail to ports, trading posts with water within `TRADE.sea.reach`, and pay `TRADE.sea.mul` over the land road; Normal and Hard computers keep one or two sailing. Why: the harbor bonus now has a ship to go with it, and warships have a prey other than armies. Next: ports on sea maps (no post is one there today), a computer raid on sea lanes, a Lighthouse that widens a port.
@@ -338,3 +343,7 @@ Built: on the sea map trading posts are placed on the shore (open water within `
 ## Designers' notes: bats at dusk (own pitch, 2026-10-14, chain 1014-1340 s5)
 
 Built: `src/render/bats.ts`, 28 dark flitting points in a box around the camera, each drawn as a wing-beating chevron; they fade in where the light turns (dusk and dawn, from `l.moon`), clear weather only, off on Low quality. Why I love it: the evening now has a short, living hour between the fireflies and the day. Next: bats roosting out of ruins, owls, a bat swarm leaving a cave tile. Render only; no rules or save change.
+
+## Designers' notes: flickering lights (own pitch, 2026-10-14, chain 1014-1340 s4)
+
+Built: in `src/render/materials.ts` the glow of warm-coloured parts is dimmed by two beating sines, phase from the instance's position, so no two torches or windows pulse together. Why I love it: lit windows made towns read at dusk; flutter makes the light feel like fire. Next: bats at dusk, smoke thicker at night, a stronger flutter for torches than for windows (needs a baked flag). Render only.
