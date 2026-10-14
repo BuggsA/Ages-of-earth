@@ -75,14 +75,14 @@ export function inject<T extends THREE.Material>(mat: T, o: Inject): T {
     prev?.call(mat, shader, renderer);
     if (o.fog !== false) Object.assign(shader.uniforms, fogUniforms);
     if (o.rig || o.team) Object.assign(shader.uniforms, glowUniform);
-    if (o.sway) shader.uniforms.uTime = timeUniform;
+    if (o.sway || o.rig || o.team) shader.uniforms.uTime = timeUniform;
     let vs = shader.vertexShader;
     let fs = shader.fragmentShader;
     const parsV: string[] = [];
     if (o.fog !== false) parsV.push(FOG_PARS_VERTEX);
     if (o.rig || o.team) parsV.push('attribute float aTeam;\nvarying float vGlow;');
     if (o.rig) parsV.push('attribute vec3 aRig;\nattribute vec3 aAnim;');
-    if (o.sway) parsV.push('uniform float uTime;');
+    if (o.sway || o.rig || o.team) parsV.push('uniform float uTime;');
     vs = vs.replace('#include <common>', `#include <common>\n${parsV.join('\n')}`);
     if (o.rig || o.team) {
       vs = vs.replace(
@@ -96,6 +96,17 @@ export function inject<T extends THREE.Material>(mat: T, o: Inject): T {
           vColor.rgb = mix(vColor.rgb, vColor.rgb * instanceColor.rgb, step(0.5, aTeam) * step(aTeam, 1.5));
         #endif
         vGlow = step(1.5, aTeam);
+        {
+          // Warm lights (fire, windows, torches) flutter, each on its own beat by where it stands.
+          vec4 fp = vec4(0.0, 0.0, 0.0, 1.0);
+          #ifdef USE_INSTANCING
+            fp = instanceMatrix * fp;
+          #endif
+          float warm = step(vColor.b * 1.4, vColor.r);
+          float ph = fp.x * 1.7 + fp.z * 2.3 + position.x * 9.0 + position.z * 7.0;
+          float fl = 0.5 + 0.5 * sin(uTime * 9.0 + ph) * sin(uTime * 5.3 + ph * 1.9);
+          vGlow *= 1.0 - warm * 0.35 * fl;
+        }
         `,
       );
     }
