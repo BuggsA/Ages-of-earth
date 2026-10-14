@@ -326,3 +326,7 @@ Built: in the Age of Sail a Market with a finished Dock within `TRADE.harbor.rea
 ## Designers' notes: sea trade (own pitch, 2026-10-14, chain 1014-1400 s2)
 
 Built: a Dock trains merchant ships (`cog`) that sail to ports, trading posts with water within `TRADE.sea.reach`, and pay `TRADE.sea.mul` over the land road; Normal and Hard computers keep one or two sailing. Why: the harbor bonus now has a ship to go with it, and warships have a prey other than armies. Next: ports on sea maps (no post is one there today), a computer raid on sea lanes, a Lighthouse that widens a port.
+
+## Designers' notes: ports on the Inland Sea (own pitch, 2026-10-14, chain 1014-1400 s3)
+
+Built: on the sea map trading posts are placed on the shore (open water within `TRADE.sea.reach`-1 tiles), not at the map edge, so every post is a port (0 of 24 were before; other maps unchanged). Why: sea trade had no ports on the one map made of water. Changes sea-map worlds for a given seed (older sea replays may differ). Next: raids on sea lanes, a Lighthouse that widens a port. Not played in a browser.
