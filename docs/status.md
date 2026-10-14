@@ -1,6 +1,6 @@
 # Status
 
-**Read this at the start of every session** (`AGENTS.md`), with `docs/team.md` and the board. Keep it short: where the build stands, what's in flight, what waits on the owner. Change only your own rows. Updated 2026-10-13.
+**Read this at the start of every session** (`AGENTS.md`), with `docs/team.md` and the board. Keep it short: where the build stands, what's in flight, what waits on the owner. Change only your own rows. Updated 2026-10-14.
 
 ## Standing rulings
 
@@ -21,37 +21,17 @@ Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders
 
 | Check | State |
 | --- | --- |
-| Quick tier (`npm run check`) | 156 tests, about 20 s |
+| Quick tier (`npm run check`) | about 170 tests, about 20 s |
 | Slow tier (`tests/slow/`) | `campaign-proof*.test.ts`: every chapter won by a computer on its own map or, at Hard, one of 15 more (#43); three files side by side, about 3½ minutes on a cloud container |
 | Browser checks | none automated; the first session tested by hand in headless Chromium |
 | CI (`ci`, `periodic`) | added 2026-10-13; `periodic` starts once `main` is the default branch |
 
 ## In flight
 
+- [#50](https://github.com/BuggsA/Ages-of-earth/issues/50), ages as a web s4, the computer walks the web (lane ai, effort:hard): free now that #36 has landed.
+- [#37](https://github.com/BuggsA/Ages-of-earth/issues/37), ages as a web (umbrella): s1–s3 and s5–s7 are merged (#40, #46, #48, #52, #56, #57); only s4 (#50) remains. No save bump: every new field is optional.
 
-- [#41](https://github.com/BuggsA/Ages-of-earth/issues/41), Codex: one live connection per online player, branch `codex/41-online-connections`. Stale socket events and reconnect timers isolated; server rejects messages from replaced or departed connections. No simulation, balance, protocol or save changes. Implementation and nine regression cases complete; see #41 for CI and handoff. Browser behaviour unverified.
-
-- [#30](https://github.com/BuggsA/Ages-of-earth/issues/30), Codex: Market recovery indicators and regression coverage ([PR #32](https://github.com/BuggsA/Ages-of-earth/pull/32)), branch `codex/30-market-recovery`. Updated with the repair changes and #33 browser-free rule. No balance or save-shape changes. Browser appearance unverified; merge after green CI on the combined commit.
-
-- [#37](https://github.com/BuggsA/Ages-of-earth/issues/37), **ages as a web** (umbrella, lane rules, effort:hard; chain 1014-0030): s1, the skeleton and the **Age of Merchants** ([#38](https://github.com/BuggsA/Ages-of-earth/issues/38)), merged from `claude/37-ages-web`. s2, **bog iron and the Iron Age** ([#39](https://github.com/BuggsA/Ages-of-earth/issues/39)), from `claude/39-iron-age`: a deposit on about half the seeds, a yes-or-no survey at the Storehouse, a tier-1 side age from the Stone Age. s3, **windows and stepping back** ([#47](https://github.com/BuggsA/Ages-of-earth/issues/47)), from `claude/47-step-back`: a Town Center step back (Z) to the trunk age one tier down, technologies above it suspended until the climb, shut side roads shown with where they open. s5, **pilgrims and fairs** ([#49](https://github.com/BuggsA/Ages-of-earth/issues/49)), from `claude/49-hybrid-ages`: relics open a turn off the Middle Ages into the Age of Pilgrims; trade and relic deeds together open the Age of Fairs (a hybrid, from either side), where kept relics make trade pay more. s6, **the web map** ([#54](https://github.com/BuggsA/Ages-of-earth/issues/54)), from `claude/54-web-map`: a title-screen map of the nine ages, discovery kept in browser storage. s7, **ages that look and sound like themselves** ([#55](https://github.com/BuggsA/Ages-of-earth/issues/55)), from `claude/55-age-looks`: baked touches on buildings, smoke and music themes per side age (lane look; browser unverified). Next: s4, the computer walks the web (lane ai, after #36). No save bump: the new fields are optional, and an older save is a world without bog iron.
-
-- [#42](https://github.com/BuggsA/Ages-of-earth/issues/42), computer traders judge the road they walk (chain 1013-1734, 7/10, lane ai): branch `claude/42-trade-roads`, merged after #43 (#51) made the proof sturdy. Every computer now trades for real, rivals included, so Wings over the Steppe (one against two) got harder: maps won at Hard 8/16 → 4/16 (`docs/log/2026-10-14-0230-trade-roads.md`); the proof still passes. No numbers in `data.ts` change; no save bump.
-
-- [#36](https://github.com/BuggsA/Ages-of-earth/issues/36), the two-front war (chain 1013-1734, 8/10, lane ai): branch `claude/36-two-fronts`. The Tsar plays Easy in Wings, and a chapter seat strikes a rival's wonder first. Wings maps won 4/16 → 8/16; a Normal seat wins its own map (`docs/log/2026-10-14-0505-two-fronts.md`). Changed in `campaign.ts`: the Tsar's `ai` 'normal' → 'easy'. No save bump.
-
-- [#24](https://github.com/BuggsA/Ages-of-earth/issues/24), Wings over the Steppe shown winnable (chain 1013-1734, 5/10, lane ai): branch `claude/24-wings`, tests and docs only. Found on the way: [#42](https://github.com/BuggsA/Ages-of-earth/issues/42), computer traders die on bent roads (merged after [#43](https://github.com/BuggsA/Ages-of-earth/issues/43)); [#36](https://github.com/BuggsA/Ages-of-earth/issues/36), the computer can't fight a two-front war.
-
-- [#1](https://github.com/BuggsA/Ages-of-earth/pull/1), repairs for damaged buildings: brought up to date with `main` on 2026-10-14, typecheck and all tests pass; the game loads in headless Chromium with no errors. Not yet played by a person (the right-click, hammer cursor and sound are untried); ready for review.
-
-- [#21](https://github.com/BuggsA/Ages-of-earth/issues/21), Muse reviewer docs (owner-ask, lane tooling): branch `claude/21-muse-docs`. Docs only.
-
-Merged since the last update (2026-10-13): the campaign (#11), the computer plays campaign goals (#25), sea landings (#26, test #27), veterancy, signature lines and their marks, and **Pilgrimage** (#28: a Temple tech that doubles relic gold; chain 1013-1900, 8/10). **Market prices recover** (#31: they drift back toward their start, 1 point every 10 s; agents may open pull requests without asking, `AGENTS.md` §3). The chain ended there: `create_session` refused at lineage depth 8.
-
-- [#64](https://github.com/BuggsA/Ages-of-earth/issues/64), **ancient ruins** (pitch, lane rules, with a small `ai.ts` addition): branch `claude/upbeat-cori-rc8bef`. Ruins between the towns, dug by citizens for a seeded find (hoard, lost knowledge, old map, relic); the computer digs them. Not in campaign maps, so the campaign proof is untouched. Also fixes music on `main`: `Music.style()` called itself outside side ages (from #55) and threw every bar. No save bump (`ruins` is optional).
-
-- Allied trade (pitch, lane rules): allies with a Market take a quarter of each teammate's trade trip (`TRADE.ally`); branch `claude/zealous-knuth-njzd4m`. No save bump; browser unverified.
-
-**Idle citizens together** (#61, merged [#62](https://github.com/BuggsA/Ages-of-earth/pull/62)): Shift + . or Shift-click Idle selects all available idle citizens. Final CI passed pinned typechecks, build and 171 tests; browser interaction unverified. — Codex
+Merged since the last update: **the two-front war** (#36: the Tsar plays Easy in Wings, a chapter seat strikes a rival's wonder first; Wings maps won at Hard 4/16 → 8/16), **ancient ruins** (#64, also a fix to `Music.style()` recursing outside side ages), **health bar quarter marks** (#68, Codex); the web of ages and its map and looks (above); computer traders judging the road they walk (#53, which made Wings over the Steppe harder: 8/16 maps at Hard became 4/16, see #36); the campaign proof over 16 maps a chapter (#51); Wings in the proof (#45); repairs (#1) and Market recovery indicators (#32); one live connection per online player (#44); browser-free shipping (#33); idle citizens together (#62: Shift + . selects them all); **allied trade** (#60, #63, #66: allies with a Market take `TRADE.ally`, a quarter, of each teammate's trade trip; a Market-less player may set out from an ally's Market; own coin effect and `tradeShare` sound; browser unverified, the sound level wants an ear); standing merge authorization (#67).
 
 ## Waiting on the owner
 
