@@ -16,6 +16,7 @@ import { Post, QUALITY, loadQuality, saveQuality, type QualityName } from './pos
 import { RelicsView } from './relicsView';
 import { PostsView } from './postsView';
 import { RuinsView } from './ruinsView';
+import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, type RangeGuide } from './rangeGuides';
 import { ResourcesView } from './resourcesView';
 import { Sky } from './sky';
 import { forcedHour, hourAt, lightAt, moonPhase } from './daylight';
@@ -85,6 +86,7 @@ export class View {
   /** When ground relics next sparkle. */
   private relicGlint = 0;
   private overlays = new Overlays();
+  private rangeGuides = new RangeGuides();
   private effects: Effects;
   private birds = new Birds();
   private fireflies = new Fireflies();
@@ -135,6 +137,7 @@ export class View {
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sky.mesh, this.hemi, this.fill, this.sun, this.sun.target);
     this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.ruins.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points);
+    this.scene.add(this.rangeGuides.mesh);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.post = new Post(this.renderer, this.scene, this.rig.camera);
     this.applyQuality();
@@ -370,9 +373,22 @@ export class View {
     const foe = new THREE.Color('#ff6a5a').multiplyScalar(1.25);
     const aura = new THREE.Color('#ffd166');
     const way = new THREE.Color('#d8ffd6');
+    const guides: RangeGuide[] = [];
+    // Placement gets the first slot, so a big selection cannot hide the defense being planned.
+    if (sel.ghost) {
+      const g = placementRange(s, this.viewer, sel.ghost.type, sel.ghost.tx, sel.ghost.ty);
+      if (g) guides.push(g);
+    }
     for (const id of sel.ids) {
       const e = s.byId.get(id);
       if (!e || e.hp <= 0) continue;
+      if (sel.allBars && guides.length < MAX_RANGE_GUIDES) {
+        const g = selectedRange(s, this.viewer, e);
+        if (g) {
+          const at = e.kind === 'unit' ? this.units.drawn.get(id) : null;
+          if (e.kind === 'building' || at) guides.push(at ? { ...g, x: at.x, y: at.z } : g);
+        }
+      }
       if (e.kind === 'unit') {
         const at = this.units.drawn.get(id);
         if (!at) continue;
@@ -424,6 +440,7 @@ export class View {
       }
     }
     this.overlays.setRings(rings);
+    this.rangeGuides.update(s, guides, (x, y) => this.reveal || s.players[this.viewer].vis[Math.floor(y) * s.w + Math.floor(x)] > 0);
     this.overlays.setBars(bars, this.rig.camera);
     const p = s.players[this.viewer];
     this.overlays.setGhost(s, sel.ghost ? { ...sel.ghost, epoch: p.epoch, color: p.color } : null);
