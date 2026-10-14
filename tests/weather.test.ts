@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeWeather, moodOf, stormGap, weatherFor } from '../src/render/weather';
+import { describeWeather, moodOf, stormGap, weatherFor, windFor } from '../src/render/weather';
 import type { MapType } from '../src/sim/types';
 
 const LANDS: MapType[] = ['continental', 'highlands', 'lakes', 'forest', 'plains', 'sea'];
@@ -60,5 +60,20 @@ describe('weather', () => {
       expect(stormGap(n)).toBeGreaterThanOrEqual(12);
       expect(stormGap(n)).toBeLessThan(40);
     }
+  });
+
+  it('has a wind fixed by the seed that blows harder in a storm and never dies away', () => {
+    const clear = { kind: 'clear' as const, strength: 0 };
+    const storm = { kind: 'rain' as const, strength: 1 };
+    const dirs = new Set<string>();
+    for (let seed = 1; seed < 200; seed++) {
+      expect(windFor(seed, clear)).toEqual(windFor(seed, clear));
+      const a = windFor(seed, clear);
+      const b = windFor(seed, storm);
+      expect(Math.hypot(b.x, b.z)).toBeGreaterThan(Math.hypot(a.x, a.z));
+      expect(Math.hypot(a.x, a.z)).toBeGreaterThanOrEqual(0.08);
+      dirs.add(`${Math.sign(a.x)},${Math.sign(a.z)}`);
+    }
+    expect(dirs.size).toBe(8);
   });
 });
