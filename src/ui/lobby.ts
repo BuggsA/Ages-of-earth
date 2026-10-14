@@ -11,6 +11,8 @@ import { MAX_SEATS, type ClientMsg, type LobbyState } from '../net/protocol';
 export interface LobbyActions {
   create(name: string): void;
   join(code: string, name: string): void;
+  /** Join a match already under way, to look on. */
+  watch(code: string, name: string): void;
   leave(): void;
   send(m: ClientMsg): void;
 }
@@ -66,7 +68,7 @@ export class Lobby {
         </div>
         <div class="choice">
           <h3>Join a room</h3>
-          <div class="seed-row"><input id="join-code" maxlength="5" placeholder="CODE" value="${esc(code)}" style="text-transform:uppercase"><button class="btn" data-lobby="join">Join</button></div>
+          <div class="seed-row"><input id="join-code" maxlength="5" placeholder="CODE" value="${esc(code)}" style="text-transform:uppercase"><button class="btn" data-lobby="join">Join</button><button class="btn" data-lobby="watch" title="Look in on a match already under way">Watch</button></div>
         </div>
       </div>
       <button class="btn small" data-lobby="back">Back</button>
@@ -159,10 +161,11 @@ export class Lobby {
     return v || 'Player';
   }
 
-  private joinFromInput(): void {
+  private joinFromInput(watch = false): void {
     const code = ((this.el.querySelector('#join-code') as HTMLInputElement).value || '').trim().toUpperCase();
     if (code.length !== 5) return this.showError('A room code has 5 letters and numbers.');
-    this.act.join(code, this.nameInput());
+    if (watch) this.act.watch(code, this.nameInput());
+    else this.act.join(code, this.nameInput());
   }
 
   private sendChat(): void {
@@ -182,6 +185,9 @@ export class Lobby {
         break;
       case 'join':
         this.joinFromInput();
+        break;
+      case 'watch':
+        this.joinFromInput(true);
         break;
       case 'back':
         this.act.leave();

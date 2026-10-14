@@ -64,6 +64,8 @@ export class NetClient {
   constructor(
     readonly code: string,
     private name: string,
+    /** A watcher only receives: the room reads nothing from them, so nothing else is sent. */
+    private watch = false,
   ) {}
 
   connect(): void {
@@ -77,6 +79,7 @@ export class NetClient {
     this.onStatus?.('connecting');
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const q = new URLSearchParams({ cid: clientId(), name: this.name, build: typeof __BUILD__ === 'string' ? __BUILD__ : 'dev' });
+    if (this.watch) q.set('watch', '1');
     const ws = new WebSocket(`${proto}//${location.host}/api/rooms/${this.code}/ws?${q}`);
     this.ws = ws;
     let refused = '';
@@ -125,6 +128,7 @@ export class NetClient {
   }
 
   send(m: ClientMsg): void {
+    if (this.watch && m.t !== 'ping') return;
     if (this.ws && this.ws.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m));
   }
 
