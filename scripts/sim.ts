@@ -2,7 +2,8 @@
  * A headless match between two computer opponents, printed minute by minute, for balancing and timing.
  *   npx tsx scripts/sim.ts [seed] [small|medium|large] [minutes]
  */
-import { EPOCHS, RUINS, secs } from '../src/sim/data';
+import { AGES, RUINS, secs } from '../src/sim/data';
+import { ageOf } from '../src/sim/ages';
 import { checksum, createGame, step } from '../src/sim/game';
 
 const seed = Number(process.argv[2] ?? 1);
@@ -23,7 +24,8 @@ for (let i = 0; i < minutes * 60 * 20 && !s.over; i++) {
     const res = Object.values(p.res).map(Math.floor).join('/');
     const relics = s.relics.filter((r) => r.temple && s.byId.get(r.temple)?.owner === p.id).length;
     const traders = units.filter((u) => u.kind === 'unit' && u.type === 'trader').length;
-    return `${p.name}: ${EPOCHS[p.epoch].short}, ${cit} citizens, ${units.length - cit} soldiers, ${blds} buildings, ${res}, kills ${p.stats.kills}, relics ${relics}, traders ${traders} (${p.stats.traded} gold)`;
+    // The age, not just the epoch: a side road (#50) shows by its own name.
+    return `${p.name}: ${AGES[ageOf(p)].short}, ${cit} citizens, ${units.length - cit} soldiers, ${blds} buildings, ${res}, kills ${p.stats.kills}, relics ${relics}, traders ${traders} (${Math.floor(p.stats.traded)} gold)${p.stats.iron ? `, bog iron ${Math.floor(p.stats.iron)}` : ''}`;
   });
   console.log(`min ${i / 1200}  ${line.join('  |  ')}`);
 }
