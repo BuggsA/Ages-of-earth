@@ -10,6 +10,9 @@ import * as THREE from 'three';
  *    angles (legs walk, an arm strikes or chops), so instanced armies animate without skeletons.
  */
 
+/** How brightly glowing parts (windows, torches, lanterns) shine: dimmer by day, strong as dusk falls. */
+export const glowUniform = { uGlow: { value: 1.25 } };
+
 export const fogUniforms = {
   uFogTex: { value: null as THREE.Texture | null },
   uFogSize: { value: new THREE.Vector2(1, 1) },
@@ -71,6 +74,7 @@ export function inject<T extends THREE.Material>(mat: T, o: Inject): T {
   mat.onBeforeCompile = (shader, renderer) => {
     prev?.call(mat, shader, renderer);
     if (o.fog !== false) Object.assign(shader.uniforms, fogUniforms);
+    if (o.rig || o.team) Object.assign(shader.uniforms, glowUniform);
     if (o.sway) shader.uniforms.uTime = timeUniform;
     let vs = shader.vertexShader;
     let fs = shader.fragmentShader;
@@ -133,10 +137,10 @@ export function inject<T extends THREE.Material>(mat: T, o: Inject): T {
 
     const parsF: string[] = [];
     if (o.fog !== false) parsF.push(FOG_PARS_FRAGMENT);
-    if (o.rig || o.team) parsF.push('varying float vGlow;');
+    if (o.rig || o.team) parsF.push('varying float vGlow;\nuniform float uGlow;');
     fs = fs.replace('#include <common>', `#include <common>\n${parsF.join('\n')}`);
     let tail = '#include <opaque_fragment>';
-    if (o.rig || o.team) tail += '\n  gl_FragColor.rgb += diffuseColor.rgb * vGlow * 1.25;';
+    if (o.rig || o.team) tail += '\n  gl_FragColor.rgb += diffuseColor.rgb * vGlow * uGlow;';
     if (o.fog !== false) tail += `\n${FOG_FRAGMENT}`;
     fs = fs.replace('#include <opaque_fragment>', tail);
     shader.fragmentShader = fs;

@@ -299,6 +299,13 @@ Built: gold planning pennants and red danger pennants on both the 3D land and th
 **Learned:** the camera (38° FOV, pitch 46-66° down) never shows the sky dome, so a starfield or moon disc in `sky.ts` would be invisible; I tried it and dropped it. If a tilted camera or a screenshot mode ever lifts the view, the shader is the place. **Next:** lit windows and braziers at dusk, fireflies at night. Seen in headless Chromium at night in a match (the light, no lake in view); the lake glints are unverified.
 
 
+### Lit windows (own pitch, lane look), 2026-10-14
+
+**Built:** one `uGlow` uniform (`materials.ts`) scales every glowing part (windows, torches, lanterns); `view.ts` sets it from the hour: the old strength by day, near double at night, a little more under grey weather. Render only.
+
+**Why:** the windows were already modelled glowing; they just never *meant* anything. Now a town reads as lived-in at dusk and enemy camps show in the dark. **Next:** fireflies at night near water and forest; braziers that flicker. Unverified in a browser (checked only typecheck and tests).
+
+
 ## Designers' notes: Age of Reclaimers (2026-10-14, Codex, #94)
 
 I love the moment when exploration changes a civilization rather than only filling its treasury. A completed excavation now reveals a people who put yesterday's knowledge to work: faster building and repair, cheaper research, slower military training. The Middle Ages window spreads the web into another tier and gives opponents time to scout and punish a rebuilding town. Its armies still use the ordinary counters; there is no secret super-unit.
