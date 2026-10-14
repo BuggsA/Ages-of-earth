@@ -322,3 +322,7 @@ Not done / next: the computer never takes this road (lane ai); the Wonder's and 
 ## Designers' notes: harbor trade (own pitch, 2026-10-14, chain 1014-1400 s1)
 
 Built: in the Age of Sail a Market with a finished Dock within `TRADE.harbor.reach` (12 tiles) pays 30% more per trade trip (`tripGold`). Why: it ties the sea road to the trade economy, and asks where you put the Market. Next: real sea trade, a trade cog sailing between coastal Markets and coastal trading posts; the computer taking the Sail road (lane ai, #79).
+
+## Designers' notes: sea trade (own pitch, 2026-10-14, chain 1014-1400 s2)
+
+Built: a Dock trains merchant ships (`cog`) that sail to ports, trading posts with water within `TRADE.sea.reach`, and pay `TRADE.sea.mul` over the land road; Normal and Hard computers keep one or two sailing. Why: the harbor bonus now has a ship to go with it, and warships have a prey other than armies. Next: ports on sea maps (no post is one there today), a computer raid on sea lanes, a Lighthouse that widens a port.

@@ -113,10 +113,12 @@ function orderWords(s: GameState, u: Unit): string {
     case 'dig':
       return u.act === 'mine' ? 'Digging at the ruins' : 'Going to dig at the ruins';
     case 'trade':
+      if (u.type === 'cog') return o.phase === 'back' ? (u.carry > 0 ? 'Sailing gold home to the Dock' : 'Going home to the Dock') : 'Sailing goods to the port';
       return o.phase === 'back' ? (u.carry > 0 ? 'Bringing gold home to the Market' : 'Going home to the Market') : 'Taking goods to the trading post';
     default:
       if (carriedBy(s, u)) return 'Holding a relic';
       if (u.type === 'trader' && u.carry > 0) return 'Waiting with gold: right-click a Market';
+      if (u.type === 'cog' && u.carry > 0) return 'Waiting with gold: right-click a Dock';
       return ACT_WORDS[u.act] ?? 'Standing by';
   }
 }
@@ -426,12 +428,12 @@ export class Hud {
   private postPanel(s: GameState, viewer: number, post: TradePost): [string, string] {
     const m = homeMarket(s, viewer, post.x, post.y);
     const pay = m ? tripGold(s, viewer, m, post) : 0;
-    const mine = s.ents.filter((e) => e.kind === 'unit' && e.owner === viewer && e.type === 'trader' && e.order.k === 'trade' && e.order.post === post.id).length;
+    const mine = s.ents.filter((e) => e.kind === 'unit' && e.owner === viewer && (e.type === 'trader' || e.type === 'cog') && e.order.k === 'trade' && e.order.post === post.id).length;
     const status = m ? `From your nearest Market: ${icon('gold', 14)}${pay} a trip` : 'Build a Market to trade here';
     const html = `<div class="sel-portrait"><span style="font-size:54px">🐪</span></div>
       <div class="sel-info"><div class="sel-name">Trading Post</div><div class="sel-sub">${status}</div>
       <div class="stats"><span data-tip="<b>Your traders</b>On the road to this post.">🐪<em>Your traders</em> ${mine}</span><span data-tip="<b>Most a trip</b>The farthest roads pay up to this.">${icon('gold')}<em>At most</em> ${TRADE.max}</span></div>
-      <div class="blurb">Neutral ground where anyone may trade. Train traders at a Market, select them and right-click here: they carry goods out and bring back gold, the more the farther their Market stands from the post. Nothing is paid until they are home, so guard the road.</div></div>`;
+      <div class="blurb">Neutral ground where anyone may trade. Train traders at a Market, select them and right-click here: they carry goods out and bring back gold, the more the farther their Market stands from the post. Where water lies within ${TRADE.sea.reach} tiles it is a port too: merchant ships from a Dock sail here for ${Math.round((TRADE.sea.mul - 1) * 100)}% more. Nothing is paid until they are home, so guard the road.</div></div>`;
     return [html, `post:${post.id}:${status}:${mine}`];
   }
 
@@ -532,7 +534,7 @@ export class Hud {
     const mine = ents.filter((e) => e.owner === viewer);
     const units = mine.filter((e): e is Unit => e.kind === 'unit');
     const citizens = units.filter((u) => u.type === 'citizen');
-    const soldiers = units.filter((u) => u.type !== 'citizen' && u.type !== 'fisher' && u.type !== 'transport' && u.type !== 'trader');
+    const soldiers = units.filter((u) => u.type !== 'citizen' && u.type !== 'fisher' && u.type !== 'transport' && u.type !== 'trader' && u.type !== 'cog');
     const walkers = units.filter((u) => domainOf(u.type) === 'land');
     const transports = units.filter((u) => u.type === 'transport');
     const cmds: Cmd[] = [];

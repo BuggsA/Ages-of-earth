@@ -710,6 +710,17 @@ function transport(epoch: number): Kit {
   return k;
 }
 
+/** A merchant ship: a transport's hull with its deck stacked high with bales and a golden pennant. */
+function cog(epoch: number): Kit {
+  const k = transport(epoch);
+  const gold = '#d8b24a';
+  k.box(0.2, 0.14, 0.22, '#b88e5a', -0.14, 0.2, 0.3);
+  k.box(0.18, 0.12, 0.2, '#a07a50', 0.14, 0.2, 0.18);
+  k.box(0.16, 0.1, 0.16, gold, 0, 0.2, -0.22);
+  k.team(k.box(0.16, 0.1, 0.02, TEAM, 0, 0.2, 0.62));
+  return k;
+}
+
 // ---- Aircraft --------------------------------------------------------------------------------------
 
 /** A blur of propeller at a point, facing forward. */
@@ -926,7 +937,7 @@ function trader(epoch: number): Kit {
   return k;
 }
 
-const MAKERS: Record<UnitType, (epoch: number) => Kit> = { citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, fighter, bomber, trader };
+const MAKERS: Record<UnitType, (epoch: number) => Kit> = { citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, cog, fighter, bomber, trader };
 
 
 // ---- Deer ------------------------------------------------------------------------------------------
