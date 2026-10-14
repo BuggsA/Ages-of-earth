@@ -1,4 +1,5 @@
-import { BORDERS } from './data';
+import { ATTRITION, BORDERS, domainOf, secs } from './data';
+import { isEnemy, maxHp } from './world';
 import type { GameState } from './types';
 
 /** Who owns each tile (player index, or -1 for no one's land). Pure: reads the state, changes nothing. */
@@ -28,4 +29,36 @@ export function borderMap(s: GameState): Int8Array {
     }
   }
   return owner;
+}
+
+const EXEMPT = new Set(['citizen', 'priest', 'trader']);
+
+/** Armies far from their own border, deep in an enemy's, wear down. Called every tick; works on a timer. */
+export function attrition(s: GameState): void {
+  if (s.tick === 0 || s.tick < s.peaceUntil || s.tick % secs(ATTRITION.every) !== 0) return;
+  let own: Int8Array | null = null;
+  const reach = ATTRITION.deep;
+  for (const u of s.ents) {
+    if (u.kind !== 'unit' || u.hp <= 0 || u.inside || EXEMPT.has(u.type) || domainOf(u.type) !== 'land') continue;
+    own ??= borderMap(s);
+    const x = Math.floor(u.x);
+    const y = Math.floor(u.y);
+    const here = own[y * s.w + x];
+    if (here < 0 || !isEnemy(s, u.owner, here)) continue;
+    const team = s.players[u.owner].team;
+    let supplied = false;
+    for (let dy = -reach; dy <= reach && !supplied; dy += 2) {
+      for (let dx = -reach; dx <= reach; dx += 2) {
+        const tx = x + dx;
+        const ty = y + dy;
+        if (tx < 0 || ty < 0 || tx >= s.w || ty >= s.h || dx * dx + dy * dy > reach * reach) continue;
+        const o = own[ty * s.w + tx];
+        if (o >= 0 && s.players[o].team === team) {
+          supplied = true;
+          break;
+        }
+      }
+    }
+    if (!supplied) u.hp -= Math.max(1, maxHp(s, u) * ATTRITION.loss);
+  }
 }
