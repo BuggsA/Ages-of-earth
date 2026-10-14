@@ -334,3 +334,7 @@ Built: a Dock trains merchant ships (`cog`) that sail to ports, trading posts wi
 ## Designers' notes: ports on the Inland Sea (own pitch, 2026-10-14, chain 1014-1400 s3)
 
 Built: on the sea map trading posts are placed on the shore (open water within `TRADE.sea.reach`-1 tiles), not at the map edge, so every post is a port (0 of 24 were before; other maps unchanged). Why: sea trade had no ports on the one map made of water. Changes sea-map worlds for a given seed (older sea replays may differ). Next: raids on sea lanes, a Lighthouse that widens a port. Not played in a browser.
+
+## Designers' notes: bats at dusk (own pitch, 2026-10-14, chain 1014-1340 s5)
+
+Built: `src/render/bats.ts`, 28 dark flitting points in a box around the camera, each drawn as a wing-beating chevron; they fade in where the light turns (dusk and dawn, from `l.moon`), clear weather only, off on Low quality. Why I love it: the evening now has a short, living hour between the fireflies and the day. Next: bats roosting out of ruins, owls, a bat swarm leaving a cave tile. Render only; no rules or save change.

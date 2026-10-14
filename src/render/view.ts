@@ -24,6 +24,7 @@ import { FogTexture, TerrainView, heightAt } from './terrain';
 import { AIR_ALT, UnitsView } from './unitsView';
 import { WATER_Y, WaterView } from './water';
 import { Fireflies } from './fireflies';
+import { Bats } from './bats';
 
 /**
  * The 3D view of a match through one player's eyes: lit terrain and lakes under a sky, woods and
@@ -88,6 +89,7 @@ export class View {
   private effects: Effects;
   private birds = new Birds();
   private fireflies = new Fireflies();
+  private bats = new Bats();
   private weather = new Weather();
   /** How far the haze lets the view reach today (1 on a clear day). */
   private reach = 1;
@@ -134,7 +136,7 @@ export class View {
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sky.mesh, this.hemi, this.fill, this.sun, this.sun.target);
-    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.ruins.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points);
+    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.ruins.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.post = new Post(this.renderer, this.scene, this.rig.camera);
     this.applyQuality();
@@ -261,6 +263,7 @@ export class View {
     this.baseSun = 2.5 * m.sun * l.sun * (1 - 0.4 * this.phase * l.moon);
     this.water.setStars(l.moon * (1 - m.grey));
     this.fireflies.setNight(this.weather.day.kind === 'clear' ? l.moon : 0);
+    this.bats.setDusk(l.moon, this.weather.day.kind === 'clear');
     // Windows and torches light up as the sun sets: the old strength by day, near double by night.
     glowUniform.uGlow.value = 0.9 + 1.2 * Math.min(1, l.moon + (1 - l.sun) * 0.9 + (1 - m.sky) * 0.3);
     this.baseHemi = 1.0 * m.sky * l.sky;
@@ -357,6 +360,7 @@ export class View {
     this.effects.update(dt);
     this.birds.update(this.time, dt, this.rig.target, this.rig.distance);
     this.fireflies.update(this.time, this.rig.target, this.rig.distance, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
+    this.bats.update(this.time, this.rig.target, this.rig.distance, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
     this.effects.placeTexts(this.rig.camera, this.width, this.height);
 
     if (QUALITY[this.quality].post) this.post.render();
