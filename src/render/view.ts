@@ -21,7 +21,7 @@ import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, type Rang
 import { ResourcesView } from './resourcesView';
 import { Sky } from './sky';
 import { forcedHour, hourAt, lightAt, moonPhase } from './daylight';
-import { Weather, describeWeather, forcedWeather, moodOf, weatherFor, type WeatherDay } from './weather';
+import { Weather, describeWeather, forcedWeather, moodOf, weatherFor, windFor, type WeatherDay } from './weather';
 import { FogTexture, TerrainView, heightAt } from './terrain';
 import { AIR_ALT, UnitsView } from './unitsView';
 import { WATER_Y, WaterView } from './water';
@@ -255,6 +255,8 @@ export class View {
   /** Put a day's weather over the land: its falling rain or snow, and a greyer, dimmer, closer sky. */
   private setWeather(day: WeatherDay): void {
     this.weather.set(day);
+    const wind = windFor(this.state?.seed ?? 0, day);
+    this.effects.setWind(wind.x, wind.z);
     this.mood = moodOf(day);
     this.reach = this.mood.reach;
     this.litHour = -1;

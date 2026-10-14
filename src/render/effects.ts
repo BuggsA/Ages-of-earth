@@ -83,6 +83,8 @@ export class Effects {
   private v = new THREE.Vector3();
   private sc = new THREE.Vector3();
   private e = new THREE.Euler();
+  /** The day's wind, in tiles a second: smoke and dust lean into it, sparks are too quick to notice. */
+  private wind = { x: 0, z: 0 };
 
   constructor(private layer: HTMLElement) {
     const pool = (geo: THREE.BufferGeometry, mat: THREE.Material): Pool => {
@@ -182,6 +184,11 @@ export class Effects {
     this.texts.push({ el, at: spot, age: 0, life });
   }
 
+  setWind(x: number, z: number): void {
+    this.wind.x = x;
+    this.wind.z = z;
+  }
+
   update(dt: number): void {
     this.clock += dt;
     if (this.queue.length) {
@@ -192,6 +199,7 @@ export class Effects {
 
     // Sparks and puffs: drift, fall (or rise), shrink (or swell).
     for (const pool of this.pools) {
+      const soft = pool === this.pools[1];
       let n = 0;
       const keep: Spark[] = [];
       for (const p of pool.list) {
@@ -199,6 +207,11 @@ export class Effects {
         if (p.age >= p.life) continue;
         keep.push(p);
         p.vel.y -= p.gravity * dt;
+        if (soft) {
+          // Drag pulls a puff toward the air's own speed, so it settles at the wind's pace.
+          p.vel.x += this.wind.x * p.drag * dt;
+          p.vel.z += this.wind.z * p.drag * dt;
+        }
         p.vel.multiplyScalar(Math.max(0, 1 - p.drag * dt));
         p.pos.addScaledVector(p.vel, dt);
         const k = p.age / p.life;
