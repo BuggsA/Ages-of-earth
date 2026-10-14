@@ -10,5 +10,11 @@ export default defineConfig(({ mode }) => ({
   server: { proxy: { '/api': { target: 'http://localhost:8787', ws: true } } },
   // Two test tiers (AGENTS.md, "Checks"): `npm test` runs the quick tests in tests/, and
   // `npm run test:slow` (mode "slow") the long ones in tests/slow/, which CI runs on a schedule.
-  test: { include: [mode === 'slow' ? 'tests/slow/**/*.test.ts' : 'tests/*.test.ts'], environment: 'node' },
+  // 15 s per test, not vitest's 5 s: a test taking ~3 s alone (trading posts on 18 maps) timed
+  // out when the whole quick tier ran in parallel on a loaded machine.
+  test: {
+    include: [mode === 'slow' ? 'tests/slow/**/*.test.ts' : 'tests/*.test.ts'],
+    environment: 'node',
+    testTimeout: 15000,
+  },
 }));
