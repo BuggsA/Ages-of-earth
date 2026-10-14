@@ -7,7 +7,7 @@ import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } 
 import { ageOf, barred, deedsDone, deedsProgress, hiresAt, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
 import { carriedBy } from './relics';
 import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple } from './units';
-import { goalForPost, nearestMarket, tripGold } from './trade';
+import { goalForPost, nearestMarket, portSpot, tripGold } from './trade';
 import { findRoute } from './path';
 import { isEnemy } from './world';
 import { progress, scenarioById } from './campaign';
@@ -83,6 +83,8 @@ interface View {
   army: Unit[];
   priests: Unit[];
   traders: Unit[];
+  /** Merchant ships, on the sea road. */
+  cogs: Unit[];
   fishers: Unit[];
   /** Warships and transports. */
   navy: Unit[];
@@ -112,6 +114,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   const army: Unit[] = [];
   const priests: Unit[] = [];
   const traders: Unit[] = [];
+  const cogs: Unit[] = [];
   const fishers: Unit[] = [];
   const navy: Unit[] = [];
   const planes: Unit[] = [];
@@ -122,7 +125,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
     if (e.kind === 'unit' && s.kings[p.id] === e.id) king = e;
     else if (e.kind === 'unit') {
       const list =
-        e.type === 'citizen' ? citizens : e.type === 'priest' ? priests : e.type === 'trader' ? traders : e.type === 'fisher' ? fishers : e.type === 'warship' || e.type === 'transport' ? navy : e.type === 'fighter' || e.type === 'bomber' ? planes : army;
+        e.type === 'citizen' ? citizens : e.type === 'priest' ? priests : e.type === 'trader' ? traders : e.type === 'cog' ? cogs : e.type === 'fisher' ? fishers : e.type === 'warship' || e.type === 'transport' ? navy : e.type === 'fighter' || e.type === 'bomber' ? planes : army;
       list.push(e);
     } else buildings.push(e);
   }
@@ -130,7 +133,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   // A King stays out of harm's way, sheltered in the Town Center.
   if (king && tc && !king.inside && king.order.k !== 'garrison') applyCommand(s, { t: 'garrison', p: p.id, ids: [king.id], target: tc.id });
   const home = tc ? { x: tc.x, y: tc.y } : { x: p.startX, y: p.startY };
-  const v: View = { p, citizens, army, priests, traders, fishers, navy, planes, buildings, home, tc, budget: { ...p.res }, plan: NO_PLAN, diggers: new Set() };
+  const v: View = { p, citizens, army, priests, traders, cogs, fishers, navy, planes, buildings, home, tc, budget: { ...p.res }, plan: NO_PLAN, diggers: new Set() };
   const issue = (c: Command) => applyCommand(s, c);
 
   // The iron road's survey (#50) is cheap and first in line: in the Stone Age, citizens eat every scrap.
@@ -150,6 +153,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
 
   // Traders pay for themselves: they come before the epoch's savings and the army.
   merchants(s, v, mem, issue);
+  seaMerchants(s, v, issue);
 
   // In a campaign chapter, its goals come before the epoch's savings.
   v.plan = chapterGoals(s, v, mem, issue);
@@ -1464,6 +1468,39 @@ function merchants(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
     const best = bestRoad(from).post;
     if (best >= 0 && !(u.order.k === 'trade' && u.order.post === best)) issue({ t: 'route', p: p.id, ids: [u.id], post: best });
   }
+}
+
+/**
+ * Merchant ships: with a Dock, a port post within reach and gold to spare, keep one (two at Hard) sailing
+ * to the port that pays best; a sunk one is not replaced until the Dock has had a quiet spell.
+ */
+function seaMerchants(s: GameState, v: View, issue: (c: Command) => void): void {
+  const { p } = v;
+  const L = AI_LEVELS[p.ai!];
+  if (!L.traders || p.epoch < 2 || v.citizens.length < 18) return;
+  const dock = v.buildings.find((b) => b.type === 'dock' && b.built);
+  if (!dock) return;
+  let best: TradePost | null = null;
+  let bestGold = 0;
+  for (const post of s.posts) {
+    if (!portSpot(s, post)) continue;
+    const g = tripGold(s, p.id, dock, post, true);
+    if (g > bestGold) {
+      bestGold = g;
+      best = post;
+    }
+  }
+  if (!best) return;
+  const want = p.ai === 'hard' ? 2 : 1;
+  const queued = dock.queue.filter((q) => q.unit === 'cog').length;
+  if (v.cogs.length + queued < want && dock.queue.length < 2 && p.pop < p.cap) {
+    const cost = unitStats('cog', p.epoch).cost;
+    if (afford(v, { ...cost, gold: (cost.gold ?? 0) + 100 })) {
+      issue({ t: 'train', p: p.id, building: dock.id, unit: 'cog' });
+      spend(v, cost);
+    }
+  }
+  for (const u of v.cogs) if (!u.inside && u.order.k === 'idle') issue({ t: 'route', p: p.id, ids: [u.id], post: best.id });
 }
 
 // ---- Campaign goals --------------------------------------------------------------------------------

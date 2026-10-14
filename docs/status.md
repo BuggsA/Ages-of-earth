@@ -76,3 +76,5 @@ Merged since the last update: **camera bookmarks** (#76, merged in #77: Ctrl+Shi
 **Harbor trade** (own pitch, lane rules): in the Age of Sail a Market within 12 tiles of its owner's Dock pays 30% more per trade trip. Numbers in `TRADE.harbor`. Tests only; browser unverified; no save bump.
 
 **Fireflies** (own pitch, lane look): clear nights get blinking green-gold sparks near the camera. Render only; no rules or save change. Browser: see the pull request.
+
+**Sea trade** (own pitch, lane rules): a Dock trains merchant ships (`cog`) that sail to coastal trading posts (ports: water within `TRADE.sea.reach` of the post) and pay `TRADE.sea.mul` (1.2) over the land road; computer Normal/Hard keep 1–2. Tests in `tests/sea-trade.test.ts`; browser unverified; no save bump.

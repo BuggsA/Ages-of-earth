@@ -8,7 +8,7 @@ import type { Act, Animal, Building, Cost, Ent, GameState, Goal, Order, Res, Uni
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { carriedBy, relicAt } from './relics';
 import { dig, ruinAt } from './ruins';
-import { atPost, goalForPost, homeMarket, marketOf, nearestMarket, postAt, tripGold } from './trade';
+import { atPost, dockOf, goalForPost, homeMarket, marketOf, nearestDock, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { canHit, exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, passOf, pay, radiusOf, statsOf, teamOf } from './world';
 
 /**
@@ -796,12 +796,87 @@ function digStep(s: GameState, u: Unit, o: Extract<Order, { k: 'dig' }>): void {
   if (!approach(u, goalForPoint(s, r.x, r.y, passOf(s, u)))) setOrder(u, { k: 'idle' });
 }
 
+/** Pay a trader's (or merchant ship's) load in at the Market (or Dock) it came home to, and cut in the allies. */
+function payTrip(s: GameState, u: Unit, m: Building, sea: boolean): void {
+  const p = s.players[u.owner];
+  p.res.gold += u.carry;
+  p.stats.gathered += u.carry;
+  p.stats.traded += u.carry;
+  s.events.push({ k: 'caravan', id: u.id, owner: u.owner, what: 'paid', amount: u.carry, x: m.x, y: m.y });
+  // Allies with a Market (by sea, a Dock) of their own take a cut of the trade passing through the alliance.
+  const cut = Math.floor(u.carry * TRADE.ally);
+  if (cut <= 0) return;
+  for (const q of s.players) {
+    if (q.id === u.owner || q.team !== p.team || q.defeated || !(sea ? nearestDock(s, q.id, m.x, m.y) : nearestMarket(s, q.id, m.x, m.y))) continue;
+    q.res.gold += cut;
+    q.stats.gathered += cut;
+    q.stats.traded += cut;
+    s.events.push({ k: 'caravan', id: u.id, owner: q.id, what: 'paid', share: true, amount: cut, x: m.x, y: m.y });
+  }
+}
+
+/**
+ * Sail the sea road: a merchant ship out from its Dock to the water off a port post, loads gold worth
+ * the distance, and home again to pay it in. With its Dock sunk, the nearest other one will do.
+ */
+function seaTradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>): void {
+  const post = postAt(s, o.post);
+  if (o.phase === 'back') {
+    let d = dockOf(s, u.owner, o.market);
+    if (!d) {
+      d = nearestDock(s, u.owner, u.x, u.y);
+      if (!d) {
+        s.events.push({ k: 'refused', owner: u.owner, why: 'Your merchant ship has no Dock to come home to' });
+        setOrder(u, { k: 'idle' });
+        return;
+      }
+      o.market = d.id;
+      stopWalking(u);
+    }
+    if (distToRect(u.x, u.y, d) - statsOf(s, u).radius <= REACH + 0.2) {
+      stopWalking(u);
+      if (u.carry > 0) payTrip(s, u, d, true);
+      u.carry = 0;
+      u.carryRes = null;
+      if (post && portSpot(s, post)) o.phase = 'go';
+      else setOrder(u, { k: 'idle' });
+      return;
+    }
+    if (!approach(u, goalForBuilding(d))) setOrder(u, { k: 'idle' });
+    return;
+  }
+  const spot = post ? portSpot(s, post) : null;
+  if (!post || !spot) {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  const dx = spot.x - u.x;
+  const dy = spot.y - u.y;
+  if (dx * dx + dy * dy <= 1.5 * 1.5) {
+    stopWalking(u);
+    const d = dockOf(s, u.owner, o.market) ?? nearestDock(s, u.owner, post.x, post.y);
+    if (!d) {
+      s.events.push({ k: 'refused', owner: u.owner, why: 'Build a Dock to trade from' });
+      setOrder(u, { k: 'idle' });
+      return;
+    }
+    o.market = d.id;
+    u.carry = tripGold(s, u.owner, d, post, true);
+    u.carryRes = 'gold';
+    o.phase = 'back';
+    s.events.push({ k: 'caravan', id: u.id, owner: u.owner, what: 'loaded', amount: u.carry, x: post.x, y: post.y });
+    return;
+  }
+  if (!approach(u, goalForPoint(s, spot.x, spot.y, NAVAL))) setOrder(u, { k: 'idle' });
+}
+
 /**
  * Run the road: out to the trading post, take on gold worth the distance from the Market, and back to
  * pay it in; then out again. If the Market falls, the nearest other one will do; with none left, the
  * trader waits with what it carries.
  */
 function tradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>): void {
+  if (u.type === 'cog') return seaTradeStep(s, u, o);
   if (u.type !== 'trader') {
     setOrder(u, { k: 'idle' });
     return;
@@ -820,24 +895,7 @@ function tradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>): vo
     }
     if (distToRect(u.x, u.y, m) - statsOf(s, u).radius <= REACH + 0.2) {
       stopWalking(u);
-      if (u.carry > 0) {
-        const p = s.players[u.owner];
-        p.res.gold += u.carry;
-        p.stats.gathered += u.carry;
-        p.stats.traded += u.carry;
-        s.events.push({ k: 'caravan', id: u.id, owner: u.owner, what: 'paid', amount: u.carry, x: m.x, y: m.y });
-        // Allies with a Market of their own take a cut of the trade passing through the alliance.
-        const cut = Math.floor(u.carry * TRADE.ally);
-        if (cut > 0) {
-          for (const q of s.players) {
-            if (q.id === u.owner || q.team !== p.team || q.defeated || !nearestMarket(s, q.id, m.x, m.y)) continue;
-            q.res.gold += cut;
-            q.stats.gathered += cut;
-            q.stats.traded += cut;
-            s.events.push({ k: 'caravan', id: u.id, owner: q.id, what: 'paid', share: true, amount: cut, x: m.x, y: m.y });
-          }
-        }
-      }
+      if (u.carry > 0) payTrip(s, u, m, false);
       u.carry = 0;
       u.carryRes = null;
       // Out again, unless the post is gone.

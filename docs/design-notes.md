@@ -326,3 +326,7 @@ Built: in the Age of Sail a Market with a finished Dock within `TRADE.harbor.rea
 ## Designers' notes: fireflies (own pitch, 2026-10-14, chain 1014-1340 s3)
 
 Built: `src/render/fireflies.ts`, a swarm of 260 blinking points in a box that follows the camera, shown on clear nights only (`l.moon`), additive green-gold. Why I love it: the night had stars on the lakes and lit windows, but the ground itself was empty; now a quiet camp feels alive. Next: flickering braziers and torches (a light that flutters), fireflies thicker near water and forest, bats at dusk. Render only; no rules or save change.
+
+## Designers' notes: sea trade (own pitch, 2026-10-14, chain 1014-1400 s2)
+
+Built: a Dock trains merchant ships (`cog`) that sail to ports, trading posts with water within `TRADE.sea.reach`, and pay `TRADE.sea.mul` over the land road; Normal and Hard computers keep one or two sailing. Why: the harbor bonus now has a ship to go with it, and warships have a prey other than armies. Next: ports on sea maps (no post is one there today), a computer raid on sea lanes, a Lighthouse that widens a port.
