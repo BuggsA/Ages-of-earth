@@ -347,3 +347,5 @@ Built: `src/render/bats.ts`, 28 dark flitting points in a box around the camera,
 ## Designers' notes: flickering lights (own pitch, 2026-10-14, chain 1014-1340 s4)
 
 Built: in `src/render/materials.ts` the glow of warm-coloured parts is dimmed by two beating sines, phase from the instance's position, so no two torches or windows pulse together. Why I love it: lit windows made towns read at dusk; flutter makes the light feel like fire. Next: bats at dusk, smoke thicker at night, a stronger flutter for torches than for windows (needs a baked flag). Render only.
+
+**Owls** (lane look, 2026-10-14): `src/render/owls.ts`, seven pale owls on slow wide circuits in the dead of a clear night (they come in after the bats leave, when the moon level passes about 0.55), plus an `owl` hoot every 18–48 s of deep night, panned at random. Why I love it: the night now has a second creature and a sound, and the bats, then fireflies, then owls give the evening a sequence. Next: owls roosting on ruins, bats pouring from a cave tile, an owl that perches on a watchtower. Render and audio only; no rules or save change. Hoot level unheard.
