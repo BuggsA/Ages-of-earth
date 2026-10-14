@@ -440,6 +440,13 @@ export const COUNTER: Record<'infantry' | 'ranged' | 'cavalry', UnitType> = { in
 /** A hero's presence: soldiers within this many tiles strike harder and heal. */
 export const AURA = { radius: 6, attack: 1.2, heal: 1.5 };
 /**
+ * The hero's Rallying Cry (own pitch): a free shout that stirs every friendly soldier within `radius` tiles for
+ * `duration` seconds: blows land `attack` times harder, `armor` more armor, and each is mended `heal` at once.
+ * The hero then needs `cooldown` seconds to draw breath. It is a stand, not a charge: the cry does nothing for
+ * a soldier who isn't fighting, so it is called when the lines meet.
+ */
+export const RALLY = { radius: 8, duration: 12, cooldown: 70, attack: 1.3, armor: 1, heal: 6 };
+/**
  * Veterancy: a soldier who defeats enemy soldiers earns ranks (Veteran, Elite, Champion). `kills` is how
  * many it takes for each rank; a rank adds to its blows (`attack`, a multiplier) and its armor.
  */

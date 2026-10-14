@@ -2,13 +2,15 @@ import { scenarioById } from '../sim/campaign';
 import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
-import { AGES, BEACON, STEP_BACK, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, RELIC, REPAIR_SHARE, RUINS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { AGES, BEACON, RALLY, STEP_BACK, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, RELIC, REPAIR_SHARE, RUINS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { homeMarket, marketOf, postAt, tripGold } from '../sim/trade';
 import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
 import { workProblem } from '../sim/works';
 import { beaconProblem, lit } from '../sim/beacon';
+import { rallyProblem } from '../sim/rally';
+import { stirred as stirredNow } from '../sim/combat';
 import { sees } from '../sim/vision';
 import { buildingCostFor, buildingMaxHp, modsOf, statsFor, techCostFor, techProblem, trainCostFor, trainTimeFor } from '../sim/stats';
 import { ageDef, ageOf, backProblem, backTo, barred, deedsProgress, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, surveyFinds, suspendedTechs, trainsAt, windowsOf } from '../sim/ages';
@@ -576,6 +578,11 @@ export class Hud {
         const aboard = transports.reduce((n, t) => n + t.cargo.length, 0);
         cmds.push({ key: 'U', pic: '', glyph: '⚓', title: 'Unload', desc: 'Then click a shore: sail there and put everyone aboard on land. (Right-clicking land does the same.)', ok: aboard > 0, why: 'Nobody is aboard', count: aboard || undefined, run: () => this.act.unloadMode() });
         cmds.push({ key: 'Y', pic: '', glyph: '🏖', title: 'Unload here', desc: 'Land everyone aboard on the nearest shore.', ok: aboard > 0, why: 'Nobody is aboard', run: () => transports.forEach((t) => this.act.issue({ t: 'unload', p: viewer, ids: [t.id], x: t.x, y: t.y })) });
+      }
+      const kings = units.filter((u) => u.type === 'hero');
+      if (kings.length === 1) {
+        const why = rallyProblem(s, p, kings[0]);
+        cmds.push({ key: 'R', pic: '', glyph: '📯', title: 'Rallying Cry', desc: `Soldiers within ${RALLY.radius} tiles strike ${Math.round((RALLY.attack - 1) * 100)}% harder, take ${RALLY.armor} less damage a blow and are mended ${RALLY.heal} for ${RALLY.duration} seconds. The hero needs ${RALLY.cooldown} seconds to draw breath. Call it when the lines meet.`, ok: !why, why: why ?? undefined, on: stirredNow(s, kings[0]), run: () => this.act.issue({ t: 'cry', p: viewer, id: kings[0].id }) });
       }
       if (soldiers.length) {
         const stances: [string, Stance, string, string][] = [

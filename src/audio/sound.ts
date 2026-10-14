@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -120,7 +120,7 @@ export class Sound {
     'click', 'open', 'select', 'selectBuilding', 'move', 'attack', 'strike', 'thud', 'hit', 'hitBuilding', 'bow', 'sling', 'musket', 'fall',
     'collapse', 'built', 'place', 'ready', 'readyCitizen', 'chop', 'mine', 'hammer', 'rustle', 'epoch', 'alert', 'victory', 'defeat', 'error', 'coin', 'queue',
     'catapult', 'cannon', 'impact', 'spear', 'chant', 'convert', 'heal', 'townBell', 'allClear', 'research', 'wonder', 'shelter',
-    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind', 'thunder', 'owl', 'gull', 'cricket', 'frog', 'birdsong', 'greatWork', 'beacon',
+    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind', 'thunder', 'owl', 'gull', 'cricket', 'frog', 'birdsong', 'greatWork', 'beacon', 'rally',
   ];
 
   /**
@@ -672,6 +672,12 @@ export class Sound {
         this.noise(out, t, { dur: 0.5, filter: 'bandpass', f: 700, q: 0.8, peak: 0.12 });
         this.tone(out, t + 0.15, { f: N.D4 / 2, type: 'sawtooth', dur: 0.6, peak: 0.05 });
         this.tone(out, t + 0.45, { f: N.A4 / 2, type: 'sawtooth', dur: 0.7, peak: 0.05 });
+        break;
+      case 'rally':
+        // A war horn: a low rising call, then a bright answer over it.
+        this.tone(out, t, { f: N.D4 / 2, to: N.A4 / 2, type: 'sawtooth', dur: 0.55, peak: 0.07 });
+        this.tone(out, t + 0.35, { f: N.A4, type: 'square', dur: 0.4, peak: 0.04 });
+        this.noise(out, t + 0.3, { dur: 0.25, filter: 'bandpass', f: 1800, q: 1, peak: 0.05 });
         break;
       case 'shelter':
         this.noise(out, t, { dur: 0.12, filter: 'bandpass', f: 500, q: 1.5, peak: 0.15 });

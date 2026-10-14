@@ -1804,6 +1804,14 @@ function onEvents(s: GameState, list: GameEvent[]): void {
       case 'bell':
         if (ev.owner === viewer) hud.toast(ev.ring ? 'The town bell rings: citizens run for shelter' : 'All clear: back to work', 'info');
         break;
+      case 'cry':
+        if (ev.owner === viewer) {
+          play('rally');
+          hud.toast(`📯 Rallying Cry! ${ev.n} soldier${ev.n === 1 ? '' : 's'} stirred`, 'good');
+        } else if (isEnemy(s, viewer, ev.owner)) {
+          lastAlert = { x: ev.x, y: ev.y };
+        }
+        break;
       case 'beacon':
         if (ev.owner === viewer && ev.on) play('beacon');
         if (ev.owner === viewer) hud.toast(ev.on ? '🔥 The beacon is lit: the tower sees far, and so is seen' : 'The beacon burns out', ev.on ? 'good' : 'info');

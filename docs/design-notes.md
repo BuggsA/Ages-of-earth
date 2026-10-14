@@ -440,3 +440,10 @@ Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), n
 **Built:** a watcher joins a started room (`?watch=1`), gets the start, the catch-up and every turn, and the Worker ignores everything but their pings (`watchers` in `worker/room.ts`, apart from `conns`, so a watcher can never act on a seat). The client shows the whole map or any player's eyes, and sends nothing. **Why I love it:** you learn an opening by watching a friend play it. **Seen:** `tests/room-watch.test.ts` (refusal before the start, catch-up, no commands/pause/chat/hash, no seat, cap of 8). The browser side (Watch button, bar, banner) is unseen. **Next:** a "watch" link beside the room link, a watcher count, and a delay so a watcher can't relay a live view to a player.
 
 **Pennants in the wind** (own pitch, lane look): ship masts carry a small team pennant and riders' and siege engines' pole banners flutter, streaming downwind through the same cloth shader as building banners (`pennant` in `src/render/unitModels.ts`; `unitMaterial` gained `flag`). **Why I love it:** a fleet at anchor now shows which way the day blows. **Next:** billowing square sails, which want a different bend than cloth along z. Render only, no save change. Seen: `browser-smoke` passes with no console errors; how it looks in a match is unseen.
+
+### The Rallying Cry (own pitch), 2026-10-14
+
+**Built:** the hero's aura was always on and never a decision. Now R is a shout: soldiers within 8 tiles hit 30% harder, take 1 less damage and are mended for 12 seconds, then 70 seconds of rest. Clever computers call it when the lines meet.
+**Why I love it:** it gives the hero a moment to time, and a reason to keep him alive and in the middle of the line (the AI cry keys on four soldiers beside him).
+**Next:** a visible ring and banner flash on the stirred soldiers (look lane), a per-people cry (Greek phalanx brace, Mongol charge speed), and a rival's war horn showing on the minimap.
+
