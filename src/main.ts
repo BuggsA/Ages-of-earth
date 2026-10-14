@@ -682,6 +682,18 @@ showContinue();
 showReplayButton();
 mapSel.addEventListener('change', civBlurb);
 civBlurb();
+// A shared world link (?seed=N&size=&map=&foes=): the title screen opens with that world's settings (the seed atlas prints them).
+{
+  const q = new URLSearchParams(location.search);
+  const seed = Math.floor(Number(q.get('seed')));
+  if (seed >= 1 && seed <= 2 ** 31 - 1) seedInput.value = String(seed);
+  for (const [key, id] of [['size', 'opt-size'], ['map', 'opt-map'], ['foes', 'opt-foes']] as const) {
+    const v = q.get(key);
+    const sel = $<HTMLSelectElement>(id);
+    if (v !== null && [...sel.options].some((o) => o.value === v)) sel.value = v;
+  }
+  civBlurb();
+}
 const qualitySel = $<HTMLSelectElement>('opt-quality');
 qualitySel.value = view.qualityName;
 qualitySel.addEventListener('change', () => view.setQuality(qualitySel.value as QualityName));
