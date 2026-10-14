@@ -4,7 +4,6 @@ import { ageOf } from '../sim/ages';
 import { AURA, BUILDINGS, SIGNATURES, TICK_HZ, RUINS, TRADE, domainOf } from '../sim/data';
 import { buildingMaxHp, statsFor } from '../sim/stats';
 import type { AgeId, BuildingType, Ent, GameEvent, GameState, Unit } from '../sim/types';
-import type { ScoutFlag } from '../ui/scoutFlags';
 import { R_BOG, R_GOLD, R_STONE } from '../sim/types';
 import { seesRect } from '../sim/vision';
 import { BuildingsView } from './buildingsView';
@@ -38,8 +37,6 @@ export interface Selection {
   rallyOf: number | null;
   /** A line of wall being laid out. */
   wall: { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean } | null;
-  /** Personal notes visible only in this browser. */
-  scoutFlags: readonly ScoutFlag[];
 }
 
 export type Pick =
@@ -392,7 +389,6 @@ export class View {
     this.overlays.setWallGhost(s, sel.wall?.tiles ?? [], p.epoch, p.color, sel.wall?.alongY ?? false);
     const rb = sel.rallyOf ? s.byId.get(sel.rallyOf) : undefined;
     this.overlays.setFlag(s, rb && rb.kind === 'building' && rb.rally ? rb.rally : null, p.color, this.time);
-    this.overlays.setScoutFlags(s, sel.scoutFlags, this.time);
   }
 
   /** Chimney smoke, fires on damaged buildings, the glint of gold. */
