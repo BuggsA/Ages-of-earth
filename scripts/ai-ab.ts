@@ -5,6 +5,7 @@
  * each seed is played twice, seats swapped, so the map and the peoples even out.
  *   npx tsx scripts/ai-ab.ts <first seed> <seeds> <minutes> '<old numbers, JSON>' ['<new numbers, JSON>']
  *   npx tsx scripts/ai-ab.ts 21 6 20 '{"armyWait":1e9}'
+ *   npx tsx scripts/ai-ab.ts 21 6 20 '{"fort":false}'   (the forward Tower, #132)
  * Prints an `ab {…}` line a match (for totting up runs played side by side) and a summary: wins, who
  * leads the undecided (the age reached, then kills less losses), the new side's gathering over the old
  * side's (geometric mean, with its standard error) and how far ahead in the ages it ends on average.
