@@ -138,7 +138,7 @@ export function inject<T extends THREE.Material>(mat: T, o: Inject): T {
     }
     if (o.flag) {
       begin += /* glsl */ `
-        if (aRig.x > 3.5) {
+        if (aRig.x > 3.5 && aRig.x < 4.5) {
           // Cloth: aRig.y is its length along z from the anchor aRig.z (negative when it runs the other way).
           float f = clamp((transformed.z - aRig.z) / aRig.y, 0.0, 1.0);
           float speed = length(uWind);
@@ -159,6 +159,25 @@ export function inject<T extends THREE.Material>(mat: T, o: Inject): T {
           float ph = uTime * (2.5 + speed * 9.0) - f * 5.0 + fw.x * 0.9 + fw.z * 1.3;
           transformed.y += sin(ph) * f * (0.01 + 0.05 * m) - (1.0 - m) * f * 0.1 * abs(aRig.y);
           transformed.xz += vec2(-dir.y, dir.x) * sin(ph * 1.3 + 1.0) * f * 0.04 * m;
+        }
+      `;
+    }
+    if (o.flag) {
+      begin += /* glsl */ `
+        if (aRig.x >= 5.0) {
+          // A square sail: aRig.x - 5 is its height, aRig.y half its width, aRig.z the y of its foot.
+          float sh = max(aRig.x - 5.0, 0.01);
+          float u = clamp(transformed.x / max(aRig.y, 0.01), -1.0, 1.0);
+          float v = clamp((transformed.y - aRig.z) / sh, 0.0, 1.0);
+          float speed = min(1.0, length(uWind) * 2.2);
+          vec4 sp = modelMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+          #ifdef USE_INSTANCING
+            sp = modelMatrix * (instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0));
+          #endif
+          float breathe = sin(uTime * (1.4 + speed * 2.0) + sp.x * 0.8 + sp.z * 1.1);
+          // The cloth fills like a belly: deepest mid-sail, pinned to the yard and the corners.
+          float belly = (1.0 - u * u) * sin(v * 3.14159) * (0.5 + 0.5 * v);
+          transformed.z += belly * aRig.y * (0.3 + 0.5 * speed + 0.1 * breathe * speed);
         }
       `;
     }
