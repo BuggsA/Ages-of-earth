@@ -10,11 +10,11 @@ import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup }
 import { placeProblem, walkable } from './sim/grid';
 import { findDockSpot, findSpot } from './sim/ai';
 import { maxHp, placeBuilding, spawnUnit } from './sim/world';
-import type { BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, MapSize, MapType, Unit } from './sim/types';
+import type { AgeId, BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, MapSize, MapType, Unit } from './sim/types';
 import { R_FISH, R_NONE } from './sim/types';
 import { carriedBy, relicAt } from './sim/relics';
 import { postAt } from './sim/trade';
-import { ageDef, isSideRoad, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
+import { ageDef, ageOf, isSideRoad, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
 import { NetClient, newRoomCode, saveName, savedName } from './net/client';
 import { HASH_EVERY, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
 import { deserialize, serialize } from './sim/save';
@@ -42,18 +42,20 @@ const tips = new Tips();
 const music = new Music();
 /** The style of music wanted now (it starts once the browser lets sound play). */
 let musicEpoch = 2;
+let musicAge: AgeId | undefined;
 sound.onReady = (ctx, out) => {
   music.attach(ctx, out);
-  music.start(musicEpoch);
+  music.start(musicEpoch, musicAge);
 };
 /** The age an `epoch` event announces (older replays carry only the epoch). */
 const ageName = (ev: { epoch: number; age?: keyof typeof AGES }) => (ev.age ? AGES[ev.age] : EPOCHS[ev.epoch]).name;
 
-function playMusic(epoch: number): void {
+function playMusic(epoch: number, age?: AgeId): void {
   musicEpoch = epoch;
+  musicAge = age;
   if (music.attached) {
-    music.start(epoch);
-    music.setEpoch(epoch);
+    music.start(epoch, age);
+    music.setEpoch(epoch, age);
   }
 }
 
@@ -375,7 +377,7 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   else if (!saved) hud.banner(ageDef(me).name, `You lead the ${CIVS[me.civ].name}. Facing ${rivals.join(', ')}.${goal}`, 6000);
   else hud.banner('Welcome back', `${ageDef(me).name}, ${fmtClock(game.tick)} into the match.`, 3200);
   sound.startAmbience();
-  playMusic(me.epoch);
+  playMusic(me.epoch, ageOf(me));
   // Start with the Town Center in view and selected.
   const tc = game.ents.find((e) => e.kind === 'building' && e.owner === viewer && e.type === 'towncenter');
   if (tc) {
@@ -1609,7 +1611,7 @@ function onEvents(s: GameState, list: GameEvent[]): void {
             hud.banner(age.name, age.blurb, 4500);
             play('epoch');
           }
-          playMusic(ev.epoch);
+          playMusic(ev.epoch, ageOf(s.players[viewer]));
         } else hud.toast(`${s.players[ev.owner].name} has ${ev.back ? 'stepped back to' : 'reached'} the ${ageName(ev)}`, 'info');
         break;
       case 'hit':
