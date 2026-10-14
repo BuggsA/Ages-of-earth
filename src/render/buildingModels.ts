@@ -35,7 +35,7 @@ const LIGHT = '#ffc46b';
 
 function banner(k: Kit, x: number, y: number, z: number, h = 0.7, big = 1): void {
   k.cyl(0.018, 0.022, h, 5, '#5b4330', x, y, z);
-  k.team(k.box(0.012, 0.22 * big, 0.3 * big, TEAM, x, y + h - 0.26 * big, z + 0.15 * big));
+  k.cloth(k.team(k.box(0.012, 0.22 * big, 0.3 * big, TEAM, x, y + h - 0.26 * big, z + 0.15 * big)), 0.3 * big, z);
   k.sphere(0.03, '#e2b23c', x, y + h + 0.02, z);
 }
 
@@ -840,7 +840,7 @@ function airfield(k: Kit, _e: number, st: Style): void {
   k.glow(k.sphere(0.05, '#ff5a4a', 1.25, 1.75, -1.2));
   // Windsock in team colors, fuel drums.
   k.cyl(0.02, 0.02, 1.1, 4, '#d8d8d8', 1.7, 0, 0.3);
-  const sock = k.team(k.cone(0.08, 0.4, 8, TEAM, 1.7, 0.95, 0.5));
+  const sock = k.cloth(k.team(k.cone(0.08, 0.4, 8, TEAM, 1.7, 0.95, 0.5)), -0.4, 0.72);
   sock.rotation.x = -Math.PI / 2 - 0.2;
   sock.position.set(1.7, 1.0, 0.52);
   for (const [x, z] of [[1.0, -0.2], [1.2, -0.25], [1.1, -0.05]]) k.cyl(0.1, 0.1, 0.26, 8, '#5a6450', x, 0, z);
