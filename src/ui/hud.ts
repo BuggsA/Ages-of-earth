@@ -47,6 +47,12 @@ interface Cmd {
   run: () => void;
 }
 
+/** Explain the shared quote without implying that the automatic drift is a forecast. */
+function marketTrend(price: number, res: 'food' | 'wood' | 'stone'): string {
+  const base = MARKET.start[res];
+  return price < base ? `↑ recovering toward ${base}` : price > base ? `↓ recovering toward ${base}` : `→ steady at ${base}`;
+}
+
 const ACT_WORDS: Record<string, string> = {
   idle: 'Standing by',
   walk: 'Walking',
@@ -436,7 +442,7 @@ export class Hud {
     } else if (b.type === 'wonder' && b.timer >= 0) status = `Stands ${fmtTime(b.timer)} more for victory`;
     else if (b.type === 'market') {
       const traders = s.ents.filter((e) => e.kind === 'unit' && e.owner === b.owner && e.type === 'trader' && e.order.k === 'trade' && e.order.market === b.id).length;
-      status = `Prices: ${(['food', 'wood', 'stone'] as const).map((r) => `${icon(r, 14)}${s.market[r]}`).join(' ')}${traders ? ` · 🐪 ${traders} on the road` : ''}`;
+      status = `Prices: ${(['food', 'wood', 'stone'] as const).map((r) => `${icon(r, 14)}${s.market[r]} ${s.market[r] < MARKET.start[r] ? '↑' : s.market[r] > MARKET.start[r] ? '↓' : '→'}`).join(' ')}${traders ? ` · 🐪 ${traders} on the road` : ''}`;
     }
     else if (b.type === 'dock') status = 'Fishing boats bring their catch here';
     else if (b.type === 'temple' && keptIn(s, b)) status = `Keeps ${keptIn(s, b)} relic${keptIn(s, b) > 1 ? 's' : ''}: ${icon('gold', 14)}${Math.round((60 / RELIC.every) * RELIC.gold * keptIn(s, b))} a minute`;
@@ -449,6 +455,7 @@ export class Hud {
         <div class="sel-name">${def.name}</div>
         <div class="sel-sub">${status}</div>
         ${hpBar(b.hp, max, b.hp / max)}
+        ${mine && b.type === 'market' && b.built ? `<div class="blurb">Prices shared by all players. ↑ recovers upward, ↓ downward, → steady. Drift: ${MARKET.recover} gold every ${MARKET.every}s toward the starting quote; trades move it immediately.</div>` : ''}
         ${mine && b.built && b.hp < max ? `<div class="blurb">Select citizens and right-click to repair (a full repair costs ${Math.round(REPAIR_SHARE * 100)}% of its price).${def.garrison ? ' Press G to shelter instead.' : ''}</div>` : ''}
         ${inside}
         ${queue || `<div class="blurb">${def.blurb}${def.guns ? ` Shoots ${def.guns.range} tiles.` : ''}</div>`}
@@ -596,7 +603,7 @@ export class Hud {
               pic: '',
               glyph: `<span class="trade">${icon(res, 22)}<b>+</b></span>`,
               title: `Buy ${MARKET.lot} ${RES_LABEL[res].toLowerCase()}`,
-              desc: `Pay ${price} gold. Each purchase raises the price.`,
+              desc: `Pay ${price} gold. Shared price: ${marketTrend(price, res)}. Each purchase raises it. Recovery is ${MARKET.recover} gold every ${MARKET.every}s; other players’ trades can change it.`,
               cost: { gold: price },
               ok: p.res.gold >= price,
               why: `Need ${Math.ceil(price - p.res.gold)} more gold`,
@@ -610,7 +617,7 @@ export class Hud {
               pic: '',
               glyph: `<span class="trade">${icon(res, 22)}<b>−</b></span>`,
               title: `Sell ${MARKET.lot} ${RES_LABEL[res].toLowerCase()}`,
-              desc: `Get ${gets} gold. Each sale lowers the price.`,
+              desc: `Get ${gets} gold. Shared price: ${marketTrend(s.market[res], res)}. Each sale lowers it. Recovery is ${MARKET.recover} gold every ${MARKET.every}s; other players’ trades can change it.`,
               cost: { [res]: MARKET.lot },
               ok: p.res[res] >= MARKET.lot,
               why: `Need ${MARKET.lot} ${RES_LABEL[res].toLowerCase()} to sell`,
@@ -632,7 +639,7 @@ export class Hud {
       cmds.push({ key: 'DELETE', pic: '', glyph: '💀', title: 'Delete', desc: 'Tear these buildings down (Del).', ok: true, run: () => this.act.issue({ t: 'delete', p: viewer, ids: mine.map((e) => e.id) }) });
     }
     this.cmds = cmds;
-    const sig = cmds.map((c) => `${c.key}${c.ok ? 1 : 0}${c.count ?? ''}${c.on ? 1 : 0}${c.pic.length}${c.title}`).join('|');
+    const sig = cmds.map((c) => `${c.key}${c.ok ? 1 : 0}${c.count ?? ''}${c.on ? 1 : 0}${c.pic.length}${c.title}${c.desc}${JSON.stringify(c.cost)}${c.why}`).join('|');
     if (sig === this.cmdSig) return;
     this.cmdSig = sig;
     this.cmdEl.innerHTML = cmds
