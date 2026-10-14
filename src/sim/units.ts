@@ -7,7 +7,7 @@ import { buildTimeFor, buildingCostFor, modsOf } from './stats';
 import type { Act, Animal, Building, Cost, Ent, GameState, Goal, Order, Res, Unit } from './types';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { carriedBy, relicAt } from './relics';
-import { atPost, goalForPost, marketOf, nearestMarket, postAt, tripGold } from './trade';
+import { atPost, goalForPost, homeMarket, marketOf, nearestMarket, postAt, tripGold } from './trade';
 import { canHit, exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, passOf, pay, radiusOf, statsOf, teamOf } from './world';
 
 /**
@@ -784,7 +784,7 @@ function tradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>): vo
   if (o.phase === 'back') {
     let m = marketOf(s, u.owner, o.market);
     if (!m) {
-      m = nearestMarket(s, u.owner, u.x, u.y);
+      m = homeMarket(s, u.owner, u.x, u.y);
       if (!m) {
         s.events.push({ k: 'refused', owner: u.owner, why: 'Your trader has no Market to come home to' });
         setOrder(u, { k: 'idle' });
@@ -831,7 +831,7 @@ function tradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>): vo
   if (atPost(post, u.x, u.y)) {
     stopWalking(u);
     // Paid by the road from home: the Market it set out from, or the nearest one to the post.
-    const m = marketOf(s, u.owner, o.market) ?? nearestMarket(s, u.owner, post.x, post.y);
+    const m = marketOf(s, u.owner, o.market) ?? homeMarket(s, u.owner, post.x, post.y);
     if (!m) {
       s.events.push({ k: 'refused', owner: u.owner, why: 'Build a Market to trade from' });
       setOrder(u, { k: 'idle' });

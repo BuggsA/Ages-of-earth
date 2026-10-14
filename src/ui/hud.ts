@@ -5,7 +5,7 @@ import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
 import { AGES, STEP_BACK, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, SIGNATURES, EPOCHS, MARKET, RELIC, REPAIR_SHARE, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
-import { marketOf, nearestMarket, postAt, tripGold } from '../sim/trade';
+import { homeMarket, marketOf, postAt, tripGold } from '../sim/trade';
 import { buildingCostFor, buildingMaxHp, modsOf, statsFor, techCostFor, techProblem, trainCostFor, trainTimeFor } from '../sim/stats';
 import { ageDef, ageOf, backProblem, backTo, barred, deedsProgress, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, surveyFinds, suspendedTechs, trainsAt, windowsOf } from '../sim/ages';
 import type { Building, BuildingType, Command, Cost, Ent, GameState, Player, Stance, TechId, TradePost, Unit } from '../sim/types';
@@ -367,7 +367,7 @@ export class Hud {
   }
 
   private postPanel(s: GameState, viewer: number, post: TradePost): [string, string] {
-    const m = nearestMarket(s, viewer, post.x, post.y);
+    const m = homeMarket(s, viewer, post.x, post.y);
     const pay = m ? tripGold(s, viewer, m, post) : 0;
     const mine = s.ents.filter((e) => e.kind === 'unit' && e.owner === viewer && e.type === 'trader' && e.order.k === 'trade' && e.order.post === post.id).length;
     const status = m ? `From your nearest Market: ${icon('gold', 14)}${pay} a trip` : 'Build a Market to trade here';
@@ -393,7 +393,7 @@ export class Hud {
     const vet = rank ? `<span data-tip="<b>${VETERANCY.names[rank - 1]}</b>${u.vet} enemy soldiers defeated: blows ${Math.round((VETERANCY.attack[rank - 1] - 1) * 100)}% harder${VETERANCY.armor[rank - 1] ? `, +${VETERANCY.armor[rank - 1]} armor` : ''}.">${'▲'.repeat(rank)}<em>${VETERANCY.names[rank - 1]}</em></span>` : '';
     const o = u.order;
     const route = mine && o.k === 'trade' ? postAt(s, o.post) : undefined;
-    const home = route && o.k === 'trade' ? (marketOf(s, u.owner, o.market) ?? nearestMarket(s, u.owner, route.x, route.y)) : null;
+    const home = route && o.k === 'trade' ? (marketOf(s, u.owner, o.market) ?? homeMarket(s, u.owner, route.x, route.y)) : null;
     const trip = route && home ? `<span data-tip="<b>A trip</b>What one trip between its Market and the post pays, once home.">${icon('gold')}${tripGold(s, u.owner, home, route)}<em>a trip</em></span>` : '';
     const held = u.type === 'priest' && carriedBy(s, u) ? `<span data-tip="<b>Relic</b>Carried to a Temple, it brings in gold. Hands full: no healing or converting until it is set down (D).">⚱<em>Relic</em></span>` : '';
     const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}:${u.cargo.length}:${rank}`;
