@@ -415,3 +415,7 @@ Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), n
 ### Wind (#150, own pitch), 2026-10-14
 
 **Built:** each match has a wind from its seed, one of eight directions and a speed that a storm raises and mist lowers (`windFor` in `src/render/weather.ts`); smoke and dust in `Effects` settle at the wind's pace, sparks are left alone. **Why I love it:** smoke always rose straight, so every town looked becalmed; now a burning town bends downwind and the whole land shares one sky. **Next:** rain and snow slanting with it, banners, sails and the windsock on the airfield turning to it, and a wind rose on the minimap for archers' range. Render only. Not seen by eye.
+
+## Designers' notes: the computer turns sailor (own pitch, 2026-10-14, lane ai)
+
+**Built:** a clever computer with a finished Dock takes the Middle Ages → Age of Sail road once its boats have landed the 500 fish (`turnRoad` in `src/sim/ai.ts`), if its people's coin-toss (`wants`, `AI_WEB.take`) says so, and comes ashore if its last Dock falls. No number or save change. **Why I love it:** the sea road was only for people; now a rival can quietly become a sea power. **Seen:** headless `web-walk` (6 seeds, small, 25 min): Sail@13m, @13m, @11m on three seeds, then on to Gunpowder; `tests/ai-sail.test.ts`. No win-rate comparison made. **Next:** the sailor building warships and docks more on purpose, and raiding the coast.

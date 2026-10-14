@@ -339,7 +339,7 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
 
 /**
  * A turn sideways, between advances: into the pilgrims' age from the Middle Ages once the relics it keeps
- * (`relics` of them at least) have paid the deed; and back out onto the trunk when its road has been
+ * (`relics` of them at least) have paid the deed, or into the Age of Sail once its boats have landed the catch; and back out onto the trunk when its road has been
  * countered, the Temples that held its relics fallen or robbed.
  */
 function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
@@ -356,6 +356,13 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
       return { road: r, wait: false };
     }
     if (here === 'pilgrim' && r.to === 'middle' && kept === 0) return { road: r, wait: false };
+    // A coastal people turns sailor once its boats have landed the catch; with its last Dock gone, it comes ashore.
+    if (here === 'sail' && r.to === 'middle' && count(v, 'dock', true) === 0) {
+      mem.roads ??= {};
+      mem.roads.sail = false;
+      return { road: r, wait: false };
+    }
+    if (r.to === 'sail' && count(v, 'dock', true) > 0 && roadKnown(s, p, r) && deedsDone(p, r) && wants(s, p, mem, r.to)) return { road: r, wait: false };
     if (r.to !== 'pilgrim' || kept < AI_WEB.relics || !roadKnown(s, p, r) || !deedsDone(p, r) || !wants(s, p, mem, r.to)) continue;
     return { road: r, wait: false };
   }
