@@ -23,6 +23,7 @@ import { SCENARIOS, scenarioById, starsFor } from './sim/campaign';
 import { loadDiscovery, observe, saveDiscovery, webMapHtml } from './ui/webMap';
 import { idleCitizens, idleSelection, idleShortcut } from './ui/idle';
 import { CameraBookmarks, bookmarkShortcut } from './ui/cameraBookmarks';
+import { ScoutFlags } from './ui/scoutFlags';
 import { briefingHtml, chapterListHtml, recordStars, starRow } from './ui/campaignUi';
 import { Lobby } from './ui/lobby';
 import { Hud, nameOf } from './ui/hud';
@@ -86,6 +87,7 @@ const SPEEDS = [1, 1.5, 2, 3];
 let speedIdx = 0;
 const groups = new Map<number, number[]>();
 const cameraBookmarks = new CameraBookmarks();
+const scoutFlags = new ScoutFlags();
 let lastGroupKey = { key: -1, at: 0 };
 let lastAlert: { x: number; y: number } | null = null;
 let altHeld = false;
@@ -125,6 +127,20 @@ function issue(c: Command): void {
   if (mode !== 'play' || watching) return;
   if (online && net) net.send({ t: 'cmd', c });
   else pending.push(c);
+}
+
+/** Personal battlefield notes neither issue unit orders nor send online packets. */
+function markScout(x: number, y: number, danger: boolean): void {
+  if (!game || mode !== 'play' || watching) return;
+  const result = scoutFlags.toggle(game, viewer, x, y, danger ? 'danger' : 'plan');
+  if (result === 'unexplored') {
+    hud.toast('Scout that ground before placing a flag', 'bad');
+    play('error');
+    return;
+  }
+  play('click');
+  hud.toast(result === 'removed' ? 'Scout flag removed' : result === 'changed' ? 'Scout flag changed' : danger ? 'Danger marked on your map' : 'Scout flag placed on your map', 'info');
+  mapTimer = 0;
 }
 
 // ---- Online ----------------------------------------------------------------------------------------
@@ -368,6 +384,7 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   speedIdx = 0;
   groups.clear();
   cameraBookmarks.reset();
+  scoutFlags.reset();
   lastAlert = null;
   acc = 0;
   hud.reset();
@@ -682,6 +699,18 @@ showContinue();
 showReplayButton();
 mapSel.addEventListener('change', civBlurb);
 civBlurb();
+// A shared world link (?seed=N&size=&map=&foes=): the title screen opens with that world's settings (the seed atlas prints them).
+{
+  const q = new URLSearchParams(location.search);
+  const seed = Math.floor(Number(q.get('seed')));
+  if (seed >= 1 && seed <= 2 ** 31 - 1) seedInput.value = String(seed);
+  for (const [key, id] of [['size', 'opt-size'], ['map', 'opt-map'], ['foes', 'opt-foes']] as const) {
+    const v = q.get(key);
+    const sel = $<HTMLSelectElement>(id);
+    if (v !== null && [...sel.options].some((o) => o.value === v)) sel.value = v;
+  }
+  civBlurb();
+}
 const qualitySel = $<HTMLSelectElement>('opt-quality');
 qualitySel.value = view.qualityName;
 qualitySel.addEventListener('change', () => view.setQuality(qualitySel.value as QualityName));
@@ -1121,6 +1150,11 @@ canvas.addEventListener('pointerdown', (e) => {
     return;
   }
   if (e.button === 2) {
+    if (e.ctrlKey) {
+      const point = view.groundAt(e.clientX, e.clientY);
+      if (point) markScout(point.x, point.y, e.shiftKey);
+      return;
+    }
     if (placing) {
       placing = null;
       placeAt = null;
@@ -1323,6 +1357,7 @@ canvas.addEventListener(
 );
 
 minimap.onLook = (x, y) => view.rig.focus(x, y);
+minimap.onMark = (x, y, danger) => markScout(x, y, danger);
 minimap.onCommand = (x, y) => {
   const s = game;
   if (!s || mode !== 'play') return;
@@ -1982,6 +2017,7 @@ function frame(now: number): void {
       ghost: placing && placing !== 'wall' && placeAt ? { type: placing, ...placeAt, turn: placing === 'gate' && gateTurned(s, placeAt.tx, placeAt.ty) } : null,
       rallyOf: selection.size === 1 ? [...selection][0] : null,
       wall: wallPlan(s),
+      scoutFlags: scoutFlags.all,
     });
     if (mode === 'play') watchFrameRate(dt);
     if (online && net && mode !== 'title') $('clock').title = `Online · ${net.rtt} ms`;
@@ -1998,7 +2034,7 @@ function frame(now: number): void {
       mapTimer -= dt;
       if (mapTimer <= 0) {
         mapTimer = 0.2;
-        minimap.draw(s, viewer, mode === 'over' || !!watching?.all, [...view.knownBuildings()], view.rig.footprint(), selection);
+        minimap.draw(s, viewer, mode === 'over' || !!watching?.all, [...view.knownBuildings()], view.rig.footprint(), selection, scoutFlags.all);
       }
       cursorTimer -= dt;
       if (cursorTimer <= 0) {

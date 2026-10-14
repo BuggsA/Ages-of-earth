@@ -1,6 +1,7 @@
 import { ageOf } from '../sim/ages';
 import { domainOf } from '../sim/data';
 import type { AgeId, GameState } from '../sim/types';
+import type { ScoutFlag } from './scoutFlags';
 import { R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE, T_ROCK, T_SAND, T_WATER } from '../sim/types';
 
 /**
@@ -24,6 +25,7 @@ const rgb = (hex: string): [number, number, number] => [parseInt(hex.slice(1, 3)
 export class Minimap {
   onLook: ((x: number, y: number) => void) | null = null;
   onCommand: ((x: number, y: number) => void) | null = null;
+  onMark: ((x: number, y: number, danger: boolean) => void) | null = null;
   private ctx: CanvasRenderingContext2D;
   private base = document.createElement('canvas');
   private baseCtx: CanvasRenderingContext2D;
@@ -40,7 +42,8 @@ export class Minimap {
     canvas.addEventListener('pointerdown', (e) => {
       if (e.button === 2) {
         const p = this.toMap(e);
-        this.onCommand?.(p.x, p.y);
+        if (e.ctrlKey) this.onMark?.(p.x, p.y, e.shiftKey);
+        else this.onCommand?.(p.x, p.y);
         return;
       }
       if (e.button !== 0) return;
@@ -100,6 +103,7 @@ export class Minimap {
     buildings: Iterable<{ owner: number; x: number; y: number; size: number }>,
     footprint: { x: number; z: number }[],
     selected: Set<number>,
+    scoutFlags: readonly ScoutFlag[] = [],
   ): void {
     if (!this.img) return;
     const p = s.players[viewer];
@@ -211,6 +215,24 @@ export class Minimap {
         ctx.lineTo(e.x * sx - r * 1.2, e.y * sy);
         ctx.fill();
       } else ctx.fillRect(e.x * sx - r, e.y * sy - r, r * 2, r * 2);
+    }
+
+    // Personal notes stay visible on ground the player has already explored.
+    for (const f of scoutFlags) {
+      const x = f.x * sx, y = f.y * sy;
+      const r = Math.max(4, cw / 54);
+      ctx.beginPath();
+      ctx.moveTo(x, y - r);
+      ctx.lineTo(x + r * 0.85, y + r * 0.7);
+      ctx.lineTo(x - r * 0.85, y + r * 0.7);
+      ctx.closePath();
+      ctx.fillStyle = f.kind === 'danger' ? '#ff655a' : '#ffdf8a';
+      ctx.fill();
+      ctx.lineWidth = Math.max(1.2, cw / 185);
+      ctx.strokeStyle = '#1d2432';
+      ctx.stroke();
+      ctx.fillStyle = '#1d2432';
+      ctx.fillRect(x - 0.8, y - 1, 1.6, 2.2);
     }
 
     // The camera's view.

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { BUILDINGS, domainOf } from '../sim/data';
 import type { BuildingType, GameState, Shot } from '../sim/types';
+import type { ScoutFlag } from '../ui/scoutFlags';
 import { buildingGeometry } from './buildingModels';
 import { Kit, bake } from './kit';
 import { heightAt } from './terrain';
@@ -52,6 +53,9 @@ export class Overlays {
   private wallKey = '';
   private flag: THREE.Group;
   private flagCloth: THREE.Mesh;
+  private scoutMasts: THREE.InstancedMesh;
+  private scoutCloths: THREE.InstancedMesh;
+  private scoutBases: THREE.InstancedMesh;
   private m = new THREE.Matrix4();
   private q = new THREE.Quaternion();
   private e = new THREE.Euler();
@@ -156,6 +160,27 @@ export class Overlays {
     this.flag.add(this.flagCloth);
     this.flag.visible = false;
     this.group.add(this.flag);
+
+    // Three instanced batches make six low-poly field pennants cheap even on busy maps.
+    const mast = new THREE.CylinderGeometry(0.018, 0.028, 1.12, 5);
+    mast.translate(0, 0.56, 0);
+    const pennant = new THREE.BufferGeometry();
+    pennant.setAttribute('position', new THREE.Float32BufferAttribute([
+      0, 1.10, 0, 0.62, 0.99, 0, 0, 0.85, 0,
+    ], 3));
+    pennant.computeVertexNormals();
+    const base = new THREE.RingGeometry(0.28, 0.38, 5);
+    base.rotateX(-Math.PI / 2);
+    base.translate(0, 0.04, 0);
+    this.scoutMasts = new THREE.InstancedMesh(mast, new THREE.MeshStandardMaterial({ color: '#71543a', flatShading: true }), 6);
+    this.scoutCloths = new THREE.InstancedMesh(pennant, new THREE.MeshBasicMaterial({ color: '#ffffff', side: THREE.DoubleSide, fog: false, toneMapped: false }), 6);
+    this.scoutBases = new THREE.InstancedMesh(base, new THREE.MeshBasicMaterial({ color: '#ffffff', side: THREE.DoubleSide, depthWrite: false, transparent: true, opacity: 0.85, fog: false, toneMapped: false }), 6);
+    for (const mesh of [this.scoutMasts, this.scoutCloths, this.scoutBases]) {
+      mesh.count = 0;
+      mesh.frustumCulled = false;
+      this.group.add(mesh);
+    }
+    this.scoutBases.renderOrder = 3;
   }
 
   setRings(list: RingSpec[]): void {
@@ -294,6 +319,29 @@ export class Overlays {
       m.count = n;
       m.instanceMatrix.needsUpdate = true;
       if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    }
+  }
+
+  /** Personal plan/danger markers, with no relation to authoritative game state. */
+  setScoutFlags(s: GameState, flags: readonly ScoutFlag[], time: number): void {
+    const n = Math.min(6, flags.length);
+    for (let i = 0; i < n; i++) {
+      const f = flags[i];
+      this.p.set(f.x, Math.max(WATER_Y, heightAt(s, f.x, f.y)), f.y);
+      this.e.set(0, Math.sin(time * 1.6 + i * 0.8) * 0.18, 0);
+      this.q.setFromEuler(this.e);
+      this.m.compose(this.p, this.q, this.sc.set(1, 1, 1));
+      this.scoutMasts.setMatrixAt(i, this.m);
+      this.scoutCloths.setMatrixAt(i, this.m);
+      this.scoutBases.setMatrixAt(i, this.m);
+      const color = f.kind === 'danger' ? '#ff655a' : '#ffdf8a';
+      this.scoutCloths.setColorAt(i, this.c.set(color));
+      this.scoutBases.setColorAt(i, this.c.set(color));
+    }
+    for (const mesh of [this.scoutMasts, this.scoutCloths, this.scoutBases]) {
+      mesh.count = n;
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
   }
 
