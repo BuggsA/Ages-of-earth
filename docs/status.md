@@ -28,6 +28,8 @@ Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders
 
 ## In flight
 
+- [#41](https://github.com/BuggsA/Ages-of-earth/issues/41), Codex: one live connection per online player, branch `codex/41-online-connections`. Stale socket events and reconnect timers isolated; server rejects messages from replaced or departed connections. No simulation, balance, protocol or save changes. Implementation and nine regression cases complete; see #41 for CI and handoff. Browser behaviour unverified.
+
 - [#30](https://github.com/BuggsA/Ages-of-earth/issues/30), Codex: Market recovery indicators and regression coverage ([PR #32](https://github.com/BuggsA/Ages-of-earth/pull/32)), branch `codex/30-market-recovery`. Updated with the repair changes and #33 browser-free rule. No balance or save-shape changes. Browser appearance unverified; merge after green CI on the combined commit.
 
 - [#37](https://github.com/BuggsA/Ages-of-earth/issues/37), **ages as a web** (umbrella, lane rules, effort:hard; chain 1014-0030): s1, the skeleton and the **Age of Merchants** ([#38](https://github.com/BuggsA/Ages-of-earth/issues/38)), merged from `claude/37-ages-web`. Next: s2, the Iron Age and a seed-dependent deposit ([#39](https://github.com/BuggsA/Ages-of-earth/issues/39), ready). The computer walks the trunk only until s4 (lane ai). No save bump: the new fields are optional.
