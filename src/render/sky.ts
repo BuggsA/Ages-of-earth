@@ -51,8 +51,8 @@ export class Sky {
   }
 
   /** Dim the sun's glare (cloud cover): 1 is a clear day. */
-  setGlare(k: number): void {
-    this.material.uniforms.uSunColor.value.set('#fff1d0').multiplyScalar(k);
+  setGlare(k: number, color?: THREE.Color): void {
+    this.material.uniforms.uSunColor.value.copy(color ?? new THREE.Color('#fff1d0')).multiplyScalar(k);
   }
 
   apply(top: THREE.Color, horizon: THREE.Color, sunDir: THREE.Vector3): void {

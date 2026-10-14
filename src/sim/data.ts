@@ -66,6 +66,13 @@ export const AGES: Record<AgeId, Age> = {
   middle: trunkAge(2),
   gunpowder: trunkAge(3),
   industrial: trunkAge(4),
+  reclaimer: {
+    name: 'Age of Reclaimers',
+    short: 'Reclaimers',
+    tier: 3,
+    blurb: 'Build tomorrow from yesterday: excavating an ancient ruin teaches a people to rebuild. Construction and repairs work 25% faster, technologies cost 20% less, but military units take 25% longer to train. The same armies and technologies as the Gunpowder Age.',
+    mul: { buildSpeed: 1.25, techCost: 0.8, militaryTrain: 1.25 },
+  },
   merchant: {
     name: 'Age of Merchants',
     short: 'Merchant',
@@ -127,6 +134,8 @@ export interface Road {
   time: number;
   /** Shown at the Town Center only once the player has one of these, the clue that the road is there. */
   clue?: BuildingType;
+  /** Revealed only to the people who completed an ancient ruin's excavation. */
+  ruin?: boolean;
   /**
    * Shown only once this survey (a technology) has been researched and found what it looks for in this
    * world (#39). A survey that finds nothing keeps the road hidden for good.
@@ -146,6 +155,13 @@ export interface Road {
 
 export const ROADS: Road[] = [
   ...TRUNK.slice(1).map((to, i): Road => ({ from: TRUNK[i], to, cost: EPOCHS[i + 1].cost, time: EPOCHS[i + 1].time })),
+  {
+    from: 'middle', to: 'reclaimer', cost: { food: 900, wood: 350, gold: 500 }, time: 65,
+    ruin: true,
+    blurb: 'Instead of the Gunpowder Age, after your citizens excavate an ancient ruin: build and repair 25% faster, research technologies for 20% less, but train military units 25% more slowly. An expedition buys a rebuilding people; raids and siege can punish its slower reinforcements.',
+  },
+  { from: 'reclaimer', to: 'industrial', cost: EPOCHS[4].cost, time: EPOCHS[4].time, blurb: 'Rejoin the main road at the Industrial Age for the ordinary price. Construction, research and military training return to their usual rates.' },
+  { from: 'reclaimer', to: 'gunpowder', cost: { food: 400, stone: 200 }, time: 30, blurb: 'Leave the rebuilding life for the Gunpowder Age. Construction and technologies lose their advantage, but military training returns to its usual speed.' },
   {
     from: 'bronze',
     to: 'merchant',

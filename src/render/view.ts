@@ -18,6 +18,7 @@ import { PostsView } from './postsView';
 import { RuinsView } from './ruinsView';
 import { ResourcesView } from './resourcesView';
 import { Sky } from './sky';
+import { forcedHour, hourAt, lightAt } from './daylight';
 import { Weather, describeWeather, forcedWeather, moodOf, weatherFor, type WeatherDay } from './weather';
 import { FogTexture, TerrainView, heightAt } from './terrain';
 import { AIR_ALT, UnitsView } from './unitsView';
@@ -52,6 +53,7 @@ export type Pick =
   | { kind: 'resource'; tile: number }
   | { kind: 'ground'; x: number; y: number };
 
+/** Where the light comes from now: set every frame from the hour (`daylight.ts`). */
 const SUN_DIR = new THREE.Vector3(-0.45, 0.82, 0.38).normalize();
 
 export class View {
@@ -89,6 +91,11 @@ export class View {
   private flash = 0;
   private baseSun = 2.5;
   private baseHemi = 1.0;
+  private mood = moodOf({ kind: 'clear', strength: 0 });
+  /** The hour of the day last lit, so the light is only worked out when it has moved. */
+  private litHour = -1;
+  private tint = new THREE.Color();
+  private sunTint = new THREE.Color();
   private post: Post;
   private quality: QualityName = loadQuality();
   private fog: FogTexture | null = null;
@@ -220,18 +227,38 @@ export class View {
   /** Put a day's weather over the land: its falling rain or snow, and a greyer, dimmer, closer sky. */
   private setWeather(day: WeatherDay): void {
     this.weather.set(day);
-    const m = moodOf(day);
-    const grey = new THREE.Color(m.tint);
-    this.skyTop.set('#5aa7e0').lerp(grey, m.grey);
-    this.horizon.set('#cfe8f3').lerp(grey, m.grey);
+    this.mood = moodOf(day);
+    this.reach = this.mood.reach;
+    this.litHour = -1;
+    this.light(this.hourNow());
+  }
+
+  private hourNow(): number {
+    return forcedHour() ?? (this.state ? hourAt(this.state.seed, this.state.tick / TICK_HZ) : 9);
+  }
+
+  /** Light the land for an hour of the day, greyed by today's weather. */
+  private light(hour: number): void {
+    if (Math.abs(hour - this.litHour) < 0.01) return;
+    this.litHour = hour;
+    const m = this.mood;
+    const l = lightAt(hour);
+    const grey = this.tint.set(m.tint);
+    // A grey day takes its tint down with the dusk too, so rain at night is dark and not pale.
+    const dim = (l.sky * 0.5 + 0.5);
+    this.skyTop.set(l.top).lerp(grey.clone().multiplyScalar(dim), m.grey);
+    this.horizon.set(l.horizon).lerp(grey.clone().multiplyScalar(dim), m.grey);
+    SUN_DIR.set(l.dir[0], l.dir[1], l.dir[2]);
+    this.sunTint.set(l.sunColor);
+    this.sun.color.copy(this.sunTint);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
-    this.sky.setGlare(m.sun);
-    this.baseSun = 2.5 * m.sun;
-    this.baseHemi = 1.0 * m.sky;
+    this.sky.setGlare(m.sun, this.sunTint);
+    this.baseSun = 2.5 * m.sun * l.sun;
+    this.baseHemi = 1.0 * m.sky * l.sky;
+    this.fill.intensity = 0.4 * l.fill;
     this.sun.intensity = this.baseSun;
     this.hemi.intensity = this.baseHemi;
     (this.scene.fog as THREE.Fog).color.copy(this.horizon);
-    this.reach = m.reach;
   }
 
   /** See the match through another player's eyes, or (with `reveal`) everyone's (replays). */
@@ -265,6 +292,7 @@ export class View {
     const p = s.players[this.viewer];
     if (!this.reveal) this.fog?.update(p.vis, p.seen, dt);
 
+    this.light(forcedHour() ?? hourAt(s.seed, s.tick / TICK_HZ));
     // Light follows the view so shadows stay crisp where the player looks.
     const t = this.rig.target;
     const span = 14 + this.rig.distance * 0.75;
@@ -316,7 +344,7 @@ export class View {
     this.drawSelection(s, sel);
     this.ambient(s, dt);
     this.vessels(s);
-    this.water.update(this.time, SUN_DIR, this.horizon);
+    this.water.update(this.time, SUN_DIR, this.horizon, this.sunTint);
     this.effects.update(dt);
     this.birds.update(this.time, dt, this.rig.target, this.rig.distance);
     this.effects.placeTexts(this.rig.camera, this.width, this.height);

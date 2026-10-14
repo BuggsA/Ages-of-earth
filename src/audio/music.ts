@@ -41,6 +41,7 @@ const STYLES: Style[] = [
  * of recorder and oom-pah.
  */
 const SIDE_STYLES: Partial<Record<AgeId, Style>> = {
+  reclaimer: { bpm: 72, root: 146.83, scale: [0, 2, 3, 5, 7, 9, 10], chords: [0, 3, 0, 5], lead: 'recorder', accomp: 'drone', drums: 'frame', density: 0.36 },
   merchant: { bpm: 96, root: 196.0, scale: [0, 2, 4, 5, 7, 9, 10], chords: [0, 3, 6, 0, 4, 3, 6, 0], lead: 'bell', accomp: 'lute', drums: 'tabor', density: 0.5 },
   iron: { bpm: 66, root: 123.47, scale: [0, 3, 5, 7, 10], chords: [0, 0, 2, 0], lead: 'flute', accomp: 'drone', drums: 'anvil', density: 0.3 },
   pilgrim: { bpm: 58, root: 164.81, scale: [0, 1, 3, 5, 7, 8, 10], chords: [0, 0, 5, 3, 0, 4, 5, 0], lead: 'bell', accomp: 'strings', drums: 'frame', density: 0.28 },
