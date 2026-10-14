@@ -52,7 +52,7 @@ What players love most about the classics, and where to find it here, is written
 - **Online play.** Make a room, share its code or link, and play with up to three friends and computer players, in teams or every one for themselves, with chat. If someone's connection drops they can reload and rejoin; if they leave, the computer takes over their people.
 - **One live connection per player.** Reopening an online room replaces the old tab's connection; the old tab stops retrying, and its queued messages cannot act on your seat. Closing or reconnecting cancels obsolete retries; lobby validation errors still allow recovery from a later network drop.
 - **Saves and replays.** Matches save in the browser (and when you leave the page) and can be continued. Every match is recorded: watch it back at up to 8× speed through anyone's eyes, or download the replay to share.
-- **After the match,** a timeline charts everyone's score, population, army and gathering, with the moment each reached a new epoch.
+- **After the match,** a timeline charts everyone's score, population, army and gathering, with the moment each reached a new epoch. Hover a player's epoch in the table for the minute they reached each age.
 - **Tips for a first game** point the way, one at a time, and can be turned off.
 - **Fog of war** shared by allies; enemy buildings stay as you last saw them until you look again.
 
