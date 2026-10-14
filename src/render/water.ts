@@ -41,6 +41,7 @@ const fragment = /* glsl */ `
   uniform vec3 uSunDir;
   uniform vec3 uSunColor;
   uniform vec3 uSky;
+  uniform float uStars;
   uniform vec3 uShallow;
   uniform vec3 uDeep;
   uniform sampler2D uFogTex;
@@ -75,6 +76,14 @@ const fragment = /* glsl */ `
     col = mix(col, uSky, fres * 0.5);
     vec3 H = normalize(V + normalize(uSunDir));
     col += uSunColor * pow(max(dot(N, H), 0.0), 160.0) * 0.8;
+    if (uStars > 0.01) {
+      // At night the lake mirrors the stars: pin-pricks that glint now here, now there.
+      vec2 c = floor(vWorld.xz * 5.0);
+      float r = hash(c);
+      float glint = smoothstep(0.55, 1.0, sin(uTime * (1.2 + r * 2.0) + r * 80.0));
+      float d = length(fract(vWorld.xz * 5.0) - 0.5);
+      col += vec3(0.8, 0.88, 1.0) * step(0.93, r) * glint * smoothstep(0.28, 0.0, d) * uStars * (0.4 + 0.6 * fres);
+    }
     col = mix(col, vec3(0.95, 0.98, 1.0), foam);
 
     if (uFogOn > 0.5) {
@@ -106,6 +115,7 @@ export class WaterView {
           uSunDir: { value: new THREE.Vector3(-0.5, 0.8, 0.3) },
           uSunColor: { value: new THREE.Color('#fff2d6') },
           uSky: { value: new THREE.Color('#bfe6f2') },
+          uStars: { value: 0 },
           uShallow: { value: new THREE.Color('#58cfc4') },
           uDeep: { value: new THREE.Color('#1d7fae') },
         },
@@ -141,6 +151,11 @@ export class WaterView {
     this.mesh.geometry.dispose();
     this.mesh.geometry = geo;
     this.mesh.position.set(s.w / 2, WATER_Y, s.h / 2);
+  }
+
+  /** Stars glinting on the lakes: 0 by day to 1 on a clear night. */
+  setStars(k: number): void {
+    this.material.uniforms.uStars.value = k;
   }
 
   update(time: number, sunDir: THREE.Vector3, sky: THREE.Color, sunColor?: THREE.Color): void {

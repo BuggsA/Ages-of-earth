@@ -14,6 +14,11 @@ export function hourAt(seed: number, seconds: number): number {
   return (open + (seconds / DAY_SECONDS) * 24) % 24;
 }
 
+/** The moon's phase for a match, from its seed: 0 is full, up to 0.9 a thin crescent. */
+export function moonPhase(seed: number): number {
+  return (((Math.imul(seed | 0, 2246822519) >>> 0) % 10) / 10) * 0.9 + 0;
+}
+
 /** One hour's light: colours as hex, strengths as multiples of a clear noon. */
 interface Key {
   h: number;
@@ -51,6 +56,8 @@ export interface Light {
   sun: number;
   sky: number;
   fill: number;
+  /** 0 by day to 1 at night: the stars and the moon's disc show with it. */
+  moon: number;
   /** Where the light comes from: a unit vector, +y up. */
   dir: [number, number, number];
 }
@@ -90,6 +97,7 @@ export function lightAt(hour: number): Light {
     sun: num(a.sun, b.sun),
     sky: num(a.sky, b.sky),
     fill: num(a.fill, b.fill),
+    moon,
     dir: [x / len, y / len, z / len],
   };
 }

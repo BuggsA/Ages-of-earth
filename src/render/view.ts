@@ -18,7 +18,7 @@ import { PostsView } from './postsView';
 import { RuinsView } from './ruinsView';
 import { ResourcesView } from './resourcesView';
 import { Sky } from './sky';
-import { forcedHour, hourAt, lightAt } from './daylight';
+import { forcedHour, hourAt, lightAt, moonPhase } from './daylight';
 import { Weather, describeWeather, forcedWeather, moodOf, weatherFor, type WeatherDay } from './weather';
 import { FogTexture, TerrainView, heightAt } from './terrain';
 import { AIR_ALT, UnitsView } from './unitsView';
@@ -67,6 +67,7 @@ export class View {
   onPing: ((x: number, y: number, color: string) => void) | null = null;
 
   private sky = new Sky();
+  private phase = 0;
   private hemi = new THREE.HemisphereLight('#dcefff', '#b9a77a', 1.0);
   private sun = new THREE.DirectionalLight('#fff3dc', 2.5);
   private fill = new THREE.AmbientLight('#cfe0ff', 0.4);
@@ -212,6 +213,7 @@ export class View {
     this.chimneys.clear();
     this.wakes.clear();
     this.later = [];
+    this.phase = moonPhase(s.seed);
     this.setWeather(forcedWeather() ?? weatherFor(s.seed, s.mapType));
   }
 
@@ -253,7 +255,9 @@ export class View {
     this.sun.color.copy(this.sunTint);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.sky.setGlare(m.sun, this.sunTint);
-    this.baseSun = 2.5 * m.sun * l.sun;
+    // A full moon lights the night better than a crescent does; by day the phase means nothing.
+    this.baseSun = 2.5 * m.sun * l.sun * (1 - 0.4 * this.phase * l.moon);
+    this.water.setStars(l.moon * (1 - m.grey));
     this.baseHemi = 1.0 * m.sky * l.sky;
     this.fill.intensity = 0.4 * l.fill;
     this.sun.intensity = this.baseSun;

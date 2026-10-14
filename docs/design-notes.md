@@ -290,7 +290,14 @@ Built: gold planning pennants and red danger pennants on both the 3D land and th
 **Why I love it:** a match used to be one frozen noon. Now a long game has a shape you can feel: the opening bright morning, long gold shadows over the first armies, and a night that arrives just as a siege does. It costs the player nothing in readability (night is dimmed to a floor, never black).
 
 **Next, if you pick it up:** lit windows and Town Center braziers that glow as the evening comes (the bloom is there, the buildings' windows don't change yet); stars and a moon disc in the sky shader; owls and fireflies for the birds' place at night; a night-sight rule (units see less in the dark) would be a sim change and a real design call; a lobby option to fix the hour or turn the cycle off. Seen in headless Chromium on the title screen only, at 07, 12, 17:30, 19:12, 21 and 02: warm long shadows at dusk, noticeably darker at night. In a real match, and the sound of it (nothing yet), unverified.
-=======
+
+### Moonlit nights (own pitch, lane look), 2026-10-14
+
+**Built:** `moonPhase(seed)` in `daylight.ts` gives each match a phase; a full moon keeps the night light, a thin crescent takes up to 40% off it. Lakes glint with star pin-pricks at night (`uStars` in `water.ts`), hidden by cloud and rain. Render only; no rules, save or `data.ts` change.
+
+**Why I love it:** nights now differ from match to match, and the lakes are the one place the strategy camera can see the sky's stars.
+
+**Learned:** the camera (38° FOV, pitch 46-66° down) never shows the sky dome, so a starfield or moon disc in `sky.ts` would be invisible; I tried it and dropped it. If a tilted camera or a screenshot mode ever lifts the view, the shader is the place. **Next:** lit windows and braziers at dusk, fireflies at night. Seen in headless Chromium at night in a match (the light, no lake in view); the lake glints are unverified.
 
 
 ## Designers' notes: Age of Reclaimers (2026-10-14, Codex, #94)
