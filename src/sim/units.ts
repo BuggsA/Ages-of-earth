@@ -1,4 +1,4 @@
-import { AI_LEVELS, BUILDINGS, CARRY, DEER, DT, EPOCH_GATHER_BONUS, FISH_CARRY, GATHER, MILITARY, PRIEST, REPAIR_SHARE, domainOf, secs } from './data';
+import { AI_LEVELS, BUILDINGS, CARRY, DEER, DT, EPOCH_GATHER_BONUS, FISH_CARRY, GATHER, MILITARY, PRIEST, REPAIR_SHARE, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
@@ -7,7 +7,7 @@ import { buildTimeFor, buildingCostFor, modsOf } from './stats';
 import type { Act, Animal, Building, Cost, Ent, GameState, Goal, Order, Res, Unit } from './types';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { carriedBy, relicAt } from './relics';
-import { atPost, goalForPost, marketOf, nearestMarket, postAt, tripGold } from './trade';
+import { atPost, goalForPost, homeMarket, marketOf, nearestMarket, postAt, tripGold } from './trade';
 import { canHit, exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, passOf, pay, radiusOf, statsOf, teamOf } from './world';
 
 /**
@@ -784,7 +784,7 @@ function tradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>): vo
   if (o.phase === 'back') {
     let m = marketOf(s, u.owner, o.market);
     if (!m) {
-      m = nearestMarket(s, u.owner, u.x, u.y);
+      m = homeMarket(s, u.owner, u.x, u.y);
       if (!m) {
         s.events.push({ k: 'refused', owner: u.owner, why: 'Your trader has no Market to come home to' });
         setOrder(u, { k: 'idle' });
@@ -801,6 +801,17 @@ function tradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>): vo
         p.stats.gathered += u.carry;
         p.stats.traded += u.carry;
         s.events.push({ k: 'caravan', id: u.id, owner: u.owner, what: 'paid', amount: u.carry, x: m.x, y: m.y });
+        // Allies with a Market of their own take a cut of the trade passing through the alliance.
+        const cut = Math.floor(u.carry * TRADE.ally);
+        if (cut > 0) {
+          for (const q of s.players) {
+            if (q.id === u.owner || q.team !== p.team || q.defeated || !nearestMarket(s, q.id, m.x, m.y)) continue;
+            q.res.gold += cut;
+            q.stats.gathered += cut;
+            q.stats.traded += cut;
+            s.events.push({ k: 'caravan', id: u.id, owner: q.id, what: 'paid', amount: cut, x: m.x, y: m.y });
+          }
+        }
       }
       u.carry = 0;
       u.carryRes = null;
@@ -820,7 +831,7 @@ function tradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>): vo
   if (atPost(post, u.x, u.y)) {
     stopWalking(u);
     // Paid by the road from home: the Market it set out from, or the nearest one to the post.
-    const m = marketOf(s, u.owner, o.market) ?? nearestMarket(s, u.owner, post.x, post.y);
+    const m = marketOf(s, u.owner, o.market) ?? homeMarket(s, u.owner, post.x, post.y);
     if (!m) {
       s.events.push({ k: 'refused', owner: u.owner, why: 'Build a Market to trade from' });
       setOrder(u, { k: 'idle' });

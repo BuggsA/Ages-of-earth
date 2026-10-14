@@ -113,6 +113,58 @@ describe('traders', () => {
     expect(s.players[0].stats.traded).toBeGreaterThanOrEqual(2 * pay);
   });
 
+  it('share a quarter of each trip with allies who have a Market, and with no one else', () => {
+    const s = game({
+      players: [
+        { name: 'A', ai: null, civ: 'romans', team: 0 },
+        { name: 'B', ai: null, civ: 'romans', team: 0 },
+        { name: 'C', ai: null, civ: 'romans', team: 1 },
+      ],
+    });
+    const post = postNear(s);
+    const m = marketNear(s, 0, post, 20);
+    marketNear(s, 2, post, 20);
+    const t = traderBy(s, 0, m);
+    const pay = tripGold(s, 0, m, post);
+    const [a, b, c] = s.players.map((p) => p.res.gold);
+    run(s, 1, [{ t: 'route', p: 0, ids: [t.id], post: post.id }]);
+    for (let i = 0; i < 90 * TICK_HZ && !s.players[0].stats.traded; i++) step(s);
+    expect(s.players[0].res.gold - a).toBeGreaterThanOrEqual(pay);
+    // The ally has no Market yet; the rival never shares.
+    expect(s.players[1].res.gold).toBe(b);
+    expect(s.players[2].res.gold).toBe(c);
+    marketNear(s, 1, post, 20);
+    const before = s.players[1].res.gold;
+    const mark = s.players[0].stats.traded;
+    for (let i = 0; i < 120 * TICK_HZ && s.players[0].stats.traded === mark; i++) step(s);
+    expect(s.players[1].res.gold - before).toBeGreaterThanOrEqual(Math.floor((s.players[0].stats.traded - mark) * TRADE.ally));
+    expect(s.players[1].stats.traded).toBeGreaterThan(0);
+    expect(s.players[2].res.gold).toBe(c);
+  });
+
+  it('may trade from an ally\'s Market when they have none, and the ally takes its share; a rival\'s will not do', () => {
+    const s = game({
+      players: [
+        { name: 'A', ai: null, civ: 'romans', team: 0 },
+        { name: 'B', ai: null, civ: 'romans', team: 0 },
+        { name: 'C', ai: null, civ: 'romans', team: 1 },
+      ],
+    });
+    const post = postNear(s);
+    const rivalMarket = marketNear(s, 2, post, 20);
+    const t = traderBy(s, 0, rivalMarket);
+    run(s, 1, [{ t: 'route', p: 0, ids: [t.id], post: post.id }]);
+    expect(t.order.k).toBe('idle');
+    const m = marketNear(s, 1, post, 20);
+    const pay = tripGold(s, 0, m, post);
+    const [a, b] = s.players.map((p) => p.res.gold);
+    run(s, 1, [{ t: 'route', p: 0, ids: [t.id], post: post.id }]);
+    expect(t.order).toMatchObject({ k: 'trade', market: m.id });
+    for (let i = 0; i < 150 * TICK_HZ && !s.players[0].stats.traded; i++) step(s);
+    expect(s.players[0].res.gold - a).toBe(pay);
+    expect(s.players[1].res.gold - b).toBeGreaterThanOrEqual(Math.floor(pay * TRADE.ally));
+  });
+
   it('pay grows with the square of the road, and Banking adds a fifth', () => {
     const s = game({ startEpoch: 3 });
     const post = s.posts[0];

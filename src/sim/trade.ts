@@ -34,7 +34,30 @@ const usable = (b: Building, owner: number) => b.type === 'market' && b.owner ==
 /** A player's finished Market by this id, if it still stands. */
 export function marketOf(s: GameState, owner: number, id: number): Building | null {
   const b = id ? s.byId.get(id) : undefined;
-  return b && b.kind === 'building' && usable(b, owner) ? b : null;
+  return b && b.kind === 'building' && (usable(b, owner) || usableByTeam(s, b, owner)) ? b : null;
+}
+
+/** A finished Market of an ally's, which a trader with none of its own may trade from. */
+const usableByTeam = (s: GameState, b: Building, owner: number) => b.type === 'market' && b.built && b.hp > 0 && b.owner !== owner && s.players[b.owner].team === s.players[owner].team && !s.players[b.owner].defeated;
+
+/**
+ * Where a player's trader sets out from and comes home to: their own nearest Market, or with none
+ * standing, an ally's (the ally takes its share, `TRADE.ally`, as ever).
+ */
+export function homeMarket(s: GameState, owner: number, x: number, y: number): Building | null {
+  const own = nearestMarket(s, owner, x, y);
+  if (own) return own;
+  let best: Building | null = null;
+  let bestD = Infinity;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || !usableByTeam(s, e, owner)) continue;
+    const d = distToRect(x, y, e);
+    if (d < bestD) {
+      bestD = d;
+      best = e;
+    }
+  }
+  return best;
 }
 
 /** The nearest finished Market of a player's to a point, or null. */
