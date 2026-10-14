@@ -444,3 +444,10 @@ Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), n
 ## Designers' notes: answering the flame (own pitch, 2026-10-14, chain 1014-2155 s8, lane ai)
 
 **Built:** a clever computer that sees a rival's beacon burning within `AI_RAID.flame` (24) tiles of one of its Towers lights that Tower's own, so a flame you light to warn your town now draws a reply from a watchful neighbour. **Why I love it:** the beacon's trade-off (warning for exposure) now has a cost you can read in play: a rival that sees your fire stirs. **Seen:** `tests/beacon.test.ts` (one test fails without the change, one checks the range). No win-rate sweep. **Next:** reading the flame to move a wave toward or away from it; a beacon relay for the computer's own chain.
+
+### The Rallying Cry (own pitch), 2026-10-14
+
+**Built:** the hero's aura was always on and never a decision. Now R is a shout: soldiers within 8 tiles hit 30% harder, take 1 less damage and are mended for 12 seconds, then 70 seconds of rest. Clever computers call it when the lines meet.
+**Why I love it:** it gives the hero a moment to time, and a reason to keep him alive and in the middle of the line (the AI cry keys on four soldiers beside him).
+**Next:** a visible ring and banner flash on the stirred soldiers (look lane), a per-people cry (Greek phalanx brace, Mongol charge speed), and a rival's war horn showing on the minimap.
+

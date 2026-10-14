@@ -1,5 +1,5 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, AI_LEVELS, AI_RAID, AI_WEB, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, TECHS, WORKS, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_LEVELS, AI_RAID, AI_WEB, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Player, Res, Ruin, TechId, TradePost, Unit, UnitType } from './types';
@@ -13,6 +13,7 @@ import { isEnemy, maxHp } from './world';
 import { borderMap, suppliedAt } from './borders';
 import { workProblem } from './works';
 import { beaconProblem, lit } from './beacon';
+import { rallyProblem } from './rally';
 import { sees } from './vision';
 import { progress, scenarioById } from './campaign';
 
@@ -201,6 +202,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   townBell(s, v, mem, issue);
   greatWork(s, v, mem, issue);
   lightBeacons(s, v, issue);
+  rallyTheLine(s, v, issue);
   research(s, v, citizens.length >= wantCitizens - 2, issue);
   trade(s, v, issue);
   planBuildings(s, v, mem, issue);
@@ -1213,6 +1215,23 @@ function lightBeacons(s: GameState, v: View, issue: (c: Command) => void): void 
       issue({ t: 'beacon', p: v.p.id, building: b.id });
       return;
     }
+  }
+}
+
+/** A clever computer's hero cries out when the lines have met: at least four of its soldiers beside the hero and a rival soldier in reach. */
+function rallyTheLine(s: GameState, v: View, issue: (c: Command) => void): void {
+  if (!AI_LEVELS[v.p.ai!].clever) return;
+  for (const h of s.ents) {
+    if (h.kind !== 'unit' || h.type !== 'hero' || h.owner !== v.p.id || rallyProblem(s, v.p, h)) continue;
+    let mine = 0, foes = 0;
+    for (const e of s.ents) {
+      if (e.kind !== 'unit' || e.hp <= 0 || e.inside || e.id === h.id) continue;
+      const dx = e.x - h.x, dy = e.y - h.y;
+      if (dx * dx + dy * dy > RALLY.radius * RALLY.radius) continue;
+      if (e.owner === v.p.id) { if (e.type !== 'citizen' && e.type !== 'trader' && e.type !== 'priest') mine++; }
+      else if (isEnemy(s, v.p.id, e.owner) && e.type !== 'citizen' && e.type !== 'trader') foes++;
+    }
+    if (mine >= 4 && foes >= 2) issue({ t: 'cry', p: v.p.id, id: h.id });
   }
 }
 

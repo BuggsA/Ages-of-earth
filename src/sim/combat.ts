@@ -1,4 +1,4 @@
-import { AURA, BONUS, BUILDINGS, DEER, VETERANCY, TICK_HZ, domainOf, secs, type UnitStats } from './data';
+import { AURA, RALLY, BONUS, BUILDINGS, DEER, VETERANCY, TICK_HZ, domainOf, secs, type UnitStats } from './data';
 import { distToRect } from './grid';
 import type { Spatial } from './spatial';
 import { modsOf, statsFor } from './stats';
@@ -20,9 +20,14 @@ export function rankOf(u: Unit): number {
   return r;
 }
 
+/** Whether a Rallying Cry is still stirring a unit. */
+export function stirred(s: GameState, u: Unit): boolean {
+  return u.cry !== undefined && s.tick < u.cry;
+}
+
 /** Damage of one blow or shot after the counter bonus, a hero's inspiration and armor. */
 export function damageOf(s: GameState, attacker: Unit | null, st: UnitStats, target: Ent, ranged: boolean): number {
-  const inspired = (attacker && s.tick - attacker.aura < 5 ? AURA.attack : 1) * (attacker && rankOf(attacker) ? VETERANCY.attack[rankOf(attacker) - 1] : 1);
+  const inspired = (attacker && s.tick - attacker.aura < 5 ? AURA.attack : 1) * (attacker && rankOf(attacker) ? VETERANCY.attack[rankOf(attacker) - 1] : 1) * (attacker && stirred(s, attacker) ? RALLY.attack : 1);
   if (target.kind === 'building') {
     // Walls shrug off all but siege and heavy blows.
     const wall = target.type === 'wall' || target.type === 'gate' ? (st.cls === 'siege' ? 1.2 : st.cls === 'infantry' || st.cls === 'hero' ? 0.5 : 0.15) : 1;
@@ -30,7 +35,7 @@ export function damageOf(s: GameState, attacker: Unit | null, st: UnitStats, tar
   }
   const ts = statsOf(s, target);
   const rank = target.kind === 'unit' ? rankOf(target) : 0;
-  const armor = (ranged ? ts.parmor : ts.armor) + (rank ? VETERANCY.armor[rank - 1] : 0);
+  const armor = (ranged ? ts.parmor : ts.armor) + (rank ? VETERANCY.armor[rank - 1] : 0) + (target.kind === 'unit' && stirred(s, target) ? RALLY.armor : 0);
   return Math.max(1, st.attack * BONUS[st.cls][ts.cls] * inspired - armor);
 }
 

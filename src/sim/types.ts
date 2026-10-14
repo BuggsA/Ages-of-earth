@@ -160,6 +160,9 @@ export interface Unit {
   born: number;
   /** Last tick a hero's presence inspired it. */
   aura: number;
+  /** Tick a Rallying Cry stirring it ends; on a hero, the tick it may cry again. */
+  cry?: number;
+  cryReady?: number;
   /** Enemy soldiers it has defeated (older saves lack it). */
   vet?: number;
 }
@@ -403,6 +406,7 @@ export type GameEvent =
   | { k: 'healed'; id: number; x: number; y: number }
   | { k: 'garrison'; owner: number; building: number; inside: boolean }
   | { k: 'bell'; owner: number; ring: boolean }
+  | { k: 'cry'; owner: number; id: number; x: number; y: number; n: number }
   | { k: 'beacon'; owner: number; building: number; x: number; y: number; on: boolean }
   /** A great work was called (`on`) or ran out (seed #133). */
   | { k: 'greatWork'; owner: number; on: boolean }
@@ -548,6 +552,8 @@ export type Command =
   | { t: 'ungarrison'; p: number; building: number }
   | { t: 'bell'; p: number; ring: boolean }
   | { t: 'beacon'; p: number; building: number }
+  /** A hero's Rallying Cry. */
+  | { t: 'cry'; p: number; id: number }
   /** Call the people's great work (seed #133), once in each epoch. */
   | { t: 'greatWork'; p: number }
   | { t: 'stance'; p: number; ids: number[]; stance: Stance }

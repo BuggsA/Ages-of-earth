@@ -11,6 +11,7 @@ import { dockOf, homeMarket, marketOf, nearestDock, portSpot, postAt } from './t
 import { ruinAt } from './ruins';
 import { callWork, workProblem } from './works';
 import { beaconProblem, lightBeacon } from './beacon';
+import { rallyCry, rallyProblem } from './rally';
 import { canHit, isEnemy, maxHp, pay, placeBuilding, refund } from './world';
 
 /**
@@ -436,6 +437,14 @@ export function applyCommand(s: GameState, c: Command): void {
       const why = beaconProblem(s, p, b);
       if (why) return refuse(s, c.p, why);
       lightBeacon(s, p, b);
+      break;
+    }
+    case 'cry': {
+      const h = s.byId.get(c.id);
+      if (!h || h.kind !== 'unit') return;
+      const why = rallyProblem(s, p, h);
+      if (why) return refuse(s, c.p, why);
+      rallyCry(s, h);
       break;
     }
     case 'greatWork': {
