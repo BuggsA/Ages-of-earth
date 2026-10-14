@@ -23,7 +23,7 @@ Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders
 | --- | --- |
 | Quick tier (`npm run check`) | about 170 tests, about 20 s |
 | Slow tier (`tests/slow/`) | `campaign-proof*.test.ts`: every chapter won by a computer on its own map or, at Hard, one of 15 more (#43); three files side by side, about 3½ minutes on a cloud container |
-| Browser checks | none automated; the first session tested by hand in headless Chromium |
+| Browser checks | `tests/slow/browser-smoke.test.ts` (#87): title, Web of Ages, Campaign, a match and its hotkeys in headless Chromium, failing on any page or console error; daily in `periodic`, screenshots kept as an artifact |
 | CI (`ci`, `periodic`) | added 2026-10-13; `periodic` starts once `main` is the default branch |
 
 ## In flight
