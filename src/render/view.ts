@@ -17,6 +17,7 @@ import { PostsView } from './postsView';
 import { RuinsView } from './ruinsView';
 import { ResourcesView } from './resourcesView';
 import { Sky } from './sky';
+import { Weather, describeWeather, forcedWeather, moodOf, weatherFor, type WeatherDay } from './weather';
 import { FogTexture, TerrainView, heightAt } from './terrain';
 import { AIR_ALT, UnitsView } from './unitsView';
 import { WATER_Y, WaterView } from './water';
@@ -79,6 +80,12 @@ export class View {
   private overlays = new Overlays();
   private effects: Effects;
   private birds = new Birds();
+  private weather = new Weather();
+  /** How far the haze lets the view reach today (1 on a clear day). */
+  private reach = 1;
+  private flash = 0;
+  private baseSun = 2.5;
+  private baseHemi = 1.0;
   private post: Post;
   private quality: QualityName = loadQuality();
   private fog: FogTexture | null = null;
@@ -114,7 +121,7 @@ export class View {
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sky.mesh, this.hemi, this.fill, this.sun, this.sun.target);
-    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.ruins.group, this.overlays.group, this.effects.group, this.birds.mesh);
+    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.ruins.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.post = new Post(this.renderer, this.scene, this.rig.camera);
     this.applyQuality();
@@ -195,6 +202,33 @@ export class View {
     this.chimneys.clear();
     this.wakes.clear();
     this.later = [];
+    this.setWeather(forcedWeather() ?? weatherFor(s.seed, s.mapType));
+  }
+
+  /** Today's weather, in words for the opening banner ('' on a clear day). */
+  get weatherWords(): string {
+    return describeWeather(this.weather.day);
+  }
+
+  get weatherDay(): WeatherDay {
+    return this.weather.day;
+  }
+
+  /** Put a day's weather over the land: its falling rain or snow, and a greyer, dimmer, closer sky. */
+  private setWeather(day: WeatherDay): void {
+    this.weather.set(day);
+    const m = moodOf(day);
+    const grey = new THREE.Color(m.tint);
+    this.skyTop.set('#5aa7e0').lerp(grey, m.grey);
+    this.horizon.set('#cfe8f3').lerp(grey, m.grey);
+    this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
+    this.sky.setGlare(m.sun);
+    this.baseSun = 2.5 * m.sun;
+    this.baseHemi = 1.0 * m.sky;
+    this.sun.intensity = this.baseSun;
+    this.hemi.intensity = this.baseHemi;
+    (this.scene.fog as THREE.Fog).color.copy(this.horizon);
+    this.reach = m.reach;
   }
 
   /** See the match through another player's eyes, or (with `reveal`) everyone's (replays). */
@@ -243,8 +277,17 @@ export class View {
     cam.updateProjectionMatrix();
     this.sky.mesh.position.copy(this.rig.camera.position);
     const fog = this.scene.fog as THREE.Fog;
-    fog.near = this.rig.distance * 2.2;
-    fog.far = this.rig.distance * 5 + 60;
+    fog.near = this.rig.distance * 2.2 * this.reach;
+    fog.far = (this.rig.distance * 5 + 60) * this.reach;
+    this.weather.show(this.quality !== 'low');
+    const sky = this.weather.update(this.time, dt, this.rig.target, this.rig.distance, this.renderer.getPixelRatio(), this.height);
+    if (sky.thunder >= 0) {
+      const pan = Math.random() * 1.6 - 0.8;
+      this.later.push({ at: this.time + sky.thunder, run: () => this.onCue?.('thunder', pan, 0.7) });
+    }
+    this.flash = sky.flash;
+    this.hemi.intensity = this.baseHemi + this.flash * 2.2;
+    this.sun.intensity = this.baseSun + this.flash * 1.5;
 
     this.resources.update(s, dt);
     this.buildings.update(s, this.viewer, (b) => this.reveal || seesRect(s, this.viewer, b.tx, b.ty, b.size), dt, this.reveal);
