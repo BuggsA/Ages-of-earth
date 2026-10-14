@@ -24,7 +24,7 @@ Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders
 | Quick tier (`npm run check`) | 215 tests in 36 files, about 40 s on a cloud container (2026-10-14); slowest single test about 10 s (`trade.test.ts`, traders on the road) |
 | Slow tier (`tests/slow/`) | `campaign-proof*.test.ts`: every chapter won by a computer on its own map or, at Hard, one of 15 more (#43); three files side by side, about 3½ minutes on a cloud container |
 | Coverage (2026-10-14) | rules (`src/sim/`) 83–100% of lines; rendering, sound, HUD, lobby, minimap and `main.ts` 0%: checked only by hand in a browser |
-| Browser checks | none automated; by hand in headless Chromium (last: 2026-10-14, `docs/log/2026-10-14-1150-cleanup.md`) |
+| Browser checks | `tests/slow/browser-smoke.test.ts` (#87): title, Web of Ages, Campaign, a match and its hotkeys in headless Chromium, failing on any page or console error; daily in `periodic`, screenshots kept as an artifact |
 | CI (`ci`, `periodic`) | added 2026-10-13; `periodic` starts once `main` is the default branch |
 
 ## In flight
