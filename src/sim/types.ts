@@ -496,6 +496,13 @@ export interface AiMemory {
   roadLost?: Record<number, number>;
   /** Ruin id → the tick its diggers last fled rival soldiers there (#64). */
   ruinFled?: Record<number, number>;
+  /**
+   * The side ages it has made up its mind about (#50): true to walk the road there once it opens,
+   * false to pass it by. Decided once each, so it doesn't waver from one turn to the next.
+   */
+  roads?: Partial<Record<AgeId, boolean>>;
+  /** Tick it began holding its Town Center for a side road's last deeds, so it holds only so long. */
+  waiting?: number;
 }
 
 /** Orders that can be given with Shift held to queue them after the current one. */
