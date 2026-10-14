@@ -666,6 +666,38 @@ export const CIVS: Record<CivId, Civ> = {
 export const CIV_IDS = Object.keys(CIVS) as CivId[];
 
 /**
+ * A people's great work (seed #133): once in each epoch from `WORK.from`, a player may call it from a
+ * Town Center, free, and for `WORK.duration` seconds the people's stats change as `add` and `mul` say
+ * (the same levers as technologies and civilizations). Each is a real achievement of that people.
+ */
+export interface GreatWork {
+  name: string;
+  icon: string;
+  /** What the player reads on the button. */
+  blurb: string;
+  /** What the computer is calling it for: its economy, or its war. */
+  use: 'eco' | 'war';
+  add?: Partial<Mods>;
+  mul?: Partial<Mods>;
+}
+
+export const WORK = {
+  /** The first epoch a great work can be called in (the Stone Age has none). */
+  from: 1,
+  /** Seconds a great work lasts. */
+  duration: 90,
+};
+
+export const WORKS: Record<CivId, GreatWork> = {
+  egyptians: { name: 'The Nile Flood', icon: '🌊', use: 'eco', blurb: 'The river rises and leaves its black silt: farms work 60% faster.', mul: { farm: 1.6 } },
+  greeks: { name: 'The Phalanx', icon: '🛡', use: 'war', blurb: 'Shields locked, spears level: foot soldiers have +2 melee armor and strike +2 harder.', add: { infantryArmor: 2, infantryAttack: 2 } },
+  romans: { name: 'The Roman Road', icon: '🛣', use: 'eco', blurb: 'Legions and labourers lay the road: buildings go up 75% faster and citizens walk a quarter faster.', mul: { buildSpeed: 1.75, citizenSpeed: 1.25 } },
+  mongols: { name: 'The Yam Relay', icon: '🐎', use: 'war', blurb: 'Fresh mounts waiting at every post: cavalry ride 40% faster and citizens 15% faster.', mul: { cavalrySpeed: 1.4, citizenSpeed: 1.15 } },
+  chinese: { name: 'The Grand Canal', icon: '🛶', use: 'eco', blurb: 'Barges carry the empire’s grain and silk: every trade trip pays 50% more, and traders travel 30% faster.', mul: { tradeGold: 1.5, traderSpeed: 1.3 } },
+  britons: { name: 'The Longbow Volley', icon: '🏹', use: 'war', blurb: 'Every yeoman draws as one: ranged soldiers strike +3 harder, and archery ranges train twice as fast.', add: { rangedAttack: 3 }, mul: { rangedTrain: 0.5 } },
+};
+
+/**
  * A people's signature soldiers: one unit line that carries their own names (one per epoch) and a
  * trade-off in numbers. Same model and counters as the line it replaces; only the stats and names change.
  * Cost is left alone on purpose, so training and the computer's budgeting price every line the same.

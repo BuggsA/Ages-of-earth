@@ -9,6 +9,7 @@ import { RES_OF_TILE, cargoRoom, freeFarm, garrisonRoom, giveOrder, landing, set
 import { carriedBy, letGo, relicAt } from './relics';
 import { dockOf, homeMarket, marketOf, nearestDock, portSpot, postAt } from './trade';
 import { ruinAt } from './ruins';
+import { callWork, workProblem } from './works';
 import { canHit, isEnemy, maxHp, pay, placeBuilding, refund } from './world';
 
 /**
@@ -426,6 +427,12 @@ export function applyCommand(s: GameState, c: Command): void {
         }
       }
       s.events.push({ k: 'bell', owner: c.p, ring: c.ring });
+      break;
+    }
+    case 'greatWork': {
+      const why = workProblem(s, p);
+      if (why) return refuse(s, c.p, why);
+      callWork(s, p);
       break;
     }
     case 'stance':
