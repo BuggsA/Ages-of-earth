@@ -102,3 +102,24 @@ describe('trade by sea', () => {
     }
   });
 });
+
+describe('ports on the Inland Sea', () => {
+  it('stands every trading post on a shore a ship can reach', () => {
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      for (const size of ['small', 'medium'] as const) {
+        const s = createGame({
+          seed,
+          size,
+          mapType: 'sea',
+          startEpoch: 2,
+          players: [
+            { name: 'A', ai: null, civ: 'romans' },
+            { name: 'B', ai: null, civ: 'romans' },
+          ],
+        });
+        expect(s.posts.length).toBeGreaterThan(0);
+        for (const p of s.posts) expect(portSpot(s, p)).not.toBeNull();
+      }
+    }
+  });
+});
