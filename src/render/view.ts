@@ -29,6 +29,7 @@ import { Bats } from './bats';
 import { Owls } from './owls';
 import { Roosts } from './roosts';
 import { Perches } from './perches';
+import { armyNear, nearWater, voiceFits, wet, type CreatureVoice } from './ambience';
 
 /**
  * The 3D view of a match through one player's eyes: lit terrain and lakes under a sky, woods and
@@ -391,25 +392,25 @@ export class View {
     if (this.owlLevel > 0 && this.time > this.nextChirp) {
       this.nextChirp = this.time + 5 + Math.random() * 9;
       const s = this.state;
-      if (s && !this.nearWater(s) && !this.armyNear(s)) this.onCue?.('cricket', Math.random() * 1.8 - 0.9, 0.4);
+      if (this.voiceHere(s, 'cricket')) this.onCue?.('cricket', Math.random() * 1.8 - 0.9, 0.4);
     }
     // On a clear night, within sight of open water, frogs croak at the shore.
     if (this.owlLevel > 0 && this.time > this.nextCroak) {
       this.nextCroak = this.time + 4 + Math.random() * 8;
       const s = this.state;
-      if (s && this.nearWater(s) && !this.armyNear(s)) this.onCue?.('frog', Math.random() * 1.8 - 0.9, 0.4);
+      if (this.voiceHere(s, 'frog')) this.onCue?.('frog', Math.random() * 1.8 - 0.9, 0.4);
     }
     // By day, within sight of open water, a gull now and then.
     if (this.dayLevel > 0.3 && this.time > this.nextGull) {
       this.nextGull = this.time + 9 + Math.random() * 16;
       const s = this.state;
-      if (s && this.nearWater(s)) this.onCue?.('gull', Math.random() * 1.4 - 0.7, 0.45);
+      if (this.voiceHere(s, 'gull')) this.onCue?.('gull', Math.random() * 1.4 - 0.7, 0.45);
     }
     // By day, away from open water and armies, a songbird now and then.
     if (this.dayLevel > 0.3 && this.time > this.nextSong) {
       this.nextSong = this.time + 7 + Math.random() * 14;
       const s = this.state;
-      if (s && !this.nearWater(s) && !this.armyNear(s)) this.onCue?.('birdsong', Math.random() * 1.6 - 0.8, 0.4);
+      if (this.voiceHere(s, 'birdsong')) this.onCue?.('birdsong', Math.random() * 1.6 - 0.8, 0.4);
     }
     this.roosts.update(this.time, this.ruins.standingAt, this.rig.target, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
     this.perches.update(this.time, this.ruins.standingAt, this.rig.target, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
@@ -898,30 +899,26 @@ export class View {
 
   /** Whether open water lies within a few tiles of the view's centre (a coast, a lake, the sea). */
   private nearWater(s: GameState): boolean {
-    const r = Math.max(6, this.rig.distance * 0.5);
-    const { x, z } = this.rig.target;
-    for (let i = 0; i < 8; i++) {
-      const a = i * 0.785;
-      if (this.wet(s, x + Math.cos(a) * r, z + Math.sin(a) * r) || this.wet(s, x + Math.cos(a) * r * 0.5, z + Math.sin(a) * r * 0.5)) return true;
-    }
-    return this.wet(s, x, z);
+    return nearWater(s, this.rig.target.x, this.rig.target.z, this.rig.distance);
   }
 
-  /** Whether a column of soldiers (five or more, seen) marches within a dozen tiles of the view's centre: the night creatures hush. */
+  /** Whether a column of soldiers (five or more, seen) marches near the view's centre: the small creatures hush. */
   private armyNear(s: GameState): boolean {
-    const { x, z } = this.rig.target;
-    let n = 0;
-    for (const e of s.ents) {
-      if (e.kind !== 'unit' || Math.abs(e.x - x) > 12 || Math.abs(e.y - z) > 12 || !this.visibleUnit(e)) continue;
-      const c = statsFor(s, e.owner, e.type).cls;
-      if ((c === 'infantry' || c === 'ranged' || c === 'cavalry' || c === 'siege') && ++n >= 5) return true;
-    }
-    return false;
+    return armyNear(s, this.rig.target.x, this.rig.target.z, this.visibleUnit);
   }
 
   /** Whether a map point is open water. */
   private wet(s: GameState, x: number, y: number): boolean {
-    return heightAt(s, x, y) < WATER_Y - 0.05;
+    return wet(s, x, y);
+  }
+
+  /** Whether a creature's voice belongs where the view looks now. */
+  private voiceHere(s: GameState | null, voice: CreatureVoice): boolean {
+    if (!s) return false;
+    const water = this.nearWater(s);
+    // The wrong side of the shore whatever marches by: skip counting soldiers.
+    if (!voiceFits(voice, water, false)) return false;
+    return voiceFits(voice, water, this.armyNear(s));
   }
 
   /** Ask for a sound placed by where it happens on screen and how far from the view it is. */
