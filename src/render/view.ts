@@ -539,6 +539,12 @@ export class View {
         const at = new THREE.Vector3(e.x + Math.cos(a) * e.size * 0.35, base + 2 + Math.random() * 0.4, e.y + Math.sin(a) * e.size * 0.35);
         this.effects.burst(at, { count: 3, speed: 0.35, up: 1, life: 2, size: 0.07, gravity: -0.9, drag: 0.6, colors: WORK_GLOW[s.players[e.owner].civ] });
         this.chimneys.set(e.id, this.time + 0.12);
+      } else if (e.type === 'tower' && e.beacon !== undefined && s.tick < e.beacon) {
+        // A lit beacon: flames and a column of smoke rise from the roof.
+        const at = new THREE.Vector3(e.x + (Math.random() - 0.5) * 0.4, base + 3.7 + Math.random() * 0.3, e.y + (Math.random() - 0.5) * 0.4);
+        this.effects.burst(at, { count: 3, speed: 0.4, up: 1, life: 0.8, size: 0.09, gravity: -1.3, drag: 1, colors: ['#ff9a3c', '#ffd166', '#e0471f'] });
+        this.effects.burst(at, { count: 1, speed: 0.25, up: 1, life: 3, size: 0.14, grow: 4, gravity: -0.5, drag: 0.4, soft: true, colors: ['#4a4644', '#6a6460'] });
+        this.chimneys.set(e.id, this.time + 0.1);
       } else if (e.type === 'wonder' && e.timer >= 0) {
         // A finished wonder glitters.
         const at = new THREE.Vector3(e.x + (Math.random() - 0.5) * 4, base + 1 + Math.random() * 3, e.y + (Math.random() - 0.5) * 4);

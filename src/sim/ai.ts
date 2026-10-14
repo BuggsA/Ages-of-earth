@@ -12,6 +12,7 @@ import { findRoute } from './path';
 import { isEnemy, maxHp } from './world';
 import { borderMap, suppliedAt } from './borders';
 import { workProblem } from './works';
+import { beaconProblem } from './beacon';
 import { progress, scenarioById } from './campaign';
 
 /**
@@ -198,6 +199,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
 
   townBell(s, v, mem, issue);
   greatWork(s, v, mem, issue);
+  lightBeacons(s, v, issue);
   research(s, v, citizens.length >= wantCitizens - 2, issue);
   trade(s, v, issue);
   planBuildings(s, v, mem, issue);
@@ -1194,6 +1196,23 @@ function greatWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   const busy = p.civ === 'chinese' ? v.traders.length >= 3 : v.citizens.length >= 14;
   const fight = (mem.attacking && v.army.length >= 6) || threatNear(s, v).count >= 4;
   if (w.use === 'eco' ? busy : fight) issue({ t: 'greatWork', p: p.id });
+}
+
+/** A clever computer lights a tower's beacon when three or more rival soldiers close in on it: it sees farther, and the flame is seen by all. */
+function lightBeacons(s: GameState, v: View, issue: (c: Command) => void): void {
+  if (!AI_LEVELS[v.p.ai!].clever) return;
+  for (const b of v.buildings) {
+    if (b.type !== 'tower' || beaconProblem(s, v.p, b)) continue;
+    let n = 0;
+    for (const e of s.ents) {
+      if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !isEnemy(s, v.p.id, e.owner) || e.type === 'citizen' || e.type === 'trader') continue;
+      if (distToRect(e.x, e.y, b) < 12 && ++n >= 3) break;
+    }
+    if (n >= 3) {
+      issue({ t: 'beacon', p: v.p.id, building: b.id });
+      return;
+    }
+  }
 }
 
 function townBell(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {

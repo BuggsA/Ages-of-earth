@@ -208,6 +208,9 @@ export interface Building {
   dir: number;
   hurt: number;
   born: number;
+  /** Tower beacon: tick it burns out (while lit), and tick it may be lit again (#beacon). */
+  beacon?: number;
+  beaconReady?: number;
 }
 
 export type Ent = Unit | Building;
@@ -400,6 +403,7 @@ export type GameEvent =
   | { k: 'healed'; id: number; x: number; y: number }
   | { k: 'garrison'; owner: number; building: number; inside: boolean }
   | { k: 'bell'; owner: number; ring: boolean }
+  | { k: 'beacon'; owner: number; building: number; x: number; y: number; on: boolean }
   /** A great work was called (`on`) or ran out (seed #133). */
   | { k: 'greatWork'; owner: number; on: boolean }
   | { k: 'wonder'; owner: number; id: number; x: number; y: number; ticks: number }
@@ -543,6 +547,7 @@ export type Command =
   | ({ t: 'unload'; p: number; ids: number[]; x: number; y: number } & Queued)
   | { t: 'ungarrison'; p: number; building: number }
   | { t: 'bell'; p: number; ring: boolean }
+  | { t: 'beacon'; p: number; building: number }
   /** Call the people's great work (seed #133), once in each epoch. */
   | { t: 'greatWork'; p: number }
   | { t: 'stance'; p: number; ids: number[]; stance: Stance }

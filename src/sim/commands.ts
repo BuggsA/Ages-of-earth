@@ -10,6 +10,7 @@ import { carriedBy, letGo, relicAt } from './relics';
 import { dockOf, homeMarket, marketOf, nearestDock, portSpot, postAt } from './trade';
 import { ruinAt } from './ruins';
 import { callWork, workProblem } from './works';
+import { beaconProblem, lightBeacon } from './beacon';
 import { canHit, isEnemy, maxHp, pay, placeBuilding, refund } from './world';
 
 /**
@@ -427,6 +428,14 @@ export function applyCommand(s: GameState, c: Command): void {
         }
       }
       s.events.push({ k: 'bell', owner: c.p, ring: c.ring });
+      break;
+    }
+    case 'beacon': {
+      const b = s.byId.get(c.building);
+      if (!b || b.kind !== 'building') return;
+      const why = beaconProblem(s, p, b);
+      if (why) return refuse(s, c.p, why);
+      lightBeacon(s, p, b);
       break;
     }
     case 'greatWork': {
