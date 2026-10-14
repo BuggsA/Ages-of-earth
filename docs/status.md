@@ -121,4 +121,4 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Attrition** (#132 s2, own build, lane rules): land soldiers deep in enemy land (no own-team border within 9 tiles) lose 2% health per 5 s, never during peace. Numbers in `ATTRITION`. Tests and campaign proof pass; browser/feel unverified; computer does not yet judge raid depth.
 
-**Wind** (#150, own pitch, lane look): a seeded wind per match (`windFor`, stronger in a storm) leans chimney, forge and battle smoke the same way. Render only; no rules, save or `data.ts` change. Quick check and browser smoke test pass; how the lean looks in a match is unseen by eye.
+**Wind** (#150, own pitch, lane look): a seeded wind per match (`windFor`, stronger in a storm) leans chimney, forge and battle smoke the same way, and (part two) slants rain and snow. Render only; no rules, save or `data.ts` change. Quick check and browser smoke test pass; how the lean looks in a match is unseen by eye.
