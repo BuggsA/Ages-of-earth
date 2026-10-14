@@ -199,6 +199,6 @@ export function inject<T extends THREE.Material>(mat: T, o: Inject): T {
 /** Everything baked: vertex colors, faceted, with fog of war and glowing parts. */
 export const bakedMaterial = inject(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.85 }), { team: true, flag: true });
 /** Units: team colors, swinging limbs, fog of war. */
-export const unitMaterial = inject(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.8 }), { rig: true, team: true });
+export const unitMaterial = inject(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.8 }), { rig: true, team: true, flag: true });
 /** Trees and crops sway a little in the wind. */
 export const swayMaterial = inject(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.9 }), { team: true, sway: 0.03 });
