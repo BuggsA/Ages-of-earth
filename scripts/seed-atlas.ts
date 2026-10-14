@@ -28,6 +28,7 @@ export interface Query {
   limit: number;
   json: boolean;
   survey: boolean;
+  share: boolean;
 }
 
 export interface Hit {
@@ -43,7 +44,7 @@ const FLAGS = new Set(['--from', '--count', '--size', '--type', '--players', '--
 
 /** Reads the command line; throws an Error with a plain message for anything it can't use. */
 export function parseArgs(argv: string[]): Query {
-  const q: Query = { from: 1, count: 200, size: 'medium', type: 'continental', players: 2, posts: 0, ruins: 0, relics: 0, finds: [], limit: 20, json: false, survey: false };
+  const q: Query = { from: 1, count: 200, size: 'medium', type: 'continental', players: 2, posts: 0, ruins: 0, relics: 0, finds: [], limit: 20, json: false, survey: false, share: false };
   const int = (name: string, v: string, min: number, max: number): number => {
     const n = Number(v);
     if (!Number.isInteger(n) || n < min || n > max) throw new Error(`${name} must be a whole number from ${min} to ${max}, not "${v}"`);
@@ -55,6 +56,7 @@ export function parseArgs(argv: string[]): Query {
     else if (a === '--no-bog') q.bog = false;
     else if (a === '--json') q.json = true;
     else if (a === '--survey') q.survey = true;
+    else if (a === '--share') q.share = true;
     else if (FLAGS.has(a)) {
       const v = argv[++i];
       if (v === undefined || v.startsWith('--')) throw new Error(`${a} needs a value`);
@@ -140,6 +142,11 @@ export function surveyTable(s: ReturnType<typeof survey>): string {
   return [head, ...rows].join('\n');
 }
 
+/** The title-screen address of a world: open it on the game's site (or `npm run dev`) to start from these settings. */
+export function shareQuery(seed: number, q: Pick<Query, 'size' | 'type' | 'players'>): string {
+  return `?seed=${seed}&size=${q.size}&map=${q.type}&foes=${q.players - 1}`;
+}
+
 export function table(hits: Hit[]): string {
   const head = 'seed       bog  posts relics ruins (hoard lore map relic)';
   const rows = hits.map(
@@ -154,7 +161,7 @@ function main(): void {
     q = parseArgs(process.argv.slice(2));
   } catch (e) {
     console.error(`seed-atlas: ${(e as Error).message}`);
-    console.error('usage: npx tsx scripts/seed-atlas.ts [--from N] [--count N] [--size S] [--type T] [--players 2-4] [--bog|--no-bog] [--posts N] [--ruin hoard,lore,map,relic] [--ruins N] [--relics N] [--limit N] [--json] [--survey]');
+    console.error('usage: npx tsx scripts/seed-atlas.ts [--from N] [--count N] [--size S] [--type T] [--players 2-4] [--bog|--no-bog] [--posts N] [--ruin hoard,lore,map,relic] [--ruins N] [--relics N] [--limit N] [--json] [--survey] [--share]');
     process.exit(1);
   }
   if (q.survey) {
@@ -171,6 +178,7 @@ function main(): void {
   else {
     console.log(`${q.size} ${q.type}, ${q.players} players: ${hits.length} of ${looked} seeds from ${q.from} match`);
     if (hits.length) console.log(table(hits));
+    if (q.share) for (const h of hits) console.log(shareQuery(h.seed, q));
   }
 }
 
