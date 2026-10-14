@@ -143,10 +143,11 @@ export class WaterView {
     this.mesh.position.set(s.w / 2, WATER_Y, s.h / 2);
   }
 
-  update(time: number, sunDir: THREE.Vector3, sky: THREE.Color): void {
+  update(time: number, sunDir: THREE.Vector3, sky: THREE.Color, sunColor?: THREE.Color): void {
     const u = this.material.uniforms;
     u.uTime.value = time;
     u.uSunDir.value.copy(sunDir);
     u.uSky.value.copy(sky);
+    if (sunColor) u.uSunColor.value.copy(sunColor);
   }
 }

@@ -282,6 +282,15 @@ Seed atlas, third pass (chain 1014-1135, session 3): the game now reads `?seed=N
 
 Built: gold planning pennants and red danger pennants on both the 3D land and the minimap. Ctrl+right-click explored ground to plant one; Shift makes it red. Repeating removes one, or changes its kind. Six stand at once; the oldest makes room for the seventh. Why I love it: an RTS map is a place to think, not just a place to march. Mark a ruin to revisit, a crossing the rival holds, or a shore to land an army. These notes are private to the browser and never reveal fog, issue commands, affect AI or get saved/transmitted. Browser appearance remains unverified here. Next: optional shared allied notes, but only with authorization checks on every network message.
 
+<<<<<<< HEAD
+### The hours of the day (own pitch), 2026-10-14
+
+**Built:** `src/render/daylight.ts`: one day lasts an hour of play (`DAY_SECONDS`), a match opens between 07:30 and 10:30 by seed, and a table of hours (dawn, morning, noon, golden hour, sunset, dusk, night) gives the sun's colour and strength, the sky and horizon colours and the fill light, blended smoothly. The sun climbs from the east and sinks into the west, and a higher, bluer moon carries the light on without a jump. The view relights only when the hour has moved. Weather (`moodOf`) greys whatever hour it is, so rain at dusk is dark. `?hour=` holds the clock for trying it out. Pure render: it reads `s.tick` and `s.seed` and writes nothing back.
+
+**Why I love it:** a match used to be one frozen noon. Now a long game has a shape you can feel: the opening bright morning, long gold shadows over the first armies, and a night that arrives just as a siege does. It costs the player nothing in readability (night is dimmed to a floor, never black).
+
+**Next, if you pick it up:** lit windows and Town Center braziers that glow as the evening comes (the bloom is there, the buildings' windows don't change yet); stars and a moon disc in the sky shader; owls and fireflies for the birds' place at night; a night-sight rule (units see less in the dark) would be a sim change and a real design call; a lobby option to fix the hour or turn the cycle off. Seen in headless Chromium on the title screen only, at 07, 12, 17:30, 19:12, 21 and 02: warm long shadows at dusk, noticeably darker at night. In a real match, and the sound of it (nothing yet), unverified.
+=======
 
 
 ## Designers' notes: Age of Reclaimers (2026-10-14, Codex, #94)
@@ -289,3 +298,4 @@ Built: gold planning pennants and red danger pennants on both the 3D land and th
 I love the moment when exploration changes a civilization rather than only filling its treasury. A completed excavation now reveals a people who put yesterday's knowledge to work: faster building and repair, cheaper research, slower military training. The Middle Ages window spreads the web into another tier and gives opponents time to scout and punish a rebuilding town. Its armies still use the ordinary counters; there is no secret super-unit.
 
 Ruin ownership is already saved, so the discovery needs no extra tally, and the existing computer excavation and forward-road chooser can use it. Next I'd explore contested restoration projects that stay useful on the map after the dig, with benefits an opponent can interrupt. The synthesized theme and salvaged-column models still want the owner's eyes and ears; Chromium is absent in this container.
+>>>>>>> origin/main
