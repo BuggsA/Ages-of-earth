@@ -30,7 +30,7 @@ Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders
 
 - [#24](https://github.com/BuggsA/Ages-of-earth/issues/24), Wings over the Steppe isn't shown winnable (lane ai, effort:hard): claimed by another chain.
 
-- [#1](https://github.com/BuggsA/Ages-of-earth/pull/1), repairs for damaged buildings: opened before these rules, with no issue; now targets `main`. Its author couldn't run the typecheck and hadn't tried it in a browser.
+- [#1](https://github.com/BuggsA/Ages-of-earth/pull/1), repairs for damaged buildings: brought up to date with `main` on 2026-10-14, typecheck and all tests pass; the game loads in headless Chromium with no errors. Not yet played by a person (the right-click, hammer cursor and sound are untried); ready for review.
 
 - [#21](https://github.com/BuggsA/Ages-of-earth/issues/21), Muse reviewer docs (owner-ask, lane tooling): branch `claude/21-muse-docs`. Docs only.
 
