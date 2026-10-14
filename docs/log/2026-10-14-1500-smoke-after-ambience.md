@@ -1,0 +1,2 @@
+# Browser smoke after the ambience wave (chain 1014-1400 s8)
+No issue was ready (#113 is effort:hard, #121 claimed). Instead of piling on another ambient effect, ran `npx vitest run --mode slow tests/slow/browser-smoke.test.ts` on `main` (36d5091, after crickets, gulls, fireflies, bat roosts, lit windows, moonlit nights): 1 passed, no page or console errors in headless Chromium. Not checked: how any of it looks or sounds in play; the owner's ear and eye still decide the levels.
