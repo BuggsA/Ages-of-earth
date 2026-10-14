@@ -99,6 +99,7 @@ export class View {
   private owlLevel = 0;
   private nextHoot = 12;
   private nextGull = 8;
+  private nextChirp = 6;
   private dayLevel = 0;
   private weather = new Weather();
   /** How far the haze lets the view reach today (1 on a clear day). */
@@ -380,6 +381,12 @@ export class View {
     if (this.owlLevel > 0.3 && this.time > this.nextHoot) {
       this.nextHoot = this.time + 18 + Math.random() * 30;
       this.onCue?.('owl', Math.random() * 1.6 - 0.8, 0.5);
+    }
+    // On a clear night, away from open water, crickets chirp in the grass.
+    if (this.owlLevel > 0 && this.time > this.nextChirp) {
+      this.nextChirp = this.time + 5 + Math.random() * 9;
+      const s = this.state;
+      if (s && !this.nearWater(s)) this.onCue?.('cricket', Math.random() * 1.8 - 0.9, 0.4);
     }
     // By day, within sight of open water, a gull now and then.
     if (this.dayLevel > 0.3 && this.time > this.nextGull) {
