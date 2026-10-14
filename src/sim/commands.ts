@@ -7,7 +7,7 @@ import type { Building, BuildingType, Command, Cost, GameState, Order, Player, U
 import { RES, R_FISH, R_NONE } from './types';
 import { RES_OF_TILE, cargoRoom, freeFarm, garrisonRoom, giveOrder, landing, setOrder, ungarrison } from './units';
 import { carriedBy, letGo, relicAt } from './relics';
-import { homeMarket, marketOf, postAt } from './trade';
+import { dockOf, homeMarket, marketOf, nearestDock, portSpot, postAt } from './trade';
 import { ruinAt } from './ruins';
 import { canHit, isEnemy, maxHp, pay, placeBuilding, refund } from './world';
 
@@ -267,7 +267,17 @@ export function applyCommand(s: GameState, c: Command): void {
           giveOrder(u, { k: 'trade', post: post.id, market: m ? m.id : 0, phase: u.carry > 0 ? 'back' : 'go' }, c.queue);
         }
       }
-      const others = units.filter((u) => u.type !== 'trader');
+      // Merchant ships sail to a port post from their nearest Dock.
+      const cogs = units.filter((u) => u.type === 'cog');
+      if (cogs.length && !portSpot(s, post)) refuse(s, c.p, 'No harbor near this trading post: merchant ships need water within a few tiles');
+      else if (cogs.length && !nearestDock(s, c.p, post.x, post.y)) refuse(s, c.p, 'Build a Dock to trade by sea');
+      else {
+        for (const u of cogs) {
+          const d = (u.order.k === 'trade' ? dockOf(s, c.p, u.order.market) : null) ?? nearestDock(s, c.p, u.x, u.y);
+          giveOrder(u, { k: 'trade', post: post.id, market: d ? d.id : 0, phase: u.carry > 0 ? 'back' : 'go' }, c.queue);
+        }
+      }
+      const others = units.filter((u) => u.type !== 'trader' && u.type !== 'cog');
       if (others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: post.x, y: post.y, queue: c.queue });
       break;
     }
@@ -306,6 +316,14 @@ export function applyCommand(s: GameState, c: Command): void {
         }
         // A trader: home to this Market (with what it carries), and its road starts here from now on.
         if (u.type === 'trader' && b.type === 'market' && b.built) {
+          const post = u.order.k === 'trade' ? u.order.post : 0;
+          if (u.carry > 0 || post) {
+            giveOrder(u, { k: 'trade', post, market: b.id, phase: u.carry > 0 ? 'back' : 'go' }, c.queue);
+            continue;
+          }
+        }
+        // A merchant ship: home to this Dock, and its sea road starts here from now on.
+        if (u.type === 'cog' && b.type === 'dock' && b.built) {
           const post = u.order.k === 'trade' ? u.order.post : 0;
           if (u.carry > 0 || post) {
             giveOrder(u, { k: 'trade', post, market: b.id, phase: u.carry > 0 ? 'back' : 'go' }, c.queue);

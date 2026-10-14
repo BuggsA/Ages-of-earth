@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -91,7 +91,11 @@ export class Sound {
   private noiseBuf!: AudioBuffer;
   private pinkBuf!: AudioBuffer;
   private wind: GainNode | null = null;
+  /** Rain's hiss and snow's hush on the ambience bus, and the day they follow. */
+  private weatherGain: GainNode | null = null;
+  private weatherDay: { kind: string; strength: number } = { kind: 'clear', strength: 0 };
   private ambOn = false;
+  private birdQuiet = false;
   private birdTimer = 0;
   /** Recent plays per sound, to keep a busy turn from stacking the same sound twenty times. */
   private recent = new Map<SoundName, number[]>();
@@ -116,7 +120,7 @@ export class Sound {
     'click', 'open', 'select', 'selectBuilding', 'move', 'attack', 'strike', 'thud', 'hit', 'hitBuilding', 'bow', 'sling', 'musket', 'fall',
     'collapse', 'built', 'place', 'ready', 'readyCitizen', 'chop', 'mine', 'hammer', 'rustle', 'epoch', 'alert', 'victory', 'defeat', 'error', 'coin', 'queue',
     'catapult', 'cannon', 'impact', 'spear', 'chant', 'convert', 'heal', 'townBell', 'allClear', 'research', 'wonder', 'shelter',
-    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind',
+    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind', 'thunder',
   ];
 
   /**
@@ -594,6 +598,13 @@ export class Sound {
         for (const f of [N.A3, N.E4, N.A4, N.C5]) this.tone(out, t + 0.15, { f, type: 'sawtooth', dur: 1.8, peak: 0.028, attack: 0.4, lp: 1500 });
         [N.E5, N.A5, N.C6, N.E6].forEach((f, i) => this.bell(out, t + 0.5 + i * 0.11, f, 1.2, 0.04));
         break;
+      case 'thunder':
+        // A crack that rolls away: sharp high noise, then a long low rumble that swells and sinks.
+        this.noise(out, t, { dur: 0.12, filter: 'highpass', f: 1600, peak: 0.2 });
+        this.noise(out, t, { dur: 2.6, f: 260, to: 55, peak: 0.55, attack: 0.18 });
+        this.noise(out, t + 0.5, { dur: 2.2, f: 180, to: 45, peak: 0.35, attack: 0.5 });
+        this.tone(out, t + 0.05, { f: 52, to: 34, dur: 2.2, peak: 0.12, attack: 0.3 });
+        break;
       case 'ruinFind':
         // Struck stone: the spade rings on something hard, earth slides, then an old mode rises out of it.
         this.tone(out, t, { f: 1250, to: 900, dur: 0.07, peak: 0.07 });
@@ -718,7 +729,32 @@ export class Sound {
     // A low breeze, and leaves rustling over it.
     layer('lowpass', 380, 0.7, 0.35, 0.25, 0.06, 0);
     this.wind = layer('bandpass', 1800, 0.5, 0.05, 0.045, 0.11, 3.1);
+    // Rain: a bright hiss with a soft patter under it. Snow: only a muffled hush. Both start silent.
+    const rain = ctx.createBufferSource();
+    rain.buffer = this.pinkBuf;
+    rain.loop = true;
+    const hiss = ctx.createBiquadFilter();
+    hiss.type = 'highpass';
+    hiss.frequency.value = 1400;
+    const patter = ctx.createBiquadFilter();
+    patter.type = 'lowpass';
+    patter.frequency.value = 7000;
+    this.weatherGain = ctx.createGain();
+    this.weatherGain.gain.value = 0;
+    rain.connect(hiss).connect(patter).connect(this.weatherGain).connect(this.amb);
+    rain.start(0, 1.7);
+    this.setWeather(this.weatherDay.kind, this.weatherDay.strength);
     if (!this.offline) this.scheduleBirds();
+  }
+
+  /** Let the day's weather be heard: rain hisses, snow hushes, mist and clear skies add nothing. */
+  setWeather(kind: string, strength: number): void {
+    this.weatherDay = { kind, strength };
+    if (!this.ctx || !this.weatherGain) return;
+    const level = kind === 'rain' ? 0.55 * strength : kind === 'snow' ? 0.05 * strength : 0;
+    this.weatherGain.gain.setTargetAtTime(level, this.ctx.currentTime, 0.8);
+    // Fewer birds sing in the rain.
+    this.birdQuiet = kind === 'rain' || kind === 'snow';
   }
 
   stopAmbience(): void {
@@ -743,7 +779,7 @@ export class Sound {
     window.clearTimeout(this.birdTimer);
     this.birdTimer = window.setTimeout(() => {
       if (!this.ambOn) return;
-      this.bird();
+      if (!this.birdQuiet) this.bird();
       this.scheduleBirds();
     }, 6000 + Math.random() * 14000);
   }

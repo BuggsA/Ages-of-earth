@@ -905,8 +905,28 @@ function ironTower(k: Kit, st: Style): void {
 // extra draw: awnings and bright cloth (merchants), rust and smithy glow (iron), banners, lamps and
 // pale stone (pilgrims), stripes and bunting (fairs). Fronts face +z.
 
-/** The side ages that dress buildings; the trunk ages have their own epoch styles. */
+/** The original four dressed ages, kept as the baseline model regression set. */
 export const LOOK_AGES: AgeId[] = ['merchant', 'iron', 'pilgrim', 'fair'];
+/** All dressed ages; additions get their own model coverage beside the baseline set. */
+export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer', 'sail'];
+
+const SAIL = '#efe8d4';
+const NET = '#b9ad8a';
+
+/** A mast with a square sail and a pennant: the sea people's mark. */
+function mast(k: Kit, x: number, z: number, h: number, w = 0.7): void {
+  k.cyl(0.03, 0.04, h, 5, '#5a4630', x, 0, z);
+  k.box(w, h * 0.45, 0.025, SAIL, x, h * 0.45, z + 0.03);
+  k.box(w + 0.1, 0.03, 0.04, '#5a4630', x, h * 0.92, z + 0.03);
+  k.box(0.22, 0.09, 0.02, '#3f8fc4', x + 0.12, h + 0.04, z);
+}
+
+/** Nets hung to dry on two posts, with cork floats along the top. */
+function hungNets(k: Kit, x: number, y: number, z: number, w: number): void {
+  for (const dx of [-w / 2, w / 2]) k.cyl(0.02, 0.02, 0.6, 4, '#5a4630', x + dx, y, z);
+  k.box(w, 0.4, 0.015, NET, x, y + 0.14, z);
+  for (let i = 0; i < 5; i++) k.sphere(0.03, '#c9a25a', x - w / 2 + (w * (i + 0.5)) / 5, y + 0.56, z);
+}
 
 const CLOTH = ['#d94a3c', '#e8b43a', '#3f8fc4', '#8a4fa8'];
 const RUST = '#8a4a2c';
@@ -950,6 +970,21 @@ function lamp(k: Kit, x: number, y: number, z: number, h = 0.5): void {
 function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
   const big = type === 'towncenter';
   switch (age) {
+    case 'reclaimer': {
+      // Salvaged stone columns and timber braces: old fragments become a working town.
+      if (['towncenter', 'storehouse', 'forge', 'house', 'wonder'].includes(type)) {
+        const span = big ? 1.65 : type === 'wonder' ? 2.5 : type === 'house' ? 0.7 : 1.05;
+        const height = big || type === 'wonder' ? 1.3 : 0.7;
+        for (const x of [-span, span]) {
+          k.cyl(0.09, 0.12, height, 6, PALE, x, 0, span);
+          k.box(0.28, 0.1, 0.28, PALE, x, height, span);
+          k.cyl(0.025, 0.025, height + 0.25, 4, WOOD, x + 0.18, 0, span);
+        }
+        k.box(span * 2 + 0.4, 0.07, 0.08, WOOD, 0, height * 0.65, span + 0.05);
+        k.box(0.36, 0.18, 0.22, PALE, span - 0.25, 0, span - 0.35);
+      }
+      break;
+    }
     case 'merchant':
       if (type === 'market') {
         awning(k, -0.9, 0.78, 1.25, 1.2, 4, 0);
@@ -1010,6 +1045,24 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
         lamp(k, 0, 0, 2.9, 0.6);
       }
       break;
+    case 'sail':
+      if (type === 'dock') {
+        mast(k, 0.4, 1.7, 1.7, 0.75);
+        hungNets(k, -1.25, 0, 0.1, 0.9);
+      } else if (type === 'house') hungNets(k, 0, 0, 0.95, 0.8);
+      else if (big) {
+        mast(k, -1.7, 1.9, 2.4);
+        mast(k, 1.7, 1.9, 2.4);
+        hungNets(k, 0, 0, 2.1, 1.2);
+      } else if (type === 'market') {
+        hungNets(k, -1.3, 0, 1.3, 0.9);
+        k.cyl(0.16, 0.16, 0.3, 8, '#7a5634', 1.2, 0, 1.2);
+        k.cyl(0.16, 0.16, 0.3, 8, '#7a5634', 1.55, 0, 1.0);
+      } else if (type === 'wonder') {
+        mast(k, -2.2, 2.7, 3.0, 0.9);
+        mast(k, 2.2, 2.7, 3.0, 0.9);
+      }
+      break;
     case 'fair':
       if (type === 'market') {
         stripedStall(k, -1.3, 0.45);
@@ -1040,7 +1093,7 @@ const cache = new Map<string, THREE.BufferGeometry>();
 
 /** The baked model of a building in an epoch, in a player's color (`variant`: which way a wall piece joins its neighbors). */
 export function buildingGeometry(type: BuildingType, epoch: number, color: string, variant = 0, age?: AgeId): THREE.BufferGeometry {
-  const look = age && LOOK_AGES.includes(age) && type !== 'wall' ? age : undefined;
+  const look = age && DRESSED_AGES.includes(age) && type !== 'wall' ? age : undefined;
   const key = `${type}:${epoch}:${color}:${variant}${look ? ':' + look : ''}`;
   let g = cache.get(key);
   if (!g) {

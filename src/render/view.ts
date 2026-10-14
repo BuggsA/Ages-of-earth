@@ -4,12 +4,13 @@ import { ageOf } from '../sim/ages';
 import { AURA, BUILDINGS, SIGNATURES, TICK_HZ, RUINS, TRADE, domainOf } from '../sim/data';
 import { buildingMaxHp, statsFor } from '../sim/stats';
 import type { AgeId, BuildingType, Ent, GameEvent, GameState, Unit } from '../sim/types';
+import type { ScoutFlag } from '../ui/scoutFlags';
 import { R_BOG, R_GOLD, R_STONE } from '../sim/types';
 import { seesRect } from '../sim/vision';
 import { BuildingsView } from './buildingsView';
 import { CameraRig } from './camera';
 import { Birds, Effects } from './effects';
-import { fogUniforms, timeUniform } from './materials';
+import { fogUniforms, glowUniform, timeUniform } from './materials';
 import { Overlays, type BarSpec, type RingSpec } from './overlays';
 import { Post, QUALITY, loadQuality, saveQuality, type QualityName } from './post';
 import { RelicsView } from './relicsView';
@@ -17,6 +18,8 @@ import { PostsView } from './postsView';
 import { RuinsView } from './ruinsView';
 import { ResourcesView } from './resourcesView';
 import { Sky } from './sky';
+import { forcedHour, hourAt, lightAt, moonPhase } from './daylight';
+import { Weather, describeWeather, forcedWeather, moodOf, weatherFor, type WeatherDay } from './weather';
 import { FogTexture, TerrainView, heightAt } from './terrain';
 import { AIR_ALT, UnitsView } from './unitsView';
 import { WATER_Y, WaterView } from './water';
@@ -36,6 +39,8 @@ export interface Selection {
   rallyOf: number | null;
   /** A line of wall being laid out. */
   wall: { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean } | null;
+  /** Personal notes visible only in this browser. */
+  scoutFlags: readonly ScoutFlag[];
 }
 
 export type Pick =
@@ -48,6 +53,7 @@ export type Pick =
   | { kind: 'resource'; tile: number }
   | { kind: 'ground'; x: number; y: number };
 
+/** Where the light comes from now: set every frame from the hour (`daylight.ts`). */
 const SUN_DIR = new THREE.Vector3(-0.45, 0.82, 0.38).normalize();
 
 export class View {
@@ -61,6 +67,7 @@ export class View {
   onPing: ((x: number, y: number, color: string) => void) | null = null;
 
   private sky = new Sky();
+  private phase = 0;
   private hemi = new THREE.HemisphereLight('#dcefff', '#b9a77a', 1.0);
   private sun = new THREE.DirectionalLight('#fff3dc', 2.5);
   private fill = new THREE.AmbientLight('#cfe0ff', 0.4);
@@ -79,6 +86,17 @@ export class View {
   private overlays = new Overlays();
   private effects: Effects;
   private birds = new Birds();
+  private weather = new Weather();
+  /** How far the haze lets the view reach today (1 on a clear day). */
+  private reach = 1;
+  private flash = 0;
+  private baseSun = 2.5;
+  private baseHemi = 1.0;
+  private mood = moodOf({ kind: 'clear', strength: 0 });
+  /** The hour of the day last lit, so the light is only worked out when it has moved. */
+  private litHour = -1;
+  private tint = new THREE.Color();
+  private sunTint = new THREE.Color();
   private post: Post;
   private quality: QualityName = loadQuality();
   private fog: FogTexture | null = null;
@@ -114,7 +132,7 @@ export class View {
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sky.mesh, this.hemi, this.fill, this.sun, this.sun.target);
-    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.ruins.group, this.overlays.group, this.effects.group, this.birds.mesh);
+    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.ruins.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.post = new Post(this.renderer, this.scene, this.rig.camera);
     this.applyQuality();
@@ -195,6 +213,58 @@ export class View {
     this.chimneys.clear();
     this.wakes.clear();
     this.later = [];
+    this.phase = moonPhase(s.seed);
+    this.setWeather(forcedWeather() ?? weatherFor(s.seed, s.mapType));
+  }
+
+  /** Today's weather, in words for the opening banner ('' on a clear day). */
+  get weatherWords(): string {
+    return describeWeather(this.weather.day);
+  }
+
+  get weatherDay(): WeatherDay {
+    return this.weather.day;
+  }
+
+  /** Put a day's weather over the land: its falling rain or snow, and a greyer, dimmer, closer sky. */
+  private setWeather(day: WeatherDay): void {
+    this.weather.set(day);
+    this.mood = moodOf(day);
+    this.reach = this.mood.reach;
+    this.litHour = -1;
+    this.light(this.hourNow());
+  }
+
+  private hourNow(): number {
+    return forcedHour() ?? (this.state ? hourAt(this.state.seed, this.state.tick / TICK_HZ) : 9);
+  }
+
+  /** Light the land for an hour of the day, greyed by today's weather. */
+  private light(hour: number): void {
+    if (Math.abs(hour - this.litHour) < 0.01) return;
+    this.litHour = hour;
+    const m = this.mood;
+    const l = lightAt(hour);
+    const grey = this.tint.set(m.tint);
+    // A grey day takes its tint down with the dusk too, so rain at night is dark and not pale.
+    const dim = (l.sky * 0.5 + 0.5);
+    this.skyTop.set(l.top).lerp(grey.clone().multiplyScalar(dim), m.grey);
+    this.horizon.set(l.horizon).lerp(grey.clone().multiplyScalar(dim), m.grey);
+    SUN_DIR.set(l.dir[0], l.dir[1], l.dir[2]);
+    this.sunTint.set(l.sunColor);
+    this.sun.color.copy(this.sunTint);
+    this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
+    this.sky.setGlare(m.sun, this.sunTint);
+    // A full moon lights the night better than a crescent does; by day the phase means nothing.
+    this.baseSun = 2.5 * m.sun * l.sun * (1 - 0.4 * this.phase * l.moon);
+    this.water.setStars(l.moon * (1 - m.grey));
+    // Windows and torches light up as the sun sets: the old strength by day, near double by night.
+    glowUniform.uGlow.value = 0.9 + 1.2 * Math.min(1, l.moon + (1 - l.sun) * 0.9 + (1 - m.sky) * 0.3);
+    this.baseHemi = 1.0 * m.sky * l.sky;
+    this.fill.intensity = 0.4 * l.fill;
+    this.sun.intensity = this.baseSun;
+    this.hemi.intensity = this.baseHemi;
+    (this.scene.fog as THREE.Fog).color.copy(this.horizon);
   }
 
   /** See the match through another player's eyes, or (with `reveal`) everyone's (replays). */
@@ -228,6 +298,7 @@ export class View {
     const p = s.players[this.viewer];
     if (!this.reveal) this.fog?.update(p.vis, p.seen, dt);
 
+    this.light(forcedHour() ?? hourAt(s.seed, s.tick / TICK_HZ));
     // Light follows the view so shadows stay crisp where the player looks.
     const t = this.rig.target;
     const span = 14 + this.rig.distance * 0.75;
@@ -243,8 +314,17 @@ export class View {
     cam.updateProjectionMatrix();
     this.sky.mesh.position.copy(this.rig.camera.position);
     const fog = this.scene.fog as THREE.Fog;
-    fog.near = this.rig.distance * 2.2;
-    fog.far = this.rig.distance * 5 + 60;
+    fog.near = this.rig.distance * 2.2 * this.reach;
+    fog.far = (this.rig.distance * 5 + 60) * this.reach;
+    this.weather.show(this.quality !== 'low');
+    const sky = this.weather.update(this.time, dt, this.rig.target, this.rig.distance, this.renderer.getPixelRatio(), this.height);
+    if (sky.thunder >= 0) {
+      const pan = Math.random() * 1.6 - 0.8;
+      this.later.push({ at: this.time + sky.thunder, run: () => this.onCue?.('thunder', pan, 0.7) });
+    }
+    this.flash = sky.flash;
+    this.hemi.intensity = this.baseHemi + this.flash * 2.2;
+    this.sun.intensity = this.baseSun + this.flash * 1.5;
 
     this.resources.update(s, dt);
     this.buildings.update(s, this.viewer, (b) => this.reveal || seesRect(s, this.viewer, b.tx, b.ty, b.size), dt, this.reveal);
@@ -270,7 +350,7 @@ export class View {
     this.drawSelection(s, sel);
     this.ambient(s, dt);
     this.vessels(s);
-    this.water.update(this.time, SUN_DIR, this.horizon);
+    this.water.update(this.time, SUN_DIR, this.horizon, this.sunTint);
     this.effects.update(dt);
     this.birds.update(this.time, dt, this.rig.target, this.rig.distance);
     this.effects.placeTexts(this.rig.camera, this.width, this.height);
@@ -346,6 +426,7 @@ export class View {
     this.overlays.setWallGhost(s, sel.wall?.tiles ?? [], p.epoch, p.color, sel.wall?.alongY ?? false);
     const rb = sel.rallyOf ? s.byId.get(sel.rallyOf) : undefined;
     this.overlays.setFlag(s, rb && rb.kind === 'building' && rb.rally ? rb.rally : null, p.color, this.time);
+    this.overlays.setScoutFlags(s, sel.scoutFlags, this.time);
   }
 
   /** Chimney smoke, fires on damaged buildings, the glint of gold. */
@@ -910,6 +991,10 @@ function sideAgeAmbient(fx: Effects, age: AgeId, e: Ent, base: number): boolean 
   }
   if (age === 'pilgrim' && e.type === 'temple') {
     fx.burst(new THREE.Vector3(e.x, base + 2.7, e.y), { count: 1, speed: 0.08, up: 1, life: 3.4, size: 0.07, grow: 3, gravity: -0.1, drag: 0.4, soft: true, colors: ['#efe9d6', '#fff6dc'] });
+    return true;
+  }
+  if (age === 'sail' && e.type === 'dock') {
+    fx.burst(new THREE.Vector3(e.x + 0.4, base + 0.3, e.y + 1.7), { count: 1, speed: 0.25, up: 0.4, life: 1.3, size: 0.05, grow: 2, gravity: -0.1, drag: 0.5, soft: true, colors: ['#ffffff', '#cfe9ef'] });
     return true;
   }
   if (age === 'fair' && e.type === 'market') {

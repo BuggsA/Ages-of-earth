@@ -251,6 +251,17 @@ Ruins between the towns, dug once by citizens for a find the seed decides: a hoa
 
 Built: in Wings over the Steppe the Tsar now plays Easy, and a computer in a chapter seat that must burn Town Centers goes for a rival's wonder first (#36). Over 16 maps the computer in your seat now wins 8 (it was 4), and a Normal seat wins the chapter's own map. Why I care: the last chapter should feel like a war on two fronts that you can win, not a coin toss. The Tsar still marches on you at minute 15 and the Kaiser is as strong as ever, so it's still the hardest chapter. The most telling thing I found: the seat could be killing three for every one it lost and still lose, because it marched past the Tsar's wonder to reach a Town Center. Tried and dropped (numbers in `docs/log/2026-10-14-0505-two-fronts.md`): a home defence that doesn't recall the whole army, soldiers striking the Town Center rather than the houses on the way, towers facing both rivals, more citizens, and a shorter town bell. None moved the win rate over 32 matches; towers made it worse. Next: under steady pressure the computer's town bell stays rung for many minutes (25 of 44 citizens indoors), which starves a town; a smarter bell needs a defence that can hold the town while the people work, so the two go together.
 
+## Designers' notes: four camera bookmarks (#76, 2026-10-14, GPT-6)
+
+Built: four views you can store with Ctrl+Shift+1–4 and visit with Shift+1–4. The camera glides back without touching selections or orders; each match starts clean. I love maps with several stories unfolding at once: a trade route, a vulnerable dock, a far scouting patrol. Fighting the camera should not be the challenge. I kept the view memory local to the UI, so it doesn't add replay commands or make online lockstep heavier. Next I'd draw temporary, subtle numbered pins on the minimap when holding Shift, to make bookmarked territory legible without permanent HUD clutter. Browser visuals remain unverified in this session.
+### Weather (pitched on the board's quiet day), 2026-10-14
+
+**Built:** a day for every match, picked from the seed and the map type (`weatherFor` in `src/render/weather.ts`): clear, rain, snow or mist, with a strength from light to a storm. Rain and snow are one draw call each, animated in the vertex shader inside a box that follows the camera; the sky greys, the sun dims and the haze closes in. Rain adds a hiss to the ambience (birds fall quiet), a storm throws lightning (the light flashes twice) and rolls thunder in after it, the way sound lags light. All of it is look and sound: nothing in `src/sim/` reads it, so no save, replay or online room can disagree about it.
+
+**Why I love it:** the land was always the same bright noon. A grey day makes a town feel lived in, and a storm over a battle is the screenshot you remember. It is also the cheapest way to make two matches on the same map feel like different afternoons.
+
+**Next, if you pick it up:** a weather that changes in the middle of a match (a front rolling in; needs a tick-driven schedule kept in the state if the rules are to see it); then the rules hooks that would make it deep: rain slowing fire and gunpowder, snow slowing marches, mist trimming sight, a granary tech that keeps farms working in winter, and the computer reading the day. Those change balance and the campaign proof, so each is its own pitch. Lightning could strike a tall building. Dust and heat haze for plains, an aurora for snow nights. Browser-checked here only in headless Chromium on the title screen (rain, snow and mist drawn, no console errors); the loudness of the rain and thunder wants an ear.
+
 ## Designers' notes: a workforce ledger (2026-10-14, GPT-6)
 
 Built: a top-bar Workers panel that counts living citizens by what their current order says, including workers in shelter, and selects that job's group with one click. Why I love it: the shape of a town's economy should be visible before its citizens are lost in the buildings. This extends the idle-citizen shortcut without disturbing any orders, rules or saves. Next: a gathered-per-minute history might let players tell a wood shortage from a slow road. Browser appearance unverified in this environment. — GPT-6
@@ -258,6 +269,63 @@ Built: a top-bar Workers panel that counts living citizens by what their current
 ## Designers' notes: the computer walks the web (2026-10-14, chain 1014-0320 session 2, s4 of #37)
 
 Built: Normal and Hard opponents now take side roads (#50). Each one judges a side age by its own rules against its people's signature line: an age that makes that line cheaper (Greek and Roman foot in the Iron Age, Egyptian priests among the pilgrims) it always takes when it qualifies; one that bars it (Mongol riders in the Iron Age, Chinese siege among the pilgrims) it never takes; any other with a 60% chance, decided once (`AI_WEB` in `data.ts`, `fit` and `wants` in `ai.ts`). So a new age gets judged without anyone keeping a table. Then it works for the road: it surveys first thing (in the Stone Age every scrap of food goes on citizens otherwise), keeps three citizens digging, raises its Market early in the Bronze Age on a map with posts, and holds its Town Center for a deed that's under way, for 90 seconds at most. In a side age it uses what it got: hires at the Market, skips the Stable in the Iron Age. It turns back onto the Middle Ages if its relics are taken. And it reads you: against an Iron people it trains other lines only while they number under half its archers and builds a second range; against merchants, a band of riders lies in wait by the trading post nearest your town and strikes only the traders it can see. Why I love it: the web was a player's toy until now; a rival on a different road makes it a conversation. When the scoreboard says "Iron", the archers that come next mean something. Next: `docs/log/2026-10-14-1100-computer-web.md` has the head-to-head numbers: a walker loses more often than it wins against a computer kept to the trunk that reads it (3–10 over 48 matches, 35 undecided), mostly in matches where it prepared for a road and didn't take it. Make that preparation cheaper and smarter: survey only when the town is safe, and drop a road the moment the trunk is ready first. Holding for the merchant deed can run into the army-first window (an attack due) and stretch the Bronze Age by minutes, and the iron dig costs tempo; both want a smarter sense of when a road is worth its delay. The Step Back (Z) is never used: the iron road falls back to the Stone Age, which is never worth it for the computer, and the merchants' and pilgrims' own roads back onto the Middle Ages are the better retreat.
+
+## Designers' notes: the seed atlas (2026-10-14, chain 1014-1135, #80)
+
+Built `scripts/seed-atlas.ts`: scans seeds through `generateMap` and lists those with bog iron, enough trading posts, relics, or particular ruin finds, by size, type and players (`--json` for other tools). Why I love it: the game promises that the seed changes what's possible, and now a tester or world-builder can go and find those worlds instead of hoping. Not seen in a browser (it's a terminal tool). Next: a `--share` flag that prints a ready-to-paste match setup, filters for start-to-start distance or water, and a "rarest worlds" survey of how often each feature occurs per map type.
+
+Seed atlas, second pass (chain 1014-1135, session 2): `--survey` counts how often bog iron, trading posts, relics and each ruin find occur on every map type. Over 100 small seeds bog iron is about 48% on every type, so the map type doesn't steer it; the seed alone does. Left out: `--share`, because the game has no seed address parameter yet. Next: a `?seed=` address so a found world can be opened in one click, then a filter for start-to-start distance.
+
+Seed atlas, third pass (chain 1014-1135, session 3): the game now reads `?seed=N&size=&map=&foes=` and opens its title screen on that world; `seed-atlas.ts --share` prints those addresses for its hits. Ignores bad values rather than failing. Not seen in a browser (Chromium unused); the title code is a few lines and falls back to the usual random seed. Next: a start-to-start distance filter, and a one-click "Copy world link" button on the title screen.
+
+## Designers' notes: Scout Flags (2026-10-14, GPT-6, #85)
+
+Built: gold planning pennants and red danger pennants on both the 3D land and the minimap. Ctrl+right-click explored ground to plant one; Shift makes it red. Repeating removes one, or changes its kind. Six stand at once; the oldest makes room for the seventh. Why I love it: an RTS map is a place to think, not just a place to march. Mark a ruin to revisit, a crossing the rival holds, or a shore to land an army. These notes are private to the browser and never reveal fog, issue commands, affect AI or get saved/transmitted. Browser appearance remains unverified here. Next: optional shared allied notes, but only with authorization checks on every network message.
+
+### The hours of the day (own pitch), 2026-10-14
+
+**Built:** `src/render/daylight.ts`: one day lasts an hour of play (`DAY_SECONDS`), a match opens between 07:30 and 10:30 by seed, and a table of hours (dawn, morning, noon, golden hour, sunset, dusk, night) gives the sun's colour and strength, the sky and horizon colours and the fill light, blended smoothly. The sun climbs from the east and sinks into the west, and a higher, bluer moon carries the light on without a jump. The view relights only when the hour has moved. Weather (`moodOf`) greys whatever hour it is, so rain at dusk is dark. `?hour=` holds the clock for trying it out. Pure render: it reads `s.tick` and `s.seed` and writes nothing back.
+
+**Why I love it:** a match used to be one frozen noon. Now a long game has a shape you can feel: the opening bright morning, long gold shadows over the first armies, and a night that arrives just as a siege does. It costs the player nothing in readability (night is dimmed to a floor, never black).
+
+**Next, if you pick it up:** lit windows and Town Center braziers that glow as the evening comes (the bloom is there, the buildings' windows don't change yet); stars and a moon disc in the sky shader; owls and fireflies for the birds' place at night; a night-sight rule (units see less in the dark) would be a sim change and a real design call; a lobby option to fix the hour or turn the cycle off. Seen in headless Chromium on the title screen only, at 07, 12, 17:30, 19:12, 21 and 02: warm long shadows at dusk, noticeably darker at night. In a real match, and the sound of it (nothing yet), unverified.
+
+### Moonlit nights (own pitch, lane look), 2026-10-14
+
+**Built:** `moonPhase(seed)` in `daylight.ts` gives each match a phase; a full moon keeps the night light, a thin crescent takes up to 40% off it. Lakes glint with star pin-pricks at night (`uStars` in `water.ts`), hidden by cloud and rain. Render only; no rules, save or `data.ts` change.
+
+**Why I love it:** nights now differ from match to match, and the lakes are the one place the strategy camera can see the sky's stars.
+
+**Learned:** the camera (38° FOV, pitch 46-66° down) never shows the sky dome, so a starfield or moon disc in `sky.ts` would be invisible; I tried it and dropped it. If a tilted camera or a screenshot mode ever lifts the view, the shader is the place. **Next:** lit windows and braziers at dusk, fireflies at night. Seen in headless Chromium at night in a match (the light, no lake in view); the lake glints are unverified.
+
+
+### Lit windows (own pitch, lane look), 2026-10-14
+
+**Built:** one `uGlow` uniform (`materials.ts`) scales every glowing part (windows, torches, lanterns); `view.ts` sets it from the hour: the old strength by day, near double at night, a little more under grey weather. Render only.
+
+**Why:** the windows were already modelled glowing; they just never *meant* anything. Now a town reads as lived-in at dusk and enemy camps show in the dark. **Next:** fireflies at night near water and forest; braziers that flicker. Unverified in a browser (checked only typecheck and tests).
+
+
+## Designers' notes: Age of Reclaimers (2026-10-14, Codex, #94)
+
+I love the moment when exploration changes a civilization rather than only filling its treasury. A completed excavation now reveals a people who put yesterday's knowledge to work: faster building and repair, cheaper research, slower military training. The Middle Ages window spreads the web into another tier and gives opponents time to scout and punish a rebuilding town. Its armies still use the ordinary counters; there is no secret super-unit.
+
+Ruin ownership is already saved, so the discovery needs no extra tally, and the existing computer excavation and forward-road chooser can use it. Next I'd explore contested restoration projects that stay useful on the map after the dig, with benefits an opponent can interrupt. The synthesized theme and salvaged-column models still want the owner's eyes and ears; Chromium is absent in this container.
+
+## Designers' notes: the Age of Sail (own pitch, 2026-10-14, session claude/upbeat-babbage-5uz2fx)
+
+Built: a fifth side age, a *turn* off the Middle Ages for a people of the coast. A Dock is the clue and 500 fish landed by boats (`PlayerStats.fished`, counted where fish are gathered in `units.ts`) is the deed. While it lasts, boats fish half again as fast, every ship costs a quarter less and has a quarter more hull, and farms yield 15% less (numbers in `AGES.sail`, roads `middle→sail`, `sail→gunpowder`, `sail→middle` in `data.ts`). It dresses docks, houses, Town Centers, Markets and the Wonder with masts, sails and drying nets (`DRESSED_AGES`, beside `LOOK_AGES`, so the existing look test stays as written), puffs sea-spray at the Dock, has its own lute-and-flute theme and a teal minimap blip, and a tip tells a Middle Ages town with a Dock that the road exists.
+Why I love it: the web had trade and faith, but the navy and the fishing fleet, half the game, had no road of their own. Now a player who lives on a lake coast has a reason to build boats before they need them, and a rival can read a sea people by its masts and starve it by raiding its fields, since it gives up farms.
+Connects to: fishing, docks, warships and transports; the Pilgrim road also leaves from the Middle Ages, so a people must choose.
+Not done / next: the computer never takes this road (lane ai); the Wonder's and units' sea dress; a sea trade (traders by ship between Markets on the coast) would be the natural second half; the numbers are untried, so the first thing to watch is whether ×1.5 fishing plus cheaper ships makes naval rushes too cheap. I could not play it in a browser.
+
+## Designers' notes: harbor trade (own pitch, 2026-10-14, chain 1014-1400 s1)
+
+Built: in the Age of Sail a Market with a finished Dock within `TRADE.harbor.reach` (12 tiles) pays 30% more per trade trip (`tripGold`). Why: it ties the sea road to the trade economy, and asks where you put the Market. Next: real sea trade, a trade cog sailing between coastal Markets and coastal trading posts; the computer taking the Sail road (lane ai, #79).
+
+## Designers' notes: sea trade (own pitch, 2026-10-14, chain 1014-1400 s2)
+
+Built: a Dock trains merchant ships (`cog`) that sail to ports, trading posts with water within `TRADE.sea.reach`, and pay `TRADE.sea.mul` over the land road; Normal and Hard computers keep one or two sailing. Why: the harbor bonus now has a ship to go with it, and warships have a prey other than armies. Next: ports on sea maps (no post is one there today), a computer raid on sea lanes, a Lighthouse that widens a port.
 
 ## Designers' notes: walking the web without losing the war (2026-10-14, chain 1014-0320 session 3, #79)
 

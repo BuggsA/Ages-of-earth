@@ -22,6 +22,8 @@ import { deserialize, serialize } from './sim/save';
 import { SCENARIOS, scenarioById, starsFor } from './sim/campaign';
 import { loadDiscovery, observe, saveDiscovery, webMapHtml } from './ui/webMap';
 import { idleCitizens, idleSelection, idleShortcut } from './ui/idle';
+import { CameraBookmarks, bookmarkShortcut } from './ui/cameraBookmarks';
+import { ScoutFlags } from './ui/scoutFlags';
 import { briefingHtml, chapterListHtml, recordStars, starRow } from './ui/campaignUi';
 import { Lobby } from './ui/lobby';
 import { Hud, nameOf } from './ui/hud';
@@ -84,6 +86,8 @@ let paused = false;
 const SPEEDS = [1, 1.5, 2, 3];
 let speedIdx = 0;
 const groups = new Map<number, number[]>();
+const cameraBookmarks = new CameraBookmarks();
+const scoutFlags = new ScoutFlags();
 let lastGroupKey = { key: -1, at: 0 };
 let lastAlert: { x: number; y: number } | null = null;
 let altHeld = false;
@@ -123,6 +127,20 @@ function issue(c: Command): void {
   if (mode !== 'play' || watching) return;
   if (online && net) net.send({ t: 'cmd', c });
   else pending.push(c);
+}
+
+/** Personal battlefield notes neither issue unit orders nor send online packets. */
+function markScout(x: number, y: number, danger: boolean): void {
+  if (!game || mode !== 'play' || watching) return;
+  const result = scoutFlags.toggle(game, viewer, x, y, danger ? 'danger' : 'plan');
+  if (result === 'unexplored') {
+    hud.toast('Scout that ground before placing a flag', 'bad');
+    play('error');
+    return;
+  }
+  play('click');
+  hud.toast(result === 'removed' ? 'Scout flag removed' : result === 'changed' ? 'Scout flag changed' : danger ? 'Danger marked on your map' : 'Scout flag placed on your map', 'info');
+  mapTimer = 0;
 }
 
 // ---- Online ----------------------------------------------------------------------------------------
@@ -365,6 +383,8 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   paused = false;
   speedIdx = 0;
   groups.clear();
+  cameraBookmarks.reset();
+  scoutFlags.reset();
   lastAlert = null;
   acc = 0;
   hud.reset();
@@ -379,8 +399,9 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   const goal = game.mode === 'regicide' ? ' Keep your King alive: shelter them in the Town Center.' : game.mode === 'deathmatch' ? ' Everyone starts rich: build fast.' : '';
   const chapter = game.scenario ? scenarioById(game.scenario.id) : undefined;
   if (!saved && chapter) hud.banner(chapter.title, chapter.place, 6000);
-  else if (!saved) hud.banner(ageDef(me).name, `You lead the ${CIVS[me.civ].name}. Facing ${rivals.join(', ')}.${goal}`, 6000);
+  else if (!saved) hud.banner(ageDef(me).name, `You lead the ${CIVS[me.civ].name}. Facing ${rivals.join(', ')}.${goal} ${view.weatherWords}`.trim(), 6000);
   else hud.banner('Welcome back', `${ageDef(me).name}, ${fmtClock(game.tick)} into the match.`, 3200);
+  sound.setWeather(view.weatherDay.kind, view.weatherDay.strength);
   sound.startAmbience();
   playMusic(me.epoch, ageOf(me));
   // Start with the Town Center in view and selected.
@@ -678,6 +699,18 @@ showContinue();
 showReplayButton();
 mapSel.addEventListener('change', civBlurb);
 civBlurb();
+// A shared world link (?seed=N&size=&map=&foes=): the title screen opens with that world's settings (the seed atlas prints them).
+{
+  const q = new URLSearchParams(location.search);
+  const seed = Math.floor(Number(q.get('seed')));
+  if (seed >= 1 && seed <= 2 ** 31 - 1) seedInput.value = String(seed);
+  for (const [key, id] of [['size', 'opt-size'], ['map', 'opt-map'], ['foes', 'opt-foes']] as const) {
+    const v = q.get(key);
+    const sel = $<HTMLSelectElement>(id);
+    if (v !== null && [...sel.options].some((o) => o.value === v)) sel.value = v;
+  }
+  civBlurb();
+}
 const qualitySel = $<HTMLSelectElement>('opt-quality');
 qualitySel.value = view.qualityName;
 qualitySel.addEventListener('change', () => view.setQuality(qualitySel.value as QualityName));
@@ -710,6 +743,21 @@ document.addEventListener('click', (e) => {
     case 'reroll':
       seedInput.value = String(newSeed());
       break;
+    case 'copy-world': {
+      const seed = Math.floor(Number(seedInput.value));
+      if (!(seed >= 1 && seed <= 2 ** 31 - 1)) {
+        hud.toast('Enter a map seed first', 'bad');
+        break;
+      }
+      const q = new URLSearchParams({ seed: String(seed) });
+      for (const [key, id] of [['size', 'opt-size'], ['map', 'opt-map'], ['foes', 'opt-foes']] as const) q.set(key, $<HTMLSelectElement>(id).value);
+      const link = `${location.origin}${location.pathname}?${q}`;
+      const done = () => hud.toast('World link copied', 'info');
+      const fail = () => hud.toast(link, 'info');
+      if (navigator.clipboard) navigator.clipboard.writeText(link).then(done, fail);
+      else fail();
+      break;
+    }
     case 'idle':
       nextIdle(e.shiftKey);
       break;
@@ -1117,6 +1165,11 @@ canvas.addEventListener('pointerdown', (e) => {
     return;
   }
   if (e.button === 2) {
+    if (e.ctrlKey) {
+      const point = view.groundAt(e.clientX, e.clientY);
+      if (point) markScout(point.x, point.y, e.shiftKey);
+      return;
+    }
     if (placing) {
       placing = null;
       placeAt = null;
@@ -1319,6 +1372,7 @@ canvas.addEventListener(
 );
 
 minimap.onLook = (x, y) => view.rig.focus(x, y);
+minimap.onMark = (x, y, danger) => markScout(x, y, danger);
 minimap.onCommand = (x, y) => {
   const s = game;
   if (!s || mode !== 'play') return;
@@ -1356,6 +1410,22 @@ window.addEventListener('keydown', (e) => {
   if (e.repeat && !['+', '=', '-'].includes(k)) return;
   if (!$('modal').classList.contains('hidden')) {
     if (k === 'Escape' || k === 'F10') closeModal();
+    return;
+  }
+  // Camera bookmarks share the digits without disturbing ordinary control groups.
+  const mark = bookmarkShortcut(e);
+  if (mark) {
+    e.preventDefault();
+    if (mark.action === 'save') {
+      cameraBookmarks.save(mark.slot, { x: view.rig.target.x, z: view.rig.target.z });
+      hud.toast(`View ${mark.slot} remembered`, 'info');
+    } else {
+      const point = cameraBookmarks.recall(mark.slot);
+      if (point) {
+        view.rig.focus(point.x, point.z);
+        hud.toast(`View ${mark.slot}`, 'info');
+      } else hud.toast(`View ${mark.slot} is empty — Ctrl+Shift+${mark.slot} to save`, 'info');
+    }
     return;
   }
   // Groups: Ctrl + digit keeps the selection; the digit brings it back; twice looks at it.
@@ -1720,7 +1790,8 @@ function onEvents(s: GameState, list: GameEvent[]): void {
             : ev.find === 'lore' ? `lost knowledge: ${ev.tech ? TECHS[ev.tech].name : 'a technology'}, learned for nothing`
             : ev.find === 'map' ? 'an old map: the whole land lies open to you'
             : 'a relic! Send a priest to carry it to a Temple';
-          hud.banner(RUIN_FINDS[ev.find].name, `Your diggers found ${what}.`, 5000);
+          const first = s.ruins?.filter((r) => r.by === viewer).length === 1;
+          hud.banner(RUIN_FINDS[ev.find].name, `Your diggers found ${what}.${first ? ' A new road is revealed: the Age of Reclaimers opens from the Middle Ages at your Town Center.' : ''}`, 5000);
         } else if (view.sees(ev.x, ev.y)) hud.toast(`${s.players[ev.owner].name} dug out the ruins`, 'info');
         break;
       }
@@ -1962,6 +2033,7 @@ function frame(now: number): void {
       ghost: placing && placing !== 'wall' && placeAt ? { type: placing, ...placeAt, turn: placing === 'gate' && gateTurned(s, placeAt.tx, placeAt.ty) } : null,
       rallyOf: selection.size === 1 ? [...selection][0] : null,
       wall: wallPlan(s),
+      scoutFlags: scoutFlags.all,
     });
     if (mode === 'play') watchFrameRate(dt);
     if (online && net && mode !== 'title') $('clock').title = `Online · ${net.rtt} ms`;
@@ -1978,7 +2050,7 @@ function frame(now: number): void {
       mapTimer -= dt;
       if (mapTimer <= 0) {
         mapTimer = 0.2;
-        minimap.draw(s, viewer, mode === 'over' || !!watching?.all, [...view.knownBuildings()], view.rig.footprint(), selection);
+        minimap.draw(s, viewer, mode === 'over' || !!watching?.all, [...view.knownBuildings()], view.rig.footprint(), selection, scoutFlags.all);
       }
       cursorTimer -= dt;
       if (cursorTimer <= 0) {

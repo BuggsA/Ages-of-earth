@@ -66,6 +66,13 @@ export const AGES: Record<AgeId, Age> = {
   middle: trunkAge(2),
   gunpowder: trunkAge(3),
   industrial: trunkAge(4),
+  reclaimer: {
+    name: 'Age of Reclaimers',
+    short: 'Reclaimers',
+    tier: 3,
+    blurb: 'Build tomorrow from yesterday: excavating an ancient ruin teaches a people to rebuild. Construction and repairs work 25% faster, technologies cost 20% less, but military units take 25% longer to train. The same armies and technologies as the Gunpowder Age.',
+    mul: { buildSpeed: 1.25, techCost: 0.8, militaryTrain: 1.25 },
+  },
   merchant: {
     name: 'Age of Merchants',
     short: 'Merchant',
@@ -102,6 +109,14 @@ export const AGES: Record<AgeId, Age> = {
     mul: { tradeGold: 1.25, traderSpeed: 1.15, buildingHp: 0.85 },
     relicTrade: { each: 0.1, most: 5 },
   },
+  sail: {
+    name: 'Age of Sail',
+    short: 'Sail',
+    tier: 2,
+    blurb: 'A people that has turned to the sea: boats fish half again as fast, ships come a quarter cheaper and a quarter sturdier, but the fields are tilled with less care. A Market within a dozen tiles of a Dock ships its goods by water: its trade trips pay 30% more.',
+    mul: { fish: 1.5, shipHp: 1.25, farm: 0.85 },
+    price: { ship: 0.75 },
+  },
 };
 
 /** Something a people must have done before a road opens: a tally from its stats reaching `n`. */
@@ -119,6 +134,8 @@ export interface Road {
   time: number;
   /** Shown at the Town Center only once the player has one of these, the clue that the road is there. */
   clue?: BuildingType;
+  /** Revealed only to the people who completed an ancient ruin's excavation. */
+  ruin?: boolean;
   /**
    * Shown only once this survey (a technology) has been researched and found what it looks for in this
    * world (#39). A survey that finds nothing keeps the road hidden for good.
@@ -138,6 +155,13 @@ export interface Road {
 
 export const ROADS: Road[] = [
   ...TRUNK.slice(1).map((to, i): Road => ({ from: TRUNK[i], to, cost: EPOCHS[i + 1].cost, time: EPOCHS[i + 1].time })),
+  {
+    from: 'middle', to: 'reclaimer', cost: { food: 900, wood: 350, gold: 500 }, time: 65,
+    ruin: true,
+    blurb: 'Instead of the Gunpowder Age, after your citizens excavate an ancient ruin: build and repair 25% faster, research technologies for 20% less, but train military units 25% more slowly. An expedition buys a rebuilding people; raids and siege can punish its slower reinforcements.',
+  },
+  { from: 'reclaimer', to: 'industrial', cost: EPOCHS[4].cost, time: EPOCHS[4].time, blurb: 'Rejoin the main road at the Industrial Age for the ordinary price. Construction, research and military training return to their usual rates.' },
+  { from: 'reclaimer', to: 'gunpowder', cost: { food: 400, stone: 200 }, time: 30, blurb: 'Leave the rebuilding life for the Gunpowder Age. Construction and technologies lose their advantage, but military training returns to its usual speed.' },
   {
     from: 'bronze',
     to: 'merchant',
@@ -193,6 +217,18 @@ export const ROADS: Road[] = [
     also: [{ stat: 'traded', n: 800, text: 'Your traders bring home 800 gold' }],
     blurb: 'Instead of the Gunpowder Age, for a people both faithful and merchant: trade pays 25% more, and 10% more again for every relic your Temples keep (up to five); traders travel 15% faster. Relics pay their usual gold, and the Siege Workshop works again. What it gives up: towns grown open round the fairground, every building 15% weaker.',
   },
+  // A turn off the Middle Ages for a people of the coast (the Dock is the clue, the catch the deed).
+  {
+    from: 'middle',
+    to: 'sail',
+    cost: { food: 300, wood: 300, gold: 100 },
+    time: 40,
+    clue: 'dock',
+    deed: { stat: 'fished', n: 500, text: 'Your boats land 500 fish' },
+    blurb: 'A turn, not a climb: the same soldiers and technologies as the Middle Ages, but the people live by the sea. Fishing boats fish half again as fast, every ship costs a quarter less and has a quarter more hull. What it gives up: the fields, which yield 15% less. A sea people can strike from the water and hold the shore, but a rival on land can starve it.',
+  },
+  { from: 'sail', to: 'gunpowder', cost: { food: 800, wood: 500, gold: 450, stone: 100 }, time: 60, blurb: 'Rejoin the main road: the shipping fortune carries your people into gunpowder (more wood and less gold than from the Middle Ages). Farms return to their usual yield.' },
+  { from: 'sail', to: 'middle', cost: { food: 150, wood: 150 }, time: 25, blurb: 'Come ashore: the Middle Ages again, with ordinary fields, ordinary hulls and the usual price for ships.' },
   { from: 'fair', to: 'industrial', cost: { food: 1300, gold: 1100, stone: 300 }, time: 80, blurb: 'Rejoin the main road: the fairs\' fortune buys its way into the Industrial Age (more gold and less food and stone than from the Gunpowder Age).' },
   { from: 'fair', to: 'gunpowder', cost: { food: 400, stone: 200 }, time: 30, blurb: 'Settle down: wall the fairground and join the Gunpowder Age. Trade and buildings go back to their usual strength.' },
 ];
@@ -332,6 +368,14 @@ export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
     { name: 'Fluyt', cls: 'ship', hp: 320, attack: 0, armor: 1, parmor: 4, range: 0, reload: 1, speed: 2.2, sight: 8, cost: { wood: 130 }, time: 20, radius: 0.52, capacity: 10, blurb: 'Carries soldiers and citizens across the water. Right-click a shore to land them.' },
     { name: 'Steam Transport', cls: 'ship', hp: 420, attack: 0, armor: 2, parmor: 5, range: 0, reload: 1, speed: 2.6, sight: 8, cost: { wood: 100, gold: 40 }, time: 20, radius: 0.55, capacity: 12, blurb: 'Carries soldiers and citizens across the water. Right-click a shore to land them.' },
   ],
+  // ---- Under sail (trade by sea) ----
+  cog: [
+    null,
+    { name: 'Merchant Galley', cls: 'trader', hp: 150, attack: 0, armor: 0, parmor: 2, range: 0, reload: 1, speed: 1.9, sight: 7, cost: { wood: 90, gold: 40 }, time: 22, radius: 0.46, blurb: 'Sails goods from a Dock to a trading post on the coast and brings back gold: the farther the post, the more, and 20% over the land road. Only a post with water within 7 tiles is a port. Warships are its enemy.' },
+    { name: 'Merchant Cog', cls: 'trader', hp: 210, attack: 0, armor: 1, parmor: 3, range: 0, reload: 1, speed: 2.0, sight: 7, cost: { wood: 100, gold: 40 }, time: 22, radius: 0.48, blurb: 'Sails goods from a Dock to a trading post on the coast and brings back gold: the farther the post, the more, and 20% over the land road. Only a post with water within 7 tiles is a port. Warships are its enemy.' },
+    { name: 'East Indiaman', cls: 'trader', hp: 290, attack: 0, armor: 1, parmor: 4, range: 0, reload: 1, speed: 2.1, sight: 8, cost: { wood: 110, gold: 50 }, time: 22, radius: 0.5, blurb: 'Sails goods from a Dock to a trading post on the coast and brings back gold: the farther the post, the more, and 20% over the land road. Only a post with water within 7 tiles is a port. Warships are its enemy.' },
+    { name: 'Steam Freighter', cls: 'trader', hp: 380, attack: 0, armor: 2, parmor: 5, range: 0, reload: 1, speed: 2.5, sight: 8, cost: { wood: 80, gold: 60 }, time: 22, radius: 0.52, blurb: 'Sails goods from a Dock to a trading post on the coast and brings back gold: the farther the post, the more, and 20% over the land road. Only a post with water within 7 tiles is a port. Warships are its enemy.' },
+  ],
   // ---- In the air ----
   fighter: [
     null,
@@ -357,11 +401,11 @@ export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
   ],
 };
 
-const DOMAINS: Partial<Record<UnitType, Domain>> = { fisher: 'water', warship: 'water', transport: 'water', fighter: 'air', bomber: 'air' };
+const DOMAINS: Partial<Record<UnitType, Domain>> = { fisher: 'water', warship: 'water', transport: 'water', cog: 'water', fighter: 'air', bomber: 'air' };
 /** Where a unit line goes: on foot, on the water or in the air. */
 export const domainOf = (type: UnitType): Domain => DOMAINS[type] ?? 'land';
 
-export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'fighter', 'bomber', 'trader'];
+export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader'];
 export const MILITARY: UnitType[] = ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'warship', 'fighter', 'bomber'];
 
 type Target = UnitClass | 'building';
@@ -411,6 +455,7 @@ export const RELIC = { home: 20, fair: 3, spacing: 12, extra: { small: 1, medium
  * squared distance (in tiles) from the trader's Market to the post, `epoch` more for each epoch after
  * the Bronze Age, at most `max`: so a long road pays more per minute, and has more road to guard.
  * Each ally with a Market of its own takes `ally` of every trip home (a quarter), so a team trades together.
+ * By sea: a post with water within `sea.reach` tiles is a port, and a merchant ship from a Dock sails there for `sea.mul` times the land road's gold.
  */
 /**
  * Ancient ruins (#64): `count` (by map size) lie out between the towns, at least `home` tiles from every
@@ -424,7 +469,7 @@ export const RELIC = { home: 20, fair: 3, spacing: 12, extra: { small: 1, medium
 export const RUINS = { count: { small: 2, medium: 3, large: 4 } as Record<MapSize, number>, home: 24, fair: 4, spacing: 14, dig: 40, gold: 300, reach: 1.7, clear: 1 };
 /** Repairs: restoring a building's whole health costs this share of its price, paid as the hammers work. */
 export const REPAIR_SHARE = 0.4;
-export const TRADE = { posts: { small: 2, medium: 2, large: 3 } as Record<MapSize, number>, edge: 9, fair: 4, far: 0.3, spacing: 0.4, plaza: 1, reach: 1.8, gold: 0.012, epoch: 0.08, max: 180, ally: 0.25 };
+export const TRADE = { posts: { small: 2, medium: 2, large: 3 } as Record<MapSize, number>, edge: 9, fair: 4, far: 0.3, spacing: 0.4, plaza: 1, reach: 1.8, gold: 0.012, epoch: 0.08, max: 180, ally: 0.25, harbor: { reach: 12, mul: 1.3 }, sea: { reach: 7, mul: 1.2 } };
 
 export interface BuildingStats {
   name: string;
@@ -473,7 +518,7 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   forge: { name: 'Forge', size: 3, hp: 1600, cost: { wood: 175 }, time: 40, pop: 0, sight: 5, trains: [], drop: [], epoch: 1, menu: 'mil', key: 'R', blurb: 'Better weapons and armor for every soldier.' },
   workshop: { name: 'Siege Workshop', size: 3, hp: 1400, cost: { wood: 200 }, time: 40, pop: 0, sight: 5, trains: ['siege'], drop: [], epoch: 1, menu: 'mil', key: 'K', blurb: 'Builds rams, catapults and cannon to break towns.' },
   tower: { name: 'Watch Tower', size: 2, hp: 1000, cost: { wood: 50, stone: 125 }, time: 45, pop: 0, sight: 9, trains: [], drop: [], epoch: 1, guns: { damage: 8, range: 8, reload: 1.8 }, garrison: 5, menu: 'mil', key: 'W', blurb: 'Sees far and shoots at enemies nearby, aircraft too. Shelter soldiers inside for more arrows.' },
-  dock: { name: 'Dock', size: 3, hp: 1800, cost: { wood: 150 }, time: 35, pop: 0, sight: 6, trains: ['fisher', 'transport', 'warship'], drop: ['food'], epoch: 0, shore: true, menu: 'eco', key: 'D', blurb: 'Builds fishing boats, transports and warships, and takes in fish. Build it on the shore.' },
+  dock: { name: 'Dock', size: 3, hp: 1800, cost: { wood: 150 }, time: 35, pop: 0, sight: 6, trains: ['fisher', 'transport', 'warship', 'cog'], drop: ['food'], epoch: 0, shore: true, menu: 'eco', key: 'D', blurb: 'Builds fishing boats, transports, warships and merchant ships, and takes in fish. Build it on the shore.' },
   airfield: { name: 'Airfield', size: 4, hp: 2200, cost: { wood: 250, stone: 100, gold: 150 }, time: 60, pop: 0, sight: 8, trains: ['fighter', 'bomber'], drop: [], epoch: 4, menu: 'mil', key: 'F', blurb: 'Builds fighters and bombers. Fighters hunt aircraft; bombers wreck towns.' },
 };
 

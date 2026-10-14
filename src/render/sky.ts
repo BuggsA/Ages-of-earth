@@ -50,6 +50,11 @@ export class Sky {
     this.mesh.frustumCulled = false;
   }
 
+  /** Dim the sun's glare (cloud cover): 1 is a clear day. */
+  setGlare(k: number, color?: THREE.Color): void {
+    this.material.uniforms.uSunColor.value.copy(color ?? new THREE.Color('#fff1d0')).multiplyScalar(k);
+  }
+
   apply(top: THREE.Color, horizon: THREE.Color, sunDir: THREE.Vector3): void {
     this.material.uniforms.uTop.value.copy(top);
     this.material.uniforms.uHorizon.value.copy(horizon);

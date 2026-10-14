@@ -21,31 +21,34 @@ Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders
 
 | Check | State |
 | --- | --- |
-| Quick tier (`npm run check`) | about 170 tests, about 20 s |
+| Quick tier (`npm run check`) | 215 tests in 36 files, about 40 s on a cloud container (2026-10-14); slowest single test about 10 s (`trade.test.ts`, traders on the road) |
 | Slow tier (`tests/slow/`) | `campaign-proof*.test.ts`: every chapter won by a computer on its own map or, at Hard, one of 15 more (#43); three files side by side, about 3½ minutes on a cloud container |
-| Browser checks | none automated; the first session tested by hand in headless Chromium |
+| Coverage (2026-10-14) | rules (`src/sim/`) 83–100% of lines; rendering, sound, HUD, lobby, minimap and `main.ts` 0%: checked only by hand in a browser |
+| Browser checks | `tests/slow/browser-smoke.test.ts` (#87): title, Web of Ages, Campaign, a match and its hotkeys in headless Chromium, failing on any page or console error; daily in `periodic`, screenshots kept as an artifact |
 | CI (`ci`, `periodic`) | added 2026-10-13; `periodic` starts once `main` is the default branch |
 
 ## In flight
 
-- Lane ai is free: #79's first step merged (below); #79 stays open and `ready` for the rest (Greek walkers on the iron road, the issue's own 48 duels at 5–7).
+- [#79](https://github.com/BuggsA/Ages-of-earth/issues/79), the computer walks the web well: its first step merged (below); it stays open and `ready` for the rest (Greek walkers on the iron road; the issue's own 48 duels at 5–7). And [#80](https://github.com/BuggsA/Ages-of-earth/issues/80), the Seed Atlas (in review, lane tooling).
 
-Merged since the last update: **walking the web without losing strength** (#79, first step): the computer surveys at 22 citizens, doubles its diggers while it holds for the iron deed and sends them back to work once it's dug, raises the merchants' early Market only when no soldiers are owed, and answers a barred counter with the best line its age keeps; over 144 duels against a trunk computer the walker went 25–38 → 27–30 and gives up about 5% of its gathering instead of 12% (`docs/log/2026-10-14-1400-web-strength.md`; new number `AI_WEB.survey = 22`). **The computer walks the web of ages** (#50, s4 of #37): Normal and Hard survey and dig into the Iron Age, take the merchants' road and hire at the Market, turn pilgrim and back, take the Fairs, mass archers against an Iron rival and waylay a merchant rival's traders by a trading post; numbers in `AI_WEB` (`src/sim/data.ts`); `npx tsx scripts/web-walk.ts` shows the roads computers take, and with `duel` how a web walker fares against one kept to the trunk (on Hard it lost more than it won, 3–10 over 48 matches with 35 undecided: `docs/log/2026-10-14-1100-computer-web.md`); no save bump. **The two-front war** (#36: the Tsar plays Easy in Wings, a chapter seat strikes a rival's wonder first; Wings maps won at Hard 4/16 → 8/16), **ancient ruins** (#64, also a fix to `Music.style()` recursing outside side ages), **health bar quarter marks** (#68, Codex); the web of ages and its map and looks (above); computer traders judging the road they walk (#53, which made Wings over the Steppe harder: 8/16 maps at Hard became 4/16, see #36); the campaign proof over 16 maps a chapter (#51); Wings in the proof (#45); repairs (#1) and Market recovery indicators (#32); one live connection per online player (#44); browser-free shipping (#33); idle citizens together (#62: Shift + . selects them all); **allied trade** (#60, #63, #66: allies with a Market take `TRADE.ally`, a quarter, of each teammate's trade trip; a Market-less player may set out from an ally's Market; own coin effect and `tradeShare` sound; browser unverified, the sound level wants an ear); standing merge authorization (#67).
+Merged since the last update: **walking the web without losing strength** (#79, first step): the computer surveys at 22 citizens, doubles its diggers while it holds for the iron deed and sends them back to work once it's dug, raises the merchants' early Market only when no soldiers are owed, and answers a barred counter with the best line its age keeps; over 144 duels against a trunk computer the walker went 25–38 → 27–30 and gives up about 5% of its gathering instead of 12% (`docs/log/2026-10-14-1400-web-strength.md`; new number `AI_WEB.survey = 22`), **camera bookmarks** (#76, merged in #77: Ctrl+Shift+1–4 saves a view, Shift+1–4 returns to it), **the workforce ledger** (#73, merged in #74: the Workers panel counts and selects citizens by job), **weather** (#78), **the computer walks the web of ages** (#50, s4 of #37): Normal and Hard survey and dig into the Iron Age, take the merchants' road and hire at the Market, turn pilgrim and back, take the Fairs, mass archers against an Iron rival and waylay a merchant rival's traders by a trading post; numbers in `AI_WEB` (`src/sim/data.ts`); `npx tsx scripts/web-walk.ts` shows the roads computers take, and with `duel` how a web walker fares against one kept to the trunk (on Hard it lost more than it won, 3–10 over 48 matches with 35 undecided: `docs/log/2026-10-14-1100-computer-web.md`); no save bump. **The two-front war** (#36: the Tsar plays Easy in Wings, a chapter seat strikes a rival's wonder first; Wings maps won at Hard 4/16 → 8/16), **ancient ruins** (#64, also a fix to `Music.style()` recursing outside side ages), **health bar quarter marks** (#68, Codex); the web of ages and its map and looks (above); computer traders judging the road they walk (#53, which made Wings over the Steppe harder: 8/16 maps at Hard became 4/16, see #36); the campaign proof over 16 maps a chapter (#51); Wings in the proof (#45); repairs (#1) and Market recovery indicators (#32); one live connection per online player (#44); browser-free shipping (#33); idle citizens together (#62: Shift + . selects them all); **allied trade** (#60, #63, #66: allies with a Market take `TRADE.ally`, a quarter, of each teammate's trade trip; a Market-less player may set out from an ally's Market; own coin effect and `tradeShare` sound; browser unverified, the sound level wants an ear); standing merge authorization (#67).
+
+**Weather** (own pitch, lane look): a seeded day per match (clear, rain, snow, mist; storms with lightning and thunder), look and sound only, no rules or save change. Seen in headless Chromium on the title screen only; the sound levels want an ear.
 
 ## Waiting on the owner
 
 **Setup only the owner can do:**
-1. GitHub, Settings → General → Default branch: switch to `main`. Until then new sessions clone the old branch and the daily `periodic` run doesn't start.
+1. ~~Default branch → `main`~~: done (2026-10-13). But the daily `periodic` run has never fired on its schedule (no runs at all by 2026-10-14 11:40 UTC); it was started by hand once. If it still never runs on its own, check Settings → Actions that scheduled workflows are allowed.
 2. Optional: Settings → General → "Automatically delete head branches", so merged branches tidy themselves.
 3. If Cloudflare Workers Builds is connected, set its production branch to `main`.
-4. **Cloudflare's "Workers Builds" check failed on every pull request** (the build passed; the preview deploy step died with "needs a `previews` block"). Fixed by adding `[previews]` to `wrangler.toml` (2026-10-13, branch `claude/wrangler-previews`); previews have no online rooms. Still for the owner to confirm in the dashboard: that builds of `main` itself run, since the last one listed there was 17:41 UTC (the #3 merge). Agents still merge on `ci` alone (`docs/team.md`, "Merging").
+4. ~~Workers Builds failing on every pull request~~: fixed by `[previews]` in `wrangler.toml` (#23); it has passed on every pull request and on `main` since.
 5. Other agent tools (Codex and the like): give their environments `npm install` as a setup step.
 6. Nothing else is needed for agents to start: with an empty board they pitch their own work. To steer them, open issues labelled `owner-ask` (they go before pitches).
 
 **Defaults in force, flagged:**
 - Saves and replays aren't tied to a build; a change may break older ones, as long as it bumps the save's `v` (`docs/team.md`, "Saves and replays").
 - CI uses GitHub Actions, about 2 minutes a run: ten pull-request pushes a day comes to roughly 600–700 of the 2,000 free minutes a month.
-- Chains no longer end when the board is empty, since agents pitch their own work, so they run to their caps (10 sessions a chain, 20 a day, `docs/successors.md`). Lower the caps if the usage limits pinch.
+- Chains no longer end when the board is empty, since agents pitch their own work, so they run to their caps (10 sessions a chain, two chains at once, no daily cap: `docs/successors.md`). Lower the caps if the usage limits pinch.
 - The 10-second line for slow tests and the 2-minute budget for the quick tier (`AGENTS.md` §5) are drafts.
 
 **Health bar quarter marks** (#68, Codex): three fine divisions support reading health without color alone. 173 unit tests and TypeScript 5.9 fallback checks pass locally; the pinned TypeScript 7 compiler crashes in this container. Browser appearance unverified (Chromium absent); final pinned checks run in CI. No balance or save changes.
@@ -53,3 +56,23 @@ Merged since the last update: **walking the web without losing strength** (#79, 
 
 
 **Workforce ledger** (#73, GPT-6): a read-only Workers dropdown in the HUD groups citizens by current job and selects a group on click; no sim or save changes. Browser appearance unverified; CI verification in PR.
+
+**Seed atlas** (#80, lane tooling): `scripts/seed-atlas.ts` finds seeds by what the map holds (bog iron, posts, relics, ruin finds); no sim, UI or save change. `--share` prints `?seed=` addresses; the title screen reads them.
+
+**Scout Flags** (#85, GPT-6, lane look): up to six personal gold planning / red danger pennants on explored locations, shown in 3D and on the minimap with Ctrl(+Shift)+right-click. UI-only, absent from saves, replays and online commands; browser appearance unverified, CI tracked in PR.
+
+**Atlas start distance** (#93, lane tooling): `scripts/seed-atlas.ts --apart N / --close N` filters worlds by the distance between the two nearest starts, and the table shows a `gap` column. Tooling only; no sim, UI or save change.
+
+**The hours of the day** (#97, own pitch, lane look): the light drifts from morning to dusk and night over an hour of play, from the tick and seed alone (render only; no rules, save or `data.ts` change). `?hour=` pins it. Seen in headless Chromium on the title screen only; a match in play unverified.
+
+
+**Age of Reclaimers** (#94, Codex, lane rules): finishing a ruin reveals a Middle Ages → alternative Gunpowder road. Construction/repairs 25% faster, research 20% cheaper, military training 25% slower; ordinary Industrial exit or Gunpowder settlement. Ruin ownership supplies discovery without a save bump. New road/AI/model tests; browser appearance and music unverified (Chromium unavailable).
+
+**Moonlit nights** (own pitch, lane look): a moon phase per match changes how bright the night is; lakes glint with stars at night. Render only. Seen in headless Chromium in a night match; lake glints unverified.
+**Age of Sail** (own pitch, lane rules): a side age off the Middle Ages for a coastal people (Dock + 500 fish landed): faster fishing, cheaper and sturdier ships, weaker farms; new roads to Gunpowder and back. Looks, music, minimap and tip included. Computer doesn't take it yet; browser unverified; no save bump.
+
+**Lit windows** (own pitch, lane look): glowing parts (windows, torches) brighten after dusk via one shader uniform. Render only; browser unverified.
+
+**Harbor trade** (own pitch, lane rules): in the Age of Sail a Market within 12 tiles of its owner's Dock pays 30% more per trade trip. Numbers in `TRADE.harbor`. Tests only; browser unverified; no save bump.
+
+**Sea trade** (own pitch, lane rules): a Dock trains merchant ships (`cog`) that sail to coastal trading posts (ports: water within `TRADE.sea.reach` of the post) and pay `TRADE.sea.mul` (1.2) over the land road; computer Normal/Hard keep 1–2. Tests in `tests/sea-trade.test.ts`; browser unverified; no save bump.

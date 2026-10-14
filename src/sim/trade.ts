@@ -1,6 +1,6 @@
-import { relicTradeShare } from './ages';
+import { ageOf, relicTradeShare } from './ages';
 import { LAST_EPOCH, TRADE } from './data';
-import { distToRect } from './grid';
+import { NAVAL, distToRect, nearestWalkable } from './grid';
 import { modsOf } from './stats';
 import type { Building, GameState, Goal, TradePost } from './types';
 
@@ -75,11 +75,61 @@ export function nearestMarket(s: GameState, owner: number, x: number, y: number)
   return best;
 }
 
-/** What one trip between a Market and a post pays its owner now. */
-export function tripGold(s: GameState, owner: number, market: { x: number; y: number }, post: TradePost): number {
+/** Whether a finished Dock of the owner's stands near a Market, so the Age of Sail ships its goods by water. */
+export function harborNear(s: GameState, owner: number, market: { x: number; y: number }): boolean {
+  if (ageOf(s.players[owner]) !== 'sail') return false;
+  const r = TRADE.harbor.reach;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.owner !== owner || e.type !== 'dock' || !e.built || e.hp <= 0) continue;
+    const dx = e.x - market.x;
+    const dy = e.y - market.y;
+    if (dx * dx + dy * dy <= r * r) return true;
+  }
+  return false;
+}
+
+/**
+ * Where a ship tied up at a post's coast lies: the nearest open water within `TRADE.sea.reach` tiles of
+ * it, or null when the post is inland (not a port).
+ */
+export function portSpot(s: GameState, post: TradePost): { x: number; y: number } | null {
+  const t = nearestWalkable(s, post.x, post.y, TRADE.sea.reach, NAVAL);
+  if (t < 0) return null;
+  const x = (t % s.w) + 0.5;
+  const y = Math.floor(t / s.w) + 0.5;
+  const dx = x - post.x;
+  const dy = y - post.y;
+  return dx * dx + dy * dy <= TRADE.sea.reach * TRADE.sea.reach ? { x, y } : null;
+}
+
+const usableDock = (b: Building, owner: number) => b.type === 'dock' && b.owner === owner && b.built && b.hp > 0;
+
+/** A player's finished Dock by this id, if it still stands. */
+export function dockOf(s: GameState, owner: number, id: number): Building | null {
+  const b = id ? s.byId.get(id) : undefined;
+  return b && b.kind === 'building' && usableDock(b, owner) ? b : null;
+}
+
+/** The nearest finished Dock of a player's to a point, or null. */
+export function nearestDock(s: GameState, owner: number, x: number, y: number): Building | null {
+  let best: Building | null = null;
+  let bestD = Infinity;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || !usableDock(e, owner)) continue;
+    const d = distToRect(x, y, e);
+    if (d < bestD) {
+      bestD = d;
+      best = e;
+    }
+  }
+  return best;
+}
+
+/** What one trip between a Market (or, by sea, a Dock) and a post pays its owner now. */
+export function tripGold(s: GameState, owner: number, market: { x: number; y: number }, post: TradePost, sea = false): number {
   const dx = market.x - post.x;
   const dy = market.y - post.y;
   const epoch = Math.min(LAST_EPOCH, s.players[owner].epoch);
-  const k = TRADE.gold * (1 + Math.max(0, epoch - 1) * TRADE.epoch) * modsOf(s, owner).tradeGold * relicTradeShare(s, owner);
+  const k = TRADE.gold * (1 + Math.max(0, epoch - 1) * TRADE.epoch) * modsOf(s, owner).tradeGold * relicTradeShare(s, owner) * (sea ? TRADE.sea.mul : harborNear(s, owner, market) ? TRADE.harbor.mul : 1);
   return Math.max(1, Math.min(TRADE.max, Math.floor((dx * dx + dy * dy) * k)));
 }

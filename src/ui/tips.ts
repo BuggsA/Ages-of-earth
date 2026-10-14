@@ -12,6 +12,7 @@ import { isIdleCitizen } from './idle';
 const MERCHANT_ROAD = ROADS.find((r) => r.to === 'merchant')!;
 const IRON_ROAD = ROADS.find((r) => r.to === 'iron')!;
 const PILGRIM_ROAD = ROADS.find((r) => r.to === 'pilgrim')!;
+const SAIL_ROAD = ROADS.find((r) => r.to === 'sail')!;
 const FAIR_ROAD = ROADS.find((r) => r.to === 'fair')!;
 
 interface Tip {
@@ -60,6 +61,8 @@ const TIPS: Tip[] = [
   { id: 'bell', when: (s, me) => s.players[me].alert > 0 && s.tick - s.players[me].alert < 40, text: 'Under attack? Ring the <b>town bell</b> (Town Center, <kbd>R</kbd>): citizens shelter inside and the Town Center shoots more arrows. <kbd>T</kbd> sends them back to work.' },
   { id: 'forge', when: (s, me) => s.players[me].epoch >= 1 && secsIn(s) > 30 && !has(s, me, 'forge'), text: `A <b>Forge</b> (<kbd>V</kbd> <kbd>R</kbd>) makes every soldier hit harder and take less damage. The <b>${BUILDINGS.market.name}</b> trades surplus goods for gold.` },
   { id: 'queue', when: (s) => secsIn(s) > 420, text: 'Hold <kbd>Shift</kbd> while giving orders to queue them: walk here, then there, then attack. <kbd>,</kbd> selects your whole army.' },
+  { id: 'cameraBookmarks', when: (s) => secsIn(s) > 300, text: 'Guarding two fronts? Save this camera view with <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>1</kbd>–<kbd>4</kbd>, then jump back with <kbd>Shift</kbd> + <kbd>1</kbd>–<kbd>4</kbd>. Your selected troops keep their orders.' },
+  { id: 'scoutFlags', when: (s) => secsIn(s) > 240, text: 'Planning an ambush or revisiting a ruin? <b>Ctrl + right-click</b> explored ground or the minimap to plant a golden Scout Flag. Add <b>Shift</b> for a red danger flag; repeat to remove. Up to six, without ordering your units.' },
   {
     id: 'relic',
     when: (s, me) => s.players[me].epoch >= 1 && s.relics.some((r) => !r.carrier && !r.temple && s.players[me].seen[Math.floor(r.y) * s.w + Math.floor(r.x)] === 1),
@@ -68,7 +71,7 @@ const TIPS: Tip[] = [
   {
     id: 'ruins',
     when: (s, me) => !!s.ruins?.some((r) => r.by < 0 && s.players[me].seen[Math.floor(r.y) * s.w + Math.floor(r.x)] === 1),
-    text: 'You have found <b>ancient ruins</b> (two pale columns on the map). Select a few <b>citizens</b> and right-click them to dig: whoever finishes the dig takes what lies beneath, a hoard of gold, lost knowledge, an old map of the land or a relic. It\'s a long way from home, so send an escort.',
+    text: 'You have found <b>ancient ruins</b> (two pale columns on the map). Select a few <b>citizens</b> and right-click them to dig: whoever finishes the dig takes what lies beneath, a hoard of gold, lost knowledge, an old map of the land or a relic. Excavation can also reveal a new road for your people. It\'s a long way from home, so send an escort.',
   },
   {
     id: 'trade',
@@ -109,6 +112,15 @@ const TIPS: Tip[] = [
     text: `There is a turning off the Middle Ages. Carry relics to your Temple: once they have brought in ${PILGRIM_ROAD.deed!.n} gold, the Town Center (🔀) can turn your people into the <b>${AGES.pilgrim.name}</b>: relics pay double and priests come cheap, but no siege engines. The road shuts once you advance.`,
   },
   {
+    id: 'sail',
+    // A Dock stands while the Middle Ages last: the sea is a road too.
+    when: (s, me) => {
+      const p = s.players[me];
+      return ageOf(p) === 'middle' && roadKnown(s, p, SAIL_ROAD) && !deedsDone(p, SAIL_ROAD);
+    },
+    text: `The sea is a road. Land ${SAIL_ROAD.deed!.n} fish with your boats, and the Town Center (🔀) can turn your people into the <b>${AGES.sail.name}</b>: fishing is half again as quick, ships cost less and have sturdier hulls, but the fields yield less. The road shuts once you advance.`,
+  },
+  {
     id: 'fairs',
     // The hybrid (#49): a merchant or pilgrim people with the other system's building in view.
     when: (s, me) => {
@@ -128,6 +140,7 @@ const TIPS: Tip[] = [
   },
   { id: 'wonder', when: (s, me) => s.players[me].epoch >= 2, text: 'Rich? Build a <b>Wonder</b> (<kbd>B</kbd> <kbd>X</kbd>). If it stands long enough, you win, but everyone will come for it.' },
   { id: 'dock', when: (s, me) => secsIn(s) > 150 && !has(s, me, 'dock') && waterNear(s, me), text: 'Water nearby! A <b>Dock</b> (<kbd>B</kbd> <kbd>D</kbd>) on the shore trains <b>fishing boats</b>: fish shoals feed you for a long time. Later, warships and transports.' },
+  { id: 'cog', when: (s, me) => units(s, me).some((u) => u.type === 'cog'), text: 'A <b>merchant ship</b> sails from your Dock to a trading post with water near it (a <b>port</b>) and brings back gold, 20% more than the land road. Select it and right-click the post. Warships are its enemy.' },
   { id: 'transport', when: (s, me) => units(s, me).some((u) => u.type === 'transport'), text: 'To cross the water, select soldiers and <b>right-click your transport</b> to board. Then select the transport and right-click a far shore to land them.' },
   { id: 'airfield', when: (s, me) => s.players[me].epoch >= 4 && !has(s, me, 'airfield'), text: 'The Industrial Age brings flight: an <b>Airfield</b> (<kbd>V</kbd> <kbd>F</kbd>) trains fighters and bombers. Only missiles reach them: fighters, riflemen, towers and warships.' },
 ];
