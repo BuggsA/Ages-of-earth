@@ -126,14 +126,14 @@ const hud = new Hud({
 });
 
 function issue(c: Command): void {
-  if (mode !== 'play' || watching) return;
+  if (mode !== 'play' || watching || spectating) return;
   if (online && net) net.send({ t: 'cmd', c });
   else pending.push(c);
 }
 
 /** Personal battlefield notes neither issue unit orders nor send online packets. */
 function markScout(x: number, y: number, danger: boolean): void {
-  if (!game || mode !== 'play' || watching) return;
+  if (!game || mode !== 'play' || watching || spectating) return;
   const result = scoutFlags.toggle(game, viewer, x, y, danger ? 'danger' : 'plan');
   if (result === 'unexplored') {
     hud.toast('Scout that ground before placing a flag', 'bad');
@@ -153,6 +153,9 @@ let online = false;
 let netTurns: Command[][] = [];
 let netReach = 0;
 let netPaused = false;
+/** Looking in on someone else's online match: nothing is sent, and the whole map shows. */
+let spectating = false;
+let spectateAll = true;
 
 const lobby = new Lobby(
   {
@@ -169,16 +172,20 @@ const lobby = new Lobby(
       saveName(name);
       connectRoom(code, name);
     },
+    watch: (code, name) => {
+      saveName(name);
+      connectRoom(code, name, true);
+    },
     leave: () => leaveOnline(),
     send: (m) => net?.send(m),
   },
   () => savedName(),
 );
 
-function connectRoom(code: string, name: string): void {
+function connectRoom(code: string, name: string, watch = false): void {
   net?.close();
   lobby.showConnecting(code);
-  const n = new NetClient(code, name);
+  const n = new NetClient(code, name, watch);
   net = n;
   n.onMessage = (m) => net === n && onNet(m);
   n.onClosed = (why) => {
@@ -194,11 +201,13 @@ function connectRoom(code: string, name: string): void {
     if (online && st === 'retrying') hud.toast('Connection lost: reconnecting…', 'alert');
   };
   n.connect();
-  history.replaceState(null, '', `?room=${code}`);
+  history.replaceState(null, '', `?room=${code}${watch ? '&watch=1' : ''}`);
 }
 
 function leaveOnline(): void {
-  if (net && online && game && !game.over) net.send({ t: 'cmd', c: { t: 'leave', p: viewer } });
+  if (net && online && !spectating && game && !game.over) net.send({ t: 'cmd', c: { t: 'leave', p: viewer } });
+  spectating = false;
+  $('replay-bar').classList.add('hidden');
   net?.close();
   net = null;
   online = false;
@@ -259,7 +268,23 @@ function startOnline(match: MatchStart, you: number): void {
   netPaused = false;
   online = true;
   lobby.hide();
-  startMatch({ ...match.setup, players }, undefined, you);
+  startMatch({ ...match.setup, players }, undefined, Math.max(0, you));
+  if (you < 0) {
+    spectating = true;
+    spectateAll = true;
+    tips.hide();
+    view.revealAll();
+    $('replay-bar').classList.remove('hidden');
+    spectateBar();
+    hud.banner('Watching', 'You can look but not touch: pick whose eyes to see through in the bar above.', 5000);
+  }
+}
+
+function spectateBar(): void {
+  const s = game;
+  if (!s) return;
+  const views = [`<option value="-1">Everything</option>`, ...s.players.map((p, i) => `<option value="${i}" ${!spectateAll && i === viewer ? 'selected' : ''}>${p.name}'s eyes</option>`)].join('');
+  $('replay-bar').innerHTML = `<span class="rb-title">Watching</span><select id="rb-view">${views}</select><button class="tb-btn" data-rb="exit">Leave</button>`;
 }
 
 /** A line of chat, shown over the game for a while. */
@@ -372,6 +397,7 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
     $('replay-bar').classList.add('hidden');
   }
   watchingNext = false;
+  spectating = false;
   mode = 'play';
   pending = [];
   selection = new Set();
@@ -637,6 +663,7 @@ function replayBar(): void {
 
 $('replay-bar').addEventListener('click', (e) => {
   const b = (e.target as HTMLElement).closest<HTMLElement>('[data-rb]');
+  if (b && spectating && b.dataset.rb === 'exit') return toTitle();
   if (!b || !watching) return;
   switch (b.dataset.rb) {
     case 'pause':
@@ -659,6 +686,7 @@ $('replay-bar').addEventListener('change', (e) => {
   if (sel.id !== 'rb-view' || !game) return;
   const v = Number(sel.value);
   if (watching) watching.all = v < 0;
+  else if (spectating) spectateAll = v < 0;
   if (v < 0) view.setViewer(game, viewer, true);
   else {
     viewer = v;
@@ -1960,7 +1988,7 @@ function stepOnline(s: GameState, dt: number): void {
       const key = s.events.filter((e) => e.k === 'over' || e.k === 'defeated');
       if (key.length) onEvents(s, key);
     } else onEvents(s, s.events);
-    if (s.tick % (TURN_TICKS * HASH_EVERY) === 0 && net) net.send({ t: 'hash', n: s.tick / TURN_TICKS, h: checksum(s) });
+    if (s.tick % (TURN_TICKS * HASH_EVERY) === 0 && net && !spectating) net.send({ t: 'hash', n: s.tick / TURN_TICKS, h: checksum(s) });
     if (mode === 'title') return;
   }
   if (replaying) view.events(s, [{ k: 'depleted', tile: 0 }]);
@@ -2063,7 +2091,7 @@ function frame(now: number): void {
       mapTimer -= dt;
       if (mapTimer <= 0) {
         mapTimer = 0.2;
-        minimap.draw(s, viewer, mode === 'over' || !!watching?.all, [...view.knownBuildings()], view.rig.footprint(), selection, scoutFlags.all);
+        minimap.draw(s, viewer, mode === 'over' || !!watching?.all || (spectating && spectateAll), [...view.knownBuildings()], view.rig.footprint(), selection, scoutFlags.all);
       }
       cursorTimer -= dt;
       if (cursorTimer <= 0) {
@@ -2139,7 +2167,7 @@ $('loading').classList.add('hidden');
 // A shared room link: straight into the room (or back into a match after a reload).
 const roomCode = new URLSearchParams(location.search).get('room')?.toUpperCase() ?? '';
 startAttract(roomCode.length !== 5);
-if (roomCode.length === 5 && savedName()) connectRoom(roomCode, savedName());
+if (roomCode.length === 5 && savedName()) connectRoom(roomCode, savedName(), new URLSearchParams(location.search).get('watch') === '1');
 else if (roomCode.length === 5) lobby.showEntry(roomCode);
 else $('title').classList.remove('hidden');
 requestAnimationFrame(frame);
