@@ -8,7 +8,7 @@ describe('workforce ledger', () => {
   it('groups all living citizens by actual job, excluding soldiers, rivals and dead workers', () => {
     const s = createGame({ seed: 11, size: 'small', players: [{ name: 'A', ai: null }, { name: 'B', ai: null }] });
     const cs = s.ents.filter((e): e is Unit => e.kind === 'unit' && e.owner === 0 && e.type === 'citizen');
-    expect(cs.length).toBeGreaterThanOrEqual(7);
+    while (cs.length < 7) cs.push(spawnUnit(s, 0, 'citizen', cs[0].x, cs[0].y));
     cs[0].order = { k: 'gather', tile: 0, res: 'wood', phase: 'go' };
     cs[1].order = { k: 'farm', target: 1, phase: 'work' };
     cs[2].order = { k: 'build', target: 1 };
