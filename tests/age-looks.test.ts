@@ -5,10 +5,10 @@ import type { BuildingType } from '../src/sim/types';
 
 /** Side ages (#55) dress buildings in their own touches, baked into the same one geometry each. */
 const DRESSED: Record<string, BuildingType[]> = {
-  merchant: ['market', 'house', 'towncenter', 'storehouse'],
-  iron: ['forge', 'house', 'towncenter', 'barracks', 'storehouse'],
-  pilgrim: ['temple', 'house', 'towncenter', 'market'],
-  fair: ['market', 'house', 'towncenter', 'temple'],
+  merchant: ['wonder', 'market', 'house', 'towncenter', 'storehouse'],
+  iron: ['wonder', 'forge', 'house', 'towncenter', 'barracks', 'storehouse'],
+  pilgrim: ['wonder', 'temple', 'house', 'towncenter', 'market'],
+  fair: ['wonder', 'market', 'house', 'towncenter', 'temple'],
 };
 
 const verts = (g: ReturnType<typeof buildingGeometry>) => g.getAttribute('position').count;

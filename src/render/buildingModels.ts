@@ -960,6 +960,10 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
         awning(k, -0.8, 1.0, 2.1, 1.4, 4, 0);
         awning(k, 0.8, 1.0, 2.1, 1.4, 4, 2);
       } else if (type === 'storehouse') awning(k, 0, 0.7, 1.0, 1.0, 4, 3);
+      else if (type === 'wonder') {
+        awning(k, -1.4, 1.1, 2.7, 1.6, 4, 0);
+        awning(k, 1.4, 1.1, 2.7, 1.6, 4, 2);
+      }
       break;
     case 'iron':
       if (type === 'forge') {
@@ -975,6 +979,11 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
         torch(k, -1.4, 0, 2.05);
         torch(k, 1.4, 0, 2.05);
       } else if (type === 'barracks' || type === 'storehouse') k.box(1.9, 0.14, 1.9, RUST, 0, 0, 0);
+      else if (type === 'wonder') {
+        k.box(5.2, 0.2, 5.2, RUST, 0, 0, 0);
+        torch(k, -2.3, 0, 2.7);
+        torch(k, 2.3, 0, 2.7);
+      }
       break;
     case 'pilgrim':
       if (type === 'temple') {
@@ -994,6 +1003,11 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
       } else if (type === 'market') {
         lamp(k, -1.3, 0, 1.3);
         lamp(k, 1.3, 0, 1.3);
+      } else if (type === 'wonder') {
+        k.box(5.2, 0.22, 5.2, PALE, 0, 0, 0);
+        banner(k, -2.0, 0, 2.8, 2.2, 1.4);
+        banner(k, 2.0, 0, 2.8, 2.2, 1.4);
+        lamp(k, 0, 0, 2.9, 0.6);
       }
       break;
     case 'fair':
@@ -1009,6 +1023,11 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
         stripedStall(k, -1.7, 1.5);
         stripedStall(k, 1.7, 1.5);
       } else if (type === 'temple') bunting(k, -1.2, 1.2, 1.1, 1.3, 7);
+      else if (type === 'wonder') {
+        bunting(k, -2.2, 2.2, 1.8, 2.8, 13);
+        stripedStall(k, -2.1, 2.5);
+        stripedStall(k, 2.1, 2.5);
+      }
       break;
   }
 }

@@ -1,5 +1,6 @@
+import { ageOf } from '../sim/ages';
 import { domainOf } from '../sim/data';
-import type { GameState } from '../sim/types';
+import type { AgeId, GameState } from '../sim/types';
 import { R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE, T_ROCK, T_SAND, T_WATER } from '../sim/types';
 
 /**
@@ -7,6 +8,9 @@ import { R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE, T_ROCK, T_SAND
  * units in sight, the camera's view and pings where things happen. Click or drag to look somewhere;
  * right-click to send the selected units there.
  */
+
+/** A side age rings its owner's buildings on the map, so a rival's road shows at a glance (#55). */
+const AGE_BLIP: Partial<Record<AgeId, string>> = { merchant: '#ffd166', iron: '#ff7a2a', pilgrim: '#f4efe4', fair: '#e0524a' };
 
 interface Ping {
   x: number;
@@ -137,8 +141,10 @@ export class Minimap {
     for (const b of buildings) {
       const pl = s.players[b.owner];
       ctx.fillStyle = pl.color;
-      ctx.strokeStyle = 'rgba(0,0,0,0.6)';
-      ctx.lineWidth = 1;
+      const age = ageOf(pl);
+      const mark = AGE_BLIP[age];
+      ctx.strokeStyle = mark ?? 'rgba(0,0,0,0.6)';
+      ctx.lineWidth = mark ? 1.5 : 1;
       const half = (b.size / 2) * sx;
       ctx.fillRect(b.x * sx - half, b.y * sy - half, half * 2, half * 2);
       ctx.strokeRect(b.x * sx - half, b.y * sy - half, half * 2, half * 2);
