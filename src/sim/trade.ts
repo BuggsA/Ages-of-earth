@@ -92,14 +92,15 @@ export function harborNear(s: GameState, owner: number, market: { x: number; y: 
  * Where a ship tied up at a post's coast lies: the nearest open water within `TRADE.sea.reach` tiles of
  * it, or null when the post is inland (not a port).
  */
-export function portSpot(s: GameState, post: TradePost): { x: number; y: number } | null {
-  const t = nearestWalkable(s, post.x, post.y, TRADE.sea.reach, NAVAL);
+export function portSpot(s: GameState, post: TradePost, owner = -1): { x: number; y: number } | null {
+  const reach = TRADE.sea.reach + (owner >= 0 ? modsOf(s, owner).portReach : 0);
+  const t = nearestWalkable(s, post.x, post.y, reach, NAVAL);
   if (t < 0) return null;
   const x = (t % s.w) + 0.5;
   const y = Math.floor(t / s.w) + 0.5;
   const dx = x - post.x;
   const dy = y - post.y;
-  return dx * dx + dy * dy <= TRADE.sea.reach * TRADE.sea.reach ? { x, y } : null;
+  return dx * dx + dy * dy <= reach * reach ? { x, y } : null;
 }
 
 const usableDock = (b: Building, owner: number) => b.type === 'dock' && b.owner === owner && b.built && b.hp > 0;

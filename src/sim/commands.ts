@@ -269,7 +269,7 @@ export function applyCommand(s: GameState, c: Command): void {
       }
       // Merchant ships sail to a port post from their nearest Dock.
       const cogs = units.filter((u) => u.type === 'cog');
-      if (cogs.length && !portSpot(s, post)) refuse(s, c.p, 'No harbor near this trading post: merchant ships need water within a few tiles');
+      if (cogs.length && !portSpot(s, post, c.p)) refuse(s, c.p, 'No harbor near this trading post: merchant ships need water within a few tiles');
       else if (cogs.length && !nearestDock(s, c.p, post.x, post.y)) refuse(s, c.p, 'Build a Dock to trade by sea');
       else {
         for (const u of cogs) {
