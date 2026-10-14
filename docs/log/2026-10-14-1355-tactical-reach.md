@@ -12,4 +12,4 @@ Integrated main 2c3a2c9 (Sail, harbor trade, moonlit nights), preserving their f
 - Browser smoke attempted once → build succeeded, launch failed: missing Chromium executable. Appearance and interactive Alt/placement behavior unverified.
 - Headless match: esbuild bundled scripts/sim.ts, then node headless.mjs 3 medium 30 → completed 30 minutes, no winner yet, checksum 2807796726; 9142 ms total, worst tick 11.6 ms. tsx CLI was unavailable because its IPC pipe is forbidden here.
 
-Exact-commit CI result is recorded in the PR. Next: owner can check line contrast on snow and overlapping defenses. Successor: none, the owner starts the next.
+Initial CI passed the pinned build and all 247 tests (run 38576124367). Incorporated main b5974b0 with lit windows before merging; final exact-commit CI result is recorded in the PR. Next: owner can check line contrast on snow and overlapping defenses. Successor: none, the owner starts the next.
