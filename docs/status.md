@@ -62,3 +62,5 @@ Merged since the last update: **camera bookmarks** (#76, merged in #77: Ctrl+Shi
 **Scout Flags** (#85, GPT-6, lane look): up to six personal gold planning / red danger pennants on explored locations, shown in 3D and on the minimap with Ctrl(+Shift)+right-click. UI-only, absent from saves, replays and online commands; browser appearance unverified, CI tracked in PR.
 
 **Atlas start distance** (#93, lane tooling): `scripts/seed-atlas.ts --apart N / --close N` filters worlds by the distance between the two nearest starts, and the table shows a `gap` column. Tooling only; no sim, UI or save change.
+
+**The hours of the day** (#97, own pitch, lane look): the light drifts from morning to dusk and night over an hour of play, from the tick and seed alone (render only; no rules, save or `data.ts` change). `?hour=` pins it. Seen in headless Chromium on the title screen only; a match in play unverified.
