@@ -12,6 +12,7 @@ import type { Building, BuildingType, Command, Cost, Ent, GameState, Player, Sta
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
 import { buildingPicture, unitPicture } from './thumbs';
+import { idleCitizens } from './idle';
 
 /**
  * The heads-up display: resources and population along the top with the epoch and the clock, and along
@@ -236,7 +237,7 @@ export class Hud {
   private top(s: GameState, viewer: number, speed: number): void {
     const p = s.players[viewer];
     const tc = s.ents.find((e): e is Building => e.kind === 'building' && e.owner === viewer && e.advance >= 0);
-    const idle = s.ents.filter((e) => e.kind === 'unit' && e.owner === viewer && e.type === 'citizen' && e.order.k === 'idle').length;
+    const idle = idleCitizens(s, viewer).length;
     const road = tc ? journeyOf(p, tc) : undefined;
     const adv = road ? Math.floor((tc!.advance / secs(road.time)) * 100) : -1;
     const age = ageDef(p);
@@ -322,7 +323,7 @@ export class Hud {
       sig = `none:${ageOf(p)}`;
       html = `<div class="empty-sel"><div class="sel-name">${ageDef(p).name}</div>
         <div>Left-click to select, drag to select many. Right-click to give orders.</div>
-        <div><kbd>.</kbd> finds an idle citizen, <kbd>,</kbd> your army, <kbd>H</kbd> your Town Center; <kbd>B</kbd> and <kbd>V</kbd> build with citizens selected.</div>
+        <div><kbd>.</kbd> finds an idle citizen, <kbd>Shift</kbd> + <kbd>.</kbd> selects all idle citizens, <kbd>,</kbd> your army, <kbd>H</kbd> your Town Center; <kbd>B</kbd> and <kbd>V</kbd> build with citizens selected.</div>
         <div>Hold <kbd>Shift</kbd> while giving orders to queue them up.</div></div>`;
     } else if (ents.length === 1) {
       const e = ents[0];
@@ -809,3 +810,4 @@ function plural(name: string): string {
 function busyWhy(p: Player, b: Building): string {
   return journeyOf(p, b)?.back ? 'Busy stepping back an age' : 'Busy advancing to the next epoch';
 }
+

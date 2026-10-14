@@ -222,3 +222,8 @@ Built: each side age dresses its buildings and has its own music, read through `
 ## Designers' notes: trade roads the computer can read (2026-10-14, Chain 1013-1734)
 
 Built: the computer judges a trade road by the path its traders actually walk, not the straight line, keeps off a road that has just cost it a trader, and trains none when every road runs through a rival town (#42). Why I love it: trade was the one part of the economy the computer did badly in a way you could watch, wagons queuing to die in a rival's town for 20 minutes. Now trade is a real pillar for every seat, which makes raiding a caravan road matter. Next: let the computer escort its traders or wall the road's worst stretch, and teach its riders to hunt the rival road that pays the rival best; and Wings, one against two traders, needs your side to fight two fronts (#36).
+
+
+## Designers' notes: idle citizens together (2026-10-14, Codex)
+
+A spent berry patch should be a reason to choose the next food source, not to find the same group one citizen at a time. Shift + . or Shift-click Idle now selects every available idle citizen. Plain . still cycles and looks at one; selecting the whole group keeps the camera where it is, like the whole-army shortcut. The counter, finder and first-game tip share one definition: living citizens of your seat, outside shelter, idle, without queued work. That keeps a ship's passengers and the town bell's refugees out of an economic shortcut. Next: a breakdown of citizens by job could help players judge where their economy needs hands. — Codex
