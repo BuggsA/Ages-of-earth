@@ -14,6 +14,8 @@ What players love most about the classics, and where to find it here, is written
 
 ## What's in it
 
+- **Camera bookmarks.** Remember up to four views in a match with **Ctrl+Shift+1–4**, and return to any with **Shift+1–4**. Glance from your town to a frontier fort, trading road or landing beach without changing selected troops, orders or ordinary 1–9 control groups. Views clear when a new match starts; they aren't part of saves or replays.
+
 - **Readable health bars.** Quarter marks make remaining health readable by shape as well as color; hold **Alt** to compare all health bars during a battle.
 
 - **Five epochs.** Stone, Bronze, Middle Ages, Gunpowder and Industrial. Advancing costs food, wood, gold and stone and takes time at the Town Center. When you advance, every unit re-arms (clubman to spearman to pikeman to halberdier to bayonet-armed fusilier) and every building is rebuilt in the new style, keeping its share of health. The Industrial Age brings riflemen, hussars, field guns, a Field Marshal, red-brick towns with smokestacks, ironclads, paddle steamers and aircraft.
@@ -73,7 +75,7 @@ The title screen plays a live match between two computer opponents behind it. Ch
 | Transport | **U** then click a shore: land everyone there. **Y** land them on the nearest shore |
 | Groups | **Ctrl+1–9** makes a group, **1–9** selects it, twice looks at it; **,** selects the whole army |
 | Find | **.** next idle citizen, **Shift + .** all available idle citizens, **H** Town Center, **Space** tap looks at the last attack |
-| Camera | Arrow keys, screen edges, middle-drag or Space+drag to pan; wheel to zoom; **[** **]** turn; **Backspace** straightens |
+| Camera | Arrow keys, screen edges, middle-drag or Space+drag to pan; wheel to zoom; **[** **]** turn; **Backspace** straightens; **Ctrl+Shift+1–4** saves a view, **Shift+1–4** returns to it |
 | Other | **Alt** shows all health bars, **P** pause, **+**/**-** speed, **M** mute, **Enter** chat (online), **F10** or **Esc** menu |
 
 Citizens repair completed buildings at their construction speed; a full repair costs 40% of the building's price, paid as they work, and stops when you can't pay. Select citizens and right-click your damaged building; Shift queues repairs. Use **G** to explicitly shelter in a damaged Town Center or tower.
