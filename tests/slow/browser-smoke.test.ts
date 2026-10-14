@@ -1,5 +1,5 @@
 // A browser smoke test (#87): build, serve dist/, drive the title screen, a match, the campaign and the
-// Web of Ages in headless Chromium, and fail on any page error or console error. The lines that draw,
+// Web of Ages in headless Chromium (training a citizen from the Town Center included), and fail on any page error or console error. The lines that draw,
 // play sound or read input run in no other test. Screenshots go to SMOKE_SHOTS (default test-results/smoke).
 import { createServer, type Server } from 'node:http';
 import { execFileSync } from 'node:child_process';
@@ -70,6 +70,9 @@ test('title, match, campaign and Web of Ages run without errors', async () => {
   await page.waitForSelector('#workforce-panel:not(.hidden)');
   await page.screenshot({ path: join(SHOTS, '4-workers.png') });
   await page.click('#workforce-btn');
+  // The Town Center starts selected: Q trains a citizen, and the queue shows it.
+  await page.keyboard.press('q');
+  await page.waitForSelector('#selection .queue .qitem', { timeout: 5000 });
   await page.keyboard.press('.');
   await page.keyboard.press('Shift+.');
   await page.keyboard.press('Control+Shift+1');
