@@ -1,14 +1,14 @@
-import { AI_LEVELS, BUILDINGS, CARRY, DEER, DT, EPOCH_GATHER_BONUS, FISH_CARRY, GATHER, MILITARY, PRIEST, domainOf, secs } from './data';
+import { AI_LEVELS, BUILDINGS, CARRY, DEER, DT, EPOCH_GATHER_BONUS, FISH_CARRY, GATHER, MILITARY, PRIEST, REPAIR_SHARE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
 import type { Spatial } from './spatial';
-import { buildTimeFor, modsOf } from './stats';
-import type { Act, Animal, Building, Ent, GameState, Goal, Order, Res, Unit } from './types';
-import { R_BERRY, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
+import { buildTimeFor, buildingCostFor, modsOf } from './stats';
+import type { Act, Animal, Building, Cost, Ent, GameState, Goal, Order, Res, Unit } from './types';
+import { RES, R_BERRY, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { carriedBy, relicAt } from './relics';
 import { atPost, goalForPost, marketOf, nearestMarket, postAt, tripGold } from './trade';
-import { canHit, exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, passOf, radiusOf, statsOf, teamOf } from './world';
+import { canHit, exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, passOf, pay, radiusOf, statsOf, teamOf } from './world';
 
 /**
  * What units do each tick: follow their order (walk, gather and carry, farm, build, hunt, fight, heal,
@@ -385,7 +385,7 @@ function buildStep(s: GameState, u: Unit, o: Extract<Order, { k: 'build' }>): vo
     setOrder(u, { k: 'idle' });
     return;
   }
-  if (b.built) {
+  if (b.built && b.hp >= maxHp(s, b)) {
     afterBuilding(s, u, b);
     return;
   }
@@ -395,10 +395,25 @@ function buildStep(s: GameState, u: Unit, o: Extract<Order, { k: 'build' }>): vo
     face(u, b.x, b.y);
     u.act = 'build';
     const step = DT / buildTimeFor(s, u.owner, b.type);
-    b.progress = Math.min(1, b.progress + step);
-    b.hp = Math.min(maxHp(s, b), b.hp + maxHp(s, b) * step);
+    const max = maxHp(s, b);
+    const hp = Math.min(max, b.hp + max * step);
+    if (b.built) {
+      // A repair is paid for as it goes: whole units, so the total over a job is exact.
+      const cost = buildingCostFor(s, u.owner, b.type);
+      const owed: Cost = {};
+      for (const r of RES) owed[r] = Math.floor(REPAIR_SHARE * (cost[r] ?? 0) * (1 - b.hp / max)) - Math.floor(REPAIR_SHARE * (cost[r] ?? 0) * (1 - hp / max));
+      const p = s.players[u.owner];
+      if (RES.some((r) => (owed[r] ?? 0) > p.res[r])) {
+        s.events.push({ k: 'refused', owner: u.owner, why: 'Not enough to pay for the repairs' });
+        setOrder(u, { k: 'idle' });
+        return;
+      }
+      pay(p, owed);
+    } else b.progress = Math.min(1, b.progress + step);
+    b.hp = hp;
     workEvent(s, u, 'build', u.x, u.y);
-    if (b.progress >= 1) completeBuilding(s, b);
+    // Repairs must not repeat completion events or reset a wonder's timer.
+    if (!b.built && b.progress >= 1) completeBuilding(s, b);
     return;
   }
   if (!approach(u, goalForBuilding(b, BUILDINGS[b.type].open))) setOrder(u, { k: 'idle' });

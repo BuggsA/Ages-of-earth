@@ -8,5 +8,5 @@ Branch `codex/30-market-recovery`; Codex, 2026-10-14 UTC.
 - No new balance numbers or save fields. Existing rules remain #31's.
 - Native `npm run check` fails before tests: TypeScript 7 panics reading `/proc/self/exe`. Fallback TypeScript 5.9.3 is a separate compatibility check, not a claim that the required native check passed.
 - Browser unverified: `/opt/pw-browsers/chromium` is absent. No automated browser claim.
-- PR must remain draft until the required checks and browser verification are satisfied. CI may run in its supported environment.
+- Update 2026-10-14: #33 permits shipping without Chromium on green CI, with browser claims unverified. Merged the latest main including repairs, kept both Market and repair hints, and refreshed quote tooltips when their price changes. CI may run in its supported environment.
 - Successor: none; the owner starts the next session.

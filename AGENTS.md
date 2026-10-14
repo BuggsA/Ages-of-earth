@@ -66,7 +66,7 @@ The owner, 2026-10-13: tests "can often eat a lot of the build time … each age
 ## 6. Done means
 
 - `npm run check` passes and the `ci` check is green on the final commit.
-- If you changed what the player sees or does, you tried it in a browser (`npm run dev`; cloud containers have Chromium at `/opt/pw-browsers/chromium`) and said how in the pull request.
+- If you changed what the player sees or does, you tried it in a browser (`npm run dev`; cloud containers have Chromium at `/opt/pw-browsers/chromium`) and said how in the pull request. **No Chromium, or it won't start?** That never blocks you. Try the browser-free checks instead (`npx vitest run tests/models.test.ts` builds every model, `npx tsx scripts/sim.ts` plays a headless match), mark the browser claims `unverified` in `## Verification`, and merge on a green `ci`: the owner plays it, and may revert.
 - The pull request ends with `## Verification`: each claim paired with its evidence (`command → output`, or `file:line`). A claim without evidence is marked unverified. Never write "verified" for something you didn't run.
 - `docs/status.md` updated (your rows only) and one new file in `docs/log/` (`YYYY-MM-DD-HHMM-<topic>.md`, UTC).
 

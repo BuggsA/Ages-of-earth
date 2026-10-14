@@ -2,7 +2,7 @@ import { scenarioById } from '../sim/campaign';
 import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
-import { VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, SIGNATURES, EPOCHS, LAST_EPOCH, MARKET, RELIC, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, SIGNATURES, EPOCHS, LAST_EPOCH, MARKET, RELIC, REPAIR_SHARE, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { marketOf, nearestMarket, postAt, tripGold } from '../sim/trade';
@@ -80,8 +80,11 @@ function orderWords(s: GameState, u: Unit): string {
     }
     case 'farm':
       return o.phase === 'drop' ? 'Carrying grain home' : o.phase === 'work' ? 'Farming' : 'Going to the fields';
-    case 'build':
+    case 'build': {
+      const target = s.byId.get(o.target);
+      if (target?.kind === 'building' && target.built) return u.act === 'build' ? 'Repairing' : 'Going to repair';
       return u.act === 'build' ? 'Building' : 'Going to build';
+    }
     case 'attack':
       return u.act === 'attack' ? 'Fighting' : 'Charging';
     case 'move':
@@ -453,6 +456,7 @@ export class Hud {
         <div class="sel-sub">${status}</div>
         ${hpBar(b.hp, max, b.hp / max)}
         ${mine && b.type === 'market' && b.built ? `<div class="blurb">Prices shared by all players. ↑ recovers upward, ↓ downward, → steady. Drift: ${MARKET.recover} gold every ${MARKET.every}s toward the starting quote; trades move it immediately.</div>` : ''}
+        ${mine && b.built && b.hp < max ? `<div class="blurb">Select citizens and right-click to repair (a full repair costs ${Math.round(REPAIR_SHARE * 100)}% of its price).${def.garrison ? ' Press G to shelter instead.' : ''}</div>` : ''}
         ${inside}
         ${queue || `<div class="blurb">${def.blurb}${def.guns ? ` Shoots ${def.guns.range} tiles.` : ''}</div>`}
       </div>`;
@@ -635,7 +639,7 @@ export class Hud {
       cmds.push({ key: 'DELETE', pic: '', glyph: '💀', title: 'Delete', desc: 'Tear these buildings down (Del).', ok: true, run: () => this.act.issue({ t: 'delete', p: viewer, ids: mine.map((e) => e.id) }) });
     }
     this.cmds = cmds;
-    const sig = cmds.map((c) => `${c.key}${c.ok ? 1 : 0}${c.count ?? ''}${c.on ? 1 : 0}${c.pic.length}${c.title}`).join('|');
+    const sig = cmds.map((c) => `${c.key}${c.ok ? 1 : 0}${c.count ?? ''}${c.on ? 1 : 0}${c.pic.length}${c.title}${c.desc}${JSON.stringify(c.cost)}${c.why}`).join('|');
     if (sig === this.cmdSig) return;
     this.cmdSig = sig;
     this.cmdEl.innerHTML = cmds
