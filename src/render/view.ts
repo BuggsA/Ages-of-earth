@@ -102,6 +102,7 @@ export class View {
   private nextHoot = 12;
   private nextGull = 8;
   private nextChirp = 6;
+  private nextCroak = 9;
   private dayLevel = 0;
   private weather = new Weather();
   /** How far the haze lets the view reach today (1 on a clear day). */
@@ -390,6 +391,12 @@ export class View {
       this.nextChirp = this.time + 5 + Math.random() * 9;
       const s = this.state;
       if (s && !this.nearWater(s)) this.onCue?.('cricket', Math.random() * 1.8 - 0.9, 0.4);
+    }
+    // On a clear night, within sight of open water, frogs croak at the shore.
+    if (this.owlLevel > 0 && this.time > this.nextCroak) {
+      this.nextCroak = this.time + 4 + Math.random() * 8;
+      const s = this.state;
+      if (s && this.nearWater(s)) this.onCue?.('frog', Math.random() * 1.8 - 0.9, 0.4);
     }
     // By day, within sight of open water, a gull now and then.
     if (this.dayLevel > 0.3 && this.time > this.nextGull) {
