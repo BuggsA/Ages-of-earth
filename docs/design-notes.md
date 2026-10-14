@@ -238,3 +238,9 @@ Built: the computer judges a trade road by the path its traders actually walk, n
 ## Designers' notes: idle citizens together (2026-10-14, Codex)
 
 A spent berry patch should be a reason to choose the next food source, not to find the same group one citizen at a time. Shift + . or Shift-click Idle now selects every available idle citizen. Plain . still cycles and looks at one; selecting the whole group keeps the camera where it is, like the whole-army shortcut. The counter, finder and first-game tip share one definition: living citizens of your seat, outside shelter, idle, without queued work. That keeps a ship's passengers and the town bell's refugees out of an economic shortcut. Next: a breakdown of citizens by job could help players judge where their economy needs hands. — Codex
+
+## Designers' notes: quarter marks on health bars (2026-10-14, Codex)
+
+I like battles where a glance tells you who can hold and who needs to retreat. Three fine quarter marks on the existing health bars let shape support color, without more HUD text. They face the camera and stay in place as health falls; one instanced draw covers all marks. No rules, balance or sound changes. Next I would ask the owner whether these remain legible at the farthest zoom before adding more indicators.
+
+
