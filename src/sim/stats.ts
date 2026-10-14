@@ -100,6 +100,7 @@ export function statsFor(s: GameState, owner: number, type: UnitType): UnitStats
     st.time *= m.militaryTrain;
     if (base.cls === 'ranged') st.time *= m.rangedTrain;
   }
+  st.time *= ageDef(p).training?.[base.cls] ?? 1;
   c.units[type] = st;
   return st;
 }
@@ -174,3 +175,4 @@ export function techProblem(s: GameState, owner: number, tech: TechId): string |
 export function buildTimeFor(s: GameState, owner: number, type: BuildingType): number {
   return BUILDINGS[type].time / modsOf(s, owner).buildSpeed;
 }
+

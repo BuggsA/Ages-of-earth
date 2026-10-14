@@ -333,6 +333,12 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   const kept = relicsKept(s, p.id);
   for (const r of roadsFrom(p)) {
     if (AGES[r.to].tier !== p.epoch) continue;
+    if (r.to === 'aeronaut' && v.planes.length > 0 && roadKnown(s, p, r) && wants(s, p, mem, r.to)) return { road: r, wait: false };
+    if (here === 'aeronaut' && r.to === 'industrial' && count(v, 'airfield', true) === 0) {
+      mem.roads ??= {};
+      mem.roads.aeronaut = false;
+      return { road: r, wait: false };
+    }
     if (here === 'pilgrim' && r.to === 'middle' && kept === 0) return { road: r, wait: false };
     if (r.to !== 'pilgrim' || kept < AI_WEB.relics || !roadKnown(s, p, r) || !deedsDone(p, r) || !wants(s, p, mem, r.to)) continue;
     return { road: r, wait: false };
@@ -1721,3 +1727,4 @@ function rivalTownCenter(s: GameState, p: Player): Building | null {
   }
   return best;
 }
+

@@ -908,7 +908,7 @@ function ironTower(k: Kit, st: Style): void {
 /** The original four dressed ages, kept as the baseline model regression set. */
 export const LOOK_AGES: AgeId[] = ['merchant', 'iron', 'pilgrim', 'fair'];
 /** All dressed ages; additions get their own model coverage beside the baseline set. */
-export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer', 'sail'];
+export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer', 'sail', 'aeronaut'];
 
 const SAIL = '#efe8d4';
 const NET = '#b9ad8a';
@@ -970,6 +970,18 @@ function lamp(k: Kit, x: number, y: number, z: number, h = 0.5): void {
 function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
   const big = type === 'towncenter';
   switch (age) {
+    case 'aeronaut': {
+      // Sky blue navigation bands and a rooftop windsock mark the aviation towns.
+      if (['airfield', 'towncenter', 'house', 'forge', 'wonder'].includes(type)) {
+        const span = type === 'airfield' || type === 'wonder' ? 1.8 : big ? 1.4 : 0.7;
+        k.box(span * 2, 0.12, 0.04, '#76c6d6', 0, 0.55, span);
+        const h = type === 'wonder' ? 3.3 : big ? 2.5 : 1.6;
+        k.cyl(0.025, 0.025, h, 5, '#d7e4e8', span, 0, 0);
+        k.box(0.48, 0.12, 0.1, '#76c6d6', span + 0.24, h, 0);
+        k.box(0.12, 0.12, 0.11, '#f4efe4', span + 0.18, h, 0);
+      }
+      break;
+    }
     case 'reclaimer': {
       // Salvaged stone columns and timber braces: old fragments become a working town.
       if (['towncenter', 'storehouse', 'forge', 'house', 'wonder'].includes(type)) {
@@ -1174,3 +1186,4 @@ export function rubbleGeometry(size: number, epoch: number): THREE.BufferGeometr
   }
   return g;
 }
+
