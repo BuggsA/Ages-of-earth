@@ -39,6 +39,7 @@ export class Overlays {
   private thin: THREE.InstancedMesh;
   private barBack: THREE.InstancedMesh;
   private barFill: THREE.InstancedMesh;
+  private barMarks: THREE.InstancedMesh;
   private shots = new Map<Shot['kind'], THREE.InstancedMesh>();
   private ghost: THREE.Group;
   private ghostBody: THREE.Mesh;
@@ -73,6 +74,12 @@ export class Overlays {
     const plane = new THREE.PlaneGeometry(1, 1);
     this.barBack = new THREE.InstancedMesh(plane, new THREE.MeshBasicMaterial({ color: '#1a1a1a', transparent: true, opacity: 0.75, depthWrite: false, fog: false }), MAX_BARS);
     this.barFill = new THREE.InstancedMesh(plane, new THREE.MeshBasicMaterial({ depthWrite: false, fog: false, toneMapped: false }), MAX_BARS);
+    // Shape as well as color: fixed quarter marks remain readable as health falls.
+    this.barMarks = new THREE.InstancedMesh(plane, new THREE.MeshBasicMaterial({ color: '#141414', depthWrite: false, fog: false, toneMapped: false }), MAX_BARS * 3);
+    this.barMarks.count = 0;
+    this.barMarks.frustumCulled = false;
+    this.barMarks.renderOrder = 12;
+    this.group.add(this.barMarks);
     for (const m of [this.rings, this.squares, this.thin, this.barBack, this.barFill]) {
       m.count = 0;
       m.frustumCulled = false;
@@ -191,7 +198,14 @@ export class Overlays {
       this.barFill.setMatrixAt(i, this.m);
       this.c.setRGB(f > 0.5 ? (1 - f) * 2 : 1, f > 0.5 ? 1 : f * 2, 0.15).multiplyScalar(1.1);
       this.barFill.setColorAt(i, this.c);
+      for (let j = 0; j < 3; j++) {
+        this.p.copy(b.at).addScaledVector(right, b.width * ((j + 1) / 4 - 0.5));
+        this.m.compose(this.p, this.q, this.sc.set(b.width * 0.015, h, 1));
+        this.barMarks.setMatrixAt(i * 3 + j, this.m);
+      }
     }
+    this.barMarks.count = n * 3;
+    this.barMarks.instanceMatrix.needsUpdate = true;
     for (const m of [this.barBack, this.barFill]) {
       m.count = n;
       m.instanceMatrix.needsUpdate = true;
@@ -294,3 +308,4 @@ export class Overlays {
     this.flag.visible = true;
   }
 }
+
