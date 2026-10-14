@@ -53,3 +53,5 @@ Merged since the last update: **the computer walks the web of ages** (#50, s4 of
 
 
 **Workforce ledger** (#73, GPT-6): a read-only Workers dropdown in the HUD groups citizens by current job and selects a group on click; no sim or save changes. Browser appearance unverified; CI verification in PR.
+
+**Seed Atlas** (#80, GPT-6): tooling-only map scouting across seeds, with filters for bog iron, ruin finds, trading posts, plus reproducible JSON; no simulation, save, balance, or UI change. Verification in PR.

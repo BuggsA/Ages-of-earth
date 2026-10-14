@@ -159,3 +159,14 @@ In an RTS the hard parts (a deterministic simulation, pathfinding and lockstep n
 - **Balance is a first pass**, tuned with computer-vs-computer matches; human play will tell more.
 - **Ideas for later:** more epochs (Atomic, Modern), trade ships between docks and coastal posts, the computer using transports for invasions, more chapters and a scenario editor, a map editor, ranked matchmaking.
 
+## Seed Atlas (map scouting)
+
+Find reproducible worlds before launching a match. This developer tool uses the **same seeded map generator** as the game; it never advances the simulation or changes a map.
+
+```bash
+npx tsx scripts/seed-atlas.ts --from 1 --count 40 --map highlands --size medium --iron yes --find relic
+npx tsx scripts/seed-atlas.ts --players 4 --min-posts 2 --json
+npx tsx scripts/seed-atlas.ts --help
+```
+
+The report lists bog iron, neutral trading posts, relics, and each ruin's buried find. **It contains spoilers**: ruin prizes are supposed to be hidden during play. A seed only reproduces the same world with the same map type, size, and player count; JSON includes those settings for sharing. The nearest ruin number is straight-line tiles from the nearest starting town, **not walking distance**. Default scan is 12 seeds; one scan is capped at 500 for predictable run time.
