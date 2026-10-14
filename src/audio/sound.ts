@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'stepBack';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -116,7 +116,7 @@ export class Sound {
     'click', 'open', 'select', 'selectBuilding', 'move', 'attack', 'strike', 'thud', 'hit', 'hitBuilding', 'bow', 'sling', 'musket', 'fall',
     'collapse', 'built', 'place', 'ready', 'readyCitizen', 'chop', 'mine', 'hammer', 'rustle', 'epoch', 'alert', 'victory', 'defeat', 'error', 'coin', 'queue',
     'catapult', 'cannon', 'impact', 'spear', 'chant', 'convert', 'heal', 'townBell', 'allClear', 'research', 'wonder', 'shelter',
-    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'rankUp',
+    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'rankUp', 'stepBack',
   ];
 
   /**
@@ -449,6 +449,12 @@ export class Sound {
         for (const f of [N.C4, N.E4, N.G4]) this.brass(out, t, f, 1.3, 0.07);
         this.brass(out, t + 0.45, N.C5, 1.2, 0.07);
         [N.G5, N.C6, N.E6, N.G6].forEach((f, i) => this.bell(out, t + 0.5 + i * 0.1, f, 1.2, 0.07));
+        break;
+      case 'stepBack':
+        // Stepping back an age (#47): the epoch fanfare's notes walked downhill, ending on a low bell.
+        [N.G4, N.E4, N.C4].forEach((f, i) => this.brass(out, t + i * 0.32, f, 0.9, 0.065));
+        this.brass(out, t + 0.96, N.G3, 1.4, 0.06);
+        this.bell(out, t + 1.0, N.C4, 1.8, 0.06);
         break;
       case 'alert':
         // A war horn, twice.

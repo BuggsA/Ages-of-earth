@@ -659,9 +659,11 @@ export class View {
           const tc = s.ents.find((e) => e.kind === 'building' && e.owner === ev.owner && e.type === 'towncenter');
           if (tc && (ev.owner === this.viewer || this.sees(tc.x, tc.y))) {
             const at = this.ground(s, tc.x, tc.y, 0.2);
-            this.effects.ring(at, '#ffd166', 5, 1.6);
-            this.effects.ring(at, '#fff3c4', 3.5, 1.2);
-            this.effects.burst(at.clone().setY(at.y + 1.5), { count: 60, speed: 3, up: 0.9, life: 1.8, size: 0.07, gravity: 2, colors: ['#ffd166', '#fff3c4', '#ffb347'] });
+            // A step back (#47) glows dusk-blue instead of gold, and its sparks fall rather than rise.
+            const c = ev.back ? ['#8fa8d8', '#d8e2f4', '#6a7fb0'] : ['#ffd166', '#fff3c4', '#ffb347'];
+            this.effects.ring(at, c[0], 5, 1.6);
+            this.effects.ring(at, c[1], 3.5, 1.2);
+            this.effects.burst(at.clone().setY(at.y + 1.5), { count: 60, speed: 3, up: ev.back ? 0.2 : 0.9, life: 1.8, size: 0.07, gravity: 2, colors: c });
           }
           break;
         }

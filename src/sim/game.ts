@@ -3,19 +3,19 @@ import { hitAnimal, spawnAnimal, updateAnimals } from './animals';
 import { markGoals, scenarioStep, startScenario } from './campaign';
 import { buildingGuns, updateShots } from './combat';
 import { applyCommand } from './commands';
-import { AGES, AURA, CIV_IDS, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
+import { AGES, AURA, unitEpoch, CIV_IDS, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
 import { AIR, NAVAL, stampBuilding } from './grid';
 import { generateMap } from './mapgen';
 import { Spatial } from './spatial';
 import { updateRelics } from './relics';
 import { atPost } from './trade';
 import { modsOf, trainTimeFor } from './stats';
-import { roadTo, surveyFinds } from './ages';
+import { barred, journeyOf, surveyFinds, trainsAt } from './ages';
 import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, MapSize, MapType, Player } from './types';
 import { RES, R_FISH, R_NONE } from './types';
 import { RES_OF_TILE, carryCargo, checkStuck, collide, findResource, routeUnits, separate, setOrder, think, ungarrison, walk } from './units';
 import { updateVision } from './vision';
-import { countPop, exitSpot, maxHp, placeBuilding, spawnUnit } from './world';
+import { countPop, exitSpot, maxHp, placeBuilding, refund, spawnUnit } from './world';
 
 /**
  * The match: made from a seed and a list of players, then advanced one fixed tick at a time with the
@@ -190,13 +190,36 @@ function restat(s: GameState, p: Player, change: () => void): void {
   }
 }
 
-/** Into another age (#37): every unit re-arms to the age's tier and every building is reinforced. */
-function enterAge(s: GameState, p: Player, to: AgeId): void {
+/**
+ * Into another age (#37): every unit re-arms to the age's tier and every building is rebuilt in its
+ * style. On a step back (#47) they fall back to the older forms, and whatever the new age can't train
+ * or research is taken off the queues and refunded.
+ */
+function enterAge(s: GameState, p: Player, to: AgeId, back = false): void {
+  const tier = AGES[to].tier;
   restat(s, p, () => {
-    p.epoch = AGES[to].tier;
+    p.epoch = tier;
     p.age = to;
+    // A step back suspends what lies above the new tier; any change of age brings back what fits.
+    const off = back ? p.techs.filter((t) => TECHS[t].epoch > tier) : [];
+    const on = (p.suspended ?? []).filter((t) => TECHS[t].epoch <= tier);
+    if (!off.length && !on.length) return;
+    const still = [...(p.suspended ?? []).filter((t) => TECHS[t].epoch > tier), ...off];
+    p.techs = [...p.techs.filter((t) => !off.includes(t)), ...on];
+    if (still.length) p.suspended = still;
+    else delete p.suspended;
   });
-  s.events.push({ k: 'epoch', owner: p.id, epoch: p.epoch, age: to });
+  if (back) p.backAt = s.tick;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.owner !== p.id || !e.queue.length) continue;
+    const keep = e.queue.filter((q) =>
+      q.tech ? TECHS[q.tech].epoch <= p.epoch : trainsAt(p, e.type).includes(q.unit!) && unitEpoch(q.unit!) <= p.epoch && !barred(p, q.unit!),
+    );
+    if (keep.length === e.queue.length) continue;
+    for (const q of e.queue) if (!keep.includes(q)) refund(p, q.paid);
+    e.queue = keep;
+  }
+  s.events.push({ k: 'epoch', owner: p.id, epoch: p.epoch, age: to, ...(back ? { back: true } : {}) });
 }
 
 function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
@@ -212,18 +235,20 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
   }
   if (b.timer > 0) b.timer--;
   if (b.advance >= 0) {
-    const road = roadTo(p, b.advanceTo);
+    const road = journeyOf(p, b);
     if (!road) {
       // The road is gone (the age changed under it): stand down.
       b.advance = -1;
       delete b.advanceTo;
+      delete b.back;
       return;
     }
     b.advance++;
     if (b.advance >= secs(road.time)) {
       b.advance = -1;
       delete b.advanceTo;
-      enterAge(s, p, road.to);
+      delete b.back;
+      enterAge(s, p, road.to, road.back);
     }
     return;
   }
