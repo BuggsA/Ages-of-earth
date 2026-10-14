@@ -64,3 +64,6 @@ Merged since the last update: **camera bookmarks** (#76, merged in #77: Ctrl+Shi
 **Atlas start distance** (#93, lane tooling): `scripts/seed-atlas.ts --apart N / --close N` filters worlds by the distance between the two nearest starts, and the table shows a `gap` column. Tooling only; no sim, UI or save change.
 
 **The hours of the day** (#97, own pitch, lane look): the light drifts from morning to dusk and night over an hour of play, from the tick and seed alone (render only; no rules, save or `data.ts` change). `?hour=` pins it. Seen in headless Chromium on the title screen only; a match in play unverified.
+
+
+**Age of Reclaimers** (#94, Codex, lane rules): finishing a ruin reveals a Middle Ages → alternative Gunpowder road. Construction/repairs 25% faster, research 20% cheaper, military training 25% slower; ordinary Industrial exit or Gunpowder settlement. Ruin ownership supplies discovery without a save bump. New road/AI/model tests; browser appearance and music unverified (Chromium unavailable).

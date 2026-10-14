@@ -31,7 +31,7 @@ export type TechId =
   | 'conscription' | 'husbandry' | 'theology' | 'chemistry'
   | 'gillnets' | 'shipwright' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'survey';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer';
 
 /** Tile ground. Water and rock can't be walked or built on. */
 export const T_GRASS = 0;

@@ -1790,7 +1790,8 @@ function onEvents(s: GameState, list: GameEvent[]): void {
             : ev.find === 'lore' ? `lost knowledge: ${ev.tech ? TECHS[ev.tech].name : 'a technology'}, learned for nothing`
             : ev.find === 'map' ? 'an old map: the whole land lies open to you'
             : 'a relic! Send a priest to carry it to a Temple';
-          hud.banner(RUIN_FINDS[ev.find].name, `Your diggers found ${what}.`, 5000);
+          const first = s.ruins?.filter((r) => r.by === viewer).length === 1;
+          hud.banner(RUIN_FINDS[ev.find].name, `Your diggers found ${what}.${first ? ' A new road is revealed: the Age of Reclaimers opens from the Middle Ages at your Town Center.' : ''}`, 5000);
         } else if (view.sees(ev.x, ev.y)) hud.toast(`${s.players[ev.owner].name} dug out the ruins`, 'info');
         break;
       }

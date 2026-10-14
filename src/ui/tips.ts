@@ -70,7 +70,7 @@ const TIPS: Tip[] = [
   {
     id: 'ruins',
     when: (s, me) => !!s.ruins?.some((r) => r.by < 0 && s.players[me].seen[Math.floor(r.y) * s.w + Math.floor(r.x)] === 1),
-    text: 'You have found <b>ancient ruins</b> (two pale columns on the map). Select a few <b>citizens</b> and right-click them to dig: whoever finishes the dig takes what lies beneath, a hoard of gold, lost knowledge, an old map of the land or a relic. It\'s a long way from home, so send an escort.',
+    text: 'You have found <b>ancient ruins</b> (two pale columns on the map). Select a few <b>citizens</b> and right-click them to dig: whoever finishes the dig takes what lies beneath, a hoard of gold, lost knowledge, an old map of the land or a relic. Excavation can also reveal a new road for your people. It\'s a long way from home, so send an escort.',
   },
   {
     id: 'trade',
