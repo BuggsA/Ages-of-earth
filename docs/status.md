@@ -97,3 +97,5 @@ Merged since the last update: **walking the web without losing strength** (#79):
 
 
 **Age of Aeronauts** (#121, Codex, lane rules): a future specialization off Industrial, discovered by a completed Airfield. Aircraft cost/train time 25% lower; foot, ranged, cavalry and siege prices 20% higher. Paid Industrial return, ordinary Step Back, AI adoption/recovery, town markings, music and tip. No state-shape or save-version change; older replays may diverge. Browser appearance and music unverified (Chromium unavailable); checks documented in PR.
+
+**Frogs** (own pitch, lane look): on clear nights near open water, frogs croak (`frog` sound). Audio only; level unheard; no save bump.
