@@ -19,6 +19,7 @@ import { NetClient, newRoomCode, saveName, savedName } from './net/client';
 import { HASH_EVERY, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
 import { deserialize, serialize } from './sim/save';
 import { SCENARIOS, scenarioById, starsFor } from './sim/campaign';
+import { loadDiscovery, observe, saveDiscovery, webMapHtml } from './ui/webMap';
 import { briefingHtml, chapterListHtml, recordStars, starRow } from './ui/campaignUi';
 import { Lobby } from './ui/lobby';
 import { Hud, nameOf } from './ui/hud';
@@ -746,6 +747,10 @@ document.addEventListener('click', (e) => {
     case 'campaign':
       sound.play('click');
       showCampaign(chapterListHtml());
+      break;
+    case 'web-map':
+      sound.play('click');
+      showCampaign(webMapHtml(loadDiscovery()));
       break;
     case 'camp-back':
       $('campaign').classList.add('hidden');
@@ -1722,9 +1727,21 @@ function onEvents(s: GameState, list: GameEvent[]): void {
 
 // ---- The loop --------------------------------------------------------------------------------------
 
+let discovery: ReturnType<typeof loadDiscovery> | null = null;
+let discoveryTick = -1;
+
+/** The web map (#54) fills in as the viewer's people find the roads: recorded here, outside the sim. */
+function recordDiscovery(s: GameState): void {
+  if (s.tick - discoveryTick < 20 && s.tick >= discoveryTick) return;
+  discoveryTick = s.tick;
+  discovery ??= loadDiscovery();
+  if (observe(discovery, s, viewer)) saveDiscovery(discovery);
+}
+
 function refreshHud(): void {
   if (!game || mode === 'title') return;
   pruneSelection(game);
+  recordDiscovery(game);
   hud.update(game, viewer, [...selection], SPEEDS[speedIdx], selectedTile, selectedRelic, selectedPost);
 }
 

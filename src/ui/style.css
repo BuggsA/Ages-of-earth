@@ -332,3 +332,23 @@ body.online .tip-box { bottom: 330px; }
 .obj-limit { margin-top: 6px; color: var(--muted); }
 .obj-limit.bad { color: var(--bad); }
 .end-stars { font-size: 38px; color: var(--gold); letter-spacing: 6px; text-align: center; margin: 4px 0 8px; }
+
+/* The web map (#54) */
+.wm-map { width: 100%; max-width: 420px; height: auto; margin: 8px auto; display: block; color: var(--muted); }
+.wm-node rect { fill: #1b2030; stroke: var(--edge-soft); stroke-width: 1.5; }
+.wm-node text { fill: var(--ink); font: 800 12px 'Nunito', sans-serif; }
+.wm-node.grey { opacity: 0.4; }
+.wm-node.known rect { stroke-dasharray: 4 3; stroke: var(--gold-2); }
+.wm-node.entered.side rect { stroke: var(--gold); }
+.wm-node.entered.trunk rect { stroke: var(--ink); }
+.wm-road { stroke: currentColor; stroke-width: 1.5; }
+.wm-road.faint { opacity: 0.35; }
+.wm-road.side { stroke: var(--gold-2); stroke-dasharray: 5 3; }
+.wm-cards { display: grid; gap: 8px; margin: 10px 0; text-align: left; }
+.wm-card { padding: 8px 12px; background: #1b2030; border: 1px solid var(--edge-soft); border-radius: 10px; font-weight: 700; line-height: 1.45; }
+.wm-card.grey { opacity: 0.5; }
+.wm-card h3 { margin: 0 0 2px; font: 800 15px 'Cinzel', serif; color: var(--gold); }
+.wm-card h3 small { color: var(--muted); font: 700 12px 'Nunito', sans-serif; }
+.wm-card p { margin: 2px 0; }
+.wm-dim { color: var(--muted); }
+.wm-roads { margin: 4px 0 0; padding-left: 18px; color: var(--gold-2); font-size: 13px; }
