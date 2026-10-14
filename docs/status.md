@@ -30,7 +30,7 @@ Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders
 
 ## In flight
 
-- **Borders and supply** (#132, all steps built): borders shown, attrition, building only in your own land, the computer reading borders and raising a forward Tower (`AI_RAID.fort`, `.pop`). Browser unverified; win rates not compared.
+- **Borders and supply** (#132, all steps built): borders shown, attrition, building only in your own land, the computer reading borders and raising a forward Tower (`AI_RAID.fort`, `.pop`). Browser unverified. The forward Tower vs none (`AI_LEVELS.fort`, `scripts/ai-ab.ts`): 24 matches, no difference seen (#149).
 
 - [#113](https://github.com/BuggsA/Ages-of-earth/issues/113), a beaten computer doesn't freeze (lane ai, after #79): once a wave has gone out it waits at most `armyWait` (90 s) for the next before it climbs, its bell comes down when two or fewer enemies are left (`bell`, both new in `AI_LEVELS`), and a deed three-quarters done earns twice the patience (`AI_WEB.close`). Sides stuck 10+ minutes in one age: 102 → 68 of 192 (Greek duels), 48 → 32 of 96 (seeds 21–44); against its own old play in the same matches, gathering unchanged (×0.97 and ×1.01, se ~0.07). Greek walkers gather ×0.957 of their trunk twins over 96 duels (×0.956 on `main` before: the issue's ×0.73 was from a smaller pre-merge sample). `scripts/ai-ab.ts` judges an AI change against the old play (`docs/log/2026-10-14-1730-beaten-town.md`). And [#80](https://github.com/BuggsA/Ages-of-earth/issues/80), the Seed Atlas (in review, lane tooling).
 
