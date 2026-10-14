@@ -304,3 +304,7 @@ Built: a fifth side age, a *turn* off the Middle Ages for a people of the coast.
 Why I love it: the web had trade and faith, but the navy and the fishing fleet, half the game, had no road of their own. Now a player who lives on a lake coast has a reason to build boats before they need them, and a rival can read a sea people by its masts and starve it by raiding its fields, since it gives up farms.
 Connects to: fishing, docks, warships and transports; the Pilgrim road also leaves from the Middle Ages, so a people must choose.
 Not done / next: the computer never takes this road (lane ai); the Wonder's and units' sea dress; a sea trade (traders by ship between Markets on the coast) would be the natural second half; the numbers are untried, so the first thing to watch is whether ×1.5 fishing plus cheaper ships makes naval rushes too cheap. I could not play it in a browser.
+
+## Designers' notes: harbor trade (own pitch, 2026-10-14, chain 1014-1400 s1)
+
+Built: in the Age of Sail a Market with a finished Dock within `TRADE.harbor.reach` (12 tiles) pays 30% more per trade trip (`tripGold`). Why: it ties the sea road to the trade economy, and asks where you put the Market. Next: real sea trade, a trade cog sailing between coastal Markets and coastal trading posts; the computer taking the Sail road (lane ai, #79).
