@@ -86,3 +86,5 @@ Merged since the last update: **camera bookmarks** (#76, merged in #77: Ctrl+Shi
 **Bats at dusk** (own pitch, lane look): dark wing-beating bats flit near the camera at dusk and dawn, clear weather only, off on Low. Render only; no rules or save change. Seen in headless Chromium (no errors); motion unverified by eye.
 
 **Tactical Reach** (#101, Codex, lane look): Alt shows selected owned ranged weapons' reach and dashed siege dead zones; defense placement previews future reach. Terrain-following, clipped to current vision, capped at 24 guides in one draw. No rules, balance or save changes. Quick checks pass with the documented local TS5.9 fallback; pinned compiler checked by CI. Browser appearance unverified (Chromium missing).
+
+**Owls** (own pitch, lane look): pale owls glide over the land on clear deep nights, with an occasional hoot (`owl` sound). Render and audio only; no rules or save change. Shader and hoot level unseen by eye (see PR).

@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -120,7 +120,7 @@ export class Sound {
     'click', 'open', 'select', 'selectBuilding', 'move', 'attack', 'strike', 'thud', 'hit', 'hitBuilding', 'bow', 'sling', 'musket', 'fall',
     'collapse', 'built', 'place', 'ready', 'readyCitizen', 'chop', 'mine', 'hammer', 'rustle', 'epoch', 'alert', 'victory', 'defeat', 'error', 'coin', 'queue',
     'catapult', 'cannon', 'impact', 'spear', 'chant', 'convert', 'heal', 'townBell', 'allClear', 'research', 'wonder', 'shelter',
-    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind', 'thunder',
+    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind', 'thunder', 'owl',
   ];
 
   /**
@@ -597,6 +597,13 @@ export class Sound {
         this.bell(out, t, N.A3 * 2.4, 1.4, 0.04);
         for (const f of [N.A3, N.E4, N.A4, N.C5]) this.tone(out, t + 0.15, { f, type: 'sawtooth', dur: 1.8, peak: 0.028, attack: 0.4, lp: 1500 });
         [N.E5, N.A5, N.C6, N.E6].forEach((f, i) => this.bell(out, t + 0.5 + i * 0.11, f, 1.2, 0.04));
+        break;
+      case 'owl':
+        // A soft, hollow hoot-hoo: a low breathy tone that dips, a short rest, a longer fall.
+        this.tone(out, t, { f: 420, to: 360, dur: 0.22, peak: 0.06, attack: 0.04 });
+        this.noise(out, t, { dur: 0.2, filter: 'bandpass', f: 400, q: 3, peak: 0.015, attack: 0.04 });
+        this.tone(out, t + 0.3, { f: 400, to: 300, dur: 0.5, peak: 0.07, attack: 0.05 });
+        this.noise(out, t + 0.3, { dur: 0.45, filter: 'bandpass', f: 380, q: 3, peak: 0.015, attack: 0.05 });
         break;
       case 'thunder':
         // A crack that rolls away: sharp high noise, then a long low rumble that swells and sinks.
