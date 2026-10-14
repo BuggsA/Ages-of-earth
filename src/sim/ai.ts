@@ -165,10 +165,19 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   // Epochs: once there are enough people, set the cost aside (so the army doesn't eat it) and advance;
   // but when an attack is due and the army is short of it, soldiers come first.
   const waveSize = L.wave + mem.wave * L.waveGrowth;
-  const armyFirst = s.tick > secs(L.firstAttack - 150) && army.length < waveSize && !mem.attacking;
+  const short = s.tick > secs(L.firstAttack - 150) && army.length < waveSize && !mem.attacking;
+  // A beaten town (#113): once a wave has gone out, an army that stays short of the next one holds the
+  // next age back only so long. Waiting longer, it lost every soldier it trained to the rival at its
+  // gates and stayed an age behind for ten minutes and more, food-starved.
+  if (!short || mem.wave === 0) delete mem.short;
+  else if (!mem.short || mem.short.epoch !== p.epoch) mem.short = { since: s.tick, epoch: p.epoch };
+  const armyFirst = short && (!mem.short || s.tick - mem.short.since <= secs(L.armyWait));
   v.armyFirst = armyFirst;
   // Which road it takes is the web's to say (#50): the trunk, or a side road it has chosen once it opens.
   const wantEpoch = p.epoch < Math.min(LAST_EPOCH, v.plan.maxEpoch) && !advancing && !armyFirst && citizens.length >= ADVANCE_AT[p.epoch] && s.tick > secs(150 + p.epoch * 150);
+  // Patience for a road's deeds counts only while the Town Center holds for them (#113): army-first
+  // kept a town from holding for minutes, and it came back out of patience at once.
+  if (!wantEpoch) delete mem.waiting;
   const journey = advancing ? null : (!armyFirst && turnRoad(s, v, mem)) || (wantEpoch ? nextRoad(s, v, mem) : null);
   if (journey) {
     const { road, wait } = journey;
@@ -277,8 +286,8 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
 /**
  * Whether a chosen road's deeds are worth holding the Town Center for, rather than taking the trunk now:
  * each one a `nearly` share done, or under way where that costs nothing more (relics in its Temples,
- * citizens digging; traders on the road cost the Bronze Age army its wood), for at most `patience` seconds from when it first held. Out of patience, it gives the road
- * up for good.
+ * citizens digging; traders on the road cost the Bronze Age army its wood), for at most `patience` seconds from when it first held
+ * (twice that with every deed a `close` share done). Out of patience, it gives the road up for good.
  */
 function worthWaiting(s: GameState, v: View, mem: AiMemory, r: Road): boolean {
   const { p } = v;
@@ -286,9 +295,13 @@ function worthWaiting(s: GameState, v: View, mem: AiMemory, r: Road): boolean {
     d.have >= d.need * AI_WEB.nearly ||
     (d.deed.stat === 'relicGold' && relicsKept(s, p.id) > 0) ||
     (d.deed.stat === 'iron' && v.diggers.size > 0);
-  if (!deedsProgress(p, r).every(underWay)) return false;
+  const deeds = deedsProgress(p, r);
+  if (!deeds.every(underWay)) return false;
   mem.waiting ??= s.tick;
-  if (s.tick - mem.waiting <= secs(AI_WEB.patience)) return true;
+  // A deed nearly done earns more patience (#113): a Greek town gave up its dig at 135 bog iron of 150,
+  // seconds from the Iron Age, with the price of it banked.
+  const close = deeds.every((d) => d.have >= d.need * AI_WEB.close);
+  if (s.tick - mem.waiting <= secs(AI_WEB.patience * (close ? 2 : 1))) return true;
   mem.roads![r.to] = false;
   delete mem.waiting;
   return false;
@@ -1153,12 +1166,15 @@ function threatNear(s: GameState, v: View): { unit: Unit | null; count: number }
 
 function townBell(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   if (!AI_LEVELS[v.p.ai!].clever || !v.tc) return;
+  const bell = AI_LEVELS[v.p.ai!].bell;
   const t = threatNear(s, v);
   const defenders = v.army.filter((u) => !u.inside).length;
-  if (mem.bell < 0 && t.count >= 5 && defenders < t.count / 2) {
+  if (mem.bell < 0 && t.count >= bell.ring && defenders < t.count / 2) {
     issue({ t: 'bell', p: v.p.id, ring: true });
     mem.bell = s.tick;
-  } else if (mem.bell >= 0 && t.count === 0 && s.tick - mem.bell > secs(20)) {
+  } else if (mem.bell >= 0 && t.count <= bell.quiet && s.tick - mem.bell > secs(bell.hold)) {
+    // A straggler or two is the Town Center's arrows to deal with (#113): waiting for none at all, a
+    // beaten town kept fifteen citizens inside for nine minutes while a rival's trickle came and went.
     issue({ t: 'bell', p: v.p.id, ring: false });
     mem.bell = -1;
   }

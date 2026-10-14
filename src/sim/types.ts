@@ -505,6 +505,11 @@ export interface AiMemory {
   roads?: Partial<Record<AgeId, boolean>>;
   /** Tick it began holding its Town Center for a side road's last deeds, so it holds only so long. */
   waiting?: number;
+  /**
+   * Since when, and in which epoch, its army has been short of the next wave after a first wave went out
+   * (#113): army-first holds an advance back only `armyWait` seconds of it.
+   */
+  short?: { since: number; epoch: number };
 }
 
 /** Orders that can be given with Shift held to queue them after the current one. */
