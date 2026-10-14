@@ -916,7 +916,7 @@ const NET = '#b9ad8a';
 /** A mast with a square sail and a pennant: the sea people's mark. */
 function mast(k: Kit, x: number, z: number, h: number, w = 0.7): void {
   k.cyl(0.03, 0.04, h, 5, '#5a4630', x, 0, z);
-  k.box(w, h * 0.45, 0.025, SAIL, x, h * 0.45, z + 0.03);
+  k.sail(k.box(w, h * 0.45, 0.025, SAIL, x, h * 0.45, z + 0.03), w / 2, h * 0.225, h * 0.45);
   k.box(w + 0.1, 0.03, 0.04, '#5a4630', x, h * 0.92, z + 0.03);
   k.box(0.22, 0.09, 0.02, '#3f8fc4', x + 0.12, h + 0.04, z);
 }

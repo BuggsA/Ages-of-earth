@@ -129,7 +129,10 @@ export function bake(root: THREE.Object3D, teamColor?: string): THREE.BufferGeom
     const cloth = inherited(mesh, 'cloth') as [number, number] | undefined;
     const sail = inherited(mesh, 'sail') as [number, number, number] | undefined;
     // A sail packs its height into the type (5 + height); its width and foot ride in the other two.
-    const rig = sail ? [5 + sail[2], sail[0], sail[1]] : cloth ? [4, cloth[0], cloth[1]] : ((inherited(mesh, 'rig') as [number, number, number] | undefined) ?? [0, 0, 0]);
+    // An off-centre sail (a dock's mast) also packs its centre x, in twentieths, into hundreds of the foot.
+    g.computeBoundingBox();
+    const cx = sail ? Math.round(((g.boundingBox!.min.x + g.boundingBox!.max.x) / 2) * 20) + 200 : 0;
+    const rig = sail ? [5 + sail[2], sail[0], sail[1] + 100 * cx] : cloth ? [4, cloth[0], cloth[1]] : ((inherited(mesh, 'rig') as [number, number, number] | undefined) ?? [0, 0, 0]);
     const c = new THREE.Color(team && teamColor ? teamColor : (mesh.userData.color ?? '#ffffff'));
     const colors = new Float32Array(n * 3);
     const teams = new Float32Array(n);
