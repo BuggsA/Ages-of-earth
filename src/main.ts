@@ -743,6 +743,21 @@ document.addEventListener('click', (e) => {
     case 'reroll':
       seedInput.value = String(newSeed());
       break;
+    case 'copy-world': {
+      const seed = Math.floor(Number(seedInput.value));
+      if (!(seed >= 1 && seed <= 2 ** 31 - 1)) {
+        hud.toast('Enter a map seed first', 'bad');
+        break;
+      }
+      const q = new URLSearchParams({ seed: String(seed) });
+      for (const [key, id] of [['size', 'opt-size'], ['map', 'opt-map'], ['foes', 'opt-foes']] as const) q.set(key, $<HTMLSelectElement>(id).value);
+      const link = `${location.origin}${location.pathname}?${q}`;
+      const done = () => hud.toast('World link copied', 'info');
+      const fail = () => hud.toast(link, 'info');
+      if (navigator.clipboard) navigator.clipboard.writeText(link).then(done, fail);
+      else fail();
+      break;
+    }
     case 'idle':
       nextIdle(e.shiftKey);
       break;
