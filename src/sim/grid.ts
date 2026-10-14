@@ -1,4 +1,6 @@
 import { BUILDINGS, RUINS, TRADE } from './data';
+import { landOwnerAt } from './borders';
+import { isEnemy } from './world';
 import type { Building, BuildingType, GameState } from './types';
 import { B_BUILDING, B_GATE, B_RES, B_TERRAIN, R_NONE, T_ROCK, T_WATER } from './types';
 
@@ -59,7 +61,7 @@ export function groundAt(s: GameState, x: number, y: number): number {
   return a * (1 - fx) * (1 - fy) + b * fx * (1 - fy) + c * (1 - fx) * fy + d * fx * fy;
 }
 
-export type PlaceProblem = null | 'edge' | 'water' | 'rock' | 'blocked' | 'slope' | 'shore';
+export type PlaceProblem = null | 'edge' | 'water' | 'rock' | 'blocked' | 'slope' | 'shore' | 'foreign';
 
 /** Whether a building of this type could go with its top-left corner on this tile. */
 export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: number, ignoreUnits = true, owner = -1): PlaceProblem {
@@ -87,6 +89,11 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
   // Walls follow the land (and docks the shore); everything else wants it fairly level.
   if (hi - lo > (type === 'wall' || type === 'gate' || type === 'dock' ? 2.2 : 1.1)) return 'slope';
   if (BUILDINGS[type].shore && shoreWater(s, tx, ty, n) < 3) return 'shore';
+  // Borders (#132 s3): no building in an enemy's land, but a Tower may be raised there as a foothold.
+  if (owner >= 0 && type !== 'tower') {
+    const o = landOwnerAt(s, tx + (n >> 1), ty + (n >> 1));
+    if (o >= 0 && isEnemy(s, owner, o)) return 'foreign';
+  }
   void ignoreUnits;
   return null;
 }
