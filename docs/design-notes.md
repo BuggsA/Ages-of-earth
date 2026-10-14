@@ -408,3 +408,7 @@ Built: every finished Town Center, Tower, Wonder, Dock and Airfield claims land 
 ## Designers' notes: raid depth (2026-10-14, chain 1014-2045 s5, step 4 of seed #132)
 
 Built: the computer pulls a worn wave back from deep enemy land (`wornDeep`, `AI_RAID`) so attrition no longer bleeds it dry. Why I love it: borders now bite both ways, and the computer feels the pressure you do. Next: building only in your own land (step 3), and the computer raising a forward Tower as a foothold. Untuned: no win-rate sweep was run.
+
+## Designers' notes: waymarks (2026-10-14, chain 1014-2155 s1, seed #152)
+
+Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), not the live truth under fog; a dug ruin is struck through in its digger's colour. Why I love it: a scout's second trip now buys something, and a raider can read which ruins a rival has emptied. Next: share the memory across a team and let the computer read it (needs sim state and a save bump), and a river-ford and bog-iron mark. Browser appearance unseen.

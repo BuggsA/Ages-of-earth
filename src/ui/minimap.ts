@@ -2,6 +2,7 @@ import { ageOf } from '../sim/ages';
 import { domainOf } from '../sim/data';
 import type { AgeId, GameState } from '../sim/types';
 import type { ScoutFlag } from './scoutFlags';
+import { Waymarks } from './waymarks';
 import { R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE, T_ROCK, T_SAND, T_WATER } from '../sim/types';
 
 /**
@@ -33,6 +34,7 @@ export class Minimap {
   private img: ImageData | null = null;
   private pings: Ping[] = [];
   private dragging = false;
+  readonly waymarks = new Waymarks();
   private w = 1;
   private h = 1;
 
@@ -85,6 +87,7 @@ export class Minimap {
       this.land.set(c, i * 3);
     }
     this.pings = [];
+    this.waymarks.reset();
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const size = this.canvas.clientWidth || 184;
     this.canvas.width = Math.round(size * dpr);
@@ -107,6 +110,7 @@ export class Minimap {
   ): void {
     if (!this.img) return;
     const p = s.players[viewer];
+    if (!reveal) this.waymarks.update(s, viewer);
     const d = this.img.data;
     const tree = rgb('#2f6a32');
     const gold = rgb('#ffd24a');
@@ -173,32 +177,46 @@ export class Minimap {
       ctx.fillRect(t.x * sx - rr * 0.4, t.y * sy - rr * 0.4, rr * 0.8, rr * 0.8);
     }
     // Ancient ruins the viewer has found (#64): a pale stone column mark with a dark rim.
+    // A dug ruin is hollow and rimmed in its digger's colour; one still standing is a pale column pair.
+    // Under fog each shows as it was when last seen (waymarks, #152).
     for (const r of s.ruins ?? []) {
-      if (!reveal && !p.seen[Math.floor(r.y) * s.w + Math.floor(r.x)]) continue;
+      const by = reveal ? r.by : this.waymarks.ruins.get(r.id);
+      if (by === undefined) continue;
       const rr = Math.max(2.4, sx * 1.4);
-      ctx.fillStyle = '#d8cfb8';
+      const dug = by >= 0;
+      ctx.fillStyle = dug ? '#8d8676' : '#d8cfb8';
+      ctx.strokeStyle = dug ? s.players[by].color : 'rgba(40,30,10,0.85)';
+      ctx.lineWidth = dug ? 1.5 : 1;
       ctx.fillRect(r.x * sx - rr, r.y * sy - rr * 0.5, rr * 0.7, rr * 1.5);
       ctx.fillRect(r.x * sx + rr * 0.3, r.y * sy - rr, rr * 0.7, rr * 2);
-      ctx.strokeStyle = 'rgba(40,30,10,0.85)';
-      ctx.lineWidth = 1;
       ctx.strokeRect(r.x * sx - rr, r.y * sy - rr * 0.5, rr * 0.7, rr * 1.5);
       ctx.strokeRect(r.x * sx + rr * 0.3, r.y * sy - rr, rr * 0.7, rr * 2);
+      if (dug) {
+        ctx.beginPath();
+        ctx.moveTo(r.x * sx - rr, r.y * sy + rr);
+        ctx.lineTo(r.x * sx + rr, r.y * sy - rr);
+        ctx.stroke();
+      }
     }
-    // Relics lying where the viewer has explored: a gold diamond with a dark rim, easy to spot.
+    // Relics lying where the viewer last saw them: a gold diamond with a dark rim, dimmed while out of sight.
     for (const r of s.relics) {
-      if (r.carrier || r.temple || (!reveal && !p.seen[Math.floor(r.y) * s.w + Math.floor(r.x)])) continue;
+      const m = reveal ? { x: r.x, y: r.y, hidden: !!(r.carrier || r.temple) } : this.waymarks.relics.get(r.id);
+      if (!m || m.hidden) continue;
       const rr = Math.max(2.4, sx * 1.4);
       ctx.beginPath();
-      ctx.moveTo(r.x * sx, r.y * sy - rr);
-      ctx.lineTo(r.x * sx + rr, r.y * sy);
-      ctx.lineTo(r.x * sx, r.y * sy + rr);
-      ctx.lineTo(r.x * sx - rr, r.y * sy);
+      ctx.moveTo(m.x * sx, m.y * sy - rr);
+      ctx.lineTo(m.x * sx + rr, m.y * sy);
+      ctx.lineTo(m.x * sx, m.y * sy + rr);
+      ctx.lineTo(m.x * sx - rr, m.y * sy);
       ctx.closePath();
+      const live = reveal || p.vis[Math.floor(m.y) * s.w + Math.floor(m.x)];
+      ctx.globalAlpha = live ? 1 : 0.55;
       ctx.fillStyle = '#ffd166';
       ctx.fill();
       ctx.strokeStyle = 'rgba(40,24,0,0.85)';
       ctx.lineWidth = 1;
       ctx.stroke();
+      ctx.globalAlpha = 1;
     }
     for (const e of s.ents) {
       if (e.kind !== 'unit' || e.hp <= 0 || e.inside) continue;
