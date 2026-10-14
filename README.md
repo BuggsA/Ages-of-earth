@@ -14,6 +14,7 @@ What players love most about the classics, and where to find it here, is written
 
 ## What's in it
 
+- **Weather.** Every match is played under a day chosen from its seed and its land, so everyone in an online room, a save and a replay see the same one: clear, **rain** (streaks, a grey sky, a hiss over the ambience, and in a storm lightning that lights the land and thunder that rolls in a moment later), **snow** (flakes drifting, a muffled hush) or **mist** (the horizon closes in). Highlands snow, forests rain, plains are mostly fair. The opening banner says what it is. It changes only how the land looks and sounds, never the rules: units see and shoot as far as on a clear day. Low graphics draw no rain or snow. Add `?weather=rain` (or `snow`, `mist`, `clear`) to the address to try one.
 - **Readable health bars.** Quarter marks make remaining health readable by shape as well as color; hold **Alt** to compare all health bars during a battle.
 
 - **Five epochs.** Stone, Bronze, Middle Ages, Gunpowder and Industrial. Advancing costs food, wood, gold and stone and takes time at the Town Center. When you advance, every unit re-arms (clubman to spearman to pikeman to halberdier to bayonet-armed fusilier) and every building is rebuilt in the new style, keeping its share of health. The Industrial Age brings riflemen, hussars, field guns, a Field Marshal, red-brick towns with smokestacks, ironclads, paddle steamers and aircraft.
