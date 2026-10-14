@@ -168,6 +168,18 @@ export class Minimap {
       ctx.fillStyle = '#8a5a2e';
       ctx.fillRect(t.x * sx - rr * 0.4, t.y * sy - rr * 0.4, rr * 0.8, rr * 0.8);
     }
+    // Ancient ruins the viewer has found (#64): a pale stone column mark with a dark rim.
+    for (const r of s.ruins ?? []) {
+      if (!reveal && !p.seen[Math.floor(r.y) * s.w + Math.floor(r.x)]) continue;
+      const rr = Math.max(2.4, sx * 1.4);
+      ctx.fillStyle = '#d8cfb8';
+      ctx.fillRect(r.x * sx - rr, r.y * sy - rr * 0.5, rr * 0.7, rr * 1.5);
+      ctx.fillRect(r.x * sx + rr * 0.3, r.y * sy - rr, rr * 0.7, rr * 2);
+      ctx.strokeStyle = 'rgba(40,30,10,0.85)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(r.x * sx - rr, r.y * sy - rr * 0.5, rr * 0.7, rr * 1.5);
+      ctx.strokeRect(r.x * sx + rr * 0.3, r.y * sy - rr, rr * 0.7, rr * 2);
+    }
     // Relics lying where the viewer has explored: a gold diamond with a dark rim, easy to spot.
     for (const r of s.relics) {
       if (r.carrier || r.temple || (!reveal && !p.seen[Math.floor(r.y) * s.w + Math.floor(r.x)])) continue;

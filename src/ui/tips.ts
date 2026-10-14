@@ -66,6 +66,11 @@ const TIPS: Tip[] = [
     text: 'A golden <b>relic</b> glints out there (a gold diamond on the map). Build a <b>Temple</b> (<kbd>B</kbd> <kbd>Y</kbd>), then select a <b>priest</b> and right-click the relic: carried home, it brings in gold. Keep every relic long enough and you win.',
   },
   {
+    id: 'ruins',
+    when: (s, me) => !!s.ruins?.some((r) => r.by < 0 && s.players[me].seen[Math.floor(r.y) * s.w + Math.floor(r.x)] === 1),
+    text: 'You have found <b>ancient ruins</b> (two pale columns on the map). Select a few <b>citizens</b> and right-click them to dig: whoever finishes the dig takes what lies beneath, a hoard of gold, lost knowledge, an old map of the land or a relic. It\'s a long way from home, so send an escort.',
+  },
+  {
     id: 'trade',
     when: (s, me) => s.players[me].epoch >= 1 && s.posts.some((t) => s.players[me].seen[Math.floor(t.y) * s.w + Math.floor(t.x)] === 1),
     text: 'You have found a <b>trading post</b> (a camel on the map). Build a <b>Market</b> (<kbd>B</kbd> <kbd>M</kbd>), train <b>traders</b> there (<kbd>T</kbd>) and right-click the post: they bring back gold every trip, more the farther the Market. Guard the road: cavalry love to raid it.',

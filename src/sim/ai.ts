@@ -2,7 +2,7 @@ import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { AI_LEVELS, BUILDINGS, COUNTER, EPOCHS, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, TECHS, secs, unitEpoch, unitStats } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem } from './stats';
-import type { AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Player, Res, TechId, TradePost, Unit, UnitType } from './types';
+import type { AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Player, Res, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RES, R_BERRY, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { carriedBy } from './relics';
 import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple } from './units';
@@ -168,6 +168,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   research(s, v, citizens.length >= wantCitizens - 2, issue);
   trade(s, v, issue);
   planBuildings(s, v, mem, issue);
+  excavate(s, v, mem, issue);
   assignCitizens(s, v, issue);
   // Ships and aircraft are few and dear: they get first call on the treasury.
   seafaring(s, v, mem, issue);
@@ -591,6 +592,62 @@ function assignCitizens(s: GameState, v: View, issue: (c: Command) => void): voi
     const mover = v.citizens.find((u) => jobOf(u) === over && u.carry <= 2 && u.order.k !== 'farm' && u.order.k !== 'hunt' && !u.inside);
     if (mover) sendTo(s, v, mover, under, issue);
   }
+}
+
+// ---- Ancient ruins (#64) -----------------------------------------------------------------------------
+
+/** Citizens sent to dig a ruin, how many citizens the town needs before it spares them, and seconds to keep off a ruin it fled. */
+const RUIN_DIGGERS = 2;
+const RUIN_TOWN = 10;
+const RUIN_WARY = 180;
+
+/** Rival soldiers it can see within `r` tiles of a ruin, or a rival tower or Town Center it knows of within `r + 8`. */
+function ruinDanger(s: GameState, p: Player, ruin: Ruin, r: number): boolean {
+  for (const e of s.ents) {
+    if (e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
+    const dx = e.x - ruin.x;
+    const dy = e.y - ruin.y;
+    if (e.kind === 'unit') {
+      if (e.inside || e.type === 'citizen' || e.type === 'trader' || e.type === 'fisher' || !p.vis[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
+      if (dx * dx + dy * dy <= r * r) return true;
+    } else if ((e.type === 'towncenter' || e.type === 'tower') && p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)] && dx * dx + dy * dy <= (r + 8) * (r + 8)) return true;
+  }
+  return false;
+}
+
+/**
+ * Dig up the nearest ruin nobody's guarding, with a pair of citizens spared from wood, stone and gold
+ * once the town has enough of them; call them home when rival soldiers come near, and keep off that
+ * ruin for a few minutes.
+ */
+function excavate(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  if (!s.ruins) return;
+  const digging = v.citizens.filter((u) => u.order.k === 'dig');
+  for (const u of digging) {
+    const ruin = s.ruins.find((r) => u.order.k === 'dig' && r.id === u.order.target);
+    if (!ruin || !ruinDanger(s, v.p, ruin, 9)) continue;
+    (mem.ruinFled ??= {})[ruin.id] = s.tick;
+    issue({ t: 'move', p: v.p.id, ids: digging.filter((d) => d.order.k === 'dig' && d.order.target === ruin.id).map((d) => d.id), x: v.home.x, y: v.home.y });
+    return;
+  }
+  if (digging.length || v.citizens.length < RUIN_TOWN || threatNear(s, v).count) return;
+  let best: Ruin | null = null;
+  let bestD = Infinity;
+  for (const r of s.ruins) {
+    if (r.by >= 0 || s.tick - (mem.ruinFled?.[r.id] ?? -99999) < secs(RUIN_WARY) || ruinDanger(s, v.p, r, 12)) continue;
+    const d = (r.x - v.home.x) * (r.x - v.home.x) + (r.y - v.home.y) * (r.y - v.home.y);
+    if (d < bestD) {
+      bestD = d;
+      best = r;
+    }
+  }
+  if (!best) return;
+  const ruin = best;
+  const spare = v.citizens
+    .filter((u) => !u.inside && !u.queue.length && u.carry <= 2 && (u.order.k === 'idle' || (u.order.k === 'gather' && u.order.res !== 'food')))
+    .sort((a, b) => (a.x - ruin.x) * (a.x - ruin.x) + (a.y - ruin.y) * (a.y - ruin.y) - ((b.x - ruin.x) * (b.x - ruin.x) + (b.y - ruin.y) * (b.y - ruin.y)) || a.id - b.id)
+    .slice(0, RUIN_DIGGERS);
+  if (spare.length === RUIN_DIGGERS) issue({ t: 'dig', p: v.p.id, ids: spare.map((u) => u.id), target: ruin.id });
 }
 
 function nearestDropTo(v: View, u: Unit): { x: number; y: number } {
@@ -1226,7 +1283,8 @@ function chapterGoals(s: GameState, v: View, mem: AiMemory, issue: (c: Command) 
       const rivals = s.players.filter((q) => q.team !== p.team && !q.defeated).length;
       plan.wave = 10 + (rivals - 1) * 14 + mem.wave * 2;
       plan.siege = 4;
-      plan.target = rivalTownCenter(s, p);
+      // A rival's wonder wins the match if it stands: it falls first, before any Town Center (#36).
+      plan.target = rivalWonder(s, p) ?? rivalTownCenter(s, p);
       const left = sc.limit ? sc.limit - s.tick / 20 : Infinity;
       plan.allIn = sc.limit ? left < sc.limit * 0.45 : false;
     } else if (o.kind === 'build' && now < goal && o.type) {
@@ -1304,6 +1362,25 @@ function chapterGoals(s: GameState, v: View, mem: AiMemory, issue: (c: Command) 
     }
   }
   return plan;
+}
+
+/**
+ * A rival's wonder, the nearest. The goal names Town Centers, but a wonder left standing five minutes
+ * wins the match for its builder: in Wings over the Steppe a seat that had killed three times what it
+ * lost marched past the Tsar's wonder at a Town Center and lost to it at 24 minutes.
+ */
+function rivalWonder(s: GameState, p: Player): Building | null {
+  let best: Building | null = null;
+  let bestD = Infinity;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'wonder' || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
+    const d = (e.x - p.startX) * (e.x - p.startX) + (e.y - p.startY) * (e.y - p.startY);
+    if (d < bestD) {
+      bestD = d;
+      best = e;
+    }
+  }
+  return best;
 }
 
 /** The goal's target: the nearest standing Town Center of a rival, one not yet burned first. */

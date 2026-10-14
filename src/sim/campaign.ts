@@ -195,7 +195,8 @@ export const SCENARIOS: Scenario[] = [
       startEpoch: 4,
       players: [
         { ...you, civ: 'mongols' },
-        { name: 'The Tsar', ai: 'normal', team: 1, civ: 'chinese' },
+        // The Tsar plays Easy: one against two Normal rivals, a computer in your seat won 4 maps in 16 (#36).
+        { name: 'The Tsar', ai: 'easy', team: 1, civ: 'chinese' },
         { name: 'The Kaiser', ai: 'normal', team: 2, civ: 'britons' },
       ],
     },

@@ -412,6 +412,16 @@ export const RELIC = { home: 20, fair: 3, spacing: 12, extra: { small: 1, medium
  * the Bronze Age, at most `max`: so a long road pays more per minute, and has more road to guard.
  * Each ally with a Market of its own takes `ally` of every trip home (a quarter), so a team trades together.
  */
+/**
+ * Ancient ruins (#64): `count` (by map size) lie out between the towns, at least `home` tiles from every
+ * town, within `fair` tiles of as far from the two nearest, `spacing` apart and clear of relics and
+ * trading posts. One citizen digs a ruin out in `dig` seconds (more dig it quicker; the work is shared,
+ * and whoever's citizen strikes the last spade takes the find). A hoard is `gold` gold; lost knowledge
+ * is the cheapest technology of your age you don't have yet, free (a hoard of `gold` if there's none);
+ * an old map shows you the whole land; a relic comes up out of the earth. Diggers stand within `reach`
+ * tiles of the ruin's middle, and nothing is built within `clear` tiles of it.
+ */
+export const RUINS = { count: { small: 2, medium: 3, large: 4 } as Record<MapSize, number>, home: 24, fair: 4, spacing: 14, dig: 40, gold: 300, reach: 1.7, clear: 1 };
 /** Repairs: restoring a building's whole health costs this share of its price, paid as the hammers work. */
 export const REPAIR_SHARE = 0.4;
 export const TRADE = { posts: { small: 2, medium: 2, large: 3 } as Record<MapSize, number>, edge: 9, fair: 4, far: 0.3, spacing: 0.4, plaza: 1, reach: 1.8, gold: 0.012, epoch: 0.08, max: 180, ally: 0.25 };

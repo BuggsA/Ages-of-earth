@@ -2,7 +2,7 @@
  * A headless match between two computer opponents, printed minute by minute, for balancing and timing.
  *   npx tsx scripts/sim.ts [seed] [small|medium|large] [minutes]
  */
-import { EPOCHS } from '../src/sim/data';
+import { EPOCHS, RUINS, secs } from '../src/sim/data';
 import { checksum, createGame, step } from '../src/sim/game';
 
 const seed = Number(process.argv[2] ?? 1);
@@ -29,4 +29,5 @@ for (let i = 0; i < minutes * 60 * 20 && !s.over; i++) {
 }
 const won = s.winner >= 0 ? s.players[s.winner].name : 'nobody yet';
 console.log(`Relics: ${s.relics.length} on the map, ${s.relics.filter((r) => r.temple).length} kept, ${s.relics.filter((r) => r.carrier).length} carried.`);
+if (s.ruins) console.log(`Ruins: ${s.ruins.map((r) => `${r.find} ${r.by >= 0 ? `dug by ${s.players[r.by].name}` : `${Math.round((100 * r.dug) / secs(RUINS.dig))}% dug`}`).join(', ')}.`);
 console.log(`Winner: ${won} after ${(s.tick / 1200).toFixed(1)} min. ${(performance.now() - t0).toFixed(0)} ms in all, worst tick ${worst.toFixed(1)} ms, checksum ${checksum(s)}.`);
