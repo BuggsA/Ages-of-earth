@@ -838,14 +838,14 @@ function seaTradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>):
       if (u.carry > 0) payTrip(s, u, d, true);
       u.carry = 0;
       u.carryRes = null;
-      if (post && portSpot(s, post)) o.phase = 'go';
+      if (post && portSpot(s, post, u.owner)) o.phase = 'go';
       else setOrder(u, { k: 'idle' });
       return;
     }
     if (!approach(u, goalForBuilding(d))) setOrder(u, { k: 'idle' });
     return;
   }
-  const spot = post ? portSpot(s, post) : null;
+  const spot = post ? portSpot(s, post, u.owner) : null;
   if (!post || !spot) {
     setOrder(u, { k: 'idle' });
     return;
