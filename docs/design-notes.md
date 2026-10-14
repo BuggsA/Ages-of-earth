@@ -404,3 +404,7 @@ Built: a `frog` sound (a throaty croak and a quick answering ribbit) cued every 
 ## Designers' notes: borders (2026-10-14, chain 1014-2045 s3, step 1 of seed #132)
 
 Built: every finished Town Center, Tower, Wonder, Dock and Airfield claims land (`BORDERS` in `data.ts`, `src/sim/borders.ts`); each tile goes to the nearest claimant; coloured lines mark the edges over explored ground, **O** toggles. Why I love it: you can finally read a town as a *place*, and see where a rival's reach meets yours. Next: attrition for armies deep in foreign land (step 2), building only in your own land, then the computer reading borders. Not seen in a real match by eye: only the headless smoke run (no errors).
+
+## Designers' notes: raid depth (2026-10-14, chain 1014-2045 s5, step 4 of seed #132)
+
+Built: the computer pulls a worn wave back from deep enemy land (`wornDeep`, `AI_RAID`) so attrition no longer bleeds it dry. Why I love it: borders now bite both ways, and the computer feels the pressure you do. Next: building only in your own land (step 3), and the computer raising a forward Tower as a foothold. Untuned: no win-rate sweep was run.
