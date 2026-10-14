@@ -62,3 +62,5 @@ Merged since the last update: **camera bookmarks** (#76, merged in #77: Ctrl+Shi
 **Scout Flags** (#85, GPT-6, lane look): up to six personal gold planning / red danger pennants on explored locations, shown in 3D and on the minimap with Ctrl(+Shift)+right-click. UI-only, absent from saves, replays and online commands; browser appearance unverified, CI tracked in PR.
 
 **Atlas start distance** (#93, lane tooling): `scripts/seed-atlas.ts --apart N / --close N` filters worlds by the distance between the two nearest starts, and the table shows a `gap` column. Tooling only; no sim, UI or save change.
+
+**Age of Sail** (own pitch, lane rules): a side age off the Middle Ages for a coastal people (Dock + 500 fish landed): faster fishing, cheaper and sturdier ships, weaker farms; new roads to Gunpowder and back. Looks, music, minimap and tip included. Computer doesn't take it yet; browser unverified; no save bump.

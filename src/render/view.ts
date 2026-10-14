@@ -959,6 +959,10 @@ function sideAgeAmbient(fx: Effects, age: AgeId, e: Ent, base: number): boolean 
     fx.burst(new THREE.Vector3(e.x, base + 2.7, e.y), { count: 1, speed: 0.08, up: 1, life: 3.4, size: 0.07, grow: 3, gravity: -0.1, drag: 0.4, soft: true, colors: ['#efe9d6', '#fff6dc'] });
     return true;
   }
+  if (age === 'sail' && e.type === 'dock') {
+    fx.burst(new THREE.Vector3(e.x + 0.4, base + 0.3, e.y + 1.7), { count: 1, speed: 0.25, up: 0.4, life: 1.3, size: 0.05, grow: 2, gravity: -0.1, drag: 0.5, soft: true, colors: ['#ffffff', '#cfe9ef'] });
+    return true;
+  }
   if (age === 'fair' && e.type === 'market') {
     fx.burst(new THREE.Vector3(e.x, base + 2.0, e.y), { count: 2, speed: 0.5, up: 1, life: 1.6, size: 0.04, gravity: 0.5, colors: ['#d94a3c', '#e8b43a', '#3f8fc4', '#f4efe4'] });
     return true;

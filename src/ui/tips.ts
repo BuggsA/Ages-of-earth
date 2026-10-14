@@ -12,6 +12,7 @@ import { isIdleCitizen } from './idle';
 const MERCHANT_ROAD = ROADS.find((r) => r.to === 'merchant')!;
 const IRON_ROAD = ROADS.find((r) => r.to === 'iron')!;
 const PILGRIM_ROAD = ROADS.find((r) => r.to === 'pilgrim')!;
+const SAIL_ROAD = ROADS.find((r) => r.to === 'sail')!;
 const FAIR_ROAD = ROADS.find((r) => r.to === 'fair')!;
 
 interface Tip {
@@ -109,6 +110,15 @@ const TIPS: Tip[] = [
       return ageOf(p) === 'middle' && roadKnown(s, p, PILGRIM_ROAD) && !deedsDone(p, PILGRIM_ROAD);
     },
     text: `There is a turning off the Middle Ages. Carry relics to your Temple: once they have brought in ${PILGRIM_ROAD.deed!.n} gold, the Town Center (🔀) can turn your people into the <b>${AGES.pilgrim.name}</b>: relics pay double and priests come cheap, but no siege engines. The road shuts once you advance.`,
+  },
+  {
+    id: 'sail',
+    // A Dock stands while the Middle Ages last: the sea is a road too.
+    when: (s, me) => {
+      const p = s.players[me];
+      return ageOf(p) === 'middle' && roadKnown(s, p, SAIL_ROAD) && !deedsDone(p, SAIL_ROAD);
+    },
+    text: `The sea is a road. Land ${SAIL_ROAD.deed!.n} fish with your boats, and the Town Center (🔀) can turn your people into the <b>${AGES.sail.name}</b>: fishing is half again as quick, ships cost less and have sturdier hulls, but the fields yield less. The road shuts once you advance.`,
   },
   {
     id: 'fairs',

@@ -907,6 +907,26 @@ function ironTower(k: Kit, st: Style): void {
 
 /** The side ages that dress buildings; the trunk ages have their own epoch styles. */
 export const LOOK_AGES: AgeId[] = ['merchant', 'iron', 'pilgrim', 'fair'];
+/** The side ages that dress buildings, with the Age of Sail (kept apart so the first four stay as tested). */
+export const ALL_LOOK_AGES: AgeId[] = [...LOOK_AGES, 'sail'];
+
+const SAIL = '#efe8d4';
+const NET = '#b9ad8a';
+
+/** A mast with a square sail and a pennant: the sea people's mark. */
+function mast(k: Kit, x: number, z: number, h: number, w = 0.7): void {
+  k.cyl(0.03, 0.04, h, 5, '#5a4630', x, 0, z);
+  k.box(w, h * 0.45, 0.025, SAIL, x, h * 0.45, z + 0.03);
+  k.box(w + 0.1, 0.03, 0.04, '#5a4630', x, h * 0.92, z + 0.03);
+  k.box(0.22, 0.09, 0.02, '#3f8fc4', x + 0.12, h + 0.04, z);
+}
+
+/** Nets hung to dry on two posts, with cork floats along the top. */
+function hungNets(k: Kit, x: number, y: number, z: number, w: number): void {
+  for (const dx of [-w / 2, w / 2]) k.cyl(0.02, 0.02, 0.6, 4, '#5a4630', x + dx, y, z);
+  k.box(w, 0.4, 0.015, NET, x, y + 0.14, z);
+  for (let i = 0; i < 5; i++) k.sphere(0.03, '#c9a25a', x - w / 2 + (w * (i + 0.5)) / 5, y + 0.56, z);
+}
 
 const CLOTH = ['#d94a3c', '#e8b43a', '#3f8fc4', '#8a4fa8'];
 const RUST = '#8a4a2c';
@@ -1010,6 +1030,24 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
         lamp(k, 0, 0, 2.9, 0.6);
       }
       break;
+    case 'sail':
+      if (type === 'dock') {
+        mast(k, 0.4, 1.7, 1.7, 0.75);
+        hungNets(k, -1.25, 0, 0.1, 0.9);
+      } else if (type === 'house') hungNets(k, 0, 0, 0.95, 0.8);
+      else if (big) {
+        mast(k, -1.7, 1.9, 2.4);
+        mast(k, 1.7, 1.9, 2.4);
+        hungNets(k, 0, 0, 2.1, 1.2);
+      } else if (type === 'market') {
+        hungNets(k, -1.3, 0, 1.3, 0.9);
+        k.cyl(0.16, 0.16, 0.3, 8, '#7a5634', 1.2, 0, 1.2);
+        k.cyl(0.16, 0.16, 0.3, 8, '#7a5634', 1.55, 0, 1.0);
+      } else if (type === 'wonder') {
+        mast(k, -2.2, 2.7, 3.0, 0.9);
+        mast(k, 2.2, 2.7, 3.0, 0.9);
+      }
+      break;
     case 'fair':
       if (type === 'market') {
         stripedStall(k, -1.3, 0.45);
@@ -1040,7 +1078,7 @@ const cache = new Map<string, THREE.BufferGeometry>();
 
 /** The baked model of a building in an epoch, in a player's color (`variant`: which way a wall piece joins its neighbors). */
 export function buildingGeometry(type: BuildingType, epoch: number, color: string, variant = 0, age?: AgeId): THREE.BufferGeometry {
-  const look = age && LOOK_AGES.includes(age) && type !== 'wall' ? age : undefined;
+  const look = age && ALL_LOOK_AGES.includes(age) && type !== 'wall' ? age : undefined;
   const key = `${type}:${epoch}:${color}:${variant}${look ? ':' + look : ''}`;
   let g = cache.get(key);
   if (!g) {
