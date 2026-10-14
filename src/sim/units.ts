@@ -809,7 +809,7 @@ function tradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>): vo
             q.res.gold += cut;
             q.stats.gathered += cut;
             q.stats.traded += cut;
-            s.events.push({ k: 'caravan', id: u.id, owner: q.id, what: 'paid', amount: cut, x: m.x, y: m.y });
+            s.events.push({ k: 'caravan', id: u.id, owner: q.id, what: 'paid', share: true, amount: cut, x: m.x, y: m.y });
           }
         }
       }
