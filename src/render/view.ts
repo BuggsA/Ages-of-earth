@@ -6,6 +6,7 @@ import { buildingMaxHp, statsFor } from '../sim/stats';
 import type { AgeId, BuildingType, CivId, Ent, GameEvent, GameState, Unit } from '../sim/types';
 import type { ScoutFlag } from '../ui/scoutFlags';
 import { R_BOG, R_GOLD, R_STONE } from '../sim/types';
+import { stirred } from '../sim/combat';
 import { seesRect } from '../sim/vision';
 import { BuildingsView } from './buildingsView';
 import { CameraRig } from './camera';
@@ -481,6 +482,17 @@ export class View {
       const k = id ? s.byId.get(id) : undefined;
       const at = k ? this.units.drawn.get(id) : undefined;
       if (k && at) rings.push({ x: at.x, y: at.y, z: at.z, r: 0.7, color: aura, thin: true });
+    }
+    // Soldiers stirred by a Rallying Cry glow with a pulsing gold band, fading as the cry runs out.
+    const cheer = new THREE.Color('#ffc94a');
+    for (const e of s.ents) {
+      if (e.kind !== 'unit' || e.hp <= 0 || !stirred(s, e)) continue;
+      const at = this.units.drawn.get(e.id);
+      if (!at) continue;
+      const left = Math.min(1, (e.cry! - s.tick) / (TICK_HZ * 3));
+      const pulse = 1 + 0.12 * Math.sin(this.time * 6 + e.id);
+      const ry = domainOf(e.type) === 'air' ? Math.max(WATER_Y, heightAt(s, at.x, at.z)) : at.y;
+      rings.push({ x: at.x, y: ry, z: at.z, r: (statsFor(s, e.owner, e.type).radius + 0.3) * pulse, color: cheer.clone().multiplyScalar(0.4 + 0.9 * left) });
     }
     // Health: the selected, the recently hurt, or everyone while asked.
     const recent = s.tick - TICK_HZ * 4;
