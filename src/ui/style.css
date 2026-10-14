@@ -352,3 +352,15 @@ body.online .tip-box { bottom: 330px; }
 .wm-card p { margin: 2px 0; }
 .wm-dim { color: var(--muted); }
 .wm-roads { margin: 4px 0 0; padding-left: 18px; color: var(--gold-2); font-size: 13px; }
+
+/* Citizen workforce ledger: an on-demand overlay, never a simulation command. */
+.workforce-wrap { position: relative; flex: none; }
+.workforce-panel { position: absolute; top: calc(100% + 9px); right: 0; z-index: 40; width: 210px; padding: 8px; border: 1px solid var(--edge); border-radius: 10px; background: rgba(19, 24, 35, 0.97); box-shadow: var(--shadow); }
+.workforce-panel.hidden { display: none; }
+.workforce-head { display: flex; justify-content: space-between; align-items: baseline; font: 800 13px 'Cinzel', serif; color: var(--gold-2); padding: 4px 6px 9px; }
+.workforce-head span { color: var(--muted); font: 700 11px 'Nunito', sans-serif; }
+.workforce-panel button { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; color: var(--ink); background: transparent; border: 0; border-radius: 6px; font: 700 13px 'Nunito', sans-serif; cursor: pointer; text-align: left; }
+.workforce-panel button strong { font-variant-numeric: tabular-nums; color: var(--gold-2); }
+.workforce-panel button:hover:not(:disabled), .workforce-panel button:focus-visible { background: rgba(232, 196, 106, 0.14); outline: 1px solid var(--gold); }
+.workforce-panel button:disabled { opacity: 0.42; cursor: default; }
+.workforce-note { border-top: 1px solid var(--edge); padding: 8px 6px 3px; color: var(--muted); font-size: 11px; line-height: 1.4; }
