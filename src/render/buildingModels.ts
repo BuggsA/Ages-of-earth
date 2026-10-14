@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { BuildingType } from '../sim/types';
+import type { AgeId, BuildingType } from '../sim/types';
 import { Kit, bake, rnd } from './kit';
 
 /**
@@ -899,6 +899,139 @@ function ironTower(k: Kit, st: Style): void {
   for (const [x, z] of [[-2.1, 2.1], [2.1, 2.1]]) banner(k, x, 0, z, 1.6, 1.2);
 }
 
+
+// ---- Side ages (#55) -------------------------------------------------------------------------------
+// Touches baked into a building's own vertices, so a side age reads at a glance and still costs no
+// extra draw: awnings and bright cloth (merchants), rust and smithy glow (iron), banners, lamps and
+// pale stone (pilgrims), stripes and bunting (fairs). Fronts face +z.
+
+/** The side ages that dress buildings; the trunk ages have their own epoch styles. */
+export const LOOK_AGES: AgeId[] = ['merchant', 'iron', 'pilgrim', 'fair'];
+
+const CLOTH = ['#d94a3c', '#e8b43a', '#3f8fc4', '#8a4fa8'];
+const RUST = '#8a4a2c';
+const PALE = '#e9e4d6';
+
+/** A slanted awning over a front: alternate bright strips. */
+function awning(k: Kit, x: number, y: number, z: number, w: number, strips: number, a = 0): void {
+  const sw = w / strips;
+  for (let i = 0; i < strips; i++) {
+    const m = k.box(sw, 0.03, 0.5, CLOTH[(i + a) % CLOTH.length], x - w / 2 + sw * (i + 0.5), y, z);
+    m.rotation.x = 0.3;
+  }
+  k.box(w, 0.1, 0.03, CLOTH[a % CLOTH.length], x, y - 0.1, z + 0.28);
+}
+
+/** Bunting: a sagging line of small flags between two points along x. */
+function bunting(k: Kit, x0: number, x1: number, y: number, z: number, n: number): void {
+  for (let i = 0; i < n; i++) {
+    const t = (i + 0.5) / n;
+    const sag = 0.1 * Math.sin(t * Math.PI);
+    const m = k.box(0.1, 0.14, 0.02, CLOTH[i % CLOTH.length], x0 + (x1 - x0) * t, y - sag - 0.07, z);
+    m.rotation.z = i % 2 ? 0.2 : -0.2;
+  }
+  k.box(x1 - x0, 0.015, 0.015, '#4a3426', (x0 + x1) / 2, y - 0.02, z);
+}
+
+/** A striped stall: a red and white canopy on four poles, a counter beneath. */
+function stripedStall(k: Kit, x: number, z: number): void {
+  for (const dx of [-0.28, 0.28]) for (const dz of [-0.2, 0.2]) k.cyl(0.02, 0.02, 0.62, 4, WOOD, x + dx, 0, z + dz);
+  for (let i = 0; i < 6; i++) k.box(0.1, 0.03, 0.5, i % 2 ? '#f4efe4' : '#cf3d34', x - 0.25 + i * 0.1, 0.64, z).rotation.x = 0.12;
+  k.box(0.5, 0.22, 0.2, '#8a6440', x, 0, z);
+  k.sphere(0.05, '#e2b23c', x, 0.26, z);
+}
+
+/** A lamp on a post, glowing. */
+function lamp(k: Kit, x: number, y: number, z: number, h = 0.5): void {
+  k.cyl(0.015, 0.02, h, 4, '#4a3426', x, y, z);
+  k.glow(k.octa(0.05, LIGHT, x, y + h + 0.04, z));
+}
+
+function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
+  const big = type === 'towncenter';
+  switch (age) {
+    case 'merchant':
+      if (type === 'market') {
+        awning(k, -0.9, 0.78, 1.25, 1.2, 4, 0);
+        awning(k, 0.9, 0.78, 1.25, 1.2, 4, 2);
+        k.box(0.5, 0.3, 0.04, '#e2b23c', 0, 1.55, 0.2);
+      } else if (type === 'house') awning(k, 0, 0.62, 0.85, 0.7, 3, 1);
+      else if (big) {
+        awning(k, -0.8, 1.0, 2.1, 1.4, 4, 0);
+        awning(k, 0.8, 1.0, 2.1, 1.4, 4, 2);
+      } else if (type === 'storehouse') awning(k, 0, 0.7, 1.0, 1.0, 4, 3);
+      else if (type === 'wonder') {
+        awning(k, -1.4, 1.1, 2.7, 1.6, 4, 0);
+        awning(k, 1.4, 1.1, 2.7, 1.6, 4, 2);
+      }
+      break;
+    case 'iron':
+      if (type === 'forge') {
+        k.box(0.62, 0.52, 0.03, '#2b2b2e', 0, 0.16, 1.5);
+        k.glow(k.box(0.5, 0.4, 0.05, '#ff7a2a', 0, 0.2, 1.52));
+        k.box(2.6, 0.18, 0.04, RUST, 0, 0.1, 1.5);
+        k.glow(k.octa(0.08, '#ff9a3c', 1.1, 2.7, -1.1));
+      } else if (type === 'house') {
+        k.box(1.45, 0.14, 1.2, RUST, -0.1, 0, -0.1);
+        k.glow(k.box(0.12, 0.1, 0.03, '#ff7a2a', 0.35, 0.3, 0.52));
+      } else if (big) {
+        k.box(3.0, 0.2, 3.0, RUST, 0, 0, 0);
+        torch(k, -1.4, 0, 2.05);
+        torch(k, 1.4, 0, 2.05);
+      } else if (type === 'barracks' || type === 'storehouse') k.box(1.9, 0.14, 1.9, RUST, 0, 0, 0);
+      else if (type === 'wonder') {
+        k.box(5.2, 0.2, 5.2, RUST, 0, 0, 0);
+        torch(k, -2.3, 0, 2.7);
+        torch(k, 2.3, 0, 2.7);
+      }
+      break;
+    case 'pilgrim':
+      if (type === 'temple') {
+        banner(k, -0.6, 0, 1.6, 1.9, 1.3);
+        banner(k, 0.6, 0, 1.6, 1.9, 1.3);
+        lamp(k, -1.3, 0, 1.45);
+        lamp(k, 1.3, 0, 1.45);
+        k.box(2.6, 0.18, 2.4, PALE, 0, -0.01, -0.1);
+      } else if (type === 'house') {
+        k.box(1.5, 0.22, 1.25, PALE, -0.1, 0, -0.1);
+        lamp(k, 0.8, 0, 0.8, 0.4);
+      } else if (big) {
+        k.box(3.2, 0.22, 3.2, PALE, 0, 0, 0);
+        banner(k, -1.6, 0, 1.9, 2.0, 1.3);
+        banner(k, 1.6, 0, 1.9, 2.0, 1.3);
+        lamp(k, 0, 0, 2.1, 0.55);
+      } else if (type === 'market') {
+        lamp(k, -1.3, 0, 1.3);
+        lamp(k, 1.3, 0, 1.3);
+      } else if (type === 'wonder') {
+        k.box(5.2, 0.22, 5.2, PALE, 0, 0, 0);
+        banner(k, -2.0, 0, 2.8, 2.2, 1.4);
+        banner(k, 2.0, 0, 2.8, 2.2, 1.4);
+        lamp(k, 0, 0, 2.9, 0.6);
+      }
+      break;
+    case 'fair':
+      if (type === 'market') {
+        stripedStall(k, -1.3, 0.45);
+        stripedStall(k, 1.3, 0.45);
+        stripedStall(k, 0, 1.45);
+        bunting(k, -1.35, 1.35, 1.55, 1.3, 9);
+        bunting(k, -1.35, 1.35, 1.1, -0.1, 9);
+      } else if (type === 'house') bunting(k, -0.7, 0.7, 0.75, 0.8, 5);
+      else if (big) {
+        bunting(k, -1.7, 1.7, 1.6, 2.05, 11);
+        stripedStall(k, -1.7, 1.5);
+        stripedStall(k, 1.7, 1.5);
+      } else if (type === 'temple') bunting(k, -1.2, 1.2, 1.1, 1.3, 7);
+      else if (type === 'wonder') {
+        bunting(k, -2.2, 2.2, 1.8, 2.8, 13);
+        stripedStall(k, -2.1, 2.5);
+        stripedStall(k, 2.1, 2.5);
+      }
+      break;
+  }
+}
+
 const MAKERS: Record<Exclude<BuildingType, 'wall'>, (k: Kit, e: number, st: Style) => void> = {
   towncenter, house, storehouse, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield,
 };
@@ -906,8 +1039,9 @@ const MAKERS: Record<Exclude<BuildingType, 'wall'>, (k: Kit, e: number, st: Styl
 const cache = new Map<string, THREE.BufferGeometry>();
 
 /** The baked model of a building in an epoch, in a player's color (`variant`: which way a wall piece joins its neighbors). */
-export function buildingGeometry(type: BuildingType, epoch: number, color: string, variant = 0): THREE.BufferGeometry {
-  const key = `${type}:${epoch}:${color}:${variant}`;
+export function buildingGeometry(type: BuildingType, epoch: number, color: string, variant = 0, age?: AgeId): THREE.BufferGeometry {
+  const look = age && LOOK_AGES.includes(age) && type !== 'wall' ? age : undefined;
+  const key = `${type}:${epoch}:${color}:${variant}${look ? ':' + look : ''}`;
   let g = cache.get(key);
   if (!g) {
     const k = new Kit();
@@ -915,6 +1049,7 @@ export function buildingGeometry(type: BuildingType, epoch: number, color: strin
     else MAKERS[type](k, epoch, STYLES[epoch]);
     const stack = STACKS[type];
     if (epoch >= 4 && stack) smokestack(k, stack[0], stack[1], stack[2]);
+    if (look) ageTouches(k, type, look);
     g = bake(k.root, color);
     cache.set(key, g);
   }

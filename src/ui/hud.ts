@@ -6,8 +6,8 @@ import { AGES, STEP_BACK, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CI
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { marketOf, nearestMarket, postAt, tripGold } from '../sim/trade';
-import { buildingCostFor, buildingMaxHp, statsFor, techCostFor, techProblem, trainCostFor, trainTimeFor } from '../sim/stats';
-import { ageDef, ageOf, backProblem, backTo, barred, deedProgress, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, roadKnown, roadProblem, roadsFrom, shutRoads, surveyFinds, suspendedTechs, trainsAt } from '../sim/ages';
+import { buildingCostFor, buildingMaxHp, modsOf, statsFor, techCostFor, techProblem, trainCostFor, trainTimeFor } from '../sim/stats';
+import { ageDef, ageOf, backProblem, backTo, barred, deedsProgress, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, surveyFinds, suspendedTechs, trainsAt, windowsOf } from '../sim/ages';
 import type { Building, BuildingType, Command, Cost, Ent, GameState, Player, Stance, TechId, TradePost, Unit } from '../sim/types';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
@@ -447,11 +447,12 @@ export class Hud {
     } else if (b.type === 'wonder' && b.timer >= 0) status = `Stands ${fmtTime(b.timer)} more for victory`;
     else if (b.type === 'market') {
       const traders = s.ents.filter((e) => e.kind === 'unit' && e.owner === b.owner && e.type === 'trader' && e.order.k === 'trade' && e.order.market === b.id).length;
-      status = `Prices: ${(['food', 'wood', 'stone'] as const).map((r) => `${icon(r, 14)}${s.market[r]} ${s.market[r] < MARKET.start[r] ? '↑' : s.market[r] > MARKET.start[r] ? '↓' : '→'}`).join(' ')}${traders ? ` · 🐪 ${traders} on the road` : ''}`;
+      const fair = relicTradeShare(s, b.owner);
+      status = `Prices: ${(['food', 'wood', 'stone'] as const).map((r) => `${icon(r, 14)}${s.market[r]} ${s.market[r] < MARKET.start[r] ? '↑' : s.market[r] > MARKET.start[r] ? '↓' : '→'}`).join(' ')}${traders ? ` · 🐪 ${traders} on the road` : ''}${fair > 1 ? ` · ⚱ trade +${Math.round((fair - 1) * 100)}% for relics kept` : ''}`;
     }
     else if (b.type === 'dock') status = 'Fishing boats bring their catch here';
     else if (b.type === 'storehouse' && p.techs.includes('survey')) status = surveyFinds(s, 'survey') ? '🧭 Bog iron lies somewhere in this world' : '🧭 No bog iron in this world';
-    else if (b.type === 'temple' && keptIn(s, b)) status = `Keeps ${keptIn(s, b)} relic${keptIn(s, b) > 1 ? 's' : ''}: ${icon('gold', 14)}${Math.round((60 / RELIC.every) * RELIC.gold * keptIn(s, b))} a minute`;
+    else if (b.type === 'temple' && keptIn(s, b)) status = `Keeps ${keptIn(s, b)} relic${keptIn(s, b) > 1 ? 's' : ''}: ${icon('gold', 14)}${Math.round((60 / RELIC.every) * Math.round(RELIC.gold * modsOf(s, b.owner).relicGold) * keptIn(s, b))} a minute`;
     else status = def.drop.length ? 'Drop-off for every resource' : def.pop ? `Room for ${def.pop}` : 'Ready';
     if (!mine) status = `<span class="swatch" style="background:${p.color}"></span>${p.name}${b.type === 'wonder' && b.timer >= 0 ? `: wins in ${fmtTime(b.timer)}` : ''}${b.type === 'temple' && keptIn(s, b) ? `: keeps ${keptIn(s, b)} relic${keptIn(s, b) > 1 ? 's' : ''}` : ''}`;
     const inside = def.garrison && b.built ? `<div class="stats"><span data-tip="<b>Sheltering</b>Units inside are safe, heal slowly and add arrows.">🏰<em>Inside</em> ${b.garrison.length}/${def.garrison}</span></div>` : '';
@@ -566,17 +567,17 @@ export class Hud {
           });
         });
         if (b.type === 'towncenter') {
-          // Every known road out of this age (#37): the main road on W, side roads on Y and X.
+          // Every known road out of this age (#37): the main road on W, side roads on Y, X and C.
           const advancing = s.ents.some((e) => e.kind === 'building' && e.owner === viewer && e.advance >= 0);
           const main = mainRoad(p);
-          const sideKeys = ['Y', 'X'];
+          const sideKeys = ['Y', 'X', 'C'];
           for (const road of roadsFrom(p)) {
             if (!roadKnown(s, p, road)) continue;
             const to = AGES[road.to];
             const isMain = road === main;
             const problem = roadProblem(s, p, road);
             const short = shortfall(p, road.cost);
-            const deed = deedProgress(p, road);
+            const deeds = deedsProgress(p, road);
             const toward = to.tier > p.epoch ? 'Advance to' : to.tier < p.epoch ? 'Step back to' : 'Turn to';
             const back = suspendedTechs(p).filter((t) => TECHS[t].epoch <= to.tier);
             cmds.push({
@@ -584,7 +585,7 @@ export class Hud {
               pic: '',
               glyph: isMain ? '⏫' : '🔀',
               title: `${toward} the ${to.name}`,
-              desc: `${road.blurb ?? to.blurb}${isSideRoad(road) ? ` Opens only from the ${AGES[road.from].name}.` : ''}${deed ? `<br>${road.deed!.text}: ${Math.min(deed.have, deed.need)}/${deed.need}.` : ''}${back.length ? `<br>Brings back ${back.map((t) => TECHS[t].name).join(', ')}.` : ''} Takes ${road.time}s. Every unit re-arms and every building is rebuilt in the new style.`,
+              desc: `${road.blurb ?? to.blurb}${isSideRoad(road) ? ` Opens only from ${windowsOf(road.to).map((a) => `the ${AGES[a].name}`).join(' or ')}.` : ''}${deeds.map((d) => `<br>${d.have >= d.need ? '✔' : '…'} ${d.deed.text}: ${Math.min(d.have, d.need)}/${d.need}.`).join('')}${back.length ? `<br>Brings back ${back.map((t) => TECHS[t].name).join(', ')}.` : ''} Takes ${road.time}s. Every unit re-arms and every building is rebuilt in the new style.`,
               cost: road.cost,
               ok: !advancing && !problem && !short && b.queue.length === 0,
               on: b.advance >= 0 && !b.back && journeyOf(p, b)?.to === road.to,
@@ -626,15 +627,16 @@ export class Hud {
           // Side roads whose window this age is outside of (#47): shown shut, with the way to them.
           for (const road of shutRoads(s, p)) {
             const from = AGES[road.from];
+            const windows = windowsOf(road.to).map((a) => `the ${AGES[a].name}`).join(' or ');
             cmds.push({
               key: '',
               pic: '',
               glyph: '🔒',
               title: `The ${AGES[road.to].name}`,
-              desc: `${road.blurb ?? AGES[road.to].blurb}<br>This road opens only from the ${from.name}.`,
+              desc: `${road.blurb ?? AGES[road.to].blurb}<br>This road opens only from ${windows}.`,
               cost: road.cost,
               ok: false,
-              why: from.tier < p.epoch ? `Shut: step back to the ${from.name} to take it` : `Shut: it opens only from the ${from.name}`,
+              why: from.tier < p.epoch ? `Shut: step back to the ${from.name} to take it` : `Shut: it opens only from ${windows}`,
               run: () => {},
             });
           }

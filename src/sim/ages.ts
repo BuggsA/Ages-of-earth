@@ -1,4 +1,4 @@
-import { AGES, BUILDINGS, ROADS, STEP_BACK, TECHS, TICK_HZ, TRUNK, secs, stepBackCost, type Age, type Road } from './data';
+import { AGES, BUILDINGS, ROADS, STEP_BACK, TECHS, TICK_HZ, TRUNK, secs, stepBackCost, type Age, type Deed, type Road } from './data';
 import type { AgeId, Building, BuildingType, Cost, GameState, Player, TechId, UnitType } from './types';
 
 /**
@@ -45,11 +45,26 @@ export function roadKnown(s: GameState, p: Player, r: Road): boolean {
   return !r.clue || s.ents.some((e) => e.kind === 'building' && e.owner === p.id && e.type === r.clue && e.built);
 }
 
-/** How far along a road's deed is, or null if it has none. */
-export function deedProgress(p: Player, r: Road): { have: number; need: number } | null {
-  if (!r.deed) return null;
-  return { have: Math.floor(p.stats[r.deed.stat] ?? 0), need: r.deed.n };
+/** Every deed a road needs: its own, then any it asks for `also` (#49). */
+export const deedsOf = (r: Road): Deed[] => (r.deed ? (r.also ? [r.deed, ...r.also] : [r.deed]) : (r.also ?? []));
+
+export interface DeedProgress {
+  deed: Deed;
+  have: number;
+  need: number;
 }
+
+/** How far along each of a road's deeds is (empty if it needs none). */
+export const deedsProgress = (p: Player, r: Road): DeedProgress[] => deedsOf(r).map((deed) => ({ deed, have: Math.floor(p.stats[deed.stat] ?? 0), need: deed.n }));
+
+/** How far along a road's first deed is, or null if it has none. */
+export function deedProgress(p: Player, r: Road): { have: number; need: number } | null {
+  const d = deedsProgress(p, r)[0];
+  return d ? { have: d.have, need: d.need } : null;
+}
+
+/** Whether every deed a road asks for is done. */
+export const deedsDone = (p: Player, r: Road): boolean => deedsProgress(p, r).every((d) => d.have >= d.need);
 
 /** What, besides its price, keeps a player off a road, or null. */
 export function roadProblem(s: GameState, p: Player, r: Road): string | null {
@@ -58,9 +73,8 @@ export function roadProblem(s: GameState, p: Player, r: Road): string | null {
     if (r.found && !surveyFinds(s, r.found)) return 'There is none in this world';
     return `Needs a ${BUILDINGS[r.clue!].name}`;
   }
-  const d = deedProgress(p, r);
-  if (d && d.have < d.need) return `${r.deed!.text} (${d.have}/${d.need})`;
-  return null;
+  const left = deedsProgress(p, r).filter((d) => d.have < d.need);
+  return left.length ? left.map((d) => `${d.deed.text} (${d.have}/${d.need})`).join('; ') : null;
 }
 
 /** Units a player hires at a building in their age, beyond what it usually trains. */
@@ -83,6 +97,23 @@ export function barred(p: Player, unit: UnitType): string | null {
   return no && no.units.includes(unit) ? no.why : null;
 }
 
+/** How many relics a player keeps in standing Temples. */
+export function relicsKept(s: GameState, owner: number): number {
+  let n = 0;
+  for (const r of s.relics) {
+    if (!r.temple) continue;
+    const b = s.byId.get(r.temple);
+    if (b && b.kind === 'building' && b.owner === owner && b.hp > 0) n++;
+  }
+  return n;
+}
+
+/** What a player's age multiplies each trade trip by for the relics it keeps (the Age of Fairs, #49); 1 elsewhere. */
+export function relicTradeShare(s: GameState, owner: number): number {
+  const rt = ageDef(s.players[owner]).relicTrade;
+  return rt ? 1 + rt.each * Math.min(rt.most, relicsKept(s, owner)) : 1;
+}
+
 /** A road into a side age, as against the trunk's own roads and the roads back onto it. */
 export const isSideRoad = (r: Road): boolean => !TRUNK.includes(r.to);
 
@@ -92,8 +123,20 @@ export const isSideRoad = (r: Road): boolean => !TRUNK.includes(r.to);
  */
 export function shutRoads(s: GameState, p: Player): Road[] {
   const here = ageOf(p);
-  return ROADS.filter((r) => isSideRoad(r) && r.from !== here && r.to !== here && AGES[r.from].tier <= p.epoch && roadKnown(s, p, r));
+  // An age with several ways in (the Age of Fairs, #49) shows once, by the first road the player knows;
+  // and not at all while one of its roads is open from here.
+  const open = new Set(roadsFrom(p).map((r) => r.to));
+  const seen = new Set<AgeId>();
+  return ROADS.filter((r) => {
+    if (!isSideRoad(r) || r.from === here || r.to === here || open.has(r.to) || seen.has(r.to)) return false;
+    if (AGES[r.from].tier > p.epoch || !roadKnown(s, p, r)) return false;
+    seen.add(r.to);
+    return true;
+  });
 }
+
+/** Every age a shut road's destination can be reached from: its windows (#47, #49). */
+export const windowsOf = (to: AgeId): AgeId[] => ROADS.filter((r) => r.to === to).map((r) => r.from);
 
 /** The age a step back lands in (#47): the trunk age one tier down, whatever road led here. */
 export function backTo(p: Player): AgeId | undefined {

@@ -5,20 +5,21 @@ import { CameraRig } from './render/camera';
 import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { wallLine } from './sim/commands';
-import { AGES, BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, RELIC, TECHS, TICK_HZ, domainOf, unitStats } from './sim/data';
+import { AGES, BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, RELIC, TECHS, TICK_HZ, TRUNK, domainOf, unitStats } from './sim/data';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
 import { placeProblem, walkable } from './sim/grid';
 import { findDockSpot, findSpot } from './sim/ai';
 import { maxHp, placeBuilding, spawnUnit } from './sim/world';
-import type { BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, MapSize, MapType, Unit } from './sim/types';
+import type { AgeId, BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, MapSize, MapType, Unit } from './sim/types';
 import { R_FISH, R_NONE } from './sim/types';
 import { carriedBy, relicAt } from './sim/relics';
 import { postAt } from './sim/trade';
-import { ageDef, isSideRoad, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
+import { ageDef, ageOf, isSideRoad, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
 import { NetClient, newRoomCode, saveName, savedName } from './net/client';
 import { HASH_EVERY, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
 import { deserialize, serialize } from './sim/save';
 import { SCENARIOS, scenarioById, starsFor } from './sim/campaign';
+import { loadDiscovery, observe, saveDiscovery, webMapHtml } from './ui/webMap';
 import { briefingHtml, chapterListHtml, recordStars, starRow } from './ui/campaignUi';
 import { Lobby } from './ui/lobby';
 import { Hud, nameOf } from './ui/hud';
@@ -41,18 +42,20 @@ const tips = new Tips();
 const music = new Music();
 /** The style of music wanted now (it starts once the browser lets sound play). */
 let musicEpoch = 2;
+let musicAge: AgeId | undefined;
 sound.onReady = (ctx, out) => {
   music.attach(ctx, out);
-  music.start(musicEpoch);
+  music.start(musicEpoch, musicAge);
 };
 /** The age an `epoch` event announces (older replays carry only the epoch). */
 const ageName = (ev: { epoch: number; age?: keyof typeof AGES }) => (ev.age ? AGES[ev.age] : EPOCHS[ev.epoch]).name;
 
-function playMusic(epoch: number): void {
+function playMusic(epoch: number, age?: AgeId): void {
   musicEpoch = epoch;
+  musicAge = age;
   if (music.attached) {
-    music.start(epoch);
-    music.setEpoch(epoch);
+    music.start(epoch, age);
+    music.setEpoch(epoch, age);
   }
 }
 
@@ -374,7 +377,7 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   else if (!saved) hud.banner(ageDef(me).name, `You lead the ${CIVS[me.civ].name}. Facing ${rivals.join(', ')}.${goal}`, 6000);
   else hud.banner('Welcome back', `${ageDef(me).name}, ${fmtClock(game.tick)} into the match.`, 3200);
   sound.startAmbience();
-  playMusic(me.epoch);
+  playMusic(me.epoch, ageOf(me));
   // Start with the Town Center in view and selected.
   const tc = game.ents.find((e) => e.kind === 'building' && e.owner === viewer && e.type === 'towncenter');
   if (tc) {
@@ -746,6 +749,10 @@ document.addEventListener('click', (e) => {
     case 'campaign':
       sound.play('click');
       showCampaign(chapterListHtml());
+      break;
+    case 'web-map':
+      sound.play('click');
+      showCampaign(webMapHtml(loadDiscovery()));
       break;
     case 'camp-back':
       $('campaign').classList.add('hidden');
@@ -1604,7 +1611,7 @@ function onEvents(s: GameState, list: GameEvent[]): void {
             hud.banner(age.name, age.blurb, 4500);
             play('epoch');
           }
-          playMusic(ev.epoch);
+          playMusic(ev.epoch, ageOf(s.players[viewer]));
         } else hud.toast(`${s.players[ev.owner].name} has ${ev.back ? 'stepped back to' : 'reached'} the ${ageName(ev)}`, 'info');
         break;
       case 'hit':
@@ -1722,9 +1729,28 @@ function onEvents(s: GameState, list: GameEvent[]): void {
 
 // ---- The loop --------------------------------------------------------------------------------------
 
+let discovery: ReturnType<typeof loadDiscovery> | null = null;
+let discoveryTick = -1;
+
+/** The web map (#54) fills in as the viewer's people find the roads: recorded here, outside the sim. */
+function recordDiscovery(s: GameState): void {
+  if (s.tick - discoveryTick < 20 && s.tick >= discoveryTick) return;
+  discoveryTick = s.tick;
+  discovery ??= loadDiscovery();
+  const before = discovery.entered.length;
+  if (observe(discovery, s, viewer)) {
+    saveDiscovery(discovery);
+    // A side age found for the first time, ever, is worth a line: it is now on the title-screen map.
+    for (const a of discovery.entered.slice(before)) {
+      if (!TRUNK.includes(a)) hud.toast(`A new age for your web map: the ${AGES[a].name}`, 'good');
+    }
+  }
+}
+
 function refreshHud(): void {
   if (!game || mode === 'title') return;
   pruneSelection(game);
+  recordDiscovery(game);
   hud.update(game, viewer, [...selection], SPEEDS[speedIdx], selectedTile, selectedRelic, selectedPost);
 }
 
