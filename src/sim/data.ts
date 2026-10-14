@@ -49,6 +49,11 @@ export interface Age {
   price?: Partial<Record<UnitClass, number>>;
   /** Lines this age can't train, and why (shown on the greyed button). */
   no?: { units: UnitType[]; why: string };
+  /**
+   * Trade fed by faith (#49): every relic the people keeps in its Temples makes each trade trip pay
+   * `each` more of its usual gold, counting at most `most` relics.
+   */
+  relicTrade?: { each: number; most: number };
 }
 
 export const TRUNK: AgeId[] = ['stone', 'bronze', 'middle', 'gunpowder', 'industrial'];
@@ -80,7 +85,31 @@ export const AGES: Record<AgeId, Age> = {
     price: { infantry: 0.75 },
     no: { units: ['cavalry'], why: 'No horses in the Iron Age: cavalry waits for the Middle Ages' },
   },
+  pilgrim: {
+    name: 'Age of Pilgrims',
+    short: 'Pilgrim',
+    tier: 2,
+    blurb: 'The faithful walk from far away to see the relics in your Temples: relics pay double, priests come at half price and work a quarter faster, but a pilgrim people builds no siege engines.',
+    mul: { relicGold: 2, priest: 1.25 },
+    price: { priest: 0.5 },
+    no: { units: ['siege'], why: 'A pilgrim people builds no siege engines: rams and catapults wait until it leaves the pilgrims\' road' },
+  },
+  fair: {
+    name: 'Age of Fairs',
+    short: 'Fairs',
+    tier: 3,
+    blurb: 'Where pilgrims gather, merchants follow: feast days become great fairs. Trade pays more for every relic your Temples keep, and traders travel faster, but towns grown open round the fairground stand 15% weaker.',
+    mul: { tradeGold: 1.25, traderSpeed: 1.15, buildingHp: 0.85 },
+    relicTrade: { each: 0.1, most: 5 },
+  },
 };
+
+/** Something a people must have done before a road opens: a tally from its stats reaching `n`. */
+export interface Deed {
+  stat: keyof PlayerStats;
+  n: number;
+  text: string;
+}
 
 /** A road from one age to another, taken at a Town Center. */
 export interface Road {
@@ -96,7 +125,13 @@ export interface Road {
    */
   found?: TechId;
   /** A deed the road needs beyond its price: a tally from the player's stats. */
-  deed?: { stat: keyof PlayerStats; n: number; text: string };
+  deed?: Deed;
+  /**
+   * More deeds, every one needed as well (#49): a hybrid age asks for deeds in two systems at once.
+   * A list of tallies rather than a new kind of condition, because every system already keeps its
+   * tally in `PlayerStats` (trade, bog iron, relics), so a crossing is one stat and one line here.
+   */
+  also?: Deed[];
   /** What taking it means, for the tooltip (trunk roads use the age's blurb). */
   blurb?: string;
 }
@@ -124,6 +159,42 @@ export const ROADS: Road[] = [
     blurb: 'Instead of the Bronze Age, as many peoples of Africa went from stone straight to iron: foot soldiers cost a quarter less and strike 1 harder, and iron hoes and axes make farms and woodcutters 10% quicker. What it gives up: the horse. The Stable trains no cavalry until the Middle Ages.',
   },
   { from: 'iron', to: 'middle', cost: EPOCHS[2].cost, time: EPOCHS[2].time, blurb: 'Rejoin the main road at the Middle Ages, for the same price as from the Bronze Age: the horse arrives, and the iron foot soldiers become ordinary pikemen.' },
+  // Crossing chains (#49): relics, a deed of the faith, open a turn off the Middle Ages; trade and relics
+  // together open a hybrid, from either side. Its clue is a Temple from both: the relics are what a
+  // merchant people hears of last, and a Middle Ages town with a Market alone shows no sign of it.
+  {
+    from: 'middle',
+    to: 'pilgrim',
+    cost: { food: 300, wood: 100, gold: 150 },
+    time: 40,
+    clue: 'temple',
+    deed: { stat: 'relicGold', n: 120, text: 'Relics kept in your Temples bring in 120 gold' },
+    blurb: 'A turn, not a climb: the same soldiers and technologies as the Middle Ages, but the faithful walk from far away to your Temples. Every relic kept there pays double gold; priests cost half as much and convert and heal a quarter faster. What it gives up: siege. The Siege Workshop builds nothing while you walk the pilgrims\' road, so walls and towers must be taken by other means.',
+  },
+  { from: 'pilgrim', to: 'gunpowder', cost: { food: 900, gold: 750, stone: 200 }, time: 65, blurb: 'Rejoin the main road: the pilgrims\' gold carries your people into gunpowder (more gold and less food and stone than from the Middle Ages). The siege engines return as cannon.' },
+  { from: 'pilgrim', to: 'middle', cost: { food: 200, stone: 100 }, time: 25, blurb: 'Leave the pilgrims\' road for the ordinary Middle Ages: relics pay their usual gold, and the Siege Workshop works again.' },
+  {
+    from: 'merchant',
+    to: 'fair',
+    cost: { food: 900, wood: 300, gold: 700 },
+    time: 65,
+    clue: 'temple',
+    deed: { stat: 'traded', n: 800, text: 'Your traders bring home 800 gold' },
+    also: [{ stat: 'relicGold', n: 200, text: 'Relics kept in your Temples bring in 200 gold' }],
+    blurb: 'Instead of the Gunpowder Age, for a people both merchant and faithful: trade pays 25% more, and 10% more again for every relic your Temples keep (up to five); traders travel 15% faster. No more hired swords. What it gives up: towns grown open round the fairground, every building 15% weaker.',
+  },
+  {
+    from: 'pilgrim',
+    to: 'fair',
+    cost: { food: 900, wood: 300, gold: 700 },
+    time: 65,
+    clue: 'temple',
+    deed: { stat: 'relicGold', n: 200, text: 'Relics kept in your Temples bring in 200 gold' },
+    also: [{ stat: 'traded', n: 800, text: 'Your traders bring home 800 gold' }],
+    blurb: 'Instead of the Gunpowder Age, for a people both faithful and merchant: trade pays 25% more, and 10% more again for every relic your Temples keep (up to five); traders travel 15% faster. Relics pay their usual gold, and the Siege Workshop works again. What it gives up: towns grown open round the fairground, every building 15% weaker.',
+  },
+  { from: 'fair', to: 'industrial', cost: { food: 1300, gold: 1100, stone: 300 }, time: 80, blurb: 'Rejoin the main road: the fairs\' fortune buys its way into the Industrial Age (more gold and less food and stone than from the Gunpowder Age).' },
+  { from: 'fair', to: 'gunpowder', cost: { food: 400, stone: 200 }, time: 30, blurb: 'Settle down: wall the fairground and join the Gunpowder Age. Trade and buildings go back to their usual strength.' },
 ];
 
 /**
