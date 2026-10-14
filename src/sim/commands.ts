@@ -132,7 +132,7 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
   }
   const problem = placeProblem(s, type, tx, ty, true, p);
   if (problem) {
-    if (!quiet) refuse(s, p, problem === 'slope' ? 'Too steep to build there' : "Can't build there");
+    if (!quiet) refuse(s, p, problem === 'slope' ? 'Too steep to build there' : problem === 'foreign' ? "That's enemy land: only a Tower can be raised there" : "Can't build there");
     return null;
   }
   const cost = buildingCostFor(s, p, type);

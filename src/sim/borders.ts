@@ -31,6 +31,25 @@ export function borderMap(s: GameState): Int8Array {
   return owner;
 }
 
+/** Who owns one tile (same rule as `borderMap`, without building the whole map), or -1. */
+export function landOwnerAt(s: GameState, x: number, y: number): number {
+  let owner = -1;
+  let best = Infinity;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || !e.built || e.hp <= 0) continue;
+    const radius = BORDERS[e.type];
+    if (!radius) continue;
+    const reach = radius + e.size / 2;
+    const dx = x + 0.5 - (e.tx + e.size / 2);
+    const dy = y + 0.5 - (e.ty + e.size / 2);
+    const d = dx * dx + dy * dy;
+    if (d > reach * reach || d >= best) continue;
+    best = d;
+    owner = e.owner;
+  }
+  return owner;
+}
+
 /** Whether some land of `team` lies within the supply reach of tile (x, y). */
 export function suppliedAt(s: GameState, own: Int8Array, team: number, x: number, y: number): boolean {
   const reach = ATTRITION.deep;
