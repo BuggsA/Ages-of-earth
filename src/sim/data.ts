@@ -109,6 +109,14 @@ export const AGES: Record<AgeId, Age> = {
     mul: { tradeGold: 1.25, traderSpeed: 1.15, buildingHp: 0.85 },
     relicTrade: { each: 0.1, most: 5 },
   },
+  sail: {
+    name: 'Age of Sail',
+    short: 'Sail',
+    tier: 2,
+    blurb: 'A people that has turned to the sea: boats fish half again as fast, ships come a quarter cheaper and a quarter sturdier, but the fields are tilled with less care.',
+    mul: { fish: 1.5, shipHp: 1.25, farm: 0.85 },
+    price: { ship: 0.75 },
+  },
 };
 
 /** Something a people must have done before a road opens: a tally from its stats reaching `n`. */
@@ -209,6 +217,18 @@ export const ROADS: Road[] = [
     also: [{ stat: 'traded', n: 800, text: 'Your traders bring home 800 gold' }],
     blurb: 'Instead of the Gunpowder Age, for a people both faithful and merchant: trade pays 25% more, and 10% more again for every relic your Temples keep (up to five); traders travel 15% faster. Relics pay their usual gold, and the Siege Workshop works again. What it gives up: towns grown open round the fairground, every building 15% weaker.',
   },
+  // A turn off the Middle Ages for a people of the coast (the Dock is the clue, the catch the deed).
+  {
+    from: 'middle',
+    to: 'sail',
+    cost: { food: 300, wood: 300, gold: 100 },
+    time: 40,
+    clue: 'dock',
+    deed: { stat: 'fished', n: 500, text: 'Your boats land 500 fish' },
+    blurb: 'A turn, not a climb: the same soldiers and technologies as the Middle Ages, but the people live by the sea. Fishing boats fish half again as fast, every ship costs a quarter less and has a quarter more hull. What it gives up: the fields, which yield 15% less. A sea people can strike from the water and hold the shore, but a rival on land can starve it.',
+  },
+  { from: 'sail', to: 'gunpowder', cost: { food: 800, wood: 500, gold: 450, stone: 100 }, time: 60, blurb: 'Rejoin the main road: the shipping fortune carries your people into gunpowder (more wood and less gold than from the Middle Ages). Farms return to their usual yield.' },
+  { from: 'sail', to: 'middle', cost: { food: 150, wood: 150 }, time: 25, blurb: 'Come ashore: the Middle Ages again, with ordinary fields, ordinary hulls and the usual price for ships.' },
   { from: 'fair', to: 'industrial', cost: { food: 1300, gold: 1100, stone: 300 }, time: 80, blurb: 'Rejoin the main road: the fairs\' fortune buys its way into the Industrial Age (more gold and less food and stone than from the Gunpowder Age).' },
   { from: 'fair', to: 'gunpowder', cost: { food: 400, stone: 200 }, time: 30, blurb: 'Settle down: wall the fairground and join the Gunpowder Age. Trade and buildings go back to their usual strength.' },
 ];

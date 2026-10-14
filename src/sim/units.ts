@@ -215,6 +215,10 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
       if (kind === R_BOG) {
         const st = s.players[u.owner].stats;
         st.iron = (st.iron ?? 0) + 1;
+      } else if (kind === R_FISH) {
+        // Fish landed counts toward the Age of Sail's deed.
+        const st = s.players[u.owner].stats;
+        st.fished = (st.fished ?? 0) + 1;
       }
     }
     workEvent(s, u, u.act, tx, ty);

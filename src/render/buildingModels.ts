@@ -908,7 +908,25 @@ function ironTower(k: Kit, st: Style): void {
 /** The original four dressed ages, kept as the baseline model regression set. */
 export const LOOK_AGES: AgeId[] = ['merchant', 'iron', 'pilgrim', 'fair'];
 /** All dressed ages; additions get their own model coverage beside the baseline set. */
-export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer'];
+export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer', 'sail'];
+
+const SAIL = '#efe8d4';
+const NET = '#b9ad8a';
+
+/** A mast with a square sail and a pennant: the sea people's mark. */
+function mast(k: Kit, x: number, z: number, h: number, w = 0.7): void {
+  k.cyl(0.03, 0.04, h, 5, '#5a4630', x, 0, z);
+  k.box(w, h * 0.45, 0.025, SAIL, x, h * 0.45, z + 0.03);
+  k.box(w + 0.1, 0.03, 0.04, '#5a4630', x, h * 0.92, z + 0.03);
+  k.box(0.22, 0.09, 0.02, '#3f8fc4', x + 0.12, h + 0.04, z);
+}
+
+/** Nets hung to dry on two posts, with cork floats along the top. */
+function hungNets(k: Kit, x: number, y: number, z: number, w: number): void {
+  for (const dx of [-w / 2, w / 2]) k.cyl(0.02, 0.02, 0.6, 4, '#5a4630', x + dx, y, z);
+  k.box(w, 0.4, 0.015, NET, x, y + 0.14, z);
+  for (let i = 0; i < 5; i++) k.sphere(0.03, '#c9a25a', x - w / 2 + (w * (i + 0.5)) / 5, y + 0.56, z);
+}
 
 const CLOTH = ['#d94a3c', '#e8b43a', '#3f8fc4', '#8a4fa8'];
 const RUST = '#8a4a2c';
@@ -1025,6 +1043,24 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
         banner(k, -2.0, 0, 2.8, 2.2, 1.4);
         banner(k, 2.0, 0, 2.8, 2.2, 1.4);
         lamp(k, 0, 0, 2.9, 0.6);
+      }
+      break;
+    case 'sail':
+      if (type === 'dock') {
+        mast(k, 0.4, 1.7, 1.7, 0.75);
+        hungNets(k, -1.25, 0, 0.1, 0.9);
+      } else if (type === 'house') hungNets(k, 0, 0, 0.95, 0.8);
+      else if (big) {
+        mast(k, -1.7, 1.9, 2.4);
+        mast(k, 1.7, 1.9, 2.4);
+        hungNets(k, 0, 0, 2.1, 1.2);
+      } else if (type === 'market') {
+        hungNets(k, -1.3, 0, 1.3, 0.9);
+        k.cyl(0.16, 0.16, 0.3, 8, '#7a5634', 1.2, 0, 1.2);
+        k.cyl(0.16, 0.16, 0.3, 8, '#7a5634', 1.55, 0, 1.0);
+      } else if (type === 'wonder') {
+        mast(k, -2.2, 2.7, 3.0, 0.9);
+        mast(k, 2.2, 2.7, 3.0, 0.9);
       }
       break;
     case 'fair':
