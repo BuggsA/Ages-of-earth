@@ -105,3 +105,5 @@ Merged since the last update: **walking the web without losing strength** (#79):
 **Hushed nights** (own pitch, lane look): crickets and frogs go quiet when an army (5+ soldiers in sight) is near the view. Audio only; no rules or save change; unheard.
 
 **Birdsong** (own pitch, lane look): by day, away from water and armies, a songbird now and then (`birdsong` sound). Audio only; level unheard; no save bump.
+
+**Tests for untested modules** (#129, owner ask, lane tooling): direct tests for `rng`, `spatial`, `vision`, deer, the Worker's routes and room lists, and the creature voices (moved into `src/render/ambience.ts`, same behaviour). Quick tier now 276 tests in 53 files. No rules, save or `data.ts` change.
