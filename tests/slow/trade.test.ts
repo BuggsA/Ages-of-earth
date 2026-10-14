@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { findSpot } from '../src/sim/ai';
-import { BONUS, TICK_HZ, TRADE } from '../src/sim/data';
-import { checksum, createGame, step, type GameSetup } from '../src/sim/game';
-import { placeProblem, walkable } from '../src/sim/grid';
-import { generateMap } from '../src/sim/mapgen';
-import { deserialize, serialize } from '../src/sim/save';
-import { tripGold } from '../src/sim/trade';
-import type { Building, Command, GameState, MapSize, MapType, TradePost, Unit } from '../src/sim/types';
-import { R_NONE, T_GRASS, T_SAND } from '../src/sim/types';
-import { placeBuilding, spawnUnit } from '../src/sim/world';
+import { findSpot } from '../../src/sim/ai';
+import { BONUS, TICK_HZ, TRADE } from '../../src/sim/data';
+import { checksum, createGame, step, type GameSetup } from '../../src/sim/game';
+import { placeProblem, walkable } from '../../src/sim/grid';
+import { generateMap } from '../../src/sim/mapgen';
+import { deserialize, serialize } from '../../src/sim/save';
+import { tripGold } from '../../src/sim/trade';
+import type { Building, Command, GameState, MapSize, MapType, TradePost, Unit } from '../../src/sim/types';
+import { R_NONE, T_GRASS, T_SAND } from '../../src/sim/types';
+import { placeBuilding, spawnUnit } from '../../src/sim/world';
 
 const game = (o: Partial<GameSetup> = {}): GameState =>
   createGame({
