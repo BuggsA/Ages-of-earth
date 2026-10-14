@@ -1,0 +1,51 @@
+/**
+ * Judge a change to how the computer plays against the old play, in the same matches (#113): one seat
+ * plays Hard as it stands, the other a copy of Hard with some of its numbers set back (`AI_LEVELS`, in
+ * `src/sim/data.ts`). Gate a change on a number there (`armyWait`, `bell`), set the number back here, and
+ * each seed is played twice, seats swapped, so the map and the peoples even out.
+ *   npx tsx scripts/ai-ab.ts <first seed> <seeds> <minutes> '<old numbers, JSON>' ['<new numbers, JSON>']
+ *   npx tsx scripts/ai-ab.ts 21 6 20 '{"armyWait":1e9}'
+ * Prints an `ab {…}` line a match (for totting up runs played side by side) and a summary: wins, who
+ * leads the undecided (the age reached, then kills less losses), the new side's gathering over the old
+ * side's (geometric mean, with its standard error) and how far ahead in the ages it ends on average.
+ * The old side plays under Normal's name, so the few choices made by name (merchant ships kept) differ.
+ */
+import { AGES, AI_LEVELS } from '../src/sim/data';
+import { createGame, step } from '../src/sim/game';
+import { ageOf } from '../src/sim/ages';
+
+const first = Number(process.argv[2] ?? 1);
+const seeds = Number(process.argv[3] ?? 6);
+const minutes = Number(process.argv[4] ?? 20);
+Object.assign(AI_LEVELS.hard, JSON.parse(process.argv[6] ?? '{}'));
+AI_LEVELS.normal = { ...AI_LEVELS.hard, label: 'Old', ...JSON.parse(process.argv[5] ?? '{}') };
+const tally = { won: 0, lost: 0, ahead: 0, behind: 0, gather: [] as number[], ages: 0 };
+for (let game = 0; game < seeds * 2; game++) {
+  const seed = first + (game >> 1);
+  const fresh = game & 1;
+  const s = createGame({ seed, size: 'medium', players: [0, 1].map((i) => ({ name: `P${i}`, ai: i === fresh ? 'hard' : 'normal' })) });
+  const at = s.players.map((p) => ageOf(p));
+  const roads = s.players.map((p) => [AGES[ageOf(p)].short]);
+  for (let i = 0; i < minutes * 60 * 20 && !s.over; i++) {
+    step(s);
+    if (i % 20) continue;
+    for (const p of s.players) {
+      const a = ageOf(p);
+      if (at[p.id] === a) continue;
+      at[p.id] = a;
+      roads[p.id].push(`${AGES[a].short}@${Math.round(s.tick / 1200)}m`);
+    }
+  }
+  const n = s.players[fresh];
+  const o = s.players[1 - fresh];
+  const margin = n.epoch - o.epoch || n.stats.kills - n.stats.losses - (o.stats.kills - o.stats.losses);
+  if (s.winner >= 0) tally[s.winner === fresh ? 'won' : 'lost']++;
+  else if (margin) tally[margin > 0 ? 'ahead' : 'behind']++;
+  tally.gather.push(Math.log(n.stats.gathered / o.stats.gathered));
+  tally.ages += n.epoch - o.epoch;
+  console.log(`ab ${JSON.stringify({ seed, seat: fresh, won: s.winner < 0 ? null : s.winner === fresh, margin, gn: Math.round(n.stats.gathered), go: Math.round(o.stats.gathered), new: roads[fresh].join('→'), old: roads[1 - fresh].join('→') })}`);
+}
+const g = tally.gather;
+const mean = g.reduce((a, b) => a + b, 0) / g.length;
+const sd = Math.sqrt(g.reduce((a, b) => a + (b - mean) * (b - mean), 0) / Math.max(1, g.length - 1));
+console.log(`new ${tally.won}–${tally.lost} of ${g.length}; undecided: new ahead in ${tally.ahead}, behind in ${tally.behind}; gathered ×${Math.exp(mean).toFixed(3)} (se ${(sd / Math.sqrt(g.length)).toFixed(3)}); ages ahead ${(tally.ages / g.length).toFixed(2)}`);

@@ -743,12 +743,22 @@ export interface AiLevel {
   clever: boolean;
   /** Traders it keeps on the road from the Middle Ages (half as many in the Bronze Age). */
   traders: number;
+  /**
+   * Seconds, once its first wave has gone out, that an army short of the next wave holds back the next
+   * age (#113). A beaten town that can't raise the wave stops waiting for it and climbs.
+   */
+  armyWait: number;
+  /**
+   * The town bell (#113): it rings when `ring` enemy soldiers are near and the army can't meet half of
+   * them, and the citizens come back out once `quiet` or fewer are left, the bell `hold` seconds rung.
+   */
+  bell: { ring: number; quiet: number; hold: number };
 }
 
 export const AI_LEVELS: Record<Difficulty, AiLevel> = {
-  easy: { label: 'Easy', gather: 0.8, citizens: 16, firstAttack: 720, wave: 6, waveGrowth: 3, think: 1.5, towers: 0, clever: false, traders: 2 },
-  normal: { label: 'Normal', gather: 1, citizens: 24, firstAttack: 480, wave: 8, waveGrowth: 4, think: 1, towers: 1, clever: true, traders: 5 },
-  hard: { label: 'Hard', gather: 1.15, citizens: 32, firstAttack: 330, wave: 9, waveGrowth: 5, think: 0.5, towers: 2, clever: true, traders: 8 },
+  easy: { label: 'Easy', gather: 0.8, citizens: 16, firstAttack: 720, wave: 6, waveGrowth: 3, think: 1.5, towers: 0, clever: false, traders: 2, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 } },
+  normal: { label: 'Normal', gather: 1, citizens: 24, firstAttack: 480, wave: 8, waveGrowth: 4, think: 1, towers: 1, clever: true, traders: 5, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 } },
+  hard: { label: 'Hard', gather: 1.15, citizens: 32, firstAttack: 330, wave: 9, waveGrowth: 5, think: 0.5, towers: 2, clever: true, traders: 8, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 } },
 };
 
 /**
@@ -757,13 +767,13 @@ export const AI_LEVELS: Record<Difficulty, AiLevel> = {
  * line, and any other with chance `take`, decided once. It surveys for bog iron once its town has
  * `survey` citizens, and keeps `diggers` citizens on bog iron toward the Iron Age (twice as many while it
  * holds for the deed; none once the deed is dug, #79); it holds its Town Center for a chosen road's deeds once a `nearly` share of each is
- * done or under way, for at most `patience` seconds; it turns pilgrim with at least `relics` relics
+ * done or under way, for at most `patience` seconds (twice that once a `close` share of each is done, #113); it turns pilgrim with at least `relics` relics
  * kept. Against a merchant rival, a band of `riders` riders waits by the trading post nearest its town
  * and falls on the traders it sees within `raid` tiles (anyone's traders within `raidNear` tiles of home
  * are fair game anyway); against an iron rival, it trains the archers that answer its foot with chance
  * `read`.
  */
-export const AI_WEB = { take: 0.6, survey: 22, diggers: 3, nearly: 0.5, patience: 90, relics: 2, raid: 18, raidNear: 30, riders: 4, read: 0.85 };
+export const AI_WEB = { take: 0.6, survey: 22, diggers: 3, nearly: 0.5, patience: 90, close: 0.75, relics: 2, raid: 18, raidNear: 30, riders: 4, read: 0.85 };
 
 export const PLAYER_COLORS = ['#2f7fe0', '#e0473a', '#e8b630', '#3aa35a', '#9b59d0', '#e07a2f'];
 export const PLAYER_NAMES = ['You', 'Rival'];
