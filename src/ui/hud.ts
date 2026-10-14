@@ -2,13 +2,15 @@ import { scenarioById } from '../sim/campaign';
 import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
-import { AGES, STEP_BACK, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, SIGNATURES, EPOCHS, MARKET, RELIC, REPAIR_SHARE, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { AGES, STEP_BACK, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, SIGNATURES, EPOCHS, MARKET, RELIC, REPAIR_SHARE, RUINS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { homeMarket, marketOf, postAt, tripGold } from '../sim/trade';
+import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
+import { sees } from '../sim/vision';
 import { buildingCostFor, buildingMaxHp, modsOf, statsFor, techCostFor, techProblem, trainCostFor, trainTimeFor } from '../sim/stats';
 import { ageDef, ageOf, backProblem, backTo, barred, deedsProgress, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, surveyFinds, suspendedTechs, trainsAt, windowsOf } from '../sim/ages';
-import type { Building, BuildingType, Command, Cost, Ent, GameState, Player, Stance, TechId, TradePost, Unit } from '../sim/types';
+import type { Building, BuildingType, Command, Cost, Ent, GameState, Player, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
 import { buildingPicture, unitPicture } from './thumbs';
@@ -107,6 +109,8 @@ function orderWords(s: GameState, u: Unit): string {
       return u.cargo.length ? 'Sailing to land passengers' : 'Moving';
     case 'relic':
       return carriedBy(s, u) ? 'Carrying a relic to the Temple' : 'Going for a relic';
+    case 'dig':
+      return u.act === 'mine' ? 'Digging at the ruins' : 'Going to dig at the ruins';
     case 'trade':
       return o.phase === 'back' ? (u.carry > 0 ? 'Bringing gold home to the Market' : 'Going home to the Market') : 'Taking goods to the trading post';
     default:
@@ -224,13 +228,14 @@ export class Hud {
   }
 
   /** Bring every part of the HUD up to date. */
-  update(s: GameState, viewer: number, ids: number[], speed: number, selectedTile: number | null, selectedRelic: number | null = null, selectedPost: number | null = null): void {
+  /** `selectedRuin`: a ruin picked out, and whether the viewer last saw it dug out (#64). */
+  update(s: GameState, viewer: number, ids: number[], speed: number, selectedTile: number | null, selectedRelic: number | null = null, selectedPost: number | null = null, selectedRuin: { id: number; dug: boolean } | null = null): void {
     this.state = s;
     this.viewer = viewer;
     this.lastIds = ids;
     this.top(s, viewer, speed);
     const ents = ids.map((id) => s.byId.get(id)).filter((e): e is Ent => !!e && e.hp > 0);
-    this.selection(s, viewer, ents, selectedTile, selectedRelic, selectedPost);
+    this.selection(s, viewer, ents, selectedTile, selectedRelic, selectedPost, selectedRuin);
     this.commands(s, viewer, ents);
   }
 
@@ -303,12 +308,14 @@ export class Hud {
     }
   }
 
-  private selection(s: GameState, viewer: number, ents: Ent[], tile: number | null, relicId: number | null, postId: number | null): void {
+  private selection(s: GameState, viewer: number, ents: Ent[], tile: number | null, relicId: number | null, postId: number | null, ruinSel: { id: number; dug: boolean } | null = null): void {
     let html = '';
     let sig = '';
     const relic = !ents.length && relicId !== null ? relicAt(s, relicId) : undefined;
     const post = !ents.length && postId !== null ? postAt(s, postId) : undefined;
-    if (relic) [html, sig] = this.relicPanel(s, viewer, relic);
+    const ruin = !ents.length && ruinSel ? ruinAt(s, ruinSel.id) : undefined;
+    if (ruin) [html, sig] = this.ruinPanel(s, viewer, ruin, ruinSel!.dug);
+    else if (relic) [html, sig] = this.relicPanel(s, viewer, relic);
     else if (post) [html, sig] = this.postPanel(s, viewer, post);
     else if (!ents.length && tile !== null && s.res[tile]) {
       const kind = s.res[tile];
@@ -365,6 +372,24 @@ export class Hud {
       <div class="stats"><span data-tip="<b>Gold</b>Brings in gold while kept in a Temple.">${icon('gold')}${perMin}<em>a minute</em></span><span data-tip="<b>Relics</b>How many lie on this map.">⚱<em>On the map</em> ${s.relics.length}</span></div>
       <div class="blurb">Select a priest and right-click it to carry it to your Temple, where it brings in ${perMin} gold a minute. Keep every relic on the map for ${fmtTime(s.wonderTime)} and you win.</div></div>`;
     return [html, `relic:${r.id}:${status}:${s.relics.length}`];
+  }
+
+  /** An ancient ruin (#64): what might lie beneath (never what does, until it's dug), and how the dig goes. */
+  private ruinPanel(s: GameState, viewer: number, r: Ruin, dugAsSeen: boolean): [string, string] {
+    const inSight = sees(s, viewer, r.x, r.y);
+    const dug = inSight ? r.by >= 0 : dugAsSeen;
+    const ours = r.by >= 0 && s.players[r.by].team === s.players[viewer].team;
+    const pct = Math.floor((100 * r.dug) / digWork());
+    const mine = s.ents.filter((e) => e.kind === 'unit' && e.owner === viewer && e.order.k === 'dig' && e.order.target === r.id).length;
+    const status = dug
+      ? ours ? `Dug out by ${r.by === viewer ? 'your people' : s.players[r.by].name}: ${RUIN_FINDS[r.find].name.toLowerCase()}` : 'Dug out: whatever lay here is gone'
+      : inSight && r.dug > 0 ? `${pct}% dug${mine ? ` · ${mine} of your citizens at work` : ''}` : mine ? `${mine} of your citizens on the way` : 'Undisturbed';
+    const finds = (Object.keys(RUIN_FINDS) as (keyof typeof RUIN_FINDS)[]).map((k) => `<b>${RUIN_FINDS[k].name}</b>: ${RUIN_FINDS[k].blurb}`).join('<br>');
+    const html = `<div class="sel-portrait"><span style="font-size:54px">${dug ? '⛏' : '🏛'}</span></div>
+      <div class="sel-info"><div class="sel-name">Ancient Ruins</div><div class="sel-sub">${status}</div>
+      <div class="stats"><span data-tip="<b>The dig</b>How long one citizen takes to dig it out. More dig quicker.">⛏<em>One citizen</em> ${RUINS.dig}s</span><span data-tip="<b>What may lie beneath</b>${finds}">❔<em>Beneath</em> ${dug && ours ? RUIN_FINDS[r.find].name : dug ? 'gone' : 'unknown'}</span></div>
+      <div class="blurb">${dug ? 'Only an open pit and spoil heaps now.' : 'Stones of a people older than any here. Select citizens and right-click to dig: whoever strikes the last spade takes what lies beneath. It might be a hoard of gold, lost knowledge, an old map of the land, or a relic. Diggers far from home want an escort.'}</div></div>`;
+    return [html, `ruin:${r.id}:${status}:${dug}`];
   }
 
   private postPanel(s: GameState, viewer: number, post: TradePost): [string, string] {

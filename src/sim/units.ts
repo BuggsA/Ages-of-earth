@@ -1,4 +1,4 @@
-import { AI_LEVELS, BUILDINGS, CARRY, DEER, DT, EPOCH_GATHER_BONUS, FISH_CARRY, GATHER, MILITARY, PRIEST, REPAIR_SHARE, TRADE, domainOf, secs } from './data';
+import { AI_LEVELS, BUILDINGS, CARRY, DEER, DT, EPOCH_GATHER_BONUS, FISH_CARRY, GATHER, MILITARY, PRIEST, REPAIR_SHARE, RUINS, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
@@ -7,6 +7,7 @@ import { buildTimeFor, buildingCostFor, modsOf } from './stats';
 import type { Act, Animal, Building, Cost, Ent, GameState, Goal, Order, Res, Unit } from './types';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { carriedBy, relicAt } from './relics';
+import { dig, ruinAt } from './ruins';
 import { atPost, goalForPost, homeMarket, marketOf, nearestMarket, postAt, tripGold } from './trade';
 import { canHit, exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, passOf, pay, radiusOf, statsOf, teamOf } from './world';
 
@@ -771,6 +772,26 @@ function relicStep(s: GameState, u: Unit, o: Extract<Order, { k: 'relic' }>): vo
   if (!approach(u, goalForPoint(s, r.x, r.y, passOf(s, u)))) setOrder(u, { k: 'idle' });
 }
 
+/** Dig at an ancient ruin (#64) until it gives up its find, to this citizen's people or another's. */
+function digStep(s: GameState, u: Unit, o: Extract<Order, { k: 'dig' }>): void {
+  const r = ruinAt(s, o.target);
+  if (!r || r.by >= 0 || u.type !== 'citizen') {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  const dx = r.x - u.x;
+  const dy = r.y - u.y;
+  if (dx * dx + dy * dy <= RUINS.reach * RUINS.reach) {
+    if (walking(u)) stopWalking(u);
+    face(u, r.x, r.y);
+    u.act = 'mine';
+    workEvent(s, u, 'mine', r.x, r.y);
+    if (dig(s, r, u.owner)) setOrder(u, { k: 'idle' });
+    return;
+  }
+  if (!approach(u, goalForPoint(s, r.x, r.y, passOf(s, u)))) setOrder(u, { k: 'idle' });
+}
+
 /**
  * Run the road: out to the trading post, take on gold worth the distance from the Market, and back to
  * pay it in; then out again. If the Market falls, the nearest other one will do; with none left, the
@@ -1170,6 +1191,9 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
       break;
     case 'trade':
       tradeStep(s, u, o);
+      break;
+    case 'dig':
+      digStep(s, u, o);
       break;
   }
 }
