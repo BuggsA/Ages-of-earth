@@ -356,3 +356,7 @@ Built: a `gull` sound (two rising, nasal mews) cued every 9–25 s by day while 
 ## Designers' notes: bat roosts (own pitch, 2026-10-14, chain 1014-1340 s7)
 
 Built: `src/render/roosts.ts`, seven bats wheeling around each of the ten nearest standing ruins the viewer has seen (`RuinsView.standingAt`), on the bats' dusk-and-dawn light, clear weather, off on Low quality; a dug-out ruin goes quiet. Why I love it: the ruins were a gamble you read only up close; now the evening tells you where they are. Next: owls perched on ruins and watchtowers, a swarm pouring from a cave tile. Render only; no rules or save change. Not seen in a browser.
+
+## Designers' notes: crickets (own pitch, 2026-10-14, chain 1014-1400 s7)
+
+Built: a `cricket` sound (two quick runs of thin pulses) cued every 5–14 s on a clear night while no open water lies near the view, so the shore keeps its gulls by day and the meadow its crickets by night. Why: the night had owls to see and hear but no ground-level hum. Next: crickets hushing when an army marches close, frogs at the lake edge. Audio only; no rules or save change. Level unheard.
