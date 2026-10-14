@@ -10,7 +10,7 @@ import { seesRect } from '../sim/vision';
 import { BuildingsView } from './buildingsView';
 import { CameraRig } from './camera';
 import { Birds, Effects } from './effects';
-import { fogUniforms, glowUniform, timeUniform } from './materials';
+import { fogUniforms, glowUniform, timeUniform, windUniform } from './materials';
 import { Overlays, type BarSpec, type RingSpec } from './overlays';
 import { Post, QUALITY, loadQuality, saveQuality, type QualityName } from './post';
 import { RelicsView } from './relicsView';
@@ -258,6 +258,7 @@ export class View {
     const wind = windFor(this.state?.seed ?? 0, day);
     this.effects.setWind(wind.x, wind.z);
     this.weather.setWind(wind.x, wind.z);
+    windUniform.value.set(wind.x, wind.z);
     this.mood = moodOf(day);
     this.reach = this.mood.reach;
     this.litHour = -1;

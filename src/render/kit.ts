@@ -90,6 +90,11 @@ export class Kit {
     o.userData.rig = [rig, pivotY, pivotZ];
     return o;
   }
+  /** Mark a part as cloth in the wind: it runs `len` along z from the anchor `z` (len negative toward -z). */
+  cloth<T extends THREE.Object3D>(o: T, len: number, z: number): T {
+    o.userData.cloth = [len, z];
+    return o;
+  }
   /** Mark a part as glowing (it will be bright enough to catch the bloom). */
   glow<T extends THREE.Object3D>(o: T): T {
     o.userData.glow = true;
@@ -116,7 +121,8 @@ export function bake(root: THREE.Object3D, teamColor?: string): THREE.BufferGeom
     const n = g.getAttribute('position').count;
     const team = inherited(mesh, 'team') === true;
     const glow = inherited(mesh, 'glow') === true;
-    const rig = (inherited(mesh, 'rig') as [number, number, number] | undefined) ?? [0, 0, 0];
+    const cloth = inherited(mesh, 'cloth') as [number, number] | undefined;
+    const rig = cloth ? [4, cloth[0], cloth[1]] : ((inherited(mesh, 'rig') as [number, number, number] | undefined) ?? [0, 0, 0]);
     const c = new THREE.Color(team && teamColor ? teamColor : (mesh.userData.color ?? '#ffffff'));
     const colors = new Float32Array(n * 3);
     const teams = new Float32Array(n);
