@@ -103,3 +103,5 @@ Merged since the last update: **walking the web without losing strength** (#79):
 **Ages reached** (own pitch, lane look): hovering a player's epoch in the end-of-match table lists when they reached each age ("Bronze 8m · Iron 17m"), read from the existing history. UI only; no rules, save or `data.ts` change. Browser unverified.
 
 **Hushed nights** (own pitch, lane look): crickets and frogs go quiet when an army (5+ soldiers in sight) is near the view. Audio only; no rules or save change; unheard.
+
+**Birdsong** (own pitch, lane look): by day, away from water and armies, a songbird now and then (`birdsong` sound). Audio only; level unheard; no save bump.

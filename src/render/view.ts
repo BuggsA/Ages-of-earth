@@ -101,6 +101,7 @@ export class View {
   private owlLevel = 0;
   private nextHoot = 12;
   private nextGull = 8;
+  private nextSong = 5;
   private nextChirp = 6;
   private nextCroak = 9;
   private dayLevel = 0;
@@ -403,6 +404,12 @@ export class View {
       this.nextGull = this.time + 9 + Math.random() * 16;
       const s = this.state;
       if (s && this.nearWater(s)) this.onCue?.('gull', Math.random() * 1.4 - 0.7, 0.45);
+    }
+    // By day, away from open water and armies, a songbird now and then.
+    if (this.dayLevel > 0.3 && this.time > this.nextSong) {
+      this.nextSong = this.time + 7 + Math.random() * 14;
+      const s = this.state;
+      if (s && !this.nearWater(s) && !this.armyNear(s)) this.onCue?.('birdsong', Math.random() * 1.6 - 0.8, 0.4);
     }
     this.roosts.update(this.time, this.ruins.standingAt, this.rig.target, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
     this.perches.update(this.time, this.ruins.standingAt, this.rig.target, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
