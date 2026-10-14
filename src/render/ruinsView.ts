@@ -121,6 +121,7 @@ export class RuinsView {
     this.pits = this.mesh(pitGeometry, this.pits, n);
     let a = 0;
     let b = 0;
+    this.standingAt.length = 0;
     for (const r of ruins) {
       if (seesNow(r.x, r.y)) this.known.set(r.id, r.by >= 0);
       else if (!seenTile(r.x, r.y)) continue;
@@ -130,13 +131,19 @@ export class RuinsView {
       this.p.set(r.x, heightAt(s, r.x, r.y), r.y);
       this.m.compose(this.p, this.q, this.one);
       if (dug) this.pits.setMatrixAt(b++, this.m);
-      else this.standing.setMatrixAt(a++, this.m);
+      else {
+        this.standing.setMatrixAt(a++, this.m);
+        this.standingAt.push(this.p.clone());
+      }
     }
     this.standing.count = a;
     this.pits.count = b;
     this.standing.instanceMatrix.needsUpdate = true;
     this.pits.instanceMatrix.needsUpdate = true;
   }
+
+  /** Where the ruins last drawn standing are: the bats' roosts. */
+  readonly standingAt: THREE.Vector3[] = [];
 
   /** Whether the viewer last saw this ruin dug out. */
   dugAsSeen(id: number): boolean {
@@ -145,6 +152,7 @@ export class RuinsView {
 
   clear(): void {
     this.known.clear();
+    this.standingAt.length = 0;
     if (this.standing) this.standing.count = 0;
     if (this.pits) this.pits.count = 0;
   }
