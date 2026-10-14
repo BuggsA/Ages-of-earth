@@ -79,7 +79,10 @@ export function statsFor(s: GameState, owner: number, type: UnitType): UnitStats
     st.armor += m.infantryArmor;
     st.attack += m.infantryAttack;
   }
-  if (base.cls === 'cavalry' || (base.cls === 'hero' && base.mounted)) st.speed *= m.cavalrySpeed;
+  if (base.cls === 'cavalry' || (base.cls === 'hero' && base.mounted)) {
+    st.speed *= m.cavalrySpeed;
+    st.sight += m.riderSight;
+  }
   if (base.cls === 'citizen') st.speed *= m.citizenSpeed;
   if (base.cls === 'siege') {
     st.attack *= m.siegeAttack;

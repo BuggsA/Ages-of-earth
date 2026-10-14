@@ -395,3 +395,8 @@ Built: a `frog` sound (a throaty croak and a quick answering ribbit) cued every 
 
 **Built:** while a great work runs, motes in the people's colors (the Nile's blue and gold, Rome's red and gold, the steppe's green) rise from each of its Town Centers (`WORK_GLOW` in `src/render/view.ts`). Why I love it: a rival's work is a window to strike or brace in, and now you can read it from the map without a toast. Render only. Not seen in a browser.
 **Next:** a flood tint on the Egyptian fields, Roman roads drawn on the ground, the Mongol work really widening sight.
+
+### Yam Relay sight (own pitch), 2026-10-14
+
+**Built:** the Mongol great work now also lifts mounted soldiers' sight by 3 tiles (`riderSight` mod, `WORKS.mongols`), so the relay is a window to scout as well as to ride. Why I love it: the steppe's work was only speed; now it reveals a rival's town as your horse archers sweep past. Rules only, no save bump. Not seen in a browser; `tests/yam-sight.test.ts`.
+**Next:** a flood tint on the Egyptian fields, Roman roads drawn on the ground.

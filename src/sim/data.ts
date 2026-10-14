@@ -584,13 +584,15 @@ export interface Mods {
   relicGold: number;
   /** Extra tiles of water a trading post may lie from the sea and still be a port. */
   portReach: number;
+  /** Added to a mounted soldier's sight (the Yam Relay). */
+  riderSight: number;
 }
 
 export const NO_MODS: Mods = {
   meleeAttack: 0, rangedAttack: 0, armor: 0, parmor: 0, range: 0, carry: 0, citizenSpeed: 1, wood: 1, mine: 1, farm: 1, forage: 1, hunt: 1,
   buildingHp: 1, buildSpeed: 1, militaryTrain: 1, rangedTrain: 1, cavalrySpeed: 1, infantryHp: 1, infantryArmor: 0, infantryAttack: 0, priest: 1,
   siegeAttack: 1, siegeRange: 0, techCost: 1, wonderCost: 1, extraCitizens: 0, fish: 1, shipHp: 1, shipRange: 0, airSpeed: 1, airHp: 1,
-  traderSpeed: 1, tradeGold: 1, relicGold: 1, portReach: 0,
+  traderSpeed: 1, tradeGold: 1, relicGold: 1, portReach: 0, riderSight: 0,
 };
 
 export interface Tech {
@@ -692,7 +694,7 @@ export const WORKS: Record<CivId, GreatWork> = {
   egyptians: { name: 'The Nile Flood', icon: '🌊', use: 'eco', blurb: 'The river rises and leaves its black silt: farms work 60% faster.', mul: { farm: 1.6 } },
   greeks: { name: 'The Phalanx', icon: '🛡', use: 'war', blurb: 'Shields locked, spears level: foot soldiers have +2 melee armor and strike +2 harder.', add: { infantryArmor: 2, infantryAttack: 2 } },
   romans: { name: 'The Roman Road', icon: '🛣', use: 'eco', blurb: 'Legions and labourers lay the road: buildings go up 75% faster and citizens walk a quarter faster.', mul: { buildSpeed: 1.75, citizenSpeed: 1.25 } },
-  mongols: { name: 'The Yam Relay', icon: '🐎', use: 'war', blurb: 'Fresh mounts waiting at every post: cavalry ride 40% faster and citizens 15% faster.', mul: { cavalrySpeed: 1.4, citizenSpeed: 1.15 } },
+  mongols: { name: 'The Yam Relay', icon: '🐎', use: 'war', blurb: 'Fresh mounts waiting at every post: cavalry ride 40% faster and see 3 tiles farther, and citizens walk 15% faster.', add: { riderSight: 3 }, mul: { cavalrySpeed: 1.4, citizenSpeed: 1.15 } },
   chinese: { name: 'The Grand Canal', icon: '🛶', use: 'eco', blurb: 'Barges carry the empire’s grain and silk: every trade trip pays 50% more, and traders travel 30% faster.', mul: { tradeGold: 1.5, traderSpeed: 1.3 } },
   britons: { name: 'The Longbow Volley', icon: '🏹', use: 'war', blurb: 'Every yeoman draws as one: ranged soldiers strike +3 harder, and archery ranges train twice as fast.', add: { rangedAttack: 3 }, mul: { rangedTrain: 0.5 } },
 };
