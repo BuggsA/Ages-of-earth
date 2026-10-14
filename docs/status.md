@@ -17,12 +17,12 @@ The full list, with the owner's words, is `docs/rulings.md`.
 
 Everything in `README.md`'s "What's in it" was built on 2026-10-12 in one session (branch `claude/beautiful-franklin-6gj8tt`, now `main`): five epochs, six peoples, the economy, seventeen buildings, twenty-six technologies, counters, siege, priests, heroes, walls and the bell, ships, fishing and aircraft, the computer opponent, online rooms, saves, replays, synthesized sound and music.
 
-Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders and trading posts (#6, merged in #10; the save `v` is 3), and **the campaign**, The Long Road (#9, merged in #11; from an earlier session's unmerged branch). The computer plays a chapter's goals, so all six chapters are shown winnable (#12, #24), Wings over the Steppe and Sea Lords only at Hard; one seed each, so close chapters flip with unrelated changes (#43).
+Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders and trading posts (#6, merged in #10; the save `v` is 3), and **the campaign**, The Long Road (#9, merged in #11; from an earlier session's unmerged branch). The computer plays a chapter's goals, so all six chapters are shown winnable (#12, #24), Wings over the Steppe and Sea Lords only at Hard. The proof plays up to 16 maps a chapter, so one chaotic match no longer flips it (#43); Wings is still won on few maps (#36).
 
 | Check | State |
 | --- | --- |
 | Quick tier (`npm run check`) | 115 tests, about 25 s |
-| Slow tier (`tests/slow/`) | `campaign-proof.test.ts`: all six chapters played to a win, about 5 minutes on a cloud container |
+| Slow tier (`tests/slow/`) | `campaign-proof*.test.ts`: every chapter won by a computer on its own map or, at Hard, one of 15 more (#43); three files side by side, about 3½ minutes on a cloud container |
 | Browser checks | none automated; the first session tested by hand in headless Chromium |
 | CI (`ci`, `periodic`) | added 2026-10-13; `periodic` starts once `main` is the default branch |
 
@@ -33,6 +33,8 @@ Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders
 - [#30](https://github.com/BuggsA/Ages-of-earth/issues/30), Codex: Market recovery indicators and regression coverage ([PR #32](https://github.com/BuggsA/Ages-of-earth/pull/32)), branch `codex/30-market-recovery`. Updated with the repair changes and #33 browser-free rule. No balance or save-shape changes. Browser appearance unverified; merge after green CI on the combined commit.
 
 - [#37](https://github.com/BuggsA/Ages-of-earth/issues/37), **ages as a web** (umbrella, lane rules, effort:hard; chain 1014-0030): s1, the skeleton and the **Age of Merchants** ([#38](https://github.com/BuggsA/Ages-of-earth/issues/38)), merged from `claude/37-ages-web`. Next: s2, the Iron Age and a seed-dependent deposit ([#39](https://github.com/BuggsA/Ages-of-earth/issues/39), ready). The computer walks the trunk only until s4 (lane ai). No save bump: the new fields are optional.
+
+- [#43](https://github.com/BuggsA/Ages-of-earth/issues/43), a sturdier campaign proof (chain 1013-1734, 6/10, lane tooling): branch `claude/43-sturdy-proof`. A chapter passes when a computer wins any of 16 maps; `scripts/campaign.ts --seeds N` prints win rates. No game code or numbers change. Unblocks [#42](https://github.com/BuggsA/Ages-of-earth/issues/42).
 
 - [#24](https://github.com/BuggsA/Ages-of-earth/issues/24), Wings over the Steppe shown winnable (chain 1013-1734, 5/10, lane ai): branch `claude/24-wings`, tests and docs only. Found on the way: [#42](https://github.com/BuggsA/Ages-of-earth/issues/42), computer traders die on bent roads (fix on `claude/42-trade-roads`, blocked on [#43](https://github.com/BuggsA/Ages-of-earth/issues/43), the proof's fragility); [#36](https://github.com/BuggsA/Ages-of-earth/issues/36), the computer can't fight a two-front war.
 

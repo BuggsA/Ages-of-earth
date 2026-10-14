@@ -55,9 +55,10 @@ The owner, 2026-10-13: tests "can often eat a lot of the build time … each age
 | --- | --- | --- | --- |
 | Quick | `npm run check` (typecheck + unit tests in `tests/`) | by you, as often as you like while building | about 20 s |
 | Merge | the `ci` workflow (build + unit tests) | by GitHub on every push to a pull request and to `main` | a minute or two |
-| Full | `npm run check:full` (build, unit tests and the slow tests in `tests/slow/`) | by GitHub daily on `main` (the `periodic` workflow), or on demand | under a minute: `tests/slow/` is empty |
+| Full | `npm run check:full` (build, unit tests and the slow tests in `tests/slow/`) | by GitHub daily on `main` (the `periodic` workflow), or on demand | a few minutes: the campaign proof, three files side by side |
 
 - **Keep the quick tier quick:** under 2 minutes in all. A new test that takes over 10 seconds goes in `tests/slow/`: browser runs, long computer-vs-computer matches, sweeps over many seeds. If the quick tier passes 2 minutes, open an issue to move the slowest tests.
+- **The campaign proof judges whether a chapter can be won, not how well.** A chapter passes when a computer wins it on any of 16 maps (#43), so unrelated changes don't flip it. To judge an AI or balance change, compare win rates over many maps before and after (`npx tsx scripts/campaign.ts --seeds 8`, about 15 minutes for the close chapters), never one match.
 - **Don't run the full tier after each change.** Before merging, run once only the slow test files that cover what you changed (`npx vitest run --mode slow tests/slow/<file>`).
 - **A red `periodic` run** opens or updates an issue labelled `ci-periodic` and `ready`. It goes ahead of new features: fix it, or revert the pull request that caused it.
 - **Read CI logs yourself** through the GitHub tools (`actions_list`, `get_job_logs`). Never merge past a red check you haven't read.
