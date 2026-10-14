@@ -165,10 +165,14 @@ export function inject<T extends THREE.Material>(mat: T, o: Inject): T {
     if (o.flag) {
       begin += /* glsl */ `
         if (aRig.x >= 5.0) {
-          // A square sail: aRig.x - 5 is its height, aRig.y half its width, aRig.z the y of its foot.
+          // A square sail: aRig.x - 5 is its height, aRig.y half its width, aRig.z its foot and centre x.
           float sh = max(aRig.x - 5.0, 0.01);
-          float u = clamp(transformed.x / max(aRig.y, 0.01), -1.0, 1.0);
-          float v = clamp((transformed.y - aRig.z) / sh, 0.0, 1.0);
+          // aRig.z packs the foot with the sail's centre x: 100 * (20 * x + 200) + foot.
+          float cxq = floor((aRig.z + 50.0) / 100.0);
+          float cx = (cxq - 200.0) / 20.0;
+          float foot = aRig.z - cxq * 100.0;
+          float u = clamp((transformed.x - cx) / max(aRig.y, 0.01), -1.0, 1.0);
+          float v = clamp((transformed.y - foot) / sh, 0.0, 1.0);
           float speed = min(1.0, length(uWind) * 2.2);
           vec4 sp = modelMatrix * vec4(0.0, 0.0, 0.0, 1.0);
           #ifdef USE_INSTANCING
