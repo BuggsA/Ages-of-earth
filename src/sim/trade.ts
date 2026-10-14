@@ -1,4 +1,4 @@
-import { relicTradeShare } from './ages';
+import { ageOf, relicTradeShare } from './ages';
 import { LAST_EPOCH, TRADE } from './data';
 import { distToRect } from './grid';
 import { modsOf } from './stats';
@@ -75,11 +75,24 @@ export function nearestMarket(s: GameState, owner: number, x: number, y: number)
   return best;
 }
 
+/** Whether a finished Dock of the owner's stands near a Market, so the Age of Sail ships its goods by water. */
+export function harborNear(s: GameState, owner: number, market: { x: number; y: number }): boolean {
+  if (ageOf(s.players[owner]) !== 'sail') return false;
+  const r = TRADE.harbor.reach;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.owner !== owner || e.type !== 'dock' || !e.built || e.hp <= 0) continue;
+    const dx = e.x - market.x;
+    const dy = e.y - market.y;
+    if (dx * dx + dy * dy <= r * r) return true;
+  }
+  return false;
+}
+
 /** What one trip between a Market and a post pays its owner now. */
 export function tripGold(s: GameState, owner: number, market: { x: number; y: number }, post: TradePost): number {
   const dx = market.x - post.x;
   const dy = market.y - post.y;
   const epoch = Math.min(LAST_EPOCH, s.players[owner].epoch);
-  const k = TRADE.gold * (1 + Math.max(0, epoch - 1) * TRADE.epoch) * modsOf(s, owner).tradeGold * relicTradeShare(s, owner);
+  const k = TRADE.gold * (1 + Math.max(0, epoch - 1) * TRADE.epoch) * modsOf(s, owner).tradeGold * relicTradeShare(s, owner) * (harborNear(s, owner, market) ? TRADE.harbor.mul : 1);
   return Math.max(1, Math.min(TRADE.max, Math.floor((dx * dx + dy * dy) * k)));
 }
