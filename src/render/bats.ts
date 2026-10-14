@@ -33,7 +33,7 @@ const vertex = /* glsl */ `
   }
 `;
 
-const fragment = /* glsl */ `
+export const batFragment = /* glsl */ `
   uniform float uOpacity;
   varying float vAlpha;
   varying float vFlap;
@@ -69,7 +69,7 @@ export class Bats {
     };
     this.points = new THREE.Points(
       g,
-      new THREE.ShaderMaterial({ vertexShader: vertex, fragmentShader: fragment, uniforms: this.u, transparent: true, depthWrite: false, fog: false }),
+      new THREE.ShaderMaterial({ vertexShader: vertex, fragmentShader: batFragment, uniforms: this.u, transparent: true, depthWrite: false, fog: false }),
     );
     this.points.frustumCulled = false;
     this.points.visible = false;
