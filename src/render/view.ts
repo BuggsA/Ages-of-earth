@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import type { SoundName } from '../audio/sound';
+import { ageOf } from '../sim/ages';
 import { AURA, BUILDINGS, SIGNATURES, TICK_HZ, TRADE, domainOf } from '../sim/data';
 import { buildingMaxHp, statsFor } from '../sim/stats';
-import type { BuildingType, Ent, GameEvent, GameState, Unit } from '../sim/types';
+import type { AgeId, BuildingType, Ent, GameEvent, GameState, Unit } from '../sim/types';
 import { R_BOG, R_GOLD, R_STONE } from '../sim/types';
 import { seesRect } from '../sim/vision';
 import { BuildingsView } from './buildingsView';
@@ -366,6 +367,8 @@ export class View {
         const at = new THREE.Vector3(e.x + (Math.random() - 0.5) * 4, base + 1 + Math.random() * 3, e.y + (Math.random() - 0.5) * 4);
         this.effects.burst(at, { count: 3, speed: 0.5, up: 1, life: 1.4, size: 0.05, gravity: -0.6, colors: ['#ffd166', '#fff3c4'] });
         this.chimneys.set(e.id, this.time + 0.25);
+      } else if (sideAgeAmbient(this.effects, ageOf(s.players[e.owner]), e, base)) {
+        this.chimneys.set(e.id, this.time + 0.35 + Math.random() * 0.4);
       } else if (e.type === 'forge' && s.players[e.owner].epoch >= 1) {
         const at = new THREE.Vector3(e.x + 0.95, base + 2.2, e.y - 0.75);
         this.effects.burst(at, { count: 1, speed: 0.15, up: 1, life: 2.6, size: 0.08, grow: 4, gravity: -0.2, drag: 0.3, soft: true, colors: ['#6a6460', '#8a8480'] });
@@ -867,4 +870,27 @@ export class View {
   shows(e: Ent): boolean {
     return e.kind === 'unit' ? this.units.drawn.has(e.id) : this.buildings.known.has(e.id);
   }
+}
+
+/**
+ * What a side age (#55) adds to the air over its buildings: black smithy smoke and sparks in the Iron
+ * Age, incense over a pilgrims' Temple, paper confetti over a fair's Market. Returns whether it drew.
+ */
+function sideAgeAmbient(fx: Effects, age: AgeId, e: Ent, base: number): boolean {
+  if (e.kind !== 'building') return false;
+  if (age === 'iron' && (e.type === 'forge' || e.type === 'towncenter' || e.type === 'house')) {
+    const at = new THREE.Vector3(e.x + (e.type === 'forge' ? 0.95 : 0.4), base + (e.type === 'house' ? 1.6 : e.type === 'forge' ? 2.2 : 2.4), e.y - 0.5);
+    fx.burst(at, { count: 1, speed: 0.15, up: 1, life: 2.8, size: 0.09, grow: 4, gravity: -0.2, drag: 0.3, soft: true, colors: ['#3a3634', '#55504c'] });
+    if (e.type === 'forge') fx.burst(at, { count: 2, speed: 0.6, up: 1, life: 0.6, size: 0.025, gravity: -0.5, colors: ['#ffb24a', '#ff7a2a'] });
+    return true;
+  }
+  if (age === 'pilgrim' && e.type === 'temple') {
+    fx.burst(new THREE.Vector3(e.x, base + 2.7, e.y), { count: 1, speed: 0.08, up: 1, life: 3.4, size: 0.07, grow: 3, gravity: -0.1, drag: 0.4, soft: true, colors: ['#efe9d6', '#fff6dc'] });
+    return true;
+  }
+  if (age === 'fair' && e.type === 'market') {
+    fx.burst(new THREE.Vector3(e.x, base + 2.0, e.y), { count: 2, speed: 0.5, up: 1, life: 1.6, size: 0.04, gravity: 0.5, colors: ['#d94a3c', '#e8b43a', '#3f8fc4', '#f4efe4'] });
+    return true;
+  }
+  return false;
 }

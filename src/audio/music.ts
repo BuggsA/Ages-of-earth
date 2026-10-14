@@ -9,6 +9,7 @@
  * Plucked strings are Karplus-Strong: a burst of noise fed round a short delay that loses a little each
  * pass, rendered once into buffers.
  */
+import type { AgeId } from '../sim/types';
 
 interface Style {
   bpm: number;
@@ -18,9 +19,9 @@ interface Style {
   scale: number[];
   /** Chords as scale degrees, one per bar, cycled. */
   chords: number[];
-  lead: 'flute' | 'pluck' | 'recorder' | 'harpsichord' | 'cornet';
+  lead: 'flute' | 'pluck' | 'recorder' | 'harpsichord' | 'cornet' | 'bell';
   accomp: 'drone' | 'lyre' | 'lute' | 'strings' | 'oompah';
-  drums: 'hand' | 'frame' | 'tabor' | 'timpani' | 'snare';
+  drums: 'hand' | 'frame' | 'tabor' | 'timpani' | 'snare' | 'anvil';
   /** How busy the tune is (chance of a note on each half beat). */
   density: number;
 }
@@ -33,12 +34,26 @@ const STYLES: Style[] = [
   { bpm: 104, root: 174.61, scale: [0, 2, 4, 5, 7, 9, 11], chords: [0, 3, 4, 0, 5, 3, 4, 0], lead: 'cornet', accomp: 'oompah', drums: 'snare', density: 0.48 },
 ];
 
+/**
+ * The side ages (#55) each have a theme of their own, in place of their tier's: merchants a bright
+ * Mixolydian on lute and bells over a tabor, the Iron Age a minor pentatonic over a drone with an
+ * anvil keeping time, pilgrims a slow Phrygian chant of bells and strings, fairs a lively major waltz
+ * of recorder and oom-pah.
+ */
+const SIDE_STYLES: Partial<Record<AgeId, Style>> = {
+  merchant: { bpm: 96, root: 196.0, scale: [0, 2, 4, 5, 7, 9, 10], chords: [0, 3, 6, 0, 4, 3, 6, 0], lead: 'bell', accomp: 'lute', drums: 'tabor', density: 0.5 },
+  iron: { bpm: 66, root: 123.47, scale: [0, 3, 5, 7, 10], chords: [0, 0, 2, 0], lead: 'flute', accomp: 'drone', drums: 'anvil', density: 0.3 },
+  pilgrim: { bpm: 58, root: 164.81, scale: [0, 1, 3, 5, 7, 8, 10], chords: [0, 0, 5, 3, 0, 4, 5, 0], lead: 'bell', accomp: 'strings', drums: 'frame', density: 0.28 },
+  fair: { bpm: 112, root: 220.0, scale: [0, 2, 4, 5, 7, 9, 11], chords: [0, 4, 3, 0, 5, 3, 4, 0], lead: 'recorder', accomp: 'oompah', drums: 'tabor', density: 0.58 },
+};
+
 const LOOKAHEAD = 1.2;
 
 export class Music {
   private ctx: BaseAudioContext | null = null;
   private out: GainNode | null = null;
   private epoch = 0;
+  private age: AgeId | undefined;
   private timer = 0;
   private nextBar = 0;
   private bar = 0;
@@ -62,8 +77,14 @@ export class Music {
     return !!this.ctx;
   }
 
-  start(epoch: number): void {
+  /** The style now playing: a side age's own theme, or its tier's. */
+  private style(): Style {
+    return (this.age && SIDE_STYLES[this.age]) || this.style();
+  }
+
+  start(epoch: number, age?: AgeId): void {
     this.epoch = Math.min(epoch, STYLES.length - 1);
+    this.age = age;
     if (this.playing || !this.ctx) {
       this.playing = true;
       return;
@@ -83,10 +104,11 @@ export class Music {
     this.timer = 0;
   }
 
-  setEpoch(epoch: number): void {
+  setEpoch(epoch: number, age?: AgeId): void {
     epoch = Math.min(epoch, STYLES.length - 1);
-    if (epoch === this.epoch) return;
+    if (epoch === this.epoch && age === this.age) return;
     this.epoch = epoch;
+    this.age = age;
     // A fresh section in the new style.
     this.bar = 0;
     this.motif = [];
@@ -104,7 +126,7 @@ export class Music {
     if (this.nextBar < ctx.currentTime) this.nextBar = ctx.currentTime + 0.1;
     while (this.nextBar < ctx.currentTime + LOOKAHEAD) {
       this.playBar(this.nextBar);
-      const st = STYLES[this.epoch];
+      const st = this.style();
       this.nextBar += (4 * 60) / st.bpm;
       this.bar++;
       this.heat = Math.max(0, this.heat - 0.06);
@@ -121,7 +143,7 @@ export class Music {
   }
 
   private playBar(t: number): void {
-    const st = STYLES[this.epoch];
+    const st = this.style();
     const beat = 60 / st.bpm;
     // Sections of 16 bars: 12 playing and 4 resting (drone and a little drum only).
     const inSection = this.bar % 16;
@@ -203,12 +225,33 @@ export class Music {
   // ---- Instruments -------------------------------------------------------------------------------
 
   private lead(st: Style, t: number, f: number, len: number): void {
-    if (st.lead === 'pluck') this.pluck(t, f, 0.16, 0.9);
+    if (st.lead === 'bell') this.bell(t, f);
+    else if (st.lead === 'pluck') this.pluck(t, f, 0.16, 0.9);
     else if (st.lead === 'harpsichord') {
       this.pluck(t, f, 0.13, 0.6, true);
       this.pluck(t, f * 2, 0.04, 0.4, true);
     } else if (st.lead === 'cornet') this.flute(t, f, len * 0.85, 0.045, 'sawtooth', 2.2);
     else this.flute(t, f * (st.lead === 'recorder' ? 2 : 1), len * 0.95, st.lead === 'flute' ? 0.06 : 0.05);
+  }
+
+  /** A struck bell: a sine and an inharmonic partner, ringing out. */
+  private bell(t: number, f: number): void {
+    const ctx = this.ctx!;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.exponentialRampToValueAtTime(0.07, t + 0.008);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + 2.2);
+    env.connect(this.out!);
+    for (const [mul, vol] of [[1, 1], [2.76, 0.35]]) {
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = f * 2 * mul;
+      const g = ctx.createGain();
+      g.gain.value = vol;
+      o.connect(g).connect(env);
+      o.start(t);
+      o.stop(t + 2.3);
+    }
   }
 
   /** A breathy wind voice: a flute or recorder, or (a brighter wave, filtered) a cornet. */
@@ -303,6 +346,23 @@ export class Music {
 
   private drum(st: Style, t: number, peak: number, low: boolean): void {
     const ctx = this.ctx!;
+    if (st.drums === 'anvil') {
+      // A hammer on iron: a ringing square wave, hard on the downbeat.
+      const e = ctx.createGain();
+      const o = ctx.createOscillator();
+      o.type = 'square';
+      o.frequency.value = low ? 520 : 780;
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = low ? 900 : 1500;
+      e.gain.setValueAtTime(0.0001, t);
+      e.gain.exponentialRampToValueAtTime(peak * 0.5, t + 0.003);
+      e.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+      o.connect(bp).connect(e).connect(this.out!);
+      o.start(t);
+      o.stop(t + 0.6);
+      return;
+    }
     const env = ctx.createGain();
     const osc = ctx.createOscillator();
     const base = st.drums === 'timpani' ? 70 : st.drums === 'hand' ? 120 : st.drums === 'snare' ? 150 : 100;
