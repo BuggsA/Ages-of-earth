@@ -17,24 +17,32 @@ The full list, with the owner's words, is `docs/rulings.md`.
 
 Everything in `README.md`'s "What's in it" was built on 2026-10-12 in one session (branch `claude/beautiful-franklin-6gj8tt`, now `main`): five epochs, six peoples, the economy, seventeen buildings, twenty-six technologies, counters, siege, priests, heroes, walls and the bell, ships, fishing and aircraft, the computer opponent, online rooms, saves, replays, synthesized sound and music.
 
-Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders and trading posts (#6, merged in #10; the save `v` is 3), and **the campaign**, The Long Road (#9, merged in #11; from an earlier session's unmerged branch). The computer plays a chapter's goals, so chapters 1–5 are shown winnable (#12); chapter 6 isn't yet (#24).
+Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders and trading posts (#6, merged in #10; the save `v` is 3), and **the campaign**, The Long Road (#9, merged in #11; from an earlier session's unmerged branch). The computer plays a chapter's goals, so all six chapters are shown winnable (#12, #24), Wings over the Steppe and Sea Lords only at Hard. The proof plays up to 16 maps a chapter, so one chaotic match no longer flips it (#43); Wings is still won on few maps (#36).
 
 | Check | State |
 | --- | --- |
-| Quick tier (`npm run check`) | 93 tests, about 20 s |
-| Slow tier (`tests/slow/`) | `campaign-proof.test.ts`: chapters 1–5 played to a win, about 75 s |
+| Quick tier (`npm run check`) | 144 tests, about 30 s |
+| Slow tier (`tests/slow/`) | `campaign-proof*.test.ts`: every chapter won by a computer on its own map or, at Hard, one of 15 more (#43); three files side by side, about 3½ minutes on a cloud container |
 | Browser checks | none automated; the first session tested by hand in headless Chromium |
 | CI (`ci`, `periodic`) | added 2026-10-13; `periodic` starts once `main` is the default branch |
 
 ## In flight
 
-- [#24](https://github.com/BuggsA/Ages-of-earth/issues/24), Wings over the Steppe isn't shown winnable (lane ai, effort:hard): claimed by another chain.
+- [#41](https://github.com/BuggsA/Ages-of-earth/issues/41), Codex: one live connection per online player, branch `codex/41-online-connections`. Stale socket events and reconnect timers isolated; server rejects messages from replaced or departed connections. No simulation, balance, protocol or save changes. Implementation and nine regression cases complete; see #41 for CI and handoff. Browser behaviour unverified.
+
+- [#30](https://github.com/BuggsA/Ages-of-earth/issues/30), Codex: Market recovery indicators and regression coverage ([PR #32](https://github.com/BuggsA/Ages-of-earth/pull/32)), branch `codex/30-market-recovery`. Updated with the repair changes and #33 browser-free rule. No balance or save-shape changes. Browser appearance unverified; merge after green CI on the combined commit.
+
+- [#37](https://github.com/BuggsA/Ages-of-earth/issues/37), **ages as a web** (umbrella, lane rules, effort:hard; chain 1014-0030): s1, the skeleton and the **Age of Merchants** ([#38](https://github.com/BuggsA/Ages-of-earth/issues/38)), merged from `claude/37-ages-web`. s2, **bog iron and the Iron Age** ([#39](https://github.com/BuggsA/Ages-of-earth/issues/39)), from `claude/39-iron-age`: a deposit on about half the seeds, a yes-or-no survey at the Storehouse, a tier-1 side age from the Stone Age. s3, **windows and stepping back** ([#47](https://github.com/BuggsA/Ages-of-earth/issues/47)), from `claude/47-step-back`: a Town Center step back (Z) to the trunk age one tier down, technologies above it suspended until the climb, shut side roads shown with where they open. Next: s4, the computer walks the web (lane ai, after #36). No save bump: the new fields are optional, and an older save is a world without bog iron.
+
+- [#43](https://github.com/BuggsA/Ages-of-earth/issues/43), a sturdier campaign proof (chain 1013-1734, 6/10, lane tooling): branch `claude/43-sturdy-proof`. A chapter passes when a computer wins any of 16 maps; `scripts/campaign.ts --seeds N` prints win rates. No game code or numbers change. Unblocks [#42](https://github.com/BuggsA/Ages-of-earth/issues/42).
+
+- [#24](https://github.com/BuggsA/Ages-of-earth/issues/24), Wings over the Steppe shown winnable (chain 1013-1734, 5/10, lane ai): branch `claude/24-wings`, tests and docs only. Found on the way: [#42](https://github.com/BuggsA/Ages-of-earth/issues/42), computer traders die on bent roads (fix on `claude/42-trade-roads`, blocked on [#43](https://github.com/BuggsA/Ages-of-earth/issues/43), the proof's fragility); [#36](https://github.com/BuggsA/Ages-of-earth/issues/36), the computer can't fight a two-front war.
 
 - [#1](https://github.com/BuggsA/Ages-of-earth/pull/1), repairs for damaged buildings: brought up to date with `main` on 2026-10-14, typecheck and all tests pass; the game loads in headless Chromium with no errors. Not yet played by a person (the right-click, hammer cursor and sound are untried); ready for review.
 
 - [#21](https://github.com/BuggsA/Ages-of-earth/issues/21), Muse reviewer docs (owner-ask, lane tooling): branch `claude/21-muse-docs`. Docs only.
 
-Merged since the last update (2026-10-13): the campaign (#11), the computer plays campaign goals (#25), sea landings (#26, test #27), veterancy, signature lines and their marks, and **Pilgrimage** (#28: a Temple tech that doubles relic gold; chain 1013-1900, 8/10). The chain ended there: `create_session` refused at lineage depth 8.
+Merged since the last update (2026-10-13): the campaign (#11), the computer plays campaign goals (#25), sea landings (#26, test #27), veterancy, signature lines and their marks, and **Pilgrimage** (#28: a Temple tech that doubles relic gold; chain 1013-1900, 8/10). **Market prices recover** (#31: they drift back toward their start, 1 point every 10 s; agents may open pull requests without asking, `AGENTS.md` §3). The chain ended there: `create_session` refused at lineage depth 8.
 
 ## Waiting on the owner
 

@@ -88,6 +88,23 @@ function goldDeposit(): Kit {
   return k;
 }
 
+/** Bog iron (#39): a rust-filmed pool in dark marsh mud, lumps of red-brown ore, and reeds. */
+function bogIron(): Kit {
+  const k = new Kit();
+  k.cyl(0.46, 0.5, 0.04, 9, '#5c4a32', 0, 0.0);
+  k.cyl(0.32, 0.32, 0.02, 9, '#c8702e', -0.06, 0.035, 0.04);
+  k.cyl(0.17, 0.17, 0.012, 7, '#e8a048', -0.1, 0.05, 0.06);
+  k.rock(0.17, '#8a4424', 0.22, 0.08, -0.12);
+  k.rock(0.13, '#a0562c', 0.08, 0.06, -0.26);
+  k.rock(0.1, '#7a3c22', -0.28, 0.05, -0.18);
+  for (let i = 0; i < 8; i++) {
+    const a = 0.6 + i * 0.7;
+    const reed = k.cone(0.035, 0.42 + (i % 3) * 0.1, 4, i % 2 ? '#7d8c42' : '#a0a052', Math.cos(a) * 0.38, 0, Math.sin(a) * 0.38);
+    reed.rotation.z = ((i % 3) - 1) * 0.15;
+  }
+  return k;
+}
+
 function tuft(): Kit {
   const k = new Kit();
   for (let i = 0; i < 4; i++) {
@@ -164,7 +181,7 @@ function fish(): Kit {
   return k;
 }
 
-const MAKERS = { pine, broadleaf, birch, palm, felled, berryBush, stoneDeposit, goldDeposit, carcass, tuft, flowers, pebbles, boulder, fish };
+const MAKERS = { pine, broadleaf, birch, palm, felled, berryBush, stoneDeposit, goldDeposit, bogIron, carcass, tuft, flowers, pebbles, boulder, fish };
 export type NatureKind = keyof typeof MAKERS;
 
 const cache = new Map<NatureKind, THREE.BufferGeometry>();

@@ -3,18 +3,19 @@ import { hitAnimal, spawnAnimal, updateAnimals } from './animals';
 import { markGoals, scenarioStep, startScenario } from './campaign';
 import { buildingGuns, updateShots } from './combat';
 import { applyCommand } from './commands';
-import { AURA, CIV_IDS, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
+import { AGES, AURA, unitEpoch, CIV_IDS, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
 import { AIR, NAVAL, stampBuilding } from './grid';
 import { generateMap } from './mapgen';
 import { Spatial } from './spatial';
 import { updateRelics } from './relics';
 import { atPost } from './trade';
-import { modsOf, statsFor } from './stats';
-import type { Building, CivId, Command, Difficulty, GameMode, GameState, MapSize, MapType, Player } from './types';
+import { modsOf, trainTimeFor } from './stats';
+import { barred, journeyOf, surveyFinds, trainsAt } from './ages';
+import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, MapSize, MapType, Player } from './types';
 import { RES, R_FISH, R_NONE } from './types';
 import { RES_OF_TILE, carryCargo, checkStuck, collide, findResource, routeUnits, separate, setOrder, think, ungarrison, walk } from './units';
 import { updateVision } from './vision';
-import { countPop, exitSpot, maxHp, placeBuilding, spawnUnit } from './world';
+import { countPop, exitSpot, maxHp, placeBuilding, refund, spawnUnit } from './world';
 
 /**
  * The match: made from a seed and a list of players, then advanced one fixed tick at a time with the
@@ -52,7 +53,8 @@ const spatials = new WeakMap<GameState, Spatial>();
 
 export function createGame(setup: GameSetup): GameState {
   const mapType = setup.mapType ?? 'continental';
-  const map = generateMap(setup.seed, setup.size, setup.players.length, mapType);
+  // Campaign maps are drawn as they always were: no deposits that only some seeds hold.
+  const map = generateMap(setup.seed, setup.size, setup.players.length, mapType, !setup.scenario);
   const n = map.w * map.h;
   const startEpoch = Math.max(0, Math.min(EPOCHS.length - 1, setup.startEpoch ?? 0));
   const mode = setup.mode ?? 'conquest';
@@ -81,6 +83,7 @@ export function createGame(setup: GameSetup): GameState {
     relicTeam: -1,
     relicTimer: -1,
     posts: [],
+    bogIron: map.bogIron,
     nextId: 1,
     shots: [],
     rng: setup.seed >>> 0,
@@ -113,7 +116,7 @@ export function createGame(setup: GameSetup): GameState {
       vis: new Uint8Array(n),
       seen: new Uint8Array(n),
       defeated: false,
-      stats: { gathered: 0, trained: 0, kills: 0, losses: 0, built: 0, razed: 0, converted: 0, techs: 0, traded: 0 },
+      stats: { gathered: 0, trained: 0, kills: 0, losses: 0, built: 0, razed: 0, converted: 0, techs: 0, traded: 0, iron: 0 },
       history: [],
       startX: start.x,
       startY: start.y,
@@ -187,10 +190,36 @@ function restat(s: GameState, p: Player, change: () => void): void {
   }
 }
 
-/** Into the next epoch: every unit re-arms and every building is reinforced. */
-function advanceEpoch(s: GameState, p: Player): void {
-  restat(s, p, () => p.epoch++);
-  s.events.push({ k: 'epoch', owner: p.id, epoch: p.epoch });
+/**
+ * Into another age (#37): every unit re-arms to the age's tier and every building is rebuilt in its
+ * style. On a step back (#47) they fall back to the older forms, and whatever the new age can't train
+ * or research is taken off the queues and refunded.
+ */
+function enterAge(s: GameState, p: Player, to: AgeId, back = false): void {
+  const tier = AGES[to].tier;
+  restat(s, p, () => {
+    p.epoch = tier;
+    p.age = to;
+    // A step back suspends what lies above the new tier; any change of age brings back what fits.
+    const off = back ? p.techs.filter((t) => TECHS[t].epoch > tier) : [];
+    const on = (p.suspended ?? []).filter((t) => TECHS[t].epoch <= tier);
+    if (!off.length && !on.length) return;
+    const still = [...(p.suspended ?? []).filter((t) => TECHS[t].epoch > tier), ...off];
+    p.techs = [...p.techs.filter((t) => !off.includes(t)), ...on];
+    if (still.length) p.suspended = still;
+    else delete p.suspended;
+  });
+  if (back) p.backAt = s.tick;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.owner !== p.id || !e.queue.length) continue;
+    const keep = e.queue.filter((q) =>
+      q.tech ? TECHS[q.tech].epoch <= p.epoch : trainsAt(p, e.type).includes(q.unit!) && unitEpoch(q.unit!) <= p.epoch && !barred(p, q.unit!),
+    );
+    if (keep.length === e.queue.length) continue;
+    for (const q of e.queue) if (!keep.includes(q)) refund(p, q.paid);
+    e.queue = keep;
+  }
+  s.events.push({ k: 'epoch', owner: p.id, epoch: p.epoch, age: to, ...(back ? { back: true } : {}) });
 }
 
 function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
@@ -206,10 +235,20 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
   }
   if (b.timer > 0) b.timer--;
   if (b.advance >= 0) {
-    b.advance++;
-    if (b.advance >= secs(EPOCHS[p.epoch + 1].time)) {
+    const road = journeyOf(p, b);
+    if (!road) {
+      // The road is gone (the age changed under it): stand down.
       b.advance = -1;
-      advanceEpoch(s, p);
+      delete b.advanceTo;
+      delete b.back;
+      return;
+    }
+    b.advance++;
+    if (b.advance >= secs(road.time)) {
+      b.advance = -1;
+      delete b.advanceTo;
+      delete b.back;
+      enterAge(s, p, road.to, road.back);
     }
     return;
   }
@@ -222,10 +261,11 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
     restat(s, p, () => p.techs.push(tech));
     p.stats.techs++;
     s.events.push({ k: 'researched', owner: p.id, tech });
+    if (TECHS[tech].survey) s.events.push({ k: 'survey', owner: p.id, tech, found: surveyFinds(s, tech) });
     return;
   }
   const unit = item.unit!;
-  const need = secs(statsFor(s, p.id, unit).time);
+  const need = secs(trainTimeFor(s, p.id, unit, b.type));
   if (item.done < need) {
     item.done++;
     if (item.done < need) return;

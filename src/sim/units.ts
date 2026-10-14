@@ -5,7 +5,7 @@ import { findRoute } from './path';
 import type { Spatial } from './spatial';
 import { buildTimeFor, buildingCostFor, modsOf } from './stats';
 import type { Act, Animal, Building, Cost, Ent, GameState, Goal, Order, Res, Unit } from './types';
-import { RES, R_BERRY, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
+import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { carriedBy, relicAt } from './relics';
 import { atPost, goalForPost, marketOf, nearestMarket, postAt, tripGold } from './trade';
 import { canHit, exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, passOf, pay, radiusOf, statsOf, teamOf } from './world';
@@ -24,9 +24,10 @@ const PATH_BUDGET = 60000;
 /** Defensive units chase no farther than this from where they stood. */
 const LEASH = 7;
 
-export const RES_OF_TILE: Record<number, Res> = { [R_TREE]: 'wood', [R_BERRY]: 'food', [R_STONE]: 'stone', [R_GOLD]: 'gold', [R_MEAT]: 'food', [R_FISH]: 'food' };
-const ACT_OF_TILE: Record<number, Act> = { [R_TREE]: 'chop', [R_BERRY]: 'forage', [R_STONE]: 'mine', [R_GOLD]: 'mine', [R_MEAT]: 'forage', [R_FISH]: 'fish' };
-const RATE_OF_TILE: Record<number, number> = { [R_TREE]: GATHER.tree, [R_BERRY]: GATHER.berry, [R_STONE]: GATHER.stone, [R_GOLD]: GATHER.gold, [R_MEAT]: GATHER.meat, [R_FISH]: GATHER.fish };
+/** Bog iron is paid in as gold: iron bars were money across much of West Africa. */
+export const RES_OF_TILE: Record<number, Res> = { [R_TREE]: 'wood', [R_BERRY]: 'food', [R_STONE]: 'stone', [R_GOLD]: 'gold', [R_MEAT]: 'food', [R_FISH]: 'food', [R_BOG]: 'gold' };
+const ACT_OF_TILE: Record<number, Act> = { [R_TREE]: 'chop', [R_BERRY]: 'forage', [R_STONE]: 'mine', [R_GOLD]: 'mine', [R_MEAT]: 'forage', [R_FISH]: 'fish', [R_BOG]: 'mine' };
+const RATE_OF_TILE: Record<number, number> = { [R_TREE]: GATHER.tree, [R_BERRY]: GATHER.berry, [R_STONE]: GATHER.stone, [R_GOLD]: GATHER.gold, [R_MEAT]: GATHER.meat, [R_FISH]: GATHER.fish, [R_BOG]: GATHER.bog };
 
 export function setOrder(u: Unit, order: Order): void {
   u.order = order;
@@ -88,7 +89,7 @@ function gatherRate(s: GameState, u: Unit, kind: number | 'farm'): number {
   const ai = p.ai ? AI_LEVELS[p.ai].gather : 1;
   const base = kind === 'farm' ? GATHER.farm : RATE_OF_TILE[kind];
   const mod =
-    kind === 'farm' ? m.farm : kind === R_TREE ? m.wood : kind === R_STONE || kind === R_GOLD ? m.mine : kind === R_MEAT ? m.hunt * m.forage : kind === R_FISH ? m.fish : m.forage;
+    kind === 'farm' ? m.farm : kind === R_TREE ? m.wood : kind === R_STONE || kind === R_GOLD || kind === R_BOG ? m.mine : kind === R_MEAT ? m.hunt * m.forage : kind === R_FISH ? m.fish : m.forage;
   return base * mod * (1 + p.epoch * EPOCH_GATHER_BONUS) * ai;
 }
 
@@ -178,7 +179,7 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
   const kind = s.res[o.tile];
   if (kind === R_NONE || RES_OF_TILE[kind] !== o.res) {
     // Run out: the next one nearby of the same kind (game first, then berries, for food; boats fish).
-    const wants = u.type === 'fisher' ? [R_FISH] : o.res === 'wood' ? [R_TREE] : o.res === 'food' ? [R_MEAT, R_BERRY] : o.res === 'stone' ? [R_STONE] : [R_GOLD];
+    const wants = u.type === 'fisher' ? [R_FISH] : o.res === 'wood' ? [R_TREE] : o.res === 'food' ? [R_MEAT, R_BERRY] : o.res === 'stone' ? [R_STONE] : o.bog ? [R_BOG, R_GOLD] : [R_GOLD];
     let next = -1;
     for (const want of wants) {
       next = findResource(s, want, (o.tile % s.w) + 0.5, Math.floor(o.tile / s.w) + 0.5, want === R_MEAT ? 5 : want === R_FISH ? 12 : 8);
@@ -201,11 +202,19 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
     u.miss = 0;
     face(u, tx, ty);
     u.act = ACT_OF_TILE[kind];
+    // Diggers of bog iron go on to the next patch of it when this one is dug out.
+    if (kind === R_BOG) o.bog = true;
+    else if (o.bog) delete o.bog;
     u.frac += gatherRate(s, u, kind) * DT;
     while (u.frac >= 1 && u.carry < cap && s.amount[o.tile] > 0) {
       u.frac -= 1;
       u.carry++;
       s.amount[o.tile]--;
+      // Bog iron dug counts toward the Iron Age's deed (#39).
+      if (kind === R_BOG) {
+        const st = s.players[u.owner].stats;
+        st.iron = (st.iron ?? 0) + 1;
+      }
     }
     workEvent(s, u, u.act, tx, ty);
     if (s.amount[o.tile] <= 0) {
@@ -362,7 +371,7 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
     // Work whatever lies closest to the new storehouse.
     let best = -1;
     let bestDist = Infinity;
-    for (const kind of [R_TREE, R_GOLD, R_STONE, R_BERRY]) {
+    for (const kind of [R_TREE, R_GOLD, R_STONE, R_BERRY, R_BOG]) {
       const t = findResource(s, kind, b.x, b.y, 8);
       if (t < 0) continue;
       const d = distToTile(b.x, b.y, t, s.w);

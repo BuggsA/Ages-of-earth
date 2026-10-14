@@ -1,24 +1,4 @@
-import { describe, expect, it } from 'vitest';
-import { SCENARIOS } from '../../src/sim/campaign';
-import { playChapter } from '../../src/sim/campaignPlay';
+import { campaignProof } from './campaignProof';
 
-/**
- * Each chapter played to the end by a computer in the player's seat, playing toward the chapter's
- * goals (`chapterGoals` in src/sim/ai.ts): proof the chapter can be won. A match turns on small
- * things, so a chapter counts as won if a Normal computer wins it, or failing that a Hard one. Wings over the Steppe isn't
- * proven yet (#24 follows it up), so it is left out.
- */
-const PROVEN = ['first-fires', 'river-of-kings', 'the-wall', 'iron-and-gold', 'sea-lords'];
-
-describe('the campaign can be won', () => {
-  for (const sc of SCENARIOS.filter((c) => PROVEN.includes(c.id))) {
-    it(`${sc.title}: a computer in your seat wins it`, () => {
-      let s = playChapter(sc.id, 'normal');
-      if (s.scenario!.result !== 'win') s = playChapter(sc.id, 'hard');
-      expect(s.scenario!.result).toBe('win');
-      sc.objectives.forEach((o, i) => {
-        if (!o.bonus) expect(s.scenario!.done[i]).toBe(true);
-      });
-    }, 300_000);
-  }
-});
+/** The campaign can be won (`campaignProof`): the first four chapters. The last two have files of their own. */
+campaignProof(['first-fires', 'river-of-kings', 'the-wall', 'iron-and-gold']);

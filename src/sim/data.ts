@@ -1,4 +1,4 @@
-import type { BuildingType, CivId, Cost, Difficulty, Domain, MapSize, MapType, Res, TechId, UnitType } from './types';
+import type { AgeId, BuildingType, CivId, Cost, Difficulty, Domain, MapSize, MapType, Res, TechId, UnitType, PlayerStats } from './types';
 
 /** Every number in the game lives here. */
 
@@ -23,6 +23,126 @@ export const EPOCHS: Epoch[] = [
   { name: 'Industrial Age', short: 'Industrial', cost: { food: 1400, gold: 900, stone: 400 }, time: 80, blurb: 'Rifles, field guns, ironclads, and the first aeroplanes.' },
 ];
 export const LAST_EPOCH = EPOCHS.length - 1;
+
+/**
+ * Ages as a web (#37). An age is where a people stands; its tier is the epoch that every
+ * epoch-based number reads (unit versions, building styles and toughness, technologies, walls), so
+ * a side age's armies keep pace. The trunk is the five epochs above, the dependable road on every
+ * map; side ages branch off it, change how a people works while it stays there, and rejoin it.
+ */
+export interface Age {
+  name: string;
+  short: string;
+  tier: number;
+  blurb: string;
+  /** What changes while a people is in this age, as civilizations and technologies change things. */
+  add?: Partial<Mods>;
+  mul?: Partial<Mods>;
+  /**
+   * Soldiers hired for gold alone at a building: which lines, gold per point of their usual
+   * price (rounded to 5), and the share of their usual training time.
+   */
+  hire?: { at: BuildingType; units: UnitType[]; gold: number; time: number };
+  /** Foot, bow and horse trained the usual way cost this much more. */
+  levy?: number;
+  /** What each class of unit costs here, as a share of its usual price (after any levy). */
+  price?: Partial<Record<UnitClass, number>>;
+  /** Lines this age can't train, and why (shown on the greyed button). */
+  no?: { units: UnitType[]; why: string };
+}
+
+export const TRUNK: AgeId[] = ['stone', 'bronze', 'middle', 'gunpowder', 'industrial'];
+
+const trunkAge = (e: number): Age => ({ name: EPOCHS[e].name, short: EPOCHS[e].short, tier: e, blurb: EPOCHS[e].blurb });
+
+export const AGES: Record<AgeId, Age> = {
+  stone: trunkAge(0),
+  bronze: trunkAge(1),
+  middle: trunkAge(2),
+  gunpowder: trunkAge(3),
+  industrial: trunkAge(4),
+  merchant: {
+    name: 'Age of Merchants',
+    short: 'Merchant',
+    tier: 2,
+    blurb: 'Guilds, banks and hired swords: the Market hires soldiers for gold, trade pays more, and levies cost dear.',
+    mul: { tradeGold: 1.25 },
+    hire: { at: 'market', units: ['infantry', 'ranged', 'cavalry'], gold: 1.2, time: 0.5 },
+    levy: 1.2,
+  },
+  iron: {
+    name: 'Iron Age',
+    short: 'Iron',
+    tier: 1,
+    blurb: 'Iron spears, iron hoes and iron axes, but no horse: cheap, hard-hitting foot soldiers and quicker farms and woodcutters; cavalry waits for the Middle Ages.',
+    add: { infantryAttack: 1 },
+    mul: { farm: 1.1, wood: 1.1 },
+    price: { infantry: 0.75 },
+    no: { units: ['cavalry'], why: 'No horses in the Iron Age: cavalry waits for the Middle Ages' },
+  },
+};
+
+/** A road from one age to another, taken at a Town Center. */
+export interface Road {
+  from: AgeId;
+  to: AgeId;
+  cost: Cost;
+  time: number;
+  /** Shown at the Town Center only once the player has one of these, the clue that the road is there. */
+  clue?: BuildingType;
+  /**
+   * Shown only once this survey (a technology) has been researched and found what it looks for in this
+   * world (#39). A survey that finds nothing keeps the road hidden for good.
+   */
+  found?: TechId;
+  /** A deed the road needs beyond its price: a tally from the player's stats. */
+  deed?: { stat: keyof PlayerStats; n: number; text: string };
+  /** What taking it means, for the tooltip (trunk roads use the age's blurb). */
+  blurb?: string;
+}
+
+export const ROADS: Road[] = [
+  ...TRUNK.slice(1).map((to, i): Road => ({ from: TRUNK[i], to, cost: EPOCHS[i + 1].cost, time: EPOCHS[i + 1].time })),
+  {
+    from: 'bronze',
+    to: 'merchant',
+    cost: { food: 500, wood: 200, gold: 300 },
+    time: 50,
+    clue: 'market',
+    deed: { stat: 'traded', n: 400, text: 'Your traders bring home 400 gold' },
+    blurb: 'Instead of the Middle Ages: the same soldiers and technologies, but the Market hires foot, bow and horse for gold alone, in half the time; trade pays 25% more; soldiers trained the usual way cost 20% more.',
+  },
+  { from: 'merchant', to: 'gunpowder', cost: { food: 800, gold: 900, stone: 100 }, time: 65, blurb: 'Rejoin the main road: the merchant fortune buys its way into gunpowder (more gold and less stone than from the Middle Ages).' },
+  { from: 'merchant', to: 'middle', cost: { food: 300, stone: 150 }, time: 30, blurb: 'Settle down: leave the merchant life for the Middle Ages, no hiring and no levy price.' },
+  {
+    from: 'stone',
+    to: 'iron',
+    cost: { food: 350, wood: 150 },
+    time: 35,
+    found: 'survey',
+    deed: { stat: 'iron', n: 150, text: 'Your citizens dig 150 bog iron' },
+    blurb: 'Instead of the Bronze Age, as many peoples of Africa went from stone straight to iron: foot soldiers cost a quarter less and strike 1 harder, and iron hoes and axes make farms and woodcutters 10% quicker. What it gives up: the horse. The Stable trains no cavalry until the Middle Ages.',
+  },
+  { from: 'iron', to: 'middle', cost: EPOCHS[2].cost, time: EPOCHS[2].time, blurb: 'Rejoin the main road at the Middle Ages, for the same price as from the Bronze Age: the horse arrives, and the iron foot soldiers become ordinary pikemen.' },
+];
+
+/**
+ * Stepping back an age (#47), at a Town Center: down to the trunk age one tier below, whatever road
+ * led here (the Iron Age falls back to the Stone Age, the merchants to the Bronze Age). Every unit
+ * falls back to its older form, and technologies above the new tier are suspended, not lost: they
+ * return when the people climbs again, at the climb's full price. What the step itself costs, for each
+ * tier given up: food to carry the people through the unrest, gold to pay off those who did well
+ * under the new order. `time` is seconds at the Town Center; `cooldown` is seconds after a step lands
+ * before the next may begin, so a people can't flicker between ages to dodge a counter.
+ */
+export const STEP_BACK = { food: 100, gold: 50, time: 25, cooldown: 300 };
+export const stepBackCost = (tier: number): Cost => ({ food: STEP_BACK.food * tier, gold: STEP_BACK.gold * tier });
+
+/**
+ * Bog iron (#39): on a `chance` share of seeds, a patch of `tiles` tiles for each player, about `home`
+ * tiles from their town (nearer it than any other), each holding `AMOUNT.bog`. Other seeds hold none.
+ */
+export const BOG_IRON = { chance: 0.5, home: 22, tiles: 5 };
 
 export type UnitClass = 'citizen' | 'infantry' | 'ranged' | 'cavalry' | 'siege' | 'priest' | 'hero' | 'ship' | 'fighter' | 'bomber' | 'trader';
 
@@ -309,6 +429,8 @@ export interface Mods {
   cavalrySpeed: number;
   infantryHp: number;
   infantryArmor: number;
+  /** Added to foot soldiers' blows (the Iron Age). */
+  infantryAttack: number;
   priest: number;
   siegeAttack: number;
   siegeRange: number;
@@ -327,7 +449,7 @@ export interface Mods {
 
 export const NO_MODS: Mods = {
   meleeAttack: 0, rangedAttack: 0, armor: 0, parmor: 0, range: 0, carry: 0, citizenSpeed: 1, wood: 1, mine: 1, farm: 1, forage: 1, hunt: 1,
-  buildingHp: 1, buildSpeed: 1, militaryTrain: 1, rangedTrain: 1, cavalrySpeed: 1, infantryHp: 1, infantryArmor: 0, priest: 1,
+  buildingHp: 1, buildSpeed: 1, militaryTrain: 1, rangedTrain: 1, cavalrySpeed: 1, infantryHp: 1, infantryArmor: 0, infantryAttack: 0, priest: 1,
   siegeAttack: 1, siegeRange: 0, techCost: 1, wonderCost: 1, extraCitizens: 0, fish: 1, shipHp: 1, shipRange: 0, airSpeed: 1, airHp: 1,
   traderSpeed: 1, tradeGold: 1, relicGold: 1,
 };
@@ -344,6 +466,8 @@ export interface Tech {
   mul?: Partial<Mods>;
   blurb: string;
   icon: string;
+  /** A survey (#39): when done, it answers whether this world holds what the state's flag records. */
+  survey?: 'bogIron';
 }
 
 export const TECHS: Record<TechId, Tech> = {
@@ -376,6 +500,7 @@ export const TECHS: Record<TechId, Tech> = {
   caravan: { name: 'Caravans', at: 'market', epoch: 2, cost: { food: 200, gold: 100 }, time: 40, mul: { traderSpeed: 1.2 }, blurb: 'Traders travel 20% faster.', icon: '🐪' },
   banking: { name: 'Banking', at: 'market', epoch: 3, cost: { food: 300, gold: 200 }, time: 45, needs: 'caravan', mul: { tradeGold: 1.2 }, blurb: 'Every trade trip pays 20% more gold.', icon: '🏦' },
   pilgrimage: { name: 'Pilgrimage', at: 'temple', epoch: 2, cost: { food: 200, gold: 150 }, time: 40, mul: { relicGold: 2 }, blurb: 'Every relic kept in a Temple pays double gold.', icon: '🕯' },
+  survey: { name: 'Survey the Land', at: 'storehouse', epoch: 0, cost: { food: 50, wood: 50 }, time: 15, survey: 'bogIron', blurb: 'Prospectors walk the streams and marshes and answer one question: is there bog iron anywhere in this world? Yes or no; not where, nor how much.', icon: '🧭' },
 };
 
 export const TECH_IDS = Object.keys(TECHS) as TechId[];
@@ -430,9 +555,9 @@ export const CARRY = [10, 12, 14, 16, 18];
 /** What a fishing boat holds, by epoch. */
 export const FISH_CARRY = [15, 18, 21, 24, 30];
 /** Gathering per second, before the epoch bonus. */
-export const GATHER: Record<'tree' | 'berry' | 'stone' | 'gold' | 'farm' | 'meat' | 'fish', number> = { tree: 0.65, berry: 0.8, stone: 0.55, gold: 0.55, farm: 0.6, meat: 1.0, fish: 0.75 };
+export const GATHER: Record<'tree' | 'berry' | 'stone' | 'gold' | 'farm' | 'meat' | 'fish' | 'bog', number> = { tree: 0.65, berry: 0.8, stone: 0.55, gold: 0.55, farm: 0.6, meat: 1.0, fish: 0.75, bog: 0.45 };
 export const EPOCH_GATHER_BONUS = 0.1;
-export const AMOUNT = { tree: 80, berry: 125, stone: 300, gold: 400, meat: 140, fish: 250 };
+export const AMOUNT = { tree: 80, berry: 125, stone: 300, gold: 400, meat: 140, fish: 250, bog: 300 };
 /** Deer: health, speeds, and how far a hunter throws a spear. */
 export const DEER = { hp: 8, walk: 0.8, flee: 2.3, spear: 3.5, spearDamage: 4 };
 
