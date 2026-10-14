@@ -31,7 +31,7 @@ export type TechId =
   | 'conscription' | 'husbandry' | 'theology' | 'chemistry'
   | 'gillnets' | 'shipwright' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'survey';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair';
 
 /** Tile ground. Water and rock can't be walked or built on. */
 export const T_GRASS = 0;
@@ -297,6 +297,8 @@ export interface PlayerStats {
   traded: number;
   /** Bog iron dug (#39); absent in older saves. */
   iron?: number;
+  /** Gold brought in by relics kept in Temples (#49); absent in older saves. */
+  relicGold?: number;
 }
 
 /** One sample of a player's state for the post-game timeline. */

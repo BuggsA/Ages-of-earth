@@ -85,6 +85,8 @@ export function updateRelics(s: GameState): void {
         const gold = Math.round(RELIC.gold * modsOf(s, b.owner).relicGold);
         p.res.gold += gold;
         p.stats.gathered += gold;
+        // Relic gold counts toward the pilgrims' deeds (#49).
+        p.stats.relicGold = (p.stats.relicGold ?? 0) + gold;
       }
     }
   }

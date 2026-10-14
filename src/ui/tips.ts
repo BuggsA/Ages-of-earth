@@ -1,5 +1,5 @@
 import { AGES, BUILDINGS, ROADS, STEP_BACK } from '../sim/data';
-import { ageOf, backTo, deedProgress, mainRoad, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
+import { ageOf, backTo, deedProgress, deedsDone, mainRoad, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
 import type { Building, GameState, Unit } from '../sim/types';
 import { R_FISH } from '../sim/types';
 
@@ -10,6 +10,8 @@ import { R_FISH } from '../sim/types';
 
 const MERCHANT_ROAD = ROADS.find((r) => r.to === 'merchant')!;
 const IRON_ROAD = ROADS.find((r) => r.to === 'iron')!;
+const PILGRIM_ROAD = ROADS.find((r) => r.to === 'pilgrim')!;
+const FAIR_ROAD = ROADS.find((r) => r.to === 'fair')!;
 
 interface Tip {
   id: string;
@@ -90,6 +92,24 @@ const TIPS: Tip[] = [
       return ageOf(p) === 'stone' && roadKnown(s, p, IRON_ROAD) && (deedProgress(p, IRON_ROAD)?.have ?? 0) < IRON_ROAD.deed!.n;
     },
     text: `This world holds bog iron: rust-red ore in marsh mud (look on the minimap). Dig ${IRON_ROAD.deed!.n} of it, and the Town Center (<kbd>Y</kbd>) can take your people into the <b>${AGES.iron.name}</b> instead of the Bronze Age: cheap, hard-hitting foot soldiers and iron tools, but no horses until the Middle Ages.`,
+  },
+  {
+    id: 'pilgrims',
+    // Relics open a door (#49): a Temple stands while the Middle Ages last.
+    when: (s, me) => {
+      const p = s.players[me];
+      return ageOf(p) === 'middle' && roadKnown(s, p, PILGRIM_ROAD) && !deedsDone(p, PILGRIM_ROAD);
+    },
+    text: `There is a turning off the Middle Ages. Carry relics to your Temple: once they have brought in ${PILGRIM_ROAD.deed!.n} gold, the Town Center (🔀) can turn your people into the <b>${AGES.pilgrim.name}</b>: relics pay double and priests come cheap, but no siege engines. The road shuts once you advance.`,
+  },
+  {
+    id: 'fairs',
+    // The hybrid (#49): a merchant or pilgrim people with the other system's building in view.
+    when: (s, me) => {
+      const p = s.players[me];
+      return roadsFrom(p).some((r) => r.to === 'fair' && roadKnown(s, p, r) && !deedsDone(p, r));
+    },
+    text: `A people both <b>merchant</b> and <b>faithful</b> can hold great fairs. Bring home ${FAIR_ROAD.deed!.n} gold by trade <i>and</i> ${FAIR_ROAD.also![0].n} from relics, and the Town Center (🔀) leads into the <b>${AGES.fair.name}</b> instead of the Gunpowder Age: every relic your Temples keep makes trade pay more. Guard the Temples and the roads, though: fair towns stand weaker.`,
   },
   {
     id: 'stepBack',

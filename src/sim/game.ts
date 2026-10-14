@@ -116,7 +116,7 @@ export function createGame(setup: GameSetup): GameState {
       vis: new Uint8Array(n),
       seen: new Uint8Array(n),
       defeated: false,
-      stats: { gathered: 0, trained: 0, kills: 0, losses: 0, built: 0, razed: 0, converted: 0, techs: 0, traded: 0, iron: 0 },
+      stats: { gathered: 0, trained: 0, kills: 0, losses: 0, built: 0, razed: 0, converted: 0, techs: 0, traded: 0, iron: 0, relicGold: 0 },
       history: [],
       startX: start.x,
       startY: start.y,
