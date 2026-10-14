@@ -5,7 +5,7 @@ import { CameraRig } from './render/camera';
 import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { wallLine } from './sim/commands';
-import { AGES, BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, RELIC, TECHS, TICK_HZ, domainOf, unitStats } from './sim/data';
+import { AGES, BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, RELIC, TECHS, TICK_HZ, TRUNK, domainOf, unitStats } from './sim/data';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
 import { placeProblem, walkable } from './sim/grid';
 import { findDockSpot, findSpot } from './sim/ai';
@@ -1737,7 +1737,14 @@ function recordDiscovery(s: GameState): void {
   if (s.tick - discoveryTick < 20 && s.tick >= discoveryTick) return;
   discoveryTick = s.tick;
   discovery ??= loadDiscovery();
-  if (observe(discovery, s, viewer)) saveDiscovery(discovery);
+  const before = discovery.entered.length;
+  if (observe(discovery, s, viewer)) {
+    saveDiscovery(discovery);
+    // A side age found for the first time, ever, is worth a line: it is now on the title-screen map.
+    for (const a of discovery.entered.slice(before)) {
+      if (!TRUNK.includes(a)) hud.toast(`A new age for your web map: the ${AGES[a].name}`, 'good');
+    }
+  }
 }
 
 function refreshHud(): void {
