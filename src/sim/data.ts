@@ -47,6 +47,8 @@ export interface Age {
   levy?: number;
   /** What each class of unit costs here, as a share of its usual price (after any levy). */
   price?: Partial<Record<UnitClass, number>>;
+  /** Training time by class, multiplied after civilization and technology modifiers. */
+  training?: Partial<Record<UnitClass, number>>;
   /** Lines this age can't train, and why (shown on the greyed button). */
   no?: { units: UnitType[]; why: string };
   /**
@@ -66,6 +68,12 @@ export const AGES: Record<AgeId, Age> = {
   middle: trunkAge(2),
   gunpowder: trunkAge(3),
   industrial: trunkAge(4),
+  aeronaut: {
+    name: 'Age of Aeronauts', short: 'Aeronauts', tier: 4,
+    blurb: 'A future built around the airfield: fighters and bombers cost 25% less and train in 25% less time. Foot, ranged, cavalry and siege units cost 20% more. Aircraft keep Industrial combat strength; riflemen, towers, ironclads and enemy fighters still answer them.',
+    price: { fighter: 0.75, bomber: 0.75, infantry: 1.2, ranged: 1.2, cavalry: 1.2, siege: 1.2 },
+    training: { fighter: 0.75, bomber: 0.75 },
+  },
   reclaimer: {
     name: 'Age of Reclaimers',
     short: 'Reclaimers',
@@ -155,6 +163,8 @@ export interface Road {
 
 export const ROADS: Road[] = [
   ...TRUNK.slice(1).map((to, i): Road => ({ from: TRUNK[i], to, cost: EPOCHS[i + 1].cost, time: EPOCHS[i + 1].time })),
+  { from: 'industrial', to: 'aeronaut', clue: 'airfield', cost: { food: 600, wood: 500, gold: 800 }, time: 60, blurb: 'Build a future around aviation: aircraft cost and training time fall by 25%, but foot, ranged, cavalry and siege units cost 20% more. An Airfield must stand when the journey starts.' },
+  { from: 'aeronaut', to: 'industrial', cost: { food: 200, wood: 200 }, time: 30, blurb: 'Return to a balanced Industrial economy: ordinary aircraft production and ordinary land army prices.' },
   {
     from: 'middle', to: 'reclaimer', cost: { food: 900, wood: 350, gold: 500 }, time: 65,
     ruin: true,
@@ -784,3 +794,4 @@ export function unitStats(type: UnitType, epoch: number): UnitStats {
 export function unitEpoch(type: UnitType): number {
   return UNITS[type].findIndex((s) => s !== null);
 }
+
