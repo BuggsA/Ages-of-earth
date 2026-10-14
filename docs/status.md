@@ -75,6 +75,12 @@ Merged since the last update: **camera bookmarks** (#76, merged in #77: Ctrl+Shi
 
 **Harbor trade** (own pitch, lane rules): in the Age of Sail a Market within 12 tiles of its owner's Dock pays 30% more per trade trip. Numbers in `TRADE.harbor`. Tests only; browser unverified; no save bump.
 
+**Fireflies** (own pitch, lane look): clear nights get blinking green-gold sparks near the camera. Render only; no rules or save change. Browser: see the pull request.
+
 **Sea trade** (own pitch, lane rules): a Dock trains merchant ships (`cog`) that sail to coastal trading posts (ports: water within `TRADE.sea.reach` of the post) and pay `TRADE.sea.mul` (1.2) over the land road; computer Normal/Hard keep 1–2. Tests in `tests/sea-trade.test.ts`; browser unverified; no save bump.
 
 **Lighthouse** (own pitch, lane rules): a Dock technology (after Gillnets, Middle Ages; 200 wood, 120 gold) that adds 4 tiles to how far a trading post may lie from water and still be a port for its owner's merchant ships (`portReach` mod; `portSpot` takes the owner). Computers research it in tech order. Tests in `tests/lighthouse.test.ts`; browser unverified; no save bump.
+**Flickering lights** (own pitch, lane look): warm glowing parts (windows, torches, braziers, lamps) flutter up to a third dimmer on their own beat, per building, in the shared material shader. Render only; no rules, save or `data.ts` change. Browser smoke test passes (shaders compile, no console errors); how it looks in a match is unseen.
+**Ports on the Inland Sea** (#106, own pitch, lane rules): on the sea map trading posts stand on the shore, so every post is a port (24/24 over 12 seeds, was 0/24); other maps unchanged. Sea Lords proof passes; browser unverified; no save bump.
+
+**Tactical Reach** (#101, Codex, lane look): Alt shows selected owned ranged weapons' reach and dashed siege dead zones; defense placement previews future reach. Terrain-following, clipped to current vision, capped at 24 guides in one draw. No rules, balance or save changes. Quick checks pass with the documented local TS5.9 fallback; pinned compiler checked by CI. Browser appearance unverified (Chromium missing).
