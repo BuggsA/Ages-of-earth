@@ -408,3 +408,7 @@ Built: every finished Town Center, Tower, Wonder, Dock and Airfield claims land 
 ## Designers' notes: raid depth (2026-10-14, chain 1014-2045 s5, step 4 of seed #132)
 
 Built: the computer pulls a worn wave back from deep enemy land (`wornDeep`, `AI_RAID`) so attrition no longer bleeds it dry. Why I love it: borders now bite both ways, and the computer feels the pressure you do. Next: building only in your own land (step 3), and the computer raising a forward Tower as a foothold. Untuned: no win-rate sweep was run.
+
+### Wind (#150, own pitch), 2026-10-14
+
+**Built:** each match has a wind from its seed, one of eight directions and a speed that a storm raises and mist lowers (`windFor` in `src/render/weather.ts`); smoke and dust in `Effects` settle at the wind's pace, sparks are left alone. **Why I love it:** smoke always rose straight, so every town looked becalmed; now a burning town bends downwind and the whole land shares one sky. **Next:** rain and snow slanting with it, banners, sails and the windsock on the airfield turning to it, and a wind rose on the minimap for archers' range. Render only. Not seen by eye.

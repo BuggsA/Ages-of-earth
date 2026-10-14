@@ -53,6 +53,33 @@ export function weatherFor(seed: number, mapType: MapType): WeatherDay {
   return { kind, strength: 0.5 + (mix(seed + 191) % 51) / 100 };
 }
 
+/** Which way the air moves, and how fast (tiles a second) once smoke has caught it. */
+export interface Wind {
+  x: number;
+  z: number;
+}
+
+/** Eight directions, as unit steps, so no trigonometry is needed. */
+const COMPASS: [number, number][] = [
+  [1, 0],
+  [0.7071, 0.7071],
+  [0, 1],
+  [-0.7071, 0.7071],
+  [-1, 0],
+  [-0.7071, -0.7071],
+  [0, -1],
+  [0.7071, -0.7071],
+];
+
+/** The day's wind: a direction from the seed, a speed from the seed and the weather (a storm blows hardest). */
+export function windFor(seed: number, day: WeatherDay): Wind {
+  const [dx, dz] = COMPASS[mix(seed + 313) % 8];
+  const base = 0.15 + (mix(seed + 509) % 31) / 100;
+  const speed = base + (day.kind === 'rain' ? 0.35 * day.strength : day.kind === 'mist' ? -0.1 : day.kind === 'snow' ? 0.1 * day.strength : 0);
+  const v = Math.max(0.08, speed);
+  return { x: dx * v, z: dz * v };
+}
+
 /** `?weather=rain` (or snow, mist, clear) in the address forces a day, for trying them out. */
 export function forcedWeather(): WeatherDay | null {
   if (typeof location === 'undefined') return null;
