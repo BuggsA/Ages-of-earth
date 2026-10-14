@@ -3,7 +3,7 @@ import type { SoundName } from '../audio/sound';
 import { ageOf } from '../sim/ages';
 import { AURA, BUILDINGS, SIGNATURES, TICK_HZ, RUINS, TRADE, domainOf } from '../sim/data';
 import { buildingMaxHp, statsFor } from '../sim/stats';
-import type { AgeId, BuildingType, Ent, GameEvent, GameState, Unit } from '../sim/types';
+import type { AgeId, BuildingType, CivId, Ent, GameEvent, GameState, Unit } from '../sim/types';
 import type { ScoutFlag } from '../ui/scoutFlags';
 import { R_BOG, R_GOLD, R_STONE } from '../sim/types';
 import { seesRect } from '../sim/vision';
@@ -524,6 +524,12 @@ export class View {
         this.effects.burst(at, { count: 2, speed: 0.4, up: 1, life: 0.7, size: 0.07, gravity: -1.2, drag: 1, colors: ['#ff9a3c', '#ffd166', '#e0471f'] });
         this.effects.burst(at, { count: 1, speed: 0.3, up: 1, life: 2.2, size: 0.12, grow: 3, gravity: -0.4, drag: 0.4, soft: true, colors: ['#3a3634', '#55504c'] });
         this.chimneys.set(e.id, this.time + (frac < 0.3 ? 0.12 : 0.3));
+      } else if (e.type === 'towncenter' && s.players[e.owner].workEnd !== undefined) {
+        // A great work is under way: a ribbon of its people's colors rises from the Town Center.
+        const a = Math.random() * 6.283;
+        const at = new THREE.Vector3(e.x + Math.cos(a) * e.size * 0.35, base + 2 + Math.random() * 0.4, e.y + Math.sin(a) * e.size * 0.35);
+        this.effects.burst(at, { count: 3, speed: 0.35, up: 1, life: 2, size: 0.07, gravity: -0.9, drag: 0.6, colors: WORK_GLOW[s.players[e.owner].civ] });
+        this.chimneys.set(e.id, this.time + 0.12);
       } else if (e.type === 'wonder' && e.timer >= 0) {
         // A finished wonder glitters.
         const at = new THREE.Vector3(e.x + (Math.random() - 0.5) * 4, base + 1 + Math.random() * 3, e.y + (Math.random() - 0.5) * 4);
@@ -1071,6 +1077,16 @@ export class View {
     return e.kind === 'unit' ? this.units.drawn.has(e.id) : this.buildings.known.has(e.id);
   }
 }
+
+/** The colors of each people's great work as it runs (render only). */
+const WORK_GLOW: Record<CivId, string[]> = {
+  egyptians: ['#4fc3d9', '#9be7f2', '#ffd166'],
+  greeks: ['#e8edf2', '#7fa6d6', '#ffffff'],
+  romans: ['#c0392b', '#ffd166', '#f4e3c1'],
+  mongols: ['#8fd36a', '#e8e0b0', '#ffffff'],
+  chinese: ['#e84a3c', '#ffd166', '#4fd1a5'],
+  britons: ['#3a6fd0', '#e8e8e8', '#d0443a'],
+};
 
 /**
  * What a side age (#55) adds to the air over its buildings: black smithy smoke and sparks in the Iron

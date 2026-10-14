@@ -390,3 +390,8 @@ Built: a `frog` sound (a throaty croak and a quick answering ribbit) cued every 
 
 **Built:** each people can call one great work once per epoch (from the Bronze Age): free, 90 seconds, from the Town Center (**W**). Numbers are `WORKS` and `WORK` in `src/sim/data.ts`; it rides the same `add`/`mul` levers as technologies, so rules, stats panel and cache all just work. Player fields `works`, `workEnd` are optional, so no save bump. Why I love it: the one decision, *when*, is the whole mechanic, and each people's call is a real history (the Nile's flood, the yam relay, the Grand Canal) rather than a number bonus. The computer calls farming and trading works while busy and fighting works when a wave marches or a raid arrives. Not seen in a browser; unit-tested, headless match run.
 **Next:** a second flavour per side age (a pilgrim people calls something else), a map effect (Roman roads showing on the ground, a flood tint on the fields), a visible banner over the Town Center while it lasts, and the Mongol work really widening sight.
+
+### Great work glow (#141), 2026-10-14
+
+**Built:** while a great work runs, motes in the people's colors (the Nile's blue and gold, Rome's red and gold, the steppe's green) rise from each of its Town Centers (`WORK_GLOW` in `src/render/view.ts`). Why I love it: a rival's work is a window to strike or brace in, and now you can read it from the map without a toast. Render only. Not seen in a browser.
+**Next:** a flood tint on the Egyptian fields, Roman roads drawn on the ground, the Mongol work really widening sight.
