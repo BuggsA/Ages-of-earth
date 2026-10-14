@@ -1,5 +1,5 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, AI_LEVELS, AI_WEB, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, TECHS, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_LEVELS, AI_WEB, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, TECHS, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Player, Res, Ruin, TechId, TradePost, Unit, UnitType } from './types';
@@ -96,6 +96,8 @@ interface View {
   plan: Plan;
   /** Citizens digging bog iron toward the Iron Age's deed, kept at it while it is unfinished (#50). */
   diggers: Set<number>;
+  /** An attack is due and the army is short of a wave: soldiers come first (#79). */
+  armyFirst: boolean;
 }
 
 function afford(v: View, cost: Cost): boolean {
@@ -130,10 +132,12 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   // A King stays out of harm's way, sheltered in the Town Center.
   if (king && tc && !king.inside && king.order.k !== 'garrison') applyCommand(s, { t: 'garrison', p: p.id, ids: [king.id], target: tc.id });
   const home = tc ? { x: tc.x, y: tc.y } : { x: p.startX, y: p.startY };
-  const v: View = { p, citizens, army, priests, traders, fishers, navy, planes, buildings, home, tc, budget: { ...p.res }, plan: NO_PLAN, diggers: new Set() };
+  const v: View = { p, citizens, army, priests, traders, fishers, navy, planes, buildings, home, tc, budget: { ...p.res }, plan: NO_PLAN, diggers: new Set(), armyFirst: false };
   const issue = (c: Command) => applyCommand(s, c);
 
   // The iron road's survey (#50) is cheap and first in line: in the Stone Age, citizens eat every scrap.
+  // It waits for a town of `survey` citizens (#79): at ten, it held up the citizens of a town that might
+  // find no bog at all, the very ones that win the first fight.
   ironRoad(s, v, mem, issue);
 
   // People first: a growing town pays for everything else.
@@ -158,6 +162,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   // but when an attack is due and the army is short of it, soldiers come first.
   const waveSize = L.wave + mem.wave * L.waveGrowth;
   const armyFirst = s.tick > secs(L.firstAttack - 150) && army.length < waveSize && !mem.attacking;
+  v.armyFirst = armyFirst;
   // Which road it takes is the web's to say (#50): the trunk, or a side road it has chosen once it opens.
   const wantEpoch = p.epoch < Math.min(LAST_EPOCH, v.plan.maxEpoch) && !advancing && !armyFirst && citizens.length >= ADVANCE_AT[p.epoch] && s.tick > secs(150 + p.epoch * 150);
   const journey = advancing ? null : (!armyFirst && turnRoad(s, v, mem)) || (wantEpoch ? nextRoad(s, v, mem) : null);
@@ -337,9 +342,15 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
  */
 function ironRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
-  if (p.epoch !== 0 || !walksWeb(v) || v.citizens.length < 10 || count(v, 'barracks', true) === 0 || fit(p, 'iron') < 0) return;
   const road = roadsFrom(p).find((r) => r.to === 'iron');
-  if (!road?.found) return;
+  // Once the deed is dug, or the road given up, bog iron is only a poor gold mine: diggers go back to
+  // what the town needs (#79). Left to it, they walked from one bog to the next all through the Stone Age.
+  if (!road || deedsDone(p, road) || mem.roads?.iron === false) {
+    releaseDiggers(s, v, issue);
+    return;
+  }
+  if (p.epoch !== 0 || !walksWeb(v) || v.citizens.length < AI_WEB.survey || count(v, 'barracks', true) === 0 || fit(p, 'iron') < 0) return;
+  if (!road.found) return;
   if (!p.techs.includes(road.found)) {
     if (!wants(s, p, mem, 'iron') || techProblem(s, p.id, road.found)) return;
     const at = v.buildings.find((b) => b.type === TECHS[road.found!].at && b.built && b.queue.length === 0);
@@ -351,7 +362,9 @@ function ironRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   }
   if (!roadKnown(s, p, road) || !wants(s, p, mem, 'iron') || deedsDone(p, road)) return;
   for (const u of v.citizens) if (u.order.k === 'gather' && (u.order.bog || s.res[u.order.tile] === R_BOG)) v.diggers.add(u.id);
-  if (v.diggers.size >= AI_WEB.diggers) return;
+  // Holding the Town Center for the deed, it digs harder (#79): idle savings are the dearest wait.
+  const crew = mem.waiting !== undefined ? AI_WEB.diggers * 2 : AI_WEB.diggers;
+  if (v.diggers.size >= crew) return;
   // The nearest gatherers of wood or gold (or anyone idle) go to the nearest bog.
   const bog = findResource(s, R_BOG, v.home.x, v.home.y, 40);
   if (bog < 0) return;
@@ -360,10 +373,27 @@ function ironRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const free = v.citizens
     .filter((u) => !u.inside && !v.diggers.has(u.id) && u.carry <= 2 && (u.order.k === 'idle' || (u.order.k === 'gather' && (u.order.res === 'wood' || u.order.res === 'gold'))))
     .sort((a, c) => (a.x - bx) * (a.x - bx) + (a.y - by) * (a.y - by) - ((c.x - bx) * (c.x - bx) + (c.y - by) * (c.y - by)) || a.id - c.id);
-  const ids = free.slice(0, AI_WEB.diggers - v.diggers.size).map((u) => u.id);
+  const ids = free.slice(0, crew - v.diggers.size).map((u) => u.id);
   if (!ids.length) return;
   issue({ t: 'gather', p: p.id, ids, tile: bog });
   for (const id of ids) v.diggers.add(id);
+}
+
+/** Citizens still digging bog iron when no deed needs it go to the resource the town is shortest of (#79). */
+function releaseDiggers(s: GameState, v: View, issue: (c: Command) => void): void {
+  const bog = v.citizens.filter((u) => u.order.k === 'gather' && (u.order.bog || s.res[u.order.tile] === R_BOG) && u.carry <= 2 && !u.inside);
+  if (!bog.length) return;
+  const want = wanted(v);
+  const have: Record<Res, number> = { food: 0, wood: 0, gold: 0, stone: 0 };
+  for (const u of v.citizens) {
+    const j = jobOf(u);
+    if (j && j !== 'build') have[j]++;
+  }
+  for (const u of bog) {
+    have.gold--;
+    const need = [...RES].sort((a, b) => want[b] - have[b] - (want[a] - have[a]))[0];
+    if (sendTo(s, v, u, need, issue) || sendTo(s, v, u, 'wood', issue)) have[need]++;
+  }
 }
 
 /**
@@ -570,7 +600,7 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
 
   // A Storehouse to survey from, for a people the Iron Age would suit (#50); after the Barracks, so the
   // town can defend itself before it spends on prospecting.
-  if (p.epoch === 0 && walksWeb(v) && n >= 10 && count(v, 'barracks', true) > 0 && !p.techs.includes('survey') && count(v, 'storehouse') === 0 && !recently('storehouse', 30) && wants(s, p, mem, 'iron')) {
+  if (p.epoch === 0 && walksWeb(v) && n >= AI_WEB.survey && count(v, 'barracks', true) > 0 && !p.techs.includes('survey') && count(v, 'storehouse') === 0 && !recently('storehouse', 30) && wants(s, p, mem, 'iron')) {
     const tree = findResource(s, R_TREE, home.x, home.y, 16);
     const near = tree >= 0 ? { x: (tree % s.w) + 0.5, y: Math.floor(tree / s.w) + 0.5 } : home;
     const spot = findSpot(s, 'storehouse', near.x, near.y, 2, 6);
@@ -580,7 +610,9 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   const ironRival = clever && rivalIn(s, p, ['iron']);
 
   // Trading posts make a Market worth saving for: set its wood aside so soldiers don't eat it.
-  if (s.posts.length && (p.epoch >= 2 || merchantBound(s, v, mem)) && n >= 18 && count(v, 'market') === 0 && !recently('market', 25)) {
+  // Bound for the merchants' age, it raises one early, but never with soldiers owed (#79): set aside
+  // there, the Market's wood starved the Bronze Age army and the town stalled behind army-first.
+  if (s.posts.length && (p.epoch >= 2 || (merchantBound(s, v, mem) && !v.armyFirst)) && n >= 18 && count(v, 'market') === 0 && !recently('market', 25)) {
     const cost = buildingCostFor(s, p.id, 'market');
     const spot = afford(v, cost) ? findSpot(s, 'market', home.x, home.y, 6, 18) : null;
     if (spot && construct(s, v, mem, 'market', spot, 3, issue)) return;
@@ -1058,6 +1090,21 @@ function pickUnit(v: View, mem: AiMemory, building: Building): UnitType | null {
   return trains[mem.unitTurn++ % trains.length];
 }
 
+/** The line that fares best against an arm, by the counter triangle, among those its age allows. */
+function bestAllowed(p: Player, arm: 'infantry' | 'ranged' | 'cavalry'): UnitType | null {
+  let best: UnitType | null = null;
+  let edge = 0;
+  for (const u of ['infantry', 'ranged', 'cavalry'] as const) {
+    if (barred(p, u) || unitEpoch(u) > p.epoch) continue;
+    const e = BONUS[u][arm] / BONUS[arm][u];
+    if (e > edge) {
+      edge = e;
+      best = u;
+    }
+  }
+  return best;
+}
+
 /** The soldiers a building gives an army: its own lines, or at a hiring building (the merchants' Market, #37) the hired ones. */
 function lines(p: Player, b: Building): UnitType[] {
   const hires = hiresAt(p, b.type);
@@ -1130,7 +1177,10 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const mix = enemyMix(s, p);
   const main = (Object.keys(mix) as (keyof typeof mix)[]).sort((a, b) => mix[b] - mix[a])[0];
   const ironRival = L.clever && rivalIn(s, p, ['iron']);
-  const counter = mix[main] >= 3 ? COUNTER[main] : ironRival ? COUNTER.infantry : null;
+  let counter: UnitType | null = mix[main] >= 3 ? COUNTER[main] : ironRival ? COUNTER.infantry : null;
+  // An age that bars the answer (the horse, in the Iron Age) answers with the best line it keeps (#79):
+  // archers against archers, rather than foot that archers cut down twice as fast.
+  if (counter && mix[main] >= 3 && barred(p, counter)) counter = bestAllowed(p, main);
   const counterOdds = ironRival && counter === COUNTER.infantry ? AI_WEB.read : 0.7;
   const answer = { archers: 0, others: 0 };
   const tally = (u: UnitType) => {

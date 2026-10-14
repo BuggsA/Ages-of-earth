@@ -706,15 +706,16 @@ export const AI_LEVELS: Record<Difficulty, AiLevel> = {
 /**
  * How the computer walks the web of ages (#50). It takes a side road that plays to its people's
  * strength (its signature line comes cheaper there) whenever it qualifies, never one that bars that
- * line, and any other with chance `take`, decided once. It keeps `diggers` citizens on bog iron toward
- * the Iron Age; it holds its Town Center for a chosen road's deeds once a `nearly` share of each is
+ * line, and any other with chance `take`, decided once. It surveys for bog iron once its town has
+ * `survey` citizens, and keeps `diggers` citizens on bog iron toward the Iron Age (twice as many while it
+ * holds for the deed; none once the deed is dug, #79); it holds its Town Center for a chosen road's deeds once a `nearly` share of each is
  * done or under way, for at most `patience` seconds; it turns pilgrim with at least `relics` relics
  * kept. Against a merchant rival, a band of `riders` riders waits by the trading post nearest its town
  * and falls on the traders it sees within `raid` tiles (anyone's traders within `raidNear` tiles of home
  * are fair game anyway); against an iron rival, it trains the archers that answer its foot with chance
  * `read`.
  */
-export const AI_WEB = { take: 0.6, diggers: 3, nearly: 0.5, patience: 90, relics: 2, raid: 18, raidNear: 30, riders: 4, read: 0.85 };
+export const AI_WEB = { take: 0.6, survey: 22, diggers: 3, nearly: 0.5, patience: 90, relics: 2, raid: 18, raidNear: 30, riders: 4, read: 0.85 };
 
 export const PLAYER_COLORS = ['#2f7fe0', '#e0473a', '#e8b630', '#3aa35a', '#9b59d0', '#e07a2f'];
 export const PLAYER_NAMES = ['You', 'Rival'];
