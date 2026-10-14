@@ -12,7 +12,7 @@ export type Stock = Record<Res, number>;
 
 export type UnitType =
   | 'citizen' | 'infantry' | 'ranged' | 'cavalry' | 'siege' | 'priest' | 'hero'
-  | 'fisher' | 'warship' | 'transport' | 'fighter' | 'bomber' | 'trader';
+  | 'fisher' | 'warship' | 'transport' | 'cog' | 'fighter' | 'bomber' | 'trader';
 /** How a unit gets about: on foot, on the water, or in the air. */
 export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =

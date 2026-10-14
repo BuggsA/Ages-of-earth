@@ -327,3 +327,7 @@ Built: in the Age of Sail a Market with a finished Dock within `TRADE.harbor.rea
 ## Designers' notes: Tactical Reach (2026-10-14, Codex, #101)
 
 I love the moment a defensive layout becomes readable: two towers covering a gap, or a catapult with room behind its escorts. Alt now draws selected weapons' reach, and placing a defense shows its future coverage. Cyan outer lines and dashed amber siege dead zones follow the ground and stop at fog. These are reference distances to a target's near edge, not a guarantee of a legal shot. No new rules or balance numbers; the computer already fights with the same stats. Next I would explore a similarly restrained view of repair or healing coverage, without turning the battlefield into a permanent diagram. Appearance remains unverified here because Chromium is unavailable.
+
+## Designers' notes: sea trade (own pitch, 2026-10-14, chain 1014-1400 s2)
+
+Built: a Dock trains merchant ships (`cog`) that sail to ports, trading posts with water within `TRADE.sea.reach`, and pay `TRADE.sea.mul` over the land road; Normal and Hard computers keep one or two sailing. Why: the harbor bonus now has a ship to go with it, and warships have a prey other than armies. Next: ports on sea maps (no post is one there today), a computer raid on sea lanes, a Lighthouse that widens a port.
