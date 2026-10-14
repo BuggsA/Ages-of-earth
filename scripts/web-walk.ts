@@ -3,7 +3,8 @@
  * each side's road, with the deeds that open side roads, and who won.
  *   npx tsx scripts/web-walk.ts [first seed] [seeds] [small|medium|large] [minutes] [normal|hard] [web|duel]
  * `duel` plays each seed twice, a web walker against a computer kept to the trunk, once from each seat,
- * and counts the walker's wins: is the web worth walking?
+ * and counts the walker's wins: is the web worth walking? An undecided match is read for who leads at the
+ * end, by the age reached and then by kills less losses (#79).
  */
 import { AGES } from '../src/sim/data';
 import { createGame, step } from '../src/sim/game';
@@ -16,7 +17,7 @@ const minutes = Number(process.argv[5] ?? 30);
 const level = (process.argv[6] ?? 'hard') as 'normal' | 'hard';
 const duel = process.argv[7] === 'duel';
 const wins = [0, 0];
-const walker = { won: 0, lost: 0 };
+const walker = { won: 0, lost: 0, ahead: 0, behind: 0 };
 for (let game = 0; game < seeds * (duel ? 2 : 1); game++) {
   const seed = first + (duel ? game >> 1 : game);
   // In a duel, the trunk seat: one that has passed every side road by.
@@ -40,8 +41,16 @@ for (let game = 0; game < seeds * (duel ? 2 : 1); game++) {
   }
   if (s.winner >= 0) wins[s.winner]++;
   if (trunk >= 0 && s.winner >= 0) walker[s.winner === trunk ? 'lost' : 'won']++;
+  let lead = '';
+  if (trunk >= 0 && s.winner < 0) {
+    const w = s.players[1 - trunk];
+    const t = s.players[trunk];
+    const margin = w.epoch - t.epoch || w.stats.kills - w.stats.losses - (t.stats.kills - t.stats.losses);
+    walker[margin > 0 ? 'ahead' : 'behind']++;
+    lead = `, the walker ${margin > 0 ? 'ahead' : 'behind'}`;
+  }
   const line = s.players.map((p) => `${p.id === trunk ? '(trunk) ' : ''}${p.civ}: ${roads[p.id].join('→')} traded ${Math.floor(p.stats.traded)} relic ${Math.floor(p.stats.relicGold ?? 0)} iron ${Math.floor(p.stats.iron ?? 0)} minded ${JSON.stringify(s.ai[p.id]?.roads ?? {})}`);
-  console.log(`seed ${seed}${s.bogIron ? ' bog' : ''}${s.posts.length ? ` posts ${s.posts.length}` : ''}: ${line.join(' | ')} → ${s.winner >= 0 ? `team ${s.winner} won at ${(s.tick / 1200).toFixed(1)}m` : 'no winner'}`);
+  console.log(`seed ${seed}${s.bogIron ? ' bog' : ''}${s.posts.length ? ` posts ${s.posts.length}` : ''}: ${line.join(' | ')} → ${s.winner >= 0 ? `team ${s.winner} won at ${(s.tick / 1200).toFixed(1)}m` : `no winner${lead}`}`);
 }
 console.log(`wins: A ${wins[0]}, B ${wins[1]} of ${seeds * (duel ? 2 : 1)}`);
-if (duel) console.log(`the web walker won ${walker.won}, lost ${walker.lost}`);
+if (duel) console.log(`the web walker won ${walker.won}, lost ${walker.lost}; of ${seeds * 2 - walker.won - walker.lost} undecided, ahead in ${walker.ahead}, behind in ${walker.behind}`);
