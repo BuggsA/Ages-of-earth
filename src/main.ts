@@ -22,6 +22,7 @@ import { deserialize, serialize } from './sim/save';
 import { SCENARIOS, scenarioById, starsFor } from './sim/campaign';
 import { loadDiscovery, observe, saveDiscovery, webMapHtml } from './ui/webMap';
 import { idleCitizens, idleSelection, idleShortcut } from './ui/idle';
+import { CameraBookmarks, bookmarkShortcut } from './ui/cameraBookmarks';
 import { briefingHtml, chapterListHtml, recordStars, starRow } from './ui/campaignUi';
 import { Lobby } from './ui/lobby';
 import { Hud, nameOf } from './ui/hud';
@@ -84,6 +85,7 @@ let paused = false;
 const SPEEDS = [1, 1.5, 2, 3];
 let speedIdx = 0;
 const groups = new Map<number, number[]>();
+const cameraBookmarks = new CameraBookmarks();
 let lastGroupKey = { key: -1, at: 0 };
 let lastAlert: { x: number; y: number } | null = null;
 let altHeld = false;
@@ -365,6 +367,7 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   paused = false;
   speedIdx = 0;
   groups.clear();
+  cameraBookmarks.reset();
   lastAlert = null;
   acc = 0;
   hud.reset();
@@ -1356,6 +1359,22 @@ window.addEventListener('keydown', (e) => {
   if (e.repeat && !['+', '=', '-'].includes(k)) return;
   if (!$('modal').classList.contains('hidden')) {
     if (k === 'Escape' || k === 'F10') closeModal();
+    return;
+  }
+  // Camera bookmarks share the digits without disturbing ordinary control groups.
+  const mark = bookmarkShortcut(e);
+  if (mark) {
+    e.preventDefault();
+    if (mark.action === 'save') {
+      cameraBookmarks.save(mark.slot, { x: view.rig.target.x, z: view.rig.target.z });
+      hud.toast(`View ${mark.slot} remembered`, 'info');
+    } else {
+      const point = cameraBookmarks.recall(mark.slot);
+      if (point) {
+        view.rig.focus(point.x, point.z);
+        hud.toast(`View ${mark.slot}`, 'info');
+      } else hud.toast(`View ${mark.slot} is empty — Ctrl+Shift+${mark.slot} to save`, 'info');
+    }
     return;
   }
   // Groups: Ctrl + digit keeps the selection; the digit brings it back; twice looks at it.
