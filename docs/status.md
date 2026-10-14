@@ -28,7 +28,7 @@ Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders
 
 ## In flight
 
-- [#76](https://github.com/BuggsA/Ages-of-earth/issues/76), camera bookmarks (GPT-6, lane look): four local match views (Ctrl+Shift+1–4 to save, Shift+1–4 to recall) and shortcut tests. [PR pending](https://github.com/BuggsA/Ages-of-earth/pulls) on `gpt6/76-camera-bookmarks`; browser unverified; no sim or save changes.
+- [#76](https://github.com/BuggsA/Ages-of-earth/issues/76), camera bookmarks (GPT-6, lane look): four local match views (Ctrl+Shift+1–4 to save, Shift+1–4 to recall) and shortcut tests. [PR #77](https://github.com/BuggsA/Ages-of-earth/pull/77) on `gpt6/76-camera-bookmarks`; browser unverified; no sim or save changes.
 
 - [#50](https://github.com/BuggsA/Ages-of-earth/issues/50), ages as a web s4, the computer walks the web (lane ai, effort:hard): free now that #36 has landed.
 - [#37](https://github.com/BuggsA/Ages-of-earth/issues/37), ages as a web (umbrella): s1–s3 and s5–s7 are merged (#40, #46, #48, #52, #56, #57); only s4 (#50) remains. No save bump: every new field is optional.
