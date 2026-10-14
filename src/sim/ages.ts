@@ -41,6 +41,7 @@ export function surveyFinds(s: GameState, tech: TechId): boolean {
  * survey has been made and found what the road needs. A survey that finds nothing hides it for good.
  */
 export function roadKnown(s: GameState, p: Player, r: Road): boolean {
+  if (r.ruin && !s.ruins?.some((ruin) => ruin.by === p.id)) return false;
   if (r.found && !(p.techs.includes(r.found) && surveyFinds(s, r.found))) return false;
   return !r.clue || s.ents.some((e) => e.kind === 'building' && e.owner === p.id && e.type === r.clue && e.built);
 }
@@ -69,6 +70,7 @@ export const deedsDone = (p: Player, r: Road): boolean => deedsProgress(p, r).ev
 /** What, besides its price, keeps a player off a road, or null. */
 export function roadProblem(s: GameState, p: Player, r: Road): string | null {
   if (!roadKnown(s, p, r)) {
+    if (r.ruin) return 'Your citizens must finish excavating an ancient ruin';
     if (r.found && !p.techs.includes(r.found)) return `Needs ${TECHS[r.found].name}`;
     if (r.found && !surveyFinds(s, r.found)) return 'There is none in this world';
     return `Needs a ${BUILDINGS[r.clue!].name}`;
