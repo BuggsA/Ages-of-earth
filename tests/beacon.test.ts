@@ -56,6 +56,29 @@ describe('signal beacons', () => {
     expect(lit(s, tower)).toBe(true);
   });
 
+  it('has a clever computer answer a rival\'s flame it can see, but not one far off', () => {
+    const { s, tower } = setup();
+    s.players[0].ai = 'hard';
+    s.ai[0] = { next: s.tick, wave: 0, attacking: false, muster: null, ordered: {}, unitTurn: 0, bell: -1, roads: {} } as never;
+    const x = Math.floor(tower.x), y = Math.floor(tower.y);
+    const near = placeBuilding(s, 1, 'tower', x + 10, y, true) as Building;
+    s.players[1].res.wood = 500;
+    step(s, [{ t: 'beacon', p: 1, building: near.id }]);
+    for (let i = 0; i < 60 && !lit(s, tower); i++) step(s);
+    expect(lit(s, tower)).toBe(true);
+  });
+
+  it('ignores a rival\'s flame beyond AI_RAID.flame', () => {
+    const { s, tower } = setup();
+    s.players[0].ai = 'hard';
+    s.ai[0] = { next: s.tick, wave: 0, attacking: false, muster: null, ordered: {}, unitTurn: 0, bell: -1, roads: {} } as never;
+    const far = placeBuilding(s, 1, 'tower', Math.floor(tower.x) + 60, Math.floor(tower.y), true) as Building;
+    s.players[1].res.wood = 500;
+    step(s, [{ t: 'beacon', p: 1, building: far.id }]);
+    for (let i = 0; i < 60; i++) step(s);
+    expect(lit(s, tower)).toBe(false);
+  });
+
   it('relays down a chain of the owner\'s towers, free and shorter, but not to rivals or far towers', () => {
     const { s, tower } = setup();
     const x = Math.floor(tower.x), y = Math.floor(tower.y);
