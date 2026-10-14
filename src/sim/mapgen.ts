@@ -511,7 +511,7 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
   }
 
   const relics = placeRelics(seed, size, w, h, terrain, res, starts);
-  const posts = placePosts(seed, size, w, h, terrain, height, res, amount, starts, relics);
+  const posts = placePosts(seed, size, w, h, terrain, height, res, amount, starts, relics, type === 'sea');
   const bogIron = deposits && placeBogIron(seed, w, h, terrain, res, amount, starts, deer, relics, posts);
   const ruins = deposits ? placeRuins(seed, size, w, h, terrain, res, starts, deer, relics, posts) : [];
 
@@ -646,6 +646,7 @@ function placePosts(
   amount: Int32Array,
   starts: { x: number; y: number }[],
   relics: { x: number; y: number }[],
+  shore = false,
 ): { x: number; y: number }[] {
   const rng = mulberry32(seed ^ 0x7ade05);
   const n = Math.min(w, h);
@@ -678,11 +679,24 @@ function placePosts(
     }
     return hi - lo <= 1.1;
   };
+  // On a sea map the posts stand on the shore, so ships can call there: open water a few tiles off.
+  const harbor = (x: number, y: number) => {
+    const r = TRADE.sea.reach - 1;
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        const xx = x + dx;
+        const yy = y + dy;
+        if (xx < 0 || yy < 0 || xx >= w || yy >= h || dx * dx + dy * dy > r * r) continue;
+        if (terrain[yy * w + xx] === T_WATER) return true;
+      }
+    }
+    return false;
+  };
   const out: { x: number; y: number }[] = [];
   const want = TRADE.posts[size];
   // Looser and looser: a wider band along the edge, less even distances, then cutting through woods.
-  const passes: [number, number, boolean][] = [[1, 0, false], [2, 3, false], [1, 0, true], [2, 3, true], [3, 9, true], [4, 99, true]];
-  for (const [looser, wider, axes] of passes) {
+  const passes: [number, number, boolean, boolean?][] = [...(shore ? ([[1, 0, false, true], [2, 3, false, true], [3, 9, true, true]] as [number, number, boolean, boolean][]) : []), [1, 0, false], [2, 3, false], [1, 0, true], [2, 3, true], [3, 9, true], [4, 99, true]];
+  for (const [looser, wider, axes, coastal] of passes) {
     if (out.length >= want) break;
     const fair = TRADE.fair * looser;
     const edge = TRADE.edge + wider;
@@ -691,7 +705,7 @@ function placePosts(
     for (let y = R + 1; y < h - R - 1; y++) {
       for (let x = R + 1; x < w - R - 1; x++) {
         const e = Math.min(x, y, w - 1 - x, h - 1 - y);
-        if (e < 3 || e > edge) continue;
+        if (e < 3 || (coastal ? !harbor(x, y) : e > edge)) continue;
         const ds = starts.map((st) => Math.sqrt((x + 0.5 - st.x) * (x + 0.5 - st.x) + (y + 0.5 - st.y) * (y + 0.5 - st.y))).sort((a, b) => a - b);
         if (ds[0] < TRADE.far * n || (ds.length > 1 && ds[1] - ds[0] > fair)) continue;
         if (relics.some((r) => (r.x - x - 0.5) * (r.x - x - 0.5) + (r.y - y - 0.5) * (r.y - y - 0.5) < 25)) continue;
