@@ -57,9 +57,9 @@ export class NetClient {
   rtt = 0;
   private ws: WebSocket | null = null;
   private closed = false;
-  private refused = '';
   private retries = 0;
   private pinger = 0;
+  private retryTimer = 0;
 
   constructor(
     readonly code: string,
@@ -67,19 +67,28 @@ export class NetClient {
   ) {}
 
   connect(): void {
+    this.close();
     this.closed = false;
+    this.retries = 0;
+    this.openSocket();
+  }
+
+  private openSocket(): void {
     this.onStatus?.('connecting');
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const q = new URLSearchParams({ cid: clientId(), name: this.name, build: typeof __BUILD__ === 'string' ? __BUILD__ : 'dev' });
     const ws = new WebSocket(`${proto}//${location.host}/api/rooms/${this.code}/ws?${q}`);
     this.ws = ws;
+    let refused = '';
     ws.addEventListener('open', () => {
+      if (this.closed || this.ws !== ws) return;
       this.retries = 0;
       this.onStatus?.('open');
       window.clearInterval(this.pinger);
       this.pinger = window.setInterval(() => this.send({ t: 'ping', at: performance.now() }), 2000);
     });
     ws.addEventListener('message', (e) => {
+      if (this.closed || this.ws !== ws) return;
       let m: ServerMsg;
       try {
         m = JSON.parse(String(e.data));
@@ -90,23 +99,28 @@ export class NetClient {
         this.rtt = Math.round(performance.now() - m.at);
         return;
       }
-      if (m.t === 'error') this.refused = m.why;
+      if (m.t === 'error') refused = m.why;
       this.onMessage?.(m);
     });
-    ws.addEventListener('close', () => {
-      window.clearInterval(this.pinger);
+    ws.addEventListener('close', (e) => {
       if (this.ws !== ws) return;
+      window.clearInterval(this.pinger);
       this.ws = null;
       if (this.closed) return;
-      if (this.refused || this.retries >= 6) {
+      // A policy refusal or an intentional replacement is final. A lobby validation error
+      // alone is recoverable and must not poison a later reconnect.
+      if (e.code === 1008 || e.code === 1000 || this.retries >= 6) {
         this.closed = true;
-        this.onClosed?.(this.refused || 'Lost the connection to the room.');
+        this.onClosed?.(e.reason || (e.code === 1008 ? refused : '') || 'Lost the connection to the room.');
         return;
       }
       // Try again, a little later each time.
       this.retries++;
       this.onStatus?.('retrying');
-      window.setTimeout(() => !this.closed && this.connect(), 500 * 2 ** this.retries);
+      this.retryTimer = window.setTimeout(() => {
+        this.retryTimer = 0;
+        if (!this.closed) this.openSocket();
+      }, 500 * 2 ** this.retries);
     });
   }
 
@@ -116,8 +130,11 @@ export class NetClient {
 
   close(): void {
     this.closed = true;
+    window.clearTimeout(this.retryTimer);
+    this.retryTimer = 0;
     window.clearInterval(this.pinger);
-    this.ws?.close();
+    const ws = this.ws;
     this.ws = null;
+    ws?.close();
   }
 }

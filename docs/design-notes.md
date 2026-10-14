@@ -173,3 +173,8 @@ Why I love it: it turns trade from a side income into a road. A merchant people 
 
 Not done, by design: the computer still walks the trunk only (lane ai is claimed; it's #37 s4). No new models or music: a merchant town looks medieval (s7). An age's traits last only while you're in it; what carries over when you leave is an open question in `docs/vision.md`, and I'd answer it in s3 with the step back. Next, the Iron Age (s2): a deposit only some seeds have, a survey that says yes or no.
 
+### One live connection per player (#41), 2026-10-14 — Codex
+
+Built: replacing or closing an online connection cancels its pending reconnect; old socket events cannot clear the replacement's heartbeat or deliver stale messages. A tab replaced elsewhere stops retrying instead of fighting for the seat. A recoverable lobby error no longer disables reconnection after a later network drop. The room rejects every message from a connection it has already removed, including queued messages arriving before the socket finishes closing.
+
+Why I care: a long match should survive a flaky connection without two tabs competing for the same people. This strengthens the existing reconnect and seat-ownership rules without changing the match itself. Next: test the complete drop/rejoin/catchup sequence with two real browsers and a Worker. Socket behaviour is covered with controlled event and timer tests here; browser play remains unverified.
