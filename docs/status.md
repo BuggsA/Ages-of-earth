@@ -21,7 +21,7 @@ Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders
 
 | Check | State |
 | --- | --- |
-| Quick tier (`npm run check`) | 115 tests, about 25 s |
+| Quick tier (`npm run check`) | 144 tests, about 30 s |
 | Slow tier (`tests/slow/`) | `campaign-proof.test.ts`: all six chapters played to a win, about 5 minutes on a cloud container |
 | Browser checks | none automated; the first session tested by hand in headless Chromium |
 | CI (`ci`, `periodic`) | added 2026-10-13; `periodic` starts once `main` is the default branch |
@@ -32,7 +32,7 @@ Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders
 
 - [#30](https://github.com/BuggsA/Ages-of-earth/issues/30), Codex: Market recovery indicators and regression coverage ([PR #32](https://github.com/BuggsA/Ages-of-earth/pull/32)), branch `codex/30-market-recovery`. Updated with the repair changes and #33 browser-free rule. No balance or save-shape changes. Browser appearance unverified; merge after green CI on the combined commit.
 
-- [#37](https://github.com/BuggsA/Ages-of-earth/issues/37), **ages as a web** (umbrella, lane rules, effort:hard; chain 1014-0030): s1, the skeleton and the **Age of Merchants** ([#38](https://github.com/BuggsA/Ages-of-earth/issues/38)), merged from `claude/37-ages-web`. s2, **bog iron and the Iron Age** ([#39](https://github.com/BuggsA/Ages-of-earth/issues/39)), from `claude/39-iron-age`: a deposit on about half the seeds, a yes-or-no survey at the Storehouse, a tier-1 side age from the Stone Age. Next: s3, windows and stepping back. The computer walks the trunk only until s4 (lane ai). No save bump: the new fields are optional, and an older save is a world without bog iron.
+- [#37](https://github.com/BuggsA/Ages-of-earth/issues/37), **ages as a web** (umbrella, lane rules, effort:hard; chain 1014-0030): s1, the skeleton and the **Age of Merchants** ([#38](https://github.com/BuggsA/Ages-of-earth/issues/38)), merged from `claude/37-ages-web`. s2, **bog iron and the Iron Age** ([#39](https://github.com/BuggsA/Ages-of-earth/issues/39)), from `claude/39-iron-age`: a deposit on about half the seeds, a yes-or-no survey at the Storehouse, a tier-1 side age from the Stone Age. s3, **windows and stepping back** ([#47](https://github.com/BuggsA/Ages-of-earth/issues/47)), from `claude/47-step-back`: a Town Center step back (Z) to the trunk age one tier down, technologies above it suspended until the climb, shut side roads shown with where they open. Next: s4, the computer walks the web (lane ai, after #36). No save bump: the new fields are optional, and an older save is a world without bog iron.
 
 - [#24](https://github.com/BuggsA/Ages-of-earth/issues/24), Wings over the Steppe shown winnable (chain 1013-1734, 5/10, lane ai): branch `claude/24-wings`, tests and docs only. Found on the way: [#42](https://github.com/BuggsA/Ages-of-earth/issues/42), computer traders die on bent roads (fix on `claude/42-trade-roads`, blocked on [#43](https://github.com/BuggsA/Ages-of-earth/issues/43), the proof's fragility); [#36](https://github.com/BuggsA/Ages-of-earth/issues/36), the computer can't fight a two-front war.
 

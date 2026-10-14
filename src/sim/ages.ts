@@ -1,5 +1,5 @@
-import { AGES, BUILDINGS, ROADS, TECHS, TRUNK, type Age, type Road } from './data';
-import type { AgeId, BuildingType, GameState, Player, TechId, UnitType } from './types';
+import { AGES, BUILDINGS, ROADS, STEP_BACK, TECHS, TICK_HZ, TRUNK, secs, stepBackCost, type Age, type Road } from './data';
+import type { AgeId, Building, BuildingType, Cost, GameState, Player, TechId, UnitType } from './types';
 
 /**
  * Ages as a web (#37): which age a people is in, the roads out of it, and what that age lets them
@@ -81,4 +81,59 @@ export const isHire = (p: Player, at: BuildingType, unit: UnitType): boolean => 
 export function barred(p: Player, unit: UnitType): string | null {
   const no = ageDef(p).no;
   return no && no.units.includes(unit) ? no.why : null;
+}
+
+/** A road into a side age, as against the trunk's own roads and the roads back onto it. */
+export const isSideRoad = (r: Road): boolean => !TRUNK.includes(r.to);
+
+/**
+ * Side roads the player knows of but can't take from where they stand (#47): each opens only from
+ * its own age, its window. The HUD shows them shut, with the way back to them.
+ */
+export function shutRoads(s: GameState, p: Player): Road[] {
+  const here = ageOf(p);
+  return ROADS.filter((r) => isSideRoad(r) && r.from !== here && r.to !== here && AGES[r.from].tier <= p.epoch && roadKnown(s, p, r));
+}
+
+/** The age a step back lands in (#47): the trunk age one tier down, whatever road led here. */
+export function backTo(p: Player): AgeId | undefined {
+  return p.epoch > 0 ? TRUNK[Math.min(p.epoch, TRUNK.length) - 1] : undefined;
+}
+
+/** Whole seconds until the player may step back again; 0 when they may. */
+export function backWait(s: GameState, p: Player): number {
+  if (p.backAt === undefined) return 0;
+  return Math.max(0, Math.ceil((p.backAt + secs(STEP_BACK.cooldown) - s.tick) / TICK_HZ));
+}
+
+/** What, besides its price, keeps a player from stepping back, or null. */
+export function backProblem(s: GameState, p: Player): string | null {
+  if (!backTo(p)) return 'There is no older age to return to';
+  const wait = backWait(s, p);
+  return wait > 0 ? `The people need ${wait}s more before stepping back again` : null;
+}
+
+/** Whether a step back has suspended this technology: kept, idle, and back when the people climbs. */
+export const isSuspended = (p: Player, tech: TechId): boolean => !!p.suspended?.includes(tech);
+
+export const suspendedTechs = (p: Player): TechId[] => p.suspended ?? [];
+
+/** The technologies a step back down to a tier would suspend. */
+export const suspendedBelow = (p: Player, tier: number): TechId[] => p.techs.filter((t) => TECHS[t].epoch > tier);
+
+/** Where a Town Center's advance leads: along a road, or a step back. */
+export interface Journey {
+  to: AgeId;
+  cost: Cost;
+  time: number;
+  back: boolean;
+}
+
+export function journeyOf(p: Player, b: Building): Journey | undefined {
+  if (b.back) {
+    const to = backTo(p);
+    return to ? { to, cost: stepBackCost(p.epoch), time: STEP_BACK.time, back: true } : undefined;
+  }
+  const r = roadTo(p, b.advanceTo);
+  return r && { to: r.to, cost: r.cost, time: r.time, back: false };
 }

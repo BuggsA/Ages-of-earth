@@ -110,7 +110,7 @@ export const ROADS: Road[] = [
     time: 50,
     clue: 'market',
     deed: { stat: 'traded', n: 400, text: 'Your traders bring home 400 gold' },
-    blurb: 'Instead of the Middle Ages: the same soldiers and technologies, but the Market hires foot, bow and horse for gold alone, in half the time; trade pays 25% more; soldiers trained the usual way cost 20% more. Only from the Bronze Age.',
+    blurb: 'Instead of the Middle Ages: the same soldiers and technologies, but the Market hires foot, bow and horse for gold alone, in half the time; trade pays 25% more; soldiers trained the usual way cost 20% more.',
   },
   { from: 'merchant', to: 'gunpowder', cost: { food: 800, gold: 900, stone: 100 }, time: 65, blurb: 'Rejoin the main road: the merchant fortune buys its way into gunpowder (more gold and less stone than from the Middle Ages).' },
   { from: 'merchant', to: 'middle', cost: { food: 300, stone: 150 }, time: 30, blurb: 'Settle down: leave the merchant life for the Middle Ages, no hiring and no levy price.' },
@@ -121,10 +121,22 @@ export const ROADS: Road[] = [
     time: 35,
     found: 'survey',
     deed: { stat: 'iron', n: 150, text: 'Your citizens dig 150 bog iron' },
-    blurb: 'Instead of the Bronze Age, as many peoples of Africa went from stone straight to iron: foot soldiers cost a quarter less and strike 1 harder, and iron hoes and axes make farms and woodcutters 10% quicker. What it gives up: the horse. The Stable trains no cavalry until the Middle Ages. Only from the Stone Age.',
+    blurb: 'Instead of the Bronze Age, as many peoples of Africa went from stone straight to iron: foot soldiers cost a quarter less and strike 1 harder, and iron hoes and axes make farms and woodcutters 10% quicker. What it gives up: the horse. The Stable trains no cavalry until the Middle Ages.',
   },
   { from: 'iron', to: 'middle', cost: EPOCHS[2].cost, time: EPOCHS[2].time, blurb: 'Rejoin the main road at the Middle Ages, for the same price as from the Bronze Age: the horse arrives, and the iron foot soldiers become ordinary pikemen.' },
 ];
+
+/**
+ * Stepping back an age (#47), at a Town Center: down to the trunk age one tier below, whatever road
+ * led here (the Iron Age falls back to the Stone Age, the merchants to the Bronze Age). Every unit
+ * falls back to its older form, and technologies above the new tier are suspended, not lost: they
+ * return when the people climbs again, at the climb's full price. What the step itself costs, for each
+ * tier given up: food to carry the people through the unrest, gold to pay off those who did well
+ * under the new order. `time` is seconds at the Town Center; `cooldown` is seconds after a step lands
+ * before the next may begin, so a people can't flicker between ages to dodge a counter.
+ */
+export const STEP_BACK = { food: 100, gold: 50, time: 25, cooldown: 300 };
+export const stepBackCost = (tier: number): Cost => ({ food: STEP_BACK.food * tier, gold: STEP_BACK.gold * tier });
 
 /**
  * Bog iron (#39): on a `chance` share of seeds, a patch of `tiles` tiles for each player, about `home`

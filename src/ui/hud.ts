@@ -2,12 +2,12 @@ import { scenarioById } from '../sim/campaign';
 import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
-import { AGES, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, SIGNATURES, EPOCHS, MARKET, RELIC, REPAIR_SHARE, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { AGES, STEP_BACK, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, SIGNATURES, EPOCHS, MARKET, RELIC, REPAIR_SHARE, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { marketOf, nearestMarket, postAt, tripGold } from '../sim/trade';
 import { buildingCostFor, buildingMaxHp, statsFor, techCostFor, techProblem, trainCostFor, trainTimeFor } from '../sim/stats';
-import { ageDef, ageOf, barred, deedProgress, isHire, mainRoad, roadKnown, roadProblem, roadTo, roadsFrom, surveyFinds, trainsAt } from '../sim/ages';
+import { ageDef, ageOf, backProblem, backTo, barred, deedProgress, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, roadKnown, roadProblem, roadsFrom, shutRoads, surveyFinds, suspendedTechs, trainsAt } from '../sim/ages';
 import type { Building, BuildingType, Command, Cost, Ent, GameState, Player, Stance, TechId, TradePost, Unit } from '../sim/types';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
@@ -237,11 +237,12 @@ export class Hud {
     const p = s.players[viewer];
     const tc = s.ents.find((e): e is Building => e.kind === 'building' && e.owner === viewer && e.advance >= 0);
     const idle = s.ents.filter((e) => e.kind === 'unit' && e.owner === viewer && e.type === 'citizen' && e.order.k === 'idle').length;
-    const road = tc ? roadTo(p, tc.advanceTo) : undefined;
+    const road = tc ? journeyOf(p, tc) : undefined;
     const adv = road ? Math.floor((tc!.advance / secs(road.time)) * 100) : -1;
     const age = ageDef(p);
+    const idleTechs = suspendedTechs(p).map((t) => TECHS[t].name);
     const scores = s.players.map((q) => scoreOf(s, q));
-    const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${p.pop}/${p.cap}|${ageOf(p)}|${adv}|${idle}|${speed}|${scores.join(',')}`;
+    const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${p.pop}/${p.cap}|${ageOf(p)}|${adv}|${idleTechs.length}|${idle}|${speed}|${scores.join(',')}`;
     this.clockEl.textContent = fmtTime(s.tick);
     this.timers(s, viewer);
     this.objectives(s);
@@ -256,8 +257,8 @@ export class Hud {
       .join('');
     this.resEl.innerHTML += `<div class="res civ" data-tip="<b>${civ.name}</b>${civ.blurb}<br><i>${SIGNATURES[p.civ].blurb}</i>">${civ.name}</div><div class="res score" data-tip="<b>Score</b>Gathering, fighting, building, research and epochs.${board}">⭐${scores[viewer]}</div>`;
     this.epochEl.innerHTML = road
-      ? `${age.name} <span class="bar" data-tip="<b>Advancing to the ${AGES[road.to].name}</b>${adv}%"><i style="width:${adv}%"></i></span>`
-      : `<span data-tip="<b>${age.name}</b>${age.blurb}${mainRoad(p) ? `<br><span class='hint'>Advance at a Town Center.</span>` : ''}">${age.name}</span>`;
+      ? `${age.name} <span class="bar" data-tip="<b>${road.back ? 'Stepping back' : 'Advancing'} to the ${AGES[road.to].name}</b>${adv}%"><i style="width:${adv}%"></i></span>`
+      : `<span data-tip="<b>${age.name}</b>${age.blurb}${idleTechs.length ? `<br>Suspended until you climb again: ${idleTechs.join(', ')}.` : ''}${mainRoad(p) ? `<br><span class='hint'>Advance at a Town Center.</span>` : ''}">${age.name}</span>`;
     this.idleEl.textContent = `Idle ${idle}`;
     this.idleEl.classList.toggle('alert', idle > 0);
     document.getElementById('speed-btn')!.textContent = `${speed}×`;
@@ -421,11 +422,11 @@ export class Hud {
     let status = '';
     let queue = '';
     if (!b.built) status = `Under construction: ${Math.floor(b.progress * 100)}%`;
-    else if (b.advance >= 0 && roadTo(p, b.advanceTo)) {
-      const road = roadTo(p, b.advanceTo)!;
+    else if (b.advance >= 0 && journeyOf(p, b)) {
+      const road = journeyOf(p, b)!;
       const pct = Math.floor((b.advance / secs(road.time)) * 100);
-      status = `Advancing to the ${AGES[road.to].name}: ${pct}%`;
-      if (mine) queue = `<div class="queue"><div class="qitem" data-cancel="${b.id}:-1" data-tip="<b>${AGES[road.to].name}</b>Click to cancel (full refund)."><span class="qglyph">⏫</span><div class="prog"><i style="width:${pct}%"></i></div></div></div>`;
+      status = `${road.back ? 'Stepping back' : 'Advancing'} to the ${AGES[road.to].name}: ${pct}%`;
+      if (mine) queue = `<div class="queue"><div class="qitem" data-cancel="${b.id}:-1" data-tip="<b>${AGES[road.to].name}</b>Click to cancel (full refund)."><span class="qglyph">${road.back ? '⏬' : '⏫'}</span><div class="prog"><i style="width:${pct}%"></i></div></div></div>`;
     } else if (b.queue.length) {
       const it = b.queue[0];
       const need = it.tech ? secs(TECHS[it.tech].time) : secs(trainTimeFor(s, b.owner, it.unit!, b.type));
@@ -556,7 +557,7 @@ export class Hud {
               : `${st.blurb} Takes ${Math.round(time)}s.${levied ? ` Levies cost ${Math.round((age.levy! - 1) * 100)}% more in the ${age.name}.` : ''}${priced ? ` ${Math.round(Math.abs(1 - priced) * 100)}% ${priced < 1 ? 'cheaper' : 'dearer'} in the ${age.name}.` : ''}`,
             cost,
             ok: !locked && !no && !short && !full && !busy && !hero,
-            why: locked ? `Needs the ${EPOCHS[unitEpoch(unit)].name}` : no ? no : busy ? 'Busy advancing to the next epoch' : hero ? 'You can lead with one hero at a time' : full ? 'The queue is full' : (short ?? undefined),
+            why: locked ? `Needs the ${EPOCHS[unitEpoch(unit)].name}` : no ? no : busy ? busyWhy(p, b) : hero ? 'You can lead with one hero at a time' : full ? 'The queue is full' : (short ?? undefined),
             count: b.queue.filter((q) => q.unit === unit).length || undefined,
             run: () => {
               this.act.issue({ t: 'train', p: viewer, building: b.id, unit });
@@ -577,20 +578,64 @@ export class Hud {
             const short = shortfall(p, road.cost);
             const deed = deedProgress(p, road);
             const toward = to.tier > p.epoch ? 'Advance to' : to.tier < p.epoch ? 'Step back to' : 'Turn to';
+            const back = suspendedTechs(p).filter((t) => TECHS[t].epoch <= to.tier);
             cmds.push({
               key: isMain ? 'W' : (sideKeys.shift() ?? ''),
               pic: '',
               glyph: isMain ? '⏫' : '🔀',
               title: `${toward} the ${to.name}`,
-              desc: `${road.blurb ?? to.blurb}${deed ? `<br>${road.deed!.text}: ${Math.min(deed.have, deed.need)}/${deed.need}.` : ''} Takes ${road.time}s. Every unit re-arms and every building is rebuilt in the new style.`,
+              desc: `${road.blurb ?? to.blurb}${isSideRoad(road) ? ` Opens only from the ${AGES[road.from].name}.` : ''}${deed ? `<br>${road.deed!.text}: ${Math.min(deed.have, deed.need)}/${deed.need}.` : ''}${back.length ? `<br>Brings back ${back.map((t) => TECHS[t].name).join(', ')}.` : ''} Takes ${road.time}s. Every unit re-arms and every building is rebuilt in the new style.`,
               cost: road.cost,
               ok: !advancing && !problem && !short && b.queue.length === 0,
-              on: b.advance >= 0 && roadTo(p, b.advanceTo) === road,
+              on: b.advance >= 0 && !b.back && journeyOf(p, b)?.to === road.to,
               why: advancing ? 'Already advancing' : b.queue.length ? 'Finish training first' : (problem ?? short ?? undefined),
               run: () => {
                 this.act.issue({ t: 'advance', p: viewer, building: b.id, to: road.to });
                 this.act.sound('queue');
               },
+            });
+          }
+          // Stepping back (#47) on Z: down to the trunk age one tier below, with what that reopens.
+          const down = backTo(p);
+          if (down) {
+            const cost = stepBackCost(p.epoch);
+            const problem = backProblem(s, p);
+            const short = shortfall(p, cost);
+            const idle = suspendedBelow(p, AGES[down].tier);
+            const opens = roadsFrom({ ...p, age: down, epoch: AGES[down].tier }).filter((r) => isSideRoad(r) && roadKnown(s, p, r));
+            cmds.push({
+              key: 'Z',
+              pic: '',
+              glyph: '⏬',
+              title: `Step back to the ${AGES[down].name}`,
+              desc:
+                `Return to the older ways. Every unit falls back to its ${AGES[down].name} form and every building to its style.` +
+                (idle.length ? ` Suspended, not lost, until you climb again: ${idle.map((t) => TECHS[t].name).join(', ')}.` : ' Technologies above it are suspended, not lost, until you climb again.') +
+                (opens.length ? `<br>Reopens the road to the ${opens.map((r) => AGES[r.to].name).join(' and the ')}.` : '') +
+                `<br>Takes ${STEP_BACK.time}s; climbing again costs the full price. Then ${Math.round(STEP_BACK.cooldown / 60)} minutes before you may step back again.`,
+              cost,
+              ok: !advancing && !problem && !short && b.queue.length === 0,
+              on: b.advance >= 0 && !!b.back,
+              why: advancing ? 'Already advancing' : b.queue.length ? 'Finish training first' : (problem ?? short ?? undefined),
+              run: () => {
+                this.act.issue({ t: 'stepBack', p: viewer, building: b.id });
+                this.act.sound('queue');
+              },
+            });
+          }
+          // Side roads whose window this age is outside of (#47): shown shut, with the way to them.
+          for (const road of shutRoads(s, p)) {
+            const from = AGES[road.from];
+            cmds.push({
+              key: '',
+              pic: '',
+              glyph: '🔒',
+              title: `The ${AGES[road.to].name}`,
+              desc: `${road.blurb ?? AGES[road.to].blurb}<br>This road opens only from the ${from.name}.`,
+              cost: road.cost,
+              ok: false,
+              why: from.tier < p.epoch ? `Shut: step back to the ${from.name} to take it` : `Shut: it opens only from the ${from.name}`,
+              run: () => {},
             });
           }
         }
@@ -612,7 +657,7 @@ export class Hud {
             cost,
             ok: !problem && !short && !full && !busy,
             on: queued,
-            why: queued ? 'Being researched' : (problem ?? (busy ? 'Busy advancing to the next epoch' : full ? 'The queue is full' : (short ?? undefined))),
+            why: queued ? 'Being researched' : (problem ?? (busy ? busyWhy(p, b) : full ? 'The queue is full' : (short ?? undefined))),
             run: () => {
               this.act.issue({ t: 'research', p: viewer, building: b.id, tech });
               this.act.sound('queue');
@@ -670,7 +715,7 @@ export class Hud {
     this.cmdEl.innerHTML = cmds
       .map((c, i) => {
         const key = c.key === 'ESCAPE' ? 'Esc' : c.key === 'DELETE' ? 'Del' : c.key;
-        const tip = `<b>${c.title}</b>${c.cost ? `<div class='cost'>${costHtml(c.cost, s.players[viewer].res).replace(/"/g, "'")}</div>` : ''}${c.desc}${!c.ok && c.why ? `<br><span style='color:#ff9a8a'>${c.why}</span>` : ''}<br><span class='hint'>Hotkey: ${key}</span>`;
+        const tip = `<b>${c.title}</b>${c.cost ? `<div class='cost'>${costHtml(c.cost, s.players[viewer].res).replace(/"/g, "'")}</div>` : ''}${c.desc}${!c.ok && c.why ? `<br><span style='color:#ff9a8a'>${c.why}</span>` : ''}${key ? `<br><span class='hint'>Hotkey: ${key}</span>` : ''}`;
         return `<button class="cmd ${c.ok ? '' : 'off'} ${c.on ? 'on' : ''}" data-i="${i}" data-tip="${tip.replace(/"/g, '&quot;')}">${c.pic ? `<img src="${c.pic}" alt="">` : `<span class="glyph">${c.glyph ?? ''}</span>`}<span class="key">${key}</span>${c.count ? `<span class="count">${c.count}</span>` : ''}</button>`;
       })
       .join('');
@@ -747,6 +792,7 @@ function nextTechs(p: Player, at: BuildingType): TechId[] {
   const out: TechId[] = [];
   for (const line of TECH_LINES) {
     if (TECHS[line[0]].at !== at) continue;
+    // A suspended step (#47) shows greyed, with when it returns.
     const next = line.find((t) => !p.techs.includes(t));
     if (next) out.push(next);
   }
@@ -755,4 +801,9 @@ function nextTechs(p: Player, at: BuildingType): TechId[] {
 
 function plural(name: string): string {
   return name.endsWith('man') ? `${name.slice(0, -3)}men` : name.endsWith('ry') ? `${name.slice(0, -1)}ies` : `${name}s`;
+}
+
+/** Why a Town Center's other buttons wait while it is busy changing age. */
+function busyWhy(p: Player, b: Building): string {
+  return journeyOf(p, b)?.back ? 'Busy stepping back an age' : 'Busy advancing to the next epoch';
 }
