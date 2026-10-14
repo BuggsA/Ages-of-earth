@@ -25,7 +25,7 @@ A chain is the run of sessions that each start the next.
 - **Position:** a session the owner starts by hand is 0; its successor is 1. **Position 10 doesn't spawn.**
 - **The id** is the UTC date and time of the chain's first spawn (`1013-1720`). Position 0 makes it up; later sessions copy it.
 - **At most two chains at once, in different lanes** (`docs/team.md`, "Lanes"). Before spawning, read the recent `Chain` comments on #2 and count the chains under two hours old that don't say "ended". Two running: don't start a third. One running in your lane: wait.
-- **At most 20 sessions spawned in a UTC day,** across all chains. Count the day's `Chain` comments on #2; at 20, say so there and stop.
+- **No daily cap** (the owner, 2026-10-14, `docs/rulings.md`): the 10 per chain and the two chains at once are the only limits.
 - **Log each spawn on #2:** `Chain 1013-1720, 3 of 10, lane rules: <branch> took #42 (regular), started "<child title>" for #57.` When a chain ends: `Chain 1013-1720 ended at 3 of 10: <reason>.` Don't start a new chain yourself: that's the owner's.
 
 ## The prompt
