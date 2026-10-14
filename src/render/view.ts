@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { SoundName } from '../audio/sound';
 import { ageOf } from '../sim/ages';
-import { AURA, BUILDINGS, SIGNATURES, TICK_HZ, RUINS, TRADE, domainOf } from '../sim/data';
+import { AURA, BUILDINGS, RALLY, SIGNATURES, TICK_HZ, RUINS, TRADE, domainOf } from '../sim/data';
 import { buildingMaxHp, statsFor } from '../sim/stats';
 import type { AgeId, BuildingType, CivId, Ent, GameEvent, GameState, Unit } from '../sim/types';
 import type { ScoutFlag } from '../ui/scoutFlags';
@@ -708,6 +708,14 @@ export class View {
           this.effects.burst(at, { count: 10, speed: 2.6, up: 0.9, life: 0.9, size: 0.05, gravity: 6, drag: 0.3, colors: ['#7d7a72', '#5a4a3a'] });
           this.effects.ring(at, '#d9c7a8', ev.kind === 'boulder' ? 2.2 : 1.6, 0.7);
           this.cue('impact', ev.x, ev.y, 0.9);
+          break;
+        }
+        case 'cry': {
+          // The cry goes out: gold rings sweep to the edge of its reach.
+          if (!this.sees(ev.x, ev.y)) break;
+          const at = this.ground(s, ev.x, ev.y, 0.2);
+          this.effects.ring(at, '#ffc94a', RALLY.radius, 0.9);
+          this.effects.ring(at, '#fff0b8', RALLY.radius * 0.6, 0.6);
           break;
         }
         case 'animalDie':
