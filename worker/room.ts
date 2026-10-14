@@ -80,14 +80,15 @@ export class Room {
       if (this.conns.length === 0 && !this.seats.some((s, i) => i !== seat && s.kind === 'human')) this.host = seat;
     }
     // Only one connection per seat: a new one replaces the old.
-    for (const c of this.conns.filter((c) => c.seat === seat)) {
+    const replaced = this.conns.filter((c) => c.seat === seat);
+    this.conns = this.conns.filter((c) => c.seat !== seat);
+    for (const c of replaced) {
       try {
         c.ws.close(1000, 'Opened elsewhere');
       } catch {
         /* Already gone. */
       }
     }
-    this.conns = this.conns.filter((c) => c.seat !== seat);
     const conn: Conn = { ws, cid, seat, sent: 0 };
     this.conns.push(conn);
     this.seats[seat].online = true;
@@ -148,6 +149,9 @@ export class Room {
   }
 
   private message(conn: Conn, data: string | ArrayBuffer): void {
+    // Closing a socket is asynchronous; already queued messages from a replaced or departed
+    // connection must never act on the seat now held by someone else.
+    if (!this.conns.includes(conn)) return;
     if (typeof data !== 'string' || data.length > MAX_MSG) return;
     let m: ClientMsg;
     try {
