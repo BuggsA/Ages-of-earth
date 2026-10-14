@@ -10,7 +10,7 @@ import { seesRect } from '../sim/vision';
 import { BuildingsView } from './buildingsView';
 import { CameraRig } from './camera';
 import { Birds, Effects } from './effects';
-import { fogUniforms, timeUniform } from './materials';
+import { fogUniforms, glowUniform, timeUniform } from './materials';
 import { Overlays, type BarSpec, type RingSpec } from './overlays';
 import { Post, QUALITY, loadQuality, saveQuality, type QualityName } from './post';
 import { RelicsView } from './relicsView';
@@ -258,6 +258,8 @@ export class View {
     // A full moon lights the night better than a crescent does; by day the phase means nothing.
     this.baseSun = 2.5 * m.sun * l.sun * (1 - 0.4 * this.phase * l.moon);
     this.water.setStars(l.moon * (1 - m.grey));
+    // Windows and torches light up as the sun sets: the old strength by day, near double by night.
+    glowUniform.uGlow.value = 0.9 + 1.2 * Math.min(1, l.moon + (1 - l.sun) * 0.9 + (1 - m.sky) * 0.3);
     this.baseHemi = 1.0 * m.sky * l.sky;
     this.fill.intensity = 0.4 * l.fill;
     this.sun.intensity = this.baseSun;
