@@ -1,12 +1,13 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { AI_LEVELS, BUILDINGS, COUNTER, EPOCHS, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, TECHS, secs, unitEpoch, unitStats } from './data';
-import { NAVAL, distToRect, placeProblem, walkable } from './grid';
+import { NAVAL, distToRect, nearestWalkable, placeProblem, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem } from './stats';
-import type { AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Player, Res, TechId, Unit, UnitType } from './types';
+import type { AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Player, Res, TechId, TradePost, Unit, UnitType } from './types';
 import { RES, R_BERRY, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { carriedBy } from './relics';
 import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple } from './units';
-import { nearestMarket } from './trade';
+import { goalForPost, nearestMarket, tripGold } from './trade';
+import { findRoute } from './path';
 import { isEnemy } from './world';
 import { progress, scenarioById } from './campaign';
 
@@ -58,6 +59,8 @@ const TECH_ORDER: TechId[] = [
   'ironCasting', 'chainMail', 'bodkin', 'masonry', 'theology', 'conscription', 'blastFurnace', 'plateArmor', 'chemistry',
   'gillnets', 'shipwright', 'steamEngine', 'rifling', 'aviation', 'caravan', 'banking', 'pilgrimage',
 ];
+/** Seconds a computer keeps its traders off a road after losing one on it. */
+const TRADER_WARY = 240;
 const ECONOMY: TechId[] = ['plow', 'axes', 'wheelbarrow', 'picks', 'irrigation', 'saws', 'shafts', 'handcart', 'gillnets', 'steamEngine'];
 
 export function aiStep(s: GameState): void {
@@ -137,7 +140,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   }
 
   // Traders pay for themselves: they come before the epoch's savings and the army.
-  merchants(s, v, issue);
+  merchants(s, v, mem, issue);
 
   // In a campaign chapter, its goals come before the epoch's savings.
   v.plan = chapterGoals(s, v, mem, issue);
@@ -1076,44 +1079,97 @@ function passes(ax: number, ay: number, bx: number, by: number, px: number, py: 
   return qx * qx + qy * qy;
 }
 
+/** The road a trader would walk from a Market to a post (the pathfinder's own route), as waypoints [x0, y0, x1, y1, …]. */
+function road(s: GameState, p: Player, from: { x: number; y: number }, post: TradePost): number[] {
+  // From the nearest open ground: a Market's own tiles are built over.
+  const t = nearestWalkable(s, from.x, from.y, 6, p.team);
+  if (t < 0) return [];
+  const x = (t % s.w) + 0.5;
+  const y = Math.floor(t / s.w) + 0.5;
+  const r = findRoute(s, x, y, goalForPost(post), 8000, p.team);
+  return r.complete ? [x, y, ...r.points] : [];
+}
+
 /**
- * Traders: once there is a Market and gold to spare, keep a few on the road to the post that pays best
- * without running past a rival's town (failing that, the one that keeps farthest from them).
+ * How close a road comes to danger (squared): a rival's starting place or any Town Center or tower of
+ * theirs it knows of. Roads bend around water and hills, so it is measured along the road walked, not
+ * the straight line: on a map with a sea in the middle, the straight line to the far post can be safe
+ * while the road runs through a rival's town.
  */
-function merchants(s: GameState, v: View, issue: (c: Command) => void): void {
+function roadDanger(s: GameState, p: Player, pts: number[]): number {
+  const danger: { x: number; y: number }[] = [];
+  for (const o of s.players) if (!o.defeated && isEnemy(s, p.id, o.id)) danger.push({ x: o.startX, y: o.startY });
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.hp <= 0 || (e.type !== 'towncenter' && e.type !== 'tower') || !isEnemy(s, p.id, e.owner)) continue;
+    if (p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) danger.push({ x: e.x, y: e.y });
+  }
+  let clear = Infinity;
+  for (let i = 0; i + 3 < pts.length; i += 2) for (const d of danger) clear = Math.min(clear, passes(pts[i], pts[i + 1], pts[i + 2], pts[i + 3], d.x, d.y));
+  return clear;
+}
+
+/** A road's length in tiles. */
+function roadLength(pts: number[]): number {
+  let l = 0;
+  for (let i = 0; i + 3 < pts.length; i += 2) {
+    const dx = pts[i + 2] - pts[i];
+    const dy = pts[i + 3] - pts[i + 1];
+    l += Math.sqrt(dx * dx + dy * dy);
+  }
+  return l;
+}
+
+/**
+ * Traders: once there is a Market and gold to spare, keep a few on the road that pays best for the
+ * time it takes without passing a rival's town (failing that, the one that keeps farthest from them).
+ * With no road that reaches a post at all, none are trained.
+ */
+function merchants(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
   if (!s.posts.length || p.epoch < 1 || v.citizens.length < 18) return;
   const market = v.buildings.find((b) => b.type === 'market' && b.built);
   if (!market) return;
+  // Traders that were on the road last turn and are gone now were lost on it: keep off that road a while.
+  const lost = (mem.roadLost ??= {});
+  const alive = new Set(v.traders.map((u) => u.id));
+  for (const id in mem.caravans ?? {}) if (!alive.has(Number(id))) lost[mem.caravans![id]] = s.tick;
+  mem.caravans = {};
+  for (const u of v.traders) if (u.order.k === 'trade') mem.caravans[u.id] = u.order.post;
+  const shunned = (post: number) => s.tick - (lost[post] ?? -99999) < secs(TRADER_WARY);
+  // The roads from each Market, worked out once a decision.
+  const roads = new Map<number, { post: number; score: number }>();
+  const bestRoad = (from: Building) => {
+    let best = roads.get(from.id);
+    if (best) return best;
+    best = { post: -1, score: -Infinity };
+    for (const post of s.posts) {
+      const pts = road(s, p, from, post);
+      if (!pts.length) continue;
+      const clear = shunned(post.id) ? 0 : roadDanger(s, p, pts);
+      // A safe road scores by its gold for each tile walked; an unsafe one only by how far it keeps from danger.
+      const score = clear >= 18 * 18 ? 1e6 + tripGold(s, p.id, from, post) / Math.max(1, roadLength(pts)) : clear;
+      if (score > best.score) best = { post: post.id, score };
+    }
+    roads.set(from.id, best);
+    return best;
+  };
   const L = AI_LEVELS[p.ai!];
   const want = p.epoch >= 2 ? L.traders : Math.ceil(L.traders / 2);
   const queued = market.queue.filter((q) => q.unit === 'trader').length;
-  if (v.traders.length + queued < want && market.queue.length < 2 && p.pop < p.cap) {
+  if (v.traders.length + queued < want && market.queue.length < 2 && p.pop < p.cap && bestRoad(market).score >= 1e6) {
+    // (Only on a road that keeps clear of rival towns: none are trained to be lost on the others.)
     const cost = unitStats('trader', p.epoch).cost;
     if (afford(v, cost)) {
       issue({ t: 'train', p: p.id, building: market.id, unit: 'trader' });
       spend(v, cost);
     }
   }
-  const idle = v.traders.filter((u) => u.order.k === 'idle' && !u.inside);
-  if (!idle.length) return;
-  const rivals = s.players.filter((o) => !o.defeated && isEnemy(s, p.id, o.id));
-  for (const u of idle) {
+  // Idle traders take the best road; those on a road that has just cost one turn onto a better one.
+  for (const u of v.traders) {
+    if (u.inside || !(u.order.k === 'idle' || (u.order.k === 'trade' && shunned(u.order.post)))) continue;
     const from = nearestMarket(s, p.id, u.x, u.y) ?? market;
-    let best = -1;
-    let bestScore = -Infinity;
-    for (const post of s.posts) {
-      let clear = Infinity;
-      for (const o of rivals) clear = Math.min(clear, passes(from.x, from.y, post.x, post.y, o.startX, o.startY));
-      const d2 = (post.x - from.x) * (post.x - from.x) + (post.y - from.y) * (post.y - from.y);
-      // A safe road scores by its pay; an unsafe one only by how far it keeps from danger.
-      const score = clear >= 22 * 22 ? 1e6 + d2 : clear;
-      if (score > bestScore) {
-        bestScore = score;
-        best = post.id;
-      }
-    }
-    if (best >= 0) issue({ t: 'route', p: p.id, ids: [u.id], post: best });
+    const best = bestRoad(from).post;
+    if (best >= 0 && !(u.order.k === 'trade' && u.order.post === best)) issue({ t: 'route', p: p.id, ids: [u.id], post: best });
   }
 }
 

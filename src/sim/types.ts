@@ -439,6 +439,10 @@ export interface AiMemory {
   landing?: { ship: number; ids: number[]; since: number; phase: 'load' | 'sail' };
   /** Tick its last landing set out. */
   landed?: number;
+  /** Its traders on the road last turn: trader id → post id (to notice the ones lost on the way). */
+  caravans?: Record<number, number>;
+  /** Post id → the tick a trader was last lost on the road to it, so it keeps off that road a while. */
+  roadLost?: Record<number, number>;
 }
 
 /** Orders that can be given with Shift held to queue them after the current one. */
