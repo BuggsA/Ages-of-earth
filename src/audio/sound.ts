@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'gull' | 'cricket' | 'frog';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'gull' | 'cricket' | 'frog' | 'birdsong';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -120,7 +120,7 @@ export class Sound {
     'click', 'open', 'select', 'selectBuilding', 'move', 'attack', 'strike', 'thud', 'hit', 'hitBuilding', 'bow', 'sling', 'musket', 'fall',
     'collapse', 'built', 'place', 'ready', 'readyCitizen', 'chop', 'mine', 'hammer', 'rustle', 'epoch', 'alert', 'victory', 'defeat', 'error', 'coin', 'queue',
     'catapult', 'cannon', 'impact', 'spear', 'chant', 'convert', 'heal', 'townBell', 'allClear', 'research', 'wonder', 'shelter',
-    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind', 'thunder', 'owl', 'gull', 'cricket', 'frog',
+    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind', 'thunder', 'owl', 'gull', 'cricket', 'frog', 'birdsong',
   ];
 
   /**
@@ -610,6 +610,11 @@ export class Sound {
         this.tone(out, t, { f: 1500, to: 2300, type: 'sawtooth', dur: 0.16, peak: 0.022, attack: 0.02, lp: 3200 });
         this.tone(out, t + 0.2, { f: 2200, to: 1300, type: 'sawtooth', dur: 0.3, peak: 0.02, attack: 0.02, lp: 3200 });
         this.noise(out, t + 0.02, { dur: 0.4, filter: 'bandpass', f: 2400, q: 4, peak: 0.008, attack: 0.03 });
+        break;
+      case 'birdsong':
+        // A songbird: three quick rising whistles and a trilling fall, thin and high.
+        [2600, 3000, 3400].forEach((f, i) => this.tone(out, t + i * 0.09, { f, to: f + 500, dur: 0.07, peak: 0.012, attack: 0.01, lp: 5200 }));
+        for (let k = 0; k < 5; k++) this.tone(out, t + 0.36 + k * 0.045, { f: 3600 - k * 220, to: 3300 - k * 220, dur: 0.035, peak: 0.01, attack: 0.006, lp: 5200 });
         break;
       case 'cricket':
         // A cricket's chirp: a quick run of high, thin pulses, the whole run twice.
