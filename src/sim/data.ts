@@ -220,6 +220,8 @@ export const RELIC = { home: 20, fair: 3, spacing: 12, extra: { small: 1, medium
  * squared distance (in tiles) from the trader's Market to the post, `epoch` more for each epoch after
  * the Bronze Age, at most `max`: so a long road pays more per minute, and has more road to guard.
  */
+/** Repairs: restoring a building's whole health costs this share of its price, paid as the hammers work. */
+export const REPAIR_SHARE = 0.4;
 export const TRADE = { posts: { small: 2, medium: 2, large: 3 } as Record<MapSize, number>, edge: 9, fair: 4, far: 0.3, spacing: 0.4, plaza: 1, reach: 1.8, gold: 0.012, epoch: 0.08, max: 180 };
 
 export interface BuildingStats {

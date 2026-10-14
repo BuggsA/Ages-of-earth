@@ -67,7 +67,7 @@ The title screen plays a live match between two computer opponents behind it. Ch
 | Camera | Arrow keys, screen edges, middle-drag or Space+drag to pan; wheel to zoom; **[** **]** turn; **Backspace** straightens |
 | Other | **Alt** shows all health bars, **P** pause, **+**/**-** speed, **M** mute, **Enter** chat (online), **F10** or **Esc** menu |
 
-Citizens repair completed buildings at their construction speed, costing time but no resources. Select citizens and right-click your damaged building; Shift queues repairs. Use **G** to explicitly shelter in a damaged Town Center or tower.
+Citizens repair completed buildings at their construction speed; a full repair costs 40% of the building's price, paid as they work, and stops when you can't pay. Select citizens and right-click your damaged building; Shift queues repairs. Use **G** to explicitly shelter in a damaged Town Center or tower.
 
 ## Run it
 
