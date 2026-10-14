@@ -1,4 +1,4 @@
-import { BUILDINGS } from './data';
+import { BEACON, BUILDINGS } from './data';
 import type { GameState } from './types';
 import { statsOf } from './world';
 
@@ -26,7 +26,7 @@ export function updateVision(s: GameState): void {
     const p = s.players[e.owner];
     let r: number;
     if (e.kind === 'unit') r = statsOf(s, e).sight;
-    else r = e.built ? BUILDINGS[e.type].sight + e.size / 2 : 2 + e.size / 2;
+    else r = e.built ? BUILDINGS[e.type].sight + e.size / 2 + (e.beacon !== undefined && s.tick < e.beacon ? BEACON.sight : 0) : 2 + e.size / 2;
     const cx = Math.floor(e.x);
     const cy = Math.floor(e.y);
     const d = disc(r);
@@ -37,6 +37,23 @@ export function updateVision(s: GameState): void {
       const i = y * s.w + x;
       p.vis[i] = 1;
       p.seen[i] = 1;
+    }
+  }
+  // A lit beacon is seen by everyone: the ground around it shows to every rival.
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.beacon === undefined || s.tick >= e.beacon || e.hp <= 0) continue;
+    const d = disc(BEACON.exposed + e.size / 2);
+    const cx = Math.floor(e.x);
+    const cy = Math.floor(e.y);
+    for (const p of s.players) {
+      if (p.id === e.owner) continue;
+      for (let k = 0; k < d.length; k += 2) {
+        const x = cx + d[k];
+        const y = cy + d[k + 1];
+        if (x < 0 || y < 0 || x >= s.w || y >= s.h) continue;
+        p.vis[y * s.w + x] = 1;
+        p.seen[y * s.w + x] = 1;
+      }
     }
   }
   // Allies share what they see.

@@ -1,5 +1,6 @@
 import { aiStep } from './ai';
 import { workStep } from './works';
+import { beaconStep } from './beacon';
 import { hitAnimal, spawnAnimal, updateAnimals } from './animals';
 import { markGoals, scenarioStep, startScenario } from './campaign';
 import { buildingGuns, updateShots } from './combat';
@@ -442,6 +443,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   updateRelics(s);
   attrition(s);
   workStep(s);
+  beaconStep(s);
   removeDead(s);
   if (s.tick % 4 === 0) updateVision(s);
   if (s.tick % 20 === 0) {

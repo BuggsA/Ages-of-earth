@@ -690,6 +690,22 @@ export const WORK = {
   duration: 90,
 };
 
+/**
+ * Signal beacons (own pitch): a built Watch Tower can light a fire on its roof. While it burns the tower sees
+ * `sight` tiles farther, and every rival sees the ground around it (`exposed` tiles): the flame is visible to all.
+ */
+export const BEACON = {
+  /** Seconds a lit beacon burns. */
+  duration: 45,
+  /** Seconds after lighting before the same tower can light again. */
+  cooldown: 120,
+  cost: { wood: 30 } as Cost,
+  /** Extra tiles of sight for the tower while lit. */
+  sight: 7,
+  /** Tiles around a lit beacon that every rival sees. */
+  exposed: 3,
+};
+
 export const WORKS: Record<CivId, GreatWork> = {
   egyptians: { name: 'The Nile Flood', icon: '🌊', use: 'eco', blurb: 'The river rises and leaves its black silt: farms work 60% faster.', mul: { farm: 1.6 } },
   greeks: { name: 'The Phalanx', icon: '🛡', use: 'war', blurb: 'Shields locked, spears level: foot soldiers have +2 melee armor and strike +2 harder.', add: { infantryArmor: 2, infantryAttack: 2 } },

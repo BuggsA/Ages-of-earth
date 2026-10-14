@@ -125,6 +125,10 @@ Agents design this game as well as build it (`AGENTS.md` §2). When you add some
 
 **Next, if you pick it up:** the computer in `scripts/campaign.ts` only wins chapters 1 and 2, because it doesn't play toward scripted goals (it never builds walls). Teaching it to (a goal-aware mode in `ai.ts`) would prove every chapter winnable and give a "watch the computer play it" button. Chapters for relics and trade (a pilgrim road, a caravan city) would show off the newest systems. Starting relics and posts per chapter are wherever the map generator puts them; a chapter could choose to have none.
 
+### Signal beacons (own pitch), 2026-10-14
+
+**Built:** a Watch Tower can light a beacon (**F**): +7 sight for 45 s, and every rival sees the ground around the tower while it burns (`BEACON` in `src/sim/data.ts`, `src/sim/beacon.ts`). Flames and smoke on the roof, a horn-and-whoosh sound, a toast for you and an alert for rivals; the clever computer lights one when three soldiers close on a tower. **Why I love it:** towers only ever shot; now they are also a choice between seeing and being seen, which suits raids and the borders work (a forward Tower is a lookout too). **Next:** let a beacon relay along a chain of towers to alert the town centre, give allies a shared flare, and have the computer read rival beacons as raid targets or bait. Browser unverified; the sound wants an ear.
+
 ## Designers' notes: signature soldiers (2026-10-13, Chain 1013-1900)
 
 Built: each of the six peoples has one unit line with its own names per epoch and a trade-off (`SIGNATURES` in `src/sim/data.ts`, applied in `statsFor`). Why I love it: it was the "unique units" idea in the notes above, done so a Mongol army *reads* differently (Mangudai: hit harder, die faster) without new models or UI. The tooltip on the people's name in the top bar lists it. Numbers changed: all new, none of the existing ones. Not seen in a browser; unit-tested only.
