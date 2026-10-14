@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'gull';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'gull' | 'cricket';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -120,7 +120,7 @@ export class Sound {
     'click', 'open', 'select', 'selectBuilding', 'move', 'attack', 'strike', 'thud', 'hit', 'hitBuilding', 'bow', 'sling', 'musket', 'fall',
     'collapse', 'built', 'place', 'ready', 'readyCitizen', 'chop', 'mine', 'hammer', 'rustle', 'epoch', 'alert', 'victory', 'defeat', 'error', 'coin', 'queue',
     'catapult', 'cannon', 'impact', 'spear', 'chant', 'convert', 'heal', 'townBell', 'allClear', 'research', 'wonder', 'shelter',
-    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind', 'thunder', 'owl', 'gull',
+    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind', 'thunder', 'owl', 'gull', 'cricket',
   ];
 
   /**
@@ -610,6 +610,11 @@ export class Sound {
         this.tone(out, t, { f: 1500, to: 2300, type: 'sawtooth', dur: 0.16, peak: 0.022, attack: 0.02, lp: 3200 });
         this.tone(out, t + 0.2, { f: 2200, to: 1300, type: 'sawtooth', dur: 0.3, peak: 0.02, attack: 0.02, lp: 3200 });
         this.noise(out, t + 0.02, { dur: 0.4, filter: 'bandpass', f: 2400, q: 4, peak: 0.008, attack: 0.03 });
+        break;
+      case 'cricket':
+        // A cricket's chirp: a quick run of high, thin pulses, the whole run twice.
+        for (let k = 0; k < 6; k++) this.tone(out, t + k * 0.055, { f: 4300, to: 4500, dur: 0.035, peak: 0.01, attack: 0.005, lp: 5200 });
+        for (let k = 0; k < 6; k++) this.tone(out, t + 0.5 + k * 0.055, { f: 4300, to: 4500, dur: 0.035, peak: 0.009, attack: 0.005, lp: 5200 });
         break;
       case 'thunder':
         // A crack that rolls away: sharp high noise, then a long low rumble that swells and sinks.

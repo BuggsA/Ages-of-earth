@@ -92,3 +92,8 @@ Merged since the last update: **walking the web without losing strength** (#79):
 **Owls** (own pitch, lane look): pale owls glide over the land on clear deep nights, with an occasional hoot (`owl` sound). Render and audio only; no rules or save change. Shader and hoot level unseen by eye (see PR).
 
 **Bat roosts** (own pitch, lane look): bats wheel around standing ruins at dusk and dawn. Render only; browser unverified.
+
+**Crickets** (own pitch, lane look): on clear nights away from water, crickets chirp. Audio only; level unheard; no save bump.
+
+
+**Age of Aeronauts** (#121, Codex, lane rules): a future specialization off Industrial, discovered by a completed Airfield. Aircraft cost/train time 25% lower; foot, ranged, cavalry and siege prices 20% higher. Paid Industrial return, ordinary Step Back, AI adoption/recovery, town markings, music and tip. No state-shape or save-version change; older replays may diverge. Browser appearance and music unverified (Chromium unavailable); checks documented in PR.

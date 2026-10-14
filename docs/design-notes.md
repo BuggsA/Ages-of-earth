@@ -357,7 +357,20 @@ Built: a `gull` sound (two rising, nasal mews) cued every 9–25 s by day while 
 
 Built: `src/render/roosts.ts`, seven bats wheeling around each of the ten nearest standing ruins the viewer has seen (`RuinsView.standingAt`), on the bats' dusk-and-dawn light, clear weather, off on Low quality; a dug-out ruin goes quiet. Why I love it: the ruins were a gamble you read only up close; now the evening tells you where they are. Next: owls perched on ruins and watchtowers, a swarm pouring from a cave tile. Render only; no rules or save change. Not seen in a browser.
 
+## Designers' notes: owl perches (own pitch, 2026-10-14, chain 1014-1340 s8)
+
+Built: `src/render/perches.ts`, one owl sitting on each of the six nearest standing ruins the viewer has seen, in the dead of a clear night (the flying owls' light, `Owls.level`), ear tufts up, eyes that blink shut every few seconds on each owl's own beat; a dug-out ruin goes quiet, off on Low quality. Why I love it: bats mark the ruins at dusk, and now an owl keeps watch over them in the dead of night. Next: an owl on a watchtower, a swarm pouring from a cave tile. Render only; no rules or save change. Shader not seen in a browser.
+
+
+## Designers' notes: crickets (own pitch, 2026-10-14, chain 1014-1400 s7)
+
+Built: a `cricket` sound (two quick runs of thin pulses) cued every 5–14 s on a clear night while no open water lies near the view, so the shore keeps its gulls by day and the meadow its crickets by night. Why: the night had owls to see and hear but no ground-level hum. Next: crickets hushing when an army marches close, frogs at the lake edge. Audio only; no rules or save change. Level unheard.
 ## Designers' notes: walking the web without losing the war (2026-10-14, chain 1014-0320 session 3, #79)
 
 Built: the computer prepares for a side road without starving its war. It surveys once its town has 22 citizens, digs with twice the crew while its Town Center waits on the iron deed, sends its diggers back to work once the deed is dug (they used to walk from bog to bog all Stone Age), raises the merchants' early Market only when its army isn't owed soldiers, and an Iron Age army without horses answers massed archers with its own bows (`releaseDiggers`, `bestAllowed`, `AI_WEB.survey`). Why I care: a side road should be a threat you have to read, not a handicap the computer pays for being clever. Over 144 duels against a computer kept to the trunk, the walker went from 25–38 to 27–30, and the gathering it gives up fell from about 12% to about 5%; on today's merged build it wins the issue's 48 duels 11–8 (`docs/log/2026-10-14-1400-web-strength.md`).
 Next (#113): Greek walkers still gather a quarter less than their trunk twins, mostly on the iron road against archers: try the Step Back (Z) for an Iron people facing massed archers, which the README already offers players. And the army-first rule traps any computer that loses its first battle in its age, walker or not; a beaten town might advance once its wave is clearly out of reach.
+
+
+## Designers' notes: Age of Aeronauts (2026-10-14, Codex, #121)
+
+I wanted a future age with a specific commitment: a civilization reorganizing around aviation, rather than every weapon becoming stronger. Cheap, quickly replaced aircraft connect the airfield to the economy; dearer land soldiers make defending that infrastructure a choice. The Industrial combat numbers stay, so existing anti-air still matters. Sky blue navigation bands, rooftop windsocks and a rising Lydian theme give the towns their own identity. Next I would explore aerial scouting and exposed logistics before adding another damage tier.
