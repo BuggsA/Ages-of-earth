@@ -1283,7 +1283,8 @@ function chapterGoals(s: GameState, v: View, mem: AiMemory, issue: (c: Command) 
       const rivals = s.players.filter((q) => q.team !== p.team && !q.defeated).length;
       plan.wave = 10 + (rivals - 1) * 14 + mem.wave * 2;
       plan.siege = 4;
-      plan.target = rivalTownCenter(s, p);
+      // A rival's wonder wins the match if it stands: it falls first, before any Town Center (#36).
+      plan.target = rivalWonder(s, p) ?? rivalTownCenter(s, p);
       const left = sc.limit ? sc.limit - s.tick / 20 : Infinity;
       plan.allIn = sc.limit ? left < sc.limit * 0.45 : false;
     } else if (o.kind === 'build' && now < goal && o.type) {
@@ -1361,6 +1362,25 @@ function chapterGoals(s: GameState, v: View, mem: AiMemory, issue: (c: Command) 
     }
   }
   return plan;
+}
+
+/**
+ * A rival's wonder, the nearest. The goal names Town Centers, but a wonder left standing five minutes
+ * wins the match for its builder: in Wings over the Steppe a seat that had killed three times what it
+ * lost marched past the Tsar's wonder at a Town Center and lost to it at 24 minutes.
+ */
+function rivalWonder(s: GameState, p: Player): Building | null {
+  let best: Building | null = null;
+  let bestD = Infinity;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'wonder' || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
+    const d = (e.x - p.startX) * (e.x - p.startX) + (e.y - p.startY) * (e.y - p.startY);
+    if (d < bestD) {
+      bestD = d;
+      best = e;
+    }
+  }
+  return best;
 }
 
 /** The goal's target: the nearest standing Town Center of a rival, one not yet burned first. */
