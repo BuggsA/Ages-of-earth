@@ -15,6 +15,7 @@ import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '..
 import { costHtml, icon } from './icons';
 import { buildingPicture, unitPicture } from './thumbs';
 import { idleCitizens } from './idle';
+import { workforce, WORKFORCE_JOBS } from './workforce';
 
 /**
  * The heads-up display: resources and population along the top with the epoch and the clock, and along
@@ -136,6 +137,8 @@ export class Hud {
   private epochEl = document.getElementById('epoch-chip')!;
   private clockEl = document.getElementById('clock')!;
   private idleEl = document.getElementById('idle-btn')!;
+  private workforceBtn = document.getElementById('workforce-btn') as HTMLButtonElement;
+  private workforcePanel = document.getElementById('workforce-panel')!;
   private selEl = document.getElementById('selection')!;
   private cmdEl = document.getElementById('commands')!;
   private tipEl = document.getElementById('tooltip')!;
@@ -153,6 +156,23 @@ export class Hud {
   private viewer = 0;
 
   constructor(private act: HudActions) {
+    this.workforceBtn.addEventListener('click', () => {
+      const open = this.workforcePanel.classList.toggle('hidden');
+      this.workforceBtn.setAttribute('aria-expanded', String(!open));
+      if (!open && this.state) this.drawWorkforce(this.state, this.viewer);
+    });
+    this.workforcePanel.addEventListener('click', (e) => {
+      const row = (e.target as HTMLElement).closest<HTMLElement>('[data-job]');
+      if (!row || !this.state) return;
+      const job = row.dataset.job;
+      const ids = workforce(this.state, this.viewer).get(job ?? '') ?? [];
+      if (ids.length) {
+        this.act.select(ids);
+        this.act.sound('click');
+      }
+      this.workforcePanel.classList.add('hidden');
+      this.workforceBtn.setAttribute('aria-expanded', 'false');
+    });
     this.cmdEl.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest<HTMLElement>('[data-i]');
       if (!b) return;
@@ -234,9 +254,20 @@ export class Hud {
     this.viewer = viewer;
     this.lastIds = ids;
     this.top(s, viewer, speed);
+    if (!this.workforcePanel.classList.contains('hidden')) this.drawWorkforce(s, viewer);
     const ents = ids.map((id) => s.byId.get(id)).filter((e): e is Ent => !!e && e.hp > 0);
     this.selection(s, viewer, ents, selectedTile, selectedRelic, selectedPost, selectedRuin);
     this.commands(s, viewer, ents);
+  }
+
+  private drawWorkforce(s: GameState, viewer: number): void {
+    const jobs = workforce(s, viewer);
+    const total = WORKFORCE_JOBS.reduce((n, job) => n + (jobs.get(job.key)?.length ?? 0), 0);
+    this.workforcePanel.innerHTML = `<div class="workforce-head">Workforce <span>${total} citizens</span></div>` +
+      WORKFORCE_JOBS.map((job) => {
+        const n = jobs.get(job.key)?.length ?? 0;
+        return `<button type="button" data-job="${job.key}" ${n ? '' : 'disabled'} title="Select ${job.label.toLowerCase()} citizens"><span>${job.icon} ${job.label}</span><strong>${n}</strong></button>`;
+      }).join('') + '<div class="workforce-note">Choose a row to select its citizens. No orders are changed.</div>';
   }
 
   private top(s: GameState, viewer: number, speed: number): void {
