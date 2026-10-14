@@ -400,3 +400,7 @@ Built: a `frog` sound (a throaty croak and a quick answering ribbit) cued every 
 
 **Built:** the Mongol great work now also lifts mounted soldiers' sight by 3 tiles (`riderSight` mod, `WORKS.mongols`), so the relay is a window to scout as well as to ride. Why I love it: the steppe's work was only speed; now it reveals a rival's town as your horse archers sweep past. Rules only, no save bump. Not seen in a browser; `tests/yam-sight.test.ts`.
 **Next:** a flood tint on the Egyptian fields, Roman roads drawn on the ground.
+
+## Designers' notes: borders (2026-10-14, chain 1014-2045 s3, step 1 of seed #132)
+
+Built: every finished Town Center, Tower, Wonder, Dock and Airfield claims land (`BORDERS` in `data.ts`, `src/sim/borders.ts`); each tile goes to the nearest claimant; coloured lines mark the edges over explored ground, **O** toggles. Why I love it: you can finally read a town as a *place*, and see where a rival's reach meets yours. Next: attrition for armies deep in foreign land (step 2), building only in your own land, then the computer reading borders. Not seen in a real match by eye: only the headless smoke run (no errors).

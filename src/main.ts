@@ -1505,6 +1505,9 @@ window.addEventListener('keydown', (e) => {
     case 'm':
       toggleMute();
       break;
+    case 'o':
+      view.showBorders = !view.showBorders;
+      break;
     case '[':
       view.rig.rotate(-Math.PI / 8);
       break;

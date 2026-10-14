@@ -16,6 +16,7 @@ import { Post, QUALITY, loadQuality, saveQuality, type QualityName } from './pos
 import { RelicsView } from './relicsView';
 import { PostsView } from './postsView';
 import { RuinsView } from './ruinsView';
+import { BorderView } from './borderView';
 import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, type RangeGuide } from './rangeGuides';
 import { ResourcesView } from './resourcesView';
 import { Sky } from './sky';
@@ -92,6 +93,9 @@ export class View {
   private relicGlint = 0;
   private overlays = new Overlays();
   private rangeGuides = new RangeGuides();
+  private borders = new BorderView();
+  /** Whether the land borders show (the O key). */
+  showBorders = true;
   private effects: Effects;
   private birds = new Birds();
   private fireflies = new Fireflies();
@@ -153,7 +157,7 @@ export class View {
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sky.mesh, this.hemi, this.fill, this.sun, this.sun.target);
     this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.ruins.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points);
-    this.scene.add(this.rangeGuides.mesh);
+    this.scene.add(this.rangeGuides.mesh, this.borders.mesh);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.post = new Post(this.renderer, this.scene, this.rig.camera);
     this.applyQuality();
@@ -220,6 +224,7 @@ export class View {
     const colors = s.players.map((p) => p.color);
     this.units.setColors(colors);
     this.buildings.setColors(colors);
+    this.borders.setColors(colors);
     this.terrain.build(s);
     this.water.setup(s);
     this.fog = new FogTexture(s.w, s.h);
@@ -495,6 +500,7 @@ export class View {
       }
     }
     this.overlays.setRings(rings);
+    this.borders.update(s, this.viewer, this.reveal, this.showBorders);
     this.rangeGuides.update(s, guides, (x, y) => this.reveal || s.players[this.viewer].vis[Math.floor(y) * s.w + Math.floor(x)] > 0);
     this.overlays.setBars(bars, this.rig.camera);
     const p = s.players[this.viewer];
