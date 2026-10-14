@@ -21,6 +21,7 @@ import { HASH_EVERY, TURN_TICKS, type MatchStart, type ServerMsg } from './net/p
 import { deserialize, serialize } from './sim/save';
 import { SCENARIOS, scenarioById, starsFor } from './sim/campaign';
 import { loadDiscovery, observe, saveDiscovery, webMapHtml } from './ui/webMap';
+import { idleCitizens, idleSelection, idleShortcut } from './ui/idle';
 import { briefingHtml, chapterListHtml, recordStars, starRow } from './ui/campaignUi';
 import { Lobby } from './ui/lobby';
 import { Hud, nameOf } from './ui/hud';
@@ -710,7 +711,7 @@ document.addEventListener('click', (e) => {
       seedInput.value = String(newSeed());
       break;
     case 'idle':
-      nextIdle();
+      nextIdle(e.shiftKey);
       break;
     case 'speed':
       cycleSpeed(1);
@@ -831,18 +832,20 @@ function selectedUnits(s: GameState, own = true): Unit[] {
   return out;
 }
 
-function nextIdle(): void {
+function nextIdle(all = false): void {
   if (!game) return;
-  const idle = game.ents.filter((e): e is Unit => e.kind === 'unit' && e.owner === viewer && e.type === 'citizen' && e.order.k === 'idle');
+  const idle = idleCitizens(game, viewer);
   if (!idle.length) {
     hud.toast('No idle citizens', 'info');
     return;
   }
   const cur = [...selection][0];
-  const i = idle.findIndex((u) => u.id === cur);
-  const u = idle[(i + 1) % idle.length];
-  setSelection([u.id]);
-  view.rig.focus(u.x, u.y);
+  const ids = idleSelection(idle, cur, all);
+  setSelection(ids);
+  if (!all) {
+    const u = game.byId.get(ids[0])!;
+    view.rig.focus(u.x, u.y);
+  }
   play('select');
 }
 
@@ -1404,10 +1407,12 @@ window.addEventListener('keydown', (e) => {
     refreshHud();
     return;
   }
+  if (idleShortcut(e)) {
+    e.preventDefault();
+    nextIdle(e.shiftKey);
+    return;
+  }
   switch (k.toLowerCase()) {
-    case '.':
-      nextIdle();
-      break;
     case ',':
       selectArmy();
       break;
@@ -2053,3 +2058,4 @@ if (roomCode.length === 5 && savedName()) connectRoom(roomCode, savedName());
 else if (roomCode.length === 5) lobby.showEntry(roomCode);
 else $('title').classList.remove('hidden');
 requestAnimationFrame(frame);
+

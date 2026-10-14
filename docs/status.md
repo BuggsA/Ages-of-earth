@@ -6,7 +6,7 @@
 
 The full list, with the owner's words, is `docs/rulings.md`.
 
-- **Agents work as a team** (2026-10-13), as in Homeward Bound and fully autonomous: they claim from the board, build, merge their own pull requests under the checklist (`docs/team.md`, "Merging"), and Claude Code sessions start their successors (`docs/successors.md`).
+- **Agents work as a team** (2026-10-13), as in Homeward Bound and fully autonomous (standing merge authorization reaffirmed 2026-10-14): they claim from the board, build, merge their own pull requests under the checklist (`docs/team.md`, "Merging"), and Claude Code sessions start their successors (`docs/successors.md`).
 - **Agents are co-designers** (2026-10-13): real creative freedom and no approval for design calls, numbers, looks, sounds or words; they pitch and build their own ideas. Only the hard stops wait for the owner (`AGENTS.md` §2–3).
 - **The owner's "game vision" is inspiration, not a rule** (2026-10-13): `docs/vision.md`, for agents to glance at and build toward if it sparks something.
 - **Any agent tool may work here:** the rules live once, in `AGENTS.md`.
@@ -28,6 +28,7 @@ Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders
 
 ## In flight
 
+
 - [#41](https://github.com/BuggsA/Ages-of-earth/issues/41), Codex: one live connection per online player, branch `codex/41-online-connections`. Stale socket events and reconnect timers isolated; server rejects messages from replaced or departed connections. No simulation, balance, protocol or save changes. Implementation and nine regression cases complete; see #41 for CI and handoff. Browser behaviour unverified.
 
 - [#30](https://github.com/BuggsA/Ages-of-earth/issues/30), Codex: Market recovery indicators and regression coverage ([PR #32](https://github.com/BuggsA/Ages-of-earth/pull/32)), branch `codex/30-market-recovery`. Updated with the repair changes and #33 browser-free rule. No balance or save-shape changes. Browser appearance unverified; merge after green CI on the combined commit.
@@ -47,6 +48,8 @@ Merged since the last update (2026-10-13): the campaign (#11), the computer play
 - [#64](https://github.com/BuggsA/Ages-of-earth/issues/64), **ancient ruins** (pitch, lane rules, with a small `ai.ts` addition): branch `claude/upbeat-cori-rc8bef`. Ruins between the towns, dug by citizens for a seeded find (hoard, lost knowledge, old map, relic); the computer digs them. Not in campaign maps, so the campaign proof is untouched. Also fixes music on `main`: `Music.style()` called itself outside side ages (from #55) and threw every bar. No save bump (`ruins` is optional).
 
 - Allied trade (pitch, lane rules): allies with a Market take a quarter of each teammate's trade trip (`TRADE.ally`); branch `claude/zealous-knuth-njzd4m`. No save bump; browser unverified.
+
+**Idle citizens together** (#61, merged [#62](https://github.com/BuggsA/Ages-of-earth/pull/62)): Shift + . or Shift-click Idle selects all available idle citizens. Final CI passed pinned typechecks, build and 171 tests; browser interaction unverified. — Codex
 
 ## Waiting on the owner
 

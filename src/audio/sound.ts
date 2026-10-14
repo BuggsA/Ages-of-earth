@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'stepBack' | 'ruinFind';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -116,7 +116,7 @@ export class Sound {
     'click', 'open', 'select', 'selectBuilding', 'move', 'attack', 'strike', 'thud', 'hit', 'hitBuilding', 'bow', 'sling', 'musket', 'fall',
     'collapse', 'built', 'place', 'ready', 'readyCitizen', 'chop', 'mine', 'hammer', 'rustle', 'epoch', 'alert', 'victory', 'defeat', 'error', 'coin', 'queue',
     'catapult', 'cannon', 'impact', 'spear', 'chant', 'convert', 'heal', 'townBell', 'allClear', 'research', 'wonder', 'shelter',
-    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'rankUp', 'stepBack', 'ruinFind',
+    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind',
   ];
 
   /**
@@ -615,6 +615,11 @@ export class Sound {
         this.noise(out, t, { dur: 0.3, filter: 'highpass', f: 5000, q: 0.7, peak: 0.03 });
         this.tone(out, t + 0.34, { f: N.A5, type: 'triangle', dur: 0.12, peak: 0.05 });
         this.tone(out, t + 0.44, { f: N.E6, type: 'triangle', dur: 0.22, peak: 0.05 });
+        break;
+      case 'tradeShare':
+        // An ally's caravan passing through: a lighter spill of coins and one clear bell, softer than your own.
+        for (let i = 0; i < 4; i++) this.tone(out, t + i * 0.05, { f: 2300 + ((i * 331) % 600), dur: 0.06, peak: 0.028 - i * 0.004 });
+        this.bell(out, t + 0.2, N.E6, 0.7, 0.03);
         break;
       case 'shelter':
         this.noise(out, t, { dur: 0.12, filter: 'bandpass', f: 500, q: 1.5, peak: 0.15 });

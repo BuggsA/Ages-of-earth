@@ -403,7 +403,7 @@ export type GameEvent =
   /** One side now keeps every relic (its countdown starts), or no longer does (`team` -1). */
   | { k: 'relicHold'; team: number; ticks: number }
   /** A trader took on its gold at a trading post (`loaded`), or paid it in at its Market (`paid`). */
-  | { k: 'caravan'; id: number; owner: number; what: 'loaded' | 'paid'; amount: number; x: number; y: number }
+  | { k: 'caravan'; id: number; owner: number; what: 'loaded' | 'paid'; share?: boolean; amount: number; x: number; y: number }
   /** A scenario's story beat (a raid, a gift) and an objective completed. */
   | { k: 'story'; title: string; text: string; bad: boolean }
   | { k: 'objective'; index: number }

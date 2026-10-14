@@ -5,7 +5,7 @@ import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
 import { AGES, STEP_BACK, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, SIGNATURES, EPOCHS, MARKET, RELIC, REPAIR_SHARE, RUINS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
-import { marketOf, nearestMarket, postAt, tripGold } from '../sim/trade';
+import { homeMarket, marketOf, postAt, tripGold } from '../sim/trade';
 import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
 import { sees } from '../sim/vision';
 import { buildingCostFor, buildingMaxHp, modsOf, statsFor, techCostFor, techProblem, trainCostFor, trainTimeFor } from '../sim/stats';
@@ -14,6 +14,7 @@ import type { Building, BuildingType, Command, Cost, Ent, GameState, Player, Rui
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
 import { buildingPicture, unitPicture } from './thumbs';
+import { idleCitizens } from './idle';
 
 /**
  * The heads-up display: resources and population along the top with the epoch and the clock, and along
@@ -241,7 +242,7 @@ export class Hud {
   private top(s: GameState, viewer: number, speed: number): void {
     const p = s.players[viewer];
     const tc = s.ents.find((e): e is Building => e.kind === 'building' && e.owner === viewer && e.advance >= 0);
-    const idle = s.ents.filter((e) => e.kind === 'unit' && e.owner === viewer && e.type === 'citizen' && e.order.k === 'idle').length;
+    const idle = idleCitizens(s, viewer).length;
     const road = tc ? journeyOf(p, tc) : undefined;
     const adv = road ? Math.floor((tc!.advance / secs(road.time)) * 100) : -1;
     const age = ageDef(p);
@@ -329,7 +330,7 @@ export class Hud {
       sig = `none:${ageOf(p)}`;
       html = `<div class="empty-sel"><div class="sel-name">${ageDef(p).name}</div>
         <div>Left-click to select, drag to select many. Right-click to give orders.</div>
-        <div><kbd>.</kbd> finds an idle citizen, <kbd>,</kbd> your army, <kbd>H</kbd> your Town Center; <kbd>B</kbd> and <kbd>V</kbd> build with citizens selected.</div>
+        <div><kbd>.</kbd> finds an idle citizen, <kbd>Shift</kbd> + <kbd>.</kbd> selects all idle citizens, <kbd>,</kbd> your army, <kbd>H</kbd> your Town Center; <kbd>B</kbd> and <kbd>V</kbd> build with citizens selected.</div>
         <div>Hold <kbd>Shift</kbd> while giving orders to queue them up.</div></div>`;
     } else if (ents.length === 1) {
       const e = ents[0];
@@ -392,7 +393,7 @@ export class Hud {
   }
 
   private postPanel(s: GameState, viewer: number, post: TradePost): [string, string] {
-    const m = nearestMarket(s, viewer, post.x, post.y);
+    const m = homeMarket(s, viewer, post.x, post.y);
     const pay = m ? tripGold(s, viewer, m, post) : 0;
     const mine = s.ents.filter((e) => e.kind === 'unit' && e.owner === viewer && e.type === 'trader' && e.order.k === 'trade' && e.order.post === post.id).length;
     const status = m ? `From your nearest Market: ${icon('gold', 14)}${pay} a trip` : 'Build a Market to trade here';
@@ -418,7 +419,7 @@ export class Hud {
     const vet = rank ? `<span data-tip="<b>${VETERANCY.names[rank - 1]}</b>${u.vet} enemy soldiers defeated: blows ${Math.round((VETERANCY.attack[rank - 1] - 1) * 100)}% harder${VETERANCY.armor[rank - 1] ? `, +${VETERANCY.armor[rank - 1]} armor` : ''}.">${'▲'.repeat(rank)}<em>${VETERANCY.names[rank - 1]}</em></span>` : '';
     const o = u.order;
     const route = mine && o.k === 'trade' ? postAt(s, o.post) : undefined;
-    const home = route && o.k === 'trade' ? (marketOf(s, u.owner, o.market) ?? nearestMarket(s, u.owner, route.x, route.y)) : null;
+    const home = route && o.k === 'trade' ? (marketOf(s, u.owner, o.market) ?? homeMarket(s, u.owner, route.x, route.y)) : null;
     const trip = route && home ? `<span data-tip="<b>A trip</b>What one trip between its Market and the post pays, once home.">${icon('gold')}${tripGold(s, u.owner, home, route)}<em>a trip</em></span>` : '';
     const held = u.type === 'priest' && carriedBy(s, u) ? `<span data-tip="<b>Relic</b>Carried to a Temple, it brings in gold. Hands full: no healing or converting until it is set down (D).">⚱<em>Relic</em></span>` : '';
     const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}:${u.cargo.length}:${rank}`;

@@ -231,7 +231,14 @@ Built: the computer judges a trade road by the path its traders actually walk, n
 
 **Next:** let a trader choose an ally's Market as its home (AoE2's way, so far allies' roads pay by distance); the computer ally building a Market when a teammate trades. Number added: `TRADE.ally = 0.25` in `data.ts`. Unit-tested only; not seen in a browser.
 
+**Follow-up, same day:** a player with no Market of their own can now route traders from an ally's (`homeMarket` in `trade.ts`): the trader's owner is paid in full by distance from that Market and its owner takes the usual quarter. So a Market-less partner can still join the trade, and the player with the Market becomes worth protecting. Still open: the computer ally building a Market (lane ai is held until #36). Unit-tested only.
+
+**Allied trade looks and sounds like itself (same day):** when an ally takes their share, the paying Market gets a pale-blue ring and slow silver-gold coins rather than your own gold burst, with a lighter four-coin spill and one bell (`tradeShare`), so you can tell a partner's caravan from your own across the town. The event carries `share: true`. Not seen or heard by a person; the sound's level is a guess and wants an ear.
+
+## Designers' notes: idle citizens together (2026-10-14, Codex)
+
+A spent berry patch should be a reason to choose the next food source, not to find the same group one citizen at a time. Shift + . or Shift-click Idle now selects every available idle citizen. Plain . still cycles and looks at one; selecting the whole group keeps the camera where it is, like the whole-army shortcut. The counter, finder and first-game tip share one definition: living citizens of your seat, outside shelter, idle, without queued work. That keeps a ship's passengers and the town bell's refugees out of an economic shortcut. Next: a breakdown of citizens by job could help players judge where their economy needs hands. — Codex
+
 ### Ancient ruins (#64), 2026-10-14, session claude/upbeat-cori-rc8bef
 
 Ruins between the towns, dug once by citizens for a find the seed decides: a hoard, lost knowledge (a free technology), an old map, or a relic. I wanted the first ten minutes to have something worth a gamble far from home: citizens off the economy, walking out where cavalry hunt, for a reward you can't see. It's a small corner of `docs/vision.md`'s "the seed changes what's possible" and "discovery": two maps with the same layout play differently because of what's under the stones, and the relic find feeds the pilgrims' road. The work is shared, so a rival who walks up late can steal the last spade: escort your diggers. Next, if you'd like it: finds that only some seeds hold (a ruin with a lost machine that opens a side age, as the vision's "restored-machine societies"), ruins in a campaign chapter, and the computer escorting its diggers rather than fleeing.
-

@@ -564,7 +564,12 @@ export class View {
         case 'caravan': {
           if (ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;
           const at = this.ground(s, ev.x, ev.y, 0.4);
-          if (ev.what === 'paid') {
+          if (ev.what === 'paid' && ev.share) {
+            // A partner's trade passing through: pale silver-gold coins drift up from the Market, with a ring.
+            this.effects.ring(at, '#cfe8ff', 2.4, 1.1);
+            this.effects.burst(at.clone().setY(at.y + 1.6), { count: 10, speed: 0.7, up: 1.6, life: 1.6, size: 0.04, gravity: 0.6, colors: ['#e8f1ff', '#ffe9a8', '#cfe8ff'] });
+            if (ev.owner === this.viewer) this.cue('tradeShare', ev.x, ev.y, 1);
+          } else if (ev.what === 'paid') {
             this.effects.burst(at.clone().setY(at.y + 1.2), { count: 18, speed: 1.2, up: 1.2, life: 1.2, size: 0.05, gravity: 2.2, colors: ['#ffd166', '#f2cf4a', '#fff3c4'] });
             if (ev.owner === this.viewer) this.cue('tradePaid', ev.x, ev.y, 1);
           } else this.cue('tradeLoad', ev.x, ev.y, 0.7);
