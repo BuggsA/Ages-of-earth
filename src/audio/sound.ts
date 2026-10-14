@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'stepBack';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -116,7 +116,7 @@ export class Sound {
     'click', 'open', 'select', 'selectBuilding', 'move', 'attack', 'strike', 'thud', 'hit', 'hitBuilding', 'bow', 'sling', 'musket', 'fall',
     'collapse', 'built', 'place', 'ready', 'readyCitizen', 'chop', 'mine', 'hammer', 'rustle', 'epoch', 'alert', 'victory', 'defeat', 'error', 'coin', 'queue',
     'catapult', 'cannon', 'impact', 'spear', 'chant', 'convert', 'heal', 'townBell', 'allClear', 'research', 'wonder', 'shelter',
-    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'rankUp', 'stepBack',
+    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind',
   ];
 
   /**
@@ -594,6 +594,15 @@ export class Sound {
         for (const f of [N.A3, N.E4, N.A4, N.C5]) this.tone(out, t + 0.15, { f, type: 'sawtooth', dur: 1.8, peak: 0.028, attack: 0.4, lp: 1500 });
         [N.E5, N.A5, N.C6, N.E6].forEach((f, i) => this.bell(out, t + 0.5 + i * 0.11, f, 1.2, 0.04));
         break;
+      case 'ruinFind':
+        // Struck stone: the spade rings on something hard, earth slides, then an old mode rises out of it.
+        this.tone(out, t, { f: 1250, to: 900, dur: 0.07, peak: 0.07 });
+        this.bell(out, t + 0.01, N.D5 * 1.48, 0.5, 0.035);
+        this.noise(out, t + 0.06, { dur: 0.45, filter: 'lowpass', f: 700, q: 0.8, peak: 0.07 });
+        this.tone(out, t + 0.08, { f: 120, to: 70, dur: 0.2, peak: 0.08 });
+        [N.D4, N.A4, N.C5, N.D5, N.F4 * 2].forEach((f, i) => this.bell(out, t + 0.45 + i * 0.12, f, 1.1 - i * 0.1, 0.035));
+        this.tone(out, t + 0.45, { f: N.D4 / 2, type: 'triangle', dur: 1.4, peak: 0.04, attack: 0.3 });
+        break;
       case 'tradeLoad':
         // Loaded at the post: a creak of harness, a thump of bales and a little string of camel bells.
         this.noise(out, t, { dur: 0.1, filter: 'bandpass', f: 380, q: 3, peak: 0.08 });
@@ -606,6 +615,11 @@ export class Sound {
         this.noise(out, t, { dur: 0.3, filter: 'highpass', f: 5000, q: 0.7, peak: 0.03 });
         this.tone(out, t + 0.34, { f: N.A5, type: 'triangle', dur: 0.12, peak: 0.05 });
         this.tone(out, t + 0.44, { f: N.E6, type: 'triangle', dur: 0.22, peak: 0.05 });
+        break;
+      case 'tradeShare':
+        // An ally's caravan passing through: a lighter spill of coins and one clear bell, softer than your own.
+        for (let i = 0; i < 4; i++) this.tone(out, t + i * 0.05, { f: 2300 + ((i * 331) % 600), dur: 0.06, peak: 0.028 - i * 0.004 });
+        this.bell(out, t + 0.2, N.E6, 0.7, 0.03);
         break;
       case 'shelter':
         this.noise(out, t, { dur: 0.12, filter: 'bandpass', f: 500, q: 1.5, peak: 0.15 });

@@ -238,3 +238,16 @@ export function goalForPoint(s: GameState, x: number, y: number, team = -1): Goa
 export function townCenters(s: GameState, owner: number): Building[] {
   return s.ents.filter((e): e is Building => e.kind === 'building' && e.owner === owner && e.type === 'towncenter' && e.hp > 0);
 }
+
+/** Change a player's stats (an epoch, a technology), keeping every unit's and building's share of health. */
+export function restat(s: GameState, p: Player, change: () => void): void {
+  const before = new Map<number, number>();
+  for (const e of s.ents) if (e.owner === p.id && e.hp > 0) before.set(e.id, maxHp(s, e));
+  change();
+  p.statsVersion++;
+  for (const e of s.ents) {
+    const was = before.get(e.id);
+    if (!was) continue;
+    e.hp = (e.hp * maxHp(s, e)) / was;
+  }
+}

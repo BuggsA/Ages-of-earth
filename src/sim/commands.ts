@@ -7,7 +7,8 @@ import type { Building, BuildingType, Command, Cost, GameState, Order, Player, U
 import { RES, R_FISH, R_NONE } from './types';
 import { RES_OF_TILE, cargoRoom, freeFarm, garrisonRoom, giveOrder, landing, setOrder, ungarrison } from './units';
 import { carriedBy, letGo, relicAt } from './relics';
-import { marketOf, nearestMarket, postAt } from './trade';
+import { homeMarket, marketOf, postAt } from './trade';
+import { ruinAt } from './ruins';
 import { canHit, isEnemy, maxHp, pay, placeBuilding, refund } from './world';
 
 /**
@@ -258,16 +259,27 @@ export function applyCommand(s: GameState, c: Command): void {
       if (!post) return;
       const units = myUnits(s, c.p, c.ids);
       const traders = units.filter((u) => u.type === 'trader');
-      if (traders.length && !nearestMarket(s, c.p, post.x, post.y)) refuse(s, c.p, 'Build a Market to trade from');
+      if (traders.length && !homeMarket(s, c.p, post.x, post.y)) refuse(s, c.p, 'Build a Market to trade from');
       else {
         for (const u of traders) {
           // Each trades from the Market nearest it; one already carrying gold takes it home first.
-          const m = (u.order.k === 'trade' ? marketOf(s, c.p, u.order.market) : null) ?? nearestMarket(s, c.p, u.x, u.y);
+          const m = (u.order.k === 'trade' ? marketOf(s, c.p, u.order.market) : null) ?? homeMarket(s, c.p, u.x, u.y);
           giveOrder(u, { k: 'trade', post: post.id, market: m ? m.id : 0, phase: u.carry > 0 ? 'back' : 'go' }, c.queue);
         }
       }
       const others = units.filter((u) => u.type !== 'trader');
       if (others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: post.x, y: post.y, queue: c.queue });
+      break;
+    }
+    case 'dig': {
+      const r = ruinAt(s, c.target);
+      if (!r) return;
+      const units = myUnits(s, c.p, c.ids);
+      if (r.by >= 0) {
+        if (units.some((u) => u.type === 'citizen')) refuse(s, c.p, 'These ruins have been dug out already');
+      } else for (const u of units) if (u.type === 'citizen') giveOrder(u, { k: 'dig', target: r.id }, c.queue);
+      const others = units.filter((u) => u.type !== 'citizen');
+      if (others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: r.x, y: r.y, queue: c.queue });
       break;
     }
     case 'dropRelic':

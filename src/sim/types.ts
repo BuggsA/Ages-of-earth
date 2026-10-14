@@ -99,7 +99,9 @@ export type Order =
    * A trader running the road between a Market and a trading post: out to the post (`go`), where it
    * loads gold worth the distance from the Market, and back to the Market to pay it in (`back`).
    */
-  | { k: 'trade'; post: number; market: number; phase: 'go' | 'back' };
+  | { k: 'trade'; post: number; market: number; phase: 'go' | 'back' }
+  /** A citizen digging at an ancient ruin (#64). */
+  | { k: 'dig'; target: number };
 
 /** What a unit is visibly doing, for the renderer's animation. */
 export type Act = 'idle' | 'walk' | 'attack' | 'chop' | 'mine' | 'forage' | 'farm' | 'build' | 'chant' | 'fish';
@@ -237,6 +239,26 @@ export interface TradePost {
   y: number;
 }
 
+/** What lies under a ruin (#64): gold, a technology, a map of the whole land, or a relic. */
+export type RuinFind = 'hoard' | 'lore' | 'map' | 'relic';
+
+/**
+ * Ancient ruins (#64): a site out in the wilds that citizens dig, once. It belongs to nobody and can't
+ * be harmed; nothing is built right beside it, but anyone may walk across it.
+ */
+export interface Ruin {
+  id: number;
+  /** The center of its tile. */
+  x: number;
+  y: number;
+  /** What lies beneath, decided by the seed. */
+  find: RuinFind;
+  /** Digging done so far, in ticks of one citizen's work. */
+  dug: number;
+  /** The player who dug it out, or -1 while it stands. */
+  by: number;
+}
+
 export interface Animal {
   id: number;
   kind: 'deer';
@@ -358,6 +380,8 @@ export type GameEvent =
   | { k: 'researched'; owner: number; tech: TechId }
   /** A survey's answer (#39): whether what it looks for lies anywhere in this world. */
   | { k: 'survey'; owner: number; tech: TechId; found: boolean }
+  /** A ruin dug out (#64): what came up, and for lore, which technology. */
+  | { k: 'ruin'; id: number; owner: number; find: RuinFind; tech?: TechId; x: number; y: number }
   | { k: 'placed'; id: number; owner: number; type: BuildingType }
   | { k: 'built'; id: number; owner: number; type: BuildingType }
   | { k: 'epoch'; owner: number; epoch: number; age?: AgeId; back?: boolean }
@@ -379,7 +403,7 @@ export type GameEvent =
   /** One side now keeps every relic (its countdown starts), or no longer does (`team` -1). */
   | { k: 'relicHold'; team: number; ticks: number }
   /** A trader took on its gold at a trading post (`loaded`), or paid it in at its Market (`paid`). */
-  | { k: 'caravan'; id: number; owner: number; what: 'loaded' | 'paid'; amount: number; x: number; y: number }
+  | { k: 'caravan'; id: number; owner: number; what: 'loaded' | 'paid'; share?: boolean; amount: number; x: number; y: number }
   /** A scenario's story beat (a raid, a gift) and an objective completed. */
   | { k: 'story'; title: string; text: string; bad: boolean }
   | { k: 'objective'; index: number }
@@ -423,6 +447,8 @@ export interface GameState {
   relicTimer: number;
   /** The trading posts out on the map. */
   posts: TradePost[];
+  /** Ancient ruins (#64); absent in older saves and in campaign chapters (none). */
+  ruins?: Ruin[];
   /** Whether this world holds bog iron (#39), decided by the seed; absent in older saves (none). */
   bogIron?: boolean;
   nextId: number;
@@ -468,6 +494,8 @@ export interface AiMemory {
   caravans?: Record<number, number>;
   /** Post id → the tick a trader was last lost on the road to it, so it keeps off that road a while. */
   roadLost?: Record<number, number>;
+  /** Ruin id → the tick its diggers last fled rival soldiers there (#64). */
+  ruinFled?: Record<number, number>;
 }
 
 /** Orders that can be given with Shift held to queue them after the current one. */
@@ -510,5 +538,7 @@ export type Command =
   | { t: 'resign'; p: number }
   /** Priests set down the relics they carry, where they stand. */
   | { t: 'dropRelic'; p: number; ids: number[] }
+  /** Citizens dig at an ancient ruin (#64). */
+  | ({ t: 'dig'; p: number; ids: number[]; target: number } & Queued)
   /** A player left an online match: the computer takes over their people. */
   | { t: 'leave'; p: number };

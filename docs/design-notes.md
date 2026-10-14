@@ -223,6 +223,30 @@ Built: each side age dresses its buildings and has its own music, read through `
 
 Built: the computer judges a trade road by the path its traders actually walk, not the straight line, keeps off a road that has just cost it a trader, and trains none when every road runs through a rival town (#42). Why I love it: trade was the one part of the economy the computer did badly in a way you could watch, wagons queuing to die in a rival's town for 20 minutes. Now trade is a real pillar for every seat, which makes raiding a caravan road matter. Next: let the computer escort its traders or wall the road's worst stretch, and teach its riders to hunt the rival road that pays the rival best; and Wings, one against two traders, needs your side to fight two fronts (#36).
 
+### Allied trade, 2026-10-14
+
+**Built:** when a trader pays in, each ally who has a finished Market takes `TRADE.ally` (a quarter) of the trip as gold, with a coin chime and sparkle at the paying Market. Rivals and Market-less allies get nothing; the trader's owner is paid in full, so nothing is taken from anyone.
+
+**Why I love it:** team games had no reason to trade side by side; now a Market is worth building even for the partner whose posts are far, and a raid on one trader costs the whole team. It is the "trade with an ally's Market" idea in the trade notes, in its smallest form.
+
+**Next:** let a trader choose an ally's Market as its home (AoE2's way, so far allies' roads pay by distance); the computer ally building a Market when a teammate trades. Number added: `TRADE.ally = 0.25` in `data.ts`. Unit-tested only; not seen in a browser.
+
+**Follow-up, same day:** a player with no Market of their own can now route traders from an ally's (`homeMarket` in `trade.ts`): the trader's owner is paid in full by distance from that Market and its owner takes the usual quarter. So a Market-less partner can still join the trade, and the player with the Market becomes worth protecting. Still open: the computer ally building a Market (lane ai is held until #36). Unit-tested only.
+
+**Allied trade looks and sounds like itself (same day):** when an ally takes their share, the paying Market gets a pale-blue ring and slow silver-gold coins rather than your own gold burst, with a lighter four-coin spill and one bell (`tradeShare`), so you can tell a partner's caravan from your own across the town. The event carries `share: true`. Not seen or heard by a person; the sound's level is a guess and wants an ear.
+
+## Designers' notes: idle citizens together (2026-10-14, Codex)
+
+A spent berry patch should be a reason to choose the next food source, not to find the same group one citizen at a time. Shift + . or Shift-click Idle now selects every available idle citizen. Plain . still cycles and looks at one; selecting the whole group keeps the camera where it is, like the whole-army shortcut. The counter, finder and first-game tip share one definition: living citizens of your seat, outside shelter, idle, without queued work. That keeps a ship's passengers and the town bell's refugees out of an economic shortcut. Next: a breakdown of citizens by job could help players judge where their economy needs hands. — Codex
+
+## Designers' notes: quarter marks on health bars (2026-10-14, Codex)
+
+I like battles where a glance tells you who can hold and who needs to retreat. Three fine quarter marks on the existing health bars let shape support color, without more HUD text. They face the camera and stay in place as health falls; one instanced draw covers all marks. No rules, balance or sound changes. Next I would ask the owner whether these remain legible at the farthest zoom before adding more indicators.
+
+### Ancient ruins (#64), 2026-10-14, session claude/upbeat-cori-rc8bef
+
+Ruins between the towns, dug once by citizens for a find the seed decides: a hoard, lost knowledge (a free technology), an old map, or a relic. I wanted the first ten minutes to have something worth a gamble far from home: citizens off the economy, walking out where cavalry hunt, for a reward you can't see. It's a small corner of `docs/vision.md`'s "the seed changes what's possible" and "discovery": two maps with the same layout play differently because of what's under the stones, and the relic find feeds the pilgrims' road. The work is shared, so a rival who walks up late can steal the last spade: escort your diggers. Next, if you'd like it: finds that only some seeds hold (a ruin with a lost machine that opens a side age, as the vision's "restored-machine societies"), ruins in a campaign chapter, and the computer escorting its diggers rather than fleeing.
+
 ## Designers' notes: the two-front war (2026-10-14, Chain 1013-1734 session 8)
 
 Built: in Wings over the Steppe the Tsar now plays Easy, and a computer in a chapter seat that must burn Town Centers goes for a rival's wonder first (#36). Over 16 maps the computer in your seat now wins 8 (it was 4), and a Normal seat wins the chapter's own map. Why I care: the last chapter should feel like a war on two fronts that you can win, not a coin toss. The Tsar still marches on you at minute 15 and the Kaiser is as strong as ever, so it's still the hardest chapter. The most telling thing I found: the seat could be killing three for every one it lost and still lose, because it marched past the Tsar's wonder to reach a Town Center. Tried and dropped (numbers in `docs/log/2026-10-14-0505-two-fronts.md`): a home defence that doesn't recall the whole army, soldiers striking the Town Center rather than the houses on the way, towers facing both rivals, more citizens, and a shorter town bell. None moved the win rate over 32 matches; towers made it worse. Next: under steady pressure the computer's town bell stays rung for many minutes (25 of 44 citizens indoors), which starves a town; a smarter bell needs a defence that can hold the town while the people work, so the two go together.

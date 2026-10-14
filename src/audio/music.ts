@@ -79,7 +79,7 @@ export class Music {
 
   /** The style now playing: a side age's own theme, or its tier's. */
   private style(): Style {
-    return (this.age && SIDE_STYLES[this.age]) || this.style();
+    return (this.age && SIDE_STYLES[this.age]) || STYLES[this.epoch];
   }
 
   start(epoch: number, age?: AgeId): void {
