@@ -96,6 +96,7 @@ npm run build      # typecheck (game and worker) + production build into dist/
 npx tsx scripts/sim.ts 3 medium 30   # a headless computer-vs-computer match, minute by minute
 npx tsx scripts/seed-atlas.ts --size small --bog --ruin lore,map   # find seeds with bog iron, ruins and the like (#80)
 npx tsx scripts/seed-atlas.ts --survey --size small --count 100   # how often each feature occurs on each map type
+npx tsx scripts/seed-atlas.ts --size small --apart 70 --close 90   # only worlds whose nearest two starts lie 70–90 tiles apart
 npx tsx scripts/seed-atlas.ts --size small --bog --share   # also print ?seed=… addresses that open the title screen on that world
 # On the title screen, the 🔗 beside the map seed copies the same kind of address for the world you have set up.
 ```
