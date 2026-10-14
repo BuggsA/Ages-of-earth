@@ -20,6 +20,25 @@ export function lightBeacon(s: GameState, p: Player, b: Building): void {
   b.beacon = s.tick + secs(BEACON.duration);
   b.beaconReady = s.tick + secs(BEACON.duration + BEACON.cooldown);
   s.events.push({ k: 'beacon', owner: b.owner, building: b.id, x: b.x, y: b.y, on: true });
+  relay(s, b);
+}
+
+/** The flame is passed on: each finished, rested tower of the owner's within `BEACON.relay` of a lit one burns too, free, for a shorter time. Id order, so every machine agrees. */
+function relay(s: GameState, from: Building): void {
+  const queue = [from];
+  for (let i = 0; i < queue.length; i++) {
+    const a = queue[i];
+    for (const e of s.ents) {
+      if (e.kind !== 'building' || e.owner !== a.owner || e.type !== 'tower' || !e.built || e.hp <= 0 || lit(s, e)) continue;
+      if (e.beaconReady !== undefined && s.tick < e.beaconReady) continue;
+      const dx = e.x - a.x, dy = e.y - a.y;
+      if (dx * dx + dy * dy > BEACON.relay * BEACON.relay) continue;
+      e.beacon = s.tick + secs(BEACON.relayDuration);
+      e.beaconReady = s.tick + secs(BEACON.relayDuration + BEACON.cooldown);
+      s.events.push({ k: 'beacon', owner: e.owner, building: e.id, x: e.x, y: e.y, on: true });
+      queue.push(e);
+    }
+  }
 }
 
 /** Let burnt-out beacons go dark. */
