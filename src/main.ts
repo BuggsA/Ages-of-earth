@@ -14,7 +14,7 @@ import type { BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode
 import { R_FISH, R_NONE } from './sim/types';
 import { carriedBy, relicAt } from './sim/relics';
 import { postAt } from './sim/trade';
-import { ageDef, roadsFrom } from './sim/ages';
+import { ageDef, isSideRoad, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
 import { NetClient, newRoomCode, saveName, savedName } from './net/client';
 import { HASH_EVERY, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
 import { deserialize, serialize } from './sim/save';
@@ -573,7 +573,7 @@ function stepReplay(s: GameState, dt: number): void {
   while (acc >= DT && n < 40 && s.tick < w.file.end) {
     step(s, w.at.get(s.tick) ?? []);
     view.events(s, s.events);
-    for (const ev of s.events) if (ev.k === 'epoch') hud.toast(`${s.players[ev.owner].name} reached the ${ageName(ev)}`, 'info');
+    for (const ev of s.events) if (ev.k === 'epoch') hud.toast(`${s.players[ev.owner].name} ${ev.back ? 'stepped back to' : 'reached'} the ${ageName(ev)}`, 'info');
     acc -= DT;
     n++;
   }
@@ -1589,10 +1589,23 @@ function onEvents(s: GameState, list: GameEvent[]): void {
       case 'epoch':
         if (ev.owner === viewer) {
           const age = ev.age ? AGES[ev.age] : EPOCHS[ev.epoch];
-          hud.banner(age.name, age.blurb, 4500);
-          play('epoch');
+          if (ev.back) {
+            // A step back (#47): what waits until the climb, and what roads it reopened.
+            const p = s.players[viewer];
+            const idle = suspendedTechs(p).map((t) => TECHS[t].name);
+            const opens = roadsFrom(p).filter((r) => isSideRoad(r) && roadKnown(s, p, r)).map((r) => AGES[r.to].name);
+            hud.banner(
+              `Back to the ${age.name}`,
+              `Your people return to the older ways.${idle.length ? ` Suspended until you climb again: ${idle.join(', ')}.` : ''}${opens.length ? ` The road to the ${opens.join(' and the ')} is open again.` : ''}`,
+              5500,
+            );
+            play('stepBack');
+          } else {
+            hud.banner(age.name, age.blurb, 4500);
+            play('epoch');
+          }
           playMusic(ev.epoch);
-        } else hud.toast(`${s.players[ev.owner].name} has reached the ${ageName(ev)}`, 'info');
+        } else hud.toast(`${s.players[ev.owner].name} has ${ev.back ? 'stepped back to' : 'reached'} the ${ageName(ev)}`, 'info');
         break;
       case 'hit':
         if (view.sees(ev.x, ev.y)) music.stir(0.012);
@@ -1625,6 +1638,21 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         break;
       case 'researched':
         if (ev.owner === viewer) hud.toast(`${TECHS[ev.tech].name} researched`, 'good');
+        break;
+      case 'survey':
+        // The survey's answer (#39): yes or no, never where.
+        if (ev.owner !== viewer) break;
+        if (!ev.found) hud.toast('The prospectors found no bog iron anywhere in this world', 'info');
+        else {
+          const road = roadsFrom(s.players[viewer]).find((r) => r.found === ev.tech);
+          hud.banner(
+            'Bog iron',
+            road
+              ? `There is bog iron somewhere in this world: rust-red ore in the marshes. Find it and dig it, and the Town Center can lead you into the ${AGES[road.to].name} instead of the Bronze Age.`
+              : 'There is bog iron somewhere in this world: rust-red ore in the marshes, paid in as gold. The road to the Iron Age closed with the Stone Age.',
+            6000,
+          );
+        }
         break;
       case 'left':
         hud.toast(`${s.players[ev.owner].name} has left: the computer leads their people now`, 'info');

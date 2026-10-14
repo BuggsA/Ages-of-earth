@@ -1,7 +1,7 @@
-import { AMOUNT, MAP_SIZES, RELIC, TRADE } from './data';
+import { AMOUNT, BOG_IRON, MAP_SIZES, RELIC, TRADE } from './data';
 import { fbm, mulberry32, type Rng } from './rng';
 import type { MapSize, MapType } from './types';
-import { B_RES, B_TERRAIN, R_BERRY, R_FISH, R_GOLD, R_NONE, R_STONE, R_TREE, T_GRASS, T_ROCK, T_SAND, T_WATER } from './types';
+import { B_RES, B_TERRAIN, R_BERRY, R_BOG, R_FISH, R_GOLD, R_NONE, R_STONE, R_TREE, T_GRASS, T_ROCK, T_SAND, T_WATER } from './types';
 
 /**
  * World generation: rolling grassland with lakes, rocky ridges and woods (more or less of each by map
@@ -49,6 +49,8 @@ export interface MapData {
   relics: { x: number; y: number }[];
   /** Where the trading posts stand (the centers of their middle tiles). */
   posts: { x: number; y: number }[];
+  /** Whether this world holds bog iron (#39). */
+  bogIron: boolean;
 }
 
 const DIR8 = [
@@ -63,7 +65,8 @@ function shuffle<T>(rng: Rng, a: T[]): T[] {
   return a;
 }
 
-export function generateMap(seed: number, size: MapSize, players = 2, type: MapType = 'continental'): MapData {
+/** `deposits` false leaves out what only some seeds hold (bog iron): campaign maps stay as they were made. */
+export function generateMap(seed: number, size: MapSize, players = 2, type: MapType = 'continental', deposits = true): MapData {
   const R = RECIPES[type];
   const WL = R.water;
   const n = MAP_SIZES[size].n;
@@ -507,6 +510,7 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
 
   const relics = placeRelics(seed, size, w, h, terrain, res, starts);
   const posts = placePosts(seed, size, w, h, terrain, height, res, amount, starts, relics);
+  const bogIron = deposits && placeBogIron(seed, w, h, terrain, res, amount, starts, deer, relics, posts);
 
   // Resources nobody could stand next to are cleared away.
   const block = new Uint8Array(w * h);
@@ -515,7 +519,7 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
     if (res[i] !== R_NONE) block[i] |= B_RES;
   }
 
-  return { w, h, terrain, height, res, amount, block, starts, deer, relics, posts };
+  return { w, h, terrain, height, res, amount, block, starts, deer, relics, posts, bogIron };
 }
 
 /** Where a town's people can walk to without cutting a tree (or, with `axes`, by cutting their way). */
@@ -713,4 +717,109 @@ function placePosts(
     }
   }
   return out.map((p) => ({ x: p.x + 0.5, y: p.y + 0.5 }));
+}
+
+/**
+ * Bog iron (#39), on some seeds and not others: the seed's own dice decide, then each town gets a
+ * patch of the same size, the same distance out, turned the same way off the line to the middle of the
+ * map, nearer that town than any other and walkable from it. If any town can't have one, no town
+ * does: a world either holds bog iron for everyone or for nobody. It rolls its own dice and only puts
+ * ore on empty ground, so the rest of the map is the same as it would be without it.
+ */
+function placeBogIron(
+  seed: number,
+  w: number,
+  h: number,
+  terrain: Uint8Array,
+  res: Uint8Array,
+  amount: Int32Array,
+  starts: { x: number; y: number }[],
+  deer: { x: number; y: number }[],
+  relics: { x: number; y: number }[],
+  posts: { x: number; y: number }[],
+): boolean {
+  const rng = mulberry32(seed ^ 0xb0619e);
+  if (rng() >= BOG_IRON.chance) return false;
+  const near = (list: { x: number; y: number }[], x: number, y: number, r: number) =>
+    list.some((p) => (p.x - x - 0.5) * (p.x - x - 0.5) + (p.y - y - 0.5) * (p.y - y - 0.5) < r * r);
+  // Open ground, clear of relics, trading posts and grazing deer.
+  const free = (x: number, y: number) =>
+    x >= 2 && y >= 2 && x < w - 2 && y < h - 2 && (terrain[y * w + x] === T_GRASS || terrain[y * w + x] === T_SAND) && res[y * w + x] === R_NONE &&
+    !near(relics, x, y, 3) && !near(posts, x, y, TRADE.plaza + 4) && !near(deer, x, y, 1.5);
+  const STEPS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  // Room for a whole patch: enough open ground joined to the spot.
+  const room = (x: number, y: number) => {
+    const seen = [y * w + x];
+    for (let q = 0; q < seen.length && seen.length < BOG_IRON.tiles; q++) {
+      const i = seen[q];
+      for (const [dx, dy] of STEPS) {
+        const nx = (i % w) + dx;
+        const ny = Math.floor(i / w) + dy;
+        if (free(nx, ny) && !seen.includes(ny * w + nx)) seen.push(ny * w + nx);
+      }
+    }
+    return seen.length >= BOG_IRON.tiles;
+  };
+  const reaches = starts.map((st) => reachFrom(w, h, terrain, res, st));
+  const turn = rng() < 0.5 ? 1 : -1;
+  const home = BOG_IRON.home;
+  const centers: { x: number; y: number }[] = [];
+  for (let k = 0; k < starts.length; k++) {
+    const st = starts[k];
+    const mx = w / 2 - st.x;
+    const my = h / 2 - st.y;
+    const ml = Math.sqrt(mx * mx + my * my) || 1;
+    // Square to the line to the middle: off to one side of the town, not on the way to a rival.
+    const tx = st.x + ((-turn * my) / ml) * home;
+    const ty = st.y + ((turn * mx) / ml) * home;
+    let best: { x: number; y: number } | null = null;
+    for (let band = 2; band <= 8 && !best; band += 2) {
+      let bestD = Infinity;
+      const R = home + band;
+      for (let y = Math.max(2, st.y - R); y <= Math.min(h - 3, st.y + R); y++) {
+        for (let x = Math.max(2, st.x - R); x <= Math.min(w - 3, st.x + R); x++) {
+          if (!free(x, y) || reaches[k][y * w + x] !== 1 || !room(x, y)) continue;
+          const ds = starts.map((o) => Math.sqrt((x + 0.5 - o.x) * (x + 0.5 - o.x) + (y + 0.5 - o.y) * (y + 0.5 - o.y)));
+          if (Math.abs(ds[k] - home) > band || ds.some((d, j) => j !== k && d <= ds[k] + 4)) continue;
+          const d = (x + 0.5 - tx) * (x + 0.5 - tx) + (y + 0.5 - ty) * (y + 0.5 - ty);
+          if (d < bestD) {
+            bestD = d;
+            best = { x, y };
+          }
+        }
+      }
+    }
+    if (!best) return false;
+    centers.push(best);
+  }
+  // Grow every patch to the same size where there is room, a tile at a time beside one already laid.
+  const patches = centers.map((): { x: number; y: number }[] => []);
+  const lay = (tiles: { x: number; y: number }[], x: number, y: number) => {
+    res[y * w + x] = R_BOG;
+    amount[y * w + x] = AMOUNT.bog;
+    tiles.push({ x, y });
+  };
+  centers.forEach((c, k) => lay(patches[k], c.x, c.y));
+  for (let n = 1; n < BOG_IRON.tiles; n++) {
+    for (const tiles of patches) {
+      let laid = false;
+      for (let guard = 0; guard < 40 && !laid; guard++) {
+        const b = tiles[Math.floor(rng() * tiles.length)];
+        const [dx, dy] = STEPS[Math.floor(rng() * 4)];
+        if (!free(b.x + dx, b.y + dy)) continue;
+        lay(tiles, b.x + dx, b.y + dy);
+        laid = true;
+      }
+      // Cramped: the first open tile beside the patch, in order (the room check promised one).
+      for (let t = 0; t < tiles.length && !laid; t++) {
+        for (const [dx, dy] of STEPS) {
+          if (!free(tiles[t].x + dx, tiles[t].y + dy)) continue;
+          lay(tiles, tiles[t].x + dx, tiles[t].y + dy);
+          laid = true;
+          break;
+        }
+      }
+    }
+  }
+  return true;
 }

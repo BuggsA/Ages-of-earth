@@ -1,5 +1,5 @@
 import { BUILDINGS, CIVS, SIGNATURES, EPOCHS, NO_MODS, TECHS, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
-import { ageDef, isHire } from './ages';
+import { ageDef, isHire, isSuspended } from './ages';
 import type { BuildingType, Cost, GameState, Player, TechId, UnitType } from './types';
 import { RES } from './types';
 
@@ -76,6 +76,7 @@ export function statsFor(s: GameState, owner: number, type: UnitType): UnitStats
   if (base.cls === 'infantry') {
     st.hp = Math.round(st.hp * m.infantryHp);
     st.armor += m.infantryArmor;
+    st.attack += m.infantryAttack;
   }
   if (base.cls === 'cavalry' || (base.cls === 'hero' && base.mounted)) st.speed *= m.cavalrySpeed;
   if (base.cls === 'citizen') st.speed *= m.citizenSpeed;
@@ -107,7 +108,8 @@ const LEVIED = new Set(['infantry', 'ranged', 'cavalry']);
 
 /**
  * What training a unit at a building costs a player now: its usual price, all in gold when their
- * age hires it there, or dearer where their age makes levies cost more (#37).
+ * age hires it there, dearer where their age makes levies cost more (#37), and scaled by what their
+ * age charges for its class (the Iron Age's cheap foot soldiers, #39).
  */
 export function trainCostFor(s: GameState, owner: number, type: UnitType, at: BuildingType): Cost {
   const p = s.players[owner];
@@ -118,8 +120,10 @@ export function trainCostFor(s: GameState, owner: number, type: UnitType, at: Bu
     for (const r of RES) sum += base[r] ?? 0;
     return { gold: Math.round((sum * age.hire.gold) / 5) * 5 };
   }
-  if (age.levy && LEVIED.has(unitStats(type, p.epoch).cls)) return scale(base, age.levy);
-  return base;
+  const cls = unitStats(type, p.epoch).cls;
+  const levied = age.levy && LEVIED.has(cls) ? scale(base, age.levy) : base;
+  const price = age.price?.[cls];
+  return price ? scale(levied, price) : levied;
 }
 
 /** Seconds to train a unit at a building (hired soldiers come faster). */
@@ -159,6 +163,7 @@ export function techProblem(s: GameState, owner: number, tech: TechId): string |
   const p = s.players[owner];
   const t = TECHS[tech];
   if (p.techs.includes(tech)) return 'Already researched';
+  if (isSuspended(p, tech)) return `Researched, but suspended until the ${EPOCHS[t.epoch].name}`;
   if (t.epoch > p.epoch) return `Needs the ${EPOCHS[t.epoch].name}`;
   if (t.needs && !p.techs.includes(t.needs)) return `Needs ${TECHS[t.needs].name} first`;
   for (const e of s.ents) if (e.kind === 'building' && e.owner === owner && e.queue.some((q) => q.tech === tech)) return 'Already being researched';

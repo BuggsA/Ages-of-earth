@@ -1,5 +1,5 @@
-import { AGES, BUILDINGS, ROADS } from '../sim/data';
-import { ageOf, deedProgress, mainRoad, roadKnown, roadsFrom } from '../sim/ages';
+import { AGES, BUILDINGS, ROADS, STEP_BACK } from '../sim/data';
+import { ageOf, backTo, deedProgress, mainRoad, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
 import type { Building, GameState, Unit } from '../sim/types';
 import { R_FISH } from '../sim/types';
 
@@ -9,6 +9,7 @@ import { R_FISH } from '../sim/types';
  */
 
 const MERCHANT_ROAD = ROADS.find((r) => r.to === 'merchant')!;
+const IRON_ROAD = ROADS.find((r) => r.to === 'iron')!;
 
 interface Tip {
   id: string;
@@ -73,7 +74,31 @@ const TIPS: Tip[] = [
       const p = s.players[me];
       return ageOf(p) === 'bronze' && roadsFrom(p).some((r) => r.to === 'merchant' && roadKnown(s, p, r) && (deedProgress(p, r)?.have ?? 0) < r.deed!.n);
     },
-    text: `There is another road out of the Bronze Age. Bring home ${MERCHANT_ROAD.deed!.n} gold by trade, and the Town Center (<kbd>Y</kbd>) can take your people into the <b>${AGES.merchant.name}</b> instead of the Middle Ages: the Market hires soldiers for gold, trade pays more, levies cost more. The road closes once you advance.`,
+    text: `There is another road out of the Bronze Age. Bring home ${MERCHANT_ROAD.deed!.n} gold by trade, and the Town Center (<kbd>Y</kbd>) can take your people into the <b>${AGES.merchant.name}</b> instead of the Middle Ages: the Market hires soldiers for gold, trade pays more, levies cost more. The road shuts once you advance; stepping back (<kbd>Z</kbd>) reopens it.`,
+  },
+  {
+    id: 'survey',
+    // Some worlds hold bog iron (#39): a cheap question at the Storehouse, asked while the Stone Age lasts.
+    when: (s, me) => !s.scenario && ageOf(s.players[me]) === 'stone' && secsIn(s) > 140 && has(s, me, 'storehouse') && !s.players[me].techs.includes('survey'),
+    text: 'Some worlds hold <b>bog iron</b> and some don\'t. A Storehouse can <b>Survey the Land</b> (🧭) for a little food and wood: the answer is yes or no, never where.',
+  },
+  {
+    id: 'iron',
+    // The survey said yes, and the Stone Age lasts: the road to the Iron Age is in view.
+    when: (s, me) => {
+      const p = s.players[me];
+      return ageOf(p) === 'stone' && roadKnown(s, p, IRON_ROAD) && (deedProgress(p, IRON_ROAD)?.have ?? 0) < IRON_ROAD.deed!.n;
+    },
+    text: `This world holds bog iron: rust-red ore in marsh mud (look on the minimap). Dig ${IRON_ROAD.deed!.n} of it, and the Town Center (<kbd>Y</kbd>) can take your people into the <b>${AGES.iron.name}</b> instead of the Bronze Age: cheap, hard-hitting foot soldiers and iron tools, but no horses until the Middle Ages.`,
+  },
+  {
+    id: 'stepBack',
+    // A side road (#47) shut behind the player: the way back to it.
+    when: (s, me) => {
+      const p = s.players[me];
+      return !!backTo(p) && shutRoads(s, p).some((r) => AGES[r.from].tier < p.epoch);
+    },
+    text: `A road is shut behind you (🔒 at the Town Center). The Town Center can <b>step back</b> an age (<kbd>Z</kbd>): units fall back to their older form and newer technologies wait, suspended, until you climb again. Then ${Math.round(STEP_BACK.cooldown / 60)} minutes before the next step back.`,
   },
   { id: 'wonder', when: (s, me) => s.players[me].epoch >= 2, text: 'Rich? Build a <b>Wonder</b> (<kbd>B</kbd> <kbd>X</kbd>). If it stands long enough, you win, but everyone will come for it.' },
   { id: 'dock', when: (s, me) => secsIn(s) > 150 && !has(s, me, 'dock') && waterNear(s, me), text: 'Water nearby! A <b>Dock</b> (<kbd>B</kbd> <kbd>D</kbd>) on the shore trains <b>fishing boats</b>: fish shoals feed you for a long time. Later, warships and transports.' },

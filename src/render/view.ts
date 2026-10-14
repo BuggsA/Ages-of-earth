@@ -3,7 +3,7 @@ import type { SoundName } from '../audio/sound';
 import { AURA, BUILDINGS, SIGNATURES, TICK_HZ, TRADE, domainOf } from '../sim/data';
 import { buildingMaxHp, statsFor } from '../sim/stats';
 import type { BuildingType, Ent, GameEvent, GameState, Unit } from '../sim/types';
-import { R_GOLD, R_STONE } from '../sim/types';
+import { R_BOG, R_GOLD, R_STONE } from '../sim/types';
 import { seesRect } from '../sim/vision';
 import { BuildingsView } from './buildingsView';
 import { CameraRig } from './camera';
@@ -659,9 +659,11 @@ export class View {
           const tc = s.ents.find((e) => e.kind === 'building' && e.owner === ev.owner && e.type === 'towncenter');
           if (tc && (ev.owner === this.viewer || this.sees(tc.x, tc.y))) {
             const at = this.ground(s, tc.x, tc.y, 0.2);
-            this.effects.ring(at, '#ffd166', 5, 1.6);
-            this.effects.ring(at, '#fff3c4', 3.5, 1.2);
-            this.effects.burst(at.clone().setY(at.y + 1.5), { count: 60, speed: 3, up: 0.9, life: 1.8, size: 0.07, gravity: 2, colors: ['#ffd166', '#fff3c4', '#ffb347'] });
+            // A step back (#47) glows dusk-blue instead of gold, and its sparks fall rather than rise.
+            const c = ev.back ? ['#8fa8d8', '#d8e2f4', '#6a7fb0'] : ['#ffd166', '#fff3c4', '#ffb347'];
+            this.effects.ring(at, c[0], 5, 1.6);
+            this.effects.ring(at, c[1], 3.5, 1.2);
+            this.effects.burst(at.clone().setY(at.y + 1.5), { count: 60, speed: 3, up: ev.back ? 0.2 : 0.9, life: 1.8, size: 0.07, gravity: 2, colors: c });
           }
           break;
         }
@@ -674,8 +676,9 @@ export class View {
           } else if (ev.act === 'mine') {
             const tile = Math.floor(ev.y) * s.w + Math.floor(ev.x);
             const gold = s.res[tile] === R_GOLD;
-            this.effects.burst(at, { count: 3, speed: 1.0, up: 0.7, life: 0.5, size: 0.025, gravity: 4, colors: gold ? ['#ffd24a', '#f2b830'] : ['#c8c3b8', '#9a948a'] });
-            this.cue('mine', ev.x, ev.y, s.res[tile] === R_STONE || gold ? 0.35 : 0.2);
+            const bog = s.res[tile] === R_BOG;
+            this.effects.burst(at, { count: 3, speed: 1.0, up: 0.7, life: 0.5, size: 0.025, gravity: 4, colors: gold ? ['#ffd24a', '#f2b830'] : bog ? ['#b8642a', '#6a4a2a'] : ['#c8c3b8', '#9a948a'] });
+            this.cue('mine', ev.x, ev.y, s.res[tile] === R_STONE || gold || bog ? 0.35 : 0.2);
           } else if (ev.act === 'build') {
             this.effects.burst(at, { count: 2, speed: 0.6, up: 0.6, life: 0.6, size: 0.05, grow: 2, gravity: 0, drag: 1.4, soft: true, colors: ['#c9b79c'] });
             this.cue('hammer', ev.x, ev.y, 0.35);
