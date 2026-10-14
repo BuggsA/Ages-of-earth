@@ -371,6 +371,15 @@ function sample(s: GameState): void {
 }
 
 /** Advance the match one tick, applying the commands given for it first. */
+/** Prices drift back toward where they started (integers only, so it stays deterministic). */
+function driftMarket(s: GameState): void {
+  for (const r of ['food', 'wood', 'stone'] as const) {
+    const home = MARKET.start[r];
+    const d = home - s.market[r];
+    s.market[r] += d > 0 ? Math.min(d, MARKET.recover) : -Math.min(-d, MARKET.recover);
+  }
+}
+
 export function step(s: GameState, cmds: readonly Command[] = []): void {
   s.events = [];
   if (s.over) return;
@@ -410,6 +419,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
       s.scenario.result = s.winner === s.players[0].team ? 'win' : 'lose';
     }
   }
+  if (s.tick > 0 && s.tick % secs(MARKET.every) === 0) driftMarket(s);
   if (s.tick % secs(30) === 0) sample(s);
   s.tick++;
 }

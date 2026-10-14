@@ -29,7 +29,7 @@ export type TechId =
   | 'forging' | 'ironCasting' | 'blastFurnace' | 'fletching' | 'bodkin' | 'scaleArmor' | 'chainMail' | 'plateArmor'
   | 'wheelbarrow' | 'handcart' | 'axes' | 'saws' | 'picks' | 'shafts' | 'plow' | 'irrigation' | 'masonry'
   | 'conscription' | 'husbandry' | 'theology' | 'chemistry'
-  | 'gillnets' | 'shipwright' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking';
+  | 'gillnets' | 'shipwright' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage';
 
 /** Tile ground. Water and rock can't be walked or built on. */
 export const T_GRASS = 0;
@@ -439,6 +439,10 @@ export interface AiMemory {
   caravans?: Record<number, number>;
   /** Post id → the tick a trader was last lost on the road to it, so it keeps off that road a while. */
   roadLost?: Record<number, number>;
+  /** A sea landing under way: the transport, the soldiers aboard (or boarding) and how far along it is. */
+  landing?: { ship: number; ids: number[]; since: number; phase: 'load' | 'sail' };
+  /** Tick its last landing set out. */
+  landed?: number;
 }
 
 /** Orders that can be given with Shift held to queue them after the current one. */

@@ -9,7 +9,7 @@ import { BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLOR
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
 import { placeProblem, walkable } from './sim/grid';
 import { findDockSpot, findSpot } from './sim/ai';
-import { placeBuilding, spawnUnit } from './sim/world';
+import { maxHp, placeBuilding, spawnUnit } from './sim/world';
 import type { BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, MapSize, MapType, Unit } from './sim/types';
 import { R_FISH, R_NONE } from './sim/types';
 import { carriedBy, relicAt } from './sim/relics';
@@ -922,7 +922,7 @@ function order(clientX: number, clientY: number, forceAttack = false, queue = fa
     if (t.kind === 'building' && t.owner === viewer) {
       issue({ t: 'work', p: viewer, ids, target: t.id, queue: q });
       view.marker(s, t.x, t.y, false);
-      play(t.built ? 'move' : 'hammer');
+      play(units.some((u) => u.type === 'citizen') && (!t.built || t.hp < maxHp(s, t)) ? 'hammer' : 'move');
       return;
     }
     issue({ t: 'move', p: viewer, ids, x: t.x, y: t.y, amove: forceAttack, queue: q });
@@ -1707,7 +1707,7 @@ function cursorFor(s: GameState): string {
     if (!t) return '';
     const foe = s.players[t.owner].team !== s.players[viewer].team;
     if (units.length && foe) return units.every((u) => u.type === 'priest') && t.kind === 'unit' ? 'cur-convert' : 'cur-attack';
-    if (units.some((u) => u.type === 'citizen') && t.kind === 'building' && t.owner === viewer && (!t.built || t.type === 'farm')) return 'cur-build';
+    if (units.some((u) => u.type === 'citizen') && t.kind === 'building' && t.owner === viewer && (!t.built || t.hp < maxHp(s, t) || t.type === 'farm')) return 'cur-build';
     if (units.length && t.kind === 'building' && t.owner === viewer && t.built && BUILDINGS[t.type].garrison) return 'cur-garrison';
     if (t.kind === 'building' && t.type === 'temple' && t.owner === viewer && t.built && units.some((u) => u.type === 'priest' && carriedBy(s, u))) return 'cur-gather';
     if (t.kind === 'building' && t.type === 'market' && t.owner === viewer && t.built && units.some((u) => u.type === 'trader')) return 'cur-gather';

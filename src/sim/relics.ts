@@ -1,6 +1,7 @@
 import { RELIC, secs } from './data';
 import { nearestWalkable, relicOnTile } from './grid';
 import type { Building, GameState, Relic, Unit } from './types';
+import { modsOf } from './stats';
 import { exitSpot } from './world';
 
 /**
@@ -81,8 +82,9 @@ export function updateRelics(s: GameState): void {
         letGo(s, r, spot.x, spot.y, b.owner);
       } else if (pay) {
         const p = s.players[b.owner];
-        p.res.gold += RELIC.gold;
-        p.stats.gathered += RELIC.gold;
+        const gold = Math.round(RELIC.gold * modsOf(s, b.owner).relicGold);
+        p.res.gold += gold;
+        p.stats.gathered += gold;
       }
     }
   }

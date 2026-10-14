@@ -5,7 +5,7 @@ import { buildingCostFor, techCostFor, techProblem } from './stats';
 import type { AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Player, Res, TechId, TradePost, Unit, UnitType } from './types';
 import { RES, R_BERRY, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { carriedBy } from './relics';
-import { findResource, freeFarm, nearestTemple } from './units';
+import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple } from './units';
 import { goalForPost, nearestMarket, tripGold } from './trade';
 import { findRoute } from './path';
 import { isEnemy } from './world';
@@ -57,7 +57,7 @@ const TILE_OF: Record<Res, number> = { food: R_BERRY, wood: R_TREE, stone: R_STO
 const TECH_ORDER: TechId[] = [
   'plow', 'axes', 'wheelbarrow', 'picks', 'forging', 'scaleArmor', 'fletching', 'husbandry', 'irrigation', 'saws', 'shafts', 'handcart',
   'ironCasting', 'chainMail', 'bodkin', 'masonry', 'theology', 'conscription', 'blastFurnace', 'plateArmor', 'chemistry',
-  'gillnets', 'shipwright', 'steamEngine', 'rifling', 'aviation', 'caravan', 'banking',
+  'gillnets', 'shipwright', 'steamEngine', 'rifling', 'aviation', 'caravan', 'banking', 'pilgrimage',
 ];
 /** Seconds a computer keeps its traders off a road after losing one on it. */
 const TRADER_WARY = 240;
@@ -667,6 +667,7 @@ function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   }
   // Warships: once the Bronze Age opens them, if the enemy has boats or the map is mostly sea.
   if (!L.clever || p.epoch < 1) return;
+  seaLanding(s, v, mem, dock, issue);
   const enemyShips = s.ents.filter((e): e is Unit => e.kind === 'unit' && e.hp > 0 && isEnemy(s, p.id, e.owner) && (e.type === 'warship' || e.type === 'fisher' || e.type === 'transport') && p.vis[Math.floor(e.y) * s.w + Math.floor(e.x)] === 1);
   const warships = v.navy.filter((u) => u.type === 'warship');
   const wantShips = s.mapType === 'sea' ? Math.min(2 + p.epoch, 6) : enemyShips.length ? Math.min(2 + Math.floor(enemyShips.length / 2), 5) : 0;
@@ -686,6 +687,65 @@ function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
     const far = idle.filter((u) => (u.x - dock.x) * (u.x - dock.x) + (u.y - dock.y) * (u.y - dock.y) > 100);
     if (far.length) issue({ t: 'move', p: p.id, ids: far.map((u) => u.id), x: dock.x, y: dock.y });
   }
+}
+
+/**
+ * On a map with a great sea, a transport carries part of the army straight across it and puts
+ * them ashore by the enemy's town, while the rest waits at home for the next wave.
+ */
+function seaLanding(s: GameState, v: View, mem: AiMemory, dock: Building, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (s.mapType !== 'sea') return;
+  const enemy = enemyHome(s, p);
+  const queued = dock.queue.filter((q) => q.unit === 'transport').length;
+  const ships = v.navy.filter((u) => u.type === 'transport');
+  const lz = mem.landing;
+  if (lz) {
+    const ship = s.byId.get(lz.ship);
+    if (!ship || ship.kind !== 'unit' || ship.hp <= 0) {
+      mem.landing = undefined;
+      return;
+    }
+    const riders = lz.ids.map((id) => s.byId.get(id)).filter((u): u is Unit => !!u && u.kind === 'unit' && u.hp > 0);
+    if (lz.phase === 'load') {
+      const aboard = ship.cargo.length;
+      if (aboard >= riders.length || s.tick - lz.since > secs(45)) {
+        if (aboard >= 3) {
+          issue({ t: 'unload', p: p.id, ids: [ship.id], x: enemy.x, y: enemy.y });
+          lz.phase = 'sail';
+          lz.since = s.tick;
+        } else mem.landing = undefined;
+      }
+    } else if (ship.cargo.length === 0) {
+      // Ashore: on to the town.
+      const ashore = riders.filter((u) => !u.inside);
+      if (ashore.length) issue({ t: 'move', p: p.id, ids: ashore.map((u) => u.id), x: enemy.x, y: enemy.y, amove: true });
+      mem.landing = undefined;
+      mem.landed = s.tick;
+    } else if (s.tick - lz.since > secs(150)) mem.landing = undefined;
+    return;
+  }
+  // A transport, once there is an army worth halving.
+  if (!ships.length && !queued && v.army.length >= 8 && dock.queue.length < 2 && unitEpoch('transport') <= p.epoch) {
+    const cost = unitStats('transport', p.epoch).cost;
+    if (afford(v, cost)) {
+      issue({ t: 'train', p: p.id, building: dock.id, unit: 'transport' });
+      spend(v, cost);
+    }
+  }
+  const ship = ships.find((u) => u.order.k === 'idle' && u.cargo.length === 0);
+  if (!ship) return;
+  const due = s.tick >= secs(AI_LEVELS[p.ai!].firstAttack) && s.tick >= s.peaceUntil && s.tick - (mem.landed ?? 0) > secs(240);
+  const crew = v.army
+    .filter((u) => !u.inside && u.type !== 'siege' && u.order.k === 'idle' && (u.x - v.home.x) * (u.x - v.home.x) + (u.y - v.home.y) * (u.y - v.home.y) < 18 * 18)
+    .slice(0, Math.min(cargoRoom(s, ship), Math.floor(v.army.length / 2)));
+  if (!due || mem.attacking || crew.length < 5 || !coastNear(s, enemy.x, enemy.y, 24)) {
+    // Wait at the dock.
+    if ((ship.x - dock.x) * (ship.x - dock.x) + (ship.y - dock.y) * (ship.y - dock.y) > 100) issue({ t: 'move', p: p.id, ids: [ship.id], x: dock.x, y: dock.y });
+    return;
+  }
+  issue({ t: 'board', p: p.id, ids: crew.map((u) => u.id), target: ship.id });
+  mem.landing = { ship: ship.id, ids: crew.map((u) => u.id), since: s.tick, phase: 'load' };
 }
 
 function countFish(s: GameState, x: number, y: number, r: number): number {
@@ -900,9 +960,10 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
 
   // Defend: enemies near home draw the army. While an attack is under way, only the soldiers still near
   // home turn back; those already deep in enemy land press on, since they couldn't be back in time.
-  const near = threatNear(s, v);
-  const threat = near.unit;
-  const fighters = v.army.filter((u) => !u.inside);
+  const threat = threatNear(s, v).unit;
+  // Soldiers on their way to (or aboard) a landing ship are not the land army's to command.
+  const sailing = new Set(mem.landing?.ids);
+  const fighters = v.army.filter((u) => !u.inside && !sailing.has(u.id));
   if (threat) {
     const homeR = 40;
     const atHome = (u: Unit) => (u.x - v.home.x) * (u.x - v.home.x) + (u.y - v.home.y) * (u.y - v.home.y) < homeR * homeR;

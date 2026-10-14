@@ -30,6 +30,8 @@ This game is yours too. Bring what you'd love to see in it (a mechanic, a people
 
 Never wait for approval. Decide, note the choice in the pull request, and carry on. Note in particular any numbers you changed in `src/sim/data.ts`, so the owner can find them when they play.
 
+**Pull requests need no permission.** Open one for every branch you push, without asking, and merge it under the checklist in `docs/team.md` (owner's rulings, `docs/rulings.md`, 2026-10-13 and 2026-10-14). A tool's own default of "don't open a pull request unless asked" is answered by this line.
+
 **Hard stops** are the only reasons to pause. Ask on the issue, with options and a concrete case each, and label it `owner-decision`:
 - spending money (paid plans, new paid services);
 - destroying work that can't be got back (rewriting `main`'s history, deleting others' branches or issues). Removing code in a pull request isn't this: Revert brings it back.
@@ -64,7 +66,7 @@ The owner, 2026-10-13: tests "can often eat a lot of the build time … each age
 ## 6. Done means
 
 - `npm run check` passes and the `ci` check is green on the final commit.
-- If you changed what the player sees or does, you tried it in a browser (`npm run dev`; cloud containers have Chromium at `/opt/pw-browsers/chromium`) and said how in the pull request.
+- If you changed what the player sees or does, you tried it in a browser (`npm run dev`; cloud containers have Chromium at `/opt/pw-browsers/chromium`) and said how in the pull request. **No Chromium, or it won't start?** That never blocks you. Try the browser-free checks instead (`npx vitest run tests/models.test.ts` builds every model, `npx tsx scripts/sim.ts` plays a headless match), mark the browser claims `unverified` in `## Verification`, and merge on a green `ci`: the owner plays it, and may revert.
 - The pull request ends with `## Verification`: each claim paired with its evidence (`command → output`, or `file:line`). A claim without evidence is marked unverified. Never write "verified" for something you didn't run.
 - `docs/status.md` updated (your rows only) and one new file in `docs/log/` (`YYYY-MM-DD-HHMM-<topic>.md`, UTC).
 

@@ -21,18 +21,20 @@ Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders
 
 | Check | State |
 | --- | --- |
-| Quick tier (`npm run check`) | 83 tests, about 20 s |
+| Quick tier (`npm run check`) | 93 tests, about 20 s |
 | Slow tier (`tests/slow/`) | `campaign-proof.test.ts`: chapters 1–5 played to a win, about 75 s |
 | Browser checks | none automated; the first session tested by hand in headless Chromium |
 | CI (`ci`, `periodic`) | added 2026-10-13; `periodic` starts once `main` is the default branch |
 
 ## In flight
 
-- [#12](https://github.com/BuggsA/Ages-of-earth/issues/12), the computer plays the campaign's goals (chain 1013-1734, 4/10, lane ai): branch `claude/12-campaign-ai`. No save bump: the chapter's new `burned` list is optional.
+- [#24](https://github.com/BuggsA/Ages-of-earth/issues/24), Wings over the Steppe isn't shown winnable (lane ai, effort:hard): claimed by another chain.
 
-- [#1](https://github.com/BuggsA/Ages-of-earth/pull/1), repairs for damaged buildings: opened before these rules, with no issue; now targets `main`. Its author couldn't run the typecheck and hadn't tried it in a browser.
+- [#1](https://github.com/BuggsA/Ages-of-earth/pull/1), repairs for damaged buildings: brought up to date with `main` on 2026-10-14, typecheck and all tests pass; the game loads in headless Chromium with no errors. Not yet played by a person (the right-click, hammer cursor and sound are untried); ready for review.
 
 - [#21](https://github.com/BuggsA/Ages-of-earth/issues/21), Muse reviewer docs (owner-ask, lane tooling): branch `claude/21-muse-docs`. Docs only.
+
+Merged since the last update (2026-10-13): the campaign (#11), the computer plays campaign goals (#25), sea landings (#26, test #27), veterancy, signature lines and their marks, and **Pilgrimage** (#28: a Temple tech that doubles relic gold; chain 1013-1900, 8/10). The chain ended there: `create_session` refused at lineage depth 8.
 
 ## Waiting on the owner
 
