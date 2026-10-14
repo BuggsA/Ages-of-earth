@@ -555,6 +555,12 @@ function mast(k: Kit, z: number, h: number, sailW: number, team = true, y = 0.06
   const sail = k.box(sailW, h * 0.5, 0.015, team ? TEAM : '#efe8d8', 0, y + h * 0.33, z + 0.015);
   if (team) k.team(sail);
   else k.team(k.box(sailW, 0.05, 0.018, TEAM, 0, y + h * 0.55, z + 0.016));
+  pennant(k, 0, y + h * 0.5 - 0.04, z, 0.1 + h * 0.12);
+}
+
+/** A small team pennant that streams aft from a masthead or pole top in the wind (cloth, see `Kit.cloth`). */
+function pennant(k: Kit, x: number, y: number, z: number, len: number): void {
+  k.cloth(k.team(k.box(0.01, len * 0.32, len, TEAM, x, y, z - len / 2)), -len, z);
 }
 
 /** A bank of oars along one side, each a limb that sweeps fore and aft. */
@@ -986,7 +992,10 @@ function signatureMark(k: Kit, civ: CivId, type: UnitType): void {
   const pole = type === 'siege' || type === 'cavalry';
   const z = pole ? -0.2 : -0.01;
   const top = pole ? y + 0.3 : y + 0.06;
-  if (pole) k.cyl(0.01, 0.01, 0.34, 4, WOOD, 0, y, z);
+  if (pole) {
+    k.cyl(0.01, 0.01, 0.34, 4, WOOD, 0, y, z);
+    pennant(k, 0, y + 0.13, z, 0.16);
+  }
   switch (civ) {
     case 'egyptians':
       k.cone(0.07, 0.14, 4, '#e0b13c', 0, top - 0.02, z);
