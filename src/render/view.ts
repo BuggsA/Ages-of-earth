@@ -390,13 +390,13 @@ export class View {
     if (this.owlLevel > 0 && this.time > this.nextChirp) {
       this.nextChirp = this.time + 5 + Math.random() * 9;
       const s = this.state;
-      if (s && !this.nearWater(s)) this.onCue?.('cricket', Math.random() * 1.8 - 0.9, 0.4);
+      if (s && !this.nearWater(s) && !this.armyNear(s)) this.onCue?.('cricket', Math.random() * 1.8 - 0.9, 0.4);
     }
     // On a clear night, within sight of open water, frogs croak at the shore.
     if (this.owlLevel > 0 && this.time > this.nextCroak) {
       this.nextCroak = this.time + 4 + Math.random() * 8;
       const s = this.state;
-      if (s && this.nearWater(s)) this.onCue?.('frog', Math.random() * 1.8 - 0.9, 0.4);
+      if (s && this.nearWater(s) && !this.armyNear(s)) this.onCue?.('frog', Math.random() * 1.8 - 0.9, 0.4);
     }
     // By day, within sight of open water, a gull now and then.
     if (this.dayLevel > 0.3 && this.time > this.nextGull) {
@@ -898,6 +898,18 @@ export class View {
       if (this.wet(s, x + Math.cos(a) * r, z + Math.sin(a) * r) || this.wet(s, x + Math.cos(a) * r * 0.5, z + Math.sin(a) * r * 0.5)) return true;
     }
     return this.wet(s, x, z);
+  }
+
+  /** Whether a column of soldiers (five or more, seen) marches within a dozen tiles of the view's centre: the night creatures hush. */
+  private armyNear(s: GameState): boolean {
+    const { x, z } = this.rig.target;
+    let n = 0;
+    for (const e of s.ents) {
+      if (e.kind !== 'unit' || Math.abs(e.x - x) > 12 || Math.abs(e.y - z) > 12 || !this.visibleUnit(e)) continue;
+      const c = statsFor(s, e.owner, e.type).cls;
+      if ((c === 'infantry' || c === 'ranged' || c === 'cavalry' || c === 'siege') && ++n >= 5) return true;
+    }
+    return false;
   }
 
   /** Whether a map point is open water. */
