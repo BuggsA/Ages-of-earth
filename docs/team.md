@@ -95,7 +95,7 @@ Sessions end without warning, so claims are built for that.
 2. The latest `main` is merged into your branch. If `main` moves while you wait, merge it again and let `ci` run again.
 3. `ci` is green on that exact commit; you ran `npm run check` and the slow tests that cover your change (`AGENTS.md` §5); the `## Verification` section has the real output. A check that fails once and passes on a re-run is not a pass: say so in the pull request.
 
-   **Cloudflare's "Workers Builds" check is not a gate.** Agents can't read its log, `ci` runs the same build, and a failed Cloudflare build deploys nothing, so the live game stays as it was. When it fails, say so in the pull request and on #2, so the owner can read the log in the Cloudflare dashboard. (Since 2026-10-13 it has failed in 0 seconds on every branch, #1 included: a setting on Cloudflare's side.)
+   **Cloudflare's "Workers Builds" check is not a gate.** Agents can't read its log, `ci` runs the same build, and a failed Cloudflare build deploys nothing, so the live game stays as it was. When it fails, say so in the pull request and on #2, so the owner can read the log in the Cloudflare dashboard. (It failed on every branch until `[previews]` was added to `wrangler.toml` in #23; it has passed since.)
 4. Nothing in it is a hard stop, or the owner approved that part in their own words. Flags don't block.
 5. Merge with a merge commit. Never force-push or rewrite `main`, and never delete branches, tags or issues that aren't yours.
 6. After merging, comment the pull request link on the issue.
