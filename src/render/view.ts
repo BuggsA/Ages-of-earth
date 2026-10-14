@@ -257,6 +257,7 @@ export class View {
     this.weather.set(day);
     const wind = windFor(this.state?.seed ?? 0, day);
     this.effects.setWind(wind.x, wind.z);
+    this.weather.setWind(wind.x, wind.z);
     this.mood = moodOf(day);
     this.reach = this.mood.reach;
     this.litHour = -1;

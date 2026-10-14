@@ -138,6 +138,9 @@ export function stormGap(n: number): number {
 
 const RAIN_COUNT = 2600;
 const SNOW_COUNT = 2000;
+/** How many times a smoke wind's speed the falling rain and snow are blown. */
+const RAIN_LEAN = 7;
+const SNOW_LEAN = 3;
 
 const rainVertex = /* glsl */ `
   attribute vec4 aSeed;
@@ -177,11 +180,12 @@ const snowVertex = /* glsl */ `
   uniform vec3 uCenter;
   uniform vec2 uBox;
   uniform float uFall;
+  uniform vec2 uWind;
   uniform float uScale;
   varying float vAlpha;
   void main() {
     vec3 s = aSeed.xyz;
-    vec2 wrapped = fract(s.xz - uCenter.xz / uBox.x);
+    vec2 wrapped = fract(s.xz - uCenter.xz / uBox.x + uWind * uTime / uBox.x);
     float h = fract(s.y - uTime * uFall * (0.6 + aSeed.w * 0.8) / uBox.y);
     float sway = uTime * (0.5 + aSeed.w) + s.x * 40.0;
     vec3 p = vec3(uCenter.x + (wrapped.x - 0.5) * uBox.x + sin(sway) * 0.5, uCenter.y + h * uBox.y, uCenter.z + (wrapped.y - 0.5) * uBox.x + cos(sway * 0.8) * 0.5);
@@ -253,6 +257,7 @@ export class Weather {
       uCenter: { value: new THREE.Vector3() },
       uBox: { value: new THREE.Vector2(30, 24) },
       uFall: { value: 2.2 },
+      uWind: { value: new THREE.Vector2(0.6, 0.2) },
       uScale: { value: 600 },
       uOpacity: { value: 0.85 },
     };
@@ -263,6 +268,15 @@ export class Weather {
     this.snow.frustumCulled = false;
     this.group.add(this.rain, this.snow);
     this.set({ kind: 'clear', strength: 0 });
+  }
+
+  /**
+   * Lean the falling rain and snow into the day's wind (tiles a second, as `windFor` gives it).
+   * Rain is quick and slants hard; snow, which floats, drifts gently.
+   */
+  setWind(x: number, z: number): void {
+    (this.rainU.uWind.value as THREE.Vector2).set(x * RAIN_LEAN, z * RAIN_LEAN);
+    (this.snowU.uWind.value as THREE.Vector2).set(x * SNOW_LEAN, z * SNOW_LEAN);
   }
 
   /** Begin a new day. */
