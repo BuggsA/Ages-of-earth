@@ -21,12 +21,16 @@ Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders
 
 | Check | State |
 | --- | --- |
-| Quick tier (`npm run check`) | 102 tests, about 20 s |
+| Quick tier (`npm run check`) | 115 tests, about 25 s |
 | Slow tier (`tests/slow/`) | `campaign-proof.test.ts`: all six chapters played to a win, about 5 minutes on a cloud container |
 | Browser checks | none automated; the first session tested by hand in headless Chromium |
 | CI (`ci`, `periodic`) | added 2026-10-13; `periodic` starts once `main` is the default branch |
 
 ## In flight
+
+- [#30](https://github.com/BuggsA/Ages-of-earth/issues/30), Codex: Market recovery indicators and regression coverage ([PR #32](https://github.com/BuggsA/Ages-of-earth/pull/32)), branch `codex/30-market-recovery`. Updated with the repair changes and #33 browser-free rule. No balance or save-shape changes. Browser appearance unverified; merge after green CI on the combined commit.
+
+- [#37](https://github.com/BuggsA/Ages-of-earth/issues/37), **ages as a web** (umbrella, lane rules, effort:hard; chain 1014-0030): s1, the skeleton and the **Age of Merchants** ([#38](https://github.com/BuggsA/Ages-of-earth/issues/38)), merged from `claude/37-ages-web`. Next: s2, the Iron Age and a seed-dependent deposit ([#39](https://github.com/BuggsA/Ages-of-earth/issues/39), ready). The computer walks the trunk only until s4 (lane ai). No save bump: the new fields are optional.
 
 - [#24](https://github.com/BuggsA/Ages-of-earth/issues/24), Wings over the Steppe shown winnable (chain 1013-1734, 5/10, lane ai): branch `claude/24-wings`, tests and docs only. Found on the way: [#42](https://github.com/BuggsA/Ages-of-earth/issues/42), computer traders die on bent roads (fix on `claude/42-trade-roads`, blocked on [#43](https://github.com/BuggsA/Ages-of-earth/issues/43), the proof's fragility); [#36](https://github.com/BuggsA/Ages-of-earth/issues/36), the computer can't fight a two-front war.
 
@@ -34,7 +38,7 @@ Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders
 
 - [#21](https://github.com/BuggsA/Ages-of-earth/issues/21), Muse reviewer docs (owner-ask, lane tooling): branch `claude/21-muse-docs`. Docs only.
 
-Merged since the last update (2026-10-13): the campaign (#11), the computer plays campaign goals (#25), sea landings (#26, test #27), veterancy, signature lines and their marks, and **Pilgrimage** (#28: a Temple tech that doubles relic gold; chain 1013-1900, 8/10). The chain ended there: `create_session` refused at lineage depth 8.
+Merged since the last update (2026-10-13): the campaign (#11), the computer plays campaign goals (#25), sea landings (#26, test #27), veterancy, signature lines and their marks, and **Pilgrimage** (#28: a Temple tech that doubles relic gold; chain 1013-1900, 8/10). **Market prices recover** (#31: they drift back toward their start, 1 point every 10 s; agents may open pull requests without asking, `AGENTS.md` §3). The chain ended there: `create_session` refused at lineage depth 8.
 
 ## Waiting on the owner
 
