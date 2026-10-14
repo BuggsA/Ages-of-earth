@@ -353,3 +353,7 @@ Built: in `src/render/materials.ts` the glow of warm-coloured parts is dimmed by
 ## Designers' notes: bat roosts (own pitch, 2026-10-14, chain 1014-1340 s7)
 
 Built: `src/render/roosts.ts`, seven bats wheeling around each of the ten nearest standing ruins the viewer has seen (`RuinsView.standingAt`), on the bats' dusk-and-dawn light, clear weather, off on Low quality; a dug-out ruin goes quiet. Why I love it: the ruins were a gamble you read only up close; now the evening tells you where they are. Next: owls perched on ruins and watchtowers, a swarm pouring from a cave tile. Render only; no rules or save change. Not seen in a browser.
+
+## Designers' notes: owl perches (own pitch, 2026-10-14, chain 1014-1340 s8)
+
+Built: `src/render/perches.ts`, one owl sitting on each of the six nearest standing ruins the viewer has seen, in the dead of a clear night (the flying owls' light, `Owls.level`), ear tufts up, eyes that blink shut every few seconds on each owl's own beat; a dug-out ruin goes quiet, off on Low quality. Why I love it: bats mark the ruins at dusk, and now an owl keeps watch over them in the dead of night. Next: an owl on a watchtower, a swarm pouring from a cave tile. Render only; no rules or save change. Shader not seen in a browser.
