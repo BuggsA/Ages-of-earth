@@ -44,6 +44,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Signal beacons** (own pitch, lane rules): a Watch Tower can light a fire (F): +7 sight for 45 s, and rivals see the ground around it; the clever computer lights one when three soldiers close in. Browser unverified; sound wants an ear; no save bump.
 
+**Beacon relay** (own pitch, lane rules): a lit beacon sets alight your other rested Watch Towers within 14 tiles, free, 25 s each, down a chain (`BEACON.relay`, `.relayDuration`). Tests only; browser unverified; no save bump.
+
 **Waymarks** (#154, seed #152, lane look): the minimap remembers ruins (dug or standing, by whom) and relics as last seen. UI only; browser unverified.
 
 ## Waiting on the owner

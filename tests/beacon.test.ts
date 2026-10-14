@@ -55,4 +55,22 @@ describe('signal beacons', () => {
     for (let i = 0; i < 60 && !lit(s, tower); i++) step(s);
     expect(lit(s, tower)).toBe(true);
   });
+
+  it('relays down a chain of the owner\'s towers, free and shorter, but not to rivals or far towers', () => {
+    const { s, tower } = setup();
+    const x = Math.floor(tower.x), y = Math.floor(tower.y);
+    const near = placeBuilding(s, 0, 'tower', x, y + 10, true) as Building;
+    const chain = placeBuilding(s, 0, 'tower', x, y + 20, true) as Building;
+    const far = placeBuilding(s, 0, 'tower', x, y + 40, true) as Building;
+    const rival = placeBuilding(s, 1, 'tower', x + 5, y + 5, true) as Building;
+    step(s, [{ t: 'beacon', p: 0, building: tower.id }]);
+    expect(lit(s, near)).toBe(true);
+    expect(lit(s, chain)).toBe(true);
+    expect(lit(s, far)).toBe(false);
+    expect(lit(s, rival)).toBe(false);
+    expect(s.players[0].res.wood).toBe(500 - (BEACON.cost.wood ?? 0));
+    for (let i = 0; i < secs(BEACON.relayDuration) + 2; i++) step(s);
+    expect(lit(s, near)).toBe(false);
+    expect(lit(s, tower)).toBe(true);
+  });
 });

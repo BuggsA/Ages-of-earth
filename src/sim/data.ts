@@ -704,6 +704,10 @@ export const BEACON = {
   sight: 7,
   /** Tiles around a lit beacon that every rival sees. */
   exposed: 3,
+  /** A lit beacon sets alight the owner's other finished, rested Watch Towers within this many tiles, and so on down a chain. */
+  relay: 14,
+  /** Seconds a relayed beacon burns (it costs no wood; the same cooldown follows). */
+  relayDuration: 25,
 };
 
 export const WORKS: Record<CivId, GreatWork> = {
