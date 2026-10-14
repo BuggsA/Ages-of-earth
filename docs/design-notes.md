@@ -281,3 +281,11 @@ Seed atlas, third pass (chain 1014-1135, session 3): the game now reads `?seed=N
 ## Designers' notes: Scout Flags (2026-10-14, GPT-6, #85)
 
 Built: gold planning pennants and red danger pennants on both the 3D land and the minimap. Ctrl+right-click explored ground to plant one; Shift makes it red. Repeating removes one, or changes its kind. Six stand at once; the oldest makes room for the seventh. Why I love it: an RTS map is a place to think, not just a place to march. Mark a ruin to revisit, a crossing the rival holds, or a shore to land an army. These notes are private to the browser and never reveal fog, issue commands, affect AI or get saved/transmitted. Browser appearance remains unverified here. Next: optional shared allied notes, but only with authorization checks on every network message.
+
+
+
+## Designers' notes: Age of Reclaimers (2026-10-14, Codex, #94)
+
+I love the moment when exploration changes a civilization rather than only filling its treasury. A completed excavation now reveals a people who put yesterday's knowledge to work: faster building and repair, cheaper research, slower military training. The Middle Ages window spreads the web into another tier and gives opponents time to scout and punish a rebuilding town. Its armies still use the ordinary counters; there is no secret super-unit.
+
+Ruin ownership is already saved, so the discovery needs no extra tally, and the existing computer excavation and forward-road chooser can use it. Next I'd explore contested restoration projects that stay useful on the map after the dig, with benefits an opponent can interrupt. The synthesized theme and salvaged-column models still want the owner's eyes and ears; Chromium is absent in this container.

@@ -905,8 +905,10 @@ function ironTower(k: Kit, st: Style): void {
 // extra draw: awnings and bright cloth (merchants), rust and smithy glow (iron), banners, lamps and
 // pale stone (pilgrims), stripes and bunting (fairs). Fronts face +z.
 
-/** The side ages that dress buildings; the trunk ages have their own epoch styles. */
+/** The original four dressed ages, kept as the baseline model regression set. */
 export const LOOK_AGES: AgeId[] = ['merchant', 'iron', 'pilgrim', 'fair'];
+/** All dressed ages; additions get their own model coverage beside the baseline set. */
+export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer'];
 
 const CLOTH = ['#d94a3c', '#e8b43a', '#3f8fc4', '#8a4fa8'];
 const RUST = '#8a4a2c';
@@ -950,6 +952,21 @@ function lamp(k: Kit, x: number, y: number, z: number, h = 0.5): void {
 function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
   const big = type === 'towncenter';
   switch (age) {
+    case 'reclaimer': {
+      // Salvaged stone columns and timber braces: old fragments become a working town.
+      if (['towncenter', 'storehouse', 'forge', 'house', 'wonder'].includes(type)) {
+        const span = big ? 1.65 : type === 'wonder' ? 2.5 : type === 'house' ? 0.7 : 1.05;
+        const height = big || type === 'wonder' ? 1.3 : 0.7;
+        for (const x of [-span, span]) {
+          k.cyl(0.09, 0.12, height, 6, PALE, x, 0, span);
+          k.box(0.28, 0.1, 0.28, PALE, x, height, span);
+          k.cyl(0.025, 0.025, height + 0.25, 4, WOOD, x + 0.18, 0, span);
+        }
+        k.box(span * 2 + 0.4, 0.07, 0.08, WOOD, 0, height * 0.65, span + 0.05);
+        k.box(0.36, 0.18, 0.22, PALE, span - 0.25, 0, span - 0.35);
+      }
+      break;
+    }
     case 'merchant':
       if (type === 'market') {
         awning(k, -0.9, 0.78, 1.25, 1.2, 4, 0);
@@ -1040,7 +1057,7 @@ const cache = new Map<string, THREE.BufferGeometry>();
 
 /** The baked model of a building in an epoch, in a player's color (`variant`: which way a wall piece joins its neighbors). */
 export function buildingGeometry(type: BuildingType, epoch: number, color: string, variant = 0, age?: AgeId): THREE.BufferGeometry {
-  const look = age && LOOK_AGES.includes(age) && type !== 'wall' ? age : undefined;
+  const look = age && DRESSED_AGES.includes(age) && type !== 'wall' ? age : undefined;
   const key = `${type}:${epoch}:${color}:${variant}${look ? ':' + look : ''}`;
   let g = cache.get(key);
   if (!g) {
