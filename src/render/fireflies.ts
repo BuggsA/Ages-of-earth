@@ -22,7 +22,7 @@ const vertex = /* glsl */ `
     vec3 p = vec3(uCenter.x + (wrapped.x - 0.5) * uBox, uCenter.y + 0.3 + s.y * 1.1 + bob * 0.4, uCenter.z + (wrapped.y - 0.5) * uBox);
     vec4 mv = viewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * mv;
-    gl_PointSize = clamp(uScale * 0.07 / max(0.5, -mv.z), 2.0, 14.0);
+    gl_PointSize = clamp(uScale * 0.16 / max(0.5, -mv.z), 3.0, 24.0);
     float edge = min(1.0 - abs(wrapped.x * 2.0 - 1.0), 1.0 - abs(wrapped.y * 2.0 - 1.0));
     // Each blinks on and off at its own pace, most of the time dark.
     float blink = smoothstep(0.35, 1.0, sin(uTime * (0.9 + aSeed.w * 1.4) + s.z * 90.0));
