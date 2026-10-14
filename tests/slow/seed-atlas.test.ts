@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { generateMap } from '../src/sim/mapgen';
-import { inspect, matches, parseArgs, scan, survey } from '../scripts/seed-atlas';
+import { generateMap } from '../../src/sim/mapgen';
+import { inspect, matches, parseArgs, scan, survey } from '../../scripts/seed-atlas';
 
 describe('seed atlas', () => {
   it('reads filters and rejects bad ones', () => {
