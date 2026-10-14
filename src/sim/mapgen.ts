@@ -1,4 +1,4 @@
-import { AMOUNT, MAP_SIZES } from './data';
+import { AMOUNT, MAP_SIZES, RELIC, TRADE } from './data';
 import { fbm, mulberry32, type Rng } from './rng';
 import type { MapSize, MapType } from './types';
 import { B_RES, B_TERRAIN, R_BERRY, R_FISH, R_GOLD, R_NONE, R_STONE, R_TREE, T_GRASS, T_ROCK, T_SAND, T_WATER } from './types';
@@ -45,6 +45,10 @@ export interface MapData {
   starts: { x: number; y: number }[];
   /** Where deer graze at the start. */
   deer: { x: number; y: number }[];
+  /** Where relics lie at the start (tile centers). */
+  relics: { x: number; y: number }[];
+  /** Where the trading posts stand (the centers of their middle tiles). */
+  posts: { x: number; y: number }[];
 }
 
 const DIR8 = [
@@ -501,6 +505,9 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
     if (shoal(x, y, 2 + Math.floor(frng() * 2)) > 0) k++;
   }
 
+  const relics = placeRelics(seed, size, w, h, terrain, res, starts);
+  const posts = placePosts(seed, size, w, h, terrain, height, res, amount, starts, relics);
+
   // Resources nobody could stand next to are cleared away.
   const block = new Uint8Array(w * h);
   for (let i = 0; i < w * h; i++) {
@@ -508,5 +515,202 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
     if (res[i] !== R_NONE) block[i] |= B_RES;
   }
 
-  return { w, h, terrain, height, res, amount, block, starts, deer };
+  return { w, h, terrain, height, res, amount, block, starts, deer, relics, posts };
+}
+
+/** Where a town's people can walk to without cutting a tree (or, with `axes`, by cutting their way). */
+function reachFrom(w: number, h: number, terrain: Uint8Array, res: Uint8Array, st: { x: number; y: number }, axes = false): Uint8Array {
+  const seen = new Uint8Array(w * h);
+  const from = st.y * w + st.x;
+  const queue = [from];
+  seen[from] = 1;
+  for (let q = 0; q < queue.length; q++) {
+    const i = queue[q];
+    const x = i % w;
+    const y = (i - x) / w;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+      const ni = ny * w + nx;
+      if (seen[ni] || (res[ni] !== R_NONE && !(axes && res[ni] === R_TREE)) || (terrain[ni] !== T_GRASS && terrain[ni] !== T_SAND)) continue;
+      seen[ni] = 1;
+      queue.push(ni);
+    }
+  }
+  return seen;
+}
+
+/**
+ * Relics, fairly: one for each player at the same distance from home and the same turn off the line to
+ * the middle of the map, then a few more out where the land is as far from the two nearest towns as
+ * from each other. Every one stands in open ground that can be walked to from every town. They roll
+ * their own dice, so the rest of the map is the same as it would be without them.
+ */
+function placeRelics(seed: number, size: MapSize, w: number, h: number, terrain: Uint8Array, res: Uint8Array, starts: { x: number; y: number }[]): { x: number; y: number }[] {
+  const rng = mulberry32(seed ^ 0x2e11c5);
+  const land = (x: number, y: number) => x >= 2 && y >= 2 && x < w - 2 && y < h - 2 && (terrain[y * w + x] === T_GRASS || terrain[y * w + x] === T_SAND);
+  const reaches = starts.map((st) => reachFrom(w, h, terrain, res, st));
+  const out: { x: number; y: number }[] = [];
+  const spaced = (x: number, y: number) => out.every((r) => (r.x - x) * (r.x - x) + (r.y - y) * (r.y - y) >= RELIC.spacing * RELIC.spacing);
+  const fit = (x: number, y: number, k: number) => land(x, y) && reaches[k][y * w + x] === 1 && spaced(x, y);
+  // Open ground (nothing growing or mined right beside it) is better, where there is some.
+  const open = (x: number, y: number) => {
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (!land(x + dx, y + dy) || res[(y + dy) * w + x + dx] !== R_NONE) return false;
+    return true;
+  };
+  const dists = (x: number, y: number) => starts.map((st) => Math.sqrt((x + 0.5 - st.x) * (x + 0.5 - st.x) + (y + 0.5 - st.y) * (y + 0.5 - st.y)));
+  // One for each player, `home` tiles out (give or take a little), nearest the spot turned the same way
+  // off the line to the middle for everyone, and nearer that town than any other.
+  const turn = rng() < 0.5 ? 1 : -1;
+  starts.forEach((st, k) => {
+    const mx = w / 2 - st.x;
+    const my = h / 2 - st.y;
+    const ml = Math.sqrt(mx * mx + my * my) || 1;
+    // Half way between the line to the middle and square to it.
+    const ax = mx / ml - (turn * my) / ml;
+    const ay = my / ml + (turn * mx) / ml;
+    const al = Math.sqrt(ax * ax + ay * ay);
+    const tx = st.x + (ax / al) * RELIC.home;
+    const ty = st.y + (ay / al) * RELIC.home;
+    for (let pass = 0; pass < 8; pass++) {
+      const band = 2 + (pass >> 1) * 2;
+      const needOpen = pass % 2 === 0;
+      let best: { x: number; y: number } | null = null;
+      let bestD = Infinity;
+      const R = RELIC.home + band;
+      for (let y = Math.max(2, st.y - R); y <= Math.min(h - 3, st.y + R); y++) {
+        for (let x = Math.max(2, st.x - R); x <= Math.min(w - 3, st.x + R); x++) {
+          if (!fit(x, y, k) || (needOpen && !open(x, y))) continue;
+          const ds = dists(x, y);
+          if (Math.abs(ds[k] - RELIC.home) > band || ds.some((d, j) => j !== k && d <= ds[k])) continue;
+          const d = (x + 0.5 - tx) * (x + 0.5 - tx) + (y + 0.5 - ty) * (y + 0.5 - ty);
+          if (d < bestD) {
+            bestD = d;
+            best = { x, y };
+          }
+        }
+      }
+      if (best) {
+        out.push(best);
+        break;
+      }
+    }
+  });
+  // More between the towns, each about as far from its two nearest towns, and well away from all.
+  const extra = RELIC.extra[size];
+  for (let fair = RELIC.fair, placed = 0; fair <= RELIC.fair * 3 && placed < extra; fair += RELIC.fair) {
+    const candidates: number[] = [];
+    for (let y = 2; y < h - 2; y++) {
+      for (let x = 2; x < w - 2; x++) {
+        // Somewhere every town can walk to.
+        if (!land(x, y) || reaches.some((r) => r[y * w + x] !== 1) || (fair === RELIC.fair && !open(x, y))) continue;
+        const ds = dists(x, y).sort((a, b) => a - b);
+        if (ds[0] < RELIC.home + 2 || ds[1] - ds[0] > fair) continue;
+        candidates.push(y * w + x);
+      }
+    }
+    for (let guard = 0; placed < extra && candidates.length && guard < extra * 40; guard++) {
+      const i = candidates[Math.floor(rng() * candidates.length)];
+      const x = i % w;
+      const y = (i - x) / w;
+      if (!spaced(x, y)) continue;
+      out.push({ x, y });
+      placed++;
+    }
+  }
+  return out.map((r) => ({ x: r.x + 0.5, y: r.y + 0.5 }));
+}
+
+/**
+ * Trading posts, fairly: near the edge of the map, about as far from their two nearest towns, well away
+ * from every town and from each other, on fairly level open ground that every town can walk to. Trees
+ * on the plaza are cleared; nothing else is touched. They roll their own dice, so the rest of the map
+ * (relics included) is the same as it would be without them.
+ */
+function placePosts(
+  seed: number,
+  size: MapSize,
+  w: number,
+  h: number,
+  terrain: Uint8Array,
+  height: Float32Array,
+  res: Uint8Array,
+  amount: Int32Array,
+  starts: { x: number; y: number }[],
+  relics: { x: number; y: number }[],
+): { x: number; y: number }[] {
+  const rng = mulberry32(seed ^ 0x7ade05);
+  const n = Math.min(w, h);
+  // The plaza and a tile round it.
+  const R = TRADE.plaza + 1;
+  // Somewhere every town can walk to; failing that (in deep woods), cut their way to.
+  const open = starts.map((st) => reachFrom(w, h, terrain, res, st));
+  let reaches = open;
+  const site = (x: number, y: number) => {
+    let reached = false;
+    for (let dy = -R; dy <= R; dy++) {
+      for (let dx = -R; dx <= R; dx++) {
+        const i = (y + dy) * w + x + dx;
+        if (terrain[i] !== T_GRASS && terrain[i] !== T_SAND) return false;
+        // Trees make way for the plaza; berries and mines don't.
+        if (res[i] !== R_NONE && res[i] !== R_TREE) return false;
+        if (!reached && reaches.every((r) => r[i] === 1)) reached = true;
+      }
+    }
+    if (!reached) return false;
+    // Level enough for the stalls.
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (let dy = -TRADE.plaza; dy <= TRADE.plaza + 1; dy++) {
+      for (let dx = -TRADE.plaza; dx <= TRADE.plaza + 1; dx++) {
+        const v = height[(y + dy) * (w + 1) + x + dx];
+        lo = Math.min(lo, v);
+        hi = Math.max(hi, v);
+      }
+    }
+    return hi - lo <= 1.1;
+  };
+  const out: { x: number; y: number }[] = [];
+  const want = TRADE.posts[size];
+  // Looser and looser: a wider band along the edge, less even distances, then cutting through woods.
+  const passes: [number, number, boolean][] = [[1, 0, false], [2, 3, false], [1, 0, true], [2, 3, true], [3, 9, true], [4, 99, true]];
+  for (const [looser, wider, axes] of passes) {
+    if (out.length >= want) break;
+    const fair = TRADE.fair * looser;
+    const edge = TRADE.edge + wider;
+    if (axes && reaches === open) reaches = starts.map((st) => reachFrom(w, h, terrain, res, st, true));
+    const candidates: number[] = [];
+    for (let y = R + 1; y < h - R - 1; y++) {
+      for (let x = R + 1; x < w - R - 1; x++) {
+        const e = Math.min(x, y, w - 1 - x, h - 1 - y);
+        if (e < 3 || e > edge) continue;
+        const ds = starts.map((st) => Math.sqrt((x + 0.5 - st.x) * (x + 0.5 - st.x) + (y + 0.5 - st.y) * (y + 0.5 - st.y))).sort((a, b) => a - b);
+        if (ds[0] < TRADE.far * n || (ds.length > 1 && ds[1] - ds[0] > fair)) continue;
+        if (relics.some((r) => (r.x - x - 0.5) * (r.x - x - 0.5) + (r.y - y - 0.5) * (r.y - y - 0.5) < 25)) continue;
+        if (!site(x, y)) continue;
+        candidates.push(y * w + x);
+      }
+    }
+    const apart = TRADE.spacing * n;
+    for (let guard = 0; out.length < want && candidates.length && guard < want * 60; guard++) {
+      const i = candidates[Math.floor(rng() * candidates.length)];
+      const x = i % w;
+      const y = (i - x) / w;
+      if (out.some((p) => (p.x - x) * (p.x - x) + (p.y - y) * (p.y - y) < apart * apart)) continue;
+      out.push({ x, y });
+    }
+  }
+  for (const p of out) {
+    for (let dy = -R; dy <= R; dy++) {
+      for (let dx = -R; dx <= R; dx++) {
+        const i = (p.y + dy) * w + p.x + dx;
+        if (res[i] === R_TREE) {
+          res[i] = R_NONE;
+          amount[i] = 0;
+        }
+      }
+    }
+  }
+  return out.map((p) => ({ x: p.x + 0.5, y: p.y + 0.5 }));
 }

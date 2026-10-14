@@ -148,6 +148,34 @@ export class Minimap {
       const r = Math.max(1.2, sx * 0.6);
       ctx.fillRect(a.x * sx - r, a.y * sy - r, r * 2, r * 2);
     }
+    // Trading posts the viewer has found: a sand-coloured square with a dark rim and a camel-brown dot.
+    for (const t of s.posts) {
+      if (!reveal && !p.seen[Math.floor(t.y) * s.w + Math.floor(t.x)]) continue;
+      const rr = Math.max(3, sx * 1.8);
+      ctx.fillStyle = '#e8d2a0';
+      ctx.fillRect(t.x * sx - rr, t.y * sy - rr, rr * 2, rr * 2);
+      ctx.strokeStyle = 'rgba(40,24,0,0.85)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(t.x * sx - rr, t.y * sy - rr, rr * 2, rr * 2);
+      ctx.fillStyle = '#8a5a2e';
+      ctx.fillRect(t.x * sx - rr * 0.4, t.y * sy - rr * 0.4, rr * 0.8, rr * 0.8);
+    }
+    // Relics lying where the viewer has explored: a gold diamond with a dark rim, easy to spot.
+    for (const r of s.relics) {
+      if (r.carrier || r.temple || (!reveal && !p.seen[Math.floor(r.y) * s.w + Math.floor(r.x)])) continue;
+      const rr = Math.max(2.4, sx * 1.4);
+      ctx.beginPath();
+      ctx.moveTo(r.x * sx, r.y * sy - rr);
+      ctx.lineTo(r.x * sx + rr, r.y * sy);
+      ctx.lineTo(r.x * sx, r.y * sy + rr);
+      ctx.lineTo(r.x * sx - rr, r.y * sy);
+      ctx.closePath();
+      ctx.fillStyle = '#ffd166';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(40,24,0,0.85)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
     for (const e of s.ents) {
       if (e.kind !== 'unit' || e.hp <= 0 || e.inside) continue;
       if (e.owner !== viewer && !reveal && !p.vis[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;

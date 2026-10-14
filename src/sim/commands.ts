@@ -5,6 +5,8 @@ import { buildingCostFor, techCostFor, techProblem } from './stats';
 import type { Building, BuildingType, Command, Cost, GameState, Order, Player, Unit } from './types';
 import { RES, R_FISH, R_NONE } from './types';
 import { RES_OF_TILE, cargoRoom, freeFarm, garrisonRoom, giveOrder, landing, setOrder, ungarrison } from './units';
+import { carriedBy, letGo, relicAt } from './relics';
+import { marketOf, nearestMarket, postAt } from './trade';
 import { canHit, isEnemy, maxHp, pay, placeBuilding, refund } from './world';
 
 /**
@@ -193,7 +195,7 @@ export function applyCommand(s: GameState, c: Command): void {
       if (peace(s)) return refuse(s, c.p, `The peace treaty holds for ${Math.ceil((s.peaceUntil - s.tick) / 20)} more seconds`);
       for (const u of units) {
         if (u.type === 'priest') {
-          if (t.kind === 'unit' && domainOf(t.type) === 'land') giveOrder(u, { k: 'convert', target: t.id, done: 0 }, c.queue);
+          if (t.kind === 'unit' && domainOf(t.type) === 'land' && !carriedBy(s, u)) giveOrder(u, { k: 'convert', target: t.id, done: 0 }, c.queue);
           continue;
         }
         // Swords can't reach a ship or an aircraft, nor a ram a soldier.
@@ -226,9 +228,55 @@ export function applyCommand(s: GameState, c: Command): void {
       const t = s.byId.get(c.target);
       if (!t || t.kind !== 'unit' || !isEnemy(s, c.p, t.owner)) return;
       if (peace(s)) return refuse(s, c.p, 'Not while the peace treaty holds');
-      for (const u of myUnits(s, c.p, c.ids)) if (u.type === 'priest') giveOrder(u, { k: 'convert', target: t.id, done: 0 }, c.queue);
+      for (const u of myUnits(s, c.p, c.ids)) if (u.type === 'priest' && !carriedBy(s, u)) giveOrder(u, { k: 'convert', target: t.id, done: 0 }, c.queue);
       break;
     }
+    case 'relic': {
+      const r = relicAt(s, c.target);
+      if (!r || r.temple || r.carrier) return;
+      const units = myUnits(s, c.p, c.ids);
+      // The nearest priest with free hands goes for it; the others walk over with them.
+      let best: Unit | null = null;
+      let bestD = Infinity;
+      for (const u of units) {
+        if (u.type !== 'priest' || carriedBy(s, u)) continue;
+        const d = (u.x - r.x) * (u.x - r.x) + (u.y - r.y) * (u.y - r.y);
+        if (d < bestD) {
+          bestD = d;
+          best = u;
+        }
+      }
+      if (best) giveOrder(best, { k: 'relic', target: r.id, temple: 0 }, c.queue);
+      else if (units.some((u) => u.type === 'priest')) refuse(s, c.p, 'Only a priest with free hands can carry a relic');
+      const others = units.filter((u) => u !== best);
+      if (others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: r.x, y: r.y, queue: c.queue });
+      break;
+    }
+    case 'route': {
+      const post = postAt(s, c.post);
+      if (!post) return;
+      const units = myUnits(s, c.p, c.ids);
+      const traders = units.filter((u) => u.type === 'trader');
+      if (traders.length && !nearestMarket(s, c.p, post.x, post.y)) refuse(s, c.p, 'Build a Market to trade from');
+      else {
+        for (const u of traders) {
+          // Each trades from the Market nearest it; one already carrying gold takes it home first.
+          const m = (u.order.k === 'trade' ? marketOf(s, c.p, u.order.market) : null) ?? nearestMarket(s, c.p, u.x, u.y);
+          giveOrder(u, { k: 'trade', post: post.id, market: m ? m.id : 0, phase: u.carry > 0 ? 'back' : 'go' }, c.queue);
+        }
+      }
+      const others = units.filter((u) => u.type !== 'trader');
+      if (others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: post.x, y: post.y, queue: c.queue });
+      break;
+    }
+    case 'dropRelic':
+      for (const u of myUnits(s, c.p, c.ids)) {
+        const r = carriedBy(s, u);
+        if (!r) continue;
+        letGo(s, r, u.x, u.y, c.p);
+        if (u.order.k === 'relic') setOrder(u, { k: 'idle' });
+      }
+      break;
     case 'work': {
       const b = myBuilding(s, c.p, c.target);
       if (!b) return;
@@ -237,6 +285,20 @@ export function applyCommand(s: GameState, c: Command): void {
       const shelters = !!BUILDINGS[b.type].garrison && b.built;
       const movers: Unit[] = [];
       for (const u of units) {
+        // A priest bringing a relic home.
+        const relic = u.type === 'priest' && b.type === 'temple' && b.built ? carriedBy(s, u) : undefined;
+        if (relic) {
+          giveOrder(u, { k: 'relic', target: relic.id, temple: b.id }, c.queue);
+          continue;
+        }
+        // A trader: home to this Market (with what it carries), and its road starts here from now on.
+        if (u.type === 'trader' && b.type === 'market' && b.built) {
+          const post = u.order.k === 'trade' ? u.order.post : 0;
+          if (u.carry > 0 || post) {
+            giveOrder(u, { k: 'trade', post, market: b.id, phase: u.carry > 0 ? 'back' : 'go' }, c.queue);
+            continue;
+          }
+        }
         if (u.type === 'fisher' && b.type === 'dock' && b.built && u.carry > 0) {
           giveOrder(u, { k: 'deliver' }, c.queue);
           continue;

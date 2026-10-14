@@ -11,9 +11,9 @@
 export type SoundName =
   | 'click' | 'open' | 'select' | 'selectBuilding' | 'move' | 'attack' | 'strike' | 'thud' | 'hit' | 'hitBuilding' | 'bow' | 'sling' | 'musket'
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
-  | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
+  | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -38,8 +38,8 @@ const KEY = 'ages-sound';
 
 // Notes in Hz.
 const N = {
-  C3: 130.81, G3: 196, C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392, A4: 440, B4: 493.88,
-  C5: 523.25, D5: 587.33, E5: 659.25, G5: 783.99, A5: 880, B5: 987.77, C6: 1046.5, E6: 1318.51, G6: 1567.98, B6: 1975.53, C7: 2093,
+  C3: 130.81, G3: 196, A3: 220, C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392, A4: 440, B4: 493.88,
+  C5: 523.25, D5: 587.33, E5: 659.25, G5: 783.99, A5: 880, B5: 987.77, C6: 1046.5, E6: 1318.51, G6: 1567.98, A6: 1760, B6: 1975.53, C7: 2093,
 };
 
 interface ToneOpts {
@@ -116,6 +116,7 @@ export class Sound {
     'click', 'open', 'select', 'selectBuilding', 'move', 'attack', 'strike', 'thud', 'hit', 'hitBuilding', 'bow', 'sling', 'musket', 'fall',
     'collapse', 'built', 'place', 'ready', 'readyCitizen', 'chop', 'mine', 'hammer', 'rustle', 'epoch', 'alert', 'victory', 'defeat', 'error', 'coin', 'queue',
     'catapult', 'cannon', 'impact', 'spear', 'chant', 'convert', 'heal', 'townBell', 'allClear', 'research', 'wonder', 'shelter',
+    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'rankUp',
   ];
 
   /**
@@ -541,6 +542,12 @@ export class Sound {
         for (const f of [N.C4, N.E4, N.G4, N.C5]) this.tone(out, t, { f, type: 'sawtooth', dur: 1.3, peak: 0.03, attack: 0.08, lp: 1800 });
         [N.G5, N.C6, N.E6].forEach((f, i) => this.bell(out, t + 0.1 + i * 0.09, f, 0.9, 0.05));
         break;
+      case 'rankUp':
+        // A bright rising fanfare: two notes and a bell.
+        this.tone(out, t, { f: N.G4, type: 'triangle', dur: 0.18, peak: 0.07, attack: 0.01 });
+        this.tone(out, t + 0.1, { f: N.C5, type: 'triangle', dur: 0.3, peak: 0.07, attack: 0.01 });
+        this.bell(out, t + 0.2, N.E6, 0.7, 0.04);
+        break;
       case 'heal':
         this.bell(out, t, N.E6, 0.5, 0.035);
         this.bell(out, t + 0.07, N.G6, 0.5, 0.03);
@@ -568,6 +575,31 @@ export class Sound {
         this.drum(out, t, 0.2);
         this.drum(out, t + 0.5, 0.2);
         this.drum(out, t + 1.0, 0.25);
+        break;
+      case 'relicTake':
+        // Lifted: a rising shimmer of small bells over a soft breath of voices.
+        [N.A5, N.C6, N.E6, N.A6].forEach((f, i) => this.bell(out, t + i * 0.06, f, 0.9, 0.04));
+        this.tone(out, t, { f: N.A3, type: 'sawtooth', dur: 0.9, peak: 0.02, attack: 0.25, lp: 900 });
+        break;
+      case 'relicKeep':
+        // Laid in the Temple: a deep bell, then a choir chord that opens out.
+        this.bell(out, t, N.A3, 2.2, 0.11);
+        this.bell(out, t, N.A3 * 2.4, 1.4, 0.04);
+        for (const f of [N.A3, N.E4, N.A4, N.C5]) this.tone(out, t + 0.15, { f, type: 'sawtooth', dur: 1.8, peak: 0.028, attack: 0.4, lp: 1500 });
+        [N.E5, N.A5, N.C6, N.E6].forEach((f, i) => this.bell(out, t + 0.5 + i * 0.11, f, 1.2, 0.04));
+        break;
+      case 'tradeLoad':
+        // Loaded at the post: a creak of harness, a thump of bales and a little string of camel bells.
+        this.noise(out, t, { dur: 0.1, filter: 'bandpass', f: 380, q: 3, peak: 0.08 });
+        this.tone(out, t + 0.04, { f: 110, to: 70, dur: 0.14, peak: 0.09 });
+        [N.E5, N.G5, N.E5, N.A5].forEach((f, i) => this.bell(out, t + 0.12 + i * 0.09, f, 0.35, 0.025));
+        break;
+      case 'tradePaid':
+        // Home with the gold: coins poured out, brightening, and a merchant's two-note flourish.
+        for (let i = 0; i < 7; i++) this.tone(out, t + i * 0.045, { f: 1900 + ((i * 397) % 900), dur: 0.08, peak: 0.05 - i * 0.004 });
+        this.noise(out, t, { dur: 0.3, filter: 'highpass', f: 5000, q: 0.7, peak: 0.03 });
+        this.tone(out, t + 0.34, { f: N.A5, type: 'triangle', dur: 0.12, peak: 0.05 });
+        this.tone(out, t + 0.44, { f: N.E6, type: 'triangle', dur: 0.22, peak: 0.05 });
         break;
       case 'shelter':
         this.noise(out, t, { dur: 0.12, filter: 'bandpass', f: 500, q: 1.5, peak: 0.15 });

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { UnitType } from '../sim/types';
+import type { CivId, UnitType } from '../sim/types';
 import { Kit, RIG_ARM, RIG_LEG_A, RIG_LEG_B, bake } from './kit';
 
 /**
@@ -767,7 +767,166 @@ function bomber(_epoch: number): Kit {
   return k;
 }
 
-const MAKERS: Record<UnitType, (epoch: number) => Kit> = { citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, fighter, bomber };
+// ---- Traders ---------------------------------------------------------------------------------------
+
+/** A beast of burden standing at the origin facing +z; returns the height of its back. */
+function beast(k: Kit, o: { coat: string; leg: number; body: [number, number, number]; z?: number; ears?: boolean; horns?: boolean }): number {
+  const z0 = o.z ?? 0;
+  const [bw, bh, bl] = o.body;
+  const LEG = o.leg;
+  const legs: [number, number, number][] = [
+    [-bw * 0.36, bl * 0.34, RIG_LEG_A],
+    [bw * 0.36, bl * 0.34, RIG_LEG_B],
+    [-bw * 0.36, -bl * 0.34, RIG_LEG_B],
+    [bw * 0.36, -bl * 0.34, RIG_LEG_A],
+  ];
+  for (const [x, z, rig] of legs) {
+    const g = k.limb(k.group(0, 0, 0), rig, LEG, z0 + z);
+    k.box(bw * 0.28, LEG - 0.03, bw * 0.32, o.coat, x, 0.03, z0 + z, g);
+    k.box(bw * 0.3, 0.035, bw * 0.34, '#2b2420', x, 0, z0 + z, g);
+  }
+  k.box(bw, bh, bl, o.coat, 0, LEG, z0);
+  const neck = k.box(bw * 0.5, bh * 1.1, bw * 0.55, o.coat, 0, LEG + bh * 0.4, z0 + bl * 0.45);
+  neck.rotation.x = 0.7;
+  const head = k.box(bw * 0.48, bw * 0.45, bl * 0.36, o.coat, 0, LEG + bh * 1.05, z0 + bl * 0.62);
+  head.rotation.x = 0.45;
+  k.box(bw * 0.42, bw * 0.3, bl * 0.12, '#d8cbb4', 0, LEG + bh * 0.95, z0 + bl * 0.78).rotation.x = 0.45;
+  if (o.ears) for (const x of [-0.035, 0.035]) k.box(0.025, 0.12, 0.03, o.coat, x, LEG + bh * 1.35, z0 + bl * 0.55).rotation.z = x * 6;
+  if (o.horns) for (const x of [-1, 1]) {
+    const h = k.cone(0.02, 0.12, 5, '#e8dcc0', x * bw * 0.32, LEG + bh * 1.3, z0 + bl * 0.6);
+    h.rotation.z = -x * 1.1;
+  }
+  // A tail.
+  k.box(0.025, bh * 0.9, 0.025, '#3a2c22', 0, LEG - bh * 0.3, z0 - bl * 0.52).rotation.x = -0.3;
+  return LEG + bh;
+}
+
+/** What a trader carries: bales, jars and baskets on the way out, a chest of gold on the way home. */
+function wares(k: Kit, homeward: boolean, x: number, y: number, z: number, w: number, l: number): void {
+  if (homeward) {
+    const chest = k.group(x, y, z);
+    k.box(w * 0.7, 0.1, l * 0.45, '#6b4426', 0, 0, 0, chest);
+    k.box(w * 0.74, 0.02, l * 0.48, '#c8913f', 0, 0.1, 0, chest);
+    for (const zz of [-l * 0.12, l * 0.12]) k.box(w * 0.74, 0.11, 0.02, '#c8913f', 0, 0, zz, chest);
+    // Coins heaped over the brim catch the light.
+    k.glow(k.blob(Math.max(0.05, w * 0.26), '#f2cf4a', -w * 0.08, 0.13, 0, chest)).scale.set(1, 0.6, 1);
+    k.glow(k.blob(Math.max(0.04, w * 0.2), '#ffd75a', w * 0.14, 0.12, l * 0.05, chest)).scale.set(1, 0.6, 1);
+    return;
+  }
+  // Bales under a cloth in the player's color, a jar and a basket of fruit.
+  k.team(k.box(w * 0.8, 0.11, l * 0.5, TEAM, x, y, z - l * 0.08));
+  k.box(w * 0.82, 0.02, 0.03, '#8a6a46', x, y + 0.09, z - l * 0.08);
+  k.lathe([[0, 0], [0.04, 0.01], [0.055, 0.06], [0.03, 0.12], [0.035, 0.14]], 8, '#b8673a', x - w * 0.22, y + 0.11, z + l * 0.25);
+  k.cyl(0.05, 0.04, 0.05, 7, '#b08a4e', x + w * 0.2, y + 0.11, z + l * 0.25);
+  for (const [dx, c] of [[-0.02, '#e0782e'], [0.025, '#7aa83a'], [0, '#c8402e']] as [number, string][]) k.sphere(0.025, c, x + w * 0.2 + dx, y + 0.17, z + l * 0.25, undefined, 5);
+}
+
+/** A carter walking beside the beast with a stick. */
+function carter(k: Kit, x: number, z: number, outfit: { legs: string; torso: string; hat?: string }): void {
+  const at = k.group(x, 0, z);
+  const b = person(k, { legs: outfit.legs, torso: outfit.torso, belt: TEAM, at });
+  k.team(k.box(0.176, 0.035, 0.116, TEAM, 0, HIP + 0.02, 0, at));
+  if (outfit.hat) k.cyl(0.09, 0.1, 0.035, 8, outfit.hat, 0, 0.55, 0, at);
+  else hairOrHat(k, 0, undefined, at);
+  held(b, (kk, g) => kk.cyl(0.008, 0.008, 0.4, 4, WOOD, 0, -0.05, 0, g), SHOULDER - 0.18, 0.5);
+}
+
+function trader(epoch: number): Kit {
+  const k = new Kit();
+  // Above 10: the same, homeward with gold.
+  const homeward = epoch >= 10;
+  const e = epoch % 10;
+  if (e <= 1) {
+    // Pack donkey: panniers either side, the load on its back, led by a carter.
+    const back = beast(k, { coat: '#8a7d6e', leg: 0.2, body: [0.15, 0.14, 0.36], ears: true });
+    for (const x of [-0.12, 0.12]) {
+      k.box(0.07, 0.13, 0.2, '#9a7a4a', x, back - 0.2, -0.02);
+      k.team(k.box(0.075, 0.03, 0.21, TEAM, x, back - 0.08, -0.02));
+    }
+    wares(k, homeward, 0, back, -0.02, 0.2, 0.3);
+    carter(k, -0.24, 0.16, { legs: SKIN, torso: LINEN });
+    return k;
+  }
+  if (e === 2) {
+    // Ox cart: a yoked ox, a two-wheeled cart behind, the carter with a goad.
+    beast(k, { coat: '#6e5a48', leg: 0.22, body: [0.22, 0.18, 0.4], z: 0.32, horns: true });
+    k.box(0.3, 0.04, 0.05, WOOD, 0, 0.42, 0.52);
+    for (const x of [-0.08, 0.08]) k.box(0.025, 0.025, 0.5, WOOD, x, 0.3, 0.05).rotation.x = -0.12;
+    wheel(k, -0.24, -0.25, 0.17);
+    wheel(k, 0.24, -0.25, 0.17);
+    k.box(0.42, 0.05, 0.5, '#8a6440', 0, 0.22, -0.25);
+    for (const x of [-0.2, 0.2]) k.box(0.03, 0.1, 0.5, '#7a5636', x, 0.27, -0.25);
+    k.box(0.42, 0.1, 0.03, '#7a5636', 0, 0.27, -0.49);
+    wares(k, homeward, 0, 0.27, -0.25, 0.36, 0.45);
+    carter(k, -0.3, 0.42, { legs: '#6b5a48', torso: '#8c7a5a' });
+    return k;
+  }
+  if (e === 3) {
+    // Covered wagon: a draught horse, four wheels, a canvas hood in the player's color, a driver up front.
+    beast(k, { coat: '#8a5a34', leg: 0.27, body: [0.18, 0.17, 0.44], z: 0.48 });
+    for (const x of [-0.07, 0.07]) k.box(0.025, 0.025, 0.4, WOOD, x, 0.3, 0.12).rotation.x = -0.1;
+    for (const z of [0.05, -0.55]) {
+      wheel(k, -0.25, z, 0.15, '#5b4330');
+      wheel(k, 0.25, z, 0.15, '#5b4330');
+    }
+    k.box(0.44, 0.06, 0.78, '#7a5636', 0, 0.2, -0.25);
+    k.box(0.46, 0.12, 0.8, '#8a6440', 0, 0.26, -0.25);
+    // A tailboard behind the hood, where the gold rides home.
+    k.box(0.4, 0.04, 0.18, '#7a5636', 0, 0.3, -0.7);
+    if (homeward) wares(k, true, 0, 0.34, -0.7, 0.36, 0.34);
+    const hood = k.team(k.cyl(0.24, 0.24, 0.62, 10, TEAM, 0, 0.38, -0.28));
+    hood.rotation.x = Math.PI / 2;
+    hood.position.set(0, 0.38, -0.28);
+    hood.scale.set(1, 1, 0.9);
+    for (const z of [-0.02, -0.28, -0.54]) k.ring(0.245, 0.012, '#5b4330', 0.38, k.group(0, 0, z)).rotation.set(0, 0, 0);
+    // The driver on the bench, reins in hand.
+    const seat = k.group(0, 0.3, 0.08);
+    const drv = person(k, { legs: '#5a5f6b', torso: LINEN, at: seat, y: -0.12, mounted: true });
+    k.cyl(0.11, 0.11, 0.015, 10, '#5a4632', 0, 0.42, 0, seat);
+    k.cyl(0.06, 0.07, 0.07, 8, '#5a4632', 0, 0.43, 0, seat);
+    held(drv, (kk, g) => kk.cyl(0.006, 0.006, 0.3, 4, LEATHER, 0, 0, 0, g), SHOULDER - 0.3, 1.2);
+    return k;
+  }
+  // Traction engine: a steam boiler on iron wheels, a tall stack, a canopy in the player's color,
+  // towing a little wagon of crates.
+  wheel(k, -0.26, -0.05, 0.22, '#3f4247');
+  wheel(k, 0.26, -0.05, 0.22, '#3f4247');
+  wheel(k, -0.18, 0.42, 0.12, '#3f4247');
+  wheel(k, 0.18, 0.42, 0.12, '#3f4247');
+  const boiler = k.cyl(0.13, 0.13, 0.6, 12, '#2f5a3a', 0, 0.3, 0.2);
+  boiler.rotation.x = Math.PI / 2;
+  boiler.position.set(0, 0.32, 0.2);
+  for (const z of [0.0, 0.2, 0.4]) {
+    const band = k.cyl(0.135, 0.135, 0.02, 12, '#c8a040', 0, 0.32, z);
+    band.rotation.x = Math.PI / 2;
+    band.position.set(0, 0.32, z);
+  }
+  k.cyl(0.04, 0.05, 0.36, 8, '#26262a', 0, 0.42, 0.42);
+  k.cyl(0.06, 0.04, 0.04, 8, '#26262a', 0, 0.78, 0.42);
+  k.box(0.36, 0.22, 0.2, '#3f4247', 0, 0.16, -0.18);
+  // A little canopy over the footplate only, so the boiler shows.
+  for (const [x, z] of [[-0.16, -0.32], [0.16, -0.32], [-0.16, -0.04], [0.16, -0.04]]) k.box(0.02, 0.4, 0.02, '#3f4247', x, 0.3, z);
+  k.team(k.box(0.4, 0.03, 0.36, TEAM, 0, 0.7, -0.18));
+  // The engineer on the footplate.
+  const plate = k.group(0, 0.14, -0.2);
+  plate.scale.setScalar(0.85);
+  person(k, { legs: '#454952', torso: '#3a3a40', at: plate });
+  k.cyl(0.072, 0.078, 0.035, 10, '#3a3a40', 0, 0.54, 0, plate);
+  // The wagon behind.
+  wheel(k, -0.2, -0.72, 0.1, '#4a3a2c');
+  wheel(k, 0.2, -0.72, 0.1, '#4a3a2c');
+  k.box(0.04, 0.03, 0.22, IRON, 0, 0.12, -0.4);
+  k.box(0.38, 0.05, 0.4, '#7a5636', 0, 0.14, -0.72);
+  if (homeward) wares(k, true, 0, 0.19, -0.72, 0.36, 0.38);
+  else {
+    k.box(0.15, 0.13, 0.15, '#a07a4a', -0.09, 0.19, -0.66);
+    k.box(0.13, 0.11, 0.13, '#8a6440', 0.1, 0.19, -0.78);
+    k.team(k.box(0.17, 0.02, 0.17, TEAM, -0.09, 0.32, -0.66));
+  }
+  return k;
+}
+
+const MAKERS: Record<UnitType, (epoch: number) => Kit> = { citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, fighter, bomber, trader };
 
 
 // ---- Deer ------------------------------------------------------------------------------------------
@@ -806,18 +965,58 @@ export function deerGeometry(): THREE.BufferGeometry {
 
 const cache = new Map<string, THREE.BufferGeometry>();
 
-/** The baked geometry of a unit line in an epoch (team parts left white for tinting). */
-export function unitGeometry(type: UnitType, epoch: number): THREE.BufferGeometry {
-  const key = `${type}:${epoch}`;
+/** How high a unit line's head (or its banner pole) reaches, where a people's mark sits. */
+const MARK_Y: Partial<Record<UnitType, number>> = { infantry: 0.5, ranged: 0.5, priest: 0.5, cavalry: 0.98, siege: 0.8 };
+
+/** A people's mark on its signature line: a crest, plume, headdress or banner, so its army reads at a glance. */
+function signatureMark(k: Kit, civ: CivId, type: UnitType): void {
+  const y = MARK_Y[type] ?? 0.5;
+  // Foot soldiers wear it on the head; siege and riders carry it on a pole behind.
+  const pole = type === 'siege' || type === 'cavalry';
+  const z = pole ? -0.2 : -0.01;
+  const top = pole ? y + 0.3 : y + 0.06;
+  if (pole) k.cyl(0.01, 0.01, 0.34, 4, WOOD, 0, y, z);
+  switch (civ) {
+    case 'egyptians':
+      k.cone(0.07, 0.14, 4, '#e0b13c', 0, top - 0.02, z);
+      k.box(0.16, 0.03, 0.03, '#2f5fa8', 0, top - 0.05, z + 0.06);
+      break;
+    case 'greeks':
+      k.box(0.03, 0.09, 0.18, '#b3282d', 0, top, z);
+      break;
+    case 'romans':
+      k.box(0.2, 0.08, 0.03, '#c0302f', 0, top, z);
+      break;
+    case 'mongols':
+      k.cone(0.045, 0.1, 5, '#22201e', 0, top, z);
+      k.blob(0.045, '#f1ece0', 0, top + 0.08, z);
+      break;
+    case 'chinese':
+      k.box(0.03, 0.14, 0.2, '#d03a2a', 0.0, top - 0.04, z);
+      k.box(0.032, 0.05, 0.08, '#f0c43a', 0.0, top - 0.01, z);
+      break;
+    case 'britons':
+      k.cone(0.03, 0.2, 4, '#f6f4ee', 0, top, z - 0.03).rotation.x = -0.5;
+      break;
+  }
+}
+
+/** The baked geometry of a unit line in an epoch (team parts left white for tinting), with a people's mark when given. */
+export function unitGeometry(type: UnitType, epoch: number, civ?: CivId): THREE.BufferGeometry {
+  const key = `${type}:${epoch}:${civ ?? ''}`;
   let g = cache.get(key);
   if (!g) {
-    g = bake(MAKERS[type](epoch).root);
+    const kit = MAKERS[type](epoch);
+    if (civ) signatureMark(kit, civ, type);
+    g = bake(kit.root);
     cache.set(key, g);
   }
   return g;
 }
 
 /** The same model with the team color baked in (for portraits). */
-export function unitGeometryColored(type: UnitType, epoch: number, color: string): THREE.BufferGeometry {
-  return bake(MAKERS[type](epoch).root, color);
+export function unitGeometryColored(type: UnitType, epoch: number, color: string, civ?: CivId): THREE.BufferGeometry {
+  const kit = MAKERS[type](epoch);
+  if (civ) signatureMark(kit, civ, type);
+  return bake(kit.root, color);
 }

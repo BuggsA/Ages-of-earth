@@ -1,11 +1,14 @@
 import { aiStep } from './ai';
 import { hitAnimal, spawnAnimal, updateAnimals } from './animals';
+import { markGoals, scenarioStep, startScenario } from './campaign';
 import { buildingGuns, updateShots } from './combat';
 import { applyCommand } from './commands';
-import { AURA, CIV_IDS, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
+import { AURA, CIV_IDS, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
 import { AIR, NAVAL, stampBuilding } from './grid';
 import { generateMap } from './mapgen';
 import { Spatial } from './spatial';
+import { updateRelics } from './relics';
+import { atPost } from './trade';
 import { modsOf, statsFor } from './stats';
 import type { Building, CivId, Command, Difficulty, GameMode, GameState, MapSize, MapType, Player } from './types';
 import { RES, R_FISH, R_NONE } from './types';
@@ -41,6 +44,8 @@ export interface GameSetup {
   mode?: GameMode;
   /** Seconds a finished wonder must stand to win. */
   wonderSeconds?: number;
+  /** A campaign scenario's id: adds its goals, raids and gifts. */
+  scenario?: string;
 }
 
 const spatials = new WeakMap<GameState, Spatial>();
@@ -72,6 +77,10 @@ export function createGame(setup: GameSetup): GameState {
     ents: [],
     byId: new Map(),
     animals: [],
+    relics: [],
+    relicTeam: -1,
+    relicTimer: -1,
+    posts: [],
     nextId: 1,
     shots: [],
     rng: setup.seed >>> 0,
@@ -82,7 +91,9 @@ export function createGame(setup: GameSetup): GameState {
     events: [],
     winner: -1,
     over: false,
+    scenario: null,
   };
+  if (setup.scenario) startScenario(s, setup.scenario);
   setup.players.forEach((ps, i) => {
     const start = map.starts[i];
     const extra = EPOCH_START_RES[startEpoch];
@@ -102,7 +113,7 @@ export function createGame(setup: GameSetup): GameState {
       vis: new Uint8Array(n),
       seen: new Uint8Array(n),
       defeated: false,
-      stats: { gathered: 0, trained: 0, kills: 0, losses: 0, built: 0, razed: 0, converted: 0, techs: 0 },
+      stats: { gathered: 0, trained: 0, kills: 0, losses: 0, built: 0, razed: 0, converted: 0, techs: 0, traded: 0 },
       history: [],
       startX: start.x,
       startY: start.y,
@@ -136,6 +147,8 @@ export function createGame(setup: GameSetup): GameState {
     }
   }
   for (const d of map.deer) spawnAnimal(s, d.x, d.y);
+  for (const r of map.relics) s.relics.push({ id: s.nextId++, x: r.x, y: r.y, carrier: 0, temple: 0 });
+  for (const t of map.posts) s.posts.push({ id: s.nextId++, x: t.x, y: t.y });
   countPop(s);
   updateVision(s);
   // Everyone knows the lie of the land around home.
@@ -235,7 +248,10 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
   s.events.push({ k: 'trained', id: u.id, owner: p.id, type: unit });
   const fishing = (t: number) => u.type === 'fisher' && t >= 0 && s.res[t] === R_FISH;
   const working = (t: number) => u.type === 'citizen' && t >= 0 && s.res[t] !== R_NONE && s.res[t] !== R_FISH;
-  if (b.rally) {
+  // A rally point on a trading post puts new traders straight on the road.
+  const post = u.type === 'trader' && b.rally ? s.posts.find((t) => atPost(t, b.rally!.x, b.rally!.y)) : undefined;
+  if (post) setOrder(u, { k: 'trade', post: post.id, market: b.type === 'market' ? b.id : 0, phase: 'go' });
+  else if (b.rally) {
     const t = b.rally.tile;
     if (working(t) || fishing(t)) setOrder(u, { k: 'gather', tile: t, res: RES_OF_TILE[s.res[t]], phase: 'go' });
     else setOrder(u, { k: 'move', x: b.rally.x, y: b.rally.y, amove: false, started: false });
@@ -303,6 +319,14 @@ function checkVictory(s: GameState): void {
       return;
     }
   }
+  // So does keeping every relic for as long.
+  if (s.relicTeam >= 0 && s.relicTimer === 0) {
+    s.over = true;
+    s.winner = s.relicTeam;
+    for (const p of s.players) if (p.team !== s.winner) p.defeated = true;
+    s.events.push({ k: 'over', winner: s.winner, how: 'relics' });
+    return;
+  }
   for (const p of s.players) {
     if (p.defeated) continue;
     // Regicide: a people whose King has fallen is lost.
@@ -332,6 +356,8 @@ function checkVictory(s: GameState): void {
 export function scoreOf(s: GameState, p: Player): number {
   let wonder = 0;
   for (const e of s.ents) if (e.kind === 'building' && e.owner === p.id && e.type === 'wonder' && e.built) wonder += 500;
+  // Each relic kept in a Temple.
+  for (const r of s.relics) if (r.temple && s.byId.get(r.temple)?.owner === p.id) wonder += RELIC.score;
   return Math.round(p.stats.gathered / 10 + p.stats.kills * 8 + p.stats.razed * 15 + p.stats.converted * 10 + p.stats.techs * 25 + p.epoch * 150 + p.stats.built * 3 + wonder);
 }
 
@@ -345,6 +371,15 @@ function sample(s: GameState): void {
 }
 
 /** Advance the match one tick, applying the commands given for it first. */
+/** Prices drift back toward where they started (integers only, so it stays deterministic). */
+function driftMarket(s: GameState): void {
+  for (const r of ['food', 'wood', 'stone'] as const) {
+    const home = MARKET.start[r];
+    const d = home - s.market[r];
+    s.market[r] += d > 0 ? Math.min(d, MARKET.recover) : -Math.min(-d, MARKET.recover);
+  }
+}
+
 export function step(s: GameState, cmds: readonly Command[] = []): void {
   s.events = [];
   if (s.over) return;
@@ -373,9 +408,18 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   }
   carryCargo(s);
   updateShots(s, sp, (a, damage, x, y) => hitAnimal(s, a, damage, x, y));
+  updateRelics(s);
   removeDead(s);
   if (s.tick % 4 === 0) updateVision(s);
-  if (s.tick % 20 === 0) checkVictory(s);
+  if (s.tick % 20 === 0) {
+    scenarioStep(s);
+    if (!s.over) checkVictory(s);
+    if (s.scenario && s.over && !s.scenario.result) {
+      markGoals(s);
+      s.scenario.result = s.winner === s.players[0].team ? 'win' : 'lose';
+    }
+  }
+  if (s.tick > 0 && s.tick % secs(MARKET.every) === 0) driftMarket(s);
   if (s.tick % secs(30) === 0) sample(s);
   s.tick++;
 }
@@ -404,6 +448,12 @@ export function checksum(s: GameState): number {
   for (const a of s.animals) {
     mix(a.x);
     mix(a.y);
+  }
+  for (const r of s.relics) {
+    mix(r.x);
+    mix(r.y);
+    mix(r.carrier);
+    mix(r.temple);
   }
   for (const p of s.players) for (const r of RES) mix(p.res[r]);
   for (const sh of s.shots) mix(sh.t);

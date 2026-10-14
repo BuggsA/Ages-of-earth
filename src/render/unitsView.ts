@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { TICK_HZ, domainOf, unitStats } from '../sim/data';
-import type { GameState, Unit, UnitType } from '../sim/types';
+import { rankOf } from '../sim/combat';
+import { SIGNATURES, TICK_HZ, domainOf, unitStats } from '../sim/data';
+import type { CivId, GameState, Unit, UnitType } from '../sim/types';
 import { unitMaterial } from './materials';
 import { heightAt } from './terrain';
 import { deerGeometry, unitGeometry } from './unitModels';
@@ -36,6 +37,7 @@ interface Corpse {
   type: UnitType;
   mounted: boolean;
   epoch: number;
+  civ?: CivId;
   color: THREE.Color;
   x: number;
   y: number;
@@ -87,6 +89,33 @@ class Batch {
   }
 }
 
+/** Gold chevrons stacked one per rank, flat and unlit, facing +Z (turned toward the camera when drawn). */
+function chevronGeometry(rank: number): THREE.BufferGeometry {
+  const pos: number[] = [];
+  const col: number[] = [];
+  const gold = new THREE.Color('#ffd24d');
+  const w = 0.2;
+  const h = 0.1;
+  const t = 0.06;
+  for (let r = 0; r < rank; r++) {
+    const y = r * 0.14;
+    const quad = (a: number[], b: number[], c: number[], d: number[]) => {
+      for (const v of [a, b, c, a, c, d]) {
+        pos.push(v[0], v[1] + y, 0);
+        col.push(gold.r, gold.g, gold.b);
+      }
+    };
+    quad([-w, 0], [0, -h], [0, -h + t], [-w, t]);
+    quad([0, -h], [w, 0], [w, t], [0, -h + t]);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  return g;
+}
+
+const chevronMaterial = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+
 export interface ScreenUnit {
   id: number;
   sx: number;
@@ -97,6 +126,15 @@ export interface ScreenUnit {
 export class UnitsView {
   readonly group = new THREE.Group();
   private batches = new Map<string, Batch>();
+  /** Rank chevrons over veterans, one instanced mesh per rank (index 0 is rank 1). */
+  private chevrons: THREE.InstancedMesh[] = [1, 2, 3].map((r) => {
+    const m = new THREE.InstancedMesh(chevronGeometry(r), chevronMaterial, 64);
+    m.frustumCulled = false;
+    m.count = 0;
+    this.group.add(m);
+    return m;
+  });
+  private chevronCount = [0, 0, 0];
   private anims = new Map<number, Anim>();
   private corpses: Corpse[] = [];
   private m = new THREE.Matrix4();
@@ -119,21 +157,21 @@ export class UnitsView {
     this.colors = colors.map((c) => new THREE.Color(c));
   }
 
-  private batch(type: UnitType, epoch: number): Batch {
-    const key = `${type}:${epoch}`;
+  private batch(type: UnitType, epoch: number, civ?: CivId): Batch {
+    const key = `${type}:${epoch}:${civ ?? ''}`;
     let b = this.batches.get(key);
     if (!b) {
-      b = new Batch(unitGeometry(type, epoch), 64, this.group);
+      b = new Batch(unitGeometry(type, epoch, civ), 64, this.group);
       this.batches.set(key, b);
     }
     return b;
   }
 
   /** A unit died: it falls where it stood. */
-  fall(type: UnitType, epoch: number, owner: number, x: number, y: number, fx: number, fy: number, id: number): void {
+  fall(type: UnitType, epoch: number, owner: number, x: number, y: number, fx: number, fy: number, id: number, civ?: CivId): void {
     const a = this.anims.get(id);
     this.anims.delete(id);
-    this.corpses.push({ type, epoch, mounted: !!unitStats(type, epoch).mounted, color: this.colors[owner] ?? new THREE.Color('#ffffff'), x, y, yaw: a ? a.yaw : Math.atan2(fx, fy), age: 0, side: id % 2 ? 1 : -1 });
+    this.corpses.push({ type, epoch, civ, mounted: !!unitStats(type, epoch).mounted, color: this.colors[owner] ?? new THREE.Color('#ffffff'), x, y, yaw: a ? a.yaw : Math.atan2(fx, fy), age: 0, side: id % 2 ? 1 : -1 });
     if (this.corpses.length > 160) this.corpses.shift();
   }
 
@@ -209,6 +247,7 @@ export class UnitsView {
   ): void {
     this.animals(s, alpha, dt, time, sees, camera, width, height);
     for (const b of this.batches.values()) b.count = 0;
+    this.chevronCount = [0, 0, 0];
     this.screen.length = 0;
     this.drawn.clear();
     const ticks = s.tick - 1 + alpha;
@@ -220,16 +259,16 @@ export class UnitsView {
       // Those sheltering inside a building aren't drawn.
       if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !visible(e)) continue;
       show.push(e);
-      const key = `${e.type}:${s.players[e.owner].epoch}`;
+      const key = `${e.type}:${modelEpoch(e, s.players[e.owner].epoch)}:${markOf(s, e.type, e.owner) ?? ''}`;
       need.set(key, (need.get(key) ?? 0) + 1);
     }
     for (const c of this.corpses) {
-      const key = `${c.type}:${c.epoch}`;
+      const key = `${c.type}:${c.epoch}:${c.civ ?? ''}`;
       need.set(key, (need.get(key) ?? 0) + 1);
     }
     for (const [key, n] of need) {
-      const [type, epoch] = key.split(':');
-      this.batch(type as UnitType, Number(epoch)).reserve(n);
+      const [type, epoch, civ] = key.split(':');
+      this.batch(type as UnitType, Number(epoch), (civ || undefined) as CivId | undefined).reserve(n);
     }
 
     const seen = new Set<number>();
@@ -353,7 +392,7 @@ export class UnitsView {
         bob = 0;
         lift = 0;
       }
-      const b = this.batch(u.type, epoch);
+      const b = this.batch(u.type, modelEpoch(u, epoch), markOf(s, u.type, u.owner));
       const i = b.count++;
       this.e.set(pitch, yaw, roll);
       this.q.setFromEuler(this.e);
@@ -364,6 +403,25 @@ export class UnitsView {
       b.mesh.setColorAt(i, this.colors[u.owner]);
       b.anim.setXYZ(i, leg, arm, bob);
       this.drawn.set(u.id, new THREE.Vector3(dx, gy, dz));
+
+      // Veterans wear their rank above the head.
+      const rank = u.type === 'citizen' ? 0 : rankOf(u);
+      if (rank > 0 && dom !== 'water') {
+        const ci = this.chevronCount[rank - 1]++;
+        let cm = this.chevrons[rank - 1];
+        if (ci >= cm.instanceMatrix.count) {
+          const bigger = new THREE.InstancedMesh(cm.geometry, chevronMaterial, cm.instanceMatrix.count * 2);
+          bigger.frustumCulled = false;
+          this.group.remove(cm);
+          this.group.add(bigger);
+          this.chevrons[rank - 1] = cm = bigger;
+        }
+        this.e.set(0, Math.atan2(camera.position.x - dx, camera.position.z - dz), 0);
+        this.q.setFromEuler(this.e);
+        this.p.set(dx, gy + (dom === 'air' ? 0.9 : mounted ? 1.75 : 1.5), dz);
+        this.m.compose(this.p, this.q, this.sc.set(1, 1, 1));
+        cm.setMatrixAt(ci, this.m);
+      }
 
       // Where it lands on screen, for picking.
       this.v.set(dx, gy + lift, dz).project(camera);
@@ -384,7 +442,7 @@ export class UnitsView {
       const fall = Math.min(1, c.age / 0.45);
       const ease = fall * fall;
       const sink = c.age > 7 ? (c.age - 7) * 0.2 : 0;
-      const b = this.batch(c.type, c.epoch);
+      const b = this.batch(c.type, c.epoch, c.civ);
       const i = b.count++;
       const dom = domainOf(c.type);
       if (dom === 'water') {
@@ -413,6 +471,10 @@ export class UnitsView {
     }
     this.corpses = keep;
 
+    this.chevrons.forEach((cm, i) => {
+      cm.count = this.chevronCount[i];
+      cm.instanceMatrix.needsUpdate = true;
+    });
     for (const b of this.batches.values()) {
       b.mesh.count = b.count;
       b.mesh.instanceMatrix.needsUpdate = true;
@@ -420,4 +482,15 @@ export class UnitsView {
       b.anim.needsUpdate = true;
     }
   }
+}
+
+/** Which model to draw: a trader heading home with gold has its own (the epoch plus 10). */
+/** The people whose mark a unit wears: only a signature line carries one. */
+function markOf(s: GameState, type: UnitType, owner: number): CivId | undefined {
+  const civ = s.players[owner].civ;
+  return SIGNATURES[civ].type === type ? civ : undefined;
+}
+
+function modelEpoch(u: Unit, epoch: number): number {
+  return u.type === 'trader' && u.carry > 0 ? epoch + 10 : epoch;
 }

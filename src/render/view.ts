@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { SoundName } from '../audio/sound';
-import { AURA, BUILDINGS, TICK_HZ, domainOf } from '../sim/data';
+import { AURA, BUILDINGS, SIGNATURES, TICK_HZ, TRADE, domainOf } from '../sim/data';
 import { buildingMaxHp, statsFor } from '../sim/stats';
 import type { BuildingType, Ent, GameEvent, GameState, Unit } from '../sim/types';
 import { R_GOLD, R_STONE } from '../sim/types';
@@ -11,6 +11,8 @@ import { Birds, Effects } from './effects';
 import { fogUniforms, timeUniform } from './materials';
 import { Overlays, type BarSpec, type RingSpec } from './overlays';
 import { Post, QUALITY, loadQuality, saveQuality, type QualityName } from './post';
+import { RelicsView } from './relicsView';
+import { PostsView } from './postsView';
 import { ResourcesView } from './resourcesView';
 import { Sky } from './sky';
 import { FogTexture, TerrainView, heightAt } from './terrain';
@@ -38,6 +40,8 @@ export type Pick =
   | { kind: 'unit'; id: number }
   | { kind: 'building'; id: number }
   | { kind: 'animal'; id: number }
+  | { kind: 'relic'; id: number }
+  | { kind: 'post'; id: number }
   | { kind: 'resource'; tile: number }
   | { kind: 'ground'; x: number; y: number };
 
@@ -64,6 +68,10 @@ export class View {
   private resources = new ResourcesView();
   private buildings = new BuildingsView();
   private units = new UnitsView();
+  private relics = new RelicsView();
+  private posts = new PostsView();
+  /** When ground relics next sparkle. */
+  private relicGlint = 0;
   private overlays = new Overlays();
   private effects: Effects;
   private birds = new Birds();
@@ -102,7 +110,7 @@ export class View {
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sky.mesh, this.hemi, this.fill, this.sun, this.sun.target);
-    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.overlays.group, this.effects.group, this.birds.mesh);
+    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.overlays.group, this.effects.group, this.birds.mesh);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.post = new Post(this.renderer, this.scene, this.rig.camera);
     this.applyQuality();
@@ -163,6 +171,8 @@ export class View {
     this.units.clear();
     this.buildings.clear();
     this.resources.clear();
+    this.relics.clear();
+    this.posts.clear();
     const colors = s.players.map((p) => p.color);
     this.units.setColors(colors);
     this.buildings.setColors(colors);
@@ -234,6 +244,22 @@ export class View {
     this.resources.update(s, dt);
     this.buildings.update(s, this.viewer, (b) => this.reveal || seesRect(s, this.viewer, b.tx, b.ty, b.size), dt, this.reveal);
     this.units.update(s, alpha, dt, this.time, this.visibleUnit, this.rig.camera, this.width, this.height, (x, y) => this.sees(x, y));
+    this.relics.update(
+      s,
+      this.time,
+      this.rig.camera,
+      this.width,
+      this.height,
+      (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1,
+      (id) => this.units.drawn.get(id) ?? null,
+      (id) => {
+        const b = s.byId.get(id);
+        if (!b || b.kind !== 'building' || !(b.owner === this.viewer || this.reveal || seesRect(s, this.viewer, b.tx, b.ty, b.size))) return null;
+        return this.buildings.topOf(id);
+      },
+    );
+    this.glintRelics();
+    this.posts.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1);
     this.overlays.setShots(s, alpha, (x, y) => this.sees(x, y));
     this.drawSelection(s, sel);
     this.ambient(s, dt);
@@ -350,6 +376,24 @@ export class View {
         this.effects.burst(at, { count: 1, speed: 0.12, up: 1, life: 3, size: 0.06, grow: 4, gravity: -0.12, drag: 0.3, soft: true, colors: ['#c9c6c2', '#e2dfdb'] });
         this.chimneys.set(e.id, this.time + 0.9 + Math.random() * 0.8);
       } else this.chimneys.set(e.id, this.time + 2);
+    }
+  }
+
+  /** Relics lying in sight give off a slow glitter of gold, so they can be spotted from afar. */
+  private glintRelics(): void {
+    if (this.time < this.relicGlint) return;
+    this.relicGlint = this.time + 0.35;
+    for (const at of this.relics.onGround) {
+      if (!this.sees(at.x, at.z)) continue;
+      this.effects.burst(new THREE.Vector3(at.x + (Math.random() - 0.5) * 0.4, at.y + 0.5 + Math.random() * 0.3, at.z + (Math.random() - 0.5) * 0.4), {
+        count: 2,
+        speed: 0.25,
+        up: 1,
+        life: 1.6,
+        size: 0.045,
+        gravity: -0.5,
+        colors: ['#ffd166', '#fff3c4'],
+      });
     }
   }
 
@@ -509,12 +553,35 @@ export class View {
         case 'trade':
           if (ev.owner === this.viewer) this.onCue?.('coin', 0, 1);
           break;
+        case 'caravan': {
+          if (ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;
+          const at = this.ground(s, ev.x, ev.y, 0.4);
+          if (ev.what === 'paid') {
+            this.effects.burst(at.clone().setY(at.y + 1.2), { count: 18, speed: 1.2, up: 1.2, life: 1.2, size: 0.05, gravity: 2.2, colors: ['#ffd166', '#f2cf4a', '#fff3c4'] });
+            if (ev.owner === this.viewer) this.cue('tradePaid', ev.x, ev.y, 1);
+          } else this.cue('tradeLoad', ev.x, ev.y, 0.7);
+          break;
+        }
+        case 'relic': {
+          if (ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;
+          const at = this.ground(s, ev.x, ev.y, 0.2);
+          if (ev.what === 'kept') {
+            this.effects.ring(at, '#ffd166', 3.5, 1.6);
+            this.effects.burst(at.clone().setY(at.y + 2.4), { count: 40, speed: 1.6, up: 1, life: 2, size: 0.06, gravity: -0.3, colors: ['#ffd166', '#fff3c4', '#ffffff'] });
+            this.cue('relicKeep', ev.x, ev.y, 1);
+          } else {
+            this.effects.ring(at, '#fff3c4', 1, 0.8);
+            this.effects.burst(at.clone().setY(at.y + 0.6), { count: 14, speed: 0.8, up: 1, life: 1.2, size: 0.045, gravity: -0.6, colors: ['#ffd166', '#fff3c4'] });
+            if (ev.what === 'taken') this.cue('relicTake', ev.x, ev.y, 0.8);
+          }
+          break;
+        }
         case 'die': {
           if (!ev.building) {
             if (!this.sees(ev.x, ev.y) && ev.owner !== this.viewer) break;
             const type = ev.type as Unit['type'];
             const drawnAt = this.units.drawn.get(ev.id);
-            this.units.fall(type, ev.epoch, ev.owner, ev.x, ev.y, ev.fx, ev.fy, ev.id);
+            this.units.fall(type, ev.epoch, ev.owner, ev.x, ev.y, ev.fx, ev.fy, ev.id, SIGNATURES[s.players[ev.owner].civ].type === type ? s.players[ev.owner].civ : undefined);
             const dom = domainOf(type);
             if (dom === 'water') {
               // A ship breaks up: spray, splinters, a slick of smoke.
@@ -628,6 +695,11 @@ export class View {
         case 'deliver':
           if (ev.owner === this.viewer) this.resources.markDirty();
           break;
+        case 'rank':
+          this.cue('rankUp', ev.x, ev.y, 0.5);
+          this.effects.burst(this.ground(s, ev.x, ev.y, 1.2), { count: 6, speed: 0.5, up: 1, life: 0.9, size: 0.05, gravity: -0.5, colors: ['#fff3c4', '#ffd24d'] });
+          if (ev.owner === this.viewer) this.onPing?.(ev.x, ev.y, '#ffd24d');
+          break;
         case 'alert':
           if (ev.owner === this.viewer) this.onPing?.(ev.x, ev.y, '#ff4d4d');
           break;
@@ -733,6 +805,14 @@ export class View {
       }
     }
     if (best !== null) return { kind: 'animal', id: best };
+    for (const r of this.relics.screen) {
+      const d = Math.hypot(r.sx - px, r.sy - py);
+      if (d < r.r * 1.3 && d < bestD) {
+        bestD = d;
+        best = r.id;
+      }
+    }
+    if (best !== null) return { kind: 'relic', id: best };
     this.raycaster.setFromCamera(this.ndc(clientX, clientY), this.rig.camera);
     const hits = this.raycaster.intersectObjects([...this.buildings.pickables(), ...this.resources.pickables()], true);
     for (const h of hits) {
@@ -749,6 +829,10 @@ export class View {
     const ty = Math.floor(g.y);
     if (tx >= 0 && ty >= 0 && tx < s.w && ty < s.h) {
       const tile = ty * s.w + tx;
+      // A trading post's plaza, once seen.
+      for (const post of s.posts) {
+        if (Math.abs(g.x - post.x) <= TRADE.plaza + 0.6 && Math.abs(g.y - post.y) <= TRADE.plaza + 0.6 && (this.reveal || s.players[this.viewer].seen[tile])) return { kind: 'post', id: post.id };
+      }
       if (s.res[tile] && s.players[this.viewer].seen[tile]) return { kind: 'resource', tile };
       const b = s.bldAt[tile];
       if (b && this.buildings.known.has(b)) return { kind: 'building', id: b };

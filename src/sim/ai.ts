@@ -1,11 +1,14 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AI_LEVELS, BUILDINGS, COUNTER, EPOCHS, LAST_EPOCH, MARKET, POP_MAX, TECHS, secs, unitEpoch, unitStats } from './data';
+import { AI_LEVELS, BUILDINGS, COUNTER, EPOCHS, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, TECHS, secs, unitEpoch, unitStats } from './data';
 import { NAVAL, distToRect, placeProblem, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem } from './stats';
 import type { AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Player, Res, TechId, Unit, UnitType } from './types';
 import { RES, R_BERRY, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
-import { findResource, freeFarm } from './units';
+import { carriedBy } from './relics';
+import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple } from './units';
+import { nearestMarket } from './trade';
 import { isEnemy } from './world';
+import { progress, scenarioById } from './campaign';
 
 /**
  * The computer opponent. It plays by the same rules and through the same commands as a person: it
@@ -53,7 +56,7 @@ const TILE_OF: Record<Res, number> = { food: R_BERRY, wood: R_TREE, stone: R_STO
 const TECH_ORDER: TechId[] = [
   'plow', 'axes', 'wheelbarrow', 'picks', 'forging', 'scaleArmor', 'fletching', 'husbandry', 'irrigation', 'saws', 'shafts', 'handcart',
   'ironCasting', 'chainMail', 'bodkin', 'masonry', 'theology', 'conscription', 'blastFurnace', 'plateArmor', 'chemistry',
-  'gillnets', 'shipwright', 'steamEngine', 'rifling', 'aviation',
+  'gillnets', 'shipwright', 'steamEngine', 'rifling', 'aviation', 'caravan', 'banking', 'pilgrimage',
 ];
 const ECONOMY: TechId[] = ['plow', 'axes', 'wheelbarrow', 'picks', 'irrigation', 'saws', 'shafts', 'handcart', 'gillnets', 'steamEngine'];
 
@@ -72,6 +75,7 @@ interface View {
   citizens: Unit[];
   army: Unit[];
   priests: Unit[];
+  traders: Unit[];
   fishers: Unit[];
   /** Warships and transports. */
   navy: Unit[];
@@ -81,6 +85,8 @@ interface View {
   tc: Building | null;
   /** Spendable after setting aside what the next epoch costs. */
   budget: Record<Res, number>;
+  /** What a campaign chapter's goals ask of the army (only for the chapter's own seat). */
+  plan: Plan;
 }
 
 function afford(v: View, cost: Cost): boolean {
@@ -96,6 +102,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   const citizens: Unit[] = [];
   const army: Unit[] = [];
   const priests: Unit[] = [];
+  const traders: Unit[] = [];
   const fishers: Unit[] = [];
   const navy: Unit[] = [];
   const planes: Unit[] = [];
@@ -106,7 +113,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
     if (e.kind === 'unit' && s.kings[p.id] === e.id) king = e;
     else if (e.kind === 'unit') {
       const list =
-        e.type === 'citizen' ? citizens : e.type === 'priest' ? priests : e.type === 'fisher' ? fishers : e.type === 'warship' || e.type === 'transport' ? navy : e.type === 'fighter' || e.type === 'bomber' ? planes : army;
+        e.type === 'citizen' ? citizens : e.type === 'priest' ? priests : e.type === 'trader' ? traders : e.type === 'fisher' ? fishers : e.type === 'warship' || e.type === 'transport' ? navy : e.type === 'fighter' || e.type === 'bomber' ? planes : army;
       list.push(e);
     } else buildings.push(e);
   }
@@ -114,7 +121,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   // A King stays out of harm's way, sheltered in the Town Center.
   if (king && tc && !king.inside && king.order.k !== 'garrison') applyCommand(s, { t: 'garrison', p: p.id, ids: [king.id], target: tc.id });
   const home = tc ? { x: tc.x, y: tc.y } : { x: p.startX, y: p.startY };
-  const v: View = { p, citizens, army, priests, fishers, navy, planes, buildings, home, tc, budget: { ...p.res } };
+  const v: View = { p, citizens, army, priests, traders, fishers, navy, planes, buildings, home, tc, budget: { ...p.res }, plan: NO_PLAN };
   const issue = (c: Command) => applyCommand(s, c);
 
   // People first: a growing town pays for everything else.
@@ -129,11 +136,17 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
     }
   }
 
+  // Traders pay for themselves: they come before the epoch's savings and the army.
+  merchants(s, v, issue);
+
+  // In a campaign chapter, its goals come before the epoch's savings.
+  v.plan = chapterGoals(s, v, mem, issue);
+
   // Epochs: once there are enough people, set the cost aside (so the army doesn't eat it) and advance;
   // but when an attack is due and the army is short of it, soldiers come first.
   const waveSize = L.wave + mem.wave * L.waveGrowth;
   const armyFirst = s.tick > secs(L.firstAttack - 150) && army.length < waveSize && !mem.attacking;
-  const wantEpoch = p.epoch < LAST_EPOCH && !advancing && !armyFirst && citizens.length >= ADVANCE_AT[p.epoch] && s.tick > secs(150 + p.epoch * 150);
+  const wantEpoch = p.epoch < Math.min(LAST_EPOCH, v.plan.maxEpoch) && !advancing && !armyFirst && citizens.length >= ADVANCE_AT[p.epoch] && s.tick > secs(150 + p.epoch * 150);
   if (wantEpoch) {
     const cost = EPOCHS[p.epoch + 1].cost;
     if (tc && tc.queue.length === 0 && afford(v, cost)) issue({ t: 'advance', p: p.id, building: tc.id });
@@ -168,6 +181,8 @@ function research(s: GameState, v: View, peopleEnough: boolean, issue: (c: Comma
   const order = L.clever ? TECH_ORDER : ECONOMY;
   for (const tech of order) {
     if (techProblem(s, p.id, tech)) continue;
+    // Trade technologies only pay with traders on the road.
+    if (TECHS[tech].at === 'market' && v.traders.length < 3) continue;
     const at = v.buildings.find((b) => b.type === TECHS[tech].at && b.built && b.queue.length === 0 && b.advance < 0);
     if (!at) continue;
     // The Town Center trains citizens first.
@@ -185,15 +200,17 @@ function research(s: GameState, v: View, peopleEnough: boolean, issue: (c: Comma
 function trade(s: GameState, v: View, issue: (c: Command) => void): void {
   const { p } = v;
   if (!AI_LEVELS[p.ai!].clever || !v.buildings.some((b) => b.type === 'market' && b.built)) return;
-  // Sell what piles up for gold; buy what is short when gold piles up.
+  // Sell what piles up for gold; buy what is short when gold piles up. On a chapter's clock, a smaller pile is worth selling.
+  const pile = v.plan.wave ? 600 : 1500;
   for (const r of ['food', 'wood', 'stone'] as const) {
-    if (p.res[r] > 1500 && p.res.gold < 400 && s.market[r] > MARKET.min + 10) {
+    if (p.res[r] > pile && p.res.gold < 400 && s.market[r] > MARKET.min + 10) {
       issue({ t: 'trade', p: p.id, res: r, buy: false });
       return;
     }
   }
+  const rich = v.plan.wave ? 500 : 1200;
   for (const r of ['food', 'wood'] as const) {
-    if (p.res[r] < 100 && p.res.gold > 1200 && s.market[r] < 250) {
+    if (p.res[r] < 100 && p.res.gold > rich && s.market[r] < 250) {
       issue({ t: 'trade', p: p.id, res: r, buy: true });
       return;
     }
@@ -388,6 +405,14 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   const n = v.citizens.length;
   const clever = L.clever;
 
+  // Trading posts make a Market worth saving for: set its wood aside so soldiers don't eat it.
+  if (s.posts.length && p.epoch >= 2 && n >= 18 && count(v, 'market') === 0 && !recently('market', 25)) {
+    const cost = buildingCostFor(s, p.id, 'market');
+    const spot = afford(v, cost) ? findSpot(s, 'market', home.x, home.y, 6, 18) : null;
+    if (spot && construct(s, v, mem, 'market', spot, 3, issue)) return;
+    spend(v, cost);
+  }
+
   // A dock, where there is fish and water to sail near home.
   if (n >= 9 && count(v, 'dock') === 0 && !recently('dock', 40) && s.tick - (mem.dockless ?? -99999) > secs(120)) {
     const spot = findDockSpot(s, home.x, home.y, 24);
@@ -400,6 +425,8 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     ['range', n >= 12 && count(v, 'range') === 0],
     ['stable', p.epoch >= 1 && n >= 14 && count(v, 'stable') === 0],
     ['forge', p.epoch >= 1 && n >= 16 && count(v, 'forge') === 0],
+    // Relics lying loose are worth a Temple early.
+    ['temple', clever && p.epoch >= 1 && n >= 16 && count(v, 'temple') === 0 && looseRelics(s) > 0],
     ['tower', p.epoch >= 1 && count(v, 'tower') < L.towers && n >= 16],
     ['market', clever && p.epoch >= 1 && n >= 20 && count(v, 'market') === 0],
     ['workshop', clever && p.epoch >= 2 && n >= 20 && count(v, 'workshop') === 0],
@@ -599,7 +626,8 @@ function enemyHome(s: GameState, p: Player): { x: number; y: number } {
     const dx = e.x - p.startX;
     const dy = e.y - p.startY;
     const shelter = s.mode === 'regicide' && e.garrison.some((id) => s.kings.includes(id));
-    const d = dx * dx + dy * dy + (e.type === 'wonder' ? -1e6 : shelter ? -5e5 : e.type === 'towncenter' ? 0 : e.type === 'wall' || e.type === 'gate' ? 1e5 : 400);
+    const shrine = e.type === 'temple' && relicRace(s, p) && s.relics.some((r) => r.temple === e.id);
+    const d = dx * dx + dy * dy + (e.type === 'wonder' || shrine ? -1e6 : shelter ? -5e5 : e.type === 'towncenter' ? 0 : e.type === 'wall' || e.type === 'gate' ? 1e5 : 400);
     if (d < bestD) {
       bestD = d;
       best = { x: e.x, y: e.y };
@@ -636,6 +664,7 @@ function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   }
   // Warships: once the Bronze Age opens them, if the enemy has boats or the map is mostly sea.
   if (!L.clever || p.epoch < 1) return;
+  seaLanding(s, v, mem, dock, issue);
   const enemyShips = s.ents.filter((e): e is Unit => e.kind === 'unit' && e.hp > 0 && isEnemy(s, p.id, e.owner) && (e.type === 'warship' || e.type === 'fisher' || e.type === 'transport') && p.vis[Math.floor(e.y) * s.w + Math.floor(e.x)] === 1);
   const warships = v.navy.filter((u) => u.type === 'warship');
   const wantShips = s.mapType === 'sea' ? Math.min(2 + p.epoch, 6) : enemyShips.length ? Math.min(2 + Math.floor(enemyShips.length / 2), 5) : 0;
@@ -655,6 +684,65 @@ function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
     const far = idle.filter((u) => (u.x - dock.x) * (u.x - dock.x) + (u.y - dock.y) * (u.y - dock.y) > 100);
     if (far.length) issue({ t: 'move', p: p.id, ids: far.map((u) => u.id), x: dock.x, y: dock.y });
   }
+}
+
+/**
+ * On a map with a great sea, a transport carries part of the army straight across it and puts
+ * them ashore by the enemy's town, while the rest waits at home for the next wave.
+ */
+function seaLanding(s: GameState, v: View, mem: AiMemory, dock: Building, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (s.mapType !== 'sea') return;
+  const enemy = enemyHome(s, p);
+  const queued = dock.queue.filter((q) => q.unit === 'transport').length;
+  const ships = v.navy.filter((u) => u.type === 'transport');
+  const lz = mem.landing;
+  if (lz) {
+    const ship = s.byId.get(lz.ship);
+    if (!ship || ship.kind !== 'unit' || ship.hp <= 0) {
+      mem.landing = undefined;
+      return;
+    }
+    const riders = lz.ids.map((id) => s.byId.get(id)).filter((u): u is Unit => !!u && u.kind === 'unit' && u.hp > 0);
+    if (lz.phase === 'load') {
+      const aboard = ship.cargo.length;
+      if (aboard >= riders.length || s.tick - lz.since > secs(45)) {
+        if (aboard >= 3) {
+          issue({ t: 'unload', p: p.id, ids: [ship.id], x: enemy.x, y: enemy.y });
+          lz.phase = 'sail';
+          lz.since = s.tick;
+        } else mem.landing = undefined;
+      }
+    } else if (ship.cargo.length === 0) {
+      // Ashore: on to the town.
+      const ashore = riders.filter((u) => !u.inside);
+      if (ashore.length) issue({ t: 'move', p: p.id, ids: ashore.map((u) => u.id), x: enemy.x, y: enemy.y, amove: true });
+      mem.landing = undefined;
+      mem.landed = s.tick;
+    } else if (s.tick - lz.since > secs(150)) mem.landing = undefined;
+    return;
+  }
+  // A transport, once there is an army worth halving.
+  if (!ships.length && !queued && v.army.length >= 8 && dock.queue.length < 2 && unitEpoch('transport') <= p.epoch) {
+    const cost = unitStats('transport', p.epoch).cost;
+    if (afford(v, cost)) {
+      issue({ t: 'train', p: p.id, building: dock.id, unit: 'transport' });
+      spend(v, cost);
+    }
+  }
+  const ship = ships.find((u) => u.order.k === 'idle' && u.cargo.length === 0);
+  if (!ship) return;
+  const due = s.tick >= secs(AI_LEVELS[p.ai!].firstAttack) && s.tick >= s.peaceUntil && s.tick - (mem.landed ?? 0) > secs(240);
+  const crew = v.army
+    .filter((u) => !u.inside && u.type !== 'siege' && u.order.k === 'idle' && (u.x - v.home.x) * (u.x - v.home.x) + (u.y - v.home.y) * (u.y - v.home.y) < 18 * 18)
+    .slice(0, Math.min(cargoRoom(s, ship), Math.floor(v.army.length / 2)));
+  if (!due || mem.attacking || crew.length < 5 || !coastNear(s, enemy.x, enemy.y, 24)) {
+    // Wait at the dock.
+    if ((ship.x - dock.x) * (ship.x - dock.x) + (ship.y - dock.y) * (ship.y - dock.y) > 100) issue({ t: 'move', p: p.id, ids: [ship.id], x: dock.x, y: dock.y });
+    return;
+  }
+  issue({ t: 'board', p: p.id, ids: crew.map((u) => u.id), target: ship.id });
+  mem.landing = { ship: ship.id, ids: crew.map((u) => u.id), since: s.tick, phase: 'load' };
 }
 
 function countFish(s: GameState, x: number, y: number, r: number): number {
@@ -695,8 +783,11 @@ function airforce(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   if (enemyAir && freeFighters.length) issue({ t: 'attack', p: p.id, ids: freeFighters.map((u) => u.id), target: enemyAir.id });
   // Bombers set out in a group against the enemy's town when the army attacks, or every couple of minutes.
   const ready = bombers.filter((u) => u.order.k === 'idle');
-  if (ready.length >= 2 && (mem.attacking || s.tick - (mem.sortie ?? 0) > secs(120)) && s.tick >= s.peaceUntil) {
-    const target = enemyTarget(s, p);
+  // In a chapter whose goal is a Town Center, bombers fly with the army, at it: alone they only feed the enemy's guns.
+  const goal = v.plan.target;
+  const alone = goal ? mem.attacking : mem.attacking || s.tick - (mem.sortie ?? 0) > secs(120);
+  if (ready.length >= 2 && alone && s.tick >= s.peaceUntil) {
+    const target = goal ?? enemyTarget(s, p);
     if (target) {
       issue({ t: 'attack', p: p.id, ids: ready.map((u) => u.id), target: target.id });
       if (!enemyAir && freeFighters.length) issue({ t: 'move', p: p.id, ids: freeFighters.map((u) => u.id), x: target.x, y: target.y, amove: true });
@@ -714,7 +805,8 @@ function enemyTarget(s: GameState, p: Player): Building | null {
     if (e.type === 'wall' || e.type === 'gate' || e.type === 'farm') continue;
     const dx = e.x - p.startX;
     const dy = e.y - p.startY;
-    const d = dx * dx + dy * dy + (e.type === 'wonder' ? -1e6 : e.type === 'towncenter' ? -400 : 0);
+    const shrine = e.type === 'temple' && relicRace(s, p) && s.relics.some((r) => r.temple === e.id);
+    const d = dx * dx + dy * dy + (e.type === 'wonder' || shrine ? -1e6 : e.type === 'towncenter' ? -400 : 0);
     if (d < bestD) {
       bestD = d;
       best = e;
@@ -745,7 +837,7 @@ function threatNear(s: GameState, v: View): { unit: Unit | null; count: number }
   let threatD = Infinity;
   let n = 0;
   for (const e of s.ents) {
-    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !isEnemy(s, v.p.id, e.owner) || e.type === 'citizen') continue;
+    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !isEnemy(s, v.p.id, e.owner) || e.type === 'citizen' || e.type === 'trader') continue;
     let near = Infinity;
     for (const b of v.buildings) near = Math.min(near, distToRect(e.x, e.y, b));
     if (near < 12) {
@@ -775,7 +867,7 @@ function townBell(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
 function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
   const L = AI_LEVELS[p.ai!];
-  const enemy = enemyHome(s, p);
+  const enemy = v.plan.target ?? enemyHome(s, p);
   const dx = enemy.x - v.home.x;
   const dy = enemy.y - v.home.y;
   const dl = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -799,13 +891,16 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   for (const b of v.buildings) {
     if (!b.built || b.queue.length >= Math.min(2, MAX_QUEUE) || keepCitizensGrowing) continue;
     const trains = BUILDINGS[b.type].trains;
-    if (!trains.length || trains.includes('citizen') || b.type === 'dock' || b.type === 'airfield') continue;
+    if (!trains.length || trains.includes('citizen') || b.type === 'dock' || b.type === 'airfield' || b.type === 'market') continue;
     let unit: UnitType | null;
-    if (b.type === 'workshop') unit = siege < (p.epoch >= 2 ? 3 : 2) && v.army.length >= 6 ? 'siege' : null;
-    else if (b.type === 'temple') unit = v.priests.length < 2 && v.army.length >= 6 ? 'priest' : null;
+    if (b.type === 'workshop') unit = siege < Math.max(v.plan.siege, p.epoch >= 2 ? 3 : 2) && (v.army.length >= 6 || siege < v.plan.siege) ? 'siege' : null;
+    else if (b.type === 'temple') unit = v.priests.length < (v.army.length >= 6 ? 2 : 0) + (looseRelics(s) > 0 ? 1 : 0) ? 'priest' : null;
     else {
       unit = counter && trains.includes(counter) && unitEpoch(counter) <= p.epoch && roll(s) < 0.7 ? counter : pickUnit(v, mem, b);
       if (unit && unitEpoch(unit) > p.epoch) unit = pickUnit(v, mem, b);
+      // Play to the people's strength: when not countering, favour the signature line about half the time.
+      const sig = SIGNATURES[p.civ].type;
+      if (unit !== counter && sig !== 'siege' && sig !== 'priest' && trains.includes(sig) && unitEpoch(sig) <= p.epoch && roll(s) < 0.5) unit = sig;
     }
     if (!unit || unitEpoch(unit) > p.epoch) continue;
     const cost = unitStats(unit, p.epoch).cost;
@@ -817,7 +912,9 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
 
   // Defend: enemies near home draw the whole army.
   const threat = threatNear(s, v).unit;
-  const fighters = v.army.filter((u) => !u.inside);
+  // Soldiers on their way to (or aboard) a landing ship are not the land army's to command.
+  const sailing = new Set(mem.landing?.ids);
+  const fighters = v.army.filter((u) => !u.inside && !sailing.has(u.id));
   if (threat) {
     const responders = fighters.filter((u) => u.order.k !== 'attack');
     if (responders.length) issue({ t: 'move', p: p.id, ids: responders.map((u) => u.id), x: threat.x, y: threat.y, amove: true });
@@ -827,21 +924,32 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
 
   // Attack in waves once the army is big enough (at once against a wonder); between waves, gather at the muster point.
   const ready = fighters.filter((u) => u.order.k === 'idle' || (u.order.k === 'move' && !u.order.amove));
-  const waveSize = L.wave + mem.wave * L.waveGrowth;
+  // A chapter's goals may set the waves instead: none while holding out, smaller and sooner when the rival town must fall.
+  const plan = v.plan;
+  const waveSize = plan.wave || L.wave + mem.wave * L.waveGrowth;
   const onAttack = fighters.filter((u) => u.order.k === 'attack' || (u.order.k === 'move' && u.order.amove));
   if (mem.attacking && onAttack.length === 0) mem.attacking = false;
-  const wonderRace = s.ents.some((e) => e.kind === 'building' && e.type === 'wonder' && e.hp > 0 && isEnemy(s, p.id, e.owner));
-  const due = s.tick >= secs(L.firstAttack) && s.tick >= s.peaceUntil;
-  if (due && !mem.attacking && (fighters.length >= waveSize || (wonderRace && fighters.length >= 4))) {
+  const wonderRace = s.ents.some((e) => e.kind === 'building' && e.type === 'wonder' && e.hp > 0 && isEnemy(s, p.id, e.owner)) || relicRace(s, p);
+  const due = !plan.hold && (plan.wave ? true : s.tick >= secs(L.firstAttack)) && s.tick >= s.peaceUntil;
+  if (due && !mem.attacking && (fighters.length >= waveSize || (wonderRace && fighters.length >= 4) || (plan.allIn && fighters.length >= 12))) {
     issue({ t: 'move', p: p.id, ids: fighters.map((u) => u.id), x: enemy.x, y: enemy.y, amove: true });
     mem.attacking = true;
     mem.wave++;
     return;
   }
-  if (mem.attacking && ready.length >= 4) {
+  if (mem.attacking && ready.length >= (plan.allIn ? 1 : 4)) {
     // Reinforcements join the attack.
     issue({ t: 'move', p: p.id, ids: ready.map((u) => u.id), x: enemy.x, y: enemy.y, amove: true });
     return;
+  }
+  // Between waves, a few riders cut the rivals' trade roads near home.
+  if (L.clever) {
+    const riders = ready.filter((u) => u.type === 'cavalry' && u.order.k === 'idle');
+    const prey = riders.length ? enemyTrader(s, v, 30) : null;
+    if (prey) {
+      issue({ t: 'attack', p: p.id, ids: riders.slice(0, 3).map((u) => u.id), target: prey.id });
+      return;
+    }
   }
   const strays = ready.filter((u) => {
     const ox = u.x - mem.muster!.x;
@@ -851,12 +959,58 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   if (strays.length) issue({ t: 'move', p: p.id, ids: strays.map((u) => u.id), x: mem.muster.x, y: mem.muster.y });
 }
 
-/** Priests walk with the army (healing as they go) and turn the enemy's best units. */
+/** Relics on the ground, for anyone to take. */
+function looseRelics(s: GameState): number {
+  let n = 0;
+  for (const r of s.relics) if (!r.carrier && !r.temple) n++;
+  return n;
+}
+
+/** A rival side keeps every relic: their temples must fall before the countdown ends. */
+function relicRace(s: GameState, p: Player): boolean {
+  return s.relicTeam >= 0 && s.relicTeam !== p.team;
+}
+
+/**
+ * Priests bring relics home first (the nearest loose one nobody of ours is fetching), then walk with
+ * the army (healing as they go) and turn the enemy's best units.
+ */
 function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   if (!v.priests.length) return;
   const army = v.army.filter((u) => !u.inside && u.type !== 'siege');
+  const fetching = new Set<number>();
+  for (const pr of v.priests) if (pr.order.k === 'relic') fetching.add(pr.order.target);
   for (const pr of v.priests) {
-    if (pr.order.k !== 'idle' || pr.cool > 0) continue;
+    if (pr.order.k !== 'idle' || pr.inside) continue;
+    const held = carriedBy(s, pr);
+    if (held) {
+      const t = nearestTemple(s, v.p.id, pr.x, pr.y);
+      if (t) issue({ t: 'work', p: v.p.id, ids: [pr.id], target: t.id });
+      else if ((pr.x - v.home.x) * (pr.x - v.home.x) + (pr.y - v.home.y) * (pr.y - v.home.y) > 49) issue({ t: 'move', p: v.p.id, ids: [pr.id], x: v.home.x, y: v.home.y + 3 });
+      continue;
+    }
+    if (nearestTemple(s, v.p.id, pr.x, pr.y)) {
+      let relic = -1;
+      let bestD = Infinity;
+      const rivals = s.players.filter((o) => !o.defeated && isEnemy(s, v.p.id, o.id));
+      for (const r of s.relics) {
+        if (r.carrier || r.temple || fetching.has(r.id)) continue;
+        // Not from under a rival's walls.
+        const mine = (r.x - v.home.x) * (r.x - v.home.x) + (r.y - v.home.y) * (r.y - v.home.y);
+        if (rivals.some((o) => (r.x - o.startX) * (r.x - o.startX) + (r.y - o.startY) * (r.y - o.startY) < mine * 0.6)) continue;
+        const d = (r.x - pr.x) * (r.x - pr.x) + (r.y - pr.y) * (r.y - pr.y);
+        if (d < bestD) {
+          bestD = d;
+          relic = r.id;
+        }
+      }
+      if (relic >= 0) {
+        fetching.add(relic);
+        issue({ t: 'relic', p: v.p.id, ids: [pr.id], target: relic });
+        continue;
+      }
+    }
+    if (pr.cool > 0) continue;
     // Something worth converting close by?
     let best: Unit | null = null;
     let bestScore = 0;
@@ -892,4 +1046,222 @@ function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
       if (dx * dx + dy * dy > 49) issue({ t: 'move', p: v.p.id, ids: [pr.id], x: cx, y: cy });
     } else if (mem.muster) issue({ t: 'move', p: v.p.id, ids: [pr.id], x: mem.muster.x, y: mem.muster.y });
   }
+}
+
+// ---- Trade -----------------------------------------------------------------------------------------
+
+/** A rival's trader on the road within reach of home, nearest first. */
+function enemyTrader(s: GameState, v: View, r: number): Unit | null {
+  let best: Unit | null = null;
+  let bestD = r * r;
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.type !== 'trader' || e.hp <= 0 || e.inside || !isEnemy(s, v.p.id, e.owner)) continue;
+    const d = (e.x - v.home.x) * (e.x - v.home.x) + (e.y - v.home.y) * (e.y - v.home.y);
+    if (d < bestD) {
+      bestD = d;
+      best = e;
+    }
+  }
+  return best;
+}
+
+/** How close a road from one point to another passes to a third (squared). */
+function passes(ax: number, ay: number, bx: number, by: number, px: number, py: number): number {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const l = dx * dx + dy * dy;
+  const t = l > 0 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l)) : 0;
+  const qx = ax + dx * t - px;
+  const qy = ay + dy * t - py;
+  return qx * qx + qy * qy;
+}
+
+/**
+ * Traders: once there is a Market and gold to spare, keep a few on the road to the post that pays best
+ * without running past a rival's town (failing that, the one that keeps farthest from them).
+ */
+function merchants(s: GameState, v: View, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!s.posts.length || p.epoch < 1 || v.citizens.length < 18) return;
+  const market = v.buildings.find((b) => b.type === 'market' && b.built);
+  if (!market) return;
+  const L = AI_LEVELS[p.ai!];
+  const want = p.epoch >= 2 ? L.traders : Math.ceil(L.traders / 2);
+  const queued = market.queue.filter((q) => q.unit === 'trader').length;
+  if (v.traders.length + queued < want && market.queue.length < 2 && p.pop < p.cap) {
+    const cost = unitStats('trader', p.epoch).cost;
+    if (afford(v, cost)) {
+      issue({ t: 'train', p: p.id, building: market.id, unit: 'trader' });
+      spend(v, cost);
+    }
+  }
+  const idle = v.traders.filter((u) => u.order.k === 'idle' && !u.inside);
+  if (!idle.length) return;
+  const rivals = s.players.filter((o) => !o.defeated && isEnemy(s, p.id, o.id));
+  for (const u of idle) {
+    const from = nearestMarket(s, p.id, u.x, u.y) ?? market;
+    let best = -1;
+    let bestScore = -Infinity;
+    for (const post of s.posts) {
+      let clear = Infinity;
+      for (const o of rivals) clear = Math.min(clear, passes(from.x, from.y, post.x, post.y, o.startX, o.startY));
+      const d2 = (post.x - from.x) * (post.x - from.x) + (post.y - from.y) * (post.y - from.y);
+      // A safe road scores by its pay; an unsafe one only by how far it keeps from danger.
+      const score = clear >= 22 * 22 ? 1e6 + d2 : clear;
+      if (score > bestScore) {
+        bestScore = score;
+        best = post.id;
+      }
+    }
+    if (best >= 0) issue({ t: 'route', p: p.id, ids: [u.id], post: best });
+  }
+}
+
+// ---- Campaign goals --------------------------------------------------------------------------------
+
+/** How a chapter's goals bend the army's plans: hold at home, attack early with smaller waves, or throw everything in. */
+interface Plan {
+  hold: boolean;
+  /** Wave size when the goals want the rival town gone; 0 when they don't. */
+  wave: number;
+  allIn: boolean;
+  /** The last epoch worth reaching: a chapter's clock is better spent on its goals than on epochs it doesn't ask for. */
+  maxEpoch: number;
+  /** Siege engines to keep when there are walls and a Town Center to break. */
+  siege: number;
+  /** Where the army strikes, when the goals name a building (a rival Town Center). */
+  target: Building | null;
+}
+const NO_PLAN: Plan = { hold: false, wave: 0, allIn: false, maxEpoch: 99, siege: 0, target: null };
+
+/** What trains each unit a goal can ask for. */
+const TRAINED_AT: Partial<Record<UnitType, BuildingType>> = { siege: 'workshop', warship: 'dock', transport: 'dock', bomber: 'airfield', fighter: 'airfield', priest: 'temple', infantry: 'barracks', ranged: 'range', cavalry: 'stable' };
+
+/**
+ * When a computer plays a campaign chapter's own seat (to show a chapter can be won), it works toward
+ * the goals: raises the buildings they name, trains the units they count, holds at home while it
+ * must survive, and attacks early (then with everything as the clock runs down) when the rival town
+ * must fall. Rivals, and every ordinary match, never come here.
+ */
+function chapterGoals(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): Plan {
+  const run = s.scenario;
+  const { p } = v;
+  if (!run || run.result || p.id !== 0) return NO_PLAN;
+  const sc = scenarioById(run.id);
+  if (!sc) return NO_PLAN;
+  const recently = (type: BuildingType, sec: number) => s.tick - (mem.ordered[type] ?? -99999) < secs(sec);
+  const open = sc.objectives.filter((o, i) => !run.done[i] && (!o.bonus || o.kind === 'units' || o.kind === 'build' || o.kind === 'epoch'));
+  // Epochs only as far as a goal (a bonus one too) asks; with no epoch goals, as far as the rivals have got.
+  let maxEpoch = p.epoch;
+  for (const o of open) if (o.kind === 'epoch') maxEpoch = Math.max(maxEpoch, o.n);
+  for (const q of s.players) if (q.team !== p.team && !q.defeated) maxEpoch = Math.max(maxEpoch, q.epoch);
+  const plan: Plan = { hold: false, wave: 0, allIn: false, maxEpoch, siege: 0, target: null };
+  const enemy = enemyHome(s, p);
+  const ex = enemy.x - v.home.x;
+  const ey = enemy.y - v.home.y;
+  const el = Math.sqrt(ex * ex + ey * ey) || 1;
+  const fx = ex / el;
+  const fy = ey / el;
+  for (const o of open) {
+    const [now, goal] = progress(s, o, p.id);
+    if (o.kind === 'survive') plan.hold = true;
+    else if (o.kind === 'destroy') {
+      // Bigger waves for each rival still standing: a lone early wave into two towns only feeds them.
+      const rivals = s.players.filter((q) => q.team !== p.team && !q.defeated).length;
+      plan.wave = 10 + (rivals - 1) * 14 + mem.wave * 2;
+      plan.siege = 4;
+      plan.target = rivalTownCenter(s, p);
+      const left = sc.limit ? sc.limit - s.tick / 20 : Infinity;
+      plan.allIn = sc.limit ? left < sc.limit * 0.45 : false;
+    } else if (o.kind === 'build' && now < goal && o.type) {
+      const type = o.type as BuildingType;
+      if (BUILDINGS[type].epoch > p.epoch) continue;
+      const placed = count(v, type);
+      if (placed >= goal) continue;
+      const cost = buildingCostFor(s, p.id, type);
+      if (type === 'wall') {
+        if (recently('wall', 15)) continue;
+        // A line of wall across the way the rival comes, a little in front of the Town Center.
+        const need = goal - placed + 2;
+        const cx = v.home.x + fx * (11 + (placed > 0 ? 3 : 0));
+        const cy = v.home.y + fy * (11 + (placed > 0 ? 3 : 0));
+        const half = Math.ceil(need / 2);
+        const x0 = Math.floor(cx - fy * half);
+        const y0 = Math.floor(cy + fx * half);
+        const x1 = Math.floor(cx + fy * half);
+        const y1 = Math.floor(cy - fx * half);
+        const all = RES.every((r) => !cost[r] || v.budget[r] >= cost[r]! * need);
+        const crew = v.citizens.filter((u) => !u.inside && u.order.k !== 'build' && !(u.order.k === 'farm' && u.order.phase === 'work')).sort((a, b) => a.id - b.id).slice(0, 4);
+        if (all && crew.length) {
+          issue({ t: 'wall', p: p.id, ids: crew.map((u) => u.id), x0, y0, x1, y1 });
+          for (const r of RES) v.budget[r] -= (cost[r] ?? 0) * need;
+          mem.ordered.wall = s.tick;
+        } else for (const r of RES) v.budget[r] -= (cost[r] ?? 0) * need;
+        continue;
+      }
+      if (recently(type, 25)) {
+        spend(v, cost);
+        continue;
+      }
+      let spot: { tx: number; ty: number } | null;
+      if (type === 'dock') spot = findDockSpot(s, v.home.x, v.home.y, 30);
+      else if (type === 'tower') spot = findSpot(s, type, v.home.x + fx * 8 - fy * (placed % 2 ? 4 : -4), v.home.y + fy * 8 + fx * (placed % 2 ? 4 : -4), 0, 12);
+      else spot = findSpot(s, type, v.home.x, v.home.y, 6, 22);
+      if (!spot || !construct(s, v, mem, type, spot, type === 'tower' ? 3 : 4, issue)) spend(v, cost);
+    } else if (o.kind === 'units' && o.type) {
+      const type = o.type as UnitType;
+      if (unitEpoch(type) > p.epoch) continue;
+      const at = TRAINED_AT[type];
+      if (!at) continue;
+      const where = v.buildings.filter((b) => b.type === at && b.built);
+      if (!where.length) {
+        // Raise what trains it, unless the goal list already does.
+        if (!open.some((q) => q.kind === 'build' && q.type === at) && !count(v, at) && !recently(at, 30) && BUILDINGS[at].epoch <= p.epoch) {
+          const spot = at === 'dock' ? findDockSpot(s, v.home.x, v.home.y, 30) : findSpot(s, at, v.home.x + fx * 6, v.home.y + fy * 6, 0, 18);
+          const cost = buildingCostFor(s, p.id, at);
+          if (!spot || !construct(s, v, mem, at, spot, 4, issue)) spend(v, cost);
+        }
+        continue;
+      }
+      const cost = unitStats(type, p.epoch).cost;
+      // Dear units wait for a town that can pay for them and still grow.
+      if ((cost.wood ?? 0) + (cost.gold ?? 0) + (cost.food ?? 0) > 300 && v.citizens.length < 25) continue;
+      const queued = where.reduce((n, b) => n + b.queue.filter((q) => q.unit === type).length, 0);
+      // Keep a few spare: some will be lost before the count is reached.
+      if (now + queued >= goal + (o.bonus ? 0 : 1)) continue;
+      const b = where.sort((a, c) => a.queue.length - c.queue.length || a.id - c.id)[0];
+      if (b.queue.length < 2 && afford(v, cost) && p.pop < p.cap) {
+        issue({ t: 'train', p: p.id, building: b.id, unit: type });
+        spend(v, cost);
+      } else if (!o.bonus) spend(v, cost);
+    }
+  }
+  if (plan.wave) {
+    plan.hold = false;
+    // Food and wood piling up while the rival town stands: more places to train soldiers.
+    if (v.budget.food > 800 && v.budget.wood > 600 && v.citizens.length >= 30) {
+      for (const type of ['barracks', 'range', 'stable'] as BuildingType[]) {
+        if (count(v, type) >= 4 || recently(type, 30) || BUILDINGS[type].epoch > p.epoch) continue;
+        const spot = findSpot(s, type, v.home.x + fx * 6, v.home.y + fy * 6, 0, 20);
+        if (spot && construct(s, v, mem, type, spot, 3, issue)) break;
+      }
+    }
+  }
+  return plan;
+}
+
+/** The goal's target: the nearest standing Town Center of a rival, one not yet burned first. */
+function rivalTownCenter(s: GameState, p: Player): Building | null {
+  let best: Building | null = null;
+  let bestD = Infinity;
+  const burned = s.scenario?.burned ?? [];
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'towncenter' || !e.built || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
+    const d = (e.x - p.startX) * (e.x - p.startX) + (e.y - p.startY) * (e.y - p.startY) + (burned.includes(e.owner) ? 1e6 : 0);
+    if (d < bestD) {
+      bestD = d;
+      best = e;
+    }
+  }
+  return best;
 }

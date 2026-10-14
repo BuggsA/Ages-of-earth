@@ -5,16 +5,20 @@ import { CameraRig } from './render/camera';
 import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { wallLine } from './sim/commands';
-import { BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, TECHS, TICK_HZ, domainOf, unitStats } from './sim/data';
+import { BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, RELIC, TECHS, TICK_HZ, domainOf, unitStats } from './sim/data';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
 import { placeProblem, walkable } from './sim/grid';
 import { findDockSpot, findSpot } from './sim/ai';
 import { maxHp, placeBuilding, spawnUnit } from './sim/world';
 import type { BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, MapSize, MapType, Unit } from './sim/types';
 import { R_FISH, R_NONE } from './sim/types';
+import { carriedBy, relicAt } from './sim/relics';
+import { postAt } from './sim/trade';
 import { NetClient, newRoomCode, saveName, savedName } from './net/client';
 import { HASH_EVERY, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
 import { deserialize, serialize } from './sim/save';
+import { SCENARIOS, scenarioById, starsFor } from './sim/campaign';
+import { briefingHtml, chapterListHtml, recordStars, starRow } from './ui/campaignUi';
 import { Lobby } from './ui/lobby';
 import { Hud, nameOf } from './ui/hud';
 import { Minimap } from './ui/minimap';
@@ -55,6 +59,10 @@ let viewer = 0;
 let pending: Command[] = [];
 let selection = new Set<number>();
 let selectedTile: number | null = null;
+/** A relic picked out with a left click, to read about. */
+let selectedRelic: number | null = null;
+/** A trading post picked out with a left click. */
+let selectedPost: number | null = null;
 let placing: BuildingType | null = null;
 let placeAt: { tx: number; ty: number; ok: boolean } | null = null;
 /** A wall being dragged out, from tile to tile. */
@@ -337,6 +345,8 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   pending = [];
   selection = new Set();
   selectedTile = null;
+  selectedRelic = null;
+  selectedPost = null;
   placing = null;
   wallDrag = null;
   targetMode = null;
@@ -355,7 +365,9 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   const me = game.players[viewer];
   const rivals = game.players.filter((p) => p.team !== me.team).map((p) => `${p.name} of the ${CIVS[p.civ].name}`);
   const goal = game.mode === 'regicide' ? ' Keep your King alive: shelter them in the Town Center.' : game.mode === 'deathmatch' ? ' Everyone starts rich: build fast.' : '';
-  if (!saved) hud.banner(EPOCHS[me.epoch].name, `You lead the ${CIVS[me.civ].name}. Facing ${rivals.join(', ')}.${goal}`, 6000);
+  const chapter = game.scenario ? scenarioById(game.scenario.id) : undefined;
+  if (!saved && chapter) hud.banner(chapter.title, chapter.place, 6000);
+  else if (!saved) hud.banner(EPOCHS[me.epoch].name, `You lead the ${CIVS[me.civ].name}. Facing ${rivals.join(', ')}.${goal}`, 6000);
   else hud.banner('Welcome back', `${EPOCHS[me.epoch].name}, ${fmtClock(game.tick)} into the match.`, 3200);
   sound.startAmbience();
   playMusic(me.epoch);
@@ -376,7 +388,22 @@ const fmtClock = (ticks: number) => {
   return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
 };
 
+function showCampaign(html: string): void {
+  $('title').classList.add('hidden');
+  const c = $('campaign');
+  c.innerHTML = html;
+  c.classList.remove('hidden');
+}
+
+function startChapter(id: string): void {
+  const sc = scenarioById(id);
+  if (!sc) return;
+  $('campaign').classList.add('hidden');
+  startMatch({ ...sc.setup, scenario: id });
+}
+
 function toTitle(): void {
+  $('campaign').classList.add('hidden');
   autosave(true);
   if (watching) {
     watching = null;
@@ -394,10 +421,12 @@ function toTitle(): void {
 // ---- Saving ----------------------------------------------------------------------------------------
 
 const SAVE_KEY = 'ages-save';
+/** Bumped when the state's shape changes, so an older save is set aside instead of loading broken (2: relics; 3: trading posts). */
+const SAVE_V = 3;
 
 function saveGame(s: GameState, setup: GameSetup): boolean {
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, setup, at: Date.now(), state: serialize(s), record }));
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ v: SAVE_V, setup, at: Date.now(), state: serialize(s), record }));
     showContinue();
     return true;
   } catch {
@@ -410,7 +439,7 @@ function loadGame(): { setup: GameSetup; state: GameState; record: [number, Comm
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     const saved = JSON.parse(raw);
-    if (saved.v !== 1) return null;
+    if (saved.v !== SAVE_V) return null;
     return { setup: saved.setup, state: deserialize(saved.state), record: Array.isArray(saved.record) ? saved.record : [] };
   } catch {
     return null;
@@ -710,6 +739,35 @@ document.addEventListener('click', (e) => {
     case 'replay-save':
       if (game) downloadReplay(game);
       break;
+    case 'campaign':
+      sound.play('click');
+      showCampaign(chapterListHtml());
+      break;
+    case 'camp-back':
+      $('campaign').classList.add('hidden');
+      $('title').classList.remove('hidden');
+      break;
+    case 'camp-list':
+      showCampaign(chapterListHtml());
+      break;
+    case 'camp-open': {
+      const sc = scenarioById(el.dataset.id!);
+      if (sc) showCampaign(briefingHtml(sc));
+      break;
+    }
+    case 'camp-begin':
+      sound.play('click');
+      startChapter(el.dataset.id!);
+      break;
+    case 'camp-next': {
+      const next = SCENARIOS[SCENARIOS.findIndex((c) => c.id === el.dataset.id) + 1];
+      if (next) {
+        $('modal').classList.add('hidden');
+        toTitle();
+        showCampaign(briefingHtml(next));
+      }
+      break;
+    }
     case 'online':
       sound.play('click');
       $('title').classList.add('hidden');
@@ -734,6 +792,8 @@ function setSelection(ids: number[], add = false): void {
   for (const id of ids) next.add(id);
   selection = next;
   selectedTile = null;
+  selectedRelic = null;
+  selectedPost = null;
   hud.buildMenu = null;
   refreshHud();
 }
@@ -808,7 +868,7 @@ function order(clientX: number, clientY: number, forceAttack = false, queue = fa
     // A building of yours: set where its trainees gather.
     const b = [...selection].map((id) => s.byId.get(id)).find((e) => e && e.kind === 'building' && e.owner === viewer);
     if (b) {
-      const at = pk.kind === 'ground' ? pk : pk.kind === 'resource' ? { x: (pk.tile % s.w) + 0.5, y: Math.floor(pk.tile / s.w) + 0.5 } : pk.kind === 'animal' ? null : (() => {
+      const at = pk.kind === 'ground' ? pk : pk.kind === 'resource' ? { x: (pk.tile % s.w) + 0.5, y: Math.floor(pk.tile / s.w) + 0.5 } : pk.kind === 'animal' ? null : pk.kind === 'relic' ? (relicAt(s, pk.id) ?? null) : pk.kind === 'post' ? (postAt(s, pk.id) ?? null) : (() => {
         const t = s.byId.get(pk.id);
         return t ? { x: t.x, y: t.y } : null;
       })();
@@ -826,6 +886,25 @@ function order(clientX: number, clientY: number, forceAttack = false, queue = fa
     issue({ t: 'hunt', p: viewer, ids, target: a.id, queue: q });
     view.marker(s, a.x, a.y, true);
     play('move');
+    return;
+  }
+  if (pk.kind === 'relic') {
+    const r = relicAt(s, pk.id);
+    if (!r) return;
+    issue({ t: 'relic', p: viewer, ids, target: r.id, queue: q });
+    view.marker(s, r.x, r.y, false);
+    play('move');
+    ack('move');
+    return;
+  }
+  if (pk.kind === 'post') {
+    const post = postAt(s, pk.id);
+    if (!post) return;
+    if (forceAttack) issue({ t: 'move', p: viewer, ids, x: post.x, y: post.y, amove: true, queue: q });
+    else issue({ t: 'route', p: viewer, ids, post: post.id, queue: q });
+    view.marker(s, post.x, post.y, forceAttack);
+    play(forceAttack ? 'attack' : 'move');
+    ack(forceAttack ? 'attack' : 'move');
     return;
   }
   if (pk.kind === 'unit' || pk.kind === 'building') {
@@ -1134,6 +1213,20 @@ function clickSelect(x: number, y: number, shift: boolean, ctrl: boolean): void 
     refreshHud();
     return;
   }
+  if (pk.kind === 'relic') {
+    setSelection([]);
+    selectedRelic = pk.id;
+    refreshHud();
+    play('click');
+    return;
+  }
+  if (pk.kind === 'post') {
+    setSelection([]);
+    selectedPost = pk.id;
+    refreshHud();
+    play('click');
+    return;
+  }
   const e = s.byId.get(pk.id);
   if (!e) return;
   const now = performance.now();
@@ -1375,7 +1468,7 @@ function openMenu(): void {
     <div class="row">
       ${online ? `<div class="hint">Online room ${net?.code ?? ''} · ${net?.rtt ?? 0} ms</div>` : `<button class="btn wide" data-act="save">Save game</button>
       <button class="btn wide" data-act="restart">Restart this map</button>
-      <button class="btn wide" data-act="new-map">New map</button>`}
+      ${game?.scenario ? '' : '<button class="btn wide" data-act="new-map">New map</button>'}`}
       <button class="btn wide" data-act="resign">Resign</button>
       <button class="btn wide" data-act="quit">${online ? 'Leave the match' : 'Quit to title'}</button>
     </div></div>`;
@@ -1427,26 +1520,42 @@ function timeline(s: GameState, metric: Metric): string {
   return `<svg class="timeline" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${grid}${lines}</svg>`;
 }
 
-function showEnd(s: GameState, won: boolean, how: 'conquest' | 'wonder' | 'resign' = 'conquest'): void {
+function showEnd(s: GameState, won: boolean, how: 'conquest' | 'wonder' | 'relics' | 'resign' | 'time' | 'scenario' = 'conquest'): void {
   mode = 'over';
   keepReplay(s);
   const m = $('modal');
   const mins = Math.floor(s.tick / TICK_HZ / 60);
   const rows = s.players
     .map(
-      (p) => `<tr><td><span class="swatch" style="background:${p.color}"></span>${p.name}<div class="civ-tag">${CIVS[p.civ].name}</div></td><td>${scoreOf(s, p)}</td><td>${EPOCHS[p.epoch].short}</td><td>${p.stats.gathered}</td><td>${p.stats.trained}</td><td>${p.stats.built}</td><td>${p.stats.techs}</td><td>${p.stats.kills}</td><td>${p.stats.losses}</td></tr>`,
+      (p) => `<tr><td><span class="swatch" style="background:${p.color}"></span>${p.name}<div class="civ-tag">${CIVS[p.civ].name}</div></td><td>${scoreOf(s, p)}</td><td>${EPOCHS[p.epoch].short}</td><td>${p.stats.gathered}</td><td>${p.stats.traded ?? 0}</td><td>${p.stats.trained}</td><td>${p.stats.built}</td><td>${p.stats.techs}</td><td>${p.stats.kills}</td><td>${p.stats.losses}</td></tr>`,
     )
     .join('');
-  const why = how === 'wonder' ? (won ? 'Your Wonder stood the test of time.' : 'A rival Wonder stood the test of time.') : won ? 'Your rivals have fallen.' : 'Your people are no more.';
-  m.innerHTML = `<div class="card wide"><h2>${won ? 'Victory!' : 'Defeat'}</h2>
+  const sc = s.scenario ? scenarioById(s.scenario.id) : undefined;
+  const stars = sc ? starsFor(s) : 0;
+  if (sc) recordStars(sc.id, stars);
+  const nextCh = sc ? SCENARIOS[SCENARIOS.indexOf(sc) + 1] : undefined;
+  const why = sc
+    ? won
+      ? sc.epilogue
+      : how === 'time'
+        ? 'Time ran out before the goals were met.'
+        : 'Your people are no more.'
+    : how === 'wonder'
+      ? won ? 'Your Wonder stood the test of time.' : 'A rival Wonder stood the test of time.'
+      : how === 'relics'
+        ? won ? 'Every relic in the world rests in your temples.' : 'A rival kept every relic in the world.'
+        : won ? 'Your rivals have fallen.' : 'Your people are no more.';
+  const extra = sc ? `${won ? `<div class="end-stars">${starRow(stars)}</div>` : ''}<ul class="goals">${sc.objectives.map((o, i) => `<li class="${o.bonus ? 'bonus' : ''}">${s.scenario!.done[i] ? '✔' : '✖'} ${o.text}</li>`).join('')}</ul>` : '';
+  m.innerHTML = `<div class="card wide"><h2>${won ? (sc ? sc.title + ': victory!' : 'Victory!') : 'Defeat'}</h2>
     <div class="sel-sub">${why} The match lasted ${mins < 1 ? 'less than a minute' : `${mins} minute${mins === 1 ? '' : 's'}`}.</div>
+    ${extra}
     <div class="chart-tabs">${(Object.keys(METRICS) as Metric[]).map((k) => `<button class="tab ${k === 'score' ? 'on' : ''}" data-metric="${k}">${METRICS[k]}</button>`).join('')}</div>
     <div id="chart">${timeline(s, 'score')}</div>
-    <table class="end-stats"><tr><th></th><th>Score</th><th>Epoch</th><th>Gathered</th><th>Trained</th><th>Built</th><th>Techs</th><th>Kills</th><th>Lost</th></tr>${rows}</table>
+    <table class="end-stats"><tr><th></th><th>Score</th><th>Epoch</th><th>Gathered</th><th>Traded</th><th>Trained</th><th>Built</th><th>Techs</th><th>Kills</th><th>Lost</th></tr>${rows}</table>
     <div class="row">
       <button class="btn wide" data-act="watch">Look around</button>
       <button class="btn wide" data-act="replay-save">Download the replay</button>
-      ${online ? '' : '<button class="btn wide primary" data-act="new-map">Play again</button>'}
+      ${sc ? (won && nextCh ? `<button class="btn wide primary" data-act="camp-next" data-id="${sc.id}">Next chapter: ${nextCh.title}</button>` : '') + '<button class="btn wide' + (won && nextCh ? '' : ' primary') + '" data-act="restart">Play the chapter again</button>' : online ? '' : '<button class="btn wide primary" data-act="new-map">Play again</button>'}
       <button class="btn wide" data-act="quit">Quit to title</button>
     </div></div>`;
   m.querySelector('.chart-tabs')!.addEventListener('click', (e) => {
@@ -1531,6 +1640,40 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         }
         break;
       }
+      case 'relic':
+        if (ev.owner === viewer && ev.what === 'kept') hud.toast(`A relic rests in your Temple: +${Math.round((60 / RELIC.every) * RELIC.gold)} gold a minute`, 'good');
+        else if (ev.owner === viewer && ev.what === 'taken') hud.toast('Your priest has taken up a relic: bring it to a Temple', 'info');
+        else if (ev.owner === viewer && ev.what === 'dropped' && !list.some((e) => e.k === 'die' && e.owner === viewer)) break;
+        else if (ev.owner === viewer && ev.what === 'dropped') {
+          hud.toast('A relic has been lost! (Space to look)', 'alert');
+          lastAlert = { x: ev.x, y: ev.y };
+        }
+        break;
+      case 'relicHold': {
+        const mins = Math.round(ev.ticks / TICK_HZ / 60);
+        if (ev.team < 0) {
+          hud.toast('A relic has changed hands: the relic countdown stops', 'info');
+          break;
+        }
+        const ours = ev.team === s.players[viewer].team;
+        if (ours) hud.banner('Every relic is yours', `Keep them all ${mins} minutes and you win.`, 5000);
+        else {
+          const keepers = s.players.filter((q) => q.team === ev.team).map((q) => q.name).join(' and ');
+          hud.banner(`${keepers} ${keepers.includes(' and ') ? 'keep' : 'keeps'} every relic`, `Take one back within ${mins} minutes or lose.`, 5000);
+        }
+        play('wonder');
+        break;
+      }
+      case 'story':
+        hud.banner(ev.title, ev.text, 5000);
+        play(ev.bad ? 'alert' : 'coin');
+        break;
+      case 'objective': {
+        const sc = s.scenario && scenarioById(s.scenario.id);
+        if (sc) hud.toast(`${sc.objectives[ev.index].bonus ? 'Bonus goal' : 'Goal'} complete: ${sc.objectives[ev.index].text.replace(/^Bonus: /, '')}`, 'good');
+        play('ready');
+        break;
+      }
       case 'over':
         clearSave();
         showEnd(s, ev.winner === s.players[viewer].team, ev.how);
@@ -1544,7 +1687,7 @@ function onEvents(s: GameState, list: GameEvent[]): void {
 function refreshHud(): void {
   if (!game || mode === 'title') return;
   pruneSelection(game);
-  hud.update(game, viewer, [...selection], SPEEDS[speedIdx], selectedTile);
+  hud.update(game, viewer, [...selection], SPEEDS[speedIdx], selectedTile, selectedRelic, selectedPost);
 }
 
 function cursorFor(s: GameState): string {
@@ -1557,6 +1700,8 @@ function cursorFor(s: GameState): string {
   const pk: Pick | null = view.pick(pointer.x, pointer.y);
   if (!pk) return '';
   if (pk.kind === 'animal') return units.length ? 'cur-attack' : 'cur-select';
+  if (pk.kind === 'relic') return units.some((u) => u.type === 'priest' && !carriedBy(s, u)) ? 'cur-gather' : 'cur-select';
+  if (pk.kind === 'post') return units.some((u) => u.type === 'trader') ? 'cur-gather' : 'cur-select';
   if (pk.kind === 'unit' || pk.kind === 'building') {
     const t = s.byId.get(pk.id) as Ent | undefined;
     if (!t) return '';
@@ -1564,6 +1709,8 @@ function cursorFor(s: GameState): string {
     if (units.length && foe) return units.every((u) => u.type === 'priest') && t.kind === 'unit' ? 'cur-convert' : 'cur-attack';
     if (units.some((u) => u.type === 'citizen') && t.kind === 'building' && t.owner === viewer && (!t.built || t.hp < maxHp(s, t) || t.type === 'farm')) return 'cur-build';
     if (units.length && t.kind === 'building' && t.owner === viewer && t.built && BUILDINGS[t.type].garrison) return 'cur-garrison';
+    if (t.kind === 'building' && t.type === 'temple' && t.owner === viewer && t.built && units.some((u) => u.type === 'priest' && carriedBy(s, u))) return 'cur-gather';
+    if (t.kind === 'building' && t.type === 'market' && t.owner === viewer && t.built && units.some((u) => u.type === 'trader')) return 'cur-gather';
     if (t.kind === 'unit' && t.type === 'transport' && t.owner === viewer && units.some((u) => domainOf(u.type) === 'land')) return 'cur-garrison';
     return 'cur-select';
   }
