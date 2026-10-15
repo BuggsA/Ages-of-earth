@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -741,6 +741,19 @@ export class Sound {
         this.tone(out, t + 0.2, { f: 210, to: 150, type: 'sawtooth', dur: 0.32, peak: 0.035 });
         this.tone(out, t + 0.5, { f: 180, to: 240, type: 'sawtooth', dur: 0.28, peak: 0.03 });
         break;
+      case 'bleat':
+      case 'lambBleat': {
+        // A bleat (#308): a nasal reed voice shaking in quick pulses, sliding down, a lamb's higher and shorter.
+        const lamb = name === 'lambBleat';
+        const f0 = lamb ? 520 : 330;
+        const n = lamb ? 5 : 7;
+        for (let i = 0; i < n; i++) {
+          const f = f0 * (1 - i * 0.02);
+          this.tone(out, t + i * 0.055, { f, to: f * 0.97, type: 'sawtooth', dur: 0.07, peak: 0.035, attack: 0.01, lp: lamb ? 2200 : 1400 });
+        }
+        this.noise(out, t, { dur: n * 0.055, filter: 'bandpass', f: lamb ? 1800 : 1100, q: 3, peak: 0.01 });
+        break;
+      }
       case 'pitchCamp':
         // A camp pitched (#297): the lattice snapping open, two mallet knocks on the stakes, the felt settling.
         this.noise(out, t, { dur: 0.08, filter: 'bandpass', f: 2200, q: 2, peak: 0.08 });

@@ -4,7 +4,7 @@ import { BOAR, MAMMOTH, SIGNATURES, TICK_HZ, WOLF, domainOf, unitStats } from '.
 import type { Animal, CivId, GameState, Unit, UnitType } from '../sim/types';
 import { unitMaterial } from './materials';
 import { heightAt } from './terrain';
-import { boarGeometry, deerGeometry, mammothGeometry, unitGeometry, wolfGeometry } from './unitModels';
+import { boarGeometry, deerGeometry, mammothGeometry, sheepGeometry, unitGeometry, wolfGeometry } from './unitModels';
 import { WATER_Y } from './water';
 
 /** Units are drawn a little larger than their footprint in the rules, so they read well from above. */
@@ -188,9 +188,9 @@ export class UnitsView {
   /** Deer grazing, wandering and bolting; mammoths and wolves (#171) charging and biting. */
   private animals(s: GameState, alpha: number, dt: number, time: number, visible: (x: number, y: number) => boolean, camera: THREE.Camera, width: number, height: number): void {
     this.animalScreen.length = 0;
-    const kinds: Animal['kind'][] = ['deer', 'mammoth', 'wolf', 'boar'];
+    const kinds: Animal['kind'][] = ['deer', 'mammoth', 'wolf', 'boar', 'sheep'];
     for (const k of kinds) {
-      const bb = (this.beasts[k] ??= new Batch(k === 'deer' ? deerGeometry() : k === 'mammoth' ? mammothGeometry() : k === 'boar' ? boarGeometry() : wolfGeometry(), 32, this.group));
+      const bb = (this.beasts[k] ??= new Batch(k === 'deer' ? deerGeometry() : k === 'mammoth' ? mammothGeometry() : k === 'boar' ? boarGeometry() : k === 'sheep' ? sheepGeometry() : wolfGeometry(), 32, this.group));
       bb.count = 0;
       bb.reserve(s.animals.length);
     }
@@ -217,7 +217,7 @@ export class UnitsView {
       a.yaw += d * Math.min(1, dt * 8);
       const running = a.speed > 0.1;
       // Big feet take slow strides; a wolf's quick ones.
-      a.phase += dt * a.speed * (an.kind === 'mammoth' ? 5 : an.kind === 'wolf' ? 12 : an.kind === 'boar' ? 11 : 9);
+      a.phase += dt * a.speed * (an.kind === 'mammoth' ? 5 : an.kind === 'wolf' ? 12 : an.kind === 'boar' ? 11 : an.kind === 'sheep' ? 13 : 9);
       const leg = running ? Math.sin(a.phase) * Math.min(0.9, 0.35 + a.speed * 0.2) : 0;
       // A gentle sway while grazing; the hop of a run.
       const bob = running ? Math.abs(Math.sin(a.phase)) * 0.04 * Math.min(1, a.speed / 2) : Math.sin(time * 0.9 + an.id) * 0.004;
@@ -226,13 +226,17 @@ export class UnitsView {
       this.e.set(0, a.yaw, 0);
       this.q.setFromEuler(this.e);
       this.p.set(x, gy, y);
-      this.m.compose(this.p, this.q, this.sc.set(UNIT_SCALE, UNIT_SCALE, UNIT_SCALE));
+      // A lamb (#308) is two-thirds grown; a sheep wears its people's dye.
+      const size = an.kind === 'sheep' && an.lamb !== undefined ? UNIT_SCALE * 0.65 : UNIT_SCALE;
+      this.m.compose(this.p, this.q, this.sc.set(size, size, size));
       b.mesh.setMatrixAt(i, this.m);
-      b.mesh.setColorAt(i, WHITE);
+      b.mesh.setColorAt(i, an.owner !== undefined ? (this.colors[an.owner] ?? WHITE) : WHITE);
       // A gore or a bite: the head lunges just after the blow lands, then eases back.
       const reload = an.kind === 'mammoth' ? MAMMOTH.reload : an.kind === 'boar' ? BOAR.reload : WOLF.reload;
       const since = an.state === 'fight' && an.cool ? reload * TICK_HZ - an.cool : 99;
-      const lunge = since < 8 ? Math.sin((since / 8) * Math.PI) * (an.kind === 'mammoth' ? -0.45 : an.kind === 'boar' ? -0.4 : 0.5) : 0;
+      let lunge = since < 8 ? Math.sin((since / 8) * Math.PI) * (an.kind === 'mammoth' ? -0.45 : an.kind === 'boar' ? -0.4 : 0.5) : 0;
+      // A grazing sheep dips its head to the grass and lifts it to chew.
+      if (an.kind === 'sheep' && !running) lunge = 0.6 * Math.max(0, Math.sin(time * 1.1 + an.id * 1.7));
       b.anim.setXYZ(i, leg, lunge, bob);
       this.v.set(x, gy + (an.kind === 'mammoth' ? 0.6 : 0.35), y).project(camera);
       if (this.v.z < 1) {

@@ -3,6 +3,7 @@ import { peace } from './combat';
 import { placeProblem, stampBuilding, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
 import { packCamp, packProblem, pitchCamp, pitchProblem } from './steppe';
+import { lambProblem, raiseLamb } from './flocks';
 import { backProblem, backTo, barred, buildBarred, canRaise, journeyOf, roadProblem, roadTo, trainsAt } from './ages';
 import type { Building, BuildingType, Command, Ent, Cost, GameState, Order, Player, Unit } from './types';
 import { RES, R_FISH, R_MEAT, R_NONE } from './types';
@@ -284,6 +285,11 @@ export function applyCommand(s: GameState, c: Command): void {
     case 'hunt': {
       const a = s.animals.find((x) => x.id === c.target);
       if (!a) return;
+      // A flock (#308): your own is slaughtered, a rival's raided; an ally's is left alone.
+      if (a.owner !== undefined && a.owner !== c.p) {
+        if (!isEnemy(s, c.p, a.owner)) return refuse(s, c.p, "That flock is an ally's");
+        if (peace(s)) return refuse(s, c.p, 'Not while the peace treaty holds');
+      }
       const units = myUnits(s, c.p, c.ids);
       // Citizens hunt; soldiers on foot or horse (#171) can bring down a beast too.
       const hunters = units.filter((x) => fightsBeasts(x));
@@ -532,6 +538,26 @@ export function applyCommand(s: GameState, c: Command): void {
       const why = packProblem(s, p, b);
       if (why) return refuse(s, c.p, why);
       packCamp(s, b);
+      break;
+    }
+    case 'milk': {
+      const a = s.animals.find((x) => x.id === c.target);
+      if (!a || a.kind !== 'sheep') return;
+      if (a.owner !== c.p) return refuse(s, c.p, 'Only your own flock can be milked');
+      if (a.lamb !== undefined) return refuse(s, c.p, 'A lamb gives no milk yet');
+      const units = myUnits(s, c.p, c.ids);
+      const milkers = units.filter((u) => u.type === 'citizen');
+      for (const u of milkers) giveOrder(u, { k: 'milk', target: a.id, phase: 'go' }, c.queue);
+      const others = units.filter((u) => !milkers.includes(u));
+      if (others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: a.x, y: a.y, queue: c.queue });
+      break;
+    }
+    case 'lamb': {
+      const b = myBuilding(s, c.p, c.building);
+      if (!b) return;
+      const why = lambProblem(s, p, b);
+      if (why) return refuse(s, c.p, why);
+      raiseLamb(s, b);
       break;
     }
     case 'pitch': {

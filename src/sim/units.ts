@@ -1,4 +1,4 @@
-import { AI_LEVELS, BUILDINGS, CARRY, CONSECRATE, DEER, DT, GALVANIC, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, PRIEST, REPAIR_SHARE, RUINS, SPREAD, TRADE, domainOf, secs } from './data';
+import { AI_LEVELS, BUILDINGS, CARRY, CONSECRATE, DEER, DT, FLOCK, GALVANIC, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, PRIEST, REPAIR_SHARE, RUINS, SPREAD, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
@@ -10,6 +10,7 @@ import { seasonOf } from './seasons';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { carriedBy, relicAt } from './relics';
 import { animalRadius, hitAnimal } from './animals';
+import { milkable } from './flocks';
 import { dig, ruinAt } from './ruins';
 import { fordMarch, groveBoost, keptOf, kinBonus } from './landmarks';
 import { chant, chantedOver, consecrateProblem, consecrates, turnBuilding } from './consecrate';
@@ -686,6 +687,82 @@ function huntStep(s: GameState, u: Unit, o: Extract<Order, { k: 'hunt' }>): void
   if (!approach(u, g)) setOrder(u, { k: 'idle' });
 }
 
+// ---- The flock (#308) -------------------------------------------------------------------------------
+
+/** How fast a citizen milks, a little quicker in each epoch like all gathering. */
+export function milkRate(s: GameState, u: Unit): number {
+  return FLOCK.milkRate * (1 + s.players[u.owner].epoch * EPOCH_GATHER_BONUS);
+}
+
+/**
+ * A citizen milking the flock: to the sheep, milk it into the pail while it stands still for them, on to the
+ * next sheep with milk when this one is dry, and to the drop site when the pail is full (or the flock is dry).
+ */
+function milkStep(s: GameState, u: Unit, o: Extract<Order, { k: 'milk' }>): void {
+  if (u.carryRes !== 'food') {
+    u.carry = 0;
+    u.frac = 0;
+    u.carryRes = 'food';
+  }
+  if (o.phase === 'drop') {
+    const r = dropOff(s, u);
+    if (r === 'done') {
+      o.phase = 'go';
+      u.miss = 0;
+    } else if (r === 'none') setOrder(u, { k: 'idle' });
+    return;
+  }
+  let a = s.animals.find((x) => x.id === o.target);
+  const mine = (x: Animal | undefined): x is Animal => !!x && x.kind === 'sheep' && x.hp > 0 && x.owner === u.owner && x.lamb === undefined;
+  if (!mine(a) || (a.milk ?? 0) < 1) {
+    const next = milkable(s, u.owner, a?.x ?? u.x, a?.y ?? u.y, 10, a?.id);
+    if (next) {
+      o.target = next.id;
+      a = next;
+    } else if (u.carry > 0) {
+      o.phase = 'drop';
+      return;
+    } else if (!mine(a)) {
+      setOrder(u, { k: 'idle' });
+      return;
+    }
+  }
+  const dx = a.x - u.x;
+  const dy = a.y - u.y;
+  const d = Math.sqrt(dx * dx + dy * dy) - statsOf(s, u).radius - animalRadius(a);
+  if (d <= REACH + 0.3) {
+    if (walking(u)) stopWalking(u);
+    face(u, a.x, a.y);
+    u.miss = 0;
+    // A dry udder: wait by the sheep (free to graze) for it to fill.
+    if ((a.milk ?? 0) < 1) return;
+    a.held = s.tick;
+    o.phase = 'work';
+    u.act = 'forage';
+    u.frac += milkRate(s, u) * DT;
+    const cap = carryCap(s, u);
+    while (u.frac >= 1 && u.carry < cap && (a.milk ?? 0) >= 1) {
+      u.frac -= 1;
+      u.carry++;
+      a.milk = (a.milk ?? 0) - 1;
+    }
+    workEvent(s, u, 'forage', a.x, a.y);
+    if (u.carry >= cap) {
+      u.frac = 0;
+      o.phase = 'drop';
+    }
+    return;
+  }
+  o.phase = 'go';
+  const g = goalForPoint(s, a.x, a.y, passOf(s, u));
+  const moved = u.goal ? Math.abs(u.goal.px - g.px) + Math.abs(u.goal.py - g.py) : 99;
+  if (walking(u) && moved > 1.5 && s.tick - u.pathTick > 15) {
+    goTo(u, g);
+    return;
+  }
+  if (!approach(u, g)) setOrder(u, { k: 'idle' });
+}
+
 // ---- Priests ---------------------------------------------------------------------------------------
 
 /** How long a conversion takes for this target, in ticks (heavier units resist longer). */
@@ -1335,6 +1412,9 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
       break;
     case 'hunt':
       huntStep(s, u, o);
+      break;
+    case 'milk':
+      milkStep(s, u, o);
       break;
     case 'convert':
       convertStep(s, u, o);

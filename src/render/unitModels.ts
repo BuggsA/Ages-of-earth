@@ -1150,6 +1150,47 @@ export function wolfGeometry(): THREE.BufferGeometry {
   return wolfGeo;
 }
 
+// ---- The flock (#308) ------------------------------------------------------------------------------
+
+/**
+ * A fat-tailed steppe sheep: a cream fleece, a dark face and legs, the broad tail the herders of the
+ * grasslands bred for, and a daub of its people's dye on the back (the team color). Its head (the arm rig)
+ * dips to crop the grass.
+ */
+function sheep(): Kit {
+  const k = new Kit();
+  const wool = '#e6dcc4';
+  const dark = '#3a2e26';
+  const LEG = 0.11;
+  for (const [x, z, rig] of [[-0.045, 0.08, RIG_LEG_A], [0.045, 0.08, RIG_LEG_B], [-0.045, -0.08, RIG_LEG_B], [0.045, -0.08, RIG_LEG_A]] as [number, number, number][]) {
+    const g = k.limb(k.group(0, 0, 0), rig, LEG, z);
+    k.box(0.028, LEG, 0.03, dark, x, 0, z, g);
+  }
+  // A round fleece in three puffs, and the fat tail behind.
+  k.blob(0.12, wool, 0, LEG + 0.08, 0).scale.set(0.95, 0.85, 1.3);
+  k.blob(0.08, '#efe7d2', 0, LEG + 0.14, 0.06);
+  k.blob(0.08, '#ddd2b6', 0, LEG + 0.13, -0.07);
+  k.blob(0.06, '#d8cba9', 0, LEG + 0.03, -0.17).scale.set(1.3, 1, 0.8);
+  // The herders' dye on the back.
+  k.team(k.box(0.09, 0.02, 0.08, TEAM, 0, LEG + 0.2, -0.02));
+  const head = k.limb(k.group(0, 0, 0), RIG_ARM, LEG + 0.1, 0.12);
+  k.blob(0.045, wool, 0, LEG + 0.15, 0.13, head);
+  k.box(0.05, 0.05, 0.08, dark, 0, LEG + 0.11, 0.19, head).rotation.x = 0.35;
+  for (const x of [-1, 1]) {
+    const ear = k.box(0.05, 0.012, 0.025, dark, x * 0.045, LEG + 0.13, 0.16, head);
+    ear.rotation.z = x * -0.4;
+  }
+  return k;
+}
+
+let sheepGeo: THREE.BufferGeometry | null = null;
+
+/** The sheep, rigged to walk and to dip its head to graze. */
+export function sheepGeometry(): THREE.BufferGeometry {
+  sheepGeo ??= bake(sheep().root);
+  return sheepGeo;
+}
+
 const cache = new Map<string, THREE.BufferGeometry>();
 
 /** How high a unit line's head (or its banner pole) reaches, where a people's mark sits. */
