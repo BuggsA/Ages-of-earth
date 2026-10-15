@@ -59,12 +59,17 @@ export async function syncProgress(): Promise<number> {
 }
 
 /** After a win: if this browser syncs, send the stars up (a failure is ignored; the panel syncs again). */
-function pushProgress(): void {
+/** Whether the cloud panel has been opened in this browser, so wins and finds follow the key on their own. */
+export function syncOn(): boolean {
   try {
-    if (localStorage.getItem(SYNC) !== '1') return;
+    return localStorage.getItem(SYNC) === '1';
   } catch {
-    return;
+    return false;
   }
+}
+
+function pushProgress(): void {
+  if (!syncOn()) return;
   void putCloudProgress(vaultKey(), loadProgress()).catch(() => undefined);
 }
 

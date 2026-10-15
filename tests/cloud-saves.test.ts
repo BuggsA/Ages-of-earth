@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { MAX_CLOUD_SAVE, VAULT_KEY_LENGTH, VAULT_SLOTS, cleanProgress, formatVaultKey, mergeProgress, newVaultKey, normalizeVaultKey, validVaultKey } from '../src/net/vault';
-import { deleteCloud, getCloudProgress, listCloud, loadCloud, putCloudProgress, saveCloud } from '../src/net/cloud';
+import { MAX_CLOUD_SAVE, VAULT_KEY_LENGTH, VAULT_SLOTS, cleanProgress, cleanWeb, formatVaultKey, mergeProgress, mergeWeb, newVaultKey, normalizeVaultKey, validVaultKey } from '../src/net/vault';
+import { deleteCloud, getCloudProgress, getCloudWeb, listCloud, loadCloud, putCloudProgress, putCloudWeb, saveCloud } from '../src/net/cloud';
 
 // Load through Vitest so Worker globals do not leak into the browser's typecheck (as in worker-routes).
 const { Vault } = await vi.importActual<{ Vault: new (state: object, env: unknown) => { fetch(req: Request): Promise<Response>; alarm(): Promise<void> } }>('../worker/vault');
@@ -180,6 +180,35 @@ describe('campaign stars in the vault', () => {
     expect((await prog({ method: 'PUT', body: ' '.repeat(5000) })).status).toBe(413);
     const res = await prog({ method: 'PUT', body: JSON.stringify({ progress: { ok: 3, bad: 99, __proto__: 1 } }) });
     expect(((await res.json()) as { progress: unknown }).progress).toEqual({ ok: 3 });
+  });
+});
+
+describe('web discoveries in the vault', () => {
+  it('clean to age ids and roads, and merge by union', () => {
+    expect(cleanWeb({ entered: ['iron', 'Bad', 'iron', 3], roads: ['stone>iron', 'nope', 'a>b'] })).toEqual({ entered: ['iron'], roads: ['stone>iron'] });
+    expect(cleanWeb(null)).toEqual({ entered: [], roads: [] });
+    expect(mergeWeb({ entered: ['stone'], roads: [] }, { entered: ['iron', 'stone'], roads: ['stone>iron'] })).toEqual({ entered: ['stone', 'iron'], roads: ['stone>iron'] });
+  });
+
+  it('keep every find sent from any device', async () => {
+    const e = env();
+    vi.stubGlobal('fetch', (url: string, init?: RequestInit) => worker.fetch(new Request(new URL(url, 'https://ages.example'), init), e));
+    try {
+      expect(await getCloudWeb(KEY)).toEqual({ entered: [], roads: [] });
+      await putCloudWeb(KEY, { entered: ['stone', 'bronze'], roads: [] });
+      expect(await putCloudWeb(KEY, { entered: ['merchant'], roads: ['bronze>merchant'] })).toEqual({ entered: ['stone', 'bronze', 'merchant'], roads: ['bronze>merchant'] });
+      expect(await getCloudProgress(KEY)).toEqual({});
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('refuse junk and wrong verbs', async () => {
+    const e = env();
+    const web = (init?: RequestInit) => worker.fetch(at(`${KEY}/web`, init), e);
+    expect((await web({ method: 'PUT', body: 'not json' })).status).toBe(400);
+    expect((await web({ method: 'DELETE' })).status).toBe(405);
+    expect((await web({ method: 'PUT', body: ' '.repeat(5000) })).status).toBe(413);
   });
 });
 
