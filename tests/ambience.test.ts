@@ -72,3 +72,20 @@ describe('where the land’s voices belong', () => {
     expect(armyNear(s, at.x, at.y, all)).toBe(true);
   });
 });
+
+describe('the hum of a Coil Tower', () => {
+  it('is heard near a finished tower of a people in the Age of Lightning, louder the nearer', async () => {
+    const { coilDistance, coilHumGain } = await import('../src/render/ambience');
+    const { placeBuilding } = await import('../src/sim/world');
+    const s = createGame({ seed: 4, size: 'small', mapType: 'plains', players: [{ name: 'A', ai: null, civ: 'romans' }, { name: 'B', ai: null, civ: 'romans' }] });
+    const t = placeBuilding(s, 0, 'tower', 20, 20, true);
+    expect(coilDistance(s, 20, 20, 12)).toBe(Infinity); // an ordinary Watch Tower is silent
+    s.players[0].epoch = 4;
+    s.players[0].age = 'lightning';
+    expect(coilDistance(s, t.x + 3, t.y, 12)).toBeCloseTo(3, 5);
+    expect(coilDistance(s, t.x + 30, t.y, 12)).toBe(Infinity);
+    expect(coilDistance(s, t.x + 3, t.y, 12, () => false)).toBe(Infinity); // unseen: silent
+    expect(coilHumGain(0, 12)).toBeGreaterThan(coilHumGain(6, 12));
+    expect(coilHumGain(12, 12)).toBe(0);
+  });
+});

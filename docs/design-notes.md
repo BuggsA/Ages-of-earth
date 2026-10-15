@@ -673,6 +673,7 @@ Built: bog iron dug on any road (`stats.iron`) raises each trade trip in the Mer
 
 **Next (umbrella #231):** draw the field on the ground and mark dark buildings in the panel; an heirloom or hybrid (Lightning + Reclaimers: old machines woken by current?); the computer laying its town out inside its fields; a counter for coils in the Aeronauts' hands (bombers that seek coils?).
 
+**Coil hum (own pitch, 2026-10-15, Chain 1015-0942 s5, lane look):** the Age of Lightning had a crackle for each bolt but a coil at rest was silent. A finished Coil Tower within `COIL_HUM_RANGE` (12) tiles of the view now hums, a 60 Hz saw and its octave swelling and fading, with a thin whine on top, louder the nearer (`coilDistance`, `coilHumGain` in `ambience.ts`). I love that you can hear a rival's field before you see it, as you scroll toward their quarter. Seen: unit test; level unheard, browser unseen. Next: a hum that dips when its field is dark, a corona of blue sparks on the mast at night.
 
 ## Designers' notes: reading a rival's heirlooms (#242, own pitch, 2026-10-15, chain 1015-1037 s1, lane ai)
 
