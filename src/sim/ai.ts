@@ -4,7 +4,7 @@ import { NAVAL, distToRect, nearestWalkable, placeProblem, walkable } from './gr
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
-import { ageOf, barred, deedsDone, deedsProgress, hiresAt, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
+import { ageOf, barred, deedsDone, hasWalked, deedsProgress, hiresAt, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
 import { carriedBy } from './relics';
 import { claimants, favours, landmarkAt } from './landmarks';
 import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple } from './units';
@@ -67,11 +67,12 @@ const ADVANCE_AT = [11, 17, 22, 28];
 const TILE_OF: Record<Res, number> = { food: R_BERRY, wood: R_TREE, stone: R_STONE, gold: R_GOLD };
 /** Technologies in the order the opponent wants them (economy first). */
 const TECH_ORDER: TechId[] = [
+  // Heirlooms first (#224, #232): techProblem keeps them shut until both their ages are walked, and once
+  // one opens it is the prize of the road the computer chose for it, so it is bought before anything else.
+  'bellFoundry', 'ironHulls', 'jointStock', 'masonsLodge',
   'plow', 'drying', 'hounds', 'axes', 'wheelbarrow', 'picks', 'forging', 'bloomery', 'scaleArmor', 'fletching', 'husbandry', 'irrigation', 'saws', 'shafts', 'handcart',
   'ironCasting', 'chainMail', 'bodkin', 'masonry', 'theology', 'conscription', 'blastFurnace', 'plateArmor', 'chemistry',
   'gillnets', 'shipwright', 'lighthouse', 'steamEngine', 'rifling', 'aviation', 'caravan', 'banking', 'pilgrimage', 'credit', 'ropewalk', 'litany',
-  // Heirlooms (#224): techProblem keeps them shut until both their ages are walked.
-  'bellFoundry', 'ironHulls', 'jointStock', 'masonsLodge',
 ];
 /** Seconds a computer keeps its traders off a road after losing one on it. */
 const TRADER_WARY = 240;
@@ -238,7 +239,9 @@ function research(s: GameState, v: View, peopleEnough: boolean, issue: (c: Comma
     if (tech === 'hounds' && !s.carcasses?.some((c) => c.full > AMOUNT.meat)) continue;
     // Trade technologies only pay with traders on the road.
     if (TECHS[tech].at === 'market' && v.traders.length < 3) continue;
-    const at = v.buildings.find((b) => b.type === TECHS[tech].at && b.built && b.queue.length === 0 && b.advance < 0);
+    // An heirloom (#232) joins a queue that has room: a Dock that never stops training would otherwise never learn its own.
+    const room = TECHS[tech].walked ? MAX_QUEUE : 1;
+    const at = v.buildings.find((b) => b.type === TECHS[tech].at && b.built && b.queue.length < room && b.advance < 0);
     if (!at) continue;
     // The Town Center trains citizens first.
     if (at.type === 'towncenter' && !peopleEnough && v.citizens.length < 12) continue;
@@ -294,12 +297,30 @@ function fit(p: Player, to: AgeId): number {
   return (age.price?.[cls] ?? 1) < 1 ? 1 : 0;
 }
 
-/** Whether it means to walk the road to a side age, decided the first time it asks (#50). */
+/**
+ * The heirloom (#224) a road into `to` would open: one whose other age the people has already walked,
+ * and that it hasn't learned yet. Null when the road opens none.
+ */
+export function heirloomAhead(p: Player, to: AgeId): TechId | null {
+  for (const id of TECH_ORDER) {
+    const pair = TECHS[id].walked;
+    if (!pair || !pair.includes(to) || p.techs.includes(id)) continue;
+    const other = pair[0] === to ? pair[1] : pair[0];
+    if (hasWalked(p, other)) return id;
+  }
+  return null;
+}
+
+/**
+ * Whether it means to walk the road to a side age, decided the first time it asks (#50). A road that
+ * opens an heirloom with an age it has already walked (#232) is taken at `AI_WEB.heir` odds rather than
+ * `take`: the second road is the plan, not a coin toss. A road that bars its people's strength still isn't.
+ */
 function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   const roads = (mem.roads ??= {});
   if (roads[to] === undefined) {
     const f = fit(p, to);
-    roads[to] = f > 0 || (f === 0 && roll(s) < AI_WEB.take);
+    roads[to] = f > 0 || (f === 0 && roll(s) < (heirloomAhead(p, to) ? AI_WEB.heir : AI_WEB.take));
   }
   return roads[to]!;
 }

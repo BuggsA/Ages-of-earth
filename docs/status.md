@@ -208,3 +208,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Heirlooms** (#224, own pitch from #197, lane rules): crafts only a people that walked two side ages can learn, kept for good: Bell Foundry, Iron-Bound Hulls, Joint-Stock Company, Masons' Lodge (`Tech.walked`, `Player.walked`). Tests and a headless match; browser and win rates unseen; no save bump.
 **Lords of the Land** (own pitch, lane rules): the 'lords' game mode: keep every landmark 240 s to win; HUD countdown, banner, end line; the computer breaks a rival's hold with any soldiers. `LANDMARKS.lordsSeconds/.lordsMin`. Unit tests only; browser and win-rate unseen; no save bump.
+
+**The computer reaches for an heirloom** (#232, own pitch, lane ai): once it has walked a side age, the clever computer takes the second road that opens an heirloom (`AI_WEB.heir` 1, was `take` 0.6) and buys the heirloom first, queuing it even at a busy building. Tests and a headless match; no win-rate sweep; browser unseen; no save bump.
