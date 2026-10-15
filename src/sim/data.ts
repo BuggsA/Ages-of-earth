@@ -1018,7 +1018,7 @@ export const MAP_TYPES: Record<MapType, { label: string; blurb: string }> = {
 
 export interface AiLevel {
   label: string;
-  /** Gathering multiplier (a small edge on Hard). */
+  /** Gathering multiplier (a small edge on Expert, a handicap on Easy and Normal). */
   gather: number;
   citizens: number;
   /** Seconds before the first attack, and its size; later waves grow. */
@@ -1050,10 +1050,17 @@ export interface AiLevel {
   worthy: boolean;
 }
 
+/**
+ * Four honest difficulties (#256, #258). A newcomer picks the one called Normal, so Normal is the fair
+ * learning game and Easy is gentler still: a first-timer should reach the Bronze Age alive. The ids keep
+ * the behaviour they always had, so saves, replays, rooms and tests stay as they were; only the names
+ * moved: `easy` is shown as Normal, `normal` as Hard, `hard` as Expert (the campaign proof's level).
+ */
 export const AI_LEVELS: Record<Difficulty, AiLevel> = {
-  easy: { label: 'Easy', gather: 0.8, citizens: 16, firstAttack: 720, wave: 6, waveGrowth: 3, think: 1.5, towers: 0, clever: false, traders: 2, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true },
-  normal: { label: 'Normal', gather: 1, citizens: 24, firstAttack: 480, wave: 8, waveGrowth: 4, think: 1, towers: 1, clever: true, traders: 5, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true },
-  hard: { label: 'Hard', gather: 1.15, citizens: 32, firstAttack: 330, wave: 9, waveGrowth: 5, think: 0.5, towers: 2, clever: true, traders: 8, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true },
+  gentle: { label: 'Easy', gather: 0.65, citizens: 12, firstAttack: 1080, wave: 4, waveGrowth: 2, think: 2, towers: 0, clever: false, traders: 1, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true },
+  easy: { label: 'Normal', gather: 0.8, citizens: 16, firstAttack: 720, wave: 6, waveGrowth: 3, think: 1.5, towers: 0, clever: false, traders: 2, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true },
+  normal: { label: 'Hard', gather: 1, citizens: 24, firstAttack: 480, wave: 8, waveGrowth: 4, think: 1, towers: 1, clever: true, traders: 5, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true },
+  hard: { label: 'Expert', gather: 1.15, citizens: 32, firstAttack: 330, wave: 9, waveGrowth: 5, think: 0.5, towers: 2, clever: true, traders: 8, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true },
 };
 
 /**
