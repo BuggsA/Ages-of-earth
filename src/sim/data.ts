@@ -1302,6 +1302,17 @@ export const ATTRITION = { every: 5, deep: 9, loss: 0.02 };
  */
 export const AI_LIGHTNING = { towers: 2, every: 40, gap: 45, most: 6, raid: 150 };
 
+/**
+ * The computer on the Path of Blood (#307). `take`: odds a clever war-people (foot or riders for its signature)
+ * chooses the path. `patience`: seconds it holds the Warband for the plunder before the climb to Gunpowder,
+ * given up after that. `stay`: seconds in Iron and Blood before it climbs out. `reach`: how near (tiles) to
+ * the rival's home a wave must be before it pitches a War Camp; `clear`: tiles it keeps from the rival's
+ * Town Center and Towers (arrow range and a margin). `keep`: soldiers left by each camp. `again`: seconds
+ * before a burnt camp is pitched anew. `answer`: tiles from home within which a rival's camp draws a strike
+ * band of `strike` soldiers.
+ */
+export const AI_BLOOD = { take: 0.6, patience: 480, stay: 360, reach: 40, clear: 11, keep: 3, again: 120, answer: 48, strike: 5 };
+
 export const AI_RAID = { weary: 0.5, calm: 7, fort: 15, pop: 24, flame: 24, stage: 36 };
 /**
  * Hunters hunted (#260): between waves a clever computer sends `band` to `most` idle soldiers at a rival citizen

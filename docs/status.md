@@ -59,6 +59,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Iron and Blood** (#303, s2 of #299, lane rules): the Path of Blood's tier-3 step, a turn off Gunpowder for peoples that walked the Warband (deed: 600 plunder); War Camps pitched by foot soldiers in enemy land, burn when left alone (`WARCAMP`, `AGES.ironblood`). Seen in headless Chromium; computer still off paths (checksum unchanged); no save bump.
 
+**The computer walks the Path of Blood** (#307, s3 of #299, lane ai): clever war-peoples (Romans, Greeks, Mongols) turn Warband, hold the climb for plunder, turn Iron and Blood, pitch War Camps with a guard when a wave nears the rival, and fall on a rival's camp near home (`AI_BLOOD`). Duels (16 matches a people, Hard, medium, 30 min): Romans walker won 6 lost 4 (main: 4–4), Mongols 5–5 (main: 5–6); gathering unchanged. `scripts/sim.ts 3 medium 30` checksum 1521548769 → 2462650154 (Hard now turns Warband). Browser not needed (rules only); no save bump.
+
 **Art pass 8** (#267, lane look): epoch 4 citizen work clothes and pick, ironclad armor belt. Render only; models test passes; look unseen.
 
 **Art pass 11** (#267, lane look): stables of epochs 0–2 get their own silhouettes: a rail-fenced horse corral with a hide lean-to and horsetail totem; mudbrick stalls with arched doors and beam ends; a hayloft dormer and weathervane on the medieval stable. Render only; `models.test.ts` builds them; look in a browser unseen; no save bump.

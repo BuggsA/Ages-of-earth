@@ -1,10 +1,10 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_PROWL, AI_RAID, AI_WEB, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, AI_PROWL, WARCAMP, AI_RAID, AI_WEB, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
-import { ageOf, barred, deedsDone, hasCoils, hasWalked, deedsProgress, hiresAt, inField, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
+import { ageOf, barred, buildBarred, deedsDone, hasCoils, hasWalked, deedsProgress, hiresAt, inField, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
 import { carriedBy } from './relics';
 import { claimants, favours, landmarkAt } from './landmarks';
 import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple } from './units';
@@ -293,10 +293,10 @@ const walksWeb = (v: View): boolean => AI_LEVELS[v.p.ai!].clever && v.plan === N
 function fit(p: Player, to: AgeId): number {
   const sig = SIGNATURES[p.civ].type;
   const age = AGES[to];
-  // A path (#299) is walked only once the computer has learned it (s3); until then it never rolls for one.
-  if (age.path) return -1;
-  if (age.no?.units.includes(sig)) return -1;
   const cls = unitStats(sig, 0).cls;
+  // The Path of Blood (#307) suits a people that fights with foot or riders; the others keep to trade, faith and craft.
+  if (age.path) return age.path === 'blood' && (cls === 'infantry' || cls === 'cavalry') ? 0 : -1;
+  if (age.no?.units.includes(sig)) return -1;
   return (age.price?.[cls] ?? 1) < 1 ? 1 : 0;
 }
 
@@ -321,9 +321,12 @@ export function heirloomAhead(p: Player, to: AgeId): TechId | null {
  */
 function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   const roads = (mem.roads ??= {});
-  if (roads[to] === undefined) {
+  if (roads[to] === undefined && to === 'ironblood') {
+    // The second step of the Path of Blood is no new coin toss: a people that walked the Warband goes on.
+    roads[to] = hasWalked(p, 'warband');
+  } else if (roads[to] === undefined) {
     const f = fit(p, to);
-    roads[to] = f > 0 || (f === 0 && roll(s) < (heirloomAhead(p, to) ? AI_WEB.heir : AI_WEB.take));
+    roads[to] = f > 0 || (f === 0 && roll(s) < (AGES[to].path ? AI_BLOOD.take : heirloomAhead(p, to) ? AI_WEB.heir : AI_WEB.take));
   }
   return roads[to]!;
 }
@@ -376,7 +379,39 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
     }
   }
   delete mem.waiting;
+  if (walksWeb(v)) {
+    const hold = bloodHold(s, v, mem);
+    if (hold === 'stay') return null;
+    if (hold) return { road: hold, wait: true };
+  }
   return main ? { road: main, wait: false } : null;
+}
+
+/**
+ * The Path of Blood (#307) holds the climb on the trunk three times: in the Middle Ages for the Warband's
+ * deed (the slain, held as other deeds are), in the Warband for the plunder the Iron and Blood road asks
+ * (`AI_BLOOD.patience` seconds, then the road is given up), and in Iron and Blood itself for `stay` seconds,
+ * since its camps are what it came for. Returns the road held for, 'stay', or null.
+ */
+function bloodHold(s: GameState, v: View, mem: AiMemory): Road | 'stay' | null {
+  const { p } = v;
+  const here = ageOf(p);
+  const blood = (mem.blood ??= {});
+  if (here === 'ironblood') {
+    blood.since ??= s.tick;
+    return s.tick - blood.since < secs(AI_BLOOD.stay) ? 'stay' : null;
+  }
+  const road =
+    here === 'warband'
+      ? ROADS.find((r) => r.from === 'gunpowder' && r.to === 'ironblood')
+      : roadsFrom(p).find((r) => AGES[r.to].path === 'blood' && AGES[r.to].tier === p.epoch && roadKnown(s, p, r));
+  if (!road || !wants(s, p, mem, road.to) || (here !== 'warband' && !roadKnown(s, p, road))) return null;
+  if (deedsDone(p, road)) return null;
+  if (here !== 'warband') return worthWaiting(s, v, mem, road) ? road : null;
+  blood.hold ??= s.tick;
+  if (s.tick - blood.hold <= secs(AI_BLOOD.patience)) return road;
+  mem.roads![road.to] = false;
+  return null;
 }
 
 /**
@@ -419,6 +454,11 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
       return { road: r, wait: false };
     }
     if (r.to === 'sail' && count(v, 'dock', true) > 0 && roadKnown(s, p, r) && deedsDone(p, r) && wants(s, p, mem, r.to)) return { road: r, wait: false };
+    // The Path of Blood (#307): a war-people with a Barracks turns Warband once the slain are counted, and Iron and Blood once the plunder is in.
+    if (AGES[r.to].path === 'blood') {
+      if (roadKnown(s, p, r) && deedsDone(p, r) && wants(s, p, mem, r.to)) return { road: r, wait: false };
+      continue;
+    }
     if (r.to !== 'pilgrim' || kept < AI_WEB.relics || !roadKnown(s, p, r) || !deedsDone(p, r) || !wants(s, p, mem, r.to)) continue;
     return { road: r, wait: false };
   }
@@ -1723,6 +1763,82 @@ export function stagingFord(s: GameState, owner: number, home: { x: number; y: n
   return best;
 }
 
+/** Soldiers a War Camp counts as keepers: the people's land fighters, as `warcamp.ts` reads them. */
+const campKeeper = (u: Unit): boolean => u.type !== 'citizen' && u.type !== 'priest' && u.type !== 'trader' && domainOf(u.type) === 'land';
+
+/**
+ * The Path of Blood (#307): soldiers left by each finished War Camp (`AI_BLOOD.keep`, in id order), so it
+ * doesn't burn (`WARCAMP.grace`) and its trainees stay as its guard; the wave's orders pass them by.
+ */
+function campGuards(v: View): Set<number> {
+  const guards = new Set<number>();
+  if (ageOf(v.p) !== 'ironblood') return guards;
+  const r2 = (WARCAMP.watch - 2) * (WARCAMP.watch - 2);
+  for (const b of v.buildings) {
+    if (b.type !== 'warcamp' || !b.built) continue;
+    let n = 0;
+    for (const u of v.army) {
+      if (n >= AI_BLOOD.keep) break;
+      if (u.inside || guards.has(u.id) || !campKeeper(u) || u.type === 'hero') continue;
+      if ((u.x - b.x) * (u.x - b.x) + (u.y - b.y) * (u.y - b.y) > r2) continue;
+      guards.add(u.id);
+      n++;
+    }
+  }
+  return guards;
+}
+
+/**
+ * The Path of Blood (#307): a wave that has marched to within `reach` tiles of the rival's home pitches a War
+ * Camp where it stands, back from the Town Center's and Towers' arrows (`clear`), with its foot soldiers; its
+ * trainees then rally to it. One camp at a time, and a burnt one is not pitched again for `again` seconds.
+ */
+function pitchCamp(s: GameState, v: View, mem: AiMemory, wave: Unit[], enemy: { x: number; y: number }, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (ageOf(p) !== 'ironblood' || buildBarred(p, 'warcamp') || v.buildings.some((b) => b.type === 'warcamp')) return;
+  const blood = (mem.blood ??= {});
+  if (blood.camp !== undefined && s.tick - blood.camp < secs(AI_BLOOD.again)) return;
+  const foot = wave.filter((u) => u.type === 'infantry' && !u.inside);
+  if (foot.length < 3) return;
+  let cx = 0;
+  let cy = 0;
+  for (const u of foot) {
+    cx += u.x;
+    cy += u.y;
+  }
+  cx /= foot.length;
+  cy /= foot.length;
+  if ((cx - enemy.x) * (cx - enemy.x) + (cy - enemy.y) * (cy - enemy.y) > AI_BLOOD.reach * AI_BLOOD.reach) return;
+  const cost = buildingCostFor(s, p.id, 'warcamp');
+  if (!afford(v, cost)) return;
+  const clear2 = AI_BLOOD.clear * AI_BLOOD.clear;
+  const spot = findSpot(s, 'warcamp', cx, cy, 0, 5, 1, (tx, ty) => {
+    const x = tx + 1;
+    const y = ty + 1;
+    return !s.ents.some((e) => e.kind === 'building' && e.hp > 0 && e.built && isEnemy(s, p.id, e.owner) && (e.type === 'towncenter' || e.type === 'tower') && (e.x - x) * (e.x - x) + (e.y - y) * (e.y - y) <= clear2);
+  });
+  if (!spot) return;
+  const crew = foot.sort((a, b) => (a.x - spot.tx) * (a.x - spot.tx) + (a.y - spot.ty) * (a.y - spot.ty) - ((b.x - spot.tx) * (b.x - spot.tx) + (b.y - spot.ty) * (b.y - spot.ty)) || a.id - b.id).slice(0, 4);
+  issue({ t: 'build', p: p.id, ids: crew.map((u) => u.id), type: 'warcamp', tx: spot.tx, ty: spot.ty });
+  spend(v, cost);
+  blood.camp = s.tick;
+}
+
+/** The nearest rival War Camp the computer has seen within `AI_BLOOD.answer` tiles of home, or null. */
+export function rivalWarCamp(s: GameState, p: Player, home: { x: number; y: number }): Building | null {
+  let best: Building | null = null;
+  let bestD = AI_BLOOD.answer * AI_BLOOD.answer;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'warcamp' || !e.built || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
+    if (!p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
+    const d = (e.x - home.x) * (e.x - home.x) + (e.y - home.y) * (e.y - home.y);
+    if (d >= bestD) continue;
+    bestD = d;
+    best = e;
+  }
+  return best;
+}
+
 function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
   const L = AI_LEVELS[p.ai!];
@@ -1792,14 +1908,17 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     issue({ t: 'train', p: p.id, building: b.id, unit });
     spend(v, cost);
     tally(unit);
-    if (!b.rally || Math.abs(b.rally.x - mem.muster.x) > 1) issue({ t: 'rally', p: p.id, building: b.id, x: mem.muster.x, y: mem.muster.y });
+    // A War Camp's trainees stay by it, its guard (#307).
+    const rally = b.type === 'warcamp' ? { x: b.x, y: b.y + b.size / 2 + 1 } : mem.muster;
+    if (!b.rally || Math.abs(b.rally.x - rally.x) > 1 || Math.abs(b.rally.y - rally.y) > 1) issue({ t: 'rally', p: p.id, building: b.id, x: rally.x, y: rally.y });
   }
 
   // Defend: enemies near home draw the whole army.
   const threat = threatNear(s, v).unit;
   // Soldiers on their way to (or aboard) a landing ship are not the land army's to command.
   const sailing = new Set(mem.landing?.ids);
-  const fighters = v.army.filter((u) => !u.inside && !sailing.has(u.id));
+  const guards = L.clever ? campGuards(v) : new Set<number>();
+  const fighters = v.army.filter((u) => !u.inside && !sailing.has(u.id) && !guards.has(u.id));
   if (threat) {
     const responders = fighters.filter((u) => u.order.k !== 'attack');
     if (responders.length) issue({ t: 'move', p: p.id, ids: responders.map((u) => u.id), x: threat.x, y: threat.y, amove: true });
@@ -1819,6 +1938,16 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     issue({ t: 'move', p: p.id, ids: fighters.map((u) => u.id), x: mem.muster.x, y: mem.muster.y });
     mem.attacking = false;
     return;
+  }
+  if (L.clever && mem.attacking) pitchCamp(s, v, mem, onAttack, enemy, issue);
+  // A rival's War Camp in reach is a raid worth more than a house (#307): kill its keepers and it burns.
+  if (L.clever && !mem.attacking && !plan.hold ) {
+    const camp = rivalWarCamp(s, p, v.home);
+    const band = camp ? ready.filter(prowler) : [];
+    if (camp && band.length >= AI_BLOOD.strike) {
+      issue({ t: 'move', p: p.id, ids: band.map((u) => u.id), x: camp.x, y: camp.y, amove: true });
+      return;
+    }
   }
   const due = !plan.hold && (plan.wave ? true : s.tick >= secs(L.firstAttack)) && s.tick >= s.peaceUntil;
   if (due && !mem.attacking && (fighters.length >= waveSize || (wonderRace && fighters.length >= 4) || (plan.allIn && fighters.length >= 12))) {
