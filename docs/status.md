@@ -54,6 +54,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Rally ring** (own pitch, lane look): stirred soldiers wear a pulsing gold band that fades with the cry. Render only; smoke passes; look in a match unseen.
 **Cry ripple** (own pitch, lane look): calling the Rallying Cry sends two gold rings out to its reach. Render only; reach vs. the ring mesh unseen in a browser.
 
+**Machine-age silhouettes** (#267 art pass, lane look): epoch 4 houses are brick terraces (flat parapet, chimney pots) and Watch Towers iron-framed lookouts with a lamp gallery, no longer the epoch 3 shapes. Render only; `models.test.ts` builds them; look in a browser unseen; no save bump.
+
 **Waymarks** (#154, seed #152, lane look): the minimap remembers ruins (dug or standing, by whom) and relics as last seen. UI only; browser unverified.
 
 **The wild** (#171, own pitch from the owner's chat, lane rules): mammoths (a feast that charges its hunters) and wolf packs by dens out between the towns, often by wild gold; bitten people fight back; soldiers can hunt beasts; the computer hunts its mammoth with five and clears near dens. New numbers `MAMMOTH`, `WOLF`, `AI_WILD`. No save bump (old saves hold only deer). Seen in headless Chromium; sound levels unheard; not played by hand.
