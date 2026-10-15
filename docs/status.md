@@ -76,6 +76,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Contested landmarks** (#182, own pitch, lane rules): a Sacred Spring, Lookout Crag and Ancestors' Cairn between the towns (players + 1), claimed by standing on them alone; held ones are land. The computer claims with a citizen and retakes with soldiers. New numbers `LANDMARKS`, `AI_MARK`. Tests, headless matches and headless-Chromium screenshots; sounds unheard; no win-rate sweep; no save bump. Also: a people down to unarmed boats (fishing boats, merchant ships) is beaten (`checkVictory`).
 
+**Flint Scatter** (#187, own pitch, lane rules): a fourth landmark kind; its keeper's citizens chop and mine 20% faster (`LANDMARKS.flint.tools`). Unit and model tests only; browser, sound and win-rate unseen; no save bump. `tests/relics.test.ts` sits near its 15 s limit and timed out once under load.
+
 ## Waiting on the owner
 
 **Setup only the owner can do:**
