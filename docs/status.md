@@ -232,3 +232,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Sail detour sweep** (own pitch, lane ai): `AI_LEVELS.detour` gates the #232 detour; 32 A/B matches, 12–13, gathering ×1.00: no difference, and it fires rarely (`docs/log/2026-10-15-2400-sail-sweep.md`). No save bump.
 
 **Coil layout** (own pitch, lane ai, s4 of #231): in the Age of Lightning the computer builds new buildings inside a coil's field (`fieldSpot`). Tests only; no win-rate sweep; no save bump.
+
+**Hunters hunted** (#260, own pitch, lane ai): Hard/Expert computers send 2–3 idle soldiers at rival citizens they see working far from home with no guard, and walk to a seen rival Hunting Camp to look (`AI_PROWL`). Tests and a headless match; about one foray per computer-vs-computer match; browser unseen; no save bump.

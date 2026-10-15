@@ -1,5 +1,5 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_RAID, AI_WEB, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_PROWL, AI_RAID, AI_WEB, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Ruin, TechId, TradePost, Unit, UnitType } from './types';
@@ -1771,6 +1771,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     issue({ t: 'move', p: p.id, ids: fighters.map((u) => u.id), x: enemy.x, y: enemy.y, amove: true });
     mem.attacking = true;
     mem.wave++;
+    delete mem.prowl; // the band marches with the wave
     return;
   }
   if (mem.attacking && ready.length >= (plan.allIn ? 1 : 4)) {
@@ -1778,8 +1779,10 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     issue({ t: 'move', p: p.id, ids: ready.map((u) => u.id), x: enemy.x, y: enemy.y, amove: true });
     return;
   }
-  // Between waves, a few riders cut the rivals' trade roads near home.
+  // Between waves, a small band falls on rival citizens working far from their town (#260).
   const watching = new Set<number>();
+  if (L.clever && !plan.hold) for (const id of prowl(s, v, mem, ready, issue)) watching.add(id);
+  // Between waves, a few riders cut the rivals' trade roads near home.
   if (L.clever) {
     const riders = ready.filter((u) => u.type === 'cavalry' && u.order.k === 'idle');
     const prey = riders.length ? enemyTrader(s, v, v.home, AI_WEB.raidNear, false) : null;
@@ -1810,6 +1813,132 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     return ox * ox + oy * oy > 36 && u.order.k === 'idle';
   });
   if (strays.length) issue({ t: 'move', p: p.id, ids: strays.map((u) => u.id), x: mem.muster.x, y: mem.muster.y });
+}
+
+/** Soldiers who can go prowling: not siege, and not the hero, who leads the army. */
+function prowler(u: Unit): boolean {
+  return u.type === 'infantry' || u.type === 'ranged' || u.type === 'cavalry';
+}
+
+/** Armed: a rival unit that can fight a prowling band off. */
+function armed(u: Unit): boolean {
+  return prowler(u) || u.type === 'hero';
+}
+
+/**
+ * The rival citizen nearest a point that a band of `n` may fall on (#260): one the computer's own units see,
+ * within `reach` tiles of its home, more than `safe` tiles from any rival Town Center or Tower, no rival soldier
+ * within `guard` tiles, and at most `odds` rival citizens per raider within 4 tiles. Null when there is none.
+ */
+export function prey(s: GameState, p: Player, home: { x: number; y: number }, at: { x: number; y: number }, within: number, n: number): Unit | null {
+  const P = AI_PROWL;
+  const forts: Building[] = [];
+  const guards: Unit[] = [];
+  const folk: Unit[] = [];
+  for (const e of s.ents) {
+    if (e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
+    if (e.kind === 'building') {
+      if (e.built && (e.type === 'towncenter' || e.type === 'tower')) forts.push(e);
+    } else if (!e.inside) {
+      if (armed(e)) guards.push(e);
+      else if (e.type === 'citizen') folk.push(e);
+    }
+  }
+  let best: Unit | null = null;
+  let bestD = within * within;
+  for (const c of folk) {
+    if (!p.vis[Math.floor(c.y) * s.w + Math.floor(c.x)]) continue;
+    const d = (c.x - at.x) * (c.x - at.x) + (c.y - at.y) * (c.y - at.y);
+    if (d >= bestD) continue;
+    const hx = c.x - home.x;
+    const hy = c.y - home.y;
+    if (hx * hx + hy * hy > P.reach * P.reach) continue;
+    if (forts.some((b) => distToRect(c.x, c.y, b) <= P.safe)) continue;
+    if (guards.some((g) => (g.x - c.x) * (g.x - c.x) + (g.y - c.y) * (g.y - c.y) <= P.guard * P.guard)) continue;
+    let mob = 0;
+    for (const o of folk) if ((o.x - c.x) * (o.x - c.x) + (o.y - c.y) * (o.y - c.y) <= 16) mob++;
+    if (mob > n * P.odds) continue;
+    bestD = d;
+    best = c;
+  }
+  return best;
+}
+
+/**
+ * Hunters hunted (#260): between waves a clever computer sends a small band at rival citizens working far
+ * from their town (a far kill, a ruin, a landmark, wild gold) when nothing of theirs guards them, chases on to
+ * the next one near, and comes home when rival soldiers come or the time is up. Returns the band's ids, so
+ * the rest of the army leaves them be.
+ */
+function prowl(s: GameState, v: View, mem: AiMemory, ready: Unit[], issue: (c: Command) => void): Set<number> {
+  const P = AI_PROWL;
+  const { p } = v;
+  const held = new Set<number>();
+  const home = mem.muster ?? v.home;
+  if (mem.prowl) {
+    const band: Unit[] = [];
+    for (const id of mem.prowl.ids) {
+      const u = s.byId.get(id);
+      if (u && u.kind === 'unit' && u.hp > 0) band.push(u);
+    }
+    const lead = band[0];
+    const quarry = s.byId.get(mem.prowl.target);
+    const hunted = quarry && quarry.kind === 'unit' && quarry.hp > 0 && !quarry.inside ? quarry : null;
+    // Walking to a camp: it looks farther round, and keeps walking until it is there.
+    const camp = mem.prowl.look !== undefined ? s.byId.get(mem.prowl.look) : undefined;
+    const walking = !!lead && !hunted && !!camp && camp.hp > 0 && (camp.x - lead.x) * (camp.x - lead.x) + (camp.y - lead.y) * (camp.y - lead.y) > 9;
+    const next = lead && !hunted ? prey(s, p, v.home, lead, camp ? P.look : P.chase, band.length) : null;
+    const threatened = lead && s.ents.some((e) => e.kind === 'unit' && e.hp > 0 && !e.inside && isEnemy(s, p.id, e.owner) && armed(e) && (e.x - lead.x) * (e.x - lead.x) + (e.y - lead.y) * (e.y - lead.y) <= P.guard * P.guard);
+    if (!lead || threatened || s.tick - mem.prowl.since > secs(P.time) || (!hunted && !next && !walking)) {
+      if (band.length) issue({ t: 'move', p: p.id, ids: band.map((u) => u.id), x: home.x, y: home.y });
+      delete mem.prowl;
+      mem.prowled = s.tick;
+      return held;
+    }
+    if (next) {
+      issue({ t: 'attack', p: p.id, ids: band.map((u) => u.id), target: next.id });
+      mem.prowl.target = next.id;
+      delete mem.prowl.look;
+    }
+    for (const u of band) held.add(u.id);
+    return held;
+  }
+  if (s.tick < s.peaceUntil || s.tick - (mem.prowled ?? -secs(P.every)) < secs(P.every)) return held;
+  const free = ready.filter((u) => prowler(u) && !u.inside);
+  if (free.length < P.band) return held;
+  const target = prey(s, p, v.home, v.home, P.reach, Math.min(P.most, free.length)) ?? rivalCamp(s, p, v.home);
+  if (!target) return held;
+  const band = free
+    .map((u) => ({ u, d: (u.x - target.x) * (u.x - target.x) + (u.y - target.y) * (u.y - target.y) }))
+    .sort((a, b) => a.d - b.d || a.u.id - b.u.id)
+    .slice(0, P.most)
+    .map((o) => o.u);
+  if (target.kind === 'building') {
+    issue({ t: 'move', p: p.id, ids: band.map((u) => u.id), x: target.x, y: target.y });
+    mem.prowl = { ids: band.map((u) => u.id), target: -1, since: s.tick, look: target.id };
+  } else {
+    issue({ t: 'attack', p: p.id, ids: band.map((u) => u.id), target: target.id });
+    mem.prowl = { ids: band.map((u) => u.id), target: target.id, since: s.tick };
+  }
+  for (const u of band) held.add(u.id);
+  return held;
+}
+
+/** The nearest rival Hunting Camp the computer has seen within `reach` of home and clear of the rival's forts (#260), or null. */
+export function rivalCamp(s: GameState, p: Player, home: { x: number; y: number }): Building | null {
+  const P = AI_PROWL;
+  let best: Building | null = null;
+  let bestD = P.reach * P.reach;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'huntcamp' || !e.built || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
+    if (!p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
+    const d = (e.x - home.x) * (e.x - home.x) + (e.y - home.y) * (e.y - home.y);
+    if (d >= bestD) continue;
+    if (s.ents.some((f) => f.kind === 'building' && f.hp > 0 && f.built && f.owner === e.owner && (f.type === 'towncenter' || f.type === 'tower') && distToRect(e.x, e.y, f) <= P.safe)) continue;
+    bestD = d;
+    best = e;
+  }
+  return best;
 }
 
 /** A wave worn down deep in enemy land, out of reach of its own supply and clear of any fight (#132 s4). */
