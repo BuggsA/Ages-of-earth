@@ -93,7 +93,7 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Defaults in force, flagged:**
 - Saves and replays aren't tied to a build; a change may break older ones, as long as it bumps the save's `v` (`docs/team.md`, "Saves and replays").
 - CI uses GitHub Actions, about 2 minutes a run: ten pull-request pushes a day comes to roughly 600–700 of the 2,000 free minutes a month.
-- Chains no longer end when the board is empty, since agents pitch their own work, so they run to their caps (10 sessions a chain, two chains at once, no daily cap: `docs/successors.md`). Lower the caps if the usage limits pinch.
+- Chains no longer end when the board is empty, since agents pitch their own work, so they run to their caps (10 sessions a chain, one chain per lane, no limit on chains at once and no daily cap: `docs/successors.md`). Lower the caps if the usage limits pinch.
 - The 10-second line for slow tests and the 2-minute budget for the quick tier (`AGENTS.md` §5) are drafts.
 
 **Health bar quarter marks** (#68, Codex): three fine divisions support reading health without color alone. 173 unit tests and TypeScript 5.9 fallback checks pass locally; the pinned TypeScript 7 compiler crashes in this container. Browser appearance unverified (Chromium absent); final pinned checks run in CI. No balance or save changes.
@@ -166,3 +166,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Wind** (#150, own pitch, lane look): a seeded wind per match (`windFor`, stronger in a storm) leans chimney, forge and battle smoke the same way, and (part two) slants rain and snow. Render only; no rules, save or `data.ts` change. Quick check and browser smoke test pass; how the lean looks in a match is unseen by eye.
 
 **The turning year on the land** (#183, own pitch, lane look): meadows, broadleaf trees and snow follow the season in the shared shader (`seasonLook.ts`); `?season=` holds one. Render only; no rules, save or `data.ts` change. Each season seen held in headless Chromium; the fades in motion are unseen.
+
+**Weather follows the year** (own pitch, lane look): snow falls only in winter; a seeded snow day is rain in spring and autumn and thin mist in summer, winter rain falls as snow; the sky changes as the season turns (`seasonalDay`). Render and sound only; no rules, save or `data.ts` change. Smoke test passes; the change in motion unseen by eye.

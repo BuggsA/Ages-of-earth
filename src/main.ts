@@ -433,6 +433,7 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   else if (!saved) hud.banner(ageDef(me).name, `You lead the ${CIVS[me.civ].name}. Facing ${rivals.join(', ')}.${goal} ${view.weatherWords}`.trim(), 6000);
   else hud.banner('Welcome back', `${ageDef(me).name}, ${fmtClock(game.tick)} into the match.`, 3200);
   sound.setWeather(view.weatherDay.kind, view.weatherDay.strength);
+  view.onWeather = (d) => sound.setWeather(d.kind, d.strength);
   sound.startAmbience();
   playMusic(me.epoch, ageOf(me));
   // Start with the Town Center in view and selected.
