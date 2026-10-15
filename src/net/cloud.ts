@@ -1,4 +1,4 @@
-import { MAX_CLOUD_SAVE, MAX_SAVE_TITLE, cleanProgress, newVaultKey, normalizeVaultKey, type CloudSlot } from './vault';
+import { MAX_CLOUD_SAVE, MAX_SAVE_TITLE, cleanProgress, cleanWeb, newVaultKey, normalizeVaultKey, type CloudSlot, type WebFound } from './vault';
 
 /** The browser's side of cloud saves (#290): this browser's save key and the calls to its vault. */
 
@@ -85,4 +85,15 @@ export async function getCloudProgress(key: string): Promise<Record<string, numb
 export async function putCloudProgress(key: string, progress: Record<string, number>): Promise<Record<string, number>> {
   const res = await ask(`${key}/progress`, { method: 'PUT', body: JSON.stringify({ progress }), headers: { 'content-type': 'application/json' } });
   return cleanProgress(((await res.json()) as { progress?: unknown }).progress);
+}
+
+/** The Web of Ages discoveries kept under this key. */
+export async function getCloudWeb(key: string): Promise<WebFound> {
+  return cleanWeb(((await (await ask(`${key}/web`)).json()) as { web?: unknown }).web);
+}
+
+/** Send discoveries up; the vault unions them with what it holds and answers with the whole. */
+export async function putCloudWeb(key: string, web: WebFound): Promise<WebFound> {
+  const res = await ask(`${key}/web`, { method: 'PUT', body: JSON.stringify({ web }), headers: { 'content-type': 'application/json' } });
+  return cleanWeb(((await res.json()) as { web?: unknown }).web);
 }
