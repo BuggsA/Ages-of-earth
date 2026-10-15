@@ -1,11 +1,13 @@
 import * as THREE from 'three';
 import type { GameState } from '../sim/types';
 import { fogUniforms } from './materials';
+import { seasonUniforms } from './seasonLook';
 
 /**
  * Lakes: one shaded plane at the water line, colored by how deep the lake bed lies beneath it (read from
  * a small height texture): turquoise shallows, deep blue middles, a band of foam along the shore and
- * wave lines rolling in, sun glints and a fresnel sheen of sky. It reads the fog of war like everything else.
+ * wave lines rolling in, sun glints and a fresnel sheen of sky. In winter ice grows out from the shore as the
+ * snow settles (`uFrost`, the season's snow cover), leaving the deep middle open. It reads the fog of war like everything else.
  */
 
 export const WATER_Y = -0.02;
@@ -42,6 +44,7 @@ const fragment = /* glsl */ `
   uniform vec3 uSunColor;
   uniform vec3 uSky;
   uniform float uStars;
+  uniform float uFrost;
   uniform vec3 uShallow;
   uniform vec3 uDeep;
   uniform sampler2D uFogTex;
@@ -85,6 +88,14 @@ const fragment = /* glsl */ `
       col += vec3(0.8, 0.88, 1.0) * step(0.93, r) * glint * smoothstep(0.28, 0.0, d) * uStars * (0.4 + 0.6 * fres);
     }
     col = mix(col, vec3(0.95, 0.98, 1.0), foam);
+    if (uFrost > 0.0) {
+      // Ice creeps from the shallows toward the deep; its edge is ragged, and it is cracked and dull.
+      float reach = uFrost * 0.62;
+      float ice = 1.0 - smoothstep(reach - 0.1, reach, depth + (n - 0.5) * 0.28);
+      float crack = smoothstep(0.03, 0.0, abs(noise(vWorld.xz * 3.1) - 0.5)) * 0.18;
+      vec3 sheet = mix(vec3(0.74, 0.86, 0.93), vec3(0.93, 0.97, 1.0), ripple * 0.8 + n * 0.3) - crack;
+      col = mix(col, sheet, ice * 0.92);
+    }
 
     if (uFogOn > 0.5) {
       vec2 f = texture2D(uFogTex, vFogUv).rg;
@@ -116,6 +127,7 @@ export class WaterView {
           uSunColor: { value: new THREE.Color('#fff2d6') },
           uSky: { value: new THREE.Color('#bfe6f2') },
           uStars: { value: 0 },
+          uFrost: seasonUniforms.uSnow,
           uShallow: { value: new THREE.Color('#58cfc4') },
           uDeep: { value: new THREE.Color('#1d7fae') },
         },

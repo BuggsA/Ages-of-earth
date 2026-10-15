@@ -2,7 +2,7 @@ import { ageOf } from '../sim/ages';
 import { domainOf } from '../sim/data';
 import type { AgeId, GameState } from '../sim/types';
 import type { ScoutFlag } from './scoutFlags';
-import { lookFor, mapTint } from '../render/seasonLook';
+import { iceCover, lookFor, mapTint } from '../render/seasonLook';
 import { Waymarks } from './waymarks';
 import { R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE, T_ROCK, T_SAND, T_WATER } from '../sim/types';
 
@@ -34,6 +34,8 @@ export class Minimap {
   private land: Uint8ClampedArray = new Uint8ClampedArray(0);
   /** 1 where the base colour is meadow, which the season recolours. */
   private green: Uint8Array = new Uint8Array(0);
+  /** Lake depth under each water tile (0 on land), for the winter ice. */
+  private depth: Float32Array = new Float32Array(0);
   private img: ImageData | null = null;
   private pings: Ping[] = [];
   private dragging = false;
@@ -80,6 +82,7 @@ export class Minimap {
     this.img = this.baseCtx.createImageData(s.w, s.h);
     this.land = new Uint8ClampedArray(s.w * s.h * 3);
     this.green = new Uint8Array(s.w * s.h);
+    this.depth = new Float32Array(s.w * s.h);
     const grass = rgb('#6fa548');
     const grass2 = rgb('#7fb354');
     const sand = rgb('#d9c48a');
@@ -89,6 +92,7 @@ export class Minimap {
       const t = s.terrain[i];
       const c = t === T_WATER ? water : t === T_SAND ? sand : t === T_ROCK ? rock : (i * 7) % 5 ? grass : grass2;
       this.land.set(c, i * 3);
+      if (t === T_WATER) this.depth[i] = Math.max(0, -0.02 - s.height[Math.floor(i / s.w) * (s.w + 1) + (i % s.w)]);
       this.green[i] = t === T_WATER || t === T_SAND || t === T_ROCK ? 0 : 1;
     }
     this.pings = [];
@@ -137,6 +141,12 @@ export class Minimap {
         r = Math.min(255, r * meadowK[0]);
         g = Math.min(255, g * meadowK[1]);
         b = Math.min(255, b * meadowK[2]);
+      }
+      if (look.snow > 0 && this.depth[i] > 0) {
+        const ice = iceCover(look.snow, this.depth[i]) * 0.9;
+        r += (214 - r) * ice;
+        g += (232 - g) * ice;
+        b += (244 - b) * ice;
       }
       const res = s.res[i];
       if (res === R_TREE) [r, g, b] = tree;

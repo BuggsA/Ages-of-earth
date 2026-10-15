@@ -567,3 +567,9 @@ Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), n
 **Next:** breath puffs or a muffled winter ambience; frozen lake edges (water tinted white in deep winter).
 
 **Landmark worth, swept** (2026-10-15, lane ai). Built: `AI_LEVELS.worthy` (on by default) so `scripts/ai-ab.ts 21 4 20 '{"worthy":false}'` compares need-based landmark choice against nearest-only. Result over 32 Hard-vs-Hard matches (seeds 21–100, seats swapped): wins 1–3, undecided ahead 17 / behind 11, gathering ×~0.94 (se ~0.1): no difference seen, so the rule stays (it costs nothing measurable and reads as sensible play). Next: the lone-citizen recall question, or a sweep with the landmarks as the deciding fight.
+## Designers' notes: frozen lake edges (own pitch, 2026-10-15, Chain 1015-0203 session 3, lane look)
+
+**Built:** `uFrost` in the water shader (`src/render/water.ts`) is the season's snow cover; ice creeps from the shallows toward the deep with a ragged noisy edge, pale cracked and dull over the waves, and leaves the deep middle open. `iceCover`/`iceReach` in `seasonLook.ts` share the reach with the minimap, which whitens water by lake depth. Melts with the snow in spring. Render and UI only.
+**Why I love it:** the land froze but the lakes still shimmered; now winter reaches the shore and the open middle looks like a promise (or a danger) for ships.
+**Seen:** headless Chromium with `?season=winter`, seeds 3 and 7: no console errors, shader compiles; no lake was in view, so the ice itself is unseen. `tests/season-look.test.ts` checks the cover.
+**Next:** ships slowed or blocked by ice (a rules change with a save bump); breath puffs or a muffled winter ambience; a banner line when the sky changes.

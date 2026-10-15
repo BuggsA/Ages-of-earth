@@ -83,3 +83,15 @@ export function setSeasonLook(tick: number, forced: number | null = forcedSeason
   seasonUniforms.uSeason.value.set(look.w[0], look.w[1], look.w[2], look.w[3]);
   seasonUniforms.uSnow.value = look.snow;
 }
+
+/** How far from the shore, in lake depth, winter ice reaches at a snow cover (the water shader's `reach`). */
+export function iceReach(snow: number): number {
+  return snow * 0.62;
+}
+
+/** How frozen (0..1) water of a depth is at a snow cover: shallows first, the deep middle stays open. */
+export function iceCover(snow: number, depth: number): number {
+  if (snow <= 0) return 0;
+  const t = (iceReach(snow) - depth) / 0.1;
+  return t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
+}
