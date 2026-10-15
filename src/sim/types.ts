@@ -610,7 +610,7 @@ export interface AiMemory {
   short?: { since: number; epoch: number };
   /** A band out after rival citizens working far from home (#260): its soldiers, their quarry and since when. */
   /** With `look`, the band is walking to a rival Hunting Camp it has seen, to find who works there (`target` -1 until it does). */
-  prowl?: { ids: number[]; target: number; since: number; look?: number };
+  prowl?: { ids: number[]; target: number; since: number; look?: number; burn?: number };
   /** Tick its last band came home from prowling. */
   prowled?: number;
 }

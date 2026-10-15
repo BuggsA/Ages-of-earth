@@ -125,4 +125,21 @@ describe('the computer looks for hunters at a rival Hunting Camp', () => {
     }
     expect(fell).toBe(true);
   }, 30000);
+
+  it('burns the camp when the butchers are gone, and goes home once it falls', () => {
+    const s = game('normal');
+    clearWild(s);
+    const b = s.players[1];
+    const at = between(s, 0.45);
+    const camp = placeBuilding(s, 0, 'huntcamp', Math.floor(at.x), Math.floor(at.y), true) as Building;
+    b.seen.fill(1);
+    for (let i = 0; i < 4; i++) spawnUnit(s, 1, 'infantry', b.startX + 4 + i * 0.4, b.startY + 4);
+    let burned = false;
+    for (let i = 0; i < 150 * TICK_HZ && camp.hp > 0; i++) {
+      step(s);
+      if (s.ai[1]?.prowl?.burn !== undefined) burned = true;
+    }
+    expect(burned).toBe(true);
+    expect(camp.hp).toBeLessThanOrEqual(0);
+  }, 60000);
 });
