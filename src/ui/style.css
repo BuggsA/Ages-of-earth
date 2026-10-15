@@ -85,6 +85,11 @@ kbd {
 .res.civ .crest { margin-right: 0; }
 .civ-crest { flex: none; display: block; filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.45)); }
 .civ-blurb { flex: 1; grid-column: 1 / -1; font-size: 13px; font-weight: 700; color: var(--ink); opacity: 0.85; min-height: 18px; }
+.more-opts { margin-top: 2px; }
+.more-opts summary { cursor: pointer; font-weight: 800; font-size: 13px; color: var(--gold-2); padding: 4px 0; }
+.more-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; margin-top: 8px; }
+.more-grid label { display: grid; gap: 4px; font-size: 13px; font-weight: 800; color: var(--muted); }
+.more-grid select { font: 700 14px 'Nunito', sans-serif; color: var(--ink); background: #1b2030; border: 1px solid var(--edge-soft); border-radius: 8px; padding: 7px 8px; }
 .title-buttons { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 .title-links { display: flex; gap: 16px; justify-content: center; margin-top: 10px; }
 .link { font: 800 13px 'Nunito', sans-serif; color: var(--gold-2); background: none; border: none; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; padding: 2px; }

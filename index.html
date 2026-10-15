@@ -25,22 +25,6 @@
             <label>Your people
               <select id="opt-civ"></select>
             </label>
-            <label>Color
-              <select id="opt-color"></select>
-            </label>
-            <label>Opponents
-              <select id="opt-foes">
-                <option value="1" selected>1 rival</option>
-                <option value="2">2 rivals</option>
-                <option value="3">3 rivals</option>
-              </select>
-            </label>
-            <label>Teams
-              <select id="opt-teams">
-                <option value="ffa" selected>Everyone for themselves</option>
-                <option value="ally">You and a computer ally</option>
-              </select>
-            </label>
             <label>Difficulty
               <select id="opt-diff">
                 <option value="gentle">Easy: a first game</option>
@@ -49,17 +33,40 @@
                 <option value="hard">Expert</option>
               </select>
             </label>
-            <label>Map
+            <label>Map seed
+              <span class="seed-row"><input id="opt-seed" type="number" min="1" /><button class="btn small" data-act="reroll" title="A new map">🎲</button><button class="btn small" data-act="copy-world" title="Copy a link to this world (seed, size, map, foes)">🔗</button></span>
+            </label>
+            <div class="civ-row"><span id="civ-crest" class="civ-crest"></span><div id="civ-blurb" class="civ-blurb"></div></div>
+            <details class="more-opts wide" id="more-opts">
+              <summary>More options: rivals, map, game type, graphics</summary>
+              <div class="more-grid">
+                <label>Color
+              <select id="opt-color"></select>
+            </label>
+                <label>Opponents
+              <select id="opt-foes">
+                <option value="1" selected>1 rival</option>
+                <option value="2">2 rivals</option>
+                <option value="3">3 rivals</option>
+              </select>
+            </label>
+                <label>Teams
+              <select id="opt-teams">
+                <option value="ffa" selected>Everyone for themselves</option>
+                <option value="ally">You and a computer ally</option>
+              </select>
+            </label>
+                <label>Map
               <select id="opt-map"></select>
             </label>
-            <label>Map size
+                <label>Map size
               <select id="opt-size">
                 <option value="small">Small</option>
                 <option value="medium" selected>Medium</option>
                 <option value="large">Large</option>
               </select>
             </label>
-            <label>Start in
+                <label>Start in
               <select id="opt-epoch">
                 <option value="0" selected>Stone Age</option>
                 <option value="1">Bronze Age</option>
@@ -68,7 +75,7 @@
                 <option value="4">Industrial Age</option>
               </select>
             </label>
-            <label>Game
+                <label>Game
               <select id="opt-mode">
                 <option value="conquest" selected>Conquest</option>
                 <option value="regicide">Regicide: protect your King</option>
@@ -76,7 +83,7 @@
                 <option value="lords">Lords of the Land: hold every landmark</option>
               </select>
             </label>
-            <label>Peace treaty
+                <label>Peace treaty
               <select id="opt-peace">
                 <option value="0" selected>None</option>
                 <option value="5">5 minutes</option>
@@ -84,17 +91,15 @@
                 <option value="20">20 minutes</option>
               </select>
             </label>
-            <label>Map seed
-              <span class="seed-row"><input id="opt-seed" type="number" min="1" /><button class="btn small" data-act="reroll" title="A new map">🎲</button><button class="btn small" data-act="copy-world" title="Copy a link to this world (seed, size, map, foes)">🔗</button></span>
-            </label>
-            <label>Graphics
+                <label>Graphics
               <select id="opt-quality">
                 <option value="high">High: shadows, bloom</option>
                 <option value="medium">Medium: shadows</option>
                 <option value="low">Low: fastest</option>
               </select>
             </label>
-            <div class="civ-row"><span id="civ-crest" class="civ-crest"></span><div id="civ-blurb" class="civ-blurb"></div></div>
+              </div>
+            </details>
           </div>
           <div class="title-buttons">
             <button class="btn primary big" data-act="start">Play</button>
