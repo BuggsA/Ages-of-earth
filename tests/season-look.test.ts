@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SEASON, secs } from '../src/sim/data';
-import { BLEND, MELT, SETTLE, lookFor, mapTint, seasonLook } from '../src/render/seasonLook';
+import { BLEND, MELT, SETTLE, iceCover, lookFor, mapTint, seasonLook } from '../src/render/seasonLook';
 import { seasonAt } from '../src/sim/seasons';
 import type { GameState } from '../src/sim/types';
 
@@ -65,5 +65,23 @@ describe('the minimap wears the season', () => {
   it('holds a forced season', () => {
     expect(lookFor(0, 3).snow).toBe(1);
     expect(lookFor(12345, null)).toEqual(seasonLook(12345));
+  });
+});
+
+describe('ice on the lakes', () => {
+  it('freezes the shallows first and leaves the deep open until the snow lies full', () => {
+    expect(iceCover(0, 0.05)).toBe(0);
+    expect(iceCover(0.5, 0.05)).toBe(1);
+    expect(iceCover(0.5, 0.9)).toBe(0);
+    expect(iceCover(1, 0.3)).toBe(1);
+    expect(iceCover(1, 0.9)).toBe(0);
+  });
+  it('spreads outward as the snow settles', () => {
+    let last = 0;
+    for (const snow of [0.2, 0.4, 0.6, 0.8, 1]) {
+      const c = iceCover(snow, 0.3);
+      expect(c).toBeGreaterThanOrEqual(last);
+      last = c;
+    }
   });
 });
