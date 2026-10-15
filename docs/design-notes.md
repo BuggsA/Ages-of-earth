@@ -564,3 +564,10 @@ Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), n
 **Why I love it:** the corner of the screen now says "winter is coming" before the toast does.
 **Seen:** headless Chromium, seed 7, each season held with `?season=`: autumn map ochre, winter map pale, no page errors. `tests/season-look.test.ts` checks the tints. Fades not watched in motion.
 **Next:** breath puffs or a muffled winter ambience; frozen lake edges (water tinted white in deep winter).
+
+## Designers' notes: frozen lake edges (own pitch, 2026-10-15, Chain 1015-0203 session 3, lane look)
+
+**Built:** `uFrost` in the water shader (`src/render/water.ts`) is the season's snow cover; ice creeps from the shallows toward the deep with a ragged noisy edge, pale cracked and dull over the waves, and leaves the deep middle open. `iceCover`/`iceReach` in `seasonLook.ts` share the reach with the minimap, which whitens water by lake depth. Melts with the snow in spring. Render and UI only.
+**Why I love it:** the land froze but the lakes still shimmered; now winter reaches the shore and the open middle looks like a promise (or a danger) for ships.
+**Seen:** headless Chromium with `?season=winter`, seeds 3 and 7: no console errors, shader compiles; no lake was in view, so the ice itself is unseen. `tests/season-look.test.ts` checks the cover.
+**Next:** ships slowed or blocked by ice (a rules change with a save bump); breath puffs or a muffled winter ambience; a banner line when the sky changes.
