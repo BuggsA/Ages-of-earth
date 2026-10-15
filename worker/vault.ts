@@ -1,4 +1,4 @@
-import { MAX_CLOUD_SAVE, MAX_SAVE_TITLE, VAULT_KEEP_DAYS, VAULT_SLOTS, validSlot, type CloudSlot } from '../src/net/vault';
+import { MAX_CLOUD_SAVE, MAX_PROGRESS_BODY, MAX_SAVE_TITLE, VAULT_KEEP_DAYS, VAULT_SLOTS, cleanProgress, mergeProgress, validSlot, type CloudSlot } from '../src/net/vault';
 
 /**
  * One player's cloud saves (#290): a Durable Object per save key, holding up to VAULT_SLOTS gzipped
@@ -26,8 +26,25 @@ export class Vault {
   }
 
   async fetch(req: Request): Promise<Response> {
-    const slot = Number(new URL(req.url).searchParams.get('slot') ?? '0');
+    const params = new URL(req.url).searchParams;
+    const slot = Number(params.get('slot') ?? '0');
     await this.store.setAlarm(Date.now() + KEEP_MS);
+    if (params.get('progress')) {
+      const kept = cleanProgress(await this.store.get<unknown>('progress'));
+      if (req.method === 'GET') return json({ progress: kept });
+      if (req.method !== 'PUT') return json({ error: 'Not allowed.' }, 405);
+      const text = await req.text();
+      if (text.length > MAX_PROGRESS_BODY) return json({ error: 'Too large.' }, 413);
+      let sent: unknown;
+      try {
+        sent = (JSON.parse(text) as { progress?: unknown }).progress;
+      } catch {
+        return json({ error: 'Not progress.' }, 400);
+      }
+      const merged = mergeProgress(kept, cleanProgress(sent));
+      await this.store.put('progress', merged);
+      return json({ progress: merged });
+    }
     if (!slot) {
       if (req.method !== 'GET') return json({ error: 'Not allowed.' }, 405);
       const slots: (CloudSlot | null)[] = [];

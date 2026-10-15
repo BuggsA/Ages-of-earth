@@ -31,7 +31,7 @@ import { loadDiscovery, observe, saveDiscovery, webMapHtml } from './ui/webMap';
 import { idleCitizens, idleSelection, idleShortcut } from './ui/idle';
 import { CameraBookmarks, bookmarkShortcut } from './ui/cameraBookmarks';
 import { ScoutFlags } from './ui/scoutFlags';
-import { briefingHtml, chapterListHtml, recordStars, starRow } from './ui/campaignUi';
+import { briefingHtml, chapterListHtml, recordStars, starRow, syncProgress } from './ui/campaignUi';
 import { Lobby } from './ui/lobby';
 import { Hud, nameOf } from './ui/hud';
 import { Minimap } from './ui/minimap';
@@ -604,7 +604,7 @@ async function openCloud(note = ''): Promise<void> {
   const inMatch = !$('hud').classList.contains('hidden');
   const saving = canCloudSave();
   const html = `<div class="card wide cloud"><h2>Cloud saves</h2>
-    <p class="hint">Kept on the server under your save key, ${VAULT_SLOTS} slots. Enter the same key on another device to play them there. A key nobody uses for a year is emptied.${saving ? '' : ' To save, open Cloud saves from the Menu during a match.'}</p>
+    <p class="hint">Kept on the server under your save key, ${VAULT_SLOTS} slots. Enter the same key on another device to play them there; your Long Road stars follow the key too. A key nobody uses for a year is emptied.${saving ? '' : ' To save, open Cloud saves from the Menu during a match.'}</p>
     <div class="cloud-slots" ><div class="hint">Opening your saves…</div></div>
     ${note ? `<div class="hint cloud-note">${escHtml(note)}</div>` : ''}
     <div class="row cloud-key">
@@ -628,6 +628,12 @@ async function openCloud(note = ''): Promise<void> {
     return;
   }
   if (draw !== cloudDraw || !box.querySelector('.cloud') || box.classList.contains('hidden')) return;
+  syncProgress().then(
+    (learned) => {
+      if (learned) hud.toast(`Campaign stars from your cloud: ${learned} chapter${learned === 1 ? '' : 's'} brought here`, 'info');
+    },
+    () => undefined,
+  );
   list.innerHTML = slots
     .map((slot, i) => {
       const n = i + 1;

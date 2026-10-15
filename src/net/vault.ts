@@ -10,6 +10,8 @@ import { CODE_CHARS } from './protocol';
  *   PUT    /api/vault/KEY/N      store slot N (gzipped save text; the title in the x-save-title header)
  *   GET    /api/vault/KEY/N      read slot N back (gzipped)
  *   DELETE /api/vault/KEY/N      empty slot N
+ *   GET    /api/vault/KEY/progress   the campaign's best stars: { chapterId: 0–3, … }
+ *   PUT    /api/vault/KEY/progress   merge stars in (the best of old and new wins; stars never go down)
  *
  * The Worker checks the key's shape, the slot and the size before any vault is touched.
  */
@@ -54,4 +56,28 @@ export function newVaultKey(): string {
 
 export function validSlot(slot: number): boolean {
   return Number.isInteger(slot) && slot >= 1 && slot <= VAULT_SLOTS;
+}
+
+/** Most chapters a stored progress may name, and the longest chapter id. */
+export const MAX_PROGRESS_CHAPTERS = 32;
+/** Largest progress body, in bytes. */
+export const MAX_PROGRESS_BODY = 4096;
+const CHAPTER_ID = /^[a-z0-9_-]{1,40}$/;
+
+/** Campaign progress (chapter id → best stars) cleaned of anything that isn't one: unknown shapes become {}. */
+export function cleanProgress(raw: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  for (const [id, n] of Object.entries(raw)) {
+    if (Object.keys(out).length >= MAX_PROGRESS_CHAPTERS) break;
+    if (CHAPTER_ID.test(id) && typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= 3) out[id] = n;
+  }
+  return out;
+}
+
+/** The best of two progresses, chapter by chapter. */
+export function mergeProgress(a: Record<string, number>, b: Record<string, number>): Record<string, number> {
+  const out = cleanProgress(a);
+  for (const [id, n] of Object.entries(cleanProgress(b))) if (n > (out[id] ?? 0)) out[id] = n;
+  return out;
 }
