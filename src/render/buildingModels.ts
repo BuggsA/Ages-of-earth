@@ -437,10 +437,65 @@ function stable(k: Kit, e: number, st: Style): void {
     banner(k, 1.3, 0, 1.25, 1.2);
     return;
   }
+  if (e === 0) {
+    // A horse corral: a rail fence round a trampled yard, a hide lean-to at the back, a horsetail totem at the gate.
+    for (let i = 0; i < 9; i++) {
+      const t = -1.3 + i * 0.325;
+      k.cyl(0.05, 0.06, 0.55, 5, st.post, t, 0, 1.3);
+      if (i % 4 === 0) {
+        k.cyl(0.05, 0.06, 0.55, 5, st.post, -1.3, 0, t);
+        k.cyl(0.05, 0.06, 0.55, 5, st.post, 1.3, 0, t);
+      }
+    }
+    for (const y of [0.22, 0.42]) {
+      k.box(2.6, 0.04, 0.04, st.post, 0, y, 1.3);
+      k.box(0.04, 0.04, 2.6, st.post, -1.3, y, 0);
+      k.box(0.04, 0.04, 2.6, st.post, 1.3, y, 0);
+    }
+    for (const x of [-1.1, 1.1]) k.cyl(0.05, 0.06, 0.8, 5, st.post, x, 0, -1.1);
+    k.prism(2.5, 0.5, 1.0, st.roof, 0, 0.8, -0.95);
+    k.box(2.3, 0.04, 0.6, st.wall2, 0, 0.0, -1.0);
+    for (let i = 0; i < 3; i++) k.box(0.34, 0.2, 0.26, HAY, -0.9 + i * 0.4, 0, -0.5);
+    k.box(0.6, 0.14, 0.2, WOOD, 0.8, 0, 0.1);
+    k.box(0.52, 0.02, 0.14, '#5aa0c8', 0.8, 0.13, 0.1);
+    k.cyl(0.03, 0.03, 1.1, 5, st.post, -1.3, 0, 1.3);
+    k.team(k.cone(0.12, 0.34, 6, TEAM, -1.3, 1.05, 1.3));
+    banner(k, 1.2, 0, 1.2, 1.1);
+    return;
+  }
+  if (e === 1) {
+    // Mudbrick stalls: a flat-roofed row with arched openings, a roof-beam fringe and a clay trough.
+    k.box(2.7, 0.75, 1.3, st.wall, 0, 0, -0.65);
+    k.box(2.8, 0.08, 1.4, st.trim, 0, 0.75, -0.65);
+    for (let i = 0; i < 6; i++) k.cyl(0.035, 0.035, 0.2, 5, st.post, -1.25 + i * 0.5, 0.68, 0.08).rotation.x = Math.PI / 2;
+    for (let i = 0; i < 4; i++) {
+      const x = -1.0 + i * 0.66;
+      k.box(0.46, 0.4, 0.03, '#3a2b20', x, 0, 0.01);
+      const arch = k.cyl(0.23, 0.23, 0.03, 10, '#3a2b20', x, 0.4, 0.01);
+      arch.rotation.x = Math.PI / 2;
+      arch.scale.set(1, 1, 0.5);
+    }
+    for (const x of [-1.3, 1.3]) k.box(0.2, 0.15, 0.2, st.wall2, x, 0.75, -1.1);
+    for (let i = 0; i < 3; i++) k.box(0.32, 0.22, 0.24, HAY, -1.1 + i * 0.36, 0, 0.7);
+    for (let i = 0; i < 3; i++) k.cyl(0.04, 0.04, 0.4, 5, st.post, 0.3 + i * 0.3, 0, 1.0);
+    k.box(0.9, 0.04, 0.05, st.post, 0.6, 0.38, 1.0);
+    k.box(0.7, 0.16, 0.22, st.wall2, 0.7, 0, 0.75);
+    k.box(0.62, 0.02, 0.16, '#5aa0c8', 0.7, 0.15, 0.75);
+    k.team(k.box(2.8, 0.06, 0.06, TEAM, 0, 0.77, 0.07));
+    banner(k, 1.3, 0, 1.25, 1.2);
+    return;
+  }
   const wall = e >= 2 ? st.wall : st.wall2;
   k.box(2.7, 0.7, 1.3, wall, 0, 0, -0.65);
   if (e === 2) for (const x of [-1.3, -0.65, 0, 0.65, 1.3]) k.box(0.05, 0.7, 1.32, st.trim, x, 0, -0.65);
   if (e >= 3) k.box(2.76, 0.06, 1.36, st.trim, 0, 0.7, -0.65);
+  if (e === 2) {
+    k.box(0.45, 0.4, 0.35, st.wall, 0.9, 0.85, 0.0);
+    k.prism(0.55, 0.25, 0.45, st.roof2, 0.9, 1.25, 0.0);
+    k.box(0.28, 0.24, 0.04, '#3a2b20', 0.9, 0.93, 0.19);
+    k.cyl(0.015, 0.015, 0.35, 4, IRON_DARK, 0, 1.28, -0.55);
+    k.box(0.3, 0.1, 0.02, IRON_DARK, 0.1, 1.55, -0.55);
+  }
   k.prism(2.85, 0.6, 1.6, st.roof, 0, 0.7, -0.55);
   for (let i = 0; i < 4; i++) {
     const x = -1.0 + i * 0.66;
