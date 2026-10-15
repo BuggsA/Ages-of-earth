@@ -1,4 +1,4 @@
-import { BUILDINGS, POP_MAX, domainOf, type UnitStats } from './data';
+import { BUILDINGS, LANDMARKS, POP_MAX, domainOf, type UnitStats } from './data';
 import { AIR, NAVAL, distToRect, nearestWalkable, stampBuilding, walkable } from './grid';
 import { buildingMaxHp, statsFor } from './stats';
 import type { Building, BuildingType, Cost, Ent, GameState, Goal, Player, Unit, UnitType } from './types';
@@ -158,6 +158,8 @@ export function countPop(s: GameState): void {
     if (e.kind === 'unit') p.pop++;
     else if (e.built) p.cap += BUILDINGS[e.type].pop;
   }
+  // An Ancestors' Cairn gives its keeper room for more.
+  for (const m of s.landmarks ?? []) if (m.kind === 'cairn' && m.owner >= 0) s.players[m.owner].cap += LANDMARKS.cairn.pop;
   for (const p of s.players) p.cap = Math.min(POP_MAX, p.cap);
 }
 

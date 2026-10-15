@@ -1,4 +1,4 @@
-import { BUILDINGS, RUINS, TRADE } from './data';
+import { BUILDINGS, LANDMARKS, RUINS, TRADE } from './data';
 import { landOwnerAt } from './borders';
 import { isEnemy } from './world';
 import type { Building, BuildingType, GameState } from './types';
@@ -74,7 +74,7 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
       const i = y * s.w + x;
       if (s.terrain[i] === T_WATER) return 'water';
       if (s.terrain[i] === T_ROCK) return 'rock';
-      if (s.res[i] !== R_NONE || relicOnTile(s, x, y) || postOnTile(s, x, y) || ruinOnTile(s, x, y)) return 'blocked';
+      if (s.res[i] !== R_NONE || relicOnTile(s, x, y) || postOnTile(s, x, y) || ruinOnTile(s, x, y) || landmarkOnTile(s, x, y)) return 'blocked';
       // A gate may go into its owner's own wall, replacing the pieces it covers.
       if (s.bldAt[i] !== 0 && !(type === 'gate' && ownWall(s, s.bldAt[i], owner))) return 'blocked';
     }
@@ -108,6 +108,13 @@ export function relicOnTile(s: GameState, tx: number, ty: number): boolean {
 export function postOnTile(s: GameState, tx: number, ty: number): boolean {
   const r = TRADE.plaza + 1;
   for (const p of s.posts) if (Math.abs(tx - Math.floor(p.x)) <= r && Math.abs(ty - Math.floor(p.y)) <= r) return true;
+  return false;
+}
+
+/** A contested landmark on this tile or right beside it: nothing is built there. */
+export function landmarkOnTile(s: GameState, tx: number, ty: number): boolean {
+  if (!s.landmarks) return false;
+  for (const m of s.landmarks) if (Math.abs(tx - Math.floor(m.x)) <= LANDMARKS.clear && Math.abs(ty - Math.floor(m.y)) <= LANDMARKS.clear) return true;
   return false;
 }
 

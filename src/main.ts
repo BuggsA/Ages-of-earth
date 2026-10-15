@@ -16,6 +16,7 @@ import type { AgeId, BuildingType, CivId, Command, Difficulty, Ent, GameEvent, G
 import { R_FISH, R_NONE } from './sim/types';
 import { carriedBy, relicAt } from './sim/relics';
 import { RUIN_FINDS, ruinAt } from './sim/ruins';
+import { LANDMARK_KINDS, landmarkAt } from './sim/landmarks';
 import { postAt } from './sim/trade';
 import { ageDef, ageOf, isSideRoad, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
 import { NetClient, newRoomCode, saveName, savedName } from './net/client';
@@ -78,6 +79,7 @@ let selectedRelic: number | null = null;
 let selectedPost: number | null = null;
 /** An ancient ruin picked out with a left click, to read about (#64). */
 let selectedRuin: number | null = null;
+let selectedLandmark: number | null = null;
 let placing: BuildingType | null = null;
 let placeAt: { tx: number; ty: number; ok: boolean } | null = null;
 /** A wall being dragged out, from tile to tile. */
@@ -405,6 +407,7 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   selectedRelic = null;
   selectedPost = null;
   selectedRuin = null;
+  selectedLandmark = null;
   placing = null;
   wallDrag = null;
   targetMode = null;
@@ -889,6 +892,7 @@ function setSelection(ids: number[], add = false): void {
   selectedRelic = null;
   selectedPost = null;
   selectedRuin = null;
+  selectedLandmark = null;
   hud.buildMenu = null;
   refreshHud();
 }
@@ -965,7 +969,7 @@ function order(clientX: number, clientY: number, forceAttack = false, queue = fa
     // A building of yours: set where its trainees gather.
     const b = [...selection].map((id) => s.byId.get(id)).find((e) => e && e.kind === 'building' && e.owner === viewer);
     if (b) {
-      const at = pk.kind === 'ground' ? pk : pk.kind === 'resource' ? { x: (pk.tile % s.w) + 0.5, y: Math.floor(pk.tile / s.w) + 0.5 } : pk.kind === 'animal' ? null : pk.kind === 'relic' ? (relicAt(s, pk.id) ?? null) : pk.kind === 'post' ? (postAt(s, pk.id) ?? null) : pk.kind === 'ruin' ? (ruinAt(s, pk.id) ?? null) : (() => {
+      const at = pk.kind === 'ground' ? pk : pk.kind === 'resource' ? { x: (pk.tile % s.w) + 0.5, y: Math.floor(pk.tile / s.w) + 0.5 } : pk.kind === 'animal' ? null : pk.kind === 'relic' ? (relicAt(s, pk.id) ?? null) : pk.kind === 'post' ? (postAt(s, pk.id) ?? null) : pk.kind === 'ruin' ? (ruinAt(s, pk.id) ?? null) : pk.kind === 'landmark' ? (landmarkAt(s, pk.id) ?? null) : (() => {
         const t = s.byId.get(pk.id);
         return t ? { x: t.x, y: t.y } : null;
       })();
@@ -1000,6 +1004,16 @@ function order(clientX: number, clientY: number, forceAttack = false, queue = fa
     if (forceAttack || !units.some((u) => u.type === 'citizen')) issue({ t: 'move', p: viewer, ids, x: r.x, y: r.y, amove: forceAttack, queue: q });
     else issue({ t: 'dig', p: viewer, ids, target: r.id, queue: q });
     view.marker(s, r.x, r.y, forceAttack);
+    play(forceAttack ? 'attack' : 'move');
+    ack(forceAttack ? 'attack' : 'move');
+    return;
+  }
+  if (pk.kind === 'landmark') {
+    // Stand on it to claim it (or hold it).
+    const m = landmarkAt(s, pk.id);
+    if (!m) return;
+    issue({ t: 'move', p: viewer, ids, x: m.x, y: m.y, amove: forceAttack, queue: q });
+    view.marker(s, m.x, m.y, forceAttack);
     play(forceAttack ? 'attack' : 'move');
     ack(forceAttack ? 'attack' : 'move');
     return;
@@ -1328,6 +1342,13 @@ function clickSelect(x: number, y: number, shift: boolean, ctrl: boolean): void 
   if (pk.kind === 'relic') {
     setSelection([]);
     selectedRelic = pk.id;
+    refreshHud();
+    play('click');
+    return;
+  }
+  if (pk.kind === 'landmark') {
+    setSelection([]);
+    selectedLandmark = pk.id;
     refreshHud();
     play('click');
     return;
@@ -1852,6 +1873,23 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         } else if (view.sees(ev.x, ev.y)) hud.toast(`${s.players[ev.owner].name} dug out the ruins`, 'info');
         break;
       }
+      case 'landmark': {
+        const name = LANDMARK_KINDS[ev.kind].name;
+        const team = s.players[viewer].team;
+        if (ev.owner === viewer) hud.banner(`You hold the ${name}`, `${LANDMARK_KINDS[ev.kind].blurb} Keep rivals off it, or they'll take it.`, 4500);
+        else if (ev.from === viewer) {
+          hud.toast(`You have lost the ${name}! (Space to look)`, 'alert');
+          lastAlert = { x: ev.x, y: ev.y };
+        } else if (ev.owner >= 0 && s.players[ev.owner].team === team) hud.toast(`${s.players[ev.owner].name} holds the ${name}`, 'good');
+        else if (ev.owner >= 0 && (view.sees(ev.x, ev.y) || s.players[viewer].seen[Math.floor(ev.y) * s.w + Math.floor(ev.x)])) hud.toast(`${s.players[ev.owner].name} has taken the ${name}`, 'info');
+        break;
+      }
+      case 'landmarkThreat':
+        if (ev.owner === viewer) {
+          hud.toast(`Rivals are taking the ${LANDMARK_KINDS[ev.kind].name}! (Space to look)`, 'alert');
+          lastAlert = { x: ev.x, y: ev.y };
+        }
+        break;
       case 'relic':
         if (ev.owner === viewer && ev.what === 'kept') hud.toast(`A relic rests in your Temple: +${Math.round((60 / RELIC.every) * RELIC.gold)} gold a minute`, 'good');
         else if (ev.owner === viewer && ev.what === 'taken') hud.toast('Your priest has taken up a relic: bring it to a Temple', 'info');
@@ -1918,7 +1956,7 @@ function refreshHud(): void {
   if (!game || mode === 'title') return;
   pruneSelection(game);
   recordDiscovery(game);
-  hud.update(game, viewer, [...selection], SPEEDS[speedIdx], selectedTile, selectedRelic, selectedPost, selectedRuin !== null ? { id: selectedRuin, dug: view.ruins.dugAsSeen(selectedRuin) } : null);
+  hud.update(game, viewer, [...selection], SPEEDS[speedIdx], selectedTile, selectedRelic, selectedPost, selectedRuin !== null ? { id: selectedRuin, dug: view.ruins.dugAsSeen(selectedRuin) } : null, selectedLandmark !== null ? { id: selectedLandmark, keeper: view.landmarks.keeperAsSeen(selectedLandmark) } : null);
 }
 
 function cursorFor(s: GameState): string {
@@ -1933,6 +1971,7 @@ function cursorFor(s: GameState): string {
   if (pk.kind === 'animal') return units.length ? 'cur-attack' : 'cur-select';
   if (pk.kind === 'relic') return units.some((u) => u.type === 'priest' && !carriedBy(s, u)) ? 'cur-gather' : 'cur-select';
   if (pk.kind === 'post') return units.some((u) => u.type === 'trader') ? 'cur-gather' : 'cur-select';
+  if (pk.kind === 'landmark') return units.length ? 'cur-gather' : 'cur-select';
   if (pk.kind === 'ruin') return units.some((u) => u.type === 'citizen') && !view.ruins.dugAsSeen(pk.id) ? 'cur-gather' : 'cur-select';
   if (pk.kind === 'unit' || pk.kind === 'building') {
     const t = s.byId.get(pk.id) as Ent | undefined;

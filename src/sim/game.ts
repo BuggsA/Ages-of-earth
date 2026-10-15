@@ -5,11 +5,12 @@ import { hitAnimal, spawnAnimal, updateAnimals } from './animals';
 import { markGoals, scenarioStep, startScenario } from './campaign';
 import { buildingGuns, updateShots } from './combat';
 import { applyCommand } from './commands';
-import { AGES, AURA, unitEpoch, CIV_IDS, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
+import { AGES, AURA, unitEpoch, CIV_IDS, LANDMARKS, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
 import { AIR, NAVAL, stampBuilding } from './grid';
 import { generateMap } from './mapgen';
 import { Spatial } from './spatial';
 import { updateRelics } from './relics';
+import { landmarkStep } from './landmarks';
 import { atPost } from './trade';
 import { modsOf, trainTimeFor } from './stats';
 import { attrition } from './borders';
@@ -157,6 +158,7 @@ export function createGame(setup: GameSetup): GameState {
   for (const t of map.posts) s.posts.push({ id: s.nextId++, x: t.x, y: t.y });
   if (map.ruins.length) s.ruins = map.ruins.map((r) => ({ id: s.nextId++, x: r.x, y: r.y, find: r.find, dug: 0, by: -1 }));
   for (const b of map.wild) spawnAnimal(s, b.x, b.y, b.kind);
+  if (map.landmarks.length) s.landmarks = map.landmarks.map((m) => ({ id: s.nextId++, x: m.x, y: m.y, kind: m.kind, owner: -1, claim: 0, by: -1 }));
   countPop(s);
   updateVision(s);
   // Everyone knows the lie of the land around home.
@@ -391,6 +393,8 @@ export function scoreOf(s: GameState, p: Player): number {
   for (const e of s.ents) if (e.kind === 'building' && e.owner === p.id && e.type === 'wonder' && e.built) wonder += 500;
   // Each relic kept in a Temple.
   for (const r of s.relics) if (r.temple && s.byId.get(r.temple)?.owner === p.id) wonder += RELIC.score;
+  // Each landmark kept.
+  for (const m of s.landmarks ?? []) if (m.owner === p.id) wonder += LANDMARKS.score;
   return Math.round(p.stats.gathered / 10 + p.stats.kills * 8 + p.stats.razed * 15 + p.stats.converted * 10 + p.stats.techs * 25 + p.epoch * 150 + p.stats.built * 3 + wonder);
 }
 
@@ -442,6 +446,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   carryCargo(s);
   updateShots(s, sp, (a, damage, x, y) => hitAnimal(s, a, damage, x, y));
   updateRelics(s);
+  landmarkStep(s);
   attrition(s);
   workStep(s);
   beaconStep(s);
@@ -494,6 +499,11 @@ export function checksum(s: GameState): number {
   for (const r of s.ruins ?? []) {
     mix(r.dug);
     mix(r.by);
+  }
+  for (const m of s.landmarks ?? []) {
+    mix(m.owner);
+    mix(m.claim);
+    mix(m.by);
   }
   for (const p of s.players) for (const r of RES) mix(p.res[r]);
   for (const sh of s.shots) mix(sh.t);

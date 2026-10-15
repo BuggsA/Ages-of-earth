@@ -484,6 +484,39 @@ export const RELIC = { home: 20, fair: 3, spacing: 12, extra: { small: 1, medium
  * tiles of the ruin's middle, and nothing is built within `clear` tiles of it.
  */
 export const RUINS = { count: { small: 2, medium: 3, large: 4 } as Record<MapSize, number>, home: 24, fair: 4, spacing: 14, dig: 40, gold: 300, reach: 1.7, clear: 1 };
+/**
+ * Contested landmarks: one more than there are players lies out between the towns (at most `max`), at
+ * least `home` tiles from every town and at most `far` from the nearest, within `fair` tiles of as far from the two nearest (looser if the
+ * map allows nothing better), `spacing` apart and clear of relics, posts, ruins and wolf dens. Each is a
+ * kind dealt from a shuffled hand, so a two-player map holds one of each and the third is a coin toss.
+ *
+ * Land units (traders aside) within `reach` tiles of one claim it: with one side's people there alone,
+ * the claim grows by one tick each tick for each of them, up to `crowd` at once; `claim` seconds of one
+ * person's claim takes a landmark nobody keeps. Rivals there alone pull a held one back down to nobody's
+ * first, at the same pace. Two sides there at once: nothing moves. During a peace treaty nobody's
+ * landmark can be taken from them, though one nobody keeps can be claimed. A keeper holds the land
+ * `border` tiles round it (borders: supply, building, the wild), and nothing is built within `clear`
+ * tiles of its middle. Each landmark kept adds `score`.
+ *
+ * - The Sacred Spring mends its keeper's people within `spring.reach` tiles: `spring.heal` of their full
+ *   health every `spring.every` seconds. A place to stage a raid from, or to bring the bitten home to.
+ * - The Lookout Crag shows its keeper everything within `crag.sight` tiles: the road their rival walks.
+ * - The Ancestors' Cairn gives its keeper `cairn.pop` more room for people: a house or two not built.
+ */
+export const LANDMARKS = {
+  max: 5, home: 22, far: 34, fair: 4, spacing: 16, reach: 3.5, claim: 20, crowd: 3, border: 5, clear: 1, score: 100,
+  spring: { reach: 6, heal: 0.03, every: 2 },
+  crag: { sight: 14 },
+  cairn: { pop: 5 },
+};
+/**
+ * The computer and the landmarks: once it has `townAt` citizens and sees no danger near one nobody
+ * keeps within `near` tiles of home (or `rival` of the way to its rival's town, if farther), it sends one citizen to claim it (calling them back after `walk`
+ * seconds if it hasn't come to anything). Between waves, with at least `party` soldiers standing ready,
+ * it sends up to `guard` of them to take (or take back) the nearest landmark in reach that a rival keeps
+ * or is claiming, and holds them there until it's no longer the rival's, or `hold` seconds pass.
+ */
+export const AI_MARK = { townAt: 8, near: 44, rival: 0.75, walk: 150, party: 3, guard: 5, hold: 120 };
 /** Repairs: restoring a building's whole health costs this share of its price, paid as the hammers work. */
 export const REPAIR_SHARE = 0.4;
 export const TRADE = { posts: { small: 2, medium: 2, large: 3 } as Record<MapSize, number>, edge: 9, fair: 4, far: 0.3, spacing: 0.4, plaza: 1, reach: 1.8, gold: 0.012, epoch: 0.08, max: 180, ally: 0.25, harbor: { reach: 12, mul: 1.3 }, sea: { reach: 7, mul: 1.2 } };

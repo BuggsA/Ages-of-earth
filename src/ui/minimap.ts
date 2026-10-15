@@ -199,6 +199,22 @@ export class Minimap {
         ctx.stroke();
       }
     }
+    // Landmarks the viewer has found: a stone-grey triangle, filled in its keeper's colour (as last seen).
+    for (const m of s.landmarks ?? []) {
+      const keeper = reveal ? m.owner : this.waymarks.landmarks.get(m.id);
+      if (keeper === undefined) continue;
+      const rr = Math.max(3, sx * 1.8);
+      ctx.beginPath();
+      ctx.moveTo(m.x * sx, m.y * sy - rr);
+      ctx.lineTo(m.x * sx + rr, m.y * sy + rr * 0.8);
+      ctx.lineTo(m.x * sx - rr, m.y * sy + rr * 0.8);
+      ctx.closePath();
+      ctx.fillStyle = keeper >= 0 ? s.players[keeper].color : '#c9c2b2';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(20,16,8,0.9)';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    }
     // Relics lying where the viewer last saw them: a gold diamond with a dark rim, dimmed while out of sight.
     for (const r of s.relics) {
       const m = reveal ? { x: r.x, y: r.y, hidden: !!(r.carrier || r.temple) } : this.waymarks.relics.get(r.id);
