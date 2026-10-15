@@ -1344,9 +1344,11 @@ export const AI_LIGHTNING = { towers: 2, every: 40, gap: 45, most: 6, raid: 150 
  * the rival's home a wave must be before it pitches a War Camp; `clear`: tiles it keeps from the rival's
  * Town Center and Towers (arrow range and a margin). `keep`: soldiers left by each camp. `again`: seconds
  * before a burnt camp is pitched anew. `answer`: tiles from home within which a rival's camp draws a strike
- * band of `strike` soldiers.
+ * band of `strike` soldiers. Total War (#315): `home` tiles from the Town Center a muster camp is pitched (and held
+ * in Iron and Blood for the deed, up to `patience` seconds); `alarm` tiles from it within which `foes` enemy soldiers
+ * call citizens to arms; `held` citizens are always kept at their work.
  */
-export const AI_BLOOD = { take: 0.6, patience: 480, stay: 360, reach: 40, clear: 11, keep: 3, again: 120, answer: 48, strike: 5 };
+export const AI_BLOOD = { take: 0.6, patience: 480, stay: 360, reach: 40, clear: 11, keep: 3, again: 120, answer: 48, strike: 5, home: 9, alarm: 16, foes: 3, held: 22 };
 
 export const AI_RAID = { weary: 0.5, calm: 7, fort: 15, pop: 24, flame: 24, stage: 36 };
 /**

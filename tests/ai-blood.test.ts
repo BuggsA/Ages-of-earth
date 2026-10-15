@@ -168,3 +168,68 @@ describe('answering a rival camp', () => {
     void camp;
   });
 });
+
+describe('the computer walks Total War (#315)', () => {
+  it('in Iron and Blood a people that walked it pitches a muster camp at home, which trains the deed', () => {
+    const s = game('romans', 3);
+    s.players[0].walked = ['warband'];
+    s.players[0].age = 'ironblood';
+    step(s);
+    const home = tc(s, 0);
+    for (let i = 0; i < 6; i++) spawnUnit(s, 0, 'infantry', home.x + 4 + i * 0.4, home.y + 4);
+    run(s, 60);
+    const made = camps(s);
+    expect(made.length).toBe(1);
+    expect(Math.hypot(made[0].x - home.x, made[0].y - home.y)).toBeLessThan(AI_BLOOD.home + 10);
+    run(s, 120);
+    expect(s.players[0].stats.campTrained ?? 0).toBeGreaterThan(0);
+  });
+
+  it('holds Iron and Blood past the stay while the camp deed is undone, then goes', () => {
+    const s = game('romans', 3);
+    s.players[0].walked = ['warband'];
+    s.players[0].age = 'ironblood';
+    step(s);
+    s.ai[0].blood = { since: s.tick - secs(AI_BLOOD.stay + 10) };
+    run(s, 5);
+    expect(s.ai[0].roads?.totalwar).toBe(true);
+    expect(ageOf(s.players[0])).toBe('ironblood');
+  });
+
+  it('turns Total War from the Industrial Age once the deed is done', () => {
+    const s = game('romans', 4);
+    barracks(s);
+    s.players[0].walked = ['warband', 'ironblood'];
+    s.players[0].stats.campTrained = 12;
+    run(s, 90);
+    expect(ageOf(s.players[0])).toBe('totalwar');
+  });
+
+  it('calls citizens to arms at the camp nearest foes at the gates, keeping some at work', () => {
+    const s = game('romans', 4);
+    s.players[0].walked = ['warband', 'ironblood'];
+    s.players[0].age = 'totalwar';
+    step(s);
+    const home = tc(s, 0);
+    const at = spot(s, 'warcamp', home.x, home.y, 7, 12, 0);
+    const camp = placeBuilding(s, 0, 'warcamp', at.tx, at.ty, true);
+    for (let i = 0; i < 5; i++) spawnUnit(s, 1, 'infantry', home.x + 10 + i * 0.4, home.y + 10);
+    for (let i = 0; i < 12; i++) spawnUnit(s, 0, 'citizen', camp.x + 1 + (i % 4) * 0.4, camp.y + 3 + (i >> 2) * 0.4);
+    const before = s.players[0].stats.calledUp ?? 0;
+    run(s, 4);
+    expect((s.players[0].stats.calledUp ?? 0) - before).toBeGreaterThan(0);
+    expect(s.ents.filter((e) => e.kind === 'unit' && e.owner === 0 && e.type === 'citizen').length).toBeGreaterThanOrEqual(AI_BLOOD.held);
+  });
+
+  it('calls up none in peace', () => {
+    const s = game('romans', 4);
+    s.players[0].walked = ['warband', 'ironblood'];
+    s.players[0].age = 'totalwar';
+    step(s);
+    const home = tc(s, 0);
+    const at = spot(s, 'warcamp', home.x, home.y, 7, 12, 0);
+    placeBuilding(s, 0, 'warcamp', at.tx, at.ty, true);
+    run(s, 10);
+    expect(s.players[0].stats.calledUp ?? 0).toBe(0);
+  });
+});
