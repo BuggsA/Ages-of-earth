@@ -237,4 +237,6 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Coil layout** (own pitch, lane ai, s4 of #231): in the Age of Lightning the computer builds new buildings inside a coil's field (`fieldSpot`). Tests only; no win-rate sweep; no save bump.
 
+**Wireless Telegraphy** (#240, lane rules): Sail + Lightning heirloom at the Dock: ships and Docks in a Tower's field see +5 tiles (`TELEGRAPH`). Tests only; browser and the computer's use unseen; no save bump.
+
 **Hunters hunted** (#260, own pitch, lane ai): Hard/Expert computers send 2–3 idle soldiers at rival citizens they see working far from home with no guard, and walk to a seen rival Hunting Camp to look (`AI_PROWL`). Tests and a headless match; about one foray per computer-vs-computer match; browser unseen; no save bump.

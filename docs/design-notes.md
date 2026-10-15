@@ -671,7 +671,7 @@ Built: bog iron dug on any road (`stats.iron`) raises each trade trip in the Mer
 
 **Seen:** `tests/lightning.test.ts` (road, deed, field timing, the bolt through a crowd and a spread line, save/replay, the computer); 6 Hard-vs-Hard headless matches from the Industrial, 25 min: the computer took the road on 3 seeds, one match was Aeronauts against Lightning, coils fired 117 bolts; headless Chromium: the Coil Tower drawn in a match, a bolt held on screen through a crowd, no console errors. Unheard: the crackle's and theremin's levels. No win-rate sweep.
 
-**St. Elmo's Fire (#240, Chain 1015-1020 s1, lane rules):** the Pilgrims + Lightning heirloom. A built Temple within `LIGHTNING.reach` of the owner's finished Watch Tower mends the owner's soldiers within `ELMO.reach` (6 tiles) 4% of full health every 2 s (`elmoStep` in `src/sim/elmo.ts`; mod `elmo`). It uses any Tower, not only coils, so it stays useful on every road once learned; it changes where the Temple goes and where an army stages. I love that the faith reads the coil's glow as a blessing. Not done: Sail + Lightning (Wireless Telegraphy: ships seeing farther in a field needs position-based sight) and Reclaimers + Lightning (Galvanic Revival); a mark on the Temple for it; a ring showing the healing reach.
+**St. Elmo's Fire (#240, Chain 1015-1020 s1, lane rules):** the Pilgrims + Lightning heirloom. A built Temple within `LIGHTNING.reach` of the owner's finished Watch Tower mends the owner's soldiers within `ELMO.reach` (6 tiles) 4% of full health every 2 s (`elmoStep` in `src/sim/elmo.ts`; mod `elmo`). It uses any Tower, not only coils, so it stays useful on every road once learned; it changes where the Temple goes and where an army stages. I love that the faith reads the coil's glow as a blessing. Not done: Reclaimers + Lightning (Galvanic Revival); a mark on the Temple for it; a ring showing the healing reach.
 
 **Next (umbrella #231):** draw the field on the ground and mark dark buildings in the panel; an heirloom or hybrid (Lightning + Reclaimers: old machines woken by current?); the computer laying its town out inside its fields; a counter for coils in the Aeronauts' hands (bombers that seek coils?).
 
@@ -694,6 +694,8 @@ Session 2 (lane ai): Iron-Bound Hulls answered. `fleetWanted` adds `AI_WEB.hulls
 **Why I love it:** the owner's playtest is the classic onboarding trap: nobody picks "Easy" on a first game, so Normal *is* the beginner setting, and it crushed them in the Stone Age. A first game should be the one where you learn that a Town Center trains citizens and a Barracks trains a guard, not the one where you learn to quit. Keeping the ids and moving only the names means no save, replay, room or test notices.
 
 **Next:** let rooms offer Easy (`worker/lists.ts` plus `tests/worker-routes.test.ts`, which pins the list today). A gentler tier could also *teach*: a first wave that announces itself ("Scouts from Augustus are on the road") a minute out. And watch the wild: wolves and a mammoth can still end a first game before any rival does.
+
+**Wireless Telegraphy (#240, Chain 1015-1020 s2, lane rules):** the Sail + Lightning heirloom. Ships and finished Docks inside a Tower's field see `TELEGRAPH.sight` (5) tiles farther (`updateVision`, mod `telegraph`). It decides where the coil goes: on the headland, so the harbour is watched. I love a lookout made of current. Not done: merchant ships reporting pirates; a Dock mark; Reclaimers + Lightning (Galvanic Revival).
 
 ## Designers' notes: hunters hunted (#260, own pitch, 2026-10-15, lane ai)
 
