@@ -125,4 +125,24 @@ describe('the computer escorts its walker', () => {
     for (let i = 0; i < 3 * TICK_HZ; i++) { step(s); }
     expect(walker.x).toBeLessThan(stopped - 1);
   }, 60000);
+  it('sends a fresh escort when the first one has fallen', () => {
+    const s = game();
+    const home = s.ents.find((e) => e.kind === 'building' && e.owner === 1)!;
+    const [a] = s.landmarks!;
+    for (const m of s.landmarks!) { m.owner = -1; m.by = -1; m.claim = 0; }
+    a.x = home.x + 32; a.y = home.y;
+    for (let i = 0; i < 10; i++) spawnUnit(s, 1, 'citizen', home.x + 3 + i * 0.5, home.y + 3);
+    for (let i = 0; i < 8; i++) spawnUnit(s, 1, 'infantry', home.x + 2 + i * 0.4, home.y + 3);
+    for (let i = 0; i < 15 * TICK_HZ && !s.ai[1]?.markEscort; i++) step(s);
+    const first = [...s.ai[1]!.markEscort!.ids];
+    for (const id of first) (s.byId.get(id) as Unit).hp = 0;
+    // The rest of the army waits idle at home.
+    for (let i = 0; i < 3 * TICK_HZ; i++) {
+      for (const u of s.ents) if (u.kind === 'unit' && u.owner === 1 && u.type === 'infantry' && u.hp > 0) { u.order = { k: 'idle' }; u.x = home.x + 2; u.y = home.y + 3; }
+      step(s);
+    }
+    const next = s.ai[1]?.markEscort;
+    expect(next?.ids.length).toBe(2);
+    expect(next!.ids.some((id) => first.includes(id))).toBe(false);
+  }, 60000);
 });
