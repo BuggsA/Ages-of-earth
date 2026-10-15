@@ -116,6 +116,12 @@ export function relicTradeShare(s: GameState, owner: number): number {
   return rt ? 1 + rt.each * Math.min(rt.most, relicsKept(s, owner)) : 1;
 }
 
+/** What a player's age multiplies each trade trip by for the bog iron its people have dug (Merchants, Fairs, Sail); 1 elsewhere. */
+export function ironTradeShare(s: GameState, owner: number): number {
+  const it = ageDef(s.players[owner]).ironTrade;
+  return it ? 1 + it.each * Math.min(it.most, Math.floor((s.players[owner].stats.iron ?? 0) / it.per)) : 1;
+}
+
 /** A road into a side age, as against the trunk's own roads and the roads back onto it. */
 export const isSideRoad = (r: Road): boolean => !TRUNK.includes(r.to);
 

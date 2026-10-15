@@ -56,11 +56,19 @@ export interface Age {
    * `each` more of its usual gold, counting at most `most` relics.
    */
   relicTrade?: { each: number; most: number };
+  /**
+   * Trade fed by iron: every `per` bars of bog iron the people has ever dug make each trade trip pay `each`
+   * more, counting at most `most` such steps. Iron dug on the way here still counts (the web's link).
+   */
+  ironTrade?: { per: number; each: number; most: number };
 }
 
 export const TRUNK: AgeId[] = ['stone', 'bronze', 'middle', 'gunpowder', 'industrial'];
 
 const trunkAge = (e: number): Age => ({ name: EPOCHS[e].name, short: EPOCHS[e].short, tier: e, blurb: EPOCHS[e].blurb });
+
+/** Iron wares: bog iron dug (any age) raises trade in the trading ages (Merchants, Fairs, Sail): +8% a 75 bars, to +40%. */
+export const IRON_TRADE = { per: 75, each: 0.08, most: 5 };
 
 export const AGES: Record<AgeId, Age> = {
   stone: trunkAge(0),
@@ -85,8 +93,9 @@ export const AGES: Record<AgeId, Age> = {
     name: 'Age of Merchants',
     short: 'Merchant',
     tier: 2,
-    blurb: 'Guilds, banks and hired swords: the Market hires soldiers for gold, trade pays more, and levies cost dear.',
+    blurb: 'Guilds, banks and hired swords: the Market hires soldiers for gold, trade pays more (more still for every bar of bog iron your people ever dug), and levies cost dear.',
     mul: { tradeGold: 1.25 },
+    ironTrade: IRON_TRADE,
     hire: { at: 'market', units: ['infantry', 'ranged', 'cavalry'], gold: 1.2, time: 0.5 },
     levy: 1.2,
   },
@@ -117,6 +126,7 @@ export const AGES: Record<AgeId, Age> = {
     blurb: 'Where pilgrims gather, merchants follow: feast days become great fairs. Trade pays more for every relic your Temples keep, and traders travel faster, but towns grown open round the fairground stand 15% weaker.',
     mul: { tradeGold: 1.25, traderSpeed: 1.15, buildingHp: 0.85 },
     relicTrade: { each: 0.1, most: 5 },
+    ironTrade: IRON_TRADE,
   },
   sail: {
     name: 'Age of Sail',
@@ -125,6 +135,7 @@ export const AGES: Record<AgeId, Age> = {
     blurb: 'A people that has turned to the sea: boats fish half again as fast, ships come a quarter cheaper and a quarter sturdier, but the fields are tilled with less care. A Market within a dozen tiles of a Dock ships its goods by water: its trade trips pay 30% more.',
     mul: { fish: 1.5, shipHp: 1.25, farm: 0.85 },
     price: { ship: 0.75 },
+    ironTrade: IRON_TRADE,
   },
 };
 
@@ -546,7 +557,9 @@ export const LANDMARKS = {
  * it sends up to `guard` of them to take (or take back) the nearest landmark in reach that a rival keeps
  * or is claiming, and holds them there until it's no longer the rival's, or `hold` seconds pass.
  */
-export const AI_MARK = { escort: 2, far: 28, townAt: 8, near: 44, rival: 0.75, walk: 150, party: 3, guard: 5, hold: 120,
+export const AI_MARK = { escort: 2, far: 28, townAt: 8, near: 44, rival: 0.75, walk: 150, party: 3, guard: 5, hold: 120, linger: 20,
+  /** The walker halts when its escort trails it by more than this many tiles, and goes on once they close up. */
+  lead: 9,
   /** Divisors of a landmark's distance (bigger: more worth walking for): by kind, with the cairn when houses are full and the spring when people are hurt. */
   worth: { crag: 1, flint: 1.25, spring: 1, springHurt: 1.5, cairn: 1, cairnFull: 1.6,
     /** Times more worth walking for the kind its own people favour (`LANDMARKS.kin`), since it pays half again as much. */
@@ -692,6 +705,8 @@ export interface Tech {
   icon: string;
   /** A survey (#39): when done, it answers whether this world holds what the state's flag records. */
   survey?: 'bogIron';
+  /** Learned and worked only while the people stands in this age (a craft of one road); it lapses when they leave and returns if they come back. */
+  only?: AgeId;
 }
 
 export const TECHS: Record<TechId, Tech> = {
@@ -727,6 +742,7 @@ export const TECHS: Record<TechId, Tech> = {
   pilgrimage: { name: 'Pilgrimage', at: 'temple', epoch: 2, cost: { food: 200, gold: 150 }, time: 40, mul: { relicGold: 2 }, blurb: 'Every relic kept in a Temple pays double gold.', icon: '🕯' },
   drying: { name: 'Drying Racks', at: 'towncenter', epoch: 0, cost: { food: 60, wood: 60 }, time: 20, mul: { rot: 0.25 }, blurb: 'Meat hung on racks keeps: carcasses on land you hold rot at a quarter the pace.', icon: '🍖' },
   hounds: { name: 'Hounds', at: 'huntcamp', epoch: 0, cost: { food: 80, wood: 40 }, time: 20, mul: { hunt: 1.25, beastWard: 0.5 }, blurb: 'Tamed hounds run beside your hunters: game is butchered 25% faster, and wolves, boars and mammoths do half their damage to your people.', icon: '🐕' },
+  bloomery: { name: 'Bloomery', at: 'forge', epoch: 1, only: 'iron', cost: { food: 120, gold: 80 }, time: 35, mul: { infantryHp: 1.2 }, add: { infantryArmor: 1 }, blurb: 'Iron Age only: bloom iron into hard-wearing mail and helms. Foot soldiers have 20% more health and 1 more armor. The craft is lost when the people leaves the Iron Age, and returns if it comes back.', icon: '🔥' },
   survey: { name: 'Survey the Land', at: 'storehouse', epoch: 0, cost: { food: 50, wood: 50 }, time: 15, survey: 'bogIron', blurb: 'Prospectors walk the streams and marshes and answer one question: is there bog iron anywhere in this world? Yes or no; not where, nor how much.', icon: '🧭' },
 };
 

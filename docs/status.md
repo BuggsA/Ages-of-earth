@@ -76,6 +76,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Contested landmarks** (#182, own pitch, lane rules): a Sacred Spring, Lookout Crag and Ancestors' Cairn between the towns (players + 1), claimed by standing on them alone; held ones are land. The computer claims with a citizen and retakes with soldiers. New numbers `LANDMARKS`, `AI_MARK`. Tests, headless matches and headless-Chromium screenshots; sounds unheard; no win-rate sweep; no save bump. Also: a people down to unarmed boats (fishing boats, merchant ships) is beaten (`checkVictory`).
 
+**Escort lingers** (own pitch, lane ai): a walker's escort stays 20 s (`AI_MARK.linger`) after the claim is won; escort now keyed to its landmark. Unit test only; no sweep; no save bump.
+
 **Kin landmarks for the computer** (own pitch, lane ai): the computer weighs its people's favoured landmark kind 1.4× (`AI_MARK.worth.kin`). Unit test only; no sweep; no save bump.
 
 **Flint Scatter** (#187, own pitch, lane rules): a fourth landmark kind; its keeper's citizens chop and mine 20% faster (`LANDMARKS.flint.tools`). Unit and model tests only; browser, sound and win-rate unseen; no save bump. `tests/relics.test.ts` sits near its 15 s limit and timed out once under load.
@@ -180,3 +182,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Iron bars** (#197, own pitch, lane rules): Iron Age bog iron pays double gold (`bogGold`); the Iron Age computer keeps digging. Tests only; no save bump.
 **Recalling the lone walker** (own pitch, lane ai): the landmark walker turns home when rival soldiers come within 7 tiles of it on the road. Test only; no sweep; no save bump.
+
+**Iron wares** (own pitch, lane rules; #197): bog iron dug on any road lifts trade pay in the Merchants, Fairs and Sail ages, +8% per 75 bars to +40% (`IRON_TRADE`); Market panel shows it. Unit tests only; browser unseen; no sweep; the computer doesn't weigh it; no save bump.
+
+**Walker waits** (own pitch, lane ai): the landmark walker halts when its escort trails by more than `AI_MARK.lead` (9) tiles. Unit test and a headless match; no sweep; no save bump.
+**Bloomery** (own pitch, lane rules, #197): Forge tech, Iron Age only (`Tech.only`): foot +20% hp, +1 armor; lapses on leaving. Tests only; browser unseen; no sweep; no save bump.
