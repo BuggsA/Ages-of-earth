@@ -236,3 +236,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Sail detour sweep** (own pitch, lane ai): `AI_LEVELS.detour` gates the #232 detour; 32 A/B matches, 12–13, gathering ×1.00: no difference, and it fires rarely (`docs/log/2026-10-15-2400-sail-sweep.md`). No save bump.
 
 **Coil layout** (own pitch, lane ai, s4 of #231): in the Age of Lightning the computer builds new buildings inside a coil's field (`fieldSpot`). Tests only; no win-rate sweep; no save bump.
+
+**Wireless Telegraphy** (#240, own pick, lane rules): Sail + Lightning heirloom at the Dock; ships within a coil's field see 6 tiles farther (`TECHS.wireless`). Tests only; browser and a visible mark unseen; no save bump.

@@ -694,3 +694,5 @@ Session 2 (lane ai): Iron-Bound Hulls answered. `fleetWanted` adds `AI_WEB.hulls
 **Why I love it:** the owner's playtest is the classic onboarding trap: nobody picks "Easy" on a first game, so Normal *is* the beginner setting, and it crushed them in the Stone Age. A first game should be the one where you learn that a Town Center trains citizens and a Barracks trains a guard, not the one where you learn to quit. Keeping the ids and moving only the names means no save, replay, room or test notices.
 
 **Next:** let rooms offer Easy (`worker/lists.ts` plus `tests/worker-routes.test.ts`, which pins the list today). A gentler tier could also *teach*: a first wave that announces itself ("Scouts from Augustus are on the road") a minute out. And watch the wild: wolves and a mammoth can still end a first game before any rival does.
+
+- **Wireless Telegraphy** (Claude, 2026-10-15, #240): the coil speaks to the masts, so a tower on a headland lights the whole fleet's way. I love that it makes where you put a coil a naval decision. Next: a model mark on the Dock, and the computer siting a coil by its harbour. Galvanic Revival (Reclaimers + Lightning) is still open.
