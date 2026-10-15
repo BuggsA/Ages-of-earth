@@ -2,7 +2,7 @@ import { BUILDINGS, EPOCHS, MARKET, RES_LABEL, SPREAD, TECHS, UNITS, domainOf, s
 import { peace } from './combat';
 import { placeProblem, stampBuilding, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
-import { backProblem, backTo, barred, journeyOf, roadProblem, roadTo, trainsAt } from './ages';
+import { backProblem, backTo, barred, buildBarred, canRaise, journeyOf, roadProblem, roadTo, trainsAt } from './ages';
 import type { Building, BuildingType, Command, Ent, Cost, GameState, Order, Player, Unit } from './types';
 import { RES, R_FISH, R_MEAT, R_NONE } from './types';
 import { RES_OF_TILE, cargoRoom, findResource, freeFarm, garrisonRoom, giveOrder, landing, setOrder, ungarrison } from './units';
@@ -135,6 +135,11 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
     if (!quiet) refuse(s, p, `Needs the ${EPOCHS[def.epoch].name}`);
     return null;
   }
+  const off = buildBarred(player, type);
+  if (off) {
+    if (!quiet) refuse(s, p, off);
+    return null;
+  }
   const problem = placeProblem(s, type, tx, ty, true, p);
   if (problem) {
     if (!quiet) refuse(s, p, problem === 'slope' ? 'Too steep to build there' : problem === 'foreign' ? "That's enemy land: only a Tower can be raised there" : "Can't build there");
@@ -167,7 +172,7 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
 /** Send citizens to build, remembering the work they were doing to go back to it after. */
 function assignBuilders(units: Unit[], b: Building, queue: boolean): void {
   for (const u of units) {
-    if (u.type !== 'citizen') continue;
+    if (!canRaise(u.type, b.type)) continue;
     const o = u.order;
     const back: Order | null = o.k === 'gather' ? { ...o, phase: 'go' } : o.k === 'farm' ? { ...o, phase: 'go' } : o.k === 'build' ? u.resume : null;
     giveOrder(u, { k: 'build', target: b.id }, queue);
@@ -402,6 +407,11 @@ export function applyCommand(s: GameState, c: Command): void {
           giveOrder(u, { k: 'deliver' }, c.queue);
           continue;
         }
+        // Foot soldiers finish a War Camp they or others pitched (#303).
+        if (u.type !== 'citizen' && !b.built && canRaise(u.type, b.type)) {
+          assignBuilders([u], b, !!c.queue);
+          continue;
+        }
         if (u.type === 'citizen') {
           if (!b.built || b.hp < maxHp(s, b)) {
             assignBuilders([u], b, !!c.queue);
@@ -562,6 +572,8 @@ export function applyCommand(s: GameState, c: Command): void {
       const b = myBuilding(s, c.p, c.building);
       if (!b || !b.built) return;
       if (!trainsAt(p, b.type).includes(c.unit) || !UNITS[c.unit]) return;
+      const struck = buildBarred(p, b.type);
+      if (struck) return refuse(s, c.p, struck);
       if (unitEpoch(c.unit) > p.epoch) return refuse(s, c.p, `Needs the ${EPOCHS[unitEpoch(c.unit)].name}`);
       const no = barred(p, c.unit);
       if (no) return refuse(s, c.p, no);

@@ -57,6 +57,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Rallying Cry** (own pitch, lane rules): the hero's R shout stirs soldiers within 8 tiles for 12 s (+30% blows, +1 armor, mended 6; 70 s rest); the clever computer calls it. `RALLY` in `data.ts`. Tests and a headless match only; browser, sound level and a visible effect unseen; no save bump.
 
+**Iron and Blood** (#303, s2 of #299, lane rules): the Path of Blood's tier-3 step, a turn off Gunpowder for peoples that walked the Warband (deed: 600 plunder); War Camps pitched by foot soldiers in enemy land, burn when left alone (`WARCAMP`, `AGES.ironblood`). Seen in headless Chromium; computer still off paths (checksum unchanged); no save bump.
+
 **Art pass 8** (#267, lane look): epoch 4 citizen work clothes and pick, ironclad armor belt. Render only; models test passes; look unseen.
 
 **Rally ring** (own pitch, lane look): stirred soldiers wear a pulsing gold band that fades with the cry. Render only; smoke passes; look in a match unseen.

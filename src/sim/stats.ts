@@ -1,4 +1,4 @@
-import { AGES, BUILDINGS, CIVS, WORKS, SIGNATURES, EPOCHS, NO_MODS, PATHS, TECHS, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
+import { AGES, BUILDINGS, CIVS, WORKS, SIGNATURES, EPOCHS, NO_MODS, PATHS, TECHS, WARCAMP, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
 import { ageDef, ageOf, hasWalked, isHire, isSuspended, pathCarry } from './ages';
 import type { BuildingType, Cost, GameState, Player, TechId, UnitType } from './types';
 import { RES } from './types';
@@ -138,6 +138,8 @@ export function trainTimeFor(s: GameState, owner: number, type: UnitType, at: Bu
   const p = s.players[owner];
   const t = statsFor(s, owner, type).time;
   const hire = ageDef(p).hire;
+  // A War Camp's tents train slower than a Barracks' drill yard (#303).
+  if (at === 'warcamp') return t * WARCAMP.train;
   return hire && isHire(p, at, type) ? t * hire.time : t;
 }
 

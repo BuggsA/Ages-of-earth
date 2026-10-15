@@ -14,6 +14,7 @@ const IRON_ROAD = ROADS.find((r) => r.to === 'iron')!;
 const PILGRIM_ROAD = ROADS.find((r) => r.to === 'pilgrim')!;
 const SAIL_ROAD = ROADS.find((r) => r.to === 'sail')!;
 const WARBAND_ROAD = ROADS.find((r) => r.to === 'warband')!;
+const IRONBLOOD_ROAD = ROADS.find((r) => r.to === 'ironblood')!;
 const FAIR_ROAD = ROADS.find((r) => r.to === 'fair')!;
 
 interface Tip {
@@ -153,6 +154,20 @@ const TIPS: Tip[] = [
     id: 'plunder',
     when: (s, me) => ageOf(s.players[me]) === 'warband',
     text: 'Your warband lives on plunder: every enemy unit your forces slay pays part of its price in gold, more the further you walk the Path of Blood. Raids feed the town now, and a quiet border starves it.',
+  },
+  {
+    id: 'ironblood',
+    // The Path of Blood goes on (#303): a people that walked the Warband, now in the Gunpowder Age.
+    when: (s, me) => {
+      const p = s.players[me];
+      return ageOf(p) === 'gunpowder' && roadKnown(s, p, IRONBLOOD_ROAD);
+    },
+    text: `The Path of Blood goes on. With ${IRONBLOOD_ROAD.deed!.n} gold of plunder taken, the Town Center (🔀) can turn your people into the <b>${AGES.ironblood.name}</b>: your foot soldiers pitch War Camps where the army stands, even in enemy land, and the plunder grows. The road shuts once you advance.`,
+  },
+  {
+    id: 'warcamp',
+    when: (s, me) => ageOf(s.players[me]) === 'ironblood' && !has(s, me, 'warcamp'),
+    text: 'Select foot soldiers and press <b>B</b> to pitch a <b>War Camp</b> where they stand, in enemy land too. It trains foot soldiers at the front and holds the land round it, so your army there is fed. Keep soldiers by it: a camp left alone burns.',
   },
   {
     id: 'fairs',

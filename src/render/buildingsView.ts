@@ -210,7 +210,7 @@ const plinthMaterial = inject(new THREE.MeshStandardMaterial({ color: '#8d7a62',
 
 const HEIGHT: Record<BuildingType, number> = {
   towncenter: 2.9, house: 1.5, storehouse: 1.3, farm: 0.4, barracks: 2.0, range: 1.4, stable: 1.4, tower: 3.4,
-  forge: 2.1, workshop: 1.7, temple: 2.6, market: 1.6, wonder: 4.6, wall: 1.3, gate: 1.8, dock: 1.5, airfield: 1.8, huntcamp: 1.4,
+  forge: 2.1, workshop: 1.7, temple: 2.6, market: 1.6, wonder: 4.6, wall: 1.3, gate: 1.8, dock: 1.5, airfield: 1.8, huntcamp: 1.4, warcamp: 1.7,
 };
 
 /** Which neighboring tiles hold the same owner's wall or gate. */

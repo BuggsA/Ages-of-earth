@@ -62,6 +62,7 @@ export function surveyFinds(s: GameState, tech: TechId): boolean {
  * survey has been made and found what the road needs. A survey that finds nothing hides it for good.
  */
 export function roadKnown(s: GameState, p: Player, r: Road): boolean {
+  if (r.walked && !hasWalked(p, r.walked)) return false;
   if (r.ruin && !s.ruins?.some((ruin) => ruin.by === p.id)) return false;
   if (r.found && !(p.techs.includes(r.found) && surveyFinds(s, r.found))) return false;
   return !r.clue || s.ents.some((e) => e.kind === 'building' && e.owner === p.id && e.type === r.clue && e.built);
@@ -91,6 +92,7 @@ export const deedsDone = (p: Player, r: Road): boolean => deedsProgress(p, r).ev
 /** What, besides its price, keeps a player off a road, or null. */
 export function roadProblem(s: GameState, p: Player, r: Road): string | null {
   if (!roadKnown(s, p, r)) {
+    if (r.walked && !hasWalked(p, r.walked)) return `Only a people that walked the ${AGES[r.walked].name} finds this road`;
     if (r.ruin) return 'Your citizens must finish excavating an ancient ruin';
     if (r.found && !p.techs.includes(r.found)) return `Needs ${TECHS[r.found].name}`;
     if (r.found && !surveyFinds(s, r.found)) return 'There is none in this world';
@@ -272,3 +274,12 @@ export function pathCarry(p: Player): { path: PathId; times: number } | null {
   const times = pathDepth(p) - 1;
   return path && PATHS[path].carry && times > 0 ? { path, times } : null;
 }
+
+/** Why a people's age won't let it raise or keep this building (the War Camp, #303), or null. */
+export function buildBarred(p: Player, type: BuildingType): string | null {
+  const ages = BUILDINGS[type].ages;
+  return !ages || ages.includes(ageOf(p)) ? null : `Only in the ${ages.map((a) => AGES[a].name).join(' or ')}`;
+}
+
+/** Whether a unit may raise this building: citizens raise them all, and some buildings name others (#303). */
+export const canRaise = (unit: UnitType, type: BuildingType): boolean => unit === 'citizen' || !!BUILDINGS[type].builders?.includes(unit);
