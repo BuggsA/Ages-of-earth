@@ -428,6 +428,7 @@ export class View {
     this.ambient(s, dt);
     this.vessels(s);
     this.water.update(this.time, SUN_DIR, this.horizon, this.sunTint);
+    this.dust();
     this.effects.update(dt);
     this.birds.update(this.time, dt, this.rig.target, this.rig.distance);
     this.fireflies.update(this.time, this.rig.target, this.rig.distance, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
@@ -567,6 +568,22 @@ export class View {
   }
 
   /** Chimney smoke, fires on damaged buildings, the glint of gold. */
+  /** Riders and engines at a hard pace raise dust off dry ground, powder off snow; rain keeps it down. */
+  private dust(): void {
+    const k = this.units.kicks;
+    if (this.quality === 'low' || !k.length) return;
+    const kind = this.weather.day.kind;
+    if (kind === 'rain') return;
+    const snow = kind === 'snow';
+    const colors = snow ? ['#e8eef2', '#f6f9fb'] : ['#a08c6a', '#b8a47e'];
+    for (let i = 0; i < k.length; i += 4) {
+      if (kind === 'mist' && Math.random() < 0.5) continue;
+      const at = new THREE.Vector3(k[i]!, k[i + 2]! + 0.04, k[i + 1]!);
+      const f = k[i + 3]!;
+      this.effects.burst(at, { count: 1 + (f > 0.7 ? 1 : 0), speed: 0.3, up: 0.6, life: 0.9, size: 0.07, grow: 3.2, gravity: -0.15, drag: 1.2, soft: true, colors });
+    }
+  }
+
   private ambient(s: GameState, dt: number): void {
     for (const e of s.ents) {
       if (e.kind !== 'building' || e.hp <= 0 || !e.built) continue;
