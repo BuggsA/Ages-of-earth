@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { BUILDINGS, type UnitStats } from '../sim/data';
+import { BUILDINGS, LIGHTNING, type UnitStats } from '../sim/data';
+import { hasCoils } from '../sim/ages';
 import { modsOf, statsFor } from '../sim/stats';
 import type { BuildingType, Ent, GameState } from '../sim/types';
 import { heightAt } from './terrain';
@@ -11,12 +12,15 @@ const SEGMENTS = 128;
 const LIFT = 0.08;
 const OUTER = new THREE.Color('#a9e9ff');
 const INNER = new THREE.Color('#ffd166');
+const FIELD = new THREE.Color('#9fb8ff');
 
 export interface RangeGuide {
   x: number;
   y: number;
   reach: number;
   minimum: number;
+  /** A coil's field (the Age of Lightning, #239): drawn in blue-white, not the weapon colour. */
+  field?: boolean;
 }
 
 function unitReach(st: UnitStats): Pick<RangeGuide, 'reach' | 'minimum'> | null {
@@ -48,6 +52,25 @@ export function placementRange(s: GameState, viewer: number, type: BuildingType,
   } : null;
 }
 
+/** The reach of each of the viewer's finished, standing Coil Towers, while they are in the Age of Lightning. */
+export function coilFields(s: GameState, viewer: number): RangeGuide[] {
+  if (!hasCoils(s.players[viewer])) return [];
+  const out: RangeGuide[] = [];
+  for (const e of s.ents) {
+    if (e.kind === 'building' && e.type === 'tower' && e.owner === viewer && e.built && e.hp > 0) {
+      out.push({ x: e.x, y: e.y, reach: LIGHTNING.reach, minimum: 0, field: true });
+    }
+  }
+  return out;
+}
+
+/** The field a Watch Tower about to be raised would add, in the Age of Lightning. */
+export function placementField(s: GameState, viewer: number, type: BuildingType, tx: number, ty: number): RangeGuide | null {
+  if (type !== 'tower' || !hasCoils(s.players[viewer])) return null;
+  const size = BUILDINGS[type].size;
+  return { x: tx + size / 2, y: ty + size / 2, reach: LIGHTNING.reach, minimum: 0, field: true };
+}
+
 /** Terrain-following weapon guides: solid outer reach, broken inner dead zone. */
 export class RangeGuides {
   readonly mesh: THREE.LineSegments;
@@ -73,7 +96,7 @@ export class RangeGuides {
       for (const minimum of [false, true]) {
         const radius = minimum ? g.minimum : g.reach;
         if (!(radius > 0)) continue;
-        const color = minimum ? INNER : OUTER;
+        const color = g.field ? FIELD : minimum ? INNER : OUTER;
         for (let i = 0; i < SEGMENTS; i++) {
           if (minimum && i % 4 >= 2) continue;
           const a = i * Math.PI * 2 / SEGMENTS;

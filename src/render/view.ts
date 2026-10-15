@@ -21,7 +21,7 @@ import { PostsView } from './postsView';
 import { RuinsView } from './ruinsView';
 import { LandmarksView } from './landmarksView';
 import { BorderView } from './borderView';
-import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, type RangeGuide } from './rangeGuides';
+import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, coilFields, placementField, type RangeGuide } from './rangeGuides';
 import { ResourcesView } from './resourcesView';
 import { Sky } from './sky';
 import { forcedHour, hourAt, lightAt, moonPhase } from './daylight';
@@ -483,7 +483,11 @@ export class View {
     if (sel.ghost) {
       const g = placementRange(s, this.viewer, sel.ghost.type, sel.ghost.tx, sel.ghost.ty);
       if (g) guides.push(g);
+      const f = placementField(s, this.viewer, sel.ghost.type, sel.ghost.tx, sel.ghost.ty);
+      if (f) guides.push(f);
     }
+    // In the Age of Lightning every finished coil shows its field.
+    for (const f of coilFields(s, this.viewer)) if (guides.length < MAX_RANGE_GUIDES) guides.push(f);
     for (const id of sel.ids) {
       const e = s.byId.get(id);
       if (!e || e.hp <= 0) continue;
