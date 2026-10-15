@@ -718,6 +718,9 @@ replayInput.addEventListener('change', async () => {
 // ---- Title screen ----------------------------------------------------------------------------------
 
 const seedInput = $<HTMLInputElement>('opt-seed');
+const moreOpts = $<HTMLDetailsElement>('more-opts');
+try { moreOpts.open = localStorage.getItem('aoe-more-opts') === '1'; } catch { /* storage blocked: stay folded */ }
+moreOpts.addEventListener('toggle', () => { try { localStorage.setItem('aoe-more-opts', moreOpts.open ? '1' : '0'); } catch { /* ignore */ } });
 seedInput.value = String(newSeed());
 const colorSel = $<HTMLSelectElement>('opt-color');
 colorSel.innerHTML = ['Blue', 'Red', 'Gold', 'Green', 'Purple', 'Orange'].map((n, i) => `<option value="${i}">${n}</option>`).join('');
