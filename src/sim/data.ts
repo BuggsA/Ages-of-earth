@@ -502,6 +502,7 @@ export const RUINS = { count: { small: 2, medium: 3, large: 4 } as Record<MapSiz
  *   health every `spring.every` seconds. A place to stage a raid from, or to bring the bitten home to.
  * - The Lookout Crag shows its keeper everything within `crag.sight` tiles: the road their rival walks.
  * - The Flint Scatter gives its keeper's citizens good edges: chopping and mining (stone, gold, bog iron) `flint.tools` times as fast.
+ * - The Sacred Grove makes its keeper's priests work `grove.priest` times as fast (converting, healing) within `grove.reach` tiles of it: a place to bring a priest to turn a rival's army.
  * - The Ancestors' Cairn gives its keeper `cairn.pop` more room for people: a house or two not built.
  */
 export const LANDMARKS = {
@@ -510,6 +511,7 @@ export const LANDMARKS = {
   crag: { sight: 14 },
   cairn: { pop: 5 },
   flint: { tools: 1.2 },
+  grove: { reach: 10, priest: 1.8 },
 };
 /**
  * The computer and the landmarks: once it has `townAt` citizens and sees no danger near one nobody

@@ -10,7 +10,7 @@ import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } 
 import { carriedBy, relicAt } from './relics';
 import { animalRadius, hitAnimal } from './animals';
 import { dig, ruinAt } from './ruins';
-import { keptOf } from './landmarks';
+import { groveBoost, keptOf } from './landmarks';
 import { atPost, dockOf, goalForPost, homeMarket, marketOf, nearestDock, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { canHit, exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, passOf, pay, radiusOf, statsOf, teamOf } from './world';
 
@@ -662,7 +662,7 @@ function huntStep(s: GameState, u: Unit, o: Extract<Order, { k: 'hunt' }>): void
 /** How long a conversion takes for this target, in ticks (heavier units resist longer). */
 function convertTicks(s: GameState, priest: Unit, t: Unit): number {
   const hard = t.type === 'hero' ? 3 : t.type === 'cavalry' || t.type === 'siege' ? 1.5 : t.type === 'priest' ? 2 : 1;
-  return secs((PRIEST.convert * hard) / modsOf(s, priest.owner).priest);
+  return secs((PRIEST.convert * hard) / (modsOf(s, priest.owner).priest * groveBoost(s, priest)));
 }
 
 function convertStep(s: GameState, u: Unit, o: Extract<Order, { k: 'convert' }>): void {
@@ -721,7 +721,7 @@ function healStep(s: GameState, u: Unit, o: Extract<Order, { k: 'heal' }>): void
     if (walking(u)) stopWalking(u);
     face(u, t.x, t.y);
     u.act = 'chant';
-    t.hp = Math.min(maxHp(s, t), t.hp + PRIEST.heal * modsOf(s, u.owner).priest * DT);
+    t.hp = Math.min(maxHp(s, t), t.hp + PRIEST.heal * modsOf(s, u.owner).priest * groveBoost(s, u) * DT);
     if ((s.tick + u.id) % 30 === 0) s.events.push({ k: 'healed', id: t.id, x: t.x, y: t.y });
     return;
   }

@@ -1109,12 +1109,15 @@ function placeLandmarks(
     }
   }
   const kinds: LandmarkKind[] = [];
+  // The grove stands where a flint scatter would, on half the hands (its own stream, so the draws above are as they were).
+  const grng = mulberry32(seed ^ 0x6a07e5);
   while (kinds.length < out.length) {
     const hand: LandmarkKind[] = ['spring', 'crag', 'cairn', 'flint'];
     for (let i = hand.length - 1; i > 0; i--) {
       const j = Math.floor(rng() * (i + 1));
       [hand[i], hand[j]] = [hand[j], hand[i]];
     }
+    if (grng() < 0.5) hand[hand.indexOf('flint')] = 'grove';
     kinds.push(...hand);
   }
   return out.map((p, k) => ({ x: p.x + 0.5, y: p.y + 0.5, kind: kinds[k] }));
