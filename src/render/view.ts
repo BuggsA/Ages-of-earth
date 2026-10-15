@@ -958,6 +958,15 @@ export class View {
                 },
               });
               this.cue('impact', ev.x, ev.y, 0.5);
+            } else if (type === 'hero') {
+              // A hero falls: gold rings over the ground, embers rising, a low toll.
+              const at = this.ground(s, ev.x, ev.y, 0.1);
+              this.effects.ring(at, '#ffd166', 2.4, 1.4);
+              this.effects.ring(at, '#fff3c4', 1.4, 1);
+              this.effects.burst(at.clone().setY(at.y + 0.4), { count: 22, speed: 0.9, up: 0.9, life: 2.2, size: 0.06, gravity: -0.4, drag: 0.8, colors: ['#ffd166', '#ffb347', '#fff3c4'] });
+              this.effects.burst(at, { count: 6, speed: 0.5, up: 0.4, life: 0.9, size: 0.06, grow: 1.8, gravity: -0.1, drag: 1.5, soft: true, colors: ['#bba98a', '#d6c7aa'] });
+              this.cue('fall', ev.x, ev.y, 0.6);
+              this.cue('heroFall', ev.x, ev.y, 0.9);
             } else {
               this.effects.burst(this.ground(s, ev.x, ev.y, 0.1), { count: 4, speed: 0.5, up: 0.4, life: 0.8, size: 0.05, grow: 1.8, gravity: -0.1, drag: 1.5, soft: true, colors: ['#bba98a', '#d6c7aa'] });
               this.cue('fall', ev.x, ev.y, 0.6);
@@ -1047,6 +1056,13 @@ export class View {
           this.effects.burst(this.ground(s, ev.x, ev.y, 1.2), { count: 6, speed: 0.5, up: 1, life: 0.9, size: 0.05, gravity: -0.5, colors: ['#fff3c4', '#ffd24d'] });
           if (ev.owner === this.viewer) this.onPing?.(ev.x, ev.y, '#ffd24d');
           break;
+        case 'plunder': {
+          // Spoils from the fallen (#299): a spatter of crimson and a few gold coins, and a clink for the taker.
+          if (ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;
+          this.effects.burst(this.ground(s, ev.x, ev.y, 0.8), { count: 8, speed: 0.8, up: 1.1, life: 1, size: 0.05, gravity: 2, colors: ['#ffd166', '#9b1c2c', '#f2cf4a'] });
+          if (ev.owner === this.viewer) this.cue('tradePaid', ev.x, ev.y, 0.4);
+          break;
+        }
         case 'alert':
           if (ev.owner === this.viewer) this.onPing?.(ev.x, ev.y, '#ff4d4d');
           break;

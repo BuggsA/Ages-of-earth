@@ -283,3 +283,6 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Save-key QR** (own pitch, lane online): Cloud saves → Show QR code; scanning opens the game and offers the key. UI only; seen in headless Chromium, not scanned by a real phone; no save bump.
 
 **Web finds in the vault** (own pitch, lane online): Web of Ages discoveries follow the cloud save key like campaign stars. Tests only; browser unseen; no save bump.
+
+**A hero's fall** (#300, own pitch, lane look): gold rings, embers and a double toll when a hero dies. Render and sound only; typecheck and quick tier pass; look and level unseen; no save bump.
+**The Path of Blood, s1** (#299, the owner's ask, lane rules): *paths*, side ages chained across tiers (`PATHS`, `Age.path`, `Path.carry`), and the first step, the **Age of the Warband** (a turn off the Middle Ages: Barracks, slay 25; plunder in gold, soldiers 15% faster; no traders, farms −10%). The computer is kept off paths (its play is unchanged). Tests, a headless match and the browser smoke test; the age not played by hand; no save bump.
