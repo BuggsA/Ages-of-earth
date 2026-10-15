@@ -1,4 +1,4 @@
-import { CIVS, CIV_IDS, MAP_SIZES, MAP_TYPES, PLAYER_COLORS } from '../sim/data';
+import { AI_LEVELS, CIVS, CIV_IDS, MAP_SIZES, MAP_TYPES, PLAYER_COLORS } from '../sim/data';
 import type { Difficulty, MapSize, MapType } from '../sim/types';
 import { MAX_SEATS, type ClientMsg, type LobbyState } from '../net/protocol';
 
@@ -92,14 +92,15 @@ export class Lobby {
       PLAYER_COLORS.map((_, i) => `<option value="${i}" ${i === cur ? 'selected' : ''} ${state.seats.some((s) => s.color === i) && i !== cur ? 'disabled' : ''}>${COLOR_NAMES[i]}</option>`).join('');
     const civOpts = (cur: string) => `<option value="random">Random</option>` + CIV_IDS.map((c) => `<option value="${c}" ${c === cur ? 'selected' : ''}>${CIVS[c].name}</option>`).join('');
     const teamOpts = (cur: number) => Array.from({ length: MAX_SEATS }, (_, i) => `<option value="${i + 1}" ${i + 1 === cur ? 'selected' : ''}>Team ${i + 1}</option>`).join('');
-    const levelOpts = (cur?: Difficulty) => (['easy', 'normal', 'hard'] as Difficulty[]).map((l) => `<option value="${l}" ${l === cur ? 'selected' : ''}>${l[0].toUpperCase() + l.slice(1)}</option>`).join('');
+// A room takes the three levels its Worker knows (worker/lists.ts); the gentlest is single-player for now (#258).
+    const levelOpts = (cur?: Difficulty) => (['easy', 'normal', 'hard'] as Difficulty[]).map((l) => `<option value="${l}" ${l === cur ? 'selected' : ''}>${AI_LEVELS[l].label}</option>`).join('');
     const rows = state.seats
       .map((s, i) => {
         const mine = i === you;
         const edit = mine || (host && s.kind === 'ai');
         const dis = edit ? '' : 'disabled';
         const who = s.kind === 'ai'
-          ? `🤖 Computer ${host ? `<select data-seat="${i}" data-field="level">${levelOpts(s.level)}</select>` : `(${s.level})`}`
+          ? `🤖 Computer ${host ? `<select data-seat="${i}" data-field="level">${levelOpts(s.level)}</select>` : `(${AI_LEVELS[s.level ?? 'normal'].label})`}`
           : `${i === state.host ? '👑 ' : ''}${esc(s.name)}${mine ? ' (you)' : ''}${s.online === false ? ' <span class="hint">(offline)</span>' : ''}`;
         return `<tr>
           <td><span class="swatch" style="background:${PLAYER_COLORS[s.color]}"></span>${who}</td>
@@ -200,7 +201,7 @@ export class Lobby {
         break;
       }
       case 'addAi':
-        this.act.send({ t: 'addAi', level: 'normal' });
+        this.act.send({ t: 'addAi', level: 'easy' }); // shown as Normal (#258)
         break;
       case 'remove':
         this.act.send({ t: 'removeSeat', seat: Number(b.dataset.seat) });

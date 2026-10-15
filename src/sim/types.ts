@@ -18,7 +18,8 @@ export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
   | 'towncenter' | 'house' | 'storehouse' | 'farm' | 'barracks' | 'range' | 'stable' | 'tower'
   | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp';
-export type Difficulty = 'easy' | 'normal' | 'hard';
+/** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
+export type Difficulty = 'gentle' | 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
 export type MapType = 'continental' | 'highlands' | 'lakes' | 'forest' | 'plains' | 'sea';
 /** Conquest: destroy every rival town. Regicide: each people has a King; lose them and you lose. Deathmatch: start rich. */
@@ -30,7 +31,7 @@ export type TechId =
   | 'wheelbarrow' | 'handcart' | 'axes' | 'saws' | 'picks' | 'shafts' | 'plow' | 'irrigation' | 'masonry'
   | 'conscription' | 'husbandry' | 'theology' | 'chemistry'
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
-  | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge';
+  | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
 export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning';
 
