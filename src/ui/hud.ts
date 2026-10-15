@@ -441,7 +441,7 @@ export class Hud {
       else if (m.owner < 0 && m.by >= 0 && m.claim > 0) status += ` · ${m.by === viewer ? 'your' : `${s.players[m.by].name}'s`} claim ${pct}%`;
       else if (m.owner >= 0 && m.claim < claimWork()) status += ` · held ${pct}%`;
     }
-    const portrait = m.kind === 'spring' ? '⛲' : m.kind === 'crag' ? '⛰' : m.kind === 'flint' ? '🔶' : m.kind === 'grove' ? '🌳' : '🪨';
+    const portrait = m.kind === 'spring' ? '⛲' : m.kind === 'crag' ? '⛰' : m.kind === 'flint' ? '🔶' : m.kind === 'grove' ? '🌳' : m.kind === 'ford' ? '🌊' : '🪨';
     const html = `<div class="sel-portrait"><span style="font-size:54px">${portrait}</span></div>
       <div class="sel-info"><div class="sel-name">${def.name}</div><div class="sel-sub">${status}</div>
       <div class="stats"><span data-tip="<b>Claiming</b>How long one person standing on it alone takes to claim it. Up to ${LANDMARKS.crowd} claim faster; rivals there too stop the claim.">⚑<em>One person</em> ${LANDMARKS.claim}s</span><span data-tip="<b>Land</b>Its keeper holds the land round it: their soldiers are supplied there, and rivals can't build in it.">🗺<em>Land</em> ${LANDMARKS.border} tiles</span></div>

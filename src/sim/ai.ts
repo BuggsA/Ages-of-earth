@@ -1037,7 +1037,7 @@ function markNeed(s: GameState, v: View, m: Landmark): number {
     return v.p.pop + 4 >= v.p.cap ? w.cairnFull : w.cairn;
   }
   if (m.kind === 'spring') return v.citizens.some((u) => u.hp < maxHp(s, u) * 0.7) || v.army.some((u) => u.hp < maxHp(s, u) * 0.7) ? w.springHurt : w.spring;
-  return m.kind === 'flint' ? w.flint : w.crag;
+  return m.kind === 'flint' ? w.flint : m.kind === 'ford' ? w.ford : w.crag;
 }
 
 /**

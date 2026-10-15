@@ -125,6 +125,18 @@ export function flintGeometry(): THREE.BufferGeometry {
   return bake(k.root);
 }
 
+export function fordGeometry(): THREE.BufferGeometry {
+  const k = new Kit();
+  // A shallow crossing: stepping stones in a pale ribbon of water, wheel-worn banks, and a marker post.
+  k.box(2.0, 0.04, 0.8, WATER, 0, 0, 0).rotation.y = 0.15;
+  for (let i = 0; i < 6; i++) k.rock(0.17 - (i % 2) * 0.03, i % 2 ? STONE : STONE_PALE, -0.85 + i * 0.34, 0.05, Math.sin(i * 1.7) * 0.12);
+  k.box(0.5, 0.14, 0.9, MOSS, -1.1, 0, 0.1).rotation.y = 0.2;
+  k.box(0.5, 0.14, 0.9, MOSS, 1.1, 0, -0.1).rotation.y = -0.2;
+  k.cyl(0.05, 0.06, 1.1, 6, BARK, 0.9, 0, 0.55);
+  k.box(0.3, 0.06, 0.06, OCHRE, 0.9, 1.0, 0.55);
+  return bake(k.root);
+}
+
 export function groveGeometry(): THREE.BufferGeometry {
   const k = new Kit();
   // Three old trees ringed round a mossy altar stone, hung with ribbons.
@@ -145,9 +157,9 @@ export function groveGeometry(): THREE.BufferGeometry {
   return bake(k.root);
 }
 
-const GEOMETRY: Record<LandmarkKind, () => THREE.BufferGeometry> = { spring: springGeometry, crag: cragGeometry, cairn: cairnGeometry, flint: flintGeometry, grove: groveGeometry };
+const GEOMETRY: Record<LandmarkKind, () => THREE.BufferGeometry> = { spring: springGeometry, crag: cragGeometry, cairn: cairnGeometry, flint: flintGeometry, grove: groveGeometry, ford: fordGeometry };
 /** Where each kind's banner stands, in model space. */
-const BANNER: Record<LandmarkKind, [number, number, number]> = { spring: [0.75, 0, 0.75], crag: [0.25, 1.4, -0.35], cairn: [1.25, 0, -0.35], flint: [0.7, 0, 0.7], grove: [0.5, 0, 0.7] };
+const BANNER: Record<LandmarkKind, [number, number, number]> = { spring: [0.75, 0, 0.75], crag: [0.25, 1.4, -0.35], cairn: [1.25, 0, -0.35], flint: [0.7, 0, 0.7], grove: [0.5, 0, 0.7], ford: [0.9, 0, 0.55] };
 
 export class LandmarksView {
   readonly group = new THREE.Group();
@@ -178,7 +190,7 @@ export class LandmarksView {
   update(s: GameState, seenTile: (x: number, y: number) => boolean, seesNow: (x: number, y: number) => boolean): void {
     const marks = s.landmarks ?? [];
     const n = Math.max(4, marks.length);
-    const counts: Record<LandmarkKind, number> = { spring: 0, crag: 0, cairn: 0, flint: 0, grove: 0 };
+    const counts: Record<LandmarkKind, number> = { spring: 0, crag: 0, cairn: 0, flint: 0, grove: 0, ford: 0 };
     for (const kind of Object.keys(GEOMETRY) as LandmarkKind[]) this.meshes[kind] = this.mesh(GEOMETRY[kind], this.meshes[kind], n);
     this.banners = this.mesh(bannerGeometry, this.banners, n);
     let flags = 0;
