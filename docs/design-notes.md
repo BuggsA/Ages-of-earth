@@ -548,3 +548,11 @@ Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), n
 **Seen:** `tests/landmarks.test.ts`, `tests/landmark-models.test.ts`, headless matches on small, medium and large maps (`scripts/sim.ts` now prints who took what, when), and screenshots in headless Chromium (models, the banner, borders, the panel, minimap triangles; no console errors). Not played by hand; the horn sounds are unheard; no win-rate sweep.
 **Added later (Flint Scatter, same session chain):** a fourth kind, an economic one: keeper's citizens chop and mine ×`LANDMARKS.flint.tools` (1.2) anywhere. It makes the walk out a trade-off against the cairn's houses. Seen: unit test and model test only; not played, no win-rate sweep. Still open: a ford, a sacred grove, hold-them-all mode.
 **Next:** more kinds that change *what* you do rather than add numbers: a flint scatter that arms citizens, a ford that only its keeper's army can cross, a sacred grove priests convert faster in. Peoples who care about a kind (the Britons' cairn). Landmarks as a match mode: keep them all for N minutes to win, like relics. A Watch Tower that sees a landmark gets the "they're taking it" alert sooner.
+
+## Designers' notes: weather follows the year (own pitch, 2026-10-15, lane look)
+
+**Built:** `seasonalDay` in `src/render/weather.ts` maps the match's seeded day through the current season: snow only in winter (rain/autumn-spring, thin mist in summer otherwise), winter rain becomes a blizzard. `view.ts` re-applies it when the season turns and tells the sound. `?weather=` still forces a day.
+**Why I love it:** summer grass under falling snow broke the spell the new season colours had cast.
+**Seen:** unit tests for the mapping and the browser smoke test; not watched in a match.
+**Next:** breath puffs or a muffled winter ambience; frozen lake edges; minimap tinted by season; a banner line when the sky changes.
+
