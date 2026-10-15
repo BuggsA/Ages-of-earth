@@ -12,6 +12,7 @@ import { CODE_CHARS } from './protocol';
  *   DELETE /api/vault/KEY/N      empty slot N
  *   GET    /api/vault/KEY/progress   the campaign's best stars: { chapterId: 0–3, … }
  *   PUT    /api/vault/KEY/progress   merge stars in (the best of old and new wins; stars never go down)
+ *   GET/PUT /api/vault/KEY/web       the Web of Ages map's discoveries: { entered: [ageId…], roads: ["from>to"…] } (PUT unions them in)
  *
  * The Worker checks the key's shape, the slot and the size before any vault is touched.
  */
@@ -80,4 +81,36 @@ export function mergeProgress(a: Record<string, number>, b: Record<string, numbe
   const out = cleanProgress(a);
   for (const [id, n] of Object.entries(cleanProgress(b))) if (n > (out[id] ?? 0)) out[id] = n;
   return out;
+}
+
+/** Web of Ages discoveries (#37, #54): the ages a player has stood in and the side roads they have known. */
+export interface WebFound {
+  entered: string[];
+  roads: string[];
+}
+export const MAX_WEB_BODY = 4096;
+const AGE_ID = /^[a-z]{2,20}$/;
+const ROAD_ID = /^[a-z]{2,20}>[a-z]{2,20}$/;
+const MAX_WEB_ENTRIES = 64;
+
+function cleanList(raw: unknown, shape: RegExp): string[] {
+  const out: string[] = [];
+  if (!Array.isArray(raw)) return out;
+  for (const v of raw) {
+    if (out.length >= MAX_WEB_ENTRIES) break;
+    if (typeof v === 'string' && shape.test(v) && !out.includes(v)) out.push(v);
+  }
+  return out;
+}
+
+/** Discoveries cleaned of anything that isn't an age id or a road: unknown shapes become empty. */
+export function cleanWeb(raw: unknown): WebFound {
+  const o = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  return { entered: cleanList(o.entered, AGE_ID), roads: cleanList(o.roads, ROAD_ID) };
+}
+
+/** Everything either has found: discoveries only ever grow. */
+export function mergeWeb(a: WebFound, b: WebFound): WebFound {
+  const x = cleanWeb(a), y = cleanWeb(b);
+  return { entered: cleanList([...x.entered, ...y.entered], AGE_ID), roads: cleanList([...x.roads, ...y.roads], ROAD_ID) };
 }

@@ -279,3 +279,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Stars in the cloud** (#292, lane online): campaign stars kept under the save key (`/api/vault/KEY/progress`, best-of merge); synced when the Cloud saves panel opens and after each win. Tests only; browser unseen; no save bump.
 
 **Save-key QR** (own pitch, lane online): Cloud saves → Show QR code; scanning opens the game and offers the key. UI only; seen in headless Chromium, not scanned by a real phone; no save bump.
+
+**Web finds in the vault** (own pitch, lane online): Web of Ages discoveries follow the cloud save key like campaign stars. Tests only; browser unseen; no save bump.

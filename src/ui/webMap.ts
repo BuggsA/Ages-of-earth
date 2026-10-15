@@ -1,6 +1,9 @@
 import { ageOf, deedsOf, isSideRoad, roadKnown } from '../sim/ages';
 import { AGES, BUILDINGS, ROADS, TECHS, TRUNK, type Road } from '../sim/data';
 import type { AgeId, GameState } from '../sim/types';
+import { getCloudWeb, putCloudWeb, vaultKey } from '../net/cloud';
+import { mergeWeb } from '../net/vault';
+import { syncOn } from './campaignUi';
 
 /**
  * The web map (#54): a screen outside the match that draws the web of ages (#37). What it shows
@@ -37,6 +40,28 @@ export function saveDiscovery(d: Discovery): void {
   } catch {
     /* Storage is off: the map shows only the trunk. */
   }
+}
+
+/**
+ * Discoveries follow the save key (#292 follow-up): opening the Cloud saves panel unions this browser's
+ * map with the vault's both ways; once synced, a new find is sent up in the background. Returns how many
+ * ages and roads the vault taught this browser.
+ */
+export async function syncDiscovery(): Promise<number> {
+  const key = vaultKey();
+  const local = loadDiscovery();
+  const remote = await getCloudWeb(key);
+  const merged = mergeWeb(local, remote);
+  const next: Discovery = { entered: merged.entered.filter((a) => a in AGES) as AgeId[], roads: merged.roads };
+  const learned = next.entered.filter((a) => !local.entered.includes(a)).length + next.roads.filter((r) => !local.roads.includes(r)).length;
+  saveDiscovery(next);
+  if (next.entered.some((a) => !remote.entered.includes(a)) || next.roads.some((r) => !remote.roads.includes(r))) await putCloudWeb(key, next);
+  return learned;
+}
+
+/** After a new find: if this browser syncs, send the map up (a failure is ignored; the panel syncs again). */
+export function pushDiscovery(d: Discovery): void {
+  if (syncOn()) void putCloudWeb(vaultKey(), d).catch(() => undefined);
 }
 
 /** Fold what a player has now into the record; true if it grew. Trunk ages below the one reached count as entered. */
