@@ -1060,6 +1060,19 @@ function claimWalk(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
       return;
     }
     v.claimers.add(u.id);
+    // A walker out ahead of a slower escort halts and lets it close up.
+    const e = mem.markEscort;
+    if (e && e.unit === u.id && e.mark === m.id) {
+      let near = Infinity;
+      for (const id of e.ids) {
+        const o = s.byId.get(id);
+        if (o && o.kind === 'unit' && o.hp > 0) near = Math.min(near, (o.x - u.x) * (o.x - u.x) + (o.y - u.y) * (o.y - u.y));
+      }
+      if (near > AI_MARK.lead * AI_MARK.lead && near < Infinity) {
+        if (u.order.k === 'move') issue({ t: 'stop', p: v.p.id, ids: [u.id] });
+        return;
+      }
+    }
     if (u.order.k === 'idle' && (u.x - m.x) * (u.x - m.x) + (u.y - m.y) * (u.y - m.y) > 4) issue({ t: 'move', p: v.p.id, ids: [u.id], x: m.x, y: m.y });
     return;
   }

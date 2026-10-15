@@ -535,6 +535,8 @@ export const LANDMARKS = {
  * or is claiming, and holds them there until it's no longer the rival's, or `hold` seconds pass.
  */
 export const AI_MARK = { escort: 2, far: 28, townAt: 8, near: 44, rival: 0.75, walk: 150, party: 3, guard: 5, hold: 120, linger: 20,
+  /** The walker halts when its escort trails it by more than this many tiles, and goes on once they close up. */
+  lead: 9,
   /** Divisors of a landmark's distance (bigger: more worth walking for): by kind, with the cairn when houses are full and the spring when people are hurt. */
   worth: { crag: 1, flint: 1.25, spring: 1, springHurt: 1.5, cairn: 1, cairnFull: 1.6,
     /** Times more worth walking for the kind its own people favour (`LANDMARKS.kin`), since it pays half again as much. */
