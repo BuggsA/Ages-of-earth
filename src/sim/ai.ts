@@ -1,10 +1,10 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_RAID, AI_WEB, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_RAID, AI_WEB, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
-import { ageOf, barred, deedsDone, hasWalked, deedsProgress, hiresAt, inField, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
+import { ageOf, barred, deedsDone, hasCoils, hasWalked, deedsProgress, hiresAt, inField, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
 import { carriedBy } from './relics';
 import { claimants, favours, landmarkAt } from './landmarks';
 import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple } from './units';
@@ -1448,6 +1448,19 @@ function airforce(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   }
 }
 
+/** How many of a rival's buildings go dark if this coil falls (#231): in its field and in no other coil's. 0 for anything but a finished coil. */
+function darkened(s: GameState, b: Building): number {
+  if (b.type !== 'tower' || !b.built || !hasCoils(s.players[b.owner])) return 0;
+  const r2 = LIGHTNING.reach * LIGHTNING.reach;
+  const near = (a: Building, c: Building): boolean => (a.x - c.x) * (a.x - c.x) + (a.y - c.y) * (a.y - c.y) <= r2;
+  let n = 0;
+  for (const o of s.ents) {
+    if (o.kind !== 'building' || o.owner !== b.owner || o.hp <= 0 || o === b || !near(o, b)) continue;
+    if (!s.ents.some((c) => c.kind === 'building' && c.type === 'tower' && c.owner === b.owner && c.built && c.hp > 0 && c !== b && near(o, c))) n++;
+  }
+  return n;
+}
+
 /** A building of the enemy's worth bombing: their nearest Town Center, or any building known. */
 export function enemyTarget(s: GameState, p: Player): Building | null {
   let best: Building | null = null;
@@ -1462,7 +1475,7 @@ export function enemyTarget(s: GameState, p: Player): Building | null {
     // A pilgrim people's wealth is the relics in its Temples (#50): they come before its Town Center.
     // A Bell Foundry people's relics pay it 50% more gold (#224), so its Temples are worth the same pull on any road (#242).
     const pilgrims = holds && (ageOf(s.players[e.owner]) === 'pilgrim' || s.players[e.owner].techs.includes('bellFoundry'));
-    const d = dx * dx + dy * dy + (e.type === 'wonder' || shrine ? -1e6 : pilgrims ? -AI_WEB.bell : e.type === 'towncenter' ? -400 : 0);
+    const d = dx * dx + dy * dy + (e.type === 'wonder' || shrine ? -1e6 : pilgrims ? -AI_WEB.bell : e.type === 'towncenter' ? -400 : -AI_LIGHTNING.raid * darkened(s, e));
     if (d < bestD) {
       bestD = d;
       best = e;
