@@ -3,7 +3,7 @@ import { scenarioById } from '../sim/campaign';
 import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
-import { AGES, AMOUNT, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { AGES, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { homeMarket, marketOf, postAt, tripGold } from '../sim/trade';
@@ -16,7 +16,7 @@ import { rallyProblem } from '../sim/rally';
 import { stirred as stirredNow } from '../sim/combat';
 import { sees } from '../sim/vision';
 import { buildingCostFor, buildingMaxHp, modsOf, statsFor, techCostFor, techProblem, trainCostFor, trainTimeFor } from '../sim/stats';
-import { ageDef, ageOf, backProblem, hasWalked, backTo, barred, deedsProgress, ironTradeShare, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, surveyFinds, suspendedTechs, trainsAt, windowsOf } from '../sim/ages';
+import { ageDef, ageOf, backProblem, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, ironTradeShare, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, surveyFinds, suspendedTechs, trainsAt, windowsOf } from '../sim/ages';
 import type { Building, BuildingType, Command, Cost, Ent, GameState, Landmark, Player, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
@@ -566,6 +566,12 @@ export class Hud {
       status += standing
         ? ` · <span data-tip="<b>Standing to answer</b>Priests held beside the building sing back ${CONSECRATE.counter.stand * 100 + 100}% as strongly.">🎶 ${standing} priest${standing > 1 ? 's' : ''} answering</span>`
         : ' · <span data-tip="<b>Answer the chant</b>Select priests and right-click this building: they stand by it and sing back, wearing the rival\'s faith down.">🎶 no one answering</span>';
+    }
+    // The Age of Lightning (#239): is this building in a coil's field, and so how fast it works.
+    if (mine && b.built && hasCoils(p) && def.trains.length > 0) {
+      status += inField(s, b)
+        ? ` · <span data-tip="<b>In a coil's field</b>A Coil Tower within ${LIGHTNING.reach} tiles broadcasts power here: it trains and researches ${LIGHTNING.lit - 100}% faster.">⚡ In a coil's field: works ${LIGHTNING.lit - 100}% faster</span>`
+        : ` · <span data-tip="<b>Dark</b>No Coil Tower reaches this building, so it trains and researches ${100 - LIGHTNING.dark}% slower. Raise a Watch Tower within ${LIGHTNING.reach} tiles.">🌑 Dark: works ${100 - LIGHTNING.dark}% slower (raise a Coil Tower within ${LIGHTNING.reach} tiles)</span>`;
     }
     const inside = def.garrison && b.built ? `<div class="stats"><span data-tip="<b>Sheltering</b>Units inside are safe, heal slowly and add arrows.">🏰<em>Inside</em> ${b.garrison.length}/${def.garrison}</span></div>` : '';
     const sig = `b:${b.id}:${Math.ceil(b.hp)}:${status}:${b.queue.length}:${p.epoch}:${queue.length}:${b.garrison.length}`;

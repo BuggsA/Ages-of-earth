@@ -97,3 +97,22 @@ describe('tactical reach', () => {
     expect(guides.mesh.geometry).toBe(geometry);
   });
 });
+
+describe('coil fields (Age of Lightning)', () => {
+  it('shows each finished own tower\'s field only in the Age of Lightning', async () => {
+    const { coilFields, placementField } = await import('../src/render/rangeGuides');
+    const { LIGHTNING } = await import('../src/sim/data');
+    const s = game();
+    placeBuilding(s, 0, 'tower', 20, 20, true);
+    placeBuilding(s, 0, 'tower', 30, 20, false);
+    placeBuilding(s, 1, 'tower', 40, 20, true);
+    expect(coilFields(s, 0)).toEqual([]);
+    expect(placementField(s, 0, 'tower', 10, 10)).toBeNull();
+    restat(s, s.players[0], () => { s.players[0].epoch = 4; s.players[0].age = 'lightning'; });
+    const f = coilFields(s, 0);
+    expect(f).toHaveLength(1);
+    expect(f[0].reach).toBe(LIGHTNING.reach);
+    expect(placementField(s, 0, 'tower', 10, 10)!.field).toBe(true);
+    expect(placementField(s, 0, 'house', 10, 10)).toBeNull();
+  });
+});
