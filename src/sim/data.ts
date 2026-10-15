@@ -56,6 +56,12 @@ export interface Age {
    * `each` more of its usual gold, counting at most `most` relics.
    */
   relicTrade?: { each: number; most: number };
+  /**
+   * Iron on the cart (a crossing of the Iron and Merchant roads): every `per` bog iron the people has
+   * ever dug makes each trade trip pay `each` more, counting at most `most` lots. The tally is kept
+   * for good, so a merchant town that dug the marsh before it sold keeps the bars' worth.
+   */
+  ironTrade?: { per: number; each: number; most: number };
 }
 
 export const TRUNK: AgeId[] = ['stone', 'bronze', 'middle', 'gunpowder', 'industrial'];
@@ -85,10 +91,11 @@ export const AGES: Record<AgeId, Age> = {
     name: 'Age of Merchants',
     short: 'Merchant',
     tier: 2,
-    blurb: 'Guilds, banks and hired swords: the Market hires soldiers for gold, trade pays more, and levies cost dear.',
+    blurb: 'Guilds, banks and hired swords: the Market hires soldiers for gold, trade pays more (more still for every 100 bog iron your people has dug: bars sell far), and levies cost dear.',
     mul: { tradeGold: 1.25 },
     hire: { at: 'market', units: ['infantry', 'ranged', 'cavalry'], gold: 1.2, time: 0.5 },
     levy: 1.2,
+    ironTrade: { per: 100, each: 0.05, most: 6 },
   },
   iron: {
     name: 'Iron Age',
@@ -179,7 +186,7 @@ export const ROADS: Road[] = [
     time: 50,
     clue: 'market',
     deed: { stat: 'traded', n: 400, text: 'Your traders bring home 400 gold' },
-    blurb: 'Instead of the Middle Ages: the same soldiers and technologies, but the Market hires foot, bow and horse for gold alone, in half the time; trade pays 25% more; soldiers trained the usual way cost 20% more.',
+    blurb: 'Instead of the Middle Ages: the same soldiers and technologies, but the Market hires foot, bow and horse for gold alone, in half the time; trade pays 25% more, and 5% more again for every 100 bog iron your citizens have dug (up to 30%): bars sell far; soldiers trained the usual way cost 20% more.',
   },
   { from: 'merchant', to: 'gunpowder', cost: { food: 800, gold: 900, stone: 100 }, time: 65, blurb: 'Rejoin the main road: the merchant fortune buys its way into gunpowder (more gold and less stone than from the Middle Ages).' },
   { from: 'merchant', to: 'middle', cost: { food: 300, stone: 150 }, time: 30, blurb: 'Settle down: leave the merchant life for the Middle Ages, no hiring and no levy price.' },

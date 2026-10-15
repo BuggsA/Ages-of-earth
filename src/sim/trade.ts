@@ -1,4 +1,4 @@
-import { ageOf, relicTradeShare } from './ages';
+import { ageOf, ironTradeShare, relicTradeShare } from './ages';
 import { LAST_EPOCH, TRADE } from './data';
 import { NAVAL, distToRect, nearestWalkable } from './grid';
 import { modsOf } from './stats';
@@ -131,6 +131,6 @@ export function tripGold(s: GameState, owner: number, market: { x: number; y: nu
   const dx = market.x - post.x;
   const dy = market.y - post.y;
   const epoch = Math.min(LAST_EPOCH, s.players[owner].epoch);
-  const k = TRADE.gold * (1 + Math.max(0, epoch - 1) * TRADE.epoch) * modsOf(s, owner).tradeGold * relicTradeShare(s, owner) * (sea ? TRADE.sea.mul : harborNear(s, owner, market) ? TRADE.harbor.mul : 1);
+  const k = TRADE.gold * (1 + Math.max(0, epoch - 1) * TRADE.epoch) * modsOf(s, owner).tradeGold * relicTradeShare(s, owner) * ironTradeShare(s, owner) * (sea ? TRADE.sea.mul : harborNear(s, owner, market) ? TRADE.harbor.mul : 1);
   return Math.max(1, Math.min(TRADE.max, Math.floor((dx * dx + dy * dy) * k)));
 }
