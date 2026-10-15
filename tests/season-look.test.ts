@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SEASON, secs } from '../src/sim/data';
-import { BLEND, MELT, SETTLE, seasonLook } from '../src/render/seasonLook';
+import { BLEND, MELT, SETTLE, lookFor, mapTint, seasonLook } from '../src/render/seasonLook';
 import { seasonAt } from '../src/sim/seasons';
 import type { GameState } from '../src/sim/types';
 
@@ -44,5 +44,26 @@ describe('the turning year on the land', () => {
     expect(seasonLook(at(0, 0, 1)).snow).toBe(1);
     expect(seasonLook(at(0, MELT / 2, 1)).snow).toBeCloseTo(0.5, 6);
     expect(seasonLook(at(0, MELT, 1)).snow).toBe(0);
+  });
+});
+
+describe('the minimap wears the season', () => {
+  const tint = (tick: number, woods: boolean) => mapTint(seasonLook(tick), woods);
+  it('keeps spring meadow the old green, turns summer gold and autumn woods orange', () => {
+    expect(tint(at(0, 60, 0), false)).toEqual([111, 165, 72]);
+    expect(tint(at(1, 60), false)[0]).toBeGreaterThan(tint(at(0, 60), false)[0]);
+    const autumn = tint(at(2, 60), true);
+    expect(autumn[0]).toBeGreaterThan(autumn[1]);
+  });
+  it('lays white over winter meadow as the snow settles and lifts it in spring', () => {
+    const early = tint(at(3, 0), false);
+    const late = tint(at(3, SETTLE + 10), false);
+    expect(late[2]).toBeGreaterThan(early[2]);
+    expect(late[2]).toBeGreaterThan(200);
+    expect(tint(at(0, MELT + 5, 1), false)[2]).toBeLessThan(late[2]);
+  });
+  it('holds a forced season', () => {
+    expect(lookFor(0, 3).snow).toBe(1);
+    expect(lookFor(12345, null)).toEqual(seasonLook(12345));
   });
 });

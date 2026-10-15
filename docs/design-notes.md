@@ -557,3 +557,10 @@ Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), n
 **Seen:** unit tests for the mapping and the browser smoke test; not watched in a match.
 **Next:** breath puffs or a muffled winter ambience; frozen lake edges; minimap tinted by season; a banner line when the sky changes.
 
+
+## Designers' notes: the minimap wears the season (own pitch #195, 2026-10-15, lane look)
+
+**Built:** `mapTint` and `lookFor` in `src/render/seasonLook.ts`; `Minimap.draw` recolours meadow (scaled from the old green) and woods by the season weights, with snow whitening the grass (and a little the woods) in winter. Same blend, snow timing and `?season=` as the land.
+**Why I love it:** the corner of the screen now says "winter is coming" before the toast does.
+**Seen:** headless Chromium, seed 7, each season held with `?season=`: autumn map ochre, winter map pale, no page errors. `tests/season-look.test.ts` checks the tints. Fades not watched in motion.
+**Next:** breath puffs or a muffled winter ambience; frozen lake edges (water tinted white in deep winter).

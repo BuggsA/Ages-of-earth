@@ -55,9 +55,31 @@ export function forcedSeason(): number | null {
   return i < 0 ? null : i;
 }
 
+/** The look at a tick, or the held season's when one is forced. */
+export function lookFor(tick: number, forced: number | null = forcedSeason()): SeasonLook {
+  if (forced === null) return seasonLook(tick);
+  return { w: [0, 1, 2, 3].map((k) => (k === forced ? 1 : 0)) as SeasonLook['w'], snow: forced === 3 ? 1 : 0 };
+}
+
+type RGB = [number, number, number];
+/** Overview-map colours per season (spring, summer, autumn, winter): meadow and woods. */
+const MAP_GRASS: RGB[] = [[111, 165, 72], [158, 168, 78], [176, 138, 70], [150, 168, 150]];
+const MAP_WOODS: RGB[] = [[47, 106, 50], [47, 100, 44], [190, 96, 40], [36, 70, 52]];
+const MAP_SNOW: RGB = [236, 242, 248];
+
+/** A meadow or wood colour on the minimap for a look: the seasons blended, then snow laid over by its cover. */
+export function mapTint(look: SeasonLook, woods: boolean): RGB {
+  const set = woods ? MAP_WOODS : MAP_GRASS;
+  const out: RGB = [0, 0, 0];
+  for (let k = 0; k < 4; k++) for (let c = 0; c < 3; c++) out[c] += set[k][c] * look.w[k];
+  const cover = look.snow * (woods ? 0.35 : 0.85);
+  for (let c = 0; c < 3; c++) out[c] = Math.round(out[c] + (MAP_SNOW[c] - out[c]) * cover);
+  return out;
+}
+
 /** Set the shader's season for this frame. */
 export function setSeasonLook(tick: number, forced: number | null = forcedSeason()): void {
-  const look = forced === null ? seasonLook(tick) : { w: [0, 1, 2, 3].map((k) => (k === forced ? 1 : 0)), snow: forced === 3 ? 1 : 0 };
+  const look = lookFor(tick, forced);
   seasonUniforms.uSeason.value.set(look.w[0], look.w[1], look.w[2], look.w[3]);
   seasonUniforms.uSnow.value = look.snow;
 }
