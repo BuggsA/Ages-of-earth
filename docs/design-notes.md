@@ -694,6 +694,7 @@ Session 2 (lane ai): Iron-Bound Hulls answered. `fleetWanted` adds `AI_WEB.hulls
 **Why I love it:** the owner's playtest is the classic onboarding trap: nobody picks "Easy" on a first game, so Normal *is* the beginner setting, and it crushed them in the Stone Age. A first game should be the one where you learn that a Town Center trains citizens and a Barracks trains a guard, not the one where you learn to quit. Keeping the ids and moving only the names means no save, replay, room or test notices.
 
 **Next:** let rooms offer Easy (`worker/lists.ts` plus `tests/worker-routes.test.ts`, which pins the list today). A gentler tier could also *teach*: a first wave that announces itself ("Scouts from Augustus are on the road") a minute out. And watch the wild: wolves and a mammoth can still end a first game before any rival does.
+
 ## Designers' notes: hunters hunted (#260, own pitch, 2026-10-15, lane ai)
 
 **Built:** `prowl` in `ai.ts`. Between waves a clever computer (Hard and Expert) sends two or three idle soldiers at a rival citizen its own units can see, working within 40 tiles of its home, more than 12 from the rival's Town Centers and Towers, with no rival soldier within 7 and no crowd too big for the band (`prey`). The band chases on to the next one within 8, and goes home when a rival soldier comes near, the 45 s are up, or nobody's left; it sets out at most every 75 s. Seeing no one, it walks to a rival Hunting Camp it has seen (`rivalCamp`) and looks for the butchers. `AI_PROWL` in `data.ts`.
