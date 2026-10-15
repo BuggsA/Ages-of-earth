@@ -76,9 +76,13 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Planning for winter** (own pitch, lane ai): from autumn a clever computer adds fields, leans 30% more to food, hunts mammoths/boars with a smaller town, clears winter wolves with one fewer soldier. New numbers `AI_WINTER`. Tests only; browser and win-rate unseen; no save bump.
 
+**Heirloom looks** (own pitch, lane look): Bell Foundry puts a bell cote on the Temple, Iron-Bound Hulls bands the Dock; a bell peal when an heirloom opens. Render/sound only; model tests pass; browser and sound level unseen; no save bump.
+
 **Old Ford** (own pitch, lane rules): a sixth landmark kind; its keeper's soldiers march 1.2× (`LANDMARKS.ford`). Tests only; browser and win-rate unseen; no save bump.
 
 **Staging from the ford** (own pitch, lane ai): a clever computer keeping an Old Ford toward its rival (`AI_RAID.stage`, 36 tiles) musters waves there. Tests only; browser and win-rate unseen; no save bump.
+
+**Contesting the ford** (own pitch, lane ai): Normal/Hard soldier bands weigh a rival's kept Old Ford 1.6× (`AI_MARK.worth.fordRival`) when picking a landmark to take. Tests only; browser and win-rate unseen; no save bump.
 
 **Lords AI** (own pitch, lane ai): in Lords of the Land the computer ranges the whole map for landmarks and sends bands of two (`AI_MARK.lordsReach`, `.lordsParty`). Tests only; no win-rate sweep; no save bump.
 

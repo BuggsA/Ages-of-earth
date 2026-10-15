@@ -1771,7 +1771,9 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           // Heirlooms (#224): two roads walked open a craft neither teaches alone.
           if (ev.age && !ev.back) {
             const p = s.players[viewer];
-            for (const t of heirloomsOpened(p, ev.age)) if (!p.techs.includes(t)) hud.toast(`${TECHS[t].icon} An heirloom opens: ${TECHS[t].name}, at the ${BUILDINGS[TECHS[t].at].name}`, 'good');
+            const opened = heirloomsOpened(p, ev.age).filter((t) => !p.techs.includes(t));
+            if (opened.length) setTimeout(() => play('heirloom'), 900);
+            for (const t of opened) hud.toast(`${TECHS[t].icon} An heirloom opens: ${TECHS[t].name}, at the ${BUILDINGS[TECHS[t].at].name}`, 'good');
           }
         } else hud.toast(`${s.players[ev.owner].name} has ${ev.back ? 'stepped back to' : 'reached'} the ${ageName(ev)}`, 'info');
         break;
