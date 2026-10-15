@@ -44,7 +44,7 @@ export function counterChant(s: GameState, b: Building): number {
 /** What one priest's chant adds to a building's tally each tick (as a share of the whole). */
 export function chantShare(s: GameState, u: Unit, b: Building): number {
   const need = maxHp(s, b) * (CONSECRATE.hard[b.type] ?? 1);
-  const voice = CONSECRATE.rate * modsOf(s, u.owner).priest * groveBoost(s, u);
+  const voice = CONSECRATE.rate * modsOf(s, u.owner).priest * modsOf(s, u.owner).chant * groveBoost(s, u);
   return (voice * DT) / (need * (1 + CONSECRATE.guard * b.garrison.length + counterChant(s, b)));
 }
 
