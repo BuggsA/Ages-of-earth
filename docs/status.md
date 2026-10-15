@@ -76,6 +76,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Hunting Camp** (own pitch, lane rules): a 45-wood Stone Age food drop (N) that holds a 4-tile border, so a far kill or the herd's new ground can be worked and kept from wolves; the computer builds one by a far kill. New numbers `BORDERS.huntcamp`, `AI_WILD.camp*`. Tests and a headless match; browser unseen; no save bump.
 
+**Escort recall** (own pitch, lane ai): after a far mammoth hunt the escorting soldiers walk home once the beast is down (`AiMemory.huntEscort`). Test only; no sweep; no save bump.
+
 **Hounds** (own pitch, lane rules): Hunting Camp tech (80 food 40 wood): hunt +25%, beast damage halved (`TECHS.hounds`, mod `beastWard`); the computer buys it after big game. Tests only; browser unseen; no save bump.
 
 **Seasons** (own pitch, lane rules): four seasons of 150 s from spring; summer berries +25% but meat rots 1.5×, winter berries ×0.55, fields ×0.75, meat keeps 2×, wolves/boars notice +40%. New numbers `SEASON`, `SEASONS`. Tests only; browser unseen; no save bump.

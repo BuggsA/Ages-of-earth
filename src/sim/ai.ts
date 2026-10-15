@@ -978,6 +978,19 @@ function wilds(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void
   // Autumn and winter: meat keeps, berries fail, so the clever computer hunts with a smaller town.
   const cold = coldComing(s, v);
   const eager = cold ? AI_WINTER.hunters : 0;
+  // The far hunt over (the beast down, the escort idle), the soldiers walk home.
+  if (mem.huntEscort) {
+    const home: number[] = [];
+    const out: number[] = [];
+    for (const id of mem.huntEscort) {
+      const u = s.byId.get(id);
+      if (!u || u.kind !== 'unit' || u.owner !== v.p.id || u.hp <= 0) continue;
+      if (u.order.k === 'idle' && !u.inside) home.push(id);
+      else if (u.order.k === 'hunt') out.push(id);
+    }
+    if (home.length) issue({ t: 'move', p: v.p.id, ids: home, x: v.home.x, y: v.home.y });
+    mem.huntEscort = out.length ? out : undefined;
+  }
   if (v.citizens.length >= AI_WILD.mammothAt - eager && !v.citizens.some((u) => hunting(u, 'mammoth'))) {
     let m = nearestBeast(s, 'mammoth', v.home.x, v.home.y, AI_WILD.mammothNear);
     // A clever computer also goes for a far mammoth, with soldiers along to take the charge, if no rival is by it.
@@ -995,7 +1008,10 @@ function wilds(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void
         .filter((u) => !u.inside && u.carry <= 2 && !v.diggers.has(u.id) && u.order.k === 'gather' && (u.order.res === 'food' || u.order.res === 'wood'))
         .sort((a, b) => (a.x - m.x) * (a.x - m.x) + (a.y - m.y) * (a.y - m.y) - ((b.x - m.x) * (b.x - m.x) + (b.y - m.y) * (b.y - m.y)) || a.id - b.id)
         .slice(0, AI_WILD.party);
-      if (party.length === AI_WILD.party) issue({ t: 'hunt', p: v.p.id, ids: [...escort, ...party].map((u) => u.id), target: m.id });
+      if (party.length === AI_WILD.party) {
+        issue({ t: 'hunt', p: v.p.id, ids: [...escort, ...party].map((u) => u.id), target: m.id });
+        if (escort.length) mem.huntEscort = escort.map((u) => u.id);
+      }
     }
   }
   // A boar guarding berries near home: three citizens spear it together, once the town has six.

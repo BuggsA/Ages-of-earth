@@ -713,4 +713,4 @@ Session 2 (lane ai): Iron-Bound Hulls answered. `fleetWanted` adds `AI_WEB.hulls
 
 **Why I love it:** it is the other side of #260: the computer now weighs the same gamble it punishes in you. A far feast is worth the risk only with soldiers to spare.
 
-**Seen:** `tests/wild.test.ts` (escorted with six soldiers, not with one). No win-rate sweep; browser unseen. **Next:** recall the escort once the carcass is butchered; have the band bring a tower or Hunting Camp along.
+**Seen:** `tests/wild.test.ts` (escorted with six soldiers, not with one). No win-rate sweep; browser unseen. **Next:** have the band bring a tower or Hunting Camp along. *Done 2026-10-15 (recall):* once the beast is down the escort (`mem.huntEscort`) walks home instead of standing idle at the carcass, where a raider would find it.
