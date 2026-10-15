@@ -58,6 +58,8 @@ describe('one player never commands another’s people', () => {
       callUp: { t: 'callUp', p: 1, building: tc.id, n: 5 },
       pack: { t: 'pack', p: 1, building: tc.id },
       pitch: { t: 'pitch', p: 1, ids },
+      milk: { t: 'milk', p: 1, ids, target: s.animals[0]?.id ?? 0 },
+      lamb: { t: 'lamb', p: 1, building: tc.id },
       cry: { t: 'cry', p: 1, id: ids[0] },
       stance: { t: 'stance', p: 1, ids, stance: 'stand' },
       train: { t: 'train', p: 1, building: tc.id, unit: 'citizen' },

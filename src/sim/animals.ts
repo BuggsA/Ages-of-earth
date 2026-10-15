@@ -1,5 +1,5 @@
 import { landOwnerAt } from './borders';
-import { AMOUNT, BOAR, DEER, DT, MAMMOTH, ROT, TICK_HZ, WOLF, domainOf, secs } from './data';
+import { AMOUNT, BOAR, DEER, DT, FLOCK, MAMMOTH, ROT, TICK_HZ, WOLF, domainOf, secs } from './data';
 import { clearResource, walkable } from './grid';
 import type { Spatial } from './spatial';
 import type { Animal, GameState, Order, Unit } from './types';
@@ -17,7 +17,7 @@ import { statsOf } from './world';
  * wander the same way in every browser.
  */
 
-function roll(s: GameState): number {
+export function roll(s: GameState): number {
   s.rng = (s.rng + 0x6d2b79f5) >>> 0;
   let t = s.rng;
   t = Math.imul(t ^ (t >>> 15), t | 1);
@@ -26,11 +26,11 @@ function roll(s: GameState): number {
 }
 
 /** Eight directions, as unit vectors (no trigonometry in the rules). */
-const DIRS = [
+export const DIRS = [
   [1, 0], [0.7071, 0.7071], [0, 1], [-0.7071, 0.7071], [-1, 0], [-0.7071, -0.7071], [0, -1], [0.7071, -0.7071],
 ] as const;
 
-const HP: Record<Animal['kind'], number> = { deer: DEER.hp, mammoth: MAMMOTH.hp, wolf: WOLF.hp, boar: BOAR.hp };
+const HP: Record<Animal['kind'], number> = { deer: DEER.hp, mammoth: MAMMOTH.hp, wolf: WOLF.hp, boar: BOAR.hp, sheep: FLOCK.hp };
 
 export function spawnAnimal(s: GameState, x: number, y: number, kind: Animal['kind'] = 'deer'): Animal {
   const a: Animal = { id: s.nextId++, kind, x, y, px: x, py: y, fx: 0, fy: 1, hp: HP[kind], state: 'graze', t: secs(2) + (s.nextId % 40), tx: x, ty: y, homeX: x, homeY: y, hurt: -999 };
@@ -47,7 +47,7 @@ export function spawnAnimal(s: GameState, x: number, y: number, kind: Animal['ki
 
 /** How wide an animal is, from its middle. */
 export function animalRadius(a: Animal): number {
-  return a.kind === 'mammoth' ? MAMMOTH.radius : a.kind === 'wolf' ? WOLF.radius : a.kind === 'boar' ? BOAR.radius : 0.2;
+  return a.kind === 'mammoth' ? MAMMOTH.radius : a.kind === 'wolf' ? WOLF.radius : a.kind === 'boar' ? BOAR.radius : a.kind === 'sheep' && a.lamb !== undefined ? 0.14 : 0.2;
 }
 
 /** Who can stand up to a beast: citizens with their spears, and soldiers on foot or horse. */
@@ -113,12 +113,17 @@ function rot(s: GameState): void {
   });
 }
 
-export function updateAnimals(s: GameState, sp?: Spatial): void {
+export function updateAnimals(s: GameState, sp?: Spatial, sheep?: (a: Animal) => void): void {
   rot(s);
   for (const a of s.animals) {
     a.px = a.x;
     a.py = a.y;
     a.t--;
+    // A people's flock (#308) keeps its own ways: `flocks.ts`.
+    if (a.kind === 'sheep') {
+      sheep?.(a);
+      continue;
+    }
     if (a.kind !== 'deer') {
       beastStep(s, sp, a);
       continue;
@@ -282,12 +287,14 @@ function beastStep(s: GameState, sp: Spatial | undefined, a: Animal): void {
       a.scav = c;
       return;
     }
-    // Nobody to fight: a hungry pack runs down the deer that graze near its den.
+    // Nobody to fight: a hungry pack runs down the deer that graze near its den, and sheep (#308) a little further.
     let best: Animal | null = null;
-    let bestD = WOLF.hunt * WOLF.hunt;
+    const flock = sheepReach(s);
+    let bestD = Math.max(WOLF.hunt, flock) * Math.max(WOLF.hunt, flock);
     for (const d of s.animals) {
-      if (d.kind !== 'deer' || d.hp <= 0) continue;
+      if ((d.kind !== 'deer' && d.kind !== 'sheep') || d.hp <= 0) continue;
       const dd = (d.x - a.homeX) * (d.x - a.homeX) + (d.y - a.homeY) * (d.y - a.homeY);
+      if (d.kind === 'deer' ? dd >= WOLF.hunt * WOLF.hunt : dd >= flock * flock || shepherded(s, d)) continue;
       if (dd < bestD) {
         best = d;
         bestD = dd;
@@ -316,15 +323,27 @@ function beastStep(s: GameState, sp: Spatial | undefined, a: Animal): void {
   }
 }
 
-/** A wolf runs down its deer; false once the chase is over (the deer is dead, or too far from the den). */
+/** How far from its den a pack goes after sheep (#308): further in a hungry winter. */
+const sheepReach = (s: GameState) => FLOCK.wolf * seasonOf(s).bold;
+
+/** A sheep the wolves pass by (#308): with Hounds, its people's dogs watch it near its camp. */
+function shepherded(s: GameState, d: Animal): boolean {
+  if (d.owner === undefined || d.lead !== undefined || modsOf(s, d.owner).beastWard >= 1) return false;
+  return (d.x - d.homeX) * (d.x - d.homeX) + (d.y - d.homeY) * (d.y - d.homeY) <= FLOCK.guard * FLOCK.guard;
+}
+
+/** A wolf runs down its deer (or sheep); false once the chase is over (the prey is dead, or too far from the den). */
 function wolfHunt(s: GameState, a: Animal): boolean {
   const d = s.animals.find((b) => b.id === a.prey);
   if (!d || d.hp <= 0 || a.t <= 0) return false;
-  if ((d.x - a.homeX) * (d.x - a.homeX) + (d.y - a.homeY) * (d.y - a.homeY) > WOLF.leash * WOLF.leash) return false;
+  const leash = d.kind === 'sheep' ? Math.max(WOLF.leash, sheepReach(s) + 2) : WOLF.leash;
+  if ((d.x - a.homeX) * (d.x - a.homeX) + (d.y - a.homeY) * (d.y - a.homeY) > leash * leash) return false;
+  if (d.kind === 'sheep' && shepherded(s, d)) return false;
   const dx = d.x - a.x;
   const dy = d.y - a.y;
   const dist = Math.sqrt(dx * dx + dy * dy);
   if (dist < 0.5) {
+    if (d.kind === 'sheep' && d.owner !== undefined) s.events.push({ k: 'flock', owner: d.owner, what: 'wolf', x: d.x, y: d.y });
     hitAnimal(s, d, 99, a.x, a.y);
     return false;
   }
@@ -409,15 +428,18 @@ function maul(s: GameState, a: Animal, u: Unit): void {
   if (u.hp > 0) fightBack(u, a);
 }
 
+/** What a slaughtered sheep (#308) gives: a lamb little, a grown sheep more for every bit of fat on it. */
+export const sheepMeat = (a: Animal): number => (a.lamb !== undefined ? FLOCK.lambMeat : FLOCK.meat + (a.fat ?? 0) * 2);
+
 /** Work an order can be set down for, and picked up again after the fight. */
-const WORK: Order['k'][] = ['idle', 'gather', 'farm', 'build', 'deliver', 'dig'];
+const WORK: Order['k'][] = ['idle', 'gather', 'farm', 'build', 'deliver', 'dig', 'milk'];
 
 /** Someone bitten or gored at their work turns on the beast, then goes back to it. */
 function fightBack(u: Unit, a: Animal): void {
   if (!fightsBeasts(u) || !WORK.includes(u.order.k)) return;
   if (u.stance === 'stand' && u.type !== 'citizen') return;
   const o = u.order;
-  if (o.k !== 'idle') u.queue.unshift(o.k === 'gather' || o.k === 'farm' ? { ...o, phase: 'go' } : o);
+  if (o.k !== 'idle') u.queue.unshift(o.k === 'gather' || o.k === 'farm' || o.k === 'milk' ? { ...o, phase: 'go' } : o);
   u.order = { k: 'hunt', target: a.id, fight: a.kind === 'wolf' };
   u.path = null;
   u.goal = null;
@@ -446,7 +468,7 @@ export function hitAnimal(s: GameState, a: Animal, damage: number, fromX: number
   if (a.hp <= 0) return;
   a.hp -= damage;
   a.hurt = s.tick;
-  if (a.hp > 0 && a.kind !== 'deer') {
+  if (a.hp > 0 && a.kind !== 'deer' && a.kind !== 'sheep') {
     if (a.kind === 'mammoth') a.t = secs(MAMMOTH.rage);
     const u = a.state === 'fight' && a.foe !== undefined ? null : thrower(s, fromX, fromY);
     if (u) rouse(s, a, u);
@@ -485,7 +507,7 @@ export function hitAnimal(s: GameState, a: Animal, damage: number, fromX: number
   // A wolf leaves nothing to eat.
   if (tile >= 0 && a.kind !== 'wolf') {
     s.res[tile] = R_MEAT;
-    s.amount[tile] = a.kind === 'mammoth' ? MAMMOTH.meat : a.kind === 'boar' ? BOAR.meat : AMOUNT.meat;
+    s.amount[tile] = a.kind === 'mammoth' ? MAMMOTH.meat : a.kind === 'boar' ? BOAR.meat : a.kind === 'sheep' ? sheepMeat(a) : AMOUNT.meat;
     s.block[tile] |= B_RES;
     s.blockVersion++;
     (s.carcasses ??= []).push({ tile, born: s.tick, full: s.amount[tile] });

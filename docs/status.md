@@ -65,6 +65,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **The computer walks Total War** (#315, s5 of #299, lane ai): a war-people that walked Iron and Blood pitches a muster War Camp at home (`AI_BLOOD.home`), stays in Iron and Blood until its camps have trained the 12 (up to `patience`), turns Total War, and with `foes` enemy soldiers within `alarm` tiles of home calls citizens to arms at the nearest camp, keeping `held` at work. Tests only; 16-match Romans duel (35 min) never reached Total War, so no win-rate change; checksum unchanged (1658101786); browser not needed; no save bump.
 
+**Flocks** (#308, s2 of #297, lane rules): steppe Town Centers raise sheep (L, 60 food, 8 a Town Center; two come with the age) that graze by the camp and follow it when struck; each bite crops the grass bare a while (slower in winter), so a flock grazes out and the camp must move; citizens milk (right-click), an unmilked sheep fattens and breeds, A slaughters; wolves take sheep near dens (Hounds guard near camp); rivals drive off unwatched sheep (`FLOCK`, `flocks.ts`). Seen in headless Chromium (`docs/screenshots/steppe-flock.jpg`); bleat unheard; computer ignores flocks; checksum unchanged (1658101786); no save bump.
+
 **Art pass 8** (#267, lane look): epoch 4 citizen work clothes and pick, ironclad armor belt. Render only; models test passes; look unseen.
 
 **Art pass 11** (#267, lane look): stables of epochs 0–2 get their own silhouettes: a rail-fenced horse corral with a hide lean-to and horsetail totem; mudbrick stalls with arched doors and beam ends; a hayloft dormer and weathervane on the medieval stable. Render only; `models.test.ts` builds them; look in a browser unseen; no save bump.

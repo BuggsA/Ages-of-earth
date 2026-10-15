@@ -186,6 +186,15 @@ export class Minimap {
       if (!reveal && !p.vis[Math.floor(a.y) * s.w + Math.floor(a.x)]) continue;
       // Deer pale; a mammoth (#171) big and brown; wolves a warning red.
       ctx.fillStyle = a.kind === 'mammoth' ? '#9a6a3c' : a.kind === 'wolf' ? '#d2493a' : a.kind === 'boar' ? '#b8622e' : '#e8c79a';
+      // A flock (#308): wool white, ringed in its people's colour.
+      if (a.kind === 'sheep' && a.owner !== undefined) {
+        const r = Math.max(1.5, sx * 0.7);
+        ctx.fillStyle = s.players[a.owner]?.color ?? '#ffffff';
+        ctx.fillRect(a.x * sx - r - 0.6, a.y * sy - r - 0.6, r * 2 + 1.2, r * 2 + 1.2);
+        ctx.fillStyle = '#f4efe2';
+        ctx.fillRect(a.x * sx - r * 0.6, a.y * sy - r * 0.6, r * 1.2, r * 1.2);
+        continue;
+      }
       const r = Math.max(1.2, sx * (a.kind === 'mammoth' ? 1.1 : 0.6));
       ctx.fillRect(a.x * sx - r, a.y * sy - r, r * 2, r * 2);
     }

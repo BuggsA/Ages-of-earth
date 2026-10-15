@@ -3,6 +3,7 @@ import { workStep } from './works';
 import { beaconStep } from './beacon';
 import { warCampStep } from './warcamp';
 import { raiseCamps } from './steppe';
+import { giftFlock, sheepStep } from './flocks';
 import { faithStep } from './consecrate';
 import { turnSeason } from './seasons';
 import { hitAnimal, spawnAnimal, updateAnimals } from './animals';
@@ -200,6 +201,8 @@ function spatial(s: GameState): Spatial {
  */
 function enterAge(s: GameState, p: Player, to: AgeId, back = false): void {
   const tier = AGES[to].tier;
+  // The first steps onto the steppe bring the herds (#308).
+  const herds = !!AGES[to].mobile && !p.walked?.includes(to);
   restat(s, p, () => {
     p.epoch = tier;
     p.age = to;
@@ -214,6 +217,7 @@ function enterAge(s: GameState, p: Player, to: AgeId, back = false): void {
     else delete p.suspended;
   });
   if (back) p.backAt = s.tick;
+  if (herds) giftFlock(s, p);
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.owner !== p.id || !e.queue.length) continue;
     const keep = e.queue.filter((q) =>
@@ -459,7 +463,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   for (const e of s.ents) if (e.kind === 'unit' && e.hp > 0) think(s, sp, e);
   routeUnits(s);
   for (const e of s.ents) if (e.kind === 'unit' && e.hp > 0 && !e.inside) walk(s, e);
-  updateAnimals(s, sp);
+  updateAnimals(s, sp, (a) => sheepStep(s, sp, a));
   turnSeason(s);
   sp.rebuild(s);
   separate(s, sp);

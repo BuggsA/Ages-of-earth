@@ -238,6 +238,48 @@ export const AGES: Record<AgeId, Age> = {
  */
 export const STEPPE = { pitch: 10, spot: 3, packs: ['towncenter', 'house'] as BuildingType[] };
 
+/**
+ * Flocks (#308): the steppe's answer to the Farm it can't build, food that walks. A Town Center in the Age of
+ * the Steppe raises a lamb for `cost` (each brings `start` grown sheep into the age), up to `cap` sheep a Town
+ * Center (packed ones count). A sheep keeps within `range` tiles of its camp, the nearest Town Center of its
+ * people (or wagon carrying one) within `follow` tiles, and trots after it when camp is struck. Every `bite`
+ * seconds it crops the grass tile it stands on, which grows back in `regrow` seconds (slower out of season,
+ * `SEASONS[].grass`); a cropped tile is bare, so it walks to fresh grass, and when none is left in reach it
+ * goes hungry: time to move. Each bite fills its udder by `milk`, up to `udder`; citizens milk it at
+ * `milkRate` a second (slow, renewable). Once the udder is full, bites go to fat instead, `fat` each: at
+ * `breed` fat it bears a lamb (while its people walks the steppe and the flock is under `cap`), and twice its fat
+ * adds to the `meat` it falls as when slaughtered (fast, once). A lamb (`lambHp`, `lambMeat`) grows up in `lamb`
+ * seconds and gives no milk.
+ * Wolves run down sheep grazing within `wolf` tiles of their den (further in winter); with Hounds, sheep within
+ * `guard` tiles of their camp are watched and the wolves pass them by. Rustling: a sheep with no one of its
+ * people (or its camp) within `guard` tiles, and a rival on foot or horse within `steal`, goes over to the
+ * rival and follows them home.
+ */
+export const FLOCK = {
+  cost: { food: 60 } as Cost,
+  start: 2,
+  cap: 8,
+  hp: 24,
+  lambHp: 10,
+  walk: 0.9,
+  flee: 1.5,
+  range: 6,
+  follow: 40,
+  bite: 4,
+  regrow: 75,
+  milk: 1,
+  udder: 25,
+  fat: 1,
+  breed: 18,
+  milkRate: 0.7,
+  meat: 90,
+  lambMeat: 40,
+  lamb: 80,
+  wolf: 11,
+  guard: 6,
+  steal: 2,
+};
+
 /** Something a people must have done before a road opens: a tally from its stats reaching `n`. */
 export interface Deed {
   stat: keyof PlayerStats;
@@ -1109,10 +1151,10 @@ export const ROT = { grace: 40, rate: 1 / 160 };
  */
 export const SEASON = { len: 150 };
 export const SEASONS = [
-  { name: 'Spring', icon: '🌱', plant: 1, field: 1, rot: 1, bold: 1, blurb: 'The thaw: berries and herds return.' },
-  { name: 'Summer', icon: '☀️', plant: 1.25, field: 1.1, rot: 1.5, bold: 0.85, blurb: 'Berries are heavy, but meat spoils fast.' },
-  { name: 'Autumn', icon: '🍂', plant: 1.1, field: 1.15, rot: 1, bold: 1, blurb: 'The harvest, and the beasts grow lean.' },
-  { name: 'Winter', icon: '❄️', plant: 0.55, field: 0.75, rot: 0.5, bold: 1.4, blurb: 'Berries fail, meat keeps, and hungry wolves range further.' },
+  { name: 'Spring', icon: '🌱', plant: 1, field: 1, rot: 1, bold: 1, grass: 1.2, blurb: 'The thaw: berries and herds return.' },
+  { name: 'Summer', icon: '☀️', plant: 1.25, field: 1.1, rot: 1.5, bold: 0.85, grass: 1, blurb: 'Berries are heavy, but meat spoils fast.' },
+  { name: 'Autumn', icon: '🍂', plant: 1.1, field: 1.15, rot: 1, bold: 1, grass: 0.8, blurb: 'The harvest, and the beasts grow lean.' },
+  { name: 'Winter', icon: '❄️', plant: 0.55, field: 0.75, rot: 0.5, bold: 1.4, grass: 0.4, blurb: 'Berries fail, meat keeps, grass grows back slowly, and hungry wolves range further.' },
 ] as const;
 /**
  * The clever computer plans for winter (autumn onward, season `from`): it counts no berries (they fail in

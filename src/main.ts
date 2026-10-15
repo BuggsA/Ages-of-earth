@@ -99,6 +99,8 @@ const cameraBookmarks = new CameraBookmarks();
 const scoutFlags = new ScoutFlags();
 let lastGroupKey = { key: -1, at: 0 };
 let lastAlert: { x: number; y: number } | null = null;
+/** When the flock last told of a lamb born, or of bare ground (#308), so the toasts don't pile up. */
+const flockToast = { born: -1e9, hungry: -1e9 };
 let altHeld = false;
 let acc = 0;
 let lastFrame = performance.now();
@@ -1210,6 +1212,14 @@ function order(clientX: number, clientY: number, forceAttack = false, queue = fa
   if (pk.kind === 'animal') {
     const a = s.animals.find((x) => x.id === pk.id);
     if (!a) return;
+    // Your own flock (#308): citizens milk it; attack-move (A) slaughters it.
+    if (a.kind === 'sheep' && a.owner === viewer && !forceAttack && units.some((u) => u.type === 'citizen')) {
+      issue({ t: 'milk', p: viewer, ids, target: a.id, queue: q });
+      view.marker(s, a.x, a.y, false);
+      play('move');
+      ack('move');
+      return;
+    }
     issue({ t: 'hunt', p: viewer, ids, target: a.id, queue: q });
     view.marker(s, a.x, a.y, true);
     play('move');
@@ -2103,6 +2113,30 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           lastAlert = { x: ev.x, y: ev.y };
         }
         break;
+      case 'flock':
+        // The flock (#308): lambs, losses and a grazed-out camp.
+        if (ev.what === 'rustled' && ev.by === viewer) {
+          hud.toast('🐑 Your people drive off a rival\'s sheep: lead it home to a Town Center', 'good');
+          play('bleat');
+        } else if (ev.owner !== viewer) break;
+        else if (ev.what === 'raised') play('lambBleat');
+        else if (ev.what === 'born') {
+          play('lambBleat');
+          if (s.tick - flockToast.born > 30 * TICK_HZ || s.tick < flockToast.born) hud.toast('🐑 A lamb is born to your flock', 'good');
+          flockToast.born = s.tick;
+        } else if (ev.what === 'wolf') {
+          hud.toast('🐺 Wolves have taken a sheep from your flock!', 'alert');
+          lastAlert = { x: ev.x, y: ev.y };
+        } else if (ev.what === 'rustled') {
+          hud.toast(`🐑 ${s.players[ev.by ?? 0]?.name ?? 'Raiders'} drove off one of your sheep, left with no one to watch it!`, 'alert');
+          lastAlert = { x: ev.x, y: ev.y };
+          play('bleat');
+        } else if (ev.what === 'hungry' && (s.tick - flockToast.hungry > 45 * TICK_HZ || s.tick < flockToast.hungry)) {
+          flockToast.hungry = s.tick;
+          hud.toast('🌾 Your flock has grazed the land bare: strike camp (J) and drive on to fresh grass', 'info');
+          play('bleat');
+        }
+        break;
       case 'camp':
         if (ev.owner === viewer) {
           play(ev.pitched ? 'pitchCamp' : 'strikeCamp');
@@ -2259,7 +2293,11 @@ function cursorFor(s: GameState): string {
   const units = selectedUnits(s);
   const pk: Pick | null = view.pick(pointer.x, pointer.y);
   if (!pk) return '';
-  if (pk.kind === 'animal') return units.length ? 'cur-attack' : 'cur-select';
+  if (pk.kind === 'animal') {
+    const a = s.animals.find((x) => x.id === pk.id);
+    if (a?.kind === 'sheep' && a.owner === viewer && targetMode !== 'amove' && units.some((u) => u.type === 'citizen')) return 'cur-gather';
+    return units.length ? 'cur-attack' : 'cur-select';
+  }
   if (pk.kind === 'relic') return units.some((u) => u.type === 'priest' && !carriedBy(s, u)) ? 'cur-gather' : 'cur-select';
   if (pk.kind === 'post') return units.some((u) => u.type === 'trader') ? 'cur-gather' : 'cur-select';
   if (pk.kind === 'landmark') return units.length ? 'cur-gather' : 'cur-select';

@@ -92,6 +92,8 @@ export type Order =
   | { k: 'garrison'; target: number }
   /** Hunt an animal; once it falls, butcher it. With `fight`, a wolf fought off: nothing to butcher. */
   | { k: 'hunt'; target: number; fight?: boolean }
+  /** Milk a sheep of the people's flock (#308), carry the milk to a drop site, and back. */
+  | { k: 'milk'; target: number; phase: 'go' | 'work' | 'drop' }
   /** A priest turning an enemy to your side: `done` ticks of chanting so far. */
   | { k: 'convert'; target: number; done: number }
   /** A pilgrim priest standing by a friendly building a rival is chanting over, singing back (#219). */
@@ -318,8 +320,8 @@ export interface Landmark {
 
 export interface Animal {
   id: number;
-  /** Deer bolt; mammoths and wolves (#171) fight. */
-  kind: 'deer' | 'mammoth' | 'wolf' | 'boar';
+  /** Deer bolt; mammoths and wolves (#171) fight; sheep (#308) belong to a people and graze by its camp. */
+  kind: 'deer' | 'mammoth' | 'wolf' | 'boar' | 'sheep';
   x: number;
   y: number;
   px: number;
@@ -348,6 +350,20 @@ export interface Animal {
   prey?: number;
   /** The carcass tile a wolf has scented and is eating (carrion). */
   scav?: number;
+  /**
+   * A sheep (#308): the people it belongs to; milk in its udder and fat on its bones; the tick a lamb grows
+   * up (absent once grown); the rival unit leading it home after rustling it; ticks to its next bite; and
+   * whether it went hungry at its last bite (no grass left in reach of its camp). Its camp is `homeX`, `homeY`.
+   */
+  owner?: number;
+  milk?: number;
+  fat?: number;
+  lamb?: number;
+  lead?: number;
+  bite?: number;
+  hungry?: boolean;
+  /** The tick a citizen last milked it: it stands still for them. */
+  held?: number;
 }
 
 export interface Shot {
@@ -507,6 +523,11 @@ export type GameEvent =
   | { k: 'beacon'; owner: number; building: number; x: number; y: number; on: boolean }
   /** A steppe people struck camp (#297): a building packed onto a wagon, or a wagon pitched as a building. */
   | { k: 'camp'; owner: number; id: number; type: BuildingType; x: number; y: number; pitched: boolean }
+  /**
+   * The flock (#308): a lamb born or raised, a sheep taken by wolves, rustled away (`owner` lost it to `by`),
+   * or a flock gone hungry on bare ground.
+   */
+  | { k: 'flock'; owner: number; what: 'born' | 'raised' | 'wolf' | 'rustled' | 'hungry'; x: number; y: number; by?: number }
   /** A Coil Tower's bolt (the Age of Lightning, #231): from the tower through each enemy it struck, as x, y pairs. */
   | { k: 'arc'; owner: number; building: number; pts: number[] }
   /** A great work was called (`on`) or ran out (seed #133). */
@@ -561,6 +582,8 @@ export interface GameState {
   animals: Animal[];
   /** Carcasses that are spoiling: the tile, the tick it fell, what it held (old saves have none). */
   carcasses?: { tile: number; born: number; full: number }[];
+  /** Per tile: the tick cropped grass grows back (#308), made when the first sheep is; absent until then. */
+  grazed?: Int32Array;
   relics: Relic[];
   /** The team keeping every relic in its temples, or -1; and ticks left before it wins (-1 when none). */
   relicTeam: number;
@@ -684,6 +707,10 @@ export type Command =
   | { t: 'pack'; p: number; building: number }
   /** Pitch camp (#297): wagons set down the building they carry where they stand. */
   | { t: 'pitch'; p: number; ids: number[] }
+  /** Citizens milk a sheep of their flock (#308). */
+  | ({ t: 'milk'; p: number; ids: number[]; target: number } & Queued)
+  /** A Town Center raises a lamb for the flock (#308). */
+  | { t: 'lamb'; p: number; building: number }
   /** A hero's Rallying Cry. */
   | { t: 'cry'; p: number; id: number }
   /** Call the people's great work (seed #133), once in each epoch. */
