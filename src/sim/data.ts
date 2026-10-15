@@ -678,6 +678,8 @@ export interface Tech {
   icon: string;
   /** A survey (#39): when done, it answers whether this world holds what the state's flag records. */
   survey?: 'bogIron';
+  /** Learned and worked only while the people stands in this age (a craft of one road); it lapses when they leave and returns if they come back. */
+  only?: AgeId;
 }
 
 export const TECHS: Record<TechId, Tech> = {
@@ -713,6 +715,7 @@ export const TECHS: Record<TechId, Tech> = {
   pilgrimage: { name: 'Pilgrimage', at: 'temple', epoch: 2, cost: { food: 200, gold: 150 }, time: 40, mul: { relicGold: 2 }, blurb: 'Every relic kept in a Temple pays double gold.', icon: '🕯' },
   drying: { name: 'Drying Racks', at: 'towncenter', epoch: 0, cost: { food: 60, wood: 60 }, time: 20, mul: { rot: 0.25 }, blurb: 'Meat hung on racks keeps: carcasses on land you hold rot at a quarter the pace.', icon: '🍖' },
   hounds: { name: 'Hounds', at: 'huntcamp', epoch: 0, cost: { food: 80, wood: 40 }, time: 20, mul: { hunt: 1.25, beastWard: 0.5 }, blurb: 'Tamed hounds run beside your hunters: game is butchered 25% faster, and wolves, boars and mammoths do half their damage to your people.', icon: '🐕' },
+  bloomery: { name: 'Bloomery', at: 'forge', epoch: 1, only: 'iron', cost: { food: 120, gold: 80 }, time: 35, mul: { infantryHp: 1.2 }, add: { infantryArmor: 1 }, blurb: 'Iron Age only: bloom iron into hard-wearing mail and helms. Foot soldiers have 20% more health and 1 more armor. The craft is lost when the people leaves the Iron Age, and returns if it comes back.', icon: '🔥' },
   survey: { name: 'Survey the Land', at: 'storehouse', epoch: 0, cost: { food: 50, wood: 50 }, time: 15, survey: 'bogIron', blurb: 'Prospectors walk the streams and marshes and answer one question: is there bog iron anywhere in this world? Yes or no; not where, nor how much.', icon: '🧭' },
 };
 
