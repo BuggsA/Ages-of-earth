@@ -16,6 +16,9 @@ export const glowUniform = { uGlow: { value: 1.25 } };
 /** The day's wind (tiles a second, x and z), which streams banners and windsocks. */
 export const windUniform = { value: new THREE.Vector2(0.2, 0) };
 
+/** The season's look (#185): x spring's fresh green, y autumn's leaves, z winter's frost and snow (`seasonLook.ts`). */
+export const seasonUniform = { value: new THREE.Vector3(1, 0, 0) };
+
 export const fogUniforms = {
   uFogTex: { value: null as THREE.Texture | null },
   uFogSize: { value: new THREE.Vector2(1, 1) },
@@ -54,6 +57,87 @@ const FOG_PARS_FRAGMENT = /* glsl */ `
   }
 `;
 
+const SEASON_PARS_VERTEX = /* glsl */ `
+  varying vec3 vSeasonPos;
+  varying vec2 vSeasonSeed;
+`;
+
+const SEASON_VERTEX = /* glsl */ `
+  {
+    vec4 sp = vec4(transformed, 1.0);
+    vec4 so = vec4(0.0, 0.0, 0.0, 1.0);
+    #ifdef USE_INSTANCING
+      sp = instanceMatrix * sp;
+      so = instanceMatrix * so;
+    #endif
+    sp = modelMatrix * sp;
+    so = modelMatrix * so;
+    vSeasonPos = sp.xyz;
+    // One seed per tree or tuft (its own spot), so each turns its own shade; the ground uses the point itself.
+    #ifdef USE_INSTANCING
+      vSeasonSeed = so.xz;
+    #else
+      vSeasonSeed = sp.xz;
+    #endif
+  }
+`;
+
+const SEASON_PARS_FRAGMENT = /* glsl */ `
+  uniform vec3 uSeason;
+  varying vec3 vSeasonPos;
+  varying vec2 vSeasonSeed;
+  float seasonHash(vec2 p) {
+    return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+  }
+  float seasonNoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = seasonHash(i);
+    float b = seasonHash(i + vec2(1.0, 0.0));
+    float c = seasonHash(i + vec2(0.0, 1.0));
+    float d = seasonHash(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+  }
+`;
+
+/**
+ * Leafy greens (green well above red and blue) take the season; deciduous ones (red at least blue, so
+ * broadleaf, birch, grass and tufts, not pines or palms) turn in autumn. Snow lies on faces that point up.
+ * `LEAF` is 1.0 for trees and plants, 0.0 for the ground, which yellows and frosts more gently.
+ */
+const SEASON_FRAGMENT = (leaf: boolean) => /* glsl */ `
+  {
+    const float LEAF = ${leaf ? '1.0' : '0.0'};
+    vec3 c = diffuseColor.rgb;
+    float green = clamp((c.g - max(c.r, c.b)) * 8.0, 0.0, 1.0);
+    float decid = smoothstep(-0.01, 0.02, c.r - c.b);
+    float lum = dot(c, vec3(0.3, 0.59, 0.11));
+    float h = seasonHash(floor(vSeasonSeed * 3.0) + 0.5);
+    // Spring: lusher, brighter greens.
+    c = mix(c, c * vec3(0.9, 1.14, 0.82), uSeason.x * green * 0.85);
+    // Autumn: each tree its own gold, orange or rust, some later than others; meadows go to straw.
+    vec3 fall = h < 0.45 ? vec3(0.85, 0.52, 0.06) : h < 0.8 ? vec3(0.82, 0.27, 0.04) : vec3(0.6, 0.13, 0.04);
+    fall *= clamp(lum * 3.8, 0.5, 1.2);
+    vec3 straw = vec3(0.5, 0.4, 0.13) * clamp(lum * 3.0, 0.5, 1.1);
+    float turn = uSeason.y * green * decid * mix(0.55, 0.75 + 0.25 * fract(h * 7.31), LEAF);
+    c = mix(c, mix(straw, fall, LEAF), turn);
+    // Winter: frost greys the meadows, the woods lose their colour, and berries and flowers wither.
+    float w = uSeason.z;
+    vec3 frost = vec3(lum) * vec3(0.95, 1.02, 1.1) * 1.15;
+    vec3 bare = mix(vec3(0.16, 0.1, 0.06), c * 0.6, 1.0 - decid);
+    c = mix(c, mix(frost, bare, LEAF), w * green * mix(0.6, 0.75, LEAF));
+    float berry = LEAF * step(c.g * 2.5, c.r) * step(c.b * 2.0, c.r);
+    c = mix(c, vec3(0.12, 0.06, 0.04), w * berry * 0.85);
+    // Snow on what faces the sky: patchy on the ground, on the tops of trees.
+    vec3 up = inverseTransformDirection(normal, viewMatrix);
+    float lie = smoothstep(mix(0.6, 0.35, LEAF), mix(0.92, 0.8, LEAF), up.y);
+    float patchy = mix(smoothstep(0.32, 0.55, seasonNoise(vSeasonPos.xz * 0.35) * 0.7 + seasonNoise(vSeasonPos.xz * 1.7) * 0.3), 0.85, LEAF);
+    c = mix(c, vec3(0.78, 0.82, 0.9), w * lie * patchy);
+    diffuseColor.rgb = c;
+  }
+`;
+
 const FOG_FRAGMENT = /* glsl */ `
   gl_FragColor.rgb = fogOfWar(gl_FragColor.rgb);
 `;
@@ -69,6 +153,8 @@ export interface Inject {
   flag?: boolean;
   /** Sway with the wind (trees, crops): vertices higher up move more, by `uTime`. */
   sway?: number;
+  /** Wear the season (#185): 'ground' yellows, frosts and lies under snow; 'leaf' turns, goes bare and catches snow on top. */
+  season?: 'ground' | 'leaf';
 }
 
 export const timeUniform = { value: 0 };
@@ -82,10 +168,12 @@ export function inject<T extends THREE.Material>(mat: T, o: Inject): T {
     if (o.rig || o.team) Object.assign(shader.uniforms, glowUniform);
     if (o.sway || o.rig || o.team) shader.uniforms.uTime = timeUniform;
     if (o.flag) shader.uniforms.uWind = windUniform;
+    if (o.season) shader.uniforms.uSeason = seasonUniform;
     let vs = shader.vertexShader;
     let fs = shader.fragmentShader;
     const parsV: string[] = [];
     if (o.fog !== false) parsV.push(FOG_PARS_VERTEX);
+    if (o.season) parsV.push(SEASON_PARS_VERTEX);
     if (o.rig || o.team) parsV.push('attribute float aTeam;\nvarying float vGlow;');
     if (o.rig) parsV.push('attribute vec3 aRig;\nattribute vec3 aAnim;');
     else if (o.flag) parsV.push('attribute vec3 aRig;');
@@ -201,19 +289,22 @@ export function inject<T extends THREE.Material>(mat: T, o: Inject): T {
     }
     vs = vs.replace('#include <begin_vertex>', begin);
     if (o.fog !== false) vs = vs.replace('#include <project_vertex>', `#include <project_vertex>\n${FOG_VERTEX}`);
+    if (o.season) vs = vs.replace('#include <project_vertex>', `#include <project_vertex>\n${SEASON_VERTEX}`);
     shader.vertexShader = vs;
 
     const parsF: string[] = [];
     if (o.fog !== false) parsF.push(FOG_PARS_FRAGMENT);
     if (o.rig || o.team) parsF.push('varying float vGlow;\nuniform float uGlow;');
+    if (o.season) parsF.push(SEASON_PARS_FRAGMENT);
     fs = fs.replace('#include <common>', `#include <common>\n${parsF.join('\n')}`);
+    if (o.season) fs = fs.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n${SEASON_FRAGMENT(o.season === 'leaf')}`);
     let tail = '#include <opaque_fragment>';
     if (o.rig || o.team) tail += '\n  gl_FragColor.rgb += diffuseColor.rgb * vGlow * uGlow;';
     if (o.fog !== false) tail += `\n${FOG_FRAGMENT}`;
     fs = fs.replace('#include <opaque_fragment>', tail);
     shader.fragmentShader = fs;
   };
-  const key = `${o.rig ? 'r' : ''}${o.flag ? 'w' : ''}${o.team ? 't' : ''}${o.fog === false ? '' : 'f'}${o.sway ?? ''}`;
+  const key = `${o.rig ? 'r' : ''}${o.flag ? 'w' : ''}${o.team ? 't' : ''}${o.fog === false ? '' : 'f'}${o.sway ?? ''}${o.season ?? ''}`;
   const prevKey = mat.customProgramCacheKey?.bind(mat);
   mat.customProgramCacheKey = () => `${prevKey ? prevKey() : ''}|${key}`;
   return mat;
@@ -224,4 +315,4 @@ export const bakedMaterial = inject(new THREE.MeshStandardMaterial({ vertexColor
 /** Units: team colors, swinging limbs, fog of war. */
 export const unitMaterial = inject(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.8 }), { rig: true, team: true, flag: true });
 /** Trees and crops sway a little in the wind. */
-export const swayMaterial = inject(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.9 }), { team: true, sway: 0.03 });
+export const swayMaterial = inject(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.9 }), { team: true, sway: 0.03, season: 'leaf' });

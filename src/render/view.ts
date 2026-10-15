@@ -21,6 +21,7 @@ import { BorderView } from './borderView';
 import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, type RangeGuide } from './rangeGuides';
 import { ResourcesView } from './resourcesView';
 import { Sky } from './sky';
+import { paintSeason } from './seasonLook';
 import { forcedHour, hourAt, lightAt, moonPhase } from './daylight';
 import { Weather, describeWeather, forcedWeather, moodOf, weatherFor, windFor, type WeatherDay } from './weather';
 import { FogTexture, TerrainView, heightAt } from './terrain';
@@ -337,6 +338,7 @@ export class View {
     if (!this.reveal) this.fog?.update(p.vis, p.seen, dt);
 
     this.light(forcedHour() ?? hourAt(s.seed, s.tick / TICK_HZ));
+    paintSeason(s.tick);
     // Light follows the view so shadows stay crisp where the player looks.
     const t = this.rig.target;
     const span = 14 + this.rig.distance * 0.75;

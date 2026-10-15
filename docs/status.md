@@ -74,6 +74,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Planning for winter** (own pitch, lane ai): from autumn a clever computer adds fields, leans 30% more to food, hunts mammoths/boars with a smaller town, clears winter wolves with one fewer soldier. New numbers `AI_WINTER`. Tests only; browser and win-rate unseen; no save bump.
 
+**The land wears the season** (#185, own pitch, lane look): autumn woods turn gold and rust (pines stay green), winter frost and snow on the ground and treetops, berries wither, spring green; eases in late in the season before. Render only; seen in headless Chromium with each season forced; not watched turning live; no save bump.
+
 ## Waiting on the owner
 
 **Setup only the owner can do:**
