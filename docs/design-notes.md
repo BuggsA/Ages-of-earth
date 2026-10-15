@@ -465,3 +465,11 @@ Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), n
 **Why I love it:** the owner called the Stone Age mechanical. Berries were free food; now the second patch has a guard, so the build order asks something: spear it with three (losing gathering time, maybe a citizen), or skip the patch? It connects to the leash too: you can pull a boar off its patch and run.
 **Seen:** `tests/boar.test.ts`; `models.test.ts`; a headless match. Not seen in a browser; sound reuses the wolf's snarl; no win-rate sweep (map seeds shift: wolves and mammoths moved on some maps because placement shares a dice).
 **Next:** herds that migrate, wolves that hunt deer, the wild thinning as borders grow; a boar that roots up unguarded berries.
+
+## Designers' notes: drifting herds (2026-10-15, Chain 1014-2358, session 2)
+
+**Built:** deer herds migrate (`DEER.every/min/max/range` in `data.ts`, `drift` in `src/sim/animals.ts`): each herd moves to fresh ground every 150 s, never onto land inside a border and never too far from where it began; deer that start together move as one, from an integer hash (deterministic). Wolves (`WOLF.hunt`) run down deer grazing near their den and leave the carcass, and the herd bolts as the pack closes.
+**Why I love it:** the owner said the Stone Age felt mechanical. The meat by your first town now runs out as your borders grow, so a hunting camp is a bet on where the herd goes next, and a carcass beside a den is a dare. It touches borders, wolves and the computer's hunting (it already hunts the nearest deer, so it follows without new code).
+**Seen:** `tests/herds.test.ts` and a headless match; not in a browser, not played by hand; no win-rate sweep. No save bump (new fields are optional; old deer are each their own herd).
+**Next:** a lookout/scout that reads herd tracks on the minimap; seasons that also move berries' yield; mammoths that migrate too; the computer building a forward camp by the herd.
+

@@ -1,3 +1,4 @@
+import { landOwnerAt } from './borders';
 import { AMOUNT, BOAR, DEER, DT, MAMMOTH, WOLF, domainOf, secs } from './data';
 import { walkable } from './grid';
 import type { Spatial } from './spatial';
@@ -32,6 +33,12 @@ const HP: Record<Animal['kind'], number> = { deer: DEER.hp, mammoth: MAMMOTH.hp,
 export function spawnAnimal(s: GameState, x: number, y: number, kind: Animal['kind'] = 'deer'): Animal {
   const a: Animal = { id: s.nextId++, kind, x, y, px: x, py: y, fx: 0, fy: 1, hp: HP[kind], state: 'graze', t: secs(2) + (s.nextId % 40), tx: x, ty: y, homeX: x, homeY: y, hurt: -999 };
   if (kind !== 'deer') a.cool = 0;
+  else {
+    const mate = s.animals.find((b) => b.kind === 'deer' && (b.x - x) * (b.x - x) + (b.y - y) * (b.y - y) <= DEER.herd * DEER.herd);
+    a.herd = mate ? (mate.herd ?? mate.id) : a.id;
+    a.origX = mate ? (mate.origX ?? mate.homeX) : x;
+    a.origY = mate ? (mate.origY ?? mate.homeY) : y;
+  }
   s.animals.push(a);
   return a;
 }
@@ -92,6 +99,7 @@ export function updateAnimals(s: GameState, sp?: Spatial): void {
       beastStep(s, sp, a);
       continue;
     }
+    if (a.state !== 'flee') drift(s, a);
     if (a.state === 'graze') {
       if (a.t <= 0) {
         // Wander a little way from home.
@@ -129,6 +137,47 @@ export function updateAnimals(s: GameState, sp?: Spatial): void {
   }
 }
 
+/** A hash of whole numbers (the rules keep no trigonometry): the same herd and season give the same answer everywhere. */
+function mixInt(a: number, b: number): number {
+  let h = Math.imul(a + 0x9e3779b9, 0x85ebca6b) ^ Math.imul(b + 0x7f4a7c15, 0xc2b2ae35);
+  h ^= h >>> 15;
+  h = Math.imul(h, 0x2c1b3c6d);
+  h ^= h >>> 13;
+  return h >>> 0;
+}
+
+/** Once a season the herd moves on to fresh ground, away from towns. All its deer pick the same move. */
+function drift(s: GameState, a: Animal): void {
+  const herd = a.herd ?? a.id;
+  const every = secs(DEER.every);
+  if ((s.tick + (herd % 97) * 31) % every !== 0 || s.tick === 0) return;
+  const season = Math.floor((s.tick + (herd % 97) * 31) / every);
+  const h = mixInt(herd, season);
+  const ox = a.origX ?? a.homeX;
+  const oy = a.origY ?? a.homeY;
+  const dist = DEER.min + (h % 1000) / 1000 * (DEER.max - DEER.min);
+  for (let k = 0; k < 8; k++) {
+    const d = DIRS[((h >>> 10) + k) % 8];
+    let x = a.homeX + d[0] * dist;
+    let y = a.homeY + d[1] * dist;
+    // Too far from where the herd began: turn back toward it.
+    if ((x - ox) * (x - ox) + (y - oy) * (y - oy) > DEER.range * DEER.range) {
+      x = a.homeX - d[0] * dist;
+      y = a.homeY - d[1] * dist;
+    }
+    const tx = Math.floor(x);
+    const ty = Math.floor(y);
+    if (tx < 3 || ty < 3 || tx >= s.w - 3 || ty >= s.h - 3 || !walkable(s, tx, ty) || landOwnerAt(s, tx, ty) >= 0) continue;
+    a.homeX = x;
+    a.homeY = y;
+    a.tx = x;
+    a.ty = y;
+    a.state = 'walk';
+    a.t = secs(40);
+    return;
+  }
+}
+
 // ---- Mammoths and wolves ----------------------------------------------------------------------------
 
 function beastStep(s: GameState, sp: Spatial | undefined, a: Animal): void {
@@ -138,6 +187,7 @@ function beastStep(s: GameState, sp: Spatial | undefined, a: Animal): void {
     return;
   }
   const wolf = a.kind === 'wolf';
+  if (wolf && a.prey !== undefined && !wolfHunt(s, a)) a.prey = undefined;
   const guard = wolf || a.kind === 'boar';
   // A pack keeps watch (so does a boar by its patch): anyone who comes near is set upon.
   if (guard && (s.tick + a.id) % 4 === 0) {
@@ -147,6 +197,25 @@ function beastStep(s: GameState, sp: Spatial | undefined, a: Animal): void {
       return;
     }
   }
+  if (wolf && a.prey === undefined && (s.tick + a.id) % 12 === 0) {
+    // Nobody to fight: a hungry pack runs down the deer that graze near its den.
+    let best: Animal | null = null;
+    let bestD = WOLF.hunt * WOLF.hunt;
+    for (const d of s.animals) {
+      if (d.kind !== 'deer' || d.hp <= 0) continue;
+      const dd = (d.x - a.homeX) * (d.x - a.homeX) + (d.y - a.homeY) * (d.y - a.homeY);
+      if (dd < bestD) {
+        best = d;
+        bestD = dd;
+      }
+    }
+    if (best) {
+      a.prey = best.id;
+      a.state = 'walk';
+      a.t = secs(12);
+    }
+  }
+  if (wolf && a.prey !== undefined) return;
   const roam = wolf ? WOLF.roam : a.kind === 'boar' ? BOAR.roam : MAMMOTH.roam;
   if (a.state === 'graze') {
     if (a.t <= 0) {
@@ -161,6 +230,30 @@ function beastStep(s: GameState, sp: Spatial | undefined, a: Animal): void {
     a.state = 'graze';
     a.t = secs(guard ? 2 : 4) + Math.floor(roll(s) * secs(6));
   }
+}
+
+/** A wolf runs down its deer; false once the chase is over (the deer is dead, or too far from the den). */
+function wolfHunt(s: GameState, a: Animal): boolean {
+  const d = s.animals.find((b) => b.id === a.prey);
+  if (!d || d.hp <= 0 || a.t <= 0) return false;
+  if ((d.x - a.homeX) * (d.x - a.homeX) + (d.y - a.homeY) * (d.y - a.homeY) > WOLF.leash * WOLF.leash) return false;
+  const dx = d.x - a.x;
+  const dy = d.y - a.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist < 0.5) {
+    hitAnimal(s, d, 99, a.x, a.y);
+    return false;
+  }
+  // The herd bolts from the pack.
+  if (dist < 3 && d.state !== 'flee') {
+    d.state = 'flee';
+    d.fx = dx / dist;
+    d.fy = dy / dist;
+    d.t = secs(2.5);
+  }
+  stepToward(s, a, d.x, d.y, WOLF.run);
+  a.state = 'walk';
+  return true;
 }
 
 /** Turn to fight `u`: a wolf brings its whole pack. */
