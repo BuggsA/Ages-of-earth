@@ -63,6 +63,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Total War** (#313, s4 of #299, lane rules): the Path of Blood's tier-4 step, a turn off the Industrial Age for peoples that walked Iron and Blood (deed: 12 soldiers trained at War Camps); War Camps call citizens within 8 tiles to arms (C, V for five; `CALL_UP`); war banners, stakes and sandbags dress the path's towns. Seen in headless Chromium; computer kept off it (`fit`); checksum unchanged (1658101786, same as `main`); no save bump.
 
+**The computer walks Total War** (#315, s5 of #299, lane ai): a war-people that walked Iron and Blood pitches a muster War Camp at home (`AI_BLOOD.home`), stays in Iron and Blood until its camps have trained the 12 (up to `patience`), turns Total War, and with `foes` enemy soldiers within `alarm` tiles of home calls citizens to arms at the nearest camp, keeping `held` at work. Tests only; 16-match Romans duel (35 min) never reached Total War, so no win-rate change; checksum unchanged (1658101786); browser not needed; no save bump.
+
 **Art pass 8** (#267, lane look): epoch 4 citizen work clothes and pick, ironclad armor belt. Render only; models test passes; look unseen.
 
 **Art pass 11** (#267, lane look): stables of epochs 0–2 get their own silhouettes: a rail-fenced horse corral with a hide lean-to and horsetail totem; mudbrick stalls with arched doors and beam ends; a hayloft dormer and weathervane on the medieval stable. Render only; `models.test.ts` builds them; look in a browser unseen; no save bump.
