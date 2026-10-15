@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { RUINS, TECHS, TICK_HZ } from '../src/sim/data';
-import { checksum, createGame, step, type GameSetup } from '../src/sim/game';
-import { placeProblem, walkable } from '../src/sim/grid';
-import { generateMap } from '../src/sim/mapgen';
-import { digWork, loreFor } from '../src/sim/ruins';
-import { deserialize, serialize } from '../src/sim/save';
-import type { Command, GameState, MapSize, MapType, Ruin, RuinFind, Unit } from '../src/sim/types';
-import { spawnUnit } from '../src/sim/world';
+import { RUINS, TECHS, TICK_HZ } from '../../src/sim/data';
+import { checksum, createGame, step, type GameSetup } from '../../src/sim/game';
+import { placeProblem, walkable } from '../../src/sim/grid';
+import { generateMap } from '../../src/sim/mapgen';
+import { digWork, loreFor } from '../../src/sim/ruins';
+import { deserialize, serialize } from '../../src/sim/save';
+import type { Command, GameState, MapSize, MapType, Ruin, RuinFind, Unit } from '../../src/sim/types';
+import { spawnUnit } from '../../src/sim/world';
 
 const game = (o: Partial<GameSetup> = {}): GameState =>
   createGame({
@@ -204,7 +204,7 @@ describe('the computer', () => {
 
 describe('the look', () => {
   it('a standing ruin and a dug pit both build, with colours baked in', async () => {
-    const { pitGeometry, ruinGeometry } = await import('../src/render/ruinsView');
+    const { pitGeometry, ruinGeometry } = await import('../../src/render/ruinsView');
     for (const geo of [ruinGeometry(), pitGeometry()]) {
       expect(geo.getAttribute('position').count).toBeGreaterThan(100);
       expect(geo.getAttribute('color')).toBeTruthy();
