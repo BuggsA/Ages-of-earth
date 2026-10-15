@@ -289,6 +289,12 @@ export interface Animal {
   foe?: number;
   /** Ticks until a fighting beast can strike again. */
   cool?: number;
+  /** Deer that graze together drift together: the herd's id, and where it began (old saves have neither). */
+  herd?: number;
+  origX?: number;
+  origY?: number;
+  /** The deer a hunting wolf is running down. */
+  prey?: number;
 }
 
 export interface Shot {

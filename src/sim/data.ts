@@ -760,7 +760,14 @@ export const GATHER: Record<'tree' | 'berry' | 'stone' | 'gold' | 'farm' | 'meat
 export const EPOCH_GATHER_BONUS = 0.1;
 export const AMOUNT = { tree: 80, berry: 125, stone: 300, gold: 400, meat: 140, fish: 250, bog: 300 };
 /** Deer: health, speeds, and how far a hunter throws a spear. */
-export const DEER = { hp: 8, walk: 0.8, flee: 2.3, spear: 3.5, spearDamage: 4 };
+export const DEER = { hp: 8, walk: 0.8, flee: 2.3, spear: 3.5, spearDamage: 4,
+  /**
+   * Herds drift: a herd keeps its ground `every` seconds, then moves `min`–`max` tiles to a new one, never
+   * onto land inside a border (the wild shies from towns, so the easy hunting near home thins as the
+   * borders grow) and never further than `range` tiles from where it began. Deer within `herd` tiles of
+   * each other at the start move as one.
+   */
+  herd: 4, every: 150, min: 7, max: 12, range: 26 };
 /**
  * The wild (#171). A mammoth grazes `home` tiles out from every town (and `extra` more in the open): it
  * doesn't bolt when speared but turns on whoever threw, charging and goring for `rage` seconds after its
@@ -776,7 +783,7 @@ export const MAMMOTH = { hp: 90, walk: 0.5, charge: 1.7, gore: 8, reach: 0.5, re
  * leaves a carcass worth `meat` (more than a deer's). A lone citizen loses; three win.
  */
 export const BOAR = { hp: 36, walk: 0.7, run: 2.3, bite: 5, reach: 0.35, reload: 1.2, notice: 3.2, leash: 7, roam: 1.5, meat: 260, radius: 0.28, near: 3, min: 7, max: 15, count: 1, extra: { small: 0, medium: 1, large: 2 } as Record<MapSize, number> };
-export const WOLF = { hp: 20, walk: 0.9, run: 2.1, bite: 3, reach: 0.35, reload: 1.2, notice: 4.5, leash: 10, roam: 2.5, radius: 0.22, pack: 3, home: 22, fair: 6, spacing: 14, dens: { small: 2, medium: 3, large: 4 } as Record<MapSize, number> };
+export const WOLF = { hunt: 7, hp: 20, walk: 0.9, run: 2.1, bite: 3, reach: 0.35, reload: 1.2, notice: 4.5, leash: 10, roam: 2.5, radius: 0.22, pack: 3, home: 22, fair: 6, spacing: 14, dens: { small: 2, medium: 3, large: 4 } as Record<MapSize, number> };
 
 /** Market: gold per 100 of a resource to start, how much each trade moves it, and the cut when selling. */
 export const MARKET = { start: { food: 100, wood: 100, stone: 130 }, step: 4, min: 20, max: 600, sellRate: 0.75, lot: 100,
