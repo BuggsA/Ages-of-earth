@@ -1,15 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { CIV_IDS, LANDMARKS } from '../src/sim/data';
+import { LANDMARKS } from '../src/sim/data';
 import { createGame } from '../src/sim/game';
 import { favours, groveBoost, kinBonus } from '../src/sim/landmarks';
 import { spawnUnit } from '../src/sim/world';
 
 describe('peoples and their landmark', () => {
-  it('names a favourite for every people', () => {
-    for (const c of CIV_IDS) expect(LANDMARKS.kin[c]).toBeTruthy();
-  });
   it("strengthens only the favoured kind's bonus, for that people alone", () => {
-    const s = createGame({ seed: 7, size: 'small', players: [{ name: 'G', ai: null, civ: 'greeks' }, { name: 'R', ai: null, civ: 'romans' }] });
+    const s = createGame({ seed: 7, size: 'small', players: [{ name: 'C', ai: null, civ: 'chinese' }, { name: 'R', ai: null, civ: 'romans' }] });
     expect(favours(s, 0, 'grove')).toBe(true);
     expect(favours(s, 1, 'grove')).toBe(false);
     expect(kinBonus(s, 0, 'grove', 0.8)).toBeCloseTo(0.8 * LANDMARKS.kinMul);
@@ -17,8 +14,8 @@ describe('peoples and their landmark', () => {
     const m = s.landmarks![0];
     m.kind = 'grove';
     m.owner = 0;
-    const greek = spawnUnit(s, 0, 'priest', m.x + 3, m.y);
-    expect(groveBoost(s, greek)).toBeCloseTo(1 + (LANDMARKS.grove.priest - 1) * LANDMARKS.kinMul);
+    const chinese = spawnUnit(s, 0, 'priest', m.x + 3, m.y);
+    expect(groveBoost(s, chinese)).toBeCloseTo(1 + (LANDMARKS.grove.priest - 1) * LANDMARKS.kinMul);
     m.owner = 1;
     const roman = spawnUnit(s, 1, 'priest', m.x + 3, m.y);
     expect(groveBoost(s, roman)).toBe(LANDMARKS.grove.priest);

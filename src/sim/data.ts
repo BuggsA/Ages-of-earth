@@ -512,9 +512,9 @@ export const LANDMARKS = {
   cairn: { pop: 5 },
   flint: { tools: 1.2 },
   grove: { reach: 10, priest: 1.8 },
-  /** A people's own kind of landmark gives it `kinMul` times the effect (of the part above that is a bonus). */
+  /** A people's own kind of landmark (the Romans, who build their own, have none) gives it `kinMul` times the effect (of the part above that is a bonus). */
   kinMul: 1.5,
-  kin: { egyptians: 'spring', greeks: 'grove', romans: 'flint', mongols: 'crag', chinese: 'cairn', britons: 'cairn' } as Record<CivId, LandmarkKind>,
+  kin: { egyptians: 'flint', greeks: 'spring', mongols: 'crag', chinese: 'grove', britons: 'cairn' } as Partial<Record<CivId, LandmarkKind>>,
 };
 /**
  * The computer and the landmarks: once it has `townAt` citizens and sees no danger near one nobody
