@@ -550,3 +550,10 @@ Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), n
 **Next:** more kinds that change *what* you do rather than add numbers: a flint scatter that arms citizens, a ford that only its keeper's army can cross, a sacred grove priests convert faster in. Peoples who care about a kind (the Britons' cairn). Landmarks as a match mode: keep them all for N minutes to win, like relics. A Watch Tower that sees a landmark gets the "they're taking it" alert sooner.
 
 **Holding landmarks** (2026-10-15, lane ai, #191). Built: the computer picks landmarks by what its town needs (a Cairn when houses are full, a Spring when people are hurt, Flint) instead of nearest only, and defends one of its own that rivals are pulling down. Why: taking a computer's landmark was free. Next: a sweep of win rates with `AI_MARK.worth` off vs on; leaving a lone citizen to be driven off versus recalling it.
+## Designers' notes: weather follows the year (own pitch, 2026-10-15, lane look)
+
+**Built:** `seasonalDay` in `src/render/weather.ts` maps the match's seeded day through the current season: snow only in winter (rain/autumn-spring, thin mist in summer otherwise), winter rain becomes a blizzard. `view.ts` re-applies it when the season turns and tells the sound. `?weather=` still forces a day.
+**Why I love it:** summer grass under falling snow broke the spell the new season colours had cast.
+**Seen:** unit tests for the mapping and the browser smoke test; not watched in a match.
+**Next:** breath puffs or a muffled winter ambience; frozen lake edges; minimap tinted by season; a banner line when the sky changes.
+
