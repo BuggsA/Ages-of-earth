@@ -1,4 +1,4 @@
-import { ATTRITION, BORDERS, domainOf, secs } from './data';
+import { ATTRITION, BORDERS, LANDMARKS, domainOf, secs } from './data';
 import { isEnemy, maxHp } from './world';
 import type { GameState } from './types';
 
@@ -28,6 +28,25 @@ export function borderMap(s: GameState): Int8Array {
       }
     }
   }
+  // A kept landmark holds the land round it.
+  for (const m of s.landmarks ?? []) {
+    if (m.owner < 0) continue;
+    const reach = LANDMARKS.border;
+    const x0 = Math.max(0, Math.floor(m.x - reach));
+    const x1 = Math.min(s.w - 1, Math.floor(m.x + reach));
+    const y0 = Math.max(0, Math.floor(m.y - reach));
+    const y1 = Math.min(s.h - 1, Math.floor(m.y + reach));
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const dx = x + 0.5 - m.x;
+        const dy = y + 0.5 - m.y;
+        const d = dx * dx + dy * dy;
+        if (d > reach * reach || d >= best[y * s.w + x]) continue;
+        best[y * s.w + x] = d;
+        owner[y * s.w + x] = m.owner;
+      }
+    }
+  }
   return owner;
 }
 
@@ -46,6 +65,15 @@ export function landOwnerAt(s: GameState, x: number, y: number): number {
     if (d > reach * reach || d >= best) continue;
     best = d;
     owner = e.owner;
+  }
+  for (const m of s.landmarks ?? []) {
+    if (m.owner < 0) continue;
+    const dx = x + 0.5 - m.x;
+    const dy = y + 0.5 - m.y;
+    const d = dx * dx + dy * dy;
+    if (d > LANDMARKS.border * LANDMARKS.border || d >= best) continue;
+    best = d;
+    owner = m.owner;
   }
   return owner;
 }

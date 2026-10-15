@@ -1,4 +1,4 @@
-import { BEACON, BUILDINGS } from './data';
+import { BEACON, BUILDINGS, LANDMARKS } from './data';
 import type { GameState } from './types';
 import { statsOf } from './world';
 
@@ -37,6 +37,21 @@ export function updateVision(s: GameState): void {
       const i = y * s.w + x;
       p.vis[i] = 1;
       p.seen[i] = 1;
+    }
+  }
+  // A Lookout Crag shows its keeper the land all round it.
+  for (const m of s.landmarks ?? []) {
+    if (m.kind !== 'crag' || m.owner < 0) continue;
+    const p = s.players[m.owner];
+    const d = disc(LANDMARKS.crag.sight);
+    const cx = Math.floor(m.x);
+    const cy = Math.floor(m.y);
+    for (let k = 0; k < d.length; k += 2) {
+      const x = cx + d[k];
+      const y = cy + d[k + 1];
+      if (x < 0 || y < 0 || x >= s.w || y >= s.h) continue;
+      p.vis[y * s.w + x] = 1;
+      p.seen[y * s.w + x] = 1;
     }
   }
   // A lit beacon is seen by everyone: the ground around it shows to every rival.

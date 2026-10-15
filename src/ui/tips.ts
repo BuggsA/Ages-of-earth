@@ -77,6 +77,11 @@ const TIPS: Tip[] = [
     text: 'A golden <b>relic</b> glints out there (a gold diamond on the map). Build a <b>Temple</b> (<kbd>B</kbd> <kbd>Y</kbd>), then select a <b>priest</b> and right-click the relic: carried home, it brings in gold. Keep every relic long enough and you win.',
   },
   {
+    id: 'landmarks',
+    when: (s, me) => !!s.landmarks?.length && (secsIn(s) > 75 || s.landmarks.some((m) => s.players[me].seen[Math.floor(m.y) * s.w + Math.floor(m.x)] === 1)),
+    text: 'Out between the towns stand <b>landmarks</b> (grey triangles on the map, once found): a <b>Sacred Spring</b> that mends, a <b>Lookout Crag</b> that sees far, an <b>Ancestors\' Cairn</b> that makes room for more people. Right-click one with anyone, a citizen will do, and keep rivals off it to claim it and the land round it. Rivals can take it back the same way, so a fight over it may come before any army does.',
+  },
+  {
     id: 'ruins',
     when: (s, me) => !!s.ruins?.some((r) => r.by < 0 && s.players[me].seen[Math.floor(r.y) * s.w + Math.floor(r.x)] === 1),
     text: 'You have found <b>ancient ruins</b> (two pale columns on the map). Select a few <b>citizens</b> and right-click them to dig: whoever finishes the dig takes what lies beneath, a hoard of gold, lost knowledge, an old map of the land or a relic. Excavation can also reveal a new road for your people. It\'s a long way from home, so send an escort.',

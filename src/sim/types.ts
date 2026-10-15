@@ -265,6 +265,27 @@ export interface Ruin {
   by: number;
 }
 
+/** A landmark's kind (contested landmarks): what its keeper gets besides the land round it. */
+export type LandmarkKind = 'spring' | 'crag' | 'cairn';
+
+/**
+ * A contested landmark: a place out between the towns that belongs to whoever's people hold the ground
+ * round it, alone, long enough. It can't be harmed or built on, only held, lost and taken back.
+ */
+export interface Landmark {
+  id: number;
+  /** The center of its tile. */
+  x: number;
+  y: number;
+  kind: LandmarkKind;
+  /** The player who keeps it, or -1. */
+  owner: number;
+  /** How firmly it is held (or, while nobody keeps it, how far `by` has got), in ticks of claiming. */
+  claim: number;
+  /** The player whose people are claiming it while nobody keeps it, or -1. */
+  by: number;
+}
+
 export interface Animal {
   id: number;
   /** Deer bolt; mammoths and wolves (#171) fight. */
@@ -411,6 +432,10 @@ export type GameEvent =
   | { k: 'survey'; owner: number; tech: TechId; found: boolean }
   /** A ruin dug out (#64): what came up, and for lore, which technology. */
   | { k: 'ruin'; id: number; owner: number; find: RuinFind; tech?: TechId; x: number; y: number }
+  /** A landmark changed hands: `owner` keeps it now (-1: nobody, after `from` was driven off). */
+  | { k: 'landmark'; id: number; kind: LandmarkKind; owner: number; from: number; x: number; y: number }
+  /** Rivals began to pull a held landmark away from its keeper. */
+  | { k: 'landmarkThreat'; id: number; kind: LandmarkKind; owner: number; x: number; y: number }
   | { k: 'placed'; id: number; owner: number; type: BuildingType }
   | { k: 'built'; id: number; owner: number; type: BuildingType }
   | { k: 'epoch'; owner: number; epoch: number; age?: AgeId; back?: boolean }
@@ -485,6 +510,8 @@ export interface GameState {
   posts: TradePost[];
   /** Ancient ruins (#64); absent in older saves and in campaign chapters (none). */
   ruins?: Ruin[];
+  /** Contested landmarks; absent in older saves and in campaign chapters (none). */
+  landmarks?: Landmark[];
   /** Whether this world holds bog iron (#39), decided by the seed; absent in older saves (none). */
   bogIron?: boolean;
   nextId: number;
@@ -532,6 +559,10 @@ export interface AiMemory {
   roadLost?: Record<number, number>;
   /** Ruin id → the tick its diggers last fled rival soldiers there (#64). */
   ruinFled?: Record<number, number>;
+  /** A citizen sent to claim a landmark nobody keeps: which landmark, which citizen, since when. */
+  markWalker?: { id: number; unit: number; since: number };
+  /** Soldiers sent to take (or take back) a landmark, held there until it is the computer's. */
+  markGuard?: { id: number; ids: number[]; since: number };
   /**
    * The side ages it has made up its mind about (#50): true to walk the road there once it opens,
    * false to pass it by. Decided once each, so it doesn't waver from one turn to the next.
