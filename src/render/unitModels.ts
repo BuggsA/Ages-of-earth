@@ -97,10 +97,14 @@ function citizen(epoch: number): Kit {
     k.cyl(0.11, 0.11, 0.015, 10, '#5a4632', 0, 0.54, 0);
     k.team(k.cyl(0.055, 0.065, 0.06, 8, TEAM, 0, 0.55, 0));
   } else if (epoch >= 4) {
-    // A flat cap and a team neckerchief.
+    // A flat cap, a team neckerchief, braces over a waistcoat, rolled sleeves and a lunch pail.
     k.cyl(0.072, 0.078, 0.035, 10, '#3a3a40', 0, 0.54, 0);
     k.box(0.1, 0.012, 0.06, '#3a3a40', 0, 0.545, 0.06);
     k.team(k.box(0.12, 0.03, 0.08, TEAM, 0, 0.41, 0.02));
+    for (const x of [-0.045, 0.045]) k.box(0.02, 0.2, 0.125, '#5a3e2c', x, 0.23, 0.0);
+    k.box(0.14, 0.02, 0.01, '#d8cdb0', 0, 0.35, 0.066);
+    k.cyl(0.035, 0.035, 0.06, 8, '#7d8791', 0.13, 0.12, 0.02);
+    k.cyl(0.036, 0.036, 0.012, 8, '#4a5158', 0.13, 0.18, 0.02);
   } else if (epoch === 1) {
     hairOrHat(k, 0);
     k.team(k.cyl(0.07, 0.07, 0.02, 8, TEAM, 0, 0.53, 0));
@@ -112,6 +116,8 @@ function citizen(epoch: number): Kit {
     kk.cyl(0.012, 0.012, 0.22, 4, WOOD, 0, 0, 0, g);
     const head = epoch === 0 ? '#8a8a84' : epoch === 1 ? BRONZE : STEEL;
     kk.box(0.03, 0.05, 0.08, head, 0, 0.18, 0.03, g);
+    // A pickaxe: a second blade swung the other way.
+    if (epoch >= 4) kk.box(0.03, 0.05, 0.08, head, 0, 0.18, -0.05, g);
   });
   return k;
 }
@@ -675,6 +681,13 @@ function warship(epoch: number): Kit {
   k.team(k.cyl(0.076, 0.076, 0.07, 8, TEAM, 0, 0.42, -0.12));
   k.cyl(0.012, 0.012, 0.55, 4, '#2b2b2e', 0, 0.12, -0.62);
   k.team(k.box(0.012, 0.1, 0.16, TEAM, 0, 0.56, -0.54));
+  // Armor belt: a riveted band along each flank, a ram at the bow, a lit conning-tower slit.
+  for (const x of [-0.235, 0.235]) {
+    k.box(0.02, 0.05, 1.3, '#2a2d31', x, 0.03, -0.05);
+    for (let i = 0; i < 7; i++) k.sphere(0.014, '#8a9098', x * 1.02, 0.06, -0.62 + i * 0.2, undefined, 5);
+  }
+  k.cone(0.05, 0.2, 6, '#4a4e54', 0, 0.04, 0.9).rotation.x = Math.PI / 2;
+  k.glow(k.box(0.12, 0.015, 0.012, '#ffd27a', 0, 0.16, -0.24));
   return k;
 }
 
