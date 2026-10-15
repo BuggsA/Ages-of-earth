@@ -688,6 +688,33 @@ function temple(k: Kit, e: number, st: Style): void {
     banner(k, 1.3, 0, 1.3, 1.2);
     return;
   }
+  if (e === 4) {
+    // A cathedral of the machine age: a long brick nave with buttresses and a rose window, a clock tower under an iron-ribbed spire.
+    k.box(1.5, 1.3, 2.5, st.wall, 0.35, 0, -0.1);
+    k.box(1.56, 0.08, 2.56, st.trim, 0.35, 1.3, -0.1);
+    k.prism(2.6, 0.85, 1.65, st.roof, 0.35, 1.38, -0.1).rotation.y = Math.PI / 2;
+    for (const z of [-1.0, -0.3, 0.4]) for (const x of [-0.5, 1.2]) {
+      k.box(0.14, 1.1, 0.2, st.trim, x, 0, z);
+      k.box(0.1, 0.2, 0.14, st.trim, x, 1.1, z);
+    }
+    for (const z of [-1.0, -0.3, 0.4]) window(k, st, 1.11, 0.6, z, 0.12, 0.5, true, true);
+    k.cyl(0.3, 0.3, 0.05, 14, '#e8e0cc', 0.35, 0.95, 1.16).rotation.x = Math.PI / 2;
+    k.glow(k.cyl(0.22, 0.22, 0.06, 14, '#d86a5a', 0.35, 0.95, 1.17)).rotation.x = Math.PI / 2;
+    k.box(0.4, 0.7, 0.04, '#3a2b20', 0.35, 0, 1.17);
+    k.prism(0.5, 0.3, 0.1, st.trim, 0.35, 0.7, 1.19);
+    // The clock tower and its iron spire.
+    k.box(0.85, 2.3, 0.85, st.wall, -0.95, 0, 0.55);
+    k.box(0.92, 0.08, 0.92, st.trim, -0.95, 2.3, 0.55);
+    k.cyl(0.24, 0.24, 0.04, 14, '#f2ead8', -0.95, 1.8, 1.0).rotation.x = Math.PI / 2;
+    k.glow(k.cyl(0.04, 0.04, 0.05, 6, '#ffd890', -0.95, 1.8, 1.03)).rotation.x = Math.PI / 2;
+    k.cone(0.5, 1.5, 4, IRON_DARK, -0.95, 2.38, 0.55).rotation.y = Math.PI / 4;
+    for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) k.box(0.05, 0.4, 0.05, IRON_DARK, -0.95 + dx * 0.4, 2.38, 0.55 + dz * 0.4);
+    k.box(0.04, 0.45, 0.04, '#e2b23c', -0.95, 3.85, 0.55);
+    k.box(0.22, 0.04, 0.04, '#e2b23c', -0.95, 4.1, 0.55);
+    k.team(k.box(0.9, 0.12, 0.9, TEAM, -0.95, 0.9, 0.55));
+    banner(k, 1.35, 0, 1.35, 1.3);
+    return;
+  }
   // A domed church of brick and white stone with a portico and a bell tower.
   k.box(2.0, 1.2, 1.9, st.wall2, 0.1, 0, -0.3);
   k.box(2.06, 0.08, 1.96, st.trim, 0.1, 1.2, -0.3);
@@ -719,7 +746,24 @@ function stall(k: Kit, st: Style, x: number, z: number, goods: string): void {
 
 function market(k: Kit, e: number, st: Style): void {
   pad(k, 3, st.base);
-  if (e >= 2) {
+  if (e === 4) {
+    // An iron-and-glass arcade: slender cast columns carry a barrel-vaulted glass roof, with a clock at the gable and gas lamps by the stalls.
+    for (const x of [-1.25, -0.4, 0.45, 1.25]) for (const z of [-1.3, -0.2]) k.cyl(0.05, 0.07, 1.2, 6, IRON_DARK, x, 0, z);
+    k.box(2.7, 0.08, 1.3, st.trim, 0, 1.2, -0.75);
+    k.box(2.6, 0.9, 0.08, st.wall, 0, 0, -1.3);
+    k.prism(2.8, 0.55, 1.5, '#9fc4cc', 0, 1.28, -0.75);
+    k.glow(k.prism(2.4, 0.3, 1.1, '#cfe8ee', 0, 1.34, -0.75));
+    for (let i = 0; i < 5; i++) k.box(0.04, 0.5, 1.52, IRON_DARK, -1.2 + i * 0.6, 1.3, -0.75);
+    k.box(0.5, 0.5, 0.4, '#8a6440', -0.7, 0, -1.0);
+    k.box(0.4, 0.34, 0.3, '#a07a50', 0.6, 0, -1.0);
+    k.cyl(0.2, 0.2, 0.05, 12, '#f2ead8', 0, 1.62, -0.0).rotation.x = Math.PI / 2;
+    k.glow(k.cyl(0.03, 0.03, 0.06, 6, '#ffd890', 0, 1.62, 0.03)).rotation.x = Math.PI / 2;
+    for (const x of [-1.5, 1.5]) {
+      k.cyl(0.02, 0.03, 0.9, 5, IRON_DARK, x, 0, 0.3);
+      k.glow(k.sphere(0.07, '#ffd890', x, 0.95, 0.3));
+    }
+    k.team(k.box(2.7, 0.08, 0.06, TEAM, 0, 1.12, -0.12));
+  } else   if (e >= 2) {
     // A covered market hall on arches behind the stalls.
     k.box(2.6, 0.12, 1.2, st.wall2, 0, 0.95, -0.75);
     for (const x of [-1.2, -0.4, 0.4, 1.2]) for (const z of [-1.25, -0.25]) k.box(0.18, 0.95, 0.18, e >= 3 ? st.wall2 : STONE, x, 0, z);
