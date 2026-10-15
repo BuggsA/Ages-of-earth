@@ -222,3 +222,4 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Coil hum** (own pitch, lane look): a finished Coil Tower within 12 tiles of the view hums (60 Hz and its octave), louder the nearer; only towers you see. Audio only; level unheard; unit test of the distance; no save bump.
 **Reading a rival's heirlooms** (#242, own pitch, lane ai): the clever computer watches a Joint-Stock rival's trading post on any road and keeps one more siege engine against a Masons' Lodge (`AI_WEB.lodge`). Unit tests only; no win-rate sweep; no save bump.
+**Reading a rival's heirlooms** (#242, own pitch, lane ai): the clever computer watches a Joint-Stock rival's trading post on any road and keeps one more siege engine against a Masons' Lodge (`AI_WEB.lodge`) and one more warship against Iron-Bound Hulls (`AI_WEB.hulls`). Unit tests only; no win-rate sweep; no save bump.
