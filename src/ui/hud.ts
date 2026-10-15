@@ -1,9 +1,10 @@
+import { crestSvg } from './crests';
 import { seasonOf } from '../sim/seasons';
 import { scenarioById } from '../sim/campaign';
 import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
-import { AGES, AMOUNT, BEACON, BOAR, RALLY, STEP_BACK, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { AGES, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { homeMarket, marketOf, postAt, tripGold } from '../sim/trade';
@@ -11,12 +12,12 @@ import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
 import { LANDMARK_KINDS, claimWork, claimants, favours, landmarkAt } from '../sim/landmarks';
 import { workProblem } from '../sim/works';
 import { beaconProblem, lit } from '../sim/beacon';
-import { faithOf } from '../sim/consecrate';
+import { chantedOver, consecrates, faithOf } from '../sim/consecrate';
 import { rallyProblem } from '../sim/rally';
 import { stirred as stirredNow } from '../sim/combat';
 import { sees } from '../sim/vision';
 import { buildingCostFor, buildingMaxHp, modsOf, statsFor, techCostFor, techProblem, trainCostFor, trainTimeFor } from '../sim/stats';
-import { ageDef, ageOf, backProblem, backTo, barred, deedsProgress, ironTradeShare, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, surveyFinds, suspendedTechs, trainsAt, windowsOf } from '../sim/ages';
+import { ageDef, ageOf, backProblem, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, ironTradeShare, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, surveyFinds, suspendedTechs, trainsAt, windowsOf } from '../sim/ages';
 import type { Building, BuildingType, Command, Cost, Ent, GameState, Landmark, Player, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
@@ -304,7 +305,7 @@ export class Hud {
     const board = s.players
       .map((q, i) => `<div><span class='swatch' style='background:${q.color}'></span>${q.name}${q.defeated ? ' (out)' : ''}: ${q.id === viewer || q.team === p.team ? scores[i] : '?'}</div>`)
       .join('');
-    this.resEl.innerHTML += `<div class="res civ" data-tip="<b>${civ.name}</b>${civ.blurb}<br><i>${SIGNATURES[p.civ].blurb}</i>">${civ.name}</div><div class="res score" data-tip="<b>Score</b>Gathering, fighting, building, research and epochs.${board}">⭐${scores[viewer]}</div>`;
+    this.resEl.innerHTML += `<div class="res civ" data-tip="<b>${civ.name}</b>${civ.blurb}<br><i>${SIGNATURES[p.civ].blurb}</i>">${crestSvg(p.civ, p.color, 18)}${civ.name}</div><div class="res score" data-tip="<b>Score</b>Gathering, fighting, building, research and epochs.${board}">⭐${scores[viewer]}</div>`;
     this.epochEl.innerHTML = road
       ? `${age.name} <span class="bar" data-tip="<b>${road.back ? 'Stepping back' : 'Advancing'} to the ${AGES[road.to].name}</b>${adv}%"><i style="width:${adv}%"></i></span>`
       : `<span data-tip="<b>${age.name}</b>${age.blurb}${idleTechs.length ? `<br>Suspended until you climb again: ${idleTechs.join(', ')}.` : ''}${mainRoad(p) ? `<br><span class='hint'>Advance at a Town Center.</span>` : ''}">${age.name}</span>`;
@@ -343,6 +344,14 @@ export class Hud {
       const shrine = s.relics[0] ? s.byId.get(s.relics[0].temple) : undefined;
       const focus = shrine ? ` data-focus="${shrine.x},${shrine.y}"` : '';
       parts.push(`<div class="timer ${ours ? 'good' : 'bad'}"${focus}>⚱ ${who} every relic: ${fmtTime(s.relicTimer)}${ours ? '' : ' (take one back!)'}</div>`);
+    }
+    if ((s.landTeam ?? -1) >= 0 && (s.landTimer ?? -1) >= 0) {
+      const ours = s.landTeam === s.players[viewer].team;
+      const keepers = s.players.filter((q) => q.team === s.landTeam);
+      const who = ours ? (keepers.length > 1 ? 'Your side keeps' : 'You keep') : `${keepers.map((q) => q.name).join(' and ')} ${keepers.length > 1 ? 'keep' : 'keeps'}`;
+      const m = s.landmarks?.[0];
+      const focus = m ? ` data-focus="${m.x},${m.y}"` : '';
+      parts.push(`<div class="timer ${ours ? 'good' : 'bad'}"${focus}>⛰ ${who} every landmark: ${fmtTime(s.landTimer!)}${ours ? '' : ' (take one back!)'}</div>`);
     }
     const html = parts.join('');
     if (html !== this.timerHtml) {
@@ -433,7 +442,7 @@ export class Hud {
       else if (m.owner < 0 && m.by >= 0 && m.claim > 0) status += ` · ${m.by === viewer ? 'your' : `${s.players[m.by].name}'s`} claim ${pct}%`;
       else if (m.owner >= 0 && m.claim < claimWork()) status += ` · held ${pct}%`;
     }
-    const portrait = m.kind === 'spring' ? '⛲' : m.kind === 'crag' ? '⛰' : m.kind === 'flint' ? '🔶' : m.kind === 'grove' ? '🌳' : '🪨';
+    const portrait = m.kind === 'spring' ? '⛲' : m.kind === 'crag' ? '⛰' : m.kind === 'flint' ? '🔶' : m.kind === 'grove' ? '🌳' : m.kind === 'ford' ? '🌊' : '🪨';
     const html = `<div class="sel-portrait"><span style="font-size:54px">${portrait}</span></div>
       <div class="sel-info"><div class="sel-name">${def.name}</div><div class="sel-sub">${status}</div>
       <div class="stats"><span data-tip="<b>Claiming</b>How long one person standing on it alone takes to claim it. Up to ${LANDMARKS.crowd} claim faster; rivals there too stop the claim.">⚑<em>One person</em> ${LANDMARKS.claim}s</span><span data-tip="<b>Land</b>Its keeper holds the land round it: their soldiers are supplied there, and rivals can't build in it.">🗺<em>Land</em> ${LANDMARKS.border} tiles</span></div>
@@ -551,7 +560,20 @@ export class Hud {
     if (!mine) status = `<span class="swatch" style="background:${p.color}"></span>${p.name}${b.type === 'wonder' && b.timer >= 0 ? `: wins in ${fmtTime(b.timer)}` : ''}${b.type === 'temple' && keptIn(s, b) ? `: keeps ${keptIn(s, b)} relic${keptIn(s, b) > 1 ? 's' : ''}` : ''}`;
     // Faith takes the walls (#209): how near rival priests have chanted it over.
     const faith = faithOf(b);
-    if (faith > 0 && b.faithBy !== undefined) status += ` · <span data-tip="<b>Faith</b>${b.faithBy === viewer ? 'Your priests are chanting it over: keep them at it, or the faith fades.' : 'Rival priests are chanting it over. Strike them down, or shelter soldiers inside to slow them.'}">✨ ${Math.floor(faith * 100)}% ${b.faithBy === viewer ? 'won over' : `to ${s.players[b.faithBy].name}`}</span>`;
+    if (faith > 0 && b.faithBy !== undefined) status += ` · <span data-tip="<b>Faith</b>${b.faithBy === viewer ? 'Your priests are chanting it over: keep them at it, or the faith fades.' : 'Rival priests are chanting it over. Strike them down, or shelter soldiers inside and stand your own priests beside it to slow them (pilgrim priests sing back and wear the faith down).'}">✨ ${Math.floor(faith * 100)}% ${b.faithBy === viewer ? 'won over' : `to ${s.players[b.faithBy].name}`}</span>`;
+    // Standing to answer: own priests singing back by a chanted-over building (pilgrims only).
+    if (mine && chantedOver(s, b) && consecrates(s, viewer)) {
+      const standing = s.ents.filter((e) => e.kind === 'unit' && e.owner === viewer && e.type === 'priest' && e.hp > 0 && e.order.k === 'answer' && e.order.target === b.id && e.act === 'chant').length;
+      status += standing
+        ? ` · <span data-tip="<b>Standing to answer</b>Priests held beside the building sing back ${CONSECRATE.counter.stand * 100 + 100}% as strongly.">🎶 ${standing} priest${standing > 1 ? 's' : ''} answering</span>`
+        : ' · <span data-tip="<b>Answer the chant</b>Select priests and right-click this building: they stand by it and sing back, wearing the rival\'s faith down.">🎶 no one answering</span>';
+    }
+    // The Age of Lightning (#239): is this building in a coil's field, and so how fast it works.
+    if (mine && b.built && hasCoils(p) && def.trains.length > 0) {
+      status += inField(s, b)
+        ? ` · <span data-tip="<b>In a coil's field</b>A Coil Tower within ${LIGHTNING.reach} tiles broadcasts power here: it trains and researches ${LIGHTNING.lit - 100}% faster.">⚡ In a coil's field: works ${LIGHTNING.lit - 100}% faster</span>`
+        : ` · <span data-tip="<b>Dark</b>No Coil Tower reaches this building, so it trains and researches ${100 - LIGHTNING.dark}% slower. Raise a Watch Tower within ${LIGHTNING.reach} tiles.">🌑 Dark: works ${100 - LIGHTNING.dark}% slower (raise a Coil Tower within ${LIGHTNING.reach} tiles)</span>`;
+    }
     const inside = def.garrison && b.built ? `<div class="stats"><span data-tip="<b>Sheltering</b>Units inside are safe, heal slowly and add arrows.">🏰<em>Inside</em> ${b.garrison.length}/${def.garrison}</span></div>` : '';
     const sig = `b:${b.id}:${Math.ceil(b.hp)}:${status}:${b.queue.length}:${p.epoch}:${queue.length}:${b.garrison.length}`;
     const html = `<div class="sel-portrait"><img src="${buildingPicture(b.type, p.epoch, p.color)}" alt=""></div>
@@ -807,7 +829,7 @@ export class Hud {
         if (b.type === 'towncenter') {
           const w = WORKS[p.civ];
           const why = workProblem(s, p);
-          cmds.push({ key: 'W', pic: '', glyph: w.icon, title: w.name, desc: `${w.blurb} Free; lasts ${WORK.duration} seconds, once in each epoch.`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'greatWork', p: viewer }) });
+          cmds.push({ key: 'V', pic: '', glyph: w.icon, title: w.name, desc: `${w.blurb} Free; lasts ${WORK.duration} seconds, once in each epoch.`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'greatWork', p: viewer }) });
         }
         if (b.type === 'tower') {
           const why = beaconProblem(s, p, b);
@@ -905,6 +927,9 @@ function nextTechs(p: Player, at: BuildingType): TechId[] {
   const out: TechId[] = [];
   for (const line of TECH_LINES) {
     if (TECHS[line[0]].at !== at) continue;
+    // An heirloom (#224) shows only once one of its two ages is walked: the clue that it is there.
+    const pair = TECHS[line[0]].walked;
+    if (pair && !pair.some((a) => hasWalked(p, a))) continue;
     // A suspended step (#47) shows greyed, with when it returns.
     const next = line.find((t) => !p.techs.includes(t));
     if (next) out.push(next);

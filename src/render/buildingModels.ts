@@ -964,7 +964,7 @@ function ironTower(k: Kit, st: Style): void {
 /** The original four dressed ages, kept as the baseline model regression set. */
 export const LOOK_AGES: AgeId[] = ['merchant', 'iron', 'pilgrim', 'fair'];
 /** All dressed ages; additions get their own model coverage beside the baseline set. */
-export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer', 'sail', 'aeronaut'];
+export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer', 'sail', 'aeronaut', 'lightning'];
 
 const SAIL = '#efe8d4';
 const NET = '#b9ad8a';
@@ -986,6 +986,7 @@ function hungNets(k: Kit, x: number, y: number, z: number, w: number): void {
 
 const CLOTH = ['#d94a3c', '#e8b43a', '#3f8fc4', '#8a4fa8'];
 const RUST = '#8a4a2c';
+const COPPER = '#c27a3e';
 const PALE = '#e9e4d6';
 
 /** A slanted awning over a front: alternate bright strips. */
@@ -1035,6 +1036,25 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
         k.cyl(0.025, 0.025, h, 5, '#d7e4e8', span, 0, 0);
         k.box(0.48, 0.12, 0.1, '#76c6d6', span + 0.24, h, 0);
         k.box(0.12, 0.12, 0.11, '#f4efe4', span + 0.18, h, 0);
+      }
+      break;
+    }
+    case 'lightning': {
+      // The Age of Lightning (#231): the Watch Tower turns Coil Tower, a copper winding round its shaft,
+      // a lattice mast and Wardenclyffe's mushroom crown, glowing; other buildings carry a small receiving mast.
+      if (type === 'tower') {
+        for (const y of [1.15, 1.35, 1.55, 1.75, 1.95, 2.15]) k.ring(0.74, 0.035, COPPER, y);
+        for (const [x, z] of [[-0.22, -0.22], [0.22, -0.22], [-0.22, 0.22], [0.22, 0.22]]) k.cyl(0.025, 0.04, 1.05, 4, IRON_DARK, x, 2.72, z);
+        for (const y of [3.05, 3.4]) k.box(0.5, 0.03, 0.5, IRON_DARK, 0, y, 0);
+        k.cyl(0.62, 0.2, 0.12, 12, COPPER, 0, 3.72, 0);
+        k.dome(0.62, COPPER, 0, 3.84, 0);
+        k.glow(k.sphere(0.12, '#bfe6ff', 0, 4.5, 0));
+      } else if (['towncenter', 'barracks', 'range', 'stable', 'workshop', 'forge', 'market', 'temple', 'dock', 'wonder'].includes(type)) {
+        const span = type === 'wonder' ? 2.2 : big ? 1.7 : 1.2;
+        const h = type === 'wonder' ? 3.4 : big ? 2.9 : 2.1;
+        k.cyl(0.025, 0.035, h, 4, IRON_DARK, span, 0, -span * 0.6);
+        k.ring(0.12, 0.02, COPPER, 0).position.set(span, h * 0.8, -span * 0.6);
+        k.glow(k.octa(0.06, '#bfe6ff', span, h + 0.04, -span * 0.6));
       }
       break;
     }
@@ -1159,10 +1179,62 @@ const MAKERS: Record<Exclude<BuildingType, 'wall'>, (k: Kit, e: number, st: Styl
 
 const cache = new Map<string, THREE.BufferGeometry>();
 
+/** The building an heirloom (#224) shows on, and the tech that earns the mark. */
+export const HEIRLOOM_MARKS: Partial<Record<BuildingType, string>> = { temple: 'bellFoundry', dock: 'ironHulls' };
+
+/** A second heirloom that shows on a building type that already has one: the Temple holds both the Bell Foundry's bell and the Masons' Lodge's works. */
+export const HEIRLOOM_MORE: Partial<Record<BuildingType, string>> = { market: 'jointStock', temple: 'masonsLodge' };
+
+/** Every heirloom id that dresses a kind of building. */
+export function heirloomsFor(type: BuildingType): string[] {
+  return [HEIRLOOM_MARKS[type], HEIRLOOM_MORE[type]].filter((id): id is string => !!id);
+}
+
+/** Bell Foundry: a bronze bell hung in a little timber cote on the Temple's roof ridge. Iron-Bound Hulls: iron bands and bolts on the dock's boathouse and pier. Joint-Stock Company: a counting-house board with a gilt seal and coin stacks by the Market. Masons' Lodge: dressed ashlar and shear-legs hoisting a block beside the Temple. */
+function heirloomTouch(k: Kit, id: string): void {
+  const BRONZE = '#b8893a';
+  const IRON = '#34373d';
+  const GOLD = '#e2b23c';
+  const ASHLAR = '#b9b2a2';
+  if (id === 'bellFoundry') {
+    k.box(0.07, 0.5, 0.07, '#5a4630', -0.22, 1.7, -0.2);
+    k.box(0.07, 0.5, 0.07, '#5a4630', 0.22, 1.7, -0.2);
+    k.box(0.6, 0.07, 0.14, '#5a4630', 0, 2.2, -0.2);
+    k.prism(0.7, 0.22, 0.3, '#6e5a44', 0, 2.27, -0.2);
+    k.cone(0.17, 0.3, 8, BRONZE, 0, 1.78, -0.2);
+    k.sphere(0.04, IRON, 0, 1.76, -0.2);
+  } else if (id === 'ironHulls') {
+    for (const x of [-1.2, -0.7, -0.2]) k.box(0.06, 0.9, 1.44, IRON, x, 0, -0.55);
+    for (const z of [0.85, 1.35, 1.8]) k.box(1.14, 0.03, 0.06, IRON, 0.4, 0.2, z);
+    for (const x of [-0.1, 0.9]) k.cyl(0.07, 0.07, 0.05, 6, IRON, x, -0.1, 1.0);
+  } else if (id === 'jointStock') {
+    // A counting-house board on two posts at the back, a gilt seal on it, and coin stacks on a ledger desk.
+    for (const x of [-0.5, 0.5]) k.cyl(0.04, 0.05, 1.1, 5, '#5a4630', x, 0, -1.2);
+    k.box(1.3, 0.4, 0.06, '#2f3d55', 0, 0.85, -1.2);
+    k.box(1.36, 0.05, 0.1, '#5a4630', 0, 1.25, -1.2);
+    k.cyl(0.14, 0.14, 0.03, 10, GOLD, 0, 0.9, -1.16).rotation.x = Math.PI / 2;
+    k.box(0.7, 0.3, 0.4, '#8a6440', 1.05, 0, -0.75);
+    k.box(0.5, 0.03, 0.3, '#f4efe4', 1.05, 0.31, -0.75);
+    for (let i = 0; i < 4; i++) k.cyl(0.07, 0.07, 0.03, 8, GOLD, 0.9, 0.34 + i * 0.03, -0.75);
+    for (let i = 0; i < 3; i++) k.cyl(0.07, 0.07, 0.03, 8, GOLD, 1.2, 0.34 + i * 0.03, -0.75);
+  } else if (id === 'masonsLodge') {
+    // Shear-legs with a dressed block hanging from them, and a stack of ashlar beside.
+    k.box(0.06, 1.5, 0.06, '#5a4630', 1.05, 0, 1.15).rotation.x = 0.28;
+    k.box(0.06, 1.5, 0.06, '#5a4630', 1.05, 0, 1.45).rotation.x = -0.28;
+    k.box(0.1, 0.06, 0.5, '#5a4630', 1.05, 1.42, 1.3);
+    k.cyl(0.008, 0.008, 0.6, 3, IRON, 1.05, 0.8, 1.3);
+    k.box(0.3, 0.22, 0.3, ASHLAR, 1.05, 0.52, 1.3);
+    for (let i = 0; i < 3; i++) k.box(0.4, 0.18, 0.3, i % 2 ? ASHLAR : '#a29a8a', -1.1 + (i % 2) * 0.05, i * 0.18, 1.3);
+    k.box(0.3, 0.18, 0.3, '#a29a8a', -1.5, 0, 1.3);
+  }
+}
+
 /** The baked model of a building in an epoch, in a player's color (`variant`: which way a wall piece joins its neighbors). */
-export function buildingGeometry(type: BuildingType, epoch: number, color: string, variant = 0, age?: AgeId): THREE.BufferGeometry {
+export function buildingGeometry(type: BuildingType, epoch: number, color: string, variant = 0, age?: AgeId, heirloom = ''): THREE.BufferGeometry {
   const look = age && DRESSED_AGES.includes(age) && type !== 'wall' ? age : undefined;
-  const key = `${type}:${epoch}:${color}:${variant}${look ? ':' + look : ''}`;
+  const held = heirloom.split(',');
+  const marks = heirloomsFor(type).filter((id) => held.includes(id));
+  const key = `${type}:${epoch}:${color}:${variant}${look ? ':' + look : ''}${marks.map((m) => ':' + m).join('')}`;
   let g = cache.get(key);
   if (!g) {
     const k = new Kit();
@@ -1171,6 +1243,7 @@ export function buildingGeometry(type: BuildingType, epoch: number, color: strin
     const stack = STACKS[type];
     if (epoch >= 4 && stack) smokestack(k, stack[0], stack[1], stack[2]);
     if (look) ageTouches(k, type, look);
+    for (const m of marks) heirloomTouch(k, m);
     g = bake(k.root, color);
     cache.set(key, g);
   }

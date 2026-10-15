@@ -12,11 +12,13 @@ import { AIR, NAVAL, stampBuilding } from './grid';
 import { generateMap } from './mapgen';
 import { Spatial } from './spatial';
 import { updateRelics } from './relics';
+import { elmoStep } from './elmo';
+import { galvanicStep } from './galvanic';
 import { landmarkStep } from './landmarks';
 import { atPost } from './trade';
 import { modsOf, trainTimeFor } from './stats';
 import { attrition } from './borders';
-import { barred, journeyOf, surveyFinds, trainsAt } from './ages';
+import { barred, journeyOf, noteWalked, surveyFinds, trainsAt, workSteps } from './ages';
 import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, MapSize, MapType, Player } from './types';
 import { RES, R_FISH, R_NONE } from './types';
 import { RES_OF_TILE, carryCargo, checkStuck, collide, findResource, routeUnits, separate, setOrder, think, ungarrison, walk } from './units';
@@ -88,6 +90,8 @@ export function createGame(setup: GameSetup): GameState {
     relics: [],
     relicTeam: -1,
     relicTimer: -1,
+    landTeam: -1,
+    landTimer: -1,
     posts: [],
     bogIron: map.bogIron,
     nextId: 1,
@@ -197,6 +201,7 @@ function enterAge(s: GameState, p: Player, to: AgeId, back = false): void {
   restat(s, p, () => {
     p.epoch = tier;
     p.age = to;
+    noteWalked(p, to);
     // A step back suspends what lies above the new tier; any change of age brings back what fits.
     const off = back ? p.techs.filter((t) => TECHS[t].epoch > tier) : [];
     const on = (p.suspended ?? []).filter((t) => TECHS[t].epoch <= tier);
@@ -251,8 +256,11 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
   }
   const item = b.queue[0];
   if (!item) return;
+  // In the Age of Lightning a coil's field speeds the work and the dark slows it (#231); elsewhere one step a tick.
+  const steps = workSteps(s, b);
   if (item.tech) {
-    if (++item.done < secs(TECHS[item.tech].time)) return;
+    item.done += steps;
+    if (item.done < secs(TECHS[item.tech].time)) return;
     b.queue.shift();
     const tech = item.tech;
     restat(s, p, () => p.techs.push(tech));
@@ -264,7 +272,7 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
   const unit = item.unit!;
   const need = secs(trainTimeFor(s, p.id, unit, b.type));
   if (item.done < need) {
-    item.done++;
+    item.done = Math.min(need, item.done + steps);
     if (item.done < need) return;
   }
   if (p.pop >= p.cap) {
@@ -364,6 +372,14 @@ function checkVictory(s: GameState): void {
     s.events.push({ k: 'over', winner: s.winner, how: 'relics' });
     return;
   }
+  // And so does keeping every landmark.
+  if ((s.landTeam ?? -1) >= 0 && s.landTimer === 0) {
+    s.over = true;
+    s.winner = s.landTeam!;
+    for (const p of s.players) if (p.team !== s.winner) p.defeated = true;
+    s.events.push({ k: 'over', winner: s.winner, how: 'lands' });
+    return;
+  }
   for (const p of s.players) {
     if (p.defeated) continue;
     // Regicide: a people whose King has fallen is lost.
@@ -452,6 +468,8 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   updateShots(s, sp, (a, damage, x, y) => hitAnimal(s, a, damage, x, y));
   updateRelics(s);
   landmarkStep(s);
+  elmoStep(s);
+  galvanicStep(s);
   attrition(s);
   workStep(s);
   beaconStep(s);

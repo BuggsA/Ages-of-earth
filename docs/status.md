@@ -23,7 +23,7 @@ Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders
 
 | Check | State |
 | --- | --- |
-| Quick tier (`npm run check`) | 235 tests in 44 files, about 47 s on a cloud container (2026-10-14); `trade.test.ts` and `seed-atlas.test.ts` moved to `tests/slow/` (#110) |
+| Quick tier (`npm run check`) | 407 tests, 81 s on a 4-core cloud container (2026-10-15; 157 s under load before #234); `trade.test.ts` and `seed-atlas.test.ts` moved to `tests/slow/` (#110), `ai-winter`, `lords`, `relics`, `ai-forward-tower` and `ruins` (#234), `ai-rival-heirlooms` (14 s of a 15 s limit); `sim.test.ts` stays because it holds the determinism scan |
 | Slow tier (`tests/slow/`) | `campaign-proof*.test.ts`: every chapter won by a computer on its own map or, at Hard, one of 15 more (#43); three files side by side, about 3½ minutes on a cloud container |
 | Coverage (2026-10-14) | rules (`src/sim/`) 83–100% of lines; rendering, sound, HUD, lobby, minimap and `main.ts` 0%: checked only by hand in a browser |
 | Browser checks | `tests/slow/browser-smoke.test.ts` (#87): title, Web of Ages, Campaign, a match and its hotkeys in headless Chromium, failing on any page or console error; daily in `periodic`, screenshots kept as an artifact |
@@ -43,9 +43,9 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Billowing sails** (own pitch, lane look): ship sails belly out in the wind (render only). Shader compiles in headless Chromium; look in a match unseen. Dock masts billow too (off-centre sails packed with their centre x).
 **Watch a live match** (seed #134, lane online): a watcher joins a started room, sees everything or any player's eyes, and cannot act; the Worker reads only their pings. Browser unverified.
 
-**Signal beacons** (own pitch, lane rules): a Watch Tower can light a fire (F): +7 sight for 45 s, and rivals see the ground around it; the clever computer lights one when three soldiers close in. Browser unverified; sound wants an ear; no save bump.
+**Signal beacons** (own pitch, lane rules): a Watch Tower can light a fire (F): +7 sight for 45 s, and rivals see the ground around it; the clever computer lights one when three soldiers close in. Seen in headless Chromium (2026-10-15: F lights it, the toast shows, flames and smoke rise from the roof, `docs/screenshots/beacons-great-work.jpg`); sound wants an ear; no save bump.
 
-**Beacon relay** (own pitch, lane rules): a lit beacon sets alight your other rested Watch Towers within 14 tiles, free, 25 s each, down a chain (`BEACON.relay`, `.relayDuration`). Tests only; browser unverified; no save bump.
+**Beacon relay** (own pitch, lane rules): a lit beacon sets alight your other rested Watch Towers within 14 tiles, free, 25 s each, down a chain (`BEACON.relay`, `.relayDuration`). Seen in headless Chromium (2026-10-15: a second tower 12 tiles off caught alight for 25 s and smokes); no save bump.
 
 **Answering the flame** (own pitch, lane ai): a clever computer lights a Tower's beacon when it sees a rival's burning within `AI_RAID.flame` tiles. Tests only; no win-rate sweep; no save bump.
 
@@ -57,6 +57,15 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Machine-age silhouettes** (#267 art pass, lane look): epoch 4 houses are brick terraces (flat parapet, chimney pots) and Watch Towers iron-framed lookouts with a lamp gallery, no longer the epoch 3 shapes. Render only; `models.test.ts` builds them; look in a browser unseen; no save bump.
 
 **Waymarks** (#154, seed #152, lane look): the minimap remembers ruins (dug or standing, by whom) and relics as last seen. UI only; browser unverified.
+**Standing to answer** (own pitch, lane rules): pilgrim priests right-clicked onto a chanted-over own building stand by it and sing back 1.5× (`CONSECRATE.counter.stand`, `.hold`). Tests only; browser and sound unseen; no save bump. The pilgrim computer orders it (`ai.ts` priestly), and the cursor shows gather over such a building; the building panel says how many priests are answering (HUD only, unseen).
+
+**Orders spread** (#266, owner's note, lane rules): the player's bulk gather and attack orders fan over nearby nodes and visible foes (`SPREAD` in `data.ts`); the computer is unchanged. Tests only; browser unseen; no save bump.
+**Farm fields spread** (#266 leftover, lane rules): a group sent to work one field fans over the free fields near it instead of piling on one. Tests only; browser unseen; no save bump.
+**Depleted nodes spread** (#266 leftover, lane rules): when a node runs dry, the player's workers fan over the next free nodes instead of one. Human players only. Tests only; browser unseen; no save bump.
+
+**Four honest difficulties** (#258, from the owner's note #256, lane rules): a new gentlest tier (id `gentle`) shown as **Easy**; the old ids keep their behaviour and are shown one step up (`easy` → Normal, the default; `normal` → Hard; `hard` → Expert, the campaign proof's level). Online rooms keep their three levels until `tests/worker-routes.test.ts` allows `gentle`. Title picker seen in headless Chromium; a beginner's first game unseen; no save bump.
+
+**Waymarks** (#154, seed #152, lane look): the minimap remembers ruins (dug or standing, by whom) and relics as last seen. UI only; ruin marks seen on the minimap in headless Chromium (2026-10-15).
 
 **The wild** (#171, own pitch from the owner's chat, lane rules): mammoths (a feast that charges its hunters) and wolf packs by dens out between the towns, often by wild gold; bitten people fight back; soldiers can hunt beasts; the computer hunts its mammoth with five and clears near dens. New numbers `MAMMOTH`, `WOLF`, `AI_WILD`. No save bump (old saves hold only deer). Seen in headless Chromium; sound levels unheard; not played by hand.
 
@@ -70,11 +79,29 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Hunting Camp** (own pitch, lane rules): a 45-wood Stone Age food drop (N) that holds a 4-tile border, so a far kill or the herd's new ground can be worked and kept from wolves; the computer builds one by a far kill. New numbers `BORDERS.huntcamp`, `AI_WILD.camp*`. Tests and a headless match; browser unseen; no save bump.
 
+**Far camp** (own pitch, lane ai): `AI_WILD.campNear` 24 → 38, so the computer's Hunting Camp rule covers far-hunt kills too. Test only; no sweep; no save bump.
+
+**Escort recall** (own pitch, lane ai): after a far mammoth hunt the escorting soldiers walk home once the beast is down (`AiMemory.huntEscort`). Test only; no sweep; no save bump.
+
 **Hounds** (own pitch, lane rules): Hunting Camp tech (80 food 40 wood): hunt +25%, beast damage halved (`TECHS.hounds`, mod `beastWard`); the computer buys it after big game. Tests only; browser unseen; no save bump.
 
 **Seasons** (own pitch, lane rules): four seasons of 150 s from spring; summer berries +25% but meat rots 1.5×, winter berries ×0.55, fields ×0.75, meat keeps 2×, wolves/boars notice +40%. New numbers `SEASON`, `SEASONS`. Tests only; browser unseen; no save bump.
 
 **Planning for winter** (own pitch, lane ai): from autumn a clever computer adds fields, leans 30% more to food, hunts mammoths/boars with a smaller town, clears winter wolves with one fewer soldier. New numbers `AI_WINTER`. Tests only; browser and win-rate unseen; no save bump.
+
+**Raiding the coil** (own pitch, lane ai): the computer raids the rival coil whose fall darkens the most buildings (`AI_LIGHTNING.raid`). Tests only; no sweep; no save bump.
+
+**St. Elmo's Fire** (#240, s3 of #231, lane rules): Pilgrims + Lightning heirloom; a Temple within a Tower's reach mends nearby soldiers (`ELMO`, mod `elmo`); the computer researches it. Tests only; browser unseen; no save bump.
+
+**Heirloom looks** (own pitch, lane look): Bell Foundry puts a bell cote on the Temple, Iron-Bound Hulls bands the Dock; a bell peal when an heirloom opens. Second marks: Joint-Stock counting-house board and coins at the Market, Masons' Lodge shear-legs and ashlar at the Temple (`HEIRLOOM_MORE`; a building may wear several). Render/sound only; model tests pass; browser and sound level unseen; no save bump.
+
+**Old Ford** (own pitch, lane rules): a sixth landmark kind; its keeper's soldiers march 1.2× (`LANDMARKS.ford`). Tests only; browser and win-rate unseen; no save bump.
+
+**Staging from the ford** (own pitch, lane ai): a clever computer keeping an Old Ford toward its rival (`AI_RAID.stage`, 36 tiles) musters waves there. Tests only; browser and win-rate unseen; no save bump.
+
+**Contesting the ford** (own pitch, lane ai): Normal/Hard soldier bands weigh a rival's kept Old Ford 1.6× (`AI_MARK.worth.fordRival`) when picking a landmark to take. Tests only; browser and win-rate unseen; no save bump.
+
+**Lords AI** (own pitch, lane ai): in Lords of the Land the computer ranges the whole map for landmarks and sends bands of two (`AI_MARK.lordsReach`, `.lordsParty`). Tests only; no win-rate sweep; no save bump.
 
 **Contested landmarks** (#182, own pitch, lane rules): a Sacred Spring, Lookout Crag and Ancestors' Cairn between the towns (players + 1), claimed by standing on them alone; held ones are land. The computer claims with a citizen and retakes with soldiers. New numbers `LANDMARKS`, `AI_MARK`. Tests, headless matches and headless-Chromium screenshots; sounds unheard; no win-rate sweep; no save bump. Also: a people down to unarmed boats (fishing boats, merchant ships) is beaten (`checkVictory`).
 
@@ -87,6 +114,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Sacred Grove** (own pitch, lane rules): a fifth landmark kind; its keeper's priests convert and heal 1.8x as fast within 10 tiles (`LANDMARKS.grove`). Unit and model tests only; browser, sound and win-rate unseen; the computer claims it but doesn't yet stage priests there; no save bump.
 
 **Faith takes the walls** (#209, own pitch from the owner's note #197, lane rules): in the Age of Pilgrims, priests chant a rival's building over together (never a Town Center or Wonder), slower with soldiers inside, and a Temple brings its relics; a pilgrim computer sends priest bands with its army. New numbers `CONSECRATE`, `AI_FAITH`, mod `consecrate`. Tests, headless matches and headless-Chromium screenshots of a tower turning; the chant's gold motes and the bell chord unseen/unheard; no save bump.
+
+**Raiding the Bell** (own pitch, lane ai): a bomber/raid target pick weighs a Bell Foundry rival's relic Temples like a pilgrim people's (`AI_WEB.bell`). Unit test only; no win-rate sweep; no save bump.
 
 ## Waiting on the owner
 
@@ -104,7 +133,7 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 - Chains no longer end when the board is empty, since agents pitch their own work, so they run to their caps (10 sessions a chain, one chain per lane, no limit on chains at once and no daily cap: `docs/successors.md`). Lower the caps if the usage limits pinch.
 - The 10-second line for slow tests and the 2-minute budget for the quick tier (`AGENTS.md` §5) are drafts.
 
-**Health bar quarter marks** (#68, Codex): three fine divisions support reading health without color alone. 173 unit tests and TypeScript 5.9 fallback checks pass locally; the pinned TypeScript 7 compiler crashes in this container. Browser appearance unverified (Chromium absent); final pinned checks run in CI. No balance or save changes.
+**Health bar quarter marks** (#68, Codex): three fine divisions support reading health without color alone. 173 unit tests and TypeScript 5.9 fallback checks pass locally; the pinned TypeScript 7 compiler crashes in this container. Seen in headless Chromium (2026-10-15, `docs/screenshots/health-quarters.jpg`): the marks split each bar in four. No balance or save changes.
 
 
 
@@ -112,7 +141,7 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Seed atlas** (#80, lane tooling): `scripts/seed-atlas.ts` finds seeds by what the map holds (bog iron, posts, relics, ruin finds); no sim, UI or save change. `--share` prints `?seed=` addresses; the title screen reads them.
 
-**Scout Flags** (#85, GPT-6, lane look): up to six personal gold planning / red danger pennants on explored locations, shown in 3D and on the minimap with Ctrl(+Shift)+right-click. UI-only, absent from saves, replays and online commands; browser appearance unverified, CI tracked in PR.
+**Scout Flags** (#85, GPT-6, lane look): up to six personal gold planning / red danger pennants on explored locations, shown in 3D and on the minimap with Ctrl(+Shift)+right-click. UI-only, absent from saves, replays and online commands. Seen in headless Chromium (2026-10-15): Ctrl+right-click on the map and minimap place a gold flag, with Shift a red one, toasts and 3D pennants shown.
 
 **Atlas start distance** (#93, lane tooling): `scripts/seed-atlas.ts --apart N / --close N` filters worlds by the distance between the two nearest starts, and the table shows a `gap` column. Tooling only; no sim, UI or save change.
 
@@ -122,7 +151,7 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Age of Reclaimers** (#94, Codex, lane rules): finishing a ruin reveals a Middle Ages → alternative Gunpowder road. Construction/repairs 25% faster, research 20% cheaper, military training 25% slower; ordinary Industrial exit or Gunpowder settlement. Ruin ownership supplies discovery without a save bump. New road/AI/model tests; browser appearance and music unverified (Chromium unavailable).
 
 **Moonlit nights** (own pitch, lane look): a moon phase per match changes how bright the night is; lakes glint with stars at night. Render only. Seen in headless Chromium in a night match; lake glints unverified.
-**Age of Sail** (own pitch, lane rules): a side age off the Middle Ages for a coastal people (Dock + 500 fish landed): faster fishing, cheaper and sturdier ships, weaker farms; new roads to Gunpowder and back. Looks, music, minimap and tip included. The clever computer now takes it too (own pitch, lane ai; win rates not compared); browser unverified; no save bump.
+**Age of Sail** (own pitch, lane rules): a side age off the Middle Ages for a coastal people (Dock + 500 fish landed): faster fishing, cheaper and sturdier ships, weaker farms; new roads to Gunpowder and back. Looks, music, minimap and tip included. The clever computer now takes it too (own pitch, lane ai; win rates not compared); the top bar, a Dock and the town at night seen in headless Chromium (2026-10-15, `docs/screenshots/age-of-sail-night.jpg`), ships and music not; no save bump.
 
 **Lit windows** (own pitch, lane look): glowing parts (windows, torches) brighten after dusk via one shader uniform. Render only; browser unverified.
 
@@ -140,7 +169,7 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Bats at dusk** (own pitch, lane look): dark wing-beating bats flit near the camera at dusk and dawn, clear weather only, off on Low. Render only; no rules or save change. Seen in headless Chromium (no errors); motion unverified by eye.
 
-**Tactical Reach** (#101, Codex, lane look): Alt shows selected owned ranged weapons' reach and dashed siege dead zones; defense placement previews future reach. Terrain-following, clipped to current vision, capped at 24 guides in one draw. No rules, balance or save changes. Quick checks pass with the documented local TS5.9 fallback; pinned compiler checked by CI. Browser appearance unverified (Chromium missing).
+**Tactical Reach** (#101, Codex, lane look): Alt shows selected owned ranged weapons' reach and dashed siege dead zones; defense placement previews future reach. Terrain-following, clipped to current vision, capped at 24 guides in one draw. No rules, balance or save changes. Quick checks pass with the documented local TS5.9 fallback; pinned compiler checked by CI. Seen in headless Chromium (2026-10-15, `docs/screenshots/tactical-reach.jpg`): Alt with archers shows their reach rings; siege dead zones not seen.
 
 **Owls** (own pitch, lane look): pale owls glide over the land on clear deep nights, with an occasional hoot (`owl` sound). Render and audio only; no rules or save change. Shader and hoot level unseen by eye (see PR).
 
@@ -153,7 +182,7 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Frogs** (own pitch, lane look): on clear nights near open water, frogs croak (`frog` sound). Audio only; level unheard; no save bump.
 
-**Ages reached** (own pitch, lane look): hovering a player's epoch in the end-of-match table lists when they reached each age ("Bronze 8m · Iron 17m"), read from the existing history. UI only; no rules, save or `data.ts` change. Browser unverified.
+**Ages reached** (own pitch, lane look): hovering a player's epoch in the end-of-match table lists when they reached each age ("Bronze 8m · Iron 17m"), read from the existing history. UI only; no rules, save or `data.ts` change. Tooltip seen in headless Chromium (2026-10-15).
 
 **Hushed nights** (own pitch, lane look): crickets and frogs go quiet when an army (5+ soldiers in sight) is near the view. Audio only; no rules or save change; unheard.
 
@@ -161,9 +190,9 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Tests for untested modules** (#129, owner ask, lane tooling): direct tests for `rng`, `spatial`, `vision`, deer, the Worker's routes and room lists, and the creature voices (moved into `src/render/ambience.ts`, same behaviour). Quick tier now 276 tests in 53 files. No rules, save or `data.ts` change.
 
-**Great works** (#133 seed, own pitch, lane rules): once per epoch from the Bronze Age a people calls its great work from the Town Center (W), free, 90 s: Nile Flood, Phalanx, Roman Road, Yam Relay, Grand Canal, Longbow Volley (`WORKS` in `data.ts`). Computer times its call. No save bump. Browser unverified; sound unheard.
+**Great works** (#133 seed, own pitch, lane rules): once per epoch from the Bronze Age a people calls its great work from the Town Center (W), free, 90 s: Nile Flood, Phalanx, Roman Road, Yam Relay, Grand Canal, Longbow Volley (`WORKS` in `data.ts`). Computer times its call. No save bump. Hotkey moved from W to V on 2026-10-15: W was also the advance-age key, which won, so the work could never be called by key while a road was open; seen working in headless Chromium after the fix. Sound unheard.
 
-**Great work glow** (#141, own pitch, lane look): motes in the people's colors rise from its Town Centers while a great work runs. Render only; no rules, save or `data.ts` change. Browser unverified.
+**Great work glow** (#141, own pitch, lane look): motes in the people's colors rise from its Town Centers while a great work runs. Render only; no rules, save or `data.ts` change. Headless Chromium (2026-10-15): the motes spawn at roof height in the people's colours, but swiftshader draws about a frame a second, so how they look is unjudged.
 
 **Yam Relay sight** (own pitch, lane rules): the Mongol great work also gives mounted soldiers +3 sight (`riderSight` in `Mods`, `WORKS.mongols`). No save bump. Browser unverified.
 
@@ -190,4 +219,47 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Walker waits** (own pitch, lane ai): the landmark walker halts when its escort trails by more than `AI_MARK.lead` (9) tiles. Unit test and a headless match; no sweep; no save bump.
 **Bloomery** (own pitch, lane rules, #197): Forge tech, Iron Age only (`Tech.only`): foot +20% hp, +1 armor; lapses on leaving. Tests only; browser unseen; no sweep; no save bump.
 
+**Escort replaced** (own pitch, lane ai): a walker whose escort has all fallen gets a fresh one if soldiers can be spared. Unit test only; no sweep; no save bump.
+
 **Side-age crafts** (#197, #213, own pitch, lane rules): Ropewalk (Dock, Sail only: ships +15% hp, +1 range) and Letters of Credit (Market, Merchants only: techs 15% cheaper) beside the Bloomery. New `TECHS.ropewalk`, `.credit`. Unit test only; browser and sweep unseen; no save bump.
+
+**Litany** (own pitch, lane rules): Temple craft, pilgrims' road only: chants 30% faster (`TECHS.litany`, mod `chant`); the pilgrim computer buys it. Tests only; browser unseen; no save bump.
+
+**Chanting back** (own pitch, lane rules): a pilgrim keeper's priests within 7 tiles of a building being chanted over wear the rival's faith down (`CONSECRATE.counter.answer`). Tests only; browser, sound and win rates unseen; no save bump.
+
+**Dust of the march** (own pitch, lane look): fast riders and siege engines raise dust (powder on snow, none in rain). Render only; browser unseen; no save bump.
+
+**Heirlooms** (#224, own pitch from #197, lane rules): crafts only a people that walked two side ages can learn, kept for good: Bell Foundry, Iron-Bound Hulls, Joint-Stock Company, Masons' Lodge (`Tech.walked`, `Player.walked`). Tests and a headless match; browser and win rates unseen; no save bump.
+**Lords of the Land** (own pitch, lane rules): the 'lords' game mode: keep every landmark 240 s to win; HUD countdown, banner, end line; the computer breaks a rival's hold with any soldiers. `LANDMARKS.lordsSeconds/.lordsMin`. Unit tests only; browser and win-rate unseen; no save bump.
+
+**Age of Lightning** (#231, grows seed #136, lane rules): a side age off the Industrial. Watch Towers become Coil Towers whose field speeds training and research nearby (1.35×) and slows it outside every field (0.75×); their bolt leaps through crowds; no aircraft. Road: a Watch Tower and 6 beacons lit (`stats.beacons`, new). The computer lights beacons toward it, takes it with towers and no aircraft, and leaves when its coils fall. New numbers `LIGHTNING`, `AI_LIGHTNING`. Tests, 6 headless matches, and the tower and bolt seen in headless Chromium; sounds unheard; no win-rate sweep; no save bump.
+
+**Coil fields shown** (#239, s2 of #231, lane look): blue-white rings on the ground for each finished Coil Tower (and for a Watch Tower being placed); lit/dark line in the panel of own training buildings. Render/UI only; unit test passes; seen in headless Chromium (rings, panel line; `docs/screenshots/coil-fields.png`, `docs/log/2026-10-16-0000-coil-fields-seen.md`); the dark-building line, bolt and sounds unseen; no save bump.
+
+
+**The computer reaches for an heirloom** (#232, own pitch, lane ai): once it has walked a side age, the clever computer takes the second road that opens an heirloom (`AI_WEB.heir` 1, was `take` 0.6) and buys the heirloom first, queuing it even at a busy building. Tests and a headless match; no win-rate sweep; browser unseen; no save bump.
+
+**Coil hum** (own pitch, lane look): a finished Coil Tower within 12 tiles of the view hums (60 Hz and its octave), louder the nearer; only towers you see. Audio only; level unheard; unit test of the distance; no save bump.
+**Reading a rival's heirlooms** (#242, own pitch, lane ai): the clever computer watches a Joint-Stock rival's trading post on any road and keeps one more siege engine against a Masons' Lodge (`AI_WEB.lodge`) and one more warship against Iron-Bound Hulls (`AI_WEB.hulls`). Unit tests only; no win-rate sweep; no save bump.
+
+**Sail detour** (own pitch, lane ai): a pilgrim town that keeps its relics, has a Dock and the catch landed steps back to the Middle Ages and on to Sail when Sail opens an heirloom with an age it walked. Tests only; no win-rate sweep; no save bump.
+
+**Sail detour sweep** (own pitch, lane ai): `AI_LEVELS.detour` gates the #232 detour; 32 A/B matches, 12–13, gathering ×1.00: no difference, and it fires rarely (`docs/log/2026-10-15-2400-sail-sweep.md`). No save bump.
+
+**Coil layout** (own pitch, lane ai, s4 of #231): in the Age of Lightning the computer builds new buildings inside a coil's field (`fieldSpot`). Tests only; no win-rate sweep; no save bump.
+
+**Wireless Telegraphy** (#240, lane rules): Sail + Lightning heirloom at the Dock: ships and Docks in a Tower's field see +5 tiles (`TELEGRAPH`). Tests only; browser and the computer's use unseen; no save bump.
+**Galvanic Revival** (#240, lane rules): Reclaimers + Lightning heirloom at the Workshop: free, quicker repairs in a Tower's field and dug ruins there pay 25 gold/30 s (`GALVANIC`). Tests only; browser unseen; no save bump. Closes #240.
+
+
+**Hunters hunted** (#260, own pitch, lane ai): Hard/Expert computers send 2–3 idle soldiers at rival citizens they see working far from home with no guard, and walk to a seen rival Hunting Camp to look (`AI_PROWL`). Tests and a headless match; about one foray per computer-vs-computer match; browser unseen; no save bump.
+
+**Escorted hunt** (own pitch, lane ai): a clever computer hunts a mammoth 22–38 tiles out with two soldiers along (`AI_WILD.far/.escort/.guard/.safe`). Tests only; no sweep; no save bump.
+
+**Tidier title card** (#267, owner's art-pass note, lane look): the title shows people, difficulty and map seed; rivals, colour, teams, map, size, start age, game, peace and graphics fold under "More options" (remembered). Same element ids, no rules change. Seen in headless Chromium (fold opens, Play starts a match, no page errors); the wider art pass (characters, buildings) is not started.
+
+**People crests** (#267 art pass, own step, lane look): the title card shows your people's crest in your colour. UI only; seen in headless Chromium (title card, two peoples); no save bump.
+
+**Crests in the match** (#267 s2, own pitch, lane look): the people's crest, small, on the HUD people chip and in the end report's player rows. Render/UI only; smoke (a match) passes; look in a browser unseen.
+
+**Lobby crest** (#267 step 3, lane look): each lobby seat shows its people's crest in its colour. Render only; tests pass, look unseen.

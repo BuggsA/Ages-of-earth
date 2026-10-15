@@ -15,6 +15,7 @@ export const LANDMARK_KINDS: Record<LandmarkKind, { name: string; blurb: string 
   crag: { name: 'Lookout Crag', blurb: `Its keeper sees everything within ${LANDMARKS.crag.sight} tiles: who walks the land between the towns.` },
   cairn: { name: "Ancestors' Cairn", blurb: `Its keeper has room for ${LANDMARKS.cairn.pop} more people, as if they had built a house or two.` },
   grove: { name: 'Sacred Grove', blurb: `Its keeper's priests chant ${LANDMARKS.grove.priest} times as fast within ${LANDMARKS.grove.reach} tiles of it: turn a rival's soldiers, or mend your own, here.` },
+  ford: { name: 'Old Ford', blurb: `A crossing the whole country knows: its keeper's soldiers march ${Math.round((LANDMARKS.ford.march - 1) * 100)}% faster, wherever they go. Citizens and traders walk as before.` },
   flint: { name: 'Flint Scatter', blurb: `Good knapping stone lies here: its keeper's citizens chop and mine ${Math.round((LANDMARKS.flint.tools - 1) * 100)}% faster, wherever they work.` },
 };
 
@@ -53,6 +54,12 @@ export function groveBoost(s: GameState, u: Unit): number {
     if (dx * dx + dy * dy <= LANDMARKS.grove.reach * LANDMARKS.grove.reach) return 1 + kinBonus(s, u.owner, 'grove', LANDMARKS.grove.priest - 1);
   }
   return 1;
+}
+
+/** How much faster a soldier marches for its people keeping an Old Ford (1 when they don't, or for citizens and traders). */
+export function fordMarch(s: GameState, u: Unit): number {
+  if (u.type === 'citizen' || u.type === 'trader' || keptOf(s, u.owner, 'ford') === 0) return 1;
+  return 1 + kinBonus(s, u.owner, 'ford', LANDMARKS.ford.march - 1);
 }
 
 /** Who stands round a landmark: for each team there, how many (land units, traders aside) and its lowest-id player. */
@@ -126,6 +133,14 @@ function springStep(s: GameState, m: Landmark): void {
   }
 }
 
+/** The team that keeps every landmark (only in the Lords of the Land game; at least `lordsMin` stand), or -1. */
+function lords(s: GameState): number {
+  const marks = s.landmarks ?? [];
+  if (s.mode !== 'lords' || s.scenario || marks.length < LANDMARKS.lordsMin || marks.some((m) => m.owner < 0)) return -1;
+  const team = s.players[marks[0].owner].team;
+  return marks.every((m) => s.players[m.owner].team === team) ? team : -1;
+}
+
 /** Every tick: the claims at each landmark, and what the springs give. A defeated keeper lets go. */
 export function landmarkStep(s: GameState): void {
   if (!s.landmarks) return;
@@ -139,4 +154,11 @@ export function landmarkStep(s: GameState): void {
     claimStep(s, m);
     if (m.kind === 'spring') springStep(s, m);
   }
+  // Keeping every landmark long enough makes a side lord of the land.
+  const team = lords(s);
+  if (team !== (s.landTeam ?? -1)) {
+    s.landTeam = team;
+    s.landTimer = team >= 0 ? secs(LANDMARKS.lordsSeconds) : -1;
+    s.events.push({ k: 'landHold', team, ticks: s.landTimer });
+  } else if ((s.landTimer ?? -1) > 0) s.landTimer!--;
 }

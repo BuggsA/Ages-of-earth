@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -123,7 +123,7 @@ export class Sound {
     'click', 'open', 'select', 'selectBuilding', 'move', 'attack', 'strike', 'thud', 'hit', 'hitBuilding', 'bow', 'sling', 'musket', 'fall',
     'collapse', 'built', 'place', 'ready', 'readyCitizen', 'chop', 'mine', 'hammer', 'rustle', 'epoch', 'alert', 'victory', 'defeat', 'error', 'coin', 'queue',
     'catapult', 'cannon', 'impact', 'spear', 'chant', 'convert', 'heal', 'townBell', 'allClear', 'research', 'wonder', 'shelter',
-    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind', 'thunder', 'owl', 'gull', 'cricket', 'frog', 'birdsong', 'greatWork', 'beacon', 'rally', 'mammoth', 'howl', 'snarl', 'landmarkTaken', 'landmarkLost', 'consecrate',
+    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind', 'thunder', 'owl', 'gull', 'cricket', 'frog', 'birdsong', 'greatWork', 'beacon', 'rally', 'mammoth', 'howl', 'snarl', 'landmarkTaken', 'landmarkLost', 'consecrate', 'heirloom', 'zap', 'coilHum',
   ];
 
   /**
@@ -457,6 +457,11 @@ export class Sound {
         this.brass(out, t + 0.45, N.C5, 1.2, 0.07);
         [N.G5, N.C6, N.E6, N.G6].forEach((f, i) => this.bell(out, t + 0.5 + i * 0.1, f, 1.2, 0.07));
         break;
+      case 'heirloom':
+        // A slow peal from the new craft: a low bronze bell, then a falling change of three over its hum.
+        this.bell(out, t, N.C4, 2.2, 0.08);
+        [N.G5, N.E5, N.C5].forEach((f, i) => this.bell(out, t + 0.55 + i * 0.4, f, 1.6, 0.06));
+        break;
       case 'stepBack':
         // Stepping back an age (#47): the epoch fanfare's notes walked downhill, ending on a low bell.
         [N.G4, N.E4, N.C4].forEach((f, i) => this.brass(out, t + i * 0.32, f, 0.9, 0.065));
@@ -657,6 +662,20 @@ export class Sound {
         this.noise(out, t, { dur: 2.6, f: 260, to: 55, peak: 0.55, attack: 0.18 });
         this.noise(out, t + 0.5, { dur: 2.2, f: 180, to: 45, peak: 0.35, attack: 0.5 });
         this.tone(out, t + 0.05, { f: 52, to: 34, dur: 2.2, peak: 0.12, attack: 0.3 });
+        break;
+      case 'zap':
+        // A Coil Tower's bolt (#231): a sharp crack, a buzzing 120 Hz snarl that dies away, a hiss of ozone.
+        this.noise(out, t, { dur: 0.06, filter: 'highpass', f: 2600, peak: 0.16 });
+        this.tone(out, t, { f: 120, type: 'sawtooth', dur: 0.32, peak: 0.05, lp: 1800 });
+        this.tone(out, t + 0.01, { f: 2400, to: 600, type: 'square', dur: 0.12, peak: 0.018 });
+        this.noise(out, t + 0.05, { dur: 0.4, filter: 'bandpass', f: 5200, q: 0.7, peak: 0.04 });
+        break;
+      case 'coilHum':
+        // The mains hum of a Coil Tower's field (#231): 60 Hz and its octave swelling and ebbing, a thin whine on top.
+        this.tone(out, t, { f: 60, type: 'sawtooth', dur: 2.4, peak: 0.035, attack: 0.7, lp: 400 });
+        this.tone(out, t, { f: 120, type: 'triangle', dur: 2.4, peak: 0.03, attack: 0.9 });
+        this.tone(out, t + 0.2, { f: 3200, to: 3320, dur: 1.8, peak: 0.004, attack: 0.8 });
+        this.noise(out, t, { dur: 2.2, filter: 'bandpass', f: 900, q: 2, peak: 0.006, attack: 0.8 });
         break;
       case 'ruinFind':
         // Struck stone: the spade rings on something hard, earth slides, then an old mode rises out of it.

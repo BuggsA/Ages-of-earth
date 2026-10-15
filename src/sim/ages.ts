@@ -1,4 +1,4 @@
-import { AGES, BUILDINGS, ROADS, STEP_BACK, TECHS, TICK_HZ, TRUNK, secs, stepBackCost, type Age, type Deed, type Road } from './data';
+import { AGES, BUILDINGS, LIGHTNING, ROADS, STEP_BACK, TECHS, TICK_HZ, TRUNK, secs, stepBackCost, type Age, type Deed, type Road } from './data';
 import type { AgeId, Building, BuildingType, Cost, GameState, Player, TechId, UnitType } from './types';
 
 /**
@@ -12,6 +12,27 @@ export function ageOf(p: Player): AgeId {
 }
 
 export const ageDef = (p: Player): Age => AGES[ageOf(p)];
+
+/** Whether the people has stood in this age at some time in the match, or stands in it now (heirlooms, #224). */
+export function hasWalked(p: Player, age: AgeId): boolean {
+  return ageOf(p) === age || !!p.walked?.includes(age);
+}
+
+/** Records the side age a people has just entered; the trunk ages are everyone's and aren't kept. */
+export function noteWalked(p: Player, age: AgeId): void {
+  if (TRUNK.includes(age) || p.walked?.includes(age)) return;
+  p.walked = [...(p.walked ?? []), age];
+}
+
+/** The heirlooms whose ages the people has both walked, in tech order: what entering `age` just opened. */
+export function heirloomsOpened(p: Player, age: AgeId): TechId[] {
+  const out: TechId[] = [];
+  for (const id of Object.keys(TECHS) as TechId[]) {
+    const pair = TECHS[id].walked;
+    if (pair && pair.includes(age) && pair.every((a) => hasWalked(p, a))) out.push(id);
+  }
+  return out;
+}
 
 /** Every road out of the player's age, known or not. */
 export function roadsFrom(p: Player): Road[] {
@@ -187,4 +208,41 @@ export function journeyOf(p: Player, b: Building): Journey | undefined {
   }
   const r = roadTo(p, b.advanceTo);
   return r && { to: r.to, cost: r.cost, time: r.time, back: false };
+}
+
+/** Whether the player's age broadcasts power from coils (the Age of Lightning, #231). */
+export const hasCoils = (p: Player): boolean => !!ageDef(p).coils;
+
+/** Whether a building stands in the field of one of its owner's finished, standing Watch (Coil) Towers. */
+export function inField(s: GameState, b: { x: number; y: number; owner: number }): boolean {
+  const r2 = LIGHTNING.reach * LIGHTNING.reach;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'tower' || e.owner !== b.owner || !e.built || e.hp <= 0) continue;
+    const dx = e.x - b.x, dy = e.y - b.y;
+    if (dx * dx + dy * dy <= r2) return true;
+  }
+  return false;
+}
+
+/**
+ * How fast a building trains and researches, in hundredths: 100 in every age but Lightning, where a building
+ * in a coil's field works at `LIGHTNING.lit` and one outside every field at `LIGHTNING.dark`.
+ */
+export function workRate(s: GameState, b: Building): number {
+  if (!hasCoils(s.players[b.owner])) return 100;
+  return inField(s, b) ? LIGHTNING.lit : LIGHTNING.dark;
+}
+
+/**
+ * Whole steps of work a building makes this tick at its rate, carrying what is left over in `b.spark`
+ * (integer hundredths, so every machine agrees). At 100 it is always one step and `spark` is never touched.
+ */
+export function workSteps(s: GameState, b: Building): number {
+  const rate = workRate(s, b);
+  if (rate === 100 && !b.spark) return 1;
+  const sum = (b.spark ?? 0) + rate;
+  const n = Math.floor(sum / 100);
+  b.spark = sum - n * 100;
+  if (rate === 100 && b.spark === 0) delete b.spark;
+  return n;
 }

@@ -191,3 +191,63 @@ describe('the computer and the wild', () => {
     expect(s.animals.includes(mine)).toBe(false);
   });
 });
+
+describe('the computer and a far mammoth', () => {
+  it('hunts a far mammoth with soldiers along, but not with a rival by it or no soldiers to spare', () => {
+    let id = 0;
+    const mk = (soldiers: number) => {
+      const s = game(4, 'normal');
+      for (const a of s.animals) if (a.kind === 'mammoth') a.hp = 0;
+      s.animals = s.animals.filter((a) => a.hp > 0);
+      const b = s.players[1];
+      s.peaceUntil = 0;
+      for (let i = 0; i < 12; i++) spawnUnit(s, 1, 'citizen', b.startX + 3, b.startY - 3 - i * 0.4);
+      const at = { x: b.startX + (s.players[0].startX > b.startX ? 30 : -30), y: b.startY };
+      id = spawnAnimal(s, at.x, at.y, 'mammoth').id;
+      for (let i = 0; i < soldiers; i++) spawnUnit(s, 1, 'infantry', b.startX + 2, b.startY + 2 + i * 0.5);
+      return { s, at };
+    };
+    const hunters = (s: GameState) => s.ents.filter((e) => e.kind === 'unit' && e.owner === 1 && e.order.k === 'hunt' && e.order.target === id);
+    const a = mk(6);
+    let escorted = false;
+    for (let i = 0; i < secs(120); i++) {
+      step(a.s);
+      if (hunters(a.s).some((u) => u.kind === 'unit' && u.type === 'infantry')) escorted = true;
+    }
+    expect(escorted).toBe(true);
+    const b = mk(1);
+    let went = false;
+    for (let i = 0; i < secs(120); i++) {
+      step(b.s);
+      if (hunters(b.s).length) went = true;
+    }
+    expect(went).toBe(false);
+  });
+
+  it('brings the escort home once the beast is down', () => {
+    const s = game(4, 'normal');
+    for (const a of s.animals) if (a.kind === 'mammoth') a.hp = 0;
+    s.animals = s.animals.filter((a) => a.hp > 0);
+    const b = s.players[1];
+    s.peaceUntil = 0;
+    for (let i = 0; i < 12; i++) spawnUnit(s, 1, 'citizen', b.startX + 3, b.startY - 3 - i * 0.4);
+    const x = b.startX + (s.players[0].startX > b.startX ? 30 : -30);
+    const m = spawnAnimal(s, x, b.startY, 'mammoth');
+    for (let i = 0; i < 6; i++) spawnUnit(s, 1, 'infantry', b.startX + 2, b.startY + 2 + i * 0.5);
+    let sent = false;
+    for (let i = 0; i < secs(60) && !sent; i++) {
+      step(s);
+      sent = !!s.ai[1]?.huntEscort?.length;
+    }
+    expect(sent).toBe(true);
+    const ids = [...(s.ai[1].huntEscort as number[])];
+    m.hp = 0;
+    for (let i = 0; i < secs(30); i++) step(s);
+    const near = ids.filter((id) => {
+      const u = s.byId.get(id);
+      return !u || Math.hypot((u as Unit).x - b.startX, (u as Unit).y - b.startY) < 20;
+    });
+    expect(near.length).toBe(ids.length);
+    expect(s.ai[1].huntEscort).toBeUndefined();
+  });
+});

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { AI_WINTER, SEASON, TICK_HZ } from '../src/sim/data';
-import { createGame, step } from '../src/sim/game';
-import type { GameState, Unit } from '../src/sim/types';
+import { AI_WINTER, SEASON, TICK_HZ } from '../../src/sim/data';
+import { createGame, step } from '../../src/sim/game';
+import type { GameState, Unit } from '../../src/sim/types';
 
 /** The clever computer plans for winter: more of its people turn to food in autumn, before the berries fail. */
 

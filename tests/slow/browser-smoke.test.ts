@@ -40,7 +40,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await browser?.close();
   server?.close();
-});
+}, 60_000); // closing swiftshader Chromium can pass the 10 s hook default on a loaded runner
 
 test('title, match, campaign and Web of Ages run without errors', async () => {
   mkdirSync(SHOTS, { recursive: true });

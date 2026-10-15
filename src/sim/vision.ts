@@ -1,5 +1,7 @@
 import { kinBonus } from './landmarks';
-import { BEACON, BUILDINGS, LANDMARKS } from './data';
+import { BEACON, BUILDINGS, LANDMARKS, TELEGRAPH } from './data';
+import { inField } from './ages';
+import { modsOf } from './stats';
 import type { GameState } from './types';
 import { statsOf } from './world';
 
@@ -28,6 +30,8 @@ export function updateVision(s: GameState): void {
     let r: number;
     if (e.kind === 'unit') r = statsOf(s, e).sight;
     else r = e.built ? BUILDINGS[e.type].sight + e.size / 2 + (e.beacon !== undefined && s.tick < e.beacon ? BEACON.sight : 0) : 2 + e.size / 2;
+    // Wireless Telegraphy: ships and finished Docks inside a Tower's field see farther over the water.
+    if ((e.kind === 'unit' ? statsOf(s, e).cls === 'ship' : e.type === 'dock' && e.built) && modsOf(s, e.owner).telegraph && inField(s, e)) r += TELEGRAPH.sight;
     const cx = Math.floor(e.x);
     const cy = Math.floor(e.y);
     const d = disc(r);

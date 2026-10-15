@@ -61,6 +61,12 @@ export interface Age {
    * more, counting at most `most` such steps. Iron dug on the way here still counts (the web's link).
    */
   ironTrade?: { per: number; each: number; most: number };
+  /**
+   * Power broadcast from coils (the Age of Lightning, #231): Watch Towers become Coil Towers, whose field
+   * speeds the work of buildings near them and slows every building outside, and whose shot is a leaping
+   * arc. The numbers are `LIGHTNING`.
+   */
+  coils?: boolean;
 }
 
 export const TRUNK: AgeId[] = ['stone', 'bronze', 'middle', 'gunpowder', 'industrial'];
@@ -137,6 +143,14 @@ export const AGES: Record<AgeId, Age> = {
     price: { ship: 0.75 },
     ironTrade: IRON_TRADE,
   },
+  lightning: {
+    name: 'Age of Lightning',
+    short: 'Lightning',
+    tier: 4,
+    blurb: 'The future that almost was: power is broadcast through the air from Coil Towers, not carried by coal and belts. Buildings in a coil\'s field train and research 35% faster; buildings outside every field run 25% slower. A coil\'s bolt leaps from one enemy to the next nearby. The air hums with current: no aeroplane flies.',
+    coils: true,
+    no: { units: ['fighter', 'bomber'], why: 'The air hums with current in the Age of Lightning: no aeroplane flies until you return to the Industrial Age' },
+  },
 };
 
 /** Something a people must have done before a road opens: a tally from its stats reaching `n`. */
@@ -177,6 +191,17 @@ export const ROADS: Road[] = [
   ...TRUNK.slice(1).map((to, i): Road => ({ from: TRUNK[i], to, cost: EPOCHS[i + 1].cost, time: EPOCHS[i + 1].time })),
   { from: 'industrial', to: 'aeronaut', clue: 'airfield', cost: { food: 600, wood: 500, gold: 800 }, time: 60, blurb: 'Build a future around aviation: aircraft cost and training time fall by 25%, but foot, ranged, cavalry and siege units cost 20% more. An Airfield must stand when the journey starts.' },
   { from: 'aeronaut', to: 'industrial', cost: { food: 200, wood: 200 }, time: 30, blurb: 'Return to a balanced Industrial economy: ordinary aircraft production and ordinary land army prices.' },
+  // The other future out of the Industrial (#231): fire signals, then the telegraph, then power sent through the air.
+  {
+    from: 'industrial',
+    to: 'lightning',
+    cost: { food: 500, stone: 300, gold: 900 },
+    time: 60,
+    clue: 'tower',
+    deed: { stat: 'beacons', n: 6, text: 'Your towers light 6 beacons (relays count)' },
+    blurb: 'Instead of the skies, the wires that need no wires: every Watch Tower becomes a Coil Tower. Buildings within its field train and research 35% faster, but buildings outside every field run 25% slower, so the town is laid out around its coils, and a coil that falls darkens its quarter. A coil\'s bolt leaps from enemy to enemy, the hardest on armies that crowd together. What it gives up: aircraft. The Airfield builds nothing while you stay.',
+  },
+  { from: 'lightning', to: 'industrial', cost: { food: 200, wood: 300 }, time: 30, blurb: 'Bring the steam engines back: every building works at its usual speed again, Watch Towers loose arrows, and the Airfield builds aircraft once more.' },
   {
     from: 'middle', to: 'reclaimer', cost: { food: 900, wood: 350, gold: 500 }, time: 65,
     ruin: true,
@@ -481,6 +506,9 @@ export const PRIEST = { heal: 3, convert: 7, rest: 8 };
  * - `hard` makes some buildings resist longer: holy ground holds out, and a Temple taken brings its relics.
  * - Every unit sheltering inside slows the chant: rate / (1 + `guard` × those inside). They spill out
  *   to fight when it turns.
+ * - Counter-chant: each of the keeper's own priests within `counter.range` tiles of the building (out in the
+ *   open, not sheltering) answers, and slows the chant as a guard does, by `counter.each` times its people's
+ *   priest speed. Two answering priests halve a lone chanter's pace; a full band of five still wins.
  * - `never`: a people's heart and its glory stay its own.
  * - After `grace` seconds with no one chanting, the faith fades by `fade` of the whole each second.
  */
@@ -488,6 +516,7 @@ export const CONSECRATE = {
   rate: 15,
   hard: { temple: 1.5 } as Partial<Record<BuildingType, number>>,
   guard: 0.35,
+  counter: { range: 7, each: 0.5, answer: 0.015, stand: 0.5, hold: 3 },
   never: ['towncenter', 'wonder'] as BuildingType[],
   grace: 1,
   fade: 0.05,
@@ -537,15 +566,20 @@ export const RUINS = { count: { small: 2, medium: 3, large: 4 } as Record<MapSiz
  * - The Lookout Crag shows its keeper everything within `crag.sight` tiles: the road their rival walks.
  * - The Flint Scatter gives its keeper's citizens good edges: chopping and mining (stone, gold, bog iron) `flint.tools` times as fast.
  * - The Sacred Grove makes its keeper's priests work `grove.priest` times as fast (converting, healing) within `grove.reach` tiles of it: a place to bring a priest to turn a rival's army.
+ * - The Old Ford lets its keeper's soldiers march `ford.march` times as fast: a road for the army, so the keeper strikes first.
  * - The Ancestors' Cairn gives its keeper `cairn.pop` more room for people: a house or two not built.
  */
 export const LANDMARKS = {
+  /** Lords of the Land: a side that keeps every landmark (at least `lordsMin` stand) for `lordsSeconds` wins. */
+  lordsSeconds: 240, lordsMin: 3,
   max: 5, home: 22, far: 34, fair: 4, spacing: 16, reach: 3.5, claim: 20, crowd: 3, border: 5, clear: 1, score: 100,
   spring: { reach: 6, heal: 0.03, every: 2 },
   crag: { sight: 14 },
   cairn: { pop: 5 },
   flint: { tools: 1.2 },
   grove: { reach: 10, priest: 1.8 },
+  /** The Old Ford: its keeper's soldiers (not citizens or traders) march `march` times as fast, anywhere on land. */
+  ford: { march: 1.2 },
   /** A people's own kind of landmark (the Romans, who build their own, have none) gives it `kinMul` times the effect (of the part above that is a bonus). */
   kinMul: 1.5,
   kin: { egyptians: 'flint', greeks: 'spring', mongols: 'crag', chinese: 'grove', britons: 'cairn' } as Partial<Record<CivId, LandmarkKind>>,
@@ -557,13 +591,15 @@ export const LANDMARKS = {
  * it sends up to `guard` of them to take (or take back) the nearest landmark in reach that a rival keeps
  * or is claiming, and holds them there until it's no longer the rival's, or `hold` seconds pass.
  */
-export const AI_MARK = { escort: 2, far: 28, townAt: 8, near: 44, rival: 0.75, walk: 150, party: 3, guard: 5, hold: 120, linger: 20,
+export const AI_MARK = { /** In a Lords of the Land match: reach over the whole map, and the band that goes after a landmark. */ lordsReach: 400, lordsParty: 2, escort: 2, far: 28, townAt: 8, near: 44, rival: 0.75, walk: 150, party: 3, guard: 5, hold: 120, linger: 20,
   /** The walker halts when its escort trails it by more than this many tiles, and goes on once they close up. */
   lead: 9,
   /** Divisors of a landmark's distance (bigger: more worth walking for): by kind, with the cairn when houses are full and the spring when people are hurt. */
-  worth: { crag: 1, flint: 1.25, spring: 1, springHurt: 1.5, cairn: 1, cairnFull: 1.6,
+  worth: { crag: 1, flint: 1.25, ford: 1.1, spring: 1, springHurt: 1.5, cairn: 1, cairnFull: 1.6,
     /** Times more worth walking for the kind its own people favour (`LANDMARKS.kin`), since it pays half again as much. */
-    kin: 1.4 } };
+    kin: 1.4,
+    /** Soldiers weigh a rival's kept Old Ford this many times more: it quickens the strikes against them, so it is taken before a war. */
+    fordRival: 1.6 } };
 /** Repairs: restoring a building's whole health costs this share of its price, paid as the hammers work. */
 export const REPAIR_SHARE = 0.4;
 export const TRADE = { posts: { small: 2, medium: 2, large: 3 } as Record<MapSize, number>, edge: 9, fair: 4, far: 0.3, spacing: 0.4, plaza: 1, reach: 1.8, gold: 0.012, epoch: 0.08, max: 180, ally: 0.25, harbor: { reach: 12, mul: 1.3 }, sea: { reach: 7, mul: 1.2 } };
@@ -657,6 +693,8 @@ export interface Mods {
   /** Added to foot soldiers' blows (the Iron Age). */
   infantryAttack: number;
   priest: number;
+  /** Multiplies the strength of a priest's chant over a rival's building (Litany), not its healing or converting. */
+  chant: number;
   siegeAttack: number;
   siegeRange: number;
   techCost: number;
@@ -682,13 +720,19 @@ export interface Mods {
   riderSight: number;
   /** Above 0, the people's priests can chant a rival's building over to their side (the Age of Pilgrims, #209). */
   consecrate: number;
+  /** Above 0, a Temple within a Watch Tower's reach mends its people's soldiers near it (St. Elmo's Fire, #240). */
+  elmo: number;
+  /** Above 0, ships and Docks standing in a Watch Tower's reach see `TELEGRAPH.sight` tiles farther (Wireless Telegraphy, #240). */
+  telegraph: number;
+  /** Above 0, repairs inside a Watch Tower's reach are free and quicker, and ruins you dug there pay (Galvanic Revival, #240). */
+  galvanic: number;
 }
 
 export const NO_MODS: Mods = {
   meleeAttack: 0, rangedAttack: 0, armor: 0, parmor: 0, range: 0, carry: 0, citizenSpeed: 1, wood: 1, mine: 1, farm: 1, forage: 1, hunt: 1,
-  buildingHp: 1, buildSpeed: 1, militaryTrain: 1, rangedTrain: 1, cavalrySpeed: 1, infantryHp: 1, infantryArmor: 0, infantryAttack: 0, priest: 1,
+  buildingHp: 1, buildSpeed: 1, militaryTrain: 1, rangedTrain: 1, cavalrySpeed: 1, infantryHp: 1, infantryArmor: 0, infantryAttack: 0, priest: 1, chant: 1,
   siegeAttack: 1, siegeRange: 0, techCost: 1, wonderCost: 1, extraCitizens: 0, fish: 1, shipHp: 1, shipRange: 0, airSpeed: 1, airHp: 1,
-  traderSpeed: 1, tradeGold: 1, relicGold: 1, bogGold: 1, rot: 1, beastWard: 1, portReach: 0, riderSight: 0, consecrate: 0,
+  traderSpeed: 1, tradeGold: 1, relicGold: 1, bogGold: 1, rot: 1, beastWard: 1, portReach: 0, riderSight: 0, consecrate: 0, elmo: 0, telegraph: 0, galvanic: 0,
 };
 
 export interface Tech {
@@ -707,6 +751,11 @@ export interface Tech {
   survey?: 'bogIron';
   /** Learned and worked only while the people stands in this age (a craft of one road); it lapses when they leave and returns if they come back. */
   only?: AgeId;
+  /**
+   * An heirloom (#224): opened only to a people that has stood in both these ages, in either order and
+   * at any time in the match. Unlike `only`, it is kept for good once learned, on whatever road comes next.
+   */
+  walked?: [AgeId, AgeId];
 }
 
 export const TECHS: Record<TechId, Tech> = {
@@ -745,6 +794,15 @@ export const TECHS: Record<TechId, Tech> = {
   bloomery: { name: 'Bloomery', at: 'forge', epoch: 1, only: 'iron', cost: { food: 120, gold: 80 }, time: 35, mul: { infantryHp: 1.2 }, add: { infantryArmor: 1 }, blurb: 'Iron Age only: bloom iron into hard-wearing mail and helms. Foot soldiers have 20% more health and 1 more armor. The craft is lost when the people leaves the Iron Age, and returns if it comes back.', icon: '🔥' },
   ropewalk: { name: 'Ropewalk', at: 'dock', epoch: 2, only: 'sail', cost: { wood: 200, gold: 100 }, time: 35, mul: { shipHp: 1.15 }, add: { shipRange: 1 }, blurb: 'Age of Sail only: long ropes and tarred rigging. Ships are 15% sturdier and warships shoot 1 tile farther. The craft is lost when the people leaves the Age of Sail, and returns if it comes back.', icon: '🪢' },
   credit: { name: 'Letters of Credit', at: 'market', epoch: 2, only: 'merchant', cost: { food: 150, gold: 150 }, time: 35, mul: { techCost: 0.85 }, blurb: 'Age of Merchants only: paper in place of coin lets guilds fund the schools. Technologies cost 15% less. Lost when the people leaves the Age of Merchants, and returns if it comes back.', icon: '📜' },
+  litany: { name: 'Litany', at: 'temple', epoch: 2, only: 'pilgrim', cost: { food: 100, gold: 120 }, time: 35, mul: { chant: 1.3 }, blurb: 'Age of Pilgrims only: a chant sung in answer, line and response, carries further. Priests chant over a rival\'s building 30% faster. Lost when the people leaves the pilgrims\' road, and returns if it comes back.', icon: '🎶' },
+  // Heirlooms (#224): what two roads walked teach together, kept for good once learned.
+  bellFoundry: { name: 'Bell Foundry', at: 'temple', epoch: 2, walked: ['iron', 'pilgrim'], cost: { wood: 150, gold: 150 }, time: 40, mul: { relicGold: 1.5, priest: 1.2 }, blurb: 'Heirloom of the Iron Age and the Age of Pilgrims: smiths who learned the bloom cast bells for the shrines, and the faithful come from farther to hear them. Relics pay 50% more gold and priests convert and heal 20% faster. Kept for good, on any road.', icon: '🔔' },
+  ironHulls: { name: 'Iron-Bound Hulls', at: 'dock', epoch: 2, walked: ['iron', 'sail'], cost: { wood: 200, gold: 100 }, time: 40, mul: { shipHp: 1.3, fish: 1.2 }, blurb: 'Heirloom of the Iron Age and the Age of Sail: iron knees, nails and anchors from the marsh smithies. Ships are 30% sturdier and fishing boats fish 20% faster. Kept for good, on any road.', icon: '🔩' },
+  jointStock: { name: 'Joint-Stock Company', at: 'market', epoch: 2, walked: ['merchant', 'sail'], cost: { food: 200, gold: 200 }, time: 40, mul: { tradeGold: 1.15, traderSpeed: 1.1 }, blurb: 'Heirloom of the Age of Merchants and the Age of Sail: the guilds\' ledgers meet the shipping fortune, and many purses share one venture. Every trade trip pays 15% more and traders travel 10% faster. Kept for good, on any road.', icon: '📈' },
+  telegraphy: { name: 'Wireless Telegraphy', at: 'dock', epoch: 4, walked: ['sail', 'lightning'], cost: { wood: 200, gold: 250 }, time: 50, add: { telegraph: 1 }, blurb: 'Heirloom of the Age of Sail and the Age of Lightning: the masters of the sea learn to speak through the coil\'s current. Ships and Docks within a Watch Tower\'s reach (10 tiles) see 5 tiles farther, so a coil on the headland becomes a lookout over the water: no fleet closes on the harbour unseen. Kept for good, on any road.', icon: '📡' },
+  galvanic: { name: 'Galvanic Revival', at: 'workshop', epoch: 4, walked: ['reclaimer', 'lightning'], cost: { wood: 250, gold: 200 }, time: 50, add: { galvanic: 1 }, blurb: 'Heirloom of the Age of Reclaimers and the Age of Lightning: the coil\'s current wakes old machines. Inside a Watch Tower\'s reach (10 tiles) repairs cost nothing and go half as fast again, and every ancient ruin your citizens dug that lies in a field yields 25 gold every 30 seconds. A forward coil beside a ruin becomes a mine; a coil at home, a free field hospital for buildings. Kept for good, on any road.', icon: '🔌' },
+  stElmo: { name: 'St. Elmo\'s Fire', at: 'temple', epoch: 4, walked: ['pilgrim', 'lightning'], cost: { gold: 300, stone: 150 }, time: 50, add: { elmo: 1 }, blurb: 'Heirloom of the Age of Pilgrims and the Age of Lightning: the faithful read the blue glow on the coil\'s crown as a blessing. A Temple within a Watch Tower\'s reach (10 tiles) mends the soldiers standing near it, 4% of their health every 2 seconds, so an army can be staged between a coil and a shrine. Kept for good, on any road.', icon: '🌩' },
+  masonsLodge: { name: 'Masons\' Lodge', at: 'temple', epoch: 2, walked: ['pilgrim', 'reclaimer'], cost: { wood: 200, stone: 150 }, time: 40, mul: { buildSpeed: 1.2, buildingHp: 1.15 }, blurb: 'Heirloom of the Age of Pilgrims and the Age of Reclaimers: the builders who studied the old ruins raise the great churches, and keep their lodge. Buildings go up 20% faster and are 15% sturdier. Kept for good, on any road.', icon: '⛪' },
   survey: { name: 'Survey the Land', at: 'storehouse', epoch: 0, cost: { food: 50, wood: 50 }, time: 15, survey: 'bogIron', blurb: 'Prospectors walk the streams and marshes and answer one question: is there bog iron anywhere in this world? Yes or no; not where, nor how much.', icon: '🧭' },
 };
 
@@ -792,6 +850,23 @@ export const WORK = {
   /** Seconds a great work lasts. */
   duration: 90,
 };
+
+/**
+ * The Age of Lightning (#231). `reach`: tiles from a finished Watch (Coil) Tower's centre within which a
+ * building's centre is in its field. `lit` and `dark`: how fast a building in a field, and one outside every
+ * field, trains and researches, in hundredths. The arc: one bolt strikes at most `strikes` enemies, leaping
+ * at most `leap` tiles from one to the next, and keeps `keep` of its strength at each leap.
+ */
+/** St. Elmo's Fire (#240): soldiers within `reach` tiles of a Temple in a Tower's field mend `heal` of their health every `every` seconds. */
+export const ELMO = { reach: 6, heal: 0.04, every: 2 };
+
+/** Wireless Telegraphy (#240): ships and Docks in a Tower's field see `sight` tiles farther. */
+export const TELEGRAPH = { sight: 5 };
+
+/** Galvanic Revival (#240): repairs in a Tower's field cost nothing and go `repair` times as fast; a dug ruin in a field pays `gold` every `every` seconds. */
+export const GALVANIC = { repair: 1.5, gold: 25, every: 30 };
+
+export const LIGHTNING = { reach: 10, lit: 135, dark: 75, strikes: 4, leap: 2.5, keep: 0.7 };
 
 /**
  * Signal beacons (own pitch): a built Watch Tower can light a fire on its roof. While it burns the tower sees
@@ -877,6 +952,12 @@ export const SEASONS = [
  * the cold), wants `fields` more fields and `food` more of its people on food, hunts mammoths and boars with `hunters` fewer citizens (meat
  * keeps in the cold) and, in the winter itself, clears wolves with `pack` fewer soldiers.
  */
+/**
+ * A bulk order from the player spreads (#266): gatherers fan over nodes of that resource within `reach` tiles
+ * of the one clicked, `perNode` to a node; attackers fall on foes within `foe` tiles of the one clicked,
+ * `perFoe` to a foe (the clicked one first), the rest on the clicked one. Meat is one carcass, so it isn't spread.
+ */
+export const SPREAD = { reach: 5, perNode: 2, foe: 4, perFoe: 3 };
 export const AI_WINTER = { from: 2, fields: 2, hunters: 3, pack: 1, food: 0.3 };
 
 /**
@@ -884,9 +965,11 @@ export const AI_WINTER = { from: 2, fields: 2, hunters: 3, pack: 1, food: 0.3 };
  * numbers six, and sends those that have kept up with its army (within `reach` + `keep` tiles of its
  * centre, idle, walking or healing) in a band of at least `band` to chant over the rival building nearest that centre, within
  * `reach` tiles, that it can see. Towers and gates weigh as if `wall` times as near, a Temple that keeps
- * relics `relic` times.
+ * relics `relic` times. Counter-chant (#216): a free priest within `ward` tiles of a building of its own that a rival is
+ * chanting over walks to stand by it; against a pilgrim rival, a spare priest stands by the tower, gate or Temple nearest
+ * that rival's town.
  */
-export const AI_FAITH = { priests: 6, band: 3, reach: 14, keep: 6, wall: 0.4, relic: 0.6 };
+export const AI_FAITH = { priests: 6, band: 3, reach: 14, keep: 6, wall: 0.4, relic: 0.6, ward: 30 };
 export const AMOUNT = { tree: 80, berry: 125, stone: 300, gold: 400, meat: 140, fish: 250, bog: 300 };
 /** Deer: health, speeds, and how far a hunter throws a spear. */
 export const DEER = { hp: 8, walk: 0.8, flee: 2.3, spear: 3.5, spearDamage: 4,
@@ -959,7 +1042,7 @@ export const MAP_TYPES: Record<MapType, { label: string; blurb: string }> = {
 
 export interface AiLevel {
   label: string;
-  /** Gathering multiplier (a small edge on Hard). */
+  /** Gathering multiplier (a small edge on Expert, a handicap on Easy and Normal). */
   gather: number;
   citizens: number;
   /** Seconds before the first attack, and its size; later waves grow. */
@@ -985,29 +1068,39 @@ export interface AiLevel {
   bell: { ring: number; quiet: number; hold: number };
   /** Whether a clever computer raises a forward Tower as a foothold (#132 s5); `scripts/ai-ab.ts` sets it back to compare. */
   fort: boolean;
+  /** A pilgrim town detours to the Age of Sail for an heirloom (#232); off only in `scripts/ai-ab.ts`. */
+  detour: boolean;
   /** Whether a landmark's worth follows what the town needs (`AI_MARK.worth`); off, every one counts the same. `scripts/ai-ab.ts` sets it back to compare. */
   worthy: boolean;
 }
 
+/**
+ * Four honest difficulties (#256, #258). A newcomer picks the one called Normal, so Normal is the fair
+ * learning game and Easy is gentler still: a first-timer should reach the Bronze Age alive. The ids keep
+ * the behaviour they always had, so saves, replays, rooms and tests stay as they were; only the names
+ * moved: `easy` is shown as Normal, `normal` as Hard, `hard` as Expert (the campaign proof's level).
+ */
 export const AI_LEVELS: Record<Difficulty, AiLevel> = {
-  easy: { label: 'Easy', gather: 0.8, citizens: 16, firstAttack: 720, wave: 6, waveGrowth: 3, think: 1.5, towers: 0, clever: false, traders: 2, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true },
-  normal: { label: 'Normal', gather: 1, citizens: 24, firstAttack: 480, wave: 8, waveGrowth: 4, think: 1, towers: 1, clever: true, traders: 5, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true },
-  hard: { label: 'Hard', gather: 1.15, citizens: 32, firstAttack: 330, wave: 9, waveGrowth: 5, think: 0.5, towers: 2, clever: true, traders: 8, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true },
+  gentle: { label: 'Easy', gather: 0.65, citizens: 12, firstAttack: 1080, wave: 4, waveGrowth: 2, think: 2, towers: 0, clever: false, traders: 1, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true },
+  easy: { label: 'Normal', gather: 0.8, citizens: 16, firstAttack: 720, wave: 6, waveGrowth: 3, think: 1.5, towers: 0, clever: false, traders: 2, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true },
+  normal: { label: 'Hard', gather: 1, citizens: 24, firstAttack: 480, wave: 8, waveGrowth: 4, think: 1, towers: 1, clever: true, traders: 5, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true },
+  hard: { label: 'Expert', gather: 1.15, citizens: 32, firstAttack: 330, wave: 9, waveGrowth: 5, think: 0.5, towers: 2, clever: true, traders: 8, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true },
 };
 
 /**
  * How the computer walks the web of ages (#50). It takes a side road that plays to its people's
  * strength (its signature line comes cheaper there) whenever it qualifies, never one that bars that
- * line, and any other with chance `take`, decided once. It surveys for bog iron once its town has
+ * line, and any other with chance `take`, decided once; a road that would open an heirloom with an age
+ * it has already walked, with chance `heir` instead (#232). It surveys for bog iron once its town has
  * `survey` citizens, and keeps `diggers` citizens on bog iron toward the Iron Age (twice as many while it
  * holds for the deed; none once the deed is dug, #79); it holds its Town Center for a chosen road's deeds once a `nearly` share of each is
  * done or under way, for at most `patience` seconds (twice that once a `close` share of each is done, #113); it turns pilgrim with at least `relics` relics
  * kept. Against a merchant rival, a band of `riders` riders waits by the trading post nearest its town
  * and falls on the traders it sees within `raid` tiles (anyone's traders within `raidNear` tiles of home
  * are fair game anyway); against an iron rival, it trains the archers that answer its foot with chance
- * `read`.
+ * `read`. It reads a rival's heirlooms (#242): a Joint-Stock Company makes the rival a trade rival on any road, a Masons' Lodge asks `lodge` more siege engines, Iron-Bound Hulls `hulls` more warships, and a Bell Foundry rival's relic Temples are pulled `bell` ahead as a target (as a pilgrim people's are).
  */
-export const AI_WEB = { take: 0.6, survey: 22, diggers: 3, nearly: 0.5, patience: 90, close: 0.75, relics: 2, raid: 18, raidNear: 30, riders: 4, read: 0.85 };
+export const AI_WEB = { take: 0.6, heir: 1, survey: 22, diggers: 3, nearly: 0.5, patience: 90, close: 0.75, relics: 2, raid: 18, raidNear: 30, riders: 4, read: 0.85, lodge: 1, hulls: 1, bell: 900 };
 
 export const PLAYER_COLORS = ['#2f7fe0', '#e0473a', '#e8b630', '#3aa35a', '#9b59d0', '#e07a2f'];
 export const PLAYER_NAMES = ['You', 'Rival'];
@@ -1051,12 +1144,33 @@ export const ATTRITION = { every: 5, deep: 9, loss: 0.02 };
  * A clever computer with `pop` citizens also raises one forward Tower `fort` tiles toward its rival, at the edge of its own
  * land, so its next wave has a border to fight from (#132 s5).
  * `flame`: a clever computer that sees a rival's beacon burning within this many tiles of one of its Towers lights that Tower's own.
+ * `stage`: a clever computer that keeps an Old Ford up to this many tiles from home, on the rival's side of it, musters its waves there, so they march out already forward.
  */
-export const AI_RAID = { weary: 0.5, calm: 7, fort: 15, pop: 24, flame: 24 };
+/**
+ * The computer and the Age of Lightning (#231): it takes the road with at least `towers` finished towers and no
+ * aircraft, and while it walks the web in the Industrial Age it lights a beacon every `every` seconds toward
+ * the deed. In the age it raises a coil by a dark workshop, `gap` seconds apart, up to `most` towers.
+ * `raid`: a rival's coil that is the only one lighting some buildings draws a raid, `raid` tiles² of pull for each building it alone keeps lit.
+ */
+export const AI_LIGHTNING = { towers: 2, every: 40, gap: 45, most: 6, raid: 150 };
+
+export const AI_RAID = { weary: 0.5, calm: 7, fort: 15, pop: 24, flame: 24, stage: 36 };
+/**
+ * Hunters hunted (#260): between waves a clever computer sends `band` to `most` idle soldiers at a rival citizen
+ * its own units see working within `reach` tiles of its home, more than `safe` tiles from any rival Town Center
+ * or Tower, with no rival soldier within `guard` tiles and at most `odds` rival citizens per raider within 4
+ * tiles of it. The band chases on to the next such citizen within `chase` tiles, goes home when a rival soldier
+ * comes within `guard` or after `time` seconds, and sets out again at most every `every` seconds. Seeing no one,
+ * a band walks to a rival Hunting Camp it has seen within `reach` (one more than `safe` from the rival's forts)
+ * to find who works there, and looks within `look` tiles of the band once it is near.
+ */
+export const AI_PROWL = { band: 2, most: 3, reach: 40, safe: 12, guard: 7, odds: 2, chase: 8, look: 10, time: 45, every: 75 };
 /**
  * The computer and the wild (#171): once it has `mammothAt` citizens it sends a party of `party` after the
  * mammoth within `mammothNear` tiles of home; with `pack` soldiers at hand it clears wolves within `clear`.
  */
 export const AI_WILD = { mammothAt: 10, party: 5, mammothNear: 22, pack: 3, clear: 32, boarAt: 6, boarParty: 3, boarNear: 18,
-  /** A Hunting Camp goes up by a kill of at least `campMeat` food that lies `campFar` tiles from any food drop (and within `campNear` of home). */
-  campMeat: 150, campFar: 9, campNear: 24 };
+  /** A Hunting Camp goes up by a kill of at least `campMeat` food that lies `campFar` tiles from any food drop (and within `campNear` of home: as far as the far hunt goes, so a far feast gets its camp). */
+  campMeat: 150, campFar: 9, campNear: 38,
+  /** A mammoth `mammothNear` to `far` tiles from home is hunted too, by a clever computer, with `escort` idle soldiers sent along (beyond a guard of `guard` at home) and no rival soldier seen within `safe` tiles of it. */
+  far: 38, escort: 2, guard: 3, safe: 12 };

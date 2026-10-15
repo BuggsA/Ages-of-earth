@@ -21,7 +21,7 @@ import { PostsView } from './postsView';
 import { RuinsView } from './ruinsView';
 import { LandmarksView } from './landmarksView';
 import { BorderView } from './borderView';
-import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, type RangeGuide } from './rangeGuides';
+import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, coilFields, placementField, type RangeGuide } from './rangeGuides';
 import { ResourcesView } from './resourcesView';
 import { Sky } from './sky';
 import { forcedHour, hourAt, lightAt, moonPhase } from './daylight';
@@ -34,7 +34,7 @@ import { Bats } from './bats';
 import { Owls } from './owls';
 import { Roosts } from './roosts';
 import { Perches } from './perches';
-import { armyNear, nearWater, voiceFits, wet, type CreatureVoice } from './ambience';
+import { armyNear, coilDistance, coilHumGain, COIL_HUM_RANGE, nearWater, voiceFits, wet, type CreatureVoice } from './ambience';
 
 /**
  * The 3D view of a match through one player's eyes: lit terrain and lakes under a sky, woods and
@@ -113,6 +113,7 @@ export class View {
   private nextHoot = 12;
   private nextGull = 8;
   private nextSong = 5;
+  private nextHum = 3;
   private nextChirp = 6;
   private nextCroak = 9;
   private dayLevel = 0;
@@ -428,6 +429,7 @@ export class View {
     this.ambient(s, dt);
     this.vessels(s);
     this.water.update(this.time, SUN_DIR, this.horizon, this.sunTint);
+    this.dust();
     this.effects.update(dt);
     this.birds.update(this.time, dt, this.rig.target, this.rig.distance);
     this.fireflies.update(this.time, this.rig.target, this.rig.distance, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
@@ -461,6 +463,16 @@ export class View {
       const s = this.state;
       if (this.voiceHere(s, 'birdsong')) this.onCue?.('birdsong', Math.random() * 1.6 - 0.8, 0.4);
     }
+    // A Coil Tower within a dozen tiles of the view hums; the nearer, the louder (#231).
+    if (this.time > this.nextHum) {
+      this.nextHum = this.time + 2.2;
+      const s = this.state;
+      if (s) {
+        const d = coilDistance(s, this.rig.target.x, this.rig.target.z, COIL_HUM_RANGE, (b) => this.reveal || b.owner === this.viewer || this.sees(b.x, b.y));
+        const g = coilHumGain(d, COIL_HUM_RANGE);
+        if (g > 0.02) this.onCue?.('coilHum', 0, g);
+      }
+    }
     this.roosts.update(this.time, this.ruins.standingAt, this.rig.target, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
     this.perches.update(this.time, this.ruins.standingAt, this.rig.target, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
     this.bats.update(this.time, this.rig.target, this.rig.distance, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
@@ -482,7 +494,11 @@ export class View {
     if (sel.ghost) {
       const g = placementRange(s, this.viewer, sel.ghost.type, sel.ghost.tx, sel.ghost.ty);
       if (g) guides.push(g);
+      const f = placementField(s, this.viewer, sel.ghost.type, sel.ghost.tx, sel.ghost.ty);
+      if (f) guides.push(f);
     }
+    // In the Age of Lightning every finished coil shows its field.
+    for (const f of coilFields(s, this.viewer)) if (guides.length < MAX_RANGE_GUIDES) guides.push(f);
     for (const id of sel.ids) {
       const e = s.byId.get(id);
       if (!e || e.hp <= 0) continue;
@@ -567,6 +583,22 @@ export class View {
   }
 
   /** Chimney smoke, fires on damaged buildings, the glint of gold. */
+  /** Riders and engines at a hard pace raise dust off dry ground, powder off snow; rain keeps it down. */
+  private dust(): void {
+    const k = this.units.kicks;
+    if (this.quality === 'low' || !k.length) return;
+    const kind = this.weather.day.kind;
+    if (kind === 'rain') return;
+    const snow = kind === 'snow';
+    const colors = snow ? ['#e8eef2', '#f6f9fb'] : ['#a08c6a', '#b8a47e'];
+    for (let i = 0; i < k.length; i += 4) {
+      if (kind === 'mist' && Math.random() < 0.5) continue;
+      const at = new THREE.Vector3(k[i]!, k[i + 2]! + 0.04, k[i + 1]!);
+      const f = k[i + 3]!;
+      this.effects.burst(at, { count: 1 + (f > 0.7 ? 1 : 0), speed: 0.3, up: 0.6, life: 0.9, size: 0.07, grow: 3.2, gravity: -0.15, drag: 1.2, soft: true, colors });
+    }
+  }
+
   private ambient(s: GameState, dt: number): void {
     for (const e of s.ents) {
       if (e.kind !== 'building' || e.hp <= 0 || !e.built) continue;
@@ -731,6 +763,18 @@ export class View {
             this.effects.burst(this.ground(s, ev.x, ev.y, 0.5), { count: big ? 10 : 3, speed: big ? 0.9 : 0.4, up: 0.6, life: big ? 2.4 : 1.4, size: big ? 0.16 : 0.08, grow: 3, gravity: -0.2, drag: 1, soft: true, colors: ['#e6e2dc', '#cfcac2'] });
             if (big) this.effects.burst(this.ground(s, ev.x, ev.y, 0.4), { count: 6, speed: 1.5, life: 0.25, size: 0.07, gravity: 0, colors: ['#ffd27a', '#ff9a3c'] });
           }
+          break;
+        }
+        case 'arc': {
+          // A Coil Tower's bolt (#231): from the crown through each enemy it struck.
+          const [x0, y0] = ev.pts;
+          if (!this.sees(x0, y0)) break;
+          const pts: THREE.Vector3[] = [];
+          for (let i = 0; i < ev.pts.length; i += 2) pts.push(this.ground(s, ev.pts[i], ev.pts[i + 1], i === 0 ? 4.4 : 0.45));
+          this.effects.bolt(pts, '#bfe6ff');
+          const end = pts[pts.length - 1];
+          this.effects.burst(end, { count: 6, speed: 1.8, life: 0.3, size: 0.03, gravity: 2, colors: ['#e8f6ff', '#8fd8ff'] });
+          this.cue('zap', x0, y0, 0.7);
           break;
         }
         case 'splash': {

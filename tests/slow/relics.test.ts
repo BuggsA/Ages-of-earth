@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { findSpot } from '../src/sim/ai';
-import { RELIC, TICK_HZ } from '../src/sim/data';
-import { checksum, createGame, step, type GameSetup } from '../src/sim/game';
-import { placeProblem, walkable } from '../src/sim/grid';
-import { generateMap } from '../src/sim/mapgen';
-import { keptIn } from '../src/sim/relics';
-import { deserialize, serialize } from '../src/sim/save';
-import type { Building, Command, GameState, MapSize, MapType, Relic, Unit } from '../src/sim/types';
-import { placeBuilding, spawnUnit } from '../src/sim/world';
+import { findSpot } from '../../src/sim/ai';
+import { RELIC, TICK_HZ } from '../../src/sim/data';
+import { checksum, createGame, step, type GameSetup } from '../../src/sim/game';
+import { placeProblem, walkable } from '../../src/sim/grid';
+import { generateMap } from '../../src/sim/mapgen';
+import { keptIn } from '../../src/sim/relics';
+import { deserialize, serialize } from '../../src/sim/save';
+import type { Building, Command, GameState, MapSize, MapType, Relic, Unit } from '../../src/sim/types';
+import { placeBuilding, spawnUnit } from '../../src/sim/world';
 
 const game = (o: Partial<GameSetup> = {}): GameState =>
   createGame({

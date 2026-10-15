@@ -18,20 +18,22 @@ export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
   | 'towncenter' | 'house' | 'storehouse' | 'farm' | 'barracks' | 'range' | 'stable' | 'tower'
   | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp';
-export type Difficulty = 'easy' | 'normal' | 'hard';
+/** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
+export type Difficulty = 'gentle' | 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
 export type MapType = 'continental' | 'highlands' | 'lakes' | 'forest' | 'plains' | 'sea';
 /** Conquest: destroy every rival town. Regicide: each people has a King; lose them and you lose. Deathmatch: start rich. */
-export type GameMode = 'conquest' | 'regicide' | 'deathmatch';
+export type GameMode = 'conquest' | 'regicide' | 'deathmatch' | 'lords';
 export type Stance = 'aggressive' | 'defensive' | 'stand';
 export type CivId = 'egyptians' | 'greeks' | 'romans' | 'mongols' | 'chinese' | 'britons';
 export type TechId =
   | 'forging' | 'ironCasting' | 'blastFurnace' | 'fletching' | 'bodkin' | 'scaleArmor' | 'chainMail' | 'plateArmor'
   | 'wheelbarrow' | 'handcart' | 'axes' | 'saws' | 'picks' | 'shafts' | 'plow' | 'irrigation' | 'masonry'
   | 'conscription' | 'husbandry' | 'theology' | 'chemistry'
-  | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'bloomery' | 'ropewalk' | 'credit';
+  | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
+  | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning';
 
 /** Tile ground. Water and rock can't be walked or built on. */
 export const T_GRASS = 0;
@@ -87,6 +89,8 @@ export type Order =
   | { k: 'hunt'; target: number; fight?: boolean }
   /** A priest turning an enemy to your side: `done` ticks of chanting so far. */
   | { k: 'convert'; target: number; done: number }
+  /** A pilgrim priest standing by a friendly building a rival is chanting over, singing back (#219). */
+  | { k: 'answer'; target: number }
   /** A priest tending a wounded friend. */
   | { k: 'heal'; target: number }
   /** Walk to the shore by a transport ship and go aboard. */
@@ -211,6 +215,8 @@ export interface Building {
   dir: number;
   hurt: number;
   born: number;
+  /** Work carried over between ticks, in hundredths of a step, while the owner's age speeds or slows it (the Age of Lightning, #231). */
+  spark?: number;
   /** Tower beacon: tick it burns out (while lit), and tick it may be lit again (#beacon). */
   beacon?: number;
   beaconReady?: number;
@@ -273,7 +279,7 @@ export interface Ruin {
 }
 
 /** A landmark's kind (contested landmarks): what its keeper gets besides the land round it. */
-export type LandmarkKind = 'spring' | 'crag' | 'cairn' | 'flint' | 'grove';
+export type LandmarkKind = 'spring' | 'crag' | 'cairn' | 'flint' | 'grove' | 'ford';
 
 /**
  * A contested landmark: a place out between the towns that belongs to whoever's people hold the ground
@@ -370,6 +376,8 @@ export interface PlayerStats {
   relicGold?: number;
   /** Fish landed by boats (the Age of Sail's deed); absent in older saves. */
   fished?: number;
+  /** Beacons lit on the people's towers, relays included (the Age of Lightning's deed, #231); absent in older saves. */
+  beacons?: number;
 }
 
 /** One sample of a player's state for the post-game timeline. */
@@ -394,6 +402,8 @@ export interface Player {
   epoch: number;
   /** The age within the web (#37); its tier is `epoch`. Absent, or out of step with `epoch`, means the trunk age of `epoch` (see `ageOf`). */
   age?: AgeId;
+  /** Side ages this people has stood in, in the order first entered (heirlooms, #224); absent if none. The age it stands in counts too (see `hasWalked`). */
+  walked?: AgeId[];
   /** Epochs whose great work this player has called (seed #133); absent if none. */
   works?: number[];
   /** Tick the great work now at hand ends; absent when none is. */
@@ -462,16 +472,19 @@ export type GameEvent =
   | { k: 'bell'; owner: number; ring: boolean }
   | { k: 'cry'; owner: number; id: number; x: number; y: number; n: number }
   | { k: 'beacon'; owner: number; building: number; x: number; y: number; on: boolean }
+  /** A Coil Tower's bolt (the Age of Lightning, #231): from the tower through each enemy it struck, as x, y pairs. */
+  | { k: 'arc'; owner: number; building: number; pts: number[] }
   /** A great work was called (`on`) or ran out (seed #133). */
   | { k: 'greatWork'; owner: number; on: boolean }
   | { k: 'wonder'; owner: number; id: number; x: number; y: number; ticks: number }
   | { k: 'trade'; owner: number; res: Res; buy: boolean }
   | { k: 'defeated'; owner: number }
-  | { k: 'over'; winner: number; how: 'conquest' | 'wonder' | 'relics' | 'resign' | 'time' | 'scenario' }
+  | { k: 'over'; winner: number; how: 'conquest' | 'wonder' | 'relics' | 'lands' | 'resign' | 'time' | 'scenario' }
   /** A relic picked up, kept in a Temple, or let go where it lies. */
   | { k: 'relic'; id: number; owner: number; what: 'taken' | 'kept' | 'dropped'; x: number; y: number }
   /** One side now keeps every relic (its countdown starts), or no longer does (`team` -1). */
   | { k: 'relicHold'; team: number; ticks: number }
+  | { k: 'landHold'; team: number; ticks: number }
   /** A trader took on its gold at a trading post (`loaded`), or paid it in at its Market (`paid`). */
   | { k: 'caravan'; id: number; owner: number; what: 'loaded' | 'paid'; share?: boolean; amount: number; x: number; y: number }
   /** A scenario's story beat (a raid, a gift) and an objective completed. */
@@ -517,6 +530,9 @@ export interface GameState {
   /** The team keeping every relic in its temples, or -1; and ticks left before it wins (-1 when none). */
   relicTeam: number;
   relicTimer: number;
+  /** The team keeping every landmark, or -1; and ticks left before it wins (-1 when none). Old saves have neither. */
+  landTeam?: number;
+  landTimer?: number;
   /** The trading posts out on the map. */
   posts: TradePost[];
   /** Ancient ruins (#64); absent in older saves and in campaign chapters (none). */
@@ -574,6 +590,8 @@ export interface AiMemory {
   markWalker?: { id: number; unit: number; since: number };
   /** Soldiers sent to take (or take back) a landmark, held there until it is the computer's. */
   markGuard?: { id: number; ids: number[]; since: number };
+  /** Soldiers sent along on a far mammoth hunt; once idle (the beast down) they walk home. */
+  huntEscort?: number[];
   /** Soldiers sent along with the landmark walker to a far landmark, until the walk is over. */
   markEscort?: { unit: number; mark: number; ids: number[]; until?: number };
   /**
@@ -581,6 +599,8 @@ export interface AiMemory {
    * false to pass it by. Decided once each, so it doesn't waver from one turn to the next.
    */
   roads?: Partial<Record<AgeId, boolean>>;
+  /** Tick it last lit a beacon toward the Age of Lightning's deed (#231). */
+  zap?: number;
   /** Tick it began holding its Town Center for a side road's last deeds, so it holds only so long. */
   waiting?: number;
   /**
@@ -588,6 +608,11 @@ export interface AiMemory {
    * (#113): army-first holds an advance back only `armyWait` seconds of it.
    */
   short?: { since: number; epoch: number };
+  /** A band out after rival citizens working far from home (#260): its soldiers, their quarry and since when. */
+  /** With `look`, the band is walking to a rival Hunting Camp it has seen, to find who works there (`target` -1 until it does). */
+  prowl?: { ids: number[]; target: number; since: number; look?: number };
+  /** Tick its last band came home from prowling. */
+  prowled?: number;
 }
 
 /** Orders that can be given with Shift held to queue them after the current one. */
@@ -595,8 +620,8 @@ type Queued = { queue?: boolean };
 
 export type Command =
   | ({ t: 'move'; p: number; ids: number[]; x: number; y: number; amove?: boolean } & Queued)
-  | ({ t: 'attack'; p: number; ids: number[]; target: number } & Queued)
-  | ({ t: 'gather'; p: number; ids: number[]; tile: number } & Queued)
+  | ({ t: 'attack'; p: number; ids: number[]; target: number; spread?: boolean } & Queued)
+  | ({ t: 'gather'; p: number; ids: number[]; tile: number; spread?: boolean } & Queued)
   /** Right-click on your own building: help build it, farm it, drop off resources there or shelter in it. */
   | ({ t: 'work'; p: number; ids: number[]; target: number } & Queued)
   | ({ t: 'build'; p: number; ids: number[]; type: BuildingType; tx: number; ty: number } & Queued)

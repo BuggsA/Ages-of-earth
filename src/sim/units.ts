@@ -1,17 +1,18 @@
-import { AI_LEVELS, BUILDINGS, CARRY, DEER, DT, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, PRIEST, REPAIR_SHARE, RUINS, TRADE, domainOf, secs } from './data';
+import { AI_LEVELS, BUILDINGS, CARRY, CONSECRATE, DEER, DT, GALVANIC, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, PRIEST, REPAIR_SHARE, RUINS, SPREAD, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
 import type { Spatial } from './spatial';
 import { buildTimeFor, buildingCostFor, modsOf } from './stats';
+import { inField } from './ages';
 import type { Act, Animal, Building, Cost, Ent, GameState, Goal, Order, Res, Unit } from './types';
 import { seasonOf } from './seasons';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { carriedBy, relicAt } from './relics';
 import { animalRadius, hitAnimal } from './animals';
 import { dig, ruinAt } from './ruins';
-import { groveBoost, keptOf, kinBonus } from './landmarks';
-import { chant, consecrateProblem, turnBuilding } from './consecrate';
+import { fordMarch, groveBoost, keptOf, kinBonus } from './landmarks';
+import { chant, chantedOver, consecrateProblem, consecrates, turnBuilding } from './consecrate';
 import { atPost, dockOf, goalForPost, homeMarket, marketOf, nearestDock, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { canHit, exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, passOf, pay, radiusOf, statsOf, teamOf } from './world';
 
@@ -106,7 +107,7 @@ const carryCap = (s: GameState, u: Unit) =>
   u.type === 'fisher' ? FISH_CARRY[s.players[u.owner].epoch] : CARRY[s.players[u.owner].epoch] + modsOf(s, u.owner).carry;
 
 /** The nearest tile of a resource near a point that a citizen (or, for fish, a boat) could reach, or -1. */
-export function findResource(s: GameState, kind: number, x: number, y: number, maxR: number): number {
+export function findResource(s: GameState, kind: number, x: number, y: number, maxR: number, skip?: (i: number) => boolean): number {
   const pass = kind === R_FISH ? NAVAL : -1;
   const cx = Math.floor(x);
   const cy = Math.floor(y);
@@ -120,7 +121,7 @@ export function findResource(s: GameState, kind: number, x: number, y: number, m
         const ty = cy + dy;
         if (tx < 0 || ty < 0 || tx >= s.w || ty >= s.h) continue;
         const i = ty * s.w + tx;
-        if (s.res[i] !== kind) continue;
+        if (s.res[i] !== kind || skip?.(i)) continue;
         let open = false;
         for (let oy = -1; oy <= 1 && !open; oy++) for (let ox = -1; ox <= 1; ox++) if ((ox || oy) && walkable(s, tx + ox, ty + oy, pass)) open = true;
         if (!open) continue;
@@ -170,6 +171,16 @@ function workEvent(s: GameState, u: Unit, act: Act, x: number, y: number): void 
   if ((s.tick + u.id) % 24 === 0) s.events.push({ k: 'work', id: u.id, owner: u.owner, act, x, y });
 }
 
+/** How many other citizens (or boats) are working each tile, by tile. */
+function gatherLoad(s: GameState, u: Unit): Map<number, number> {
+  const load = new Map<number, number>();
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.id === u.id || e.owner !== u.owner || e.hp <= 0 || e.order.k !== 'gather') continue;
+    load.set(e.order.tile, (load.get(e.order.tile) ?? 0) + 1);
+  }
+  return load;
+}
+
 function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): void {
   if (u.carryRes !== o.res) {
     u.carry = 0;
@@ -191,7 +202,18 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
     const wants = u.type === 'fisher' ? [R_FISH] : o.res === 'wood' ? [R_TREE] : o.res === 'food' ? [R_MEAT, R_BERRY] : o.res === 'stone' ? [R_STONE] : o.bog ? [R_BOG, R_GOLD] : [R_GOLD];
     let next = -1;
     for (const want of wants) {
-      next = findResource(s, want, (o.tile % s.w) + 0.5, Math.floor(o.tile / s.w) + 0.5, want === R_MEAT ? 5 : want === R_FISH ? 12 : 8);
+      const fx = (o.tile % s.w) + 0.5;
+      const fy = Math.floor(o.tile / s.w) + 0.5;
+      const reach = want === R_MEAT ? 5 : want === R_FISH ? 12 : 8;
+      next = findResource(s, want, fx, fy, reach);
+      // A crowd of the player's that ran out together fans over the nodes near it instead of piling on one (#266).
+      if (next >= 0 && want !== R_MEAT && !s.players[u.owner].ai) {
+        const load = gatherLoad(s, u);
+        if ((load.get(next) ?? 0) >= SPREAD.perNode) {
+          const alt = findResource(s, want, fx, fy, reach, (i) => (load.get(i) ?? 0) >= SPREAD.perNode);
+          if (alt >= 0) next = alt;
+        }
+      }
       if (next >= 0) break;
     }
     if (next >= 0) {
@@ -309,12 +331,12 @@ function farmStep(s: GameState, u: Unit, o: Extract<Order, { k: 'farm' }>): void
   if (!approach(u, { ...goalForBuilding(f, true), px: f.tx + 0.9 + spot * 3, py: f.ty + 0.9 + spot * 2 })) setOrder(u, { k: 'idle' });
 }
 
-export function freeFarm(s: GameState, owner: number, x: number, y: number, r: number): Building | null {
+export function freeFarm(s: GameState, owner: number, x: number, y: number, r: number, skip?: Set<number>): Building | null {
   let best: Building | null = null;
   let bestD = r;
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.type !== 'farm' || e.owner !== owner || e.hp <= 0) continue;
-    if (farmTaken(s, e)) continue;
+    if (farmTaken(s, e) || skip?.has(e.id)) continue;
     const d = distToRect(x, y, e);
     if (d < bestD) {
       bestD = d;
@@ -416,10 +438,12 @@ function buildStep(s: GameState, u: Unit, o: Extract<Order, { k: 'build' }>): vo
     if (walking(u)) stopWalking(u);
     face(u, b.x, b.y);
     u.act = 'build';
-    const step = DT / buildTimeFor(s, u.owner, b.type);
+    // Galvanic Revival: a repair inside a Tower's field is free and quicker.
+    const wired = b.built && !!modsOf(s, u.owner).galvanic && inField(s, b);
+    const step = (DT / buildTimeFor(s, u.owner, b.type)) * (wired ? GALVANIC.repair : 1);
     const max = maxHp(s, b);
     const hp = Math.min(max, b.hp + max * step);
-    if (b.built) {
+    if (b.built && !wired) {
       // A repair is paid for as it goes: whole units, so the total over a job is exact.
       const cost = buildingCostFor(s, u.owner, b.type);
       const owed: Cost = {};
@@ -431,7 +455,7 @@ function buildStep(s: GameState, u: Unit, o: Extract<Order, { k: 'build' }>): vo
         return;
       }
       pay(p, owed);
-    } else b.progress = Math.min(1, b.progress + step);
+    } else if (!b.built) b.progress = Math.min(1, b.progress + step);
     b.hp = hp;
     workEvent(s, u, 'build', u.x, u.y);
     // Repairs must not repeat completion events or reset a wonder's timer.
@@ -738,6 +762,27 @@ function consecrateStep(s: GameState, u: Unit, o: Extract<Order, { k: 'convert' 
       u.cool = secs(PRIEST.rest);
       setOrder(u, { k: 'idle' });
     }
+    return;
+  }
+  if (!approach(u, goalForBuilding(b))) setOrder(u, { k: 'idle' });
+}
+
+/** A pilgrim priest told to stand by a chanted-over building of its own and sing back (#219): it walks up, holds the line and sings louder than one who merely stands near. */
+function answerStep(s: GameState, u: Unit, o: Extract<Order, { k: 'answer' }>): void {
+  const b = s.byId.get(o.target);
+  if (!b || b.kind !== 'building' || b.hp <= 0 || b.owner !== u.owner || !consecrates(s, u.owner) || carriedBy(s, u) || !chantedOver(s, b)) {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  if (u.cool > 0) {
+    if (walking(u)) stopWalking(u);
+    return;
+  }
+  if (gap(s, u, b) <= CONSECRATE.counter.hold) {
+    if (walking(u)) stopWalking(u);
+    face(u, b.x, b.y);
+    u.act = 'chant';
+    if ((s.tick + u.id) % 24 === 0) s.events.push({ k: 'work', id: u.id, owner: u.owner, act: 'chant', x: b.x, y: b.y });
     return;
   }
   if (!approach(u, goalForBuilding(b))) setOrder(u, { k: 'idle' });
@@ -1290,6 +1335,9 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
     case 'convert':
       convertStep(s, u, o);
       break;
+    case 'answer':
+      answerStep(s, u, o);
+      break;
     case 'heal':
       healStep(s, u, o);
       break;
@@ -1337,7 +1385,7 @@ export function routeUnits(s: GameState): void {
 /** Walk the route. */
 export function walk(s: GameState, u: Unit): void {
   if (!u.path) return;
-  let left = statsOf(s, u).speed * DT;
+  let left = statsOf(s, u).speed * fordMarch(s, u) * DT;
   while (left > 1e-9 && u.path) {
     const tx = u.path[u.pathI * 2];
     const ty = u.path[u.pathI * 2 + 1];

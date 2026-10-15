@@ -1118,6 +1118,8 @@ function placeLandmarks(
       [hand[i], hand[j]] = [hand[j], hand[i]];
     }
     if (grng() < 0.5) hand[hand.indexOf('flint')] = 'grove';
+    // The ford takes a crag's place on a third of the hands (a later draw of the same stream).
+    if (grng() < 0.34) hand[hand.indexOf('crag')] = 'ford';
     kinds.push(...hand);
   }
   return out.map((p, k) => ({ x: p.x + 0.5, y: p.y + 0.5, kind: kinds[k] }));

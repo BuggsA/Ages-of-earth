@@ -1,10 +1,10 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, AI_FAITH, AI_LEVELS, AI_MARK, AI_RAID, AI_WEB, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_PROWL, AI_RAID, AI_WEB, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
-import { ageOf, barred, deedsDone, deedsProgress, hiresAt, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
+import { ageOf, barred, deedsDone, hasCoils, hasWalked, deedsProgress, hiresAt, inField, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
 import { carriedBy } from './relics';
 import { claimants, favours, landmarkAt } from './landmarks';
 import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple } from './units';
@@ -67,9 +67,12 @@ const ADVANCE_AT = [11, 17, 22, 28];
 const TILE_OF: Record<Res, number> = { food: R_BERRY, wood: R_TREE, stone: R_STONE, gold: R_GOLD };
 /** Technologies in the order the opponent wants them (economy first). */
 const TECH_ORDER: TechId[] = [
+  // Heirlooms first (#224, #232): techProblem keeps them shut until both their ages are walked, and once
+  // one opens it is the prize of the road the computer chose for it, so it is bought before anything else.
+  'bellFoundry', 'ironHulls', 'jointStock', 'masonsLodge', 'stElmo', 'telegraphy', 'galvanic',
   'plow', 'drying', 'hounds', 'axes', 'wheelbarrow', 'picks', 'forging', 'bloomery', 'scaleArmor', 'fletching', 'husbandry', 'irrigation', 'saws', 'shafts', 'handcart',
   'ironCasting', 'chainMail', 'bodkin', 'masonry', 'theology', 'conscription', 'blastFurnace', 'plateArmor', 'chemistry',
-  'gillnets', 'shipwright', 'lighthouse', 'steamEngine', 'rifling', 'aviation', 'caravan', 'banking', 'pilgrimage', 'credit', 'ropewalk',
+  'gillnets', 'shipwright', 'lighthouse', 'steamEngine', 'rifling', 'aviation', 'caravan', 'banking', 'pilgrimage', 'credit', 'ropewalk', 'litany',
 ];
 /** Seconds a computer keeps its traders off a road after losing one on it. */
 const TRADER_WARY = 240;
@@ -197,7 +200,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   }
 
   // In the age of flight, save up for an airfield before anything smaller takes the wood.
-  if (L.clever && p.epoch >= 4 && citizens.length >= 24 && !buildings.some((b) => b.type === 'airfield')) {
+  if (L.clever && p.epoch >= 4 && citizens.length >= 24 && !buildings.some((b) => b.type === 'airfield') && !lightningBound(s, v, mem)) {
     const cost = buildingCostFor(s, p.id, 'airfield');
     const recent = s.tick - (mem.ordered.airfield ?? -99999) < secs(40);
     const spot = !recent && afford(v, cost) ? findSpot(s, 'airfield', home.x, home.y, 6, 22) : null;
@@ -207,6 +210,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   townBell(s, v, mem, issue);
   greatWork(s, v, mem, issue);
   lightBeacons(s, v, issue);
+  beaconsForLightning(s, v, mem, issue);
   rallyTheLine(s, v, issue);
   research(s, v, citizens.length >= wantCitizens - 2, issue);
   trade(s, v, issue);
@@ -236,7 +240,9 @@ function research(s: GameState, v: View, peopleEnough: boolean, issue: (c: Comma
     if (tech === 'hounds' && !s.carcasses?.some((c) => c.full > AMOUNT.meat)) continue;
     // Trade technologies only pay with traders on the road.
     if (TECHS[tech].at === 'market' && v.traders.length < 3) continue;
-    const at = v.buildings.find((b) => b.type === TECHS[tech].at && b.built && b.queue.length === 0 && b.advance < 0);
+    // An heirloom (#232) joins a queue that has room: a Dock that never stops training would otherwise never learn its own.
+    const room = TECHS[tech].walked ? MAX_QUEUE : 1;
+    const at = v.buildings.find((b) => b.type === TECHS[tech].at && b.built && b.queue.length < room && b.advance < 0);
     if (!at) continue;
     // The Town Center trains citizens first.
     if (at.type === 'towncenter' && !peopleEnough && v.citizens.length < 12) continue;
@@ -292,12 +298,30 @@ function fit(p: Player, to: AgeId): number {
   return (age.price?.[cls] ?? 1) < 1 ? 1 : 0;
 }
 
-/** Whether it means to walk the road to a side age, decided the first time it asks (#50). */
+/**
+ * The heirloom (#224) a road into `to` would open: one whose other age the people has already walked,
+ * and that it hasn't learned yet. Null when the road opens none.
+ */
+export function heirloomAhead(p: Player, to: AgeId): TechId | null {
+  for (const id of TECH_ORDER) {
+    const pair = TECHS[id].walked;
+    if (!pair || !pair.includes(to) || p.techs.includes(id)) continue;
+    const other = pair[0] === to ? pair[1] : pair[0];
+    if (hasWalked(p, other)) return id;
+  }
+  return null;
+}
+
+/**
+ * Whether it means to walk the road to a side age, decided the first time it asks (#50). A road that
+ * opens an heirloom with an age it has already walked (#232) is taken at `AI_WEB.heir` odds rather than
+ * `take`: the second road is the plan, not a coin toss. A road that bars its people's strength still isn't.
+ */
 function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   const roads = (mem.roads ??= {});
   if (roads[to] === undefined) {
     const f = fit(p, to);
-    roads[to] = f > 0 || (f === 0 && roll(s) < AI_WEB.take);
+    roads[to] = f > 0 || (f === 0 && roll(s) < (heirloomAhead(p, to) ? AI_WEB.heir : AI_WEB.take));
   }
   return roads[to]!;
 }
@@ -363,12 +387,26 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   if (!walksWeb(v)) return null;
   const here = ageOf(p);
   const kept = relicsKept(s, p.id);
+  // A detour (#232): a pilgrim town with the catch landed and a Dock, whose Age of Sail would open an heirloom, steps back to
+  // the Middle Ages to take it, and doesn't turn pilgrim again on the way (the road to Sail is the plan).
+  const sailRoad = ROADS.find((r) => r.from === 'middle' && r.to === 'sail');
+  const toSail = AI_LEVELS[p.ai!].detour && !!sailRoad && !!heirloomAhead(p, 'sail') && count(v, 'dock', true) > 0 && deedsDone(p, sailRoad) && wants(s, p, mem, 'sail');
   for (const r of roadsFrom(p)) {
     if (AGES[r.to].tier !== p.epoch) continue;
+    if (toSail && here === 'pilgrim' && r.to === 'middle') return { road: r, wait: false };
+    if (toSail && r.to === 'pilgrim') continue;
     if (r.to === 'aeronaut' && v.planes.length > 0 && roadKnown(s, p, r) && wants(s, p, mem, r.to)) return { road: r, wait: false };
     if (here === 'aeronaut' && r.to === 'industrial' && count(v, 'airfield', true) === 0) {
       mem.roads ??= {};
       mem.roads.aeronaut = false;
+      return { road: r, wait: false };
+    }
+    // The other future (#231): a town of towers and no aircraft goes over to lightning once its beacons are lit;
+    // with its last tower fallen it brings the steam engines back.
+    if (r.to === 'lightning' && v.planes.length === 0 && count(v, 'tower', true) >= AI_LIGHTNING.towers && roadKnown(s, p, r) && deedsDone(p, r) && wants(s, p, mem, r.to)) return { road: r, wait: false };
+    if (here === 'lightning' && r.to === 'industrial' && count(v, 'tower', true) === 0) {
+      mem.roads ??= {};
+      mem.roads.lightning = false;
       return { road: r, wait: false };
     }
     if (here === 'pilgrim' && r.to === 'middle' && kept === 0) return { road: r, wait: false };
@@ -461,10 +499,20 @@ function rivalIn(s: GameState, p: Player, ages: AgeId[]): boolean {
   return s.players.some((o) => !o.defeated && isEnemy(s, p.id, o.id) && ages.includes(ageOf(o)));
 }
 
+/** Whether a living rival has learned a craft (#242): an heirloom shows in what a people does, and the clever computer reads it. */
+function rivalHas(s: GameState, p: Player, tech: TechId): boolean {
+  return s.players.some((o) => !o.defeated && isEnemy(s, p.id, o.id) && o.techs.includes(tech));
+}
+
+/** The warships to keep (#242): a rival's Iron-Bound Hulls makes its ships 30% sturdier, so a fleet that means to meet them is `hulls` bigger. */
+export function fleetWanted(s: GameState, p: Player, base: number): number {
+  return base > 0 && rivalHas(s, p, 'ironHulls') ? base + AI_WEB.hulls : base;
+}
+
 // ---- Building --------------------------------------------------------------------------------------
 
 /** A free spot for a building near a point, keeping a lane open around it. */
-export function findSpot(s: GameState, type: BuildingType, x: number, y: number, minR: number, maxR: number, margin = 1): { tx: number; ty: number } | null {
+export function findSpot(s: GameState, type: BuildingType, x: number, y: number, minR: number, maxR: number, margin = 1, ok?: (tx: number, ty: number) => boolean): { tx: number; ty: number } | null {
   const n = BUILDINGS[type].size;
   const cx = Math.floor(x - n / 2);
   const cy = Math.floor(y - n / 2);
@@ -479,8 +527,28 @@ export function findSpot(s: GameState, type: BuildingType, x: number, y: number,
       const ty = cy + dy;
       if (placeProblem(s, type, tx, ty)) continue;
       if (margin && !laneClear(s, tx, ty, n, type === 'farm')) continue;
+      if (ok && !ok(tx, ty)) continue;
       return { tx, ty };
     }
+  }
+  return null;
+}
+
+/**
+ * A spot inside the field of one of our finished coils, so a building raised in the Age of Lightning works lit
+ * and no coil has to chase it (#231 s4). The nearest coil to home that has room wins; null when none has.
+ */
+function fieldSpot(s: GameState, v: View, type: BuildingType): { tx: number; ty: number } | null {
+  const n = BUILDINGS[type].size;
+  const r2 = LIGHTNING.reach * LIGHTNING.reach;
+  for (const t of v.buildings) {
+    if (t.type !== 'tower' || !t.built || t.hp <= 0) continue;
+    const inside = (tx: number, ty: number): boolean => {
+      const dx = tx + n / 2 - t.x, dy = ty + n / 2 - t.y;
+      return dx * dx + dy * dy <= r2;
+    };
+    const spot = findSpot(s, type, t.x, t.y, 2, LIGHTNING.reach, 1, inside);
+    if (spot) return spot;
   }
   return null;
 }
@@ -694,6 +762,13 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     else if (construct(s, v, mem, 'dock', spot, 2, issue)) return;
   }
 
+  // In the Age of Lightning a coil goes up by a workshop that stands dark (#231), so its training runs fast again.
+  if (ageOf(p) === 'lightning' && count(v, 'tower') < AI_LIGHTNING.most && !recently('tower', AI_LIGHTNING.gap)) {
+    const dark = v.buildings.find((b) => b.built && b.type !== 'tower' && BUILDINGS[b.type].trains.length > 0 && !inField(s, b));
+    const spot = dark ? findSpot(s, 'tower', dark.x, dark.y, 2, 6) : null;
+    if (spot && construct(s, v, mem, 'tower', spot, 2, issue)) return;
+  }
+
   const want: [BuildingType, boolean][] = [
     ['barracks', n >= 8 && count(v, 'barracks') === 0],
     ['range', n >= 12 && count(v, 'range') === 0],
@@ -716,7 +791,7 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     const lines = BUILDINGS[type].trains;
     if (lines.length && lines.every((u) => barred(p, u))) continue;
     const at = type === 'tower' ? towardEnemy(9) : type === 'market' || type === 'temple' ? home : towardEnemy(6);
-    const spot = findSpot(s, type, at.x, at.y, type === 'market' || type === 'temple' ? 6 : 0, 18);
+    const spot = (type !== 'tower' && ageOf(p) === 'lightning' && fieldSpot(s, v, type)) || findSpot(s, type, at.x, at.y, type === 'market' || type === 'temple' ? 6 : 0, 18);
     if (spot && construct(s, v, mem, type, spot, type === 'tower' ? 2 : 3, issue)) return;
   }
 
@@ -903,14 +978,40 @@ function wilds(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void
   // Autumn and winter: meat keeps, berries fail, so the clever computer hunts with a smaller town.
   const cold = coldComing(s, v);
   const eager = cold ? AI_WINTER.hunters : 0;
+  // The far hunt over (the beast down, the escort idle), the soldiers walk home.
+  if (mem.huntEscort) {
+    const home: number[] = [];
+    const out: number[] = [];
+    for (const id of mem.huntEscort) {
+      const u = s.byId.get(id);
+      if (!u || u.kind !== 'unit' || u.owner !== v.p.id || u.hp <= 0) continue;
+      if (u.order.k === 'idle' && !u.inside) home.push(id);
+      else if (u.order.k === 'hunt') out.push(id);
+    }
+    if (home.length) issue({ t: 'move', p: v.p.id, ids: home, x: v.home.x, y: v.home.y });
+    mem.huntEscort = out.length ? out : undefined;
+  }
   if (v.citizens.length >= AI_WILD.mammothAt - eager && !v.citizens.some((u) => hunting(u, 'mammoth'))) {
-    const m = nearestBeast(s, 'mammoth', v.home.x, v.home.y, AI_WILD.mammothNear);
+    let m = nearestBeast(s, 'mammoth', v.home.x, v.home.y, AI_WILD.mammothNear);
+    // A clever computer also goes for a far mammoth, with soldiers along to take the charge, if no rival is by it.
+    let escort: Unit[] = [];
+    if (!m && AI_LEVELS[v.p.ai!].clever && v.p.epoch <= 2 && s.tick >= s.peaceUntil) {
+      const far = nearestBeast(s, 'mammoth', v.home.x, v.home.y, AI_WILD.far);
+      const idle = v.army.filter((u) => !u.inside && u.order.k === 'idle' && u.type !== 'siege' && u.type !== 'hero');
+      if (far && far.state !== 'fight' && idle.length >= AI_WILD.escort + AI_WILD.guard && !ruinDanger(s, v.p, far, AI_WILD.safe)) {
+        m = far;
+        escort = idle.sort((a, b) => (a.x - far.x) * (a.x - far.x) + (a.y - far.y) * (a.y - far.y) - ((b.x - far.x) * (b.x - far.x) + (b.y - far.y) * (b.y - far.y)) || a.id - b.id).slice(0, AI_WILD.escort);
+      }
+    }
     if (m && m.state !== 'fight') {
       const party = v.citizens
         .filter((u) => !u.inside && u.carry <= 2 && !v.diggers.has(u.id) && u.order.k === 'gather' && (u.order.res === 'food' || u.order.res === 'wood'))
         .sort((a, b) => (a.x - m.x) * (a.x - m.x) + (a.y - m.y) * (a.y - m.y) - ((b.x - m.x) * (b.x - m.x) + (b.y - m.y) * (b.y - m.y)) || a.id - b.id)
         .slice(0, AI_WILD.party);
-      if (party.length === AI_WILD.party) issue({ t: 'hunt', p: v.p.id, ids: party.map((u) => u.id), target: m.id });
+      if (party.length === AI_WILD.party) {
+        issue({ t: 'hunt', p: v.p.id, ids: [...escort, ...party].map((u) => u.id), target: m.id });
+        if (escort.length) mem.huntEscort = escort.map((u) => u.id);
+      }
     }
   }
   // A boar guarding berries near home: three citizens spear it together, once the town has six.
@@ -994,16 +1095,18 @@ function excavate(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
  * The nearest landmark within reach of home for it to go after: for a citizen (`free`), one nobody keeps;
  * for soldiers, one a rival keeps, or one nobody keeps that a rival is part way to claiming.
  */
-function markToTake(s: GameState, v: View, free: boolean, safe: boolean): Landmark | null {
+export function markToTake(s: GameState, v: View, free: boolean, safe: boolean): Landmark | null {
   let best: Landmark | null = null;
   const rival = enemyHome(s, v.p);
-  const reach = Math.max(AI_MARK.near, AI_MARK.rival * Math.sqrt((rival.x - v.home.x) * (rival.x - v.home.x) + (rival.y - v.home.y) * (rival.y - v.home.y)));
+  // Going for lordship, no landmark is too far.
+  const reach = s.mode === 'lords' ? AI_MARK.lordsReach : Math.max(AI_MARK.near, AI_MARK.rival * Math.sqrt((rival.x - v.home.x) * (rival.x - v.home.x) + (rival.y - v.home.y) * (rival.y - v.home.y)));
   let bestD = reach * reach;
   for (const m of s.landmarks ?? []) {
     // Soldiers also go to a landmark of ours that rivals are standing on.
     if (free ? m.owner >= 0 : m.owner >= 0 ? !isEnemy(s, v.p.id, m.owner) && !pulledDown(s, v.p, m) : !(m.by >= 0 && m.claim > 0 && isEnemy(s, v.p.id, m.by))) continue;
     if (safe && ruinDanger(s, v.p, m, 10)) continue;
-    const w = markWorth(s, v, m);
+    // Soldiers go for a rival's Old Ford first: it is the road its army strikes down (clever computers only).
+    const w = markWorth(s, v, m) * (!free && m.kind === 'ford' && m.owner >= 0 && isEnemy(s, v.p.id, m.owner) && AI_LEVELS[v.p.ai!].clever ? AI_MARK.worth.fordRival : 1);
     const d = ((m.x - v.home.x) * (m.x - v.home.x) + (m.y - v.home.y) * (m.y - v.home.y)) / (w * w);
     if (d < bestD || (d === bestD && best && m.id < best.id)) {
       bestD = d;
@@ -1034,7 +1137,7 @@ function markNeed(s: GameState, v: View, m: Landmark): number {
     return v.p.pop + 4 >= v.p.cap ? w.cairnFull : w.cairn;
   }
   if (m.kind === 'spring') return v.citizens.some((u) => u.hp < maxHp(s, u) * 0.7) || v.army.some((u) => u.hp < maxHp(s, u) * 0.7) ? w.springHurt : w.spring;
-  return m.kind === 'flint' ? w.flint : w.crag;
+  return m.kind === 'flint' ? w.flint : m.kind === 'ford' ? w.ford : w.crag;
 }
 
 /**
@@ -1120,7 +1223,9 @@ function guardMarks(s: GameState, v: View, mem: AiMemory, ready: Unit[], issue: 
     return held;
   }
   const band = ready.filter((u) => u.type !== 'siege' && u.order.k === 'idle');
-  if (band.length < AI_MARK.party) return held;
+  // When a rival is about to be lord of every landmark, any soldiers will do to break it.
+  const lordRace = (s.landTeam ?? -1) >= 0 && s.landTeam !== v.p.team;
+  if (band.length < (lordRace ? 1 : s.mode === 'lords' ? AI_MARK.lordsParty : AI_MARK.party)) return held;
   const m = markToTake(s, v, false, false);
   if (!m) return held;
   const ids = band
@@ -1161,8 +1266,12 @@ function escortWalker(s: GameState, v: View, mem: AiMemory, ready: Unit[], held:
       const u = s.byId.get(id);
       return u && u.kind === 'unit' && u.hp > 0;
     });
-    for (const id of e.ids) held.add(id);
-    return;
+    // Every one fallen on the road: the walker gets a fresh escort below, if the town has soldiers to spare.
+    if (e.ids.length) {
+      for (const id of e.ids) held.add(id);
+      return;
+    }
+    delete mem.markEscort;
   }
   if (!w || !m || (m.x - v.home.x) * (m.x - v.home.x) + (m.y - v.home.y) * (m.y - v.home.y) < AI_MARK.far * AI_MARK.far) return;
   const band = ready
@@ -1255,7 +1364,8 @@ function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   const sailor = ageOf(p) === 'sail';
   const enemyShips = s.ents.filter((e): e is Unit => e.kind === 'unit' && e.hp > 0 && isEnemy(s, p.id, e.owner) && (e.type === 'warship' || e.type === 'fisher' || e.type === 'transport' || (sailor && e.type === 'cog')) && p.vis[Math.floor(e.y) * s.w + Math.floor(e.x)] === 1);
   const warships = v.navy.filter((u) => u.type === 'warship');
-  const wantShips = s.mapType === 'sea' ? Math.min(2 + p.epoch, 6) : enemyShips.length ? Math.min(2 + Math.floor(enemyShips.length / 2), 5) : sailor ? 2 : 0;
+  const baseShips = s.mapType === 'sea' ? Math.min(2 + p.epoch, 6) : enemyShips.length ? Math.min(2 + Math.floor(enemyShips.length / 2), 5) : sailor ? 2 : 0;
+  const wantShips = fleetWanted(s, p, baseShips);
   if (warships.length + queued('warship') < wantShips && dock.queue.length < 2 && v.army.length >= 3) {
     const cost = unitStats('warship', p.epoch).cost;
     if (afford(v, cost)) {
@@ -1384,8 +1494,21 @@ function airforce(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   }
 }
 
+/** How many of a rival's buildings go dark if this coil falls (#231): in its field and in no other coil's. 0 for anything but a finished coil. */
+function darkened(s: GameState, b: Building): number {
+  if (b.type !== 'tower' || !b.built || !hasCoils(s.players[b.owner])) return 0;
+  const r2 = LIGHTNING.reach * LIGHTNING.reach;
+  const near = (a: Building, c: Building): boolean => (a.x - c.x) * (a.x - c.x) + (a.y - c.y) * (a.y - c.y) <= r2;
+  let n = 0;
+  for (const o of s.ents) {
+    if (o.kind !== 'building' || o.owner !== b.owner || o.hp <= 0 || o === b || !near(o, b)) continue;
+    if (!s.ents.some((c) => c.kind === 'building' && c.type === 'tower' && c.owner === b.owner && c.built && c.hp > 0 && c !== b && near(o, c))) n++;
+  }
+  return n;
+}
+
 /** A building of the enemy's worth bombing: their nearest Town Center, or any building known. */
-function enemyTarget(s: GameState, p: Player): Building | null {
+export function enemyTarget(s: GameState, p: Player): Building | null {
   let best: Building | null = null;
   let bestD = Infinity;
   for (const e of s.ents) {
@@ -1396,8 +1519,9 @@ function enemyTarget(s: GameState, p: Player): Building | null {
     const holds = e.type === 'temple' && s.relics.some((r) => r.temple === e.id);
     const shrine = holds && relicRace(s, p);
     // A pilgrim people's wealth is the relics in its Temples (#50): they come before its Town Center.
-    const pilgrims = holds && ageOf(s.players[e.owner]) === 'pilgrim';
-    const d = dx * dx + dy * dy + (e.type === 'wonder' || shrine ? -1e6 : pilgrims ? -900 : e.type === 'towncenter' ? -400 : 0);
+    // A Bell Foundry people's relics pay it 50% more gold (#224), so its Temples are worth the same pull on any road (#242).
+    const pilgrims = holds && (ageOf(s.players[e.owner]) === 'pilgrim' || s.players[e.owner].techs.includes('bellFoundry'));
+    const d = dx * dx + dy * dy + (e.type === 'wonder' || shrine ? -1e6 : pilgrims ? -AI_WEB.bell : e.type === 'towncenter' ? -400 : -AI_LIGHTNING.raid * darkened(s, e));
     if (d < bestD) {
       bestD = d;
       best = e;
@@ -1493,6 +1617,25 @@ function lightBeacons(s: GameState, v: View, issue: (c: Command) => void): void 
   }
 }
 
+/** Whether a web-walking Industrial computer means to take the road to lightning (#231): it raises no Airfield then. */
+function lightningBound(s: GameState, v: View, mem: AiMemory): boolean {
+  const here = ageOf(v.p);
+  if (here === 'lightning') return true;
+  return here === 'industrial' && walksWeb(v) && roadsFrom(v.p).some((r) => r.to === 'lightning') && wants(s, v.p, mem, 'lightning');
+}
+
+/** Bound for lightning, it lights a tower's beacon every `AI_LIGHTNING.every` seconds until the road's deed is done (#231). */
+function beaconsForLightning(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (ageOf(p) !== 'industrial' || !lightningBound(s, v, mem)) return;
+  const road = roadsFrom(p).find((r) => r.to === 'lightning');
+  if (!road || deedsDone(p, road) || s.tick - (mem.zap ?? -99999) < secs(AI_LIGHTNING.every)) return;
+  const b = v.buildings.find((e) => e.type === 'tower' && !beaconProblem(s, p, e));
+  if (!b) return;
+  issue({ t: 'beacon', p: p.id, building: b.id });
+  mem.zap = s.tick;
+}
+
 /** A clever computer's hero cries out when the lines have met: at least four of its soldiers beside the hero and a rival soldier in reach. */
 function rallyTheLine(s: GameState, v: View, issue: (c: Command) => void): void {
   if (!AI_LEVELS[v.p.ai!].clever) return;
@@ -1537,6 +1680,21 @@ function townBell(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   }
 }
 
+/** An Old Ford we keep, on the way to the rival (within `AI_RAID.stage` of home and nearer to it than home is): waves muster there. */
+export function stagingFord(s: GameState, owner: number, home: { x: number; y: number }, enemy: { x: number; y: number }): Landmark | null {
+  let best: Landmark | null = null;
+  let bd = Infinity;
+  const homeEnemy = (enemy.x - home.x) * (enemy.x - home.x) + (enemy.y - home.y) * (enemy.y - home.y);
+  for (const m of s.landmarks ?? []) {
+    if (m.kind !== 'ford' || m.owner !== owner) continue;
+    const d = (m.x - home.x) * (m.x - home.x) + (m.y - home.y) * (m.y - home.y);
+    if (d > AI_RAID.stage * AI_RAID.stage || d < 64) continue;
+    if ((enemy.x - m.x) * (enemy.x - m.x) + (enemy.y - m.y) * (enemy.y - m.y) >= homeEnemy) continue;
+    if (d < bd) { bd = d; best = m; }
+  }
+  return best;
+}
+
 function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
   const L = AI_LEVELS[p.ai!];
@@ -1545,6 +1703,8 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const dy = enemy.y - v.home.y;
   const dl = Math.sqrt(dx * dx + dy * dy) || 1;
   mem.muster = { x: v.home.x + (dx / dl) * 8, y: v.home.y + (dy / dl) * 8 };
+  const ford = L.clever ? stagingFord(s, p.id, v.home, enemy) : null;
+  if (ford) mem.muster = { x: ford.x, y: ford.y };
 
   // A hero to lead the army.
   if (L.clever && v.tc && v.army.length >= 6 && !heroBusy(s, p.id) && v.tc.queue.length < 2 && v.tc.advance < 0) {
@@ -1576,6 +1736,8 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   }
   const keepCitizensGrowing = v.citizens.length < 8;
   const siege = v.army.filter((u) => u.type === 'siege').length;
+  // A rival with the Masons' Lodge raises sturdier buildings (+15%): one more engine to break them (#242).
+  const lodge = L.clever && rivalHas(s, p, 'masonsLodge') ? AI_WEB.lodge : 0;
   for (const b of v.buildings) {
     if (!b.built || b.queue.length >= Math.min(2, MAX_QUEUE) || keepCitizensGrowing) continue;
     const trains = lines(p, b);
@@ -1586,7 +1748,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     // The Market hires (#37) only in an age that hires there, after the traders have had first call on its queue.
     if (b.type === 'market' && !hiresAt(p, b.type).length) continue;
     let unit: UnitType | null;
-    if (b.type === 'workshop') unit = siege < Math.max(v.plan.siege, p.epoch >= 2 ? 3 : 2) && (v.army.length >= 6 || siege < v.plan.siege) ? 'siege' : null;
+    if (b.type === 'workshop') unit = siege < Math.max(v.plan.siege, p.epoch >= 2 ? 3 : 2) + lodge && (v.army.length >= 6 || siege < v.plan.siege) ? 'siege' : null;
     else if (b.type === 'temple') unit = v.priests.length < (v.army.length >= 6 ? (consecrates(s, p.id) ? AI_FAITH.priests : 2) : 0) + (looseRelics(s) > 0 ? 1 : 0) ? 'priest' : null;
     else {
       unit = counter && trains.includes(counter) && unitEpoch(counter) <= p.epoch && !barred(p, counter) && roll(s) < counterOdds ? counter : pickUnit(v, mem, b);
@@ -1635,6 +1797,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     issue({ t: 'move', p: p.id, ids: fighters.map((u) => u.id), x: enemy.x, y: enemy.y, amove: true });
     mem.attacking = true;
     mem.wave++;
+    delete mem.prowl; // the band marches with the wave
     return;
   }
   if (mem.attacking && ready.length >= (plan.allIn ? 1 : 4)) {
@@ -1642,8 +1805,10 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     issue({ t: 'move', p: p.id, ids: ready.map((u) => u.id), x: enemy.x, y: enemy.y, amove: true });
     return;
   }
-  // Between waves, a few riders cut the rivals' trade roads near home.
+  // Between waves, a small band falls on rival citizens working far from their town (#260).
   const watching = new Set<number>();
+  if (L.clever && !plan.hold) for (const id of prowl(s, v, mem, ready, issue)) watching.add(id);
+  // Between waves, a few riders cut the rivals' trade roads near home.
   if (L.clever) {
     const riders = ready.filter((u) => u.type === 'cavalry' && u.order.k === 'idle');
     const prey = riders.length ? enemyTrader(s, v, v.home, AI_WEB.raidNear, false) : null;
@@ -1651,7 +1816,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
       issue({ t: 'attack', p: p.id, ids: riders.slice(0, 3).map((u) => u.id), target: prey.id });
       return;
     }
-    // A merchant rival's age stands on its trade (#50): a band of riders lies in wait by the trading
+    // A merchant rival's age stands on its trade (#50), and a Joint-Stock Company keeps it so on any road (#242): a band of riders lies in wait by the trading
     // post nearest its town, and falls on the traders it sees coming.
     const post = riders.length ? watchPost(s, p) : null;
     if (post) {
@@ -1674,6 +1839,132 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     return ox * ox + oy * oy > 36 && u.order.k === 'idle';
   });
   if (strays.length) issue({ t: 'move', p: p.id, ids: strays.map((u) => u.id), x: mem.muster.x, y: mem.muster.y });
+}
+
+/** Soldiers who can go prowling: not siege, and not the hero, who leads the army. */
+function prowler(u: Unit): boolean {
+  return u.type === 'infantry' || u.type === 'ranged' || u.type === 'cavalry';
+}
+
+/** Armed: a rival unit that can fight a prowling band off. */
+function armed(u: Unit): boolean {
+  return prowler(u) || u.type === 'hero';
+}
+
+/**
+ * The rival citizen nearest a point that a band of `n` may fall on (#260): one the computer's own units see,
+ * within `reach` tiles of its home, more than `safe` tiles from any rival Town Center or Tower, no rival soldier
+ * within `guard` tiles, and at most `odds` rival citizens per raider within 4 tiles. Null when there is none.
+ */
+export function prey(s: GameState, p: Player, home: { x: number; y: number }, at: { x: number; y: number }, within: number, n: number): Unit | null {
+  const P = AI_PROWL;
+  const forts: Building[] = [];
+  const guards: Unit[] = [];
+  const folk: Unit[] = [];
+  for (const e of s.ents) {
+    if (e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
+    if (e.kind === 'building') {
+      if (e.built && (e.type === 'towncenter' || e.type === 'tower')) forts.push(e);
+    } else if (!e.inside) {
+      if (armed(e)) guards.push(e);
+      else if (e.type === 'citizen') folk.push(e);
+    }
+  }
+  let best: Unit | null = null;
+  let bestD = within * within;
+  for (const c of folk) {
+    if (!p.vis[Math.floor(c.y) * s.w + Math.floor(c.x)]) continue;
+    const d = (c.x - at.x) * (c.x - at.x) + (c.y - at.y) * (c.y - at.y);
+    if (d >= bestD) continue;
+    const hx = c.x - home.x;
+    const hy = c.y - home.y;
+    if (hx * hx + hy * hy > P.reach * P.reach) continue;
+    if (forts.some((b) => distToRect(c.x, c.y, b) <= P.safe)) continue;
+    if (guards.some((g) => (g.x - c.x) * (g.x - c.x) + (g.y - c.y) * (g.y - c.y) <= P.guard * P.guard)) continue;
+    let mob = 0;
+    for (const o of folk) if ((o.x - c.x) * (o.x - c.x) + (o.y - c.y) * (o.y - c.y) <= 16) mob++;
+    if (mob > n * P.odds) continue;
+    bestD = d;
+    best = c;
+  }
+  return best;
+}
+
+/**
+ * Hunters hunted (#260): between waves a clever computer sends a small band at rival citizens working far
+ * from their town (a far kill, a ruin, a landmark, wild gold) when nothing of theirs guards them, chases on to
+ * the next one near, and comes home when rival soldiers come or the time is up. Returns the band's ids, so
+ * the rest of the army leaves them be.
+ */
+function prowl(s: GameState, v: View, mem: AiMemory, ready: Unit[], issue: (c: Command) => void): Set<number> {
+  const P = AI_PROWL;
+  const { p } = v;
+  const held = new Set<number>();
+  const home = mem.muster ?? v.home;
+  if (mem.prowl) {
+    const band: Unit[] = [];
+    for (const id of mem.prowl.ids) {
+      const u = s.byId.get(id);
+      if (u && u.kind === 'unit' && u.hp > 0) band.push(u);
+    }
+    const lead = band[0];
+    const quarry = s.byId.get(mem.prowl.target);
+    const hunted = quarry && quarry.kind === 'unit' && quarry.hp > 0 && !quarry.inside ? quarry : null;
+    // Walking to a camp: it looks farther round, and keeps walking until it is there.
+    const camp = mem.prowl.look !== undefined ? s.byId.get(mem.prowl.look) : undefined;
+    const walking = !!lead && !hunted && !!camp && camp.hp > 0 && (camp.x - lead.x) * (camp.x - lead.x) + (camp.y - lead.y) * (camp.y - lead.y) > 9;
+    const next = lead && !hunted ? prey(s, p, v.home, lead, camp ? P.look : P.chase, band.length) : null;
+    const threatened = lead && s.ents.some((e) => e.kind === 'unit' && e.hp > 0 && !e.inside && isEnemy(s, p.id, e.owner) && armed(e) && (e.x - lead.x) * (e.x - lead.x) + (e.y - lead.y) * (e.y - lead.y) <= P.guard * P.guard);
+    if (!lead || threatened || s.tick - mem.prowl.since > secs(P.time) || (!hunted && !next && !walking)) {
+      if (band.length) issue({ t: 'move', p: p.id, ids: band.map((u) => u.id), x: home.x, y: home.y });
+      delete mem.prowl;
+      mem.prowled = s.tick;
+      return held;
+    }
+    if (next) {
+      issue({ t: 'attack', p: p.id, ids: band.map((u) => u.id), target: next.id });
+      mem.prowl.target = next.id;
+      delete mem.prowl.look;
+    }
+    for (const u of band) held.add(u.id);
+    return held;
+  }
+  if (s.tick < s.peaceUntil || s.tick - (mem.prowled ?? -secs(P.every)) < secs(P.every)) return held;
+  const free = ready.filter((u) => prowler(u) && !u.inside);
+  if (free.length < P.band) return held;
+  const target = prey(s, p, v.home, v.home, P.reach, Math.min(P.most, free.length)) ?? rivalCamp(s, p, v.home);
+  if (!target) return held;
+  const band = free
+    .map((u) => ({ u, d: (u.x - target.x) * (u.x - target.x) + (u.y - target.y) * (u.y - target.y) }))
+    .sort((a, b) => a.d - b.d || a.u.id - b.u.id)
+    .slice(0, P.most)
+    .map((o) => o.u);
+  if (target.kind === 'building') {
+    issue({ t: 'move', p: p.id, ids: band.map((u) => u.id), x: target.x, y: target.y });
+    mem.prowl = { ids: band.map((u) => u.id), target: -1, since: s.tick, look: target.id };
+  } else {
+    issue({ t: 'attack', p: p.id, ids: band.map((u) => u.id), target: target.id });
+    mem.prowl = { ids: band.map((u) => u.id), target: target.id, since: s.tick };
+  }
+  for (const u of band) held.add(u.id);
+  return held;
+}
+
+/** The nearest rival Hunting Camp the computer has seen within `reach` of home and clear of the rival's forts (#260), or null. */
+export function rivalCamp(s: GameState, p: Player, home: { x: number; y: number }): Building | null {
+  const P = AI_PROWL;
+  let best: Building | null = null;
+  let bestD = P.reach * P.reach;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'huntcamp' || !e.built || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
+    if (!p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
+    const d = (e.x - home.x) * (e.x - home.x) + (e.y - home.y) * (e.y - home.y);
+    if (d >= bestD) continue;
+    if (s.ents.some((f) => f.kind === 'building' && f.hp > 0 && f.built && f.owner === e.owner && (f.type === 'towncenter' || f.type === 'tower') && distToRect(e.x, e.y, f) <= P.safe)) continue;
+    bestD = d;
+    best = e;
+  }
+  return best;
 }
 
 /** A wave worn down deep in enemy land, out of reach of its own supply and clear of any fight (#132 s4). */
@@ -1750,6 +2041,14 @@ function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
         continue;
       }
     }
+    // A building of ours is being chanted over: stand by it and slow the chant (#216).
+    const ward = wardPost(s, v, pr);
+    if (ward && ward.hot) {
+      // A work order on the chanted-over building: the priest stands by it and sings back louder (#219).
+      if (consecrates(s, v.p.id)) issue({ t: 'work', p: v.p.id, ids: [pr.id], target: ward.b.id });
+      else issue({ t: 'move', p: v.p.id, ids: [pr.id], x: ward.b.x, y: ward.b.y });
+      continue;
+    }
     if (pr.cool > 0) continue;
     // Something worth converting close by?
     let best: Unit | null = null;
@@ -1771,6 +2070,11 @@ function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
       issue({ t: 'convert', p: v.p.id, ids: [pr.id], target: best.id });
       continue;
     }
+    // Against a pilgrim rival, a spare priest stands by a tower, gate or Temple.
+    if (ward) {
+      issue({ t: 'move', p: v.p.id, ids: [pr.id], x: ward.b.x, y: ward.b.y });
+      continue;
+    }
     // Otherwise keep up with the army.
     if (army.length) {
       let cx = 0;
@@ -1786,6 +2090,44 @@ function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
       if (dx * dx + dy * dy > 49) issue({ t: 'move', p: v.p.id, ids: [pr.id], x: cx, y: cy });
     } else if (mem.muster) issue({ t: 'move', p: v.p.id, ids: [pr.id], x: mem.muster.x, y: mem.muster.y });
   }
+}
+
+/**
+ * Counter-chant (#216), for the computer: the building a free priest should stand by, within `counter.range`
+ * of it so its voice slows a rival's chant. `hot`: a rival is chanting it now (the nearest one within
+ * `AI_FAITH.ward` tiles of the priest). Otherwise, with a pilgrim rival in the match, a priest when none of
+ * ours stands by the most exposed tower, gate or Temple (nearest the rival's town). Null: nothing to ward.
+ */
+function wardPost(s: GameState, v: View, pr: Unit): { b: Building; hot: boolean } | null {
+  const r2 = CONSECRATE.counter.range * CONSECRATE.counter.range;
+  const reach2 = AI_FAITH.ward * AI_FAITH.ward;
+  const near = (b: Building, u: Unit): boolean => (u.x - b.x) * (u.x - b.x) + (u.y - b.y) * (u.y - b.y) <= r2;
+  let hot: Building | null = null;
+  let hotD = Infinity;
+  for (const b of v.buildings) {
+    if (b.hp <= 0 || !b.built || CONSECRATE.never.includes(b.type)) continue;
+    if (!b.faith || b.faithBy === undefined || b.faithBy === v.p.id || !isEnemy(s, v.p.id, b.faithBy)) continue;
+    const d = (pr.x - b.x) * (pr.x - b.x) + (pr.y - b.y) * (pr.y - b.y);
+    if (d <= reach2 && d < hotD) {
+      hotD = d;
+      hot = b;
+    }
+  }
+  if (hot) return near(hot, pr) ? null : { b: hot, hot: true };
+  const rival = s.players.find((o) => !o.defeated && isEnemy(s, v.p.id, o.id) && consecrates(s, o.id));
+  if (!rival) return null;
+  let post: Building | null = null;
+  let postD = Infinity;
+  for (const b of v.buildings) {
+    if (b.hp <= 0 || !b.built || (b.type !== 'tower' && b.type !== 'gate' && b.type !== 'temple')) continue;
+    if (v.priests.some((o) => o.id !== pr.id && !o.inside && near(b, o))) continue;
+    const d = (rival.startX - b.x) * (rival.startX - b.x) + (rival.startY - b.y) * (rival.startY - b.y);
+    if (d < postD) {
+      postD = d;
+      post = b;
+    }
+  }
+  return post && !near(post, pr) ? { b: post, hot: false } : null;
 }
 
 /**
@@ -1854,11 +2196,11 @@ function enemyTrader(s: GameState, v: View, at: { x: number; y: number }, r: num
 }
 
 /** The trading post a band of riders watches against merchant rivals (#50): the one nearest any of their towns, or null with no merchant rival. */
-function watchPost(s: GameState, p: Player): TradePost | null {
+export function watchPost(s: GameState, p: Player): TradePost | null {
   let best: TradePost | null = null;
   let bestD = Infinity;
   for (const o of s.players) {
-    if (o.defeated || !isEnemy(s, p.id, o.id) || (ageOf(o) !== 'merchant' && ageOf(o) !== 'fair')) continue;
+    if (o.defeated || !isEnemy(s, p.id, o.id) || (ageOf(o) !== 'merchant' && ageOf(o) !== 'fair' && !o.techs.includes('jointStock'))) continue;
     for (const post of s.posts) {
       const d = (post.x - o.startX) * (post.x - o.startX) + (post.y - o.startY) * (post.y - o.startY);
       if (d < bestD) {

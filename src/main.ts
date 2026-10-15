@@ -6,6 +6,7 @@ import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { wallLine } from './sim/commands';
 import { AGES, BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, RELIC, RUINS, SEASONS, TECHS, TICK_HZ, TRUNK, WORKS, domainOf, unitStats } from './sim/data';
+import { crestSvg } from './ui/crests';
 import { isEnemy } from './sim/world';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
 import { placeProblem, walkable } from './sim/grid';
@@ -18,8 +19,8 @@ import { carriedBy, relicAt } from './sim/relics';
 import { RUIN_FINDS, ruinAt } from './sim/ruins';
 import { LANDMARK_KINDS, landmarkAt } from './sim/landmarks';
 import { postAt } from './sim/trade';
-import { consecrateProblem } from './sim/consecrate';
-import { ageDef, ageOf, isSideRoad, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
+import { chantedOver, consecrateProblem, consecrates } from './sim/consecrate';
+import { ageDef, ageOf, heirloomsOpened, isSideRoad, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
 import { NetClient, newRoomCode, saveName, savedName } from './net/client';
 import { HASH_EVERY, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
 import { deserialize, serialize } from './sim/save';
@@ -428,7 +429,7 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   $('paused').classList.add('hidden');
   const me = game.players[viewer];
   const rivals = game.players.filter((p) => p.team !== me.team).map((p) => `${p.name} of the ${CIVS[p.civ].name}`);
-  const goal = game.mode === 'regicide' ? ' Keep your King alive: shelter them in the Town Center.' : game.mode === 'deathmatch' ? ' Everyone starts rich: build fast.' : '';
+  const goal = game.mode === 'regicide' ? ' Keep your King alive: shelter them in the Town Center.' : game.mode === 'deathmatch' ? ' Everyone starts rich: build fast.' : game.mode === 'lords' ? ' Keep every landmark for four minutes and you win.' : '';
   const chapter = game.scenario ? scenarioById(game.scenario.id) : undefined;
   if (!saved && chapter) hud.banner(chapter.title, chapter.place, 6000);
   else if (!saved) hud.banner(ageDef(me).name, `You lead the ${CIVS[me.civ].name}. Facing ${rivals.join(', ')}.${goal} ${view.weatherWords}`.trim(), 6000);
@@ -718,6 +719,9 @@ replayInput.addEventListener('change', async () => {
 // ---- Title screen ----------------------------------------------------------------------------------
 
 const seedInput = $<HTMLInputElement>('opt-seed');
+const moreOpts = $<HTMLDetailsElement>('more-opts');
+try { moreOpts.open = localStorage.getItem('aoe-more-opts') === '1'; } catch { /* storage blocked: stay folded */ }
+moreOpts.addEventListener('toggle', () => { try { localStorage.setItem('aoe-more-opts', moreOpts.open ? '1' : '0'); } catch { /* ignore */ } });
 seedInput.value = String(newSeed());
 const colorSel = $<HTMLSelectElement>('opt-color');
 colorSel.innerHTML = ['Blue', 'Red', 'Gold', 'Green', 'Purple', 'Orange'].map((n, i) => `<option value="${i}">${n}</option>`).join('');
@@ -728,9 +732,11 @@ mapSel.innerHTML = (Object.keys(MAP_TYPES) as MapType[]).map((m) => `<option val
 const civBlurb = () => {
   const c = civSel.value;
   const m = MAP_TYPES[mapSel.value as MapType];
+  $('civ-crest').innerHTML = crestSvg(c as CivId | 'random', PLAYER_COLORS[Number(colorSel.value)] ?? PLAYER_COLORS[0]);
   $('civ-blurb').innerHTML = `${c === 'random' ? 'A people chosen at random.' : `<b>${CIVS[c as CivId].name}:</b> ${CIVS[c as CivId].blurb.split(': ').slice(1).join(': ') || CIVS[c as CivId].blurb}`}<br><b>${m.label}:</b> ${m.blurb}`;
 };
 civSel.addEventListener('change', civBlurb);
+colorSel.addEventListener('change', civBlurb);
 showContinue();
 showReplayButton();
 mapSel.addEventListener('change', civBlurb);
@@ -1037,7 +1043,7 @@ function order(clientX: number, clientY: number, forceAttack = false, queue = fa
     // Your own transport: those on foot go aboard.
     if (t.kind === 'unit' && t.type === 'transport' && t.owner === viewer && board(s, units, t, q)) return;
     if (t.owner !== viewer && s.players[t.owner].team !== s.players[viewer].team) {
-      issue({ t: 'attack', p: viewer, ids, target: t.id, queue: q });
+      issue({ t: 'attack', p: viewer, ids, target: t.id, queue: q, spread: true });
       view.marker(s, t.x, t.y, true);
       play(units.every((u) => u.type === 'priest') ? 'chant' : 'attack');
       ack('attack');
@@ -1055,7 +1061,7 @@ function order(clientX: number, clientY: number, forceAttack = false, queue = fa
     return;
   }
   if (pk.kind === 'resource') {
-    issue({ t: 'gather', p: viewer, ids, tile: pk.tile, queue: q });
+    issue({ t: 'gather', p: viewer, ids, tile: pk.tile, queue: q, spread: true });
     view.marker(s, (pk.tile % s.w) + 0.5, Math.floor(pk.tile / s.w) + 0.5, false);
     play('move');
     ack('move');
@@ -1685,14 +1691,14 @@ function timeline(s: GameState, metric: Metric): string {
   return `<svg class="timeline" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${grid}${lines}</svg>`;
 }
 
-function showEnd(s: GameState, won: boolean, how: 'conquest' | 'wonder' | 'relics' | 'resign' | 'time' | 'scenario' = 'conquest'): void {
+function showEnd(s: GameState, won: boolean, how: 'conquest' | 'wonder' | 'relics' | 'lands' | 'resign' | 'time' | 'scenario' = 'conquest'): void {
   mode = 'over';
   keepReplay(s);
   const m = $('modal');
   const mins = Math.floor(s.tick / TICK_HZ / 60);
   const rows = s.players
     .map(
-      (p) => `<tr><td><span class="swatch" style="background:${p.color}"></span>${p.name}<div class="civ-tag">${CIVS[p.civ].name}</div></td><td>${scoreOf(s, p)}</td><td data-tip="<b>Ages reached</b>${arrivalText(epochArrivals(p.history), EPOCHS.map((e) => e.name), TICK_HZ) || 'Never left the first age.'}">${ageDef(p).short}</td><td>${p.stats.gathered}</td><td>${p.stats.traded ?? 0}</td><td>${p.stats.trained}</td><td>${p.stats.built}</td><td>${p.stats.techs}</td><td>${p.stats.kills}</td><td>${p.stats.losses}</td></tr>`,
+      (p) => `<tr><td><span class="swatch" style="background:${p.color}"></span>${p.name}<div class="civ-tag">${crestSvg(p.civ, p.color, 14)}${CIVS[p.civ].name}</div></td><td>${scoreOf(s, p)}</td><td data-tip="<b>Ages reached</b>${arrivalText(epochArrivals(p.history), EPOCHS.map((e) => e.name), TICK_HZ) || 'Never left the first age.'}">${ageDef(p).short}</td><td>${p.stats.gathered}</td><td>${p.stats.traded ?? 0}</td><td>${p.stats.trained}</td><td>${p.stats.built}</td><td>${p.stats.techs}</td><td>${p.stats.kills}</td><td>${p.stats.losses}</td></tr>`,
     )
     .join('');
   const sc = s.scenario ? scenarioById(s.scenario.id) : undefined;
@@ -1707,6 +1713,8 @@ function showEnd(s: GameState, won: boolean, how: 'conquest' | 'wonder' | 'relic
         : 'Your people are no more.'
     : how === 'wonder'
       ? won ? 'Your Wonder stood the test of time.' : 'A rival Wonder stood the test of time.'
+      : how === 'lands'
+        ? won ? 'Every landmark in the land is yours: you are its lord.' : 'A rival became lord of every landmark in the land.'
       : how === 'relics'
         ? won ? 'Every relic in the world rests in your temples.' : 'A rival kept every relic in the world.'
         : won ? 'Your rivals have fallen.' : 'Your people are no more.';
@@ -1766,6 +1774,13 @@ function onEvents(s: GameState, list: GameEvent[]): void {
             play('epoch');
           }
           playMusic(ev.epoch, ageOf(s.players[viewer]));
+          // Heirlooms (#224): two roads walked open a craft neither teaches alone.
+          if (ev.age && !ev.back) {
+            const p = s.players[viewer];
+            const opened = heirloomsOpened(p, ev.age).filter((t) => !p.techs.includes(t));
+            if (opened.length) setTimeout(() => play('heirloom'), 900);
+            for (const t of opened) hud.toast(`${TECHS[t].icon} An heirloom opens: ${TECHS[t].name}, at the ${BUILDINGS[TECHS[t].at].name}`, 'good');
+          }
         } else hud.toast(`${s.players[ev.owner].name} has ${ev.back ? 'stepped back to' : 'reached'} the ${ageName(ev)}`, 'info');
         break;
       case 'season': {
@@ -1935,6 +1950,20 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         play('wonder');
         break;
       }
+      case 'landHold': {
+        const mins = Math.round(ev.ticks / TICK_HZ / 60);
+        if (ev.team < 0) {
+          hud.toast('A landmark has changed hands: the lords\' countdown stops', 'info');
+          break;
+        }
+        if (ev.team === s.players[viewer].team) hud.banner('Lords of the Land', `Keep every landmark ${mins} minutes and you win.`, 5000);
+        else {
+          const keepers = s.players.filter((q) => q.team === ev.team).map((q) => q.name).join(' and ');
+          hud.banner(`${keepers} ${keepers.includes(' and ') ? 'keep' : 'keeps'} every landmark`, `Take one back within ${mins} minutes or lose.`, 5000);
+        }
+        play('wonder');
+        break;
+      }
       case 'story':
         hud.banner(ev.title, ev.text, 5000);
         play(ev.bad ? 'alert' : 'coin');
@@ -2000,6 +2029,7 @@ function cursorFor(s: GameState): string {
     const foe = s.players[t.owner].team !== s.players[viewer].team;
     if (units.length && foe) return units.every((u) => u.type === 'priest') && (t.kind === 'unit' || !consecrateProblem(s, viewer, t)) ? 'cur-convert' : 'cur-attack';
     if (units.some((u) => u.type === 'citizen') && t.kind === 'building' && t.owner === viewer && (!t.built || t.hp < maxHp(s, t) || t.type === 'farm')) return 'cur-build';
+    if (t.kind === 'building' && t.owner === viewer && chantedOver(s, t) && consecrates(s, viewer) && units.some((u) => u.type === 'priest' && !carriedBy(s, u))) return 'cur-gather';
     if (units.length && t.kind === 'building' && t.owner === viewer && t.built && BUILDINGS[t.type].garrison) return 'cur-garrison';
     if (t.kind === 'building' && t.type === 'temple' && t.owner === viewer && t.built && units.some((u) => u.type === 'priest' && carriedBy(s, u))) return 'cur-gather';
     if (t.kind === 'building' && t.type === 'market' && t.owner === viewer && t.built && units.some((u) => u.type === 'trader')) return 'cur-gather';

@@ -27,11 +27,25 @@ export function consecrateProblem(s: GameState, owner: number, b: Building): str
 /** How far the chant has come on a building (0 to 1), and whose it is. */
 export const faithOf = (b: Building): number => b.faith ?? 0;
 
+/** How much the keeper's own priests, standing near in the open, slow a chant on `b` (each adds `counter.each`). */
+export function counterChant(s: GameState, b: Building): number {
+  const r2 = CONSECRATE.counter.range * CONSECRATE.counter.range;
+  const mul = modsOf(s, b.owner).priest;
+  let n = 0;
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.owner !== b.owner || e.type !== 'priest' || e.hp <= 0 || e.inside) continue;
+    const dx = e.x - b.x;
+    const dy = e.y - b.y;
+    if (dx * dx + dy * dy <= r2) n += mul;
+  }
+  return n * CONSECRATE.counter.each;
+}
+
 /** What one priest's chant adds to a building's tally each tick (as a share of the whole). */
 export function chantShare(s: GameState, u: Unit, b: Building): number {
   const need = maxHp(s, b) * (CONSECRATE.hard[b.type] ?? 1);
-  const voice = CONSECRATE.rate * modsOf(s, u.owner).priest * groveBoost(s, u);
-  return (voice * DT) / (need * (1 + CONSECRATE.guard * b.garrison.length));
+  const voice = CONSECRATE.rate * modsOf(s, u.owner).priest * modsOf(s, u.owner).chant * groveBoost(s, u);
+  return (voice * DT) / (need * (1 + CONSECRATE.guard * b.garrison.length + counterChant(s, b)));
 }
 
 /**
@@ -92,10 +106,41 @@ export function turnBuilding(s: GameState, b: Building, to: number): void {
   s.events.push({ k: 'consecrated', id: b.id, from, to, x: b.x, y: b.y, type: b.type, size: b.size });
 }
 
-/** Faith with no one chanting fades, after a breath. */
+/** Whether a rival's priests are chanting over this building of a pilgrim keeper's right now. */
+export function chantedOver(s: GameState, b: Building): boolean {
+  return b.faith !== undefined && b.faith > 0 && b.faithBy !== undefined && b.faithBy !== b.owner && isEnemy(s, b.owner, b.faithBy);
+}
+
+/**
+ * Answering the chant: a pilgrim keeper's priests standing within `counter.range` of a building a rival is
+ * chanting over sing back, wearing the rival's tally down by `counter.answer` a second each (with the
+ * same Litany and Grove voice as their own chant). Returns how much faith they take off this tick.
+ */
+export function answerChant(s: GameState, b: Building): number {
+  if (!consecrates(s, b.owner)) return 0;
+  const r2 = CONSECRATE.counter.range * CONSECRATE.counter.range;
+  const m = modsOf(s, b.owner);
+  let n = 0;
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.owner !== b.owner || e.type !== 'priest' || e.hp <= 0 || e.inside || e.cool > 0) continue;
+    const dx = e.x - b.x;
+    const dy = e.y - b.y;
+    if (dx * dx + dy * dy <= r2) n += m.priest * m.chant * groveBoost(s, e) * (e.order.k === 'answer' && e.order.target === b.id && e.act === 'chant' ? 1 + CONSECRATE.counter.stand : 1);
+  }
+  return n * CONSECRATE.counter.answer * DT;
+}
+
+/** Faith with no one chanting fades, after a breath; a pilgrim keeper's priests wear a rival's away. */
 export function faithStep(s: GameState): void {
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.faith === undefined) continue;
+    if (e.faithBy !== undefined && e.faithBy !== e.owner && isEnemy(s, e.owner, e.faithBy)) {
+      e.faith -= answerChant(s, e);
+      if (e.faith <= 0) {
+        forget(e);
+        continue;
+      }
+    }
     if (s.tick - (e.chant ?? 0) <= secs(CONSECRATE.grace)) continue;
     e.faith -= CONSECRATE.fade * DT;
     if (e.faith <= 0) forget(e);
