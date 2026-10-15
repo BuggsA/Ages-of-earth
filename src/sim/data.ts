@@ -56,11 +56,19 @@ export interface Age {
    * `each` more of its usual gold, counting at most `most` relics.
    */
   relicTrade?: { each: number; most: number };
+  /**
+   * Trade fed by iron: every `per` bars of bog iron the people has ever dug make each trade trip pay `each`
+   * more, counting at most `most` such steps. Iron dug on the way here still counts (the web's link).
+   */
+  ironTrade?: { per: number; each: number; most: number };
 }
 
 export const TRUNK: AgeId[] = ['stone', 'bronze', 'middle', 'gunpowder', 'industrial'];
 
 const trunkAge = (e: number): Age => ({ name: EPOCHS[e].name, short: EPOCHS[e].short, tier: e, blurb: EPOCHS[e].blurb });
+
+/** Iron wares: bog iron dug (any age) raises trade in the trading ages (Merchants, Fairs, Sail): +8% a 75 bars, to +40%. */
+export const IRON_TRADE = { per: 75, each: 0.08, most: 5 };
 
 export const AGES: Record<AgeId, Age> = {
   stone: trunkAge(0),
@@ -85,8 +93,9 @@ export const AGES: Record<AgeId, Age> = {
     name: 'Age of Merchants',
     short: 'Merchant',
     tier: 2,
-    blurb: 'Guilds, banks and hired swords: the Market hires soldiers for gold, trade pays more, and levies cost dear.',
+    blurb: 'Guilds, banks and hired swords: the Market hires soldiers for gold, trade pays more (more still for every bar of bog iron your people ever dug), and levies cost dear.',
     mul: { tradeGold: 1.25 },
+    ironTrade: IRON_TRADE,
     hire: { at: 'market', units: ['infantry', 'ranged', 'cavalry'], gold: 1.2, time: 0.5 },
     levy: 1.2,
   },
@@ -116,6 +125,7 @@ export const AGES: Record<AgeId, Age> = {
     blurb: 'Where pilgrims gather, merchants follow: feast days become great fairs. Trade pays more for every relic your Temples keep, and traders travel faster, but towns grown open round the fairground stand 15% weaker.',
     mul: { tradeGold: 1.25, traderSpeed: 1.15, buildingHp: 0.85 },
     relicTrade: { each: 0.1, most: 5 },
+    ironTrade: IRON_TRADE,
   },
   sail: {
     name: 'Age of Sail',
@@ -124,6 +134,7 @@ export const AGES: Record<AgeId, Age> = {
     blurb: 'A people that has turned to the sea: boats fish half again as fast, ships come a quarter cheaper and a quarter sturdier, but the fields are tilled with less care. A Market within a dozen tiles of a Dock ships its goods by water: its trade trips pay 30% more.',
     mul: { fish: 1.5, shipHp: 1.25, farm: 0.85 },
     price: { ship: 0.75 },
+    ironTrade: IRON_TRADE,
   },
 };
 

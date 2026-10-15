@@ -178,3 +178,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Iron bars** (#197, own pitch, lane rules): Iron Age bog iron pays double gold (`bogGold`); the Iron Age computer keeps digging. Tests only; no save bump.
 **Recalling the lone walker** (own pitch, lane ai): the landmark walker turns home when rival soldiers come within 7 tiles of it on the road. Test only; no sweep; no save bump.
+
+**Iron wares** (own pitch, lane rules; #197): bog iron dug on any road lifts trade pay in the Merchants, Fairs and Sail ages, +8% per 75 bars to +40% (`IRON_TRADE`); Market panel shows it. Unit tests only; browser unseen; no sweep; the computer doesn't weigh it; no save bump.
