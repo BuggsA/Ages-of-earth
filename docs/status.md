@@ -215,3 +215,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Age of Lightning** (#231, grows seed #136, lane rules): a side age off the Industrial. Watch Towers become Coil Towers whose field speeds training and research nearby (1.35×) and slows it outside every field (0.75×); their bolt leaps through crowds; no aircraft. Road: a Watch Tower and 6 beacons lit (`stats.beacons`, new). The computer lights beacons toward it, takes it with towers and no aircraft, and leaves when its coils fall. New numbers `LIGHTNING`, `AI_LIGHTNING`. Tests, 6 headless matches, and the tower and bolt seen in headless Chromium; sounds unheard; no win-rate sweep; no save bump.
 
+**Coil fields shown** (#239, s2 of #231, lane look): blue-white rings on the ground for each finished Coil Tower (and for a Watch Tower being placed); lit/dark line in the panel of own training buildings. Render/UI only; unit test passes; browser look unseen; no save bump.
+
