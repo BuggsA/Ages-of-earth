@@ -705,4 +705,12 @@ Session 2 (lane ai): Iron-Bound Hulls answered. `fleetWanted` adds `AI_WEB.hulls
 
 **Why I love it:** the wild, Hunting Camps, ruins and landmarks all pull citizens out between the towns, but until now only wolves made that reach a gamble. A rival that punishes an unguarded hunt makes "how far, and with whom?" a choice two good players answer differently (`docs/design-notes.md`, "Richness"): it rewards a couple of early soldiers, a tower by the camp, or the bell. It only sees what its units see, so a careful player can hide the hunt.
 
-**Seen:** `tests/ai-prowl.test.ts`; between two Hard computers it fires about once a match over six 20-minute matches (they rarely leave citizens exposed), so its weight falls on players who greed. Not played by hand. **Next:** have the band burn an unguarded Hunting Camp once the butchers flee; a toast naming it ("Raiders fall on your hunters!") through the event the alert already sends; the computer guarding its own far hunts (an escort for its mammoth party, like the landmark walker's).
+**Seen:** `tests/ai-prowl.test.ts`; between two Hard computers it fires about once a match over six 20-minute matches (they rarely leave citizens exposed), so its weight falls on players who greed. Not played by hand. **Next:** have the band burn an unguarded Hunting Camp once the butchers flee; a toast naming it ("Raiders fall on your hunters!") through the event the alert already sends; ~~the computer guarding its own far hunts~~ (done: see "Escorted hunt" below).
+
+## Designers' notes: escorted hunt (own pitch, 2026-10-15, lane ai)
+
+**Built:** a clever computer (Hard and Expert) now goes for a mammoth 22–38 tiles from home (`AI_WILD.far`), sending two idle soldiers (`.escort`) with the five citizens, if three more stay at home (`.guard`) and it sees no rival soldier within 12 tiles of the beast (`.safe`). The soldiers hunt it too, so they take the charge and the kill is quicker.
+
+**Why I love it:** it is the other side of #260: the computer now weighs the same gamble it punishes in you. A far feast is worth the risk only with soldiers to spare.
+
+**Seen:** `tests/wild.test.ts` (escorted with six soldiers, not with one). No win-rate sweep; browser unseen. **Next:** recall the escort once the carcass is butchered; have the band bring a tower or Hunting Camp along.
