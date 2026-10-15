@@ -254,3 +254,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **People crests** (#267 art pass, own step, lane look): the title card shows your people's crest in your colour. UI only; seen in headless Chromium (title card, two peoples); no save bump.
 
 **Crests in the match** (#267 s2, own pitch, lane look): the people's crest, small, on the HUD people chip and in the end report's player rows. Render/UI only; smoke (a match) passes; look in a browser unseen.
+
+**Lobby crest** (#267 step 3, lane look): each lobby seat shows its people's crest in its colour. Render only; tests pass, look unseen.

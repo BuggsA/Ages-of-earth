@@ -1,3 +1,5 @@
+import { crestSvg } from './crests';
+import type { CivId } from '../sim/types';
 import { AI_LEVELS, CIVS, CIV_IDS, MAP_SIZES, MAP_TYPES, PLAYER_COLORS } from '../sim/data';
 import type { Difficulty, MapSize, MapType } from '../sim/types';
 import { MAX_SEATS, type ClientMsg, type LobbyState } from '../net/protocol';
@@ -103,7 +105,7 @@ export class Lobby {
           ? `🤖 Computer ${host ? `<select data-seat="${i}" data-field="level">${levelOpts(s.level)}</select>` : `(${AI_LEVELS[s.level ?? 'normal'].label})`}`
           : `${i === state.host ? '👑 ' : ''}${esc(s.name)}${mine ? ' (you)' : ''}${s.online === false ? ' <span class="hint">(offline)</span>' : ''}`;
         return `<tr>
-          <td><span class="swatch" style="background:${PLAYER_COLORS[s.color]}"></span>${who}</td>
+          <td><span class="seat-crest" title="${COLOR_NAMES[s.color]}">${crestSvg(s.civ as CivId | 'random', PLAYER_COLORS[s.color], 22)}</span>${who}</td>
           <td><select data-seat="${i}" data-field="civ" ${dis}>${civOpts(s.civ)}</select></td>
           <td><select data-seat="${i}" data-field="color" ${dis}>${colorOpts(s.color)}</select></td>
           <td><select data-seat="${i}" data-field="team" ${dis}>${teamOpts(s.team)}</select></td>

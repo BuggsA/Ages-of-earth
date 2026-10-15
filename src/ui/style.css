@@ -368,3 +368,5 @@ body.online .tip-box { bottom: 330px; }
 .workforce-panel button:hover:not(:disabled), .workforce-panel button:focus-visible { background: rgba(232, 196, 106, 0.14); outline: 1px solid var(--gold); }
 .workforce-panel button:disabled { opacity: 0.42; cursor: default; }
 .workforce-note { border-top: 1px solid var(--edge); padding: 8px 6px 3px; color: var(--muted); font-size: 11px; line-height: 1.4; }
+.seat-crest { display: inline-block; margin-right: 6px; vertical-align: -5px; }
+.seat-crest .crest { display: block; }
