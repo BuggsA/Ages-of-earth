@@ -16,7 +16,7 @@ import { rallyProblem } from '../sim/rally';
 import { stirred as stirredNow } from '../sim/combat';
 import { sees } from '../sim/vision';
 import { buildingCostFor, buildingMaxHp, modsOf, statsFor, techCostFor, techProblem, trainCostFor, trainTimeFor } from '../sim/stats';
-import { ageDef, ageOf, backProblem, backTo, barred, deedsProgress, ironTradeShare, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, surveyFinds, suspendedTechs, trainsAt, windowsOf } from '../sim/ages';
+import { ageDef, ageOf, backProblem, hasWalked, backTo, barred, deedsProgress, ironTradeShare, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, surveyFinds, suspendedTechs, trainsAt, windowsOf } from '../sim/ages';
 import type { Building, BuildingType, Command, Cost, Ent, GameState, Landmark, Player, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
@@ -920,6 +920,9 @@ function nextTechs(p: Player, at: BuildingType): TechId[] {
   const out: TechId[] = [];
   for (const line of TECH_LINES) {
     if (TECHS[line[0]].at !== at) continue;
+    // An heirloom (#224) shows only once one of its two ages is walked: the clue that it is there.
+    const pair = TECHS[line[0]].walked;
+    if (pair && !pair.some((a) => hasWalked(p, a))) continue;
     // A suspended step (#47) shows greyed, with when it returns.
     const next = line.find((t) => !p.techs.includes(t));
     if (next) out.push(next);

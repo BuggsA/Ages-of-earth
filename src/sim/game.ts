@@ -16,7 +16,7 @@ import { landmarkStep } from './landmarks';
 import { atPost } from './trade';
 import { modsOf, trainTimeFor } from './stats';
 import { attrition } from './borders';
-import { barred, journeyOf, surveyFinds, trainsAt } from './ages';
+import { barred, journeyOf, noteWalked, surveyFinds, trainsAt } from './ages';
 import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, MapSize, MapType, Player } from './types';
 import { RES, R_FISH, R_NONE } from './types';
 import { RES_OF_TILE, carryCargo, checkStuck, collide, findResource, routeUnits, separate, setOrder, think, ungarrison, walk } from './units';
@@ -199,6 +199,7 @@ function enterAge(s: GameState, p: Player, to: AgeId, back = false): void {
   restat(s, p, () => {
     p.epoch = tier;
     p.age = to;
+    noteWalked(p, to);
     // A step back suspends what lies above the new tier; any change of age brings back what fits.
     const off = back ? p.techs.filter((t) => TECHS[t].epoch > tier) : [];
     const on = (p.suspended ?? []).filter((t) => TECHS[t].epoch <= tier);

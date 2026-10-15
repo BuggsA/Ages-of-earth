@@ -1,5 +1,5 @@
 import { AGES, BUILDINGS, CIVS, WORKS, SIGNATURES, EPOCHS, NO_MODS, TECHS, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
-import { ageDef, ageOf, isHire, isSuspended } from './ages';
+import { ageDef, ageOf, hasWalked, isHire, isSuspended } from './ages';
 import type { BuildingType, Cost, GameState, Player, TechId, UnitType } from './types';
 import { RES } from './types';
 
@@ -171,6 +171,10 @@ export function techProblem(s: GameState, owner: number, tech: TechId): string |
   if (isSuspended(p, tech)) return `Researched, but suspended until the ${EPOCHS[t.epoch].name}`;
   if (t.epoch > p.epoch) return `Needs the ${EPOCHS[t.epoch].name}`;
   if (t.only && ageOf(p) !== t.only) return `Only in the ${AGES[t.only].name}`;
+  if (t.walked) {
+    const missing = t.walked.filter((a) => !hasWalked(p, a));
+    if (missing.length) return `An heirloom: walk the ${missing.map((a) => AGES[a].name).join(' and the ')} first`;
+  }
   if (t.needs && !p.techs.includes(t.needs)) return `Needs ${TECHS[t.needs].name} first`;
   for (const e of s.ents) if (e.kind === 'building' && e.owner === owner && e.queue.some((q) => q.tech === tech)) return 'Already being researched';
   return null;

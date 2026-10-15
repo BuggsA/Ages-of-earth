@@ -70,6 +70,8 @@ const TECH_ORDER: TechId[] = [
   'plow', 'drying', 'hounds', 'axes', 'wheelbarrow', 'picks', 'forging', 'bloomery', 'scaleArmor', 'fletching', 'husbandry', 'irrigation', 'saws', 'shafts', 'handcart',
   'ironCasting', 'chainMail', 'bodkin', 'masonry', 'theology', 'conscription', 'blastFurnace', 'plateArmor', 'chemistry',
   'gillnets', 'shipwright', 'lighthouse', 'steamEngine', 'rifling', 'aviation', 'caravan', 'banking', 'pilgrimage', 'credit', 'ropewalk', 'litany',
+  // Heirlooms (#224): techProblem keeps them shut until both their ages are walked.
+  'bellFoundry', 'ironHulls', 'jointStock', 'masonsLodge',
 ];
 /** Seconds a computer keeps its traders off a road after losing one on it. */
 const TRADER_WARY = 240;
