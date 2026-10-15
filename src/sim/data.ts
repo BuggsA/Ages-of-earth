@@ -541,6 +541,7 @@ export const RUINS = { count: { small: 2, medium: 3, large: 4 } as Record<MapSiz
  * - The Lookout Crag shows its keeper everything within `crag.sight` tiles: the road their rival walks.
  * - The Flint Scatter gives its keeper's citizens good edges: chopping and mining (stone, gold, bog iron) `flint.tools` times as fast.
  * - The Sacred Grove makes its keeper's priests work `grove.priest` times as fast (converting, healing) within `grove.reach` tiles of it: a place to bring a priest to turn a rival's army.
+ * - The Old Ford lets its keeper's soldiers march `ford.march` times as fast: a road for the army, so the keeper strikes first.
  * - The Ancestors' Cairn gives its keeper `cairn.pop` more room for people: a house or two not built.
  */
 export const LANDMARKS = {
@@ -552,6 +553,8 @@ export const LANDMARKS = {
   cairn: { pop: 5 },
   flint: { tools: 1.2 },
   grove: { reach: 10, priest: 1.8 },
+  /** The Old Ford: its keeper's soldiers (not citizens or traders) march `march` times as fast, anywhere on land. */
+  ford: { march: 1.2 },
   /** A people's own kind of landmark (the Romans, who build their own, have none) gives it `kinMul` times the effect (of the part above that is a bonus). */
   kinMul: 1.5,
   kin: { egyptians: 'flint', greeks: 'spring', mongols: 'crag', chinese: 'grove', britons: 'cairn' } as Partial<Record<CivId, LandmarkKind>>,
@@ -567,7 +570,7 @@ export const AI_MARK = { /** In a Lords of the Land match: reach over the whole 
   /** The walker halts when its escort trails it by more than this many tiles, and goes on once they close up. */
   lead: 9,
   /** Divisors of a landmark's distance (bigger: more worth walking for): by kind, with the cairn when houses are full and the spring when people are hurt. */
-  worth: { crag: 1, flint: 1.25, spring: 1, springHurt: 1.5, cairn: 1, cairnFull: 1.6,
+  worth: { crag: 1, flint: 1.25, ford: 1.1, spring: 1, springHurt: 1.5, cairn: 1, cairnFull: 1.6,
     /** Times more worth walking for the kind its own people favour (`LANDMARKS.kin`), since it pays half again as much. */
     kin: 1.4 } };
 /** Repairs: restoring a building's whole health costs this share of its price, paid as the hammers work. */
