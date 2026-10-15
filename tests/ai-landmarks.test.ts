@@ -44,3 +44,23 @@ describe('the computer favours its own people\'s landmark kind', () => {
     expect(s.ai[1]?.markWalker?.id).toBe(b.id);
   }, 30000);
 });
+
+describe('the computer recalls a lone walker', () => {
+  it('turns its walker home when rival soldiers appear beside it on the road', () => {
+    const s = game();
+    const home = s.ents.find((e) => e.kind === 'building' && e.owner === 1)!;
+    const [a] = s.landmarks!;
+    for (const m of s.landmarks!) { m.owner = -1; m.by = -1; m.claim = 0; }
+    a.x = home.x + 30; a.y = home.y;
+    for (let i = 0; i < 10; i++) spawnUnit(s, 1, 'citizen', home.x + 3 + i * 0.5, home.y + 3);
+    for (let i = 0; i < 15 * TICK_HZ && !s.ai[1]?.markWalker; i++) step(s);
+    const w = s.ai[1]!.markWalker!;
+    expect(w).toBeTruthy();
+    const u = s.byId.get(w.unit) as Unit;
+    // A rival soldier appears next to the walker, far from the landmark.
+    const foe = spawnUnit(s, 0, 'infantry', u.x + 3, u.y);
+    s.players[1].vis[Math.floor(foe.y) * s.w + Math.floor(foe.x)] = 1;
+    for (let i = 0; i < 2 * TICK_HZ; i++) step(s);
+    expect(s.ai[1]?.markWalker?.unit).not.toBe(u.id);
+  }, 30000);
+});

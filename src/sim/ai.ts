@@ -1053,7 +1053,8 @@ function claimWalk(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
       delete mem.markWalker;
       return;
     }
-    if (over) {
+    // Rival soldiers beside the walker on the road recall it too, not only ones at the landmark.
+    if (over || ruinDanger(s, v.p, u, 7)) {
       delete mem.markWalker;
       issue({ t: 'stop', p: v.p.id, ids: [u.id] });
       return;
