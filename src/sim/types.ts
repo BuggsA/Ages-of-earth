@@ -87,6 +87,8 @@ export type Order =
   | { k: 'hunt'; target: number; fight?: boolean }
   /** A priest turning an enemy to your side: `done` ticks of chanting so far. */
   | { k: 'convert'; target: number; done: number }
+  /** A pilgrim priest standing by a friendly building a rival is chanting over, singing back (#219). */
+  | { k: 'answer'; target: number }
   /** A priest tending a wounded friend. */
   | { k: 'heal'; target: number }
   /** Walk to the shore by a transport ship and go aboard. */

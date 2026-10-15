@@ -12,7 +12,7 @@ import { ruinAt } from './ruins';
 import { callWork, workProblem } from './works';
 import { beaconProblem, lightBeacon } from './beacon';
 import { rallyCry, rallyProblem } from './rally';
-import { consecrateProblem } from './consecrate';
+import { chantedOver, consecrateProblem, consecrates } from './consecrate';
 import { canHit, isEnemy, maxHp, pay, placeBuilding, refund } from './world';
 import { fightsBeasts } from './animals';
 
@@ -325,6 +325,11 @@ export function applyCommand(s: GameState, c: Command): void {
         const relic = u.type === 'priest' && b.type === 'temple' && b.built ? carriedBy(s, u) : undefined;
         if (relic) {
           giveOrder(u, { k: 'relic', target: relic.id, temple: b.id }, c.queue);
+          continue;
+        }
+        // A pilgrim priest stands by a building rivals are chanting over and sings back (#219).
+        if (u.type === 'priest' && chantedOver(s, b) && consecrates(s, c.p) && !carriedBy(s, u)) {
+          giveOrder(u, { k: 'answer', target: b.id }, c.queue);
           continue;
         }
         // A trader: home to this Market (with what it carries), and its road starts here from now on.
