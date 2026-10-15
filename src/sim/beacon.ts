@@ -19,6 +19,7 @@ export function lightBeacon(s: GameState, p: Player, b: Building): void {
   p.res.wood -= BEACON.cost.wood ?? 0;
   b.beacon = s.tick + secs(BEACON.duration);
   b.beaconReady = s.tick + secs(BEACON.duration + BEACON.cooldown);
+  p.stats.beacons = (p.stats.beacons ?? 0) + 1;
   s.events.push({ k: 'beacon', owner: b.owner, building: b.id, x: b.x, y: b.y, on: true });
   relay(s, b);
 }
@@ -35,6 +36,8 @@ function relay(s: GameState, from: Building): void {
       if (dx * dx + dy * dy > BEACON.relay * BEACON.relay) continue;
       e.beacon = s.tick + secs(BEACON.relayDuration);
       e.beaconReady = s.tick + secs(BEACON.relayDuration + BEACON.cooldown);
+      const st = s.players[e.owner].stats;
+      st.beacons = (st.beacons ?? 0) + 1;
       s.events.push({ k: 'beacon', owner: e.owner, building: e.id, x: e.x, y: e.y, on: true });
       queue.push(e);
     }

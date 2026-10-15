@@ -16,7 +16,7 @@ import { landmarkStep } from './landmarks';
 import { atPost } from './trade';
 import { modsOf, trainTimeFor } from './stats';
 import { attrition } from './borders';
-import { barred, journeyOf, noteWalked, surveyFinds, trainsAt } from './ages';
+import { barred, journeyOf, noteWalked, surveyFinds, trainsAt, workSteps } from './ages';
 import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, MapSize, MapType, Player } from './types';
 import { RES, R_FISH, R_NONE } from './types';
 import { RES_OF_TILE, carryCargo, checkStuck, collide, findResource, routeUnits, separate, setOrder, think, ungarrison, walk } from './units';
@@ -254,8 +254,11 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
   }
   const item = b.queue[0];
   if (!item) return;
+  // In the Age of Lightning a coil's field speeds the work and the dark slows it (#231); elsewhere one step a tick.
+  const steps = workSteps(s, b);
   if (item.tech) {
-    if (++item.done < secs(TECHS[item.tech].time)) return;
+    item.done += steps;
+    if (item.done < secs(TECHS[item.tech].time)) return;
     b.queue.shift();
     const tech = item.tech;
     restat(s, p, () => p.techs.push(tech));
@@ -267,7 +270,7 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
   const unit = item.unit!;
   const need = secs(trainTimeFor(s, p.id, unit, b.type));
   if (item.done < need) {
-    item.done++;
+    item.done = Math.min(need, item.done + steps);
     if (item.done < need) return;
   }
   if (p.pop >= p.cap) {
