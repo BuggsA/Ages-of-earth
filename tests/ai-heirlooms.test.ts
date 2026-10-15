@@ -82,3 +82,36 @@ describe('the computer reaches for an heirloom (#232)', () => {
     expect(first).toBe('ironHulls');
   });
 });
+
+describe('the computer detours off a pilgrim town for an heirloom (#232)', () => {
+  const pilgrim = (fished: number): GameState => {
+    const s = game();
+    const p = s.players[0];
+    p.epoch = 2;
+    p.walked = ['iron', 'middle'];
+    p.age = 'pilgrim';
+    p.res = { food: 900, wood: 900, stone: 300, gold: 400 };
+    dock(s);
+    // A relic kept in a Temple: the pilgrims' road holds, so only the heirloom could pull the town off it.
+    const temple = placeBuilding(s, 0, 'temple', p.startX + 8, p.startY + 8, true);
+    s.relics[0].temple = temple.id;
+    p.stats.fished = fished;
+    s.ai[0].roads!.pilgrim = true;
+    return s;
+  };
+  it('steps back to the Middle Ages and on to Sail once the catch is landed', () => {
+    const s = pilgrim(500);
+    const seen: string[] = [];
+    run(s, 150, () => {
+      const a = ageOf(s.players[0]);
+      if (seen[seen.length - 1] !== a) seen.push(a);
+      return a === 'sail';
+    });
+    expect(seen).toEqual(['pilgrim', 'middle', 'sail']);
+  });
+  it('stays a pilgrim while the catch is short', () => {
+    const s = pilgrim(100);
+    run(s, 60, () => false);
+    expect(ageOf(s.players[0])).toBe('pilgrim');
+  });
+});
