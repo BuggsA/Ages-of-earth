@@ -995,11 +995,24 @@ function wilds(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void
   if (mem.huntEscort) {
     const home: number[] = [];
     const out: number[] = [];
+    const towers = v.buildings.filter((b) => b.type === 'tower' && b.built && b.hp > 0);
+    const meatNear = (b: Building) => (s.carcasses ?? []).some((c) => s.amount[c.tile] > 0 && distToRect((c.tile % s.w) + 0.5, Math.floor(c.tile / s.w) + 0.5, b) < AI_WILD.towerNear + 4);
+    const freed = new Set<number>();
     for (const id of mem.huntEscort) {
       const u = s.byId.get(id);
       if (!u || u.kind !== 'unit' || u.owner !== v.p.id || u.hp <= 0) continue;
-      if (u.order.k === 'idle' && !u.inside) home.push(id);
-      else if (u.order.k === 'hunt') out.push(id);
+      if (u.inside) {
+        // Sheltered in the hunt's Tower: they stay, adding arrows, while meat is left to butcher.
+        const t = s.byId.get(u.inside);
+        if (t && t.kind === 'building' && meatNear(t)) out.push(id);
+        else if (t && !freed.has(t.id)) { freed.add(t.id); issue({ t: 'ungarrison', p: v.p.id, building: t.id }); }
+        continue;
+      }
+      if (u.order.k === 'idle') {
+        const t = towers.find((b) => b.garrison.length < (BUILDINGS.tower.garrison ?? 0) && distToRect(u.x, u.y, b) < AI_WILD.towerNear + 4 && meatNear(b));
+        if (t) { issue({ t: 'garrison', p: v.p.id, ids: [id], target: t.id }); out.push(id); }
+        else home.push(id);
+      } else if (u.order.k === 'hunt' || u.order.k === 'garrison') out.push(id);
     }
     if (home.length) issue({ t: 'move', p: v.p.id, ids: home, x: v.home.x, y: v.home.y });
     mem.huntEscort = out.length ? out : undefined;

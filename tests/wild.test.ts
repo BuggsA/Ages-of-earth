@@ -3,10 +3,10 @@ import { AMOUNT, MAMMOTH, TICK_HZ, WOLF, secs } from '../src/sim/data';
 import { createGame, step } from '../src/sim/game';
 import { walkable } from '../src/sim/grid';
 import { generateMap } from '../src/sim/mapgen';
-import { spawnAnimal } from '../src/sim/animals';
+import { hitAnimal, spawnAnimal } from '../src/sim/animals';
 import type { Animal, Command, GameState, Unit } from '../src/sim/types';
 import { R_MEAT, R_NONE } from '../src/sim/types';
-import { spawnUnit } from '../src/sim/world';
+import { placeBuilding, spawnUnit } from '../src/sim/world';
 
 /** The wild (#171): mammoths that fight back, wolf packs by their dens. */
 
@@ -249,5 +249,36 @@ describe('the computer and a far mammoth', () => {
     });
     expect(near.length).toBe(ids.length);
     expect(s.ai[1].huntEscort).toBeUndefined();
+  });
+
+  it('garrisons the escort in the hunt\'s Watch Tower while meat is left, then sends it home', () => {
+    const s = game(4, 'normal');
+    for (const a of s.animals) if (a.kind === 'mammoth') a.hp = 0;
+    s.animals = s.animals.filter((a) => a.hp > 0);
+    const b = s.players[1];
+    s.peaceUntil = 0;
+    for (let i = 0; i < 12; i++) spawnUnit(s, 1, 'citizen', b.startX + 3, b.startY - 3 - i * 0.4);
+    const x = b.startX + (s.players[0].startX > b.startX ? 30 : -30);
+    const m = spawnAnimal(s, x, b.startY, 'mammoth');
+    const tower = placeBuilding(s, 1, 'tower', Math.round(x) + (x > b.startX ? -4 : 3), Math.round(b.startY) + 2, true);
+    for (let i = 0; i < 6; i++) spawnUnit(s, 1, 'infantry', b.startX + 2, b.startY + 2 + i * 0.5);
+    let sent = false;
+    for (let i = 0; i < secs(60) && !sent; i++) {
+      step(s);
+      sent = !!s.ai[1]?.huntEscort?.length;
+    }
+    expect(sent).toBe(true);
+    const ids = [...(s.ai[1].huntEscort as number[])];
+    for (let i = 0; i < secs(90); i++) {
+      step(s);
+      if (ids.every((id) => Math.hypot((s.byId.get(id) as Unit).x - x, (s.byId.get(id) as Unit).y - b.startY) < 8)) break;
+    }
+    hitAnimal(s, m, 99999, x, b.startY);
+    for (let i = 0; i < secs(20); i++) step(s);
+    expect(tower.garrison.length).toBeGreaterThan(0);
+    expect(tower.garrison.every((id) => ids.includes(id))).toBe(true);
+    for (const c of s.carcasses ?? []) s.amount[c.tile] = 0;
+    for (let i = 0; i < secs(10); i++) step(s);
+    expect(tower.garrison.length).toBe(0);
   });
 });
