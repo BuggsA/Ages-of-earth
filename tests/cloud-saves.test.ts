@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { MAX_CLOUD_SAVE, VAULT_KEY_LENGTH, VAULT_SLOTS, formatVaultKey, newVaultKey, normalizeVaultKey, validVaultKey } from '../src/net/vault';
-import { deleteCloud, listCloud, loadCloud, saveCloud } from '../src/net/cloud';
+import { MAX_CLOUD_SAVE, VAULT_KEY_LENGTH, VAULT_SLOTS, cleanProgress, formatVaultKey, mergeProgress, newVaultKey, normalizeVaultKey, validVaultKey } from '../src/net/vault';
+import { deleteCloud, getCloudProgress, listCloud, loadCloud, putCloudProgress, saveCloud } from '../src/net/cloud';
 
 // Load through Vitest so Worker globals do not leak into the browser's typecheck (as in worker-routes).
 const { Vault } = await vi.importActual<{ Vault: new (state: object, env: unknown) => { fetch(req: Request): Promise<Response>; alarm(): Promise<void> } }>('../worker/vault');
@@ -146,6 +146,40 @@ describe('the vault routes', () => {
     const res = await worker.fetch(at(KEY), e);
     expect(res.status).toBe(503);
     expect(((await res.json()) as { error: string }).error).toMatch(/not available/);
+  });
+});
+
+describe('campaign stars in the vault', () => {
+  it('clean to chapter ids and 1–3 stars, and merge by the best', () => {
+    expect(cleanProgress({ 'first-fires': 2, bad: 9, 'Up Per': 1, x: 1.5, y: 'z', 'the-wall': 3 })).toEqual({ 'first-fires': 2, 'the-wall': 3 });
+    expect(cleanProgress([1, 2])).toEqual({});
+    expect(cleanProgress(null)).toEqual({});
+    expect(mergeProgress({ a: 1, b: 3 }, { a: 2, b: 1, c: 1 })).toEqual({ a: 2, b: 3, c: 1 });
+  });
+
+  it('keep the best stars sent from any device, and never lower them', async () => {
+    const e = env();
+    vi.stubGlobal('fetch', (url: string, init?: RequestInit) => worker.fetch(new Request(new URL(url, 'https://ages.example'), init), e));
+    try {
+      expect(await getCloudProgress(KEY)).toEqual({});
+      expect(await putCloudProgress(KEY, { 'first-fires': 2, 'river-of-kings': 1 })).toEqual({ 'first-fires': 2, 'river-of-kings': 1 });
+      expect(await putCloudProgress(KEY, { 'first-fires': 1, 'the-wall': 3 })).toEqual({ 'first-fires': 2, 'river-of-kings': 1, 'the-wall': 3 });
+      expect(await getCloudProgress(KEY)).toEqual({ 'first-fires': 2, 'river-of-kings': 1, 'the-wall': 3 });
+      // Saves and progress live side by side.
+      expect((await listCloud(KEY)).every((s) => s === null)).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('refuse junk, wrong verbs and oversize bodies', async () => {
+    const e = env();
+    const prog = (init?: RequestInit) => worker.fetch(at(`${KEY}/progress`, init), e);
+    expect((await prog({ method: 'PUT', body: 'not json' })).status).toBe(400);
+    expect((await prog({ method: 'DELETE' })).status).toBe(405);
+    expect((await prog({ method: 'PUT', body: ' '.repeat(5000) })).status).toBe(413);
+    const res = await prog({ method: 'PUT', body: JSON.stringify({ progress: { ok: 3, bad: 99, __proto__: 1 } }) });
+    expect(((await res.json()) as { progress: unknown }).progress).toEqual({ ok: 3 });
   });
 });
 

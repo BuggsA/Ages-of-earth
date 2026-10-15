@@ -1,4 +1,4 @@
-import { MAX_CLOUD_SAVE, MAX_SAVE_TITLE, newVaultKey, normalizeVaultKey, type CloudSlot } from './vault';
+import { MAX_CLOUD_SAVE, MAX_SAVE_TITLE, cleanProgress, newVaultKey, normalizeVaultKey, type CloudSlot } from './vault';
 
 /** The browser's side of cloud saves (#290): this browser's save key and the calls to its vault. */
 
@@ -74,4 +74,15 @@ export async function loadCloud(key: string, slot: number): Promise<string> {
 
 export async function deleteCloud(key: string, slot: number): Promise<void> {
   await ask(`${key}/${slot}`, { method: 'DELETE' });
+}
+
+/** The campaign's best stars kept under this key. */
+export async function getCloudProgress(key: string): Promise<Record<string, number>> {
+  return cleanProgress(((await (await ask(`${key}/progress`)).json()) as { progress?: unknown }).progress);
+}
+
+/** Send stars up; the vault keeps the best of old and new and answers with the whole. */
+export async function putCloudProgress(key: string, progress: Record<string, number>): Promise<Record<string, number>> {
+  const res = await ask(`${key}/progress`, { method: 'PUT', body: JSON.stringify({ progress }), headers: { 'content-type': 'application/json' } });
+  return cleanProgress(((await res.json()) as { progress?: unknown }).progress);
 }

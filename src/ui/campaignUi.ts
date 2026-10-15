@@ -1,5 +1,7 @@
 import { SCENARIOS, describe, type Scenario } from '../sim/campaign';
 import type { GameState } from '../sim/types';
+import { getCloudProgress, putCloudProgress, vaultKey } from '../net/cloud';
+import { mergeProgress } from '../net/vault';
 
 /** The campaign screens: chapter list, briefing, and the objectives panel during play. Progress lives in localStorage. */
 
@@ -21,11 +23,49 @@ export function recordStars(id: string, stars: number): void {
   const p = loadProgress();
   if (stars <= (p[id] ?? 0)) return;
   p[id] = stars;
+  saveProgress(p);
+  pushProgress();
+}
+
+const SYNC = 'ages-campaign-sync';
+
+function saveProgress(p: Progress): void {
   try {
     localStorage.setItem(KEY, JSON.stringify(p));
   } catch {
     /* Storage is off: progress is simply not kept. */
   }
+}
+
+/**
+ * Stars follow the save key (#292): once the cloud panel has been opened, every win is sent up in the
+ * background, and opening the panel (or typing in another device's key) merges this browser's stars with
+ * the vault's, best of each chapter. Returns how many chapters the vault taught this browser.
+ */
+export async function syncProgress(): Promise<number> {
+  const key = vaultKey();
+  const local = loadProgress();
+  const remote = await getCloudProgress(key);
+  const merged = mergeProgress(local, remote);
+  const learned = Object.keys(merged).filter((id) => merged[id] > (local[id] ?? 0)).length;
+  saveProgress(merged);
+  if (Object.keys(merged).some((id) => merged[id] > (remote[id] ?? 0))) await putCloudProgress(key, merged);
+  try {
+    localStorage.setItem(SYNC, '1');
+  } catch {
+    /* No storage: syncing happens only when the panel is opened. */
+  }
+  return learned;
+}
+
+/** After a win: if this browser syncs, send the stars up (a failure is ignored; the panel syncs again). */
+function pushProgress(): void {
+  try {
+    if (localStorage.getItem(SYNC) !== '1') return;
+  } catch {
+    return;
+  }
+  void putCloudProgress(vaultKey(), loadProgress()).catch(() => undefined);
 }
 
 /** Chapter n opens once the chapter before it has been won. */
