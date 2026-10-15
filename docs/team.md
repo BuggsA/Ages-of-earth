@@ -112,7 +112,7 @@ Sessions end without warning, so claims are built for that.
 
 ## Saves and replays
 
-A saved match is the whole game state, wrapped as `{ v: 1, … }` by `saveGame` in `src/main.ts`; `loadGame` ignores a save whose `v` differs. A replay is the setup and the command list. Neither records the build that made it, so a change to the state's shape can break an older save, and any rules change can make an older replay play out differently. Until the owner rules otherwise (`docs/status.md`), that's allowed and flagged in the pull request, with one duty: **if your change can break an older save, bump `v`**, so the old save is set aside instead of loading broken. Claim the bump on #2 first, one bump open at a time.
+A saved match is the whole game state, wrapped as `{ v: 1, … }` by `saveGame` in `src/main.ts`; `loadGame` ignores a save whose `v` differs. A replay is the setup and the command list. Neither records the build that made it, so a change to the state's shape can break an older save, and any rules change can make an older replay play out differently. Until the owner rules otherwise (`docs/status.md`), that's allowed and flagged in the pull request, with one duty: **if your change can break an older save, bump `v`**, so the old save is set aside instead of loading broken. Claim the bump on #2 first, one bump open at a time. Cloud saves (#290) hold the same save text with the same `v`, so the rule covers them too.
 
 ## Working without rework
 

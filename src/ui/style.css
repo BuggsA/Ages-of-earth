@@ -383,3 +383,13 @@ body.online .tip-box { bottom: 330px; }
 .workforce-note { border-top: 1px solid var(--edge); padding: 8px 6px 3px; color: var(--muted); font-size: 11px; line-height: 1.4; }
 .seat-crest { display: inline-block; margin-right: 6px; vertical-align: -5px; }
 .seat-crest .crest { display: block; }
+
+/* Cloud saves (#290) */
+.cloud .cloud-slots { display: grid; gap: 8px; margin: 12px 0; text-align: left; }
+.cloud .cloud-slot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border-radius: 10px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); }
+.cloud .cloud-what { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.cloud .cloud-acts { display: flex; gap: 6px; flex-shrink: 0; }
+.cloud .cloud-key code { font: 800 15px ui-monospace, monospace; color: var(--gold-2); letter-spacing: 1px; user-select: all; }
+.cloud .cloud-key input { font: 700 14px ui-monospace, monospace; color: var(--ink); background: #1b2030; border: 1px solid var(--edge-soft); border-radius: 8px; padding: 5px 8px; width: 17em; text-transform: uppercase; }
+.cloud .bad { color: #ff7a6a; }
+@media (max-width: 560px) { .cloud .cloud-slot { flex-direction: column; align-items: stretch; } }

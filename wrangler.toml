@@ -32,3 +32,12 @@ class_name = "Room"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Room"]
+
+# Cloud saves (#290): one Durable Object per player's save key keeps their saved matches.
+[[durable_objects.bindings]]
+name = "VAULTS"
+class_name = "Vault"
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Vault"]
