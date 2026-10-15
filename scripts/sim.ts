@@ -12,10 +12,13 @@ const minutes = Number(process.argv[4] ?? 30);
 const s = createGame({ seed, size, players: [{ name: 'Normal', ai: 'normal' }, { name: 'Hard', ai: 'hard' }] });
 const t0 = performance.now();
 let worst = 0;
+/** Every time a landmark changed hands: when, which, and to whom. */
+const marks: string[] = [];
 for (let i = 0; i < minutes * 60 * 20 && !s.over; i++) {
   const a = performance.now();
   step(s);
   worst = Math.max(worst, performance.now() - a);
+  for (const ev of s.events) if (ev.k === 'landmark') marks.push(`${(s.tick / 1200).toFixed(1)}m ${ev.kind} ${ev.owner >= 0 ? `to ${s.players[ev.owner].name}` : `lost by ${s.players[ev.from].name}`}`);
   if (i % (20 * 60) !== 0) continue;
   const line = s.players.map((p) => {
     const units = s.ents.filter((e) => e.owner === p.id && e.kind === 'unit');
@@ -32,4 +35,5 @@ for (let i = 0; i < minutes * 60 * 20 && !s.over; i++) {
 const won = s.winner >= 0 ? s.players[s.winner].name : 'nobody yet';
 console.log(`Relics: ${s.relics.length} on the map, ${s.relics.filter((r) => r.temple).length} kept, ${s.relics.filter((r) => r.carrier).length} carried.`);
 if (s.ruins) console.log(`Ruins: ${s.ruins.map((r) => `${r.find} ${r.by >= 0 ? `dug by ${s.players[r.by].name}` : `${Math.round((100 * r.dug) / secs(RUINS.dig))}% dug`}`).join(', ')}.`);
+if (s.landmarks) console.log(`Landmarks: ${marks.length ? marks.join(', ') : 'none taken'}.`);
 console.log(`Winner: ${won} after ${(s.tick / 1200).toFixed(1)} min. ${(performance.now() - t0).toFixed(0)} ms in all, worst tick ${worst.toFixed(1)} ms, checksum ${checksum(s)}.`);

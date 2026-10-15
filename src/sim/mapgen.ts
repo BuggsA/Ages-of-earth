@@ -1,6 +1,6 @@
-import { AMOUNT, BOAR, BOG_IRON, MAMMOTH, MAP_SIZES, RELIC, RUINS, TRADE, WOLF } from './data';
+import { AMOUNT, BOAR, BOG_IRON, LANDMARKS, MAMMOTH, MAP_SIZES, RELIC, RUINS, TRADE, WOLF } from './data';
 import { fbm, mulberry32, type Rng } from './rng';
-import type { MapSize, MapType, RuinFind } from './types';
+import type { LandmarkKind, MapSize, MapType, RuinFind } from './types';
 import { B_RES, B_TERRAIN, R_BERRY, R_BOG, R_FISH, R_GOLD, R_NONE, R_STONE, R_TREE, T_GRASS, T_ROCK, T_SAND, T_WATER } from './types';
 
 /**
@@ -55,6 +55,8 @@ export interface MapData {
   ruins: { x: number; y: number; find: RuinFind }[];
   /** The wild (#171): mammoths, and wolves by their dens. Empty on campaign maps. */
   wild: { kind: 'mammoth' | 'wolf' | 'boar'; x: number; y: number }[];
+  /** Contested landmarks: where they stand (tile centers) and what each is. */
+  landmarks: { x: number; y: number; kind: LandmarkKind }[];
 }
 
 const DIR8 = [
@@ -517,6 +519,7 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
   const bogIron = deposits && placeBogIron(seed, w, h, terrain, res, amount, starts, deer, relics, posts);
   const ruins = deposits ? placeRuins(seed, size, w, h, terrain, res, starts, deer, relics, posts) : [];
   const wild = deposits ? placeWild(seed, size, w, h, terrain, res, starts, deer, relics, posts, ruins) : [];
+  const landmarks = deposits ? placeLandmarks(seed, w, h, terrain, res, starts, deer, relics, posts, ruins, wild) : [];
 
   // Resources nobody could stand next to are cleared away.
   const block = new Uint8Array(w * h);
@@ -525,7 +528,7 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
     if (res[i] !== R_NONE) block[i] |= B_RES;
   }
 
-  return { w, h, terrain, height, res, amount, block, starts, deer, relics, posts, bogIron, ruins, wild };
+  return { w, h, terrain, height, res, amount, block, starts, deer, relics, posts, bogIron, ruins, wild, landmarks };
 }
 
 /** Where a town's people can walk to without cutting a tree (or, with `axes`, by cutting their way). */
@@ -1044,4 +1047,75 @@ function placeWild(
     for (let k = 0; k < WOLF.pack; k++) out.push({ kind: 'wolf', x: d.x + (k - 1) * 0.6, y: d.y + (k === 1 ? 0.5 : 0) });
   }
   return out;
+}
+
+/**
+ * Contested landmarks, fairly: one more than there are towns (so two rivals can't each take one and never
+ * meet), out between the towns, each about as far from its two nearest, clear of everything else placed
+ * out there, on open ground every town can walk to. Kinds are dealt from shuffled hands of all three.
+ * They roll their own dice and touch no tile, so the rest of the map is as it was.
+ */
+function placeLandmarks(
+  seed: number,
+  w: number,
+  h: number,
+  terrain: Uint8Array,
+  res: Uint8Array,
+  starts: { x: number; y: number }[],
+  deer: { x: number; y: number }[],
+  relics: { x: number; y: number }[],
+  posts: { x: number; y: number }[],
+  ruins: { x: number; y: number }[],
+  wild: { kind: string; x: number; y: number }[],
+): { x: number; y: number; kind: LandmarkKind }[] {
+  const rng = mulberry32(seed ^ 0x1a4d3a);
+  const land = (x: number, y: number) => x >= 2 && y >= 2 && x < w - 2 && y < h - 2 && (terrain[y * w + x] === T_GRASS || terrain[y * w + x] === T_SAND);
+  const near = (list: { x: number; y: number }[], x: number, y: number, r: number) =>
+    list.some((p) => (p.x - x - 0.5) * (p.x - x - 0.5) + (p.y - y - 0.5) * (p.y - y - 0.5) < r * r);
+  const open = (x: number, y: number, r: number) => {
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (!land(x + dx, y + dy) || res[(y + dy) * w + x + dx] !== R_NONE) return false;
+    return true;
+  };
+  const reaches = starts.map((st) => reachFrom(w, h, terrain, res, st));
+  const wolves = wild.filter((b) => b.kind === 'wolf');
+  const beasts = wild.filter((b) => b.kind !== 'wolf');
+  const out: { x: number; y: number }[] = [];
+  const want = Math.min(LANDMARKS.max, starts.length + 1);
+  const nearest = new Map<number, number>();
+  // Looser and looser: less even distances, then only the landmark's own tile and its neighbours clear.
+  for (let pass = 0; pass < 4 && out.length < want; pass++) {
+    const fair = LANDMARKS.fair * (1 + pass);
+    const room = pass < 2 ? 2 : 1;
+    const candidates: number[] = [];
+    for (let y = 3; y < h - 3; y++) {
+      for (let x = 3; x < w - 3; x++) {
+        if (!open(x, y, room) || reaches.some((r) => r[y * w + x] !== 1)) continue;
+        const ds = starts.map((st) => Math.sqrt((x + 0.5 - st.x) * (x + 0.5 - st.x) + (y + 0.5 - st.y) * (y + 0.5 - st.y))).sort((a, b) => a - b);
+        if (ds[0] < LANDMARKS.home || (pass < 3 && ds[0] > LANDMARKS.far + pass * 6) || (ds.length > 1 && ds[1] - ds[0] > fair)) continue;
+        if (near(relics, x, y, 5) || near(posts, x, y, TRADE.plaza + 6) || near(ruins, x, y, 8) || near(wolves, x, y, 10) || near(beasts, x, y, 4) || near(deer, x, y, 3)) continue;
+        candidates.push(y * w + x);
+        nearest.set(y * w + x, ds[0]);
+      }
+    }
+    // The nearer a spot to the towns (on the fair line between them), the likelier: not out in a far corner.
+    candidates.sort((a, b) => nearest.get(a)! - nearest.get(b)! || a - b);
+    const pool = candidates.slice(0, Math.max(12, Math.ceil(candidates.length / 3)));
+    for (let guard = 0; out.length < want && pool.length && guard < want * 60; guard++) {
+      const i = pool[Math.floor(rng() * pool.length)];
+      const x = i % w;
+      const y = (i - x) / w;
+      if (out.some((p) => (p.x - x) * (p.x - x) + (p.y - y) * (p.y - y) < LANDMARKS.spacing * LANDMARKS.spacing)) continue;
+      out.push({ x, y });
+    }
+  }
+  const kinds: LandmarkKind[] = [];
+  while (kinds.length < out.length) {
+    const hand: LandmarkKind[] = ['spring', 'crag', 'cairn'];
+    for (let i = hand.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [hand[i], hand[j]] = [hand[j], hand[i]];
+    }
+    kinds.push(...hand);
+  }
+  return out.map((p, k) => ({ x: p.x + 0.5, y: p.y + 0.5, kind: kinds[k] }));
 }

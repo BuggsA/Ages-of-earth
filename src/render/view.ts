@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { SoundName } from '../audio/sound';
 import { ageOf } from '../sim/ages';
-import { AURA, BUILDINGS, RALLY, SIGNATURES, TICK_HZ, RUINS, TRADE, domainOf } from '../sim/data';
+import { AURA, BUILDINGS, RALLY, SIGNATURES, TICK_HZ, LANDMARKS, RUINS, TRADE, domainOf } from '../sim/data';
 import { buildingMaxHp, statsFor } from '../sim/stats';
 import type { AgeId, BuildingType, CivId, Ent, GameEvent, GameState, Unit } from '../sim/types';
 import type { ScoutFlag } from '../ui/scoutFlags';
@@ -17,6 +17,7 @@ import { Post, QUALITY, loadQuality, saveQuality, type QualityName } from './pos
 import { RelicsView } from './relicsView';
 import { PostsView } from './postsView';
 import { RuinsView } from './ruinsView';
+import { LandmarksView } from './landmarksView';
 import { BorderView } from './borderView';
 import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, type RangeGuide } from './rangeGuides';
 import { ResourcesView } from './resourcesView';
@@ -60,6 +61,7 @@ export type Pick =
   | { kind: 'relic'; id: number }
   | { kind: 'post'; id: number }
   | { kind: 'ruin'; id: number }
+  | { kind: 'landmark'; id: number }
   | { kind: 'resource'; tile: number }
   | { kind: 'ground'; x: number; y: number };
 
@@ -91,6 +93,7 @@ export class View {
   private relics = new RelicsView();
   private posts = new PostsView();
   readonly ruins = new RuinsView();
+  readonly landmarks = new LandmarksView();
   /** When ground relics next sparkle. */
   private relicGlint = 0;
   private overlays = new Overlays();
@@ -158,7 +161,7 @@ export class View {
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sky.mesh, this.hemi, this.fill, this.sun, this.sun.target);
-    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.ruins.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points);
+    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.ruins.group, this.landmarks.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points);
     this.scene.add(this.rangeGuides.mesh, this.borders.mesh);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.post = new Post(this.renderer, this.scene, this.rig.camera);
@@ -223,6 +226,7 @@ export class View {
     this.relics.clear();
     this.posts.clear();
     this.ruins.clear();
+    this.landmarks.clear();
     const colors = s.players.map((p) => p.color);
     this.units.setColors(colors);
     this.buildings.setColors(colors);
@@ -386,6 +390,7 @@ export class View {
     this.glintRelics();
     this.posts.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1);
     this.ruins.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
+    this.landmarks.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     this.overlays.setShots(s, alpha, (x, y) => this.sees(x, y));
     this.drawSelection(s, sel);
     this.ambient(s, dt);
@@ -795,6 +800,18 @@ export class View {
           this.cue('ruinFind', ev.x, ev.y, ev.owner === this.viewer ? 1 : 0.6);
           break;
         }
+        case 'landmark': {
+          // A landmark changes hands: a ring in the new keeper's colour (or grey dust when it falls to nobody), and a horn.
+          const mine = ev.owner === this.viewer || ev.from === this.viewer;
+          if (!mine && !this.sees(ev.x, ev.y)) break;
+          const at = this.ground(s, ev.x, ev.y, 0.2);
+          const color = ev.owner >= 0 ? s.players[ev.owner].color : '#cfc8b8';
+          this.effects.ring(at, color, LANDMARKS.reach + 1, 1.4);
+          this.effects.burst(at.clone().setY(at.y + 0.6), { count: ev.owner >= 0 ? 26 : 14, speed: 0.8, up: 1.4, life: 1.8, size: 0.06, gravity: -0.3, colors: ev.owner >= 0 ? [color, '#ffffff', '#fff3c4'] : ['#b49a78', '#9a8266'] });
+          this.cue(ev.owner >= 0 ? 'landmarkTaken' : 'landmarkLost', ev.x, ev.y, mine ? 1 : 0.6);
+          this.onPing?.(ev.x, ev.y, color);
+          break;
+        }
         case 'relic': {
           if (ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;
           const at = this.ground(s, ev.x, ev.y, 0.2);
@@ -1087,6 +1104,10 @@ export class View {
       // A trading post's plaza, once seen.
       for (const post of s.posts) {
         if (Math.abs(g.x - post.x) <= TRADE.plaza + 0.6 && Math.abs(g.y - post.y) <= TRADE.plaza + 0.6 && (this.reveal || s.players[this.viewer].seen[tile])) return { kind: 'post', id: post.id };
+      }
+      // A contested landmark, once seen.
+      for (const m of s.landmarks ?? []) {
+        if (Math.abs(g.x - m.x) <= 1.6 && Math.abs(g.y - m.y) <= 1.6 && (this.reveal || s.players[this.viewer].seen[tile])) return { kind: 'landmark', id: m.id };
       }
       // An ancient ruin (#64), once seen.
       for (const r of s.ruins ?? []) {

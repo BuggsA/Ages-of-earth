@@ -111,7 +111,7 @@ The owner played and said: "When I play I enter the stone age and it feels mecha
 - **Surprises the player answers:** events, discoveries and rival moves that break the script.
 - **The computer playing the same game,** so the choices matter against it too.
 
-**Built toward it so far:** the wild (#171); meat that spoils and Drying Racks; wolves drawn to carrion; the Hunting Camp and Hounds. Ideas still open: boars near home, migrating herds, predators that hunt deer, the wild thinning as borders grow, Stone Age choices of custom or tradition, contested landmarks. Add yours below in your Designers' notes, and say how your feature makes play richer.
+**Built toward it so far:** the wild (#171); meat that spoils and Drying Racks; wolves drawn to carrion; the Hunting Camp and Hounds; contested landmarks (#182: a spring, a crag and a cairn to fight over from the first minutes). Ideas still open: boars near home, migrating herds, predators that hunt deer, the wild thinning as borders grow, Stone Age choices of custom or tradition. Add yours below in your Designers' notes, and say how your feature makes play richer.
 
 ## Designers' notes
 
@@ -533,6 +533,12 @@ Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), n
 **Seen:** `tests/ai-winter.test.ts` (spring identical, autumn more on food); `npm run check`. No browser, no win-rate sweep; no save bump.
 **Next:** racks bought in autumn before the kill; deer wintering south; the computer sending a raid at a rival's lean winter; snow and bare trees by season (look lane).
 
+## Designers' notes: contested landmarks (#182, own pitch, 2026-10-15, session peaceful-ramanujan)
+
+**Built:** a Sacred Spring (heals), a Lookout Crag (sight 14) and an Ancestors' Cairn (+5 room) on the fair line between the towns, one more than there are players. Stand on one alone to claim it; a rival alone pulls it down, then takes it; contested, nothing moves. A kept landmark is land (`borderMap`), so it plugs into supply, building and the wild. The computer claims free ones with a citizen and takes back held ones with soldiers. Numbers: `LANDMARKS` and `AI_MARK` in `data.ts`.
+**Why I love it:** this answers the owner's "mechanical race" directly. The first two minutes now have a decision with no free answer (a citizen walking out is a citizen not gathering), the map says which choice is worth it (a cairn saves a house, a crag shows the road their army walks), and with one more landmark than players, rivals have to meet. In the headless matches, landmarks change hands five to twenty times over 20 minutes, and that's the game I wanted: small fights over places, not one big fight at minute ten.
+**Seen:** `tests/landmarks.test.ts`, `tests/landmark-models.test.ts`, headless matches on small, medium and large maps (`scripts/sim.ts` now prints who took what, when), and screenshots in headless Chromium (models, the banner, borders, the panel, minimap triangles; no console errors). Not played by hand; the horn sounds are unheard; no win-rate sweep.
+**Next:** more kinds that change *what* you do rather than add numbers: a flint scatter that arms citizens, a ford that only its keeper's army can cross, a sacred grove priests convert faster in. Peoples who care about a kind (the Britons' cairn). Landmarks as a match mode: keep them all for N minutes to win, like relics. A Watch Tower that sees a landmark gets the "they're taking it" alert sooner.
 
 ## Designers' notes: the land wears the season (#185, own pitch, 2026-10-15)
 

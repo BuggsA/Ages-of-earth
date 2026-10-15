@@ -1,11 +1,12 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, AI_LEVELS, AI_RAID, AI_WEB, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_LEVELS, AI_MARK, AI_RAID, AI_WEB, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
-import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Player, Res, Ruin, TechId, TradePost, Unit, UnitType } from './types';
+import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { ageOf, barred, deedsDone, deedsProgress, hiresAt, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
 import { carriedBy } from './relics';
+import { landmarkAt } from './landmarks';
 import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple } from './units';
 import { goalForPost, nearestMarket, portSpot, tripGold } from './trade';
 import { findRoute } from './path';
@@ -106,6 +107,8 @@ interface View {
   diggers: Set<number>;
   /** An attack is due and the army is short of a wave: soldiers come first (#79). */
   armyFirst: boolean;
+  /** A citizen out claiming a landmark, left alone by the town's work. */
+  claimers: Set<number>;
 }
 
 function afford(v: View, cost: Cost): boolean {
@@ -141,7 +144,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   // A King stays out of harm's way, sheltered in the Town Center.
   if (king && tc && !king.inside && king.order.k !== 'garrison') applyCommand(s, { t: 'garrison', p: p.id, ids: [king.id], target: tc.id });
   const home = tc ? { x: tc.x, y: tc.y } : { x: p.startX, y: p.startY };
-  const v: View = { p, citizens, army, priests, traders, cogs, fishers, navy, planes, buildings, home, tc, budget: { ...p.res }, plan: NO_PLAN, diggers: new Set(), armyFirst: false };
+  const v: View = { p, citizens, army, priests, traders, cogs, fishers, navy, planes, buildings, home, tc, budget: { ...p.res }, plan: NO_PLAN, diggers: new Set(), armyFirst: false, claimers: new Set() };
   const issue = (c: Command) => applyCommand(s, c);
 
   // The iron road's survey (#50) is cheap and first in line: in the Stone Age, citizens eat every scrap.
@@ -208,6 +211,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   trade(s, v, issue);
   planBuildings(s, v, mem, issue);
   excavate(s, v, mem, issue);
+  claimWalk(s, v, mem, issue);
   assignCitizens(s, v, issue);
   wilds(s, v, mem, issue);
   // Ships and aircraft are few and dear: they get first call on the treasury.
@@ -824,7 +828,7 @@ function assignCitizens(s: GameState, v: View, issue: (c: Command) => void): voi
   for (const b of v.buildings) {
     if (b.built || v.citizens.some((u) => u.order.k === 'build' && u.order.target === b.id)) continue;
     const helper = v.citizens
-      .filter((u) => !u.inside && (u.order.k === 'idle' || (u.order.k === 'gather' && u.order.res === 'wood')))
+      .filter((u) => !u.inside && !v.claimers.has(u.id) && (u.order.k === 'idle' || (u.order.k === 'gather' && u.order.res === 'wood')))
       .sort((a, c) => distToRect(a.x, a.y, b) - distToRect(c.x, c.y, b) || a.id - c.id)[0];
     if (helper) issue({ t: 'work', p: v.p.id, ids: [helper.id], target: b.id });
   }
@@ -841,7 +845,7 @@ function assignCitizens(s: GameState, v: View, issue: (c: Command) => void): voi
     }
     return best;
   };
-  for (const u of v.citizens.filter((c) => c.order.k === 'idle' && !c.inside && !c.queue.length)) {
+  for (const u of v.citizens.filter((c) => c.order.k === 'idle' && !c.inside && !c.queue.length && !v.claimers.has(c.id))) {
     const skip = new Set<Res>();
     for (let tries = 0; tries < 4; tries++) {
       const r = neediest(skip);
@@ -933,7 +937,7 @@ const RUIN_TOWN = 10;
 const RUIN_WARY = 180;
 
 /** Rival soldiers it can see within `r` tiles of a ruin, or a rival tower or Town Center it knows of within `r + 8`. */
-function ruinDanger(s: GameState, p: Player, ruin: Ruin, r: number): boolean {
+function ruinDanger(s: GameState, p: Player, ruin: { x: number; y: number }, r: number): boolean {
   for (const e of s.ents) {
     if (e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
     const dx = e.x - ruin.x;
@@ -979,6 +983,110 @@ function excavate(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     .sort((a, b) => (a.x - ruin.x) * (a.x - ruin.x) + (a.y - ruin.y) * (a.y - ruin.y) - ((b.x - ruin.x) * (b.x - ruin.x) + (b.y - ruin.y) * (b.y - ruin.y)) || a.id - b.id)
     .slice(0, RUIN_DIGGERS);
   if (spare.length === RUIN_DIGGERS) issue({ t: 'dig', p: v.p.id, ids: spare.map((u) => u.id), target: ruin.id });
+}
+
+// ---- Contested landmarks -------------------------------------------------------------------------------
+
+/**
+ * The nearest landmark within reach of home for it to go after: for a citizen (`free`), one nobody keeps;
+ * for soldiers, one a rival keeps, or one nobody keeps that a rival is part way to claiming.
+ */
+function markToTake(s: GameState, v: View, free: boolean, safe: boolean): Landmark | null {
+  let best: Landmark | null = null;
+  const rival = enemyHome(s, v.p);
+  const reach = Math.max(AI_MARK.near, AI_MARK.rival * Math.sqrt((rival.x - v.home.x) * (rival.x - v.home.x) + (rival.y - v.home.y) * (rival.y - v.home.y)));
+  let bestD = reach * reach;
+  for (const m of s.landmarks ?? []) {
+    if (free ? m.owner >= 0 : m.owner >= 0 ? !isEnemy(s, v.p.id, m.owner) : !(m.by >= 0 && m.claim > 0 && isEnemy(s, v.p.id, m.by))) continue;
+    if (safe && ruinDanger(s, v.p, m, 10)) continue;
+    const d = (m.x - v.home.x) * (m.x - v.home.x) + (m.y - v.home.y) * (m.y - v.home.y);
+    if (d < bestD || (d === bestD && best && m.id < best.id)) {
+      bestD = d;
+      best = m;
+    }
+  }
+  return best;
+}
+
+/**
+ * One citizen walks out to claim the nearest landmark nobody keeps, once the town can spare one; called
+ * home when it's theirs, when rival soldiers come near, or when it has taken too long.
+ */
+function claimWalk(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  if (!s.landmarks) return;
+  const w = mem.markWalker;
+  if (w) {
+    const m = landmarkAt(s, w.id);
+    const u = s.byId.get(w.unit);
+    const alive = u && u.kind === 'unit' && u.hp > 0;
+    // Done once anyone keeps it: theirs to enjoy, or a rival's that a lone citizen can't take.
+    const over = !m || m.owner >= 0 || s.tick - w.since > secs(AI_MARK.walk) || ruinDanger(s, v.p, m, 9);
+    if (!alive || (u.order.k !== 'idle' && u.order.k !== 'move')) {
+      delete mem.markWalker;
+      return;
+    }
+    if (over) {
+      delete mem.markWalker;
+      issue({ t: 'stop', p: v.p.id, ids: [u.id] });
+      return;
+    }
+    v.claimers.add(u.id);
+    if (u.order.k === 'idle' && (u.x - m.x) * (u.x - m.x) + (u.y - m.y) * (u.y - m.y) > 4) issue({ t: 'move', p: v.p.id, ids: [u.id], x: m.x, y: m.y });
+    return;
+  }
+  if (v.citizens.length < AI_MARK.townAt || threatNear(s, v).count) return;
+  const m = markToTake(s, v, true, true);
+  if (!m) return;
+  const walker = v.citizens
+    .filter((u) => !u.inside && !u.queue.length && u.carry <= 2 && !v.diggers.has(u.id) && (u.order.k === 'idle' || (u.order.k === 'gather' && u.order.res !== 'food')))
+    .sort((a, b) => (a.x - m.x) * (a.x - m.x) + (a.y - m.y) * (a.y - m.y) - ((b.x - m.x) * (b.x - m.x) + (b.y - m.y) * (b.y - m.y)) || a.id - b.id)[0];
+  if (!walker) return;
+  mem.markWalker = { id: m.id, unit: walker.id, since: s.tick };
+  v.claimers.add(walker.id);
+  issue({ t: 'move', p: v.p.id, ids: [walker.id], x: m.x, y: m.y });
+}
+
+/**
+ * Between waves, a band of soldiers takes (or takes back) the nearest landmark a rival keeps or is
+ * claiming, and holds there until it is the computer's own (or nobody's claim is in the rival's hands). Returns the soldiers on that duty, so they aren't called back to the muster.
+ */
+function guardMarks(s: GameState, v: View, mem: AiMemory, ready: Unit[], issue: (c: Command) => void): Set<number> {
+  const held = new Set<number>();
+  if (!s.landmarks || s.tick < s.peaceUntil) return held;
+  const g = mem.markGuard;
+  if (g) {
+    const m = landmarkAt(s, g.id);
+    const ids = g.ids.filter((id) => {
+      const u = s.byId.get(id);
+      return u && u.kind === 'unit' && u.hp > 0;
+    });
+    const settled = m && (m.owner >= 0 ? !isEnemy(s, v.p.id, m.owner) : !(m.by >= 0 && isEnemy(s, v.p.id, m.by)));
+    if (!m || settled || !ids.length || s.tick - g.since > secs(AI_MARK.hold)) {
+      delete mem.markGuard;
+      return held;
+    }
+    g.ids = ids;
+    for (const id of ids) held.add(id);
+    // Those that wandered off after a fight walk back onto it.
+    const off = ids.filter((id) => {
+      const u = s.byId.get(id) as Unit;
+      return u.order.k === 'idle' && (u.x - m.x) * (u.x - m.x) + (u.y - m.y) * (u.y - m.y) > 4;
+    });
+    if (off.length) issue({ t: 'move', p: v.p.id, ids: off, x: m.x, y: m.y, amove: true });
+    return held;
+  }
+  const band = ready.filter((u) => u.type !== 'siege' && u.order.k === 'idle');
+  if (band.length < AI_MARK.party) return held;
+  const m = markToTake(s, v, false, false);
+  if (!m) return held;
+  const ids = band
+    .sort((a, b) => (a.x - m.x) * (a.x - m.x) + (a.y - m.y) * (a.y - m.y) - ((b.x - m.x) * (b.x - m.x) + (b.y - m.y) * (b.y - m.y)) || a.id - b.id)
+    .slice(0, AI_MARK.guard)
+    .map((u) => u.id);
+  mem.markGuard = { id: m.id, ids, since: s.tick };
+  for (const id of ids) held.add(id);
+  issue({ t: 'move', p: v.p.id, ids, x: m.x, y: m.y, amove: true });
+  return held;
 }
 
 function nearestDropTo(v: View, u: Unit): { x: number; y: number } {
@@ -1471,6 +1579,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
       for (const u of band) watching.add(u.id);
     }
   }
+  if (L.clever) for (const id of guardMarks(s, v, mem, ready.filter((u) => !watching.has(u.id)), issue)) watching.add(id);
   const strays = ready.filter((u) => {
     if (watching.has(u.id)) return false;
     const ox = u.x - mem.muster!.x;

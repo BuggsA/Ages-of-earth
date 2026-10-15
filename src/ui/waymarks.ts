@@ -12,9 +12,12 @@ export class Waymarks {
   ruins = new Map<number, number>();
   /** Relic id -> where it lay when last seen; `hidden` when it was carried or in a Temple. */
   relics = new Map<number, RelicMark>();
+  /** Landmark id -> who kept it when last seen (-1: nobody). */
+  landmarks = new Map<number, number>();
 
   reset(): void {
     this.ruins.clear();
+    this.landmarks.clear();
     this.relics.clear();
   }
 
@@ -25,6 +28,10 @@ export class Waymarks {
     for (const r of s.ruins ?? []) {
       const i = at(r.x, r.y);
       if (p.vis[i] || (p.seen[i] && !this.ruins.has(r.id))) this.ruins.set(r.id, r.by);
+    }
+    for (const m of s.landmarks ?? []) {
+      const i = at(m.x, m.y);
+      if (p.vis[i] || (p.seen[i] && !this.landmarks.has(m.id))) this.landmarks.set(m.id, m.owner);
     }
     for (const r of s.relics) {
       const i = at(r.x, r.y);
