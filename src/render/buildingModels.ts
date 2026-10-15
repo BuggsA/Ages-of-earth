@@ -379,19 +379,37 @@ function range(k: Kit, e: number, st: Style): void {
   pad(k, 3, st.base);
   // A shooting shed at the back, targets in front.
   if (e === 0) {
+    // An open hunters' shed: spear rack and throwing-stick bundle under the roof, a pile of throwing stones, a skull on a post.
     for (const [x, z] of [[-1.2, -1.2], [1.2, -1.2], [-1.2, -0.3], [1.2, -0.3]]) k.cyl(0.05, 0.05, 0.75, 5, st.post, x, 0, z);
     k.prism(2.7, 0.55, 1.2, st.roof, 0, 0.75, -0.75);
+    k.box(2.3, 0.04, 0.04, st.post, 0, 0.55, -1.15);
+    for (let i = 0; i < 6; i++) k.cyl(0.015, 0.015, 0.9, 4, WOOD, -0.9 + i * 0.16, 0, -1.1).rotation.z = 0.12;
+    for (let i = 0; i < 6; i++) k.cone(0.025, 0.1, 4, '#8b8d88', -0.9 + i * 0.16 + 0.1, 0.84, -1.1);
+    for (let i = 0; i < 5; i++) k.cyl(0.07, 0.07, 0.07, 5, '#8b8d88', 0.4 + (i % 3) * 0.12, 0, -0.4 + Math.floor(i / 3) * 0.1);
+    k.cyl(0.03, 0.03, 0.5, 5, st.post, 1.55, 0, 0.5);
+    k.cyl(0.07, 0.06, 0.1, 6, '#e8e2d0', 1.55, 0.5, 0.5);
   } else if (e === 1) {
+    // A mudbrick archers' court: a flat-roofed hall with crenellated parapet, a bow rack and an earth butt.
     k.box(2.6, 0.8, 1.0, st.wall, 0, 0, -0.85);
     k.box(2.7, 0.07, 1.1, st.trim, 0, 0.8, -0.85);
+    for (let i = 0; i < 7; i++) k.box(0.22, 0.14, 0.1, st.wall, -1.2 + i * 0.4, 0.87, -1.3);
     for (let i = 0; i < 4; i++) k.cyl(0.05, 0.06, 0.8, 6, st.trim, -1.0 + i * 0.66, 0, -0.25);
     k.box(2.6, 0.06, 0.7, st.roof, 0, 0.78, -0.3);
+    for (const x of [-0.7, 0.7]) k.box(0.1, 0.4, 0.04, '#2b2b2e', x, 0.2, -0.33);
+    for (let i = 0; i < 3; i++) k.cyl(0.015, 0.015, 0.55, 4, WOOD, -1.2 + i * 0.1, 0, 0.35).rotation.z = 0.2;
+    k.prism(1.4, 0.35, 0.4, st.wall2, 0, 0, 1.45);
   } else if (e === 2) {
+    // A timber-framed archery hall: arrow slits, an overhanging hoarding, a quiver barrel and straw butts.
     k.box(2.6, 0.85, 1.0, st.wall, 0, 0, -0.85);
     for (const x of [-1.0, -0.5, 0, 0.5, 1.0]) k.box(0.05, 0.85, 1.02, st.trim, x, 0, -0.85);
-    k.prism(2.7, 0.65, 1.2, st.roof, 0, 0.85, -0.85);
+    k.box(2.8, 0.14, 1.2, st.trim, 0, 0.85, -0.85);
+    k.prism(2.7, 0.65, 1.2, st.roof, 0, 0.99, -0.85);
     window(k, st, -0.6, 0.4, -0.34);
     window(k, st, 0.6, 0.4, -0.34);
+    for (const x of [-0.25, 0, 0.25]) k.box(0.04, 0.22, 0.03, '#2b2b2e', x, 0.4, -0.34);
+    k.cyl(0.14, 0.12, 0.34, 8, WOOD, -1.3, 0, 0.3);
+    for (let i = 0; i < 4; i++) k.cyl(0.012, 0.012, 0.3, 4, '#e8e2d0', -1.36 + i * 0.04, 0.34, 0.3);
+    for (const x of [-0.45, 0.45]) k.box(0.3, 0.2, 0.2, HAY, x, 0, 1.2);
   } else if (e === 4) {
     // A rifle range of the machine age: a brick hall with a flat roof and skylight, firing stands in front.
     k.box(2.6, 1.0, 1.0, st.wall, 0, 0, -0.85);
