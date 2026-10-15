@@ -982,7 +982,7 @@ function wilds(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void
     let m = nearestBeast(s, 'mammoth', v.home.x, v.home.y, AI_WILD.mammothNear);
     // A clever computer also goes for a far mammoth, with soldiers along to take the charge, if no rival is by it.
     let escort: Unit[] = [];
-    if (!m && AI_LEVELS[v.p.ai!].clever && s.tick >= s.peaceUntil) {
+    if (!m && AI_LEVELS[v.p.ai!].clever && v.p.epoch <= 2 && s.tick >= s.peaceUntil) {
       const far = nearestBeast(s, 'mammoth', v.home.x, v.home.y, AI_WILD.far);
       const idle = v.army.filter((u) => !u.inside && u.order.k === 'idle' && u.type !== 'siege' && u.type !== 'hero');
       if (far && far.state !== 'fight' && idle.length >= AI_WILD.escort + AI_WILD.guard && !ruinDanger(s, v.p, far, AI_WILD.safe)) {

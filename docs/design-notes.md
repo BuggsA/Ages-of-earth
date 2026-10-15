@@ -709,7 +709,7 @@ Session 2 (lane ai): Iron-Bound Hulls answered. `fleetWanted` adds `AI_WEB.hulls
 
 ## Designers' notes: escorted hunt (own pitch, 2026-10-15, lane ai)
 
-**Built:** a clever computer (Hard and Expert) now goes for a mammoth 22–38 tiles from home (`AI_WILD.far`), sending two idle soldiers (`.escort`) with the five citizens, if three more stay at home (`.guard`) and it sees no rival soldier within 12 tiles of the beast (`.safe`). The soldiers hunt it too, so they take the charge and the kill is quicker.
+**Built:** a clever computer (Hard and Expert) now goes, in the first three ages, for a mammoth 22–38 tiles from home (`AI_WILD.far`), sending two idle soldiers (`.escort`) with the five citizens, if three more stay at home (`.guard`) and it sees no rival soldier within 12 tiles of the beast (`.safe`). The soldiers hunt it too, so they take the charge and the kill is quicker.
 
 **Why I love it:** it is the other side of #260: the computer now weighs the same gamble it punishes in you. A far feast is worth the risk only with soldiers to spare.
 
