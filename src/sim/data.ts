@@ -1065,8 +1065,9 @@ export const ATTRITION = { every: 5, deep: 9, loss: 0.02 };
  * A clever computer with `pop` citizens also raises one forward Tower `fort` tiles toward its rival, at the edge of its own
  * land, so its next wave has a border to fight from (#132 s5).
  * `flame`: a clever computer that sees a rival's beacon burning within this many tiles of one of its Towers lights that Tower's own.
+ * `stage`: a clever computer that keeps an Old Ford up to this many tiles from home, on the rival's side of it, musters its waves there, so they march out already forward.
  */
-export const AI_RAID = { weary: 0.5, calm: 7, fort: 15, pop: 24, flame: 24 };
+export const AI_RAID = { weary: 0.5, calm: 7, fort: 15, pop: 24, flame: 24, stage: 36 };
 /**
  * The computer and the wild (#171): once it has `mammothAt` citizens it sends a party of `party` after the
  * mammoth within `mammothNear` tiles of home; with `pack` soldiers at hand it clears wolves within `clear`.
