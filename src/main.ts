@@ -18,7 +18,7 @@ import { carriedBy, relicAt } from './sim/relics';
 import { RUIN_FINDS, ruinAt } from './sim/ruins';
 import { LANDMARK_KINDS, landmarkAt } from './sim/landmarks';
 import { postAt } from './sim/trade';
-import { consecrateProblem } from './sim/consecrate';
+import { chantedOver, consecrateProblem, consecrates } from './sim/consecrate';
 import { ageDef, ageOf, isSideRoad, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
 import { NetClient, newRoomCode, saveName, savedName } from './net/client';
 import { HASH_EVERY, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
@@ -2000,6 +2000,7 @@ function cursorFor(s: GameState): string {
     const foe = s.players[t.owner].team !== s.players[viewer].team;
     if (units.length && foe) return units.every((u) => u.type === 'priest') && (t.kind === 'unit' || !consecrateProblem(s, viewer, t)) ? 'cur-convert' : 'cur-attack';
     if (units.some((u) => u.type === 'citizen') && t.kind === 'building' && t.owner === viewer && (!t.built || t.hp < maxHp(s, t) || t.type === 'farm')) return 'cur-build';
+    if (t.kind === 'building' && t.owner === viewer && chantedOver(s, t) && consecrates(s, viewer) && units.some((u) => u.type === 'priest' && !carriedBy(s, u))) return 'cur-gather';
     if (units.length && t.kind === 'building' && t.owner === viewer && t.built && BUILDINGS[t.type].garrison) return 'cur-garrison';
     if (t.kind === 'building' && t.type === 'temple' && t.owner === viewer && t.built && units.some((u) => u.type === 'priest' && carriedBy(s, u))) return 'cur-gather';
     if (t.kind === 'building' && t.type === 'market' && t.owner === viewer && t.built && units.some((u) => u.type === 'trader')) return 'cur-gather';

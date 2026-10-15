@@ -1757,7 +1757,9 @@ function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     // A building of ours is being chanted over: stand by it and slow the chant (#216).
     const ward = wardPost(s, v, pr);
     if (ward && ward.hot) {
-      issue({ t: 'move', p: v.p.id, ids: [pr.id], x: ward.b.x, y: ward.b.y });
+      // A work order on the chanted-over building: the priest stands by it and sings back louder (#219).
+      if (consecrates(s, v.p.id)) issue({ t: 'work', p: v.p.id, ids: [pr.id], target: ward.b.id });
+      else issue({ t: 'move', p: v.p.id, ids: [pr.id], x: ward.b.x, y: ward.b.y });
       continue;
     }
     if (pr.cool > 0) continue;
