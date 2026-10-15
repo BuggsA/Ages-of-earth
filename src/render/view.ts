@@ -21,7 +21,7 @@ import { PostsView } from './postsView';
 import { RuinsView } from './ruinsView';
 import { LandmarksView } from './landmarksView';
 import { BorderView } from './borderView';
-import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, type RangeGuide } from './rangeGuides';
+import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, coilFields, placementField, type RangeGuide } from './rangeGuides';
 import { ResourcesView } from './resourcesView';
 import { Sky } from './sky';
 import { forcedHour, hourAt, lightAt, moonPhase } from './daylight';
@@ -34,7 +34,7 @@ import { Bats } from './bats';
 import { Owls } from './owls';
 import { Roosts } from './roosts';
 import { Perches } from './perches';
-import { armyNear, nearWater, voiceFits, wet, type CreatureVoice } from './ambience';
+import { armyNear, coilDistance, coilHumGain, COIL_HUM_RANGE, nearWater, voiceFits, wet, type CreatureVoice } from './ambience';
 
 /**
  * The 3D view of a match through one player's eyes: lit terrain and lakes under a sky, woods and
@@ -113,6 +113,7 @@ export class View {
   private nextHoot = 12;
   private nextGull = 8;
   private nextSong = 5;
+  private nextHum = 3;
   private nextChirp = 6;
   private nextCroak = 9;
   private dayLevel = 0;
@@ -462,6 +463,16 @@ export class View {
       const s = this.state;
       if (this.voiceHere(s, 'birdsong')) this.onCue?.('birdsong', Math.random() * 1.6 - 0.8, 0.4);
     }
+    // A Coil Tower within a dozen tiles of the view hums; the nearer, the louder (#231).
+    if (this.time > this.nextHum) {
+      this.nextHum = this.time + 2.2;
+      const s = this.state;
+      if (s) {
+        const d = coilDistance(s, this.rig.target.x, this.rig.target.z, COIL_HUM_RANGE, (b) => this.reveal || b.owner === this.viewer || this.sees(b.x, b.y));
+        const g = coilHumGain(d, COIL_HUM_RANGE);
+        if (g > 0.02) this.onCue?.('coilHum', 0, g);
+      }
+    }
     this.roosts.update(this.time, this.ruins.standingAt, this.rig.target, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
     this.perches.update(this.time, this.ruins.standingAt, this.rig.target, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
     this.bats.update(this.time, this.rig.target, this.rig.distance, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
@@ -483,7 +494,11 @@ export class View {
     if (sel.ghost) {
       const g = placementRange(s, this.viewer, sel.ghost.type, sel.ghost.tx, sel.ghost.ty);
       if (g) guides.push(g);
+      const f = placementField(s, this.viewer, sel.ghost.type, sel.ghost.tx, sel.ghost.ty);
+      if (f) guides.push(f);
     }
+    // In the Age of Lightning every finished coil shows its field.
+    for (const f of coilFields(s, this.viewer)) if (guides.length < MAX_RANGE_GUIDES) guides.push(f);
     for (const id of sel.ids) {
       const e = s.byId.get(id);
       if (!e || e.hp <= 0) continue;

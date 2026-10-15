@@ -10,8 +10,9 @@ import type { Building, Command, GameState, MapSize, MapType, TradePost, Unit } 
 import { R_NONE, T_GRASS, T_SAND } from '../../src/sim/types';
 import { placeBuilding, spawnUnit } from '../../src/sim/world';
 
-const game = (o: Partial<GameSetup> = {}): GameState =>
-  createGame({
+/** The wild is cleared: wolves by the road would eat the traders these tests follow. */
+const game = (o: Partial<GameSetup> = {}): GameState => {
+  const s = createGame({
     seed: o.seed ?? 7,
     size: o.size ?? 'small',
     mapType: o.mapType,
@@ -22,6 +23,9 @@ const game = (o: Partial<GameSetup> = {}): GameState =>
       { name: 'B', ai: null, civ: 'romans' },
     ],
   });
+  s.animals = [];
+  return s;
+};
 
 const run = (s: GameState, seconds: number, cmds: Command[] = []) => {
   step(s, cmds);
@@ -236,7 +240,8 @@ describe('traders', () => {
   it('are easy prey for cavalry and never fight back', () => {
     expect(BONUS.cavalry.trader).toBeGreaterThan(2);
     const s = game();
-    const p = s.players[0];
+    // In the riders' own land, so border attrition (#132) doesn't wear them down.
+    const p = s.players[1];
     const t = spawnUnit(s, 0, 'trader', p.startX + 10, p.startY + 10);
     const rider = spawnUnit(s, 1, 'cavalry', p.startX + 11, p.startY + 10);
     const foe = spawnUnit(s, 1, 'infantry', p.startX + 10, p.startY + 12);

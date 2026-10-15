@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { LANDMARKS, TICK_HZ } from '../src/sim/data';
-import { claimWork } from '../src/sim/landmarks';
-import { createGame, step } from '../src/sim/game';
-import type { GameState } from '../src/sim/types';
+import { LANDMARKS, TICK_HZ } from '../../src/sim/data';
+import { claimWork } from '../../src/sim/landmarks';
+import { createGame, step } from '../../src/sim/game';
+import type { GameState } from '../../src/sim/types';
 
 /** Lords of the Land: keep every landmark for LANDMARKS.lordsSeconds and win. */
 

@@ -1024,7 +1024,7 @@ export const MAP_TYPES: Record<MapType, { label: string; blurb: string }> = {
 
 export interface AiLevel {
   label: string;
-  /** Gathering multiplier (a small edge on Hard). */
+  /** Gathering multiplier (a small edge on Expert, a handicap on Easy and Normal). */
   gather: number;
   citizens: number;
   /** Seconds before the first attack, and its size; later waves grow. */
@@ -1050,29 +1050,39 @@ export interface AiLevel {
   bell: { ring: number; quiet: number; hold: number };
   /** Whether a clever computer raises a forward Tower as a foothold (#132 s5); `scripts/ai-ab.ts` sets it back to compare. */
   fort: boolean;
+  /** A pilgrim town detours to the Age of Sail for an heirloom (#232); off only in `scripts/ai-ab.ts`. */
+  detour: boolean;
   /** Whether a landmark's worth follows what the town needs (`AI_MARK.worth`); off, every one counts the same. `scripts/ai-ab.ts` sets it back to compare. */
   worthy: boolean;
 }
 
+/**
+ * Four honest difficulties (#256, #258). A newcomer picks the one called Normal, so Normal is the fair
+ * learning game and Easy is gentler still: a first-timer should reach the Bronze Age alive. The ids keep
+ * the behaviour they always had, so saves, replays, rooms and tests stay as they were; only the names
+ * moved: `easy` is shown as Normal, `normal` as Hard, `hard` as Expert (the campaign proof's level).
+ */
 export const AI_LEVELS: Record<Difficulty, AiLevel> = {
-  easy: { label: 'Easy', gather: 0.8, citizens: 16, firstAttack: 720, wave: 6, waveGrowth: 3, think: 1.5, towers: 0, clever: false, traders: 2, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true },
-  normal: { label: 'Normal', gather: 1, citizens: 24, firstAttack: 480, wave: 8, waveGrowth: 4, think: 1, towers: 1, clever: true, traders: 5, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true },
-  hard: { label: 'Hard', gather: 1.15, citizens: 32, firstAttack: 330, wave: 9, waveGrowth: 5, think: 0.5, towers: 2, clever: true, traders: 8, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true },
+  gentle: { label: 'Easy', gather: 0.65, citizens: 12, firstAttack: 1080, wave: 4, waveGrowth: 2, think: 2, towers: 0, clever: false, traders: 1, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true },
+  easy: { label: 'Normal', gather: 0.8, citizens: 16, firstAttack: 720, wave: 6, waveGrowth: 3, think: 1.5, towers: 0, clever: false, traders: 2, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true },
+  normal: { label: 'Hard', gather: 1, citizens: 24, firstAttack: 480, wave: 8, waveGrowth: 4, think: 1, towers: 1, clever: true, traders: 5, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true },
+  hard: { label: 'Expert', gather: 1.15, citizens: 32, firstAttack: 330, wave: 9, waveGrowth: 5, think: 0.5, towers: 2, clever: true, traders: 8, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true },
 };
 
 /**
  * How the computer walks the web of ages (#50). It takes a side road that plays to its people's
  * strength (its signature line comes cheaper there) whenever it qualifies, never one that bars that
- * line, and any other with chance `take`, decided once. It surveys for bog iron once its town has
+ * line, and any other with chance `take`, decided once; a road that would open an heirloom with an age
+ * it has already walked, with chance `heir` instead (#232). It surveys for bog iron once its town has
  * `survey` citizens, and keeps `diggers` citizens on bog iron toward the Iron Age (twice as many while it
  * holds for the deed; none once the deed is dug, #79); it holds its Town Center for a chosen road's deeds once a `nearly` share of each is
  * done or under way, for at most `patience` seconds (twice that once a `close` share of each is done, #113); it turns pilgrim with at least `relics` relics
  * kept. Against a merchant rival, a band of `riders` riders waits by the trading post nearest its town
  * and falls on the traders it sees within `raid` tiles (anyone's traders within `raidNear` tiles of home
  * are fair game anyway); against an iron rival, it trains the archers that answer its foot with chance
- * `read`.
+ * `read`. It reads a rival's heirlooms (#242): a Joint-Stock Company makes the rival a trade rival on any road, a Masons' Lodge asks `lodge` more siege engines, Iron-Bound Hulls `hulls` more warships, and a Bell Foundry rival's relic Temples are pulled `bell` ahead as a target (as a pilgrim people's are).
  */
-export const AI_WEB = { take: 0.6, survey: 22, diggers: 3, nearly: 0.5, patience: 90, close: 0.75, relics: 2, raid: 18, raidNear: 30, riders: 4, read: 0.85 };
+export const AI_WEB = { take: 0.6, heir: 1, survey: 22, diggers: 3, nearly: 0.5, patience: 90, close: 0.75, relics: 2, raid: 18, raidNear: 30, riders: 4, read: 0.85, lodge: 1, hulls: 1, bell: 900 };
 
 export const PLAYER_COLORS = ['#2f7fe0', '#e0473a', '#e8b630', '#3aa35a', '#9b59d0', '#e07a2f'];
 export const PLAYER_NAMES = ['You', 'Rival'];
@@ -1122,8 +1132,9 @@ export const ATTRITION = { every: 5, deep: 9, loss: 0.02 };
  * The computer and the Age of Lightning (#231): it takes the road with at least `towers` finished towers and no
  * aircraft, and while it walks the web in the Industrial Age it lights a beacon every `every` seconds toward
  * the deed. In the age it raises a coil by a dark workshop, `gap` seconds apart, up to `most` towers.
+ * `raid`: a rival's coil that is the only one lighting some buildings draws a raid, `raid` tiles² of pull for each building it alone keeps lit.
  */
-export const AI_LIGHTNING = { towers: 2, every: 40, gap: 45, most: 6 };
+export const AI_LIGHTNING = { towers: 2, every: 40, gap: 45, most: 6, raid: 150 };
 
 export const AI_RAID = { weary: 0.5, calm: 7, fort: 15, pop: 24, flame: 24, stage: 36 };
 /**

@@ -1,10 +1,10 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, AI_FAITH, AI_LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_RAID, AI_WEB, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_RAID, AI_WEB, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
-import { ageOf, barred, deedsDone, deedsProgress, hiresAt, inField, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
+import { ageOf, barred, deedsDone, hasCoils, hasWalked, deedsProgress, hiresAt, inField, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
 import { carriedBy } from './relics';
 import { claimants, favours, landmarkAt } from './landmarks';
 import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple } from './units';
@@ -67,11 +67,12 @@ const ADVANCE_AT = [11, 17, 22, 28];
 const TILE_OF: Record<Res, number> = { food: R_BERRY, wood: R_TREE, stone: R_STONE, gold: R_GOLD };
 /** Technologies in the order the opponent wants them (economy first). */
 const TECH_ORDER: TechId[] = [
+  // Heirlooms first (#224, #232): techProblem keeps them shut until both their ages are walked, and once
+  // one opens it is the prize of the road the computer chose for it, so it is bought before anything else.
+  'bellFoundry', 'ironHulls', 'jointStock', 'masonsLodge', 'stElmo',
   'plow', 'drying', 'hounds', 'axes', 'wheelbarrow', 'picks', 'forging', 'bloomery', 'scaleArmor', 'fletching', 'husbandry', 'irrigation', 'saws', 'shafts', 'handcart',
   'ironCasting', 'chainMail', 'bodkin', 'masonry', 'theology', 'conscription', 'blastFurnace', 'plateArmor', 'chemistry',
   'gillnets', 'shipwright', 'lighthouse', 'steamEngine', 'rifling', 'aviation', 'caravan', 'banking', 'pilgrimage', 'credit', 'ropewalk', 'litany',
-  // Heirlooms (#224): techProblem keeps them shut until both their ages are walked.
-  'bellFoundry', 'ironHulls', 'jointStock', 'masonsLodge', 'stElmo',
 ];
 /** Seconds a computer keeps its traders off a road after losing one on it. */
 const TRADER_WARY = 240;
@@ -239,7 +240,9 @@ function research(s: GameState, v: View, peopleEnough: boolean, issue: (c: Comma
     if (tech === 'hounds' && !s.carcasses?.some((c) => c.full > AMOUNT.meat)) continue;
     // Trade technologies only pay with traders on the road.
     if (TECHS[tech].at === 'market' && v.traders.length < 3) continue;
-    const at = v.buildings.find((b) => b.type === TECHS[tech].at && b.built && b.queue.length === 0 && b.advance < 0);
+    // An heirloom (#232) joins a queue that has room: a Dock that never stops training would otherwise never learn its own.
+    const room = TECHS[tech].walked ? MAX_QUEUE : 1;
+    const at = v.buildings.find((b) => b.type === TECHS[tech].at && b.built && b.queue.length < room && b.advance < 0);
     if (!at) continue;
     // The Town Center trains citizens first.
     if (at.type === 'towncenter' && !peopleEnough && v.citizens.length < 12) continue;
@@ -295,12 +298,30 @@ function fit(p: Player, to: AgeId): number {
   return (age.price?.[cls] ?? 1) < 1 ? 1 : 0;
 }
 
-/** Whether it means to walk the road to a side age, decided the first time it asks (#50). */
+/**
+ * The heirloom (#224) a road into `to` would open: one whose other age the people has already walked,
+ * and that it hasn't learned yet. Null when the road opens none.
+ */
+export function heirloomAhead(p: Player, to: AgeId): TechId | null {
+  for (const id of TECH_ORDER) {
+    const pair = TECHS[id].walked;
+    if (!pair || !pair.includes(to) || p.techs.includes(id)) continue;
+    const other = pair[0] === to ? pair[1] : pair[0];
+    if (hasWalked(p, other)) return id;
+  }
+  return null;
+}
+
+/**
+ * Whether it means to walk the road to a side age, decided the first time it asks (#50). A road that
+ * opens an heirloom with an age it has already walked (#232) is taken at `AI_WEB.heir` odds rather than
+ * `take`: the second road is the plan, not a coin toss. A road that bars its people's strength still isn't.
+ */
 function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   const roads = (mem.roads ??= {});
   if (roads[to] === undefined) {
     const f = fit(p, to);
-    roads[to] = f > 0 || (f === 0 && roll(s) < AI_WEB.take);
+    roads[to] = f > 0 || (f === 0 && roll(s) < (heirloomAhead(p, to) ? AI_WEB.heir : AI_WEB.take));
   }
   return roads[to]!;
 }
@@ -366,8 +387,14 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   if (!walksWeb(v)) return null;
   const here = ageOf(p);
   const kept = relicsKept(s, p.id);
+  // A detour (#232): a pilgrim town with the catch landed and a Dock, whose Age of Sail would open an heirloom, steps back to
+  // the Middle Ages to take it, and doesn't turn pilgrim again on the way (the road to Sail is the plan).
+  const sailRoad = ROADS.find((r) => r.from === 'middle' && r.to === 'sail');
+  const toSail = AI_LEVELS[p.ai!].detour && !!sailRoad && !!heirloomAhead(p, 'sail') && count(v, 'dock', true) > 0 && deedsDone(p, sailRoad) && wants(s, p, mem, 'sail');
   for (const r of roadsFrom(p)) {
     if (AGES[r.to].tier !== p.epoch) continue;
+    if (toSail && here === 'pilgrim' && r.to === 'middle') return { road: r, wait: false };
+    if (toSail && r.to === 'pilgrim') continue;
     if (r.to === 'aeronaut' && v.planes.length > 0 && roadKnown(s, p, r) && wants(s, p, mem, r.to)) return { road: r, wait: false };
     if (here === 'aeronaut' && r.to === 'industrial' && count(v, 'airfield', true) === 0) {
       mem.roads ??= {};
@@ -472,10 +499,20 @@ function rivalIn(s: GameState, p: Player, ages: AgeId[]): boolean {
   return s.players.some((o) => !o.defeated && isEnemy(s, p.id, o.id) && ages.includes(ageOf(o)));
 }
 
+/** Whether a living rival has learned a craft (#242): an heirloom shows in what a people does, and the clever computer reads it. */
+function rivalHas(s: GameState, p: Player, tech: TechId): boolean {
+  return s.players.some((o) => !o.defeated && isEnemy(s, p.id, o.id) && o.techs.includes(tech));
+}
+
+/** The warships to keep (#242): a rival's Iron-Bound Hulls makes its ships 30% sturdier, so a fleet that means to meet them is `hulls` bigger. */
+export function fleetWanted(s: GameState, p: Player, base: number): number {
+  return base > 0 && rivalHas(s, p, 'ironHulls') ? base + AI_WEB.hulls : base;
+}
+
 // ---- Building --------------------------------------------------------------------------------------
 
 /** A free spot for a building near a point, keeping a lane open around it. */
-export function findSpot(s: GameState, type: BuildingType, x: number, y: number, minR: number, maxR: number, margin = 1): { tx: number; ty: number } | null {
+export function findSpot(s: GameState, type: BuildingType, x: number, y: number, minR: number, maxR: number, margin = 1, ok?: (tx: number, ty: number) => boolean): { tx: number; ty: number } | null {
   const n = BUILDINGS[type].size;
   const cx = Math.floor(x - n / 2);
   const cy = Math.floor(y - n / 2);
@@ -490,8 +527,28 @@ export function findSpot(s: GameState, type: BuildingType, x: number, y: number,
       const ty = cy + dy;
       if (placeProblem(s, type, tx, ty)) continue;
       if (margin && !laneClear(s, tx, ty, n, type === 'farm')) continue;
+      if (ok && !ok(tx, ty)) continue;
       return { tx, ty };
     }
+  }
+  return null;
+}
+
+/**
+ * A spot inside the field of one of our finished coils, so a building raised in the Age of Lightning works lit
+ * and no coil has to chase it (#231 s4). The nearest coil to home that has room wins; null when none has.
+ */
+function fieldSpot(s: GameState, v: View, type: BuildingType): { tx: number; ty: number } | null {
+  const n = BUILDINGS[type].size;
+  const r2 = LIGHTNING.reach * LIGHTNING.reach;
+  for (const t of v.buildings) {
+    if (t.type !== 'tower' || !t.built || t.hp <= 0) continue;
+    const inside = (tx: number, ty: number): boolean => {
+      const dx = tx + n / 2 - t.x, dy = ty + n / 2 - t.y;
+      return dx * dx + dy * dy <= r2;
+    };
+    const spot = findSpot(s, type, t.x, t.y, 2, LIGHTNING.reach, 1, inside);
+    if (spot) return spot;
   }
   return null;
 }
@@ -734,7 +791,7 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     const lines = BUILDINGS[type].trains;
     if (lines.length && lines.every((u) => barred(p, u))) continue;
     const at = type === 'tower' ? towardEnemy(9) : type === 'market' || type === 'temple' ? home : towardEnemy(6);
-    const spot = findSpot(s, type, at.x, at.y, type === 'market' || type === 'temple' ? 6 : 0, 18);
+    const spot = (type !== 'tower' && ageOf(p) === 'lightning' && fieldSpot(s, v, type)) || findSpot(s, type, at.x, at.y, type === 'market' || type === 'temple' ? 6 : 0, 18);
     if (spot && construct(s, v, mem, type, spot, type === 'tower' ? 2 : 3, issue)) return;
   }
 
@@ -1281,7 +1338,8 @@ function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   const sailor = ageOf(p) === 'sail';
   const enemyShips = s.ents.filter((e): e is Unit => e.kind === 'unit' && e.hp > 0 && isEnemy(s, p.id, e.owner) && (e.type === 'warship' || e.type === 'fisher' || e.type === 'transport' || (sailor && e.type === 'cog')) && p.vis[Math.floor(e.y) * s.w + Math.floor(e.x)] === 1);
   const warships = v.navy.filter((u) => u.type === 'warship');
-  const wantShips = s.mapType === 'sea' ? Math.min(2 + p.epoch, 6) : enemyShips.length ? Math.min(2 + Math.floor(enemyShips.length / 2), 5) : sailor ? 2 : 0;
+  const baseShips = s.mapType === 'sea' ? Math.min(2 + p.epoch, 6) : enemyShips.length ? Math.min(2 + Math.floor(enemyShips.length / 2), 5) : sailor ? 2 : 0;
+  const wantShips = fleetWanted(s, p, baseShips);
   if (warships.length + queued('warship') < wantShips && dock.queue.length < 2 && v.army.length >= 3) {
     const cost = unitStats('warship', p.epoch).cost;
     if (afford(v, cost)) {
@@ -1410,8 +1468,21 @@ function airforce(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   }
 }
 
+/** How many of a rival's buildings go dark if this coil falls (#231): in its field and in no other coil's. 0 for anything but a finished coil. */
+function darkened(s: GameState, b: Building): number {
+  if (b.type !== 'tower' || !b.built || !hasCoils(s.players[b.owner])) return 0;
+  const r2 = LIGHTNING.reach * LIGHTNING.reach;
+  const near = (a: Building, c: Building): boolean => (a.x - c.x) * (a.x - c.x) + (a.y - c.y) * (a.y - c.y) <= r2;
+  let n = 0;
+  for (const o of s.ents) {
+    if (o.kind !== 'building' || o.owner !== b.owner || o.hp <= 0 || o === b || !near(o, b)) continue;
+    if (!s.ents.some((c) => c.kind === 'building' && c.type === 'tower' && c.owner === b.owner && c.built && c.hp > 0 && c !== b && near(o, c))) n++;
+  }
+  return n;
+}
+
 /** A building of the enemy's worth bombing: their nearest Town Center, or any building known. */
-function enemyTarget(s: GameState, p: Player): Building | null {
+export function enemyTarget(s: GameState, p: Player): Building | null {
   let best: Building | null = null;
   let bestD = Infinity;
   for (const e of s.ents) {
@@ -1422,8 +1493,9 @@ function enemyTarget(s: GameState, p: Player): Building | null {
     const holds = e.type === 'temple' && s.relics.some((r) => r.temple === e.id);
     const shrine = holds && relicRace(s, p);
     // A pilgrim people's wealth is the relics in its Temples (#50): they come before its Town Center.
-    const pilgrims = holds && ageOf(s.players[e.owner]) === 'pilgrim';
-    const d = dx * dx + dy * dy + (e.type === 'wonder' || shrine ? -1e6 : pilgrims ? -900 : e.type === 'towncenter' ? -400 : 0);
+    // A Bell Foundry people's relics pay it 50% more gold (#224), so its Temples are worth the same pull on any road (#242).
+    const pilgrims = holds && (ageOf(s.players[e.owner]) === 'pilgrim' || s.players[e.owner].techs.includes('bellFoundry'));
+    const d = dx * dx + dy * dy + (e.type === 'wonder' || shrine ? -1e6 : pilgrims ? -AI_WEB.bell : e.type === 'towncenter' ? -400 : -AI_LIGHTNING.raid * darkened(s, e));
     if (d < bestD) {
       bestD = d;
       best = e;
@@ -1638,6 +1710,8 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   }
   const keepCitizensGrowing = v.citizens.length < 8;
   const siege = v.army.filter((u) => u.type === 'siege').length;
+  // A rival with the Masons' Lodge raises sturdier buildings (+15%): one more engine to break them (#242).
+  const lodge = L.clever && rivalHas(s, p, 'masonsLodge') ? AI_WEB.lodge : 0;
   for (const b of v.buildings) {
     if (!b.built || b.queue.length >= Math.min(2, MAX_QUEUE) || keepCitizensGrowing) continue;
     const trains = lines(p, b);
@@ -1648,7 +1722,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     // The Market hires (#37) only in an age that hires there, after the traders have had first call on its queue.
     if (b.type === 'market' && !hiresAt(p, b.type).length) continue;
     let unit: UnitType | null;
-    if (b.type === 'workshop') unit = siege < Math.max(v.plan.siege, p.epoch >= 2 ? 3 : 2) && (v.army.length >= 6 || siege < v.plan.siege) ? 'siege' : null;
+    if (b.type === 'workshop') unit = siege < Math.max(v.plan.siege, p.epoch >= 2 ? 3 : 2) + lodge && (v.army.length >= 6 || siege < v.plan.siege) ? 'siege' : null;
     else if (b.type === 'temple') unit = v.priests.length < (v.army.length >= 6 ? (consecrates(s, p.id) ? AI_FAITH.priests : 2) : 0) + (looseRelics(s) > 0 ? 1 : 0) ? 'priest' : null;
     else {
       unit = counter && trains.includes(counter) && unitEpoch(counter) <= p.epoch && !barred(p, counter) && roll(s) < counterOdds ? counter : pickUnit(v, mem, b);
@@ -1713,7 +1787,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
       issue({ t: 'attack', p: p.id, ids: riders.slice(0, 3).map((u) => u.id), target: prey.id });
       return;
     }
-    // A merchant rival's age stands on its trade (#50): a band of riders lies in wait by the trading
+    // A merchant rival's age stands on its trade (#50), and a Joint-Stock Company keeps it so on any road (#242): a band of riders lies in wait by the trading
     // post nearest its town, and falls on the traders it sees coming.
     const post = riders.length ? watchPost(s, p) : null;
     if (post) {
@@ -1967,11 +2041,11 @@ function enemyTrader(s: GameState, v: View, at: { x: number; y: number }, r: num
 }
 
 /** The trading post a band of riders watches against merchant rivals (#50): the one nearest any of their towns, or null with no merchant rival. */
-function watchPost(s: GameState, p: Player): TradePost | null {
+export function watchPost(s: GameState, p: Player): TradePost | null {
   let best: TradePost | null = null;
   let bestD = Infinity;
   for (const o of s.players) {
-    if (o.defeated || !isEnemy(s, p.id, o.id) || (ageOf(o) !== 'merchant' && ageOf(o) !== 'fair')) continue;
+    if (o.defeated || !isEnemy(s, p.id, o.id) || (ageOf(o) !== 'merchant' && ageOf(o) !== 'fair' && !o.techs.includes('jointStock'))) continue;
     for (const post of s.posts) {
       const d = (post.x - o.startX) * (post.x - o.startX) + (post.y - o.startY) * (post.y - o.startY);
       if (d < bestD) {
