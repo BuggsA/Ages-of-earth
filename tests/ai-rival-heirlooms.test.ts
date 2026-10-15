@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fleetWanted, watchPost } from '../src/sim/ai';
+import { enemyTarget, fleetWanted, watchPost } from '../src/sim/ai';
 import { AI_WEB, secs } from '../src/sim/data';
 import { createGame, step } from '../src/sim/game';
 import type { GameState } from '../src/sim/types';
@@ -58,5 +58,30 @@ describe('the computer answers Iron-Bound Hulls (#242)', () => {
     s.players[1].techs.push('ironHulls');
     expect(fleetWanted(s, s.players[0], 3)).toBe(3 + AI_WEB.hulls);
     expect(fleetWanted(s, s.players[0], 0)).toBe(0);
+  });
+});
+
+describe('the computer raids a Bell Foundry rival\'s relic Temple (#242)', () => {
+  /** The rival's Temple keeping a relic stands a little farther off than its Town Center. */
+  const target = (bell: boolean) => {
+    const s = game();
+    const [a, b] = s.players;
+    a.seen.fill(1);
+    const temple = placeBuilding(s, 1, 'temple', b.startX + 6, b.startY + 6, true)!;
+    const tc = s.ents.find((e) => e.kind === 'building' && e.owner === 1 && e.type === 'towncenter')!;
+    const d2 = (x: number, y: number) => (x - a.startX) ** 2 + (y - a.startY) ** 2;
+    // Slide the Temple along the line from our start until it lies `AI_WEB.bell / 2` (squared tiles) farther than the Town Center.
+    const dir = Math.hypot(tc.x - a.startX, tc.y - a.startY);
+    const want = Math.sqrt(d2(tc.x, tc.y) + AI_WEB.bell / 2);
+    temple.x = a.startX + ((tc.x - a.startX) / dir) * want;
+    temple.y = a.startY + ((tc.y - a.startY) / dir) * want;
+    s.relics.push({ id: 9999, x: temple.x, y: temple.y, carrier: 0, temple: temple.id });
+    if (bell) b.techs.push('bellFoundry');
+    return enemyTarget(s, a)?.type;
+  };
+
+  it('prefers the Temple only when its keeper has the Foundry', () => {
+    expect(target(false)).toBe('towncenter');
+    expect(target(true)).toBe('temple');
   });
 });
