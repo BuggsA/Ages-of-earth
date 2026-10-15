@@ -2089,6 +2089,13 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           lastAlert = { x: ev.x, y: ev.y };
         }
         break;
+      case 'callUp':
+        // Citizens called to arms at a War Camp (#313).
+        if (ev.owner === viewer) {
+          play('callUp');
+          hud.toast(`📯 ${ev.ids.length === 1 ? 'A citizen takes' : `${ev.ids.length} citizens take`} up arms at the War Camp`, 'good');
+        }
+        break;
       case 'campAlone':
         // A War Camp left without its soldiers (#303).
         if (ev.owner === viewer) {

@@ -1,4 +1,4 @@
-import { AGES, BUILDINGS, ROADS, ROT, STEP_BACK, secs } from '../sim/data';
+import { AGES, BUILDINGS, CALL_UP, ROADS, ROT, STEP_BACK, secs } from '../sim/data';
 import { ageOf, backTo, deedProgress, deedsDone, mainRoad, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
 import type { Building, GameState, Unit } from '../sim/types';
 import { R_FISH } from '../sim/types';
@@ -15,6 +15,7 @@ const PILGRIM_ROAD = ROADS.find((r) => r.to === 'pilgrim')!;
 const SAIL_ROAD = ROADS.find((r) => r.to === 'sail')!;
 const WARBAND_ROAD = ROADS.find((r) => r.to === 'warband')!;
 const IRONBLOOD_ROAD = ROADS.find((r) => r.to === 'ironblood')!;
+const TOTALWAR_ROAD = ROADS.find((r) => r.to === 'totalwar')!;
 const FAIR_ROAD = ROADS.find((r) => r.to === 'fair')!;
 
 interface Tip {
@@ -168,6 +169,29 @@ const TIPS: Tip[] = [
     id: 'warcamp',
     when: (s, me) => ageOf(s.players[me]) === 'ironblood' && !has(s, me, 'warcamp'),
     text: 'Select foot soldiers and press <b>B</b> to pitch a <b>War Camp</b> where they stand, in enemy land too. It trains foot soldiers at the front and holds the land round it, so your army there is fed. Keep soldiers by it: a camp left alone burns.',
+  },
+  {
+    id: 'campdeed',
+    // The way to Total War (#313): a camp stands, and the soldiers it trains are the next step's deed.
+    when: (s, me) => {
+      const p = s.players[me];
+      return ageOf(p) === 'ironblood' && has(s, me, 'warcamp') && (p.stats.campTrained ?? 0) < TOTALWAR_ROAD.deed!.n;
+    },
+    text: `Train foot soldiers at your War Camps, not only at home: ${TOTALWAR_ROAD.deed!.n} trained at the front open the last step of the Path of Blood, the <b>${AGES.totalwar.name}</b>, once your people reaches the Industrial Age.`,
+  },
+  {
+    id: 'totalwar',
+    // The last step (#313): a people that walked Iron and Blood, now in the Industrial Age.
+    when: (s, me) => {
+      const p = s.players[me];
+      return ageOf(p) === 'industrial' && roadKnown(s, p, TOTALWAR_ROAD);
+    },
+    text: `The Path of Blood has one step left. With ${TOTALWAR_ROAD.deed!.n} soldiers trained at War Camps, the Town Center (🔀) can turn your people into the <b>${AGES.totalwar.name}</b>: War Camps return as muster grounds, where citizens are called to arms, and the plunder is the deepest of the path.`,
+  },
+  {
+    id: 'callup',
+    when: (s, me) => ageOf(s.players[me]) === 'totalwar',
+    text: `Every War Camp is a muster ground now. Select one and press <b>C</b> to call the nearest citizen within ${CALL_UP.reach} tiles to arms, or <b>V</b> for up to ${CALL_UP.most}: each becomes a foot soldier where it stands, for its arms alone. A town under attack can take up arms at once, but every citizen called is one less at work.`,
   },
   {
     id: 'fairs',

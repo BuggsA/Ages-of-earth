@@ -98,9 +98,11 @@ export function roadView(d: Discovery, r: Road): 'hidden' | 'faint' | 'known' {
 
 // ---- Layout: tiers run down the page, lanes across, so it reads at phone width. ----------------
 
-// The Path of Blood keeps the left column (Warband over Iron and Blood, #303), so the Reclaimers moved to lane 2 and the Fairs to lane 3 at tier 3.
-const LANE: Record<AgeId, number> = { iron: 0, reclaimer: 2, stone: 1, bronze: 1, middle: 1, gunpowder: 1, industrial: 1, merchant: 2, pilgrim: 3, fair: 3, sail: 4, aeronaut: 2, lightning: 0, warband: 0, steppe: 2, ironblood: 0 };
-export const MAP = { w: 360, h: 420, nodeW: 76, nodeH: 34, top: 40, gap: 85 };
+// The Path of Blood keeps the left column (Warband over Iron and Blood, #303, over Total War, #313), so the Reclaimers moved to lane 2
+// and the Fairs to lane 3 at tier 3, and Lightning to lane 3 at tier 4 (its road curves under the Aeronauts).
+const LANE: Record<AgeId, number> = { iron: 0, reclaimer: 2, stone: 1, bronze: 1, middle: 1, gunpowder: 1, industrial: 1, merchant: 2, pilgrim: 3, fair: 3, sail: 4, aeronaut: 2, lightning: 3, warband: 0, steppe: 2, ironblood: 0, totalwar: 0 };
+/** Five lanes wide: 48 + 4 × 88 + half a node fits in 440 (the Age of Sail, lane 4, sat past the old 360). */
+export const MAP = { w: 440, h: 440, nodeW: 76, nodeH: 34, top: 40, gap: 85 };
 
 export function layout(): Record<AgeId, { x: number; y: number }> {
   const out = {} as Record<AgeId, { x: number; y: number }>;
@@ -136,6 +138,11 @@ export function webMapHtml(d: Discovery): string {
       const a = pos[r.from], b = pos[r.to];
       const down = b.y > a.y;
       const side = b.y === a.y;
+      // A road along a tier that skips a lane curves under the age between, rather than running through it.
+      if (side && Math.abs(b.x - a.x) > 100) {
+        const y = a.y + h / 2, dip = y + 34;
+        return `<path class="wm-road ${roadView(d, r)} ${isSideRoad(r) ? 'side' : ''}" d="M${a.x} ${y}Q${(a.x + b.x) / 2} ${dip} ${b.x} ${y}" marker-end="url(#wm-arrow)"/>`;
+      }
       const x1 = side ? a.x + (b.x > a.x ? w / 2 : -w / 2) : a.x, y1 = side ? a.y : a.y + (down ? h / 2 : -h / 2);
       const x2 = side ? b.x + (b.x > a.x ? -w / 2 : w / 2) : b.x, y2 = side ? b.y : b.y + (down ? -h / 2 : h / 2);
       return `<line class="wm-road ${roadView(d, r)} ${isSideRoad(r) ? 'side' : ''}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" marker-end="url(#wm-arrow)"/>`;

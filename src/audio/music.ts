@@ -52,6 +52,8 @@ const SIDE_STYLES: Partial<Record<AgeId, Style>> = {
   // The Age of the Warband (#299): a hard Phrygian march, horn-like cornet over a drone, the timpani a war drum.
   // The Age of Iron and Blood (#303): the warband's march grown heavy, in Phrygian minor over strings, an anvil for the drum.
   ironblood: { bpm: 96, root: 110.0, scale: [0, 1, 3, 5, 7, 8, 10], chords: [0, 1, 0, 5, 0, 1, 6, 0], lead: 'cornet', accomp: 'strings', drums: 'anvil', density: 0.42 },
+  // The Age of Total War (#313): the march of the whole people, a snare and cornet over strings in Aeolian, quicker and lower than Iron and Blood.
+  totalwar: { bpm: 108, root: 98.0, scale: [0, 2, 3, 5, 7, 8, 10], chords: [0, 5, 3, 0, 6, 5, 4, 0], lead: 'cornet', accomp: 'strings', drums: 'snare', density: 0.48 },
   warband: { bpm: 88, root: 130.81, scale: [0, 1, 3, 5, 7, 8, 10], chords: [0, 0, 1, 0, 6, 0, 1, 0], lead: 'cornet', accomp: 'drone', drums: 'timpani', density: 0.36 },
   fair: { bpm: 112, root: 220.0, scale: [0, 2, 4, 5, 7, 9, 11], chords: [0, 4, 3, 0, 5, 3, 4, 0], lead: 'recorder', accomp: 'oompah', drums: 'tabor', density: 0.58 },
 };

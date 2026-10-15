@@ -4,7 +4,7 @@ import { scenarioById } from '../sim/campaign';
 import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
-import { AGES, PATHS, WARCAMP, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { AGES, CALL_UP, PATHS, WARCAMP, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { homeMarket, marketOf, postAt, tripGold } from '../sim/trade';
@@ -12,7 +12,7 @@ import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
 import { LANDMARK_KINDS, claimWork, claimants, favours, landmarkAt } from '../sim/landmarks';
 import { workProblem } from '../sim/works';
 import { beaconProblem, lit } from '../sim/beacon';
-import { campGrace } from '../sim/warcamp';
+import { callUpProblem, callUpReach, campGrace, musterWait } from '../sim/warcamp';
 import { chantedOver, consecrates, faithOf } from '../sim/consecrate';
 import { rallyProblem } from '../sim/rally';
 import { stirred as stirredNow } from '../sim/combat';
@@ -589,6 +589,8 @@ export class Hud {
           : grace > 0
             ? ` · <span data-tip="<b>Alone</b>No soldier of yours within ${WARCAMP.watch} tiles. Send some back before it catches fire.">⚠ Alone: burns in ${grace}s</span>`
             : ` · <span data-tip="<b>Burning</b>Left alone, the camp burns. Soldiers within ${WARCAMP.watch} tiles put it out; citizens can repair it.">🔥 Burning: send soldiers back</span>`;
+      const wait = musterWait(s, b);
+      if (!struck && ageDef(p).callUp) status += wait > 0 ? ` · <span data-tip="<b>Mustering</b>The camp is arming the last citizens it called.">📯 Mustering: ${wait}s</span>` : ` · <span data-tip="<b>Muster ground</b>Citizens within ${CALL_UP.reach} tiles can be called to arms here (C, or V for ${CALL_UP.most}).">📯 Muster ground</span>`;
     }
     const inside = def.garrison && b.built ? `<div class="stats"><span data-tip="<b>Sheltering</b>Units inside are safe, heal slowly and add arrows.">🏰<em>Inside</em> ${b.garrison.length}/${def.garrison}</span></div>` : '';
     const sig = `b:${b.id}:${Math.ceil(b.hp)}:${status}:${b.queue.length}:${p.epoch}:${queue.length}:${b.garrison.length}`;
@@ -874,6 +876,17 @@ export class Hud {
         if (isMobile(p) && STEPPE.packs.includes(b.type)) {
           const why = packProblem(s, p, b);
           cmds.push({ key: 'J', pic: '', glyph: '🛞', title: 'Strike camp', desc: `Pack this ${def.name} onto a wagon, with everyone sheltering inside stepping out. Drive it to new ground and pitch it there (P). While it rolls it gives no room, takes in nothing and trains no one, and riders run it down.`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'pack', p: viewer, building: b.id }) });
+        }
+        // The call to arms (the Age of Total War, #313): a War Camp turns the citizens near it into foot soldiers.
+        if (b.type === 'warcamp' && ageDef(p).callUp) {
+          const why = callUpProblem(s, p, b);
+          const near = callUpReach(s, b).length;
+          const soldier = statsFor(s, viewer, 'infantry').name;
+          const desc = (n: number) => `${n === 1 ? 'The nearest citizen' : `Up to the ${n} nearest citizens`} within ${CALL_UP.reach} tiles of this camp ${n === 1 ? 'takes' : 'take'} up arms: each becomes a ${soldier} where it stands, with the health it had, and drops what it carried. The camp then rests ${CALL_UP.rest} seconds for each one called. Every citizen called is one less at work.`;
+          cmds.push({ key: 'C', pic: unitPicture('infantry', p.epoch, p.color), title: 'Call to arms', desc: desc(1), cost: CALL_UP.cost, ok: !why, why: why ?? undefined, count: near || undefined, run: () => (this.act.issue({ t: 'callUp', p: viewer, building: b.id, n: 1 }), this.act.sound('queue')) });
+          const five: Cost = {};
+          for (const [r, v] of Object.entries(CALL_UP.cost) as [keyof Cost, number][]) five[r] = v * CALL_UP.most;
+          cmds.push({ key: 'V', pic: '', glyph: '📯', title: `Call ${CALL_UP.most} to arms`, desc: `${desc(CALL_UP.most)} Each costs its own arms.`, cost: five, ok: !why, why: why ?? undefined, run: () => (this.act.issue({ t: 'callUp', p: viewer, building: b.id, n: CALL_UP.most }), this.act.sound('queue')) });
         }
         if (b.type === 'tower') {
           const why = beaconProblem(s, p, b);

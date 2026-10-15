@@ -1217,7 +1217,7 @@ function ironTower(k: Kit, st: Style): void {
 /** The original four dressed ages, kept as the baseline model regression set. */
 export const LOOK_AGES: AgeId[] = ['merchant', 'iron', 'pilgrim', 'fair'];
 /** All dressed ages; additions get their own model coverage beside the baseline set. */
-export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer', 'sail', 'aeronaut', 'lightning'];
+export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer', 'sail', 'aeronaut', 'lightning', 'warband', 'ironblood', 'totalwar'];
 
 const SAIL = '#efe8d4';
 const NET = '#b9ad8a';
@@ -1277,9 +1277,56 @@ function lamp(k: Kit, x: number, y: number, z: number, h = 0.5): void {
   k.glow(k.octa(0.05, LIGHT, x, y + h + 0.04, z));
 }
 
+const BLOOD = '#9b1c2c';
+const SANDBAG = '#a89a72';
+
+/** A war banner (#313): a tall pole, a long crimson streamer in the wind over a band of the people's colour, a spear point on top. */
+function warBanner(k: Kit, x: number, z: number, h: number): void {
+  k.cyl(0.022, 0.028, h, 5, '#3f2e22', x, 0, z);
+  k.cloth(k.box(0.012, 0.2, 0.46, BLOOD, x, h - 0.2, z + 0.23), 0.46, z);
+  k.cloth(k.team(k.box(0.014, 0.08, 0.3, TEAM, x, h - 0.36, z + 0.15)), 0.3, z);
+  k.cone(0.035, 0.12, 4, '#7c8088', x, h, z);
+}
+
+/** A row of sharpened stakes leaning out along x: the camp's palisade carried home (Iron and Blood). */
+function stakes(k: Kit, x0: number, x1: number, z: number, n: number): void {
+  for (let i = 0; i < n; i++) k.cyl(0.0, 0.04, 0.4, 4, '#5a4630', x0 + ((x1 - x0) * (i + 0.5)) / n, 0, z).rotation.x = 0.35;
+}
+
+/** A low wall of stacked sandbags along x (Total War). */
+function sandbags(k: Kit, x0: number, x1: number, z: number, rows = 2): void {
+  const n = Math.max(2, Math.round((x1 - x0) / 0.24));
+  const w = (x1 - x0) / n;
+  for (let r = 0; r < rows; r++) for (let i = 0; i < n - (r % 2); i++) k.box(w * 0.92, 0.1, 0.16, SANDBAG, x0 + w * (i + 0.5 + (r % 2) * 0.5), r * 0.1, z);
+}
+
+/**
+ * The Path of Blood (#313): its towns arm as it goes deeper. The Warband flies war banners; Iron and Blood
+ * adds the camp's sharpened stakes before the doors; Total War rings the fronts with sandbags as well.
+ */
+function bloodTouches(k: Kit, type: BuildingType, age: AgeId): void {
+  const depth = age === 'warband' ? 1 : age === 'ironblood' ? 2 : 3;
+  // Farms, gates and towers stay bare, and the War Camp already flies its standard.
+  const span = type === 'wonder' ? 2.5 : type === 'towncenter' ? 1.75 : type === 'house' ? 0.72 : ['farm', 'gate', 'tower', 'warcamp'].includes(type) ? 0 : 1.05;
+  if (!span) return;
+  const tall = type === 'wonder' ? 3.0 : type === 'towncenter' ? 2.5 : type === 'house' ? 1.3 : 1.9;
+  const war = ['towncenter', 'barracks', 'range', 'stable', 'wonder'].includes(type);
+  if (war) {
+    warBanner(k, -span, span, tall);
+    warBanner(k, span, span, tall);
+  } else warBanner(k, span * 0.9, span * 0.9, tall * 0.8);
+  if (depth >= 2 && (war || type === 'house')) stakes(k, -span * 0.8, span * 0.8, span + 0.22, type === 'house' ? 4 : 7);
+  if (depth >= 3 && (war || type === 'house' || type === 'storehouse')) sandbags(k, -span * 0.75, span * 0.75, span + (depth >= 2 && type !== 'storehouse' ? 0.45 : 0.2));
+}
+
 function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
   const big = type === 'towncenter';
   switch (age) {
+    case 'warband':
+    case 'ironblood':
+    case 'totalwar':
+      bloodTouches(k, type, age);
+      break;
     case 'aeronaut': {
       // Sky blue navigation bands and a rooftop windsock mark the aviation towns.
       if (['airfield', 'towncenter', 'house', 'forge', 'wonder'].includes(type)) {
