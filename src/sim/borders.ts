@@ -93,7 +93,7 @@ export function suppliedAt(s: GameState, own: Int8Array, team: number, x: number
   return false;
 }
 
-const EXEMPT = new Set(['citizen', 'priest', 'trader']);
+const EXEMPT = new Set(['citizen', 'priest', 'trader', 'wagon']);
 
 /** Armies far from their own border, deep in an enemy's, wear down. Called every tick; works on a timer. */
 export function attrition(s: GameState): void {

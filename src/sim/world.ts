@@ -156,7 +156,8 @@ export function countPop(s: GameState): void {
   for (const e of s.ents) {
     if (e.hp <= 0) continue;
     const p = s.players[e.owner];
-    if (e.kind === 'unit') p.pop++;
+    // A wagon (#297) is a packed building, not a person: it takes no room.
+    if (e.kind === 'unit') p.pop += e.type === 'wagon' ? 0 : 1;
     else if (e.built) p.cap += BUILDINGS[e.type].pop;
   }
   // An Ancestors' Cairn gives its keeper room for more.
