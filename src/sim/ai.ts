@@ -1546,6 +1546,21 @@ function townBell(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   }
 }
 
+/** An Old Ford we keep, on the way to the rival (within `AI_RAID.stage` of home and nearer to it than home is): waves muster there. */
+export function stagingFord(s: GameState, owner: number, home: { x: number; y: number }, enemy: { x: number; y: number }): Landmark | null {
+  let best: Landmark | null = null;
+  let bd = Infinity;
+  const homeEnemy = (enemy.x - home.x) * (enemy.x - home.x) + (enemy.y - home.y) * (enemy.y - home.y);
+  for (const m of s.landmarks ?? []) {
+    if (m.kind !== 'ford' || m.owner !== owner) continue;
+    const d = (m.x - home.x) * (m.x - home.x) + (m.y - home.y) * (m.y - home.y);
+    if (d > AI_RAID.stage * AI_RAID.stage || d < 64) continue;
+    if ((enemy.x - m.x) * (enemy.x - m.x) + (enemy.y - m.y) * (enemy.y - m.y) >= homeEnemy) continue;
+    if (d < bd) { bd = d; best = m; }
+  }
+  return best;
+}
+
 function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
   const L = AI_LEVELS[p.ai!];
@@ -1554,6 +1569,8 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const dy = enemy.y - v.home.y;
   const dl = Math.sqrt(dx * dx + dy * dy) || 1;
   mem.muster = { x: v.home.x + (dx / dl) * 8, y: v.home.y + (dy / dl) * 8 };
+  const ford = L.clever ? stagingFord(s, p.id, v.home, enemy) : null;
+  if (ford) mem.muster = { x: ford.x, y: ford.y };
 
   // A hero to lead the army.
   if (L.clever && v.tc && v.army.length >= 6 && !heroBusy(s, p.id) && v.tc.queue.length < 2 && v.tc.advance < 0) {
