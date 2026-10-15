@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { watchPost } from '../src/sim/ai';
-import { secs } from '../src/sim/data';
+import { fleetWanted, watchPost } from '../src/sim/ai';
+import { AI_WEB, secs } from '../src/sim/data';
 import { createGame, step } from '../src/sim/game';
 import type { GameState } from '../src/sim/types';
 import { placeBuilding, spawnUnit } from '../src/sim/world';
@@ -28,7 +28,7 @@ const engines = (lodge: boolean): number => {
   if (lodge) s.players[1].techs.push('masonsLodge');
   s.ai[0] = { next: 0, wave: 0, attacking: false, muster: null, ordered: {}, unitTurn: 0, bell: -1, roads: {} };
   let n = 0;
-  for (let i = 0; i < secs(400) && !s.over; i++) {
+  for (let i = 0; i < secs(250) && !s.over; i++) {
     step(s);
     const now = s.ents.filter((e) => e.kind === 'unit' && e.owner === 0 && e.type === 'siege').length;
     n = Math.max(n, now);
@@ -48,5 +48,15 @@ describe('the computer reads a rival heirloom (#242)', () => {
   it('keeps more siege engines against a Masons\' Lodge rival', () => {
     const [a, b] = [engines(true), engines(false)];
     expect(a).toBeGreaterThan(b);
+  });
+});
+
+describe('the computer answers Iron-Bound Hulls (#242)', () => {
+  it('keeps a bigger fleet against a rival with them', () => {
+    const s = game();
+    expect(fleetWanted(s, s.players[0], 3)).toBe(3);
+    s.players[1].techs.push('ironHulls');
+    expect(fleetWanted(s, s.players[0], 3)).toBe(3 + AI_WEB.hulls);
+    expect(fleetWanted(s, s.players[0], 0)).toBe(0);
   });
 });

@@ -498,6 +498,11 @@ function rivalHas(s: GameState, p: Player, tech: TechId): boolean {
   return s.players.some((o) => !o.defeated && isEnemy(s, p.id, o.id) && o.techs.includes(tech));
 }
 
+/** The warships to keep (#242): a rival's Iron-Bound Hulls makes its ships 30% sturdier, so a fleet that means to meet them is `hulls` bigger. */
+export function fleetWanted(s: GameState, p: Player, base: number): number {
+  return base > 0 && rivalHas(s, p, 'ironHulls') ? base + AI_WEB.hulls : base;
+}
+
 // ---- Building --------------------------------------------------------------------------------------
 
 /** A free spot for a building near a point, keeping a lane open around it. */
@@ -1307,7 +1312,8 @@ function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   const sailor = ageOf(p) === 'sail';
   const enemyShips = s.ents.filter((e): e is Unit => e.kind === 'unit' && e.hp > 0 && isEnemy(s, p.id, e.owner) && (e.type === 'warship' || e.type === 'fisher' || e.type === 'transport' || (sailor && e.type === 'cog')) && p.vis[Math.floor(e.y) * s.w + Math.floor(e.x)] === 1);
   const warships = v.navy.filter((u) => u.type === 'warship');
-  const wantShips = s.mapType === 'sea' ? Math.min(2 + p.epoch, 6) : enemyShips.length ? Math.min(2 + Math.floor(enemyShips.length / 2), 5) : sailor ? 2 : 0;
+  const baseShips = s.mapType === 'sea' ? Math.min(2 + p.epoch, 6) : enemyShips.length ? Math.min(2 + Math.floor(enemyShips.length / 2), 5) : sailor ? 2 : 0;
+  const wantShips = fleetWanted(s, p, baseShips);
   if (warships.length + queued('warship') < wantShips && dock.queue.length < 2 && v.army.length >= 3) {
     const cost = unitStats('warship', p.epoch).cost;
     if (afford(v, cost)) {
