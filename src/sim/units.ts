@@ -1,4 +1,4 @@
-import { AI_LEVELS, BUILDINGS, CARRY, CONSECRATE, DEER, DT, GALVANIC, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, PRIEST, REPAIR_SHARE, RUINS, TRADE, domainOf, secs } from './data';
+import { AI_LEVELS, BUILDINGS, CARRY, CONSECRATE, DEER, DT, GALVANIC, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, PRIEST, REPAIR_SHARE, RUINS, SPREAD, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
@@ -107,7 +107,7 @@ const carryCap = (s: GameState, u: Unit) =>
   u.type === 'fisher' ? FISH_CARRY[s.players[u.owner].epoch] : CARRY[s.players[u.owner].epoch] + modsOf(s, u.owner).carry;
 
 /** The nearest tile of a resource near a point that a citizen (or, for fish, a boat) could reach, or -1. */
-export function findResource(s: GameState, kind: number, x: number, y: number, maxR: number): number {
+export function findResource(s: GameState, kind: number, x: number, y: number, maxR: number, skip?: (i: number) => boolean): number {
   const pass = kind === R_FISH ? NAVAL : -1;
   const cx = Math.floor(x);
   const cy = Math.floor(y);
@@ -121,7 +121,7 @@ export function findResource(s: GameState, kind: number, x: number, y: number, m
         const ty = cy + dy;
         if (tx < 0 || ty < 0 || tx >= s.w || ty >= s.h) continue;
         const i = ty * s.w + tx;
-        if (s.res[i] !== kind) continue;
+        if (s.res[i] !== kind || skip?.(i)) continue;
         let open = false;
         for (let oy = -1; oy <= 1 && !open; oy++) for (let ox = -1; ox <= 1; ox++) if ((ox || oy) && walkable(s, tx + ox, ty + oy, pass)) open = true;
         if (!open) continue;
@@ -171,6 +171,16 @@ function workEvent(s: GameState, u: Unit, act: Act, x: number, y: number): void 
   if ((s.tick + u.id) % 24 === 0) s.events.push({ k: 'work', id: u.id, owner: u.owner, act, x, y });
 }
 
+/** How many other citizens (or boats) are working each tile, by tile. */
+function gatherLoad(s: GameState, u: Unit): Map<number, number> {
+  const load = new Map<number, number>();
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.id === u.id || e.owner !== u.owner || e.hp <= 0 || e.order.k !== 'gather') continue;
+    load.set(e.order.tile, (load.get(e.order.tile) ?? 0) + 1);
+  }
+  return load;
+}
+
 function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): void {
   if (u.carryRes !== o.res) {
     u.carry = 0;
@@ -192,7 +202,18 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
     const wants = u.type === 'fisher' ? [R_FISH] : o.res === 'wood' ? [R_TREE] : o.res === 'food' ? [R_MEAT, R_BERRY] : o.res === 'stone' ? [R_STONE] : o.bog ? [R_BOG, R_GOLD] : [R_GOLD];
     let next = -1;
     for (const want of wants) {
-      next = findResource(s, want, (o.tile % s.w) + 0.5, Math.floor(o.tile / s.w) + 0.5, want === R_MEAT ? 5 : want === R_FISH ? 12 : 8);
+      const fx = (o.tile % s.w) + 0.5;
+      const fy = Math.floor(o.tile / s.w) + 0.5;
+      const reach = want === R_MEAT ? 5 : want === R_FISH ? 12 : 8;
+      next = findResource(s, want, fx, fy, reach);
+      // A crowd of the player's that ran out together fans over the nodes near it instead of piling on one (#266).
+      if (next >= 0 && want !== R_MEAT && !s.players[u.owner].ai) {
+        const load = gatherLoad(s, u);
+        if ((load.get(next) ?? 0) >= SPREAD.perNode) {
+          const alt = findResource(s, want, fx, fy, reach, (i) => (load.get(i) ?? 0) >= SPREAD.perNode);
+          if (alt >= 0) next = alt;
+        }
+      }
       if (next >= 0) break;
     }
     if (next >= 0) {
