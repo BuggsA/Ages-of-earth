@@ -1119,8 +1119,9 @@ export const ATTRITION = { every: 5, deep: 9, loss: 0.02 };
  * The computer and the Age of Lightning (#231): it takes the road with at least `towers` finished towers and no
  * aircraft, and while it walks the web in the Industrial Age it lights a beacon every `every` seconds toward
  * the deed. In the age it raises a coil by a dark workshop, `gap` seconds apart, up to `most` towers.
+ * `raid`: a rival's coil that is the only one lighting some buildings draws a raid, `raid` tiles² of pull for each building it alone keeps lit.
  */
-export const AI_LIGHTNING = { towers: 2, every: 40, gap: 45, most: 6 };
+export const AI_LIGHTNING = { towers: 2, every: 40, gap: 45, most: 6, raid: 150 };
 
 export const AI_RAID = { weary: 0.5, calm: 7, fort: 15, pop: 24, flame: 24, stage: 36 };
 /**
