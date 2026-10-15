@@ -96,6 +96,9 @@ export class Sound {
   private weatherDay: { kind: string; strength: number } = { kind: 'clear', strength: 0 };
   private ambOn = false;
   private birdQuiet = false;
+  /** Winter's cold wind, and the season it follows. */
+  private winterGain: GainNode | null = null;
+  private season = 0;
   private birdTimer = 0;
   /** Recent plays per sound, to keep a busy turn from stacking the same sound twenty times. */
   private recent = new Map<SoundName, number[]>();
@@ -824,8 +827,40 @@ export class Sound {
     this.weatherGain.gain.value = 0;
     rain.connect(hiss).connect(patter).connect(this.weatherGain).connect(this.amb);
     rain.start(0, 1.7);
+    // Winter: a thin, hollow wind that swells and sinks, a bandpass sweeping slowly across the cold air.
+    const cold = ctx.createBufferSource();
+    cold.buffer = this.pinkBuf;
+    cold.loop = true;
+    const hollow = ctx.createBiquadFilter();
+    hollow.type = 'bandpass';
+    hollow.frequency.value = 520;
+    hollow.Q.value = 5;
+    const sweep = ctx.createOscillator();
+    sweep.frequency.value = 0.07;
+    const sweepDepth = ctx.createGain();
+    sweepDepth.gain.value = 180;
+    sweep.connect(sweepDepth).connect(hollow.frequency);
+    const gust = ctx.createOscillator();
+    gust.frequency.value = 0.11;
+    const gustDepth = ctx.createGain();
+    gustDepth.gain.value = 0.5;
+    this.winterGain = ctx.createGain();
+    this.winterGain.gain.value = 0;
+    gust.connect(gustDepth).connect(this.winterGain.gain);
+    cold.connect(hollow).connect(this.winterGain).connect(this.amb);
+    cold.start(0, 5.3);
+    sweep.start();
+    gust.start();
+    this.setSeason(this.season);
     this.setWeather(this.weatherDay.kind, this.weatherDay.strength);
     if (!this.offline) this.scheduleBirds();
+  }
+
+  /** Let the season be heard: winter brings a hollow wind and silences the songbirds. */
+  setSeason(season: number): void {
+    this.season = season;
+    if (!this.ctx || !this.winterGain) return;
+    this.winterGain.gain.setTargetAtTime(season === 3 ? 0.5 : 0, this.ctx.currentTime, 2.5);
   }
 
   /** Let the day's weather be heard: rain hisses, snow hushes, mist and clear skies add nothing. */
@@ -860,7 +895,7 @@ export class Sound {
     window.clearTimeout(this.birdTimer);
     this.birdTimer = window.setTimeout(() => {
       if (!this.ambOn) return;
-      if (!this.birdQuiet) this.bird();
+      if (!this.birdQuiet && this.season !== 3) this.bird();
       this.scheduleBirds();
     }, 6000 + Math.random() * 14000);
   }
