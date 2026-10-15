@@ -6,7 +6,7 @@ import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, Ga
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { ageOf, barred, deedsDone, deedsProgress, hiresAt, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
 import { carriedBy } from './relics';
-import { landmarkAt } from './landmarks';
+import { claimants, landmarkAt } from './landmarks';
 import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple } from './units';
 import { goalForPost, nearestMarket, portSpot, tripGold } from './trade';
 import { findRoute } from './path';
@@ -997,15 +997,36 @@ function markToTake(s: GameState, v: View, free: boolean, safe: boolean): Landma
   const reach = Math.max(AI_MARK.near, AI_MARK.rival * Math.sqrt((rival.x - v.home.x) * (rival.x - v.home.x) + (rival.y - v.home.y) * (rival.y - v.home.y)));
   let bestD = reach * reach;
   for (const m of s.landmarks ?? []) {
-    if (free ? m.owner >= 0 : m.owner >= 0 ? !isEnemy(s, v.p.id, m.owner) : !(m.by >= 0 && m.claim > 0 && isEnemy(s, v.p.id, m.by))) continue;
+    // Soldiers also go to a landmark of ours that rivals are standing on.
+    if (free ? m.owner >= 0 : m.owner >= 0 ? !isEnemy(s, v.p.id, m.owner) && !pulledDown(s, v.p, m) : !(m.by >= 0 && m.claim > 0 && isEnemy(s, v.p.id, m.by))) continue;
     if (safe && ruinDanger(s, v.p, m, 10)) continue;
-    const d = (m.x - v.home.x) * (m.x - v.home.x) + (m.y - v.home.y) * (m.y - v.home.y);
+    const w = markWorth(s, v, m);
+    const d = ((m.x - v.home.x) * (m.x - v.home.x) + (m.y - v.home.y) * (m.y - v.home.y)) / (w * w);
     if (d < bestD || (d === bestD && best && m.id < best.id)) {
       bestD = d;
       best = m;
     }
   }
   return best;
+}
+
+/** True while rivals stand alone round a landmark we (or an ally) keep: it is being pulled down. */
+function pulledDown(s: GameState, p: Player, m: Landmark): boolean {
+  if (m.owner < 0 || isEnemy(s, p.id, m.owner)) return false;
+  const there = claimants(s, m);
+  if (there.size !== 1) return false;
+  return isEnemy(s, p.id, [...there][0][1].player);
+}
+
+/** How much a landmark is worth walking for, as a divisor of its distance: more for what this town needs now. */
+function markWorth(s: GameState, v: View, m: Landmark): number {
+  const w = AI_MARK.worth;
+  if (m.kind === 'cairn') {
+    // Room for people matters once houses are nearly full.
+    return v.p.pop + 4 >= v.p.cap ? w.cairnFull : w.cairn;
+  }
+  if (m.kind === 'spring') return v.citizens.some((u) => u.hp < maxHp(s, u) * 0.7) || v.army.some((u) => u.hp < maxHp(s, u) * 0.7) ? w.springHurt : w.spring;
+  return m.kind === 'flint' ? w.flint : w.crag;
 }
 
 /**
@@ -1060,7 +1081,7 @@ function guardMarks(s: GameState, v: View, mem: AiMemory, ready: Unit[], issue: 
       const u = s.byId.get(id);
       return u && u.kind === 'unit' && u.hp > 0;
     });
-    const settled = m && (m.owner >= 0 ? !isEnemy(s, v.p.id, m.owner) : !(m.by >= 0 && isEnemy(s, v.p.id, m.by)));
+    const settled = m && (m.owner >= 0 ? !isEnemy(s, v.p.id, m.owner) && !pulledDown(s, v.p, m) : !(m.by >= 0 && isEnemy(s, v.p.id, m.by)));
     if (!m || settled || !ids.length || s.tick - g.since > secs(AI_MARK.hold)) {
       delete mem.markGuard;
       return held;

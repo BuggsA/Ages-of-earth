@@ -164,3 +164,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Wind** (#150, own pitch, lane look): a seeded wind per match (`windFor`, stronger in a storm) leans chimney, forge and battle smoke the same way, and (part two) slants rain and snow. Render only; no rules, save or `data.ts` change. Quick check and browser smoke test pass; how the lean looks in a match is unseen by eye.
 
 **The turning year on the land** (#183, own pitch, lane look): meadows, broadleaf trees and snow follow the season in the shared shader (`seasonLook.ts`); `?season=` holds one. Render only; no rules, save or `data.ts` change. Each season seen held in headless Chromium; the fades in motion are unseen.
+
+**Holding landmarks** (#191, own pitch, lane ai): the computer weighs landmarks by kind (`AI_MARK.worth`: Cairn when houses are full, Spring when hurt, Flint) and sends soldiers to one of its own that rivals stand on alone. Unit test and a headless match; no win-rate sweep; browser unseen; no save bump.
