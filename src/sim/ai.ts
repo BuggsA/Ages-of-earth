@@ -1,5 +1,5 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, AI_LEVELS, AI_RAID, AI_WEB, AI_WILD, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_LEVELS, AI_RAID, AI_WEB, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Player, Res, Ruin, TechId, TradePost, Unit, UnitType } from './types';
@@ -15,6 +15,7 @@ import { workProblem } from './works';
 import { beaconProblem, lit } from './beacon';
 import { rallyProblem } from './rally';
 import { sees } from './vision';
+import { seasonAt } from './seasons';
 import { progress, scenarioById } from './campaign';
 
 /**
@@ -426,7 +427,7 @@ function ironRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
 function releaseDiggers(s: GameState, v: View, issue: (c: Command) => void): void {
   const bog = v.citizens.filter((u) => u.order.k === 'gather' && (u.order.bog || s.res[u.order.tile] === R_BOG) && u.carry <= 2 && !u.inside);
   if (!bog.length) return;
-  const want = wanted(v);
+  const want = wanted(v, coldComing(s, v));
   const have: Record<Res, number> = { food: 0, wood: 0, gold: 0, stone: 0 };
   for (const u of v.citizens) {
     const j = jobOf(u);
@@ -632,7 +633,9 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   const berries = findResource(s, R_BERRY, home.x, home.y, 14);
   const farms = count(v, 'farm');
   const freeFields = v.buildings.filter((b) => b.type === 'farm' && !v.citizens.some((u) => u.order.k === 'farm' && u.order.target === b.id)).length;
-  const foodWanted = Math.round(wanted(v).food) - (berries >= 0 ? 6 : 0);
+  // Autumn onward the clever computer plans for winter: berries fail in the cold, so fields go up first.
+  const coldComing_ = coldComing(s, v);
+  const foodWanted = Math.round(wanted(v).food) - (berries >= 0 && !coldComing_ ? 6 : 0) + (coldComing_ ? AI_WINTER.fields : 0);
   if (farms < foodWanted && freeFields < 2 && !recently('farm', 2)) {
     const spot = findSpot(s, 'farm', home.x, home.y, 3, 16);
     if (spot && construct(s, v, mem, 'farm', spot, 1, issue)) return;
@@ -737,15 +740,20 @@ function jobOf(u: Unit): Res | 'build' | null {
   return null;
 }
 
+/** Autumn onward, a clever computer plans for the winter ahead (`AI_WINTER`). */
+function coldComing(s: GameState, v: View): boolean {
+  return AI_LEVELS[v.p.ai!].clever && seasonAt(s) >= AI_WINTER.from;
+}
+
 /** How many citizens each resource should have now: the epoch's shares, leaning away from what piles up. */
-function wanted(v: View): Record<Res, number> {
+function wanted(v: View, cold = false): Record<Res, number> {
   const share = SHARE[v.p.epoch];
   const weight: Record<Res, number> = { food: 0, wood: 0, gold: 0, stone: 0 };
   let total = 0;
   for (const r of RES) {
     const stock = v.p.res[r];
     const lean = stock > 1200 ? 0.15 : stock > 700 ? 0.4 : stock > 400 ? 0.7 : stock < 80 ? 1.4 : 1;
-    weight[r] = share[r] * lean;
+    weight[r] = share[r] * lean * (cold && r === 'food' ? 1 + AI_WINTER.food : 1);
     total += weight[r];
   }
   const n = v.citizens.filter((u) => u.order.k !== 'build' && !u.inside).length;
@@ -806,7 +814,7 @@ function sendTo(s: GameState, v: View, u: Unit, res: Res, issue: (c: Command) =>
 }
 
 function assignCitizens(s: GameState, v: View, issue: (c: Command) => void): void {
-  const want = wanted(v);
+  const want = wanted(v, coldComing(s, v));
   const have: Record<Res, number> = { food: 0, wood: 0, gold: 0, stone: 0 };
   for (const u of v.citizens) {
     const j = jobOf(u);
@@ -885,7 +893,10 @@ function nearestBeast(s: GameState, kind: Animal['kind'], x: number, y: number, 
 /** A hunting party for the mammoth near home, and soldiers to clear the wolves near it. */
 function wilds(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const hunting = (u: Unit, kind: Animal['kind']) => u.order.k === 'hunt' && s.animals.some((a) => a.id === (u.order as { target: number }).target && a.kind === kind);
-  if (v.citizens.length >= AI_WILD.mammothAt && !v.citizens.some((u) => hunting(u, 'mammoth'))) {
+  // Autumn and winter: meat keeps, berries fail, so the clever computer hunts with a smaller town.
+  const cold = coldComing(s, v);
+  const eager = cold ? AI_WINTER.hunters : 0;
+  if (v.citizens.length >= AI_WILD.mammothAt - eager && !v.citizens.some((u) => hunting(u, 'mammoth'))) {
     const m = nearestBeast(s, 'mammoth', v.home.x, v.home.y, AI_WILD.mammothNear);
     if (m && m.state !== 'fight') {
       const party = v.citizens
@@ -896,7 +907,7 @@ function wilds(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void
     }
   }
   // A boar guarding berries near home: three citizens spear it together, once the town has six.
-  if (v.citizens.length >= AI_WILD.boarAt && !v.citizens.some((u) => hunting(u, 'boar'))) {
+  if (v.citizens.length >= AI_WILD.boarAt - eager && !v.citizens.some((u) => hunting(u, 'boar'))) {
     const b = nearestBeast(s, 'boar', v.home.x, v.home.y, AI_WILD.boarNear);
     if (b && b.state !== 'fight') {
       const party = v.citizens
@@ -910,7 +921,8 @@ function wilds(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void
   const wolf = nearestBeast(s, 'wolf', v.home.x, v.home.y, AI_WILD.clear);
   if (!wolf) return;
   const free = v.army.filter((u) => !u.inside && (u.order.k === 'idle' || (u.order.k === 'move' && !u.order.amove)) && u.type !== 'siege');
-  if (free.length >= AI_WILD.pack) issue({ t: 'hunt', p: v.p.id, ids: free.map((u) => u.id), target: wolf.id });
+  const need = cold && seasonAt(s) === 3 ? AI_WILD.pack - AI_WINTER.pack : AI_WILD.pack;
+  if (free.length >= need) issue({ t: 'hunt', p: v.p.id, ids: free.map((u) => u.id), target: wolf.id });
 }
 
 // ---- Ancient ruins (#64) -----------------------------------------------------------------------------

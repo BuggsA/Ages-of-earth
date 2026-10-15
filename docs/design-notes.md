@@ -525,3 +525,11 @@ Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), n
 **Why I love it:** the Stone Age still had one best answer in every minute. Now the answer changes with the clock: forage while it's warm, hunt and dry meat before the first winter (7½ min), and expect the pack at your door when it comes. It ties into rot, Drying Racks, Hunting Camps, wolves, farms (a reason to get them), and Hounds. Spring start so the opening is never punished, and no seed offset so tests and campaigns stay put.
 **Seen:** `tests/seasons.test.ts` (turn order, one event a turn, winter meat keeps); `npm run check`. Not in a browser; no win-rate sweep (all computers lose and gain the same, but their economies feel winter's berry cut); no save bump.
 **Next:** the computer planning for winter (hunt, build racks and farms in autumn); deer migrating south in winter; snow and bare trees tied to the season (look lane); a winter hardship on idle housing; a mid-campaign chapter set in the cold.
+
+## Designers' notes: planning for winter (own pitch, 2026-10-15, Chain 1014-2358, session 8)
+
+**Built:** from autumn (`AI_WINTER.from`) a clever computer counts no berries and wants `fields` more fields, weights food `food` (30%) higher in its job shares, hunts mammoths and boars with `hunters` (3) fewer citizens, and in winter clears wolves with `pack` (1) fewer soldiers (`coldComing` in `ai.ts`).
+**Why I love it:** seasons only matter if the rivals live in them too. Now a computer's economy visibly turns with the year, so a player can read the autumn rush (fields rising, parties out after game) and strike at a town stretched thin on food, or copy it.
+**Seen:** `tests/ai-winter.test.ts` (spring identical, autumn more on food); `npm run check`. No browser, no win-rate sweep; no save bump.
+**Next:** racks bought in autumn before the kill; deer wintering south; the computer sending a raid at a rival's lean winter; snow and bare trees by season (look lane).
+
