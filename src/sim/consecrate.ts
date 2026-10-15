@@ -27,11 +27,25 @@ export function consecrateProblem(s: GameState, owner: number, b: Building): str
 /** How far the chant has come on a building (0 to 1), and whose it is. */
 export const faithOf = (b: Building): number => b.faith ?? 0;
 
+/** How much the keeper's own priests, standing near in the open, slow a chant on `b` (each adds `counter.each`). */
+export function counterChant(s: GameState, b: Building): number {
+  const r2 = CONSECRATE.counter.range * CONSECRATE.counter.range;
+  const mul = modsOf(s, b.owner).priest;
+  let n = 0;
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.owner !== b.owner || e.type !== 'priest' || e.hp <= 0 || e.inside) continue;
+    const dx = e.x - b.x;
+    const dy = e.y - b.y;
+    if (dx * dx + dy * dy <= r2) n += mul;
+  }
+  return n * CONSECRATE.counter.each;
+}
+
 /** What one priest's chant adds to a building's tally each tick (as a share of the whole). */
 export function chantShare(s: GameState, u: Unit, b: Building): number {
   const need = maxHp(s, b) * (CONSECRATE.hard[b.type] ?? 1);
   const voice = CONSECRATE.rate * modsOf(s, u.owner).priest * groveBoost(s, u);
-  return (voice * DT) / (need * (1 + CONSECRATE.guard * b.garrison.length));
+  return (voice * DT) / (need * (1 + CONSECRATE.guard * b.garrison.length + counterChant(s, b)));
 }
 
 /**

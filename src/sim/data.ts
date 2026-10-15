@@ -481,6 +481,9 @@ export const PRIEST = { heal: 3, convert: 7, rest: 8 };
  * - `hard` makes some buildings resist longer: holy ground holds out, and a Temple taken brings its relics.
  * - Every unit sheltering inside slows the chant: rate / (1 + `guard` × those inside). They spill out
  *   to fight when it turns.
+ * - Counter-chant: each of the keeper's own priests within `counter.range` tiles of the building (out in the
+ *   open, not sheltering) answers, and slows the chant as a guard does, by `counter.each` times its people's
+ *   priest speed. Two answering priests halve a lone chanter's pace; a full band of five still wins.
  * - `never`: a people's heart and its glory stay its own.
  * - After `grace` seconds with no one chanting, the faith fades by `fade` of the whole each second.
  */
@@ -488,6 +491,7 @@ export const CONSECRATE = {
   rate: 15,
   hard: { temple: 1.5 } as Partial<Record<BuildingType, number>>,
   guard: 0.35,
+  counter: { range: 7, each: 0.5 },
   never: ['towncenter', 'wonder'] as BuildingType[],
   grace: 1,
   fade: 0.05,

@@ -611,4 +611,12 @@ Built: bog iron dug on any road (`stats.iron`) raises each trade trip in the Mer
 
 **Seen:** headless Chromium, by driving a match through `window.ages`. At 81% the panel reads "✨ 81% won over". When it turns, the tower's banner goes from red to blue, the borders around it change colour and the ring plays. No page errors. The motes' code runs in the browser, but the headless renderer reached only 1.5 s of view time in 12 s, so they never showed on screen: unseen. The sound is unheard.
 
-**Next:** a counter-chant (the keeper's own priests slowing a rival's faith); a pilgrim computer escorting its priest band with its army instead of just shadowing it; a Temple technology that lets a pilgrim people keep a converted building's arrows or garrison loyal; and the reverse question, whether a converted Temple should count toward the Pilgrimage deed.
+**Next:** a pilgrim computer escorting its priest band with its army instead of just shadowing it; a Temple technology that lets a pilgrim people keep a converted building's arrows or garrison loyal; and the reverse question, whether a converted Temple should count toward the Pilgrimage deed.
+
+## Designers' notes: counter-chant (2026-10-15, lane rules)
+
+**Built:** the keeper's own priests, standing in the open within 7 tiles of a building being chanted over, slow the chant (`CONSECRATE.counter`: each adds 0.5 times its people's priest speed to the divisor, beside the garrison's). Two defenders halve a lone chanter; five pilgrims still beat two. Sheltering priests don't count; kill or lure them. `counterChant` in `consecrate.ts`. No save bump.
+
+**Why:** a tower under chant had one defence, hiding soldiers inside. Now priests are a trade-off for the keeper: heal at the front or guard the walls.
+
+**Next:** the computer parking a priest by its towers when it sees rival priests; the defenders' priests actually chanting back (wearing faith down faster than they slow it); a Temple craft for the pilgrims.
