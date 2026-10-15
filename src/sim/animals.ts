@@ -4,6 +4,7 @@ import { clearResource, walkable } from './grid';
 import type { Spatial } from './spatial';
 import type { Animal, GameState, Order, Unit } from './types';
 import { B_RES, R_MEAT, R_NONE } from './types';
+import { seasonOf } from './seasons';
 import { modsOf } from './stats';
 import { statsOf } from './world';
 
@@ -102,7 +103,7 @@ function rot(s: GameState): void {
     const x = c.tile % s.w;
     const y = Math.floor(c.tile / s.w);
     const owner = landOwnerAt(s, x, y);
-    const slow = owner >= 0 ? modsOf(s, owner).rot : 1;
+    const slow = (owner >= 0 ? modsOf(s, owner).rot : 1) * seasonOf(s).rot;
     // Round up so a small carcass still shrinks.
     s.amount[c.tile] -= Math.max(1, Math.ceil(c.full * ROT.rate * slow));
     if (s.amount[c.tile] > 0) return true;
@@ -263,7 +264,7 @@ function beastStep(s: GameState, sp: Spatial | undefined, a: Animal): void {
   // A pack keeps watch (so does a boar by its patch): anyone who comes near is set upon.
   if (guard && (s.tick + a.id) % 4 === 0) {
     const c = anchor(s, a);
-    const u = nearestPrey(s, sp, a.x, a.y, wolf ? WOLF.notice : BOAR.notice, { x: c.x, y: c.y, r: wolf ? WOLF.leash : BOAR.leash });
+    const u = nearestPrey(s, sp, a.x, a.y, (wolf ? WOLF.notice : BOAR.notice) * seasonOf(s).bold, { x: c.x, y: c.y, r: wolf ? WOLF.leash : BOAR.leash });
     if (u) {
       rouse(s, a, u);
       return;
@@ -370,7 +371,7 @@ function fightStep(s: GameState, sp: Spatial | undefined, a: Animal): void {
   if (foe && leash && (foe.x - leash.x) * (foe.x - leash.x) + (foe.y - leash.y) * (foe.y - leash.y) > leash.r * leash.r) foe = null;
   // A mammoth's rage cools some seconds after its last wound.
   if (a.kind === 'mammoth' && a.t <= 0) foe = null;
-  else if (!foe) foe = nearestPrey(s, sp, a.x, a.y, wolf ? WOLF.notice : boar ? BOAR.notice : 6, leash);
+  else if (!foe) foe = nearestPrey(s, sp, a.x, a.y, wolf ? WOLF.notice * seasonOf(s).bold : boar ? BOAR.notice * seasonOf(s).bold : 6, leash);
   if (!foe) {
     calm(a);
     return;

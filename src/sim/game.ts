@@ -1,6 +1,7 @@
 import { aiStep } from './ai';
 import { workStep } from './works';
 import { beaconStep } from './beacon';
+import { turnSeason } from './seasons';
 import { hitAnimal, spawnAnimal, updateAnimals } from './animals';
 import { markGoals, scenarioStep, startScenario } from './campaign';
 import { buildingGuns, updateShots } from './combat';
@@ -432,6 +433,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   routeUnits(s);
   for (const e of s.ents) if (e.kind === 'unit' && e.hp > 0 && !e.inside) walk(s, e);
   updateAnimals(s, sp);
+  turnSeason(s);
   sp.rebuild(s);
   separate(s, sp);
   for (const e of s.ents) {

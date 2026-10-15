@@ -5,6 +5,7 @@ import { findRoute } from './path';
 import type { Spatial } from './spatial';
 import { buildTimeFor, buildingCostFor, modsOf } from './stats';
 import type { Act, Animal, Building, Cost, Ent, GameState, Goal, Order, Res, Unit } from './types';
+import { seasonOf } from './seasons';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { carriedBy, relicAt } from './relics';
 import { animalRadius, hitAnimal } from './animals';
@@ -92,7 +93,9 @@ function gatherRate(s: GameState, u: Unit, kind: number | 'farm'): number {
   const base = kind === 'farm' ? GATHER.farm : RATE_OF_TILE[kind];
   const mod =
     kind === 'farm' ? m.farm : kind === R_TREE ? m.wood : kind === R_STONE || kind === R_GOLD || kind === R_BOG ? m.mine : kind === R_MEAT ? m.hunt * m.forage : kind === R_FISH ? m.fish : m.forage;
-  return base * mod * (1 + p.epoch * EPOCH_GATHER_BONUS) * ai;
+  const sn = seasonOf(s);
+  const season = kind === 'farm' ? sn.field : kind === R_BERRY ? sn.plant : 1;
+  return base * mod * (1 + p.epoch * EPOCH_GATHER_BONUS) * ai * season;
 }
 
 const carryCap = (s: GameState, u: Unit) =>

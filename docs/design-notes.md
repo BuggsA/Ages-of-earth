@@ -518,3 +518,10 @@ Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), n
 **Why I love it:** the camp gave the wild a place to be fought from; hounds give it something to research. Spend food and wood on a safer, faster hunt (the mammoth party loses fewer people), or on the next age. It ties into the camp, boars, mammoths, wolf dens and Drying Racks (two hunt techs, two clocks).
 **Seen:** `tests/hounds.test.ts` (a wolf's first bite halves; mods); the full quick tier. Not in a browser, not played by hand; no win-rate sweep. No save bump (new tech id only).
 **Next:** a hound that walks beside a hunter as a small unit; hounds that bark at an approaching pack (a warning); wolves that fear a camp with hounds.
+
+## Designers' notes: seasons (own pitch, 2026-10-15, Chain 1014-2358, session 7)
+
+**Built:** a year of four seasons of `SEASON.len` (150) seconds, starting in spring (`SEASONS`, `src/sim/seasons.ts`; derived from the tick, no state). Summer: berries +25%, fields +10%, meat rots 1.5×. Winter: berries ×0.55, fields ×0.75, meat rots at half speed, wolves and boars notice from 40% further. A clock icon with the season, a toast at each turn, a tip.
+**Why I love it:** the Stone Age still had one best answer in every minute. Now the answer changes with the clock: forage while it's warm, hunt and dry meat before the first winter (7½ min), and expect the pack at your door when it comes. It ties into rot, Drying Racks, Hunting Camps, wolves, farms (a reason to get them), and Hounds. Spring start so the opening is never punished, and no seed offset so tests and campaigns stay put.
+**Seen:** `tests/seasons.test.ts` (turn order, one event a turn, winter meat keeps); `npm run check`. Not in a browser; no win-rate sweep (all computers lose and gain the same, but their economies feel winter's berry cut); no save bump.
+**Next:** the computer planning for winter (hunt, build racks and farms in autumn); deer migrating south in winter; snow and bare trees tied to the season (look lane); a winter hardship on idle housing; a mid-campaign chapter set in the cold.

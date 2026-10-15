@@ -1,3 +1,4 @@
+import { seasonOf } from '../sim/seasons';
 import { scenarioById } from '../sim/campaign';
 import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
@@ -286,7 +287,9 @@ export class Hud {
     const idleTechs = suspendedTechs(p).map((t) => TECHS[t].name);
     const scores = s.players.map((q) => scoreOf(s, q));
     const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${p.pop}/${p.cap}|${ageOf(p)}|${adv}|${idleTechs.length}|${idle}|${speed}|${scores.join(',')}`;
-    this.clockEl.textContent = fmtTime(s.tick);
+    const sn = seasonOf(s);
+    this.clockEl.textContent = `${sn.icon} ${fmtTime(s.tick)}`;
+    this.clockEl.title = `${sn.name}: ${sn.blurb}`;
     this.timers(s, viewer);
     this.objectives(s);
     if (sig === this.topSig) return;
