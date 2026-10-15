@@ -23,7 +23,7 @@ Since then, all on 2026-10-13: **relics** (#4, merged in #5), **trade**: traders
 
 | Check | State |
 | --- | --- |
-| Quick tier (`npm run check`) | 436 tests, 81 s on a 4-core cloud container (2026-10-15; 157 s under load before #234); `trade.test.ts` and `seed-atlas.test.ts` moved to `tests/slow/` (#110), `ai-winter`, `lords`, `relics`, `ai-forward-tower` and `ruins` (#234); `sim.test.ts` stays because it holds the determinism scan |
+| Quick tier (`npm run check`) | 407 tests, 81 s on a 4-core cloud container (2026-10-15; 157 s under load before #234); `trade.test.ts` and `seed-atlas.test.ts` moved to `tests/slow/` (#110), `ai-winter`, `lords`, `relics`, `ai-forward-tower` and `ruins` (#234); `sim.test.ts` stays because it holds the determinism scan |
 | Slow tier (`tests/slow/`) | `campaign-proof*.test.ts`: every chapter won by a computer on its own map or, at Hard, one of 15 more (#43); three files side by side, about 3½ minutes on a cloud container |
 | Coverage (2026-10-14) | rules (`src/sim/`) 83–100% of lines; rendering, sound, HUD, lobby, minimap and `main.ts` 0%: checked only by hand in a browser |
 | Browser checks | `tests/slow/browser-smoke.test.ts` (#87): title, Web of Ages, Campaign, a match and its hotkeys in headless Chromium, failing on any page or console error; daily in `periodic`, screenshots kept as an artifact |
