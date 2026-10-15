@@ -185,3 +185,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Walker waits** (own pitch, lane ai): the landmark walker halts when its escort trails by more than `AI_MARK.lead` (9) tiles. Unit test and a headless match; no sweep; no save bump.
 **Bloomery** (own pitch, lane rules, #197): Forge tech, Iron Age only (`Tech.only`): foot +20% hp, +1 armor; lapses on leaving. Tests only; browser unseen; no sweep; no save bump.
+
+**Side-age crafts** (#197, #213, own pitch, lane rules): Ropewalk (Dock, Sail only: ships +15% hp, +1 range) and Letters of Credit (Market, Merchants only: techs 15% cheaper) beside the Bloomery. New `TECHS.ropewalk`, `.credit`. Unit test only; browser and sweep unseen; no save bump.
