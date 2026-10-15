@@ -49,6 +49,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Camp burners** (own pitch, lane ai): the prowling band burns a rival Hunting Camp it finds empty (`AI_PROWL.burn`). Test only; no sweep; browser unseen; no save bump.
 
+**Camp cover** (own pitch, lane ai): a rival Hunting Camp within `AI_PROWL.cover` tiles of the computer's own Tower draws a band two larger (`.extra`). Test only; no sweep; browser unseen; no save bump.
+
 **Beacon relay** (own pitch, lane rules): a lit beacon sets alight your other rested Watch Towers within 14 tiles, free, 25 s each, down a chain (`BEACON.relay`, `.relayDuration`). Seen in headless Chromium (2026-10-15: a second tower 12 tiles off caught alight for 25 s and smokes); no save bump.
 
 **Answering the flame** (own pitch, lane ai): a clever computer lights a Tower's beacon when it sees a rival's burning within `AI_RAID.flame` tiles. Tests only; no win-rate sweep; no save bump.

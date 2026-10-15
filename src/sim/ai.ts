@@ -1971,7 +1971,7 @@ function prowl(s: GameState, v: View, mem: AiMemory, ready: Unit[], issue: (c: C
   const band = free
     .map((u) => ({ u, d: (u.x - target.x) * (u.x - target.x) + (u.y - target.y) * (u.y - target.y) }))
     .sort((a, b) => a.d - b.d || a.u.id - b.u.id)
-    .slice(0, P.most)
+    .slice(0, P.most + (target.kind === 'building' && towerCovers(s, p, target) ? P.extra : 0))
     .map((o) => o.u);
   if (target.kind === 'building') {
     issue({ t: 'move', p: p.id, ids: band.map((u) => u.id), x: target.x, y: target.y });
@@ -1982,6 +1982,12 @@ function prowl(s: GameState, v: View, mem: AiMemory, ready: Unit[], issue: (c: C
   }
   for (const u of band) held.add(u.id);
   return held;
+}
+
+/** True when one of the computer's own finished Towers stands within `cover` tiles of a point: a band there has cover to fall back on. */
+export function towerCovers(s: GameState, p: Player, at: { x: number; y: number }): boolean {
+  const r = AI_PROWL.cover * AI_PROWL.cover;
+  return s.ents.some((e) => e.kind === 'building' && e.type === 'tower' && e.built && e.hp > 0 && e.owner === p.id && (e.x - at.x) * (e.x - at.x) + (e.y - at.y) * (e.y - at.y) <= r);
 }
 
 /** The nearest rival Hunting Camp the computer has seen within `reach` of home and clear of the rival's forts (#260), or null. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AI_PROWL, TICK_HZ } from '../src/sim/data';
-import { prey, rivalCamp } from '../src/sim/ai';
+import { prey, rivalCamp, towerCovers } from '../src/sim/ai';
 import { createGame, step } from '../src/sim/game';
 import type { Building, GameState, Unit } from '../src/sim/types';
 import { placeBuilding, spawnUnit } from '../src/sim/world';
@@ -143,6 +143,24 @@ describe('the computer looks for hunters at a rival Hunting Camp', () => {
     expect(burned).toBe(true);
     expect(camp.hp).toBeLessThanOrEqual(0);
   }, 60000);
+
+  it('sends a bigger band at a camp that lies within reach of its own Tower', () => {
+    const run = (tower: boolean) => {
+      const s = game('normal');
+      clearWild(s);
+      const b = s.players[1];
+      const at = between(s, 0.45);
+      placeBuilding(s, 0, 'huntcamp', Math.floor(at.x), Math.floor(at.y), true);
+      if (tower) placeBuilding(s, 1, 'tower', Math.floor(at.x) + 6, Math.floor(at.y), true);
+      b.seen.fill(1);
+      expect(towerCovers(s, b, at)).toBe(tower);
+      for (let i = 0; i < 6; i++) spawnUnit(s, 1, 'infantry', b.startX + 4 + i * 0.4, b.startY + 4);
+      for (let i = 0; i < 3 * TICK_HZ; i++) step(s);
+      return s.ai[1]?.prowl?.ids.length ?? 0;
+    };
+    expect(run(false)).toBe(AI_PROWL.most);
+    expect(run(true)).toBe(AI_PROWL.most + AI_PROWL.extra);
+  }, 30000);
 });
 
 describe('the alert for a hunter struck by a rival', () => {
