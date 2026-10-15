@@ -268,7 +268,7 @@ export interface Ruin {
 export interface Animal {
   id: number;
   /** Deer bolt; mammoths and wolves (#171) fight. */
-  kind: 'deer' | 'mammoth' | 'wolf';
+  kind: 'deer' | 'mammoth' | 'wolf' | 'boar';
   x: number;
   y: number;
   px: number;

@@ -720,11 +720,11 @@ export class View {
         }
         case 'wildCry':
           // The wild (#171): a mammoth trumpets, a pack howls as it turns to fight.
-          if (this.sees(ev.x, ev.y)) this.cue(ev.kind === 'mammoth' ? 'mammoth' : 'howl', ev.x, ev.y, 1);
+          if (this.sees(ev.x, ev.y)) this.cue(ev.kind === 'mammoth' ? 'mammoth' : ev.kind === 'boar' ? 'snarl' : 'howl', ev.x, ev.y, 1);
           break;
         case 'wildStrike':
           if (!this.sees(ev.x, ev.y)) break;
-          if (ev.kind === 'wolf') this.cue('snarl', ev.x, ev.y, 0.8);
+          if (ev.kind === 'wolf' || ev.kind === 'boar') this.cue('snarl', ev.x, ev.y, 0.8);
           else this.effects.burst(this.ground(s, ev.x, ev.y, 0.2), { count: 8, speed: 1, up: 0.8, life: 0.7, size: 0.06, grow: 1.5, gravity: -0.5, drag: 1.5, soft: true, colors: ['#a08a68', '#c8b590'] });
           break;
         case 'animalDie':

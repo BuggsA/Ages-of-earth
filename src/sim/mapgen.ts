@@ -1,4 +1,4 @@
-import { AMOUNT, BOG_IRON, MAMMOTH, MAP_SIZES, RELIC, RUINS, TRADE, WOLF } from './data';
+import { AMOUNT, BOAR, BOG_IRON, MAMMOTH, MAP_SIZES, RELIC, RUINS, TRADE, WOLF } from './data';
 import { fbm, mulberry32, type Rng } from './rng';
 import type { MapSize, MapType, RuinFind } from './types';
 import { B_RES, B_TERRAIN, R_BERRY, R_BOG, R_FISH, R_GOLD, R_NONE, R_STONE, R_TREE, T_GRASS, T_ROCK, T_SAND, T_WATER } from './types';
@@ -54,7 +54,7 @@ export interface MapData {
   /** Ancient ruins (#64): where they stand (tile centers) and what lies under each. */
   ruins: { x: number; y: number; find: RuinFind }[];
   /** The wild (#171): mammoths, and wolves by their dens. Empty on campaign maps. */
-  wild: { kind: 'mammoth' | 'wolf'; x: number; y: number }[];
+  wild: { kind: 'mammoth' | 'wolf' | 'boar'; x: number; y: number }[];
 }
 
 const DIR8 = [
@@ -927,7 +927,7 @@ function placeWild(
   relics: { x: number; y: number }[],
   posts: { x: number; y: number }[],
   ruins: { x: number; y: number }[],
-): { kind: 'mammoth' | 'wolf'; x: number; y: number }[] {
+): { kind: 'mammoth' | 'wolf' | 'boar'; x: number; y: number }[] {
   const rng = mulberry32(seed ^ 0x3a7e0f);
   const land = (x: number, y: number) => x >= 2 && y >= 2 && x < w - 2 && y < h - 2 && (terrain[y * w + x] === T_GRASS || terrain[y * w + x] === T_SAND);
   const near = (list: { x: number; y: number }[], x: number, y: number, r: number) =>
@@ -940,7 +940,7 @@ function placeWild(
   const dists = (x: number, y: number) => starts.map((st) => Math.sqrt((x + 0.5 - st.x) * (x + 0.5 - st.x) + (y + 0.5 - st.y) * (y + 0.5 - st.y)));
   const clear = (x: number, y: number) =>
     open(x, y, 1) && reaches.every((r) => r[y * w + x] === 1) && !near(relics, x, y, 4) && !near(posts, x, y, TRADE.plaza + 4) && !near(ruins, x, y, 5) && !near(deer, x, y, 3);
-  const out: { kind: 'mammoth' | 'wolf'; x: number; y: number }[] = [];
+  const out: { kind: 'mammoth' | 'wolf' | 'boar'; x: number; y: number }[] = [];
   const pick = (list: number[]): number => list[Math.floor(rng() * list.length)];
 
   // A mammoth for every town: on a ring `home` tiles out, nearer that town than any other.
@@ -960,6 +960,40 @@ function placeWild(
     if (!ring.length) continue;
     const i = pick(ring);
     out.push({ kind: 'mammoth', x: (i % w) + 0.5, y: Math.floor(i / w) + 0.5 });
+  }
+
+  // A boar on guard by a berry patch, a way out from each town (more in the open on bigger maps).
+  const patchNear = (x: number, y: number) => {
+    for (let dy = -BOAR.near; dy <= BOAR.near; dy++) for (let dx = -BOAR.near; dx <= BOAR.near; dx++) if (res[(y + dy) * w + x + dx] === R_BERRY) return true;
+    return false;
+  };
+  const boarSpots = (k: number | null): number[] => {
+    const list: number[] = [];
+    for (let y = 3; y < h - 3; y++) {
+      for (let x = 3; x < w - 3; x++) {
+        if (!land(x, y) || !patchNear(x, y)) continue;
+        const ds = dists(x, y);
+        const m = ds.indexOf(Math.min(...ds));
+        if (k !== null ? m !== k || ds[k] < BOAR.min || ds[k] > BOAR.max : ds[m] < BOAR.max + 2) continue;
+        if (!clear(x, y) || near(out, x, y, 5)) continue;
+        list.push(y * w + x);
+      }
+    }
+    return list;
+  };
+  for (let k = 0; k < starts.length; k++) {
+    for (let n = 0; n < BOAR.count; n++) {
+      const list = boarSpots(k);
+      if (!list.length) break;
+      const i = pick(list);
+      out.push({ kind: 'boar', x: (i % w) + 0.5, y: Math.floor(i / w) + 0.5 });
+    }
+  }
+  for (let n = 0; n < BOAR.extra[size]; n++) {
+    const list = boarSpots(null);
+    if (!list.length) break;
+    const i = pick(list);
+    out.push({ kind: 'boar', x: (i % w) + 0.5, y: Math.floor(i / w) + 0.5 });
   }
 
   // Open ground out between the towns, about as far from the two nearest.

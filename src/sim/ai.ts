@@ -876,6 +876,17 @@ function wilds(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void
       if (party.length === AI_WILD.party) issue({ t: 'hunt', p: v.p.id, ids: party.map((u) => u.id), target: m.id });
     }
   }
+  // A boar guarding berries near home: three citizens spear it together, once the town has six.
+  if (v.citizens.length >= AI_WILD.boarAt && !v.citizens.some((u) => hunting(u, 'boar'))) {
+    const b = nearestBeast(s, 'boar', v.home.x, v.home.y, AI_WILD.boarNear);
+    if (b && b.state !== 'fight') {
+      const party = v.citizens
+        .filter((u) => !u.inside && u.carry <= 2 && !v.diggers.has(u.id) && u.order.k === 'gather' && (u.order.res === 'food' || u.order.res === 'wood'))
+        .sort((a, c) => (a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y) - ((c.x - b.x) * (c.x - b.x) + (c.y - b.y) * (c.y - b.y)) || a.id - c.id)
+        .slice(0, AI_WILD.boarParty);
+      if (party.length === AI_WILD.boarParty) issue({ t: 'hunt', p: v.p.id, ids: party.map((u) => u.id), target: b.id });
+    }
+  }
   if (mem.attacking || v.army.some((u) => hunting(u, 'wolf'))) return;
   const wolf = nearestBeast(s, 'wolf', v.home.x, v.home.y, AI_WILD.clear);
   if (!wolf) return;
