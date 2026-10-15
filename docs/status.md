@@ -220,4 +220,4 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **The computer reaches for an heirloom** (#232, own pitch, lane ai): once it has walked a side age, the clever computer takes the second road that opens an heirloom (`AI_WEB.heir` 1, was `take` 0.6) and buys the heirloom first, queuing it even at a busy building. Tests and a headless match; no win-rate sweep; browser unseen; no save bump.
 
-**Reading a rival's heirlooms** (#242, own pitch, lane ai): the clever computer watches a Joint-Stock rival's trading post on any road and keeps one more siege engine against a Masons' Lodge (`AI_WEB.lodge`). Unit tests only; no win-rate sweep; no save bump.
+**Reading a rival's heirlooms** (#242, own pitch, lane ai): the clever computer watches a Joint-Stock rival's trading post on any road and keeps one more siege engine against a Masons' Lodge (`AI_WEB.lodge`) and one more warship against Iron-Bound Hulls (`AI_WEB.hulls`). Unit tests only; no win-rate sweep; no save bump.
