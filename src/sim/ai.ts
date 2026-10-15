@@ -1,5 +1,5 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, AI_LEVELS, AI_MARK, AI_RAID, AI_WEB, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_FAITH, AI_LEVELS, AI_MARK, AI_RAID, AI_WEB, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Ruin, TechId, TradePost, Unit, UnitType } from './types';
@@ -15,6 +15,7 @@ import { borderMap, suppliedAt } from './borders';
 import { workProblem } from './works';
 import { beaconProblem, lit } from './beacon';
 import { rallyProblem } from './rally';
+import { consecrateProblem, consecrates } from './consecrate';
 import { sees } from './vision';
 import { seasonAt } from './seasons';
 import { progress, scenarioById } from './campaign';
@@ -68,7 +69,7 @@ const TILE_OF: Record<Res, number> = { food: R_BERRY, wood: R_TREE, stone: R_STO
 const TECH_ORDER: TechId[] = [
   'plow', 'drying', 'hounds', 'axes', 'wheelbarrow', 'picks', 'forging', 'bloomery', 'scaleArmor', 'fletching', 'husbandry', 'irrigation', 'saws', 'shafts', 'handcart',
   'ironCasting', 'chainMail', 'bodkin', 'masonry', 'theology', 'conscription', 'blastFurnace', 'plateArmor', 'chemistry',
-  'gillnets', 'shipwright', 'lighthouse', 'steamEngine', 'rifling', 'aviation', 'caravan', 'banking', 'pilgrimage',
+  'gillnets', 'shipwright', 'lighthouse', 'steamEngine', 'rifling', 'aviation', 'caravan', 'banking', 'pilgrimage', 'credit', 'ropewalk',
 ];
 /** Seconds a computer keeps its traders off a road after losing one on it. */
 const TRADER_WARY = 240;
@@ -1590,7 +1591,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     if (b.type === 'market' && !hiresAt(p, b.type).length) continue;
     let unit: UnitType | null;
     if (b.type === 'workshop') unit = siege < Math.max(v.plan.siege, p.epoch >= 2 ? 3 : 2) && (v.army.length >= 6 || siege < v.plan.siege) ? 'siege' : null;
-    else if (b.type === 'temple') unit = v.priests.length < (v.army.length >= 6 ? 2 : 0) + (looseRelics(s) > 0 ? 1 : 0) ? 'priest' : null;
+    else if (b.type === 'temple') unit = v.priests.length < (v.army.length >= 6 ? (consecrates(s, p.id) ? AI_FAITH.priests : 2) : 0) + (looseRelics(s) > 0 ? 1 : 0) ? 'priest' : null;
     else {
       unit = counter && trains.includes(counter) && unitEpoch(counter) <= p.epoch && !barred(p, counter) && roll(s) < counterOdds ? counter : pickUnit(v, mem, b);
       if (unit && unitEpoch(unit) > p.epoch) unit = pickUnit(v, mem, b);
@@ -1719,6 +1720,7 @@ function relicRace(s: GameState, p: Player): boolean {
  */
 function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   if (!v.priests.length) return;
+  chantBand(s, v, issue);
   const army = v.army.filter((u) => !u.inside && u.type !== 'siege');
   const fetching = new Set<number>();
   for (const pr of v.priests) if (pr.order.k === 'relic') fetching.add(pr.order.target);
@@ -1788,6 +1790,53 @@ function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
       if (dx * dx + dy * dy > 49) issue({ t: 'move', p: v.p.id, ids: [pr.id], x: cx, y: cy });
     } else if (mem.muster) issue({ t: 'move', p: v.p.id, ids: [pr.id], x: mem.muster.x, y: mem.muster.y });
   }
+}
+
+/**
+ * Faith takes the walls (#209): a pilgrim computer builds no siege, so the priests that have kept up with
+ * its army (idle, walking or healing) chant over, together, the rival building nearest the army: a tower
+ * or a gate first, then a Temple that keeps relics. A band already chanting draws in every free priest.
+ */
+function chantBand(s: GameState, v: View, issue: (c: Command) => void): void {
+  if (!consecrates(s, v.p.id)) return;
+  const army = v.army.filter((u) => !u.inside && u.type !== 'siege');
+  if (!army.length) return;
+  let cx = 0;
+  let cy = 0;
+  for (const a of army) {
+    cx += a.x;
+    cy += a.y;
+  }
+  cx /= army.length;
+  cy /= army.length;
+  const keep = (AI_FAITH.reach + AI_FAITH.keep) * (AI_FAITH.reach + AI_FAITH.keep);
+  // Healing and keeping up with the army both give way: a pilgrim people's priests are its siege.
+  const free = v.priests.filter((pr) => (pr.order.k === 'idle' || pr.order.k === 'move' || pr.order.k === 'heal') && !pr.inside && pr.cool <= 0 && !carriedBy(s, pr) && (pr.x - cx) * (pr.x - cx) + (pr.y - cy) * (pr.y - cy) <= keep);
+  if (!free.length) return;
+  // Join a chant already under way.
+  let target: Building | null = null;
+  let voices = 0;
+  for (const pr of v.priests) {
+    if (pr.order.k !== 'convert') continue;
+    const b = s.byId.get(pr.order.target);
+    if (!b || b.kind !== 'building' || consecrateProblem(s, v.p.id, b)) continue;
+    target = b;
+    voices++;
+  }
+  if (!target) {
+    let best = AI_FAITH.reach * AI_FAITH.reach;
+    for (const e of s.ents) {
+      if (e.kind !== 'building' || consecrateProblem(s, v.p.id, e) || !v.p.vis[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
+      const near = e.type === 'tower' || e.type === 'gate' ? AI_FAITH.wall : e.type === 'temple' && s.relics.some((r) => r.temple === e.id) ? AI_FAITH.relic : 1;
+      const d = ((e.x - cx) * (e.x - cx) + (e.y - cy) * (e.y - cy)) * near;
+      if (d < best) {
+        best = d;
+        target = e;
+      }
+    }
+  }
+  if (!target || free.length + voices < AI_FAITH.band) return;
+  issue({ t: 'convert', p: v.p.id, ids: free.map((pr) => pr.id), target: target.id });
 }
 
 // ---- Trade -----------------------------------------------------------------------------------------

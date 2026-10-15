@@ -29,7 +29,7 @@ export type TechId =
   | 'forging' | 'ironCasting' | 'blastFurnace' | 'fletching' | 'bodkin' | 'scaleArmor' | 'chainMail' | 'plateArmor'
   | 'wheelbarrow' | 'handcart' | 'axes' | 'saws' | 'picks' | 'shafts' | 'plow' | 'irrigation' | 'masonry'
   | 'conscription' | 'husbandry' | 'theology' | 'chemistry'
-  | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'bloomery';
+  | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'bloomery' | 'ropewalk' | 'credit';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
 export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut';
 
@@ -214,6 +214,13 @@ export interface Building {
   /** Tower beacon: tick it burns out (while lit), and tick it may be lit again (#beacon). */
   beacon?: number;
   beaconReady?: number;
+  /**
+   * Faith takes the walls (#209): how far a rival's priests have chanted this building over (0 to 1),
+   * whose they are, and the tick of the last chant (the faith fades after a pause). Absent: none.
+   */
+  faith?: number;
+  faithBy?: number;
+  chant?: number;
 }
 
 export type Ent = Unit | Building;
@@ -446,6 +453,10 @@ export type GameEvent =
   | { k: 'rank'; id: number; owner: number; x: number; y: number; rank: number }
   | { k: 'alert'; owner: number; x: number; y: number; building: boolean; wild?: Animal['kind'] }
   | { k: 'converted'; id: number; from: number; to: number; x: number; y: number }
+  /** A building chanted over to a pilgrim people (#209). */
+  | { k: 'consecrated'; id: number; from: number; to: number; x: number; y: number; type: BuildingType; size: number }
+  /** Rival priests have begun chanting at one of `owner`'s buildings (#209). */
+  | { k: 'chanting'; owner: number; by: number; id: number; type: BuildingType; x: number; y: number }
   | { k: 'healed'; id: number; x: number; y: number }
   | { k: 'garrison'; owner: number; building: number; inside: boolean }
   | { k: 'bell'; owner: number; ring: boolean }

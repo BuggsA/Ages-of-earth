@@ -84,6 +84,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Sacred Grove** (own pitch, lane rules): a fifth landmark kind; its keeper's priests convert and heal 1.8x as fast within 10 tiles (`LANDMARKS.grove`). Unit and model tests only; browser, sound and win-rate unseen; the computer claims it but doesn't yet stage priests there; no save bump.
 
+**Faith takes the walls** (#209, own pitch from the owner's note #197, lane rules): in the Age of Pilgrims, priests chant a rival's building over together (never a Town Center or Wonder), slower with soldiers inside, and a Temple brings its relics; a pilgrim computer sends priest bands with its army. New numbers `CONSECRATE`, `AI_FAITH`, mod `consecrate`. Tests, headless matches and headless-Chromium screenshots of a tower turning; the chant's gold motes and the bell chord unseen/unheard; no save bump.
+
 ## Waiting on the owner
 
 **Setup only the owner can do:**
@@ -187,3 +189,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Bloomery** (own pitch, lane rules, #197): Forge tech, Iron Age only (`Tech.only`): foot +20% hp, +1 armor; lapses on leaving. Tests only; browser unseen; no sweep; no save bump.
 
 **Escort replaced** (own pitch, lane ai): a walker whose escort has all fallen gets a fresh one if soldiers can be spared. Unit test only; no sweep; no save bump.
+
+**Side-age crafts** (#197, #213, own pitch, lane rules): Ropewalk (Dock, Sail only: ships +15% hp, +1 range) and Letters of Credit (Market, Merchants only: techs 15% cheaper) beside the Bloomery. New `TECHS.ropewalk`, `.credit`. Unit test only; browser and sweep unseen; no save bump.

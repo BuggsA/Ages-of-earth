@@ -18,6 +18,7 @@ import { carriedBy, relicAt } from './sim/relics';
 import { RUIN_FINDS, ruinAt } from './sim/ruins';
 import { LANDMARK_KINDS, landmarkAt } from './sim/landmarks';
 import { postAt } from './sim/trade';
+import { consecrateProblem } from './sim/consecrate';
 import { ageDef, ageOf, isSideRoad, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
 import { NetClient, newRoomCode, saveName, savedName } from './net/client';
 import { HASH_EVERY, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
@@ -1829,6 +1830,19 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           lastAlert = { x: ev.x, y: ev.y };
         }
         break;
+      case 'consecrated':
+        if (ev.to === viewer) hud.toast(`✨ Your priests have won over a ${BUILDINGS[ev.type].name}`, 'good');
+        else if (ev.from === viewer) {
+          hud.toast(`Your ${BUILDINGS[ev.type].name} has been won over by ${s.players[ev.to].name}'s priests!`, 'alert');
+          lastAlert = { x: ev.x, y: ev.y };
+        }
+        break;
+      case 'chanting':
+        if (ev.owner === viewer) {
+          hud.toast(`${s.players[ev.by].name}'s priests are chanting at your ${BUILDINGS[ev.type].name}: strike them down before it turns!`, 'alert');
+          lastAlert = { x: ev.x, y: ev.y };
+        }
+        break;
       case 'bell':
         if (ev.owner === viewer) hud.toast(ev.ring ? 'The town bell rings: citizens run for shelter' : 'All clear: back to work', 'info');
         break;
@@ -1984,7 +1998,7 @@ function cursorFor(s: GameState): string {
     const t = s.byId.get(pk.id) as Ent | undefined;
     if (!t) return '';
     const foe = s.players[t.owner].team !== s.players[viewer].team;
-    if (units.length && foe) return units.every((u) => u.type === 'priest') && t.kind === 'unit' ? 'cur-convert' : 'cur-attack';
+    if (units.length && foe) return units.every((u) => u.type === 'priest') && (t.kind === 'unit' || !consecrateProblem(s, viewer, t)) ? 'cur-convert' : 'cur-attack';
     if (units.some((u) => u.type === 'citizen') && t.kind === 'building' && t.owner === viewer && (!t.built || t.hp < maxHp(s, t) || t.type === 'farm')) return 'cur-build';
     if (units.length && t.kind === 'building' && t.owner === viewer && t.built && BUILDINGS[t.type].garrison) return 'cur-garrison';
     if (t.kind === 'building' && t.type === 'temple' && t.owner === viewer && t.built && units.some((u) => u.type === 'priest' && carriedBy(s, u))) return 'cur-gather';

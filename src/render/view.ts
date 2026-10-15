@@ -579,7 +579,16 @@ export class View {
         this.chimneys.set(e.id, next + dt);
         continue;
       }
-      if (frac < 0.6) {
+      if ((e.faith ?? 0) > 0) {
+        // Faith takes the walls (#209): pale gold motes rise round a building being chanted over, higher and thicker as the faith builds.
+        const f = e.faith!;
+        const a = Math.random() * 6.283;
+        // Just outside the walls, so the building doesn't hide them.
+        const r = e.size * (0.6 + Math.random() * 0.2);
+        const at = new THREE.Vector3(e.x + Math.cos(a) * r, base + 0.2 + Math.random() * 0.6 + f * 1.5, e.y + Math.sin(a) * r);
+        this.effects.burst(at, { count: 2 + Math.round(f * 6), speed: 0.25, up: 1, life: 1.8, size: 0.13, grow: 1.4, gravity: -0.7, drag: 0.6, colors: ['#ffd166', '#ffe9a0', '#fff3c4'] });
+        this.chimneys.set(e.id, this.time + 0.25 - f * 0.15);
+      } else if (frac < 0.6) {
         // Burning: flames and black smoke, more as it falls.
         const at = new THREE.Vector3(e.x + (Math.random() - 0.5) * e.size * 0.6, base + 0.6 + Math.random() * 0.6, e.y + (Math.random() - 0.5) * e.size * 0.6);
         this.effects.burst(at, { count: 2, speed: 0.4, up: 1, life: 0.7, size: 0.07, gravity: -1.2, drag: 1, colors: ['#ff9a3c', '#ffd166', '#e0471f'] });
@@ -780,6 +789,15 @@ export class View {
           this.effects.ring(at, '#fff3c4', 1.4, 1.2);
           this.effects.burst(at.clone().setY(at.y + 0.6), { count: 24, speed: 1.2, up: 1, life: 1.4, size: 0.05, gravity: -0.8, colors: ['#fff3c4', '#ffd166', '#ffffff'] });
           this.cue('convert', ev.x, ev.y, 1);
+          break;
+        }
+        case 'consecrated': {
+          // The building turns (#209): a wide ring of light at its foot and a fountain of gold over it.
+          if (!this.sees(ev.x, ev.y) && ev.from !== this.viewer && ev.to !== this.viewer) break;
+          const at = this.ground(s, ev.x, ev.y, 0.1);
+          this.effects.ring(at, '#fff3c4', 1.2 + ev.size * 0.8, 1.6);
+          this.effects.burst(at.clone().setY(at.y + 1), { count: 30 + ev.size * 10, speed: 1.6, up: 1.4, life: 1.8, size: 0.06, gravity: -0.6, colors: ['#fff3c4', '#ffd166', '#ffffff'] });
+          this.cue('consecrate', ev.x, ev.y, 1);
           break;
         }
         case 'healed':
