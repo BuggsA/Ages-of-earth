@@ -525,7 +525,9 @@ export const LANDMARKS = {
  */
 export const AI_MARK = { townAt: 8, near: 44, rival: 0.75, walk: 150, party: 3, guard: 5, hold: 120,
   /** Divisors of a landmark's distance (bigger: more worth walking for): by kind, with the cairn when houses are full and the spring when people are hurt. */
-  worth: { crag: 1, flint: 1.25, spring: 1, springHurt: 1.5, cairn: 1, cairnFull: 1.6 } };
+  worth: { crag: 1, flint: 1.25, spring: 1, springHurt: 1.5, cairn: 1, cairnFull: 1.6,
+    /** Times more worth walking for the kind its own people favour (`LANDMARKS.kin`), since it pays half again as much. */
+    kin: 1.4 } };
 /** Repairs: restoring a building's whole health costs this share of its price, paid as the hammers work. */
 export const REPAIR_SHARE = 0.4;
 export const TRADE = { posts: { small: 2, medium: 2, large: 3 } as Record<MapSize, number>, edge: 9, fair: 4, far: 0.3, spacing: 0.4, plaza: 1, reach: 1.8, gold: 0.012, epoch: 0.08, max: 180, ally: 0.25, harbor: { reach: 12, mul: 1.3 }, sea: { reach: 7, mul: 1.2 } };
