@@ -395,7 +395,7 @@ function fightStep(s: GameState, sp: Spatial | undefined, a: Animal): void {
 /** A wolf bites, or a mammoth gores: armor helps; the bitten fight back. */
 function maul(s: GameState, a: Animal, u: Unit): void {
   const st = statsOf(s, u);
-  const damage = Math.max(1, (a.kind === 'wolf' ? WOLF.bite : a.kind === 'boar' ? BOAR.bite : MAMMOTH.gore) - st.armor);
+  const damage = Math.max(1, (a.kind === 'wolf' ? WOLF.bite : a.kind === 'boar' ? BOAR.bite : MAMMOTH.gore) - st.armor) * modsOf(s, u.owner).beastWard;
   u.hp -= damage;
   u.hurt = s.tick;
   s.events.push({ k: 'wildStrike', id: a.id, kind: a.kind, target: u.id, x: u.x, y: u.y });
