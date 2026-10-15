@@ -673,3 +673,7 @@ Built: bog iron dug on any road (`stats.iron`) raises each trade trip in the Mer
 
 **Next (umbrella #231):** draw the field on the ground and mark dark buildings in the panel; an heirloom or hybrid (Lightning + Reclaimers: old machines woken by current?); the computer laying its town out inside its fields; a counter for coils in the Aeronauts' hands (bombers that seek coils?).
 
+
+## Designers' notes: reading a rival's heirlooms (#242, own pitch, 2026-10-15, chain 1015-1037 s1, lane ai)
+
+**Built:** heirlooms are kept for good, so a rival can see what they say about you. The clever computer now reads two (`rivalHas`, `AI_WEB.lodge`): a Joint-Stock Company makes you a trade rival on any road (its riders watch your trading post, `watchPost`), and a Masons' Lodge, with its sturdier buildings, makes it keep one more siege engine. **Why I love it:** walking two side ages now costs something as well as giving something: the other side notices. **Seen:** `tests/ai-rival-heirlooms.test.ts`; no win-rate sweep. **Next:** a Bell Foundry rival's temples as a target, Iron-Bound Hulls answered by more warships, and a detour off a turn age (Pilgrims → Middle → Sail) when an heirloom is worth it.

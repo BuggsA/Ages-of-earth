@@ -493,6 +493,11 @@ function rivalIn(s: GameState, p: Player, ages: AgeId[]): boolean {
   return s.players.some((o) => !o.defeated && isEnemy(s, p.id, o.id) && ages.includes(ageOf(o)));
 }
 
+/** Whether a living rival has learned a craft (#242): an heirloom shows in what a people does, and the clever computer reads it. */
+function rivalHas(s: GameState, p: Player, tech: TechId): boolean {
+  return s.players.some((o) => !o.defeated && isEnemy(s, p.id, o.id) && o.techs.includes(tech));
+}
+
 // ---- Building --------------------------------------------------------------------------------------
 
 /** A free spot for a building near a point, keeping a lane open around it. */
@@ -1659,6 +1664,8 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   }
   const keepCitizensGrowing = v.citizens.length < 8;
   const siege = v.army.filter((u) => u.type === 'siege').length;
+  // A rival with the Masons' Lodge raises sturdier buildings (+15%): one more engine to break them (#242).
+  const lodge = L.clever && rivalHas(s, p, 'masonsLodge') ? AI_WEB.lodge : 0;
   for (const b of v.buildings) {
     if (!b.built || b.queue.length >= Math.min(2, MAX_QUEUE) || keepCitizensGrowing) continue;
     const trains = lines(p, b);
@@ -1669,7 +1676,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     // The Market hires (#37) only in an age that hires there, after the traders have had first call on its queue.
     if (b.type === 'market' && !hiresAt(p, b.type).length) continue;
     let unit: UnitType | null;
-    if (b.type === 'workshop') unit = siege < Math.max(v.plan.siege, p.epoch >= 2 ? 3 : 2) && (v.army.length >= 6 || siege < v.plan.siege) ? 'siege' : null;
+    if (b.type === 'workshop') unit = siege < Math.max(v.plan.siege, p.epoch >= 2 ? 3 : 2) + lodge && (v.army.length >= 6 || siege < v.plan.siege) ? 'siege' : null;
     else if (b.type === 'temple') unit = v.priests.length < (v.army.length >= 6 ? (consecrates(s, p.id) ? AI_FAITH.priests : 2) : 0) + (looseRelics(s) > 0 ? 1 : 0) ? 'priest' : null;
     else {
       unit = counter && trains.includes(counter) && unitEpoch(counter) <= p.epoch && !barred(p, counter) && roll(s) < counterOdds ? counter : pickUnit(v, mem, b);
@@ -1734,7 +1741,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
       issue({ t: 'attack', p: p.id, ids: riders.slice(0, 3).map((u) => u.id), target: prey.id });
       return;
     }
-    // A merchant rival's age stands on its trade (#50): a band of riders lies in wait by the trading
+    // A merchant rival's age stands on its trade (#50), and a Joint-Stock Company keeps it so on any road (#242): a band of riders lies in wait by the trading
     // post nearest its town, and falls on the traders it sees coming.
     const post = riders.length ? watchPost(s, p) : null;
     if (post) {
@@ -1988,11 +1995,11 @@ function enemyTrader(s: GameState, v: View, at: { x: number; y: number }, r: num
 }
 
 /** The trading post a band of riders watches against merchant rivals (#50): the one nearest any of their towns, or null with no merchant rival. */
-function watchPost(s: GameState, p: Player): TradePost | null {
+export function watchPost(s: GameState, p: Player): TradePost | null {
   let best: TradePost | null = null;
   let bestD = Infinity;
   for (const o of s.players) {
-    if (o.defeated || !isEnemy(s, p.id, o.id) || (ageOf(o) !== 'merchant' && ageOf(o) !== 'fair')) continue;
+    if (o.defeated || !isEnemy(s, p.id, o.id) || (ageOf(o) !== 'merchant' && ageOf(o) !== 'fair' && !o.techs.includes('jointStock'))) continue;
     for (const post of s.posts) {
       const d = (post.x - o.startX) * (post.x - o.startX) + (post.y - o.startY) * (post.y - o.startY);
       if (d < bestD) {
