@@ -21,7 +21,7 @@ const ROCK = [C('#8f8679'), C('#a0988b'), C('#7d756a')];
 const CLIFF = C('#7e7466');
 const BED = [C('#b9a87a'), C('#8b9378')];
 
-export const terrainMaterial = inject(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.95 }), {});
+export const terrainMaterial = inject(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.95 }), { season: 'ground' });
 
 /** Smooth value noise for color patches (render only). */
 function smooth(x: number, y: number, scale: number, salt: number): number {
