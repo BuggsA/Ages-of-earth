@@ -81,4 +81,24 @@ describe('the computer escorts its walker', () => {
     for (let i = 0; i < 6 * TICK_HZ; i++) step(s);
     expect(band.filter((u) => Math.hypot(u.x - home.x, u.y - home.y) > 5).length).toBeGreaterThanOrEqual(2);
   }, 30000);
+  it('lingers by the landmark for a while once it is won', () => {
+    const s = game();
+    const home = s.ents.find((e) => e.kind === 'building' && e.owner === 1)!;
+    const [a] = s.landmarks!;
+    for (const m of s.landmarks!) { m.owner = -1; m.by = -1; m.claim = 0; }
+    a.x = home.x + 32; a.y = home.y;
+    for (let i = 0; i < 10; i++) spawnUnit(s, 1, 'citizen', home.x + 3 + i * 0.5, home.y + 3);
+    for (let i = 0; i < 5; i++) spawnUnit(s, 1, 'infantry', home.x + 2 + i * 0.4, home.y + 3);
+    for (let i = 0; i < 15 * TICK_HZ && !s.ai[1]?.markEscort; i++) step(s);
+    const e = s.ai[1]!.markEscort!;
+    const target = s.landmarks!.find((m) => m.id === e.mark)!;
+    // The claim is won: the walk ends, but the escort stays held for a while.
+    target.owner = 1; target.by = 1; target.claim = claimWork();
+    for (let i = 0; i < 3 * TICK_HZ; i++) step(s);
+    expect(s.ai[1]?.markEscort?.until).toBeGreaterThan(s.tick);
+    for (let i = 0; i < 25 * TICK_HZ; i++) step(s);
+    // (A new walk to another landmark may start its own escort by then.)
+    const later = s.ai[1]?.markEscort;
+    expect(later?.mark === target.id && later.until).toBeFalsy();
+  }, 60000);
 });

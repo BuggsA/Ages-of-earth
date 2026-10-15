@@ -564,7 +564,7 @@ export interface AiMemory {
   /** Soldiers sent to take (or take back) a landmark, held there until it is the computer's. */
   markGuard?: { id: number; ids: number[]; since: number };
   /** Soldiers sent along with the landmark walker to a far landmark, until the walk is over. */
-  markEscort?: { unit: number; ids: number[] };
+  markEscort?: { unit: number; mark: number; ids: number[]; until?: number };
   /**
    * The side ages it has made up its mind about (#50): true to walk the road there once it opens,
    * false to pass it by. Decided once each, so it doesn't waver from one turn to the next.
