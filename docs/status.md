@@ -57,10 +57,12 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Rallying Cry** (own pitch, lane rules): the hero's R shout stirs soldiers within 8 tiles for 12 s (+30% blows, +1 armor, mended 6; 70 s rest); the clever computer calls it. `RALLY` in `data.ts`. Tests and a headless match only; browser, sound level and a visible effect unseen; no save bump.
 
+**Art pass 8** (#267, lane look): epoch 4 citizen work clothes and pick, ironclad armor belt. Render only; models test passes; look unseen.
+
 **Rally ring** (own pitch, lane look): stirred soldiers wear a pulsing gold band that fades with the cry. Render only; smoke passes; look in a match unseen.
 **Cry ripple** (own pitch, lane look): calling the Rallying Cry sends two gold rings out to its reach. Render only; reach vs. the ring mesh unseen in a browser.
 
-**Machine-age silhouettes** (#267 art pass, lane look): epoch 4 barracks (brick drill hall, gatehouse, gun), range (skylit hall, iron firing rail) and stable (cavalry depot, loft hoist) too; the forge is a foundry (sawtooth roof, banded cupola furnace, steam hammer, ingots) and the siege workshop an engineering shed (glazed roof, gantry crane, gun on the stocks); epoch 4 houses are brick terraces (flat parapet, chimney pots) and Watch Towers iron-framed lookouts with a lamp gallery, no longer the epoch 3 shapes. Render only; `models.test.ts` builds them; look in a browser unseen; no save bump.
+**Machine-age silhouettes** (#267 art pass, lane look): epoch 4 barracks (brick drill hall, gatehouse, gun), range (skylit hall, iron firing rail) and stable (cavalry depot, loft hoist) too; the forge is a foundry (sawtooth roof, banded cupola furnace, steam hammer, ingots) and the siege workshop an engineering shed (glazed roof, gantry crane, gun on the stocks); epoch 4 houses are brick terraces (flat parapet, chimney pots) and Watch Towers iron-framed lookouts with a lamp gallery, no longer the epoch 3 shapes; the epoch 4 Temple is a brick cathedral with a clock tower and iron spire, the Market an iron-and-glass arcade. Render only; `models.test.ts` builds them; look in a browser unseen; no save bump.
 
 **Waymarks** (#154, seed #152, lane look): the minimap remembers ruins (dug or standing, by whom) and relics as last seen. UI only; browser unverified.
 **Standing to answer** (own pitch, lane rules): pilgrim priests right-clicked onto a chanted-over own building stand by it and sing back 1.5× (`CONSECRATE.counter.stand`, `.hold`). Tests only; browser and sound unseen; no save bump. The pilgrim computer orders it (`ai.ts` priestly), and the cursor shows gather over such a building; the building panel says how many priests are answering (HUD only, unseen).
