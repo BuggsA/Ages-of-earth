@@ -952,6 +952,12 @@ export const SEASONS = [
  * the cold), wants `fields` more fields and `food` more of its people on food, hunts mammoths and boars with `hunters` fewer citizens (meat
  * keeps in the cold) and, in the winter itself, clears wolves with `pack` fewer soldiers.
  */
+/**
+ * A bulk order from the player spreads (#266): gatherers fan over nodes of that resource within `reach` tiles
+ * of the one clicked, `perNode` to a node; attackers fall on foes within `foe` tiles of the one clicked,
+ * `perFoe` to a foe (the clicked one first), the rest on the clicked one. Meat is one carcass, so it isn't spread.
+ */
+export const SPREAD = { reach: 5, perNode: 2, foe: 4, perFoe: 3 };
 export const AI_WINTER = { from: 2, fields: 2, hunters: 3, pack: 1, food: 0.3 };
 
 /**

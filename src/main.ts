@@ -1037,7 +1037,7 @@ function order(clientX: number, clientY: number, forceAttack = false, queue = fa
     // Your own transport: those on foot go aboard.
     if (t.kind === 'unit' && t.type === 'transport' && t.owner === viewer && board(s, units, t, q)) return;
     if (t.owner !== viewer && s.players[t.owner].team !== s.players[viewer].team) {
-      issue({ t: 'attack', p: viewer, ids, target: t.id, queue: q });
+      issue({ t: 'attack', p: viewer, ids, target: t.id, queue: q, spread: true });
       view.marker(s, t.x, t.y, true);
       play(units.every((u) => u.type === 'priest') ? 'chant' : 'attack');
       ack('attack');
@@ -1055,7 +1055,7 @@ function order(clientX: number, clientY: number, forceAttack = false, queue = fa
     return;
   }
   if (pk.kind === 'resource') {
-    issue({ t: 'gather', p: viewer, ids, tile: pk.tile, queue: q });
+    issue({ t: 'gather', p: viewer, ids, tile: pk.tile, queue: q, spread: true });
     view.marker(s, (pk.tile % s.w) + 0.5, Math.floor(pk.tile / s.w) + 0.5, false);
     play('move');
     ack('move');
