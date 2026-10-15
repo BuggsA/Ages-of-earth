@@ -245,6 +245,41 @@ function huntcamp(k: Kit, e: number, st: Style): void {
   banner(k, 0.85, 0, 0.8, 0.8);
 }
 
+// ---- War Camp (#303) -------------------------------------------------------------------------------
+
+function warcamp(k: Kit, e: number, st: Style): void {
+  // Trampled ground, a ring of sharpened stakes, two ridge tents, a rack of spears, a cook fire, and the war standard.
+  k.box(1.9, 0.05, 1.9, '#6f5a43', 0, -0.02, 0);
+  const canvas = e >= 3 ? '#cfc6ae' : '#b9a27a';
+  for (let i = 0; i < 14; i++) {
+    // Around the edge, leaving a gap on the near side for the gate.
+    const side = i % 4;
+    const a = -0.8 + (Math.floor(i / 4) + 0.5) * 0.4;
+    if (side === 2 && Math.abs(a) < 0.3) continue;
+    const x = side === 0 ? -0.88 : side === 1 ? 0.88 : a;
+    const z = side === 2 ? 0.88 : side === 3 ? -0.88 : a;
+    k.cyl(0.0, 0.045, 0.42, 4, st.post, x, 0, z);
+  }
+  for (const [x, z] of [[-0.42, -0.35], [0.38, -0.3]]) {
+    k.prism(0.75, 0.55, 0.62, canvas, x, 0, z);
+    k.box(0.04, 0.6, 0.04, st.post, x, 0, z + 0.32);
+  }
+  // Spears stacked on a rack, iron-tipped.
+  k.box(0.6, 0.04, 0.04, st.post, 0.35, 0.36, 0.42);
+  for (const x of [0.15, 0.27, 0.39, 0.51]) {
+    const spear = k.cyl(0.012, 0.012, 0.75, 4, '#7a5a3a', x, 0, 0.38);
+    spear.rotation.x = -0.18;
+    k.cone(0.025, 0.09, 4, '#7c8088', x, 0.75, 0.31);
+  }
+  k.cyl(0.18, 0.2, 0.06, 8, '#55504a', -0.35, 0, 0.35);
+  k.sphere(0.09, '#e5742a', -0.35, 0.1, 0.35).scale.set(1, 1.3, 1);
+  // The war standard: a tall pole with a crimson streamer over the people's colour.
+  k.cyl(0.025, 0.03, 1.6, 5, '#3f2e22', 0, 0, -0.05);
+  k.box(0.012, 0.18, 0.5, '#9b1c2c', 0, 1.3, 0.2);
+  k.team(k.box(0.014, 0.16, 0.36, TEAM, 0, 1.1, 0.13));
+  k.cone(0.05, 0.12, 4, '#c9a23a', 0, 1.6, -0.05);
+}
+
 // ---- Farm ------------------------------------------------------------------------------------------
 
 function farm(k: Kit, e: number, st: Style): void {
@@ -1374,7 +1409,7 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
 }
 
 const MAKERS: Record<Exclude<BuildingType, 'wall'>, (k: Kit, e: number, st: Style) => void> = {
-  towncenter, house, storehouse, huntcamp, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield,
+  towncenter, house, storehouse, huntcamp, warcamp, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield,
 };
 
 const cache = new Map<string, THREE.BufferGeometry>();

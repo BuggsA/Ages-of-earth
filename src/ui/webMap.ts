@@ -98,7 +98,8 @@ export function roadView(d: Discovery, r: Road): 'hidden' | 'faint' | 'known' {
 
 // ---- Layout: tiers run down the page, lanes across, so it reads at phone width. ----------------
 
-const LANE: Record<AgeId, number> = { iron: 0, reclaimer: 0, stone: 1, bronze: 1, middle: 1, gunpowder: 1, industrial: 1, merchant: 2, pilgrim: 3, fair: 2.5, sail: 4, aeronaut: 2, lightning: 0, warband: 0, steppe: 2 };
+// The Path of Blood keeps the left column (Warband over Iron and Blood, #303), so the Reclaimers moved to lane 2 and the Fairs to lane 3 at tier 3.
+const LANE: Record<AgeId, number> = { iron: 0, reclaimer: 2, stone: 1, bronze: 1, middle: 1, gunpowder: 1, industrial: 1, merchant: 2, pilgrim: 3, fair: 3, sail: 4, aeronaut: 2, lightning: 0, warband: 0, steppe: 2, ironblood: 0 };
 export const MAP = { w: 360, h: 420, nodeW: 76, nodeH: 34, top: 40, gap: 85 };
 
 export function layout(): Record<AgeId, { x: number; y: number }> {

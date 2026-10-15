@@ -19,7 +19,7 @@ export type UnitType =
 export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
   | 'towncenter' | 'house' | 'storehouse' | 'farm' | 'barracks' | 'range' | 'stable' | 'tower'
-  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp';
+  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp';
 /** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
 export type Difficulty = 'gentle' | 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
@@ -35,7 +35,7 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
 export type PathId = 'blood';
@@ -240,6 +240,8 @@ export interface Building {
    * reaches 1. The share of its full health it was packed with, which it climbs back to as it goes up.
    */
   pitch?: number;
+  /** A War Camp (#303): whole seconds it has stood with none of its people's soldiers near; absent while they are. */
+  alone?: number;
 }
 
 export type Ent = Unit | Building;
@@ -482,6 +484,8 @@ export type GameEvent =
   | { k: 'rank'; id: number; owner: number; x: number; y: number; rank: number }
   /** Gold taken from an enemy unit slain by a people with a plunder share (the Path of Blood, #299). */
   | { k: 'plunder'; owner: number; x: number; y: number; gold: number }
+  /** A War Camp left without its soldiers (#303): it burns after a grace, or at once if its people left the path (`struck`). */
+  | { k: 'campAlone'; owner: number; id: number; x: number; y: number; struck: boolean }
   | { k: 'alert'; owner: number; x: number; y: number; building: boolean; wild?: Animal['kind']; /** A rival's soldiers fell on a citizen out hunting. */ hunter?: boolean }
   | { k: 'converted'; id: number; from: number; to: number; x: number; y: number }
   /** A building chanted over to a pilgrim people (#209). */

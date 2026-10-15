@@ -89,8 +89,9 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
   // Walls follow the land (and docks the shore); everything else wants it fairly level.
   if (hi - lo > (type === 'wall' || type === 'gate' || type === 'dock' ? 2.2 : 1.1)) return 'slope';
   if (BUILDINGS[type].shore && shoreWater(s, tx, ty, n) < 3) return 'shore';
-  // Borders (#132 s3): no building in an enemy's land, but a Tower may be raised there as a foothold.
-  if (owner >= 0 && type !== 'tower') {
+  // Borders (#132 s3): no building in an enemy's land, but a Tower may be raised there as a foothold,
+  // and a War Camp pitched where the army stands (#303).
+  if (owner >= 0 && type !== 'tower' && type !== 'warcamp') {
     const o = landOwnerAt(s, tx + (n >> 1), ty + (n >> 1));
     if (o >= 0 && isEnemy(s, owner, o)) return 'foreign';
   }

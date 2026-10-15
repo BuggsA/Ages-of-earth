@@ -1,6 +1,7 @@
 import { aiStep } from './ai';
 import { workStep } from './works';
 import { beaconStep } from './beacon';
+import { warCampStep } from './warcamp';
 import { raiseCamps } from './steppe';
 import { faithStep } from './consecrate';
 import { turnSeason } from './seasons';
@@ -474,6 +475,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   attrition(s);
   workStep(s);
   beaconStep(s);
+  warCampStep(s);
   raiseCamps(s);
   faithStep(s);
   removeDead(s);

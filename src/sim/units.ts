@@ -4,7 +4,7 @@ import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWa
 import { findRoute } from './path';
 import type { Spatial } from './spatial';
 import { buildTimeFor, buildingCostFor, modsOf } from './stats';
-import { inField } from './ages';
+import { canRaise, inField } from './ages';
 import type { Act, Animal, Building, Cost, Ent, GameState, Goal, Order, Res, Unit } from './types';
 import { seasonOf } from './seasons';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
@@ -384,7 +384,7 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
   let next: Building | null = null;
   let bestD = b.type === 'wall' || b.type === 'gate' ? 4 : 14;
   for (const e of s.ents) {
-    if (e.kind !== 'building' || e.owner !== u.owner || e.built || e.hp <= 0) continue;
+    if (e.kind !== 'building' || e.owner !== u.owner || e.built || e.hp <= 0 || !canRaise(u.type, e.type)) continue;
     const d = distToRect(u.x, u.y, e);
     if (d < bestD) {
       bestD = d;

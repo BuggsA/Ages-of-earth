@@ -4,7 +4,7 @@ import { scenarioById } from '../sim/campaign';
 import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
-import { AGES, PATHS, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { AGES, PATHS, WARCAMP, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { homeMarket, marketOf, postAt, tripGold } from '../sim/trade';
@@ -12,13 +12,14 @@ import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
 import { LANDMARK_KINDS, claimWork, claimants, favours, landmarkAt } from '../sim/landmarks';
 import { workProblem } from '../sim/works';
 import { beaconProblem, lit } from '../sim/beacon';
+import { campGrace } from '../sim/warcamp';
 import { chantedOver, consecrates, faithOf } from '../sim/consecrate';
 import { rallyProblem } from '../sim/rally';
 import { stirred as stirredNow } from '../sim/combat';
 import { sees } from '../sim/vision';
 import { buildingCostFor, buildingMaxHp, modsOf, statsFor, techCostFor, techProblem, trainCostFor, trainTimeFor } from '../sim/stats';
 import { isMobile, packProblem, pitchProblem } from '../sim/steppe';
-import { ageDef, ageOf, backProblem, buildBarred, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, ironTradeShare, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, pathAges, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, surveyFinds, suspendedTechs, trainsAt, windowsOf } from '../sim/ages';
+import { ageDef, ageOf, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, ironTradeShare, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, pathAges, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, surveyFinds, suspendedTechs, trainsAt, windowsOf } from '../sim/ages';
 import type { Building, BuildingType, Command, Cost, Ent, GameState, Landmark, Player, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
@@ -577,6 +578,18 @@ export class Hud {
         ? ` · <span data-tip="<b>In a coil's field</b>A Coil Tower within ${LIGHTNING.reach} tiles broadcasts power here: it trains and researches ${LIGHTNING.lit - 100}% faster.">⚡ In a coil's field: works ${LIGHTNING.lit - 100}% faster</span>`
         : ` · <span data-tip="<b>Dark</b>No Coil Tower reaches this building, so it trains and researches ${100 - LIGHTNING.dark}% slower. Raise a Watch Tower within ${LIGHTNING.reach} tiles.">🌑 Dark: works ${100 - LIGHTNING.dark}% slower (raise a Coil Tower within ${LIGHTNING.reach} tiles)</span>`;
     }
+    // War Camps (#303): who keeps it, and how long before an unkept one burns.
+    if (mine && b.built && b.type === 'warcamp') {
+      const struck = buildBarred(p, b.type);
+      const grace = campGrace(b);
+      status += struck
+        ? ` · <span data-tip="<b>Struck</b>${struck}: off the Path of Blood a camp can't be kept, and it burns.">🔥 Struck: burning</span>`
+        : b.alone === undefined
+          ? ` · <span data-tip="<b>Kept</b>Your soldiers stand within ${WARCAMP.watch} tiles. Leave it without them for ${WARCAMP.grace} seconds and it catches fire.">⛺ Kept by its soldiers</span>`
+          : grace > 0
+            ? ` · <span data-tip="<b>Alone</b>No soldier of yours within ${WARCAMP.watch} tiles. Send some back before it catches fire.">⚠ Alone: burns in ${grace}s</span>`
+            : ` · <span data-tip="<b>Burning</b>Left alone, the camp burns. Soldiers within ${WARCAMP.watch} tiles put it out; citizens can repair it.">🔥 Burning: send soldiers back</span>`;
+    }
     const inside = def.garrison && b.built ? `<div class="stats"><span data-tip="<b>Sheltering</b>Units inside are safe, heal slowly and add arrows.">🏰<em>Inside</em> ${b.garrison.length}/${def.garrison}</span></div>` : '';
     const sig = `b:${b.id}:${Math.ceil(b.hp)}:${status}:${b.queue.length}:${p.epoch}:${queue.length}:${b.garrison.length}`;
     const html = `<div class="sel-portrait"><img src="${buildingPicture(b.type, p.epoch, p.color)}" alt=""></div>
@@ -607,6 +620,8 @@ export class Hud {
       for (const type of BUILDING_TYPES) {
         const def = BUILDINGS[type];
         if (def.menu !== this.buildMenu) continue;
+        // A path's own building (the War Camp, #303) shows only to the people standing on that step.
+        if (def.ages && !def.ages.includes(ageOf(p))) continue;
         const locked = def.epoch > p.epoch;
         const no = buildBarred(p, type);
         const cost = buildingCostFor(s, viewer, type);
@@ -628,6 +643,22 @@ export class Hud {
       if (citizens.length) {
         cmds.push({ key: 'B', pic: '', glyph: '🏠', title: 'Build (economy)', desc: 'Houses, farms, storehouses, markets, temples, walls and wonders.', ok: true, run: () => ((this.buildMenu = 'eco'), this.act.sound('open')) });
         cmds.push({ key: 'V', pic: '', glyph: '🛡', title: 'Build (military)', desc: 'Barracks, ranges, stables, forges, siege workshops and towers.', ok: true, run: () => ((this.buildMenu = 'mil'), this.act.sound('open')) });
+      }
+      // The Age of Iron and Blood (#303): foot soldiers pitch a War Camp where they stand.
+      const pitchers = units.filter((u) => u.type !== 'citizen' && canRaise(u.type, 'warcamp'));
+      if (pitchers.length && !citizens.length && !buildBarred(p, 'warcamp')) {
+        const cost = buildingCostFor(s, viewer, 'warcamp');
+        const short = shortfall(p, cost);
+        cmds.push({
+          key: 'B',
+          pic: buildingPicture('warcamp', p.epoch, p.color),
+          title: 'Pitch a War Camp',
+          desc: `${BUILDINGS.warcamp.blurb} Then click where to pitch it: in your own land, no one's, or the enemy's.`,
+          cost,
+          ok: !short,
+          why: short ?? undefined,
+          run: () => this.act.place('warcamp'),
+        });
       }
       if (soldiers.length) cmds.push({ key: 'A', pic: '', glyph: '⚔', title: 'Attack-move', desc: 'Then click on the map: march there, fighting every enemy met on the way.', ok: true, run: () => this.act.attackMove() });
       cmds.push({ key: 'S', pic: '', glyph: '✋', title: 'Stop', desc: 'Stop what they are doing (and forget queued orders).', ok: true, run: () => this.act.issue({ t: 'stop', p: viewer, ids: units.map((u) => u.id) }) });
@@ -679,7 +710,7 @@ export class Hud {
           const levied = !hired && !!age.levy && JSON.stringify(cost) !== JSON.stringify(st.cost);
           const priced = !hired && age.price?.[st.cls];
           const locked = unitEpoch(unit) > p.epoch;
-          const no = barred(p, unit);
+          const no = barred(p, unit) ?? buildBarred(p, b.type);
           const short = shortfall(p, cost);
           const hero = unit === 'hero' && (heroBusy(s, viewer) || b.queue.some((q) => q.unit === 'hero'));
           cmds.push({

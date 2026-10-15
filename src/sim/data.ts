@@ -94,7 +94,7 @@ export const PATHS: Record<PathId, Path> = {
     name: 'Path of Blood',
     blurb: 'A people that lives by war: it trades with no one, and feeds its towns on what its soldiers take from the enemy dead. Each age of the path opens with a deeper deed of blood, and the plunder grows with every age of it walked.',
     carry: { plunder: 0.1 },
-    planned: ['tier 3: the Age of Iron and Blood', 'tier 4: the Age of Total War'],
+    planned: ['tier 4: the Age of Total War'],
   },
 };
 
@@ -191,6 +191,17 @@ export const AGES: Record<AgeId, Age> = {
     mul: { militaryTrain: 0.85, farm: 0.9 },
     no: { units: ['trader'], why: 'A warband trades with no one: traders wait until your people leave the Path of Blood' },
   },
+  // The second step of the Path of Blood (#303): a turn off the Gunpowder Age, open only to a people that walked the Warband.
+  ironblood: {
+    name: 'Age of Iron and Blood',
+    short: 'Iron & Blood',
+    tier: 3,
+    path: 'blood',
+    blurb: 'War is the state. Foot soldiers pitch War Camps where the army stands, even in enemy land, and the camps train foot soldiers at the front and hold a little land, so the army is fed and the march home is gone. Soldiers train 15% faster and the enemy dead pay plunder, more than in the Warband. But a camp left without soldiers burns, no traders leave the Markets, the fields yield 15% less and scholars cost a fifth more: a people at war has no patience for them.',
+    add: { plunder: 0.25 },
+    mul: { militaryTrain: 0.85, farm: 0.85, techCost: 1.2 },
+    no: { units: ['trader'], why: 'A people of iron and blood trades with no one: traders wait until your people leave the Path of Blood' },
+  },
   steppe: {
     name: 'Age of the Steppe',
     short: 'Steppe',
@@ -235,6 +246,11 @@ export interface Road {
    * world (#39). A survey that finds nothing keeps the road hidden for good.
    */
   found?: TechId;
+  /**
+   * Shown only to a people that has stood in this age (#303): a path's way on, where the next step
+   * leaves from a trunk age, is the path's own and stays hidden from everyone who didn't walk it.
+   */
+  walked?: AgeId;
   /** A deed the road needs beyond its price: a tally from the player's stats. */
   deed?: Deed;
   /**
@@ -360,8 +376,22 @@ export const ROADS: Road[] = [
     deed: { stat: 'slain', n: 25, text: 'Your forces slay 25 enemy units' },
     blurb: 'A turn, not a climb: the first step on the Path of Blood. The same soldiers and technologies as the Middle Ages, but soldiers train 15% faster and every enemy unit slain pays a quarter of its price as plunder in gold, so war feeds the town. What it gives up: trade (no traders) and some of the harvest (farms 10% less). A warband that stops fighting grows poor.',
   },
-  { from: 'warband', to: 'gunpowder', cost: { food: 1000, gold: 500, stone: 300 }, time: 65, blurb: 'Leave the Path of Blood for the Gunpowder Age: the plunder ends, traders and full harvests return (less gold and more stone than from the Middle Ages: the war-host was never rich in coin).' },
+  { from: 'warband', to: 'gunpowder', cost: { food: 1000, gold: 500, stone: 300 }, time: 65, blurb: 'Climb to the Gunpowder Age: the plunder ends, traders and full harvests return (less gold and more stone than from the Middle Ages: the war-host was never rich in coin). The Path of Blood goes on from there, into the Age of Iron and Blood, for a people whose plunder is already taken.' },
   { from: 'warband', to: 'middle', cost: { food: 250, gold: 100 }, time: 30, blurb: 'Hang up the spear: the ordinary Middle Ages, with trade and full fields, and no plunder.' },
+  // The Path of Blood (#303), second step: back off the trunk at tier 3. Only a people that walked the Warband
+  // sees it, and the plunder it took there is the deed. The climb to Gunpowder just paid, the turn itself is cheap.
+  {
+    from: 'gunpowder',
+    to: 'ironblood',
+    cost: { food: 400, wood: 200, gold: 150 },
+    time: 35,
+    clue: 'barracks',
+    walked: 'warband',
+    deed: { stat: 'plunder', n: 600, text: 'Your forces take 600 gold in plunder' },
+    blurb: 'A turn, not a climb: the second step on the Path of Blood. Foot soldiers pitch War Camps where the army stands, even in enemy land, that train foot soldiers at the front and keep the army fed; plunder grows (the Warband walked adds to it). What it gives up: trade, a sixth of the harvest and a fifth more for every technology. A camp left without soldiers burns.',
+  },
+  { from: 'ironblood', to: 'industrial', cost: { food: 1400, gold: 700, stone: 500 }, time: 80, blurb: 'Rejoin the main road: the war economy becomes an industry (less gold and more stone than from the Gunpowder Age). The plunder ends, the War Camps are struck, and traders and full harvests return.' },
+  { from: 'ironblood', to: 'gunpowder', cost: { food: 300, gold: 150 }, time: 30, blurb: 'Make peace: the ordinary Gunpowder Age, with trade, full fields and the usual price of learning. The plunder ends and the War Camps are struck.' },
 ];
 
 /**
@@ -730,6 +760,10 @@ export interface BuildingStats {
   open?: boolean;
   /** Must stand on the shore, with water beside it (docks). */
   shore?: boolean;
+  /** Raised only by a people standing in one of these ages (the War Camp, #303); absent: by anyone. */
+  ages?: AgeId[];
+  /** Units besides citizens that may raise it (the War Camp is pitched by foot soldiers, #303). */
+  builders?: UnitType[];
   /** Which build menu it is in, and its key there. */
   menu: 'eco' | 'mil';
   key: string;
@@ -754,6 +788,8 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   tower: { name: 'Watch Tower', size: 2, hp: 1000, cost: { wood: 50, stone: 125 }, time: 45, pop: 0, sight: 9, trains: [], drop: [], epoch: 1, guns: { damage: 8, range: 8, reload: 1.8 }, garrison: 5, menu: 'mil', key: 'W', blurb: 'Sees far and shoots at enemies nearby, aircraft too. Shelter soldiers inside for more arrows.' },
   dock: { name: 'Dock', size: 3, hp: 1800, cost: { wood: 150 }, time: 35, pop: 0, sight: 6, trains: ['fisher', 'transport', 'warship', 'cog'], drop: ['food'], epoch: 0, shore: true, menu: 'eco', key: 'D', blurb: 'Builds fishing boats, transports, warships and merchant ships, and takes in fish. Build it on the shore.' },
   huntcamp: { name: 'Hunting Camp', size: 2, hp: 500, cost: { wood: 45 }, time: 14, pop: 0, sight: 5, trains: [], drop: ['food'], epoch: 0, menu: 'eco', key: 'N', blurb: 'A drop-off for food, and a small claim on the land round it. Raise it by the herd or a far kill: meat inside your border is safe from wolves, and Drying Racks keep it.' },
+  // The Path of Blood (#303): pitched by foot soldiers where the army stands, enemy land too; burns when left alone (`WARCAMP`).
+  warcamp: { name: 'War Camp', size: 2, hp: 700, cost: { wood: 100, gold: 40 }, time: 30, pop: 0, sight: 6, trains: ['infantry'], drop: [], epoch: 3, ages: ['ironblood'], builders: ['infantry'], menu: 'mil', key: 'Q', blurb: 'Tents, a stockade and a war standard, pitched by foot soldiers where the army stands, in enemy land too. Trains foot soldiers at the front and holds the land round it, so the army there is fed. Left without soldiers nearby, it burns.' },
   airfield: { name: 'Airfield', size: 4, hp: 2200, cost: { wood: 250, stone: 100, gold: 150 }, time: 60, pop: 0, sight: 8, trains: ['fighter', 'bomber'], drop: [], epoch: 4, menu: 'mil', key: 'F', blurb: 'Builds fighters and bombers. Fighters hunt aircraft; bombers wreck towns.' },
 };
 
@@ -1231,7 +1267,16 @@ export function unitEpoch(type: UnitType): number {
  * nearest claimant (ties go to the older building). Shown only, so far; attrition and building limits
  * are later steps of the seed.
  */
-export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6, huntcamp: 4 };
+export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6, huntcamp: 4, warcamp: 3 };
+
+/**
+ * War Camps (#303): a finished camp with none of its people's soldiers (land units that fight) within
+ * `watch` tiles for `grace` seconds starts to burn, losing `burn` of its full health a second until
+ * soldiers come back; a people off the path it belongs to (`BUILDINGS.warcamp.ages`) can't keep one
+ * at all, so its camps burn at once. `train`: a camp trains its foot soldiers this much slower than a
+ * Barracks (tents, not a drill yard).
+ */
+export const WARCAMP = { watch: 8, grace: 10, burn: 0.05, train: 1.2 };
 
 /**
  * Attrition (#132 s2): every `every` seconds a land soldier standing in an enemy's land, with none of its

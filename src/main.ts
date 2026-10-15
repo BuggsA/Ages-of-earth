@@ -5,7 +5,7 @@ import { CameraRig } from './render/camera';
 import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { wallLine } from './sim/commands';
-import { AGES, BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, RELIC, RUINS, SEASONS, STEPPE, TECHS, TICK_HZ, TRUNK, WORKS, domainOf, unitStats } from './sim/data';
+import { AGES, BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, RELIC, RUINS, SEASONS, STEPPE, TECHS, TICK_HZ, TRUNK, WARCAMP, WORKS, domainOf, unitStats } from './sim/data';
 import { crestSvg } from './ui/crests';
 import { isEnemy } from './sim/world';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
@@ -20,7 +20,7 @@ import { RUIN_FINDS, ruinAt } from './sim/ruins';
 import { LANDMARK_KINDS, landmarkAt } from './sim/landmarks';
 import { postAt } from './sim/trade';
 import { chantedOver, consecrateProblem, consecrates } from './sim/consecrate';
-import { ageDef, ageOf, heirloomsOpened, isSideRoad, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
+import { ageDef, ageOf, canRaise, heirloomsOpened, isSideRoad, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
 import { NetClient, newRoomCode, saveName, savedName } from './net/client';
 import { HASH_EVERY, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
 import { deserialize, serialize } from './sim/save';
@@ -1387,7 +1387,9 @@ function placeHere(shift: boolean): void {
     play('error');
     return;
   }
-  const ids = selectedUnits(s).filter((u) => u.type === 'citizen').map((u) => u.id);
+  // Citizens raise everything; foot soldiers pitch War Camps (#303).
+  const kind = placing;
+  const ids = selectedUnits(s).filter((u) => canRaise(u.type, kind)).map((u) => u.id);
   issue({ t: 'build', p: viewer, ids, type: placing, tx: placeAt.tx, ty: placeAt.ty, queue: shift || undefined });
   if (!shift) {
     placing = null;
@@ -2069,6 +2071,13 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           play('rally');
           hud.toast(`📯 Rallying Cry! ${ev.n} soldier${ev.n === 1 ? '' : 's'} stirred`, 'good');
         } else if (isEnemy(s, viewer, ev.owner)) {
+          lastAlert = { x: ev.x, y: ev.y };
+        }
+        break;
+      case 'campAlone':
+        // A War Camp left without its soldiers (#303).
+        if (ev.owner === viewer) {
+          hud.toast(ev.struck ? '🔥 Off the Path of Blood, your War Camps are struck and burn' : `⛺ A War Camp is left without soldiers: it burns in ${WARCAMP.grace}s`, 'alert');
           lastAlert = { x: ev.x, y: ev.y };
         }
         break;
