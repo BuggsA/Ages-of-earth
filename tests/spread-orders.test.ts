@@ -66,3 +66,19 @@ describe('farm fields (#266 leftover)', () => {
     expect(new Set(targets).size).toBe(3);
   });
 });
+
+describe('a crowd that runs a node dry (#266 leftover)', () => {
+  it('fans over the next trees instead of piling on one', () => {
+    const s = game();
+    const p = s.players[0];
+    const tree = findResource(s, R_TREE, p.startX, p.startY, 30);
+    const cs = [0, 1, 2, 3, 4, 5].map((i) => spawnUnit(s, 0, 'citizen', p.startX + i * 0.3, p.startY + 3));
+    applyCommand(s, { t: 'gather', p: 0, ids: cs.map((u) => u.id), tile: tree });
+    s.res[tree] = 0;
+    step(s);
+    const per = new Map<number, number>();
+    for (const u of cs) per.set(tileOf(u), (per.get(tileOf(u)) ?? 0) + 1);
+    expect(per.size).toBeGreaterThan(1);
+    expect(Math.max(...per.values())).toBeLessThanOrEqual(SPREAD.perNode);
+  });
+});
