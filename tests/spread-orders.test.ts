@@ -3,7 +3,7 @@ import { SPREAD } from '../src/sim/data';
 import { createGame, step } from '../src/sim/game';
 import { findResource } from '../src/sim/units';
 import { applyCommand } from '../src/sim/commands';
-import { spawnUnit } from '../src/sim/world';
+import { placeBuilding, spawnUnit } from '../src/sim/world';
 import { R_TREE } from '../src/sim/types';
 import type { GameState, Unit } from '../src/sim/types';
 
@@ -49,5 +49,20 @@ describe('bulk orders spread (#266)', () => {
     for (const u of mine) if (u.order.k === 'attack') per.set(u.order.target, (per.get(u.order.target) ?? 0) + 1);
     expect(per.get(foes[0].id)).toBe(SPREAD.perFoe);
     expect(per.size).toBeGreaterThan(1);
+  });
+});
+
+describe('farm fields (#266 leftover)', () => {
+  it('several citizens sent to one field take different fields', () => {
+    const s = game();
+    const p = s.players[0];
+    const fields = [0, 1, 2].map((i) => {
+      const b = placeBuilding(s, 0, 'farm', Math.floor(p.startX) + 4 + i * 3, Math.floor(p.startY) + 4, true);
+      return b;
+    });
+    const cs = [0, 1, 2].map((i) => spawnUnit(s, 0, 'citizen', p.startX + i * 0.3, p.startY + 2));
+    applyCommand(s, { t: 'work', p: 0, ids: cs.map((u) => u.id), target: fields[0].id });
+    const targets = cs.map((u) => (u.order.k === 'farm' ? u.order.target : -1));
+    expect(new Set(targets).size).toBe(3);
   });
 });

@@ -310,12 +310,12 @@ function farmStep(s: GameState, u: Unit, o: Extract<Order, { k: 'farm' }>): void
   if (!approach(u, { ...goalForBuilding(f, true), px: f.tx + 0.9 + spot * 3, py: f.ty + 0.9 + spot * 2 })) setOrder(u, { k: 'idle' });
 }
 
-export function freeFarm(s: GameState, owner: number, x: number, y: number, r: number): Building | null {
+export function freeFarm(s: GameState, owner: number, x: number, y: number, r: number, skip?: Set<number>): Building | null {
   let best: Building | null = null;
   let bestD = r;
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.type !== 'farm' || e.owner !== owner || e.hp <= 0) continue;
-    if (farmTaken(s, e)) continue;
+    if (farmTaken(s, e) || skip?.has(e.id)) continue;
     const d = distToRect(x, y, e);
     if (d < bestD) {
       bestD = d;
