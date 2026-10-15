@@ -997,7 +997,8 @@ function excavate(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
 function markToTake(s: GameState, v: View, free: boolean, safe: boolean): Landmark | null {
   let best: Landmark | null = null;
   const rival = enemyHome(s, v.p);
-  const reach = Math.max(AI_MARK.near, AI_MARK.rival * Math.sqrt((rival.x - v.home.x) * (rival.x - v.home.x) + (rival.y - v.home.y) * (rival.y - v.home.y)));
+  // Going for lordship, no landmark is too far.
+  const reach = s.mode === 'lords' ? AI_MARK.lordsReach : Math.max(AI_MARK.near, AI_MARK.rival * Math.sqrt((rival.x - v.home.x) * (rival.x - v.home.x) + (rival.y - v.home.y) * (rival.y - v.home.y)));
   let bestD = reach * reach;
   for (const m of s.landmarks ?? []) {
     // Soldiers also go to a landmark of ours that rivals are standing on.
@@ -1122,7 +1123,7 @@ function guardMarks(s: GameState, v: View, mem: AiMemory, ready: Unit[], issue: 
   const band = ready.filter((u) => u.type !== 'siege' && u.order.k === 'idle');
   // When a rival is about to be lord of every landmark, any soldiers will do to break it.
   const lordRace = (s.landTeam ?? -1) >= 0 && s.landTeam !== v.p.team;
-  if (band.length < (lordRace ? 1 : AI_MARK.party)) return held;
+  if (band.length < (lordRace ? 1 : s.mode === 'lords' ? AI_MARK.lordsParty : AI_MARK.party)) return held;
   const m = markToTake(s, v, false, false);
   if (!m) return held;
   const ids = band
