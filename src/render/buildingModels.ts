@@ -330,6 +330,25 @@ function barracks(k: Kit, e: number, st: Style): void {
     banner(k, -1.2, 1.9, 0.2, 0.7);
     return;
   }
+  if (e === 4) {
+    // A brick drill hall: long flat-roofed wings with a parapet, a central gatehouse, a flagpole and a gun on the parade.
+    k.box(2.7, 1.1, 1.6, st.wall, 0, 0, -0.5);
+    k.box(2.8, 0.1, 1.7, st.trim, 0, 1.1, -0.5);
+    k.box(2.8, 0.14, 0.06, IRON_DARK, 0, 1.2, 0.33);
+    k.box(0.9, 1.6, 0.9, st.wall, 0, 0, -0.1);
+    k.box(1.0, 0.1, 1.0, st.trim, 0, 1.6, -0.1);
+    k.prism(1.0, 0.45, 0.95, st.roof, 0, 1.7, -0.1);
+    k.box(0.5, 0.8, 0.04, '#2b2b2e', 0, 0, 0.37);
+    k.box(0.6, 0.06, 0.1, IRON_DARK, 0, 0.82, 0.4);
+    for (const x of [-1.15, -0.75, 0.75, 1.15]) window(k, st, x, 0.45, 0.31, 0.16, 0.3);
+    for (const x of [-1.0, 1.0]) k.box(0.2, 0.4, 0.2, st.base, x, 1.2, 0.2);
+    k.team(k.box(0.5, 0.1, 0.04, TEAM, 0, 1.0, 0.4));
+    k.cyl(0.04, 0.04, 2.6, 5, '#e8e2d0', 1.2, 0, 1.2);
+    k.team(k.box(0.02, 0.4, 0.6, TEAM, 1.2, 2.1, 1.5));
+    k.cyl(0.1, 0.12, 0.45, 8, IRON_DARK, -0.9, 0.05, 1.1).rotation.x = Math.PI / 2 - 0.15;
+    for (const sx of [-1, 1]) k.cyl(0.14, 0.14, 0.05, 8, IRON_DARK, -0.9 + sx * 0.16, 0, 1.0).rotation.z = Math.PI / 2;
+    return;
+  }
   k.box(2.7, 1.3, 1.6, st.wall, 0, 0, -0.5);
   k.box(2.76, 0.07, 1.66, st.trim, 0, 1.3, -0.5);
   k.prism(2.8, 0.65, 1.7, st.roof, 0, 1.36, -0.5);
@@ -373,6 +392,16 @@ function range(k: Kit, e: number, st: Style): void {
     k.prism(2.7, 0.65, 1.2, st.roof, 0, 0.85, -0.85);
     window(k, st, -0.6, 0.4, -0.34);
     window(k, st, 0.6, 0.4, -0.34);
+  } else if (e === 4) {
+    // A rifle range of the machine age: a brick hall with a flat roof and skylight, firing stands in front.
+    k.box(2.6, 1.0, 1.0, st.wall, 0, 0, -0.85);
+    k.box(2.7, 0.08, 1.1, st.trim, 0, 1.0, -0.85);
+    k.box(1.2, 0.2, 0.5, IRON_DARK, 0, 1.08, -0.85);
+    k.box(1.1, 0.04, 0.4, '#8fb4c8', 0, 1.28, -0.85);
+    for (let i = 0; i < 4; i++) window(k, st, -0.9 + i * 0.6, 0.45, -0.34, 0.16, 0.26);
+    k.box(2.2, 0.06, 0.3, IRON_DARK, 0, 0.45, -0.1);
+    for (const x of [-1.0, 0, 1.0]) k.cyl(0.03, 0.03, 0.45, 4, IRON_DARK, x, 0, -0.1);
+    k.team(k.box(2.2, 0.04, 0.06, TEAM, 0, 0.52, -0.1));
   } else {
     k.box(2.6, 0.95, 1.0, st.wall, 0, 0, -0.85);
     k.box(2.66, 0.06, 1.06, st.trim, 0, 0.95, -0.85);
@@ -389,6 +418,25 @@ function range(k: Kit, e: number, st: Style): void {
 function stable(k: Kit, e: number, st: Style): void {
   pad(k, 3, st.base);
   // A long stable with stalls, hay and a trough.
+  if (e === 4) {
+    // A cavalry depot: a brick hall under a pitched slate roof with a loft hoist and iron stall rails.
+    k.box(2.7, 0.9, 1.3, st.wall, 0, 0, -0.65);
+    k.box(2.76, 0.08, 1.36, st.trim, 0, 0.9, -0.65);
+    k.prism(2.85, 0.6, 1.6, st.roof, 0, 0.98, -0.55);
+    k.box(0.5, 0.5, 0.3, st.wall, 0.9, 1.0, -0.2);
+    k.cyl(0.03, 0.03, 0.5, 4, IRON_DARK, 0.9, 1.3, 0.1).rotation.x = Math.PI / 2;
+    for (let i = 0; i < 4; i++) {
+      const x = -1.0 + i * 0.66;
+      k.box(0.5, 0.55, 0.03, '#2b2b2e', x, 0, 0.01);
+      k.box(0.5, 0.05, 0.05, IRON_DARK, x, 0.55, 0.03);
+    }
+    for (let i = 0; i < 3; i++) k.box(0.32, 0.22, 0.24, HAY, -1.1 + i * 0.36, 0, 0.7);
+    k.box(0.7, 0.16, 0.22, IRON_DARK, 0.7, 0, 0.75);
+    k.box(0.62, 0.02, 0.16, '#5aa0c8', 0.7, 0.15, 0.75);
+    k.team(k.box(2.88, 0.06, 0.06, TEAM, 0, 0.92, 0.27));
+    banner(k, 1.3, 0, 1.25, 1.2);
+    return;
+  }
   const wall = e >= 2 ? st.wall : st.wall2;
   k.box(2.7, 0.7, 1.3, wall, 0, 0, -0.65);
   if (e === 2) for (const x of [-1.3, -0.65, 0, 0.65, 1.3]) k.box(0.05, 0.7, 1.32, st.trim, x, 0, -0.65);
