@@ -1443,7 +1443,7 @@ function airforce(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
 }
 
 /** A building of the enemy's worth bombing: their nearest Town Center, or any building known. */
-function enemyTarget(s: GameState, p: Player): Building | null {
+export function enemyTarget(s: GameState, p: Player): Building | null {
   let best: Building | null = null;
   let bestD = Infinity;
   for (const e of s.ents) {
@@ -1454,8 +1454,9 @@ function enemyTarget(s: GameState, p: Player): Building | null {
     const holds = e.type === 'temple' && s.relics.some((r) => r.temple === e.id);
     const shrine = holds && relicRace(s, p);
     // A pilgrim people's wealth is the relics in its Temples (#50): they come before its Town Center.
-    const pilgrims = holds && ageOf(s.players[e.owner]) === 'pilgrim';
-    const d = dx * dx + dy * dy + (e.type === 'wonder' || shrine ? -1e6 : pilgrims ? -900 : e.type === 'towncenter' ? -400 : 0);
+    // A Bell Foundry people's relics pay it 50% more gold (#224), so its Temples are worth the same pull on any road (#242).
+    const pilgrims = holds && (ageOf(s.players[e.owner]) === 'pilgrim' || s.players[e.owner].techs.includes('bellFoundry'));
+    const d = dx * dx + dy * dy + (e.type === 'wonder' || shrine ? -1e6 : pilgrims ? -AI_WEB.bell : e.type === 'towncenter' ? -400 : 0);
     if (d < bestD) {
       bestD = d;
       best = e;
