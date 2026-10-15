@@ -28,3 +28,19 @@ describe('the computer defends its landmarks', () => {
     expect(gone.length).toBeGreaterThanOrEqual(3);
   }, 30000);
 });
+
+describe('the computer favours its own people\'s landmark kind', () => {
+  it('sends its walker to its kin kind when another is a little nearer', () => {
+    const s = game();
+    const home = s.ents.find((e) => e.kind === 'building' && e.owner === 1)!;
+    const [a, b] = s.landmarks!;
+    a.kind = 'crag';
+    b.kind = 'spring';
+    for (const m of s.landmarks!) { m.owner = -1; m.by = -1; m.claim = 0; }
+    a.x = home.x + 20; a.y = home.y;
+    b.x = home.x + 26; b.y = home.y;
+    for (let i = 0; i < 10; i++) spawnUnit(s, 1, 'citizen', home.x + 3 + i * 0.5, home.y + 3);
+    for (let i = 0; i < 15 * TICK_HZ && !s.ai[1]?.markWalker; i++) step(s);
+    expect(s.ai[1]?.markWalker?.id).toBe(b.id);
+  }, 30000);
+});

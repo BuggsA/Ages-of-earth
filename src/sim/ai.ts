@@ -6,7 +6,7 @@ import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, Ga
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { ageOf, barred, deedsDone, deedsProgress, hiresAt, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
 import { carriedBy } from './relics';
-import { claimants, landmarkAt } from './landmarks';
+import { claimants, favours, landmarkAt } from './landmarks';
 import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple } from './units';
 import { goalForPost, nearestMarket, portSpot, tripGold } from './trade';
 import { findRoute } from './path';
@@ -1021,6 +1021,10 @@ function pulledDown(s: GameState, p: Player, m: Landmark): boolean {
 /** How much a landmark is worth walking for, as a divisor of its distance: more for what this town needs now. */
 function markWorth(s: GameState, v: View, m: Landmark): number {
   if (!AI_LEVELS[v.p.ai!].worthy) return 1;
+  return markNeed(s, v, m) * (favours(s, v.p.id, m.kind) ? AI_MARK.worth.kin : 1);
+}
+
+function markNeed(s: GameState, v: View, m: Landmark): number {
   const w = AI_MARK.worth;
   if (m.kind === 'cairn') {
     // Room for people matters once houses are nearly full.
