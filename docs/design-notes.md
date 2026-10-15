@@ -565,3 +565,5 @@ Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), n
 **Why I love it:** the corner of the screen now says "winter is coming" before the toast does.
 **Seen:** headless Chromium, seed 7, each season held with `?season=`: autumn map ochre, winter map pale, no page errors. `tests/season-look.test.ts` checks the tints. Fades not watched in motion.
 **Next:** breath puffs or a muffled winter ambience; frozen lake edges (water tinted white in deep winter).
+
+**Landmark worth, swept** (2026-10-15, lane ai). Built: `AI_LEVELS.worthy` (on by default) so `scripts/ai-ab.ts 21 4 20 '{"worthy":false}'` compares need-based landmark choice against nearest-only. Result over 32 Hard-vs-Hard matches (seeds 21–100, seats swapped): wins 1–3, undecided ahead 17 / behind 11, gathering ×~0.94 (se ~0.1): no difference seen, so the rule stays (it costs nothing measurable and reads as sensible play). Next: the lone-citizen recall question, or a sweep with the landmarks as the deciding fight.
