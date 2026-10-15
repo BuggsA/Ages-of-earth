@@ -459,6 +459,11 @@ function priest(epoch: number): Kit {
     k.cyl(0.13, 0.13, 0.012, 12, '#1a1a1e', 0, 0.55, 0);
     k.cyl(0.06, 0.065, 0.06, 10, '#1a1a1e', 0, 0.555, 0);
     k.team(k.cyl(0.066, 0.066, 0.015, 10, TEAM, 0, 0.56, 0));
+    // A team stole down the front, a brass cross on the chest and a skirt hem of grey wool.
+    k.team(k.box(0.04, 0.3, 0.012, TEAM, 0, 0.12, 0.112));
+    k.box(0.012, 0.05, 0.01, GOLD, 0, 0.36, 0.118);
+    k.box(0.036, 0.012, 0.01, GOLD, 0, 0.375, 0.118);
+    k.cyl(0.152, 0.155, 0.035, 8, '#4a4a52', 0, 0.03, 0);
   }
   const g = k.group(0.12, SHOULDER - 0.18, 0.03, arm);
   g.rotation.x = 0.3;
@@ -525,6 +530,10 @@ function hero(epoch: number): Kit {
     k.cyl(0.075, 0.07, 0.05, 10, '#2a2c34', 0, 0.38, 0, rider);
     k.box(0.1, 0.012, 0.06, '#1a1a1e', 0, 0.38, 0.06, rider);
     k.glow(k.box(0.05, 0.02, 0.01, GOLD, 0, 0.4, 0.075, rider));
+    // Medals on the breast, gold aiguillettes at the shoulder and a long team-coloured coat-tail.
+    for (let i = 0; i < 3; i++) k.glow(k.box(0.018, 0.028, 0.008, i === 1 ? '#c8302a' : GOLD, -0.06 + i * 0.022, 0.2, 0.08, rider));
+    k.box(0.015, 0.14, 0.015, GOLD, 0.1, 0.2, 0.05, rider);
+    k.team(k.box(0.2, 0.24, 0.03, TEAM, 0, -0.04, -0.1, rider));
     held(b, (kk, g) => {
       kk.cyl(0.015, 0.015, 0.16, 6, '#c8302a', 0, 0.02, 0, g);
       kk.cyl(0.018, 0.018, 0.02, 6, GOLD, 0, 0.1, 0, g);
