@@ -43,3 +43,21 @@ describe('the computer wards its buildings against a chant (#216)', () => {
     expect(dist(priest, tower)).toBeLessThan(start);
   });
 });
+
+describe('the computer stands its priests to answer (#219)', () => {
+  it('orders a priest to answer a building a rival is chanting over', () => {
+    const { s, tower, priest } = setup();
+    restat(s, s.players[1], () => { s.players[1].age = 'pilgrim'; });
+    tower.faith = 0.3;
+    tower.faithBy = 0;
+    tower.chant = s.tick;
+    let answered = false;
+    for (let i = 0; i < secs(5); i++) {
+      tower.chant = s.tick;
+      step(s);
+      aiStep(s);
+      if (priest.order.k === 'answer') answered = true;
+    }
+    expect(answered).toBe(true);
+  });
+});
