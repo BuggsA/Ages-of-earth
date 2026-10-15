@@ -1161,8 +1161,12 @@ function escortWalker(s: GameState, v: View, mem: AiMemory, ready: Unit[], held:
       const u = s.byId.get(id);
       return u && u.kind === 'unit' && u.hp > 0;
     });
-    for (const id of e.ids) held.add(id);
-    return;
+    // Every one fallen on the road: the walker gets a fresh escort below, if the town has soldiers to spare.
+    if (e.ids.length) {
+      for (const id of e.ids) held.add(id);
+      return;
+    }
+    delete mem.markEscort;
   }
   if (!w || !m || (m.x - v.home.x) * (m.x - v.home.x) + (m.y - v.home.y) * (m.y - v.home.y) < AI_MARK.far * AI_MARK.far) return;
   const band = ready
