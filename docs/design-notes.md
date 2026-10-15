@@ -708,7 +708,7 @@ Session 2 (lane ai): Iron-Bound Hulls answered. `fleetWanted` adds `AI_WEB.hulls
 
 **Why I love it:** the wild, Hunting Camps, ruins and landmarks all pull citizens out between the towns, but until now only wolves made that reach a gamble. A rival that punishes an unguarded hunt makes "how far, and with whom?" a choice two good players answer differently (`docs/design-notes.md`, "Richness"): it rewards a couple of early soldiers, a tower by the camp, or the bell. It only sees what its units see, so a careful player can hide the hunt.
 
-**Seen:** `tests/ai-prowl.test.ts`; between two Hard computers it fires about once a match over six 20-minute matches (they rarely leave citizens exposed), so its weight falls on players who greed. Not played by hand. **Next:** have the band burn an unguarded Hunting Camp once the butchers flee; a toast naming it ("Raiders fall on your hunters!") through the event the alert already sends; ~~the computer guarding its own far hunts~~ (done: see "Escorted hunt" below).
+**Seen:** `tests/ai-prowl.test.ts`; between two Hard computers it fires about once a match over six 20-minute matches (they rarely leave citizens exposed), so its weight falls on players who greed. Not played by hand. **Next:** ~~have the band burn an unguarded Hunting Camp once the butchers flee~~ (done 2026-10-16: at the camp with nobody to chase it attacks the camp for `AI_PROWL.burn` (45) s more; `tests/ai-prowl.test.ts`, no sweep, browser unseen); a toast naming it ("Raiders fall on your hunters!") through the event the alert already sends; ~~the computer guarding its own far hunts~~ (done: see "Escorted hunt" below).
 
 ## Designers' notes: escorted hunt (own pitch, 2026-10-15, lane ai)
 

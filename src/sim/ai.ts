@@ -1939,9 +1939,13 @@ function prowl(s: GameState, v: View, mem: AiMemory, ready: Unit[], issue: (c: C
     // Walking to a camp: it looks farther round, and keeps walking until it is there.
     const camp = mem.prowl.look !== undefined ? s.byId.get(mem.prowl.look) : undefined;
     const walking = !!lead && !hunted && !!camp && camp.hp > 0 && (camp.x - lead.x) * (camp.x - lead.x) + (camp.y - lead.y) * (camp.y - lead.y) > 9;
-    const next = lead && !hunted ? prey(s, p, v.home, lead, camp ? P.look : P.chase, band.length) : null;
+    // At the camp with nobody there to chase: it sets about the camp itself, with `burn` seconds more to do it.
+    const arrived = !!lead && !hunted && !!camp && camp.hp > 0 && !walking;
+    const burning = mem.prowl.burn !== undefined && !!camp && camp.hp > 0;
+    const next = lead && !hunted && !burning ? prey(s, p, v.home, lead, camp ? P.look : P.chase, band.length) : null;
     const threatened = lead && s.ents.some((e) => e.kind === 'unit' && e.hp > 0 && !e.inside && isEnemy(s, p.id, e.owner) && armed(e) && (e.x - lead.x) * (e.x - lead.x) + (e.y - lead.y) * (e.y - lead.y) <= P.guard * P.guard);
-    if (!lead || threatened || s.tick - mem.prowl.since > secs(P.time) || (!hunted && !next && !walking)) {
+    const limit = secs(P.time) + (mem.prowl.burn !== undefined ? secs(P.burn) : 0);
+    if (!lead || threatened || s.tick - mem.prowl.since > limit || (!hunted && !next && !walking && !burning && !arrived)) {
       if (band.length) issue({ t: 'move', p: p.id, ids: band.map((u) => u.id), x: home.x, y: home.y });
       delete mem.prowl;
       mem.prowled = s.tick;
@@ -1951,6 +1955,10 @@ function prowl(s: GameState, v: View, mem: AiMemory, ready: Unit[], issue: (c: C
       issue({ t: 'attack', p: p.id, ids: band.map((u) => u.id), target: next.id });
       mem.prowl.target = next.id;
       delete mem.prowl.look;
+      delete mem.prowl.burn;
+    } else if (arrived && camp && mem.prowl.burn === undefined) {
+      issue({ t: 'attack', p: p.id, ids: band.map((u) => u.id), target: camp.id });
+      mem.prowl.burn = s.tick;
     }
     for (const u of band) held.add(u.id);
     return held;
