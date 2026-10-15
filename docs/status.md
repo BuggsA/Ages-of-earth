@@ -69,6 +69,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Hounds** (own pitch, lane rules): Hunting Camp tech (80 food 40 wood): hunt +25%, beast damage halved (`TECHS.hounds`, mod `beastWard`); the computer buys it after big game. Tests only; browser unseen; no save bump.
 
+**Seasons** (own pitch, lane rules): four seasons of 150 s from spring; summer berries +25% but meat rots 1.5×, winter berries ×0.55, fields ×0.75, meat keeps 2×, wolves/boars notice +40%. New numbers `SEASON`, `SEASONS`. Tests only; browser unseen; no save bump.
+
 ## Waiting on the owner
 
 **Setup only the owner can do:**

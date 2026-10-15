@@ -417,6 +417,7 @@ export type GameEvent =
   | { k: 'deliver'; owner: number; res: Res; amount: number; x: number; y: number }
   | { k: 'work'; id: number; owner: number; act: Act; x: number; y: number }
   | { k: 'depleted'; tile: number }
+  | { k: 'season'; i: number }
   | { k: 'rank'; id: number; owner: number; x: number; y: number; rank: number }
   | { k: 'alert'; owner: number; x: number; y: number; building: boolean; wild?: Animal['kind'] }
   | { k: 'converted'; id: number; from: number; to: number; x: number; y: number }
