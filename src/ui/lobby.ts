@@ -122,7 +122,7 @@ export class Lobby {
         <label>Map ${sel('mapType', (Object.keys(MAP_TYPES) as MapType[]).map((m) => [m, MAP_TYPES[m].label]), st.mapType)}</label>
         <label>Map size ${sel('size', (Object.keys(MAP_SIZES) as MapSize[]).map((m) => [m, MAP_SIZES[m].label]), st.size)}</label>
         <label>Start in ${sel('startEpoch', [['0', 'Stone Age'], ['1', 'Bronze Age'], ['2', 'Middle Ages'], ['3', 'Gunpowder Age'], ['4', 'Industrial Age']], String(st.startEpoch))}</label>
-        <label>Game ${sel('mode', [['conquest', 'Conquest'], ['regicide', 'Regicide'], ['deathmatch', 'Deathmatch']], st.mode)}</label>
+        <label>Game ${sel('mode', [['conquest', 'Conquest'], ['regicide', 'Regicide'], ['deathmatch', 'Deathmatch'], ['lords', 'Lords of the Land']], st.mode)}</label>
         <label>Peace treaty ${sel('peaceMinutes', [['0', 'None'], ['5', '5 minutes'], ['10', '10 minutes'], ['20', '20 minutes']], String(st.peaceMinutes))}</label>
       </div>
       <div class="lobby-chat"><div class="lines" id="lobby-lines">${this.chatLines.join('')}</div><input id="lobby-chat" maxlength="200" placeholder="Say something (Enter)"></div>

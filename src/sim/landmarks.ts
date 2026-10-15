@@ -126,6 +126,14 @@ function springStep(s: GameState, m: Landmark): void {
   }
 }
 
+/** The team that keeps every landmark (only in the Lords of the Land game; at least `lordsMin` stand), or -1. */
+function lords(s: GameState): number {
+  const marks = s.landmarks ?? [];
+  if (s.mode !== 'lords' || s.scenario || marks.length < LANDMARKS.lordsMin || marks.some((m) => m.owner < 0)) return -1;
+  const team = s.players[marks[0].owner].team;
+  return marks.every((m) => s.players[m.owner].team === team) ? team : -1;
+}
+
 /** Every tick: the claims at each landmark, and what the springs give. A defeated keeper lets go. */
 export function landmarkStep(s: GameState): void {
   if (!s.landmarks) return;
@@ -139,4 +147,11 @@ export function landmarkStep(s: GameState): void {
     claimStep(s, m);
     if (m.kind === 'spring') springStep(s, m);
   }
+  // Keeping every landmark long enough makes a side lord of the land.
+  const team = lords(s);
+  if (team !== (s.landTeam ?? -1)) {
+    s.landTeam = team;
+    s.landTimer = team >= 0 ? secs(LANDMARKS.lordsSeconds) : -1;
+    s.events.push({ k: 'landHold', team, ticks: s.landTimer });
+  } else if ((s.landTimer ?? -1) > 0) s.landTimer!--;
 }

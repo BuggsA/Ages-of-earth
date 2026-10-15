@@ -428,7 +428,7 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   $('paused').classList.add('hidden');
   const me = game.players[viewer];
   const rivals = game.players.filter((p) => p.team !== me.team).map((p) => `${p.name} of the ${CIVS[p.civ].name}`);
-  const goal = game.mode === 'regicide' ? ' Keep your King alive: shelter them in the Town Center.' : game.mode === 'deathmatch' ? ' Everyone starts rich: build fast.' : '';
+  const goal = game.mode === 'regicide' ? ' Keep your King alive: shelter them in the Town Center.' : game.mode === 'deathmatch' ? ' Everyone starts rich: build fast.' : game.mode === 'lords' ? ' Keep every landmark for four minutes and you win.' : '';
   const chapter = game.scenario ? scenarioById(game.scenario.id) : undefined;
   if (!saved && chapter) hud.banner(chapter.title, chapter.place, 6000);
   else if (!saved) hud.banner(ageDef(me).name, `You lead the ${CIVS[me.civ].name}. Facing ${rivals.join(', ')}.${goal} ${view.weatherWords}`.trim(), 6000);
@@ -1685,7 +1685,7 @@ function timeline(s: GameState, metric: Metric): string {
   return `<svg class="timeline" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${grid}${lines}</svg>`;
 }
 
-function showEnd(s: GameState, won: boolean, how: 'conquest' | 'wonder' | 'relics' | 'resign' | 'time' | 'scenario' = 'conquest'): void {
+function showEnd(s: GameState, won: boolean, how: 'conquest' | 'wonder' | 'relics' | 'lands' | 'resign' | 'time' | 'scenario' = 'conquest'): void {
   mode = 'over';
   keepReplay(s);
   const m = $('modal');
@@ -1707,6 +1707,8 @@ function showEnd(s: GameState, won: boolean, how: 'conquest' | 'wonder' | 'relic
         : 'Your people are no more.'
     : how === 'wonder'
       ? won ? 'Your Wonder stood the test of time.' : 'A rival Wonder stood the test of time.'
+      : how === 'lands'
+        ? won ? 'Every landmark in the land is yours: you are its lord.' : 'A rival became lord of every landmark in the land.'
       : how === 'relics'
         ? won ? 'Every relic in the world rests in your temples.' : 'A rival kept every relic in the world.'
         : won ? 'Your rivals have fallen.' : 'Your people are no more.';
@@ -1931,6 +1933,20 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         else {
           const keepers = s.players.filter((q) => q.team === ev.team).map((q) => q.name).join(' and ');
           hud.banner(`${keepers} ${keepers.includes(' and ') ? 'keep' : 'keeps'} every relic`, `Take one back within ${mins} minutes or lose.`, 5000);
+        }
+        play('wonder');
+        break;
+      }
+      case 'landHold': {
+        const mins = Math.round(ev.ticks / TICK_HZ / 60);
+        if (ev.team < 0) {
+          hud.toast('A landmark has changed hands: the lords\' countdown stops', 'info');
+          break;
+        }
+        if (ev.team === s.players[viewer].team) hud.banner('Lords of the Land', `Keep every landmark ${mins} minutes and you win.`, 5000);
+        else {
+          const keepers = s.players.filter((q) => q.team === ev.team).map((q) => q.name).join(' and ');
+          hud.banner(`${keepers} ${keepers.includes(' and ') ? 'keep' : 'keeps'} every landmark`, `Take one back within ${mins} minutes or lose.`, 5000);
         }
         play('wonder');
         break;
