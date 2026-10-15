@@ -316,6 +316,10 @@ body.online .tip-box { bottom: 330px; }
 
 /* Campaign */
 #campaign { pointer-events: auto; background: rgba(10, 14, 22, 0.78); }
+.cloud-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; margin: 12px 0; color: var(--muted); font-weight: 700; }
+.cloud-label { font-weight: 800; }
+.cloud-key { font: 800 20px ui-monospace, monospace; color: var(--gold); letter-spacing: 1px; user-select: all; }
+.cloud-in { font: 800 15px ui-monospace, monospace; color: var(--ink); background: #1b2030; border: 1px solid var(--edge-soft); border-radius: 8px; padding: 6px 8px; width: 13em; text-transform: uppercase; }
 .camp-card { max-width: 560px; width: min(560px, 94vw); max-height: 92vh; overflow-y: auto; }
 .chapters { display: grid; gap: 8px; margin: 14px 0; }
 .chapter { display: flex; align-items: center; gap: 12px; text-align: left; padding: 10px 14px; background: #1b2030; color: var(--ink); border: 1px solid var(--edge-soft); border-radius: 10px; cursor: pointer; font-family: 'Nunito', sans-serif; }

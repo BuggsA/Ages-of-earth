@@ -77,6 +77,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Boars** (own pitch, lane rules): a boar guards a berry patch out from each town; three citizens beat it, one loses; carcass 260 food; the computer sends three at six citizens. New numbers `BOAR`, `AI_WILD.boar*`. Tests and a headless match; browser and sound unseen; no save bump.
 
+**Cloud saves** (owner's ask, lane online): a match saved to a vault on the Worker under a 16-letter key and carried on from any browser (`worker/vault.ts`, a new `Vault` Durable Object, migration `v2`; `src/net/cloud.ts`; `MAX_CLOUD_SAVE`, `VAULT_KEEP_DAYS` in `src/net/vault.ts`). Round trip and a second browser picking the match up seen against `wrangler dev` in headless Chromium; the live deploy unseen. No save bump.
+
 **Drifting herds** (own pitch, lane rules): deer herds migrate every 150 s away from borders; wolves hunt deer near dens and leave the carcass. New numbers `DEER.herd/every/min/max/range`, `WOLF.hunt`. Tests and a headless match; browser unseen; no save bump.
 
 **Meat spoils** (own pitch, lane rules): carcasses rot after 40 s (a mammoth gone in ~3 min); Drying Racks (Stone Age tech) slow it on your land; the computer buys them after big game. New numbers `ROT`, tech `drying`, mod `rot`. Tests and a headless match; browser unseen; no save bump.

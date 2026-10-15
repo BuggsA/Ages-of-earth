@@ -22,6 +22,8 @@ import { postAt } from './sim/trade';
 import { chantedOver, consecrateProblem, consecrates } from './sim/consecrate';
 import { ageDef, ageOf, heirloomsOpened, isSideRoad, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
 import { NetClient, newRoomCode, saveName, savedName } from './net/client';
+import { cloudGet, cloudPut, setVaultKey, vaultKey } from './net/cloud';
+import { readVaultKey, showVaultKey, VAULT_KEEP_DAYS } from './net/vault';
 import { HASH_EVERY, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
 import { deserialize, serialize } from './sim/save';
 import { SCENARIOS, scenarioById, starsFor } from './sim/campaign';
@@ -492,9 +494,13 @@ const SAVE_KEY = 'ages-save';
 /** Bumped when the state's shape changes, so an older save is set aside instead of loading broken (2: relics; 3: trading posts). */
 const SAVE_V = 3;
 
+function saveText(s: GameState, setup: GameSetup): string {
+  return JSON.stringify({ v: SAVE_V, setup, at: Date.now(), state: serialize(s), record });
+}
+
 function saveGame(s: GameState, setup: GameSetup): boolean {
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify({ v: SAVE_V, setup, at: Date.now(), state: serialize(s), record }));
+    localStorage.setItem(SAVE_KEY, saveText(s, setup));
     showContinue();
     return true;
   } catch {
@@ -502,9 +508,19 @@ function saveGame(s: GameState, setup: GameSetup): boolean {
   }
 }
 
-function loadGame(): { setup: GameSetup; state: GameState; record: [number, Command[]][] } | null {
+type SavedGame = { setup: GameSetup; state: GameState; record: [number, Command[]][] };
+
+function loadGame(): SavedGame | null {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
+    return readSave(localStorage.getItem(SAVE_KEY));
+  } catch {
+    return null;
+  }
+}
+
+/** A save's text read back, or null if it is missing, broken or from an older shape of the state. */
+function readSave(raw: string | null): SavedGame | null {
+  try {
     if (!raw) return null;
     const saved = JSON.parse(raw);
     if (saved.v !== SAVE_V) return null;
@@ -546,6 +562,84 @@ function autosave(force = false): void {
   if (!force && game.tick < autosaveAt) return;
   autosaveAt = game.tick + TICK_HZ * 60;
   saveGame(game, lastSetup);
+  // A browser that has saved to the cloud keeps its vault up to date too, less often.
+  if (vaultKey() && (force || game.tick >= cloudAutosaveAt)) {
+    cloudAutosaveAt = game.tick + TICK_HZ * 300;
+    cloudPut(saveText(game, lastSetup)).catch(() => {
+      /* Offline or no server (the dev server has none): the browser's own save still holds. */
+    });
+  }
+}
+let cloudAutosaveAt = 0;
+
+// ---- Cloud saves -----------------------------------------------------------------------------------
+
+let cloudBusy = false;
+
+async function saveToCloud(): Promise<void> {
+  if (!game || mode !== 'play' || !lastSetup || online || watching || cloudBusy) return;
+  cloudBusy = true;
+  hud.toast('Saving to the cloud…', 'info');
+  try {
+    const text = saveText(game, lastSetup);
+    const { key } = await cloudPut(text);
+    try {
+      localStorage.setItem(SAVE_KEY, text);
+      showContinue();
+    } catch {
+      /* The cloud has it even if the browser can't. */
+    }
+    cloudAutosaveAt = game.tick + TICK_HZ * 300;
+    hud.toast(`Saved to the cloud. Your key: ${showVaultKey(key)} (Cloud save… on the title screen shows it again)`, 'info');
+  } catch (err) {
+    hud.toast(`Could not save to the cloud: ${(err as Error).message}`, 'bad');
+  } finally {
+    cloudBusy = false;
+  }
+}
+
+async function loadFromCloud(key: string): Promise<void> {
+  if (cloudBusy) return;
+  cloudBusy = true;
+  try {
+    const raw = await cloudGet(key);
+    if (raw === null) {
+      hud.toast('Nothing is saved under that key yet', 'bad');
+      return;
+    }
+    const saved = readSave(raw);
+    if (!saved) {
+      hud.toast('That cloud save is from an older version of the game and cannot be read', 'bad');
+      return;
+    }
+    setVaultKey(key);
+    $('campaign').classList.add('hidden');
+    sound.play('click');
+    startMatch(saved.setup, saved.state);
+    record = saved.record;
+  } catch (err) {
+    hud.toast(`Could not reach the cloud: ${(err as Error).message}`, 'bad');
+  } finally {
+    cloudBusy = false;
+  }
+}
+
+/** The title screen's cloud page: this browser's key, carrying on from the cloud, using another device's key. */
+function openCloud(): void {
+  const key = vaultKey();
+  showCampaign(`<div class="title-card camp-card cloud-card"><h1>Cloud <span>save</span></h1>
+    <p class="tagline">Save a match to the cloud from the in-game menu, then carry it on here or on any other device with your key. There are no accounts: anyone with the key can open the save, so keep it to yourself. A save nobody opens for ${VAULT_KEEP_DAYS} days is cleared.</p>
+    ${
+      key
+        ? `<div class="cloud-row"><span class="cloud-label">Your key</span><code class="cloud-key">${showVaultKey(key)}</code><button class="link" data-act="cloud-copy">Copy</button></div>
+      <div class="title-buttons"><button class="btn big primary" data-act="cloud-load">Continue from the cloud</button></div>`
+        : '<p class="cloud-row">This browser has no cloud save yet.</p>'
+    }
+    <div class="cloud-row"><span class="cloud-label">Key from another device</span><input id="cloud-key-in" class="cloud-in" placeholder="ABCD-EFGH-JKLM-NPQR" maxlength="24" autocomplete="off" spellcheck="false"><button class="btn" data-act="cloud-use">Use it</button></div>
+    <div class="title-buttons"><button class="btn big" data-act="camp-back">Back</button></div></div>`);
+  $<HTMLInputElement>('cloud-key-in').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.querySelector<HTMLElement>('[data-act="cloud-use"]')?.click();
+  });
 }
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) autosave(true);
@@ -774,6 +868,35 @@ document.addEventListener('click', (e) => {
         startMatch(saved.setup, saved.state);
         record = saved.record;
       } else hud.toast('The saved game could not be read', 'bad');
+      break;
+    }
+    case 'cloud':
+      sound.play('click');
+      openCloud();
+      break;
+    case 'cloud-save':
+      closeModal();
+      void saveToCloud();
+      break;
+    case 'cloud-load': {
+      const key = vaultKey();
+      if (key) void loadFromCloud(key);
+      break;
+    }
+    case 'cloud-copy': {
+      const key = vaultKey();
+      if (!key) break;
+      const shown = showVaultKey(key);
+      const done = () => hud.toast('Key copied', 'info');
+      const fail = () => hud.toast(shown, 'info');
+      if (navigator.clipboard) navigator.clipboard.writeText(shown).then(done, fail);
+      else fail();
+      break;
+    }
+    case 'cloud-use': {
+      const key = readVaultKey($<HTMLInputElement>('cloud-key-in').value);
+      if (key) void loadFromCloud(key);
+      else hud.toast('A key is 16 letters and digits, like ABCD-EFGH-JKLM-NPQR', 'bad');
       break;
     }
     case 'save':
@@ -1638,6 +1761,7 @@ function openMenu(): void {
     </div>
     <div class="row">
       ${online ? `<div class="hint">Online room ${net?.code ?? ''} · ${net?.rtt ?? 0} ms</div>` : `<button class="btn wide" data-act="save">Save game</button>
+      ${watching ? '' : '<button class="btn wide" data-act="cloud-save">Save to the cloud</button>'}
       <button class="btn wide" data-act="restart">Restart this map</button>
       ${game?.scenario ? '' : '<button class="btn wide" data-act="new-map">New map</button>'}`}
       <button class="btn wide" data-act="resign">Resign</button>
