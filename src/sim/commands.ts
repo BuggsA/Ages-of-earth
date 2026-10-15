@@ -1,11 +1,11 @@
-import { BUILDINGS, EPOCHS, MARKET, RES_LABEL, TECHS, UNITS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
+import { BUILDINGS, EPOCHS, MARKET, RES_LABEL, SPREAD, TECHS, UNITS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
 import { peace } from './combat';
 import { placeProblem, stampBuilding, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
 import { backProblem, backTo, barred, journeyOf, roadProblem, roadTo, trainsAt } from './ages';
-import type { Building, BuildingType, Command, Cost, GameState, Order, Player, Unit } from './types';
-import { RES, R_FISH, R_NONE } from './types';
-import { RES_OF_TILE, cargoRoom, freeFarm, garrisonRoom, giveOrder, landing, setOrder, ungarrison } from './units';
+import type { Building, BuildingType, Command, Ent, Cost, GameState, Order, Player, Unit } from './types';
+import { RES, R_FISH, R_MEAT, R_NONE } from './types';
+import { RES_OF_TILE, cargoRoom, findResource, freeFarm, garrisonRoom, giveOrder, landing, setOrder, ungarrison } from './units';
 import { carriedBy, letGo, relicAt } from './relics';
 import { dockOf, homeMarket, marketOf, nearestDock, portSpot, postAt } from './trade';
 import { ruinAt } from './ruins';
@@ -13,6 +13,7 @@ import { callWork, workProblem } from './works';
 import { beaconProblem, lightBeacon } from './beacon';
 import { rallyCry, rallyProblem } from './rally';
 import { chantedOver, consecrateProblem, consecrates } from './consecrate';
+import { sees } from './vision';
 import { canHit, isEnemy, maxHp, pay, placeBuilding, refund } from './world';
 import { fightsBeasts } from './animals';
 
@@ -174,6 +175,46 @@ function assignBuilders(units: Unit[], b: Building, queue: boolean): void {
   }
 }
 
+/** The clicked node first, then others of its kind within `SPREAD.reach` tiles, nearest first. */
+function nodesNear(s: GameState, tile: number, kind: number): number[] {
+  const cx = (tile % s.w) + 0.5;
+  const cy = Math.floor(tile / s.w) + 0.5;
+  const out: { i: number; d: number }[] = [];
+  const r = SPREAD.reach;
+  for (let y = Math.max(0, Math.floor(cy) - r); y <= Math.min(s.h - 1, Math.floor(cy) + r); y++) {
+    for (let x = Math.max(0, Math.floor(cx) - r); x <= Math.min(s.w - 1, Math.floor(cx) + r); x++) {
+      const i = y * s.w + x;
+      if (i === tile || s.res[i] !== kind || s.amount[i] <= 0) continue;
+      // Skip nodes walled in on every side: findResource only returns open ones.
+      if (findResource(s, kind, x + 0.5, y + 0.5, 0) !== i) continue;
+      out.push({ i, d: (x + 0.5 - cx) * (x + 0.5 - cx) + (y + 0.5 - cy) * (y + 0.5 - cy) });
+    }
+  }
+  out.sort((a, b) => a.d - b.d || a.i - b.i);
+  return [tile, ...out.map((o) => o.i)];
+}
+
+/** Foes the player can see near the clicked one, nearest first (units only, in id order for ties). */
+function foesNear(s: GameState, p: number, t: Ent): Unit[] {
+  const out: { u: Unit; d: number }[] = [];
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.id === t.id || e.hp <= 0 || e.inside || !isEnemy(s, p, e.owner)) continue;
+    const d = (e.x - t.x) * (e.x - t.x) + (e.y - t.y) * (e.y - t.y);
+    if (d > SPREAD.foe * SPREAD.foe || !sees(s, p, e.x, e.y)) continue;
+    out.push({ u: e, d });
+  }
+  out.sort((a, b) => a.d - b.d || a.u.id - b.u.id);
+  return out.map((o) => o.u);
+}
+
+/** The clicked foe takes `perFoe` attackers, then the next nearest each take their share; extras pile on the clicked one. */
+function spreadFoe(s: GameState, u: Unit, t: Ent, foes: Unit[], load: Map<number, number>): number {
+  let pick = t;
+  if ((load.get(t.id) ?? 0) >= SPREAD.perFoe) for (const f of foes) if ((load.get(f.id) ?? 0) < SPREAD.perFoe && canHit(s, u, f)) { pick = f; break; }
+  load.set(pick.id, (load.get(pick.id) ?? 0) + 1);
+  return pick.id;
+}
+
 export function applyCommand(s: GameState, c: Command): void {
   const p = s.players[c.p];
   if (!p || p.defeated || s.over) return;
@@ -200,6 +241,8 @@ export function applyCommand(s: GameState, c: Command): void {
         return;
       }
       if (peace(s)) return refuse(s, c.p, `The peace treaty holds for ${Math.ceil((s.peaceUntil - s.tick) / 20)} more seconds`);
+      const foes = c.spread && t.kind === 'unit' && units.length > 1 ? foesNear(s, c.p, t) : [];
+      const load = new Map<number, number>();
       for (const u of units) {
         if (u.type === 'priest') {
           if (t.kind === 'unit' && domainOf(t.type) === 'land' && !carriedBy(s, u)) giveOrder(u, { k: 'convert', target: t.id, done: 0 }, c.queue);
@@ -209,7 +252,7 @@ export function applyCommand(s: GameState, c: Command): void {
         }
         // Swords can't reach a ship or an aircraft, nor a ram a soldier.
         if (!canHit(s, u, t)) continue;
-        giveOrder(u, { k: 'attack', target: t.id, auto: false, then: null }, c.queue);
+        giveOrder(u, { k: 'attack', target: spreadFoe(s, u, t, foes, load), auto: false, then: null }, c.queue);
       }
       break;
     }
@@ -219,7 +262,14 @@ export function applyCommand(s: GameState, c: Command): void {
       const units = myUnits(s, c.p, c.ids);
       // Citizens work the land; fishing boats fish.
       const workers = units.filter((u) => (kind === R_FISH ? u.type === 'fisher' : u.type === 'citizen'));
-      for (const u of workers) giveOrder(u, { k: 'gather', tile: c.tile, res: RES_OF_TILE[kind], phase: 'go' }, c.queue);
+      const nodes = c.spread && kind !== R_MEAT && workers.length > 1 ? nodesNear(s, c.tile, kind) : [c.tile];
+      const load = new Map<number, number>();
+      for (const u of workers) {
+        let tile = c.tile;
+        for (const n of nodes) if ((load.get(n) ?? 0) < SPREAD.perNode) { tile = n; break; }
+        load.set(tile, (load.get(tile) ?? 0) + 1);
+        giveOrder(u, { k: 'gather', tile, res: RES_OF_TILE[kind], phase: 'go' }, c.queue);
+      }
       const others = units.filter((u) => !workers.includes(u));
       if (others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: (c.tile % s.w) + 0.5, y: Math.floor(c.tile / s.w) + 0.5, queue: c.queue });
       break;

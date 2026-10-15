@@ -618,8 +618,8 @@ type Queued = { queue?: boolean };
 
 export type Command =
   | ({ t: 'move'; p: number; ids: number[]; x: number; y: number; amove?: boolean } & Queued)
-  | ({ t: 'attack'; p: number; ids: number[]; target: number } & Queued)
-  | ({ t: 'gather'; p: number; ids: number[]; tile: number } & Queued)
+  | ({ t: 'attack'; p: number; ids: number[]; target: number; spread?: boolean } & Queued)
+  | ({ t: 'gather'; p: number; ids: number[]; tile: number; spread?: boolean } & Queued)
   /** Right-click on your own building: help build it, farm it, drop off resources there or shelter in it. */
   | ({ t: 'work'; p: number; ids: number[]; target: number } & Queued)
   | ({ t: 'build'; p: number; ids: number[]; type: BuildingType; tx: number; ty: number } & Queued)
