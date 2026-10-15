@@ -1,3 +1,4 @@
+import { kinBonus } from './landmarks';
 import { BEACON, BUILDINGS, LANDMARKS } from './data';
 import type { GameState } from './types';
 import { statsOf } from './world';
@@ -43,7 +44,7 @@ export function updateVision(s: GameState): void {
   for (const m of s.landmarks ?? []) {
     if (m.kind !== 'crag' || m.owner < 0) continue;
     const p = s.players[m.owner];
-    const d = disc(LANDMARKS.crag.sight);
+    const d = disc(Math.round(kinBonus(s, m.owner, 'crag', LANDMARKS.crag.sight)));
     const cx = Math.floor(m.x);
     const cy = Math.floor(m.y);
     for (let k = 0; k < d.length; k += 2) {

@@ -1,4 +1,4 @@
-import type { AgeId, BuildingType, CivId, Cost, Difficulty, Domain, MapSize, MapType, Res, TechId, UnitType, PlayerStats } from './types';
+import type { AgeId, LandmarkKind, BuildingType, CivId, Cost, Difficulty, Domain, MapSize, MapType, Res, TechId, UnitType, PlayerStats } from './types';
 
 /** Every number in the game lives here. */
 
@@ -512,6 +512,9 @@ export const LANDMARKS = {
   cairn: { pop: 5 },
   flint: { tools: 1.2 },
   grove: { reach: 10, priest: 1.8 },
+  /** A people's own kind of landmark gives it `kinMul` times the effect (of the part above that is a bonus). */
+  kinMul: 1.5,
+  kin: { egyptians: 'spring', greeks: 'grove', romans: 'flint', mongols: 'crag', chinese: 'cairn', britons: 'cairn' } as Record<CivId, LandmarkKind>,
 };
 /**
  * The computer and the landmarks: once it has `townAt` citizens and sees no danger near one nobody
