@@ -99,7 +99,7 @@ export function statsFor(s: GameState, owner: number, type: UnitType): UnitStats
     st.speed *= m.airSpeed;
     st.hp = Math.round(st.hp * m.airHp);
   }
-  if (base.cls === 'trader') st.speed *= m.traderSpeed;
+  if (base.cls === 'trader' && type !== 'wagon') st.speed *= m.traderSpeed;
   if (base.cls !== 'citizen' && base.cls !== 'priest' && base.cls !== 'trader' && type !== 'fisher') {
     st.time *= m.militaryTrain;
     if (base.cls === 'ranged') st.time *= m.rangedTrain;

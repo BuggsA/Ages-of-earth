@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'strikeCamp' | 'pitchCamp';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -734,6 +734,19 @@ export class Sound {
         this.noise(out, t, { dur: 0.5, filter: 'bandpass', f: 700, q: 0.8, peak: 0.12 });
         this.tone(out, t + 0.15, { f: N.D4 / 2, type: 'sawtooth', dur: 0.6, peak: 0.05 });
         this.tone(out, t + 0.45, { f: N.A4 / 2, type: 'sawtooth', dur: 0.7, peak: 0.05 });
+        break;
+      case 'strikeCamp':
+        // A camp struck (#297): felt dropping onto the cart, then the axle creaking as the ox leans in.
+        this.noise(out, t, { dur: 0.22, filter: 'lowpass', f: 380, q: 0.7, peak: 0.16 });
+        this.tone(out, t + 0.2, { f: 210, to: 150, type: 'sawtooth', dur: 0.32, peak: 0.035 });
+        this.tone(out, t + 0.5, { f: 180, to: 240, type: 'sawtooth', dur: 0.28, peak: 0.03 });
+        break;
+      case 'pitchCamp':
+        // A camp pitched (#297): the lattice snapping open, two mallet knocks on the stakes, the felt settling.
+        this.noise(out, t, { dur: 0.08, filter: 'bandpass', f: 2200, q: 2, peak: 0.08 });
+        this.tone(out, t + 0.12, { f: 160, to: 110, dur: 0.12, peak: 0.12 });
+        this.tone(out, t + 0.32, { f: 170, to: 115, dur: 0.12, peak: 0.12 });
+        this.noise(out, t + 0.45, { dur: 0.35, filter: 'lowpass', f: 300, q: 0.6, peak: 0.1 });
         break;
       case 'rally':
         // A war horn: a low rising call, then a bright answer over it.

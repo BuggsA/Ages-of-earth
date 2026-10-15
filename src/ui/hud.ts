@@ -4,7 +4,7 @@ import { scenarioById } from '../sim/campaign';
 import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
-import { AGES, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { AGES, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { homeMarket, marketOf, postAt, tripGold } from '../sim/trade';
@@ -17,7 +17,8 @@ import { rallyProblem } from '../sim/rally';
 import { stirred as stirredNow } from '../sim/combat';
 import { sees } from '../sim/vision';
 import { buildingCostFor, buildingMaxHp, modsOf, statsFor, techCostFor, techProblem, trainCostFor, trainTimeFor } from '../sim/stats';
-import { ageDef, ageOf, backProblem, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, ironTradeShare, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, surveyFinds, suspendedTechs, trainsAt, windowsOf } from '../sim/ages';
+import { isMobile, packProblem, pitchProblem } from '../sim/steppe';
+import { ageDef, ageOf, backProblem, buildBarred, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, ironTradeShare, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, surveyFinds, suspendedTechs, trainsAt, windowsOf } from '../sim/ages';
 import type { Building, BuildingType, Command, Cost, Ent, GameState, Landmark, Player, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
@@ -127,6 +128,7 @@ function orderWords(s: GameState, u: Unit): string {
       if (carriedBy(s, u)) return 'Holding a relic';
       if (u.type === 'trader' && u.carry > 0) return 'Waiting with gold: right-click a Market';
       if (u.type === 'cog' && u.carry > 0) return 'Waiting with gold: right-click a Dock';
+      if (u.type === 'wagon') return 'Packed for the road: press P to pitch camp';
       return ACT_WORDS[u.act] ?? 'Standing by';
   }
 }
@@ -497,6 +499,7 @@ export class Hud {
     const route = mine && o.k === 'trade' ? postAt(s, o.post) : undefined;
     const home = route && o.k === 'trade' ? (marketOf(s, u.owner, o.market) ?? homeMarket(s, u.owner, route.x, route.y)) : null;
     const trip = route && home ? `<span data-tip="<b>A trip</b>What one trip between its Market and the post pays, once home.">${icon('gold')}${tripGold(s, u.owner, home, route)}<em>a trip</em></span>` : '';
+    const load = u.type === 'wagon' && u.packed ? `<span data-tip="<b>Packed</b>The ${BUILDINGS[u.packed].name} this wagon carries, and the health it will be pitched with. Press P to pitch it.">⛺<em>${BUILDINGS[u.packed].name}</em> ${Math.round((u.packedHp ?? 1) * 100)}%</span>` : '';
     const held = u.type === 'priest' && carriedBy(s, u) ? `<span data-tip="<b>Relic</b>Carried to a Temple, it brings in gold. Hands full: no healing or converting until it is set down (D).">⚱<em>Relic</em></span>` : '';
     const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}:${u.cargo.length}:${rank}`;
     const html = `<div class="sel-portrait"><img src="${unitPicture(u.type, p.epoch, p.color)}" alt=""></div>
@@ -509,7 +512,7 @@ export class Hud {
           <span data-tip="<b>Armor</b>Melee / missile armor: taken off every blow or shot.">🛡<em>Armor</em> ${st.armor}/${st.parmor}</span>
           ${st.range ? `<span data-tip="<b>Range</b>How far it shoots, in tiles.">🏹<em>Range</em> ${st.range}</span>` : ''}
           <span data-tip="<b>Speed</b>Tiles per second.">👣<em>Speed</em> ${Math.round(st.speed * 100) / 100}</span>
-          ${carry}${cargo}${stance}${vet}${aura}${held}${trip}
+          ${carry}${cargo}${load}${stance}${vet}${aura}${held}${trip}
         </div>
         <div class="blurb">${st.blurb}</div>
       </div>`;
@@ -594,7 +597,7 @@ export class Hud {
     const mine = ents.filter((e) => e.owner === viewer);
     const units = mine.filter((e): e is Unit => e.kind === 'unit');
     const citizens = units.filter((u) => u.type === 'citizen');
-    const soldiers = units.filter((u) => u.type !== 'citizen' && u.type !== 'fisher' && u.type !== 'transport' && u.type !== 'trader' && u.type !== 'cog');
+    const soldiers = units.filter((u) => u.type !== 'citizen' && u.type !== 'fisher' && u.type !== 'transport' && u.type !== 'trader' && u.type !== 'cog' && u.type !== 'wagon');
     const walkers = units.filter((u) => domainOf(u.type) === 'land');
     const transports = units.filter((u) => u.type === 'transport');
     const cmds: Cmd[] = [];
@@ -605,6 +608,7 @@ export class Hud {
         const def = BUILDINGS[type];
         if (def.menu !== this.buildMenu) continue;
         const locked = def.epoch > p.epoch;
+        const no = buildBarred(p, type);
         const cost = buildingCostFor(s, viewer, type);
         const short = shortfall(p, cost);
         const wonderUp = type === 'wonder' && s.ents.some((e) => e.kind === 'building' && e.owner === viewer && e.type === 'wonder');
@@ -614,8 +618,8 @@ export class Hud {
           title: def.name,
           desc: def.blurb + (type === 'wall' ? ' Click and drag to lay out a line.' : ''),
           cost,
-          ok: !locked && !short && !wonderUp,
-          why: locked ? `Needs the ${EPOCHS[def.epoch].name}` : wonderUp ? 'You already have a wonder' : (short ?? undefined),
+          ok: !locked && !no && !short && !wonderUp,
+          why: locked ? `Needs the ${EPOCHS[def.epoch].name}` : no ? no : wonderUp ? 'You already have a wonder' : (short ?? undefined),
           run: () => this.act.place(type),
         });
       }
@@ -634,6 +638,11 @@ export class Hud {
         const aboard = transports.reduce((n, t) => n + t.cargo.length, 0);
         cmds.push({ key: 'U', pic: '', glyph: '⚓', title: 'Unload', desc: 'Then click a shore: sail there and put everyone aboard on land. (Right-clicking land does the same.)', ok: aboard > 0, why: 'Nobody is aboard', count: aboard || undefined, run: () => this.act.unloadMode() });
         cmds.push({ key: 'Y', pic: '', glyph: '🏖', title: 'Unload here', desc: 'Land everyone aboard on the nearest shore.', ok: aboard > 0, why: 'Nobody is aboard', run: () => transports.forEach((t) => this.act.issue({ t: 'unload', p: viewer, ids: [t.id], x: t.x, y: t.y })) });
+      }
+      const wagons = units.filter((u) => u.type === 'wagon');
+      if (wagons.length) {
+        const why = wagons.map((w) => pitchProblem(s, w)).find((w) => w) ?? null;
+        cmds.push({ key: 'P', pic: '', glyph: '⛺', title: 'Pitch camp', desc: `Set the ${wagons.length > 1 ? 'wagons\' loads' : 'wagon\'s load'} down here, on any ground a rival does not hold. It raises itself in ${STEPPE.pitch} seconds, with the health it was packed with.`, ok: !why || wagons.some((w) => !pitchProblem(s, w)), why: why ?? undefined, run: () => this.act.issue({ t: 'pitch', p: viewer, ids: wagons.map((w) => w.id) }) });
       }
       const kings = units.filter((u) => u.type === 'hero');
       if (kings.length === 1) {
@@ -830,6 +839,10 @@ export class Hud {
           const w = WORKS[p.civ];
           const why = workProblem(s, p);
           cmds.push({ key: 'V', pic: '', glyph: w.icon, title: w.name, desc: `${w.blurb} Free; lasts ${WORK.duration} seconds, once in each epoch.`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'greatWork', p: viewer }) });
+        }
+        if (isMobile(p) && STEPPE.packs.includes(b.type)) {
+          const why = packProblem(s, p, b);
+          cmds.push({ key: 'J', pic: '', glyph: '🛞', title: 'Strike camp', desc: `Pack this ${def.name} onto a wagon, with everyone sheltering inside stepping out. Drive it to new ground and pitch it there (P). While it rolls it gives no room, takes in nothing and trains no one, and riders run it down.`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'pack', p: viewer, building: b.id }) });
         }
         if (b.type === 'tower') {
           const why = beaconProblem(s, p, b);
