@@ -57,6 +57,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Rallying Cry** (own pitch, lane rules): the hero's R shout stirs soldiers within 8 tiles for 12 s (+30% blows, +1 armor, mended 6; 70 s rest); the clever computer calls it. `RALLY` in `data.ts`. Tests and a headless match only; browser, sound level and a visible effect unseen; no save bump.
 
+**Art pass 8** (#267, lane look): epoch 4 citizen work clothes and pick, ironclad armor belt. Render only; models test passes; look unseen.
+
 **Rally ring** (own pitch, lane look): stirred soldiers wear a pulsing gold band that fades with the cry. Render only; smoke passes; look in a match unseen.
 **Cry ripple** (own pitch, lane look): calling the Rallying Cry sends two gold rings out to its reach. Render only; reach vs. the ring mesh unseen in a browser.
 
@@ -273,3 +275,4 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Camp tower** (own pitch, lane ai): a clever computer past the Stone Age raises a Watch Tower by a far kill whose Hunting Camp stands (`AI_WILD.towerNear = 6`). Tests only; no sweep; no save bump.
 
 **Cloud saves** (#290, owner-ask, lane online): three server slots per secret save key (a new SQLite Durable Object class `Vault`, migration `v2`), from the Menu and the title screen; a key copied to another device opens the same saves. Seen end to end under `wrangler dev` in headless Chromium (save in one profile, load in a fresh one by key). Live deploy unseen; no save bump.
+**Art pass 9** (#267, lane look): title card age ribbon, card steps left on wide screens. CSS/markup only; look unseen.

@@ -74,6 +74,14 @@ kbd {
 .title-card h1 { margin: 0; font: 800 50px 'Cinzel', serif; letter-spacing: 1px; color: var(--gold); text-shadow: 0 2px 0 #4a3510, 0 6px 24px rgba(232, 196, 106, 0.35); }
 .title-card h1 span { font-size: 30px; color: var(--muted); }
 .tagline { color: var(--muted); font-weight: 700; margin: 4px 0 18px; }
+.age-ribbon { display: flex; gap: 3px; list-style: none; margin: -6px 0 16px; padding: 0; }
+.age-ribbon li { flex: 1; padding: 3px 0 2px; font: 800 10px 'Cinzel', serif; letter-spacing: 0.5px; text-transform: uppercase; color: #fff; background: linear-gradient(var(--c), rgba(0, 0, 0, 0.45)); background-blend-mode: multiply; border-top: 2px solid var(--c); opacity: 0.9; }
+.age-ribbon li:first-child { border-radius: 6px 0 0 6px; }
+.age-ribbon li:last-child { border-radius: 0 6px 6px 0; }
+/* On a wide screen the card steps left, so the live match it floats over is seen, not hidden behind a form. */
+@media (min-width: 1100px) {
+  #title.screen { place-items: center start; padding-left: 6vw; background: linear-gradient(90deg, rgba(10, 14, 22, 0.6), rgba(10, 14, 22, 0) 60%); }
+}
 .setup { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; text-align: left; margin-bottom: 18px; }
 .setup label { display: grid; gap: 4px; font-size: 13px; font-weight: 800; color: var(--muted); }
 .setup select, .setup input {
