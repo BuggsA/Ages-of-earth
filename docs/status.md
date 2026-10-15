@@ -56,6 +56,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Standing to answer** (own pitch, lane rules): pilgrim priests right-clicked onto a chanted-over own building stand by it and sing back 1.5× (`CONSECRATE.counter.stand`, `.hold`). Tests only; browser and sound unseen; no save bump. The pilgrim computer orders it (`ai.ts` priestly), and the cursor shows gather over such a building; the building panel says how many priests are answering (HUD only, unseen).
 
+**Four honest difficulties** (#258, from the owner's note #256, lane rules): a new gentlest tier (id `gentle`) shown as **Easy**; the old ids keep their behaviour and are shown one step up (`easy` → Normal, the default; `normal` → Hard; `hard` → Expert, the campaign proof's level). Online rooms keep their three levels until `tests/worker-routes.test.ts` allows `gentle`. Title picker seen in headless Chromium; a beginner's first game unseen; no save bump.
+
 **Waymarks** (#154, seed #152, lane look): the minimap remembers ruins (dug or standing, by whom) and relics as last seen. UI only; ruin marks seen on the minimap in headless Chromium (2026-10-15).
 
 **The wild** (#171, own pitch from the owner's chat, lane rules): mammoths (a feast that charges its hunters) and wolf packs by dens out between the towns, often by wild gold; bitten people fight back; soldiers can hunt beasts; the computer hunts its mammoth with five and clears near dens. New numbers `MAMMOTH`, `WOLF`, `AI_WILD`. No save bump (old saves hold only deer). Seen in headless Chromium; sound levels unheard; not played by hand.

@@ -684,3 +684,11 @@ Session 2 (lane ai): Iron-Bound Hulls answered. `fleetWanted` adds `AI_WEB.hulls
 ## Designers' notes: raiding the coil (own pitch, 2026-10-15, chain 1015-1037 s6, lane ai)
 
 **Built:** a coil that alone keeps buildings lit is now a raid target (`darkened` in `ai.ts`, `AI_LIGHTNING.raid` = 150 tiles² of pull per building it alone covers): the computer sends its waves at the tower whose fall darkens the most of a rival's quarter, the way #231's pitch says a raid on a coil should. A coil another coil also covers draws nothing. **Why I love it:** it makes the field's weakness real for the player, so a town with one coil in the middle invites a strike and two overlapping coils don't. **Seen:** `tests/ai-coil-raid.test.ts`; no win-rate sweep. **Next:** s4 of #231 (the computer lays its own town inside its fields) once #240 merges.
+
+## Designers' notes: four honest difficulties (#258, from the owner's note #256, 2026-10-15, lane rules)
+
+**Built:** a fourth, gentlest computer (id `gentle`, shown as **Easy**: 0.65 gathering, 12 citizens, a first wave of 4 at 18 minutes growing by 2, no tricks, no towers), and the three old levels shown one step up: `easy` is now **Normal** and the title screen's default, `normal` is **Hard**, `hard` is **Expert**. Against a town that does nothing, the first wave arrives at about 18.6 / 12.5 / 8.7 / 7.9 minutes (`npx tsx scripts/tiers.ts`).
+
+**Why I love it:** the owner's playtest is the classic onboarding trap: nobody picks "Easy" on a first game, so Normal *is* the beginner setting, and it crushed them in the Stone Age. A first game should be the one where you learn that a Town Center trains citizens and a Barracks trains a guard, not the one where you learn to quit. Keeping the ids and moving only the names means no save, replay, room or test notices.
+
+**Next:** let rooms offer Easy (`worker/lists.ts` plus `tests/worker-routes.test.ts`, which pins the list today). A gentler tier could also *teach*: a first wave that announces itself ("Scouts from Augustus are on the road") a minute out. And watch the wild: wolves and a mammoth can still end a first game before any rival does.
