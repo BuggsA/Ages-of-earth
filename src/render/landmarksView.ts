@@ -20,6 +20,9 @@ const WATER_LIGHT = '#78b4d2';
 const REED = '#7c8f3e';
 const OCHRE = '#a5532c';
 const FLINT = '#2f3238';
+const BARK = '#6b4a2b';
+const LEAF = '#4d7a35';
+const LEAF_LIGHT = '#78a043';
 const TEAM = '#ffffff';
 
 export function springGeometry(): THREE.BufferGeometry {
@@ -122,9 +125,29 @@ export function flintGeometry(): THREE.BufferGeometry {
   return bake(k.root);
 }
 
-const GEOMETRY: Record<LandmarkKind, () => THREE.BufferGeometry> = { spring: springGeometry, crag: cragGeometry, cairn: cairnGeometry, flint: flintGeometry };
+export function groveGeometry(): THREE.BufferGeometry {
+  const k = new Kit();
+  // Three old trees ringed round a mossy altar stone, hung with ribbons.
+  k.cyl(0.4, 0.46, 0.1, 9, MOSS, 0, 0, 0);
+  k.box(0.34, 0.3, 0.24, STONE_PALE, 0, 0.05, 0).rotation.y = 0.3;
+  k.box(0.38, 0.05, 0.28, STONE, 0, 0.35, 0).rotation.y = 0.3;
+  const trees: [number, number, number][] = [[-0.8, -0.5, 1.5], [0.85, -0.35, 1.3], [0.05, 0.9, 1.4]];
+  for (const [x, z, h] of trees) {
+    k.cyl(0.09, 0.15, h * 0.7, 6, BARK, x, 0, z);
+    k.blob(0.55, LEAF, x, h * 0.7, z);
+    k.blob(0.38, LEAF_LIGHT, x + 0.18, h * 0.7 + 0.32, z - 0.1);
+    k.box(0.03, 0.4, 0.02, OCHRE, x + 0.2, h * 0.7 - 0.45, z + 0.12);
+  }
+  for (let i = 0; i < 6; i++) {
+    const a = i * 1.05 + 0.4;
+    k.rock(0.09, i % 2 ? STONE : STONE_PALE, Math.cos(a) * 0.7, 0, Math.sin(a) * 0.7);
+  }
+  return bake(k.root);
+}
+
+const GEOMETRY: Record<LandmarkKind, () => THREE.BufferGeometry> = { spring: springGeometry, crag: cragGeometry, cairn: cairnGeometry, flint: flintGeometry, grove: groveGeometry };
 /** Where each kind's banner stands, in model space. */
-const BANNER: Record<LandmarkKind, [number, number, number]> = { spring: [0.75, 0, 0.75], crag: [0.25, 1.4, -0.35], cairn: [1.25, 0, -0.35], flint: [0.7, 0, 0.7] };
+const BANNER: Record<LandmarkKind, [number, number, number]> = { spring: [0.75, 0, 0.75], crag: [0.25, 1.4, -0.35], cairn: [1.25, 0, -0.35], flint: [0.7, 0, 0.7], grove: [0.5, 0, 0.7] };
 
 export class LandmarksView {
   readonly group = new THREE.Group();
@@ -155,7 +178,7 @@ export class LandmarksView {
   update(s: GameState, seenTile: (x: number, y: number) => boolean, seesNow: (x: number, y: number) => boolean): void {
     const marks = s.landmarks ?? [];
     const n = Math.max(4, marks.length);
-    const counts: Record<LandmarkKind, number> = { spring: 0, crag: 0, cairn: 0, flint: 0 };
+    const counts: Record<LandmarkKind, number> = { spring: 0, crag: 0, cairn: 0, flint: 0, grove: 0 };
     for (const kind of Object.keys(GEOMETRY) as LandmarkKind[]) this.meshes[kind] = this.mesh(GEOMETRY[kind], this.meshes[kind], n);
     this.banners = this.mesh(bannerGeometry, this.banners, n);
     let flags = 0;

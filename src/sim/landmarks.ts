@@ -1,6 +1,6 @@
 import { LANDMARKS, domainOf, secs } from './data';
 import { maxHp } from './world';
-import type { GameState, Landmark, LandmarkKind } from './types';
+import type { GameState, Landmark, LandmarkKind, Unit } from './types';
 
 /**
  * Contested landmarks: a sacred spring, a lookout crag and an ancestors' cairn, out on the open ground
@@ -14,6 +14,7 @@ export const LANDMARK_KINDS: Record<LandmarkKind, { name: string; blurb: string 
   spring: { name: 'Sacred Spring', blurb: `Its keeper's people within ${LANDMARKS.spring.reach} tiles mend as they rest: a place to stage a raid from, or to bring the wounded.` },
   crag: { name: 'Lookout Crag', blurb: `Its keeper sees everything within ${LANDMARKS.crag.sight} tiles: who walks the land between the towns.` },
   cairn: { name: "Ancestors' Cairn", blurb: `Its keeper has room for ${LANDMARKS.cairn.pop} more people, as if they had built a house or two.` },
+  grove: { name: 'Sacred Grove', blurb: `Its keeper's priests chant ${LANDMARKS.grove.priest} times as fast within ${LANDMARKS.grove.reach} tiles of it: turn a rival's soldiers, or mend your own, here.` },
   flint: { name: 'Flint Scatter', blurb: `Good knapping stone lies here: its keeper's citizens chop and mine ${Math.round((LANDMARKS.flint.tools - 1) * 100)}% faster, wherever they work.` },
 };
 
@@ -31,6 +32,17 @@ export function keptOf(s: GameState, player: number, kind: LandmarkKind): number
   let n = 0;
   for (const m of s.landmarks ?? []) if (m.owner === player && m.kind === kind) n++;
   return n;
+}
+
+/** How much faster a priest works for standing in its people's Sacred Grove (1 when it isn't). */
+export function groveBoost(s: GameState, u: Unit): number {
+  for (const m of s.landmarks ?? []) {
+    if (m.kind !== 'grove' || m.owner !== u.owner) continue;
+    const dx = u.x - m.x;
+    const dy = u.y - m.y;
+    if (dx * dx + dy * dy <= LANDMARKS.grove.reach * LANDMARKS.grove.reach) return LANDMARKS.grove.priest;
+  }
+  return 1;
 }
 
 /** Who stands round a landmark: for each team there, how many (land units, traders aside) and its lowest-id player. */
