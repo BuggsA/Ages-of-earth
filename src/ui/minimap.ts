@@ -2,6 +2,7 @@ import { ageOf } from '../sim/ages';
 import { domainOf } from '../sim/data';
 import type { AgeId, GameState } from '../sim/types';
 import type { ScoutFlag } from './scoutFlags';
+import { lookFor, mapTint } from '../render/seasonLook';
 import { Waymarks } from './waymarks';
 import { R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE, T_ROCK, T_SAND, T_WATER } from '../sim/types';
 
@@ -31,6 +32,8 @@ export class Minimap {
   private base = document.createElement('canvas');
   private baseCtx: CanvasRenderingContext2D;
   private land: Uint8ClampedArray = new Uint8ClampedArray(0);
+  /** 1 where the base colour is meadow, which the season recolours. */
+  private green: Uint8Array = new Uint8Array(0);
   private img: ImageData | null = null;
   private pings: Ping[] = [];
   private dragging = false;
@@ -76,6 +79,7 @@ export class Minimap {
     this.base.height = s.h;
     this.img = this.baseCtx.createImageData(s.w, s.h);
     this.land = new Uint8ClampedArray(s.w * s.h * 3);
+    this.green = new Uint8Array(s.w * s.h);
     const grass = rgb('#6fa548');
     const grass2 = rgb('#7fb354');
     const sand = rgb('#d9c48a');
@@ -85,6 +89,7 @@ export class Minimap {
       const t = s.terrain[i];
       const c = t === T_WATER ? water : t === T_SAND ? sand : t === T_ROCK ? rock : (i * 7) % 5 ? grass : grass2;
       this.land.set(c, i * 3);
+      this.green[i] = t === T_WATER || t === T_SAND || t === T_ROCK ? 0 : 1;
     }
     this.pings = [];
     this.waymarks.reset();
@@ -112,7 +117,11 @@ export class Minimap {
     const p = s.players[viewer];
     if (!reveal) this.waymarks.update(s, viewer);
     const d = this.img.data;
-    const tree = rgb('#2f6a32');
+    // The year on the map: meadow and woods follow the season, snow lies in winter (as in the land's own look).
+    const look = lookFor(s.tick);
+    const tree = mapTint(look, true);
+    const meadow = mapTint(look, false);
+    const meadowK = [meadow[0] / 111, meadow[1] / 165, meadow[2] / 72];
     const gold = rgb('#ffd24a');
     const stone = rgb('#d8d3c8');
     const berry = rgb('#e0405a');
@@ -124,6 +133,11 @@ export class Minimap {
       let r = this.land[i * 3];
       let g = this.land[i * 3 + 1];
       let b = this.land[i * 3 + 2];
+      if (this.green[i]) {
+        r = Math.min(255, r * meadowK[0]);
+        g = Math.min(255, g * meadowK[1]);
+        b = Math.min(255, b * meadowK[2]);
+      }
       const res = s.res[i];
       if (res === R_TREE) [r, g, b] = tree;
       else if (res === R_GOLD) [r, g, b] = gold;

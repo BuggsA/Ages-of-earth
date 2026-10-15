@@ -550,6 +550,7 @@ Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), n
 **Next:** more kinds that change *what* you do rather than add numbers: a flint scatter that arms citizens, a ford that only its keeper's army can cross, a sacred grove priests convert faster in. Peoples who care about a kind (the Britons' cairn). Landmarks as a match mode: keep them all for N minutes to win, like relics. A Watch Tower that sees a landmark gets the "they're taking it" alert sooner.
 **Sacred Grove (session 2, chain 1015-0151):** a grove of old trees round a mossy altar; its keeper's priests chant 1.8x as fast within 10 tiles. I love it because converting is the rarely-used lever: now a priest has a *place* to go, and the rival must decide whether to contest it. Next: the computer staging priests there, a ford, peoples who favour a kind.
 
+**Holding landmarks** (2026-10-15, lane ai, #191). Built: the computer picks landmarks by what its town needs (a Cairn when houses are full, a Spring when people are hurt, Flint) instead of nearest only, and defends one of its own that rivals are pulling down. Why: taking a computer's landmark was free. Next: a sweep of win rates with `AI_MARK.worth` off vs on; leaving a lone citizen to be driven off versus recalling it.
 ## Designers' notes: weather follows the year (own pitch, 2026-10-15, lane look)
 
 **Built:** `seasonalDay` in `src/render/weather.ts` maps the match's seeded day through the current season: snow only in winter (rain/autumn-spring, thin mist in summer otherwise), winter rain becomes a blizzard. `view.ts` re-applies it when the season turns and tells the sound. `?weather=` still forces a day.
@@ -557,5 +558,12 @@ Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), n
 **Seen:** unit tests for the mapping and the browser smoke test; not watched in a match.
 **Next:** breath puffs or a muffled winter ambience; frozen lake edges; minimap tinted by season; a banner line when the sky changes.
 
+
+## Designers' notes: the minimap wears the season (own pitch #195, 2026-10-15, lane look)
+
+**Built:** `mapTint` and `lookFor` in `src/render/seasonLook.ts`; `Minimap.draw` recolours meadow (scaled from the old green) and woods by the season weights, with snow whitening the grass (and a little the woods) in winter. Same blend, snow timing and `?season=` as the land.
+**Why I love it:** the corner of the screen now says "winter is coming" before the toast does.
+**Seen:** headless Chromium, seed 7, each season held with `?season=`: autumn map ochre, winter map pale, no page errors. `tests/season-look.test.ts` checks the tints. Fades not watched in motion.
+**Next:** breath puffs or a muffled winter ambience; frozen lake edges (water tinted white in deep winter).
 
 **Kin landmarks (session 3, chain 1015-0151):** each people has a favourite landmark kind (Egyptians Flint, Greeks Spring, Mongols Crag, Chinese Grove, Britons Cairn; Romans none, since existing tests use them as the plain people) whose bonus is half again as strong for them (`LANDMARKS.kin`, `.kinMul`). I love it because the same map reads differently to each people, and a rival's favourite is the one worth stealing. Seen: unit tests only; no win-rate sweep, the computer doesn't yet prefer its own kind. Next: the computer favouring its kind (see #191), a ford, hold-them-all mode.
