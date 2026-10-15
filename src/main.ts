@@ -28,7 +28,7 @@ import { VAULT_SLOTS, formatVaultKey, normalizeVaultKey, type CloudSlot } from '
 import { qrSvg } from './ui/qr';
 import { deleteCloud, listCloud, loadCloud, saveCloud, useVaultKey, vaultKey } from './net/cloud';
 import { SCENARIOS, scenarioById, starsFor } from './sim/campaign';
-import { loadDiscovery, observe, saveDiscovery, webMapHtml } from './ui/webMap';
+import { loadDiscovery, observe, pushDiscovery, saveDiscovery, syncDiscovery, webMapHtml } from './ui/webMap';
 import { idleCitizens, idleSelection, idleShortcut } from './ui/idle';
 import { CameraBookmarks, bookmarkShortcut } from './ui/cameraBookmarks';
 import { ScoutFlags } from './ui/scoutFlags';
@@ -605,7 +605,7 @@ async function openCloud(note = ''): Promise<void> {
   const inMatch = !$('hud').classList.contains('hidden');
   const saving = canCloudSave();
   const html = `<div class="card wide cloud"><h2>Cloud saves</h2>
-    <p class="hint">Kept on the server under your save key, ${VAULT_SLOTS} slots. Enter the same key on another device to play them there; your Long Road stars follow the key too. A key nobody uses for a year is emptied.${saving ? '' : ' To save, open Cloud saves from the Menu during a match.'}</p>
+    <p class="hint">Kept on the server under your save key, ${VAULT_SLOTS} slots. Enter the same key on another device to play them there; your Long Road stars and Web of Ages finds follow the key too. A key nobody uses for a year is emptied.${saving ? '' : ' To save, open Cloud saves from the Menu during a match.'}</p>
     <div class="cloud-slots" ><div class="hint">Opening your saves…</div></div>
     ${note ? `<div class="hint cloud-note">${escHtml(note)}</div>` : ''}
     <div class="row cloud-key">
@@ -634,6 +634,13 @@ async function openCloud(note = ''): Promise<void> {
   syncProgress().then(
     (learned) => {
       if (learned) hud.toast(`Campaign stars from your cloud: ${learned} chapter${learned === 1 ? '' : 's'} brought here`, 'info');
+    },
+    () => undefined,
+  );
+  syncDiscovery().then(
+    (learned) => {
+      discovery = null; // reread on the next find
+      if (learned) hud.toast(`Web of Ages finds from your cloud: ${learned} brought here`, 'info');
     },
     () => undefined,
   );
@@ -2191,6 +2198,7 @@ function recordDiscovery(s: GameState): void {
   const before = discovery.entered.length;
   if (observe(discovery, s, viewer)) {
     saveDiscovery(discovery);
+    pushDiscovery(discovery);
     // A side age found for the first time, ever, is worth a line: it is now on the title-screen map.
     for (const a of discovery.entered.slice(before)) {
       if (!TRUNK.includes(a)) hud.toast(`A new age for your web map: the ${AGES[a].name}`, 'good');

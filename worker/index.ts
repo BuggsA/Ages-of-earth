@@ -1,5 +1,5 @@
 import { CODE_CHARS, CODE_LENGTH, validCode } from '../src/net/protocol';
-import { MAX_CLOUD_SAVE, MAX_PROGRESS_BODY, validSlot, validVaultKey } from '../src/net/vault';
+import { MAX_CLOUD_SAVE, MAX_PROGRESS_BODY, MAX_WEB_BODY, validSlot, validVaultKey } from '../src/net/vault';
 
 /**
  * The Ages of Earth Worker: serves the built game, and online rooms under /api/:
@@ -35,20 +35,20 @@ export default {
       fwd.searchParams.set('code', m[1]);
       return room.fetch(new Request(fwd.toString(), req));
     }
-    const v = url.pathname.match(/^\/api\/vault\/([A-Z0-9]+)(?:\/(\d+|progress))?$/);
+    const v = url.pathname.match(/^\/api\/vault\/([A-Z0-9]+)(?:\/(\d+|progress|web))?$/);
     if (v && validVaultKey(v[1])) {
       // Previews carry no Durable Objects, so no vaults.
       if (!env.VAULTS) return json({ error: 'Cloud saves are not available here.' }, 503);
-      const progress = v[2] === 'progress';
+      const progress = v[2] === 'progress' || v[2] === 'web';
       const slot = v[2] === undefined || progress ? 0 : Number(v[2]);
       if (v[2] !== undefined && !progress && !validSlot(slot)) return json({ error: 'No such slot.' }, 404);
       if (progress ? !['GET', 'PUT'].includes(req.method) : !slot && req.method !== 'GET') return json({ error: 'Not allowed.' }, 405);
       if (slot && !['GET', 'PUT', 'DELETE'].includes(req.method)) return json({ error: 'Not allowed.' }, 405);
-      if (req.method === 'PUT' && Number(req.headers.get('content-length') ?? 0) > (progress ? MAX_PROGRESS_BODY : MAX_CLOUD_SAVE)) return json({ error: progress ? 'Too large.' : 'This match is too large to keep in the cloud.' }, 413);
+      if (req.method === 'PUT' && Number(req.headers.get('content-length') ?? 0) > (progress ? Math.max(MAX_PROGRESS_BODY, MAX_WEB_BODY) : MAX_CLOUD_SAVE)) return json({ error: progress ? 'Too large.' : 'This match is too large to keep in the cloud.' }, 413);
       // The vault measures the body itself, for a request that doesn't say its length.
       const vault = env.VAULTS.get(env.VAULTS.idFromName(`vault:${v[1]}`));
       const fwd = new URL(req.url);
-      fwd.search = progress ? '?progress=1' : slot ? `?slot=${slot}` : '';
+      fwd.search = progress ? `?${v[2]}=1` : slot ? `?slot=${slot}` : '';
       return vault.fetch(new Request(fwd.toString(), req));
     }
     return json({ error: 'Not found.' }, 404);
