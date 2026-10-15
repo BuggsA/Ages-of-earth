@@ -647,6 +647,21 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     const spot = findSpot(s, 'storehouse', near.x, near.y, 2, 6);
     if (spot && construct(s, v, mem, 'storehouse', spot, 2, issue)) return;
   }
+  // A Hunting Camp by a far kill, so the butchers carry meat a short way and the land round it is held against wolves.
+  if (p.epoch === 0 || s.carcasses?.length) {
+    const kill = (s.carcasses ?? []).find((c) => {
+      const tx = (c.tile % s.w) + 0.5;
+      const ty = Math.floor(c.tile / s.w) + 0.5;
+      if (s.res[c.tile] !== R_MEAT || s.amount[c.tile] < AI_WILD.campMeat) return false;
+      if ((tx - home.x) * (tx - home.x) + (ty - home.y) * (ty - home.y) > AI_WILD.campNear * AI_WILD.campNear) return false;
+      return !v.buildings.some((b) => BUILDINGS[b.type].drop.includes('food') && distToRect(tx, ty, b) < AI_WILD.campFar && (b.built || b.type === 'huntcamp'));
+    });
+    if (kill && n >= 12 && p.res.wood >= 120 && count(v, 'huntcamp') < 3 && !recently('huntcamp', 25)) {
+      const spot = findSpot(s, 'huntcamp', (kill.tile % s.w) + 0.5, Math.floor(kill.tile / s.w) + 0.5, 2, 5);
+      if (spot && construct(s, v, mem, 'huntcamp', spot, 2, issue)) return;
+    }
+  }
+
   // Against a people of iron (cheap, hard-hitting foot), a second range early (#50).
   const ironRival = clever && rivalIn(s, p, ['iron']);
 
