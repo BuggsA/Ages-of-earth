@@ -250,3 +250,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Hunters hunted** (#260, own pitch, lane ai): Hard/Expert computers send 2–3 idle soldiers at rival citizens they see working far from home with no guard, and walk to a seen rival Hunting Camp to look (`AI_PROWL`). Tests and a headless match; about one foray per computer-vs-computer match; browser unseen; no save bump.
 
 **Escorted hunt** (own pitch, lane ai): a clever computer hunts a mammoth 22–38 tiles out with two soldiers along (`AI_WILD.far/.escort/.guard/.safe`). Tests only; no sweep; no save bump.
+
+**People crests** (#267 art pass, own step, lane look): the title card shows your people's crest in your colour. UI only; seen in headless Chromium (title card, two peoples); no save bump.

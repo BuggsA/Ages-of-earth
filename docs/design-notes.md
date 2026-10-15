@@ -714,3 +714,11 @@ Session 2 (lane ai): Iron-Bound Hulls answered. `fleetWanted` adds `AI_WEB.hulls
 **Why I love it:** it is the other side of #260: the computer now weighs the same gamble it punishes in you. A far feast is worth the risk only with soldiers to spare.
 
 **Seen:** `tests/wild.test.ts` (escorted with six soldiers, not with one). No win-rate sweep; browser unseen. **Next:** have the band bring a tower or Hunting Camp along. *Done 2026-10-15 (recall):* once the beast is down the escort (`mem.huntEscort`) walks home instead of standing idle at the carcass, where a raider would find it.
+
+## Designers' notes: people crests (#267, art pass, 2026-10-16, lane look)
+
+**Built:** `src/ui/crests.ts`: each people gets a banner crest in the player's colour on the title card, beside the blurb, redrawn when people or colour change.
+
+**Why I love it:** the title was a form; peoples had names but no faces. A flag in your own colour is the first thing the match then shows on your buildings, so the menu and the field say the same thing.
+
+**Seen:** headless Chromium, Mongols in red and Romans in green on the title card, no console errors. Emblems are small and plain; the Chinese and Egyptian ones want a better hand. **Next (the art pass has more to do):** the same crest on the HUD's people chip, the lobby and the end report; building models' silhouettes per epoch; a title-screen backdrop that isn't a form over a live field.
