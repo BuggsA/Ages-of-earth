@@ -750,6 +750,18 @@ export class View {
           }
           break;
         }
+        case 'arc': {
+          // A Coil Tower's bolt (#231): from the crown through each enemy it struck.
+          const [x0, y0] = ev.pts;
+          if (!this.sees(x0, y0)) break;
+          const pts: THREE.Vector3[] = [];
+          for (let i = 0; i < ev.pts.length; i += 2) pts.push(this.ground(s, ev.pts[i], ev.pts[i + 1], i === 0 ? 4.4 : 0.45));
+          this.effects.bolt(pts, '#bfe6ff');
+          const end = pts[pts.length - 1];
+          this.effects.burst(end, { count: 6, speed: 1.8, life: 0.3, size: 0.03, gravity: 2, colors: ['#e8f6ff', '#8fd8ff'] });
+          this.cue('zap', x0, y0, 0.7);
+          break;
+        }
         case 'splash': {
           if (!this.sees(ev.x, ev.y)) break;
           const at = this.ground(s, ev.x, ev.y, 0.15);

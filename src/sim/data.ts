@@ -61,6 +61,12 @@ export interface Age {
    * more, counting at most `most` such steps. Iron dug on the way here still counts (the web's link).
    */
   ironTrade?: { per: number; each: number; most: number };
+  /**
+   * Power broadcast from coils (the Age of Lightning, #231): Watch Towers become Coil Towers, whose field
+   * speeds the work of buildings near them and slows every building outside, and whose shot is a leaping
+   * arc. The numbers are `LIGHTNING`.
+   */
+  coils?: boolean;
 }
 
 export const TRUNK: AgeId[] = ['stone', 'bronze', 'middle', 'gunpowder', 'industrial'];
@@ -137,6 +143,14 @@ export const AGES: Record<AgeId, Age> = {
     price: { ship: 0.75 },
     ironTrade: IRON_TRADE,
   },
+  lightning: {
+    name: 'Age of Lightning',
+    short: 'Lightning',
+    tier: 4,
+    blurb: 'The future that almost was: power is broadcast through the air from Coil Towers, not carried by coal and belts. Buildings in a coil\'s field train and research 35% faster; buildings outside every field run 25% slower. A coil\'s bolt leaps from one enemy to the next nearby. The air hums with current: no aeroplane flies.',
+    coils: true,
+    no: { units: ['fighter', 'bomber'], why: 'The air hums with current in the Age of Lightning: no aeroplane flies until you return to the Industrial Age' },
+  },
 };
 
 /** Something a people must have done before a road opens: a tally from its stats reaching `n`. */
@@ -177,6 +191,17 @@ export const ROADS: Road[] = [
   ...TRUNK.slice(1).map((to, i): Road => ({ from: TRUNK[i], to, cost: EPOCHS[i + 1].cost, time: EPOCHS[i + 1].time })),
   { from: 'industrial', to: 'aeronaut', clue: 'airfield', cost: { food: 600, wood: 500, gold: 800 }, time: 60, blurb: 'Build a future around aviation: aircraft cost and training time fall by 25%, but foot, ranged, cavalry and siege units cost 20% more. An Airfield must stand when the journey starts.' },
   { from: 'aeronaut', to: 'industrial', cost: { food: 200, wood: 200 }, time: 30, blurb: 'Return to a balanced Industrial economy: ordinary aircraft production and ordinary land army prices.' },
+  // The other future out of the Industrial (#231): fire signals, then the telegraph, then power sent through the air.
+  {
+    from: 'industrial',
+    to: 'lightning',
+    cost: { food: 500, stone: 300, gold: 900 },
+    time: 60,
+    clue: 'tower',
+    deed: { stat: 'beacons', n: 6, text: 'Your towers light 6 beacons (relays count)' },
+    blurb: 'Instead of the skies, the wires that need no wires: every Watch Tower becomes a Coil Tower. Buildings within its field train and research 35% faster, but buildings outside every field run 25% slower, so the town is laid out around its coils, and a coil that falls darkens its quarter. A coil\'s bolt leaps from enemy to enemy, the hardest on armies that crowd together. What it gives up: aircraft. The Airfield builds nothing while you stay.',
+  },
+  { from: 'lightning', to: 'industrial', cost: { food: 200, wood: 300 }, time: 30, blurb: 'Bring the steam engines back: every building works at its usual speed again, Watch Towers loose arrows, and the Airfield builds aircraft once more.' },
   {
     from: 'middle', to: 'reclaimer', cost: { food: 900, wood: 350, gold: 500 }, time: 65,
     ruin: true,
@@ -818,6 +843,14 @@ export const WORK = {
 };
 
 /**
+ * The Age of Lightning (#231). `reach`: tiles from a finished Watch (Coil) Tower's centre within which a
+ * building's centre is in its field. `lit` and `dark`: how fast a building in a field, and one outside every
+ * field, trains and researches, in hundredths. The arc: one bolt strikes at most `strikes` enemies, leaping
+ * at most `leap` tiles from one to the next, and keeps `keep` of its strength at each leap.
+ */
+export const LIGHTNING = { reach: 10, lit: 135, dark: 75, strikes: 4, leap: 2.5, keep: 0.7 };
+
+/**
  * Signal beacons (own pitch): a built Watch Tower can light a fire on its roof. While it burns the tower sees
  * `sight` tiles farther, and every rival sees the ground around it (`exposed` tiles): the flame is visible to all.
  */
@@ -1079,6 +1112,13 @@ export const ATTRITION = { every: 5, deep: 9, loss: 0.02 };
  * `flame`: a clever computer that sees a rival's beacon burning within this many tiles of one of its Towers lights that Tower's own.
  * `stage`: a clever computer that keeps an Old Ford up to this many tiles from home, on the rival's side of it, musters its waves there, so they march out already forward.
  */
+/**
+ * The computer and the Age of Lightning (#231): it takes the road with at least `towers` finished towers and no
+ * aircraft, and while it walks the web in the Industrial Age it lights a beacon every `every` seconds toward
+ * the deed. In the age it raises a coil by a dark workshop, `gap` seconds apart, up to `most` towers.
+ */
+export const AI_LIGHTNING = { towers: 2, every: 40, gap: 45, most: 6 };
+
 export const AI_RAID = { weary: 0.5, calm: 7, fort: 15, pop: 24, flame: 24, stage: 36 };
 /**
  * The computer and the wild (#171): once it has `mammothAt` citizens it sends a party of `party` after the
