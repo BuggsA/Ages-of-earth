@@ -828,7 +828,7 @@ export class Hud {
         if (b.type === 'towncenter') {
           const w = WORKS[p.civ];
           const why = workProblem(s, p);
-          cmds.push({ key: 'W', pic: '', glyph: w.icon, title: w.name, desc: `${w.blurb} Free; lasts ${WORK.duration} seconds, once in each epoch.`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'greatWork', p: viewer }) });
+          cmds.push({ key: 'V', pic: '', glyph: w.icon, title: w.name, desc: `${w.blurb} Free; lasts ${WORK.duration} seconds, once in each epoch.`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'greatWork', p: viewer }) });
         }
         if (b.type === 'tower') {
           const why = beaconProblem(s, p, b);
