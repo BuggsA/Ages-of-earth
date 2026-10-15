@@ -6,6 +6,7 @@ import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { wallLine } from './sim/commands';
 import { AGES, BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, RELIC, RUINS, SEASONS, TECHS, TICK_HZ, TRUNK, WORKS, domainOf, unitStats } from './sim/data';
+import { crestSvg } from './ui/crests';
 import { isEnemy } from './sim/world';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
 import { placeProblem, walkable } from './sim/grid';
@@ -731,9 +732,11 @@ mapSel.innerHTML = (Object.keys(MAP_TYPES) as MapType[]).map((m) => `<option val
 const civBlurb = () => {
   const c = civSel.value;
   const m = MAP_TYPES[mapSel.value as MapType];
+  $('civ-crest').innerHTML = crestSvg(c as CivId | 'random', PLAYER_COLORS[Number(colorSel.value)] ?? PLAYER_COLORS[0]);
   $('civ-blurb').innerHTML = `${c === 'random' ? 'A people chosen at random.' : `<b>${CIVS[c as CivId].name}:</b> ${CIVS[c as CivId].blurb.split(': ').slice(1).join(': ') || CIVS[c as CivId].blurb}`}<br><b>${m.label}:</b> ${m.blurb}`;
 };
 civSel.addEventListener('change', civBlurb);
+colorSel.addEventListener('change', civBlurb);
 showContinue();
 showReplayButton();
 mapSel.addEventListener('change', civBlurb);

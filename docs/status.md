@@ -250,3 +250,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Escorted hunt** (own pitch, lane ai): a clever computer hunts a mammoth 22–38 tiles out with two soldiers along (`AI_WILD.far/.escort/.guard/.safe`). Tests only; no sweep; no save bump.
 
 **Tidier title card** (#267, owner's art-pass note, lane look): the title shows people, difficulty and map seed; rivals, colour, teams, map, size, start age, game, peace and graphics fold under "More options" (remembered). Same element ids, no rules change. Seen in headless Chromium (fold opens, Play starts a match, no page errors); the wider art pass (characters, buildings) is not started.
+
+**People crests** (#267 art pass, own step, lane look): the title card shows your people's crest in your colour. UI only; seen in headless Chromium (title card, two peoples); no save bump.
