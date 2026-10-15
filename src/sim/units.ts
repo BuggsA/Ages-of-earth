@@ -11,6 +11,7 @@ import { carriedBy, relicAt } from './relics';
 import { animalRadius, hitAnimal } from './animals';
 import { dig, ruinAt } from './ruins';
 import { groveBoost, keptOf, kinBonus } from './landmarks';
+import { chant, consecrateProblem, turnBuilding } from './consecrate';
 import { atPost, dockOf, goalForPost, homeMarket, marketOf, nearestDock, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { canHit, exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, passOf, pay, radiusOf, statsOf, teamOf } from './world';
 
@@ -255,7 +256,7 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
 
 function farmStep(s: GameState, u: Unit, o: Extract<Order, { k: 'farm' }>): void {
   const f = s.byId.get(o.target);
-  if (!f || f.kind !== 'building' || f.hp <= 0 || f.type !== 'farm') {
+  if (!f || f.kind !== 'building' || f.hp <= 0 || f.type !== 'farm' || f.owner !== u.owner) {
     if (u.carry > 0) setOrder(u, { k: 'deliver' });
     else setOrder(u, { k: 'idle' });
     return;
@@ -668,6 +669,10 @@ function convertTicks(s: GameState, priest: Unit, t: Unit): number {
 function convertStep(s: GameState, u: Unit, o: Extract<Order, { k: 'convert' }>): void {
   const t = s.byId.get(o.target);
   const st = statsOf(s, u);
+  if (t && t.kind === 'building') {
+    consecrateStep(s, u, o, t);
+    return;
+  }
   // Kings never turn, and a priest's hands are full with a relic.
   if (!t || t.kind !== 'unit' || t.hp <= 0 || t.inside || !isEnemy(s, u.owner, t.owner) || peace(s) || s.kings.includes(t.id) || carriedBy(s, u)) {
     setOrder(u, { k: 'idle' });
@@ -707,6 +712,35 @@ function convertStep(s: GameState, u: Unit, o: Extract<Order, { k: 'convert' }>)
     return;
   }
   if (!approach(u, g)) setOrder(u, { k: 'idle' });
+}
+
+/** Chanting a rival's building over, beside any other priests of the same people (#209). */
+function consecrateStep(s: GameState, u: Unit, o: Extract<Order, { k: 'convert' }>, b: Building): void {
+  if (consecrateProblem(s, u.owner, b) || carriedBy(s, u)) {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  if (u.cool > 0) {
+    if (walking(u)) stopWalking(u);
+    return;
+  }
+  const range = statsOf(s, u).range;
+  if (gap(s, u, b) <= range) {
+    if (walking(u)) stopWalking(u);
+    face(u, b.x, b.y);
+    u.act = 'chant';
+    if (o.done % 24 === 0) s.events.push({ k: 'work', id: u.id, owner: u.owner, act: 'chant', x: b.x, y: b.y });
+    o.done++;
+    if (chant(s, u, b)) {
+      // Those sheltering inside run out to fight for the side that lost it.
+      ungarrison(s, b);
+      turnBuilding(s, b, u.owner);
+      u.cool = secs(PRIEST.rest);
+      setOrder(u, { k: 'idle' });
+    }
+    return;
+  }
+  if (!approach(u, goalForBuilding(b))) setOrder(u, { k: 'idle' });
 }
 
 function healStep(s: GameState, u: Unit, o: Extract<Order, { k: 'heal' }>): void {

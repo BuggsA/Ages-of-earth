@@ -113,7 +113,8 @@ export class BuildingsView {
     }
 
     for (const [id, k] of this.known) {
-      const key = `${k.type}:${k.epoch}:${k.age}:${k.built ? 1 : 0}:${k.variant}`;
+      // The owner too, so a building won over (#209) is redrawn in its new colours.
+      const key = `${k.type}:${k.epoch}:${k.age}:${k.built ? 1 : 0}:${k.variant}:${k.owner}`;
       let v = this.views.get(id);
       if (v && v.key !== key) {
         this.group.remove(v.group);

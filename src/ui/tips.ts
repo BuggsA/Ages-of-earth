@@ -125,6 +125,12 @@ const TIPS: Tip[] = [
     text: `There is a turning off the Middle Ages. Carry relics to your Temple: once they have brought in ${PILGRIM_ROAD.deed!.n} gold, the Town Center (🔀) can turn your people into the <b>${AGES.pilgrim.name}</b>: relics pay double and priests come cheap, but no siege engines. The road shuts once you advance.`,
   },
   {
+    id: 'consecrate',
+    // Faith takes the walls (#209): a pilgrim people with priests to send.
+    when: (s, me) => ageOf(s.players[me]) === 'pilgrim' && s.ents.some((e) => e.kind === 'unit' && e.owner === me && e.type === 'priest'),
+    text: 'A pilgrim people takes walls by faith. Select several priests and right-click a rival\'s <b>tower, gate or Temple</b>: they chant it over together, faster with every voice, and a Temple brings its relics. Soldiers sheltering inside slow them, and towers shoot back, so keep an escort near. Town Centers and Wonders never turn.',
+  },
+  {
     id: 'sail',
     // A Dock stands while the Middle Ages last: the sea is a road too.
     when: (s, me) => {

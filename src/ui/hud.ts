@@ -11,6 +11,7 @@ import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
 import { LANDMARK_KINDS, claimWork, claimants, favours, landmarkAt } from '../sim/landmarks';
 import { workProblem } from '../sim/works';
 import { beaconProblem, lit } from '../sim/beacon';
+import { faithOf } from '../sim/consecrate';
 import { rallyProblem } from '../sim/rally';
 import { stirred as stirredNow } from '../sim/combat';
 import { sees } from '../sim/vision';
@@ -548,6 +549,9 @@ export class Hud {
     else if (b.type === 'temple' && keptIn(s, b)) status = `Keeps ${keptIn(s, b)} relic${keptIn(s, b) > 1 ? 's' : ''}: ${icon('gold', 14)}${Math.round((60 / RELIC.every) * Math.round(RELIC.gold * modsOf(s, b.owner).relicGold) * keptIn(s, b))} a minute`;
     else status = def.drop.length ? 'Drop-off for every resource' : def.pop ? `Room for ${def.pop}` : 'Ready';
     if (!mine) status = `<span class="swatch" style="background:${p.color}"></span>${p.name}${b.type === 'wonder' && b.timer >= 0 ? `: wins in ${fmtTime(b.timer)}` : ''}${b.type === 'temple' && keptIn(s, b) ? `: keeps ${keptIn(s, b)} relic${keptIn(s, b) > 1 ? 's' : ''}` : ''}`;
+    // Faith takes the walls (#209): how near rival priests have chanted it over.
+    const faith = faithOf(b);
+    if (faith > 0 && b.faithBy !== undefined) status += ` · <span data-tip="<b>Faith</b>${b.faithBy === viewer ? 'Your priests are chanting it over: keep them at it, or the faith fades.' : 'Rival priests are chanting it over. Strike them down, or shelter soldiers inside to slow them.'}">✨ ${Math.floor(faith * 100)}% ${b.faithBy === viewer ? 'won over' : `to ${s.players[b.faithBy].name}`}</span>`;
     const inside = def.garrison && b.built ? `<div class="stats"><span data-tip="<b>Sheltering</b>Units inside are safe, heal slowly and add arrows.">🏰<em>Inside</em> ${b.garrison.length}/${def.garrison}</span></div>` : '';
     const sig = `b:${b.id}:${Math.ceil(b.hp)}:${status}:${b.queue.length}:${p.epoch}:${queue.length}:${b.garrison.length}`;
     const html = `<div class="sel-portrait"><img src="${buildingPicture(b.type, p.epoch, p.color)}" alt=""></div>
