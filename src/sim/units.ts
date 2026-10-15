@@ -1,4 +1,4 @@
-import { AI_LEVELS, BUILDINGS, CARRY, DEER, DT, EPOCH_GATHER_BONUS, FISH_CARRY, GATHER, MILITARY, PRIEST, REPAIR_SHARE, RUINS, TRADE, domainOf, secs } from './data';
+import { AI_LEVELS, BUILDINGS, CARRY, DEER, DT, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, PRIEST, REPAIR_SHARE, RUINS, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
@@ -10,6 +10,7 @@ import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } 
 import { carriedBy, relicAt } from './relics';
 import { animalRadius, hitAnimal } from './animals';
 import { dig, ruinAt } from './ruins';
+import { keptOf } from './landmarks';
 import { atPost, dockOf, goalForPost, homeMarket, marketOf, nearestDock, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { canHit, exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, passOf, pay, radiusOf, statsOf, teamOf } from './world';
 
@@ -86,7 +87,7 @@ function face(u: Unit, x: number, y: number): void {
   }
 }
 
-function gatherRate(s: GameState, u: Unit, kind: number | 'farm'): number {
+export function gatherRate(s: GameState, u: Unit, kind: number | 'farm'): number {
   const p = s.players[u.owner];
   const m = modsOf(s, u.owner);
   const ai = p.ai ? AI_LEVELS[p.ai].gather : 1;
@@ -95,7 +96,9 @@ function gatherRate(s: GameState, u: Unit, kind: number | 'farm'): number {
     kind === 'farm' ? m.farm : kind === R_TREE ? m.wood : kind === R_STONE || kind === R_GOLD || kind === R_BOG ? m.mine : kind === R_MEAT ? m.hunt * m.forage : kind === R_FISH ? m.fish : m.forage;
   const sn = seasonOf(s);
   const season = kind === 'farm' ? sn.field : kind === R_BERRY ? sn.plant : 1;
-  return base * mod * (1 + p.epoch * EPOCH_GATHER_BONUS) * ai * season;
+  // A Flint Scatter sharpens its keeper's axes and picks.
+  const tools = (kind === R_TREE || kind === R_STONE || kind === R_GOLD || kind === R_BOG) && keptOf(s, u.owner, 'flint') > 0 ? LANDMARKS.flint.tools : 1;
+  return base * mod * (1 + p.epoch * EPOCH_GATHER_BONUS) * ai * season * tools;
 }
 
 const carryCap = (s: GameState, u: Unit) =>
