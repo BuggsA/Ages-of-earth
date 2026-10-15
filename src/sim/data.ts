@@ -501,6 +501,7 @@ export const RUINS = { count: { small: 2, medium: 3, large: 4 } as Record<MapSiz
  * - The Sacred Spring mends its keeper's people within `spring.reach` tiles: `spring.heal` of their full
  *   health every `spring.every` seconds. A place to stage a raid from, or to bring the bitten home to.
  * - The Lookout Crag shows its keeper everything within `crag.sight` tiles: the road their rival walks.
+ * - The Flint Scatter gives its keeper's citizens good edges: chopping and mining (stone, gold, bog iron) `flint.tools` times as fast.
  * - The Ancestors' Cairn gives its keeper `cairn.pop` more room for people: a house or two not built.
  */
 export const LANDMARKS = {
@@ -508,6 +509,7 @@ export const LANDMARKS = {
   spring: { reach: 6, heal: 0.03, every: 2 },
   crag: { sight: 14 },
   cairn: { pop: 5 },
+  flint: { tools: 1.2 },
 };
 /**
  * The computer and the landmarks: once it has `townAt` citizens and sees no danger near one nobody

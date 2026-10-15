@@ -1110,7 +1110,7 @@ function placeLandmarks(
   }
   const kinds: LandmarkKind[] = [];
   while (kinds.length < out.length) {
-    const hand: LandmarkKind[] = ['spring', 'crag', 'cairn'];
+    const hand: LandmarkKind[] = ['spring', 'crag', 'cairn', 'flint'];
     for (let i = hand.length - 1; i > 0; i--) {
       const j = Math.floor(rng() * (i + 1));
       [hand[i], hand[j]] = [hand[j], hand[i]];

@@ -19,6 +19,7 @@ const WATER = '#3f7fa8';
 const WATER_LIGHT = '#78b4d2';
 const REED = '#7c8f3e';
 const OCHRE = '#a5532c';
+const FLINT = '#2f3238';
 const TEAM = '#ffffff';
 
 export function springGeometry(): THREE.BufferGeometry {
@@ -103,9 +104,27 @@ export function bannerGeometry(): THREE.BufferGeometry {
   return bake(k.root);
 }
 
-const GEOMETRY: Record<LandmarkKind, () => THREE.BufferGeometry> = { spring: springGeometry, crag: cragGeometry, cairn: cairnGeometry };
+export function flintGeometry(): THREE.BufferGeometry {
+  const k = new Kit();
+  // A low bank of pale chalk, black flint nodules in it, and a scatter of struck flakes round a knapping stone.
+  k.box(1.5, 0.22, 1.1, STONE_PALE, 0, 0, 0).rotation.y = 0.2;
+  k.box(1.0, 0.2, 0.8, STONE, -0.1, 0.2, -0.05).rotation.y = -0.15;
+  for (let i = 0; i < 7; i++) {
+    const a = i * 2.4;
+    k.rock(0.1 + (i % 3) * 0.03, FLINT, Math.cos(a) * 0.55, 0.18 + (i % 2) * 0.1, Math.sin(a) * 0.4);
+  }
+  for (let i = 0; i < 12; i++) {
+    const a = i * 1.9;
+    k.box(0.09, 0.015, 0.05, i % 3 ? FLINT : STONE_PALE, Math.cos(a) * (0.7 + (i % 4) * 0.1), 0, Math.sin(a) * (0.6 + (i % 3) * 0.12)).rotation.y = a;
+  }
+  k.cyl(0.2, 0.24, 0.2, 7, STONE_DARK, 0.5, 0, 0.55);
+  k.box(0.2, 0.05, 0.08, FLINT, 0.5, 0.2, 0.55).rotation.y = 0.6;
+  return bake(k.root);
+}
+
+const GEOMETRY: Record<LandmarkKind, () => THREE.BufferGeometry> = { spring: springGeometry, crag: cragGeometry, cairn: cairnGeometry, flint: flintGeometry };
 /** Where each kind's banner stands, in model space. */
-const BANNER: Record<LandmarkKind, [number, number, number]> = { spring: [0.75, 0, 0.75], crag: [0.25, 1.4, -0.35], cairn: [1.25, 0, -0.35] };
+const BANNER: Record<LandmarkKind, [number, number, number]> = { spring: [0.75, 0, 0.75], crag: [0.25, 1.4, -0.35], cairn: [1.25, 0, -0.35], flint: [0.7, 0, 0.7] };
 
 export class LandmarksView {
   readonly group = new THREE.Group();
@@ -136,7 +155,7 @@ export class LandmarksView {
   update(s: GameState, seenTile: (x: number, y: number) => boolean, seesNow: (x: number, y: number) => boolean): void {
     const marks = s.landmarks ?? [];
     const n = Math.max(4, marks.length);
-    const counts: Record<LandmarkKind, number> = { spring: 0, crag: 0, cairn: 0 };
+    const counts: Record<LandmarkKind, number> = { spring: 0, crag: 0, cairn: 0, flint: 0 };
     for (const kind of Object.keys(GEOMETRY) as LandmarkKind[]) this.meshes[kind] = this.mesh(GEOMETRY[kind], this.meshes[kind], n);
     this.banners = this.mesh(bannerGeometry, this.banners, n);
     let flags = 0;

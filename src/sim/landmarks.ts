@@ -14,6 +14,7 @@ export const LANDMARK_KINDS: Record<LandmarkKind, { name: string; blurb: string 
   spring: { name: 'Sacred Spring', blurb: `Its keeper's people within ${LANDMARKS.spring.reach} tiles mend as they rest: a place to stage a raid from, or to bring the wounded.` },
   crag: { name: 'Lookout Crag', blurb: `Its keeper sees everything within ${LANDMARKS.crag.sight} tiles: who walks the land between the towns.` },
   cairn: { name: "Ancestors' Cairn", blurb: `Its keeper has room for ${LANDMARKS.cairn.pop} more people, as if they had built a house or two.` },
+  flint: { name: 'Flint Scatter', blurb: `Good knapping stone lies here: its keeper's citizens chop and mine ${Math.round((LANDMARKS.flint.tools - 1) * 100)}% faster, wherever they work.` },
 };
 
 export function landmarkAt(s: GameState, id: number): Landmark | undefined {

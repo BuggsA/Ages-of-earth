@@ -79,7 +79,7 @@ const TIPS: Tip[] = [
   {
     id: 'landmarks',
     when: (s, me) => !!s.landmarks?.length && (secsIn(s) > 75 || s.landmarks.some((m) => s.players[me].seen[Math.floor(m.y) * s.w + Math.floor(m.x)] === 1)),
-    text: 'Out between the towns stand <b>landmarks</b> (grey triangles on the map, once found): a <b>Sacred Spring</b> that mends, a <b>Lookout Crag</b> that sees far, an <b>Ancestors\' Cairn</b> that makes room for more people. Right-click one with anyone, a citizen will do, and keep rivals off it to claim it and the land round it. Rivals can take it back the same way, so a fight over it may come before any army does.',
+    text: 'Out between the towns stand <b>landmarks</b> (grey triangles on the map, once found): a <b>Sacred Spring</b> that mends, a <b>Lookout Crag</b> that sees far, an <b>Ancestors\' Cairn</b> that makes room for more people, a <b>Flint Scatter</b> that speeds axes and picks. Right-click one with anyone, a citizen will do, and keep rivals off it to claim it and the land round it. Rivals can take it back the same way, so a fight over it may come before any army does.',
   },
   {
     id: 'ruins',
