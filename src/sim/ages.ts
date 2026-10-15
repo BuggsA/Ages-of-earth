@@ -1,5 +1,5 @@
-import { AGES, BUILDINGS, LIGHTNING, ROADS, STEP_BACK, TECHS, TICK_HZ, TRUNK, secs, stepBackCost, type Age, type Deed, type Road } from './data';
-import type { AgeId, Building, BuildingType, Cost, GameState, Player, TechId, UnitType } from './types';
+import { AGES, BUILDINGS, LIGHTNING, PATHS, ROADS, STEP_BACK, TECHS, TICK_HZ, TRUNK, secs, stepBackCost, type Age, type Deed, type Road } from './data';
+import type { AgeId, PathId, Building, BuildingType, Cost, GameState, Player, TechId, UnitType } from './types';
 
 /**
  * Ages as a web (#37): which age a people is in, the roads out of it, and what that age lets them
@@ -245,4 +245,30 @@ export function workSteps(s: GameState, b: Building): number {
   b.spark = sum - n * 100;
   if (rate === 100 && b.spark === 0) delete b.spark;
   return n;
+}
+
+/** The path (#299) an age is a step of, if any. */
+export const pathOf = (age: AgeId): PathId | undefined => AGES[age].path;
+
+/** A path's ages, built so far, from its lowest tier up. */
+export const pathAges = (path: PathId): AgeId[] =>
+  (Object.keys(AGES) as AgeId[]).filter((a) => AGES[a].path === path).sort((a, b) => AGES[a].tier - AGES[b].tier);
+
+/** How many of its path's ages a people standing on a path has walked, the one it stands in counted; 0 off every path. */
+export function pathDepth(p: Player): number {
+  const path = pathOf(ageOf(p));
+  return path ? pathAges(path).filter((a) => hasWalked(p, a)).length : 0;
+}
+
+/** Roads out of the player's age that carry on along its path: the way deeper. */
+export function pathRoads(p: Player): Road[] {
+  const path = pathOf(ageOf(p));
+  return path ? roadsFrom(p).filter((r) => AGES[r.to].path === path) : [];
+}
+
+/** What a path adds for the ages of it already walked: `carry`, once for each earlier one (#299). */
+export function pathCarry(p: Player): { path: PathId; times: number } | null {
+  const path = pathOf(ageOf(p));
+  const times = pathDepth(p) - 1;
+  return path && PATHS[path].carry && times > 0 ? { path, times } : null;
 }

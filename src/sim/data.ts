@@ -1,4 +1,4 @@
-import type { AgeId, LandmarkKind, BuildingType, CivId, Cost, Difficulty, Domain, MapSize, MapType, Res, TechId, UnitType, PlayerStats } from './types';
+import type { AgeId, PathId, LandmarkKind, BuildingType, CivId, Cost, Difficulty, Domain, MapSize, MapType, Res, TechId, UnitType, PlayerStats } from './types';
 
 /** Every number in the game lives here. */
 
@@ -67,7 +67,32 @@ export interface Age {
    * arc. The numbers are `LIGHTNING`.
    */
   coils?: boolean;
+  /** The path (#299) this age is a step of: a chain of side ages, one per tier, that carries its own way of life across epochs. */
+  path?: PathId;
 }
+
+/**
+ * A path (#299): side ages chained one per tier, so a people can leave the trunk and stay off it for
+ * several epochs, each step's door a deeper deed of the same kind. A path remembers how far it has been
+ * walked: `carry` is added to the people's modifiers once for every earlier age of the path they have
+ * stood in, so the path's own strength grows the longer it is kept. Its ages are the ones naming it
+ * (`Age.path`); `planned` names the steps still to be built, for the docs and the HUD.
+ */
+export interface Path {
+  name: string;
+  blurb: string;
+  carry?: Partial<Mods>;
+  planned?: string[];
+}
+
+export const PATHS: Record<PathId, Path> = {
+  blood: {
+    name: 'Path of Blood',
+    blurb: 'A people that lives by war: it trades with no one, and feeds its towns on what its soldiers take from the enemy dead. Each age of the path opens with a deeper deed of blood, and the plunder grows with every age of it walked.',
+    carry: { plunder: 0.1 },
+    planned: ['tier 3: the Age of Iron and Blood', 'tier 4: the Age of Total War'],
+  },
+};
 
 export const TRUNK: AgeId[] = ['stone', 'bronze', 'middle', 'gunpowder', 'industrial'];
 
@@ -150,6 +175,17 @@ export const AGES: Record<AgeId, Age> = {
     blurb: 'The future that almost was: power is broadcast through the air from Coil Towers, not carried by coal and belts. Buildings in a coil\'s field train and research 35% faster; buildings outside every field run 25% slower. A coil\'s bolt leaps from one enemy to the next nearby. The air hums with current: no aeroplane flies.',
     coils: true,
     no: { units: ['fighter', 'bomber'], why: 'The air hums with current in the Age of Lightning: no aeroplane flies until you return to the Industrial Age' },
+  },
+  // The first step of the Path of Blood (#299): a turn off the Middle Ages, at its tier.
+  warband: {
+    name: 'Age of the Warband',
+    short: 'Warband',
+    tier: 2,
+    path: 'blood',
+    blurb: 'The war-host is the people: soldiers train 15% faster, and every enemy unit your forces slay pays a quarter of its price as plunder in gold. But a warband trades with no one: no traders leave its Markets, and with the young away at war the fields yield 10% less.',
+    add: { plunder: 0.25 },
+    mul: { militaryTrain: 0.85, farm: 0.9 },
+    no: { units: ['trader'], why: 'A warband trades with no one: traders wait until your people leave the Path of Blood' },
   },
 };
 
@@ -278,6 +314,18 @@ export const ROADS: Road[] = [
   { from: 'sail', to: 'middle', cost: { food: 150, wood: 150 }, time: 25, blurb: 'Come ashore: the Middle Ages again, with ordinary fields, ordinary hulls and the usual price for ships.' },
   { from: 'fair', to: 'industrial', cost: { food: 1300, gold: 1100, stone: 300 }, time: 80, blurb: 'Rejoin the main road: the fairs\' fortune buys its way into the Industrial Age (more gold and less food and stone than from the Gunpowder Age).' },
   { from: 'fair', to: 'gunpowder', cost: { food: 400, stone: 200 }, time: 30, blurb: 'Settle down: wall the fairground and join the Gunpowder Age. Trade and buildings go back to their usual strength.' },
+  // The Path of Blood (#299), first step: a turn off the Middle Ages. A Barracks is the clue, the enemy dead the deed.
+  {
+    from: 'middle',
+    to: 'warband',
+    cost: { food: 350, wood: 150, gold: 100 },
+    time: 40,
+    clue: 'barracks',
+    deed: { stat: 'slain', n: 25, text: 'Your forces slay 25 enemy units' },
+    blurb: 'A turn, not a climb: the first step on the Path of Blood. The same soldiers and technologies as the Middle Ages, but soldiers train 15% faster and every enemy unit slain pays a quarter of its price as plunder in gold, so war feeds the town. What it gives up: trade (no traders) and some of the harvest (farms 10% less). A warband that stops fighting grows poor.',
+  },
+  { from: 'warband', to: 'gunpowder', cost: { food: 1000, gold: 500, stone: 300 }, time: 65, blurb: 'Leave the Path of Blood for the Gunpowder Age: the plunder ends, traders and full harvests return (less gold and more stone than from the Middle Ages: the war-host was never rich in coin).' },
+  { from: 'warband', to: 'middle', cost: { food: 250, gold: 100 }, time: 30, blurb: 'Hang up the spear: the ordinary Middle Ages, with trade and full fields, and no plunder.' },
 ];
 
 /**
@@ -726,13 +774,15 @@ export interface Mods {
   telegraph: number;
   /** Above 0, repairs inside a Watch Tower's reach are free and quicker, and ruins you dug there pay (Galvanic Revival, #240). */
   galvanic: number;
+  /** Share of a slain enemy unit's price paid to its killer's people as gold (the Path of Blood, #299). */
+  plunder: number;
 }
 
 export const NO_MODS: Mods = {
   meleeAttack: 0, rangedAttack: 0, armor: 0, parmor: 0, range: 0, carry: 0, citizenSpeed: 1, wood: 1, mine: 1, farm: 1, forage: 1, hunt: 1,
   buildingHp: 1, buildSpeed: 1, militaryTrain: 1, rangedTrain: 1, cavalrySpeed: 1, infantryHp: 1, infantryArmor: 0, infantryAttack: 0, priest: 1, chant: 1,
   siegeAttack: 1, siegeRange: 0, techCost: 1, wonderCost: 1, extraCitizens: 0, fish: 1, shipHp: 1, shipRange: 0, airSpeed: 1, airHp: 1,
-  traderSpeed: 1, tradeGold: 1, relicGold: 1, bogGold: 1, rot: 1, beastWard: 1, portReach: 0, riderSight: 0, consecrate: 0, elmo: 0, telegraph: 0, galvanic: 0,
+  traderSpeed: 1, tradeGold: 1, relicGold: 1, bogGold: 1, rot: 1, beastWard: 1, portReach: 0, riderSight: 0, consecrate: 0, elmo: 0, telegraph: 0, galvanic: 0, plunder: 0,
 };
 
 export interface Tech {

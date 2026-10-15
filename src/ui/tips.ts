@@ -13,6 +13,7 @@ const MERCHANT_ROAD = ROADS.find((r) => r.to === 'merchant')!;
 const IRON_ROAD = ROADS.find((r) => r.to === 'iron')!;
 const PILGRIM_ROAD = ROADS.find((r) => r.to === 'pilgrim')!;
 const SAIL_ROAD = ROADS.find((r) => r.to === 'sail')!;
+const WARBAND_ROAD = ROADS.find((r) => r.to === 'warband')!;
 const FAIR_ROAD = ROADS.find((r) => r.to === 'fair')!;
 
 interface Tip {
@@ -138,6 +139,20 @@ const TIPS: Tip[] = [
       return ageOf(p) === 'middle' && roadKnown(s, p, SAIL_ROAD) && !deedsDone(p, SAIL_ROAD);
     },
     text: `The sea is a road. Land ${SAIL_ROAD.deed!.n} fish with your boats, and the Town Center (🔀) can turn your people into the <b>${AGES.sail.name}</b>: fishing is half again as quick, ships cost less and have sturdier hulls, but the fields yield less. The road shuts once you advance.`,
+  },
+  {
+    id: 'warband',
+    // The Path of Blood (#299): a Middle Ages town with a Barracks and blood already shed.
+    when: (s, me) => {
+      const p = s.players[me];
+      return ageOf(p) === 'middle' && roadKnown(s, p, WARBAND_ROAD) && (p.stats.slain ?? 0) > 0 && !deedsDone(p, WARBAND_ROAD);
+    },
+    text: `War can be a way of life. Slay ${WARBAND_ROAD.deed!.n} enemy units and the Town Center (🔀) can set your people on the <b>Path of Blood</b>, into the <b>${AGES.warband.name}</b>: soldiers train faster and every enemy slain pays plunder in gold, but no traders, and the fields yield less. The road shuts once you advance.`,
+  },
+  {
+    id: 'plunder',
+    when: (s, me) => ageOf(s.players[me]) === 'warband',
+    text: 'Your warband lives on plunder: every enemy unit your forces slay pays part of its price in gold, more the further you walk the Path of Blood. Raids feed the town now, and a quiet border starves it.',
   },
   {
     id: 'fairs',
