@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'zap';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -657,6 +657,13 @@ export class Sound {
         this.noise(out, t, { dur: 2.6, f: 260, to: 55, peak: 0.55, attack: 0.18 });
         this.noise(out, t + 0.5, { dur: 2.2, f: 180, to: 45, peak: 0.35, attack: 0.5 });
         this.tone(out, t + 0.05, { f: 52, to: 34, dur: 2.2, peak: 0.12, attack: 0.3 });
+        break;
+      case 'zap':
+        // A Coil Tower's bolt (#231): a sharp crack, a buzzing 120 Hz snarl that dies away, a hiss of ozone.
+        this.noise(out, t, { dur: 0.06, filter: 'highpass', f: 2600, peak: 0.16 });
+        this.tone(out, t, { f: 120, type: 'sawtooth', dur: 0.32, peak: 0.05, lp: 1800 });
+        this.tone(out, t + 0.01, { f: 2400, to: 600, type: 'square', dur: 0.12, peak: 0.018 });
+        this.noise(out, t + 0.05, { dur: 0.4, filter: 'bandpass', f: 5200, q: 0.7, peak: 0.04 });
         break;
       case 'ruinFind':
         // Struck stone: the spade rings on something hard, earth slides, then an old mode rises out of it.

@@ -19,7 +19,7 @@ interface Style {
   scale: number[];
   /** Chords as scale degrees, one per bar, cycled. */
   chords: number[];
-  lead: 'flute' | 'pluck' | 'recorder' | 'harpsichord' | 'cornet' | 'bell';
+  lead: 'flute' | 'pluck' | 'recorder' | 'harpsichord' | 'cornet' | 'bell' | 'theremin';
   accomp: 'drone' | 'lyre' | 'lute' | 'strings' | 'oompah';
   drums: 'hand' | 'frame' | 'tabor' | 'timpani' | 'snare' | 'anvil';
   /** How busy the tune is (chance of a note on each half beat). */
@@ -47,6 +47,8 @@ const SIDE_STYLES: Partial<Record<AgeId, Style>> = {
   iron: { bpm: 66, root: 123.47, scale: [0, 3, 5, 7, 10], chords: [0, 0, 2, 0], lead: 'flute', accomp: 'drone', drums: 'anvil', density: 0.3 },
   pilgrim: { bpm: 58, root: 164.81, scale: [0, 1, 3, 5, 7, 8, 10], chords: [0, 0, 5, 3, 0, 4, 5, 0], lead: 'bell', accomp: 'strings', drums: 'frame', density: 0.28 },
   sail: { bpm: 78, root: 146.83, scale: [0, 2, 3, 5, 7, 9, 10], chords: [0, 3, 4, 0, 6, 3, 4, 0], lead: 'flute', accomp: 'lute', drums: 'frame', density: 0.4 },
+  // The Age of Lightning (#231): a whole-tone theremin over held strings and the anvil's clank, the sound of a laboratory at night.
+  lightning: { bpm: 80, root: 155.56, scale: [0, 2, 4, 6, 8, 10], chords: [0, 3, 1, 4], lead: 'theremin', accomp: 'strings', drums: 'anvil', density: 0.3 },
   fair: { bpm: 112, root: 220.0, scale: [0, 2, 4, 5, 7, 9, 11], chords: [0, 4, 3, 0, 5, 3, 4, 0], lead: 'recorder', accomp: 'oompah', drums: 'tabor', density: 0.58 },
 };
 
@@ -234,6 +236,7 @@ export class Music {
       this.pluck(t, f, 0.13, 0.6, true);
       this.pluck(t, f * 2, 0.04, 0.4, true);
     } else if (st.lead === 'cornet') this.flute(t, f, len * 0.85, 0.045, 'sawtooth', 2.2);
+    else if (st.lead === 'theremin') this.theremin(t, f * 2, len * 1.1);
     else this.flute(t, f * (st.lead === 'recorder' ? 2 : 1), len * 0.95, st.lead === 'flute' ? 0.06 : 0.05);
   }
 
@@ -258,6 +261,31 @@ export class Music {
   }
 
   /** A breathy wind voice: a flute or recorder, or (a brighter wave, filtered) a cornet. */
+  /** A theremin: a pure tone that slides up into each note and wavers on a wide vibrato. */
+  private theremin(t: number, f: number, len: number): void {
+    const ctx = this.ctx!;
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(f * 0.94, t);
+    osc.frequency.exponentialRampToValueAtTime(f, t + 0.14);
+    const vib = ctx.createOscillator();
+    vib.frequency.value = 6.2;
+    const vibAmt = ctx.createGain();
+    vibAmt.gain.value = f * 0.016;
+    vib.connect(vibAmt).connect(osc.frequency);
+    const env = ctx.createGain();
+    const end = t + Math.max(0.3, len);
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.exponentialRampToValueAtTime(0.045, t + 0.12);
+    env.gain.setValueAtTime(0.04, end - 0.1);
+    env.gain.exponentialRampToValueAtTime(0.0001, end + 0.2);
+    osc.connect(env).connect(this.out!);
+    osc.start(t);
+    vib.start(t);
+    osc.stop(end + 0.25);
+    vib.stop(end + 0.25);
+  }
+
   private flute(t: number, f: number, len: number, peak: number, type: OscillatorType = 'triangle', bright = 3): void {
     const ctx = this.ctx!;
     const osc = ctx.createOscillator();

@@ -32,7 +32,7 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning';
 
 /** Tile ground. Water and rock can't be walked or built on. */
 export const T_GRASS = 0;
@@ -214,6 +214,8 @@ export interface Building {
   dir: number;
   hurt: number;
   born: number;
+  /** Work carried over between ticks, in hundredths of a step, while the owner's age speeds or slows it (the Age of Lightning, #231). */
+  spark?: number;
   /** Tower beacon: tick it burns out (while lit), and tick it may be lit again (#beacon). */
   beacon?: number;
   beaconReady?: number;
@@ -373,6 +375,8 @@ export interface PlayerStats {
   relicGold?: number;
   /** Fish landed by boats (the Age of Sail's deed); absent in older saves. */
   fished?: number;
+  /** Beacons lit on the people's towers, relays included (the Age of Lightning's deed, #231); absent in older saves. */
+  beacons?: number;
 }
 
 /** One sample of a player's state for the post-game timeline. */
@@ -467,6 +471,8 @@ export type GameEvent =
   | { k: 'bell'; owner: number; ring: boolean }
   | { k: 'cry'; owner: number; id: number; x: number; y: number; n: number }
   | { k: 'beacon'; owner: number; building: number; x: number; y: number; on: boolean }
+  /** A Coil Tower's bolt (the Age of Lightning, #231): from the tower through each enemy it struck, as x, y pairs. */
+  | { k: 'arc'; owner: number; building: number; pts: number[] }
   /** A great work was called (`on`) or ran out (seed #133). */
   | { k: 'greatWork'; owner: number; on: boolean }
   | { k: 'wonder'; owner: number; id: number; x: number; y: number; ticks: number }
@@ -590,6 +596,8 @@ export interface AiMemory {
    * false to pass it by. Decided once each, so it doesn't waver from one turn to the next.
    */
   roads?: Partial<Record<AgeId, boolean>>;
+  /** Tick it last lit a beacon toward the Age of Lightning's deed (#231). */
+  zap?: number;
   /** Tick it began holding its Town Center for a side road's last deeds, so it holds only so long. */
   waiting?: number;
   /**
