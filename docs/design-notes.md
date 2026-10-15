@@ -636,3 +636,6 @@ Built: bog iron dug on any road (`stats.iron`) raises each trade trip in the Mer
 **Why:** pilgrim vs pilgrim becomes a duel of voices: whoever has more priests near, and Litany, wins the building; a lone chanter can no longer finish a tower the keeper's priests stand by.
 
 **Seen:** unit tests only (`tests/chant-back.test.ts`); no win-rate sweep, browser unseen. **Next:** a priest order to stand and answer; an audible answering chant.
+
+### Standing to answer (s5, chain 1015-0406)
+**Built:** right-click a chanted-over building of your own with pilgrim priests: they walk up (`CONSECRATE.counter.hold` 3 tiles), stand and sing back at `1 + counter.stand` (1.5×) the strength of a priest merely nearby, with the chant sound; the order ends when the faith is gone. **Why:** a defence you steer, not just proximity. **Seen:** `tests/chant-back.test.ts`; browser and sound unseen. **Next:** the computer ordering its priests to stand; a cursor for it.

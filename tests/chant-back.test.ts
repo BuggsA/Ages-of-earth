@@ -39,3 +39,23 @@ describe('chanting back', () => {
     expect(answerChant(far.s, far.b)).toBe(0);
   });
 });
+
+describe('standing to answer', () => {
+  it('walks a ordered pilgrim priest up, and it sings louder than one merely near', async () => {
+    const { applyCommand } = await import('../src/sim/commands');
+    const { step } = await import('../src/sim/game');
+    const { s, b } = setup(true);
+    const p = spawnUnit(s, 1, 'priest', b.x + 5, b.y);
+    const idle = spawnUnit(s, 1, 'priest', b.x + 5, b.y + 1);
+    const base = answerChant(s, b);
+    applyCommand(s, { t: 'work', p: 1, ids: [p.id], target: b.id });
+    expect(p.order.k).toBe('answer');
+    for (let i = 0; i < 200; i++) { b.chant = s.tick; b.faith = 0.5; step(s); }
+    expect(p.act).toBe('chant');
+    expect(answerChant(s, b)).toBeCloseTo(base * (2 + CONSECRATE.counter.stand) / 2, 5);
+    b.faith = 0; b.faithBy = undefined;
+    step(s); step(s);
+    expect(p.order.k).toBe('idle');
+    void idle;
+  });
+});

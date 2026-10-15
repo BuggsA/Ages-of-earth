@@ -1,4 +1,4 @@
-import { AI_LEVELS, BUILDINGS, CARRY, DEER, DT, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, PRIEST, REPAIR_SHARE, RUINS, TRADE, domainOf, secs } from './data';
+import { AI_LEVELS, BUILDINGS, CARRY, CONSECRATE, DEER, DT, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, PRIEST, REPAIR_SHARE, RUINS, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
@@ -11,7 +11,7 @@ import { carriedBy, relicAt } from './relics';
 import { animalRadius, hitAnimal } from './animals';
 import { dig, ruinAt } from './ruins';
 import { groveBoost, keptOf, kinBonus } from './landmarks';
-import { chant, consecrateProblem, turnBuilding } from './consecrate';
+import { chant, chantedOver, consecrateProblem, consecrates, turnBuilding } from './consecrate';
 import { atPost, dockOf, goalForPost, homeMarket, marketOf, nearestDock, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { canHit, exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, passOf, pay, radiusOf, statsOf, teamOf } from './world';
 
@@ -743,6 +743,27 @@ function consecrateStep(s: GameState, u: Unit, o: Extract<Order, { k: 'convert' 
   if (!approach(u, goalForBuilding(b))) setOrder(u, { k: 'idle' });
 }
 
+/** A pilgrim priest told to stand by a chanted-over building of its own and sing back (#219): it walks up, holds the line and sings louder than one who merely stands near. */
+function answerStep(s: GameState, u: Unit, o: Extract<Order, { k: 'answer' }>): void {
+  const b = s.byId.get(o.target);
+  if (!b || b.kind !== 'building' || b.hp <= 0 || b.owner !== u.owner || !consecrates(s, u.owner) || carriedBy(s, u) || !chantedOver(s, b)) {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  if (u.cool > 0) {
+    if (walking(u)) stopWalking(u);
+    return;
+  }
+  if (gap(s, u, b) <= CONSECRATE.counter.hold) {
+    if (walking(u)) stopWalking(u);
+    face(u, b.x, b.y);
+    u.act = 'chant';
+    if ((s.tick + u.id) % 24 === 0) s.events.push({ k: 'work', id: u.id, owner: u.owner, act: 'chant', x: b.x, y: b.y });
+    return;
+  }
+  if (!approach(u, goalForBuilding(b))) setOrder(u, { k: 'idle' });
+}
+
 function healStep(s: GameState, u: Unit, o: Extract<Order, { k: 'heal' }>): void {
   const t = s.byId.get(o.target);
   if (!t || t.kind !== 'unit' || t.hp <= 0 || t.inside || t.owner !== u.owner || t.hp >= maxHp(s, t) || t.type === 'siege' || carriedBy(s, u)) {
@@ -1289,6 +1310,9 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
       break;
     case 'convert':
       convertStep(s, u, o);
+      break;
+    case 'answer':
+      answerStep(s, u, o);
       break;
     case 'heal':
       healStep(s, u, o);

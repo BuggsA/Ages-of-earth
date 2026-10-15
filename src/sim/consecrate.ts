@@ -106,6 +106,11 @@ export function turnBuilding(s: GameState, b: Building, to: number): void {
   s.events.push({ k: 'consecrated', id: b.id, from, to, x: b.x, y: b.y, type: b.type, size: b.size });
 }
 
+/** Whether a rival's priests are chanting over this building of a pilgrim keeper's right now. */
+export function chantedOver(s: GameState, b: Building): boolean {
+  return b.faith !== undefined && b.faith > 0 && b.faithBy !== undefined && b.faithBy !== b.owner && isEnemy(s, b.owner, b.faithBy);
+}
+
 /**
  * Answering the chant: a pilgrim keeper's priests standing within `counter.range` of a building a rival is
  * chanting over sing back, wearing the rival's tally down by `counter.answer` a second each (with the
@@ -120,7 +125,7 @@ export function answerChant(s: GameState, b: Building): number {
     if (e.kind !== 'unit' || e.owner !== b.owner || e.type !== 'priest' || e.hp <= 0 || e.inside || e.cool > 0) continue;
     const dx = e.x - b.x;
     const dy = e.y - b.y;
-    if (dx * dx + dy * dy <= r2) n += m.priest * m.chant * groveBoost(s, e);
+    if (dx * dx + dy * dy <= r2) n += m.priest * m.chant * groveBoost(s, e) * (e.order.k === 'answer' && e.order.target === b.id && e.act === 'chant' ? 1 + CONSECRATE.counter.stand : 1);
   }
   return n * CONSECRATE.counter.answer * DT;
 }
