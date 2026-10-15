@@ -536,6 +536,7 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   workshop: { name: 'Siege Workshop', size: 3, hp: 1400, cost: { wood: 200 }, time: 40, pop: 0, sight: 5, trains: ['siege'], drop: [], epoch: 1, menu: 'mil', key: 'K', blurb: 'Builds rams, catapults and cannon to break towns.' },
   tower: { name: 'Watch Tower', size: 2, hp: 1000, cost: { wood: 50, stone: 125 }, time: 45, pop: 0, sight: 9, trains: [], drop: [], epoch: 1, guns: { damage: 8, range: 8, reload: 1.8 }, garrison: 5, menu: 'mil', key: 'W', blurb: 'Sees far and shoots at enemies nearby, aircraft too. Shelter soldiers inside for more arrows.' },
   dock: { name: 'Dock', size: 3, hp: 1800, cost: { wood: 150 }, time: 35, pop: 0, sight: 6, trains: ['fisher', 'transport', 'warship', 'cog'], drop: ['food'], epoch: 0, shore: true, menu: 'eco', key: 'D', blurb: 'Builds fishing boats, transports, warships and merchant ships, and takes in fish. Build it on the shore.' },
+  huntcamp: { name: 'Hunting Camp', size: 2, hp: 500, cost: { wood: 45 }, time: 14, pop: 0, sight: 5, trains: [], drop: ['food'], epoch: 0, menu: 'eco', key: 'N', blurb: 'A drop-off for food, and a small claim on the land round it. Raise it by the herd or a far kill: meat inside your border is safe from wolves, and Drying Racks keep it.' },
   airfield: { name: 'Airfield', size: 4, hp: 2200, cost: { wood: 250, stone: 100, gold: 150 }, time: 60, pop: 0, sight: 8, trains: ['fighter', 'bomber'], drop: [], epoch: 4, menu: 'mil', key: 'F', blurb: 'Builds fighters and bombers. Fighters hunt aircraft; bombers wreck towns.' },
 };
 
@@ -913,7 +914,7 @@ export function unitEpoch(type: UnitType): number {
  * nearest claimant (ties go to the older building). Shown only, so far; attrition and building limits
  * are later steps of the seed.
  */
-export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6 };
+export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6, huntcamp: 4 };
 
 /**
  * Attrition (#132 s2): every `every` seconds a land soldier standing in an enemy's land, with none of its
@@ -935,4 +936,6 @@ export const AI_RAID = { weary: 0.5, calm: 7, fort: 15, pop: 24, flame: 24 };
  * The computer and the wild (#171): once it has `mammothAt` citizens it sends a party of `party` after the
  * mammoth within `mammothNear` tiles of home; with `pack` soldiers at hand it clears wolves within `clear`.
  */
-export const AI_WILD = { mammothAt: 10, party: 5, mammothNear: 22, pack: 3, clear: 32, boarAt: 6, boarParty: 3, boarNear: 18 };
+export const AI_WILD = { mammothAt: 10, party: 5, mammothNear: 22, pack: 3, clear: 32, boarAt: 6, boarParty: 3, boarNear: 18,
+  /** A Hunting Camp goes up by a kill of at least `campMeat` food that lies `campFar` tiles from any food drop (and within `campNear` of home). */
+  campMeat: 150, campFar: 9, campNear: 24 };

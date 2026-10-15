@@ -17,7 +17,7 @@ export type UnitType =
 export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
   | 'towncenter' | 'house' | 'storehouse' | 'farm' | 'barracks' | 'range' | 'stable' | 'tower'
-  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield';
+  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp';
 export type Difficulty = 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
 export type MapType = 'continental' | 'highlands' | 'lakes' | 'forest' | 'plains' | 'sea';

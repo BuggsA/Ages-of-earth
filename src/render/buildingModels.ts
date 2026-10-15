@@ -209,6 +209,28 @@ function storehouse(k: Kit, e: number, st: Style): void {
   banner(k, 0.85, 0, 0.85, 0.9);
 }
 
+// ---- Hunting Camp ----------------------------------------------------------------------------------
+
+function huntcamp(k: Kit, e: number, st: Style): void {
+  pad(k, 2, st.base);
+  // A lean-to of hide on poles, a drying rack of meat beside it, a pile of antlers and a fire ring.
+  const hide = e >= 2 ? st.roof : '#a8845a';
+  for (const x of [-0.6, 0.6]) k.cyl(0.05, 0.05, 1.1, 5, st.post, x, 0, -0.45);
+  k.prism(1.5, 0.55, 0.9, hide, 0, 0.62, -0.35);
+  k.box(1.4, 0.45, 0.07, st.wall2, 0, 0, -0.78);
+  for (const x of [0.35, 0.75]) k.cyl(0.04, 0.04, 0.8, 5, st.post, x, 0, 0.4);
+  k.box(0.52, 0.04, 0.04, st.post, 0.55, 0.78, 0.4);
+  for (const x of [0.43, 0.55, 0.67]) k.box(0.07, 0.3, 0.05, '#a33b32', x, 0.48, 0.4);
+  for (const [x, z, r] of [[-0.5, 0.45, 0.4], [-0.3, 0.55, -0.5], [-0.45, 0.65, 0.1]]) {
+    const antler = k.box(0.05, 0.05, 0.38, '#e7dfcc', x, 0.06, z);
+    antler.rotation.y = r;
+  }
+  k.cyl(0.2, 0.22, 0.07, 8, '#5c5651', -0.05, 0, 0.45);
+  k.sphere(0.1, '#e5742a', -0.05, 0.1, 0.45).scale.set(1, 0.9, 1);
+  k.team(k.box(1.3, 0.05, 0.06, TEAM, 0, 0.6, 0.12));
+  banner(k, 0.85, 0, 0.8, 0.8);
+}
+
 // ---- Farm ------------------------------------------------------------------------------------------
 
 function farm(k: Kit, e: number, st: Style): void {
@@ -1098,7 +1120,7 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
 }
 
 const MAKERS: Record<Exclude<BuildingType, 'wall'>, (k: Kit, e: number, st: Style) => void> = {
-  towncenter, house, storehouse, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield,
+  towncenter, house, storehouse, huntcamp, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield,
 };
 
 const cache = new Map<string, THREE.BufferGeometry>();

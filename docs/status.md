@@ -65,6 +65,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Carrion** (own pitch, lane rules): wolves within 15 tiles of a den eat turning carcasses on unheld land and bite butchers; border meat is safe. New numbers `WOLF.scent`, `WOLF.gnaw`. Tests and a headless match; browser unseen; no save bump.
 
+**Hunting Camp** (own pitch, lane rules): a 45-wood Stone Age food drop (N) that holds a 4-tile border, so a far kill or the herd's new ground can be worked and kept from wolves; the computer builds one by a far kill. New numbers `BORDERS.huntcamp`, `AI_WILD.camp*`. Tests and a headless match; browser unseen; no save bump.
+
 ## Waiting on the owner
 
 **Setup only the owner can do:**
