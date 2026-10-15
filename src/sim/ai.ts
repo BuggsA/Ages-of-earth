@@ -979,13 +979,23 @@ function wilds(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void
   const cold = coldComing(s, v);
   const eager = cold ? AI_WINTER.hunters : 0;
   if (v.citizens.length >= AI_WILD.mammothAt - eager && !v.citizens.some((u) => hunting(u, 'mammoth'))) {
-    const m = nearestBeast(s, 'mammoth', v.home.x, v.home.y, AI_WILD.mammothNear);
+    let m = nearestBeast(s, 'mammoth', v.home.x, v.home.y, AI_WILD.mammothNear);
+    // A clever computer also goes for a far mammoth, with soldiers along to take the charge, if no rival is by it.
+    let escort: Unit[] = [];
+    if (!m && AI_LEVELS[v.p.ai!].clever && v.p.epoch <= 2 && s.tick >= s.peaceUntil) {
+      const far = nearestBeast(s, 'mammoth', v.home.x, v.home.y, AI_WILD.far);
+      const idle = v.army.filter((u) => !u.inside && u.order.k === 'idle' && u.type !== 'siege' && u.type !== 'hero');
+      if (far && far.state !== 'fight' && idle.length >= AI_WILD.escort + AI_WILD.guard && !ruinDanger(s, v.p, far, AI_WILD.safe)) {
+        m = far;
+        escort = idle.sort((a, b) => (a.x - far.x) * (a.x - far.x) + (a.y - far.y) * (a.y - far.y) - ((b.x - far.x) * (b.x - far.x) + (b.y - far.y) * (b.y - far.y)) || a.id - b.id).slice(0, AI_WILD.escort);
+      }
+    }
     if (m && m.state !== 'fight') {
       const party = v.citizens
         .filter((u) => !u.inside && u.carry <= 2 && !v.diggers.has(u.id) && u.order.k === 'gather' && (u.order.res === 'food' || u.order.res === 'wood'))
         .sort((a, b) => (a.x - m.x) * (a.x - m.x) + (a.y - m.y) * (a.y - m.y) - ((b.x - m.x) * (b.x - m.x) + (b.y - m.y) * (b.y - m.y)) || a.id - b.id)
         .slice(0, AI_WILD.party);
-      if (party.length === AI_WILD.party) issue({ t: 'hunt', p: v.p.id, ids: party.map((u) => u.id), target: m.id });
+      if (party.length === AI_WILD.party) issue({ t: 'hunt', p: v.p.id, ids: [...escort, ...party].map((u) => u.id), target: m.id });
     }
   }
   // A boar guarding berries near home: three citizens spear it together, once the town has six.

@@ -1171,4 +1171,6 @@ export const AI_PROWL = { band: 2, most: 3, reach: 40, safe: 12, guard: 7, odds:
  */
 export const AI_WILD = { mammothAt: 10, party: 5, mammothNear: 22, pack: 3, clear: 32, boarAt: 6, boarParty: 3, boarNear: 18,
   /** A Hunting Camp goes up by a kill of at least `campMeat` food that lies `campFar` tiles from any food drop (and within `campNear` of home). */
-  campMeat: 150, campFar: 9, campNear: 24 };
+  campMeat: 150, campFar: 9, campNear: 24,
+  /** A mammoth `mammothNear` to `far` tiles from home is hunted too, by a clever computer, with `escort` idle soldiers sent along (beyond a guard of `guard` at home) and no rival soldier seen within `safe` tiles of it. */
+  far: 38, escort: 2, guard: 3, safe: 12 };
