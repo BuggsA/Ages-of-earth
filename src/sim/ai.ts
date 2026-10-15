@@ -1020,6 +1020,7 @@ function pulledDown(s: GameState, p: Player, m: Landmark): boolean {
 
 /** How much a landmark is worth walking for, as a divisor of its distance: more for what this town needs now. */
 function markWorth(s: GameState, v: View, m: Landmark): number {
+  if (!AI_LEVELS[v.p.ai!].worthy) return 1;
   const w = AI_MARK.worth;
   if (m.kind === 'cairn') {
     // Room for people matters once houses are nearly full.
