@@ -512,7 +512,7 @@ export function fleetWanted(s: GameState, p: Player, base: number): number {
 // ---- Building --------------------------------------------------------------------------------------
 
 /** A free spot for a building near a point, keeping a lane open around it. */
-export function findSpot(s: GameState, type: BuildingType, x: number, y: number, minR: number, maxR: number, margin = 1): { tx: number; ty: number } | null {
+export function findSpot(s: GameState, type: BuildingType, x: number, y: number, minR: number, maxR: number, margin = 1, ok?: (tx: number, ty: number) => boolean): { tx: number; ty: number } | null {
   const n = BUILDINGS[type].size;
   const cx = Math.floor(x - n / 2);
   const cy = Math.floor(y - n / 2);
@@ -527,8 +527,28 @@ export function findSpot(s: GameState, type: BuildingType, x: number, y: number,
       const ty = cy + dy;
       if (placeProblem(s, type, tx, ty)) continue;
       if (margin && !laneClear(s, tx, ty, n, type === 'farm')) continue;
+      if (ok && !ok(tx, ty)) continue;
       return { tx, ty };
     }
+  }
+  return null;
+}
+
+/**
+ * A spot inside the field of one of our finished coils, so a building raised in the Age of Lightning works lit
+ * and no coil has to chase it (#231 s4). The nearest coil to home that has room wins; null when none has.
+ */
+function fieldSpot(s: GameState, v: View, type: BuildingType): { tx: number; ty: number } | null {
+  const n = BUILDINGS[type].size;
+  const r2 = LIGHTNING.reach * LIGHTNING.reach;
+  for (const t of v.buildings) {
+    if (t.type !== 'tower' || !t.built || t.hp <= 0) continue;
+    const inside = (tx: number, ty: number): boolean => {
+      const dx = tx + n / 2 - t.x, dy = ty + n / 2 - t.y;
+      return dx * dx + dy * dy <= r2;
+    };
+    const spot = findSpot(s, type, t.x, t.y, 2, LIGHTNING.reach, 1, inside);
+    if (spot) return spot;
   }
   return null;
 }
@@ -771,7 +791,7 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     const lines = BUILDINGS[type].trains;
     if (lines.length && lines.every((u) => barred(p, u))) continue;
     const at = type === 'tower' ? towardEnemy(9) : type === 'market' || type === 'temple' ? home : towardEnemy(6);
-    const spot = findSpot(s, type, at.x, at.y, type === 'market' || type === 'temple' ? 6 : 0, 18);
+    const spot = (type !== 'tower' && ageOf(p) === 'lightning' && fieldSpot(s, v, type)) || findSpot(s, type, at.x, at.y, type === 'market' || type === 'temple' ? 6 : 0, 18);
     if (spot && construct(s, v, mem, type, spot, type === 'tower' ? 2 : 3, issue)) return;
   }
 
