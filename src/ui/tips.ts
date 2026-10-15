@@ -39,7 +39,7 @@ const waterNear = (s: GameState, me: number) => {
 };
 const secsIn = (s: GameState) => s.tick / 20;
 /** Whether the player can see a beast of the wild (#171). */
-const sighted = (s: GameState, me: number, kind: 'mammoth' | 'wolf') => s.animals.some((a) => a.kind === kind && s.players[me].vis[Math.floor(a.y) * s.w + Math.floor(a.x)]);
+const sighted = (s: GameState, me: number, kind: 'mammoth' | 'wolf' | 'boar') => s.animals.some((a) => a.kind === kind && s.players[me].vis[Math.floor(a.y) * s.w + Math.floor(a.x)]);
 
 const TIPS: Tip[] = [
   { id: 'gather', when: (s) => secsIn(s) > 2, text: 'Drag a box around your <b>citizens</b>, then <b>right-click</b> berry bushes, trees or a deer to gather food and wood.' },
@@ -48,6 +48,7 @@ const TIPS: Tip[] = [
   { id: 'idle', when: (s, me) => secsIn(s) > 60 && s.ents.some((e) => isIdleCitizen(e, me)), text: 'Someone is standing around: press <kbd>.</kbd> to find an idle citizen, or <kbd>Shift</kbd> + <kbd>.</kbd> to select every idle citizen and put them to work.' },
   { id: 'store', when: (s) => secsIn(s) > 110, text: 'Long walks waste time. Build a <b>Storehouse</b> (<kbd>B</kbd> <kbd>S</kbd>) next to the woods or a mine. It also teaches better tools.' },
   { id: 'mammoth', when: (s, me) => sighted(s, me, 'mammoth'), text: 'A <b>mammoth</b>! Its carcass feeds a town for a long while, but it charges when speared. Send <b>five or more</b> citizens together, or put a couple of soldiers in front.' },
+  { id: 'boar', when: (s, me) => sighted(s, me, 'boar'), text: 'A <b>wild boar</b> guards that berry patch and charges anyone who comes close. One citizen will lose; send <b>three</b> to spear it, and its carcass pays better than a deer. Or leave the berries and gather elsewhere.' },
   { id: 'wolves', when: (s, me) => sighted(s, me, 'wolf'), text: '<b>Wolves</b> keep a den out here, often by wild gold, and fall on anyone who comes near. A lone citizen won\'t survive them: send a few soldiers, or a band of citizens, to clear the den first.' },
   { id: 'army', when: (s) => secsIn(s) > 200, text: 'Rivals will come. Build a <b>Barracks</b> (<kbd>V</kbd> <kbd>B</kbd>) and train soldiers. Infantry beat cavalry, archers beat infantry, cavalry beat archers.' },
   { id: 'farm', when: (s, me) => secsIn(s) > 260 && !has(s, me, 'farm'), text: 'Berries and deer run out. <b>Farms</b> (<kbd>B</kbd> <kbd>F</kbd>) give food forever; build them near your Town Center.' },

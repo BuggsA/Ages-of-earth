@@ -57,6 +57,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **The wild** (#171, own pitch from the owner's chat, lane rules): mammoths (a feast that charges its hunters) and wolf packs by dens out between the towns, often by wild gold; bitten people fight back; soldiers can hunt beasts; the computer hunts its mammoth with five and clears near dens. New numbers `MAMMOTH`, `WOLF`, `AI_WILD`. No save bump (old saves hold only deer). Seen in headless Chromium; sound levels unheard; not played by hand.
 
+**Boars** (own pitch, lane rules): a boar guards a berry patch out from each town; three citizens beat it, one loses; carcass 260 food; the computer sends three at six citizens. New numbers `BOAR`, `AI_WILD.boar*`. Tests and a headless match; browser and sound unseen; no save bump.
+
 ## Waiting on the owner
 
 **Setup only the owner can do:**

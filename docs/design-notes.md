@@ -458,3 +458,10 @@ Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), n
 **Seen:** `tests/wild.test.ts` (map fairness, the hunt, the pack, the leash, fighting back, the computer's party); headless matches in `scripts/wild-watch.ts` (the computer fells its mammoth at 74–111 s and loses 0–2 people to beasts a match); screenshots in headless Chromium of the mammoth, a hunt and a pack running at a citizen. Not played by hand; sound levels unheard; no win-rate sweep.
 **Next:** more of a living Stone Age. Boars (a small, fierce hunt near home), herds that migrate across the map over the match, a predator that hunts the deer, the wild thinning as towns grow (borders could push it out), and a campaign chapter built on a great hunt.
 
+
+## Designers' notes: boars (2026-10-15, session chain 1014-2358 #1, lane rules)
+
+**Built:** a wild boar (`BOAR` in `data.ts`, `animals.ts`, `placeWild`) guarding a berry patch 7–15 tiles from each town. It charges anyone within 3.2 tiles and gives up past 7 tiles of its patch; leaves 260 food. Model, snarl, minimap mark, tip, warning toast, and the computer sends three citizens once it has six.
+**Why I love it:** the owner called the Stone Age mechanical. Berries were free food; now the second patch has a guard, so the build order asks something: spear it with three (losing gathering time, maybe a citizen), or skip the patch? It connects to the leash too: you can pull a boar off its patch and run.
+**Seen:** `tests/boar.test.ts`; `models.test.ts`; a headless match. Not seen in a browser; sound reuses the wolf's snarl; no win-rate sweep (map seeds shift: wolves and mammoths moved on some maps because placement shares a dice).
+**Next:** herds that migrate, wolves that hunt deer, the wild thinning as borders grow; a boar that roots up unguarded berries.

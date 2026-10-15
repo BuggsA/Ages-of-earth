@@ -1043,6 +1043,34 @@ function wolf(): Kit {
   return k;
 }
 
+/** A wild boar: low, bristled and thick-necked, with pale tusks. Its head jerks up and forward to gore. */
+function boar(): Kit {
+  const k = new Kit();
+  const hide = '#4d3b2a';
+  const dark = '#2f241a';
+  const LEG = 0.12;
+  for (const [x, z, rig] of [[-0.05, 0.1, RIG_LEG_A], [0.05, 0.1, RIG_LEG_B], [-0.05, -0.1, RIG_LEG_B], [0.05, -0.1, RIG_LEG_A]] as [number, number, number][]) {
+    const g = k.limb(k.group(0, 0, 0), rig, LEG, z);
+    k.box(0.035, LEG, 0.035, dark, x, 0, z, g);
+  }
+  k.blob(0.14, hide, 0, LEG + 0.1, 0.0).scale.set(0.9, 0.85, 1.5);
+  k.blob(0.1, dark, 0, LEG + 0.2, 0.1).scale.set(0.7, 0.6, 1.2);
+  // A bristle ridge down the back.
+  k.box(0.03, 0.05, 0.28, dark, 0, LEG + 0.25, 0);
+  const head = k.limb(k.group(0, 0, 0), RIG_ARM, LEG + 0.1, 0.17);
+  k.blob(0.085, hide, 0, LEG + 0.1, 0.22, head).scale.set(1, 0.95, 1.2);
+  k.box(0.07, 0.06, 0.08, dark, 0, LEG + 0.07, 0.31, head);
+  for (const x of [-0.045, 0.045]) {
+    const tusk = k.cone(0.012, 0.07, 4, '#e8dfc8', x, LEG + 0.07, 0.3, head);
+    tusk.rotation.x = -0.9;
+  }
+  for (const x of [-0.04, 0.04]) k.cone(0.02, 0.04, 4, dark, x, LEG + 0.2, 0.2, head);
+  const tail = k.cyl(0.008, 0.008, 0.08, 3, dark, 0, LEG + 0.2, -0.22);
+  tail.rotation.x = 0.7;
+  return k;
+}
+
+let boarGeo: THREE.BufferGeometry | null = null;
 let mammothGeo: THREE.BufferGeometry | null = null;
 let wolfGeo: THREE.BufferGeometry | null = null;
 
@@ -1050,6 +1078,12 @@ let wolfGeo: THREE.BufferGeometry | null = null;
 export function mammothGeometry(): THREE.BufferGeometry {
   mammothGeo ??= bake(mammoth().root);
   return mammothGeo;
+}
+
+/** The boar, rigged to trot and gore. */
+export function boarGeometry(): THREE.BufferGeometry {
+  boarGeo ??= bake(boar().root);
+  return boarGeo;
 }
 
 /** The wolf, rigged to run and bite. */

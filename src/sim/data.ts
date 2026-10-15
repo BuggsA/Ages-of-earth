@@ -770,6 +770,12 @@ export const DEER = { hp: 8, walk: 0.8, flee: 2.3, spear: 3.5, spearDamage: 4 };
  * Speeds in tiles a second, blows every `reload` seconds, `reach` from the beast's edge.
  */
 export const MAMMOTH = { hp: 90, walk: 0.5, charge: 1.7, gore: 8, reach: 0.5, reload: 1.8, rage: 7, roam: 2.5, meat: 600, radius: 0.55, home: 17, extra: { small: 1, medium: 2, large: 3 } as Record<MapSize, number> };
+/**
+ * Wild boars: one stands guard by a berry patch 7–15 tiles from each town, so the second patch is a choice,
+ * not free food. A boar charges anyone who comes within `notice`, gives up past `leash` of its patch, and
+ * leaves a carcass worth `meat` (more than a deer's). A lone citizen loses; three win.
+ */
+export const BOAR = { hp: 36, walk: 0.7, run: 2.3, bite: 5, reach: 0.35, reload: 1.2, notice: 3.2, leash: 7, roam: 1.5, meat: 260, radius: 0.28, near: 3, min: 7, max: 15, count: 1, extra: { small: 0, medium: 1, large: 2 } as Record<MapSize, number> };
 export const WOLF = { hp: 20, walk: 0.9, run: 2.1, bite: 3, reach: 0.35, reload: 1.2, notice: 4.5, leash: 10, roam: 2.5, radius: 0.22, pack: 3, home: 22, fair: 6, spacing: 14, dens: { small: 2, medium: 3, large: 4 } as Record<MapSize, number> };
 
 /** Market: gold per 100 of a resource to start, how much each trade moves it, and the cut when selling. */
@@ -906,4 +912,4 @@ export const AI_RAID = { weary: 0.5, calm: 7, fort: 15, pop: 24, flame: 24 };
  * The computer and the wild (#171): once it has `mammothAt` citizens it sends a party of `party` after the
  * mammoth within `mammothNear` tiles of home; with `pack` soldiers at hand it clears wolves within `clear`.
  */
-export const AI_WILD = { mammothAt: 10, party: 5, mammothNear: 22, pack: 3, clear: 32 };
+export const AI_WILD = { mammothAt: 10, party: 5, mammothNear: 22, pack: 3, clear: 32, boarAt: 6, boarParty: 3, boarNear: 18 };
