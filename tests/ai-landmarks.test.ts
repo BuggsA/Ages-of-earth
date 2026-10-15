@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { TICK_HZ } from '../src/sim/data';
+import { markWorth } from '../src/sim/ai';
+import { AI_MARK, TICK_HZ } from '../src/sim/data';
 import { claimWork } from '../src/sim/landmarks';
 import { createGame, step } from '../src/sim/game';
 import type { GameState, Unit } from '../src/sim/types';
@@ -27,4 +28,19 @@ describe('the computer defends its landmarks', () => {
     const gone = band.filter((u) => u.hp > 0 && (u.order.k === 'move' || u.order.k === 'attack') && Math.hypot(u.x - home.x, u.y - home.y) > 3);
     expect(gone.length).toBeGreaterThanOrEqual(3);
   }, 30000);
+});
+
+describe('the computer prizes its own people\'s kind of landmark', () => {
+  it('finds a favoured kind worth a longer walk than the same kind to a people that does not favour it', () => {
+    const s = game();
+    const m = s.landmarks![0];
+    for (const [civ, kind] of [['greeks', 'spring'], ['mongols', 'crag'], ['chinese', 'grove']] as const) {
+      s.players[1].civ = civ;
+      m.kind = kind;
+      const view = { p: s.players[1], citizens: [], army: [] } as never;
+      const own = markWorth(s, view, m);
+      s.players[1].civ = 'romans';
+      expect(own).toBeCloseTo(markWorth(s, view, m) * AI_MARK.worth.kin, 6);
+    }
+  });
 });

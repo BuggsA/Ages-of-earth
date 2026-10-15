@@ -173,3 +173,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Minimap season** (#195, own pitch, lane look): the overview map's meadow and woods follow the season and winter snow whitens it. Render/UI only; seen in headless Chromium per season; no save bump.
 
 **Kin landmarks** (own pitch, lane rules): each people's favourite landmark kind gives it half again the gift (`LANDMARKS.kin`, `.kinMul` 1.5). Unit tests only; browser and win-rate unseen; the computer doesn't yet prefer its kind; no save bump.
+
+**Computer favours its kin landmark** (own pitch, lane ai): a computer finds its people's favourite landmark kind worth 1.4x the walk (`AI_MARK.worth.kin`); the Sacred Grove gets its own `worth`. Unit test only; no win-rate sweep; no save bump.

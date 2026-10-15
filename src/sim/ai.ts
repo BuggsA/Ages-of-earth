@@ -6,7 +6,7 @@ import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, Ga
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { ageOf, barred, deedsDone, deedsProgress, hiresAt, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
 import { carriedBy } from './relics';
-import { claimants, landmarkAt } from './landmarks';
+import { claimants, favours, landmarkAt } from './landmarks';
 import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple } from './units';
 import { goalForPost, nearestMarket, portSpot, tripGold } from './trade';
 import { findRoute } from './path';
@@ -1019,14 +1019,16 @@ function pulledDown(s: GameState, p: Player, m: Landmark): boolean {
 }
 
 /** How much a landmark is worth walking for, as a divisor of its distance: more for what this town needs now. */
-function markWorth(s: GameState, v: View, m: Landmark): number {
+export function markWorth(s: GameState, v: View, m: Landmark): number {
   const w = AI_MARK.worth;
+  let worth: number;
   if (m.kind === 'cairn') {
     // Room for people matters once houses are nearly full.
-    return v.p.pop + 4 >= v.p.cap ? w.cairnFull : w.cairn;
-  }
-  if (m.kind === 'spring') return v.citizens.some((u) => u.hp < maxHp(s, u) * 0.7) || v.army.some((u) => u.hp < maxHp(s, u) * 0.7) ? w.springHurt : w.spring;
-  return m.kind === 'flint' ? w.flint : w.crag;
+    worth = v.p.pop + 4 >= v.p.cap ? w.cairnFull : w.cairn;
+  } else if (m.kind === 'spring') worth = v.citizens.some((u) => u.hp < maxHp(s, u) * 0.7) || v.army.some((u) => u.hp < maxHp(s, u) * 0.7) ? w.springHurt : w.spring;
+  else worth = m.kind === 'flint' ? w.flint : m.kind === 'grove' ? w.grove : w.crag;
+  // The kind its own people favour pays half again: worth a longer walk.
+  return favours(s, v.p.id, m.kind) ? worth * w.kin : worth;
 }
 
 /**
