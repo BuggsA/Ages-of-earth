@@ -166,3 +166,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **The turning year on the land** (#183, own pitch, lane look): meadows, broadleaf trees and snow follow the season in the shared shader (`seasonLook.ts`); `?season=` holds one. Render only; no rules, save or `data.ts` change. Each season seen held in headless Chromium; the fades in motion are unseen.
 
 **Weather follows the year** (own pitch, lane look): snow falls only in winter; a seeded snow day is rain in spring and autumn and thin mist in summer, winter rain falls as snow; the sky changes as the season turns (`seasonalDay`). Render and sound only; no rules, save or `data.ts` change. Smoke test passes; the change in motion unseen by eye.
+
+**Minimap season** (#195, own pitch, lane look): the overview map's meadow and woods follow the season and winter snow whitens it. Render/UI only; seen in headless Chromium per season; no save bump.
