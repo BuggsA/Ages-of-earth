@@ -249,6 +249,10 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
         // Fish landed counts toward the Age of Sail's deed.
         const st = s.players[u.owner].stats;
         st.fished = (st.fished ?? 0) + 1;
+      } else if (kind === R_MEAT) {
+        // Meat butchered counts toward the Age of the Steppe's deed (#297).
+        const st = s.players[u.owner].stats;
+        st.hunted = (st.hunted ?? 0) + 1;
       }
     }
     workEvent(s, u, u.act, tx, ty);

@@ -122,6 +122,17 @@ export function barred(p: Player, unit: UnitType): string | null {
   return no && no.units.includes(unit) ? no.why : null;
 }
 
+/**
+ * Why a player's age won't let them raise a building at all, or null: the age bars it (the steppe tills no
+ * fields, #297), or the building belongs to other ages (the War Camp, only on its step of the path, #303).
+ */
+export function buildBarred(p: Player, type: BuildingType): string | null {
+  const no = ageDef(p).noBuild;
+  if (no && no.buildings.includes(type)) return no.why;
+  const only = BUILDINGS[type].ages;
+  return !only || only.includes(ageOf(p)) ? null : `Only in the ${only.map((a) => AGES[a].name).join(' or ')}`;
+}
+
 /** How many relics a player keeps in standing Temples. */
 export function relicsKept(s: GameState, owner: number): number {
   let n = 0;
@@ -273,12 +284,6 @@ export function pathCarry(p: Player): { path: PathId; times: number } | null {
   const path = pathOf(ageOf(p));
   const times = pathDepth(p) - 1;
   return path && PATHS[path].carry && times > 0 ? { path, times } : null;
-}
-
-/** Why a people's age won't let it raise or keep this building (the War Camp, #303), or null. */
-export function buildBarred(p: Player, type: BuildingType): string | null {
-  const ages = BUILDINGS[type].ages;
-  return !ages || ages.includes(ageOf(p)) ? null : `Only in the ${ages.map((a) => AGES[a].name).join(' or ')}`;
 }
 
 /** Whether a unit may raise this building: citizens raise them all, and some buildings name others (#303). */

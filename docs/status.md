@@ -127,6 +127,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Raiding the Bell** (own pitch, lane ai): a bomber/raid target pick weighs a Bell Foundry rival's relic Temples like a pilgrim people's (`AI_WEB.bell`). Unit test only; no win-rate sweep; no save bump.
 
+**The Age of the Steppe, s1** (#297, own pitch, lane rules; the owner chose it as the root of a second main path): a Stone Age road (Hunting Camp, 400 meat) where Town Centers and Houses pack onto ger carts (J) and pitch elsewhere (P); no Farms, Walls or Gates; riders ×0.8 price, ×0.75 time. New numbers `STEPPE`, the road and age in `ROADS`/`AGES`. Pack, drive and pitch seen in headless Chromium; sounds unheard; the computer doesn't take it yet; no save bump. Next steps on #297.
+
 ## Waiting on the owner
 
 **Setup only the owner can do:**

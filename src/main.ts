@@ -5,7 +5,7 @@ import { CameraRig } from './render/camera';
 import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { wallLine } from './sim/commands';
-import { AGES, BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, RELIC, RUINS, SEASONS, TECHS, TICK_HZ, TRUNK, WARCAMP, WORKS, domainOf, unitStats } from './sim/data';
+import { AGES, BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, RELIC, RUINS, SEASONS, STEPPE, TECHS, TICK_HZ, TRUNK, WARCAMP, WORKS, domainOf, unitStats } from './sim/data';
 import { crestSvg } from './ui/crests';
 import { isEnemy } from './sim/world';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
@@ -1617,7 +1617,7 @@ function ack(mood: 'select' | 'move' | 'attack'): void {
   if (!s || watching) return;
   const u = selectedUnits(s)[0];
   if (!u) return;
-  const who = u.type === 'citizen' || u.type === 'fisher' ? 'citizen' : u.type === 'priest' ? 'priest' : u.type === 'hero' ? 'hero' : u.type === 'siege' || domainOf(u.type) !== 'land' ? 'engineer' : 'soldier';
+  const who = u.type === 'citizen' || u.type === 'fisher' || u.type === 'wagon' ? 'citizen' : u.type === 'priest' ? 'priest' : u.type === 'hero' ? 'hero' : u.type === 'siege' || domainOf(u.type) !== 'land' ? 'engineer' : 'soldier';
   sound.speak(who, mood, u.id);
 }
 
@@ -2079,6 +2079,12 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         if (ev.owner === viewer) {
           hud.toast(ev.struck ? '🔥 Off the Path of Blood, your War Camps are struck and burn' : `⛺ A War Camp is left without soldiers: it burns in ${WARCAMP.grace}s`, 'alert');
           lastAlert = { x: ev.x, y: ev.y };
+        }
+        break;
+      case 'camp':
+        if (ev.owner === viewer) {
+          play(ev.pitched ? 'pitchCamp' : 'strikeCamp');
+          hud.toast(ev.pitched ? `⛺ The ${BUILDINGS[ev.type].name} is pitched: it raises itself in ${STEPPE.pitch}s` : `🛞 Camp struck: the ${BUILDINGS[ev.type].name} rolls on a wagon (P to pitch)`, 'info');
         }
         break;
       case 'beacon':

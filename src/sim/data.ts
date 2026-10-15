@@ -51,6 +51,10 @@ export interface Age {
   training?: Partial<Record<UnitClass, number>>;
   /** Lines this age can't train, and why (shown on the greyed button). */
   no?: { units: UnitType[]; why: string };
+  /** Buildings this age can't raise, and why (the Age of the Steppe tills no fields and builds no walls, #297). */
+  noBuild?: { buildings: BuildingType[]; why: string };
+  /** A town on wheels (#297): Town Centers and Houses can be packed onto wagons and pitched again elsewhere (`STEPPE`). */
+  mobile?: boolean;
   /**
    * Trade fed by faith (#49): every relic the people keeps in its Temples makes each trade trip pay
    * `each` more of its usual gold, counting at most `most` relics.
@@ -198,7 +202,27 @@ export const AGES: Record<AgeId, Age> = {
     mul: { militaryTrain: 0.85, farm: 0.85, techCost: 1.2 },
     no: { units: ['trader'], why: 'A people of iron and blood trades with no one: traders wait until your people leave the Path of Blood' },
   },
+  steppe: {
+    name: 'Age of the Steppe',
+    short: 'Steppe',
+    tier: 1,
+    blurb: 'A people of herders and riders, whose town goes where the herds go: Town Centers and Houses pack onto wagons and are pitched again wherever the land is not a rival\'s. Riders cost a fifth less and train a quarter faster, and hunters work 15% faster. No fields are tilled and no walls raised until the Middle Ages.',
+    mul: { hunt: 1.15 },
+    price: { cavalry: 0.8 },
+    training: { cavalry: 0.75 },
+    mobile: true,
+    noBuild: { buildings: ['farm', 'wall', 'gate'], why: 'A steppe people tills no fields and raises no walls: they wait for the Middle Ages' },
+  },
 };
+
+/**
+ * The Age of the Steppe (#297): a town on wheels. A Town Center or House that stands finished, with nothing
+ * in training, can be packed onto a wagon in an instant (its sheltering people step out). A wagon pitches
+ * where it stands, on any ground a rival does not hold, within `spot` tiles of it, and the building raises
+ * itself in `pitch` seconds with the health it was packed with. While packed it gives no room, takes in
+ * nothing and trains no one: the price of moving.
+ */
+export const STEPPE = { pitch: 10, spot: 3, packs: ['towncenter', 'house'] as BuildingType[] };
 
 /** Something a people must have done before a road opens: a tally from its stats reaching `n`. */
 export interface Deed {
@@ -281,6 +305,18 @@ export const ROADS: Road[] = [
     deed: { stat: 'iron', n: 150, text: 'Your citizens dig 150 bog iron' },
     blurb: 'Instead of the Bronze Age, as many peoples of Africa went from stone straight to iron: foot soldiers cost a quarter less and strike 1 harder, and iron hoes and axes make farms and woodcutters 10% quicker. Bog iron keeps paying double gold as iron bars, so the marsh is worth guarding. What it gives up: the horse. The Stable trains no cavalry until the Middle Ages.',
   },
+  // The other road out of the Stone Age (#297): the hunt, not the bog, opens it.
+  {
+    from: 'stone',
+    to: 'steppe',
+    cost: { food: 350, wood: 100 },
+    time: 35,
+    clue: 'huntcamp',
+    deed: { stat: 'hunted', n: 400, text: 'Your hunters butcher 400 meat' },
+    blurb: 'Instead of the Bronze Age, as the peoples of the great grasslands did, from the Scythians to the Mongols: follow the herds. Town Centers and Houses pack onto wagons (J) and are pitched again where the hunting is, anywhere a rival does not hold. Riders cost a fifth less and train a quarter faster; hunters work 15% faster. What it gives up: the plough and the wall. No Farms, Walls or Gates are raised until the Middle Ages, so the people eats what it hunts, gathers and fishes, and moves on when the land runs thin.',
+  },
+  { from: 'steppe', to: 'middle', cost: EPOCHS[2].cost, time: EPOCHS[2].time, blurb: 'Rejoin the main road at the Middle Ages, for the same price as from the Bronze Age: fields and walls return. Wagons still on the road can be pitched, but nothing more is packed.' },
+  { from: 'steppe', to: 'bronze', cost: { food: 150, wood: 150 }, time: 20, blurb: 'Settle down: leave the herds for the Bronze Age. Fields and walls return, riders cost their usual price, and the town stays where it stands.' },
   { from: 'iron', to: 'middle', cost: EPOCHS[2].cost, time: EPOCHS[2].time, blurb: 'Rejoin the main road at the Middle Ages, for the same price as from the Bronze Age: the horse arrives, and the iron foot soldiers become ordinary pikemen.' },
   // Crossing chains (#49): relics, a deed of the faith, open a turn off the Middle Ages; trade and relics
   // together open a hybrid, from either side. Its clue is a Temple from both: the relics are what a
@@ -517,6 +553,23 @@ export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
     { name: 'Bomber', cls: 'bomber', hp: 240, attack: 40, armor: 1, parmor: 2, range: 0.6, reload: 6, speed: 3.8, sight: 9, cost: { wood: 120, gold: 260 }, time: 30, radius: 0.55, shot: 'bomb', splash: 1.6, blurb: 'Drops bombs that wreck buildings, ships and crowds. Easy prey for fighters and rifles.' },
   ],
   // ---- On the road ----
+  // A packed Town Center or House (#297): never trained, only made by striking camp. Cavalry's easy prey (trader class).
+  wagon: [0, 1, 2, 3, 4].map((e) => ({
+    name: e < 2 ? 'Ger Cart' : 'Ger Wagon',
+    cls: 'trader' as const,
+    hp: 260 + e * 40,
+    attack: 0,
+    armor: 1,
+    parmor: 3,
+    range: 0,
+    reload: 1,
+    speed: 1.2,
+    sight: 6,
+    cost: {},
+    time: 1,
+    radius: 0.5,
+    blurb: 'A Town Center or House packed onto an ox cart: drive it to new ground and pitch it there (P). It shelters, trains and takes in nothing while it rolls, and riders run it down.',
+  })),
   trader: [
     null,
     { name: 'Pack Donkey', cls: 'trader', hp: 80, attack: 0, armor: 0, parmor: 1, range: 0, reload: 1, speed: 1.3, sight: 6, cost: { wood: 60, gold: 40 }, time: 20, radius: 0.32, blurb: 'Carries goods to a trading post and brings back gold: the farther its Market from the post, the more. Easy prey for cavalry.' },
@@ -530,7 +583,7 @@ const DOMAINS: Partial<Record<UnitType, Domain>> = { fisher: 'water', warship: '
 /** Where a unit line goes: on foot, on the water or in the air. */
 export const domainOf = (type: UnitType): Domain => DOMAINS[type] ?? 'land';
 
-export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader'];
+export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader', 'wagon'];
 export const MILITARY: UnitType[] = ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'warship', 'fighter', 'bomber'];
 
 type Target = UnitClass | 'building';

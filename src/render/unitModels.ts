@@ -965,7 +965,43 @@ function trader(epoch: number): Kit {
   return k;
 }
 
-const MAKERS: Record<UnitType, (epoch: number) => Kit> = { citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, cog, fighter, bomber, trader };
+/**
+ * A ger cart (the Age of the Steppe, #297): a horned ox yoked to a broad cart carrying a packed ger, the
+ * felt drum and its smoke-hole roof lashed down with a band in the player's colour, the painted door at the
+ * front and the folded lattice walls along the sides. From the Middle Ages a heavier wagon on four wheels.
+ */
+function wagon(epoch: number): Kit {
+  const k = new Kit();
+  beast(k, { coat: '#5e4a3a', leg: 0.22, body: [0.22, 0.18, 0.4], z: 0.55, horns: true });
+  k.box(0.34, 0.04, 0.05, WOOD, 0, 0.42, 0.74);
+  for (const x of [-0.08, 0.08]) k.box(0.025, 0.025, 0.55, WOOD, x, 0.3, 0.28).rotation.x = -0.12;
+  if (epoch >= 2) {
+    for (const z of [0.12, -0.42]) {
+      wheel(k, -0.3, z, 0.15, '#5b4330');
+      wheel(k, 0.3, z, 0.15, '#5b4330');
+    }
+  } else {
+    wheel(k, -0.3, -0.15, 0.19);
+    wheel(k, 0.3, -0.15, 0.19);
+  }
+  // The bed, and the lattice walls folded along its sides.
+  k.box(0.56, 0.05, 0.8, '#8a6440', 0, 0.22, -0.15);
+  for (const x of [-0.25, 0.25]) {
+    k.box(0.05, 0.12, 0.66, '#b08a58', x, 0.31, -0.15);
+    for (const z of [-0.4, -0.15, 0.1]) k.box(0.055, 0.02, 0.1, '#6a4a2c', x, 0.34, z).rotation.x = 0.6;
+  }
+  // The felt drum, its band, the domed roof and the crown ring.
+  k.cyl(0.21, 0.23, 0.2, 10, '#ddd2b8', 0, 0.35, -0.17);
+  k.team(k.cyl(0.235, 0.235, 0.04, 10, TEAM, 0, 0.36, -0.17));
+  k.cone(0.25, 0.14, 10, '#cdbf9e', 0, 0.52, -0.17);
+  k.cyl(0.05, 0.05, 0.03, 8, '#8a6440', 0, 0.6, -0.17);
+  // The painted door, facing the road.
+  k.box(0.1, 0.14, 0.02, '#b8462e', 0, 0.34, 0.07);
+  carter(k, -0.34, 0.6, { legs: '#5a4a3a', torso: '#3e5a7a', hat: '#8a3a2a' });
+  return k;
+}
+
+const MAKERS: Record<UnitType, (epoch: number) => Kit> = { citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, cog, fighter, bomber, trader, wagon };
 
 
 // ---- Deer ------------------------------------------------------------------------------------------

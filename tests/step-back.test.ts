@@ -244,8 +244,9 @@ describe('stepping back an age (#47)', () => {
     expect(ageOf(p)).toBe('iron');
     stepBack(s);
     expect(ageOf(p)).toBe('stone');
-    // Both roads out of the Stone Age again: the trunk, and the iron road (its deed stays done).
-    expect(roadsFrom(p).map((r) => r.to).sort()).toEqual(['bronze', 'iron']);
+    // Both roads out of the Stone Age again: the trunk, and the iron road (its deed stays done). Other main
+    // paths leave the Stone Age too (the steppe, #297), so this asks for these two, not for only these.
+    expect(roadsFrom(p).map((r) => r.to)).toEqual(expect.arrayContaining(['bronze', 'iron']));
     advance(s);
     expect(ageOf(p)).toBe('bronze');
     const stable = raise(s, 'stable');
