@@ -1173,4 +1173,6 @@ export const AI_WILD = { mammothAt: 10, party: 5, mammothNear: 22, pack: 3, clea
   /** A Hunting Camp goes up by a kill of at least `campMeat` food that lies `campFar` tiles from any food drop (and within `campNear` of home: as far as the far hunt goes, so a far feast gets its camp). */
   campMeat: 150, campFar: 9, campNear: 38,
   /** A mammoth `mammothNear` to `far` tiles from home is hunted too, by a clever computer, with `escort` idle soldiers sent along (beyond a guard of `guard` at home) and no rival soldier seen within `safe` tiles of it. */
-  far: 38, escort: 2, guard: 3, safe: 12 };
+  far: 38, escort: 2, guard: 3, safe: 12,
+  /** A clever computer past the Stone Age raises a Watch Tower within `towerNear` tiles of a far kill (22 to `campNear` tiles from home) whose Hunting Camp stands. */
+  towerNear: 6 };

@@ -740,6 +740,19 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
       const spot = findSpot(s, 'huntcamp', (kill.tile % s.w) + 0.5, Math.floor(kill.tile / s.w) + 0.5, 2, 5);
       if (spot && construct(s, v, mem, 'huntcamp', spot, 2, issue)) return;
     }
+    // A clever computer in the Bronze Age or later puts a Watch Tower by a far kill whose camp stands, so the butchers have cover.
+    const camped = clever && p.epoch >= 1 ? (s.carcasses ?? []).find((c) => {
+      const tx = (c.tile % s.w) + 0.5;
+      const ty = Math.floor(c.tile / s.w) + 0.5;
+      if (s.res[c.tile] !== R_MEAT || s.amount[c.tile] < AI_WILD.campMeat) return false;
+      const dh = (tx - home.x) * (tx - home.x) + (ty - home.y) * (ty - home.y);
+      if (dh <= AI_WILD.mammothNear * AI_WILD.mammothNear || dh > AI_WILD.campNear * AI_WILD.campNear) return false;
+      return v.buildings.some((b) => b.type === 'huntcamp' && distToRect(tx, ty, b) < AI_WILD.towerNear) && !v.buildings.some((b) => b.type === 'tower' && distToRect(tx, ty, b) < AI_WILD.towerNear + 2);
+    }) : undefined;
+    if (camped && n >= 12 && !recently('tower', 60) && v.budget.wood >= 50 && v.budget.stone >= 125 && count(v, 'tower') < 6) {
+      const spot = findSpot(s, 'tower', (camped.tile % s.w) + 0.5, Math.floor(camped.tile / s.w) + 0.5, 2, 6);
+      if (spot && construct(s, v, mem, 'tower', spot, 2, issue)) return;
+    }
   }
 
   // Against a people of iron (cheap, hard-hitting foot), a second range early (#50).
