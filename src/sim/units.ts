@@ -10,7 +10,7 @@ import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } 
 import { carriedBy, relicAt } from './relics';
 import { animalRadius, hitAnimal } from './animals';
 import { dig, ruinAt } from './ruins';
-import { groveBoost, keptOf } from './landmarks';
+import { groveBoost, keptOf, kinBonus } from './landmarks';
 import { atPost, dockOf, goalForPost, homeMarket, marketOf, nearestDock, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { canHit, exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, passOf, pay, radiusOf, statsOf, teamOf } from './world';
 
@@ -97,7 +97,7 @@ export function gatherRate(s: GameState, u: Unit, kind: number | 'farm'): number
   const sn = seasonOf(s);
   const season = kind === 'farm' ? sn.field : kind === R_BERRY ? sn.plant : 1;
   // A Flint Scatter sharpens its keeper's axes and picks.
-  const tools = (kind === R_TREE || kind === R_STONE || kind === R_GOLD || kind === R_BOG) && keptOf(s, u.owner, 'flint') > 0 ? LANDMARKS.flint.tools : 1;
+  const tools = (kind === R_TREE || kind === R_STONE || kind === R_GOLD || kind === R_BOG) && keptOf(s, u.owner, 'flint') > 0 ? 1 + kinBonus(s, u.owner, 'flint', LANDMARKS.flint.tools - 1) : 1;
   return base * mod * (1 + p.epoch * EPOCH_GATHER_BONUS) * ai * season * tools;
 }
 
