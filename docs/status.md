@@ -275,3 +275,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Lobby crest** (#267 step 3, lane look): each lobby seat shows its people's crest in its colour. Render only; tests pass, look unseen.
 
 **Camp tower** (own pitch, lane ai): a clever computer past the Stone Age raises a Watch Tower by a far kill whose Hunting Camp stands (`AI_WILD.towerNear = 6`). Tests only; no sweep; no save bump.
+
+**Art pass 9** (#267, lane look): title card age ribbon, card steps left on wide screens. CSS/markup only; look unseen.
