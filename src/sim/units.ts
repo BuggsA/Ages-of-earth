@@ -1,9 +1,10 @@
-import { AI_LEVELS, BUILDINGS, CARRY, CONSECRATE, DEER, DT, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, PRIEST, REPAIR_SHARE, RUINS, TRADE, domainOf, secs } from './data';
+import { AI_LEVELS, BUILDINGS, CARRY, CONSECRATE, DEER, DT, GALVANIC, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, PRIEST, REPAIR_SHARE, RUINS, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
 import type { Spatial } from './spatial';
 import { buildTimeFor, buildingCostFor, modsOf } from './stats';
+import { inField } from './ages';
 import type { Act, Animal, Building, Cost, Ent, GameState, Goal, Order, Res, Unit } from './types';
 import { seasonOf } from './seasons';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
@@ -416,10 +417,12 @@ function buildStep(s: GameState, u: Unit, o: Extract<Order, { k: 'build' }>): vo
     if (walking(u)) stopWalking(u);
     face(u, b.x, b.y);
     u.act = 'build';
-    const step = DT / buildTimeFor(s, u.owner, b.type);
+    // Galvanic Revival: a repair inside a Tower's field is free and quicker.
+    const wired = b.built && !!modsOf(s, u.owner).galvanic && inField(s, b);
+    const step = (DT / buildTimeFor(s, u.owner, b.type)) * (wired ? GALVANIC.repair : 1);
     const max = maxHp(s, b);
     const hp = Math.min(max, b.hp + max * step);
-    if (b.built) {
+    if (b.built && !wired) {
       // A repair is paid for as it goes: whole units, so the total over a job is exact.
       const cost = buildingCostFor(s, u.owner, b.type);
       const owed: Cost = {};
@@ -431,7 +434,7 @@ function buildStep(s: GameState, u: Unit, o: Extract<Order, { k: 'build' }>): vo
         return;
       }
       pay(p, owed);
-    } else b.progress = Math.min(1, b.progress + step);
+    } else if (!b.built) b.progress = Math.min(1, b.progress + step);
     b.hp = hp;
     workEvent(s, u, 'build', u.x, u.y);
     // Repairs must not repeat completion events or reset a wonder's timer.

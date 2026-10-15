@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { findSpot } from '../src/sim/ai';
-import { ELMO, secs } from '../src/sim/data';
+import { ELMO, GALVANIC, secs } from '../src/sim/data';
 import { createGame, step } from '../src/sim/game';
 import { modsOf, techProblem } from '../src/sim/stats';
 import type { Building, BuildingType, GameState, Unit } from '../src/sim/types';
@@ -73,5 +73,44 @@ describe('Wireless Telegraphy (#240)', () => {
     ship.y = Math.min(s.h - 2, ship.y);
     updateVision(s);
     expect(p.vis[idx]).toBe(0);
+  });
+});
+
+describe('Galvanic Revival (#240)', () => {
+  const learn = (s: GameState) => { s.players[0].techs.push('galvanic'); s.players[0].statsVersion++; };
+  it('is shut until Reclaimers and Lightning are walked', () => {
+    const s = game();
+    expect(techProblem(s, 0, 'galvanic')).toContain('heirloom');
+    s.players[0].walked = ['reclaimer', 'lightning'];
+    expect(techProblem(s, 0, 'galvanic')).toBeNull();
+  });
+  it('pays gold from a dug ruin in a Tower field, only with the heirloom', () => {
+    const s = game();
+    const tower = raise(s, 'tower');
+    s.ruins = [{ id: 9999, x: tower.x + 3, y: tower.y + 3, find: 'hoard', dug: 1, by: 0 }];
+    const g0 = s.players[0].res.gold;
+    run(s, GALVANIC.every);
+    expect(s.players[0].res.gold).toBe(g0);
+    learn(s);
+    run(s, GALVANIC.every);
+    expect(s.players[0].res.gold).toBe(g0 + GALVANIC.gold);
+    s.ruins[0].x = tower.x + 40;
+    const g1 = s.players[0].res.gold;
+    run(s, GALVANIC.every);
+    expect(s.players[0].res.gold).toBe(g1);
+  });
+  it('repairs in a field cost nothing', () => {
+    const s = game();
+    const tower = raise(s, 'tower');
+    const house = raise(s, 'house', tower);
+    house.hp = 1;
+    const c = spawnUnit(s, 0, 'citizen', house.x, house.y + 2);
+    c.order = { k: 'build', target: house.id } as never;
+    learn(s);
+    const g0 = s.players[0].res.gold, w0 = s.players[0].res.wood;
+    run(s, 5);
+    expect(house.hp).toBeGreaterThan(1);
+    expect(s.players[0].res.gold).toBe(g0);
+    expect(s.players[0].res.wood).toBe(w0);
   });
 });

@@ -13,6 +13,7 @@ import { generateMap } from './mapgen';
 import { Spatial } from './spatial';
 import { updateRelics } from './relics';
 import { elmoStep } from './elmo';
+import { galvanicStep } from './galvanic';
 import { landmarkStep } from './landmarks';
 import { atPost } from './trade';
 import { modsOf, trainTimeFor } from './stats';
@@ -468,6 +469,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   updateRelics(s);
   landmarkStep(s);
   elmoStep(s);
+  galvanicStep(s);
   attrition(s);
   workStep(s);
   beaconStep(s);
