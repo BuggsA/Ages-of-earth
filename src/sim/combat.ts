@@ -61,6 +61,7 @@ export function hurt(s: GameState, target: Ent, damage: number, by: number, atta
   }
   if (target.hp <= 0) {
     s.players[by].stats.kills++;
+    if (target.kind === 'unit' && by !== target.owner) plunder(s, target, by);
     if (target.kind === 'building') s.players[by].stats.razed++;
     else if (credit && credit.hp > 0 && credit.owner === by && statsOf(s, target).cls !== 'citizen') {
       const before = rankOf(credit);
@@ -74,6 +75,23 @@ export function hurt(s: GameState, target: Ent, damage: number, by: number, atta
   if (attacker && target.kind === 'unit' && target.type !== 'citizen' && target.type !== 'priest' && target.order.k === 'idle' && attacker.hp > 0 && target.stance !== 'stand' && canHit(s, target, attacker)) {
     target.order = { k: 'attack', target: attacker.id, auto: true, then: null };
   }
+}
+
+/**
+ * An enemy unit has fallen to `by`'s people (#299): it counts toward the Path of Blood's deeds, and a
+ * people with a `plunder` share takes that much of the fallen unit's price as gold.
+ */
+function plunder(s: GameState, target: Unit, by: number): void {
+  const p = s.players[by];
+  p.stats.slain = (p.stats.slain ?? 0) + 1;
+  const share = modsOf(s, by).plunder;
+  if (share <= 0) return;
+  const c = statsOf(s, target).cost;
+  const gold = Math.floor(((c.food ?? 0) + (c.wood ?? 0) + (c.gold ?? 0) + (c.stone ?? 0)) * share);
+  if (gold <= 0) return;
+  p.res.gold += gold;
+  p.stats.plunder = (p.stats.plunder ?? 0) + gold;
+  s.events.push({ k: 'plunder', owner: by, x: target.x, y: target.y, gold });
 }
 
 /** Swing at or shoot a target that is in reach. */

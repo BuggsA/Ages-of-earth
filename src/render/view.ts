@@ -1056,6 +1056,13 @@ export class View {
           this.effects.burst(this.ground(s, ev.x, ev.y, 1.2), { count: 6, speed: 0.5, up: 1, life: 0.9, size: 0.05, gravity: -0.5, colors: ['#fff3c4', '#ffd24d'] });
           if (ev.owner === this.viewer) this.onPing?.(ev.x, ev.y, '#ffd24d');
           break;
+        case 'plunder': {
+          // Spoils from the fallen (#299): a spatter of crimson and a few gold coins, and a clink for the taker.
+          if (ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;
+          this.effects.burst(this.ground(s, ev.x, ev.y, 0.8), { count: 8, speed: 0.8, up: 1.1, life: 1, size: 0.05, gravity: 2, colors: ['#ffd166', '#9b1c2c', '#f2cf4a'] });
+          if (ev.owner === this.viewer) this.cue('tradePaid', ev.x, ev.y, 0.4);
+          break;
+        }
         case 'alert':
           if (ev.owner === this.viewer) this.onPing?.(ev.x, ev.y, '#ff4d4d');
           break;

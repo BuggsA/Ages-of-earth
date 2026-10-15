@@ -293,6 +293,8 @@ const walksWeb = (v: View): boolean => AI_LEVELS[v.p.ai!].clever && v.plan === N
 function fit(p: Player, to: AgeId): number {
   const sig = SIGNATURES[p.civ].type;
   const age = AGES[to];
+  // A path (#299) is walked only once the computer has learned it (s3); until then it never rolls for one.
+  if (age.path) return -1;
   if (age.no?.units.includes(sig)) return -1;
   const cls = unitStats(sig, 0).cls;
   return (age.price?.[cls] ?? 1) < 1 ? 1 : 0;
