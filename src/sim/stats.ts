@@ -1,5 +1,5 @@
-import { BUILDINGS, CIVS, WORKS, SIGNATURES, EPOCHS, NO_MODS, TECHS, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
-import { ageDef, isHire, isSuspended } from './ages';
+import { AGES, BUILDINGS, CIVS, WORKS, SIGNATURES, EPOCHS, NO_MODS, TECHS, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
+import { ageDef, ageOf, isHire, isSuspended } from './ages';
 import type { BuildingType, Cost, GameState, Player, TechId, UnitType } from './types';
 import { RES } from './types';
 
@@ -36,8 +36,8 @@ export function computeMods(p: Player): Mods {
   const m: Mods = { ...NO_MODS };
   const civ = CIVS[p.civ];
   apply(m, civ.add, civ.mul);
-  for (const t of p.techs) apply(m, TECHS[t].add, TECHS[t].mul);
   const age = ageDef(p);
+  for (const t of p.techs) if (!TECHS[t].only || TECHS[t].only === ageOf(p)) apply(m, TECHS[t].add, TECHS[t].mul);
   apply(m, age.add, age.mul);
   if (p.workEnd !== undefined) apply(m, WORKS[p.civ].add, WORKS[p.civ].mul);
   return m;
@@ -170,6 +170,7 @@ export function techProblem(s: GameState, owner: number, tech: TechId): string |
   if (p.techs.includes(tech)) return 'Already researched';
   if (isSuspended(p, tech)) return `Researched, but suspended until the ${EPOCHS[t.epoch].name}`;
   if (t.epoch > p.epoch) return `Needs the ${EPOCHS[t.epoch].name}`;
+  if (t.only && ageOf(p) !== t.only) return `Only in the ${AGES[t.only].name}`;
   if (t.needs && !p.techs.includes(t.needs)) return `Needs ${TECHS[t.needs].name} first`;
   for (const e of s.ents) if (e.kind === 'building' && e.owner === owner && e.queue.some((q) => q.tech === tech)) return 'Already being researched';
   return null;
