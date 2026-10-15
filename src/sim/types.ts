@@ -295,6 +295,8 @@ export interface Animal {
   origY?: number;
   /** The deer a hunting wolf is running down. */
   prey?: number;
+  /** The carcass tile a wolf has scented and is eating (carrion). */
+  scav?: number;
 }
 
 export interface Shot {

@@ -792,7 +792,14 @@ export const MAMMOTH = { hp: 90, walk: 0.5, charge: 1.7, gore: 8, reach: 0.5, re
  * leaves a carcass worth `meat` (more than a deer's). A lone citizen loses; three win.
  */
 export const BOAR = { hp: 36, walk: 0.7, run: 2.3, bite: 5, reach: 0.35, reload: 1.2, notice: 3.2, leash: 7, roam: 1.5, meat: 260, radius: 0.28, near: 3, min: 7, max: 15, count: 1, extra: { small: 0, medium: 1, large: 2 } as Record<MapSize, number> };
-export const WOLF = { hunt: 7, hp: 20, walk: 0.9, run: 2.1, bite: 3, reach: 0.35, reload: 1.2, notice: 4.5, leash: 10, roam: 2.5, radius: 0.22, pack: 3, home: 22, fair: 6, spacing: 14, dens: { small: 2, medium: 3, large: 4 } as Record<MapSize, number> };
+export const WOLF = { hunt: 7, hp: 20, walk: 0.9, run: 2.1, bite: 3, reach: 0.35, reload: 1.2, notice: 4.5, leash: 10, roam: 2.5, radius: 0.22, pack: 3, home: 22, fair: 6, spacing: 14,
+  /**
+   * Carrion (own pitch): a pack within `scent` tiles of a carcass that has begun to turn (`ROT.grace`) on land nobody holds comes to eat it, each
+   * wolf `gnaw` food a second, and fights anyone at the meat as if it were its den (its leash and notice
+   * centre on the carcass). Meat inside a border is safe, so a far kill is a race: butcher it fast, guard
+   * it, or clear the den first.
+   */
+  scent: 15, gnaw: 3, dens: { small: 2, medium: 3, large: 4 } as Record<MapSize, number> };
 
 /** Market: gold per 100 of a resource to start, how much each trade moves it, and the cut when selling. */
 export const MARKET = { start: { food: 100, wood: 100, stone: 130 }, step: 4, min: 20, max: 600, sellRate: 0.75, lot: 100,
