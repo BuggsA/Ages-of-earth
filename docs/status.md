@@ -173,3 +173,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Minimap season** (#195, own pitch, lane look): the overview map's meadow and woods follow the season and winter snow whitens it. Render/UI only; seen in headless Chromium per season; no save bump.
 
 **Kin landmarks** (own pitch, lane rules): each people's favourite landmark kind gives it half again the gift (`LANDMARKS.kin`, `.kinMul` 1.5). Unit tests only; browser and win-rate unseen; the computer doesn't yet prefer its kind; no save bump.
+
+**Iron bars** (#197, own pitch, lane rules): Iron Age bog iron pays double gold (`bogGold`); the Iron Age computer keeps digging. Tests only; no save bump.

@@ -393,6 +393,8 @@ function ironRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const road = roadsFrom(p).find((r) => r.to === 'iron');
   // Once the deed is dug, or the road given up, bog iron is only a poor gold mine: diggers go back to
   // what the town needs (#79). Left to it, they walked from one bog to the next all through the Stone Age.
+  // In the Iron Age itself the bog pays double gold: its diggers stay.
+  if (ageOf(p) === 'iron') return;
   if (!road || deedsDone(p, road) || mem.roads?.iron === false) {
     releaseDiggers(s, v, issue);
     return;

@@ -216,7 +216,7 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
     u.frac += gatherRate(s, u, kind) * DT;
     while (u.frac >= 1 && u.carry < cap && s.amount[o.tile] > 0) {
       u.frac -= 1;
-      u.carry++;
+      u.carry += kind === R_BOG ? modsOf(s, u.owner).bogGold : 1;
       s.amount[o.tile]--;
       // Bog iron dug counts toward the Iron Age's deed (#39).
       if (kind === R_BOG) {
