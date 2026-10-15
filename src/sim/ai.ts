@@ -295,6 +295,8 @@ function fit(p: Player, to: AgeId): number {
   const age = AGES[to];
   const cls = unitStats(sig, 0).cls;
   // The Path of Blood (#307) suits a people that fights with foot or riders; the others keep to trade, faith and craft.
+  // Total War (#313) waits for the computer to learn the call to arms: kept off it for now.
+  if (to === 'totalwar') return -1;
   if (age.path) return age.path === 'blood' && (cls === 'infantry' || cls === 'cavalry') ? 0 : -1;
   if (age.no?.units.includes(sig)) return -1;
   return (age.price?.[cls] ?? 1) < 1 ? 1 : 0;

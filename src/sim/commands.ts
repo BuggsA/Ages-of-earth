@@ -12,6 +12,7 @@ import { dockOf, homeMarket, marketOf, nearestDock, portSpot, postAt } from './t
 import { ruinAt } from './ruins';
 import { callWork, workProblem } from './works';
 import { beaconProblem, lightBeacon } from './beacon';
+import { callUp, callUpProblem } from './warcamp';
 import { rallyCry, rallyProblem } from './rally';
 import { chantedOver, consecrateProblem, consecrates } from './consecrate';
 import { sees } from './vision';
@@ -515,6 +516,14 @@ export function applyCommand(s: GameState, c: Command): void {
       const why = beaconProblem(s, p, b);
       if (why) return refuse(s, c.p, why);
       lightBeacon(s, p, b);
+      break;
+    }
+    case 'callUp': {
+      const b = myBuilding(s, c.p, c.building);
+      if (!b) return;
+      const why = callUpProblem(s, p, b);
+      if (why) return refuse(s, c.p, why);
+      callUp(s, p, b, c.n);
       break;
     }
     case 'pack': {

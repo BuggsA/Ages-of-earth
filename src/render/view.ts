@@ -1063,6 +1063,15 @@ export class View {
           if (ev.owner === this.viewer) this.cue('tradePaid', ev.x, ev.y, 0.4);
           break;
         }
+        case 'callUp': {
+          // The call to arms (#313): dust kicked up and a flash of crimson where each new soldier stands.
+          for (const id of ev.ids) {
+            const u = s.byId.get(id);
+            if (!u || (ev.owner !== this.viewer && !this.sees(u.x, u.y))) continue;
+            this.effects.burst(this.ground(s, u.x, u.y, 0.4), { count: 10, speed: 0.7, up: 1.2, life: 0.9, size: 0.05, gravity: 2.5, colors: ['#9b1c2c', '#c9b48a', '#6e0f1c', '#e8dcc0'] });
+          }
+          break;
+        }
         case 'alert':
           if (ev.owner === this.viewer) this.onPing?.(ev.x, ev.y, '#ff4d4d');
           break;

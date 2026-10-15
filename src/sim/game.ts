@@ -292,6 +292,8 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
   const u = spawnUnit(s, p.id, unit, spot.x, spot.y);
   p.pop++;
   p.stats.trained++;
+  // The deed of the Age of Total War (#313): foot soldiers trained at the front.
+  if (b.type === 'warcamp') p.stats.campTrained = (p.stats.campTrained ?? 0) + 1;
   s.events.push({ k: 'trained', id: u.id, owner: p.id, type: unit });
   const fishing = (t: number) => u.type === 'fisher' && t >= 0 && s.res[t] === R_FISH;
   const working = (t: number) => u.type === 'citizen' && t >= 0 && s.res[t] !== R_NONE && s.res[t] !== R_FISH;
