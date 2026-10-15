@@ -185,3 +185,15 @@ describe('faith takes the walls (#209)', () => {
     expect(s.gateTeam[tile]).toBe(s.players[0].team);
   });
 });
+
+describe('counter-chant', () => {
+  it("slows a chant while the keeper's own priests stand by, but not when they shelter", () => {
+    const { s, b } = setup();
+    const [one] = priests(s, b, 1);
+    const alone = chantShare(s, one, b);
+    const defenders = Array.from({ length: 2 }, (_, i) => spawnUnit(s, 1, 'priest', b.x - 2, b.y + i * 0.5));
+    expect(chantShare(s, one, b)).toBeCloseTo(alone / 2, 6);
+    defenders[0].inside = b.id;
+    expect(chantShare(s, one, b)).toBeGreaterThan(alone / 2);
+  });
+});
