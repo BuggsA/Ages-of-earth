@@ -533,3 +533,10 @@ Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), n
 **Seen:** `tests/ai-winter.test.ts` (spring identical, autumn more on food); `npm run check`. No browser, no win-rate sweep; no save bump.
 **Next:** racks bought in autumn before the kill; deer wintering south; the computer sending a raid at a rival's lean winter; snow and bare trees by season (look lane).
 
+
+## Designers' notes: the turning year on the land (#183, own pitch, 2026-10-15, lane look)
+
+**Built:** the seasons seen (`src/render/seasonLook.ts`; the shader is the `season` option in `materials.ts`). One uniform carries the weights of the four seasons and the snow cover. Greens on the terrain and the swaying plants are recoloured: gold summer grass, ochre autumn, frosted winter. Broadleaf crowns (vertex colours redder than blue, high in the model) turn orange, red or gold in autumn, one colour per tree, a few late, and go bare in winter. Evergreens (bluer) only darken. Snow lies on surfaces facing up: patchy on the ground, only on the flattest tops of models so stone and ore still read, and never on team-coloured or glowing parts. It fades over the last 20 s of a season, snow settles over 45 s of winter and melts over 30 s of spring. Nothing is added to the scene, there are no new draw calls, and the rules aren't touched.
+**Why I love it:** the seasons already change real choices, but you only learned about them from an icon. Now the first red leaves are a warning that winter is coming, and the snow is a reminder of why you dried that meat.
+**Seen:** headless Chromium on seed 7 at noon, each season held with `?season=`, with no console errors. I looked at the screenshots: autumn trees in sight go orange, red and gold; in winter the town and rocks read through patchy snow. The fades and the melt were not watched in motion. `tests/season-look.test.ts` checks the weights and the snow timing.
+**Next:** a snowy weather day in summer still drops flakes on gold grass, so tie the weather to the season (rain falls as snow in winter, no snow outside it); breath puffs or a muffled winter ambience; frozen lake edges; the minimap tinted by season.

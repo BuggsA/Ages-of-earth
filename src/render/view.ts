@@ -12,6 +12,7 @@ import { BuildingsView } from './buildingsView';
 import { CameraRig } from './camera';
 import { Birds, Effects } from './effects';
 import { fogUniforms, glowUniform, timeUniform, windUniform } from './materials';
+import { setSeasonLook } from './seasonLook';
 import { Overlays, type BarSpec, type RingSpec } from './overlays';
 import { Post, QUALITY, loadQuality, saveQuality, type QualityName } from './post';
 import { RelicsView } from './relicsView';
@@ -332,6 +333,7 @@ export class View {
   frame(s: GameState, alpha: number, dt: number, sel: Selection): void {
     this.time += dt;
     timeUniform.value = this.time;
+    setSeasonLook(s.tick);
     this.rig.update(dt);
     const p = s.players[this.viewer];
     if (!this.reveal) this.fog?.update(p.vis, p.seen, dt);
