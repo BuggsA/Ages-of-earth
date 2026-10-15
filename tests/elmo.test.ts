@@ -5,6 +5,7 @@ import { createGame, step } from '../src/sim/game';
 import { modsOf, techProblem } from '../src/sim/stats';
 import type { Building, BuildingType, GameState, Unit } from '../src/sim/types';
 import { placeBuilding, spawnUnit } from '../src/sim/world';
+import { updateVision } from '../src/sim/vision';
 
 /** St. Elmo's Fire (#240): the Pilgrims + Lightning heirloom. */
 const game = (): GameState => createGame({ seed: 11, size: 'small', startEpoch: 4, players: [{ name: 'A', ai: null }, { name: 'B', ai: null }] });
@@ -49,5 +50,28 @@ describe("St. Elmo's Fire (#240)", () => {
     const before = u.hp;
     run(s, 6);
     expect(u.hp).toBe(before);
+  });
+});
+
+describe('Wireless Telegraphy (#240)', () => {
+  it('lets ships in a Tower field see farther, only with the heirloom', () => {
+    const s = game();
+    const p = s.players[0];
+    const tower = raise(s, 'tower');
+    const ship = spawnUnit(s, 0, 'warship', tower.x + 3, tower.y + 3);
+    const far = Math.floor(ship.x) + 12;
+    const idx = Math.floor(ship.y) * s.w + far;
+    updateVision(s);
+    const before = p.vis[idx];
+    p.techs.push('telegraphy');
+    p.statsVersion++;
+    expect(techProblem(s, 0, 'telegraphy')).not.toBeNull();
+    updateVision(s);
+    expect(p.vis[idx]).toBe(1);
+    expect(before).toBe(0);
+    ship.x += 30;
+    ship.y = Math.min(s.h - 2, ship.y);
+    updateVision(s);
+    expect(p.vis[idx]).toBe(0);
   });
 });
