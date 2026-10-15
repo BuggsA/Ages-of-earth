@@ -78,6 +78,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Flint Scatter** (#187, own pitch, lane rules): a fourth landmark kind; its keeper's citizens chop and mine 20% faster (`LANDMARKS.flint.tools`). Unit and model tests only; browser, sound and win-rate unseen; no save bump. `tests/relics.test.ts` sits near its 15 s limit and timed out once under load.
 
+**Sacred Grove** (own pitch, lane rules): a fifth landmark kind; its keeper's priests convert and heal 1.8x as fast within 10 tiles (`LANDMARKS.grove`). Unit and model tests only; browser, sound and win-rate unseen; the computer claims it but doesn't yet stage priests there; no save bump.
+
 ## Waiting on the owner
 
 **Setup only the owner can do:**

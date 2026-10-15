@@ -266,7 +266,7 @@ export interface Ruin {
 }
 
 /** A landmark's kind (contested landmarks): what its keeper gets besides the land round it. */
-export type LandmarkKind = 'spring' | 'crag' | 'cairn' | 'flint';
+export type LandmarkKind = 'spring' | 'crag' | 'cairn' | 'flint' | 'grove';
 
 /**
  * A contested landmark: a place out between the towns that belongs to whoever's people hold the ground
