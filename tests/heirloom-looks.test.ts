@@ -24,3 +24,18 @@ describe('heirloom looks (#224)', () => {
     expect(buildingGeometry('temple', 2, '#cc3333', 0, undefined, 'ironHulls')).toBe(buildingGeometry('temple', 2, '#cc3333'));
   });
 });
+
+describe('second heirloom marks', () => {
+  it('the Market shows the Joint-Stock Company and the Temple the Masons\' Lodge, beside the Bell Foundry', () => {
+    for (let e = 0; e <= LAST_EPOCH; e++) {
+      const market = buildingGeometry('market', e, '#cc3333');
+      expect(verts(buildingGeometry('market', e, '#cc3333', 0, undefined, 'jointStock'))).toBeGreaterThan(verts(market));
+      const bell = buildingGeometry('temple', e, '#cc3333', 0, undefined, 'bellFoundry');
+      const lodge = buildingGeometry('temple', e, '#cc3333', 0, undefined, 'masonsLodge');
+      const both = buildingGeometry('temple', e, '#cc3333', 0, undefined, 'bellFoundry,masonsLodge');
+      expect(verts(lodge)).toBeGreaterThan(verts(buildingGeometry('temple', e, '#cc3333')));
+      expect(verts(both)).toBeGreaterThan(verts(bell));
+      expect(verts(both)).toBeGreaterThan(verts(lodge));
+    }
+  });
+});

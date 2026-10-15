@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { ageOf } from '../sim/ages';
 import { BUILDINGS } from '../sim/data';
 import type { AgeId, Building, BuildingType, GameState } from '../sim/types';
-import { buildingGeometry, HEIRLOOM_MARKS, foundationGeometry, rubbleGeometry, scaffoldGeometry } from './buildingModels';
+import { buildingGeometry, heirloomsFor, foundationGeometry, rubbleGeometry, scaffoldGeometry } from './buildingModels';
 import { bakedMaterial, inject } from './materials';
 import { heightAt } from './terrain';
 
@@ -247,8 +247,8 @@ function snapshot(s: GameState, b: Building): Known {
   };
 }
 
-/** The heirloom (#224) that dresses this building, if its owner has learned it. */
+/** The heirlooms (#224) that dress this building, comma-joined, for those its owner has learned. */
 function heirloomOn(s: GameState, b: Building): string {
-  const id = HEIRLOOM_MARKS[b.type];
-  return id && s.players[b.owner].techs.includes(id as never) ? id : '';
+  const techs = s.players[b.owner].techs as string[];
+  return heirloomsFor(b.type).filter((id) => techs.includes(id)).join(',');
 }
