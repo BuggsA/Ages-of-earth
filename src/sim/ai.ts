@@ -1,5 +1,5 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, AI_FAITH, AI_LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_RAID, AI_WEB, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_RAID, AI_WEB, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Ruin, TechId, TradePost, Unit, UnitType } from './types';
@@ -387,8 +387,14 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   if (!walksWeb(v)) return null;
   const here = ageOf(p);
   const kept = relicsKept(s, p.id);
+  // A detour (#232): a pilgrim town with the catch landed and a Dock, whose Age of Sail would open an heirloom, steps back to
+  // the Middle Ages to take it, and doesn't turn pilgrim again on the way (the road to Sail is the plan).
+  const sailRoad = ROADS.find((r) => r.from === 'middle' && r.to === 'sail');
+  const toSail = !!sailRoad && !!heirloomAhead(p, 'sail') && count(v, 'dock', true) > 0 && deedsDone(p, sailRoad) && wants(s, p, mem, 'sail');
   for (const r of roadsFrom(p)) {
     if (AGES[r.to].tier !== p.epoch) continue;
+    if (toSail && here === 'pilgrim' && r.to === 'middle') return { road: r, wait: false };
+    if (toSail && r.to === 'pilgrim') continue;
     if (r.to === 'aeronaut' && v.planes.length > 0 && roadKnown(s, p, r) && wants(s, p, mem, r.to)) return { road: r, wait: false };
     if (here === 'aeronaut' && r.to === 'industrial' && count(v, 'airfield', true) === 0) {
       mem.roads ??= {};
