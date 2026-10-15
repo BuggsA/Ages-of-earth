@@ -24,8 +24,8 @@ When a Claude Code session finishes a task, it starts the next session itself, s
 A chain is the run of sessions that each start the next.
 - **Position:** a session the owner starts by hand is 0; its successor is 1. **Position 10 doesn't spawn.**
 - **The id** is the UTC date and time of the chain's first spawn (`1013-1720`). Position 0 makes it up; later sessions copy it.
-- **At most two chains at once, in different lanes** (`docs/team.md`, "Lanes"). Before spawning, read the recent `Chain` comments on #2 and count the chains under two hours old that don't say "ended". Two running: don't start a third. One running in your lane: wait.
-- **No daily cap** (the owner, 2026-10-14, `docs/rulings.md`): the 10 per chain and the two chains at once are the only limits.
+- **One chain per lane** (`docs/team.md`, "Lanes"), and no limit on how many run at once (the owner, 2026-10-15, `docs/rulings.md`). Before spawning, read the recent `Chain` comments on #2 for the chains under two hours old that don't say "ended". One running in your lane: wait.
+- **No daily cap** (the owner, 2026-10-14, `docs/rulings.md`): 10 sessions a chain is the only count limit.
 - **Log each spawn on #2:** `Chain 1013-1720, 3 of 10, lane rules: <branch> took #42 (regular), started "<child title>" for #57.` When a chain ends: `Chain 1013-1720 ended at 3 of 10: <reason>.` Don't start a new chain yourself: that's the owner's.
 
 ## The prompt
