@@ -82,6 +82,10 @@ kbd {
 @media (min-width: 1100px) {
   #title.screen { place-items: center start; padding-left: 6vw; background: linear-gradient(90deg, rgba(10, 14, 22, 0.6), rgba(10, 14, 22, 0) 60%); }
 }
+/* The live match behind the title is named in the corner, as a film names its place. */
+.title-caption { position: absolute; right: 24px; bottom: 20px; margin: 0; max-width: 40ch; text-align: right; font: 700 14px 'Cinzel', serif; letter-spacing: 0.5px; color: var(--ink); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85); opacity: 0; transition: opacity 1.2s; pointer-events: none; }
+.title-caption.on { opacity: 0.85; }
+.title-caption b { display: block; color: var(--gold); font-size: 16px; }
 .setup { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; text-align: left; margin-bottom: 18px; }
 .setup label { display: grid; gap: 4px; font-size: 13px; font-weight: 800; color: var(--muted); }
 .setup select, .setup input {

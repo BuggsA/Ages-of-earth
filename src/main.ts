@@ -358,6 +358,21 @@ function startAttract(skipAhead = true): void {
   playMusic(2);
 }
 
+let captionKey = '';
+/** Names the town the title's camera is visiting, fading it out and in as the camera moves on. */
+function captionTown(who: GameState['players'][number], marching: boolean): void {
+  const key = `${who.id}${marching ? 'a' : 't'}${who.epoch}`;
+  if (key === captionKey) return;
+  captionKey = key;
+  const el = $('title-caption');
+  el.classList.remove('on');
+  setTimeout(() => {
+    if (mode !== 'title' || captionKey !== key) return;
+    el.innerHTML = `<b>${escHtml(who.name)} of the ${CIVS[who.civ].name}</b>${marching ? 'an army on the march' : `${ageDef(who).name}`}`;
+    el.classList.add('on');
+  }, 1200);
+}
+
 /** Leaders for the computer's peoples. */
 const LEADERS: Record<CivId, string> = { egyptians: 'Hatshepsut', greeks: 'Pericles', romans: 'Augustus', mongols: 'Genghis', chinese: 'Wu Zetian', britons: 'Boudica' };
 
@@ -2346,6 +2361,7 @@ function frame(now: number): void {
       const at = army.length >= 4 ? army[0] : (tc ?? { x: who.startX, y: who.startY });
       view.rig.focus(at.x, at.y);
       view.rig.rotate(dt * 0.05);
+      captionTown(who, army.length >= 4);
     } else {
       // Keyboard and screen-edge panning.
       const sp = view.rig.panSpeed * dt;
