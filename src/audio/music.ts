@@ -49,6 +49,8 @@ const SIDE_STYLES: Partial<Record<AgeId, Style>> = {
   sail: { bpm: 78, root: 146.83, scale: [0, 2, 3, 5, 7, 9, 10], chords: [0, 3, 4, 0, 6, 3, 4, 0], lead: 'flute', accomp: 'lute', drums: 'frame', density: 0.4 },
   // The Age of Lightning (#231): a whole-tone theremin over held strings and the anvil's clank, the sound of a laboratory at night.
   lightning: { bpm: 80, root: 155.56, scale: [0, 2, 4, 6, 8, 10], chords: [0, 3, 1, 4], lead: 'theremin', accomp: 'strings', drums: 'anvil', density: 0.3 },
+  // The Age of the Warband (#299): a hard Phrygian march, horn-like cornet over a drone, the timpani a war drum.
+  warband: { bpm: 88, root: 130.81, scale: [0, 1, 3, 5, 7, 8, 10], chords: [0, 0, 1, 0, 6, 0, 1, 0], lead: 'cornet', accomp: 'drone', drums: 'timpani', density: 0.36 },
   fair: { bpm: 112, root: 220.0, scale: [0, 2, 4, 5, 7, 9, 11], chords: [0, 4, 3, 0, 5, 3, 4, 0], lead: 'recorder', accomp: 'oompah', drums: 'tabor', density: 0.58 },
 };
 

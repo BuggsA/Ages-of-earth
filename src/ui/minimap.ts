@@ -13,7 +13,7 @@ import { R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE, T_ROCK, T_SAND
  */
 
 /** A side age rings its owner's buildings on the map, so a rival's road shows at a glance (#55). */
-const AGE_BLIP: Partial<Record<AgeId, string>> = { merchant: '#ffd166', iron: '#ff7a2a', pilgrim: '#f4efe4', fair: '#e0524a', sail: '#3fb8c8', lightning: '#8fd8ff' };
+const AGE_BLIP: Partial<Record<AgeId, string>> = { merchant: '#ffd166', iron: '#ff7a2a', pilgrim: '#f4efe4', fair: '#e0524a', sail: '#3fb8c8', lightning: '#8fd8ff', warband: '#9b1c2c' };
 
 interface Ping {
   x: number;

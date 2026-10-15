@@ -33,7 +33,10 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband';
+
+/** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
+export type PathId = 'blood';
 
 /** Tile ground. Water and rock can't be walked or built on. */
 export const T_GRASS = 0;
@@ -378,6 +381,10 @@ export interface PlayerStats {
   fished?: number;
   /** Beacons lit on the people's towers, relays included (the Age of Lightning's deed, #231); absent in older saves. */
   beacons?: number;
+  /** Enemy units (not buildings) the people's forces have slain: the Path of Blood's deeds (#299); absent in older saves. */
+  slain?: number;
+  /** Gold taken as plunder from the enemy dead (#299); absent in older saves. */
+  plunder?: number;
 }
 
 /** One sample of a player's state for the post-game timeline. */
@@ -461,6 +468,8 @@ export type GameEvent =
   | { k: 'depleted'; tile: number }
   | { k: 'season'; i: number }
   | { k: 'rank'; id: number; owner: number; x: number; y: number; rank: number }
+  /** Gold taken from an enemy unit slain by a people with a plunder share (the Path of Blood, #299). */
+  | { k: 'plunder'; owner: number; x: number; y: number; gold: number }
   | { k: 'alert'; owner: number; x: number; y: number; building: boolean; wild?: Animal['kind']; /** A rival's soldiers fell on a citizen out hunting. */ hunter?: boolean }
   | { k: 'converted'; id: number; from: number; to: number; x: number; y: number }
   /** A building chanted over to a pilgrim people (#209). */
