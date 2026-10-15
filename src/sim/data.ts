@@ -104,7 +104,8 @@ export const AGES: Record<AgeId, Age> = {
     name: 'Age of Pilgrims',
     short: 'Pilgrim',
     tier: 2,
-    blurb: 'The faithful walk from far away to see the relics in your Temples: relics pay double, priests come at half price and work a quarter faster, but a pilgrim people builds no siege engines.',
+    blurb: 'The faithful walk from far away to see the relics in your Temples: relics pay double, and priests come at half price and work a quarter faster. A pilgrim people builds no siege engines, but its priests, chanting together, win a rival\'s towers, gates and Temples over.',
+    add: { consecrate: 1 },
     mul: { relicGold: 2, priest: 1.25 },
     price: { priest: 0.5 },
     no: { units: ['siege'], why: 'A pilgrim people builds no siege engines: rams and catapults wait until it leaves the pilgrims\' road' },
@@ -203,7 +204,7 @@ export const ROADS: Road[] = [
     time: 40,
     clue: 'temple',
     deed: { stat: 'relicGold', n: 120, text: 'Relics kept in your Temples bring in 120 gold' },
-    blurb: 'A turn, not a climb: the same soldiers and technologies as the Middle Ages, but the faithful walk from far away to your Temples. Every relic kept there pays double gold; priests cost half as much and convert and heal a quarter faster. What it gives up: siege. The Siege Workshop builds nothing while you walk the pilgrims\' road, so walls and towers must be taken by other means.',
+    blurb: 'A turn, not a climb: the same soldiers and technologies as the Middle Ages, but the faithful walk from far away to your Temples. Every relic kept there pays double gold; priests cost half as much and convert and heal a quarter faster. What it gives up: siege. The Siege Workshop builds nothing while you walk the pilgrims\' road, so walls and towers are taken by faith: priests chanting together win over a rival\'s buildings (never a Town Center or a Wonder), slower with soldiers sheltering inside.',
   },
   { from: 'pilgrim', to: 'gunpowder', cost: { food: 900, gold: 750, stone: 200 }, time: 65, blurb: 'Rejoin the main road: the pilgrims\' gold carries your people into gunpowder (more gold and less food and stone than from the Middle Ages). The siege engines return as cannon.' },
   { from: 'pilgrim', to: 'middle', cost: { food: 200, stone: 100 }, time: 25, blurb: 'Leave the pilgrims\' road for the ordinary Middle Ages: relics pay their usual gold, and the Siege Workshop works again.' },
@@ -458,6 +459,28 @@ export const VETERANCY = {
 };
 /** Priests: healing per second, and how long a conversion takes (seconds, before the target's toughness). */
 export const PRIEST = { heal: 3, convert: 7, rest: 8 };
+
+/**
+ * Faith takes the walls (#209). A pilgrim people (`Mods.consecrate`) builds no siege engines; its priests
+ * chant a rival's building over instead, every voice adding to one shared tally on the building.
+ * - Each chanting priest wins over `rate` of the building's full health a second, times its people's
+ *   priest speed (Theology, the pilgrims) and the Sacred Grove's boost, so a Middle Ages Watch Tower
+ *   (1500) takes five pilgrim priests about 16 s if none fall; under its arrows, nearer 28 s, and three
+ *   of the five are lost (Theology: 15 s, two lost).
+ * - `hard` makes some buildings resist longer: holy ground holds out, and a Temple taken brings its relics.
+ * - Every unit sheltering inside slows the chant: rate / (1 + `guard` × those inside). They spill out
+ *   to fight when it turns.
+ * - `never`: a people's heart and its glory stay its own.
+ * - After `grace` seconds with no one chanting, the faith fades by `fade` of the whole each second.
+ */
+export const CONSECRATE = {
+  rate: 15,
+  hard: { temple: 1.5 } as Partial<Record<BuildingType, number>>,
+  guard: 0.35,
+  never: ['towncenter', 'wonder'] as BuildingType[],
+  grace: 1,
+  fade: 0.05,
+};
 /**
  * Relics: one lies out for each player, `home` tiles from their town, and `extra` more (by map size) where
  * the land is within `fair` tiles of as far from the two nearest towns, at least `spacing` apart. A
@@ -644,13 +667,15 @@ export interface Mods {
   portReach: number;
   /** Added to a mounted soldier's sight (the Yam Relay). */
   riderSight: number;
+  /** Above 0, the people's priests can chant a rival's building over to their side (the Age of Pilgrims, #209). */
+  consecrate: number;
 }
 
 export const NO_MODS: Mods = {
   meleeAttack: 0, rangedAttack: 0, armor: 0, parmor: 0, range: 0, carry: 0, citizenSpeed: 1, wood: 1, mine: 1, farm: 1, forage: 1, hunt: 1,
   buildingHp: 1, buildSpeed: 1, militaryTrain: 1, rangedTrain: 1, cavalrySpeed: 1, infantryHp: 1, infantryArmor: 0, infantryAttack: 0, priest: 1,
   siegeAttack: 1, siegeRange: 0, techCost: 1, wonderCost: 1, extraCitizens: 0, fish: 1, shipHp: 1, shipRange: 0, airSpeed: 1, airHp: 1,
-  traderSpeed: 1, tradeGold: 1, relicGold: 1, bogGold: 1, rot: 1, beastWard: 1, portReach: 0, riderSight: 0,
+  traderSpeed: 1, tradeGold: 1, relicGold: 1, bogGold: 1, rot: 1, beastWard: 1, portReach: 0, riderSight: 0, consecrate: 0,
 };
 
 export interface Tech {
@@ -835,6 +860,15 @@ export const SEASONS = [
  * keeps in the cold) and, in the winter itself, clears wolves with `pack` fewer soldiers.
  */
 export const AI_WINTER = { from: 2, fields: 2, hunters: 3, pack: 1, food: 0.3 };
+
+/**
+ * Faith takes the walls (#209), for the computer: a pilgrim computer keeps `priests` priests once its army
+ * numbers six, and sends those that have kept up with its army (within `reach` + `keep` tiles of its
+ * centre, idle, walking or healing) in a band of at least `band` to chant over the rival building nearest that centre, within
+ * `reach` tiles, that it can see. Towers and gates weigh as if `wall` times as near, a Temple that keeps
+ * relics `relic` times.
+ */
+export const AI_FAITH = { priests: 6, band: 3, reach: 14, keep: 6, wall: 0.4, relic: 0.6 };
 export const AMOUNT = { tree: 80, berry: 125, stone: 300, gold: 400, meat: 140, fish: 250, bog: 300 };
 /** Deer: health, speeds, and how far a hunter throws a spear. */
 export const DEER = { hp: 8, walk: 0.8, flee: 2.3, spear: 3.5, spearDamage: 4,

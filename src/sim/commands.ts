@@ -12,6 +12,7 @@ import { ruinAt } from './ruins';
 import { callWork, workProblem } from './works';
 import { beaconProblem, lightBeacon } from './beacon';
 import { rallyCry, rallyProblem } from './rally';
+import { consecrateProblem } from './consecrate';
 import { canHit, isEnemy, maxHp, pay, placeBuilding, refund } from './world';
 import { fightsBeasts } from './animals';
 
@@ -202,6 +203,8 @@ export function applyCommand(s: GameState, c: Command): void {
       for (const u of units) {
         if (u.type === 'priest') {
           if (t.kind === 'unit' && domainOf(t.type) === 'land' && !carriedBy(s, u)) giveOrder(u, { k: 'convert', target: t.id, done: 0 }, c.queue);
+          // A pilgrim people's priests chant a building over (#209).
+          else if (t.kind === 'building' && !consecrateProblem(s, c.p, t) && !carriedBy(s, u)) giveOrder(u, { k: 'convert', target: t.id, done: 0 }, c.queue);
           continue;
         }
         // Swords can't reach a ship or an aircraft, nor a ram a soldier.
@@ -234,8 +237,12 @@ export function applyCommand(s: GameState, c: Command): void {
     }
     case 'convert': {
       const t = s.byId.get(c.target);
-      if (!t || t.kind !== 'unit' || !isEnemy(s, c.p, t.owner)) return;
+      if (!t || !isEnemy(s, c.p, t.owner)) return;
       if (peace(s)) return refuse(s, c.p, 'Not while the peace treaty holds');
+      if (t.kind === 'building') {
+        const why = consecrateProblem(s, c.p, t);
+        if (why) return refuse(s, c.p, why);
+      }
       for (const u of myUnits(s, c.p, c.ids)) if (u.type === 'priest' && !carriedBy(s, u)) giveOrder(u, { k: 'convert', target: t.id, done: 0 }, c.queue);
       break;
     }
