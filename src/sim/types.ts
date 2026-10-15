@@ -638,6 +638,8 @@ export interface AiMemory {
   /** A band out after rival citizens working far from home (#260): its soldiers, their quarry and since when. */
   /** With `look`, the band is walking to a rival Hunting Camp it has seen, to find who works there (`target` -1 until it does). */
   prowl?: { ids: number[]; target: number; since: number; look?: number; burn?: number };
+  /** The Path of Blood (#307): since when it holds the Warband for plunder (-1 once done), when it entered Iron and Blood, and when it last pitched a War Camp. */
+  blood?: { hold?: number; since?: number; camp?: number };
   /** Tick its last band came home from prowling. */
   prowled?: number;
 }
