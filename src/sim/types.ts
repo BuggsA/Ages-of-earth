@@ -461,7 +461,7 @@ export type GameEvent =
   | { k: 'depleted'; tile: number }
   | { k: 'season'; i: number }
   | { k: 'rank'; id: number; owner: number; x: number; y: number; rank: number }
-  | { k: 'alert'; owner: number; x: number; y: number; building: boolean; wild?: Animal['kind'] }
+  | { k: 'alert'; owner: number; x: number; y: number; building: boolean; wild?: Animal['kind']; /** A rival's soldiers fell on a citizen out hunting. */ hunter?: boolean }
   | { k: 'converted'; id: number; from: number; to: number; x: number; y: number }
   /** A building chanted over to a pilgrim people (#209). */
   | { k: 'consecrated'; id: number; from: number; to: number; x: number; y: number; type: BuildingType; size: number }

@@ -57,7 +57,7 @@ export function hurt(s: GameState, target: Ent, damage: number, by: number, atta
   const p = s.players[target.owner];
   if (by !== target.owner && s.tick - p.alert > secs(12)) {
     p.alert = s.tick;
-    s.events.push({ k: 'alert', owner: target.owner, x: target.x, y: target.y, building: target.kind === 'building' });
+    s.events.push({ k: 'alert', owner: target.owner, x: target.x, y: target.y, building: target.kind === 'building', ...(target.kind === 'unit' && target.order.k === 'hunt' ? { hunter: true } : {}) });
   }
   if (target.hp <= 0) {
     s.players[by].stats.kills++;

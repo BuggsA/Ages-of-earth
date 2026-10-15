@@ -45,6 +45,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Signal beacons** (own pitch, lane rules): a Watch Tower can light a fire (F): +7 sight for 45 s, and rivals see the ground around it; the clever computer lights one when three soldiers close in. Seen in headless Chromium (2026-10-15: F lights it, the toast shows, flames and smoke rise from the roof, `docs/screenshots/beacons-great-work.jpg`); sound wants an ear; no save bump.
 
+**Hunters hunted toast** (own pitch, lane ai): a rival striking your hunting citizen toasts "Raiders fall on your hunters!" (`alert.hunter`). Test only; browser unseen; no save bump.
+
 **Camp burners** (own pitch, lane ai): the prowling band burns a rival Hunting Camp it finds empty (`AI_PROWL.burn`). Test only; no sweep; browser unseen; no save bump.
 
 **Beacon relay** (own pitch, lane rules): a lit beacon sets alight your other rested Watch Towers within 14 tiles, free, 25 s each, down a chain (`BEACON.relay`, `.relayDuration`). Seen in headless Chromium (2026-10-15: a second tower 12 tiles off caught alight for 25 s and smokes); no save bump.

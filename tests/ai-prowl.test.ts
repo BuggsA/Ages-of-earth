@@ -4,6 +4,7 @@ import { prey, rivalCamp } from '../src/sim/ai';
 import { createGame, step } from '../src/sim/game';
 import type { Building, GameState, Unit } from '../src/sim/types';
 import { placeBuilding, spawnUnit } from '../src/sim/world';
+import { hurt } from '../src/sim/combat';
 
 /** Hunters hunted (#260): the clever computer falls on rival citizens working far from their town. */
 
@@ -142,4 +143,23 @@ describe('the computer looks for hunters at a rival Hunting Camp', () => {
     expect(burned).toBe(true);
     expect(camp.hp).toBeLessThanOrEqual(0);
   }, 60000);
+});
+
+describe('the alert for a hunter struck by a rival', () => {
+  it('says hunters when the citizen was out hunting, and nothing special otherwise', () => {
+    const s = game();
+    clearWild(s);
+    const at = between(s, 0.4);
+    const raider = spawnUnit(s, 1, 'infantry', at.x + 1, at.y);
+    const walker = spawnUnit(s, 0, 'citizen', at.x, at.y);
+    hurt(s, walker, 1, 1, raider);
+    const plain = s.events.find((e) => e.k === 'alert');
+    expect(plain && plain.k === 'alert' && plain.hunter).toBeFalsy();
+    s.events.length = 0;
+    s.players[0].alert = -9999;
+    walker.order = { k: 'hunt', target: 1 };
+    hurt(s, walker, 1, 1, raider);
+    const hunted = s.events.find((e) => e.k === 'alert');
+    expect(hunted && hunted.k === 'alert' && hunted.hunter).toBe(true);
+  });
 });
