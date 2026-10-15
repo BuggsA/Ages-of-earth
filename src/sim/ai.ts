@@ -64,7 +64,7 @@ const ADVANCE_AT = [11, 17, 22, 28];
 const TILE_OF: Record<Res, number> = { food: R_BERRY, wood: R_TREE, stone: R_STONE, gold: R_GOLD };
 /** Technologies in the order the opponent wants them (economy first). */
 const TECH_ORDER: TechId[] = [
-  'plow', 'drying', 'axes', 'wheelbarrow', 'picks', 'forging', 'scaleArmor', 'fletching', 'husbandry', 'irrigation', 'saws', 'shafts', 'handcart',
+  'plow', 'drying', 'hounds', 'axes', 'wheelbarrow', 'picks', 'forging', 'scaleArmor', 'fletching', 'husbandry', 'irrigation', 'saws', 'shafts', 'handcart',
   'ironCasting', 'chainMail', 'bodkin', 'masonry', 'theology', 'conscription', 'blastFurnace', 'plateArmor', 'chemistry',
   'gillnets', 'shipwright', 'lighthouse', 'steamEngine', 'rifling', 'aviation', 'caravan', 'banking', 'pilgrimage',
 ];
@@ -226,6 +226,8 @@ function research(s: GameState, v: View, peopleEnough: boolean, issue: (c: Comma
     if (techProblem(s, p.id, tech)) continue;
     // Racks are worth their wood once big game (a boar or mammoth) is down.
     if (tech === 'drying' && !s.carcasses?.some((c) => c.full > AMOUNT.meat)) continue;
+    // Hounds are for hunters with a camp, once there is game worth the fight.
+    if (tech === 'hounds' && !s.carcasses?.some((c) => c.full > AMOUNT.meat)) continue;
     // Trade technologies only pay with traders on the road.
     if (TECHS[tech].at === 'market' && v.traders.length < 3) continue;
     const at = v.buildings.find((b) => b.type === TECHS[tech].at && b.built && b.queue.length === 0 && b.advance < 0);

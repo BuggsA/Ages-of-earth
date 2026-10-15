@@ -494,3 +494,10 @@ Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), n
 **Why I love it:** the wild gave the opening its questions and rot and carrion gave the hunt its clocks, but the answer to all of them was still "walk it home". A camp is the answer that costs something: wood, a builder's minutes, and a frail building out in the open. It ties together borders (meat inside is safe from wolves), Drying Racks (they now work out by the herd), herds (follow them with a camp, or let it strand) and attrition (a small supplied foothold).
 **Seen:** `tests/huntcamp.test.ts` (food-only drop, claim only once built, wolves leave meat in its land, the computer builds one); the full quick tier; a headless match. Not in a browser, not played by hand; no win-rate sweep. No save bump (a new building type only).
 **Next:** hunters at a camp gather meat faster, or the camp trains nothing but sells jerky for gold; wolves that gnaw a frail camp; a camp that dissolves when its herd leaves.
+
+## Designers' notes: Hounds (own pitch, 2026-10-15, Chain 1014-2358, session 6)
+
+**Built:** `hounds`, a Stone Age tech at the Hunting Camp (80 food, 40 wood): `hunt` x1.25 and a new mod `beastWard` x0.5 on the damage wolves, boars and mammoths do (`maul` in `animals.ts`). The clever computer buys it once big game is down and it has a camp.
+**Why I love it:** the camp gave the wild a place to be fought from; hounds give it something to research. Spend food and wood on a safer, faster hunt (the mammoth party loses fewer people), or on the next age. It ties into the camp, boars, mammoths, wolf dens and Drying Racks (two hunt techs, two clocks).
+**Seen:** `tests/hounds.test.ts` (a wolf's first bite halves; mods); the full quick tier. Not in a browser, not played by hand; no win-rate sweep. No save bump (new tech id only).
+**Next:** a hound that walks beside a hunter as a small unit; hounds that bark at an approaching pack (a warning); wolves that fear a camp with hounds.
