@@ -524,6 +524,37 @@ function anvil(k: Kit, x: number, z: number): void {
 
 function forge(k: Kit, e: number, st: Style): void {
   pad(k, 3, st.base);
+  if (e === 4) {
+    // A foundry: a brick hall under a sawtooth roof, a banded cupola furnace, a steam hammer and cooling ingots.
+    k.box(2.4, 1.0, 1.3, st.wall, -0.2, 0, -0.6);
+    for (const x of [-1.2, -0.6, 0, 0.6, 1.0]) k.box(0.06, 1.0, 1.34, st.trim, x, 0, -0.6);
+    k.box(2.46, 0.07, 1.36, st.trim, -0.2, 1.0, -0.6);
+    for (let i = 0; i < 3; i++) {
+      k.prism(0.8, 0.45, 1.3, st.roof, -0.9 + i * 0.8, 1.07, -0.6);
+      k.glow(k.box(0.5, 0.2, 0.03, '#ffb25a', -0.9 + i * 0.8, 1.12, -0.05));
+    }
+    // The cupola furnace: a riveted iron drum on a brick base with a tall stack.
+    k.box(0.7, 0.5, 0.7, st.wall, 1.15, 0, 0.05);
+    k.cyl(0.26, 0.3, 1.5, 10, IRON_DARK, 1.15, 0.5, 0.05);
+    for (const y of [0.8, 1.2, 1.7]) k.cyl(0.31, 0.31, 0.05, 10, '#2b2b2e', 1.15, y, 0.05);
+    k.cyl(0.14, 0.2, 0.7, 8, IRON_DARK, 1.15, 2.0, 0.05);
+    k.glow(k.box(0.3, 0.14, 0.04, '#ff7a2a', 1.15, 0.18, 0.42));
+    k.glow(k.sphere(0.1, '#ff9a3c', 1.15, 2.72, 0.05));
+    // A steam hammer: two iron uprights, a crosshead and a falling head over an anvil block.
+    for (const x of [-0.12, 0.28]) k.box(0.07, 1.0, 0.07, IRON_DARK, x, 0, 0.85);
+    k.box(0.5, 0.1, 0.12, IRON_DARK, 0.08, 1.0, 0.85);
+    k.cyl(0.05, 0.05, 0.4, 6, '#c8ccd0', 0.08, 0.45, 0.85);
+    k.box(0.2, 0.14, 0.16, IRON_DARK, 0.08, 0.31, 0.85);
+    k.box(0.4, 0.2, 0.3, '#3a3a3e', 0.08, 0, 0.85);
+    // Ingots cooling on a rack, and a coal heap.
+    for (let i = 0; i < 4; i++) k.box(0.34, 0.06, 0.1, i < 2 ? '#d8d0c0' : '#c8ccd0', -1.05, 0.06 + (i % 2) * 0.07, 0.62 + (i >> 1) * 0.14);
+    k.cone(0.3, 0.25, 6, '#2a2a2e', -0.55, 0, 0.9);
+    k.box(0.36, 0.55, 0.04, '#3a2b20', -0.2, 0, 0.06);
+    window(k, st, -0.8, 0.5, 0.06);
+    k.team(k.box(2.46, 0.08, 0.04, TEAM, -0.2, 0.88, 0.08));
+    banner(k, -1.3, 0, 1.3, 1.2);
+    return;
+  }
   const wall = e >= 2 ? STONE : st.wall;
   // A smithy with a roaring furnace, a tall chimney and an anvil out front.
   k.box(2.3, 0.95, 1.3, e >= 3 ? st.wall : wall, -0.2, 0, -0.6);
@@ -560,6 +591,28 @@ function forge(k: Kit, e: number, st: Style): void {
 
 function workshop(k: Kit, e: number, st: Style): void {
   pad(k, 3, st.base);
+  if (e === 4) {
+    // An engineering shed: iron columns and a glazed roof, a gantry crane and a gun on the stocks.
+    for (const x of [-1.25, -0.4, 0.45, 1.25]) for (const z of [-1.2, 0.1]) k.cyl(0.06, 0.08, 1.3, 6, IRON_DARK, x, 0, z);
+    k.box(2.6, 1.0, 0.08, st.wall, 0, 0, -1.25);
+    k.prism(2.8, 0.5, 1.7, st.roof, 0, 1.3, -0.55);
+    k.glow(k.box(2.2, 0.06, 0.5, '#bfe3ea', 0, 1.62, -0.55));
+    // The gun on its carriage: a barrel on cheeks and iron-shod wheels.
+    for (const z of [-0.95, -0.15]) k.cyl(0.2, 0.2, 0.06, 10, IRON_DARK, -0.3, 0.2, z).rotation.x = Math.PI / 2;
+    k.box(0.9, 0.12, 0.6, WOOD, -0.3, 0.25, -0.55);
+    k.cyl(0.1, 0.13, 1.1, 8, IRON_DARK, -0.3, 0.45, -0.55).rotation.z = Math.PI / 2 - 0.15;
+    // A gantry crane over the yard, running on rails, with a hook and a shell.
+    for (const x of [-1.4, 1.4]) k.box(0.08, 1.5, 0.08, IRON_DARK, x, 0, 0.85);
+    k.box(2.9, 0.1, 0.12, IRON_DARK, 0, 1.5, 0.85);
+    k.cyl(0.006, 0.006, 0.7, 3, '#d8d0b8', 0.5, 0.8, 0.85);
+    k.sphere(0.12, '#2b2b2e', 0.5, 0.68, 0.85);
+    // Stacked shot, a boiler with its stack, and a steam-pipe run.
+    for (const [x, y] of [[-0.9, 0], [-0.75, 0], [-0.83, 0.12]]) k.sphere(0.07, '#2b2b2e', x, y + 0.07, 1.0);
+    k.cyl(0.2, 0.2, 0.6, 10, '#6b6258', 0.9, 0.12, 0.55).rotation.z = Math.PI / 2;
+    k.team(k.box(2.82, 0.06, 0.06, TEAM, 0, 1.08, 0.2));
+    banner(k, 1.3, 0, 1.3, 1.3);
+    return;
+  }
   // A great open shed on heavy posts, a half-built engine inside and a crane over the yard.
   const post = e >= 2 ? st.trim : st.post;
   for (const x of [-1.25, -0.4, 0.45, 1.25]) for (const z of [-1.2, 0.1]) k.cyl(0.07, 0.08, 1.1, 6, post, x, 0, z);
