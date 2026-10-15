@@ -473,3 +473,10 @@ Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), n
 **Seen:** `tests/herds.test.ts` and a headless match; not in a browser, not played by hand; no win-rate sweep. No save bump (new fields are optional; old deer are each their own herd).
 **Next:** a lookout/scout that reads herd tracks on the minimap; seasons that also move berries' yield; mammoths that migrate too; the computer building a forward camp by the herd.
 
+
+## Designers' notes: meat spoils (own pitch, 2026-10-15, Chain 1014-2358, session 3)
+
+**Built:** carcasses rot (`ROT` in `data.ts`, `rot` in `animals.ts`, `GameState.carcasses`). A kill keeps 40 s, then loses 1/160 of its size every second (a mammoth about 4 food/s, gone in 2½ minutes). New Stone Age tech **Drying Racks** (Town Center, 60 food 60 wood, `rot` ×0.25) slows it on land inside your borders; the clever computer buys them once a boar or mammoth is down. The selection panel says "(spoiling)", and a tip explains it.
+**Why I love it:** the wild gave the opening questions, but a felled mammoth was a free 600 food whenever you got round to it. Now the kill is a clock: how many hands, how far from the Town Center, and are racks worth a Stone Age tech slot before the hunt? It ties into borders (kills inside your land keep) and herds (follow the herd out and the meat rots before you carry it).
+**Seen:** `tests/rot.test.ts` (grace, full rot, small carcass, racks, determinism); a headless match. Not in a browser, not played by hand; no win-rate sweep. No save bump (the list is optional; old carcasses never rot).
+**Next:** a Hunting Camp drop-off near the herd; scavengers (wolves, later crows) drawn to old kills; carcass tint going green as it spoils; the computer sending bigger parties for far kills.

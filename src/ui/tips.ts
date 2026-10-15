@@ -1,4 +1,4 @@
-import { AGES, BUILDINGS, ROADS, STEP_BACK } from '../sim/data';
+import { AGES, BUILDINGS, ROADS, ROT, STEP_BACK, secs } from '../sim/data';
 import { ageOf, backTo, deedProgress, deedsDone, mainRoad, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
 import type { Building, GameState, Unit } from '../sim/types';
 import { R_FISH } from '../sim/types';
@@ -49,6 +49,7 @@ const TIPS: Tip[] = [
   { id: 'store', when: (s) => secsIn(s) > 110, text: 'Long walks waste time. Build a <b>Storehouse</b> (<kbd>B</kbd> <kbd>S</kbd>) next to the woods or a mine. It also teaches better tools.' },
   { id: 'mammoth', when: (s, me) => sighted(s, me, 'mammoth'), text: 'A <b>mammoth</b>! Its carcass feeds a town for a long while, but it charges when speared. Send <b>five or more</b> citizens together, or put a couple of soldiers in front.' },
   { id: 'boar', when: (s, me) => sighted(s, me, 'boar'), text: 'A <b>wild boar</b> guards that berry patch and charges anyone who comes close. One citizen will lose; send <b>three</b> to spear it, and its carcass pays better than a deer. Or leave the berries and gather elsewhere.' },
+  { id: 'rot', when: (s) => !!s.carcasses?.some((c) => s.tick - c.born > secs(ROT.grace)), text: '<b>Meat spoils.</b> A carcass left too long rots away: put more hands on it, or research <b>Drying Racks</b> at the Town Center to keep it on your own land.' },
   { id: 'wolves', when: (s, me) => sighted(s, me, 'wolf'), text: '<b>Wolves</b> keep a den out here, often by wild gold, and fall on anyone who comes near. A lone citizen won\'t survive them: send a few soldiers, or a band of citizens, to clear the den first.' },
   { id: 'army', when: (s) => secsIn(s) > 200, text: 'Rivals will come. Build a <b>Barracks</b> (<kbd>V</kbd> <kbd>B</kbd>) and train soldiers. Infantry beat cavalry, archers beat infantry, cavalry beat archers.' },
   { id: 'farm', when: (s, me) => secsIn(s) > 260 && !has(s, me, 'farm'), text: 'Berries and deer run out. <b>Farms</b> (<kbd>B</kbd> <kbd>F</kbd>) give food forever; build them near your Town Center.' },

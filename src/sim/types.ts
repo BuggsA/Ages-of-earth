@@ -29,7 +29,7 @@ export type TechId =
   | 'forging' | 'ironCasting' | 'blastFurnace' | 'fletching' | 'bodkin' | 'scaleArmor' | 'chainMail' | 'plateArmor'
   | 'wheelbarrow' | 'handcart' | 'axes' | 'saws' | 'picks' | 'shafts' | 'plow' | 'irrigation' | 'masonry'
   | 'conscription' | 'husbandry' | 'theology' | 'chemistry'
-  | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'survey';
+  | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'survey';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
 export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut';
 
@@ -472,6 +472,8 @@ export interface GameState {
   ents: Ent[];
   byId: Map<number, Ent>;
   animals: Animal[];
+  /** Carcasses that are spoiling: the tile, the tick it fell, what it held (old saves have none). */
+  carcasses?: { tile: number; born: number; full: number }[];
   relics: Relic[];
   /** The team keeping every relic in its temples, or -1; and ticks left before it wins (-1 when none). */
   relicTeam: number;

@@ -589,6 +589,8 @@ export interface Mods {
   traderSpeed: number;
   tradeGold: number;
   relicGold: number;
+  /** How fast carcasses rot on land the player holds (1 = as in the open). */
+  rot: number;
   /** Extra tiles of water a trading post may lie from the sea and still be a port. */
   portReach: number;
   /** Added to a mounted soldier's sight (the Yam Relay). */
@@ -599,7 +601,7 @@ export const NO_MODS: Mods = {
   meleeAttack: 0, rangedAttack: 0, armor: 0, parmor: 0, range: 0, carry: 0, citizenSpeed: 1, wood: 1, mine: 1, farm: 1, forage: 1, hunt: 1,
   buildingHp: 1, buildSpeed: 1, militaryTrain: 1, rangedTrain: 1, cavalrySpeed: 1, infantryHp: 1, infantryArmor: 0, infantryAttack: 0, priest: 1,
   siegeAttack: 1, siegeRange: 0, techCost: 1, wonderCost: 1, extraCitizens: 0, fish: 1, shipHp: 1, shipRange: 0, airSpeed: 1, airHp: 1,
-  traderSpeed: 1, tradeGold: 1, relicGold: 1, portReach: 0, riderSight: 0,
+  traderSpeed: 1, tradeGold: 1, relicGold: 1, rot: 1, portReach: 0, riderSight: 0,
 };
 
 export interface Tech {
@@ -649,6 +651,7 @@ export const TECHS: Record<TechId, Tech> = {
   caravan: { name: 'Caravans', at: 'market', epoch: 2, cost: { food: 200, gold: 100 }, time: 40, mul: { traderSpeed: 1.2 }, blurb: 'Traders travel 20% faster.', icon: '🐪' },
   banking: { name: 'Banking', at: 'market', epoch: 3, cost: { food: 300, gold: 200 }, time: 45, needs: 'caravan', mul: { tradeGold: 1.2 }, blurb: 'Every trade trip pays 20% more gold.', icon: '🏦' },
   pilgrimage: { name: 'Pilgrimage', at: 'temple', epoch: 2, cost: { food: 200, gold: 150 }, time: 40, mul: { relicGold: 2 }, blurb: 'Every relic kept in a Temple pays double gold.', icon: '🕯' },
+  drying: { name: 'Drying Racks', at: 'towncenter', epoch: 0, cost: { food: 60, wood: 60 }, time: 20, mul: { rot: 0.25 }, blurb: 'Meat hung on racks keeps: carcasses on land you hold rot at a quarter the pace.', icon: '🍖' },
   survey: { name: 'Survey the Land', at: 'storehouse', epoch: 0, cost: { food: 50, wood: 50 }, time: 15, survey: 'bogIron', blurb: 'Prospectors walk the streams and marshes and answer one question: is there bog iron anywhere in this world? Yes or no; not where, nor how much.', icon: '🧭' },
 };
 
@@ -758,6 +761,12 @@ export const FISH_CARRY = [15, 18, 21, 24, 30];
 /** Gathering per second, before the epoch bonus. */
 export const GATHER: Record<'tree' | 'berry' | 'stone' | 'gold' | 'farm' | 'meat' | 'fish' | 'bog', number> = { tree: 0.65, berry: 0.8, stone: 0.55, gold: 0.55, farm: 0.6, meat: 1.0, fish: 0.75, bog: 0.45 };
 export const EPOCH_GATHER_BONUS = 0.1;
+/**
+ * Meat spoils (own pitch, Stone Age depth). A carcass keeps `grace` seconds, then loses `rate` of what it
+ * held each second, so a mammoth hunt is a race to the butchering, not just to the kill. On land a
+ * player holds, their `rot` modifier slows it (Drying Racks).
+ */
+export const ROT = { grace: 40, rate: 1 / 160 };
 export const AMOUNT = { tree: 80, berry: 125, stone: 300, gold: 400, meat: 140, fish: 250, bog: 300 };
 /** Deer: health, speeds, and how far a hunter throws a spear. */
 export const DEER = { hp: 8, walk: 0.8, flee: 2.3, spear: 3.5, spearDamage: 4,

@@ -61,6 +61,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Drifting herds** (own pitch, lane rules): deer herds migrate every 150 s away from borders; wolves hunt deer near dens and leave the carcass. New numbers `DEER.herd/every/min/max/range`, `WOLF.hunt`. Tests and a headless match; browser unseen; no save bump.
 
+**Meat spoils** (own pitch, lane rules): carcasses rot after 40 s (a mammoth gone in ~3 min); Drying Racks (Stone Age tech) slow it on your land; the computer buys them after big game. New numbers `ROT`, tech `drying`, mod `rot`. Tests and a headless match; browser unseen; no save bump.
+
 ## Waiting on the owner
 
 **Setup only the owner can do:**
