@@ -1,6 +1,7 @@
 import { aiStep } from './ai';
 import { workStep } from './works';
 import { beaconStep } from './beacon';
+import { turnSeason } from './seasons';
 import { hitAnimal, spawnAnimal, updateAnimals } from './animals';
 import { markGoals, scenarioStep, startScenario } from './campaign';
 import { buildingGuns, updateShots } from './combat';
@@ -372,8 +373,10 @@ function checkVictory(s: GameState): void {
       s.events.push({ k: 'defeated', owner: p.id });
       continue;
     }
-    // Fields and walls alone don't keep a people alive.
-    const alive = s.ents.some((e) => e.owner === p.id && e.hp > 0 && !(e.kind === 'building' && (e.type === 'farm' || e.type === 'wall' || e.type === 'gate')));
+    // Fields and walls alone don't keep a people alive, nor do unarmed boats (fishing boats, merchant
+    // ships): none of them can build or fight, so a people down to them can never come back, and a rival
+    // at its population cap with no fleet could never sink them.
+    const alive = s.ents.some((e) => e.owner === p.id && e.hp > 0 && !(e.kind === 'building' && (e.type === 'farm' || e.type === 'wall' || e.type === 'gate')) && !(e.kind === 'unit' && (e.type === 'fisher' || e.type === 'cog')));
     if (alive) continue;
     p.defeated = true;
     for (const e of s.ents) if (e.owner === p.id) e.hp = 0;
@@ -436,6 +439,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   routeUnits(s);
   for (const e of s.ents) if (e.kind === 'unit' && e.hp > 0 && !e.inside) walk(s, e);
   updateAnimals(s, sp);
+  turnSeason(s);
   sp.rebuild(s);
   separate(s, sp);
   for (const e of s.ents) {

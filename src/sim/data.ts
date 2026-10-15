@@ -804,6 +804,24 @@ export const EPOCH_GATHER_BONUS = 0.1;
  * player holds, their `rot` modifier slows it (Drying Racks).
  */
 export const ROT = { grace: 40, rate: 1 / 160 };
+/**
+ * Seasons (own pitch, Stone Age depth): the year turns every `len` seconds, from a season the seed picks.
+ * `plant` scales berry gathering and `field` farming; `rot` scales how fast meat spoils (cold keeps it);
+ * `bold` scales how far wolves and boars notice your people. Summer is for foraging, winter for the hunt.
+ */
+export const SEASON = { len: 150 };
+export const SEASONS = [
+  { name: 'Spring', icon: '🌱', plant: 1, field: 1, rot: 1, bold: 1, blurb: 'The thaw: berries and herds return.' },
+  { name: 'Summer', icon: '☀️', plant: 1.25, field: 1.1, rot: 1.5, bold: 0.85, blurb: 'Berries are heavy, but meat spoils fast.' },
+  { name: 'Autumn', icon: '🍂', plant: 1.1, field: 1.15, rot: 1, bold: 1, blurb: 'The harvest, and the beasts grow lean.' },
+  { name: 'Winter', icon: '❄️', plant: 0.55, field: 0.75, rot: 0.5, bold: 1.4, blurb: 'Berries fail, meat keeps, and hungry wolves range further.' },
+] as const;
+/**
+ * The clever computer plans for winter (autumn onward, season `from`): it counts no berries (they fail in
+ * the cold), wants `fields` more fields and `food` more of its people on food, hunts mammoths and boars with `hunters` fewer citizens (meat
+ * keeps in the cold) and, in the winter itself, clears wolves with `pack` fewer soldiers.
+ */
+export const AI_WINTER = { from: 2, fields: 2, hunters: 3, pack: 1, food: 0.3 };
 export const AMOUNT = { tree: 80, berry: 125, stone: 300, gold: 400, meat: 140, fish: 250, bog: 300 };
 /** Deer: health, speeds, and how far a hunter throws a spear. */
 export const DEER = { hp: 8, walk: 0.8, flee: 2.3, spear: 3.5, spearDamage: 4,

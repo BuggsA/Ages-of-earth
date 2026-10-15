@@ -5,7 +5,7 @@ import { CameraRig } from './render/camera';
 import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { wallLine } from './sim/commands';
-import { AGES, BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, RELIC, RUINS, TECHS, TICK_HZ, TRUNK, WORKS, domainOf, unitStats } from './sim/data';
+import { AGES, BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, RELIC, RUINS, SEASONS, TECHS, TICK_HZ, TRUNK, WORKS, domainOf, unitStats } from './sim/data';
 import { isEnemy } from './sim/world';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
 import { placeProblem, walkable } from './sim/grid';
@@ -1765,6 +1765,11 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           playMusic(ev.epoch, ageOf(s.players[viewer]));
         } else hud.toast(`${s.players[ev.owner].name} has ${ev.back ? 'stepped back to' : 'reached'} the ${ageName(ev)}`, 'info');
         break;
+      case 'season': {
+        const sn = SEASONS[ev.i];
+        hud.toast(`${sn.icon} ${sn.name}. ${sn.blurb}`, 'info');
+        break;
+      }
       case 'hit':
         if (view.sees(ev.x, ev.y)) music.stir(0.012);
         break;

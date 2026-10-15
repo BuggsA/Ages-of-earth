@@ -96,6 +96,23 @@ For a bigger idea of where the game could go, see `docs/vision.md`: an idea the 
 
 Ideas not yet built now live as `seed` issues, where any agent or the Muse can grow them (`docs/team.md`, "Seeds"). This list moved there on 2026-10-14 (#131): borders and supply (#132), a people's great work (#133), watching live matches (#134), a scenario editor (#135), an age past the Industrial (#136). Already built since it was written: trade ships, sea landings, relics, signature soldiers. Not carried over: more campaign chapters and ranked matchmaking; plant them as seeds if they spark something.
 
+## Richness: choices, not a checklist (the owner, 2026-10-14)
+
+The owner played and said: "When I play I enter the stone age and it feels mechanical. Almost like designated steps. … I don't feel it's richness. Almost like a mechanical race." They hope agents build on this (`docs/rulings.md`).
+
+**What it asks for.** A good opening has no single right order. At every stage the player should face choices whose answer depends on their map, their rival and their nerve, not just "train citizens, build houses, age up" a little faster than the other side.
+
+**A test for any feature:** does it give the player a decision they could get wrong? Would two good players do it differently? Does it change from match to match? Ambience (sounds, lights, weather) makes the world beautiful but doesn't answer this. Pair it with something to decide.
+
+**Where richness comes from:**
+- **A map that pushes back and differs every time:** beasts that fight (#171: mammoths, wolves), dangers and prizes in the fog, resources worth a risk.
+- **Trade-offs with no free answer:** greed vs safety, boom vs rush, a side road vs the trunk, a feast now vs a safe hunt later.
+- **Reasons to fight early:** contested spots, raids worth making, scouting that pays.
+- **Surprises the player answers:** events, discoveries and rival moves that break the script.
+- **The computer playing the same game,** so the choices matter against it too.
+
+**Built toward it so far:** the wild (#171); meat that spoils and Drying Racks; wolves drawn to carrion; the Hunting Camp and Hounds; contested landmarks (#182: a spring, a crag and a cairn to fight over from the first minutes). Ideas still open: boars near home, migrating herds, predators that hunt deer, the wild thinning as borders grow, Stone Age choices of custom or tradition. Add yours below in your Designers' notes, and say how your feature makes play richer.
+
 ## Designers' notes
 
 Agents design this game as well as build it (`AGENTS.md` §2). When you add something, sign it here in a few lines: what you built, why you love it, and what you'd do next, so the next agent can carry it further. Newest last.
@@ -501,6 +518,20 @@ Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), n
 **Why I love it:** the camp gave the wild a place to be fought from; hounds give it something to research. Spend food and wood on a safer, faster hunt (the mammoth party loses fewer people), or on the next age. It ties into the camp, boars, mammoths, wolf dens and Drying Racks (two hunt techs, two clocks).
 **Seen:** `tests/hounds.test.ts` (a wolf's first bite halves; mods); the full quick tier. Not in a browser, not played by hand; no win-rate sweep. No save bump (new tech id only).
 **Next:** a hound that walks beside a hunter as a small unit; hounds that bark at an approaching pack (a warning); wolves that fear a camp with hounds.
+
+## Designers' notes: seasons (own pitch, 2026-10-15, Chain 1014-2358, session 7)
+
+**Built:** a year of four seasons of `SEASON.len` (150) seconds, starting in spring (`SEASONS`, `src/sim/seasons.ts`; derived from the tick, no state). Summer: berries +25%, fields +10%, meat rots 1.5×. Winter: berries ×0.55, fields ×0.75, meat rots at half speed, wolves and boars notice from 40% further. A clock icon with the season, a toast at each turn, a tip.
+**Why I love it:** the Stone Age still had one best answer in every minute. Now the answer changes with the clock: forage while it's warm, hunt and dry meat before the first winter (7½ min), and expect the pack at your door when it comes. It ties into rot, Drying Racks, Hunting Camps, wolves, farms (a reason to get them), and Hounds. Spring start so the opening is never punished, and no seed offset so tests and campaigns stay put.
+**Seen:** `tests/seasons.test.ts` (turn order, one event a turn, winter meat keeps); `npm run check`. Not in a browser; no win-rate sweep (all computers lose and gain the same, but their economies feel winter's berry cut); no save bump.
+**Next:** the computer planning for winter (hunt, build racks and farms in autumn); deer migrating south in winter; snow and bare trees tied to the season (look lane); a winter hardship on idle housing; a mid-campaign chapter set in the cold.
+
+## Designers' notes: planning for winter (own pitch, 2026-10-15, Chain 1014-2358, session 8)
+
+**Built:** from autumn (`AI_WINTER.from`) a clever computer counts no berries and wants `fields` more fields, weights food `food` (30%) higher in its job shares, hunts mammoths and boars with `hunters` (3) fewer citizens, and in winter clears wolves with `pack` (1) fewer soldiers (`coldComing` in `ai.ts`).
+**Why I love it:** seasons only matter if the rivals live in them too. Now a computer's economy visibly turns with the year, so a player can read the autumn rush (fields rising, parties out after game) and strike at a town stretched thin on food, or copy it.
+**Seen:** `tests/ai-winter.test.ts` (spring identical, autumn more on food); `npm run check`. No browser, no win-rate sweep; no save bump.
+**Next:** racks bought in autumn before the kill; deer wintering south; the computer sending a raid at a rival's lean winter; snow and bare trees by season (look lane).
 
 ## Designers' notes: contested landmarks (#182, own pitch, 2026-10-15, session peaceful-ramanujan)
 
