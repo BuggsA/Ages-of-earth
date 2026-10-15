@@ -86,4 +86,28 @@ describe('hunting camp', () => {
     run(s, 200);
     expect(s.ents.some((e) => e.kind === 'building' && e.type === 'huntcamp' && e.owner === 1)).toBe(true);
   });
+  it('a clever computer in the Bronze Age puts a Watch Tower by the far kill once its camp stands', () => {
+    const s = game('normal');
+    const { x, y } = field(s, 1, 26, 4);
+    placeBuilding(s, 1, 'huntcamp', x - 2, y - 2, true);
+    const m = spawnAnimal(s, x + 0.5, y + 0.5, 'mammoth');
+    hitAnimal(s, m, 9999, x, y);
+    s.players[1].epoch = 1;
+    s.players[1].res.wood = 600;
+    s.players[1].res.stone = 600;
+    run(s, 200);
+    expect(s.ents.some((e) => e.kind === 'building' && e.type === 'tower' && e.owner === 1 && Math.hypot(e.x - x, e.y - y) < 10)).toBe(true);
+  });
+
+  it('but not in the Stone Age', () => {
+    const s = game('normal');
+    const { x, y } = field(s, 1, 26, 4);
+    placeBuilding(s, 1, 'huntcamp', x - 2, y - 2, true);
+    const m = spawnAnimal(s, x + 0.5, y + 0.5, 'mammoth');
+    hitAnimal(s, m, 9999, x, y);
+    s.players[1].res.wood = 600;
+    s.players[1].res.stone = 600;
+    run(s, 100);
+    expect(s.ents.some((e) => e.kind === 'building' && e.type === 'tower' && e.owner === 1 && Math.hypot(e.x - x, e.y - y) < 10)).toBe(false);
+  });
 });
