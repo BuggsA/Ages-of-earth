@@ -434,6 +434,7 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   else hud.banner('Welcome back', `${ageDef(me).name}, ${fmtClock(game.tick)} into the match.`, 3200);
   sound.setWeather(view.weatherDay.kind, view.weatherDay.strength);
   view.onWeather = (d) => sound.setWeather(d.kind, d.strength);
+  view.onSeason = (sn) => sound.setSeason(sn);
   sound.startAmbience();
   playMusic(me.epoch, ageOf(me));
   // Start with the Town Center in view and selected.

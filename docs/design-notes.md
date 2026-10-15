@@ -574,4 +574,10 @@ Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), n
 **Seen:** headless Chromium with `?season=winter`, seeds 3 and 7: no console errors, shader compiles; no lake was in view, so the ice itself is unseen. `tests/season-look.test.ts` checks the cover.
 **Next:** ships slowed or blocked by ice (a rules change with a save bump); breath puffs or a muffled winter ambience; a banner line when the sky changes.
 
+## Designers' notes: a hollow winter wind (own pitch, 2026-10-15, Chain 1015-0203 session 4, lane look)
+
+**Built:** `Sound.setSeason` (`src/audio/sound.ts`): in winter a thin bandpass wind, its pitch sweeping slowly and its strength rising and falling in gusts, fades in over a few seconds on the ambience bus; the songbirds stop, and `voiceFits` (`src/render/ambience.ts`) silences crickets, birdsong and frogs, leaving gulls at the water. `View.onSeason` tells the sound when the season turns (also under `?season=`).
+**Why I love it:** you now hear winter before you read it. The woods go quiet and a cold wind comes through the quiet, just as the snow settles.
+**Seen:** `tests/winter-sound.test.ts`; `npm run check`. Not heard in a browser; the wind's level and colour want an ear; no save bump.
+**Next:** breath puffs on citizens in winter; ships slowed by ice (a rules change with a save bump); a banner line when the season turns; wolves howling more often in winter nights.
 **Kin landmarks (session 3, chain 1015-0151):** each people has a favourite landmark kind (Egyptians Flint, Greeks Spring, Mongols Crag, Chinese Grove, Britons Cairn; Romans none, since existing tests use them as the plain people) whose bonus is half again as strong for them (`LANDMARKS.kin`, `.kinMul`). I love it because the same map reads differently to each people, and a rival's favourite is the one worth stealing. Seen: unit tests only; no win-rate sweep, the computer doesn't yet prefer its own kind. Next: the computer favouring its kind (see #191), a ford, hold-them-all mode.

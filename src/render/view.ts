@@ -263,6 +263,9 @@ export class View {
   private baseWeather: WeatherDay | null = null;
   private forcedDay = false;
   private weatherSeason = 0;
+  private heardSeason = -1;
+  /** Told when the season turns, so the sound can follow it. */
+  onSeason: ((season: number) => void) | null = null;
   /** Told when the season changes what falls from the sky. */
   onWeather: ((day: WeatherDay) => void) | null = null;
 
@@ -355,6 +358,10 @@ export class View {
     timeUniform.value = this.time;
     setSeasonLook(s.tick);
     const sn = this.currentSeason();
+    if (sn !== this.heardSeason) {
+      this.heardSeason = sn;
+      this.onSeason?.(sn);
+    }
     if (sn !== this.weatherSeason && this.baseWeather && !this.forcedDay) {
       this.weatherSeason = sn;
       const day = seasonalDay(this.baseWeather, sn);
@@ -1012,8 +1019,9 @@ export class View {
     if (!s) return false;
     const water = this.nearWater(s);
     // The wrong side of the shore whatever marches by: skip counting soldiers.
-    if (!voiceFits(voice, water, false)) return false;
-    return voiceFits(voice, water, this.armyNear(s));
+    const sn = this.currentSeason();
+    if (!voiceFits(voice, water, false, sn)) return false;
+    return voiceFits(voice, water, this.armyNear(s), sn);
   }
 
   /** Ask for a sound placed by where it happens on screen and how far from the view it is. */

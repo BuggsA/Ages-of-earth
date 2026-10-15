@@ -39,7 +39,9 @@ export function armyNear(s: GameState, x: number, z: number, visible: (u: Unit) 
 }
 
 /** Whether a creature sings here: by the water or away from it, and (but for gulls) only with no army near. */
-export function voiceFits(voice: CreatureVoice, water: boolean, army: boolean): boolean {
+export function voiceFits(voice: CreatureVoice, water: boolean, army: boolean, season = 0): boolean {
+  // Winter (season 3) hushes the land: crickets, songbirds and frogs sleep; only the gulls stay.
+  if (season === 3 && voice !== 'gull') return false;
   switch (voice) {
     case 'cricket':
     case 'birdsong':
