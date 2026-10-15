@@ -57,6 +57,7 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Standing to answer** (own pitch, lane rules): pilgrim priests right-clicked onto a chanted-over own building stand by it and sing back 1.5× (`CONSECRATE.counter.stand`, `.hold`). Tests only; browser and sound unseen; no save bump. The pilgrim computer orders it (`ai.ts` priestly), and the cursor shows gather over such a building; the building panel says how many priests are answering (HUD only, unseen).
 
 **Orders spread** (#266, owner's note, lane rules): the player's bulk gather and attack orders fan over nearby nodes and visible foes (`SPREAD` in `data.ts`); the computer is unchanged. Tests only; browser unseen; no save bump.
+**Farm fields spread** (#266 leftover, lane rules): a group sent to work one field fans over the free fields near it instead of piling on one. Tests only; browser unseen; no save bump.
 
 **Four honest difficulties** (#258, from the owner's note #256, lane rules): a new gentlest tier (id `gentle`) shown as **Easy**; the old ids keep their behaviour and are shown one step up (`easy` → Normal, the default; `normal` → Hard; `hard` → Expert, the campaign proof's level). Online rooms keep their three levels until `tests/worker-routes.test.ts` allows `gentle`. Title picker seen in headless Chromium; a beginner's first game unseen; no save bump.
 

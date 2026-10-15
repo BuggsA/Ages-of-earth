@@ -367,7 +367,7 @@ export function applyCommand(s: GameState, c: Command): void {
       const b = myBuilding(s, c.p, c.target);
       if (!b) return;
       const units = myUnits(s, c.p, c.ids);
-      let farmTaken = false;
+      const fieldsGiven = new Set<number>();
       const shelters = !!BUILDINGS[b.type].garrison && b.built;
       const movers: Unit[] = [];
       for (const u of units) {
@@ -409,9 +409,11 @@ export function applyCommand(s: GameState, c: Command): void {
           }
           if (b.type === 'farm') {
             // One farmer per field; the rest look for free fields nearby.
-            const field = farmTaken ? freeFarm(s, c.p, b.x, b.y, 12) : b;
-            farmTaken = true;
-            if (field) giveOrder(u, { k: 'farm', target: field.id, phase: 'go' }, c.queue);
+            const field = fieldsGiven.size ? freeFarm(s, c.p, b.x, b.y, 12, fieldsGiven) : b;
+            if (field) {
+              fieldsGiven.add(field.id);
+              giveOrder(u, { k: 'farm', target: field.id, phase: 'go' }, c.queue);
+            }
             continue;
           }
           if (BUILDINGS[b.type].drop.length && u.carry > 0) {
