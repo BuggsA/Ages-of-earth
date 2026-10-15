@@ -1,9 +1,10 @@
 import { landOwnerAt } from './borders';
-import { AMOUNT, BOAR, DEER, DT, MAMMOTH, WOLF, domainOf, secs } from './data';
-import { walkable } from './grid';
+import { AMOUNT, BOAR, DEER, DT, MAMMOTH, ROT, TICK_HZ, WOLF, domainOf, secs } from './data';
+import { clearResource, walkable } from './grid';
 import type { Spatial } from './spatial';
 import type { Animal, GameState, Order, Unit } from './types';
 import { B_RES, R_MEAT, R_NONE } from './types';
+import { modsOf } from './stats';
 import { statsOf } from './world';
 
 /**
@@ -90,7 +91,29 @@ function stepToward(s: GameState, a: Animal, tx: number, ty: number, speed: numb
   return d <= step;
 }
 
+/** Fallen meat spoils once a second after its grace, slower on land whose holder has Drying Racks. */
+function rot(s: GameState): void {
+  const list = s.carcasses;
+  if (!list || !list.length) return;
+  const tick = s.tick % TICK_HZ === 0;
+  s.carcasses = list.filter((c) => {
+    if (s.res[c.tile] !== R_MEAT || s.amount[c.tile] <= 0) return false;
+    if (!tick || s.tick - c.born < secs(ROT.grace)) return true;
+    const x = c.tile % s.w;
+    const y = Math.floor(c.tile / s.w);
+    const owner = landOwnerAt(s, x, y);
+    const slow = owner >= 0 ? modsOf(s, owner).rot : 1;
+    // Round up so a small carcass still shrinks.
+    s.amount[c.tile] -= Math.max(1, Math.ceil(c.full * ROT.rate * slow));
+    if (s.amount[c.tile] > 0) return true;
+    clearResource(s, c.tile);
+    s.events.push({ k: 'depleted', tile: c.tile });
+    return false;
+  });
+}
+
 export function updateAnimals(s: GameState, sp?: Spatial): void {
+  rot(s);
   for (const a of s.animals) {
     a.px = a.x;
     a.py = a.y;
@@ -403,6 +426,7 @@ export function hitAnimal(s: GameState, a: Animal, damage: number, fromX: number
     s.amount[tile] = a.kind === 'mammoth' ? MAMMOTH.meat : a.kind === 'boar' ? BOAR.meat : AMOUNT.meat;
     s.block[tile] |= B_RES;
     s.blockVersion++;
+    (s.carcasses ??= []).push({ tile, born: s.tick, full: s.amount[tile] });
   }
   s.events.push({ k: 'animalDie', id: a.id, x: a.x, y: a.y, fx: a.fx, fy: a.fy, kind: a.kind });
   s.animals = s.animals.filter((x) => x !== a);
