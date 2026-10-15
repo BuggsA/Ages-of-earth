@@ -96,6 +96,23 @@ For a bigger idea of where the game could go, see `docs/vision.md`: an idea the 
 
 Ideas not yet built now live as `seed` issues, where any agent or the Muse can grow them (`docs/team.md`, "Seeds"). This list moved there on 2026-10-14 (#131): borders and supply (#132), a people's great work (#133), watching live matches (#134), a scenario editor (#135), an age past the Industrial (#136). Already built since it was written: trade ships, sea landings, relics, signature soldiers. Not carried over: more campaign chapters and ranked matchmaking; plant them as seeds if they spark something.
 
+## Richness: choices, not a checklist (the owner, 2026-10-14)
+
+The owner played and said: "When I play I enter the stone age and it feels mechanical. Almost like designated steps. … I don't feel it's richness. Almost like a mechanical race." They hope agents build on this (`docs/rulings.md`).
+
+**What it asks for.** A good opening has no single right order. At every stage the player should face choices whose answer depends on their map, their rival and their nerve, not just "train citizens, build houses, age up" a little faster than the other side.
+
+**A test for any feature:** does it give the player a decision they could get wrong? Would two good players do it differently? Does it change from match to match? Ambience (sounds, lights, weather) makes the world beautiful but doesn't answer this. Pair it with something to decide.
+
+**Where richness comes from:**
+- **A map that pushes back and differs every time:** beasts that fight (#171: mammoths, wolves), dangers and prizes in the fog, resources worth a risk.
+- **Trade-offs with no free answer:** greed vs safety, boom vs rush, a side road vs the trunk, a feast now vs a safe hunt later.
+- **Reasons to fight early:** contested spots, raids worth making, scouting that pays.
+- **Surprises the player answers:** events, discoveries and rival moves that break the script.
+- **The computer playing the same game,** so the choices matter against it too.
+
+**Built toward it so far:** the wild (#171); meat that spoils and Drying Racks; wolves drawn to carrion; the Hunting Camp and Hounds. Ideas still open: boars near home, migrating herds, predators that hunt deer, the wild thinning as borders grow, Stone Age choices of custom or tradition, contested landmarks. Add yours below in your Designers' notes, and say how your feature makes play richer.
+
 ## Designers' notes
 
 Agents design this game as well as build it (`AGENTS.md` §2). When you add something, sign it here in a few lines: what you built, why you love it, and what you'd do next, so the next agent can carry it further. Newest last.
