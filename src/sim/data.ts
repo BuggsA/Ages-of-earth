@@ -94,9 +94,9 @@ export const AGES: Record<AgeId, Age> = {
     name: 'Iron Age',
     short: 'Iron',
     tier: 1,
-    blurb: 'Iron spears, iron hoes and iron axes, but no horse: cheap, hard-hitting foot soldiers and quicker farms and woodcutters; cavalry waits for the Middle Ages.',
+    blurb: 'Iron spears, iron hoes and iron axes, but no horse: cheap, hard-hitting foot soldiers and quicker farms and woodcutters, and every scrap of bog iron dug pays twice its gold, so the marsh is worth holding; cavalry waits for the Middle Ages.',
     add: { infantryAttack: 1 },
-    mul: { farm: 1.1, wood: 1.1 },
+    mul: { farm: 1.1, wood: 1.1, bogGold: 2 },
     price: { infantry: 0.75 },
     no: { units: ['cavalry'], why: 'No horses in the Iron Age: cavalry waits for the Middle Ages' },
   },
@@ -190,7 +190,7 @@ export const ROADS: Road[] = [
     time: 35,
     found: 'survey',
     deed: { stat: 'iron', n: 150, text: 'Your citizens dig 150 bog iron' },
-    blurb: 'Instead of the Bronze Age, as many peoples of Africa went from stone straight to iron: foot soldiers cost a quarter less and strike 1 harder, and iron hoes and axes make farms and woodcutters 10% quicker. What it gives up: the horse. The Stable trains no cavalry until the Middle Ages.',
+    blurb: 'Instead of the Bronze Age, as many peoples of Africa went from stone straight to iron: foot soldiers cost a quarter less and strike 1 harder, and iron hoes and axes make farms and woodcutters 10% quicker. Bog iron keeps paying double gold as iron bars, so the marsh is worth guarding. What it gives up: the horse. The Stable trains no cavalry until the Middle Ages.',
   },
   { from: 'iron', to: 'middle', cost: EPOCHS[2].cost, time: EPOCHS[2].time, blurb: 'Rejoin the main road at the Middle Ages, for the same price as from the Bronze Age: the horse arrives, and the iron foot soldiers become ordinary pikemen.' },
   // Crossing chains (#49): relics, a deed of the faith, open a turn off the Middle Ages; trade and relics
@@ -634,6 +634,8 @@ export interface Mods {
   traderSpeed: number;
   tradeGold: number;
   relicGold: number;
+  /** Gold paid for each unit of bog iron dug (the Iron Age: bars were coin). */
+  bogGold: number;
   /** How fast carcasses rot on land the player holds (1 = as in the open). */
   rot: number;
   /** Damage from wolves, boars and mammoths is multiplied by this (Hounds). */
@@ -648,7 +650,7 @@ export const NO_MODS: Mods = {
   meleeAttack: 0, rangedAttack: 0, armor: 0, parmor: 0, range: 0, carry: 0, citizenSpeed: 1, wood: 1, mine: 1, farm: 1, forage: 1, hunt: 1,
   buildingHp: 1, buildSpeed: 1, militaryTrain: 1, rangedTrain: 1, cavalrySpeed: 1, infantryHp: 1, infantryArmor: 0, infantryAttack: 0, priest: 1,
   siegeAttack: 1, siegeRange: 0, techCost: 1, wonderCost: 1, extraCitizens: 0, fish: 1, shipHp: 1, shipRange: 0, airSpeed: 1, airHp: 1,
-  traderSpeed: 1, tradeGold: 1, relicGold: 1, rot: 1, beastWard: 1, portReach: 0, riderSight: 0,
+  traderSpeed: 1, tradeGold: 1, relicGold: 1, bogGold: 1, rot: 1, beastWard: 1, portReach: 0, riderSight: 0,
 };
 
 export interface Tech {

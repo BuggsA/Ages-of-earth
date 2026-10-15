@@ -176,4 +176,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Kin landmarks** (own pitch, lane rules): each people's favourite landmark kind gives it half again the gift (`LANDMARKS.kin`, `.kinMul` 1.5). Unit tests only; browser and win-rate unseen; the computer doesn't yet prefer its kind; no save bump.
 
+**Iron bars** (#197, own pitch, lane rules): Iron Age bog iron pays double gold (`bogGold`); the Iron Age computer keeps digging. Tests only; no save bump.
 **Recalling the lone walker** (own pitch, lane ai): the landmark walker turns home when rival soldiers come within 7 tiles of it on the road. Test only; no sweep; no save bump.
