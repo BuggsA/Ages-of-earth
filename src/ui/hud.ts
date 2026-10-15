@@ -3,11 +3,12 @@ import { scenarioById } from '../sim/campaign';
 import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
-import { AGES, AMOUNT, BEACON, BOAR, RALLY, STEP_BACK, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, RELIC, ROT, REPAIR_SHARE, RUINS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { AGES, AMOUNT, BEACON, BOAR, RALLY, STEP_BACK, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { homeMarket, marketOf, postAt, tripGold } from '../sim/trade';
 import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
+import { LANDMARK_KINDS, claimWork, claimants, landmarkAt } from '../sim/landmarks';
 import { workProblem } from '../sim/works';
 import { beaconProblem, lit } from '../sim/beacon';
 import { rallyProblem } from '../sim/rally';
@@ -15,7 +16,7 @@ import { stirred as stirredNow } from '../sim/combat';
 import { sees } from '../sim/vision';
 import { buildingCostFor, buildingMaxHp, modsOf, statsFor, techCostFor, techProblem, trainCostFor, trainTimeFor } from '../sim/stats';
 import { ageDef, ageOf, backProblem, backTo, barred, deedsProgress, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, surveyFinds, suspendedTechs, trainsAt, windowsOf } from '../sim/ages';
-import type { Building, BuildingType, Command, Cost, Ent, GameState, Player, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
+import type { Building, BuildingType, Command, Cost, Ent, GameState, Landmark, Player, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
 import { buildingPicture, unitPicture } from './thumbs';
@@ -256,14 +257,15 @@ export class Hud {
 
   /** Bring every part of the HUD up to date. */
   /** `selectedRuin`: a ruin picked out, and whether the viewer last saw it dug out (#64). */
-  update(s: GameState, viewer: number, ids: number[], speed: number, selectedTile: number | null, selectedRelic: number | null = null, selectedPost: number | null = null, selectedRuin: { id: number; dug: boolean } | null = null): void {
+  /** `selectedLandmark`: a landmark picked out, and who the viewer last saw keep it. */
+  update(s: GameState, viewer: number, ids: number[], speed: number, selectedTile: number | null, selectedRelic: number | null = null, selectedPost: number | null = null, selectedRuin: { id: number; dug: boolean } | null = null, selectedLandmark: { id: number; keeper: number } | null = null): void {
     this.state = s;
     this.viewer = viewer;
     this.lastIds = ids;
     this.top(s, viewer, speed);
     if (!this.workforcePanel.classList.contains('hidden')) this.drawWorkforce(s, viewer);
     const ents = ids.map((id) => s.byId.get(id)).filter((e): e is Ent => !!e && e.hp > 0);
-    this.selection(s, viewer, ents, selectedTile, selectedRelic, selectedPost, selectedRuin);
+    this.selection(s, viewer, ents, selectedTile, selectedRelic, selectedPost, selectedRuin, selectedLandmark);
     this.commands(s, viewer, ents);
   }
 
@@ -348,13 +350,15 @@ export class Hud {
     }
   }
 
-  private selection(s: GameState, viewer: number, ents: Ent[], tile: number | null, relicId: number | null, postId: number | null, ruinSel: { id: number; dug: boolean } | null = null): void {
+  private selection(s: GameState, viewer: number, ents: Ent[], tile: number | null, relicId: number | null, postId: number | null, ruinSel: { id: number; dug: boolean } | null = null, markSel: { id: number; keeper: number } | null = null): void {
     let html = '';
     let sig = '';
     const relic = !ents.length && relicId !== null ? relicAt(s, relicId) : undefined;
     const post = !ents.length && postId !== null ? postAt(s, postId) : undefined;
     const ruin = !ents.length && ruinSel ? ruinAt(s, ruinSel.id) : undefined;
-    if (ruin) [html, sig] = this.ruinPanel(s, viewer, ruin, ruinSel!.dug);
+    const mark = !ents.length && markSel ? landmarkAt(s, markSel.id) : undefined;
+    if (mark) [html, sig] = this.landmarkPanel(s, viewer, mark, markSel!.keeper);
+    else if (ruin) [html, sig] = this.ruinPanel(s, viewer, ruin, ruinSel!.dug);
     else if (relic) [html, sig] = this.relicPanel(s, viewer, relic);
     else if (post) [html, sig] = this.postPanel(s, viewer, post);
     else if (!ents.length && tile !== null && s.res[tile]) {
@@ -412,6 +416,28 @@ export class Hud {
       <div class="stats"><span data-tip="<b>Gold</b>Brings in gold while kept in a Temple.">${icon('gold')}${perMin}<em>a minute</em></span><span data-tip="<b>Relics</b>How many lie on this map.">⚱<em>On the map</em> ${s.relics.length}</span></div>
       <div class="blurb">Select a priest and right-click it to carry it to your Temple, where it brings in ${perMin} gold a minute. Keep every relic on the map for ${fmtTime(s.wonderTime)} and you win.</div></div>`;
     return [html, `relic:${r.id}:${status}:${s.relics.length}`];
+  }
+
+  /** A contested landmark: who keeps it, how the claim stands (when in sight), and what it gives. */
+  private landmarkPanel(s: GameState, viewer: number, m: Landmark, keeperAsSeen: number): [string, string] {
+    const inSight = sees(s, viewer, m.x, m.y);
+    const keeper = inSight ? m.owner : keeperAsSeen;
+    const def = LANDMARK_KINDS[m.kind];
+    const who = (p: number) => (p === viewer ? 'you' : s.players[p].name);
+    const pct = Math.floor((100 * m.claim) / claimWork());
+    let status = keeper < 0 ? 'Nobody keeps it' : `Kept by ${who(keeper)}`;
+    if (inSight) {
+      const there = claimants(s, m);
+      if (there.size > 1) status += ' · contested!';
+      else if (m.owner < 0 && m.by >= 0 && m.claim > 0) status += ` · ${m.by === viewer ? 'your' : `${s.players[m.by].name}'s`} claim ${pct}%`;
+      else if (m.owner >= 0 && m.claim < claimWork()) status += ` · held ${pct}%`;
+    }
+    const portrait = m.kind === 'spring' ? '⛲' : m.kind === 'crag' ? '⛰' : '🪨';
+    const html = `<div class="sel-portrait"><span style="font-size:54px">${portrait}</span></div>
+      <div class="sel-info"><div class="sel-name">${def.name}</div><div class="sel-sub">${status}</div>
+      <div class="stats"><span data-tip="<b>Claiming</b>How long one person standing on it alone takes to claim it. Up to ${LANDMARKS.crowd} claim faster; rivals there too stop the claim.">⚑<em>One person</em> ${LANDMARKS.claim}s</span><span data-tip="<b>Land</b>Its keeper holds the land round it: their soldiers are supplied there, and rivals can't build in it.">🗺<em>Land</em> ${LANDMARKS.border} tiles</span></div>
+      <div class="blurb">${def.blurb} Send anyone there (citizens too) and keep rivals off it to claim it; a rival standing on it alone pulls it back down to nobody's, then takes it.</div></div>`;
+    return [html, `mark:${m.id}:${status}`];
   }
 
   /** An ancient ruin (#64): what might lie beneath (never what does, until it's dug), and how the dig goes. */
