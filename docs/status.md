@@ -76,6 +76,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Planning for winter** (own pitch, lane ai): from autumn a clever computer adds fields, leans 30% more to food, hunts mammoths/boars with a smaller town, clears winter wolves with one fewer soldier. New numbers `AI_WINTER`. Tests only; browser and win-rate unseen; no save bump.
 
+**Lords AI** (own pitch, lane ai): in Lords of the Land the computer ranges the whole map for landmarks and sends bands of two (`AI_MARK.lordsReach`, `.lordsParty`). Tests only; no win-rate sweep; no save bump.
+
 **Contested landmarks** (#182, own pitch, lane rules): a Sacred Spring, Lookout Crag and Ancestors' Cairn between the towns (players + 1), claimed by standing on them alone; held ones are land. The computer claims with a citizen and retakes with soldiers. New numbers `LANDMARKS`, `AI_MARK`. Tests, headless matches and headless-Chromium screenshots; sounds unheard; no win-rate sweep; no save bump. Also: a people down to unarmed boats (fishing boats, merchant ships) is beaten (`checkVictory`).
 
 **Escort lingers** (own pitch, lane ai): a walker's escort stays 20 s (`AI_MARK.linger`) after the claim is won; escort now keyed to its landmark. Unit test only; no sweep; no save bump.

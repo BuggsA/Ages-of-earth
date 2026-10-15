@@ -563,7 +563,7 @@ export const LANDMARKS = {
  * it sends up to `guard` of them to take (or take back) the nearest landmark in reach that a rival keeps
  * or is claiming, and holds them there until it's no longer the rival's, or `hold` seconds pass.
  */
-export const AI_MARK = { escort: 2, far: 28, townAt: 8, near: 44, rival: 0.75, walk: 150, party: 3, guard: 5, hold: 120, linger: 20,
+export const AI_MARK = { /** In a Lords of the Land match: reach over the whole map, and the band that goes after a landmark. */ lordsReach: 400, lordsParty: 2, escort: 2, far: 28, townAt: 8, near: 44, rival: 0.75, walk: 150, party: 3, guard: 5, hold: 120, linger: 20,
   /** The walker halts when its escort trails it by more than this many tiles, and goes on once they close up. */
   lead: 9,
   /** Divisors of a landmark's distance (bigger: more worth walking for): by kind, with the cairn when houses are full and the spring when people are hurt. */

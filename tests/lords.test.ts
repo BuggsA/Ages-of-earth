@@ -63,3 +63,16 @@ describe('lords of the land is a game mode', () => {
     expect(s.landTeam).toBe(-1);
   });
 });
+
+describe('the computer goes for lordship', () => {
+  it('keeps at least as many landmarks in a lords match as in conquest on the same map', () => {
+    const kept = (mode?: 'lords'): number => {
+      const s = createGame({ seed: 7, size: 'large', mode, peaceMinutes: 0, players: [{ name: 'A', ai: 'normal', civ: 'romans' }, { name: 'B', ai: 'normal', civ: 'greeks' }] });
+      for (let i = 0; i < 600 * TICK_HZ && !s.over; i++) step(s);
+      return s.landmarks!.filter((m) => m.owner >= 0).length;
+    };
+    const lords = kept('lords');
+    expect(lords).toBeGreaterThan(0);
+    expect(lords).toBeGreaterThanOrEqual(kept());
+  }, 120000);
+});
