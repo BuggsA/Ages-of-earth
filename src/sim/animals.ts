@@ -203,6 +203,54 @@ function drift(s: GameState, a: Animal): void {
 
 // ---- Mammoths and wolves ----------------------------------------------------------------------------
 
+/** Where a beast's leash is tied: its den, or the carcass a wolf is eating. */
+function anchor(s: GameState, a: Animal): { x: number; y: number } {
+  if (a.scav !== undefined) return { x: (a.scav % s.w) + 0.5, y: Math.floor(a.scav / s.w) + 0.5 };
+  return { x: a.homeX, y: a.homeY };
+}
+
+/** The nearest carcass on unheld land that a wolf can scent from its den, or -1. */
+function scentCarrion(s: GameState, a: Animal): number {
+  let best = -1;
+  let bestD = WOLF.scent * WOLF.scent;
+  for (const c of s.carcasses ?? []) {
+    // Meat smells once it begins to turn, not when it falls.
+    if (s.res[c.tile] !== R_MEAT || s.amount[c.tile] <= 0 || s.tick - c.born < secs(ROT.grace)) continue;
+    const x = (c.tile % s.w) + 0.5;
+    const y = Math.floor(c.tile / s.w) + 0.5;
+    const d = (x - a.homeX) * (x - a.homeX) + (y - a.homeY) * (y - a.homeY);
+    if (d >= bestD || landOwnerAt(s, Math.floor(x), Math.floor(y)) >= 0) continue;
+    best = c.tile;
+    bestD = d;
+  }
+  return best;
+}
+
+/** A wolf at its feast: runs to the carcass and gnaws; false once the meat is gone. */
+function scavenge(s: GameState, a: Animal): boolean {
+  const t = a.scav!;
+  if (s.res[t] !== R_MEAT || s.amount[t] <= 0) return false;
+  const { x, y } = anchor(s, a);
+  const dx = x - a.x;
+  const dy = y - a.y;
+  // The carcass blocks its own tile, so the wolf feeds from beside it.
+  if (dx * dx + dy * dy > 1.2 * 1.2) {
+    stepToward(s, a, x, y, WOLF.run);
+    a.state = 'walk';
+    return true;
+  }
+  a.state = 'graze';
+  if (s.tick % TICK_HZ === 0) {
+    s.amount[t] -= WOLF.gnaw;
+    if (s.amount[t] <= 0) {
+      clearResource(s, t);
+      s.events.push({ k: 'depleted', tile: t });
+      return false;
+    }
+  }
+  return true;
+}
+
 function beastStep(s: GameState, sp: Spatial | undefined, a: Animal): void {
   if (a.cool) a.cool--;
   if (a.state === 'fight') {
@@ -214,13 +262,25 @@ function beastStep(s: GameState, sp: Spatial | undefined, a: Animal): void {
   const guard = wolf || a.kind === 'boar';
   // A pack keeps watch (so does a boar by its patch): anyone who comes near is set upon.
   if (guard && (s.tick + a.id) % 4 === 0) {
-    const u = nearestPrey(s, sp, a.x, a.y, wolf ? WOLF.notice : BOAR.notice, { x: a.homeX, y: a.homeY, r: wolf ? WOLF.leash : BOAR.leash });
+    const c = anchor(s, a);
+    const u = nearestPrey(s, sp, a.x, a.y, wolf ? WOLF.notice : BOAR.notice, { x: c.x, y: c.y, r: wolf ? WOLF.leash : BOAR.leash });
     if (u) {
       rouse(s, a, u);
       return;
     }
   }
+  if (wolf && a.scav !== undefined && a.prey === undefined) {
+    if (scavenge(s, a)) return;
+    a.scav = undefined;
+    calm(a);
+    return;
+  }
   if (wolf && a.prey === undefined && (s.tick + a.id) % 12 === 0) {
+    const c = scentCarrion(s, a);
+    if (c >= 0) {
+      a.scav = c;
+      return;
+    }
     // Nobody to fight: a hungry pack runs down the deer that graze near its den.
     let best: Animal | null = null;
     let bestD = WOLF.hunt * WOLF.hunt;
@@ -303,7 +363,8 @@ function calm(a: Animal): void {
 function fightStep(s: GameState, sp: Spatial | undefined, a: Animal): void {
   const wolf = a.kind === 'wolf';
   const boar = a.kind === 'boar';
-  const leash = wolf ? { x: a.homeX, y: a.homeY, r: WOLF.leash } : boar ? { x: a.homeX, y: a.homeY, r: BOAR.leash } : undefined;
+  const home = anchor(s, a);
+  const leash = wolf ? { x: home.x, y: home.y, r: WOLF.leash } : boar ? { x: a.homeX, y: a.homeY, r: BOAR.leash } : undefined;
   const u = a.foe !== undefined ? s.byId.get(a.foe) : undefined;
   let foe = u && u.kind === 'unit' && prey(u) ? u : null;
   if (foe && leash && (foe.x - leash.x) * (foe.x - leash.x) + (foe.y - leash.y) * (foe.y - leash.y) > leash.r * leash.r) foe = null;

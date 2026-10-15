@@ -63,6 +63,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Meat spoils** (own pitch, lane rules): carcasses rot after 40 s (a mammoth gone in ~3 min); Drying Racks (Stone Age tech) slow it on your land; the computer buys them after big game. New numbers `ROT`, tech `drying`, mod `rot`. Tests and a headless match; browser unseen; no save bump.
 
+**Carrion** (own pitch, lane rules): wolves within 15 tiles of a den eat turning carcasses on unheld land and bite butchers; border meat is safe. New numbers `WOLF.scent`, `WOLF.gnaw`. Tests and a headless match; browser unseen; no save bump.
+
 ## Waiting on the owner
 
 **Setup only the owner can do:**
