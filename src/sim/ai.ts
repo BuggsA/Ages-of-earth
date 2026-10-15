@@ -390,7 +390,7 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   // A detour (#232): a pilgrim town with the catch landed and a Dock, whose Age of Sail would open an heirloom, steps back to
   // the Middle Ages to take it, and doesn't turn pilgrim again on the way (the road to Sail is the plan).
   const sailRoad = ROADS.find((r) => r.from === 'middle' && r.to === 'sail');
-  const toSail = !!sailRoad && !!heirloomAhead(p, 'sail') && count(v, 'dock', true) > 0 && deedsDone(p, sailRoad) && wants(s, p, mem, 'sail');
+  const toSail = AI_LEVELS[p.ai!].detour && !!sailRoad && !!heirloomAhead(p, 'sail') && count(v, 'dock', true) > 0 && deedsDone(p, sailRoad) && wants(s, p, mem, 'sail');
   for (const r of roadsFrom(p)) {
     if (AGES[r.to].tier !== p.epoch) continue;
     if (toSail && here === 'pilgrim' && r.to === 'middle') return { road: r, wait: false };
