@@ -24,6 +24,8 @@ import { ageDef, ageOf, heirloomsOpened, isSideRoad, roadKnown, roadsFrom, suspe
 import { NetClient, newRoomCode, saveName, savedName } from './net/client';
 import { HASH_EVERY, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
 import { deserialize, serialize } from './sim/save';
+import { VAULT_SLOTS, formatVaultKey, type CloudSlot } from './net/vault';
+import { deleteCloud, listCloud, loadCloud, saveCloud, useVaultKey, vaultKey } from './net/cloud';
 import { SCENARIOS, scenarioById, starsFor } from './sim/campaign';
 import { loadDiscovery, observe, saveDiscovery, webMapHtml } from './ui/webMap';
 import { idleCitizens, idleSelection, idleShortcut } from './ui/idle';
@@ -492,9 +494,32 @@ const SAVE_KEY = 'ages-save';
 /** Bumped when the state's shape changes, so an older save is set aside instead of loading broken (2: relics; 3: trading posts). */
 const SAVE_V = 3;
 
+interface SavedMatch {
+  setup: GameSetup;
+  state: GameState;
+  record: [number, Command[]][];
+}
+
+/** A match as save text, the same for the browser's own save and a cloud slot. */
+function saveText(s: GameState, setup: GameSetup): string {
+  return JSON.stringify({ v: SAVE_V, setup, at: Date.now(), state: serialize(s), record });
+}
+
+/** Save text back to a match; null if it can't be read or is from an older shape (`SAVE_V`). */
+function readSave(raw: string | null): SavedMatch | null {
+  try {
+    if (!raw) return null;
+    const saved = JSON.parse(raw);
+    if (saved.v !== SAVE_V) return null;
+    return { setup: saved.setup, state: deserialize(saved.state), record: Array.isArray(saved.record) ? saved.record : [] };
+  } catch {
+    return null;
+  }
+}
+
 function saveGame(s: GameState, setup: GameSetup): boolean {
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify({ v: SAVE_V, setup, at: Date.now(), state: serialize(s), record }));
+    localStorage.setItem(SAVE_KEY, saveText(s, setup));
     showContinue();
     return true;
   } catch {
@@ -502,13 +527,9 @@ function saveGame(s: GameState, setup: GameSetup): boolean {
   }
 }
 
-function loadGame(): { setup: GameSetup; state: GameState; record: [number, Command[]][] } | null {
+function loadGame(): SavedMatch | null {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return null;
-    const saved = JSON.parse(raw);
-    if (saved.v !== SAVE_V) return null;
-    return { setup: saved.setup, state: deserialize(saved.state), record: Array.isArray(saved.record) ? saved.record : [] };
+    return readSave(localStorage.getItem(SAVE_KEY));
   } catch {
     return null;
   }
@@ -551,6 +572,156 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) autosave(true);
 });
 window.addEventListener('pagehide', () => autosave(true));
+
+// ---- Cloud saves (#290) ----------------------------------------------------------------------------
+
+const escHtml = (t: string) => t.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+/** What a cloud slot is called: the chapter, or your people, their age and the time played. */
+function cloudTitle(s: GameState): string {
+  const me = s.players[viewer];
+  const minutes = Math.floor(s.tick / (TICK_HZ * 60));
+  const chapter = s.scenario ? scenarioById(s.scenario.id) : undefined;
+  return `${chapter ? chapter.title : `${CIVS[me.civ].name}, ${ageDef(me).name}`} · ${minutes} min`;
+}
+
+/** Whether the match on screen may go to the cloud: your own, under way, not online or watched. */
+function canCloudSave(): boolean {
+  return !!game && mode === 'play' && !!lastSetup && !game.over && !online && !watching;
+}
+
+let cloudBusy = false;
+/** Where the panel is open (the modal or the campaign screen), or null when it is closed. */
+let cloudBox: HTMLElement | null = null;
+/** Bumped by each draw, so a slow answer never paints over a newer panel. */
+let cloudDraw = 0;
+
+async function openCloud(note = ''): Promise<void> {
+  const draw = ++cloudDraw;
+  const key = vaultKey();
+  // In a match the panel is the pause menu's modal; on the title screen (where the HUD and its modal are
+  // hidden) it takes the campaign screen, as the Web of Ages does.
+  const inMatch = !$('hud').classList.contains('hidden');
+  const saving = canCloudSave();
+  const html = `<div class="card wide cloud"><h2>Cloud saves</h2>
+    <p class="hint">Kept on the server under your save key, ${VAULT_SLOTS} slots. Enter the same key on another device to play them there. A key nobody uses for a year is emptied.${saving ? '' : ' To save, open Cloud saves from the Menu during a match.'}</p>
+    <div class="cloud-slots" ><div class="hint">Opening your saves…</div></div>
+    ${note ? `<div class="hint cloud-note">${escHtml(note)}</div>` : ''}
+    <div class="row cloud-key">
+      <label>Your save key <code id="cloud-key">${formatVaultKey(key)}</code></label>
+      <button class="btn" data-act="cloud-copy">Copy key</button>
+      <label>Key from another device <input id="cloud-key-in" maxlength="30" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false"></label>
+      <button class="btn" data-act="cloud-use">Use this key</button>
+    </div>
+    <div class="row"><button class="btn wide" data-act="cloud-close">Back</button></div></div>`;
+  if (inMatch) {
+    $('modal').innerHTML = html;
+    $('modal').classList.remove('hidden');
+  } else showCampaign(`<div class="modal">${html}</div>`);
+  const box = (cloudBox = inMatch ? $('modal') : $('campaign'));
+  const list = box.querySelector<HTMLElement>('.cloud-slots')!;
+  let slots: (CloudSlot | null)[];
+  try {
+    slots = await listCloud(key);
+  } catch (err) {
+    if (draw === cloudDraw) list.innerHTML = `<div class="hint bad">${escHtml((err as Error).message)}</div>`;
+    return;
+  }
+  if (draw !== cloudDraw || !box.querySelector('.cloud') || box.classList.contains('hidden')) return;
+  list.innerHTML = slots
+    .map((slot, i) => {
+      const n = i + 1;
+      const when = slot ? new Date(slot.at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '';
+      return `<div class="cloud-slot">
+        <div class="cloud-what"><b>Slot ${n}</b> ${slot ? `${escHtml(slot.title)}<span class="hint">${when}</span>` : '<span class="hint">Empty</span>'}</div>
+        <div class="cloud-acts">
+          ${saving ? `<button class="btn ${slot ? '' : 'primary'}" data-act="cloud-save" data-slot="${n}">${slot ? 'Save over' : 'Save here'}</button>` : ''}
+          ${slot ? `<button class="btn ${saving ? '' : 'primary'}" data-act="cloud-load" data-slot="${n}">Load</button><button class="btn" data-act="cloud-delete" data-slot="${n}">Delete</button>` : ''}
+        </div></div>`;
+    })
+    .join('');
+}
+
+/** One cloud call at a time, with its outcome told in a toast and the panel drawn afresh. */
+async function cloudDo(work: () => Promise<string | void>): Promise<void> {
+  if (cloudBusy) return;
+  cloudBusy = true;
+  for (const b of document.querySelectorAll<HTMLButtonElement>('.cloud button')) b.disabled = true;
+  try {
+    const said = await work();
+    if (said) hud.toast(said, 'info');
+  } catch (err) {
+    hud.toast((err as Error).message, 'bad');
+  } finally {
+    cloudBusy = false;
+  }
+  if (cloudBox?.querySelector('.cloud') && !cloudBox.classList.contains('hidden')) void openCloud();
+}
+
+function cloudAct(act: string, el: HTMLElement): void {
+  const slot = Number(el.dataset.slot);
+  switch (act) {
+    case 'cloud':
+      sound.play('click');
+      void openCloud();
+      break;
+    case 'cloud-save':
+      if (!canCloudSave() || !game || !lastSetup) break;
+      {
+        const text = saveText(game, lastSetup);
+        const title = cloudTitle(game);
+        void cloudDo(async () => {
+          await saveCloud(vaultKey(), slot, title, text);
+          return `Saved to cloud slot ${slot}`;
+        });
+      }
+      break;
+    case 'cloud-load':
+      void cloudDo(async () => {
+        const saved = readSave(await loadCloud(vaultKey(), slot));
+        if (!saved) throw new Error('That save is from an older version of the game and cannot be opened.');
+        sound.play('click');
+        cloudBox = null;
+        $('campaign').innerHTML = '';
+        $('campaign').classList.add('hidden');
+        startMatch(saved.setup, saved.state);
+        record = saved.record;
+        return `Loaded cloud slot ${slot}`;
+      });
+      break;
+    case 'cloud-delete':
+      if (!confirm(`Delete the save in cloud slot ${slot}? It can't be brought back.`)) break;
+      void cloudDo(async () => {
+        await deleteCloud(vaultKey(), slot);
+        return `Cloud slot ${slot} emptied`;
+      });
+      break;
+    case 'cloud-copy': {
+      const key = formatVaultKey(vaultKey());
+      const fail = () => hud.toast(`Your save key: ${key}`, 'info');
+      if (navigator.clipboard) navigator.clipboard.writeText(key).then(() => hud.toast('Save key copied. Keep it secret: it opens your saves.', 'info'), fail);
+      else fail();
+      break;
+    }
+    case 'cloud-use': {
+      const typed = cloudBox?.querySelector<HTMLInputElement>('#cloud-key-in')?.value ?? '';
+      if (!typed.trim()) break;
+      if (useVaultKey(typed)) void openCloud('Now using that key. Copy your old key first if you may want its saves again.');
+      else hud.toast('That is not a save key: 20 letters and digits, like ABCD-EFGH-JKLM-NPQR-STUV', 'bad');
+      break;
+    }
+    case 'cloud-close':
+      cloudDraw++;
+      cloudBox = null;
+      if (!$('hud').classList.contains('hidden')) openMenu();
+      else {
+        $('campaign').innerHTML = '';
+        $('campaign').classList.add('hidden');
+        $('title').classList.remove('hidden');
+      }
+      break;
+  }
+}
 
 // ---- Replays --------------------------------------------------------------------------------------
 
@@ -762,6 +933,7 @@ document.addEventListener('click', (e) => {
   if (!el) return;
   sound.unlock();
   const act = el.dataset.act!;
+  if (act.startsWith('cloud')) return cloudAct(act, el);
   switch (act) {
     case 'start':
       sound.play('click');
@@ -1638,6 +1810,7 @@ function openMenu(): void {
     </div>
     <div class="row">
       ${online ? `<div class="hint">Online room ${net?.code ?? ''} · ${net?.rtt ?? 0} ms</div>` : `<button class="btn wide" data-act="save">Save game</button>
+      <button class="btn wide" data-act="cloud">Cloud saves</button>
       <button class="btn wide" data-act="restart">Restart this map</button>
       ${game?.scenario ? '' : '<button class="btn wide" data-act="new-map">New map</button>'}`}
       <button class="btn wide" data-act="resign">Resign</button>

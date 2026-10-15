@@ -725,3 +725,11 @@ Session 2 (lane ai): Iron-Bound Hulls answered. `fleetWanted` adds `AI_WEB.hulls
 **Why I love it:** the title was a form; peoples had names but no faces. A flag in your own colour is the first thing the match then shows on your buildings, so the menu and the field say the same thing.
 
 **Seen:** headless Chromium, Mongols in red and Romans in green on the title card, no console errors. Emblems are small and plain; the Chinese and Egyptian ones want a better hand. **Next (the art pass has more to do):** the same crest on the HUD's people chip, the lobby and the end report; building models' silhouettes per epoch; a title-screen backdrop that isn't a form over a live field.
+
+## Designers' notes: cloud saves (#290, owner-ask, 2026-10-15, lane online)
+
+**Built:** a vault per save key on the Worker (`worker/vault.ts`, one Durable Object each), three slots of gzipped save text, and a Cloud saves panel in the Menu and on the title screen. The key is 20 of the room codes' unmistakable letters (100 bits), shown as `ABCD-EFGH-…` so it can be read off one screen and typed into another.
+
+**Why this shape:** no accounts, no passwords, no email: a strategy game shouldn't ask for any of that to keep your match. The key is the whole identity, the same way a room code is the whole lobby. A year untouched empties a vault, so forgotten keys don't pile up on the server.
+
+**Next:** autosave to a cloud slot on leaving the page (needs `keepalive` and a size check, since `keepalive` bodies cap at 64 KB, so probably a small "resume" pointer instead); a QR code of the key for phones; campaign progress and the Web of Ages discovery carried in the vault too.

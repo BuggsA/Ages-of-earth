@@ -271,3 +271,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Lobby crest** (#267 step 3, lane look): each lobby seat shows its people's crest in its colour. Render only; tests pass, look unseen.
 
 **Camp tower** (own pitch, lane ai): a clever computer past the Stone Age raises a Watch Tower by a far kill whose Hunting Camp stands (`AI_WILD.towerNear = 6`). Tests only; no sweep; no save bump.
+
+**Cloud saves** (#290, owner-ask, lane online): three server slots per secret save key (a new SQLite Durable Object class `Vault`, migration `v2`), from the Menu and the title screen; a key copied to another device opens the same saves. Seen end to end under `wrangler dev` in headless Chromium (save in one profile, load in a fresh one by key). Live deploy unseen; no save bump.
