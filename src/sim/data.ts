@@ -1065,9 +1065,9 @@ export const AI_LEVELS: Record<Difficulty, AiLevel> = {
  * kept. Against a merchant rival, a band of `riders` riders waits by the trading post nearest its town
  * and falls on the traders it sees within `raid` tiles (anyone's traders within `raidNear` tiles of home
  * are fair game anyway); against an iron rival, it trains the archers that answer its foot with chance
- * `read`.
+ * `read`. It reads a rival's heirlooms (#242): a Joint-Stock Company makes the rival a trade rival on any road, and a Masons' Lodge asks `lodge` more siege engines.
  */
-export const AI_WEB = { take: 0.6, heir: 1, survey: 22, diggers: 3, nearly: 0.5, patience: 90, close: 0.75, relics: 2, raid: 18, raidNear: 30, riders: 4, read: 0.85 };
+export const AI_WEB = { take: 0.6, heir: 1, survey: 22, diggers: 3, nearly: 0.5, patience: 90, close: 0.75, relics: 2, raid: 18, raidNear: 30, riders: 4, read: 0.85, lodge: 1 };
 
 export const PLAYER_COLORS = ['#2f7fe0', '#e0473a', '#e8b630', '#3aa35a', '#9b59d0', '#e07a2f'];
 export const PLAYER_NAMES = ['You', 'Rival'];
