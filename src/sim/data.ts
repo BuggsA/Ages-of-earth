@@ -888,9 +888,11 @@ export const AI_WINTER = { from: 2, fields: 2, hunters: 3, pack: 1, food: 0.3 };
  * numbers six, and sends those that have kept up with its army (within `reach` + `keep` tiles of its
  * centre, idle, walking or healing) in a band of at least `band` to chant over the rival building nearest that centre, within
  * `reach` tiles, that it can see. Towers and gates weigh as if `wall` times as near, a Temple that keeps
- * relics `relic` times.
+ * relics `relic` times. Counter-chant (#216): a free priest within `ward` tiles of a building of its own that a rival is
+ * chanting over walks to stand by it; against a pilgrim rival, a spare priest stands by the tower, gate or Temple nearest
+ * that rival's town.
  */
-export const AI_FAITH = { priests: 6, band: 3, reach: 14, keep: 6, wall: 0.4, relic: 0.6 };
+export const AI_FAITH = { priests: 6, band: 3, reach: 14, keep: 6, wall: 0.4, relic: 0.6, ward: 30 };
 export const AMOUNT = { tree: 80, berry: 125, stone: 300, gold: 400, meat: 140, fish: 250, bog: 300 };
 /** Deer: health, speeds, and how far a hunter throws a spear. */
 export const DEER = { hp: 8, walk: 0.8, flee: 2.3, spear: 3.5, spearDamage: 4,

@@ -620,3 +620,11 @@ Built: bog iron dug on any road (`stats.iron`) raises each trade trip in the Mer
 **Why:** a tower under chant had one defence, hiding soldiers inside. Now priests are a trade-off for the keeper: heal at the front or guard the walls.
 
 **Next:** the computer parking a priest by its towers when it sees rival priests; the defenders' priests actually chanting back (wearing faith down faster than they slow it); a Temple craft for the pilgrims.
+
+## Designers' notes: priests ward the walls (2026-10-15, lane ai)
+
+**Built:** the computer answers counter-chant. A free priest within `AI_FAITH.ward` (30) tiles of a tower, gate or Temple a rival is chanting over walks to stand within 7 tiles of it; against a pilgrim rival, a spare priest stands by the tower/gate/Temple nearest that rival's town while none of ours does. It only takes priests that are idle, after relics and before converting/following the army.
+
+**Why:** counter-chant was a choice only a human made; now a pilgrim player meets defenders who answer, so five priests alone no longer walk through a lone tower.
+
+**Seen:** unit tests only (`tests/ward-priests.test.ts`); no win-rate sweep, browser unseen. **Next:** defenders' priests actively chanting back; a Temple craft for pilgrims.

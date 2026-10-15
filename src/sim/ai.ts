@@ -1,5 +1,5 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, AI_FAITH, AI_LEVELS, AI_MARK, AI_RAID, AI_WEB, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_FAITH, CONSECRATE, AI_LEVELS, AI_MARK, AI_RAID, AI_WEB, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Ruin, TechId, TradePost, Unit, UnitType } from './types';
@@ -1750,6 +1750,12 @@ function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
         continue;
       }
     }
+    // A building of ours is being chanted over: stand by it and slow the chant (#216).
+    const ward = wardPost(s, v, pr);
+    if (ward && ward.hot) {
+      issue({ t: 'move', p: v.p.id, ids: [pr.id], x: ward.b.x, y: ward.b.y });
+      continue;
+    }
     if (pr.cool > 0) continue;
     // Something worth converting close by?
     let best: Unit | null = null;
@@ -1771,6 +1777,11 @@ function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
       issue({ t: 'convert', p: v.p.id, ids: [pr.id], target: best.id });
       continue;
     }
+    // Against a pilgrim rival, a spare priest stands by a tower, gate or Temple.
+    if (ward) {
+      issue({ t: 'move', p: v.p.id, ids: [pr.id], x: ward.b.x, y: ward.b.y });
+      continue;
+    }
     // Otherwise keep up with the army.
     if (army.length) {
       let cx = 0;
@@ -1786,6 +1797,44 @@ function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
       if (dx * dx + dy * dy > 49) issue({ t: 'move', p: v.p.id, ids: [pr.id], x: cx, y: cy });
     } else if (mem.muster) issue({ t: 'move', p: v.p.id, ids: [pr.id], x: mem.muster.x, y: mem.muster.y });
   }
+}
+
+/**
+ * Counter-chant (#216), for the computer: the building a free priest should stand by, within `counter.range`
+ * of it so its voice slows a rival's chant. `hot`: a rival is chanting it now (the nearest one within
+ * `AI_FAITH.ward` tiles of the priest). Otherwise, with a pilgrim rival in the match, a priest when none of
+ * ours stands by the most exposed tower, gate or Temple (nearest the rival's town). Null: nothing to ward.
+ */
+function wardPost(s: GameState, v: View, pr: Unit): { b: Building; hot: boolean } | null {
+  const r2 = CONSECRATE.counter.range * CONSECRATE.counter.range;
+  const reach2 = AI_FAITH.ward * AI_FAITH.ward;
+  const near = (b: Building, u: Unit): boolean => (u.x - b.x) * (u.x - b.x) + (u.y - b.y) * (u.y - b.y) <= r2;
+  let hot: Building | null = null;
+  let hotD = Infinity;
+  for (const b of v.buildings) {
+    if (b.hp <= 0 || !b.built || CONSECRATE.never.includes(b.type)) continue;
+    if (!b.faith || b.faithBy === undefined || b.faithBy === v.p.id || !isEnemy(s, v.p.id, b.faithBy)) continue;
+    const d = (pr.x - b.x) * (pr.x - b.x) + (pr.y - b.y) * (pr.y - b.y);
+    if (d <= reach2 && d < hotD) {
+      hotD = d;
+      hot = b;
+    }
+  }
+  if (hot) return near(hot, pr) ? null : { b: hot, hot: true };
+  const rival = s.players.find((o) => !o.defeated && isEnemy(s, v.p.id, o.id) && consecrates(s, o.id));
+  if (!rival) return null;
+  let post: Building | null = null;
+  let postD = Infinity;
+  for (const b of v.buildings) {
+    if (b.hp <= 0 || !b.built || (b.type !== 'tower' && b.type !== 'gate' && b.type !== 'temple')) continue;
+    if (v.priests.some((o) => o.id !== pr.id && !o.inside && near(b, o))) continue;
+    const d = (rival.startX - b.x) * (rival.startX - b.x) + (rival.startY - b.y) * (rival.startY - b.y);
+    if (d < postD) {
+      postD = d;
+      post = b;
+    }
+  }
+  return post && !near(post, pr) ? { b: post, hot: false } : null;
 }
 
 /**
