@@ -1127,8 +1127,19 @@ function escortWalker(s: GameState, v: View, mem: AiMemory, ready: Unit[], held:
   const w = mem.markWalker;
   const e = mem.markEscort;
   const m = w ? landmarkAt(s, w.id) : undefined;
-  if (e && (!w || w.unit !== e.unit || !m)) {
-    delete mem.markEscort;
+  if (e && (!w || w.unit !== e.unit || w.id !== e.mark || !m)) {
+    // The claim is won: the escort lingers a while so a passing raider can't pull it straight down.
+    const won = landmarkAt(s, e.mark);
+    if (won && won.owner === v.p.id && !e.until) e.until = s.tick + secs(AI_MARK.linger);
+    if (!e.until || s.tick >= e.until || !won || won.owner !== v.p.id) {
+      delete mem.markEscort;
+      return;
+    }
+    e.ids = e.ids.filter((id) => {
+      const u = s.byId.get(id);
+      return u && u.kind === 'unit' && u.hp > 0;
+    });
+    for (const id of e.ids) held.add(id);
     return;
   }
   if (e && m) {
@@ -1146,7 +1157,7 @@ function escortWalker(s: GameState, v: View, mem: AiMemory, ready: Unit[], held:
   // A small army stays home: the escort comes from what is left beyond a guard of `AI_MARK.party`.
   if (band.length < AI_MARK.escort + AI_MARK.party) return;
   const ids = band.slice(0, AI_MARK.escort).map((u) => u.id);
-  mem.markEscort = { unit: w.unit, ids };
+  mem.markEscort = { unit: w.unit, mark: m.id, ids };
   for (const id of ids) held.add(id);
   issue({ t: 'move', p: v.p.id, ids, x: m.x, y: m.y, amove: true });
 }
