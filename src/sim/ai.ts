@@ -1080,6 +1080,7 @@ function claimWalk(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
 function guardMarks(s: GameState, v: View, mem: AiMemory, ready: Unit[], issue: (c: Command) => void): Set<number> {
   const held = new Set<number>();
   if (!s.landmarks || s.tick < s.peaceUntil) return held;
+  escortWalker(s, v, mem, ready, held, issue);
   const g = mem.markGuard;
   if (g) {
     const m = landmarkAt(s, g.id);
@@ -1114,6 +1115,38 @@ function guardMarks(s: GameState, v: View, mem: AiMemory, ready: Unit[], issue: 
   for (const id of ids) held.add(id);
   issue({ t: 'move', p: v.p.id, ids, x: m.x, y: m.y, amove: true });
   return held;
+}
+
+/**
+ * A walker bound for a landmark more than `AI_MARK.far` tiles from home gets `AI_MARK.escort` idle
+ * soldiers sent along, who clear the road (attack-move) and stay by the landmark until the walk is over.
+ */
+function escortWalker(s: GameState, v: View, mem: AiMemory, ready: Unit[], held: Set<number>, issue: (c: Command) => void): void {
+  const w = mem.markWalker;
+  const e = mem.markEscort;
+  const m = w ? landmarkAt(s, w.id) : undefined;
+  if (e && (!w || w.unit !== e.unit || !m)) {
+    delete mem.markEscort;
+    return;
+  }
+  if (e && m) {
+    e.ids = e.ids.filter((id) => {
+      const u = s.byId.get(id);
+      return u && u.kind === 'unit' && u.hp > 0;
+    });
+    for (const id of e.ids) held.add(id);
+    return;
+  }
+  if (!w || !m || (m.x - v.home.x) * (m.x - v.home.x) + (m.y - v.home.y) * (m.y - v.home.y) < AI_MARK.far * AI_MARK.far) return;
+  const band = ready
+    .filter((u) => u.type !== 'siege' && u.order.k === 'idle')
+    .sort((a, b) => (a.x - m.x) * (a.x - m.x) + (a.y - m.y) * (a.y - m.y) - ((b.x - m.x) * (b.x - m.x) + (b.y - m.y) * (b.y - m.y)) || a.id - b.id);
+  // A small army stays home: the escort comes from what is left beyond a guard of `AI_MARK.party`.
+  if (band.length < AI_MARK.escort + AI_MARK.party) return;
+  const ids = band.slice(0, AI_MARK.escort).map((u) => u.id);
+  mem.markEscort = { unit: w.unit, ids };
+  for (const id of ids) held.add(id);
+  issue({ t: 'move', p: v.p.id, ids, x: m.x, y: m.y, amove: true });
 }
 
 function nearestDropTo(v: View, u: Unit): { x: number; y: number } {
