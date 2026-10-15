@@ -1017,7 +1017,7 @@ function excavate(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
  * The nearest landmark within reach of home for it to go after: for a citizen (`free`), one nobody keeps;
  * for soldiers, one a rival keeps, or one nobody keeps that a rival is part way to claiming.
  */
-function markToTake(s: GameState, v: View, free: boolean, safe: boolean): Landmark | null {
+export function markToTake(s: GameState, v: View, free: boolean, safe: boolean): Landmark | null {
   let best: Landmark | null = null;
   const rival = enemyHome(s, v.p);
   // Going for lordship, no landmark is too far.
@@ -1027,7 +1027,8 @@ function markToTake(s: GameState, v: View, free: boolean, safe: boolean): Landma
     // Soldiers also go to a landmark of ours that rivals are standing on.
     if (free ? m.owner >= 0 : m.owner >= 0 ? !isEnemy(s, v.p.id, m.owner) && !pulledDown(s, v.p, m) : !(m.by >= 0 && m.claim > 0 && isEnemy(s, v.p.id, m.by))) continue;
     if (safe && ruinDanger(s, v.p, m, 10)) continue;
-    const w = markWorth(s, v, m);
+    // Soldiers go for a rival's Old Ford first: it is the road its army strikes down (clever computers only).
+    const w = markWorth(s, v, m) * (!free && m.kind === 'ford' && m.owner >= 0 && isEnemy(s, v.p.id, m.owner) && AI_LEVELS[v.p.ai!].clever ? AI_MARK.worth.fordRival : 1);
     const d = ((m.x - v.home.x) * (m.x - v.home.x) + (m.y - v.home.y) * (m.y - v.home.y)) / (w * w);
     if (d < bestD || (d === bestD && best && m.id < best.id)) {
       bestD = d;

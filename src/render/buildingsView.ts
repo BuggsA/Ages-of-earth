@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { ageOf } from '../sim/ages';
 import { BUILDINGS } from '../sim/data';
 import type { AgeId, Building, BuildingType, GameState } from '../sim/types';
-import { buildingGeometry, foundationGeometry, rubbleGeometry, scaffoldGeometry } from './buildingModels';
+import { buildingGeometry, HEIRLOOM_MARKS, foundationGeometry, rubbleGeometry, scaffoldGeometry } from './buildingModels';
 import { bakedMaterial, inject } from './materials';
 import { heightAt } from './terrain';
 
@@ -26,6 +26,8 @@ export interface Known {
   epoch: number;
   /** The age within the web (#37), for the look of the side ages (#55). */
   age: AgeId;
+  /** The heirloom (#224) this building's owner holds that shows on this kind of building, or ''. */
+  heirloom: string;
   built: boolean;
   progress: number;
   /** Walls: which neighbors a piece joins (1 east, 2 south, 4 west, 8 north). Gates: 1 if the wall runs along y. */
@@ -114,7 +116,7 @@ export class BuildingsView {
 
     for (const [id, k] of this.known) {
       // The owner too, so a building won over (#209) is redrawn in its new colours.
-      const key = `${k.type}:${k.epoch}:${k.age}:${k.built ? 1 : 0}:${k.variant}:${k.owner}`;
+      const key = `${k.type}:${k.epoch}:${k.age}:${k.built ? 1 : 0}:${k.variant}:${k.owner}:${k.heirloom}`;
       let v = this.views.get(id);
       if (v && v.key !== key) {
         this.group.remove(v.group);
@@ -155,7 +157,7 @@ export class BuildingsView {
     const base = this.baseHeight(s, k);
     group.position.set(k.x, base, k.y);
     const wall = k.type === 'wall';
-    const body = new THREE.Mesh(buildingGeometry(k.type, k.epoch, this.colors[k.owner] ?? '#ffffff', wall ? k.variant : 0, k.age), bakedMaterial);
+    const body = new THREE.Mesh(buildingGeometry(k.type, k.epoch, this.colors[k.owner] ?? '#ffffff', wall ? k.variant : 0, k.age, k.heirloom), bakedMaterial);
     if (k.type === 'gate' && k.variant) body.rotation.y = Math.PI / 2;
     // A dock's pier reaches out over the water.
     if (k.type === 'dock') body.rotation.y = (k.variant * Math.PI) / 2;
@@ -238,8 +240,15 @@ function snapshot(s: GameState, b: Building): Known {
     y: b.y,
     epoch: s.players[b.owner].epoch,
     age: ageOf(s.players[b.owner]),
+    heirloom: heirloomOn(s, b),
     built: b.built,
     progress: b.progress,
     variant: b.type === 'wall' ? wallMask(s, b) : b.type === 'gate' || b.type === 'dock' ? b.dir : 0,
   };
+}
+
+/** The heirloom (#224) that dresses this building, if its owner has learned it. */
+function heirloomOn(s: GameState, b: Building): string {
+  const id = HEIRLOOM_MARKS[b.type];
+  return id && s.players[b.owner].techs.includes(id as never) ? id : '';
 }
