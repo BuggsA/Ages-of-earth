@@ -4,7 +4,7 @@ import { createGame } from '../src/sim/game';
 import { fordGeometry } from '../src/render/landmarksView';
 import { LANDMARK_KINDS, fordMarch } from '../src/sim/landmarks';
 import { spawnUnit } from '../src/sim/world';
-import { stagingFord } from '../src/sim/ai';
+import { markToTake, stagingFord } from '../src/sim/ai';
 
 describe('Old Ford', () => {
   const s = createGame({ seed: 7, size: 'small', players: [{ name: 'A', ai: null, civ: 'romans' }, { name: 'B', ai: null, civ: 'romans' }] });
@@ -52,5 +52,26 @@ describe('staging from the ford', () => {
     expect(stagingFord(s, 0, home, enemy)).toBeNull();
     ford(23, 20, 0);
     expect(stagingFord(s, 0, home, enemy)).toBeNull();
+  });
+});
+
+describe('contesting a rival ford', () => {
+  const mk = (ai: 'hard' | 'easy') => createGame({ seed: 7, size: 'small', players: [{ name: 'A', ai, civ: 'romans' }, { name: 'B', ai: 'hard', civ: 'romans' }] });
+  const pick = (s: ReturnType<typeof mk>) => {
+    const home = { x: 20, y: 20 };
+    const [a, b] = s.landmarks!;
+    for (const m of [a, b]) { m.owner = 1; m.claim = 0; m.by = -1; }
+    a.kind = 'crag'; a.x = 34; a.y = 20;
+    b.kind = 'ford'; b.x = 36; b.y = 20;
+    for (const m of s.landmarks!.slice(2)) m.owner = 0;
+    return markToTake(s, { p: s.players[0], home } as never, false, false);
+  };
+  it('a clever computer goes for the rival ford before a nearer crag', () => {
+    const s = mk('hard');
+    expect(pick(s)!.kind).toBe('ford');
+  });
+  it('an easy one takes the nearer crag', () => {
+    const s = mk('easy');
+    expect(pick(s)!.kind).toBe('crag');
   });
 });
