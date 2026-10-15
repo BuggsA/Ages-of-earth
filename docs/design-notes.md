@@ -588,3 +588,7 @@ Built: in the Iron Age, bog iron pays double gold (`bogGold` mod, `AGES.iron`); 
 **The computer favours its kin landmark** (2026-10-15, chain 1015-0206 s3, lane ai): `AI_MARK.worth.kin` makes a Greek computer walk further for a Spring, a Mongol for a Crag. I like that the same map now sends different peoples to different hills. Unit-tested only, no sweep. Next: soldiers retaking kin landmarks first; the lone-citizen recall question is still open.
 
 **Recalling the lone walker** (2026-10-15, chain 1015-0206 s4, lane ai): the computer's landmark walker now turns home when rival soldiers it can see come within 7 tiles of the walker itself, not only of the landmark, so a citizen no longer strolls into a raiding party on the road. Settles the open recall question. Unit-tested (fails without the change); no sweep; no save bump. Next: soldiers escorting the walker to a far landmark.
+
+## Designers' notes: iron wares (2026-10-15, chain 1015-0203 session 6, #197)
+
+Built: bog iron dug on any road (`stats.iron`) raises each trade trip in the Merchants, Fairs and Sail ages, +8% per 75 bars to +40% (`IRON_TRADE`, `ironTradeShare`); the Market panel shows it. Why I love it: the owner wants branches to combine. Iron is a choice made ages earlier, and it now pays out in a different economy, so a people that dug the marsh early reaches the merchants richer. Seen: unit tests only; no browser, no win-rate sweep, the computer neither digs for it nor weighs it. Next: a Bloomery that turns bars into armour; a hub where iron gates something no single age gives.
