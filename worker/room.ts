@@ -288,7 +288,7 @@ export class Room {
     if (typeof u.mapType === 'string' && MAP_TYPES_FOR_ROOMS.includes(u.mapType)) this.setup.mapType = u.mapType;
     if (typeof u.startEpoch === 'number' && u.startEpoch >= 0 && u.startEpoch <= 4) this.setup.startEpoch = Math.floor(u.startEpoch);
     if (typeof u.peaceMinutes === 'number' && u.peaceMinutes >= 0 && u.peaceMinutes <= 30) this.setup.peaceMinutes = Math.floor(u.peaceMinutes);
-    if (u.mode === 'conquest' || u.mode === 'regicide' || u.mode === 'deathmatch') this.setup.mode = u.mode;
+    if (u.mode === 'conquest' || u.mode === 'regicide' || u.mode === 'deathmatch' || u.mode === 'lords') this.setup.mode = u.mode;
   }
 
   private start(conn: Conn): void {

@@ -199,3 +199,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Chanting back** (own pitch, lane rules): a pilgrim keeper's priests within 7 tiles of a building being chanted over wear the rival's faith down (`CONSECRATE.counter.answer`). Tests only; browser, sound and win rates unseen; no save bump.
 
 **Dust of the march** (own pitch, lane look): fast riders and siege engines raise dust (powder on snow, none in rain). Render only; browser unseen; no save bump.
+
+**Lords of the Land** (own pitch, lane rules): the 'lords' game mode: keep every landmark 240 s to win; HUD countdown, banner, end line; the computer breaks a rival's hold with any soldiers. `LANDMARKS.lordsSeconds/.lordsMin`. Unit tests only; browser and win-rate unseen; no save bump.

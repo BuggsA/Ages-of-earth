@@ -544,6 +544,8 @@ export const RUINS = { count: { small: 2, medium: 3, large: 4 } as Record<MapSiz
  * - The Ancestors' Cairn gives its keeper `cairn.pop` more room for people: a house or two not built.
  */
 export const LANDMARKS = {
+  /** Lords of the Land: a side that keeps every landmark (at least `lordsMin` stand) for `lordsSeconds` wins. */
+  lordsSeconds: 240, lordsMin: 3,
   max: 5, home: 22, far: 34, fair: 4, spacing: 16, reach: 3.5, claim: 20, crowd: 3, border: 5, clear: 1, score: 100,
   spring: { reach: 6, heal: 0.03, every: 2 },
   crag: { sight: 14 },

@@ -88,6 +88,8 @@ export function createGame(setup: GameSetup): GameState {
     relics: [],
     relicTeam: -1,
     relicTimer: -1,
+    landTeam: -1,
+    landTimer: -1,
     posts: [],
     bogIron: map.bogIron,
     nextId: 1,
@@ -362,6 +364,14 @@ function checkVictory(s: GameState): void {
     s.winner = s.relicTeam;
     for (const p of s.players) if (p.team !== s.winner) p.defeated = true;
     s.events.push({ k: 'over', winner: s.winner, how: 'relics' });
+    return;
+  }
+  // And so does keeping every landmark.
+  if ((s.landTeam ?? -1) >= 0 && s.landTimer === 0) {
+    s.over = true;
+    s.winner = s.landTeam!;
+    for (const p of s.players) if (p.team !== s.winner) p.defeated = true;
+    s.events.push({ k: 'over', winner: s.winner, how: 'lands' });
     return;
   }
   for (const p of s.players) {
