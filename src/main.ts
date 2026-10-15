@@ -24,7 +24,8 @@ import { ageDef, ageOf, heirloomsOpened, isSideRoad, roadKnown, roadsFrom, suspe
 import { NetClient, newRoomCode, saveName, savedName } from './net/client';
 import { HASH_EVERY, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
 import { deserialize, serialize } from './sim/save';
-import { VAULT_SLOTS, formatVaultKey, type CloudSlot } from './net/vault';
+import { VAULT_SLOTS, formatVaultKey, normalizeVaultKey, type CloudSlot } from './net/vault';
+import { qrSvg } from './ui/qr';
 import { deleteCloud, listCloud, loadCloud, saveCloud, useVaultKey, vaultKey } from './net/cloud';
 import { SCENARIOS, scenarioById, starsFor } from './sim/campaign';
 import { loadDiscovery, observe, saveDiscovery, webMapHtml } from './ui/webMap';
@@ -610,9 +611,11 @@ async function openCloud(note = ''): Promise<void> {
     <div class="row cloud-key">
       <label>Your save key <code id="cloud-key">${formatVaultKey(key)}</code></label>
       <button class="btn" data-act="cloud-copy">Copy key</button>
+      <button class="btn" data-act="cloud-qr">Show QR code</button>
       <label>Key from another device <input id="cloud-key-in" maxlength="30" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false"></label>
       <button class="btn" data-act="cloud-use">Use this key</button>
     </div>
+    <div class="cloud-qr hidden"></div>
     <div class="row"><button class="btn wide" data-act="cloud-close">Back</button></div></div>`;
   if (inMatch) {
     $('modal').innerHTML = html;
@@ -707,6 +710,20 @@ function cloudAct(act: string, el: HTMLElement): void {
       const fail = () => hud.toast(`Your save key: ${key}`, 'info');
       if (navigator.clipboard) navigator.clipboard.writeText(key).then(() => hud.toast('Save key copied. Keep it secret: it opens your saves.', 'info'), fail);
       else fail();
+      break;
+    }
+    case 'cloud-qr': {
+      // The key rides in the link's #fragment, which a browser never sends to any server.
+      const box = cloudBox?.querySelector<HTMLElement>('.cloud-qr');
+      if (!box) break;
+      if (box.classList.toggle('hidden')) {
+        el.textContent = 'Show QR code';
+        box.innerHTML = '';
+      } else {
+        el.textContent = 'Hide QR code';
+        const link = `${location.origin}${location.pathname}#vault=${vaultKey()}`;
+        box.innerHTML = `${qrSvg(link)}<div class="hint">Scan with your phone's camera to open the game there with this key. It opens your saves: show it to nobody else.</div>`;
+      }
       break;
     }
     case 'cloud-use': {
@@ -2456,4 +2473,17 @@ if (roomCode.length === 5 && savedName()) connectRoom(roomCode, savedName(), new
 else if (roomCode.length === 5) lobby.showEntry(roomCode);
 else $('title').classList.remove('hidden');
 requestAnimationFrame(frame);
+// A scanned save-key link (#vault=KEY): the key leaves the address bar at once, then the player is asked.
+{
+  const scanned = /^#vault=([A-Za-z0-9-]+)$/.exec(location.hash)?.[1];
+  if (scanned && roomCode.length !== 5) {
+    history.replaceState(null, '', location.pathname + location.search);
+    const key = normalizeVaultKey(scanned);
+    if (!key) hud.toast('That save-key link is not valid.', 'bad');
+    else if (key === vaultKey() || confirm('Use the save key from this link? Your Cloud saves and campaign stars will be the ones under that key.')) {
+      if (key !== vaultKey()) useVaultKey(key);
+      void openCloud();
+    }
+  }
+}
 

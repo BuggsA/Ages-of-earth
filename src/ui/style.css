@@ -391,5 +391,7 @@ body.online .tip-box { bottom: 330px; }
 .cloud .cloud-acts { display: flex; gap: 6px; flex-shrink: 0; }
 .cloud .cloud-key code { font: 800 15px ui-monospace, monospace; color: var(--gold-2); letter-spacing: 1px; user-select: all; }
 .cloud .cloud-key input { font: 700 14px ui-monospace, monospace; color: var(--ink); background: #1b2030; border: 1px solid var(--edge-soft); border-radius: 8px; padding: 5px 8px; width: 17em; text-transform: uppercase; }
+.cloud .cloud-qr { display: grid; justify-items: center; gap: 6px; margin: 10px 0; }
+.cloud .cloud-qr .qr { border-radius: 8px; max-width: 100%; height: auto; }
 .cloud .bad { color: #ff7a6a; }
 @media (max-width: 560px) { .cloud .cloud-slot { flex-direction: column; align-items: stretch; } }
