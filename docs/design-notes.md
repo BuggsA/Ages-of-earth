@@ -628,3 +628,11 @@ Built: bog iron dug on any road (`stats.iron`) raises each trade trip in the Mer
 **Why:** counter-chant was a choice only a human made; now a pilgrim player meets defenders who answer, so five priests alone no longer walk through a lone tower.
 
 **Seen:** unit tests only (`tests/ward-priests.test.ts`); no win-rate sweep, browser unseen. **Next:** defenders' priests actively chanting back; a Temple craft for pilgrims.
+
+## Designers' notes: chanting back (2026-10-15, lane rules)
+
+**Built:** a pilgrim keeper's priests (in the open, within 7 tiles, not resting) don't only slow a rival's chant: they sing back, wearing its tally down by `CONSECRATE.counter.answer` (0.015) a second each, with their Litany and Grove voice. Other peoples' priests still only slow. `answerChant` in `consecrate.ts`, run from `faithStep`. No save bump.
+
+**Why:** pilgrim vs pilgrim becomes a duel of voices: whoever has more priests near, and Litany, wins the building; a lone chanter can no longer finish a tower the keeper's priests stand by.
+
+**Seen:** unit tests only (`tests/chant-back.test.ts`); no win-rate sweep, browser unseen. **Next:** a priest order to stand and answer; an audible answering chant.

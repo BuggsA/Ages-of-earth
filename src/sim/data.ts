@@ -491,7 +491,7 @@ export const CONSECRATE = {
   rate: 15,
   hard: { temple: 1.5 } as Partial<Record<BuildingType, number>>,
   guard: 0.35,
-  counter: { range: 7, each: 0.5 },
+  counter: { range: 7, each: 0.5, answer: 0.015 },
   never: ['towncenter', 'wonder'] as BuildingType[],
   grace: 1,
   fade: 0.05,
