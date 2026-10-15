@@ -9,6 +9,10 @@ import * as THREE from 'three';
 const MAX_SPARKS = 900;
 const MAX_RINGS = 24;
 const MAX_SHOTS = 24;
+const MAX_BOLTS = 12;
+/** Points in one drawn bolt: each straight leap is broken into this many jagged pieces. */
+const BOLT_KINKS = 6;
+const BOLT_POINTS = 4 * BOLT_KINKS + 1;
 
 interface Spark {
   pos: THREE.Vector3;
@@ -37,6 +41,12 @@ interface Shot {
   age: number;
   life: number;
   color: THREE.Color;
+}
+
+interface Bolt {
+  line: THREE.Line;
+  age: number;
+  life: number;
 }
 
 interface FloatText {
@@ -75,6 +85,8 @@ export class Effects {
   private ringFree: THREE.Mesh[] = [];
   private shots: Shot[] = [];
   private shotFree: THREE.Mesh[] = [];
+  private bolts: Bolt[] = [];
+  private boltFree: THREE.Line[] = [];
   private texts: FloatText[] = [];
   private queue: { at: number; run: () => void }[] = [];
   private clock = 0;
@@ -110,6 +122,16 @@ export class Effects {
       this.group.add(mesh);
       this.ringFree.push(mesh);
     }
+    for (let i = 0; i < MAX_BOLTS; i++) {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(BOLT_POINTS * 3), 3));
+      const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ transparent: true, depthWrite: false, fog: false, toneMapped: false }));
+      line.visible = false;
+      line.frustumCulled = false;
+      line.renderOrder = 5;
+      this.group.add(line);
+      this.boltFree.push(line);
+    }
     const shotGeo = new THREE.SphereGeometry(0.07, 8, 6);
     for (let i = 0; i < MAX_SHOTS; i++) {
       const mesh = new THREE.Mesh(shotGeo, new THREE.MeshBasicMaterial({ fog: false }));
@@ -117,6 +139,37 @@ export class Effects {
       this.group.add(mesh);
       this.shotFree.push(mesh);
     }
+  }
+
+  /** A forked bolt of lightning through the points given, flickering out over `life` seconds (#231). */
+  bolt(pts: THREE.Vector3[], color: THREE.ColorRepresentation, life = 0.28): void {
+    const line = this.boltFree.pop() ?? this.bolts.shift()?.line;
+    if (!line || pts.length < 2) return;
+    const pos = line.geometry.getAttribute('position') as THREE.BufferAttribute;
+    let n = 0;
+    for (let i = 0; i + 1 < pts.length && n + BOLT_KINKS < BOLT_POINTS; i++) {
+      const a = pts[i], b = pts[i + 1];
+      const jag = Math.min(0.5, a.distanceTo(b) * 0.08);
+      for (let k = 0; k < BOLT_KINKS; k++) {
+        const f = k / BOLT_KINKS;
+        const j = k === 0 ? 0 : jag;
+        pos.setXYZ(n++, a.x + (b.x - a.x) * f + (Math.random() - 0.5) * j, a.y + (b.y - a.y) * f + (Math.random() - 0.5) * j, a.z + (b.z - a.z) * f + (Math.random() - 0.5) * j);
+      }
+    }
+    const last = pts[pts.length - 1];
+    pos.setXYZ(n++, last.x, last.y, last.z);
+    // A line is a hair wide on screen: glowing sparks along the path give the bolt its body and catch the bloom.
+    const c = new THREE.Color(color);
+    for (let i = 1; i < n; i++) {
+      this.v.set(pos.getX(i), pos.getY(i), pos.getZ(i));
+      this.burst(this.v, { count: 1, speed: 0.2, life: life * 0.9, size: 0.06, grow: 0.3, gravity: 0, colors: [c] });
+    }
+    pos.needsUpdate = true;
+    line.geometry.setDrawRange(0, n);
+    line.geometry.computeBoundingSphere();
+    (line.material as THREE.LineBasicMaterial).color.set(color).multiplyScalar(2.4);
+    line.visible = true;
+    this.bolts.push({ line, age: 0, life });
   }
 
   /** Run something a little later (seconds), so a fight plays out as strike, then hit, then fall. */
@@ -261,6 +314,19 @@ export class Effects {
       return true;
     });
 
+    // Bolts flicker and fade.
+    this.bolts = this.bolts.filter((b) => {
+      b.age += dt;
+      const k = b.age / b.life;
+      if (k >= 1) {
+        b.line.visible = false;
+        this.boltFree.push(b.line);
+        return false;
+      }
+      (b.line.material as THREE.LineBasicMaterial).opacity = (1 - k) * (Math.random() < 0.25 ? 0.35 : 1);
+      return true;
+    });
+
     for (const t of this.texts) t.age += dt;
     for (const t of this.texts.filter((x) => x.age >= x.life)) t.el.remove();
     this.texts = this.texts.filter((x) => x.age < x.life);
@@ -297,6 +363,11 @@ export class Effects {
       this.shotFree.push(s.mesh);
     }
     this.shots = [];
+    for (const b of this.bolts) {
+      b.line.visible = false;
+      this.boltFree.push(b.line);
+    }
+    this.bolts = [];
     for (const t of this.texts) t.el.remove();
     this.texts = [];
   }

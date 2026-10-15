@@ -1,4 +1,5 @@
-import { AURA, RALLY, BONUS, BUILDINGS, DEER, VETERANCY, TICK_HZ, domainOf, secs, type UnitStats } from './data';
+import { AURA, RALLY, BONUS, BUILDINGS, DEER, LIGHTNING, VETERANCY, TICK_HZ, domainOf, secs, type UnitStats } from './data';
+import { hasCoils } from './ages';
 import { distToRect } from './grid';
 import type { Spatial } from './spatial';
 import { modsOf, statsFor } from './stats';
@@ -206,6 +207,10 @@ export function buildingGuns(s: GameState, sp: Spatial, b: Building): void {
   const t = nearestEnemyUnit(s, sp, b.owner, b.x, b.y, reach);
   if (!t) return;
   b.cool = secs(g.reload);
+  const power = (g.damage + m.rangedAttack) * (1 + epoch * 0.2);
+  // A Coil Tower (the Age of Lightning, #231) looses a bolt in place of its own arrow; those sheltering inside still shoot.
+  const coil = b.type === 'tower' && hasCoils(s.players[b.owner]);
+  if (coil) arc(s, sp, b, t, power);
   const arrows = 1 + Math.min(10, b.garrison.length);
   // Extra arrows go to others nearby when there are any, so a volley spreads over a crowd.
   const others: Unit[] = [];
@@ -216,7 +221,8 @@ export function buildingGuns(s: GameState, sp: Spatial, b: Building): void {
       if (dx * dx + dy * dy <= reach * reach) others.push(o);
     }
   });
-  for (let k = 0; k < arrows; k++) {
+  if (coil && arrows === 1) return;
+  for (let k = coil ? 1 : 0; k < arrows; k++) {
     const target = k === 0 || !others.length ? t : others[(k - 1) % others.length];
     const ts = statsOf(s, target);
     const dx = target.x - b.x;
@@ -233,11 +239,34 @@ export function buildingGuns(s: GameState, sp: Spatial, b: Building): void {
       ty: target.y,
       t: -k,
       dur: Math.max(2, Math.ceil((d / SHOT_SPEED.arrow) * TICK_HZ)),
-      damage: Math.max(1, (g.damage + m.rangedAttack) * (1 + epoch * 0.2) - ts.parmor),
+      damage: Math.max(1, power - ts.parmor),
       splash: 0,
       from: null,
       animal: false,
     });
   }
   s.events.push({ k: 'shot', owner: b.owner, kind: 'arrow', x: b.x, y: b.y });
+}
+
+/**
+ * A Coil Tower's bolt (#231): it strikes the first enemy, then leaps to the nearest enemy within
+ * `LIGHTNING.leap` of the last one struck that it hasn't struck yet, keeping `LIGHTNING.keep` of its strength
+ * at each leap, up to `LIGHTNING.strikes` in all. A crowd takes it all; a spread line takes one blow.
+ */
+function arc(s: GameState, sp: Spatial, b: Building, first: Unit, power: number): void {
+  const struck: Unit[] = [first];
+  const pts = [b.x, b.y, first.x, first.y];
+  let at = first;
+  let damage = power;
+  for (;;) {
+    hurt(s, at, Math.max(1, damage - statsOf(s, at).parmor), b.owner, null);
+    if (struck.length >= LIGHTNING.strikes) break;
+    const next = nearestEnemyUnit(s, sp, b.owner, at.x, at.y, LIGHTNING.leap, (o) => !struck.includes(o));
+    if (!next) break;
+    struck.push(next);
+    pts.push(next.x, next.y);
+    damage *= LIGHTNING.keep;
+    at = next;
+  }
+  s.events.push({ k: 'arc', owner: b.owner, building: b.id, pts });
 }

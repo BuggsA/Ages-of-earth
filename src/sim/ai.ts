@@ -1,10 +1,10 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, AI_FAITH, CONSECRATE, AI_LEVELS, AI_MARK, AI_RAID, AI_WEB, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_FAITH, AI_LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_RAID, AI_WEB, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
-import { ageOf, barred, deedsDone, hasWalked, deedsProgress, hiresAt, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
+import { ageOf, barred, deedsDone, hasWalked, deedsProgress, hiresAt, inField, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
 import { carriedBy } from './relics';
 import { claimants, favours, landmarkAt } from './landmarks';
 import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple } from './units';
@@ -200,7 +200,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   }
 
   // In the age of flight, save up for an airfield before anything smaller takes the wood.
-  if (L.clever && p.epoch >= 4 && citizens.length >= 24 && !buildings.some((b) => b.type === 'airfield')) {
+  if (L.clever && p.epoch >= 4 && citizens.length >= 24 && !buildings.some((b) => b.type === 'airfield') && !lightningBound(s, v, mem)) {
     const cost = buildingCostFor(s, p.id, 'airfield');
     const recent = s.tick - (mem.ordered.airfield ?? -99999) < secs(40);
     const spot = !recent && afford(v, cost) ? findSpot(s, 'airfield', home.x, home.y, 6, 22) : null;
@@ -210,6 +210,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   townBell(s, v, mem, issue);
   greatWork(s, v, mem, issue);
   lightBeacons(s, v, issue);
+  beaconsForLightning(s, v, mem, issue);
   rallyTheLine(s, v, issue);
   research(s, v, citizens.length >= wantCitizens - 2, issue);
   trade(s, v, issue);
@@ -392,6 +393,14 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
     if (here === 'aeronaut' && r.to === 'industrial' && count(v, 'airfield', true) === 0) {
       mem.roads ??= {};
       mem.roads.aeronaut = false;
+      return { road: r, wait: false };
+    }
+    // The other future (#231): a town of towers and no aircraft goes over to lightning once its beacons are lit;
+    // with its last tower fallen it brings the steam engines back.
+    if (r.to === 'lightning' && v.planes.length === 0 && count(v, 'tower', true) >= AI_LIGHTNING.towers && roadKnown(s, p, r) && deedsDone(p, r) && wants(s, p, mem, r.to)) return { road: r, wait: false };
+    if (here === 'lightning' && r.to === 'industrial' && count(v, 'tower', true) === 0) {
+      mem.roads ??= {};
+      mem.roads.lightning = false;
       return { road: r, wait: false };
     }
     if (here === 'pilgrim' && r.to === 'middle' && kept === 0) return { road: r, wait: false };
@@ -715,6 +724,13 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     const spot = findDockSpot(s, home.x, home.y, 24);
     if (!spot) mem.dockless = s.tick;
     else if (construct(s, v, mem, 'dock', spot, 2, issue)) return;
+  }
+
+  // In the Age of Lightning a coil goes up by a workshop that stands dark (#231), so its training runs fast again.
+  if (ageOf(p) === 'lightning' && count(v, 'tower') < AI_LIGHTNING.most && !recently('tower', AI_LIGHTNING.gap)) {
+    const dark = v.buildings.find((b) => b.built && b.type !== 'tower' && BUILDINGS[b.type].trains.length > 0 && !inField(s, b));
+    const spot = dark ? findSpot(s, 'tower', dark.x, dark.y, 2, 6) : null;
+    if (spot && construct(s, v, mem, 'tower', spot, 2, issue)) return;
   }
 
   const want: [BuildingType, boolean][] = [
@@ -1522,6 +1538,25 @@ function lightBeacons(s: GameState, v: View, issue: (c: Command) => void): void 
       return;
     }
   }
+}
+
+/** Whether a web-walking Industrial computer means to take the road to lightning (#231): it raises no Airfield then. */
+function lightningBound(s: GameState, v: View, mem: AiMemory): boolean {
+  const here = ageOf(v.p);
+  if (here === 'lightning') return true;
+  return here === 'industrial' && walksWeb(v) && roadsFrom(v.p).some((r) => r.to === 'lightning') && wants(s, v.p, mem, 'lightning');
+}
+
+/** Bound for lightning, it lights a tower's beacon every `AI_LIGHTNING.every` seconds until the road's deed is done (#231). */
+function beaconsForLightning(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (ageOf(p) !== 'industrial' || !lightningBound(s, v, mem)) return;
+  const road = roadsFrom(p).find((r) => r.to === 'lightning');
+  if (!road || deedsDone(p, road) || s.tick - (mem.zap ?? -99999) < secs(AI_LIGHTNING.every)) return;
+  const b = v.buildings.find((e) => e.type === 'tower' && !beaconProblem(s, p, e));
+  if (!b) return;
+  issue({ t: 'beacon', p: p.id, building: b.id });
+  mem.zap = s.tick;
 }
 
 /** A clever computer's hero cries out when the lines have met: at least four of its soldiers beside the hero and a rival soldier in reach. */

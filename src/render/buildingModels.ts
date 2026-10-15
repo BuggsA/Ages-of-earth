@@ -930,7 +930,7 @@ function ironTower(k: Kit, st: Style): void {
 /** The original four dressed ages, kept as the baseline model regression set. */
 export const LOOK_AGES: AgeId[] = ['merchant', 'iron', 'pilgrim', 'fair'];
 /** All dressed ages; additions get their own model coverage beside the baseline set. */
-export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer', 'sail', 'aeronaut'];
+export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer', 'sail', 'aeronaut', 'lightning'];
 
 const SAIL = '#efe8d4';
 const NET = '#b9ad8a';
@@ -952,6 +952,7 @@ function hungNets(k: Kit, x: number, y: number, z: number, w: number): void {
 
 const CLOTH = ['#d94a3c', '#e8b43a', '#3f8fc4', '#8a4fa8'];
 const RUST = '#8a4a2c';
+const COPPER = '#c27a3e';
 const PALE = '#e9e4d6';
 
 /** A slanted awning over a front: alternate bright strips. */
@@ -1001,6 +1002,25 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
         k.cyl(0.025, 0.025, h, 5, '#d7e4e8', span, 0, 0);
         k.box(0.48, 0.12, 0.1, '#76c6d6', span + 0.24, h, 0);
         k.box(0.12, 0.12, 0.11, '#f4efe4', span + 0.18, h, 0);
+      }
+      break;
+    }
+    case 'lightning': {
+      // The Age of Lightning (#231): the Watch Tower turns Coil Tower, a copper winding round its shaft,
+      // a lattice mast and Wardenclyffe's mushroom crown, glowing; other buildings carry a small receiving mast.
+      if (type === 'tower') {
+        for (const y of [1.15, 1.35, 1.55, 1.75, 1.95, 2.15]) k.ring(0.74, 0.035, COPPER, y);
+        for (const [x, z] of [[-0.22, -0.22], [0.22, -0.22], [-0.22, 0.22], [0.22, 0.22]]) k.cyl(0.025, 0.04, 1.05, 4, IRON_DARK, x, 2.72, z);
+        for (const y of [3.05, 3.4]) k.box(0.5, 0.03, 0.5, IRON_DARK, 0, y, 0);
+        k.cyl(0.62, 0.2, 0.12, 12, COPPER, 0, 3.72, 0);
+        k.dome(0.62, COPPER, 0, 3.84, 0);
+        k.glow(k.sphere(0.12, '#bfe6ff', 0, 4.5, 0));
+      } else if (['towncenter', 'barracks', 'range', 'stable', 'workshop', 'forge', 'market', 'temple', 'dock', 'wonder'].includes(type)) {
+        const span = type === 'wonder' ? 2.2 : big ? 1.7 : 1.2;
+        const h = type === 'wonder' ? 3.4 : big ? 2.9 : 2.1;
+        k.cyl(0.025, 0.035, h, 4, IRON_DARK, span, 0, -span * 0.6);
+        k.ring(0.12, 0.02, COPPER, 0).position.set(span, h * 0.8, -span * 0.6);
+        k.glow(k.octa(0.06, '#bfe6ff', span, h + 0.04, -span * 0.6));
       }
       break;
     }
