@@ -53,6 +53,19 @@ export function weatherFor(seed: number, mapType: MapType): WeatherDay {
   return { kind, strength: 0.5 + (mix(seed + 191) % 51) / 100 };
 }
 
+/**
+ * The day's sky in a season (0 spring .. 3 winter): the year's turn decides what falls. Snow comes only in
+ * winter, so a seeded snow day is rain in spring and autumn and a thin mist in summer; winter rain falls as
+ * snow (a winter storm is a blizzard, without lightning). Mist and clear days are the same all year.
+ */
+export function seasonalDay(day: WeatherDay, season: number): WeatherDay {
+  if (season === 3 && day.kind === 'rain') return { kind: 'snow', strength: day.strength };
+  if (season !== 3 && day.kind === 'snow') {
+    return season === 1 ? { kind: 'mist', strength: day.strength * 0.5 } : { kind: 'rain', strength: day.strength * 0.8 };
+  }
+  return day;
+}
+
 /** Which way the air moves, and how fast (tiles a second) once smoke has caught it. */
 export interface Wind {
   x: number;

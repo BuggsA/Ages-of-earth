@@ -12,7 +12,8 @@ import { BuildingsView } from './buildingsView';
 import { CameraRig } from './camera';
 import { Birds, Effects } from './effects';
 import { fogUniforms, glowUniform, timeUniform, windUniform } from './materials';
-import { setSeasonLook } from './seasonLook';
+import { forcedSeason, setSeasonLook } from './seasonLook';
+import { seasonAt } from '../sim/seasons';
 import { Overlays, type BarSpec, type RingSpec } from './overlays';
 import { Post, QUALITY, loadQuality, saveQuality, type QualityName } from './post';
 import { RelicsView } from './relicsView';
@@ -24,7 +25,7 @@ import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, type Rang
 import { ResourcesView } from './resourcesView';
 import { Sky } from './sky';
 import { forcedHour, hourAt, lightAt, moonPhase } from './daylight';
-import { Weather, describeWeather, forcedWeather, moodOf, weatherFor, windFor, type WeatherDay } from './weather';
+import { Weather, describeWeather, forcedWeather, moodOf, seasonalDay, weatherFor, windFor, type WeatherDay } from './weather';
 import { FogTexture, TerrainView, heightAt } from './terrain';
 import { AIR_ALT, UnitsView } from './unitsView';
 import { WATER_Y, WaterView } from './water';
@@ -246,12 +247,27 @@ export class View {
     this.wakes.clear();
     this.later = [];
     this.phase = moonPhase(s.seed);
-    this.setWeather(forcedWeather() ?? weatherFor(s.seed, s.mapType));
+    this.baseWeather = forcedWeather();
+    this.forcedDay = this.baseWeather !== null;
+    this.baseWeather ??= weatherFor(s.seed, s.mapType);
+    this.weatherSeason = this.currentSeason();
+    this.setWeather(this.forcedDay ? this.baseWeather : seasonalDay(this.baseWeather, this.weatherSeason));
   }
 
   /** Today's weather, in words for the opening banner ('' on a clear day). */
   get weatherWords(): string {
     return describeWeather(this.weather.day);
+  }
+
+  /** The seeded day, before the season has its say. */
+  private baseWeather: WeatherDay | null = null;
+  private forcedDay = false;
+  private weatherSeason = 0;
+  /** Told when the season changes what falls from the sky. */
+  onWeather: ((day: WeatherDay) => void) | null = null;
+
+  private currentSeason(): number {
+    return forcedSeason() ?? (this.state ? seasonAt(this.state) : 0);
   }
 
   get weatherDay(): WeatherDay {
@@ -338,6 +354,15 @@ export class View {
     this.time += dt;
     timeUniform.value = this.time;
     setSeasonLook(s.tick);
+    const sn = this.currentSeason();
+    if (sn !== this.weatherSeason && this.baseWeather && !this.forcedDay) {
+      this.weatherSeason = sn;
+      const day = seasonalDay(this.baseWeather, sn);
+      if (day.kind !== this.weather.day.kind || day.strength !== this.weather.day.strength) {
+        this.setWeather(day);
+        this.onWeather?.(day);
+      }
+    }
     this.rig.update(dt);
     const p = s.players[this.viewer];
     if (!this.reveal) this.fog?.update(p.vis, p.seen, dt);
