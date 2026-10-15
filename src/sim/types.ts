@@ -22,7 +22,7 @@ export type Difficulty = 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
 export type MapType = 'continental' | 'highlands' | 'lakes' | 'forest' | 'plains' | 'sea';
 /** Conquest: destroy every rival town. Regicide: each people has a King; lose them and you lose. Deathmatch: start rich. */
-export type GameMode = 'conquest' | 'regicide' | 'deathmatch';
+export type GameMode = 'conquest' | 'regicide' | 'deathmatch' | 'lords';
 export type Stance = 'aggressive' | 'defensive' | 'stand';
 export type CivId = 'egyptians' | 'greeks' | 'romans' | 'mongols' | 'chinese' | 'britons';
 export type TechId =
@@ -472,11 +472,12 @@ export type GameEvent =
   | { k: 'wonder'; owner: number; id: number; x: number; y: number; ticks: number }
   | { k: 'trade'; owner: number; res: Res; buy: boolean }
   | { k: 'defeated'; owner: number }
-  | { k: 'over'; winner: number; how: 'conquest' | 'wonder' | 'relics' | 'resign' | 'time' | 'scenario' }
+  | { k: 'over'; winner: number; how: 'conquest' | 'wonder' | 'relics' | 'lands' | 'resign' | 'time' | 'scenario' }
   /** A relic picked up, kept in a Temple, or let go where it lies. */
   | { k: 'relic'; id: number; owner: number; what: 'taken' | 'kept' | 'dropped'; x: number; y: number }
   /** One side now keeps every relic (its countdown starts), or no longer does (`team` -1). */
   | { k: 'relicHold'; team: number; ticks: number }
+  | { k: 'landHold'; team: number; ticks: number }
   /** A trader took on its gold at a trading post (`loaded`), or paid it in at its Market (`paid`). */
   | { k: 'caravan'; id: number; owner: number; what: 'loaded' | 'paid'; share?: boolean; amount: number; x: number; y: number }
   /** A scenario's story beat (a raid, a gift) and an objective completed. */
@@ -522,6 +523,9 @@ export interface GameState {
   /** The team keeping every relic in its temples, or -1; and ticks left before it wins (-1 when none). */
   relicTeam: number;
   relicTimer: number;
+  /** The team keeping every landmark, or -1; and ticks left before it wins (-1 when none). Old saves have neither. */
+  landTeam?: number;
+  landTimer?: number;
   /** The trading posts out on the map. */
   posts: TradePost[];
   /** Ancient ruins (#64); absent in older saves and in campaign chapters (none). */

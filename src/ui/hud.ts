@@ -344,6 +344,14 @@ export class Hud {
       const focus = shrine ? ` data-focus="${shrine.x},${shrine.y}"` : '';
       parts.push(`<div class="timer ${ours ? 'good' : 'bad'}"${focus}>⚱ ${who} every relic: ${fmtTime(s.relicTimer)}${ours ? '' : ' (take one back!)'}</div>`);
     }
+    if ((s.landTeam ?? -1) >= 0 && (s.landTimer ?? -1) >= 0) {
+      const ours = s.landTeam === s.players[viewer].team;
+      const keepers = s.players.filter((q) => q.team === s.landTeam);
+      const who = ours ? (keepers.length > 1 ? 'Your side keeps' : 'You keep') : `${keepers.map((q) => q.name).join(' and ')} ${keepers.length > 1 ? 'keep' : 'keeps'}`;
+      const m = s.landmarks?.[0];
+      const focus = m ? ` data-focus="${m.x},${m.y}"` : '';
+      parts.push(`<div class="timer ${ours ? 'good' : 'bad'}"${focus}>⛰ ${who} every landmark: ${fmtTime(s.landTimer!)}${ours ? '' : ' (take one back!)'}</div>`);
+    }
     const html = parts.join('');
     if (html !== this.timerHtml) {
       this.timerHtml = html;

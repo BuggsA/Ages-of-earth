@@ -1122,7 +1122,9 @@ function guardMarks(s: GameState, v: View, mem: AiMemory, ready: Unit[], issue: 
     return held;
   }
   const band = ready.filter((u) => u.type !== 'siege' && u.order.k === 'idle');
-  if (band.length < AI_MARK.party) return held;
+  // When a rival is about to be lord of every landmark, any soldiers will do to break it.
+  const lordRace = (s.landTeam ?? -1) >= 0 && s.landTeam !== v.p.team;
+  if (band.length < (lordRace ? 1 : AI_MARK.party)) return held;
   const m = markToTake(s, v, false, false);
   if (!m) return held;
   const ids = band
