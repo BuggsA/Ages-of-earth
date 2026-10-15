@@ -8,7 +8,7 @@ import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { homeMarket, marketOf, postAt, tripGold } from '../sim/trade';
 import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
-import { LANDMARK_KINDS, claimWork, claimants, landmarkAt } from '../sim/landmarks';
+import { LANDMARK_KINDS, claimWork, claimants, favours, landmarkAt } from '../sim/landmarks';
 import { workProblem } from '../sim/works';
 import { beaconProblem, lit } from '../sim/beacon';
 import { rallyProblem } from '../sim/rally';
@@ -436,7 +436,7 @@ export class Hud {
     const html = `<div class="sel-portrait"><span style="font-size:54px">${portrait}</span></div>
       <div class="sel-info"><div class="sel-name">${def.name}</div><div class="sel-sub">${status}</div>
       <div class="stats"><span data-tip="<b>Claiming</b>How long one person standing on it alone takes to claim it. Up to ${LANDMARKS.crowd} claim faster; rivals there too stop the claim.">⚑<em>One person</em> ${LANDMARKS.claim}s</span><span data-tip="<b>Land</b>Its keeper holds the land round it: their soldiers are supplied there, and rivals can't build in it.">🗺<em>Land</em> ${LANDMARKS.border} tiles</span></div>
-      <div class="blurb">${def.blurb} Send anyone there (citizens too) and keep rivals off it to claim it; a rival standing on it alone pulls it back down to nobody's, then takes it.</div></div>`;
+      <div class="blurb">${def.blurb}${favours(s, viewer, m.kind) ? ` It is your people's own: its gift is ${LANDMARKS.kinMul} times as strong for you.` : ''} Send anyone there (citizens too) and keep rivals off it to claim it; a rival standing on it alone pulls it back down to nobody's, then takes it.</div></div>`;
     return [html, `mark:${m.id}:${status}`];
   }
 

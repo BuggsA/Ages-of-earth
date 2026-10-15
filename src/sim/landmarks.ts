@@ -27,6 +27,16 @@ export function claimWork(): number {
   return secs(LANDMARKS.claim);
 }
 
+/** Whether a landmark kind is the one a player's people favour (`LANDMARKS.kin`). */
+export function favours(s: GameState, player: number, kind: LandmarkKind): boolean {
+  return LANDMARKS.kin[s.players[player].civ] === kind;
+}
+
+/** A landmark's bonus part (the `1.8` of 1.8x is `0.8`) grows by `kinMul` for the people who favour that kind. */
+export function kinBonus(s: GameState, player: number, kind: LandmarkKind, bonus: number): number {
+  return favours(s, player, kind) ? bonus * LANDMARKS.kinMul : bonus;
+}
+
 /** The landmarks a player keeps of a kind. */
 export function keptOf(s: GameState, player: number, kind: LandmarkKind): number {
   let n = 0;
@@ -40,7 +50,7 @@ export function groveBoost(s: GameState, u: Unit): number {
     if (m.kind !== 'grove' || m.owner !== u.owner) continue;
     const dx = u.x - m.x;
     const dy = u.y - m.y;
-    if (dx * dx + dy * dy <= LANDMARKS.grove.reach * LANDMARKS.grove.reach) return LANDMARKS.grove.priest;
+    if (dx * dx + dy * dy <= LANDMARKS.grove.reach * LANDMARKS.grove.reach) return 1 + kinBonus(s, u.owner, 'grove', LANDMARKS.grove.priest - 1);
   }
   return 1;
 }
@@ -111,7 +121,7 @@ function springStep(s: GameState, m: Landmark): void {
     if (dx * dx + dy * dy > r2) continue;
     const top = maxHp(s, e);
     if (e.hp >= top) continue;
-    e.hp = Math.min(top, e.hp + top * LANDMARKS.spring.heal);
+    e.hp = Math.min(top, e.hp + top * kinBonus(s, m.owner, 'spring', LANDMARKS.spring.heal));
     if (s.tick % secs(LANDMARKS.spring.every * 3) === 0) s.events.push({ k: 'healed', id: e.id, x: e.x, y: e.y });
   }
 }

@@ -566,6 +566,7 @@ Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), n
 **Seen:** headless Chromium, seed 7, each season held with `?season=`: autumn map ochre, winter map pale, no page errors. `tests/season-look.test.ts` checks the tints. Fades not watched in motion.
 **Next:** breath puffs or a muffled winter ambience; frozen lake edges (water tinted white in deep winter).
 
+**Landmark worth, swept** (2026-10-15, lane ai). Built: `AI_LEVELS.worthy` (on by default) so `scripts/ai-ab.ts 21 4 20 '{"worthy":false}'` compares need-based landmark choice against nearest-only. Result over 32 Hard-vs-Hard matches (seeds 21–100, seats swapped): wins 1–3, undecided ahead 17 / behind 11, gathering ×~0.94 (se ~0.1): no difference seen, so the rule stays (it costs nothing measurable and reads as sensible play). Next: the lone-citizen recall question, or a sweep with the landmarks as the deciding fight.
 ## Designers' notes: frozen lake edges (own pitch, 2026-10-15, Chain 1015-0203 session 3, lane look)
 
 **Built:** `uFrost` in the water shader (`src/render/water.ts`) is the season's snow cover; ice creeps from the shallows toward the deep with a ragged noisy edge, pale cracked and dull over the waves, and leaves the deep middle open. `iceCover`/`iceReach` in `seasonLook.ts` share the reach with the minimap, which whitens water by lake depth. Melts with the snow in spring. Render and UI only.
@@ -579,3 +580,4 @@ Built: the minimap shows ruins and relics as last seen (`src/ui/waymarks.ts`), n
 **Why I love it:** you now hear winter before you read it. The woods go quiet and a cold wind comes through the quiet, just as the snow settles.
 **Seen:** `tests/winter-sound.test.ts`; `npm run check`. Not heard in a browser; the wind's level and colour want an ear; no save bump.
 **Next:** breath puffs on citizens in winter; ships slowed by ice (a rules change with a save bump); a banner line when the season turns; wolves howling more often in winter nights.
+**Kin landmarks (session 3, chain 1015-0151):** each people has a favourite landmark kind (Egyptians Flint, Greeks Spring, Mongols Crag, Chinese Grove, Britons Cairn; Romans none, since existing tests use them as the plain people) whose bonus is half again as strong for them (`LANDMARKS.kin`, `.kinMul`). I love it because the same map reads differently to each people, and a rival's favourite is the one worth stealing. Seen: unit tests only; no win-rate sweep, the computer doesn't yet prefer its own kind. Next: the computer favouring its kind (see #191), a ford, hold-them-all mode.

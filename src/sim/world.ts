@@ -1,3 +1,4 @@
+import { kinBonus } from './landmarks';
 import { BUILDINGS, LANDMARKS, POP_MAX, domainOf, type UnitStats } from './data';
 import { AIR, NAVAL, distToRect, nearestWalkable, stampBuilding, walkable } from './grid';
 import { buildingMaxHp, statsFor } from './stats';
@@ -159,7 +160,7 @@ export function countPop(s: GameState): void {
     else if (e.built) p.cap += BUILDINGS[e.type].pop;
   }
   // An Ancestors' Cairn gives its keeper room for more.
-  for (const m of s.landmarks ?? []) if (m.kind === 'cairn' && m.owner >= 0) s.players[m.owner].cap += LANDMARKS.cairn.pop;
+  for (const m of s.landmarks ?? []) if (m.kind === 'cairn' && m.owner >= 0) s.players[m.owner].cap += Math.round(kinBonus(s, m.owner, 'cairn', LANDMARKS.cairn.pop));
   for (const p of s.players) p.cap = Math.min(POP_MAX, p.cap);
 }
 

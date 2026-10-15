@@ -1,4 +1,4 @@
-import type { AgeId, BuildingType, CivId, Cost, Difficulty, Domain, MapSize, MapType, Res, TechId, UnitType, PlayerStats } from './types';
+import type { AgeId, LandmarkKind, BuildingType, CivId, Cost, Difficulty, Domain, MapSize, MapType, Res, TechId, UnitType, PlayerStats } from './types';
 
 /** Every number in the game lives here. */
 
@@ -512,6 +512,9 @@ export const LANDMARKS = {
   cairn: { pop: 5 },
   flint: { tools: 1.2 },
   grove: { reach: 10, priest: 1.8 },
+  /** A people's own kind of landmark (the Romans, who build their own, have none) gives it `kinMul` times the effect (of the part above that is a bonus). */
+  kinMul: 1.5,
+  kin: { egyptians: 'flint', greeks: 'spring', mongols: 'crag', chinese: 'grove', britons: 'cairn' } as Partial<Record<CivId, LandmarkKind>>,
 };
 /**
  * The computer and the landmarks: once it has `townAt` citizens and sees no danger near one nobody
@@ -926,12 +929,14 @@ export interface AiLevel {
   bell: { ring: number; quiet: number; hold: number };
   /** Whether a clever computer raises a forward Tower as a foothold (#132 s5); `scripts/ai-ab.ts` sets it back to compare. */
   fort: boolean;
+  /** Whether a landmark's worth follows what the town needs (`AI_MARK.worth`); off, every one counts the same. `scripts/ai-ab.ts` sets it back to compare. */
+  worthy: boolean;
 }
 
 export const AI_LEVELS: Record<Difficulty, AiLevel> = {
-  easy: { label: 'Easy', gather: 0.8, citizens: 16, firstAttack: 720, wave: 6, waveGrowth: 3, think: 1.5, towers: 0, clever: false, traders: 2, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true },
-  normal: { label: 'Normal', gather: 1, citizens: 24, firstAttack: 480, wave: 8, waveGrowth: 4, think: 1, towers: 1, clever: true, traders: 5, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true },
-  hard: { label: 'Hard', gather: 1.15, citizens: 32, firstAttack: 330, wave: 9, waveGrowth: 5, think: 0.5, towers: 2, clever: true, traders: 8, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true },
+  easy: { label: 'Easy', gather: 0.8, citizens: 16, firstAttack: 720, wave: 6, waveGrowth: 3, think: 1.5, towers: 0, clever: false, traders: 2, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true },
+  normal: { label: 'Normal', gather: 1, citizens: 24, firstAttack: 480, wave: 8, waveGrowth: 4, think: 1, towers: 1, clever: true, traders: 5, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true },
+  hard: { label: 'Hard', gather: 1.15, citizens: 32, firstAttack: 330, wave: 9, waveGrowth: 5, think: 0.5, towers: 2, clever: true, traders: 8, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true },
 };
 
 /**
