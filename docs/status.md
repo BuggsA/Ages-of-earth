@@ -63,6 +63,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Art pass 11** (#267, lane look): stables of epochs 0–2 get their own silhouettes: a rail-fenced horse corral with a hide lean-to and horsetail totem; mudbrick stalls with arched doors and beam ends; a hayloft dormer and weathervane on the medieval stable. Render only; `models.test.ts` builds them; look in a browser unseen; no save bump.
 
+**Art pass 12** (#267, lane look): ranges of epochs 0–2 get their own silhouettes: an open hunters' shed with spear rack and stone pile; a mudbrick court with a crenellated parapet, bow rack and earth butt; a timber-framed hall with slits, hoarding, quiver barrel and straw butts. Render only; `models.test.ts` builds them; look in a browser unseen; no save bump.
+
 **Rally ring** (own pitch, lane look): stirred soldiers wear a pulsing gold band that fades with the cry. Render only; smoke passes; look in a match unseen.
 **Cry ripple** (own pitch, lane look): calling the Rallying Cry sends two gold rings out to its reach. Render only; reach vs. the ring mesh unseen in a browser.
 
