@@ -120,6 +120,12 @@ export function barred(p: Player, unit: UnitType): string | null {
   return no && no.units.includes(unit) ? no.why : null;
 }
 
+/** Why a player's age won't let them raise a building at all (the steppe tills no fields, #297), or null. */
+export function buildBarred(p: Player, type: BuildingType): string | null {
+  const no = ageDef(p).noBuild;
+  return no && no.buildings.includes(type) ? no.why : null;
+}
+
 /** How many relics a player keeps in standing Temples. */
 export function relicsKept(s: GameState, owner: number): number {
   let n = 0;

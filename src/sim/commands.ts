@@ -2,7 +2,8 @@ import { BUILDINGS, EPOCHS, MARKET, RES_LABEL, SPREAD, TECHS, UNITS, domainOf, s
 import { peace } from './combat';
 import { placeProblem, stampBuilding, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
-import { backProblem, backTo, barred, journeyOf, roadProblem, roadTo, trainsAt } from './ages';
+import { packCamp, packProblem, pitchCamp, pitchProblem } from './steppe';
+import { backProblem, backTo, barred, buildBarred, journeyOf, roadProblem, roadTo, trainsAt } from './ages';
 import type { Building, BuildingType, Command, Ent, Cost, GameState, Order, Player, Unit } from './types';
 import { RES, R_FISH, R_MEAT, R_NONE } from './types';
 import { RES_OF_TILE, cargoRoom, findResource, freeFarm, garrisonRoom, giveOrder, landing, setOrder, ungarrison } from './units';
@@ -133,6 +134,11 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
   const player = s.players[p];
   if (def.epoch > player.epoch) {
     if (!quiet) refuse(s, p, `Needs the ${EPOCHS[def.epoch].name}`);
+    return null;
+  }
+  const no = buildBarred(player, type);
+  if (no) {
+    if (!quiet) refuse(s, p, no);
     return null;
   }
   const problem = placeProblem(s, type, tx, ty, true, p);
@@ -506,6 +512,24 @@ export function applyCommand(s: GameState, c: Command): void {
       lightBeacon(s, p, b);
       break;
     }
+    case 'pack': {
+      const b = myBuilding(s, c.p, c.building);
+      if (!b) return;
+      const why = packProblem(s, p, b);
+      if (why) return refuse(s, c.p, why);
+      packCamp(s, b);
+      break;
+    }
+    case 'pitch': {
+      const wagons = myUnits(s, c.p, c.ids).filter((u) => u.type === 'wagon');
+      let why: string | null = null;
+      for (const w of wagons) {
+        why = pitchProblem(s, w);
+        if (!why) pitchCamp(s, w);
+      }
+      if (why) refuse(s, c.p, why);
+      break;
+    }
     case 'cry': {
       const h = s.byId.get(c.id);
       if (!h || h.kind !== 'unit') return;
@@ -672,7 +696,7 @@ export function applyCommand(s: GameState, c: Command): void {
       for (const id of c.ids) {
         const e = s.byId.get(id);
         if (!e || e.owner !== c.p || e.hp <= 0) continue;
-        if (e.kind === 'building' && !e.built && e.progress === 0) refund(p, buildingCostFor(s, c.p, e.type));
+        if (e.kind === 'building' && !e.built && e.progress === 0 && e.pitch === undefined) refund(p, buildingCostFor(s, c.p, e.type));
         e.hp = 0;
       }
       break;

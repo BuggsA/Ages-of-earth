@@ -12,7 +12,9 @@ export type Stock = Record<Res, number>;
 
 export type UnitType =
   | 'citizen' | 'infantry' | 'ranged' | 'cavalry' | 'siege' | 'priest' | 'hero'
-  | 'fisher' | 'warship' | 'transport' | 'cog' | 'fighter' | 'bomber' | 'trader';
+  | 'fisher' | 'warship' | 'transport' | 'cog' | 'fighter' | 'bomber' | 'trader'
+  /** A packed Town Center or House on the move (the Age of the Steppe, #297). */
+  | 'wagon';
 /** How a unit gets about: on foot, on the water, or in the air. */
 export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
@@ -33,7 +35,7 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
 export type PathId = 'blood';
@@ -172,6 +174,9 @@ export interface Unit {
   cryReady?: number;
   /** Enemy soldiers it has defeated (older saves lack it). */
   vet?: number;
+  /** A wagon (#297): the building it carries, and that building's health as a share of its full health. */
+  packed?: BuildingType;
+  packedHp?: number;
 }
 
 export interface TrainItem {
@@ -230,6 +235,11 @@ export interface Building {
   faith?: number;
   faithBy?: number;
   chant?: number;
+  /**
+   * Being pitched from a wagon (#297): it raises itself, with no builders, and is finished when `progress`
+   * reaches 1. The share of its full health it was packed with, which it climbs back to as it goes up.
+   */
+  pitch?: number;
 }
 
 export type Ent = Unit | Building;
@@ -381,6 +391,8 @@ export interface PlayerStats {
   fished?: number;
   /** Beacons lit on the people's towers, relays included (the Age of Lightning's deed, #231); absent in older saves. */
   beacons?: number;
+  /** Meat butchered by hunters (the Age of the Steppe's deed, #297); absent in older saves. */
+  hunted?: number;
   /** Enemy units (not buildings) the people's forces have slain: the Path of Blood's deeds (#299); absent in older saves. */
   slain?: number;
   /** Gold taken as plunder from the enemy dead (#299); absent in older saves. */
@@ -481,6 +493,8 @@ export type GameEvent =
   | { k: 'bell'; owner: number; ring: boolean }
   | { k: 'cry'; owner: number; id: number; x: number; y: number; n: number }
   | { k: 'beacon'; owner: number; building: number; x: number; y: number; on: boolean }
+  /** A steppe people struck camp (#297): a building packed onto a wagon, or a wagon pitched as a building. */
+  | { k: 'camp'; owner: number; id: number; type: BuildingType; x: number; y: number; pitched: boolean }
   /** A Coil Tower's bolt (the Age of Lightning, #231): from the tower through each enemy it struck, as x, y pairs. */
   | { k: 'arc'; owner: number; building: number; pts: number[] }
   /** A great work was called (`on`) or ran out (seed #133). */
@@ -650,6 +664,10 @@ export type Command =
   | { t: 'ungarrison'; p: number; building: number }
   | { t: 'bell'; p: number; ring: boolean }
   | { t: 'beacon'; p: number; building: number }
+  /** Strike camp (#297): pack a Town Center or House onto a wagon. */
+  | { t: 'pack'; p: number; building: number }
+  /** Pitch camp (#297): wagons set down the building they carry where they stand. */
+  | { t: 'pitch'; p: number; ids: number[] }
   /** A hero's Rallying Cry. */
   | { t: 'cry'; p: number; id: number }
   /** Call the people's great work (seed #133), once in each epoch. */
