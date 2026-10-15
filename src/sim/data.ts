@@ -722,13 +722,15 @@ export interface Mods {
   consecrate: number;
   /** Above 0, a Temple within a Watch Tower's reach mends its people's soldiers near it (St. Elmo's Fire, #240). */
   elmo: number;
+  /** Added to the sight of a ship within a Watch Tower's reach (Wireless Telegraphy, #240). */
+  wireless: number;
 }
 
 export const NO_MODS: Mods = {
   meleeAttack: 0, rangedAttack: 0, armor: 0, parmor: 0, range: 0, carry: 0, citizenSpeed: 1, wood: 1, mine: 1, farm: 1, forage: 1, hunt: 1,
   buildingHp: 1, buildSpeed: 1, militaryTrain: 1, rangedTrain: 1, cavalrySpeed: 1, infantryHp: 1, infantryArmor: 0, infantryAttack: 0, priest: 1, chant: 1,
   siegeAttack: 1, siegeRange: 0, techCost: 1, wonderCost: 1, extraCitizens: 0, fish: 1, shipHp: 1, shipRange: 0, airSpeed: 1, airHp: 1,
-  traderSpeed: 1, tradeGold: 1, relicGold: 1, bogGold: 1, rot: 1, beastWard: 1, portReach: 0, riderSight: 0, consecrate: 0, elmo: 0,
+  traderSpeed: 1, tradeGold: 1, relicGold: 1, bogGold: 1, rot: 1, beastWard: 1, portReach: 0, riderSight: 0, consecrate: 0, elmo: 0, wireless: 0,
 };
 
 export interface Tech {
@@ -796,6 +798,7 @@ export const TECHS: Record<TechId, Tech> = {
   ironHulls: { name: 'Iron-Bound Hulls', at: 'dock', epoch: 2, walked: ['iron', 'sail'], cost: { wood: 200, gold: 100 }, time: 40, mul: { shipHp: 1.3, fish: 1.2 }, blurb: 'Heirloom of the Iron Age and the Age of Sail: iron knees, nails and anchors from the marsh smithies. Ships are 30% sturdier and fishing boats fish 20% faster. Kept for good, on any road.', icon: '🔩' },
   jointStock: { name: 'Joint-Stock Company', at: 'market', epoch: 2, walked: ['merchant', 'sail'], cost: { food: 200, gold: 200 }, time: 40, mul: { tradeGold: 1.15, traderSpeed: 1.1 }, blurb: 'Heirloom of the Age of Merchants and the Age of Sail: the guilds\' ledgers meet the shipping fortune, and many purses share one venture. Every trade trip pays 15% more and traders travel 10% faster. Kept for good, on any road.', icon: '📈' },
   stElmo: { name: 'St. Elmo\'s Fire', at: 'temple', epoch: 4, walked: ['pilgrim', 'lightning'], cost: { gold: 300, stone: 150 }, time: 50, add: { elmo: 1 }, blurb: 'Heirloom of the Age of Pilgrims and the Age of Lightning: the faithful read the blue glow on the coil\'s crown as a blessing. A Temple within a Watch Tower\'s reach (10 tiles) mends the soldiers standing near it, 4% of their health every 2 seconds, so an army can be staged between a coil and a shrine. Kept for good, on any road.', icon: '🌩' },
+  wireless: { name: 'Wireless Telegraphy', at: 'dock', epoch: 4, walked: ['sail', 'lightning'], cost: { wood: 200, gold: 250 }, time: 45, add: { wireless: 6 }, blurb: 'Heirloom of the Age of Sail and the Age of Lightning: the coil speaks to the masts. Every ship within a Watch Tower\'s reach (10 tiles) sees 6 tiles farther, so a coil on a headland is a lighthouse for the whole fleet, and a raider is spotted before it closes. Kept for good, on any road.', icon: '📡' },
   masonsLodge: { name: 'Masons\' Lodge', at: 'temple', epoch: 2, walked: ['pilgrim', 'reclaimer'], cost: { wood: 200, stone: 150 }, time: 40, mul: { buildSpeed: 1.2, buildingHp: 1.15 }, blurb: 'Heirloom of the Age of Pilgrims and the Age of Reclaimers: the builders who studied the old ruins raise the great churches, and keep their lodge. Buildings go up 20% faster and are 15% sturdier. Kept for good, on any road.', icon: '⛪' },
   survey: { name: 'Survey the Land', at: 'storehouse', epoch: 0, cost: { food: 50, wood: 50 }, time: 15, survey: 'bogIron', blurb: 'Prospectors walk the streams and marshes and answer one question: is there bog iron anywhere in this world? Yes or no; not where, nor how much.', icon: '🧭' },
 };

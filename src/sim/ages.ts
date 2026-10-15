@@ -214,7 +214,7 @@ export function journeyOf(p: Player, b: Building): Journey | undefined {
 export const hasCoils = (p: Player): boolean => !!ageDef(p).coils;
 
 /** Whether a building stands in the field of one of its owner's finished, standing Watch (Coil) Towers. */
-export function inField(s: GameState, b: Building): boolean {
+export function inField(s: GameState, b: { owner: number; x: number; y: number }): boolean {
   const r2 = LIGHTNING.reach * LIGHTNING.reach;
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.type !== 'tower' || e.owner !== b.owner || !e.built || e.hp <= 0) continue;

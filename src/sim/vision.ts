@@ -2,6 +2,8 @@ import { kinBonus } from './landmarks';
 import { BEACON, BUILDINGS, LANDMARKS } from './data';
 import type { GameState } from './types';
 import { statsOf } from './world';
+import { inField } from './ages';
+import { modsOf } from './stats';
 
 /** Fog of war: which tiles each player sees now, and which they have ever seen. */
 
@@ -26,7 +28,12 @@ export function updateVision(s: GameState): void {
     if (e.hp <= 0) continue;
     const p = s.players[e.owner];
     let r: number;
-    if (e.kind === 'unit') r = statsOf(s, e).sight;
+    if (e.kind === 'unit') {
+      const st = statsOf(s, e);
+      r = st.sight;
+      // Wireless Telegraphy (#240): a ship within a coil's field sees farther.
+      if (st.cls === 'ship' && modsOf(s, e.owner).wireless && inField(s, e)) r += modsOf(s, e.owner).wireless;
+    }
     else r = e.built ? BUILDINGS[e.type].sight + e.size / 2 + (e.beacon !== undefined && s.tick < e.beacon ? BEACON.sight : 0) : 2 + e.size / 2;
     const cx = Math.floor(e.x);
     const cy = Math.floor(e.y);
