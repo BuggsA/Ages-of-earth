@@ -1,6 +1,7 @@
 import type { SoundName } from '../audio/sound';
+import { hasCoils } from '../sim/ages';
 import { statsFor } from '../sim/stats';
-import type { GameState, Unit } from '../sim/types';
+import type { Building, GameState, Unit } from '../sim/types';
 import { heightAt } from './terrain';
 import { WATER_Y } from './water';
 
@@ -52,3 +53,23 @@ export function voiceFits(voice: CreatureVoice, water: boolean, army: boolean, s
       return water;
   }
 }
+
+/**
+ * How near the view's centre the closest humming Coil Tower stands, in tiles, or Infinity: a finished tower
+ * (any player's) whose owner stands in the Age of Lightning (#231) and that lies within `range`.
+ */
+export function coilDistance(s: GameState, x: number, z: number, range: number, seen: (b: Building) => boolean = () => true): number {
+  let best = Infinity;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'tower' || !e.built || e.hp <= 0 || !hasCoils(s.players[e.owner]) || !seen(e)) continue;
+    const d = Math.sqrt((e.x - x) * (e.x - x) + (e.y - z) * (e.y - z));
+    if (d <= range && d < best) best = d;
+  }
+  return best;
+}
+
+/** How loud the hum is at a distance: full beside the tower, fading to nothing at `range`. */
+export const coilHumGain = (d: number, range: number): number => (d >= range ? 0 : 0.5 * (1 - d / range));
+
+/** How far from the view's centre a Coil Tower is heard, in tiles. */
+export const COIL_HUM_RANGE = 12;

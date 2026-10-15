@@ -219,3 +219,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 
 **The computer reaches for an heirloom** (#232, own pitch, lane ai): once it has walked a side age, the clever computer takes the second road that opens an heirloom (`AI_WEB.heir` 1, was `take` 0.6) and buys the heirloom first, queuing it even at a busy building. Tests and a headless match; no win-rate sweep; browser unseen; no save bump.
+
+**Coil hum** (own pitch, lane look): a finished Coil Tower within 12 tiles of the view hums (60 Hz and its octave), louder the nearer; only towers you see. Audio only; level unheard; unit test of the distance; no save bump.

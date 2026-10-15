@@ -34,7 +34,7 @@ import { Bats } from './bats';
 import { Owls } from './owls';
 import { Roosts } from './roosts';
 import { Perches } from './perches';
-import { armyNear, nearWater, voiceFits, wet, type CreatureVoice } from './ambience';
+import { armyNear, coilDistance, coilHumGain, COIL_HUM_RANGE, nearWater, voiceFits, wet, type CreatureVoice } from './ambience';
 
 /**
  * The 3D view of a match through one player's eyes: lit terrain and lakes under a sky, woods and
@@ -113,6 +113,7 @@ export class View {
   private nextHoot = 12;
   private nextGull = 8;
   private nextSong = 5;
+  private nextHum = 3;
   private nextChirp = 6;
   private nextCroak = 9;
   private dayLevel = 0;
@@ -461,6 +462,16 @@ export class View {
       this.nextSong = this.time + 7 + Math.random() * 14;
       const s = this.state;
       if (this.voiceHere(s, 'birdsong')) this.onCue?.('birdsong', Math.random() * 1.6 - 0.8, 0.4);
+    }
+    // A Coil Tower within a dozen tiles of the view hums; the nearer, the louder (#231).
+    if (this.time > this.nextHum) {
+      this.nextHum = this.time + 2.2;
+      const s = this.state;
+      if (s) {
+        const d = coilDistance(s, this.rig.target.x, this.rig.target.z, COIL_HUM_RANGE, (b) => this.reveal || b.owner === this.viewer || this.sees(b.x, b.y));
+        const g = coilHumGain(d, COIL_HUM_RANGE);
+        if (g > 0.02) this.onCue?.('coilHum', 0, g);
+      }
     }
     this.roosts.update(this.time, this.ruins.standingAt, this.rig.target, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
     this.perches.update(this.time, this.ruins.standingAt, this.rig.target, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
