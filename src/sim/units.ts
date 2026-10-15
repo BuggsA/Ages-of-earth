@@ -10,7 +10,7 @@ import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } 
 import { carriedBy, relicAt } from './relics';
 import { animalRadius, hitAnimal } from './animals';
 import { dig, ruinAt } from './ruins';
-import { groveBoost, keptOf, kinBonus } from './landmarks';
+import { fordMarch, groveBoost, keptOf, kinBonus } from './landmarks';
 import { chant, chantedOver, consecrateProblem, consecrates, turnBuilding } from './consecrate';
 import { atPost, dockOf, goalForPost, homeMarket, marketOf, nearestDock, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { canHit, exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, passOf, pay, radiusOf, statsOf, teamOf } from './world';
@@ -1361,7 +1361,7 @@ export function routeUnits(s: GameState): void {
 /** Walk the route. */
 export function walk(s: GameState, u: Unit): void {
   if (!u.path) return;
-  let left = statsOf(s, u).speed * DT;
+  let left = statsOf(s, u).speed * fordMarch(s, u) * DT;
   while (left > 1e-9 && u.path) {
     const tx = u.path[u.pathI * 2];
     const ty = u.path[u.pathI * 2 + 1];
