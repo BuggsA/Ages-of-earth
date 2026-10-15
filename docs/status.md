@@ -250,3 +250,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Escorted hunt** (own pitch, lane ai): a clever computer hunts a mammoth 22–38 tiles out with two soldiers along (`AI_WILD.far/.escort/.guard/.safe`). Tests only; no sweep; no save bump.
 
 **People crests** (#267 art pass, own step, lane look): the title card shows your people's crest in your colour. UI only; seen in headless Chromium (title card, two peoples); no save bump.
+
+**Crests in the match** (#267 s2, own pitch, lane look): the people's crest, small, on the HUD people chip and in the end report's player rows. Render/UI only; smoke (a match) passes; look in a browser unseen.
