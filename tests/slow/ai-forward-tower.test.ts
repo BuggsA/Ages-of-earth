@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createGame, step } from '../src/sim/game';
-import { AI_RAID } from '../src/sim/data';
+import { createGame, step } from '../../src/sim/game';
+import { AI_RAID } from '../../src/sim/data';
 
 describe('the computer raises a forward Tower (#132 s5)', () => {
   it('a Hard computer puts a tower out at the edge of its land', () => {
