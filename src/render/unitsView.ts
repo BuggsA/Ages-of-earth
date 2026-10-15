@@ -31,6 +31,8 @@ interface Anim {
   circle: number;
   /** Aircraft: how much it is banking. */
   bank: number;
+  /** Seconds until the next puff of dust from a hard-moving foot or hoof. */
+  dust?: number;
 }
 
 interface Corpse {
@@ -136,6 +138,8 @@ export class UnitsView {
   });
   private chevronCount = [0, 0, 0];
   private anims = new Map<number, Anim>();
+  /** Where hooves and wheels kicked up dust this frame, as x, y, ground height, strength: the view turns them into puffs. */
+  readonly kicks: number[] = [];
   private corpses: Corpse[] = [];
   private m = new THREE.Matrix4();
   private q = new THREE.Quaternion();
@@ -260,6 +264,7 @@ export class UnitsView {
     for (const b of this.batches.values()) b.count = 0;
     this.chevronCount = [0, 0, 0];
     this.screen.length = 0;
+    this.kicks.length = 0;
     this.drawn.clear();
     const ticks = s.tick - 1 + alpha;
 
@@ -310,6 +315,14 @@ export class UnitsView {
       const walking = a.speed > 0.15;
       const mounted = !!st.mounted;
       const engine = u.type === 'siege';
+      // Riders and engines at a hard pace kick up a puff now and then (the view decides if the ground is dry enough).
+      if ((mounted || engine) && a.speed > 1.1 && domainOf(u.type) === 'land' && this.kicks.length < 96) {
+        a.dust = (a.dust ?? (u.id % 7) * 0.05) - dt;
+        if (a.dust <= 0) {
+          a.dust = 0.28 + (u.id % 5) * 0.04;
+          this.kicks.push(x, y, heightAt(s, x, y), Math.min(1, a.speed / 3));
+        }
+      }
       a.phase += dt * (walking ? a.speed * (mounted ? 5.5 : 8.5) : 0);
       let leg = walking ? Math.sin(a.phase) * (mounted ? 0.5 : 0.6) : 0;
       let arm = 0;

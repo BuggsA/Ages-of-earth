@@ -639,3 +639,6 @@ Built: bog iron dug on any road (`stats.iron`) raises each trade trip in the Mer
 
 ### Standing to answer (s5, chain 1015-0406)
 **Built:** right-click a chanted-over building of your own with pilgrim priests: they walk up (`CONSECRATE.counter.hold` 3 tiles), stand and sing back at `1 + counter.stand` (1.5×) the strength of a priest merely nearby, with the chant sound; the order ends when the faith is gone. **Why:** a defence you steer, not just proximity. **Seen:** `tests/chant-back.test.ts`; browser and sound unseen. **Next:** the computer ordering its priests to stand; a cursor for it.
+
+## Designers' notes: dust of the march (own pitch, 2026-10-15, chain 1015-0406 s8, lane look)
+**Built:** riders and siege engines moving fast kick a puff every ~0.3 s (`unitsView.kicks`, turned into soft bursts by `View.dust`): tan dust in clear weather, white powder under snow, nothing in rain, half in mist. **Why:** a cavalry charge across the plain should be seen from the far edge of the map as a rolling cloud, and the weather already decides what the ground does. **Seen:** `npm run check` only; the look in a browser unseen. **Next:** infantry columns raising a thin haze, dust that fades to mud after rain, hoof sound.
