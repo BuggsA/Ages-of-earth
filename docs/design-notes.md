@@ -611,6 +611,9 @@ Built: bog iron dug on any road (`stats.iron`) raises each trade trip in the Mer
 
 **Seen:** headless Chromium, by driving a match through `window.ages`. At 81% the panel reads "✨ 81% won over". When it turns, the tower's banner goes from red to blue, the borders around it change colour and the ring plays. No page errors. The motes' code runs in the browser, but the headless renderer reached only 1.5 s of view time in 12 s, so they never showed on screen: unseen. The sound is unheard.
 
+**Next:** a counter-chant (the keeper's own priests slowing a rival's faith); a pilgrim computer escorting its priest band with its army instead of just shadowing it; a Temple technology that lets a pilgrim people keep a converted building's arrows or garrison loyal; and the reverse question, whether a converted Temple should count toward the Pilgrimage deed.
+
+Built (art pass #267): epoch 4 houses are brick terraces with a flat parapet and chimney pots, and Watch Towers iron-framed lookouts with a lamp gallery, so the machine age no longer reuses the epoch 3 silhouettes. Why: a town should read its age at a glance. Unseen in a browser. Next: epoch 4 shapes for the barracks, range and stable; a title backdrop that isn't a form over a live field.
 **Next:** a pilgrim computer escorting its priest band with its army instead of just shadowing it; a Temple technology that lets a pilgrim people keep a converted building's arrows or garrison loyal; and the reverse question, whether a converted Temple should count toward the Pilgrimage deed.
 
 ## Designers' notes: counter-chant (2026-10-15, lane rules)

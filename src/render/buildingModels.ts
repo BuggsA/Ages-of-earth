@@ -177,6 +177,20 @@ function house(k: Kit, e: number, st: Style): void {
     k.team(k.box(0.3, 0.04, 0.03, TEAM, -0.02, 0.4, 0.52));
     return;
   }
+  if (e === 4) {
+    // A brick terrace of the machine age: two storeys, a flat parapet roof and a row of chimney pots.
+    k.box(1.5, 0.3, 1.2, st.base, 0, 0, -0.05);
+    k.box(1.5, 1.15, 1.2, st.wall, 0, 0.3, -0.05);
+    k.box(1.56, 0.06, 1.26, st.trim, 0, 0.9, -0.05);
+    k.box(1.56, 0.12, 1.26, st.trim, 0, 1.45, -0.05);
+    k.box(1.56, 0.1, 0.06, IRON_DARK, 0, 1.57, 0.55);
+    for (const x of [-0.5, -0.15, 0.2, 0.55]) k.cyl(0.07, 0.08, 0.3, 6, '#5c3024', x, 1.57, -0.35);
+    for (const x of [-0.45, 0.05, 0.5]) for (const y of [0.5, 1.05]) window(k, st, x, y, 0.56, 0.16, 0.24, y > 1);
+    k.box(0.26, 0.48, 0.03, '#2b2b2e', -0.02, 0.3, 0.56);
+    k.box(0.4, 0.05, 0.22, IRON_DARK, -0.02, 0.8, 0.64);
+    k.team(k.box(0.34, 0.06, 0.12, TEAM, -0.02, 0.62, 0.7));
+    return;
+  }
   k.box(1.4, 0.95, 1.15, st.wall, 0, 0, -0.05);
   k.box(1.44, 0.06, 1.2, st.trim, 0, 0.95, -0.05);
   k.prism(1.5, 0.6, 1.3, st.roof, 0, 1.0, -0.05);
@@ -420,6 +434,26 @@ function tower(k: Kit, e: number, st: Style): void {
     window(k, st, 0, 1.4, 0.64, 0.1, 0.24);
     k.team(k.box(0.36, 0.5, 0.02, TEAM, 0, 0.7, 0.7));
     banner(k, 0, 3.3, 0, 0.6, 0.8);
+    return;
+  }
+  if (e === 4) {
+    // An iron-framed lookout: a brick pier with a riveted lattice rising to a lamp gallery.
+    k.box(1.3, 0.8, 1.3, STONE, 0, 0, 0);
+    k.box(0.9, 1.0, 0.9, st.wall, 0, 0.8, 0);
+    k.box(1.1, 0.08, 1.1, IRON_DARK, 0, 1.8, 0);
+    for (const [x, z] of [[-0.42, -0.42], [0.42, -0.42], [-0.42, 0.42], [0.42, 0.42]]) k.cyl(0.04, 0.05, 1.2, 5, IRON_DARK, x, 1.88, z);
+    for (const y of [2.25, 2.7]) {
+      k.box(0.88, 0.04, 0.04, IRON_DARK, 0, y, 0.42);
+      k.box(0.88, 0.04, 0.04, IRON_DARK, 0, y, -0.42);
+      k.box(0.04, 0.04, 0.88, IRON_DARK, 0.42, y, 0);
+      k.box(0.04, 0.04, 0.88, IRON_DARK, -0.42, y, 0);
+    }
+    k.box(1.2, 0.08, 1.2, IRON_DARK, 0, 3.08, 0);
+    k.cone(0.7, 0.4, 4, st.roof, 0, 3.16, 0).rotation.y = Math.PI / 4;
+    k.glow(k.sphere(0.12, LIGHT, 0, 2.4, 0));
+    for (const y of [1.0, 1.4]) window(k, st, 0, y, 0.46, 0.12, 0.2);
+    k.team(k.box(0.92, 0.12, 0.92, TEAM, 0, 0.8, 0));
+    banner(k, 0, 3.5, 0, 0.8, 0.8);
     return;
   }
   k.box(1.3, 1.0, 1.3, STONE, 0, 0, 0);
