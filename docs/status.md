@@ -72,6 +72,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Seasons** (own pitch, lane rules): four seasons of 150 s from spring; summer berries +25% but meat rots 1.5×, winter berries ×0.55, fields ×0.75, meat keeps 2×, wolves/boars notice +40%. New numbers `SEASON`, `SEASONS`. Tests only; browser unseen; no save bump.
 
+**Planning for winter** (own pitch, lane ai): from autumn a clever computer adds fields, leans 30% more to food, hunts mammoths/boars with a smaller town, clears winter wolves with one fewer soldier. New numbers `AI_WINTER`. Tests only; browser and win-rate unseen; no save bump.
+
 ## Waiting on the owner
 
 **Setup only the owner can do:**
