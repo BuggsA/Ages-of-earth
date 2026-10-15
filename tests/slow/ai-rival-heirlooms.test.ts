@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { enemyTarget, fleetWanted, watchPost } from '../src/sim/ai';
-import { AI_WEB, secs } from '../src/sim/data';
-import { createGame, step } from '../src/sim/game';
-import type { GameState } from '../src/sim/types';
-import { placeBuilding, spawnUnit } from '../src/sim/world';
+import { enemyTarget, fleetWanted, watchPost } from '../../src/sim/ai';
+import { AI_WEB, secs } from '../../src/sim/data';
+import { createGame, step } from '../../src/sim/game';
+import type { GameState } from '../../src/sim/types';
+import { placeBuilding, spawnUnit } from '../../src/sim/world';
 
 /** The computer reads a rival's heirlooms (#242). */
 
