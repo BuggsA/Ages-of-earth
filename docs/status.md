@@ -217,3 +217,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Coil fields shown** (#239, s2 of #231, lane look): blue-white rings on the ground for each finished Coil Tower (and for a Watch Tower being placed); lit/dark line in the panel of own training buildings. Render/UI only; unit test passes; browser look unseen; no save bump.
 
+
+**The computer reaches for an heirloom** (#232, own pitch, lane ai): once it has walked a side age, the clever computer takes the second road that opens an heirloom (`AI_WEB.heir` 1, was `take` 0.6) and buys the heirloom first, queuing it even at a busy building. Tests and a headless match; no win-rate sweep; browser unseen; no save bump.
