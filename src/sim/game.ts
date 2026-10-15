@@ -12,6 +12,7 @@ import { AIR, NAVAL, stampBuilding } from './grid';
 import { generateMap } from './mapgen';
 import { Spatial } from './spatial';
 import { updateRelics } from './relics';
+import { elmoStep } from './elmo';
 import { landmarkStep } from './landmarks';
 import { atPost } from './trade';
 import { modsOf, trainTimeFor } from './stats';
@@ -466,6 +467,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   updateShots(s, sp, (a, damage, x, y) => hitAnimal(s, a, damage, x, y));
   updateRelics(s);
   landmarkStep(s);
+  elmoStep(s);
   attrition(s);
   workStep(s);
   beaconStep(s);

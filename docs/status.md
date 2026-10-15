@@ -76,6 +76,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Planning for winter** (own pitch, lane ai): from autumn a clever computer adds fields, leans 30% more to food, hunts mammoths/boars with a smaller town, clears winter wolves with one fewer soldier. New numbers `AI_WINTER`. Tests only; browser and win-rate unseen; no save bump.
 
+**St. Elmo's Fire** (#240, s3 of #231, lane rules): Pilgrims + Lightning heirloom; a Temple within a Tower's reach mends nearby soldiers (`ELMO`, mod `elmo`); the computer researches it. Tests only; browser unseen; no save bump.
+
 **Heirloom looks** (own pitch, lane look): Bell Foundry puts a bell cote on the Temple, Iron-Bound Hulls bands the Dock; a bell peal when an heirloom opens. Second marks: Joint-Stock counting-house board and coins at the Market, Masons' Lodge shear-legs and ashlar at the Temple (`HEIRLOOM_MORE`; a building may wear several). Render/sound only; model tests pass; browser and sound level unseen; no save bump.
 
 **Old Ford** (own pitch, lane rules): a sixth landmark kind; its keeper's soldiers march 1.2× (`LANDMARKS.ford`). Tests only; browser and win-rate unseen; no save bump.

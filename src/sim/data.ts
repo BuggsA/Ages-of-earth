@@ -720,13 +720,15 @@ export interface Mods {
   riderSight: number;
   /** Above 0, the people's priests can chant a rival's building over to their side (the Age of Pilgrims, #209). */
   consecrate: number;
+  /** Above 0, a Temple within a Watch Tower's reach mends its people's soldiers near it (St. Elmo's Fire, #240). */
+  elmo: number;
 }
 
 export const NO_MODS: Mods = {
   meleeAttack: 0, rangedAttack: 0, armor: 0, parmor: 0, range: 0, carry: 0, citizenSpeed: 1, wood: 1, mine: 1, farm: 1, forage: 1, hunt: 1,
   buildingHp: 1, buildSpeed: 1, militaryTrain: 1, rangedTrain: 1, cavalrySpeed: 1, infantryHp: 1, infantryArmor: 0, infantryAttack: 0, priest: 1, chant: 1,
   siegeAttack: 1, siegeRange: 0, techCost: 1, wonderCost: 1, extraCitizens: 0, fish: 1, shipHp: 1, shipRange: 0, airSpeed: 1, airHp: 1,
-  traderSpeed: 1, tradeGold: 1, relicGold: 1, bogGold: 1, rot: 1, beastWard: 1, portReach: 0, riderSight: 0, consecrate: 0,
+  traderSpeed: 1, tradeGold: 1, relicGold: 1, bogGold: 1, rot: 1, beastWard: 1, portReach: 0, riderSight: 0, consecrate: 0, elmo: 0,
 };
 
 export interface Tech {
@@ -793,6 +795,7 @@ export const TECHS: Record<TechId, Tech> = {
   bellFoundry: { name: 'Bell Foundry', at: 'temple', epoch: 2, walked: ['iron', 'pilgrim'], cost: { wood: 150, gold: 150 }, time: 40, mul: { relicGold: 1.5, priest: 1.2 }, blurb: 'Heirloom of the Iron Age and the Age of Pilgrims: smiths who learned the bloom cast bells for the shrines, and the faithful come from farther to hear them. Relics pay 50% more gold and priests convert and heal 20% faster. Kept for good, on any road.', icon: '🔔' },
   ironHulls: { name: 'Iron-Bound Hulls', at: 'dock', epoch: 2, walked: ['iron', 'sail'], cost: { wood: 200, gold: 100 }, time: 40, mul: { shipHp: 1.3, fish: 1.2 }, blurb: 'Heirloom of the Iron Age and the Age of Sail: iron knees, nails and anchors from the marsh smithies. Ships are 30% sturdier and fishing boats fish 20% faster. Kept for good, on any road.', icon: '🔩' },
   jointStock: { name: 'Joint-Stock Company', at: 'market', epoch: 2, walked: ['merchant', 'sail'], cost: { food: 200, gold: 200 }, time: 40, mul: { tradeGold: 1.15, traderSpeed: 1.1 }, blurb: 'Heirloom of the Age of Merchants and the Age of Sail: the guilds\' ledgers meet the shipping fortune, and many purses share one venture. Every trade trip pays 15% more and traders travel 10% faster. Kept for good, on any road.', icon: '📈' },
+  stElmo: { name: 'St. Elmo\'s Fire', at: 'temple', epoch: 4, walked: ['pilgrim', 'lightning'], cost: { gold: 300, stone: 150 }, time: 50, add: { elmo: 1 }, blurb: 'Heirloom of the Age of Pilgrims and the Age of Lightning: the faithful read the blue glow on the coil\'s crown as a blessing. A Temple within a Watch Tower\'s reach (10 tiles) mends the soldiers standing near it, 4% of their health every 2 seconds, so an army can be staged between a coil and a shrine. Kept for good, on any road.', icon: '🌩' },
   masonsLodge: { name: 'Masons\' Lodge', at: 'temple', epoch: 2, walked: ['pilgrim', 'reclaimer'], cost: { wood: 200, stone: 150 }, time: 40, mul: { buildSpeed: 1.2, buildingHp: 1.15 }, blurb: 'Heirloom of the Age of Pilgrims and the Age of Reclaimers: the builders who studied the old ruins raise the great churches, and keep their lodge. Buildings go up 20% faster and are 15% sturdier. Kept for good, on any road.', icon: '⛪' },
   survey: { name: 'Survey the Land', at: 'storehouse', epoch: 0, cost: { food: 50, wood: 50 }, time: 15, survey: 'bogIron', blurb: 'Prospectors walk the streams and marshes and answer one question: is there bog iron anywhere in this world? Yes or no; not where, nor how much.', icon: '🧭' },
 };
@@ -848,6 +851,9 @@ export const WORK = {
  * field, trains and researches, in hundredths. The arc: one bolt strikes at most `strikes` enemies, leaping
  * at most `leap` tiles from one to the next, and keeps `keep` of its strength at each leap.
  */
+/** St. Elmo's Fire (#240): soldiers within `reach` tiles of a Temple in a Tower's field mend `heal` of their health every `every` seconds. */
+export const ELMO = { reach: 6, heal: 0.04, every: 2 };
+
 export const LIGHTNING = { reach: 10, lit: 135, dark: 75, strikes: 4, leap: 2.5, keep: 0.7 };
 
 /**
