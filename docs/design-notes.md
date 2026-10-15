@@ -713,7 +713,7 @@ Session 2 (lane ai): Iron-Bound Hulls answered. `fleetWanted` adds `AI_WEB.hulls
 
 **Why I love it:** it is the other side of #260: the computer now weighs the same gamble it punishes in you. A far feast is worth the risk only with soldiers to spare.
 
-**Seen:** `tests/wild.test.ts` (escorted with six soldiers, not with one). No win-rate sweep; browser unseen. **Next:** have the band bring a tower or Hunting Camp along. *Done 2026-10-15 (recall):* once the beast is down the escort (`mem.huntEscort`) walks home instead of standing idle at the carcass, where a raider would find it.
+**Seen:** `tests/wild.test.ts` (escorted with six soldiers, not with one). No win-rate sweep; browser unseen. **Next:** have the band bring a tower or Hunting Camp along. *Done 2026-10-16 (camp):* the Hunting Camp rule now reaches as far as the far hunt (`AI_WILD.campNear` 24 → 38), so a far feast gets its camp; a tower along is still open. *Done 2026-10-15 (recall):* once the beast is down the escort (`mem.huntEscort`) walks home instead of standing idle at the carcass, where a raider would find it.
 
 ## Designers' notes: people crests (#267, art pass, 2026-10-16, lane look)
 

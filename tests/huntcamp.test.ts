@@ -76,4 +76,14 @@ describe('hunting camp', () => {
     run(s, 150);
     expect(s.ents.some((e) => e.kind === 'building' && e.type === 'huntcamp' && e.owner === 1)).toBe(true);
   });
+
+  it('the computer raises one by a kill as far as the far hunt goes', () => {
+    const s = game('normal');
+    const { x, y } = field(s, 1, 26, 4);
+    const m = spawnAnimal(s, x + 0.5, y + 0.5, 'mammoth');
+    hitAnimal(s, m, 9999, x, y);
+    s.players[1].res.wood = 400;
+    run(s, 200);
+    expect(s.ents.some((e) => e.kind === 'building' && e.type === 'huntcamp' && e.owner === 1)).toBe(true);
+  });
 });

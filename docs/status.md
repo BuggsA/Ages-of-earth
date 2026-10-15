@@ -76,6 +76,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Hunting Camp** (own pitch, lane rules): a 45-wood Stone Age food drop (N) that holds a 4-tile border, so a far kill or the herd's new ground can be worked and kept from wolves; the computer builds one by a far kill. New numbers `BORDERS.huntcamp`, `AI_WILD.camp*`. Tests and a headless match; browser unseen; no save bump.
 
+**Far camp** (own pitch, lane ai): `AI_WILD.campNear` 24 → 38, so the computer's Hunting Camp rule covers far-hunt kills too. Test only; no sweep; no save bump.
+
 **Escort recall** (own pitch, lane ai): after a far mammoth hunt the escorting soldiers walk home once the beast is down (`AiMemory.huntEscort`). Test only; no sweep; no save bump.
 
 **Hounds** (own pitch, lane rules): Hunting Camp tech (80 food 40 wood): hunt +25%, beast damage halved (`TECHS.hounds`, mod `beastWard`); the computer buys it after big game. Tests only; browser unseen; no save bump.
