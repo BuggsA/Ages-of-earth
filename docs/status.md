@@ -241,3 +241,6 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Wireless Telegraphy** (#240, lane rules): Sail + Lightning heirloom at the Dock: ships and Docks in a Tower's field see +5 tiles (`TELEGRAPH`). Tests only; browser and the computer's use unseen; no save bump.
 **Galvanic Revival** (#240, lane rules): Reclaimers + Lightning heirloom at the Workshop: free, quicker repairs in a Tower's field and dug ruins there pay 25 gold/30 s (`GALVANIC`). Tests only; browser unseen; no save bump. Closes #240.
+
+
+**Hunters hunted** (#260, own pitch, lane ai): Hard/Expert computers send 2–3 idle soldiers at rival citizens they see working far from home with no guard, and walk to a seen rival Hunting Camp to look (`AI_PROWL`). Tests and a headless match; about one foray per computer-vs-computer match; browser unseen; no save bump.

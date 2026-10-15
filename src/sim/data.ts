@@ -1156,6 +1156,16 @@ export const AI_LIGHTNING = { towers: 2, every: 40, gap: 45, most: 6, raid: 150 
 
 export const AI_RAID = { weary: 0.5, calm: 7, fort: 15, pop: 24, flame: 24, stage: 36 };
 /**
+ * Hunters hunted (#260): between waves a clever computer sends `band` to `most` idle soldiers at a rival citizen
+ * its own units see working within `reach` tiles of its home, more than `safe` tiles from any rival Town Center
+ * or Tower, with no rival soldier within `guard` tiles and at most `odds` rival citizens per raider within 4
+ * tiles of it. The band chases on to the next such citizen within `chase` tiles, goes home when a rival soldier
+ * comes within `guard` or after `time` seconds, and sets out again at most every `every` seconds. Seeing no one,
+ * a band walks to a rival Hunting Camp it has seen within `reach` (one more than `safe` from the rival's forts)
+ * to find who works there, and looks within `look` tiles of the band once it is near.
+ */
+export const AI_PROWL = { band: 2, most: 3, reach: 40, safe: 12, guard: 7, odds: 2, chase: 8, look: 10, time: 45, every: 75 };
+/**
  * The computer and the wild (#171): once it has `mammothAt` citizens it sends a party of `party` after the
  * mammoth within `mammothNear` tiles of home; with `pack` soldiers at hand it clears wolves within `clear`.
  */
