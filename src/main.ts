@@ -19,7 +19,7 @@ import { RUIN_FINDS, ruinAt } from './sim/ruins';
 import { LANDMARK_KINDS, landmarkAt } from './sim/landmarks';
 import { postAt } from './sim/trade';
 import { chantedOver, consecrateProblem, consecrates } from './sim/consecrate';
-import { ageDef, ageOf, isSideRoad, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
+import { ageDef, ageOf, heirloomsOpened, isSideRoad, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
 import { NetClient, newRoomCode, saveName, savedName } from './net/client';
 import { HASH_EVERY, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
 import { deserialize, serialize } from './sim/save';
@@ -1766,6 +1766,11 @@ function onEvents(s: GameState, list: GameEvent[]): void {
             play('epoch');
           }
           playMusic(ev.epoch, ageOf(s.players[viewer]));
+          // Heirlooms (#224): two roads walked open a craft neither teaches alone.
+          if (ev.age && !ev.back) {
+            const p = s.players[viewer];
+            for (const t of heirloomsOpened(p, ev.age)) if (!p.techs.includes(t)) hud.toast(`${TECHS[t].icon} An heirloom opens: ${TECHS[t].name}, at the ${BUILDINGS[TECHS[t].at].name}`, 'good');
+          }
         } else hud.toast(`${s.players[ev.owner].name} has ${ev.back ? 'stepped back to' : 'reached'} the ${ageName(ev)}`, 'info');
         break;
       case 'season': {

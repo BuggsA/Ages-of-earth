@@ -13,6 +13,27 @@ export function ageOf(p: Player): AgeId {
 
 export const ageDef = (p: Player): Age => AGES[ageOf(p)];
 
+/** Whether the people has stood in this age at some time in the match, or stands in it now (heirlooms, #224). */
+export function hasWalked(p: Player, age: AgeId): boolean {
+  return ageOf(p) === age || !!p.walked?.includes(age);
+}
+
+/** Records the side age a people has just entered; the trunk ages are everyone's and aren't kept. */
+export function noteWalked(p: Player, age: AgeId): void {
+  if (TRUNK.includes(age) || p.walked?.includes(age)) return;
+  p.walked = [...(p.walked ?? []), age];
+}
+
+/** The heirlooms whose ages the people has both walked, in tech order: what entering `age` just opened. */
+export function heirloomsOpened(p: Player, age: AgeId): TechId[] {
+  const out: TechId[] = [];
+  for (const id of Object.keys(TECHS) as TechId[]) {
+    const pair = TECHS[id].walked;
+    if (pair && pair.includes(age) && pair.every((a) => hasWalked(p, a))) out.push(id);
+  }
+  return out;
+}
+
 /** Every road out of the player's age, known or not. */
 export function roadsFrom(p: Player): Road[] {
   const here = ageOf(p);

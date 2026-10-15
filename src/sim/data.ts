@@ -713,6 +713,11 @@ export interface Tech {
   survey?: 'bogIron';
   /** Learned and worked only while the people stands in this age (a craft of one road); it lapses when they leave and returns if they come back. */
   only?: AgeId;
+  /**
+   * An heirloom (#224): opened only to a people that has stood in both these ages, in either order and
+   * at any time in the match. Unlike `only`, it is kept for good once learned, on whatever road comes next.
+   */
+  walked?: [AgeId, AgeId];
 }
 
 export const TECHS: Record<TechId, Tech> = {
@@ -752,6 +757,11 @@ export const TECHS: Record<TechId, Tech> = {
   ropewalk: { name: 'Ropewalk', at: 'dock', epoch: 2, only: 'sail', cost: { wood: 200, gold: 100 }, time: 35, mul: { shipHp: 1.15 }, add: { shipRange: 1 }, blurb: 'Age of Sail only: long ropes and tarred rigging. Ships are 15% sturdier and warships shoot 1 tile farther. The craft is lost when the people leaves the Age of Sail, and returns if it comes back.', icon: '🪢' },
   credit: { name: 'Letters of Credit', at: 'market', epoch: 2, only: 'merchant', cost: { food: 150, gold: 150 }, time: 35, mul: { techCost: 0.85 }, blurb: 'Age of Merchants only: paper in place of coin lets guilds fund the schools. Technologies cost 15% less. Lost when the people leaves the Age of Merchants, and returns if it comes back.', icon: '📜' },
   litany: { name: 'Litany', at: 'temple', epoch: 2, only: 'pilgrim', cost: { food: 100, gold: 120 }, time: 35, mul: { chant: 1.3 }, blurb: 'Age of Pilgrims only: a chant sung in answer, line and response, carries further. Priests chant over a rival\'s building 30% faster. Lost when the people leaves the pilgrims\' road, and returns if it comes back.', icon: '🎶' },
+  // Heirlooms (#224): what two roads walked teach together, kept for good once learned.
+  bellFoundry: { name: 'Bell Foundry', at: 'temple', epoch: 2, walked: ['iron', 'pilgrim'], cost: { wood: 150, gold: 150 }, time: 40, mul: { relicGold: 1.5, priest: 1.2 }, blurb: 'Heirloom of the Iron Age and the Age of Pilgrims: smiths who learned the bloom cast bells for the shrines, and the faithful come from farther to hear them. Relics pay 50% more gold and priests convert and heal 20% faster. Kept for good, on any road.', icon: '🔔' },
+  ironHulls: { name: 'Iron-Bound Hulls', at: 'dock', epoch: 2, walked: ['iron', 'sail'], cost: { wood: 200, gold: 100 }, time: 40, mul: { shipHp: 1.3, fish: 1.2 }, blurb: 'Heirloom of the Iron Age and the Age of Sail: iron knees, nails and anchors from the marsh smithies. Ships are 30% sturdier and fishing boats fish 20% faster. Kept for good, on any road.', icon: '🔩' },
+  jointStock: { name: 'Joint-Stock Company', at: 'market', epoch: 2, walked: ['merchant', 'sail'], cost: { food: 200, gold: 200 }, time: 40, mul: { tradeGold: 1.15, traderSpeed: 1.1 }, blurb: 'Heirloom of the Age of Merchants and the Age of Sail: the guilds\' ledgers meet the shipping fortune, and many purses share one venture. Every trade trip pays 15% more and traders travel 10% faster. Kept for good, on any road.', icon: '📈' },
+  masonsLodge: { name: 'Masons\' Lodge', at: 'temple', epoch: 2, walked: ['pilgrim', 'reclaimer'], cost: { wood: 200, stone: 150 }, time: 40, mul: { buildSpeed: 1.2, buildingHp: 1.15 }, blurb: 'Heirloom of the Age of Pilgrims and the Age of Reclaimers: the builders who studied the old ruins raise the great churches, and keep their lodge. Buildings go up 20% faster and are 15% sturdier. Kept for good, on any road.', icon: '⛪' },
   survey: { name: 'Survey the Land', at: 'storehouse', epoch: 0, cost: { food: 50, wood: 50 }, time: 15, survey: 'bogIron', blurb: 'Prospectors walk the streams and marshes and answer one question: is there bog iron anywhere in this world? Yes or no; not where, nor how much.', icon: '🧭' },
 };
 
