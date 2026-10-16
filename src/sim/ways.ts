@@ -1,5 +1,5 @@
 import { WAY, WAYS, WAY_IDS, secs } from './data';
-import { isEnemy, restat, townCenters } from './world';
+import { canAfford, isEnemy, pay, restat, townCenters } from './world';
 import { R_BERRY } from './types';
 import type { GameState, Player, WayId } from './types';
 
@@ -58,4 +58,39 @@ export function aiWay(s: GameState, p: Player): WayId | null {
   if (s.tick < secs(WAY.aiAfter)) return null;
   const way = wayFor(s, p);
   return wayProblem(s, p, way) ? null : way;
+}
+
+/**
+ * Vows (#338): in the Bronze Age a people may deepen its Way (`way` unset) or turn to another, once.
+ * Why it can't be done now, or null.
+ */
+export function vowProblem(s: GameState, p: Player, way?: WayId): string | null {
+  if (!p.way) return 'Your people live by no Way';
+  if (p.vowed) return 'Your people have made their vow';
+  if (p.epoch !== WAY.vow) return 'A vow is made in the Bronze Age';
+  if (!townCenters(s, p.id).some((b) => b.built)) return 'A vow is made at a Town Center';
+  if (way) {
+    if (!WAYS[way]) return 'No such Way';
+    if (way === p.way) return 'Your people already live by that Way';
+  }
+  const cost = way ? WAY.turnCost : WAY.deepenCost;
+  return canAfford(p, cost) ? null : 'Not enough resources';
+}
+
+/** Deepen the Way, or turn from it; either way the vow is spent. */
+export function takeVow(s: GameState, p: Player, way?: WayId): void {
+  pay(p, way ? WAY.turnCost : WAY.deepenCost);
+  restat(s, p, () => {
+    p.vowed = true;
+    if (way) {
+      p.way = way;
+      p.deep = false;
+    } else p.deep = true;
+  });
+  s.events.push({ k: 'way', owner: p.id, way: p.way!, deep: !way, turned: !!way });
+}
+
+/** A clever computer deepens its Way once it can pay and still keep a stock for the age after. */
+export function aiVow(s: GameState, p: Player): boolean {
+  return !vowProblem(s, p) && p.res.food >= WAY.deepenCost.food! + 150 && p.res.wood >= WAY.deepenCost.wood! + 100;
 }

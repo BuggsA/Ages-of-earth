@@ -463,6 +463,10 @@ export interface Player {
   works?: number[];
   /** The Way this people chose in the Stone Age (#336); absent if none. */
   way?: WayId;
+  /** The Way was deepened in the Bronze Age (#338). */
+  deep?: boolean;
+  /** The Bronze Age vow has been made, deepening or turning (#338). */
+  vowed?: boolean;
   /** Tick the great work now at hand ends; absent when none is. */
   workEnd?: number;
   /** Tick its last step back (#47) landed, for the cooldown; absent if it never stepped back. */
@@ -550,7 +554,7 @@ export type GameEvent =
   | { k: 'arc'; owner: number; building: number; pts: number[] }
   /** A great work was called (`on`) or ran out (seed #133). */
   | { k: 'greatWork'; owner: number; on: boolean }
-  | { k: 'way'; owner: number; way: WayId }
+  | { k: 'way'; owner: number; way: WayId; deep?: boolean; turned?: boolean }
   | { k: 'wonder'; owner: number; id: number; x: number; y: number; ticks: number }
   | { k: 'trade'; owner: number; res: Res; buy: boolean }
   | { k: 'defeated'; owner: number }
@@ -741,6 +745,8 @@ export type Command =
   /** Call the people's great work (seed #133), once in each epoch. */
   | { t: 'greatWork'; p: number }
   | { t: 'way'; p: number; way: WayId }
+  /** A vow (#338): deepen the Way (no `way`), or turn to `way`. */
+  | { t: 'vow'; p: number; way?: WayId }
   | { t: 'stance'; p: number; ids: number[]; stance: Stance }
   | { t: 'train'; p: number; building: number; unit: UnitType }
   | { t: 'research'; p: number; building: number; tech: TechId }

@@ -783,3 +783,10 @@ Built: a small corner caption names the town the title screen's camera is visiti
 **Why I love it:** the owner's "mechanical Stone Age" ruling asks for decisions a player can get wrong. Opening the same eight minutes with a different Way changes where the first citizens go and whether the first fight is wanted, and a rival's toast is information to play against.
 **Seen:** `tests/ways.test.ts`, `npm run check`, a headless match (Hard now picks a Way, so the `scripts/sim.ts 3 medium 30` checksum moved 976921883 → 2738409368). No win-rate sweep; browser: see the pull request.
 **Next:** a second custom at the Bronze Age (a tradition that builds on the first); Ways that rivals can scout from their look (a banner on the Town Center); a Hearth Way that shows in the Stone Age town (drying racks, a shared fire); the computer reading a rival's Way and changing its raids (hunters are easier to catch far from home).
+
+## Designers' notes: Vows (#338, own pitch, 2026-10-16, chain 1016-0017 s5, lane rules)
+
+**Built:** the Way chosen in the Stone Age meets a second fork in the Bronze Age: **deepen** it (`WAY.deepenCost`, a `deep` layer on each Way) or **turn** to another (`WAY.turnCost`), once (`vow` command, `vowProblem`/`takeVow` in `ways.ts`; optional `Player.deep`, `.vowed`, no save bump). Rivals are toasted. A clever computer deepens when it can pay and still keep 150 food and 100 wood (`aiVow`); it never turns.
+**Why I love it:** a choice that was made blind in minute one now comes back with the map, the rival and a bill in view: double down, hedge, or ignore it. Two good players will answer differently.
+**Seen:** `tests/ways.test.ts`; `scripts/sim.ts 3 medium 30` checksum unchanged (2738409368). Browser unverified: the three extra Town Center buttons and the tip were not seen on screen; no win-rate sweep.
+**Next:** the computer turning when its land turned out wrong; a Way-specific building or unit at Bronze; deepening again at Iron.
