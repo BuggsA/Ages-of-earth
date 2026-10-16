@@ -112,7 +112,7 @@ The title screen plays a live match between two computer opponents behind it. Ch
 | Groups | **Ctrl+1–9** makes a group, **1–9** selects it, twice looks at it; **,** selects the whole army |
 | Find | **.** next idle citizen, **Shift + .** all available idle citizens, **H** Town Center, **Space** tap looks at the last attack |
 | Camera | Arrow keys, screen edges, middle-drag or Space+drag to pan; wheel to zoom; **[** **]** turn; **Backspace** straightens; **Ctrl+Shift+1–4** saves a view, **Shift+1–4** returns to it |
-| Other | **Alt** shows all health bars, **P** pause, **+**/**-** speed, **M** mute, **O** hide or show land borders, **Enter** chat (online), **F10** or **Esc** menu |
+| Other | **Alt** shows all health bars, **P** pause, **+**/**-** speed (or click the speed button for faster, right-click for slower), **M** mute, **O** hide or show land borders, **Enter** chat (online), **F10** or **Esc** menu (after a match, the results again) |
 
 Citizens repair completed buildings at their construction speed; a full repair costs 40% of the building's price, paid as they work, and stops when you can't pay. Select citizens and right-click your damaged building; Shift queues repairs. Use **G** to explicitly shelter in a damaged Town Center or tower.
 
