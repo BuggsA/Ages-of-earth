@@ -464,6 +464,8 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   view.onSeason = (sn) => sound.setSeason(sn);
   sound.startAmbience();
   playMusic(me.epoch, ageOf(me));
+  // Start facing north, as the minimap does, whatever way the title's drifting camera had turned.
+  view.rig.faceNorth();
   // Start with the Town Center in view and selected.
   const tc = game.ents.find((e) => e.kind === 'building' && e.owner === viewer && e.type === 'towncenter');
   if (tc) {

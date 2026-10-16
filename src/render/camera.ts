@@ -56,6 +56,11 @@ export class CameraRig {
     this.goalYaw = Math.round(this.goalYaw / (Math.PI * 2)) * Math.PI * 2;
   }
 
+  /** Turn straight to north-up at once, the way the minimap is drawn. */
+  faceNorth(): void {
+    this.yaw = this.goalYaw = 0;
+  }
+
   get zoomT(): number {
     return (this.distance - CameraRig.MIN) / (CameraRig.MAX - CameraRig.MIN);
   }
