@@ -352,3 +352,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Deep veins s5: the computer digs the ore** (#356, lane rules): clever towns dig salt/blood-iron for their ore door in worlds that hold it (`oreRoad`, `AI_ORE`). `tests/ai-ore.test.ts`; checksum of `scripts/sim.ts 3 medium 30` unchanged; no win-rate sweep; browser unseen; no save bump.
 **Black Powder** (#356, lane rules): saltpetre has a use: the Siege Workshop researches Black Powder (ranged +1, siege +15%) after 40 mined, only in worlds with saltpetre (`Tech.ore`). Tests only; checksum unchanged (3065971783); browser unseen; no save bump.
+
+**Foundations** (#356 s4 audit, lane rules): the Age of Reclaimers keeps a fallen building's footprint 5 minutes; raising the same kind there costs 40% and starts half built (`RECLAIM`, `reclaim.ts`); the computer does it. Tests only; checksum unchanged (3065971783); browser unseen; no save bump.

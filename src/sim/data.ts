@@ -82,6 +82,8 @@ export interface Age {
   path?: PathId;
   /** The whole people at war (the Age of Total War, #313): War Camps call citizens near them to arms (`CALL_UP`). */
   callUp?: boolean;
+  /** A people that raises again on the foundations of what fell (the Age of Reclaimers): see `RECLAIM` (`reclaim.ts`). */
+  reclaim?: boolean;
 }
 
 /**
@@ -136,8 +138,9 @@ export const AGES: Record<AgeId, Age> = {
     name: 'Age of Reclaimers',
     short: 'Reclaimers',
     tier: 3,
-    blurb: 'Build tomorrow from yesterday: excavating an ancient ruin teaches a people to rebuild. Construction and repairs work 25% faster, technologies cost 20% less, but military units take 25% longer to train. The same armies and technologies as the Gunpowder Age.',
+    blurb: 'Build tomorrow from yesterday: excavating an ancient ruin teaches a people to rebuild. Construction and repairs work 25% faster, technologies cost 20% less, but military units take 25% longer to train. And what falls can be raised again: a building of yours that is destroyed leaves its foundations for 5 minutes, and the same building raised on the same spot costs 40% of the price and starts half built. The same armies and technologies as the Gunpowder Age.',
     mul: { buildSpeed: 1.25, techCost: 0.8, militaryTrain: 1.25 },
+    reclaim: true,
   },
   merchant: {
     name: 'Age of Merchants',
@@ -895,6 +898,13 @@ export const RELIC = { home: 20, fair: 3, spacing: 12, extra: { small: 1, medium
  * an old map shows you the whole land; a relic comes up out of the earth. Diggers stand within `reach`
  * tiles of the ruin's middle, and nothing is built within `clear` tiles of it.
  */
+/**
+ * Foundations (the Age of Reclaimers): when one of a reclaiming people's buildings falls, its footprint is
+ * remembered for `window` seconds. Raising the same building on the same spot again costs `cost` of the
+ * usual price and starts `head` built (hit points to match). Walls, gates and wonders leave nothing to build on.
+ */
+export const RECLAIM = { window: 300, cost: 0.4, head: 0.5, skip: ['wall', 'gate', 'wonder'] as string[] };
+
 export const RUINS = { count: { small: 2, medium: 3, large: 4 } as Record<MapSize, number>, home: 24, fair: 4, spacing: 14, dig: 40, gold: 300, reach: 1.7, clear: 1 };
 /**
  * Contested landmarks: one more than there are players lies out between the towns (at most `max`), at

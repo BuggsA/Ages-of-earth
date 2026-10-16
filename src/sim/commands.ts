@@ -11,6 +11,7 @@ import { RES_OF_TILE, cargoRoom, findResource, freeFarm, garrisonRoom, giveOrder
 import { carriedBy, letGo, relicAt } from './relics';
 import { caravanOf, dockOf, homeMarket, marketOf, nearestCaravan, nearestDock, portSpot, postAt } from './trade';
 import { ruinAt } from './ruins';
+import { raise, raiseCost } from './reclaim';
 import { callWork, workProblem } from './works';
 import { takeVow, takeWay, vowProblem, wayProblem } from './ways';
 import { beaconProblem, lightBeacon } from './beacon';
@@ -149,7 +150,7 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
     if (!quiet) refuse(s, p, problem === 'slope' ? 'Too steep to build there' : problem === 'foreign' ? "That's enemy land: only a Tower can be raised there" : "Can't build there");
     return null;
   }
-  const cost = buildingCostFor(s, p, type);
+  const cost = raiseCost(s, p, type, tx, ty);
   const short = shortfall(player, cost);
   if (short) {
     if (!quiet) refuse(s, p, short);
@@ -169,6 +170,7 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
     if (gone.size) s.ents = s.ents.filter((e) => !gone.has(e.id));
   }
   const b = placeBuilding(s, p, type, tx, ty, false);
+  raise(s, b);
   s.events.push({ k: 'placed', id: b.id, owner: p, type });
   return b;
 }
