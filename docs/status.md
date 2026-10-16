@@ -307,3 +307,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **The Path of Blood, s1** (#299, the owner's ask, lane rules): *paths*, side ages chained across tiers (`PATHS`, `Age.path`, `Path.carry`), and the first step, the **Age of the Warband** (a turn off the Middle Ages: Barracks, slay 25; plunder in gold, soldiers 15% faster; no traders, farms −10%). The computer is kept off paths (its play is unchanged). Tests, a headless match and the browser smoke test; the age not played by hand; no save bump.
 
 **Title caption** (#267, lane look): the live match behind the title is named in the corner (the town and age the camera visits, or an army on the march), fading between towns. UI only; smoke passes (no page errors), the look itself unseen; no save bump.
+
+**Model gallery** (#267, lane look): `scripts/gallery/` draws all buildings per epoch in headless Chromium (`docs/screenshots/gallery-e0..4.jpg`). Art passes 11, 12 and the machine-age silhouettes are now seen in a render (epochs 0, 1, 2, 4): all build and read apart; in-match lighting and units still unseen. Tooling only; no save bump.
