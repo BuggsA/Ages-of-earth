@@ -1338,6 +1338,8 @@ export const SEASONS = [
  * of the one clicked, `perNode` to a node; attackers fall on foes within `foe` tiles of the one clicked,
  * `perFoe` to a foe (the clicked one first), the rest on the clicked one. Meat is one carcass, so it isn't spread.
  */
+/** Idle hands find work (#344), for the player: a citizen with no rally point takes the nearest node within `reach` tiles. */
+export const AUTO_WORK = { trained: 14 };
 export const SPREAD = { reach: 5, perNode: 2, foe: 4, perFoe: 3 };
 export const AI_WINTER = { from: 2, fields: 2, hunters: 3, pack: 1, food: 0.3 };
 

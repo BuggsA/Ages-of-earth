@@ -182,6 +182,23 @@ function gatherLoad(s: GameState, u: Unit): Map<number, number> {
   return load;
 }
 
+/**
+ * Put an idle citizen of a person (not the computer) on the nearest node within `reach` tiles of (x, y):
+ * the kind it last carried, else whichever of food and wood the owner holds less of (#344).
+ */
+export function autoWork(s: GameState, u: Unit, x: number, y: number, reach: number): boolean {
+  if (u.type !== 'citizen' || s.players[u.owner].ai) return false;
+  const p = s.players[u.owner];
+  const kinds = u.carryRes === 'wood' ? [R_TREE, R_MEAT, R_BERRY] : u.carryRes === 'food' ? [R_MEAT, R_BERRY, R_TREE] : p.res.wood < p.res.food ? [R_TREE, R_MEAT, R_BERRY] : [R_MEAT, R_BERRY, R_TREE];
+  for (const kind of kinds) {
+    const t = findResource(s, kind, x, y, kind === R_MEAT ? Math.min(reach, 8) : reach);
+    if (t < 0) continue;
+    setOrder(u, { k: 'gather', tile: t, res: RES_OF_TILE[s.res[t]], phase: 'go' });
+    return true;
+  }
+  return false;
+}
+
 function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): void {
   if (u.carryRes !== o.res) {
     u.carry = 0;

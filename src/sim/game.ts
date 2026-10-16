@@ -10,7 +10,7 @@ import { hitAnimal, spawnAnimal, updateAnimals } from './animals';
 import { markGoals, scenarioStep, startScenario } from './campaign';
 import { buildingGuns, updateShots } from './combat';
 import { applyCommand } from './commands';
-import { AGES, AURA, unitEpoch, CIV_IDS, LANDMARKS, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
+import { AGES, AURA, AUTO_WORK, unitEpoch, CIV_IDS, LANDMARKS, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
 import { AIR, NAVAL, stampBuilding } from './grid';
 import { generateMap } from './mapgen';
 import { Spatial } from './spatial';
@@ -26,7 +26,7 @@ import { seraiStep, tollStep } from './passage';
 import { barred, journeyOf, noteWalked, surveyFinds, trainsAt, workSteps } from './ages';
 import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, MapSize, MapType, Player } from './types';
 import { RES, R_FISH, R_NONE } from './types';
-import { RES_OF_TILE, carryCargo, checkStuck, collide, findResource, routeUnits, separate, setOrder, think, ungarrison, walk } from './units';
+import { RES_OF_TILE, autoWork, carryCargo, checkStuck, collide, findResource, routeUnits, separate, setOrder, think, ungarrison, walk } from './units';
 import { updateVision } from './vision';
 import { countPop, exitSpot, maxHp, placeBuilding, refund, restat, spawnUnit } from './world';
 
@@ -314,7 +314,7 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
     // Fishing boats go straight to the nearest shoal.
     const t = findResource(s, R_FISH, b.x, b.y, 16);
     if (t >= 0) setOrder(u, { k: 'gather', tile: t, res: 'food', phase: 'go' });
-  }
+  } else autoWork(s, u, b.x, b.y, AUTO_WORK.trained);
 }
 
 /** Heroes inspire soldiers near them: they strike harder and slowly heal. */
