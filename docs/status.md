@@ -128,7 +128,7 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Raiding the coil** (own pitch, lane ai): the computer raids the rival coil whose fall darkens the most buildings (`AI_LIGHTNING.raid`). Tests only; no sweep; no save bump.
 
-**St. Elmo's Fire** (#240, s3 of #231, lane rules): Pilgrims + Lightning heirloom; a Temple within a Tower's reach mends nearby soldiers (`ELMO`, mod `elmo`); the computer researches it. Tests only; browser unseen; no save bump.
+**St. Elmo's Fire** (#240, s3 of #231, lane rules): Pilgrims + Lightning heirloom; a Temple within a Tower's reach mends nearby soldiers (`ELMO`, mod `elmo`); the computer researches it. Seen in headless Chromium (2026-10-15): the Temple offers it as a research button, a hurt soldier by the Temple mended 10 → 34 HP in 10 s, no console errors; look and sound unseen; no save bump.
 
 **Heirloom looks** (own pitch, lane look): Bell Foundry puts a bell cote on the Temple, Iron-Bound Hulls bands the Dock; a bell peal when an heirloom opens. Second marks: Joint-Stock counting-house board and coins at the Market, Masons' Lodge shear-legs and ashlar at the Temple (`HEIRLOOM_MORE`; a building may wear several). Render/sound only; model tests pass; browser and sound level unseen; no save bump.
 
@@ -287,7 +287,7 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Coil layout** (own pitch, lane ai, s4 of #231): in the Age of Lightning the computer builds new buildings inside a coil's field (`fieldSpot`). Tests only; no win-rate sweep; no save bump.
 
-**Wireless Telegraphy** (#240, lane rules): Sail + Lightning heirloom at the Dock: ships and Docks in a Tower's field see +5 tiles (`TELEGRAPH`). Tests only; browser and the computer's use unseen; no save bump.
+**Wireless Telegraphy** (#240, lane rules): Sail + Lightning heirloom at the Dock: ships and Docks in a Tower's field see +5 tiles (`TELEGRAPH`). Seen in headless Chromium (2026-10-15): the Dock offers it, and learning it took the visible tiles from 624 to 769 with a ship in a Tower's field; no console errors; the computer's use in a full match and the look unseen; no save bump.
 **Galvanic Revival** (#240, lane rules): Reclaimers + Lightning heirloom at the Workshop: free, quicker repairs in a Tower's field and dug ruins there pay 25 gold/30 s (`GALVANIC`). Tests only; browser unseen; no save bump. Closes #240.
 
 

@@ -1,0 +1,3 @@
+# Browser check of the Lightning heirlooms (Chain 1015-1020 s2 follow-up)
+
+Headless Chromium against `vite build`, state set through `window.ages` (epoch 4, Age of Lightning, `walked` set, buildings via `ages.build`). St. Elmo's Fire: research button at the Temple; a 10-HP infantryman beside it was at 34 after 10 s. Wireless Telegraphy: research button at the Dock; with a Tower beside the Dock and a warship in the field, `p.vis` went 624 → 769 tiles after learning it. No page or console errors. Also found, in a normal match, that the Dock's fourth command shows "undefined" for its hotkey (fixed in #269). Not seen: sound, the toast and bell, the computer buying an heirloom in a full match.
