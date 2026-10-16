@@ -1,13 +1,13 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_ORE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, walkable } from './grid';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
-import { ageOf, barred, buildBarred, deedsDone, hasCoils, hasWalked, deedsProgress, hiresAt, inField, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
+import { ageOf, barred, buildBarred, deedsDone, oreDone, hasCoils, hasWalked, deedsProgress, hiresAt, inField, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
 import { carriedBy } from './relics';
 import { claimants, favours, landmarkAt } from './landmarks';
-import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple } from './units';
+import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple, TILE_OF_RARE } from './units';
 import { goalForPost, nearestMarket, portSpot, tripGold } from './trade';
 import { findRoute } from './path';
 import { isEnemy, maxHp } from './world';
@@ -180,6 +180,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   // It waits for a town of `survey` citizens (#79): at ten, it held up the citizens of a town that might
   // find no bog at all, the very ones that win the first fight.
   ironRoad(s, v, mem, issue);
+  oreRoad(s, v, mem, issue);
   steppeRoad(s, v, mem, issue);
 
   // People first: a growing town pays for everything else.
@@ -383,7 +384,9 @@ function worthWaiting(s: GameState, v: View, mem: AiMemory, r: Road): boolean {
     (d.deed.stat === 'relicGold' && relicsKept(s, p.id) > 0) ||
     (d.deed.stat === 'iron' && v.diggers.size > 0);
   const deeds = deedsProgress(p, r);
-  if (!deeds.every(underWay)) return false;
+  // An ore door under way (#356 s5): a crew is digging the ore, so the road is worth holding for.
+  const digging = !!r.ore && !!s.rares?.includes(r.ore.id) && v.citizens.some((u) => u.order.k === 'gather' && u.order.rare === r.ore!.id);
+  if (!digging && !deeds.every(underWay)) return false;
   mem.waiting ??= s.tick;
   // A deed nearly done earns more patience (#113): a Greek town gave up its dig at 135 bog iron of 150,
   // seconds from the Iron Age, with the price of it banked.
@@ -562,6 +565,53 @@ function ironRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const ids = free.slice(0, crew - v.diggers.size).map((u) => u.id);
   if (!ids.length) return;
   issue({ t: 'gather', p: p.id, ids, tile: bog });
+  for (const id of ids) v.diggers.add(id);
+}
+
+/**
+ * The ore road (#356 s5): a road with an ore door, in a world that holds the ore, is walked by mining it when the
+ * computer means to take that road: a crew digs the nearest vein and the door opens in place of the deeds. When the
+ * door is open, the road is given up, or the vein is gone, the crew goes back to what the town needs. A world without
+ * the ore leaves it on the deeds, as before.
+ */
+function oreRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!s.rares?.length || !walksWeb(v)) return;
+  const road = roadsFrom(p).find((r) => r.ore && s.rares!.includes(r.ore.id));
+  const crew = v.citizens.filter((u) => u.order.k === 'gather' && u.order.rare !== undefined);
+  for (const u of crew) v.diggers.add(u.id);
+  const open = !road || oreDone(p, road) || deedsDone(p, road) || mem.roads?.[road.to] === false || !roadKnown(s, p, road);
+  if (open) {
+    const idle = crew.filter((u) => u.carry <= 2 && !u.inside);
+    if (idle.length) {
+      const want = wanted(v, coldComing(s, v));
+      const have: Record<Res, number> = { food: 0, wood: 0, gold: 0, stone: 0 };
+      for (const u of v.citizens) {
+        const j = jobOf(u);
+        if (j && j !== 'build') have[j]++;
+      }
+      for (const u of idle) {
+        v.diggers.delete(u.id);
+        have.stone--;
+        const need = [...RES].sort((a, b) => want[b] - have[b] - (want[a] - have[a]))[0];
+        if (sendTo(s, v, u, need, issue) || sendTo(s, v, u, 'wood', issue)) have[need]++;
+      }
+    }
+    return;
+  }
+  if (!wants(s, p, mem, road.to) || count(v, 'storehouse', true) === 0) return;
+  const kind = TILE_OF_RARE[road.ore!.id];
+  if (v.diggers.size >= AI_ORE.crew) return;
+  const vein = findResource(s, kind, v.home.x, v.home.y, AI_ORE.reach);
+  if (vein < 0) return;
+  const bx = (vein % s.w) + 0.5;
+  const by = Math.floor(vein / s.w) + 0.5;
+  const free = v.citizens
+    .filter((u) => !u.inside && !v.diggers.has(u.id) && u.carry <= 2 && (u.order.k === 'idle' || (u.order.k === 'gather' && (u.order.res === 'wood' || u.order.res === 'gold'))))
+    .sort((a, c) => (a.x - bx) * (a.x - bx) + (a.y - by) * (a.y - by) - ((c.x - bx) * (c.x - bx) + (c.y - by) * (c.y - by)) || a.id - c.id);
+  const ids = free.slice(0, AI_ORE.crew - v.diggers.size).map((u) => u.id);
+  if (!ids.length) return;
+  issue({ t: 'gather', p: p.id, ids, tile: vein });
   for (const id of ids) v.diggers.add(id);
 }
 
