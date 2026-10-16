@@ -725,7 +725,7 @@ export class Hud {
       if (b.built) {
         // The Market's Q W E and A S D buy and sell: its trader and technologies go on T and R F.
         // Soldiers an age hires here (the merchants' Market) go on Z X C.
-        const unitKeys = b.type === 'towncenter' ? ['Q', 'E'] : b.type === 'market' ? ['T', 'Z', 'X', 'C'] : ['Q', 'W', 'E'];
+        const unitKeys = b.type === 'towncenter' ? ['Q', 'E'] : b.type === 'market' ? ['T', 'Z', 'X', 'C'] : ['Q', 'W', 'E', 'R'];
         trainsAt(p, b.type).forEach((unit, i) => {
           const st = statsFor(s, viewer, unit);
           const hired = isHire(p, b.type, unit);
@@ -739,7 +739,7 @@ export class Hud {
           const short = shortfall(p, cost);
           const hero = unit === 'hero' && (heroBusy(s, viewer) || b.queue.some((q) => q.unit === 'hero'));
           cmds.push({
-            key: unitKeys[i],
+            key: unitKeys[i] ?? '',
             pic: unitPicture(unit, Math.max(p.epoch, unitEpoch(unit)), p.color),
             title: `${hired ? 'Hire' : 'Train'} ${st.name}`,
             desc: hired
