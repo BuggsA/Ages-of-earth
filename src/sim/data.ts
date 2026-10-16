@@ -1486,4 +1486,15 @@ export const AI_WILD = { mammothAt: 10, party: 5, mammothNear: 22, pack: 3, clea
  * fresh pasture that lies no nearer the rival, and pitches there; a wagon still on the road after `drive`
  * seconds pitches where it stands. It keeps to the steppe at least `stay` seconds before rejoining the trunk.
  */
+/**
+ * The computer in the Age of the Horde (#322, s5b of #297). It holds the climb out of the steppe for the Horde's
+ * deeds up to `hold` seconds, keeping a milker for each sheep (`milkers` at most), raising lambs at `spare` food over their price and, once the milk is in, culling the flock for the meat down to `least` grown sheep; it saves for a Stable, the road's clue; stays in the Horde `stay` seconds, and trains riders `cavalry` of
+ * the time while it has under a full band. Then `riders` idle riders (up to `TRIBUTE.most`) ride to the nearest
+ * rival land inside their supply, `clear` tiles from the rival's Town Centers and Towers, and stand there; the
+ * band comes home when it numbers under `weary` or more than its own number of rival soldiers (at least `foes`
+ * for the choice of site) stand within `alarm` tiles, and sets out again after `redo` seconds. A computer drained
+ * by standing riders sends its army against them once `answer` of them stand in its land.
+ */
+export const AI_HORDE = { milkers: 5, spare: 40, least: 3, hold: 300, stay: 300, cavalry: 0.9, riders: 6, clear: 12, weary: 3, foes: 4, alarm: 9, redo: 150, answer: 2 };
+
 export const AI_STEPPE = { take: 0.35, at: 12, campFrom: 8, campTo: 30, hunters: 6, reach: 26, spare: 100, perMilker: 3, every: 150, hungry: 0.5, bare: 16, move: 10, far: 18, drive: 40, stay: 90 };
