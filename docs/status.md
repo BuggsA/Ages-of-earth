@@ -311,3 +311,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Model gallery** (#267, lane look): `scripts/gallery/` draws all buildings per epoch in headless Chromium (`docs/screenshots/gallery-e0..4.jpg`). Art passes 11, 12 and the machine-age silhouettes are now seen in a render (epochs 0, 1, 2, 4): all build and read apart; in-match lighting and units still unseen. Tooling only; no save bump.
 
 **Unit gallery** (#267, lane look): `scripts/gallery/units.html` draws every unit line across the five epochs, land and sea/air apart (`docs/screenshots/gallery-units-land.jpg`, `-sea.jpg`; `node scripts/gallery/shoot-units.mjs [dir] [civ]`). Seen in headless Chromium: epoch 0 and 1 warships and transports read alike from above, and every aircraft is one shape (epoch 4 only): candidates for a later art pass. Tooling only; no save bump.
+
+**Ship silhouettes** (#267, lane look): Stone Age war canoe and log raft, Gunpowder fluyt (stern castle, lantern, bowsprit). Render only; seen in the headless unit gallery only; no save bump.

@@ -636,7 +636,20 @@ function fisher(epoch: number): Kit {
 
 function warship(epoch: number): Kit {
   const k = new Kit();
-  if (epoch <= 1) {
+  if (epoch === 0) {
+    // A war canoe: a long dugout with a carved, upswept prow, paddlers' oars, team shields on the gunwale, no sail.
+    hull(k, 1.5, 0.26, 0.12, '#5b4330', '#7a5638');
+    k.cone(0.05, 0.3, 6, '#6e4f33', 0, 0.12, 0.78).rotation.x = -0.9;
+    k.sphere(0.05, '#d8d0b8', 0, 0.27, 0.9, undefined, 6);
+    k.cone(0.04, 0.2, 5, '#6e4f33', 0, 0.1, -0.78).rotation.x = Math.PI + 0.7;
+    for (const side of [-1, 1]) {
+      oars(k, side, 6, 1.5, 0.26);
+      for (let i = 0; i < 5; i++) k.team(k.cyl(0.04, 0.04, 0.012, 8, TEAM, side * 0.13, 0.1, -0.4 + i * 0.2)).rotation.z = Math.PI / 2;
+    }
+    k.team(k.box(0.14, 0.1, 0.02, TEAM, 0, 0.12, 0.45));
+    return k;
+  }
+  if (epoch === 1) {
     // A trireme: a long narrow hull, a bronze ram, three banks of oars, team shields and sail.
     hull(k, 1.6, 0.34, 0.14, '#5b4330', '#8a6440');
     k.cone(0.05, 0.22, 6, BRONZE, 0, 0.0, 0.8).rotation.x = Math.PI / 2;
@@ -702,7 +715,16 @@ function warship(epoch: number): Kit {
 
 function transport(epoch: number): Kit {
   const k = new Kit();
-  if (epoch <= 1) {
+  if (epoch === 0) {
+    // A log raft: lashed trunks, a hide sail on a pole, a heap of bundles and baskets.
+    for (let i = 0; i < 5; i++) k.cyl(0.07, 0.07, 1.1, 7, i % 2 ? '#7a5638' : '#6e4f33', (i - 2) * 0.13, 0.0, 0).rotation.x = Math.PI / 2;
+    for (const z of [-0.3, 0.3]) k.box(0.7, 0.025, 0.04, '#3a2a1e', 0, 0.08, z);
+    k.cyl(0.018, 0.022, 0.7, 5, WOOD, 0, 0.08, 0.2);
+    k.sail(k.team(k.box(0.4, 0.4, 0.015, TEAM, 0, 0.45, 0.2)), 0.2, 0.2, 0.4);
+    for (let i = 0; i < 3; i++) k.box(0.14, 0.1, 0.14, '#a07a50', -0.15 + (i % 2) * 0.28, 0.08, -0.15 - i * 0.15);
+    return k;
+  }
+  if (epoch === 1) {
     // A transport galley: a broad hull, oars, a team sail, crates and amphorae on deck.
     hull(k, 1.4, 0.5, 0.16, '#6e4f33', '#9a7448');
     for (const side of [-1, 1]) oars(k, side, 5, 1.4, 0.5);
@@ -734,7 +756,14 @@ function transport(epoch: number): Kit {
   k.box(0.54, 0.1, 1.1, '#5a4430', 0, 0.06, 0);
   k.box(0.3, 0.04, 0.4, '#3a2a1e', 0, 0.16, 0.05);
   mast(k, 0.3, 1.0, 0.55);
-  if (epoch === 3) mast(k, -0.35, 0.8, 0.45, false, 0.16);
+  if (epoch === 3) {
+    // A fluyt: a second mast, a raised stern with a gilded lantern and a bowsprit.
+    mast(k, -0.35, 0.8, 0.45, false, 0.16);
+    k.box(0.5, 0.16, 0.34, '#4a3426', 0, 0.06, -0.58);
+    k.cyl(0.02, 0.02, 0.18, 5, GOLD, 0, 0.22, -0.7);
+    k.glow(k.sphere(0.04, '#ffd27a', 0, 0.42, -0.7, undefined, 6));
+    k.cyl(0.012, 0.012, 0.45, 4, WOOD, 0, 0.18, 0.78).rotation.x = 1.1;
+  }
   return k;
 }
 
