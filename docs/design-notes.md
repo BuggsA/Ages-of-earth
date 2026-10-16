@@ -776,3 +776,10 @@ The hero is the one unit with a story, so its death gets two gold rings, rising 
 ## Designers' notes: title caption (#267, 2026-10-15, lane look)
 
 Built: a small corner caption names the town the title screen's camera is visiting ("Azure of the Greeks / Bronze Age"), fading between towns. Why: a backdrop that says what it shows reads as a place, not wallpaper. Unseen in a browser beyond the smoke test. Next: let a click on the caption jump the camera to that town, or watch that match as a spectator.
+
+## Designers' notes: Ways (#336, own pitch, 2026-10-16, chain 1016-0017 s4, lane rules)
+
+**Built:** in the Stone Age a Town Center offers three Ways (Hunters, Hearth, Warband): one free pick, kept all match, lost if you climb out of the Stone Age without it (`WAYS`, `WAY` in `data.ts`; `ways.ts`; the `way` command and event; optional `Player.way`). Each is `Mods` with a price in what the others do well, so there is no best pick: it depends on the deer and berries round home, the beasts about and how near the rival is. Rivals are toasted which Way you took; the top-bar chip carries your own. A clever computer chooses by counting deer and berry tiles within `WAY.near` and the nearest rival Town Center (`wayFor`; ties go in a fixed order).
+**Why I love it:** the owner's "mechanical Stone Age" ruling asks for decisions a player can get wrong. Opening the same eight minutes with a different Way changes where the first citizens go and whether the first fight is wanted, and a rival's toast is information to play against.
+**Seen:** `tests/ways.test.ts`, `npm run check`, a headless match (Hard now picks a Way, so the `scripts/sim.ts 3 medium 30` checksum moved 976921883 → 2738409368). No win-rate sweep; browser: see the pull request.
+**Next:** a second custom at the Bronze Age (a tradition that builds on the first); Ways that rivals can scout from their look (a banner on the Town Center); a Hearth Way that shows in the Stone Age town (drying racks, a shared fire); the computer reading a rival's Way and changing its raids (hunters are easier to catch far from home).

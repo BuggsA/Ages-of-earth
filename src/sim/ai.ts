@@ -14,6 +14,7 @@ import { isEnemy, maxHp } from './world';
 import { callUpProblem } from './warcamp';
 import { borderMap, suppliedAt } from './borders';
 import { workProblem } from './works';
+import { aiWay } from './ways';
 import { beaconProblem, lit } from './beacon';
 import { rallyProblem } from './rally';
 import { consecrateProblem, consecrates } from './consecrate';
@@ -233,6 +234,8 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
 
   townBell(s, v, mem, issue);
   greatWork(s, v, mem, issue);
+  const way = AI_LEVELS[v.p.ai!].clever ? aiWay(s, v.p) : null;
+  if (way) issue({ t: 'way', p: v.p.id, way });
   lightBeacons(s, v, issue);
   beaconsForLightning(s, v, mem, issue);
   rallyTheLine(s, v, issue);

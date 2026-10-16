@@ -1,4 +1,4 @@
-import { AGES, BUILDINGS, CIVS, WORKS, SIGNATURES, EPOCHS, NO_MODS, PATHS, TECHS, WARCAMP, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
+import { AGES, BUILDINGS, CIVS, WAYS, WORKS, SIGNATURES, EPOCHS, NO_MODS, PATHS, TECHS, WARCAMP, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
 import { ageDef, ageOf, hasWalked, isHire, isSuspended, pathCarry } from './ages';
 import type { BuildingType, Cost, GameState, Player, TechId, UnitType } from './types';
 import { RES } from './types';
@@ -36,6 +36,7 @@ export function computeMods(p: Player): Mods {
   const m: Mods = { ...NO_MODS };
   const civ = CIVS[p.civ];
   apply(m, civ.add, civ.mul);
+  if (p.way) apply(m, WAYS[p.way].add, WAYS[p.way].mul);
   const age = ageDef(p);
   for (const t of p.techs) if (!TECHS[t].only || TECHS[t].only === ageOf(p)) apply(m, TECHS[t].add, TECHS[t].mul);
   apply(m, age.add, age.mul);
