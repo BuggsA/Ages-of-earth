@@ -339,3 +339,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Deep marks** (own pitch, lane look): a deepened Way (#338) adds a second flourish at its Town Center (more pelts and antlers, a drying rack, a drum and banner). Render only; models and `tests/way-marks-deep.test.ts` pass; look unseen in a browser; no save bump.
 
 **Speed both ways, and back from the map** (#346, #347, owner's playtest notes, lane rules, UI only): the speed button steps 1× → 1.5× → 2× → 3× and back round to 1×, right-click steps down (+/- as before); after a match, Esc, F10 or ☰ Menu bring the results card back (Look around, Play again, Quit to title), and arrow keys pan while looking around. Seen in headless Chromium; no save bump.
+
+**A match starts facing north** (#345, owner's playtest note, lane look): the title's drifting camera kept turning (`rig.rotate(dt * 0.05)`) and a match never turned it back, so after a minute on the title the view sat near upside down against the north-up minimap. `CameraRig.faceNorth()` at match start. Seen in headless Chromium (60 s on the title, then a match: turned before, square after); no save bump.
