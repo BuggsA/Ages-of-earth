@@ -58,6 +58,17 @@ function roll(s: GameState): number {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
 
+/**
+ * A coin of its own for one decision, from the match's seed, the player and the question (#320): tossing it
+ * leaves the match's dice where they were, so a match where nobody heads for the steppe plays as it did.
+ */
+function coin(s: GameState, id: number, salt: number): number {
+  let t = (s.seed + Math.imul(id + 1, 0x9e3779b9) + salt) >>> 0;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
 const SHARE: Record<Res, number>[] = [
   { food: 0.5, wood: 0.4, gold: 0.05, stone: 0.05 },
   { food: 0.42, wood: 0.34, gold: 0.15, stone: 0.09 },
@@ -341,7 +352,9 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
     roads[to] = hasWalked(p, to === 'ironblood' ? 'warband' : 'ironblood');
   } else if (roads[to] === undefined) {
     const f = fit(p, to);
-    roads[to] = f > 0 || (f === 0 && roll(s) < (AGES[to].path ? AI_BLOOD.take : heirloomAhead(p, to) ? AI_WEB.heir : AGES[to].mobile ? AI_STEPPE.take : AI_WEB.take));
+    // The steppe tosses a coin of its own: asked early by every clever town, it would shift the dice of every match.
+    if (f === 0 && AGES[to].mobile && !heirloomAhead(p, to)) roads[to] = coin(s, p.id, 0x57e9) < AI_STEPPE.take;
+    else roads[to] = f > 0 || (f === 0 && roll(s) < (AGES[to].path ? AI_BLOOD.take : heirloomAhead(p, to) ? AI_WEB.heir : AI_WEB.take));
   }
   return roads[to]!;
 }

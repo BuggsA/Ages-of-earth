@@ -67,6 +67,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Flocks** (#308, s2 of #297, lane rules): steppe Town Centers raise sheep (L, 60 food, 8 a Town Center; two come with the age) that graze by the camp and follow it when struck; each bite crops the grass bare a while (slower in winter), so a flock grazes out and the camp must move; citizens milk (right-click), an unmilked sheep fattens and breeds, A slaughters; wolves take sheep near dens (Hounds guard near camp); rivals drive off unwatched sheep (`FLOCK`, `flocks.ts`). Seen in headless Chromium (`docs/screenshots/steppe-flock.jpg`); bleat unheard; computer ignores flocks; checksum unchanged (1658101786); no save bump.
 
+**A nomad rival** (#320, s5a of #297, lane ai): a clever computer may take the steppe (riding peoples always, others on a coin of their own at `AI_STEPPE.take`, so other matches' dice don't move): a Hunting Camp by the deer and more hunters for the deed, then lambs, milkers, slaughter of sheep too fat to breed, no Farms, and striking camp to fresh pasture when the flock grazes out (`AI_STEPPE`). Tests and headless matches only; browser not needed (the player's own cart models and sounds); `scripts/sim.ts 3 medium 30` checksum 1658101786 → 976921883; no save bump.
+
 **Art pass 8** (#267, lane look): epoch 4 citizen work clothes and pick, ironclad armor belt. Render only; models test passes; look unseen.
 
 **Art pass 11** (#267, lane look): stables of epochs 0–2 get their own silhouettes: a rail-fenced horse corral with a hide lean-to and horsetail totem; mudbrick stalls with arched doors and beam ends; a hayloft dormer and weathervane on the medieval stable. Render only; `models.test.ts` builds them; look in a browser unseen; no save bump.

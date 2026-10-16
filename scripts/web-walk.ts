@@ -38,7 +38,7 @@ for (let game = 0; game < seeds * (duel ? 2 : 1); game++) {
   const s = createGame({ seed, size, players: [{ name: 'A', ai: level, civ }, { name: 'B', ai: level }] });
   if (trunk >= 0) {
     step(s);
-    s.ai[trunk].roads = { iron: false, merchant: false, pilgrim: false, fair: false, warband: false, ironblood: false };
+    s.ai[trunk].roads = { iron: false, merchant: false, pilgrim: false, fair: false, warband: false, ironblood: false, steppe: false };
   }
   const roads = s.players.map((p) => [AGES[ageOf(p)].short]);
   const at = s.players.map((p) => ageOf(p));
