@@ -392,6 +392,12 @@ export interface Road {
   also?: Deed[];
   /** What taking it means, for the tooltip (trunk roads use the age's blurb). */
   blurb?: string;
+  /**
+   * How hard the door is (#348): an easy on-ramp (a small deed, a modest price) invites a people to try the
+   * web; a hard gate (a dear price, a long journey) marks the special ages. Most roads carry neither, and
+   * are the usual middle.
+   */
+  gate?: 'easy' | 'hard';
 }
 
 export const ROADS: Road[] = [
@@ -402,9 +408,10 @@ export const ROADS: Road[] = [
   {
     from: 'industrial',
     to: 'lightning',
-    cost: { food: 500, stone: 300, gold: 900 },
-    time: 60,
+    cost: { food: 700, stone: 450, gold: 1300 },
+    time: 75,
     clue: 'tower',
+    gate: 'hard',
     deed: { stat: 'beacons', n: 6, text: 'Your towers light 6 beacons (relays count)' },
     blurb: 'Instead of the skies, the wires that need no wires: every Watch Tower becomes a Coil Tower. Buildings within its field train and research 35% faster, but buildings outside every field run 25% slower, so the town is laid out around its coils, and a coil that falls darkens its quarter. A coil\'s bolt leaps from enemy to enemy, the hardest on armies that crowd together. What it gives up: aircraft. The Airfield builds nothing while you stay.',
   },
@@ -479,9 +486,10 @@ export const ROADS: Road[] = [
   {
     from: 'merchant',
     to: 'silk',
-    cost: { food: 900, wood: 300, gold: 600 },
-    time: 60,
+    cost: { food: 1000, wood: 400, gold: 900 },
+    time: 70,
     clue: 'market',
+    gate: 'hard',
     walked: 'steppe',
     deed: { stat: 'traded', n: 800, text: 'Your traders bring home 800 gold' },
     also: [{ stat: 'hunted', n: 800, text: 'Your hunters butcher 800 meat (the steppe\'s count goes on)' }],
@@ -508,10 +516,11 @@ export const ROADS: Road[] = [
   {
     from: 'middle',
     to: 'pilgrim',
-    cost: { food: 300, wood: 100, gold: 150 },
-    time: 40,
+    cost: { food: 250, wood: 100, gold: 100 },
+    time: 30,
     clue: 'temple',
-    deed: { stat: 'relicGold', n: 120, text: 'Relics kept in your Temples bring in 120 gold' },
+    gate: 'easy',
+    deed: { stat: 'relicGold', n: 60, text: 'Relics kept in your Temples bring in 60 gold' },
     blurb: 'A turn, not a climb: the same soldiers and technologies as the Middle Ages, but the faithful walk from far away to your Temples. Every relic kept there pays double gold; priests cost half as much and convert and heal a quarter faster. What it gives up: siege. The Siege Workshop builds nothing while you walk the pilgrims\' road, so walls and towers are taken by faith: priests chanting together win over a rival\'s buildings (never a Town Center or a Wonder), slower with soldiers sheltering inside.',
   },
   { from: 'pilgrim', to: 'gunpowder', cost: { food: 900, gold: 750, stone: 200 }, time: 65, blurb: 'Rejoin the main road: the pilgrims\' gold carries your people into gunpowder (more gold and less food and stone than from the Middle Ages). The siege engines return as cannon.' },
@@ -519,9 +528,10 @@ export const ROADS: Road[] = [
   {
     from: 'merchant',
     to: 'fair',
-    cost: { food: 900, wood: 300, gold: 700 },
-    time: 65,
+    cost: { food: 1000, wood: 400, gold: 900 },
+    time: 75,
     clue: 'temple',
+    gate: 'hard',
     deed: { stat: 'traded', n: 800, text: 'Your traders bring home 800 gold' },
     also: [{ stat: 'relicGold', n: 200, text: 'Relics kept in your Temples bring in 200 gold' }],
     blurb: 'Instead of the Gunpowder Age, for a people both merchant and faithful: trade pays 25% more, and 10% more again for every relic your Temples keep (up to five); traders travel 15% faster. No more hired swords. What it gives up: towns grown open round the fairground, every building 15% weaker.',
@@ -529,9 +539,10 @@ export const ROADS: Road[] = [
   {
     from: 'pilgrim',
     to: 'fair',
-    cost: { food: 900, wood: 300, gold: 700 },
-    time: 65,
+    cost: { food: 1000, wood: 400, gold: 900 },
+    time: 75,
     clue: 'temple',
+    gate: 'hard',
     deed: { stat: 'relicGold', n: 200, text: 'Relics kept in your Temples bring in 200 gold' },
     also: [{ stat: 'traded', n: 800, text: 'Your traders bring home 800 gold' }],
     blurb: 'Instead of the Gunpowder Age, for a people both faithful and merchant: trade pays 25% more, and 10% more again for every relic your Temples keep (up to five); traders travel 15% faster. Relics pay their usual gold, and the Siege Workshop works again. What it gives up: towns grown open round the fairground, every building 15% weaker.',
@@ -554,10 +565,11 @@ export const ROADS: Road[] = [
   {
     from: 'middle',
     to: 'warband',
-    cost: { food: 350, wood: 150, gold: 100 },
-    time: 40,
+    cost: { food: 250, wood: 100, gold: 60 },
+    time: 30,
     clue: 'barracks',
-    deed: { stat: 'slain', n: 25, text: 'Your forces slay 25 enemy units' },
+    gate: 'easy',
+    deed: { stat: 'slain', n: 10, text: 'Your forces slay 10 enemy units' },
     blurb: 'A turn, not a climb: the first step on the Path of Blood. The same soldiers and technologies as the Middle Ages, but soldiers train 15% faster and every enemy unit slain pays a quarter of its price as plunder in gold, so war feeds the town. What it gives up: trade (no traders) and some of the harvest (farms 10% less). A warband that stops fighting grows poor.',
   },
   { from: 'warband', to: 'gunpowder', cost: { food: 1000, gold: 500, stone: 300 }, time: 65, blurb: 'Climb to the Gunpowder Age: the plunder ends, traders and full harvests return (less gold and more stone than from the Middle Ages: the war-host was never rich in coin). The Path of Blood goes on from there, into the Age of Iron and Blood, for a people whose plunder is already taken.' },
@@ -582,9 +594,10 @@ export const ROADS: Road[] = [
   {
     from: 'industrial',
     to: 'totalwar',
-    cost: { food: 600, wood: 300, gold: 400 },
-    time: 45,
+    cost: { food: 800, wood: 400, gold: 700 },
+    time: 60,
     clue: 'barracks',
+    gate: 'hard',
     walked: 'ironblood',
     deed: { stat: 'campTrained', n: 12, text: 'Your War Camps train 12 foot soldiers' },
     blurb: 'A turn, not a climb: the last step on the Path of Blood. War Camps return as muster grounds, where citizens are called to arms and become foot soldiers where they stand; plunder is the deepest of the path. What it gives up: trade, a fifth of the harvest and a quarter more for every technology. Every citizen called up is one less at work.',
