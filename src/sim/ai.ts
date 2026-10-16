@@ -1,6 +1,7 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_ORE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, walkable } from './grid';
+import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
@@ -779,7 +780,7 @@ function laneClear(s: GameState, tx: number, ty: number, n: number, farm: boolea
 
 /** Order a building with a few citizens pulled off other work (wood first, farmers last). */
 function construct(s: GameState, v: View, mem: AiMemory, type: BuildingType, spot: { tx: number; ty: number }, builders: number, issue: (c: Command) => void): boolean {
-  const cost = buildingCostFor(s, v.p.id, type);
+  const cost = raiseCost(s, v.p.id, type, spot.tx, spot.ty);
   if (!afford(v, cost)) return false;
   const cx = spot.tx + BUILDINGS[type].size / 2;
   const cy = spot.ty + BUILDINGS[type].size / 2;
@@ -823,6 +824,12 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     const spot = findSpot(s, 'towncenter', home.x, home.y, 0, 14);
     if (spot) construct(s, v, mem, 'towncenter', spot, 4, issue);
     return;
+  }
+
+  // A reclaiming people raises what fell on the same ground again, at a fraction of the price.
+  for (const f of s.fallen ?? []) {
+    if (f.owner !== p.id || f.until <= s.tick || pending.length > 1 || recently(f.type, 8)) continue;
+    if (construct(s, v, mem, f.type, { tx: f.tx, ty: f.ty }, 3, issue)) return;
   }
 
   // Houses ahead of need (two at once later on).
