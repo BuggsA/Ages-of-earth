@@ -1,4 +1,4 @@
-import { AGES, BUILDINGS, CALL_UP, ROADS, ROT, SILK, STEP_BACK, TRIBUTE, secs } from '../sim/data';
+import { AGES, BUILDINGS, CALL_UP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, secs } from '../sim/data';
 import { ageOf, backTo, deedProgress, deedsDone, mainRoad, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
 import type { Building, GameState, Unit } from '../sim/types';
 import { R_FISH } from '../sim/types';
@@ -223,6 +223,17 @@ const TIPS: Tip[] = [
     id: 'caravans',
     when: (s, me) => ageOf(s.players[me]) === 'silk',
     text: `Your town is a moving trade post. Select the Market and press <b>J</b> to pack it onto a wagon, drive it along the road and pitch it (<b>P</b>) further on: traders come home to it wherever it is, rolling or pitched, and every tile it moved since they set out pays ${Math.round(SILK.each * 100)}% more, up to ${Math.round(SILK.each * SILK.most * 100)}% (🐫 on a trader shows it). Nobody buys or sells while it rolls, and riders run a lone wagon down: keep it with the camp.`,
+  },
+  {
+    id: 'caravanserai',
+    // The Silk Road's waystation (#334), once the caravans are rolling.
+    when: (s, me) => ageOf(s.players[me]) === 'silk' && has(s, me, 'market') && !has(s, me, 'caravanserai'),
+    text: `Raise a <b>Caravanserai</b> (<kbd>C</kbd> in the economy build menu) by a far trading post, in no one's land too: your traders' trips to any post within ${SERAI.near} tiles of it pay ${Math.round((SERAI.pay - 1) * 100)}% more, traders and wagons within ${SERAI.rest} tiles mend, and the land round it becomes yours.`,
+  },
+  {
+    id: 'toll',
+    when: (s, me) => ageOf(s.players[me]) === 'silk' && has(s, me, 'caravanserai'),
+    text: `Your land is the road now. A rival's trader heading home with gold across it pays you <b>${Math.round((AGES.silk.add!.toll ?? 0) * 100)}% of its load</b> for safe passage, once a trip. A Caravanserai beside a post your rivals use makes the ground there yours, so every trader loading there pays. They may burn it, or trade elsewhere.`,
   },
   {
     id: 'fairs',

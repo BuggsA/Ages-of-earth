@@ -261,7 +261,8 @@ export const AGES: Record<AgeId, Age> = {
     short: 'Silk Road',
     tier: 3,
     path: 'steppe',
-    blurb: 'The camp has become a moving trade post. The Market packs onto a wagon too (J) and rolls with the town, and traders come home to it wherever it has gone: every tile the Market covered while a trader was out pays that trip 2% more, up to 80%. Trade pays a fifth more and traders travel 15% faster; riders stay cheap and quick. No tribute is taken (a people that lives by the caravans keeps the roads open), and still no fields are tilled or walls raised.',
+    blurb: 'The camp has become a moving trade post. The Market packs onto a wagon too (J) and rolls with the town, and traders come home to it wherever it has gone: every tile the Market covered while a trader was out pays that trip 2% more, up to 80%. Trade pays a fifth more and traders travel 15% faster; riders stay cheap and quick. No tribute is taken (a people that lives by the caravans keeps the roads open): instead, rival traders crossing your land with gold pay a toll of 15% for safe passage, once a trip, and Caravanserais (C) raised by the road rest your traders and make a near post pay more. Still no fields are tilled or walls raised.',
+    add: { toll: 0.15 },
     mul: { tradeGold: 1.2, traderSpeed: 1.15, hunt: 1.15 },
     price: { cavalry: 0.8 },
     training: { cavalry: 0.75 },
@@ -296,6 +297,21 @@ export const TRIBUTE = { every: 1, most: 8 };
  * with `caravans`; the Market that rolls on a wagon (or is being pitched) still takes its traders home.
  */
 export const SILK = { each: 0.02, most: 40 };
+
+/**
+ * Caravanserais (#334): a Silk Road waystation. A player's land trips to a post within `near` tiles of the
+ * middle of one of their finished Caravanserais pay `pay` times as much (once, however many stand near).
+ * Every `every` seconds, the player's and allies' traders and wagons within `rest` tiles of one mend `heal`
+ * health a second. It holds land like a camp (`BORDERS.caravanserai`), so the toll is taken there too.
+ */
+export const SERAI = { near: 8, pay: 1.25, rest: 4, heal: 2, every: 1 };
+
+/**
+ * Safe passage (#334): what tribute becomes for a caravan people. Every `every` seconds outside the peace, a
+ * rival's trader heading home with gold, standing on the land of a people whose `toll` mod is above 0, gives
+ * that people the mod's share of its load (whole gold, floored), once a trip for each people it crosses.
+ */
+export const TOLL = { every: 1 };
 
 /**
  * Flocks (#308): the steppe's answer to the Farm it can't build, food that walks. A Town Center in the Age of
@@ -972,6 +988,8 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   huntcamp: { name: 'Hunting Camp', size: 2, hp: 500, cost: { wood: 45 }, time: 14, pop: 0, sight: 5, trains: [], drop: ['food'], epoch: 0, menu: 'eco', key: 'N', blurb: 'A drop-off for food, and a small claim on the land round it. Raise it by the herd or a far kill: meat inside your border is safe from wolves, and Drying Racks keep it.' },
   // The Path of Blood (#303): pitched by foot soldiers where the army stands, enemy land too; burns when left alone (`WARCAMP`).
   warcamp: { name: 'War Camp', size: 2, hp: 700, cost: { wood: 100, gold: 40 }, time: 30, pop: 0, sight: 6, trains: ['infantry'], drop: [], epoch: 3, ages: ['ironblood', 'totalwar'], builders: ['infantry'], menu: 'mil', key: 'Q', blurb: 'Tents, a stockade and a war standard, pitched by foot soldiers where the army stands, in enemy land too. Trains foot soldiers at the front and holds the land round it, so the army there is fed. Left without soldiers nearby, it burns.' },
+  // The Silk Road (#334): a waystation by the road, raised in no one's land too; it rests traders, holds the land round it, and makes a near post pay more (`SERAI`).
+  caravanserai: { name: 'Caravanserai', size: 2, hp: 900, cost: { wood: 90, gold: 30 }, time: 25, pop: 0, sight: 6, trains: [], drop: [], epoch: 3, ages: ['silk'], menu: 'eco', key: 'C', blurb: 'A walled courtyard by the road where caravans rest. Raise it by a far trading post, in no one\'s land too: your traders\' trips to a post within 8 tiles of it pay a quarter more, traders and wagons within 4 tiles of it mend, and the land round it is yours, so rival traders crossing it pay your toll.' },
   airfield: { name: 'Airfield', size: 4, hp: 2200, cost: { wood: 250, stone: 100, gold: 150 }, time: 60, pop: 0, sight: 8, trains: ['fighter', 'bomber'], drop: [], epoch: 4, menu: 'mil', key: 'F', blurb: 'Builds fighters and bombers. Fighters hunt aircraft; bombers wreck towns.' },
 };
 
@@ -1049,13 +1067,15 @@ export interface Mods {
   plunder: number;
   /** Gold a second each standing rider takes from the rival whose land it holds (the Age of the Horde, #318; `TRIBUTE`). */
   tribute: number;
+  /** Share of a loaded rival trader's gold taken once a trip when it crosses the people's land (safe passage on the Silk Road, #334; `TOLL`). */
+  toll: number;
 }
 
 export const NO_MODS: Mods = {
   meleeAttack: 0, rangedAttack: 0, armor: 0, parmor: 0, range: 0, carry: 0, citizenSpeed: 1, wood: 1, mine: 1, farm: 1, forage: 1, hunt: 1,
   buildingHp: 1, buildSpeed: 1, militaryTrain: 1, rangedTrain: 1, cavalrySpeed: 1, infantryHp: 1, infantryArmor: 0, infantryAttack: 0, priest: 1, chant: 1,
   siegeAttack: 1, siegeRange: 0, techCost: 1, wonderCost: 1, extraCitizens: 0, fish: 1, shipHp: 1, shipRange: 0, airSpeed: 1, airHp: 1,
-  traderSpeed: 1, tradeGold: 1, relicGold: 1, bogGold: 1, rot: 1, beastWard: 1, portReach: 0, riderSight: 0, consecrate: 0, elmo: 0, telegraph: 0, galvanic: 0, plunder: 0, tribute: 0,
+  traderSpeed: 1, tradeGold: 1, relicGold: 1, bogGold: 1, rot: 1, beastWard: 1, portReach: 0, riderSight: 0, consecrate: 0, elmo: 0, telegraph: 0, galvanic: 0, plunder: 0, tribute: 0, toll: 0,
 };
 
 export interface Tech {
@@ -1451,7 +1471,7 @@ export function unitEpoch(type: UnitType): number {
  * nearest claimant (ties go to the older building). Shown only, so far; attrition and building limits
  * are later steps of the seed.
  */
-export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6, huntcamp: 4, warcamp: 3 };
+export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6, huntcamp: 4, warcamp: 3, caravanserai: 5 };
 
 /**
  * War Camps (#303): a finished camp with none of its people's soldiers (land units that fight) within

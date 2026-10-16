@@ -315,6 +315,60 @@ function warcamp(k: Kit, e: number, st: Style): void {
   k.cone(0.05, 0.12, 4, '#c9a23a', 0, 1.6, -0.05);
 }
 
+/**
+ * The Caravanserai (#334): a square mudbrick courtyard with round corner buttresses and a tall arched portal
+ * banded in turquoise tile. Inside, a well, bales of dyed cloth, and a camel kneeling to be unloaded.
+ */
+function caravanserai(k: Kit, _e: number, _st: Style): void {
+  const BRICK = '#d4b07e';
+  const BRICK2 = '#c39d6a';
+  const TILE = '#3f8f9a';
+  const DARK = '#2a2018';
+  k.box(1.95, 0.05, 1.95, '#b89a6c', 0, -0.02, 0);
+  k.box(1.5, 0.03, 1.5, '#cdb48c', 0, 0.02, 0);
+  // The outer walls, the front split by the portal.
+  k.box(1.8, 0.58, 0.18, BRICK, 0, 0, -0.81);
+  for (const x of [-0.81, 0.81]) k.box(0.18, 0.58, 1.8, BRICK, x, 0, 0);
+  for (const x of [-0.6, 0.6]) k.box(0.6, 0.58, 0.18, BRICK, x, 0, 0.81);
+  // A crenellated parapet along the top.
+  for (let i = 0; i < 7; i++) {
+    const t = -0.72 + i * 0.24;
+    k.box(0.1, 0.08, 0.2, BRICK2, -0.81, 0.58, t);
+    k.box(0.1, 0.08, 0.2, BRICK2, 0.81, 0.58, t);
+    k.box(0.2, 0.08, 0.1, BRICK2, t, 0.58, -0.81);
+  }
+  // Round buttresses at the corners.
+  for (const [x, z] of [[-0.84, -0.84], [0.84, -0.84], [-0.84, 0.84], [0.84, 0.84]]) {
+    k.cyl(0.15, 0.17, 0.72, 8, BRICK2, x, 0, z);
+    k.cyl(0.17, 0.17, 0.05, 8, BRICK, x, 0.72, z);
+  }
+  // Arched sleeping bays along the inside of the back wall.
+  for (const x of [-0.45, 0, 0.45]) {
+    k.box(0.22, 0.3, 0.02, DARK, x, 0.04, -0.71);
+    k.dome(0.11, DARK, x, 0.34, -0.71).scale.set(1, 1, 0.15);
+  }
+  // The portal (pishtaq): taller than the walls, its arch dark, a band of turquoise tile over it.
+  k.box(0.64, 1.0, 0.26, BRICK2, 0, 0, 0.84);
+  k.box(0.32, 0.5, 0.03, DARK, 0, 0, 0.97);
+  k.dome(0.16, DARK, 0, 0.5, 0.97).scale.set(1, 1.1, 0.12);
+  k.box(0.66, 0.08, 0.28, TILE, 0, 0.8, 0.84);
+  k.box(0.68, 0.05, 0.3, BRICK, 0, 1.0, 0.84);
+  for (const x of [-0.24, 0.24]) k.box(0.05, 0.6, 0.02, TILE, x, 0.08, 0.98);
+  banner(k, 0, 1.03, 0.78, 0.55);
+  for (const x of [-0.42, 0.42]) torch(k, x, 0.55, 1.0);
+  // The courtyard: a well, bales of dyed cloth, and a camel kneeling by them.
+  k.cyl(0.15, 0.16, 0.16, 8, STONE, 0, 0, -0.2);
+  k.cyl(0.11, 0.11, 0.01, 8, '#2d4a5a', 0, 0.16, -0.2);
+  const dyes = ['#a83a3a', '#3a4e9a', '#e0a83a'];
+  for (let i = 0; i < 3; i++) k.box(0.2, 0.15, 0.16, dyes[i], 0.42, i === 2 ? 0.15 : 0, -0.42 + (i === 2 ? 0.08 : i * 0.17));
+  const CAMEL = '#c49a62';
+  k.box(0.34, 0.15, 0.15, CAMEL, -0.38, 0.02, -0.42);
+  k.sphere(0.09, CAMEL, -0.4, 0.2, -0.42).scale.set(1.2, 0.9, 0.9);
+  k.box(0.06, 0.2, 0.06, CAMEL, -0.17, 0.12, -0.42).rotation.z = -0.35;
+  k.box(0.12, 0.06, 0.06, CAMEL, -0.1, 0.3, -0.42);
+  k.box(0.1, 0.03, 0.17, dyes[1], -0.4, 0.17, -0.42);
+}
+
 // ---- Farm ------------------------------------------------------------------------------------------
 
 function farm(k: Kit, e: number, st: Style): void {
@@ -1446,7 +1500,8 @@ function hordeTouches(k: Kit, type: BuildingType): void {
  * dyed silk drying on a line beside the bigger tents, and the white horsetail kept before the Town Center.
  */
 function silkTouches(k: Kit, type: BuildingType): void {
-  if (['farm', 'gate', 'tower', 'warcamp'].includes(type)) return;
+  // The Caravanserai (#334) is already the road's own building.
+  if (['farm', 'gate', 'tower', 'warcamp', 'caravanserai'].includes(type)) return;
   const span = type === 'wonder' ? 2.4 : type === 'towncenter' ? 1.6 : type === 'house' ? 0.6 : type === 'market' ? 1.3 : 0.95;
   const h = type === 'house' ? 0.8 : type === 'towncenter' || type === 'wonder' ? 1.5 : 1.15;
   const front = span + 0.1;
@@ -1627,7 +1682,7 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
 }
 
 const MAKERS: Record<Exclude<BuildingType, 'wall'>, (k: Kit, e: number, st: Style) => void> = {
-  towncenter, house, storehouse, huntcamp, warcamp, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield,
+  towncenter, house, storehouse, huntcamp, warcamp, caravanserai, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield,
 };
 
 const cache = new Map<string, THREE.BufferGeometry>();

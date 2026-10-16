@@ -4,10 +4,11 @@ import { scenarioById } from '../sim/campaign';
 import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
-import { AGES, CALL_UP, PATHS, WARCAMP, FLOCK, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { AGES, CALL_UP, PATHS, WARCAMP, FLOCK, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
-import { caravanBonus, caravanOf, homeMarket, marketOf, nearestCaravan, postAt, tripGold } from '../sim/trade';
+import { caravanBonus, caravanOf, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
+import { restsAt } from '../sim/passage';
 import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
 import { LANDMARK_KINDS, claimWork, claimants, favours, landmarkAt } from '../sim/landmarks';
 import { workProblem } from '../sim/works';
@@ -316,7 +317,7 @@ export class Hud {
     this.resEl.innerHTML += `<div class="res civ" data-tip="<b>${civ.name}</b>${civ.blurb}<br><i>${SIGNATURES[p.civ].blurb}</i>">${crestSvg(p.civ, p.color, 18)}${civ.name}</div><div class="res score" data-tip="<b>Score</b>Gathering, fighting, building, research and epochs.${board}">⭐${scores[viewer]}</div>`;
     this.epochEl.innerHTML = road
       ? `${age.name} <span class="bar" data-tip="<b>${road.back ? 'Stepping back' : 'Advancing'} to the ${AGES[road.to].name}</b>${adv}%"><i style="width:${adv}%"></i></span>`
-      : `<span data-tip="<b>${age.name}</b>${age.blurb}${age.path ? `<br><i>${PATHS[age.path].name}: step ${pathDepth(p)} of ${pathAges(age.path).length + (PATHS[age.path].planned?.length ?? 0)}. ${age.path === 'steppe' ? `Tribute taken: ${Math.floor(p.stats.tribute ?? 0)} gold.${age.caravans ? ` Gold the caravans earned on the move: ${p.stats.caravan ?? 0}.` : ''}` : `Plunder taken: ${p.stats.plunder ?? 0} gold.`}</i>` : ''}${idleTechs.length ? `<br>Suspended until you climb again: ${idleTechs.join(', ')}.` : ''}${mainRoad(p) ? `<br><span class='hint'>Advance at a Town Center.</span>` : ''}">${age.name}</span>`;
+      : `<span data-tip="<b>${age.name}</b>${age.blurb}${age.path ? `<br><i>${PATHS[age.path].name}: step ${pathDepth(p)} of ${pathAges(age.path).length + (PATHS[age.path].planned?.length ?? 0)}. ${age.path === 'steppe' ? `Tribute taken: ${Math.floor(p.stats.tribute ?? 0)} gold.${age.caravans ? ` Gold the caravans earned on the move: ${p.stats.caravan ?? 0}. Tolls taken from rival traders: ${p.stats.toll ?? 0}.` : ''}` : `Plunder taken: ${p.stats.plunder ?? 0} gold.`}</i>` : ''}${idleTechs.length ? `<br>Suspended until you climb again: ${idleTechs.join(', ')}.` : ''}${mainRoad(p) ? `<br><span class='hint'>Advance at a Town Center.</span>` : ''}">${age.name}</span>`;
     this.idleEl.textContent = `Idle ${idle}`;
     this.idleEl.classList.toggle('alert', idle > 0);
     document.getElementById('speed-btn')!.textContent = `${speed}×`;
@@ -513,8 +514,11 @@ export class Hud {
     const landlord = modsOf(s, u.owner).tribute > 0 && isRider(u) ? landOwnerAt(s, Math.floor(u.x), Math.floor(u.y)) : -1;
     const taking = landlord >= 0 && exacting(s, u, landlord);
     const tribute = taking ? `<span data-tip="<b>Tribute</b>Standing in ${s.players[landlord].name}'s land, this rider takes ${modsOf(s, u.owner).tribute} gold a second from its treasury (at most ${TRIBUTE.most} riders a rival). Moving, it takes nothing.">${icon('gold')}<em>Tribute</em></span>` : '';
+    // Safe passage (#334): the tolls this load has paid on its way home.
+    const paidTo = mine && u.tolled ? s.players.filter((q) => (u.tolled! & (1 << q.id)) !== 0).map((q) => q.name) : [];
+    const toll = paidTo.length ? `<span data-tip="<b>Toll paid</b>This load paid ${paidTo.join(' and ')} a toll for safe passage across its land. A road that keeps out of a caravan people's land pays in full.">🛂<em>Toll paid</em></span>` : '';
     const held = u.type === 'priest' && carriedBy(s, u) ? `<span data-tip="<b>Relic</b>Carried to a Temple, it brings in gold. Hands full: no healing or converting until it is set down (D).">⚱<em>Relic</em></span>` : '';
-    const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}:${u.cargo.length}:${rank}:${taking}:${road}`;
+    const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}:${u.cargo.length}:${rank}:${taking}:${road}:${u.tolled ?? 0}`;
     const html = `<div class="sel-portrait"><img src="${unitPicture(u.type, u.type === 'wagon' && u.packed === 'market' ? p.epoch + 20 : p.epoch, p.color)}" alt=""></div>
       <div class="sel-info">
         <div class="sel-name">${s.kings.includes(u.id) ? `👑 King (${st.name})` : st.name}</div>
@@ -525,7 +529,7 @@ export class Hud {
           <span data-tip="<b>Armor</b>Melee / missile armor: taken off every blow or shot.">🛡<em>Armor</em> ${st.armor}/${st.parmor}</span>
           ${st.range ? `<span data-tip="<b>Range</b>How far it shoots, in tiles.">🏹<em>Range</em> ${st.range}</span>` : ''}
           <span data-tip="<b>Speed</b>Tiles per second.">👣<em>Speed</em> ${Math.round(st.speed * 100) / 100}</span>
-          ${carry}${cargo}${load}${stance}${vet}${aura}${held}${trip}${caravan}${tribute}
+          ${carry}${cargo}${load}${stance}${vet}${aura}${held}${trip}${caravan}${tribute}${toll}
         </div>
         <div class="blurb">${st.blurb}</div>
       </div>`;
@@ -568,6 +572,12 @@ export class Hud {
       const fair = relicTradeShare(s, b.owner);
       const wares = ironTradeShare(s, b.owner);
       status = `Prices: ${(['food', 'wood', 'stone'] as const).map((r) => `${icon(r, 14)}${s.market[r]} ${s.market[r] < MARKET.start[r] ? '↑' : s.market[r] > MARKET.start[r] ? '↓' : '→'}`).join(' ')}${traders ? ` · 🐪 ${traders} on the road` : ''}${fair > 1 ? ` · ⚱ trade +${Math.round((fair - 1) * 100)}% for relics kept` : ''}${wares > 1 ? ` · ⛓ trade +${Math.round((wares - 1) * 100)}% for iron dug` : ''}`;
+    }
+    else if (b.type === 'caravanserai' && b.built) {
+      // The Silk Road's waystation (#334): the posts it serves and the caravans resting in it.
+      const posts = s.posts.filter((q) => seraiNear(s, b.owner, q) === b).length;
+      const resting = s.ents.filter((e) => e.kind === 'unit' && restsAt(s, e, b) && e.hp < statsFor(s, e.owner, e.type).hp).length;
+      status = `<span data-tip="<b>Waystation</b>Your traders' trips to a trading post within ${SERAI.near} tiles of a Caravanserai pay ${Math.round((SERAI.pay - 1) * 100)}% more. Traders and wagons within ${SERAI.rest} tiles mend ${SERAI.heal} a second.">🐫 ${posts ? `${posts} post${posts > 1 ? 's' : ''} near: trips there +${Math.round((SERAI.pay - 1) * 100)}%` : `No post within ${SERAI.near} tiles`}</span>${resting ? ` · ${resting} resting` : ''}`;
     }
     else if (b.type === 'dock') status = 'Fishing boats bring their catch here';
     else if (b.type === 'storehouse' && p.techs.includes('survey')) status = surveyFinds(s, 'survey') ? '🧭 Bog iron lies somewhere in this world' : '🧭 No bog iron in this world';

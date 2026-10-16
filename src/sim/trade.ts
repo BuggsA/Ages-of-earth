@@ -1,5 +1,5 @@
 import { ageDef, ageOf, ironTradeShare, relicTradeShare } from './ages';
-import { LAST_EPOCH, SILK, TRADE } from './data';
+import { LAST_EPOCH, SERAI, SILK, TRADE } from './data';
 import { NAVAL, distToRect, nearestWalkable } from './grid';
 import { modsOf } from './stats';
 import type { Building, GameState, Goal, TradePost, Unit } from './types';
@@ -131,7 +131,7 @@ export function tripGold(s: GameState, owner: number, market: { x: number; y: nu
   const dx = market.x - post.x;
   const dy = market.y - post.y;
   const epoch = Math.min(LAST_EPOCH, s.players[owner].epoch);
-  const k = TRADE.gold * (1 + Math.max(0, epoch - 1) * TRADE.epoch) * modsOf(s, owner).tradeGold * relicTradeShare(s, owner) * ironTradeShare(s, owner) * (sea ? TRADE.sea.mul : harborNear(s, owner, market) ? TRADE.harbor.mul : 1);
+  const k = TRADE.gold * (1 + Math.max(0, epoch - 1) * TRADE.epoch) * modsOf(s, owner).tradeGold * relicTradeShare(s, owner) * ironTradeShare(s, owner) * (sea ? TRADE.sea.mul : harborNear(s, owner, market) ? TRADE.harbor.mul : 1) * (!sea && seraiNear(s, owner, post) ? SERAI.pay : 1);
   return Math.max(1, Math.min(TRADE.max, Math.floor((dx * dx + dy * dy) * k)));
 }
 
@@ -174,4 +174,18 @@ export function caravanBonus(s: GameState, owner: number, carry: number, from: {
   const dx = home.x - from.x, dy = home.y - from.y;
   const moved = Math.floor(Math.sqrt(dx * dx + dy * dy));
   return { moved, bonus: Math.floor(carry * SILK.each * Math.min(SILK.most, moved)) };
+}
+
+/**
+ * A finished Caravanserai of the owner's whose middle lies within `SERAI.near` tiles of the post (#334), the
+ * first in id order, or null. Its land trips to that post pay `SERAI.pay` times as much.
+ */
+export function seraiNear(s: GameState, owner: number, post: { x: number; y: number }): Building | null {
+  const r = SERAI.near;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'caravanserai' || e.owner !== owner || !e.built || e.hp <= 0) continue;
+    const dx = e.x - post.x, dy = e.y - post.y;
+    if (dx * dx + dy * dy <= r * r) return e;
+  }
+  return null;
 }
