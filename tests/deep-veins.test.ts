@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RARE } from '../src/sim/data';
+import { CAVE, RARE } from '../src/sim/data';
 import { createGame, step } from '../src/sim/game';
 import { applyCommand } from '../src/sim/commands';
 import { RARE_OF_TILE } from '../src/sim/units';
@@ -33,7 +33,7 @@ describe('deep veins', () => {
       for (const id of RARES) {
         const tiles = veinTiles(s, id);
         expect(tiles.length > 0).toBe((s.rares ?? []).includes(id));
-        for (const t of tiles) expect(s.amount[t]).toBe(RARE[id].amount);
+        for (const t of tiles) expect(s.amount[t]).toBe(RARE[id].amount * ((s.caves ?? []).some((c) => c.tile === t) ? CAVE.rich : 1));
       }
     }
   });

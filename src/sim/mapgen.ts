@@ -910,10 +910,19 @@ function placeRares(
 }
 const RARES_ORDER: RareId[] = ['salt', 'saltpetre', 'bloodiron'];
 
+/** Where a den cave's wolves start (#356): the pack lies at the mouth. `createGame` spawns them after everything else, so a cave moves no other id. */
+export function denWolves(tile: number, w: number): { x: number; y: number }[] {
+  const x = tile % w;
+  const y = Math.floor(tile / w);
+  const out: { x: number; y: number }[] = [];
+  for (let k = 0; k < WOLF.pack; k++) out.push({ x: x + 0.5 + (k - 1) * 0.8, y: y + 1.6 + (k === 1 ? 0.5 : 0) });
+  return out;
+}
+
 /**
  * Caves (#356): see `CAVE`. They roll their own dice and mark empty open ground, as the veins do. The ore of each is dealt
  * from the world's ores in turn from a seeded start, so two caves never hold the same ore while another is unshown. A den
- * cave's wolves are added to `wild` on the open tiles beside it.
+ * cave's wolves are spawned by `createGame` (see `denWolves`).
  */
 function placeCaves(
   seed: number,
@@ -946,12 +955,11 @@ function placeCaves(
     for (let dy = -2; dy <= 2 && !crowded; dy++) for (let dx = -2; dx <= 2; dx++) if (res[(y + dy) * w + x + dx] !== R_NONE) crowded = true;
     if (crowded || wild.some((b) => (b.x - x - 0.5) * (b.x - x - 0.5) + (b.y - y - 0.5) * (b.y - y - 0.5) < 36)) continue;
     const ore = rares[(first + out.length) % rares.length];
-    const den = rng() < CAVE.den;
+    const den = rng() < CAVE.den[size];
     res[y * w + x] = RARE_TILE[ore];
     amount[y * w + x] = RARE[ore].amount * CAVE.rich;
     at.push({ x, y });
     out.push({ tile: y * w + x, ore, den });
-    if (den) for (let k = 0; k < WOLF.pack; k++) wild.push({ kind: 'wolf', x: x + 0.5 + (k - 1) * 0.8, y: y + 1.6 + (k === 1 ? 0.5 : 0) });
   }
   return out;
 }

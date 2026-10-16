@@ -115,6 +115,18 @@ function saltVein(): Kit {
   return k;
 }
 
+/** A cave mouth (#356): a hump of rock with a dark opening, a glint of ore at the lip. */
+function caveMouth(): Kit {
+  const k = new Kit();
+  k.rock(0.46, '#6e6a62', 0, 0.2).scale.set(1.15, 0.9, 1);
+  k.rock(0.3, '#7d786e', -0.3, 0.12, 0.12);
+  k.rock(0.26, '#625e57', 0.32, 0.1, -0.1);
+  k.box(0.3, 0.26, 0.2, '#0d0b0a', 0, 0.13, 0.36);
+  k.rock(0.09, '#e8e2c8', 0.18, 0.05, 0.5);
+  k.rock(0.07, '#d8cf9a', -0.16, 0.04, 0.52);
+  return k;
+}
+
 /** Saltpetre (#356): a pale yellow crust on damp dark rock, with fine needles. */
 function saltpetreVein(): Kit {
   const k = new Kit();
@@ -217,7 +229,7 @@ function fish(): Kit {
   return k;
 }
 
-const MAKERS = { pine, broadleaf, birch, palm, felled, berryBush, stoneDeposit, goldDeposit, bogIron, saltVein, saltpetreVein, bloodIronVein, carcass, tuft, flowers, pebbles, boulder, fish };
+const MAKERS = { pine, broadleaf, birch, palm, felled, berryBush, stoneDeposit, goldDeposit, bogIron, saltVein, caveMouth, saltpetreVein, bloodIronVein, carcass, tuft, flowers, pebbles, boulder, fish };
 export type NatureKind = keyof typeof MAKERS;
 
 const cache = new Map<NatureKind, THREE.BufferGeometry>();
