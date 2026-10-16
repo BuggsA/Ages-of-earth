@@ -797,3 +797,5 @@ Built: a small corner caption names the town the title screen's camera is visiti
 **Why I love it.** A raid that kills nothing and still hurts, and a defender who has to learn to see it.
 
 **Where it goes.** The Horde arrives late and rarely (1 of 6 headless Mongol matches, at 19.7 min) because the 200-milk deed runs at about 20 a minute: more lambs sooner, or a cheaper deed (rules lane), would bring it forward. The camp should creep toward the nearest rival so tribute is in supply. Tribute in a full match is unseen. Not seen in a browser.
+
+**Deep marks (own pitch, 2026-10-16, chain 1016-0017 s7, lane look).** Built: a Way deepened at its vow shows a second flourish by the Town Center, so a scout can tell a deep Way from a plain one (`deep` token in the heirloom string; same cache, no new ids). Why: the vow is a choice worth reading. Seen: models test and `tests/way-marks-deep.test.ts`; not seen in a browser. Next: the computer reading a rival's Way and deep mark when it picks raids (lane ai).

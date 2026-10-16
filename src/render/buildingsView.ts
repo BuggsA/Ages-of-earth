@@ -251,5 +251,7 @@ function snapshot(s: GameState, b: Building): Known {
 function heirloomOn(s: GameState, b: Building): string {
   const techs = s.players[b.owner].techs as string[];
   const way = b.type === 'towncenter' && s.players[b.owner].way ? `way:${s.players[b.owner].way}` : '';
-  return heirloomsFor(b.type).filter((id) => techs.includes(id) || id === way).join(',');
+  const marks = heirloomsFor(b.type).filter((id) => techs.includes(id) || id === way);
+  if (way && s.players[b.owner].deep) marks.push('deep');
+  return marks.join(',');
 }

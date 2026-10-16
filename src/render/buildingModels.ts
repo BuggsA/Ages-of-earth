@@ -1702,8 +1702,8 @@ export function heirloomsFor(type: BuildingType): string[] {
 }
 
 /** Bell Foundry: a bronze bell hung in a little timber cote on the Temple's roof ridge. Iron-Bound Hulls: iron bands and bolts on the dock's boathouse and pier. Joint-Stock Company: a counting-house board with a gilt seal and coin stacks by the Market. Masons' Lodge: dressed ashlar and shear-legs hoisting a block beside the Temple. */
-function heirloomTouch(k: Kit, id: string): void {
-  if (id.startsWith('way:')) return wayTouch(k, id.slice(4));
+function heirloomTouch(k: Kit, id: string, deep = false): void {
+  if (id.startsWith('way:')) return wayTouch(k, id.slice(4), deep);
   const BRONZE = '#b8893a';
   const IRON = '#34373d';
   const GOLD = '#e2b23c';
@@ -1746,7 +1746,7 @@ function heirloomTouch(k: Kit, id: string): void {
  * on a pole. The Hearth: a ring of stones round a glowing fire with a clay pot. The Warband: spears planted
  * in a rack with a painted shield.
  */
-function wayTouch(k: Kit, way: string): void {
+function wayTouch(k: Kit, way: string, deep = false): void {
   const WOOD = '#5a4630';
   if (way === 'hunt') {
     for (const x of [-1.6, -0.7]) k.cyl(0.04, 0.05, 1.2, 5, WOOD, x, 0, 2.1);
@@ -1773,6 +1773,33 @@ function wayTouch(k: Kit, way: string): void {
     k.cyl(0.26, 0.26, 0.05, 10, '#a83a2e', -1.1, 0.95, 2.18).rotation.x = Math.PI / 2;
     k.cyl(0.07, 0.07, 0.06, 6, '#d8b25a', -1.1, 0.95, 2.2).rotation.x = Math.PI / 2;
   }
+  if (!deep) return;
+  // A vow deepened (#338) adds a second flourish beside the first.
+  if (way === 'hunt') {
+    // A second frame, hung with a long hide and a row of teeth, and antlers piled at its foot.
+    for (const x of [-2.5, -1.9]) k.cyl(0.04, 0.05, 1.3, 5, WOOD, x, 0, 2.1);
+    k.box(0.8, 0.05, 0.05, WOOD, -2.2, 1.25, 2.1);
+    k.box(0.4, 0.8, 0.03, '#a8845a', -2.35, 0.4, 2.1);
+    for (let i = 0; i < 4; i++) k.cone(0.03, 0.12, 4, '#e6dcc4', -2.5 + i * 0.2, 1.1, 2.1).rotation.x = Math.PI;
+    for (const s of [-1, 1]) k.box(0.05, 0.4, 0.05, '#d8cdb0', -1.9 + s * 0.12, 0, 2.5).rotation.z = s * 0.6;
+  } else if (way === 'hearth') {
+    // A drying rack of fish and herbs over the fire, and a second pot beside the first.
+    for (const x of [-1.7, -0.7]) k.cyl(0.03, 0.04, 1.0, 5, WOOD, x, 0, 2.2);
+    k.box(1.1, 0.04, 0.04, WOOD, -1.2, 1.0, 2.2);
+    for (let i = 0; i < 4; i++) k.box(0.08, 0.3, 0.03, i % 2 ? '#c2b08a' : '#6f8a4a', -1.5 + i * 0.22, 0.7, 2.2);
+    k.cyl(0.11, 0.08, 0.18, 8, '#8a4a30', -0.3, 0, 2.4);
+  } else if (way === 'warband') {
+    // A second rack of spears, a war drum, and a banner pole with a red pennant.
+    k.box(1.0, 0.06, 0.06, WOOD, -2.5, 0.7, 2.1);
+    for (const x of [-2.9, -2.5, -2.1]) {
+      k.cyl(0.02, 0.025, 1.7, 4, WOOD, x, 0, 2.1);
+      k.cone(0.045, 0.2, 4, '#9a9aa0', x, 1.7, 2.1);
+    }
+    k.cyl(0.2, 0.2, 0.3, 8, '#7a5a3a', -0.2, 0, 2.3);
+    k.cyl(0.21, 0.21, 0.03, 8, '#e6dcc4', -0.2, 0.3, 2.3);
+    k.cyl(0.025, 0.03, 2.2, 4, WOOD, 0.4, 0, 2.0);
+    k.box(0.45, 0.28, 0.03, '#a83a2e', 0.65, 1.8, 2.0);
+  }
 }
 
 /** The baked model of a building in an epoch, in a player's color (`variant`: which way a wall piece joins its neighbors). */
@@ -1780,7 +1807,8 @@ export function buildingGeometry(type: BuildingType, epoch: number, color: strin
   const look = age && DRESSED_AGES.includes(age) && type !== 'wall' ? age : undefined;
   const held = heirloom.split(',');
   const marks = heirloomsFor(type).filter((id) => held.includes(id));
-  const key = `${type}:${epoch}:${color}:${variant}${look ? ':' + look : ''}${marks.map((m) => ':' + m).join('')}`;
+  const deep = type === 'towncenter' && held.includes('deep');
+  const key = `${type}:${epoch}:${color}:${variant}${look ? ':' + look : ''}${marks.map((m) => ':' + m).join('')}${deep ? ':deep' : ''}`;
   let g = cache.get(key);
   if (!g) {
     const k = new Kit();
@@ -1789,7 +1817,7 @@ export function buildingGeometry(type: BuildingType, epoch: number, color: strin
     const stack = STACKS[type];
     if (epoch >= 4 && stack) smokestack(k, stack[0], stack[1], stack[2]);
     if (look) ageTouches(k, type, look);
-    for (const m of marks) heirloomTouch(k, m);
+    for (const m of marks) heirloomTouch(k, m, deep);
     g = bake(k.root, color);
     cache.set(key, g);
   }
