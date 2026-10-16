@@ -1,4 +1,5 @@
-import { RELIC, secs } from './data';
+import { RELIC, VIGIL, secs } from './data';
+import { vigilGold } from './vigil';
 import { nearestWalkable, relicOnTile } from './grid';
 import type { Building, GameState, Relic, Unit } from './types';
 import { modsOf } from './stats';
@@ -82,7 +83,9 @@ export function updateRelics(s: GameState): void {
         letGo(s, r, spot.x, spot.y, b.owner);
       } else if (pay) {
         const p = s.players[b.owner];
-        const gold = Math.round(RELIC.gold * modsOf(s, b.owner).relicGold);
+        const vigil = vigilGold(s, b);
+        const gold = Math.round(RELIC.gold * modsOf(s, b.owner).relicGold) + vigil;
+        if (vigil > 0 && s.tick % secs(VIGIL.toast) === 0) s.events.push({ k: 'vigil', owner: b.owner, x: b.x, y: b.y, priests: vigil / VIGIL.each });
         p.res.gold += gold;
         p.stats.gathered += gold;
         // Relic gold counts toward the pilgrims' deeds (#49).
