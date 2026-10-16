@@ -2422,8 +2422,11 @@ function frame(now: number): void {
       const at = army.length >= 4 ? army[0] : (tc ?? { x: who.startX, y: who.startY });
       view.rig.focus(at.x, at.y);
       view.rig.rotate(dt * 0.05);
+      // A whole day in eight minutes, opening at the golden hour.
+      view.titleHour = (16 + attractT / 20) % 24;
       captionTown(who, army.length >= 4);
     } else {
+      view.titleHour = null;
       // Keyboard and screen-edge panning.
       const sp = view.rig.panSpeed * dt;
       let px = 0;

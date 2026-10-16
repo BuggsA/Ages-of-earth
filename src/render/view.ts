@@ -295,8 +295,11 @@ export class View {
     this.light(this.hourNow());
   }
 
+  /** The title's backdrop sets its own hour, so the town turns through dusk and night while it plays. */
+  titleHour: number | null = null;
+
   private hourNow(): number {
-    return forcedHour() ?? (this.state ? hourAt(this.state.seed, this.state.tick / TICK_HZ) : 9);
+    return forcedHour() ?? this.titleHour ?? (this.state ? hourAt(this.state.seed, this.state.tick / TICK_HZ) : 9);
   }
 
   /** Light the land for an hour of the day, greyed by today's weather. */
@@ -379,7 +382,7 @@ export class View {
     const p = s.players[this.viewer];
     if (!this.reveal) this.fog?.update(p.vis, p.seen, dt);
 
-    this.light(forcedHour() ?? hourAt(s.seed, s.tick / TICK_HZ));
+    this.light(this.hourNow());
     // Light follows the view so shadows stay crisp where the player looks.
     const t = this.rig.target;
     const span = 14 + this.rig.distance * 0.75;

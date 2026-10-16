@@ -220,6 +220,15 @@ function storehouse(k: Kit, e: number, st: Style): void {
   k.sphere(0.08, '#cfa030', 0.45, 0.07, 0.25);
   k.cyl(0.12, 0.1, 0.25, 7, '#b08a4e', -0.4, 0, 0.6);
   k.team(k.box(1.62, 0.05, 0.06, TEAM, 0, 0.74, 0.55));
+  if (e >= 3) {
+    // Powder-age yard: a hoist beam with a hanging crate, and stacked cases.
+    k.cyl(0.04, 0.05, 1.2, 5, e >= 4 ? '#3a3e44' : st.post, -0.95, 0, 0.75);
+    k.box(0.9, 0.05, 0.05, e >= 4 ? '#3a3e44' : st.post, -0.5, 1.15, 0.75);
+    k.cyl(0.005, 0.005, 0.35, 3, '#d8d0b8', -0.2, 0.8, 0.75);
+    k.box(0.2, 0.16, 0.2, '#a07a48', -0.2, 0.64, 0.75);
+    for (const [x, y] of [[0.8, 0], [0.8, 0.2], [1.05, 0]]) k.box(0.22, 0.2, 0.22, '#a07a48', x, y, 0.75);
+  }
+  if (e >= 4) lamp(k, 0.9, 0, -0.62, 0.8);
   banner(k, 0.85, 0, 0.85, 0.9);
 }
 
@@ -311,6 +320,21 @@ function farm(k: Kit, e: number, st: Style): void {
     k.box(0.32, 0.02, 0.02, WOOD, -1.0, 0.38, 0.9);
     k.sphere(0.05, HAY, -1.0, 0.52, 0.9);
     k.cone(0.07, 0.07, 6, '#6b5a3a', -1.0, 0.55, 0.9);
+  }
+  if (e >= 3) {
+    // A haystack and a water trough at the corner.
+    k.cone(0.3, 0.42, 7, HAY, -1.1, 0, -1.1).scale.set(1, 1, 1);
+    k.box(0.5, 0.1, 0.16, WOOD, 1.05, 0, -1.1);
+  }
+  if (e >= 4) {
+    // A lattice windpump: legs, a vane and a many-bladed wheel.
+    for (const [x, z] of [[-0.07, -0.07], [0.07, -0.07], [-0.07, 0.07], [0.07, 0.07]]) k.cyl(0.012, 0.02, 1.2, 4, '#3a3e44', 1.2 + x * 1.5, 0, -1.2 + z * 1.5);
+    k.cyl(0.012, 0.012, 0.1, 4, '#3a3e44', 1.2, 1.2, -1.2);
+    for (let i = 0; i < 6; i++) {
+      const blade = k.box(0.03, 0.26, 0.01, '#9aa0a6', 1.2, 1.3, -1.12);
+      blade.rotation.z = (i * Math.PI) / 3;
+    }
+    k.box(0.01, 0.12, 0.3, '#b33a32', 1.2, 1.3, -1.35);
   }
 }
 
@@ -1032,9 +1056,21 @@ function wall(k: Kit, e: number, st: Style, mask: number): void {
   const top = e === 1 ? 1.0 : 1.2;
   const post = straight ? 0.5 : 0.62;
   const ph = straight ? top : top + 0.25;
-  k.box(post, ph, post, c, 0, 0, 0);
-  k.box(post + 0.06, 0.06, post + 0.06, e === 1 ? st.trim : '#8f897f', 0, ph, 0);
-  if (!straight) {
+  if (e === 3 && !straight) {
+    // Gunpowder: a squat round bastion with a cannon port, in place of a square post.
+    k.cyl(0.36, 0.42, ph, 10, c, 0, 0, 0);
+    k.cyl(0.4, 0.4, 0.07, 10, '#8f897f', 0, ph, 0);
+    k.box(0.14, 0.12, 0.2, '#2b2b2e', 0, ph - 0.4, 0.34);
+    k.team(k.cyl(0.37, 0.37, 0.1, 10, TEAM, 0, ph - 0.7, 0));
+  } else if (e === 4 && !straight) {
+    // Industrial: a brick pier with a cast-iron lamp.
+    k.box(post, ph, post, st.wall, 0, 0, 0);
+    k.box(post + 0.08, 0.08, post + 0.08, st.wall2, 0, ph, 0);
+    lamp(k, 0, ph + 0.08, 0, 0.45);
+    k.team(k.box(post + 0.02, 0.1, post + 0.02, TEAM, 0, ph - 0.3, 0));
+  } else k.box(post, ph, post, c, 0, 0, 0);
+  if (e < 3 || straight) k.box(post + 0.06, 0.06, post + 0.06, e === 1 ? st.trim : '#8f897f', 0, ph, 0);
+  if (!straight && e < 3) {
     for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) k.box(0.14, 0.16, 0.14, c, x * (post / 2 - 0.07), ph + 0.06, z * (post / 2 - 0.07));
     k.team(k.box(post + 0.02, 0.1, post + 0.02, TEAM, 0, ph - 0.3, 0));
   }
@@ -1042,6 +1078,22 @@ function wall(k: Kit, e: number, st: Style, mask: number): void {
     if (!(mask & bit)) continue;
     const w = Math.abs(dx) * 0.5 + Math.abs(dz) * 0.44;
     const d = Math.abs(dz) * 0.5 + Math.abs(dx) * 0.44;
+    if (e === 3) {
+      // A sloped rampart: broad battered foot, a low parapet with gun embrasures instead of merlons.
+      k.box(w, top * 0.5, d + 0.18, c, dx * 0.25, 0, dz * 0.25);
+      k.box(w, top * 0.5, d, c, dx * 0.25, top * 0.5, dz * 0.25);
+      k.box(dx ? 0.5 : 0.08, 0.12, dz ? 0.5 : 0.08, '#8f897f', dx * 0.25 + (dz ? 0.17 : 0), top, dz * 0.25 + (dx ? 0.17 : 0));
+      k.box(dx ? 0.5 : 0.08, 0.12, dz ? 0.5 : 0.08, '#8f897f', dx * 0.25 - (dz ? 0.17 : 0), top, dz * 0.25 - (dx ? 0.17 : 0));
+      continue;
+    }
+    if (e === 4) {
+      // A low brick wall topped with iron railings.
+      k.box(w, top * 0.55, d, st.wall, dx * 0.25, 0, dz * 0.25);
+      k.box(w, 0.06, d + 0.06, st.wall2, dx * 0.25, top * 0.55, dz * 0.25);
+      for (let i = 1; i <= 3; i++) k.cyl(0.015, 0.015, 0.5, 4, '#2b2b2e', dx * (i * 0.125), top * 0.6, dz * (i * 0.125));
+      k.box(dx ? 0.5 : 0.02, 0.025, dz ? 0.5 : 0.02, '#2b2b2e', dx * 0.25, top * 0.6 + 0.4, dz * 0.25);
+      continue;
+    }
     k.box(w, top, d, c, dx * 0.25, 0, dz * 0.25);
     // Merlons along both edges.
     for (const side of [-1, 1]) {
@@ -1078,6 +1130,23 @@ function gate(k: Kit, e: number, st: Style): void {
   for (const x of [-0.42, 0.42]) {
     const door = k.box(0.04, h - 0.4, 0.44, '#5b4330', x, 0, 0.3);
     door.rotation.y = x > 0 ? 0.3 : -0.3;
+  }
+  if (e === 2) {
+    // A portcullis raised in its slot above the arch.
+    for (let i = 0; i < 4; i++) k.box(0.03, 0.4, 0.03, '#2b2b2e', -0.15 + i * 0.1, h - 0.7, 0);
+  }
+  if (e === 3) {
+    // Gunpowder: gun ports in the gate towers and a drawbridge chain on the lintel.
+    for (const x of [-0.72, 0.72]) {
+      k.box(0.14, 0.12, 0.1, '#2b2b2e', x, h * 0.45, 0.4);
+      k.box(0.14, 0.12, 0.1, '#2b2b2e', x, h * 0.45, -0.4);
+    }
+    for (const x of [-0.3, 0.3]) k.cyl(0.015, 0.015, 0.5, 4, '#2b2b2e', x, h - 0.75, 0.28);
+  }
+  if (e === 4) {
+    // Industrial: iron-barred gate leaves between brick piers, a lamp on each.
+    for (const x of [-0.72, 0.72]) lamp(k, x, h + 0.06, 0, 0.45);
+    for (let i = 0; i < 5; i++) for (const x of [-1, 1]) k.cyl(0.015, 0.015, h - 0.5, 4, '#2b2b2e', x * (0.1 + i * 0.07), 0, 0.3);
   }
   if (e >= 2) banner(k, 0.72, h + 0.06, 0, 0.6, 0.8);
 }
