@@ -103,14 +103,18 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
 
 /** Whether a relic, trading post, ruin or landmark keeps any tile of this n-by-n square clear: the tile-by-tile checks below, asked once for the whole square. */
 function keepClearNear(s: GameState, tx: number, ty: number, n: number): boolean {
-  const ex = tx + n - 1;
-  const ey = ty + n - 1;
-  const box = (x: number, y: number, r: number) => x - r <= ex && x + r >= tx && y - r <= ey && y + r >= ty;
-  for (const r of s.relics) if (!r.carrier && !r.temple && box(Math.floor(r.x), Math.floor(r.y), 0)) return true;
-  for (const p of s.posts) if (box(Math.floor(p.x), Math.floor(p.y), TRADE.plaza + 1)) return true;
-  if (s.ruins) for (const r of s.ruins) if (box(Math.floor(r.x), Math.floor(r.y), RUINS.clear)) return true;
-  if (s.landmarks) for (const m of s.landmarks) if (box(Math.floor(m.x), Math.floor(m.y), LANDMARKS.clear)) return true;
+  for (const r of s.relics) if (!r.carrier && !r.temple && inBox(r.x, r.y, 0, tx, ty, n)) return true;
+  for (const p of s.posts) if (inBox(p.x, p.y, TRADE.plaza + 1, tx, ty, n)) return true;
+  if (s.ruins) for (const r of s.ruins) if (inBox(r.x, r.y, RUINS.clear, tx, ty, n)) return true;
+  if (s.landmarks) for (const m of s.landmarks) if (inBox(m.x, m.y, LANDMARKS.clear, tx, ty, n)) return true;
   return false;
+}
+
+/** Whether the tile under a point, grown by `r` tiles each way, overlaps the n-by-n square at (tx, ty). */
+function inBox(px: number, py: number, r: number, tx: number, ty: number, n: number): boolean {
+  const x = Math.floor(px);
+  const y = Math.floor(py);
+  return x - r <= tx + n - 1 && x + r >= tx && y - r <= ty + n - 1 && y + r >= ty;
 }
 
 /** A relic on the ground on this tile (buildings can't go over one). */

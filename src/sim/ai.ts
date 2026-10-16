@@ -1,6 +1,6 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_ORE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
-import { NAVAL, distToRect, nearestWalkable, placeProblem, walkable } from './grid';
+import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Ruin, TechId, TradePost, Unit, UnitType } from './types';
@@ -667,10 +667,24 @@ export function findSpot(s: GameState, type: BuildingType, x: number, y: number,
   for (let r = minR; r <= maxR; r++) {
     // Start each ring at a different side, so buildings don't all line up.
     const start = Math.floor(roll(s) * 8 * Math.max(1, r));
-    const ring: [number, number][] = [];
-    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === r) ring.push([dx, dy]);
-    for (let k = 0; k < ring.length; k++) {
-      const [dx, dy] = ring[(k + start) % ring.length];
+    // The ring's tiles in reading order (its top row, then its two sides row by row, then its bottom row),
+    // worked out one at a time rather than listed: this search runs whenever the computer builds.
+    const len = r === 0 ? 1 : 8 * r;
+    for (let k = 0; k < len; k++) {
+      let j = (k + start) % len;
+      let dx: number;
+      let dy: number;
+      if (r === 0) dx = dy = 0;
+      else if (j < 2 * r + 1) {
+        dx = j - r;
+        dy = -r;
+      } else if ((j -= 2 * r + 1) < 2 * (2 * r - 1)) {
+        dx = j & 1 ? r : -r;
+        dy = -r + 1 + (j >> 1);
+      } else {
+        dx = j - 2 * (2 * r - 1) - r;
+        dy = r;
+      }
       const tx = cx + dx;
       const ty = cy + dy;
       if (placeProblem(s, type, tx, ty)) continue;
@@ -731,11 +745,11 @@ export function findDockSpot(s: GameState, x: number, y: number, maxR: number): 
   }
   for (let ty = Math.floor(y) - maxR; ty <= y + maxR; ty++) {
     for (let tx = Math.floor(x) - maxR; tx <= x + maxR; tx++) {
-      if (placeProblem(s, 'dock', tx, ty)) continue;
       const cx = tx + 1.5;
       const cy = ty + 1.5;
       const home = Math.sqrt((cx - x) * (cx - x) + (cy - y) * (cy - y));
-      if (home > maxR) continue;
+      // Too little water beside it is a problem `placeProblem` would find too, last and dearest; most of the land fails here.
+      if (home > maxR || shoreWater(s, tx, ty, 3) < 3 || placeProblem(s, 'dock', tx, ty)) continue;
       let near = 99;
       for (const f of fish) {
         const fx = (f % s.w) + 0.5 - cx;
