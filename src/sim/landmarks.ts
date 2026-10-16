@@ -67,10 +67,11 @@ export function claimants(s: GameState, m: Landmark): Map<number, { n: number; p
   const out = new Map<number, { n: number; player: number }>();
   const r2 = LANDMARKS.reach * LANDMARKS.reach;
   for (const e of s.ents) {
-    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || e.type === 'trader' || domainOf(e.type) !== 'land') continue;
+    if (e.kind !== 'unit') continue;
+    // Distance first: run every tick for every landmark, and most units are nowhere near.
     const dx = e.x - m.x;
     const dy = e.y - m.y;
-    if (dx * dx + dy * dy > r2) continue;
+    if (dx * dx + dy * dy > r2 || e.hp <= 0 || e.inside || e.type === 'trader' || domainOf(e.type) !== 'land') continue;
     const team = s.players[e.owner].team;
     const have = out.get(team);
     if (have) have.n++;

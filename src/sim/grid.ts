@@ -69,12 +69,14 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
   if (tx < 1 || ty < 1 || tx + n > s.w - 1 || ty + n > s.h - 1) return 'edge';
   let lo = Infinity;
   let hi = -Infinity;
+  // The computer asks this of hundreds of tiles a search; most are nowhere near a relic, post, ruin or landmark.
+  const near = keepClearNear(s, tx, ty, n);
   for (let y = ty; y < ty + n; y++) {
     for (let x = tx; x < tx + n; x++) {
       const i = y * s.w + x;
       if (s.terrain[i] === T_WATER) return 'water';
       if (s.terrain[i] === T_ROCK) return 'rock';
-      if (s.res[i] !== R_NONE || relicOnTile(s, x, y) || postOnTile(s, x, y) || ruinOnTile(s, x, y) || landmarkOnTile(s, x, y)) return 'blocked';
+      if (s.res[i] !== R_NONE || (near && (relicOnTile(s, x, y) || postOnTile(s, x, y) || ruinOnTile(s, x, y) || landmarkOnTile(s, x, y)))) return 'blocked';
       // A gate may go into its owner's own wall, replacing the pieces it covers.
       if (s.bldAt[i] !== 0 && !(type === 'gate' && ownWall(s, s.bldAt[i], owner))) return 'blocked';
     }
@@ -97,6 +99,22 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
   }
   void ignoreUnits;
   return null;
+}
+
+/** Whether a relic, trading post, ruin or landmark keeps any tile of this n-by-n square clear: the tile-by-tile checks below, asked once for the whole square. */
+function keepClearNear(s: GameState, tx: number, ty: number, n: number): boolean {
+  for (const r of s.relics) if (!r.carrier && !r.temple && inBox(r.x, r.y, 0, tx, ty, n)) return true;
+  for (const p of s.posts) if (inBox(p.x, p.y, TRADE.plaza + 1, tx, ty, n)) return true;
+  if (s.ruins) for (const r of s.ruins) if (inBox(r.x, r.y, RUINS.clear, tx, ty, n)) return true;
+  if (s.landmarks) for (const m of s.landmarks) if (inBox(m.x, m.y, LANDMARKS.clear, tx, ty, n)) return true;
+  return false;
+}
+
+/** Whether the tile under a point, grown by `r` tiles each way, overlaps the n-by-n square at (tx, ty). */
+function inBox(px: number, py: number, r: number, tx: number, ty: number, n: number): boolean {
+  const x = Math.floor(px);
+  const y = Math.floor(py);
+  return x - r <= tx + n - 1 && x + r >= tx && y - r <= ty + n - 1 && y + r >= ty;
 }
 
 /** A relic on the ground on this tile (buildings can't go over one). */

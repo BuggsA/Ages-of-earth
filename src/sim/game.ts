@@ -17,6 +17,9 @@ import { Spatial } from './spatial';
 import { updateRelics } from './relics';
 import { elmoStep } from './elmo';
 import { galvanicStep } from './galvanic';
+import { reclaimStep, remember } from './reclaim';
+import { sortieStep } from './sortie';
+import { fairStep } from './fair';
 import { landmarkStep } from './landmarks';
 import { atPost } from './trade';
 import { modsOf, trainTimeFor } from './stats';
@@ -352,6 +355,7 @@ function removeDead(s: GameState): void {
       // Those inside run out before it falls.
       ungarrison(s, e);
       stampBuilding(s, e, false);
+      remember(s, e);
       s.events.push({ k: 'die', id: e.id, owner: e.owner, type: e.type, x: e.x, y: e.y, building: true, size: e.size, epoch: p.epoch, fx: e.dir, fy: 1 });
     } else {
       if (e.inside) {
@@ -483,6 +487,9 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   landmarkStep(s);
   elmoStep(s);
   galvanicStep(s);
+  reclaimStep(s);
+  sortieStep(s);
+  fairStep(s);
   attrition(s);
   tributeStep(s);
   tollStep(s);
@@ -541,6 +548,12 @@ export function checksum(s: GameState): number {
   for (const r of s.ruins ?? []) {
     mix(r.dug);
     mix(r.by);
+  }
+  for (const f of s.fallen ?? []) {
+    mix(f.owner);
+    mix(f.tx);
+    mix(f.ty);
+    mix(f.until);
   }
   for (const m of s.landmarks ?? []) {
     mix(m.owner);

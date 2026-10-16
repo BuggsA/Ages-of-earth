@@ -66,6 +66,32 @@ export interface MapData {
 const DIR8 = [
   [1, 0], [0.7071, 0.7071], [0, 1], [-0.7071, 0.7071], [-1, 0], [-0.7071, -0.7071], [0, -1], [0.7071, -0.7071],
 ] as const;
+/** The four sides of a tile, and the four tiles around a vertex, as flat offsets: these loops run for every tile. */
+const N4X = [1, -1, 0, 0];
+const N4Y = [0, 0, 1, -1];
+const CORNER_X = [-1, 0, -1, 0];
+const CORNER_Y = [-1, -1, 0, 0];
+
+/**
+ * The nearest and second-nearest start to a tile's centre, as `[nearest, second]` (second is NaN with
+ * one start, which compares false just as a missing entry did). Same sums as sorting every distance,
+ * without a fresh sorted list per tile: map generation calls this for every tile, several times over.
+ */
+const NEAR2 = new Float64Array(2);
+function nearestTwo(starts: readonly { x: number; y: number }[], x: number, y: number): Float64Array {
+  let a = Infinity;
+  let b = Infinity;
+  for (const st of starts) {
+    const d = Math.sqrt((x + 0.5 - st.x) * (x + 0.5 - st.x) + (y + 0.5 - st.y) * (y + 0.5 - st.y));
+    if (d < a) {
+      b = a;
+      a = d;
+    } else if (d < b) b = d;
+  }
+  NEAR2[0] = a;
+  NEAR2[1] = starts.length > 1 ? b : NaN;
+  return NEAR2;
+}
 
 function shuffle<T>(rng: Rng, a: T[]): T[] {
   for (let i = a.length - 1; i > 0; i--) {
@@ -161,7 +187,9 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
       const i = queue[q];
       const x = i % w;
       const y = (i - x) / w;
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      for (let d = 0; d < 4; d++) {
+        const dx = N4X[d];
+        const dy = N4Y[d];
         const nx = x + dx;
         const ny = y + dy;
         if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
@@ -246,7 +274,9 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
       let rock = 0;
       let count = 0;
       let e = 0;
-      for (const [dx, dy] of [[-1, -1], [0, -1], [-1, 0], [0, 0]]) {
+      for (let d = 0; d < 4; d++) {
+        const dx = CORNER_X[d];
+        const dy = CORNER_Y[d];
         const tx = x + dx;
         const ty = y + dy;
         if (tx < 0 || ty < 0 || tx >= w || ty >= h) continue;
@@ -397,7 +427,9 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
         const i = queue[q];
         const x = i % w;
         const y = (i - x) / w;
-        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        for (let d = 0; d < 4; d++) {
+          const dx = N4X[d];
+          const dy = N4Y[d];
           const nx = x + dx;
           const ny = y + dy;
           if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
@@ -450,7 +482,9 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
       count++;
       const cx = c % w;
       const cy = (c - cx) / w;
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      for (let d = 0; d < 4; d++) {
+        const dx = N4X[d];
+        const dy = N4Y[d];
         const nx = cx + dx;
         const ny = cy + dy;
         if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
@@ -518,14 +552,20 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
     if (shoal(x, y, 2 + Math.floor(frng() * 2)) > 0) k++;
   }
 
-  const relics = placeRelics(seed, size, w, h, terrain, res, starts);
-  const posts = placePosts(seed, size, w, h, terrain, height, res, amount, starts, relics, type === 'sea');
+  // Where each town can walk, worked out once for every step that sees the same ground: relics and posts
+  // (posts clear their plazas only after looking), then ruins, the wild, landmarks and rare ores (none of
+  // the first three changes the ground, and the ores look before they are laid). Bog iron changes it between.
+  const reachAll = () => starts.map((st) => reachFrom(w, h, terrain, res, st));
+  const first = reachAll();
+  const relics = placeRelics(seed, size, w, h, terrain, res, starts, first);
+  const posts = placePosts(seed, size, w, h, terrain, height, res, amount, starts, relics, type === 'sea', first);
   const bogIron = deposits && placeBogIron(seed, w, h, terrain, res, amount, starts, deer, relics, posts);
-  const ruins = deposits ? placeRuins(seed, size, w, h, terrain, res, starts, deer, relics, posts) : [];
-  const wild = deposits ? placeWild(seed, size, w, h, terrain, res, starts, deer, relics, posts, ruins) : [];
-  const landmarks = deposits ? placeLandmarks(seed, w, h, terrain, res, starts, deer, relics, posts, ruins, wild) : [];
+  const later = deposits ? reachAll() : [];
+  const ruins = deposits ? placeRuins(seed, size, w, h, terrain, res, starts, deer, relics, posts, later) : [];
+  const wild = deposits ? placeWild(seed, size, w, h, terrain, res, starts, deer, relics, posts, ruins, later) : [];
+  const landmarks = deposits ? placeLandmarks(seed, w, h, terrain, res, starts, deer, relics, posts, ruins, wild, later) : [];
 
-  const rares = deposits && veins ? placeRares(seed, w, h, terrain, res, amount, starts, [...deer, ...relics, ...posts, ...ruins, ...wild.map((x) => ({ x: x.x, y: x.y })), ...landmarks.map((x) => ({ x: x.x, y: x.y }))]) : [];
+  const rares = deposits && veins ? placeRares(seed, w, h, terrain, res, amount, starts, [...deer, ...relics, ...posts, ...ruins, ...wild.map((x) => ({ x: x.x, y: x.y })), ...landmarks.map((x) => ({ x: x.x, y: x.y }))], later) : [];
 
   const caves = deposits && veins && rares.length ? placeCaves(seed, size, w, h, terrain, res, amount, starts, rares, wild) : [];
 
@@ -549,7 +589,9 @@ function reachFrom(w: number, h: number, terrain: Uint8Array, res: Uint8Array, s
     const i = queue[q];
     const x = i % w;
     const y = (i - x) / w;
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    for (let d = 0; d < 4; d++) {
+      const dx = N4X[d];
+      const dy = N4Y[d];
       const nx = x + dx;
       const ny = y + dy;
       if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
@@ -568,10 +610,9 @@ function reachFrom(w: number, h: number, terrain: Uint8Array, res: Uint8Array, s
  * from each other. Every one stands in open ground that can be walked to from every town. They roll
  * their own dice, so the rest of the map is the same as it would be without them.
  */
-function placeRelics(seed: number, size: MapSize, w: number, h: number, terrain: Uint8Array, res: Uint8Array, starts: { x: number; y: number }[]): { x: number; y: number }[] {
+function placeRelics(seed: number, size: MapSize, w: number, h: number, terrain: Uint8Array, res: Uint8Array, starts: { x: number; y: number }[], reaches: Uint8Array[]): { x: number; y: number }[] {
   const rng = mulberry32(seed ^ 0x2e11c5);
   const land = (x: number, y: number) => x >= 2 && y >= 2 && x < w - 2 && y < h - 2 && (terrain[y * w + x] === T_GRASS || terrain[y * w + x] === T_SAND);
-  const reaches = starts.map((st) => reachFrom(w, h, terrain, res, st));
   const out: { x: number; y: number }[] = [];
   const spaced = (x: number, y: number) => out.every((r) => (r.x - x) * (r.x - x) + (r.y - y) * (r.y - y) >= RELIC.spacing * RELIC.spacing);
   const fit = (x: number, y: number, k: number) => land(x, y) && reaches[k][y * w + x] === 1 && spaced(x, y);
@@ -626,7 +667,7 @@ function placeRelics(seed: number, size: MapSize, w: number, h: number, terrain:
       for (let x = 2; x < w - 2; x++) {
         // Somewhere every town can walk to.
         if (!land(x, y) || reaches.some((r) => r[y * w + x] !== 1) || (fair === RELIC.fair && !open(x, y))) continue;
-        const ds = dists(x, y).sort((a, b) => a - b);
+        const ds = nearestTwo(starts, x, y);
         if (ds[0] < RELIC.home + 2 || ds[1] - ds[0] > fair) continue;
         candidates.push(y * w + x);
       }
@@ -660,14 +701,14 @@ function placePosts(
   amount: Int32Array,
   starts: { x: number; y: number }[],
   relics: { x: number; y: number }[],
-  shore = false,
+  shore: boolean,
+  open: Uint8Array[],
 ): { x: number; y: number }[] {
   const rng = mulberry32(seed ^ 0x7ade05);
   const n = Math.min(w, h);
   // The plaza and a tile round it.
   const R = TRADE.plaza + 1;
   // Somewhere every town can walk to; failing that (in deep woods), cut their way to.
-  const open = starts.map((st) => reachFrom(w, h, terrain, res, st));
   let reaches = open;
   const site = (x: number, y: number) => {
     let reached = false;
@@ -720,8 +761,8 @@ function placePosts(
       for (let x = R + 1; x < w - R - 1; x++) {
         const e = Math.min(x, y, w - 1 - x, h - 1 - y);
         if (e < 3 || (coastal ? !harbor(x, y) : e > edge)) continue;
-        const ds = starts.map((st) => Math.sqrt((x + 0.5 - st.x) * (x + 0.5 - st.x) + (y + 0.5 - st.y) * (y + 0.5 - st.y))).sort((a, b) => a - b);
-        if (ds[0] < TRADE.far * n || (ds.length > 1 && ds[1] - ds[0] > fair)) continue;
+        const ds = nearestTwo(starts, x, y);
+        if (ds[0] < TRADE.far * n || (starts.length > 1 && ds[1] - ds[0] > fair)) continue;
         if (relics.some((r) => (r.x - x - 0.5) * (r.x - x - 0.5) + (r.y - y - 0.5) * (r.y - y - 0.5) < 25)) continue;
         if (!site(x, y)) continue;
         candidates.push(y * w + x);
@@ -872,8 +913,8 @@ function placeRares(
   amount: Int32Array,
   starts: { x: number; y: number }[],
   keepOff: { x: number; y: number }[],
+  reaches: Uint8Array[],
 ): RareId[] {
-  const reaches = starts.map((st) => reachFrom(w, h, terrain, res, st));
   const STEPS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
   const found: RareId[] = [];
   const laid: { x: number; y: number }[] = [];
@@ -982,6 +1023,7 @@ function placeRuins(
   deer: { x: number; y: number }[],
   relics: { x: number; y: number }[],
   posts: { x: number; y: number }[],
+  reaches: Uint8Array[],
 ): { x: number; y: number; find: RuinFind }[] {
   const rng = mulberry32(seed ^ 0x5a1e0b);
   const land = (x: number, y: number) => x >= 2 && y >= 2 && x < w - 2 && y < h - 2 && (terrain[y * w + x] === T_GRASS || terrain[y * w + x] === T_SAND);
@@ -991,7 +1033,6 @@ function placeRuins(
     for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (!land(x + dx, y + dy) || res[(y + dy) * w + x + dx] !== R_NONE) return false;
     return true;
   };
-  const reaches = starts.map((st) => reachFrom(w, h, terrain, res, st));
   const out: { x: number; y: number }[] = [];
   const want = RUINS.count[size];
   // Looser and looser: less even distances, then only the ruin's own tile and its neighbours clear.
@@ -1002,8 +1043,8 @@ function placeRuins(
     for (let y = 3; y < h - 3; y++) {
       for (let x = 3; x < w - 3; x++) {
         if (!open(x, y, room) || reaches.some((r) => r[y * w + x] !== 1)) continue;
-        const ds = starts.map((st) => Math.sqrt((x + 0.5 - st.x) * (x + 0.5 - st.x) + (y + 0.5 - st.y) * (y + 0.5 - st.y))).sort((a, b) => a - b);
-        if (ds[0] < RUINS.home || (ds.length > 1 && ds[1] - ds[0] > fair)) continue;
+        const ds = nearestTwo(starts, x, y);
+        if (ds[0] < RUINS.home || (starts.length > 1 && ds[1] - ds[0] > fair)) continue;
         if (near(relics, x, y, 4) || near(posts, x, y, TRADE.plaza + 4) || near(deer, x, y, 2)) continue;
         candidates.push(y * w + x);
       }
@@ -1047,6 +1088,7 @@ function placeWild(
   relics: { x: number; y: number }[],
   posts: { x: number; y: number }[],
   ruins: { x: number; y: number }[],
+  reaches: Uint8Array[],
 ): { kind: 'mammoth' | 'wolf' | 'boar'; x: number; y: number }[] {
   const rng = mulberry32(seed ^ 0x3a7e0f);
   const land = (x: number, y: number) => x >= 2 && y >= 2 && x < w - 2 && y < h - 2 && (terrain[y * w + x] === T_GRASS || terrain[y * w + x] === T_SAND);
@@ -1056,7 +1098,6 @@ function placeWild(
     for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (!land(x + dx, y + dy) || res[(y + dy) * w + x + dx] !== R_NONE) return false;
     return true;
   };
-  const reaches = starts.map((st) => reachFrom(w, h, terrain, res, st));
   const dists = (x: number, y: number) => starts.map((st) => Math.sqrt((x + 0.5 - st.x) * (x + 0.5 - st.x) + (y + 0.5 - st.y) * (y + 0.5 - st.y)));
   const clear = (x: number, y: number) =>
     open(x, y, 1) && reaches.every((r) => r[y * w + x] === 1) && !near(relics, x, y, 4) && !near(posts, x, y, TRADE.plaza + 4) && !near(ruins, x, y, 5) && !near(deer, x, y, 3);
@@ -1122,8 +1163,8 @@ function placeWild(
     for (let y = 3; y < h - 3; y++) {
       for (let x = 3; x < w - 3; x++) {
         if (!land(x, y)) continue;
-        const ds = dists(x, y).sort((a, b) => a - b);
-        if (ds[0] < home || (ds.length > 1 && ds[1] - ds[0] > fair)) continue;
+        const ds = nearestTwo(starts, x, y);
+        if (ds[0] < home || (starts.length > 1 && ds[1] - ds[0] > fair)) continue;
         if (!clear(x, y)) continue;
         list.push(y * w + x);
       }
@@ -1184,6 +1225,7 @@ function placeLandmarks(
   posts: { x: number; y: number }[],
   ruins: { x: number; y: number }[],
   wild: { kind: string; x: number; y: number }[],
+  reaches: Uint8Array[],
 ): { x: number; y: number; kind: LandmarkKind }[] {
   const rng = mulberry32(seed ^ 0x1a4d3a);
   const land = (x: number, y: number) => x >= 2 && y >= 2 && x < w - 2 && y < h - 2 && (terrain[y * w + x] === T_GRASS || terrain[y * w + x] === T_SAND);
@@ -1193,7 +1235,6 @@ function placeLandmarks(
     for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (!land(x + dx, y + dy) || res[(y + dy) * w + x + dx] !== R_NONE) return false;
     return true;
   };
-  const reaches = starts.map((st) => reachFrom(w, h, terrain, res, st));
   const wolves = wild.filter((b) => b.kind === 'wolf');
   const beasts = wild.filter((b) => b.kind !== 'wolf');
   const out: { x: number; y: number }[] = [];
@@ -1207,8 +1248,8 @@ function placeLandmarks(
     for (let y = 3; y < h - 3; y++) {
       for (let x = 3; x < w - 3; x++) {
         if (!open(x, y, room) || reaches.some((r) => r[y * w + x] !== 1)) continue;
-        const ds = starts.map((st) => Math.sqrt((x + 0.5 - st.x) * (x + 0.5 - st.x) + (y + 0.5 - st.y) * (y + 0.5 - st.y))).sort((a, b) => a - b);
-        if (ds[0] < LANDMARKS.home || (pass < 3 && ds[0] > LANDMARKS.far + pass * 6) || (ds.length > 1 && ds[1] - ds[0] > fair)) continue;
+        const ds = nearestTwo(starts, x, y);
+        if (ds[0] < LANDMARKS.home || (pass < 3 && ds[0] > LANDMARKS.far + pass * 6) || (starts.length > 1 && ds[1] - ds[0] > fair)) continue;
         if (near(relics, x, y, 5) || near(posts, x, y, TRADE.plaza + 6) || near(ruins, x, y, 8) || near(wolves, x, y, 10) || near(beasts, x, y, 4) || near(deer, x, y, 3)) continue;
         candidates.push(y * w + x);
         nearest.set(y * w + x, ds[0]);
