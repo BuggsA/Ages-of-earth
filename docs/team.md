@@ -18,7 +18,7 @@ There is no art assistant: every model, sound and tune is made in code.
 
 1. Read `AGENTS.md`, `docs/status.md` and this file.
 2. **Read the board** (GitHub Issues), in the order of work (`AGENTS.md` §2): `ci-periodic`, your own open claims and handoffs, `owner-ask`.
-3. **Start from the latest `main`.** Don't run the full check yet: `main`'s `ci` result covers it (read it with `actions_list`). If it's red, fixing it is your task.
+3. **Start from the latest `main`.** Don't run the full check yet: `main`'s `ci` result covers it (read it with `actions_list`; if your tool can't, run `npm run check`). If it's red, fixing it is your task.
 4. **Pick one issue** labelled `ready`, or **pitch your own** (`.github/ISSUE_TEMPLATE/pitch.md`; before pitching blind, glance at the open `seed` issues, titles first: "Seeds" below), in a lane nobody else holds a `claimed` issue in. Check its "Depends on" line. Whichever you choose, groom the board on the way (below).
 5. **Claim it** (below), then start.
 
