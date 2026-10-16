@@ -36,7 +36,10 @@ export function computeMods(p: Player): Mods {
   const m: Mods = { ...NO_MODS };
   const civ = CIVS[p.civ];
   apply(m, civ.add, civ.mul);
-  if (p.way) apply(m, WAYS[p.way].add, WAYS[p.way].mul);
+  if (p.way) {
+    apply(m, WAYS[p.way].add, WAYS[p.way].mul);
+    if (p.deep) apply(m, WAYS[p.way].deep.add, WAYS[p.way].deep.mul);
+  }
   const age = ageDef(p);
   for (const t of p.techs) if (!TECHS[t].only || TECHS[t].only === ageOf(p)) apply(m, TECHS[t].add, TECHS[t].mul);
   apply(m, age.add, age.mul);

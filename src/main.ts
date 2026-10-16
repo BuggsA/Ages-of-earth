@@ -2183,7 +2183,13 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         break;
       case 'way': {
         const w = WAYS[ev.way];
-        if (ev.owner === viewer) {
+        if (ev.deep || ev.turned) {
+          const who = s.players[ev.owner];
+          const what = ev.deep ? `deepens ${w.name}` : `turns to ${w.name}`;
+          if (ev.owner === viewer) hud.toast(`${w.icon} Your people ${ev.deep ? `deepen ${w.name}: ${w.deep.blurb}` : `turn to ${w.name}: ${w.blurb}`}`, 'good');
+          else hud.toast(`${who.name} ${what}`, who.team === s.players[viewer].team ? 'info' : 'alert');
+          if (ev.owner === viewer) play('relicKeep');
+        } else if (ev.owner === viewer) {
           hud.toast(`${w.icon} ${w.name}: ${w.blurb}`, 'good');
           play('relicKeep');
         } else if (s.players[ev.owner].team === s.players[viewer].team) hud.toast(`${s.players[ev.owner].name} takes ${w.name}`, 'info');

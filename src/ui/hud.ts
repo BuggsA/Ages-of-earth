@@ -12,7 +12,7 @@ import { restsAt } from '../sim/passage';
 import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
 import { LANDMARK_KINDS, claimWork, claimants, favours, landmarkAt } from '../sim/landmarks';
 import { workProblem } from '../sim/works';
-import { wayProblem } from '../sim/ways';
+import { vowProblem, wayProblem } from '../sim/ways';
 import { beaconProblem, lit } from '../sim/beacon';
 import { callUpProblem, callUpReach, campGrace, musterWait } from '../sim/warcamp';
 import { chantedOver, consecrates, faithOf } from '../sim/consecrate';
@@ -300,7 +300,7 @@ export class Hud {
     const age = ageDef(p);
     const idleTechs = suspendedTechs(p).map((t) => TECHS[t].name);
     const scores = s.players.map((q) => scoreOf(s, q));
-    const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${p.pop}/${p.cap}|${ageOf(p)}|${adv}|${p.way ?? ''}|${idleTechs.length}|${idle}|${speed}|${scores.join(',')}`;
+    const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${p.pop}/${p.cap}|${ageOf(p)}|${adv}|${p.way ?? ''}${p.deep ? '+' : ''}${p.vowed ? 'v' : ''}|${idleTechs.length}|${idle}|${speed}|${scores.join(',')}`;
     const sn = seasonOf(s);
     this.clockEl.textContent = `${sn.icon} ${fmtTime(s.tick)}`;
     this.clockEl.title = `${sn.name}: ${sn.blurb}`;
@@ -315,7 +315,7 @@ export class Hud {
     const board = s.players
       .map((q, i) => `<div><span class='swatch' style='background:${q.color}'></span>${q.name}${q.defeated ? ' (out)' : ''}: ${q.id === viewer || q.team === p.team ? scores[i] : '?'}</div>`)
       .join('');
-    this.resEl.innerHTML += `<div class="res civ" data-tip="<b>${civ.name}</b>${civ.blurb}<br><i>${SIGNATURES[p.civ].blurb}</i>${p.way ? `<br>${WAYS[p.way].icon} <b>${WAYS[p.way].name}</b>: ${WAYS[p.way].blurb}` : ''}">${crestSvg(p.civ, p.color, 18)}${civ.name}${p.way ? ` ${WAYS[p.way].icon}` : ''}</div><div class="res score" data-tip="<b>Score</b>Gathering, fighting, building, research and epochs.${board}">⭐${scores[viewer]}</div>`;
+    this.resEl.innerHTML += `<div class="res civ" data-tip="<b>${civ.name}</b>${civ.blurb}<br><i>${SIGNATURES[p.civ].blurb}</i>${p.way ? `<br>${WAYS[p.way].icon} <b>${WAYS[p.way].name}</b>: ${WAYS[p.way].blurb}${p.deep ? `<br>Deepened: ${WAYS[p.way].deep.blurb}` : ''}` : ''}">${crestSvg(p.civ, p.color, 18)}${civ.name}${p.way ? ` ${WAYS[p.way].icon}` : ''}</div><div class="res score" data-tip="<b>Score</b>Gathering, fighting, building, research and epochs.${board}">⭐${scores[viewer]}</div>`;
     this.epochEl.innerHTML = road
       ? `${age.name} <span class="bar" data-tip="<b>${road.back ? 'Stepping back' : 'Advancing'} to the ${AGES[road.to].name}</b>${adv}%"><i style="width:${adv}%"></i></span>`
       : `<span data-tip="<b>${age.name}</b>${age.blurb}${age.path ? `<br><i>${PATHS[age.path].name}: step ${pathDepth(p)} of ${pathAges(age.path).length + (PATHS[age.path].planned?.length ?? 0)}. ${age.path === 'steppe' ? `Tribute taken: ${Math.floor(p.stats.tribute ?? 0)} gold.${age.caravans ? ` Gold the caravans earned on the move: ${p.stats.caravan ?? 0}. Tolls taken from rival traders: ${p.stats.toll ?? 0}.` : ''}` : `Plunder taken: ${p.stats.plunder ?? 0} gold.`}</i>` : ''}${idleTechs.length ? `<br>Suspended until you climb again: ${idleTechs.join(', ')}.` : ''}${mainRoad(p) ? `<br><span class='hint'>Advance at a Town Center.</span>` : ''}">${age.name}</span>`;
@@ -896,6 +896,18 @@ export class Hud {
             const w = WAYS[id];
             const why = wayProblem(s, p, id);
             cmds.push({ key: '', pic: '', glyph: w.icon, title: w.name, desc: `${w.blurb} Free, once, kept the whole match. The choice is lost when you leave the Stone Age. Your rivals will see which Way you take.`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'way', p: viewer, way: id }) });
+          }
+        }
+        if (b.type === 'towncenter' && p.way && !p.vowed && p.epoch === WAY.vow) {
+          const mine = WAYS[p.way];
+          const price = (c: typeof WAY.deepenCost) => Object.entries(c).map(([r, n]) => `${n} ${r}`).join(' + ');
+          const dWhy = vowProblem(s, p);
+          cmds.push({ key: '', pic: '', glyph: '⛰', title: `Deepen ${mine.name}`, desc: `${mine.deep.blurb} Costs ${price(WAY.deepenCost)}. One vow in the Bronze Age, deepening or turning.`, ok: !dWhy, why: dWhy ?? undefined, run: () => this.act.issue({ t: 'vow', p: viewer }) });
+          for (const id of WAY_IDS) {
+            if (id === p.way) continue;
+            const w = WAYS[id];
+            const why = vowProblem(s, p, id);
+            cmds.push({ key: '', pic: '', glyph: '↪' + w.icon, title: `Turn to ${w.name}`, desc: `${w.blurb} Costs ${price(WAY.turnCost)}; ${mine.name} is dropped. One vow in the Bronze Age.`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'vow', p: viewer, way: id }) });
           }
         }
         if (b.type === 'towncenter') {
