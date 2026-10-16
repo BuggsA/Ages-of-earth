@@ -12,6 +12,7 @@ import type { Building, GameState } from './types';
  */
 export function sortieStep(s: GameState): void {
   if (s.tick % 20 !== 0) return;
+  const rearm2 = SORTIE.rearm * SORTIE.rearm, reach2 = SORTIE.reach * SORTIE.reach, turn2 = SORTIE.turn * SORTIE.turn;
   let fields: Building[][] | null = null;
   for (const u of s.ents) {
     if (u.kind !== 'unit' || u.hp <= 0 || u.inside || domainOf(u.type) !== 'air' || !ageDef(s.players[u.owner]).sortie) continue;
@@ -22,16 +23,16 @@ export function sortieStep(s: GameState): void {
     let home: Building | null = null;
     let best = Infinity;
     for (const b of fields[u.owner]) {
-      const d = (b.x - u.x) ** 2 + (b.y - u.y) ** 2;
+      const d = (b.x - u.x) * (b.x - u.x) + (b.y - u.y) * (b.y - u.y);
       if (d < best) { best = d; home = b; }
     }
     const top = maxHp(s, u);
-    if (home && best <= SORTIE.rearm ** 2) {
+    if (home && best <= rearm2) {
       u.hp = Math.min(top, u.hp + top * SORTIE.mend);
-    } else if (!home || best > SORTIE.reach ** 2) {
+    } else if (!home || best > reach2) {
       u.hp -= top * SORTIE.burn;
       if (u.hp <= 0) s.events.push({ k: 'sortie', owner: u.owner, id: u.id, x: u.x, y: u.y, what: 'lost' });
-    } else if (best > SORTIE.turn ** 2 && !(u.order.k === 'move' && !u.order.amove && (u.order.x - home.x) ** 2 + (u.order.y - home.y) ** 2 < 4)) {
+    } else if (best > turn2 && !(u.order.k === 'move' && !u.order.amove && (u.order.x - home.x) * (u.order.x - home.x) + (u.order.y - home.y) * (u.order.y - home.y) < 4)) {
       giveOrder(u, { k: 'move', x: home.x, y: home.y, amove: false, started: false });
       s.events.push({ k: 'sortie', owner: u.owner, id: u.id, x: u.x, y: u.y, what: 'home' });
     }
