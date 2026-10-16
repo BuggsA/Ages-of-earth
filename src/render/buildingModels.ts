@@ -251,6 +251,32 @@ function huntcamp(k: Kit, e: number, st: Style): void {
   k.cyl(0.2, 0.22, 0.07, 8, '#5c5651', -0.05, 0, 0.45);
   k.sphere(0.1, '#e5742a', -0.05, 0.1, 0.45).scale.set(1, 0.9, 1);
   k.team(k.box(1.3, 0.05, 0.06, TEAM, 0, 0.6, 0.12));
+  if (e <= 1) {
+    // Stone and bronze hunters: a pelt stretched on a frame and an aurochs skull on a post.
+    for (const x of [-1.05, -0.75]) k.cyl(0.03, 0.03, 0.6, 4, st.post, x, 0, 0.1);
+    k.box(0.38, 0.4, 0.02, '#b89468', -0.9, 0.12, 0.1);
+    k.cyl(0.035, 0.04, 0.9, 5, st.post, 1.1, 0, -0.1);
+    k.box(0.2, 0.1, 0.12, '#e7dfcc', 1.1, 0.9, -0.1);
+    for (const sx of [-1, 1]) k.box(0.14, 0.04, 0.04, '#e7dfcc', 1.1 + sx * 0.16, 0.98, -0.1);
+  } else if (e === 2) {
+    // Iron-age hunters: a stone-footed smokehouse with a chimney and a tanner's stretching frame.
+    k.box(0.5, 0.5, 0.45, STONE, -1.0, 0, -0.1);
+    k.prism(0.6, 0.25, 0.55, st.roof, -1.0, 0.5, -0.1);
+    k.box(0.12, 0.35, 0.12, STONE, -1.15, 0.6, -0.2);
+    k.box(0.14, 0.2, 0.03, '#2a2420', -1.0, 0, 0.14);
+    k.cyl(0.03, 0.03, 0.7, 4, st.post, 1.1, 0, 0.0);
+    k.box(0.4, 0.04, 0.04, st.post, 1.1, 0.7, 0.0);
+    k.box(0.3, 0.4, 0.02, '#b89468', 1.1, 0.3, 0.0);
+  } else {
+    // Gunpowder and industrial game-dealers: a butcher's hook beam hung with carcasses, and a game cart.
+    k.cyl(0.04, 0.05, 1.1, 5, e >= 4 ? '#3a3e44' : st.post, -1.1, 0, 0.0);
+    k.box(0.8, 0.05, 0.05, e >= 4 ? '#3a3e44' : st.post, -0.75, 1.05, 0.0);
+    for (const x of [-0.95, -0.7, -0.45]) k.box(0.1, 0.3, 0.08, '#a33b32', x, 0.7, 0.0);
+    k.box(0.5, 0.18, 0.3, WOOD, 1.1, 0.12, 0.0);
+    for (const z of [-0.17, 0.17]) k.cyl(0.14, 0.14, 0.04, 8, '#3a2b20', 1.1, 0.14, z).rotation.x = Math.PI / 2;
+    k.box(0.3, 0.12, 0.2, '#a33b32', 1.1, 0.3, 0.0);
+    if (e >= 4) lamp(k, 0.9, 0, 0.9, 0.75);
+  }
   banner(k, 0.85, 0, 0.8, 0.8);
 }
 
