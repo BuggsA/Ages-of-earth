@@ -321,7 +321,9 @@ function fit(p: Player, to: AgeId): number {
   const age = AGES[to];
   const cls = unitStats(sig, 0).cls;
   // The Path of Blood (#307) suits a people that fights with foot or riders; the others keep to trade, faith and craft.
-  if (age.path) return age.path === 'blood' && (cls === 'infantry' || cls === 'cavalry') ? 0 : -1;
+  if (age.path === 'blood') return cls === 'infantry' || cls === 'cavalry' ? 0 : -1;
+  // The Steppe Road (#320): its first age is judged as any side age; the Horde waits until the computer knows how to exact tribute (#297 s5b).
+  if (age.path === 'steppe' && age.tier > 1) return -1;
   if (age.no?.units.includes(sig)) return -1;
   return (age.price?.[cls] ?? 1) < 1 ? 1 : 0;
 }
@@ -354,7 +356,7 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
     const f = fit(p, to);
     // The steppe tosses a coin of its own: asked early by every clever town, it would shift the dice of every match.
     if (f === 0 && AGES[to].mobile && !heirloomAhead(p, to)) roads[to] = coin(s, p.id, 0x57e9) < AI_STEPPE.take;
-    else roads[to] = f > 0 || (f === 0 && roll(s) < (AGES[to].path ? AI_BLOOD.take : heirloomAhead(p, to) ? AI_WEB.heir : AI_WEB.take));
+    else roads[to] = f > 0 || (f === 0 && roll(s) < (AGES[to].path === 'blood' ? AI_BLOOD.take : heirloomAhead(p, to) ? AI_WEB.heir : AI_WEB.take));
   }
   return roads[to]!;
 }

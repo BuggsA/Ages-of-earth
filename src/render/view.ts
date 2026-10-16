@@ -82,6 +82,8 @@ export class View {
 
   private sky = new Sky();
   private phase = 0;
+  /** The tick the tribute clink last sounded (#318), so a horde at work isn't a constant jingle. */
+  private tributeCue = -1e9;
   private hemi = new THREE.HemisphereLight('#dcefff', '#b9a77a', 1.0);
   private sun = new THREE.DirectionalLight('#fff3dc', 2.5);
   private fill = new THREE.AmbientLight('#cfe0ff', 0.4);
@@ -1064,6 +1066,19 @@ export class View {
           if (ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;
           this.effects.burst(this.ground(s, ev.x, ev.y, 0.8), { count: 8, speed: 0.8, up: 1.1, life: 1, size: 0.05, gravity: 2, colors: ['#ffd166', '#9b1c2c', '#f2cf4a'] });
           if (ev.owner === this.viewer) this.cue('tradePaid', ev.x, ev.y, 0.4);
+          break;
+        }
+        case 'tribute': {
+          // Tribute (#318): a glint of gold over each rider taking it, and now and then a clink in the taker's saddlebag.
+          for (const id of ev.ids) {
+            const u = s.byId.get(id);
+            if (!u || (ev.owner !== this.viewer && !this.sees(u.x, u.y))) continue;
+            this.effects.burst(this.ground(s, u.x, u.y, 1.5), { count: 3, speed: 0.3, up: 0.8, life: 0.8, size: 0.045, gravity: 1.2, colors: ['#ffd166', '#f2cf4a', '#fff3c4'] });
+          }
+          if (ev.owner === this.viewer && (s.tick - this.tributeCue > TICK_HZ * 6 || s.tick < this.tributeCue)) {
+            this.tributeCue = s.tick;
+            this.cue('tribute', ev.x, ev.y, 0.35);
+          }
           break;
         }
         case 'callUp': {

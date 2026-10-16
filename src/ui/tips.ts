@@ -1,4 +1,4 @@
-import { AGES, BUILDINGS, CALL_UP, ROADS, ROT, STEP_BACK, secs } from '../sim/data';
+import { AGES, BUILDINGS, CALL_UP, ROADS, ROT, STEP_BACK, TRIBUTE, secs } from '../sim/data';
 import { ageOf, backTo, deedProgress, deedsDone, mainRoad, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
 import type { Building, GameState, Unit } from '../sim/types';
 import { R_FISH } from '../sim/types';
@@ -17,6 +17,7 @@ const WARBAND_ROAD = ROADS.find((r) => r.to === 'warband')!;
 const IRONBLOOD_ROAD = ROADS.find((r) => r.to === 'ironblood')!;
 const TOTALWAR_ROAD = ROADS.find((r) => r.to === 'totalwar')!;
 const FAIR_ROAD = ROADS.find((r) => r.to === 'fair')!;
+const HORDE_ROAD = ROADS.find((r) => r.from === 'steppe' && r.to === 'horde')!;
 
 interface Tip {
   id: string;
@@ -194,6 +195,20 @@ const TIPS: Tip[] = [
     id: 'callup',
     when: (s, me) => ageOf(s.players[me]) === 'totalwar',
     text: `Every War Camp is a muster ground now. Select one and press <b>C</b> to call the nearest citizen within ${CALL_UP.reach} tiles to arms, or <b>V</b> for up to ${CALL_UP.most}: each becomes a foot soldier where it stands, for its arms alone. A town under attack can take up arms at once, but every citizen called is one less at work.`,
+  },
+  {
+    id: 'horde',
+    // The Steppe Road's second step (#318): a steppe people with a Stable, its flock already milked.
+    when: (s, me) => {
+      const p = s.players[me];
+      return ageOf(p) === 'steppe' && roadKnown(s, p, HORDE_ROAD) && (p.stats.milked ?? 0) > 0 && !deedsDone(p, HORDE_ROAD);
+    },
+    text: `The camp can grow into a horde. Milk ${HORDE_ROAD.deed!.n} from your flock and butcher ${HORDE_ROAD.also![0].n} meat in all, and the Town Center (🔀) can take your people into the <b>${AGES.horde.name}</b> instead of the Middle Ages: still on wagons, still no fields or walls, and riders who stand in a rival's land take tribute from its treasury.`,
+  },
+  {
+    id: 'tribute',
+    when: (s, me) => ageOf(s.players[me]) === 'horde',
+    text: `Your horde lives on <b>tribute</b>. Ride into a rival's land and <b>hold your riders still</b> there (<kbd>C</kbd>, stand ground): each takes ${AGES.horde.add!.tribute} gold a second from that rival, up to ${TRIBUTE.most} riders a rival. Riders on the move take nothing, spears and towers answer them, and deep past your own land they wear down: pitch a camp near the border to keep them fed.`,
   },
   {
     id: 'fairs',

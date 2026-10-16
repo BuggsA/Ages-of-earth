@@ -21,6 +21,7 @@ import { landmarkStep } from './landmarks';
 import { atPost } from './trade';
 import { modsOf, trainTimeFor } from './stats';
 import { attrition } from './borders';
+import { tributeStep } from './tribute';
 import { barred, journeyOf, noteWalked, surveyFinds, trainsAt, workSteps } from './ages';
 import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, MapSize, MapType, Player } from './types';
 import { RES, R_FISH, R_NONE } from './types';
@@ -479,6 +480,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   elmoStep(s);
   galvanicStep(s);
   attrition(s);
+  tributeStep(s);
   workStep(s);
   beaconStep(s);
   warCampStep(s);
