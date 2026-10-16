@@ -1217,7 +1217,7 @@ function ironTower(k: Kit, st: Style): void {
 /** The original four dressed ages, kept as the baseline model regression set. */
 export const LOOK_AGES: AgeId[] = ['merchant', 'iron', 'pilgrim', 'fair'];
 /** All dressed ages; additions get their own model coverage beside the baseline set. */
-export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer', 'sail', 'aeronaut', 'lightning', 'warband', 'ironblood', 'totalwar'];
+export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer', 'sail', 'aeronaut', 'lightning', 'warband', 'ironblood', 'totalwar', 'horde'];
 
 const SAIL = '#efe8d4';
 const NET = '#b9ad8a';
@@ -1319,6 +1319,33 @@ function bloodTouches(k: Kit, type: BuildingType, age: AgeId): void {
   if (depth >= 3 && (war || type === 'house' || type === 'storehouse')) sandbags(k, -span * 0.75, span * 0.75, span + (depth >= 2 && type !== 'storehouse' ? 0.45 : 0.2));
 }
 
+/**
+ * A horsetail standard (the Age of the Horde, #318): a spear-headed pole with a gilded ring, under it a
+ * skirt of long horsehair strands, black for war or white for the camp's own spirit banner.
+ */
+function horsetail(k: Kit, x: number, z: number, h: number, white = false): void {
+  k.cyl(0.026, 0.032, h, 5, '#4a3626', x, 0, z);
+  k.cyl(0.13, 0.13, 0.05, 8, '#c8a24a', x, h - 0.12, z);
+  const hair = white ? '#ece6d6' : '#231a15';
+  k.cyl(0.11, 0.06, 0.5, 7, hair, x, h - 0.62, z);
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    k.cyl(0.045, 0.008, 0.78, 4, hair, x + Math.cos(a) * 0.09, h - 0.9, z + Math.sin(a) * 0.09);
+  }
+  k.cone(0.045, 0.26, 4, '#d8b25a', x, h - 0.07, z);
+}
+
+/** The Horde's towns (#318) fly horsetail standards before their doors: two at a Town Center (one white) and the war buildings, one elsewhere. */
+function hordeTouches(k: Kit, type: BuildingType): void {
+  if (['farm', 'gate', 'tower', 'warcamp'].includes(type)) return;
+  const span = type === 'wonder' ? 2.5 : type === 'towncenter' ? 1.75 : type === 'house' ? 0.72 : 1.05;
+  const tall = type === 'wonder' ? 3.2 : type === 'towncenter' ? 2.7 : type === 'house' ? 1.4 : 2.0;
+  if (['towncenter', 'barracks', 'range', 'stable', 'wonder'].includes(type)) {
+    horsetail(k, -span, span + 0.1, tall, type === 'towncenter');
+    horsetail(k, span, span + 0.1, tall);
+  } else horsetail(k, span * 0.9, span * 0.9, tall * 0.85);
+}
+
 function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
   const big = type === 'towncenter';
   switch (age) {
@@ -1326,6 +1353,9 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
     case 'ironblood':
     case 'totalwar':
       bloodTouches(k, type, age);
+      break;
+    case 'horde':
+      hordeTouches(k, type);
       break;
     case 'aeronaut': {
       // Sky blue navigation bands and a rooftop windsock mark the aviation towns.

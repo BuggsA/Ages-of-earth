@@ -745,6 +745,9 @@ function milkStep(s: GameState, u: Unit, o: Extract<Order, { k: 'milk' }>): void
       u.frac -= 1;
       u.carry++;
       a.milk = (a.milk ?? 0) - 1;
+      // Milk drawn counts toward the Age of the Horde's deed (#318).
+      const st = s.players[u.owner].stats;
+      st.milked = (st.milked ?? 0) + 1;
     }
     workEvent(s, u, 'forage', a.x, a.y);
     if (u.carry >= cap) {
