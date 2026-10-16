@@ -35,10 +35,10 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
-export type PathId = 'blood';
+export type PathId = 'blood' | 'steppe';
 
 /** Tile ground. Water and rock can't be walked or built on. */
 export const T_GRASS = 0;
@@ -413,6 +413,10 @@ export interface PlayerStats {
   beacons?: number;
   /** Meat butchered by hunters (the Age of the Steppe's deed, #297); absent in older saves. */
   hunted?: number;
+  /** Milk drawn from the flock by citizens (the Age of the Horde's deed, #318); absent in older saves. */
+  milked?: number;
+  /** Gold taken as tribute by riders standing in rivals' land (#318); absent in older saves. */
+  tribute?: number;
   /** Enemy units (not buildings) the people's forces have slain: the Path of Blood's deeds (#299); absent in older saves. */
   slain?: number;
   /** Gold taken as plunder from the enemy dead (#299); absent in older saves. */
@@ -509,6 +513,8 @@ export type GameEvent =
   /** A War Camp left without its soldiers (#303): it burns after a grace, or at once if its people left the path (`struck`). */
   /** Citizens called up at a War Camp (#313): each became the foot soldier `id` where it stood. */
   | { k: 'callUp'; owner: number; camp: number; ids: number[]; x: number; y: number }
+  /** Riders of a horde (#318) took `gold` in tribute from `from`, standing in its land: `ids` are the riders counted. */
+  | { k: 'tribute'; owner: number; from: number; gold: number; ids: number[]; x: number; y: number }
   | { k: 'campAlone'; owner: number; id: number; x: number; y: number; struck: boolean }
   | { k: 'alert'; owner: number; x: number; y: number; building: boolean; wild?: Animal['kind']; /** A rival's soldiers fell on a citizen out hunting. */ hunter?: boolean }
   | { k: 'converted'; id: number; from: number; to: number; x: number; y: number }

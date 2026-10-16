@@ -5,7 +5,7 @@ import { CameraRig } from './render/camera';
 import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { wallLine } from './sim/commands';
-import { AGES, BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, RELIC, RUINS, SEASONS, STEPPE, TECHS, TICK_HZ, TRUNK, WARCAMP, WORKS, domainOf, unitStats } from './sim/data';
+import { AGES, BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, RELIC, RUINS, SEASONS, STEPPE, TECHS, TICK_HZ, TRIBUTE, TRUNK, WARCAMP, WORKS, domainOf, unitStats } from './sim/data';
 import { crestSvg } from './ui/crests';
 import { isEnemy } from './sim/world';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
@@ -101,6 +101,8 @@ let lastGroupKey = { key: -1, at: 0 };
 let lastAlert: { x: number; y: number } | null = null;
 /** When the flock last told of a lamb born, or of bare ground (#308), so the toasts don't pile up. */
 const flockToast = { born: -1e9, hungry: -1e9 };
+/** When tribute was last told of (#318), taken by the viewer's riders or from the viewer's land. */
+const tributeToast = { took: -1e9, paid: -1e9 };
 let altHeld = false;
 let acc = 0;
 let lastFrame = performance.now();
@@ -2106,6 +2108,20 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           hud.toast(`📯 ${ev.ids.length === 1 ? 'A citizen takes' : `${ev.ids.length} citizens take`} up arms at the War Camp`, 'good');
         }
         break;
+      case 'tribute': {
+        // A horde's riders standing in a rival's land (#318).
+        const fresh = (at: number, gap: number) => s.tick - at > gap * TICK_HZ || s.tick < at;
+        const rate = (ev.gold / TRIBUTE.every).toFixed(1);
+        if (ev.owner === viewer && fresh(tributeToast.took, 60)) {
+          tributeToast.took = s.tick;
+          hud.toast(`🐎 Your riders exact tribute from ${s.players[ev.from].name}: ${rate} gold a second while they stand in its land`, 'good');
+        } else if (ev.from === viewer && fresh(tributeToast.paid, 30)) {
+          tributeToast.paid = s.tick;
+          hud.toast(`🐎 ${s.players[ev.owner].name}'s horde exacts tribute in your land (${rate} gold a second): drive its riders off with spears and towers`, 'alert');
+          lastAlert = { x: ev.x, y: ev.y };
+        }
+        break;
+      }
       case 'campAlone':
         // A War Camp left without its soldiers (#303).
         if (ev.owner === viewer) {

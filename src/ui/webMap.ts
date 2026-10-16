@@ -100,9 +100,10 @@ export function roadView(d: Discovery, r: Road): 'hidden' | 'faint' | 'known' {
 
 // The Path of Blood keeps the left column (Warband over Iron and Blood, #303, over Total War, #313), so the Reclaimers moved to lane 2
 // and the Fairs to lane 3 at tier 3, and Lightning to lane 3 at tier 4 (its road curves under the Aeronauts).
-const LANE: Record<AgeId, number> = { iron: 0, reclaimer: 2, stone: 1, bronze: 1, middle: 1, gunpowder: 1, industrial: 1, merchant: 2, pilgrim: 3, fair: 3, sail: 4, aeronaut: 2, lightning: 3, warband: 0, steppe: 2, ironblood: 0, totalwar: 0 };
-/** Five lanes wide: 48 + 4 × 88 + half a node fits in 440 (the Age of Sail, lane 4, sat past the old 360). */
-export const MAP = { w: 440, h: 440, nodeW: 76, nodeH: 34, top: 40, gap: 85 };
+// The Steppe Road (#318) keeps the right column, as the Path of Blood keeps the left: the Steppe over the Horde.
+const LANE: Record<AgeId, number> = { iron: 0, reclaimer: 2, stone: 1, bronze: 1, middle: 1, gunpowder: 1, industrial: 1, merchant: 2, pilgrim: 3, fair: 3, sail: 4, aeronaut: 2, lightning: 3, warband: 0, steppe: 5, ironblood: 0, totalwar: 0, horde: 5 };
+/** Six lanes wide: 48 + 5 × 88 + half a node fits in 528 (the Steppe Road, lane 5, sat past the old 440). */
+export const MAP = { w: 528, h: 440, nodeW: 76, nodeH: 34, top: 40, gap: 85 };
 
 export function layout(): Record<AgeId, { x: number; y: number }> {
   const out = {} as Record<AgeId, { x: number; y: number }>;
