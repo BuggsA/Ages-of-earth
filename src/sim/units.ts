@@ -411,8 +411,10 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
     // Work whatever lies closest to the new storehouse.
     let best = -1;
     let bestDist = Infinity;
+    // The player's builders fan over the nodes by the new storehouse instead of all taking the nearest (#266).
+    const load = s.players[u.owner].ai ? null : gatherLoad(s, u);
     for (const kind of [R_TREE, R_GOLD, R_STONE, R_BERRY, R_BOG]) {
-      const t = findResource(s, kind, b.x, b.y, 8);
+      const t = findResource(s, kind, b.x, b.y, 8, load ? (i) => (load.get(i) ?? 0) >= SPREAD.perNode : undefined);
       if (t < 0) continue;
       const d = distToTile(b.x, b.y, t, s.w);
       if (d < bestDist) {
