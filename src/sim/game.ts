@@ -12,7 +12,7 @@ import { buildingGuns, updateShots } from './combat';
 import { applyCommand } from './commands';
 import { AGES, AURA, unitEpoch, CIV_IDS, LANDMARKS, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
 import { AIR, NAVAL, stampBuilding } from './grid';
-import { generateMap } from './mapgen';
+import { denWolves, generateMap } from './mapgen';
 import { Spatial } from './spatial';
 import { updateRelics } from './relics';
 import { elmoStep } from './elmo';
@@ -170,7 +170,9 @@ export function createGame(setup: GameSetup): GameState {
   for (const t of map.posts) s.posts.push({ id: s.nextId++, x: t.x, y: t.y });
   if (map.ruins.length) s.ruins = map.ruins.map((r) => ({ id: s.nextId++, x: r.x, y: r.y, find: r.find, dug: 0, by: -1 }));
   for (const b of map.wild) spawnAnimal(s, b.x, b.y, b.kind);
+  if (map.caves.length) s.caves = map.caves.map((c) => ({ ...c }));
   if (map.landmarks.length) s.landmarks = map.landmarks.map((m) => ({ id: s.nextId++, x: m.x, y: m.y, kind: m.kind, owner: -1, claim: 0, by: -1 }));
+  for (const c of map.caves) if (c.den) for (const p of denWolves(c.tile, map.w)) spawnAnimal(s, p.x, p.y, 'wolf');
   countPop(s);
   updateVision(s);
   // Everyone knows the lie of the land around home.

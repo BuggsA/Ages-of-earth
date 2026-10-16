@@ -1353,6 +1353,13 @@ export const AI_WINTER = { from: 2, fields: 2, hunters: 3, pack: 1, food: 0.3 };
 export const AI_FAITH = { priests: 6, band: 3, reach: 14, keep: 6, wall: 0.4, relic: 0.6, ward: 30 };
 export const AMOUNT = { tree: 80, berry: 125, stone: 300, gold: 400, meat: 140, fish: 250, bog: 300 };
 /**
+ * Caves (#356): on a world that holds any rare ore, `count` caves for the map's size are cut into open ground at least
+ * `away` tiles from every town and `apart` from each other. Each is a single tile of one of the world's ores, `rich` times
+ * a vein tile's amount, and with the roll `den` (none on small maps, where a pack in the middle would sit on every road) a wolf pack (`WOLF.pack`) lairs beside it: the richest ore is the best
+ * guarded. Mined like any vein, and the wolves are the ordinary kind (they hold the ground round their den).
+ */
+export const CAVE = { count: { small: 1, medium: 2, large: 3 } as Record<MapSize, number>, rich: 3, den: { small: 0, medium: 0.5, large: 0.5 } as Record<MapSize, number>, away: 18, apart: 24 };
+/**
  * Deep veins (#356): rare ores that only some seeds hold. Each is rolled by its own dice (`chance`), then laid as
  * `veins` neutral veins of `tiles` tiles, `amount` an ore tile, out between the towns (at least `away` tiles from
  * any town, `apart` from each other), where every town can walk to them. `rate` is how fast a citizen mines one.
