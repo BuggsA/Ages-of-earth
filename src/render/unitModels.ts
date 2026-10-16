@@ -629,6 +629,15 @@ function fisher(epoch: number): Kit {
   // A wooden fishing boat with a mast (a cog, then a sloop with a big sail).
   hull(k, 1.1, 0.34, 0.12, epoch === 2 ? '#6e4f33' : '#5a4430', '#9a7448');
   mast(k, 0.08, epoch === 2 ? 0.7 : 0.85, epoch === 2 ? 0.34 : 0.4, epoch === 2);
+  if (epoch === 3) {
+    // A lugger: a bowsprit with a jib, a tarred hull stripe, a lantern at the stern and a catch of fish.
+    k.cyl(0.012, 0.012, 0.4, 4, WOOD, 0, 0.1, 0.62).rotation.x = 1.2;
+    k.sail(k.box(0.012, 0.4, 0.22, '#efe8d8', 0, 0.38, 0.4), 0.2, 0.18, 0.4);
+    k.box(0.35, 0.025, 1.0, '#2a1e16', 0, 0.06, 0);
+    k.glow(k.sphere(0.035, '#ffd27a', 0, 0.22, -0.5, undefined, 6));
+    k.cyl(0.012, 0.012, 0.16, 4, WOOD, 0, 0.06, -0.5);
+    k.box(0.14, 0.04, 0.1, '#9aa8b0', 0.08, 0.07, -0.38);
+  }
   net(k, -0.3, 0.5);
   for (let i = 0; i < 2; i++) k.cyl(0.05, 0.045, 0.08, 6, '#8a6440', -0.08 + i * 0.12, 0.06, -0.38);
   return k;
@@ -756,6 +765,15 @@ function transport(epoch: number): Kit {
   k.box(0.54, 0.1, 1.1, '#5a4430', 0, 0.06, 0);
   k.box(0.3, 0.04, 0.4, '#3a2a1e', 0, 0.16, 0.05);
   mast(k, 0.3, 1.0, 0.55);
+  if (epoch === 2) {
+    // A trading cog: clinker strakes along the flanks, a stern castle with a rail, a stem post and a stern rudder.
+    for (const x of [-0.275, 0.275]) for (const y of [0.0, 0.05, 0.1]) k.box(0.014, 0.025, 1.0, y === 0.05 ? '#4a3626' : '#6a5036', x, 0.08 + y, 0.0);
+    k.box(0.48, 0.14, 0.3, '#6e4f33', 0, 0.06, -0.55);
+    for (const x of [-0.2, 0, 0.2]) k.box(0.05, 0.05, 0.05, '#6e4f33', x, 0.2, -0.66);
+    k.cyl(0.02, 0.025, 0.3, 5, WOOD, 0, 0.12, 0.74).rotation.x = 0.35;
+    k.box(0.03, 0.18, 0.1, '#4a3426', 0, 0.0, -0.78);
+    for (let i = 0; i < 3; i++) k.cyl(0.06, 0.055, 0.1, 7, '#8a5a3a', -0.12 + i * 0.12, 0.2, 0.0);
+  }
   if (epoch === 3) {
     // A fluyt: a second mast, a raised stern with a gilded lantern and a bowsprit.
     mast(k, -0.35, 0.8, 0.45, false, 0.16);
