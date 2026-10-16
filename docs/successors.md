@@ -17,15 +17,13 @@ When a Claude Code session finishes a task, it starts the next session itself, s
 - **When:** after the task's pull request is merged and the handoff is posted.
 - **How:** `create_session` (the claude-code-remote tools) on this repo, in the same environment. If you don't have it, say so in the handoff.
 
-## Before spawning: is it worth it?
+## Before spawning
 
-A new session costs its startup (the docs, the board, finding the code) before any work. Spawn only when it will earn that. Check cheaply: one `list_issues` by label with `minimal_output`, and `main`'s last `ci` run; don't reread the docs.
-
-1. **Don't spawn** (checked first) when: #2 carries the `paused` label (the owner's stop switch); you are position 10; your session merged nothing; `create_session` failed twice; another chain in your lane is under two hours old and not "ended"; or nothing waits in your lane and your chain's last two sessions each shipped only a minor tweak (a number, a word, a small look change).
-2. **An owner-started session** that wasn't working the board (a chat, a one-off) doesn't spawn unless the owner asks.
-3. **Otherwise spawn.** It takes, in order: a red `ci-periodic` or `ci` on `main`, an `owner-ask`, a `ready` issue in your lane; with none, it pitches its own (`AGENTS.md` §2).
-- **Related next step** (up to 3 a session, `docs/team.md` "Small and often"): take it yourself while the code is loaded and cheap to reread, rather than spawning for it.
-- **Say why** in your #2 line: what you shipped, and why you spawned or ended.
+Check cheaply (one `list_issues` by label with `minimal_output`, and `main`'s last `ci`), never by rereading the docs.
+- **Don't spawn** if #2 is labelled `paused`, you merged nothing, `create_session` failed twice, a cap below stops you, or nothing waits in your lane and your chain's last two sessions each shipped only a minor tweak.
+- **Don't spawn** from an owner-started chat or one-off, unless asked.
+- **Otherwise spawn.** Its task, in order: a red `ci-periodic` or `ci` on `main`, an `owner-ask`, a `ready` issue in your lane, else its own pitch.
+- Take related next steps yourself first (`docs/team.md`, "Small and often").
 
 ## Chains and caps
 
@@ -34,7 +32,7 @@ A chain is the run of sessions that each start the next.
 - **The id** is the UTC date and time of the chain's first spawn (`1013-1720`). Position 0 makes it up; later sessions copy it.
 - **One chain per lane** (`docs/team.md`, "Lanes"), and no limit on how many run at once (the owner, 2026-10-15, `docs/rulings.md`). Before spawning, read the recent `Chain` comments on #2 for the chains under two hours old that don't say "ended". One running in your lane: wait.
 - **No daily cap** (the owner, 2026-10-14, `docs/rulings.md`): 10 sessions a chain is the only count limit.
-- **Log each spawn on #2:** `Chain 1013-1720, 3 of 10, lane rules: <branch> took #42 (regular), started "<child title>" for #57.` When a chain ends: `Chain 1013-1720 ended at 3 of 10: <reason>.` Don't start a new chain yourself: that's the owner's.
+- **Log each spawn on #2, with why:** `Chain 1013-1720, 3 of 10, lane rules: <branch> took #42 (regular), started "<child title>" for #57.` When a chain ends: `Chain 1013-1720 ended at 3 of 10: <reason>.` Don't start a new chain yourself: that's the owner's.
 
 ## The prompt
 

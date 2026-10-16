@@ -1,6 +1,6 @@
 # Status
 
-Read at the start of every session. Current state only: what runs, what's blocked, what waits on the owner. Finished work goes in `docs/log/`, not here; the old ledger is `docs/status-archive.md` (history, not startup reading).
+Current state only: what's blocked and what waits on the owner. Finished work goes in `docs/log/`; old entries are in `docs/status-archive.md` (not startup reading).
 
 ## Standing rulings
 
