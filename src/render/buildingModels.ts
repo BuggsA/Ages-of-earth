@@ -220,6 +220,15 @@ function storehouse(k: Kit, e: number, st: Style): void {
   k.sphere(0.08, '#cfa030', 0.45, 0.07, 0.25);
   k.cyl(0.12, 0.1, 0.25, 7, '#b08a4e', -0.4, 0, 0.6);
   k.team(k.box(1.62, 0.05, 0.06, TEAM, 0, 0.74, 0.55));
+  if (e >= 3) {
+    // Powder-age yard: a hoist beam with a hanging crate, and stacked cases.
+    k.cyl(0.04, 0.05, 1.2, 5, e >= 4 ? '#3a3e44' : st.post, -0.95, 0, 0.75);
+    k.box(0.9, 0.05, 0.05, e >= 4 ? '#3a3e44' : st.post, -0.5, 1.15, 0.75);
+    k.cyl(0.005, 0.005, 0.35, 3, '#d8d0b8', -0.2, 0.8, 0.75);
+    k.box(0.2, 0.16, 0.2, '#a07a48', -0.2, 0.64, 0.75);
+    for (const [x, y] of [[0.8, 0], [0.8, 0.2], [1.05, 0]]) k.box(0.22, 0.2, 0.22, '#a07a48', x, y, 0.75);
+  }
+  if (e >= 4) lamp(k, 0.9, 0, -0.62, 0.8);
   banner(k, 0.85, 0, 0.85, 0.9);
 }
 
@@ -311,6 +320,21 @@ function farm(k: Kit, e: number, st: Style): void {
     k.box(0.32, 0.02, 0.02, WOOD, -1.0, 0.38, 0.9);
     k.sphere(0.05, HAY, -1.0, 0.52, 0.9);
     k.cone(0.07, 0.07, 6, '#6b5a3a', -1.0, 0.55, 0.9);
+  }
+  if (e >= 3) {
+    // A haystack and a water trough at the corner.
+    k.cone(0.3, 0.42, 7, HAY, -1.1, 0, -1.1).scale.set(1, 1, 1);
+    k.box(0.5, 0.1, 0.16, WOOD, 1.05, 0, -1.1);
+  }
+  if (e >= 4) {
+    // A lattice windpump: legs, a vane and a many-bladed wheel.
+    for (const [x, z] of [[-0.07, -0.07], [0.07, -0.07], [-0.07, 0.07], [0.07, 0.07]]) k.cyl(0.012, 0.02, 1.2, 4, '#3a3e44', 1.2 + x * 1.5, 0, -1.2 + z * 1.5);
+    k.cyl(0.012, 0.012, 0.1, 4, '#3a3e44', 1.2, 1.2, -1.2);
+    for (let i = 0; i < 6; i++) {
+      const blade = k.box(0.03, 0.26, 0.01, '#9aa0a6', 1.2, 1.3, -1.12);
+      blade.rotation.z = (i * Math.PI) / 3;
+    }
+    k.box(0.01, 0.12, 0.3, '#b33a32', 1.2, 1.3, -1.35);
   }
 }
 
