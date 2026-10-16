@@ -1119,6 +1119,8 @@ export interface Tech {
    * at any time in the match. Unlike `only`, it is kept for good once learned, on whatever road comes next.
    */
   walked?: [AgeId, AgeId];
+  /** A rare ore door (#356): researched only in a world that holds this ore, once the people has mined `n` of it. A world without it keeps the plain technologies. */
+  ore?: { id: RareId; n: number };
 }
 
 export const TECHS: Record<TechId, Tech> = {
@@ -1143,6 +1145,7 @@ export const TECHS: Record<TechId, Tech> = {
   husbandry: { name: 'Husbandry', at: 'stable', epoch: 2, cost: { food: 150 }, time: 35, mul: { cavalrySpeed: 1.1 }, blurb: 'Cavalry ride 10% faster.', icon: '🐎' },
   theology: { name: 'Theology', at: 'temple', epoch: 2, cost: { gold: 200 }, time: 40, mul: { priest: 1.5 }, blurb: 'Priests convert and heal half again as fast.', icon: '✨' },
   chemistry: { name: 'Chemistry', at: 'workshop', epoch: 3, cost: { food: 300, gold: 200 }, time: 45, add: { siegeRange: 1 }, mul: { siegeAttack: 1.2 }, blurb: 'Siege hits 20% harder and reaches 1 tile farther.', icon: '🧪' },
+  blackPowder: { name: 'Black Powder', at: 'workshop', epoch: 3, ore: { id: 'saltpetre', n: 40 }, cost: { food: 250, gold: 150 }, time: 45, add: { rangedAttack: 1 }, mul: { siegeAttack: 1.15 }, blurb: 'Only where saltpetre lies: once your citizens have mined 40, the powder-makers grind it fine. Musketeers and all ranged soldiers hit for 1 more and siege 15% harder, on top of Chemistry. Where there is none, the plain road stays open.', icon: '💥' },
   gillnets: { name: 'Gillnets', at: 'dock', epoch: 1, cost: { food: 100, wood: 100 }, time: 30, mul: { fish: 1.25 }, blurb: 'Fishing boats fish 25% faster.', icon: '🐟' },
   lighthouse: { name: 'Lighthouse', at: 'dock', epoch: 2, cost: { wood: 200, gold: 120 }, time: 35, needs: 'gillnets', add: { portReach: 4 }, blurb: 'A beacon on the headland: trading posts up to 4 tiles farther from the water become ports for your merchant ships.', icon: '🗼' },
   shipwright: { name: 'Shipwright', at: 'dock', epoch: 2, cost: { wood: 250, gold: 150 }, time: 40, add: { shipRange: 1 }, mul: { shipHp: 1.2 }, blurb: 'Ships are 20% sturdier, and warships shoot 1 tile farther.', icon: '⚓' },
