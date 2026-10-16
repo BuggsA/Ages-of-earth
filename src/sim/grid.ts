@@ -69,12 +69,14 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
   if (tx < 1 || ty < 1 || tx + n > s.w - 1 || ty + n > s.h - 1) return 'edge';
   let lo = Infinity;
   let hi = -Infinity;
+  // The computer asks this of hundreds of tiles a search; most are nowhere near a relic, post, ruin or landmark.
+  const near = keepClearNear(s, tx, ty, n);
   for (let y = ty; y < ty + n; y++) {
     for (let x = tx; x < tx + n; x++) {
       const i = y * s.w + x;
       if (s.terrain[i] === T_WATER) return 'water';
       if (s.terrain[i] === T_ROCK) return 'rock';
-      if (s.res[i] !== R_NONE || relicOnTile(s, x, y) || postOnTile(s, x, y) || ruinOnTile(s, x, y) || landmarkOnTile(s, x, y)) return 'blocked';
+      if (s.res[i] !== R_NONE || (near && (relicOnTile(s, x, y) || postOnTile(s, x, y) || ruinOnTile(s, x, y) || landmarkOnTile(s, x, y)))) return 'blocked';
       // A gate may go into its owner's own wall, replacing the pieces it covers.
       if (s.bldAt[i] !== 0 && !(type === 'gate' && ownWall(s, s.bldAt[i], owner))) return 'blocked';
     }
@@ -97,6 +99,18 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
   }
   void ignoreUnits;
   return null;
+}
+
+/** Whether a relic, trading post, ruin or landmark keeps any tile of this n-by-n square clear: the tile-by-tile checks below, asked once for the whole square. */
+function keepClearNear(s: GameState, tx: number, ty: number, n: number): boolean {
+  const ex = tx + n - 1;
+  const ey = ty + n - 1;
+  const box = (x: number, y: number, r: number) => x - r <= ex && x + r >= tx && y - r <= ey && y + r >= ty;
+  for (const r of s.relics) if (!r.carrier && !r.temple && box(Math.floor(r.x), Math.floor(r.y), 0)) return true;
+  for (const p of s.posts) if (box(Math.floor(p.x), Math.floor(p.y), TRADE.plaza + 1)) return true;
+  if (s.ruins) for (const r of s.ruins) if (box(Math.floor(r.x), Math.floor(r.y), RUINS.clear)) return true;
+  if (s.landmarks) for (const m of s.landmarks) if (box(Math.floor(m.x), Math.floor(m.y), LANDMARKS.clear)) return true;
+  return false;
 }
 
 /** A relic on the ground on this tile (buildings can't go over one). */
