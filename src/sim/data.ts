@@ -98,6 +98,13 @@ export const PATHS: Record<PathId, Path> = {
     carry: { plunder: 0.1 },
     planned: ['a Blood heirloom, shared with another road'],
   },
+  // The Steppe (#297, #318): the second main path, a people whose town moves. The riders grow quicker with every age of it walked.
+  steppe: {
+    name: 'Steppe Road',
+    blurb: 'A people of herders and riders whose town goes where the grass and the fight are: no fields, no walls, Town Centers and Houses on wagons, flocks that walk with the camp. Each age of the road opens with a deeper deed of the hunt and the herd, and every age of it walked makes its riders 5% quicker.',
+    carry: { cavalrySpeed: 0.05 },
+    planned: ['the Silk Road, where the horde meets the merchants'],
+  },
 };
 
 export const TRUNK: AgeId[] = ['stone', 'bronze', 'middle', 'gunpowder', 'industrial'];
@@ -220,12 +227,27 @@ export const AGES: Record<AgeId, Age> = {
     name: 'Age of the Steppe',
     short: 'Steppe',
     tier: 1,
+    path: 'steppe',
     blurb: 'A people of herders and riders, whose town goes where the herds go: Town Centers and Houses pack onto wagons and are pitched again wherever the land is not a rival\'s. Riders cost a fifth less and train a quarter faster, and hunters work 15% faster. No fields are tilled and no walls raised until the Middle Ages.',
     mul: { hunt: 1.15 },
     price: { cavalry: 0.8 },
     training: { cavalry: 0.75 },
     mobile: true,
     noBuild: { buildings: ['farm', 'wall', 'gate'], why: 'A steppe people tills no fields and raises no walls: they wait for the Middle Ages' },
+  },
+  // The second step of the Steppe Road (#318): the moving town grows into a horde, at the Middle Ages' tier.
+  horde: {
+    name: 'Age of the Horde',
+    short: 'Horde',
+    tier: 2,
+    path: 'steppe',
+    blurb: 'The camp has become a horde, and its neighbours pay it to go away. Riders who stand their ground in a rival\'s land exact tribute: each takes 0.3 gold a second from that rival\'s treasury, up to eight riders a rival (deep in their land, past your own supply, they wear down). The town still rolls on wagons and the flocks still walk with it; riders cost a fifth less and train a quarter faster, and hunters work 15% faster. No fields are tilled and no walls raised.',
+    add: { tribute: 0.3 },
+    mul: { hunt: 1.15 },
+    price: { cavalry: 0.8 },
+    training: { cavalry: 0.75 },
+    mobile: true,
+    noBuild: { buildings: ['farm', 'wall', 'gate'], why: 'A horde tills no fields and raises no walls: they wait until it settles in the Middle Ages' },
   },
 };
 
@@ -237,6 +259,14 @@ export const AGES: Record<AgeId, Age> = {
  * nothing and trains no one: the price of moving.
  */
 export const STEPPE = { pitch: 10, spot: 3, packs: ['towncenter', 'house'] as BuildingType[] };
+
+/**
+ * Tribute (the Age of the Horde, #318): every `every` seconds outside the peace, each of a people's mounted
+ * soldiers that stands still (not walking; fighting where it stands counts) on land a rival holds takes the
+ * people's `tribute` mod in gold a second from that rival's treasury, counting at most `most` riders a rival.
+ * A rival with no gold pays nothing. Attrition (`ATTRITION`) still wears down riders past their own supply.
+ */
+export const TRIBUTE = { every: 1, most: 8 };
 
 /**
  * Flocks (#308): the steppe's answer to the Farm it can't build, food that walks. A Town Center in the Age of
@@ -373,6 +403,32 @@ export const ROADS: Road[] = [
   },
   { from: 'steppe', to: 'middle', cost: EPOCHS[2].cost, time: EPOCHS[2].time, blurb: 'Rejoin the main road at the Middle Ages, for the same price as from the Bronze Age: fields and walls return. Wagons still on the road can be pitched, but nothing more is packed.' },
   { from: 'steppe', to: 'bronze', cost: { food: 150, wood: 150 }, time: 20, blurb: 'Settle down: leave the herds for the Bronze Age. Fields and walls return, riders cost their usual price, and the town stays where it stands.' },
+  // The Steppe Road (#318), second step: the climb into the Horde, a deeper deed of the hunt and now the herd as well.
+  // A people that left the steppe for the Middle Ages may turn back to it; nobody who never rode the steppe sees either road.
+  {
+    from: 'steppe',
+    to: 'horde',
+    cost: { food: 600, wood: 200, gold: 150 },
+    time: 45,
+    clue: 'stable',
+    walked: 'steppe',
+    deed: { stat: 'milked', n: 200, text: 'Your citizens milk 200 from the flock' },
+    also: [{ stat: 'hunted', n: 800, text: 'Your hunters butcher 800 meat (slaughtered sheep count)' }],
+    blurb: 'Instead of the Middle Ages: the camp grows into a horde. Riders standing in a rival\'s land exact tribute from its treasury, and the town still rolls on wagons with its flocks; riders stay cheap and quick (every age of the Steppe Road walked makes them 5% quicker). What it gives up, still: the plough and the wall.',
+  },
+  {
+    from: 'middle',
+    to: 'horde',
+    cost: { food: 300, wood: 150, gold: 100 },
+    time: 35,
+    clue: 'stable',
+    walked: 'steppe',
+    deed: { stat: 'milked', n: 200, text: 'Your citizens milk 200 from the flock' },
+    also: [{ stat: 'hunted', n: 800, text: 'Your hunters butcher 800 meat (slaughtered sheep count)' }],
+    blurb: 'A turn, not a climb, for a people that once rode the steppe: back onto the wagons as a horde. Riders standing in a rival\'s land exact tribute from its treasury. What it gives up: no new Farms, Walls or Gates are raised while it rides (the fields already tilled still yield).',
+  },
+  { from: 'horde', to: 'gunpowder', cost: { food: 1000, gold: 700, stone: 150 }, time: 65, blurb: 'Rejoin the main road: the tribute buys the horde its guns (more gold and less stone than from the Middle Ages: it never built in stone). Fields and walls return, the tribute ends, and nothing more is packed.' },
+  { from: 'horde', to: 'middle', cost: { food: 200, wood: 150 }, time: 25, blurb: 'Settle down: the ordinary Middle Ages. Fields and walls return, riders cost their usual price, the tribute ends and the town stays where it stands.' },
   { from: 'iron', to: 'middle', cost: EPOCHS[2].cost, time: EPOCHS[2].time, blurb: 'Rejoin the main road at the Middle Ages, for the same price as from the Bronze Age: the horse arrives, and the iron foot soldiers become ordinary pikemen.' },
   // Crossing chains (#49): relics, a deed of the faith, open a turn off the Middle Ages; trade and relics
   // together open a hybrid, from either side. Its clue is a Temple from both: the relics are what a
@@ -935,13 +991,15 @@ export interface Mods {
   galvanic: number;
   /** Share of a slain enemy unit's price paid to its killer's people as gold (the Path of Blood, #299). */
   plunder: number;
+  /** Gold a second each standing rider takes from the rival whose land it holds (the Age of the Horde, #318; `TRIBUTE`). */
+  tribute: number;
 }
 
 export const NO_MODS: Mods = {
   meleeAttack: 0, rangedAttack: 0, armor: 0, parmor: 0, range: 0, carry: 0, citizenSpeed: 1, wood: 1, mine: 1, farm: 1, forage: 1, hunt: 1,
   buildingHp: 1, buildSpeed: 1, militaryTrain: 1, rangedTrain: 1, cavalrySpeed: 1, infantryHp: 1, infantryArmor: 0, infantryAttack: 0, priest: 1, chant: 1,
   siegeAttack: 1, siegeRange: 0, techCost: 1, wonderCost: 1, extraCitizens: 0, fish: 1, shipHp: 1, shipRange: 0, airSpeed: 1, airHp: 1,
-  traderSpeed: 1, tradeGold: 1, relicGold: 1, bogGold: 1, rot: 1, beastWard: 1, portReach: 0, riderSight: 0, consecrate: 0, elmo: 0, telegraph: 0, galvanic: 0, plunder: 0,
+  traderSpeed: 1, tradeGold: 1, relicGold: 1, bogGold: 1, rot: 1, beastWard: 1, portReach: 0, riderSight: 0, consecrate: 0, elmo: 0, telegraph: 0, galvanic: 0, plunder: 0, tribute: 0,
 };
 
 export interface Tech {

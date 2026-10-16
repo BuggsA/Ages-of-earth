@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -123,7 +123,7 @@ export class Sound {
     'click', 'open', 'select', 'selectBuilding', 'move', 'attack', 'strike', 'thud', 'hit', 'hitBuilding', 'bow', 'sling', 'musket', 'fall',
     'collapse', 'built', 'place', 'ready', 'readyCitizen', 'chop', 'mine', 'hammer', 'rustle', 'epoch', 'alert', 'victory', 'defeat', 'error', 'coin', 'queue',
     'catapult', 'cannon', 'impact', 'spear', 'chant', 'convert', 'heal', 'townBell', 'allClear', 'research', 'wonder', 'shelter',
-    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind', 'thunder', 'owl', 'gull', 'cricket', 'frog', 'birdsong', 'greatWork', 'beacon', 'rally', 'mammoth', 'howl', 'snarl', 'landmarkTaken', 'landmarkLost', 'consecrate', 'heirloom', 'zap', 'coilHum', 'heroFall', 'callUp',
+    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind', 'thunder', 'owl', 'gull', 'cricket', 'frog', 'birdsong', 'greatWork', 'beacon', 'rally', 'mammoth', 'howl', 'snarl', 'landmarkTaken', 'landmarkLost', 'consecrate', 'heirloom', 'zap', 'coilHum', 'heroFall', 'callUp', 'tribute',
   ];
 
   /**
@@ -766,6 +766,14 @@ export class Sound {
         [N.G4, N.C5, N.E5, N.G5].forEach((f, i) => this.tone(out, t + i * 0.13, { f, type: 'square', dur: i === 3 ? 0.42 : 0.12, peak: 0.035 }));
         for (let i = 0; i < 8; i++) this.noise(out, t + 0.05 + i * 0.07, { dur: 0.05, filter: 'bandpass', f: 2600, q: 1.2, peak: 0.03 + i * 0.006 });
         this.tone(out, t + 0.6, { f: 120, to: 70, dur: 0.18, peak: 0.1 });
+        break;
+      case 'tribute':
+        // Tribute (#318): a horse snorting and stamping where it stands, then a purse of coins tipped into a saddlebag.
+        this.noise(out, t, { dur: 0.16, filter: 'bandpass', f: 900, q: 1.4, peak: 0.05 });
+        this.tone(out, t + 0.18, { f: 95, to: 60, dur: 0.08, peak: 0.08 });
+        this.tone(out, t + 0.3, { f: 90, to: 58, dur: 0.08, peak: 0.07 });
+        for (let i = 0; i < 5; i++) this.tone(out, t + 0.42 + i * 0.05, { f: 1700 + ((i * 433) % 800), dur: 0.07, peak: 0.04 - i * 0.005 });
+        this.noise(out, t + 0.42, { dur: 0.22, filter: 'highpass', f: 4500, q: 0.7, peak: 0.02 });
         break;
       case 'rally':
         // A war horn: a low rising call, then a bright answer over it.

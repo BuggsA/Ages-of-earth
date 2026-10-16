@@ -55,6 +55,8 @@ const SIDE_STYLES: Partial<Record<AgeId, Style>> = {
   // The Age of Total War (#313): the march of the whole people, a snare and cornet over strings in Aeolian, quicker and lower than Iron and Blood.
   totalwar: { bpm: 108, root: 98.0, scale: [0, 2, 3, 5, 7, 8, 10], chords: [0, 5, 3, 0, 6, 5, 4, 0], lead: 'cornet', accomp: 'strings', drums: 'snare', density: 0.48 },
   warband: { bpm: 88, root: 130.81, scale: [0, 1, 3, 5, 7, 8, 10], chords: [0, 0, 1, 0, 6, 0, 1, 0], lead: 'cornet', accomp: 'drone', drums: 'timpani', density: 0.36 },
+  // The Age of the Horde (#318): a galloping pentatonic flute over a fiddle-like drone, the frame drum a hoofbeat.
+  horde: { bpm: 104, root: 110.0, scale: [0, 2, 5, 7, 9], chords: [0, 0, 3, 0, 4, 0, 3, 0], lead: 'flute', accomp: 'drone', drums: 'frame', density: 0.42 },
   fair: { bpm: 112, root: 220.0, scale: [0, 2, 4, 5, 7, 9, 11], chords: [0, 4, 3, 0, 5, 3, 4, 0], lead: 'recorder', accomp: 'oompah', drums: 'tabor', density: 0.58 },
 };
 
