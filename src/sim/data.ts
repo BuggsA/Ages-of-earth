@@ -1358,6 +1358,13 @@ export const AMOUNT = { tree: 80, berry: 125, stone: 300, gold: 400, meat: 140, 
  * any town, `apart` from each other), where every town can walk to them. `rate` is how fast a citizen mines one.
  * The ore is paid into `Player.rare`; a later step makes the ages and roads that want it.
  */
+/**
+ * Caves (#356): on a world that holds any rare ore, `count` caves for the map's size are cut into open ground at least
+ * `away` tiles from every town and `apart` from each other. Each is a single tile of one of the world's ores, `rich` times
+ * a vein tile's amount, and with the roll `den` a wolf pack (`WOLF.pack`) lairs beside it: the richest ore is the best
+ * guarded. Mined like any vein, and the wolves are the ordinary kind (they hold the ground round their den).
+ */
+export const CAVE = { count: { small: 1, medium: 2, large: 3 } as Record<MapSize, number>, rich: 3, den: 0.5, away: 18, apart: 24 };
 export const RARE: Record<'salt' | 'saltpetre' | 'bloodiron', { name: string; chance: number; veins: number; tiles: number; amount: number; rate: number; away: number; apart: number; blurb: string }> = {
   salt: { name: 'Salt', chance: 0.7, veins: 2, tiles: 3, amount: 200, rate: 0.5, away: 14, apart: 10, blurb: 'White crust on bare ground. Cures meat, tans hides and keeps a long march fed.' },
   saltpetre: { name: 'Saltpetre', chance: 0.5, veins: 2, tiles: 2, amount: 160, rate: 0.45, away: 16, apart: 12, blurb: 'Pale, bitter crystal scraped from damp rock. The black of powder is made from it.' },

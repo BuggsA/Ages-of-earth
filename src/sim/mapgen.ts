@@ -1,6 +1,6 @@
-import { AMOUNT, BOAR, BOG_IRON, LANDMARKS, RARE, MAMMOTH, MAP_SIZES, RELIC, RUINS, TRADE, WOLF } from './data';
+import { AMOUNT, BOAR, BOG_IRON, CAVE, LANDMARKS, RARE, MAMMOTH, MAP_SIZES, RELIC, RUINS, TRADE, WOLF } from './data';
 import { fbm, mulberry32, type Rng } from './rng';
-import type { LandmarkKind, MapSize, MapType, RareId, RuinFind } from './types';
+import type { Cave, LandmarkKind, MapSize, MapType, RareId, RuinFind } from './types';
 import { B_RES, B_TERRAIN, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_NONE, R_STONE, R_TREE, T_GRASS, T_ROCK, T_SAND, T_WATER } from './types';
 
 /**
@@ -53,6 +53,8 @@ export interface MapData {
   bogIron: boolean;
   /** Which rare ores this world holds (#356). */
   rares: RareId[];
+  /** Cave mouths (#356). */
+  caves: Cave[];
   /** Ancient ruins (#64): where they stand (tile centers) and what lies under each. */
   ruins: { x: number; y: number; find: RuinFind }[];
   /** The wild (#171): mammoths, and wolves by their dens. Empty on campaign maps. */
@@ -525,6 +527,8 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
 
   const rares = deposits && veins ? placeRares(seed, w, h, terrain, res, amount, starts, [...deer, ...relics, ...posts, ...ruins, ...wild.map((x) => ({ x: x.x, y: x.y })), ...landmarks.map((x) => ({ x: x.x, y: x.y }))]) : [];
 
+  const caves = deposits && veins && rares.length ? placeCaves(seed, size, w, h, terrain, res, amount, starts, rares, wild) : [];
+
   // Resources nobody could stand next to are cleared away.
   const block = new Uint8Array(w * h);
   for (let i = 0; i < w * h; i++) {
@@ -532,7 +536,7 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
     if (res[i] !== R_NONE) block[i] |= B_RES;
   }
 
-  return { w, h, terrain, height, res, amount, block, starts, deer, relics, posts, bogIron, rares, ruins, wild, landmarks };
+  return { w, h, terrain, height, res, amount, block, starts, deer, relics, posts, bogIron, rares, caves, ruins, wild, landmarks };
 }
 
 /** Where a town's people can walk to without cutting a tree (or, with `axes`, by cutting their way). */
@@ -905,6 +909,52 @@ function placeRares(
   return found;
 }
 const RARES_ORDER: RareId[] = ['salt', 'saltpetre', 'bloodiron'];
+
+/**
+ * Caves (#356): see `CAVE`. They roll their own dice and mark empty open ground, as the veins do. The ore of each is dealt
+ * from the world's ores in turn from a seeded start, so two caves never hold the same ore while another is unshown. A den
+ * cave's wolves are added to `wild` on the open tiles beside it.
+ */
+function placeCaves(
+  seed: number,
+  size: MapSize,
+  w: number,
+  h: number,
+  terrain: Uint8Array,
+  res: Uint8Array,
+  amount: Int32Array,
+  starts: { x: number; y: number }[],
+  rares: RareId[],
+  wild: { kind: 'mammoth' | 'wolf' | 'boar'; x: number; y: number }[],
+): Cave[] {
+  const rng = mulberry32(seed ^ 0xca7e5);
+  const reaches = starts.map((st) => reachFrom(w, h, terrain, res, st));
+  const open = (x: number, y: number) =>
+    x >= 2 && y >= 2 && x < w - 2 && y < h - 2 && (terrain[y * w + x] === T_GRASS || terrain[y * w + x] === T_SAND) && res[y * w + x] === R_NONE;
+  const far = (list: { x: number; y: number }[], x: number, y: number, r: number) =>
+    list.every((p) => (p.x - x - 0.5) * (p.x - x - 0.5) + (p.y - y - 0.5) * (p.y - y - 0.5) >= r * r);
+  const out: Cave[] = [];
+  const at: { x: number; y: number }[] = [];
+  const first = Math.floor(rng() * rares.length);
+  for (let guard = 0; guard < 400 && out.length < CAVE.count[size]; guard++) {
+    const x = 2 + Math.floor(rng() * (w - 4));
+    const y = 2 + Math.floor(rng() * (h - 4));
+    if (!open(x, y) || reaches.some((r) => r[y * w + x] !== 1)) continue;
+    if (!far(starts, x, y, CAVE.away) || !far(at, x, y, CAVE.apart)) continue;
+    // Anything else already on the map keeps its distance: no ore, tree or beast within 2 tiles.
+    let crowded = false;
+    for (let dy = -2; dy <= 2 && !crowded; dy++) for (let dx = -2; dx <= 2; dx++) if (res[(y + dy) * w + x + dx] !== R_NONE) crowded = true;
+    if (crowded || wild.some((b) => (b.x - x - 0.5) * (b.x - x - 0.5) + (b.y - y - 0.5) * (b.y - y - 0.5) < 36)) continue;
+    const ore = rares[(first + out.length) % rares.length];
+    const den = rng() < CAVE.den;
+    res[y * w + x] = RARE_TILE[ore];
+    amount[y * w + x] = RARE[ore].amount * CAVE.rich;
+    at.push({ x, y });
+    out.push({ tile: y * w + x, ore, den });
+    if (den) for (let k = 0; k < WOLF.pack; k++) wild.push({ kind: 'wolf', x: x + 0.5 + (k - 1) * 0.8, y: y + 1.6 + (k === 1 ? 0.5 : 0) });
+  }
+  return out;
+}
 
 /**
  * Ancient ruins (#64), fairly: out between the towns, each about as far from its two nearest towns,

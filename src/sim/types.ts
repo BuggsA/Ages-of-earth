@@ -66,6 +66,13 @@ export const R_SALTPETRE = 9;
 export const R_BLOODIRON = 10;
 export type RareId = 'salt' | 'saltpetre' | 'bloodiron';
 export const RARES: readonly RareId[] = ['salt', 'saltpetre', 'bloodiron'];
+/** A cave mouth (#356): one rich tile of a rare ore, sometimes with a wolf pack in it. The ore is mined like any vein. */
+export interface Cave {
+  tile: number;
+  ore: RareId;
+  /** Wolves lair here. */
+  den: boolean;
+}
 
 /** Why a tile can't be walked: bits of `block`. */
 export const B_TERRAIN = 1;
@@ -634,6 +641,8 @@ export interface GameState {
   bogIron?: boolean;
   /** Which rare ores this world holds (#356), decided by the seed; absent in older saves (none). */
   rares?: RareId[];
+  /** Cave mouths (#356); absent in older saves and campaigns (none). */
+  caves?: Cave[];
   nextId: number;
   shots: Shot[];
   rng: number;

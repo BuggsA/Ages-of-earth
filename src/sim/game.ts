@@ -170,6 +170,7 @@ export function createGame(setup: GameSetup): GameState {
   for (const t of map.posts) s.posts.push({ id: s.nextId++, x: t.x, y: t.y });
   if (map.ruins.length) s.ruins = map.ruins.map((r) => ({ id: s.nextId++, x: r.x, y: r.y, find: r.find, dug: 0, by: -1 }));
   for (const b of map.wild) spawnAnimal(s, b.x, b.y, b.kind);
+  if (map.caves.length) s.caves = map.caves.map((c) => ({ ...c }));
   if (map.landmarks.length) s.landmarks = map.landmarks.map((m) => ({ id: s.nextId++, x: m.x, y: m.y, kind: m.kind, owner: -1, claim: 0, by: -1 }));
   countPop(s);
   updateVision(s);
