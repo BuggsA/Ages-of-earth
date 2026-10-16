@@ -9,7 +9,7 @@ import type { Building, BuildingType, Command, Ent, Cost, GameState, Order, Play
 import { RES, R_FISH, R_MEAT, R_NONE } from './types';
 import { RES_OF_TILE, cargoRoom, findResource, freeFarm, garrisonRoom, giveOrder, landing, setOrder, ungarrison } from './units';
 import { carriedBy, letGo, relicAt } from './relics';
-import { dockOf, homeMarket, marketOf, nearestDock, portSpot, postAt } from './trade';
+import { caravanOf, dockOf, homeMarket, marketOf, nearestCaravan, nearestDock, portSpot, postAt } from './trade';
 import { ruinAt } from './ruins';
 import { callWork, workProblem } from './works';
 import { beaconProblem, lightBeacon } from './beacon';
@@ -335,12 +335,14 @@ export function applyCommand(s: GameState, c: Command): void {
       if (!post) return;
       const units = myUnits(s, c.p, c.ids);
       const traders = units.filter((u) => u.type === 'trader');
-      if (traders.length && !homeMarket(s, c.p, post.x, post.y)) refuse(s, c.p, 'Build a Market to trade from');
+      if (traders.length && !homeMarket(s, c.p, post.x, post.y) && !nearestCaravan(s, c.p, post.x, post.y)) refuse(s, c.p, 'Build a Market to trade from');
       else {
         for (const u of traders) {
-          // Each trades from the Market nearest it; one already carrying gold takes it home first.
-          const m = (u.order.k === 'trade' ? marketOf(s, c.p, u.order.market) : null) ?? homeMarket(s, c.p, u.x, u.y);
-          giveOrder(u, { k: 'trade', post: post.id, market: m ? m.id : 0, phase: u.carry > 0 ? 'back' : 'go' }, c.queue);
+          // Each trades from the Market nearest it (on the Silk Road, the one on its wagon too, #326); one already
+          // carrying gold takes it home first, and a caravan keeps where its Market stood when it set out.
+          const o = u.order.k === 'trade' ? u.order : null;
+          const m = (o ? (marketOf(s, c.p, o.market) ?? caravanOf(s, c.p, o.market)) : null) ?? homeMarket(s, c.p, u.x, u.y) ?? nearestCaravan(s, c.p, u.x, u.y);
+          giveOrder(u, o?.from ? { k: 'trade', post: post.id, market: m ? m.id : 0, phase: u.carry > 0 ? 'back' : 'go', from: o.from } : { k: 'trade', post: post.id, market: m ? m.id : 0, phase: u.carry > 0 ? 'back' : 'go' }, c.queue);
         }
       }
       // Merchant ships sail to a port post from their nearest Dock.

@@ -4,7 +4,7 @@ import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWa
 import { findRoute } from './path';
 import type { Spatial } from './spatial';
 import { buildTimeFor, buildingCostFor, modsOf } from './stats';
-import { canRaise, inField } from './ages';
+import { ageDef, canRaise, inField } from './ages';
 import type { Act, Animal, Building, Cost, Ent, GameState, Goal, Order, Res, Unit } from './types';
 import { seasonOf } from './seasons';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
@@ -14,7 +14,7 @@ import { milkable } from './flocks';
 import { dig, ruinAt } from './ruins';
 import { fordMarch, groveBoost, keptOf, kinBonus } from './landmarks';
 import { chant, chantedOver, consecrateProblem, consecrates, turnBuilding } from './consecrate';
-import { atPost, dockOf, goalForPost, homeMarket, marketOf, nearestDock, nearestMarket, portSpot, postAt, tripGold } from './trade';
+import { atPost, caravanBonus, caravanOf, dockOf, goalForPost, homeMarket, marketOf, nearestCaravan, nearestDock, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { canHit, exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, passOf, pay, radiusOf, statsOf, teamOf } from './world';
 
 /**
@@ -976,13 +976,18 @@ function digStep(s: GameState, u: Unit, o: Extract<Order, { k: 'dig' }>): void {
   if (!approach(u, goalForPoint(s, r.x, r.y, passOf(s, u)))) setOrder(u, { k: 'idle' });
 }
 
-/** Pay a trader's (or merchant ship's) load in at the Market (or Dock) it came home to, and cut in the allies. */
-function payTrip(s: GameState, u: Unit, m: Building, sea: boolean): void {
+/**
+ * Pay a trader's (or merchant ship's) load in at the Market (or Dock) it came home to, and cut in the allies.
+ * On the Silk Road (#326) the ground its Market covered since it set out (`from`) pays more, the owner's alone.
+ */
+function payTrip(s: GameState, u: Unit, m: Building | Unit, sea: boolean, from?: { x: number; y: number }): void {
   const p = s.players[u.owner];
-  p.res.gold += u.carry;
-  p.stats.gathered += u.carry;
-  p.stats.traded += u.carry;
-  s.events.push({ k: 'caravan', id: u.id, owner: u.owner, what: 'paid', amount: u.carry, x: m.x, y: m.y });
+  const { moved, bonus } = caravanBonus(s, u.owner, u.carry, from, m);
+  p.res.gold += u.carry + bonus;
+  p.stats.gathered += u.carry + bonus;
+  p.stats.traded += u.carry + bonus;
+  if (bonus > 0) p.stats.caravan = (p.stats.caravan ?? 0) + bonus;
+  s.events.push(moved > 0 ? { k: 'caravan', id: u.id, owner: u.owner, what: 'paid', amount: u.carry + bonus, x: m.x, y: m.y, moved, bonus } : { k: 'caravan', id: u.id, owner: u.owner, what: 'paid', amount: u.carry, x: m.x, y: m.y });
   // Allies with a Market (by sea, a Dock) of their own take a cut of the trade passing through the alliance.
   const cut = Math.floor(u.carry * TRADE.ally);
   if (cut <= 0) return;
@@ -1053,7 +1058,8 @@ function seaTradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>):
 /**
  * Run the road: out to the trading post, take on gold worth the distance from the Market, and back to
  * pay it in; then out again. If the Market falls, the nearest other one will do; with none left, the
- * trader waits with what it carries.
+ * trader waits with what it carries. A Market rolling on a wagon (the Silk Road, #326) is still home:
+ * the trader follows it, and is paid more for the ground it covered.
  */
 function tradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>): void {
   if (u.type === 'cog') return seaTradeStep(s, u, o);
@@ -1062,9 +1068,9 @@ function tradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>): vo
     return;
   }
   if (o.phase === 'back') {
-    let m = marketOf(s, u.owner, o.market);
+    let m: Building | Unit | null = marketOf(s, u.owner, o.market) ?? caravanOf(s, u.owner, o.market);
     if (!m) {
-      m = homeMarket(s, u.owner, u.x, u.y);
+      m = homeMarket(s, u.owner, u.x, u.y) ?? nearestCaravan(s, u.owner, u.x, u.y);
       if (!m) {
         s.events.push({ k: 'refused', owner: u.owner, why: 'Your trader has no Market to come home to' });
         setOrder(u, { k: 'idle' });
@@ -1073,17 +1079,32 @@ function tradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>): vo
       o.market = m.id;
       stopWalking(u);
     }
-    if (distToRect(u.x, u.y, m) - statsOf(s, u).radius <= REACH + 0.2) {
+    const gap = m.kind === 'building' ? distToRect(u.x, u.y, m) : Math.sqrt((m.x - u.x) * (m.x - u.x) + (m.y - u.y) * (m.y - u.y)) - statsOf(s, m).radius;
+    if (gap - statsOf(s, u).radius <= REACH + 0.2) {
       stopWalking(u);
-      if (u.carry > 0) payTrip(s, u, m, false);
+      if (u.carry > 0) payTrip(s, u, m, false, o.from);
       u.carry = 0;
       u.carryRes = null;
-      // Out again, unless the post is gone.
-      if (postAt(s, o.post)) o.phase = 'go';
-      else setOrder(u, { k: 'idle' });
+      // Out again, unless the post is gone; a caravan notes where its Market stands as it sets out (#326).
+      if (postAt(s, o.post)) {
+        o.phase = 'go';
+        if (ageDef(s.players[u.owner]).caravans) o.from = { x: m.x, y: m.y };
+        else if (o.from) delete o.from;
+      } else setOrder(u, { k: 'idle' });
       return;
     }
-    if (!approach(u, goalForBuilding(m))) setOrder(u, { k: 'idle' });
+    if (m.kind === 'building') {
+      if (!approach(u, goalForBuilding(m))) setOrder(u, { k: 'idle' });
+      return;
+    }
+    // A Market on its wagon: make for where it is, and set a fresh course when it has rolled on.
+    const g = goalForPoint(s, m.x, m.y, passOf(s, u));
+    const moved = u.goal ? Math.abs(u.goal.px - g.px) + Math.abs(u.goal.py - g.py) : 99;
+    if (walking(u) && moved > 1.5 && s.tick - u.pathTick > 15) {
+      goTo(u, g);
+      return;
+    }
+    if (!approach(u, g)) setOrder(u, { k: 'idle' });
     return;
   }
   const post = postAt(s, o.post);
@@ -1093,14 +1114,15 @@ function tradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>): vo
   }
   if (atPost(post, u.x, u.y)) {
     stopWalking(u);
-    // Paid by the road from home: the Market it set out from, or the nearest one to the post.
-    const m = marketOf(s, u.owner, o.market) ?? homeMarket(s, u.owner, post.x, post.y);
+    // Paid by the road from home: the Market it set out from (on its wagon too, #326), or the nearest one to the post.
+    const m = marketOf(s, u.owner, o.market) ?? caravanOf(s, u.owner, o.market) ?? homeMarket(s, u.owner, post.x, post.y) ?? nearestCaravan(s, u.owner, post.x, post.y);
     if (!m) {
       s.events.push({ k: 'refused', owner: u.owner, why: 'Build a Market to trade from' });
       setOrder(u, { k: 'idle' });
       return;
     }
     o.market = m.id;
+    if (!o.from && ageDef(s.players[u.owner]).caravans) o.from = { x: m.x, y: m.y };
     u.carry = tripGold(s, u.owner, m, post);
     u.carryRes = 'gold';
     o.phase = 'back';

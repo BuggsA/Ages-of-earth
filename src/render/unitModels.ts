@@ -1000,6 +1000,8 @@ function trader(epoch: number): Kit {
  * front and the folded lattice walls along the sides. From the Middle Ages a heavier wagon on four wheels.
  */
 function wagon(epoch: number): Kit {
+  // Above 20: the Market on the road (the Silk Road, #326).
+  if (epoch >= 20) return caravanCart(epoch - 20);
   const k = new Kit();
   beast(k, { coat: '#5e4a3a', leg: 0.22, body: [0.22, 0.18, 0.4], z: 0.55, horns: true });
   k.box(0.34, 0.04, 0.05, WOOD, 0, 0.42, 0.74);
@@ -1027,6 +1029,52 @@ function wagon(epoch: number): Kit {
   // The painted door, facing the road.
   k.box(0.1, 0.14, 0.02, '#b8462e', 0, 0.34, 0.07);
   carter(k, -0.34, 0.6, { legs: '#5a4a3a', torso: '#3e5a7a', hat: '#8a3a2a' });
+  return k;
+}
+
+/**
+ * The Market on the road (the Silk Road, #326): a two-humped Bactrian camel, the caravans' beast from the
+ * Gobi to the Caspian, draws a four-wheeled cart. On it ride the Market's striped awning rolled on its poles,
+ * bales of silk in madder red, indigo and saffron under a cloth in the player's colour, a tall oil jar, a
+ * chest of the scales and weights, and a pennant on a pole so the traders can find the camp across the grass.
+ */
+function caravanCart(epoch: number): Kit {
+  const k = new Kit();
+  const coat = '#b48a58';
+  const back = beast(k, { coat, leg: 0.32, body: [0.19, 0.17, 0.4], z: 0.62 });
+  // Two humps, and the shaggy tuft at the throat.
+  for (const z of [0.74, 0.5]) k.sphere(0.09, '#a87e4e', 0, back + 0.02, z, undefined, 8).scale.set(1, 1.2, 1);
+  k.box(0.09, 0.12, 0.08, '#8a6440', 0, back - 0.08, 0.86);
+  // A saddle blanket in the player's colour between the humps, and a bell under the chin.
+  k.team(k.box(0.21, 0.02, 0.12, TEAM, 0, back + 0.01, 0.61));
+  k.sphere(0.025, '#d8b25a', 0, back - 0.16, 0.92, undefined, 6);
+  // Shafts to the cart.
+  for (const x of [-0.1, 0.1]) k.box(0.025, 0.025, 0.55, WOOD, x, 0.34, 0.24).rotation.x = -0.15;
+  for (const z of [0.12, -0.46]) {
+    wheel(k, -0.3, z, 0.15, '#5b4330');
+    wheel(k, 0.3, z, 0.15, '#5b4330');
+  }
+  k.box(0.56, 0.05, 0.84, '#8a6440', 0, 0.24, -0.17);
+  for (const x of [-0.27, 0.27]) k.box(0.03, 0.08, 0.84, '#6a4a2c', x, 0.3, -0.17);
+  // The awning, rolled on its poles along the left side: stripes of red and cream.
+  const roll = k.group(-0.17, 0.36, -0.17);
+  for (let i = 0; i < 6; i++) k.cyl(0.055, 0.055, 0.13, 8, i % 2 ? '#efe2c4' : '#b8462e', 0, 0, -0.33 + i * 0.13, roll).rotation.x = Math.PI / 2;
+  for (const z of [-0.43, 0.43]) k.box(0.02, 0.02, 0.06, WOOD, 0, 0, z, roll);
+  // Bales of silk.
+  for (const [x, y, z, c] of [[0.1, 0.33, 0.02, '#a83a3a'], [0.1, 0.33, -0.22, '#3a4e9a'], [0.1, 0.45, -0.1, '#e0a83a'], [-0.06, 0.47, -0.36, '#7a3a8a']] as [number, number, number, string][]) {
+    k.box(0.17, 0.11, 0.2, c, x, y, z);
+    k.box(0.18, 0.02, 0.025, '#d8c8a0', x, y + 0.01, z);
+  }
+  k.team(k.box(0.2, 0.02, 0.48, TEAM, 0.1, 0.395, -0.1));
+  // The scales' chest at the back, and a tall jar.
+  k.box(0.2, 0.12, 0.13, '#6b4426', 0.08, 0.32, -0.5);
+  k.box(0.21, 0.02, 0.14, '#c8913f', 0.08, 0.39, -0.5);
+  k.lathe([[0, 0], [0.04, 0.01], [0.06, 0.08], [0.035, 0.17], [0.04, 0.19]], 8, '#b8673a', -0.16, 0.27, -0.52);
+  // The pennant pole, so the traders find the camp across the grass.
+  k.cyl(0.012, 0.012, 0.75, 5, WOOD, -0.24, 0.27, -0.56);
+  k.team(k.box(0.02, 0.1, 0.18, TEAM, -0.24, 0.92, -0.65));
+  carter(k, -0.36, 0.72, { legs: '#5a4a3a', torso: '#7a3a2e', hat: '#3e5a7a' });
+  void epoch;
   return k;
 }
 
