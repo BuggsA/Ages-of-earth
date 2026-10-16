@@ -322,6 +322,8 @@ function fit(p: Player, to: AgeId): number {
   const cls = unitStats(sig, 0).cls;
   // The Path of Blood (#307) suits a people that fights with foot or riders; the others keep to trade, faith and craft.
   if (age.path === 'blood') return cls === 'infantry' || cls === 'cavalry' ? 0 : -1;
+  // The Silk Road (#326) waits until the computer knows how to move its Market with the camp.
+  if (to === 'silk') return -1;
   // The Steppe Road (#320): its first age is judged as any side age; the Horde waits until the computer knows how to exact tribute (#297 s5b).
   if (age.path === 'steppe' && age.tier > 1) return -1;
   if (age.no?.units.includes(sig)) return -1;

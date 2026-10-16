@@ -1,8 +1,8 @@
-import { ageOf, ironTradeShare, relicTradeShare } from './ages';
-import { LAST_EPOCH, TRADE } from './data';
+import { ageDef, ageOf, ironTradeShare, relicTradeShare } from './ages';
+import { LAST_EPOCH, SILK, TRADE } from './data';
 import { NAVAL, distToRect, nearestWalkable } from './grid';
 import { modsOf } from './stats';
-import type { Building, GameState, Goal, TradePost } from './types';
+import type { Building, GameState, Goal, TradePost, Unit } from './types';
 
 /**
  * Trade: traders from a Market run the road to a neutral trading post out on the map and bring back
@@ -133,4 +133,45 @@ export function tripGold(s: GameState, owner: number, market: { x: number; y: nu
   const epoch = Math.min(LAST_EPOCH, s.players[owner].epoch);
   const k = TRADE.gold * (1 + Math.max(0, epoch - 1) * TRADE.epoch) * modsOf(s, owner).tradeGold * relicTradeShare(s, owner) * ironTradeShare(s, owner) * (sea ? TRADE.sea.mul : harborNear(s, owner, market) ? TRADE.harbor.mul : 1);
   return Math.max(1, Math.min(TRADE.max, Math.floor((dx * dx + dy * dy) * k)));
+}
+
+/**
+ * A Market on the move (the Silk Road, #326): a player's wagon carrying a Market, or a Market being pitched
+ * from one. A trader whose Market is on the road comes home to it there.
+ */
+const rolling = (e: Building | Unit, owner: number): boolean =>
+  e.owner === owner && e.hp > 0 && (e.kind === 'unit' ? e.type === 'wagon' && e.packed === 'market' && !e.inside : e.type === 'market' && !e.built && e.pitch !== undefined);
+
+/** A player's rolling Market by this id, if it still rolls (or is being pitched). */
+export function caravanOf(s: GameState, owner: number, id: number): Building | Unit | null {
+  const e = id ? s.byId.get(id) : undefined;
+  return e && rolling(e, owner) ? e : null;
+}
+
+/** The nearest of a player's rolling Markets to a point, in id order on a tie, or null. */
+export function nearestCaravan(s: GameState, owner: number, x: number, y: number): Building | Unit | null {
+  let best: Building | Unit | null = null;
+  let bestD = Infinity;
+  for (const e of s.ents) {
+    if (!rolling(e, owner)) continue;
+    const dx = e.x - x, dy = e.y - y;
+    const d = dx * dx + dy * dy;
+    if (d < bestD) {
+      bestD = d;
+      best = e;
+    }
+  }
+  return best;
+}
+
+/**
+ * What the Silk Road's caravans add to a trip (#326): `SILK.each` of its gold for every tile between where
+ * the trader's Market stood when it set out and where it is paid in, at most `SILK.most` tiles. Whole
+ * gold, and nothing outside an age with caravans or for a trip with no starting point.
+ */
+export function caravanBonus(s: GameState, owner: number, carry: number, from: { x: number; y: number } | undefined, home: { x: number; y: number }): { moved: number; bonus: number } {
+  if (!from || carry <= 0 || !ageDef(s.players[owner]).caravans) return { moved: 0, bonus: 0 };
+  const dx = home.x - from.x, dy = home.y - from.y;
+  const moved = Math.floor(Math.sqrt(dx * dx + dy * dy));
+  return { moved, bonus: Math.floor(carry * SILK.each * Math.min(SILK.most, moved)) };
 }

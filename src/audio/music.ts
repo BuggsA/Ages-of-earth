@@ -57,6 +57,9 @@ const SIDE_STYLES: Partial<Record<AgeId, Style>> = {
   warband: { bpm: 88, root: 130.81, scale: [0, 1, 3, 5, 7, 8, 10], chords: [0, 0, 1, 0, 6, 0, 1, 0], lead: 'cornet', accomp: 'drone', drums: 'timpani', density: 0.36 },
   // The Age of the Horde (#318): a galloping pentatonic flute over a fiddle-like drone, the frame drum a hoofbeat.
   horde: { bpm: 104, root: 110.0, scale: [0, 2, 5, 7, 9], chords: [0, 0, 3, 0, 4, 0, 3, 0], lead: 'flute', accomp: 'drone', drums: 'frame', density: 0.42 },
+  // The Age of the Silk Road (#326): a plucked lute in the double-harmonic of the caravan cities over the horde's drone,
+  // the frame drum an ambling camel's stride rather than a gallop.
+  silk: { bpm: 92, root: 146.83, scale: [0, 1, 4, 5, 7, 8, 11], chords: [0, 0, 3, 0, 4, 0, 5, 0], lead: 'pluck', accomp: 'drone', drums: 'frame', density: 0.44 },
   fair: { bpm: 112, root: 220.0, scale: [0, 2, 4, 5, 7, 9, 11], chords: [0, 4, 3, 0, 5, 3, 4, 0], lead: 'recorder', accomp: 'oompah', drums: 'tabor', density: 0.58 },
 };
 
