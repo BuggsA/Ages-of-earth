@@ -84,4 +84,4 @@ The owner, 2026-10-13: tests "can often eat a lot of the build time … each age
 - Read `docs/status.md` and your issue; read older `docs/log/` entries only when the task needs their history.
 - Search first, then read the lines you need. Send long output to a file and read its tail.
 - GitHub tools: small pages, `minimal_output`, an issue's newest comments.
-- One task per session (a small related follow-up may ride along), then hand off (`docs/team.md`).
+- Up to 3 related steps per session, then hand off (`docs/team.md`, "Small and often").

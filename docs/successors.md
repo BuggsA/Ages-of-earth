@@ -24,7 +24,7 @@ A new session costs its startup (the docs, the board, finding the code) before a
 1. **Don't spawn** (checked first) when: #2 carries the `paused` label (the owner's stop switch); you are position 10; your session merged nothing; `create_session` failed twice; another chain in your lane is under two hours old and not "ended"; or nothing waits in your lane and your chain's last two sessions each shipped only a minor tweak (a number, a word, a small look change).
 2. **An owner-started session** that wasn't working the board (a chat, a one-off) doesn't spawn unless the owner asks.
 3. **Otherwise spawn.** It takes, in order: a red `ci-periodic` or `ci` on `main`, an `owner-ask`, a `ready` issue in your lane; with none, it pitches its own (`AGENTS.md` §2).
-- **Related follow-up** to your own work: do it now, while the code is loaded and cheap to reread; leave unrelated work to a fresh session.
+- **Related next step** (up to 3 a session, `docs/team.md` "Small and often"): take it yourself while the code is loaded and cheap to reread, rather than spawning for it.
 - **Say why** in your #2 line: what you shipped, and why you spawned or ended.
 
 ## Chains and caps
