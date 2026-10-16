@@ -90,6 +90,8 @@ export interface Age {
   fairs?: boolean;
   /** Escorted merchant ships carry more (the Age of Sail): see `CONVOY` (`convoy.ts`). */
   convoys?: boolean;
+  /** Priests keeping vigil at a relic Temple add to its gold (the Age of Pilgrims): see `VIGIL` (`vigil.ts`). */
+  vigils?: boolean;
 }
 
 /**
@@ -177,6 +179,7 @@ export const AGES: Record<AgeId, Age> = {
     add: { consecrate: 1 },
     mul: { relicGold: 2, priest: 1.25 },
     price: { priest: 0.5 },
+    vigils: true,
     no: { units: ['siege'], why: 'A pilgrim people builds no siege engines: rams and catapults wait until it leaves the pilgrims\' road' },
   },
   fair: {
@@ -539,7 +542,7 @@ export const ROADS: Road[] = [
     clue: 'temple',
     gate: 'easy',
     deed: { stat: 'relicGold', n: 60, text: 'Relics kept in your Temples bring in 60 gold' },
-    blurb: 'A turn, not a climb: the same soldiers and technologies as the Middle Ages, but the faithful walk from far away to your Temples. Every relic kept there pays double gold; priests cost half as much and convert and heal a quarter faster. What it gives up: siege. The Siege Workshop builds nothing while you walk the pilgrims\' road, so walls and towers are taken by faith: priests chanting together win over a rival\'s buildings (never a Town Center or a Wonder), slower with soldiers sheltering inside.',
+    blurb: 'A turn, not a climb: the same soldiers and technologies as the Middle Ages, but the faithful walk from far away to your Temples. Every relic kept there pays double gold, and up to three priests keeping vigil beside the shrine add a gold each to every payment; priests cost half as much and convert and heal a quarter faster. What it gives up: siege. The Siege Workshop builds nothing while you walk the pilgrims\' road, so walls and towers are taken by faith: priests chanting together win over a rival\'s buildings (never a Town Center or a Wonder), slower with soldiers sheltering inside.',
   },
   { from: 'pilgrim', to: 'gunpowder', cost: { food: 900, gold: 750, stone: 200 }, time: 65, blurb: 'Rejoin the main road: the pilgrims\' gold carries your people into gunpowder (more gold and less food and stone than from the Middle Ages). The siege engines return as cannon.' },
   { from: 'pilgrim', to: 'middle', cost: { food: 200, stone: 100 }, time: 25, blurb: 'Leave the pilgrims\' road for the ordinary Middle Ages: relics pay their usual gold, and the Siege Workshop works again.' },
@@ -930,6 +933,12 @@ export const FAIR = { every: 240, open: 60, reach: 12, pay: 1.5 };
  * tiles carries `pay` times the gold. Send the fleet with the cogs: the escort is also what the rival's raiders meet.
  */
 export const CONVOY = { reach: 6, pay: 1.4 };
+/**
+ * Vigils (the Age of Pilgrims): each own priest standing within `reach` tiles of a finished Temple that keeps a
+ * relic adds `each` gold to that relic's payment, for at most `most` priests; the toast tells of it at most every `toast` seconds. A priest at the shrine is a priest
+ * not chanting at a rival's wall, and the shrine is where the rival's raiders come.
+ */
+export const VIGIL = { reach: 5, each: 1, most: 3, toast: 30 };
 export const RECLAIM = { window: 300, cost: 0.4, head: 0.5, skip: ['wall', 'gate', 'wonder'] as string[] };
 
 export const RUINS = { count: { small: 2, medium: 3, large: 4 } as Record<MapSize, number>, home: 24, fair: 4, spacing: 14, dig: 40, gold: 300, reach: 1.7, clear: 1 };
