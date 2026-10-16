@@ -84,6 +84,8 @@ export interface Age {
   callUp?: boolean;
   /** A people that raises again on the foundations of what fell (the Age of Reclaimers): see `RECLAIM` (`reclaim.ts`). */
   reclaim?: boolean;
+  /** Aircraft fly on fuel from the Airfield (the Age of Aeronauts): see `SORTIE` (`sortie.ts`). */
+  sortie?: boolean;
 }
 
 /**
@@ -130,9 +132,10 @@ export const AGES: Record<AgeId, Age> = {
   industrial: trunkAge(4),
   aeronaut: {
     name: 'Age of Aeronauts', short: 'Aeronauts', tier: 4,
-    blurb: 'A future built around the airfield: fighters and bombers cost 25% less and train in 25% less time. Foot, ranged, cavalry and siege units cost 20% more. Aircraft keep Industrial combat strength; riflemen, towers, ironclads and enemy fighters still answer them.',
+    blurb: 'A future built around the airfield: fighters and bombers cost 25% less and train in 25% less time. Foot, ranged, cavalry and siege units cost 20% more. But aircraft fly on fuel: they turn for home 30 tiles from an Airfield of yours and burn out beyond 36, and they are rearmed and mended while they sit at one. A long reach means a forward Airfield. Aircraft keep Industrial combat strength; riflemen, towers, ironclads and enemy fighters still answer them.',
     price: { fighter: 0.75, bomber: 0.75, infantry: 1.2, ranged: 1.2, cavalry: 1.2, siege: 1.2 },
     training: { fighter: 0.75, bomber: 0.75 },
+    sortie: true,
   },
   reclaimer: {
     name: 'Age of Reclaimers',
@@ -903,6 +906,13 @@ export const RELIC = { home: 20, fair: 3, spacing: 12, extra: { small: 1, medium
  * remembered for `window` seconds. Raising the same building on the same spot again costs `cost` of the
  * usual price and starts `head` built (hit points to match). Walls, gates and wonders leave nothing to build on.
  */
+/**
+ * Sorties (the Age of Aeronauts): aircraft of a sortie people fly on fuel from their finished Airfields. Within
+ * `rearm` tiles of one they are rearmed and mended (`mend` of full health a second); more than `turn` tiles
+ * from the nearest they give up their orders and fly home; past `reach` tiles (or with no Airfield left) they
+ * burn `burn` of full health a second. Reach a far target with a forward Airfield, raised in your own land.
+ */
+export const SORTIE = { rearm: 4, mend: 0.08, turn: 30, reach: 36, burn: 0.04 };
 export const RECLAIM = { window: 300, cost: 0.4, head: 0.5, skip: ['wall', 'gate', 'wonder'] as string[] };
 
 export const RUINS = { count: { small: 2, medium: 3, large: 4 } as Record<MapSize, number>, home: 24, fair: 4, spacing: 14, dig: 40, gold: 300, reach: 1.7, clear: 1 };

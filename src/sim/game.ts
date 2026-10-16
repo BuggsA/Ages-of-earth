@@ -18,6 +18,7 @@ import { updateRelics } from './relics';
 import { elmoStep } from './elmo';
 import { galvanicStep } from './galvanic';
 import { reclaimStep, remember } from './reclaim';
+import { sortieStep } from './sortie';
 import { landmarkStep } from './landmarks';
 import { atPost } from './trade';
 import { modsOf, trainTimeFor } from './stats';
@@ -486,6 +487,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   elmoStep(s);
   galvanicStep(s);
   reclaimStep(s);
+  sortieStep(s);
   attrition(s);
   tributeStep(s);
   tollStep(s);

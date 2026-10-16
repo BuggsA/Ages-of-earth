@@ -2251,6 +2251,9 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         }
         break;
       }
+      case 'sortie':
+        if (ev.owner === viewer) hud.toast(ev.what === 'home' ? 'Low fuel: aircraft turn for their Airfield. Raise a forward Airfield to reach farther' : 'An aircraft ran out of fuel and fell', ev.what === 'lost' ? 'bad' : 'alert');
+        break;
       case 'foundation':
         if (ev.owner === viewer) hud.toast(ev.what === 'kept' ? `Foundations of your ${BUILDINGS[ev.type].name} will keep ${RECLAIM.window / 60} minutes: raise it again on the spot for ${Math.round(RECLAIM.cost * 100)}%` : `${BUILDINGS[ev.type].name} raised on old foundations, half built`, ev.what === 'kept' ? 'info' : 'good');
         break;
