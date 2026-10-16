@@ -1722,6 +1722,9 @@ const MAKERS: Record<Exclude<BuildingType, 'wall'>, (k: Kit, e: number, st: Styl
 
 const cache = new Map<string, THREE.BufferGeometry>();
 
+/** The Way a people lives by (#336) shows at its Town Center, so a rival who scouts the town can read it. */
+export const WAY_MARKS = ['way:hunt', 'way:hearth', 'way:warband'];
+
 /** The building an heirloom (#224) shows on, and the tech that earns the mark. */
 export const HEIRLOOM_MARKS: Partial<Record<BuildingType, string>> = { temple: 'bellFoundry', dock: 'ironHulls' };
 
@@ -1730,11 +1733,12 @@ export const HEIRLOOM_MORE: Partial<Record<BuildingType, string>> = { market: 'j
 
 /** Every heirloom id that dresses a kind of building. */
 export function heirloomsFor(type: BuildingType): string[] {
-  return [HEIRLOOM_MARKS[type], HEIRLOOM_MORE[type]].filter((id): id is string => !!id);
+  return [HEIRLOOM_MARKS[type], HEIRLOOM_MORE[type], ...(type === 'towncenter' ? WAY_MARKS : [])].filter((id): id is string => !!id);
 }
 
 /** Bell Foundry: a bronze bell hung in a little timber cote on the Temple's roof ridge. Iron-Bound Hulls: iron bands and bolts on the dock's boathouse and pier. Joint-Stock Company: a counting-house board with a gilt seal and coin stacks by the Market. Masons' Lodge: dressed ashlar and shear-legs hoisting a block beside the Temple. */
 function heirloomTouch(k: Kit, id: string): void {
+  if (id.startsWith('way:')) return wayTouch(k, id.slice(4));
   const BRONZE = '#b8893a';
   const IRON = '#34373d';
   const GOLD = '#e2b23c';
@@ -1769,6 +1773,40 @@ function heirloomTouch(k: Kit, id: string): void {
     k.box(0.3, 0.22, 0.3, ASHLAR, 1.05, 0.52, 1.3);
     for (let i = 0; i < 3; i++) k.box(0.4, 0.18, 0.3, i % 2 ? ASHLAR : '#a29a8a', -1.1 + (i % 2) * 0.05, i * 0.18, 1.3);
     k.box(0.3, 0.18, 0.3, '#a29a8a', -1.5, 0, 1.3);
+  }
+}
+
+/**
+ * A Way's mark before the Town Center (#336). The Hunters: a drying frame hung with pelts and a stag skull
+ * on a pole. The Hearth: a ring of stones round a glowing fire with a clay pot. The Warband: spears planted
+ * in a rack with a painted shield.
+ */
+function wayTouch(k: Kit, way: string): void {
+  const WOOD = '#5a4630';
+  if (way === 'hunt') {
+    for (const x of [-1.6, -0.7]) k.cyl(0.04, 0.05, 1.2, 5, WOOD, x, 0, 2.1);
+    k.box(1.1, 0.05, 0.05, WOOD, -1.15, 1.15, 2.1);
+    for (const [i, c] of ['#8a6440', '#b89a6a', '#6e5238'].entries()) k.box(0.24, 0.55, 0.03, c, -1.5 + i * 0.35, 0.85, 2.1);
+    k.cyl(0.035, 0.045, 1.4, 5, WOOD, 0.3, 0, 2.2);
+    k.box(0.22, 0.16, 0.28, '#e6dcc4', 0.3, 1.4, 2.2);
+    for (const s of [-1, 1]) k.box(0.04, 0.34, 0.04, '#d8cdb0', 0.3 + s * 0.16, 1.62, 2.2).rotation.z = -s * 0.5;
+  } else if (way === 'hearth') {
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      k.box(0.22, 0.16, 0.2, i % 2 ? '#8a8478' : '#9a948a', -1.2 + Math.cos(a) * 0.42, 0, 2.2 + Math.sin(a) * 0.42);
+    }
+    k.cone(0.2, 0.5, 6, '#e8803a', -1.2, 0.05, 2.2);
+    k.glow(k.sphere(0.1, '#ffd070', -1.2, 0.3, 2.2));
+    k.cyl(0.14, 0.1, 0.22, 8, '#9a5a3a', -0.55, 0, 2.5);
+    k.cyl(0.16, 0.16, 0.03, 8, '#7a4a30', -0.55, 0.22, 2.5);
+  } else if (way === 'warband') {
+    k.box(1.3, 0.06, 0.06, WOOD, -1.1, 0.75, 2.1);
+    for (const x of [-1.7, -1.1, -0.5]) {
+      k.cyl(0.02, 0.025, 1.9, 4, WOOD, x, 0, 2.1);
+      k.cone(0.045, 0.2, 4, '#9a9aa0', x, 1.9, 2.1);
+    }
+    k.cyl(0.26, 0.26, 0.05, 10, '#a83a2e', -1.1, 0.95, 2.18).rotation.x = Math.PI / 2;
+    k.cyl(0.07, 0.07, 0.06, 6, '#d8b25a', -1.1, 0.95, 2.2).rotation.x = Math.PI / 2;
   }
 }
 

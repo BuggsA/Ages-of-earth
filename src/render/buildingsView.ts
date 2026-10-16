@@ -250,5 +250,6 @@ function snapshot(s: GameState, b: Building): Known {
 /** The heirlooms (#224) that dress this building, comma-joined, for those its owner has learned. */
 function heirloomOn(s: GameState, b: Building): string {
   const techs = s.players[b.owner].techs as string[];
-  return heirloomsFor(b.type).filter((id) => techs.includes(id)).join(',');
+  const way = b.type === 'towncenter' && s.players[b.owner].way ? `way:${s.players[b.owner].way}` : '';
+  return heirloomsFor(b.type).filter((id) => techs.includes(id) || id === way).join(',');
 }
