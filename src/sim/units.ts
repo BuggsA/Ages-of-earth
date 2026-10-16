@@ -1123,6 +1123,8 @@ function tradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>): vo
     }
     o.market = m.id;
     if (!o.from && ageDef(s.players[u.owner]).caravans) o.from = { x: m.x, y: m.y };
+    // A fresh load owes every toll on the way home again (#334).
+    delete u.tolled;
     u.carry = tripGold(s, u.owner, m, post);
     u.carryRes = 'gold';
     o.phase = 'back';

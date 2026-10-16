@@ -1090,6 +1090,13 @@ export class View {
           }
           break;
         }
+        case 'toll': {
+          // Safe passage (#334): coins spill from the rival trader's load, and the taker hears them counted.
+          if (ev.owner !== this.viewer && ev.from !== this.viewer && !this.sees(ev.x, ev.y)) break;
+          this.effects.burst(this.ground(s, ev.x, ev.y, 1.0), { count: 7, speed: 0.6, up: 1.1, life: 0.9, size: 0.05, gravity: 2, colors: ['#ffd166', '#f2cf4a', '#3f8f9a'] });
+          if (ev.owner === this.viewer) this.cue('toll', ev.x, ev.y, 0.4);
+          break;
+        }
         case 'callUp': {
           // The call to arms (#313): dust kicked up and a flash of crimson where each new soldier stands.
           for (const id of ev.ids) {

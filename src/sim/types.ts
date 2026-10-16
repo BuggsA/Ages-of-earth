@@ -19,7 +19,7 @@ export type UnitType =
 export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
   | 'towncenter' | 'house' | 'storehouse' | 'farm' | 'barracks' | 'range' | 'stable' | 'tower'
-  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp';
+  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai';
 /** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
 export type Difficulty = 'gentle' | 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
@@ -154,6 +154,8 @@ export interface Unit {
   cool: number;
   carry: number;
   carryRes: Res | null;
+  /** A trader's load: a bit for each player whose toll it has paid since it was loaded (safe passage, #334). */
+  tolled?: number;
   /** Fraction of the next carried unit gathered so far. */
   frac: number;
   /** Ticks spent barely moving while trying to walk. */
@@ -419,6 +421,8 @@ export interface PlayerStats {
   tribute?: number;
   /** Gold the Silk Road's caravans earned for the ground the camp covered while they were out (#326); absent in older saves. */
   caravan?: number;
+  /** Gold taken in tolls from rival traders crossing the people's land (#334); absent in older saves. */
+  toll?: number;
   /** Enemy units (not buildings) the people's forces have slain: the Path of Blood's deeds (#299); absent in older saves. */
   slain?: number;
   /** Gold taken as plunder from the enemy dead (#299); absent in older saves. */
@@ -517,6 +521,8 @@ export type GameEvent =
   | { k: 'callUp'; owner: number; camp: number; ids: number[]; x: number; y: number }
   /** Riders of a horde (#318) took `gold` in tribute from `from`, standing in its land: `ids` are the riders counted. */
   | { k: 'tribute'; owner: number; from: number; gold: number; ids: number[]; x: number; y: number }
+  /** A rival trader of `from`'s paid `owner` a toll of `gold` for safe passage across its land (#334). */
+  | { k: 'toll'; owner: number; from: number; gold: number; id: number; x: number; y: number }
   | { k: 'campAlone'; owner: number; id: number; x: number; y: number; struck: boolean }
   | { k: 'alert'; owner: number; x: number; y: number; building: boolean; wild?: Animal['kind']; /** A rival's soldiers fell on a citizen out hunting. */ hunter?: boolean }
   | { k: 'converted'; id: number; from: number; to: number; x: number; y: number }
