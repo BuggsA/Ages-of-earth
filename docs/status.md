@@ -351,3 +351,4 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Deep veins s3: ore doors** (#356, lane rules): 60 salt opens Merchants, 50 blood-iron opens Iron and Blood, in place of the deeds, only in worlds holding the ore; clue shows after digging. `tests/ore-door.test.ts`; browser unseen; no save bump (`stats.mined` optional).
 
 **Deep veins s5: the computer digs the ore** (#356, lane rules): clever towns dig salt/blood-iron for their ore door in worlds that hold it (`oreRoad`, `AI_ORE`). `tests/ai-ore.test.ts`; checksum of `scripts/sim.ts 3 medium 30` unchanged; no win-rate sweep; browser unseen; no save bump.
+**Black Powder** (#356, lane rules): saltpetre has a use: the Siege Workshop researches Black Powder (ranged +1, siege +15%) after 40 mined, only in worlds with saltpetre (`Tech.ore`). Tests only; checksum unchanged (3065971783); browser unseen; no save bump.
