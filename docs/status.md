@@ -76,6 +76,8 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 
 **Vows** (#338, own pitch, lane rules): in the Bronze Age a Town Center offers to deepen your Way (200 food + 100 wood) or turn to another (100 food), once; a clever computer deepens when rich (`WAY.deepenCost`, `aiVow`). Tests only; browser unverified; checksum unchanged (2738409368); no save bump.
 
+**Way marks** (own pitch, lane look): a Way shows at its Town Center (pelts and skull, hearth fire, spear rack) so scouts can read it. Render only; models tests pass; look unseen in a browser; no save bump.
+
 **Art pass 8** (#267, lane look): epoch 4 citizen work clothes and pick, ironclad armor belt. Render only; models test passes; look unseen.
 
 **Art pass 11** (#267, lane look): stables of epochs 0–2 get their own silhouettes: a rail-fenced horse corral with a hide lean-to and horsetail totem; mudbrick stalls with arched doors and beam ends; a hayloft dormer and weathervane on the medieval stable. Render only; `models.test.ts` builds them; look in a browser unseen; no save bump.
