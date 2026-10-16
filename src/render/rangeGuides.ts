@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { BUILDINGS, LIGHTNING, type UnitStats } from '../sim/data';
-import { hasCoils } from '../sim/ages';
+import { BUILDINGS, LIGHTNING, SORTIE, type UnitStats } from '../sim/data';
+import { ageDef, hasCoils } from '../sim/ages';
 import { modsOf, statsFor } from '../sim/stats';
-import type { BuildingType, Ent, GameState } from '../sim/types';
+import type { Building, BuildingType, Ent, GameState } from '../sim/types';
 import { heightAt } from './terrain';
 import { WATER_Y } from './water';
 
@@ -13,6 +13,7 @@ const LIFT = 0.08;
 const OUTER = new THREE.Color('#a9e9ff');
 const INNER = new THREE.Color('#ffd166');
 const FIELD = new THREE.Color('#9fb8ff');
+const BANDS = { rearm: new THREE.Color('#8dff9a'), turn: new THREE.Color('#ffd166'), reach: new THREE.Color('#ff6a5a') };
 
 export interface RangeGuide {
   x: number;
@@ -21,6 +22,8 @@ export interface RangeGuide {
   minimum: number;
   /** A coil's field (the Age of Lightning, #239): drawn in blue-white, not the weapon colour. */
   field?: boolean;
+  /** A fuel band round an Airfield (the Age of Aeronauts, #356): green mended, amber turns home, red burns. */
+  band?: 'rearm' | 'turn' | 'reach';
 }
 
 function unitReach(st: UnitStats): Pick<RangeGuide, 'reach' | 'minimum'> | null {
@@ -64,6 +67,25 @@ export function coilFields(s: GameState, viewer: number): RangeGuide[] {
   return out;
 }
 
+/**
+ * Where the viewer's aircraft are mended, turned home and burned (`SORTIE`, `sortie.ts`): three rings round each
+ * finished Airfield of theirs, nearest `max` to `near` so a big air base cannot crowd out the other guides.
+ */
+export function sortieRings(s: GameState, viewer: number, near: { x: number; y: number }, max = 3): RangeGuide[] {
+  if (!ageDef(s.players[viewer]).sortie) return [];
+  const fields: Building[] = [];
+  for (const e of s.ents) if (e.kind === 'building' && e.type === 'airfield' && e.owner === viewer && e.built && e.hp > 0) fields.push(e);
+  const d2 = (b: Building) => (b.x - near.x) * (b.x - near.x) + (b.y - near.y) * (b.y - near.y);
+  fields.sort((a, b) => d2(a) - d2(b) || a.id - b.id);
+  const out: RangeGuide[] = [];
+  for (const b of fields.slice(0, max)) {
+    out.push({ x: b.x, y: b.y, reach: SORTIE.rearm, minimum: 0, band: 'rearm' });
+    out.push({ x: b.x, y: b.y, reach: SORTIE.turn, minimum: 0, band: 'turn' });
+    out.push({ x: b.x, y: b.y, reach: SORTIE.reach, minimum: 0, band: 'reach' });
+  }
+  return out;
+}
+
 /** The field a Watch Tower about to be raised would add, in the Age of Lightning. */
 export function placementField(s: GameState, viewer: number, type: BuildingType, tx: number, ty: number): RangeGuide | null {
   if (type !== 'tower' || !hasCoils(s.players[viewer])) return null;
@@ -96,7 +118,7 @@ export class RangeGuides {
       for (const minimum of [false, true]) {
         const radius = minimum ? g.minimum : g.reach;
         if (!(radius > 0)) continue;
-        const color = g.field ? FIELD : minimum ? INNER : OUTER;
+        const color = g.band ? BANDS[g.band] : g.field ? FIELD : minimum ? INNER : OUTER;
         for (let i = 0; i < SEGMENTS; i++) {
           if (minimum && i % 4 >= 2) continue;
           const a = i * Math.PI * 2 / SEGMENTS;
