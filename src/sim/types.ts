@@ -303,6 +303,16 @@ export type RuinFind = 'hoard' | 'lore' | 'map' | 'relic';
  * Ancient ruins (#64): a site out in the wilds that citizens dig, once. It belongs to nobody and can't
  * be harmed; nothing is built right beside it, but anyone may walk across it.
  */
+/** Foundations of a fallen building a reclaiming people may raise again cheaply (`RECLAIM`, `reclaim.ts`). */
+export interface Fallen {
+  owner: number;
+  type: BuildingType;
+  tx: number;
+  ty: number;
+  /** The tick the memory fades. */
+  until: number;
+}
+
 export interface Ruin {
   id: number;
   /** The center of its tile. */
@@ -528,6 +538,7 @@ export type GameEvent =
   /** A survey's answer (#39): whether what it looks for lies anywhere in this world. */
   | { k: 'survey'; owner: number; tech: TechId; found: boolean }
   /** A ruin dug out (#64): what came up, and for lore, which technology. */
+  | { k: 'foundation'; owner: number; type: BuildingType; x: number; y: number; what: 'kept' | 'raised' }
   | { k: 'ruin'; id: number; owner: number; find: RuinFind; tech?: TechId; x: number; y: number }
   /** A landmark changed hands: `owner` keeps it now (-1: nobody, after `from` was driven off). */
   | { k: 'landmark'; id: number; kind: LandmarkKind; owner: number; from: number; x: number; y: number }
@@ -637,6 +648,8 @@ export interface GameState {
   posts: TradePost[];
   /** Ancient ruins (#64); absent in older saves and in campaign chapters (none). */
   ruins?: Ruin[];
+  /** Foundations of fallen buildings a reclaiming people may raise again (`reclaim.ts`); absent until one falls. */
+  fallen?: Fallen[];
   /** Contested landmarks; absent in older saves and in campaign chapters (none). */
   landmarks?: Landmark[];
   /** Whether this world holds bog iron (#39), decided by the seed; absent in older saves (none). */
