@@ -2191,7 +2191,7 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           if (ev.owner === viewer) play('relicKeep');
         } else if (ev.owner === viewer) {
           hud.toast(`${w.icon} ${w.name}: ${w.blurb}`, 'good');
-          play('relicKeep');
+          play(ev.way === 'hunt' ? 'wayHunters' : ev.way === 'hearth' ? 'wayHearth' : 'wayWarband');
         } else if (s.players[ev.owner].team === s.players[viewer].team) hud.toast(`${s.players[ev.owner].name} takes ${w.name}`, 'info');
         else hud.toast(`${s.players[ev.owner].name} lives by ${w.name}`, 'alert');
         break;
