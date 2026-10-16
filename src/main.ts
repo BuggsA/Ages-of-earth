@@ -427,6 +427,7 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   watchingNext = false;
   spectating = false;
   mode = 'play';
+  lastEnd = null;
   pending = [];
   selection = new Set();
   selectedTile = null;
@@ -1027,7 +1028,7 @@ document.addEventListener('click', (e) => {
       nextIdle(e.shiftKey);
       break;
     case 'speed':
-      cycleSpeed(1);
+      cycleSpeed(1, true);
       break;
     case 'pause':
       togglePause();
@@ -1109,6 +1110,7 @@ document.addEventListener('click', (e) => {
     case 'watch':
       $('modal').classList.add('hidden');
       view.revealAll();
+      hud.toast('Esc or ☰ Menu brings the results back', 'info');
       break;
   }
 });
@@ -1440,6 +1442,11 @@ let pointer = { x: 0, y: 0, inside: false };
 let lastClick = { at: 0, id: -1 };
 
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+// Right-click on the speed button slows the game a step.
+$('speed-btn').addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  if (mode === 'play') cycleSpeed(-1);
+});
 canvas.addEventListener('pointerdown', (e) => {
   sound.unlock();
   if (mode !== 'play') return;
@@ -1688,7 +1695,13 @@ window.addEventListener('keydown', (e) => {
     altHeld = true;
     e.preventDefault();
   }
-  if (mode !== 'play') return;
+  if (mode === 'over' && (k === 'Escape' || k === 'F10')) {
+    e.preventDefault();
+    if ($('modal').classList.contains('hidden')) openMenu();
+    else closeModal();
+    return;
+  }
+  if (mode !== 'play' && !(mode === 'over' && k.startsWith('Arrow'))) return;
   if (k.startsWith('Arrow')) {
     held.add(k);
     e.preventDefault();
@@ -1840,12 +1853,13 @@ function togglePause(): void {
   $('pause-btn').innerHTML = paused ? PLAY_ICON : PAUSE_ICON;
 }
 
-function cycleSpeed(d: number): void {
+/** Steps the game speed by d; with wrap, stepping past the fastest comes back round to 1×. */
+function cycleSpeed(d: number, wrap = false): void {
   if (online) {
     hud.toast('Online matches run at normal speed', 'info');
     return;
   }
-  speedIdx = Math.max(0, Math.min(SPEEDS.length - 1, speedIdx + d));
+  speedIdx = wrap ? (speedIdx + d + SPEEDS.length) % SPEEDS.length : Math.max(0, Math.min(SPEEDS.length - 1, speedIdx + d));
   hud.toast(`Speed ${SPEEDS[speedIdx]}×`, 'info');
   refreshHud();
 }
@@ -1858,6 +1872,18 @@ function toggleMute(): void {
 // ---- Menus -----------------------------------------------------------------------------------------
 
 function openMenu(): void {
+  if (mode === 'over' && game) {
+    // After the match, the menu is the results card, with its way back to the title.
+    if (lastEnd) showEnd(game, lastEnd.won, lastEnd.how, true);
+    else {
+      const m = $('modal');
+      m.innerHTML = `<div class="card"><h2>The match is over</h2>
+        <div class="row"><button class="btn wide" data-act="resume">Keep looking</button>
+        <button class="btn wide primary" data-act="quit">Quit to title</button></div></div>`;
+      m.classList.remove('hidden');
+    }
+    return;
+  }
   if (mode !== 'play') return;
   const m = $('modal');
   m.innerHTML = `<div class="card"><h2>Menu</h2>
@@ -1925,11 +1951,18 @@ function timeline(s: GameState, metric: Metric): string {
   return `<svg class="timeline" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${grid}${lines}</svg>`;
 }
 
-function showEnd(s: GameState, won: boolean, how: 'conquest' | 'wonder' | 'relics' | 'lands' | 'resign' | 'time' | 'scenario' = 'conquest'): void {
+type EndHow = 'conquest' | 'wonder' | 'relics' | 'lands' | 'resign' | 'time' | 'scenario';
+/** How the viewer's match ended, so the menu can bring the results back after a look around. */
+let lastEnd: { won: boolean; how: EndHow; tick: number } | null = null;
+
+function showEnd(s: GameState, won: boolean, how: EndHow = 'conquest', again = false): void {
   mode = 'over';
-  keepReplay(s);
+  if (!again) {
+    keepReplay(s);
+    lastEnd = { won, how, tick: s.tick };
+  }
   const m = $('modal');
-  const mins = Math.floor(s.tick / TICK_HZ / 60);
+  const mins = Math.floor((lastEnd?.tick ?? s.tick) / TICK_HZ / 60);
   const rows = s.players
     .map(
       (p) => `<tr><td><span class="swatch" style="background:${p.color}"></span>${p.name}<div class="civ-tag">${crestSvg(p.civ, p.color, 14)}${CIVS[p.civ].name}</div></td><td>${scoreOf(s, p)}</td><td data-tip="<b>Ages reached</b>${arrivalText(epochArrivals(p.history), EPOCHS.map((e) => e.name), TICK_HZ) || 'Never left the first age.'}">${ageDef(p).short}</td><td>${p.stats.gathered}</td><td>${p.stats.traded ?? 0}</td><td>${p.stats.trained}</td><td>${p.stats.built}</td><td>${p.stats.techs}</td><td>${p.stats.kills}</td><td>${p.stats.losses}</td></tr>`,
@@ -1937,7 +1970,7 @@ function showEnd(s: GameState, won: boolean, how: 'conquest' | 'wonder' | 'relic
     .join('');
   const sc = s.scenario ? scenarioById(s.scenario.id) : undefined;
   const stars = sc ? starsFor(s) : 0;
-  if (sc) recordStars(sc.id, stars);
+  if (sc && !again) recordStars(sc.id, stars);
   const nextCh = sc ? SCENARIOS[SCENARIOS.indexOf(sc) + 1] : undefined;
   const why = sc
     ? won
@@ -1972,6 +2005,7 @@ function showEnd(s: GameState, won: boolean, how: 'conquest' | 'wonder' | 'relic
     $('chart').innerHTML = timeline(s, b.dataset.metric as Metric);
   });
   m.classList.remove('hidden');
+  if (again) return;
   play(won ? 'victory' : 'defeat');
   hud.banner(won ? 'Victory' : 'Defeat', '', 5000);
 }
