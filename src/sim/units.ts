@@ -14,6 +14,7 @@ import { milkable } from './flocks';
 import { dig, ruinAt } from './ruins';
 import { fordMarch, groveBoost, keptOf, kinBonus } from './landmarks';
 import { chant, chantedOver, consecrateProblem, consecrates, turnBuilding } from './consecrate';
+import { convoyShare } from './convoy';
 import { atPost, caravanBonus, caravanOf, dockOf, goalForPost, homeMarket, marketOf, nearestCaravan, nearestDock, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { canHit, exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, passOf, pay, radiusOf, statsOf, teamOf } from './world';
 
@@ -1063,8 +1064,10 @@ function seaTradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>):
       return;
     }
     o.market = d.id;
-    u.carry = tripGold(s, u.owner, d, post, true);
+    const escort = convoyShare(s, u);
+    u.carry = Math.max(1, Math.min(TRADE.max, Math.floor(tripGold(s, u.owner, d, post, true) * escort)));
     u.carryRes = 'gold';
+    if (escort > 1) s.events.push({ k: 'convoy', owner: u.owner, x: u.x, y: u.y });
     o.phase = 'back';
     s.events.push({ k: 'caravan', id: u.id, owner: u.owner, what: 'loaded', amount: u.carry, x: post.x, y: post.y });
     return;
