@@ -349,3 +349,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **A match starts facing north** (#345, owner's playtest note, lane look): the title's drifting camera kept turning (`rig.rotate(dt * 0.05)`) and a match never turned it back, so after a minute on the title the view sat near upside down against the north-up minimap. `CameraRig.faceNorth()` at match start. Seen in headless Chromium (60 s on the title, then a match: turned before, square after); no save bump.
 
 **Deep veins s3: ore doors** (#356, lane rules): 60 salt opens Merchants, 50 blood-iron opens Iron and Blood, in place of the deeds, only in worlds holding the ore; clue shows after digging. `tests/ore-door.test.ts`; browser unseen; no save bump (`stats.mined` optional).
+
+**Deep veins s5: the computer digs the ore** (#356, lane rules): clever towns dig salt/blood-iron for their ore door in worlds that hold it (`oreRoad`, `AI_ORE`). `tests/ai-ore.test.ts`; checksum of `scripts/sim.ts 3 medium 30` unchanged; no win-rate sweep; browser unseen; no save bump.
