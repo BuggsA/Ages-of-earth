@@ -22,6 +22,36 @@ function disc(r: number): Int16Array {
   return d;
 }
 
+const rowsOf = new Map<Int16Array, Int16Array>();
+
+/** The same disc as rows, [dy, half-width, dy, half-width, ...]: each row of a disc is one unbroken run of tiles. */
+function rows(d: Int16Array): Int16Array {
+  let out = rowsOf.get(d);
+  if (out) return out;
+  const half = new Map<number, number>();
+  for (let k = 0; k < d.length; k += 2) half.set(d[k + 1], Math.max(half.get(d[k + 1]) ?? 0, Math.abs(d[k])));
+  const list: number[] = [];
+  for (const [dy, m] of half) list.push(dy, m);
+  out = Int16Array.from(list);
+  rowsOf.set(d, out);
+  return out;
+}
+
+/** Marks a disc around a tile as seen now and ever, for one player: run by run, clipped to the map once a row. */
+function stamp(s: GameState, vis: Uint8Array, seen: Uint8Array, cx: number, cy: number, d: Int16Array): void {
+  const r = rows(d);
+  for (let k = 0; k < r.length; k += 2) {
+    const y = cy + r[k];
+    if (y < 0 || y >= s.h) continue;
+    const x0 = Math.max(0, cx - r[k + 1]);
+    const x1 = Math.min(s.w - 1, cx + r[k + 1]);
+    if (x0 > x1) continue;
+    const row = y * s.w;
+    vis.fill(1, row + x0, row + x1 + 1);
+    seen.fill(1, row + x0, row + x1 + 1);
+  }
+}
+
 export function updateVision(s: GameState): void {
   for (const p of s.players) p.vis.fill(0);
   for (const e of s.ents) {
@@ -34,15 +64,7 @@ export function updateVision(s: GameState): void {
     if ((e.kind === 'unit' ? statsOf(s, e).cls === 'ship' : e.type === 'dock' && e.built) && modsOf(s, e.owner).telegraph && inField(s, e)) r += TELEGRAPH.sight;
     const cx = Math.floor(e.x);
     const cy = Math.floor(e.y);
-    const d = disc(r);
-    for (let k = 0; k < d.length; k += 2) {
-      const x = cx + d[k];
-      const y = cy + d[k + 1];
-      if (x < 0 || y < 0 || x >= s.w || y >= s.h) continue;
-      const i = y * s.w + x;
-      p.vis[i] = 1;
-      p.seen[i] = 1;
-    }
+    stamp(s, p.vis, p.seen, cx, cy, disc(r));
   }
   // A Lookout Crag shows its keeper the land all round it.
   for (const m of s.landmarks ?? []) {
@@ -51,13 +73,7 @@ export function updateVision(s: GameState): void {
     const d = disc(Math.round(kinBonus(s, m.owner, 'crag', LANDMARKS.crag.sight)));
     const cx = Math.floor(m.x);
     const cy = Math.floor(m.y);
-    for (let k = 0; k < d.length; k += 2) {
-      const x = cx + d[k];
-      const y = cy + d[k + 1];
-      if (x < 0 || y < 0 || x >= s.w || y >= s.h) continue;
-      p.vis[y * s.w + x] = 1;
-      p.seen[y * s.w + x] = 1;
-    }
+    stamp(s, p.vis, p.seen, cx, cy, d);
   }
   // A lit beacon is seen by everyone: the ground around it shows to every rival.
   for (const e of s.ents) {
@@ -67,13 +83,7 @@ export function updateVision(s: GameState): void {
     const cy = Math.floor(e.y);
     for (const p of s.players) {
       if (p.id === e.owner) continue;
-      for (let k = 0; k < d.length; k += 2) {
-        const x = cx + d[k];
-        const y = cy + d[k + 1];
-        if (x < 0 || y < 0 || x >= s.w || y >= s.h) continue;
-        p.vis[y * s.w + x] = 1;
-        p.seen[y * s.w + x] = 1;
-      }
+      stamp(s, p.vis, p.seen, cx, cy, d);
     }
   }
   // Allies share what they see.
