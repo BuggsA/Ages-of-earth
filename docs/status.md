@@ -34,4 +34,4 @@ Claims and open PRs live on the board (`claimed`, `in-review`). List here only w
 - Other agent tools (Codex etc.): run `npm install` as a setup step.
 - Many features are unseen in a browser or want an ear for their sound levels; each says so in its log or archive entry.
 
-**Defaults in force, flagged:** saves may break when a change bumps their `v` (`docs/team.md`, "Saves and replays"); CI costs ~2 min a run of 2,000 free a month; chain caps are 10 a chain, one per lane (`docs/successors.md`); the quick-tier budget (2 min) is a draft.
+**Defaults in force, flagged:** saves may break when a change bumps their `v` (`docs/team.md`, "Saves and replays"); CI costs ~2 min a run of 2,000 free a month; chain caps are 8 a chain (the platform's lineage depth), one per lane (`docs/successors.md`); the quick-tier budget (2 min) is a draft.

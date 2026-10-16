@@ -28,11 +28,11 @@ Check cheaply (one `list_issues` by label with `minimal_output`, and `main`'s la
 ## Chains and caps
 
 A chain is the run of sessions that each start the next.
-- **Position:** a session the owner starts by hand is 0; its successor is 1. **Position 10 doesn't spawn.**
+- **Position:** a session the owner starts by hand is 0; its successor is 1. **Position 8 doesn't spawn:** the platform refuses `create_session` at lineage depth 8 (chain 1016-2001 ended there, 2026-10-16), so the cap is 8, not the 10 the first draft assumed.
 - **The id** is the UTC date and time of the chain's first spawn (`1013-1720`). Position 0 makes it up; later sessions copy it.
 - **One chain per lane** (`docs/team.md`, "Lanes"), and no limit on how many run at once (the owner, 2026-10-15, `docs/rulings.md`). Before spawning, read the recent `Chain` comments on #2 for the chains under two hours old that don't say "ended". One running in your lane: wait.
-- **No daily cap** (the owner, 2026-10-14, `docs/rulings.md`): 10 sessions a chain is the only count limit.
-- **Log each spawn on #2, with why:** `Chain 1013-1720, 3 of 10, lane rules: <branch> took #42 (regular), started "<child title>" for #57.` When a chain ends: `Chain 1013-1720 ended at 3 of 10: <reason>.` Don't start a new chain yourself: that's the owner's.
+- **No daily cap** (the owner, 2026-10-14, `docs/rulings.md`): 8 sessions a chain (the platform's lineage depth) is the only count limit.
+- **Log each spawn on #2, with why:** `Chain 1013-1720, 3 of 8, lane rules: <branch> took #42 (regular), started "<child title>" for #57.` When a chain ends: `Chain 1013-1720 ended at 3 of 8: <reason>.` Don't start a new chain yourself: that's the owner's.
 
 ## The prompt
 
@@ -41,7 +41,7 @@ Enough for a cold start, and no more; the issue and its last handoff carry the d
 ```
 You are a building agent for Ages of Earth (BuggsA/Ages-of-earth).
 Start per AGENTS.md and docs/team.md: docs/status.md, then the board.
-Chain <id>, session <k> of 10. When you finish, follow docs/successors.md.
+Chain <id>, session <k> of 8. When you finish, follow docs/successors.md.
 Your task: #<N> (<regular|hard>). Read the issue and its latest handoff comment. (Or: "No task is waiting: pick a ready issue or pitch your own, AGENTS.md §2.")
 Start from: <the files and functions involved, and anything you learned that saves searching>.
 Waiting to merge: <pull request and what it waits on, or "nothing">.
