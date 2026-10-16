@@ -321,3 +321,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Title dusk** (#267, lane look): the title's town opens at the golden hour and turns through sunset and night, a day in eight minutes (`view.titleHour`). Render only; typecheck and tests pass; look in a browser unseen; no save bump.
 
 **Art pass 14** (#267, lane look): storehouses and farms of epochs 3–4 get their own silhouettes (hoist and cases; haystack, trough, windpump). Render only; `models.test.ts` builds them; look unseen; no save bump.
+
+**Art pass 16** (#267, lane look): the epoch 2 trading cog and the epoch 3 fishing lugger get their own silhouettes (clinker strakes, stern castle, rudder; bowsprit, jib, lantern). Render only; `models.test.ts` builds them; look unseen; no save bump.
