@@ -60,6 +60,12 @@ export const R_MEAT = 5;
 export const R_FISH = 6;
 /** Bog iron (#39): ore in the wetland mud, found on some worlds and not others. Mined like gold, and paid in as gold (iron bars). */
 export const R_BOG = 7;
+/** Deep veins (#356): rare ores that only some seeds hold, mined like stone and kept apart from the four stocks. */
+export const R_SALT = 8;
+export const R_SALTPETRE = 9;
+export const R_BLOODIRON = 10;
+export type RareId = 'salt' | 'saltpetre' | 'bloodiron';
+export const RARES: readonly RareId[] = ['salt', 'saltpetre', 'bloodiron'];
 
 /** Why a tile can't be walked: bits of `block`. */
 export const B_TERRAIN = 1;
@@ -85,7 +91,7 @@ export type Order =
   /** Fight a unit or building. `auto` when picked by the unit itself (it gives up sooner); `then` resumes an attack-move. */
   | { k: 'attack'; target: number; auto: boolean; then: { x: number; y: number } | null }
   /** Gather a resource tile: walk there, work it, carry the load to a drop site, and back. */
-  | { k: 'gather'; tile: number; res: Res; phase: 'go' | 'work' | 'drop'; bog?: boolean }
+  | { k: 'gather'; tile: number; res: Res; phase: 'go' | 'work' | 'drop'; bog?: boolean; rare?: RareId }
   | { k: 'build'; target: number }
   | { k: 'farm'; target: number; phase: 'go' | 'work' | 'drop' }
   /** Carry what is held to a drop site, then go idle. */
@@ -156,6 +162,8 @@ export interface Unit {
   cool: number;
   carry: number;
   carryRes: Res | null;
+  /** A rare ore in the basket (#356): its paid into `Player.rare`, not the four stocks. */
+  carryRare?: RareId | null;
   /** A trader's load: a bit for each player whose toll it has paid since it was loaded (safe passage, #334). */
   tolled?: number;
   /** Fraction of the next carried unit gathered so far. */
@@ -454,6 +462,8 @@ export interface Player {
   ai: Difficulty | null;
   team: number;
   res: Stock;
+  /** Rare ores mined (#356); absent until the first is brought home. */
+  rare?: Partial<Record<RareId, number>>;
   epoch: number;
   /** The age within the web (#37); its tier is `epoch`. Absent, or out of step with `epoch`, means the trunk age of `epoch` (see `ageOf`). */
   age?: AgeId;
@@ -517,7 +527,7 @@ export type GameEvent =
   | { k: 'placed'; id: number; owner: number; type: BuildingType }
   | { k: 'built'; id: number; owner: number; type: BuildingType }
   | { k: 'epoch'; owner: number; epoch: number; age?: AgeId; back?: boolean }
-  | { k: 'deliver'; owner: number; res: Res; amount: number; x: number; y: number }
+  | { k: 'deliver'; owner: number; res: Res; amount: number; x: number; y: number; rare?: RareId }
   | { k: 'work'; id: number; owner: number; act: Act; x: number; y: number }
   | { k: 'depleted'; tile: number }
   | { k: 'season'; i: number }
@@ -622,6 +632,8 @@ export interface GameState {
   landmarks?: Landmark[];
   /** Whether this world holds bog iron (#39), decided by the seed; absent in older saves (none). */
   bogIron?: boolean;
+  /** Which rare ores this world holds (#356), decided by the seed; absent in older saves (none). */
+  rares?: RareId[];
   nextId: number;
   shots: Shot[];
   rng: number;

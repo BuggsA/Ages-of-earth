@@ -1,13 +1,13 @@
-import { AI_LEVELS, BUILDINGS, CARRY, CONSECRATE, DEER, DT, FLOCK, GALVANIC, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, PRIEST, REPAIR_SHARE, RUINS, SPREAD, TRADE, domainOf, secs } from './data';
+import { AI_LEVELS, BUILDINGS, CARRY, CONSECRATE, DEER, DT, FLOCK, GALVANIC, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, PRIEST, RARE, REPAIR_SHARE, RUINS, SPREAD, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
 import type { Spatial } from './spatial';
 import { buildTimeFor, buildingCostFor, modsOf } from './stats';
 import { ageDef, canRaise, inField } from './ages';
-import type { Act, Animal, Building, Cost, Ent, GameState, Goal, Order, Res, Unit } from './types';
+import type { Act, Animal, Building, Cost, Ent, GameState, Goal, Order, RareId, Res, Unit } from './types';
 import { seasonOf } from './seasons';
-import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
+import { RES, R_BERRY, R_BLOODIRON, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_SALT, R_SALTPETRE, R_STONE, R_TREE } from './types';
 import { carriedBy, relicAt } from './relics';
 import { animalRadius, hitAnimal } from './animals';
 import { milkable } from './flocks';
@@ -32,9 +32,12 @@ const PATH_BUDGET = 60000;
 const LEASH = 7;
 
 /** Bog iron is paid in as gold: iron bars were money across much of West Africa. */
-export const RES_OF_TILE: Record<number, Res> = { [R_TREE]: 'wood', [R_BERRY]: 'food', [R_STONE]: 'stone', [R_GOLD]: 'gold', [R_MEAT]: 'food', [R_FISH]: 'food', [R_BOG]: 'gold' };
-const ACT_OF_TILE: Record<number, Act> = { [R_TREE]: 'chop', [R_BERRY]: 'forage', [R_STONE]: 'mine', [R_GOLD]: 'mine', [R_MEAT]: 'forage', [R_FISH]: 'fish', [R_BOG]: 'mine' };
-const RATE_OF_TILE: Record<number, number> = { [R_TREE]: GATHER.tree, [R_BERRY]: GATHER.berry, [R_STONE]: GATHER.stone, [R_GOLD]: GATHER.gold, [R_MEAT]: GATHER.meat, [R_FISH]: GATHER.fish, [R_BOG]: GATHER.bog };
+export const RES_OF_TILE: Record<number, Res> = { [R_TREE]: 'wood', [R_BERRY]: 'food', [R_STONE]: 'stone', [R_GOLD]: 'gold', [R_MEAT]: 'food', [R_FISH]: 'food', [R_BOG]: 'gold', [R_SALT]: 'stone', [R_SALTPETRE]: 'stone', [R_BLOODIRON]: 'stone' };
+/** The rare ore a tile holds, if any (#356). */
+export const RARE_OF_TILE: Record<number, RareId> = { [R_SALT]: 'salt', [R_SALTPETRE]: 'saltpetre', [R_BLOODIRON]: 'bloodiron' };
+const TILE_OF_RARE: Record<RareId, number> = { salt: R_SALT, saltpetre: R_SALTPETRE, bloodiron: R_BLOODIRON };
+const ACT_OF_TILE: Record<number, Act> = { [R_TREE]: 'chop', [R_BERRY]: 'forage', [R_STONE]: 'mine', [R_GOLD]: 'mine', [R_MEAT]: 'forage', [R_FISH]: 'fish', [R_BOG]: 'mine', [R_SALT]: 'mine', [R_SALTPETRE]: 'mine', [R_BLOODIRON]: 'mine' };
+const RATE_OF_TILE: Record<number, number> = { [R_TREE]: GATHER.tree, [R_BERRY]: GATHER.berry, [R_STONE]: GATHER.stone, [R_GOLD]: GATHER.gold, [R_MEAT]: GATHER.meat, [R_FISH]: GATHER.fish, [R_BOG]: GATHER.bog, [R_SALT]: RARE.salt.rate, [R_SALTPETRE]: RARE.saltpetre.rate, [R_BLOODIRON]: RARE.bloodiron.rate };
 
 export function setOrder(u: Unit, order: Order): void {
   u.order = order;
@@ -96,7 +99,7 @@ export function gatherRate(s: GameState, u: Unit, kind: number | 'farm'): number
   const ai = p.ai ? AI_LEVELS[p.ai].gather : 1;
   const base = kind === 'farm' ? GATHER.farm : RATE_OF_TILE[kind];
   const mod =
-    kind === 'farm' ? m.farm : kind === R_TREE ? m.wood : kind === R_STONE || kind === R_GOLD || kind === R_BOG ? m.mine : kind === R_MEAT ? m.hunt * m.forage : kind === R_FISH ? m.fish : m.forage;
+    kind === 'farm' ? m.farm : kind === R_TREE ? m.wood : kind === R_STONE || kind === R_GOLD || kind === R_BOG || kind in RARE_OF_TILE ? m.mine : kind === R_MEAT ? m.hunt * m.forage : kind === R_FISH ? m.fish : m.forage;
   const sn = seasonOf(s);
   const season = kind === 'farm' ? sn.field : kind === R_BERRY ? sn.plant : 1;
   // A Flint Scatter sharpens its keeper's axes and picks.
@@ -142,7 +145,12 @@ export function findResource(s: GameState, kind: number, x: number, y: number, m
 }
 
 function deposit(s: GameState, u: Unit, at: Building): void {
-  if (u.carry > 0 && u.carryRes) {
+  if (u.carry > 0 && u.carryRes === 'stone' && u.carryRare) {
+    const p = s.players[u.owner];
+    const stock = (p.rare ??= {});
+    stock[u.carryRare] = (stock[u.carryRare] ?? 0) + u.carry;
+    s.events.push({ k: 'deliver', owner: u.owner, res: u.carryRes, amount: u.carry, x: at.x, y: at.y, rare: u.carryRare });
+  } else if (u.carry > 0 && u.carryRes) {
     const p = s.players[u.owner];
     p.res[u.carryRes] += u.carry;
     p.stats.gathered += u.carry;
@@ -183,10 +191,15 @@ function gatherLoad(s: GameState, u: Unit): Map<number, number> {
 }
 
 function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): void {
-  if (u.carryRes !== o.res) {
+  // A rare ore (#356) rides on the order, learned from the tile while it still holds ore, so the next vein is the same ore.
+  const here = RARE_OF_TILE[s.res[o.tile]];
+  if (here) o.rare = here;
+  else if (s.res[o.tile] !== R_NONE && o.rare) delete o.rare;
+  if (u.carryRes !== o.res || (u.carryRare ?? null) !== (o.rare ?? null)) {
     u.carry = 0;
     u.frac = 0;
     u.carryRes = o.res;
+    u.carryRare = o.rare ?? null;
   }
   const cap = carryCap(s, u);
   if (o.phase === 'drop') {
@@ -200,7 +213,7 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
   const kind = s.res[o.tile];
   if (kind === R_NONE || RES_OF_TILE[kind] !== o.res) {
     // Run out: the next one nearby of the same kind (game first, then berries, for food; boats fish).
-    const wants = u.type === 'fisher' ? [R_FISH] : o.res === 'wood' ? [R_TREE] : o.res === 'food' ? [R_MEAT, R_BERRY] : o.res === 'stone' ? [R_STONE] : o.bog ? [R_BOG, R_GOLD] : [R_GOLD];
+    const wants = o.rare ? [TILE_OF_RARE[o.rare]] : u.type === 'fisher' ? [R_FISH] : o.res === 'wood' ? [R_TREE] : o.res === 'food' ? [R_MEAT, R_BERRY] : o.res === 'stone' ? [R_STONE] : o.bog ? [R_BOG, R_GOLD] : [R_GOLD];
     let next = -1;
     for (const want of wants) {
       const fx = (o.tile % s.w) + 0.5;

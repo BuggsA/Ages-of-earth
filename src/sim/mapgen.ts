@@ -1,7 +1,7 @@
-import { AMOUNT, BOAR, BOG_IRON, LANDMARKS, MAMMOTH, MAP_SIZES, RELIC, RUINS, TRADE, WOLF } from './data';
+import { AMOUNT, BOAR, BOG_IRON, LANDMARKS, RARE, MAMMOTH, MAP_SIZES, RELIC, RUINS, TRADE, WOLF } from './data';
 import { fbm, mulberry32, type Rng } from './rng';
-import type { LandmarkKind, MapSize, MapType, RuinFind } from './types';
-import { B_RES, B_TERRAIN, R_BERRY, R_BOG, R_FISH, R_GOLD, R_NONE, R_STONE, R_TREE, T_GRASS, T_ROCK, T_SAND, T_WATER } from './types';
+import type { LandmarkKind, MapSize, MapType, RareId, RuinFind } from './types';
+import { B_RES, B_TERRAIN, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_NONE, R_STONE, R_TREE, T_GRASS, T_ROCK, T_SAND, T_WATER } from './types';
 
 /**
  * World generation: rolling grassland with lakes, rocky ridges and woods (more or less of each by map
@@ -51,6 +51,8 @@ export interface MapData {
   posts: { x: number; y: number }[];
   /** Whether this world holds bog iron (#39). */
   bogIron: boolean;
+  /** Which rare ores this world holds (#356). */
+  rares: RareId[];
   /** Ancient ruins (#64): where they stand (tile centers) and what lies under each. */
   ruins: { x: number; y: number; find: RuinFind }[];
   /** The wild (#171): mammoths, and wolves by their dens. Empty on campaign maps. */
@@ -71,8 +73,8 @@ function shuffle<T>(rng: Rng, a: T[]): T[] {
   return a;
 }
 
-/** `deposits` false leaves out what only some seeds hold (bog iron, ruins): campaign maps stay as they were made. */
-export function generateMap(seed: number, size: MapSize, players = 2, type: MapType = 'continental', deposits = true): MapData {
+/** `deposits` false leaves out what only some seeds hold (bog iron, ruins): campaign maps stay as they were made. `veins` adds the deep veins (#356); `createGame` turns it on for ordinary matches. */
+export function generateMap(seed: number, size: MapSize, players = 2, type: MapType = 'continental', deposits = true, veins = false): MapData {
   const R = RECIPES[type];
   const WL = R.water;
   const n = MAP_SIZES[size].n;
@@ -521,6 +523,8 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
   const wild = deposits ? placeWild(seed, size, w, h, terrain, res, starts, deer, relics, posts, ruins) : [];
   const landmarks = deposits ? placeLandmarks(seed, w, h, terrain, res, starts, deer, relics, posts, ruins, wild) : [];
 
+  const rares = deposits && veins ? placeRares(seed, w, h, terrain, res, amount, starts, [...deer, ...relics, ...posts, ...ruins, ...wild.map((x) => ({ x: x.x, y: x.y })), ...landmarks.map((x) => ({ x: x.x, y: x.y }))]) : [];
+
   // Resources nobody could stand next to are cleared away.
   const block = new Uint8Array(w * h);
   for (let i = 0; i < w * h; i++) {
@@ -528,7 +532,7 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
     if (res[i] !== R_NONE) block[i] |= B_RES;
   }
 
-  return { w, h, terrain, height, res, amount, block, starts, deer, relics, posts, bogIron, ruins, wild, landmarks };
+  return { w, h, terrain, height, res, amount, block, starts, deer, relics, posts, bogIron, rares, ruins, wild, landmarks };
 }
 
 /** Where a town's people can walk to without cutting a tree (or, with `axes`, by cutting their way). */
@@ -846,6 +850,61 @@ function placeBogIron(
   }
   return true;
 }
+
+const RARE_TILE: Record<RareId, number> = { salt: R_SALT, saltpetre: R_SALTPETRE, bloodiron: R_BLOODIRON };
+
+/**
+ * Deep veins (#356): for each rare ore the seed's own dice say whether this world holds it at all, then its veins are
+ * laid out between the towns, on open ground every town can walk to, clear of every town, of what else lies on the map
+ * and of each other. They roll their own dice (a seed per ore) and only mark empty ground, so the rest of the map is the
+ * same as it would be without them. A vein that finds no room is left out: a world never promises a vein it cannot show.
+ */
+function placeRares(
+  seed: number,
+  w: number,
+  h: number,
+  terrain: Uint8Array,
+  res: Uint8Array,
+  amount: Int32Array,
+  starts: { x: number; y: number }[],
+  keepOff: { x: number; y: number }[],
+): RareId[] {
+  const reaches = starts.map((st) => reachFrom(w, h, terrain, res, st));
+  const STEPS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const found: RareId[] = [];
+  const laid: { x: number; y: number }[] = [];
+  const far = (list: { x: number; y: number }[], x: number, y: number, r: number) =>
+    list.every((p) => (p.x - x - 0.5) * (p.x - x - 0.5) + (p.y - y - 0.5) * (p.y - y - 0.5) >= r * r);
+  const free = (x: number, y: number) =>
+    x >= 2 && y >= 2 && x < w - 2 && y < h - 2 && (terrain[y * w + x] === T_GRASS || terrain[y * w + x] === T_SAND) && res[y * w + x] === R_NONE && far(keepOff, x, y, 3);
+  RARES_ORDER.forEach((id, n) => {
+    const rng = mulberry32(seed ^ (0x7a4e5 + n * 0x9e37));
+    if (rng() >= RARE[id].chance) return;
+    const cfg = RARE[id];
+    let made = 0;
+    for (let guard = 0; guard < 300 && made < cfg.veins; guard++) {
+      const x = 2 + Math.floor(rng() * (w - 4));
+      const y = 2 + Math.floor(rng() * (h - 4));
+      if (!free(x, y) || reaches.some((r) => r[y * w + x] !== 1)) continue;
+      if (!far(starts, x, y, cfg.away) || !far(laid, x, y, cfg.apart)) continue;
+      const tiles = [{ x, y }];
+      for (let g = 0; g < 60 && tiles.length < cfg.tiles; g++) {
+        const b = tiles[Math.floor(rng() * tiles.length)];
+        const [dx, dy] = STEPS[Math.floor(rng() * 4)];
+        if (free(b.x + dx, b.y + dy) && !tiles.some((t) => t.x === b.x + dx && t.y === b.y + dy)) tiles.push({ x: b.x + dx, y: b.y + dy });
+      }
+      for (const t of tiles) {
+        res[t.y * w + t.x] = RARE_TILE[id];
+        amount[t.y * w + t.x] = cfg.amount;
+      }
+      laid.push({ x, y });
+      made++;
+    }
+    if (made > 0) found.push(id);
+  });
+  return found;
+}
+const RARES_ORDER: RareId[] = ['salt', 'saltpetre', 'bloodiron'];
 
 /**
  * Ancient ruins (#64), fairly: out between the towns, each about as far from its two nearest towns,

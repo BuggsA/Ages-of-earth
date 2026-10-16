@@ -67,7 +67,7 @@ const spatials = new WeakMap<GameState, Spatial>();
 export function createGame(setup: GameSetup): GameState {
   const mapType = setup.mapType ?? 'continental';
   // Campaign maps are drawn as they always were: no deposits that only some seeds hold.
-  const map = generateMap(setup.seed, setup.size, setup.players.length, mapType, !setup.scenario);
+  const map = generateMap(setup.seed, setup.size, setup.players.length, mapType, !setup.scenario, !setup.scenario);
   const n = map.w * map.h;
   const startEpoch = Math.max(0, Math.min(EPOCHS.length - 1, setup.startEpoch ?? 0));
   const mode = setup.mode ?? 'conquest';
@@ -99,6 +99,7 @@ export function createGame(setup: GameSetup): GameState {
     landTimer: -1,
     posts: [],
     bogIron: map.bogIron,
+    rares: map.rares,
     nextId: 1,
     shots: [],
     rng: setup.seed >>> 0,
