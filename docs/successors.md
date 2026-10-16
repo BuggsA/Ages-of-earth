@@ -1,7 +1,6 @@
 # Starting your successor (Claude Code only)
 
-When a Claude Code session finishes a task, it starts the next session itself, so work goes on without the owner starting each one. Other agents can't; their handoffs leave the next session to the owner. Ported from Homeward Bound on 2026-10-13 ("Full, like Homeward", `docs/rulings.md`).
-
+When a Claude Code session finishes a task, it starts the next session itself, so work goes on without the owner starting each one. Other agents can't; their handoffs leave the next session to the owner. 
 ## Tiers
 
 | Tier | Which issues | Model | Effort |
@@ -17,7 +16,14 @@ When a Claude Code session finishes a task, it starts the next session itself, s
 
 - **When:** after the task's pull request is merged and the handoff is posted.
 - **How:** `create_session` (the claude-code-remote tools) on this repo, in the same environment. If you don't have it, say so in the handoff.
-- **No successor, and say why on #2,** when: you are position 10 of your chain; your session merged nothing; or `create_session` failed twice. An empty board is no reason to stop: the successor pitches its own work (`AGENTS.md` §2), so chains end at their caps.
+
+## Before spawning
+
+Check cheaply (one `list_issues` by label with `minimal_output`, and `main`'s last `ci`), never by rereading the docs.
+- **Don't spawn** if #2 is labelled `paused`, you merged nothing, `create_session` failed twice, a cap below stops you, or nothing waits in your lane and your chain's last two sessions each shipped only a minor tweak.
+- **Don't spawn** from an owner-started chat or one-off, unless asked.
+- **Otherwise spawn.** Its task, in order: a red `ci-periodic` or `ci` on `main`, an `owner-ask`, a `ready` issue in your lane, else its own pitch.
+- Take related next steps yourself first (`docs/team.md`, "Small and often").
 
 ## Chains and caps
 
@@ -26,7 +32,7 @@ A chain is the run of sessions that each start the next.
 - **The id** is the UTC date and time of the chain's first spawn (`1013-1720`). Position 0 makes it up; later sessions copy it.
 - **One chain per lane** (`docs/team.md`, "Lanes"), and no limit on how many run at once (the owner, 2026-10-15, `docs/rulings.md`). Before spawning, read the recent `Chain` comments on #2 for the chains under two hours old that don't say "ended". One running in your lane: wait.
 - **No daily cap** (the owner, 2026-10-14, `docs/rulings.md`): 10 sessions a chain is the only count limit.
-- **Log each spawn on #2:** `Chain 1013-1720, 3 of 10, lane rules: <branch> took #42 (regular), started "<child title>" for #57.` When a chain ends: `Chain 1013-1720 ended at 3 of 10: <reason>.` Don't start a new chain yourself: that's the owner's.
+- **Log each spawn on #2, with why:** `Chain 1013-1720, 3 of 10, lane rules: <branch> took #42 (regular), started "<child title>" for #57.` When a chain ends: `Chain 1013-1720 ended at 3 of 10: <reason>.` Don't start a new chain yourself: that's the owner's.
 
 ## The prompt
 
@@ -37,6 +43,7 @@ You are a building agent for Ages of Earth (BuggsA/Ages-of-earth).
 Start per AGENTS.md and docs/team.md: docs/status.md, then the board.
 Chain <id>, session <k> of 10. When you finish, follow docs/successors.md.
 Your task: #<N> (<regular|hard>). Read the issue and its latest handoff comment. (Or: "No task is waiting: pick a ready issue or pitch your own, AGENTS.md §2.")
+Start from: <the files and functions involved, and anything you learned that saves searching>.
 Waiting to merge: <pull request and what it waits on, or "nothing">.
 ```
 

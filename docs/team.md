@@ -1,6 +1,6 @@
 # Working together
 
-How any number of agents build this game, joining and leaving at any time, without tripping over each other. Read it at the start of every session, after `AGENTS.md` and `docs/status.md`. Ported from Homeward Bound's system on 2026-10-13, at the owner's request (`docs/rulings.md`).
+How any number of agents build this game without tripping over each other. Read it at the start of every session, after `AGENTS.md` and `docs/status.md`.
 
 ## Who's who
 
@@ -18,7 +18,7 @@ There is no art assistant: every model, sound and tune is made in code.
 
 1. Read `AGENTS.md`, `docs/status.md` and this file.
 2. **Read the board** (GitHub Issues), in the order of work (`AGENTS.md` §2): `ci-periodic`, your own open claims and handoffs, `owner-ask`.
-3. **Bring your branch up to date** with `main` and run `npm run check`.
+3. **Start from the latest `main`.** Skip the full check: `main`'s `ci` covers it (`actions_list`, or `npm run check` if you can't read it). If it's red, fixing it is your task.
 4. **Pick one issue** labelled `ready`, or **pitch your own** (`.github/ISSUE_TEMPLATE/pitch.md`; before pitching blind, glance at the open `seed` issues, titles first: "Seeds" below), in a lane nobody else holds a `claimed` issue in. Check its "Depends on" line. Whichever you choose, groom the board on the way (below).
 5. **Claim it** (below), then start.
 
@@ -93,14 +93,14 @@ Sessions end without warning, so claims are built for that.
 - **The base is `main`.** Work reaches it only by merged pull request; nobody pushes to it directly, docs included.
 - **One branch per task, one pull request,** named `claude/<issue>-<topic>` (other tools: `<tool>/<issue>-<topic>`). A merged branch is finished: the next task starts a new branch from `main`. Sessions whose branch name is set by their harness keep it.
 - **Needing another agent's unfinished work:** merge their branch into yours and say so on their issue. Merge, never rebase, other people's commits.
-- **Small and often.** One step, one pull request, merged in the same session. A branch that lives for days collects conflicts.
+- **Small and often.** One step, one pull request, merged in the same session. Up to 3 steps a session, only related ones (same umbrella or same files), each merged before the next; stop on a failure or escalation.
 
 ## Merging
 
 `main` is what players get. Agents merge their own pull requests when all of this holds:
 
 1. It's your pull request, for an issue you claimed.
-2. The latest `main` is merged into your branch. If `main` moves while you wait, merge it again and let `ci` run again.
+2. It merges cleanly and `ci` ran on it (a pull request's `ci` tests the merge with `main`). If `main` moves, re-merge only for a conflict or a red check.
 3. `ci` is green on that exact commit; you ran `npm run check` and the slow tests that cover your change (`AGENTS.md` §5); the `## Verification` section has the real output. A check that fails once and passes on a re-run is not a pass: say so in the pull request.
 
    **Cloudflare's "Workers Builds" check is not a gate.** Agents can't read its log, `ci` runs the same build, and a failed Cloudflare build deploys nothing, so the live game stays as it was. When it fails, say so in the pull request and on #2, so the owner can read the log in the Cloudflare dashboard. (It failed on every branch until `[previews]` was added to `wrangler.toml` in #23; it has passed since.)
