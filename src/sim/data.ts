@@ -86,6 +86,8 @@ export interface Age {
   reclaim?: boolean;
   /** Aircraft fly on fuel from the Airfield (the Age of Aeronauts): see `SORTIE` (`sortie.ts`). */
   sortie?: boolean;
+  /** Feast days (the Age of Fairs): see `FAIR` (`fair.ts`). */
+  fairs?: boolean;
 }
 
 /**
@@ -179,10 +181,11 @@ export const AGES: Record<AgeId, Age> = {
     name: 'Age of Fairs',
     short: 'Fairs',
     tier: 3,
-    blurb: 'Where pilgrims gather, merchants follow: feast days become great fairs. Trade pays more for every relic your Temples keep, and traders travel faster, but towns grown open round the fairground stand 15% weaker.',
+    blurb: 'Where pilgrims gather, merchants follow: feast days become great fairs. Trade pays more for every relic your Temples keep, and traders travel faster, but towns grown open round the fairground stand 15% weaker. And the fair keeps a calendar: a feast day opens every 4 minutes and lasts one, and a trip paid at a Market within 12 tiles of a Temple that keeps a relic pays half again as much. Build the Market by the shrine, and send the traders so they come home on the feast.',
     mul: { tradeGold: 1.25, traderSpeed: 1.15, buildingHp: 0.85 },
     relicTrade: { each: 0.1, most: 5 },
     ironTrade: IRON_TRADE,
+    fairs: true,
   },
   sail: {
     name: 'Age of Sail',
@@ -913,6 +916,12 @@ export const RELIC = { home: 20, fair: 3, spacing: 12, extra: { small: 1, medium
  * burn `burn` of full health a second. Reach a far target with a forward Airfield, raised in your own land.
  */
 export const SORTIE = { rearm: 4, mend: 0.08, turn: 30, reach: 36, burn: 0.04 };
+/**
+ * Feast days (the Age of Fairs): every `every` seconds a feast opens for `open` seconds. A trade trip paid at a
+ * Market within `reach` tiles of a standing Temple that keeps a relic (the fairground) pays `pay` times as much
+ * while it lasts. The calendar is the same for everyone, so the computer's traders profit too.
+ */
+export const FAIR = { every: 240, open: 60, reach: 12, pay: 1.5 };
 export const RECLAIM = { window: 300, cost: 0.4, head: 0.5, skip: ['wall', 'gate', 'wonder'] as string[] };
 
 export const RUINS = { count: { small: 2, medium: 3, large: 4 } as Record<MapSize, number>, home: 24, fair: 4, spacing: 14, dig: 40, gold: 300, reach: 1.7, clear: 1 };
