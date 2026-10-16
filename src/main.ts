@@ -2251,6 +2251,18 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         }
         break;
       }
+      case 'wonderRising': {
+        // #361: a Wonder's whole build is contestable, so everyone hears when one is begun.
+        const p = s.players[ev.owner];
+        if (ev.owner === viewer) hud.banner('Your Wonder rises', 'Every rival now knows where it stands. Guard it while it is built.', 5000);
+        else if (p.team === s.players[viewer].team) hud.banner(`${p.name} begins a Wonder`, 'Guard it while it rises.', 5000);
+        else {
+          hud.banner(`${p.name} begins a Wonder`, 'Strike it before it is finished, while it is weakest (Space to look).', 5000);
+          lastAlert = { x: ev.x, y: ev.y };
+        }
+        play('wonderRising');
+        break;
+      }
       case 'fair':
         if (ev.owner === viewer) hud.toast(`A feast day opens at your fairground: trade trips paid there pay ${Math.round((FAIR.pay - 1) * 100)}% more for ${FAIR.open} seconds`, 'good');
         break;

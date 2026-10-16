@@ -346,9 +346,15 @@ export class Hud {
     const parts: string[] = [];
     if (s.tick < s.peaceUntil) parts.push(`<div class="timer peace">🕊 Peace for ${fmtTime(s.peaceUntil - s.tick)}</div>`);
     for (const e of s.ents) {
-      if (e.kind !== 'building' || e.type !== 'wonder' || e.timer < 0 || e.hp <= 0) continue;
+      if (e.kind !== 'building' || e.type !== 'wonder' || e.hp <= 0) continue;
       const q = s.players[e.owner];
       const ours = q.team === s.players[viewer].team;
+      // A Wonder still being built (#361): how far along, so its rivals can judge when to strike.
+      if (!e.built) {
+        parts.push(`<div class="timer ${ours ? 'good' : 'bad'}" data-focus="${e.x},${e.y}"><span class="swatch" style="background:${q.color}"></span>${q.id === viewer ? 'Your' : `${q.name}'s`} Wonder rising: ${Math.floor(e.progress * 100)}% built${ours ? '' : ' (stop it!)'}</div>`);
+        continue;
+      }
+      if (e.timer < 0) continue;
       parts.push(`<div class="timer ${ours ? 'good' : 'bad'}" data-focus="${e.x},${e.y}"><span class="swatch" style="background:${q.color}"></span>${q.id === viewer ? 'Your' : `${q.name}'s`} Wonder: ${fmtTime(e.timer)}${ours ? '' : ' (destroy it!)'}</div>`);
     }
     if (s.relicTeam >= 0 && s.relicTimer >= 0) {

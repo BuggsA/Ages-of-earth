@@ -589,6 +589,8 @@ export type GameEvent =
   | { k: 'greatWork'; owner: number; on: boolean }
   | { k: 'way'; owner: number; way: WayId; deep?: boolean; turned?: boolean }
   | { k: 'wonder'; owner: number; id: number; x: number; y: number; ticks: number }
+  /** A Wonder's foundation was laid (#361): every player hears of it, so the whole build can be contested. */
+  | { k: 'wonderRising'; owner: number; id: number; x: number; y: number }
   | { k: 'trade'; owner: number; res: Res; buy: boolean }
   | { k: 'defeated'; owner: number }
   | { k: 'over'; winner: number; how: 'conquest' | 'wonder' | 'relics' | 'lands' | 'resign' | 'time' | 'scenario' }

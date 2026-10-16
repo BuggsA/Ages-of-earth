@@ -172,6 +172,7 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
   const b = placeBuilding(s, p, type, tx, ty, false);
   raise(s, b);
   s.events.push({ k: 'placed', id: b.id, owner: p, type });
+  if (type === 'wonder') s.events.push({ k: 'wonderRising', owner: p, id: b.id, x: b.x, y: b.y });
   return b;
 }
 
