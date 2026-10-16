@@ -1,7 +1,7 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_WEB, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, walkable } from './grid';
-import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
+import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { ageOf, barred, buildBarred, deedsDone, hasCoils, hasWalked, deedsProgress, hiresAt, inField, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
@@ -12,7 +12,7 @@ import { goalForPost, nearestMarket, portSpot, tripGold } from './trade';
 import { findRoute } from './path';
 import { isEnemy, maxHp } from './world';
 import { callUpProblem } from './warcamp';
-import { borderMap, suppliedAt } from './borders';
+import { borderMap, landOwnerAt, suppliedAt } from './borders';
 import { workProblem } from './works';
 import { aiVow, aiWay } from './ways';
 import { beaconProblem, lit } from './beacon';
@@ -21,6 +21,7 @@ import { consecrateProblem, consecrates } from './consecrate';
 import { sees } from './vision';
 import { seasonAt } from './seasons';
 import { isMobile } from './steppe';
+import { isRider, standing } from './tribute';
 import { flockCap, flockOf, grassy, milkable } from './flocks';
 import { progress, scenarioById } from './campaign';
 
@@ -328,8 +329,7 @@ function fit(p: Player, to: AgeId): number {
   if (age.path === 'blood') return cls === 'infantry' || cls === 'cavalry' ? 0 : -1;
   // The Silk Road (#326) waits until the computer knows how to move its Market with the camp.
   if (to === 'silk') return -1;
-  // The Steppe Road (#320): its first age is judged as any side age; the Horde waits until the computer knows how to exact tribute (#297 s5b).
-  if (age.path === 'steppe' && age.tier > 1) return -1;
+  // The Steppe Road (#320): its first age is judged as any side age; the Horde follows it (#322, see `wants`).
   if (age.no?.units.includes(sig)) return -1;
   return (age.price?.[cls] ?? 1) < 1 ? 1 : 0;
 }
@@ -355,7 +355,10 @@ export function heirloomAhead(p: Player, to: AgeId): TechId | null {
  */
 function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   const roads = (mem.roads ??= {});
-  if (roads[to] === undefined && (to === 'ironblood' || to === 'totalwar')) {
+  if (roads[to] === undefined && to === 'horde') {
+    // The Horde is the steppe's second step (#322): a people that rode the steppe goes on, as the Path of Blood's later steps do.
+    roads[to] = hasWalked(p, 'steppe');
+  } else if (roads[to] === undefined && (to === 'ironblood' || to === 'totalwar')) {
     // The later steps of the Path of Blood are no new coin toss: a people that walked the step before goes on.
     roads[to] = hasWalked(p, to === 'ironblood' ? 'warband' : 'ironblood');
   } else if (roads[to] === undefined) {
@@ -385,7 +388,7 @@ function worthWaiting(s: GameState, v: View, mem: AiMemory, r: Road): boolean {
   // A deed nearly done earns more patience (#113): a Greek town gave up its dig at 135 bog iron of 150,
   // seconds from the Iron Age, with the price of it banked.
   const close = deeds.every((d) => d.have >= d.need * AI_WEB.close);
-  if (s.tick - mem.waiting <= secs(AI_WEB.patience * (close ? 2 : 1))) return true;
+  if (s.tick - mem.waiting <= secs((r.to === 'horde' ? AI_HORDE.hold : AI_WEB.patience) * (close ? 2 : 1))) return true;
   mem.roads![r.to] = false;
   delete mem.waiting;
   return false;
@@ -417,6 +420,12 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   delete mem.waiting;
   // The steppe (#320) is kept a while, so the flock it came for pays.
   if (walksWeb(v) && isMobile(p) && s.tick - (mem.steppe?.since ?? s.tick) < secs(AI_STEPPE.stay)) return null;
+  // The Horde stays `stay` seconds before it climbs on: tribute is what it came for (#322).
+  if (walksWeb(v) && ageOf(p) === 'horde') {
+    const st = (mem.steppe ??= {});
+    st.horde ??= s.tick;
+    if (s.tick - st.horde < secs(AI_HORDE.stay)) return null;
+  }
   if (walksWeb(v)) {
     const hold = bloodHold(s, v, mem);
     if (hold === 'stay') return null;
@@ -486,6 +495,11 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
       mem.roads ??= {};
       mem.roads.lightning = false;
       return { road: r, wait: false };
+    }
+    // A people that settled in the Middle Ages after the steppe turns horde again once the herd's deeds are done (#322).
+    if (r.to === 'horde') {
+      if (roadKnown(s, p, r) && deedsDone(p, r) && wants(s, p, mem, r.to)) return { road: r, wait: false };
+      continue;
     }
     if (here === 'pilgrim' && r.to === 'middle' && kept === 0) return { road: r, wait: false };
     // A coastal people turns sailor once its boats have landed the catch; with its last Dock gone, it comes ashore.
@@ -787,6 +801,12 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     }
   }
 
+  // The road into the Horde opens with a Stable (#322): save the wood for it before the small things take it.
+  if (ageOf(p) === 'steppe' && walksWeb(v) && v.citizens.length >= 14 && count(v, 'stable') === 0 && !recently('stable', 25) && wants(s, p, mem, 'horde')) {
+    const cost = buildingCostFor(s, p.id, 'stable');
+    const spot = afford(v, cost) ? findSpot(s, 'stable', home.x, home.y, 4, 18) : null;
+    if (!spot || !construct(s, v, mem, 'stable', spot, 3, issue)) spend(v, cost);
+  }
   // Fields once the berries near home run short of feeding everyone who should be on food.
   const berries = findResource(s, R_BERRY, home.x, home.y, 14);
   const farms = count(v, 'farm');
@@ -1186,9 +1206,19 @@ function steppeRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) =>
 
 const grownSheep = (s: GameState, owner: number): Animal[] => s.animals.filter((a) => a.kind === 'sheep' && a.owner === owner && a.hp > 0 && a.lamb === undefined);
 
-/** How many milkers its flock wants: one for each `perMilker` grown sheep. */
+/** The road from the steppe into the Horde (#322), while the computer wants it and its deeds are not yet done; null otherwise. */
+function hordeClimb(s: GameState, v: View, mem: AiMemory): Road | null {
+  const { p } = v;
+  if (ageOf(p) !== 'steppe' || !walksWeb(v) || !wants(s, p, mem, 'horde')) return null;
+  const road = roadsFrom(p).find((r) => r.to === 'horde');
+  return road && !deedsDone(p, road) ? road : null;
+}
+
+/** How many milkers its flock wants: one for each `perMilker` grown sheep, one for each sheep while the Horde's milk is to be drawn (#322). */
 function milkersWanted(s: GameState, v: View): number {
-  return Math.ceil(grownSheep(s, v.p.id).length / AI_STEPPE.perMilker);
+  const grown = grownSheep(s, v.p.id).length;
+  const mem = s.ai[v.p.id];
+  return mem && hordeClimb(s, v, mem) ? Math.min(AI_HORDE.milkers, grown) : Math.ceil(grown / AI_STEPPE.perMilker);
 }
 
 /**
@@ -1199,8 +1229,10 @@ function tendFlock(s: GameState, v: View, issue: (c: Command) => void): void {
   const { p } = v;
   const mobile = isMobile(p);
   const grown = grownSheep(s, p.id);
+  const climb = mobile ? hordeClimb(s, v, s.ai[p.id] ?? ({} as AiMemory)) : null;
+  const hordeWanted = !!climb;
   if (!mobile && !grown.length) return;
-  if (mobile && v.tc && flockOf(s, p.id) < flockCap(s, p.id) && v.budget.food >= (FLOCK.cost.food ?? 0) + AI_STEPPE.spare) {
+  if (mobile && v.tc && flockOf(s, p.id) < flockCap(s, p.id) && v.budget.food >= (FLOCK.cost.food ?? 0) + (hordeWanted ? AI_HORDE.spare : AI_STEPPE.spare)) {
     issue({ t: 'lamb', p: p.id, building: v.tc.id });
     spend(v, FLOCK.cost);
   }
@@ -1211,7 +1243,7 @@ function tendFlock(s: GameState, v: View, issue: (c: Command) => void): void {
     const ewe = milkable(s, p.id, v.home.x, v.home.y, FLOCK.follow);
     const hand = ewe
       ? v.citizens
-          .filter((u) => !u.inside && !u.queue.length && u.carry <= 2 && !v.diggers.has(u.id) && !v.claimers.has(u.id) && (u.order.k === 'idle' || (u.order.k === 'gather' && (u.order.res === 'wood' || s.res[u.order.tile] === R_BERRY))))
+          .filter((u) => !u.inside && !u.queue.length && u.carry <= 2 && !v.diggers.has(u.id) && !v.claimers.has(u.id) && (u.order.k === 'idle' || (hordeWanted && u.order.k === 'farm') || (u.order.k === 'gather' && (u.order.res === 'wood' || s.res[u.order.tile] === R_BERRY))))
           .sort((a, b) => near(a, ewe) - near(b, ewe) || a.id - b.id)[0]
       : undefined;
     if (ewe && hand) issue({ t: 'milk', p: p.id, ids: [hand.id], target: ewe.id });
@@ -1219,9 +1251,11 @@ function tendFlock(s: GameState, v: View, issue: (c: Command) => void): void {
   // Fat that can't become a lamb (the flock full, or the people settled) is meat: one sheep at a time.
   const ids = new Set(grown.map((a) => a.id));
   if (v.citizens.some((u) => u.order.k === 'hunt' && ids.has(u.order.target))) return;
-  if (mobile && flockOf(s, p.id) < flockCap(s, p.id)) return;
+  // The Horde's hunting deed counts butchered sheep (#322): once the milk is in and the meat is short, the flock is culled, down to `AI_HORDE.least`.
+  const butchery = !!climb && grown.length > AI_HORDE.least && deedsProgress(p, climb).every((d) => d.deed.stat === 'hunted' || d.have >= d.need) && deedsProgress(p, climb).some((d) => d.deed.stat === 'hunted' && d.have < d.need);
+  if (mobile && flockOf(s, p.id) < flockCap(s, p.id) && !butchery) return;
   let fat: Animal | null = null;
-  for (const a of grown) if ((a.fat ?? 0) >= FLOCK.breed && (!fat || (a.fat ?? 0) > (fat.fat ?? 0))) fat = a;
+  for (const a of grown) if (((a.fat ?? 0) >= FLOCK.breed || butchery) && (!fat || (a.fat ?? 0) > (fat.fat ?? 0))) fat = a;
   if (!fat) return;
   const prey = fat;
   const butcher = v.citizens
@@ -2153,6 +2187,114 @@ export function rivalWarCamp(s: GameState, p: Player, home: { x: number; y: numb
   return best;
 }
 
+// ---- The Horde (#322) ----------------------------------------------------------------------------------
+
+/** Rival soldiers (no citizens, priests or traders; no ships) standing within `r` tiles of a point. */
+function foesWithin(s: GameState, p: Player, x: number, y: number, r: number): Unit[] {
+  const out: Unit[] = [];
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !isEnemy(s, p.id, e.owner) || e.type === 'citizen' || e.type === 'priest' || e.type === 'trader' || e.type === 'wagon' || domainOf(e.type) !== 'land') continue;
+    if ((e.x - x) * (e.x - x) + (e.y - y) * (e.y - y) <= r * r) out.push(e);
+  }
+  return out;
+}
+
+/**
+ * The horde exacts tribute (#322): idle riders (`riders` at least, up to `TRIBUTE.most`) ride to the rival land
+ * nearest home that lies inside their supply, `clear` tiles from the rival's Town Centers and Towers, and stand
+ * their ground there. The band comes home under `weary` riders or with `foes` rival soldiers within `alarm`
+ * tiles. Returns the riders held there, whom the waves pass by.
+ */
+function exactTribute(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): Set<number> {
+  const { p } = v;
+  const held = new Set<number>();
+  const st = mem.steppe;
+  if (modsOf(s, p.id).tribute <= 0) {
+    if (st?.band) delete st.band;
+    return held;
+  }
+  const mine = (mem.steppe ??= {});
+  const live = (mine.band ?? []).map((id) => s.byId.get(id)).filter((u): u is Unit => !!u && u.kind === 'unit' && u.hp > 0 && !u.inside);
+  if (mine.band) {
+    const at = mine.at ?? v.home;
+    const foes = foesWithin(s, p, at.x, at.y, AI_HORDE.alarm);
+    if (live.length < AI_HORDE.weary || foes.length > live.length) {
+      // Losing: ride home, and stop standing.
+      if (live.length) {
+        issue({ t: 'stance', p: p.id, ids: live.map((u) => u.id), stance: 'aggressive' });
+        issue({ t: 'move', p: p.id, ids: live.map((u) => u.id), x: mem.muster?.x ?? v.home.x, y: mem.muster?.y ?? v.home.y });
+      }
+      delete mine.band;
+      delete mine.at;
+      mine.recalled = s.tick;
+      return held;
+    }
+    mine.band = live.map((u) => u.id);
+    // On arrival, stand the ground.
+    const near = live.filter((u) => (u.x - at.x) * (u.x - at.x) + (u.y - at.y) * (u.y - at.y) <= 25 && u.stance !== 'stand');
+    if (near.length) issue({ t: 'stance', p: p.id, ids: near.map((u) => u.id), stance: 'stand' });
+    for (const u of live) held.add(u.id);
+    return held;
+  }
+  if (s.tick < s.peaceUntil || s.tick - (mine.recalled ?? -1e9) < secs(AI_HORDE.redo) || mem.attacking || !v.tc) return held;
+  const riders = v.army.filter((u) => u.type === 'cavalry' && !u.inside && u.order.k === 'idle' && isRider(u) && standing(u)).sort((a, b) => a.id - b.id);
+  if (riders.length < AI_HORDE.riders) return held;
+  // The nearest rival with gold, and a spot of its land on our side of its Town Center.
+  const own = borderMap(s);
+  let best: { x: number; y: number } | null = null;
+  let bestD = Infinity;
+  for (const b of s.ents) {
+    if (b.kind !== 'building' || b.type !== 'towncenter' || !b.built || b.hp <= 0 || !isEnemy(s, p.id, b.owner) || s.players[b.owner].res.gold < 50) continue;
+    const dx = v.home.x - b.x;
+    const dy = v.home.y - b.y;
+    const dl = Math.sqrt(dx * dx + dy * dy) || 1;
+    if (dl >= bestD) continue;
+    for (let r = AI_HORDE.clear; r <= AI_HORDE.clear + 8; r++) {
+      const x = b.x + (dx / dl) * r;
+      const y = b.y + (dy / dl) * r;
+      const tx = Math.floor(x);
+      const ty = Math.floor(y);
+      if (tx < 0 || ty < 0 || tx >= s.w || ty >= s.h || own[ty * s.w + tx] !== b.owner || !walkable(s, tx, ty) || !suppliedAt(s, own, p.team, tx, ty)) continue;
+      const covered = s.ents.some((e) => e.kind === 'building' && e.hp > 0 && e.built && e.owner === b.owner && (e.type === 'towncenter' || e.type === 'tower') && (e.x - x) * (e.x - x) + (e.y - y) * (e.y - y) < AI_HORDE.clear * AI_HORDE.clear);
+      if (covered || foesWithin(s, p, x, y, AI_HORDE.alarm).length >= AI_HORDE.foes) continue;
+      best = { x, y };
+      bestD = dl;
+      break;
+    }
+  }
+  if (!best) return held;
+  const band = riders.slice(0, TRIBUTE.most);
+  // A plain move, not an attack-move: the band is there for the gold, and a Town Center's arrows are no place for a fight.
+  issue({ t: 'move', p: p.id, ids: band.map((u) => u.id), x: best.x, y: best.y });
+  mine.band = band.map((u) => u.id);
+  mine.at = best;
+  mine.out = s.tick;
+  for (const u of band) held.add(u.id);
+  return held;
+}
+
+/**
+ * A computer whose gold riders drain (#322): `answer` or more rival riders standing in its land, with its army
+ * at least as many, ride out to drive them off. True when it gave the order. The riders on the move are met by
+ * the spears its trainers already pick for a rival's horse (`COUNTER`).
+ */
+function answerRiders(s: GameState, v: View, fighters: Unit[], issue: (c: Command) => void): boolean {
+  const { p } = v;
+  if (!s.players.some((q) => !q.defeated && isEnemy(s, p.id, q.id) && modsOf(s, q.id).tribute > 0)) return false;
+  const riders: Unit[] = [];
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !isEnemy(s, p.id, e.owner) || !isRider(e) || !standing(e) || modsOf(s, e.owner).tribute <= 0) continue;
+    if (landOwnerAt(s, Math.floor(e.x), Math.floor(e.y)) === p.id) riders.push(e);
+  }
+  if (riders.length < AI_HORDE.answer) return false;
+  const ready = fighters.filter((u) => u.order.k === 'idle' && u.type !== 'siege');
+  if (ready.length < riders.length) return false;
+  const x = riders.reduce((n, u) => n + u.x, 0) / riders.length;
+  const y = riders.reduce((n, u) => n + u.y, 0) / riders.length;
+  issue({ t: 'move', p: p.id, ids: ready.map((u) => u.id), x, y, amove: true });
+  return true;
+}
+
 function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
   const L = AI_LEVELS[p.ai!];
@@ -2193,6 +2335,8 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     for (const b of v.buildings) for (const q of b.queue) if (q.unit) tally(q.unit);
   }
   const keepCitizensGrowing = v.citizens.length < 8;
+  // A horde (#322) wants riders to stand in rival land: it trains them more often until it has a full band.
+  const riderless = L.clever && modsOf(s, p.id).tribute > 0 && v.army.filter((u) => u.type === 'cavalry').length < TRIBUTE.most + 2;
   const siege = v.army.filter((u) => u.type === 'siege').length;
   // A rival with the Masons' Lodge raises sturdier buildings (+15%): one more engine to break them (#242).
   const lodge = L.clever && rivalHas(s, p, 'masonsLodge') ? AI_WEB.lodge : 0;
@@ -2213,7 +2357,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
       if (unit && unitEpoch(unit) > p.epoch) unit = pickUnit(v, mem, b);
       // Play to the people's strength: when not countering, favour the signature line about half the time.
       const sig = SIGNATURES[p.civ].type;
-      if (unit !== counter && sig !== 'siege' && sig !== 'priest' && trains.includes(sig) && unitEpoch(sig) <= p.epoch && !barred(p, sig) && roll(s) < 0.5) unit = sig;
+      if (unit !== counter && sig !== 'siege' && sig !== 'priest' && trains.includes(sig) && unitEpoch(sig) <= p.epoch && !barred(p, sig) && roll(s) < (sig === 'cavalry' && riderless ? AI_HORDE.cavalry : 0.5)) unit = sig;
     }
     if (!unit || unitEpoch(unit) > p.epoch || barred(p, unit)) continue;
     // What it costs here: a levy, an age's price or a hire for gold (#37).
@@ -2233,10 +2377,20 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   // Soldiers on their way to (or aboard) a landing ship are not the land army's to command.
   const sailing = new Set(mem.landing?.ids);
   const guards = L.clever ? campGuards(v) : new Set<number>();
-  const fighters = v.army.filter((u) => !u.inside && !sailing.has(u.id) && !guards.has(u.id));
+  // The horde's riders in a rival's land (#322) are held there, out of the waves' orders.
+  if (L.clever) for (const id of exactTribute(s, v, mem, issue)) guards.add(id);
+  let fighters = v.army.filter((u) => !u.inside && !sailing.has(u.id) && !guards.has(u.id));
   if (threat) {
     const responders = fighters.filter((u) => u.order.k !== 'attack');
     if (responders.length) issue({ t: 'move', p: p.id, ids: responders.map((u) => u.id), x: threat.x, y: threat.y, amove: true });
+    mem.attacking = false;
+    return;
+  }
+
+  // A horde's riders wait at home for their band (#322): the waves leave them be until it sets out.
+  if (L.clever && !mem.steppe?.band && modsOf(s, p.id).tribute > 0 && fighters.filter((u) => u.type === 'cavalry').length < TRIBUTE.most) fighters = fighters.filter((u) => u.type !== 'cavalry');
+  // Riders standing in our land take our gold (#322): the army rides out to drive them off.
+  if (L.clever && answerRiders(s, v, fighters, issue)) {
     mem.attacking = false;
     return;
   }

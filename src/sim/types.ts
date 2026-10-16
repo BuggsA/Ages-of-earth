@@ -701,7 +701,7 @@ export interface AiMemory {
    * move to while its Town Center's queue empties (`pack`), and, while the wagon is on the road, where it is
    * driving (with the tick it set out) and the camp it left.
    */
-  steppe?: { since?: number; struck?: number; pack?: { x: number; y: number; at: number }; to?: { x: number; y: number; at: number }; from?: { x: number; y: number } };
+  steppe?: { band?: number[]; at?: { x: number; y: number }; out?: number; recalled?: number; horde?: number; since?: number; struck?: number; pack?: { x: number; y: number; at: number }; to?: { x: number; y: number; at: number }; from?: { x: number; y: number } };
 }
 
 /** Orders that can be given with Shift held to queue them after the current one. */
