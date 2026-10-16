@@ -3,7 +3,7 @@ import { ageDef } from './ages';
 import { placeProblem, stampBuilding } from './grid';
 import { ungarrison } from './units';
 import { maxHp, placeBuilding, spawnUnit } from './world';
-import type { Building, GameState, Player, Unit } from './types';
+import type { Building, BuildingType, GameState, Player, Unit } from './types';
 
 /**
  * The Age of the Steppe (#297): a town on wheels. A Town Center or House is packed onto a wagon, driven,
@@ -13,10 +13,16 @@ import type { Building, GameState, Player, Unit } from './types';
 /** Whether the player's age lets them pack their town onto wagons. */
 export const isMobile = (p: Player): boolean => !!ageDef(p).mobile;
 
+/** What the player's age packs onto wagons: Town Centers and Houses, and on the Silk Road the Market (#326). */
+export const packsOf = (p: Player): BuildingType[] => {
+  const more = ageDef(p).packs;
+  return more ? [...STEPPE.packs, ...more] : STEPPE.packs;
+};
+
 /** Why this building can't be packed now, or null. */
 export function packProblem(s: GameState, p: Player, b: Building): string | null {
   if (!isMobile(p)) return 'Only a steppe people strikes camp';
-  if (!STEPPE.packs.includes(b.type)) return 'Only Town Centers and Houses pack onto wagons';
+  if (!packsOf(p).includes(b.type)) return ageDef(p).packs ? 'Only Town Centers, Houses and Markets pack onto wagons' : 'Only Town Centers and Houses pack onto wagons';
   if (!b.built || b.hp <= 0) return 'It must stand finished first';
   if (b.advance >= 0) return 'Not while the people is changing its age';
   if (b.queue.length) return 'Finish or cancel the training here first';

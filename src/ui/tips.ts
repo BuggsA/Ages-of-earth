@@ -1,4 +1,4 @@
-import { AGES, BUILDINGS, CALL_UP, ROADS, ROT, STEP_BACK, TRIBUTE, secs } from '../sim/data';
+import { AGES, BUILDINGS, CALL_UP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, secs } from '../sim/data';
 import { ageOf, backTo, deedProgress, deedsDone, mainRoad, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
 import type { Building, GameState, Unit } from '../sim/types';
 import { R_FISH } from '../sim/types';
@@ -47,6 +47,7 @@ const sighted = (s: GameState, me: number, kind: 'mammoth' | 'wolf' | 'boar') =>
 
 const TIPS: Tip[] = [
   { id: 'gather', when: (s) => secsIn(s) > 2, text: 'Drag a box around your <b>citizens</b>, then <b>right-click</b> berry bushes, trees or a deer to gather food and wood.' },
+  { id: 'way', when: (s, me) => s.players[me].epoch <= WAY.until && !s.players[me].way && secsIn(s) > 40, text: 'Choose a <b>Way</b> at your Town Center: <b>Hunters</b> (deer and beasts), <b>Hearth</b> (berries and farms) or <b>Warband</b> (soldiers). Free, once, and the moment passes when you leave the Stone Age. Look at the deer and berries near home, and at how close your rival is.' },
   { id: 'train', when: (s) => secsIn(s) > 25, text: 'More citizens mean a faster economy. Click your <b>Town Center</b> and press <kbd>Q</kbd> to train one (you can queue several).' },
   { id: 'house', when: (s, me) => s.players[me].pop >= s.players[me].cap - 2, text: 'You are nearly out of room. Select a citizen, press <kbd>B</kbd> then <kbd>E</kbd> to build a <b>house</b> (5 more people each).' },
   { id: 'idle', when: (s, me) => secsIn(s) > 60 && s.ents.some((e) => isIdleCitizen(e, me)), text: 'Someone is standing around: press <kbd>.</kbd> to find an idle citizen, or <kbd>Shift</kbd> + <kbd>.</kbd> to select every idle citizen and put them to work.' },
@@ -209,6 +210,31 @@ const TIPS: Tip[] = [
     id: 'tribute',
     when: (s, me) => ageOf(s.players[me]) === 'horde',
     text: `Your horde lives on <b>tribute</b>. Ride into a rival's land and <b>hold your riders still</b> there (<kbd>C</kbd>, stand ground): each takes ${AGES.horde.add!.tribute} gold a second from that rival, up to ${TRIBUTE.most} riders a rival. Riders on the move take nothing, spears and towers answer them, and deep past your own land they wear down: pitch a camp near the border to keep them fed.`,
+  },
+  {
+    id: 'silkroad',
+    // The Steppe Road's third step (#326), a crossing: a merchant people that rode the steppe, or a Gunpowder people that rode as a horde.
+    when: (s, me) => {
+      const p = s.players[me];
+      return roadsFrom(p).some((r) => r.to === 'silk' && roadKnown(s, p, r) && !deedsDone(p, r));
+    },
+    text: `Your people remembers the wagons. Bring home the gold its deeds ask by trade (the Town Center's 🔀 shows how far along you are), and it can take the <b>${AGES.silk.name}</b> instead: the Market packs onto a wagon and rolls with the camp, and every tile it covers while a trader is out pays that trip ${Math.round(SILK.each * 100)}% more.`,
+  },
+  {
+    id: 'caravans',
+    when: (s, me) => ageOf(s.players[me]) === 'silk',
+    text: `Your town is a moving trade post. Select the Market and press <b>J</b> to pack it onto a wagon, drive it along the road and pitch it (<b>P</b>) further on: traders come home to it wherever it is, rolling or pitched, and every tile it moved since they set out pays ${Math.round(SILK.each * 100)}% more, up to ${Math.round(SILK.each * SILK.most * 100)}% (🐫 on a trader shows it). Nobody buys or sells while it rolls, and riders run a lone wagon down: keep it with the camp.`,
+  },
+  {
+    id: 'caravanserai',
+    // The Silk Road's waystation (#334), once the caravans are rolling.
+    when: (s, me) => ageOf(s.players[me]) === 'silk' && has(s, me, 'market') && !has(s, me, 'caravanserai'),
+    text: `Raise a <b>Caravanserai</b> (<kbd>C</kbd> in the economy build menu) by a far trading post, in no one's land too: your traders' trips to any post within ${SERAI.near} tiles of it pay ${Math.round((SERAI.pay - 1) * 100)}% more, traders and wagons within ${SERAI.rest} tiles mend, and the land round it becomes yours.`,
+  },
+  {
+    id: 'toll',
+    when: (s, me) => ageOf(s.players[me]) === 'silk' && has(s, me, 'caravanserai'),
+    text: `Your land is the road now. A rival's trader heading home with gold across it pays you <b>${Math.round((AGES.silk.add!.toll ?? 0) * 100)}% of its load</b> for safe passage, once a trip. A Caravanserai beside a post your rivals use makes the ground there yours, so every trader loading there pays. They may burn it, or trade elsewhere.`,
   },
   {
     id: 'fairs',

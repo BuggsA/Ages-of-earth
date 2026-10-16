@@ -5,7 +5,7 @@ import { CameraRig } from './render/camera';
 import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { wallLine } from './sim/commands';
-import { AGES, BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, RELIC, RUINS, SEASONS, STEPPE, TECHS, TICK_HZ, TRIBUTE, TRUNK, WARCAMP, WORKS, domainOf, unitStats } from './sim/data';
+import { AGES, BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, RELIC, RUINS, SEASONS, STEPPE, TECHS, TICK_HZ, TRIBUTE, TRUNK, WARCAMP, WAYS, WORKS, domainOf, unitStats } from './sim/data';
 import { crestSvg } from './ui/crests';
 import { isEnemy } from './sim/world';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
@@ -103,6 +103,8 @@ let lastAlert: { x: number; y: number } | null = null;
 const flockToast = { born: -1e9, hungry: -1e9 };
 /** When tribute was last told of (#318), taken by the viewer's riders or from the viewer's land. */
 const tributeToast = { took: -1e9, paid: -1e9 };
+/** When a toll was last told of (#334), taken by the viewer's land or paid by the viewer's traders. */
+const tollToast = { took: -1e9, paid: -1e9 };
 let altHeld = false;
 let acc = 0;
 let lastFrame = performance.now();
@@ -2122,6 +2124,18 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         }
         break;
       }
+      case 'toll': {
+        // Safe passage on the Silk Road (#334): a rival trader paid its way across a caravan people's land.
+        const fresh = (at: number, gap: number) => s.tick - at > gap * TICK_HZ || s.tick < at;
+        if (ev.owner === viewer && fresh(tollToast.took, 45)) {
+          tollToast.took = s.tick;
+          hud.toast(`🐫 A trader of ${s.players[ev.from].name}'s pays ${ev.gold} gold for safe passage across your land`, 'good');
+        } else if (ev.from === viewer && fresh(tollToast.paid, 45)) {
+          tollToast.paid = s.tick;
+          hud.toast(`🐫 Your trader pays ${s.players[ev.owner].name} a toll of ${ev.gold} gold crossing its land: a post whose road keeps out of it pays in full`, 'info');
+        }
+        break;
+      }
       case 'campAlone':
         // A War Camp left without its soldiers (#303).
         if (ev.owner === viewer) {
@@ -2167,6 +2181,15 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           lastAlert = { x: ev.x, y: ev.y };
         }
         break;
+      case 'way': {
+        const w = WAYS[ev.way];
+        if (ev.owner === viewer) {
+          hud.toast(`${w.icon} ${w.name}: ${w.blurb}`, 'good');
+          play('relicKeep');
+        } else if (s.players[ev.owner].team === s.players[viewer].team) hud.toast(`${s.players[ev.owner].name} takes ${w.name}`, 'info');
+        else hud.toast(`${s.players[ev.owner].name} lives by ${w.name}`, 'alert');
+        break;
+      }
       case 'greatWork':
         if (ev.owner === viewer) {
           const w = WORKS[s.players[viewer].civ];

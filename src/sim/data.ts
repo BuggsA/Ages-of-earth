@@ -1,4 +1,4 @@
-import type { AgeId, PathId, LandmarkKind, BuildingType, CivId, Cost, Difficulty, Domain, MapSize, MapType, Res, TechId, UnitType, PlayerStats } from './types';
+import type { AgeId, PathId, LandmarkKind, BuildingType, CivId, Cost, Difficulty, Domain, MapSize, MapType, Res, TechId, UnitType, PlayerStats, WayId } from './types';
 
 /** Every number in the game lives here. */
 
@@ -55,6 +55,13 @@ export interface Age {
   noBuild?: { buildings: BuildingType[]; why: string };
   /** A town on wheels (#297): Town Centers and Houses can be packed onto wagons and pitched again elsewhere (`STEPPE`). */
   mobile?: boolean;
+  /** Buildings a mobile age packs onto wagons besides `STEPPE.packs` (the Silk Road's Market, #326). */
+  packs?: BuildingType[];
+  /**
+   * Caravans that travel with the camp (the Silk Road, #326): a trader comes home to its Market even while
+   * it rolls on a wagon, and is paid more for the ground the Market covered while it was out (`SILK`).
+   */
+  caravans?: boolean;
   /**
    * Trade fed by faith (#49): every relic the people keeps in its Temples makes each trade trip pay
    * `each` more of its usual gold, counting at most `most` relics.
@@ -103,7 +110,6 @@ export const PATHS: Record<PathId, Path> = {
     name: 'Steppe Road',
     blurb: 'A people of herders and riders whose town goes where the grass and the fight are: no fields, no walls, Town Centers and Houses on wagons, flocks that walk with the camp. Each age of the road opens with a deeper deed of the hunt and the herd, and every age of it walked makes its riders 5% quicker.',
     carry: { cavalrySpeed: 0.05 },
-    planned: ['the Silk Road, where the horde meets the merchants'],
   },
 };
 
@@ -249,6 +255,22 @@ export const AGES: Record<AgeId, Age> = {
     mobile: true,
     noBuild: { buildings: ['farm', 'wall', 'gate'], why: 'A horde tills no fields and raises no walls: they wait until it settles in the Middle Ages' },
   },
+  // The third step of the Steppe Road (#326), a crossing: where the horde meets the merchants, at the Gunpowder Age's tier.
+  silk: {
+    name: 'Age of the Silk Road',
+    short: 'Silk Road',
+    tier: 3,
+    path: 'steppe',
+    blurb: 'The camp has become a moving trade post. The Market packs onto a wagon too (J) and rolls with the town, and traders come home to it wherever it has gone: every tile the Market covered while a trader was out pays that trip 2% more, up to 80%. Trade pays a fifth more and traders travel 15% faster; riders stay cheap and quick. No tribute is taken (a people that lives by the caravans keeps the roads open): instead, rival traders crossing your land with gold pay a toll of 15% for safe passage, once a trip, and Caravanserais (C) raised by the road rest your traders and make a near post pay more. Still no fields are tilled or walls raised.',
+    add: { toll: 0.15 },
+    mul: { tradeGold: 1.2, traderSpeed: 1.15, hunt: 1.15 },
+    price: { cavalry: 0.8 },
+    training: { cavalry: 0.75 },
+    mobile: true,
+    packs: ['market'],
+    caravans: true,
+    noBuild: { buildings: ['farm', 'wall', 'gate'], why: 'A caravan people tills no fields and raises no walls: they wait until it settles in the Gunpowder Age' },
+  },
 };
 
 /**
@@ -267,6 +289,29 @@ export const STEPPE = { pitch: 10, spot: 3, packs: ['towncenter', 'house'] as Bu
  * A rival with no gold pays nothing. Attrition (`ATTRITION`) still wears down riders past their own supply.
  */
 export const TRIBUTE = { every: 1, most: 8 };
+
+/**
+ * The Silk Road (#326): caravans travel with the camp. When a trader pays in, every tile between where its
+ * Market stood when it set out and where it stands now adds `each` to the trip's gold, counting at most
+ * `most` tiles, so a camp that keeps moving along the road earns more from the same posts. Only in an age
+ * with `caravans`; the Market that rolls on a wagon (or is being pitched) still takes its traders home.
+ */
+export const SILK = { each: 0.02, most: 40 };
+
+/**
+ * Caravanserais (#334): a Silk Road waystation. A player's land trips to a post within `near` tiles of the
+ * middle of one of their finished Caravanserais pay `pay` times as much (once, however many stand near).
+ * Every `every` seconds, the player's and allies' traders and wagons within `rest` tiles of one mend `heal`
+ * health a second. It holds land like a camp (`BORDERS.caravanserai`), so the toll is taken there too.
+ */
+export const SERAI = { near: 8, pay: 1.25, rest: 4, heal: 2, every: 1 };
+
+/**
+ * Safe passage (#334): what tribute becomes for a caravan people. Every `every` seconds outside the peace, a
+ * rival's trader heading home with gold, standing on the land of a people whose `toll` mod is above 0, gives
+ * that people the mod's share of its load (whole gold, floored), once a trip for each people it crosses.
+ */
+export const TOLL = { every: 1 };
 
 /**
  * Flocks (#308): the steppe's answer to the Farm it can't build, food that walks. A Town Center in the Age of
@@ -428,6 +473,33 @@ export const ROADS: Road[] = [
     blurb: 'A turn, not a climb, for a people that once rode the steppe: back onto the wagons as a horde. Riders standing in a rival\'s land exact tribute from its treasury. What it gives up: no new Farms, Walls or Gates are raised while it rides (the fields already tilled still yield).',
   },
   { from: 'horde', to: 'gunpowder', cost: { food: 1000, gold: 700, stone: 150 }, time: 65, blurb: 'Rejoin the main road: the tribute buys the horde its guns (more gold and less stone than from the Middle Ages: it never built in stone). Fields and walls return, the tribute ends, and nothing more is packed.' },
+  // The Steppe Road (#326), third step, a crossing: the Silk Road, from the merchants for a people that once rode
+  // the steppe, or a turn off the Gunpowder Age for one that rode as a horde (the Horde's own roads stay the trunk's,
+  // as Iron and Blood leaves from the Gunpowder Age for the Warband). A Market is the clue.
+  {
+    from: 'merchant',
+    to: 'silk',
+    cost: { food: 900, wood: 300, gold: 600 },
+    time: 60,
+    clue: 'market',
+    walked: 'steppe',
+    deed: { stat: 'traded', n: 800, text: 'Your traders bring home 800 gold' },
+    also: [{ stat: 'hunted', n: 800, text: 'Your hunters butcher 800 meat (the steppe\'s count goes on)' }],
+    blurb: 'Instead of the Gunpowder Age, for a merchant people that once rode the steppe: back onto the wagons, and the Market with them. Traders come home to the Market wherever the camp has moved, and every tile it covered while they were out pays them more. Trade pays a fifth more and traders travel faster. What it gives up: the hired swords, the plough and the wall.',
+  },
+  {
+    from: 'gunpowder',
+    to: 'silk',
+    cost: { food: 400, wood: 200, gold: 200 },
+    time: 35,
+    clue: 'market',
+    walked: 'horde',
+    deed: { stat: 'tribute', n: 300, text: 'Your riders take 300 gold in tribute' },
+    also: [{ stat: 'traded', n: 400, text: 'Your traders bring home 400 gold' }],
+    blurb: 'A turn, not a climb, for a people that rode as a horde: the horde meets the merchants, back on the wagons. The Market packs onto a wagon and rolls with the camp, traders come home to it wherever it has gone, and every tile it covered while they were out pays them more. Trade pays a fifth more and traders travel faster. What it gives up: the tribute (the caravans need open roads), the plough and the wall.',
+  },
+  { from: 'silk', to: 'industrial', cost: { food: 1300, gold: 1000, stone: 300 }, time: 80, blurb: 'Rejoin the main road: the caravans\' fortune buys its way into the Industrial Age (more gold and less stone than from the Gunpowder Age). Fields and walls return, and nothing more is packed.' },
+  { from: 'silk', to: 'gunpowder', cost: { food: 400, wood: 200 }, time: 30, blurb: 'Settle down: the caravan town takes root in the Gunpowder Age. Fields and walls return, riders cost their usual price, trade its usual gold, and the town stays where it stands.' },
   { from: 'horde', to: 'middle', cost: { food: 200, wood: 150 }, time: 25, blurb: 'Settle down: the ordinary Middle Ages. Fields and walls return, riders cost their usual price, the tribute ends and the town stays where it stands.' },
   { from: 'iron', to: 'middle', cost: EPOCHS[2].cost, time: EPOCHS[2].time, blurb: 'Rejoin the main road at the Middle Ages, for the same price as from the Bronze Age: the horse arrives, and the iron foot soldiers become ordinary pikemen.' },
   // Crossing chains (#49): relics, a deed of the faith, open a turn off the Middle Ages; trade and relics
@@ -916,6 +988,8 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   huntcamp: { name: 'Hunting Camp', size: 2, hp: 500, cost: { wood: 45 }, time: 14, pop: 0, sight: 5, trains: [], drop: ['food'], epoch: 0, menu: 'eco', key: 'N', blurb: 'A drop-off for food, and a small claim on the land round it. Raise it by the herd or a far kill: meat inside your border is safe from wolves, and Drying Racks keep it.' },
   // The Path of Blood (#303): pitched by foot soldiers where the army stands, enemy land too; burns when left alone (`WARCAMP`).
   warcamp: { name: 'War Camp', size: 2, hp: 700, cost: { wood: 100, gold: 40 }, time: 30, pop: 0, sight: 6, trains: ['infantry'], drop: [], epoch: 3, ages: ['ironblood', 'totalwar'], builders: ['infantry'], menu: 'mil', key: 'Q', blurb: 'Tents, a stockade and a war standard, pitched by foot soldiers where the army stands, in enemy land too. Trains foot soldiers at the front and holds the land round it, so the army there is fed. Left without soldiers nearby, it burns.' },
+  // The Silk Road (#334): a waystation by the road, raised in no one's land too; it rests traders, holds the land round it, and makes a near post pay more (`SERAI`).
+  caravanserai: { name: 'Caravanserai', size: 2, hp: 900, cost: { wood: 90, gold: 30 }, time: 25, pop: 0, sight: 6, trains: [], drop: [], epoch: 3, ages: ['silk'], menu: 'eco', key: 'C', blurb: 'A walled courtyard by the road where caravans rest. Raise it by a far trading post, in no one\'s land too: your traders\' trips to a post within 8 tiles of it pay a quarter more, traders and wagons within 4 tiles of it mend, and the land round it is yours, so rival traders crossing it pay your toll.' },
   airfield: { name: 'Airfield', size: 4, hp: 2200, cost: { wood: 250, stone: 100, gold: 150 }, time: 60, pop: 0, sight: 8, trains: ['fighter', 'bomber'], drop: [], epoch: 4, menu: 'mil', key: 'F', blurb: 'Builds fighters and bombers. Fighters hunt aircraft; bombers wreck towns.' },
 };
 
@@ -993,13 +1067,15 @@ export interface Mods {
   plunder: number;
   /** Gold a second each standing rider takes from the rival whose land it holds (the Age of the Horde, #318; `TRIBUTE`). */
   tribute: number;
+  /** Share of a loaded rival trader's gold taken once a trip when it crosses the people's land (safe passage on the Silk Road, #334; `TOLL`). */
+  toll: number;
 }
 
 export const NO_MODS: Mods = {
   meleeAttack: 0, rangedAttack: 0, armor: 0, parmor: 0, range: 0, carry: 0, citizenSpeed: 1, wood: 1, mine: 1, farm: 1, forage: 1, hunt: 1,
   buildingHp: 1, buildSpeed: 1, militaryTrain: 1, rangedTrain: 1, cavalrySpeed: 1, infantryHp: 1, infantryArmor: 0, infantryAttack: 0, priest: 1, chant: 1,
   siegeAttack: 1, siegeRange: 0, techCost: 1, wonderCost: 1, extraCitizens: 0, fish: 1, shipHp: 1, shipRange: 0, airSpeed: 1, airHp: 1,
-  traderSpeed: 1, tradeGold: 1, relicGold: 1, bogGold: 1, rot: 1, beastWard: 1, portReach: 0, riderSight: 0, consecrate: 0, elmo: 0, telegraph: 0, galvanic: 0, plunder: 0, tribute: 0,
+  traderSpeed: 1, tradeGold: 1, relicGold: 1, bogGold: 1, rot: 1, beastWard: 1, portReach: 0, riderSight: 0, consecrate: 0, elmo: 0, telegraph: 0, galvanic: 0, plunder: 0, tribute: 0, toll: 0,
 };
 
 export interface Tech {
@@ -1163,6 +1239,29 @@ export const WORKS: Record<CivId, GreatWork> = {
   chinese: { name: 'The Grand Canal', icon: '🛶', use: 'eco', blurb: 'Barges carry the empire’s grain and silk: every trade trip pays 50% more, and traders travel 30% faster.', mul: { tradeGold: 1.5, traderSpeed: 1.3 } },
   britons: { name: 'The Longbow Volley', icon: '🏹', use: 'war', blurb: 'Every yeoman draws as one: ranged soldiers strike +3 harder, and archery ranges train twice as fast.', add: { rangedAttack: 3 }, mul: { rangedTrain: 0.5 } },
 };
+
+/**
+ * Ways (#336): a custom your people choose in the Stone Age and keep the whole match. Free, once, with
+ * a price in what the other Ways are good at. The moment passes when the people climb out of the Stone Age.
+ */
+export interface Way {
+  name: string;
+  icon: string;
+  blurb: string;
+  add?: Partial<Mods>;
+  mul?: Partial<Mods>;
+}
+
+export const WAY_IDS: WayId[] = ['hunt', 'hearth', 'warband'];
+
+export const WAYS: Record<WayId, Way> = {
+  hunt: { name: 'The Hunters\' Way', icon: '🦌', blurb: 'Hunting yields 30% more, wolves, boars and mammoths bite 30% softer, citizens walk 5% quicker; berries are gathered 20% slower.', mul: { hunt: 1.3, beastWard: 0.7, citizenSpeed: 1.05, forage: 0.8 } },
+  hearth: { name: 'The Hearth Way', icon: '🔥', blurb: 'Berries yield 30% more, farms 15% more, wood 10% more; hunting is 20% slower and beasts bite 20% harder.', mul: { forage: 1.3, farm: 1.15, wood: 1.1, hunt: 0.8, beastWard: 1.2 } },
+  warband: { name: 'The Warband Way', icon: '🗡', blurb: 'Soldiers train 15% faster and strike 1 harder in melee; berries and hunting are 15% slower.', add: { meleeAttack: 1 }, mul: { militaryTrain: 0.85, forage: 0.85, hunt: 0.85 } },
+};
+
+/** Ways are taken in the Stone Age (epoch `until`) and no later; the computer takes its own after `aiAfter` seconds. */
+export const WAY = { until: 0, aiAfter: 25, near: 16 };
 
 /**
  * A people's signature soldiers: one unit line that carries their own names (one per epoch) and a
@@ -1395,7 +1494,7 @@ export function unitEpoch(type: UnitType): number {
  * nearest claimant (ties go to the older building). Shown only, so far; attrition and building limits
  * are later steps of the seed.
  */
-export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6, huntcamp: 4, warcamp: 3 };
+export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6, huntcamp: 4, warcamp: 3, caravanserai: 5 };
 
 /**
  * War Camps (#303): a finished camp with none of its people's soldiers (land units that fight) within

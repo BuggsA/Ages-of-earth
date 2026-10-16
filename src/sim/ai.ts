@@ -14,6 +14,7 @@ import { isEnemy, maxHp } from './world';
 import { callUpProblem } from './warcamp';
 import { borderMap, landOwnerAt, suppliedAt } from './borders';
 import { workProblem } from './works';
+import { aiWay } from './ways';
 import { beaconProblem, lit } from './beacon';
 import { rallyProblem } from './rally';
 import { consecrateProblem, consecrates } from './consecrate';
@@ -234,6 +235,8 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
 
   townBell(s, v, mem, issue);
   greatWork(s, v, mem, issue);
+  const way = AI_LEVELS[v.p.ai!].clever ? aiWay(s, v.p) : null;
+  if (way) issue({ t: 'way', p: v.p.id, way });
   lightBeacons(s, v, issue);
   beaconsForLightning(s, v, mem, issue);
   rallyTheLine(s, v, issue);
@@ -323,6 +326,8 @@ function fit(p: Player, to: AgeId): number {
   const cls = unitStats(sig, 0).cls;
   // The Path of Blood (#307) suits a people that fights with foot or riders; the others keep to trade, faith and craft.
   if (age.path === 'blood') return cls === 'infantry' || cls === 'cavalry' ? 0 : -1;
+  // The Silk Road (#326) waits until the computer knows how to move its Market with the camp.
+  if (to === 'silk') return -1;
   // The Steppe Road (#320): its first age is judged as any side age; the Horde follows it (#322, see `wants`).
   if (age.no?.units.includes(sig)) return -1;
   return (age.price?.[cls] ?? 1) < 1 ? 1 : 0;

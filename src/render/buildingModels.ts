@@ -251,6 +251,32 @@ function huntcamp(k: Kit, e: number, st: Style): void {
   k.cyl(0.2, 0.22, 0.07, 8, '#5c5651', -0.05, 0, 0.45);
   k.sphere(0.1, '#e5742a', -0.05, 0.1, 0.45).scale.set(1, 0.9, 1);
   k.team(k.box(1.3, 0.05, 0.06, TEAM, 0, 0.6, 0.12));
+  if (e <= 1) {
+    // Stone and bronze hunters: a pelt stretched on a frame and an aurochs skull on a post.
+    for (const x of [-1.05, -0.75]) k.cyl(0.03, 0.03, 0.6, 4, st.post, x, 0, 0.1);
+    k.box(0.38, 0.4, 0.02, '#b89468', -0.9, 0.12, 0.1);
+    k.cyl(0.035, 0.04, 0.9, 5, st.post, 1.1, 0, -0.1);
+    k.box(0.2, 0.1, 0.12, '#e7dfcc', 1.1, 0.9, -0.1);
+    for (const sx of [-1, 1]) k.box(0.14, 0.04, 0.04, '#e7dfcc', 1.1 + sx * 0.16, 0.98, -0.1);
+  } else if (e === 2) {
+    // Iron-age hunters: a stone-footed smokehouse with a chimney and a tanner's stretching frame.
+    k.box(0.5, 0.5, 0.45, STONE, -1.0, 0, -0.1);
+    k.prism(0.6, 0.25, 0.55, st.roof, -1.0, 0.5, -0.1);
+    k.box(0.12, 0.35, 0.12, STONE, -1.15, 0.6, -0.2);
+    k.box(0.14, 0.2, 0.03, '#2a2420', -1.0, 0, 0.14);
+    k.cyl(0.03, 0.03, 0.7, 4, st.post, 1.1, 0, 0.0);
+    k.box(0.4, 0.04, 0.04, st.post, 1.1, 0.7, 0.0);
+    k.box(0.3, 0.4, 0.02, '#b89468', 1.1, 0.3, 0.0);
+  } else {
+    // Gunpowder and industrial game-dealers: a butcher's hook beam hung with carcasses, and a game cart.
+    k.cyl(0.04, 0.05, 1.1, 5, e >= 4 ? '#3a3e44' : st.post, -1.1, 0, 0.0);
+    k.box(0.8, 0.05, 0.05, e >= 4 ? '#3a3e44' : st.post, -0.75, 1.05, 0.0);
+    for (const x of [-0.95, -0.7, -0.45]) k.box(0.1, 0.3, 0.08, '#a33b32', x, 0.7, 0.0);
+    k.box(0.5, 0.18, 0.3, WOOD, 1.1, 0.12, 0.0);
+    for (const z of [-0.17, 0.17]) k.cyl(0.14, 0.14, 0.04, 8, '#3a2b20', 1.1, 0.14, z).rotation.x = Math.PI / 2;
+    k.box(0.3, 0.12, 0.2, '#a33b32', 1.1, 0.3, 0.0);
+    if (e >= 4) lamp(k, 0.9, 0, 0.9, 0.75);
+  }
   banner(k, 0.85, 0, 0.8, 0.8);
 }
 
@@ -287,6 +313,60 @@ function warcamp(k: Kit, e: number, st: Style): void {
   k.box(0.012, 0.18, 0.5, '#9b1c2c', 0, 1.3, 0.2);
   k.team(k.box(0.014, 0.16, 0.36, TEAM, 0, 1.1, 0.13));
   k.cone(0.05, 0.12, 4, '#c9a23a', 0, 1.6, -0.05);
+}
+
+/**
+ * The Caravanserai (#334): a square mudbrick courtyard with round corner buttresses and a tall arched portal
+ * banded in turquoise tile. Inside, a well, bales of dyed cloth, and a camel kneeling to be unloaded.
+ */
+function caravanserai(k: Kit, _e: number, _st: Style): void {
+  const BRICK = '#d4b07e';
+  const BRICK2 = '#c39d6a';
+  const TILE = '#3f8f9a';
+  const DARK = '#2a2018';
+  k.box(1.95, 0.05, 1.95, '#b89a6c', 0, -0.02, 0);
+  k.box(1.5, 0.03, 1.5, '#cdb48c', 0, 0.02, 0);
+  // The outer walls, the front split by the portal.
+  k.box(1.8, 0.58, 0.18, BRICK, 0, 0, -0.81);
+  for (const x of [-0.81, 0.81]) k.box(0.18, 0.58, 1.8, BRICK, x, 0, 0);
+  for (const x of [-0.6, 0.6]) k.box(0.6, 0.58, 0.18, BRICK, x, 0, 0.81);
+  // A crenellated parapet along the top.
+  for (let i = 0; i < 7; i++) {
+    const t = -0.72 + i * 0.24;
+    k.box(0.1, 0.08, 0.2, BRICK2, -0.81, 0.58, t);
+    k.box(0.1, 0.08, 0.2, BRICK2, 0.81, 0.58, t);
+    k.box(0.2, 0.08, 0.1, BRICK2, t, 0.58, -0.81);
+  }
+  // Round buttresses at the corners.
+  for (const [x, z] of [[-0.84, -0.84], [0.84, -0.84], [-0.84, 0.84], [0.84, 0.84]]) {
+    k.cyl(0.15, 0.17, 0.72, 8, BRICK2, x, 0, z);
+    k.cyl(0.17, 0.17, 0.05, 8, BRICK, x, 0.72, z);
+  }
+  // Arched sleeping bays along the inside of the back wall.
+  for (const x of [-0.45, 0, 0.45]) {
+    k.box(0.22, 0.3, 0.02, DARK, x, 0.04, -0.71);
+    k.dome(0.11, DARK, x, 0.34, -0.71).scale.set(1, 1, 0.15);
+  }
+  // The portal (pishtaq): taller than the walls, its arch dark, a band of turquoise tile over it.
+  k.box(0.64, 1.0, 0.26, BRICK2, 0, 0, 0.84);
+  k.box(0.32, 0.5, 0.03, DARK, 0, 0, 0.97);
+  k.dome(0.16, DARK, 0, 0.5, 0.97).scale.set(1, 1.1, 0.12);
+  k.box(0.66, 0.08, 0.28, TILE, 0, 0.8, 0.84);
+  k.box(0.68, 0.05, 0.3, BRICK, 0, 1.0, 0.84);
+  for (const x of [-0.24, 0.24]) k.box(0.05, 0.6, 0.02, TILE, x, 0.08, 0.98);
+  banner(k, 0, 1.03, 0.78, 0.55);
+  for (const x of [-0.42, 0.42]) torch(k, x, 0.55, 1.0);
+  // The courtyard: a well, bales of dyed cloth, and a camel kneeling by them.
+  k.cyl(0.15, 0.16, 0.16, 8, STONE, 0, 0, -0.2);
+  k.cyl(0.11, 0.11, 0.01, 8, '#2d4a5a', 0, 0.16, -0.2);
+  const dyes = ['#a83a3a', '#3a4e9a', '#e0a83a'];
+  for (let i = 0; i < 3; i++) k.box(0.2, 0.15, 0.16, dyes[i], 0.42, i === 2 ? 0.15 : 0, -0.42 + (i === 2 ? 0.08 : i * 0.17));
+  const CAMEL = '#c49a62';
+  k.box(0.34, 0.15, 0.15, CAMEL, -0.38, 0.02, -0.42);
+  k.sphere(0.09, CAMEL, -0.4, 0.2, -0.42).scale.set(1.2, 0.9, 0.9);
+  k.box(0.06, 0.2, 0.06, CAMEL, -0.17, 0.12, -0.42).rotation.z = -0.35;
+  k.box(0.12, 0.06, 0.06, CAMEL, -0.1, 0.3, -0.42);
+  k.box(0.1, 0.03, 0.17, dyes[1], -0.4, 0.17, -0.42);
 }
 
 // ---- Farm ------------------------------------------------------------------------------------------
@@ -1286,7 +1366,7 @@ function ironTower(k: Kit, st: Style): void {
 /** The original four dressed ages, kept as the baseline model regression set. */
 export const LOOK_AGES: AgeId[] = ['merchant', 'iron', 'pilgrim', 'fair'];
 /** All dressed ages; additions get their own model coverage beside the baseline set. */
-export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer', 'sail', 'aeronaut', 'lightning', 'warband', 'ironblood', 'totalwar', 'horde'];
+export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer', 'sail', 'aeronaut', 'lightning', 'warband', 'ironblood', 'totalwar', 'horde', 'silk'];
 
 const SAIL = '#efe8d4';
 const NET = '#b9ad8a';
@@ -1415,6 +1495,32 @@ function hordeTouches(k: Kit, type: BuildingType): void {
   } else horsetail(k, span * 0.9, span * 0.9, tall * 0.85);
 }
 
+/**
+ * The Silk Road's towns (#326), a caravan camp: a striped awning out over each door on two poles, bolts of
+ * dyed silk drying on a line beside the bigger tents, and the white horsetail kept before the Town Center.
+ */
+function silkTouches(k: Kit, type: BuildingType): void {
+  // The Caravanserai (#334) is already the road's own building.
+  if (['farm', 'gate', 'tower', 'warcamp', 'caravanserai'].includes(type)) return;
+  const span = type === 'wonder' ? 2.4 : type === 'towncenter' ? 1.6 : type === 'house' ? 0.6 : type === 'market' ? 1.3 : 0.95;
+  const h = type === 'house' ? 0.8 : type === 'towncenter' || type === 'wonder' ? 1.5 : 1.15;
+  const front = span + 0.1;
+  const n = type === 'house' ? 4 : 6;
+  const w = (span * 1.3) / n;
+  for (let i = 0; i < n; i++) k.box(w, 0.03, 0.55, i % 2 ? '#efe2c4' : '#b8462e', -span * 0.65 + w * (i + 0.5), h, front + 0.22).rotation.x = 0.28;
+  for (const x of [-span * 0.62, span * 0.62]) k.cyl(0.02, 0.022, h - 0.12, 4, '#4a3626', x, 0, front + 0.46);
+  if (type !== 'house') {
+    // The drying line along the right side, its bolts in madder, indigo, saffron and plum.
+    const x = span + 0.35;
+    for (const z of [-span * 0.7, span * 0.7]) k.cyl(0.018, 0.02, 1.0, 4, '#4a3626', x, 0, z);
+    k.box(0.015, 0.015, span * 1.4, '#3a2c22', x, 0.98, 0);
+    const dyes = ['#a83a3a', '#3a4e9a', '#e0a83a', '#7a3a8a', '#3a8a6a'];
+    const bolts = type === 'market' || type === 'towncenter' || type === 'wonder' ? 5 : 3;
+    for (let i = 0; i < bolts; i++) k.box(0.02, 0.5, (span * 1.1) / bolts, dyes[i % dyes.length], x, 0.48, -span * 0.55 + ((span * 1.1) / bolts) * (i + 0.5));
+  }
+  if (type === 'towncenter') horsetail(k, -span - 0.2, span + 0.15, 2.7, true);
+}
+
 function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
   const big = type === 'towncenter';
   switch (age) {
@@ -1425,6 +1531,9 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
       break;
     case 'horde':
       hordeTouches(k, type);
+      break;
+    case 'silk':
+      silkTouches(k, type);
       break;
     case 'aeronaut': {
       // Sky blue navigation bands and a rooftop windsock mark the aviation towns.
@@ -1573,7 +1682,7 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
 }
 
 const MAKERS: Record<Exclude<BuildingType, 'wall'>, (k: Kit, e: number, st: Style) => void> = {
-  towncenter, house, storehouse, huntcamp, warcamp, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield,
+  towncenter, house, storehouse, huntcamp, warcamp, caravanserai, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield,
 };
 
 const cache = new Map<string, THREE.BufferGeometry>();

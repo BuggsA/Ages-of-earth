@@ -19,7 +19,7 @@ export type UnitType =
 export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
   | 'towncenter' | 'house' | 'storehouse' | 'farm' | 'barracks' | 'range' | 'stable' | 'tower'
-  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp';
+  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai';
 /** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
 export type Difficulty = 'gentle' | 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
@@ -27,6 +27,8 @@ export type MapType = 'continental' | 'highlands' | 'lakes' | 'forest' | 'plains
 /** Conquest: destroy every rival town. Regicide: each people has a King; lose them and you lose. Deathmatch: start rich. */
 export type GameMode = 'conquest' | 'regicide' | 'deathmatch' | 'lords';
 export type Stance = 'aggressive' | 'defensive' | 'stand';
+/** A custom the people live by, chosen in the Stone Age (#336). */
+export type WayId = 'hunt' | 'hearth' | 'warband';
 export type CivId = 'egyptians' | 'greeks' | 'romans' | 'mongols' | 'chinese' | 'britons';
 export type TechId =
   | 'forging' | 'ironCasting' | 'blastFurnace' | 'fletching' | 'bodkin' | 'scaleArmor' | 'chainMail' | 'plateArmor'
@@ -35,7 +37,7 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
 export type PathId = 'blood' | 'steppe';
@@ -110,7 +112,7 @@ export type Order =
    * A trader running the road between a Market and a trading post: out to the post (`go`), where it
    * loads gold worth the distance from the Market, and back to the Market to pay it in (`back`).
    */
-  | { k: 'trade'; post: number; market: number; phase: 'go' | 'back' }
+  | { k: 'trade'; post: number; market: number; phase: 'go' | 'back'; from?: { x: number; y: number } }
   /** A citizen digging at an ancient ruin (#64). */
   | { k: 'dig'; target: number };
 
@@ -154,6 +156,8 @@ export interface Unit {
   cool: number;
   carry: number;
   carryRes: Res | null;
+  /** A trader's load: a bit for each player whose toll it has paid since it was loaded (safe passage, #334). */
+  tolled?: number;
   /** Fraction of the next carried unit gathered so far. */
   frac: number;
   /** Ticks spent barely moving while trying to walk. */
@@ -417,6 +421,10 @@ export interface PlayerStats {
   milked?: number;
   /** Gold taken as tribute by riders standing in rivals' land (#318); absent in older saves. */
   tribute?: number;
+  /** Gold the Silk Road's caravans earned for the ground the camp covered while they were out (#326); absent in older saves. */
+  caravan?: number;
+  /** Gold taken in tolls from rival traders crossing the people's land (#334); absent in older saves. */
+  toll?: number;
   /** Enemy units (not buildings) the people's forces have slain: the Path of Blood's deeds (#299); absent in older saves. */
   slain?: number;
   /** Gold taken as plunder from the enemy dead (#299); absent in older saves. */
@@ -453,6 +461,8 @@ export interface Player {
   walked?: AgeId[];
   /** Epochs whose great work this player has called (seed #133); absent if none. */
   works?: number[];
+  /** The Way this people chose in the Stone Age (#336); absent if none. */
+  way?: WayId;
   /** Tick the great work now at hand ends; absent when none is. */
   workEnd?: number;
   /** Tick its last step back (#47) landed, for the cooldown; absent if it never stepped back. */
@@ -515,6 +525,8 @@ export type GameEvent =
   | { k: 'callUp'; owner: number; camp: number; ids: number[]; x: number; y: number }
   /** Riders of a horde (#318) took `gold` in tribute from `from`, standing in its land: `ids` are the riders counted. */
   | { k: 'tribute'; owner: number; from: number; gold: number; ids: number[]; x: number; y: number }
+  /** A rival trader of `from`'s paid `owner` a toll of `gold` for safe passage across its land (#334). */
+  | { k: 'toll'; owner: number; from: number; gold: number; id: number; x: number; y: number }
   | { k: 'campAlone'; owner: number; id: number; x: number; y: number; struck: boolean }
   | { k: 'alert'; owner: number; x: number; y: number; building: boolean; wild?: Animal['kind']; /** A rival's soldiers fell on a citizen out hunting. */ hunter?: boolean }
   | { k: 'converted'; id: number; from: number; to: number; x: number; y: number }
@@ -538,6 +550,7 @@ export type GameEvent =
   | { k: 'arc'; owner: number; building: number; pts: number[] }
   /** A great work was called (`on`) or ran out (seed #133). */
   | { k: 'greatWork'; owner: number; on: boolean }
+  | { k: 'way'; owner: number; way: WayId }
   | { k: 'wonder'; owner: number; id: number; x: number; y: number; ticks: number }
   | { k: 'trade'; owner: number; res: Res; buy: boolean }
   | { k: 'defeated'; owner: number }
@@ -548,7 +561,7 @@ export type GameEvent =
   | { k: 'relicHold'; team: number; ticks: number }
   | { k: 'landHold'; team: number; ticks: number }
   /** A trader took on its gold at a trading post (`loaded`), or paid it in at its Market (`paid`). */
-  | { k: 'caravan'; id: number; owner: number; what: 'loaded' | 'paid'; share?: boolean; amount: number; x: number; y: number }
+  | { k: 'caravan'; id: number; owner: number; what: 'loaded' | 'paid'; share?: boolean; amount: number; x: number; y: number; moved?: number; bonus?: number }
   /** A scenario's story beat (a raid, a gift) and an objective completed. */
   | { k: 'story'; title: string; text: string; bad: boolean }
   | { k: 'objective'; index: number }
@@ -727,6 +740,7 @@ export type Command =
   | { t: 'cry'; p: number; id: number }
   /** Call the people's great work (seed #133), once in each epoch. */
   | { t: 'greatWork'; p: number }
+  | { t: 'way'; p: number; way: WayId }
   | { t: 'stance'; p: number; ids: number[]; stance: Stance }
   | { t: 'train'; p: number; building: number; unit: UnitType }
   | { t: 'research'; p: number; building: number; tech: TechId }
