@@ -86,8 +86,16 @@ export function deedProgress(p: Player, r: Road): { have: number; need: number }
   return d ? { have: d.have, need: d.need } : null;
 }
 
-/** Whether every deed a road asks for is done. */
-export const deedsDone = (p: Player, r: Road): boolean => deedsProgress(p, r).every((d) => d.have >= d.need);
+/** Whether the people has mined enough of the ore a road's ore door asks for (#356 s3). Only a world that holds the ore lets anyone. */
+export const oreDone = (p: Player, r: Road): boolean => !!r.ore && (p.stats.mined?.[r.ore.id] ?? 0) >= r.ore.n;
+
+/** The ore door a player may see: the ore is in this world and they have mined some (the clue comes by digging, not a checklist). */
+export function oreClue(s: GameState, p: Player, r: Road): Road['ore'] | null {
+  return r.ore && s.rares?.includes(r.ore.id) && (p.stats.mined?.[r.ore.id] ?? 0) > 0 ? r.ore : null;
+}
+
+/** Whether every deed a road asks for is done, or its ore door has been opened. */
+export const deedsDone = (p: Player, r: Road): boolean => oreDone(p, r) || deedsProgress(p, r).every((d) => d.have >= d.need);
 
 /** What, besides its price, keeps a player off a road, or null. */
 export function roadProblem(s: GameState, p: Player, r: Road): string | null {
@@ -98,8 +106,10 @@ export function roadProblem(s: GameState, p: Player, r: Road): string | null {
     if (r.found && !surveyFinds(s, r.found)) return 'There is none in this world';
     return `Needs a ${BUILDINGS[r.clue!].name}`;
   }
+  if (oreDone(p, r)) return null;
   const left = deedsProgress(p, r).filter((d) => d.have < d.need);
-  return left.length ? left.map((d) => `${d.deed.text} (${d.have}/${d.need})`).join('; ') : null;
+  const door = oreClue(s, p, r);
+  return left.length ? left.map((d) => `${d.deed.text} (${d.have}/${d.need})`).join('; ') + (door ? `; or ${door.text.charAt(0).toLowerCase()}${door.text.slice(1)} (${Math.floor(p.stats.mined?.[door.id] ?? 0)}/${door.n})` : '') : null;
 }
 
 /** Units a player hires at a building in their age, beyond what it usually trains. */

@@ -149,6 +149,8 @@ function deposit(s: GameState, u: Unit, at: Building): void {
     const p = s.players[u.owner];
     const stock = (p.rare ??= {});
     stock[u.carryRare] = (stock[u.carryRare] ?? 0) + u.carry;
+    const mined = (p.stats.mined ??= {});
+    mined[u.carryRare] = (mined[u.carryRare] ?? 0) + u.carry;
     s.events.push({ k: 'deliver', owner: u.owner, res: u.carryRes, amount: u.carry, x: at.x, y: at.y, rare: u.carryRare });
   } else if (u.carry > 0 && u.carryRes) {
     const p = s.players[u.owner];

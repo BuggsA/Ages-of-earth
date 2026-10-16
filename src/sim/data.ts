@@ -1,4 +1,4 @@
-import type { AgeId, PathId, LandmarkKind, BuildingType, CivId, Cost, Difficulty, Domain, MapSize, MapType, Res, TechId, UnitType, PlayerStats, WayId } from './types';
+import type { AgeId, PathId, LandmarkKind, BuildingType, CivId, Cost, Difficulty, Domain, MapSize, MapType, Res, TechId, UnitType, PlayerStats, RareId, WayId } from './types';
 
 /** Every number in the game lives here. */
 
@@ -357,7 +357,7 @@ export const FLOCK = {
 
 /** Something a people must have done before a road opens: a tally from its stats reaching `n`. */
 export interface Deed {
-  stat: keyof PlayerStats;
+  stat: Exclude<keyof PlayerStats, 'mined'>;
   n: number;
   text: string;
 }
@@ -384,6 +384,11 @@ export interface Road {
   walked?: AgeId;
   /** A deed the road needs beyond its price: a tally from the player's stats. */
   deed?: Deed;
+  /**
+   * An ore door (#356 s3): in a world that holds this rare ore, mining `n` of it opens the road in place of its
+   * deeds, and the clue shows once the people has mined any. In a world without the ore the deeds are the only road.
+   */
+  ore?: { id: RareId; n: number; text: string };
   /**
    * More deeds, every one needed as well (#49): a hybrid age asks for deeds in two systems at once.
    * A list of tallies rather than a new kind of condition, because every system already keeps its
@@ -430,6 +435,7 @@ export const ROADS: Road[] = [
     time: 50,
     clue: 'market',
     deed: { stat: 'traded', n: 400, text: 'Your traders bring home 400 gold' },
+    ore: { id: 'salt', n: 60, text: 'Your citizens mine 60 salt to provision the caravans' },
     blurb: 'Instead of the Middle Ages: the same soldiers and technologies, but the Market hires foot, bow and horse for gold alone, in half the time; trade pays 25% more; soldiers trained the usual way cost 20% more.',
   },
   { from: 'merchant', to: 'gunpowder', cost: { food: 800, gold: 900, stone: 100 }, time: 65, blurb: 'Rejoin the main road: the merchant fortune buys its way into gunpowder (more gold and less stone than from the Middle Ages).' },
@@ -584,6 +590,7 @@ export const ROADS: Road[] = [
     clue: 'barracks',
     walked: 'warband',
     deed: { stat: 'plunder', n: 600, text: 'Your forces take 600 gold in plunder' },
+    ore: { id: 'bloodiron', n: 50, text: 'Your citizens mine 50 blood-iron for the war-hosts\' blades' },
     blurb: 'A turn, not a climb: the second step on the Path of Blood. Foot soldiers pitch War Camps where the army stands, even in enemy land, that train foot soldiers at the front and keep the army fed; plunder grows (the Warband walked adds to it). What it gives up: trade, a sixth of the harvest and a fifth more for every technology. A camp left without soldiers burns.',
   },
   { from: 'ironblood', to: 'industrial', cost: { food: 1400, gold: 700, stone: 500 }, time: 80, blurb: 'Rejoin the main road: the war economy becomes an industry (less gold and more stone than from the Gunpowder Age). The plunder ends, the War Camps are struck, and traders and full harvests return.' },
