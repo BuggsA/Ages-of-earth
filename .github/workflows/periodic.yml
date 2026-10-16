@@ -36,11 +36,15 @@ jobs:
         run: npm test
       - name: Browser for the smoke test
         run: npx playwright-core install --with-deps chromium
-      - name: Slow tests (tests/slow/)
+      # The atlas survey generates hundreds of worlds. Keep its 15 s test budget
+      # away from the CPU-heavy campaign proofs; run every test with unchanged limits.
+      - name: Slow tests (except Seed Atlas)
         env:
           CHROMIUM_PATH: ''
           SMOKE_SHOTS: ${{ github.workspace }}/smoke-shots
-        run: npm run test:slow
+        run: npm run test:slow -- --exclude tests/slow/seed-atlas.test.ts
+      - name: Seed Atlas survey (isolated)
+        run: npm run test:slow -- tests/slow/seed-atlas.test.ts
       - name: Smoke-test screenshots
         if: always()
         uses: actions/upload-artifact@v4

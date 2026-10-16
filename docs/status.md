@@ -351,3 +351,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Deep veins s3: ore doors** (#356, lane rules): 60 salt opens Merchants, 50 blood-iron opens Iron and Blood, in place of the deeds, only in worlds holding the ore; clue shows after digging. `tests/ore-door.test.ts`; browser unseen; no save bump (`stats.mined` optional).
 
 **Deep veins s5: the computer digs the ore** (#356, lane rules): clever towns dig salt/blood-iron for their ore door in worlds that hold it (`oreRoad`, `AI_ORE`). `tests/ai-ore.test.ts`; checksum of `scripts/sim.ts 3 medium 30` unchanged; no win-rate sweep; browser unseen; no save bump.
+
+**Isolated atlas survey** (#353, Codex, lane tooling): periodic runs the unchanged Seed Atlas slow tests after the other slow files, so campaign proofs do not consume its 15-second test budget. Standalone atlas: 5 passed in 23.60 s total. Quick unit tier: 119 files / 610 tests passed in 50.68 s. Local `npm run check` blocked by the native compiler requiring unavailable `/proc/self/exe`; GitHub CI pending. No gameplay, balance, save or test changes.
