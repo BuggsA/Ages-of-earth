@@ -313,3 +313,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Unit gallery** (#267, lane look): `scripts/gallery/units.html` draws every unit line across the five epochs, land and sea/air apart (`docs/screenshots/gallery-units-land.jpg`, `-sea.jpg`; `node scripts/gallery/shoot-units.mjs [dir] [civ]`). Seen in headless Chromium: epoch 0 and 1 warships and transports read alike from above, and every aircraft is one shape (epoch 4 only): candidates for a later art pass. Tooling only; no save bump.
 
 **Ship silhouettes** (#267, lane look): Stone Age war canoe and log raft, Gunpowder fluyt (stern castle, lantern, bowsprit). Render only; seen in the headless unit gallery only; no save bump.
+
+**Art pass 13** (#267, lane look): walls and gates of epochs 3–4 get their own silhouettes (bastion posts and sloped ramparts; brick piers, lamps and iron railings; portcullis, gun ports, iron gate leaves). Render only; `models.test.ts` builds them; wall arms unseen in a browser; no save bump.
