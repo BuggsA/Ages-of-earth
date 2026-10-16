@@ -1,4 +1,4 @@
-import { AGES, BUILDINGS, CALL_UP, ROADS, ROT, STEP_BACK, TRIBUTE, secs } from '../sim/data';
+import { AGES, BUILDINGS, CALL_UP, ROADS, ROT, SILK, STEP_BACK, TRIBUTE, secs } from '../sim/data';
 import { ageOf, backTo, deedProgress, deedsDone, mainRoad, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
 import type { Building, GameState, Unit } from '../sim/types';
 import { R_FISH } from '../sim/types';
@@ -209,6 +209,20 @@ const TIPS: Tip[] = [
     id: 'tribute',
     when: (s, me) => ageOf(s.players[me]) === 'horde',
     text: `Your horde lives on <b>tribute</b>. Ride into a rival's land and <b>hold your riders still</b> there (<kbd>C</kbd>, stand ground): each takes ${AGES.horde.add!.tribute} gold a second from that rival, up to ${TRIBUTE.most} riders a rival. Riders on the move take nothing, spears and towers answer them, and deep past your own land they wear down: pitch a camp near the border to keep them fed.`,
+  },
+  {
+    id: 'silkroad',
+    // The Steppe Road's third step (#326), a crossing: a merchant people that rode the steppe, or a Gunpowder people that rode as a horde.
+    when: (s, me) => {
+      const p = s.players[me];
+      return roadsFrom(p).some((r) => r.to === 'silk' && roadKnown(s, p, r) && !deedsDone(p, r));
+    },
+    text: `Your people remembers the wagons. Bring home the gold its deeds ask by trade (the Town Center's 🔀 shows how far along you are), and it can take the <b>${AGES.silk.name}</b> instead: the Market packs onto a wagon and rolls with the camp, and every tile it covers while a trader is out pays that trip ${Math.round(SILK.each * 100)}% more.`,
+  },
+  {
+    id: 'caravans',
+    when: (s, me) => ageOf(s.players[me]) === 'silk',
+    text: `Your town is a moving trade post. Select the Market and press <b>J</b> to pack it onto a wagon, drive it along the road and pitch it (<b>P</b>) further on: traders come home to it wherever it is, rolling or pitched, and every tile it moved since they set out pays ${Math.round(SILK.each * 100)}% more, up to ${Math.round(SILK.each * SILK.most * 100)}% (🐫 on a trader shows it). Nobody buys or sells while it rolls, and riders run a lone wagon down: keep it with the camp.`,
   },
   {
     id: 'fairs',

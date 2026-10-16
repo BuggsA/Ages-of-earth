@@ -55,6 +55,13 @@ export interface Age {
   noBuild?: { buildings: BuildingType[]; why: string };
   /** A town on wheels (#297): Town Centers and Houses can be packed onto wagons and pitched again elsewhere (`STEPPE`). */
   mobile?: boolean;
+  /** Buildings a mobile age packs onto wagons besides `STEPPE.packs` (the Silk Road's Market, #326). */
+  packs?: BuildingType[];
+  /**
+   * Caravans that travel with the camp (the Silk Road, #326): a trader comes home to its Market even while
+   * it rolls on a wagon, and is paid more for the ground the Market covered while it was out (`SILK`).
+   */
+  caravans?: boolean;
   /**
    * Trade fed by faith (#49): every relic the people keeps in its Temples makes each trade trip pay
    * `each` more of its usual gold, counting at most `most` relics.
@@ -103,7 +110,6 @@ export const PATHS: Record<PathId, Path> = {
     name: 'Steppe Road',
     blurb: 'A people of herders and riders whose town goes where the grass and the fight are: no fields, no walls, Town Centers and Houses on wagons, flocks that walk with the camp. Each age of the road opens with a deeper deed of the hunt and the herd, and every age of it walked makes its riders 5% quicker.',
     carry: { cavalrySpeed: 0.05 },
-    planned: ['the Silk Road, where the horde meets the merchants'],
   },
 };
 
@@ -249,6 +255,21 @@ export const AGES: Record<AgeId, Age> = {
     mobile: true,
     noBuild: { buildings: ['farm', 'wall', 'gate'], why: 'A horde tills no fields and raises no walls: they wait until it settles in the Middle Ages' },
   },
+  // The third step of the Steppe Road (#326), a crossing: where the horde meets the merchants, at the Gunpowder Age's tier.
+  silk: {
+    name: 'Age of the Silk Road',
+    short: 'Silk Road',
+    tier: 3,
+    path: 'steppe',
+    blurb: 'The camp has become a moving trade post. The Market packs onto a wagon too (J) and rolls with the town, and traders come home to it wherever it has gone: every tile the Market covered while a trader was out pays that trip 2% more, up to 80%. Trade pays a fifth more and traders travel 15% faster; riders stay cheap and quick. No tribute is taken (a people that lives by the caravans keeps the roads open), and still no fields are tilled or walls raised.',
+    mul: { tradeGold: 1.2, traderSpeed: 1.15, hunt: 1.15 },
+    price: { cavalry: 0.8 },
+    training: { cavalry: 0.75 },
+    mobile: true,
+    packs: ['market'],
+    caravans: true,
+    noBuild: { buildings: ['farm', 'wall', 'gate'], why: 'A caravan people tills no fields and raises no walls: they wait until it settles in the Gunpowder Age' },
+  },
 };
 
 /**
@@ -267,6 +288,14 @@ export const STEPPE = { pitch: 10, spot: 3, packs: ['towncenter', 'house'] as Bu
  * A rival with no gold pays nothing. Attrition (`ATTRITION`) still wears down riders past their own supply.
  */
 export const TRIBUTE = { every: 1, most: 8 };
+
+/**
+ * The Silk Road (#326): caravans travel with the camp. When a trader pays in, every tile between where its
+ * Market stood when it set out and where it stands now adds `each` to the trip's gold, counting at most
+ * `most` tiles, so a camp that keeps moving along the road earns more from the same posts. Only in an age
+ * with `caravans`; the Market that rolls on a wagon (or is being pitched) still takes its traders home.
+ */
+export const SILK = { each: 0.02, most: 40 };
 
 /**
  * Flocks (#308): the steppe's answer to the Farm it can't build, food that walks. A Town Center in the Age of
@@ -428,6 +457,33 @@ export const ROADS: Road[] = [
     blurb: 'A turn, not a climb, for a people that once rode the steppe: back onto the wagons as a horde. Riders standing in a rival\'s land exact tribute from its treasury. What it gives up: no new Farms, Walls or Gates are raised while it rides (the fields already tilled still yield).',
   },
   { from: 'horde', to: 'gunpowder', cost: { food: 1000, gold: 700, stone: 150 }, time: 65, blurb: 'Rejoin the main road: the tribute buys the horde its guns (more gold and less stone than from the Middle Ages: it never built in stone). Fields and walls return, the tribute ends, and nothing more is packed.' },
+  // The Steppe Road (#326), third step, a crossing: the Silk Road, from the merchants for a people that once rode
+  // the steppe, or a turn off the Gunpowder Age for one that rode as a horde (the Horde's own roads stay the trunk's,
+  // as Iron and Blood leaves from the Gunpowder Age for the Warband). A Market is the clue.
+  {
+    from: 'merchant',
+    to: 'silk',
+    cost: { food: 900, wood: 300, gold: 600 },
+    time: 60,
+    clue: 'market',
+    walked: 'steppe',
+    deed: { stat: 'traded', n: 800, text: 'Your traders bring home 800 gold' },
+    also: [{ stat: 'hunted', n: 800, text: 'Your hunters butcher 800 meat (the steppe\'s count goes on)' }],
+    blurb: 'Instead of the Gunpowder Age, for a merchant people that once rode the steppe: back onto the wagons, and the Market with them. Traders come home to the Market wherever the camp has moved, and every tile it covered while they were out pays them more. Trade pays a fifth more and traders travel faster. What it gives up: the hired swords, the plough and the wall.',
+  },
+  {
+    from: 'gunpowder',
+    to: 'silk',
+    cost: { food: 400, wood: 200, gold: 200 },
+    time: 35,
+    clue: 'market',
+    walked: 'horde',
+    deed: { stat: 'tribute', n: 300, text: 'Your riders take 300 gold in tribute' },
+    also: [{ stat: 'traded', n: 400, text: 'Your traders bring home 400 gold' }],
+    blurb: 'A turn, not a climb, for a people that rode as a horde: the horde meets the merchants, back on the wagons. The Market packs onto a wagon and rolls with the camp, traders come home to it wherever it has gone, and every tile it covered while they were out pays them more. Trade pays a fifth more and traders travel faster. What it gives up: the tribute (the caravans need open roads), the plough and the wall.',
+  },
+  { from: 'silk', to: 'industrial', cost: { food: 1300, gold: 1000, stone: 300 }, time: 80, blurb: 'Rejoin the main road: the caravans\' fortune buys its way into the Industrial Age (more gold and less stone than from the Gunpowder Age). Fields and walls return, and nothing more is packed.' },
+  { from: 'silk', to: 'gunpowder', cost: { food: 400, wood: 200 }, time: 30, blurb: 'Settle down: the caravan town takes root in the Gunpowder Age. Fields and walls return, riders cost their usual price, trade its usual gold, and the town stays where it stands.' },
   { from: 'horde', to: 'middle', cost: { food: 200, wood: 150 }, time: 25, blurb: 'Settle down: the ordinary Middle Ages. Fields and walls return, riders cost their usual price, the tribute ends and the town stays where it stands.' },
   { from: 'iron', to: 'middle', cost: EPOCHS[2].cost, time: EPOCHS[2].time, blurb: 'Rejoin the main road at the Middle Ages, for the same price as from the Bronze Age: the horse arrives, and the iron foot soldiers become ordinary pikemen.' },
   // Crossing chains (#49): relics, a deed of the faith, open a turn off the Middle Ages; trade and relics

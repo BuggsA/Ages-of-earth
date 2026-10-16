@@ -883,6 +883,12 @@ export class View {
             this.effects.ring(at, '#cfe8ff', 2.4, 1.1);
             this.effects.burst(at.clone().setY(at.y + 1.6), { count: 10, speed: 0.7, up: 1.6, life: 1.6, size: 0.04, gravity: 0.6, colors: ['#e8f1ff', '#ffe9a8', '#cfe8ff'] });
             if (ev.owner === this.viewer) this.cue('tradeShare', ev.x, ev.y, 1);
+          } else if (ev.what === 'paid' && ev.bonus) {
+            // A caravan home to a camp that moved (the Silk Road, #326): more gold, and a drift of silk-coloured dust off the road.
+            this.effects.burst(at.clone().setY(at.y + 1.2), { count: 26, speed: 1.3, up: 1.3, life: 1.3, size: 0.05, gravity: 2.2, colors: ['#ffd166', '#f2cf4a', '#fff3c4'] });
+            this.effects.burst(at.clone().setY(at.y + 0.3), { count: 14, speed: 0.8, up: 0.5, life: 1.8, size: 0.1, grow: 2, gravity: -0.1, drag: 0.7, soft: true, colors: ['#c8a46a', '#a83a3a', '#3a4e9a', '#e0a83a'] });
+            this.effects.ring(at, '#e0a83a', 2.2, 1);
+            if (ev.owner === this.viewer) this.cue('caravanBells', ev.x, ev.y, 1);
           } else if (ev.what === 'paid') {
             this.effects.burst(at.clone().setY(at.y + 1.2), { count: 18, speed: 1.2, up: 1.2, life: 1.2, size: 0.05, gravity: 2.2, colors: ['#ffd166', '#f2cf4a', '#fff3c4'] });
             if (ev.owner === this.viewer) this.cue('tradePaid', ev.x, ev.y, 1);

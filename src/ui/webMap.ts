@@ -101,7 +101,8 @@ export function roadView(d: Discovery, r: Road): 'hidden' | 'faint' | 'known' {
 // The Path of Blood keeps the left column (Warband over Iron and Blood, #303, over Total War, #313), so the Reclaimers moved to lane 2
 // and the Fairs to lane 3 at tier 3, and Lightning to lane 3 at tier 4 (its road curves under the Aeronauts).
 // The Steppe Road (#318) keeps the right column, as the Path of Blood keeps the left: the Steppe over the Horde.
-const LANE: Record<AgeId, number> = { iron: 0, reclaimer: 2, stone: 1, bronze: 1, middle: 1, gunpowder: 1, industrial: 1, merchant: 2, pilgrim: 3, fair: 3, sail: 4, aeronaut: 2, lightning: 3, warband: 0, steppe: 5, ironblood: 0, totalwar: 0, horde: 5 };
+// The Silk Road (#326), the crossing where the horde meets the merchants, steps in to lane 4 under the Sail, between its two roads.
+const LANE: Record<AgeId, number> = { iron: 0, reclaimer: 2, stone: 1, bronze: 1, middle: 1, gunpowder: 1, industrial: 1, merchant: 2, pilgrim: 3, fair: 3, sail: 4, aeronaut: 2, lightning: 3, warband: 0, steppe: 5, ironblood: 0, totalwar: 0, horde: 5, silk: 4 };
 /** Six lanes wide: 48 + 5 × 88 + half a node fits in 528 (the Steppe Road, lane 5, sat past the old 440). */
 export const MAP = { w: 528, h: 440, nodeW: 76, nodeH: 34, top: 40, gap: 85 };
 

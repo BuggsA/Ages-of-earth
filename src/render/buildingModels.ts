@@ -1217,7 +1217,7 @@ function ironTower(k: Kit, st: Style): void {
 /** The original four dressed ages, kept as the baseline model regression set. */
 export const LOOK_AGES: AgeId[] = ['merchant', 'iron', 'pilgrim', 'fair'];
 /** All dressed ages; additions get their own model coverage beside the baseline set. */
-export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer', 'sail', 'aeronaut', 'lightning', 'warband', 'ironblood', 'totalwar', 'horde'];
+export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer', 'sail', 'aeronaut', 'lightning', 'warband', 'ironblood', 'totalwar', 'horde', 'silk'];
 
 const SAIL = '#efe8d4';
 const NET = '#b9ad8a';
@@ -1346,6 +1346,31 @@ function hordeTouches(k: Kit, type: BuildingType): void {
   } else horsetail(k, span * 0.9, span * 0.9, tall * 0.85);
 }
 
+/**
+ * The Silk Road's towns (#326), a caravan camp: a striped awning out over each door on two poles, bolts of
+ * dyed silk drying on a line beside the bigger tents, and the white horsetail kept before the Town Center.
+ */
+function silkTouches(k: Kit, type: BuildingType): void {
+  if (['farm', 'gate', 'tower', 'warcamp'].includes(type)) return;
+  const span = type === 'wonder' ? 2.4 : type === 'towncenter' ? 1.6 : type === 'house' ? 0.6 : type === 'market' ? 1.3 : 0.95;
+  const h = type === 'house' ? 0.8 : type === 'towncenter' || type === 'wonder' ? 1.5 : 1.15;
+  const front = span + 0.1;
+  const n = type === 'house' ? 4 : 6;
+  const w = (span * 1.3) / n;
+  for (let i = 0; i < n; i++) k.box(w, 0.03, 0.55, i % 2 ? '#efe2c4' : '#b8462e', -span * 0.65 + w * (i + 0.5), h, front + 0.22).rotation.x = 0.28;
+  for (const x of [-span * 0.62, span * 0.62]) k.cyl(0.02, 0.022, h - 0.12, 4, '#4a3626', x, 0, front + 0.46);
+  if (type !== 'house') {
+    // The drying line along the right side, its bolts in madder, indigo, saffron and plum.
+    const x = span + 0.35;
+    for (const z of [-span * 0.7, span * 0.7]) k.cyl(0.018, 0.02, 1.0, 4, '#4a3626', x, 0, z);
+    k.box(0.015, 0.015, span * 1.4, '#3a2c22', x, 0.98, 0);
+    const dyes = ['#a83a3a', '#3a4e9a', '#e0a83a', '#7a3a8a', '#3a8a6a'];
+    const bolts = type === 'market' || type === 'towncenter' || type === 'wonder' ? 5 : 3;
+    for (let i = 0; i < bolts; i++) k.box(0.02, 0.5, (span * 1.1) / bolts, dyes[i % dyes.length], x, 0.48, -span * 0.55 + ((span * 1.1) / bolts) * (i + 0.5));
+  }
+  if (type === 'towncenter') horsetail(k, -span - 0.2, span + 0.15, 2.7, true);
+}
+
 function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
   const big = type === 'towncenter';
   switch (age) {
@@ -1356,6 +1381,9 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
       break;
     case 'horde':
       hordeTouches(k, type);
+      break;
+    case 'silk':
+      silkTouches(k, type);
       break;
     case 'aeronaut': {
       // Sky blue navigation bands and a rooftop windsock mark the aviation towns.

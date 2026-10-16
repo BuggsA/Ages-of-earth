@@ -520,5 +520,6 @@ function markOf(s: GameState, type: UnitType, owner: number): CivId | undefined 
 }
 
 function modelEpoch(u: Unit, epoch: number): number {
-  return u.type === 'trader' && u.carry > 0 ? epoch + 10 : epoch;
+  // A loaded trader is drawn with its gold; a wagon carrying a Market (the Silk Road, #326) as the caravan cart.
+  return u.type === 'trader' && u.carry > 0 ? epoch + 10 : u.type === 'wagon' && u.packed === 'market' ? epoch + 20 : epoch;
 }
