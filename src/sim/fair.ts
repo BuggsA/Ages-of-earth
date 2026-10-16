@@ -1,0 +1,37 @@
+import { FAIR, secs } from './data';
+import { ageDef } from './ages';
+import type { GameState } from './types';
+
+/** Whether a feast day is open now (the Age of Fairs): the first `open` seconds of every `every`. */
+export const feastOpen = (s: GameState): boolean => s.tick % secs(FAIR.every) < secs(FAIR.open);
+
+/** Whether a Market stands within reach of a standing Temple of the owner's that keeps a relic: a fairground. */
+export function fairground(s: GameState, owner: number, at: { x: number; y: number }): boolean {
+  const r2 = FAIR.reach * FAIR.reach;
+  for (const r of s.relics) {
+    if (!r.temple) continue;
+    const t = s.byId.get(r.temple);
+    if (!t || t.kind !== 'building' || t.owner !== owner || t.hp <= 0 || !t.built) continue;
+    if ((t.x - at.x) * (t.x - at.x) + (t.y - at.y) * (t.y - at.y) <= r2) return true;
+  }
+  return false;
+}
+
+/** What a trip paid at this Market is multiplied by now: `FAIR.pay` on a feast day at a fairground, else 1. */
+export function fairShare(s: GameState, owner: number, market: { x: number; y: number }): number {
+  return ageDef(s.players[owner]).fairs && feastOpen(s) && fairground(s, owner, market) ? FAIR.pay : 1;
+}
+
+/** Tells each Fairs people with a fairground when a feast opens. */
+export function fairStep(s: GameState): void {
+  if (s.tick % secs(FAIR.every) !== 0 || s.tick === 0) return;
+  for (const p of s.players) {
+    if (!ageDef(p).fairs) continue;
+    for (const e of s.ents) {
+      if (e.kind === 'building' && e.owner === p.id && e.type === 'market' && e.built && e.hp > 0 && fairground(s, p.id, e)) {
+        s.events.push({ k: 'fair', owner: p.id });
+        break;
+      }
+    }
+  }
+}
