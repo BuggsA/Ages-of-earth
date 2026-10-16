@@ -1,4 +1,4 @@
-import { AGES, BUILDINGS, CIVS, WAYS, WORKS, SIGNATURES, EPOCHS, NO_MODS, PATHS, TECHS, WARCAMP, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
+import { AGES, BUILDINGS, CIVS, WAYS, WORKS, SIGNATURES, EPOCHS, NO_MODS, PATHS, RARE, TECHS, WARCAMP, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
 import { ageDef, ageOf, hasWalked, isHire, isSuspended, pathCarry } from './ages';
 import type { BuildingType, Cost, GameState, Player, TechId, UnitType } from './types';
 import { RES } from './types';
@@ -184,6 +184,11 @@ export function techProblem(s: GameState, owner: number, tech: TechId): string |
     if (missing.length) return `An heirloom: walk the ${missing.map((a) => AGES[a].name).join(' and the ')} first`;
   }
   if (t.needs && !p.techs.includes(t.needs)) return `Needs ${TECHS[t.needs].name} first`;
+  if (t.ore) {
+    if (!s.rares?.includes(t.ore.id)) return `There is no ${RARE[t.ore.id].name.toLowerCase()} in this world`;
+    const have = Math.floor(p.stats.mined?.[t.ore.id] ?? 0);
+    if (have < t.ore.n) return `Mine ${t.ore.n} ${RARE[t.ore.id].name.toLowerCase()} first (${have}/${t.ore.n})`;
+  }
   for (const e of s.ents) if (e.kind === 'building' && e.owner === owner && e.queue.some((q) => q.tech === tech)) return 'Already being researched';
   return null;
 }
