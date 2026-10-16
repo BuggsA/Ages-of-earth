@@ -105,6 +105,42 @@ function bogIron(): Kit {
   return k;
 }
 
+/** Salt (#356): bare ground crusted white, blocks of clean crystal. */
+function saltVein(): Kit {
+  const k = new Kit();
+  k.cyl(0.46, 0.5, 0.03, 9, '#d9d2c0', 0, 0.0);
+  k.rock(0.2, '#f1eee4', 0.1, 0.1, 0.05);
+  k.rock(0.15, '#e4e0d2', -0.18, 0.07, -0.12);
+  k.rock(0.12, '#fbf9f2', 0.02, 0.2, -0.1);
+  return k;
+}
+
+/** Saltpetre (#356): a pale yellow crust on damp dark rock, with fine needles. */
+function saltpetreVein(): Kit {
+  const k = new Kit();
+  k.rock(0.3, '#6b6558', 0, 0.14);
+  k.rock(0.2, '#7a7466', -0.22, 0.08, 0.1);
+  for (let i = 0; i < 7; i++) {
+    const a = i * 1.1;
+    const n = k.cone(0.03, 0.2 + (i % 3) * 0.06, 4, i % 2 ? '#e6df8e' : '#cfc66a', Math.cos(a) * 0.2, 0.2, Math.sin(a) * 0.2);
+    n.rotation.z = ((i % 3) - 1) * 0.35;
+  }
+  return k;
+}
+
+/** Blood-iron (#356): black ore laced with wet red veins that glow faintly, as if warm. */
+function bloodIronVein(): Kit {
+  const k = new Kit();
+  k.rock(0.32, '#2f2326', 0, 0.16);
+  k.rock(0.2, '#3a2a2e', 0.24, 0.1, 0.12);
+  k.rock(0.16, '#241a1d', -0.22, 0.08, -0.14);
+  for (let i = 0; i < 5; i++) {
+    const a = i * 1.3;
+    k.glow(k.octa(0.05 + (i % 2) * 0.02, i % 2 ? '#c4202f' : '#8f1624', Math.cos(a) * 0.18, 0.18 + (i % 3) * 0.07, Math.sin(a) * 0.18));
+  }
+  return k;
+}
+
 function tuft(): Kit {
   const k = new Kit();
   for (let i = 0; i < 4; i++) {
@@ -181,7 +217,7 @@ function fish(): Kit {
   return k;
 }
 
-const MAKERS = { pine, broadleaf, birch, palm, felled, berryBush, stoneDeposit, goldDeposit, bogIron, carcass, tuft, flowers, pebbles, boulder, fish };
+const MAKERS = { pine, broadleaf, birch, palm, felled, berryBush, stoneDeposit, goldDeposit, bogIron, saltVein, saltpetreVein, bloodIronVein, carcass, tuft, flowers, pebbles, boulder, fish };
 export type NatureKind = keyof typeof MAKERS;
 
 const cache = new Map<NatureKind, THREE.BufferGeometry>();

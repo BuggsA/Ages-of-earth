@@ -4,7 +4,7 @@ import type { AgeId, GameState } from '../sim/types';
 import type { ScoutFlag } from './scoutFlags';
 import { iceCover, lookFor, mapTint } from '../render/seasonLook';
 import { Waymarks } from './waymarks';
-import { R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE, T_ROCK, T_SAND, T_WATER } from '../sim/types';
+import { R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE, T_ROCK, T_SAND, T_WATER } from '../sim/types';
 
 /**
  * The overview map: the land through the player's fog, woods and mines, the buildings they know of,
@@ -131,6 +131,9 @@ export class Minimap {
     const berry = rgb('#e0405a');
     const fish = rgb('#8fe3f2');
     const bog = rgb('#c0622a');
+    const salt = rgb('#f4f1e8');
+    const petre = rgb('#d8d27a');
+    const bloodiron = rgb('#a01c2c');
     for (let i = 0; i < s.w * s.h; i++) {
       const seen = reveal || p.seen[i];
       const vis = reveal || p.vis[i];
@@ -155,6 +158,9 @@ export class Minimap {
       else if (res === R_BERRY || res === R_MEAT) [r, g, b] = berry;
       else if (res === R_FISH) [r, g, b] = fish;
       else if (res === R_BOG) [r, g, b] = bog;
+      else if (res === R_SALT) [r, g, b] = salt;
+      else if (res === R_SALTPETRE) [r, g, b] = petre;
+      else if (res === R_BLOODIRON) [r, g, b] = bloodiron;
       const k = seen ? (vis ? 1 : 0.55) : 0;
       d[i * 4] = seen ? r * k : 14;
       d[i * 4 + 1] = seen ? g * k : 22;

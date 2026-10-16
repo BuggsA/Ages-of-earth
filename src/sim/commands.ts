@@ -274,8 +274,8 @@ export function applyCommand(s: GameState, c: Command): void {
       const nodes = c.spread && kind !== R_MEAT && workers.length > 1 ? nodesNear(s, c.tile, kind) : [c.tile];
       const load = new Map<number, number>();
       for (const u of workers) {
-        let tile = c.tile;
-        for (const n of nodes) if ((load.get(n) ?? 0) < SPREAD.perNode) { tile = n; break; }
+        // The first node with room; when every node is full, the least crowded one (not the clicked one, again).
+        let tile = nodes.find((n) => (load.get(n) ?? 0) < SPREAD.perNode) ?? nodes.reduce((a, n) => ((load.get(n) ?? 0) < (load.get(a) ?? 0) ? n : a), nodes[0]);
         load.set(tile, (load.get(tile) ?? 0) + 1);
         giveOrder(u, { k: 'gather', tile, res: RES_OF_TILE[kind], phase: 'go' }, c.queue);
       }

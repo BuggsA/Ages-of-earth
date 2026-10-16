@@ -1,8 +1,9 @@
 import * as THREE from 'three';
-import { AMOUNT } from '../sim/data';
+import { AMOUNT, RARE } from '../sim/data';
+import { RARE_OF_TILE } from '../sim/units';
 import { hash2 } from '../sim/rng';
 import type { GameState } from '../sim/types';
-import { R_BERRY, R_BOG, R_FISH, R_MEAT, R_STONE, R_TREE, T_SAND } from '../sim/types';
+import { R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_MEAT, R_STONE, R_TREE, T_SAND } from '../sim/types';
 import { bakedMaterial, swayMaterial } from './materials';
 import { natureGeometry, type NatureKind } from './natureModels';
 import { heightAt } from './terrain';
@@ -73,7 +74,7 @@ export class ResourcesView {
         const rot = hash2(tx, ty, 33) * Math.PI * 2;
         q.setFromAxisAngle(up, rot);
         const gy = heightAt(s, x, y);
-        const frac = s.amount[i] / (r === R_TREE ? AMOUNT.tree : r === R_BERRY ? AMOUNT.berry : r === R_MEAT ? AMOUNT.meat : r === R_STONE ? AMOUNT.stone : r === R_FISH ? AMOUNT.fish : r === R_BOG ? AMOUNT.bog : AMOUNT.gold);
+        const frac = s.amount[i] / (r === R_TREE ? AMOUNT.tree : r === R_BERRY ? AMOUNT.berry : r === R_MEAT ? AMOUNT.meat : r === R_STONE ? AMOUNT.stone : r === R_FISH ? AMOUNT.fish : r === R_BOG ? AMOUNT.bog : RARE_OF_TILE[r] ? RARE[RARE_OF_TILE[r]].amount : AMOUNT.gold);
         if (r === R_TREE) {
           if (s.amount[i] < AMOUNT.tree) {
             add('felled', i, new THREE.Matrix4().compose(new THREE.Vector3(x, gy, y), q, new THREE.Vector3(1, 1, 1)));
@@ -91,7 +92,7 @@ export class ResourcesView {
           const sc = UNIT_SCALE * (0.6 + 0.4 * Math.max(0, Math.min(1, frac))) * Math.min(2, Math.max(1, Math.sqrt(frac)));
           add('carcass', i, new THREE.Matrix4().compose(new THREE.Vector3(tx + 0.5, gy, ty + 0.5), q, new THREE.Vector3(sc, sc, sc)));
         } else {
-          const kind: NatureKind = r === R_BERRY ? 'berryBush' : r === R_STONE ? 'stoneDeposit' : r === R_BOG ? 'bogIron' : 'goldDeposit';
+          const kind: NatureKind = r === R_BERRY ? 'berryBush' : r === R_STONE ? 'stoneDeposit' : r === R_BOG ? 'bogIron' : r === R_SALT ? 'saltVein' : r === R_SALTPETRE ? 'saltpetreVein' : r === R_BLOODIRON ? 'bloodIronVein' : 'goldDeposit';
           const sc = (0.55 + 0.5 * Math.max(0, Math.min(1, frac))) * (r === R_BERRY ? 1 : 1.25);
           add(kind, i, new THREE.Matrix4().compose(new THREE.Vector3(tx + 0.5, gy, ty + 0.5), q, new THREE.Vector3(sc, sc, sc)));
         }
@@ -104,7 +105,7 @@ export class ResourcesView {
           this.group.remove(mesh);
           mesh.dispose();
         }
-        const sway = kind !== 'felled' && kind !== 'stoneDeposit' && kind !== 'goldDeposit' && kind !== 'bogIron' && kind !== 'carcass';
+        const sway = kind !== 'felled' && kind !== 'stoneDeposit' && kind !== 'goldDeposit' && kind !== 'bogIron' && kind !== 'saltVein' && kind !== 'saltpetreVein' && kind !== 'bloodIronVein' && kind !== 'carcass';
         mesh = new THREE.InstancedMesh(natureGeometry(kind), sway ? swayMaterial : bakedMaterial, Math.ceil(list.length * 1.2) + 8);
         // Shoals cast no shadow on the water.
         mesh.castShadow = kind !== 'fish';
