@@ -1,5 +1,5 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_WEB, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_WEB, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Ruin, TechId, TradePost, Unit, UnitType } from './types';
@@ -19,6 +19,8 @@ import { rallyProblem } from './rally';
 import { consecrateProblem, consecrates } from './consecrate';
 import { sees } from './vision';
 import { seasonAt } from './seasons';
+import { isMobile } from './steppe';
+import { flockCap, flockOf, grassy, milkable } from './flocks';
 import { progress, scenarioById } from './campaign';
 
 /**
@@ -114,6 +116,12 @@ interface View {
   armyFirst: boolean;
   /** A citizen out claiming a landmark, left alone by the town's work. */
   claimers: Set<number>;
+  /** Its packed Town Centers and Houses on the road (#320): never soldiers. */
+  wagons: Unit[];
+  /** How many citizens may hunt deer, and how far from home: more and further for a people bound for the steppe (#320). */
+  hunt: { n: number; r: number };
+  /** About to strike camp (#320): the Town Center starts nothing new, so its queue empties and it can pack. */
+  packing: boolean;
 }
 
 function afford(v: View, cost: Cost): boolean {
@@ -134,6 +142,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   const fishers: Unit[] = [];
   const navy: Unit[] = [];
   const planes: Unit[] = [];
+  const wagons: Unit[] = [];
   const buildings: Building[] = [];
   let king: Unit | null = null;
   for (const e of s.ents) {
@@ -141,27 +150,30 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
     if (e.kind === 'unit' && s.kings[p.id] === e.id) king = e;
     else if (e.kind === 'unit') {
       const list =
-        e.type === 'citizen' ? citizens : e.type === 'priest' ? priests : e.type === 'trader' ? traders : e.type === 'cog' ? cogs : e.type === 'fisher' ? fishers : e.type === 'warship' || e.type === 'transport' ? navy : e.type === 'fighter' || e.type === 'bomber' ? planes : army;
+        e.type === 'citizen' ? citizens : e.type === 'wagon' ? wagons : e.type === 'priest' ? priests : e.type === 'trader' ? traders : e.type === 'cog' ? cogs : e.type === 'fisher' ? fishers : e.type === 'warship' || e.type === 'transport' ? navy : e.type === 'fighter' || e.type === 'bomber' ? planes : army;
       list.push(e);
     } else buildings.push(e);
   }
   const tc = buildings.find((b) => b.type === 'towncenter' && b.built) ?? null;
   // A King stays out of harm's way, sheltered in the Town Center.
   if (king && tc && !king.inside && king.order.k !== 'garrison') applyCommand(s, { t: 'garrison', p: p.id, ids: [king.id], target: tc.id });
-  const home = tc ? { x: tc.x, y: tc.y } : { x: p.startX, y: p.startY };
-  const v: View = { p, citizens, army, priests, traders, cogs, fishers, navy, planes, buildings, home, tc, budget: { ...p.res }, plan: NO_PLAN, diggers: new Set(), armyFirst: false, claimers: new Set() };
+  // A steppe camp on the move (#320): home is where its Town Center is being driven or pitched.
+  const moving = tc ? null : (buildings.find((b) => b.type === 'towncenter' && b.pitch !== undefined) ?? wagons.find((w) => w.packed === 'towncenter') ?? null);
+  const home = tc ? { x: tc.x, y: tc.y } : moving ? { x: moving.x, y: moving.y } : { x: p.startX, y: p.startY };
+  const v: View = { p, citizens, army, priests, traders, cogs, fishers, navy, planes, buildings, home, tc, budget: { ...p.res }, plan: NO_PLAN, diggers: new Set(), armyFirst: false, claimers: new Set(), wagons, hunt: { n: 3, r: 16 }, packing: !!mem.steppe?.pack };
   const issue = (c: Command) => applyCommand(s, c);
 
   // The iron road's survey (#50) is cheap and first in line: in the Stone Age, citizens eat every scrap.
   // It waits for a town of `survey` citizens (#79): at ten, it held up the citizens of a town that might
   // find no bog at all, the very ones that win the first fight.
   ironRoad(s, v, mem, issue);
+  steppeRoad(s, v, mem, issue);
 
   // People first: a growing town pays for everything else.
   const advancing = buildings.some((b) => b.advance >= 0);
   const queuedCitizens = buildings.reduce((n, b) => n + b.queue.filter((q) => q.unit === 'citizen').length, 0);
   const wantCitizens = Math.min(L.citizens + p.epoch * 3, 60);
-  if (tc && !advancing && citizens.length + queuedCitizens < wantCitizens && tc.queue.length < 2) {
+  if (tc && !advancing && !v.packing && citizens.length + queuedCitizens < wantCitizens && tc.queue.length < 2) {
     const cost = unitStats('citizen', p.epoch).cost;
     if (afford(v, cost)) {
       issue({ t: 'train', p: p.id, building: tc.id, unit: 'citizen' });
@@ -218,6 +230,8 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   planBuildings(s, v, mem, issue);
   excavate(s, v, mem, issue);
   claimWalk(s, v, mem, issue);
+  strikeCamp(s, v, mem, issue);
+  tendFlock(s, v, issue);
   assignCitizens(s, v, issue);
   wilds(s, v, mem, issue);
   // Ships and aircraft are few and dear: they get first call on the treasury.
@@ -245,8 +259,8 @@ function research(s: GameState, v: View, peopleEnough: boolean, issue: (c: Comma
     const room = TECHS[tech].walked ? MAX_QUEUE : 1;
     const at = v.buildings.find((b) => b.type === TECHS[tech].at && b.built && b.queue.length < room && b.advance < 0);
     if (!at) continue;
-    // The Town Center trains citizens first.
-    if (at.type === 'towncenter' && !peopleEnough && v.citizens.length < 12) continue;
+    // The Town Center trains citizens first, and learns nothing while it waits to strike camp.
+    if (at.type === 'towncenter' && ((!peopleEnough && v.citizens.length < 12) || v.packing)) continue;
     const cost = techCostFor(s, p.id, tech);
     // Keep something back for soldiers and the next epoch.
     const keep: Cost = { food: 100, wood: 100, gold: 50 };
@@ -327,7 +341,7 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
     roads[to] = hasWalked(p, to === 'ironblood' ? 'warband' : 'ironblood');
   } else if (roads[to] === undefined) {
     const f = fit(p, to);
-    roads[to] = f > 0 || (f === 0 && roll(s) < (AGES[to].path ? AI_BLOOD.take : heirloomAhead(p, to) ? AI_WEB.heir : AI_WEB.take));
+    roads[to] = f > 0 || (f === 0 && roll(s) < (AGES[to].path ? AI_BLOOD.take : heirloomAhead(p, to) ? AI_WEB.heir : AGES[to].mobile ? AI_STEPPE.take : AI_WEB.take));
   }
   return roads[to]!;
 }
@@ -380,6 +394,8 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
     }
   }
   delete mem.waiting;
+  // The steppe (#320) is kept a while, so the flock it came for pays.
+  if (walksWeb(v) && isMobile(p) && s.tick - (mem.steppe?.since ?? s.tick) < secs(AI_STEPPE.stay)) return null;
   if (walksWeb(v)) {
     const hold = bloodHold(s, v, mem);
     if (hold === 'stay') return null;
@@ -718,7 +734,7 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   };
 
   // Lost the Town Center: rebuilding it comes first.
-  if (!v.tc && !v.buildings.some((b) => b.type === 'towncenter') && v.citizens.length && !recently('towncenter', 30)) {
+  if (!v.tc && !v.buildings.some((b) => b.type === 'towncenter') && !v.wagons.some((w) => w.packed === 'towncenter') && v.citizens.length && !recently('towncenter', 30)) {
     const spot = findSpot(s, 'towncenter', home.x, home.y, 0, 14);
     if (spot) construct(s, v, mem, 'towncenter', spot, 4, issue);
     return;
@@ -757,7 +773,7 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   // Autumn onward the clever computer plans for winter: berries fail in the cold, so fields go up first.
   const coldComing_ = coldComing(s, v);
   const foodWanted = Math.round(wanted(v).food) - (berries >= 0 && !coldComing_ ? 6 : 0) + (coldComing_ ? AI_WINTER.fields : 0);
-  if (farms < foodWanted && freeFields < 2 && !recently('farm', 2)) {
+  if (farms < foodWanted && freeFields < 2 && !recently('farm', 2) && !buildBarred(p, 'farm')) {
     const spot = findSpot(s, 'farm', home.x, home.y, 3, 16);
     if (spot && construct(s, v, mem, 'farm', spot, 1, issue)) return;
   }
@@ -876,7 +892,7 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
 function jobOf(u: Unit): Res | 'build' | null {
   const o = u.order;
   if (o.k === 'gather') return o.res;
-  if (o.k === 'farm' || o.k === 'hunt') return 'food';
+  if (o.k === 'farm' || o.k === 'hunt' || o.k === 'milk') return 'food';
   if (o.k === 'build') return 'build';
   return null;
 }
@@ -928,8 +944,15 @@ function sendTo(s: GameState, v: View, u: Unit, res: Res, issue: (c: Command) =>
       return true;
     }
     // A few hunters while there is game close to home.
+    // A flock short of milkers (#320) is the surest food on the steppe.
+    const milkers = v.citizens.filter((c) => c.order.k === 'milk').length;
+    const ewe = milkers < milkersWanted(s, v) ? milkable(s, v.p.id, v.home.x, v.home.y, FLOCK.follow) : null;
+    if (ewe) {
+      issue({ t: 'milk', p: v.p.id, ids: [u.id], target: ewe.id });
+      return true;
+    }
     const hunters = v.citizens.filter((c) => c.order.k === 'hunt').length;
-    const deer = hunters < 3 ? nearestDeer(s, v.home.x, v.home.y, 16) : null;
+    const deer = hunters < v.hunt.n ? nearestDeer(s, v.home.x, v.home.y, v.hunt.r) : null;
     if (deer) {
       issue({ t: 'hunt', p: v.p.id, ids: [u.id], target: deer.id });
       return true;
@@ -1010,7 +1033,7 @@ function assignCitizens(s: GameState, v: View, issue: (c: Command) => void): voi
     }
   }
   if (over && under) {
-    const mover = v.citizens.find((u) => jobOf(u) === over && u.carry <= 2 && u.order.k !== 'farm' && u.order.k !== 'hunt' && !u.inside && !v.diggers.has(u.id));
+    const mover = v.citizens.find((u) => jobOf(u) === over && u.carry <= 2 && u.order.k !== 'farm' && u.order.k !== 'hunt' && u.order.k !== 'milk' && !u.inside && !v.diggers.has(u.id));
     if (mover) sendTo(s, v, mover, under, issue);
   }
 }
@@ -1103,6 +1126,207 @@ function wilds(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void
   const free = v.army.filter((u) => !u.inside && (u.order.k === 'idle' || (u.order.k === 'move' && !u.order.amove)) && u.type !== 'siege');
   const need = cold && seasonAt(s) === 3 ? AI_WILD.pack - AI_WINTER.pack : AI_WILD.pack;
   if (free.length >= need) issue({ t: 'hunt', p: v.p.id, ids: free.map((u) => u.id), target: wolf.id });
+}
+
+// ---- The steppe (#320) --------------------------------------------------------------------------------
+
+/**
+ * The steppe road, in the Stone Age: a clever computer that means to follow the herds raises a Hunting Camp
+ * by the deer (the road's clue) and sends more hunters, and further, until its butchers have the deed's meat.
+ * On the steppe itself its hunters range as far, and it notes when it arrived.
+ */
+function steppeRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (isMobile(p)) {
+    (mem.steppe ??= {}).since ??= s.tick;
+    v.hunt = { n: AI_STEPPE.hunters, r: AI_STEPPE.reach };
+    return;
+  }
+  if (p.epoch !== 0 || !walksWeb(v) || v.citizens.length < AI_STEPPE.at) return;
+  const road = roadsFrom(p).find((r) => AGES[r.to].mobile);
+  if (!road || deedsDone(p, road) || fit(p, road.to) < 0 || !wants(s, p, mem, road.to)) return;
+  v.hunt = { n: AI_STEPPE.hunters, r: AI_STEPPE.reach };
+  const clue = road.clue;
+  if (!clue || count(v, clue) > 0 || s.tick - (mem.ordered[clue] ?? -99999) < secs(25)) return;
+  let herd: Animal | null = null;
+  let bestD = AI_STEPPE.campTo * AI_STEPPE.campTo;
+  for (const a of s.animals) {
+    if (a.kind !== 'deer' || a.hp <= 0) continue;
+    const d = (a.x - v.home.x) * (a.x - v.home.x) + (a.y - v.home.y) * (a.y - v.home.y);
+    if (d >= AI_STEPPE.campFrom * AI_STEPPE.campFrom && d < bestD) {
+      bestD = d;
+      herd = a;
+    }
+  }
+  if (!herd) return;
+  const spot = findSpot(s, clue, herd.x, herd.y, 2, 5);
+  if (spot) construct(s, v, mem, clue, spot, 2, issue);
+}
+
+const grownSheep = (s: GameState, owner: number): Animal[] => s.animals.filter((a) => a.kind === 'sheep' && a.owner === owner && a.hp > 0 && a.lamb === undefined);
+
+/** How many milkers its flock wants: one for each `perMilker` grown sheep. */
+function milkersWanted(s: GameState, v: View): number {
+  return Math.ceil(grownSheep(s, v.p.id).length / AI_STEPPE.perMilker);
+}
+
+/**
+ * The flock: a lamb whenever there is food to spare, milkers enough for the grown sheep (one berry picker or
+ * woodcutter at a time goes over), and a sheep too fat to breed slaughtered, one at a time.
+ */
+function tendFlock(s: GameState, v: View, issue: (c: Command) => void): void {
+  const { p } = v;
+  const mobile = isMobile(p);
+  const grown = grownSheep(s, p.id);
+  if (!mobile && !grown.length) return;
+  if (mobile && v.tc && flockOf(s, p.id) < flockCap(s, p.id) && v.budget.food >= (FLOCK.cost.food ?? 0) + AI_STEPPE.spare) {
+    issue({ t: 'lamb', p: p.id, building: v.tc.id });
+    spend(v, FLOCK.cost);
+  }
+  if (!grown.length) return;
+  const near = (u: Unit, a: { x: number; y: number }) => (u.x - a.x) * (u.x - a.x) + (u.y - a.y) * (u.y - a.y);
+  const milkers = v.citizens.filter((u) => u.order.k === 'milk').length;
+  if (milkers < milkersWanted(s, v)) {
+    const ewe = milkable(s, p.id, v.home.x, v.home.y, FLOCK.follow);
+    const hand = ewe
+      ? v.citizens
+          .filter((u) => !u.inside && !u.queue.length && u.carry <= 2 && !v.diggers.has(u.id) && !v.claimers.has(u.id) && (u.order.k === 'idle' || (u.order.k === 'gather' && (u.order.res === 'wood' || s.res[u.order.tile] === R_BERRY))))
+          .sort((a, b) => near(a, ewe) - near(b, ewe) || a.id - b.id)[0]
+      : undefined;
+    if (ewe && hand) issue({ t: 'milk', p: p.id, ids: [hand.id], target: ewe.id });
+  }
+  // Fat that can't become a lamb (the flock full, or the people settled) is meat: one sheep at a time.
+  const ids = new Set(grown.map((a) => a.id));
+  if (v.citizens.some((u) => u.order.k === 'hunt' && ids.has(u.order.target))) return;
+  if (mobile && flockOf(s, p.id) < flockCap(s, p.id)) return;
+  let fat: Animal | null = null;
+  for (const a of grown) if ((a.fat ?? 0) >= FLOCK.breed && (!fat || (a.fat ?? 0) > (fat.fat ?? 0))) fat = a;
+  if (!fat) return;
+  const prey = fat;
+  const butcher = v.citizens
+    .filter((u) => !u.inside && !u.queue.length && u.carry <= 2 && !v.diggers.has(u.id) && !v.claimers.has(u.id) && (u.order.k === 'idle' || u.order.k === 'milk' || (u.order.k === 'gather' && u.order.res === 'food')))
+    .sort((a, b) => near(a, prey) - near(b, prey) || a.id - b.id)[0];
+  if (butcher) issue({ t: 'hunt', p: p.id, ids: [butcher.id], target: prey.id });
+}
+
+/** Sixteen ways out from camp, a compass's points and the points between them (unit length, no trigonometry). */
+const COMPASS: [number, number][] = [
+  [1, 0], [0.9239, 0.3827], [0.7071, 0.7071], [0.3827, 0.9239], [0, 1], [-0.3827, 0.9239], [-0.7071, 0.7071], [-0.9239, 0.3827],
+  [-1, 0], [-0.9239, -0.3827], [-0.7071, -0.7071], [-0.3827, -0.9239], [0, -1], [0.3827, -0.9239], [0.7071, -0.7071], [0.9239, -0.3827],
+];
+
+/** How good a pasture lies around a point: its fresh grass within a flock's range, and the deer and berries by it. */
+function pasture(s: GameState, x: number, y: number): number {
+  const cx = Math.floor(x);
+  const cy = Math.floor(y);
+  const r = FLOCK.range;
+  let n = 0;
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx * dx + dy * dy > r * r) continue;
+      const tx = cx + dx;
+      const ty = cy + dy;
+      if (grassy(s, tx, ty)) n++;
+      else if (tx >= 0 && ty >= 0 && tx < s.w && ty < s.h && s.res[ty * s.w + tx] === R_BERRY) n += 2;
+    }
+  }
+  for (const a of s.animals) if (a.kind === 'deer' && a.hp > 0 && (a.x - x) * (a.x - x) + (a.y - y) * (a.y - y) <= 144) n += 6;
+  return n;
+}
+
+/** Whether a Town Center could be pitched at (or right by) a point: on open ground that no rival holds. */
+function pitchable(s: GameState, owner: number, x: number, y: number): boolean {
+  const n = BUILDINGS.towncenter.size;
+  const bx = Math.round(x - n / 2);
+  const by = Math.round(y - n / 2);
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (!placeProblem(s, 'towncenter', bx + dx, by + dy, true, owner)) return true;
+  return false;
+}
+
+/** The best fresh pasture `move` to `far` tiles from camp that lies no nearer the rival, worth the drive; or null. */
+function newPasture(s: GameState, v: View): { x: number; y: number } | null {
+  const enemy = enemyHome(s, v.p);
+  const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
+  const away = dist(v.home, enemy) - 2;
+  let best: { x: number; y: number } | null = null;
+  let score = pasture(s, v.home.x, v.home.y) * 1.25 + 10;
+  for (const d of [AI_STEPPE.move, (AI_STEPPE.move + AI_STEPPE.far) / 2, AI_STEPPE.far]) {
+    for (const [ux, uy] of COMPASS) {
+      const at = { x: Math.floor(v.home.x + ux * d) + 0.5, y: Math.floor(v.home.y + uy * d) + 0.5 };
+      if (at.x < 4 || at.y < 4 || at.x > s.w - 4 || at.y > s.h - 4 || !walkable(s, Math.floor(at.x), Math.floor(at.y))) continue;
+      if (dist(at, enemy) < away || !pitchable(s, v.p.id, at.x, at.y)) continue;
+      const n = pasture(s, at.x, at.y);
+      if (n > score) {
+        score = n;
+        best = at;
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * Striking camp: when its flock has grazed the pasture out, or the game round camp is gone, and no rival
+ * soldiers are near, it packs its Town Center (letting the queue empty first), drives the wagon to fresh
+ * pasture and pitches it there. A wagon that finds no room falls back halfway toward where it came from.
+ */
+function strikeCamp(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  const wagon = v.wagons.find((w) => w.packed === 'towncenter' && !w.inside);
+  if (wagon) {
+    const st = (mem.steppe ??= {});
+    const to = st.to ?? { x: wagon.x, y: wagon.y, at: s.tick };
+    st.to = to;
+    const left = (to.x - wagon.x) * (to.x - wagon.x) + (to.y - wagon.y) * (to.y - wagon.y);
+    if (left > 2.25 && s.tick - to.at < secs(AI_STEPPE.drive)) {
+      if (wagon.order.k === 'idle') issue({ t: 'move', p: p.id, ids: [wagon.id], x: to.x, y: to.y });
+      return;
+    }
+    issue({ t: 'pitch', p: p.id, ids: [wagon.id] });
+    if (s.byId.has(wagon.id)) {
+      // No room here: back halfway toward the old camp, and try again there.
+      const from = st.from ?? v.home;
+      st.to = { x: (wagon.x + from.x) / 2, y: (wagon.y + from.y) / 2, at: s.tick };
+      issue({ t: 'move', p: p.id, ids: [wagon.id], x: st.to.x, y: st.to.y });
+    } else {
+      delete st.to;
+      delete st.from;
+    }
+    return;
+  }
+  const st = mem.steppe;
+  if (!st || !isMobile(p) || !walksWeb(v)) {
+    if (st) delete st.pack;
+    return;
+  }
+  const tc = v.tc;
+  if (st.pack) {
+    // Waiting for the Town Center's queue to empty before it packs.
+    if (!tc || tc.advance >= 0 || threatNear(s, v).count || s.tick - st.pack.at > secs(45)) {
+      delete st.pack;
+      return;
+    }
+    if (tc.queue.length) return;
+    issue({ t: 'pack', p: p.id, building: tc.id });
+    st.struck = s.tick;
+    st.from = { x: tc.x, y: tc.y };
+    st.to = { x: st.pack.x, y: st.pack.y, at: s.tick };
+    delete st.pack;
+    return;
+  }
+  if (!tc || tc.advance >= 0 || s.tick - (st.struck ?? st.since ?? s.tick) < secs(AI_STEPPE.every)) return;
+  const grown = grownSheep(s, p.id);
+  const hungry = grown.filter((a) => a.hungry).length;
+  const grazedOut = grown.length >= 2 && hungry >= grown.length * AI_STEPPE.hungry;
+  const huntedOut = !nearestDeer(s, v.home.x, v.home.y, AI_STEPPE.bare) && findResource(s, R_BERRY, v.home.x, v.home.y, AI_STEPPE.bare) < 0;
+  if ((!grazedOut && !huntedOut) || threatNear(s, v).count) return;
+  const to = newPasture(s, v);
+  // None worth it: look again in half a minute.
+  if (!to) {
+    st.struck = s.tick - secs(AI_STEPPE.every - 30);
+    return;
+  }
+  st.pack = { x: to.x, y: to.y, at: s.tick };
 }
 
 // ---- Ancient ruins (#64) -----------------------------------------------------------------------------

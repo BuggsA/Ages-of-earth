@@ -673,6 +673,12 @@ export interface AiMemory {
   blood?: { hold?: number; since?: number; camp?: number; muster?: number };
   /** Tick its last band came home from prowling. */
   prowled?: number;
+  /**
+   * The steppe (#320): when it entered the Age of the Steppe, when it last struck camp, the pasture it means to
+   * move to while its Town Center's queue empties (`pack`), and, while the wagon is on the road, where it is
+   * driving (with the tick it set out) and the camp it left.
+   */
+  steppe?: { since?: number; struck?: number; pack?: { x: number; y: number; at: number }; to?: { x: number; y: number; at: number }; from?: { x: number; y: number } };
 }
 
 /** Orders that can be given with Shift held to queue them after the current one. */
