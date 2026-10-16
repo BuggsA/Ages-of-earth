@@ -1472,3 +1472,18 @@ export const AI_WILD = { mammothAt: 10, party: 5, mammothNear: 22, pack: 3, clea
   far: 38, escort: 2, guard: 3, safe: 12,
   /** A clever computer past the Stone Age raises a Watch Tower within `towerNear` tiles of a far kill (22 to `campNear` tiles from home) whose Hunting Camp stands. */
   towerNear: 6 };
+
+/**
+ * The computer on the steppe (#320, s5a of #297). A clever computer whose people the steppe neither suits nor
+ * spites means to take it at `take` odds (a riding people always does). In the Stone Age one bound there, once
+ * it has `at` citizens, raises a Hunting Camp by the nearest deer `campFrom` to `campTo` tiles from home (the
+ * road's clue), and keeps up to `hunters` citizens on deer within `reach` tiles of home until the deed is met.
+ * On the steppe it raises a lamb whenever its budget holds `spare` food beyond the lamb's price, keeps one
+ * milker for each `perMilker` grown sheep, and slaughters a grown sheep whose fat is full while it can't breed
+ * (the flock is full, or the people has left the steppe), one at a time. It strikes camp at most every `every`
+ * seconds, when a `hungry` share of its grown sheep have gone hungry or no deer or berries lie within `bare`
+ * tiles of camp, and no rival soldiers are near: it drives its Town Center `move` to `far` tiles to the best
+ * fresh pasture that lies no nearer the rival, and pitches there; a wagon still on the road after `drive`
+ * seconds pitches where it stands. It keeps to the steppe at least `stay` seconds before rejoining the trunk.
+ */
+export const AI_STEPPE = { take: 0.35, at: 12, campFrom: 8, campTo: 30, hunters: 6, reach: 26, spare: 100, perMilker: 3, every: 150, hungry: 0.5, bare: 16, move: 10, far: 18, drive: 40, stay: 90 };
