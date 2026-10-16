@@ -5,7 +5,7 @@ import { CameraRig } from './render/camera';
 import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { wallLine } from './sim/commands';
-import { AGES, BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, RELIC, RUINS, SEASONS, STEPPE, TECHS, TICK_HZ, TRIBUTE, TRUNK, WARCAMP, WORKS, domainOf, unitStats } from './sim/data';
+import { AGES, BUILDINGS, CIVS, CIV_IDS, DT, EPOCHS, MAP_TYPES, MILITARY, PLAYER_COLORS, RELIC, RUINS, SEASONS, STEPPE, TECHS, TICK_HZ, TRIBUTE, TRUNK, WARCAMP, WAYS, WORKS, domainOf, unitStats } from './sim/data';
 import { crestSvg } from './ui/crests';
 import { isEnemy } from './sim/world';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
@@ -2181,6 +2181,15 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           lastAlert = { x: ev.x, y: ev.y };
         }
         break;
+      case 'way': {
+        const w = WAYS[ev.way];
+        if (ev.owner === viewer) {
+          hud.toast(`${w.icon} ${w.name}: ${w.blurb}`, 'good');
+          play('relicKeep');
+        } else if (s.players[ev.owner].team === s.players[viewer].team) hud.toast(`${s.players[ev.owner].name} takes ${w.name}`, 'info');
+        else hud.toast(`${s.players[ev.owner].name} lives by ${w.name}`, 'alert');
+        break;
+      }
       case 'greatWork':
         if (ev.owner === viewer) {
           const w = WORKS[s.players[viewer].civ];

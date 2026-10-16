@@ -12,6 +12,7 @@ import { carriedBy, letGo, relicAt } from './relics';
 import { caravanOf, dockOf, homeMarket, marketOf, nearestCaravan, nearestDock, portSpot, postAt } from './trade';
 import { ruinAt } from './ruins';
 import { callWork, workProblem } from './works';
+import { takeWay, wayProblem } from './ways';
 import { beaconProblem, lightBeacon } from './beacon';
 import { callUp, callUpProblem } from './warcamp';
 import { rallyCry, rallyProblem } from './rally';
@@ -578,6 +579,12 @@ export function applyCommand(s: GameState, c: Command): void {
       const why = rallyProblem(s, p, h);
       if (why) return refuse(s, c.p, why);
       rallyCry(s, h);
+      break;
+    }
+    case 'way': {
+      const why = wayProblem(s, p, c.way);
+      if (why) return refuse(s, c.p, why);
+      takeWay(s, p, c.way);
       break;
     }
     case 'greatWork': {

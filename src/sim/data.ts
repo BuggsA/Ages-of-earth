@@ -1,4 +1,4 @@
-import type { AgeId, PathId, LandmarkKind, BuildingType, CivId, Cost, Difficulty, Domain, MapSize, MapType, Res, TechId, UnitType, PlayerStats } from './types';
+import type { AgeId, PathId, LandmarkKind, BuildingType, CivId, Cost, Difficulty, Domain, MapSize, MapType, Res, TechId, UnitType, PlayerStats, WayId } from './types';
 
 /** Every number in the game lives here. */
 
@@ -1239,6 +1239,29 @@ export const WORKS: Record<CivId, GreatWork> = {
   chinese: { name: 'The Grand Canal', icon: '🛶', use: 'eco', blurb: 'Barges carry the empire’s grain and silk: every trade trip pays 50% more, and traders travel 30% faster.', mul: { tradeGold: 1.5, traderSpeed: 1.3 } },
   britons: { name: 'The Longbow Volley', icon: '🏹', use: 'war', blurb: 'Every yeoman draws as one: ranged soldiers strike +3 harder, and archery ranges train twice as fast.', add: { rangedAttack: 3 }, mul: { rangedTrain: 0.5 } },
 };
+
+/**
+ * Ways (#336): a custom your people choose in the Stone Age and keep the whole match. Free, once, with
+ * a price in what the other Ways are good at. The moment passes when the people climb out of the Stone Age.
+ */
+export interface Way {
+  name: string;
+  icon: string;
+  blurb: string;
+  add?: Partial<Mods>;
+  mul?: Partial<Mods>;
+}
+
+export const WAY_IDS: WayId[] = ['hunt', 'hearth', 'warband'];
+
+export const WAYS: Record<WayId, Way> = {
+  hunt: { name: 'The Hunters\' Way', icon: '🦌', blurb: 'Hunting yields 30% more, wolves, boars and mammoths bite 30% softer, citizens walk 5% quicker; berries are gathered 20% slower.', mul: { hunt: 1.3, beastWard: 0.7, citizenSpeed: 1.05, forage: 0.8 } },
+  hearth: { name: 'The Hearth Way', icon: '🔥', blurb: 'Berries yield 30% more, farms 15% more, wood 10% more; hunting is 20% slower and beasts bite 20% harder.', mul: { forage: 1.3, farm: 1.15, wood: 1.1, hunt: 0.8, beastWard: 1.2 } },
+  warband: { name: 'The Warband Way', icon: '🗡', blurb: 'Soldiers train 15% faster and strike 1 harder in melee; berries and hunting are 15% slower.', add: { meleeAttack: 1 }, mul: { militaryTrain: 0.85, forage: 0.85, hunt: 0.85 } },
+};
+
+/** Ways are taken in the Stone Age (epoch `until`) and no later; the computer takes its own after `aiAfter` seconds. */
+export const WAY = { until: 0, aiAfter: 25, near: 16 };
 
 /**
  * A people's signature soldiers: one unit line that carries their own names (one per epoch) and a

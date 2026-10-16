@@ -27,6 +27,8 @@ export type MapType = 'continental' | 'highlands' | 'lakes' | 'forest' | 'plains
 /** Conquest: destroy every rival town. Regicide: each people has a King; lose them and you lose. Deathmatch: start rich. */
 export type GameMode = 'conquest' | 'regicide' | 'deathmatch' | 'lords';
 export type Stance = 'aggressive' | 'defensive' | 'stand';
+/** A custom the people live by, chosen in the Stone Age (#336). */
+export type WayId = 'hunt' | 'hearth' | 'warband';
 export type CivId = 'egyptians' | 'greeks' | 'romans' | 'mongols' | 'chinese' | 'britons';
 export type TechId =
   | 'forging' | 'ironCasting' | 'blastFurnace' | 'fletching' | 'bodkin' | 'scaleArmor' | 'chainMail' | 'plateArmor'
@@ -459,6 +461,8 @@ export interface Player {
   walked?: AgeId[];
   /** Epochs whose great work this player has called (seed #133); absent if none. */
   works?: number[];
+  /** The Way this people chose in the Stone Age (#336); absent if none. */
+  way?: WayId;
   /** Tick the great work now at hand ends; absent when none is. */
   workEnd?: number;
   /** Tick its last step back (#47) landed, for the cooldown; absent if it never stepped back. */
@@ -546,6 +550,7 @@ export type GameEvent =
   | { k: 'arc'; owner: number; building: number; pts: number[] }
   /** A great work was called (`on`) or ran out (seed #133). */
   | { k: 'greatWork'; owner: number; on: boolean }
+  | { k: 'way'; owner: number; way: WayId }
   | { k: 'wonder'; owner: number; id: number; x: number; y: number; ticks: number }
   | { k: 'trade'; owner: number; res: Res; buy: boolean }
   | { k: 'defeated'; owner: number }
@@ -735,6 +740,7 @@ export type Command =
   | { t: 'cry'; p: number; id: number }
   /** Call the people's great work (seed #133), once in each epoch. */
   | { t: 'greatWork'; p: number }
+  | { t: 'way'; p: number; way: WayId }
   | { t: 'stance'; p: number; ids: number[]; stance: Stance }
   | { t: 'train'; p: number; building: number; unit: UnitType }
   | { t: 'research'; p: number; building: number; tech: TechId }
