@@ -1366,7 +1366,7 @@ function ironTower(k: Kit, st: Style): void {
 /** The original four dressed ages, kept as the baseline model regression set. */
 export const LOOK_AGES: AgeId[] = ['merchant', 'iron', 'pilgrim', 'fair'];
 /** All dressed ages; additions get their own model coverage beside the baseline set. */
-export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer', 'sail', 'aeronaut', 'lightning', 'warband', 'ironblood', 'totalwar', 'horde', 'silk'];
+export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer', 'sail', 'aeronaut', 'lightning', 'warband', 'ironblood', 'totalwar', 'steppe', 'horde', 'silk'];
 
 const SAIL = '#efe8d4';
 const NET = '#b9ad8a';
@@ -1496,6 +1496,38 @@ function hordeTouches(k: Kit, type: BuildingType): void {
 }
 
 /**
+ * The Steppe's camps (#297 s6): felt and hide. A white felt apron with a red and blue woven band runs along
+ * each front, painted door posts frame it, a hide stretched on a rack dries beside the bigger buildings, and
+ * the Town Center keeps an antlered pole, the herders' trophy of the hunt.
+ */
+function steppeTouches(k: Kit, type: BuildingType): void {
+  if (['farm', 'gate', 'tower', 'warcamp', 'caravanserai'].includes(type)) return;
+  const span = type === 'wonder' ? 2.4 : type === 'towncenter' ? 1.6 : type === 'house' ? 0.6 : 0.95;
+  const front = span + 0.08;
+  const h = type === 'house' ? 0.5 : type === 'towncenter' || type === 'wonder' ? 0.9 : 0.7;
+  k.box(span * 1.7, 0.3, 0.05, '#ece4cf', 0, h, front);
+  const n = type === 'house' ? 5 : 9;
+  const w = (span * 1.7) / n;
+  for (let i = 0; i < n; i++) k.box(w * 0.7, 0.07, 0.06, i % 2 ? '#a83a2e' : '#2f5a8a', -span * 0.85 + w * (i + 0.5), h + 0.1, front + 0.01);
+  for (const x of [-0.2, 0.2]) k.box(0.05, h + 0.4, 0.06, '#a83a2e', x * span * 1.4, 0, front + 0.03);
+  if (type !== 'house') {
+    const x = span + 0.4;
+    for (const z of [-span * 0.5, span * 0.5]) k.cyl(0.02, 0.024, 0.95, 4, '#4a3626', x, 0, z);
+    k.box(0.02, 0.02, span, '#4a3626', x, 0.92, 0);
+    k.box(0.03, 0.62, span * 0.85, '#b89a6a', x, 0.3, 0);
+  }
+  if (type === 'towncenter') {
+    const x = -span - 0.3;
+    k.cyl(0.03, 0.036, 2.1, 5, '#4a3626', x, 0, span * 0.6);
+    for (const d of [-1, 1]) {
+      k.box(0.05, 0.05, 0.42, '#d9cdb0', x, 2.08, span * 0.6 + d * 0.2).rotation.x = -d * 0.5;
+      k.box(0.04, 0.04, 0.22, '#d9cdb0', x, 2.28, span * 0.6 + d * 0.38);
+    }
+    k.sphere(0.1, '#e8e0cc', x, 2.04, span * 0.6);
+  }
+}
+
+/**
  * The Silk Road's towns (#326), a caravan camp: a striped awning out over each door on two poles, bolts of
  * dyed silk drying on a line beside the bigger tents, and the white horsetail kept before the Town Center.
  */
@@ -1528,6 +1560,9 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
     case 'ironblood':
     case 'totalwar':
       bloodTouches(k, type, age);
+      break;
+    case 'steppe':
+      steppeTouches(k, type);
       break;
     case 'horde':
       hordeTouches(k, type);
