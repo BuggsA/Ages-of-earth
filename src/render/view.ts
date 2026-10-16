@@ -22,7 +22,7 @@ import { RuinsView } from './ruinsView';
 import { LandmarksView } from './landmarksView';
 import { GrazeView } from './grazeView';
 import { BorderView } from './borderView';
-import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, coilFields, placementField, type RangeGuide } from './rangeGuides';
+import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, coilFields, placementField, sortieRings, type RangeGuide } from './rangeGuides';
 import { ResourcesView } from './resourcesView';
 import { Sky } from './sky';
 import { forcedHour, hourAt, lightAt, moonPhase } from './daylight';
@@ -506,6 +506,14 @@ export class View {
     }
     // In the Age of Lightning every finished coil shows its field.
     for (const f of coilFields(s, this.viewer)) if (guides.length < MAX_RANGE_GUIDES) guides.push(f);
+    // Selecting your own aircraft in the Age of Aeronauts shows the fuel bands round the nearest Airfields.
+    for (const id of sel.ids) {
+      const a = s.byId.get(id);
+      if (a && a.kind === 'unit' && a.owner === this.viewer && a.hp > 0 && domainOf(a.type) === 'air') {
+        for (const g of sortieRings(s, this.viewer, a)) if (guides.length < MAX_RANGE_GUIDES) guides.push(g);
+        break;
+      }
+    }
     for (const id of sel.ids) {
       const e = s.byId.get(id);
       if (!e || e.hp <= 0) continue;
