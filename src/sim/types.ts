@@ -424,6 +424,8 @@ export interface PlayerStats {
   traded: number;
   /** Bog iron dug (#39); absent in older saves. */
   iron?: number;
+  /** Rare ore mined and paid in, by kind (#356 s3); absent in older saves. A road's ore door counts it. */
+  mined?: Partial<Record<RareId, number>>;
   /** Gold brought in by relics kept in Temples (#49); absent in older saves. */
   relicGold?: number;
   /** Fish landed by boats (the Age of Sail's deed); absent in older saves. */
