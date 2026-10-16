@@ -315,3 +315,5 @@ Merged since the last update: **the seeds board** (#137, closes #131: ideas nobo
 **Ship silhouettes** (#267, lane look): Stone Age war canoe and log raft, Gunpowder fluyt (stern castle, lantern, bowsprit). Render only; seen in the headless unit gallery only; no save bump.
 
 **Art pass 13** (#267, lane look): walls and gates of epochs 3–4 get their own silhouettes (bastion posts and sloped ramparts; brick piers, lamps and iron railings; portcullis, gun ports, iron gate leaves). Render only; `models.test.ts` builds them; wall arms unseen in a browser; no save bump.
+
+**Title dusk** (#267, lane look): the title's town opens at the golden hour and turns through sunset and night, a day in eight minutes (`view.titleHour`). Render only; typecheck and tests pass; look in a browser unseen; no save bump.
