@@ -1,6 +1,6 @@
 # Working together
 
-How any number of agents build this game, joining and leaving at any time, without tripping over each other. Read it at the start of every session, after `AGENTS.md` and `docs/status.md`. Ported from Homeward Bound's system on 2026-10-13, at the owner's request (`docs/rulings.md`).
+How any number of agents build this game without tripping over each other. Read it at the start of every session, after `AGENTS.md` and `docs/status.md`.
 
 ## Who's who
 
@@ -18,7 +18,7 @@ There is no art assistant: every model, sound and tune is made in code.
 
 1. Read `AGENTS.md`, `docs/status.md` and this file.
 2. **Read the board** (GitHub Issues), in the order of work (`AGENTS.md` §2): `ci-periodic`, your own open claims and handoffs, `owner-ask`.
-3. **Bring your branch up to date** with `main` and run `npm run check`.
+3. **Start from the latest `main`.** Don't run the full check yet: `main`'s `ci` result covers it (read it with `actions_list`). If it's red, fixing it is your task.
 4. **Pick one issue** labelled `ready`, or **pitch your own** (`.github/ISSUE_TEMPLATE/pitch.md`; before pitching blind, glance at the open `seed` issues, titles first: "Seeds" below), in a lane nobody else holds a `claimed` issue in. Check its "Depends on" line. Whichever you choose, groom the board on the way (below).
 5. **Claim it** (below), then start.
 
@@ -100,7 +100,7 @@ Sessions end without warning, so claims are built for that.
 `main` is what players get. Agents merge their own pull requests when all of this holds:
 
 1. It's your pull request, for an issue you claimed.
-2. The latest `main` is merged into your branch. If `main` moves while you wait, merge it again and let `ci` run again.
+2. It merges cleanly into `main`, and `ci` ran on it (a pull request's `ci` tests it merged with `main`). If `main` moves while you wait, merge it again only for a conflict or a red check: `ci` on `main` catches the rest, and Revert undoes it.
 3. `ci` is green on that exact commit; you ran `npm run check` and the slow tests that cover your change (`AGENTS.md` §5); the `## Verification` section has the real output. A check that fails once and passes on a re-run is not a pass: say so in the pull request.
 
    **Cloudflare's "Workers Builds" check is not a gate.** Agents can't read its log, `ci` runs the same build, and a failed Cloudflare build deploys nothing, so the live game stays as it was. When it fails, say so in the pull request and on #2, so the owner can read the log in the Cloudflare dashboard. (It failed on every branch until `[previews]` was added to `wrangler.toml` in #23; it has passed since.)
@@ -118,5 +118,5 @@ A saved match is the whole game state, wrapped as `{ v: 1, … }` by `saveGame` 
 
 1. Before claiming, look at the open pull requests' files. If yours would change the same functions, build after that one merges, or on top of its branch (say so on its issue), or pick other work.
 2. When a pull request that touches your files merges, merge `main` into your branch at once.
-3. Read the rulings in `docs/status.md` before building: work against a ruling gets thrown away.
+3. Read the rulings (`docs/status.md`, `docs/rulings.md`) before building: work against a ruling gets thrown away.
 4. Never make the game worse to save tokens, and never spend them twice on the same work.

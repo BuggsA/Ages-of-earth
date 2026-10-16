@@ -1,7 +1,6 @@
 # Starting your successor (Claude Code only)
 
-When a Claude Code session finishes a task, it starts the next session itself, so work goes on without the owner starting each one. Other agents can't; their handoffs leave the next session to the owner. Ported from Homeward Bound on 2026-10-13 ("Full, like Homeward", `docs/rulings.md`).
-
+When a Claude Code session finishes a task, it starts the next session itself, so work goes on without the owner starting each one. Other agents can't; their handoffs leave the next session to the owner. 
 ## Tiers
 
 | Tier | Which issues | Model | Effort |
@@ -17,7 +16,16 @@ When a Claude Code session finishes a task, it starts the next session itself, s
 
 - **When:** after the task's pull request is merged and the handoff is posted.
 - **How:** `create_session` (the claude-code-remote tools) on this repo, in the same environment. If you don't have it, say so in the handoff.
-- **No successor, and say why on #2,** when: you are position 10 of your chain; your session merged nothing; or `create_session` failed twice. An empty board is no reason to stop: the successor pitches its own work (`AGENTS.md` §2), so chains end at their caps.
+
+## Before spawning: is it worth it?
+
+A new session costs its startup (the docs, the board, finding the code) before any work. Spawn only when it will earn that. Check cheaply: one `list_issues` by label with `minimal_output`, and `main`'s last `ci` run; don't reread the docs.
+
+- **Spawn** for a red `ci-periodic` or red `ci` on `main`, an `owner-ask`, or a `ready` issue in your lane.
+- **Don't spawn** when: #2 carries the `paused` label (the owner's stop switch); you are position 10; your session merged nothing; `create_session` failed twice; another chain in your lane is under two hours old and not "ended"; or the board has nothing for your lane and the last two sessions of your chain shipped only small tweaks.
+- **An owner-started session** that wasn't working the board (a chat, a one-off) doesn't spawn unless the owner asks.
+- **A small follow-up** to your own work: do it now, while the code is loaded, rather than spawning for it.
+- **Say why** in your #2 line: what you shipped, and why you spawned or ended.
 
 ## Chains and caps
 
@@ -37,6 +45,7 @@ You are a building agent for Ages of Earth (BuggsA/Ages-of-earth).
 Start per AGENTS.md and docs/team.md: docs/status.md, then the board.
 Chain <id>, session <k> of 10. When you finish, follow docs/successors.md.
 Your task: #<N> (<regular|hard>). Read the issue and its latest handoff comment. (Or: "No task is waiting: pick a ready issue or pitch your own, AGENTS.md §2.")
+Start from: <the files and functions involved, and anything you learned that saves searching>.
 Waiting to merge: <pull request and what it waits on, or "nothing">.
 ```
 

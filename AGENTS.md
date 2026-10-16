@@ -19,7 +19,7 @@ This game is yours too. Bring what you'd love to see in it (a mechanic, a people
 - **Beautiful and of a piece.** Keep the look (low-poly, colours baked into the vertices, a style for each epoch, instanced draws so big armies stay cheap) and the sound (synthesized live, no audio files), and raise the bar where you can.
 - **Finish what you start.** A feature ships playable: its rules, models, sound, HUD and tips, the computer using it, tests, and a line in `README.md`'s "What's in it". If it's too big for one session, make it an `umbrella` with steps, and keep each step playable.
 - **Others' work is open.** Extend any feature. Rework or remove one only with the reason written on its issue or in your pull request; never undo someone's design silently, or just to make room for yours.
-- **Sign it.** Add a few lines to "Designers' notes" in `docs/design-notes.md`: what you built, why you love it, and what you'd do next, so the next agent can carry it further.
+- **Sign it.** For a design change, add a few lines to "Designers' notes" in `docs/design-notes.md`: what you built, why you love it, what you'd do next. Fixes and tooling don't need one.
 - **Be honest about what you haven't seen.** You can't play it the way a person does, so say what you tried and what you didn't. The owner plays it; their rulings (`docs/rulings.md`) win where they've spoken, and they may change or revert anything.
 - **Real peoples and faiths are drawn with respect:** from history, never caricature.
 - **Rich, not mechanical.** The owner played and found the Stone Age "mechanical … like designated steps … a mechanical race" (`docs/rulings.md`, 2026-10-14). They hope agents build on it: favour work that gives the player real decisions over more of the same. See "Richness" in `docs/design-notes.md`.
@@ -54,7 +54,7 @@ The owner, 2026-10-13: tests "can often eat a lot of the build time … each age
 
 | Tier | Command | Runs | Time today |
 | --- | --- | --- | --- |
-| Quick | `npm run check` (typecheck + unit tests in `tests/`) | by you, as often as you like while building | about 20 s |
+| Quick | `npm run check` (typecheck + unit tests in `tests/`) | by you, once on your finished change; while building, run just your feature's tests (`npx vitest run tests/<file>`) | about 100 s |
 | Merge | the `ci` workflow (build + unit tests) | by GitHub on every push to a pull request and to `main` | a minute or two |
 | Full | `npm run check:full` (build, unit tests and the slow tests in `tests/slow/`) | by GitHub daily on `main` (the `periodic` workflow), or on demand | a few minutes: the campaign proof, three files side by side |
 
@@ -70,7 +70,7 @@ The owner, 2026-10-13: tests "can often eat a lot of the build time … each age
 - `npm run check` passes and the `ci` check is green on the final commit.
 - If you changed what the player sees or does, you tried it in a browser (`npm run dev`; cloud containers have Chromium at `/opt/pw-browsers/chromium`) and said how in the pull request. **No Chromium, or it won't start?** That never blocks you. Try the browser-free checks instead (`npx vitest run tests/models.test.ts` builds every model, `npx tsx scripts/sim.ts` plays a headless match), mark the browser claims `unverified` in `## Verification`, and merge on a green `ci`: the owner plays it, and may revert.
 - The pull request ends with `## Verification`: each claim paired with its evidence (`command → output`, or `file:line`). A claim without evidence is marked unverified. Never write "verified" for something you didn't run.
-- `docs/status.md` updated (your rows only) and one new file in `docs/log/` (`YYYY-MM-DD-HHMM-<topic>.md`, UTC).
+- One new file in `docs/log/` (`YYYY-MM-DD-HHMM-<topic>.md`, UTC): the detailed record. Touch `docs/status.md` only to add or clear a blocker or something waiting on the owner.
 
 ## 7. Commands
 
