@@ -88,6 +88,8 @@ export interface Age {
   sortie?: boolean;
   /** Feast days (the Age of Fairs): see `FAIR` (`fair.ts`). */
   fairs?: boolean;
+  /** Escorted merchant ships carry more (the Age of Sail): see `CONVOY` (`convoy.ts`). */
+  convoys?: boolean;
 }
 
 /**
@@ -191,10 +193,11 @@ export const AGES: Record<AgeId, Age> = {
     name: 'Age of Sail',
     short: 'Sail',
     tier: 2,
-    blurb: 'A people that has turned to the sea: boats fish half again as fast, ships come a quarter cheaper and a quarter sturdier, but the fields are tilled with less care. A Market within a dozen tiles of a Dock ships its goods by water: its trade trips pay 30% more.',
+    blurb: 'A people that has turned to the sea: boats fish half again as fast, ships come a quarter cheaper and a quarter sturdier, but the fields are tilled with less care. A Market within a dozen tiles of a Dock ships its goods by water: its trade trips pay 30% more. And a merchant ship that loads at a port with a warship beside it sails in convoy and carries 40% more: send the fleet with the cogs.',
     mul: { fish: 1.5, shipHp: 1.25, farm: 0.85 },
     price: { ship: 0.75 },
     ironTrade: IRON_TRADE,
+    convoys: true,
   },
   lightning: {
     name: 'Age of Lightning',
@@ -922,6 +925,11 @@ export const SORTIE = { rearm: 4, mend: 0.08, turn: 30, reach: 36, burn: 0.04 };
  * while it lasts. The calendar is the same for everyone, so the computer's traders profit too.
  */
 export const FAIR = { every: 240, open: 60, reach: 12, pay: 1.5 };
+/**
+ * Convoys (the Age of Sail): a merchant ship that loads at a port with a warship of its owner's within `reach`
+ * tiles carries `pay` times the gold. Send the fleet with the cogs: the escort is also what the rival's raiders meet.
+ */
+export const CONVOY = { reach: 6, pay: 1.4 };
 export const RECLAIM = { window: 300, cost: 0.4, head: 0.5, skip: ['wall', 'gate', 'wonder'] as string[] };
 
 export const RUINS = { count: { small: 2, medium: 3, large: 4 } as Record<MapSize, number>, home: 24, fair: 4, spacing: 14, dig: 40, gold: 300, reach: 1.7, clear: 1 };

@@ -540,6 +540,7 @@ export type GameEvent =
   /** A ruin dug out (#64): what came up, and for lore, which technology. */
   | { k: 'sortie'; owner: number; id: number; x: number; y: number; what: 'home' | 'lost' }
   | { k: 'fair'; owner: number }
+  | { k: 'convoy'; owner: number; x: number; y: number }
   | { k: 'foundation'; owner: number; type: BuildingType; x: number; y: number; what: 'kept' | 'raised' }
   | { k: 'ruin'; id: number; owner: number; find: RuinFind; tech?: TechId; x: number; y: number }
   /** A landmark changed hands: `owner` keeps it now (-1: nobody, after `from` was driven off). */
