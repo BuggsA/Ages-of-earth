@@ -55,6 +55,7 @@ describe('one player never commands another’s people', () => {
       bell: { t: 'bell', p: 1, ring: true },
       greatWork: { t: 'greatWork', p: 1 },
       way: { t: 'way', p: 1, way: 'hunt' },
+      vow: { t: 'vow', p: 1 },
       beacon: { t: 'beacon', p: 1, building: tc.id },
       callUp: { t: 'callUp', p: 1, building: tc.id, n: 5 },
       pack: { t: 'pack', p: 1, building: tc.id },

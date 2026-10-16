@@ -1250,18 +1250,20 @@ export interface Way {
   blurb: string;
   add?: Partial<Mods>;
   mul?: Partial<Mods>;
+  /** Laid over `add`/`mul` once the Way is deepened in the Bronze Age (#338). */
+  deep: { add?: Partial<Mods>; mul?: Partial<Mods>; blurb: string };
 }
 
 export const WAY_IDS: WayId[] = ['hunt', 'hearth', 'warband'];
 
 export const WAYS: Record<WayId, Way> = {
-  hunt: { name: 'The Hunters\' Way', icon: '🦌', blurb: 'Hunting yields 30% more, wolves, boars and mammoths bite 30% softer, citizens walk 5% quicker; berries are gathered 20% slower.', mul: { hunt: 1.3, beastWard: 0.7, citizenSpeed: 1.05, forage: 0.8 } },
-  hearth: { name: 'The Hearth Way', icon: '🔥', blurb: 'Berries yield 30% more, farms 15% more, wood 10% more; hunting is 20% slower and beasts bite 20% harder.', mul: { forage: 1.3, farm: 1.15, wood: 1.1, hunt: 0.8, beastWard: 1.2 } },
-  warband: { name: 'The Warband Way', icon: '🗡', blurb: 'Soldiers train 15% faster and strike 1 harder in melee; berries and hunting are 15% slower.', add: { meleeAttack: 1 }, mul: { militaryTrain: 0.85, forage: 0.85, hunt: 0.85 } },
+  hunt: { name: 'The Hunters\' Way', icon: '🦌', blurb: 'Hunting yields 30% more, wolves, boars and mammoths bite 30% softer, citizens walk 5% quicker; berries are gathered 20% slower.', mul: { hunt: 1.3, beastWard: 0.7, citizenSpeed: 1.05, forage: 0.8 }, deep: { mul: { hunt: 1.15, beastWard: 0.85, forage: 0.9 }, blurb: 'Hunting yields another 15%, beasts bite another 15% softer; berries another 10% slower.' } },
+  hearth: { name: 'The Hearth Way', icon: '🔥', blurb: 'Berries yield 30% more, farms 15% more, wood 10% more; hunting is 20% slower and beasts bite 20% harder.', mul: { forage: 1.3, farm: 1.15, wood: 1.1, hunt: 0.8, beastWard: 1.2 }, deep: { mul: { forage: 1.15, farm: 1.1, wood: 1.05, hunt: 0.9 }, blurb: 'Berries yield another 15%, farms another 10%, wood another 5%; hunting another 10% slower.' } },
+  warband: { name: 'The Warband Way', icon: '🗡', blurb: 'Soldiers train 15% faster and strike 1 harder in melee; berries and hunting are 15% slower.', add: { meleeAttack: 1 }, mul: { militaryTrain: 0.85, forage: 0.85, hunt: 0.85 }, deep: { add: { meleeAttack: 1 }, mul: { militaryTrain: 0.9, forage: 0.9, hunt: 0.9 }, blurb: 'Soldiers train another 10% faster and strike 1 harder again; berries and hunting another 10% slower.' } },
 };
 
 /** Ways are taken in the Stone Age (epoch `until`) and no later; the computer takes its own after `aiAfter` seconds. */
-export const WAY = { until: 0, aiAfter: 25, near: 16 };
+export const WAY = { until: 0, aiAfter: 25, near: 16, vow: 1, deepenCost: { food: 200, wood: 100 } as Cost, turnCost: { food: 100 } as Cost };
 
 /**
  * A people's signature soldiers: one unit line that carries their own names (one per epoch) and a

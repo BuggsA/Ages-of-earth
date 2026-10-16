@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { applyCommand } from '../src/sim/commands';
-import { WAYS, WAY_IDS, secs } from '../src/sim/data';
+import { WAY, WAYS, WAY_IDS, secs } from '../src/sim/data';
 import { createGame, step } from '../src/sim/game';
 import { modsOf } from '../src/sim/stats';
-import { wayFor, wayProblem } from '../src/sim/ways';
+import { vowProblem, wayFor, wayProblem } from '../src/sim/ways';
 import type { GameState } from '../src/sim/types';
 
 function game(ai: 'hard' | null = null): GameState {
@@ -79,5 +79,75 @@ describe('Ways (#336)', () => {
     s.animals = s.animals.filter((a) => (a.x - tc.x) ** 2 + (a.y - tc.y) ** 2 > 400);
     for (let i = 0; i < 12; i++) s.animals.push({ ...(s.animals[0] ?? ({} as never)), id: 9000 + i, kind: 'deer', x: tc.x + 4 + (i % 4), y: tc.y + 4 + Math.floor(i / 4), hp: 8 } as never);
     expect(wayFor(s, s.players[0])).toBe('hunt');
+  });
+
+  describe('Vows (#338)', () => {
+    function bronze(way: 'hunt' | 'hearth' | 'warband' = 'hunt'): GameState {
+      const s = game();
+      applyCommand(s, { t: 'way', p: 0, way });
+      const p = s.players[0];
+      p.epoch = 1;
+      p.statsVersion++;
+      p.res.food = 1000;
+      p.res.wood = 1000;
+      return s;
+    }
+
+    it('deepening grows the Way\'s gift and its price, and costs the stock', () => {
+      const s = bronze('hunt');
+      const before = { ...modsOf(s, 0) };
+      applyCommand(s, { t: 'vow', p: 0 });
+      const p = s.players[0];
+      expect(p.deep).toBe(true);
+      expect(p.vowed).toBe(true);
+      expect(p.res.food).toBe(1000 - WAY.deepenCost.food!);
+      expect(p.res.wood).toBe(1000 - WAY.deepenCost.wood!);
+      const m = modsOf(s, 0);
+      expect(m.hunt).toBeGreaterThan(before.hunt);
+      expect(m.forage).toBeLessThan(before.forage);
+      expect(s.events.some((e) => e.k === 'way' && e.deep)).toBe(true);
+    });
+
+    it('turning drops the old Way for another, once', () => {
+      const s = bronze('hunt');
+      applyCommand(s, { t: 'vow', p: 0, way: 'hearth' });
+      const p = s.players[0];
+      expect(p.way).toBe('hearth');
+      expect(p.deep).toBe(false);
+      expect(p.res.food).toBe(1000 - WAY.turnCost.food!);
+      applyCommand(s, { t: 'vow', p: 0, way: 'warband' });
+      applyCommand(s, { t: 'vow', p: 0 });
+      expect(p.way).toBe('hearth');
+      expect(p.deep).toBe(false);
+    });
+
+    it('is refused outside the Bronze Age, without a Way, or without the means', () => {
+      const stone = game();
+      applyCommand(stone, { t: 'way', p: 0, way: 'hunt' });
+      expect(vowProblem(stone, stone.players[0])).toMatch(/Bronze/);
+      const none = game();
+      none.players[0].epoch = 1;
+      expect(vowProblem(none, none.players[0])).toMatch(/no Way/);
+      const poor = bronze('warband');
+      poor.players[0].res.food = 10;
+      expect(vowProblem(poor, poor.players[0])).toMatch(/Not enough/);
+      expect(vowProblem(bronze('hunt'), bronze('hunt').players[0], 'hunt')).toMatch(/already/);
+    });
+
+    it('a clever computer deepens once it is rich enough, and not before', () => {
+      const s = game('hard');
+      for (let i = 0; i < secs(60); i++) step(s);
+      const p = s.players[0];
+      expect(p.way).toBeDefined();
+      p.epoch = 1;
+      p.statsVersion++;
+      p.res.food = 100;
+      for (let i = 0; i < secs(5); i++) step(s);
+      expect(p.vowed).toBeUndefined();
+      p.res.food = 600;
+      p.res.wood = 600;
+      for (let i = 0; i < secs(5); i++) step(s);
+      expect(p.deep).toBe(true);
+    });
   });
 });

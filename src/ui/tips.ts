@@ -47,6 +47,7 @@ const sighted = (s: GameState, me: number, kind: 'mammoth' | 'wolf' | 'boar') =>
 
 const TIPS: Tip[] = [
   { id: 'gather', when: (s) => secsIn(s) > 2, text: 'Drag a box around your <b>citizens</b>, then <b>right-click</b> berry bushes, trees or a deer to gather food and wood.' },
+  { id: 'vow', when: (s, me) => { const p = s.players[me]; return !!p.way && !p.vowed && p.epoch === WAY.vow; }, text: 'The Bronze Age is the time for a <b>vow</b>: at your Town Center, <b>deepen</b> your Way (its gifts and its price both grow) or <b>turn</b> to another. Once only; pass it by and your Way stays as it is.' },
   { id: 'way', when: (s, me) => s.players[me].epoch <= WAY.until && !s.players[me].way && secsIn(s) > 40, text: 'Choose a <b>Way</b> at your Town Center: <b>Hunters</b> (deer and beasts), <b>Hearth</b> (berries and farms) or <b>Warband</b> (soldiers). Free, once, and the moment passes when you leave the Stone Age. Look at the deer and berries near home, and at how close your rival is.' },
   { id: 'train', when: (s) => secsIn(s) > 25, text: 'More citizens mean a faster economy. Click your <b>Town Center</b> and press <kbd>Q</kbd> to train one (you can queue several).' },
   { id: 'house', when: (s, me) => s.players[me].pop >= s.players[me].cap - 2, text: 'You are nearly out of room. Select a citizen, press <kbd>B</kbd> then <kbd>E</kbd> to build a <b>house</b> (5 more people each).' },
