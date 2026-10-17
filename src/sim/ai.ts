@@ -1996,8 +1996,11 @@ function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   const L = AI_LEVELS[p.ai!];
   const dock = v.buildings.find((b) => b.type === 'dock' && b.built);
   if (!dock) return;
-  // Fishing boats: as many as there are shoals near the dock, up to a few.
-  const shoals = countFish(s, dock.x, dock.y, 14);
+  // On the Shore a clever computer spares each shoal its seed for spring (#482), unless it's hungry.
+  const sparing = L.clever && s.homeland === 'shore' && p.res.food >= YEAR.fishHungry;
+  const thin = (i: number) => sparing && s.amount[i] <= YEAR.fishSpare;
+  // Fishing boats: as many as there are shoals near the dock (that it would fish), up to a few.
+  const shoals = countFish(s, dock.x, dock.y, 14, thin);
   const shore = s.homeland === 'shore' ? AI_SHORE.boats : 0;
   const wantBoats = Math.min(shoals, 2 + p.epoch + shore, (L.clever ? 6 : 4) + shore);
   const queued = (u: UnitType) => dock.queue.filter((q) => q.unit === u).length;
@@ -2009,9 +2012,13 @@ function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
     }
   }
   for (const f of v.fishers) {
-    if (f.order.k !== 'idle') continue;
-    const t = findResource(s, R_FISH, f.x, f.y, 18);
+    const o = f.order;
+    // A boat on a shoal down to its seed moves on, once it has landed its catch; with nowhere else, it rests.
+    const moveOn = o.k === 'gather' && o.phase !== 'drop' && s.res[o.tile] === R_FISH && thin(o.tile);
+    if (o.k !== 'idle' && !moveOn) continue;
+    const t = findResource(s, R_FISH, f.x, f.y, 18, thin);
     if (t >= 0) issue({ t: 'gather', p: p.id, ids: [f.id], tile: t });
+    else if (moveOn) issue({ t: 'stop', p: p.id, ids: [f.id] });
   }
   // Warships: once the Bronze Age opens them, if the enemy has boats or the map is mostly sea.
   if (!L.clever || p.epoch < 1) return;
@@ -2113,10 +2120,10 @@ function seaLanding(s: GameState, v: View, mem: AiMemory, dock: Building, issue:
   mem.landing = { ship: ship.id, ids: crew.map((u) => u.id), since: s.tick, phase: 'load' };
 }
 
-function countFish(s: GameState, x: number, y: number, r: number): number {
+function countFish(s: GameState, x: number, y: number, r: number, skip?: (i: number) => boolean): number {
   let n = 0;
   for (let ty = Math.max(0, Math.floor(y - r)); ty <= Math.min(s.h - 1, y + r); ty++) {
-    for (let tx = Math.max(0, Math.floor(x - r)); tx <= Math.min(s.w - 1, x + r); tx++) if (s.res[ty * s.w + tx] === R_FISH) n++;
+    for (let tx = Math.max(0, Math.floor(x - r)); tx <= Math.min(s.w - 1, x + r); tx++) if (s.res[ty * s.w + tx] === R_FISH && !skip?.(ty * s.w + tx)) n++;
   }
   return n;
 }

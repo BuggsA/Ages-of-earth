@@ -2181,6 +2181,10 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         hud.toast(`${sn.icon} ${sn.name}. ${sn.blurb}${turn ? ` ${HOMELANDS[s.homeland!].icon} ${turn}` : ''}`, 'info');
         break;
       }
+      case 'spawned':
+        // The Shore's spring (#482): what last year's sparing bought.
+        hud.toast(`🐟 The shoals spawned: ${ev.grew} more fish in the water${ev.seeded ? `, and ${ev.seeded} new shoal${ev.seeded > 1 ? 's' : ''}` : ''}.`, 'good');
+        break;
       case 'hit':
         if (view.sees(ev.x, ev.y)) music.stir(0.012);
         break;
