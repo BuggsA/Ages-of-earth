@@ -72,6 +72,8 @@ describe('one player never commands another’s people', () => {
       rally: { t: 'rally', p: 1, building: tc.id, x, y },
       trade: { t: 'trade', p: 1, res: 'food', buy: true },
       stop: { t: 'stop', p: 1, ids },
+      patrol: { t: 'patrol', p: 1, ids, x, y },
+      explore: { t: 'explore', p: 1, ids },
       delete: { t: 'delete', p: 1, ids: [...ids, tc.id] },
       dropRelic: { t: 'dropRelic', p: 1, ids },
       dig: { t: 'dig', p: 1, ids, target: 0 },
