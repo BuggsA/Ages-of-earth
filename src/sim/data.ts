@@ -1732,7 +1732,7 @@ export const AI_WONDER = { share: 0.4, least: 3, most: 14, stay: 6, reach: 26 };
  * tiles round its relic Temple, and in the Age of Fairs keeps up to `markets` Markets so one stands there.
  */
 /** `raid`: how much nearer (squared tiles) a rival's fairground Market seems to a raid on a feast day. */
-export const AI_FAIR = { ring: 10, markets: 2, raid: 900 };
+export const AI_FAIR = { ring: 10, markets: 2, raid: 900, save: 40, army: 6 };
 /**
  * The computer and sorties (#379): when the enemy building it means to bomb lies more than `gap` tiles from its nearest
  * finished Airfield (so its aircraft would turn for home before they arrive, `SORTIE.turn`), it raises another Airfield

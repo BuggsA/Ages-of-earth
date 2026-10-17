@@ -9,7 +9,7 @@ import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_
 import { ageDef, ageOf, barred, buildBarred, deedsDone, oreDone, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
 import { carriedBy } from './relics';
 import { swordsOf } from './merc';
-import { fairground, feastOpen } from './fair';
+import { fairground, feastOpen, nextFeastIn } from './fair';
 import { claimants, favours, landmarkAt } from './landmarks';
 import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple, TILE_OF_RARE } from './units';
 import { goalForPost, nearestMarket, portSpot, tripGold } from './trade';
@@ -915,6 +915,15 @@ export function fairSpot(s: GameState, v: View): { tx: number; ty: number } | nu
   if (!shrine) return null;
   const half = BUILDINGS.market.size / 2;
   return findSpot(s, 'market', shrine.x, shrine.y, 2, AI_FAIR.ring, 1, (tx, ty) => fairground(s, id, { x: tx + half, y: ty + half }));
+}
+
+/**
+ * Whether to hold this unit back for the feast (#356): within `AI_FAIR.save` seconds of a feast opening, when the levy
+ * would cut its price at this building and the army already numbers `AI_FAIR.army`.
+ */
+export function feastSoon(s: GameState, p: Player, unit: UnitType, b: { x: number; y: number }, army: number): boolean {
+  if (unit === 'hero' || feastOpen(s) || !ageDef(p).fairs || !fairground(s, p.id, b)) return false;
+  return nextFeastIn(s) <= secs(AI_FAIR.save) && army >= AI_FAIR.army;
 }
 
 /** Our lowest-id finished Temple that keeps a relic: the fairground's heart and the vigil's post. */
@@ -2978,6 +2987,8 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
       if (unit !== counter && sig !== 'siege' && sig !== 'priest' && trains.includes(sig) && unitEpoch(sig) <= p.epoch && !barred(p, sig) && roll(s) < (sig === 'cavalry' && riderless ? AI_HORDE.cavalry : 0.5)) unit = sig;
     }
     if (!unit || unitEpoch(unit) > p.epoch || barred(p, unit)) continue;
+    // Just before a feast opens, a clever computer with an army in hand holds its muster at the fairground to buy it at the levy (#356).
+    if (L.clever && feastSoon(s, p, unit, b, v.army.length) && !threatNear(s, v).unit) continue;
     // What it costs here: a levy, an age's price or a hire for gold (#37).
     const cost = trainCostFor(s, p.id, unit, b.type, b);
     if (!afford(v, cost)) continue;
