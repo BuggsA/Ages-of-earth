@@ -424,6 +424,15 @@ function setupFromTitle(seed: number): GameSetup {
   };
 }
 
+/** The opening of a new match (wonder): the haze lifts off the home valley while a pad swells. */
+function dawn(): void {
+  const el = $('dawn');
+  el.classList.remove('lift');
+  void el.offsetWidth;
+  el.classList.add('lift');
+  play('dawn');
+}
+
 function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   lastSetup = setup;
   if (!online) {
@@ -488,6 +497,7 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
     setSelection([tc.id]);
     view.rig.focus(tc.x, tc.y + 3, true);
   }
+  if (!saved) dawn();
   tips.start(saved ? 9999 : 0);
   $('chat-lines').innerHTML = '';
   document.body.classList.toggle('online', online);
@@ -1879,6 +1889,9 @@ window.addEventListener('keydown', (e) => {
       break;
     case ']':
       view.rig.rotate(Math.PI / 8);
+      break;
+    case '/':
+      view.rig.gazing = !view.rig.gazing;
       break;
     case 'backspace':
       view.rig.resetYaw();

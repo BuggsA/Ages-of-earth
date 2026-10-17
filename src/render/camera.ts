@@ -48,6 +48,10 @@ export class CameraRig {
     this.goalDistance = Math.max(CameraRig.MIN, Math.min(CameraRig.MAX, this.goalDistance * factor));
   }
 
+  /** Gaze: lift the view to the horizon and tilt it up, so the sky fills the top of the screen. */
+  gazing = false;
+  private gazeK = 0;
+
   rotate(delta: number): void {
     this.goalYaw += delta;
   }
@@ -83,7 +87,9 @@ export class CameraRig {
     const ground = Math.max(0, this.groundAt(this.target.x, this.target.z));
     this.target.y += (ground - this.target.y) * k;
     // Close in, the view tilts toward the horizon; far out it looks more straight down.
-    const pitch = 0.8 + this.zoomT * 0.35;
+    this.gazeK += ((this.gazing ? 1 : 0) - this.gazeK) * (1 - Math.exp(-dt * 3));
+    const g = this.gazeK * this.gazeK * (3 - 2 * this.gazeK);
+    const pitch = (0.8 + this.zoomT * 0.35) * (1 - g) + 0.1 * g;
     const d = this.distance;
     this.camera.position.set(
       this.target.x + Math.sin(this.yaw) * Math.cos(pitch) * d,
@@ -91,6 +97,7 @@ export class CameraRig {
       this.target.z + Math.cos(this.yaw) * Math.cos(pitch) * d,
     );
     this.camera.lookAt(this.target);
+    if (g > 0) this.camera.rotateX(0.42 * g);
   }
 
   /** Where the four screen corners meet the ground (for the minimap's view box). */
