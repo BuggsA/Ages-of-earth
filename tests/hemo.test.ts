@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { buildBarred } from '../src/sim/ages';
 import { bloodOf, grafted, hemoPace } from '../src/sim/blood';
-import { BUILDINGS, HEMO, secs } from '../src/sim/data';
+import { graftLast } from '../src/sim/hemo';
+import { BUILDINGS, HEMO, HEMO_IRON, secs } from '../src/sim/data';
 import { applyCommand } from '../src/sim/commands';
 import { damageOf } from '../src/sim/combat';
 import { createGame, step } from '../src/sim/game';
@@ -132,6 +133,45 @@ describe('the Transfusion Station', () => {
     expect(bloodOf(p)).toBe(1);
     // Still one waiting, so the doors stay shut.
     expect(st.garrison.length).toBe(3);
+  });
+});
+
+describe('quenched grafts (#356)', () => {
+  it('spend blood-iron when the store holds it, and last, mend and crash differently', () => {
+    const s = game();
+    const p = s.players[0];
+    p.blood = HEMO.cost * 2;
+    p.rare = { bloodiron: HEMO_IRON.cost };
+    const st = raise(s, 'transfusion');
+    const men = soldiers(s, st, 2);
+    applyCommand(s, { t: 'garrison', p: 0, ids: men.map((u) => u.id), target: st.id });
+    run(s, secs(HEMO.work) * 2 + 60);
+    expect(men.every((u) => grafted(s, u))).toBe(true);
+    expect(men[0].tempered).toBe(true);
+    expect(men[1].tempered).toBeUndefined();
+    expect(p.rare.bloodiron).toBe(0);
+    expect(p.stats.quenched).toBe(1);
+    expect(graftLast(men[0])).toBe(HEMO.last * HEMO_IRON.last);
+    // Dry, the quenched one crashes softer and loses the temper.
+    s.ents = s.ents.filter((e) => e !== st);
+    s.byId.delete(st.id);
+    for (const u of men) u.hp = statsOf(s, u).hp;
+    men[0].hemo = s.tick + 1;
+    men[1].hemo = s.tick + 1;
+    run(s, secs(3));
+    expect(men[0].tempered).toBeUndefined();
+    expect(men[0].hp).toBeGreaterThan(men[1].hp);
+  });
+
+  it('are an extra: without the ore the plain graft is made', () => {
+    const s = game();
+    s.players[0].blood = HEMO.cost;
+    const st = raise(s, 'transfusion');
+    const men = soldiers(s, st, 1);
+    applyCommand(s, { t: 'garrison', p: 0, ids: [men[0].id], target: st.id });
+    run(s, secs(HEMO.work) + 60);
+    expect(grafted(s, men[0])).toBe(true);
+    expect(men[0].tempered).toBeUndefined();
   });
 });
 

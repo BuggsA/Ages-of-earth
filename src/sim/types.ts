@@ -203,6 +203,8 @@ export interface Unit {
   packedHp?: number;
   /** A hemo-engineered soldier (#355 s3): the tick its graft runs dry unless a Transfusion Station tops it up; absent when ungrafted. */
   hemo?: number;
+  /** Quenched in blood-iron (#356): the graft lasts longer, mends faster and crashes softer; cleared when it runs dry. */
+  tempered?: boolean;
   /** A hired sword (the Age of Merchants): how many paydays it has gone unpaid; absent for a soldier trained the usual way. */
   merc?: number;
   /** Cursed by a Blood-rite priest (#355 s4): the tick the curse lifts. Until then every blow on it lands harder (`RITE.taken`). */
@@ -488,6 +490,8 @@ export interface PlayerStats {
   captives?: number;
   /** Soldiers grafted at Transfusion Stations (#355 s3); absent in older saves. */
   grafted?: number;
+  /** Of those, the grafts quenched in blood-iron (#356); absent in older saves. */
+  quenched?: number;
   /** Health the Blood-rite's altars mended with blood (#355 s2); absent in older saves. */
   riteMended?: number;
   /** Enemies sacrificed by the Blood-rite's priests (#355 s4); absent in older saves. */

@@ -2,13 +2,14 @@ import * as THREE from 'three';
 import type { SoundName } from '../audio/sound';
 import { ageDef, ageOf } from '../sim/ages';
 import { fairground, feastOpen } from '../sim/fair';
-import { AURA, BUILDINGS, HEMO, RALLY, RITE, SIGNATURES, TICK_HZ, LANDMARKS, RUINS, TRADE, domainOf } from '../sim/data';
+import { AURA, BUILDINGS, RALLY, RITE, SIGNATURES, TICK_HZ, LANDMARKS, RUINS, TRADE, domainOf } from '../sim/data';
 import { buildingMaxHp, statsFor } from '../sim/stats';
 import type { AgeId, BuildingType, CivId, Ent, GameEvent, GameState, Unit } from '../sim/types';
 import type { ScoutFlag } from '../ui/scoutFlags';
 import { R_BOG, R_GOLD, R_STONE } from '../sim/types';
 import { stirred } from '../sim/combat';
 import { cursed, grafted } from '../sim/blood';
+import { graftLast } from '../sim/hemo';
 import { seesRect } from '../sim/vision';
 import { BuildingsView } from './buildingsView';
 import { CameraRig } from './camera';
@@ -590,7 +591,7 @@ export class View {
       if (e.kind !== 'unit' || e.hp <= 0 || !grafted(s, e)) continue;
       const at = this.units.drawn.get(e.id);
       if (!at) continue;
-      const left = Math.min(1, (e.hemo! - s.tick) / (TICK_HZ * HEMO.last));
+      const left = Math.min(1, (e.hemo! - s.tick) / (TICK_HZ * graftLast(e)));
       const beat = Math.max(0, Math.sin(this.time * (5 + (1 - left) * 7) + e.id));
       rings.push({ x: at.x, y: at.y, z: at.z, r: statsFor(s, e.owner, e.type).radius + 0.2 + 0.05 * beat * beat, color: vein.clone().multiplyScalar(0.45 + 0.6 * left), thin: true });
     }
