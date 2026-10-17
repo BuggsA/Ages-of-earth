@@ -630,6 +630,7 @@ export function applyCommand(s: GameState, c: Command): void {
     case 'stance':
       for (const u of myUnits(s, c.p, c.ids)) {
         u.stance = c.stance;
+        if (c.stance === 'run' && u.order.k === 'attack' && u.order.auto) setOrder(u, { k: 'idle' });
         u.guardX = u.x;
         u.guardY = u.y;
       }

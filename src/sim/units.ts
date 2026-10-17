@@ -625,11 +625,31 @@ function resumed(o: Order): Order {
 }
 
 /**
+ * A soldier told to run (#454) steps away from the nearest armed foe in sight and never turns to fight.
+ * True if it set off. The caller's order, if it was a round, is put back in the queue to take up again.
+ */
+function flee(s: GameState, sp: Spatial, u: Unit, o: Order): boolean {
+  if (u.stance !== 'run' || !MILITARY.includes(u.type) || peace(s)) return false;
+  const st = statsOf(s, u);
+  const f = nearestEnemyUnit(s, sp, u.owner, u.x, u.y, st.sight, (e) => MILITARY.includes(e.type) && !e.inside);
+  if (!f) return false;
+  const dx = u.x - f.x;
+  const dy = u.y - f.y;
+  const l = Math.sqrt(dx * dx + dy * dy) || 1;
+  const x = Math.max(1, Math.min(s.w - 1, u.x + (dx / l) * PATROL.flee));
+  const y = Math.max(1, Math.min(s.h - 1, u.y + (dy / l) * PATROL.flee));
+  if (o.k !== 'idle') u.queue.unshift(resumed(o));
+  setOrder(u, { k: 'move', x, y, amove: false, started: false });
+  return true;
+}
+
+/**
  * A soldier on patrol or exploring looks for a fight by its stance (#454): an aggressive one as far as it
  * sees, a defensive one only close by, one standing its ground only within reach. True if it turned to fight.
  */
 function roundFight(s: GameState, sp: Spatial, u: Unit, o: Order): boolean {
   if (!MILITARY.includes(u.type) || (s.tick + u.id) % PATROL.scan !== 0) return false;
+  if (u.stance === 'run') return flee(s, sp, u, o);
   const st = statsOf(s, u);
   const reach = u.stance === 'stand' ? st.range + st.radius + 0.6 : u.stance === 'defensive' ? st.sight * PATROL.provoke : st.sight;
   const t = findTarget(s, sp, u, reach, u.stance === 'aggressive' || !!st.buildingsOnly);
@@ -751,7 +771,7 @@ function attackStep(s: GameState, sp: Spatial, u: Unit, o: Extract<Order, { k: '
   };
   if (!t || t.hp <= 0 || (t.kind === 'unit' && t.inside) || !isEnemy(s, u.owner, t.owner) || peace(s)) {
     // The target fell (or changed sides): pick the next one close by if this was a fight already joined.
-    const next = u.type !== 'citizen' && !peace(s) ? findTarget(s, sp, u, st.sight, !!o.then) : null;
+    const next = u.type !== 'citizen' && u.stance !== 'run' && !peace(s) ? findTarget(s, sp, u, st.sight, !!o.then) : null;
     if (next) {
       o.target = next.id;
       o.auto = true;
@@ -1653,7 +1673,9 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
     case 'idle':
       u.guardX = u.x;
       u.guardY = u.y;
-      if (military && (s.tick + u.id) % 8 === 0) {
+      if (military && u.stance === 'run') {
+        if ((s.tick + u.id) % 8 === 0) flee(s, sp, u, o);
+      } else if (military && (s.tick + u.id) % 8 === 0) {
         const st = statsOf(s, u);
         const reach = u.stance === 'stand' ? st.range + st.radius + 0.6 : st.sight;
         const t = findTarget(s, sp, u, reach, !!st.buildingsOnly);

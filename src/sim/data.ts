@@ -1534,7 +1534,7 @@ export const SPREAD = { reach: 5, perNode: 2, foe: 4, perFoe: 3, far: 18 };
  * are headed, and passes over ground within `shun` tiles of a tile it couldn't reach; `fails` such tiles in a row
  * (with nothing new seen between) and it stops.
  */
-export const PATROL = { scan: 6, provoke: 0.5, misses: 4, points: 8 };
+export const PATROL = { scan: 6, provoke: 0.5, misses: 4, points: 8, flee: 6 };
 export const EXPLORE = { grid: 4, apart: 12, fails: 8, shun: 6 };
 /**
  * Idle hands find work (#344), for the player's people only (the computer sets its own to work):

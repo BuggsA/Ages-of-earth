@@ -87,7 +87,7 @@ export function hurt(s: GameState, target: Ent, damage: number, by: number, atta
     return;
   }
   // Soldiers standing about answer whoever hits them (if their stance lets them move).
-  if (attacker && target.kind === 'unit' && target.type !== 'citizen' && target.type !== 'priest' && target.order.k === 'idle' && attacker.hp > 0 && target.stance !== 'stand' && canHit(s, target, attacker)) {
+  if (attacker && target.kind === 'unit' && target.type !== 'citizen' && target.type !== 'priest' && target.order.k === 'idle' && attacker.hp > 0 && target.stance !== 'stand' && target.stance !== 'run' && canHit(s, target, attacker)) {
     target.order = { k: 'attack', target: attacker.id, auto: true, then: null };
   }
 }

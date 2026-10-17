@@ -26,7 +26,7 @@ export type MapSize = 'small' | 'medium' | 'large';
 export type MapType = 'continental' | 'highlands' | 'lakes' | 'forest' | 'plains' | 'sea';
 /** Conquest: destroy every rival town. Regicide: each people has a King; lose them and you lose. Deathmatch: start rich. */
 export type GameMode = 'conquest' | 'regicide' | 'deathmatch' | 'lords';
-export type Stance = 'aggressive' | 'defensive' | 'stand';
+export type Stance = 'aggressive' | 'defensive' | 'stand' | 'run';
 /** A custom the people live by, chosen in the Stone Age (#336). */
 export type WayId = 'hunt' | 'hearth' | 'warband';
 export type CivId = 'egyptians' | 'greeks' | 'romans' | 'mongols' | 'chinese' | 'britons';
