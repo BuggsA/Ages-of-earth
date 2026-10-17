@@ -20,11 +20,11 @@ When a Claude Code session finishes a task, it starts the next session itself, s
 ## Before spawning
 
 Check cheaply (one `list_issues` by label with `minimal_output`, and `main`'s last `ci`), never by rereading the docs.
-- **Don't spawn** if #2 is labelled `paused`, you stopped on a blocker only the owner can clear (an `owner-decision` you just raised: the next session would hit the same wall), `create_session` failed twice, a cap below stops you, or nothing waits in your lane and your chain's last two sessions each shipped only a minor tweak.
-- Merging nothing is not a reason by itself (the owner, 2026-10-17): a session that found its task already done, or handed work to the other tier, still starts the next one. The 8-session cap bounds a chain that makes no progress.
+- **Don't spawn** if #2 is labelled `paused`, you raised an `owner-decision` (the next session hits the same wall), `create_session` failed twice, a cap below stops you, or nothing waits in your lane and your chain's last two sessions each shipped only a minor tweak.
+- Merging nothing alone doesn't stop a successor (owner, 2026-10-17); the 8-session cap bounds a stalled chain.
 - **Don't spawn** from an owner-started chat or one-off, unless asked.
 - **Otherwise spawn.** Its task, in order: a red `ci-periodic` or `ci` on `main`, an `owner-ask`, a `ready` issue in your lane, else its own pitch.
-- **Continue before you spawn (the owner, 2026-10-17: prefer work that stays in cache).** A new session re-reads the docs, the issue and the code you already hold. If the next step is in the same umbrella or touches the files you have open, do it in this session, merge it, and only then think about a successor. Past 3 steps is fine while it stays related and your context isn't heavy (a compaction has not yet happened, and the work is still on the same files). Spawn when the next task is unrelated, your context has been compacted, or the session has passed about 5 merged pull requests. Prompt caches last an hour, so a successor that would start after the cache has gone cold costs nothing extra.
+- **Continue before you spawn** (owner, 2026-10-17: keep work in cache). Next step in the same umbrella or files: do it here, past 3 steps while related and uncompacted. Spawn when it's unrelated, you've compacted, or ~5 pull requests have merged.
 
 ## Chains and caps
 
