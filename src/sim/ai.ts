@@ -1,4 +1,5 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
+import { aiTiding } from './tidings';
 import { AGES, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, RITE, BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
@@ -15,7 +16,7 @@ import { goalForPost, nearestMarket, portSpot, tripGold } from './trade';
 import { findRoute } from './path';
 import { isEnemy, maxHp } from './world';
 import { callUpProblem } from './warcamp';
-import { GRAFTABLE, bleeds, bloodOf, cursed, grafted, levyProblem, levyWait } from './blood';
+import { GRAFTABLE, bleeds, bloodOf, cursed, grafted, levyProblem, levyWait, sworn } from './blood';
 import { offeringOf, riteProblem } from './fork';
 import { graftCost, stationsOf, waiting } from './hemo';
 import { borderMap, landOwnerAt, suppliedAt } from './borders';
@@ -91,7 +92,7 @@ const TILE_OF: Record<Res, number> = { food: R_BERRY, wood: R_TREE, stone: R_STO
 const TECH_ORDER: TechId[] = [
   // Heirlooms first (#224, #232): techProblem keeps them shut until both their ages are walked, and once
   // one opens it is the prize of the road the computer chose for it, so it is bought before anything else.
-  'bellFoundry', 'ironHulls', 'jointStock', 'masonsLodge', 'stElmo', 'telegraphy', 'galvanic',
+  'bellFoundry', 'ironHulls', 'jointStock', 'masonsLodge', 'stElmo', 'telegraphy', 'galvanic', 'galvanicBlood', 'militaryOrders',
   'plow', 'drying', 'hounds', 'axes', 'wheelbarrow', 'picks', 'forging', 'bloomery', 'scaleArmor', 'fletching', 'husbandry', 'irrigation', 'saws', 'shafts', 'handcart',
   'ironCasting', 'chainMail', 'bodkin', 'masonry', 'theology', 'conscription', 'blastFurnace', 'plateArmor', 'chemistry', 'blackPowder', 'saltCuring', 'bloodForged',
   'gillnets', 'shipwright', 'lighthouse', 'steamEngine', 'rifling', 'aviation', 'caravan', 'banking', 'pilgrimage', 'credit', 'ropewalk', 'litany',
@@ -188,6 +189,13 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   ironRoad(s, v, mem, issue);
   oreRoad(s, v, mem, issue);
   steppeRoad(s, v, mem, issue);
+
+  // Tidings at the fire (#443), one plain rule a card, answered before the town spends its stores.
+  const tiding = aiTiding(s, p);
+  if (tiding) {
+    issue({ t: 'tiding', p: p.id, ...tiding });
+    v.budget = { ...p.res };
+  }
 
   // People first: a growing town pays for everything else.
   const advancing = buildings.some((b) => b.advance >= 0);
@@ -3463,6 +3471,8 @@ function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     let bestScore = 0;
     for (const e of s.ents) {
       if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !isEnemy(s, v.p.id, e.owner)) continue;
+      // Kings, grafts and the sworn (#355 s6) never turn.
+      if (s.kings.includes(e.id) || grafted(s, e) || sworn(s, e)) continue;
       const dx = e.x - pr.x;
       const dy = e.y - pr.y;
       const d2 = dx * dx + dy * dy;

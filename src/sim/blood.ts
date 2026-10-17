@@ -1,5 +1,6 @@
-import { BLOOD, BUILDINGS, HEMO, RITE, secs, TICK_HZ, type UnitClass } from './data';
+import { BLOOD, BUILDINGS, HEMO, ORDERS, RITE, secs, TICK_HZ, type UnitClass } from './data';
 import { ageDef } from './ages';
+import { modsOf } from './stats';
 import { statsOf } from './world';
 import type { Building, BuildingType, Ent, GameState, Player, Unit, UnitType } from './types';
 
@@ -25,6 +26,16 @@ export const GRAFTABLE: readonly UnitType[] = ['infantry', 'ranged', 'cavalry', 
 /** Whether a unit carries a live graft (#355 s3). */
 export function grafted(s: GameState, u: Ent): boolean {
   return u.kind === 'unit' && u.hemo !== undefined && s.tick < u.hemo;
+}
+
+/**
+ * Whether a soldier is sworn (Military Orders, #355 s6): its people learned the heirloom and one of their priests stands within
+ * `ORDERS.reach` tiles of it, out in the open. No rival's priest can turn, offer up or curse a sworn soldier.
+ */
+export function sworn(s: GameState, u: Ent): boolean {
+  if (u.kind !== 'unit' || !GRAFTABLE.includes(u.type) || !modsOf(s, u.owner).sworn) return false;
+  const r2 = ORDERS.reach * ORDERS.reach;
+  return s.ents.some((e) => e.kind === 'unit' && e.type === 'priest' && e.owner === u.owner && e.hp > 0 && !e.inside && (e.x - u.x) * (e.x - u.x) + (e.y - u.y) * (e.y - u.y) <= r2);
 }
 
 /** Machines that hit a grafted soldier harder; every other unit class is flesh. */

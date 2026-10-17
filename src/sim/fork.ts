@@ -1,6 +1,6 @@
 import { HEMOCRAFT, RITE, TICK_HZ, secs } from './data';
 import { ageDef } from './ages';
-import { bleeds, bloodOf, gainBlood } from './blood';
+import { bleeds, bloodOf, gainBlood, sworn } from './blood';
 import { hurt, peace } from './combat';
 import { isEnemy, maxHp, statsOf } from './world';
 import type { Building, Ent, GameState, Unit } from './types';
@@ -73,6 +73,7 @@ export function riteProblem(s: GameState, p: number, rite: 'sacrifice' | 'curse'
   if (!isEnemy(s, p, t.owner)) return 'The rite is chanted over an enemy';
   if (peace(s)) return 'Not while the peace treaty holds';
   if (!bleeds(t)) return `A ${statsOf(s, t).name} bleeds nothing: steel, ships and aircraft are beyond the rite`;
+  if (sworn(s, t)) return 'Sworn to a Military Order: its priest stands by it, and no rite takes it';
   if (rite === 'sacrifice' && s.kings.includes(t.id)) return 'A King is never offered';
   if (rite === 'curse' && bloodOf(s.players[p]) < RITE.curse) return `A curse takes ${RITE.curse} blood: ${Math.ceil(RITE.curse - bloodOf(s.players[p]))} more`;
   return null;
@@ -101,7 +102,7 @@ export function curse(s: GameState, priest: Unit, t: Unit): number {
   p.blood = Math.max(0, bloodOf(p) - RITE.curse);
   const r2 = RITE.spread * RITE.spread;
   const near = s.ents
-    .filter((e): e is Unit => e.kind === 'unit' && e.hp > 0 && !e.inside && isEnemy(s, priest.owner, e.owner) && bleeds(e) && (e.x - t.x) * (e.x - t.x) + (e.y - t.y) * (e.y - t.y) <= r2)
+    .filter((e): e is Unit => e.kind === 'unit' && e.hp > 0 && !e.inside && isEnemy(s, priest.owner, e.owner) && bleeds(e) && !sworn(s, e) && (e.x - t.x) * (e.x - t.x) + (e.y - t.y) * (e.y - t.y) <= r2)
     .map((e) => ({ e, d: (e.x - t.x) * (e.x - t.x) + (e.y - t.y) * (e.y - t.y) }))
     .sort((a, b) => a.d - b.d || a.e.id - b.e.id)
     .slice(0, RITE.curses);
