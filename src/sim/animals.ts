@@ -454,7 +454,7 @@ function maul(s: GameState, a: Animal, u: Unit): void {
 export const sheepMeat = (a: Animal): number => (a.lamb !== undefined ? FLOCK.lambMeat : FLOCK.meat + (a.fat ?? 0) * 2);
 
 /** Work an order can be set down for, and picked up again after the fight. */
-const WORK: Order['k'][] = ['idle', 'gather', 'farm', 'build', 'deliver', 'dig', 'milk'];
+const WORK: Order['k'][] = ['idle', 'gather', 'farm', 'build', 'deliver', 'dig', 'salvage', 'milk'];
 
 /** Someone bitten or gored at their work turns on the beast, then goes back to it. */
 function fightBack(u: Unit, a: Animal): void {

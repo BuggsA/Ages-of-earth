@@ -101,6 +101,8 @@ export interface Age {
   rite?: boolean;
   /** A people that raises again on the foundations of what fell (the Age of Reclaimers): see `RECLAIM` (`reclaim.ts`). */
   reclaim?: boolean;
+  /** Citizens strip the rubble of fallen buildings into stock (the Age of Reclaimers, #503): see `SALVAGE` (`salvage.ts`). */
+  salvage?: boolean;
   /** Aircraft fly on fuel from the Airfield (the Age of Aeronauts): see `SORTIE` (`sortie.ts`). */
   sortie?: boolean;
   /** Feast days (the Age of Fairs): see `FAIR` (`fair.ts`). */
@@ -191,12 +193,15 @@ export const AGES: Record<AgeId, Age> = {
     sortie: true,
   },
   reclaimer: {
+    verb: 'Strip the rubble of fallen buildings, a rival\'s or your own, into stock, or leave your own to raise again',
+    door: 'Soldiers take longer to train',
     name: 'Age of Reclaimers',
     short: 'Reclaimers',
     tier: 3,
-    blurb: 'Build tomorrow from yesterday: excavating an ancient ruin teaches a people to rebuild. Construction and repairs work 25% faster, technologies cost 20% less, but military units take 25% longer to train. And what falls can be raised again: a building of yours that is destroyed leaves its foundations for 5 minutes, and the same building raised on the same spot costs 40% of the price and starts half built. The same armies and technologies as the Gunpowder Age.',
+    blurb: 'Build tomorrow from yesterday: excavating an ancient ruin teaches a people to rebuild, and to strip what others leave: citizens ordered onto the rubble of any fallen building (a rival\'s, or your own) carry off half its price in stock. Construction and repairs work 25% faster, technologies cost 20% less, but military units take 25% longer to train. And what falls can be raised again: a building of yours that is destroyed leaves its foundations for 5 minutes, and the same building raised on the same spot costs 40% of the price and starts half built. The same armies and technologies as the Gunpowder Age.',
     mul: { buildSpeed: 1.25, techCost: 0.8, militaryTrain: 1.25 },
     reclaim: true,
+    salvage: true,
   },
   merchant: {
     verb: 'Hire swords at the Market for gold, and keep paying them by the day or lose them',
@@ -1088,6 +1093,12 @@ export const PRIZE = { share: 0.5 };
  * not chanting at a rival's wall, and the shrine is where the rival's raiders come.
  */
 export const VIGIL = { reach: 5, each: 1, most: 3, toast: 30 };
+/**
+ * Salvage (the Age of Reclaimers, #503): any building that falls (a rival's, or your own) while a reclaiming people is in the match leaves rubble
+ * for `window` seconds. A reclaimer's citizens strip it: one citizen takes `work` seconds, and the stock gets `share` of the building's price.
+ * Rubble of your own fall is the choice: strip it for stock now, or leave the foundations to raise again at `RECLAIM.cost`.
+ */
+export const SALVAGE = { share: 0.5, work: 10, window: 150, reach: 2.2, find: 40 };
 export const RECLAIM = { window: 300, cost: 0.4, head: 0.5, skip: ['wall', 'gate', 'wonder'] as string[] };
 
 export const RUINS = { count: { small: 2, medium: 3, large: 4 } as Record<MapSize, number>, home: 24, fair: 4, spacing: 14, dig: 40, gold: 300, reach: 1.7, clear: 1 };
@@ -1414,7 +1425,7 @@ export const CIV_IDS = Object.keys(CIVS) as CivId[];
  * `tests/verbs.test.ts` lets these go without a `verb`, and fails once one has a verb but is still listed: strike it then.
  */
 export const VERB_GAPS: { ages: Partial<Record<AgeId, number>>; civs: Partial<Record<CivId, number>> } = {
-  ages: { warband: 502, reclaimer: 503 },
+  ages: { warband: 502 },
   civs: { egyptians: 501, greeks: 501, romans: 501, mongols: 501, chinese: 501, britons: 501 },
 };
 

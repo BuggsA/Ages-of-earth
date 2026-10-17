@@ -1,4 +1,5 @@
 import { AGES, HOMELANDS, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, secs } from '../sim/data';
+import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, mainRoad, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
 import type { AgeId, Building, GameState, Unit } from '../sim/types';
 import { R_FISH } from '../sim/types';
@@ -117,6 +118,11 @@ const TIPS: Tip[] = [
     id: 'ruins',
     when: (s, me) => !!s.ruins?.some((r) => r.by < 0 && s.players[me].seen[Math.floor(r.y) * s.w + Math.floor(r.x)] === 1),
     text: 'You have found <b>ancient ruins</b> (two pale columns on the map). Select a few <b>citizens</b> and right-click them to dig: whoever finishes the dig takes what lies beneath, a hoard of gold, lost knowledge, an old map of the land or a relic. Excavation can also reveal a new road for your people. It\'s a long way from home, so send an escort.',
+  },
+  {
+    id: 'salvage',
+    when: (s, me) => !!s.rubble?.length && !!ageDef(s.players[me]).salvage,
+    text: 'A building has fallen and left <b>rubble</b> (a heap of stone and beams). In the Age of Reclaimers, select <b>citizens</b> and right-click it to <b>strip</b> it: half the building\'s price goes into your stock. Rubble of your own is a choice: strip it now, or leave the foundations to raise the building again for 40% of the price. A rival\'s rubble lies where the fighting was, so send an escort.',
   },
   {
     id: 'trade',
