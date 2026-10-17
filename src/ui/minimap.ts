@@ -19,6 +19,8 @@ interface Ping {
   x: number;
   y: number;
   color: string;
+  /** A heavier, slower pulse (the Town Center struck, #452). */
+  heavy?: boolean;
   born: number;
 }
 
@@ -103,8 +105,8 @@ export class Minimap {
     this.canvas.height = Math.round(size * dpr);
   }
 
-  ping(x: number, y: number, color: string): void {
-    this.pings.push({ x, y, color, born: performance.now() });
+  ping(x: number, y: number, color: string, heavy = false): void {
+    this.pings.push({ x, y, color, heavy, born: performance.now() });
     if (this.pings.length > 12) this.pings.shift();
   }
 
@@ -320,16 +322,17 @@ export class Minimap {
     }
 
     const now = performance.now();
-    this.pings = this.pings.filter((pg) => now - pg.born < 2400);
+    this.pings = this.pings.filter((pg) => now - pg.born < (pg.heavy ? 4800 : 2400));
     for (const pg of this.pings) {
-      const k = (now - pg.born) / 2400;
+      const life = pg.heavy ? 4800 : 2400;
+      const k = (now - pg.born) / life;
       ctx.strokeStyle = pg.color;
       ctx.globalAlpha = 1 - k;
-      ctx.lineWidth = 2;
-      for (const off of [0, 0.35]) {
-        const kk = (k * 2 + off) % 1;
+      ctx.lineWidth = pg.heavy ? 3 : 2;
+      for (const off of pg.heavy ? [0, 0.25, 0.5] : [0, 0.35]) {
+        const kk = (k * (pg.heavy ? 4 : 2) + off) % 1;
         ctx.beginPath();
-        ctx.arc(pg.x * sx, pg.y * sy, (4 + kk * 16) * (cw / 190), 0, Math.PI * 2);
+        ctx.arc(pg.x * sx, pg.y * sy, (4 + kk * (pg.heavy ? 26 : 16)) * (cw / 190), 0, Math.PI * 2);
         ctx.stroke();
       }
       ctx.globalAlpha = 1;

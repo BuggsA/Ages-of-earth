@@ -1,4 +1,4 @@
-import { AI_LEVELS, AUTO_WORK, BUILDINGS, CARRY, CONSECRATE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SPREAD, TRADE, domainOf, secs } from './data';
+import { AI_LEVELS, AUTO_WORK, BUILDINGS, EXPLORE, PATROL, CARRY, CONSECRATE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SPREAD, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
@@ -7,6 +7,7 @@ import { buildTimeFor, buildingCostFor, modsOf } from './stats';
 import { ageDef, canRaise, inField } from './ages';
 import type { Act, Animal, Building, Cost, Ent, GameState, Goal, Order, RareId, Res, Unit } from './types';
 import { seasonOf } from './seasons';
+import { catchOf } from './year';
 import { RES, R_BERRY, R_BLOODIRON, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_SALT, R_SALTPETRE, R_STONE, R_TREE } from './types';
 import { carriedBy, relicAt } from './relics';
 import { animalRadius, hitAnimal } from './animals';
@@ -104,7 +105,7 @@ export function gatherRate(s: GameState, u: Unit, kind: number | 'farm'): number
   const mod =
     kind === 'farm' ? m.farm : kind === R_TREE ? m.wood : kind === R_STONE || kind === R_GOLD || kind === R_BOG || kind in RARE_OF_TILE ? m.mine : kind === R_MEAT ? m.hunt * m.forage : kind === R_FISH ? m.fish : m.forage;
   const sn = seasonOf(s);
-  const season = kind === 'farm' ? sn.field : kind === R_BERRY ? sn.plant : 1;
+  const season = kind === 'farm' ? sn.field : kind === R_BERRY ? sn.plant : kind === R_FISH ? catchOf(s) : 1;
   // A Flint Scatter sharpens its keeper's axes and picks.
   const tools = (kind === R_TREE || kind === R_STONE || kind === R_GOLD || kind === R_BOG) && keptOf(s, u.owner, 'flint') > 0 ? 1 + kinBonus(s, u.owner, 'flint', LANDMARKS.flint.tools - 1) : 1;
   return base * mod * (1 + p.epoch * EPOCH_GATHER_BONUS) * ai * season * tools;
@@ -620,17 +621,226 @@ function findTarget(s: GameState, sp: Spatial, u: Unit, r: number, buildings: bo
   return best;
 }
 
+/** A patrol or exploration taken up again after a fight: it sets off afresh toward where it was going. */
+function resumed(o: Order): Order {
+  return o.k === 'patrol' || o.k === 'explore' ? { ...o, started: false } : o;
+}
+
+/**
+ * A soldier told to run (#454) steps away from the nearest armed foe in sight and never turns to fight.
+ * True if it set off. The caller's order, if it was a round, is put back in the queue to take up again.
+ */
+function flee(s: GameState, sp: Spatial, u: Unit, o: Order): boolean {
+  if (u.stance !== 'run' || !MILITARY.includes(u.type) || peace(s)) return false;
+  const st = statsOf(s, u);
+  const f = nearestEnemyUnit(s, sp, u.owner, u.x, u.y, st.sight, (e) => MILITARY.includes(e.type) && !e.inside);
+  if (!f) return false;
+  const dx = u.x - f.x;
+  const dy = u.y - f.y;
+  const l = Math.sqrt(dx * dx + dy * dy) || 1;
+  const x = Math.max(1, Math.min(s.w - 1, u.x + (dx / l) * PATROL.flee));
+  const y = Math.max(1, Math.min(s.h - 1, u.y + (dy / l) * PATROL.flee));
+  if (o.k !== 'idle') u.queue.unshift(resumed(o));
+  setOrder(u, { k: 'move', x, y, amove: false, started: false });
+  return true;
+}
+
+/**
+ * A soldier on patrol or exploring looks for a fight by its stance (#454): an aggressive one as far as it
+ * sees, a defensive one only close by, one standing its ground only within reach. True if it turned to fight.
+ */
+function roundFight(s: GameState, sp: Spatial, u: Unit, o: Order): boolean {
+  if (!MILITARY.includes(u.type) || (s.tick + u.id) % PATROL.scan !== 0) return false;
+  if (u.stance === 'run') return flee(s, sp, u, o);
+  const st = statsOf(s, u);
+  const reach = u.stance === 'stand' ? st.range + st.radius + 0.6 : u.stance === 'defensive' ? st.sight * PATROL.provoke : st.sight;
+  const t = findTarget(s, sp, u, reach, u.stance === 'aggressive' || !!st.buildingsOnly);
+  if (!t) return false;
+  // The fight's leash (defensive units) is measured from where the round was left.
+  u.guardX = u.x;
+  u.guardY = u.y;
+  setOrder(u, { k: 'attack', target: t.id, auto: true, then: null, back: o });
+  return true;
+}
+
+function patrolStep(s: GameState, sp: Spatial, u: Unit, o: Extract<Order, { k: 'patrol' }>): void {
+  if (roundFight(s, sp, u, o)) return;
+  const pt = o.pts[o.i];
+  if (!o.started) {
+    o.started = true;
+    goTo(u, goalForPoint(s, pt.x, pt.y, passOf(s, u)));
+    return;
+  }
+  if (walking(u)) return;
+  // A leg is done: on to the next point. Legs that keep ending far short (no way there) end the patrol.
+  const dx = pt.x - u.x;
+  const dy = pt.y - u.y;
+  o.miss = dx * dx + dy * dy > 4 ? o.miss + 1 : 0;
+  if (o.miss >= PATROL.misses) {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  o.i = (o.i + 1) % o.pts.length;
+  o.started = false;
+}
+
+/**
+ * The unseen tile an explorer heads for next (#454): on a grid over the map, the nearest one its people
+ * have never seen that it could stand on, away from where its fellow explorers are headed and from tiles
+ * it already failed to reach. -1 when the whole map has been seen.
+ */
+function nearFail(s: GameState, x: number, y: number, fails: readonly number[]): boolean {
+  for (const f of fails) {
+    const fx = f % s.w;
+    const fy = Math.floor(f / s.w);
+    if ((fx - x) * (fx - x) + (fy - y) * (fy - y) <= EXPLORE.shun * EXPLORE.shun) return true;
+  }
+  return false;
+}
+
+/** Whether a point lies within reach of an enemy tower (or other gun) the unit's people have seen, plus `EXPLORE.wary`. */
+function underGuns(s: GameState, u: Unit, x: number, y: number): boolean {
+  const seen = s.players[u.owner].seen;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.hp <= 0 || !e.built || !isEnemy(s, u.owner, e.owner)) continue;
+    const g = BUILDINGS[e.type].guns;
+    if (!g || !seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
+    const r = g.range + EXPLORE.wary + BUILDINGS[e.type].size / 2;
+    if ((e.x - x) * (e.x - x) + (e.y - y) * (e.y - y) <= r * r) return true;
+  }
+  return false;
+}
+
+/** Rival soldiers in an explorer's sight, once there are enough to call an army: how many, and where the nearest is. */
+function armySighted(s: GameState, sp: Spatial, u: Unit): { n: number; x: number; y: number } | null {
+  let n = 0;
+  let near: Unit | null = null;
+  let nd = Infinity;
+  sp.near(u.x, u.y, statsOf(s, u).sight, (o) => {
+    if (o.hp <= 0 || o.inside || !MILITARY.includes(o.type) || !isEnemy(s, u.owner, o.owner)) return;
+    n++;
+    const d = (o.x - u.x) * (o.x - u.x) + (o.y - u.y) * (o.y - u.y);
+    if (d < nd || (d === nd && near && o.id < near.id)) {
+      nd = d;
+      near = o;
+    }
+  });
+  const f = near as Unit | null;
+  return f && n >= EXPLORE.army ? { n, x: f.x, y: f.y } : null;
+}
+
+export function exploreTarget(s: GameState, u: Unit, fails: readonly number[] = []): number {
+  const seen = s.players[u.owner].seen;
+  const pass = passOf(s, u);
+  const others: number[] = [];
+  for (const e of s.ents) {
+    if (e.kind === 'unit' && e.id !== u.id && e.owner === u.owner && e.hp > 0 && e.order.k === 'explore' && e.order.x >= 0) others.push(e.order.x, e.order.y);
+  }
+  const apart = EXPLORE.apart * EXPLORE.apart;
+  const g = EXPLORE.grid;
+  let best = -1;
+  let bestD = Infinity;
+  for (let y = g >> 1; y < s.h; y += g) {
+    for (let x = g >> 1; x < s.w; x += g) {
+      const i = y * s.w + x;
+      if (seen[i] || !walkable(s, x, y, pass) || nearFail(s, x, y, fails) || underGuns(s, u, x + 0.5, y + 0.5)) continue;
+      let d = (x + 0.5 - u.x) * (x + 0.5 - u.x) + (y + 0.5 - u.y) * (y + 0.5 - u.y);
+      // Ground a fellow is headed for counts as much further off, so a band of scouts fans out.
+      for (let k = 0; k < others.length; k += 2) {
+        if ((others[k] - x) * (others[k] - x) + (others[k + 1] - y) * (others[k + 1] - y) < apart) {
+          d += apart * 16;
+          break;
+        }
+      }
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    }
+  }
+  return best;
+}
+
+function exploreStep(s: GameState, sp: Spatial, u: Unit, o: Extract<Order, { k: 'explore' }>): void {
+  if (roundFight(s, sp, u, o)) return;
+  const seen = s.players[u.owner].seen;
+  let here = o.x >= 0 ? o.y * s.w + o.x : -1;
+  if ((s.tick + u.id) % PATROL.scan === 0 && !peace(s)) {
+    // Word of an army goes back to the player; a tower in reach (or between here and the goal) sends the explorer elsewhere.
+    if (o.told === undefined || s.tick - o.told >= secs(EXPLORE.tell)) {
+      const a = armySighted(s, sp, u);
+      if (a) {
+        o.told = s.tick;
+        s.events.push({ k: 'sighted', owner: u.owner, x: a.x, y: a.y, n: a.n });
+      }
+    }
+    if (underGuns(s, u, u.x, u.y) || (here >= 0 && underGuns(s, u, o.x + 0.5, o.y + 0.5))) {
+      o.x = -1;
+      o.y = -1;
+      here = -1;
+      o.started = false;
+      if (underGuns(s, u, u.x, u.y)) {
+        // Already in reach: back the way it came, away from the nearest gun.
+        let g: Building | null = null;
+        let gd = Infinity;
+        for (const e of s.ents) {
+          if (e.kind !== 'building' || e.hp <= 0 || !e.built || !isEnemy(s, u.owner, e.owner) || !BUILDINGS[e.type].guns) continue;
+          const d = (e.x - u.x) * (e.x - u.x) + (e.y - u.y) * (e.y - u.y);
+          if (d < gd) {
+            gd = d;
+            g = e;
+          }
+        }
+        if (g) {
+          const dx = u.x - g.x;
+          const dy = u.y - g.y;
+          const l = Math.sqrt(dx * dx + dy * dy) || 1;
+          goTo(u, goalForPoint(s, Math.max(1, Math.min(s.w - 1, u.x + (dx / l) * PATROL.flee)), Math.max(1, Math.min(s.h - 1, u.y + (dy / l) * PATROL.flee)), passOf(s, u)));
+          return;
+        }
+      }
+    }
+  }
+  // Seen at last: a step made, so the ground it failed to reach may be worth another try later.
+  if (here >= 0 && seen[here]) o.fails = [];
+  if (here < 0 || seen[here]) {
+    const t = exploreTarget(s, u, o.fails);
+    if (t < 0) {
+      setOrder(u, { k: 'idle' });
+      return;
+    }
+    o.x = t % s.w;
+    o.y = Math.floor(t / s.w);
+    o.started = false;
+  }
+  if (!o.started) {
+    o.started = true;
+    goTo(u, goalForPoint(s, o.x + 0.5, o.y + 0.5, passOf(s, u)));
+    return;
+  }
+  if (walking(u)) return;
+  // Stopped with the tile still unseen: no way there. Remember it and try elsewhere; give up after a run of them.
+  o.fails.push(o.y * s.w + o.x);
+  if (o.fails.length >= EXPLORE.fails) {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  o.x = -1;
+  o.y = -1;
+}
+
 function attackStep(s: GameState, sp: Spatial, u: Unit, o: Extract<Order, { k: 'attack' }>): void {
   const t = s.byId.get(o.target);
   const st = statsOf(s, u);
   const done = () => {
     if (o.then) setOrder(u, { k: 'move', x: o.then.x, y: o.then.y, amove: true, started: false });
+    else if (o.back) setOrder(u, resumed(o.back));
     else if (u.stance === 'defensive') setOrder(u, { k: 'move', x: u.guardX, y: u.guardY, amove: false, started: false });
     else setOrder(u, { k: 'idle' });
   };
   if (!t || t.hp <= 0 || (t.kind === 'unit' && t.inside) || !isEnemy(s, u.owner, t.owner) || peace(s)) {
     // The target fell (or changed sides): pick the next one close by if this was a fight already joined.
-    const next = u.type !== 'citizen' && !peace(s) ? findTarget(s, sp, u, st.sight, !!o.then) : null;
+    const next = u.type !== 'citizen' && u.stance !== 'run' && !peace(s) ? findTarget(s, sp, u, st.sight, !!o.then) : null;
     if (next) {
       o.target = next.id;
       o.auto = true;
@@ -1532,7 +1742,9 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
     case 'idle':
       u.guardX = u.x;
       u.guardY = u.y;
-      if (military && (s.tick + u.id) % 8 === 0) {
+      if (military && u.stance === 'run') {
+        if ((s.tick + u.id) % 8 === 0) flee(s, sp, u, o);
+      } else if (military && (s.tick + u.id) % 8 === 0) {
         const st = statsOf(s, u);
         const reach = u.stance === 'stand' ? st.range + st.radius + 0.6 : st.sight;
         const t = findTarget(s, sp, u, reach, !!st.buildingsOnly);
@@ -1558,6 +1770,12 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
       break;
     case 'attack':
       attackStep(s, sp, u, o);
+      break;
+    case 'patrol':
+      patrolStep(s, sp, u, o);
+      break;
+    case 'explore':
+      exploreStep(s, sp, u, o);
       break;
     case 'gather':
       gatherStep(s, u, o);

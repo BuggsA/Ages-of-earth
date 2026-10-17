@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { findSpot } from '../src/sim/ai';
-import { ageOf } from '../src/sim/ages';
-import { ROADS, secs } from '../src/sim/data';
-import { checksum, createGame, step } from '../src/sim/game';
-import { deserialize, serialize } from '../src/sim/save';
-import type { AgeId, Building, BuildingType, CivId, GameState, Unit, UnitType } from '../src/sim/types';
-import { placeBuilding, spawnUnit } from '../src/sim/world';
+import { findSpot } from '../../src/sim/ai';
+import { ageOf } from '../../src/sim/ages';
+import { ROADS, secs } from '../../src/sim/data';
+import { checksum, createGame, step } from '../../src/sim/game';
+import { deserialize, serialize } from '../../src/sim/save';
+import type { AgeId, Building, BuildingType, CivId, GameState, Unit, UnitType } from '../../src/sim/types';
+import { placeBuilding, spawnUnit } from '../../src/sim/world';
 
 /** The computer walks the web of ages (#50): it takes side roads, uses them, and reads its rivals' roads. */
 

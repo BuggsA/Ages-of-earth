@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { ageOf } from '../src/sim/ages';
-import { secs } from '../src/sim/data';
-import { createGame, step } from '../src/sim/game';
-import { placeProblem } from '../src/sim/grid';
-import type { Building, GameState } from '../src/sim/types';
-import { placeBuilding, spawnUnit } from '../src/sim/world';
+import { ageOf } from '../../src/sim/ages';
+import { secs } from '../../src/sim/data';
+import { createGame, step } from '../../src/sim/game';
+import { placeProblem } from '../../src/sim/grid';
+import type { Building, GameState } from '../../src/sim/types';
+import { placeBuilding, spawnUnit } from '../../src/sim/world';
 
 /** The computer turns sailor (the Age of Sail, #50's walk): a coastal town whose boats have landed the catch takes the road. */
 

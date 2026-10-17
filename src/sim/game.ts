@@ -6,11 +6,12 @@ import { raiseCamps } from './steppe';
 import { giftFlock, sheepStep } from './flocks';
 import { faithStep } from './consecrate';
 import { turnSeason } from './seasons';
+import { markHomeHerds, turnYear } from './year';
 import { hitAnimal, spawnAnimal, updateAnimals } from './animals';
 import { markGoals, scenarioStep, startScenario } from './campaign';
 import { buildingGuns, updateShots } from './combat';
 import { applyCommand } from './commands';
-import { AGES, AURA, AUTO_WORK, unitEpoch, CIV_IDS, LANDMARKS, RAIDER, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
+import { AGES, AURA, AUTO_WORK, unitEpoch, CIV_IDS, HEART, LANDMARKS, RAIDER, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
 import { AIR, NAVAL, stampBuilding } from './grid';
 import { denWolves, generateMap } from './mapgen';
 import { Spatial } from './spatial';
@@ -33,7 +34,7 @@ import { seraiStep, tollStep } from './passage';
 import { mercStep } from './merc';
 import { KIN } from './data';
 import { isHire, barred, journeyOf, noteWalked, surveyFinds, trainsAt, workSteps } from './ages';
-import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, MapSize, MapType, Player, UnitType } from './types';
+import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, HomelandId, MapSize, MapType, Player, UnitType } from './types';
 import { RES, R_FISH, R_NONE } from './types';
 import { RES_OF_TILE, autoWork, rallyNode, carryCargo, checkStuck, collide, findResource, routeUnits, separate, setOrder, think, ungarrison, walk } from './units';
 import { updateVision } from './vision';
@@ -69,6 +70,11 @@ export interface GameSetup {
   wonderSeconds?: number;
   /** A campaign scenario's id: adds its goals, raids and gifts. */
   scenario?: string;
+  /**
+   * The homeland (#473): 'random' rolls it from the seed (a match from the menu or an online room), or one
+   * named. Left out, it is the Glade, so a setup from before homelands draws the world it always did.
+   */
+  homeland?: HomelandId | 'random';
 }
 
 const spatials = new WeakMap<GameState, Spatial>();
@@ -76,7 +82,7 @@ const spatials = new WeakMap<GameState, Spatial>();
 export function createGame(setup: GameSetup): GameState {
   const mapType = setup.mapType ?? 'continental';
   // Campaign maps are drawn as they always were: no deposits that only some seeds hold.
-  const map = generateMap(setup.seed, setup.size, setup.players.length, mapType, !setup.scenario, !setup.scenario);
+  const map = generateMap(setup.seed, setup.size, setup.players.length, mapType, !setup.scenario, !setup.scenario, setup.homeland === 'random' ? undefined : (setup.homeland ?? 'glade'));
   const n = map.w * map.h;
   const startEpoch = Math.max(0, Math.min(EPOCHS.length - 1, setup.startEpoch ?? 0));
   const mode = setup.mode ?? 'conquest';
@@ -85,6 +91,7 @@ export function createGame(setup: GameSetup): GameState {
     seed: setup.seed,
     size: setup.size,
     mapType,
+    homeland: map.homeland,
     mode,
     kings: setup.players.map(() => 0),
     w: map.w,
@@ -179,6 +186,7 @@ export function createGame(setup: GameSetup): GameState {
   for (const t of map.posts) s.posts.push({ id: s.nextId++, x: t.x, y: t.y });
   if (map.ruins.length) s.ruins = map.ruins.map((r) => ({ id: s.nextId++, x: r.x, y: r.y, find: r.find, dug: 0, by: -1 }));
   for (const b of map.wild) spawnAnimal(s, b.x, b.y, b.kind);
+  markHomeHerds(s);
   if (map.caves.length) s.caves = map.caves.map((c) => ({ ...c }));
   if (map.landmarks.length) s.landmarks = map.landmarks.map((m) => ({ id: s.nextId++, x: m.x, y: m.y, kind: m.kind, owner: -1, claim: 0, by: -1 }));
   for (const c of map.caves) if (c.den) for (const p of denWolves(c.tile, map.w)) spawnAnimal(s, p.x, p.y, 'wolf');
@@ -437,6 +445,22 @@ function checkVictory(s: GameState): void {
       s.events.push({ k: 'defeated', owner: p.id });
       continue;
     }
+    // The heart (#452): with no Town Center standing, started or on a wagon, a people has `HEART.grace` seconds
+    // to lay a new foundation. Regicide has its King, and a campaign chapter its own goals.
+    if (s.mode !== 'regicide' && !s.scenario) {
+      const heart = s.ents.some((e) => e.owner === p.id && e.hp > 0 && ((e.kind === 'building' && e.type === 'towncenter') || (e.kind === 'unit' && e.packed === 'towncenter')));
+      if (heart) {
+        if (p.heartless !== undefined) delete p.heartless;
+      } else if (p.heartless === undefined) {
+        p.heartless = s.tick + secs(HEART.grace);
+        s.events.push({ k: 'heartless', owner: p.id, left: HEART.grace });
+      } else if (s.tick >= p.heartless) {
+        p.defeated = true;
+        for (const e of s.ents) if (e.owner === p.id) e.hp = 0;
+        s.events.push({ k: 'defeated', owner: p.id });
+        continue;
+      }
+    }
     // Fields and walls alone don't keep a people alive, nor do unarmed boats (fishing boats, merchant
     // ships): none of them can build or fight, so a people down to them can never come back, and a rival
     // at its population cap with no fleet could never sink them.
@@ -504,6 +528,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   for (const e of s.ents) if (e.kind === 'unit' && e.hp > 0 && !e.inside) walk(s, e);
   updateAnimals(s, sp, (a) => sheepStep(s, sp, a));
   turnSeason(s);
+  turnYear(s);
   sp.rebuild(s);
   separate(s, sp);
   for (const e of s.ents) {

@@ -5,7 +5,7 @@ import { BUILDINGS, KILL_CAMP, KIN, RAID, SEASON, secs } from '../src/sim/data';
 import { createGame, step } from '../src/sim/game';
 import { raiseCost } from '../src/sim/reclaim';
 import { buildBarred } from '../src/sim/ages';
-import { killCamp } from '../src/sim/ways';
+import { herdAtHome, killCamp, wayBarred } from '../src/sim/ways';
 import type { Animal, Building, GameState, Unit, WayId } from '../src/sim/types';
 import { placeBuilding, spawnUnit } from '../src/sim/world';
 
@@ -78,14 +78,27 @@ describe('the Ways have verbs (#463 s1)', () => {
       expect(t.players[0].res.wood).toBe(w2);
     });
 
-    it('sows no farms in the Stone Age, and farms again from the Bronze Age', () => {
+    it('sows no farms while the herd grazes by home in the Stone Age, and sows once it is gone or the Bronze Age comes', () => {
       const s = game('hunt');
       const p = s.players[0];
-      expect(buildBarred(p, 'farm')).toMatch(/Stone Age/);
-      expect(buildBarred(s.players[1], 'farm')).toBeNull();
+      const tc = tcOf(s, 0);
+      const deer = s.animals.find((a) => a.kind === 'deer')!;
+      Object.assign(deer, { x: tc.x + 5, y: tc.y + 5, hp: 8 });
+      expect(herdAtHome(s, 0)).toBeGreaterThan(0);
+      expect(wayBarred(s, p, 'farm')).toMatch(/herd grazes/);
+      expect(wayBarred(s, s.players[1], 'farm')).toBeNull();
+      const spot = findSpot(s, 'farm', tc.x, tc.y, 4, 12)!;
+      applyCommand(s, { t: 'build', p: 0, ids: [], type: 'farm', tx: spot.tx, ty: spot.ty });
+      expect(s.ents.some((e) => e.kind === 'building' && e.owner === 0 && e.type === 'farm')).toBe(false);
       p.epoch = 1;
       p.statsVersion++;
-      expect(buildBarred(p, 'farm')).toBeNull();
+      expect(wayBarred(s, p, 'farm')).toBeNull();
+      p.epoch = 0;
+      p.statsVersion++;
+      for (const a of s.animals) if (a.kind === 'deer' || a.kind === 'boar' || a.kind === 'mammoth') a.hp = 0;
+      expect(wayBarred(s, p, 'farm')).toBeNull();
+      applyCommand(s, { t: 'build', p: 0, ids: [], type: 'farm', tx: spot.tx, ty: spot.ty });
+      expect(s.ents.some((e) => e.kind === 'building' && e.owner === 0 && e.type === 'farm')).toBe(true);
     });
   });
 
@@ -191,6 +204,5 @@ describe('the Ways have verbs (#463 s1)', () => {
     expect(s.players[0].stats.raided ?? 0).toBeGreaterThan(0);
     expect(kin).toBeGreaterThanOrEqual(KIN.n);
     expect(t.ents.some((e) => e.kind === 'building' && e.owner === 0 && e.type === 'huntcamp' && e.kill)).toBe(true);
-    expect(t.ents.some((e) => e.kind === 'building' && e.owner === 0 && e.type === 'farm')).toBe(false);
   });
 });

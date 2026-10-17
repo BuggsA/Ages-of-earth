@@ -12,6 +12,7 @@
  *   …  '{}' '{"wonderGuard":false}' ... a 7th argument is extra game setup, e.g. '{"startEpoch":3,"rich":3000}' (`rich`: wood, stone and gold added to both seats) for a Wonder race (#374); `age` puts both seats in a side age on their start epoch, e.g. '{"startEpoch":4,"age":"aeronaut","rich":3000}' to judge the Airfield's fighter guard (#393)
  *   …  '{"hemo":false}' '{}' '{"startEpoch":4,"age":"totalwar","walked":["warband","ironblood"]}' also lists the ages `walked` before it, for Hemocraft (#355 s5)
  *   …  '{"rite":false}' '{}' '{"startEpoch":4,"age":"bloodrite","walked":["warband","ironblood","totalwar"]}' judges the Blood-rite's priests (#355 s4)
+ *   …  '{"breakOath":false}' '{}' '{"startEpoch":2,"age":"warband","walked":["pilgrim"]}' judges riding down the priests of a rival's Military Orders (#459)
  *   …  '{"healers":false}' judges the computer's priests leaving a heal they took up by themselves for a relic, a ward or a conversion
  *   …  '{"fork":false}' '{}' '{"startEpoch":4,"age":"totalwar","walked":["warband","ironblood"]}' judges the computer taking the fork past Total War (#355 s5); its roads show in each `ab` line
  * The old side plays under Normal's name, so the few choices made by name (merchant ships kept) differ.

@@ -1,4 +1,4 @@
-import { BUILDINGS, EPOCHS, MARKET, ORE_TRADE, RARE, RES_LABEL, SPREAD, TECHS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
+import { BUILDINGS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, SPREAD, TECHS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
 import { peace } from './combat';
 import { placeProblem, stampBuilding, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
@@ -13,7 +13,7 @@ import { caravanOf, dockOf, homeMarket, marketOf, nearestCaravan, nearestDock, p
 import { ruinAt } from './ruins';
 import { raise, raiseCost } from './reclaim';
 import { callWork, workProblem } from './works';
-import { callKin, killCamp, kinProblem, takeVow, takeWay, vowProblem, wayProblem } from './ways';
+import { callKin, killCamp, kinProblem, takeVow, takeWay, vowProblem, wayBarred, wayProblem } from './ways';
 import { beaconProblem, lightBeacon } from './beacon';
 import { callUp, callUpProblem } from './warcamp';
 import { bloodOf, bloodShort, levy, levyProblem, sworn } from './blood';
@@ -44,6 +44,24 @@ export function shortfall(p: Player, cost: Cost): string | null {
     if (need > 0) return `Need ${Math.ceil(need)} more ${RES_LABEL[r].toLowerCase()}`;
   }
   return null;
+}
+
+/** Guard a trading post's road (#454 s3): the units go back and forth between the nearest Market and the post. */
+function guardRoad(s: GameState, owner: number, all: Unit[], postId: number, queue?: boolean): void {
+  const post = postAt(s, postId);
+  if (!post) return;
+  const market = homeMarket(s, owner, post.x, post.y);
+  if (!market) return refuse(s, owner, 'Build a Market first: the road runs from it');
+  for (const dom of ['land', 'water', 'air'] as const) {
+    const group = all.filter((u) => u.type !== 'wagon' && domainOf(u.type) === dom);
+    if (!group.length) continue;
+    const end = dom === 'water' ? portSpot(s, post, owner) : { x: post.x, y: post.y };
+    if (!end) {
+      refuse(s, owner, 'That post has no harbour');
+      continue;
+    }
+    for (const u of group) giveOrder(u, { k: 'patrol', pts: [{ x: market.x, y: market.y }, end], i: 1, started: false, miss: 0 }, queue);
+  }
 }
 
 function myUnits(s: GameState, p: number, ids: number[]): Unit[] {
@@ -143,7 +161,7 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
     if (!quiet) refuse(s, p, `Needs the ${EPOCHS[def.epoch].name}`);
     return null;
   }
-  const no = buildBarred(player, type);
+  const no = buildBarred(player, type) ?? wayBarred(s, player, type);
   if (no) {
     if (!quiet) refuse(s, p, no);
     return null;
@@ -643,6 +661,7 @@ export function applyCommand(s: GameState, c: Command): void {
     case 'stance':
       for (const u of myUnits(s, c.p, c.ids)) {
         u.stance = c.stance;
+        if (c.stance === 'run' && u.order.k === 'attack' && u.order.auto) setOrder(u, { k: 'idle' });
         u.guardX = u.x;
         u.guardY = u.y;
       }
@@ -791,6 +810,39 @@ export function applyCommand(s: GameState, c: Command): void {
       s.events.push({ k: 'trade', owner: c.p, res: c.res, buy: c.buy });
       break;
     }
+    case 'patrol': {
+      if (c.post !== undefined) {
+        guardRoad(s, c.p, myUnits(s, c.p, c.ids), c.post, c.queue);
+        break;
+      }
+      // A point off the map or not a number is no order at all (the room is public).
+      if (!Number.isFinite(c.x) || !Number.isFinite(c.y)) return;
+      const x = Math.min(s.w - 0.5, Math.max(0.5, c.x));
+      const y = Math.min(s.h - 0.5, Math.max(0.5, c.y));
+      const units = myUnits(s, c.p, c.ids).filter((u) => u.type !== 'wagon');
+      for (const dom of ['land', 'water', 'air'] as const) {
+        const group = units.filter((u) => domainOf(u.type) === dom);
+        if (!group.length) continue;
+        // Each keeps its place in the group: it patrols between where it stands and its spot by the point.
+        for (const spot of formation(s, group, x, y)) {
+          const u = spot.u;
+          const pt = { x: spot.x, y: spot.y };
+          const on = u.order.k === 'patrol' ? u.order : u.order.k === 'attack' && u.order.back?.k === 'patrol' ? u.order.back : null;
+          if (c.queue && on) {
+            if (on.pts.length < PATROL.points) on.pts.push(pt);
+            continue;
+          }
+          giveOrder(u, { k: 'patrol', pts: [{ x: u.x, y: u.y }, pt], i: 1, started: false, miss: 0 }, c.queue);
+        }
+      }
+      break;
+    }
+    case 'explore':
+      for (const u of myUnits(s, c.p, c.ids)) {
+        if (u.type === 'wagon') continue;
+        giveOrder(u, { k: 'explore', x: -1, y: -1, started: false, fails: [] }, c.queue);
+      }
+      break;
     case 'stop':
       for (const u of myUnits(s, c.p, c.ids)) {
         u.queue = [];

@@ -1,4 +1,4 @@
-import { AURA, RALLY, BONUS, BLOOD_TOWER, BUILDINGS, DEER, LIGHTNING, VETERANCY, TICK_HZ, domainOf, secs, type UnitStats } from './data';
+import { AURA, RALLY, BONUS, BLOOD_TOWER, BUILDINGS, DEER, LIGHTNING, VETERANCY, TICK_HZ, domainOf, secs, HEART, type UnitStats } from './data';
 import { hasCoils } from './ages';
 import { bleeds, curseTaken, drawBlood, hemoBlow, hemoTaken } from './blood';
 import { fairPurse } from './fair';
@@ -60,7 +60,11 @@ export function hurt(s: GameState, target: Ent, damage: number, by: number, atta
   target.hurt = s.tick;
   s.events.push({ k: 'hit', target: target.id, x: target.x, y: target.y, damage, owner: target.owner, building: target.kind === 'building' });
   const p = s.players[target.owner];
-  if (by !== target.owner && s.tick - p.alert > secs(12)) {
+  if (by !== target.owner && target.kind === 'building' && target.type === 'towncenter' && s.tick - (p.tcAlert ?? -9999) > secs(HEART.alert)) {
+    p.tcAlert = s.tick;
+    p.alert = s.tick;
+    s.events.push({ k: 'alert', owner: target.owner, x: target.x, y: target.y, building: true, heart: true });
+  } else if (by !== target.owner && s.tick - p.alert > secs(12)) {
     p.alert = s.tick;
     s.events.push({ k: 'alert', owner: target.owner, x: target.x, y: target.y, building: target.kind === 'building', ...(target.kind === 'unit' && target.order.k === 'hunt' ? { hunter: true } : {}) });
   }
@@ -84,7 +88,7 @@ export function hurt(s: GameState, target: Ent, damage: number, by: number, atta
     return;
   }
   // Soldiers standing about answer whoever hits them (if their stance lets them move).
-  if (attacker && target.kind === 'unit' && target.type !== 'citizen' && target.type !== 'priest' && target.order.k === 'idle' && attacker.hp > 0 && target.stance !== 'stand' && canHit(s, target, attacker)) {
+  if (attacker && target.kind === 'unit' && target.type !== 'citizen' && target.type !== 'priest' && target.order.k === 'idle' && attacker.hp > 0 && target.stance !== 'stand' && target.stance !== 'run' && canHit(s, target, attacker)) {
     target.order = { k: 'attack', target: attacker.id, auto: true, then: null };
   }
   // The Warband feeds on the raid (#463 s1): blows on a rival's food buildings carry off its food.

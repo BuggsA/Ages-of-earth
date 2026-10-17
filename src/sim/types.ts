@@ -26,9 +26,11 @@ export type MapSize = 'small' | 'medium' | 'large';
 export type MapType = 'continental' | 'highlands' | 'lakes' | 'forest' | 'plains' | 'sea';
 /** Conquest: destroy every rival town. Regicide: each people has a King; lose them and you lose. Deathmatch: start rich. */
 export type GameMode = 'conquest' | 'regicide' | 'deathmatch' | 'lords';
-export type Stance = 'aggressive' | 'defensive' | 'stand';
+export type Stance = 'aggressive' | 'defensive' | 'stand' | 'run';
 /** A custom the people live by, chosen in the Stone Age (#336). */
 export type WayId = 'hunt' | 'hearth' | 'warband';
+/** Homelands (#473): what lies round every town at the start, rolled once per seed. */
+export type HomelandId = 'glade' | 'shore' | 'herds' | 'wood';
 export type CivId = 'egyptians' | 'greeks' | 'romans' | 'mongols' | 'chinese' | 'britons';
 export type TechId =
   | 'forging' | 'ironCasting' | 'blastFurnace' | 'fletching' | 'bodkin' | 'scaleArmor' | 'chainMail' | 'plateArmor'
@@ -96,7 +98,18 @@ export type Order =
   /** Walk to a point. With `amove`, fight anything met on the way. */
   | { k: 'move'; x: number; y: number; amove: boolean; started: boolean }
   /** Fight a unit or building. `auto` when picked by the unit itself (it gives up sooner); `then` resumes an attack-move. */
-  | { k: 'attack'; target: number; auto: boolean; then: { x: number; y: number } | null }
+  | { k: 'attack'; target: number; auto: boolean; then: { x: number; y: number } | null; back?: Order }
+  /**
+   * Walk the points in turn, round and round (#454). Soldiers fight what they meet by their stance and come
+   * back to the round (`back` on the attack). `miss` counts legs that ended short of their point.
+   */
+  | { k: 'patrol'; pts: { x: number; y: number }[]; i: number; started: boolean; miss: number }
+  /**
+   * Go and see (#454): head for the nearest ground its people have never seen, and on to the next when it
+   * comes into sight. `x`, `y` is the tile it heads for (-1 before the first); `fails` holds tiles it could
+   * not reach, so it doesn't try them again.
+   */
+  | { k: 'explore'; x: number; y: number; started: boolean; fails: number[]; told?: number }
   /** Gather a resource tile: walk there, work it, carry the load to a drop site, and back. */
   | { k: 'gather'; tile: number; res: Res; phase: 'go' | 'work' | 'drop'; bog?: boolean; rare?: RareId; meat?: boolean }
   | { k: 'build'; target: number }
@@ -399,6 +412,13 @@ export interface Animal {
   herd?: number;
   origX?: number;
   origY?: number;
+  /**
+   * The town whose year this herd keeps (#479, `YEAR`): a Herd Plains home herd treks out from it each autumn
+   * and home each spring; a Deep Wood herd yards by it each winter. Drift leaves such a herd alone.
+   */
+  town?: number;
+  /** Tiles still to walk through on the way to new ground, nearest first (#479): a herd on the move goes round woods. */
+  way?: number[];
   /** The deer a hunting wolf is running down. */
   prey?: number;
   /** The carcass tile a wolf has scented and is eating (carrion). */
@@ -576,6 +596,10 @@ export interface Player {
   startY: number;
   /** Tick of the last "under attack" alert, so they come at most every few seconds. */
   alert: number;
+  /** Tick of the last Town Center alert (#452). */
+  tcAlert?: number;
+  /** The tick by which a people with no Town Center must have a new one under way, or be lost (#452). */
+  heartless?: number;
 }
 
 export type GameEvent =
@@ -640,7 +664,7 @@ export type GameEvent =
   /** A rival trader of `from`'s paid `owner` a toll of `gold` for safe passage across its land (#334). */
   | { k: 'toll'; owner: number; from: number; gold: number; id: number; x: number; y: number }
   | { k: 'campAlone'; owner: number; id: number; x: number; y: number; struck: boolean }
-  | { k: 'alert'; owner: number; x: number; y: number; building: boolean; wild?: Animal['kind']; /** A rival's soldiers fell on a citizen out hunting. */ hunter?: boolean }
+  | { k: 'alert'; owner: number; x: number; y: number; building: boolean; /** The Town Center is struck. */ heart?: boolean; wild?: Animal['kind']; /** A rival's soldiers fell on a citizen out hunting. */ hunter?: boolean }
   | { k: 'converted'; id: number; from: number; to: number; x: number; y: number }
   /** A building chanted over to a pilgrim people (#209). */
   | { k: 'consecrated'; id: number; from: number; to: number; x: number; y: number; type: BuildingType; size: number }
@@ -673,7 +697,10 @@ export type GameEvent =
   /** A Wonder's foundation was laid (#361): every player hears of it, so the whole build can be contested. */
   | { k: 'wonderRising'; owner: number; id: number; x: number; y: number }
   | { k: 'trade'; owner: number; res: Res; buy: boolean }
+  /** An explorer of `owner` came on a rival army of `n` soldiers at (x, y) (#454 s3). */
+  | { k: 'sighted'; owner: number; x: number; y: number; n: number }
   | { k: 'defeated'; owner: number }
+  | { k: 'heartless'; owner: number; left: number }
   | { k: 'over'; winner: number; how: 'conquest' | 'wonder' | 'relics' | 'lands' | 'resign' | 'time' | 'scenario' }
   /** A relic picked up, kept in a Temple, or let go where it lies. */
   | { k: 'relic'; id: number; owner: number; what: 'taken' | 'kept' | 'dropped'; x: number; y: number }
@@ -694,6 +721,8 @@ export interface GameState {
   seed: number;
   size: MapSize;
   mapType: MapType;
+  /** The land every town wakes in (#473); a save from before it is a Glade. */
+  homeland?: HomelandId;
   mode: GameMode;
   /** Regicide: each player's King (a unit id), or 0. */
   kings: number[];
@@ -777,6 +806,9 @@ export interface AiMemory {
   bell: number;
   /** Tick it last looked for a dock site and found none (so it doesn't look every turn). */
   dockless?: number;
+  /** Its scout (#454 s4): the rider sent exploring, the tick it was last sent, and the pair that patrol its border or trade road. */
+  scout?: { id: number; sent: number };
+  guards?: number[];
   /** Tick its bombers last set out. */
   sortie?: number;
   /** A sea landing under way: the transport, the soldiers aboard (or boarding) and how far along it is. */
@@ -889,6 +921,13 @@ export type Command =
   /** A rare ore (#356) can only be sold, a lot of it for gold at a flat price. */
   | { t: 'trade'; p: number; res: 'food' | 'wood' | 'stone' | RareId; buy: boolean }
   | { t: 'stop'; p: number; ids: number[] }
+  /**
+   * Patrol between where each unit stands and the point (#454); with `queue`, add the point to a patrol under way.
+   * With `post`, guard that trading post's road instead: back and forth between the nearest Market and the post (s3).
+   */
+  | ({ t: 'patrol'; p: number; ids: number[]; x: number; y: number; post?: number } & Queued)
+  /** Explore on their own (#454). */
+  | ({ t: 'explore'; p: number; ids: number[] } & Queued)
   | { t: 'delete'; p: number; ids: number[] }
   | { t: 'resign'; p: number }
   /** Priests set down the relics they carry, where they stand. */

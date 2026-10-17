@@ -126,6 +126,29 @@ export function killCamp(s: GameState, owner: number, type: BuildingType, tx: nu
 /** As long as a Town Center's queue may grow (`MAX_QUEUE` in `commands.ts`). */
 const KIN_QUEUE = 6;
 
+/** Game (deer, boars, mammoths) living within `KILL_CAMP.home` tiles of one of `owner`'s Town Centers. */
+export function herdAtHome(s: GameState, owner: number): number {
+  const r2 = KILL_CAMP.home * KILL_CAMP.home;
+  const tcs = townCenters(s, owner);
+  let n = 0;
+  for (const a of s.animals) {
+    if (a.hp <= 0 || (a.kind !== 'deer' && a.kind !== 'boar' && a.kind !== 'mammoth')) continue;
+    if (tcs.some((b) => (a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y) <= r2)) n++;
+  }
+  return n;
+}
+
+/**
+ * The Hunters' fields wait on the herd (#463 s1): why a Way bars this building now, from the state of the land, or null.
+ * (What a Way bars outright, whatever the land, is in `buildBarred`.)
+ */
+export function wayBarred(s: GameState, p: Player, type: BuildingType): string | null {
+  const way = p.way ? WAYS[p.way] : undefined;
+  if (p.epoch !== 0 || !way?.herdShuts?.includes(type)) return null;
+  const n = herdAtHome(s, p.id);
+  return n ? `${way.name} sows nothing where the herd grazes: ${n} ${n === 1 ? 'beast lives' : 'beasts live'} within ${KILL_CAMP.home} tiles of your Town Center` : null;
+}
+
 /** How many kin answer a call now: more in winter, when the hearth is warmest. */
 export function kinCount(s: GameState): number {
   return seasonAt(s) === 3 ? KIN.winter : KIN.n;

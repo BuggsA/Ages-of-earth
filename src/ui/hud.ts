@@ -1,11 +1,11 @@
 import { crestSvg } from './crests';
-import { seasonOf } from '../sim/seasons';
+import { seasonAt, seasonOf } from '../sim/seasons';
 import { scenarioById } from '../sim/campaign';
 import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
 import { RARE_OF_TILE } from '../sim/units';
-import { RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -14,7 +14,7 @@ import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
 import { LANDMARK_KINDS, claimWork, claimants, favours, landmarkAt } from '../sim/landmarks';
 import { workProblem } from '../sim/works';
 import { TIDING_CARDS, tidingCost, tidingProblem } from '../sim/tidings';
-import { kinCount, kinProblem, vowProblem, wayProblem } from '../sim/ways';
+import { kinCount, kinProblem, vowProblem, wayBarred, wayProblem } from '../sim/ways';
 import { beaconProblem, lit } from '../sim/beacon';
 import { callUpProblem, callUpReach, campGrace, musterWait } from '../sim/warcamp';
 import { bledFlock, bloodOf, bloodShort, captivesOf, cursed, grafted, levyProblem, sworn, levyReach } from '../sim/blood';
@@ -46,6 +46,8 @@ export interface HudActions {
   issue(c: Command): void;
   /** Start placing a building with the selected citizens. */
   place(type: BuildingType): void;
+  /** Wait for a left click to patrol to (#454). */
+  patrolMode(): void;
   /** Wait for a left click to attack-move to. */
   attackMove(): void;
   /** Wait for a left click on an enemy that bleeds, for a Blood-rite priest to sacrifice or curse (#355 s4). */
@@ -78,6 +80,8 @@ function marketTrend(price: number, res: 'food' | 'wood' | 'stone'): string {
   const base = MARKET.start[res];
   return price < base ? `↑ recovering toward ${base}` : price > base ? `↓ recovering toward ${base}` : `→ steady at ${base}`;
 }
+
+const STANCE_NAMES: Record<Stance, string> = { aggressive: 'Attack and destroy', defensive: 'Fight if provoked', stand: 'Hold', run: 'Run' };
 
 const ACT_WORDS: Record<string, string> = {
   idle: 'Standing by',
@@ -115,6 +119,10 @@ function orderWords(s: GameState, u: Unit): string {
       return u.act === 'attack' ? 'Fighting' : 'Charging';
     case 'move':
       return o.amove ? 'Marching to attack' : 'Moving';
+    case 'patrol':
+      return `Patrolling (${o.pts.length} points)`;
+    case 'explore':
+      return 'Exploring';
     case 'deliver':
       return 'Carrying resources home';
     case 'hunt':
@@ -351,7 +359,8 @@ export class Hud {
     const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${RARES.map((r) => Math.floor(p.rare?.[r] ?? 0)).join(',')}|${Math.floor(bloodOf(p))}|${p.pop}/${p.cap}|${ageOf(p)}|${adv}|${p.way ?? ''}${p.deep ? '+' : ''}${p.vowed ? 'v' : ''}|${idleTechs.length}|${idle}|${speed}|${scores.join(',')}`;
     const sn = seasonOf(s);
     this.clockEl.textContent = `${sn.icon} ${fmtTime(s.tick)}`;
-    this.clockEl.title = `${sn.name}: ${sn.blurb}`;
+    const hl = s.homeland ? HOMELANDS[s.homeland] : undefined;
+    this.clockEl.title = `${sn.name}: ${sn.blurb}${hl ? `\n${hl.icon} ${hl.name}: ${hl.blurb}${hl.year[seasonAt(s)] ? `\nThis season: ${hl.year[seasonAt(s)]}` : ''}` : ''}`;
     this.timers(s, viewer);
     this.objectives(s);
     if (sig === this.topSig) return;
@@ -404,6 +413,14 @@ export class Hud {
       }
       if (e.timer < 0) continue;
       parts.push(`<div class="timer ${ours ? 'good' : 'bad'}" data-focus="${e.x},${e.y}"><span class="swatch" style="background:${q.color}"></span>${q.id === viewer ? 'Your' : `${q.name}'s`} Wonder: ${fmtTime(e.timer)}${ours ? '' : ' (destroy it!)'}</div>`);
+    }
+    // The heart (#452): a people with no Town Center standing has `heartless - tick` left to lay a new foundation.
+    for (const q of s.players) {
+      if (q.heartless === undefined || q.defeated) continue;
+      const ours = q.team === s.players[viewer].team;
+      const left = Math.max(0, q.heartless - s.tick);
+      const urgent = left < secs(10) ? ' urgent' : '';
+      parts.push(`<div class="timer ${ours ? 'bad' : 'good'}${urgent}"><span class="swatch" style="background:${q.color}"></span>${q.id === viewer ? 'Your people has' : `${q.name} has`} no Town Center: ${fmtTime(left)}${q.id === viewer ? ' (build a new Town Center!)' : ours ? ' (help them rebuild)' : ' (finish them!)'}</div>`);
     }
     if (s.relicTeam >= 0 && s.relicTimer >= 0) {
       const ours = s.relicTeam === s.players[viewer].team;
@@ -557,7 +574,7 @@ export class Hud {
     const status = mine ? orderWords(s, u) + queued : p.name;
     const carry = mine && u.carry > 0 && u.carryRes ? `<span>${icon(u.carryRes)}${u.carry}<em>carried</em></span>` : '';
     const cargo = u.type === 'transport' ? `<span data-tip="<b>Aboard</b>Soldiers and citizens carried. Right-click a shore (or press U) to land them.">⛵<em>Aboard</em> ${u.cargo.length}/${st.capacity ?? 0}</span>` : '';
-    const stance = st.attack > 0 && u.type !== 'citizen' && mine ? `<span data-tip="<b>Stance</b>Z aggressive, X defensive, C stand ground.">${u.stance === 'stand' ? '⚓ Stand' : u.stance === 'defensive' ? '🛡 Defend' : '🔥 Aggressive'}</span>` : '';
+    const stance = st.attack > 0 && u.type !== 'citizen' && mine ? `<span data-tip="<b>Stance</b>Z attack and destroy, X fight if provoked, C hold, N run.">${u.stance === 'stand' ? '⚓ Hold' : u.stance === 'defensive' ? '🛡 Provoked' : u.stance === 'run' ? '🏃 Run' : '🔥 Attack'}</span>` : '';
     const aura = s.tick - u.aura < 5 && u.type !== 'hero' ? `<span data-tip="<b>Inspired</b>A hero nearby: hits harder and heals.">✨<em>Inspired</em></span>` : '';
     const rank = rankOf(u);
     const vet = rank ? `<span data-tip="<b>${VETERANCY.names[rank - 1]}</b>${u.vet} enemy soldiers defeated: blows ${Math.round((VETERANCY.attack[rank - 1] - 1) * 100)}% harder${VETERANCY.armor[rank - 1] ? `, +${VETERANCY.armor[rank - 1]} armor` : ''}.">${'▲'.repeat(rank)}<em>${VETERANCY.names[rank - 1]}</em></span>` : '';
@@ -743,7 +760,7 @@ export class Hud {
         // A path's own building (the War Camp, #303) shows only to the people standing on that step.
         if (def.ages && !def.ages.includes(ageOf(p))) continue;
         const locked = def.epoch > p.epoch;
-        const no = buildBarred(p, type);
+        const no = buildBarred(p, type) ?? wayBarred(s, p, type);
         const cost = buildingCostFor(s, viewer, type);
         const short = shortfall(p, cost) ?? bloodShort(p, type);
         const wonderUp = type === 'wonder' && s.ents.some((e) => e.kind === 'building' && e.owner === viewer && e.type === 'wonder');
@@ -781,6 +798,13 @@ export class Hud {
         });
       }
       if (soldiers.length) cmds.push({ key: 'A', pic: '', glyph: '⚔', title: 'Attack-move', desc: 'Then click on the map: march there, fighting every enemy met on the way.', ok: true, run: () => this.act.attackMove() });
+      // Patrol and explore (#454): give the intent once and they carry it out.
+      const rovers = units.filter((u) => u.type !== 'citizen' && u.type !== 'wagon');
+      if (rovers.length) {
+        const fights = rovers.some((u) => MILITARY.includes(u.type));
+        cmds.push({ key: 'Q', pic: '', glyph: '🔁', title: 'Patrol', desc: `Then click on the map: walk back and forth between here and there${fights ? ', fighting what comes by their stance and then taking up the round again' : ''}. <b>Shift-click</b> to add more waypoints to the round. Click a <b>trading post</b> or a trader to guard its road.`, ok: true, run: () => this.act.patrolMode() });
+        cmds.push({ key: 'E', pic: '', glyph: '🧭', title: 'Explore', desc: `Go and see: each heads for the nearest ground your people have never seen, and on to the next, fanning out from one another${fights ? '. Aggressive soldiers fall on what they find; defensive ones fight only what comes close; those standing their ground only what is in reach' : ''}. They keep clear of enemy towers they have seen, report armies they come on, and stop when there is nothing left they can reach.`, ok: true, run: () => this.act.issue({ t: 'explore', p: viewer, ids: rovers.map((u) => u.id) }) });
+      }
       cmds.push({ key: 'S', pic: '', glyph: '✋', title: 'Stop', desc: 'Stop what they are doing (and forget queued orders).', ok: true, run: () => this.act.issue({ t: 'stop', p: viewer, ids: units.map((u) => u.id) }) });
       const holding = units.filter((u) => u.type === 'priest' && carriedBy(s, u));
       // The Blood-rite (#355 s4): a priest may offer an enemy up, or curse it.
@@ -809,13 +833,14 @@ export class Hud {
       }
       if (soldiers.length) {
         const stances: [string, Stance, string, string][] = [
-          ['Z', 'aggressive', '🔥', 'Aggressive: chase any enemy that comes into sight.'],
-          ['X', 'defensive', '🛡', 'Defensive: fight what comes near, but return to their post.'],
-          ['C', 'stand', '⚓', 'Stand ground: never move from the spot; strike what is in reach.'],
+          ['Z', 'aggressive', '🔥', 'Attack and destroy: seek out and chase any enemy that comes into sight.'],
+          ['X', 'defensive', '🛡', 'Fight if provoked: fight what is attacking them or comes close, but return to their post.'],
+          ['C', 'stand', '⚓', 'Hold: never move from the spot; strike what is in reach.'],
+          ['N', 'run', '🏃', 'Run: step away from armed foes in sight and never fight back on their own (a direct attack order still goes ahead).'],
         ];
         for (const [key, stance, glyph, desc] of stances) {
           const all = soldiers.every((u) => u.stance === stance);
-          cmds.push({ key, pic: '', glyph, title: `${stance === 'stand' ? 'Stand ground' : stance[0].toUpperCase() + stance.slice(1)} stance`, desc, ok: true, on: all, run: () => this.act.issue({ t: 'stance', p: viewer, ids: soldiers.map((u) => u.id), stance }) });
+          cmds.push({ key, pic: '', glyph, title: STANCE_NAMES[stance], desc, ok: true, on: all, run: () => this.act.issue({ t: 'stance', p: viewer, ids: soldiers.map((u) => u.id), stance }) });
         }
       }
       cmds.push({ key: 'DELETE', pic: '', glyph: '💀', title: 'Delete', desc: 'Dismiss the selected units for good (Del).', ok: true, run: () => this.act.issue({ t: 'delete', p: viewer, ids: units.map((u) => u.id) }) });

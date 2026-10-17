@@ -1,4 +1,4 @@
-import type { AgeId, PathId, LandmarkKind, BuildingType, CivId, Cost, Difficulty, Domain, MapSize, MapType, Res, TechId, UnitType, PlayerStats, RareId, WayId } from './types';
+import type { AgeId, PathId, LandmarkKind, BuildingType, CivId, Cost, Difficulty, Domain, MapSize, MapType, Res, TechId, UnitType, PlayerStats, RareId, WayId, HomelandId } from './types';
 
 /** Every number in the game lives here. */
 
@@ -991,6 +991,12 @@ export const CONSECRATE = {
  * the land is within `fair` tiles of as far from the two nearest towns, at least `spacing` apart. A
  * relic kept in a Temple brings its owner `gold` every `every` seconds, and `score` to their score.
  */
+/**
+ * The Town Center is the heart of a people (#452): when the last one falls (finished, under construction, or packed
+ * on a steppe wagon all count as standing), a people has `grace` seconds to lay a new foundation before it is lost.
+ * The alert for an attack on a Town Center comes at least every `alert` seconds, whatever else is being struck.
+ */
+export const HEART = { grace: 45, alert: 8 };
 export const RELIC = { home: 20, fair: 3, spacing: 12, extra: { small: 1, medium: 2, large: 3 } as Record<MapSize, number>, gold: 1, every: 2, score: 60 };
 /**
  * Trade: `posts` trading posts (by map size) stand within `edge` tiles of the map's edge (at least 3),
@@ -1144,7 +1150,7 @@ export interface BuildingStats {
 }
 
 export const BUILDINGS: Record<BuildingType, BuildingStats> = {
-  towncenter: { name: 'Town Center', size: 4, hp: 2400, cost: { wood: 275, stone: 150 }, time: 110, pop: 10, sight: 8, trains: ['citizen', 'hero'], drop: ['food', 'wood', 'stone', 'gold'], epoch: 0, guns: { damage: 6, range: 7, reload: 2 }, garrison: 15, menu: 'eco', key: 'T', blurb: 'Trains citizens and heroes, takes in every resource and leads your people into the next epoch. Citizens shelter here when the bell rings.' },
+  towncenter: { name: 'Town Center', size: 4, hp: 2800, cost: { wood: 275, stone: 150 }, time: 110, pop: 10, sight: 8, trains: ['citizen', 'hero'], drop: ['food', 'wood', 'stone', 'gold'], epoch: 0, guns: { damage: 6, range: 7, reload: 2 }, garrison: 15, menu: 'eco', key: 'T', blurb: 'Trains citizens and heroes, takes in every resource and leads your people into the next epoch. Citizens shelter here when the bell rings. Lose your last one and you have 45 seconds to raise another, or your people is lost: build a second far from the first.' },
   house: { name: 'House', size: 2, hp: 600, cost: { wood: 35 }, time: 18, pop: 5, sight: 3, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'E', blurb: 'Room for 5 more people.' },
   storehouse: { name: 'Storehouse', size: 2, hp: 800, cost: { wood: 75 }, time: 22, pop: 0, sight: 4, trains: [], drop: ['food', 'wood', 'stone', 'gold'], epoch: 0, menu: 'eco', key: 'S', blurb: 'A drop-off for every resource, and better tools for gatherers. Build it by woods and mines.' },
   farm: { name: 'Farm', size: 3, hp: 300, cost: { wood: 55 }, time: 12, pop: 0, sight: 2, trains: [], drop: [], epoch: 0, open: true, menu: 'eco', key: 'F', blurb: 'Food that never runs out, worked by one citizen.' },
@@ -1437,7 +1443,7 @@ export const WORKS: Record<CivId, GreatWork> = {
 /**
  * Ways (#336): a custom your people choose in the Stone Age and keep the whole match. Free, once. Since #463 s1
  * each Way gives the people something new to do (its verb, `KILL_CAMP`, `KIN`, `RAID`) and shuts a door
- * (`shuts`: buildings it never raises, `stoneShuts` only in the Stone Age; `noBell`), with a smaller number
+ * (`shuts`: buildings it never raises; `herdShuts`: in the Stone Age, none while game grazes near home; `noBell`), with a smaller number
  * left beside it. The moment passes when the people climb out of the Stone Age.
  */
 export interface Way {
@@ -1446,9 +1452,9 @@ export interface Way {
   blurb: string;
   add?: Partial<Mods>;
   mul?: Partial<Mods>;
-  /** Buildings a people of this Way never raises, and those it raises only once out of the Stone Age. */
+  /** Buildings a people of this Way never raises, and those it raises in the Stone Age only once no game grazes near its Town Centers (`KILL_CAMP.home`). */
   shuts?: BuildingType[];
-  stoneShuts?: BuildingType[];
+  herdShuts?: BuildingType[];
   /** Its town bell does not ring: its citizens never run to shelter. */
   noBell?: boolean;
   /** Laid over `add`/`mul` once the Way is deepened in the Bronze Age (#338). */
@@ -1461,16 +1467,17 @@ export const WAY_IDS: WayId[] = ['hunt', 'hearth', 'warband'];
 export const WAY_LEAN: Record<CivId, WayId> = { mongols: 'hunt', britons: 'hunt', egyptians: 'hearth', chinese: 'hearth', romans: 'warband', greeks: 'warband' };
 
 export const WAYS: Record<WayId, Way> = {
-  hunt: { name: 'The Hunters\' Way', icon: '🦌', blurb: 'Camp where the kill falls: a Hunting Camp pitched within 6 tiles of game or a fresh kill costs nothing and goes up three times as fast. Hunting yields 25% more, and wolves, boars and mammoths bite 30% softer. But a people that follows the herds sows nothing: no Farms until the Bronze Age, and berries are gathered 10% slower.', mul: { hunt: 1.25, beastWard: 0.7, forage: 0.9 }, stoneShuts: ['farm'], deep: { mul: { hunt: 1.15, beastWard: 0.85, forage: 0.9 }, blurb: 'Hunting yields another 15%, beasts bite another 15% softer; berries are gathered 10% slower.' } },
+  hunt: { name: 'The Hunters\' Way', icon: '🦌', blurb: 'Camp where the kill falls: a Hunting Camp pitched within 6 tiles of game or a fresh kill costs nothing and goes up three times as fast. Hunting yields 25% more, and wolves, boars and mammoths bite 30% softer. But a people that follows the herds sows nothing where they graze: in the Stone Age no Farm is raised while deer, boars or mammoths live within 24 tiles of your Town Center. Hunt the home herd out to open the fields, or spare it and range for your meat. Berries are gathered 10% slower.', mul: { hunt: 1.25, beastWard: 0.7, forage: 0.9 }, herdShuts: ['farm'], deep: { mul: { hunt: 1.15, beastWard: 0.85, forage: 0.9 }, blurb: 'Hunting yields another 15%, beasts bite another 15% softer; berries are gathered 10% slower.' } },
   hearth: { name: 'The Hearth Way', icon: '🔥', blurb: 'The hearth that keeps: Call the Kin at a Town Center, 120 food for 2 citizens in 16 seconds, and 3 in winter, so lay food up for the lean season. Berries yield 20% more and farms 10%. But a people of the hearth keeps no camps in the wild: no Hunting Camps, hunting is 20% slower and beasts bite 20% harder.', mul: { forage: 1.2, farm: 1.1, hunt: 0.8, beastWard: 1.2 }, shuts: ['huntcamp'], deep: { mul: { forage: 1.15, farm: 1.1, wood: 1.05, hunt: 0.9 }, blurb: 'Berries yield another 15%, farms another 10%, wood 5%; hunting another 10% slower.' } },
   warband: { name: 'The Warband Way', icon: '🗡', blurb: 'Feed on the raid: every blow your soldiers land on a rival Town Center, Storehouse, Hunting Camp, Dock or Farm carries off food from the rival\'s store, and a rival citizen slain gives up its load. Soldiers train 15% faster and strike 1 harder in melee. But a warband does not hide: the town bell does not ring, and berries and hunting are 15% slower.', add: { meleeAttack: 1 }, mul: { militaryTrain: 0.85, forage: 0.85, hunt: 0.85 }, noBell: true, deep: { add: { meleeAttack: 1 }, mul: { militaryTrain: 0.9, forage: 0.9, hunt: 0.9 }, blurb: 'Soldiers train another 10% faster and strike 1 harder again; berries and hunting another 10% slower.' } },
 };
 
 /**
  * The Hunters' kill camp (#463 s1): a Hunting Camp whose middle lies within `near` tiles of a living deer, boar
- * or mammoth, or a carcass with meat on it, costs nothing and takes `time` of the usual time to raise.
+ * or mammoth, or a carcass with meat on it, costs nothing and takes `time` of the usual time to raise. In the Stone Age the
+ * Hunters raise no Farm while such game lives within `home` tiles of one of their Town Centers.
  */
-export const KILL_CAMP = { near: 6, time: 1 / 3 };
+export const KILL_CAMP = { near: 6, time: 1 / 3, home: 24 };
 /**
  * The Hearth's kin (#463 s1): at a finished Town Center, `cost` buys `n` citizens (`winter` in winter, season 3),
  * who come out together after `time` seconds in the queue. They need room under the cap like any citizen.
@@ -1552,6 +1559,18 @@ export const SEASONS = [
  */
 export const SPREAD = { reach: 5, perNode: 2, foe: 4, perFoe: 3, far: 18 };
 /**
+ * Patrol and explore (#454). Soldiers on either look for foes every `scan` ticks: an aggressive one as far
+ * as it sees, a defensive one within `provoke` of its sight, one standing its ground only within reach.
+ * A patrol gives up after `misses` legs in a row end short of their point; it holds at most `points`.
+ * An explorer picks unseen ground on a grid every `grid` tiles, keeps `apart` tiles from where its fellows
+ * are headed, and passes over ground within `shun` tiles of a tile it couldn't reach; `fails` such tiles in a row
+ * (with nothing new seen between) and it stops. It keeps `wary` tiles beyond the reach of every enemy tower it
+ * has seen (and turns away if it strays in), and reports a rival army of `army` soldiers in sight, at most once
+ * every `tell` seconds (s3).
+ */
+export const PATROL = { scan: 6, provoke: 0.5, misses: 4, points: 8, flee: 6 };
+export const EXPLORE = { grid: 4, apart: 12, fails: 8, shun: 6, wary: 2, army: 4, tell: 30 };
+/**
  * Idle hands find work (#344), for the player's people only (the computer sets its own to work):
  * - `trained`: a citizen trained with no rally point takes the nearest node within this many tiles;
  * - `rally`: a rally flag on a resource that has since run out sends new hands to the nearest of its kind
@@ -1573,6 +1592,81 @@ export const AI_WINTER = { from: 2, fields: 2, hunters: 3, pack: 1, food: 0.3 };
  */
 export const AI_FAITH = { priests: 6, band: 3, reach: 14, keep: 6, wall: 0.4, relic: 0.6, ward: 30 };
 export const AMOUNT = { tree: 80, berry: 125, stone: 300, gold: 400, meat: 140, fish: 250, bog: 300 };
+/**
+ * Homelands (#473, Goal 1 s2): what lies round every town at the start. The seed rolls one (by `weight` for
+ * the map type) and every town gets the same, so the start stays fair while the best opening changes by map.
+ * Each counts tiles or beasts at home: `berries` in the first patch, `thicket` in a second, `deer` in the
+ * home herd and `herd2` in a second; `grove` how many trees crowd in close, `mammoth` how far out each town's mammoth stands, `fish` how many shoals lie off home,
+ * and `mere` the radius of a fishing mere cut `HOMELAND.mereAt` tiles out from every town (0 for none).
+ */
+export interface Homeland {
+  name: string;
+  icon: string;
+  /** A few words for the opening banner. */
+  short: string;
+  blurb: string;
+  berries: number;
+  thicket: number;
+  deer: number;
+  herd2: number;
+  grove: number;
+  mammoth: number;
+  fish: number;
+  mere: number;
+  weight: Record<MapType, number>;
+  /** The turning year (#479): what each season's turn does to this homeland, for the season's banner ('' for nothing new). */
+  year: [string, string, string, string];
+}
+export const HOMELAND_IDS: HomelandId[] = ['glade', 'shore', 'herds', 'wood'];
+export const HOMELANDS: Record<HomelandId, Homeland> = {
+  glade: {
+    name: 'The Glade', icon: '🌿', short: 'berries and deer near home',
+    blurb: 'Berries by the Town Center and a deer herd beyond: the old, easy start, where any opening works.',
+    berries: 7, thicket: 0, deer: 4, herd2: 0, grove: 0, mammoth: 17, fish: 4, mere: 0,
+    weight: { continental: 3, highlands: 3, lakes: 2, forest: 2, plains: 2, sea: 2 },
+    year: ['', '', '', ''],
+  },
+  shore: {
+    name: 'The Shore', icon: '🌊', short: 'few berries; fish the mere from a Dock',
+    blurb: 'A rich shoal just off home and only a thin berry bush. Food comes by boat: raise a Dock and launch canoes early, so the opening is hungry for wood, and a rival who burns the Dock starves you. The shoals run thick in autumn, and in winter the mere ices over.',
+    berries: 3, thicket: 0, deer: 3, herd2: 0, grove: 0, mammoth: 17, fish: 8, mere: 6,
+    weight: { continental: 2, highlands: 1, lakes: 3, forest: 1, plains: 1, sea: 3 },
+    year: ['The ice breaks: the boats fish freely again.', '', 'The autumn run: the shoals are thick, so fish hard and lay food up.', 'The mere ices over: boats fish at a third of their pace until spring.'],
+  },
+  herds: {
+    name: 'The Herd Plains', icon: '🦣', short: 'herds and a mammoth close, few berries',
+    blurb: 'Two deer herds and a mammoth close by, and little to forage. A meat economy: meat spoils, so hunt in bursts and camp by the kills. Each autumn the herds trek out toward the middle and come home in spring, each deer that lived with a calf: hunt a herd out and it never comes back.',
+    berries: 3, thicket: 0, deer: 5, herd2: 5, grove: 0, mammoth: 12, fish: 4, mere: 0,
+    weight: { continental: 2, highlands: 1, lakes: 1, forest: 0, plains: 4, sea: 2 },
+    year: ['The herds come home, each deer that lived with a calf.', '', 'The herds trek out toward the open middle: follow them, or eat from the store and the fields.', ''],
+  },
+  wood: {
+    name: 'The Deep Wood', icon: '🌲', short: 'woods and berries close, no herd near',
+    blurb: 'Woods crowd in on the Town Center and a wide berry thicket grows at their edge, but no herd grazes near home. Forage and chop: wood is a short walk, room to build is not, so clear ground or build out, and meat means going far, until winter, when the berries fail and deer come in to yard in the woods by home.',
+    berries: 7, thicket: 6, deer: 0, herd2: 0, grove: 40, mammoth: 17, fish: 4, mere: 0,
+    weight: { continental: 2, highlands: 3, lakes: 2, forest: 4, plains: 0, sea: 1 },
+    year: ['The yarded deer go back out to their summer grass.', '', '', 'Deer come in from the cold to yard in the woods by your town: the berries fail, but the hunt is close.'],
+  },
+};
+export const HOMELAND = { mereAt: 16 };
+/** The computer on the Shore (#473): it raises its Dock once it has `dockAt` citizens and keeps `boats` more fishing boats. */
+export const AI_SHORE = { dockAt: 4, boats: 2 };
+/**
+ * The turning year (#479, Goal 1 s3): each homeland's staple has a lean season and a fat one, so the opening
+ * that suits it stops working for part of every year. The Glade keeps the old year.
+ * - The Herd Plains: deer that start within `home` tiles of a town are that town's herds. They don't drift:
+ *   each autumn they trek out to grazing `out` tiles from the town, toward the map's middle (or as much as
+ *   `trek` nearer, or turned aside, where the way is blocked), and each spring they walk home, each deer still alive bringing `calves` calves, up to `herdMax` a herd. A herd
+ *   hunted out never comes back. A clever computer leaves `spare` of each home herd alive, and in autumn and
+ *   winter follows its herds out to `follow` tiles from home.
+ * - The Shore: boats fish at `run` of their pace in autumn and `ice` in winter, when the mere freezes over.
+ * - The Deep Wood: each winter `yard` deer come in (from `from` tiles out at most, `enter` at least) to a
+ *   yard `yardMin`–`yardMax` tiles from every town, by at least `trees` trees within two tiles; in spring they
+ *   go back out to where they came in, and return to the same yard the next winter. A clever computer sends
+ *   `yardHunters` more hunters in winter.
+ * Deer on the move walk for up to `walk` seconds.
+ */
+export const YEAR = { home: 16, out: 26, trek: 6, calves: 1, herdMax: 6, spare: 2, follow: 34, run: 1.3, ice: 0.3, yard: 5, from: 20, enter: 8, yardMin: 7, yardMax: 12, trees: 3, yardHunters: 2, walk: 45 };
 /**
  * Caves (#356): on a world that holds any rare ore, `count` caves for the map's size are cut into open ground at least
  * `away` tiles from every town and `apart` from each other. Each is a single tile of one of the world's ores, `rich` times
@@ -1716,6 +1810,8 @@ export interface AiLevel {
   /** Whether a clever computer raises a forward Tower as a foothold (#132 s5); `scripts/ai-ab.ts` sets it back to compare. */
   fort: boolean;
   /** Off, a clever computer leaves its own Wonder unguarded (#374); `scripts/ai-ab.ts` sets it so to compare. */
+  /** Off, the computer keeps a single Town Center (#452); `scripts/ai-ab.ts` sets it so to compare. */
+  spareHeart?: boolean;
   wonderGuard?: boolean;
   /** Off, fighters stay at the home Airfield instead of guarding a forward one (#379); `scripts/ai-ab.ts` sets it so to compare. */
   fieldGuard?: boolean;
@@ -1733,6 +1829,10 @@ export interface AiLevel {
   healers?: boolean;
   /** Off: a cursed computer army fights on and its riders ignore the priest (#434; only `scripts/ai-ab.ts` turns it off). */
   curseAnswer?: boolean;
+  /** Off: the computer does not ride down the priests who swear a rival's army (Military Orders, #459; only `scripts/ai-ab.ts` turns it off). */
+  breakOath?: boolean;
+  /** Off: a clever computer sends no scout and posts no guards (#454 s4; only `scripts/ai-ab.ts` turns it off). */
+  scouts?: boolean;
 }
 
 /**
@@ -1889,6 +1989,19 @@ export const AI_RITE = { pack: 3, keep: 40, dear: 30, pinned: 2, closing: 7, pat
  */
 export const AI_CURSE = { late: 14, hurt: 0.7, near: 5, riders: 3, reach: 14 };
 
+/**
+ * A clever computer reads a rival's Military Orders (#459): when a rival soldier within `reach` tiles of one of its riders is sworn,
+ * up to `riders` of those riders (its archers, if it has no riders) go for the nearest rival priest swearing it: the priest's fall
+ * breaks the oath and the faster mending together.
+ */
+/**
+ * The computer's spare heart (#452): a people that loses its last Town Center has `HEART.grace` seconds, so once it has
+ * reached `epoch` (by level) it raises a second one `away` tiles from home on the side away from the nearest rival,
+ * keeping `reserve` of wood and stone back for the rebuild. Switch `AiLevel.spareHeart` (off only in `scripts/ai-ab.ts`).
+ */
+export const AI_HEART = { epoch: { gentle: 2, easy: 1, normal: 1, hard: 1 } as Record<Difficulty, number>, away: 24, reach: 8, builders: 3, reserve: 100, retry: 40 };
+export const AI_ORDERS = { reach: 14, riders: 2 };
+
 /** Selling rare ore at a Market (#356 s5): a lot of `lot` pays `gold[ore]` gold at a flat price. Ore mined still counts toward its doors; only the stock in hand is spent. */
 export const ORE_TRADE = { lot: 20, gold: { salt: 40, saltpetre: 55, bloodiron: 90 } as Record<'salt' | 'saltpetre' | 'bloodiron', number> };
 
@@ -1990,6 +2103,13 @@ export const AI_BLOOD = { take: 0.6, patience: 480, stay: 360, reach: 40, clear:
 
 export const AI_RAID = { weary: 0.5, calm: 7, fort: 15, pop: 24, flame: 24, stage: 36 };
 /**
+ * The computer and the Ways' verbs (#463 s1). Hunters: up to `hunters` chase deer within `huntReach` of home, and it pitches kill camps by any kill of `campMeat` or more once it has `campAt` citizens,
+ * up to `camps`, one each `campAgain` seconds. Hearth: kin called with `kinKeep` food left over (none in winter), and in the Stone Age no citizen trained alone once it has `kinFrom`. Warband: a Barracks and soldiers from `barracksAt` citizens, a band of `band` foot before more citizens once it has `bandAt` (in the Stone Age, out of a treaty), and up to epoch `raidUntil`
+ * its band goes out every `raidEvery` seconds, first for a rival food building of `raidAt` within `raidReach` of home and
+ * `raidSafe` tiles clear of its forts, with `raidTime` seconds for the walk.
+ */
+export const AI_WAYS = { hunters: 12, huntReach: 34, campAt: 5, camps: 5, campAgain: 12, campMeat: 40, kinKeep: 0, kinFrom: 8, barracksAt: 6, bandAt: 9, band: 4, raidUntil: 1, raidEvery: 45, raidAt: ['storehouse', 'huntcamp', 'farm', 'dock'] as BuildingType[], raidReach: 90, raidSafe: 8, raidTime: 100 };
+/**
  * Hunters hunted (#260): between waves a clever computer sends `band` to `most` idle soldiers at a rival citizen
  * its own units see working within `reach` tiles of its home, more than `safe` tiles from any rival Town Center
  * or Tower, with no rival soldier within `guard` tiles and at most `odds` rival citizens per raider within 4
@@ -1999,13 +2119,11 @@ export const AI_RAID = { weary: 0.5, calm: 7, fort: 15, pop: 24, flame: 24, stag
  * to find who works there, and looks within `look` tiles of the band once it is near.
  */
 /**
- * The computer and the Ways' verbs (#463 s1). Hunters: up to `hunters` chase deer within `huntReach` of home, `hunterWood` more hands cut wood for the Bronze Age's
- * fields, and it pitches kill camps once it has `campAt` citizens, up to `camps`, one each
- * `campAgain` seconds. Hearth: kin called with `kinKeep` food left over (none in winter), and in the Stone Age no citizen trained alone once it has `kinFrom`. Warband: a Barracks and soldiers from `barracksAt` citizens, a band of `band` foot before more citizens once it has `bandAt` (in the Stone Age, out of a treaty), and up to epoch `raidUntil`
- * its band goes out every `raidEvery` seconds, first for a rival food building of `raidAt` within `raidReach` of home and
- * `raidSafe` tiles clear of its forts, with `raidTime` seconds for the walk.
+ * The computer scouts and keeps watch (#454 s4): after `after` seconds a clever computer sends one idle rider exploring (again after
+ * `rest` seconds if it stops), and, with `army` soldiers idle, posts `guards` of them (foot or bowmen) to patrol its trade road
+ * or, with no post, `reach` tiles out toward its rival.
  */
-export const AI_WAYS = { hunters: 12, huntReach: 34, hunterWood: 1.4, campAt: 5, camps: 5, campAgain: 12, kinKeep: 0, kinFrom: 8, barracksAt: 6, bandAt: 9, band: 4, raidUntil: 1, raidEvery: 45, raidAt: ['storehouse', 'huntcamp', 'farm', 'dock'] as BuildingType[], raidReach: 90, raidSafe: 8, raidTime: 100 };
+export const AI_SCOUT = { after: 150, rest: 60, guards: 2, army: 8, reach: 16 };
 export const AI_PROWL = { band: 2, most: 3, reach: 40, safe: 12, guard: 7, odds: 2, chase: 8, look: 10, time: 45, every: 75, burn: 45, cover: 14, extra: 2 };
 /**
  * The computer and the wild (#171): once it has `mammothAt` citizens it sends a party of `party` after the

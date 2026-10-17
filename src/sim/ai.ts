@@ -1,6 +1,6 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { aiTiding } from './tidings';
-import { AGES, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, RITE, BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
@@ -21,13 +21,14 @@ import { offeringOf, riteProblem } from './fork';
 import { graftCost, stationsOf, waiting } from './hemo';
 import { borderMap, landOwnerAt, suppliedAt } from './borders';
 import { workProblem } from './works';
-import { aiKin, aiVow, aiWay } from './ways';
+import { aiKin, aiVow, aiWay, wayBarred } from './ways';
 import { AI_WAYS, KIN, WAYS } from './data';
 import { beaconProblem, lit } from './beacon';
 import { rallyProblem } from './rally';
 import { consecrateProblem, consecrates } from './consecrate';
 import { sees } from './vision';
 import { seasonAt } from './seasons';
+import { catchOf, herdsOut, yarding } from './year';
 import { isMobile } from './steppe';
 import { isRider, standing } from './tribute';
 import { flockCap, flockOf, grassy, milkable } from './flocks';
@@ -192,6 +193,8 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   ironRoad(s, v, mem, issue);
   oreRoad(s, v, mem, issue);
   steppeRoad(s, v, mem, issue);
+  readYear(s, v);
+  huntTheYear(s, v, issue);
 
   // Tidings at the fire (#443), one plain rule a card, answered before the town spends its stores.
   const tiding = aiTiding(s, p);
@@ -995,9 +998,31 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
 
   // Lost the Town Center: rebuilding it comes first.
   if (!v.tc && !v.buildings.some((b) => b.type === 'towncenter') && !v.wagons.some((w) => w.packed === 'towncenter') && v.citizens.length && !recently('towncenter', 30)) {
+    // The clock is short (`HEART`): spend what the town has, not what the next epoch leaves over.
+    v.budget = { ...p.res };
     const spot = findSpot(s, 'towncenter', home.x, home.y, 0, 14);
     if (spot) construct(s, v, mem, 'towncenter', spot, 4, issue);
     return;
+  }
+
+  // A spare heart (#452): with one Town Center standing, raise another far from the rival, so losing the first isn't losing the match.
+  if (L.spareHeart !== false && v.tc && p.epoch >= AI_HEART.epoch[p.ai!] && !isMobile(p) && !recently('towncenter', AI_HEART.retry) && !v.wagons.some((w) => w.packed === 'towncenter') && v.buildings.filter((b) => b.type === 'towncenter').length === 1) {
+    const cost = raiseCost(s, p.id, 'towncenter', 0, 0);
+    if (RES.every((r) => !cost[r] || v.budget[r] >= cost[r]! + (r === 'wood' || r === 'stone' ? AI_HEART.reserve : 0))) {
+      const dx = home.x - enemy.x;
+      const dy = home.y - enemy.y;
+      const l = Math.sqrt(dx * dx + dy * dy) || 1;
+      const m = 8;
+      const x = Math.min(s.w - m, Math.max(m, home.x + (dx / l) * AI_HEART.away));
+      const y = Math.min(s.h - m, Math.max(m, home.y + (dy / l) * AI_HEART.away));
+      const far = (tx: number, ty: number) => (tx - enemy.x) * (tx - enemy.x) + (ty - enemy.y) * (ty - enemy.y) >= (home.x - enemy.x) * (home.x - enemy.x) + (home.y - enemy.y) * (home.y - enemy.y);
+      const spot = findSpot(s, 'towncenter', x, y, 0, AI_HEART.reach, 1, far);
+      if (spot) {
+        construct(s, v, mem, 'towncenter', spot, AI_HEART.builders, issue);
+        return;
+      }
+      mem.ordered.towncenter = s.tick;
+    }
   }
 
   // A reclaiming people raises what fell on the same ground again, at a fraction of the price.
@@ -1044,8 +1069,11 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   const freeFields = v.buildings.filter((b) => b.type === 'farm' && !v.citizens.some((u) => u.order.k === 'farm' && u.order.target === b.id)).length;
   // Autumn onward the clever computer plans for winter: berries fail in the cold, so fields go up first.
   const coldComing_ = coldComing(s, v);
-  const foodWanted = Math.round(wanted(v).food) - (berries >= 0 && !coldComing_ ? 6 : 0) + (coldComing_ ? AI_WINTER.fields : 0);
-  if (farms < foodWanted && freeFields < 2 && !recently('farm', 2) && !buildBarred(p, 'farm')) {
+  // On the Shore (#473) each fishing boat feeds the town in a farmer's place, and its wood is wanted for the next age.
+  // The turning year (#479): ice ahead (autumn, for the clever) or on the mere, a boat feeds a third as many.
+  const boatsFeed = s.homeland === 'shore' ? Math.round(v.fishers.length * (coldComing_ || catchOf(s) < 1 ? YEAR.ice : 1)) : 0;
+  const foodWanted = Math.round(wanted(v).food) - (berries >= 0 && !coldComing_ ? 6 : 0) + (coldComing_ ? AI_WINTER.fields : 0) - boatsFeed;
+  if (farms < foodWanted && freeFields < 2 && !recently('farm', 2) && !buildBarred(p, 'farm') && !wayBarred(s, p, 'farm')) {
     const spot = findSpot(s, 'farm', home.x, home.y, 3, 16);
     if (spot && construct(s, v, mem, 'farm', spot, 1, issue)) return;
   }
@@ -1063,16 +1091,19 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   }
   // A Hunting Camp by a far kill, so the butchers carry meat a short way and the land round it is held against wolves.
   if (p.epoch === 0 || s.carcasses?.length) {
+    // The Hunters' Way (#463 s1) pitches its camps for nothing at the kill, so it pitches them early and often, by any
+    // kill on its far hunt; the Hearth keeps none.
+    const hunter = p.way === 'hunt' && p.epoch === 0;
+    const W = AI_WAYS;
+    const meat = hunter ? W.campMeat : AI_WILD.campMeat;
+    const near = hunter ? W.huntReach : AI_WILD.campNear;
     const kill = (s.carcasses ?? []).find((c) => {
       const tx = (c.tile % s.w) + 0.5;
       const ty = Math.floor(c.tile / s.w) + 0.5;
-      if (s.res[c.tile] !== R_MEAT || s.amount[c.tile] < AI_WILD.campMeat) return false;
-      if ((tx - home.x) * (tx - home.x) + (ty - home.y) * (ty - home.y) > AI_WILD.campNear * AI_WILD.campNear) return false;
+      if (s.res[c.tile] !== R_MEAT || s.amount[c.tile] < meat) return false;
+      if ((tx - home.x) * (tx - home.x) + (ty - home.y) * (ty - home.y) > near * near) return false;
       return !v.buildings.some((b) => BUILDINGS[b.type].drop.includes('food') && distToRect(tx, ty, b) < AI_WILD.campFar && (b.built || b.type === 'huntcamp'));
     });
-    // The Hunters' Way (#463 s1) pitches its camps for nothing at the kill, so it pitches them early and often; the Hearth keeps none.
-    const hunter = p.way === 'hunt' && p.epoch === 0;
-    const W = AI_WAYS;
     if (kill && !buildBarred(p, 'huntcamp') && (hunter ? n >= W.campAt && count(v, 'huntcamp') < W.camps && !recently('huntcamp', W.campAgain) : n >= 12 && p.res.wood >= 120 && count(v, 'huntcamp') < 3 && !recently('huntcamp', 25))) {
       const spot = findSpot(s, 'huntcamp', (kill.tile % s.w) + 0.5, Math.floor(kill.tile / s.w) + 0.5, 2, 5);
       if (spot && construct(s, v, mem, 'huntcamp', spot, hunter ? 1 : 2, issue)) return;
@@ -1111,8 +1142,8 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     if (spot && construct(s, v, mem, 'market', spot, 3, issue)) return;
   }
 
-  // A dock, where there is fish and water to sail near home.
-  if (n >= 9 && count(v, 'dock') === 0 && !recently('dock', 40) && s.tick - (mem.dockless ?? -99999) > secs(120)) {
+  // A dock, where there is fish and water to sail near home: early on the Shore (#473), where fish is the food.
+  if (n >= (s.homeland === 'shore' ? AI_SHORE.dockAt : 9) && count(v, 'dock') === 0 && !recently('dock', 40) && s.tick - (mem.dockless ?? -99999) > secs(120)) {
     const spot = findDockSpot(s, home.x, home.y, 24);
     if (!spot) mem.dockless = s.tick;
     else if (construct(s, v, mem, 'dock', spot, 2, issue)) return;
@@ -1182,6 +1213,58 @@ function jobOf(u: Unit): Res | 'build' | null {
   return null;
 }
 
+/**
+ * The turning year (#479): a clever computer reads its homeland's seasons. On the Herd Plains it follows its
+ * herds out in autumn and winter (its camps go up by the far kills); in the Deep Wood's winter it sends more
+ * hunters to the yarded deer, since the berries fail.
+ */
+function readYear(s: GameState, v: View): void {
+  if (!AI_LEVELS[v.p.ai!].clever) return;
+  if (herdsOut(s)) v.hunt = { n: v.hunt.n, r: Math.max(v.hunt.r, YEAR.follow) };
+  if (yarding(s)) v.hunt = { n: v.hunt.n + YEAR.yardHunters, r: v.hunt.r };
+}
+
+/**
+ * When its homeland's year brings game in reach (the Herd Plains' herds, home or followed out; the Deep Wood's
+ * yard in winter), a clever computer takes a forager, else a farmer, off to hunt, one a think, until it has
+ * `v.hunt.n` on the hunt. Elsewhere its hunters come only from people newly sent to food (#479).
+ */
+function huntTheYear(s: GameState, v: View, issue: (c: Command) => void): void {
+  if (!AI_LEVELS[v.p.ai!].clever || !(s.homeland === 'herds' || yarding(s)) || isMobile(v.p)) return;
+  let hunting = 0;
+  for (const u of v.citizens) if (u.order.k === 'hunt' || (u.order.k === 'gather' && s.res[u.order.tile] === R_MEAT)) hunting++;
+  if (hunting >= v.hunt.n) return;
+  const deer = nearestDeer(s, v.home.x, v.home.y, v.hunt.r, spared(s, v));
+  if (!deer) return;
+  const pick = (ok: (u: Unit) => boolean) => {
+    let best: Unit | null = null;
+    let bestD = Infinity;
+    for (const u of v.citizens) {
+      if (u.inside || v.diggers.has(u.id) || !ok(u)) continue;
+      const d = (u.x - deer.x) * (u.x - deer.x) + (u.y - deer.y) * (u.y - deer.y);
+      if (d < bestD) {
+        bestD = d;
+        best = u;
+      }
+    }
+    return best;
+  };
+  const u = pick((c) => c.order.k === 'gather' && s.res[c.order.tile] === R_BERRY) ?? pick((c) => c.order.k === 'farm');
+  if (u) issue({ t: 'hunt', p: v.p.id, ids: [u.id], target: deer.id });
+}
+
+/**
+ * On the Herd Plains a clever computer leaves `YEAR.spare` of each of its own home herds alive, so they come
+ * home in spring with calves (#479). A rival's herd it hunts down gladly. Undefined where nothing is spared.
+ */
+function spared(s: GameState, v: View): ((a: Animal) => boolean) | undefined {
+  if (s.homeland !== 'herds' || !AI_LEVELS[v.p.ai!].clever) return undefined;
+  const left = new Map<number, number>();
+  for (const a of s.animals) if (a.kind === 'deer' && a.town === v.p.id && a.hp > 0) left.set(a.herd ?? a.id, (left.get(a.herd ?? a.id) ?? 0) + 1);
+  if (!left.size) return undefined;
+  return (a) => a.town === v.p.id && (left.get(a.herd ?? a.id) ?? 0) <= YEAR.spare;
+}
+
 /** Autumn onward, a clever computer plans for the winter ahead (`AI_WINTER`). */
 function coldComing(s: GameState, v: View): boolean {
   return AI_LEVELS[v.p.ai!].clever && seasonAt(s) >= AI_WINTER.from;
@@ -1196,8 +1279,6 @@ function wanted(v: View, cold = false): Record<Res, number> {
     const stock = v.p.res[r];
     const lean = stock > 1200 ? 0.15 : stock > 700 ? 0.4 : stock > 400 ? 0.7 : stock < 80 ? 1.4 : 1;
     weight[r] = share[r] * lean * (cold && r === 'food' ? 1 + AI_WINTER.food : 1);
-    // The Hunters' Way (#463 s1) sows nothing in the Stone Age: it lays wood by for the fields of the Bronze Age.
-    if (r === 'wood' && v.p.way === 'hunt' && v.p.epoch === 0) weight[r] *= AI_WAYS.hunterWood;
     total += weight[r];
   }
   const n = v.citizens.filter((u) => u.order.k !== 'build' && !u.inside).length;
@@ -1206,11 +1287,11 @@ function wanted(v: View, cold = false): Record<Res, number> {
   return out;
 }
 
-function nearestDeer(s: GameState, x: number, y: number, r: number): Animal | null {
+function nearestDeer(s: GameState, x: number, y: number, r: number, skip?: (a: Animal) => boolean): Animal | null {
   let best: Animal | null = null;
   let bestD = r * r;
   for (const a of s.animals) {
-    if (a.kind !== 'deer') continue;
+    if (a.kind !== 'deer' || skip?.(a)) continue;
     const dx = a.x - x;
     const dy = a.y - y;
     const d = dx * dx + dy * dy;
@@ -1239,7 +1320,7 @@ function sendTo(s: GameState, v: View, u: Unit, res: Res, issue: (c: Command) =>
       return true;
     }
     const hunters = v.citizens.filter((c) => c.order.k === 'hunt').length;
-    const deer = hunters < v.hunt.n ? nearestDeer(s, v.home.x, v.home.y, v.hunt.r) : null;
+    const deer = hunters < v.hunt.n ? nearestDeer(s, v.home.x, v.home.y, v.hunt.r, spared(s, v)) : null;
     if (deer) {
       issue({ t: 'hunt', p: v.p.id, ids: [u.id], target: deer.id });
       return true;
@@ -1947,7 +2028,8 @@ function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   if (!dock) return;
   // Fishing boats: as many as there are shoals near the dock, up to a few.
   const shoals = countFish(s, dock.x, dock.y, 14);
-  const wantBoats = Math.min(shoals, 2 + p.epoch, L.clever ? 6 : 4);
+  const shore = s.homeland === 'shore' ? AI_SHORE.boats : 0;
+  const wantBoats = Math.min(shoals, 2 + p.epoch + shore, (L.clever ? 6 : 4) + shore);
   const queued = (u: UnitType) => dock.queue.filter((q) => q.unit === u).length;
   if (v.fishers.length + queued('fisher') < wantBoats && dock.queue.length < 2) {
     const cost = unitStats('fisher', p.epoch).cost;
@@ -3045,6 +3127,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   if (L.clever) for (const id of exactTribute(s, v, mem, issue)) guards.add(id);
   let fighters = v.army.filter((u) => !u.inside && !sailing.has(u.id) && !guards.has(u.id));
   if (L.clever && L.curseAnswer !== false) fighters = answerCurse(s, v, mem, fighters, issue);
+  if (L.clever && L.breakOath !== false) breakOath(s, v, fighters, issue);
   // A Wonder of its own rising or counting down is held (#374): rivals near it draw the whole army, and a share of the army stays by it, out of the waves.
   const wonder = L.clever && L.wonderGuard !== false ? ownWonder(v) : null;
   if (wonder && !threat) {
@@ -3122,6 +3205,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   }
   // Between waves, a small band falls on rival citizens working far from their town (#260).
   const watching = new Set<number>();
+  if (L.clever && L.scouts !== false && !mem.attacking) for (const id of scouting(s, v, mem, ready, issue)) watching.add(id);
   if (L.clever && !plan.hold) for (const id of prowl(s, v, mem, ready, issue)) watching.add(id);
   // Between waves, a few riders cut the rivals' trade roads near home.
   if (L.clever) {
@@ -3154,6 +3238,60 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     return ox * ox + oy * oy > 36 && u.order.k === 'idle';
   });
   if (strays.length) issue({ t: 'move', p: p.id, ids: strays.map((u) => u.id), x: mem.muster.x, y: mem.muster.y });
+}
+
+/**
+ * One rider scouts by itself (explore) and a pair of soldiers patrol the trade road to the nearest trading post, or the border
+ * toward the rival (#454 s4). Returns the soldiers newly sent, so the rest of the turn leaves them be.
+ */
+function scouting(s: GameState, v: View, mem: AiMemory, ready: Unit[], issue: (c: Command) => void): number[] {
+  const { p } = v;
+  const out: number[] = [];
+  if (s.tick < secs(AI_SCOUT.after)) return out;
+  const mine = (id: number) => {
+    const e = s.byId.get(id);
+    return e && e.kind === 'unit' && e.owner === p.id && e.hp > 0 ? e : null;
+  };
+  const scout = mem.scout ? mine(mem.scout.id) : null;
+  if (!scout || (scout.order.k === 'idle' && s.tick - mem.scout!.sent >= secs(AI_SCOUT.rest))) {
+    const rider = scout ?? ready.find((u) => u.type === 'cavalry');
+    if (rider) {
+      issue({ t: 'explore', p: p.id, ids: [rider.id] });
+      mem.scout = { id: rider.id, sent: s.tick };
+      out.push(rider.id);
+    }
+  }
+  const walking = (u: Unit) => u.order.k === 'patrol' || (u.order.k === 'attack' && u.order.back?.k === 'patrol');
+  const guards = (mem.guards ?? []).filter((id) => {
+    const u = mine(id);
+    return u && walking(u);
+  });
+  const pool = ready.filter((u) => (u.type === 'infantry' || u.type === 'ranged') && u.id !== mem.scout?.id);
+  if (guards.length < AI_SCOUT.guards && ready.length >= AI_SCOUT.army && pool.length) {
+    const band = pool.slice(0, AI_SCOUT.guards - guards.length);
+    const market = v.buildings.some((b) => b.type === 'market' && b.built);
+    let post: TradePost | null = null;
+    let bestD = Infinity;
+    if (market) for (const q of s.posts) {
+      const d = (q.x - v.home.x) * (q.x - v.home.x) + (q.y - v.home.y) * (q.y - v.home.y);
+      if (d < bestD) {
+        bestD = d;
+        post = q;
+      }
+    }
+    const ids = band.map((u) => u.id);
+    if (post) issue({ t: 'patrol', p: p.id, ids, x: post.x, y: post.y, post: post.id });
+    else if (mem.muster) {
+      const dx = mem.muster.x - v.home.x;
+      const dy = mem.muster.y - v.home.y;
+      const dl = Math.sqrt(dx * dx + dy * dy) || 1;
+      issue({ t: 'patrol', p: p.id, ids, x: v.home.x + (dx / dl) * AI_SCOUT.reach, y: v.home.y + (dy / dl) * AI_SCOUT.reach });
+    }
+    guards.push(...ids);
+    out.push(...ids);
+  }
+  mem.guards = guards;
+  return out;
 }
 
 /** Soldiers who can go prowling: not siege, and not the hero, who leads the army. */
@@ -3457,6 +3595,45 @@ function answerCurse(s: GameState, v: View, mem: AiMemory, fighters: Unit[], iss
     if (go.length) issue({ t: 'attack', p: p.id, ids: go.map((r) => r.id), target: prey.id });
   }
   return fighters.filter((u) => !held.has(u.id));
+}
+
+/**
+ * The computer reads a rival's Military Orders (#459, `AI_ORDERS`): against a sworn army, its riders (or archers, with no riders) ride
+ * down the nearest priest swearing it, since no priest of its own can touch the soldiers while that one stands.
+ */
+export function breakOath(s: GameState, v: View, fighters: Unit[], issue: (c: Command) => void): void {
+  const { p } = v;
+  let hunters = fighters.filter((u) => u.type === 'cavalry');
+  if (!hunters.length) hunters = fighters.filter((u) => u.type === 'ranged');
+  if (!hunters.length) return;
+  const r2 = AI_ORDERS.reach * AI_ORDERS.reach;
+  const o2 = ORDERS.reach * ORDERS.reach;
+  const near = (a: Unit, b: Unit, d2: number) => (a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y) <= d2;
+  // The rival priests who swear a soldier that our hunters can reach.
+  const swearers: Unit[] = [];
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.type !== 'priest' || e.hp <= 0 || e.inside || !isEnemy(s, p.id, e.owner) || !modsOf(s, e.owner).sworn) continue;
+    if (s.ents.some((f) => f.kind === 'unit' && f.owner === e.owner && f.hp > 0 && !f.inside && GRAFTABLE.includes(f.type) && near(f, e, o2) && hunters.some((h) => near(h, f, r2)))) swearers.push(e);
+  }
+  let prey: Unit | null = null;
+  let bestD = Infinity;
+  for (const e of swearers) {
+    for (const h of hunters) {
+      const d = (e.x - h.x) * (e.x - h.x) + (e.y - h.y) * (e.y - h.y);
+      if (d < bestD) {
+        bestD = d;
+        prey = e;
+      }
+    }
+  }
+  if (!prey) return;
+  const target = prey;
+  const on = hunters.filter((h) => h.order.k === 'attack' && h.order.target === target.id).length;
+  const go = hunters
+    .filter((h) => !(h.order.k === 'attack' && s.byId.get(h.order.target)?.type === 'priest'))
+    .sort((a, b) => (a.x - target.x) * (a.x - target.x) + (a.y - target.y) * (a.y - target.y) - ((b.x - target.x) * (b.x - target.x) + (b.y - target.y) * (b.y - target.y)) || a.id - b.id)
+    .slice(0, Math.max(0, AI_ORDERS.riders - on));
+  if (go.length) issue({ t: 'attack', p: p.id, ids: go.map((h) => h.id), target: target.id });
 }
 
 function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {

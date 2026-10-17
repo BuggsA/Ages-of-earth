@@ -6,7 +6,7 @@ import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { SIGHT_LORE } from './render/sightings';
 import { wallLine } from './sim/commands';
-import { AGES, BUILDINGS, CIVS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
+import { AGES, BUILDINGS, CIVS, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
 import { crestSvg } from './ui/crests';
 import { isEnemy } from './sim/world';
 import { grantAll, topUp } from './sim/god';
@@ -15,7 +15,7 @@ import { placeProblem, walkable } from './sim/grid';
 import { findDockSpot, findSpot } from './sim/ai';
 import { maxHp, placeBuilding, spawnUnit } from './sim/world';
 import { arrivalText, epochArrivals } from './ui/endReport';
-import type { AgeId, BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, MapSize, MapType, Unit } from './sim/types';
+import type { AgeId, BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, HomelandId, MapSize, MapType, Unit } from './sim/types';
 import { R_FISH, R_NONE } from './sim/types';
 import { carriedBy, relicAt } from './sim/relics';
 import { RUIN_FINDS, ruinAt } from './sim/ruins';
@@ -94,7 +94,7 @@ let placeAt: { tx: number; ty: number; ok: boolean } | null = null;
 /** A wall being dragged out, from tile to tile. */
 let wallDrag: { x0: number; y0: number; x1: number; y1: number } | null = null;
 /** The next left click picks a target: where to attack-move, or a building to shelter in. */
-let targetMode: 'amove' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | null = null;
+let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | null = null;
 let paused = false;
 const SPEEDS = [1, 1.5, 2, 3];
 let speedIdx = 0;
@@ -127,6 +127,10 @@ const hud = new Hud({
   },
   attackMove: () => {
     targetMode = 'amove';
+    placing = null;
+  },
+  patrolMode: () => {
+    targetMode = 'patrol';
     placing = null;
   },
   riteMode: (how) => {
@@ -289,7 +293,8 @@ function startOnline(match: MatchStart, you: number): void {
   netPaused = false;
   online = true;
   lobby.hide();
-  startMatch({ ...match.setup, players }, undefined, Math.max(0, you));
+  // Every seat rolls the same homeland from the room's seed (#473).
+  startMatch({ homeland: 'random', ...match.setup, players }, undefined, Math.max(0, you));
   if (you < 0) {
     spectating = true;
     spectateAll = true;
@@ -352,7 +357,7 @@ view.onSighting = (what) => {
   play('sighting');
   hud.banner(look.title, look.lore, 4200);
 };
-view.onPing = (x, y, color) => minimap.ping(x, y, color);
+view.onPing = (x, y, color, heavy) => minimap.ping(x, y, color, heavy);
 
 // ---- Starting matches ------------------------------------------------------------------------------
 
@@ -365,7 +370,7 @@ function startAttract(skipAhead = true): void {
   const seed = newSeed();
   const maps = Object.keys(MAP_TYPES) as MapType[];
   // Any map, starting in any epoch: sometimes there are galleons on the sea or biplanes overhead.
-  game = createGame({ seed, size: 'small', mapType: maps[seed % maps.length], startEpoch: Math.floor(seed / maps.length) % EPOCHS.length, players: [{ name: 'Azure', ai: 'normal' }, { name: 'Crimson', ai: 'hard' }] });
+  game = createGame({ seed, size: 'small', mapType: maps[seed % maps.length], homeland: 'random', startEpoch: Math.floor(seed / maps.length) % EPOCHS.length, players: [{ name: 'Azure', ai: 'normal' }, { name: 'Crimson', ai: 'hard' }] });
   viewer = 0;
   view.setGame(game, 0);
   view.revealAll();
@@ -417,6 +422,7 @@ function setupFromTitle(seed: number): GameSetup {
     seed,
     size: val('opt-size') as MapSize,
     mapType: val('opt-map') as MapType,
+    homeland: val('opt-homeland') as HomelandId | 'random',
     players,
     startEpoch: Number(val('opt-epoch')),
     peaceMinutes: Number(val('opt-peace')),
@@ -482,8 +488,12 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   const goal = game.mode === 'regicide' ? ' Keep your King alive: shelter them in the Town Center.' : game.mode === 'deathmatch' ? ' Everyone starts rich: build fast.' : game.mode === 'lords' ? ' Keep every landmark for four minutes and you win.' : '';
   const chapter = game.scenario ? scenarioById(game.scenario.id) : undefined;
   if (!saved && chapter) hud.banner(chapter.title, chapter.place, 6000);
-  else if (!saved) hud.banner(ageDef(me).name, `You lead the ${CIVS[me.civ].name}. Facing ${rivals.join(', ')}.${goal} ${view.weatherWords}`.trim(), 6000);
-  else hud.banner('Welcome back', `${ageDef(me).name}, ${fmtClock(game.tick)} into the match.`, 3200);
+  else if (!saved) {
+    // The land every town wakes in (#473): read it before choosing an opening.
+    const hl = game.homeland ? HOMELANDS[game.homeland] : undefined;
+    const land = hl ? ` ${hl.icon} ${hl.name}: ${hl.short}.` : '';
+    hud.banner(ageDef(me).name, `You lead the ${CIVS[me.civ].name}. Facing ${rivals.join(', ')}.${land}${goal} ${view.weatherWords}`.trim(), 6000);
+  } else hud.banner('Welcome back', `${ageDef(me).name}, ${fmtClock(game.tick)} into the match.`, 3200);
   sound.setWeather(view.weatherDay.kind, view.weatherDay.strength);
   view.onWeather = (d) => sound.setWeather(d.kind, d.strength);
   view.onSeason = (sn) => sound.setSeason(sn);
@@ -980,24 +990,28 @@ const civSel = $<HTMLSelectElement>('opt-civ');
 civSel.innerHTML = `<option value="random">Random</option>` + CIV_IDS.map((c) => `<option value="${c}">${CIVS[c].name}</option>`).join('');
 const mapSel = $<HTMLSelectElement>('opt-map');
 mapSel.innerHTML = (Object.keys(MAP_TYPES) as MapType[]).map((m) => `<option value="${m}">${MAP_TYPES[m].label}</option>`).join('');
+const homeSel = $<HTMLSelectElement>('opt-homeland');
+homeSel.innerHTML = `<option value="random">Random (by the seed)</option>` + HOMELAND_IDS.map((k) => `<option value="${k}">${HOMELANDS[k].icon} ${HOMELANDS[k].name}</option>`).join('');
 const civBlurb = () => {
   const c = civSel.value;
   const m = MAP_TYPES[mapSel.value as MapType];
+  const hl = homeSel.value === 'random' ? undefined : HOMELANDS[homeSel.value as HomelandId];
   $('civ-crest').innerHTML = crestSvg(c as CivId | 'random', PLAYER_COLORS[Number(colorSel.value)] ?? PLAYER_COLORS[0]);
-  $('civ-blurb').innerHTML = `${c === 'random' ? 'A people chosen at random.' : `<b>${CIVS[c as CivId].name}:</b> ${CIVS[c as CivId].blurb.split(': ').slice(1).join(': ') || CIVS[c as CivId].blurb}`}<br><b>${m.label}:</b> ${m.blurb}`;
+  $('civ-blurb').innerHTML = `${c === 'random' ? 'A people chosen at random.' : `<b>${CIVS[c as CivId].name}:</b> ${CIVS[c as CivId].blurb.split(': ').slice(1).join(': ') || CIVS[c as CivId].blurb}`}<br><b>${m.label}:</b> ${m.blurb}<br>${hl ? `<b>${hl.icon} ${hl.name}:</b> ${hl.blurb}` : '<b>Homeland:</b> the seed decides what lies round every town: the Glade, the Shore, the Herd Plains or the Deep Wood.'}`;
 };
 civSel.addEventListener('change', civBlurb);
 colorSel.addEventListener('change', civBlurb);
 showContinue();
 showReplayButton();
 mapSel.addEventListener('change', civBlurb);
+homeSel.addEventListener('change', civBlurb);
 civBlurb();
 // A shared world link (?seed=N&size=&map=&foes=): the title screen opens with that world's settings (the seed atlas prints them).
 {
   const q = new URLSearchParams(location.search);
   const seed = Math.floor(Number(q.get('seed')));
   if (seed >= 1 && seed <= 2 ** 31 - 1) seedInput.value = String(seed);
-  for (const [key, id] of [['size', 'opt-size'], ['map', 'opt-map'], ['foes', 'opt-foes']] as const) {
+  for (const [key, id] of [['size', 'opt-size'], ['map', 'opt-map'], ['foes', 'opt-foes'], ['homeland', 'opt-homeland']] as const) {
     const v = q.get(key);
     const sel = $<HTMLSelectElement>(id);
     if (v !== null && [...sel.options].some((o) => o.value === v)) sel.value = v;
@@ -1044,7 +1058,7 @@ document.addEventListener('click', (e) => {
         break;
       }
       const q = new URLSearchParams({ seed: String(seed) });
-      for (const [key, id] of [['size', 'opt-size'], ['map', 'opt-map'], ['foes', 'opt-foes']] as const) q.set(key, $<HTMLSelectElement>(id).value);
+      for (const [key, id] of [['size', 'opt-size'], ['map', 'opt-map'], ['foes', 'opt-foes'], ['homeland', 'opt-homeland']] as const) q.set(key, $<HTMLSelectElement>(id).value);
       const link = `${location.origin}${location.pathname}?${q}`;
       const done = () => hud.toast('World link copied', 'info');
       const fail = () => hud.toast(link, 'info');
@@ -1366,6 +1380,31 @@ function board(s: GameState, units: Unit[], ship: Unit, queue: true | undefined)
 }
 
 /** Sail the selected transports to a shore and land their passengers. */
+/** Patrol between where the selection stands and the ground under the pointer (#454); Shift adds a waypoint. */
+function patrolAt(clientX: number, clientY: number, queue: boolean): void {
+  const s = game;
+  if (!s) return;
+  const g = view.groundAt(clientX, clientY);
+  const units = selectedUnits(s).filter((u) => !u.inside);
+  if (!g || !units.length) return;
+  // Click a trading post (or a trader on its road) to guard that road.
+  const pk = view.pick(clientX, clientY);
+  const trade = pk?.kind === 'unit' ? s.byId.get(pk.id) : null;
+  const post = pk?.kind === 'post' ? pk.id : trade && trade.kind === 'unit' && trade.owner === viewer && trade.order.k === 'trade' ? trade.order.post : undefined;
+  if (post !== undefined) {
+    const p = postAt(s, post);
+    if (p) {
+      issue({ t: 'patrol', p: viewer, ids: units.map((u) => u.id), x: p.x, y: p.y, post, queue: queue || undefined });
+      view.marker(s, p.x, p.y, true);
+      play('move');
+      return;
+    }
+  }
+  issue({ t: 'patrol', p: viewer, ids: units.map((u) => u.id), x: g.x, y: g.y, queue: queue || undefined });
+  view.marker(s, g.x, g.y, true);
+  play('move');
+}
+
 function unloadAt(clientX: number, clientY: number, queue: boolean): void {
   const s = game;
   if (!s) return;
@@ -1534,6 +1573,11 @@ canvas.addEventListener('pointerdown', (e) => {
   }
   if (targetMode === 'amove') {
     order(e.clientX, e.clientY, true, e.shiftKey);
+    if (!e.shiftKey) targetMode = null;
+    return;
+  }
+  if (targetMode === 'patrol') {
+    patrolAt(e.clientX, e.clientY, e.shiftKey);
     if (!e.shiftKey) targetMode = null;
     return;
   }
@@ -1729,7 +1773,8 @@ minimap.onCommand = (x, y) => {
   if (!s || mode !== 'play') return;
   const ids = selectedUnits(s).map((u) => u.id);
   if (!ids.length) return;
-  issue({ t: 'move', p: viewer, ids, x, y, amove: targetMode === 'amove' });
+  if (targetMode === 'patrol') issue({ t: 'patrol', p: viewer, ids, x, y });
+  else issue({ t: 'move', p: viewer, ids, x, y, amove: targetMode === 'amove' });
   targetMode = null;
   play('move');
 };
@@ -2131,7 +2176,9 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         break;
       case 'season': {
         const sn = SEASONS[ev.i];
-        hud.toast(`${sn.icon} ${sn.name}. ${sn.blurb}`, 'info');
+        // The turning year (#479): what the season does to this homeland.
+        const turn = s.homeland ? HOMELANDS[s.homeland].year[ev.i] : '';
+        hud.toast(`${sn.icon} ${sn.name}. ${sn.blurb}${turn ? ` ${HOMELANDS[s.homeland!].icon} ${turn}` : ''}`, 'info');
         break;
       }
       case 'hit':
@@ -2141,7 +2188,14 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         if (ev.owner === viewer) {
           music.stir(0.5);
           lastAlert = { x: ev.x, y: ev.y };
-          hud.toast(ev.wild === 'wolf' ? 'Wolves are attacking your people! (Space to look)' : ev.wild === 'boar' ? 'A wild boar is charging your people! (Space to look)' : ev.wild === 'raider' ? 'A raider camp has turned on your people! (Space to look)' : ev.wild === 'mammoth' ? 'A mammoth has turned on your hunters! (Space to look)' : ev.hunter ? 'Raiders fall on your hunters! (Space to look)' : ev.building ? 'A building is under attack! (Space to look)' : 'You are under attack! (Space to look)', 'alert');
+          hud.toast(ev.heart ? 'Your Town Center is under attack! (Space to look)' : ev.wild === 'wolf' ? 'Wolves are attacking your people! (Space to look)' : ev.wild === 'boar' ? 'A wild boar is charging your people! (Space to look)' : ev.wild === 'raider' ? 'A raider camp has turned on your people! (Space to look)' : ev.wild === 'mammoth' ? 'A mammoth has turned on your hunters! (Space to look)' : ev.hunter ? 'Raiders fall on your hunters! (Space to look)' : ev.building ? 'A building is under attack! (Space to look)' : 'You are under attack! (Space to look)', 'alert');
+          play('alert');
+        }
+        break;
+      case 'heartless':
+        if (ev.owner !== viewer && s.players[ev.owner].team !== s.players[viewer].team) hud.toast(`${s.players[ev.owner].name} has lost their last Town Center! ${ev.left} seconds to finish them.`, 'good');
+        if (ev.owner === viewer) {
+          hud.toast(`Your last Town Center has fallen! Raise another within ${ev.left} seconds, or your people is lost.`, 'alert');
           play('alert');
         }
         break;
@@ -2462,6 +2516,12 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         else if (ev.owner >= 0 && (view.sees(ev.x, ev.y) || s.players[viewer].seen[Math.floor(ev.y) * s.w + Math.floor(ev.x)])) hud.toast(`${s.players[ev.owner].name} has taken the ${name}`, 'info');
         break;
       }
+      case 'sighted':
+        if (ev.owner === viewer) {
+          hud.toast(`Scouts report an army of ${ev.n} (Space to look)`, 'alert');
+          lastAlert = { x: ev.x, y: ev.y };
+        }
+        break;
       case 'landmarkThreat':
         if (ev.owner === viewer) {
           hud.toast(`Rivals are taking the ${LANDMARK_KINDS[ev.kind].name}! (Space to look)`, 'alert');
@@ -2554,7 +2614,7 @@ function refreshHud(): void {
 
 function cursorFor(s: GameState): string {
   if (placing) return 'cur-place';
-  if (targetMode === 'amove') return 'cur-amove';
+  if (targetMode === 'amove' || targetMode === 'patrol') return 'cur-amove';
   if (targetMode === 'garrison') return 'cur-garrison';
   if (targetMode === 'sacrifice' || targetMode === 'curse') return 'cur-convert';
   if (targetMode === 'unload') return 'cur-garrison';

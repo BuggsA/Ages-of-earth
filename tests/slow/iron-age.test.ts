@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { ageOf, barred, mainRoad, roadKnown, roadProblem, roadTo, roadsFrom } from '../src/sim/ages';
-import { AMOUNT, BOG_IRON, EPOCHS, ROADS, TECHS, secs, unitStats } from '../src/sim/data';
-import { createGame, step } from '../src/sim/game';
-import { generateMap } from '../src/sim/mapgen';
-import { deserialize, serialize } from '../src/sim/save';
-import { statsFor, trainCostFor } from '../src/sim/stats';
-import type { AgeId, Building, Command, GameState, Unit } from '../src/sim/types';
-import { R_BOG, R_NONE } from '../src/sim/types';
-import { findSpot } from '../src/sim/ai';
-import { placeBuilding } from '../src/sim/world';
+import { ageOf, barred, mainRoad, roadKnown, roadProblem, roadTo, roadsFrom } from '../../src/sim/ages';
+import { AMOUNT, BOG_IRON, EPOCHS, ROADS, TECHS, secs, unitStats } from '../../src/sim/data';
+import { createGame, step } from '../../src/sim/game';
+import { generateMap } from '../../src/sim/mapgen';
+import { deserialize, serialize } from '../../src/sim/save';
+import { statsFor, trainCostFor } from '../../src/sim/stats';
+import type { AgeId, Building, Command, GameState, Unit } from '../../src/sim/types';
+import { R_BOG, R_NONE } from '../../src/sim/types';
+import { findSpot } from '../../src/sim/ai';
+import { placeBuilding } from '../../src/sim/world';
 
 /** The Iron Age (#39): bog iron on some seeds, a survey that answers yes or no, and a side age from the Stone Age. */
 

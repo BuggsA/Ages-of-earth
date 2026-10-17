@@ -151,14 +151,13 @@ export function barred(p: Player, unit: UnitType): string | null {
 /**
  * Why a player's age won't let them raise a building at all, or null: the age bars it (the steppe tills no
  * fields, #297), or the building belongs to other ages (the War Camp, only on its step of the path, #303), or the
- * people's Way shuts it (#463 s1: the Hunters sow nothing in the Stone Age, the Hearth keeps no Hunting Camps).
+ * people's Way shuts it (#463 s1: the Hearth keeps no Hunting Camps; the Hunters' fields wait on the herd, `wayBarred`).
  */
 export function buildBarred(p: Player, type: BuildingType): string | null {
   const no = ageDef(p).noBuild;
   if (no && no.buildings.includes(type)) return no.why;
   const way = p.way ? WAYS[p.way] : undefined;
   if (way?.shuts?.includes(type)) return `${way.name} raises no ${BUILDINGS[type].name}`;
-  if (p.epoch === 0 && way?.stoneShuts?.includes(type)) return `${way.name} raises no ${BUILDINGS[type].name} in the Stone Age`;
   const only = BUILDINGS[type].ages;
   return !only || only.includes(ageOf(p)) ? null : `Only in the ${only.map((a) => AGES[a].name).join(' or ')}`;
 }

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { ageOf } from '../src/sim/ages';
-import { AI_BLOOD, secs } from '../src/sim/data';
-import { createGame, step } from '../src/sim/game';
-import { placeProblem } from '../src/sim/grid';
-import type { Building, CivId, GameState, Unit } from '../src/sim/types';
-import { placeBuilding, spawnUnit } from '../src/sim/world';
+import { ageOf } from '../../src/sim/ages';
+import { AI_BLOOD, secs } from '../../src/sim/data';
+import { createGame, step } from '../../src/sim/game';
+import { placeProblem } from '../../src/sim/grid';
+import type { Building, CivId, GameState, Unit } from '../../src/sim/types';
+import { placeBuilding, spawnUnit } from '../../src/sim/world';
 
 /** The computer on the Path of Blood (#307): turns, holds, War Camps, and the answer to a rival's camp. */
 

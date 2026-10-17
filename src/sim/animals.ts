@@ -142,6 +142,15 @@ export function updateAnimals(s: GameState, sp?: Spatial, sheep?: (a: Animal) =>
       }
     } else if (a.state === 'walk') {
       if (stepToward(s, a, a.tx, a.ty, DEER.walk) || a.t <= 0) {
+        // On the move to new ground (#479): on to the next turn of the way.
+        const next = a.way?.shift();
+        if (next !== undefined) {
+          a.tx = (next % s.w) + 0.5;
+          a.ty = Math.floor(next / s.w) + 0.5;
+          a.t = secs((Math.abs(a.tx - a.x) + Math.abs(a.ty - a.y)) / DEER.walk + 2);
+          continue;
+        }
+        if (a.way) a.way = undefined;
         a.state = 'graze';
         a.t = secs(3) + Math.floor(roll(s) * secs(6));
       }
@@ -162,6 +171,7 @@ export function updateAnimals(s: GameState, sp?: Spatial, sheep?: (a: Animal) =>
         a.t = secs(2);
         a.homeX = a.x;
         a.homeY = a.y;
+        if (a.way) a.way = undefined;
       }
     }
   }
@@ -178,6 +188,8 @@ function mixInt(a: number, b: number): number {
 
 /** Once a season the herd moves on to fresh ground, away from towns. All its deer pick the same move. */
 function drift(s: GameState, a: Animal): void {
+  // A herd that keeps a town's year moves with the seasons instead (`year.ts`).
+  if (a.town !== undefined) return;
   const herd = a.herd ?? a.id;
   const every = secs(DEER.every);
   if ((s.tick + (herd % 97) * 31) % every !== 0 || s.tick === 0) return;
@@ -447,7 +459,7 @@ const WORK: Order['k'][] = ['idle', 'gather', 'farm', 'build', 'deliver', 'dig',
 /** Someone bitten or gored at their work turns on the beast, then goes back to it. */
 function fightBack(u: Unit, a: Animal): void {
   if (!fightsBeasts(u) || !WORK.includes(u.order.k)) return;
-  if (u.stance === 'stand' && u.type !== 'citizen') return;
+  if ((u.stance === 'stand' || u.stance === 'run') && u.type !== 'citizen') return;
   const o = u.order;
   if (o.k !== 'idle') u.queue.unshift(o.k === 'gather' || o.k === 'farm' || o.k === 'milk' ? { ...o, phase: 'go' } : o);
   u.order = { k: 'hunt', target: a.id, fight: a.kind === 'wolf' || a.kind === 'raider' };

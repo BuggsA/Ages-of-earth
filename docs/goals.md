@@ -44,4 +44,6 @@ Pass all four, or say in the pull request which one it fails and why that's fine
 ## Progress
 
 - 2026-10-17: goals set. Goal 1 umbrella opened (#463); #454 and #391 labelled `owner-ask`.
-- 2026-10-17: s1 (#467): each Way gives a verb and shuts a door (kill camps / the kin / the raid; no Stone Age farms / no camps / no bell); the computer picks by people and land and plays each.
+- 2026-10-17: `npx tsx scripts/opening.ts <seed> <wayA> <wayB> 15` prints two openings side by side, the check for Goal 1's "done when". Seed 3, hunt vs hearth: alike until minute 8, so today the Ways differ in pace only.
+- 2026-10-17: s2, Homelands (#473): the seed rolls the Glade, the Shore, the Herd Plains or the Deep Wood; the computer's opening and Way now vary by map. s1 (#467) is in progress on another chain.
+- 2026-10-17: s1 (#467): each Way gives a verb and shuts a door (kill camps / the kin / the raid; no fields while the home herd lives / no camps / no bell); the computer picks by people and land and plays each.
