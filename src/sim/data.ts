@@ -1687,7 +1687,8 @@ export const AI_WONDER = { share: 0.4, least: 3, most: 14, stay: 6, reach: 26 };
  * The computer and feast days (#379 s1): a clever computer raises its Market on the fairground, searching up to `ring`
  * tiles round its relic Temple, and in the Age of Fairs keeps up to `markets` Markets so one stands there.
  */
-export const AI_FAIR = { ring: 10, markets: 2 };
+/** `raid`: how much nearer (squared tiles) a rival's fairground Market seems to a raid on a feast day. */
+export const AI_FAIR = { ring: 10, markets: 2, raid: 900 };
 /**
  * The computer and sorties (#379): when the enemy building it means to bomb lies more than `gap` tiles from its nearest
  * finished Airfield (so its aircraft would turn for home before they arrive, `SORTIE.turn`), it raises another Airfield
