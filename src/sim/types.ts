@@ -760,7 +760,7 @@ export interface AiMemory {
    * The Path of Blood (#307): since when it holds the Warband for plunder (-1 once done), when it entered Iron and Blood, and when it last pitched a War Camp.
    * Hemocraft (#355 s5): where rival living soldiers last came near home (`foe`), and when it last sent citizens to the levy (`levy`).
    */
-  blood?: { hold?: number; since?: number; camp?: number; muster?: number; foe?: { x: number; y: number }; levy?: number };
+  blood?: { hold?: number; since?: number; camp?: number; muster?: number; foe?: { x: number; y: number }; levy?: number; war?: number; fork?: number };
   /** Tick its last band came home from prowling. */
   prowled?: number;
   /**

@@ -1,5 +1,5 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, AI_HEMO, BLOOD, HEMO, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
@@ -15,7 +15,7 @@ import { findRoute } from './path';
 import { isEnemy, maxHp } from './world';
 import { callUpProblem } from './warcamp';
 import { GRAFTABLE, bloodOf, grafted, levyProblem, levyWait } from './blood';
-import { stationsOf, waiting } from './hemo';
+import { graftCost, stationsOf, waiting } from './hemo';
 import { borderMap, landOwnerAt, suppliedAt } from './borders';
 import { workProblem } from './works';
 import { aiVow, aiWay } from './ways';
@@ -376,6 +376,12 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   } else if (roads[to] === undefined && (to === 'ironblood' || to === 'totalwar')) {
     // The later steps of the Path of Blood are no new coin toss: a people that walked the step before goes on.
     roads[to] = hasWalked(p, to === 'ironblood' ? 'warband' : 'ironblood');
+  } else if (roads[to] === undefined && (to === 'hemocraft' || to === 'bloodrite')) {
+    // The fork (#355 s5) is chosen once, both roads together: never Hemocraft against a rival army of steel, where a drain finds no blood.
+    const open = AI_LEVELS[p.ai!].fork !== false;
+    const hemo = livingShare(s, p) >= AI_FORK.living && coin(s, p.id, 0x4e30) < AI_FORK.hemo;
+    roads.hemocraft = open && hemo;
+    roads.bloodrite = open && !hemo;
   } else if (roads[to] === undefined) {
     const f = fit(p, to);
     // The steppe tosses a coin of its own: asked early by every clever town, it would shift the dice of every match.
@@ -490,13 +496,17 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   const { p } = v;
   if (!walksWeb(v)) return null;
   const here = ageOf(p);
+  const fork = forkTurn(s, v, mem);
+  if (fork) return fork;
+  // Bound for the fork, Industry doesn't turn back to Total War.
+  const forking = here === 'industrial' && !!forkRoad(s, p, mem);
   const kept = relicsKept(s, p.id);
   // A detour (#232): a pilgrim town with the catch landed and a Dock, whose Age of Sail would open an heirloom, steps back to
   // the Middle Ages to take it, and doesn't turn pilgrim again on the way (the road to Sail is the plan).
   const sailRoad = ROADS.find((r) => r.from === 'middle' && r.to === 'sail');
   const toSail = AI_LEVELS[p.ai!].detour && !!sailRoad && !!heirloomAhead(p, 'sail') && count(v, 'dock', true) > 0 && deedsDone(p, sailRoad, s) && wants(s, p, mem, 'sail');
   for (const r of roadsFrom(p)) {
-    if (AGES[r.to].tier !== p.epoch) continue;
+    if (AGES[r.to].tier !== p.epoch || (forking && r.to === 'totalwar')) continue;
     if (toSail && here === 'pilgrim' && r.to === 'middle') return { road: r, wait: false };
     if (toSail && r.to === 'pilgrim') continue;
     if (r.to === 'aeronaut' && v.planes.length > 0 && roadKnown(s, p, r) && wants(s, p, mem, r.to)) return { road: r, wait: false };
@@ -535,6 +545,54 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
     return { road: r, wait: false };
   }
   return null;
+}
+
+/** The road into the branch of the fork (#355 s5) the computer chose, out of the Industrial Age; undefined before Total War, or given up. */
+function forkRoad(s: GameState, p: Player, mem: AiMemory): Road | undefined {
+  if (!hasWalked(p, 'totalwar')) return undefined;
+  const to: AgeId | null = wants(s, p, mem, 'hemocraft') ? 'hemocraft' : wants(s, p, mem, 'bloodrite') ? 'bloodrite' : null;
+  return to ? ROADS.find((r) => r.from === 'industrial' && r.to === to) : undefined;
+}
+
+/**
+ * The fork at the end of the Path of Blood (#355 s5). In Total War, once its town has grown to `AI_HEMO.town` citizens, it chooses its
+ * branch and works that deed (`hemoBuild`). It stays `AI_FORK.stay` seconds at least from then, then makes peace into Industry once a
+ * deed is done and that road's clue stands: its chosen branch's, or else the other's (the rite's always, Hemocraft's only against a rival
+ * that bleeds), and the branch it takes becomes its choice. In Industry it turns down the branch. No deed done `patience` seconds after
+ * its town grew, or a road still shut `patience` seconds into Industry, gives the fork up: it stays at war, or goes back to it.
+ */
+function forkTurn(s: GameState, v: View, mem: AiMemory): Journey | null {
+  const { p } = v;
+  const here = ageOf(p);
+  if (here !== 'totalwar' && here !== 'industrial') return null;
+  const blood = (mem.blood ??= {});
+  if (here === 'totalwar' && blood.war === undefined && v.citizens.length < AI_HEMO.town) return null;
+  const road = forkRoad(s, p, mem);
+  if (!road) return null;
+  const giveUp = () => {
+    mem.roads!.hemocraft = false;
+    mem.roads!.bloodrite = false;
+  };
+  if (here === 'industrial') {
+    blood.fork ??= s.tick;
+    if (roadKnown(s, p, road) && deedsDone(p, road, s)) return { road, wait: false };
+    if (s.tick - blood.fork >= secs(AI_FORK.patience)) giveUp();
+    return null;
+  }
+  delete blood.fork;
+  blood.war ??= s.tick;
+  const other = ROADS.find((r) => r.from === 'industrial' && r.walked === 'totalwar' && r.to === road.shuns)!;
+  const open = (r: Road) => deedsDone(p, r, s) && roadKnown(s, p, r);
+  const ready = open(road) ? road : open(other) && (other.to === 'bloodrite' || livingShare(s, p) >= AI_FORK.living) ? other : null;
+  if (!ready) {
+    if (s.tick - blood.war >= secs(AI_FORK.patience)) giveUp();
+    return null;
+  }
+  if (s.tick - blood.war < secs(AI_FORK.stay)) return null;
+  mem.roads!.hemocraft = ready.to === 'hemocraft';
+  mem.roads!.bloodrite = ready.to === 'bloodrite';
+  const peace = roadsFrom(p).find((r) => r.to === 'industrial');
+  return peace ? { road: peace, wait: false } : null;
 }
 
 /**
@@ -2404,8 +2462,22 @@ export function rivalWarCamp(s: GameState, p: Player, home: { x: number; y: numb
 
 // ---- Hemocraft (#355 s5) -------------------------------------------------------------------------------
 
-/** Whether the computer plays Hemocraft: a clever one in the ages of War Camps (off only in `scripts/ai-ab.ts`). */
-const hemoPlay = (p: Player): boolean => AI_LEVELS[p.ai!].clever && AI_LEVELS[p.ai!].hemo !== false && atWar(p);
+/** Whether a people stands in a branch of the fork (#355 s2): Hemocraft or the Blood-rite. */
+const forkAge = (p: Player): boolean => !!ageDef(p).hemocraft || !!ageDef(p).rite;
+
+/** Whether the computer plays Hemocraft: a clever one in the ages of War Camps or on the fork past them (off only in `scripts/ai-ab.ts`). */
+const hemoPlay = (p: Player): boolean => AI_LEVELS[p.ai!].clever && AI_LEVELS[p.ai!].hemo !== false && (atWar(p) || forkAge(p));
+
+/**
+ * What a rival's blood stands on, which machines go for: a Transfusion Station or Blood Tower, a Drain Rig that drains (Hemocraft) and a
+ * Temple that is an altar (the Blood-rite).
+ */
+function bloodWork(s: GameState, e: Building): boolean {
+  if (HEMO_WORKS.includes(e.type)) return true;
+  if (e.type !== 'drainrig' && e.type !== 'temple') return false;
+  const age = ageDef(s.players[e.owner]);
+  return e.type === 'drainrig' ? !!age.hemocraft : !!age.rite;
+}
 
 /** The buildings a rival's Hemocraft stands on, which machines go for. */
 const HEMO_WORKS: readonly BuildingType[] = ['transfusion', 'bloodtower'];
@@ -2448,7 +2520,7 @@ function livingShare(s: GameState, p: Player): number {
 
 /** Whether it still wants a Blood Tower: fewer than `towers`, rival living soldiers come, and the rival's army mostly bleeds. */
 function towerWanted(s: GameState, v: View, mem: AiMemory): boolean {
-  return !!mem.blood?.foe && count(v, 'bloodtower') < AI_HEMO.towers && !buildBarred(v.p, 'bloodtower') && livingShare(s, v.p) >= AI_HEMO.living;
+  return !!mem.blood?.foe && count(v, 'bloodtower') < (forkAge(v.p) ? AI_FORK.towers : AI_HEMO.towers) && !buildBarred(v.p, 'bloodtower') && livingShare(s, v.p) >= AI_HEMO.living;
 }
 
 /**
@@ -2469,7 +2541,8 @@ function hemoBuild(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
     const spot = findSpot(s, 'drainrig', at.x, at.y, 0, 8);
     if (spot && construct(s, v, mem, 'drainrig', spot, 2, issue)) return;
   }
-  if (ageOf(p) === 'totalwar' && v.army.length >= AI_HEMO.army && count(v, 'transfusion') === 0 && !buildBarred(p, 'transfusion') && !recently('transfusion', AI_HEMO.again)) {
+  if (forkBuild(s, v, mem, issue)) return;
+  if ((ageOf(p) === 'totalwar' || ageOf(p) === 'hemocraft') && v.army.length >= AI_HEMO.army && count(v, 'transfusion') === 0 && !buildBarred(p, 'transfusion') && !recently('transfusion', AI_HEMO.again)) {
     const at = mem.muster ?? toward(v.home, enemyHome(s, p), 8);
     const spot = findSpot(s, 'transfusion', at.x, at.y, 2, 8);
     if (spot && construct(s, v, mem, 'transfusion', spot, 3, issue)) return;
@@ -2487,18 +2560,66 @@ function hemoBuild(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
 }
 
 /**
+ * The fork (#355 s5), one building a think, and the levy it wants. Bound for the rite in Total War, a full town gives citizens to the levy
+ * for the road's deed. In Hemocraft a second Drain Rig stands out where rival soldiers come (else toward the rival), so the Blood Towers
+ * raised there ring it and whoever fights them bleeds into the store. In the rite, a second Temple stands `AI_FORK.altar` tiles out the
+ * same way, an altar the army musters by, and while the store is under `AI_FORK.store` a full town gives the levy, to mend with.
+ */
+function forkBuild(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): boolean {
+  const { p } = v;
+  const here = ageOf(p);
+  const foe = mem.blood?.foe ?? enemyHome(s, p);
+  const recently = (type: BuildingType, t: number) => s.tick - (mem.ordered[type] ?? -99999) < secs(t);
+  if (here === 'totalwar' && mem.roads?.bloodrite) {
+    const road = forkRoad(s, p, mem);
+    if (road && !deedsDone(p, road, s)) bleedTown(s, v, mem, BLOOD.levy, issue, true);
+    return false;
+  }
+  if (!forkAge(p)) return false;
+  const spread = (type: BuildingType) => (tx: number, ty: number) => !v.buildings.some((b) => b.type === type && (b.x - tx - 1) * (b.x - tx - 1) + (b.y - ty - 1) * (b.y - ty - 1) < AI_HEMO.spread * AI_HEMO.spread);
+  if (ageDef(p).rite) {
+    if (bloodOf(p) < AI_FORK.store) bleedTown(s, v, mem, AI_FORK.store - bloodOf(p), issue);
+    if (count(v, 'temple') >= AI_FORK.altars || buildBarred(p, 'temple') || recently('temple', AI_HEMO.again)) return false;
+    const at = toward(v.home, foe, AI_FORK.altar);
+    const spot = findSpot(s, 'temple', at.x, at.y, 0, 6, 1, spread('temple'));
+    return !!spot && construct(s, v, mem, 'temple', spot, 3, issue);
+  }
+  if (count(v, 'drainrig') >= AI_FORK.rigs || buildBarred(p, 'drainrig') || recently('drainrig', AI_HEMO.again)) return false;
+  const at = toward(v.home, foe, AI_HEMO.tower);
+  const spot = findSpot(s, 'drainrig', at.x, at.y, 0, 6, 1, spread('drainrig'));
+  return !!spot && construct(s, v, mem, 'drainrig', spot, 2, issue);
+}
+
+/** The Blood-rite's forward altar (#355 s5): the built Temple nearest the front (where rival soldiers come), when it stands nearer it than home does; else null. */
+function forwardAltar(v: View, enemy: { x: number; y: number }): Building | null {
+  if (!ageDef(v.p).rite) return null;
+  let best: Building | null = null;
+  let bestD = (enemy.x - v.home.x) * (enemy.x - v.home.x) + (enemy.y - v.home.y) * (enemy.y - v.home.y);
+  for (const b of v.buildings) {
+    if (b.type !== 'temple' || !b.built || b.hp <= 0) continue;
+    const d = (enemy.x - b.x) * (enemy.x - b.x) + (enemy.y - b.y) * (enemy.y - b.y);
+    if (d < bestD) {
+      bestD = d;
+      best = b;
+    }
+  }
+  return best;
+}
+
+/**
  * The levy (#355 s5), when it pays: `short` blood is wanted for a graft or a tower, and the town is within `AI_HEMO.spare` of the
  * citizens it wants (never under `AI_BLOOD.held`), with the food to train them again. The citizens nearest the rig give their blood;
- * with none in its reach, the nearest free ones walk over, and the next think takes them.
+ * with none in its reach, the nearest free ones walk over, and the next think takes them. For a road's `deed` (the Blood-rite's), one
+ * citizen at a time goes even with no food to spare: the town trains the one back when it can.
  */
-function bleedTown(s: GameState, v: View, mem: AiMemory, short: number, issue: (c: Command) => void): void {
+function bleedTown(s: GameState, v: View, mem: AiMemory, short: number, issue: (c: Command) => void, deed = false): void {
   const { p } = v;
   const blood = (mem.blood ??= {});
   if (blood.levy !== undefined && s.tick - blood.levy < secs(AI_HEMO.levyGap)) return;
   const want = Math.min(AI_LEVELS[p.ai!].citizens + p.epoch * 3, 60);
   const spare = v.citizens.length - Math.max(AI_BLOOD.held, want - AI_HEMO.spare);
-  const n = Math.min(spare, BLOOD.levyMost, Math.ceil(short / BLOOD.levy));
-  if (n < 1 || v.budget.food < unitStats('citizen', p.epoch).cost.food! * n) return;
+  const n = Math.min(spare, deed ? 1 : BLOOD.levyMost, Math.ceil(short / BLOOD.levy));
+  if (n < 1 || (!deed && v.budget.food < unitStats('citizen', p.epoch).cost.food! * n)) return;
   const rig = v.buildings.find((b) => b.type === 'drainrig' && b.built && b.hp > 0);
   if (!rig || levyWait(s, rig) > 0) return;
   blood.levy = s.tick;
@@ -2522,23 +2643,24 @@ function transfuse(s: GameState, v: View, mem: AiMemory, ready: Unit[], issue: (
   const { p } = v;
   if (!hemoPlay(p)) return sent;
   const r2 = AI_HEMO.near * AI_HEMO.near;
+  const cost = graftCost(p);
   let blood = bloodOf(p);
   for (const b of stationsOf(s, p.id)) {
     const heading = v.army.filter((u) => u.order.k === 'garrison' && u.order.target === b.id).length;
-    blood -= (waiting(s, b).length + heading) * HEMO.cost;
+    blood -= (waiting(s, b).length + heading) * cost;
     const room = BUILDINGS.transfusion.garrison! - b.garrison.length - heading;
     const near = ready.filter((u) => GRAFTABLE.includes(u.type) && !sent.has(u.id) && !grafted(s, u) && (u.x - b.x) * (u.x - b.x) + (u.y - b.y) * (u.y - b.y) <= r2);
     const want = Math.min(room, near.length);
     if (want <= 0) continue;
     const free = Math.max(0, blood);
-    const n = Math.min(want, Math.floor(free / HEMO.cost));
-    if (n < want && want >= AI_HEMO.batch) bleedTown(s, v, mem, want * HEMO.cost - free, issue);
+    const n = Math.min(want, Math.floor(free / cost));
+    if (n < want && want >= AI_HEMO.batch) bleedTown(s, v, mem, want * cost - free, issue);
     if (n <= 0) continue;
     const d = (u: Unit) => (u.x - b.x) * (u.x - b.x) + (u.y - b.y) * (u.y - b.y);
     const go = near.sort((a, c) => d(a) - d(c) || a.id - c.id).slice(0, n);
     issue({ t: 'garrison', p: p.id, ids: go.map((u) => u.id), target: b.id });
     for (const u of go) sent.add(u.id);
-    blood -= n * HEMO.cost;
+    blood -= n * cost;
   }
   return sent;
 }
@@ -2554,17 +2676,17 @@ function bound(s: GameState, u: Unit): boolean {
 function openStations(s: GameState, v: View, issue: (c: Command) => void): void {
   if (!hemoPlay(v.p)) return;
   for (const b of stationsOf(s, v.p.id)) {
-    if (b.muster !== undefined || !waiting(s, b).length || bloodOf(v.p) >= HEMO.cost) continue;
+    if (b.muster !== undefined || !waiting(s, b).length || bloodOf(v.p) >= graftCost(v.p)) continue;
     issue({ t: 'ungarrison', p: v.p.id, building: b.id });
   }
 }
 
-/** The rival Station or Blood Tower seen nearest a point within `r` tiles (a Station counts as `AI_HEMO.spread` tiles nearer), or null. */
+/** The rival blood work (`bloodWork`) seen nearest a point within `r` tiles (a Station counts as `AI_HEMO.spread` tiles nearer), or null. */
 export function hemoTarget(s: GameState, p: Player, x: number, y: number, r: number): Building | null {
   let best: Building | null = null;
   let bestD = Infinity;
   for (const e of s.ents) {
-    if (e.kind !== 'building' || e.hp <= 0 || !HEMO_WORKS.includes(e.type) || !isEnemy(s, p.id, e.owner)) continue;
+    if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner) || !bloodWork(s, e)) continue;
     if (!p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
     const d = Math.sqrt((e.x - x) * (e.x - x) + (e.y - y) * (e.y - y));
     if (d > r) continue;
@@ -2577,13 +2699,13 @@ export function hemoTarget(s: GameState, p: Player, x: number, y: number, r: num
   return best;
 }
 
-/** A rival Station or Blood Tower seen that a warship can shell from the water, nearest the dock first, or null. */
+/** A rival blood work (`bloodWork`) seen that a warship can shell from the water, nearest the dock first, or null. */
 function shoreBlood(s: GameState, p: Player, dock: Building): Building | null {
   const range = Math.floor(unitStats('warship', p.epoch).range);
   let best: Building | null = null;
   let bestD = Infinity;
   for (const e of s.ents) {
-    if (e.kind !== 'building' || e.hp <= 0 || !HEMO_WORKS.includes(e.type) || !isEnemy(s, p.id, e.owner) || !p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
+    if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner) || !bloodWork(s, e) || !p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
     const d = (e.x - dock.x) * (e.x - dock.x) + (e.y - dock.y) * (e.y - dock.y);
     if (d >= bestD || !coastNear(s, e.x, e.y, range)) continue;
     bestD = d;
@@ -2592,26 +2714,26 @@ function shoreBlood(s: GameState, p: Player, dock: Building): Building | null {
   return best;
 }
 
-/** Whether a rival plays Hemocraft where the computer can see it: a Station or Blood Tower seen, or `AI_HEMO.grafted` grafted soldiers in sight. */
+/** Whether a rival plays Hemocraft where the computer can see it: a blood work (`bloodWork`) seen, or `AI_HEMO.grafted` grafted soldiers in sight. */
 function rivalBleeds(s: GameState, p: Player): boolean {
   let n = 0;
   for (const e of s.ents) {
     if (e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
     const at = Math.floor(e.y) * s.w + Math.floor(e.x);
-    if (e.kind === 'building' && HEMO_WORKS.includes(e.type) && p.seen[at]) return true;
+    if (e.kind === 'building' && p.seen[at] && bloodWork(s, e)) return true;
     if (grafted(s, e) && p.vis[at] === 1 && ++n >= AI_HEMO.grafted) return true;
   }
   return false;
 }
 
-/** The answer to a rival's Hemocraft (#355 s5): the siege marching with a wave goes for a Station or Blood Tower near it. Machines are the counter. */
+/** The answer to a rival's Hemocraft (#355 s5): the siege marching with a wave goes for a blood work (`bloodWork`) near it. Machines are the counter. */
 function machinesAtBlood(s: GameState, v: View, onAttack: Unit[], issue: (c: Command) => void): void {
   const by = new Map<number, number[]>();
   for (const u of onAttack) {
     if (u.type !== 'siege') continue;
     if (u.order.k === 'attack') {
       const t = s.byId.get(u.order.target);
-      if (t && t.kind === 'building' && HEMO_WORKS.includes(t.type)) continue;
+      if (t && t.kind === 'building' && bloodWork(s, t)) continue;
     }
     const t = hemoTarget(s, v.p, u.x, u.y, AI_HEMO.hunt);
     if (!t) continue;
@@ -2740,6 +2862,10 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   mem.muster = { x: v.home.x + (dx / dl) * 8, y: v.home.y + (dy / dl) * 8 };
   const ford = L.clever ? stagingFord(s, p.id, v.home, enemy) : null;
   if (ford) mem.muster = { x: ford.x, y: ford.y };
+  // The Blood-rite (#355 s5) gathers its army by its forward altar, where the hurt are mended and the fallen foe pays blood.
+  const front = mem.blood?.foe ?? enemy;
+  const altar = L.clever && L.hemo !== false ? forwardAltar(v, front) : null;
+  if (altar) mem.muster = toward(altar, front, 3);
 
   // A hero to lead the army.
   if (L.clever && v.tc && v.army.length >= 6 && !heroBusy(s, p.id) && v.tc.queue.length < 2 && v.tc.advance < 0) {
@@ -2788,7 +2914,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     if (b.type === 'market' && !hiresAt(p, b.type).length) continue;
     let unit: UnitType | null;
     if (b.type === 'workshop') unit = siege < Math.max(v.plan.siege, p.epoch >= 2 ? 3 : 2) + lodge + bleeds && (v.army.length >= 6 || siege < v.plan.siege) ? 'siege' : null;
-    else if (b.type === 'temple') unit = v.priests.length < (v.army.length >= 6 ? (consecrates(s, p.id) ? AI_FAITH.priests : 2) : 0) + (looseRelics(s) > 0 ? 1 : 0) + (vigilPost(s, v) ? VIGIL.most : 0) ? 'priest' : null;
+    else if (b.type === 'temple') unit = v.priests.length < (v.army.length >= 6 ? Math.max(consecrates(s, p.id) ? AI_FAITH.priests : 2, L.clever && ageDef(p).rite ? AI_FORK.priests : 0) : 0) + (looseRelics(s) > 0 ? 1 : 0) + (vigilPost(s, v) ? VIGIL.most : 0) ? 'priest' : null;
     else {
       unit = counter && trains.includes(counter) && unitEpoch(counter) <= p.epoch && !barred(p, counter) && roll(s) < counterOdds ? counter : pickUnit(v, mem, b);
       if (unit && unitEpoch(unit) > p.epoch) unit = pickUnit(v, mem, b);
