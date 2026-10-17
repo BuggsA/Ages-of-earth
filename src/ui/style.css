@@ -421,3 +421,9 @@ body.online .tip-box { bottom: 330px; }
 .cloud .cloud-qr .qr { border-radius: 8px; max-width: 100%; height: auto; }
 .cloud .bad { color: #ff7a6a; }
 @media (max-width: 560px) { .cloud .cloud-slot { flex-direction: column; align-items: stretch; } }
+
+/* The match opens in a golden haze that lifts off the valley (wonder). */
+.dawn { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at 50% 85%, rgba(255, 214, 140, 0.85), rgba(150, 170, 200, 0.75) 60%, rgba(60, 80, 120, 0.9)); }
+.dawn.lift { animation: dawn-lift 5.5s ease-out forwards; }
+@keyframes dawn-lift { 0% { opacity: 1; } 35% { opacity: 0.85; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .dawn.lift { animation-duration: 1.5s; } }
