@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -123,7 +123,7 @@ export class Sound {
     'click', 'open', 'select', 'selectBuilding', 'move', 'attack', 'strike', 'thud', 'hit', 'hitBuilding', 'bow', 'sling', 'musket', 'fall',
     'collapse', 'built', 'place', 'ready', 'readyCitizen', 'chop', 'mine', 'hammer', 'rustle', 'epoch', 'alert', 'victory', 'defeat', 'error', 'coin', 'queue',
     'catapult', 'cannon', 'impact', 'spear', 'chant', 'convert', 'heal', 'townBell', 'allClear', 'research', 'wonder', 'wonderRising', 'shelter',
-    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind', 'thunder', 'owl', 'gull', 'cricket', 'frog', 'birdsong', 'greatWork', 'beacon', 'rally', 'mammoth', 'howl', 'snarl', 'landmarkTaken', 'landmarkLost', 'consecrate', 'heirloom', 'zap', 'coilHum', 'heroFall', 'callUp', 'tribute', 'caravanBells', 'toll', 'wayHunters', 'wayHearth', 'wayWarband', 'blood', 'graft', 'crash', 'drain', 'sacrifice', 'curse', 'sighting',
+    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind', 'thunder', 'owl', 'gull', 'cricket', 'frog', 'birdsong', 'greatWork', 'beacon', 'rally', 'mammoth', 'howl', 'snarl', 'landmarkTaken', 'landmarkLost', 'consecrate', 'heirloom', 'zap', 'coilHum', 'heroFall', 'callUp', 'tribute', 'caravanBells', 'toll', 'wayHunters', 'wayHearth', 'wayWarband', 'blood', 'graft', 'crash', 'drain', 'sacrifice', 'curse', 'shackle', 'unshackle', 'sighting',
   ];
 
   /**
@@ -795,6 +795,18 @@ export class Sound {
         this.tone(out, t + 0.04, { f: 140, to: 62, dur: 0.32, type: 'triangle', peak: 0.06 });
         this.noise(out, t + 0.36, { dur: 0.03, filter: 'highpass', f: 3200, q: 1, peak: 0.03 });
         this.tone(out, t + 0.42, { f: 52, to: 44, dur: 0.24, type: 'sine', peak: 0.08 });
+        break;
+      case 'shackle':
+        // A captive taken (#355): three dull iron links dragged over stone, then a lock's single heavy click.
+        [0, 0.09, 0.2].forEach((d, i) => this.noise(out, t + d, { dur: 0.07, filter: 'bandpass', f: 1800 - i * 250, q: 6, peak: 0.05 }));
+        this.noise(out, t + 0.3, { dur: 0.25, filter: 'lowpass', f: 500, q: 0.7, peak: 0.04 });
+        this.tone(out, t + 0.6, { f: 220, to: 160, dur: 0.06, type: 'square', peak: 0.04 });
+        break;
+      case 'unshackle':
+        // Captives freed from a fallen rig (#355): the chains dropped in the dirt, and a rising open fifth.
+        this.noise(out, t, { dur: 0.18, filter: 'bandpass', f: 1500, q: 5, peak: 0.05 });
+        this.tone(out, t + 0.22, { f: 262, dur: 0.35, type: 'triangle', peak: 0.07 });
+        this.tone(out, t + 0.36, { f: 392, dur: 0.45, type: 'triangle', peak: 0.07 });
         break;
       case 'sacrifice':
         // The Blood-rite's offering (#355 s4): a deep gong struck once, a thin cry that is cut off, then a slow pour into a bowl.

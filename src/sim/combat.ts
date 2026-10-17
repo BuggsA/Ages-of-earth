@@ -65,7 +65,7 @@ export function hurt(s: GameState, target: Ent, damage: number, by: number, atta
   }
   if (target.hp <= 0) {
     s.players[by].stats.kills++;
-    if (target.kind === 'unit' && by !== target.owner) plunder(s, target, by);
+    if (target.kind === 'unit' && by !== target.owner) plunder(s, target, by, credit);
     if (target.kind === 'building') {
       s.players[by].stats.razed++;
       const purse = by !== target.owner ? fairPurse(s, target) : 0;
@@ -92,10 +92,10 @@ export function hurt(s: GameState, target: Ent, damage: number, by: number, atta
  * An enemy unit has fallen to `by`'s people (#299): it counts toward the Path of Blood's deeds, and a
  * people with a `plunder` share takes that much of the fallen unit's price as gold.
  */
-function plunder(s: GameState, target: Unit, by: number): void {
+function plunder(s: GameState, target: Unit, by: number, credit: Unit | null): void {
   const p = s.players[by];
   p.stats.slain = (p.stats.slain ?? 0) + 1;
-  drawBlood(s, target, by);
+  drawBlood(s, target, by, credit);
   const prize = prizeOf(s, target, by);
   if (prize > 0) {
     p.res.gold += prize;

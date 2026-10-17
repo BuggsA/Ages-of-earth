@@ -19,6 +19,7 @@ import { elmoStep } from './elmo';
 import { galvanicStep } from './galvanic';
 import { hemoStep } from './hemo';
 import { forkStep } from './fork';
+import { bloodStep, freeCaptives } from './blood';
 import { reclaimStep, remember } from './reclaim';
 import { sortieStep } from './sortie';
 import { fairStep } from './fair';
@@ -370,8 +371,9 @@ function removeDead(s: GameState): void {
     const p = s.players[e.owner];
     p.stats.losses++;
     if (e.kind === 'building') {
-      // Those inside run out before it falls.
+      // Those inside run out before it falls, and its captives (#355) go free.
       ungarrison(s, e);
+      freeCaptives(s, e);
       stampBuilding(s, e, false);
       remember(s, e);
       s.events.push({ k: 'die', id: e.id, owner: e.owner, type: e.type, x: e.x, y: e.y, building: true, size: e.size, epoch: p.epoch, fx: e.dir, fy: 1 });
@@ -518,6 +520,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   warCampStep(s);
   hemoStep(s);
   forkStep(s);
+  bloodStep(s);
   raiseCamps(s);
   faithStep(s);
   tidingStep(s);

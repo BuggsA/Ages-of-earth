@@ -17,7 +17,7 @@ import { TIDING_CARDS, tidingCost, tidingProblem } from '../sim/tidings';
 import { vowProblem, wayProblem } from '../sim/ways';
 import { beaconProblem, lit } from '../sim/beacon';
 import { callUpProblem, callUpReach, campGrace, musterWait } from '../sim/warcamp';
-import { bloodOf, bloodShort, cursed, grafted, levyProblem, sworn, levyReach } from '../sim/blood';
+import { bledFlock, bloodOf, bloodShort, captivesOf, cursed, grafted, levyProblem, sworn, levyReach } from '../sim/blood';
 import { feedReach, graftCost, graftWait, waiting } from '../sim/hemo';
 import { chantedOver, consecrates, faithOf } from '../sim/consecrate';
 import { rallyProblem } from '../sim/rally';
@@ -698,6 +698,16 @@ export class Hud {
     // The fork (#355 s2): a Hemocraft rig drains the living who stand near it; a Blood-rite Temple is an altar.
     if (mine && b.built && b.type === 'drainrig' && ageDef(p).hemocraft)
       status += ` · <span data-tip="<b>Draining</b>Each second, up to ${HEMOCRAFT.most} living enemies within ${HEMOCRAFT.drain} tiles bleed ${HEMOCRAFT.bleed} health into your store, ${HEMOCRAFT.yield} blood a point, and those who die of it pay their blood again. Machines, ships and aircraft bleed nothing.">🩸 Draining the living within ${HEMOCRAFT.drain} tiles</span>`;
+    // Beasts, flocks and captives (#355): what a rig (or altar) holds and bleeds. A rival is told when it holds some of their people.
+    if (b.built && b.type === 'drainrig' && mine) {
+      const flock = bledFlock(s, b).length;
+      if (flock) status += ` · <span data-tip="<b>Bleeding the flock</b>Each second your sheep grazing within ${BLOOD.flockReach} tiles give up to ${BLOOD.flockMilk} of their milk to the rig, ${BLOOD.flockYield} blood for each, instead of to your milkers. Graze them farther off to milk them.">🐑 Bleeding ${flock} sheep</span>`;
+    }
+    const held = captivesOf(b);
+    if (held && mine)
+      status += ` · <span data-tip="<b>Captives</b>Enemy citizens your soldiers strike down within ${BLOOD.reach} tiles are taken here alive, up to ${BLOOD.hold}: each is bled ${BLOOD.bleed} blood a second until its ${BLOOD.captive} are spent. If this falls, they go free.">⛓ ${held}/${BLOOD.hold} captives: ${Math.round((b.captives ?? []).reduce((n, c) => n + c.left, 0))} blood left in them</span>`;
+    else if (held && !mine && (b.captives ?? []).some((c) => c.p === viewer))
+      status += ` · <span data-tip="<b>Your people, captive</b>Raze it and they go free and come home.">⛓ Holds ${(b.captives ?? []).filter((c) => c.p === viewer).length} of your people</span>`;
     if (mine && b.built && b.type === 'temple' && ageDef(p).rite)
       status += ` · <span data-tip="<b>Altar</b>Enemies who fall within ${BLOOD.reach} tiles give up their blood, as at a Drain Rig. Each second the altar mends up to ${RITE.most} of your hurt living within ${RITE.reach} tiles, ${RITE.mend} health each, for ${RITE.price} blood a point, while the store lasts.">${bloodOf(p) > 0 ? '🩸 Altar: mending with blood' : '⚠ Altar: no blood to mend with'}</span>`;
     const inside = def.garrison && b.built ? `<div class="stats"><span data-tip="<b>Sheltering</b>Units inside are safe, heal slowly and add arrows.">🏰<em>Inside</em> ${b.garrison.length}/${def.garrison}</span></div>` : '';
