@@ -234,6 +234,14 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
       }
       if (next >= 0) break;
     }
+    // The player's workers look further before they stand idle (#344): the next grove, mine or bush is a longer walk, not another order.
+    if (next < 0 && !s.players[u.owner].ai && !o.rare && u.type !== 'fisher') {
+      for (const want of wants) {
+        if (want === R_MEAT || want === R_FISH) continue;
+        next = findResource(s, want, (o.tile % s.w) + 0.5, Math.floor(o.tile / s.w) + 0.5, SPREAD.far);
+        if (next >= 0) break;
+      }
+    }
     if (next >= 0) {
       o.tile = next;
       o.phase = 'go';
@@ -421,6 +429,14 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
     u.resume = null;
     if (back.k === 'gather' || back.k === 'farm') {
       setOrder(u, back);
+      return;
+    }
+  }
+  // A farm that is already worked: the player's builder takes a free field nearby rather than standing idle (#344).
+  if (b.type === 'farm' && !s.players[u.owner].ai) {
+    const f = freeFarm(s, u.owner, u.x, u.y, 10);
+    if (f) {
+      setOrder(u, { k: 'farm', target: f.id, phase: 'go' });
       return;
     }
   }

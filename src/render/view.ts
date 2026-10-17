@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { SoundName } from '../audio/sound';
-import { ageOf } from '../sim/ages';
+import { ageDef, ageOf } from '../sim/ages';
+import { fairground, feastOpen } from '../sim/fair';
 import { AURA, BUILDINGS, HEMO, RALLY, SIGNATURES, TICK_HZ, LANDMARKS, RUINS, TRADE, domainOf } from '../sim/data';
 import { buildingMaxHp, statsFor } from '../sim/stats';
 import type { AgeId, BuildingType, CivId, Ent, GameEvent, GameState, Unit } from '../sim/types';
@@ -673,6 +674,12 @@ export class View {
         const at = new THREE.Vector3(e.x + (Math.random() - 0.5) * 4, base + 1 + Math.random() * 3, e.y + (Math.random() - 0.5) * 4);
         this.effects.burst(at, { count: 3, speed: 0.5, up: 1, life: 1.4, size: 0.05, gravity: -0.6, colors: ['#ffd166', '#fff3c4'] });
         this.chimneys.set(e.id, this.time + 0.25);
+      } else if (e.type === 'market' && ageDef(s.players[e.owner]).fairs && feastOpen(s) && fairground(s, e.owner, e)) {
+        // A feast day at the fairground (`fair.ts`): the Market's confetti swells into a shower, with gold sparks above its stalls.
+        const at = new THREE.Vector3(e.x + (Math.random() - 0.5) * e.size * 0.7, base + 2.0, e.y + (Math.random() - 0.5) * e.size * 0.7);
+        this.effects.burst(at, { count: 6, speed: 0.9, up: 1, life: 1.8, size: 0.045, gravity: 0.5, colors: ['#d94a3c', '#e8b43a', '#3f8fc4', '#f4efe4', '#6fbf5a'] });
+        this.effects.burst(at, { count: 2, speed: 0.5, up: 1.4, life: 1.1, size: 0.035, gravity: -0.3, colors: ['#ffd166', '#fff3c4'] });
+        this.chimneys.set(e.id, this.time + 0.18);
       } else if (sideAgeAmbient(this.effects, ageOf(s.players[e.owner]), e, base)) {
         this.chimneys.set(e.id, this.time + 0.35 + Math.random() * 0.4);
       } else if (e.type === 'forge' && s.players[e.owner].epoch >= 1) {

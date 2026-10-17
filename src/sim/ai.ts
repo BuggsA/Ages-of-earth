@@ -1,5 +1,5 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, AI_HEMO, BLOOD, HEMO, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
@@ -14,6 +14,8 @@ import { goalForPost, nearestMarket, portSpot, tripGold } from './trade';
 import { findRoute } from './path';
 import { isEnemy, maxHp } from './world';
 import { callUpProblem } from './warcamp';
+import { GRAFTABLE, bloodOf, grafted, levyProblem, levyWait } from './blood';
+import { stationsOf, waiting } from './hemo';
 import { borderMap, landOwnerAt, suppliedAt } from './borders';
 import { workProblem } from './works';
 import { aiVow, aiWay } from './ways';
@@ -249,6 +251,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   research(s, v, citizens.length >= wantCitizens - 2, issue);
   trade(s, v, issue);
   planBuildings(s, v, mem, issue);
+  hemoBuild(s, v, mem, issue);
   excavate(s, v, mem, issue);
   claimWalk(s, v, mem, issue);
   strikeCamp(s, v, mem, issue);
@@ -1863,6 +1866,12 @@ function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   const idle = warships.filter((u) => u.order.k === 'idle' && !escorts.has(u.id));
   if (!idle.length) return;
   // Raid when the army attacks (or when there's a fleet to sink in sight); otherwise guard the dock.
+  // A rival Station or Blood Tower near the shore is a warship's to shell first (#355 s5): it does not bleed, and they are the lifeline.
+  const works = !enemyShips.length && mem.attacking && L.hemo !== false ? shoreBlood(s, p, dock) : null;
+  if (works && idle.length >= Math.min(2, warships.length)) {
+    issue({ t: 'attack', p: p.id, ids: idle.map((u) => u.id), target: works.id });
+    return;
+  }
   const prey = enemyShips[0] ?? (mem.attacking ? enemyDock(s, p) : null);
   if (prey && idle.length >= Math.min(2, warships.length)) issue({ t: 'move', p: p.id, ids: idle.map((u) => u.id), x: prey.x, y: prey.y, amove: true });
   else {
@@ -2045,6 +2054,7 @@ function darkened(s: GameState, b: Building): number {
 export function enemyTarget(s: GameState, p: Player): Building | null {
   let best: Building | null = null;
   let bestD = Infinity;
+  const hemo = !p.ai || AI_LEVELS[p.ai].hemo !== false;
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner) || !p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
     if (e.type === 'wall' || e.type === 'gate' || e.type === 'farm') continue;
@@ -2055,7 +2065,9 @@ export function enemyTarget(s: GameState, p: Player): Building | null {
     // A pilgrim people's wealth is the relics in its Temples (#50): they come before its Town Center.
     // A Bell Foundry people's relics pay it 50% more gold (#224), so its Temples are worth the same pull on any road (#242).
     const pilgrims = holds && (ageOf(s.players[e.owner]) === 'pilgrim' || s.players[e.owner].techs.includes('bellFoundry'));
-    const d = dx * dx + dy * dy + (e.type === 'wonder' || shrine ? -1e6 : pilgrims ? -AI_WEB.bell : e.type === 'towncenter' ? -400 : -AI_LIGHTNING.raid * darkened(s, e));
+    // A Transfusion Station keeps a Hemocraft army fed (#355 s5): bring it down and the army crashes. A Blood Tower is half the pull.
+    const blood = !hemo ? 0 : e.type === 'transfusion' ? AI_HEMO.bomb : e.type === 'bloodtower' ? AI_HEMO.bomb / 2 : 0;
+    const d = dx * dx + dy * dy - blood + (e.type === 'wonder' || shrine ? -1e6 : pilgrims ? -AI_WEB.bell : e.type === 'towncenter' ? -400 : -AI_LIGHTNING.raid * darkened(s, e));
     if (d < bestD) {
       bestD = d;
       best = e;
@@ -2390,6 +2402,226 @@ export function rivalWarCamp(s: GameState, p: Player, home: { x: number; y: numb
   return best;
 }
 
+// ---- Hemocraft (#355 s5) -------------------------------------------------------------------------------
+
+/** Whether the computer plays Hemocraft: a clever one in the ages of War Camps (off only in `scripts/ai-ab.ts`). */
+const hemoPlay = (p: Player): boolean => AI_LEVELS[p.ai!].clever && AI_LEVELS[p.ai!].hemo !== false && atWar(p);
+
+/** The buildings a rival's Hemocraft stands on, which machines go for. */
+const HEMO_WORKS: readonly BuildingType[] = ['transfusion', 'bloodtower'];
+
+/** A point `d` tiles from home toward `to`, or `to` itself when it is nearer. */
+function toward(home: { x: number; y: number }, to: { x: number; y: number }, d: number): { x: number; y: number } {
+  const dx = to.x - home.x;
+  const dy = to.y - home.y;
+  const l = Math.sqrt(dx * dx + dy * dy);
+  return l <= d ? { x: to.x, y: to.y } : { x: home.x + (dx / l) * d, y: home.y + (dy / l) * d };
+}
+
+/** Where rival living soldiers come near home: the middle of `AI_HEMO.foes` or more within `watch` tiles, kept in memory. */
+function noteFoes(s: GameState, v: View, mem: AiMemory): void {
+  const r2 = AI_HEMO.watch * AI_HEMO.watch;
+  let fx = 0;
+  let fy = 0;
+  let n = 0;
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !isEnemy(s, v.p.id, e.owner) || !GRAFTABLE.includes(e.type)) continue;
+    if ((e.x - v.home.x) * (e.x - v.home.x) + (e.y - v.home.y) * (e.y - v.home.y) > r2) continue;
+    fx += e.x;
+    fy += e.y;
+    n++;
+  }
+  if (n >= AI_HEMO.foes) (mem.blood ??= {}).foe = { x: fx / n, y: fy / n };
+}
+
+/** The share of the rivals' fighters that bleed (1 when they field none): a Blood Tower is worth its blood only against the living. */
+function livingShare(s: GameState, p: Player): number {
+  let living = 0;
+  let machines = 0;
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
+    if (GRAFTABLE.includes(e.type)) living++;
+    else if (e.type === 'siege' || e.type === 'warship' || e.type === 'fighter' || e.type === 'bomber') machines++;
+  }
+  return living + machines ? living / (living + machines) : 1;
+}
+
+/** Whether it still wants a Blood Tower: fewer than `towers`, rival living soldiers come, and the rival's army mostly bleeds. */
+function towerWanted(s: GameState, v: View, mem: AiMemory): boolean {
+  return !!mem.blood?.foe && count(v, 'bloodtower') < AI_HEMO.towers && !buildBarred(v.p, 'bloodtower') && livingShare(s, v.p) >= AI_HEMO.living;
+}
+
+/**
+ * The town's Hemocraft (#355 s5), one building a think: a Drain Rig toward where the rival's soldiers come (so the dead of the fights at
+ * home bleed into its store), in Total War a Transfusion Station by the muster point, and Blood Towers where living armies come, each
+ * once its blood is in store. Short of the blood for a tower, it gives citizens to the levy.
+ */
+function hemoBuild(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!hemoPlay(p)) return;
+  noteFoes(s, v, mem);
+  // A town still growing spends its wood and hands on the town first.
+  if (v.citizens.length < AI_HEMO.town) return;
+  const recently = (type: BuildingType, t: number) => s.tick - (mem.ordered[type] ?? -99999) < secs(t);
+  const foe = mem.blood?.foe ?? enemyHome(s, p);
+  if (count(v, 'drainrig') === 0 && !buildBarred(p, 'drainrig') && !recently('drainrig', AI_HEMO.again)) {
+    const at = toward(v.home, foe, AI_HEMO.rig);
+    const spot = findSpot(s, 'drainrig', at.x, at.y, 0, 8);
+    if (spot && construct(s, v, mem, 'drainrig', spot, 2, issue)) return;
+  }
+  if (ageOf(p) === 'totalwar' && v.army.length >= AI_HEMO.army && count(v, 'transfusion') === 0 && !buildBarred(p, 'transfusion') && !recently('transfusion', AI_HEMO.again)) {
+    const at = mem.muster ?? toward(v.home, enemyHome(s, p), 8);
+    const spot = findSpot(s, 'transfusion', at.x, at.y, 2, 8);
+    if (spot && construct(s, v, mem, 'transfusion', spot, 3, issue)) return;
+  }
+  if (!towerWanted(s, v, mem) || recently('bloodtower', AI_HEMO.gap)) return;
+  const short = BUILDINGS.bloodtower.blood! - bloodOf(p);
+  if (short > 0) {
+    bleedTown(s, v, mem, short, issue);
+    return;
+  }
+  const at = toward(v.home, mem.blood!.foe!, AI_HEMO.tower);
+  const r2 = AI_HEMO.spread * AI_HEMO.spread;
+  const spot = findSpot(s, 'bloodtower', at.x, at.y, 0, 6, 1, (tx, ty) => !v.buildings.some((b) => b.type === 'bloodtower' && (b.x - tx - 1) * (b.x - tx - 1) + (b.y - ty - 1) * (b.y - ty - 1) < r2));
+  if (spot) construct(s, v, mem, 'bloodtower', spot, 2, issue);
+}
+
+/**
+ * The levy (#355 s5), when it pays: `short` blood is wanted for a graft or a tower, and the town is within `AI_HEMO.spare` of the
+ * citizens it wants (never under `AI_BLOOD.held`), with the food to train them again. The citizens nearest the rig give their blood;
+ * with none in its reach, the nearest free ones walk over, and the next think takes them.
+ */
+function bleedTown(s: GameState, v: View, mem: AiMemory, short: number, issue: (c: Command) => void): void {
+  const { p } = v;
+  const blood = (mem.blood ??= {});
+  if (blood.levy !== undefined && s.tick - blood.levy < secs(AI_HEMO.levyGap)) return;
+  const want = Math.min(AI_LEVELS[p.ai!].citizens + p.epoch * 3, 60);
+  const spare = v.citizens.length - Math.max(AI_BLOOD.held, want - AI_HEMO.spare);
+  const n = Math.min(spare, BLOOD.levyMost, Math.ceil(short / BLOOD.levy));
+  if (n < 1 || v.budget.food < unitStats('citizen', p.epoch).cost.food! * n) return;
+  const rig = v.buildings.find((b) => b.type === 'drainrig' && b.built && b.hp > 0);
+  if (!rig || levyWait(s, rig) > 0) return;
+  blood.levy = s.tick;
+  if (!levyProblem(s, p, rig)) {
+    issue({ t: 'callUp', p: p.id, building: rig.id, n });
+    return;
+  }
+  const free = v.citizens.filter((u) => !u.inside && u.order.k !== 'build' && !(u.order.k === 'farm' && u.order.phase === 'work') && !v.diggers.has(u.id) && !v.claimers.has(u.id));
+  const d = (u: Unit) => (u.x - rig.x) * (u.x - rig.x) + (u.y - rig.y) * (u.y - rig.y);
+  const walkers = free.sort((a, b) => d(a) - d(b) || a.id - b.id).slice(0, n);
+  if (walkers.length) issue({ t: 'move', p: p.id, ids: walkers.map((u) => u.id), x: rig.x, y: rig.y + rig.size / 2 + 1 });
+}
+
+/**
+ * Grafting between waves (#355 s5): the idle soldiers within `AI_HEMO.near` tiles of a Transfusion Station go inside, as many as there
+ * is room and blood for; the Station opens its doors once it has grafted them all. Short of the blood for `batch` of them, the town gives
+ * citizens to the levy. Returns the soldiers sent in, so the rest of the turn leaves them be.
+ */
+function transfuse(s: GameState, v: View, mem: AiMemory, ready: Unit[], issue: (c: Command) => void): Set<number> {
+  const sent = new Set<number>();
+  const { p } = v;
+  if (!hemoPlay(p)) return sent;
+  const r2 = AI_HEMO.near * AI_HEMO.near;
+  let blood = bloodOf(p);
+  for (const b of stationsOf(s, p.id)) {
+    const heading = v.army.filter((u) => u.order.k === 'garrison' && u.order.target === b.id).length;
+    blood -= (waiting(s, b).length + heading) * HEMO.cost;
+    const room = BUILDINGS.transfusion.garrison! - b.garrison.length - heading;
+    const near = ready.filter((u) => GRAFTABLE.includes(u.type) && !sent.has(u.id) && !grafted(s, u) && (u.x - b.x) * (u.x - b.x) + (u.y - b.y) * (u.y - b.y) <= r2);
+    const want = Math.min(room, near.length);
+    if (want <= 0) continue;
+    const free = Math.max(0, blood);
+    const n = Math.min(want, Math.floor(free / HEMO.cost));
+    if (n < want && want >= AI_HEMO.batch) bleedTown(s, v, mem, want * HEMO.cost - free, issue);
+    if (n <= 0) continue;
+    const d = (u: Unit) => (u.x - b.x) * (u.x - b.x) + (u.y - b.y) * (u.y - b.y);
+    const go = near.sort((a, c) => d(a) - d(c) || a.id - c.id).slice(0, n);
+    issue({ t: 'garrison', p: p.id, ids: go.map((u) => u.id), target: b.id });
+    for (const u of go) sent.add(u.id);
+    blood -= n * HEMO.cost;
+  }
+  return sent;
+}
+
+/** Whether a soldier is on its way into one of its people's Transfusion Stations. */
+function bound(s: GameState, u: Unit): boolean {
+  if (u.order.k !== 'garrison') return false;
+  const b = s.byId.get(u.order.target);
+  return !!b && b.kind === 'building' && b.type === 'transfusion';
+}
+
+/** A Station whose soldiers inside wait on blood it hasn't got opens its doors: they are wanted out here more than in there. */
+function openStations(s: GameState, v: View, issue: (c: Command) => void): void {
+  if (!hemoPlay(v.p)) return;
+  for (const b of stationsOf(s, v.p.id)) {
+    if (b.muster !== undefined || !waiting(s, b).length || bloodOf(v.p) >= HEMO.cost) continue;
+    issue({ t: 'ungarrison', p: v.p.id, building: b.id });
+  }
+}
+
+/** The rival Station or Blood Tower seen nearest a point within `r` tiles (a Station counts as `AI_HEMO.spread` tiles nearer), or null. */
+export function hemoTarget(s: GameState, p: Player, x: number, y: number, r: number): Building | null {
+  let best: Building | null = null;
+  let bestD = Infinity;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.hp <= 0 || !HEMO_WORKS.includes(e.type) || !isEnemy(s, p.id, e.owner)) continue;
+    if (!p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
+    const d = Math.sqrt((e.x - x) * (e.x - x) + (e.y - y) * (e.y - y));
+    if (d > r) continue;
+    const rank = d - (e.type === 'transfusion' ? AI_HEMO.spread : 0);
+    if (rank < bestD) {
+      bestD = rank;
+      best = e;
+    }
+  }
+  return best;
+}
+
+/** A rival Station or Blood Tower seen that a warship can shell from the water, nearest the dock first, or null. */
+function shoreBlood(s: GameState, p: Player, dock: Building): Building | null {
+  const range = Math.floor(unitStats('warship', p.epoch).range);
+  let best: Building | null = null;
+  let bestD = Infinity;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.hp <= 0 || !HEMO_WORKS.includes(e.type) || !isEnemy(s, p.id, e.owner) || !p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
+    const d = (e.x - dock.x) * (e.x - dock.x) + (e.y - dock.y) * (e.y - dock.y);
+    if (d >= bestD || !coastNear(s, e.x, e.y, range)) continue;
+    bestD = d;
+    best = e;
+  }
+  return best;
+}
+
+/** Whether a rival plays Hemocraft where the computer can see it: a Station or Blood Tower seen, or `AI_HEMO.grafted` grafted soldiers in sight. */
+function rivalBleeds(s: GameState, p: Player): boolean {
+  let n = 0;
+  for (const e of s.ents) {
+    if (e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
+    const at = Math.floor(e.y) * s.w + Math.floor(e.x);
+    if (e.kind === 'building' && HEMO_WORKS.includes(e.type) && p.seen[at]) return true;
+    if (grafted(s, e) && p.vis[at] === 1 && ++n >= AI_HEMO.grafted) return true;
+  }
+  return false;
+}
+
+/** The answer to a rival's Hemocraft (#355 s5): the siege marching with a wave goes for a Station or Blood Tower near it. Machines are the counter. */
+function machinesAtBlood(s: GameState, v: View, onAttack: Unit[], issue: (c: Command) => void): void {
+  const by = new Map<number, number[]>();
+  for (const u of onAttack) {
+    if (u.type !== 'siege') continue;
+    if (u.order.k === 'attack') {
+      const t = s.byId.get(u.order.target);
+      if (t && t.kind === 'building' && HEMO_WORKS.includes(t.type)) continue;
+    }
+    const t = hemoTarget(s, v.p, u.x, u.y, AI_HEMO.hunt);
+    if (!t) continue;
+    const ids = by.get(t.id) ?? [];
+    ids.push(u.id);
+    by.set(t.id, ids);
+  }
+  for (const [target, ids] of [...by].sort((a, b) => a[0] - b[0])) issue({ t: 'attack', p: v.p.id, ids, target });
+}
+
 // ---- The Horde (#322) ----------------------------------------------------------------------------------
 
 /** Rival soldiers (no citizens, priests or traders; no ships) standing within `r` tiles of a point. */
@@ -2543,6 +2775,8 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const siege = v.army.filter((u) => u.type === 'siege').length;
   // A rival with the Masons' Lodge raises sturdier buildings (+15%): one more engine to break them (#242).
   const lodge = L.clever && rivalHas(s, p, 'masonsLodge') ? AI_WEB.lodge : 0;
+  // A rival on Hemocraft (#355 s5) is answered with machines: flesh can't stand its grafted soldiers, and its Stations are their lifeline.
+  const bleeds = L.clever && L.hemo !== false && rivalBleeds(s, p) ? AI_HEMO.siege : 0;
   for (const b of v.buildings) {
     if (!b.built || b.queue.length >= Math.min(2, MAX_QUEUE) || keepCitizensGrowing) continue;
     const trains = lines(p, b);
@@ -2553,7 +2787,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     // The Market hires (#37) only in an age that hires there, after the traders have had first call on its queue.
     if (b.type === 'market' && !hiresAt(p, b.type).length) continue;
     let unit: UnitType | null;
-    if (b.type === 'workshop') unit = siege < Math.max(v.plan.siege, p.epoch >= 2 ? 3 : 2) + lodge && (v.army.length >= 6 || siege < v.plan.siege) ? 'siege' : null;
+    if (b.type === 'workshop') unit = siege < Math.max(v.plan.siege, p.epoch >= 2 ? 3 : 2) + lodge + bleeds && (v.army.length >= 6 || siege < v.plan.siege) ? 'siege' : null;
     else if (b.type === 'temple') unit = v.priests.length < (v.army.length >= 6 ? (consecrates(s, p.id) ? AI_FAITH.priests : 2) : 0) + (looseRelics(s) > 0 ? 1 : 0) + (vigilPost(s, v) ? VIGIL.most : 0) ? 'priest' : null;
     else {
       unit = counter && trains.includes(counter) && unitEpoch(counter) <= p.epoch && !barred(p, counter) && roll(s) < counterOdds ? counter : pickUnit(v, mem, b);
@@ -2575,6 +2809,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   }
 
   if (L.clever) callToArms(s, v, issue);
+  if (L.clever) openStations(s, v, issue);
   // Defend: enemies near home draw the whole army.
   const threat = threatNear(s, v).unit;
   // Soldiers on their way to (or aboard) a landing ship are not the land army's to command.
@@ -2615,6 +2850,10 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     return;
   }
 
+  // Between waves, soldiers go into a Transfusion Station to be grafted (#355 s5); those on their way in are not the wave's.
+  if (L.clever && !mem.attacking) transfuse(s, v, mem, fighters.filter((u) => u.order.k === 'idle'), issue);
+  fighters = fighters.filter((u) => !bound(s, u));
+
   // Attack in waves once the army is big enough (at once against a wonder); between waves, gather at the muster point.
   const ready = fighters.filter((u) => u.order.k === 'idle' || (u.order.k === 'move' && !u.order.amove));
   // A chapter's goals may set the waves instead: none while holding out, smaller and sooner when the rival town must fall.
@@ -2628,6 +2867,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     mem.attacking = false;
     return;
   }
+  if (L.clever && L.hemo !== false && mem.attacking) machinesAtBlood(s, v, onAttack, issue);
   if (L.clever && !mem.attacking) pitchHomeCamp(s, v, mem, issue);
   if (L.clever && mem.attacking) pitchCamp(s, v, mem, onAttack, enemy, issue);
   // A rival's War Camp in reach is a raid worth more than a house (#307): kill its keepers and it burns.
