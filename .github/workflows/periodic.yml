@@ -36,17 +36,21 @@ jobs:
         run: npm test
       - name: Browser for the smoke test
         run: npx playwright-core install --with-deps chromium
-      # The atlas survey generates hundreds of worlds. Keep its 15 s test budget
-      # away from the CPU-heavy campaign proofs; run every test with unchanged limits.
-      - name: Slow tests (except Seed Atlas)
+      # The atlas survey generates hundreds of worlds, and the smoke test screenshots a software-rendered
+      # WebGL page (30 s limit; it timed out beside the campaign proofs, #415). Keep both away from the
+      # CPU-heavy campaign proofs; run every test with unchanged limits.
+      - name: Slow tests (except Seed Atlas and the browser smoke test)
         id: slow
-        env:
-          CHROMIUM_PATH: ''
-          SMOKE_SHOTS: ${{ github.workspace }}/smoke-shots
-        run: npm run test:slow -- --exclude tests/slow/seed-atlas.test.ts
+        run: npm run test:slow -- --exclude tests/slow/seed-atlas.test.ts --exclude tests/slow/browser-smoke.test.ts
       - name: Seed Atlas survey (isolated)
         if: ${{ !cancelled() && steps.slow.outcome != 'skipped' }}
         run: npm run test:slow -- tests/slow/seed-atlas.test.ts
+      - name: Browser smoke test (isolated)
+        if: ${{ !cancelled() && steps.slow.outcome != 'skipped' }}
+        env:
+          CHROMIUM_PATH: ''
+          SMOKE_SHOTS: ${{ github.workspace }}/smoke-shots
+        run: npm run test:slow -- tests/slow/browser-smoke.test.ts
       - name: Smoke-test screenshots
         if: always()
         uses: actions/upload-artifact@v4
