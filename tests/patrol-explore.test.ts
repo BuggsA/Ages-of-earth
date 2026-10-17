@@ -3,7 +3,7 @@ import { EXPLORE, PATROL } from '../src/sim/data';
 import { applyCommand } from '../src/sim/commands';
 import { createGame, step } from '../src/sim/game';
 import { exploreTarget } from '../src/sim/units';
-import { spawnUnit } from '../src/sim/world';
+import { placeBuilding, spawnUnit } from '../src/sim/world';
 import { AIR, NAVAL, walkable } from '../src/sim/grid';
 import type { GameState, Order, Unit } from '../src/sim/types';
 
@@ -131,5 +131,72 @@ describe('explore (#454)', () => {
     applyCommand(s, { t: 'explore', p: 0, ids: [u.id] });
     run(s, 3);
     expect(order(u).k).toBe('idle');
+  });
+});
+
+describe('guarding a road and scouting wary (#454 s3)', () => {
+  const withMarket = (s: GameState) => {
+    const p = s.players[0];
+    const b = placeBuilding(s, 0, 'market', Math.floor(p.startX) + 6, Math.floor(p.startY) + 6, true);
+    return b;
+  };
+
+  it('a patrol given a trading post runs between the Market and the post', () => {
+    const s = game();
+    const m = withMarket(s);
+    const { u } = rider(s);
+    const post = s.posts[0];
+    applyCommand(s, { t: 'patrol', p: 0, ids: [u.id], x: post.x, y: post.y, post: post.id });
+    const o = order(u);
+    expect(o.k).toBe('patrol');
+    if (o.k !== 'patrol') return;
+    expect(o.pts).toHaveLength(2);
+    expect(o.pts[0]).toEqual({ x: m.x, y: m.y });
+    expect(o.pts[1]).toEqual({ x: post.x, y: post.y });
+  });
+
+  it('is refused without a Market, or for a post that is not there', () => {
+    const s = game();
+    const { u } = rider(s);
+    applyCommand(s, { t: 'patrol', p: 0, ids: [u.id], x: 5, y: 5, post: s.posts[0].id });
+    expect(order(u).k).toBe('idle');
+    expect(s.events.some((e) => e.k === 'refused')).toBe(true);
+    withMarket(s);
+    applyCommand(s, { t: 'patrol', p: 0, ids: [u.id], x: 5, y: 5, post: 9999 });
+    expect(order(u).k).toBe('idle');
+  });
+
+  it('an explorer reports a rival army in sight, once in a while', () => {
+    const s = game();
+    s.peaceUntil = 0;
+    const { u } = rider(s);
+    u.stance = 'stand';
+    for (let i = 0; i < EXPLORE.army; i++) spawnUnit(s, 1, 'cavalry', u.x + 4 + i * 0.3, u.y);
+    applyCommand(s, { t: 'explore', p: 0, ids: [u.id] });
+    let told = 0;
+    const watch = (ticks: number) => {
+      for (let i = 0; i < ticks; i++) {
+        step(s);
+        told += s.events.filter((e) => e.k === 'sighted').length;
+      }
+    };
+    watch(40);
+    expect(told).toBeGreaterThanOrEqual(1);
+    const n = told;
+    watch(40);
+    expect(told).toBe(n);
+  });
+
+  it('an explorer picks no ground under a seen enemy tower', () => {
+    const s = game();
+    const { u } = rider(s);
+    const t0 = exploreTarget(s, u);
+    const tx = (t0 % s.w) + 0.5;
+    const ty = Math.floor(t0 / s.w) + 0.5;
+    const tower = placeBuilding(s, 1, 'tower', Math.floor(tx), Math.floor(ty), true);
+    s.players[0].seen[Math.floor(tower.y) * s.w + Math.floor(tower.x)] = 1;
+    const t1 = exploreTarget(s, u);
+    expect(t1).not.toBe(t0);
+    if (t1 >= 0) expect(Math.hypot((t1 % s.w) + 0.5 - tower.x, Math.floor(t1 / s.w) + 0.5 - tower.y)).toBeGreaterThan(8 + EXPLORE.wary);
   });
 });
