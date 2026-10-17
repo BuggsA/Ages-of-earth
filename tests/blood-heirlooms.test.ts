@@ -5,7 +5,7 @@ import { HEMO, ORDERS, RITE, TECHS, secs } from '../src/sim/data';
 import { riteProblem } from '../src/sim/fork';
 import { createGame, step } from '../src/sim/game';
 import { modsOf, techProblem } from '../src/sim/stats';
-import type { AgeId, Building, BuildingType, GameState, Unit } from '../src/sim/types';
+import type { AgeId, Building, BuildingType, GameState } from '../src/sim/types';
 import { placeBuilding, spawnUnit } from '../src/sim/world';
 
 /** The Path of Blood's heirlooms (#355 s6): Galvanic Blood (Lightning + Hemocraft) and Military Orders (Pilgrims + Warband). */
