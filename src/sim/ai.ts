@@ -4189,7 +4189,7 @@ function chapterGoals(s: GameState, v: View, mem: AiMemory, issue: (c: Command) 
       plan.allIn = sc.limit ? left < sc.limit * 0.45 : false;
     } else if (o.kind === 'build' && now < goal && o.type) {
       const type = o.type as BuildingType;
-      if (BUILDINGS[type].epoch > p.epoch) continue;
+      if (BUILDINGS[type].epoch > p.epoch || buildBarred(p, type)) continue;
       const placed = count(v, type);
       if (placed >= goal) continue;
       const cost = buildingCostFor(s, p.id, type);
