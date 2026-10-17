@@ -5,7 +5,7 @@ import { CameraRig } from './render/camera';
 import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { wallLine } from './sim/commands';
-import { AGES, BUILDINGS, CIVS, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SEASONS, STEPPE, TECHS, TICK_HZ, TRIBUTE, TRUNK, WARCAMP, WAYS, WORKS, domainOf, unitStats } from './sim/data';
+import { AGES, BUILDINGS, CIVS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SEASONS, STEPPE, TECHS, TICK_HZ, TRIBUTE, TRUNK, WARCAMP, WAYS, WORKS, domainOf, unitStats } from './sim/data';
 import { crestSvg } from './ui/crests';
 import { isEnemy } from './sim/world';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
@@ -2126,6 +2126,12 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         if (ev.owner === viewer) {
           hud.toast(`${s.players[ev.by].name}'s priests are chanting at your ${BUILDINGS[ev.type].name}: strike them down before it turns!`, 'alert');
           lastAlert = { x: ev.x, y: ev.y };
+        }
+        break;
+      case 'trade':
+        if (ev.owner === viewer && !ev.buy && ev.res in RARE) {
+          const ore = ev.res as keyof typeof ORE_TRADE.gold;
+          hud.toast(`Sold ${ORE_TRADE.lot} ${RARE[ore].name.toLowerCase()} for ${ORE_TRADE.gold[ore]} gold`, 'good');
         }
         break;
       case 'bell':
