@@ -29,7 +29,7 @@ import { consecrateProblem, consecrates } from './consecrate';
 import { sees } from './vision';
 import { seasonAt } from './seasons';
 import { catchOf, herdsOut, yarding } from './year';
-import { SNARE } from './data';
+import { DEER, SNARE } from './data';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
 import { isRider, standing } from './tribute';
@@ -1237,7 +1237,7 @@ function huntTheYear(s: GameState, v: View, issue: (c: Command) => void): void {
   let hunting = 0;
   for (const u of v.citizens) if (u.order.k === 'hunt' || (u.order.k === 'gather' && s.res[u.order.tile] === R_MEAT)) hunting++;
   if (hunting >= v.hunt.n) return;
-  const deer = nearestDeer(s, v.home.x, v.home.y, v.hunt.r, spared(s, v));
+  const deer = nearestDeer(s, v.home.x, v.home.y, v.hunt.r, spared(s, v.p));
   if (!deer) return;
   const pick = (ok: (u: Unit) => boolean) => {
     let best: Unit | null = null;
@@ -1257,15 +1257,18 @@ function huntTheYear(s: GameState, v: View, issue: (c: Command) => void): void {
 }
 
 /**
- * On the Herd Plains a clever computer leaves `YEAR.spare` of each of its own home herds alive, so they come
- * home in spring with calves (#479). A rival's herd it hunts down gladly. Undefined where nothing is spared.
+ * A clever computer leaves `YEAR.spare` of each of its own home herds alive on the Herd Plains, so they come
+ * home in spring with calves (#479), and a pair (`DEER.pair`) of every wild herd in the Stone Age, when game is
+ * what it lives on; a wild herd breeds each spring (#491). A rival's herd it hunts down gladly. Undefined where nothing is spared.
  */
-function spared(s: GameState, v: View): ((a: Animal) => boolean) | undefined {
-  if (s.homeland !== 'herds' || !AI_LEVELS[v.p.ai!].clever) return undefined;
+export function spared(s: GameState, p: Player): ((a: Animal) => boolean) | undefined {
+  if (!AI_LEVELS[p.ai!].clever) return undefined;
+  // A herd is spared at its own count: a town's at `YEAR.spare`, a wild one at `DEER.pair`.
+  const keep = (a: Animal) => (a.town === p.id && s.homeland === 'herds' ? YEAR.spare : a.town === undefined && p.epoch === 0 ? DEER.pair : -1);
   const left = new Map<number, number>();
-  for (const a of s.animals) if (a.kind === 'deer' && a.town === v.p.id && a.hp > 0) left.set(a.herd ?? a.id, (left.get(a.herd ?? a.id) ?? 0) + 1);
+  for (const a of s.animals) if (a.kind === 'deer' && a.hp > 0 && keep(a) >= 0) left.set(a.herd ?? a.id, (left.get(a.herd ?? a.id) ?? 0) + 1);
   if (!left.size) return undefined;
-  return (a) => a.town === v.p.id && (left.get(a.herd ?? a.id) ?? 0) <= YEAR.spare;
+  return (a) => (left.get(a.herd ?? a.id) ?? Infinity) <= keep(a);
 }
 
 /** Autumn onward, a clever computer plans for the winter ahead (`AI_WINTER`). */
@@ -1323,7 +1326,7 @@ function sendTo(s: GameState, v: View, u: Unit, res: Res, issue: (c: Command) =>
       return true;
     }
     const hunters = v.citizens.filter((c) => c.order.k === 'hunt').length;
-    const deer = hunters < v.hunt.n ? nearestDeer(s, v.home.x, v.home.y, v.hunt.r, spared(s, v)) : null;
+    const deer = hunters < v.hunt.n ? nearestDeer(s, v.home.x, v.home.y, v.hunt.r, spared(s, v.p)) : null;
     if (deer) {
       issue({ t: 'hunt', p: v.p.id, ids: [u.id], target: deer.id });
       return true;
