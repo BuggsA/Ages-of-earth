@@ -1711,8 +1711,10 @@ export const DEER = { hp: 8, walk: 0.8, flee: 2.3, spear: 3.5, spearDamage: 4,
    * onto land inside a border (the wild shies from towns, so the easy hunting near home thins as the
    * borders grow) and never further than `range` tiles from where it began. Deer within `herd` tiles of
    * each other at the start move as one.
+   * Herds breed (#491): each spring a herd of at least `pair` living deer drops a calf for every `pair` of them, up to
+   * `cap` a herd, so game is never hunted out for good while a pair is spared (a lone deer breeds nothing).
    */
-  herd: 4, every: 150, min: 7, max: 12, range: 26 };
+  pair: 2, cap: 6, herd: 4, every: 150, min: 7, max: 12, range: 26 };
 /**
  * The wild (#171). A mammoth grazes `home` tiles out from every town (and `extra` more in the open): it
  * doesn't bolt when speared but turns on whoever threw, charging and goring for `rage` seconds after its
