@@ -1161,6 +1161,7 @@ export class View {
           // A rival citizen taken captive (#502): dust and a flash of rope where the thrall rises.
           if (ev.owner !== this.viewer && ev.from !== this.viewer && !this.sees(ev.x, ev.y)) break;
           this.effects.burst(this.ground(s, ev.x, ev.y, 0.6), { count: 6, speed: 0.5, up: 0.8, life: 0.8, size: 0.05, gravity: 1.5, colors: ['#8a6a3a', '#c9b48a'] });
+          this.cue('thrall', ev.x, ev.y, 0.5);
           break;
         }
         case 'tribute': {
