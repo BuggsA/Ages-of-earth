@@ -568,6 +568,7 @@ export type GameEvent =
   /** A ruin dug out (#64): what came up, and for lore, which technology. */
   | { k: 'sortie'; owner: number; id: number; x: number; y: number; what: 'home' | 'lost' }
   | { k: 'fair'; owner: number }
+  | { k: 'joust'; owner: number; x: number; y: number; gold: number }
   | { k: 'convoy'; owner: number; x: number; y: number }
   | { k: 'vigil'; owner: number; x: number; y: number; priests: number }
   | { k: 'foundation'; owner: number; type: BuildingType; x: number; y: number; what: 'kept' | 'raised' }

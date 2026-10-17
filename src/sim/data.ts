@@ -1027,9 +1027,11 @@ export const SORTIE = { rearm: 4, mend: 0.08, turn: 30, reach: 36, burn: 0.04 };
  * Feast days (the Age of Fairs): every `every` seconds a feast opens for `open` seconds. A trade trip paid at a
  * Market within `reach` tiles of a standing Temple that keeps a relic (the fairground) pays `pay` times as much
  * while it lasts. The calendar is the same for everyone, so the computer's traders profit too. A fairground Market
- * burned by a rival on a feast day pays that rival `purse` gold: the takings are in the stalls.
+ * burned by a rival on a feast day pays that rival `purse` gold: the takings are in the stalls. When the feast
+ * closes, a hero standing within `reach` of the fairground Market (no rival soldier there) holds the lists: it is
+ * healed whole and the crowd pays `lists` gold.
  */
-export const FAIR = { every: 240, open: 60, reach: 12, pay: 1.5, purse: 150 };
+export const FAIR = { every: 240, open: 60, reach: 12, pay: 1.5, purse: 150, lists: 120 };
 /**
  * Convoys (the Age of Sail): a merchant ship that loads at a port with a warship of its owner's within `reach`
  * tiles carries `pay` times the gold. Send the fleet with the cogs: the escort is also what the rival's raiders meet.
