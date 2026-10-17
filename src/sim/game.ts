@@ -32,8 +32,9 @@ import { attrition } from './borders';
 import { tributeStep } from './tribute';
 import { seraiStep, tollStep } from './passage';
 import { mercStep } from './merc';
+import { KIN } from './data';
 import { isHire, barred, journeyOf, noteWalked, surveyFinds, trainsAt, workSteps } from './ages';
-import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, HomelandId, MapSize, MapType, Player } from './types';
+import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, HomelandId, MapSize, MapType, Player, UnitType } from './types';
 import { RES, R_FISH, R_NONE } from './types';
 import { RES_OF_TILE, autoWork, rallyNode, carryCargo, checkStuck, collide, findResource, routeUnits, separate, setOrder, think, ungarrison, walk } from './units';
 import { updateVision } from './vision';
@@ -309,12 +310,14 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
     return;
   }
   const unit = item.unit!;
-  const need = secs(trainTimeFor(s, p.id, unit, b.type));
+  // The Hearth's kin (#463 s1) come together, after their own time, and need room for all of them.
+  const kin = item.kin ?? 1;
+  const need = secs(item.kin ? KIN.time : trainTimeFor(s, p.id, unit, b.type));
   if (item.done < need) {
     item.done = Math.min(need, item.done + steps);
     if (item.done < need) return;
   }
-  if (p.pop >= p.cap) {
+  if (p.pop + kin > p.cap) {
     if (item.done === need) {
       item.done = need + 1;
       s.events.push({ k: 'refused', owner: p.id, why: 'Build more houses' });
@@ -322,6 +325,12 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
     return;
   }
   b.queue.shift();
+  for (let i = 0; i < kin; i++) bringOut(s, p, b, unit);
+  if (item.kin) s.events.push({ k: 'kin', owner: p.id, n: kin, x: b.x, y: b.y });
+}
+
+/** A unit trained (or come as kin) steps out of its building and goes where the rally sends it. */
+function bringOut(s: GameState, p: Player, b: Building, unit: UnitType): void {
   const toward = b.rally ?? { x: s.w / 2, y: s.h / 2 };
   const domain = domainOf(unit);
   // Ships put out onto the water by their dock; aircraft take off from anywhere about the field.
