@@ -104,6 +104,8 @@ export interface Age {
   fairs?: boolean;
   /** Escorted merchant ships carry more (the Age of Sail): see `CONVOY` (`convoy.ts`). */
   convoys?: boolean;
+  /** A merchant ship this people sinks gives up part of its cargo as prize money (the Age of Sail): see `PRIZE` (`convoy.ts`). */
+  prizes?: boolean;
   /** Priests keeping vigil at a relic Temple add to its gold (the Age of Pilgrims): see `VIGIL` (`vigil.ts`). */
   vigils?: boolean;
 }
@@ -240,6 +242,7 @@ export const AGES: Record<AgeId, Age> = {
     price: { ship: 0.75 },
     ironTrade: IRON_TRADE,
     convoys: true,
+    prizes: true,
   },
   lightning: {
     name: 'Age of Lightning',
@@ -1031,6 +1034,8 @@ export const FAIR = { every: 240, open: 60, reach: 12, pay: 1.5 };
  * tiles carries `pay` times the gold. Send the fleet with the cogs: the escort is also what the rival's raiders meet.
  */
 export const CONVOY = { reach: 6, pay: 1.4 };
+/** Prize money (the Age of Sail): a merchant ship sunk by a people in the Age of Sail gives the sinker `share` of the gold it carried. */
+export const PRIZE = { share: 0.5 };
 /**
  * Vigils (the Age of Pilgrims): each own priest standing within `reach` tiles of a finished Temple that keeps a
  * relic adds `each` gold to that relic's payment, for at most `most` priests; the toast tells of it at most every `toast` seconds. A priest at the shrine is a priest
