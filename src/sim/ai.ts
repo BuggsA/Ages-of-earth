@@ -578,7 +578,8 @@ function ironRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
 function oreRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
   if (!s.rares?.length || !walksWeb(v)) return;
-  const road = roadsFrom(p).find((r) => r.ore && s.rares!.includes(r.ore.id));
+  // The Warband is held for the Iron and Blood road before it is on offer (bloodHold), so its ore is dug from there.
+  const road = roadsFrom(p).find((r) => r.ore && s.rares!.includes(r.ore.id)) ?? (ageOf(p) === 'warband' ? ROADS.find((r) => r.from === 'gunpowder' && r.to === 'ironblood' && r.ore && s.rares!.includes(r.ore.id)) : undefined);
   const crew = v.citizens.filter((u) => u.order.k === 'gather' && u.order.rare !== undefined);
   for (const u of crew) v.diggers.add(u.id);
   const open = !road || oreDone(p, road) || deedsDone(p, road, s) || mem.roads?.[road.to] === false || !roadKnown(s, p, road);
