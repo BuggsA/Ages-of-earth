@@ -1,6 +1,6 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { aiTiding } from './tidings';
-import { AGES, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
@@ -972,9 +972,31 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
 
   // Lost the Town Center: rebuilding it comes first.
   if (!v.tc && !v.buildings.some((b) => b.type === 'towncenter') && !v.wagons.some((w) => w.packed === 'towncenter') && v.citizens.length && !recently('towncenter', 30)) {
+    // The clock is short (`HEART`): spend what the town has, not what the next epoch leaves over.
+    v.budget = { ...p.res };
     const spot = findSpot(s, 'towncenter', home.x, home.y, 0, 14);
     if (spot) construct(s, v, mem, 'towncenter', spot, 4, issue);
     return;
+  }
+
+  // A spare heart (#452): with one Town Center standing, raise another far from the rival, so losing the first isn't losing the match.
+  if (L.spareHeart !== false && v.tc && p.epoch >= AI_HEART.epoch[p.ai!] && !isMobile(p) && !recently('towncenter', AI_HEART.retry) && !v.wagons.some((w) => w.packed === 'towncenter') && v.buildings.filter((b) => b.type === 'towncenter').length === 1) {
+    const cost = raiseCost(s, p.id, 'towncenter', 0, 0);
+    if (RES.every((r) => !cost[r] || v.budget[r] >= cost[r]! + (r === 'wood' || r === 'stone' ? AI_HEART.reserve : 0))) {
+      const dx = home.x - enemy.x;
+      const dy = home.y - enemy.y;
+      const l = Math.sqrt(dx * dx + dy * dy) || 1;
+      const m = 8;
+      const x = Math.min(s.w - m, Math.max(m, home.x + (dx / l) * AI_HEART.away));
+      const y = Math.min(s.h - m, Math.max(m, home.y + (dy / l) * AI_HEART.away));
+      const far = (tx: number, ty: number) => (tx - enemy.x) * (tx - enemy.x) + (ty - enemy.y) * (ty - enemy.y) >= (home.x - enemy.x) * (home.x - enemy.x) + (home.y - enemy.y) * (home.y - enemy.y);
+      const spot = findSpot(s, 'towncenter', x, y, 0, AI_HEART.reach, 1, far);
+      if (spot) {
+        construct(s, v, mem, 'towncenter', spot, AI_HEART.builders, issue);
+        return;
+      }
+      mem.ordered.towncenter = s.tick;
+    }
   }
 
   // A reclaiming people raises what fell on the same ground again, at a fraction of the price.
