@@ -16,7 +16,7 @@ import { workProblem } from '../sim/works';
 import { vowProblem, wayProblem } from '../sim/ways';
 import { beaconProblem, lit } from '../sim/beacon';
 import { callUpProblem, callUpReach, campGrace, musterWait } from '../sim/warcamp';
-import { bloodOf, bloodShort, grafted, levyProblem, levyReach } from '../sim/blood';
+import { bloodOf, bloodShort, cursed, grafted, levyProblem, levyReach } from '../sim/blood';
 import { feedReach, graftCost, graftWait, waiting } from '../sim/hemo';
 import { chantedOver, consecrates, faithOf } from '../sim/consecrate';
 import { rallyProblem } from '../sim/rally';
@@ -47,6 +47,8 @@ export interface HudActions {
   place(type: BuildingType): void;
   /** Wait for a left click to attack-move to. */
   attackMove(): void;
+  /** Wait for a left click on an enemy that bleeds, for a Blood-rite priest to sacrifice or curse (#355 s4). */
+  riteMode(how: 'sacrifice' | 'curse'): void;
   /** Wait for a left click on a building to shelter in (or a transport to board). */
   garrisonMode(): void;
   /** Wait for a left click on a shore to land a transport's passengers. */
@@ -119,7 +121,7 @@ function orderWords(s: GameState, u: Unit): string {
     case 'milk':
       return o.phase === 'drop' ? 'Carrying milk home' : o.phase === 'work' ? 'Milking the flock' : 'Going to milk the flock';
     case 'convert':
-      return u.act === 'chant' ? 'Converting' : 'Going to convert';
+      return o.rite === 'sacrifice' ? (u.act === 'chant' ? 'Sacrificing' : 'Going to sacrifice') : o.rite === 'curse' ? (u.act === 'chant' ? 'Cursing' : 'Going to curse') : u.act === 'chant' ? 'Converting' : 'Going to convert';
     case 'heal':
       return 'Healing';
     case 'garrison':
@@ -534,10 +536,13 @@ export class Hud {
     // Hemocraft (#355 s3): a grafted soldier, and how long its graft holds away from the Stations.
     const hemoLeft = grafted(s, u) ? Math.ceil((u.hemo! - s.tick) / TICK_HZ) : 0;
     const graft = hemoLeft ? `<span data-tip="<b>Grafted</b>Hemo-engineered: blows ${Math.round((HEMO.attack - 1) * 100)}% harder, ${Math.round((HEMO.pace - 1) * 100)}% faster, mends ${HEMO.mend} a second and can't be converted. Blades, arrows and hooves land ${Math.round((1 - HEMO.flesh) * 100)}% softer, but siege, ships, aircraft and coils hit ${Math.round((HEMO.machine - 1) * 100)}% harder. Fed within ${feedReach(s.players[u.owner])} tiles of a Transfusion Station; away from them it runs dry in ${hemoLeft}s and the soldier loses ${Math.round(HEMO.crash * 100)}% of its health.">🩸<em>Grafted</em> ${hemoLeft >= HEMO.last - 1 ? 'fed' : `${hemoLeft}s`}</span>` : '';
+    // The Blood-rite (#355 s4): a cursed enemy takes every blow harder until the curse lifts.
+    const curseLeft = cursed(s, u) ? Math.ceil((u.cursed! - s.tick) / TICK_HZ) : 0;
+    const curse = curseLeft ? `<span data-tip="<b>Cursed</b>A Blood-rite priest has cursed this one: every blow on it lands ${Math.round((RITE.taken - 1) * 100)}% harder for ${curseLeft} more seconds.">☠<em>Cursed</em> ${curseLeft}s</span>` : '';
     // A sword for hire (the Age of Merchants): paid by the day, and gone if left unpaid.
     const sword = u.merc !== undefined ? `<span data-tip="<b>Sword for hire</b>Draws ${MERC.wage} gold every ${MERC.every} seconds from ${mine ? 'your' : 'its people\'s'} treasury${u.merc ? `, and has gone unpaid ${u.merc} payday${u.merc > 1 ? 's' : ''}: it walks off at ${MERC.patience}` : `; one left unpaid ${MERC.patience} paydays walks off`}.">💰<em>${u.merc ? 'Unpaid' : 'Hired'}</em></span>` : '';
     const held = u.type === 'priest' && carriedBy(s, u) ? `<span data-tip="<b>Relic</b>Carried to a Temple, it brings in gold. Hands full: no healing or converting until it is set down (D).">⚱<em>Relic</em></span>` : '';
-    const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}:${u.cargo.length}:${rank}:${taking}:${road}:${u.tolled ?? 0}:${hemoLeft}:${u.merc ?? -1}`;
+    const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}:${u.cargo.length}:${rank}:${taking}:${road}:${u.tolled ?? 0}:${hemoLeft}:${curseLeft}:${u.merc ?? -1}`;
     const html = `<div class="sel-portrait"><img src="${unitPicture(u.type, u.type === 'wagon' && u.packed === 'market' ? p.epoch + 20 : p.epoch, p.color)}" alt=""></div>
       <div class="sel-info">
         <div class="sel-name">${s.kings.includes(u.id) ? `👑 King (${st.name})` : st.name}</div>
@@ -548,7 +553,7 @@ export class Hud {
           <span data-tip="<b>Armor</b>Melee / missile armor: taken off every blow or shot.">🛡<em>Armor</em> ${st.armor}/${st.parmor}</span>
           ${st.range ? `<span data-tip="<b>Range</b>How far it shoots, in tiles.">🏹<em>Range</em> ${st.range}</span>` : ''}
           <span data-tip="<b>Speed</b>Tiles per second.">👣<em>Speed</em> ${Math.round(st.speed * 100) / 100}</span>
-          ${carry}${cargo}${load}${stance}${vet}${aura}${graft}${sword}${held}${trip}${caravan}${tribute}${toll}
+          ${carry}${cargo}${load}${stance}${vet}${aura}${graft}${sword}${curse}${held}${trip}${caravan}${tribute}${toll}
         </div>
         <div class="blurb">${st.blurb}</div>
       </div>`;
@@ -722,6 +727,13 @@ export class Hud {
       if (soldiers.length) cmds.push({ key: 'A', pic: '', glyph: '⚔', title: 'Attack-move', desc: 'Then click on the map: march there, fighting every enemy met on the way.', ok: true, run: () => this.act.attackMove() });
       cmds.push({ key: 'S', pic: '', glyph: '✋', title: 'Stop', desc: 'Stop what they are doing (and forget queued orders).', ok: true, run: () => this.act.issue({ t: 'stop', p: viewer, ids: units.map((u) => u.id) }) });
       const holding = units.filter((u) => u.type === 'priest' && carriedBy(s, u));
+      // The Blood-rite (#355 s4): a priest may offer an enemy up, or curse it.
+      const chanters = units.filter((u) => u.type === 'priest' && !carriedBy(s, u));
+      if (chanters.length && ageDef(p).rite) {
+        cmds.push({ key: 'X', pic: '', glyph: '🩸', title: 'Sacrifice', desc: `Then click an enemy that bleeds (not a machine, ship, aircraft or King): the priest chants as for a conversion, and the victim dies, paying ${Math.round(RITE.offering * 100)}% of its price as blood (a Hero ${RITE.hero} times that).`, ok: true, run: () => this.act.riteMode('sacrifice') });
+        const dry = bloodOf(p) < RITE.curse;
+        cmds.push({ key: 'K', pic: '', glyph: '☠', title: 'Curse', desc: `Then click an enemy that bleeds: after a ${RITE.chant}-second chant it and the living within ${RITE.spread} tiles of it take ${Math.round((RITE.taken - 1) * 100)}% more from every blow for ${RITE.last} seconds. Costs ${RITE.curse} blood; the priest rests ${RITE.rest} seconds. Machines are beyond it.`, ok: !dry, why: dry ? `Needs ${RITE.curse} blood: ${Math.ceil(RITE.curse - bloodOf(p))} more` : undefined, run: () => this.act.riteMode('curse') });
+      }
       if (holding.length) cmds.push({ key: 'D', pic: '', glyph: '⚱', title: 'Set down relic', desc: 'Lay the relic down where the priest stands, to have their hands free for healing and converting.', ok: true, run: () => this.act.issue({ t: 'dropRelic', p: viewer, ids: holding.map((u) => u.id) }) });
       if (walkers.length) cmds.push({ key: 'G', pic: '', glyph: '🏰', title: 'Garrison / board', desc: 'Then click a Town Center or tower to shelter inside (safe, and they add arrows), or your transport to go aboard.', ok: true, run: () => this.act.garrisonMode() });
       if (transports.length) {
