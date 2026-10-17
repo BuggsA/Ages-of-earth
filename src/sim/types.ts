@@ -200,6 +200,8 @@ export interface Unit {
   packedHp?: number;
   /** A hemo-engineered soldier (#355 s3): the tick its graft runs dry unless a Transfusion Station tops it up; absent when ungrafted. */
   hemo?: number;
+  /** A hired sword (the Age of Merchants): how many paydays it has gone unpaid; absent for a soldier trained the usual way. */
+  merc?: number;
 }
 
 export interface TrainItem {
@@ -461,6 +463,8 @@ export interface PlayerStats {
   slain?: number;
   /** Gold taken as plunder from the enemy dead (#299); absent in older saves. */
   plunder?: number;
+  /** Gold paid in wages to hired swords (the Age of Merchants); absent in older saves. */
+  wages?: number;
   /** Foot soldiers trained at War Camps: the deed of the Age of Total War (#313); absent in older saves. */
   campTrained?: number;
   /** Citizens called to arms at War Camps in the Age of Total War (#313); absent in older saves. */
@@ -570,6 +574,8 @@ export type GameEvent =
   | { k: 'work'; id: number; owner: number; act: Act; x: number; y: number }
   | { k: 'depleted'; tile: number }
   | { k: 'season'; i: number }
+  /** A payday for hired swords (the Age of Merchants): how many went unpaid, and how many of those walked off. */
+  | { k: 'wages'; owner: number; late: number; gone: number }
   | { k: 'rank'; id: number; owner: number; x: number; y: number; rank: number }
   /** Gold taken from an enemy unit slain by a people with a plunder share (the Path of Blood, #299). */
   | { k: 'plunder'; owner: number; x: number; y: number; gold: number }

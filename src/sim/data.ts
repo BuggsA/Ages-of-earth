@@ -186,7 +186,7 @@ export const AGES: Record<AgeId, Age> = {
     name: 'Age of Merchants',
     short: 'Merchant',
     tier: 2,
-    blurb: 'Guilds, banks and hired swords: the Market hires soldiers for gold, trade pays more (more still for every bar of bog iron your people ever dug), and levies cost dear.',
+    blurb: 'Guilds, banks and hired swords: the Market hires soldiers for gold, trade pays more (more still for every bar of bog iron your people ever dug), and levies cost dear. But a hired sword is paid by the day: 2 gold every 15 seconds once its first 45 are served, and one left unpaid twice walks off the field.',
     mul: { tradeGold: 1.25 },
     ironTrade: IRON_TRADE,
     hire: { at: 'market', units: ['infantry', 'ranged', 'cavalry'], gold: 1.2, time: 0.5 },
@@ -1751,6 +1751,16 @@ export const ORE_TRADE = { lot: 20, gold: { salt: 40, saltpetre: 55, bloodiron: 
 
 /** The computer and the rare ores (#356 s5): the crew it sends to dig the ore a road's door asks for, and how far from home it will look for the vein. */
 export const AI_ORE = { crew: 3, reach: 70 };
+
+/**
+ * Hired swords (the Age of Merchants, #37) are paid by the day, not once: the hire price covers a sword's first `first` seconds, then every
+ * `every` seconds each draws `wage` gold from its people's treasury. A purse too thin to pay one leaves it a payday behind; a sword `patience` paydays behind walks off the field, for good.
+ * Wages go on after the people leaves the Age of Merchants, until the swords are dead or gone.
+ */
+export const MERC = { every: 15, wage: 2, patience: 2, first: 45 };
+
+/** The computer's hired swords (the Age of Merchants): it hires only with `reserve` paydays of every sword it would then keep still in the purse. */
+export const AI_MERC = { reserve: 6 };
 
 export const AI_WEB = { take: 0.6, heir: 1, survey: 22, diggers: 3, nearly: 0.5, patience: 90, close: 0.75, relics: 2, raid: 18, raidNear: 30, riders: 4, read: 0.85, lodge: 1, hulls: 1, bell: 900 };
 

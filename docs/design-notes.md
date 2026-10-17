@@ -872,3 +872,11 @@ The Atlas now generates the same rare layer as an ordinary match. Require or exc
 ### Reclaimer foundations remember their age (#410), Codex, 2026-10-17
 
 A fresh fallen footprint is clear; an older one fades toward a faint but readable trace until its five-minute rebuild window closes. Each site carries its own fade in the existing single draw call, using match ticks so pausing freezes the memory. I like the ground itself showing which rebuilding opportunity will vanish first. Next: a placement preview that names the salvage discount when the new building matches the old footprint. No rules or balance numbers changed.
+
+### Swords for hire (Age of Merchants, own pitch), 2026-10-17, chain 1017-1335 s1
+
+**Built:** a soldier hired at the Merchants' Market is a sword for hire: every 15 seconds it draws 2 gold, and one left unpaid twice walks off (`src/sim/merc.ts`, `MERC` in `data.ts`). The computer keeps six paydays per sword in the purse before it hires.
+
+**Why I love it:** the Age of Merchants was a few percentages and a button; "hire an army with gold" had no price after the day it was bought. Now the quick army is a loan against your trade, so a merchant decides how many swords his traders can carry, and a rival learns that the way to beat a hired host is to starve it: raid the traders, take the Market.
+
+**Next:** a rival could outbid a sword (bribe it over with gold); a Temple's priests could sway the unpaid; a sound for the walk-off. Win-rate effect on the computer is unmeasured.
