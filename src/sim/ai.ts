@@ -3323,7 +3323,17 @@ export function riteWork(s: GameState, p: Player, pr: Unit): { target: Unit; how
       }
     }
   }
-  if (curseAt && packed >= AI_RITE.pack && !(unpinned(curseAt) && closing(curseAt))) return { target: curseAt, how: 'curse' };
+  if (curseAt && packed >= AI_RITE.pack) {
+    // The wait has a limit: a marching soldier that never lands can't hold the curse past `patience` seconds.
+    const mem = memory(s, p.id);
+    if (unpinned(curseAt) && closing(curseAt)) {
+      mem.riteWait ??= s.tick;
+      if (s.tick - mem.riteWait < secs(AI_RITE.patience)) return offer ? { target: offer, how: 'sacrifice' } : null;
+    }
+    delete mem.riteWait;
+    return { target: curseAt, how: 'curse' };
+  }
+  if (s.ai[p.id]) delete s.ai[p.id].riteWait;
   return offer ? { target: offer, how: 'sacrifice' } : null;
 }
 

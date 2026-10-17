@@ -743,6 +743,8 @@ export interface AiMemory {
   landing?: { ship: number; ids: number[]; since: number; phase: 'load' | 'sail' };
   /** Tick its last landing set out. */
   landed?: number;
+  /** Tick a Blood-rite priest began holding a curse for the army to pin the pack (#439); cleared when it casts or nothing is held. */
+  riteWait?: number;
   /** Its traders on the road last turn: trader id → post id (to notice the ones lost on the way). */
   caravans?: Record<number, number>;
   /** Post id → the tick a trader was last lost on the road to it, so it keeps off that road a while. */

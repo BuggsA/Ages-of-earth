@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { riteWork } from '../src/sim/ai';
-import { AI_RITE, RITE } from '../src/sim/data';
+import { AI_RITE, RITE, secs } from '../src/sim/data';
 import { createGame, step } from '../src/sim/game';
 import type { Building } from '../src/sim/types';
 import { spawnUnit } from '../src/sim/world';
@@ -27,6 +27,9 @@ describe('the priest waits for the pin', () => {
     const mine = spawnUnit(s, 0, 'infantry', home.x + 6, home.y + 6 + AI_RITE.closing - 2);
     mine.order = { k: 'attack', target: pack[0].id } as typeof mine.order;
     expect(riteWork(s, p, priest)).toBeNull();
+    s.tick += secs(AI_RITE.patience) + 1;
+    expect(riteWork(s, p, priest)?.how).toBe('curse');
+    s.ai[0].riteWait = undefined;
     mine.y = home.y + 7;
     mine.x = home.x + 6 + AI_RITE.pinned / 2;
     expect(riteWork(s, p, priest)?.how).toBe('curse');
