@@ -1026,9 +1026,12 @@ export const SORTIE = { rearm: 4, mend: 0.08, turn: 30, reach: 36, burn: 0.04 };
 /**
  * Feast days (the Age of Fairs): every `every` seconds a feast opens for `open` seconds. A trade trip paid at a
  * Market within `reach` tiles of a standing Temple that keeps a relic (the fairground) pays `pay` times as much
- * while it lasts. The calendar is the same for everyone, so the computer's traders profit too.
+ * while it lasts. The calendar is the same for everyone, so the computer's traders profit too. A fairground Market
+ * burned by a rival on a feast day pays that rival `purse` gold: the takings are in the stalls. When the feast
+ * closes, a hero standing within `reach` of the fairground Market (no rival soldier there) holds the lists: it is
+ * healed whole and the crowd pays `lists` gold.
  */
-export const FAIR = { every: 240, open: 60, reach: 12, pay: 1.5 };
+export const FAIR = { every: 240, open: 60, reach: 12, pay: 1.5, purse: 150, lists: 120 };
 /**
  * Convoys (the Age of Sail): a merchant ship that loads at a port with a warship of its owner's within `reach`
  * tiles carries `pay` times the gold. Send the fleet with the cogs: the escort is also what the rival's raiders meet.
@@ -1658,6 +1661,8 @@ export interface AiLevel {
   rite?: boolean;
   /** Off: a priest that has taken up healing by itself is left at it, as before (only `scripts/ai-ab.ts` turns it off). */
   healers?: boolean;
+  /** Off: a cursed computer army fights on and its riders ignore the priest (#434; only `scripts/ai-ab.ts` turns it off). */
+  curseAnswer?: boolean;
 }
 
 /**
@@ -1696,7 +1701,8 @@ export const AI_WONDER = { share: 0.4, least: 3, most: 14, stay: 6, reach: 26 };
  * The computer and feast days (#379 s1): a clever computer raises its Market on the fairground, searching up to `ring`
  * tiles round its relic Temple, and in the Age of Fairs keeps up to `markets` Markets so one stands there.
  */
-export const AI_FAIR = { ring: 10, markets: 2 };
+/** `raid`: how much nearer (squared tiles) a rival's fairground Market seems to a raid on a feast day. */
+export const AI_FAIR = { ring: 10, markets: 2, raid: 900 };
 /**
  * The computer and sorties (#379): when the enemy building it means to bomb lies more than `gap` tiles from its nearest
  * finished Airfield (so its aircraft would turn for home before they arrive, `SORTIE.turn`), it raises another Airfield
@@ -1766,7 +1772,7 @@ export const RITE = {
  * Station or Blood Tower seen within `hunt` tiles (its warships for one by the shore), and a rival with one (or `grafted` grafted soldiers
  * seen) gets `siege` engines more. Its bombers count a rival Station `bomb` squared tiles nearer than it is (a Blood Tower half that).
  */
-export const AI_HEMO = { town: 24, army: 6, rig: 6, watch: 26, foes: 2, again: 60, towers: 2, tower: 10, gap: 45, spread: 6, living: 0.6, near: 16, batch: 2, spare: 1, levyGap: 12, hunt: 22, grafted: 3, siege: 2, bomb: 2500 };
+export const AI_HEMO = { town: 24, army: 6, rig: 6, watch: 26, foes: 2, again: 60, towers: 2, tower: 10, gap: 45, spread: 6, living: 0.6, near: 16, batch: 2, spare: 1, levyGap: 12, hunt: 22, grafted: 3, siege: 2, bomb: 2500, forward: 12 };
 
 /**
  * The computer at the fork (#355 s5). A clever computer in Total War picks its branch once its town has grown (`AI_HEMO.town`): the Blood-rite when
@@ -1786,9 +1792,19 @@ export const AI_FORK = { living: 0.6, hemo: 0.5, stay: 300, patience: 1200, back
  * A clever computer's priests in the Blood-rite (#355 s4) work its rites. An idle priest within 9 tiles of the enemy curses the target
  * with the most of their soldiers (no citizens, priests or traders) within `RITE.spread` tiles of it, when `pack` or more stand there
  * uncursed and the store would still hold `keep` blood after paying; failing that, while the store is under `AI_FORK.store`, it
- * sacrifices the dearest victim whose offering is at least `dear` blood. Everything else is converted as before.
+ * sacrifices the dearest victim whose offering is at least `dear` blood. Everything else is converted as before. A soldier held within
+ * `pinned` tiles of one of ours counts double; and a pack none of ours holds yet, with our foot soldiers marching on it within `closing`
+ * tiles, is left uncursed a beat, until they land.
  */
-export const AI_RITE = { pack: 3, keep: 40, dear: 30 };
+export const AI_RITE = { pack: 3, keep: 40, dear: 30, pinned: 2, closing: 7 };
+
+/**
+ * A clever computer answers a curse on its own army (#434). For the last `late` seconds of a curse, a cursed soldier that isn't winning
+ * (hurt below `hurt` of its health, or with more rival soldiers than friends within `near` tiles) steps back to the muster point and
+ * stays out of the waves until the curse lifts. While any soldier of its own lies cursed, up to `riders` of its riders within `reach`
+ * tiles of a rival priest of the Blood-rite ride at that priest.
+ */
+export const AI_CURSE = { late: 14, hurt: 0.7, near: 5, riders: 3, reach: 14 };
 
 /** Selling rare ore at a Market (#356 s5): a lot of `lot` pays `gold[ore]` gold at a flat price. Ore mined still counts toward its doors; only the stock in hand is spent. */
 export const ORE_TRADE = { lot: 20, gold: { salt: 40, saltpetre: 55, bloodiron: 90 } as Record<'salt' | 'saltpetre' | 'bloodiron', number> };
