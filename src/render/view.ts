@@ -23,6 +23,7 @@ import { Post, QUALITY, loadQuality, saveQuality, type QualityName } from './pos
 import { RelicsView } from './relicsView';
 import { PostsView } from './postsView';
 import { FairBannersView } from './fairBannersView';
+import { VigilCandlesView } from './vigilCandlesView';
 import { RuinsView } from './ruinsView';
 import { LandmarksView } from './landmarksView';
 import { GrazeView } from './grazeView';
@@ -103,6 +104,7 @@ export class View {
   private relics = new RelicsView();
   private posts = new PostsView();
   private fairBanners = new FairBannersView();
+  private vigilCandles = new VigilCandlesView();
   readonly ruins = new RuinsView();
   readonly landmarks = new LandmarksView();
   /** When ground relics next sparkle. */
@@ -176,7 +178,7 @@ export class View {
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sky.mesh, this.hemi, this.fill, this.sun, this.sun.target);
-    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.ruins.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points);
+    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points);
     this.scene.add(this.rangeGuides.mesh, this.borders.mesh, this.graze.mesh, this.foundations.mesh);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.post = new Post(this.renderer, this.scene, this.rig.camera);
@@ -241,6 +243,7 @@ export class View {
     this.relics.clear();
     this.posts.clear();
     this.fairBanners.clear();
+    this.vigilCandles.clear();
     this.ruins.clear();
     this.landmarks.clear();
     const colors = s.players.map((p) => p.color);
@@ -443,6 +446,7 @@ export class View {
     this.glintRelics();
     this.posts.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1);
     this.fairBanners.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, this.time);
+    this.vigilCandles.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, this.time);
     this.ruins.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     this.landmarks.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     if (!this.reveal) {
