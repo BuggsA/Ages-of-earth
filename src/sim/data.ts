@@ -1582,6 +1582,8 @@ export interface Homeland {
   fish: number;
   mere: number;
   weight: Record<MapType, number>;
+  /** The turning year (#479): what each season's turn does to this homeland, for the season's banner ('' for nothing new). */
+  year: [string, string, string, string];
 }
 export const HOMELAND_IDS: HomelandId[] = ['glade', 'shore', 'herds', 'wood'];
 export const HOMELANDS: Record<HomelandId, Homeland> = {
@@ -1590,29 +1592,49 @@ export const HOMELANDS: Record<HomelandId, Homeland> = {
     blurb: 'Berries by the Town Center and a deer herd beyond: the old, easy start, where any opening works.',
     berries: 7, thicket: 0, deer: 4, herd2: 0, grove: 0, mammoth: 17, fish: 4, mere: 0,
     weight: { continental: 3, highlands: 3, lakes: 2, forest: 2, plains: 2, sea: 2 },
+    year: ['', '', '', ''],
   },
   shore: {
     name: 'The Shore', icon: '🌊', short: 'few berries; fish the mere from a Dock',
-    blurb: 'A rich shoal just off home and only a thin berry bush. Food comes by boat: raise a Dock and launch canoes early, so the opening is hungry for wood, and a rival who burns the Dock starves you.',
+    blurb: 'A rich shoal just off home and only a thin berry bush. Food comes by boat: raise a Dock and launch canoes early, so the opening is hungry for wood, and a rival who burns the Dock starves you. The shoals run thick in autumn, and in winter the mere ices over.',
     berries: 3, thicket: 0, deer: 3, herd2: 0, grove: 0, mammoth: 17, fish: 8, mere: 6,
     weight: { continental: 2, highlands: 1, lakes: 3, forest: 1, plains: 1, sea: 3 },
+    year: ['The ice breaks: the boats fish freely again.', '', 'The autumn run: the shoals are thick, so fish hard and lay food up.', 'The mere ices over: boats fish at a third of their pace until spring.'],
   },
   herds: {
     name: 'The Herd Plains', icon: '🦣', short: 'herds and a mammoth close, few berries',
-    blurb: 'Two deer herds and a mammoth close by, and little to forage. A meat economy: meat spoils, so hunt in bursts, camp by the kills and follow the herds out when they thin.',
+    blurb: 'Two deer herds and a mammoth close by, and little to forage. A meat economy: meat spoils, so hunt in bursts and camp by the kills. Each autumn the herds trek out toward the middle and come home in spring, each deer that lived with a calf: hunt a herd out and it never comes back.',
     berries: 3, thicket: 0, deer: 5, herd2: 5, grove: 0, mammoth: 12, fish: 4, mere: 0,
     weight: { continental: 2, highlands: 1, lakes: 1, forest: 0, plains: 4, sea: 2 },
+    year: ['The herds come home, each deer that lived with a calf.', '', 'The herds trek out toward the open middle: follow them, or eat from the store and the fields.', ''],
   },
   wood: {
     name: 'The Deep Wood', icon: '🌲', short: 'woods and berries close, no herd near',
-    blurb: 'Woods crowd in on the Town Center and a wide berry thicket grows at their edge, but no herd grazes near home. Forage and chop: wood is a short walk, room to build is not, so clear ground or build out, and meat means going far.',
+    blurb: 'Woods crowd in on the Town Center and a wide berry thicket grows at their edge, but no herd grazes near home. Forage and chop: wood is a short walk, room to build is not, so clear ground or build out, and meat means going far, until winter, when the berries fail and deer come in to yard in the woods by home.',
     berries: 7, thicket: 6, deer: 0, herd2: 0, grove: 40, mammoth: 17, fish: 4, mere: 0,
     weight: { continental: 2, highlands: 3, lakes: 2, forest: 4, plains: 0, sea: 1 },
+    year: ['The yarded deer go back out to their summer grass.', '', '', 'Deer come in from the cold to yard in the woods by your town: the berries fail, but the hunt is close.'],
   },
 };
 export const HOMELAND = { mereAt: 16 };
 /** The computer on the Shore (#473): it raises its Dock once it has `dockAt` citizens and keeps `boats` more fishing boats. */
 export const AI_SHORE = { dockAt: 4, boats: 2 };
+/**
+ * The turning year (#479, Goal 1 s3): each homeland's staple has a lean season and a fat one, so the opening
+ * that suits it stops working for part of every year. The Glade keeps the old year.
+ * - The Herd Plains: deer that start within `home` tiles of a town are that town's herds. They don't drift:
+ *   each autumn they trek out to grazing `out` tiles from the town, toward the map's middle (or as much as
+ *   `trek` nearer, or turned aside, where the way is blocked), and each spring they walk home, each deer still alive bringing `calves` calves, up to `herdMax` a herd. A herd
+ *   hunted out never comes back. A clever computer leaves `spare` of each home herd alive, and in autumn and
+ *   winter follows its herds out to `follow` tiles from home.
+ * - The Shore: boats fish at `run` of their pace in autumn and `ice` in winter, when the mere freezes over.
+ * - The Deep Wood: each winter `yard` deer come in (from `from` tiles out at most, `enter` at least) to a
+ *   yard `yardMin`–`yardMax` tiles from every town, by at least `trees` trees within two tiles; in spring they
+ *   go back out to where they came in, and return to the same yard the next winter. A clever computer sends
+ *   `yardHunters` more hunters in winter.
+ * Deer on the move walk for up to `walk` seconds.
+ */
+export const YEAR = { home: 16, out: 26, trek: 6, calves: 1, herdMax: 6, spare: 2, follow: 34, run: 1.3, ice: 0.3, yard: 5, from: 20, enter: 8, yardMin: 7, yardMax: 12, trees: 3, yardHunters: 2, walk: 45 };
 /**
  * Caves (#356): on a world that holds any rare ore, `count` caves for the map's size are cut into open ground at least
  * `away` tiles from every town and `apart` from each other. Each is a single tile of one of the world's ores, `rich` times

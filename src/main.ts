@@ -2176,7 +2176,9 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         break;
       case 'season': {
         const sn = SEASONS[ev.i];
-        hud.toast(`${sn.icon} ${sn.name}. ${sn.blurb}`, 'info');
+        // The turning year (#479): what the season does to this homeland.
+        const turn = s.homeland ? HOMELANDS[s.homeland].year[ev.i] : '';
+        hud.toast(`${sn.icon} ${sn.name}. ${sn.blurb}${turn ? ` ${HOMELANDS[s.homeland!].icon} ${turn}` : ''}`, 'info');
         break;
       }
       case 'hit':

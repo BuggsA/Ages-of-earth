@@ -6,6 +6,7 @@ import { raiseCamps } from './steppe';
 import { giftFlock, sheepStep } from './flocks';
 import { faithStep } from './consecrate';
 import { turnSeason } from './seasons';
+import { markHomeHerds, turnYear } from './year';
 import { hitAnimal, spawnAnimal, updateAnimals } from './animals';
 import { markGoals, scenarioStep, startScenario } from './campaign';
 import { buildingGuns, updateShots } from './combat';
@@ -184,6 +185,7 @@ export function createGame(setup: GameSetup): GameState {
   for (const t of map.posts) s.posts.push({ id: s.nextId++, x: t.x, y: t.y });
   if (map.ruins.length) s.ruins = map.ruins.map((r) => ({ id: s.nextId++, x: r.x, y: r.y, find: r.find, dug: 0, by: -1 }));
   for (const b of map.wild) spawnAnimal(s, b.x, b.y, b.kind);
+  markHomeHerds(s);
   if (map.caves.length) s.caves = map.caves.map((c) => ({ ...c }));
   if (map.landmarks.length) s.landmarks = map.landmarks.map((m) => ({ id: s.nextId++, x: m.x, y: m.y, kind: m.kind, owner: -1, claim: 0, by: -1 }));
   for (const c of map.caves) if (c.den) for (const p of denWolves(c.tile, map.w)) spawnAnimal(s, p.x, p.y, 'wolf');
@@ -517,6 +519,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   for (const e of s.ents) if (e.kind === 'unit' && e.hp > 0 && !e.inside) walk(s, e);
   updateAnimals(s, sp, (a) => sheepStep(s, sp, a));
   turnSeason(s);
+  turnYear(s);
   sp.rebuild(s);
   separate(s, sp);
   for (const e of s.ents) {

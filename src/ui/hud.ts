@@ -1,5 +1,5 @@
 import { crestSvg } from './crests';
-import { seasonOf } from '../sim/seasons';
+import { seasonAt, seasonOf } from '../sim/seasons';
 import { scenarioById } from '../sim/campaign';
 import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
@@ -360,7 +360,7 @@ export class Hud {
     const sn = seasonOf(s);
     this.clockEl.textContent = `${sn.icon} ${fmtTime(s.tick)}`;
     const hl = s.homeland ? HOMELANDS[s.homeland] : undefined;
-    this.clockEl.title = `${sn.name}: ${sn.blurb}${hl ? `\n${hl.icon} ${hl.name}: ${hl.blurb}` : ''}`;
+    this.clockEl.title = `${sn.name}: ${sn.blurb}${hl ? `\n${hl.icon} ${hl.name}: ${hl.blurb}${hl.year[seasonAt(s)] ? `\nThis season: ${hl.year[seasonAt(s)]}` : ''}` : ''}`;
     this.timers(s, viewer);
     this.objectives(s);
     if (sig === this.topSig) return;

@@ -7,6 +7,7 @@ import { buildTimeFor, buildingCostFor, modsOf } from './stats';
 import { ageDef, canRaise, inField } from './ages';
 import type { Act, Animal, Building, Cost, Ent, GameState, Goal, Order, RareId, Res, Unit } from './types';
 import { seasonOf } from './seasons';
+import { catchOf } from './year';
 import { RES, R_BERRY, R_BLOODIRON, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_SALT, R_SALTPETRE, R_STONE, R_TREE } from './types';
 import { carriedBy, relicAt } from './relics';
 import { animalRadius, hitAnimal } from './animals';
@@ -104,7 +105,7 @@ export function gatherRate(s: GameState, u: Unit, kind: number | 'farm'): number
   const mod =
     kind === 'farm' ? m.farm : kind === R_TREE ? m.wood : kind === R_STONE || kind === R_GOLD || kind === R_BOG || kind in RARE_OF_TILE ? m.mine : kind === R_MEAT ? m.hunt * m.forage : kind === R_FISH ? m.fish : m.forage;
   const sn = seasonOf(s);
-  const season = kind === 'farm' ? sn.field : kind === R_BERRY ? sn.plant : 1;
+  const season = kind === 'farm' ? sn.field : kind === R_BERRY ? sn.plant : kind === R_FISH ? catchOf(s) : 1;
   // A Flint Scatter sharpens its keeper's axes and picks.
   const tools = (kind === R_TREE || kind === R_STONE || kind === R_GOLD || kind === R_BOG) && keptOf(s, u.owner, 'flint') > 0 ? 1 + kinBonus(s, u.owner, 'flint', LANDMARKS.flint.tools - 1) : 1;
   return base * mod * (1 + p.epoch * EPOCH_GATHER_BONUS) * ai * season * tools;

@@ -981,3 +981,14 @@ Now that the last Town Center decides the match, the computer plants a second fa
 **Verbs test:** (1) the Shore adds boat-fishing as the first food verb, the Plains make hunting and butchering the whole economy; (2) each closes a door: few berries on the Shore and the Plains, no herd in the Deep Wood; (3) the land decides, not a menu; (4) a rival sees the Dock or the camps and can burn them. The Deep Wood is the weakest of the four on (1): it shifts the mix more than the verb.
 
 **Next:** stone or gold behind the Deep Wood's trees (chop your way in), herds on the Plains that drift off as they thin (s3's dilemma), and the computer pitching a Hunting Camp by the second herd. And a check that four-player Shores read fairly in a browser.
+
+### The turning year (#479, Goal 1 s3, chain 1017-1811 session 5, lane rules)
+
+**Built:** each homeland's staple now has a fat season and a lean one (`YEAR` in `data.ts`, `src/sim/year.ts`). The Herd Plains' home herds don't drift: they graze at home through spring and summer, trek out 20–26 tiles toward the map's middle each autumn, and come home each spring with a calf for every deer still alive (up to six a herd). The Shore's boats fish ×1.3 in the autumn run and ×0.3 when the mere ices in winter (the look already froze it). In the Deep Wood five deer come in to yard by every town each winter, by the trees, and leave in spring. Herds on the move find a way round woods (a short search at the season's turn, kept as waypoints on the deer). The Glade keeps the old year, so tests, campaigns and old replays are untouched.
+
+**Why I love it:** s2 made the first look round home ask a question, but once asked it stayed answered. Now the Plains player who ate the whole herd in spring meets an empty autumn and an empty next spring, while the one who spared a pair gets the herd back bigger; the Shore player lays fish up in autumn or plants before the ice; the Deep Wood player puts down the berry basket and picks up a spear in winter. Every year the same question comes back, a little different, because of what you did last year. Deer yarding and the autumn trek are what real herds do.
+
+**Verbs test:** (1) new actions: follow the herd out and camp by it, hunt the yard in winter, lay food up in the autumn run; (2) closed doors: a hunted-out herd is gone for good, and the ice shuts the Shore's boats for a season; (3) the land and the season decide, not a menu; (4) a rival sees your herds grazing toward the middle and can hunt them there, which costs you next spring too.
+
+**Next:** a rival-facing view (minimap marks for herds on the trek), salt curing as the Plains' way to keep autumn meat, fish that thin on a mere that's over-fished, and s4's proof that two Plains openings (spare vs. feast) part ways by minute 12.
+

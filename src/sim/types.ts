@@ -408,6 +408,13 @@ export interface Animal {
   herd?: number;
   origX?: number;
   origY?: number;
+  /**
+   * The town whose year this herd keeps (#479, `YEAR`): a Herd Plains home herd treks out from it each autumn
+   * and home each spring; a Deep Wood herd yards by it each winter. Drift leaves such a herd alone.
+   */
+  town?: number;
+  /** Tiles still to walk through on the way to new ground, nearest first (#479): a herd on the move goes round woods. */
+  way?: number[];
   /** The deer a hunting wolf is running down. */
   prey?: number;
   /** The carcass tile a wolf has scented and is eating (carrion). */
