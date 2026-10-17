@@ -1579,6 +1579,9 @@ export const AI_VIGIL = { slack: 1.5 };
  */
 export const AI_CONVOY = { escorts: 1, stay: 3 };
 
+/** Selling rare ore at a Market (#356 s5): a lot of `lot` pays `gold[ore]` gold at a flat price. Ore mined still counts toward its doors; only the stock in hand is spent. */
+export const ORE_TRADE = { lot: 20, gold: { salt: 40, saltpetre: 55, bloodiron: 90 } as Record<'salt' | 'saltpetre' | 'bloodiron', number> };
+
 /** The computer and the rare ores (#356 s5): the crew it sends to dig the ore a road's door asks for, and how far from home it will look for the vein. */
 export const AI_ORE = { crew: 3, reach: 70 };
 

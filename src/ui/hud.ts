@@ -5,7 +5,7 @@ import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
 import { RARE_OF_TILE } from '../sim/units';
-import { RARE, AGES, WAY, WAYS, WAY_IDS, CALL_UP, PATHS, WARCAMP, FLOCK, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { RARE, AGES, WAY, WAYS, WAY_IDS, CALL_UP, PATHS, WARCAMP, FLOCK, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -893,6 +893,20 @@ export class Hud {
               ok: p.res[res] >= MARKET.lot,
               why: `Need ${MARKET.lot} ${RES_LABEL[res].toLowerCase()} to sell`,
               run: () => (this.act.issue({ t: 'trade', p: viewer, res, buy: false }), this.act.sound('click')),
+            });
+          }
+          // Rare ore in hand sells at a flat price; the buttons show once some has been mined (#356).
+          for (const ore of RARES.filter((r) => (p.rare?.[r] ?? 0) > 0)) {
+            const have = Math.floor(p.rare![ore]!);
+            cmds.push({
+              key: '',
+              pic: '',
+              glyph: `<span class="trade">${RARE_ICON[ore]}<b>−</b></span>`,
+              title: `Sell ${ORE_TRADE.lot} ${RARE[ore].name.toLowerCase()}`,
+              desc: `Get ${ORE_TRADE.gold[ore]} gold, a flat price. You hold ${have}. Ore sold still counts toward the doors it opens.`,
+              ok: have >= ORE_TRADE.lot,
+              why: `Need ${ORE_TRADE.lot} ${RARE[ore].name.toLowerCase()} to sell`,
+              run: () => (this.act.issue({ t: 'trade', p: viewer, res: ore, buy: false }), this.act.sound('click')),
             });
           }
         }
