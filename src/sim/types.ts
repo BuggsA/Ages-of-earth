@@ -641,6 +641,8 @@ export type GameEvent =
   | { k: 'deliver'; owner: number; res: Res; amount: number; x: number; y: number; rare?: RareId }
   | { k: 'work'; id: number; owner: number; act: Act; x: number; y: number }
   | { k: 'depleted'; tile: number }
+  /** The Shore's spring (#482): the shoals left grew by `grew` fish in all, and `seeded` new shoals were laid. */
+  | { k: 'spawned'; grew: number; seeded: number }
   | { k: 'season'; i: number }
   /** A payday for hired swords (the Age of Merchants): how many went unpaid, and how many of those walked off. */
   | { k: 'wages'; owner: number; late: number; gone: number }

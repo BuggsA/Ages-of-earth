@@ -1139,6 +1139,7 @@ export class View {
           break;
         }
         case 'depleted':
+        case 'spawned':
           this.resources.markDirty();
           break;
         case 'deliver':
