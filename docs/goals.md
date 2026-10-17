@@ -44,3 +44,4 @@ Pass all four, or say in the pull request which one it fails and why that's fine
 ## Progress
 
 - 2026-10-17: goals set. Goal 1 umbrella opened (#463); #454 and #391 labelled `owner-ask`.
+- 2026-10-17: s1 (#467): each Way gives a verb and shuts a door (kill camps / the kin / the raid; no Stone Age farms / no camps / no bell); the computer picks by people and land and plays each.

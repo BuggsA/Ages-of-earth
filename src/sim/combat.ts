@@ -2,6 +2,7 @@ import { AURA, RALLY, BONUS, BLOOD_TOWER, BUILDINGS, DEER, LIGHTNING, VETERANCY,
 import { hasCoils } from './ages';
 import { bleeds, curseTaken, drawBlood, hemoBlow, hemoTaken } from './blood';
 import { fairPurse } from './fair';
+import { raidBlow, raidSlain } from './ways';
 import { prizeOf } from './convoy';
 import { distToRect } from './grid';
 import type { Spatial } from './spatial';
@@ -86,6 +87,8 @@ export function hurt(s: GameState, target: Ent, damage: number, by: number, atta
   if (attacker && target.kind === 'unit' && target.type !== 'citizen' && target.type !== 'priest' && target.order.k === 'idle' && attacker.hp > 0 && target.stance !== 'stand' && canHit(s, target, attacker)) {
     target.order = { k: 'attack', target: attacker.id, auto: true, then: null };
   }
+  // The Warband feeds on the raid (#463 s1): blows on a rival's food buildings carry off its food.
+  if (target.kind === 'building') raidBlow(s, target, damage, by, attacker);
 }
 
 /**
@@ -96,6 +99,7 @@ function plunder(s: GameState, target: Unit, by: number, credit: Unit | null): v
   const p = s.players[by];
   p.stats.slain = (p.stats.slain ?? 0) + 1;
   drawBlood(s, target, by, credit);
+  raidSlain(s, target, by);
   const prize = prizeOf(s, target, by);
   if (prize > 0) {
     p.res.gold += prize;

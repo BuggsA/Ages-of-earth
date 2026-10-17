@@ -21,7 +21,8 @@ import { offeringOf, riteProblem } from './fork';
 import { graftCost, stationsOf, waiting } from './hemo';
 import { borderMap, landOwnerAt, suppliedAt } from './borders';
 import { workProblem } from './works';
-import { aiVow, aiWay } from './ways';
+import { aiKin, aiVow, aiWay } from './ways';
+import { AI_WAYS, KIN, WAYS } from './data';
 import { beaconProblem, lit } from './beacon';
 import { rallyProblem } from './rally';
 import { consecrateProblem, consecrates } from './consecrate';
@@ -181,6 +182,8 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   const moving = tc ? null : (buildings.find((b) => b.type === 'towncenter' && b.pitch !== undefined) ?? wagons.find((w) => w.packed === 'towncenter') ?? null);
   const home = tc ? { x: tc.x, y: tc.y } : moving ? { x: moving.x, y: moving.y } : { x: p.startX, y: p.startY };
   const v: View = { p, citizens, army, priests, traders, cogs, fishers, navy, planes, buildings, home, tc, budget: { ...p.res }, plan: NO_PLAN, diggers: new Set(), armyFirst: false, claimers: new Set(), wagons, hunt: { n: 3, r: 16 }, packing: !!mem.steppe?.pack };
+  // The Hunters' Way (#463 s1) lives by the chase in the Stone Age: more hunters, ranging farther, with camps pitched at the kill.
+  if (p.way === 'hunt' && p.epoch === 0) v.hunt = { n: AI_WAYS.hunters, r: AI_WAYS.huntReach };
   const issue = (c: Command) => applyCommand(s, c);
 
   // The iron road's survey (#50) is cheap and first in line: in the Stone Age, citizens eat every scrap.
@@ -201,7 +204,25 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   const advancing = buildings.some((b) => b.advance >= 0);
   const queuedCitizens = buildings.reduce((n, b) => n + b.queue.filter((q) => q.unit === 'citizen').length, 0);
   const wantCitizens = Math.min(L.citizens + p.epoch * 3, 60);
-  if (tc && !advancing && !v.packing && citizens.length + queuedCitizens < wantCitizens && tc.queue.length < 2) {
+  // The Warband Way (#463 s1) eats by raiding: in the Stone Age, out of a treaty, its first band of foot comes before more hands (once; later bands come as soldiers do).
+  if (L.clever && p.way === 'warband' && p.epoch === 0 && s.tick >= s.peaceUntil && !mem.prowl && mem.prowled === undefined && citizens.length >= AI_WAYS.bandAt && army.filter(prowler).length < AI_WAYS.band) {
+    const yard = buildings.find((b) => b.type === 'barracks' && b.built && b.queue.length === 0);
+    const cost = yard ? trainCostFor(s, p.id, 'infantry', 'barracks', yard) : null;
+    if (yard && cost && afford(v, cost)) {
+      issue({ t: 'train', p: p.id, building: yard.id, unit: 'infantry' });
+      spend(v, cost);
+    } else if (yard) spend(v, trainCostFor(s, p.id, 'infantry', 'barracks', yard));
+  }
+  // The Hearth Way (#463 s1) grows by calling its kin, two at a time (three in winter), once its first hands are at work.
+  const hearth = L.clever && p.way === 'hearth';
+  const kinOnly = hearth && p.epoch === 0 && citizens.length >= AI_WAYS.kinFrom && citizens.length + queuedCitizens + KIN.winter <= wantCitizens && p.cap - p.pop >= KIN.winter;
+  if (hearth && tc && !advancing && citizens.length + queuedCitizens + KIN.winter <= wantCitizens && aiKin(s, p, tc, seasonAt(s) === 3 ? 0 : AI_WAYS.kinKeep)) {
+    issue({ t: 'kin', p: p.id, building: tc.id });
+    spend(v, KIN.cost);
+  } else if (kinOnly && !advancing && !threatNear(s, v).unit) {
+    // Saving for the next call: the army and the rest wait on the food it needs, unless raiders are at the door.
+    spend(v, KIN.cost);
+  } else if (tc && !advancing && !v.packing && !kinOnly && citizens.length + queuedCitizens < wantCitizens && tc.queue.length < (hearth ? 1 : 2)) {
     const cost = unitStats('citizen', p.epoch).cost;
     if (afford(v, cost)) {
       issue({ t: 'train', p: p.id, building: tc.id, unit: 'citizen' });
@@ -382,6 +403,8 @@ export function heirloomAhead(p: Player, to: AgeId): TechId | null {
  */
 function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   const roads = (mem.roads ??= {});
+  // The Hunters' Way (#463 s1) keeps no fields and little food in store: the steppe's flocks start from a store it lacks.
+  if (roads[to] === undefined && AGES[to].mobile && p.way === 'hunt') roads[to] = false;
   if (roads[to] === undefined && to === 'horde') {
     // The Horde is the steppe's second step (#322): a people that rode the steppe goes on, as the Path of Blood's later steps do.
     roads[to] = hasWalked(p, 'steppe');
@@ -1047,9 +1070,12 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
       if ((tx - home.x) * (tx - home.x) + (ty - home.y) * (ty - home.y) > AI_WILD.campNear * AI_WILD.campNear) return false;
       return !v.buildings.some((b) => BUILDINGS[b.type].drop.includes('food') && distToRect(tx, ty, b) < AI_WILD.campFar && (b.built || b.type === 'huntcamp'));
     });
-    if (kill && n >= 12 && p.res.wood >= 120 && count(v, 'huntcamp') < 3 && !recently('huntcamp', 25)) {
+    // The Hunters' Way (#463 s1) pitches its camps for nothing at the kill, so it pitches them early and often; the Hearth keeps none.
+    const hunter = p.way === 'hunt' && p.epoch === 0;
+    const W = AI_WAYS;
+    if (kill && !buildBarred(p, 'huntcamp') && (hunter ? n >= W.campAt && count(v, 'huntcamp') < W.camps && !recently('huntcamp', W.campAgain) : n >= 12 && p.res.wood >= 120 && count(v, 'huntcamp') < 3 && !recently('huntcamp', 25))) {
       const spot = findSpot(s, 'huntcamp', (kill.tile % s.w) + 0.5, Math.floor(kill.tile / s.w) + 0.5, 2, 5);
-      if (spot && construct(s, v, mem, 'huntcamp', spot, 2, issue)) return;
+      if (spot && construct(s, v, mem, 'huntcamp', spot, hunter ? 1 : 2, issue)) return;
     }
     // A clever computer in the Bronze Age or later puts a Watch Tower by a far kill whose camp stands, so the butchers have cover.
     const camped = clever && p.epoch >= 1 ? (s.carcasses ?? []).find((c) => {
@@ -1103,7 +1129,8 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   }
 
   const want: [BuildingType, boolean][] = [
-    ['barracks', n >= 8 && count(v, 'barracks') === 0],
+    // A Warband (#463 s1) raises its Barracks early: its soldiers are how it eats.
+    ['barracks', n >= (p.way === 'warband' ? AI_WAYS.barracksAt : 8) && count(v, 'barracks') === 0],
     ['range', n >= 12 && count(v, 'range') === 0],
     ['range', ironRival && p.epoch >= 1 && n >= 16 && count(v, 'range') < 2],
     ['stable', p.epoch >= 1 && n >= 14 && count(v, 'stable') === 0],
@@ -1169,6 +1196,8 @@ function wanted(v: View, cold = false): Record<Res, number> {
     const stock = v.p.res[r];
     const lean = stock > 1200 ? 0.15 : stock > 700 ? 0.4 : stock > 400 ? 0.7 : stock < 80 ? 1.4 : 1;
     weight[r] = share[r] * lean * (cold && r === 'food' ? 1 + AI_WINTER.food : 1);
+    // The Hunters' Way (#463 s1) sows nothing in the Stone Age: it lays wood by for the fields of the Bronze Age.
+    if (r === 'wood' && v.p.way === 'hunt' && v.p.epoch === 0) weight[r] *= AI_WAYS.hunterWood;
     total += weight[r];
   }
   const n = v.citizens.filter((u) => u.order.k !== 'build' && !u.inside).length;
@@ -1196,7 +1225,7 @@ function nearestDeer(s: GameState, x: number, y: number, r: number): Animal | nu
 /** Send a citizen to gather a resource (game, berries, then free fields, for food). False if there is none to be had. */
 function sendTo(s: GameState, v: View, u: Unit, res: Res, issue: (c: Command) => void): boolean {
   if (res === 'food') {
-    const meat = findResource(s, R_MEAT, v.home.x, v.home.y, 14);
+    const meat = findResource(s, R_MEAT, v.home.x, v.home.y, v.p.way === 'hunt' && v.p.epoch === 0 ? AI_WAYS.huntReach : 14);
     if (meat >= 0) {
       issue({ t: 'gather', p: v.p.id, ids: [u.id], tile: meat });
       return true;
@@ -2326,7 +2355,8 @@ function flameNear(s: GameState, v: View, tower: Building): boolean {
 }
 
 function townBell(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
-  if (!AI_LEVELS[v.p.ai!].clever || !v.tc) return;
+  // A warband does not hide (#463 s1): its bell does not ring.
+  if (!AI_LEVELS[v.p.ai!].clever || !v.tc || (v.p.way && WAYS[v.p.way].noBell)) return;
   const bell = AI_LEVELS[v.p.ai!].bell;
   const t = threatNear(s, v);
   const defenders = v.army.filter((u) => !u.inside).length;
@@ -2961,7 +2991,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     for (const u of v.army) tally(u.type);
     for (const b of v.buildings) for (const q of b.queue) if (q.unit) tally(q.unit);
   }
-  const keepCitizensGrowing = v.citizens.length < 8;
+  const keepCitizensGrowing = v.citizens.length < (p.way === 'warband' ? AI_WAYS.barracksAt : 8);
   // A horde (#322) wants riders to stand in rival land: it trains them more often until it has a full band.
   const riderless = L.clever && modsOf(s, p.id).tribute > 0 && v.army.filter((u) => u.type === 'cavalry').length < TRIBUTE.most + 2;
   const siege = v.army.filter((u) => u.type === 'siege').length;
@@ -3203,7 +3233,7 @@ function prowl(s: GameState, v: View, mem: AiMemory, ready: Unit[], issue: (c: C
     const burning = mem.prowl.burn !== undefined && !!camp && camp.hp > 0;
     const next = lead && !hunted && !burning ? prey(s, p, v.home, lead, camp ? P.look : P.chase, band.length) : null;
     const threatened = lead && s.ents.some((e) => e.kind === 'unit' && e.hp > 0 && !e.inside && isEnemy(s, p.id, e.owner) && armed(e) && (e.x - lead.x) * (e.x - lead.x) + (e.y - lead.y) * (e.y - lead.y) <= P.guard * P.guard);
-    const limit = secs(P.time) + (mem.prowl.burn !== undefined ? secs(P.burn) : 0);
+    const limit = secs(mem.prowl.raid ? AI_WAYS.raidTime : P.time) + (mem.prowl.burn !== undefined ? secs(P.burn) : 0);
     if (!lead || threatened || s.tick - mem.prowl.since > limit || (!hunted && !next && !walking && !burning && !arrived)) {
       if (band.length) issue({ t: 'move', p: p.id, ids: band.map((u) => u.id), x: home.x, y: home.y });
       delete mem.prowl;
@@ -3222,10 +3252,14 @@ function prowl(s: GameState, v: View, mem: AiMemory, ready: Unit[], issue: (c: C
     for (const u of band) held.add(u.id);
     return held;
   }
-  if (s.tick < s.peaceUntil || s.tick - (mem.prowled ?? -secs(P.every)) < secs(P.every)) return held;
+  // A Warband (#463 s1) goes out more often, and first for the rival's food: its blows there carry the food home.
+  const raider = p.way === 'warband' && p.epoch <= AI_WAYS.raidUntil;
+  const every = raider ? AI_WAYS.raidEvery : P.every;
+  if (s.tick < s.peaceUntil || s.tick - (mem.prowled ?? -secs(every)) < secs(every)) return held;
   const free = ready.filter((u) => prowler(u) && !u.inside);
   if (free.length < P.band) return held;
-  const target = prey(s, p, v.home, v.home, P.reach, Math.min(P.most, free.length)) ?? rivalCamp(s, p, v.home);
+  const larder = raider ? rivalCamp(s, p, v.home, AI_WAYS.raidAt, AI_WAYS.raidReach, true) : null;
+  const target = larder ?? prey(s, p, v.home, v.home, P.reach, Math.min(P.most, free.length)) ?? rivalCamp(s, p, v.home);
   if (!target) return held;
   const band = free
     .map((u) => ({ u, d: (u.x - target.x) * (u.x - target.x) + (u.y - target.y) * (u.y - target.y) }))
@@ -3234,7 +3268,7 @@ function prowl(s: GameState, v: View, mem: AiMemory, ready: Unit[], issue: (c: C
     .map((o) => o.u);
   if (target.kind === 'building') {
     issue({ t: 'move', p: p.id, ids: band.map((u) => u.id), x: target.x, y: target.y });
-    mem.prowl = { ids: band.map((u) => u.id), target: -1, since: s.tick, look: target.id };
+    mem.prowl = { ids: band.map((u) => u.id), target: -1, since: s.tick, look: target.id, ...(target === larder ? { raid: true } : {}) };
   } else {
     issue({ t: 'attack', p: p.id, ids: band.map((u) => u.id), target: target.id });
     mem.prowl = { ids: band.map((u) => u.id), target: target.id, since: s.tick };
@@ -3249,17 +3283,22 @@ export function towerCovers(s: GameState, p: Player, at: { x: number; y: number 
   return s.ents.some((e) => e.kind === 'building' && e.type === 'tower' && e.built && e.hp > 0 && e.owner === p.id && (e.x - at.x) * (e.x - at.x) + (e.y - at.y) * (e.y - at.y) <= r);
 }
 
-/** The nearest rival Hunting Camp the computer has seen within `reach` of home and clear of the rival's forts (#260), or null. */
-export function rivalCamp(s: GameState, p: Player, home: { x: number; y: number }): Building | null {
+/**
+ * The nearest rival Hunting Camp the computer has seen within `reach` of home and clear of the rival's forts (#260), or null.
+ * A Warband's raid (#463 s1) asks the same of any of `types`, the rival's food buildings, wherever they stand (the
+ * computer's waves know where the rival's town is too) and only out of reach of the forts' arrows (`AI_WAYS.raidSafe`).
+ */
+export function rivalCamp(s: GameState, p: Player, home: { x: number; y: number }, types: BuildingType[] = ['huntcamp'], reach = AI_PROWL.reach, raid = false): Building | null {
   const P = AI_PROWL;
+  const safe = raid ? AI_WAYS.raidSafe : P.safe;
   let best: Building | null = null;
-  let bestD = P.reach * P.reach;
+  let bestD = reach * reach;
   for (const e of s.ents) {
-    if (e.kind !== 'building' || e.type !== 'huntcamp' || !e.built || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
-    if (!p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
+    if (e.kind !== 'building' || !types.includes(e.type) || !e.built || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
+    if (!raid && !p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
     const d = (e.x - home.x) * (e.x - home.x) + (e.y - home.y) * (e.y - home.y);
     if (d >= bestD) continue;
-    if (s.ents.some((f) => f.kind === 'building' && f.hp > 0 && f.built && f.owner === e.owner && (f.type === 'towncenter' || f.type === 'tower') && distToRect(e.x, e.y, f) <= P.safe)) continue;
+    if (s.ents.some((f) => f.kind === 'building' && f.hp > 0 && f.built && f.owner === e.owner && (f.type === 'towncenter' || f.type === 'tower') && distToRect(e.x, e.y, f) <= safe)) continue;
     bestD = d;
     best = e;
   }

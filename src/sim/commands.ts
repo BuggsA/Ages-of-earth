@@ -1,4 +1,4 @@
-import { BUILDINGS, EPOCHS, MARKET, ORE_TRADE, RARE, RES_LABEL, SPREAD, TECHS, UNITS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
+import { BUILDINGS, EPOCHS, MARKET, ORE_TRADE, RARE, RES_LABEL, SPREAD, TECHS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
 import { peace } from './combat';
 import { placeProblem, stampBuilding, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
@@ -13,7 +13,7 @@ import { caravanOf, dockOf, homeMarket, marketOf, nearestCaravan, nearestDock, p
 import { ruinAt } from './ruins';
 import { raise, raiseCost } from './reclaim';
 import { callWork, workProblem } from './works';
-import { takeVow, takeWay, vowProblem, wayProblem } from './ways';
+import { callKin, killCamp, kinProblem, takeVow, takeWay, vowProblem, wayProblem } from './ways';
 import { beaconProblem, lightBeacon } from './beacon';
 import { callUp, callUpProblem } from './warcamp';
 import { bloodOf, bloodShort, levy, levyProblem, sworn } from './blood';
@@ -174,7 +174,9 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
     }
     if (gone.size) s.ents = s.ents.filter((e) => !gone.has(e.id));
   }
+  const free = killCamp(s, p, type, tx, ty);
   const b = placeBuilding(s, p, type, tx, ty, false);
+  if (free) b.kill = true;
   raise(s, b);
   s.events.push({ k: 'placed', id: b.id, owner: p, type });
   if (type === 'wonder') s.events.push({ k: 'wonderRising', owner: p, id: b.id, x: b.x, y: b.y });
@@ -463,7 +465,9 @@ export function applyCommand(s: GameState, c: Command): void {
     case 'garrison': {
       const b = myBuilding(s, c.p, c.target);
       if (!b || !b.built || !BUILDINGS[b.type].garrison) return;
-      for (const u of myUnits(s, c.p, c.ids)) if (u.type !== 'siege' && domainOf(u.type) === 'land') giveOrder(u, { k: 'garrison', target: b.id }, c.queue);
+      // A warband does not hide (#463 s1): its citizens never shelter.
+      const hides = !(p.way && WAYS[p.way].noBell);
+      for (const u of myUnits(s, c.p, c.ids)) if (u.type !== 'siege' && domainOf(u.type) === 'land' && (hides || u.type !== 'citizen')) giveOrder(u, { k: 'garrison', target: b.id }, c.queue);
       break;
     }
     case 'board': {
@@ -493,6 +497,7 @@ export function applyCommand(s: GameState, c: Command): void {
       break;
     }
     case 'bell': {
+      if (c.ring && p.way && WAYS[p.way].noBell) return refuse(s, c.p, `${WAYS[p.way].name} does not hide: the bell does not ring`);
       if (c.ring) {
         // Every citizen to the nearest shelter with room, remembering their work.
         const shelters = s.ents.filter((e): e is Building => e.kind === 'building' && e.owner === c.p && e.built && e.hp > 0 && !!BUILDINGS[e.type].garrison);
@@ -604,6 +609,14 @@ export function applyCommand(s: GameState, c: Command): void {
       const why = wayProblem(s, p, c.way);
       if (why) return refuse(s, c.p, why);
       takeWay(s, p, c.way);
+      break;
+    }
+    case 'kin': {
+      const b = myBuilding(s, c.p, c.building);
+      if (!b) return;
+      const why = kinProblem(p, b);
+      if (why) return refuse(s, c.p, why);
+      callKin(s, p, b);
       break;
     }
     case 'vow': {
@@ -789,7 +802,7 @@ export function applyCommand(s: GameState, c: Command): void {
         const e = s.byId.get(id);
         if (!e || e.owner !== c.p || e.hp <= 0) continue;
         if (e.kind === 'building' && !e.built && e.progress === 0 && e.pitch === undefined) {
-          refund(p, buildingCostFor(s, c.p, e.type));
+          if (!e.kill) refund(p, buildingCostFor(s, c.p, e.type));
           if (BUILDINGS[e.type].blood) p.blood = bloodOf(p) + BUILDINGS[e.type].blood!;
         }
         e.hp = 0;

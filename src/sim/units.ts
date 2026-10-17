@@ -1,4 +1,4 @@
-import { AI_LEVELS, AUTO_WORK, BUILDINGS, CARRY, CONSECRATE, DEER, DT, FLOCK, GALVANIC, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SPREAD, TRADE, domainOf, secs } from './data';
+import { AI_LEVELS, AUTO_WORK, BUILDINGS, CARRY, CONSECRATE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SPREAD, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
@@ -569,7 +569,8 @@ function buildStep(s: GameState, u: Unit, o: Extract<Order, { k: 'build' }>): vo
     u.act = 'build';
     // Galvanic Revival: a repair inside a Tower's field is free and quicker.
     const wired = b.built && !!modsOf(s, u.owner).galvanic && inField(s, b);
-    const step = (DT / buildTimeFor(s, u.owner, b.type)) * (wired ? GALVANIC.repair : 1);
+    // A Hunters' kill camp (#463 s1) goes up in a fraction of the time.
+    const step = (DT / (buildTimeFor(s, u.owner, b.type) * (b.kill && !b.built ? KILL_CAMP.time : 1))) * (wired ? GALVANIC.repair : 1);
     const max = maxHp(s, b);
     const hp = Math.min(max, b.hp + max * step);
     if (b.built && !wired) {

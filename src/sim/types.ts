@@ -214,6 +214,8 @@ export interface Unit {
 export interface TrainItem {
   unit?: UnitType;
   tech?: TechId;
+  /** The Hearth's kin (#463 s1): this many citizens come out together when the work is done. */
+  kin?: number;
   /** Ticks of work done. */
   done: number;
   /** What was paid, refunded if it is cancelled. */
@@ -285,6 +287,8 @@ export interface Building {
    * `BLOOD.bleed` a second until spent; freed as citizens of their own people if the building falls. Absent: none.
    */
   captives?: { p: number; left: number }[];
+  /** A Hunters' kill camp (#463 s1): raised for nothing and quickly, so a cancelled site refunds nothing. */
+  kill?: boolean;
 }
 
 export type Ent = Unit | Building;
@@ -476,6 +480,8 @@ export interface PlayerStats {
   slain?: number;
   /** Gold taken as plunder from the enemy dead (#299); absent in older saves. */
   plunder?: number;
+  /** Food a Warband's soldiers carried off from rivals (#463 s1); absent in older saves. */
+  raided?: number;
   /** Gold paid in wages to hired swords (the Age of Merchants); absent in older saves. */
   wages?: number;
   /** Foot soldiers trained at War Camps: the deed of the Age of Total War (#313); absent in older saves. */
@@ -539,6 +545,8 @@ export interface Player {
   deep?: boolean;
   /** The Bronze Age vow has been made, deepening or turning (#338). */
   vowed?: boolean;
+  /** Tick this people was last told that raiders carried off its food (#463 s1); absent if never. */
+  raidTold?: number;
   /** Tick the great work now at hand ends; absent when none is. */
   workEnd?: number;
   /** A card of tidings at the fire waiting on an answer (#443): which, which draw, and the tick it passes unanswered. Absent when none waits. */
@@ -657,6 +665,10 @@ export type GameEvent =
   /** A great work was called (`on`) or ran out (seed #133). */
   | { k: 'greatWork'; owner: number; on: boolean }
   | { k: 'way'; owner: number; way: WayId; deep?: boolean; turned?: boolean }
+  /** The Hearth's kin came to a Town Center (#463 s1). */
+  | { k: 'kin'; owner: number; n: number; x: number; y: number }
+  /** A Warband's soldiers carried `food` off from `owner`'s store (#463 s1); `tell` when the victim should hear of it. */
+  | { k: 'raided'; owner: number; by: number; food: number; x: number; y: number; tell: boolean }
   | { k: 'wonder'; owner: number; id: number; x: number; y: number; ticks: number }
   /** A Wonder's foundation was laid (#361): every player hears of it, so the whole build can be contested. */
   | { k: 'wonderRising'; owner: number; id: number; x: number; y: number }
@@ -803,7 +815,8 @@ export interface AiMemory {
   short?: { since: number; epoch: number };
   /** A band out after rival citizens working far from home (#260): its soldiers, their quarry and since when. */
   /** With `look`, the band is walking to a rival Hunting Camp it has seen, to find who works there (`target` -1 until it does). */
-  prowl?: { ids: number[]; target: number; since: number; look?: number; burn?: number };
+  /** With `raid`, a Warband's band out for a rival's food buildings (#463 s1), given longer for the walk. */
+  prowl?: { ids: number[]; target: number; since: number; look?: number; burn?: number; raid?: boolean };
   /**
    * The Path of Blood (#307): since when it holds the Warband for plunder (-1 once done), when it entered Iron and Blood, and when it last pitched a War Camp.
    * Hemocraft (#355 s5): where rival living soldiers last came near home (`foe`), and when it last sent citizens to the levy (`levy`).
@@ -860,6 +873,8 @@ export type Command =
   /** Call the people's great work (seed #133), once in each epoch. */
   | { t: 'greatWork'; p: number }
   | { t: 'way'; p: number; way: WayId }
+  /** The Hearth Way's call (#463 s1): kin come to a Town Center. */
+  | { t: 'kin'; p: number; building: number }
   /** A vow (#338): deepen the Way (no `way`), or turn to `way`. */
   | { t: 'vow'; p: number; way?: WayId }
   | { t: 'stance'; p: number; ids: number[]; stance: Stance }
