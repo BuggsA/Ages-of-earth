@@ -1,5 +1,5 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_ORE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_VIGIL, AI_ORE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
@@ -824,10 +824,20 @@ function construct(s: GameState, v: View, mem: AiMemory, type: BuildingType, spo
  */
 export function fairSpot(s: GameState, v: View): { tx: number; ty: number } | null {
   const id = v.p.id;
-  const shrine = v.buildings.find((b) => b.type === 'temple' && b.built && b.hp > 0 && s.relics.some((r) => r.temple === b.id));
+  const shrine = shrineOf(s, v);
   if (!shrine) return null;
   const half = BUILDINGS.market.size / 2;
   return findSpot(s, 'market', shrine.x, shrine.y, 2, AI_FAIR.ring, 1, (tx, ty) => fairground(s, id, { x: tx + half, y: ty + half }));
+}
+
+/** Our lowest-id finished Temple that keeps a relic: the fairground's heart and the vigil's post. */
+function shrineOf(s: GameState, v: View): Building | undefined {
+  return v.buildings.find((b) => b.type === 'temple' && b.built && b.hp > 0 && s.relics.some((r) => r.temple === b.id));
+}
+
+/** Where a clever computer's priests keep vigil (#379 s2): its shrine, in an age that pays for it (`vigil.ts`). */
+function vigilPost(s: GameState, v: View): Building | undefined {
+  return AI_LEVELS[v.p.ai!].clever && ageDef(v.p).vigils ? shrineOf(s, v) : undefined;
 }
 
 function count(v: View, type: BuildingType, builtOnly = false): number {
@@ -2462,7 +2472,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     if (b.type === 'market' && !hiresAt(p, b.type).length) continue;
     let unit: UnitType | null;
     if (b.type === 'workshop') unit = siege < Math.max(v.plan.siege, p.epoch >= 2 ? 3 : 2) + lodge && (v.army.length >= 6 || siege < v.plan.siege) ? 'siege' : null;
-    else if (b.type === 'temple') unit = v.priests.length < (v.army.length >= 6 ? (consecrates(s, p.id) ? AI_FAITH.priests : 2) : 0) + (looseRelics(s) > 0 ? 1 : 0) ? 'priest' : null;
+    else if (b.type === 'temple') unit = v.priests.length < (v.army.length >= 6 ? (consecrates(s, p.id) ? AI_FAITH.priests : 2) : 0) + (looseRelics(s) > 0 ? 1 : 0) + (vigilPost(s, v) ? VIGIL.most : 0) ? 'priest' : null;
     else {
       unit = counter && trains.includes(counter) && unitEpoch(counter) <= p.epoch && !barred(p, counter) && roll(s) < counterOdds ? counter : pickUnit(v, mem, b);
       if (unit && unitEpoch(unit) > p.epoch) unit = pickUnit(v, mem, b);
@@ -2780,6 +2790,9 @@ function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const army = v.army.filter((u) => !u.inside && u.type !== 'siege');
   const fetching = new Set<number>();
   for (const pr of v.priests) if (pr.order.k === 'relic') fetching.add(pr.order.target);
+  // In the Age of Pilgrims the first `VIGIL.most` priests (in id order) keep vigil at the shrine (#379 s2).
+  const shrine = vigilPost(s, v);
+  const keepers = new Set(shrine ? v.priests.filter((pr) => !carriedBy(s, pr)).slice(0, VIGIL.most).map((pr) => pr.id) : []);
   for (const pr of v.priests) {
     if (pr.order.k !== 'idle' || pr.inside) continue;
     const held = carriedBy(s, pr);
@@ -2837,6 +2850,12 @@ function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     }
     if (best) {
       issue({ t: 'convert', p: v.p.id, ids: [pr.id], target: best.id });
+      continue;
+    }
+    // A keeper goes back to the shrine and stays: each one adds to every relic payment.
+    if (shrine && keepers.has(pr.id)) {
+      const r = VIGIL.reach - AI_VIGIL.slack;
+      if ((pr.x - shrine.x) * (pr.x - shrine.x) + (pr.y - shrine.y) * (pr.y - shrine.y) > r * r) issue({ t: 'move', p: v.p.id, ids: [pr.id], x: shrine.x, y: shrine.y });
       continue;
     }
     // Against a pilgrim rival, a spare priest stands by a tower, gate or Temple.
