@@ -921,8 +921,10 @@ export function fairSpot(s: GameState, v: View): { tx: number; ty: number } | nu
  * Whether to hold this unit back for the feast (#356): within `AI_FAIR.save` seconds of a feast opening, when the levy
  * would cut its price at this building and the army already numbers `AI_FAIR.army`.
  */
-export function feastSoon(s: GameState, p: Player, unit: UnitType, b: { x: number; y: number }, army: number): boolean {
+export function feastSoon(s: GameState, p: Player, unit: UnitType, b: { x: number; y: number }, army: number, hoard = 0, price = 1): boolean {
   if (unit === 'hero' || feastOpen(s) || !ageDef(p).fairs || !fairground(s, p.id, b)) return false;
+  // A purse already deep enough to buy `AI_FAIR.hoard` of them keeps plenty for the levy: this one is bought now.
+  if (hoard >= AI_FAIR.hoard * price) return false;
   return nextFeastIn(s) <= secs(AI_FAIR.save) && army >= AI_FAIR.army;
 }
 
@@ -2988,9 +2990,9 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     }
     if (!unit || unitEpoch(unit) > p.epoch || barred(p, unit)) continue;
     // Just before a feast opens, a clever computer with an army in hand holds its muster at the fairground to buy it at the levy (#356).
-    if (L.clever && feastSoon(s, p, unit, b, v.army.length) && !threatNear(s, v).unit) continue;
     // What it costs here: a levy, an age's price or a hire for gold (#37).
     const cost = trainCostFor(s, p.id, unit, b.type, b);
+    if (L.clever && feastSoon(s, p, unit, b, v.army.length, v.budget.gold, cost.gold ?? 0) && !threatNear(s, v).unit) continue;
     if (!afford(v, cost)) continue;
     // A sword for hire draws wages (`MERC`): hire it only with its keep, and the keep of every sword already hired, left in the purse.
     if (isHire(p, b.type, unit) && v.budget.gold < (cost.gold ?? 0) + AI_MERC.reserve * MERC.wage * (swordsOf(s, p.id).length + 1)) continue;
