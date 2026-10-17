@@ -1702,6 +1702,8 @@ export interface AiLevel {
   healers?: boolean;
   /** Off: a cursed computer army fights on and its riders ignore the priest (#434; only `scripts/ai-ab.ts` turns it off). */
   curseAnswer?: boolean;
+  /** Off: the computer does not ride down the priests who swear a rival's army (Military Orders, #459; only `scripts/ai-ab.ts` turns it off). */
+  breakOath?: boolean;
 }
 
 /**
@@ -1857,6 +1859,13 @@ export const AI_RITE = { pack: 3, keep: 40, dear: 30, pinned: 2, closing: 7, pat
  * tiles of a rival priest of the Blood-rite ride at that priest.
  */
 export const AI_CURSE = { late: 14, hurt: 0.7, near: 5, riders: 3, reach: 14 };
+
+/**
+ * A clever computer reads a rival's Military Orders (#459): when a rival soldier within `reach` tiles of one of its riders is sworn,
+ * up to `riders` of those riders (its archers, if it has no riders) go for the nearest rival priest swearing it: the priest's fall
+ * breaks the oath and the faster mending together.
+ */
+export const AI_ORDERS = { reach: 14, riders: 2 };
 
 /** Selling rare ore at a Market (#356 s5): a lot of `lot` pays `gold[ore]` gold at a flat price. Ore mined still counts toward its doors; only the stock in hand is spent. */
 export const ORE_TRADE = { lot: 20, gold: { salt: 40, saltpetre: 55, bloodiron: 90 } as Record<'salt' | 'saltpetre' | 'bloodiron', number> };
