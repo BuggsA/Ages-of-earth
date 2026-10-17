@@ -277,9 +277,11 @@ export const AGES: Record<AgeId, Age> = {
     short: 'Warband',
     tier: 2,
     path: 'blood',
-    blurb: 'The war-host is the people: soldiers train 15% faster, and every enemy unit your forces slay pays a quarter of its price as plunder in gold. But a warband trades with no one: no traders leave its Markets, and with the young away at war the fields yield 10% less.',
+    blurb: 'The war-host is the people: soldiers train 15% faster, and every enemy unit your forces slay earns a quarter of its price in plunder, carried in the killer\'s pack (up to 90 gold) until it walks within 5 tiles of a Town Center or Barracks to bank it. A rival who fells a laden soldier takes its pack. But a warband trades with no one: no traders leave its Markets, and with the young away at war the fields yield 10% less.',
     add: { plunder: 0.25 },
     haul: true,
+    verb: 'Carry the plunder home: the soldier who makes a kill packs the gold and must walk it back to a Town Center or Barracks to bank it, so raids are timed, convoys guarded, and the war-host comes home between blows',
+    door: 'A laden soldier felled in the field hands its pack to the rival, and no pack holds more than a few kills: a host that never turns home banks nothing, and a host that hurries home gives up the front',
     mul: { militaryTrain: 0.85, farm: 0.9 },
     no: { units: ['trader'], why: 'A warband trades with no one: traders wait until your people leave the Path of Blood' },
   },
@@ -698,7 +700,7 @@ export const ROADS: Road[] = [
     clue: 'barracks',
     gate: 'easy',
     deed: { stat: 'slain', n: 10, text: 'Your forces slay 10 enemy units' },
-    blurb: 'A turn, not a climb: the first step on the Path of Blood. The same soldiers and technologies as the Middle Ages, but soldiers train 15% faster and every enemy unit slain pays a quarter of its price as plunder in gold, so war feeds the town. What it gives up: trade (no traders) and some of the harvest (farms 10% less). A warband that stops fighting grows poor.',
+    blurb: 'A turn, not a climb: the first step on the Path of Blood. The same soldiers and technologies as the Middle Ages, but soldiers train 15% faster and every enemy unit slain earns a quarter of its price in plunder, carried by the killer and banked at a Town Center or Barracks (a laden soldier felled in the field hands its pack over), so war feeds the town once the host comes home with it. What it gives up: trade (no traders) and some of the harvest (farms 10% less). A warband that stops fighting grows poor.',
   },
   { from: 'warband', to: 'gunpowder', cost: { food: 1000, gold: 500, stone: 300 }, time: 65, blurb: 'Climb to the Gunpowder Age: the plunder ends, traders and full harvests return (less gold and more stone than from the Middle Ages: the war-host was never rich in coin). The Path of Blood goes on from there, into the Age of Iron and Blood, for a people whose plunder is already taken.' },
   { from: 'warband', to: 'middle', cost: { food: 250, gold: 100 }, time: 30, blurb: 'Hang up the spear: the ordinary Middle Ages, with trade and full fields, and no plunder.' },
@@ -1414,7 +1416,7 @@ export const CIV_IDS = Object.keys(CIVS) as CivId[];
  * `tests/verbs.test.ts` lets these go without a `verb`, and fails once one has a verb but is still listed: strike it then.
  */
 export const VERB_GAPS: { ages: Partial<Record<AgeId, number>>; civs: Partial<Record<CivId, number>> } = {
-  ages: { warband: 502, reclaimer: 503 },
+  ages: { reclaimer: 503 },
   civs: { egyptians: 501, greeks: 501, romans: 501, mongols: 501, chinese: 501, britons: 501 },
 };
 

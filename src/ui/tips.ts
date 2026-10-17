@@ -178,12 +178,12 @@ const TIPS: Tip[] = [
       const p = s.players[me];
       return ageOf(p) === 'middle' && roadKnown(s, p, WARBAND_ROAD) && (p.stats.slain ?? 0) > 0 && !deedsDone(p, WARBAND_ROAD, s);
     },
-    text: `War can be a way of life. Slay ${WARBAND_ROAD.deed!.n} enemy units and the Town Center (🔀) can set your people on the <b>Path of Blood</b>, into the <b>${AGES.warband.name}</b>: soldiers train faster and every enemy slain pays plunder in gold, but no traders, and the fields yield less. The road shuts once you advance.`,
+    text: `War can be a way of life. Slay ${WARBAND_ROAD.deed!.n} enemy units and the Town Center (🔀) can set your people on the <b>Path of Blood</b>, into the <b>${AGES.warband.name}</b>: soldiers train faster and every enemy slain earns plunder, carried in the killer\'s pack until it is walked home, but no traders, and the fields yield less. The road shuts once you advance.`,
   },
   {
     id: 'plunder',
     when: (s, me) => ageOf(s.players[me]) === 'warband',
-    text: 'Your warband lives on plunder: every enemy unit your forces slay pays part of its price in gold, more the further you walk the Path of Blood. Raids feed the town now, and a quiet border starves it.',
+    text: 'Your warband lives on plunder, but it is carried: each kill fills the killer\'s pack (💰 in its panel), and the gold is yours only once that soldier walks home to a Town Center or Barracks. Bring laden soldiers back before a rival fells them, or the pack changes hands.',
   },
   {
     id: 'ironblood',
