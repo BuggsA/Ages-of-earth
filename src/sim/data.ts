@@ -32,6 +32,9 @@ export const LAST_EPOCH = EPOCHS.length - 1;
  */
 export interface Age {
   name: string;
+  /** The verbs rubric (`docs/verbs.md`, #506): what the player now does, in words and never a number, and the door it shuts. */
+  verb?: string;
+  door?: string;
   short: string;
   tier: number;
   blurb: string;
@@ -108,6 +111,8 @@ export interface Age {
   prizes?: boolean;
   /** Priests keeping vigil at a relic Temple add to its gold (the Age of Pilgrims): see `VIGIL` (`vigil.ts`). */
   vigils?: boolean;
+  /** Rival citizens slain by this people's forces are taken captive and work its fields (the Age of the Warband): see `THRALL` (`thralls.ts`). */
+  thralls?: boolean;
 }
 
 /**
@@ -177,6 +182,8 @@ export const AGES: Record<AgeId, Age> = {
   gunpowder: trunkAge(3),
   industrial: trunkAge(4),
   aeronaut: {
+    verb: 'Fight from forward Airfields: aircraft fly sorties on fuel, so where you build an Airfield is how far you reach',
+    door: 'Foot, ranged, cavalry and siege cost more',
     name: 'Age of Aeronauts', short: 'Aeronauts', tier: 4,
     blurb: 'A future built around the airfield: fighters and bombers cost 25% less and train in 25% less time. Foot, ranged, cavalry and siege units cost 20% more. But aircraft fly on fuel: they turn for home 30 tiles from an Airfield of yours and burn out beyond 36, and they are rearmed and mended while they sit at one. A long reach means a forward Airfield. Aircraft keep Industrial combat strength; riflemen, towers, ironclads and enemy fighters still answer them.',
     price: { fighter: 0.75, bomber: 0.75, infantry: 1.2, ranged: 1.2, cavalry: 1.2, siege: 1.2 },
@@ -192,6 +199,8 @@ export const AGES: Record<AgeId, Age> = {
     reclaim: true,
   },
   merchant: {
+    verb: 'Hire swords at the Market for gold, and keep paying them by the day or lose them',
+    door: 'Levies cost more',
     name: 'Age of Merchants',
     short: 'Merchant',
     tier: 2,
@@ -202,6 +211,8 @@ export const AGES: Record<AgeId, Age> = {
     levy: 1.2,
   },
   iron: {
+    verb: 'Dig the marsh: bog iron sharpens every spearman, so the bog is worth holding',
+    door: 'No cavalry until the Middle Ages',
     name: 'Iron Age',
     short: 'Iron',
     tier: 1,
@@ -213,6 +224,8 @@ export const AGES: Record<AgeId, Age> = {
     no: { units: ['cavalry'], why: 'No horses in the Iron Age: cavalry waits for the Middle Ages' },
   },
   pilgrim: {
+    verb: 'Send chanting priests to win a rival\'s towers, gates and Temples over, and keep vigils by your relics',
+    door: 'No siege engines',
     name: 'Age of Pilgrims',
     short: 'Pilgrim',
     tier: 2,
@@ -224,6 +237,8 @@ export const AGES: Record<AgeId, Age> = {
     no: { units: ['siege'], why: 'A pilgrim people builds no siege engines: rams and catapults wait until it leaves the pilgrims\' road' },
   },
   fair: {
+    verb: 'Time your traders to come home on the feast day, to a Market built by a Temple that keeps a relic',
+    door: 'Towns grown open round the fairground stand weaker',
     name: 'Age of Fairs',
     short: 'Fairs',
     tier: 3,
@@ -234,6 +249,8 @@ export const AGES: Record<AgeId, Age> = {
     fairs: true,
   },
   sail: {
+    verb: 'Send warships with the merchant cogs in convoy, and sink a rival\'s cogs for prize money',
+    door: 'Fields are tilled with less care',
     name: 'Age of Sail',
     short: 'Sail',
     tier: 2,
@@ -245,6 +262,8 @@ export const AGES: Record<AgeId, Age> = {
     prizes: true,
   },
   lightning: {
+    verb: 'Lay the town out round Coil Towers: inside a coil\'s field everything works faster, outside it slower',
+    door: 'No aircraft',
     name: 'Age of Lightning',
     short: 'Lightning',
     tier: 4,
@@ -258,13 +277,16 @@ export const AGES: Record<AgeId, Age> = {
     short: 'Warband',
     tier: 2,
     path: 'blood',
-    blurb: 'The war-host is the people: soldiers train 15% faster, and every enemy unit your forces slay pays a quarter of its price as plunder in gold. But a warband trades with no one: no traders leave its Markets, and with the young away at war the fields yield 10% less.',
-    add: { plunder: 0.25 },
+    blurb: 'The war-host is the people: soldiers train 15% faster, and every enemy unit your forces slay pays a sixth of its price as plunder in gold. A rival citizen who falls to your forces is taken instead of lost: a thrall rises where it fell, your own, to work your fields (up to 8 at a time, and if there is room). A thrall never builds. But a warband trades with no one: no traders leave its Markets, and with the young away at war the fields yield 10% less.',
+    thralls: true,
+    add: { plunder: 0.15 },
     mul: { militaryTrain: 0.85, farm: 0.9 },
     no: { units: ['trader'], why: 'A warband trades with no one: traders wait until your people leave the Path of Blood' },
   },
   // The second step of the Path of Blood (#303): a turn off the Gunpowder Age, open only to a people that walked the Warband.
   ironblood: {
+    verb: 'Pitch War Camps where the army stands, even in enemy land, and train foot soldiers at the front',
+    door: 'No traders, and a camp left without soldiers burns',
     name: 'Age of Iron and Blood',
     short: 'Iron & Blood',
     tier: 3,
@@ -277,6 +299,8 @@ export const AGES: Record<AgeId, Age> = {
   },
   // The third step of the Path of Blood (#313): a turn off the Industrial Age, open only to a people that walked Iron and Blood.
   totalwar: {
+    verb: 'Call citizens to arms at a War Camp: each becomes a foot soldier where it stands',
+    door: 'No traders, and the fields and learning suffer',
     name: 'Age of Total War',
     short: 'Total War',
     tier: 4,
@@ -291,6 +315,8 @@ export const AGES: Record<AgeId, Age> = {
   // The fork at the end of the Path of Blood (#355 s2): two turns off the Industrial Age for a people that walked Total War, each its
   // own branch path. Hemocraft is blood and machinery as one craft; the Blood-rite is blood as a sacrament. Each shuns the other.
   hemocraft: {
+    verb: 'Bleed living enemies near your Drain Rigs into a blood store, and spend it on grafts',
+    door: 'No priests and no traders; machines bleed nothing, so a rival answers with steel; the Blood-rite is closed for good',
     name: 'Age of Hemocraft',
     short: 'Hemocraft',
     tier: 4,
@@ -303,6 +329,8 @@ export const AGES: Record<AgeId, Age> = {
     hemocraft: true,
   },
   bloodrite: {
+    verb: 'Make every Temple an altar: sacrifice or curse bleeding enemies with priests, and mend your own with the blood',
+    door: 'No Transfusion Station and no traders; Hemocraft is closed for good',
     name: 'Age of the Blood-rite',
     short: 'Blood-rite',
     tier: 4,
@@ -316,6 +344,8 @@ export const AGES: Record<AgeId, Age> = {
     rite: true,
   },
   steppe: {
+    verb: 'Pack your Town Centers and Houses onto wagons and pitch them where the herds and the fight are',
+    door: 'No fields and no walls',
     name: 'Age of the Steppe',
     short: 'Steppe',
     tier: 1,
@@ -329,6 +359,8 @@ export const AGES: Record<AgeId, Age> = {
   },
   // The second step of the Steppe Road (#318): the moving town grows into a horde, at the Middle Ages' tier.
   horde: {
+    verb: 'Stand riders in a rival\'s land to take tribute from their treasury',
+    door: 'No fields and no walls',
     name: 'Age of the Horde',
     short: 'Horde',
     tier: 2,
@@ -343,6 +375,8 @@ export const AGES: Record<AgeId, Age> = {
   },
   // The third step of the Steppe Road (#326), a crossing: where the horde meets the merchants, at the Gunpowder Age's tier.
   silk: {
+    verb: 'Roll the Market on a wagon with the town, raise Caravanserais, and toll rival traders who cross your land',
+    door: 'No tribute, no fields and no walls',
     name: 'Age of the Silk Road',
     short: 'Silk Road',
     tier: 3,
@@ -1007,6 +1041,8 @@ export const RELIC = { home: 20, fair: 3, spacing: 12, extra: { small: 1, medium
  * the Bronze Age, at most `max`: so a long road pays more per minute, and has more road to guard.
  * Each ally with a Market of its own takes `ally` of every trip home (a quarter), so a team trades together.
  * By sea: a post with water within `sea.reach` tiles is a port, and a merchant ship from a Dock sails there for `sea.mul` times the land road's gold.
+ * A glut (#493): every load a post gives raises its glut by `each` (up to `max`) and every trip there pays `1 − glut` of its gold;
+ * the glut heals `heal` a second, so about one trader in 40 seconds keeps a post at full price, and a flood of them does not.
  */
 /**
  * Ancient ruins (#64): `count` (by map size) lie out between the towns, at least `home` tiles from every
@@ -1110,7 +1146,7 @@ export const AI_MARK = { /** In a Lords of the Land match: reach over the whole 
     fordRival: 1.6 } };
 /** Repairs: restoring a building's whole health costs this share of its price, paid as the hammers work. */
 export const REPAIR_SHARE = 0.4;
-export const TRADE = { posts: { small: 2, medium: 2, large: 3 } as Record<MapSize, number>, edge: 9, fair: 4, far: 0.3, spacing: 0.4, plaza: 1, reach: 1.8, gold: 0.012, epoch: 0.08, max: 180, ally: 0.25, harbor: { reach: 12, mul: 1.3 }, sea: { reach: 7, mul: 1.2 } };
+export const TRADE = { posts: { small: 2, medium: 2, large: 3 } as Record<MapSize, number>, edge: 9, fair: 4, far: 0.3, spacing: 0.4, plaza: 1, reach: 1.8, gold: 0.012, epoch: 0.08, max: 180, ally: 0.25, harbor: { reach: 12, mul: 1.3 }, sea: { reach: 7, mul: 1.2 }, glut: { each: 0.12, heal: 0.003, max: 0.5 } };
 
 export interface BuildingStats {
   name: string;
@@ -1354,6 +1390,9 @@ export const TECH_IDS = Object.keys(TECHS) as TechId[];
 
 export interface Civ {
   name: string;
+  /** The verbs rubric (`docs/verbs.md`, #506): what the player now does, in words and never a number, and the door it shuts. */
+  verb?: string;
+  door?: string;
   blurb: string;
   add?: Partial<Mods>;
   mul?: Partial<Mods>;
@@ -1369,6 +1408,15 @@ export const CIVS: Record<CivId, Civ> = {
 };
 
 export const CIV_IDS = Object.keys(CIVS) as CivId[];
+
+/**
+ * Known gaps in the verbs rubric (#506): entries that still change only numbers, each with the issue that gives it a verb.
+ * `tests/verbs.test.ts` lets these go without a `verb`, and fails once one has a verb but is still listed: strike it then.
+ */
+export const VERB_GAPS: { ages: Partial<Record<AgeId, number>>; civs: Partial<Record<CivId, number>> } = {
+  ages: { warband: 502, reclaimer: 503 },
+  civs: { egyptians: 501, greeks: 501, romans: 501, mongols: 501, chinese: 501, britons: 501 },
+};
 
 /**
  * A people's great work (seed #133): once in each epoch from `WORK.from`, a player may call it from a
@@ -1461,6 +1509,9 @@ export interface Way {
   noBell?: boolean;
   /** Laid over `add`/`mul` once the Way is deepened in the Bronze Age (#338). */
   deep: { add?: Partial<Mods>; mul?: Partial<Mods>; blurb: string };
+  /** The verbs rubric (`docs/verbs.md`, #506): what the player now does, in words and never a number, and the door it shuts. */
+  verb?: string;
+  door?: string;
 }
 
 export const WAY_IDS: WayId[] = ['hunt', 'hearth', 'warband'];
@@ -1469,9 +1520,9 @@ export const WAY_IDS: WayId[] = ['hunt', 'hearth', 'warband'];
 export const WAY_LEAN: Record<CivId, WayId> = { mongols: 'hunt', britons: 'hunt', egyptians: 'hearth', chinese: 'hearth', romans: 'warband', greeks: 'warband' };
 
 export const WAYS: Record<WayId, Way> = {
-  hunt: { name: 'The Hunters\' Way', icon: '🦌', blurb: 'Camp where the kill falls: a Hunting Camp pitched within 6 tiles of game or a fresh kill costs nothing and goes up three times as fast. Hunting yields 25% more, and wolves, boars and mammoths bite 30% softer. But a people that follows the herds sows nothing where they graze: in the Stone Age no Farm is raised while deer, boars or mammoths live within 24 tiles of your Town Center. Hunt the home herd out to open the fields, or spare it and range for your meat. Berries are gathered 10% slower.', mul: { hunt: 1.25, beastWard: 0.7, forage: 0.9 }, herdShuts: ['farm'], deep: { mul: { hunt: 1.15, beastWard: 0.85, forage: 0.9 }, blurb: 'Hunting yields another 15%, beasts bite another 15% softer; berries are gathered 10% slower.' } },
-  hearth: { name: 'The Hearth Way', icon: '🔥', blurb: 'The hearth that keeps: Call the Kin at a Town Center, 120 food for 2 citizens in 16 seconds, and 3 in winter, so lay food up for the lean season. Berries yield 20% more and farms 10%. But a people of the hearth keeps no camps in the wild: no Hunting Camps, hunting is 20% slower and beasts bite 20% harder.', mul: { forage: 1.2, farm: 1.1, hunt: 0.8, beastWard: 1.2 }, shuts: ['huntcamp'], deep: { mul: { forage: 1.15, farm: 1.1, wood: 1.05, hunt: 0.9 }, blurb: 'Berries yield another 15%, farms another 10%, wood 5%; hunting another 10% slower.' } },
-  warband: { name: 'The Warband Way', icon: '🗡', blurb: 'Feed on the raid: every blow your soldiers land on a rival Town Center, Storehouse, Hunting Camp, Dock or Farm carries off food from the rival\'s store, and a rival citizen slain gives up its load. Soldiers train 15% faster and strike 1 harder in melee. But a warband does not hide: the town bell does not ring, and berries and hunting are 15% slower.', add: { meleeAttack: 1 }, mul: { militaryTrain: 0.85, forage: 0.85, hunt: 0.85 }, noBell: true, deep: { add: { meleeAttack: 1 }, mul: { militaryTrain: 0.9, forage: 0.9, hunt: 0.9 }, blurb: 'Soldiers train another 10% faster and strike 1 harder again; berries and hunting another 10% slower.' } },
+  hunt: { verb: 'Pitch Hunting Camps free beside game or a fresh kill', door: 'No Farms in the Stone Age while game grazes near home', name: 'The Hunters\' Way', icon: '🦌', blurb: 'Camp where the kill falls: a Hunting Camp pitched within 6 tiles of game or a fresh kill costs nothing and goes up three times as fast. Hunting yields 25% more, and wolves, boars and mammoths bite 30% softer. But a people that follows the herds sows nothing where they graze: in the Stone Age no Farm is raised while deer, boars or mammoths live within 24 tiles of your Town Center. Hunt the home herd out to open the fields, or spare it and range for your meat. Berries are gathered 10% slower.', mul: { hunt: 1.25, beastWard: 0.7, forage: 0.9 }, herdShuts: ['farm'], deep: { mul: { hunt: 1.15, beastWard: 0.85, forage: 0.9 }, blurb: 'Hunting yields another 15%, beasts bite another 15% softer; berries are gathered 10% slower.' } },
+  hearth: { verb: 'Call the Kin at a Town Center, more in winter, so lay food up for the lean season', door: 'No Hunting Camps', name: 'The Hearth Way', icon: '🔥', blurb: 'The hearth that keeps: Call the Kin at a Town Center, 120 food for 2 citizens in 16 seconds, and 3 in winter, so lay food up for the lean season. Berries yield 20% more and farms 10%. But a people of the hearth keeps no camps in the wild: no Hunting Camps, hunting is 20% slower and beasts bite 20% harder.', mul: { forage: 1.2, farm: 1.1, hunt: 0.8, beastWard: 1.2 }, shuts: ['huntcamp'], deep: { mul: { forage: 1.15, farm: 1.1, wood: 1.05, hunt: 0.9 }, blurb: 'Berries yield another 15%, farms another 10%, wood 5%; hunting another 10% slower.' } },
+  warband: { verb: 'Raid a rival\'s food buildings and citizens and carry their food home', door: 'The town bell never rings', name: 'The Warband Way', icon: '🗡', blurb: 'Feed on the raid: every blow your soldiers land on a rival Town Center, Storehouse, Hunting Camp, Dock or Farm carries off food from the rival\'s store, and a rival citizen slain gives up its load. Soldiers train 15% faster and strike 1 harder in melee. But a warband does not hide: the town bell does not ring, and berries and hunting are 15% slower.', add: { meleeAttack: 1 }, mul: { militaryTrain: 0.85, forage: 0.85, hunt: 0.85 }, noBell: true, deep: { add: { meleeAttack: 1 }, mul: { militaryTrain: 0.9, forage: 0.9, hunt: 0.9 }, blurb: 'Soldiers train another 10% faster and strike 1 harder again; berries and hunting another 10% slower.' } },
 };
 
 /**
@@ -1490,6 +1541,14 @@ export const KIN = { cost: { food: 120 } as Cost, time: 16, n: 2, winter: 3 };
  * `take` food from that rival's store (never more than it holds); a slain rival citizen gives up what it carried,
  * plus `slain` food. The rival hears of it at most every `tell` seconds.
  */
+/**
+ * Thralls (the Age of the Warband, #502): a rival citizen slain by a people in that age is taken captive. A thrall of the
+ * slayer rises where it fell with `hp` of a citizen's health (a share), and goes to work nearby within `reach` tiles. A
+ * people holds at most `max` at a time, and none while its pop is full. A thrall gathers and farms but never builds or repairs.
+ * The rival answers by guarding its workers, walling its fields, or cutting the thralls down (a thrall slain by a warband changes hands).
+ */
+export const THRALL = { max: 8, hp: 0.6, reach: 14 };
+
 export const RAID = { at: ['towncenter', 'storehouse', 'huntcamp', 'dock', 'farm'] as BuildingType[], take: 0.35, slain: 10, tell: 15 };
 
 /**
@@ -1616,12 +1675,17 @@ export interface Homeland {
   fish: number;
   mere: number;
   weight: Record<MapType, number>;
+  /** The verbs rubric (`docs/verbs.md`, #506): what the player now does, in words and never a number, and the door it shuts. */
+  verb?: string;
+  door?: string;
   /** The turning year (#479): what each season's turn does to this homeland, for the season's banner ('' for nothing new). */
   year: [string, string, string, string];
 }
 export const HOMELAND_IDS: HomelandId[] = ['glade', 'shore', 'herds', 'wood'];
 export const HOMELANDS: Record<HomelandId, Homeland> = {
   glade: {
+    verb: 'Forage and hunt near home: the easy start, where any opening works',
+    door: 'Nothing: it is the plain start',
     name: 'The Glade', icon: '🌿', short: 'berries and deer near home',
     blurb: 'Berries by the Town Center and a deer herd beyond: the old, easy start, where any opening works.',
     berries: 7, thicket: 0, deer: 4, herd2: 0, grove: 0, mammoth: 17, fish: 4, mere: 0,
@@ -1629,6 +1693,8 @@ export const HOMELANDS: Record<HomelandId, Homeland> = {
     year: ['', '', '', ''],
   },
   shore: {
+    verb: 'Raise a Dock early and fish the mere by boat',
+    door: 'Few berries, so a rival who burns the Dock starves you',
     name: 'The Shore', icon: '🌊', short: 'few berries; fish the mere from a Dock',
     blurb: 'A rich shoal just off home and only a thin berry bush. Food comes by boat: raise a Dock and launch canoes early, so the opening is hungry for wood, and a rival who burns the Dock starves you. The shoals run thick in autumn, and in winter the mere ices over. Each spring every shoal left in the water spawns, growing by what was spared, and a full one seeds another: a shoal fished out never grows back, and a mere stripped bare stays bare.',
     berries: 3, thicket: 0, deer: 3, herd2: 0, grove: 0, mammoth: 17, fish: 8, mere: 6,
@@ -1636,6 +1702,8 @@ export const HOMELANDS: Record<HomelandId, Homeland> = {
     year: ['The ice breaks and the shoals spawn: each grows by what you spared, and the full ones seed new shoals.', '', 'The autumn run: the shoals are thick, so fish hard and lay food up.', 'The mere ices over: boats fish at a third of their pace until spring.'],
   },
   herds: {
+    verb: 'Hunt in bursts and camp by the kills, then follow the herds\' autumn trek or wait it out',
+    door: 'Little to forage',
     name: 'The Herd Plains', icon: '🦣', short: 'herds and a mammoth close, few berries',
     blurb: 'Two deer herds and a mammoth close by, and little to forage. A meat economy: meat spoils, so hunt in bursts and camp by the kills. Each autumn the herds trek out toward the middle and come home in spring, each deer that lived with a calf: hunt a herd out and it never comes back.',
     berries: 3, thicket: 0, deer: 5, herd2: 5, grove: 0, mammoth: 12, fish: 4, mere: 0,
@@ -1643,6 +1711,8 @@ export const HOMELANDS: Record<HomelandId, Homeland> = {
     year: ['The herds come home, each deer that lived with a calf.', '', 'The herds trek out toward the open middle: follow them, or eat from the store and the fields.', ''],
   },
   wood: {
+    verb: 'Chop room to build and lay snares among the trees you keep; walk far for meat until winter',
+    door: 'No herd near home',
     name: 'The Deep Wood', icon: '🌲', short: 'woods and berries close, no herd near',
     blurb: 'Woods crowd in on the Town Center and a wide berry thicket grows at their edge, but no herd grazes near home. Forage and chop: wood is a short walk, room to build is not, so clear ground or build out, and meat means going far, until winter, when the berries fail and deer come in to yard in the woods by home.',
     berries: 7, thicket: 6, deer: 0, herd2: 0, grove: 40, mammoth: 17, fish: 4, mere: 0,
@@ -1709,8 +1779,10 @@ export const DEER = { hp: 8, walk: 0.8, flee: 2.3, spear: 3.5, spearDamage: 4,
    * onto land inside a border (the wild shies from towns, so the easy hunting near home thins as the
    * borders grow) and never further than `range` tiles from where it began. Deer within `herd` tiles of
    * each other at the start move as one.
+   * Herds breed (#491): each spring a herd of at least `pair` living deer drops a calf for every `pair` of them, up to
+   * `cap` a herd, so game is never hunted out for good while a pair is spared (a lone deer breeds nothing).
    */
-  herd: 4, every: 150, min: 7, max: 12, range: 26 };
+  pair: 2, cap: 6, herd: 4, every: 150, min: 7, max: 12, range: 26 };
 /**
  * The wild (#171). A mammoth grazes `home` tiles out from every town (and `extra` more in the open): it
  * doesn't bolt when speared but turns on whoever threw, charging and goring for `rage` seconds after its
@@ -1858,6 +1930,9 @@ export interface AiLevel {
  * the behaviour they always had, so saves, replays, rooms and tests stay as they were; only the names
  * moved: `easy` is shown as Normal, `normal` as Hard, `hard` as Expert (the campaign proof's level).
  */
+/** The all-clear for a siege that stopped (#487): the bell sounds once no foe has come closer for `stale` seconds and the nearest stands at least `far` tiles off. */
+export const AI_BELL = { stale: 60, far: 8 };
+
 export const AI_LEVELS: Record<Difficulty, AiLevel> = {
   gentle: { label: 'Easy', gather: 0.65, citizens: 12, firstAttack: 1080, wave: 4, waveGrowth: 2, think: 2, towers: 0, clever: false, traders: 1, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true },
   easy: { label: 'Normal', gather: 0.8, citizens: 16, firstAttack: 720, wave: 6, waveGrowth: 3, think: 1.5, towers: 0, clever: false, traders: 2, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true },

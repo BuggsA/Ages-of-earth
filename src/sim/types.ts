@@ -143,7 +143,7 @@ export type Order =
    * A trader running the road between a Market and a trading post: out to the post (`go`), where it
    * loads gold worth the distance from the Market, and back to the Market to pay it in (`back`).
    */
-  | { k: 'trade'; post: number; market: number; phase: 'go' | 'back'; from?: { x: number; y: number } }
+  | { k: 'trade'; post: number; market: number; phase: 'go' | 'back'; from?: { x: number; y: number }; /** Loaded this step: the post floods on the next (#493). */ flood?: true }
   /** A citizen digging at an ancient ruin (#64). */
   | { k: 'dig'; target: number };
 
@@ -213,6 +213,8 @@ export interface Unit {
   cryReady?: number;
   /** Enemy soldiers it has defeated (older saves lack it). */
   vet?: number;
+  /** A citizen taken captive in the Age of the Warband (#502): it gathers and farms but never builds. */
+  thrall?: boolean;
   /** A wagon (#297): the building it carries, and that building's health as a share of its full health. */
   packed?: BuildingType;
   packedHp?: number;
@@ -335,6 +337,9 @@ export interface TradePost {
   /** The center of its middle tile. */
   x: number;
   y: number;
+  /** How flooded its market was at `glutAt` (#493): trips there pay `1 − glut`; healed lazily by `glutNow`. Absent until a trader loads. */
+  glut?: number;
+  glutAt?: number;
 }
 
 /** What lies under a ruin (#64): gold, a technology, a map of the whole land, or a relic. */
@@ -655,6 +660,8 @@ export type GameEvent =
   | { k: 'rank'; id: number; owner: number; x: number; y: number; rank: number }
   /** Gold taken from an enemy unit slain by a people with a plunder share (the Path of Blood, #299). */
   | { k: 'plunder'; owner: number; x: number; y: number; gold: number }
+  /** A rival citizen taken captive by a Warband people (#502): a thrall of `owner` rises at the spot, taken from `from`. */
+  | { k: 'thrall'; owner: number; from: number; x: number; y: number }
   /**
    * Blood drawn at a Drain Rig (#355): from an enemy who fell near it, or from citizens given to the levy; in Hemocraft (s2) also
    * bled from a living enemy standing by a rig (`drain`, at the bled), and in the Blood-rite from the fallen near a Temple.
@@ -812,6 +819,9 @@ export interface AiMemory {
   unitTurn: number;
   /** Tick the town bell was rung, or -1. */
   bell: number;
+  /** While the bell is rung (#487): the nearest foe's distance seen, and the tick it last came closer. */
+  bellNear?: number;
+  bellMoved?: number;
   /** Tick it last looked for a dock site and found none (so it doesn't look every turn). */
   dockless?: number;
   /** Its scout (#454 s4): the rider sent exploring, the tick it was last sent, and the pair that patrol its border or trade road. */

@@ -1,6 +1,6 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { aiTiding } from './tidings';
-import { AGES, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
@@ -12,7 +12,7 @@ import { swordsOf } from './merc';
 import { fairground, feastOpen, nextFeastIn } from './fair';
 import { claimants, favours, landmarkAt } from './landmarks';
 import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple, TILE_OF_RARE } from './units';
-import { goalForPost, nearestMarket, portSpot, tripGold } from './trade';
+import { goalForPost, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { findRoute } from './path';
 import { isEnemy, maxHp } from './world';
 import { callUpProblem } from './warcamp';
@@ -29,7 +29,7 @@ import { consecrateProblem, consecrates } from './consecrate';
 import { sees } from './vision';
 import { seasonAt } from './seasons';
 import { catchOf, herdsOut, yarding } from './year';
-import { SNARE } from './data';
+import { DEER, SNARE } from './data';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
 import { isRider, standing } from './tribute';
@@ -1237,7 +1237,7 @@ function huntTheYear(s: GameState, v: View, issue: (c: Command) => void): void {
   let hunting = 0;
   for (const u of v.citizens) if (u.order.k === 'hunt' || (u.order.k === 'gather' && s.res[u.order.tile] === R_MEAT)) hunting++;
   if (hunting >= v.hunt.n) return;
-  const deer = nearestDeer(s, v.home.x, v.home.y, v.hunt.r, spared(s, v));
+  const deer = nearestDeer(s, v.home.x, v.home.y, v.hunt.r, spared(s, v.p));
   if (!deer) return;
   const pick = (ok: (u: Unit) => boolean) => {
     let best: Unit | null = null;
@@ -1257,15 +1257,18 @@ function huntTheYear(s: GameState, v: View, issue: (c: Command) => void): void {
 }
 
 /**
- * On the Herd Plains a clever computer leaves `YEAR.spare` of each of its own home herds alive, so they come
- * home in spring with calves (#479). A rival's herd it hunts down gladly. Undefined where nothing is spared.
+ * A clever computer leaves `YEAR.spare` of each of its own home herds alive on the Herd Plains, so they come
+ * home in spring with calves (#479), and a pair (`DEER.pair`) of every wild herd in the Stone Age, when game is
+ * what it lives on; a wild herd breeds each spring (#491). A rival's herd it hunts down gladly. Undefined where nothing is spared.
  */
-function spared(s: GameState, v: View): ((a: Animal) => boolean) | undefined {
-  if (s.homeland !== 'herds' || !AI_LEVELS[v.p.ai!].clever) return undefined;
+export function spared(s: GameState, p: Player): ((a: Animal) => boolean) | undefined {
+  if (!AI_LEVELS[p.ai!].clever) return undefined;
+  // A herd is spared at its own count: a town's at `YEAR.spare`, a wild one at `DEER.pair`.
+  const keep = (a: Animal) => (a.town === p.id && s.homeland === 'herds' ? YEAR.spare : a.town === undefined && p.epoch === 0 ? DEER.pair : -1);
   const left = new Map<number, number>();
-  for (const a of s.animals) if (a.kind === 'deer' && a.town === v.p.id && a.hp > 0) left.set(a.herd ?? a.id, (left.get(a.herd ?? a.id) ?? 0) + 1);
+  for (const a of s.animals) if (a.kind === 'deer' && a.hp > 0 && keep(a) >= 0) left.set(a.herd ?? a.id, (left.get(a.herd ?? a.id) ?? 0) + 1);
   if (!left.size) return undefined;
-  return (a) => a.town === v.p.id && (left.get(a.herd ?? a.id) ?? 0) <= YEAR.spare;
+  return (a) => (left.get(a.herd ?? a.id) ?? Infinity) <= keep(a);
 }
 
 /** Autumn onward, a clever computer plans for the winter ahead (`AI_WINTER`). */
@@ -1323,7 +1326,7 @@ function sendTo(s: GameState, v: View, u: Unit, res: Res, issue: (c: Command) =>
       return true;
     }
     const hunters = v.citizens.filter((c) => c.order.k === 'hunt').length;
-    const deer = hunters < v.hunt.n ? nearestDeer(s, v.home.x, v.home.y, v.hunt.r, spared(s, v)) : null;
+    const deer = hunters < v.hunt.n ? nearestDeer(s, v.home.x, v.home.y, v.hunt.r, spared(s, v.p)) : null;
     if (deer) {
       issue({ t: 'hunt', p: v.p.id, ids: [u.id], target: deer.id });
       return true;
@@ -2388,7 +2391,7 @@ function wonderThreat(s: GameState, p: Player, w: Building): Unit | null {
 }
 
 /** Enemy soldiers close to home, and the nearest of them. */
-function threatNear(s: GameState, v: View): { unit: Unit | null; count: number } {
+function threatNear(s: GameState, v: View): { unit: Unit | null; count: number; dist: number } {
   let threat: Unit | null = null;
   let threatD = Infinity;
   let n = 0;
@@ -2405,7 +2408,7 @@ function threatNear(s: GameState, v: View): { unit: Unit | null; count: number }
       }
     }
   }
-  return { unit: threat, count: n };
+  return { unit: threat, count: n, dist: threatD };
 }
 
 /**
@@ -2494,11 +2497,19 @@ function townBell(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   if (mem.bell < 0 && t.count >= bell.ring && defenders < t.count / 2) {
     issue({ t: 'bell', p: v.p.id, ring: true });
     mem.bell = s.tick;
-  } else if (mem.bell >= 0 && t.count <= bell.quiet && s.tick - mem.bell > secs(bell.hold)) {
+    mem.bellNear = t.dist;
+    mem.bellMoved = s.tick;
+  } else if (mem.bell >= 0 && t.dist < (mem.bellNear ?? Infinity) - 1) {
+    mem.bellNear = t.dist;
+    mem.bellMoved = s.tick;
+  } else if (mem.bell >= 0 && s.tick - mem.bell > secs(bell.hold) && (t.count <= bell.quiet || (t.dist >= AI_BELL.far && s.tick - (mem.bellMoved ?? mem.bell) > secs(AI_BELL.stale)))) {
+    // Or a siege that has stopped coming (#487): foes parked outside the Town Center's reach for a minute
+    // kept a whole town sheltered for eight minutes. Anyone who steps closer starts the minute afresh.
     // A straggler or two is the Town Center's arrows to deal with (#113): waiting for none at all, a
     // beaten town kept fifteen citizens inside for nine minutes while a rival's trickle came and went.
     issue({ t: 'bell', p: v.p.id, ring: false });
     mem.bell = -1;
+    mem.bellNear = undefined;
   }
 }
 
@@ -4022,6 +4033,14 @@ function merchants(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
     const from = nearestMarket(s, p.id, u.x, u.y) ?? market;
     const best = bestRoad(from).post;
     if (best >= 0 && !(u.order.k === 'trade' && u.order.post === best)) issue({ t: 'route', p: p.id, ids: [u.id], post: best });
+  }
+  // A post flooded by its own traders (#493): move one to the fresher post when that pays a fifth more.
+  for (const u of v.traders) {
+    if (u.inside || u.order.k !== 'trade' || u.order.phase === 'back' || shunned(u.order.post)) continue;
+    const cur = postAt(s, u.order.post);
+    const from = nearestMarket(s, p.id, u.x, u.y) ?? market;
+    const best = postAt(s, bestRoad(from).post);
+    if (cur && best && best.id !== cur.id && tripGold(s, p.id, from, best) > tripGold(s, p.id, from, cur) * 1.2) issue({ t: 'route', p: p.id, ids: [u.id], post: best.id });
   }
 }
 

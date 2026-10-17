@@ -183,7 +183,7 @@ const TIPS: Tip[] = [
   {
     id: 'plunder',
     when: (s, me) => ageOf(s.players[me]) === 'warband',
-    text: 'Your warband lives on plunder: every enemy unit your forces slay pays part of its price in gold, more the further you walk the Path of Blood. Raids feed the town now, and a quiet border starves it.',
+    text: 'Your warband lives on plunder: every enemy unit your forces slay pays part of its price in gold, more the further you walk the Path of Blood. And a rival citizen who falls is taken, not lost: a <b>thrall</b> rises where it fell, yours, to work your fields (up to 8; it never builds). Raid the rival\'s workers, and guard your own.',
   },
   {
     id: 'ironblood',

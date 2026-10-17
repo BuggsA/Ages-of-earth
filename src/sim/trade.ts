@@ -1,6 +1,6 @@
 import { fairShare } from './fair';
 import { ageDef, ageOf, ironTradeShare, relicTradeShare } from './ages';
-import { LAST_EPOCH, SERAI, SILK, TRADE } from './data';
+import { LAST_EPOCH, SERAI, SILK, TICK_HZ, TRADE } from './data';
 import { NAVAL, distToRect, nearestWalkable } from './grid';
 import { modsOf } from './stats';
 import type { Building, GameState, Goal, TradePost, Unit } from './types';
@@ -127,12 +127,24 @@ export function nearestDock(s: GameState, owner: number, x: number, y: number): 
   return best;
 }
 
+/** How flooded a post's market is now (#493): its last glut, less what has healed since. Zero for a post nobody has loaded at. */
+export function glutNow(s: GameState, post: TradePost): number {
+  if (!post.glut) return 0;
+  return Math.max(0, post.glut - (TRADE.glut.heal * (s.tick - (post.glutAt ?? s.tick))) / TICK_HZ);
+}
+
+/** A trader loads at a post (#493): the market floods a little more. Call after pricing the trip. */
+export function floodPost(s: GameState, post: TradePost): void {
+  post.glut = Math.min(TRADE.glut.max, glutNow(s, post) + TRADE.glut.each);
+  post.glutAt = s.tick;
+}
+
 /** What one trip between a Market (or, by sea, a Dock) and a post pays its owner now. */
 export function tripGold(s: GameState, owner: number, market: { x: number; y: number }, post: TradePost, sea = false): number {
   const dx = market.x - post.x;
   const dy = market.y - post.y;
   const epoch = Math.min(LAST_EPOCH, s.players[owner].epoch);
-  const k = TRADE.gold * (1 + Math.max(0, epoch - 1) * TRADE.epoch) * modsOf(s, owner).tradeGold * relicTradeShare(s, owner) * ironTradeShare(s, owner) * fairShare(s, owner, market) * (sea ? TRADE.sea.mul : harborNear(s, owner, market) ? TRADE.harbor.mul : 1) * (!sea && seraiNear(s, owner, post) ? SERAI.pay : 1);
+  const k = TRADE.gold * (1 + Math.max(0, epoch - 1) * TRADE.epoch) * modsOf(s, owner).tradeGold * relicTradeShare(s, owner) * ironTradeShare(s, owner) * fairShare(s, owner, market) * (sea ? TRADE.sea.mul : harborNear(s, owner, market) ? TRADE.harbor.mul : 1) * (!sea && seraiNear(s, owner, post) ? SERAI.pay : 1) * (1 - glutNow(s, post));
   return Math.max(1, Math.min(TRADE.max, Math.floor((dx * dx + dy * dy) * k)));
 }
 

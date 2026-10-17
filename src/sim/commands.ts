@@ -204,7 +204,7 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
 /** Send citizens to build, remembering the work they were doing to go back to it after. */
 function assignBuilders(units: Unit[], b: Building, queue: boolean): void {
   for (const u of units) {
-    if (!canRaise(u.type, b.type)) continue;
+    if (u.thrall || !canRaise(u.type, b.type)) continue;
     const o = u.order;
     const back: Order | null = o.k === 'gather' ? { ...o, phase: 'go' } : o.k === 'farm' || o.k === 'snare' ? { ...o, phase: 'go' } : o.k === 'build' ? u.resume : null;
     giveOrder(u, { k: 'build', target: b.id }, queue);

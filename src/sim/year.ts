@@ -1,4 +1,4 @@
-import { AMOUNT, SEASON, YEAR, secs } from './data';
+import { AMOUNT, DEER, SEASON, YEAR, secs } from './data';
 import { DIRS, spawnAnimal } from './animals';
 import { landOwnerAt } from './borders';
 import { walkable } from './grid';
@@ -56,6 +56,7 @@ export function markHomeHerds(s: GameState): void {
 export function turnYear(s: GameState): void {
   if (s.tick === 0 || s.tick % secs(SEASON.len) !== 0) return;
   const i = seasonAt(s);
+  if (i === 0) breedHerds(s);
   if (s.homeland === 'herds') {
     if (i === 2) trekOut(s);
     else if (i === 0) comeHome(s);
@@ -64,6 +65,32 @@ export function turnYear(s: GameState): void {
   } else if (s.homeland === 'wood') {
     if (i === 3) yardIn(s);
     else if (i === 0) yardOut(s);
+  }
+}
+
+/** Spring (#491): every herd of `DEER.pair` or more living deer drops a calf for each pair, up to `DEER.cap`. A town's own herds (the Herd Plains' home herds, the Deep Wood's yard) keep their own year and calve in `comeHome` or not at all. */
+function breedHerds(s: GameState): void {
+  const herds = new Map<number, Animal[]>();
+  for (const a of s.animals) {
+    if (a.kind !== 'deer' || a.hp <= 0 || a.town !== undefined) continue;
+    const h = a.herd ?? a.id;
+    const list = herds.get(h);
+    if (list) list.push(a);
+    else herds.set(h, [a]);
+  }
+  for (const herd of herds.values()) {
+    if (herd.length < DEER.pair) continue;
+    const calves = Math.min(Math.floor(herd.length / DEER.pair), DEER.cap - herd.length);
+    const lead = herd[0];
+    const n = herd.length;
+    for (let k = 0; k < calves; k++) {
+      const mother = herd[k % n];
+      const c = spawnAnimal(s, mother.x, mother.y);
+      c.herd = lead.herd ?? lead.id;
+      c.origX = lead.origX ?? lead.homeX;
+      c.origY = lead.origY ?? lead.homeY;
+      c.town = lead.town;
+    }
   }
 }
 
