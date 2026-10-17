@@ -211,6 +211,8 @@ export interface Unit {
   /** Tick a Rallying Cry stirring it ends; on a hero, the tick it may cry again. */
   cry?: number;
   cryReady?: number;
+  /** Plunder (gold) a Warband soldier has taken but not yet carried home (#502): banked at a Town Center or Barracks, lost to whoever fells it. */
+  spoils?: number;
   /** Enemy soldiers it has defeated (older saves lack it). */
   vet?: number;
   /** A wagon (#297): the building it carries, and that building's health as a share of its full health. */

@@ -29,7 +29,7 @@ import { consecrateProblem, consecrates } from './consecrate';
 import { sees } from './vision';
 import { seasonAt } from './seasons';
 import { catchOf, herdsOut, yarding } from './year';
-import { DEER, SNARE } from './data';
+import { DEER, SNARE, SPOILS } from './data';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
 import { isRider, standing } from './tribute';
@@ -2591,6 +2591,21 @@ function callToArms(s: GameState, v: View, issue: (c: Command) => void): void {
   issue({ t: 'callUp', p: p.id, building: camp.id, n: Math.min(CALL_UP.most, spare) });
 }
 
+/**
+ * The Warband's verb (#502): a soldier carrying `SPOILS.home` gold or more, and not mid-blow, turns for home to bank it, since a laden
+ * soldier felled in the field hands its pack to the rival. Returns the soldiers still free for the wave.
+ */
+function haulHome(v: View, fighters: Unit[], issue: (c: Command) => void): Unit[] {
+  const { p } = v;
+  if (!ageDef(p).haul) return fighters;
+  const laden = fighters.filter((u) => (u.spoils ?? 0) >= SPOILS.home && u.order.k !== 'attack');
+  if (!laden.length) return fighters;
+  const fresh = laden.filter((u) => !(u.order.k === 'move' && !u.order.amove)).map((u) => u.id);
+  if (fresh.length) issue({ t: 'move', p: p.id, ids: fresh, x: v.home.x, y: v.home.y });
+  const going = new Set(laden.map((u) => u.id));
+  return fighters.filter((u) => !going.has(u.id));
+}
+
 /** Soldiers a War Camp counts as keepers: the people's land fighters, as `warcamp.ts` reads them. */
 const campKeeper = (u: Unit): boolean => u.type !== 'citizen' && u.type !== 'priest' && u.type !== 'trader' && domainOf(u.type) === 'land';
 
@@ -3220,6 +3235,8 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     return;
   }
 
+  // The Warband hauls its plunder home (#502): a laden soldier leaves the wave and walks to the Town Center to bank it.
+  if (L.clever) fighters = haulHome(v, fighters, issue);
   // Between waves, soldiers go into a Transfusion Station to be grafted (#355 s5); those on their way in are not the wave's.
   if (L.clever && !mem.attacking) transfuse(s, v, mem, fighters.filter((u) => u.order.k === 'idle'), issue);
   fighters = fighters.filter((u) => !bound(s, u));

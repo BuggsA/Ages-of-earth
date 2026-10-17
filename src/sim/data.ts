@@ -84,6 +84,8 @@ export interface Age {
   path?: PathId;
   /** The whole people at war (the Age of Total War, #313): War Camps call citizens near them to arms (`CALL_UP`). */
   callUp?: boolean;
+  /** Plunder is hauled (#502, the Age of the Warband): the soldier who makes a kill carries the gold (`SPOILS`) and banks it only at home. */
+  haul?: boolean;
   /** Drain Rigs draw blood from the enemy dead near them (#355). */
   blood?: boolean;
   /**
@@ -260,6 +262,7 @@ export const AGES: Record<AgeId, Age> = {
     path: 'blood',
     blurb: 'The war-host is the people: soldiers train 15% faster, and every enemy unit your forces slay pays a quarter of its price as plunder in gold. But a warband trades with no one: no traders leave its Markets, and with the young away at war the fields yield 10% less.',
     add: { plunder: 0.25 },
+    haul: true,
     mul: { militaryTrain: 0.85, farm: 0.9 },
     no: { units: ['trader'], why: 'A warband trades with no one: traders wait until your people leave the Path of Blood' },
   },
@@ -2079,6 +2082,13 @@ export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, 
  * at all, so its camps burn at once. `train`: a camp trains its foot soldiers this much slower than a
  * Barracks (tents, not a drill yard).
  */
+/**
+ * Spoils (#502, the Age of the Warband): the plunder a soldier's kill earns is carried in its pack, up to `cap` gold (the rest is left
+ * on the field), and banked at the first of the people's `homes` it comes within `bank` tiles of. Fell a laden soldier and its
+ * spoils pay you in full. The computer sends a soldier home once it carries `home` gold.
+ */
+export const SPOILS = { cap: 90, bank: 5, homes: ['towncenter', 'barracks'] as BuildingType[], home: 45 };
+
 export const WARCAMP = { watch: 8, grace: 10, burn: 0.05, train: 1.2 };
 
 /**
