@@ -145,7 +145,7 @@ kbd {
 #hud { position: absolute; inset: 0; pointer-events: none; }
 #hud > * { pointer-events: auto; }
 /* Overlays that only show things must never catch the mouse (an invisible banner would eat clicks). */
-#hud > #banner, #hud > #notices, #hud > #paused, #hud > #dragbox, #hud > #timers, #hud > #objectives, #hud > #bottom, #hud > #tooltip { pointer-events: none; }
+#hud > #banner, #hud > #notices, #hud > #paused, #hud > #dragbox, #hud > #timers, #hud > #objectives, #hud > #bottom, #hud > #tooltip, #hud > #dawn { pointer-events: none; }
 #timers .timer { pointer-events: auto; }
 #topbar {
   position: absolute; top: 0; left: 0; right: 0; height: 40px; display: flex; align-items: center; gap: 10px; padding: 0 10px;
