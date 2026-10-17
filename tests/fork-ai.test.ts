@@ -96,6 +96,16 @@ describe('the computer takes the fork', () => {
     expect(ageOf(s.players[0])).toBe('hemocraft');
   });
 
+  it('saves the price of the branch before it makes peace', () => {
+    const s = game('totalwar');
+    choose(s, 'hemocraft');
+    s.players[0].stats.grafted = 8;
+    s.players[0].res = { food: 400, wood: 9000, stone: 9000, gold: 9000 };
+    s.ai[0].blood = { ...s.ai[0].blood, war: s.tick - secs(AI_FORK.stay + 10) };
+    run(s, 20);
+    expect(ageOf(s.players[0])).toBe('totalwar');
+  });
+
   it('takes the other branch when its deed is done first', () => {
     const s = game('totalwar');
     choose(s, 'bloodrite');

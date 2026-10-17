@@ -1736,14 +1736,15 @@ export const AI_HEMO = { town: 24, army: 6, rig: 6, watch: 26, foes: 2, again: 6
  * The computer at the fork (#355 s5). A clever computer in Total War picks its branch once its town has grown (`AI_HEMO.town`): the Blood-rite when
  * under `living` of the rival's army bleeds (a drain finds nothing in steel), else Hemocraft with chance `hemo`. It works that road's
  * deed there (grafts at its Station, or citizens to the levy from a full town), stays at least `stay` seconds, and once a deed is done
- * (its branch's, else the other's) makes peace into the Industrial Age and turns down that branch; with no deed done `patience` seconds
- * after its town grew (or the road still shut `patience` seconds into Industry) it gives the fork up. In Hemocraft it keeps up to `rigs` Drain Rigs, the later ones
+ * (its branch's, else the other's) and the price of peace and of the branch are both in hand, makes peace into the Industrial Age and
+ * turns down that branch; with no deed done `patience` seconds after its town grew (or the road still shut `back` seconds into
+ * Industry) it gives the fork up. In Hemocraft it keeps up to `rigs` Drain Rigs, the later ones
  * `AI_HEMO.tower` tiles out where the living come so its `towers` Blood Towers ring them. In the rite it keeps up to `altars` Temples,
  * the later ones `altar` tiles out toward where the rival's soldiers come, musters its army by that altar, trains `priests` priests, and
  * gives citizens to the levy while its store is under `store` blood, to mend with. Its rivals' siege also goes for a Hemocraft rig and
  * a rite altar near a wave.
  */
-export const AI_FORK = { living: 0.6, hemo: 0.5, stay: 300, patience: 1200, rigs: 2, towers: 3, altars: 2, altar: 9, priests: 4, store: 60 };
+export const AI_FORK = { living: 0.6, hemo: 0.5, stay: 300, patience: 1200, back: 240, rigs: 2, towers: 3, altars: 2, altar: 9, priests: 4, store: 60 };
 
 /** Selling rare ore at a Market (#356 s5): a lot of `lot` pays `gold[ore]` gold at a flat price. Ore mined still counts toward its doors; only the stock in hand is spent. */
 export const ORE_TRADE = { lot: 20, gold: { salt: 40, saltpetre: 55, bloodiron: 90 } as Record<'salt' | 'saltpetre' | 'bloodiron', number> };

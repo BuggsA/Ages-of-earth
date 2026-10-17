@@ -558,8 +558,9 @@ function forkRoad(s: GameState, p: Player, mem: AiMemory): Road | undefined {
  * The fork at the end of the Path of Blood (#355 s5). In Total War, once its town has grown to `AI_HEMO.town` citizens, it chooses its
  * branch and works that deed (`hemoBuild`). It stays `AI_FORK.stay` seconds at least from then, then makes peace into Industry once a
  * deed is done and that road's clue stands: its chosen branch's, or else the other's (the rite's always, Hemocraft's only against a rival
- * that bleeds), and the branch it takes becomes its choice. In Industry it turns down the branch. No deed done `patience` seconds after
- * its town grew, or a road still shut `patience` seconds into Industry, gives the fork up: it stays at war, or goes back to it.
+ * that bleeds), and the branch it takes becomes its choice. It saves the price of peace and of the branch together before it goes. In
+ * Industry it turns down the branch. No deed done `patience` seconds after its town grew, or a road still shut `back` seconds into
+ * Industry, gives the fork up: it stays at war, or goes back to it.
  */
 function forkTurn(s: GameState, v: View, mem: AiMemory): Journey | null {
   const { p } = v;
@@ -576,7 +577,7 @@ function forkTurn(s: GameState, v: View, mem: AiMemory): Journey | null {
   if (here === 'industrial') {
     blood.fork ??= s.tick;
     if (roadKnown(s, p, road) && deedsDone(p, road, s)) return { road, wait: false };
-    if (s.tick - blood.fork >= secs(AI_FORK.patience)) giveUp();
+    if (s.tick - blood.fork >= secs(AI_FORK.back)) giveUp();
     return null;
   }
   delete blood.fork;
@@ -592,7 +593,11 @@ function forkTurn(s: GameState, v: View, mem: AiMemory): Journey | null {
   mem.roads!.hemocraft = ready.to === 'hemocraft';
   mem.roads!.bloodrite = ready.to === 'bloodrite';
   const peace = roadsFrom(p).find((r) => r.to === 'industrial');
-  return peace ? { road: peace, wait: false } : null;
+  if (!peace) return null;
+  // Peace waits until the branch's price is in hand too: a town that sits in Industry saving for it has struck its camps for nothing.
+  const both: Cost = {};
+  for (const r of RES) if (peace.cost[r] || ready.cost[r]) both[r] = (peace.cost[r] ?? 0) + (ready.cost[r] ?? 0);
+  return { road: { ...peace, cost: both }, wait: false };
 }
 
 /**
