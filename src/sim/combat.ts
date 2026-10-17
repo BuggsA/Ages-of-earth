@@ -1,5 +1,6 @@
 import { AURA, RALLY, BONUS, BUILDINGS, DEER, LIGHTNING, VETERANCY, TICK_HZ, domainOf, secs, type UnitStats } from './data';
 import { hasCoils } from './ages';
+import { drawBlood } from './blood';
 import { distToRect } from './grid';
 import type { Spatial } from './spatial';
 import { modsOf, statsFor } from './stats';
@@ -84,6 +85,7 @@ export function hurt(s: GameState, target: Ent, damage: number, by: number, atta
 function plunder(s: GameState, target: Unit, by: number): void {
   const p = s.players[by];
   p.stats.slain = (p.stats.slain ?? 0) + 1;
+  drawBlood(s, target, by);
   const share = modsOf(s, by).plunder;
   if (share <= 0) return;
   const c = statsOf(s, target).cost;

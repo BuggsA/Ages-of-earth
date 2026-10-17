@@ -82,6 +82,8 @@ export interface Age {
   path?: PathId;
   /** The whole people at war (the Age of Total War, #313): War Camps call citizens near them to arms (`CALL_UP`). */
   callUp?: boolean;
+  /** Drain Rigs draw blood from the enemy dead near them (#355). */
+  blood?: boolean;
   /** A people that raises again on the foundations of what fell (the Age of Reclaimers): see `RECLAIM` (`reclaim.ts`). */
   reclaim?: boolean;
   /** Aircraft fly on fuel from the Airfield (the Age of Aeronauts): see `SORTIE` (`sortie.ts`). */
@@ -229,6 +231,7 @@ export const AGES: Record<AgeId, Age> = {
     path: 'blood',
     blurb: 'War is the state. Foot soldiers pitch War Camps where the army stands, even in enemy land, and the camps train foot soldiers at the front and hold a little land, so the army is fed and the march home is gone. Soldiers train 15% faster and the enemy dead pay plunder, more than in the Warband. But a camp left without soldiers burns, no traders leave the Markets, the fields yield 15% less and scholars cost a fifth more: a people at war has no patience for them.',
     add: { plunder: 0.25 },
+    blood: true,
     mul: { militaryTrain: 0.85, farm: 0.85, techCost: 1.2 },
     no: { units: ['trader'], why: 'A people of iron and blood trades with no one: traders wait until your people leave the Path of Blood' },
   },
@@ -243,6 +246,7 @@ export const AGES: Record<AgeId, Age> = {
     mul: { militaryTrain: 0.85, farm: 0.8, techCost: 1.25 },
     no: { units: ['trader'], why: 'A people at total war trades with no one: traders wait until your people leave the Path of Blood' },
     callUp: true,
+    blood: true,
   },
   steppe: {
     name: 'Age of the Steppe',
@@ -1055,6 +1059,7 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   // The Path of Blood (#303): pitched by foot soldiers where the army stands, enemy land too; burns when left alone (`WARCAMP`).
   warcamp: { name: 'War Camp', size: 2, hp: 700, cost: { wood: 100, gold: 40 }, time: 30, pop: 0, sight: 6, trains: ['infantry'], drop: [], epoch: 3, ages: ['ironblood', 'totalwar'], builders: ['infantry'], menu: 'mil', key: 'Q', blurb: 'Tents, a stockade and a war standard, pitched by foot soldiers where the army stands, in enemy land too. Trains foot soldiers at the front and holds the land round it, so the army there is fed. Left without soldiers nearby, it burns.' },
   // The Silk Road (#334): a waystation by the road, raised in no one's land too; it rests traders, holds the land round it, and makes a near post pay more (`SERAI`).
+  drainrig: { name: 'Drain Rig', size: 2, hp: 600, cost: { wood: 120, gold: 60 }, time: 30, pop: 0, sight: 6, trains: [], drop: [], epoch: 3, ages: ['ironblood', 'totalwar'], menu: 'mil', key: 'H', blurb: 'Copper troughs, a windlass and a rack of pale jars on trampled ground. Every living enemy who falls within 14 tiles of a finished rig gives up a fifth of its price as blood. Citizens within 6 tiles can be given to the levy (C): each is gone, and pays 30 blood. Nothing spends blood yet: the Blood Tower and the Transfusion Station will.' },
   caravanserai: { name: 'Caravanserai', size: 2, hp: 900, cost: { wood: 90, gold: 30 }, time: 25, pop: 0, sight: 6, trains: [], drop: [], epoch: 3, ages: ['silk'], menu: 'eco', key: 'C', blurb: 'A walled courtyard by the road where caravans rest. Raise it by a far trading post, in no one\'s land too: your traders\' trips to a post within 8 tiles of it pay a quarter more, traders and wagons within 4 tiles of it mend, and the land round it is yours, so rival traders crossing it pay your toll.' },
   airfield: { name: 'Airfield', size: 4, hp: 2200, cost: { wood: 250, stone: 100, gold: 150 }, time: 60, pop: 0, sight: 8, trains: ['fighter', 'bomber'], drop: [], epoch: 4, menu: 'mil', key: 'F', blurb: 'Builds fighters and bombers. Fighters hunt aircraft; bombers wreck towns.' },
 };
@@ -1584,6 +1589,12 @@ export const AI_VIGIL = { slack: 1.5 };
  * of the port where most of its merchant ships load, so each cog loading there sails escorted (`CONVOY`).
  */
 export const AI_CONVOY = { escorts: 1, stay: 3 };
+
+/**
+ * Blood (#355 s1): a living enemy who falls within `reach` tiles of the killer's finished Drain Rig gives up `share` of its price as blood.
+ * The levy takes up to `levyMost` citizens within `levyReach` tiles of a rig at once, `levy` blood each, and rests the rig `rest` seconds for each.
+ */
+export const BLOOD = { reach: 14, share: 0.2, levy: 30, levyReach: 6, levyMost: 3, rest: 15 };
 
 /** Selling rare ore at a Market (#356 s5): a lot of `lot` pays `gold[ore]` gold at a flat price. Ore mined still counts toward its doors; only the stock in hand is spent. */
 export const ORE_TRADE = { lot: 20, gold: { salt: 40, saltpetre: 55, bloodiron: 90 } as Record<'salt' | 'saltpetre' | 'bloodiron', number> };

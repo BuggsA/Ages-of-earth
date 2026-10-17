@@ -1105,6 +1105,12 @@ export class View {
           if (ev.owner === this.viewer) this.cue('toll', ev.x, ev.y, 0.4);
           break;
         }
+        case 'blood': {
+          // Blood drawn (#355): a dark red spray where the drawn fell, or at the rig for a levy.
+          if (ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;
+          this.effects.burst(this.ground(s, ev.x, ev.y, 0.5), { count: 9, speed: 0.6, up: 1.0, life: 0.8, size: 0.05, gravity: 2.2, colors: ['#7a1822', '#4a0e16', '#a3283a'] });
+          break;
+        }
         case 'callUp': {
           // The call to arms (#313): dust kicked up and a flash of crimson where each new soldier stands.
           for (const id of ev.ids) {
