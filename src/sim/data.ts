@@ -1646,6 +1646,8 @@ export interface AiLevel {
   fork?: boolean;
   /** Off: a Blood-rite computer's priests neither curse nor sacrifice (#355 s4; only `scripts/ai-ab.ts` turns it off). */
   rite?: boolean;
+  /** Off: a priest that has taken up healing by itself is left at it, as before (only `scripts/ai-ab.ts` turns it off). */
+  healers?: boolean;
 }
 
 /**
