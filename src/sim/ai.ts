@@ -414,7 +414,7 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   if (walksWeb(v)) {
     for (const r of roadsFrom(p)) {
       if (!isSideRoad(r) || AGES[r.to].tier <= p.epoch || !roadKnown(s, p, r) || !wants(s, p, mem, r.to)) continue;
-      if (deedsDone(p, r)) {
+      if (deedsDone(p, r, s)) {
         delete mem.waiting;
         return { road: r, wait: false };
       }
@@ -452,7 +452,7 @@ function bloodHold(s: GameState, v: View, mem: AiMemory): Road | 'stay' | null {
     blood.since ??= s.tick;
     // Total War's deed is trained at the camps, which Industry strikes: stay until it is done (or the patience runs out).
     const toWar = ROADS.find((r) => r.from === 'industrial' && r.to === 'totalwar');
-    if (toWar && wants(s, p, mem, 'totalwar') && !deedsDone(p, toWar) && s.tick - blood.since < secs(AI_BLOOD.patience)) return 'stay';
+    if (toWar && wants(s, p, mem, 'totalwar') && !deedsDone(p, toWar, s) && s.tick - blood.since < secs(AI_BLOOD.patience)) return 'stay';
     return s.tick - blood.since < secs(AI_BLOOD.stay) ? 'stay' : null;
   }
   const road =
@@ -460,7 +460,7 @@ function bloodHold(s: GameState, v: View, mem: AiMemory): Road | 'stay' | null {
       ? ROADS.find((r) => r.from === 'gunpowder' && r.to === 'ironblood')
       : roadsFrom(p).find((r) => AGES[r.to].path === 'blood' && AGES[r.to].tier === p.epoch && roadKnown(s, p, r));
   if (!road || !wants(s, p, mem, road.to) || (here !== 'warband' && !roadKnown(s, p, road))) return null;
-  if (deedsDone(p, road)) return null;
+  if (deedsDone(p, road, s)) return null;
   if (here !== 'warband') return worthWaiting(s, v, mem, road) ? road : null;
   blood.hold ??= s.tick;
   if (s.tick - blood.hold <= secs(AI_BLOOD.patience)) return road;
@@ -481,7 +481,7 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   // A detour (#232): a pilgrim town with the catch landed and a Dock, whose Age of Sail would open an heirloom, steps back to
   // the Middle Ages to take it, and doesn't turn pilgrim again on the way (the road to Sail is the plan).
   const sailRoad = ROADS.find((r) => r.from === 'middle' && r.to === 'sail');
-  const toSail = AI_LEVELS[p.ai!].detour && !!sailRoad && !!heirloomAhead(p, 'sail') && count(v, 'dock', true) > 0 && deedsDone(p, sailRoad) && wants(s, p, mem, 'sail');
+  const toSail = AI_LEVELS[p.ai!].detour && !!sailRoad && !!heirloomAhead(p, 'sail') && count(v, 'dock', true) > 0 && deedsDone(p, sailRoad, s) && wants(s, p, mem, 'sail');
   for (const r of roadsFrom(p)) {
     if (AGES[r.to].tier !== p.epoch) continue;
     if (toSail && here === 'pilgrim' && r.to === 'middle') return { road: r, wait: false };
@@ -494,7 +494,7 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
     }
     // The other future (#231): a town of towers and no aircraft goes over to lightning once its beacons are lit;
     // with its last tower fallen it brings the steam engines back.
-    if (r.to === 'lightning' && v.planes.length === 0 && count(v, 'tower', true) >= AI_LIGHTNING.towers && roadKnown(s, p, r) && deedsDone(p, r) && wants(s, p, mem, r.to)) return { road: r, wait: false };
+    if (r.to === 'lightning' && v.planes.length === 0 && count(v, 'tower', true) >= AI_LIGHTNING.towers && roadKnown(s, p, r) && deedsDone(p, r, s) && wants(s, p, mem, r.to)) return { road: r, wait: false };
     if (here === 'lightning' && r.to === 'industrial' && count(v, 'tower', true) === 0) {
       mem.roads ??= {};
       mem.roads.lightning = false;
@@ -502,7 +502,7 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
     }
     // A people that settled in the Middle Ages after the steppe turns horde again once the herd's deeds are done (#322).
     if (r.to === 'horde') {
-      if (roadKnown(s, p, r) && deedsDone(p, r) && wants(s, p, mem, r.to)) return { road: r, wait: false };
+      if (roadKnown(s, p, r) && deedsDone(p, r, s) && wants(s, p, mem, r.to)) return { road: r, wait: false };
       continue;
     }
     if (here === 'pilgrim' && r.to === 'middle' && kept === 0) return { road: r, wait: false };
@@ -512,13 +512,13 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
       mem.roads.sail = false;
       return { road: r, wait: false };
     }
-    if (r.to === 'sail' && count(v, 'dock', true) > 0 && roadKnown(s, p, r) && deedsDone(p, r) && wants(s, p, mem, r.to)) return { road: r, wait: false };
+    if (r.to === 'sail' && count(v, 'dock', true) > 0 && roadKnown(s, p, r) && deedsDone(p, r, s) && wants(s, p, mem, r.to)) return { road: r, wait: false };
     // The Path of Blood (#307): a war-people with a Barracks turns Warband once the slain are counted, and Iron and Blood once the plunder is in.
     if (AGES[r.to].path === 'blood') {
-      if (roadKnown(s, p, r) && deedsDone(p, r) && wants(s, p, mem, r.to)) return { road: r, wait: false };
+      if (roadKnown(s, p, r) && deedsDone(p, r, s) && wants(s, p, mem, r.to)) return { road: r, wait: false };
       continue;
     }
-    if (r.to !== 'pilgrim' || kept < AI_WEB.relics || !roadKnown(s, p, r) || !deedsDone(p, r) || !wants(s, p, mem, r.to)) continue;
+    if (r.to !== 'pilgrim' || kept < AI_WEB.relics || !roadKnown(s, p, r) || !deedsDone(p, r, s) || !wants(s, p, mem, r.to)) continue;
     return { road: r, wait: false };
   }
   return null;
@@ -535,7 +535,7 @@ function ironRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   // what the town needs (#79). Left to it, they walked from one bog to the next all through the Stone Age.
   // In the Iron Age itself the bog pays double gold: its diggers stay.
   if (ageOf(p) === 'iron') return;
-  if (!road || deedsDone(p, road) || mem.roads?.iron === false) {
+  if (!road || deedsDone(p, road, s) || mem.roads?.iron === false) {
     releaseDiggers(s, v, issue);
     return;
   }
@@ -550,7 +550,7 @@ function ironRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     spend(v, cost);
     return;
   }
-  if (!roadKnown(s, p, road) || !wants(s, p, mem, 'iron') || deedsDone(p, road)) return;
+  if (!roadKnown(s, p, road) || !wants(s, p, mem, 'iron') || deedsDone(p, road, s)) return;
   for (const u of v.citizens) if (u.order.k === 'gather' && (u.order.bog || s.res[u.order.tile] === R_BOG)) v.diggers.add(u.id);
   // Holding the Town Center for the deed, it digs harder (#79): idle savings are the dearest wait.
   const crew = mem.waiting !== undefined ? AI_WEB.diggers * 2 : AI_WEB.diggers;
@@ -581,7 +581,7 @@ function oreRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => vo
   const road = roadsFrom(p).find((r) => r.ore && s.rares!.includes(r.ore.id));
   const crew = v.citizens.filter((u) => u.order.k === 'gather' && u.order.rare !== undefined);
   for (const u of crew) v.diggers.add(u.id);
-  const open = !road || oreDone(p, road) || deedsDone(p, road) || mem.roads?.[road.to] === false || !roadKnown(s, p, road);
+  const open = !road || oreDone(p, road) || deedsDone(p, road, s) || mem.roads?.[road.to] === false || !roadKnown(s, p, road);
   if (open) {
     const idle = crew.filter((u) => u.carry <= 2 && !u.inside);
     if (idle.length) {
@@ -1256,7 +1256,7 @@ function steppeRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) =>
   }
   if (p.epoch !== 0 || !walksWeb(v) || v.citizens.length < AI_STEPPE.at) return;
   const road = roadsFrom(p).find((r) => AGES[r.to].mobile);
-  if (!road || deedsDone(p, road) || fit(p, road.to) < 0 || !wants(s, p, mem, road.to)) return;
+  if (!road || deedsDone(p, road, s) || fit(p, road.to) < 0 || !wants(s, p, mem, road.to)) return;
   v.hunt = { n: AI_STEPPE.hunters, r: AI_STEPPE.reach };
   const clue = road.clue;
   if (!clue || count(v, clue) > 0 || s.tick - (mem.ordered[clue] ?? -99999) < secs(25)) return;
@@ -1282,7 +1282,7 @@ function hordeClimb(s: GameState, v: View, mem: AiMemory): Road | null {
   const { p } = v;
   if (ageOf(p) !== 'steppe' || !walksWeb(v) || !wants(s, p, mem, 'horde')) return null;
   const road = roadsFrom(p).find((r) => r.to === 'horde');
-  return road && !deedsDone(p, road) ? road : null;
+  return road && !deedsDone(p, road, s) ? road : null;
 }
 
 /** How many milkers its flock wants: one for each `perMilker` grown sheep, one for each sheep while the Horde's milk is to be drawn (#322). */
@@ -2071,7 +2071,7 @@ function beaconsForLightning(s: GameState, v: View, mem: AiMemory, issue: (c: Co
   const { p } = v;
   if (ageOf(p) !== 'industrial' || !lightningBound(s, v, mem)) return;
   const road = roadsFrom(p).find((r) => r.to === 'lightning');
-  if (!road || deedsDone(p, road) || s.tick - (mem.zap ?? -99999) < secs(AI_LIGHTNING.every)) return;
+  if (!road || deedsDone(p, road, s) || s.tick - (mem.zap ?? -99999) < secs(AI_LIGHTNING.every)) return;
   const b = v.buildings.find((e) => e.type === 'tower' && !beaconProblem(s, p, e));
   if (!b) return;
   issue({ t: 'beacon', p: p.id, building: b.id });

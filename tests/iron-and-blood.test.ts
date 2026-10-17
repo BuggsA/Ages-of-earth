@@ -15,6 +15,7 @@ import { placeBuilding, spawnUnit } from '../src/sim/world';
 const road = ROADS.find((r) => r.to === 'ironblood')!;
 const game = (): GameState => {
   const s = createGame({ seed: 3, size: 'small', mapType: 'continental', players: [{ name: 'A', ai: null }, { name: 'B', ai: null }] });
+  s.rares = []; // the deeds are the road here (#356)
   s.players[0].epoch = 3;
   s.players[0].res = { food: 9000, wood: 9000, stone: 9000, gold: 9000 };
   return s;

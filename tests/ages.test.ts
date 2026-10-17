@@ -8,8 +8,12 @@ import { modsOf, trainCostFor, trainTimeFor } from '../src/sim/stats';
 import type { AgeId, Building, BuildingType, Command, GameState, Unit } from '../src/sim/types';
 import { placeBuilding } from '../src/sim/world';
 
-const game = (startEpoch = 1): GameState =>
-  createGame({ seed: 11, size: 'small', startEpoch, players: [{ name: 'A', ai: null }, { name: 'B', ai: null }] });
+// These worlds test the roads' deeds: with no rare ore in the seed (#356), the deeds are the only door.
+const game = (startEpoch = 1): GameState => {
+  const s = createGame({ seed: 11, size: 'small', startEpoch, players: [{ name: 'A', ai: null }, { name: 'B', ai: null }] });
+  s.rares = [];
+  return s;
+};
 
 const run = (s: GameState, seconds: number, cmds: Command[] = []) => {
   step(s, cmds);

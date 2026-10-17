@@ -128,7 +128,7 @@ const TIPS: Tip[] = [
     // Relics open a door (#49): a Temple stands while the Middle Ages last.
     when: (s, me) => {
       const p = s.players[me];
-      return ageOf(p) === 'middle' && roadKnown(s, p, PILGRIM_ROAD) && !deedsDone(p, PILGRIM_ROAD);
+      return ageOf(p) === 'middle' && roadKnown(s, p, PILGRIM_ROAD) && !deedsDone(p, PILGRIM_ROAD, s);
     },
     text: `There is a turning off the Middle Ages. Carry relics to your Temple: once they have brought in ${PILGRIM_ROAD.deed!.n} gold, the Town Center (🔀) can turn your people into the <b>${AGES.pilgrim.name}</b>: relics pay double and priests come cheap, but no siege engines. The road shuts once you advance.`,
   },
@@ -143,7 +143,7 @@ const TIPS: Tip[] = [
     // A Dock stands while the Middle Ages last: the sea is a road too.
     when: (s, me) => {
       const p = s.players[me];
-      return ageOf(p) === 'middle' && roadKnown(s, p, SAIL_ROAD) && !deedsDone(p, SAIL_ROAD);
+      return ageOf(p) === 'middle' && roadKnown(s, p, SAIL_ROAD) && !deedsDone(p, SAIL_ROAD, s);
     },
     text: `The sea is a road. Land ${SAIL_ROAD.deed!.n} fish with your boats, and the Town Center (🔀) can turn your people into the <b>${AGES.sail.name}</b>: fishing is half again as quick, ships cost less and have sturdier hulls, but the fields yield less. The road shuts once you advance.`,
   },
@@ -152,7 +152,7 @@ const TIPS: Tip[] = [
     // The Path of Blood (#299): a Middle Ages town with a Barracks and blood already shed.
     when: (s, me) => {
       const p = s.players[me];
-      return ageOf(p) === 'middle' && roadKnown(s, p, WARBAND_ROAD) && (p.stats.slain ?? 0) > 0 && !deedsDone(p, WARBAND_ROAD);
+      return ageOf(p) === 'middle' && roadKnown(s, p, WARBAND_ROAD) && (p.stats.slain ?? 0) > 0 && !deedsDone(p, WARBAND_ROAD, s);
     },
     text: `War can be a way of life. Slay ${WARBAND_ROAD.deed!.n} enemy units and the Town Center (🔀) can set your people on the <b>Path of Blood</b>, into the <b>${AGES.warband.name}</b>: soldiers train faster and every enemy slain pays plunder in gold, but no traders, and the fields yield less. The road shuts once you advance.`,
   },
@@ -203,7 +203,7 @@ const TIPS: Tip[] = [
     // The Steppe Road's second step (#318): a steppe people with a Stable, its flock already milked.
     when: (s, me) => {
       const p = s.players[me];
-      return ageOf(p) === 'steppe' && roadKnown(s, p, HORDE_ROAD) && (p.stats.milked ?? 0) > 0 && !deedsDone(p, HORDE_ROAD);
+      return ageOf(p) === 'steppe' && roadKnown(s, p, HORDE_ROAD) && (p.stats.milked ?? 0) > 0 && !deedsDone(p, HORDE_ROAD, s);
     },
     text: `The camp can grow into a horde. Milk ${HORDE_ROAD.deed!.n} from your flock and butcher ${HORDE_ROAD.also![0].n} meat in all, and the Town Center (🔀) can take your people into the <b>${AGES.horde.name}</b> instead of the Middle Ages: still on wagons, still no fields or walls, and riders who stand in a rival's land take tribute from its treasury.`,
   },
@@ -217,7 +217,7 @@ const TIPS: Tip[] = [
     // The Steppe Road's third step (#326), a crossing: a merchant people that rode the steppe, or a Gunpowder people that rode as a horde.
     when: (s, me) => {
       const p = s.players[me];
-      return roadsFrom(p).some((r) => r.to === 'silk' && roadKnown(s, p, r) && !deedsDone(p, r));
+      return roadsFrom(p).some((r) => r.to === 'silk' && roadKnown(s, p, r) && !deedsDone(p, r, s));
     },
     text: `Your people remembers the wagons. Bring home the gold its deeds ask by trade (the Town Center's 🔀 shows how far along you are), and it can take the <b>${AGES.silk.name}</b> instead: the Market packs onto a wagon and rolls with the camp, and every tile it covers while a trader is out pays that trip ${Math.round(SILK.each * 100)}% more.`,
   },
@@ -242,7 +242,7 @@ const TIPS: Tip[] = [
     // The hybrid (#49): a merchant or pilgrim people with the other system's building in view.
     when: (s, me) => {
       const p = s.players[me];
-      return roadsFrom(p).some((r) => r.to === 'fair' && roadKnown(s, p, r) && !deedsDone(p, r));
+      return roadsFrom(p).some((r) => r.to === 'fair' && roadKnown(s, p, r) && !deedsDone(p, r, s));
     },
     text: `A people both <b>merchant</b> and <b>faithful</b> can hold great fairs. Bring home ${FAIR_ROAD.deed!.n} gold by trade <i>and</i> ${FAIR_ROAD.also![0].n} from relics, and the Town Center (🔀) leads into the <b>${AGES.fair.name}</b> instead of the Gunpowder Age: every relic your Temples keep makes trade pay more. Guard the Temples and the roads, though: fair towns stand weaker.`,
   },
