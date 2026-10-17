@@ -1181,7 +1181,7 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     ['stable', p.epoch >= 3 && n >= 26 && count(v, 'stable') < 2],
   ];
   for (const [type, ok] of want) {
-    if (!ok || recently(type, 25) || BUILDINGS[type].epoch > p.epoch) continue;
+    if (!ok || recently(type, 25) || BUILDINGS[type].epoch > p.epoch || buildBarred(p, type)) continue;
     // Not a building whose every line the age bars (a Stable in the Iron Age).
     const lines = BUILDINGS[type].trains;
     if (lines.length && lines.every((u) => barred(p, u))) continue;
