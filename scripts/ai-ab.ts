@@ -9,13 +9,13 @@
  * Prints an `ab {…}` line a match (for totting up runs played side by side) and a summary: wins, who
  * leads the undecided (the age reached, then kills less losses), the new side's gathering over the old
  * side's (geometric mean, with its standard error) and how far ahead in the ages it ends on average.
- *   …  '{}' '{"wonderGuard":false}' ... a 7th argument is extra game setup, e.g. '{"startEpoch":3,"rich":3000}' (`rich`: wood, stone and gold added to both seats) for a Wonder race (#374)
- *   …  '{"hemo":false}' '{}' '{"startEpoch":4,"age":"totalwar","walked":["warband","ironblood"]}' starts both seats in a side road's age (`age`, with the ages `walked` to it), for Hemocraft (#355 s5)
+ *   …  '{}' '{"wonderGuard":false}' ... a 7th argument is extra game setup, e.g. '{"startEpoch":3,"rich":3000}' (`rich`: wood, stone and gold added to both seats) for a Wonder race (#374); `age` puts both seats in a side age on their start epoch, e.g. '{"startEpoch":4,"age":"aeronaut","rich":3000}' to judge the Airfield's fighter guard (#393)
+ *   …  '{"hemo":false}' '{}' '{"startEpoch":4,"age":"totalwar","walked":["warband","ironblood"]}' also lists the ages `walked` before it, for Hemocraft (#355 s5)
  * The old side plays under Normal's name, so the few choices made by name (merchant ships kept) differ.
  */
 import { AGES, AI_LEVELS } from '../src/sim/data';
 import { createGame, step } from '../src/sim/game';
-import { ageOf } from '../src/sim/ages';
+import { ageOf, noteWalked } from '../src/sim/ages';
 
 const first = Number(process.argv[2] ?? 1);
 const seeds = Number(process.argv[3] ?? 6);
@@ -29,11 +29,7 @@ for (let game = 0; game < seeds * 2; game++) {
   const fresh = game & 1;
   const s = createGame({ seed, size: 'medium', ...extra, players: [0, 1].map((i) => ({ name: `P${i}`, ai: i === fresh ? 'hard' : 'normal' })) });
   if (rich) for (const p of s.players) for (const r of ['wood', 'stone', 'gold'] as const) p.res[r] += rich;
-  if (age)
-    for (const p of s.players) {
-      p.age = age;
-      p.walked = [...walked];
-    }
+  if (age) for (const p of s.players) { p.age = age; p.walked = [...walked]; noteWalked(p, age); }
   const began = [false, false];
   const at = s.players.map((p) => ageOf(p));
   const roads = s.players.map((p) => [AGES[ageOf(p)].short]);

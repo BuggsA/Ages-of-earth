@@ -8,6 +8,7 @@ import { wallLine } from './sim/commands';
 import { AGES, BUILDINGS, CIVS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SEASONS, STEPPE, TECHS, TICK_HZ, TRIBUTE, TRUNK, WARCAMP, WAYS, WORKS, domainOf, unitStats } from './sim/data';
 import { crestSvg } from './ui/crests';
 import { isEnemy } from './sim/world';
+import { grantAll, topUp } from './sim/god';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
 import { placeProblem, walkable } from './sim/grid';
 import { findDockSpot, findSpot } from './sim/ai';
@@ -429,6 +430,9 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   mode = 'play';
   lastEnd = null;
   pending = [];
+  godOn = false;
+  godTyped = '';
+  $('god-btn').classList.add('hidden');
   selection = new Set();
   selectedTile = null;
   selectedRelic = null;
@@ -1689,6 +1693,20 @@ minimap.onCommand = (x, y) => {
 
 const held = new Set<string>();
 
+// God mode (#399): typed in a solo match, never offered by a button; the one visible control leaves it.
+const GOD_CODE = 'Anissa1030';
+let godTyped = '';
+let godOn = false;
+function setGod(on: boolean): void {
+  godOn = on;
+  $('god-btn').classList.toggle('hidden', !on);
+  if (on && game) {
+    grantAll(game, viewer);
+    hud.toast('God mode: everything unlocked', 'info');
+  } else if (!on) hud.toast('God mode off', 'info');
+}
+$('god-btn').addEventListener('click', () => setGod(false));
+
 window.addEventListener('keydown', (e) => {
   if ((e.target as HTMLElement).closest('input, select, textarea')) return;
   sound.unlock();
@@ -1704,6 +1722,13 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   if (mode !== 'play' && !(mode === 'over' && k.startsWith('Arrow'))) return;
+  if (k.length === 1 && !online && !watching && !spectating && game && !godOn) {
+    godTyped = (godTyped + k).slice(-GOD_CODE.length);
+    if (godTyped === GOD_CODE) {
+      godTyped = '';
+      setGod(true);
+    }
+  }
   if (k.startsWith('Arrow')) {
     held.add(k);
     e.preventDefault();
@@ -2562,6 +2587,7 @@ function frame(now: number): void {
         acc += dt * SPEEDS[speedIdx];
         let n = 0;
         while (acc >= DT && n < 6) {
+          if (godOn) topUp(s, viewer);
           if (pending.length) record.push([s.tick, pending]);
           step(s, pending);
           pending = [];
