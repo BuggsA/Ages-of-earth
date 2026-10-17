@@ -6,7 +6,7 @@ import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { SIGHT_LORE } from './render/sightings';
 import { wallLine } from './sim/commands';
-import { AGES, BUILDINGS, CIVS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SEASONS, STEPPE, TECHS, TICK_HZ, TRIBUTE, TRUNK, WARCAMP, WAYS, WORKS, domainOf, unitStats } from './sim/data';
+import { AGES, BUILDINGS, CIVS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, TRIBUTE, TRUNK, WARCAMP, WAYS, WORKS, domainOf, unitStats } from './sim/data';
 import { crestSvg } from './ui/crests';
 import { isEnemy } from './sim/world';
 import { grantAll, topUp } from './sim/god';
@@ -19,6 +19,7 @@ import type { AgeId, BuildingType, CivId, Command, Difficulty, Ent, GameEvent, G
 import { R_FISH, R_NONE } from './sim/types';
 import { carriedBy, relicAt } from './sim/relics';
 import { RUIN_FINDS, ruinAt } from './sim/ruins';
+import { TIDING_CARDS } from './sim/tidings';
 import { LANDMARK_KINDS, landmarkAt } from './sim/landmarks';
 import { postAt } from './sim/trade';
 import { chantedOver, consecrateProblem, consecrates } from './sim/consecrate';
@@ -2396,6 +2397,28 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           const first = s.ruins?.filter((r) => r.by === viewer).length === 1;
           hud.banner(RUIN_FINDS[ev.find].name, `Your diggers found ${what}.${first ? ' A new road is revealed: the Age of Reclaimers opens from the Middle Ages at your Town Center.' : ''}`, 5000);
         } else if (view.sees(ev.x, ev.y)) hud.toast(`${s.players[ev.owner].name} dug out the ruins`, 'info');
+        break;
+      }
+      case 'tiding': {
+        // Tidings at the fire (#443): the card itself is the HUD's; here the cue and what the answer brought.
+        if (ev.owner !== viewer) break;
+        const c = TIDING_CARDS[ev.card];
+        if (ev.how === 'come') play('tidingCome');
+        else if (ev.how === 'took') {
+          play('tidingTook');
+          hud.toast(
+            ev.card === 'traveller' ? `${c.icon} The traveller stays: a citizen more by your fire`
+            : ev.card === 'hunter' ? `${c.icon} Traded: +${TIDINGS.hunter.food} food`
+            : ev.card === 'tale' ? `${c.icon} She tells of a place out in the wild: it lies open on your map (Space to look)`
+            : ev.card === 'storm' ? `${c.icon} The huts are shored up against the storm`
+            : `${c.icon} The sick are tended`,
+            'good',
+          );
+          if (ev.card === 'tale' && ev.x !== undefined && ev.y !== undefined) lastAlert = { x: ev.x, y: ev.y };
+        } else if (ev.how === 'struck') {
+          play('tidingStorm');
+          hud.toast(ev.card === 'storm' ? `${c.icon} The storm tore at ${ev.n} house${ev.n === 1 ? '' : 's'}: send citizens to mend them` : `${c.icon} The fever took one of your citizens`, 'bad');
+        } else if (ev.how === 'spared') hud.toast(ev.card === 'storm' ? `${c.icon} The storm passed you by` : `${c.icon} The fever burned itself out`, 'info');
         break;
       }
       case 'campCleared':

@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'sighting' | 'dawn';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -810,6 +810,23 @@ export class Sound {
         this.tone(out, t + 0.12, { f: 620, to: 380, dur: 0.22, type: 'sawtooth', peak: 0.03, lp: 1800 });
         this.noise(out, t + 0.5, { dur: 0.5, filter: 'lowpass', f: 650, q: 0.8, peak: 0.07 });
         this.tone(out, t + 1.05, { f: 310, to: 240, dur: 0.1, peak: 0.05 });
+        break;
+      case 'tidingCome':
+        // Tidings at the fire (#443): a hide drum, two soft strokes and a third, then a low cow-horn calling the camp in.
+        this.drum(out, t, 0.09);
+        this.drum(out, t + 0.22, 0.07);
+        this.drum(out, t + 0.38, 0.1);
+        this.tone(out, t + 0.55, { f: N.D4 / 2, to: N.A4 / 2, type: 'sawtooth', dur: 0.7, peak: 0.035, attack: 0.15, lp: 900 });
+        break;
+      case 'tidingTook':
+        // A card answered with a price paid: a short warm chime, two notes rising.
+        this.bell(out, t, N.D5, 0.6, 0.03);
+        this.bell(out, t + 0.12, N.A5, 0.8, 0.03);
+        break;
+      case 'tidingStorm':
+        // A passed storm strikes, or a fever takes one: far thunder rolling under a low falling drone.
+        this.noise(out, t, { dur: 1.6, filter: 'lowpass', f: 260, q: 0.7, peak: 0.12, attack: 0.25 });
+        this.tone(out, t + 0.1, { f: 98, to: 70, dur: 1.4, type: 'triangle', peak: 0.05, attack: 0.2 });
         break;
       case 'curse':
         // A curse laid (#355 s4): a whispering breath, a drone on a tritone that sours, and one low thud as it lands.

@@ -5,7 +5,7 @@ import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
 import { RARE_OF_TILE } from '../sim/units';
-import { RARE, MERC, BLOOD, HEMO, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, CALL_UP, PATHS, WARCAMP, FLOCK, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { RARE, MERC, ORDERS, BLOOD, HEMO, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, CALL_UP, PATHS, WARCAMP, FLOCK, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -13,10 +13,11 @@ import { restsAt } from '../sim/passage';
 import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
 import { LANDMARK_KINDS, claimWork, claimants, favours, landmarkAt } from '../sim/landmarks';
 import { workProblem } from '../sim/works';
+import { TIDING_CARDS, tidingCost, tidingProblem } from '../sim/tidings';
 import { vowProblem, wayProblem } from '../sim/ways';
 import { beaconProblem, lit } from '../sim/beacon';
 import { callUpProblem, callUpReach, campGrace, musterWait } from '../sim/warcamp';
-import { bloodOf, bloodShort, cursed, grafted, levyProblem, levyReach } from '../sim/blood';
+import { bloodOf, bloodShort, cursed, grafted, levyProblem, sworn, levyReach } from '../sim/blood';
 import { feedReach, graftCost, graftWait, waiting } from '../sim/hemo';
 import { chantedOver, consecrates, faithOf } from '../sim/consecrate';
 import { rallyProblem } from '../sim/rally';
@@ -170,6 +171,8 @@ export class Hud {
   private noticeEl = document.getElementById('notices')!;
   private bannerEl = document.getElementById('banner')!;
   private timerEl = document.getElementById('timers')!;
+  private tidingEl = document.getElementById('tiding')!;
+  private tidingSig = '';
   private timerHtml = '';
   private selSig = '';
   private cmdSig = '';
@@ -205,6 +208,21 @@ export class Hud {
       if (c) this.runCmd(c);
     });
     this.cmdEl.addEventListener('contextmenu', (e) => e.preventDefault());
+    // Tidings at the fire (#443): either answer is a command, so every screen in an online match plays it the same.
+    this.tidingEl.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-take]');
+      const t = this.state?.players[this.viewer]?.tiding;
+      if (!b || !t || !this.state) return;
+      const take = b.dataset.take === '1';
+      const why = take ? tidingProblem(this.state, this.state.players[this.viewer], t.card) : null;
+      if (why) {
+        this.toast(why, 'bad');
+        this.act.sound('error');
+        return;
+      }
+      this.act.issue({ t: 'tiding', p: this.viewer, card: t.card, take });
+      this.act.sound('click');
+    });
     this.timerEl.addEventListener('click', (e) => {
       const t = (e.target as HTMLElement).closest<HTMLElement>('[data-focus]');
       if (t) {
@@ -280,10 +298,35 @@ export class Hud {
     this.viewer = viewer;
     this.lastIds = ids;
     this.top(s, viewer, speed);
+    this.tidingCard(s, viewer);
     if (!this.workforcePanel.classList.contains('hidden')) this.drawWorkforce(s, viewer);
     const ents = ids.map((id) => s.byId.get(id)).filter((e): e is Ent => !!e && e.hp > 0);
     this.selection(s, viewer, ents, selectedTile, selectedRelic, selectedPost, selectedRuin, selectedLandmark);
     this.commands(s, viewer, ents);
+  }
+
+  /** The card of tidings waiting at the viewer's fire (#443), with its fade bar; hidden when none waits. */
+  private tidingCard(s: GameState, viewer: number): void {
+    const t = s.players[viewer]?.tiding;
+    const sig = t ? `${t.card}:${t.draw}` : '';
+    if (sig !== this.tidingSig) {
+      this.tidingSig = sig;
+      this.tidingEl.classList.toggle('hidden', !t);
+      document.getElementById('hud')!.classList.toggle('has-tiding', !!t);
+      if (!t) {
+        this.tidingEl.innerHTML = '';
+        return;
+      }
+      const c = TIDING_CARDS[t.card];
+      const cost = Object.entries(tidingCost(t.card)).map(([r, n]) => `${n} ${RES_LABEL[r as keyof typeof RES_LABEL].toLowerCase()}`).join(' + ');
+      const gain = t.card === 'traveller' ? '+1 citizen' : t.card === 'hunter' ? `+${TIDINGS.hunter.food} food` : t.card === 'tale' ? 'learn where it lies' : 'safe';
+      const risk = t.card === 'storm' ? `maybe: houses lose ${Math.round(TIDINGS.storm.harm * 100)}% health` : t.card === 'fever' ? 'maybe: a citizen dies' : 'nothing happens';
+      this.tidingEl.innerHTML = `<h3><span>${c.icon}</span>${c.name}</h3><p>${c.text}</p><div class="row"><button type="button" class="take" data-take="1">${c.take}<small>${cost}: ${gain}</small></button><button type="button" data-take="0">${c.pass}<small>${risk}</small></button></div><div class="fade"><i></i></div>`;
+    }
+    if (!t) return;
+    const left = Math.max(0, Math.min(1, (t.until - s.tick) / secs(TIDINGS.fade)));
+    const bar = this.tidingEl.querySelector<HTMLElement>('.fade i');
+    if (bar) bar.style.width = `${(left * 100).toFixed(1)}%`;
   }
 
   private drawWorkforce(s: GameState, viewer: number): void {
@@ -535,14 +578,17 @@ export class Hud {
     const toll = paidTo.length ? `<span data-tip="<b>Toll paid</b>This load paid ${paidTo.join(' and ')} a toll for safe passage across its land. A road that keeps out of a caravan people's land pays in full.">🛂<em>Toll paid</em></span>` : '';
     // Hemocraft (#355 s3): a grafted soldier, and how long its graft holds away from the Stations.
     const hemoLeft = grafted(s, u) ? Math.ceil((u.hemo! - s.tick) / TICK_HZ) : 0;
-    const graft = hemoLeft ? `<span data-tip="<b>Grafted</b>Hemo-engineered: blows ${Math.round((HEMO.attack - 1) * 100)}% harder, ${Math.round((HEMO.pace - 1) * 100)}% faster, mends ${HEMO.mend} a second and can't be converted. Blades, arrows and hooves land ${Math.round((1 - HEMO.flesh) * 100)}% softer, but siege, ships, aircraft and coils hit ${Math.round((HEMO.machine - 1) * 100)}% harder. Fed within ${feedReach(s.players[u.owner])} tiles of a Transfusion Station; away from them it runs dry in ${hemoLeft}s and the soldier loses ${Math.round(HEMO.crash * 100)}% of its health.">🩸<em>Grafted</em> ${hemoLeft >= HEMO.last - 1 ? 'fed' : `${hemoLeft}s`}</span>` : '';
+    const graft = hemoLeft ? `<span data-tip="<b>Grafted</b>Hemo-engineered: blows ${Math.round((HEMO.attack - 1) * 100)}% harder, ${Math.round((HEMO.pace - 1) * 100)}% faster, mends ${HEMO.mend} a second and can't be converted. Blades, arrows and hooves land ${Math.round((1 - HEMO.flesh) * 100)}% softer, but siege, ships, aircraft and coils hit ${Math.round((HEMO.machine - 1) * 100)}% harder. Fed within ${feedReach(s.players[u.owner])} tiles of a Transfusion Station${modsOf(s, u.owner).veins ? `, and in a Watch Tower's reach (${LIGHTNING.reach} tiles: Galvanic Blood)` : ''}; away from them it runs dry in ${hemoLeft}s and the soldier loses ${Math.round(HEMO.crash * 100)}% of its health.">🩸<em>Grafted</em> ${hemoLeft >= HEMO.last - 1 ? 'fed' : `${hemoLeft}s`}</span>` : '';
     // The Blood-rite (#355 s4): a cursed enemy takes every blow harder until the curse lifts.
     const curseLeft = cursed(s, u) ? Math.ceil((u.cursed! - s.tick) / TICK_HZ) : 0;
     const curse = curseLeft ? `<span data-tip="<b>Cursed</b>A Blood-rite priest has cursed this one: every blow on it lands ${Math.round((RITE.taken - 1) * 100)}% harder for ${curseLeft} more seconds.">☠<em>Cursed</em> ${curseLeft}s</span>` : '';
+    // Military Orders (#355 s6): a soldier with one of its priests at hand is sworn.
+    const isSworn = sworn(s, u);
+    const oath = isSworn ? `<span data-tip="<b>Sworn</b>Military Orders: one of ${mine ? 'your' : 'its people\'s'} priests stands within ${ORDERS.reach} tiles, so no rival's priest can turn it, offer it up or curse it, and ${mine ? 'your' : 'their'} priests mend it ${Math.round((ORDERS.mend - 1) * 100)}% faster. Leave it without a priest near and the oath no longer holds it.">⚜<em>Sworn</em></span>` : '';
     // A sword for hire (the Age of Merchants): paid by the day, and gone if left unpaid.
     const sword = u.merc !== undefined ? `<span data-tip="<b>Sword for hire</b>Draws ${MERC.wage} gold every ${MERC.every} seconds from ${mine ? 'your' : 'its people\'s'} treasury${u.merc ? `, and has gone unpaid ${u.merc} payday${u.merc > 1 ? 's' : ''}: it walks off at ${MERC.patience}` : `; one left unpaid ${MERC.patience} paydays walks off`}.">💰<em>${u.merc ? 'Unpaid' : 'Hired'}</em></span>` : '';
     const held = u.type === 'priest' && carriedBy(s, u) ? `<span data-tip="<b>Relic</b>Carried to a Temple, it brings in gold. Hands full: no healing or converting until it is set down (D).">⚱<em>Relic</em></span>` : '';
-    const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}:${u.cargo.length}:${rank}:${taking}:${road}:${u.tolled ?? 0}:${hemoLeft}:${curseLeft}:${u.merc ?? -1}`;
+    const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}:${u.cargo.length}:${rank}:${taking}:${road}:${u.tolled ?? 0}:${hemoLeft}:${curseLeft}:${u.merc ?? -1}:${isSworn}`;
     const html = `<div class="sel-portrait"><img src="${unitPicture(u.type, u.type === 'wagon' && u.packed === 'market' ? p.epoch + 20 : p.epoch, p.color)}" alt=""></div>
       <div class="sel-info">
         <div class="sel-name">${s.kings.includes(u.id) ? `👑 King (${st.name})` : st.name}</div>
@@ -553,7 +599,7 @@ export class Hud {
           <span data-tip="<b>Armor</b>Melee / missile armor: taken off every blow or shot.">🛡<em>Armor</em> ${st.armor}/${st.parmor}</span>
           ${st.range ? `<span data-tip="<b>Range</b>How far it shoots, in tiles.">🏹<em>Range</em> ${st.range}</span>` : ''}
           <span data-tip="<b>Speed</b>Tiles per second.">👣<em>Speed</em> ${Math.round(st.speed * 100) / 100}</span>
-          ${carry}${cargo}${load}${stance}${vet}${aura}${graft}${sword}${curse}${held}${trip}${caravan}${tribute}${toll}
+          ${carry}${cargo}${load}${stance}${vet}${aura}${graft}${oath}${sword}${curse}${held}${trip}${caravan}${tribute}${toll}
         </div>
         <div class="blurb">${st.blurb}</div>
       </div>`;

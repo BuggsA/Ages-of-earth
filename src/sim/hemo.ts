@@ -1,5 +1,6 @@
 import { HEMO, HEMOCRAFT, TICK_HZ, secs } from './data';
-import { ageDef } from './ages';
+import { ageDef, inField } from './ages';
+import { modsOf } from './stats';
 import { GRAFTABLE, bloodOf, grafted } from './blood';
 import { ungarrison } from './units';
 import { maxHp } from './world';
@@ -10,6 +11,7 @@ import type { Building, GameState, Player, Unit } from './types';
  * time, `HEMO.work` seconds and `HEMO.cost` blood each, and opens its doors once none inside is left ungrafted. A graft is fed while its
  * soldier stands within `HEMO.reach` tiles of one of its people's standing Stations; `HEMO.last` seconds from all of them it runs dry
  * and the soldier crashes. So the Stations are the army's lifeline, and the rival who brings them down with machines unmakes it.
+ * With Galvanic Blood (#355 s6) a Watch Tower's reach feeds a graft too, in any age.
  */
 
 /** The people's finished, standing Transfusion Stations. */
@@ -80,7 +82,8 @@ export function hemoStep(s: GameState): void {
     if (u.kind !== 'unit' || u.hemo === undefined || u.hp <= 0) continue;
     let mine = by.get(u.owner);
     if (!mine) by.set(u.owner, (mine = stationsOf(s, u.owner)));
-    if (fed(mine, u.x, u.y, feedReach(s.players[u.owner]))) u.hemo = s.tick + secs(HEMO.last);
+    // Galvanic Blood (#355 s6): a Watch Tower's reach feeds a graft as a Station does.
+    if (fed(mine, u.x, u.y, feedReach(s.players[u.owner])) || (modsOf(s, u.owner).veins > 0 && inField(s, u))) u.hemo = s.tick + secs(HEMO.last);
     if (s.tick >= u.hemo) {
       // Run dry: the graft is gone, and the body pays for it.
       delete u.hemo;
