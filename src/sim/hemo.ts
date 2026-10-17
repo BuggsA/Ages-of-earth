@@ -1,8 +1,9 @@
-import { HEMO, TICK_HZ, secs } from './data';
+import { HEMO, HEMOCRAFT, TICK_HZ, secs } from './data';
+import { ageDef } from './ages';
 import { GRAFTABLE, bloodOf, grafted } from './blood';
 import { ungarrison } from './units';
 import { maxHp } from './world';
-import type { Building, GameState, Unit } from './types';
+import type { Building, GameState, Player, Unit } from './types';
 
 /**
  * Hemocraft (#355 s3): soldiers grafted with blood at a Transfusion Station. The Station takes the soldiers sheltered inside one at a
@@ -18,9 +19,15 @@ export function stationsOf(s: GameState, owner: number): Building[] {
   return out;
 }
 
-/** Whether a point lies within `HEMO.reach` tiles of one of these Stations. */
-function fed(stations: Building[], x: number, y: number): boolean {
-  const r2 = HEMO.reach * HEMO.reach;
+/** The blood a graft costs this people: a quarter less in Hemocraft (#355 s2). */
+export const graftCost = (p: Player): number => (ageDef(p).hemocraft ? HEMO.cost * HEMOCRAFT.graft : HEMO.cost);
+
+/** How far from a Station this people's grafts stay fed: farther in Hemocraft (#355 s2). */
+export const feedReach = (p: Player): number => (ageDef(p).hemocraft ? HEMOCRAFT.reach : HEMO.reach);
+
+/** Whether a point lies within `reach` tiles of one of these Stations. */
+function fed(stations: Building[], x: number, y: number, reach: number): boolean {
+  const r2 = reach * reach;
   return stations.some((b) => (b.x - x) * (b.x - x) + (b.y - y) * (b.y - y) <= r2);
 }
 
@@ -48,14 +55,15 @@ function station(s: GameState, b: Building): void {
   const p = s.players[b.owner];
   if (b.muster === undefined) {
     // A graft starts only when the blood for it is in store; it is paid when it is done.
-    if (bloodOf(p) >= HEMO.cost) b.muster = s.tick + secs(HEMO.work);
+    if (bloodOf(p) >= graftCost(p)) b.muster = s.tick + secs(HEMO.work);
     return;
   }
   if (s.tick < b.muster) return;
   delete b.muster;
-  if (bloodOf(p) < HEMO.cost) return;
+  const cost = graftCost(p);
+  if (bloodOf(p) < cost) return;
   const u = queue[0];
-  p.blood = bloodOf(p) - HEMO.cost;
+  p.blood = bloodOf(p) - cost;
   p.stats.grafted = (p.stats.grafted ?? 0) + 1;
   u.hemo = s.tick + secs(HEMO.last);
   u.hp = maxHp(s, u);
@@ -72,7 +80,7 @@ export function hemoStep(s: GameState): void {
     if (u.kind !== 'unit' || u.hemo === undefined || u.hp <= 0) continue;
     let mine = by.get(u.owner);
     if (!mine) by.set(u.owner, (mine = stationsOf(s, u.owner)));
-    if (fed(mine, u.x, u.y)) u.hemo = s.tick + secs(HEMO.last);
+    if (fed(mine, u.x, u.y, feedReach(s.players[u.owner]))) u.hemo = s.tick + secs(HEMO.last);
     if (s.tick >= u.hemo) {
       // Run dry: the graft is gone, and the body pays for it.
       delete u.hemo;

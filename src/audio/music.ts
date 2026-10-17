@@ -54,6 +54,10 @@ const SIDE_STYLES: Partial<Record<AgeId, Style>> = {
   ironblood: { bpm: 96, root: 110.0, scale: [0, 1, 3, 5, 7, 8, 10], chords: [0, 1, 0, 5, 0, 1, 6, 0], lead: 'cornet', accomp: 'strings', drums: 'anvil', density: 0.42 },
   // The Age of Total War (#313): the march of the whole people, a snare and cornet over strings in Aeolian, quicker and lower than Iron and Blood.
   totalwar: { bpm: 108, root: 98.0, scale: [0, 2, 3, 5, 7, 8, 10], chords: [0, 5, 3, 0, 6, 5, 4, 0], lead: 'cornet', accomp: 'strings', drums: 'snare', density: 0.48 },
+  // The fork (#355 s2). Hemocraft: a Locrian theremin over held strings, the anvil a pump's stroke, the sound of a works run on blood.
+  hemocraft: { bpm: 100, root: 92.5, scale: [0, 1, 3, 5, 6, 8, 10], chords: [0, 0, 4, 0, 1, 0, 5, 4], lead: 'theremin', accomp: 'strings', drums: 'anvil', density: 0.4 },
+  // The Blood-rite: a slow Phrygian-dominant chant of bells over a drone, the timpani a heartbeat at the altar.
+  bloodrite: { bpm: 60, root: 110.0, scale: [0, 1, 4, 5, 7, 8, 10], chords: [0, 0, 1, 0, 5, 0, 1, 0], lead: 'bell', accomp: 'drone', drums: 'timpani', density: 0.3 },
   warband: { bpm: 88, root: 130.81, scale: [0, 1, 3, 5, 7, 8, 10], chords: [0, 0, 1, 0, 6, 0, 1, 0], lead: 'cornet', accomp: 'drone', drums: 'timpani', density: 0.36 },
   // The Age of the Steppe (#297): slow and open, a pentatonic flute over a held drone, the frame drum a distant hoofbeat.
   steppe: { bpm: 84, root: 98.0, scale: [0, 2, 5, 7, 9], chords: [0, 0, 3, 0], lead: 'flute', accomp: 'drone', drums: 'frame', density: 0.3 },

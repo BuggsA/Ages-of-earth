@@ -1129,6 +1129,12 @@ export class View {
         case 'blood': {
           // Blood drawn (#355): a dark red spray where the drawn fell, or at the rig for a levy.
           if (ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;
+          if (ev.how === 'drain') {
+            // Hemocraft's drain (#355 s2): a thin dark mist drawn up off each bled body, and every third second a low suck at the nearest.
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.8), { count: 3, speed: 0.25, up: 1.6, life: 0.7, size: 0.04, gravity: -0.6, colors: ['#5a0e18', '#8a1a2a'] });
+            if (s.tick % (TICK_HZ * 3) === 0) this.cue('drain', ev.x, ev.y, 0.3);
+            break;
+          }
           this.effects.burst(this.ground(s, ev.x, ev.y, 0.5), { count: 9, speed: 0.6, up: 1.0, life: 0.8, size: 0.05, gravity: 2.2, colors: ['#7a1822', '#4a0e16', '#a3283a'] });
           break;
         }

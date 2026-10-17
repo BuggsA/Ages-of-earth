@@ -1462,7 +1462,7 @@ function ironTower(k: Kit, st: Style): void {
 /** The original four dressed ages, kept as the baseline model regression set. */
 export const LOOK_AGES: AgeId[] = ['merchant', 'iron', 'pilgrim', 'fair'];
 /** All dressed ages; additions get their own model coverage beside the baseline set. */
-export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer', 'sail', 'aeronaut', 'lightning', 'warband', 'ironblood', 'totalwar', 'steppe', 'horde', 'silk'];
+export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer', 'sail', 'aeronaut', 'lightning', 'warband', 'ironblood', 'totalwar', 'steppe', 'horde', 'silk', 'hemocraft', 'bloodrite'];
 
 const SAIL = '#efe8d4';
 const NET = '#b9ad8a';
@@ -1564,6 +1564,57 @@ function bloodTouches(k: Kit, type: BuildingType, age: AgeId): void {
   if (depth >= 3 && (war || type === 'house' || type === 'storehouse')) sandbags(k, -span * 0.75, span * 0.75, span + (depth >= 2 && type !== 'storehouse' ? 0.45 : 0.2));
 }
 
+/** A riveted steel serum tank with a band of red glass and a red gauge lamp (Hemocraft, #355 s2). */
+function serumTank(k: Kit, x: number, z: number, r: number, h: number): void {
+  k.cyl(r, r, h, 8, IRON_DARK, x, 0, z);
+  k.cyl(r * 1.04, r * 1.04, h * 0.32, 8, '#8a1222', x, h * 0.38, z);
+  for (const y of [h * 0.2, h * 0.86]) k.cyl(r * 1.06, r * 1.06, 0.04, 8, '#6b7076', x, y, z);
+  k.dome(r, '#6b7076', x, h, z);
+  k.glow(k.sphere(0.05, '#ff3a4a', x, h + r * 0.75, z));
+}
+
+/**
+ * Hemocraft's towns (#355 s2), blood run through machines: serum tanks beside the doors, piped into the walls; the war buildings and
+ * the Town Center get two, other buildings one; the Drain Rig, Station and towers are already the age's own.
+ */
+function hemoTouches(k: Kit, type: BuildingType): void {
+  if (['farm', 'gate', 'wall', 'tower', 'warcamp', 'drainrig', 'transfusion', 'bloodtower'].includes(type)) return;
+  const span = type === 'wonder' ? 2.5 : type === 'towncenter' ? 1.75 : type === 'house' ? 0.72 : 1.05;
+  const r = type === 'house' ? 0.16 : 0.24;
+  const h = type === 'wonder' ? 1.6 : type === 'towncenter' ? 1.3 : type === 'house' ? 0.7 : 1.0;
+  const sides = ['towncenter', 'barracks', 'range', 'stable', 'wonder'].includes(type) ? [-1, 1] : [1];
+  for (const d of sides) {
+    const x = d * (span + r * 0.6);
+    serumTank(k, x, span * 0.45, r, h);
+    // The pipe from the tank into the wall, at waist height.
+    k.box(r * 1.4, 0.06, 0.06, '#6b7076', x - d * r * 0.9, h * 0.55, span * 0.45);
+  }
+}
+
+/** A bronze brazier on a tripod with live coals (the Blood-rite, #355 s2). */
+function brazier(k: Kit, x: number, z: number, h: number): void {
+  for (const [dx, dz] of [[-0.07, -0.05], [0.07, -0.05], [0, 0.08]]) k.cyl(0.015, 0.015, h, 4, '#3a2c22', x + dx, 0, z + dz);
+  k.cyl(0.16, 0.08, 0.12, 7, '#8a5a2a', x, h, z);
+  k.glow(k.sphere(0.09, '#ff6a2a', x, h + 0.12, z));
+}
+
+/**
+ * The Blood-rite's towns (#355 s2): a long red-dyed cloth hung down each front, a brazier burning at the door, and before the Temple
+ * a plain altar of pale stone between two braziers. The Temple's own model keeps each epoch's faith (a church in the late ages), so the
+ * rite's dressing stays restrained: cloth and fire, nothing that mocks the building it stands before.
+ */
+function riteTouches(k: Kit, type: BuildingType): void {
+  if (['farm', 'gate', 'wall', 'tower', 'warcamp', 'drainrig', 'transfusion', 'bloodtower'].includes(type)) return;
+  const span = type === 'wonder' ? 2.5 : type === 'towncenter' ? 1.75 : type === 'house' ? 0.72 : type === 'temple' ? 1.4 : 1.05;
+  const tall = type === 'wonder' ? 2.6 : type === 'towncenter' ? 2.0 : type === 'house' ? 1.0 : 1.5;
+  k.box(span * 0.5, tall * 0.8, 0.03, '#7a1424', 0, tall * 0.15, span + 0.02);
+  k.box(span * 0.5, 0.06, 0.05, '#c8a24a', 0, tall * 0.95, span + 0.02);
+  if (type === 'temple') {
+    k.box(0.9, 0.42, 0.5, PALE, 0, 0, span + 0.6);
+    for (const x of [-0.75, 0.75]) brazier(k, x, span + 0.6, 0.55);
+  } else if (type !== 'house') brazier(k, span * 0.75, span + 0.35, 0.5);
+}
+
 /**
  * A horsetail standard (the Age of the Horde, #318): a spear-headed pole with a gilded ring, under it a
  * skirt of long horsehair strands, black for war or white for the camp's own spirit banner.
@@ -1656,6 +1707,12 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
     case 'ironblood':
     case 'totalwar':
       bloodTouches(k, type, age);
+      break;
+    case 'hemocraft':
+      hemoTouches(k, type);
+      break;
+    case 'bloodrite':
+      riteTouches(k, type);
       break;
     case 'steppe':
       steppeTouches(k, type);

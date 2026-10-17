@@ -102,13 +102,16 @@ export function roadView(d: Discovery, r: Road): 'hidden' | 'faint' | 'known' {
 // and the Fairs to lane 3 at tier 3, and Lightning to lane 3 at tier 4 (its road curves under the Aeronauts).
 // The Steppe Road (#318) keeps the right column, as the Path of Blood keeps the left: the Steppe over the Horde.
 // The Silk Road (#326), the crossing where the horde meets the merchants, steps in to lane 4 under the Sail, between its two roads.
-const LANE: Record<AgeId, number> = { iron: 0, reclaimer: 2, stone: 1, bronze: 1, middle: 1, gunpowder: 1, industrial: 1, merchant: 2, pilgrim: 3, fair: 3, sail: 4, aeronaut: 2, lightning: 3, warband: 0, steppe: 5, ironblood: 0, totalwar: 0, horde: 5, silk: 4 };
-/** Six lanes wide: 48 + 5 × 88 + half a node fits in 528 (the Steppe Road, lane 5, sat past the old 440). */
-export const MAP = { w: 528, h: 440, nodeW: 76, nodeH: 34, top: 40, gap: 85 };
+const LANE: Record<AgeId, number> = { iron: 0, reclaimer: 2, stone: 1, bronze: 1, middle: 1, gunpowder: 1, industrial: 1, merchant: 2, pilgrim: 3, fair: 3, sail: 4, aeronaut: 2, lightning: 3, warband: 0, steppe: 5, ironblood: 0, totalwar: 0, horde: 5, silk: 4, hemocraft: 0, bloodrite: 1 };
+// The fork at the end of the Path of Blood (#355 s2) stands at Industrial strength, but past Total War: a row of its own under
+// tier 4, Hemocraft below Total War in the path's column and the Blood-rite below the Industrial Age it turns off.
+const ROW: Partial<Record<AgeId, number>> = { hemocraft: 5, bloodrite: 5 };
+/** Six lanes wide: 48 + 5 × 88 + half a node fits in 528 (the Steppe Road, lane 5, sat past the old 440); six rows deep with the fork (#355 s2). */
+export const MAP = { w: 528, h: 525, nodeW: 76, nodeH: 34, top: 40, gap: 85 };
 
 export function layout(): Record<AgeId, { x: number; y: number }> {
   const out = {} as Record<AgeId, { x: number; y: number }>;
-  for (const a of Object.keys(AGES) as AgeId[]) out[a] = { x: 48 + LANE[a] * 88, y: MAP.top + AGES[a].tier * MAP.gap };
+  for (const a of Object.keys(AGES) as AgeId[]) out[a] = { x: 48 + LANE[a] * 88, y: MAP.top + (ROW[a] ?? AGES[a].tier) * MAP.gap };
   return out;
 }
 
