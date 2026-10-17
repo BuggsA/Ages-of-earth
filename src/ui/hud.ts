@@ -81,6 +81,8 @@ function marketTrend(price: number, res: 'food' | 'wood' | 'stone'): string {
   return price < base ? `↑ recovering toward ${base}` : price > base ? `↓ recovering toward ${base}` : `→ steady at ${base}`;
 }
 
+const STANCE_NAMES: Record<Stance, string> = { aggressive: 'Attack and destroy', defensive: 'Fight if provoked', stand: 'Hold', run: 'Run' };
+
 const ACT_WORDS: Record<string, string> = {
   idle: 'Standing by',
   walk: 'Walking',
@@ -563,7 +565,7 @@ export class Hud {
     const status = mine ? orderWords(s, u) + queued : p.name;
     const carry = mine && u.carry > 0 && u.carryRes ? `<span>${icon(u.carryRes)}${u.carry}<em>carried</em></span>` : '';
     const cargo = u.type === 'transport' ? `<span data-tip="<b>Aboard</b>Soldiers and citizens carried. Right-click a shore (or press U) to land them.">⛵<em>Aboard</em> ${u.cargo.length}/${st.capacity ?? 0}</span>` : '';
-    const stance = st.attack > 0 && u.type !== 'citizen' && mine ? `<span data-tip="<b>Stance</b>Z aggressive, X defensive, C stand ground.">${u.stance === 'stand' ? '⚓ Stand' : u.stance === 'defensive' ? '🛡 Defend' : '🔥 Aggressive'}</span>` : '';
+    const stance = st.attack > 0 && u.type !== 'citizen' && mine ? `<span data-tip="<b>Stance</b>Z attack and destroy, X fight if provoked, C hold, N run.">${u.stance === 'stand' ? '⚓ Hold' : u.stance === 'defensive' ? '🛡 Provoked' : u.stance === 'run' ? '🏃 Run' : '🔥 Attack'}</span>` : '';
     const aura = s.tick - u.aura < 5 && u.type !== 'hero' ? `<span data-tip="<b>Inspired</b>A hero nearby: hits harder and heals.">✨<em>Inspired</em></span>` : '';
     const rank = rankOf(u);
     const vet = rank ? `<span data-tip="<b>${VETERANCY.names[rank - 1]}</b>${u.vet} enemy soldiers defeated: blows ${Math.round((VETERANCY.attack[rank - 1] - 1) * 100)}% harder${VETERANCY.armor[rank - 1] ? `, +${VETERANCY.armor[rank - 1]} armor` : ''}.">${'▲'.repeat(rank)}<em>${VETERANCY.names[rank - 1]}</em></span>` : '';
@@ -822,13 +824,14 @@ export class Hud {
       }
       if (soldiers.length) {
         const stances: [string, Stance, string, string][] = [
-          ['Z', 'aggressive', '🔥', 'Aggressive: chase any enemy that comes into sight.'],
-          ['X', 'defensive', '🛡', 'Defensive: fight what comes near, but return to their post.'],
-          ['C', 'stand', '⚓', 'Stand ground: never move from the spot; strike what is in reach.'],
+          ['Z', 'aggressive', '🔥', 'Attack and destroy: seek out and chase any enemy that comes into sight.'],
+          ['X', 'defensive', '🛡', 'Fight if provoked: fight what is attacking them or comes close, but return to their post.'],
+          ['C', 'stand', '⚓', 'Hold: never move from the spot; strike what is in reach.'],
+          ['N', 'run', '🏃', 'Run: step away from armed foes in sight and never fight back on their own (a direct attack order still goes ahead).'],
         ];
         for (const [key, stance, glyph, desc] of stances) {
           const all = soldiers.every((u) => u.stance === stance);
-          cmds.push({ key, pic: '', glyph, title: `${stance === 'stand' ? 'Stand ground' : stance[0].toUpperCase() + stance.slice(1)} stance`, desc, ok: true, on: all, run: () => this.act.issue({ t: 'stance', p: viewer, ids: soldiers.map((u) => u.id), stance }) });
+          cmds.push({ key, pic: '', glyph, title: STANCE_NAMES[stance], desc, ok: true, on: all, run: () => this.act.issue({ t: 'stance', p: viewer, ids: soldiers.map((u) => u.id), stance }) });
         }
       }
       cmds.push({ key: 'DELETE', pic: '', glyph: '💀', title: 'Delete', desc: 'Dismiss the selected units for good (Del).', ok: true, run: () => this.act.issue({ t: 'delete', p: viewer, ids: units.map((u) => u.id) }) });

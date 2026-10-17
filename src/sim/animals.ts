@@ -447,7 +447,7 @@ const WORK: Order['k'][] = ['idle', 'gather', 'farm', 'build', 'deliver', 'dig',
 /** Someone bitten or gored at their work turns on the beast, then goes back to it. */
 function fightBack(u: Unit, a: Animal): void {
   if (!fightsBeasts(u) || !WORK.includes(u.order.k)) return;
-  if (u.stance === 'stand' && u.type !== 'citizen') return;
+  if ((u.stance === 'stand' || u.stance === 'run') && u.type !== 'citizen') return;
   const o = u.order;
   if (o.k !== 'idle') u.queue.unshift(o.k === 'gather' || o.k === 'farm' || o.k === 'milk' ? { ...o, phase: 'go' } : o);
   u.order = { k: 'hunt', target: a.id, fight: a.kind === 'wolf' || a.kind === 'raider' };
