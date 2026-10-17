@@ -2246,10 +2246,21 @@ function onEvents(s: GameState, list: GameEvent[]): void {
       case 'blood':
         // Blood drawn at a Drain Rig (#355). Hemocraft's drain (s2) bleeds every second: the spray shows it, and the toast stays for kills and levies.
         // A sacrifice (#355 s4) tells of itself in the `rite` event.
-        if (ev.owner === viewer && ev.how !== 'drain' && ev.how !== 'sacrifice') {
+        // A bled flock and the captives held at a rig (#355) bleed every second too: the mist shows them, and the rig's panel counts them.
+        if (ev.owner === viewer && ev.how !== 'drain' && ev.how !== 'sacrifice' && ev.how !== 'flock' && ev.how !== 'captive') {
           play('blood');
-          hud.toast(ev.how === 'levy' ? `🩸 ${ev.n} blood drawn from the levy` : `🩸 ${ev.n} blood drawn from the fallen`, 'good');
+          hud.toast(ev.how === 'levy' ? `🩸 ${ev.n} blood drawn from the levy` : ev.how === 'beast' ? `🩸 ${ev.n} blood drawn from the slain beast` : `🩸 ${ev.n} blood drawn from the fallen`, 'good');
         }
+        break;
+      case 'captive':
+        // Captives (#355): taken at a rig, freed when it falls. The sound and the burst are the view's; here the words.
+        if (ev.what === 'taken') {
+          if (ev.owner === viewer) hud.toast('⛓ A captive taken to your rig: it will be bled for blood', 'good');
+          else if (ev.from === viewer) {
+            hud.toast(`⛓ ${s.players[ev.owner].name} has taken one of your citizens captive! Raze the rig that holds them to set them free`, 'alert');
+            lastAlert = { x: ev.x, y: ev.y };
+          }
+        } else if (ev.what === 'freed' && ev.from === viewer) hud.toast('⛓ The rig has fallen: your captive people are free and come home', 'good');
         break;
       case 'tribute': {
         // A horde's riders standing in a rival's land (#318).

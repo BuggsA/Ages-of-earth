@@ -277,6 +277,11 @@ export interface Building {
    * A Drain Rig (#355) rests the same way after a levy; a Transfusion Station holds here the tick its graft in hand is done.
    */
   muster?: number;
+  /**
+   * Captives held at a Drain Rig, or a Blood-rite altar (#355): each the people it was taken from and the blood still in it. Bled
+   * `BLOOD.bleed` a second until spent; freed as citizens of their own people if the building falls. Absent: none.
+   */
+  captives?: { p: number; left: number }[];
 }
 
 export type Ent = Unit | Building;
@@ -478,6 +483,8 @@ export interface PlayerStats {
   blood?: number;
   /** Citizens given to the levy at Drain Rigs (#355); absent in older saves. */
   levied?: number;
+  /** Enemy citizens taken captive at Drain Rigs and altars (#355); absent in older saves. */
+  captives?: number;
   /** Soldiers grafted at Transfusion Stations (#355 s3); absent in older saves. */
   grafted?: number;
   /** Health the Blood-rite's altars mended with blood (#355 s2); absent in older saves. */
@@ -607,7 +614,9 @@ export type GameEvent =
    * Blood drawn at a Drain Rig (#355): from an enemy who fell near it, or from citizens given to the levy; in Hemocraft (s2) also
    * bled from a living enemy standing by a rig (`drain`, at the bled), and in the Blood-rite from the fallen near a Temple.
    */
-  | { k: 'blood'; owner: number; x: number; y: number; n: number; how: 'slain' | 'levy' | 'drain' | 'sacrifice' }
+  | { k: 'blood'; owner: number; x: number; y: number; n: number; how: 'slain' | 'levy' | 'drain' | 'sacrifice' | 'beast' | 'flock' | 'captive' }
+  /** A captive (#355): an enemy citizen `taken` alive into a rig or altar at `x, y`, `freed` when it fell, or `spent`. `from` is its people. */
+  | { k: 'captive'; owner: number; from: number; x: number; y: number; what: 'taken' | 'freed' | 'spent' }
   /** A soldier grafted at a Transfusion Station (#355 s3), or a graft run dry far from every Station (`crash`). */
   | { k: 'graft'; owner: number; id: number; x: number; y: number; how: 'made' | 'crash' }
   /** A War Camp left without its soldiers (#303): it burns after a grace, or at once if its people left the path (`struck`). */

@@ -1170,6 +1170,11 @@ export class View {
         case 'blood': {
           // Blood drawn (#355): a dark red spray where the drawn fell, or at the rig for a levy.
           if (ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;
+          if (ev.how === 'flock' || ev.how === 'captive') {
+            // A bled flock, or the captives held at a rig (#355): the same thin mist, quieter, and no sound of its own.
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.6), { count: 2, speed: 0.2, up: 1.3, life: 0.6, size: 0.035, gravity: -0.6, colors: ['#5a0e18', '#8a1a2a'] });
+            break;
+          }
           if (ev.how === 'drain') {
             // Hemocraft's drain (#355 s2): a thin dark mist drawn up off each bled body, and every third second a low suck at the nearest.
             this.effects.burst(this.ground(s, ev.x, ev.y, 0.8), { count: 3, speed: 0.25, up: 1.6, life: 0.7, size: 0.04, gravity: -0.6, colors: ['#5a0e18', '#8a1a2a'] });
@@ -1177,6 +1182,15 @@ export class View {
             break;
           }
           this.effects.burst(this.ground(s, ev.x, ev.y, 0.5), { count: 9, speed: 0.6, up: 1.0, life: 0.8, size: 0.05, gravity: 2.2, colors: ['#7a1822', '#4a0e16', '#a3283a'] });
+          break;
+        }
+        case 'captive': {
+          // A captive (#355): iron-dark sparks where one is taken into a rig, a pale burst where the freed step out.
+          if (ev.owner !== this.viewer && ev.from !== this.viewer && !this.sees(ev.x, ev.y)) break;
+          if (ev.what === 'spent') break;
+          const freed = ev.what === 'freed';
+          this.effects.burst(this.ground(s, ev.x, ev.y, 0.6), { count: freed ? 14 : 10, speed: freed ? 0.9 : 0.5, up: freed ? 1.6 : 0.9, life: 0.9, size: 0.05, gravity: freed ? 0.6 : 2, colors: freed ? ['#f2e6c8', '#d9c89a', '#ffffff'] : ['#3a3a40', '#5a1018', '#22222a'] });
+          this.cue(freed ? 'unshackle' : 'shackle', ev.x, ev.y, 0.6);
           break;
         }
         case 'rite': {

@@ -2520,12 +2520,14 @@ const forkAge = (p: Player): boolean => !!ageDef(p).hemocraft || !!ageDef(p).rit
 const hemoPlay = (p: Player): boolean => AI_LEVELS[p.ai!].clever && AI_LEVELS[p.ai!].hemo !== false && (atWar(p) || forkAge(p));
 
 /**
- * What a rival's blood stands on, which machines go for: a Transfusion Station or Blood Tower, a Drain Rig that drains (Hemocraft) and a
- * Temple that is an altar (the Blood-rite).
+ * What a rival's blood stands on, which machines go for: a Transfusion Station or Blood Tower, a Drain Rig that drains (Hemocraft), a
+ * Temple that is an altar (the Blood-rite), and any rig or altar holding captives.
  */
 function bloodWork(s: GameState, e: Building): boolean {
   if (HEMO_WORKS.includes(e.type)) return true;
   if (e.type !== 'drainrig' && e.type !== 'temple') return false;
+  // A rig or altar holding captives (#355): razing it sets them free.
+  if (e.captives?.length) return true;
   const age = ageDef(s.players[e.owner]);
   return e.type === 'drainrig' ? !!age.hemocraft : !!age.rite;
 }
