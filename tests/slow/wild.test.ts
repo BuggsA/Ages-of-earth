@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { AMOUNT, MAMMOTH, TICK_HZ, WOLF, secs } from '../src/sim/data';
-import { createGame, step } from '../src/sim/game';
-import { walkable } from '../src/sim/grid';
-import { generateMap } from '../src/sim/mapgen';
-import { hitAnimal, spawnAnimal } from '../src/sim/animals';
-import type { Animal, Command, GameState, Unit } from '../src/sim/types';
-import { R_MEAT, R_NONE } from '../src/sim/types';
-import { placeBuilding, spawnUnit } from '../src/sim/world';
+import { AMOUNT, MAMMOTH, TICK_HZ, WOLF, secs } from '../../src/sim/data';
+import { createGame, step } from '../../src/sim/game';
+import { walkable } from '../../src/sim/grid';
+import { generateMap } from '../../src/sim/mapgen';
+import { hitAnimal, spawnAnimal } from '../../src/sim/animals';
+import type { Animal, Command, GameState, Unit } from '../../src/sim/types';
+import { R_MEAT, R_NONE } from '../../src/sim/types';
+import { placeBuilding, spawnUnit } from '../../src/sim/world';
 
 /** The wild (#171): mammoths that fight back, wolf packs by their dens. */
 

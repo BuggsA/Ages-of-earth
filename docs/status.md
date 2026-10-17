@@ -17,7 +17,7 @@ Full list, in the owner's words: `docs/rulings.md`.
 
 | Check | State |
 | --- | --- |
-| Quick tier (`npm run check`) | 614 tests, ~100 s on 4 cores (2026-10-16) |
+| Quick tier (`npm run check`) | 743 tests, ~85 s on 4 cores (2026-10-17) |
 | Slow tier (`tests/slow/`) | campaign proofs, long AI matches, browser smoke; daily in `periodic` |
 | Coverage | rules 83–100%; rendering, sound, HUD and `main.ts` untested, checked by hand |
 
