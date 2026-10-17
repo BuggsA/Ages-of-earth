@@ -1579,6 +1579,12 @@ export const AI_VIGIL = { slack: 1.5 };
  */
 export const AI_CONVOY = { escorts: 1, stay: 3 };
 
+/**
+ * The computer and sorties (#379 s4): a clever computer raises its Airfield `share` of the way toward the nearest enemy target it knows of
+ * (at most `most` tiles from home, searching `slack` tiles round the point), so its planes reach further on a tank of fuel.
+ */
+export const AI_AIRFIELD = { share: 0.3, most: 16, slack: 5 };
+
 /** Selling rare ore at a Market (#356 s5): a lot of `lot` pays `gold[ore]` gold at a flat price. Ore mined still counts toward its doors; only the stock in hand is spent. */
 export const ORE_TRADE = { lot: 20, gold: { salt: 40, saltpetre: 55, bloodiron: 90 } as Record<'salt' | 'saltpetre' | 'bloodiron', number> };
 

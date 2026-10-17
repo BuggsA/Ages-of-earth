@@ -1,5 +1,5 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_VIGIL, AI_CONVOY, AI_AIRFIELD, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
@@ -232,7 +232,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   if (L.clever && p.epoch >= 4 && citizens.length >= 24 && !buildings.some((b) => b.type === 'airfield') && !lightningBound(s, v, mem)) {
     const cost = buildingCostFor(s, p.id, 'airfield');
     const recent = s.tick - (mem.ordered.airfield ?? -99999) < secs(40);
-    const spot = !recent && afford(v, cost) ? findSpot(s, 'airfield', home.x, home.y, 6, 22) : null;
+    const spot = !recent && afford(v, cost) ? (L.clever && forwardField(s, v, home)) || findSpot(s, 'airfield', home.x, home.y, 6, 22) : null;
     if (!spot || !construct(s, v, mem, 'airfield', spot, 3, issue)) spend(v, cost);
   }
 
@@ -835,6 +835,27 @@ export function fairSpot(s: GameState, v: View): { tx: number; ty: number } | nu
   if (!shrine) return null;
   const half = BUILDINGS.market.size / 2;
   return findSpot(s, 'market', shrine.x, shrine.y, 2, AI_FAIR.ring, 1, (tx, ty) => fairground(s, id, { x: tx + half, y: ty + half }));
+}
+
+/**
+ * A spot for an Airfield toward the enemy (#379 s4): `AI_AIRFIELD.share` of the way to the nearest target it knows of, at most `most` tiles
+ * from home, so its planes (fuel, `SORTIE`) reach further. Null with no target known. The Airfield must stand before the road to Aeronauts starts, so this is not gated on the age.
+ */
+function forwardField(s: GameState, v: View, home: { x: number; y: number }): { tx: number; ty: number } | null {
+  const target = enemyTarget(s, v.p);
+  if (!target) return null;
+  const dx = target.x - home.x;
+  const dy = target.y - home.y;
+  const d = Math.sqrt(dx * dx + dy * dy);
+  if (d < 1) return null;
+  const push = Math.min(AI_AIRFIELD.most, d * AI_AIRFIELD.share);
+  const maxFromHome = (push + AI_AIRFIELD.slack) * (push + AI_AIRFIELD.slack);
+  const half = BUILDINGS.airfield.size / 2;
+  return findSpot(s, 'airfield', home.x + (dx / d) * push, home.y + (dy / d) * push, 0, AI_AIRFIELD.slack, 1, (tx, ty) => {
+    const ax = tx + half - home.x;
+    const ay = ty + half - home.y;
+    return ax * ax + ay * ay <= maxFromHome;
+  });
 }
 
 /** Our lowest-id finished Temple that keeps a relic: the fairground's heart and the vigil's post. */
