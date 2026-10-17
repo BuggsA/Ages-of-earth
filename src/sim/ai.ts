@@ -8,7 +8,7 @@ import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_
 import { ageDef, ageOf, barred, buildBarred, deedsDone, oreDone, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
 import { carriedBy } from './relics';
 import { swordsOf } from './merc';
-import { fairground } from './fair';
+import { fairground, feastOpen } from './fair';
 import { claimants, favours, landmarkAt } from './landmarks';
 import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple, TILE_OF_RARE } from './units';
 import { goalForPost, nearestMarket, portSpot, tripGold } from './trade';
@@ -2132,7 +2132,9 @@ export function enemyTarget(s: GameState, p: Player): Building | null {
     const pilgrims = holds && (ageOf(s.players[e.owner]) === 'pilgrim' || s.players[e.owner].techs.includes('bellFoundry'));
     // A Transfusion Station keeps a Hemocraft army fed (#355 s5): bring it down and the army crashes. A Blood Tower is half the pull.
     const blood = !hemo ? 0 : e.type === 'transfusion' ? AI_HEMO.bomb : e.type === 'bloodtower' ? AI_HEMO.bomb / 2 : 0;
-    const d = dx * dx + dy * dy - blood + (e.type === 'wonder' || shrine ? -1e6 : pilgrims ? -AI_WEB.bell : e.type === 'towncenter' ? -400 : -AI_LIGHTNING.raid * darkened(s, e));
+    // On a feast day a rival's fairground Market is where the gold is (#379): raid it while the purse is full.
+    const feast = e.type === 'market' && e.built && ageDef(s.players[e.owner]).fairs && feastOpen(s) && fairground(s, e.owner, e) ? AI_FAIR.raid : 0;
+    const d = dx * dx + dy * dy - blood - feast + (e.type === 'wonder' || shrine ? -1e6 : pilgrims ? -AI_WEB.bell : e.type === 'towncenter' ? -400 : -AI_LIGHTNING.raid * darkened(s, e));
     if (d < bestD) {
       bestD = d;
       best = e;
