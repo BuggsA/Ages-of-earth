@@ -24,6 +24,15 @@ export function fairShare(s: GameState, owner: number, market: { x: number; y: n
 }
 
 /**
+ * What a unit's price is multiplied by now (#356, the levy): `FAIR.levy` for a unit other than a hero queued on a
+ * feast day at a building of a Fairs people that stands on its fairground (`where`), else 1. Heroes are the tournament's.
+ */
+export function fairLevy(s: GameState, owner: number, unit: string, where?: { x: number; y: number }): number {
+  if (!where || unit === 'hero' || !ageDef(s.players[owner]).fairs || !feastOpen(s)) return 1;
+  return fairground(s, owner, where) ? FAIR.levy : 1;
+}
+
+/**
  * The lists (#379): when a feast closes, a Fairs people whose hero stands within `FAIR.reach` of its fairground Market
  * has held a tournament. The hero is healed whole and the crowd pays `FAIR.lists` gold, unless a rival's soldier
  * stands there too, which spoils the day.

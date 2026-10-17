@@ -831,7 +831,7 @@ export class Hud {
         trainsAt(p, b.type).forEach((unit, i) => {
           const st = statsFor(s, viewer, unit);
           const hired = isHire(p, b.type, unit);
-          const cost = trainCostFor(s, viewer, unit, b.type);
+          const cost = trainCostFor(s, viewer, unit, b.type, b);
           const time = trainTimeFor(s, viewer, unit, b.type);
           const age = ageDef(p);
           const levied = !hired && !!age.levy && JSON.stringify(cost) !== JSON.stringify(st.cost);

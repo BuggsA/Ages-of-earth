@@ -2380,7 +2380,7 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         break;
       }
       case 'fair':
-        if (ev.owner === viewer) hud.toast(`A feast day opens at your fairground: trade trips paid there pay ${Math.round((FAIR.pay - 1) * 100)}% more for ${FAIR.open} seconds`, 'good');
+        if (ev.owner === viewer) hud.toast(`A feast day opens at your fairground: trade trips paid there pay ${Math.round((FAIR.pay - 1) * 100)}% more, and soldiers raised there cost ${Math.round((1 - FAIR.levy) * 100)}% less, for ${FAIR.open} seconds`, 'good');
         break;
       case 'joust':
         if (ev.owner === viewer) hud.toast(`Your hero held the lists at the fair: healed whole, and the crowd paid ${ev.gold} gold`, 'good');

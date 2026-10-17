@@ -4,6 +4,7 @@ import { createGame, step } from '../src/sim/game';
 import { placeBuilding } from '../src/sim/world';
 import { findSpot } from '../src/sim/ai';
 import { tripGold } from '../src/sim/trade';
+import { trainCostFor } from '../src/sim/stats';
 import { fairShare } from '../src/sim/fair';
 
 /** Feast days (#356 audit, the Age of Fairs): trade at a fairground pays more on the feast. */
@@ -46,5 +47,36 @@ describe('Feast days', () => {
     s.tick = secs(FAIR.every);
     step(s, []);
     expect(s.events.some((e) => e.k === 'fair' && e.owner === 0)).toBe(true);
+  });
+});
+
+describe('The feast-day levy', () => {
+  function withBarracks(age: 'fair' | 'merchant', near: boolean) {
+    const { s, market, temple } = setup(age);
+    s.relics.push({ id: s.nextId++, x: temple.x, y: temple.y, carrier: 0, temple: temple.id });
+    const at = near ? temple : s.ents.find((e) => e.kind === 'building' && e.owner === 1 && e.type === 'towncenter')!;
+    const spot = near ? findSpot(s, 'barracks', at.x, at.y, 2, 8)! : findSpot(s, 'barracks', at.x, at.y, 4, 14)!;
+    const barracks = placeBuilding(s, 0, 'barracks', spot.tx, spot.ty, true);
+    return { s, market, barracks };
+  }
+  it('makes units cheaper on the feast at a building on the fairground', () => {
+    const { s, barracks } = withBarracks('fair', true);
+    s.tick = secs(FAIR.every) + 5;
+    const feast = trainCostFor(s, 0, 'infantry', 'barracks', barracks);
+    s.tick = secs(FAIR.every) + secs(FAIR.open) + 5;
+    const usual = trainCostFor(s, 0, 'infantry', 'barracks', barracks);
+    expect(feast.food! + (feast.gold ?? 0) + (feast.wood ?? 0)).toBeLessThan(usual.food! + (usual.gold ?? 0) + (usual.wood ?? 0));
+    expect(feast.food).toBe(Math.round(usual.food! * FAIR.levy));
+  });
+  it('leaves heroes, far barracks and other ages at the usual price', () => {
+    const near = withBarracks('fair', true);
+    near.s.tick = secs(FAIR.every) + 5;
+    expect(trainCostFor(near.s, 0, 'hero', 'towncenter', near.barracks)).toEqual(trainCostFor(near.s, 0, 'hero', 'towncenter'));
+    const far = withBarracks('fair', false);
+    far.s.tick = secs(FAIR.every) + 5;
+    expect(trainCostFor(far.s, 0, 'infantry', 'barracks', far.barracks)).toEqual(trainCostFor(far.s, 0, 'infantry', 'barracks'));
+    const other = withBarracks('merchant', true);
+    other.s.tick = secs(FAIR.every) + 5;
+    expect(trainCostFor(other.s, 0, 'infantry', 'barracks', other.barracks)).toEqual(trainCostFor(other.s, 0, 'infantry', 'barracks'));
   });
 });
