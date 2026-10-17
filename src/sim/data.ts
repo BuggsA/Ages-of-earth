@@ -82,6 +82,8 @@ export interface Age {
   path?: PathId;
   /** The whole people at war (the Age of Total War, #313): War Camps call citizens near them to arms (`CALL_UP`). */
   callUp?: boolean;
+  /** Drain Rigs draw blood from the enemy dead near them (#355). */
+  blood?: boolean;
   /** A people that raises again on the foundations of what fell (the Age of Reclaimers): see `RECLAIM` (`reclaim.ts`). */
   reclaim?: boolean;
   /** Aircraft fly on fuel from the Airfield (the Age of Aeronauts): see `SORTIE` (`sortie.ts`). */
@@ -229,6 +231,7 @@ export const AGES: Record<AgeId, Age> = {
     path: 'blood',
     blurb: 'War is the state. Foot soldiers pitch War Camps where the army stands, even in enemy land, and the camps train foot soldiers at the front and hold a little land, so the army is fed and the march home is gone. Soldiers train 15% faster and the enemy dead pay plunder, more than in the Warband. But a camp left without soldiers burns, no traders leave the Markets, the fields yield 15% less and scholars cost a fifth more: a people at war has no patience for them.',
     add: { plunder: 0.25 },
+    blood: true,
     mul: { militaryTrain: 0.85, farm: 0.85, techCost: 1.2 },
     no: { units: ['trader'], why: 'A people of iron and blood trades with no one: traders wait until your people leave the Path of Blood' },
   },
@@ -243,6 +246,7 @@ export const AGES: Record<AgeId, Age> = {
     mul: { militaryTrain: 0.85, farm: 0.8, techCost: 1.25 },
     no: { units: ['trader'], why: 'A people at total war trades with no one: traders wait until your people leave the Path of Blood' },
     callUp: true,
+    blood: true,
   },
   steppe: {
     name: 'Age of the Steppe',
@@ -1026,6 +1030,8 @@ export interface BuildingStats {
   shore?: boolean;
   /** Raised only by a people standing in one of these ages (the War Camp, #303); absent: by anyone. */
   ages?: AgeId[];
+  /** Blood paid once, from `Player.blood`, to raise it (the Blood Tower, #355 s3). */
+  blood?: number;
   /** Units besides citizens that may raise it (the War Camp is pitched by foot soldiers, #303). */
   builders?: UnitType[];
   /** Which build menu it is in, and its key there. */
@@ -1055,6 +1061,10 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   // The Path of Blood (#303): pitched by foot soldiers where the army stands, enemy land too; burns when left alone (`WARCAMP`).
   warcamp: { name: 'War Camp', size: 2, hp: 700, cost: { wood: 100, gold: 40 }, time: 30, pop: 0, sight: 6, trains: ['infantry'], drop: [], epoch: 3, ages: ['ironblood', 'totalwar'], builders: ['infantry'], menu: 'mil', key: 'Q', blurb: 'Tents, a stockade and a war standard, pitched by foot soldiers where the army stands, in enemy land too. Trains foot soldiers at the front and holds the land round it, so the army there is fed. Left without soldiers nearby, it burns.' },
   // The Silk Road (#334): a waystation by the road, raised in no one's land too; it rests traders, holds the land round it, and makes a near post pay more (`SERAI`).
+  drainrig: { name: 'Drain Rig', size: 2, hp: 600, cost: { wood: 120, gold: 60 }, time: 30, pop: 0, sight: 6, trains: [], drop: [], epoch: 3, ages: ['ironblood', 'totalwar'], menu: 'mil', key: 'H', blurb: 'Copper troughs, a windlass and a rack of pale jars on trampled ground. Every living enemy who falls within 14 tiles of a finished rig gives up a fifth of its price as blood. Citizens within 6 tiles can be given to the levy (C): each is gone, and pays 30 blood. Blood raises Blood Towers and, in Total War, grafts soldiers at Transfusion Stations.' },
+  // Hemocraft (#355 s3): blood spent. The Station grafts the soldiers sheltered inside (`HEMO`); the Blood Tower pays blood once and fires on the living (`BLOOD_TOWER`).
+  transfusion: { name: 'Transfusion Station', size: 2, hp: 800, cost: { wood: 100, stone: 60, gold: 80 }, time: 35, pop: 0, sight: 6, trains: [], drop: [], epoch: 4, garrison: 5, ages: ['totalwar'], menu: 'mil', key: 'T', blurb: 'A riveted iron shed of glass tanks, pumps and cots. Soldiers sent inside (foot, archers, riders and heroes) are grafted one at a time, 40 blood each: faster, harder-hitting and self-mending, deaf to conversion, and shrugging off blades, arrows and hooves, but machines (siege, ships, aircraft, a coil\'s bolt) hit them harder. A graft stays fed within 10 tiles of a standing Station and runs dry 150 seconds away from one: then the soldier crashes, losing a third of its health.' },
+  bloodtower: { name: 'Blood Tower', size: 2, hp: 1000, cost: { wood: 60, stone: 150 }, blood: 60, time: 45, pop: 0, sight: 9, trains: [], drop: [], epoch: 3, guns: { damage: 8, range: 8, reload: 2 }, ages: ['ironblood', 'totalwar'], menu: 'mil', key: 'L', blurb: 'A squat tower of black brick crowned with a copper cistern, paid for once with 60 blood. Its barbed bolts tear the living (soldiers, riders, citizens, priests) for three times a Watch Tower\'s harm, but glance off what does not bleed: siege, ships, aircraft and wagons take almost nothing. It takes no one inside.' },
   caravanserai: { name: 'Caravanserai', size: 2, hp: 900, cost: { wood: 90, gold: 30 }, time: 25, pop: 0, sight: 6, trains: [], drop: [], epoch: 3, ages: ['silk'], menu: 'eco', key: 'C', blurb: 'A walled courtyard by the road where caravans rest. Raise it by a far trading post, in no one\'s land too: your traders\' trips to a post within 8 tiles of it pay a quarter more, traders and wagons within 4 tiles of it mend, and the land round it is yours, so rival traders crossing it pay your toll.' },
   airfield: { name: 'Airfield', size: 4, hp: 2200, cost: { wood: 250, stone: 100, gold: 150 }, time: 60, pop: 0, sight: 8, trains: ['fighter', 'bomber'], drop: [], epoch: 4, menu: 'mil', key: 'F', blurb: 'Builds fighters and bombers. Fighters hunt aircraft; bombers wreck towns.' },
 };
@@ -1586,6 +1596,24 @@ export const AI_VIGIL = { slack: 1.5 };
  * of the port where most of its merchant ships load, so each cog loading there sails escorted (`CONVOY`).
  */
 export const AI_CONVOY = { escorts: 1, stay: 3 };
+
+/**
+ * Blood (#355 s1): a living enemy who falls within `reach` tiles of the killer's finished Drain Rig gives up `share` of its price as blood.
+ * The levy takes up to `levyMost` citizens within `levyReach` tiles of a rig at once, `levy` blood each, and rests the rig `rest` seconds for each.
+ */
+export const BLOOD = { reach: 14, share: 0.2, levy: 30, levyReach: 6, levyMost: 3, rest: 15 };
+
+/**
+ * Hemo-engineered soldiers (#355 s3). A Transfusion Station grafts one soldier sheltered inside every `work` seconds for `cost` blood,
+ * and opens its doors once none inside is left ungrafted. A graft: blows `attack` times harder, `pace` times faster, `mend` health a
+ * second; blows from the living (blades, arrows, hooves, a Watch Tower's arrows) land `flesh` times as hard, blows from machines (siege,
+ * ships, aircraft, a coil's bolt) `machine` times; no priest can turn it. It is fed while within `reach` tiles of one of its people's
+ * standing Stations; `last` seconds away from all of them it runs dry, and the soldier loses `crash` of its full health.
+ */
+export const HEMO = { cost: 40, work: 4, last: 150, reach: 10, attack: 1.2, pace: 1.15, mend: 1.5, flesh: 0.6, machine: 1.5, crash: 0.33 };
+
+/** The Blood Tower (#355 s3): its bolts hit the living `living` times as hard as a Watch Tower's arrows, the bloodless `bloodless` times. */
+export const BLOOD_TOWER = { living: 3, bloodless: 0.15 };
 
 /** Selling rare ore at a Market (#356 s5): a lot of `lot` pays `gold[ore]` gold at a flat price. Ore mined still counts toward its doors; only the stock in hand is spent. */
 export const ORE_TRADE = { lot: 20, gold: { salt: 40, saltpetre: 55, bloodiron: 90 } as Record<'salt' | 'saltpetre' | 'bloodiron', number> };

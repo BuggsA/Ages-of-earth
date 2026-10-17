@@ -5,7 +5,7 @@ import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
 import { RARE_OF_TILE } from '../sim/units';
-import { RARE, AGES, WAY, WAYS, WAY_IDS, CALL_UP, PATHS, WARCAMP, FLOCK, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { RARE, BLOOD, HEMO, AGES, WAY, WAYS, WAY_IDS, CALL_UP, PATHS, WARCAMP, FLOCK, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -16,6 +16,8 @@ import { workProblem } from '../sim/works';
 import { vowProblem, wayProblem } from '../sim/ways';
 import { beaconProblem, lit } from '../sim/beacon';
 import { callUpProblem, callUpReach, campGrace, musterWait } from '../sim/warcamp';
+import { bloodOf, bloodShort, grafted, levyProblem, levyReach } from '../sim/blood';
+import { graftWait, waiting } from '../sim/hemo';
 import { chantedOver, consecrates, faithOf } from '../sim/consecrate';
 import { rallyProblem } from '../sim/rally';
 import { stirred as stirredNow } from '../sim/combat';
@@ -301,7 +303,7 @@ export class Hud {
     const age = ageDef(p);
     const idleTechs = suspendedTechs(p).map((t) => TECHS[t].name);
     const scores = s.players.map((q) => scoreOf(s, q));
-    const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${RARES.map((r) => Math.floor(p.rare?.[r] ?? 0)).join(',')}|${p.pop}/${p.cap}|${ageOf(p)}|${adv}|${p.way ?? ''}${p.deep ? '+' : ''}${p.vowed ? 'v' : ''}|${idleTechs.length}|${idle}|${speed}|${scores.join(',')}`;
+    const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${RARES.map((r) => Math.floor(p.rare?.[r] ?? 0)).join(',')}|${Math.floor(bloodOf(p))}|${p.pop}/${p.cap}|${ageOf(p)}|${adv}|${p.way ?? ''}${p.deep ? '+' : ''}${p.vowed ? 'v' : ''}|${idleTechs.length}|${idle}|${speed}|${scores.join(',')}`;
     const sn = seasonOf(s);
     this.clockEl.textContent = `${sn.icon} ${fmtTime(s.tick)}`;
     this.clockEl.title = `${sn.name}: ${sn.blurb}`;
@@ -314,6 +316,7 @@ export class Hud {
       RARES.filter((r) => (p.rare?.[r] ?? 0) > 0)
         .map((r) => `<div class="res" data-tip="<b>${RARE[r].name}</b>${RARE[r].blurb} Mined from deep veins that only some worlds hold.">${RARE_ICON[r]}${Math.floor(p.rare![r]!)}</div>`)
         .join('') +
+      (p.blood !== undefined ? `<div class="res" data-tip="<b>Blood</b>Drawn at Drain Rigs from the enemy who fall near them, and from citizens given to the levy. Spent to raise Blood Towers, and at Transfusion Stations to graft soldiers.">🩸${Math.floor(bloodOf(p))}</div>` : '') +
       `<div class="res pop ${p.pop >= p.cap ? 'full' : ''}" data-tip="<b>Population</b>People and soldiers you have, and room for. Houses add 5 each, a Town Center 10 (150 at most).">${icon('pop')}${p.pop}/${p.cap}</div>`;
     const civ = CIVS[p.civ];
     const board = s.players
@@ -528,8 +531,11 @@ export class Hud {
     // Safe passage (#334): the tolls this load has paid on its way home.
     const paidTo = mine && u.tolled ? s.players.filter((q) => (u.tolled! & (1 << q.id)) !== 0).map((q) => q.name) : [];
     const toll = paidTo.length ? `<span data-tip="<b>Toll paid</b>This load paid ${paidTo.join(' and ')} a toll for safe passage across its land. A road that keeps out of a caravan people's land pays in full.">🛂<em>Toll paid</em></span>` : '';
+    // Hemocraft (#355 s3): a grafted soldier, and how long its graft holds away from the Stations.
+    const hemoLeft = grafted(s, u) ? Math.ceil((u.hemo! - s.tick) / TICK_HZ) : 0;
+    const graft = hemoLeft ? `<span data-tip="<b>Grafted</b>Hemo-engineered: blows ${Math.round((HEMO.attack - 1) * 100)}% harder, ${Math.round((HEMO.pace - 1) * 100)}% faster, mends ${HEMO.mend} a second and can't be converted. Blades, arrows and hooves land ${Math.round((1 - HEMO.flesh) * 100)}% softer, but siege, ships, aircraft and coils hit ${Math.round((HEMO.machine - 1) * 100)}% harder. Fed within ${HEMO.reach} tiles of a Transfusion Station; away from them it runs dry in ${hemoLeft}s and the soldier loses ${Math.round(HEMO.crash * 100)}% of its health.">🩸<em>Grafted</em> ${hemoLeft >= HEMO.last - 1 ? 'fed' : `${hemoLeft}s`}</span>` : '';
     const held = u.type === 'priest' && carriedBy(s, u) ? `<span data-tip="<b>Relic</b>Carried to a Temple, it brings in gold. Hands full: no healing or converting until it is set down (D).">⚱<em>Relic</em></span>` : '';
-    const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}:${u.cargo.length}:${rank}:${taking}:${road}:${u.tolled ?? 0}`;
+    const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}:${u.cargo.length}:${rank}:${taking}:${road}:${u.tolled ?? 0}:${hemoLeft}`;
     const html = `<div class="sel-portrait"><img src="${unitPicture(u.type, u.type === 'wagon' && u.packed === 'market' ? p.epoch + 20 : p.epoch, p.color)}" alt=""></div>
       <div class="sel-info">
         <div class="sel-name">${s.kings.includes(u.id) ? `👑 King (${st.name})` : st.name}</div>
@@ -540,7 +546,7 @@ export class Hud {
           <span data-tip="<b>Armor</b>Melee / missile armor: taken off every blow or shot.">🛡<em>Armor</em> ${st.armor}/${st.parmor}</span>
           ${st.range ? `<span data-tip="<b>Range</b>How far it shoots, in tiles.">🏹<em>Range</em> ${st.range}</span>` : ''}
           <span data-tip="<b>Speed</b>Tiles per second.">👣<em>Speed</em> ${Math.round(st.speed * 100) / 100}</span>
-          ${carry}${cargo}${load}${stance}${vet}${aura}${held}${trip}${caravan}${tribute}${toll}
+          ${carry}${cargo}${load}${stance}${vet}${aura}${graft}${held}${trip}${caravan}${tribute}${toll}
         </div>
         <div class="blurb">${st.blurb}</div>
       </div>`;
@@ -625,6 +631,16 @@ export class Hud {
       const wait = musterWait(s, b);
       if (!struck && ageDef(p).callUp) status += wait > 0 ? ` · <span data-tip="<b>Mustering</b>The camp is arming the last citizens it called.">📯 Mustering: ${wait}s</span>` : ` · <span data-tip="<b>Muster ground</b>Citizens within ${CALL_UP.reach} tiles can be called to arms here (C, or V for ${CALL_UP.most}).">📯 Muster ground</span>`;
     }
+    // A Transfusion Station (#355 s3): who waits for a graft, and whether there is blood for it.
+    if (mine && b.built && b.type === 'transfusion') {
+      const queued = waiting(s, b).length;
+      const wait = graftWait(s, b);
+      status += !queued
+        ? ` · <span data-tip="<b>Transfusion</b>Send foot soldiers, archers, riders or a hero inside (right-click, or G): each is grafted for ${HEMO.cost} blood, ${HEMO.work} seconds apiece, and the doors open when all are done. Grafts within ${HEMO.reach} tiles of a Station stay fed.">🩸 Ready: send soldiers in</span>`
+        : bloodOf(p) < HEMO.cost && !wait
+          ? ` · <span data-tip="<b>No blood</b>Each graft costs ${HEMO.cost} blood. Draw more at a Drain Rig, or let the soldiers out (U).">⚠ ${queued} waiting: needs ${HEMO.cost} blood</span>`
+          : ` · <span data-tip="<b>Grafting</b>One soldier at a time, ${HEMO.work} seconds and ${HEMO.cost} blood each.">🩸 Grafting: ${queued} waiting${wait ? `, next in ${wait}s` : ''}</span>`;
+    }
     const inside = def.garrison && b.built ? `<div class="stats"><span data-tip="<b>Sheltering</b>Units inside are safe, heal slowly and add arrows.">🏰<em>Inside</em> ${b.garrison.length}/${def.garrison}</span></div>` : '';
     const sig = `b:${b.id}:${Math.ceil(b.hp)}:${status}:${b.queue.length}:${p.epoch}:${queue.length}:${b.garrison.length}`;
     const html = `<div class="sel-portrait"><img src="${buildingPicture(b.type, p.epoch, p.color)}" alt=""></div>
@@ -660,13 +676,13 @@ export class Hud {
         const locked = def.epoch > p.epoch;
         const no = buildBarred(p, type);
         const cost = buildingCostFor(s, viewer, type);
-        const short = shortfall(p, cost);
+        const short = shortfall(p, cost) ?? bloodShort(p, type);
         const wonderUp = type === 'wonder' && s.ents.some((e) => e.kind === 'building' && e.owner === viewer && e.type === 'wonder');
         cmds.push({
           key: def.key,
           pic: buildingPicture(type, p.epoch, p.color),
           title: def.name,
-          desc: def.blurb + (type === 'wall' ? ' Click and drag to lay out a line.' : ''),
+          desc: def.blurb + (type === 'wall' ? ' Click and drag to lay out a line.' : '') + (def.blood ? ` Costs 🩸${def.blood} blood besides.` : ''),
           cost,
           ok: !locked && !no && !short && !wonderUp,
           why: locked ? `Needs the ${EPOCHS[def.epoch].name}` : no ? no : wonderUp ? 'You already have a wonder' : (short ?? undefined),
@@ -960,6 +976,12 @@ export class Hud {
           const five: Cost = {};
           for (const [r, v] of Object.entries(CALL_UP.cost) as [keyof Cost, number][]) five[r] = v * CALL_UP.most;
           cmds.push({ key: 'V', pic: '', glyph: '📯', title: `Call ${CALL_UP.most} to arms`, desc: `${desc(CALL_UP.most)} Each costs its own arms.`, cost: five, ok: !why, why: why ?? undefined, run: () => (this.act.issue({ t: 'callUp', p: viewer, building: b.id, n: CALL_UP.most }), this.act.sound('queue')) });
+        }
+        // The levy (the Path of Blood, #355): a Drain Rig turns the citizens near it into blood.
+        if (b.type === 'drainrig') {
+          const why = levyProblem(s, p, b);
+          const near = levyReach(s, b).length;
+          cmds.push({ key: 'C', pic: '', glyph: '🩸', title: 'Levy', desc: `The nearest ${BLOOD.levyMost === 1 ? 'citizen' : `up to ${BLOOD.levyMost} citizens`} within ${BLOOD.levyReach} tiles of this rig are given to the rig: each is gone for good and pays ${BLOOD.levy} blood. The rig then rests ${BLOOD.rest} seconds for each. Every citizen levied is one less at work.`, ok: !why, why: why ?? undefined, count: near || undefined, run: () => (this.act.issue({ t: 'callUp', p: viewer, building: b.id, n: BLOOD.levyMost }), this.act.sound('queue')) });
         }
         if (b.type === 'tower') {
           const why = beaconProblem(s, p, b);

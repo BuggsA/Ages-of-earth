@@ -17,6 +17,7 @@ import { Spatial } from './spatial';
 import { updateRelics } from './relics';
 import { elmoStep } from './elmo';
 import { galvanicStep } from './galvanic';
+import { hemoStep } from './hemo';
 import { reclaimStep, remember } from './reclaim';
 import { sortieStep } from './sortie';
 import { fairStep } from './fair';
@@ -497,6 +498,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   workStep(s);
   beaconStep(s);
   warCampStep(s);
+  hemoStep(s);
   raiseCamps(s);
   faithStep(s);
   removeDead(s);

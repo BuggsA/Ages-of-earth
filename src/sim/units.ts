@@ -15,6 +15,7 @@ import { dig, ruinAt } from './ruins';
 import { fordMarch, groveBoost, keptOf, kinBonus } from './landmarks';
 import { chant, chantedOver, consecrateProblem, consecrates, turnBuilding } from './consecrate';
 import { convoyShare } from './convoy';
+import { grafted, hemoPace } from './blood';
 import { atPost, caravanBonus, caravanOf, dockOf, goalForPost, homeMarket, marketOf, nearestCaravan, nearestDock, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { canHit, exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, passOf, pay, radiusOf, statsOf, teamOf } from './world';
 
@@ -799,8 +800,8 @@ function convertStep(s: GameState, u: Unit, o: Extract<Order, { k: 'convert' }>)
     consecrateStep(s, u, o, t);
     return;
   }
-  // Kings never turn, and a priest's hands are full with a relic.
-  if (!t || t.kind !== 'unit' || t.hp <= 0 || t.inside || !isEnemy(s, u.owner, t.owner) || peace(s) || s.kings.includes(t.id) || carriedBy(s, u)) {
+  // Kings never turn, nor a grafted soldier (#355 s3), and a priest's hands are full with a relic.
+  if (!t || t.kind !== 'unit' || t.hp <= 0 || t.inside || !isEnemy(s, u.owner, t.owner) || peace(s) || s.kings.includes(t.id) || grafted(s, t) || carriedBy(s, u)) {
     setOrder(u, { k: 'idle' });
     return;
   }
@@ -1516,7 +1517,7 @@ export function routeUnits(s: GameState): void {
 /** Walk the route. */
 export function walk(s: GameState, u: Unit): void {
   if (!u.path) return;
-  let left = statsOf(s, u).speed * fordMarch(s, u) * DT;
+  let left = statsOf(s, u).speed * fordMarch(s, u) * hemoPace(s, u) * DT;
   while (left > 1e-9 && u.path) {
     const tx = u.path[u.pathI * 2];
     const ty = u.path[u.pathI * 2 + 1];

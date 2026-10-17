@@ -16,6 +16,7 @@ import { callWork, workProblem } from './works';
 import { takeVow, takeWay, vowProblem, wayProblem } from './ways';
 import { beaconProblem, lightBeacon } from './beacon';
 import { callUp, callUpProblem } from './warcamp';
+import { bloodOf, bloodShort, levy, levyProblem } from './blood';
 import { rallyCry, rallyProblem } from './rally';
 import { chantedOver, consecrateProblem, consecrates } from './consecrate';
 import { sees } from './vision';
@@ -151,12 +152,14 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
     return null;
   }
   const cost = raiseCost(s, p, type, tx, ty);
-  const short = shortfall(player, cost);
+  const short = shortfall(player, cost) ?? bloodShort(player, type);
   if (short) {
     if (!quiet) refuse(s, p, short);
     return null;
   }
   pay(player, cost);
+  // The Blood Tower (#355 s3) is paid for once in blood too.
+  if (def.blood) player.blood = bloodOf(player) - def.blood;
   if (type === 'gate') {
     // Wall pieces under a new gate come down to make way for it.
     const gone = new Set<number>();
@@ -533,6 +536,13 @@ export function applyCommand(s: GameState, c: Command): void {
     case 'callUp': {
       const b = myBuilding(s, c.p, c.building);
       if (!b) return;
+      // At a Drain Rig the call is the levy (#355): the citizens near it give their blood.
+      if (b.type === 'drainrig') {
+        const no = levyProblem(s, p, b);
+        if (no) return refuse(s, c.p, no);
+        levy(s, p, b, c.n);
+        break;
+      }
       const why = callUpProblem(s, p, b);
       if (why) return refuse(s, c.p, why);
       callUp(s, p, b, c.n);
@@ -763,7 +773,10 @@ export function applyCommand(s: GameState, c: Command): void {
       for (const id of c.ids) {
         const e = s.byId.get(id);
         if (!e || e.owner !== c.p || e.hp <= 0) continue;
-        if (e.kind === 'building' && !e.built && e.progress === 0 && e.pitch === undefined) refund(p, buildingCostFor(s, c.p, e.type));
+        if (e.kind === 'building' && !e.built && e.progress === 0 && e.pitch === undefined) {
+          refund(p, buildingCostFor(s, c.p, e.type));
+          if (BUILDINGS[e.type].blood) p.blood = bloodOf(p) + BUILDINGS[e.type].blood!;
+        }
         e.hp = 0;
       }
       break;

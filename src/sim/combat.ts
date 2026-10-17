@@ -1,5 +1,6 @@
-import { AURA, RALLY, BONUS, BUILDINGS, DEER, LIGHTNING, VETERANCY, TICK_HZ, domainOf, secs, type UnitStats } from './data';
+import { AURA, RALLY, BONUS, BLOOD_TOWER, BUILDINGS, DEER, LIGHTNING, VETERANCY, TICK_HZ, domainOf, secs, type UnitStats } from './data';
 import { hasCoils } from './ages';
+import { bleeds, drawBlood, hemoBlow, hemoTaken } from './blood';
 import { distToRect } from './grid';
 import type { Spatial } from './spatial';
 import { modsOf, statsFor } from './stats';
@@ -28,7 +29,7 @@ export function stirred(s: GameState, u: Unit): boolean {
 
 /** Damage of one blow or shot after the counter bonus, a hero's inspiration and armor. */
 export function damageOf(s: GameState, attacker: Unit | null, st: UnitStats, target: Ent, ranged: boolean): number {
-  const inspired = (attacker && s.tick - attacker.aura < 5 ? AURA.attack : 1) * (attacker && rankOf(attacker) ? VETERANCY.attack[rankOf(attacker) - 1] : 1) * (attacker && stirred(s, attacker) ? RALLY.attack : 1);
+  const inspired = (attacker && s.tick - attacker.aura < 5 ? AURA.attack : 1) * (attacker && rankOf(attacker) ? VETERANCY.attack[rankOf(attacker) - 1] : 1) * (attacker && stirred(s, attacker) ? RALLY.attack : 1) * hemoBlow(s, attacker);
   if (target.kind === 'building') {
     // Walls shrug off all but siege and heavy blows.
     const wall = target.type === 'wall' || target.type === 'gate' ? (st.cls === 'siege' ? 1.2 : st.cls === 'infantry' || st.cls === 'hero' ? 0.5 : 0.15) : 1;
@@ -37,7 +38,7 @@ export function damageOf(s: GameState, attacker: Unit | null, st: UnitStats, tar
   const ts = statsOf(s, target);
   const rank = target.kind === 'unit' ? rankOf(target) : 0;
   const armor = (ranged ? ts.parmor : ts.armor) + (rank ? VETERANCY.armor[rank - 1] : 0) + (target.kind === 'unit' && stirred(s, target) ? RALLY.armor : 0);
-  return Math.max(1, st.attack * BONUS[st.cls][ts.cls] * inspired - armor);
+  return Math.max(1, st.attack * BONUS[st.cls][ts.cls] * inspired * hemoTaken(s, target, st.cls) - armor);
 }
 
 /** Edge-to-edge distance between a unit and anything. */
@@ -84,6 +85,7 @@ export function hurt(s: GameState, target: Ent, damage: number, by: number, atta
 function plunder(s: GameState, target: Unit, by: number): void {
   const p = s.players[by];
   p.stats.slain = (p.stats.slain ?? 0) + 1;
+  drawBlood(s, target, by);
   const share = modsOf(s, by).plunder;
   if (share <= 0) return;
   const c = statsOf(s, target).cost;
@@ -222,7 +224,9 @@ export function buildingGuns(s: GameState, sp: Spatial, b: Building): void {
   const epoch = s.players[b.owner].epoch;
   const m = modsOf(s, b.owner);
   const reach = g.range + m.range + b.size / 2;
-  const t = nearestEnemyUnit(s, sp, b.owner, b.x, b.y, reach);
+  // A Blood Tower (#355 s3) looks for the living first, and spends its bolts on the bloodless only when nothing else is near.
+  const blood = b.type === 'bloodtower';
+  const t = (blood ? nearestEnemyUnit(s, sp, b.owner, b.x, b.y, reach, bleeds) : null) ?? nearestEnemyUnit(s, sp, b.owner, b.x, b.y, reach);
   if (!t) return;
   b.cool = secs(g.reload);
   const power = (g.damage + m.rangedAttack) * (1 + epoch * 0.2);
@@ -249,21 +253,23 @@ export function buildingGuns(s: GameState, sp: Spatial, b: Building): void {
     s.shots.push({
       id: s.nextId++,
       owner: b.owner,
-      kind: 'arrow',
+      kind: blood ? 'bolt' : 'arrow',
       x0: b.x,
       y0: b.y,
       target: target.id,
       tx: target.x,
       ty: target.y,
       t: -k,
-      dur: Math.max(2, Math.ceil((d / SHOT_SPEED.arrow) * TICK_HZ)),
-      damage: Math.max(1, power - ts.parmor),
+      dur: Math.max(2, Math.ceil((d / SHOT_SPEED[blood ? 'bolt' : 'arrow']) * TICK_HZ)),
+      damage: blood
+        ? Math.max(1, power * (bleeds(target) ? BLOOD_TOWER.living : BLOOD_TOWER.bloodless) - ts.parmor)
+        : Math.max(1, power * hemoTaken(s, target, 'arrow') - ts.parmor),
       splash: 0,
       from: null,
       animal: false,
     });
   }
-  s.events.push({ k: 'shot', owner: b.owner, kind: 'arrow', x: b.x, y: b.y });
+  s.events.push({ k: 'shot', owner: b.owner, kind: blood ? 'bolt' : 'arrow', x: b.x, y: b.y });
 }
 
 /**
@@ -277,7 +283,7 @@ function arc(s: GameState, sp: Spatial, b: Building, first: Unit, power: number)
   let at = first;
   let damage = power;
   for (;;) {
-    hurt(s, at, Math.max(1, damage - statsOf(s, at).parmor), b.owner, null);
+    hurt(s, at, Math.max(1, damage * hemoTaken(s, at, 'coil') - statsOf(s, at).parmor), b.owner, null);
     if (struck.length >= LIGHTNING.strikes) break;
     const next = nearestEnemyUnit(s, sp, b.owner, at.x, at.y, LIGHTNING.leap, (o) => !struck.includes(o));
     if (!next) break;

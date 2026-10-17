@@ -2152,6 +2152,20 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           hud.toast(`📯 ${ev.ids.length === 1 ? 'A citizen takes' : `${ev.ids.length} citizens take`} up arms at the War Camp`, 'good');
         }
         break;
+      case 'graft':
+        // Hemocraft (#355 s3): a soldier grafted at a Transfusion Station, or a graft run dry far from every Station.
+        if (ev.owner === viewer) {
+          play(ev.how === 'made' ? 'graft' : 'crash');
+          if (ev.how === 'crash') hud.toast('🩸 A graft ran dry far from the Transfusion Stations: the soldier crashes', 'bad');
+        }
+        break;
+      case 'blood':
+        // Blood drawn at a Drain Rig (#355).
+        if (ev.owner === viewer) {
+          play('blood');
+          hud.toast(ev.how === 'levy' ? `🩸 ${ev.n} blood drawn from the levy` : `🩸 ${ev.n} blood drawn from the fallen`, 'good');
+        }
+        break;
       case 'tribute': {
         // A horde's riders standing in a rival's land (#318).
         const fresh = (at: number, gap: number) => s.tick - at > gap * TICK_HZ || s.tick < at;
