@@ -1555,6 +1555,12 @@ export const AI_LEVELS: Record<Difficulty, AiLevel> = {
  * are fair game anyway); against an iron rival, it trains the archers that answer its foot with chance
  * `read`. It reads a rival's heirlooms (#242): a Joint-Stock Company makes the rival a trade rival on any road, a Masons' Lodge asks `lodge` more siege engines, Iron-Bound Hulls `hulls` more warships, and a Bell Foundry rival's relic Temples are pulled `bell` ahead as a target (as a pilgrim people's are).
  */
+/**
+ * A clever computer guards its own Wonder (#374) while it rises or counts down: `share` of its army (at least `least`, at most `most`) stays within
+ * `stay` tiles of it and out of the attack waves; any rival soldier within `reach` tiles of it draws the whole army.
+ */
+export const AI_WONDER = { share: 0.4, least: 3, most: 14, stay: 6, reach: 26 };
+
 /** The computer and the rare ores (#356 s5): the crew it sends to dig the ore a road's door asks for, and how far from home it will look for the vein. */
 export const AI_ORE = { crew: 3, reach: 40 };
 
