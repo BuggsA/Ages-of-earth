@@ -28,7 +28,8 @@ import { modsOf, trainTimeFor } from './stats';
 import { attrition } from './borders';
 import { tributeStep } from './tribute';
 import { seraiStep, tollStep } from './passage';
-import { barred, journeyOf, noteWalked, surveyFinds, trainsAt, workSteps } from './ages';
+import { mercStep } from './merc';
+import { isHire, barred, journeyOf, noteWalked, surveyFinds, trainsAt, workSteps } from './ages';
 import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, MapSize, MapType, Player } from './types';
 import { RES, R_FISH, R_NONE } from './types';
 import { RES_OF_TILE, carryCargo, checkStuck, collide, findResource, routeUnits, separate, setOrder, think, ungarrison, walk } from './units';
@@ -306,6 +307,8 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
   const u = spawnUnit(s, p.id, unit, spot.x, spot.y);
   p.pop++;
   p.stats.trained++;
+  // A soldier hired for gold at the Market is a sword for hire (`MERC`): it draws wages from now on.
+  if (isHire(p, b.type, unit)) u.merc = 0;
   // The deed of the Age of Total War (#313): foot soldiers trained at the front.
   if (b.type === 'warcamp') p.stats.campTrained = (p.stats.campTrained ?? 0) + 1;
   s.events.push({ k: 'trained', id: u.id, owner: p.id, type: unit });
@@ -495,6 +498,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   attrition(s);
   tributeStep(s);
   tollStep(s);
+  mercStep(s);
   seraiStep(s);
   workStep(s);
   beaconStep(s);

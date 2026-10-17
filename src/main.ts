@@ -2106,6 +2106,12 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           }
         } else hud.toast(`${s.players[ev.owner].name} has ${ev.back ? 'stepped back to' : 'reached'} the ${ageName(ev)}`, 'info');
         break;
+      case 'wages':
+        if (ev.owner === viewer) {
+          hud.toast(ev.gone ? `💰 ${ev.gone} hired sword${ev.gone > 1 ? 's' : ''} walked off unpaid${ev.late > ev.gone ? `; ${ev.late - ev.gone} more unpaid` : ''}` : `💰 The treasury is short: ${ev.late} hired sword${ev.late > 1 ? 's' : ''} unpaid, and will walk off next payday`, 'bad');
+          play('error');
+        }
+        break;
       case 'season': {
         const sn = SEASONS[ev.i];
         hud.toast(`${sn.icon} ${sn.name}. ${sn.blurb}`, 'info');

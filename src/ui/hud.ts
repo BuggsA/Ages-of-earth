@@ -5,7 +5,7 @@ import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
 import { RARE_OF_TILE } from '../sim/units';
-import { RARE, BLOOD, HEMO, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, CALL_UP, PATHS, WARCAMP, FLOCK, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { RARE, MERC, BLOOD, HEMO, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, CALL_UP, PATHS, WARCAMP, FLOCK, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -539,8 +539,10 @@ export class Hud {
     // The Blood-rite (#355 s4): a cursed enemy takes every blow harder until the curse lifts.
     const curseLeft = cursed(s, u) ? Math.ceil((u.cursed! - s.tick) / TICK_HZ) : 0;
     const curse = curseLeft ? `<span data-tip="<b>Cursed</b>A Blood-rite priest has cursed this one: every blow on it lands ${Math.round((RITE.taken - 1) * 100)}% harder for ${curseLeft} more seconds.">☠<em>Cursed</em> ${curseLeft}s</span>` : '';
+    // A sword for hire (the Age of Merchants): paid by the day, and gone if left unpaid.
+    const sword = u.merc !== undefined ? `<span data-tip="<b>Sword for hire</b>Draws ${MERC.wage} gold every ${MERC.every} seconds from ${mine ? 'your' : 'its people\'s'} treasury${u.merc ? `, and has gone unpaid ${u.merc} payday${u.merc > 1 ? 's' : ''}: it walks off at ${MERC.patience}` : `; one left unpaid ${MERC.patience} paydays walks off`}.">💰<em>${u.merc ? 'Unpaid' : 'Hired'}</em></span>` : '';
     const held = u.type === 'priest' && carriedBy(s, u) ? `<span data-tip="<b>Relic</b>Carried to a Temple, it brings in gold. Hands full: no healing or converting until it is set down (D).">⚱<em>Relic</em></span>` : '';
-    const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}:${u.cargo.length}:${rank}:${taking}:${road}:${u.tolled ?? 0}:${hemoLeft}:${curseLeft}`;
+    const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}:${u.cargo.length}:${rank}:${taking}:${road}:${u.tolled ?? 0}:${hemoLeft}:${curseLeft}:${u.merc ?? -1}`;
     const html = `<div class="sel-portrait"><img src="${unitPicture(u.type, u.type === 'wagon' && u.packed === 'market' ? p.epoch + 20 : p.epoch, p.color)}" alt=""></div>
       <div class="sel-info">
         <div class="sel-name">${s.kings.includes(u.id) ? `👑 King (${st.name})` : st.name}</div>
@@ -551,7 +553,7 @@ export class Hud {
           <span data-tip="<b>Armor</b>Melee / missile armor: taken off every blow or shot.">🛡<em>Armor</em> ${st.armor}/${st.parmor}</span>
           ${st.range ? `<span data-tip="<b>Range</b>How far it shoots, in tiles.">🏹<em>Range</em> ${st.range}</span>` : ''}
           <span data-tip="<b>Speed</b>Tiles per second.">👣<em>Speed</em> ${Math.round(st.speed * 100) / 100}</span>
-          ${carry}${cargo}${load}${stance}${vet}${aura}${graft}${curse}${held}${trip}${caravan}${tribute}${toll}
+          ${carry}${cargo}${load}${stance}${vet}${aura}${graft}${sword}${curse}${held}${trip}${caravan}${tribute}${toll}
         </div>
         <div class="blurb">${st.blurb}</div>
       </div>`;
@@ -787,7 +789,7 @@ export class Hud {
             pic: unitPicture(unit, Math.max(p.epoch, unitEpoch(unit)), p.color),
             title: `${hired ? 'Hire' : 'Train'} ${st.name}`,
             desc: hired
-              ? `A mercenary, paid in gold alone and ready in ${Math.round(time)}s. ${st.blurb}`
+              ? `A mercenary, paid in gold alone and ready in ${Math.round(time)}s. After its first ${MERC.first}s he draws ${MERC.wage} gold every ${MERC.every}s from the treasury, and walks off if left unpaid ${MERC.patience} paydays. ${st.blurb}`
               : `${st.blurb} Takes ${Math.round(time)}s.${levied ? ` Levies cost ${Math.round((age.levy! - 1) * 100)}% more in the ${age.name}.` : ''}${priced ? ` ${Math.round(Math.abs(1 - priced) * 100)}% ${priced < 1 ? 'cheaper' : 'dearer'} in the ${age.name}.` : ''}`,
             cost,
             ok: !locked && !no && !short && !full && !busy && !hero,
