@@ -1,5 +1,5 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_VIGIL, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
@@ -840,6 +840,21 @@ export function fairSpot(s: GameState, v: View): { tx: number; ty: number } | nu
 /** Our lowest-id finished Temple that keeps a relic: the fairground's heart and the vigil's post. */
 function shrineOf(s: GameState, v: View): Building | undefined {
   return v.buildings.find((b) => b.type === 'temple' && b.built && b.hp > 0 && s.relics.some((r) => r.temple === b.id));
+}
+
+/** The port spot of the trading post most of our cogs sail to (ties: the lowest post id), or null with none at sea. */
+function convoyPort(s: GameState, v: View): { x: number; y: number } | null {
+  let best: TradePost | null = null;
+  let most = 0;
+  for (const post of s.posts) {
+    let n = 0;
+    for (const c of v.cogs) if (c.order.k === 'trade' && c.order.post === post.id) n++;
+    if (n > most) {
+      most = n;
+      best = post;
+    }
+  }
+  return best ? portSpot(s, best, v.p.id) : null;
 }
 
 /** Where a clever computer's priests keep vigil (#379 s2): its shrine, in an age that pays for it (`vigil.ts`). */
@@ -1832,7 +1847,15 @@ function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
       spend(v, cost);
     } else if (warships.length < 2) spend(v, cost);
   }
-  const idle = warships.filter((u) => u.order.k === 'idle');
+  // In the Age of Sail the first `AI_CONVOY.escorts` warships (id order) keep the port where most of our cogs load (#379 s3):
+  // a cog that loads with one beside it carries more (`convoy.ts`), and the port is where a rival's raiders come.
+  const port = ageDef(p).convoys ? convoyPort(s, v) : null;
+  const escorts = new Set(port ? warships.slice(0, AI_CONVOY.escorts).map((u) => u.id) : []);
+  for (const u of warships) {
+    if (!port || !escorts.has(u.id) || u.order.k !== 'idle') continue;
+    if ((u.x - port.x) * (u.x - port.x) + (u.y - port.y) * (u.y - port.y) > AI_CONVOY.stay * AI_CONVOY.stay) issue({ t: 'move', p: p.id, ids: [u.id], x: port.x, y: port.y });
+  }
+  const idle = warships.filter((u) => u.order.k === 'idle' && !escorts.has(u.id));
   if (!idle.length) return;
   // Raid when the army attacks (or when there's a fleet to sink in sight); otherwise guard the dock.
   const prey = enemyShips[0] ?? (mem.attacking ? enemyDock(s, p) : null);

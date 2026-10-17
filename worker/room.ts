@@ -1,4 +1,4 @@
-import { CIVS_FOR_ROOMS, DIFFICULTIES, MAP_SIZES_FOR_ROOMS, MAP_TYPES_FOR_ROOMS } from './lists';
+import { CIVS_FOR_ROOMS, MAP_SIZES_FOR_ROOMS, MAP_TYPES_FOR_ROOMS, ROOM_LEVELS } from './lists';
 import { HASH_EVERY, MAX_SEATS, TURN_MS, type ClientMsg, type LobbyState, type RoomSetup, type Seat, type ServerMsg } from '../src/net/protocol';
 import type { CivId, Command } from '../src/sim/types';
 
@@ -209,7 +209,7 @@ export class Room {
         this.sendLobby();
         break;
       case 'addAi': {
-        if (!isHost || this.started || this.seats.length >= MAX_SEATS || !DIFFICULTIES.includes(m.level)) return;
+        if (!isHost || this.started || this.seats.length >= MAX_SEATS || !ROOM_LEVELS.includes(m.level)) return;
         const used = new Set(this.seats.map((s) => s.color));
         const color = [0, 1, 2, 3, 4, 5].find((c) => !used.has(c)) ?? 0;
         this.seats.push({ kind: 'ai', name: 'Computer', civ: 'random', color, team: this.nextTeam(), level: m.level });
@@ -230,7 +230,7 @@ export class Room {
       case 'aiLevel': {
         const s = this.seats[Number(m.seat)];
         if (!isHost || this.started || !s || s.kind !== 'ai') return;
-        if (DIFFICULTIES.includes(m.level)) s.level = m.level;
+        if (ROOM_LEVELS.includes(m.level)) s.level = m.level;
         // The host also sets the computer's people, color and team through this seat.
         this.editSeat(s, m as unknown as { civ?: string; color?: number; team?: number });
         this.sendLobby();

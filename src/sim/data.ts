@@ -1573,6 +1573,11 @@ export const AI_FAIR = { ring: 10, markets: 2 };
  * training them on top of those it sends with the army, and walks a keeper back once it strays past `VIGIL.reach` less `slack` tiles.
  */
 export const AI_VIGIL = { slack: 1.5 };
+/**
+ * The computer and convoys (#379 s3): in the Age of Sail a clever computer keeps its first `escorts` warships within `stay` tiles
+ * of the port where most of its merchant ships load, so each cog loading there sails escorted (`CONVOY`).
+ */
+export const AI_CONVOY = { escorts: 1, stay: 3 };
 
 /** Selling rare ore at a Market (#356 s5): a lot of `lot` pays `gold[ore]` gold at a flat price. Ore mined still counts toward its doors; only the stock in hand is spent. */
 export const ORE_TRADE = { lot: 20, gold: { salt: 40, saltpetre: 55, bloodiron: 90 } as Record<'salt' | 'saltpetre' | 'bloodiron', number> };
