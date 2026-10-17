@@ -356,7 +356,7 @@ view.onSighting = (what) => {
   play('sighting');
   hud.banner(look.title, look.lore, 4200);
 };
-view.onPing = (x, y, color) => minimap.ping(x, y, color);
+view.onPing = (x, y, color, heavy) => minimap.ping(x, y, color, heavy);
 
 // ---- Starting matches ------------------------------------------------------------------------------
 
@@ -2181,6 +2181,7 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         }
         break;
       case 'heartless':
+        if (ev.owner !== viewer && s.players[ev.owner].team !== s.players[viewer].team) hud.toast(`${s.players[ev.owner].name} has lost their last Town Center! ${ev.left} seconds to finish them.`, 'good');
         if (ev.owner === viewer) {
           hud.toast(`Your last Town Center has fallen! Raise another within ${ev.left} seconds, or your people is lost.`, 'alert');
           play('alert');

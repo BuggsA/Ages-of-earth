@@ -85,7 +85,7 @@ export class View {
   /** A sound to play: its name, left-right placement and loudness by distance. */
   onCue: ((name: SoundName, pan: number, gain: number) => void) | null = null;
   /** Something worth a ping on the minimap happened at a map point. */
-  onPing: ((x: number, y: number, color: string) => void) | null = null;
+  onPing: ((x: number, y: number, color: string, heavy?: boolean) => void) | null = null;
 
   private sky = new Sky();
   private phase = 0;
@@ -1231,7 +1231,7 @@ export class View {
           break;
         }
         case 'alert':
-          if (ev.owner === this.viewer) this.onPing?.(ev.x, ev.y, '#ff4d4d');
+          if (ev.owner === this.viewer) this.onPing?.(ev.x, ev.y, ev.heart ? '#ff9f1c' : '#ff4d4d', !!ev.heart);
           break;
       }
     }
