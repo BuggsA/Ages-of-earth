@@ -1784,9 +1784,9 @@ export const AI_FORK = { living: 0.6, hemo: 0.5, stay: 300, patience: 1200, back
  * uncursed and the store would still hold `keep` blood after paying; failing that, while the store is under `AI_FORK.store`, it
  * sacrifices the dearest victim whose offering is at least `dear` blood. Everything else is converted as before. A soldier held within
  * `pinned` tiles of one of ours counts double; and a pack none of ours holds yet, with our foot soldiers marching on it within `closing`
- * tiles, is left uncursed a beat, until they land.
+ * tiles, is left uncursed a beat, until they land or `patience` seconds pass.
  */
-export const AI_RITE = { pack: 3, keep: 40, dear: 30, pinned: 2, closing: 7 };
+export const AI_RITE = { pack: 3, keep: 40, dear: 30, pinned: 2, closing: 7, patience: 6 };
 
 /**
  * A clever computer answers a curse on its own army (#434). For the last `late` seconds of a curse, a cursed soldier that isn't winning
