@@ -47,4 +47,10 @@ describe('the computer saves for the feast (#356)', () => {
     barracks.x += 60;
     expect(feastSoon(s, p, 'infantry', barracks, 10)).toBe(false);
   });
+  it('buys now when the purse already holds a deep hoard', () => {
+    const { s, p, barracks } = setup();
+    s.tick = secs(FAIR.every) - 5;
+    expect(feastSoon(s, p, 'infantry', barracks, 10, 100, 25)).toBe(false);
+    expect(feastSoon(s, p, 'infantry', barracks, 10, 99, 25)).toBe(true);
+  });
 });
