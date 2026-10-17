@@ -1377,6 +1377,19 @@ function patrolAt(clientX: number, clientY: number, queue: boolean): void {
   const g = view.groundAt(clientX, clientY);
   const units = selectedUnits(s).filter((u) => !u.inside);
   if (!g || !units.length) return;
+  // Click a trading post (or a trader on its road) to guard that road.
+  const pk = view.pick(clientX, clientY);
+  const trade = pk?.kind === 'unit' ? s.byId.get(pk.id) : null;
+  const post = pk?.kind === 'post' ? pk.id : trade && trade.kind === 'unit' && trade.owner === viewer && trade.order.k === 'trade' ? trade.order.post : undefined;
+  if (post !== undefined) {
+    const p = postAt(s, post);
+    if (p) {
+      issue({ t: 'patrol', p: viewer, ids: units.map((u) => u.id), x: p.x, y: p.y, post, queue: queue || undefined });
+      view.marker(s, p.x, p.y, true);
+      play('move');
+      return;
+    }
+  }
   issue({ t: 'patrol', p: viewer, ids: units.map((u) => u.id), x: g.x, y: g.y, queue: queue || undefined });
   view.marker(s, g.x, g.y, true);
   play('move');
@@ -2476,6 +2489,12 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         else if (ev.owner >= 0 && (view.sees(ev.x, ev.y) || s.players[viewer].seen[Math.floor(ev.y) * s.w + Math.floor(ev.x)])) hud.toast(`${s.players[ev.owner].name} has taken the ${name}`, 'info');
         break;
       }
+      case 'sighted':
+        if (ev.owner === viewer) {
+          hud.toast(`Scouts report an army of ${ev.n} (Space to look)`, 'alert');
+          lastAlert = { x: ev.x, y: ev.y };
+        }
+        break;
       case 'landmarkThreat':
         if (ev.owner === viewer) {
           hud.toast(`Rivals are taking the ${LANDMARK_KINDS[ev.kind].name}! (Space to look)`, 'alert');

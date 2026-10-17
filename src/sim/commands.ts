@@ -46,6 +46,24 @@ export function shortfall(p: Player, cost: Cost): string | null {
   return null;
 }
 
+/** Guard a trading post's road (#454 s3): the units go back and forth between the nearest Market and the post. */
+function guardRoad(s: GameState, owner: number, all: Unit[], postId: number, queue?: boolean): void {
+  const post = postAt(s, postId);
+  if (!post) return;
+  const market = homeMarket(s, owner, post.x, post.y);
+  if (!market) return refuse(s, owner, 'Build a Market first: the road runs from it');
+  for (const dom of ['land', 'water', 'air'] as const) {
+    const group = all.filter((u) => u.type !== 'wagon' && domainOf(u.type) === dom);
+    if (!group.length) continue;
+    const end = dom === 'water' ? portSpot(s, post, owner) : { x: post.x, y: post.y };
+    if (!end) {
+      refuse(s, owner, 'That post has no harbour');
+      continue;
+    }
+    for (const u of group) giveOrder(u, { k: 'patrol', pts: [{ x: market.x, y: market.y }, end], i: 1, started: false, miss: 0 }, queue);
+  }
+}
+
 function myUnits(s: GameState, p: number, ids: number[]): Unit[] {
   const out: Unit[] = [];
   const seen = new Set<number>();
@@ -780,6 +798,10 @@ export function applyCommand(s: GameState, c: Command): void {
       break;
     }
     case 'patrol': {
+      if (c.post !== undefined) {
+        guardRoad(s, c.p, myUnits(s, c.p, c.ids), c.post, c.queue);
+        break;
+      }
       // A point off the map or not a number is no order at all (the room is public).
       if (!Number.isFinite(c.x) || !Number.isFinite(c.y)) return;
       const x = Math.min(s.w - 0.5, Math.max(0.5, c.x));

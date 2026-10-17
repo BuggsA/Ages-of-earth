@@ -1532,10 +1532,12 @@ export const SPREAD = { reach: 5, perNode: 2, foe: 4, perFoe: 3, far: 18 };
  * A patrol gives up after `misses` legs in a row end short of their point; it holds at most `points`.
  * An explorer picks unseen ground on a grid every `grid` tiles, keeps `apart` tiles from where its fellows
  * are headed, and passes over ground within `shun` tiles of a tile it couldn't reach; `fails` such tiles in a row
- * (with nothing new seen between) and it stops.
+ * (with nothing new seen between) and it stops. It keeps `wary` tiles beyond the reach of every enemy tower it
+ * has seen (and turns away if it strays in), and reports a rival army of `army` soldiers in sight, at most once
+ * every `tell` seconds (s3).
  */
 export const PATROL = { scan: 6, provoke: 0.5, misses: 4, points: 8, flee: 6 };
-export const EXPLORE = { grid: 4, apart: 12, fails: 8, shun: 6 };
+export const EXPLORE = { grid: 4, apart: 12, fails: 8, shun: 6, wary: 2, army: 4, tell: 30 };
 /**
  * Idle hands find work (#344), for the player's people only (the computer sets its own to work):
  * - `trained`: a citizen trained with no rally point takes the nearest node within this many tiles;
