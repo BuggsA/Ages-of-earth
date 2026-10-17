@@ -1,4 +1,4 @@
-import { AI_LEVELS, AUTO_WORK, BUILDINGS, EXPLORE, PATROL, CARRY, CONSECRATE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SNARE, SPREAD, TRADE, domainOf, secs } from './data';
+import { AI_LEVELS, AUTO_WORK, BUILDINGS, EXPLORE, PATROL, CARRY, CONSECRATE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
@@ -15,6 +15,7 @@ import { animalRadius, hitAnimal } from './animals';
 import { milkable } from './flocks';
 import { catchIn, nextSnare } from './snares';
 import { dig, ruinAt } from './ruins';
+import { rubbleAt, salvages, strip } from './salvage';
 import { fordMarch, groveBoost, keptOf, kinBonus } from './landmarks';
 import { chant, chantedOver, consecrateProblem, consecrates, turnBuilding } from './consecrate';
 import { convoyShare } from './convoy';
@@ -563,7 +564,7 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
 
 function buildStep(s: GameState, u: Unit, o: Extract<Order, { k: 'build' }>): void {
   const b = s.byId.get(o.target);
-  if (!b || b.kind !== 'building' || b.hp <= 0 || b.owner !== u.owner) {
+  if (u.thrall || !b || b.kind !== 'building' || b.hp <= 0 || b.owner !== u.owner) {
     setOrder(u, { k: 'idle' });
     return;
   }
@@ -1402,6 +1403,26 @@ function digStep(s: GameState, u: Unit, o: Extract<Order, { k: 'dig' }>): void {
   if (!approach(u, goalForPoint(s, r.x, r.y, passOf(s, u)))) setOrder(u, { k: 'idle' });
 }
 
+/** Strip the rubble of a fallen building (#503) until it is cleared, by this citizen or another's work. */
+function salvageStep(s: GameState, u: Unit, o: Extract<Order, { k: 'salvage' }>): void {
+  const r = rubbleAt(s, o.target);
+  if (!r || u.type !== 'citizen' || !salvages(s, u.owner)) {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  const dx = r.x - u.x;
+  const dy = r.y - u.y;
+  if (dx * dx + dy * dy <= SALVAGE.reach * SALVAGE.reach) {
+    if (walking(u)) stopWalking(u);
+    face(u, r.x, r.y);
+    u.act = 'mine';
+    workEvent(s, u, 'mine', r.x, r.y);
+    if (strip(s, r, u.owner)) setOrder(u, { k: 'idle' });
+    return;
+  }
+  if (!approach(u, goalForPoint(s, r.x, r.y, passOf(s, u)))) setOrder(u, { k: 'idle' });
+}
+
 /**
  * Pay a trader's (or merchant ship's) load in at the Market (or Dock) it came home to, and cut in the allies.
  * On the Silk Road (#326) the ground its Market covered since it set out (`from`) pays more, the owner's alone.
@@ -1917,6 +1938,9 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
       break;
     case 'dig':
       digStep(s, u, o);
+      break;
+    case 'salvage':
+      salvageStep(s, u, o);
       break;
   }
 }

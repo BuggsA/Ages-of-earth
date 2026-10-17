@@ -1,4 +1,5 @@
 import { AGES, HOMELANDS, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, secs } from '../sim/data';
+import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, mainRoad, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
 import type { AgeId, Building, GameState, Unit } from '../sim/types';
 import { R_FISH } from '../sim/types';
@@ -119,6 +120,11 @@ const TIPS: Tip[] = [
     text: 'You have found <b>ancient ruins</b> (two pale columns on the map). Select a few <b>citizens</b> and right-click them to dig: whoever finishes the dig takes what lies beneath, a hoard of gold, lost knowledge, an old map of the land or a relic. Excavation can also reveal a new road for your people. It\'s a long way from home, so send an escort.',
   },
   {
+    id: 'salvage',
+    when: (s, me) => !!s.rubble?.length && !!ageDef(s.players[me]).salvage,
+    text: 'A building has fallen and left <b>rubble</b> (a heap of stone and beams). In the Age of Reclaimers, select <b>citizens</b> and right-click it to <b>strip</b> it: half the building\'s price goes into your stock. Rubble of your own is a choice: strip it now, or leave the foundations to raise the building again for 40% of the price. A rival\'s rubble lies where the fighting was, so send an escort.',
+  },
+  {
     id: 'trade',
     when: (s, me) => s.players[me].epoch >= 1 && s.posts.some((t) => s.players[me].seen[Math.floor(t.y) * s.w + Math.floor(t.x)] === 1),
     text: 'You have found a <b>trading post</b> (a camel on the map). Build a <b>Market</b> (<kbd>B</kbd> <kbd>M</kbd>), train <b>traders</b> there (<kbd>T</kbd>) and right-click the post: they bring back gold every trip, more the farther the Market. Guard the road: cavalry love to raid it.',
@@ -169,7 +175,7 @@ const TIPS: Tip[] = [
       const p = s.players[me];
       return ageOf(p) === 'middle' && roadKnown(s, p, SAIL_ROAD) && !deedsDone(p, SAIL_ROAD, s);
     },
-    text: `The sea is a road. Land ${SAIL_ROAD.deed!.n} fish with your boats, and the Town Center (🔀) can turn your people into the <b>${AGES.sail.name}</b>: fishing is half again as quick, ships cost less and have sturdier hulls, but the fields yield less. The road shuts once you advance.`,
+    text: `The sea is a road. Land ${SAIL_ROAD.deed!.n} fish with your boats, and the Town Center (🔀) can turn your people into the <b>${AGES.sail.name}</b>: fishing is half again as quick, ships cost less and have sturdier hulls, but a sea people raises no walls or gates (the fleet is the wall). The road shuts once you advance.`,
   },
   {
     id: 'warband',
@@ -178,12 +184,12 @@ const TIPS: Tip[] = [
       const p = s.players[me];
       return ageOf(p) === 'middle' && roadKnown(s, p, WARBAND_ROAD) && (p.stats.slain ?? 0) > 0 && !deedsDone(p, WARBAND_ROAD, s);
     },
-    text: `War can be a way of life. Slay ${WARBAND_ROAD.deed!.n} enemy units and the Town Center (🔀) can set your people on the <b>Path of Blood</b>, into the <b>${AGES.warband.name}</b>: soldiers train faster and every enemy slain pays plunder in gold, but no traders, and the fields yield less. The road shuts once you advance.`,
+    text: `War can be a way of life. Slay ${WARBAND_ROAD.deed!.n} enemy units and the Town Center (🔀) can set your people on the <b>Path of Blood</b>, into the <b>${AGES.warband.name}</b>: soldiers train faster and every enemy slain earns plunder, carried in the killer\'s pack until it is walked home, but no traders, and the fields yield less. The road shuts once you advance.`,
   },
   {
     id: 'plunder',
     when: (s, me) => ageOf(s.players[me]) === 'warband',
-    text: 'Your warband lives on plunder: every enemy unit your forces slay pays part of its price in gold, more the further you walk the Path of Blood. Raids feed the town now, and a quiet border starves it.',
+    text: 'Your warband lives on plunder, but it is carried: each kill fills the killer\'s pack (💰 in its panel), and the gold is yours only once that soldier walks home to a Town Center or Barracks; a laden soldier felled in the field hands its pack to the rival. And a rival citizen who falls is taken, not lost: a <b>thrall</b> rises where it fell, yours, to work your fields (up to 8; it never builds). Raid the rival\'s workers, and guard your own.',
   },
   {
     id: 'ironblood',

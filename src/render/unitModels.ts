@@ -21,6 +21,7 @@ const DARK_STEEL = '#737a84';
 const IRON = '#585d64';
 const TEAM = '#f4f4f4';
 const BOOT = '#3d2c22';
+const ROPE = '#c9b48a';
 
 const HIP = 0.22;
 const SHOULDER = 0.42;
@@ -119,6 +120,28 @@ function citizen(epoch: number): Kit {
     // A pickaxe: a second blade swung the other way.
     if (epoch >= 4) kk.box(0.03, 0.05, 0.08, head, 0, 0.18, -0.05, g);
   });
+  return k;
+}
+
+/**
+ * A thrall (#502, Age of the Warband): a taken citizen. Drab undyed sackcloth in place of the people's
+ * dress, hair uncovered, a rope noosed at the neck with its tail hanging, wrists lashed in front, no tool
+ * and no basket. Only the neck rope is team-tinted, so whose thrall it is still reads.
+ */
+function thrall(epoch: number): Kit {
+  const k = new Kit();
+  const cloth = ['#9a8a6c', '#a39375', '#948670', '#8f8672', '#7f7a6c'][epoch];
+  person(k, { legs: epoch === 0 ? SKIN : '#76705f', torso: cloth, belt: '#6b5a40' });
+  hairOrHat(k, 0);
+  if (epoch >= 3) k.box(0.1, 0.03, 0.08, '#6a645a', 0, 0.41, 0.02);
+  // The noose, and a tail of rope trailing down the back.
+  k.team(k.cyl(0.06, 0.06, 0.02, 8, TEAM, 0, 0.44, 0.0));
+  k.box(0.012, 0.2, 0.012, ROPE, 0, 0.3, -0.07);
+  k.box(0.012, 0.1, 0.012, ROPE, 0.015, 0.14, -0.08);
+  // Wrists bound in front of the body.
+  k.box(0.11, 0.035, 0.04, ROPE, 0, 0.27, 0.08);
+  k.sphere(0.026, SKIN, -0.04, 0.27, 0.09);
+  k.sphere(0.026, SKIN, 0.04, 0.27, 0.09);
   return k;
 }
 
@@ -1098,6 +1121,12 @@ function caravanCart(epoch: number): Kit {
 
 const MAKERS: Record<UnitType, (epoch: number) => Kit> = { citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, cog, fighter, bomber, trader, wagon };
 
+/** Epoch + 30 asks for the citizen as a thrall (the same offset trick as the trader's gold and the caravan cart). */
+export const THRALL_MODEL = 30;
+
+function makeUnit(type: UnitType, epoch: number): Kit {
+  return type === 'citizen' && epoch >= THRALL_MODEL ? thrall(epoch - THRALL_MODEL) : MAKERS[type](epoch);
+}
 
 // ---- Deer ------------------------------------------------------------------------------------------
 
@@ -1366,7 +1395,7 @@ export function unitGeometry(type: UnitType, epoch: number, civ?: CivId): THREE.
   const key = `${type}:${epoch}:${civ ?? ''}`;
   let g = cache.get(key);
   if (!g) {
-    const kit = MAKERS[type](epoch);
+    const kit = makeUnit(type, epoch);
     if (civ) signatureMark(kit, civ, type);
     g = bake(kit.root);
     cache.set(key, g);
@@ -1376,7 +1405,7 @@ export function unitGeometry(type: UnitType, epoch: number, civ?: CivId): THREE.
 
 /** The same model with the team color baked in (for portraits). */
 export function unitGeometryColored(type: UnitType, epoch: number, color: string, civ?: CivId): THREE.BufferGeometry {
-  const kit = MAKERS[type](epoch);
+  const kit = makeUnit(type, epoch);
   if (civ) signatureMark(kit, civ, type);
   return bake(kit.root, color);
 }

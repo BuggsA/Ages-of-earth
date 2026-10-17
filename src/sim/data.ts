@@ -87,6 +87,8 @@ export interface Age {
   path?: PathId;
   /** The whole people at war (the Age of Total War, #313): War Camps call citizens near them to arms (`CALL_UP`). */
   callUp?: boolean;
+  /** Plunder is hauled (#502, the Age of the Warband): the soldier who makes a kill carries the gold (`SPOILS`) and banks it only at home. */
+  haul?: boolean;
   /** Drain Rigs draw blood from the enemy dead near them (#355). */
   blood?: boolean;
   /**
@@ -101,6 +103,8 @@ export interface Age {
   rite?: boolean;
   /** A people that raises again on the foundations of what fell (the Age of Reclaimers): see `RECLAIM` (`reclaim.ts`). */
   reclaim?: boolean;
+  /** Citizens strip the rubble of fallen buildings into stock (the Age of Reclaimers, #503): see `SALVAGE` (`salvage.ts`). */
+  salvage?: boolean;
   /** Aircraft fly on fuel from the Airfield (the Age of Aeronauts): see `SORTIE` (`sortie.ts`). */
   sortie?: boolean;
   /** Feast days (the Age of Fairs): see `FAIR` (`fair.ts`). */
@@ -111,6 +115,8 @@ export interface Age {
   prizes?: boolean;
   /** Priests keeping vigil at a relic Temple add to its gold (the Age of Pilgrims): see `VIGIL` (`vigil.ts`). */
   vigils?: boolean;
+  /** Rival citizens slain by this people's forces are taken captive and work its fields (the Age of the Warband): see `THRALL` (`thralls.ts`). */
+  thralls?: boolean;
 }
 
 /**
@@ -189,24 +195,28 @@ export const AGES: Record<AgeId, Age> = {
     sortie: true,
   },
   reclaimer: {
+    verb: 'Strip the rubble of fallen buildings, a rival\'s or your own, into stock, or leave your own to raise again',
+    door: 'Soldiers take longer to train',
     name: 'Age of Reclaimers',
     short: 'Reclaimers',
     tier: 3,
-    blurb: 'Build tomorrow from yesterday: excavating an ancient ruin teaches a people to rebuild. Construction and repairs work 25% faster, technologies cost 20% less, but military units take 25% longer to train. And what falls can be raised again: a building of yours that is destroyed leaves its foundations for 5 minutes, and the same building raised on the same spot costs 40% of the price and starts half built. The same armies and technologies as the Gunpowder Age.',
+    blurb: 'Build tomorrow from yesterday: excavating an ancient ruin teaches a people to rebuild, and to strip what others leave: citizens ordered onto the rubble of any fallen building (a rival\'s, or your own) carry off half its price in stock. Construction and repairs work 25% faster, technologies cost 20% less, but military units take 25% longer to train. And what falls can be raised again: a building of yours that is destroyed leaves its foundations for 5 minutes, and the same building raised on the same spot costs 40% of the price and starts half built. The same armies and technologies as the Gunpowder Age.',
     mul: { buildSpeed: 1.25, techCost: 0.8, militaryTrain: 1.25 },
     reclaim: true,
+    salvage: true,
   },
   merchant: {
     verb: 'Hire swords at the Market for gold, and keep paying them by the day or lose them',
-    door: 'Levies cost more',
+    door: 'No Stables: cavalry is for hire or not at all',
     name: 'Age of Merchants',
     short: 'Merchant',
     tier: 2,
-    blurb: 'Guilds, banks and hired swords: the Market hires soldiers for gold, trade pays more (more still for every bar of bog iron your people ever dug), and levies cost dear. But a hired sword is paid by the day: 2 gold every 15 seconds once its first 45 are served, and one left unpaid twice walks off the field.',
+    blurb: 'Guilds, banks and hired swords: the Market hires soldiers for gold, trade pays more (more still for every bar of bog iron your people ever dug), and levies cost dear. A merchant people stables no horses: cavalry is only for hire, never raised at a Stable. And a hired sword is paid by the day: 2 gold every 15 seconds once its first 45 are served, and one left unpaid twice walks off the field.',
     mul: { tradeGold: 1.25 },
     ironTrade: IRON_TRADE,
     hire: { at: 'market', units: ['infantry', 'ranged', 'cavalry'], gold: 1.2, time: 0.5 },
     levy: 1.2,
+    noBuild: { buildings: ['stable'], why: 'A merchant people stables no horses: cavalry is for hire at the Market. They wait until they settle in the Middle Ages or the Gunpowder Age' },
   },
   iron: {
     verb: 'Dig the marsh: bog iron sharpens every spearman, so the bog is worth holding',
@@ -248,13 +258,14 @@ export const AGES: Record<AgeId, Age> = {
   },
   sail: {
     verb: 'Send warships with the merchant cogs in convoy, and sink a rival\'s cogs for prize money',
-    door: 'Fields are tilled with less care',
+    door: 'No walls or gates: the fleet is the wall',
     name: 'Age of Sail',
     short: 'Sail',
     tier: 2,
-    blurb: 'A people that has turned to the sea: boats fish half again as fast, ships come a quarter cheaper and a quarter sturdier, but the fields are tilled with less care. A Market within a dozen tiles of a Dock ships its goods by water: its trade trips pay 30% more. And a merchant ship that loads at a port with a warship beside it sails in convoy and carries 40% more: send the fleet with the cogs.',
-    mul: { fish: 1.5, shipHp: 1.25, farm: 0.85 },
+    blurb: 'A people that has turned to the sea: boats fish half again as fast, ships come a quarter cheaper and a quarter sturdier, but a sea people raises no walls or gates: its fleet is the wall, and a town on the shore must keep ships and towers to hold what palisades once did. A Market within a dozen tiles of a Dock ships its goods by water: its trade trips pay 30% more. And a merchant ship that loads at a port with a warship beside it sails in convoy and carries 40% more: send the fleet with the cogs.',
+    mul: { fish: 1.5, shipHp: 1.25 },
     price: { ship: 0.75 },
+    noBuild: { buildings: ['wall', 'gate'], why: 'A sea people raises no walls or gates: the fleet is the wall. They wait until it comes ashore or moves on to Gunpowder' },
     ironTrade: IRON_TRADE,
     convoys: true,
     prizes: true,
@@ -275,8 +286,12 @@ export const AGES: Record<AgeId, Age> = {
     short: 'Warband',
     tier: 2,
     path: 'blood',
-    blurb: 'The war-host is the people: soldiers train 15% faster, and every enemy unit your forces slay pays a quarter of its price as plunder in gold. But a warband trades with no one: no traders leave its Markets, and with the young away at war the fields yield 10% less.',
-    add: { plunder: 0.25 },
+    blurb: 'The war-host is the people: soldiers train 15% faster, and every enemy unit your forces slay earns a sixth of its price in plunder, carried in the killer\'s pack (up to 90 gold) until it walks within 5 tiles of a Town Center or Barracks to bank it. A rival who fells a laden soldier takes its pack. A rival citizen who falls to your forces is taken instead of lost: a thrall rises where it fell, your own, to work your fields (up to 8 at a time, and if there is room). A thrall never builds. But a warband trades with no one: no traders leave its Markets, and with the young away at war the fields yield 10% less.',
+    thralls: true,
+    add: { plunder: 0.15 },
+    haul: true,
+    verb: 'Carry the plunder home: the soldier who makes a kill packs the gold and must walk it back to a Town Center or Barracks to bank it, so raids are timed, convoys guarded, and the war-host comes home between blows',
+    door: 'A laden soldier felled in the field hands its pack to the rival, and no pack holds more than a few kills: a host that never turns home banks nothing, and a host that hurries home gives up the front',
     mul: { militaryTrain: 0.85, farm: 0.9 },
     no: { units: ['trader'], why: 'A warband trades with no one: traders wait until your people leave the Path of Blood' },
   },
@@ -682,8 +697,8 @@ export const ROADS: Road[] = [
     deed: { stat: 'fished', n: 500, text: 'Your boats land 500 fish' },
     blurb: 'A turn, not a climb: the same soldiers and technologies as the Middle Ages, but the people live by the sea. Fishing boats fish half again as fast, every ship costs a quarter less and has a quarter more hull. What it gives up: the fields, which yield 15% less. A sea people can strike from the water and hold the shore, but a rival on land can starve it.',
   },
-  { from: 'sail', to: 'gunpowder', cost: { food: 800, wood: 500, gold: 450, stone: 100 }, time: 60, blurb: 'Rejoin the main road: the shipping fortune carries your people into gunpowder (more wood and less gold than from the Middle Ages). Farms return to their usual yield.' },
-  { from: 'sail', to: 'middle', cost: { food: 150, wood: 150 }, time: 25, blurb: 'Come ashore: the Middle Ages again, with ordinary fields, ordinary hulls and the usual price for ships.' },
+  { from: 'sail', to: 'gunpowder', cost: { food: 800, wood: 500, gold: 450, stone: 100 }, time: 60, blurb: 'Rejoin the main road: the shipping fortune carries your people into gunpowder (more wood and less gold than from the Middle Ages). Walls and gates may be raised again.' },
+  { from: 'sail', to: 'middle', cost: { food: 150, wood: 150 }, time: 25, blurb: 'Come ashore: the Middle Ages again, with walls and gates allowed, ordinary hulls and the usual price for ships.' },
   { from: 'fair', to: 'industrial', cost: { food: 1300, gold: 1100, stone: 300 }, time: 80, blurb: 'Rejoin the main road: the fairs\' fortune buys its way into the Industrial Age (more gold and less food and stone than from the Gunpowder Age).' },
   { from: 'fair', to: 'gunpowder', cost: { food: 400, stone: 200 }, time: 30, blurb: 'Settle down: wall the fairground and join the Gunpowder Age. Trade and buildings go back to their usual strength.' },
   // The Path of Blood (#299), first step: a turn off the Middle Ages. A Barracks is the clue, the enemy dead the deed.
@@ -695,7 +710,7 @@ export const ROADS: Road[] = [
     clue: 'barracks',
     gate: 'easy',
     deed: { stat: 'slain', n: 10, text: 'Your forces slay 10 enemy units' },
-    blurb: 'A turn, not a climb: the first step on the Path of Blood. The same soldiers and technologies as the Middle Ages, but soldiers train 15% faster and every enemy unit slain pays a quarter of its price as plunder in gold, so war feeds the town. What it gives up: trade (no traders) and some of the harvest (farms 10% less). A warband that stops fighting grows poor.',
+    blurb: 'A turn, not a climb: the first step on the Path of Blood. The same soldiers and technologies as the Middle Ages, but soldiers train 15% faster and every enemy unit slain earns a quarter of its price in plunder, carried by the killer and banked at a Town Center or Barracks (a laden soldier felled in the field hands its pack over), so war feeds the town once the host comes home with it. What it gives up: trade (no traders) and some of the harvest (farms 10% less). A warband that stops fighting grows poor.',
   },
   { from: 'warband', to: 'gunpowder', cost: { food: 1000, gold: 500, stone: 300 }, time: 65, blurb: 'Climb to the Gunpowder Age: the plunder ends, traders and full harvests return (less gold and more stone than from the Middle Ages: the war-host was never rich in coin). The Path of Blood goes on from there, into the Age of Iron and Blood, for a people whose plunder is already taken.' },
   { from: 'warband', to: 'middle', cost: { food: 250, gold: 100 }, time: 30, blurb: 'Hang up the spear: the ordinary Middle Ages, with trade and full fields, and no plunder.' },
@@ -1085,6 +1100,12 @@ export const PRIZE = { share: 0.5 };
  * not chanting at a rival's wall, and the shrine is where the rival's raiders come.
  */
 export const VIGIL = { reach: 5, each: 1, most: 3, toast: 30 };
+/**
+ * Salvage (the Age of Reclaimers, #503): any building that falls (a rival's, or your own) while a reclaiming people is in the match leaves rubble
+ * for `window` seconds. A reclaimer's citizens strip it: one citizen takes `work` seconds, and the stock gets `share` of the building's price.
+ * Rubble of your own fall is the choice: strip it for stock now, or leave the foundations to raise again at `RECLAIM.cost`.
+ */
+export const SALVAGE = { share: 0.5, work: 10, window: 150, reach: 2.2, find: 40 };
 export const RECLAIM = { window: 300, cost: 0.4, head: 0.5, skip: ['wall', 'gate', 'wonder'] as string[] };
 
 export const RUINS = { count: { small: 2, medium: 3, large: 4 } as Record<MapSize, number>, home: 24, fair: 4, spacing: 14, dig: 40, gold: 300, reach: 1.7, clear: 1 };
@@ -1426,7 +1447,7 @@ export const CIV_IDS = Object.keys(CIVS) as CivId[];
  * `tests/verbs.test.ts` lets these go without a `verb`, and fails once one has a verb but is still listed: strike it then.
  */
 export const VERB_GAPS: { ages: Partial<Record<AgeId, number>>; civs: Partial<Record<CivId, number>> } = {
-  ages: { warband: 502, reclaimer: 503 },
+  ages: {},
   civs: { greeks: 501, romans: 501, mongols: 501, chinese: 501, britons: 501 },
 };
 
@@ -1553,6 +1574,14 @@ export const KIN = { cost: { food: 120 } as Cost, time: 16, n: 2, winter: 3 };
  * `take` food from that rival's store (never more than it holds); a slain rival citizen gives up what it carried,
  * plus `slain` food. The rival hears of it at most every `tell` seconds.
  */
+/**
+ * Thralls (the Age of the Warband, #502): a rival citizen slain by a people in that age is taken captive. A thrall of the
+ * slayer rises where it fell with `hp` of a citizen's health (a share), and goes to work nearby within `reach` tiles. A
+ * people holds at most `max` at a time, and none while its pop is full. A thrall gathers and farms but never builds or repairs.
+ * The rival answers by guarding its workers, walling its fields, or cutting the thralls down (a thrall slain by a warband changes hands).
+ */
+export const THRALL = { max: 8, hp: 0.6, reach: 14 };
+
 export const RAID = { at: ['towncenter', 'storehouse', 'huntcamp', 'dock', 'farm'] as BuildingType[], take: 0.35, slain: 10, tell: 15 };
 
 /**
@@ -2151,6 +2180,13 @@ export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, 
  * at all, so its camps burn at once. `train`: a camp trains its foot soldiers this much slower than a
  * Barracks (tents, not a drill yard).
  */
+/**
+ * Spoils (#502, the Age of the Warband): the plunder a soldier's kill earns is carried in its pack, up to `cap` gold (the rest is left
+ * on the field), and banked at the first of the people's `homes` it comes within `bank` tiles of. Fell a laden soldier and its
+ * spoils pay you in full. The computer sends a soldier home once it carries `home` gold.
+ */
+export const SPOILS = { cap: 90, bank: 5, homes: ['towncenter', 'barracks'] as BuildingType[], home: 45 };
+
 export const WARCAMP = { watch: 8, grace: 10, burn: 0.05, train: 1.2 };
 
 /**

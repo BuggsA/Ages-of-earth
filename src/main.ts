@@ -6,7 +6,7 @@ import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { SIGHT_LORE } from './render/sightings';
 import { wallLine } from './sim/commands';
-import { AGES, BUILDINGS, CIVS, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
+import { AGES, BUILDINGS, CIVS, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
 import { crestSvg } from './ui/crests';
 import { isEnemy } from './sim/world';
 import { jumpAge, rush, topUp } from './sim/god';
@@ -16,9 +16,10 @@ import { findDockSpot, findSpot } from './sim/ai';
 import { maxHp, placeBuilding, spawnUnit } from './sim/world';
 import { arrivalText, epochArrivals } from './ui/endReport';
 import type { AgeId, BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, HomelandId, MapSize, MapType, Unit } from './sim/types';
-import { R_FISH, R_NONE } from './sim/types';
+import { R_FISH, R_NONE, RES } from './sim/types';
 import { carriedBy, relicAt } from './sim/relics';
 import { RUIN_FINDS, ruinAt } from './sim/ruins';
+import { salvages } from './sim/salvage';
 import { TIDING_CARDS } from './sim/tidings';
 import { LANDMARK_KINDS, landmarkAt } from './sim/landmarks';
 import { postAt } from './sim/trade';
@@ -1258,6 +1259,17 @@ function order(clientX: number, clientY: number, forceAttack = false, queue = fa
     }
     return;
   }
+  // A reclaimer's citizens sent onto rubble strip it (#503).
+  if (pk.kind === 'ground' && !forceAttack && s.rubble && salvages(s, viewer) && units.some((u) => u.type === 'citizen')) {
+    const r = s.rubble.find((x) => Math.abs(pk.x - x.x) <= SALVAGE.reach && Math.abs(pk.y - x.y) <= SALVAGE.reach && view.sees(x.x, x.y));
+    if (r) {
+      issue({ t: 'salvage', p: viewer, ids, target: r.id, queue: q });
+      view.marker(s, r.x, r.y, false);
+      play('move');
+      ack('move');
+      return;
+    }
+  }
   if (pk.kind === 'animal') {
     const a = s.animals.find((x) => x.id === pk.id);
     if (!a) return;
@@ -2478,6 +2490,10 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         break;
       case 'sortie':
         if (ev.owner === viewer) hud.toast(ev.what === 'home' ? 'Low fuel: aircraft turn for their Airfield. Raise a forward Airfield to reach farther' : 'An aircraft ran out of fuel and fell', ev.what === 'lost' ? 'bad' : 'alert');
+        break;
+      case 'salvage':
+        if (ev.owner !== viewer) break;
+        if (ev.what === 'stripped') hud.toast(`Stripped the rubble of a ${BUILDINGS[ev.type].name}: ${RES.filter((r) => ev.gain?.[r]).map((r) => `+${ev.gain![r]} ${r}`).join(', ')}`, 'good');
         break;
       case 'foundation':
         if (ev.owner === viewer) hud.toast(ev.what === 'kept' ? `Foundations of your ${BUILDINGS[ev.type].name} will keep ${RECLAIM.window / 60} minutes: raise it again on the spot for ${Math.round(RECLAIM.cost * 100)}%` : `${BUILDINGS[ev.type].name} raised on old foundations, half built`, ev.what === 'kept' ? 'info' : 'good');
