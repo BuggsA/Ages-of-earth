@@ -1,6 +1,6 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { aiTiding } from './tidings';
-import { AGES, AI_SHORE, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
@@ -27,6 +27,7 @@ import { rallyProblem } from './rally';
 import { consecrateProblem, consecrates } from './consecrate';
 import { sees } from './vision';
 import { seasonAt } from './seasons';
+import { catchOf, herdsOut, yarding } from './year';
 import { isMobile } from './steppe';
 import { isRider, standing } from './tribute';
 import { flockCap, flockOf, grassy, milkable } from './flocks';
@@ -189,6 +190,8 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   ironRoad(s, v, mem, issue);
   oreRoad(s, v, mem, issue);
   steppeRoad(s, v, mem, issue);
+  readYear(s, v);
+  huntTheYear(s, v, issue);
 
   // Tidings at the fire (#443), one plain rule a card, answered before the town spends its stores.
   const tiding = aiTiding(s, p);
@@ -1044,7 +1047,8 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   // Autumn onward the clever computer plans for winter: berries fail in the cold, so fields go up first.
   const coldComing_ = coldComing(s, v);
   // On the Shore (#473) each fishing boat feeds the town in a farmer's place, and its wood is wanted for the next age.
-  const boatsFeed = s.homeland === 'shore' ? v.fishers.length : 0;
+  // The turning year (#479): ice ahead (autumn, for the clever) or on the mere, a boat feeds a third as many.
+  const boatsFeed = s.homeland === 'shore' ? Math.round(v.fishers.length * (coldComing_ || catchOf(s) < 1 ? YEAR.ice : 1)) : 0;
   const foodWanted = Math.round(wanted(v).food) - (berries >= 0 && !coldComing_ ? 6 : 0) + (coldComing_ ? AI_WINTER.fields : 0) - boatsFeed;
   if (farms < foodWanted && freeFields < 2 && !recently('farm', 2) && !buildBarred(p, 'farm')) {
     const spot = findSpot(s, 'farm', home.x, home.y, 3, 16);
@@ -1179,6 +1183,58 @@ function jobOf(u: Unit): Res | 'build' | null {
   return null;
 }
 
+/**
+ * The turning year (#479): a clever computer reads its homeland's seasons. On the Herd Plains it follows its
+ * herds out in autumn and winter (its camps go up by the far kills); in the Deep Wood's winter it sends more
+ * hunters to the yarded deer, since the berries fail.
+ */
+function readYear(s: GameState, v: View): void {
+  if (!AI_LEVELS[v.p.ai!].clever) return;
+  if (herdsOut(s)) v.hunt = { n: v.hunt.n, r: Math.max(v.hunt.r, YEAR.follow) };
+  if (yarding(s)) v.hunt = { n: v.hunt.n + YEAR.yardHunters, r: v.hunt.r };
+}
+
+/**
+ * When its homeland's year brings game in reach (the Herd Plains' herds, home or followed out; the Deep Wood's
+ * yard in winter), a clever computer takes a forager, else a farmer, off to hunt, one a think, until it has
+ * `v.hunt.n` on the hunt. Elsewhere its hunters come only from people newly sent to food (#479).
+ */
+function huntTheYear(s: GameState, v: View, issue: (c: Command) => void): void {
+  if (!AI_LEVELS[v.p.ai!].clever || !(s.homeland === 'herds' || yarding(s)) || isMobile(v.p)) return;
+  let hunting = 0;
+  for (const u of v.citizens) if (u.order.k === 'hunt' || (u.order.k === 'gather' && s.res[u.order.tile] === R_MEAT)) hunting++;
+  if (hunting >= v.hunt.n) return;
+  const deer = nearestDeer(s, v.home.x, v.home.y, v.hunt.r, spared(s, v));
+  if (!deer) return;
+  const pick = (ok: (u: Unit) => boolean) => {
+    let best: Unit | null = null;
+    let bestD = Infinity;
+    for (const u of v.citizens) {
+      if (u.inside || v.diggers.has(u.id) || !ok(u)) continue;
+      const d = (u.x - deer.x) * (u.x - deer.x) + (u.y - deer.y) * (u.y - deer.y);
+      if (d < bestD) {
+        bestD = d;
+        best = u;
+      }
+    }
+    return best;
+  };
+  const u = pick((c) => c.order.k === 'gather' && s.res[c.order.tile] === R_BERRY) ?? pick((c) => c.order.k === 'farm');
+  if (u) issue({ t: 'hunt', p: v.p.id, ids: [u.id], target: deer.id });
+}
+
+/**
+ * On the Herd Plains a clever computer leaves `YEAR.spare` of each of its own home herds alive, so they come
+ * home in spring with calves (#479). A rival's herd it hunts down gladly. Undefined where nothing is spared.
+ */
+function spared(s: GameState, v: View): ((a: Animal) => boolean) | undefined {
+  if (s.homeland !== 'herds' || !AI_LEVELS[v.p.ai!].clever) return undefined;
+  const left = new Map<number, number>();
+  for (const a of s.animals) if (a.kind === 'deer' && a.town === v.p.id && a.hp > 0) left.set(a.herd ?? a.id, (left.get(a.herd ?? a.id) ?? 0) + 1);
+  if (!left.size) return undefined;
+  return (a) => a.town === v.p.id && (left.get(a.herd ?? a.id) ?? 0) <= YEAR.spare;
+}
+
 /** Autumn onward, a clever computer plans for the winter ahead (`AI_WINTER`). */
 function coldComing(s: GameState, v: View): boolean {
   return AI_LEVELS[v.p.ai!].clever && seasonAt(s) >= AI_WINTER.from;
@@ -1201,11 +1257,11 @@ function wanted(v: View, cold = false): Record<Res, number> {
   return out;
 }
 
-function nearestDeer(s: GameState, x: number, y: number, r: number): Animal | null {
+function nearestDeer(s: GameState, x: number, y: number, r: number, skip?: (a: Animal) => boolean): Animal | null {
   let best: Animal | null = null;
   let bestD = r * r;
   for (const a of s.animals) {
-    if (a.kind !== 'deer') continue;
+    if (a.kind !== 'deer' || skip?.(a)) continue;
     const dx = a.x - x;
     const dy = a.y - y;
     const d = dx * dx + dy * dy;
@@ -1234,7 +1290,7 @@ function sendTo(s: GameState, v: View, u: Unit, res: Res, issue: (c: Command) =>
       return true;
     }
     const hunters = v.citizens.filter((c) => c.order.k === 'hunt').length;
-    const deer = hunters < v.hunt.n ? nearestDeer(s, v.home.x, v.home.y, v.hunt.r) : null;
+    const deer = hunters < v.hunt.n ? nearestDeer(s, v.home.x, v.home.y, v.hunt.r, spared(s, v)) : null;
     if (deer) {
       issue({ t: 'hunt', p: v.p.id, ids: [u.id], target: deer.id });
       return true;

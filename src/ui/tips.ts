@@ -3,6 +3,7 @@ import { ageOf, backTo, hasWalked, deedProgress, deedsDone, mainRoad, roadKnown,
 import type { AgeId, Building, GameState, Unit } from '../sim/types';
 import { R_FISH } from '../sim/types';
 import { isIdleCitizen } from './idle';
+import { seasonAt } from '../sim/seasons';
 
 /**
  * Advice for a first game, one tip at a time in a corner: what to do next, given how the match is
@@ -54,6 +55,10 @@ const TIPS: Tip[] = [
   { id: 'shore', when: (s, me) => s.homeland === 'shore' && secsIn(s) > 8 && !has(s, me, 'dock'), text: `${HOMELANDS.shore.icon} <b>The Shore</b>: few berries, but a rich shoal in the mere by home. Raise a <b>Dock</b> on its bank (<kbd>B</kbd> <kbd>D</kbd>) and train <b>fishing canoes</b>; they feed you while your citizens cut the wood they cost.` },
   { id: 'herds', when: (s) => s.homeland === 'herds' && secsIn(s) > 8, text: `${HOMELANDS.herds.icon} <b>The Herd Plains</b>: deer and a mammoth close by, few berries. Hunt with several citizens, put a <b>Hunting Camp</b> by the kills so meat doesn't spoil on the walk, and follow the herds out when they thin.` },
   { id: 'deepwood', when: (s) => s.homeland === 'wood' && secsIn(s) > 8, text: `${HOMELANDS.wood.icon} <b>The Deep Wood</b>: the woods crowd your Town Center and berries grow thick at their edge, but no herd grazes near. Forage and chop close to home; cut the trees back to make room for fields and houses.` },
+  // The turning year (#479): a season ahead of each homeland's lean or fat time.
+  { id: 'herds-year', when: (s) => s.homeland === 'herds' && seasonAt(s) === 1, text: `${HOMELANDS.herds.icon} <b>Autumn is coming</b>: your herds will trek out toward the middle of the map until spring. Lay food up, raise a <b>Hunting Camp</b> out by them, or plant fields; and leave a few of each herd alive, for every deer that lives to spring comes home with a calf.` },
+  { id: 'shore-year', when: (s) => s.homeland === 'shore' && seasonAt(s) === 2, text: `${HOMELANDS.shore.icon} <b>The autumn run</b>: the shoals are thick, so fish hard now. In winter the mere ices over and boats fish at a third of their pace: lay food up, or have fields ready.` },
+  { id: 'wood-year', when: (s) => s.homeland === 'wood' && seasonAt(s) === 3, text: `${HOMELANDS.wood.icon} <b>Deer in the yard</b>: a herd has come in from the cold to shelter in the woods by your town. The berries are failing, so send foragers to hunt while it stays; it leaves in spring.` },
   { id: 'vow', when: (s, me) => { const p = s.players[me]; return !!p.way && !p.vowed && p.epoch === WAY.vow; }, text: 'The Bronze Age is the time for a <b>vow</b>: at your Town Center, <b>deepen</b> your Way (its gifts and its price both grow) or <b>turn</b> to another. Once only; pass it by and your Way stays as it is.' },
   { id: 'way', when: (s, me) => s.players[me].epoch <= WAY.until && !s.players[me].way && secsIn(s) > 40, text: 'Choose a <b>Way</b> at your Town Center: <b>Hunters</b> (deer and beasts), <b>Hearth</b> (berries and farms) or <b>Warband</b> (soldiers). Free, once, and the moment passes when you leave the Stone Age. Look at the deer and berries near home, and at how close your rival is.' },
   { id: 'train', when: (s) => secsIn(s) > 25, text: 'More citizens mean a faster economy. Click your <b>Town Center</b> and press <kbd>Q</kbd> to train one (you can queue several).' },
