@@ -144,6 +144,8 @@ function orderWords(s: GameState, u: Unit): string {
       return u.cargo.length ? 'Sailing to land passengers' : 'Moving';
     case 'relic':
       return carriedBy(s, u) ? 'Carrying a relic to the Temple' : 'Going for a relic';
+    case 'salvage':
+      return u.act === 'mine' ? 'Stripping the rubble' : 'Going to strip the rubble';
     case 'dig':
       return u.act === 'mine' ? 'Digging at the ruins' : 'Going to dig at the ruins';
     case 'trade':

@@ -145,7 +145,9 @@ export type Order =
    */
   | { k: 'trade'; post: number; market: number; phase: 'go' | 'back'; from?: { x: number; y: number }; /** Loaded this step: the post floods on the next (#493). */ flood?: true }
   /** A citizen digging at an ancient ruin (#64). */
-  | { k: 'dig'; target: number };
+  | { k: 'dig'; target: number }
+  /** A citizen stripping the rubble of a fallen building (#503). */
+  | { k: 'salvage'; target: number };
 
 /** What a unit is visibly doing, for the renderer's animation. */
 export type Act = 'idle' | 'walk' | 'attack' | 'chop' | 'mine' | 'forage' | 'farm' | 'build' | 'chant' | 'fish';
@@ -356,6 +358,24 @@ export interface Fallen {
   tx: number;
   ty: number;
   /** The tick the memory fades. */
+  until: number;
+}
+
+/** Rubble of a fallen building, there to be stripped by a salvaging people (`SALVAGE`, `salvage.ts`). */
+export interface Rubble {
+  id: number;
+  x: number;
+  y: number;
+  /** Whose building fell. */
+  owner: number;
+  type: BuildingType;
+  tx: number;
+  ty: number;
+  /** What stripping it yields. */
+  worth: Cost;
+  /** Stripping done so far, in ticks of one citizen's work. */
+  done: number;
+  /** The tick it is cleared away. */
   until: number;
 }
 
@@ -641,6 +661,7 @@ export type GameEvent =
   | { k: 'convoy'; owner: number; x: number; y: number }
   | { k: 'vigil'; owner: number; x: number; y: number; priests: number }
   | { k: 'foundation'; owner: number; type: BuildingType; x: number; y: number; what: 'kept' | 'raised' }
+  | { k: 'salvage'; owner: number; x: number; y: number; type: BuildingType; what: 'left' | 'stripped'; gain?: Cost }
   | { k: 'ruin'; id: number; owner: number; find: RuinFind; tech?: TechId; x: number; y: number }
   /** A landmark changed hands: `owner` keeps it now (-1: nobody, after `from` was driven off). */
   | { k: 'landmark'; id: number; kind: LandmarkKind; owner: number; from: number; x: number; y: number }
@@ -780,6 +801,8 @@ export interface GameState {
   ruins?: Ruin[];
   /** Foundations of fallen buildings a reclaiming people may raise again (`reclaim.ts`); absent until one falls. */
   fallen?: Fallen[];
+  /** Rubble of fallen buildings a salvaging people may strip (`salvage.ts`); absent until one falls. */
+  rubble?: Rubble[];
   /** Contested landmarks; absent in older saves and in campaign chapters (none). */
   landmarks?: Landmark[];
   /** Whether this world holds bog iron (#39), decided by the seed; absent in older saves (none). */
@@ -952,6 +975,8 @@ export type Command =
   | { t: 'dropRelic'; p: number; ids: number[] }
   /** Citizens dig at an ancient ruin (#64). */
   | ({ t: 'dig'; p: number; ids: number[]; target: number } & Queued)
+  /** Citizens strip the rubble of a fallen building (#503); the target is a rubble id. */
+  | ({ t: 'salvage'; p: number; ids: number[]; target: number } & Queued)
   /** Answer the card of tidings waiting at the fire (#443): `take` pays its price, otherwise it is passed by. */
   | { t: 'tiding'; p: number; card: TidingId; take: boolean }
   /** A player left an online match: the computer takes over their people. */
