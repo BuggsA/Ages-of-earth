@@ -3301,7 +3301,10 @@ function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     }
   }
   for (const pr of v.priests) {
-    if (pr.order.k !== 'idle' || pr.inside || ritual.has(pr.id)) continue;
+    // An idle priest takes up healing by itself within ticks of seeing anyone hurt (`units.ts`), and the computer gives no heal
+    // orders, so a healing priest is one between jobs too: a relic, a ward or a conversion comes first, but not a walk away.
+    const healing = pr.order.k === 'heal' && AI_LEVELS[v.p.ai!].healers !== false;
+    if (!(pr.order.k === 'idle' || healing) || pr.inside || ritual.has(pr.id)) continue;
     const held = carriedBy(s, pr);
     if (held) {
       const t = nearestTemple(s, v.p.id, pr.x, pr.y);
@@ -3367,6 +3370,8 @@ function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
       if ((pr.x - shrine.x) * (pr.x - shrine.x) + (pr.y - shrine.y) * (pr.y - shrine.y) > r * r) issue({ t: 'move', p: v.p.id, ids: [pr.id], x: shrine.x, y: shrine.y });
       continue;
     }
+    // Healing is the work a priest keeps up with the army for: it stays at it.
+    if (healing) continue;
     // Against a pilgrim rival, a spare priest stands by a tower, gate or Temple.
     if (ward) {
       issue({ t: 'move', p: v.p.id, ids: [pr.id], x: ward.b.x, y: ward.b.y });

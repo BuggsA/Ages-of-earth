@@ -72,6 +72,8 @@ export interface Age {
    * more, counting at most `most` such steps. Iron dug on the way here still counts (the web's link).
    */
   ironTrade?: { per: number; each: number; most: number };
+  /** Blades forged from bog iron (the Iron Age): foot soldiers strike `attack` harder for every `per` bars dug, up to `most` steps. */
+  forge?: { base: number; per: number; attack: number; most: number };
   /**
    * Power broadcast from coils (the Age of Lightning, #231): Watch Towers become Coil Towers, whose field
    * speeds the work of buildings near them and slows every building outside, and whose shot is a leaping
@@ -102,6 +104,8 @@ export interface Age {
   fairs?: boolean;
   /** Escorted merchant ships carry more (the Age of Sail): see `CONVOY` (`convoy.ts`). */
   convoys?: boolean;
+  /** A merchant ship this people sinks gives up part of its cargo as prize money (the Age of Sail): see `PRIZE` (`convoy.ts`). */
+  prizes?: boolean;
   /** Priests keeping vigil at a relic Temple add to its gold (the Age of Pilgrims): see `VIGIL` (`vigil.ts`). */
   vigils?: boolean;
 }
@@ -160,6 +164,12 @@ const trunkAge = (e: number): Age => ({ name: EPOCHS[e].name, short: EPOCHS[e].s
 /** Iron wares: bog iron dug (any age) raises trade in the trading ages (Merchants, Fairs, Sail): +8% a 75 bars, to +40%. */
 export const IRON_TRADE = { per: 75, each: 0.08, most: 5 };
 
+/**
+ * The Iron Age's forge: every `per` bars of bog iron dug past the `base` that opened the road (the Iron Age's deed)
+ * sharpen foot soldiers' edges by `attack`, up to `most` steps. The marsh is the armoury.
+ */
+export const IRON_FORGE = { base: 150, per: 50, attack: 1, most: 3 };
+
 export const AGES: Record<AgeId, Age> = {
   stone: trunkAge(0),
   bronze: trunkAge(1),
@@ -195,10 +205,11 @@ export const AGES: Record<AgeId, Age> = {
     name: 'Iron Age',
     short: 'Iron',
     tier: 1,
-    blurb: 'Iron spears, iron hoes and iron axes, but no horse: cheap, hard-hitting foot soldiers and quicker farms and woodcutters, and every scrap of bog iron dug pays twice its gold, so the marsh is worth holding; cavalry waits for the Middle Ages.',
+    blurb: 'Iron spears, iron hoes and iron axes, but no horse: cheap, hard-hitting foot soldiers and quicker farms and woodcutters, and every scrap of bog iron dug pays twice its gold and, every 50 bars past the first 150 sharpen every spearman\'s edge by 1 (up to 3), so the marsh is worth holding and an army is only as keen as the iron behind it; cavalry waits for the Middle Ages.',
     add: { infantryAttack: 1 },
     mul: { farm: 1.1, wood: 1.1, bogGold: 2 },
     price: { infantry: 0.75 },
+    forge: IRON_FORGE,
     no: { units: ['cavalry'], why: 'No horses in the Iron Age: cavalry waits for the Middle Ages' },
   },
   pilgrim: {
@@ -231,6 +242,7 @@ export const AGES: Record<AgeId, Age> = {
     price: { ship: 0.75 },
     ironTrade: IRON_TRADE,
     convoys: true,
+    prizes: true,
   },
   lightning: {
     name: 'Age of Lightning',
@@ -1022,6 +1034,8 @@ export const FAIR = { every: 240, open: 60, reach: 12, pay: 1.5 };
  * tiles carries `pay` times the gold. Send the fleet with the cogs: the escort is also what the rival's raiders meet.
  */
 export const CONVOY = { reach: 6, pay: 1.4 };
+/** Prize money (the Age of Sail): a merchant ship sunk by a people in the Age of Sail gives the sinker `share` of the gold it carried. */
+export const PRIZE = { share: 0.5 };
 /**
  * Vigils (the Age of Pilgrims): each own priest standing within `reach` tiles of a finished Temple that keeps a
  * relic adds `each` gold to that relic's payment, for at most `most` priests; the toast tells of it at most every `toast` seconds. A priest at the shrine is a priest
@@ -1642,6 +1656,8 @@ export interface AiLevel {
   fork?: boolean;
   /** Off: a Blood-rite computer's priests neither curse nor sacrifice (#355 s4; only `scripts/ai-ab.ts` turns it off). */
   rite?: boolean;
+  /** Off: a priest that has taken up healing by itself is left at it, as before (only `scripts/ai-ab.ts` turns it off). */
+  healers?: boolean;
 }
 
 /**

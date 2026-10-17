@@ -270,8 +270,12 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
       s.amount[o.tile]--;
       // Bog iron dug counts toward the Iron Age's deed (#39).
       if (kind === R_BOG) {
-        const st = s.players[u.owner].stats;
+        const pl = s.players[u.owner];
+        const st = pl.stats;
         st.iron = (st.iron ?? 0) + 1;
+        // Another blade-step forged: soldiers' numbers are worked out again.
+        const forge = ageDef(pl).forge;
+        if (forge && st.iron > forge.base && (st.iron - forge.base) % forge.per === 0) pl.statsVersion++;
       } else if (kind === R_FISH) {
         // Fish landed counts toward the Age of Sail's deed.
         const st = s.players[u.owner].stats;
