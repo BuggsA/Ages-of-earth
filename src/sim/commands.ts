@@ -301,7 +301,7 @@ export function applyCommand(s: GameState, c: Command): void {
       const units = myUnits(s, c.p, c.ids);
       // Citizens hunt; soldiers on foot or horse (#171) can bring down a beast too.
       const hunters = units.filter((x) => fightsBeasts(x));
-      for (const u of hunters) giveOrder(u, { k: 'hunt', target: a.id, fight: a.kind === 'wolf' }, c.queue);
+      for (const u of hunters) giveOrder(u, { k: 'hunt', target: a.id, fight: a.kind === 'wolf' || a.kind === 'raider' }, c.queue);
       const others = units.filter((u) => !hunters.includes(u));
       if (others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: a.x, y: a.y, queue: c.queue });
       break;
