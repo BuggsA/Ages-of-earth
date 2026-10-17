@@ -1,10 +1,10 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { aiTiding } from './tidings';
-import { AGES, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
-import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Ruin, TechId, TradePost, Unit, UnitType } from './types';
+import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Rubble, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { ageDef, ageOf, barred, buildBarred, deedsDone, oreDone, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
 import { carriedBy } from './relics';
@@ -12,7 +12,7 @@ import { swordsOf } from './merc';
 import { fairground, feastOpen, nextFeastIn } from './fair';
 import { claimants, favours, landmarkAt } from './landmarks';
 import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple, TILE_OF_RARE } from './units';
-import { goalForPost, nearestMarket, portSpot, tripGold } from './trade';
+import { goalForPost, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { findRoute } from './path';
 import { isEnemy, maxHp } from './world';
 import { callUpProblem } from './warcamp';
@@ -29,6 +29,8 @@ import { consecrateProblem, consecrates } from './consecrate';
 import { sees } from './vision';
 import { seasonAt } from './seasons';
 import { catchOf, herdsOut, yarding } from './year';
+import { DEER, SNARE } from './data';
+import { treesNear } from './snares';
 import { isMobile } from './steppe';
 import { isRider, standing } from './tribute';
 import { flockCap, flockOf, grassy, milkable } from './flocks';
@@ -288,8 +290,10 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   research(s, v, citizens.length >= wantCitizens - 2, issue);
   trade(s, v, issue);
   planBuildings(s, v, mem, issue);
+  trapLine(s, v, mem, issue);
   hemoBuild(s, v, mem, issue);
   excavate(s, v, mem, issue);
+  salvage(s, v, mem, issue);
   claimWalk(s, v, mem, issue);
   strikeCamp(s, v, mem, issue);
   tendFlock(s, v, issue);
@@ -1211,7 +1215,7 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
 function jobOf(u: Unit): Res | 'build' | null {
   const o = u.order;
   if (o.k === 'gather') return o.res;
-  if (o.k === 'farm' || o.k === 'hunt' || o.k === 'milk') return 'food';
+  if (o.k === 'farm' || o.k === 'hunt' || o.k === 'milk' || o.k === 'snare') return 'food';
   if (o.k === 'build') return 'build';
   return null;
 }
@@ -1237,7 +1241,7 @@ function huntTheYear(s: GameState, v: View, issue: (c: Command) => void): void {
   let hunting = 0;
   for (const u of v.citizens) if (u.order.k === 'hunt' || (u.order.k === 'gather' && s.res[u.order.tile] === R_MEAT)) hunting++;
   if (hunting >= v.hunt.n) return;
-  const deer = nearestDeer(s, v.home.x, v.home.y, v.hunt.r, spared(s, v));
+  const deer = nearestDeer(s, v.home.x, v.home.y, v.hunt.r, spared(s, v.p));
   if (!deer) return;
   const pick = (ok: (u: Unit) => boolean) => {
     let best: Unit | null = null;
@@ -1257,17 +1261,21 @@ function huntTheYear(s: GameState, v: View, issue: (c: Command) => void): void {
 }
 
 /**
- * On the Herd Plains a clever computer leaves `YEAR.spare` of each of its own home herds alive, so they come
- * home in spring with calves (#479). A rival's herd it hunts down gladly. Undefined where nothing is spared.
- * The Hunters' Way spares none in the Stone Age (#486): no Farm stands while the herd grazes at home (`wayBarred`),
- * so a herd spared there is a town that never sows, and it hunts the herd out to open the fields.
+ * A clever computer leaves `YEAR.spare` of each of its own home herds alive on the Herd Plains, so they come
+ * home in spring with calves (#479), and a pair (`DEER.pair`) of every wild herd in the Stone Age, when game is
+ * what it lives on; a wild herd breeds each spring (#491). A rival's herd it hunts down gladly. Undefined where nothing is spared.
+ * The Hunters' Way spares none of its home herds in the Stone Age (#486): no Farm stands while the herd grazes at home
+ * (`wayBarred`), so a herd spared there is a town that never sows, and it hunts the herd out to open the fields.
  */
-function spared(s: GameState, v: View): ((a: Animal) => boolean) | undefined {
-  if (s.homeland !== 'herds' || !AI_LEVELS[v.p.ai!].clever || (v.p.way === 'hunt' && v.p.epoch === 0)) return undefined;
+export function spared(s: GameState, p: Player): ((a: Animal) => boolean) | undefined {
+  if (!AI_LEVELS[p.ai!].clever) return undefined;
+  const sows = !(p.way === 'hunt' && p.epoch === 0);
+  // A herd is spared at its own count: a town's at `YEAR.spare`, a wild one at `DEER.pair`.
+  const keep = (a: Animal) => (a.town === p.id && s.homeland === 'herds' ? (sows ? YEAR.spare : -1) : a.town === undefined && p.epoch === 0 ? DEER.pair : -1);
   const left = new Map<number, number>();
-  for (const a of s.animals) if (a.kind === 'deer' && a.town === v.p.id && a.hp > 0) left.set(a.herd ?? a.id, (left.get(a.herd ?? a.id) ?? 0) + 1);
+  for (const a of s.animals) if (a.kind === 'deer' && a.hp > 0 && keep(a) >= 0) left.set(a.herd ?? a.id, (left.get(a.herd ?? a.id) ?? 0) + 1);
   if (!left.size) return undefined;
-  return (a) => a.town === v.p.id && (left.get(a.herd ?? a.id) ?? 0) <= YEAR.spare;
+  return (a) => (left.get(a.herd ?? a.id) ?? Infinity) <= keep(a);
 }
 
 /**
@@ -1328,7 +1336,7 @@ function sendTo(s: GameState, v: View, u: Unit, res: Res, issue: (c: Command) =>
       return true;
     }
     const hunters = v.citizens.filter((c) => c.order.k === 'hunt').length;
-    const deer = hunters < v.hunt.n ? nearestDeer(s, v.home.x, v.home.y, v.hunt.r, spared(s, v)) : null;
+    const deer = hunters < v.hunt.n ? nearestDeer(s, v.home.x, v.home.y, v.hunt.r, spared(s, v.p)) : null;
     if (deer) {
       issue({ t: 'hunt', p: v.p.id, ids: [u.id], target: deer.id });
       return true;
@@ -1409,9 +1417,47 @@ function assignCitizens(s: GameState, v: View, issue: (c: Command) => void): voi
     }
   }
   if (over && under) {
-    const mover = v.citizens.find((u) => jobOf(u) === over && u.carry <= 2 && u.order.k !== 'farm' && u.order.k !== 'hunt' && u.order.k !== 'milk' && !u.inside && !v.diggers.has(u.id));
+    const mover = v.citizens.find((u) => jobOf(u) === over && u.carry <= 2 && u.order.k !== 'farm' && u.order.k !== 'hunt' && u.order.k !== 'milk' && u.order.k !== 'snare' && !u.inside && !v.diggers.has(u.id));
     if (mover) sendTo(s, v, mover, under, issue);
   }
+}
+
+// ---- Snares in the wood (#485) ----------------------------------------------------------------------
+
+/**
+ * In the Deep Wood a clever computer with `SNARE.aiAt` citizens, from its second year (`SNARE.aiFrom`), lays a trap line: up to `SNARE.ai` snares, one at a
+ * time, in thick woods (`SNARE.aiTrees`) at least `SNARE.aiFar` tiles from any tree its people are felling, and keeps `SNARE.aiTenders`
+ * citizens walking it, taken off the berries first. Elsewhere the woods are left to the axe.
+ */
+function trapLine(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  if (!AI_LEVELS[v.p.ai!].clever || s.homeland !== 'wood' || isMobile(v.p) || v.citizens.length < SNARE.aiAt || s.tick < secs(SNARE.aiFrom)) return;
+  const snares = v.buildings.filter((b) => b.type === 'snare');
+  if (snares.length < SNARE.ai && snares.every((b) => b.built) && s.tick - (mem.ordered.snare ?? -99999) > secs(20)) {
+    const felling: number[] = [];
+    for (const u of v.citizens) if (u.order.k === 'gather' && u.order.res === 'wood') felling.push(u.order.tile);
+    const far = (tx: number, ty: number) => felling.every((t) => Math.max(Math.abs((t % s.w) - tx), Math.abs(Math.floor(t / s.w) - ty)) >= SNARE.aiFar);
+    const spot = findSpot(s, 'snare', v.home.x, v.home.y, 4, 16, 0, (tx, ty) => treesNear(s, tx, ty) >= SNARE.aiTrees && far(tx, ty) && !placeProblem(s, 'snare', tx, ty, true, v.p.id));
+    if (spot) construct(s, v, mem, 'snare', spot, 1, issue);
+  }
+  const line = snares.find((b) => b.built);
+  if (!line) return;
+  let tenders = 0;
+  for (const u of v.citizens) if (u.order.k === 'snare') tenders++;
+  if (tenders >= SNARE.aiTenders) return;
+  let best: Unit | null = null;
+  let bestD = Infinity;
+  for (const pass of [(u: Unit) => u.order.k === 'gather' && s.res[u.order.tile] === R_BERRY, (u: Unit) => u.order.k === 'gather' && u.order.res === 'food']) {
+    for (const u of v.citizens) {
+      if (u.inside || u.queue.length || v.diggers.has(u.id) || !pass(u)) continue;
+      const d = (u.x - line.x) * (u.x - line.x) + (u.y - line.y) * (u.y - line.y);
+      if (d < bestD) {
+        bestD = d;
+        best = u;
+      }
+    }
+    if (best) break;
+  }
+  if (best) issue({ t: 'work', p: v.p.id, ids: [best.id], target: line.id });
 }
 
 // ---- The wild (#171) ---------------------------------------------------------------------------------
@@ -1780,6 +1826,41 @@ function excavate(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     .sort((a, b) => (a.x - ruin.x) * (a.x - ruin.x) + (a.y - ruin.y) * (a.y - ruin.y) - ((b.x - ruin.x) * (b.x - ruin.x) + (b.y - ruin.y) * (b.y - ruin.y)) || a.id - b.id)
     .slice(0, RUIN_DIGGERS);
   if (spare.length === RUIN_DIGGERS) issue({ t: 'dig', p: v.p.id, ids: spare.map((u) => u.id), target: ruin.id });
+}
+
+/**
+ * A salvaging people (#503) sends a pair of spare citizens to strip the nearest rubble nobody's guarding. Rubble of its own fall it leaves alone while the foundations can still be raised (the rebuild
+ * above does that), and strips it only once there is no gold to rebuild with.
+ */
+function salvage(s: GameState, v: View, _mem: AiMemory, issue: (c: Command) => void): void {
+  if (!s.rubble || !ageDef(v.p).salvage) return;
+  const working = v.citizens.filter((u) => u.order.k === 'salvage');
+  for (const u of working) {
+    const r = s.rubble.find((x) => u.order.k === 'salvage' && x.id === u.order.target);
+    if (!r || !ruinDanger(s, v.p, r, 9)) continue;
+    issue({ t: 'move', p: v.p.id, ids: working.map((d) => d.id), x: v.home.x, y: v.home.y });
+    return;
+  }
+  if (working.length || v.citizens.length < RUIN_TOWN || threatNear(s, v).count) return;
+  let best: Rubble | null = null;
+  let bestD = Infinity;
+  for (const r of s.rubble) {
+    const d = (r.x - v.home.x) * (r.x - v.home.x) + (r.y - v.home.y) * (r.y - v.home.y);
+    if (d > SALVAGE.find * SALVAGE.find || ruinDanger(s, v.p, r, 12)) continue;
+    // Its own: the rebuild comes first, the stones only when it cannot pay for it.
+    if (r.owner === v.p.id && v.p.res.gold >= 100) continue;
+    if (d < bestD) {
+      bestD = d;
+      best = r;
+    }
+  }
+  if (!best) return;
+  const site = best;
+  const spare = v.citizens
+    .filter((u) => !u.inside && !u.queue.length && u.carry <= 2 && (u.order.k === 'idle' || (u.order.k === 'gather' && u.order.res !== 'food')))
+    .sort((a, b) => (a.x - site.x) * (a.x - site.x) + (a.y - site.y) * (a.y - site.y) - ((b.x - site.x) * (b.x - site.x) + (b.y - site.y) * (b.y - site.y)) || a.id - b.id)
+    .slice(0, RUIN_DIGGERS);
+  if (spare.length === RUIN_DIGGERS) issue({ t: 'salvage', p: v.p.id, ids: spare.map((u) => u.id), target: site.id });
 }
 
 // ---- Contested landmarks -------------------------------------------------------------------------------
@@ -2355,14 +2436,15 @@ function wonderThreat(s: GameState, p: Player, w: Building): Unit | null {
 }
 
 /** Enemy soldiers close to home, and the nearest of them. */
-function threatNear(s: GameState, v: View): { unit: Unit | null; count: number } {
+function threatNear(s: GameState, v: View): { unit: Unit | null; count: number; dist: number } {
   let threat: Unit | null = null;
   let threatD = Infinity;
   let n = 0;
   for (const e of s.ents) {
     if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !isEnemy(s, v.p.id, e.owner) || e.type === 'citizen' || e.type === 'trader') continue;
     let near = Infinity;
-    for (const b of v.buildings) near = Math.min(near, distToRect(e.x, e.y, b));
+    // Snares out in the woods (#485) are not the town: foes by them don't ring its bell.
+    for (const b of v.buildings) if (b.type !== 'snare') near = Math.min(near, distToRect(e.x, e.y, b));
     if (near < 12) {
       n++;
       if (near < threatD) {
@@ -2371,7 +2453,7 @@ function threatNear(s: GameState, v: View): { unit: Unit | null; count: number }
       }
     }
   }
-  return { unit: threat, count: n };
+  return { unit: threat, count: n, dist: threatD };
 }
 
 /**
@@ -2460,11 +2542,19 @@ function townBell(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   if (mem.bell < 0 && t.count >= bell.ring && defenders < t.count / 2) {
     issue({ t: 'bell', p: v.p.id, ring: true });
     mem.bell = s.tick;
-  } else if (mem.bell >= 0 && t.count <= bell.quiet && s.tick - mem.bell > secs(bell.hold)) {
+    mem.bellNear = t.dist;
+    mem.bellMoved = s.tick;
+  } else if (mem.bell >= 0 && t.dist < (mem.bellNear ?? Infinity) - 1) {
+    mem.bellNear = t.dist;
+    mem.bellMoved = s.tick;
+  } else if (mem.bell >= 0 && s.tick - mem.bell > secs(bell.hold) && (t.count <= bell.quiet || (t.dist >= AI_BELL.far && s.tick - (mem.bellMoved ?? mem.bell) > secs(AI_BELL.stale)))) {
+    // Or a siege that has stopped coming (#487): foes parked outside the Town Center's reach for a minute
+    // kept a whole town sheltered for eight minutes. Anyone who steps closer starts the minute afresh.
     // A straggler or two is the Town Center's arrows to deal with (#113): waiting for none at all, a
     // beaten town kept fifteen citizens inside for nine minutes while a rival's trickle came and went.
     issue({ t: 'bell', p: v.p.id, ring: false });
     mem.bell = -1;
+    mem.bellNear = undefined;
   }
 }
 
@@ -3990,6 +4080,14 @@ function merchants(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
     const from = nearestMarket(s, p.id, u.x, u.y) ?? market;
     const best = bestRoad(from).post;
     if (best >= 0 && !(u.order.k === 'trade' && u.order.post === best)) issue({ t: 'route', p: p.id, ids: [u.id], post: best });
+  }
+  // A post flooded by its own traders (#493): move one to the fresher post when that pays a fifth more.
+  for (const u of v.traders) {
+    if (u.inside || u.order.k !== 'trade' || u.order.phase === 'back' || shunned(u.order.post)) continue;
+    const cur = postAt(s, u.order.post);
+    const from = nearestMarket(s, p.id, u.x, u.y) ?? market;
+    const best = postAt(s, bestRoad(from).post);
+    if (cur && best && best.id !== cur.id && tripGold(s, p.id, from, best) > tripGold(s, p.id, from, cur) * 1.2) issue({ t: 'route', p: p.id, ids: [u.id], post: best.id });
   }
 }
 

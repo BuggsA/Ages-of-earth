@@ -7,6 +7,7 @@ import { giftFlock, sheepStep } from './flocks';
 import { faithStep } from './consecrate';
 import { turnSeason } from './seasons';
 import { markHomeHerds, turnYear } from './year';
+import { fillSnares } from './snares';
 import { hitAnimal, spawnAnimal, updateAnimals } from './animals';
 import { markGoals, scenarioStep, startScenario } from './campaign';
 import { buildingGuns, updateShots } from './combat';
@@ -22,6 +23,7 @@ import { hemoStep } from './hemo';
 import { forkStep } from './fork';
 import { bloodStep, freeCaptives } from './blood';
 import { reclaimStep, remember } from './reclaim';
+import { leaveRubble, salvageStep } from './salvage';
 import { sortieStep } from './sortie';
 import { fairStep } from './fair';
 import { landmarkStep } from './landmarks';
@@ -233,7 +235,7 @@ function spatial(s: GameState): Spatial {
  * style. On a step back (#47) they fall back to the older forms, and whatever the new age can't train
  * or research is taken off the queues and refunded.
  */
-function enterAge(s: GameState, p: Player, to: AgeId, back = false): void {
+export function enterAge(s: GameState, p: Player, to: AgeId, back = false): void {
   const tier = AGES[to].tier;
   // The first steps onto the steppe bring the herds (#308).
   const herds = !!AGES[to].mobile && !p.walked?.includes(to);
@@ -394,6 +396,7 @@ function removeDead(s: GameState): void {
       freeCaptives(s, e);
       stampBuilding(s, e, false);
       remember(s, e);
+      leaveRubble(s, e);
       s.events.push({ k: 'die', id: e.id, owner: e.owner, type: e.type, x: e.x, y: e.y, building: true, size: e.size, epoch: p.epoch, fx: e.dir, fy: 1 });
     } else {
       if (e.inside) {
@@ -461,10 +464,10 @@ function checkVictory(s: GameState): void {
         continue;
       }
     }
-    // Fields and walls alone don't keep a people alive, nor do unarmed boats (fishing boats, merchant
+    // Fields, snares and walls alone don't keep a people alive, nor do unarmed boats (fishing boats, merchant
     // ships): none of them can build or fight, so a people down to them can never come back, and a rival
     // at its population cap with no fleet could never sink them.
-    const alive = s.ents.some((e) => e.owner === p.id && e.hp > 0 && !(e.kind === 'building' && (e.type === 'farm' || e.type === 'wall' || e.type === 'gate')) && !(e.kind === 'unit' && (e.type === 'fisher' || e.type === 'cog')));
+    const alive = s.ents.some((e) => e.owner === p.id && e.hp > 0 && !(e.kind === 'building' && (e.type === 'farm' || e.type === 'wall' || e.type === 'gate' || e.type === 'snare')) && !(e.kind === 'unit' && (e.type === 'fisher' || e.type === 'cog')));
     if (alive) continue;
     p.defeated = true;
     for (const e of s.ents) if (e.owner === p.id) e.hp = 0;
@@ -529,6 +532,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   updateAnimals(s, sp, (a) => sheepStep(s, sp, a));
   turnSeason(s);
   turnYear(s);
+  fillSnares(s);
   sp.rebuild(s);
   separate(s, sp);
   for (const e of s.ents) {
@@ -543,6 +547,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   elmoStep(s);
   galvanicStep(s);
   reclaimStep(s);
+  salvageStep(s);
   sortieStep(s);
   fairStep(s);
   attrition(s);
@@ -614,6 +619,11 @@ export function checksum(s: GameState): number {
     mix(f.tx);
     mix(f.ty);
     mix(f.until);
+  }
+  for (const r of s.rubble ?? []) {
+    mix(r.id);
+    mix(r.done);
+    mix(r.until);
   }
   for (const m of s.landmarks ?? []) {
     mix(m.owner);

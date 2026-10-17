@@ -5,16 +5,17 @@ import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
 import { RARE_OF_TILE } from '../sim/units';
-import { HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, SNARE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
-import { caravanBonus, caravanOf, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
+import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
 import { restsAt } from '../sim/passage';
 import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
 import { LANDMARK_KINDS, claimWork, claimants, favours, landmarkAt } from '../sim/landmarks';
 import { workProblem } from '../sim/works';
 import { TIDING_CARDS, tidingCost, tidingProblem } from '../sim/tidings';
 import { kinCount, kinProblem, vowProblem, wayBarred, wayProblem } from '../sim/ways';
+import { catchIn, snareRate, treesNear } from '../sim/snares';
 import { beaconProblem, lit } from '../sim/beacon';
 import { callUpProblem, callUpReach, campGrace, musterWait } from '../sim/warcamp';
 import { bledFlock, bloodOf, bloodShort, captivesOf, cursed, grafted, levyProblem, sworn, levyReach } from '../sim/blood';
@@ -129,6 +130,8 @@ function orderWords(s: GameState, u: Unit): string {
       return 'Hunting';
     case 'milk':
       return o.phase === 'drop' ? 'Carrying milk home' : o.phase === 'work' ? 'Milking the flock' : 'Going to milk the flock';
+    case 'snare':
+      return o.phase === 'drop' ? 'Carrying the catch home' : o.phase === 'work' ? 'Emptying a snare' : u.act === 'idle' ? 'Waiting by the snares for game' : 'Walking the trap line';
     case 'convert':
       return o.rite === 'sacrifice' ? (u.act === 'chant' ? 'Sacrificing' : 'Going to sacrifice') : o.rite === 'curse' ? (u.act === 'chant' ? 'Cursing' : 'Going to curse') : u.act === 'chant' ? 'Converting' : 'Going to convert';
     case 'heal':
@@ -141,6 +144,8 @@ function orderWords(s: GameState, u: Unit): string {
       return u.cargo.length ? 'Sailing to land passengers' : 'Moving';
     case 'relic':
       return carriedBy(s, u) ? 'Carrying a relic to the Temple' : 'Going for a relic';
+    case 'salvage':
+      return u.act === 'mine' ? 'Stripping the rubble' : 'Going to strip the rubble';
     case 'dig':
       return u.act === 'mine' ? 'Digging at the ruins' : 'Going to dig at the ruins';
     case 'trade':
@@ -154,6 +159,9 @@ function orderWords(s: GameState, u: Unit): string {
       return ACT_WORDS[u.act] ?? 'Standing by';
   }
 }
+
+/** The verbs rubric's line on a choice (#506): what the player will do, and what it shuts. */
+const verbLine = (e: { verb?: string; door?: string }) => (e.verb ? `<br><b>You now:</b> ${e.verb}. <b>It shuts:</b> ${e.door}.` : '');
 
 const fmtTime = (ticks: number) => {
   const sec = Math.floor(ticks / TICK_HZ);
@@ -557,11 +565,12 @@ export class Hud {
     const m = homeMarket(s, viewer, post.x, post.y);
     const pay = m ? tripGold(s, viewer, m, post) : 0;
     const mine = s.ents.filter((e) => e.kind === 'unit' && e.owner === viewer && (e.type === 'trader' || e.type === 'cog') && e.order.k === 'trade' && e.order.post === post.id).length;
-    const status = m ? `From your nearest Market: ${icon('gold', 14)}${pay} a trip` : 'Build a Market to trade here';
+    const flood = Math.round(glutNow(s, post) * 100);
+    const status = m ? `From your nearest Market: ${icon('gold', 14)}${pay} a trip${flood ? ` (${flood}% glut)` : ''}` : 'Build a Market to trade here';
     const html = `<div class="sel-portrait"><span style="font-size:54px">🐪</span></div>
       <div class="sel-info"><div class="sel-name">Trading Post</div><div class="sel-sub">${status}</div>
       <div class="stats"><span data-tip="<b>Your traders</b>On the road to this post.">🐪<em>Your traders</em> ${mine}</span><span data-tip="<b>Most a trip</b>The farthest roads pay up to this.">${icon('gold')}<em>At most</em> ${TRADE.max}</span></div>
-      <div class="blurb">Neutral ground where anyone may trade. Train traders at a Market, select them and right-click here: they carry goods out and bring back gold, the more the farther their Market stands from the post. Where water lies within ${TRADE.sea.reach} tiles it is a port too: merchant ships from a Dock sail here for ${Math.round((TRADE.sea.mul - 1) * 100)}% more. Nothing is paid until they are home, so guard the road.</div></div>`;
+      <div class="blurb">Neutral ground where anyone may trade. Train traders at a Market, select them and right-click here: they carry goods out and bring back gold, the more the farther their Market stands from the post. Where water lies within ${TRADE.sea.reach} tiles it is a port too: merchant ships from a Dock sail here for ${Math.round((TRADE.sea.mul - 1) * 100)}% more. Every load floods the post: its price falls ${Math.round(TRADE.glut.each * 100)}% a trip (anyone's) and heals slowly, so spread your traders over the posts. Nothing is paid until they are home, so guard the road.</div></div>`;
     return [html, `post:${post.id}:${status}:${mine}`];
   }
 
@@ -604,11 +613,13 @@ export class Hud {
     const oath = isSworn ? `<span data-tip="<b>Sworn</b>Military Orders: one of ${mine ? 'your' : 'its people\'s'} priests stands within ${ORDERS.reach} tiles, so no rival's priest can turn it, offer it up or curse it, and ${mine ? 'your' : 'their'} priests mend it ${Math.round((ORDERS.mend - 1) * 100)}% faster. Leave it without a priest near and the oath no longer holds it.">⚜<em>Sworn</em></span>` : '';
     // A sword for hire (the Age of Merchants): paid by the day, and gone if left unpaid.
     const sword = u.merc !== undefined ? `<span data-tip="<b>Sword for hire</b>Draws ${MERC.wage} gold every ${MERC.every} seconds from ${mine ? 'your' : 'its people\'s'} treasury${u.merc ? `, and has gone unpaid ${u.merc} payday${u.merc > 1 ? 's' : ''}: it walks off at ${MERC.patience}` : `; one left unpaid ${MERC.patience} paydays walks off`}.">💰<em>${u.merc ? 'Unpaid' : 'Hired'}</em></span>` : '';
+    // A thrall (#502): a taken citizen, bound and drab, who works but never builds.
+    const bond = u.thrall ? `<span data-tip="<b>Thrall</b>A citizen taken by a Warband people: it works a field for ${mine ? 'you' : p.name} but never builds or repairs. Slay it, or guard your workers so none are taken.">⛓<em>Thrall</em></span>` : '';
     const held = u.type === 'priest' && carriedBy(s, u) ? `<span data-tip="<b>Relic</b>Carried to a Temple, it brings in gold. Hands full: no healing or converting until it is set down (D).">⚱<em>Relic</em></span>` : '';
-    const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}:${u.cargo.length}:${rank}:${taking}:${road}:${u.tolled ?? 0}:${hemoLeft}:${curseLeft}:${u.merc ?? -1}:${isSworn}`;
+    const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}:${u.cargo.length}:${rank}:${taking}:${road}:${u.tolled ?? 0}:${hemoLeft}:${curseLeft}:${u.merc ?? -1}:${isSworn}:${!!u.thrall}`;
     const html = `<div class="sel-portrait"><img src="${unitPicture(u.type, u.type === 'wagon' && u.packed === 'market' ? p.epoch + 20 : p.epoch, p.color)}" alt=""></div>
       <div class="sel-info">
-        <div class="sel-name">${s.kings.includes(u.id) ? `👑 King (${st.name})` : st.name}</div>
+        <div class="sel-name">${s.kings.includes(u.id) ? `👑 King (${st.name})` : u.thrall ? `Thrall (${st.name})` : st.name}</div>
         <div class="sel-sub">${mine ? status : `<span class="swatch" style="background:${p.color}"></span>${p.name}`}</div>
         ${hpBar(u.hp, st.hp, frac)}
         <div class="stats">
@@ -616,7 +627,7 @@ export class Hud {
           <span data-tip="<b>Armor</b>Melee / missile armor: taken off every blow or shot.">🛡<em>Armor</em> ${st.armor}/${st.parmor}</span>
           ${st.range ? `<span data-tip="<b>Range</b>How far it shoots, in tiles.">🏹<em>Range</em> ${st.range}</span>` : ''}
           <span data-tip="<b>Speed</b>Tiles per second.">👣<em>Speed</em> ${Math.round(st.speed * 100) / 100}</span>
-          ${carry}${cargo}${load}${stance}${vet}${aura}${graft}${oath}${sword}${curse}${held}${trip}${caravan}${tribute}${toll}
+          ${carry}${cargo}${load}${stance}${vet}${aura}${graft}${oath}${sword}${curse}${bond}${held}${trip}${caravan}${tribute}${toll}
         </div>
         <div class="blurb">${st.blurb}</div>
       </div>`;
@@ -653,6 +664,12 @@ export class Hud {
     } else if (b.type === 'farm' && b.built) {
       const f = b.farmer ? s.byId.get(b.farmer) : undefined;
       status = f && f.kind === 'unit' && f.order.k === 'farm' && f.order.target === b.id ? 'Worked by a citizen' : 'Waiting for a farmer';
+    } else if (b.type === 'snare' && b.built) {
+      // Snares in the wood (#485): what it holds, how fast its woods fill it, and whether anyone walks the line.
+      const trees = treesNear(s, b.tx, b.ty);
+      const perMin = Math.round(snareRate(s, b) * 60 * 10) / 10;
+      const tended = s.ents.some((e) => e.kind === 'unit' && e.owner === b.owner && e.hp > 0 && e.order.k === 'snare');
+      status = `Caught ${catchIn(b)} / ${SNARE.cap} food${catchIn(b) >= SNARE.cap ? ' (full: it catches no more)' : ''} · ${trees} trees round it: ${perMin} a minute${trees < SNARE.full ? ` (best with ${SNARE.full})` : ''}${seasonAt(s) === 3 ? ', winter-hungry' : ''} · ${tended ? 'the line is walked' : 'nobody walks the line'}`;
     } else if (b.type === 'wonder' && b.timer >= 0) status = `Stands ${fmtTime(b.timer)} more for victory`;
     else if (b.type === 'market') {
       const traders = s.ents.filter((e) => e.kind === 'unit' && e.owner === b.owner && e.type === 'trader' && e.order.k === 'trade' && e.order.market === b.id).length;
@@ -901,7 +918,7 @@ export class Hud {
               pic: '',
               glyph: isMain ? '⏫' : '🔀',
               title: `${toward} the ${to.name}`,
-              desc: `${road.gate === 'easy' ? '<i>An easy on-ramp: a small deed and a modest price.</i><br>' : road.gate === 'hard' ? '<i>A hard gate: a dear price and a long journey, for something special.</i><br>' : ''}${road.blurb ?? to.blurb}${isSideRoad(road) ? ` Opens only from ${windowsOf(road.to).map((a) => `the ${AGES[a].name}`).join(' or ')}.` : ''}${(oreOnly(s, road) ? [] : deeds).map((d) => `<br>${oreDone(p, road) || d.have >= d.need ? '✔' : '…'} ${d.deed.text}: ${Math.min(d.have, d.need)}/${d.need}.`).join('')}${(() => { const door = oreClue(s, p, road); return door ? `<br>${oreDone(p, road) ? '✔' : '…'} ${oreOnly(s, road) ? '' : '<i>Or</i> '}${door.text.charAt(0).toLowerCase()}${door.text.slice(1)}: ${Math.min(Math.floor(p.stats.mined?.[door.id] ?? 0), door.n)}/${door.n}.` : ''; })()}${back.length ? `<br>Brings back ${back.map((t) => TECHS[t].name).join(', ')}.` : ''} Takes ${road.time}s. Every unit re-arms and every building is rebuilt in the new style.`,
+              desc: `${road.gate === 'easy' ? '<i>An easy on-ramp: a small deed and a modest price.</i><br>' : road.gate === 'hard' ? '<i>A hard gate: a dear price and a long journey, for something special.</i><br>' : ''}${road.blurb ?? to.blurb}${isSideRoad(road) ? ` Opens only from ${windowsOf(road.to).map((a) => `the ${AGES[a].name}`).join(' or ')}.` : ''}${(oreOnly(s, road) ? [] : deeds).map((d) => `<br>${oreDone(p, road) || d.have >= d.need ? '✔' : '…'} ${d.deed.text}: ${Math.min(d.have, d.need)}/${d.need}.`).join('')}${(() => { const door = oreClue(s, p, road); return door ? `<br>${oreDone(p, road) ? '✔' : '…'} ${oreOnly(s, road) ? '' : '<i>Or</i> '}${door.text.charAt(0).toLowerCase()}${door.text.slice(1)}: ${Math.min(Math.floor(p.stats.mined?.[door.id] ?? 0), door.n)}/${door.n}.` : ''; })()}${back.length ? `<br>Brings back ${back.map((t) => TECHS[t].name).join(', ')}.` : ''} Takes ${road.time}s. Every unit re-arms and every building is rebuilt in the new style.${verbLine(to)}`,
               cost: road.cost,
               ok: !advancing && !problem && !short && b.queue.length === 0,
               on: b.advance >= 0 && !b.back && journeyOf(p, b)?.to === road.to,
@@ -949,7 +966,7 @@ export class Hud {
               pic: '',
               glyph: '🔒',
               title: `The ${AGES[road.to].name}`,
-              desc: `${road.blurb ?? AGES[road.to].blurb}<br>This road opens only from ${windows}.`,
+              desc: `${road.blurb ?? AGES[road.to].blurb}<br>This road opens only from ${windows}.${verbLine(AGES[road.to])}`,
               cost: road.cost,
               ok: false,
               why: from.tier < p.epoch ? `Shut: step back to the ${from.name} to take it` : `Shut: it opens only from ${windows}`,
@@ -1043,7 +1060,7 @@ export class Hud {
           for (const id of WAY_IDS) {
             const w = WAYS[id];
             const why = wayProblem(s, p, id);
-            cmds.push({ key: '', pic: '', glyph: w.icon, title: w.name, desc: `${w.blurb} Free, once, kept the whole match. The choice is lost when you leave the Stone Age. Your rivals will see which Way you take.`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'way', p: viewer, way: id }) });
+            cmds.push({ key: '', pic: '', glyph: w.icon, title: w.name, desc: `${w.blurb} Free, once, kept the whole match. The choice is lost when you leave the Stone Age. Your rivals will see which Way you take.${verbLine(w)}`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'way', p: viewer, way: id }) });
           }
         }
         if (b.type === 'towncenter' && p.way && !p.vowed && p.epoch === WAY.vow) {

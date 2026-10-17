@@ -4,7 +4,7 @@ import { BOAR, MAMMOTH, RAIDER, SIGNATURES, TICK_HZ, WOLF, domainOf, unitStats }
 import type { Animal, CivId, GameState, Unit, UnitType } from '../sim/types';
 import { unitMaterial } from './materials';
 import { heightAt } from './terrain';
-import { boarGeometry, deerGeometry, mammothGeometry, raiderGeometry, sheepGeometry, unitGeometry, wolfGeometry } from './unitModels';
+import { boarGeometry, deerGeometry, mammothGeometry, raiderGeometry, sheepGeometry, THRALL_MODEL, unitGeometry, wolfGeometry } from './unitModels';
 import { WATER_Y } from './water';
 
 /** Units are drawn a little larger than their footprint in the rules, so they read well from above. */
@@ -520,6 +520,7 @@ function markOf(s: GameState, type: UnitType, owner: number): CivId | undefined 
 }
 
 function modelEpoch(u: Unit, epoch: number): number {
+  if (u.thrall && u.type === 'citizen') return epoch + THRALL_MODEL;
   // A loaded trader is drawn with its gold; a wagon carrying a Market (the Silk Road, #326) as the caravan cart.
   return u.type === 'trader' && u.carry > 0 ? epoch + 10 : u.type === 'wagon' && u.packed === 'market' ? epoch + 20 : epoch;
 }

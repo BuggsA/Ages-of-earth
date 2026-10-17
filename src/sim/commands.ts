@@ -1,4 +1,4 @@
-import { BUILDINGS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, SPREAD, TECHS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
+import { BUILDINGS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, SNARE, SPREAD, TECHS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
 import { peace } from './combat';
 import { placeProblem, stampBuilding, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
@@ -11,6 +11,7 @@ import { RES_OF_TILE, cargoRoom, findResource, freeFarm, garrisonRoom, giveOrder
 import { carriedBy, letGo, relicAt } from './relics';
 import { caravanOf, dockOf, homeMarket, marketOf, nearestCaravan, nearestDock, portSpot, postAt } from './trade';
 import { ruinAt } from './ruins';
+import { rubbleAt, salvages } from './salvage';
 import { raise, raiseCost } from './reclaim';
 import { callWork, workProblem } from './works';
 import { callKin, killCamp, kinProblem, takeVow, takeWay, vowProblem, wayBarred, wayProblem } from './ways';
@@ -168,7 +169,7 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
   }
   const problem = placeProblem(s, type, tx, ty, true, p);
   if (problem) {
-    if (!quiet) refuse(s, p, problem === 'slope' ? 'Too steep to build there' : problem === 'foreign' ? "That's enemy land: only a Tower can be raised there" : "Can't build there");
+    if (!quiet) refuse(s, p, problem === 'slope' ? 'Too steep to build there' : problem === 'foreign' ? "That's enemy land: only a Tower can be raised there" : problem === 'woods' ? `A snare needs ${SNARE.need} trees standing within ${SNARE.r} tiles` : problem === 'snares' ? `Too near another snare: keep them ${SNARE.apart} tiles apart` : "Can't build there");
     return null;
   }
   const cost = raiseCost(s, p, type, tx, ty);
@@ -204,9 +205,9 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
 /** Send citizens to build, remembering the work they were doing to go back to it after. */
 function assignBuilders(units: Unit[], b: Building, queue: boolean): void {
   for (const u of units) {
-    if (!canRaise(u.type, b.type)) continue;
+    if (u.thrall || !canRaise(u.type, b.type)) continue;
     const o = u.order;
-    const back: Order | null = o.k === 'gather' ? { ...o, phase: 'go' } : o.k === 'farm' ? { ...o, phase: 'go' } : o.k === 'build' ? u.resume : null;
+    const back: Order | null = o.k === 'gather' ? { ...o, phase: 'go' } : o.k === 'farm' || o.k === 'snare' ? { ...o, phase: 'go' } : o.k === 'build' ? u.resume : null;
     giveOrder(u, { k: 'build', target: b.id }, queue);
     if (!queue || u.order.k === 'build') u.resume = back ?? u.resume;
   }
@@ -392,6 +393,17 @@ export function applyCommand(s: GameState, c: Command): void {
       if (others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: post.x, y: post.y, queue: c.queue });
       break;
     }
+    case 'salvage': {
+      const r = rubbleAt(s, c.target);
+      if (!r) return;
+      const units = myUnits(s, c.p, c.ids);
+      if (!salvages(s, c.p)) {
+        if (units.some((u) => u.type === 'citizen')) refuse(s, c.p, 'Only a people of the Age of Reclaimers strips rubble');
+      } else for (const u of units) if (u.type === 'citizen') giveOrder(u, { k: 'salvage', target: r.id }, c.queue);
+      const others = units.filter((u) => u.type !== 'citizen');
+      if (others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: r.x, y: r.y, queue: c.queue });
+      break;
+    }
     case 'dig': {
       const r = ruinAt(s, c.target);
       if (!r) return;
@@ -469,6 +481,11 @@ export function applyCommand(s: GameState, c: Command): void {
             }
             continue;
           }
+          // A snare (#485): walk the trap line from here.
+          if (b.type === 'snare') {
+            giveOrder(u, { k: 'snare', target: b.id, phase: 'go' }, c.queue);
+            continue;
+          }
           if (BUILDINGS[b.type].drop.length && u.carry > 0) {
             giveOrder(u, { k: 'deliver' }, c.queue);
             continue;
@@ -537,7 +554,7 @@ export function applyCommand(s: GameState, c: Command): void {
           if (!best) continue;
           room.set(best.id, room.get(best.id)! - 1);
           const o = u.order;
-          u.resume = o.k === 'gather' || o.k === 'farm' ? { ...o, phase: 'go' } : o.k === 'build' ? o : null;
+          u.resume = o.k === 'gather' || o.k === 'farm' || o.k === 'snare' ? { ...o, phase: 'go' } : o.k === 'build' ? o : null;
           u.queue = [];
           setOrder(u, { k: 'garrison', target: best.id });
         }

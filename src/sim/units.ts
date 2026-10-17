@@ -1,4 +1,4 @@
-import { AI_LEVELS, AUTO_WORK, BUILDINGS, EXPLORE, PATROL, CARRY, CONSECRATE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SPREAD, TRADE, domainOf, secs } from './data';
+import { AI_LEVELS, AUTO_WORK, BUILDINGS, EXPLORE, PATROL, CARRY, CONSECRATE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
@@ -12,13 +12,15 @@ import { RES, R_BERRY, R_BLOODIRON, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_SAL
 import { carriedBy, relicAt } from './relics';
 import { animalRadius, hitAnimal } from './animals';
 import { milkable } from './flocks';
+import { catchIn, nextSnare } from './snares';
 import { dig, ruinAt } from './ruins';
+import { rubbleAt, salvages, strip } from './salvage';
 import { fordMarch, groveBoost, keptOf, kinBonus } from './landmarks';
 import { chant, chantedOver, consecrateProblem, consecrates, turnBuilding } from './consecrate';
 import { convoyShare } from './convoy';
 import { GRAFTABLE, grafted, hemoPace, sworn } from './blood';
 import { curse, riteProblem, sacrifice } from './fork';
-import { atPost, caravanBonus, caravanOf, dockOf, goalForPost, homeMarket, marketOf, nearestCaravan, nearestDock, nearestMarket, portSpot, postAt, tripGold } from './trade';
+import { atPost, caravanBonus, caravanOf, dockOf, floodPost, goalForPost, homeMarket, marketOf, nearestCaravan, nearestDock, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { canHit, exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, passOf, pay, radiusOf, statsOf, teamOf } from './world';
 
 /**
@@ -517,7 +519,7 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
   if (u.resume) {
     const back = u.resume;
     u.resume = null;
-    if (back.k === 'gather' || back.k === 'farm') {
+    if (back.k === 'gather' || back.k === 'farm' || back.k === 'snare') {
       setOrder(u, back);
       return;
     }
@@ -529,6 +531,11 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
       setOrder(u, { k: 'farm', target: f.id, phase: 'go' });
       return;
     }
+  }
+  // A new snare (#485): a person's builder walks the trap line (the computer picks its own tenders).
+  if (b.type === 'snare' && !s.players[u.owner].ai) {
+    setOrder(u, { k: 'snare', target: b.id, phase: 'go' });
+    return;
   }
   if (b.type === 'storehouse') {
     // Work whatever lies closest to the new storehouse.
@@ -555,7 +562,7 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
 
 function buildStep(s: GameState, u: Unit, o: Extract<Order, { k: 'build' }>): void {
   const b = s.byId.get(o.target);
-  if (!b || b.kind !== 'building' || b.hp <= 0 || b.owner !== u.owner) {
+  if (u.thrall || !b || b.kind !== 'building' || b.hp <= 0 || b.owner !== u.owner) {
     setOrder(u, { k: 'idle' });
     return;
   }
@@ -1101,6 +1108,79 @@ function milkStep(s: GameState, u: Unit, o: Extract<Order, { k: 'milk' }>): void
   if (!approach(u, g)) setOrder(u, { k: 'idle' });
 }
 
+/**
+ * Walk the trap line (#485): empty this snare into the basket, go on to the next of the people's snares with game in
+ * it, and carry the catch home when the basket is full or the line is bare; with nothing anywhere, wait by the snare.
+ */
+function snareStep(s: GameState, u: Unit, o: Extract<Order, { k: 'snare' }>): void {
+  if (u.carryRes !== 'food') {
+    u.carry = 0;
+    u.frac = 0;
+    u.carryRes = 'food';
+  }
+  if (o.phase === 'drop') {
+    const r = dropOff(s, u);
+    if (r === 'done') {
+      const next = nextSnare(s, u.owner, u.x, u.y, 0, u.id);
+      if (next) o.target = next.id;
+      o.phase = 'go';
+      u.miss = 0;
+    } else if (r === 'none') setOrder(u, { k: 'idle' });
+    return;
+  }
+  let b = s.byId.get(o.target);
+  if (!b || b.kind !== 'building' || b.type !== 'snare' || b.hp <= 0 || b.owner !== u.owner) {
+    const next = nextSnare(s, u.owner, u.x, u.y, 0, u.id);
+    if (next) {
+      o.target = next.id;
+      b = next;
+    } else {
+      if (u.carry > 0) o.phase = 'drop';
+      else setOrder(u, { k: 'idle' });
+      return;
+    }
+  }
+  if (!b.built) {
+    setOrder(u, { k: 'build', target: b.id });
+    return;
+  }
+  const cap = carryCap(s, u);
+  if (distToRect(u.x, u.y, b) - statsOf(s, u).radius <= REACH + 0.3) {
+    if (walking(u)) stopWalking(u);
+    face(u, b.x, b.y);
+    u.miss = 0;
+    if (catchIn(b) >= 1 && u.carry < cap) {
+      o.phase = 'work';
+      u.act = 'forage';
+      u.frac += SNARE.take * DT;
+      while (u.frac >= 1 && u.carry < cap && (b.snared ?? 0) >= 1) {
+        u.frac -= 1;
+        u.carry++;
+        b.snared = (b.snared ?? 0) - 1;
+        const st = s.players[u.owner].stats;
+        st.snared = (st.snared ?? 0) + 1;
+      }
+      workEvent(s, u, 'forage', b.x, b.y);
+      if (u.carry < cap && catchIn(b) >= 1) return;
+    }
+    u.frac = 0;
+    if (u.carry >= cap) {
+      o.phase = 'drop';
+      return;
+    }
+    // Emptied: on round the line. A bare line is looked over again now and then, not every tick.
+    o.phase = 'go';
+    u.act = 'idle';
+    if (u.carry === 0 && (s.tick + u.id) % 20 !== 0) return;
+    const next = nextSnare(s, u.owner, b.x, b.y, b.id, u.id);
+    if (next) o.target = next.id;
+    else if (u.carry > 0) o.phase = 'drop';
+    return;
+  }
+  o.phase = 'go';
+  if (!approach(u, goalForBuilding(b))) setOrder(u, { k: 'idle' });
+}
+
 // ---- Priests ---------------------------------------------------------------------------------------
 
 /** How long a conversion takes for this target, in ticks (heavier units resist longer). */
@@ -1321,6 +1401,26 @@ function digStep(s: GameState, u: Unit, o: Extract<Order, { k: 'dig' }>): void {
   if (!approach(u, goalForPoint(s, r.x, r.y, passOf(s, u)))) setOrder(u, { k: 'idle' });
 }
 
+/** Strip the rubble of a fallen building (#503) until it is cleared, by this citizen or another's work. */
+function salvageStep(s: GameState, u: Unit, o: Extract<Order, { k: 'salvage' }>): void {
+  const r = rubbleAt(s, o.target);
+  if (!r || u.type !== 'citizen' || !salvages(s, u.owner)) {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  const dx = r.x - u.x;
+  const dy = r.y - u.y;
+  if (dx * dx + dy * dy <= SALVAGE.reach * SALVAGE.reach) {
+    if (walking(u)) stopWalking(u);
+    face(u, r.x, r.y);
+    u.act = 'mine';
+    workEvent(s, u, 'mine', r.x, r.y);
+    if (strip(s, r, u.owner)) setOrder(u, { k: 'idle' });
+    return;
+  }
+  if (!approach(u, goalForPoint(s, r.x, r.y, passOf(s, u)))) setOrder(u, { k: 'idle' });
+}
+
 /**
  * Pay a trader's (or merchant ship's) load in at the Market (or Dock) it came home to, and cut in the allies.
  * On the Silk Road (#326) the ground its Market covered since it set out (`from`) pays more, the owner's alone.
@@ -1345,12 +1445,21 @@ function payTrip(s: GameState, u: Unit, m: Building | Unit, sea: boolean, from?:
   }
 }
 
+/** The step after a load (so the load itself is priced fresh), the post it loaded at floods a little more (#493). */
+function floodOnce(s: GameState, o: Extract<Order, { k: 'trade' }>): void {
+  if (!o.flood) return;
+  delete o.flood;
+  const post = postAt(s, o.post);
+  if (post) floodPost(s, post);
+}
+
 /**
  * Sail the sea road: a merchant ship out from its Dock to the water off a port post, loads gold worth
  * the distance, and home again to pay it in. With its Dock sunk, the nearest other one will do.
  */
 function seaTradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>): void {
   const post = postAt(s, o.post);
+  floodOnce(s, o);
   if (o.phase === 'back') {
     let d = dockOf(s, u.owner, o.market);
     if (!d) {
@@ -1394,6 +1503,7 @@ function seaTradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>):
     const escort = convoyShare(s, u);
     u.carry = Math.max(1, Math.min(TRADE.max, Math.floor(tripGold(s, u.owner, d, post, true) * escort)));
     u.carryRes = 'gold';
+    o.flood = true;
     if (escort > 1) s.events.push({ k: 'convoy', owner: u.owner, x: u.x, y: u.y });
     o.phase = 'back';
     s.events.push({ k: 'caravan', id: u.id, owner: u.owner, what: 'loaded', amount: u.carry, x: post.x, y: post.y });
@@ -1414,6 +1524,7 @@ function tradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>): vo
     setOrder(u, { k: 'idle' });
     return;
   }
+  floodOnce(s, o);
   if (o.phase === 'back') {
     let m: Building | Unit | null = marketOf(s, u.owner, o.market) ?? caravanOf(s, u.owner, o.market);
     if (!m) {
@@ -1473,6 +1584,7 @@ function tradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>): vo
     // A fresh load owes every toll on the way home again (#334).
     delete u.tolled;
     u.carry = tripGold(s, u.owner, m, post);
+    o.flood = true;
     u.carryRes = 'gold';
     o.phase = 'back';
     s.events.push({ k: 'caravan', id: u.id, owner: u.owner, what: 'loaded', amount: u.carry, x: post.x, y: post.y });
@@ -1798,6 +1910,9 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
     case 'milk':
       milkStep(s, u, o);
       break;
+    case 'snare':
+      snareStep(s, u, o);
+      break;
     case 'convert':
       convertStep(s, u, o);
       break;
@@ -1821,6 +1936,9 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
       break;
     case 'dig':
       digStep(s, u, o);
+      break;
+    case 'salvage':
+      salvageStep(s, u, o);
       break;
   }
 }

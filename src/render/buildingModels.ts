@@ -280,6 +280,39 @@ function huntcamp(k: Kit, e: number, st: Style): void {
   banner(k, 0.85, 0, 0.8, 0.8);
 }
 
+// ---- Snare (#485) ---------------------------------------------------------------------------------
+
+/** A noose on a bent sapling among the trees, a forked trigger peg and bait; with `full`, a hare lies caught in it. */
+function snare(k: Kit, e: number, full: boolean): void {
+  k.box(0.85, 0.03, 0.85, '#5b4a32', 0, -0.01, 0);
+  const bark = '#6b5232';
+  // The sapling, bent over and held down by the trigger.
+  k.cyl(0.02, 0.028, 0.75, 4, bark, -0.3, 0, 0);
+  k.cyl(0.016, 0.02, 0.4, 4, bark, -0.132, 0.658, 0).rotation.z = -1.0;
+  k.cyl(0.012, 0.016, 0.51, 4, bark, 0.143, 0.477, 0).rotation.z = -2.71;
+  for (const [x, y, z] of [[-0.36, 0.62, 0.06], [-0.05, 0.86, -0.05]]) k.cone(0.07, 0.12, 4, '#4e7a3a', x, y, z);
+  // The cord, the noose and the forked peg it hangs from.
+  k.cyl(0.006, 0.006, 0.38, 3, '#d8c9a0', 0.25, 0.12, 0);
+  for (const x of [0.19, 0.31]) k.box(0.012, 0.12, 0.012, '#d8c9a0', x, 0.03, 0);
+  for (const y of [0.03, 0.15]) k.box(0.13, 0.012, 0.012, '#d8c9a0', 0.25, y, 0);
+  for (const z of [-0.1, -0.16]) k.cyl(0.015, 0.018, 0.2, 4, bark, 0.25, 0, z);
+  k.sphere(0.035, '#8e2f3a', 0.25, 0.04, 0.12);
+  // A strip of the people's cloth tied round the sapling, so its owner can find the line.
+  k.team(k.box(0.06, 0.08, 0.06, TEAM, -0.3, 0.45, 0));
+  // Later hunters set iron jaws beside the noose.
+  if (e >= 3) {
+    k.box(0.22, 0.03, 0.18, '#3a3e44', -0.05, 0, 0.27);
+    for (const z of [0.2, 0.34]) k.box(0.22, 0.05, 0.015, '#55595f', -0.05, 0.03, z);
+  }
+  if (full) {
+    // A hare taken in the noose.
+    k.blob(0.1, '#9a8a74', 0.18, 0.07, 0.17).scale.set(1.5, 0.75, 0.9);
+    k.sphere(0.055, '#8c7c66', 0.04, 0.08, 0.17);
+    for (const z of [0.15, 0.19]) k.box(0.1, 0.018, 0.025, '#8c7c66', -0.04, 0.1, z);
+    k.sphere(0.03, '#e8e2d6', 0.33, 0.08, 0.17);
+  }
+}
+
 // ---- War Camp (#303) -------------------------------------------------------------------------------
 
 function warcamp(k: Kit, e: number, st: Style): void {
@@ -1869,7 +1902,7 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
   }
 }
 
-const MAKERS: Record<Exclude<BuildingType, 'wall'>, (k: Kit, e: number, st: Style) => void> = {
+const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare'>, (k: Kit, e: number, st: Style) => void> = {
   towncenter, house, storehouse, huntcamp, warcamp, drainrig, transfusion, bloodtower, caravanserai, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield,
 };
 
@@ -2043,6 +2076,7 @@ export function buildingGeometry(type: BuildingType, epoch: number, color: strin
   if (!g) {
     const k = new Kit();
     if (type === 'wall') wall(k, epoch, STYLES[epoch], variant);
+    else if (type === 'snare') snare(k, epoch, variant === 1);
     else MAKERS[type](k, epoch, STYLES[epoch]);
     const stack = STACKS[type];
     if (epoch >= 4 && stack) smokestack(k, stack[0], stack[1], stack[2]);

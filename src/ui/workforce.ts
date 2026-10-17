@@ -20,7 +20,8 @@ export function citizenJob(u: Unit): WorkforceJob {
     case 'farm':
     case 'hunt': return 'food';
     case 'build':
-    case 'dig': return 'build';
+    case 'dig':
+    case 'salvage': return 'build';
     case 'idle': return u.queue.length ? 'other' : 'idle';
     default: return 'other';
   }

@@ -290,7 +290,14 @@ export class Minimap {
         ctx.lineTo(e.x * sx, e.y * sy + r * 1.2);
         ctx.lineTo(e.x * sx - r * 1.2, e.y * sy);
         ctx.fill();
-      } else ctx.fillRect(e.x * sx - r, e.y * sy - r, r * 2, r * 2);
+      } else {
+        ctx.fillRect(e.x * sx - r, e.y * sy - r, r * 2, r * 2);
+        // A thrall (#502): the slayer's colour with a dark pip, so a rival can tell the bound from a free citizen.
+        if (e.thrall) {
+          ctx.fillStyle = 'rgba(20,12,4,0.9)';
+          ctx.fillRect(e.x * sx - r * 0.45, e.y * sy - r * 0.45, r * 0.9, r * 0.9);
+        }
+      }
     }
 
     // Personal notes stay visible on ground the player has already explored.

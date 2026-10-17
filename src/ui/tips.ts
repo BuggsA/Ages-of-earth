@@ -1,4 +1,5 @@
 import { AGES, HOMELANDS, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, secs } from '../sim/data';
+import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, mainRoad, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
 import type { AgeId, Building, GameState, Unit } from '../sim/types';
 import { R_FISH } from '../sim/types';
@@ -59,6 +60,8 @@ const TIPS: Tip[] = [
   { id: 'herds-year', when: (s) => s.homeland === 'herds' && seasonAt(s) === 1, text: `${HOMELANDS.herds.icon} <b>Autumn is coming</b>: your herds will trek out toward the middle of the map until spring. Lay food up, raise a <b>Hunting Camp</b> out by them, or plant fields; and leave a few of each herd alive, for every deer that lives to spring comes home with a calf.` },
   { id: 'shore-year', when: (s) => s.homeland === 'shore' && seasonAt(s) === 2, text: `${HOMELANDS.shore.icon} <b>The autumn run</b>: the shoals are thick, so fish hard now. In winter the mere ices over and boats fish at a third of their pace: lay food up, or have fields ready. But each spring every shoal still in the water grows by what is left in it, and a full one seeds another: move a boat on before its shoal is gone, for a shoal fished out never grows back.` },
   { id: 'wood-year', when: (s) => s.homeland === 'wood' && seasonAt(s) === 3, text: `${HOMELANDS.wood.icon} <b>Deer in the yard</b>: a herd has come in from the cold to shelter in the woods by your town. The berries are failing, so send foragers to hunt while it stays; it leaves in spring.` },
+  // Snares in the wood (#485): the Deep Wood's own verb, once the town is going.
+  { id: 'snares', when: (s, me) => s.homeland === 'wood' && secsIn(s) > 90 && !has(s, me, 'snare'), text: `${HOMELANDS.wood.icon} <b>Snares</b> (economy menu, <kbd>J</kbd>, 30 wood) go among standing trees and fill with game by themselves, fastest in winter. Lay a line a few tiles apart in woods you won't fell, and <b>right-click</b> one with a citizen to walk the line. Fell the trees round a snare and it starves; a <b>Hunting Camp</b> by the line saves the walk home.` },
   { id: 'vow', when: (s, me) => { const p = s.players[me]; return !!p.way && !p.vowed && p.epoch === WAY.vow; }, text: 'The Bronze Age is the time for a <b>vow</b>: at your Town Center, <b>deepen</b> your Way (its gifts and its price both grow) or <b>turn</b> to another. Once only; pass it by and your Way stays as it is.' },
   { id: 'way', when: (s, me) => s.players[me].epoch <= WAY.until && !s.players[me].way && secsIn(s) > 40, text: 'Choose a <b>Way</b> at your Town Center, and it changes what you do: <b>Hunters</b> pitch free camps at the kill but sow no fields while the herd grazes by home; the <b>Hearth</b> calls its kin in bursts but keeps no hunting camps; the <b>Warband</b> feeds on raids but its bell never rings. Free, once, and the moment passes when you leave the Stone Age. Look at the deer and berries near home, and at how close your rival is.' },
   { id: 'wayHunt', when: (s, me) => s.players[me].way === 'hunt' && s.players[me].epoch === 0, text: '<b>The Hunters\' Way:</b> follow the herds. Raise a <b>Hunting Camp</b> (<kbd>B</kbd> <kbd>N</kbd>) within ' + KILL_CAMP.near + ' tiles of game or a fresh kill and it costs nothing and goes up fast. In the Stone Age you raise no Farm while game lives within ' + KILL_CAMP.home + ' tiles of your Town Center: hunt the home herd out to open the fields, or spare it and range farther.' },
@@ -115,6 +118,11 @@ const TIPS: Tip[] = [
     id: 'ruins',
     when: (s, me) => !!s.ruins?.some((r) => r.by < 0 && s.players[me].seen[Math.floor(r.y) * s.w + Math.floor(r.x)] === 1),
     text: 'You have found <b>ancient ruins</b> (two pale columns on the map). Select a few <b>citizens</b> and right-click them to dig: whoever finishes the dig takes what lies beneath, a hoard of gold, lost knowledge, an old map of the land or a relic. Excavation can also reveal a new road for your people. It\'s a long way from home, so send an escort.',
+  },
+  {
+    id: 'salvage',
+    when: (s, me) => !!s.rubble?.length && !!ageDef(s.players[me]).salvage,
+    text: 'A building has fallen and left <b>rubble</b> (a heap of stone and beams). In the Age of Reclaimers, select <b>citizens</b> and right-click it to <b>strip</b> it: half the building\'s price goes into your stock. Rubble of your own is a choice: strip it now, or leave the foundations to raise the building again for 40% of the price. A rival\'s rubble lies where the fighting was, so send an escort.',
   },
   {
     id: 'trade',
@@ -181,7 +189,7 @@ const TIPS: Tip[] = [
   {
     id: 'plunder',
     when: (s, me) => ageOf(s.players[me]) === 'warband',
-    text: 'Your warband lives on plunder: every enemy unit your forces slay pays part of its price in gold, more the further you walk the Path of Blood. Raids feed the town now, and a quiet border starves it.',
+    text: 'Your warband lives on plunder: every enemy unit your forces slay pays part of its price in gold, more the further you walk the Path of Blood. And a rival citizen who falls is taken, not lost: a <b>thrall</b> rises where it fell, yours, to work your fields (up to 8; it never builds). Raid the rival\'s workers, and guard your own.',
   },
   {
     id: 'ironblood',

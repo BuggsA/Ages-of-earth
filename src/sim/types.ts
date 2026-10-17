@@ -19,7 +19,7 @@ export type UnitType =
 export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
   | 'towncenter' | 'house' | 'storehouse' | 'farm' | 'barracks' | 'range' | 'stable' | 'tower'
-  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai' | 'drainrig' | 'transfusion' | 'bloodtower';
+  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai' | 'drainrig' | 'transfusion' | 'bloodtower' | 'snare';
 /** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
 export type Difficulty = 'gentle' | 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
@@ -122,6 +122,8 @@ export type Order =
   | { k: 'hunt'; target: number; fight?: boolean }
   /** Milk a sheep of the people's flock (#308), carry the milk to a drop site, and back. */
   | { k: 'milk'; target: number; phase: 'go' | 'work' | 'drop' }
+  /** Walk the trap line (#485): empty a snare of its people's, on to the next with game in it, and the catch home. */
+  | { k: 'snare'; target: number; phase: 'go' | 'work' | 'drop' }
   /**
    * A priest turning an enemy to your side: `done` ticks of chanting so far. A Blood-rite priest (#355 s4) may instead chant a `rite`
    * over a living enemy: to `sacrifice` it for its blood, or to `curse` it.
@@ -141,9 +143,11 @@ export type Order =
    * A trader running the road between a Market and a trading post: out to the post (`go`), where it
    * loads gold worth the distance from the Market, and back to the Market to pay it in (`back`).
    */
-  | { k: 'trade'; post: number; market: number; phase: 'go' | 'back'; from?: { x: number; y: number } }
+  | { k: 'trade'; post: number; market: number; phase: 'go' | 'back'; from?: { x: number; y: number }; /** Loaded this step: the post floods on the next (#493). */ flood?: true }
   /** A citizen digging at an ancient ruin (#64). */
-  | { k: 'dig'; target: number };
+  | { k: 'dig'; target: number }
+  /** A citizen stripping the rubble of a fallen building (#503). */
+  | { k: 'salvage'; target: number };
 
 /** What a unit is visibly doing, for the renderer's animation. */
 export type Act = 'idle' | 'walk' | 'attack' | 'chop' | 'mine' | 'forage' | 'farm' | 'build' | 'chant' | 'fish';
@@ -211,6 +215,8 @@ export interface Unit {
   cryReady?: number;
   /** Enemy soldiers it has defeated (older saves lack it). */
   vet?: number;
+  /** A citizen taken captive in the Age of the Warband (#502): it gathers and farms but never builds. */
+  thrall?: boolean;
   /** A wagon (#297): the building it carries, and that building's health as a share of its full health. */
   packed?: BuildingType;
   packedHp?: number;
@@ -302,6 +308,8 @@ export interface Building {
   captives?: { p: number; left: number }[];
   /** A Hunters' kill camp (#463 s1): raised for nothing and quickly, so a cancelled site refunds nothing. */
   kill?: boolean;
+  /** A Snare (#485): the food caught in it so far, waiting for a tender. Absent: none. */
+  snared?: number;
 }
 
 export type Ent = Unit | Building;
@@ -331,6 +339,9 @@ export interface TradePost {
   /** The center of its middle tile. */
   x: number;
   y: number;
+  /** How flooded its market was at `glutAt` (#493): trips there pay `1 − glut`; healed lazily by `glutNow`. Absent until a trader loads. */
+  glut?: number;
+  glutAt?: number;
 }
 
 /** What lies under a ruin (#64): gold, a technology, a map of the whole land, or a relic. */
@@ -347,6 +358,24 @@ export interface Fallen {
   tx: number;
   ty: number;
   /** The tick the memory fades. */
+  until: number;
+}
+
+/** Rubble of a fallen building, there to be stripped by a salvaging people (`SALVAGE`, `salvage.ts`). */
+export interface Rubble {
+  id: number;
+  x: number;
+  y: number;
+  /** Whose building fell. */
+  owner: number;
+  type: BuildingType;
+  tx: number;
+  ty: number;
+  /** What stripping it yields. */
+  worth: Cost;
+  /** Stripping done so far, in ticks of one citizen's work. */
+  done: number;
+  /** The tick it is cleared away. */
   until: number;
 }
 
@@ -490,6 +519,8 @@ export interface PlayerStats {
   hunted?: number;
   /** Milk drawn from the flock by citizens (the Age of the Horde's deed, #318); absent in older saves. */
   milked?: number;
+  /** Food taken from snares (#485); absent in older saves. */
+  snared?: number;
   /** Gold taken as tribute by riders standing in rivals' land (#318); absent in older saves. */
   tribute?: number;
   /** Gold the Silk Road's caravans earned for the ground the camp covered while they were out (#326); absent in older saves. */
@@ -630,6 +661,7 @@ export type GameEvent =
   | { k: 'convoy'; owner: number; x: number; y: number }
   | { k: 'vigil'; owner: number; x: number; y: number; priests: number }
   | { k: 'foundation'; owner: number; type: BuildingType; x: number; y: number; what: 'kept' | 'raised' }
+  | { k: 'salvage'; owner: number; x: number; y: number; type: BuildingType; what: 'left' | 'stripped'; gain?: Cost }
   | { k: 'ruin'; id: number; owner: number; find: RuinFind; tech?: TechId; x: number; y: number }
   /** A landmark changed hands: `owner` keeps it now (-1: nobody, after `from` was driven off). */
   | { k: 'landmark'; id: number; kind: LandmarkKind; owner: number; from: number; x: number; y: number }
@@ -649,6 +681,8 @@ export type GameEvent =
   | { k: 'rank'; id: number; owner: number; x: number; y: number; rank: number }
   /** Gold taken from an enemy unit slain by a people with a plunder share (the Path of Blood, #299). */
   | { k: 'plunder'; owner: number; x: number; y: number; gold: number }
+  /** A rival citizen taken captive by a Warband people (#502): a thrall of `owner` rises at the spot, taken from `from`. */
+  | { k: 'thrall'; owner: number; from: number; x: number; y: number }
   /**
    * Blood drawn at a Drain Rig (#355): from an enemy who fell near it, or from citizens given to the levy; in Hemocraft (s2) also
    * bled from a living enemy standing by a rig (`drain`, at the bled), and in the Blood-rite from the fallen near a Temple.
@@ -767,6 +801,8 @@ export interface GameState {
   ruins?: Ruin[];
   /** Foundations of fallen buildings a reclaiming people may raise again (`reclaim.ts`); absent until one falls. */
   fallen?: Fallen[];
+  /** Rubble of fallen buildings a salvaging people may strip (`salvage.ts`); absent until one falls. */
+  rubble?: Rubble[];
   /** Contested landmarks; absent in older saves and in campaign chapters (none). */
   landmarks?: Landmark[];
   /** Whether this world holds bog iron (#39), decided by the seed; absent in older saves (none). */
@@ -806,6 +842,9 @@ export interface AiMemory {
   unitTurn: number;
   /** Tick the town bell was rung, or -1. */
   bell: number;
+  /** While the bell is rung (#487): the nearest foe's distance seen, and the tick it last came closer. */
+  bellNear?: number;
+  bellMoved?: number;
   /** Tick it last looked for a dock site and found none (so it doesn't look every turn). */
   dockless?: number;
   /** Its scout (#454 s4): the rider sent exploring, the tick it was last sent, and the pair that patrol its border or trade road. */
@@ -936,6 +975,8 @@ export type Command =
   | { t: 'dropRelic'; p: number; ids: number[] }
   /** Citizens dig at an ancient ruin (#64). */
   | ({ t: 'dig'; p: number; ids: number[]; target: number } & Queued)
+  /** Citizens strip the rubble of a fallen building (#503); the target is a rubble id. */
+  | ({ t: 'salvage'; p: number; ids: number[]; target: number } & Queued)
   /** Answer the card of tidings waiting at the fire (#443): `take` pays its price, otherwise it is passed by. */
   | { t: 'tiding'; p: number; card: TidingId; take: boolean }
   /** A player left an online match: the computer takes over their people. */
