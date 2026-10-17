@@ -432,6 +432,14 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
       return;
     }
   }
+  // A farm that is already worked: the player's builder takes a free field nearby rather than standing idle (#344).
+  if (b.type === 'farm' && !s.players[u.owner].ai) {
+    const f = freeFarm(s, u.owner, u.x, u.y, 10);
+    if (f) {
+      setOrder(u, { k: 'farm', target: f.id, phase: 'go' });
+      return;
+    }
+  }
   if (b.type === 'storehouse') {
     // Work whatever lies closest to the new storehouse.
     let best = -1;
