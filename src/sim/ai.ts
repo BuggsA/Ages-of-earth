@@ -1,5 +1,5 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, RITE, BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, RITE, BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
@@ -2982,6 +2982,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   // The horde's riders in a rival's land (#322) are held there, out of the waves' orders.
   if (L.clever) for (const id of exactTribute(s, v, mem, issue)) guards.add(id);
   let fighters = v.army.filter((u) => !u.inside && !sailing.has(u.id) && !guards.has(u.id));
+  if (L.clever && L.curseAnswer !== false) fighters = answerCurse(s, v, mem, fighters, issue);
   // A Wonder of its own rising or counting down is held (#374): rivals near it draw the whole army, and a share of the army stays by it, out of the waves.
   const wonder = L.clever && L.wonderGuard !== false ? ownWonder(v) : null;
   if (wonder && !threat) {
@@ -3307,6 +3308,57 @@ export function riteWork(s: GameState, p: Player, pr: Unit): { target: Unit; how
   }
   if (curseAt && packed >= AI_RITE.pack) return { target: curseAt, how: 'curse' };
   return offer ? { target: offer, how: 'sacrifice' } : null;
+}
+
+/**
+ * The computer answers a curse on its own army (#434, `AI_CURSE`): cursed soldiers that aren't winning step back for the curse's last
+ * seconds, and its riders go for the Blood-rite priest within reach. Returns the fighters the waves may still command.
+ */
+function answerCurse(s: GameState, v: View, mem: AiMemory, fighters: Unit[], issue: (c: Command) => void): Unit[] {
+  const { p } = v;
+  const soldier = (u: Unit) => u.type !== 'citizen' && u.type !== 'priest' && u.type !== 'trader';
+  const hurt = fighters.filter((u) => soldier(u) && cursed(s, u));
+  if (!hurt.length) return fighters;
+  const near2 = AI_CURSE.near * AI_CURSE.near;
+  const foes = s.ents.filter((e): e is Unit => e.kind === 'unit' && e.hp > 0 && !e.inside && soldier(e) && isEnemy(s, p.id, e.owner));
+  const held = new Set<number>();
+  const back: number[] = [];
+  for (const u of hurt) {
+    if (u.cursed! - s.tick > secs(AI_CURSE.late)) continue;
+    const retreating = u.order.k === 'move' && !u.order.amove;
+    let theirs = 0;
+    let ours = 0;
+    for (const f of foes) if ((f.x - u.x) * (f.x - u.x) + (f.y - u.y) * (f.y - u.y) <= near2) theirs++;
+    for (const f of hurt) if ((f.x - u.x) * (f.x - u.x) + (f.y - u.y) * (f.y - u.y) <= near2) ours++;
+    const losing = u.hp < maxHp(s, u) * AI_CURSE.hurt || theirs > ours;
+    if (!retreating && !(losing && theirs > 0) && u.order.k !== 'idle') continue;
+    held.add(u.id);
+    if (!retreating && u.order.k !== 'idle') back.push(u.id);
+  }
+  if (back.length) issue({ t: 'move', p: p.id, ids: back, x: mem.muster!.x, y: mem.muster!.y });
+  // The riders: a Blood-rite priest of a rival within reach is the one who cast it.
+  const r2 = AI_CURSE.reach * AI_CURSE.reach;
+  const riders = fighters.filter((u) => u.type === 'cavalry' && !held.has(u.id));
+  let prey: Unit | null = null;
+  let bestD = Infinity;
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.type !== 'priest' || e.hp <= 0 || e.inside || !isEnemy(s, p.id, e.owner) || !ageDef(s.players[e.owner]).rite) continue;
+    for (const r of riders) {
+      const d = (e.x - r.x) * (e.x - r.x) + (e.y - r.y) * (e.y - r.y);
+      if (d <= r2 && d < bestD) {
+        bestD = d;
+        prey = e;
+      }
+    }
+  }
+  if (prey) {
+    const go = riders
+      .filter((r) => !(r.order.k === 'attack' && r.order.target === prey!.id))
+      .sort((a, b) => (a.x - prey!.x) * (a.x - prey!.x) + (a.y - prey!.y) * (a.y - prey!.y) - ((b.x - prey!.x) * (b.x - prey!.x) + (b.y - prey!.y) * (b.y - prey!.y)) || a.id - b.id)
+      .slice(0, AI_CURSE.riders);
+    if (go.length) issue({ t: 'attack', p: p.id, ids: go.map((r) => r.id), target: prey.id });
+  }
+  return fighters.filter((u) => !held.has(u.id));
 }
 
 function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
