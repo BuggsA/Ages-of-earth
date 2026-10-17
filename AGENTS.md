@@ -54,7 +54,7 @@ The owner, 2026-10-13: tests "can often eat a lot of the build time … each age
 
 | Tier | Command | Runs | Time today |
 | --- | --- | --- | --- |
-| Quick | `npm run check` (typecheck + unit tests in `tests/`) | by you, once at the end (while building: `npx vitest run tests/<file>`) | about 100 s |
+| Quick | `npm run check` (typecheck + unit tests in `tests/`) | by you, once at the end (while building: `npx vitest run tests/<file>`) | about 85 s |
 | Merge | the `ci` workflow (build + unit tests) | by GitHub on every push to a pull request and to `main` | a minute or two |
 | Full | `npm run check:full` (build, unit tests and the slow tests in `tests/slow/`) | by GitHub daily on `main` (the `periodic` workflow), or on demand | a few minutes: the campaign proof, three files side by side |
 

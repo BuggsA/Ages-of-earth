@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { findSpot } from '../src/sim/ai';
-import { BUILDINGS, DEER, MARKET, TECHS, TICK_HZ, unitStats } from '../src/sim/data';
-import { checksum, createGame, step, type GameSetup } from '../src/sim/game';
-import { findRoute } from '../src/sim/path';
-import { deserialize, serialize } from '../src/sim/save';
-import { statsFor } from '../src/sim/stats';
-import type { Building, CivId, Command, GameState, Unit } from '../src/sim/types';
-import { R_MEAT, R_TREE } from '../src/sim/types';
-import { findResource } from '../src/sim/units';
-import { placeBuilding, spawnUnit } from '../src/sim/world';
+import { findSpot } from '../../src/sim/ai';
+import { BUILDINGS, DEER, MARKET, TECHS, TICK_HZ, unitStats } from '../../src/sim/data';
+import { checksum, createGame, step, type GameSetup } from '../../src/sim/game';
+import { findRoute } from '../../src/sim/path';
+import { deserialize, serialize } from '../../src/sim/save';
+import { statsFor } from '../../src/sim/stats';
+import type { Building, CivId, Command, GameState, Unit } from '../../src/sim/types';
+import { R_MEAT, R_TREE } from '../../src/sim/types';
+import { findResource } from '../../src/sim/units';
+import { placeBuilding, spawnUnit } from '../../src/sim/world';
 
 const game = (o: Partial<GameSetup> & { civs?: CivId[] } = {}): GameState =>
   createGame({

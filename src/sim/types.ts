@@ -107,7 +107,7 @@ export type Order =
    * comes into sight. `x`, `y` is the tile it heads for (-1 before the first); `fails` holds tiles it could
    * not reach, so it doesn't try them again.
    */
-  | { k: 'explore'; x: number; y: number; started: boolean; fails: number[] }
+  | { k: 'explore'; x: number; y: number; started: boolean; fails: number[]; told?: number }
   /** Gather a resource tile: walk there, work it, carry the load to a drop site, and back. */
   | { k: 'gather'; tile: number; res: Res; phase: 'go' | 'work' | 'drop'; bog?: boolean; rare?: RareId; meat?: boolean }
   | { k: 'build'; target: number }
@@ -676,6 +676,8 @@ export type GameEvent =
   /** A Wonder's foundation was laid (#361): every player hears of it, so the whole build can be contested. */
   | { k: 'wonderRising'; owner: number; id: number; x: number; y: number }
   | { k: 'trade'; owner: number; res: Res; buy: boolean }
+  /** An explorer of `owner` came on a rival army of `n` soldiers at (x, y) (#454 s3). */
+  | { k: 'sighted'; owner: number; x: number; y: number; n: number }
   | { k: 'defeated'; owner: number }
   | { k: 'heartless'; owner: number; left: number }
   | { k: 'over'; winner: number; how: 'conquest' | 'wonder' | 'relics' | 'lands' | 'resign' | 'time' | 'scenario' }
@@ -781,6 +783,9 @@ export interface AiMemory {
   bell: number;
   /** Tick it last looked for a dock site and found none (so it doesn't look every turn). */
   dockless?: number;
+  /** Its scout (#454 s4): the rider sent exploring, the tick it was last sent, and the pair that patrol its border or trade road. */
+  scout?: { id: number; sent: number };
+  guards?: number[];
   /** Tick its bombers last set out. */
   sortie?: number;
   /** A sea landing under way: the transport, the soldiers aboard (or boarding) and how far along it is. */
@@ -890,8 +895,11 @@ export type Command =
   /** A rare ore (#356) can only be sold, a lot of it for gold at a flat price. */
   | { t: 'trade'; p: number; res: 'food' | 'wood' | 'stone' | RareId; buy: boolean }
   | { t: 'stop'; p: number; ids: number[] }
-  /** Patrol between where each unit stands and the point (#454); with `queue`, add the point to a patrol under way. */
-  | ({ t: 'patrol'; p: number; ids: number[]; x: number; y: number } & Queued)
+  /**
+   * Patrol between where each unit stands and the point (#454); with `queue`, add the point to a patrol under way.
+   * With `post`, guard that trading post's road instead: back and forth between the nearest Market and the post (s3).
+   */
+  | ({ t: 'patrol'; p: number; ids: number[]; x: number; y: number; post?: number } & Queued)
   /** Explore on their own (#454). */
   | ({ t: 'explore'; p: number; ids: number[] } & Queued)
   | { t: 'delete'; p: number; ids: number[] }

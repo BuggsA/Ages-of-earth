@@ -696,6 +696,37 @@ function nearFail(s: GameState, x: number, y: number, fails: readonly number[]):
   return false;
 }
 
+/** Whether a point lies within reach of an enemy tower (or other gun) the unit's people have seen, plus `EXPLORE.wary`. */
+function underGuns(s: GameState, u: Unit, x: number, y: number): boolean {
+  const seen = s.players[u.owner].seen;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.hp <= 0 || !e.built || !isEnemy(s, u.owner, e.owner)) continue;
+    const g = BUILDINGS[e.type].guns;
+    if (!g || !seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
+    const r = g.range + EXPLORE.wary + BUILDINGS[e.type].size / 2;
+    if ((e.x - x) * (e.x - x) + (e.y - y) * (e.y - y) <= r * r) return true;
+  }
+  return false;
+}
+
+/** Rival soldiers in an explorer's sight, once there are enough to call an army: how many, and where the nearest is. */
+function armySighted(s: GameState, sp: Spatial, u: Unit): { n: number; x: number; y: number } | null {
+  let n = 0;
+  let near: Unit | null = null;
+  let nd = Infinity;
+  sp.near(u.x, u.y, statsOf(s, u).sight, (o) => {
+    if (o.hp <= 0 || o.inside || !MILITARY.includes(o.type) || !isEnemy(s, u.owner, o.owner)) return;
+    n++;
+    const d = (o.x - u.x) * (o.x - u.x) + (o.y - u.y) * (o.y - u.y);
+    if (d < nd || (d === nd && near && o.id < near.id)) {
+      nd = d;
+      near = o;
+    }
+  });
+  const f = near as Unit | null;
+  return f && n >= EXPLORE.army ? { n, x: f.x, y: f.y } : null;
+}
+
 export function exploreTarget(s: GameState, u: Unit, fails: readonly number[] = []): number {
   const seen = s.players[u.owner].seen;
   const pass = passOf(s, u);
@@ -710,7 +741,7 @@ export function exploreTarget(s: GameState, u: Unit, fails: readonly number[] = 
   for (let y = g >> 1; y < s.h; y += g) {
     for (let x = g >> 1; x < s.w; x += g) {
       const i = y * s.w + x;
-      if (seen[i] || !walkable(s, x, y, pass) || nearFail(s, x, y, fails)) continue;
+      if (seen[i] || !walkable(s, x, y, pass) || nearFail(s, x, y, fails) || underGuns(s, u, x + 0.5, y + 0.5)) continue;
       let d = (x + 0.5 - u.x) * (x + 0.5 - u.x) + (y + 0.5 - u.y) * (y + 0.5 - u.y);
       // Ground a fellow is headed for counts as much further off, so a band of scouts fans out.
       for (let k = 0; k < others.length; k += 2) {
@@ -731,7 +762,43 @@ export function exploreTarget(s: GameState, u: Unit, fails: readonly number[] = 
 function exploreStep(s: GameState, sp: Spatial, u: Unit, o: Extract<Order, { k: 'explore' }>): void {
   if (roundFight(s, sp, u, o)) return;
   const seen = s.players[u.owner].seen;
-  const here = o.x >= 0 ? o.y * s.w + o.x : -1;
+  let here = o.x >= 0 ? o.y * s.w + o.x : -1;
+  if ((s.tick + u.id) % PATROL.scan === 0 && !peace(s)) {
+    // Word of an army goes back to the player; a tower in reach (or between here and the goal) sends the explorer elsewhere.
+    if (o.told === undefined || s.tick - o.told >= secs(EXPLORE.tell)) {
+      const a = armySighted(s, sp, u);
+      if (a) {
+        o.told = s.tick;
+        s.events.push({ k: 'sighted', owner: u.owner, x: a.x, y: a.y, n: a.n });
+      }
+    }
+    if (underGuns(s, u, u.x, u.y) || (here >= 0 && underGuns(s, u, o.x + 0.5, o.y + 0.5))) {
+      o.x = -1;
+      o.y = -1;
+      here = -1;
+      o.started = false;
+      if (underGuns(s, u, u.x, u.y)) {
+        // Already in reach: back the way it came, away from the nearest gun.
+        let g: Building | null = null;
+        let gd = Infinity;
+        for (const e of s.ents) {
+          if (e.kind !== 'building' || e.hp <= 0 || !e.built || !isEnemy(s, u.owner, e.owner) || !BUILDINGS[e.type].guns) continue;
+          const d = (e.x - u.x) * (e.x - u.x) + (e.y - u.y) * (e.y - u.y);
+          if (d < gd) {
+            gd = d;
+            g = e;
+          }
+        }
+        if (g) {
+          const dx = u.x - g.x;
+          const dy = u.y - g.y;
+          const l = Math.sqrt(dx * dx + dy * dy) || 1;
+          goTo(u, goalForPoint(s, Math.max(1, Math.min(s.w - 1, u.x + (dx / l) * PATROL.flee)), Math.max(1, Math.min(s.h - 1, u.y + (dy / l) * PATROL.flee)), passOf(s, u)));
+          return;
+        }
+      }
+    }
+  }
   // Seen at last: a step made, so the ground it failed to reach may be worth another try later.
   if (here >= 0 && seen[here]) o.fails = [];
   if (here < 0 || seen[here]) {

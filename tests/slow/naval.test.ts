@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { findDockSpot } from '../src/sim/ai';
-import { EPOCHS, TICK_HZ, domainOf } from '../src/sim/data';
-import { checksum, createGame, step, type GameSetup } from '../src/sim/game';
-import { NAVAL, nearestWalkable, placeProblem, walkable } from '../src/sim/grid';
-import { deserialize, serialize } from '../src/sim/save';
-import { coastNear } from '../src/sim/units';
-import type { Building, Command, GameState, Unit } from '../src/sim/types';
-import { R_FISH } from '../src/sim/types';
-import { placeBuilding, spawnUnit } from '../src/sim/world';
+import { findDockSpot } from '../../src/sim/ai';
+import { EPOCHS, TICK_HZ, domainOf } from '../../src/sim/data';
+import { checksum, createGame, step, type GameSetup } from '../../src/sim/game';
+import { NAVAL, nearestWalkable, placeProblem, walkable } from '../../src/sim/grid';
+import { deserialize, serialize } from '../../src/sim/save';
+import { coastNear } from '../../src/sim/units';
+import type { Building, Command, GameState, Unit } from '../../src/sim/types';
+import { R_FISH } from '../../src/sim/types';
+import { placeBuilding, spawnUnit } from '../../src/sim/world';
 
 /** Ships, fishing, transports and aircraft. */
 
