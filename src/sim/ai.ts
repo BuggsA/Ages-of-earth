@@ -1,4 +1,5 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
+import { aiTiding } from './tidings';
 import { AGES, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, RITE, BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
@@ -188,6 +189,13 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   ironRoad(s, v, mem, issue);
   oreRoad(s, v, mem, issue);
   steppeRoad(s, v, mem, issue);
+
+  // Tidings at the fire (#443), one plain rule a card, answered before the town spends its stores.
+  const tiding = aiTiding(s, p);
+  if (tiding) {
+    issue({ t: 'tiding', p: p.id, ...tiding });
+    v.budget = { ...p.res };
+  }
 
   // People first: a growing town pays for everything else.
   const advancing = buildings.some((b) => b.advance >= 0);

@@ -5,7 +5,7 @@ import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
 import { RARE_OF_TILE } from '../sim/units';
-import { RARE, MERC, ORDERS, BLOOD, HEMO, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, CALL_UP, PATHS, WARCAMP, FLOCK, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { RARE, MERC, ORDERS, BLOOD, HEMO, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, CALL_UP, PATHS, WARCAMP, FLOCK, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -13,6 +13,7 @@ import { restsAt } from '../sim/passage';
 import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
 import { LANDMARK_KINDS, claimWork, claimants, favours, landmarkAt } from '../sim/landmarks';
 import { workProblem } from '../sim/works';
+import { TIDING_CARDS, tidingCost, tidingProblem } from '../sim/tidings';
 import { vowProblem, wayProblem } from '../sim/ways';
 import { beaconProblem, lit } from '../sim/beacon';
 import { callUpProblem, callUpReach, campGrace, musterWait } from '../sim/warcamp';
@@ -170,6 +171,8 @@ export class Hud {
   private noticeEl = document.getElementById('notices')!;
   private bannerEl = document.getElementById('banner')!;
   private timerEl = document.getElementById('timers')!;
+  private tidingEl = document.getElementById('tiding')!;
+  private tidingSig = '';
   private timerHtml = '';
   private selSig = '';
   private cmdSig = '';
@@ -205,6 +208,21 @@ export class Hud {
       if (c) this.runCmd(c);
     });
     this.cmdEl.addEventListener('contextmenu', (e) => e.preventDefault());
+    // Tidings at the fire (#443): either answer is a command, so every screen in an online match plays it the same.
+    this.tidingEl.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-take]');
+      const t = this.state?.players[this.viewer]?.tiding;
+      if (!b || !t || !this.state) return;
+      const take = b.dataset.take === '1';
+      const why = take ? tidingProblem(this.state, this.state.players[this.viewer], t.card) : null;
+      if (why) {
+        this.toast(why, 'bad');
+        this.act.sound('error');
+        return;
+      }
+      this.act.issue({ t: 'tiding', p: this.viewer, card: t.card, take });
+      this.act.sound('click');
+    });
     this.timerEl.addEventListener('click', (e) => {
       const t = (e.target as HTMLElement).closest<HTMLElement>('[data-focus]');
       if (t) {
@@ -280,10 +298,35 @@ export class Hud {
     this.viewer = viewer;
     this.lastIds = ids;
     this.top(s, viewer, speed);
+    this.tidingCard(s, viewer);
     if (!this.workforcePanel.classList.contains('hidden')) this.drawWorkforce(s, viewer);
     const ents = ids.map((id) => s.byId.get(id)).filter((e): e is Ent => !!e && e.hp > 0);
     this.selection(s, viewer, ents, selectedTile, selectedRelic, selectedPost, selectedRuin, selectedLandmark);
     this.commands(s, viewer, ents);
+  }
+
+  /** The card of tidings waiting at the viewer's fire (#443), with its fade bar; hidden when none waits. */
+  private tidingCard(s: GameState, viewer: number): void {
+    const t = s.players[viewer]?.tiding;
+    const sig = t ? `${t.card}:${t.draw}` : '';
+    if (sig !== this.tidingSig) {
+      this.tidingSig = sig;
+      this.tidingEl.classList.toggle('hidden', !t);
+      document.getElementById('hud')!.classList.toggle('has-tiding', !!t);
+      if (!t) {
+        this.tidingEl.innerHTML = '';
+        return;
+      }
+      const c = TIDING_CARDS[t.card];
+      const cost = Object.entries(tidingCost(t.card)).map(([r, n]) => `${n} ${RES_LABEL[r as keyof typeof RES_LABEL].toLowerCase()}`).join(' + ');
+      const gain = t.card === 'traveller' ? '+1 citizen' : t.card === 'hunter' ? `+${TIDINGS.hunter.food} food` : t.card === 'tale' ? 'learn where it lies' : 'safe';
+      const risk = t.card === 'storm' ? `maybe: houses lose ${Math.round(TIDINGS.storm.harm * 100)}% health` : t.card === 'fever' ? 'maybe: a citizen dies' : 'nothing happens';
+      this.tidingEl.innerHTML = `<h3><span>${c.icon}</span>${c.name}</h3><p>${c.text}</p><div class="row"><button type="button" class="take" data-take="1">${c.take}<small>${cost}: ${gain}</small></button><button type="button" data-take="0">${c.pass}<small>${risk}</small></button></div><div class="fade"><i></i></div>`;
+    }
+    if (!t) return;
+    const left = Math.max(0, Math.min(1, (t.until - s.tick) / secs(TIDINGS.fade)));
+    const bar = this.tidingEl.querySelector<HTMLElement>('.fade i');
+    if (bar) bar.style.width = `${(left * 100).toFixed(1)}%`;
   }
 
   private drawWorkforce(s: GameState, viewer: number): void {

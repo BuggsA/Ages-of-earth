@@ -498,6 +498,9 @@ export interface HistoryPoint {
   epoch: number;
 }
 
+/** The cards of tidings that come to the fire in the Stone Age (#443). */
+export type TidingId = 'traveller' | 'hunter' | 'tale' | 'storm' | 'fever';
+
 export interface Player {
   id: number;
   name: string;
@@ -526,6 +529,10 @@ export interface Player {
   vowed?: boolean;
   /** Tick the great work now at hand ends; absent when none is. */
   workEnd?: number;
+  /** A card of tidings at the fire waiting on an answer (#443): which, which draw, and the tick it passes unanswered. Absent when none waits. */
+  tiding?: { card: TidingId; draw: number; until: number };
+  /** The cards of tidings that have come to this people, in order (#443); absent before the first. */
+  told?: TidingId[];
   /** Tick its last step back (#47) landed, for the cooldown; absent if it never stepped back. */
   backAt?: number;
   techs: TechId[];
@@ -567,6 +574,11 @@ export type GameEvent =
   | { k: 'researched'; owner: number; tech: TechId }
   /** A survey's answer (#39): whether what it looks for lies anywhere in this world. */
   | { k: 'survey'; owner: number; tech: TechId; found: boolean }
+  /**
+   * Tidings at the fire (#443): a card came (`come`), was answered by paying (`took`), was passed by (`passed`,
+   * answered or faded), or a passed storm or fever struck (`struck`, `n` houses or citizens hit) or spared them (`spared`).
+   */
+  | { k: 'tiding'; owner: number; card: TidingId; how: 'come' | 'took' | 'passed' | 'struck' | 'spared'; n?: number; x?: number; y?: number }
   /** A ruin dug out (#64): what came up, and for lore, which technology. */
   | { k: 'sortie'; owner: number; id: number; x: number; y: number; what: 'home' | 'lost' }
   | { k: 'fair'; owner: number }
@@ -854,6 +866,8 @@ export type Command =
   | { t: 'dropRelic'; p: number; ids: number[] }
   /** Citizens dig at an ancient ruin (#64). */
   | ({ t: 'dig'; p: number; ids: number[]; target: number } & Queued)
+  /** Answer the card of tidings waiting at the fire (#443): `take` pays its price, otherwise it is passed by. */
+  | { t: 'tiding'; p: number; card: TidingId; take: boolean }
   /** A player left an online match: the computer takes over their people. */
   | { t: 'leave'; p: number };
 

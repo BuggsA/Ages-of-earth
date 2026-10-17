@@ -95,6 +95,11 @@ const TIPS: Tip[] = [
     text: 'Out between the towns stand <b>landmarks</b> (grey triangles on the map, once found): a <b>Sacred Spring</b> that mends, a <b>Lookout Crag</b> that sees far, an <b>Ancestors\' Cairn</b> that makes room for more people, a <b>Flint Scatter</b> that speeds axes and picks, a <b>Sacred Grove</b> where your priests chant faster, an <b>Old Ford</b> that quickens the march of your soldiers. Right-click one with anyone, a citizen will do, and keep rivals off it to claim it and the land round it. Rivals can take it back the same way, so a fight over it may come before any army does.',
   },
   {
+    id: 'tidings',
+    when: (s, me) => !!s.players[me].tiding,
+    text: '<b>Tidings at the fire</b>: twice in the Stone Age someone or something comes to your camp. Pay the price, or let it pass. Leave the card and it fades with the second answer, so a storm or a fever is left to chance.',
+  },
+  {
     id: 'ruins',
     when: (s, me) => !!s.ruins?.some((r) => r.by < 0 && s.players[me].seen[Math.floor(r.y) * s.w + Math.floor(r.x)] === 1),
     text: 'You have found <b>ancient ruins</b> (two pale columns on the map). Select a few <b>citizens</b> and right-click them to dig: whoever finishes the dig takes what lies beneath, a hoard of gold, lost knowledge, an old map of the land or a relic. Excavation can also reveal a new road for your people. It\'s a long way from home, so send an escort.',
