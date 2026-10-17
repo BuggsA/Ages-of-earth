@@ -1,6 +1,7 @@
 import { AURA, RALLY, BONUS, BLOOD_TOWER, BUILDINGS, DEER, LIGHTNING, VETERANCY, TICK_HZ, domainOf, secs, type UnitStats } from './data';
 import { hasCoils } from './ages';
 import { bleeds, curseTaken, drawBlood, hemoBlow, hemoTaken } from './blood';
+import { fairPurse } from './fair';
 import { distToRect } from './grid';
 import type { Spatial } from './spatial';
 import { modsOf, statsFor } from './stats';
@@ -64,8 +65,15 @@ export function hurt(s: GameState, target: Ent, damage: number, by: number, atta
   if (target.hp <= 0) {
     s.players[by].stats.kills++;
     if (target.kind === 'unit' && by !== target.owner) plunder(s, target, by);
-    if (target.kind === 'building') s.players[by].stats.razed++;
-    else if (credit && credit.hp > 0 && credit.owner === by && statsOf(s, target).cls !== 'citizen') {
+    if (target.kind === 'building') {
+      s.players[by].stats.razed++;
+      const purse = by !== target.owner ? fairPurse(s, target) : 0;
+      if (purse > 0) {
+        s.players[by].res.gold += purse;
+        s.players[by].stats.plunder = (s.players[by].stats.plunder ?? 0) + purse;
+        s.events.push({ k: 'plunder', owner: by, x: target.x, y: target.y, gold: purse });
+      }
+    } else if (credit && credit.hp > 0 && credit.owner === by && statsOf(s, target).cls !== 'citizen') {
       const before = rankOf(credit);
       credit.vet = (credit.vet ?? 0) + 1;
       const after = rankOf(credit);
