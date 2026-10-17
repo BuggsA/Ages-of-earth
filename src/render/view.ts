@@ -1096,6 +1096,11 @@ export class View {
             this.effects.ring(at, c[0], 5, 1.6);
             this.effects.ring(at, c[1], 3.5, 1.2);
             this.effects.burst(at.clone().setY(at.y + 1.5), { count: 60, speed: 3, up: ev.back ? 0.2 : 0.9, life: 1.8, size: 0.07, gravity: 2, colors: c });
+            // The age-up pulse (wonder): light leaps from the Town Center and a wave crosses the whole town.
+            if (!ev.back && ev.owner === this.viewer) {
+              this.sightings.raise(at, c[0]);
+              [[10, 1.4], [18, 2.2], [28, 3]].forEach(([size, life], i) => this.effects.ring(at.clone().setY(at.y + 0.1 + i * 0.01), c[i], size, life));
+            }
           }
           break;
         }
