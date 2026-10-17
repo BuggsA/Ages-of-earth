@@ -1,6 +1,6 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { aiTiding } from './tidings';
-import { AGES, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
@@ -3093,6 +3093,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   }
   // Between waves, a small band falls on rival citizens working far from their town (#260).
   const watching = new Set<number>();
+  if (L.clever && L.scouts !== false && !mem.attacking) for (const id of scouting(s, v, mem, ready, issue)) watching.add(id);
   if (L.clever && !plan.hold) for (const id of prowl(s, v, mem, ready, issue)) watching.add(id);
   // Between waves, a few riders cut the rivals' trade roads near home.
   if (L.clever) {
@@ -3125,6 +3126,60 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     return ox * ox + oy * oy > 36 && u.order.k === 'idle';
   });
   if (strays.length) issue({ t: 'move', p: p.id, ids: strays.map((u) => u.id), x: mem.muster.x, y: mem.muster.y });
+}
+
+/**
+ * One rider scouts by itself (explore) and a pair of soldiers patrol the trade road to the nearest trading post, or the border
+ * toward the rival (#454 s4). Returns the soldiers newly sent, so the rest of the turn leaves them be.
+ */
+function scouting(s: GameState, v: View, mem: AiMemory, ready: Unit[], issue: (c: Command) => void): number[] {
+  const { p } = v;
+  const out: number[] = [];
+  if (s.tick < secs(AI_SCOUT.after)) return out;
+  const mine = (id: number) => {
+    const e = s.byId.get(id);
+    return e && e.kind === 'unit' && e.owner === p.id && e.hp > 0 ? e : null;
+  };
+  const scout = mem.scout ? mine(mem.scout.id) : null;
+  if (!scout || (scout.order.k === 'idle' && s.tick - mem.scout!.sent >= secs(AI_SCOUT.rest))) {
+    const rider = scout ?? ready.find((u) => u.type === 'cavalry');
+    if (rider) {
+      issue({ t: 'explore', p: p.id, ids: [rider.id] });
+      mem.scout = { id: rider.id, sent: s.tick };
+      out.push(rider.id);
+    }
+  }
+  const walking = (u: Unit) => u.order.k === 'patrol' || (u.order.k === 'attack' && u.order.back?.k === 'patrol');
+  const guards = (mem.guards ?? []).filter((id) => {
+    const u = mine(id);
+    return u && walking(u);
+  });
+  const pool = ready.filter((u) => (u.type === 'infantry' || u.type === 'ranged') && u.id !== mem.scout?.id);
+  if (guards.length < AI_SCOUT.guards && ready.length >= AI_SCOUT.army && pool.length) {
+    const band = pool.slice(0, AI_SCOUT.guards - guards.length);
+    const market = v.buildings.some((b) => b.type === 'market' && b.built);
+    let post: TradePost | null = null;
+    let bestD = Infinity;
+    if (market) for (const q of s.posts) {
+      const d = (q.x - v.home.x) * (q.x - v.home.x) + (q.y - v.home.y) * (q.y - v.home.y);
+      if (d < bestD) {
+        bestD = d;
+        post = q;
+      }
+    }
+    const ids = band.map((u) => u.id);
+    if (post) issue({ t: 'patrol', p: p.id, ids, x: post.x, y: post.y, post: post.id });
+    else if (mem.muster) {
+      const dx = mem.muster.x - v.home.x;
+      const dy = mem.muster.y - v.home.y;
+      const dl = Math.sqrt(dx * dx + dy * dy) || 1;
+      issue({ t: 'patrol', p: p.id, ids, x: v.home.x + (dx / dl) * AI_SCOUT.reach, y: v.home.y + (dy / dl) * AI_SCOUT.reach });
+    }
+    guards.push(...ids);
+    out.push(...ids);
+  }
+  mem.guards = guards;
+  return out;
 }
 
 /** Soldiers who can go prowling: not siege, and not the hero, who leads the army. */
