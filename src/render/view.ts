@@ -13,6 +13,7 @@ import { seesRect } from '../sim/vision';
 import { BuildingsView } from './buildingsView';
 import { CameraRig } from './camera';
 import { Birds, Effects } from './effects';
+import { Sightings, SIGHT_LORE, type Sighting } from './sightings';
 import { fogUniforms, glowUniform, timeUniform, windUniform } from './materials';
 import { forcedSeason, setSeasonLook } from './seasonLook';
 import { seasonAt } from '../sim/seasons';
@@ -111,6 +112,7 @@ export class View {
   /** Whether the land borders show (the O key). */
   showBorders = true;
   private effects: Effects;
+  private sightings = new Sightings();
   private birds = new Birds();
   private fireflies = new Fireflies();
   private bats = new Bats();
@@ -171,7 +173,7 @@ export class View {
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sky.mesh, this.hemi, this.fill, this.sun, this.sun.target);
-    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.ruins.group, this.landmarks.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points);
+    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.ruins.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points);
     this.scene.add(this.rangeGuides.mesh, this.borders.mesh, this.graze.mesh, this.foundations.mesh);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.post = new Post(this.renderer, this.scene, this.rig.camera);
@@ -249,6 +251,7 @@ export class View {
     fogUniforms.uFogOn.value = 1;
     const p = s.players[viewer];
     this.fog.snap(p.vis, p.seen);
+    this.sightings.reset(s, (x, y) => p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1);
     this.rig.setBounds(s.w, s.h);
     this.rig.groundAt = (x, z) => heightAt(s, x, z);
     this.rig.focus(p.startX, p.startY + 3, true);
@@ -274,6 +277,8 @@ export class View {
   private weatherSeason = 0;
   private heardSeason = -1;
   /** Told when the season turns, so the sound can follow it. */
+  /** Called when the viewer's people first see a ruin, relic or landmark (the HUD tells its lore). */
+  onSighting: ((what: Sighting['what'], x: number, y: number) => void) | null = null;
   onSeason: ((season: number) => void) | null = null;
   /** Told when the season changes what falls from the sky. */
   onWeather: ((day: WeatherDay) => void) | null = null;
@@ -435,6 +440,17 @@ export class View {
     this.posts.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1);
     this.ruins.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     this.landmarks.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
+    if (!this.reveal) {
+      for (const f of this.sightings.scan(s, (x, y) => p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1)) {
+        const look = SIGHT_LORE[f.what];
+        const at = this.ground(s, f.x, f.y, 0);
+        this.sightings.raise(at, look.color);
+        this.effects.ring(at.clone().setY(at.y + 0.1), look.color, 4, 1.8);
+        this.effects.burst(at.clone().setY(at.y + 0.6), { count: 24, speed: 1.4, up: 1, life: 2.4, size: 0.07, gravity: -0.4, drag: 0.8, colors: [look.color, '#ffffff'] });
+        this.onSighting?.(f.what, f.x, f.y);
+      }
+    }
+    this.sightings.update(dt);
     this.overlays.setShots(s, alpha, (x, y) => this.sees(x, y));
     this.drawSelection(s, sel);
     this.ambient(s, dt);
