@@ -20,10 +20,11 @@ When a Claude Code session finishes a task, it starts the next session itself, s
 ## Before spawning
 
 Check cheaply (one `list_issues` by label with `minimal_output`, and `main`'s last `ci`), never by rereading the docs.
-- **Don't spawn** if #2 is labelled `paused`, you merged nothing, `create_session` failed twice, a cap below stops you, or nothing waits in your lane and your chain's last two sessions each shipped only a minor tweak.
+- **Don't spawn** if #2 is labelled `paused`, you raised an `owner-decision` (the next session hits the same wall), `create_session` failed twice, a cap below stops you, or nothing waits in your lane and your chain's last two sessions each shipped only a minor tweak.
+- Merging nothing alone doesn't stop a successor (owner, 2026-10-17); the 8-session cap bounds a stalled chain.
 - **Don't spawn** from an owner-started chat or one-off, unless asked.
 - **Otherwise spawn.** Its task, in order: a red `ci-periodic` or `ci` on `main`, an `owner-ask`, a `ready` issue in your lane, else its own pitch.
-- Take related next steps yourself first (`docs/team.md`, "Small and often").
+- **Continue before you spawn** (owner, 2026-10-17: keep work in cache). Next step in the same umbrella or files: do it here, past 3 steps while related and uncompacted. Spawn when it's unrelated, you've compacted, or ~5 pull requests have merged.
 
 ## Chains and caps
 

@@ -93,7 +93,7 @@ Sessions end without warning, so claims are built for that.
 - **The base is `main`.** Work reaches it only by merged pull request; nobody pushes to it directly, docs included.
 - **One branch per task, one pull request,** named `claude/<issue>-<topic>` (other tools: `<tool>/<issue>-<topic>`). A merged branch is finished: the next task starts a new branch from `main`. Sessions whose branch name is set by their harness keep it.
 - **Needing another agent's unfinished work:** merge their branch into yours and say so on their issue. Merge, never rebase, other people's commits.
-- **Small and often.** One step, one pull request, merged in the same session. Up to 3 steps a session, only related ones (same umbrella or same files), each merged before the next; stop on a failure or escalation.
+- **Small and often.** One step, one pull request, merged in the same session. Up to 3 steps a session, only related ones (same umbrella or same files), each merged before the next; stop on a failure or escalation. More while related and uncompacted (`docs/successors.md`).
 
 ## Merging
 
