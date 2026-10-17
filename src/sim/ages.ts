@@ -115,6 +115,7 @@ export function roadProblem(s: GameState, p: Player, r: Road): string | null {
     if (r.found && !surveyFinds(s, r.found)) return 'There is none in this world';
     return `Needs a ${BUILDINGS[r.clue!].name}`;
   }
+  if (r.shuns && hasWalked(p, r.shuns)) return `Your people took the ${AGES[r.shuns].name}: this road is closed to it for good`;
   if (oreDone(p, r)) return null;
   if (oreOnly(s, r)) {
     const door = oreClue(s, p, r);
@@ -292,10 +293,16 @@ export const pathOf = (age: AgeId): PathId | undefined => AGES[age].path;
 export const pathAges = (path: PathId): AgeId[] =>
   (Object.keys(AGES) as AgeId[]).filter((a) => AGES[a].path === path).sort((a, b) => AGES[a].tier - AGES[b].tier);
 
-/** How many of its path's ages a people standing on a path has walked, the one it stands in counted; 0 off every path. */
+/** A path's whole line (#355 s2): for a branch, the ages of the path it left come first, then its own. */
+export function pathLine(path: PathId): AgeId[] {
+  const from = PATHS[path].branch;
+  return from ? [...pathLine(from), ...pathAges(path)] : pathAges(path);
+}
+
+/** How many of its path's ages (a branch's whole line) a people standing on a path has walked, the one it stands in counted; 0 off every path. */
 export function pathDepth(p: Player): number {
   const path = pathOf(ageOf(p));
-  return path ? pathAges(path).filter((a) => hasWalked(p, a)).length : 0;
+  return path ? pathLine(path).filter((a) => hasWalked(p, a)).length : 0;
 }
 
 /** Roads out of the player's age that carry on along its path: the way deeper. */

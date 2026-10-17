@@ -37,10 +37,10 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'blackPowder';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
-export type PathId = 'blood' | 'steppe';
+export type PathId = 'blood' | 'steppe' | 'hemocraft' | 'rite';
 
 /** Tile ground. Water and rock can't be walked or built on. */
 export const T_GRASS = 0;
@@ -471,6 +471,8 @@ export interface PlayerStats {
   levied?: number;
   /** Soldiers grafted at Transfusion Stations (#355 s3); absent in older saves. */
   grafted?: number;
+  /** Health the Blood-rite's altars mended with blood (#355 s2); absent in older saves. */
+  riteMended?: number;
 }
 
 /** One sample of a player's state for the post-game timeline. */
@@ -571,8 +573,11 @@ export type GameEvent =
   | { k: 'rank'; id: number; owner: number; x: number; y: number; rank: number }
   /** Gold taken from an enemy unit slain by a people with a plunder share (the Path of Blood, #299). */
   | { k: 'plunder'; owner: number; x: number; y: number; gold: number }
-  /** Blood drawn at a Drain Rig (#355): from an enemy who fell near it, or from citizens given to the levy. */
-  | { k: 'blood'; owner: number; x: number; y: number; n: number; how: 'slain' | 'levy' }
+  /**
+   * Blood drawn at a Drain Rig (#355): from an enemy who fell near it, or from citizens given to the levy; in Hemocraft (s2) also
+   * bled from a living enemy standing by a rig (`drain`, at the bled), and in the Blood-rite from the fallen near a Temple.
+   */
+  | { k: 'blood'; owner: number; x: number; y: number; n: number; how: 'slain' | 'levy' | 'drain' }
   /** A soldier grafted at a Transfusion Station (#355 s3), or a graft run dry far from every Station (`crash`). */
   | { k: 'graft'; owner: number; id: number; x: number; y: number; how: 'made' | 'crash' }
   /** A War Camp left without its soldiers (#303): it burns after a grace, or at once if its people left the path (`struck`). */

@@ -2185,8 +2185,8 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         }
         break;
       case 'blood':
-        // Blood drawn at a Drain Rig (#355).
-        if (ev.owner === viewer) {
+        // Blood drawn at a Drain Rig (#355). Hemocraft's drain (s2) bleeds every second: the spray shows it, and the toast stays for kills and levies.
+        if (ev.owner === viewer && ev.how !== 'drain') {
           play('blood');
           hud.toast(ev.how === 'levy' ? `🩸 ${ev.n} blood drawn from the levy` : `🩸 ${ev.n} blood drawn from the fallen`, 'good');
         }

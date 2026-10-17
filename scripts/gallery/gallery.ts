@@ -1,10 +1,12 @@
-// Model gallery for the look lane: every building of one epoch on a lawn, or one with ?t=<type>. See shoot.mjs.
+// Model gallery for the look lane: every building of one epoch on a lawn, or one with ?t=<type>; ?a=<age> dresses them for a side age. See shoot.mjs.
 import * as THREE from 'three';
 import { buildingGeometry } from '../../src/render/buildingModels';
 import { BUILDING_TYPES } from '../../src/sim/data';
+import type { AgeId } from '../../src/sim/types';
 const q = new URLSearchParams(location.search);
 const epoch = +(q.get('e') ?? 0);
 const only = q.get('t');
+const age = (q.get('a') ?? undefined) as AgeId | undefined;
 const W = 1600, H = 1000;
 const r = new THREE.WebGLRenderer({ canvas: document.getElementById('c') as HTMLCanvasElement, antialias: true, preserveDrawingBuffer: true });
 r.setSize(W, H); r.setClearColor(0x8fa8b8);
@@ -17,7 +19,7 @@ const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200).rotateX(-Math.PI
 scene.add(ground);
 const sp = only ? 0 : 8;
 types.forEach((t, i) => {
-  const g = buildingGeometry(t, epoch, '#cc3333');
+  const g = buildingGeometry(t, epoch, '#cc3333', 0, age);
   const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true }));
   m.position.set((i % cols - (cols - 1) / 2) * sp, 0, (Math.floor(i / cols) - (rows - 1) / 2) * sp);
   scene.add(m);

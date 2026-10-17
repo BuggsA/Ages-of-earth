@@ -5,7 +5,7 @@ import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
 import { RARE_OF_TILE } from '../sim/units';
-import { RARE, BLOOD, HEMO, AGES, WAY, WAYS, WAY_IDS, CALL_UP, PATHS, WARCAMP, FLOCK, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { RARE, BLOOD, HEMO, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, CALL_UP, PATHS, WARCAMP, FLOCK, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -17,7 +17,7 @@ import { vowProblem, wayProblem } from '../sim/ways';
 import { beaconProblem, lit } from '../sim/beacon';
 import { callUpProblem, callUpReach, campGrace, musterWait } from '../sim/warcamp';
 import { bloodOf, bloodShort, grafted, levyProblem, levyReach } from '../sim/blood';
-import { graftWait, waiting } from '../sim/hemo';
+import { feedReach, graftCost, graftWait, waiting } from '../sim/hemo';
 import { chantedOver, consecrates, faithOf } from '../sim/consecrate';
 import { rallyProblem } from '../sim/rally';
 import { stirred as stirredNow } from '../sim/combat';
@@ -27,7 +27,7 @@ import { isMobile, packProblem, packsOf, pitchProblem } from '../sim/steppe';
 import { exacting, isRider } from '../sim/tribute';
 import { landOwnerAt } from '../sim/borders';
 import { flockCap, flockOf, lambProblem } from '../sim/flocks';
-import { ageDef, ageOf, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, oreClue, oreDone, oreOnly, ironTradeShare, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, pathAges, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, surveyFinds, suspendedTechs, trainsAt, windowsOf } from '../sim/ages';
+import { ageDef, ageOf, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, oreClue, oreDone, oreOnly, ironTradeShare, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, pathLine, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, surveyFinds, suspendedTechs, trainsAt, windowsOf } from '../sim/ages';
 import type { Building, BuildingType, Command, Cost, Ent, GameState, Landmark, Player, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
 import { RARES, RES, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
@@ -316,7 +316,7 @@ export class Hud {
       RARES.filter((r) => (p.rare?.[r] ?? 0) > 0)
         .map((r) => `<div class="res" data-tip="<b>${RARE[r].name}</b>${RARE[r].blurb} Mined from deep veins that only some worlds hold.">${RARE_ICON[r]}${Math.floor(p.rare![r]!)}</div>`)
         .join('') +
-      (p.blood !== undefined ? `<div class="res" data-tip="<b>Blood</b>Drawn at Drain Rigs from the enemy who fall near them, and from citizens given to the levy. Spent to raise Blood Towers, and at Transfusion Stations to graft soldiers.">🩸${Math.floor(bloodOf(p))}</div>` : '') +
+      (p.blood !== undefined ? `<div class="res" data-tip="<b>Blood</b>Drawn at Drain Rigs from the enemy who fall near them, and from citizens given to the levy. Spent to raise Blood Towers, and at Transfusion Stations to graft soldiers. In Hemocraft the rigs also bleed the living enemy who stand near them; in the Blood-rite every Temple draws as a rig does, and spends blood to mend your own.">🩸${Math.floor(bloodOf(p))}</div>` : '') +
       `<div class="res pop ${p.pop >= p.cap ? 'full' : ''}" data-tip="<b>Population</b>People and soldiers you have, and room for. Houses add 5 each, a Town Center 10 (150 at most).">${icon('pop')}${p.pop}/${p.cap}</div>`;
     const civ = CIVS[p.civ];
     const board = s.players
@@ -325,7 +325,7 @@ export class Hud {
     this.resEl.innerHTML += `<div class="res civ" data-tip="<b>${civ.name}</b>${civ.blurb}<br><i>${SIGNATURES[p.civ].blurb}</i>${p.way ? `<br>${WAYS[p.way].icon} <b>${WAYS[p.way].name}</b>: ${WAYS[p.way].blurb}${p.deep ? `<br>Deepened: ${WAYS[p.way].deep.blurb}` : ''}` : ''}">${crestSvg(p.civ, p.color, 18)}${civ.name}${p.way ? ` ${WAYS[p.way].icon}` : ''}</div><div class="res score" data-tip="<b>Score</b>Gathering, fighting, building, research and epochs.${board}">⭐${scores[viewer]}</div>`;
     this.epochEl.innerHTML = road
       ? `${age.name} <span class="bar" data-tip="<b>${road.back ? 'Stepping back' : 'Advancing'} to the ${AGES[road.to].name}</b>${adv}%"><i style="width:${adv}%"></i></span>`
-      : `<span data-tip="<b>${age.name}</b>${age.blurb}${age.path ? `<br><i>${PATHS[age.path].name}: step ${pathDepth(p)} of ${pathAges(age.path).length + (PATHS[age.path].planned?.length ?? 0)}. ${age.path === 'steppe' ? `Tribute taken: ${Math.floor(p.stats.tribute ?? 0)} gold.${age.caravans ? ` Gold the caravans earned on the move: ${p.stats.caravan ?? 0}. Tolls taken from rival traders: ${p.stats.toll ?? 0}.` : ''}` : `Plunder taken: ${p.stats.plunder ?? 0} gold.`}</i>` : ''}${idleTechs.length ? `<br>Suspended until you climb again: ${idleTechs.join(', ')}.` : ''}${mainRoad(p) ? `<br><span class='hint'>Advance at a Town Center.</span>` : ''}">${age.name}</span>`;
+      : `<span data-tip="<b>${age.name}</b>${age.blurb}${age.path ? `<br><i>${PATHS[age.path].name}: step ${pathDepth(p)} of ${pathLine(age.path).length + (PATHS[age.path].planned?.length ?? 0)}.${age.hemocraft || age.rite ? ` Blood drawn: ${Math.floor(p.stats.blood ?? 0)}.${age.rite ? ` Health mended at the altars: ${Math.floor(p.stats.riteMended ?? 0)}.` : ''}` : ''} ${age.path === 'steppe' ? `Tribute taken: ${Math.floor(p.stats.tribute ?? 0)} gold.${age.caravans ? ` Gold the caravans earned on the move: ${p.stats.caravan ?? 0}. Tolls taken from rival traders: ${p.stats.toll ?? 0}.` : ''}` : `Plunder taken: ${p.stats.plunder ?? 0} gold.`}</i>` : ''}${idleTechs.length ? `<br>Suspended until you climb again: ${idleTechs.join(', ')}.` : ''}${mainRoad(p) ? `<br><span class='hint'>Advance at a Town Center.</span>` : ''}">${age.name}</span>`;
     this.idleEl.textContent = `Idle ${idle}`;
     this.idleEl.classList.toggle('alert', idle > 0);
     document.getElementById('speed-btn')!.textContent = `${speed}×`;
@@ -533,7 +533,7 @@ export class Hud {
     const toll = paidTo.length ? `<span data-tip="<b>Toll paid</b>This load paid ${paidTo.join(' and ')} a toll for safe passage across its land. A road that keeps out of a caravan people's land pays in full.">🛂<em>Toll paid</em></span>` : '';
     // Hemocraft (#355 s3): a grafted soldier, and how long its graft holds away from the Stations.
     const hemoLeft = grafted(s, u) ? Math.ceil((u.hemo! - s.tick) / TICK_HZ) : 0;
-    const graft = hemoLeft ? `<span data-tip="<b>Grafted</b>Hemo-engineered: blows ${Math.round((HEMO.attack - 1) * 100)}% harder, ${Math.round((HEMO.pace - 1) * 100)}% faster, mends ${HEMO.mend} a second and can't be converted. Blades, arrows and hooves land ${Math.round((1 - HEMO.flesh) * 100)}% softer, but siege, ships, aircraft and coils hit ${Math.round((HEMO.machine - 1) * 100)}% harder. Fed within ${HEMO.reach} tiles of a Transfusion Station; away from them it runs dry in ${hemoLeft}s and the soldier loses ${Math.round(HEMO.crash * 100)}% of its health.">🩸<em>Grafted</em> ${hemoLeft >= HEMO.last - 1 ? 'fed' : `${hemoLeft}s`}</span>` : '';
+    const graft = hemoLeft ? `<span data-tip="<b>Grafted</b>Hemo-engineered: blows ${Math.round((HEMO.attack - 1) * 100)}% harder, ${Math.round((HEMO.pace - 1) * 100)}% faster, mends ${HEMO.mend} a second and can't be converted. Blades, arrows and hooves land ${Math.round((1 - HEMO.flesh) * 100)}% softer, but siege, ships, aircraft and coils hit ${Math.round((HEMO.machine - 1) * 100)}% harder. Fed within ${feedReach(s.players[u.owner])} tiles of a Transfusion Station; away from them it runs dry in ${hemoLeft}s and the soldier loses ${Math.round(HEMO.crash * 100)}% of its health.">🩸<em>Grafted</em> ${hemoLeft >= HEMO.last - 1 ? 'fed' : `${hemoLeft}s`}</span>` : '';
     const held = u.type === 'priest' && carriedBy(s, u) ? `<span data-tip="<b>Relic</b>Carried to a Temple, it brings in gold. Hands full: no healing or converting until it is set down (D).">⚱<em>Relic</em></span>` : '';
     const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}:${u.cargo.length}:${rank}:${taking}:${road}:${u.tolled ?? 0}:${hemoLeft}`;
     const html = `<div class="sel-portrait"><img src="${unitPicture(u.type, u.type === 'wagon' && u.packed === 'market' ? p.epoch + 20 : p.epoch, p.color)}" alt=""></div>
@@ -633,14 +633,20 @@ export class Hud {
     }
     // A Transfusion Station (#355 s3): who waits for a graft, and whether there is blood for it.
     if (mine && b.built && b.type === 'transfusion') {
+      const cost = graftCost(p);
       const queued = waiting(s, b).length;
       const wait = graftWait(s, b);
       status += !queued
-        ? ` · <span data-tip="<b>Transfusion</b>Send foot soldiers, archers, riders or a hero inside (right-click, or G): each is grafted for ${HEMO.cost} blood, ${HEMO.work} seconds apiece, and the doors open when all are done. Grafts within ${HEMO.reach} tiles of a Station stay fed.">🩸 Ready: send soldiers in</span>`
-        : bloodOf(p) < HEMO.cost && !wait
-          ? ` · <span data-tip="<b>No blood</b>Each graft costs ${HEMO.cost} blood. Draw more at a Drain Rig, or let the soldiers out (U).">⚠ ${queued} waiting: needs ${HEMO.cost} blood</span>`
-          : ` · <span data-tip="<b>Grafting</b>One soldier at a time, ${HEMO.work} seconds and ${HEMO.cost} blood each.">🩸 Grafting: ${queued} waiting${wait ? `, next in ${wait}s` : ''}</span>`;
+        ? ` · <span data-tip="<b>Transfusion</b>Send foot soldiers, archers, riders or a hero inside (right-click, or G): each is grafted for ${cost} blood, ${HEMO.work} seconds apiece, and the doors open when all are done. Grafts within ${feedReach(p)} tiles of a Station stay fed.">🩸 Ready: send soldiers in</span>`
+        : bloodOf(p) < cost && !wait
+          ? ` · <span data-tip="<b>No blood</b>Each graft costs ${cost} blood. Draw more at a Drain Rig, or let the soldiers out (U).">⚠ ${queued} waiting: needs ${cost} blood</span>`
+          : ` · <span data-tip="<b>Grafting</b>One soldier at a time, ${HEMO.work} seconds and ${cost} blood each.">🩸 Grafting: ${queued} waiting${wait ? `, next in ${wait}s` : ''}</span>`;
     }
+    // The fork (#355 s2): a Hemocraft rig drains the living who stand near it; a Blood-rite Temple is an altar.
+    if (mine && b.built && b.type === 'drainrig' && ageDef(p).hemocraft)
+      status += ` · <span data-tip="<b>Draining</b>Each second, up to ${HEMOCRAFT.most} living enemies within ${HEMOCRAFT.drain} tiles bleed ${HEMOCRAFT.bleed} health into your store, ${HEMOCRAFT.yield} blood a point, and those who die of it pay their blood again. Machines, ships and aircraft bleed nothing.">🩸 Draining the living within ${HEMOCRAFT.drain} tiles</span>`;
+    if (mine && b.built && b.type === 'temple' && ageDef(p).rite)
+      status += ` · <span data-tip="<b>Altar</b>Enemies who fall within ${BLOOD.reach} tiles give up their blood, as at a Drain Rig. Each second the altar mends up to ${RITE.most} of your hurt living within ${RITE.reach} tiles, ${RITE.mend} health each, for ${RITE.price} blood a point, while the store lasts.">${bloodOf(p) > 0 ? '🩸 Altar: mending with blood' : '⚠ Altar: no blood to mend with'}</span>`;
     const inside = def.garrison && b.built ? `<div class="stats"><span data-tip="<b>Sheltering</b>Units inside are safe, heal slowly and add arrows.">🏰<em>Inside</em> ${b.garrison.length}/${def.garrison}</span></div>` : '';
     const sig = `b:${b.id}:${Math.ceil(b.hp)}:${status}:${b.queue.length}:${p.epoch}:${queue.length}:${b.garrison.length}`;
     const html = `<div class="sel-portrait"><img src="${buildingPicture(b.type, p.epoch, p.color)}" alt=""></div>

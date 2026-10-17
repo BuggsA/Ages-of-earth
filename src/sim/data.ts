@@ -84,6 +84,16 @@ export interface Age {
   callUp?: boolean;
   /** Drain Rigs draw blood from the enemy dead near them (#355). */
   blood?: boolean;
+  /**
+   * The Age of Hemocraft (#355 s2), blood run through machines: a Drain Rig bleeds the living enemy who stand near it, and grafts
+   * come cheaper and are fed from farther off. The numbers are `HEMOCRAFT` (`fork.ts`).
+   */
+  hemocraft?: boolean;
+  /**
+   * The Age of the Blood-rite (#355 s2), blood as a sacrament: every Temple is an altar that draws blood from the enemy who fall near
+   * it, and pays it out to mend the people's own living near it. The numbers are `RITE` (`fork.ts`).
+   */
+  rite?: boolean;
   /** A people that raises again on the foundations of what fell (the Age of Reclaimers): see `RECLAIM` (`reclaim.ts`). */
   reclaim?: boolean;
   /** Aircraft fly on fuel from the Airfield (the Age of Aeronauts): see `SORTIE` (`sortie.ts`). */
@@ -108,6 +118,11 @@ export interface Path {
   blurb: string;
   carry?: Partial<Mods>;
   planned?: string[];
+  /**
+   * The path this one branches from (#355 s2): where a path forks, each fork is a path of its own (one age to a tier), and the
+   * ages of the path it left count toward how far it has been walked (`pathLine`), so the carry keeps growing past the fork.
+   */
+  branch?: PathId;
 }
 
 export const PATHS: Record<PathId, Path> = {
@@ -116,6 +131,20 @@ export const PATHS: Record<PathId, Path> = {
     blurb: 'A people that lives by war: it trades with no one, and feeds its towns on what its soldiers take from the enemy dead. Each age of the path opens with a deeper deed of blood, and the plunder grows with every age of it walked.',
     carry: { plunder: 0.1 },
     planned: ['a Blood heirloom, shared with another road'],
+  },
+  // The fork at the end of the Path of Blood (#355 s2): two branches past Total War, each its own path, both carrying the plunder on.
+  hemocraft: {
+    name: 'Hemocraft',
+    branch: 'blood',
+    blurb: 'The Path of Blood past Total War, where blood is run through machines: pumps, needles and steel. Every age of the Path of Blood walked before it still adds to the plunder.',
+    carry: { plunder: 0.1 },
+  },
+  rite: {
+    name: 'Blood-rite',
+    branch: 'blood',
+    blurb: 'The Path of Blood past Total War, where blood is a sacrament: altars, offerings and priests. Every age of the Path of Blood walked before it still adds to the plunder.',
+    carry: { plunder: 0.1 },
+    planned: ['blood priests, sacrifice and curses'],
   },
   // The Steppe (#297, #318): the second main path, a people whose town moves. The riders grow quicker with every age of it walked.
   steppe: {
@@ -247,6 +276,33 @@ export const AGES: Record<AgeId, Age> = {
     no: { units: ['trader'], why: 'A people at total war trades with no one: traders wait until your people leave the Path of Blood' },
     callUp: true,
     blood: true,
+  },
+  // The fork at the end of the Path of Blood (#355 s2): two turns off the Industrial Age for a people that walked Total War, each its
+  // own branch path. Hemocraft is blood and machinery as one craft; the Blood-rite is blood as a sacrament. Each shuns the other.
+  hemocraft: {
+    name: 'Age of Hemocraft',
+    short: 'Hemocraft',
+    tier: 4,
+    path: 'hemocraft',
+    blurb: 'Blood run through machines. Every Drain Rig becomes a drain: a living enemy standing within 6 tiles of a finished rig is bled 2 health a second into your store, up to 8 at once for each rig, and what dies there pays its blood as well. Machines, ships and aircraft bleed nothing, so a rival\'s answer is steel. Grafts at the Transfusion Station cost a quarter less blood and stay fed 16 tiles from one. The plunder goes on growing. But a people of pumps and needles keeps no priests and sends no traders, its fields yield 15% less, and learning costs a tenth more.',
+    add: { plunder: 0.25 },
+    mul: { farm: 0.85, techCost: 1.1 },
+    no: { units: ['trader', 'priest'], why: 'A people of pumps and needles keeps no priests and sends no traders: they wait until it leaves Hemocraft' },
+    blood: true,
+    hemocraft: true,
+  },
+  bloodrite: {
+    name: 'Age of the Blood-rite',
+    short: 'Blood-rite',
+    tier: 4,
+    path: 'rite',
+    blurb: 'Blood as a sacrament. Every finished Temple is an altar: a living enemy who falls within 14 tiles of one gives up its blood as at a Drain Rig, and the altar pays blood out to mend your own living within 8 tiles, 2 health a second each and up to 10 at once, a quarter of a blood for every point, while the store lasts. Priests cost a quarter less and heal and convert a quarter faster. The plunder goes on growing. But the rite scorns the pumps: no Transfusion Station is raised, siege engines cost a quarter more, no traders leave the Markets, and the fields yield 15% less.',
+    add: { plunder: 0.25 },
+    mul: { priest: 1.25, farm: 0.85 },
+    price: { priest: 0.75, siege: 1.25 },
+    no: { units: ['trader'], why: 'A people of the Blood-rite trades with no one: traders wait until it leaves the rite' },
+    blood: true,
+    rite: true,
   },
   steppe: {
     name: 'Age of the Steppe',
@@ -416,6 +472,8 @@ export interface Road {
   also?: Deed[];
   /** What taking it means, for the tooltip (trunk roads use the age's blurb). */
   blurb?: string;
+  /** Closed for good to a people that has walked this age (#355 s2): the two branches of a fork shut each other. */
+  shuns?: AgeId;
   /**
    * How hard the door is (#348): an easy on-ramp (a small deed, a modest price) invites a people to try the
    * web; a hard gate (a dear price, a long journey) marks the special ages. Most roads carry neither, and
@@ -628,7 +686,35 @@ export const ROADS: Road[] = [
     deed: { stat: 'campTrained', n: 12, text: 'Your War Camps train 12 foot soldiers' },
     blurb: 'A turn, not a climb: the last step on the Path of Blood. War Camps return as muster grounds, where citizens are called to arms and become foot soldiers where they stand; plunder is the deepest of the path. What it gives up: trade, a fifth of the harvest and a quarter more for every technology. Every citizen called up is one less at work.',
   },
-  { from: 'totalwar', to: 'industrial', cost: { food: 300, gold: 200 }, time: 30, blurb: 'Make peace: the ordinary Industrial Age, with trade, full fields and the usual price of learning. The plunder ends, the War Camps are struck, and those called to arms stay soldiers.' },
+  { from: 'totalwar', to: 'industrial', cost: { food: 300, gold: 200 }, time: 30, blurb: 'Make peace: the ordinary Industrial Age, with trade, full fields and the usual price of learning. The plunder ends, the War Camps are struck, and those called to arms stay soldiers. From there a people that walked Total War finds the fork at the end of the path: Hemocraft or the Blood-rite.' },
+  // The fork (#355 s2): past Total War the Path of Blood splits in two. A read-only test keeps Total War's one road out (to Industry), so
+  // the fork leaves the Industrial Age, as Total War itself did, seen only by a people that walked Total War. Each branch shuns the other.
+  {
+    from: 'industrial',
+    to: 'hemocraft',
+    cost: { food: 600, wood: 300, gold: 600, stone: 200 },
+    time: 60,
+    clue: 'workshop',
+    gate: 'hard',
+    walked: 'totalwar',
+    shuns: 'bloodrite',
+    deed: { stat: 'grafted', n: 8, text: 'Your Transfusion Stations graft 8 soldiers' },
+    blurb: 'A turn, not a climb: one branch of the fork at the end of the Path of Blood, where blood and machinery become one craft. Drain Rigs bleed the living enemy who stand near them; grafts cost less and are fed from farther off. What it gives up: priests, trade, some harvest and some learning. Take it, and the Blood-rite is closed to your people for good.',
+  },
+  { from: 'hemocraft', to: 'industrial', cost: { food: 300, gold: 200 }, time: 30, blurb: 'Shut the pumps: the ordinary Industrial Age, with priests, trade, full fields and the usual price of learning. The plunder ends and the rigs only catch the fallen again. The Blood-rite stays closed.' },
+  {
+    from: 'industrial',
+    to: 'bloodrite',
+    cost: { food: 700, wood: 200, gold: 700 },
+    time: 60,
+    clue: 'temple',
+    gate: 'hard',
+    walked: 'totalwar',
+    shuns: 'hemocraft',
+    deed: { stat: 'levied', n: 6, text: 'Your people give 6 of their own to the levy' },
+    blurb: 'A turn, not a climb: one branch of the fork at the end of the Path of Blood, where blood becomes a sacrament. Every Temple is an altar that takes blood from the enemy who fall near it and mends your own with it; priests come cheaper and work faster. What it gives up: the Transfusion Station, trade, some harvest, and siege at a dearer price. Take it, and Hemocraft is closed to your people for good.',
+  },
+  { from: 'bloodrite', to: 'industrial', cost: { food: 300, gold: 200 }, time: 30, blurb: 'Put out the altar fires: the ordinary Industrial Age, with trade, full fields and siege at its usual price. The plunder ends and the Temples are Temples again. Hemocraft stays closed.' },
 ];
 
 /**
@@ -1061,10 +1147,10 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   // The Path of Blood (#303): pitched by foot soldiers where the army stands, enemy land too; burns when left alone (`WARCAMP`).
   warcamp: { name: 'War Camp', size: 2, hp: 700, cost: { wood: 100, gold: 40 }, time: 30, pop: 0, sight: 6, trains: ['infantry'], drop: [], epoch: 3, ages: ['ironblood', 'totalwar'], builders: ['infantry'], menu: 'mil', key: 'Q', blurb: 'Tents, a stockade and a war standard, pitched by foot soldiers where the army stands, in enemy land too. Trains foot soldiers at the front and holds the land round it, so the army there is fed. Left without soldiers nearby, it burns.' },
   // The Silk Road (#334): a waystation by the road, raised in no one's land too; it rests traders, holds the land round it, and makes a near post pay more (`SERAI`).
-  drainrig: { name: 'Drain Rig', size: 2, hp: 600, cost: { wood: 120, gold: 60 }, time: 30, pop: 0, sight: 6, trains: [], drop: [], epoch: 3, ages: ['ironblood', 'totalwar'], menu: 'mil', key: 'H', blurb: 'Copper troughs, a windlass and a rack of pale jars on trampled ground. Every living enemy who falls within 14 tiles of a finished rig gives up a fifth of its price as blood. Citizens within 6 tiles can be given to the levy (C): each is gone, and pays 30 blood. Blood raises Blood Towers and, in Total War, grafts soldiers at Transfusion Stations.' },
+  drainrig: { name: 'Drain Rig', size: 2, hp: 600, cost: { wood: 120, gold: 60 }, time: 30, pop: 0, sight: 6, trains: [], drop: [], epoch: 3, ages: ['ironblood', 'totalwar', 'hemocraft', 'bloodrite'], menu: 'mil', key: 'H', blurb: 'Copper troughs, a windlass and a rack of pale jars on trampled ground. Every living enemy who falls within 14 tiles of a finished rig gives up a fifth of its price as blood. Citizens within 6 tiles can be given to the levy (C): each is gone, and pays 30 blood. Blood raises Blood Towers and, in Total War and Hemocraft, grafts soldiers at Transfusion Stations. In Hemocraft the rig drains: living enemies standing within 6 tiles bleed into the store.' },
   // Hemocraft (#355 s3): blood spent. The Station grafts the soldiers sheltered inside (`HEMO`); the Blood Tower pays blood once and fires on the living (`BLOOD_TOWER`).
-  transfusion: { name: 'Transfusion Station', size: 2, hp: 800, cost: { wood: 100, stone: 60, gold: 80 }, time: 35, pop: 0, sight: 6, trains: [], drop: [], epoch: 4, garrison: 5, ages: ['totalwar'], menu: 'mil', key: 'T', blurb: 'A riveted iron shed of glass tanks, pumps and cots. Soldiers sent inside (foot, archers, riders and heroes) are grafted one at a time, 40 blood each: faster, harder-hitting and self-mending, deaf to conversion, and shrugging off blades, arrows and hooves, but machines (siege, ships, aircraft, a coil\'s bolt) hit them harder. A graft stays fed within 10 tiles of a standing Station and runs dry 150 seconds away from one: then the soldier crashes, losing a third of its health.' },
-  bloodtower: { name: 'Blood Tower', size: 2, hp: 1000, cost: { wood: 60, stone: 150 }, blood: 60, time: 45, pop: 0, sight: 9, trains: [], drop: [], epoch: 3, guns: { damage: 8, range: 8, reload: 2 }, ages: ['ironblood', 'totalwar'], menu: 'mil', key: 'L', blurb: 'A squat tower of black brick crowned with a copper cistern, paid for once with 60 blood. Its barbed bolts tear the living (soldiers, riders, citizens, priests) for three times a Watch Tower\'s harm, but glance off what does not bleed: siege, ships, aircraft and wagons take almost nothing. It takes no one inside.' },
+  transfusion: { name: 'Transfusion Station', size: 2, hp: 800, cost: { wood: 100, stone: 60, gold: 80 }, time: 35, pop: 0, sight: 6, trains: [], drop: [], epoch: 4, garrison: 5, ages: ['totalwar', 'hemocraft'], menu: 'mil', key: 'T', blurb: 'A riveted iron shed of glass tanks, pumps and cots. Soldiers sent inside (foot, archers, riders and heroes) are grafted one at a time, 40 blood each: faster, harder-hitting and self-mending, deaf to conversion, and shrugging off blades, arrows and hooves, but machines (siege, ships, aircraft, a coil\'s bolt) hit them harder. A graft stays fed within 10 tiles of a standing Station and runs dry 150 seconds away from one: then the soldier crashes, losing a third of its health.' },
+  bloodtower: { name: 'Blood Tower', size: 2, hp: 1000, cost: { wood: 60, stone: 150 }, blood: 60, time: 45, pop: 0, sight: 9, trains: [], drop: [], epoch: 3, guns: { damage: 8, range: 8, reload: 2 }, ages: ['ironblood', 'totalwar', 'hemocraft', 'bloodrite'], menu: 'mil', key: 'L', blurb: 'A squat tower of black brick crowned with a copper cistern, paid for once with 60 blood. Its barbed bolts tear the living (soldiers, riders, citizens, priests) for three times a Watch Tower\'s harm, but glance off what does not bleed: siege, ships, aircraft and wagons take almost nothing. It takes no one inside.' },
   caravanserai: { name: 'Caravanserai', size: 2, hp: 900, cost: { wood: 90, gold: 30 }, time: 25, pop: 0, sight: 6, trains: [], drop: [], epoch: 3, ages: ['silk'], menu: 'eco', key: 'C', blurb: 'A walled courtyard by the road where caravans rest. Raise it by a far trading post, in no one\'s land too: your traders\' trips to a post within 8 tiles of it pay a quarter more, traders and wagons within 4 tiles of it mend, and the land round it is yours, so rival traders crossing it pay your toll.' },
   airfield: { name: 'Airfield', size: 4, hp: 2200, cost: { wood: 250, stone: 100, gold: 150 }, time: 60, pop: 0, sight: 8, trains: ['fighter', 'bomber'], drop: [], epoch: 4, menu: 'mil', key: 'F', blurb: 'Builds fighters and bombers. Fighters hunt aircraft; bombers wreck towns.' },
 };
@@ -1614,6 +1700,20 @@ export const HEMO = { cost: 40, work: 4, last: 150, reach: 10, attack: 1.2, pace
 
 /** The Blood Tower (#355 s3): its bolts hit the living `living` times as hard as a Watch Tower's arrows, the bloodless `bloodless` times. */
 export const BLOOD_TOWER = { living: 3, bloodless: 0.15 };
+
+/**
+ * The Age of Hemocraft (#355 s2): each second a finished Drain Rig bleeds up to `most` living enemies within `drain` tiles (nearest first,
+ * ties in id order) of `bleed` health each, and `yield` blood comes into its people's store for every point bled. Grafts cost `graft` of
+ * `HEMO.cost`, and a Station feeds grafts within `reach` tiles of it (in place of `HEMO.reach`).
+ */
+export const HEMOCRAFT = { drain: 6, bleed: 2, most: 8, yield: 0.5, graft: 0.75, reach: 16 };
+
+/**
+ * The Age of the Blood-rite (#355 s2): a finished Temple draws blood from the enemy who fall within `BLOOD.reach` tiles of it, as a Drain
+ * Rig does. Each second it mends up to `most` of its people's hurt living (nearest first) within `reach` tiles, `mend` health each, paying
+ * `price` blood a point from the store; with the store dry it mends no one.
+ */
+export const RITE = { reach: 8, mend: 2, most: 10, price: 0.25 };
 
 /** Selling rare ore at a Market (#356 s5): a lot of `lot` pays `gold[ore]` gold at a flat price. Ore mined still counts toward its doors; only the stock in hand is spent. */
 export const ORE_TRADE = { lot: 20, gold: { salt: 40, saltpetre: 55, bloodiron: 90 } as Record<'salt' | 'saltpetre' | 'bloodiron', number> };

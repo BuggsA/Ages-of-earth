@@ -1,6 +1,6 @@
-import { AGES, BLOOD, BUILDINGS, HEMO, CALL_UP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, secs } from '../sim/data';
-import { ageOf, backTo, deedProgress, deedsDone, mainRoad, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
-import type { Building, GameState, Unit } from '../sim/types';
+import { AGES, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, secs } from '../sim/data';
+import { ageOf, backTo, hasWalked, deedProgress, deedsDone, mainRoad, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
+import type { AgeId, Building, GameState, Unit } from '../sim/types';
 import { R_FISH } from '../sim/types';
 import { isIdleCitizen } from './idle';
 
@@ -16,6 +16,10 @@ const SAIL_ROAD = ROADS.find((r) => r.to === 'sail')!;
 const WARBAND_ROAD = ROADS.find((r) => r.to === 'warband')!;
 const IRONBLOOD_ROAD = ROADS.find((r) => r.to === 'ironblood')!;
 const TOTALWAR_ROAD = ROADS.find((r) => r.to === 'totalwar')!;
+const CRAFT_ROAD = ROADS.find((r) => r.to === 'hemocraft')!;
+const RITE_ROAD = ROADS.find((r) => r.to === 'bloodrite')!;
+/** The ages where blood is drawn: the late Path of Blood and both branches of its fork (#355). */
+const BLOOD_AGES: AgeId[] = ['ironblood', 'totalwar', 'hemocraft', 'bloodrite'];
 const FAIR_ROAD = ROADS.find((r) => r.to === 'fair')!;
 const HORDE_ROAD = ROADS.find((r) => r.from === 'steppe' && r.to === 'horde')!;
 
@@ -196,13 +200,13 @@ const TIPS: Tip[] = [
   {
     id: 'drainrig',
     // The Drain Rig (#355 s1): a late age of the Path of Blood, until the player has raised one.
-    when: (s, me) => ['ironblood', 'totalwar'].includes(ageOf(s.players[me])) && !has(s, me, 'drainrig'),
+    when: (s, me) => BLOOD_AGES.includes(ageOf(s.players[me])) && !has(s, me, 'drainrig'),
     text: `The Path of Blood has one more thing to take from the fallen. A <b>Drain Rig</b> (military buildings) draws a fifth of the price of every living enemy who falls within ${BLOOD.reach} tiles as <b>blood</b> (🩸 in the top bar), and its levy (<b>C</b>) gives the citizens beside it for ${BLOOD.levy} blood each. Machines and ships bleed nothing. Blood raises <b>Blood Towers</b> and, in Total War, grafts soldiers.`,
   },
   {
     id: 'bloodtower',
     // The Blood Tower (#355 s3): once there is blood to raise one with.
-    when: (s, me) => ['ironblood', 'totalwar'].includes(ageOf(s.players[me])) && (s.players[me].blood ?? 0) >= (BUILDINGS.bloodtower.blood ?? 0) && !has(s, me, 'bloodtower'),
+    when: (s, me) => BLOOD_AGES.includes(ageOf(s.players[me])) && (s.players[me].blood ?? 0) >= (BUILDINGS.bloodtower.blood ?? 0) && !has(s, me, 'bloodtower'),
     text: `You hold enough blood for a <b>Blood Tower</b> (military buildings, <b>L</b>): paid for once, it tears the living for three times a Watch Tower's harm, but siege, ships and aircraft barely notice it. Raise it where infantry and riders will come; meet machines with machines.`,
   },
   {
@@ -210,6 +214,25 @@ const TIPS: Tip[] = [
     // Hemocraft (#355 s3): Total War with blood in store, until the player has a Transfusion Station.
     when: (s, me) => ageOf(s.players[me]) === 'totalwar' && (s.players[me].blood ?? 0) >= HEMO.cost && !has(s, me, 'transfusion'),
     text: `Blood can remake your soldiers. A <b>Transfusion Station</b> (military buildings, <b>T</b>) grafts the soldiers you send inside, ${HEMO.cost} blood each: faster, harder-hitting, self-mending and deaf to priests, shrugging off blades and arrows. But machines hit them harder, and a graft runs dry ${HEMO.last} seconds from every Station: guard the Stations, or the army crashes.`,
+  },
+  {
+    id: 'fork',
+    // The fork at the end of the Path of Blood (#355 s2): in Total War, or back in the Industrial Age after it, before either branch is taken.
+    when: (s, me) => {
+      const p = s.players[me];
+      return (ageOf(p) === 'totalwar' || (ageOf(p) === 'industrial' && hasWalked(p, 'totalwar'))) && !hasWalked(p, 'hemocraft') && !hasWalked(p, 'bloodrite');
+    },
+    text: `Past Total War the Path of Blood forks, and you may take only one branch. Make peace, and from the Industrial Age the Town Center (🔀) can turn to <b>${AGES.hemocraft.name}</b> (${CRAFT_ROAD.deed!.n} soldiers grafted, a Siege Workshop standing): Drain Rigs bleed the living who stand near them. Or to <b>${AGES.bloodrite.name}</b> (${RITE_ROAD.deed!.n} citizens given to the levy, a Temple standing): every Temple becomes an altar that mends your own with blood.`,
+  },
+  {
+    id: 'hemocraft',
+    when: (s, me) => ageOf(s.players[me]) === 'hemocraft',
+    text: `Your Drain Rigs drain now: every living enemy standing within ${HEMOCRAFT.drain} tiles of one bleeds ${HEMOCRAFT.bleed} health a second into your store. Raise rigs where the enemy must come, behind Blood Towers, and graft soldiers for ${HEMO.cost * HEMOCRAFT.graft} blood. Your rival's answer will be machines: siege, ships and aircraft bleed nothing, so keep guns of your own for them.`,
+  },
+  {
+    id: 'bloodrite',
+    when: (s, me) => ageOf(s.players[me]) === 'bloodrite',
+    text: `Every Temple is an altar now. Enemies who fall within ${BLOOD.reach} tiles of one give up their blood, and the altar spends it to mend your own within ${RITE.reach} tiles. Fight near your Temples, keep the store full with a Drain Rig and the levy, and send cheaper, quicker priests with the army. No Transfusion Station is raised, and siege comes dear: the rite answers machines with faith and towers.`,
   },
   {
     id: 'callup',

@@ -7,7 +7,8 @@ import type { Building, BuildingType, Ent, GameState, Player, Unit, UnitType } f
  * Blood (#355 s1): a store of its own, kept as `Player.blood` so the four ordinary resources stay as they are. It is drawn two ways:
  * from the enemy's living dead that fall within `BLOOD.reach` tiles of one of the killer's finished Drain Rigs, and by the levy,
  * which turns the citizens near a rig into blood. It is spent (s3) on Blood Towers, paid once to raise, and at Transfusion Stations,
- * which graft soldiers (`hemo.ts`).
+ * which graft soldiers (`hemo.ts`). Past the fork (s2, `fork.ts`) Hemocraft's rigs also bleed the living who stand near them, and the
+ * Blood-rite's Temples draw as rigs do and pay blood out to mend.
  */
 
 /** Machines and ships bleed nothing. */
@@ -60,18 +61,22 @@ export function bloodOf(p: Player): number {
   return p.blood ?? 0;
 }
 
-function rigsOf(s: GameState, owner: number): Building[] {
+/** The people's finished, standing buildings of one type, in id order. */
+function standing(s: GameState, owner: number, type: BuildingType): Building[] {
   const out: Building[] = [];
-  for (const e of s.ents) if (e.kind === 'building' && e.type === 'drainrig' && e.owner === owner && e.built && e.hp > 0) out.push(e);
+  for (const e of s.ents) if (e.kind === 'building' && e.type === type && e.owner === owner && e.built && e.hp > 0) out.push(e);
   return out;
 }
+
+const rigsOf = (s: GameState, owner: number): Building[] => standing(s, owner, 'drainrig');
 
 /** Whether the player has a Drain Rig standing, so the blood store shows. */
 export function hasRig(s: GameState, owner: number): boolean {
   return rigsOf(s, owner).length > 0;
 }
 
-function add(s: GameState, p: Player, n: number, x: number, y: number, how: 'slain' | 'levy'): void {
+/** Blood comes into a people's store, and the tally that the fork's deeds and the end report read. */
+export function gainBlood(s: GameState, p: Player, n: number, x: number, y: number, how: 'slain' | 'levy' | 'drain'): void {
   p.blood = bloodOf(p) + n;
   p.stats.blood = (p.stats.blood ?? 0) + n;
   s.events.push({ k: 'blood', owner: p.id, x, y, n, how });
@@ -81,12 +86,15 @@ function add(s: GameState, p: Player, n: number, x: number, y: number, how: 'sla
 export function drawBlood(s: GameState, target: Unit, by: number): void {
   if (BLOODLESS.includes(target.type)) return;
   const p = s.players[by];
-  if (!ageDef(p).blood) return;
+  const age = ageDef(p);
+  if (!age.blood) return;
   const r2 = BLOOD.reach * BLOOD.reach;
-  if (!rigsOf(s, by).some((b) => (b.x - target.x) * (b.x - target.x) + (b.y - target.y) * (b.y - target.y) <= r2)) return;
+  const near = (b: Building) => (b.x - target.x) * (b.x - target.x) + (b.y - target.y) * (b.y - target.y) <= r2;
+  // In the Blood-rite (#355 s2) every Temple is an altar, and draws as a rig does.
+  if (!rigsOf(s, by).some(near) && !(age.rite && standing(s, by, 'temple').some(near))) return;
   const c = statsOf(s, target).cost;
   const n = Math.max(1, Math.floor(((c.food ?? 0) + (c.wood ?? 0) + (c.gold ?? 0) + (c.stone ?? 0)) * BLOOD.share));
-  add(s, p, n, target.x, target.y, 'slain');
+  gainBlood(s, p, n, target.x, target.y, 'slain');
 }
 
 /** The player's citizens within `BLOOD.levyReach` tiles of the rig, nearest first (ties in id order). */
@@ -131,6 +139,6 @@ export function levy(s: GameState, p: Player, b: Building, n = 1): number {
   s.ents = s.ents.filter((e) => !gone.has(e.id));
   b.muster = s.tick + secs(BLOOD.rest) * taken.length;
   p.stats.levied = (p.stats.levied ?? 0) + taken.length;
-  add(s, p, BLOOD.levy * taken.length, b.x, b.y, 'levy');
+  gainBlood(s, p, BLOOD.levy * taken.length, b.x, b.y, 'levy');
   return taken.length;
 }
