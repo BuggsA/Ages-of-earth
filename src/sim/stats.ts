@@ -1,5 +1,6 @@
-import { AGES, BUILDINGS, CIVS, WAYS, WORKS, SIGNATURES, EPOCHS, NO_MODS, PATHS, RARE, TECHS, WARCAMP, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
+import { AGES, BUILDINGS, CIVS, WAYS, WORKS, SIGNATURES, EPOCHS, FLOOD, NO_MODS, PATHS, RARE, TECHS, WARCAMP, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
 import { fairLevy } from './fair';
+import { flooded } from './flood';
 import { ageDef, ageOf, hasWalked, isHire, isSuspended, pathCarry } from './ages';
 import type { BuildingType, Cost, GameState, Player, TechId, UnitType } from './types';
 import { RES } from './types';
@@ -199,8 +200,8 @@ export function techProblem(s: GameState, owner: number, tech: TechId): string |
   return null;
 }
 
-/** Seconds a building takes to go up for one citizen (some civilizations build faster). */
+/** Seconds a building takes to go up for one citizen (some civilizations build faster, and the Nile flood's corvée faster still). */
 export function buildTimeFor(s: GameState, owner: number, type: BuildingType): number {
-  return BUILDINGS[type].time / modsOf(s, owner).buildSpeed;
+  return BUILDINGS[type].time / modsOf(s, owner).buildSpeed / (flooded(s, owner) ? FLOOD.build : 1);
 }
 

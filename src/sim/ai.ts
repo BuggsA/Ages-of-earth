@@ -28,8 +28,9 @@ import { rallyProblem } from './rally';
 import { consecrateProblem, consecrates } from './consecrate';
 import { sees } from './vision';
 import { seasonAt } from './seasons';
+import { flooded } from './flood';
 import { catchOf, herdsOut, yarding } from './year';
-import { DEER, SNARE, SPOILS } from './data';
+import { DEER, FLOOD, SNARE, SPOILS } from './data';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
 import { isRider, standing } from './tribute';
@@ -288,6 +289,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   trade(s, v, issue);
   planBuildings(s, v, mem, issue);
   trapLine(s, v, mem, issue);
+  floodWork(s, v, issue);
   hemoBuild(s, v, mem, issue);
   excavate(s, v, mem, issue);
   salvage(s, v, mem, issue);
@@ -1337,7 +1339,8 @@ function sendTo(s: GameState, v: View, u: Unit, res: Res, issue: (c: Command) =>
       issue({ t: 'gather', p: v.p.id, ids: [u.id], tile: berry });
       return true;
     }
-    const farm = freeFarm(s, v.p.id, v.home.x, v.home.y, 24);
+    // The Nile flood (#501 s1): no one is sent to a field under the river.
+    const farm = flooded(s, v.p.id) ? null : freeFarm(s, v.p.id, v.home.x, v.home.y, 24);
     if (farm) {
       issue({ t: 'work', p: v.p.id, ids: [u.id], target: farm.id });
       return true;
@@ -1410,6 +1413,23 @@ function assignCitizens(s: GameState, v: View, issue: (c: Command) => void): voi
   if (over && under) {
     const mover = v.citizens.find((u) => jobOf(u) === over && u.carry <= 2 && u.order.k !== 'farm' && u.order.k !== 'hunt' && u.order.k !== 'milk' && u.order.k !== 'snare' && !u.inside && !v.diggers.has(u.id));
     if (mover) sendTo(s, v, mover, under, issue);
+  }
+}
+
+// ---- The Nile flood (#501 s1) --------------------------------------------------------------------
+
+/**
+ * While its fields lie under the river, a flood people's computer takes `FLOOD.move` farmers a think off the fields: to berries or
+ * the hunt if any are near, else to the wood, where its builders are pulled from, so the corvée raises what it builds. When the
+ * river falls they go back to the fields as usual.
+ */
+function floodWork(s: GameState, v: View, issue: (c: Command) => void): void {
+  if (!flooded(s, v.p.id)) return;
+  let moved = 0;
+  for (const u of v.citizens) {
+    if (moved >= FLOOD.move) return;
+    if (u.order.k !== 'farm' || u.inside) continue;
+    if (sendTo(s, v, u, 'food', issue) || sendTo(s, v, u, 'wood', issue)) moved++;
   }
 }
 
@@ -2457,6 +2477,7 @@ function greatWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   const w = WORKS[p.civ];
   const busy = p.civ === 'chinese' ? v.traders.length >= 3 : v.citizens.length >= 14;
   const fight = (mem.attacking && v.army.length >= 6) || threatNear(s, v).count >= 4;
+  if (w.mul?.farm && flooded(s, p.id)) return; // a farming work is wasted while the fields lie under the river
   if (w.use === 'eco' ? busy : fight) issue({ t: 'greatWork', p: p.id });
 }
 
