@@ -1,4 +1,4 @@
-import { HEMO, HEMOCRAFT, TICK_HZ, secs } from './data';
+import { HEMO, HEMO_IRON, HEMOCRAFT, TICK_HZ, secs } from './data';
 import { ageDef, inField } from './ages';
 import { modsOf } from './stats';
 import { GRAFTABLE, bloodOf, grafted } from './blood';
@@ -23,6 +23,9 @@ export function stationsOf(s: GameState, owner: number): Building[] {
 
 /** The blood a graft costs this people: a quarter less in Hemocraft (#355 s2). */
 export const graftCost = (p: Player): number => (ageDef(p).hemocraft ? HEMO.cost * HEMOCRAFT.graft : HEMO.cost);
+
+/** How long a unit's graft lasts away from a Station: longer when quenched in blood-iron. */
+export const graftLast = (u: Unit): number => (u.tempered ? HEMO.last * HEMO_IRON.last : HEMO.last);
 
 /** How far from a Station this people's grafts stay fed: farther in Hemocraft (#355 s2). */
 export const feedReach = (p: Player): number => (ageDef(p).hemocraft ? HEMOCRAFT.reach : HEMO.reach);
@@ -67,7 +70,13 @@ function station(s: GameState, b: Building): void {
   const u = queue[0];
   p.blood = bloodOf(p) - cost;
   p.stats.grafted = (p.stats.grafted ?? 0) + 1;
-  u.hemo = s.tick + secs(HEMO.last);
+  const ore = p.rare?.bloodiron ?? 0;
+  if (ore >= HEMO_IRON.cost) {
+    p.rare!.bloodiron = ore - HEMO_IRON.cost;
+    u.tempered = true;
+    p.stats.quenched = (p.stats.quenched ?? 0) + 1;
+  } else delete u.tempered;
+  u.hemo = s.tick + secs(graftLast(u));
   u.hp = maxHp(s, u);
   s.events.push({ k: 'graft', owner: b.owner, id: u.id, x: b.x, y: b.y, how: 'made' });
   if (queue.length === 1) ungarrison(s, b);
@@ -83,14 +92,15 @@ export function hemoStep(s: GameState): void {
     let mine = by.get(u.owner);
     if (!mine) by.set(u.owner, (mine = stationsOf(s, u.owner)));
     // Galvanic Blood (#355 s6): a Watch Tower's reach feeds a graft as a Station does.
-    if (fed(mine, u.x, u.y, feedReach(s.players[u.owner])) || (modsOf(s, u.owner).veins > 0 && inField(s, u))) u.hemo = s.tick + secs(HEMO.last);
+    if (fed(mine, u.x, u.y, feedReach(s.players[u.owner])) || (modsOf(s, u.owner).veins > 0 && inField(s, u))) u.hemo = s.tick + secs(graftLast(u));
     if (s.tick >= u.hemo) {
       // Run dry: the graft is gone, and the body pays for it.
+      u.hp = Math.max(1, u.hp - maxHp(s, u) * HEMO.crash * (u.tempered ? HEMO_IRON.crash : 1));
       delete u.hemo;
-      u.hp = Math.max(1, u.hp - maxHp(s, u) * HEMO.crash);
+      delete u.tempered;
       s.events.push({ k: 'graft', owner: u.owner, id: u.id, x: u.x, y: u.y, how: 'crash' });
       continue;
     }
-    u.hp = Math.min(maxHp(s, u), u.hp + HEMO.mend);
+    u.hp = Math.min(maxHp(s, u), u.hp + HEMO.mend * (u.tempered ? HEMO_IRON.mend : 1));
   }
 }

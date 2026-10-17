@@ -1770,6 +1770,13 @@ export const BLOOD = { reach: 14, share: 0.2, levy: 30, levyReach: 6, levyMost: 
  */
 export const HEMO = { cost: 40, work: 4, last: 150, reach: 10, attack: 1.2, pace: 1.15, mend: 1.5, flesh: 0.6, machine: 1.5, crash: 0.33 };
 
+/**
+ * Quenched grafts (#355 s3 + #356): where the seed holds blood-iron, a Transfusion Station that finds `cost` of it in its people's rare
+ * stock when a graft finishes spends it and quenches the soldier. A quenched graft stays fed `last` times as long away from a Station,
+ * mends `mend` times as fast, and costs only `crash` of the usual crash. Without the ore the plain graft is unchanged.
+ */
+export const HEMO_IRON = { cost: 3, last: 2, mend: 1.5, crash: 0.5 };
+
 /** The Blood Tower (#355 s3): its bolts hit the living `living` times as hard as a Watch Tower's arrows, the bloodless `bloodless` times. */
 export const BLOOD_TOWER = { living: 3, bloodless: 0.15 };
 

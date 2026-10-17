@@ -310,6 +310,8 @@ function trade(s: GameState, v: View, issue: (c: Command) => void): void {
   if (!AI_LEVELS[p.ai!].clever || !v.buildings.some((b) => b.type === 'market' && b.built)) return;
   // Ore in hand sells at once: the doors count what was mined, not what is kept.
   for (const r of RARES) {
+    // Blood-iron is kept for grafts while a Station stands to quench them with it.
+    if (r === 'bloodiron' && stationsOf(s, p.id).length) continue;
     if ((p.rare?.[r] ?? 0) >= ORE_TRADE.lot) {
       issue({ t: 'trade', p: p.id, res: r, buy: false });
       return;
