@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import type { SoundName } from '../audio/sound';
 import { ageOf } from '../sim/ages';
-import { AURA, BUILDINGS, RALLY, SIGNATURES, TICK_HZ, LANDMARKS, RUINS, TRADE, domainOf } from '../sim/data';
+import { AURA, BUILDINGS, HEMO, RALLY, SIGNATURES, TICK_HZ, LANDMARKS, RUINS, TRADE, domainOf } from '../sim/data';
 import { buildingMaxHp, statsFor } from '../sim/stats';
 import type { AgeId, BuildingType, CivId, Ent, GameEvent, GameState, Unit } from '../sim/types';
 import type { ScoutFlag } from '../ui/scoutFlags';
 import { R_BOG, R_GOLD, R_STONE } from '../sim/types';
 import { stirred } from '../sim/combat';
+import { grafted } from '../sim/blood';
 import { seesRect } from '../sim/vision';
 import { BuildingsView } from './buildingsView';
 import { CameraRig } from './camera';
@@ -564,6 +565,16 @@ export class View {
       const ry = domainOf(e.type) === 'air' ? Math.max(WATER_Y, heightAt(s, at.x, at.z)) : at.y;
       rings.push({ x: at.x, y: ry, z: at.z, r: (statsFor(s, e.owner, e.type).radius + 0.3) * pulse, color: cheer.clone().multiplyScalar(0.4 + 0.9 * left) });
     }
+    // Grafted soldiers (#355 s3) wear a thin dark-red ring that beats like a heart, faster and dimmer as the graft runs dry.
+    const vein = new THREE.Color('#b0182c');
+    for (const e of s.ents) {
+      if (e.kind !== 'unit' || e.hp <= 0 || !grafted(s, e)) continue;
+      const at = this.units.drawn.get(e.id);
+      if (!at) continue;
+      const left = Math.min(1, (e.hemo! - s.tick) / (TICK_HZ * HEMO.last));
+      const beat = Math.max(0, Math.sin(this.time * (5 + (1 - left) * 7) + e.id));
+      rings.push({ x: at.x, y: at.y, z: at.z, r: statsFor(s, e.owner, e.type).radius + 0.2 + 0.05 * beat * beat, color: vein.clone().multiplyScalar(0.45 + 0.6 * left), thin: true });
+    }
     // Health: the selected, the recently hurt, or everyone while asked.
     const recent = s.tick - TICK_HZ * 4;
     for (const e of s.ents) {
@@ -1109,6 +1120,13 @@ export class View {
           // Blood drawn (#355): a dark red spray where the drawn fell, or at the rig for a levy.
           if (ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;
           this.effects.burst(this.ground(s, ev.x, ev.y, 0.5), { count: 9, speed: 0.6, up: 1.0, life: 0.8, size: 0.05, gravity: 2.2, colors: ['#7a1822', '#4a0e16', '#a3283a'] });
+          break;
+        }
+        case 'graft': {
+          // A soldier grafted (#355 s3): a dark spray and a steel-grey hiss at the Station; a graft run dry: a pale gout where it stands.
+          if (ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;
+          const crash = ev.how === 'crash';
+          this.effects.burst(this.ground(s, ev.x, ev.y, crash ? 0.6 : 1.2), { count: crash ? 7 : 12, speed: crash ? 0.5 : 0.9, up: 1.2, life: 0.9, size: 0.05, gravity: 2.4, colors: crash ? ['#c9b8b0', '#7a1822', '#3a3134'] : ['#7a1822', '#b0182c', '#c9d4d6'] });
           break;
         }
         case 'callUp': {

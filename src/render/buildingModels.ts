@@ -347,6 +347,70 @@ function drainrig(k: Kit, _e: number, st: Style): void {
   k.cone(0.05, 0.12, 4, '#9b1c2c', -0.75, 1.5, 0.6);
 }
 
+// ---- Transfusion Station and Blood Tower (#355 s3) ---------------------------------------------------
+
+function transfusion(k: Kit, _e: number, st: Style): void {
+  // A riveted iron shed on a brick plinth, three glass tanks of dark blood along its side fed by copper pipes, a pump with a
+  // flywheel, a chimney, and two cots under an awning at the door.
+  k.box(1.9, 0.08, 1.9, '#5b544c', 0, -0.02, 0);
+  k.box(1.2, 0.2, 1.0, '#7a3a30', -0.2, 0.06, -0.25);
+  k.box(1.1, 0.75, 0.9, '#4b4e54', -0.2, 0.26, -0.25);
+  k.prism(1.2, 0.3, 1.0, '#33363b', -0.2, 1.01, -0.25);
+  for (const x of [-0.7, -0.2, 0.3]) k.box(0.04, 0.75, 0.04, '#2c2e33', x, 0.26, 0.21);
+  k.box(0.32, 0.5, 0.02, '#1d1a1a', -0.2, 0.26, 0.21);
+  k.team(k.box(1.12, 0.1, 0.92, TEAM, -0.2, 0.88, -0.25));
+  // The tanks: glass over a dark red fill that glows faintly, iron hoops, copper pipes into the shed.
+  for (let i = 0; i < 3; i++) {
+    const z = -0.7 + i * 0.42;
+    k.cyl(0.16, 0.16, 0.06, 8, IRON_DARK, 0.65, 0.06, z);
+    const fill = 0.3 + i * 0.1;
+    k.glow(k.cyl(0.15, 0.15, fill, 8, '#7a0f1c', 0.65, 0.12, z));
+    k.cyl(0.15, 0.15, 0.62 - fill, 8, '#c9d4d6', 0.65, 0.12 + fill, z);
+    k.cyl(0.165, 0.165, 0.04, 8, IRON_DARK, 0.65, 0.74, z);
+    k.box(0.3, 0.04, 0.04, COPPER, 0.42, 0.62, z);
+  }
+  // The pump and its flywheel, and a stack.
+  k.box(0.3, 0.3, 0.3, IRON_DARK, 0.6, 0.0, 0.65);
+  const wheel = k.cyl(0.2, 0.2, 0.05, 10, '#2c2e33', 0.6, 0.45, 0.82);
+  wheel.rotation.x = Math.PI / 2;
+  k.cyl(0.07, 0.09, 1.0, 6, '#3a3c40', -0.6, 1.0, -0.55);
+  k.cyl(0.1, 0.07, 0.08, 6, RUST, -0.6, 2.0, -0.55);
+  // The cots under an awning, a dark stain on each.
+  k.box(1.0, 0.04, 0.45, st.post, -0.25, 0.75, 0.48);
+  for (const x of [-0.55, 0.05]) {
+    k.box(0.22, 0.16, 0.5, '#6d6a62', x, 0.0, 0.48);
+    k.box(0.2, 0.02, 0.46, PALE, x, 0.16, 0.48);
+    k.box(0.1, 0.012, 0.14, '#5a1019', x, 0.18, 0.52);
+  }
+}
+
+function bloodtower(k: Kit, _e: number, st: Style): void {
+  // A squat tower of black brick banded in iron, a copper cistern on its crown with a sightglass of blood, and barbed bolt-throwers
+  // at the four corners.
+  pad(k, 2, st.base);
+  k.cyl(0.7, 0.82, 1.9, 8, '#2a2426', 0, 0, 0);
+  for (const y of [0.5, 1.2, 1.85]) k.cyl(0.8 - y * 0.06, 0.8 - y * 0.06, 0.07, 8, IRON_DARK, 0, y, 0);
+  k.team(k.cyl(0.79, 0.79, 0.12, 8, TEAM, 0, 0.95, 0));
+  k.cyl(0.86, 0.72, 0.18, 8, '#3a3134', 0, 1.9, 0);
+  // The cistern, its sightglass and the drip down the side.
+  k.cyl(0.5, 0.5, 0.55, 10, COPPER, 0, 2.08, 0);
+  k.cone(0.52, 0.28, 10, '#9a5a2c', 0, 2.63, 0);
+  k.box(0.08, 0.4, 0.02, '#c9d4d6', 0, 2.12, 0.5);
+  k.glow(k.box(0.05, 0.28, 0.02, BLOOD, 0, 2.14, 0.51));
+  k.box(0.06, 1.6, 0.02, '#4a0e16', 0.3, 0.3, 0.74);
+  // Bolt-throwers at the corners of the crown.
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    const x = Math.cos(a) * 0.68;
+    const z = Math.sin(a) * 0.68;
+    k.box(0.14, 0.14, 0.14, IRON_DARK, x, 2.08, z);
+    const bolt = k.cyl(0.02, 0.02, 0.4, 4, '#7c8088', x * 1.15, 2.2, z * 1.15);
+    bolt.rotation.z = Math.PI / 2;
+    bolt.rotation.y = -a;
+  }
+  window(k, st, 0, 1.4, 0.75, 0.08, 0.18);
+}
+
 /**
  * The Caravanserai (#334): a square mudbrick courtyard with round corner buttresses and a tall arched portal
  * banded in turquoise tile. Inside, a well, bales of dyed cloth, and a camel kneeling to be unloaded.
@@ -1488,7 +1552,7 @@ function sandbags(k: Kit, x0: number, x1: number, z: number, rows = 2): void {
 function bloodTouches(k: Kit, type: BuildingType, age: AgeId): void {
   const depth = age === 'warband' ? 1 : age === 'ironblood' ? 2 : 3;
   // Farms, gates and towers stay bare, and the War Camp already flies its standard.
-  const span = type === 'wonder' ? 2.5 : type === 'towncenter' ? 1.75 : type === 'house' ? 0.72 : ['farm', 'gate', 'tower', 'warcamp', 'drainrig'].includes(type) ? 0 : 1.05;
+  const span = type === 'wonder' ? 2.5 : type === 'towncenter' ? 1.75 : type === 'house' ? 0.72 : ['farm', 'gate', 'tower', 'warcamp', 'drainrig', 'transfusion', 'bloodtower'].includes(type) ? 0 : 1.05;
   if (!span) return;
   const tall = type === 'wonder' ? 3.0 : type === 'towncenter' ? 2.5 : type === 'house' ? 1.3 : 1.9;
   const war = ['towncenter', 'barracks', 'range', 'stable', 'wonder'].includes(type);
@@ -1518,7 +1582,7 @@ function horsetail(k: Kit, x: number, z: number, h: number, white = false): void
 
 /** The Horde's towns (#318) fly horsetail standards before their doors: two at a Town Center (one white) and the war buildings, one elsewhere. */
 function hordeTouches(k: Kit, type: BuildingType): void {
-  if (['farm', 'gate', 'tower', 'warcamp', 'drainrig'].includes(type)) return;
+  if (['farm', 'gate', 'tower', 'warcamp', 'drainrig', 'transfusion', 'bloodtower'].includes(type)) return;
   const span = type === 'wonder' ? 2.5 : type === 'towncenter' ? 1.75 : type === 'house' ? 0.72 : 1.05;
   const tall = type === 'wonder' ? 3.2 : type === 'towncenter' ? 2.7 : type === 'house' ? 1.4 : 2.0;
   if (['towncenter', 'barracks', 'range', 'stable', 'wonder'].includes(type)) {
@@ -1533,7 +1597,7 @@ function hordeTouches(k: Kit, type: BuildingType): void {
  * the Town Center keeps an antlered pole, the herders' trophy of the hunt.
  */
 function steppeTouches(k: Kit, type: BuildingType): void {
-  if (['farm', 'gate', 'tower', 'warcamp', 'drainrig', 'caravanserai'].includes(type)) return;
+  if (['farm', 'gate', 'tower', 'warcamp', 'drainrig', 'transfusion', 'bloodtower', 'caravanserai'].includes(type)) return;
   const span = type === 'wonder' ? 2.4 : type === 'towncenter' ? 1.6 : type === 'house' ? 0.6 : 0.95;
   const front = span + 0.08;
   const h = type === 'house' ? 0.5 : type === 'towncenter' || type === 'wonder' ? 0.9 : 0.7;
@@ -1565,7 +1629,7 @@ function steppeTouches(k: Kit, type: BuildingType): void {
  */
 function silkTouches(k: Kit, type: BuildingType): void {
   // The Caravanserai (#334) is already the road's own building.
-  if (['farm', 'gate', 'tower', 'warcamp', 'drainrig', 'caravanserai'].includes(type)) return;
+  if (['farm', 'gate', 'tower', 'warcamp', 'drainrig', 'transfusion', 'bloodtower', 'caravanserai'].includes(type)) return;
   const span = type === 'wonder' ? 2.4 : type === 'towncenter' ? 1.6 : type === 'house' ? 0.6 : type === 'market' ? 1.3 : 0.95;
   const h = type === 'house' ? 0.8 : type === 'towncenter' || type === 'wonder' ? 1.5 : 1.15;
   const front = span + 0.1;
@@ -1749,7 +1813,7 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
 }
 
 const MAKERS: Record<Exclude<BuildingType, 'wall'>, (k: Kit, e: number, st: Style) => void> = {
-  towncenter, house, storehouse, huntcamp, warcamp, drainrig, caravanserai, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield,
+  towncenter, house, storehouse, huntcamp, warcamp, drainrig, transfusion, bloodtower, caravanserai, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield,
 };
 
 const cache = new Map<string, THREE.BufferGeometry>();

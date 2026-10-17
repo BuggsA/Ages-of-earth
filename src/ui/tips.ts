@@ -1,4 +1,4 @@
-import { AGES, BLOOD, BUILDINGS, CALL_UP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, secs } from '../sim/data';
+import { AGES, BLOOD, BUILDINGS, HEMO, CALL_UP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, secs } from '../sim/data';
 import { ageOf, backTo, deedProgress, deedsDone, mainRoad, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
 import type { Building, GameState, Unit } from '../sim/types';
 import { R_FISH } from '../sim/types';
@@ -197,7 +197,19 @@ const TIPS: Tip[] = [
     id: 'drainrig',
     // The Drain Rig (#355 s1): a late age of the Path of Blood, until the player has raised one.
     when: (s, me) => ['ironblood', 'totalwar'].includes(ageOf(s.players[me])) && !has(s, me, 'drainrig'),
-    text: `The Path of Blood has one more thing to take from the fallen. A <b>Drain Rig</b> (military buildings) draws a fifth of the price of every living enemy who falls within ${BLOOD.reach} tiles as <b>blood</b> (🩸 in the top bar), and its levy (<b>C</b>) gives the citizens beside it for ${BLOOD.levy} blood each. Machines and ships bleed nothing. Nothing spends blood yet.`,
+    text: `The Path of Blood has one more thing to take from the fallen. A <b>Drain Rig</b> (military buildings) draws a fifth of the price of every living enemy who falls within ${BLOOD.reach} tiles as <b>blood</b> (🩸 in the top bar), and its levy (<b>C</b>) gives the citizens beside it for ${BLOOD.levy} blood each. Machines and ships bleed nothing. Blood raises <b>Blood Towers</b> and, in Total War, grafts soldiers.`,
+  },
+  {
+    id: 'bloodtower',
+    // The Blood Tower (#355 s3): once there is blood to raise one with.
+    when: (s, me) => ['ironblood', 'totalwar'].includes(ageOf(s.players[me])) && (s.players[me].blood ?? 0) >= (BUILDINGS.bloodtower.blood ?? 0) && !has(s, me, 'bloodtower'),
+    text: `You hold enough blood for a <b>Blood Tower</b> (military buildings, <b>L</b>): paid for once, it tears the living for three times a Watch Tower's harm, but siege, ships and aircraft barely notice it. Raise it where infantry and riders will come; meet machines with machines.`,
+  },
+  {
+    id: 'transfusion',
+    // Hemocraft (#355 s3): Total War with blood in store, until the player has a Transfusion Station.
+    when: (s, me) => ageOf(s.players[me]) === 'totalwar' && (s.players[me].blood ?? 0) >= HEMO.cost && !has(s, me, 'transfusion'),
+    text: `Blood can remake your soldiers. A <b>Transfusion Station</b> (military buildings, <b>T</b>) grafts the soldiers you send inside, ${HEMO.cost} blood each: faster, harder-hitting, self-mending and deaf to priests, shrugging off blades and arrows. But machines hit them harder, and a graft runs dry ${HEMO.last} seconds from every Station: guard the Stations, or the army crashes.`,
   },
   {
     id: 'callup',

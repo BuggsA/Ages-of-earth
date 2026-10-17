@@ -19,7 +19,7 @@ export type UnitType =
 export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
   | 'towncenter' | 'house' | 'storehouse' | 'farm' | 'barracks' | 'range' | 'stable' | 'tower'
-  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai' | 'drainrig';
+  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai' | 'drainrig' | 'transfusion' | 'bloodtower';
 /** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
 export type Difficulty = 'gentle' | 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
@@ -198,6 +198,8 @@ export interface Unit {
   /** A wagon (#297): the building it carries, and that building's health as a share of its full health. */
   packed?: BuildingType;
   packedHp?: number;
+  /** A hemo-engineered soldier (#355 s3): the tick its graft runs dry unless a Transfusion Station tops it up; absent when ungrafted. */
+  hemo?: number;
 }
 
 export interface TrainItem {
@@ -263,7 +265,10 @@ export interface Building {
   pitch?: number;
   /** A War Camp (#303): whole seconds it has stood with none of its people's soldiers near; absent while they are. */
   alone?: number;
-  /** A War Camp in the Age of Total War (#313): the tick from which it may call up citizens again (`CALL_UP.rest`). Absent: at once. */
+  /**
+   * A War Camp in the Age of Total War (#313): the tick from which it may call up citizens again (`CALL_UP.rest`). Absent: at once.
+   * A Drain Rig (#355) rests the same way after a levy; a Transfusion Station holds here the tick its graft in hand is done.
+   */
   muster?: number;
 }
 
@@ -464,6 +469,8 @@ export interface PlayerStats {
   blood?: number;
   /** Citizens given to the levy at Drain Rigs (#355); absent in older saves. */
   levied?: number;
+  /** Soldiers grafted at Transfusion Stations (#355 s3); absent in older saves. */
+  grafted?: number;
 }
 
 /** One sample of a player's state for the post-game timeline. */
@@ -566,6 +573,8 @@ export type GameEvent =
   | { k: 'plunder'; owner: number; x: number; y: number; gold: number }
   /** Blood drawn at a Drain Rig (#355): from an enemy who fell near it, or from citizens given to the levy. */
   | { k: 'blood'; owner: number; x: number; y: number; n: number; how: 'slain' | 'levy' }
+  /** A soldier grafted at a Transfusion Station (#355 s3), or a graft run dry far from every Station (`crash`). */
+  | { k: 'graft'; owner: number; id: number; x: number; y: number; how: 'made' | 'crash' }
   /** A War Camp left without its soldiers (#303): it burns after a grace, or at once if its people left the path (`struck`). */
   /** Citizens called up at a War Camp (#313): each became the foot soldier `id` where it stood. */
   | { k: 'callUp'; owner: number; camp: number; ids: number[]; x: number; y: number }
