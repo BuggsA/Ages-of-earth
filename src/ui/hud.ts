@@ -413,6 +413,14 @@ export class Hud {
       if (e.timer < 0) continue;
       parts.push(`<div class="timer ${ours ? 'good' : 'bad'}" data-focus="${e.x},${e.y}"><span class="swatch" style="background:${q.color}"></span>${q.id === viewer ? 'Your' : `${q.name}'s`} Wonder: ${fmtTime(e.timer)}${ours ? '' : ' (destroy it!)'}</div>`);
     }
+    // The heart (#452): a people with no Town Center standing has `heartless - tick` left to lay a new foundation.
+    for (const q of s.players) {
+      if (q.heartless === undefined || q.defeated) continue;
+      const ours = q.team === s.players[viewer].team;
+      const left = Math.max(0, q.heartless - s.tick);
+      const urgent = left < secs(10) ? ' urgent' : '';
+      parts.push(`<div class="timer ${ours ? 'bad' : 'good'}${urgent}"><span class="swatch" style="background:${q.color}"></span>${q.id === viewer ? 'Your people has' : `${q.name} has`} no Town Center: ${fmtTime(left)}${q.id === viewer ? ' (build a new Town Center!)' : ours ? ' (help them rebuild)' : ' (finish them!)'}</div>`);
+    }
     if (s.relicTeam >= 0 && s.relicTimer >= 0) {
       const ours = s.relicTeam === s.players[viewer].team;
       const keepers = s.players.filter((q) => q.team === s.relicTeam);
