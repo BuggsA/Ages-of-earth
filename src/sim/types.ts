@@ -143,7 +143,7 @@ export type Order =
    * A trader running the road between a Market and a trading post: out to the post (`go`), where it
    * loads gold worth the distance from the Market, and back to the Market to pay it in (`back`).
    */
-  | { k: 'trade'; post: number; market: number; phase: 'go' | 'back'; from?: { x: number; y: number } }
+  | { k: 'trade'; post: number; market: number; phase: 'go' | 'back'; from?: { x: number; y: number }; /** Loaded this step: the post floods on the next (#493). */ flood?: true }
   /** A citizen digging at an ancient ruin (#64). */
   | { k: 'dig'; target: number };
 
@@ -335,6 +335,9 @@ export interface TradePost {
   /** The center of its middle tile. */
   x: number;
   y: number;
+  /** How flooded its market was at `glutAt` (#493): trips there pay `1 − glut`; healed lazily by `glutNow`. Absent until a trader loads. */
+  glut?: number;
+  glutAt?: number;
 }
 
 /** What lies under a ruin (#64): gold, a technology, a map of the whole land, or a relic. */

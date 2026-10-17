@@ -8,7 +8,7 @@ import { RARE_OF_TILE } from '../sim/units';
 import { HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, SNARE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
-import { caravanBonus, caravanOf, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
+import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
 import { restsAt } from '../sim/passage';
 import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
 import { LANDMARK_KINDS, claimWork, claimants, favours, landmarkAt } from '../sim/landmarks';
@@ -560,11 +560,12 @@ export class Hud {
     const m = homeMarket(s, viewer, post.x, post.y);
     const pay = m ? tripGold(s, viewer, m, post) : 0;
     const mine = s.ents.filter((e) => e.kind === 'unit' && e.owner === viewer && (e.type === 'trader' || e.type === 'cog') && e.order.k === 'trade' && e.order.post === post.id).length;
-    const status = m ? `From your nearest Market: ${icon('gold', 14)}${pay} a trip` : 'Build a Market to trade here';
+    const flood = Math.round(glutNow(s, post) * 100);
+    const status = m ? `From your nearest Market: ${icon('gold', 14)}${pay} a trip${flood ? ` (${flood}% glut)` : ''}` : 'Build a Market to trade here';
     const html = `<div class="sel-portrait"><span style="font-size:54px">🐪</span></div>
       <div class="sel-info"><div class="sel-name">Trading Post</div><div class="sel-sub">${status}</div>
       <div class="stats"><span data-tip="<b>Your traders</b>On the road to this post.">🐪<em>Your traders</em> ${mine}</span><span data-tip="<b>Most a trip</b>The farthest roads pay up to this.">${icon('gold')}<em>At most</em> ${TRADE.max}</span></div>
-      <div class="blurb">Neutral ground where anyone may trade. Train traders at a Market, select them and right-click here: they carry goods out and bring back gold, the more the farther their Market stands from the post. Where water lies within ${TRADE.sea.reach} tiles it is a port too: merchant ships from a Dock sail here for ${Math.round((TRADE.sea.mul - 1) * 100)}% more. Nothing is paid until they are home, so guard the road.</div></div>`;
+      <div class="blurb">Neutral ground where anyone may trade. Train traders at a Market, select them and right-click here: they carry goods out and bring back gold, the more the farther their Market stands from the post. Where water lies within ${TRADE.sea.reach} tiles it is a port too: merchant ships from a Dock sail here for ${Math.round((TRADE.sea.mul - 1) * 100)}% more. Every load floods the post: its price falls ${Math.round(TRADE.glut.each * 100)}% a trip (anyone's) and heals slowly, so spread your traders over the posts. Nothing is paid until they are home, so guard the road.</div></div>`;
     return [html, `post:${post.id}:${status}:${mine}`];
   }
 
