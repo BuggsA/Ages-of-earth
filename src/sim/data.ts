@@ -1570,7 +1570,7 @@ export const AI_WONDER = { share: 0.4, least: 3, most: 14, stay: 6, reach: 26 };
 export const AI_FAIR = { ring: 10, markets: 2 };
 
 /** The computer and the rare ores (#356 s5): the crew it sends to dig the ore a road's door asks for, and how far from home it will look for the vein. */
-export const AI_ORE = { crew: 3, reach: 40 };
+export const AI_ORE = { crew: 3, reach: 70 };
 
 export const AI_WEB = { take: 0.6, heir: 1, survey: 22, diggers: 3, nearly: 0.5, patience: 90, close: 0.75, relics: 2, raid: 18, raidNear: 30, riders: 4, read: 0.85, lodge: 1, hulls: 1, bell: 900 };
 
