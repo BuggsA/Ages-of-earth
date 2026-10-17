@@ -1,4 +1,4 @@
-import { AI_LEVELS, BUILDINGS, CARRY, CONSECRATE, DEER, DT, FLOCK, GALVANIC, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SPREAD, TRADE, domainOf, secs } from './data';
+import { AI_LEVELS, AUTO_WORK, BUILDINGS, CARRY, CONSECRATE, DEER, DT, FLOCK, GALVANIC, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SPREAD, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
@@ -195,11 +195,66 @@ function gatherLoad(s: GameState, u: Unit): Map<number, number> {
   return load;
 }
 
+/**
+ * Put an idle citizen of a person (not the computer) on the nearest node within `reach` tiles of (x, y):
+ * the kind it last carried, else whichever of food and wood the owner holds less of (#344).
+ */
+export function autoWork(s: GameState, u: Unit, x: number, y: number, reach: number): boolean {
+  if (u.type !== 'citizen' || s.players[u.owner].ai) return false;
+  const p = s.players[u.owner];
+  const kinds = u.carryRes === 'wood' ? [R_TREE, R_MEAT, R_BERRY] : u.carryRes === 'food' ? [R_MEAT, R_BERRY, R_TREE] : p.res.wood < p.res.food ? [R_TREE, R_MEAT, R_BERRY] : [R_MEAT, R_BERRY, R_TREE];
+  for (const kind of kinds) {
+    const t = findResource(s, kind, x, y, kind === R_MEAT ? Math.min(reach, 8) : reach);
+    if (t < 0) continue;
+    setOrder(u, { k: 'gather', tile: t, res: RES_OF_TILE[s.res[t]], phase: 'go' });
+    return true;
+  }
+  return false;
+}
+
+/**
+ * The node a rally flag still points to once its own tile has run out (#344): the nearest of the kind it was
+ * set on, near the flag, passing over nodes already worked by `SPREAD.perNode`. The player's people only; -1 if none.
+ */
+export function rallyNode(s: GameState, u: Unit, rally: NonNullable<Building['rally']>): number {
+  if (rally.kind === undefined || s.players[u.owner].ai) return -1;
+  const fish = u.type === 'fisher';
+  if (fish !== (rally.kind === R_FISH) || (u.type !== 'citizen' && !fish)) return -1;
+  const kinds = rally.kind === R_MEAT ? [R_MEAT, R_BERRY] : [rally.kind];
+  const load = gatherLoad(s, u);
+  const busy = (i: number) => (load.get(i) ?? 0) >= SPREAD.perNode;
+  for (const reach of [AUTO_WORK.rally, SPREAD.far]) {
+    for (const kind of kinds) {
+      const t = findResource(s, kind, rally.x, rally.y, reach, busy);
+      if (t >= 0) return t;
+    }
+  }
+  return -1;
+}
+
+/** The nearest living deer within `r` tiles of (x, y), in id order on ties, or null. */
+function nearestDeer(s: GameState, x: number, y: number, r: number): Animal | null {
+  let best: Animal | null = null;
+  let bestD = r * r;
+  for (const a of s.animals) {
+    if (a.kind !== 'deer' || a.hp <= 0) continue;
+    const d = (a.x - x) * (a.x - x) + (a.y - y) * (a.y - y);
+    if (d < bestD) {
+      bestD = d;
+      best = a;
+    }
+  }
+  return best;
+}
+
 function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): void {
   // A rare ore (#356) rides on the order, learned from the tile while it still holds ore, so the next vein is the same ore.
   const here = RARE_OF_TILE[s.res[o.tile]];
   if (here) o.rare = here;
   else if (s.res[o.tile] !== R_NONE && o.rare) delete o.rare;
+  // A carcass rides on the order too, so a hunter knows to look for the next deer when it is gone (#344).
+  if (s.res[o.tile] === R_MEAT) o.meat = true;
+  else if (s.res[o.tile] !== R_NONE && o.meat) delete o.meat;
   if (u.carryRes !== o.res || (u.carryRare ?? null) !== (o.rare ?? null)) {
     u.carry = 0;
     u.frac = 0;
@@ -234,6 +289,25 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
         }
       }
       if (next >= 0) break;
+    }
+    const person = !s.players[u.owner].ai && u.type === 'citizen' && !u.queue.length;
+    const fx = (o.tile % s.w) + 0.5;
+    const fy = Math.floor(o.tile / s.w) + 0.5;
+    // The player's hunter, done with a carcass, spears the next deer of the herd before turning to bushes (#344).
+    if (person && o.meat && (next < 0 || s.res[next] !== R_MEAT)) {
+      const deer = nearestDeer(s, fx, fy, AUTO_WORK.herd);
+      if (deer) {
+        setOrder(u, { k: 'hunt', target: deer.id });
+        return;
+      }
+    }
+    // The player's food gatherer with no bush or carcass near takes an unworked field before a long walk (#344).
+    if (person && next < 0 && o.res === 'food') {
+      const f = freeFarm(s, u.owner, fx, fy, AUTO_WORK.farm, headedFarms(s, u));
+      if (f) {
+        setOrder(u, { k: 'farm', target: f.id, phase: 'go' });
+        return;
+      }
     }
     // The player's workers look further before they stand idle (#344): the next grove, mine or bush is a longer walk, not another order.
     if (next < 0 && !s.players[u.owner].ai && !o.rare && u.type !== 'fisher') {
@@ -381,6 +455,16 @@ export function freeFarm(s: GameState, owner: number, x: number, y: number, r: n
   return best;
 }
 
+/** Fields some other of `u`'s people is already walking to or raising, so two hands don't race for one (#344). */
+function headedFarms(s: GameState, u: Unit): Set<number> {
+  const out = new Set<number>();
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.id === u.id || e.owner !== u.owner || e.hp <= 0) continue;
+    if (e.order.k === 'farm' || e.order.k === 'build') out.add(e.order.target);
+  }
+  return out;
+}
+
 function farmTaken(s: GameState, f: Building): boolean {
   const holder = f.farmer ? s.byId.get(f.farmer) : undefined;
   return !!holder && holder.hp > 0 && holder.kind === 'unit' && holder.order.k === 'farm' && holder.order.target === f.id;
@@ -439,7 +523,7 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
   }
   // A farm that is already worked: the player's builder takes a free field nearby rather than standing idle (#344).
   if (b.type === 'farm' && !s.players[u.owner].ai) {
-    const f = freeFarm(s, u.owner, u.x, u.y, 10);
+    const f = freeFarm(s, u.owner, u.x, u.y, 10, headedFarms(s, u));
     if (f) {
       setOrder(u, { k: 'farm', target: f.id, phase: 'go' });
       return;

@@ -1520,6 +1520,15 @@ export const SEASONS = [
  * `perFoe` to a foe (the clicked one first), the rest on the clicked one. Meat is one carcass, so it isn't spread.
  */
 export const SPREAD = { reach: 5, perNode: 2, foe: 4, perFoe: 3, far: 18 };
+/**
+ * Idle hands find work (#344), for the player's people only (the computer sets its own to work):
+ * - `trained`: a citizen trained with no rally point takes the nearest node within this many tiles;
+ * - `rally`: a rally flag on a resource that has since run out sends new hands to the nearest of its kind
+ *   within this many tiles of the flag (then `SPREAD.far`);
+ * - `herd`: a hunter done with a carcass spears the next deer within this many tiles of it;
+ * - `farm`: a food gatherer whose bushes and game are gone takes an unworked field within this many tiles.
+ */
+export const AUTO_WORK = { trained: 14, rally: 8, herd: 8, farm: 12 };
 export const AI_WINTER = { from: 2, fields: 2, hunters: 3, pack: 1, food: 0.3 };
 
 /**
