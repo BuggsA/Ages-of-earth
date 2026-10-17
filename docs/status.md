@@ -28,7 +28,6 @@ Claims and open PRs live on the board (`claimed`, `in-review`). List here only w
 
 ## Waiting on the owner
 
-- **May `tests/heirlooms.test.ts`'s exact heirloom list widen?** Asked on #355 (options A/B/C, 2026-10-17). PR #432 (two Blood heirlooms) waits on the answer, unmerged.
 - **`periodic` never fired on its schedule** (by 2026-10-14). Check Settings → Actions allows scheduled workflows.
 - Optional: Settings → General → "Automatically delete head branches".
 - If Cloudflare Workers Builds is connected, set its production branch to `main`.
