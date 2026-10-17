@@ -32,7 +32,7 @@ import { tributeStep } from './tribute';
 import { seraiStep, tollStep } from './passage';
 import { mercStep } from './merc';
 import { isHire, barred, journeyOf, noteWalked, surveyFinds, trainsAt, workSteps } from './ages';
-import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, MapSize, MapType, Player } from './types';
+import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, HomelandId, MapSize, MapType, Player } from './types';
 import { RES, R_FISH, R_NONE } from './types';
 import { RES_OF_TILE, autoWork, rallyNode, carryCargo, checkStuck, collide, findResource, routeUnits, separate, setOrder, think, ungarrison, walk } from './units';
 import { updateVision } from './vision';
@@ -68,6 +68,11 @@ export interface GameSetup {
   wonderSeconds?: number;
   /** A campaign scenario's id: adds its goals, raids and gifts. */
   scenario?: string;
+  /**
+   * The homeland (#473): 'random' rolls it from the seed (a match from the menu or an online room), or one
+   * named. Left out, it is the Glade, so a setup from before homelands draws the world it always did.
+   */
+  homeland?: HomelandId | 'random';
 }
 
 const spatials = new WeakMap<GameState, Spatial>();
@@ -75,7 +80,7 @@ const spatials = new WeakMap<GameState, Spatial>();
 export function createGame(setup: GameSetup): GameState {
   const mapType = setup.mapType ?? 'continental';
   // Campaign maps are drawn as they always were: no deposits that only some seeds hold.
-  const map = generateMap(setup.seed, setup.size, setup.players.length, mapType, !setup.scenario, !setup.scenario);
+  const map = generateMap(setup.seed, setup.size, setup.players.length, mapType, !setup.scenario, !setup.scenario, setup.homeland === 'random' ? undefined : (setup.homeland ?? 'glade'));
   const n = map.w * map.h;
   const startEpoch = Math.max(0, Math.min(EPOCHS.length - 1, setup.startEpoch ?? 0));
   const mode = setup.mode ?? 'conquest';
@@ -84,6 +89,7 @@ export function createGame(setup: GameSetup): GameState {
     seed: setup.seed,
     size: setup.size,
     mapType,
+    homeland: map.homeland,
     mode,
     kings: setup.players.map(() => 0),
     w: map.w,

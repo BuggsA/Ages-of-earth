@@ -1,6 +1,6 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { aiTiding } from './tidings';
-import { AGES, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_SHORE, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
@@ -1043,7 +1043,9 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   const freeFields = v.buildings.filter((b) => b.type === 'farm' && !v.citizens.some((u) => u.order.k === 'farm' && u.order.target === b.id)).length;
   // Autumn onward the clever computer plans for winter: berries fail in the cold, so fields go up first.
   const coldComing_ = coldComing(s, v);
-  const foodWanted = Math.round(wanted(v).food) - (berries >= 0 && !coldComing_ ? 6 : 0) + (coldComing_ ? AI_WINTER.fields : 0);
+  // On the Shore (#473) each fishing boat feeds the town in a farmer's place, and its wood is wanted for the next age.
+  const boatsFeed = s.homeland === 'shore' ? v.fishers.length : 0;
+  const foodWanted = Math.round(wanted(v).food) - (berries >= 0 && !coldComing_ ? 6 : 0) + (coldComing_ ? AI_WINTER.fields : 0) - boatsFeed;
   if (farms < foodWanted && freeFields < 2 && !recently('farm', 2) && !buildBarred(p, 'farm')) {
     const spot = findSpot(s, 'farm', home.x, home.y, 3, 16);
     if (spot && construct(s, v, mem, 'farm', spot, 1, issue)) return;
@@ -1107,8 +1109,8 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     if (spot && construct(s, v, mem, 'market', spot, 3, issue)) return;
   }
 
-  // A dock, where there is fish and water to sail near home.
-  if (n >= 9 && count(v, 'dock') === 0 && !recently('dock', 40) && s.tick - (mem.dockless ?? -99999) > secs(120)) {
+  // A dock, where there is fish and water to sail near home: early on the Shore (#473), where fish is the food.
+  if (n >= (s.homeland === 'shore' ? AI_SHORE.dockAt : 9) && count(v, 'dock') === 0 && !recently('dock', 40) && s.tick - (mem.dockless ?? -99999) > secs(120)) {
     const spot = findDockSpot(s, home.x, home.y, 24);
     if (!spot) mem.dockless = s.tick;
     else if (construct(s, v, mem, 'dock', spot, 2, issue)) return;
@@ -1940,7 +1942,8 @@ function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   if (!dock) return;
   // Fishing boats: as many as there are shoals near the dock, up to a few.
   const shoals = countFish(s, dock.x, dock.y, 14);
-  const wantBoats = Math.min(shoals, 2 + p.epoch, L.clever ? 6 : 4);
+  const shore = s.homeland === 'shore' ? AI_SHORE.boats : 0;
+  const wantBoats = Math.min(shoals, 2 + p.epoch + shore, (L.clever ? 6 : 4) + shore);
   const queued = (u: UnitType) => dock.queue.filter((q) => q.unit === u).length;
   if (v.fishers.length + queued('fisher') < wantBoats && dock.queue.length < 2) {
     const cost = unitStats('fisher', p.epoch).cost;

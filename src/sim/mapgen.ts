@@ -1,13 +1,13 @@
-import { AMOUNT, BOAR, BOG_IRON, CAVE, LANDMARKS, RARE, MAMMOTH, MAP_SIZES, RAIDER, RELIC, RUINS, TRADE, WOLF } from './data';
+import { AMOUNT, BOAR, BOG_IRON, CAVE, HOMELAND, HOMELAND_IDS, HOMELANDS, LANDMARKS, RARE, MAMMOTH, MAP_SIZES, RAIDER, RELIC, RUINS, TRADE, WOLF } from './data';
 import { fbm, mulberry32, type Rng } from './rng';
-import type { Cave, LandmarkKind, MapSize, MapType, RareId, RuinFind } from './types';
+import type { Cave, HomelandId, LandmarkKind, MapSize, MapType, RareId, RuinFind } from './types';
 import { B_RES, B_TERRAIN, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_NONE, R_STONE, R_TREE, T_GRASS, T_ROCK, T_SAND, T_WATER } from './types';
 
 /**
  * World generation: rolling grassland with lakes, rocky ridges and woods (more or less of each by map
  * type), and starting spots for two to four players that are flat, open and fair: each gets berries, a
- * herd of deer, gold, stone and a wood line at the same distances. Only integer hashing and arithmetic
- * are used, so every browser builds the same world.
+ * herd of deer, gold, stone and a wood line at the same distances (how much of each is the seed's homeland,
+ * #473). Only integer hashing and arithmetic are used, so every browser builds the same world.
  */
 
 interface Recipe {
@@ -63,6 +63,8 @@ export interface MapData {
   landmarks: { x: number; y: number; kind: LandmarkKind }[];
   /** Raider camps (own pitch): the fire each band keeps (tile centers). Empty on campaign maps. */
   camps: { x: number; y: number }[];
+  /** What lies round every town at the start (#473). */
+  homeland: HomelandId;
 }
 
 const DIR8 = [
@@ -104,7 +106,7 @@ function shuffle<T>(rng: Rng, a: T[]): T[] {
 }
 
 /** `deposits` false leaves out what only some seeds hold (bog iron, ruins): campaign maps stay as they were made. `veins` adds the deep veins (#356); `createGame` turns it on for ordinary matches. */
-export function generateMap(seed: number, size: MapSize, players = 2, type: MapType = 'continental', deposits = true, veins = false): MapData {
+export function generateMap(seed: number, size: MapSize, players = 2, type: MapType = 'continental', deposits = true, veins = false, want?: HomelandId): MapData {
   const R = RECIPES[type];
   const WL = R.water;
   const n = MAP_SIZES[size].n;
@@ -270,38 +272,42 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
   // Heights at tile corners.
   const W = w + 1;
   const height = new Float32Array(W * (h + 1));
-  for (let y = 0; y <= h; y++) {
-    for (let x = 0; x <= w; x++) {
-      let water = 0;
-      let rock = 0;
-      let count = 0;
-      let e = 0;
-      for (let d = 0; d < 4; d++) {
-        const dx = CORNER_X[d];
-        const dy = CORNER_Y[d];
-        const tx = x + dx;
-        const ty = y + dy;
-        if (tx < 0 || ty < 0 || tx >= w || ty >= h) continue;
-        const i = ty * w + tx;
-        count++;
-        e += elev[i];
-        if (terrain[i] === T_WATER) water++;
-        else if (terrain[i] === T_ROCK) rock++;
-      }
-      e /= count;
-      const detail = fbm(x / 5, y / 5, salt + 31, 2);
-      let hgt: number;
-      if (water === count) hgt = -0.55 - (WL - Math.min(WL, e)) * 6 - detail * 0.2;
-      else if (water > 0) hgt = -0.06 + detail * 0.05;
-      else {
-        // Rolling ground: broad swells from the elevation, smaller hummocks on top.
-        const swell = fbm(x / 11, y / 11, salt + 51, 2);
-        hgt = 0.2 + ((e - WL) * 4.6 + (swell - 0.5) * 0.9) * R.relief + (detail - 0.5) * 0.4;
-        if (rock > 0) hgt += (rock / count) * (1.4 + fbm(x / 3, y / 3, salt + 41, 2) * 2.6);
-      }
-      height[y * W + x] = hgt;
+  const corner = (x: number, y: number) => {
+    let water = 0;
+    let rock = 0;
+    let count = 0;
+    let e = 0;
+    for (let d = 0; d < 4; d++) {
+      const dx = CORNER_X[d];
+      const dy = CORNER_Y[d];
+      const tx = x + dx;
+      const ty = y + dy;
+      if (tx < 0 || ty < 0 || tx >= w || ty >= h) continue;
+      const i = ty * w + tx;
+      count++;
+      e += elev[i];
+      if (terrain[i] === T_WATER) water++;
+      else if (terrain[i] === T_ROCK) rock++;
     }
-  }
+    e /= count;
+    const detail = fbm(x / 5, y / 5, salt + 31, 2);
+    let hgt: number;
+    if (water === count) hgt = -0.55 - (WL - Math.min(WL, e)) * 6 - detail * 0.2;
+    else if (water > 0) hgt = -0.06 + detail * 0.05;
+    else {
+      // Rolling ground: broad swells from the elevation, smaller hummocks on top.
+      const swell = fbm(x / 11, y / 11, salt + 51, 2);
+      hgt = 0.2 + ((e - WL) * 4.6 + (swell - 0.5) * 0.9) * R.relief + (detail - 0.5) * 0.4;
+      if (rock > 0) hgt += (rock / count) * (1.4 + fbm(x / 3, y / 3, salt + 41, 2) * 2.6);
+    }
+    height[y * W + x] = hgt;
+  };
+  for (let y = 0; y <= h; y++) for (let x = 0; x <= w; x++) corner(x, y);
+
+  // The homeland (#473): on dice of its own, so the ground is the same whichever comes up. Campaign maps
+  // (no deposits) stay Glades, as they were drawn.
+  const homeland: HomelandId = want ?? (deposits ? rollHomeland(seed, type) : 'glade');
+  const HL = HOMELANDS[homeland];
 
   // Resources.
   const free = (x: number, y: number, keepOut = 6) =>
@@ -355,13 +361,14 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
     }
   }
 
-  // The same kit around every start, at the same distances, in shuffled directions.
+  // The same kit around every start, at the same distances, in shuffled directions (how much of each is
+  // the homeland's).
   const order = shuffle(rng, [0, 1, 2, 3, 4, 5, 6, 7]);
   for (const s of starts) {
     const pick = (k: number) => DIR8[order[k % 8]];
     const at = (k: number, d: number) => [Math.round(s.x + pick(k)[0] * d), Math.round(s.y + pick(k)[1] * d)];
     const [bx, by] = at(0, 7);
-    cluster(bx, by, R_BERRY, 7, 5);
+    cluster(bx, by, R_BERRY, HL.berries, 5);
     const [gx, gy] = at(2, 10);
     cluster(gx, gy, R_GOLD, 4, 5);
     const [sx, sy] = at(5, 10);
@@ -377,7 +384,83 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
       const [f2x, f2y] = at(6, 13);
       cluster(f2x, f2y, R_TREE, 14, 8);
     }
+    // The Deep Wood: a berry thicket a little way out, and trees crowding in on two sides.
+    if (HL.thicket > 0) {
+      const [tx, ty] = at(1, 10);
+      cluster(tx, ty, R_BERRY, HL.thicket, 5);
+    }
+    if (HL.grove > 0) {
+      const [ax, ay] = at(7, 8);
+      cluster(ax, ay, R_TREE, HL.grove >> 1, 6);
+      const [cx, cy] = at(4, 9);
+      cluster(cx, cy, R_TREE, HL.grove - (HL.grove >> 1), 6);
+    }
   }
+
+  // The Shore: a mere `HOMELAND.mereAt` tiles out from every town, the same size for each, the way that
+  // holds none of the kit (the free direction first). Trees in it are cleared; no dice are thrown.
+  /** Each town's mere, where it has one. */
+  const meres: ({ x: number; y: number } | null)[] = starts.map(() => null);
+  if (HL.mere > 0) {
+    const r = HL.mere;
+    // Room for the mere and a tile of shore round it: on the map, clear of the kit, away from every town.
+    const fits = (cx: number, cy: number) => {
+      const R2 = (r + 1.5) * (r + 1.5);
+      for (let y = Math.floor(cy - r - 2); y <= cy + r + 2; y++) {
+        for (let x = Math.floor(cx - r - 2); x <= cx + r + 2; x++) {
+          if ((x + 0.5 - cx) * (x + 0.5 - cx) + (y + 0.5 - cy) * (y + 0.5 - cy) > R2) continue;
+          if (x < 3 || y < 3 || x >= w - 3 || y >= h - 3) return false;
+          const k = res[y * w + x];
+          if (k !== R_NONE && k !== R_TREE) return false;
+          if (startDist(x, y) < HOMELAND.mereAt - r - 1) return false;
+        }
+      }
+      return true;
+    };
+    for (let n = 0; n < starts.length; n++) {
+      const st = starts[n];
+      // The free way first, then the others but the herd's; as far out as asked, then a little nearer or farther.
+      const ways = [order[1], ...order.filter((k) => k !== order[1] && k !== order[4])];
+      let cx = -1;
+      let cy = -1;
+      for (const far of [HOMELAND.mereAt, HOMELAND.mereAt + 2, HOMELAND.mereAt - 1]) {
+        const k = ways.find((d) => fits(st.x + DIR8[d][0] * far, st.y + DIR8[d][1] * far));
+        if (k === undefined) continue;
+        cx = st.x + DIR8[k][0] * far;
+        cy = st.y + DIR8[k][1] * far;
+        break;
+      }
+      if (cx < 0) continue;
+      meres[n] = { x: cx, y: cy };
+      const x0 = Math.floor(cx - r - 2);
+      const y0 = Math.floor(cy - r - 2);
+      const x1 = Math.ceil(cx + r + 2);
+      const y1 = Math.ceil(cy + r + 2);
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          const d = Math.sqrt((x + 0.5 - cx) * (x + 0.5 - cx) + (y + 0.5 - cy) * (y + 0.5 - cy));
+          const edge = r + (fbm(x / 3, y / 3, salt + 71, 2) - 0.5) * 1.6;
+          if (d >= edge) continue;
+          const i = y * w + x;
+          terrain[i] = T_WATER;
+          res[i] = R_NONE;
+          amount[i] = 0;
+          elev[i] = WL - 0.03 - (1 - d / edge) * 0.08;
+        }
+      }
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          const i = y * w + x;
+          if (terrain[i] !== T_GRASS) continue;
+          for (let k = 0; k < 4; k++) if (terrain[(y + N4Y[k]) * w + x + N4X[k]] === T_WATER) terrain[i] = T_SAND;
+        }
+      }
+      for (let y = y0; y <= y1 + 1; y++) for (let x = x0; x <= x1 + 1; x++) corner(x, y);
+    }
+  }
+
+  // A town with no room for its mere would start poorer than the rest: then this seed is a Glade after all.
+  if (HL.mere > 0 && !want && meres.some((m) => !m)) return generateMap(seed, size, players, type, deposits, veins, 'glade');
 
   // More players, more to go round.
   const more = 0.6 + players * 0.2;
@@ -396,7 +479,12 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
   };
   for (const st of starts) {
     const d = DIR8[order[4 % 8]];
-    herd(Math.round(st.x + d[0] * 13), Math.round(st.y + d[1] * 13), 4);
+    herd(Math.round(st.x + d[0] * 13), Math.round(st.y + d[1] * 13), HL.deer);
+    // The Herd Plains: a second herd, nearer, the other way.
+    if (HL.herd2 > 0) {
+      const d2 = DIR8[order[1]];
+      herd(Math.round(st.x + d2[0] * 11), Math.round(st.y + d2[1] * 11), HL.herd2);
+    }
   }
   for (let k = 0, guard = 0; k < Math.round((n / 30) * R.herds * more) && guard < 200; guard++) {
     const x = 6 + Math.floor(rng() * (w - 12));
@@ -529,8 +617,15 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
     }
     return placed;
   };
-  // Near every start, if there is sailable water within reach: the nearest fit spot.
-  for (const st of starts) {
+  // The Shore's shoals lie in the middle of each mere; elsewhere, near every start, if there is sailable
+  // water within reach: the nearest fit spot.
+  for (let n = 0; n < starts.length; n++) {
+    const st = starts[n];
+    const m = meres[n];
+    if (m) {
+      shoal(Math.floor(m.x), Math.floor(m.y), HL.fish);
+      continue;
+    }
     let best = -1;
     let bestD = 26 * 26;
     for (let y = Math.max(0, st.y - 26); y < Math.min(h, st.y + 26); y++) {
@@ -543,7 +638,7 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
         }
       }
     }
-    if (best >= 0) shoal(best % w, Math.floor(best / w), 4);
+    if (best >= 0) shoal(best % w, Math.floor(best / w), HL.fish);
   }
   // And scattered over the open water.
   const shoals = Math.round((n / (type === 'sea' ? 7 : 22)) * more);
@@ -564,7 +659,7 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
   const bogIron = deposits && placeBogIron(seed, w, h, terrain, res, amount, starts, deer, relics, posts);
   const later = deposits ? reachAll() : [];
   const ruins = deposits ? placeRuins(seed, size, w, h, terrain, res, starts, deer, relics, posts, later) : [];
-  const wild = deposits ? placeWild(seed, size, w, h, terrain, res, starts, deer, relics, posts, ruins, later) : [];
+  const wild = deposits ? placeWild(seed, size, w, h, terrain, res, starts, deer, relics, posts, ruins, later, HL.mammoth) : [];
   const landmarks = deposits ? placeLandmarks(seed, w, h, terrain, res, starts, deer, relics, posts, ruins, wild, later) : [];
 
   const rares = deposits && veins ? placeRares(seed, w, h, terrain, res, amount, starts, [...deer, ...relics, ...posts, ...ruins, ...wild.map((x) => ({ x: x.x, y: x.y })), ...landmarks.map((x) => ({ x: x.x, y: x.y }))], later) : [];
@@ -582,7 +677,19 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
     if (res[i] !== R_NONE) block[i] |= B_RES;
   }
 
-  return { w, h, terrain, height, res, amount, block, starts, deer, relics, posts, bogIron, rares, caves, ruins, wild, landmarks, camps };
+  return { w, h, terrain, height, res, amount, block, starts, deer, relics, posts, bogIron, rares, caves, ruins, wild, landmarks, camps, homeland };
+}
+
+/** The homeland a seed rolls for a map type (#473): by each one's `weight` there, on dice of its own. */
+export function rollHomeland(seed: number, type: MapType): HomelandId {
+  let total = 0;
+  for (const k of HOMELAND_IDS) total += HOMELANDS[k].weight[type];
+  let roll = mulberry32(seed ^ 0x40e1a4)() * total;
+  for (const k of HOMELAND_IDS) {
+    roll -= HOMELANDS[k].weight[type];
+    if (roll < 0) return k;
+  }
+  return 'glade';
 }
 
 /** Where a town's people can walk to without cutting a tree (or, with `axes`, by cutting their way). */
@@ -1095,6 +1202,7 @@ function placeWild(
   posts: { x: number; y: number }[],
   ruins: { x: number; y: number }[],
   reaches: Uint8Array[],
+  mammothAt: number = MAMMOTH.home,
 ): { kind: 'mammoth' | 'wolf' | 'boar' | 'raider'; x: number; y: number }[] {
   const rng = mulberry32(seed ^ 0x3a7e0f);
   const land = (x: number, y: number) => x >= 2 && y >= 2 && x < w - 2 && y < h - 2 && (terrain[y * w + x] === T_GRASS || terrain[y * w + x] === T_SAND);
@@ -1110,11 +1218,11 @@ function placeWild(
   const out: { kind: 'mammoth' | 'wolf' | 'boar' | 'raider'; x: number; y: number }[] = [];
   const pick = (list: number[]): number => list[Math.floor(rng() * list.length)];
 
-  // A mammoth for every town: on a ring `home` tiles out, nearer that town than any other.
+  // A mammoth for every town: on a ring `mammothAt` tiles out (the homeland's), nearer that town than any other.
   for (let k = 0; k < starts.length; k++) {
     const st = starts[k];
     const ring: number[] = [];
-    const R = MAMMOTH.home;
+    const R = mammothAt;
     for (let y = st.y - R - 2; y <= st.y + R + 2; y++) {
       for (let x = st.x - R - 2; x <= st.x + R + 2; x++) {
         if (!land(x, y)) continue;
