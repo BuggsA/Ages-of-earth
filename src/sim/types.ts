@@ -783,6 +783,9 @@ export interface AiMemory {
   bell: number;
   /** Tick it last looked for a dock site and found none (so it doesn't look every turn). */
   dockless?: number;
+  /** Its scout (#454 s4): the rider sent exploring, the tick it was last sent, and the pair that patrol its border or trade road. */
+  scout?: { id: number; sent: number };
+  guards?: number[];
   /** Tick its bombers last set out. */
   sortie?: number;
   /** A sea landing under way: the transport, the soldiers aboard (or boarding) and how far along it is. */

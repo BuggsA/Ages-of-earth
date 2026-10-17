@@ -1722,6 +1722,8 @@ export interface AiLevel {
   curseAnswer?: boolean;
   /** Off: the computer does not ride down the priests who swear a rival's army (Military Orders, #459; only `scripts/ai-ab.ts` turns it off). */
   breakOath?: boolean;
+  /** Off: a clever computer sends no scout and posts no guards (#454 s4; only `scripts/ai-ab.ts` turns it off). */
+  scouts?: boolean;
 }
 
 /**
@@ -1994,6 +1996,12 @@ export const AI_RAID = { weary: 0.5, calm: 7, fort: 15, pop: 24, flame: 24, stag
  * a band walks to a rival Hunting Camp it has seen within `reach` (one more than `safe` from the rival's forts)
  * to find who works there, and looks within `look` tiles of the band once it is near.
  */
+/**
+ * The computer scouts and keeps watch (#454 s4): after `after` seconds a clever computer sends one idle rider exploring (again after
+ * `rest` seconds if it stops), and, with `army` soldiers idle, posts `guards` of them (foot or bowmen) to patrol its trade road
+ * or, with no post, `reach` tiles out toward its rival.
+ */
+export const AI_SCOUT = { after: 150, rest: 60, guards: 2, army: 8, reach: 16 };
 export const AI_PROWL = { band: 2, most: 3, reach: 40, safe: 12, guard: 7, odds: 2, chase: 8, look: 10, time: 45, every: 75, burn: 45, cover: 14, extra: 2 };
 /**
  * The computer and the wild (#171): once it has `mammothAt` citizens it sends a party of `party` after the
