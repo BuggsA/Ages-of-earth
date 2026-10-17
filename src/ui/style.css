@@ -447,3 +447,4 @@ body.online .tip-box { bottom: 330px; }
 .dawn.lift { animation: dawn-lift 5.5s ease-out forwards; }
 @keyframes dawn-lift { 0% { opacity: 1; } 35% { opacity: 0.85; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .dawn.lift { animation-duration: 1.5s; } }
+#timers .timer.urgent { animation: pulse 0.8s infinite; border-color: var(--bad); }
