@@ -1523,6 +1523,8 @@ export interface AiLevel {
   bell: { ring: number; quiet: number; hold: number };
   /** Whether a clever computer raises a forward Tower as a foothold (#132 s5); `scripts/ai-ab.ts` sets it back to compare. */
   fort: boolean;
+  /** Off, a clever computer leaves its own Wonder unguarded (#374); `scripts/ai-ab.ts` sets it so to compare. */
+  wonderGuard?: boolean;
   /** A pilgrim town detours to the Age of Sail for an heirloom (#232); off only in `scripts/ai-ab.ts`. */
   detour: boolean;
   /** Whether a landmark's worth follows what the town needs (`AI_MARK.worth`); off, every one counts the same. `scripts/ai-ab.ts` sets it back to compare. */

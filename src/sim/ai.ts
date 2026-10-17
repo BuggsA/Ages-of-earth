@@ -2472,7 +2472,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   if (L.clever) for (const id of exactTribute(s, v, mem, issue)) guards.add(id);
   let fighters = v.army.filter((u) => !u.inside && !sailing.has(u.id) && !guards.has(u.id));
   // A Wonder of its own rising or counting down is held (#374): rivals near it draw the whole army, and a share of the army stays by it, out of the waves.
-  const wonder = L.clever ? ownWonder(v) : null;
+  const wonder = L.clever && L.wonderGuard !== false ? ownWonder(v) : null;
   if (wonder && !threat) {
     const foe = wonderThreat(s, p, wonder);
     if (foe) {
