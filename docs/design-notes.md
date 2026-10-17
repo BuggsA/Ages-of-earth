@@ -1004,3 +1004,15 @@ Now that the last Town Center decides the match, the computer plants a second fa
 
 **Next:** a Dock button to set the boats' own spare line (so a player needn't micro it), and fish that also thin in the deep sea off a Glade.
 
+
+### Snares in the wood (#485, own pitch, chain 1017-1811 session 7, lane rules)
+
+**Built:** a Snare (economy menu, J, 30 wood, one open tile) goes only where 6 trees stand within 3 tiles, 5 tiles from any other snare (`SNARE` in `data.ts`, `src/sim/snares.ts`). Each second it fills by 0.15 food times its trees over 16 (at most 1), half again in winter, up to 24; a full one catches nothing more. A citizen right-clicked onto one walks the trap line (`snareStep` in `units.ts`): empties it, goes on to the nearest of the people's snares within 14 tiles holding 4 or more, and carries the catch home when the basket is full or the line is bare, else waits by it. A hare lies in the noose once a snare holds a load, for its owner and for a rival who sees it. In the Deep Wood a clever computer lays four in thick woods away from its axes from its second year (its first winter it hunts the yard with every hand) and keeps one tender. Its town bell ignores foes by its snares.
+
+**Why I love it:** the Deep Wood was the homeland whose notes said it "shifts the mix more than the verb". Every forest people ran trap lines, and this one gives the woods two lives: the trees you keep are food, the trees you cut are wood. Where to lay a line, which grove to spare, whether a Hunting Camp by the line beats the walk home, and whether one tender is worth more than a forager on a bush: those are decisions the Glade never asks.
+
+**Verbs test:** (1) new actions: lay a line, walk it, keep a grove standing; (2) closes a door: a grove kept for snares isn't felled, a felled one starves its snares, and 30 wood a snare is wood not spent on houses; (3) a wood-poor and a wood-rich player choose differently, and the Deep Wood's winter rewards it most; (4) a rival sees the snares and the hare in them and can burn the line (60 health).
+
+**Seen:** `tests/snares.test.ts`; in Chromium (headless, swiftshader) the snare draws with its hare, the panel reads "Caught 20 / 24 food · 7 trees round it: 3.9 a minute (best with 16) · nobody walks the line", the build menu has it under J and a sent citizen reads "Walking the trap line", with no page errors. Not played by hand. Headless Hard-vs-Hard in the Deep Wood (small, seeds 1–3, 5–6, laying from minute 0): total gathered by minute 20 within 7% of the same seeds with snares off on four seeds, 16% up on seed 2, ~350–540 food each from snares. Fill and yield are guesses for a person's line; the owner's hands will say.
+
+**Next:** poaching (a rival's citizens emptying your line, so it wants guarding), traps that take a wolf or a boar now and then, and a minimap mark for your snares. And the bell bug this turned up (#487).
