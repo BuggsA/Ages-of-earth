@@ -1541,6 +1541,8 @@ export interface AiLevel {
   detour: boolean;
   /** Whether a landmark's worth follows what the town needs (`AI_MARK.worth`); off, every one counts the same. `scripts/ai-ab.ts` sets it back to compare. */
   worthy: boolean;
+  /** Off, a clever computer neither draws nor spends blood, nor sends machines at a rival's Hemocraft (#355 s5); off only in `scripts/ai-ab.ts`. */
+  hemo?: boolean;
 }
 
 /**
@@ -1614,6 +1616,19 @@ export const HEMO = { cost: 40, work: 4, last: 150, reach: 10, attack: 1.2, pace
 
 /** The Blood Tower (#355 s3): its bolts hit the living `living` times as hard as a Watch Tower's arrows, the bloodless `bloodless` times. */
 export const BLOOD_TOWER = { living: 3, bloodless: 0.15 };
+
+/**
+ * The computer and Hemocraft (#355 s5). A clever computer at war (Iron and Blood, Total War) with `town` citizens raises a Drain Rig `rig` tiles from home
+ * toward where `foes` or more rival living soldiers last came within `watch` tiles of it (else toward the rival), and builds again no
+ * sooner than `again` seconds after. It raises up to `towers` Blood Towers `tower` tiles out toward them, `gap` seconds apart and `spread`
+ * tiles from each other, while at least `living` of the rival's army bleeds. In Total War, with `army` soldiers, it raises a Transfusion
+ * Station by its muster point, and between waves sends the idle soldiers within `near` tiles of it inside, as many as its blood pays for. It gives citizens to
+ * the levy only when that blood is short for `batch` or more soldiers waiting, or for a Blood Tower it wants, and only out of a town within
+ * `spare` of the citizens it wants (never under `AI_BLOOD.held`), every `levyGap` seconds at most. Its siege and warships go for a rival
+ * Station or Blood Tower seen within `hunt` tiles (its warships for one by the shore), and a rival with one (or `grafted` grafted soldiers
+ * seen) gets `siege` engines more. Its bombers count a rival Station `bomb` squared tiles nearer than it is (a Blood Tower half that).
+ */
+export const AI_HEMO = { town: 24, army: 6, rig: 6, watch: 26, foes: 2, again: 60, towers: 2, tower: 10, gap: 45, spread: 6, living: 0.6, near: 16, batch: 2, spare: 1, levyGap: 12, hunt: 22, grafted: 3, siege: 2, bomb: 2500 };
 
 /** Selling rare ore at a Market (#356 s5): a lot of `lot` pays `gold[ore]` gold at a flat price. Ore mined still counts toward its doors; only the stock in hand is spent. */
 export const ORE_TRADE = { lot: 20, gold: { salt: 40, saltpetre: 55, bloodiron: 90 } as Record<'salt' | 'saltpetre' | 'bloodiron', number> };
