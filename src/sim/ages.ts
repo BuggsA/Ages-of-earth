@@ -94,8 +94,17 @@ export function oreClue(s: GameState, p: Player, r: Road): Road['ore'] | null {
   return r.ore && s.rares?.includes(r.ore.id) && (p.stats.mined?.[r.ore.id] ?? 0) > 0 ? r.ore : null;
 }
 
-/** Whether every deed a road asks for is done, or its ore door has been opened. */
-export const deedsDone = (p: Player, r: Road): boolean => oreDone(p, r) || deedsProgress(p, r).every((d) => d.have >= d.need);
+/**
+ * Whether the ore is the only door: the road carries an ore and this world holds it (#356). Where the seed has
+ * none, the deeds stay the road; where it has, the deeds alone no longer open it.
+ */
+export const oreOnly = (s: GameState, r: Road): boolean => !!r.ore && !!s.rares?.includes(r.ore.id);
+
+/**
+ * Whether every deed a road asks for is done, or its ore door has been opened. Pass the state to let an ore the
+ * world holds be the only door (the player's rules and the computer do); without it the deeds also open the road.
+ */
+export const deedsDone = (p: Player, r: Road, s?: GameState): boolean => oreDone(p, r) || ((!s || !oreOnly(s, r)) && deedsProgress(p, r).every((d) => d.have >= d.need));
 
 /** What, besides its price, keeps a player off a road, or null. */
 export function roadProblem(s: GameState, p: Player, r: Road): string | null {
@@ -107,6 +116,12 @@ export function roadProblem(s: GameState, p: Player, r: Road): string | null {
     return `Needs a ${BUILDINGS[r.clue!].name}`;
   }
   if (oreDone(p, r)) return null;
+  if (oreOnly(s, r)) {
+    const door = oreClue(s, p, r);
+    return door
+      ? `${door.text} (${Math.floor(p.stats.mined?.[door.id] ?? 0)}/${door.n})`
+      : 'The ground here holds what this road wants: send citizens digging, and look for veins';
+  }
   const left = deedsProgress(p, r).filter((d) => d.have < d.need);
   const door = oreClue(s, p, r);
   return left.length ? left.map((d) => `${d.deed.text} (${d.have}/${d.need})`).join('; ') + (door ? `; or ${door.text.charAt(0).toLowerCase()}${door.text.slice(1)} (${Math.floor(p.stats.mined?.[door.id] ?? 0)}/${door.n})` : '') : null;
