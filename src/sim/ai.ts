@@ -1,5 +1,5 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_ORE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_ORE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
@@ -1989,6 +1989,26 @@ function enemyMix(s: GameState, p: Player): Record<'infantry' | 'ranged' | 'cava
   return mix;
 }
 
+/** The computer's own Wonder while it rises or counts down: the one it has to hold (#374). */
+function ownWonder(v: View): Building | null {
+  return v.buildings.find((b) => b.type === 'wonder' && b.hp > 0 && (!b.built || b.timer >= 0)) ?? null;
+}
+
+/** The nearest rival soldier within `AI_WONDER.reach` tiles of the Wonder. */
+function wonderThreat(s: GameState, p: Player, w: Building): Unit | null {
+  let best: Unit | null = null;
+  let bestD = AI_WONDER.reach;
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !isEnemy(s, p.id, e.owner) || e.type === 'citizen' || e.type === 'trader') continue;
+    const d = distToRect(e.x, e.y, w);
+    if (d < bestD) {
+      bestD = d;
+      best = e;
+    }
+  }
+  return best;
+}
+
 /** Enemy soldiers close to home, and the nearest of them. */
 function threatNear(s: GameState, v: View): { unit: Unit | null; count: number } {
   let threat: Unit | null = null;
@@ -2451,6 +2471,23 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   // The horde's riders in a rival's land (#322) are held there, out of the waves' orders.
   if (L.clever) for (const id of exactTribute(s, v, mem, issue)) guards.add(id);
   let fighters = v.army.filter((u) => !u.inside && !sailing.has(u.id) && !guards.has(u.id));
+  // A Wonder of its own rising or counting down is held (#374): rivals near it draw the whole army, and a share of the army stays by it, out of the waves.
+  const wonder = L.clever ? ownWonder(v) : null;
+  if (wonder && !threat) {
+    const foe = wonderThreat(s, p, wonder);
+    if (foe) {
+      const responders = fighters.filter((u) => u.order.k !== 'attack');
+      if (responders.length) issue({ t: 'move', p: p.id, ids: responders.map((u) => u.id), x: foe.x, y: foe.y, amove: true });
+      mem.attacking = false;
+      return;
+    }
+    const n = Math.min(fighters.length, Math.max(AI_WONDER.least, Math.min(AI_WONDER.most, Math.ceil(fighters.length * AI_WONDER.share))));
+    const post = fighters.slice(0, n);
+    const strays = post.filter((u) => u.order.k === 'idle' && distToRect(u.x, u.y, wonder) > AI_WONDER.stay);
+    if (strays.length) issue({ t: 'move', p: p.id, ids: strays.map((u) => u.id), x: wonder.x, y: wonder.y + wonder.size / 2 + 1, amove: true });
+    const held = new Set(post.map((u) => u.id));
+    fighters = fighters.filter((u) => !held.has(u.id));
+  }
   if (threat) {
     const responders = fighters.filter((u) => u.order.k !== 'attack');
     if (responders.length) issue({ t: 'move', p: p.id, ids: responders.map((u) => u.id), x: threat.x, y: threat.y, amove: true });
