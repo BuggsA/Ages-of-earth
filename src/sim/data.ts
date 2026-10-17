@@ -1626,7 +1626,7 @@ export const BLOOD_TOWER = { living: 3, bloodless: 0.15 };
  * Station or Blood Tower seen within `hunt` tiles (its warships for one by the shore), and a rival with one (or `grafted` grafted soldiers
  * seen) gets `siege` engines more. Its bombers count a rival Station `bomb` squared tiles nearer than it is (a Blood Tower half that).
  */
-export const AI_HEMO = { town: 24, army: 6, rig: 6, watch: 26, foes: 2, again: 60, towers: 2, tower: 10, gap: 45, spread: 6, living: 0.6, near: 16, batch: 2, spare: 2, levyGap: 12, hunt: 22, grafted: 3, siege: 2, bomb: 2500 };
+export const AI_HEMO = { town: 24, army: 6, rig: 6, watch: 26, foes: 2, again: 60, towers: 2, tower: 10, gap: 45, spread: 6, living: 0.6, near: 16, batch: 2, spare: 1, levyGap: 12, hunt: 22, grafted: 3, siege: 2, bomb: 2500 };
 
 /** Selling rare ore at a Market (#356 s5): a lot of `lot` pays `gold[ore]` gold at a flat price. Ore mined still counts toward its doors; only the stock in hand is spent. */
 export const ORE_TRADE = { lot: 20, gold: { salt: 40, saltpetre: 55, bloodiron: 90 } as Record<'salt' | 'saltpetre' | 'bloodiron', number> };
