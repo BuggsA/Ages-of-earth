@@ -1,6 +1,6 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { aiTiding } from './tidings';
-import { AGES, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, RITE, BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
@@ -3015,6 +3015,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   if (L.clever) for (const id of exactTribute(s, v, mem, issue)) guards.add(id);
   let fighters = v.army.filter((u) => !u.inside && !sailing.has(u.id) && !guards.has(u.id));
   if (L.clever && L.curseAnswer !== false) fighters = answerCurse(s, v, mem, fighters, issue);
+  if (L.clever && L.breakOath !== false) breakOath(s, v, fighters, issue);
   // A Wonder of its own rising or counting down is held (#374): rivals near it draw the whole army, and a share of the army stays by it, out of the waves.
   const wonder = L.clever && L.wonderGuard !== false ? ownWonder(v) : null;
   if (wonder && !threat) {
@@ -3418,6 +3419,45 @@ function answerCurse(s: GameState, v: View, mem: AiMemory, fighters: Unit[], iss
     if (go.length) issue({ t: 'attack', p: p.id, ids: go.map((r) => r.id), target: prey.id });
   }
   return fighters.filter((u) => !held.has(u.id));
+}
+
+/**
+ * The computer reads a rival's Military Orders (#459, `AI_ORDERS`): against a sworn army, its riders (or archers, with no riders) ride
+ * down the nearest priest swearing it, since no priest of its own can touch the soldiers while that one stands.
+ */
+export function breakOath(s: GameState, v: View, fighters: Unit[], issue: (c: Command) => void): void {
+  const { p } = v;
+  let hunters = fighters.filter((u) => u.type === 'cavalry');
+  if (!hunters.length) hunters = fighters.filter((u) => u.type === 'ranged');
+  if (!hunters.length) return;
+  const r2 = AI_ORDERS.reach * AI_ORDERS.reach;
+  const o2 = ORDERS.reach * ORDERS.reach;
+  const near = (a: Unit, b: Unit, d2: number) => (a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y) <= d2;
+  // The rival priests who swear a soldier that our hunters can reach.
+  const swearers: Unit[] = [];
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.type !== 'priest' || e.hp <= 0 || e.inside || !isEnemy(s, p.id, e.owner) || !modsOf(s, e.owner).sworn) continue;
+    if (s.ents.some((f) => f.kind === 'unit' && f.owner === e.owner && f.hp > 0 && !f.inside && GRAFTABLE.includes(f.type) && near(f, e, o2) && hunters.some((h) => near(h, f, r2)))) swearers.push(e);
+  }
+  let prey: Unit | null = null;
+  let bestD = Infinity;
+  for (const e of swearers) {
+    for (const h of hunters) {
+      const d = (e.x - h.x) * (e.x - h.x) + (e.y - h.y) * (e.y - h.y);
+      if (d < bestD) {
+        bestD = d;
+        prey = e;
+      }
+    }
+  }
+  if (!prey) return;
+  const target = prey;
+  const on = hunters.filter((h) => h.order.k === 'attack' && h.order.target === target.id).length;
+  const go = hunters
+    .filter((h) => !(h.order.k === 'attack' && s.byId.get(h.order.target)?.type === 'priest'))
+    .sort((a, b) => (a.x - target.x) * (a.x - target.x) + (a.y - target.y) * (a.y - target.y) - ((b.x - target.x) * (b.x - target.x) + (b.y - target.y) * (b.y - target.y)) || a.id - b.id)
+    .slice(0, Math.max(0, AI_ORDERS.riders - on));
+  if (go.length) issue({ t: 'attack', p: p.id, ids: go.map((h) => h.id), target: target.id });
 }
 
 function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {

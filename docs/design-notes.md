@@ -960,3 +960,7 @@ The owner played a conquest that felt over once the Town Center fell. Now it is:
 **Why I love it:** scouting is the first decision of a match and the most tedious to do by hand. Now a rider sent off with one key comes back with the map. Patrols make a border something you set once, which matters more now that the land has borders, attrition and raider camps.
 
 **Next:** s2, the owner's four modes, with **Run** for scouts that should never stop to fight; patrol along a trade road; explorers that steer round towers and report armies; the computer scouting by explore.
+
+### Reading the oath (#459, own pitch, 2026-10-17, lane ai)
+
+**Built:** a clever computer facing a rival's Military Orders sends up to two riders (archers if it has none) at the nearest priest swearing a soldier within 14 tiles of its army (`breakOath` in `ai.ts`, `AI_ORDERS`). **Why:** the heirloom made the priest the army's keystone, and a keystone the computer never aims at isn't a choice for the player, it's a free shield. Now Military Orders asks for a guard on the priest. **Next:** the computer guarding its own oath-priests the same way; archers given priority over riders when the priest stands behind a wall.
