@@ -1648,6 +1648,8 @@ export interface AiLevel {
   rite?: boolean;
   /** Off: a priest that has taken up healing by itself is left at it, as before (only `scripts/ai-ab.ts` turns it off). */
   healers?: boolean;
+  /** Off: a cursed computer army fights on and its riders ignore the priest (#434; only `scripts/ai-ab.ts` turns it off). */
+  curseAnswer?: boolean;
 }
 
 /**
@@ -1779,6 +1781,14 @@ export const AI_FORK = { living: 0.6, hemo: 0.5, stay: 300, patience: 1200, back
  * sacrifices the dearest victim whose offering is at least `dear` blood. Everything else is converted as before.
  */
 export const AI_RITE = { pack: 3, keep: 40, dear: 30 };
+
+/**
+ * A clever computer answers a curse on its own army (#434). For the last `late` seconds of a curse, a cursed soldier that isn't winning
+ * (hurt below `hurt` of its health, or with more rival soldiers than friends within `near` tiles) steps back to the muster point and
+ * stays out of the waves until the curse lifts. While any soldier of its own lies cursed, up to `riders` of its riders within `reach`
+ * tiles of a rival priest of the Blood-rite ride at that priest.
+ */
+export const AI_CURSE = { late: 14, hurt: 0.7, near: 5, riders: 3, reach: 14 };
 
 /** Selling rare ore at a Market (#356 s5): a lot of `lot` pays `gold[ore]` gold at a flat price. Ore mined still counts toward its doors; only the stock in hand is spent. */
 export const ORE_TRADE = { lot: 20, gold: { salt: 40, saltpetre: 55, bloodiron: 90 } as Record<'salt' | 'saltpetre' | 'bloodiron', number> };
