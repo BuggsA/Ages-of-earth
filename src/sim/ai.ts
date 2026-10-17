@@ -3290,6 +3290,11 @@ export function riteWork(s: GameState, p: Player, pr: Unit): { target: Unit; how
   const pin2 = AI_RITE.pinned * AI_RITE.pinned;
   const pinned = new Set<number>();
   for (const o of foes) if (soldier(o) && mine.some((m) => (m.x - o.x) * (m.x - o.x) + (m.y - o.y) * (m.y - o.y) <= pin2)) pinned.add(o.id);
+  // Wait a beat: a pack none of ours holds yet, with our foot soldiers closing on it, is about to be pinned, and a curse cast then falls on soldiers that can't step back.
+  const reach2 = AI_RITE.closing * AI_RITE.closing;
+  const unpinned = (c: Unit) => !foes.some((o) => pinned.has(o.id) && (o.x - c.x) * (o.x - c.x) + (o.y - c.y) * (o.y - c.y) <= r2);
+  const closing = (c: Unit) =>
+    mine.some((m) => unitStats(m.type, s.players[m.owner].epoch).range === 0 && (m.order.k === 'attack' || m.order.k === 'move') && (m.x - c.x) * (m.x - c.x) + (m.y - c.y) * (m.y - c.y) <= reach2);
   let curseAt: Unit | null = null;
   let packed = 0;
   let best = 0;
@@ -3318,7 +3323,7 @@ export function riteWork(s: GameState, p: Player, pr: Unit): { target: Unit; how
       }
     }
   }
-  if (curseAt && packed >= AI_RITE.pack) return { target: curseAt, how: 'curse' };
+  if (curseAt && packed >= AI_RITE.pack && !(unpinned(curseAt) && closing(curseAt))) return { target: curseAt, how: 'curse' };
   return offer ? { target: offer, how: 'sacrifice' } : null;
 }
 
