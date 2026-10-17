@@ -1,10 +1,10 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { aiTiding } from './tidings';
-import { AGES, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
-import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Ruin, TechId, TradePost, Unit, UnitType } from './types';
+import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Rubble, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { ageDef, ageOf, barred, buildBarred, deedsDone, oreDone, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
 import { carriedBy } from './relics';
@@ -290,6 +290,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   trapLine(s, v, mem, issue);
   hemoBuild(s, v, mem, issue);
   excavate(s, v, mem, issue);
+  salvage(s, v, mem, issue);
   claimWalk(s, v, mem, issue);
   strikeCamp(s, v, mem, issue);
   tendFlock(s, v, issue);
@@ -1816,6 +1817,41 @@ function excavate(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     .sort((a, b) => (a.x - ruin.x) * (a.x - ruin.x) + (a.y - ruin.y) * (a.y - ruin.y) - ((b.x - ruin.x) * (b.x - ruin.x) + (b.y - ruin.y) * (b.y - ruin.y)) || a.id - b.id)
     .slice(0, RUIN_DIGGERS);
   if (spare.length === RUIN_DIGGERS) issue({ t: 'dig', p: v.p.id, ids: spare.map((u) => u.id), target: ruin.id });
+}
+
+/**
+ * A salvaging people (#503) sends a pair of spare citizens to strip the nearest rubble nobody's guarding. Rubble of its own fall it leaves alone while the foundations can still be raised (the rebuild
+ * above does that), and strips it only once there is no gold to rebuild with.
+ */
+function salvage(s: GameState, v: View, _mem: AiMemory, issue: (c: Command) => void): void {
+  if (!s.rubble || !ageDef(v.p).salvage) return;
+  const working = v.citizens.filter((u) => u.order.k === 'salvage');
+  for (const u of working) {
+    const r = s.rubble.find((x) => u.order.k === 'salvage' && x.id === u.order.target);
+    if (!r || !ruinDanger(s, v.p, r, 9)) continue;
+    issue({ t: 'move', p: v.p.id, ids: working.map((d) => d.id), x: v.home.x, y: v.home.y });
+    return;
+  }
+  if (working.length || v.citizens.length < RUIN_TOWN || threatNear(s, v).count) return;
+  let best: Rubble | null = null;
+  let bestD = Infinity;
+  for (const r of s.rubble) {
+    const d = (r.x - v.home.x) * (r.x - v.home.x) + (r.y - v.home.y) * (r.y - v.home.y);
+    if (d > SALVAGE.find * SALVAGE.find || ruinDanger(s, v.p, r, 12)) continue;
+    // Its own: the rebuild comes first, the stones only when it cannot pay for it.
+    if (r.owner === v.p.id && v.p.res.gold >= 100) continue;
+    if (d < bestD) {
+      bestD = d;
+      best = r;
+    }
+  }
+  if (!best) return;
+  const site = best;
+  const spare = v.citizens
+    .filter((u) => !u.inside && !u.queue.length && u.carry <= 2 && (u.order.k === 'idle' || (u.order.k === 'gather' && u.order.res !== 'food')))
+    .sort((a, b) => (a.x - site.x) * (a.x - site.x) + (a.y - site.y) * (a.y - site.y) - ((b.x - site.x) * (b.x - site.x) + (b.y - site.y) * (b.y - site.y)) || a.id - b.id)
+    .slice(0, RUIN_DIGGERS);
+  if (spare.length === RUIN_DIGGERS) issue({ t: 'salvage', p: v.p.id, ids: spare.map((u) => u.id), target: site.id });
 }
 
 // ---- Contested landmarks -------------------------------------------------------------------------------

@@ -103,6 +103,8 @@ export interface Age {
   rite?: boolean;
   /** A people that raises again on the foundations of what fell (the Age of Reclaimers): see `RECLAIM` (`reclaim.ts`). */
   reclaim?: boolean;
+  /** Citizens strip the rubble of fallen buildings into stock (the Age of Reclaimers, #503): see `SALVAGE` (`salvage.ts`). */
+  salvage?: boolean;
   /** Aircraft fly on fuel from the Airfield (the Age of Aeronauts): see `SORTIE` (`sortie.ts`). */
   sortie?: boolean;
   /** Feast days (the Age of Fairs): see `FAIR` (`fair.ts`). */
@@ -113,6 +115,8 @@ export interface Age {
   prizes?: boolean;
   /** Priests keeping vigil at a relic Temple add to its gold (the Age of Pilgrims): see `VIGIL` (`vigil.ts`). */
   vigils?: boolean;
+  /** Rival citizens slain by this people's forces are taken captive and work its fields (the Age of the Warband): see `THRALL` (`thralls.ts`). */
+  thralls?: boolean;
 }
 
 /**
@@ -191,12 +195,15 @@ export const AGES: Record<AgeId, Age> = {
     sortie: true,
   },
   reclaimer: {
+    verb: 'Strip the rubble of fallen buildings, a rival\'s or your own, into stock, or leave your own to raise again',
+    door: 'Soldiers take longer to train',
     name: 'Age of Reclaimers',
     short: 'Reclaimers',
     tier: 3,
-    blurb: 'Build tomorrow from yesterday: excavating an ancient ruin teaches a people to rebuild. Construction and repairs work 25% faster, technologies cost 20% less, but military units take 25% longer to train. And what falls can be raised again: a building of yours that is destroyed leaves its foundations for 5 minutes, and the same building raised on the same spot costs 40% of the price and starts half built. The same armies and technologies as the Gunpowder Age.',
+    blurb: 'Build tomorrow from yesterday: excavating an ancient ruin teaches a people to rebuild, and to strip what others leave: citizens ordered onto the rubble of any fallen building (a rival\'s, or your own) carry off half its price in stock. Construction and repairs work 25% faster, technologies cost 20% less, but military units take 25% longer to train. And what falls can be raised again: a building of yours that is destroyed leaves its foundations for 5 minutes, and the same building raised on the same spot costs 40% of the price and starts half built. The same armies and technologies as the Gunpowder Age.',
     mul: { buildSpeed: 1.25, techCost: 0.8, militaryTrain: 1.25 },
     reclaim: true,
+    salvage: true,
   },
   merchant: {
     verb: 'Hire swords at the Market for gold, and keep paying them by the day or lose them',
@@ -277,8 +284,9 @@ export const AGES: Record<AgeId, Age> = {
     short: 'Warband',
     tier: 2,
     path: 'blood',
-    blurb: 'The war-host is the people: soldiers train 15% faster, and every enemy unit your forces slay earns a quarter of its price in plunder, carried in the killer\'s pack (up to 90 gold) until it walks within 5 tiles of a Town Center or Barracks to bank it. A rival who fells a laden soldier takes its pack. But a warband trades with no one: no traders leave its Markets, and with the young away at war the fields yield 10% less.',
-    add: { plunder: 0.25 },
+    blurb: 'The war-host is the people: soldiers train 15% faster, and every enemy unit your forces slay earns a sixth of its price in plunder, carried in the killer\'s pack (up to 90 gold) until it walks within 5 tiles of a Town Center or Barracks to bank it. A rival who fells a laden soldier takes its pack. A rival citizen who falls to your forces is taken instead of lost: a thrall rises where it fell, your own, to work your fields (up to 8 at a time, and if there is room). A thrall never builds. But a warband trades with no one: no traders leave its Markets, and with the young away at war the fields yield 10% less.',
+    thralls: true,
+    add: { plunder: 0.15 },
     haul: true,
     verb: 'Carry the plunder home: the soldier who makes a kill packs the gold and must walk it back to a Town Center or Barracks to bank it, so raids are timed, convoys guarded, and the war-host comes home between blows',
     door: 'A laden soldier felled in the field hands its pack to the rival, and no pack holds more than a few kills: a host that never turns home banks nothing, and a host that hurries home gives up the front',
@@ -1090,6 +1098,12 @@ export const PRIZE = { share: 0.5 };
  * not chanting at a rival's wall, and the shrine is where the rival's raiders come.
  */
 export const VIGIL = { reach: 5, each: 1, most: 3, toast: 30 };
+/**
+ * Salvage (the Age of Reclaimers, #503): any building that falls (a rival's, or your own) while a reclaiming people is in the match leaves rubble
+ * for `window` seconds. A reclaimer's citizens strip it: one citizen takes `work` seconds, and the stock gets `share` of the building's price.
+ * Rubble of your own fall is the choice: strip it for stock now, or leave the foundations to raise again at `RECLAIM.cost`.
+ */
+export const SALVAGE = { share: 0.5, work: 10, window: 150, reach: 2.2, find: 40 };
 export const RECLAIM = { window: 300, cost: 0.4, head: 0.5, skip: ['wall', 'gate', 'wonder'] as string[] };
 
 export const RUINS = { count: { small: 2, medium: 3, large: 4 } as Record<MapSize, number>, home: 24, fair: 4, spacing: 14, dig: 40, gold: 300, reach: 1.7, clear: 1 };
@@ -1416,7 +1430,7 @@ export const CIV_IDS = Object.keys(CIVS) as CivId[];
  * `tests/verbs.test.ts` lets these go without a `verb`, and fails once one has a verb but is still listed: strike it then.
  */
 export const VERB_GAPS: { ages: Partial<Record<AgeId, number>>; civs: Partial<Record<CivId, number>> } = {
-  ages: { reclaimer: 503 },
+  ages: {},
   civs: { egyptians: 501, greeks: 501, romans: 501, mongols: 501, chinese: 501, britons: 501 },
 };
 
@@ -1543,6 +1557,14 @@ export const KIN = { cost: { food: 120 } as Cost, time: 16, n: 2, winter: 3 };
  * `take` food from that rival's store (never more than it holds); a slain rival citizen gives up what it carried,
  * plus `slain` food. The rival hears of it at most every `tell` seconds.
  */
+/**
+ * Thralls (the Age of the Warband, #502): a rival citizen slain by a people in that age is taken captive. A thrall of the
+ * slayer rises where it fell with `hp` of a citizen's health (a share), and goes to work nearby within `reach` tiles. A
+ * people holds at most `max` at a time, and none while its pop is full. A thrall gathers and farms but never builds or repairs.
+ * The rival answers by guarding its workers, walling its fields, or cutting the thralls down (a thrall slain by a warband changes hands).
+ */
+export const THRALL = { max: 8, hp: 0.6, reach: 14 };
+
 export const RAID = { at: ['towncenter', 'storehouse', 'huntcamp', 'dock', 'farm'] as BuildingType[], take: 0.35, slain: 10, tell: 15 };
 
 /**

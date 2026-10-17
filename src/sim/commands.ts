@@ -11,6 +11,7 @@ import { RES_OF_TILE, cargoRoom, findResource, freeFarm, garrisonRoom, giveOrder
 import { carriedBy, letGo, relicAt } from './relics';
 import { caravanOf, dockOf, homeMarket, marketOf, nearestCaravan, nearestDock, portSpot, postAt } from './trade';
 import { ruinAt } from './ruins';
+import { rubbleAt, salvages } from './salvage';
 import { raise, raiseCost } from './reclaim';
 import { callWork, workProblem } from './works';
 import { callKin, killCamp, kinProblem, takeVow, takeWay, vowProblem, wayBarred, wayProblem } from './ways';
@@ -204,7 +205,7 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
 /** Send citizens to build, remembering the work they were doing to go back to it after. */
 function assignBuilders(units: Unit[], b: Building, queue: boolean): void {
   for (const u of units) {
-    if (!canRaise(u.type, b.type)) continue;
+    if (u.thrall || !canRaise(u.type, b.type)) continue;
     const o = u.order;
     const back: Order | null = o.k === 'gather' ? { ...o, phase: 'go' } : o.k === 'farm' || o.k === 'snare' ? { ...o, phase: 'go' } : o.k === 'build' ? u.resume : null;
     giveOrder(u, { k: 'build', target: b.id }, queue);
@@ -390,6 +391,17 @@ export function applyCommand(s: GameState, c: Command): void {
       }
       const others = units.filter((u) => u.type !== 'trader' && u.type !== 'cog');
       if (others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: post.x, y: post.y, queue: c.queue });
+      break;
+    }
+    case 'salvage': {
+      const r = rubbleAt(s, c.target);
+      if (!r) return;
+      const units = myUnits(s, c.p, c.ids);
+      if (!salvages(s, c.p)) {
+        if (units.some((u) => u.type === 'citizen')) refuse(s, c.p, 'Only a people of the Age of Reclaimers strips rubble');
+      } else for (const u of units) if (u.type === 'citizen') giveOrder(u, { k: 'salvage', target: r.id }, c.queue);
+      const others = units.filter((u) => u.type !== 'citizen');
+      if (others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: r.x, y: r.y, queue: c.queue });
       break;
     }
     case 'dig': {

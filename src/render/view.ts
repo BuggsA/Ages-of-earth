@@ -25,6 +25,7 @@ import { PostsView } from './postsView';
 import { FairBannersView } from './fairBannersView';
 import { VigilCandlesView } from './vigilCandlesView';
 import { RuinsView } from './ruinsView';
+import { RubbleView } from './rubbleView';
 import { LandmarksView } from './landmarksView';
 import { GrazeView } from './grazeView';
 import { BorderView } from './borderView';
@@ -106,6 +107,7 @@ export class View {
   private fairBanners = new FairBannersView();
   private vigilCandles = new VigilCandlesView();
   readonly ruins = new RuinsView();
+  readonly rubble = new RubbleView();
   readonly landmarks = new LandmarksView();
   /** When ground relics next sparkle. */
   private relicGlint = 0;
@@ -178,7 +180,7 @@ export class View {
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sky.mesh, this.hemi, this.fill, this.sun, this.sun.target);
-    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points);
+    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.rubble.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points);
     this.scene.add(this.rangeGuides.mesh, this.borders.mesh, this.graze.mesh, this.foundations.mesh);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.post = new Post(this.renderer, this.scene, this.rig.camera);
@@ -245,6 +247,7 @@ export class View {
     this.fairBanners.clear();
     this.vigilCandles.clear();
     this.ruins.clear();
+    this.rubble.clear();
     this.landmarks.clear();
     const colors = s.players.map((p) => p.color);
     this.units.setColors(colors);
@@ -447,6 +450,7 @@ export class View {
     this.posts.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1);
     this.fairBanners.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, this.time);
     this.vigilCandles.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, this.time);
+    this.rubble.update(s, !!ageDef(p).salvage, (x, y) => this.reveal || this.sees(x, y));
     this.ruins.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     this.landmarks.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     if (!this.reveal) {
@@ -1155,6 +1159,13 @@ export class View {
           if (ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;
           this.effects.burst(this.ground(s, ev.x, ev.y, 0.8), { count: 8, speed: 0.8, up: 1.1, life: 1, size: 0.05, gravity: 2, colors: ['#ffd166', '#9b1c2c', '#f2cf4a'] });
           if (ev.owner === this.viewer) this.cue('tradePaid', ev.x, ev.y, 0.4);
+          break;
+        }
+        case 'thrall': {
+          // A rival citizen taken captive (#502): dust and a flash of rope where the thrall rises.
+          if (ev.owner !== this.viewer && ev.from !== this.viewer && !this.sees(ev.x, ev.y)) break;
+          this.effects.burst(this.ground(s, ev.x, ev.y, 0.6), { count: 6, speed: 0.5, up: 0.8, life: 0.8, size: 0.05, gravity: 1.5, colors: ['#8a6a3a', '#c9b48a'] });
+          this.cue('thrall', ev.x, ev.y, 0.5);
           break;
         }
         case 'tribute': {

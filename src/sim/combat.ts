@@ -3,6 +3,7 @@ import { hasCoils } from './ages';
 import { bleeds, curseTaken, drawBlood, hemoBlow, hemoTaken } from './blood';
 import { fairPurse } from './fair';
 import { raidBlow, raidSlain } from './ways';
+import { takeCaptive } from './thralls';
 import { prizeOf } from './convoy';
 import { looted, pack } from './spoils';
 import { distToRect } from './grid';
@@ -105,6 +106,7 @@ function plunder(s: GameState, target: Unit, by: number, credit: Unit | null): v
   p.stats.slain = (p.stats.slain ?? 0) + 1;
   drawBlood(s, target, by, credit);
   raidSlain(s, target, by);
+  takeCaptive(s, target, by);
   // A laden Warband soldier's pack goes to whoever fells it (#502).
   const pack0 = looted(target, by);
   if (pack0 > 0) {

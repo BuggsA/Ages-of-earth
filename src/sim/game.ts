@@ -24,6 +24,7 @@ import { hemoStep } from './hemo';
 import { forkStep } from './fork';
 import { bloodStep, freeCaptives } from './blood';
 import { reclaimStep, remember } from './reclaim';
+import { leaveRubble, salvageStep } from './salvage';
 import { sortieStep } from './sortie';
 import { fairStep } from './fair';
 import { landmarkStep } from './landmarks';
@@ -396,6 +397,7 @@ function removeDead(s: GameState): void {
       freeCaptives(s, e);
       stampBuilding(s, e, false);
       remember(s, e);
+      leaveRubble(s, e);
       s.events.push({ k: 'die', id: e.id, owner: e.owner, type: e.type, x: e.x, y: e.y, building: true, size: e.size, epoch: p.epoch, fx: e.dir, fy: 1 });
     } else {
       if (e.inside) {
@@ -546,6 +548,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   elmoStep(s);
   galvanicStep(s);
   reclaimStep(s);
+  salvageStep(s);
   sortieStep(s);
   fairStep(s);
   attrition(s);
@@ -618,6 +621,11 @@ export function checksum(s: GameState): number {
     mix(f.tx);
     mix(f.ty);
     mix(f.until);
+  }
+  for (const r of s.rubble ?? []) {
+    mix(r.id);
+    mix(r.done);
+    mix(r.until);
   }
   for (const m of s.landmarks ?? []) {
     mix(m.owner);
