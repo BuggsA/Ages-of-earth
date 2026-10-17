@@ -6,7 +6,7 @@ import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { SIGHT_LORE } from './render/sightings';
 import { wallLine } from './sim/commands';
-import { AGES, BUILDINGS, CIVS, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
+import { AGES, BUILDINGS, CIVS, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
 import { crestSvg } from './ui/crests';
 import { isEnemy } from './sim/world';
 import { jumpAge, rush, topUp } from './sim/god';
@@ -2200,6 +2200,10 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         // The turning year (#479): what the season does to this homeland.
         const turn = s.homeland ? HOMELANDS[s.homeland].year[ev.i] : '';
         hud.toast(`${sn.icon} ${sn.name}. ${sn.blurb}${turn ? ` ${HOMELANDS[s.homeland!].icon} ${turn}` : ''}`, 'info');
+        // The Nile flood (#501 s1): a flood people hears the river rise and fall.
+        if (CIVS[s.players[viewer]?.civ]?.flood && (ev.i === FLOOD.season || ev.i === (FLOOD.season + 1) % 4)) {
+          hud.toast(ev.i === FLOOD.season ? '🌊 The Nile floods: the fields lie under the river and yield nothing. Call the farmers to build: the corvée works twice as fast.' : '🌾 The river falls and leaves its black silt: back to the fields.', ev.i === FLOOD.season ? 'bad' : 'good');
+        }
         break;
       }
       case 'spawned':

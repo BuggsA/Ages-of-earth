@@ -1024,3 +1024,8 @@ The three Ways were percentage bundles, so a Hunter and a Hearth player played t
 ## Designers' notes: herds breed (#491, the owner's note, 2026-10-18, lane rules)
 
 Built: every spring each wild herd of two or more deer drops a calf per pair, up to six (`DEER.pair/cap`). Why: deer only ever decreased, so hunting got harder with every kill; now sparing a pair is a real choice. Next: the computer sparing a pair of wild herds (it spares two of home herds on the Herd Plains only), and wolves culling thin herds.
+
+## Designers' notes: the Nile flood (#501 s1, 2026-10-17, chain 1017-2305 parent, lane rules)
+
+Built: the Egyptians' verb. Each summer the river lies over their fields (no yield, brown water on the field, the farmer "waiting out the flood"), and the corvée makes every Egyptian builder work twice as fast; the silt makes their farms work half again as fast the rest of the year (`FLOOD`, `CIVS.egyptians`, `src/sim/flood.ts`). Why I love it: it is the first people whose year has a shape. Farmers become builders every summer, so an Egyptian lays food up in spring and plans the big building for the flood, and a rival knows when Egypt's granaries are thinnest. It is history too: the corvée gangs built in the inundation. The great work that was "the Nile Flood" is now the Shaduf Sweeps (same +60% farms), so the name means one thing.
+Next: the computer should lay food up in spring and save its wonder or walls for the flood (today it only moves farmers off the fields; it plays about a fifth weaker by summed epochs at 20 minutes, over 8 seeds); a river-mouth homeland where the flood also fertilises new ground; then the other five peoples (#501).
