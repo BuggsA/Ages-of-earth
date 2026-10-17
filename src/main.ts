@@ -4,6 +4,7 @@ import { sound, type SoundName } from './audio/sound';
 import { CameraRig } from './render/camera';
 import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
+import { SIGHT_LORE } from './render/sightings';
 import { wallLine } from './sim/commands';
 import { AGES, BUILDINGS, CIVS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, TRIBUTE, TRUNK, WARCAMP, WAYS, WORKS, domainOf, unitStats } from './sim/data';
 import { crestSvg } from './ui/crests';
@@ -346,6 +347,11 @@ function play(name: SoundName, pan = 0, gain = 1): void {
   sound.play(name, { pan, gain });
 }
 view.onCue = (name, pan, gain) => play(name, pan, gain);
+view.onSighting = (what) => {
+  const look = SIGHT_LORE[what];
+  play('sighting');
+  hud.banner(look.title, look.lore, 4200);
+};
 view.onPing = (x, y, color) => minimap.ping(x, y, color);
 
 // ---- Starting matches ------------------------------------------------------------------------------

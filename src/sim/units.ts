@@ -1,4 +1,4 @@
-import { AI_LEVELS, BUILDINGS, CARRY, CONSECRATE, DEER, DT, FLOCK, GALVANIC, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SPREAD, TRADE, domainOf, secs } from './data';
+import { AI_LEVELS, BUILDINGS, CARRY, CONSECRATE, DEER, DT, FLOCK, GALVANIC, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SPREAD, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
@@ -15,7 +15,7 @@ import { dig, ruinAt } from './ruins';
 import { fordMarch, groveBoost, keptOf, kinBonus } from './landmarks';
 import { chant, chantedOver, consecrateProblem, consecrates, turnBuilding } from './consecrate';
 import { convoyShare } from './convoy';
-import { grafted, hemoPace } from './blood';
+import { GRAFTABLE, grafted, hemoPace, sworn } from './blood';
 import { curse, riteProblem, sacrifice } from './fork';
 import { atPost, caravanBonus, caravanOf, dockOf, goalForPost, homeMarket, marketOf, nearestCaravan, nearestDock, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { canHit, exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, passOf, pay, radiusOf, statsOf, teamOf } from './world';
@@ -823,10 +823,10 @@ function convertStep(s: GameState, u: Unit, o: Extract<Order, { k: 'convert' }>)
     consecrateStep(s, u, o, t);
     return;
   }
-  // Kings never turn, nor a grafted soldier (#355 s3), and a priest's hands are full with a relic. A Blood-rite priest's rites
+  // Kings never turn, nor a grafted soldier (#355 s3) or a sworn one (#355 s6), and a priest's hands are full with a relic. A Blood-rite priest's rites
   // (#355 s4) have their own rules (`riteProblem`): they are worked on anything that bleeds, grafted or not.
   const rite = o.rite;
-  if (!t || t.kind !== 'unit' || t.hp <= 0 || t.inside || !isEnemy(s, u.owner, t.owner) || peace(s) || carriedBy(s, u) || (rite ? riteProblem(s, u.owner, rite, t) !== null : s.kings.includes(t.id) || grafted(s, t))) {
+  if (!t || t.kind !== 'unit' || t.hp <= 0 || t.inside || !isEnemy(s, u.owner, t.owner) || peace(s) || carriedBy(s, u) || (rite ? riteProblem(s, u.owner, rite, t) !== null : s.kings.includes(t.id) || grafted(s, t) || sworn(s, t))) {
     setOrder(u, { k: 'idle' });
     return;
   }
@@ -932,7 +932,9 @@ function healStep(s: GameState, u: Unit, o: Extract<Order, { k: 'heal' }>): void
     if (walking(u)) stopWalking(u);
     face(u, t.x, t.y);
     u.act = 'chant';
-    t.hp = Math.min(maxHp(s, t), t.hp + PRIEST.heal * modsOf(s, u.owner).priest * groveBoost(s, u) * DT);
+    // Military Orders (#355 s6): the people's priests mend its soldiers faster.
+    const orders = modsOf(s, u.owner).sworn && GRAFTABLE.includes(t.type) ? ORDERS.mend : 1;
+    t.hp = Math.min(maxHp(s, t), t.hp + PRIEST.heal * modsOf(s, u.owner).priest * groveBoost(s, u) * orders * DT);
     if ((s.tick + u.id) % 30 === 0) s.events.push({ k: 'healed', id: t.id, x: t.x, y: t.y });
     return;
   }
