@@ -6,7 +6,7 @@ import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { SIGHT_LORE } from './render/sightings';
 import { wallLine } from './sim/commands';
-import { AGES, BUILDINGS, CIVS, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, TRIBUTE, TRUNK, WARCAMP, WAYS, WORKS, domainOf, unitStats } from './sim/data';
+import { AGES, BUILDINGS, CIVS, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
 import { crestSvg } from './ui/crests';
 import { isEnemy } from './sim/world';
 import { grantAll, topUp } from './sim/god';
@@ -2406,6 +2406,20 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         else hud.toast(`${s.players[ev.owner].name} lives by ${w.name}`, 'alert');
         break;
       }
+      case 'kin':
+        if (ev.owner === viewer) {
+          hud.toast(`🔥 ${ev.n} kin come to the hearth${ev.n > KIN.n ? ': the winter call draws more' : ''}`, 'good');
+          play('wayHearth');
+        }
+        break;
+      case 'raided':
+        if (!ev.tell) break;
+        if (ev.owner === viewer) {
+          hud.toast('🗡 Raiders are carrying off your food! (Space to look)', 'alert');
+          lastAlert = { x: ev.x, y: ev.y };
+          play('alert');
+        } else if (ev.by === viewer) hud.toast('🗡 Your raiders carry the rival\'s food home', 'good');
+        break;
       case 'greatWork':
         if (ev.owner === viewer) {
           const w = WORKS[s.players[viewer].civ];

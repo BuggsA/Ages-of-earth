@@ -1,6 +1,7 @@
 import { RECLAIM, secs } from './data';
 import { ageDef } from './ages';
 import { buildingCostFor, buildingMaxHp } from './stats';
+import { killCamp } from './ways';
 import type { Building, BuildingType, Cost, GameState } from './types';
 import { RES } from './types';
 
@@ -29,6 +30,8 @@ export function foundationAt(s: GameState, owner: number, type: BuildingType, tx
 
 /** What raising this building here costs: a fraction of the usual price on old foundations. */
 export function raiseCost(s: GameState, owner: number, type: BuildingType, tx: number, ty: number): Cost {
+  // The Hunters' kill camp (#463 s1) is raised for nothing.
+  if (killCamp(s, owner, type, tx, ty)) return {};
   const cost = buildingCostFor(s, owner, type);
   if (foundationAt(s, owner, type, tx, ty) < 0) return cost;
   const out: Cost = {};

@@ -4,7 +4,8 @@ import { applyCommand } from '../src/sim/commands';
 import { createGame, step } from '../src/sim/game';
 import { clearResource, placeProblem } from '../src/sim/grid';
 import { catchIn, snareRate, snareSpot, treesNear } from '../src/sim/snares';
-import { placeBuilding } from '../src/sim/world';
+import { placeBuilding, spawnUnit } from '../src/sim/world';
+import { raidBlow } from '../src/sim/ways';
 import { R_TREE } from '../src/sim/types';
 import type { Building, GameState, Unit } from '../src/sim/types';
 
@@ -136,5 +137,24 @@ describe('snares in the wood (#485)', () => {
     const [r] = citizens(s, 1);
     applyCommand(s, { t: 'work', p: 1, ids: [r.id], target: b.id });
     expect(r.order.k).not.toBe('snare');
+  });
+
+  it("a Warband's soldier striking a rival's snare carries off its catch, not the rival's stores (#463 s1)", () => {
+    const s = game();
+    const b = lay(s, spots(s, 1)[0]);
+    b.snared = 17.5;
+    s.players[1].way = 'warband';
+    const raider = spawnUnit(s, 1, 'infantry', b.x + 1, b.y);
+    const stores = s.players[0].res.food;
+    const food = s.players[1].res.food;
+    raidBlow(s, b, 5, 1, raider);
+    expect(s.players[1].res.food).toBe(food + 17);
+    expect(s.players[0].res.food).toBe(stores);
+    expect(b.snared).toBeCloseTo(0.5);
+    // A people not of the Warband takes nothing.
+    b.snared = 10;
+    s.players[1].way = 'hunt';
+    raidBlow(s, b, 5, 1, raider);
+    expect(b.snared).toBe(10);
   });
 });
