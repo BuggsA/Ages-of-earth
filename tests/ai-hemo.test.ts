@@ -185,3 +185,31 @@ describe('the computer sends machines at a rival Hemocraft', () => {
     expect(ram.order.k === 'attack' && ram.order.target).toBe(station.id);
   });
 });
+
+describe('a forward Transfusion Station', () => {
+  const front = () => {
+    const s = game('totalwar');
+    const rival = tc(s, 1);
+    const at = spot(s, 'warcamp', rival.x, rival.y, 16, 22, 0);
+    const camp = placeBuilding(s, 0, 'warcamp', at.tx, at.ty, true);
+    const foot: Unit[] = [];
+    for (let i = 0; i < 6; i++) foot.push(spawnUnit(s, 0, 'infantry', camp.x + 2 + (i % 3) * 0.5, camp.y + 3 + (i >> 2) * 0.5));
+    step(s);
+    s.ai[0].attacking = true;
+    for (const u of foot) u.order = { k: 'move', x: rival.x, y: rival.y, amove: true } as Unit['order'];
+    return { s, camp, foot };
+  };
+  it('is raised beside the wave\'s War Camp at the front', () => {
+    const { s, camp } = front();
+    run(s, 12);
+    const made = mine(s, 'transfusion');
+    expect(made.length).toBe(1);
+    expect(d2(made[0], camp)).toBeLessThanOrEqual(AI_HEMO.forward * AI_HEMO.forward);
+  });
+  it('is not raised once a Station already stands within reach of the camp', () => {
+    const { s, camp } = front();
+    raise(s, 0, 'transfusion', camp.x, camp.y, 2, 6);
+    run(s, 12);
+    expect(mine(s, 'transfusion').length).toBe(1);
+  });
+});
