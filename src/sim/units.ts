@@ -1,4 +1,4 @@
-import { AI_LEVELS, BUILDINGS, CARRY, CONSECRATE, DEER, DT, FLOCK, GALVANIC, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, PRIEST, RARE, REPAIR_SHARE, RUINS, SPREAD, TRADE, domainOf, secs } from './data';
+import { AI_LEVELS, BUILDINGS, CARRY, CONSECRATE, DEER, DT, FLOCK, GALVANIC, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SPREAD, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
@@ -16,6 +16,7 @@ import { fordMarch, groveBoost, keptOf, kinBonus } from './landmarks';
 import { chant, chantedOver, consecrateProblem, consecrates, turnBuilding } from './consecrate';
 import { convoyShare } from './convoy';
 import { grafted, hemoPace } from './blood';
+import { curse, riteProblem, sacrifice } from './fork';
 import { atPost, caravanBonus, caravanOf, dockOf, goalForPost, homeMarket, marketOf, nearestCaravan, nearestDock, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { canHit, exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, passOf, pay, radiusOf, statsOf, teamOf } from './world';
 
@@ -804,9 +805,11 @@ function milkStep(s: GameState, u: Unit, o: Extract<Order, { k: 'milk' }>): void
 // ---- Priests ---------------------------------------------------------------------------------------
 
 /** How long a conversion takes for this target, in ticks (heavier units resist longer). */
-function convertTicks(s: GameState, priest: Unit, t: Unit): number {
+function convertTicks(s: GameState, priest: Unit, t: Unit, rite?: 'sacrifice' | 'curse'): number {
   const hard = t.type === 'hero' ? 3 : t.type === 'cavalry' || t.type === 'siege' ? 1.5 : t.type === 'priest' ? 2 : 1;
-  return secs((PRIEST.convert * hard) / (modsOf(s, priest.owner).priest * groveBoost(s, priest)));
+  // A curse is a short chant over any target; a sacrifice is as long as turning the same victim would be (#355 s4).
+  const base = rite === 'curse' ? RITE.chant : PRIEST.convert * hard;
+  return secs(base / (modsOf(s, priest.owner).priest * groveBoost(s, priest)));
 }
 
 function convertStep(s: GameState, u: Unit, o: Extract<Order, { k: 'convert' }>): void {
@@ -816,8 +819,10 @@ function convertStep(s: GameState, u: Unit, o: Extract<Order, { k: 'convert' }>)
     consecrateStep(s, u, o, t);
     return;
   }
-  // Kings never turn, nor a grafted soldier (#355 s3), and a priest's hands are full with a relic.
-  if (!t || t.kind !== 'unit' || t.hp <= 0 || t.inside || !isEnemy(s, u.owner, t.owner) || peace(s) || s.kings.includes(t.id) || grafted(s, t) || carriedBy(s, u)) {
+  // Kings never turn, nor a grafted soldier (#355 s3), and a priest's hands are full with a relic. A Blood-rite priest's rites
+  // (#355 s4) have their own rules (`riteProblem`): they are worked on anything that bleeds, grafted or not.
+  const rite = o.rite;
+  if (!t || t.kind !== 'unit' || t.hp <= 0 || t.inside || !isEnemy(s, u.owner, t.owner) || peace(s) || carriedBy(s, u) || (rite ? riteProblem(s, u.owner, rite, t) !== null : s.kings.includes(t.id) || grafted(s, t))) {
     setOrder(u, { k: 'idle' });
     return;
   }
@@ -833,17 +838,21 @@ function convertStep(s: GameState, u: Unit, o: Extract<Order, { k: 'convert' }>)
     u.act = 'chant';
     if (o.done % 24 === 0) s.events.push({ k: 'work', id: u.id, owner: u.owner, act: 'chant', x: t.x, y: t.y });
     o.done++;
-    if (o.done >= convertTicks(s, u, t)) {
-      // It joins us: its orders are forgotten.
-      const from = t.owner;
-      t.owner = u.owner;
-      t.queue = [];
-      t.inside = 0;
-      setOrder(t, { k: 'idle' });
-      t.resume = null;
-      s.players[u.owner].stats.converted++;
-      s.events.push({ k: 'converted', id: t.id, from, to: u.owner, x: t.x, y: t.y });
-      u.cool = secs(PRIEST.rest);
+    if (o.done >= convertTicks(s, u, t, rite)) {
+      if (rite === 'sacrifice') sacrifice(s, u, t);
+      else if (rite === 'curse') curse(s, u, t);
+      else {
+        // It joins us: its orders are forgotten.
+        const from = t.owner;
+        t.owner = u.owner;
+        t.queue = [];
+        t.inside = 0;
+        setOrder(t, { k: 'idle' });
+        t.resume = null;
+        s.players[u.owner].stats.converted++;
+        s.events.push({ k: 'converted', id: t.id, from, to: u.owner, x: t.x, y: t.y });
+      }
+      u.cool = secs(rite === 'curse' ? RITE.rest : PRIEST.rest);
       setOrder(u, { k: 'idle' });
     }
     return;

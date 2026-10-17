@@ -2,8 +2,8 @@ import { HEMOCRAFT, RITE, TICK_HZ, secs } from './data';
 import { ageDef } from './ages';
 import { bleeds, bloodOf, gainBlood } from './blood';
 import { hurt, peace } from './combat';
-import { isEnemy, maxHp } from './world';
-import type { Building, GameState, Unit } from './types';
+import { isEnemy, maxHp, statsOf } from './world';
+import type { Building, Ent, GameState, Unit } from './types';
 
 /**
  * The fork at the end of the Path of Blood (#355 s2). Past Total War a people takes one of two branches, and each does something
@@ -11,7 +11,9 @@ import type { Building, GameState, Unit } from './types';
  * - Hemocraft, blood run through machines: a finished Drain Rig bleeds the living enemy standing near it into the store (`HEMOCRAFT`).
  *   Machines, ships and aircraft bleed nothing, so the answer to a town of rigs is steel.
  * - The Blood-rite, blood as a sacrament: a finished Temple is an altar that mends its people's hurt living near it, paid from the
- *   store (`RITE`). (Its altars also draw from the enemy who fall near them: `drawBlood` in `blood.ts`.)
+ *   store (`RITE`). (Its altars also draw from the enemy who fall near them: `drawBlood` in `blood.ts`.) Its priests chant two more
+ *   rites over an enemy that bleeds (#355 s4): sacrifice, which kills it for its blood, and a curse, which makes every blow land harder
+ *   on it and the living around it. Both are `convert` orders with a `rite`, worked in `convertStep` (`units.ts`).
  */
 
 /** Units within `reach` tiles of a building that pass `ok`, nearest first (ties in id order), at most `most`. */
@@ -62,4 +64,49 @@ export function forkStep(s: GameState): void {
       if (!calm && ageDef(s.players[e.owner]).hemocraft) drain(s, e);
     } else if (e.type === 'temple' && ageDef(s.players[e.owner]).rite) mend(s, e);
   }
+}
+
+/** Why `p`'s priests can't chant this rite over `t` now, or null. Machines, ships and aircraft bleed nothing, and no King is offered. */
+export function riteProblem(s: GameState, p: number, rite: 'sacrifice' | 'curse', t: Ent): string | null {
+  if (!ageDef(s.players[p]).rite) return 'Only a people of the Blood-rite chants this';
+  if (t.kind !== 'unit' || t.hp <= 0) return 'The rite is worked on the living, not on stone';
+  if (!isEnemy(s, p, t.owner)) return 'The rite is chanted over an enemy';
+  if (peace(s)) return 'Not while the peace treaty holds';
+  if (!bleeds(t)) return `A ${statsOf(s, t).name} bleeds nothing: steel, ships and aircraft are beyond the rite`;
+  if (rite === 'sacrifice' && s.kings.includes(t.id)) return 'A King is never offered';
+  if (rite === 'curse' && bloodOf(s.players[p]) < RITE.curse) return `A curse takes ${RITE.curse} blood: ${Math.ceil(RITE.curse - bloodOf(s.players[p]))} more`;
+  return null;
+}
+
+/** The blood a sacrifice pays: `RITE.offering` of the victim's price (a Hero `RITE.hero` times that), at least 1. */
+export function offeringOf(s: GameState, t: Unit): number {
+  const c = statsOf(s, t).cost;
+  const price = (c.food ?? 0) + (c.wood ?? 0) + (c.gold ?? 0) + (c.stone ?? 0);
+  return Math.max(1, Math.floor(price * RITE.offering * (t.type === 'hero' ? RITE.hero : 1)));
+}
+
+/** The priest finishes the sacrifice: the victim dies, and its people's enemy takes the blood. */
+export function sacrifice(s: GameState, priest: Unit, t: Unit): void {
+  const p = s.players[priest.owner];
+  const n = offeringOf(s, t);
+  gainBlood(s, p, n, t.x, t.y, 'sacrifice');
+  p.stats.sacrificed = (p.stats.sacrificed ?? 0) + 1;
+  s.events.push({ k: 'rite', how: 'sacrifice', owner: priest.owner, against: t.owner, id: t.id, x: t.x, y: t.y, n });
+  hurt(s, t, t.hp, priest.owner, priest);
+}
+
+/** The priest finishes the curse: `RITE.curse` blood is spent, and `t` and the living enemies near it are cursed. Returns how many. */
+export function curse(s: GameState, priest: Unit, t: Unit): number {
+  const p = s.players[priest.owner];
+  p.blood = Math.max(0, bloodOf(p) - RITE.curse);
+  const r2 = RITE.spread * RITE.spread;
+  const near = s.ents
+    .filter((e): e is Unit => e.kind === 'unit' && e.hp > 0 && !e.inside && isEnemy(s, priest.owner, e.owner) && bleeds(e) && (e.x - t.x) * (e.x - t.x) + (e.y - t.y) * (e.y - t.y) <= r2)
+    .map((e) => ({ e, d: (e.x - t.x) * (e.x - t.x) + (e.y - t.y) * (e.y - t.y) }))
+    .sort((a, b) => a.d - b.d || a.e.id - b.e.id)
+    .slice(0, RITE.curses);
+  for (const n of near) n.e.cursed = s.tick + secs(RITE.last);
+  p.stats.cursed = (p.stats.cursed ?? 0) + 1;
+  s.events.push({ k: 'rite', how: 'curse', owner: priest.owner, against: t.owner, id: t.id, x: t.x, y: t.y, n: near.length });
+  return near.length;
 }

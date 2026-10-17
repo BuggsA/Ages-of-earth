@@ -1,4 +1,4 @@
-import { BLOOD, BUILDINGS, HEMO, secs, TICK_HZ, type UnitClass } from './data';
+import { BLOOD, BUILDINGS, HEMO, RITE, secs, TICK_HZ, type UnitClass } from './data';
 import { ageDef } from './ages';
 import { statsOf } from './world';
 import type { Building, BuildingType, Ent, GameState, Player, Unit, UnitType } from './types';
@@ -40,6 +40,16 @@ export function hemoTaken(s: GameState, target: Ent, from: UnitClass | 'arrow' |
   return from === 'coil' || MACHINES.includes(from as UnitClass) ? HEMO.machine : HEMO.flesh;
 }
 
+/** Whether a unit lies under a Blood-rite curse (#355 s4). */
+export function cursed(s: GameState, u: Ent): boolean {
+  return u.kind === 'unit' && u.cursed !== undefined && s.tick < u.cursed;
+}
+
+/** How many times harder a blow lands on `target`: `RITE.taken` while it is cursed, else 1. */
+export function curseTaken(s: GameState, target: Ent): number {
+  return cursed(s, target) ? RITE.taken : 1;
+}
+
 /** Blows a grafted soldier strikes land this many times harder. */
 export function hemoBlow(s: GameState, u: Unit | null): number {
   return u && grafted(s, u) ? HEMO.attack : 1;
@@ -76,7 +86,7 @@ export function hasRig(s: GameState, owner: number): boolean {
 }
 
 /** Blood comes into a people's store, and the tally that the fork's deeds and the end report read. */
-export function gainBlood(s: GameState, p: Player, n: number, x: number, y: number, how: 'slain' | 'levy' | 'drain'): void {
+export function gainBlood(s: GameState, p: Player, n: number, x: number, y: number, how: 'slain' | 'levy' | 'drain' | 'sacrifice'): void {
   p.blood = bloodOf(p) + n;
   p.stats.blood = (p.stats.blood ?? 0) + n;
   s.events.push({ k: 'blood', owner: p.id, x, y, n, how });

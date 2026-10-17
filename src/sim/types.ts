@@ -109,8 +109,11 @@ export type Order =
   | { k: 'hunt'; target: number; fight?: boolean }
   /** Milk a sheep of the people's flock (#308), carry the milk to a drop site, and back. */
   | { k: 'milk'; target: number; phase: 'go' | 'work' | 'drop' }
-  /** A priest turning an enemy to your side: `done` ticks of chanting so far. */
-  | { k: 'convert'; target: number; done: number }
+  /**
+   * A priest turning an enemy to your side: `done` ticks of chanting so far. A Blood-rite priest (#355 s4) may instead chant a `rite`
+   * over a living enemy: to `sacrifice` it for its blood, or to `curse` it.
+   */
+  | { k: 'convert'; target: number; done: number; rite?: 'sacrifice' | 'curse' }
   /** A pilgrim priest standing by a friendly building a rival is chanting over, singing back (#219). */
   | { k: 'answer'; target: number }
   /** A priest tending a wounded friend. */
@@ -200,6 +203,8 @@ export interface Unit {
   packedHp?: number;
   /** A hemo-engineered soldier (#355 s3): the tick its graft runs dry unless a Transfusion Station tops it up; absent when ungrafted. */
   hemo?: number;
+  /** Cursed by a Blood-rite priest (#355 s4): the tick the curse lifts. Until then every blow on it lands harder (`RITE.taken`). */
+  cursed?: number;
 }
 
 export interface TrainItem {
@@ -473,6 +478,10 @@ export interface PlayerStats {
   grafted?: number;
   /** Health the Blood-rite's altars mended with blood (#355 s2); absent in older saves. */
   riteMended?: number;
+  /** Enemies sacrificed by the Blood-rite's priests (#355 s4); absent in older saves. */
+  sacrificed?: number;
+  /** Curses the Blood-rite's priests have laid (#355 s4); absent in older saves. */
+  cursed?: number;
 }
 
 /** One sample of a player's state for the post-game timeline. */
@@ -577,7 +586,7 @@ export type GameEvent =
    * Blood drawn at a Drain Rig (#355): from an enemy who fell near it, or from citizens given to the levy; in Hemocraft (s2) also
    * bled from a living enemy standing by a rig (`drain`, at the bled), and in the Blood-rite from the fallen near a Temple.
    */
-  | { k: 'blood'; owner: number; x: number; y: number; n: number; how: 'slain' | 'levy' | 'drain' }
+  | { k: 'blood'; owner: number; x: number; y: number; n: number; how: 'slain' | 'levy' | 'drain' | 'sacrifice' }
   /** A soldier grafted at a Transfusion Station (#355 s3), or a graft run dry far from every Station (`crash`). */
   | { k: 'graft'; owner: number; id: number; x: number; y: number; how: 'made' | 'crash' }
   /** A War Camp left without its soldiers (#303): it burns after a grace, or at once if its people left the path (`struck`). */
@@ -595,6 +604,8 @@ export type GameEvent =
   /** Rival priests have begun chanting at one of `owner`'s buildings (#209). */
   | { k: 'chanting'; owner: number; by: number; id: number; type: BuildingType; x: number; y: number }
   | { k: 'healed'; id: number; x: number; y: number }
+  /** A Blood-rite priest's rite finished (#355 s4): the victim `id` sacrificed where it stood (`n` blood), or a curse laid on the ground at x, y (`n` souls under it). */
+  | { k: 'rite'; how: 'sacrifice' | 'curse'; owner: number; against: number; id: number; x: number; y: number; n: number }
   | { k: 'garrison'; owner: number; building: number; inside: boolean }
   | { k: 'bell'; owner: number; ring: boolean }
   | { k: 'cry'; owner: number; id: number; x: number; y: number; n: number }
@@ -784,7 +795,7 @@ export type Command =
   /** A line of wall from one tile to another (gates go in with `type: 'gate'` one at a time). */
   | ({ t: 'wall'; p: number; ids: number[]; x0: number; y0: number; x1: number; y1: number } & Queued)
   | ({ t: 'hunt'; p: number; ids: number[]; target: number } & Queued)
-  | ({ t: 'convert'; p: number; ids: number[]; target: number } & Queued)
+  | ({ t: 'convert'; p: number; ids: number[]; target: number; rite?: 'sacrifice' | 'curse' } & Queued)
   | ({ t: 'garrison'; p: number; ids: number[]; target: number } & Queued)
   /** Priests: fetch a relic and take it to the nearest Temple. */
   | ({ t: 'relic'; p: number; ids: number[]; target: number } & Queued)
