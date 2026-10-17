@@ -23,6 +23,7 @@ import { RuinsView } from './ruinsView';
 import { LandmarksView } from './landmarksView';
 import { GrazeView } from './grazeView';
 import { BorderView } from './borderView';
+import { FoundationView } from './foundationView';
 import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, coilFields, placementField, sortieRings, type RangeGuide } from './rangeGuides';
 import { ResourcesView } from './resourcesView';
 import { Sky } from './sky';
@@ -104,6 +105,7 @@ export class View {
   private overlays = new Overlays();
   private rangeGuides = new RangeGuides();
   private borders = new BorderView();
+  private foundations = new FoundationView();
   private graze = new GrazeView();
   /** Whether the land borders show (the O key). */
   showBorders = true;
@@ -169,7 +171,7 @@ export class View {
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sky.mesh, this.hemi, this.fill, this.sun, this.sun.target);
     this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.ruins.group, this.landmarks.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points);
-    this.scene.add(this.rangeGuides.mesh, this.borders.mesh, this.graze.mesh);
+    this.scene.add(this.rangeGuides.mesh, this.borders.mesh, this.graze.mesh, this.foundations.mesh);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.post = new Post(this.renderer, this.scene, this.rig.camera);
     this.applyQuality();
@@ -599,6 +601,7 @@ export class View {
     this.overlays.setRings(rings);
     this.borders.update(s, this.viewer, this.reveal, this.showBorders);
     this.graze.update(s, this.viewer, this.reveal);
+    this.foundations.update(s, this.viewer, (x, y) => this.reveal || s.players[this.viewer].vis[Math.floor(y) * s.w + Math.floor(x)] > 0);
     this.rangeGuides.update(s, guides, (x, y) => this.reveal || s.players[this.viewer].vis[Math.floor(y) * s.w + Math.floor(x)] > 0);
     this.overlays.setBars(bars, this.rig.camera);
     const p = s.players[this.viewer];
