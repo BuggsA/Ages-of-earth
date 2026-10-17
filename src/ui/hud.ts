@@ -5,7 +5,7 @@ import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
 import { RARE_OF_TILE } from '../sim/units';
-import { RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, CALL_UP, PATHS, WARCAMP, FLOCK, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, CALL_UP, PATHS, WARCAMP, FLOCK, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -46,6 +46,8 @@ export interface HudActions {
   issue(c: Command): void;
   /** Start placing a building with the selected citizens. */
   place(type: BuildingType): void;
+  /** Wait for a left click to patrol to (#454). */
+  patrolMode(): void;
   /** Wait for a left click to attack-move to. */
   attackMove(): void;
   /** Wait for a left click on an enemy that bleeds, for a Blood-rite priest to sacrifice or curse (#355 s4). */
@@ -115,6 +117,10 @@ function orderWords(s: GameState, u: Unit): string {
       return u.act === 'attack' ? 'Fighting' : 'Charging';
     case 'move':
       return o.amove ? 'Marching to attack' : 'Moving';
+    case 'patrol':
+      return `Patrolling (${o.pts.length} points)`;
+    case 'explore':
+      return 'Exploring';
     case 'deliver':
       return 'Carrying resources home';
     case 'hunt':
@@ -781,6 +787,13 @@ export class Hud {
         });
       }
       if (soldiers.length) cmds.push({ key: 'A', pic: '', glyph: '⚔', title: 'Attack-move', desc: 'Then click on the map: march there, fighting every enemy met on the way.', ok: true, run: () => this.act.attackMove() });
+      // Patrol and explore (#454): give the intent once and they carry it out.
+      const rovers = units.filter((u) => u.type !== 'citizen' && u.type !== 'wagon');
+      if (rovers.length) {
+        const fights = rovers.some((u) => MILITARY.includes(u.type));
+        cmds.push({ key: 'Q', pic: '', glyph: '🔁', title: 'Patrol', desc: `Then click on the map: walk back and forth between here and there${fights ? ', fighting what comes by their stance and then taking up the round again' : ''}. <b>Shift-click</b> to add more waypoints to the round.`, ok: true, run: () => this.act.patrolMode() });
+        cmds.push({ key: 'E', pic: '', glyph: '🧭', title: 'Explore', desc: `Go and see: each heads for the nearest ground your people have never seen, and on to the next, fanning out from one another${fights ? '. Aggressive soldiers fall on what they find; defensive ones fight only what comes close; those standing their ground only what is in reach' : ''}. They stop when there is nothing left they can reach.`, ok: true, run: () => this.act.issue({ t: 'explore', p: viewer, ids: rovers.map((u) => u.id) }) });
+      }
       cmds.push({ key: 'S', pic: '', glyph: '✋', title: 'Stop', desc: 'Stop what they are doing (and forget queued orders).', ok: true, run: () => this.act.issue({ t: 'stop', p: viewer, ids: units.map((u) => u.id) }) });
       const holding = units.filter((u) => u.type === 'priest' && carriedBy(s, u));
       // The Blood-rite (#355 s4): a priest may offer an enemy up, or curse it.
