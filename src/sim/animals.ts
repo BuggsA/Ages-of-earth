@@ -1,4 +1,5 @@
 import { landOwnerAt } from './borders';
+import { drawBeast } from './blood';
 import { AMOUNT, BOAR, DEER, DT, FLOCK, MAMMOTH, RAIDER, ROT, TICK_HZ, WOLF, domainOf, secs } from './data';
 import { clearResource, walkable } from './grid';
 import type { Spatial } from './spatial';
@@ -532,10 +533,14 @@ export function hitAnimal(s: GameState, a: Animal, damage: number, fromX: number
       }
     }
   }
+  const meat = a.kind === 'mammoth' ? MAMMOTH.meat : a.kind === 'boar' ? BOAR.meat : a.kind === 'sheep' ? sheepMeat(a) : AMOUNT.meat;
+  // A beast slain near a Drain Rig gives its blood too (#355).
+  const slayer = thrower(s, fromX, fromY);
+  if (slayer) drawBeast(s, a, meat, slayer.owner);
   // A wolf leaves nothing to eat.
   if (tile >= 0 && a.kind !== 'wolf') {
     s.res[tile] = R_MEAT;
-    s.amount[tile] = a.kind === 'mammoth' ? MAMMOTH.meat : a.kind === 'boar' ? BOAR.meat : a.kind === 'sheep' ? sheepMeat(a) : AMOUNT.meat;
+    s.amount[tile] = meat;
     s.block[tile] |= B_RES;
     s.blockVersion++;
     (s.carcasses ??= []).push({ tile, born: s.tick, full: s.amount[tile] });
