@@ -11,6 +11,7 @@ import { placeBuilding, spawnUnit } from '../src/sim/world';
 
 const game = (civ: CivId, startEpoch = 0, seed = 11): GameState => {
   const s = createGame({ seed, size: 'small', startEpoch, players: [{ name: 'A', ai: 'hard', civ }, { name: 'B', ai: null, civ: 'britons' }] });
+  s.rares = []; // the deeds are the road here (#356)
   // No waves: the army stays home, so nothing but the town's own choices is tested.
   s.peaceUntil = 1e9;
   return s;

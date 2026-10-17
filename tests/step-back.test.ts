@@ -11,8 +11,12 @@ import { placeBuilding, spawnUnit } from '../src/sim/world';
 
 /** Stepping back an age, and roads that open only from their own age (#47). */
 
-const game = (startEpoch = 0, seed = 11): GameState =>
-  createGame({ seed, size: 'small', startEpoch, players: [{ name: 'A', ai: null }, { name: 'B', ai: null }] });
+// With no rare ore in the seed (#356), the roads' deeds are the only door.
+const game = (startEpoch = 0, seed = 11): GameState => {
+  const s = createGame({ seed, size: 'small', startEpoch, players: [{ name: 'A', ai: null }, { name: 'B', ai: null }] });
+  s.rares = [];
+  return s;
+};
 
 const events: GameEvent[] = [];
 const run = (s: GameState, seconds: number, cmds: Command[] = []) => {

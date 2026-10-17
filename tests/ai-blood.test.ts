@@ -10,6 +10,7 @@ import { placeBuilding, spawnUnit } from '../src/sim/world';
 
 const game = (civ: CivId = 'romans', epoch = 2): GameState => {
   const s = createGame({ seed: 3, size: 'small', mapType: 'continental', players: [{ name: 'A', ai: 'hard', civ }, { name: 'B', ai: null }] });
+  s.rares = []; // the deeds are the road here (#356)
   const p = s.players[0];
   p.epoch = epoch;
   p.res = { food: 9000, wood: 9000, stone: 9000, gold: 9000 };
