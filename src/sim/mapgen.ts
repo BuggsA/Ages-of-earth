@@ -1,4 +1,4 @@
-import { AMOUNT, BOAR, BOG_IRON, CAVE, LANDMARKS, RARE, MAMMOTH, MAP_SIZES, RELIC, RUINS, TRADE, WOLF } from './data';
+import { AMOUNT, BOAR, BOG_IRON, CAVE, LANDMARKS, RARE, MAMMOTH, MAP_SIZES, RAIDER, RELIC, RUINS, TRADE, WOLF } from './data';
 import { fbm, mulberry32, type Rng } from './rng';
 import type { Cave, LandmarkKind, MapSize, MapType, RareId, RuinFind } from './types';
 import { B_RES, B_TERRAIN, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_NONE, R_STONE, R_TREE, T_GRASS, T_ROCK, T_SAND, T_WATER } from './types';
@@ -58,9 +58,11 @@ export interface MapData {
   /** Ancient ruins (#64): where they stand (tile centers) and what lies under each. */
   ruins: { x: number; y: number; find: RuinFind }[];
   /** The wild (#171): mammoths, and wolves by their dens. Empty on campaign maps. */
-  wild: { kind: 'mammoth' | 'wolf' | 'boar'; x: number; y: number }[];
+  wild: { kind: 'mammoth' | 'wolf' | 'boar' | 'raider'; x: number; y: number }[];
   /** Contested landmarks: where they stand (tile centers) and what each is. */
   landmarks: { x: number; y: number; kind: LandmarkKind }[];
+  /** Raider camps (own pitch): the fire each band keeps (tile centers). Empty on campaign maps. */
+  camps: { x: number; y: number }[];
 }
 
 const DIR8 = [
@@ -568,6 +570,10 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
   const rares = deposits && veins ? placeRares(seed, w, h, terrain, res, amount, starts, [...deer, ...relics, ...posts, ...ruins, ...wild.map((x) => ({ x: x.x, y: x.y })), ...landmarks.map((x) => ({ x: x.x, y: x.y }))], later) : [];
 
   const caves = deposits && veins && rares.length ? placeCaves(seed, size, w, h, terrain, res, amount, starts, rares, wild) : [];
+  // Camps are laid last, on their own dice, so every other seed's map is as it was.
+  const camps = deposits
+    ? placeCamps(seed, size, w, h, terrain, res, starts, [...deer, ...relics, ...posts, ...ruins, ...wild, ...landmarks, ...caves.map((c) => ({ x: c.tile % w, y: Math.floor(c.tile / w) }))], later)
+    : [];
 
   // Resources nobody could stand next to are cleared away.
   const block = new Uint8Array(w * h);
@@ -576,7 +582,7 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
     if (res[i] !== R_NONE) block[i] |= B_RES;
   }
 
-  return { w, h, terrain, height, res, amount, block, starts, deer, relics, posts, bogIron, rares, caves, ruins, wild, landmarks };
+  return { w, h, terrain, height, res, amount, block, starts, deer, relics, posts, bogIron, rares, caves, ruins, wild, landmarks, camps };
 }
 
 /** Where a town's people can walk to without cutting a tree (or, with `axes`, by cutting their way). */
@@ -975,7 +981,7 @@ function placeCaves(
   amount: Int32Array,
   starts: { x: number; y: number }[],
   rares: RareId[],
-  wild: { kind: 'mammoth' | 'wolf' | 'boar'; x: number; y: number }[],
+  wild: { kind: 'mammoth' | 'wolf' | 'boar' | 'raider'; x: number; y: number }[],
 ): Cave[] {
   const rng = mulberry32(seed ^ 0xca7e5);
   const reaches = starts.map((st) => reachFrom(w, h, terrain, res, st));
@@ -1089,7 +1095,7 @@ function placeWild(
   posts: { x: number; y: number }[],
   ruins: { x: number; y: number }[],
   reaches: Uint8Array[],
-): { kind: 'mammoth' | 'wolf' | 'boar'; x: number; y: number }[] {
+): { kind: 'mammoth' | 'wolf' | 'boar' | 'raider'; x: number; y: number }[] {
   const rng = mulberry32(seed ^ 0x3a7e0f);
   const land = (x: number, y: number) => x >= 2 && y >= 2 && x < w - 2 && y < h - 2 && (terrain[y * w + x] === T_GRASS || terrain[y * w + x] === T_SAND);
   const near = (list: { x: number; y: number }[], x: number, y: number, r: number) =>
@@ -1101,7 +1107,7 @@ function placeWild(
   const dists = (x: number, y: number) => starts.map((st) => Math.sqrt((x + 0.5 - st.x) * (x + 0.5 - st.x) + (y + 0.5 - st.y) * (y + 0.5 - st.y)));
   const clear = (x: number, y: number) =>
     open(x, y, 1) && reaches.every((r) => r[y * w + x] === 1) && !near(relics, x, y, 4) && !near(posts, x, y, TRADE.plaza + 4) && !near(ruins, x, y, 5) && !near(deer, x, y, 3);
-  const out: { kind: 'mammoth' | 'wolf' | 'boar'; x: number; y: number }[] = [];
+  const out: { kind: 'mammoth' | 'wolf' | 'boar' | 'raider'; x: number; y: number }[] = [];
   const pick = (list: number[]): number => list[Math.floor(rng() * list.length)];
 
   // A mammoth for every town: on a ring `home` tiles out, nearer that town than any other.
@@ -1203,6 +1209,55 @@ function placeWild(
   }
   for (const d of dens) {
     for (let k = 0; k < WOLF.pack; k++) out.push({ kind: 'wolf', x: d.x + (k - 1) * 0.6, y: d.y + (k === 1 ? 0.5 : 0) });
+  }
+  return out;
+}
+
+/**
+ * Raider camps: `RAIDER.camps` of them, out between the towns (at least `home` tiles from every one, about as
+ * far from the two nearest), well clear of anything else placed, on open ground every town can walk to.
+ */
+function placeCamps(
+  seed: number,
+  size: MapSize,
+  w: number,
+  h: number,
+  terrain: Uint8Array,
+  res: Uint8Array,
+  starts: { x: number; y: number }[],
+  taken: { x: number; y: number }[],
+  reaches: Uint8Array[],
+): { x: number; y: number }[] {
+  const rng = mulberry32(seed ^ 0x5a1d3c);
+  const land = (x: number, y: number) => x >= 2 && y >= 2 && x < w - 2 && y < h - 2 && (terrain[y * w + x] === T_GRASS || terrain[y * w + x] === T_SAND);
+  const near = (list: { x: number; y: number }[], x: number, y: number, r: number) =>
+    list.some((p) => (p.x - x - 0.5) * (p.x - x - 0.5) + (p.y - y - 0.5) * (p.y - y - 0.5) < r * r);
+  const open = (x: number, y: number, r: number) => {
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (!land(x + dx, y + dy) || res[(y + dy) * w + x + dx] !== R_NONE) return false;
+    return true;
+  };
+  // Few trees or berries within a stone's throw: gatherers shouldn't walk into the band's watch.
+  const crowded = (x: number, y: number) => {
+    let n = 0;
+    for (let dy = -5; dy <= 5; dy++) for (let dx = -5; dx <= 5; dx++) if (res[(y + dy) * w + x + dx] !== R_NONE) n++;
+    return n > 8;
+  };
+  const spots: number[] = [];
+  for (let y = 5; y < h - 5; y++) {
+    for (let x = 5; x < w - 5; x++) {
+      if (!land(x, y) || !open(x, y, 2) || !reaches.every((r) => r[y * w + x] === 1) || near(taken, x, y, 6) || crowded(x, y)) continue;
+      const ds = nearestTwo(starts, x, y);
+      if (ds[0] < RAIDER.home || (starts.length > 1 && ds[1] - ds[0] > RAIDER.fair)) continue;
+      spots.push(y * w + x);
+    }
+  }
+  const out: { x: number; y: number }[] = [];
+  for (let guard = 0; out.length < RAIDER.camps[size] && spots.length && guard < 300; guard++) {
+    const i = spots[Math.floor(rng() * spots.length)];
+    const x = i % w;
+    const y = (i - x) / w;
+    if (near(out, x, y, RAIDER.spacing)) continue;
+    out.push({ x: x + 0.5, y: y + 0.5 });
   }
   return out;
 }

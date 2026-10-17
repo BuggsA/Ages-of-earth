@@ -873,6 +873,15 @@ The Atlas now generates the same rare layer as an ordinary match. Require or exc
 
 A fresh fallen footprint is clear; an older one fades toward a faint but readable trace until its five-minute rebuild window closes. Each site carries its own fade in the existing single draw call, using match ticks so pausing freezes the memory. I like the ground itself showing which rebuilding opportunity will vanish first. Next: a placement preview that names the salvage discount when the new building matches the old footprint. No rules or balance numbers changed.
 
+### Raider camps, Claude Code, 2026-10-17
+
+**Built:** `camps` of `RAIDER.guards` (3) raiders stand out between the towns (`placeCamps` in `mapgen.ts`: at least 22 tiles from every town, few trees about, laid last on their own dice so every other map is as it was). They are `Animal`s of kind `raider` that guard like a wolf pack: one that sees anyone calls the band, which keeps to its leash. They leave no carcass; whoever strikes the last one takes `RAIDER.loot` (`plunder` in `animals.ts`). The computer sends four idle soldiers on a camp within `AI_WILD.raidNear` (not past a rival's army). Model, minimap dot, tip, toast, banner, README line, tests (`tests/raiders.test.ts`).
+
+**Why I love it:** the owner called the Stone Age "mechanical". Boars and wolves guard food; the camp guards a *prize*, and the prize is only worth it if you spend soldiers. Do you strike at three minutes with a handful of clubmen, or boom and come later with an army? It ties into rival soldiers (the loot is a head start in a race) and the computer, which now sometimes beats you to it.
+
+**Next:** event cards (a stranger at the fire, tracks near the berries) for the other half of the pitch; a tent and fire model at the camp (the raiders stand on bare grass today); camps that move or rebuild; a Raider Way for the player.
+
+
 ### The rite's priests: sacrifice and curse (#355 s4), 2026-10-17
 
 **Built:** the Blood-rite's priests have two new rites over any enemy that bleeds, both as `convert` orders with a `rite` flag so they reuse the chase, the chant, the cooldown and the command checks (`riteProblem`, `sacrifice`, `curse` in `fork.ts`). Sacrifice (X): the same chant as a conversion, but the victim dies and pays 60% of its price as blood (`RITE.offering`; a Hero double; never a King). Curse (K): a 3-second chant and 20 blood, then the target and the living within 3 tiles take 35% more from every blow for 20 seconds, applied once in `hurt()`; a violet ring shows it, a priest rests 30 seconds. **Why I love it:** a priest that could only make a soldier now has a real fork of its own: take the soldier, or take the blood, and blood buys Blood Towers and curses. A curse makes a priest the centre of a fight (kill it mid-chant and the blood is not spent), and it only works on flesh: the owner's rule that machinery is the answer holds for the rite as well. **Next:** the computer using the rites (`forkBuild`, lane ai); curses as a Temple research; Blood + X heirlooms (s6). Not seen in a browser or heard: the ring colour, the two sounds and the target cursor are unverified by eye or ear.
