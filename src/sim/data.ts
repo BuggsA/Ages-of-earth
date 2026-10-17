@@ -111,6 +111,8 @@ export interface Age {
   prizes?: boolean;
   /** Priests keeping vigil at a relic Temple add to its gold (the Age of Pilgrims): see `VIGIL` (`vigil.ts`). */
   vigils?: boolean;
+  /** Rival citizens slain by this people's forces are taken captive and work its fields (the Age of the Warband): see `THRALL` (`thralls.ts`). */
+  thralls?: boolean;
 }
 
 /**
@@ -275,8 +277,9 @@ export const AGES: Record<AgeId, Age> = {
     short: 'Warband',
     tier: 2,
     path: 'blood',
-    blurb: 'The war-host is the people: soldiers train 15% faster, and every enemy unit your forces slay pays a quarter of its price as plunder in gold. But a warband trades with no one: no traders leave its Markets, and with the young away at war the fields yield 10% less.',
-    add: { plunder: 0.25 },
+    blurb: 'The war-host is the people: soldiers train 15% faster, and every enemy unit your forces slay pays a sixth of its price as plunder in gold. A rival citizen who falls to your forces is taken instead of lost: a thrall rises where it fell, your own, to work your fields (up to 8 at a time, and if there is room). A thrall never builds. But a warband trades with no one: no traders leave its Markets, and with the young away at war the fields yield 10% less.',
+    thralls: true,
+    add: { plunder: 0.15 },
     mul: { militaryTrain: 0.85, farm: 0.9 },
     no: { units: ['trader'], why: 'A warband trades with no one: traders wait until your people leave the Path of Blood' },
   },
@@ -1538,6 +1541,14 @@ export const KIN = { cost: { food: 120 } as Cost, time: 16, n: 2, winter: 3 };
  * `take` food from that rival's store (never more than it holds); a slain rival citizen gives up what it carried,
  * plus `slain` food. The rival hears of it at most every `tell` seconds.
  */
+/**
+ * Thralls (the Age of the Warband, #502): a rival citizen slain by a people in that age is taken captive. A thrall of the
+ * slayer rises where it fell with `hp` of a citizen's health (a share), and goes to work nearby within `reach` tiles. A
+ * people holds at most `max` at a time, and none while its pop is full. A thrall gathers and farms but never builds or repairs.
+ * The rival answers by guarding its workers, walling its fields, or cutting the thralls down (a thrall slain by a warband changes hands).
+ */
+export const THRALL = { max: 8, hp: 0.6, reach: 14 };
+
 export const RAID = { at: ['towncenter', 'storehouse', 'huntcamp', 'dock', 'farm'] as BuildingType[], take: 0.35, slain: 10, tell: 15 };
 
 /**

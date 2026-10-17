@@ -561,7 +561,7 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
 
 function buildStep(s: GameState, u: Unit, o: Extract<Order, { k: 'build' }>): void {
   const b = s.byId.get(o.target);
-  if (!b || b.kind !== 'building' || b.hp <= 0 || b.owner !== u.owner) {
+  if (u.thrall || !b || b.kind !== 'building' || b.hp <= 0 || b.owner !== u.owner) {
     setOrder(u, { k: 'idle' });
     return;
   }
