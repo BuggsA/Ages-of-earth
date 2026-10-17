@@ -12,7 +12,7 @@ import { swordsOf } from './merc';
 import { fairground, feastOpen, nextFeastIn } from './fair';
 import { claimants, favours, landmarkAt } from './landmarks';
 import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple, TILE_OF_RARE } from './units';
-import { goalForPost, nearestMarket, portSpot, tripGold } from './trade';
+import { goalForPost, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { findRoute } from './path';
 import { isEnemy, maxHp } from './world';
 import { callUpProblem } from './warcamp';
@@ -4030,6 +4030,14 @@ function merchants(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
     const from = nearestMarket(s, p.id, u.x, u.y) ?? market;
     const best = bestRoad(from).post;
     if (best >= 0 && !(u.order.k === 'trade' && u.order.post === best)) issue({ t: 'route', p: p.id, ids: [u.id], post: best });
+  }
+  // A post flooded by its own traders (#493): move one to the fresher post when that pays a fifth more.
+  for (const u of v.traders) {
+    if (u.inside || u.order.k !== 'trade' || u.order.phase === 'back' || shunned(u.order.post)) continue;
+    const cur = postAt(s, u.order.post);
+    const from = nearestMarket(s, p.id, u.x, u.y) ?? market;
+    const best = postAt(s, bestRoad(from).post);
+    if (cur && best && best.id !== cur.id && tripGold(s, p.id, from, best) > tripGold(s, p.id, from, cur) * 1.2) issue({ t: 'route', p: p.id, ids: [u.id], post: best.id });
   }
 }
 

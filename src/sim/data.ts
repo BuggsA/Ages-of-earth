@@ -1007,6 +1007,8 @@ export const RELIC = { home: 20, fair: 3, spacing: 12, extra: { small: 1, medium
  * the Bronze Age, at most `max`: so a long road pays more per minute, and has more road to guard.
  * Each ally with a Market of its own takes `ally` of every trip home (a quarter), so a team trades together.
  * By sea: a post with water within `sea.reach` tiles is a port, and a merchant ship from a Dock sails there for `sea.mul` times the land road's gold.
+ * A glut (#493): every load a post gives raises its glut by `each` (up to `max`) and every trip there pays `1 − glut` of its gold;
+ * the glut heals `heal` a second, so about one trader in 40 seconds keeps a post at full price, and a flood of them does not.
  */
 /**
  * Ancient ruins (#64): `count` (by map size) lie out between the towns, at least `home` tiles from every
@@ -1110,7 +1112,7 @@ export const AI_MARK = { /** In a Lords of the Land match: reach over the whole 
     fordRival: 1.6 } };
 /** Repairs: restoring a building's whole health costs this share of its price, paid as the hammers work. */
 export const REPAIR_SHARE = 0.4;
-export const TRADE = { posts: { small: 2, medium: 2, large: 3 } as Record<MapSize, number>, edge: 9, fair: 4, far: 0.3, spacing: 0.4, plaza: 1, reach: 1.8, gold: 0.012, epoch: 0.08, max: 180, ally: 0.25, harbor: { reach: 12, mul: 1.3 }, sea: { reach: 7, mul: 1.2 } };
+export const TRADE = { posts: { small: 2, medium: 2, large: 3 } as Record<MapSize, number>, edge: 9, fair: 4, far: 0.3, spacing: 0.4, plaza: 1, reach: 1.8, gold: 0.012, epoch: 0.08, max: 180, ally: 0.25, harbor: { reach: 12, mul: 1.3 }, sea: { reach: 7, mul: 1.2 }, glut: { each: 0.12, heal: 0.003, max: 0.5 } };
 
 export interface BuildingStats {
   name: string;

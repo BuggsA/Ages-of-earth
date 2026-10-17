@@ -19,7 +19,7 @@ import { chant, chantedOver, consecrateProblem, consecrates, turnBuilding } from
 import { convoyShare } from './convoy';
 import { GRAFTABLE, grafted, hemoPace, sworn } from './blood';
 import { curse, riteProblem, sacrifice } from './fork';
-import { atPost, caravanBonus, caravanOf, dockOf, goalForPost, homeMarket, marketOf, nearestCaravan, nearestDock, nearestMarket, portSpot, postAt, tripGold } from './trade';
+import { atPost, caravanBonus, caravanOf, dockOf, floodPost, goalForPost, homeMarket, marketOf, nearestCaravan, nearestDock, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { canHit, exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, passOf, pay, radiusOf, statsOf, teamOf } from './world';
 
 /**
@@ -1424,12 +1424,21 @@ function payTrip(s: GameState, u: Unit, m: Building | Unit, sea: boolean, from?:
   }
 }
 
+/** The step after a load (so the load itself is priced fresh), the post it loaded at floods a little more (#493). */
+function floodOnce(s: GameState, o: Extract<Order, { k: 'trade' }>): void {
+  if (!o.flood) return;
+  delete o.flood;
+  const post = postAt(s, o.post);
+  if (post) floodPost(s, post);
+}
+
 /**
  * Sail the sea road: a merchant ship out from its Dock to the water off a port post, loads gold worth
  * the distance, and home again to pay it in. With its Dock sunk, the nearest other one will do.
  */
 function seaTradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>): void {
   const post = postAt(s, o.post);
+  floodOnce(s, o);
   if (o.phase === 'back') {
     let d = dockOf(s, u.owner, o.market);
     if (!d) {
@@ -1473,6 +1482,7 @@ function seaTradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>):
     const escort = convoyShare(s, u);
     u.carry = Math.max(1, Math.min(TRADE.max, Math.floor(tripGold(s, u.owner, d, post, true) * escort)));
     u.carryRes = 'gold';
+    o.flood = true;
     if (escort > 1) s.events.push({ k: 'convoy', owner: u.owner, x: u.x, y: u.y });
     o.phase = 'back';
     s.events.push({ k: 'caravan', id: u.id, owner: u.owner, what: 'loaded', amount: u.carry, x: post.x, y: post.y });
@@ -1493,6 +1503,7 @@ function tradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>): vo
     setOrder(u, { k: 'idle' });
     return;
   }
+  floodOnce(s, o);
   if (o.phase === 'back') {
     let m: Building | Unit | null = marketOf(s, u.owner, o.market) ?? caravanOf(s, u.owner, o.market);
     if (!m) {
@@ -1552,6 +1563,7 @@ function tradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>): vo
     // A fresh load owes every toll on the way home again (#334).
     delete u.tolled;
     u.carry = tripGold(s, u.owner, m, post);
+    o.flood = true;
     u.carryRes = 'gold';
     o.phase = 'back';
     s.events.push({ k: 'caravan', id: u.id, owner: u.owner, what: 'loaded', amount: u.carry, x: post.x, y: post.y });
