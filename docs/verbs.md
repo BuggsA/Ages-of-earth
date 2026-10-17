@@ -35,5 +35,6 @@ Pass all four, or say in the pull request which one fails and why that's fine. O
 ## Where it applies
 
 - **Pitches and pull requests** answer it in their templates (`.github/ISSUE_TEMPLATE/pitch.md`, `.github/pull_request_template.md`), so nobody has to remember this file.
+- **The data holds it:** each side age, Way and homeland in `src/sim/data.ts` has `verb` and `door`, shown on its button as "You now … It shuts …"; `tests/verbs.test.ts` fails one without them. Known gaps sit in `VERB_GAPS` with their issue; strike one when it gets a verb.
 - **Existing content too** (the owner on #500): the audit there lists what fails today; reworking it is good work (`docs/goals.md`, Goal 2).
 - Read #461 itself only when your work is a lever above (sources, shipped examples, §5's table).
