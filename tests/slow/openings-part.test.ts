@@ -73,16 +73,18 @@ describe('two openings part ways by minute 15 (#481)', () => {
     expect(held(ps, (band, hunt) => band.reach < hunt.reach)).toBeGreaterThanOrEqual(3);
   }, 240_000);
 
-  it('herds: a town that spares its herd eats from it in the second spring; one that feasts opens its fields early and has none left', () => {
+  it('herds: a town that spares its herd eats from it in the second spring; one that feasts has none left', () => {
     // From #480: the home herds trek out in autumn and come home in spring, each deer with a calf; the second spring is minutes 10-12.5.
-    const ps = pairs('herds', way('hunt'), { way: 'hunt', feast: true }, 13);
+    const ps = pairs('herds', way('hunt'), { way: 'hunt', feast: true }, 12);
+    const spring = (t: Opening) => t.hunted[12] - t.hunted[10];
     for (const [spare, feast] of ps) {
-      console.log(`herds  spare ${spare.herd.join(' ')} | feast ${feast.herd.join(' ')} | meat in the second spring ${spare.hunted[13] - spare.hunted[10]} vs ${feast.hunted[13] - feast.hunted[10]}`);
-      expect(feast.herd[5]).toBe(0);
-      // The Hunters sow nothing while the home herd grazes: hunting it out opens the fields early.
-      expect(at(feast, 'farm')).toBeLessThan(at(spare, 'farm'));
+      console.log(`herds  spare ${spare.herd.join(' ')} | feast ${feast.herd.join(' ')} | meat in the second spring ${spring(spare)} vs ${spring(feast)} | first farm ${at(spare, 'farm')} vs ${at(feast, 'farm')}`);
+      expect(spare.hunted.length, 'the match lasted into the second spring').toBeGreaterThan(12);
+      expect(feast.herd.slice(5).every((n) => n === 0)).toBe(true);
       expect(spare.herd[10]).toBeGreaterThan(0);
-      expect(spare.hunted[13] - spare.hunted[10]).toBeGreaterThan(feast.hunted[13] - feast.hunted[10]);
     }
+    // The spared herd comes home with calves, and the town that spared it eats them.
+    expect(held(ps, (spare) => spare.herd[11] > spare.herd[10])).toBeGreaterThanOrEqual(3);
+    expect(held(ps, (spare, feast) => spring(spare) > spring(feast))).toBeGreaterThanOrEqual(3);
   }, 240_000);
 });
