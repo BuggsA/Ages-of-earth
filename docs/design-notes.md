@@ -951,6 +951,14 @@ A fresh fallen footprint is clear; an older one fades toward a faint but readabl
 
 **Next:** run the audit with Shift-queued builds and walls, and on the Steppe (flocks, camps that move); show the idle count as a gentle pulse on the Idle button when it climbs; let a rally on a farm put new citizens on free fields.
 
+### Patrol and explore, s1 (#454, Claude Code, 2026-10-17, lane rules)
+
+**Built:** two orders the owner asked for, so a player gives the intent once and the units carry it out. **Patrol** (Q, click; Shift-click adds waypoints) walks a round between where each unit stands and its place by the clicked point. **Explore** (E) picks the nearest never-seen ground on a 4-tile grid that the unit could stand on, re-picks as soon as that spot comes into sight, and keeps 12 tiles from where its fellows are headed, so a band of riders fans out instead of riding in a clump. Both work on land, at sea and in the air, since they lean on the unit's own way of passing. Soldiers on either fight by their stance and then resume (`back` on the attack order).
+
+**Why I love it:** scouting is the first decision of a match and the most tedious to do by hand. Now a rider sent off with one key comes back with the map. Patrols make a border something you set once, which matters more now that the land has borders, attrition and raider camps.
+
+**Next:** s2, the owner's four modes, with **Run** for scouts that should never stop to fight; patrol along a trade road; explorers that steer round towers and report armies; the computer scouting by explore.
+
 ### Reading the oath (#459, own pitch, 2026-10-17, lane ai)
 
 **Built:** a clever computer facing a rival's Military Orders sends up to two riders (archers if it has none) at the nearest priest swearing a soldier within 14 tiles of its army (`breakOath` in `ai.ts`, `AI_ORDERS`). **Why:** the heirloom made the priest the army's keystone, and a keystone the computer never aims at isn't a choice for the player, it's a free shield. Now Military Orders asks for a guard on the priest. **Next:** the computer guarding its own oath-priests the same way; archers given priority over riders when the priest stands behind a wall.
