@@ -23,6 +23,7 @@ import { chantedOver, consecrateProblem, consecrates } from './consecrate';
 import { sees } from './vision';
 import { canHit, isEnemy, maxHp, pay, placeBuilding, refund } from './world';
 import { fightsBeasts } from './animals';
+import { answerTiding, tidingProblem } from './tidings';
 
 /**
  * Everything a player can do, as plain data. A person's clicks and the computer opponent both go
@@ -609,6 +610,15 @@ export function applyCommand(s: GameState, c: Command): void {
       const why = vowProblem(s, p, c.way);
       if (why) return refuse(s, c.p, why);
       takeVow(s, p, c.way);
+      break;
+    }
+    case 'tiding': {
+      if (p.tiding?.card !== c.card) return;
+      if (c.take) {
+        const why = tidingProblem(s, p, c.card);
+        if (why) return refuse(s, c.p, why);
+      }
+      answerTiding(s, p, c.card, c.take);
       break;
     }
     case 'greatWork': {

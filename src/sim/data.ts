@@ -1582,6 +1582,23 @@ export const WOLF = { hunt: 7, hp: 20, walk: 0.9, run: 2.1, bite: 3, reach: 0.35
 export const RAIDER = { hp: 30, walk: 0.8, run: 2.2, bite: 4, reach: 0.4, reload: 1.1, notice: 3.8, leash: 6.5, roam: 1.3, radius: 0.24, guards: 3, home: 22, fair: 10, spacing: 18,
   idBase: 1_000_000_000, loot: { gold: 120, food: 80, wood: 60 }, camps: { small: 1, medium: 2, large: 3 } as Record<MapSize, number> };
 
+/**
+ * Tidings at the fire (#443): twice in the Stone Age a card comes to each people with a choice that costs
+ * something. `at` is when each draw comes (seconds, plus up to `jitter` more, by the seed), `fade` how long
+ * it waits for an answer before passing with the do-nothing answer. Each card's numbers are its own.
+ */
+export const TIDINGS = { at: [140, 290], jitter: 50, fade: 30,
+  /** A lone traveller: take them in for food, a citizen for the town (needs room in a house). */
+  traveller: { cost: { food: 50 } as Cost, aiFloor: 0 },
+  /** A hunter's trade: wood for meat. */
+  hunter: { cost: { wood: 40 } as Cost, food: 70, aiFloor: 60 },
+  /** A stranger's tale: feed them and they tell where a raider camp (else a ruin, else a cave) lies; `reveal` tiles of it laid open. */
+  tale: { cost: { food: 25 } as Cost, reveal: 7, aiFloor: 260 },
+  /** A storm: shore up the huts for wood, or chance it: on `odds` of seeds it strikes, every house losing `harm` of its health. */
+  storm: { cost: { wood: 40 } as Cost, odds: 0.5, harm: 0.4, aiFloor: 0 },
+  /** A fever: tend the sick for food, or let it run: on `odds` of seeds one citizen dies of it. */
+  fever: { cost: { food: 40 } as Cost, odds: 0.5, aiFloor: 0 } };
+
 /** Market: gold per 100 of a resource to start, how much each trade moves it, and the cut when selling. */
 export const MARKET = { start: { food: 100, wood: 100, stone: 130 }, step: 4, min: 20, max: 600, sellRate: 0.75, lot: 100,
   /** Every `every` seconds each price moves this far back toward where it started, so a glut or a shortage fades. */

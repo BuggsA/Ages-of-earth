@@ -23,6 +23,7 @@ import { reclaimStep, remember } from './reclaim';
 import { sortieStep } from './sortie';
 import { fairStep } from './fair';
 import { landmarkStep } from './landmarks';
+import { tidingStep } from './tidings';
 import { atPost } from './trade';
 import { modsOf, trainTimeFor } from './stats';
 import { attrition } from './borders';
@@ -519,6 +520,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   forkStep(s);
   raiseCamps(s);
   faithStep(s);
+  tidingStep(s);
   removeDead(s);
   if (s.tick % 4 === 0) updateVision(s);
   if (s.tick % 20 === 0) {
