@@ -11,6 +11,8 @@ labels: 'pitch, ready'
 
 **Why I care about it:** what makes it worth having in this game.
 
+**Verbs test** (`docs/verbs.md`): "After taking it, I now ___" (a verb, not a number); the door it shuts; why two good players would choose differently; how a rival sees and answers it.
+
 **What it connects to:** the units, buildings, peoples, epochs, maps or systems it changes or plays against, and how the computer opponent will use it.
 
 **How it looks and sounds:** in the game's style (`AGENTS.md` §2).
