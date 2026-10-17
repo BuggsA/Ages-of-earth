@@ -98,7 +98,7 @@ export type Order =
   /** Fight a unit or building. `auto` when picked by the unit itself (it gives up sooner); `then` resumes an attack-move. */
   | { k: 'attack'; target: number; auto: boolean; then: { x: number; y: number } | null }
   /** Gather a resource tile: walk there, work it, carry the load to a drop site, and back. */
-  | { k: 'gather'; tile: number; res: Res; phase: 'go' | 'work' | 'drop'; bog?: boolean; rare?: RareId }
+  | { k: 'gather'; tile: number; res: Res; phase: 'go' | 'work' | 'drop'; bog?: boolean; rare?: RareId; meat?: boolean }
   | { k: 'build'; target: number }
   | { k: 'farm'; target: number; phase: 'go' | 'work' | 'drop' }
   /** Carry what is held to a drop site, then go idle. */
@@ -243,7 +243,8 @@ export interface Building {
   advanceTo?: AgeId;
   /** Set while the advance is a step back (#47) to the trunk age one tier down; absent otherwise. */
   back?: boolean;
-  rally: { x: number; y: number; tile: number } | null;
+  /** Where new units go. `kind` is the resource the flag was set on (absent on bare ground), so it outlives its tile (#344). */
+  rally: { x: number; y: number; tile: number; kind?: number } | null;
   cool: number;
   /** The citizen working this farm, or 0. */
   farmer: number;

@@ -751,7 +751,7 @@ export function applyCommand(s: GameState, c: Command): void {
       const tx = Math.floor(c.x);
       const ty = Math.floor(c.y);
       const tile = tx >= 0 && ty >= 0 && tx < s.w && ty < s.h && s.res[ty * s.w + tx] !== R_NONE ? ty * s.w + tx : -1;
-      b.rally = { x: c.x, y: c.y, tile };
+      b.rally = tile >= 0 ? { x: c.x, y: c.y, tile, kind: s.res[tile] } : { x: c.x, y: c.y, tile };
       break;
     }
     case 'trade': {
