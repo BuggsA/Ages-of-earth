@@ -1630,6 +1630,8 @@ export interface AiLevel {
   hemo?: boolean;
   /** Off: the computer never takes the fork past Total War (#355 s5; only `scripts/ai-ab.ts` turns it off). */
   fork?: boolean;
+  /** Off: a Blood-rite computer's priests neither curse nor sacrifice (#355 s4; only `scripts/ai-ab.ts` turns it off). */
+  rite?: boolean;
 }
 
 /**
@@ -1753,6 +1755,14 @@ export const AI_HEMO = { town: 24, army: 6, rig: 6, watch: 26, foes: 2, again: 6
  * a rite altar near a wave.
  */
 export const AI_FORK = { living: 0.6, hemo: 0.5, stay: 300, patience: 1200, back: 240, rigs: 2, towers: 3, altars: 2, altar: 9, priests: 4, store: 60 };
+
+/**
+ * A clever computer's priests in the Blood-rite (#355 s4) work its rites. An idle priest within 9 tiles of the enemy curses the target
+ * with the most of their soldiers (no citizens, priests or traders) within `RITE.spread` tiles of it, when `pack` or more stand there
+ * uncursed and the store would still hold `keep` blood after paying; failing that, while the store is under `AI_FORK.store`, it
+ * sacrifices the dearest victim whose offering is at least `dear` blood. Everything else is converted as before.
+ */
+export const AI_RITE = { pack: 3, keep: 40, dear: 30 };
 
 /** Selling rare ore at a Market (#356 s5): a lot of `lot` pays `gold[ore]` gold at a flat price. Ore mined still counts toward its doors; only the stock in hand is spent. */
 export const ORE_TRADE = { lot: 20, gold: { salt: 40, saltpetre: 55, bloodiron: 90 } as Record<'salt' | 'saltpetre' | 'bloodiron', number> };

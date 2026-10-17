@@ -1,5 +1,5 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, RITE, BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
@@ -14,7 +14,8 @@ import { goalForPost, nearestMarket, portSpot, tripGold } from './trade';
 import { findRoute } from './path';
 import { isEnemy, maxHp } from './world';
 import { callUpProblem } from './warcamp';
-import { GRAFTABLE, bloodOf, grafted, levyProblem, levyWait } from './blood';
+import { GRAFTABLE, bleeds, bloodOf, cursed, grafted, levyProblem, levyWait } from './blood';
+import { offeringOf, riteProblem } from './fork';
 import { graftCost, stationsOf, waiting } from './hemo';
 import { borderMap, landOwnerAt, suppliedAt } from './borders';
 import { workProblem } from './works';
@@ -3237,6 +3238,44 @@ function relicRace(s: GameState, p: Player): boolean {
  * Priests bring relics home first (the nearest loose one nobody of ours is fetching), then walk with
  * the army (healing as they go) and turn the enemy's best units.
  */
+/**
+ * The rite a Blood-rite priest should chant now (`AI_RITE`), or null: a curse on the target with the most uncursed soldiers around it,
+ * else, with the store low, a sacrifice of the dearest victim worth `dear` blood. Looks only at the bleeding enemy within 9 tiles.
+ */
+export function riteWork(s: GameState, p: Player, pr: Unit): { target: Unit; how: 'sacrifice' | 'curse' } | null {
+  const foes: Unit[] = [];
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !isEnemy(s, p.id, e.owner) || !bleeds(e)) continue;
+    if ((e.x - pr.x) * (e.x - pr.x) + (e.y - pr.y) * (e.y - pr.y) <= 81) foes.push(e);
+  }
+  const soldier = (u: Unit) => u.type !== 'citizen' && u.type !== 'priest' && u.type !== 'trader';
+  const r2 = RITE.spread * RITE.spread;
+  const rich = bloodOf(p) >= RITE.curse + AI_RITE.keep;
+  let curseAt: Unit | null = null;
+  let packed = 0;
+  let offer: Unit | null = null;
+  let dear = 0;
+  for (const e of foes) {
+    if (rich && riteProblem(s, p.id, 'curse', e) === null) {
+      let n = 0;
+      for (const o of foes) if (soldier(o) && !cursed(s, o) && (o.x - e.x) * (o.x - e.x) + (o.y - e.y) * (o.y - e.y) <= r2) n++;
+      if (n > packed) {
+        packed = n;
+        curseAt = e;
+      }
+    }
+    if (bloodOf(p) < AI_FORK.store) {
+      const n = offeringOf(s, e);
+      if (n >= AI_RITE.dear && n > dear && riteProblem(s, p.id, 'sacrifice', e) === null) {
+        dear = n;
+        offer = e;
+      }
+    }
+  }
+  if (curseAt && packed >= AI_RITE.pack) return { target: curseAt, how: 'curse' };
+  return offer ? { target: offer, how: 'sacrifice' } : null;
+}
+
 function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   if (!v.priests.length) return;
   chantBand(s, v, issue);
@@ -3246,8 +3285,20 @@ function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   // In the Age of Pilgrims the first `VIGIL.most` priests (in id order) keep vigil at the shrine (#379 s2).
   const shrine = vigilPost(s, v);
   const keepers = new Set(shrine ? v.priests.filter((pr) => !carriedBy(s, pr)).slice(0, VIGIL.most).map((pr) => pr.id) : []);
+  // The Blood-rite (#355 s4): a clever computer's priest curses a packed force, or offers up a dear victim to fill a low store. A priest
+  // between jobs has already picked up an idle priest's own healing, so idle, healing and walking priests all count.
+  const ritual = new Set<number>();
+  if (AI_LEVELS[v.p.ai!].clever && AI_LEVELS[v.p.ai!].rite !== false && ageDef(v.p).rite) {
+    for (const pr of v.priests) {
+      if (pr.inside || pr.cool > 0 || carriedBy(s, pr) || !(pr.order.k === 'idle' || pr.order.k === 'heal' || pr.order.k === 'move')) continue;
+      const rite = riteWork(s, v.p, pr);
+      if (!rite) continue;
+      ritual.add(pr.id);
+      issue({ t: 'convert', p: v.p.id, ids: [pr.id], target: rite.target.id, rite: rite.how });
+    }
+  }
   for (const pr of v.priests) {
-    if (pr.order.k !== 'idle' || pr.inside) continue;
+    if (pr.order.k !== 'idle' || pr.inside || ritual.has(pr.id)) continue;
     const held = carriedBy(s, pr);
     if (held) {
       const t = nearestTemple(s, v.p.id, pr.x, pr.y);
