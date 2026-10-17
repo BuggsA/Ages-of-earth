@@ -234,7 +234,7 @@ function spatial(s: GameState): Spatial {
  * style. On a step back (#47) they fall back to the older forms, and whatever the new age can't train
  * or research is taken off the queues and refunded.
  */
-function enterAge(s: GameState, p: Player, to: AgeId, back = false): void {
+export function enterAge(s: GameState, p: Player, to: AgeId, back = false): void {
   const tier = AGES[to].tier;
   // The first steps onto the steppe bring the herds (#308).
   const herds = !!AGES[to].mobile && !p.walked?.includes(to);
