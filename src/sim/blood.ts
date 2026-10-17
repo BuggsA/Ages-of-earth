@@ -1,16 +1,59 @@
-import { BLOOD, BUILDINGS, secs, TICK_HZ } from './data';
+import { BLOOD, BUILDINGS, HEMO, secs, TICK_HZ, type UnitClass } from './data';
 import { ageDef } from './ages';
 import { statsOf } from './world';
-import type { Building, GameState, Player, Unit, UnitType } from './types';
+import type { Building, BuildingType, Ent, GameState, Player, Unit, UnitType } from './types';
 
 /**
  * Blood (#355 s1): a store of its own, kept as `Player.blood` so the four ordinary resources stay as they are. It is drawn two ways:
  * from the enemy's living dead that fall within `BLOOD.reach` tiles of one of the killer's finished Drain Rigs, and by the levy,
- * which turns the citizens near a rig into blood. Nothing spends it yet; the Transfusion Station and the Blood Tower will.
+ * which turns the citizens near a rig into blood. It is spent (s3) on Blood Towers, paid once to raise, and at Transfusion Stations,
+ * which graft soldiers (`hemo.ts`).
  */
 
 /** Machines and ships bleed nothing. */
 const BLOODLESS: readonly UnitType[] = ['siege', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'wagon'];
+
+/** Whether a unit bleeds: everything but machines and ships. */
+export function bleeds(u: Unit): boolean {
+  return !BLOODLESS.includes(u.type);
+}
+
+/** The soldiers a Transfusion Station can graft: the living who fight on foot or horseback. */
+export const GRAFTABLE: readonly UnitType[] = ['infantry', 'ranged', 'cavalry', 'hero'];
+
+/** Whether a unit carries a live graft (#355 s3). */
+export function grafted(s: GameState, u: Ent): boolean {
+  return u.kind === 'unit' && u.hemo !== undefined && s.tick < u.hemo;
+}
+
+/** Machines that hit a grafted soldier harder; every other unit class is flesh. */
+const MACHINES: readonly UnitClass[] = ['siege', 'ship', 'fighter', 'bomber'];
+
+/**
+ * How hard a blow lands on `target` (#355 s3): 1 unless it is grafted. Then blows from the living (a unit class, or a Watch Tower's
+ * `arrow`) land `HEMO.flesh` times as hard and blows from machines (`MACHINES`, or a Coil Tower's `coil`) `HEMO.machine` times;
+ * a Blood Tower's bolt (`blood`) lands in full.
+ */
+export function hemoTaken(s: GameState, target: Ent, from: UnitClass | 'arrow' | 'coil' | 'blood'): number {
+  if (!grafted(s, target) || from === 'blood') return 1;
+  return from === 'coil' || MACHINES.includes(from as UnitClass) ? HEMO.machine : HEMO.flesh;
+}
+
+/** Blows a grafted soldier strikes land this many times harder. */
+export function hemoBlow(s: GameState, u: Unit | null): number {
+  return u && grafted(s, u) ? HEMO.attack : 1;
+}
+
+/** A grafted soldier walks this many times faster. */
+export function hemoPace(s: GameState, u: Unit): number {
+  return grafted(s, u) ? HEMO.pace : 1;
+}
+
+/** What blood is missing to raise a building, in words, or null (only the Blood Tower costs any). */
+export function bloodShort(p: Player, type: BuildingType): string | null {
+  const need = (BUILDINGS[type].blood ?? 0) - bloodOf(p);
+  return need > 0 ? `Need ${Math.ceil(need)} more blood` : null;
+}
 
 /** The blood a player holds. */
 export function bloodOf(p: Player): number {
