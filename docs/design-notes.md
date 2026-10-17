@@ -964,3 +964,6 @@ The owner played a conquest that felt over once the Town Center fell. Now it is:
 ### Reading the oath (#459, own pitch, 2026-10-17, lane ai)
 
 **Built:** a clever computer facing a rival's Military Orders sends up to two riders (archers if it has none) at the nearest priest swearing a soldier within 14 tiles of its army (`breakOath` in `ai.ts`, `AI_ORDERS`). **Why:** the heirloom made the priest the army's keystone, and a keystone the computer never aims at isn't a choice for the player, it's a free shield. Now Military Orders asks for a guard on the priest. **Next:** the computer guarding its own oath-priests the same way; archers given priority over riders when the priest stands behind a wall.
+
+### The spare heart (#452 follow-up, Claude Code, 2026-10-18, lane ai)
+Now that the last Town Center decides the match, the computer plants a second far from its rival (`AI_HEART`), and when its only one falls it rebuilds with everything it has, not what the next epoch leaves over, because the clock is 45 seconds. I like that the same rule that ends a match now gives a raid a target worth a march: hit the spare while the main stands. Next: the computer defending its spare, and raiding the player's. Switch `spareHeart` is off only in `scripts/ai-ab.ts`.

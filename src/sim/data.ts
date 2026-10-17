@@ -1701,6 +1701,8 @@ export interface AiLevel {
   /** Whether a clever computer raises a forward Tower as a foothold (#132 s5); `scripts/ai-ab.ts` sets it back to compare. */
   fort: boolean;
   /** Off, a clever computer leaves its own Wonder unguarded (#374); `scripts/ai-ab.ts` sets it so to compare. */
+  /** Off, the computer keeps a single Town Center (#452); `scripts/ai-ab.ts` sets it so to compare. */
+  spareHeart?: boolean;
   wonderGuard?: boolean;
   /** Off, fighters stay at the home Airfield instead of guarding a forward one (#379); `scripts/ai-ab.ts` sets it so to compare. */
   fieldGuard?: boolean;
@@ -1881,6 +1883,12 @@ export const AI_CURSE = { late: 14, hurt: 0.7, near: 5, riders: 3, reach: 14 };
  * up to `riders` of those riders (its archers, if it has no riders) go for the nearest rival priest swearing it: the priest's fall
  * breaks the oath and the faster mending together.
  */
+/**
+ * The computer's spare heart (#452): a people that loses its last Town Center has `HEART.grace` seconds, so once it has
+ * reached `epoch` (by level) it raises a second one `away` tiles from home on the side away from the nearest rival,
+ * keeping `reserve` of wood and stone back for the rebuild. Switch `AiLevel.spareHeart` (off only in `scripts/ai-ab.ts`).
+ */
+export const AI_HEART = { epoch: { gentle: 2, easy: 1, normal: 1, hard: 1 } as Record<Difficulty, number>, away: 24, reach: 8, builders: 3, reserve: 100, retry: 40 };
 export const AI_ORDERS = { reach: 14, riders: 2 };
 
 /** Selling rare ore at a Market (#356 s5): a lot of `lot` pays `gold[ore]` gold at a flat price. Ore mined still counts toward its doors; only the stock in hand is spent. */
