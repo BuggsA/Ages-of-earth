@@ -1827,9 +1827,12 @@ export const HEIRLOOM_MARKS: Partial<Record<BuildingType, string>> = { temple: '
 /** A second heirloom that shows on a building type that already has one: the Temple holds both the Bell Foundry's bell and the Masons' Lodge's works. */
 export const HEIRLOOM_MORE: Partial<Record<BuildingType, string>> = { market: 'jointStock', temple: 'masonsLodge' };
 
+/** The Age of Lightning's heirlooms (#240), which show on a Temple, Dock and Workshop beside any others. */
+export const HEIRLOOM_FIELD: Partial<Record<BuildingType, string>> = { temple: 'stElmo', dock: 'telegraphy', workshop: 'galvanic' };
+
 /** Every heirloom id that dresses a kind of building. */
 export function heirloomsFor(type: BuildingType): string[] {
-  return [HEIRLOOM_MARKS[type], HEIRLOOM_MORE[type], ...(type === 'towncenter' ? WAY_MARKS : [])].filter((id): id is string => !!id);
+  return [HEIRLOOM_MARKS[type], HEIRLOOM_MORE[type], HEIRLOOM_FIELD[type], ...(type === 'towncenter' ? WAY_MARKS : [])].filter((id): id is string => !!id);
 }
 
 /** Bell Foundry: a bronze bell hung in a little timber cote on the Temple's roof ridge. Iron-Bound Hulls: iron bands and bolts on the dock's boathouse and pier. Joint-Stock Company: a counting-house board with a gilt seal and coin stacks by the Market. Masons' Lodge: dressed ashlar and shear-legs hoisting a block beside the Temple. */
@@ -1839,6 +1842,7 @@ function heirloomTouch(k: Kit, id: string, deep = false): void {
   const IRON = '#34373d';
   const GOLD = '#e2b23c';
   const ASHLAR = '#b9b2a2';
+  const COPPER = '#b8683a';
   if (id === 'bellFoundry') {
     k.box(0.07, 0.5, 0.07, '#5a4630', -0.22, 1.7, -0.2);
     k.box(0.07, 0.5, 0.07, '#5a4630', 0.22, 1.7, -0.2);
@@ -1869,6 +1873,23 @@ function heirloomTouch(k: Kit, id: string, deep = false): void {
     k.box(0.3, 0.22, 0.3, ASHLAR, 1.05, 0.52, 1.3);
     for (let i = 0; i < 3; i++) k.box(0.4, 0.18, 0.3, i % 2 ? ASHLAR : '#a29a8a', -1.1 + (i % 2) * 0.05, i * 0.18, 1.3);
     k.box(0.3, 0.18, 0.3, '#a29a8a', -1.5, 0, 1.3);
+  } else if (id === 'stElmo') {
+    // A copper lightning rod on the roof, a blue glow burning on its tip, and a bronze ring at its foot.
+    k.cyl(0.02, 0.03, 1.3, 4, COPPER, -0.6, 1.7, 0.3);
+    k.cyl(0.1, 0.1, 0.04, 8, COPPER, -0.6, 1.75, 0.3);
+    k.glow(k.sphere(0.07, '#9fd8ff', -0.6, 3.05, 0.3));
+  } else if (id === 'telegraphy') {
+    // A lattice mast with two crossbars on the pier's end, a lamp on top, and a wire down to a signal hut.
+    for (const x of [-0.05, 0.05]) k.cyl(0.02, 0.025, 2.2, 4, IRON, 1.5 + x, 0, 1.5);
+    for (const y of [1.2, 1.7]) k.box(0.5, 0.03, 0.03, IRON, 1.5, y, 1.5);
+    k.glow(k.sphere(0.05, '#9fd8ff', 1.5, 2.3, 1.5));
+    k.box(0.4, 0.3, 0.3, '#6e5a44', 1.5, 0, 0.9);
+  } else if (id === 'galvanic') {
+    // A small copper coil with a blue spark between its horns, set beside the workshop.
+    k.cyl(0.14, 0.18, 0.1, 8, IRON, 1.1, 0, 1.2);
+    for (let i = 0; i < 5; i++) k.cyl(0.16, 0.16, 0.05, 8, COPPER, 1.1, 0.12 + i * 0.09, 1.2);
+    for (const s of [-1, 1]) k.box(0.03, 0.3, 0.03, COPPER, 1.1 + s * 0.1, 0.6, 1.2).rotation.z = -s * 0.25;
+    k.glow(k.sphere(0.06, '#9fd8ff', 1.1, 0.8, 1.2));
   }
 }
 

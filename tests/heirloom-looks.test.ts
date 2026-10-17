@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildingGeometry, HEIRLOOM_MARKS } from '../src/render/buildingModels';
+import { buildingGeometry, HEIRLOOM_FIELD, HEIRLOOM_MARKS } from '../src/render/buildingModels';
 import { LAST_EPOCH, TECHS } from '../src/sim/data';
 
 const verts = (g: ReturnType<typeof buildingGeometry>) => g.getAttribute('position').count;
@@ -36,6 +36,18 @@ describe('second heirloom marks', () => {
       expect(verts(lodge)).toBeGreaterThan(verts(buildingGeometry('temple', e, '#cc3333')));
       expect(verts(both)).toBeGreaterThan(verts(bell));
       expect(verts(both)).toBeGreaterThan(verts(lodge));
+    }
+  });
+});
+
+describe('Age of Lightning heirloom marks (#240)', () => {
+  it('the Temple, Dock and Workshop each gain a touch for their Lightning heirloom, in every epoch', () => {
+    for (const [type, id] of Object.entries(HEIRLOOM_FIELD)) {
+      expect(TECHS[id as keyof typeof TECHS]?.walked).toBeDefined();
+      for (let e = 0; e <= LAST_EPOCH; e++) {
+        const plain = buildingGeometry(type as 'temple', e, '#cc3333');
+        expect(verts(buildingGeometry(type as 'temple', e, '#cc3333', 0, undefined, id))).toBeGreaterThan(verts(plain));
+      }
     }
   });
 });
