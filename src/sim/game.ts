@@ -33,7 +33,7 @@ import { mercStep } from './merc';
 import { isHire, barred, journeyOf, noteWalked, surveyFinds, trainsAt, workSteps } from './ages';
 import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, MapSize, MapType, Player } from './types';
 import { RES, R_FISH, R_NONE } from './types';
-import { RES_OF_TILE, autoWork, carryCargo, checkStuck, collide, findResource, routeUnits, separate, setOrder, think, ungarrison, walk } from './units';
+import { RES_OF_TILE, autoWork, rallyNode, carryCargo, checkStuck, collide, findResource, routeUnits, separate, setOrder, think, ungarrison, walk } from './units';
 import { updateVision } from './vision';
 import { countPop, exitSpot, maxHp, placeBuilding, refund, restat, spawnUnit } from './world';
 
@@ -331,7 +331,8 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
   const post = u.type === 'trader' && b.rally ? s.posts.find((t) => atPost(t, b.rally!.x, b.rally!.y)) : undefined;
   if (post) setOrder(u, { k: 'trade', post: post.id, market: b.type === 'market' ? b.id : 0, phase: 'go' });
   else if (b.rally) {
-    const t = b.rally.tile;
+    // A flag on a tree that has since been felled still means "wood here": the nearest of its kind by the flag (#344).
+    const t = working(b.rally.tile) || fishing(b.rally.tile) ? b.rally.tile : rallyNode(s, u, b.rally);
     if (working(t) || fishing(t)) setOrder(u, { k: 'gather', tile: t, res: RES_OF_TILE[s.res[t]], phase: 'go' });
     else setOrder(u, { k: 'move', x: b.rally.x, y: b.rally.y, amove: false, started: false });
   } else if (u.type === 'fisher') {
