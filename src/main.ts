@@ -1889,6 +1889,9 @@ window.addEventListener('keydown', (e) => {
     case ']':
       view.rig.rotate(Math.PI / 8);
       break;
+    case '/':
+      view.rig.gazing = !view.rig.gazing;
+      break;
     case 'backspace':
       view.rig.resetYaw();
       break;

@@ -29,7 +29,7 @@ import { FoundationView } from './foundationView';
 import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, coilFields, placementField, sortieRings, type RangeGuide } from './rangeGuides';
 import { ResourcesView } from './resourcesView';
 import { Sky } from './sky';
-import { forcedHour, hourAt, lightAt, moonPhase } from './daylight';
+import { DAY_SECONDS, forcedHour, hourAt, lightAt, moonPhase } from './daylight';
 import { Weather, describeWeather, forcedWeather, moodOf, seasonalDay, weatherFor, windFor, type WeatherDay } from './weather';
 import { FogTexture, TerrainView, heightAt } from './terrain';
 import { AIR_ALT, UnitsView } from './unitsView';
@@ -172,6 +172,7 @@ export class View {
     this.sun.castShadow = true;
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.04;
+    this.sky.onMeteor = (pan) => this.onCue?.('meteor', pan, 0.5);
     this.scene.add(this.sky.mesh, this.hemi, this.fill, this.sun, this.sun.target);
     this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.ruins.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points);
     this.scene.add(this.rangeGuides.mesh, this.borders.mesh, this.graze.mesh, this.foundations.mesh);
@@ -311,6 +312,12 @@ export class View {
     return forcedHour() ?? this.titleHour ?? (this.state ? hourAt(this.state.seed, this.state.tick / TICK_HZ) : 9);
   }
 
+  /** How strongly the aurora burns tonight: a bright display one night in three, a faint glow otherwise. */
+  private aurora(): number {
+    const night = Math.floor((this.state ? this.state.tick / TICK_HZ : 0) / DAY_SECONDS);
+    return (Math.imul(((this.state?.seed ?? 0) | 0) + night * 7919, 2654435761) >>> 0) % 3 === 0 ? 1 : 0.25;
+  }
+
   /** Light the land for an hour of the day, greyed by today's weather. */
   private light(hour: number): void {
     if (Math.abs(hour - this.litHour) < 0.01) return;
@@ -330,6 +337,7 @@ export class View {
     // A full moon lights the night better than a crescent does; by day the phase means nothing.
     this.baseSun = 2.5 * m.sun * l.sun * (1 - 0.4 * this.phase * l.moon);
     this.water.setStars(l.moon * (1 - m.grey));
+    this.sky.setNight(l.moon * (1 - m.grey), this.phase, this.aurora());
     this.fireflies.setNight(this.weather.day.kind === 'clear' ? l.moon : 0);
     this.bats.setDusk(l.moon, this.weather.day.kind === 'clear');
     this.roosts.setDusk(l.moon, this.weather.day.kind === 'clear');
@@ -406,6 +414,7 @@ export class View {
     cam.far = 140;
     cam.updateProjectionMatrix();
     this.sky.mesh.position.copy(this.rig.camera.position);
+    this.sky.update(this.time, dt);
     const fog = this.scene.fog as THREE.Fog;
     fog.near = this.rig.distance * 2.2 * this.reach;
     fog.far = (this.rig.distance * 5 + 60) * this.reach;
