@@ -142,9 +142,8 @@ export const PATHS: Record<PathId, Path> = {
   rite: {
     name: 'Blood-rite',
     branch: 'blood',
-    blurb: 'The Path of Blood past Total War, where blood is a sacrament: altars, offerings and priests. Every age of the Path of Blood walked before it still adds to the plunder.',
+    blurb: 'The Path of Blood past Total War, where blood is a sacrament: altars, offerings, curses and priests. Every age of the Path of Blood walked before it still adds to the plunder.',
     carry: { plunder: 0.1 },
-    planned: ['blood priests, sacrifice and curses'],
   },
   // The Steppe (#297, #318): the second main path, a people whose town moves. The riders grow quicker with every age of it walked.
   steppe: {
@@ -186,7 +185,7 @@ export const AGES: Record<AgeId, Age> = {
     name: 'Age of Merchants',
     short: 'Merchant',
     tier: 2,
-    blurb: 'Guilds, banks and hired swords: the Market hires soldiers for gold, trade pays more (more still for every bar of bog iron your people ever dug), and levies cost dear.',
+    blurb: 'Guilds, banks and hired swords: the Market hires soldiers for gold, trade pays more (more still for every bar of bog iron your people ever dug), and levies cost dear. But a hired sword is paid by the day: 2 gold every 15 seconds once its first 45 are served, and one left unpaid twice walks off the field.',
     mul: { tradeGold: 1.25 },
     ironTrade: IRON_TRADE,
     hire: { at: 'market', units: ['infantry', 'ranged', 'cavalry'], gold: 1.2, time: 0.5 },
@@ -296,7 +295,7 @@ export const AGES: Record<AgeId, Age> = {
     short: 'Blood-rite',
     tier: 4,
     path: 'rite',
-    blurb: 'Blood as a sacrament. Every finished Temple is an altar: a living enemy who falls within 14 tiles of one gives up its blood as at a Drain Rig, and the altar pays blood out to mend your own living within 8 tiles, 2 health a second each and up to 10 at once, a quarter of a blood for every point, while the store lasts. Priests cost a quarter less and heal and convert a quarter faster. The plunder goes on growing. But the rite scorns the pumps: no Transfusion Station is raised, siege engines cost a quarter more, no traders leave the Markets, and the fields yield 15% less.',
+    blurb: 'Blood as a sacrament. Every finished Temple is an altar: a living enemy who falls within 14 tiles of one gives up its blood as at a Drain Rig, and the altar pays blood out to mend your own living within 8 tiles, 2 health a second each and up to 10 at once, a quarter of a blood for every point, while the store lasts. Priests cost a quarter less and heal and convert a quarter faster, and they have two rites over any enemy that bleeds: to sacrifice it (it dies, and 60% of its price comes into your store as blood), or to curse it (20 blood: it and the living within 3 tiles take 35% more from every blow for 20 seconds). The plunder goes on growing. But the rite scorns the pumps: no Transfusion Station is raised, siege engines cost a quarter more, no traders leave the Markets, and the fields yield 15% less.',
     add: { plunder: 0.25 },
     mul: { priest: 1.25, farm: 0.85 },
     price: { priest: 0.75, siege: 1.25 },
@@ -1726,8 +1725,17 @@ export const HEMOCRAFT = { drain: 6, bleed: 2, most: 8, yield: 0.5, graft: 0.75,
  * The Age of the Blood-rite (#355 s2): a finished Temple draws blood from the enemy who fall within `BLOOD.reach` tiles of it, as a Drain
  * Rig does. Each second it mends up to `most` of its people's hurt living (nearest first) within `reach` tiles, `mend` health each, paying
  * `price` blood a point from the store; with the store dry it mends no one.
+ *
+ * Its priests (#355 s4) have two more rites over an enemy that bleeds (never a machine, ship or aircraft). To sacrifice, a priest chants
+ * as for a conversion, and the victim dies at the end, paying `offering` of its price as blood (a Hero `hero` times that; a King is never
+ * offered). To curse, a priest chants `chant` seconds and spends `curse` blood: the target and up to `most` living enemies within
+ * `spread` tiles of it take `taken` times the damage from every blow for `last` seconds. A priest rests `rest` seconds after a curse.
  */
-export const RITE = { reach: 8, mend: 2, most: 10, price: 0.25 };
+export const RITE = {
+  reach: 8, mend: 2, most: 10, price: 0.25,
+  offering: 0.6, hero: 2,
+  curse: 20, chant: 3, spread: 3, last: 20, taken: 1.35, rest: 30, curses: 12,
+};
 
 /**
  * The computer and Hemocraft (#355 s5). A clever computer at war (Iron and Blood, Total War) with `town` citizens raises a Drain Rig `rig` tiles from home
@@ -1761,6 +1769,16 @@ export const ORE_TRADE = { lot: 20, gold: { salt: 40, saltpetre: 55, bloodiron: 
 
 /** The computer and the rare ores (#356 s5): the crew it sends to dig the ore a road's door asks for, and how far from home it will look for the vein. */
 export const AI_ORE = { crew: 3, reach: 70 };
+
+/**
+ * Hired swords (the Age of Merchants, #37) are paid by the day, not once: the hire price covers a sword's first `first` seconds, then every
+ * `every` seconds each draws `wage` gold from its people's treasury. A purse too thin to pay one leaves it a payday behind; a sword `patience` paydays behind walks off the field, for good.
+ * Wages go on after the people leaves the Age of Merchants, until the swords are dead or gone.
+ */
+export const MERC = { every: 15, wage: 2, patience: 2, first: 45 };
+
+/** The computer's hired swords (the Age of Merchants): it hires only with `reserve` paydays of every sword it would then keep still in the purse. */
+export const AI_MERC = { reserve: 6 };
 
 export const AI_WEB = { take: 0.6, heir: 1, survey: 22, diggers: 3, nearly: 0.5, patience: 90, close: 0.75, relics: 2, raid: 18, raidNear: 30, riders: 4, read: 0.85, lodge: 1, hulls: 1, bell: 900 };
 

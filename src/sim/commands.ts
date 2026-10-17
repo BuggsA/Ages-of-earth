@@ -17,6 +17,7 @@ import { takeVow, takeWay, vowProblem, wayProblem } from './ways';
 import { beaconProblem, lightBeacon } from './beacon';
 import { callUp, callUpProblem } from './warcamp';
 import { bloodOf, bloodShort, levy, levyProblem } from './blood';
+import { riteProblem } from './fork';
 import { rallyCry, rallyProblem } from './rally';
 import { chantedOver, consecrateProblem, consecrates } from './consecrate';
 import { sees } from './vision';
@@ -309,11 +310,15 @@ export function applyCommand(s: GameState, c: Command): void {
       const t = s.byId.get(c.target);
       if (!t || !isEnemy(s, c.p, t.owner)) return;
       if (peace(s)) return refuse(s, c.p, 'Not while the peace treaty holds');
-      if (t.kind === 'building') {
+      if (c.rite) {
+        // The Blood-rite's two rites (#355 s4), worked on the living that bleed.
+        const why = riteProblem(s, c.p, c.rite, t);
+        if (why) return refuse(s, c.p, why);
+      } else if (t.kind === 'building') {
         const why = consecrateProblem(s, c.p, t);
         if (why) return refuse(s, c.p, why);
       }
-      for (const u of myUnits(s, c.p, c.ids)) if (u.type === 'priest' && !carriedBy(s, u)) giveOrder(u, { k: 'convert', target: t.id, done: 0 }, c.queue);
+      for (const u of myUnits(s, c.p, c.ids)) if (u.type === 'priest' && !carriedBy(s, u)) giveOrder(u, { k: 'convert', target: t.id, done: 0, ...(c.rite ? { rite: c.rite } : {}) }, c.queue);
       break;
     }
     case 'relic': {

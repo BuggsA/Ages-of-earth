@@ -1,6 +1,6 @@
 import { AURA, RALLY, BONUS, BLOOD_TOWER, BUILDINGS, DEER, LIGHTNING, VETERANCY, TICK_HZ, domainOf, secs, type UnitStats } from './data';
 import { hasCoils } from './ages';
-import { bleeds, drawBlood, hemoBlow, hemoTaken } from './blood';
+import { bleeds, curseTaken, drawBlood, hemoBlow, hemoTaken } from './blood';
 import { distToRect } from './grid';
 import type { Spatial } from './spatial';
 import { modsOf, statsFor } from './stats';
@@ -52,6 +52,7 @@ export function gap(s: GameState, u: Unit, t: Ent): number {
 
 export function hurt(s: GameState, target: Ent, damage: number, by: number, attacker: Unit | null, credit: Unit | null = attacker): void {
   if (target.hp <= 0) return;
+  damage *= curseTaken(s, target);
   target.hp -= damage;
   target.hurt = s.tick;
   s.events.push({ k: 'hit', target: target.id, x: target.x, y: target.y, damage, owner: target.owner, building: target.kind === 'building' });

@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -123,7 +123,7 @@ export class Sound {
     'click', 'open', 'select', 'selectBuilding', 'move', 'attack', 'strike', 'thud', 'hit', 'hitBuilding', 'bow', 'sling', 'musket', 'fall',
     'collapse', 'built', 'place', 'ready', 'readyCitizen', 'chop', 'mine', 'hammer', 'rustle', 'epoch', 'alert', 'victory', 'defeat', 'error', 'coin', 'queue',
     'catapult', 'cannon', 'impact', 'spear', 'chant', 'convert', 'heal', 'townBell', 'allClear', 'research', 'wonder', 'wonderRising', 'shelter',
-    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind', 'thunder', 'owl', 'gull', 'cricket', 'frog', 'birdsong', 'greatWork', 'beacon', 'rally', 'mammoth', 'howl', 'snarl', 'landmarkTaken', 'landmarkLost', 'consecrate', 'heirloom', 'zap', 'coilHum', 'heroFall', 'callUp', 'tribute', 'caravanBells', 'toll', 'wayHunters', 'wayHearth', 'wayWarband', 'blood', 'graft', 'crash', 'drain',
+    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind', 'thunder', 'owl', 'gull', 'cricket', 'frog', 'birdsong', 'greatWork', 'beacon', 'rally', 'mammoth', 'howl', 'snarl', 'landmarkTaken', 'landmarkLost', 'consecrate', 'heirloom', 'zap', 'coilHum', 'heroFall', 'callUp', 'tribute', 'caravanBells', 'toll', 'wayHunters', 'wayHearth', 'wayWarband', 'blood', 'graft', 'crash', 'drain', 'sacrifice', 'curse',
   ];
 
   /**
@@ -789,6 +789,21 @@ export class Sound {
         this.tone(out, t + 0.04, { f: 140, to: 62, dur: 0.32, type: 'triangle', peak: 0.06 });
         this.noise(out, t + 0.36, { dur: 0.03, filter: 'highpass', f: 3200, q: 1, peak: 0.03 });
         this.tone(out, t + 0.42, { f: 52, to: 44, dur: 0.24, type: 'sine', peak: 0.08 });
+        break;
+      case 'sacrifice':
+        // The Blood-rite's offering (#355 s4): a deep gong struck once, a thin cry that is cut off, then a slow pour into a bowl.
+        this.tone(out, t, { f: 72, to: 58, dur: 1, type: 'sine', peak: 0.16 });
+        this.tone(out, t, { f: 144, to: 130, dur: 0.7, type: 'triangle', peak: 0.04 });
+        this.tone(out, t + 0.12, { f: 620, to: 380, dur: 0.22, type: 'sawtooth', peak: 0.03, lp: 1800 });
+        this.noise(out, t + 0.5, { dur: 0.5, filter: 'lowpass', f: 650, q: 0.8, peak: 0.07 });
+        this.tone(out, t + 1.05, { f: 310, to: 240, dur: 0.1, peak: 0.05 });
+        break;
+      case 'curse':
+        // A curse laid (#355 s4): a whispering breath, a drone on a tritone that sours, and one low thud as it lands.
+        this.noise(out, t, { dur: 0.6, filter: 'bandpass', f: 1500, q: 5, peak: 0.035 });
+        this.tone(out, t + 0.05, { f: 110, to: 104, dur: 0.75, type: 'sawtooth', peak: 0.04, lp: 700 });
+        this.tone(out, t + 0.05, { f: 156, to: 148, dur: 0.75, type: 'sawtooth', peak: 0.03, lp: 700 });
+        this.tone(out, t + 0.78, { f: 62, to: 44, dur: 0.3, type: 'sine', peak: 0.12 });
         break;
       case 'crash':
         // A graft run dry (#355 s3): the heartbeat stumbles and a falling, sour groan.

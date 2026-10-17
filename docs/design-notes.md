@@ -881,3 +881,15 @@ A fresh fallen footprint is clear; an older one fades toward a faint but readabl
 
 **Next:** event cards (a stranger at the fire, tracks near the berries) for the other half of the pitch; a tent and fire model at the camp (the raiders stand on bare grass today); camps that move or rebuild; a Raider Way for the player.
 
+
+### The rite's priests: sacrifice and curse (#355 s4), 2026-10-17
+
+**Built:** the Blood-rite's priests have two new rites over any enemy that bleeds, both as `convert` orders with a `rite` flag so they reuse the chase, the chant, the cooldown and the command checks (`riteProblem`, `sacrifice`, `curse` in `fork.ts`). Sacrifice (X): the same chant as a conversion, but the victim dies and pays 60% of its price as blood (`RITE.offering`; a Hero double; never a King). Curse (K): a 3-second chant and 20 blood, then the target and the living within 3 tiles take 35% more from every blow for 20 seconds, applied once in `hurt()`; a violet ring shows it, a priest rests 30 seconds. **Why I love it:** a priest that could only make a soldier now has a real fork of its own: take the soldier, or take the blood, and blood buys Blood Towers and curses. A curse makes a priest the centre of a fight (kill it mid-chant and the blood is not spent), and it only works on flesh: the owner's rule that machinery is the answer holds for the rite as well. **Next:** the computer using the rites (`forkBuild`, lane ai); curses as a Temple research; Blood + X heirlooms (s6). Not seen in a browser or heard: the ring colour, the two sounds and the target cursor are unverified by eye or ear.
+
+### Swords for hire (Age of Merchants, own pitch), 2026-10-17, chain 1017-1335 s1
+
+**Built:** a soldier hired at the Merchants' Market is a sword for hire: every 15 seconds it draws 2 gold, and one left unpaid twice walks off (`src/sim/merc.ts`, `MERC` in `data.ts`). The computer keeps six paydays per sword in the purse before it hires.
+
+**Why I love it:** the Age of Merchants was a few percentages and a button; "hire an army with gold" had no price after the day it was bought. Now the quick army is a loan against your trade, so a merchant decides how many swords his traders can carry, and a rival learns that the way to beat a hired host is to starve it: raid the traders, take the Market.
+
+**Next:** a rival could outbid a sword (bribe it over with gold); a Temple's priests could sway the unpaid; a sound for the walk-off. Win-rate effect on the computer is unmeasured.

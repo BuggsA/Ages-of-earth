@@ -2,13 +2,13 @@ import * as THREE from 'three';
 import type { SoundName } from '../audio/sound';
 import { ageDef, ageOf } from '../sim/ages';
 import { fairground, feastOpen } from '../sim/fair';
-import { AURA, BUILDINGS, HEMO, RALLY, SIGNATURES, TICK_HZ, LANDMARKS, RUINS, TRADE, domainOf } from '../sim/data';
+import { AURA, BUILDINGS, HEMO, RALLY, RITE, SIGNATURES, TICK_HZ, LANDMARKS, RUINS, TRADE, domainOf } from '../sim/data';
 import { buildingMaxHp, statsFor } from '../sim/stats';
 import type { AgeId, BuildingType, CivId, Ent, GameEvent, GameState, Unit } from '../sim/types';
 import type { ScoutFlag } from '../ui/scoutFlags';
 import { R_BOG, R_GOLD, R_STONE } from '../sim/types';
 import { stirred } from '../sim/combat';
-import { grafted } from '../sim/blood';
+import { cursed, grafted } from '../sim/blood';
 import { seesRect } from '../sim/vision';
 import { BuildingsView } from './buildingsView';
 import { CameraRig } from './camera';
@@ -578,6 +578,16 @@ export class View {
       const beat = Math.max(0, Math.sin(this.time * (5 + (1 - left) * 7) + e.id));
       rings.push({ x: at.x, y: at.y, z: at.z, r: statsFor(s, e.owner, e.type).radius + 0.2 + 0.05 * beat * beat, color: vein.clone().multiplyScalar(0.45 + 0.6 * left), thin: true });
     }
+    // Cursed enemies (#355 s4) wear a slow violet-black ring that sways and fades as the curse runs out.
+    const hex = new THREE.Color('#7a34b0');
+    for (const e of s.ents) {
+      if (e.kind !== 'unit' || e.hp <= 0 || !cursed(s, e)) continue;
+      const at = this.units.drawn.get(e.id);
+      if (!at) continue;
+      const left = Math.min(1, (e.cursed! - s.tick) / (TICK_HZ * RITE.last));
+      const sway = 0.5 + 0.5 * Math.sin(this.time * 2.2 + e.id);
+      rings.push({ x: at.x, y: at.y, z: at.z, r: statsFor(s, e.owner, e.type).radius + 0.3 + 0.06 * sway, color: hex.clone().multiplyScalar(0.3 + 0.7 * left), thin: true });
+    }
     // Health: the selected, the recently hurt, or everyone while asked.
     const recent = s.tick - TICK_HZ * 4;
     for (const e of s.ents) {
@@ -1146,6 +1156,18 @@ export class View {
             break;
           }
           this.effects.burst(this.ground(s, ev.x, ev.y, 0.5), { count: 9, speed: 0.6, up: 1.0, life: 0.8, size: 0.05, gravity: 2.2, colors: ['#7a1822', '#4a0e16', '#a3283a'] });
+          break;
+        }
+        case 'rite': {
+          // A Blood-rite priest's rite finished (#355 s4): a red column rising off the sacrificed, or a violet-black swirl over the cursed.
+          if (ev.owner !== this.viewer && ev.against !== this.viewer && !this.sees(ev.x, ev.y)) break;
+          if (ev.how === 'sacrifice') {
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.5), { count: 28, speed: 0.5, up: 2.4, life: 1.4, size: 0.07, gravity: -0.4, colors: ['#7a1822', '#a3283a', '#2a0610'] });
+            this.cue('sacrifice', ev.x, ev.y, 0.9);
+          } else {
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.6), { count: 34, speed: 1.2, up: 0.8, life: 1.2, size: 0.06, gravity: -0.2, colors: ['#3a1450', '#5a1f7a', '#14061c'] });
+            this.cue('curse', ev.x, ev.y, 0.9);
+          }
           break;
         }
         case 'graft': {

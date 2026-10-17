@@ -233,7 +233,7 @@ const TIPS: Tip[] = [
   {
     id: 'bloodrite',
     when: (s, me) => ageOf(s.players[me]) === 'bloodrite',
-    text: `Every Temple is an altar now. Enemies who fall within ${BLOOD.reach} tiles of one give up their blood, and the altar spends it to mend your own within ${RITE.reach} tiles. Fight near your Temples, keep the store full with a Drain Rig and the levy, and send cheaper, quicker priests with the army. No Transfusion Station is raised, and siege comes dear: the rite answers machines with faith and towers.`,
+    text: `Every Temple is an altar now. Enemies who fall within ${BLOOD.reach} tiles of one give up their blood, and the altar spends it to mend your own within ${RITE.reach} tiles. Fight near your Temples, keep the store full with a Drain Rig and the levy, and send cheaper, quicker priests with the army. Select one and press <b>X</b> to sacrifice an enemy that bleeds (it dies, and ${Math.round(RITE.offering * 100)}% of its price comes into your store as blood), or <b>K</b> to curse it: for ${RITE.curse} blood it and the living around it take ${Math.round((RITE.taken - 1) * 100)}% more from every blow for ${RITE.last} seconds. Machines are beyond both rites. No Transfusion Station is raised, and siege comes dear: the rite answers machines with faith and towers.`,
   },
   {
     id: 'callup',

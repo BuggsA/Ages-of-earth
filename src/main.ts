@@ -21,6 +21,7 @@ import { RUIN_FINDS, ruinAt } from './sim/ruins';
 import { LANDMARK_KINDS, landmarkAt } from './sim/landmarks';
 import { postAt } from './sim/trade';
 import { chantedOver, consecrateProblem, consecrates } from './sim/consecrate';
+import { riteProblem } from './sim/fork';
 import { ageDef, ageOf, canRaise, heirloomsOpened, isSideRoad, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
 import { NetClient, newRoomCode, saveName, savedName } from './net/client';
 import { HASH_EVERY, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
@@ -91,7 +92,7 @@ let placeAt: { tx: number; ty: number; ok: boolean } | null = null;
 /** A wall being dragged out, from tile to tile. */
 let wallDrag: { x0: number; y0: number; x1: number; y1: number } | null = null;
 /** The next left click picks a target: where to attack-move, or a building to shelter in. */
-let targetMode: 'amove' | 'garrison' | 'unload' | null = null;
+let targetMode: 'amove' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | null = null;
 let paused = false;
 const SPEEDS = [1, 1.5, 2, 3];
 let speedIdx = 0;
@@ -124,6 +125,10 @@ const hud = new Hud({
   },
   attackMove: () => {
     targetMode = 'amove';
+    placing = null;
+  },
+  riteMode: (how) => {
+    targetMode = how;
     placing = null;
   },
   garrisonMode: () => {
@@ -1356,6 +1361,24 @@ function unloadAt(clientX: number, clientY: number, queue: boolean): void {
 }
 
 /** Shelter the selection in the building under the pointer. */
+/** A Blood-rite priest's sacrifice or curse (#355 s4) on the enemy under the pointer. */
+function riteAt(clientX: number, clientY: number, how: 'sacrifice' | 'curse', queue: boolean): void {
+  const s = game;
+  if (!s) return;
+  const pk = view.pick(clientX, clientY);
+  const t = pk && pk.kind === 'unit' ? s.byId.get(pk.id) : undefined;
+  const why = t ? riteProblem(s, viewer, how, t) : 'Pick an enemy that bleeds';
+  if (!t || why) {
+    hud.toast(why ?? 'Pick an enemy that bleeds', 'bad');
+    play('error');
+    return;
+  }
+  const ids = selectedUnits(s).filter((u) => u.type === 'priest').map((u) => u.id);
+  issue({ t: 'convert', p: viewer, ids, target: t.id, rite: how, queue: queue || undefined });
+  view.marker(s, t.x, t.y, true);
+  play('move');
+}
+
 function garrisonAt(clientX: number, clientY: number, queue: boolean): void {
   const s = game;
   if (!s) return;
@@ -1500,6 +1523,11 @@ canvas.addEventListener('pointerdown', (e) => {
   if (targetMode === 'garrison') {
     garrisonAt(e.clientX, e.clientY, e.shiftKey);
     targetMode = null;
+    return;
+  }
+  if (targetMode === 'sacrifice' || targetMode === 'curse') {
+    riteAt(e.clientX, e.clientY, targetMode, e.shiftKey);
+    if (!e.shiftKey) targetMode = null;
     return;
   }
   if (targetMode === 'unload') {
@@ -2078,6 +2106,12 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           }
         } else hud.toast(`${s.players[ev.owner].name} has ${ev.back ? 'stepped back to' : 'reached'} the ${ageName(ev)}`, 'info');
         break;
+      case 'wages':
+        if (ev.owner === viewer) {
+          hud.toast(ev.gone ? `💰 ${ev.gone} hired sword${ev.gone > 1 ? 's' : ''} walked off unpaid${ev.late > ev.gone ? `; ${ev.late - ev.gone} more unpaid` : ''}` : `💰 The treasury is short: ${ev.late} hired sword${ev.late > 1 ? 's' : ''} unpaid, and will walk off next payday`, 'bad');
+          play('error');
+        }
+        break;
       case 'season': {
         const sn = SEASONS[ev.i];
         hud.toast(`${sn.icon} ${sn.name}. ${sn.blurb}`, 'info');
@@ -2184,9 +2218,18 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           if (ev.how === 'crash') hud.toast('🩸 A graft ran dry far from the Transfusion Stations: the soldier crashes', 'bad');
         }
         break;
+      case 'rite':
+        // The Blood-rite (#355 s4): the sound and the spray are the view's; here the words.
+        if (ev.owner === viewer) hud.toast(ev.how === 'sacrifice' ? `🩸 Sacrificed: ${ev.n} blood into your store` : `☠ Cursed ${ev.n} of the enemy: every blow on them lands harder`, 'good');
+        else if (ev.against === viewer) {
+          hud.toast(ev.how === 'sacrifice' ? 'An enemy priest has sacrificed one of yours!' : `An enemy priest has cursed ${ev.n} of yours!`, 'alert');
+          lastAlert = { x: ev.x, y: ev.y };
+        }
+        break;
       case 'blood':
         // Blood drawn at a Drain Rig (#355). Hemocraft's drain (s2) bleeds every second: the spray shows it, and the toast stays for kills and levies.
-        if (ev.owner === viewer && ev.how !== 'drain') {
+        // A sacrifice (#355 s4) tells of itself in the `rite` event.
+        if (ev.owner === viewer && ev.how !== 'drain' && ev.how !== 'sacrifice') {
           play('blood');
           hud.toast(ev.how === 'levy' ? `🩸 ${ev.n} blood drawn from the levy` : `🩸 ${ev.n} blood drawn from the fallen`, 'good');
         }
@@ -2446,6 +2489,7 @@ function cursorFor(s: GameState): string {
   if (placing) return 'cur-place';
   if (targetMode === 'amove') return 'cur-amove';
   if (targetMode === 'garrison') return 'cur-garrison';
+  if (targetMode === 'sacrifice' || targetMode === 'curse') return 'cur-convert';
   if (targetMode === 'unload') return 'cur-garrison';
   if (!pointer.inside || boxing) return '';
   const units = selectedUnits(s);
