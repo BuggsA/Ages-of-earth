@@ -1568,6 +1568,11 @@ export const AI_WONDER = { share: 0.4, least: 3, most: 14, stay: 6, reach: 26 };
  * tiles round its relic Temple, and in the Age of Fairs keeps up to `markets` Markets so one stands there.
  */
 export const AI_FAIR = { ring: 10, markets: 2 };
+/**
+ * The computer and vigils (#379 s2): in the Age of Pilgrims a clever computer keeps `VIGIL.most` priests at its relic Temple,
+ * training them on top of those it sends with the army, and walks a keeper back once it strays past `VIGIL.reach` less `slack` tiles.
+ */
+export const AI_VIGIL = { slack: 1.5 };
 
 /** The computer and the rare ores (#356 s5): the crew it sends to dig the ore a road's door asks for, and how far from home it will look for the vein. */
 export const AI_ORE = { crew: 3, reach: 70 };
