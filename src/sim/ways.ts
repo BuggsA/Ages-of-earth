@@ -23,7 +23,7 @@ export function takeWay(s: GameState, p: Player, way: WayId): void {
 /**
  * Which Way suits a computer's home: the deer within reach feed the Hunters, the berry patches the
  * Hearth, and a rival close by (or a people who fight on foot or horse) the Warband. Ties go in
- * `WAY_IDS` order, so the choice is the same every run.
+ * `WAY_IDS` order, so the choice is the same every run. A rival's Way, if it has taken one, tips the scale (`WAY.read`).
  */
 export function wayFor(s: GameState, p: Player): WayId {
   const tc = townCenters(s, p.id)[0];
@@ -48,6 +48,13 @@ export function wayFor(s: GameState, p: Player): WayId {
     hearth: berries,
     warband: (foe < 50 ? 6 : 0) + (p.civ === 'romans' || p.civ === 'greeks' || p.civ === 'mongols' ? 4 : 0),
   };
+  // A rival who has chosen already is read by its Way (players are served in id order, so the later chooser sees the earlier).
+  for (const q of s.players) {
+    if (q.id === p.id || q.defeated || !q.way || !isEnemy(s, p.id, q.id)) continue;
+    if (q.way === 'warband') score.warband += WAY.read.warband;
+    else if (q.way === 'hearth') score.warband += WAY.read.hearth;
+    else score.hearth += WAY.read.hunt;
+  }
   let best: WayId = WAY_IDS[0];
   for (const w of WAY_IDS) if (score[w] > score[best]) best = w;
   return best;

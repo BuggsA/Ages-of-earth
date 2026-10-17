@@ -950,3 +950,10 @@ A fresh fallen footprint is clear; an older one fades toward a faint but readabl
 **Why I love it:** the owner said managing people still feels hard and asked whoever took it on to find where the friction lives. A rally point you can trust is the biggest single fix: set it on the forest once and forget it. None of this decides anything for the player. Each rule only does what you would have clicked anyway.
 
 **Next:** run the audit with Shift-queued builds and walls, and on the Steppe (flocks, camps that move); show the idle count as a gentle pulse on the Idle button when it climbs; let a rally on a farm put new citizens on free fields.
+
+## Designers' notes: the computer reads a rival's Way (own idea, 2026-10-17, lane ai)
+
+**Built:** `wayFor` (`src/sim/ways.ts`) now adds `WAY.read` to the score for each living rival that has already chosen: a Warband rival +3 and a Hearth rival +2 to the Warband (soldiers at home, a rich town to meet or raid), a Hunters' rival +2 to the Hearth (the deer are stripped, so berries and farms are the safe larder). Players choose in id order, so the later chooser sees the earlier one; an unchosen or defeated rival counts for nothing.
+**Why I love it:** a Way was something the player scouted on a rival's Town Center and the computer never answered. Now your pick reaches the other side's choice, so a Warband opening has a cost: it can push a clever rival toward soldiers.
+**Seen:** `tests/ways-read.test.ts` (4), `tests/ways.test.ts`, `scripts/sim.ts 3 medium 30` checksum 2086345273, same as `main` (only one clever computer there). **Not seen:** win rates over many maps, a browser (no render change).
+**Next:** the computer scouting a Way on the Town Center and raiding Hunters far from home; a Bronze Age vow that reads the rival's.

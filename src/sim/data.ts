@@ -1456,8 +1456,12 @@ export const WAYS: Record<WayId, Way> = {
   warband: { name: 'The Warband Way', icon: '🗡', blurb: 'Soldiers train 15% faster and strike 1 harder in melee; berries and hunting are 15% slower.', add: { meleeAttack: 1 }, mul: { militaryTrain: 0.85, forage: 0.85, hunt: 0.85 }, deep: { add: { meleeAttack: 1 }, mul: { militaryTrain: 0.9, forage: 0.9, hunt: 0.9 }, blurb: 'Soldiers train another 10% faster and strike 1 harder again; berries and hunting another 10% slower.' } },
 };
 
-/** Ways are taken in the Stone Age (epoch `until`) and no later; the computer takes its own after `aiAfter` seconds. */
-export const WAY = { until: 0, aiAfter: 25, near: 16, vow: 1, deepenCost: { food: 200, wood: 100 } as Cost, turnCost: { food: 100 } as Cost };
+/**
+ * Ways are taken in the Stone Age (epoch `until`) and no later; the computer takes its own after `aiAfter` seconds.
+ * `read`: what a computer adds to a Way's score for each rival already living by the key (a Warband rival calls for
+ * soldiers at home, a Hearth rival is a rich town to raid, a Hunters' rival strips the deer and leaves the berries safe).
+ */
+export const WAY = { until: 0, aiAfter: 25, near: 16, read: { warband: 3, hearth: 2, hunt: 2 }, vow: 1, deepenCost: { food: 200, wood: 100 } as Cost, turnCost: { food: 100 } as Cost };
 
 /**
  * A people's signature soldiers: one unit line that carries their own names (one per epoch) and a
