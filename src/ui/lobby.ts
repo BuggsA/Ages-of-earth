@@ -94,8 +94,8 @@ export class Lobby {
       PLAYER_COLORS.map((_, i) => `<option value="${i}" ${i === cur ? 'selected' : ''} ${state.seats.some((s) => s.color === i) && i !== cur ? 'disabled' : ''}>${COLOR_NAMES[i]}</option>`).join('');
     const civOpts = (cur: string) => `<option value="random">Random</option>` + CIV_IDS.map((c) => `<option value="${c}" ${c === cur ? 'selected' : ''}>${CIVS[c].name}</option>`).join('');
     const teamOpts = (cur: number) => Array.from({ length: MAX_SEATS }, (_, i) => `<option value="${i + 1}" ${i + 1 === cur ? 'selected' : ''}>Team ${i + 1}</option>`).join('');
-// A room takes the three levels its Worker knows (worker/lists.ts); the gentlest is single-player for now (#258).
-    const levelOpts = (cur?: Difficulty) => (['easy', 'normal', 'hard'] as Difficulty[]).map((l) => `<option value="${l}" ${l === cur ? 'selected' : ''}>${AI_LEVELS[l].label}</option>`).join('');
+// A room takes the four levels its Worker knows (worker/lists.ts, ROOM_LEVELS).
+    const levelOpts = (cur?: Difficulty) => (['gentle', 'easy', 'normal', 'hard'] as Difficulty[]).map((l) => `<option value="${l}" ${l === cur ? 'selected' : ''}>${AI_LEVELS[l].label}</option>`).join('');
     const rows = state.seats
       .map((s, i) => {
         const mine = i === you;
