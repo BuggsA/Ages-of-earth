@@ -1006,7 +1006,10 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   // In the Age of Lightning a coil goes up by a workshop that stands dark (#231), so its training runs fast again.
   if (ageOf(p) === 'lightning' && count(v, 'tower') < AI_LIGHTNING.most && !recently('tower', AI_LIGHTNING.gap)) {
     const dark = v.buildings.find((b) => b.built && b.type !== 'tower' && BUILDINGS[b.type].trains.length > 0 && !inField(s, b));
-    const spot = dark ? findSpot(s, 'tower', dark.x, dark.y, 2, 6) : null;
+    // With Galvanic Revival (#240) a ruin it dug that lies outside every field is worth a coil first: it then pays gold.
+    const wired = modsOf(s, p.id).galvanic ? (s.ruins ?? []).find((r) => r.by === p.id && !inField(s, { x: r.x, y: r.y, owner: p.id })) : undefined;
+    const at = wired ?? dark;
+    const spot = at ? findSpot(s, 'tower', at.x, at.y, 2, 6) : null;
     if (spot && construct(s, v, mem, 'tower', spot, 2, issue)) return;
   }
 
