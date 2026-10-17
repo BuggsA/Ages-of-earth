@@ -2979,7 +2979,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     }
     if (!unit || unitEpoch(unit) > p.epoch || barred(p, unit)) continue;
     // What it costs here: a levy, an age's price or a hire for gold (#37).
-    const cost = trainCostFor(s, p.id, unit, b.type);
+    const cost = trainCostFor(s, p.id, unit, b.type, b);
     if (!afford(v, cost)) continue;
     // A sword for hire draws wages (`MERC`): hire it only with its keep, and the keep of every sword already hired, left in the purse.
     if (isHire(p, b.type, unit) && v.budget.gold < (cost.gold ?? 0) + AI_MERC.reserve * MERC.wage * (swordsOf(s, p.id).length + 1)) continue;

@@ -1,4 +1,5 @@
 import { AGES, BUILDINGS, CIVS, WAYS, WORKS, SIGNATURES, EPOCHS, NO_MODS, PATHS, RARE, TECHS, WARCAMP, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
+import { fairLevy } from './fair';
 import { ageDef, ageOf, hasWalked, isHire, isSuspended, pathCarry } from './ages';
 import type { BuildingType, Cost, GameState, Player, TechId, UnitType } from './types';
 import { RES } from './types';
@@ -126,19 +127,20 @@ const LEVIED = new Set(['infantry', 'ranged', 'cavalry']);
  * age hires it there, dearer where their age makes levies cost more (#37), and scaled by what their
  * age charges for its class (the Iron Age's cheap foot soldiers, #39).
  */
-export function trainCostFor(s: GameState, owner: number, type: UnitType, at: BuildingType): Cost {
+export function trainCostFor(s: GameState, owner: number, type: UnitType, at: BuildingType, where?: { x: number; y: number }): Cost {
   const p = s.players[owner];
   const base = unitStats(type, p.epoch).cost;
   const age = ageDef(p);
   if (age.hire && isHire(p, at, type)) {
     let sum = 0;
     for (const r of RES) sum += base[r] ?? 0;
-    return { gold: Math.round((sum * age.hire.gold) / 5) * 5 };
+    return scale({ gold: Math.round((sum * age.hire.gold) / 5) * 5 }, fairLevy(s, owner, type, where));
   }
   const cls = unitStats(type, p.epoch).cls;
   const levied = age.levy && LEVIED.has(cls) ? scale(base, age.levy) : base;
   const price = age.price?.[cls];
-  return price ? scale(levied, price) : levied;
+  const priced = price ? scale(levied, price) : levied;
+  return scale(priced, fairLevy(s, owner, type, where));
 }
 
 /** Seconds to train a unit at a building (hired soldiers come faster). */

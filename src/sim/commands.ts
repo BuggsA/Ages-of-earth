@@ -676,7 +676,7 @@ export function applyCommand(s: GameState, c: Command): void {
       if (no) return refuse(s, c.p, no);
       if (b.queue.length >= MAX_QUEUE) return refuse(s, c.p, 'The queue is full');
       if (c.unit === 'hero' && heroBusy(s, c.p)) return refuse(s, c.p, 'You can lead with one hero at a time');
-      const cost = trainCostFor(s, c.p, c.unit, b.type);
+      const cost = trainCostFor(s, c.p, c.unit, b.type, b);
       const short = shortfall(p, cost);
       if (short) return refuse(s, c.p, short);
       pay(p, cost);
