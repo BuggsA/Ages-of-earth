@@ -1,4 +1,4 @@
-import { AGES, BUILDINGS, CALL_UP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, secs } from '../sim/data';
+import { AGES, BLOOD, BUILDINGS, CALL_UP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, secs } from '../sim/data';
 import { ageOf, backTo, deedProgress, deedsDone, mainRoad, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
 import type { Building, GameState, Unit } from '../sim/types';
 import { R_FISH } from '../sim/types';
@@ -192,6 +192,12 @@ const TIPS: Tip[] = [
       return ageOf(p) === 'industrial' && roadKnown(s, p, TOTALWAR_ROAD);
     },
     text: `The Path of Blood has one step left. With ${TOTALWAR_ROAD.deed!.n} soldiers trained at War Camps, the Town Center (🔀) can turn your people into the <b>${AGES.totalwar.name}</b>: War Camps return as muster grounds, where citizens are called to arms, and the plunder is the deepest of the path.`,
+  },
+  {
+    id: 'drainrig',
+    // The Drain Rig (#355 s1): a late age of the Path of Blood, until the player has raised one.
+    when: (s, me) => ['ironblood', 'totalwar'].includes(ageOf(s.players[me])) && !has(s, me, 'drainrig'),
+    text: `The Path of Blood has one more thing to take from the fallen. A <b>Drain Rig</b> (military buildings) draws a fifth of the price of every living enemy who falls within ${BLOOD.reach} tiles as <b>blood</b> (🩸 in the top bar), and its levy (<b>C</b>) gives the citizens beside it for ${BLOOD.levy} blood each. Machines and ships bleed nothing. Nothing spends blood yet.`,
   },
   {
     id: 'callup',

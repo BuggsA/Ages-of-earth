@@ -315,6 +315,38 @@ function warcamp(k: Kit, e: number, st: Style): void {
   k.cone(0.05, 0.12, 4, '#c9a23a', 0, 1.6, -0.05);
 }
 
+// ---- Drain Rig (#355) ------------------------------------------------------------------------------
+
+function drainrig(k: Kit, _e: number, st: Style): void {
+  // Trampled ground stained dark, a copper-lined trough on trestles with a windlass over it, a rack of pale jars,
+  // and a dark standard over the people's colour.
+  k.box(1.9, 0.05, 1.9, '#5b4a3c', 0, -0.02, 0);
+  k.box(0.9, 0.012, 0.7, '#4a1218', 0.1, 0.03, 0.15);
+  // The trough: a long basin on two trestles, copper inside, with a spout.
+  for (const x of [-0.35, 0.55]) k.box(0.08, 0.34, 0.5, st.post, x, 0, 0.1);
+  k.box(1.1, 0.12, 0.55, '#8a5a3a', 0.1, 0.34, 0.1);
+  k.box(0.98, 0.02, 0.43, '#b4592f', 0.1, 0.45, 0.1);
+  k.box(0.98, 0.012, 0.43, '#5a1019', 0.1, 0.465, 0.1);
+  k.cyl(0.03, 0.03, 0.3, 5, '#b4592f', 0.7, 0.28, 0.1).rotation.z = Math.PI / 2;
+  // The windlass: two posts, a crossbar and a crank, with a chain hanging over the trough.
+  for (const x of [-0.45, 0.65]) k.cyl(0.035, 0.045, 1.0, 5, st.post, x, 0, -0.35);
+  const bar = k.cyl(0.04, 0.04, 1.2, 6, '#3f2e22', 0.1, 0.95, -0.35);
+  bar.rotation.z = Math.PI / 2;
+  k.box(0.03, 0.03, 0.2, '#7c8088', 0.72, 0.95, -0.45);
+  k.cyl(0.0, 0.012, 0.55, 4, '#7c8088', 0.1, 0.42, -0.2);
+  // A rack of pale jars along the back.
+  k.box(1.0, 0.04, 0.2, st.post, -0.1, 0.3, -0.78);
+  for (let i = 0; i < 5; i++) {
+    k.cyl(0.07, 0.085, 0.2, 7, i % 2 ? '#d8cdb8' : '#c9bda4', -0.5 + i * 0.2, 0.34, -0.78);
+    k.cone(0.045, 0.06, 6, '#7a1822', -0.5 + i * 0.2, 0.54, -0.78);
+  }
+  // The standard: a dark pole with a black-red streamer over the people's colour.
+  k.cyl(0.025, 0.03, 1.5, 5, '#2b2120', -0.75, 0, 0.6);
+  k.box(0.012, 0.2, 0.5, '#4a0e16', -0.75, 1.2, 0.85);
+  k.team(k.box(0.014, 0.16, 0.34, TEAM, -0.75, 1.0, 0.78));
+  k.cone(0.05, 0.12, 4, '#9b1c2c', -0.75, 1.5, 0.6);
+}
+
 /**
  * The Caravanserai (#334): a square mudbrick courtyard with round corner buttresses and a tall arched portal
  * banded in turquoise tile. Inside, a well, bales of dyed cloth, and a camel kneeling to be unloaded.
@@ -1456,7 +1488,7 @@ function sandbags(k: Kit, x0: number, x1: number, z: number, rows = 2): void {
 function bloodTouches(k: Kit, type: BuildingType, age: AgeId): void {
   const depth = age === 'warband' ? 1 : age === 'ironblood' ? 2 : 3;
   // Farms, gates and towers stay bare, and the War Camp already flies its standard.
-  const span = type === 'wonder' ? 2.5 : type === 'towncenter' ? 1.75 : type === 'house' ? 0.72 : ['farm', 'gate', 'tower', 'warcamp'].includes(type) ? 0 : 1.05;
+  const span = type === 'wonder' ? 2.5 : type === 'towncenter' ? 1.75 : type === 'house' ? 0.72 : ['farm', 'gate', 'tower', 'warcamp', 'drainrig'].includes(type) ? 0 : 1.05;
   if (!span) return;
   const tall = type === 'wonder' ? 3.0 : type === 'towncenter' ? 2.5 : type === 'house' ? 1.3 : 1.9;
   const war = ['towncenter', 'barracks', 'range', 'stable', 'wonder'].includes(type);
@@ -1486,7 +1518,7 @@ function horsetail(k: Kit, x: number, z: number, h: number, white = false): void
 
 /** The Horde's towns (#318) fly horsetail standards before their doors: two at a Town Center (one white) and the war buildings, one elsewhere. */
 function hordeTouches(k: Kit, type: BuildingType): void {
-  if (['farm', 'gate', 'tower', 'warcamp'].includes(type)) return;
+  if (['farm', 'gate', 'tower', 'warcamp', 'drainrig'].includes(type)) return;
   const span = type === 'wonder' ? 2.5 : type === 'towncenter' ? 1.75 : type === 'house' ? 0.72 : 1.05;
   const tall = type === 'wonder' ? 3.2 : type === 'towncenter' ? 2.7 : type === 'house' ? 1.4 : 2.0;
   if (['towncenter', 'barracks', 'range', 'stable', 'wonder'].includes(type)) {
@@ -1501,7 +1533,7 @@ function hordeTouches(k: Kit, type: BuildingType): void {
  * the Town Center keeps an antlered pole, the herders' trophy of the hunt.
  */
 function steppeTouches(k: Kit, type: BuildingType): void {
-  if (['farm', 'gate', 'tower', 'warcamp', 'caravanserai'].includes(type)) return;
+  if (['farm', 'gate', 'tower', 'warcamp', 'drainrig', 'caravanserai'].includes(type)) return;
   const span = type === 'wonder' ? 2.4 : type === 'towncenter' ? 1.6 : type === 'house' ? 0.6 : 0.95;
   const front = span + 0.08;
   const h = type === 'house' ? 0.5 : type === 'towncenter' || type === 'wonder' ? 0.9 : 0.7;
@@ -1533,7 +1565,7 @@ function steppeTouches(k: Kit, type: BuildingType): void {
  */
 function silkTouches(k: Kit, type: BuildingType): void {
   // The Caravanserai (#334) is already the road's own building.
-  if (['farm', 'gate', 'tower', 'warcamp', 'caravanserai'].includes(type)) return;
+  if (['farm', 'gate', 'tower', 'warcamp', 'drainrig', 'caravanserai'].includes(type)) return;
   const span = type === 'wonder' ? 2.4 : type === 'towncenter' ? 1.6 : type === 'house' ? 0.6 : type === 'market' ? 1.3 : 0.95;
   const h = type === 'house' ? 0.8 : type === 'towncenter' || type === 'wonder' ? 1.5 : 1.15;
   const front = span + 0.1;
@@ -1717,7 +1749,7 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
 }
 
 const MAKERS: Record<Exclude<BuildingType, 'wall'>, (k: Kit, e: number, st: Style) => void> = {
-  towncenter, house, storehouse, huntcamp, warcamp, caravanserai, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield,
+  towncenter, house, storehouse, huntcamp, warcamp, drainrig, caravanserai, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield,
 };
 
 const cache = new Map<string, THREE.BufferGeometry>();

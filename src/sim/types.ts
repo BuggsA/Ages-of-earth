@@ -19,7 +19,7 @@ export type UnitType =
 export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
   | 'towncenter' | 'house' | 'storehouse' | 'farm' | 'barracks' | 'range' | 'stable' | 'tower'
-  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai';
+  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai' | 'drainrig';
 /** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
 export type Difficulty = 'gentle' | 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
@@ -460,6 +460,10 @@ export interface PlayerStats {
   campTrained?: number;
   /** Citizens called to arms at War Camps in the Age of Total War (#313); absent in older saves. */
   calledUp?: number;
+  /** Blood drawn at Drain Rigs, from the slain and by the levy (#355); absent in older saves. */
+  blood?: number;
+  /** Citizens given to the levy at Drain Rigs (#355); absent in older saves. */
+  levied?: number;
 }
 
 /** One sample of a player's state for the post-game timeline. */
@@ -481,6 +485,8 @@ export interface Player {
   ai: Difficulty | null;
   team: number;
   res: Stock;
+  /** Blood in store (#355): drawn at Drain Rigs from the enemy dead and by the levy; absent until the first drop. */
+  blood?: number;
   /** Rare ores mined (#356); absent until the first is brought home. */
   rare?: Partial<Record<RareId, number>>;
   epoch: number;
@@ -558,6 +564,8 @@ export type GameEvent =
   | { k: 'rank'; id: number; owner: number; x: number; y: number; rank: number }
   /** Gold taken from an enemy unit slain by a people with a plunder share (the Path of Blood, #299). */
   | { k: 'plunder'; owner: number; x: number; y: number; gold: number }
+  /** Blood drawn at a Drain Rig (#355): from an enemy who fell near it, or from citizens given to the levy. */
+  | { k: 'blood'; owner: number; x: number; y: number; n: number; how: 'slain' | 'levy' }
   /** A War Camp left without its soldiers (#303): it burns after a grace, or at once if its people left the path (`struck`). */
   /** Citizens called up at a War Camp (#313): each became the foot soldier `id` where it stood. */
   | { k: 'callUp'; owner: number; camp: number; ids: number[]; x: number; y: number }

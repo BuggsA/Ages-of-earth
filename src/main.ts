@@ -2152,6 +2152,13 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           hud.toast(`📯 ${ev.ids.length === 1 ? 'A citizen takes' : `${ev.ids.length} citizens take`} up arms at the War Camp`, 'good');
         }
         break;
+      case 'blood':
+        // Blood drawn at a Drain Rig (#355).
+        if (ev.owner === viewer) {
+          play('blood');
+          hud.toast(ev.how === 'levy' ? `🩸 ${ev.n} blood drawn from the levy` : `🩸 ${ev.n} blood drawn from the fallen`, 'good');
+        }
+        break;
       case 'tribute': {
         // A horde's riders standing in a rival's land (#318).
         const fresh = (at: number, gap: number) => s.tick - at > gap * TICK_HZ || s.tick < at;

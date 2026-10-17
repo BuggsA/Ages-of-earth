@@ -16,6 +16,7 @@ import { callWork, workProblem } from './works';
 import { takeVow, takeWay, vowProblem, wayProblem } from './ways';
 import { beaconProblem, lightBeacon } from './beacon';
 import { callUp, callUpProblem } from './warcamp';
+import { levy, levyProblem } from './blood';
 import { rallyCry, rallyProblem } from './rally';
 import { chantedOver, consecrateProblem, consecrates } from './consecrate';
 import { sees } from './vision';
@@ -533,6 +534,13 @@ export function applyCommand(s: GameState, c: Command): void {
     case 'callUp': {
       const b = myBuilding(s, c.p, c.building);
       if (!b) return;
+      // At a Drain Rig the call is the levy (#355): the citizens near it give their blood.
+      if (b.type === 'drainrig') {
+        const no = levyProblem(s, p, b);
+        if (no) return refuse(s, c.p, no);
+        levy(s, p, b, c.n);
+        break;
+      }
       const why = callUpProblem(s, p, b);
       if (why) return refuse(s, c.p, why);
       callUp(s, p, b, c.n);
