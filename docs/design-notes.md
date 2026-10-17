@@ -1024,3 +1024,10 @@ The three Ways were percentage bundles, so a Hunter and a Hearth player played t
 ## Designers' notes: herds breed (#491, the owner's note, 2026-10-18, lane rules)
 
 Built: every spring each wild herd of two or more deer drops a calf per pair, up to six (`DEER.pair/cap`). Why: deer only ever decreased, so hunting got harder with every kill; now sparing a pair is a real choice. Next: the computer sparing a pair of wild herds (it spares two of home herds on the Herd Plains only), and wolves culling thin herds.
+
+## Designers' notes: carrion crows (own pitch, Chain 1017-2315 s3, lane look)
+
+**Built:** by day, up to eight spoiling carcasses nearest the camera (past `ROT.grace`, still holding meat, in sight) each draw five black crows wheeling in a slow ring (`src/render/crows.ts`, `spoilingSites`). Render only; no save or rules change.
+**Why I love it:** the carrion notes asked for a visible tell that a kill is turning. Now you read it from the camera: crows over a far mammoth mean butcher fast or the wolves come.
+**Seen:** `tests/crows.test.ts` (which carcasses draw crows); typecheck clean. Not seen in a browser.
+**Next:** a thrall corpse look; crows landing to feed once a carcass is mostly gone; a caw.
