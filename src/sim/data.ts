@@ -207,15 +207,16 @@ export const AGES: Record<AgeId, Age> = {
   },
   merchant: {
     verb: 'Hire swords at the Market for gold, and keep paying them by the day or lose them',
-    door: 'Levies cost more',
+    door: 'No Stables: cavalry is for hire or not at all',
     name: 'Age of Merchants',
     short: 'Merchant',
     tier: 2,
-    blurb: 'Guilds, banks and hired swords: the Market hires soldiers for gold, trade pays more (more still for every bar of bog iron your people ever dug), and levies cost dear. But a hired sword is paid by the day: 2 gold every 15 seconds once its first 45 are served, and one left unpaid twice walks off the field.',
+    blurb: 'Guilds, banks and hired swords: the Market hires soldiers for gold, trade pays more (more still for every bar of bog iron your people ever dug), and levies cost dear. A merchant people stables no horses: cavalry is only for hire, never raised at a Stable. And a hired sword is paid by the day: 2 gold every 15 seconds once its first 45 are served, and one left unpaid twice walks off the field.',
     mul: { tradeGold: 1.25 },
     ironTrade: IRON_TRADE,
     hire: { at: 'market', units: ['infantry', 'ranged', 'cavalry'], gold: 1.2, time: 0.5 },
     levy: 1.2,
+    noBuild: { buildings: ['stable'], why: 'A merchant people stables no horses: cavalry is for hire at the Market. They wait until they settle in the Middle Ages or the Gunpowder Age' },
   },
   iron: {
     verb: 'Dig the marsh: bog iron sharpens every spearman, so the bog is worth holding',

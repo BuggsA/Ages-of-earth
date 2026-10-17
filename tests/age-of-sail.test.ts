@@ -116,3 +116,18 @@ describe('the Age of Sail raises no walls (the fleet is the wall)', () => {
     expect(buildBarred(p, 'wall')).toBeNull();
   });
 });
+
+describe('the Age of Merchants stables no horses (cavalry is for hire)', () => {
+  it('bars the Stable but not the hired horse, and lifts on the road home', () => {
+    const s = createGame({ seed: 2, size: 'small', mapType: 'lakes', players: [{ name: 'A', ai: null }, { name: 'B', ai: null }] });
+    const p = s.players[0];
+    p.epoch = 2;
+    expect(buildBarred(p, 'stable')).toBeNull();
+    p.age = 'merchant';
+    expect(buildBarred(p, 'stable')).toContain('stables no horses');
+    expect(buildBarred(p, 'barracks')).toBeNull();
+    expect(barred(p, 'cavalry')).toBeNull();
+    p.age = 'middle';
+    expect(buildBarred(p, 'stable')).toBeNull();
+  });
+});
