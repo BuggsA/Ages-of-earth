@@ -3,6 +3,7 @@ import { hasCoils } from './ages';
 import { bleeds, curseTaken, drawBlood, hemoBlow, hemoTaken } from './blood';
 import { fairPurse } from './fair';
 import { raidBlow, raidSlain } from './ways';
+import { takeCaptive } from './thralls';
 import { prizeOf } from './convoy';
 import { distToRect } from './grid';
 import type { Spatial } from './spatial';
@@ -104,6 +105,7 @@ function plunder(s: GameState, target: Unit, by: number, credit: Unit | null): v
   p.stats.slain = (p.stats.slain ?? 0) + 1;
   drawBlood(s, target, by, credit);
   raidSlain(s, target, by);
+  takeCaptive(s, target, by);
   const prize = prizeOf(s, target, by);
   if (prize > 0) {
     p.res.gold += prize;

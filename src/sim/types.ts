@@ -213,6 +213,8 @@ export interface Unit {
   cryReady?: number;
   /** Enemy soldiers it has defeated (older saves lack it). */
   vet?: number;
+  /** A citizen taken captive in the Age of the Warband (#502): it gathers and farms but never builds. */
+  thrall?: boolean;
   /** A wagon (#297): the building it carries, and that building's health as a share of its full health. */
   packed?: BuildingType;
   packedHp?: number;
@@ -658,6 +660,8 @@ export type GameEvent =
   | { k: 'rank'; id: number; owner: number; x: number; y: number; rank: number }
   /** Gold taken from an enemy unit slain by a people with a plunder share (the Path of Blood, #299). */
   | { k: 'plunder'; owner: number; x: number; y: number; gold: number }
+  /** A rival citizen taken captive by a Warband people (#502): a thrall of `owner` rises at the spot, taken from `from`. */
+  | { k: 'thrall'; owner: number; from: number; x: number; y: number }
   /**
    * Blood drawn at a Drain Rig (#355): from an enemy who fell near it, or from citizens given to the levy; in Hemocraft (s2) also
    * bled from a living enemy standing by a rig (`drain`, at the bled), and in the Blood-rite from the fallen near a Temple.
