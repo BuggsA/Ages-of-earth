@@ -1858,6 +1858,9 @@ export interface AiLevel {
  * the behaviour they always had, so saves, replays, rooms and tests stay as they were; only the names
  * moved: `easy` is shown as Normal, `normal` as Hard, `hard` as Expert (the campaign proof's level).
  */
+/** The all-clear for a siege that stopped (#487): the bell sounds once no foe has come closer for `stale` seconds and the nearest stands at least `far` tiles off. */
+export const AI_BELL = { stale: 60, far: 8 };
+
 export const AI_LEVELS: Record<Difficulty, AiLevel> = {
   gentle: { label: 'Easy', gather: 0.65, citizens: 12, firstAttack: 1080, wave: 4, waveGrowth: 2, think: 2, towers: 0, clever: false, traders: 1, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true },
   easy: { label: 'Normal', gather: 0.8, citizens: 16, firstAttack: 720, wave: 6, waveGrowth: 3, think: 1.5, towers: 0, clever: false, traders: 2, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true },

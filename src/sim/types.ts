@@ -812,6 +812,9 @@ export interface AiMemory {
   unitTurn: number;
   /** Tick the town bell was rung, or -1. */
   bell: number;
+  /** While the bell is rung (#487): the nearest foe's distance seen, and the tick it last came closer. */
+  bellNear?: number;
+  bellMoved?: number;
   /** Tick it last looked for a dock site and found none (so it doesn't look every turn). */
   dockless?: number;
   /** Its scout (#454 s4): the rider sent exploring, the tick it was last sent, and the pair that patrol its border or trade road. */
