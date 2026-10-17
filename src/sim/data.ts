@@ -1596,10 +1596,10 @@ export const HOMELANDS: Record<HomelandId, Homeland> = {
   },
   shore: {
     name: 'The Shore', icon: '🌊', short: 'few berries; fish the mere from a Dock',
-    blurb: 'A rich shoal just off home and only a thin berry bush. Food comes by boat: raise a Dock and launch canoes early, so the opening is hungry for wood, and a rival who burns the Dock starves you. The shoals run thick in autumn, and in winter the mere ices over.',
+    blurb: 'A rich shoal just off home and only a thin berry bush. Food comes by boat: raise a Dock and launch canoes early, so the opening is hungry for wood, and a rival who burns the Dock starves you. The shoals run thick in autumn, and in winter the mere ices over. Each spring every shoal left in the water spawns, growing by what was spared, and a full one seeds another: a shoal fished out never grows back, and a mere stripped bare stays bare.',
     berries: 3, thicket: 0, deer: 3, herd2: 0, grove: 0, mammoth: 17, fish: 8, mere: 6,
     weight: { continental: 2, highlands: 1, lakes: 3, forest: 1, plains: 1, sea: 3 },
-    year: ['The ice breaks: the boats fish freely again.', '', 'The autumn run: the shoals are thick, so fish hard and lay food up.', 'The mere ices over: boats fish at a third of their pace until spring.'],
+    year: ['The ice breaks and the shoals spawn: each grows by what you spared, and the full ones seed new shoals.', '', 'The autumn run: the shoals are thick, so fish hard and lay food up.', 'The mere ices over: boats fish at a third of their pace until spring.'],
   },
   herds: {
     name: 'The Herd Plains', icon: '🦣', short: 'herds and a mammoth close, few berries',
@@ -1628,13 +1628,17 @@ export const AI_SHORE = { dockAt: 4, boats: 2 };
  *   hunted out never comes back. A clever computer leaves `spare` of each home herd alive, and in autumn and
  *   winter follows its herds out to `follow` tiles from home.
  * - The Shore: boats fish at `run` of their pace in autumn and `ice` in winter, when the mere freezes over.
+ *   Each spring every shoal still in the water spawns (#482): it gains `breed` times what is left in it, up to a
+ *   full shoal (`AMOUNT.fish`), and one that is at least `seedAt` full seeds a new shoal of `spawn` a full one on
+ *   open water two tiles off, where fewer than `crowd` shoals lie within `crowdIn` tiles. A shoal fished to nothing is gone.
+ *   A clever computer moves its boats off a shoal once it is down to `fishSpare`, unless it has under `fishHungry` food.
  * - The Deep Wood: each winter `yard` deer come in (from `from` tiles out at most, `enter` at least) to a
  *   yard `yardMin`–`yardMax` tiles from every town, by at least `trees` trees within two tiles; in spring they
  *   go back out to where they came in, and return to the same yard the next winter. A clever computer sends
  *   `yardHunters` more hunters in winter.
  * Deer on the move walk for up to `walk` seconds.
  */
-export const YEAR = { home: 16, out: 26, trek: 6, calves: 1, herdMax: 6, spare: 2, follow: 34, run: 1.3, ice: 0.3, yard: 5, from: 20, enter: 8, yardMin: 7, yardMax: 12, trees: 3, yardHunters: 2, walk: 45 };
+export const YEAR = { home: 16, out: 26, trek: 6, calves: 1, herdMax: 6, spare: 2, follow: 34, run: 1.3, ice: 0.3, yard: 5, from: 20, enter: 8, yardMin: 7, yardMax: 12, trees: 3, yardHunters: 2, walk: 45, breed: 1, seedAt: 1, spawn: 0.5, crowd: 8, crowdIn: 4, fishSpare: 60, fishHungry: 150 };
 /**
  * Caves (#356): on a world that holds any rare ore, `count` caves for the map's size are cut into open ground at least
  * `away` tiles from every town and `apart` from each other. Each is a single tile of one of the world's ores, `rich` times

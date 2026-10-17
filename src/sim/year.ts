@@ -1,9 +1,9 @@
-import { SEASON, YEAR, secs } from './data';
+import { AMOUNT, SEASON, YEAR, secs } from './data';
 import { DIRS, spawnAnimal } from './animals';
 import { landOwnerAt } from './borders';
 import { walkable } from './grid';
 import { seasonAt } from './seasons';
-import { R_NONE, R_TREE } from './types';
+import { B_RES, B_TERRAIN, R_FISH, R_NONE, R_TREE, T_WATER } from './types';
 import type { Animal, GameState } from './types';
 
 /**
@@ -11,7 +11,8 @@ import type { Animal, GameState } from './types';
  * opening that suits a homeland stops working for part of every year (`YEAR` in `data.ts`).
  * - The Herd Plains: the home herds trek out toward the middle each autumn and come home each spring, each
  *   deer still alive with a calf. A herd hunted out never comes back.
- * - The Shore: the shoals run thick in autumn and the mere ices over in winter (`catchOf`).
+ * - The Shore: the shoals run thick in autumn and the mere ices over in winter (`catchOf`); each spring every
+ *   shoal left spawns, growing by what was spared, and the full ones seed new shoals (#482, `spawnShoals`).
  * - The Deep Wood: deer come in to yard in the woods by every town each winter, and go back out in spring.
  * Everything follows from the tick and the animals, so saves and replays need nothing new but `Animal.town`.
  */
@@ -58,6 +59,8 @@ export function turnYear(s: GameState): void {
   if (s.homeland === 'herds') {
     if (i === 2) trekOut(s);
     else if (i === 0) comeHome(s);
+  } else if (s.homeland === 'shore') {
+    if (i === 0) spawnShoals(s);
   } else if (s.homeland === 'wood') {
     if (i === 3) yardIn(s);
     else if (i === 0) yardOut(s);
@@ -283,4 +286,63 @@ function yardOut(s: GameState): void {
     const lead = herd[0];
     for (const a of herd) send(s, a, lead.origX ?? lead.homeX, lead.origY ?? lead.homeY);
   }
+}
+
+/** The ring two tiles out from a shoal, where a new one may be seeded (the ring inside is too close to fish). */
+const RING2: [number, number][] = [];
+for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === 2) RING2.push([dx, dy]);
+
+/**
+ * Spring on the Shore (#482): every shoal still in the water grows by `YEAR.breed` times what is left in it, up
+ * to a full one; then each that is full enough seeds a new shoal two tiles off, on open water away from the
+ * bank and from other shoals, where no boat floats and the water isn't already crowded. A shoal fished to nothing is gone, so what a player spares
+ * in autumn is next year's catch.
+ */
+export function spawnShoals(s: GameState): void {
+  const full = AMOUNT.fish;
+  const n = s.w * s.h;
+  let grew = 0;
+  const parents: number[] = [];
+  for (let i = 0; i < n; i++) {
+    if (s.res[i] !== R_FISH || s.amount[i] <= 0) continue;
+    const was = s.amount[i];
+    const now = Math.min(full, was + Math.floor(was * YEAR.breed));
+    s.amount[i] = Math.max(was, now);
+    grew += s.amount[i] - was;
+    if (s.amount[i] >= full * YEAR.seedAt) parents.push(i);
+  }
+  // Water a boat floats on now stays open for it.
+  const afloat = new Set<number>();
+  for (const e of s.ents) if (e.kind === 'unit' && e.hp > 0) afloat.add(Math.floor(e.y) * s.w + Math.floor(e.x));
+  const water = (x: number, y: number) => x >= 0 && y >= 0 && x < s.w && y < s.h && s.terrain[y * s.w + x] === T_WATER;
+  const fishWithin = (x: number, y: number, r: number) => {
+    let k = 0;
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (water(x + dx, y + dy) && s.res[(y + dy) * s.w + x + dx] === R_FISH) k++;
+    return k;
+  };
+  let seeded = 0;
+  for (const i of parents) {
+    const px = i % s.w;
+    const py = (i - px) / s.w;
+    // Each shoal tries the ring from its own place in it, so a mere fills out evenly.
+    for (let k = 0; k < RING2.length; k++) {
+      const [dx, dy] = RING2[(k + i) % RING2.length];
+      const x = px + dx;
+      const y = py + dy;
+      if (x < 2 || y < 2 || x >= s.w - 2 || y >= s.h - 2) continue;
+      const t = y * s.w + x;
+      if (s.block[t] !== B_TERRAIN || s.res[t] !== R_NONE || afloat.has(t)) continue;
+      let open = true;
+      for (let oy = -1; oy <= 1 && open; oy++) for (let ox = -1; ox <= 1; ox++) if (!water(x + ox, y + oy) || s.res[(y + oy) * s.w + x + ox] !== R_NONE) open = false;
+      // No more shoals in a stretch of water than a mere begins with.
+      if (!open || fishWithin(x, y, YEAR.crowdIn) >= YEAR.crowd) continue;
+      s.res[t] = R_FISH;
+      s.amount[t] = Math.floor(full * YEAR.spawn);
+      s.block[t] |= B_RES;
+      seeded++;
+      break;
+    }
+  }
+  if (seeded) s.blockVersion++;
+  if (grew || seeded) s.events.push({ k: 'spawned', grew, seeded });
 }

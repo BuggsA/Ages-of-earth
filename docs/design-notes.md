@@ -992,3 +992,15 @@ Now that the last Town Center decides the match, the computer plants a second fa
 
 **Next:** a rival-facing view (minimap marks for herds on the trek), salt curing as the Plains' way to keep autumn meat, fish that thin on a mere that's over-fished, and s4's proof that two Plains openings (spare vs. feast) part ways by minute 12.
 
+### The mere spawns (#482, own pitch, chain 1017-1811 session 6, lane rules)
+
+**Built:** on the Shore, `spawnShoals` in `src/sim/year.ts` runs at each spring's turn: every shoal left gains as much as is in it (`YEAR.breed`, up to `AMOUNT.fish`), and each full one seeds a half-full shoal (`YEAR.spawn`) two tiles off, on open water away from the bank, from other shoals (fewer than `YEAR.crowd`, 8, within `YEAR.crowdIn`, 4 tiles, so a stripped mere refills its holes but never carpets) and from any boat. A shoal fished out never grows back, and a mere stripped bare stays bare. The clever computer moves its boats off a shoal at `YEAR.fishSpare` (60) and rests them if nothing fuller is near, unless its food is under `YEAR.fishHungry` (150). A toast tells the player what the spring brought.
+
+**Why I love it:** the Shore's year was only a speed. Now it has the Plains' question in its own shape: the autumn run tempts you to strip every shoal, and every shoal you strip is a shoal you never see again. The shoal model already shrinks as it's fished, so the thing to read was already on the water.
+
+**Verbs test:** (1) a new action: move boats off a thin shoal, rest them, or send them to farther water; (2) closes a door: a stripped shoal never comes back; (3) a hungry player strips, a patient one spares, and a rival's boats on your mere change the sum; (4) a rival sees your shoals thin (the model) and can fish them out to hurt next year.
+
+**Seen:** `tests/shoals.test.ts`; headless Hard-vs-Hard on the Shore (seeds 4 and 7, small): with sparing, the meres hold 6–11 shoals at minute 20; with it off, none. Fish landed by minute 20 about the same (1711/2408 vs 1879/2394; 1900/2213 vs 1772/2549). Not seen in a browser; no win-rate sweep.
+
+**Next:** a Dock button to set the boats' own spare line (so a player needn't micro it), and fish that also thin in the deep sea off a Glade.
+
