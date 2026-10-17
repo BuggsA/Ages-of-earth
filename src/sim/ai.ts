@@ -1258,13 +1258,13 @@ function huntTheYear(s: GameState, v: View, issue: (c: Command) => void): void {
 
 /**
  * A clever computer leaves `YEAR.spare` of each of its own home herds alive on the Herd Plains, so they come
- * home in spring with calves (#479), and a pair (`DEER.pair`) of every wild herd, which breeds each spring
- * (#491). A rival's herd it hunts down gladly. Undefined where nothing is spared.
+ * home in spring with calves (#479), and a pair (`DEER.pair`) of every wild herd in the Stone Age, when game is
+ * what it lives on; a wild herd breeds each spring (#491). A rival's herd it hunts down gladly. Undefined where nothing is spared.
  */
 export function spared(s: GameState, p: Player): ((a: Animal) => boolean) | undefined {
   if (!AI_LEVELS[p.ai!].clever) return undefined;
   // A herd is spared at its own count: a town's at `YEAR.spare`, a wild one at `DEER.pair`.
-  const keep = (a: Animal) => (a.town === p.id && s.homeland === 'herds' ? YEAR.spare : a.town === undefined ? DEER.pair : -1);
+  const keep = (a: Animal) => (a.town === p.id && s.homeland === 'herds' ? YEAR.spare : a.town === undefined && p.epoch === 0 ? DEER.pair : -1);
   const left = new Map<number, number>();
   for (const a of s.animals) if (a.kind === 'deer' && a.hp > 0 && keep(a) >= 0) left.set(a.herd ?? a.id, (left.get(a.herd ?? a.id) ?? 0) + 1);
   if (!left.size) return undefined;
