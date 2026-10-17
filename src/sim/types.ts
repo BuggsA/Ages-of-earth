@@ -798,7 +798,8 @@ export type Command =
   /** Step back an age (#47), to the trunk age one tier down. */
   | { t: 'stepBack'; p: number; building: number }
   | { t: 'rally'; p: number; building: number; x: number; y: number }
-  | { t: 'trade'; p: number; res: 'food' | 'wood' | 'stone'; buy: boolean }
+  /** A rare ore (#356) can only be sold, a lot of it for gold at a flat price. */
+  | { t: 'trade'; p: number; res: 'food' | 'wood' | 'stone' | RareId; buy: boolean }
   | { t: 'stop'; p: number; ids: number[] }
   | { t: 'delete'; p: number; ids: number[] }
   | { t: 'resign'; p: number }

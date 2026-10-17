@@ -1,4 +1,4 @@
-import { BUILDINGS, EPOCHS, MARKET, RES_LABEL, SPREAD, TECHS, UNITS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
+import { BUILDINGS, EPOCHS, MARKET, ORE_TRADE, RARE, RES_LABEL, SPREAD, TECHS, UNITS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
 import { peace } from './combat';
 import { placeProblem, stampBuilding, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
@@ -731,6 +731,13 @@ export function applyCommand(s: GameState, c: Command): void {
     }
     case 'trade': {
       if (!s.ents.some((e) => e.kind === 'building' && e.owner === c.p && e.type === 'market' && e.built && e.hp > 0)) return refuse(s, c.p, 'Needs a Market');
+      if (c.res === 'salt' || c.res === 'saltpetre' || c.res === 'bloodiron') {
+        const have = p.rare?.[c.res] ?? 0;
+        if (c.buy || have < ORE_TRADE.lot) return refuse(s, c.p, c.buy ? `${RARE[c.res].name} cannot be bought` : `Need ${ORE_TRADE.lot} ${RARE[c.res].name.toLowerCase()} to sell`);
+        p.rare![c.res] = have - ORE_TRADE.lot;
+        p.res.gold += ORE_TRADE.gold[c.res];
+        break;
+      }
       const price = s.market[c.res];
       if (c.buy) {
         if (p.res.gold < price) return refuse(s, c.p, `Need ${Math.ceil(price - p.res.gold)} more gold`);
