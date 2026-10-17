@@ -127,3 +127,24 @@ describe('the turning year (#479)', () => {
     expect(run()).toBe(run());
   });
 });
+
+describe('herds breed (#491)', () => {
+  it('each spring a wild herd of a pair or more grows, to a cap; a lone deer breeds nothing', () => {
+    const s = game('glade');
+    const deer = () => s.animals.filter((a) => a.kind === 'deer' && a.hp > 0);
+    const herds = () => {
+      const m = new Map<number, number>();
+      for (const a of deer()) m.set(a.herd ?? a.id, (m.get(a.herd ?? a.id) ?? 0) + 1);
+      return m;
+    };
+    const before = herds();
+    const lone = [...before.entries()].find(([, n]) => n >= 2)![0];
+    for (const a of deer().filter((d) => (d.herd ?? d.id) === lone).slice(1)) a.hp = 0;
+    s.animals = s.animals.filter((a) => a.hp > 0);
+    at(s, 4, 1);
+    const after = herds();
+    expect(after.get(lone)).toBe(1);
+    for (const [h, n] of before) if (h !== lone && n >= 2) expect(after.get(h)).toBeGreaterThan(n);
+    for (const n of after.values()) expect(n).toBeLessThanOrEqual(6);
+  });
+});
