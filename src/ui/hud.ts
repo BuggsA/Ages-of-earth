@@ -5,7 +5,7 @@ import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
 import { RARE_OF_TILE } from '../sim/units';
-import { RARE, MERC, ORDERS, BLOOD, HEMO, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, CALL_UP, PATHS, WARCAMP, FLOCK, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, CALL_UP, PATHS, WARCAMP, FLOCK, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -18,7 +18,7 @@ import { vowProblem, wayProblem } from '../sim/ways';
 import { beaconProblem, lit } from '../sim/beacon';
 import { callUpProblem, callUpReach, campGrace, musterWait } from '../sim/warcamp';
 import { bledFlock, bloodOf, bloodShort, captivesOf, cursed, grafted, levyProblem, sworn, levyReach } from '../sim/blood';
-import { feedReach, graftCost, graftWait, waiting } from '../sim/hemo';
+import { feedReach, graftCost, graftLast, graftWait, waiting } from '../sim/hemo';
 import { chantedOver, consecrates, faithOf } from '../sim/consecrate';
 import { rallyProblem } from '../sim/rally';
 import { stirred as stirredNow } from '../sim/combat';
@@ -578,7 +578,7 @@ export class Hud {
     const toll = paidTo.length ? `<span data-tip="<b>Toll paid</b>This load paid ${paidTo.join(' and ')} a toll for safe passage across its land. A road that keeps out of a caravan people's land pays in full.">🛂<em>Toll paid</em></span>` : '';
     // Hemocraft (#355 s3): a grafted soldier, and how long its graft holds away from the Stations.
     const hemoLeft = grafted(s, u) ? Math.ceil((u.hemo! - s.tick) / TICK_HZ) : 0;
-    const graft = hemoLeft ? `<span data-tip="<b>Grafted</b>Hemo-engineered: blows ${Math.round((HEMO.attack - 1) * 100)}% harder, ${Math.round((HEMO.pace - 1) * 100)}% faster, mends ${HEMO.mend} a second and can't be converted. Blades, arrows and hooves land ${Math.round((1 - HEMO.flesh) * 100)}% softer, but siege, ships, aircraft and coils hit ${Math.round((HEMO.machine - 1) * 100)}% harder. Fed within ${feedReach(s.players[u.owner])} tiles of a Transfusion Station${modsOf(s, u.owner).veins ? `, and in a Watch Tower's reach (${LIGHTNING.reach} tiles: Galvanic Blood)` : ''}; away from them it runs dry in ${hemoLeft}s and the soldier loses ${Math.round(HEMO.crash * 100)}% of its health.">🩸<em>Grafted</em> ${hemoLeft >= HEMO.last - 1 ? 'fed' : `${hemoLeft}s`}</span>` : '';
+    const graft = hemoLeft ? `<span data-tip="<b>${u.tempered ? 'Grafted, quenched in blood-iron' : 'Grafted'}</b>${u.tempered ? `Tempered: stays fed ${HEMO_IRON.last}x as long away from a Station, mends ${HEMO_IRON.mend}x as fast, and crashes ${Math.round((1 - HEMO_IRON.crash) * 100)}% softer.<br>` : ''}Hemo-engineered: blows ${Math.round((HEMO.attack - 1) * 100)}% harder, ${Math.round((HEMO.pace - 1) * 100)}% faster, mends ${HEMO.mend} a second and can't be converted. Blades, arrows and hooves land ${Math.round((1 - HEMO.flesh) * 100)}% softer, but siege, ships, aircraft and coils hit ${Math.round((HEMO.machine - 1) * 100)}% harder. Fed within ${feedReach(s.players[u.owner])} tiles of a Transfusion Station${modsOf(s, u.owner).veins ? `, and in a Watch Tower's reach (${LIGHTNING.reach} tiles: Galvanic Blood)` : ''}; away from them it runs dry in ${hemoLeft}s and the soldier loses ${Math.round(HEMO.crash * 100)}% of its health.">🩸<em>Grafted</em> ${hemoLeft >= graftLast(u) - 1 ? 'fed' : `${hemoLeft}s`}</span>` : '';
     // The Blood-rite (#355 s4): a cursed enemy takes every blow harder until the curse lifts.
     const curseLeft = cursed(s, u) ? Math.ceil((u.cursed! - s.tick) / TICK_HZ) : 0;
     const curse = curseLeft ? `<span data-tip="<b>Cursed</b>A Blood-rite priest has cursed this one: every blow on it lands ${Math.round((RITE.taken - 1) * 100)}% harder for ${curseLeft} more seconds.">☠<em>Cursed</em> ${curseLeft}s</span>` : '';
@@ -690,7 +690,7 @@ export class Hud {
       const queued = waiting(s, b).length;
       const wait = graftWait(s, b);
       status += !queued
-        ? ` · <span data-tip="<b>Transfusion</b>Send foot soldiers, archers, riders or a hero inside (right-click, or G): each is grafted for ${cost} blood, ${HEMO.work} seconds apiece, and the doors open when all are done. Grafts within ${feedReach(p)} tiles of a Station stay fed.">🩸 Ready: send soldiers in</span>`
+        ? ` · <span data-tip="<b>Transfusion</b>Send foot soldiers, archers, riders or a hero inside (right-click, or G): each is grafted for ${cost} blood, ${HEMO.work} seconds apiece, and the doors open when all are done. Grafts within ${feedReach(p)} tiles of a Station stay fed.${s.rares?.includes('bloodiron') ? ` Blood-iron in the store (${Math.floor(p.rare?.bloodiron ?? 0)}) quenches a graft: ${HEMO_IRON.cost} ore each.` : ''}">🩸 Ready: send soldiers in</span>`
         : bloodOf(p) < cost && !wait
           ? ` · <span data-tip="<b>No blood</b>Each graft costs ${cost} blood. Draw more at a Drain Rig, or let the soldiers out (U).">⚠ ${queued} waiting: needs ${cost} blood</span>`
           : ` · <span data-tip="<b>Grafting</b>One soldier at a time, ${HEMO.work} seconds and ${cost} blood each.">🩸 Grafting: ${queued} waiting${wait ? `, next in ${wait}s` : ''}</span>`;
