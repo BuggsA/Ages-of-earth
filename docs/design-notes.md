@@ -968,3 +968,13 @@ The owner played a conquest that felt over once the Town Center fell. Now it is:
 ### Reading the oath (#459, own pitch, 2026-10-17, lane ai)
 
 **Built:** a clever computer facing a rival's Military Orders sends up to two riders (archers if it has none) at the nearest priest swearing a soldier within 14 tiles of its army (`breakOath` in `ai.ts`, `AI_ORDERS`). **Why:** the heirloom made the priest the army's keystone, and a keystone the computer never aims at isn't a choice for the player, it's a free shield. Now Military Orders asks for a guard on the priest. **Next:** the computer guarding its own oath-priests the same way; archers given priority over riders when the priest stands behind a wall.
+
+### Homelands (#473, Goal 1 s2, chain 1017-1811 session 4, lane rules)
+
+**Built:** four starts, rolled by the seed and the same for every town: the Glade (today's kit), the Shore (a mere cut beside each town with eight shoals, three berry bushes), the Herd Plains (two herds and a mammoth at 12 tiles, three berry bushes) and the Deep Wood (two close groves, a second berry thicket, no herd near home). The map type weights the roll. The computer raises a Dock with its fourth citizen on the Shore and keeps two more boats; elsewhere its usual opening already follows what's near, so its Way now varies by map (Hunters on the Shore and the Plains, the Hearth in the Deep Wood).
+
+**Why I love it:** every start used to be the same seven bushes and four deer, so every opening was the same race. Now the first look round home asks a question: Dock or Storehouse, bow to the herd or to the bush, spend the first wood on boats or on houses. On one seed the headless timelines split by minute 1 (Dock at 0:00 on the Shore against Barracks at 0:12 on the Glade) and stay apart through minute 15.
+
+**Verbs test:** (1) the Shore adds boat-fishing as the first food verb, the Plains make hunting and butchering the whole economy; (2) each closes a door: few berries on the Shore and the Plains, no herd in the Deep Wood; (3) the land decides, not a menu; (4) a rival sees the Dock or the camps and can burn them. The Deep Wood is the weakest of the four on (1): it shifts the mix more than the verb.
+
+**Next:** stone or gold behind the Deep Wood's trees (chop your way in), herds on the Plains that drift off as they thin (s3's dilemma), and the computer pitching a Hunting Camp by the second herd. And a check that four-player Shores read fairly in a browser.

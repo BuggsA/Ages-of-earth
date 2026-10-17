@@ -29,6 +29,8 @@ export type GameMode = 'conquest' | 'regicide' | 'deathmatch' | 'lords';
 export type Stance = 'aggressive' | 'defensive' | 'stand' | 'run';
 /** A custom the people live by, chosen in the Stone Age (#336). */
 export type WayId = 'hunt' | 'hearth' | 'warband';
+/** Homelands (#473): what lies round every town at the start, rolled once per seed. */
+export type HomelandId = 'glade' | 'shore' | 'herds' | 'wood';
 export type CivId = 'egyptians' | 'greeks' | 'romans' | 'mongols' | 'chinese' | 'britons';
 export type TechId =
   | 'forging' | 'ironCasting' | 'blastFurnace' | 'fletching' | 'bodkin' | 'scaleArmor' | 'chainMail' | 'plateArmor'
@@ -700,6 +702,8 @@ export interface GameState {
   seed: number;
   size: MapSize;
   mapType: MapType;
+  /** The land every town wakes in (#473); a save from before it is a Glade. */
+  homeland?: HomelandId;
   mode: GameMode;
   /** Regicide: each player's King (a unit id), or 0. */
   kings: number[];

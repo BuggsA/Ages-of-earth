@@ -1,4 +1,4 @@
-import type { AgeId, PathId, LandmarkKind, BuildingType, CivId, Cost, Difficulty, Domain, MapSize, MapType, Res, TechId, UnitType, PlayerStats, RareId, WayId } from './types';
+import type { AgeId, PathId, LandmarkKind, BuildingType, CivId, Cost, Difficulty, Domain, MapSize, MapType, Res, TechId, UnitType, PlayerStats, RareId, WayId, HomelandId } from './types';
 
 /** Every number in the game lives here. */
 
@@ -1560,6 +1560,59 @@ export const AI_WINTER = { from: 2, fields: 2, hunters: 3, pack: 1, food: 0.3 };
  */
 export const AI_FAITH = { priests: 6, band: 3, reach: 14, keep: 6, wall: 0.4, relic: 0.6, ward: 30 };
 export const AMOUNT = { tree: 80, berry: 125, stone: 300, gold: 400, meat: 140, fish: 250, bog: 300 };
+/**
+ * Homelands (#473, Goal 1 s2): what lies round every town at the start. The seed rolls one (by `weight` for
+ * the map type) and every town gets the same, so the start stays fair while the best opening changes by map.
+ * Each counts tiles or beasts at home: `berries` in the first patch, `thicket` in a second, `deer` in the
+ * home herd and `herd2` in a second; `grove` how many trees crowd in close, `mammoth` how far out each town's mammoth stands, `fish` how many shoals lie off home,
+ * and `mere` the radius of a fishing mere cut `HOMELAND.mereAt` tiles out from every town (0 for none).
+ */
+export interface Homeland {
+  name: string;
+  icon: string;
+  /** A few words for the opening banner. */
+  short: string;
+  blurb: string;
+  berries: number;
+  thicket: number;
+  deer: number;
+  herd2: number;
+  grove: number;
+  mammoth: number;
+  fish: number;
+  mere: number;
+  weight: Record<MapType, number>;
+}
+export const HOMELAND_IDS: HomelandId[] = ['glade', 'shore', 'herds', 'wood'];
+export const HOMELANDS: Record<HomelandId, Homeland> = {
+  glade: {
+    name: 'The Glade', icon: '🌿', short: 'berries and deer near home',
+    blurb: 'Berries by the Town Center and a deer herd beyond: the old, easy start, where any opening works.',
+    berries: 7, thicket: 0, deer: 4, herd2: 0, grove: 0, mammoth: 17, fish: 4, mere: 0,
+    weight: { continental: 3, highlands: 3, lakes: 2, forest: 2, plains: 2, sea: 2 },
+  },
+  shore: {
+    name: 'The Shore', icon: '🌊', short: 'few berries; fish the mere from a Dock',
+    blurb: 'A rich shoal just off home and only a thin berry bush. Food comes by boat: raise a Dock and launch canoes early, so the opening is hungry for wood, and a rival who burns the Dock starves you.',
+    berries: 3, thicket: 0, deer: 3, herd2: 0, grove: 0, mammoth: 17, fish: 8, mere: 5,
+    weight: { continental: 2, highlands: 1, lakes: 3, forest: 1, plains: 1, sea: 3 },
+  },
+  herds: {
+    name: 'The Herd Plains', icon: '🦣', short: 'herds and a mammoth close, few berries',
+    blurb: 'Two deer herds and a mammoth close by, and little to forage. A meat economy: meat spoils, so hunt in bursts, camp by the kills and follow the herds out when they thin.',
+    berries: 3, thicket: 0, deer: 5, herd2: 5, grove: 0, mammoth: 12, fish: 4, mere: 0,
+    weight: { continental: 2, highlands: 1, lakes: 1, forest: 0, plains: 4, sea: 2 },
+  },
+  wood: {
+    name: 'The Deep Wood', icon: '🌲', short: 'woods and berries close, no herd near',
+    blurb: 'Woods crowd in on the Town Center and a wide berry thicket grows at their edge, but no herd grazes near home. Forage and chop: wood is a short walk, room to build is not, so clear ground or build out, and meat means going far.',
+    berries: 7, thicket: 6, deer: 0, herd2: 0, grove: 40, mammoth: 17, fish: 4, mere: 0,
+    weight: { continental: 2, highlands: 3, lakes: 2, forest: 4, plains: 0, sea: 1 },
+  },
+};
+export const HOMELAND = { mereAt: 15 };
+/** The computer on the Shore (#473): it raises its Dock once it has `dockAt` citizens and keeps `boats` more fishing boats. */
+export const AI_SHORE = { dockAt: 4, boats: 2 };
 /**
  * Caves (#356): on a world that holds any rare ore, `count` caves for the map's size are cut into open ground at least
  * `away` tiles from every town and `apart` from each other. Each is a single tile of one of the world's ores, `rich` times

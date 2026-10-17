@@ -6,7 +6,7 @@ import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { SIGHT_LORE } from './render/sightings';
 import { wallLine } from './sim/commands';
-import { AGES, BUILDINGS, CIVS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, TRIBUTE, TRUNK, WARCAMP, WAYS, WORKS, domainOf, unitStats } from './sim/data';
+import { AGES, BUILDINGS, CIVS, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, TRIBUTE, TRUNK, WARCAMP, WAYS, WORKS, domainOf, unitStats } from './sim/data';
 import { crestSvg } from './ui/crests';
 import { isEnemy } from './sim/world';
 import { grantAll, topUp } from './sim/god';
@@ -15,7 +15,7 @@ import { placeProblem, walkable } from './sim/grid';
 import { findDockSpot, findSpot } from './sim/ai';
 import { maxHp, placeBuilding, spawnUnit } from './sim/world';
 import { arrivalText, epochArrivals } from './ui/endReport';
-import type { AgeId, BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, MapSize, MapType, Unit } from './sim/types';
+import type { AgeId, BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, HomelandId, MapSize, MapType, Unit } from './sim/types';
 import { R_FISH, R_NONE } from './sim/types';
 import { carriedBy, relicAt } from './sim/relics';
 import { RUIN_FINDS, ruinAt } from './sim/ruins';
@@ -293,7 +293,8 @@ function startOnline(match: MatchStart, you: number): void {
   netPaused = false;
   online = true;
   lobby.hide();
-  startMatch({ ...match.setup, players }, undefined, Math.max(0, you));
+  // Every seat rolls the same homeland from the room's seed (#473).
+  startMatch({ homeland: 'random', ...match.setup, players }, undefined, Math.max(0, you));
   if (you < 0) {
     spectating = true;
     spectateAll = true;
@@ -369,7 +370,7 @@ function startAttract(skipAhead = true): void {
   const seed = newSeed();
   const maps = Object.keys(MAP_TYPES) as MapType[];
   // Any map, starting in any epoch: sometimes there are galleons on the sea or biplanes overhead.
-  game = createGame({ seed, size: 'small', mapType: maps[seed % maps.length], startEpoch: Math.floor(seed / maps.length) % EPOCHS.length, players: [{ name: 'Azure', ai: 'normal' }, { name: 'Crimson', ai: 'hard' }] });
+  game = createGame({ seed, size: 'small', mapType: maps[seed % maps.length], homeland: 'random', startEpoch: Math.floor(seed / maps.length) % EPOCHS.length, players: [{ name: 'Azure', ai: 'normal' }, { name: 'Crimson', ai: 'hard' }] });
   viewer = 0;
   view.setGame(game, 0);
   view.revealAll();
@@ -421,6 +422,7 @@ function setupFromTitle(seed: number): GameSetup {
     seed,
     size: val('opt-size') as MapSize,
     mapType: val('opt-map') as MapType,
+    homeland: val('opt-homeland') as HomelandId | 'random',
     players,
     startEpoch: Number(val('opt-epoch')),
     peaceMinutes: Number(val('opt-peace')),
@@ -486,8 +488,12 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   const goal = game.mode === 'regicide' ? ' Keep your King alive: shelter them in the Town Center.' : game.mode === 'deathmatch' ? ' Everyone starts rich: build fast.' : game.mode === 'lords' ? ' Keep every landmark for four minutes and you win.' : '';
   const chapter = game.scenario ? scenarioById(game.scenario.id) : undefined;
   if (!saved && chapter) hud.banner(chapter.title, chapter.place, 6000);
-  else if (!saved) hud.banner(ageDef(me).name, `You lead the ${CIVS[me.civ].name}. Facing ${rivals.join(', ')}.${goal} ${view.weatherWords}`.trim(), 6000);
-  else hud.banner('Welcome back', `${ageDef(me).name}, ${fmtClock(game.tick)} into the match.`, 3200);
+  else if (!saved) {
+    // The land every town wakes in (#473): read it before choosing an opening.
+    const hl = game.homeland ? HOMELANDS[game.homeland] : undefined;
+    const land = hl ? ` ${hl.icon} ${hl.name}: ${hl.short}.` : '';
+    hud.banner(ageDef(me).name, `You lead the ${CIVS[me.civ].name}. Facing ${rivals.join(', ')}.${land}${goal} ${view.weatherWords}`.trim(), 6000);
+  } else hud.banner('Welcome back', `${ageDef(me).name}, ${fmtClock(game.tick)} into the match.`, 3200);
   sound.setWeather(view.weatherDay.kind, view.weatherDay.strength);
   view.onWeather = (d) => sound.setWeather(d.kind, d.strength);
   view.onSeason = (sn) => sound.setSeason(sn);
@@ -984,24 +990,28 @@ const civSel = $<HTMLSelectElement>('opt-civ');
 civSel.innerHTML = `<option value="random">Random</option>` + CIV_IDS.map((c) => `<option value="${c}">${CIVS[c].name}</option>`).join('');
 const mapSel = $<HTMLSelectElement>('opt-map');
 mapSel.innerHTML = (Object.keys(MAP_TYPES) as MapType[]).map((m) => `<option value="${m}">${MAP_TYPES[m].label}</option>`).join('');
+const homeSel = $<HTMLSelectElement>('opt-homeland');
+homeSel.innerHTML = `<option value="random">Random (by the seed)</option>` + HOMELAND_IDS.map((k) => `<option value="${k}">${HOMELANDS[k].icon} ${HOMELANDS[k].name}</option>`).join('');
 const civBlurb = () => {
   const c = civSel.value;
   const m = MAP_TYPES[mapSel.value as MapType];
+  const hl = homeSel.value === 'random' ? undefined : HOMELANDS[homeSel.value as HomelandId];
   $('civ-crest').innerHTML = crestSvg(c as CivId | 'random', PLAYER_COLORS[Number(colorSel.value)] ?? PLAYER_COLORS[0]);
-  $('civ-blurb').innerHTML = `${c === 'random' ? 'A people chosen at random.' : `<b>${CIVS[c as CivId].name}:</b> ${CIVS[c as CivId].blurb.split(': ').slice(1).join(': ') || CIVS[c as CivId].blurb}`}<br><b>${m.label}:</b> ${m.blurb}`;
+  $('civ-blurb').innerHTML = `${c === 'random' ? 'A people chosen at random.' : `<b>${CIVS[c as CivId].name}:</b> ${CIVS[c as CivId].blurb.split(': ').slice(1).join(': ') || CIVS[c as CivId].blurb}`}<br><b>${m.label}:</b> ${m.blurb}<br>${hl ? `<b>${hl.icon} ${hl.name}:</b> ${hl.blurb}` : '<b>Homeland:</b> the seed decides what lies round every town: the Glade, the Shore, the Herd Plains or the Deep Wood.'}`;
 };
 civSel.addEventListener('change', civBlurb);
 colorSel.addEventListener('change', civBlurb);
 showContinue();
 showReplayButton();
 mapSel.addEventListener('change', civBlurb);
+homeSel.addEventListener('change', civBlurb);
 civBlurb();
 // A shared world link (?seed=N&size=&map=&foes=): the title screen opens with that world's settings (the seed atlas prints them).
 {
   const q = new URLSearchParams(location.search);
   const seed = Math.floor(Number(q.get('seed')));
   if (seed >= 1 && seed <= 2 ** 31 - 1) seedInput.value = String(seed);
-  for (const [key, id] of [['size', 'opt-size'], ['map', 'opt-map'], ['foes', 'opt-foes']] as const) {
+  for (const [key, id] of [['size', 'opt-size'], ['map', 'opt-map'], ['foes', 'opt-foes'], ['homeland', 'opt-homeland']] as const) {
     const v = q.get(key);
     const sel = $<HTMLSelectElement>(id);
     if (v !== null && [...sel.options].some((o) => o.value === v)) sel.value = v;
@@ -1048,7 +1058,7 @@ document.addEventListener('click', (e) => {
         break;
       }
       const q = new URLSearchParams({ seed: String(seed) });
-      for (const [key, id] of [['size', 'opt-size'], ['map', 'opt-map'], ['foes', 'opt-foes']] as const) q.set(key, $<HTMLSelectElement>(id).value);
+      for (const [key, id] of [['size', 'opt-size'], ['map', 'opt-map'], ['foes', 'opt-foes'], ['homeland', 'opt-homeland']] as const) q.set(key, $<HTMLSelectElement>(id).value);
       const link = `${location.origin}${location.pathname}?${q}`;
       const done = () => hud.toast('World link copied', 'info');
       const fail = () => hud.toast(link, 'info');
