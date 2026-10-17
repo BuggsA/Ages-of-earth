@@ -1887,9 +1887,12 @@ export const HEIRLOOM_MORE: Partial<Record<BuildingType, string>> = { market: 'j
 /** The Age of Lightning's heirlooms (#240), which show on a Temple, Dock and Workshop beside any others. */
 export const HEIRLOOM_FIELD: Partial<Record<BuildingType, string>> = { temple: 'stElmo', dock: 'telegraphy', workshop: 'galvanic' };
 
+/** The Path of Blood's heirlooms (#355 s6), on a Temple and a Workshop beside any others. */
+export const HEIRLOOM_BLOOD: Partial<Record<BuildingType, string>> = { temple: 'militaryOrders', workshop: 'galvanicBlood' };
+
 /** Every heirloom id that dresses a kind of building. */
 export function heirloomsFor(type: BuildingType): string[] {
-  return [HEIRLOOM_MARKS[type], HEIRLOOM_MORE[type], HEIRLOOM_FIELD[type], ...(type === 'towncenter' ? WAY_MARKS : [])].filter((id): id is string => !!id);
+  return [HEIRLOOM_MARKS[type], HEIRLOOM_MORE[type], HEIRLOOM_FIELD[type], HEIRLOOM_BLOOD[type], ...(type === 'towncenter' ? WAY_MARKS : [])].filter((id): id is string => !!id);
 }
 
 /** Bell Foundry: a bronze bell hung in a little timber cote on the Temple's roof ridge. Iron-Bound Hulls: iron bands and bolts on the dock's boathouse and pier. Joint-Stock Company: a counting-house board with a gilt seal and coin stacks by the Market. Masons' Lodge: dressed ashlar and shear-legs hoisting a block beside the Temple. */
@@ -1947,6 +1950,24 @@ function heirloomTouch(k: Kit, id: string, deep = false): void {
     for (let i = 0; i < 5; i++) k.cyl(0.16, 0.16, 0.05, 8, COPPER, 1.1, 0.12 + i * 0.09, 1.2);
     for (const s of [-1, 1]) k.box(0.03, 0.3, 0.03, COPPER, 1.1 + s * 0.1, 0.6, 1.2).rotation.z = -s * 0.25;
     k.glow(k.sphere(0.06, '#9fd8ff', 1.1, 0.8, 1.2));
+  } else if (id === 'galvanicBlood') {
+    // A tall glass tank of dark blood on an iron foot, a copper wire wound round it and a blue spark at its crown, on the far corner.
+    k.cyl(0.2, 0.24, 0.12, 8, IRON, -1.1, 0, 1.2);
+    k.cyl(0.15, 0.15, 0.7, 8, '#6a0f14', -1.1, 0.12, 1.2);
+    for (let i = 0; i < 4; i++) k.cyl(0.17, 0.17, 0.035, 8, COPPER, -1.1, 0.2 + i * 0.16, 1.2);
+    k.cyl(0.12, 0.18, 0.08, 8, IRON, -1.1, 0.82, 1.2);
+    k.cyl(0.015, 0.015, 0.25, 3, COPPER, -1.1, 0.9, 1.2);
+    k.glow(k.sphere(0.05, '#9fd8ff', -1.1, 1.18, 1.2));
+  } else if (id === 'militaryOrders') {
+    // A war banner on a tall pole at the back corner, deep red with a gold band, and a kite shield and a sword planted at its foot.
+    k.cyl(0.03, 0.035, 2.4, 5, '#5a4630', 1.3, 0, -1.15);
+    k.box(0.03, 0.75, 0.5, '#8a1f22', 1.3, 1.55, -0.88);
+    k.box(0.035, 0.12, 0.5, GOLD, 1.3, 1.9, -0.88);
+    k.cone(0.05, 0.12, 4, BRONZE, 1.3, 2.4, -1.15);
+    k.box(0.05, 0.45, 0.3, '#d8d2c2', 1.05, 0, -1.25).rotation.x = -0.15;
+    k.box(0.06, 0.14, 0.12, '#8a1f22', 1.08, 0.2, -1.25);
+    k.box(0.03, 0.6, 0.05, '#9a9aa0', 1.5, 0, -1.3);
+    k.box(0.18, 0.03, 0.05, IRON, 1.5, 0.45, -1.3);
   }
 }
 

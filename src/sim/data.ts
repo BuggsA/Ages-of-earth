@@ -130,7 +130,7 @@ export const PATHS: Record<PathId, Path> = {
     name: 'Path of Blood',
     blurb: 'A people that lives by war: it trades with no one, and feeds its towns on what its soldiers take from the enemy dead. Each age of the path opens with a deeper deed of blood, and the plunder grows with every age of it walked.',
     carry: { plunder: 0.1 },
-    planned: ['a Blood heirloom, shared with another road'],
+    planned: ['more Blood heirlooms, shared with other roads'],
   },
   // The fork at the end of the Path of Blood (#355 s2): two branches past Total War, each its own path, both carrying the plunder on.
   hemocraft: {
@@ -1230,13 +1230,17 @@ export interface Mods {
   tribute: number;
   /** Share of a loaded rival trader's gold taken once a trip when it crosses the people's land (safe passage on the Silk Road, #334; `TOLL`). */
   toll: number;
+  /** Above 0, a graft standing in a Watch Tower's reach is fed as at a Transfusion Station, in any age (Galvanic Blood, #355 s6). */
+  veins: number;
+  /** Above 0, a soldier near one of the people's priests is sworn: no rival priest can turn, offer up or curse it (Military Orders, #355 s6; `ORDERS`). */
+  sworn: number;
 }
 
 export const NO_MODS: Mods = {
   meleeAttack: 0, rangedAttack: 0, armor: 0, parmor: 0, range: 0, carry: 0, citizenSpeed: 1, wood: 1, mine: 1, farm: 1, forage: 1, hunt: 1,
   buildingHp: 1, buildSpeed: 1, militaryTrain: 1, rangedTrain: 1, cavalrySpeed: 1, infantryHp: 1, infantryArmor: 0, infantryAttack: 0, priest: 1, chant: 1,
   siegeAttack: 1, siegeRange: 0, techCost: 1, wonderCost: 1, extraCitizens: 0, fish: 1, shipHp: 1, shipRange: 0, airSpeed: 1, airHp: 1,
-  traderSpeed: 1, tradeGold: 1, relicGold: 1, bogGold: 1, rot: 1, beastWard: 1, portReach: 0, riderSight: 0, consecrate: 0, elmo: 0, telegraph: 0, galvanic: 0, plunder: 0, tribute: 0, toll: 0,
+  traderSpeed: 1, tradeGold: 1, relicGold: 1, bogGold: 1, rot: 1, beastWard: 1, portReach: 0, riderSight: 0, consecrate: 0, elmo: 0, telegraph: 0, galvanic: 0, plunder: 0, tribute: 0, toll: 0, veins: 0, sworn: 0,
 };
 
 export interface Tech {
@@ -1309,6 +1313,9 @@ export const TECHS: Record<TechId, Tech> = {
   telegraphy: { name: 'Wireless Telegraphy', at: 'dock', epoch: 4, walked: ['sail', 'lightning'], cost: { wood: 200, gold: 250 }, time: 50, add: { telegraph: 1 }, blurb: 'Heirloom of the Age of Sail and the Age of Lightning: the masters of the sea learn to speak through the coil\'s current. Ships and Docks within a Watch Tower\'s reach (10 tiles) see 5 tiles farther, so a coil on the headland becomes a lookout over the water: no fleet closes on the harbour unseen. Kept for good, on any road.', icon: '📡' },
   galvanic: { name: 'Galvanic Revival', at: 'workshop', epoch: 4, walked: ['reclaimer', 'lightning'], cost: { wood: 250, gold: 200 }, time: 50, add: { galvanic: 1 }, blurb: 'Heirloom of the Age of Reclaimers and the Age of Lightning: the coil\'s current wakes old machines. Inside a Watch Tower\'s reach (10 tiles) repairs cost nothing and go half as fast again, and every ancient ruin your citizens dug that lies in a field yields 25 gold every 30 seconds. A forward coil beside a ruin becomes a mine; a coil at home, a free field hospital for buildings. Kept for good, on any road.', icon: '🔌' },
   stElmo: { name: 'St. Elmo\'s Fire', at: 'temple', epoch: 4, walked: ['pilgrim', 'lightning'], cost: { gold: 300, stone: 150 }, time: 50, add: { elmo: 1 }, blurb: 'Heirloom of the Age of Pilgrims and the Age of Lightning: the faithful read the blue glow on the coil\'s crown as a blessing. A Temple within a Watch Tower\'s reach (10 tiles) mends the soldiers standing near it, 4% of their health every 2 seconds, so an army can be staged between a coil and a shrine. Kept for good, on any road.', icon: '🌩' },
+  // The Path of Blood's heirlooms (#355 s6): each with one road of the path, kept for good like the rest.
+  galvanicBlood: { name: 'Galvanic Blood', at: 'workshop', epoch: 4, walked: ['lightning', 'hemocraft'], cost: { wood: 200, gold: 250 }, time: 50, add: { veins: 1 }, blurb: 'Heirloom of the Age of Lightning and the Age of Hemocraft: the coil\'s current runs the pumps, and the grafts drink it. A grafted soldier standing in a Watch Tower\'s reach (10 tiles) is fed as at a Transfusion Station, in any age, so a grafted army lives on wherever the towers stand, after Hemocraft too. Bring the towers down and it runs dry. Kept for good, on any road.', icon: '⚡' },
+  militaryOrders: { name: 'Military Orders', at: 'temple', epoch: 2, walked: ['pilgrim', 'warband'], cost: { food: 200, gold: 200 }, time: 40, add: { sworn: 1 }, blurb: 'Heirloom of the Age of Pilgrims and the Age of the Warband: warriors who took a rule of prayer, sworn to the shrine and the sword. A soldier within 6 tiles of one of your priests is sworn: no rival\'s priest can turn it, offer it up or curse it, and your priests mend soldiers half again as fast. Walk the priests with the army. Kept for good, on any road.', icon: '⚜' },
   masonsLodge: { name: 'Masons\' Lodge', at: 'temple', epoch: 2, walked: ['pilgrim', 'reclaimer'], cost: { wood: 200, stone: 150 }, time: 40, mul: { buildSpeed: 1.2, buildingHp: 1.15 }, blurb: 'Heirloom of the Age of Pilgrims and the Age of Reclaimers: the builders who studied the old ruins raise the great churches, and keep their lodge. Buildings go up 20% faster and are 15% sturdier. Kept for good, on any road.', icon: '⛪' },
   survey: { name: 'Survey the Land', at: 'storehouse', epoch: 0, cost: { food: 50, wood: 50 }, time: 15, survey: 'bogIron', blurb: 'Prospectors walk the streams and marshes and answer one question: is there bog iron anywhere in this world? Yes or no; not where, nor how much.', icon: '🧭' },
 };
@@ -1366,6 +1373,9 @@ export const WORK = {
  */
 /** St. Elmo's Fire (#240): soldiers within `reach` tiles of a Temple in a Tower's field mend `heal` of their health every `every` seconds. */
 export const ELMO = { reach: 6, heal: 0.04, every: 2 };
+
+/** Military Orders (#355 s6): a soldier within `reach` tiles of one of its people's priests is sworn, and their priests mend soldiers `mend` times as fast. */
+export const ORDERS = { reach: 6, mend: 1.5 };
 
 /** Wireless Telegraphy (#240): ships and Docks in a Tower's field see `sight` tiles farther. */
 export const TELEGRAPH = { sight: 5 };

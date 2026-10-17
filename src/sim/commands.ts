@@ -16,7 +16,7 @@ import { callWork, workProblem } from './works';
 import { takeVow, takeWay, vowProblem, wayProblem } from './ways';
 import { beaconProblem, lightBeacon } from './beacon';
 import { callUp, callUpProblem } from './warcamp';
-import { bloodOf, bloodShort, levy, levyProblem } from './blood';
+import { bloodOf, bloodShort, levy, levyProblem, sworn } from './blood';
 import { riteProblem } from './fork';
 import { rallyCry, rallyProblem } from './rally';
 import { chantedOver, consecrateProblem, consecrates } from './consecrate';
@@ -317,7 +317,7 @@ export function applyCommand(s: GameState, c: Command): void {
       } else if (t.kind === 'building') {
         const why = consecrateProblem(s, c.p, t);
         if (why) return refuse(s, c.p, why);
-      }
+      } else if (sworn(s, t)) return refuse(s, c.p, 'Sworn to a Military Order: its priest stands by it, and it cannot be turned');
       for (const u of myUnits(s, c.p, c.ids)) if (u.type === 'priest' && !carriedBy(s, u)) giveOrder(u, { k: 'convert', target: t.id, done: 0, ...(c.rite ? { rite: c.rite } : {}) }, c.queue);
       break;
     }
