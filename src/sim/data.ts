@@ -1740,7 +1740,7 @@ export const RITE = {
  * Station or Blood Tower seen within `hunt` tiles (its warships for one by the shore), and a rival with one (or `grafted` grafted soldiers
  * seen) gets `siege` engines more. Its bombers count a rival Station `bomb` squared tiles nearer than it is (a Blood Tower half that).
  */
-export const AI_HEMO = { town: 24, army: 6, rig: 6, watch: 26, foes: 2, again: 60, towers: 2, tower: 10, gap: 45, spread: 6, living: 0.6, near: 16, batch: 2, spare: 1, levyGap: 12, hunt: 22, grafted: 3, siege: 2, bomb: 2500 };
+export const AI_HEMO = { town: 24, army: 6, rig: 6, watch: 26, foes: 2, again: 60, towers: 2, tower: 10, gap: 45, spread: 6, living: 0.6, near: 16, batch: 2, spare: 1, levyGap: 12, hunt: 22, grafted: 3, siege: 2, bomb: 2500, forward: 12 };
 
 /**
  * The computer at the fork (#355 s5). A clever computer in Total War picks its branch once its town has grown (`AI_HEMO.town`): the Blood-rite when
