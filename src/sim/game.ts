@@ -10,7 +10,7 @@ import { hitAnimal, spawnAnimal, updateAnimals } from './animals';
 import { markGoals, scenarioStep, startScenario } from './campaign';
 import { buildingGuns, updateShots } from './combat';
 import { applyCommand } from './commands';
-import { AGES, AURA, unitEpoch, CIV_IDS, LANDMARKS, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
+import { AGES, AURA, unitEpoch, CIV_IDS, LANDMARKS, RAIDER, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
 import { AIR, NAVAL, stampBuilding } from './grid';
 import { denWolves, generateMap } from './mapgen';
 import { Spatial } from './spatial';
@@ -178,6 +178,18 @@ export function createGame(setup: GameSetup): GameState {
   if (map.caves.length) s.caves = map.caves.map((c) => ({ ...c }));
   if (map.landmarks.length) s.landmarks = map.landmarks.map((m) => ({ id: s.nextId++, x: m.x, y: m.y, kind: m.kind, owner: -1, claim: 0, by: -1 }));
   for (const c of map.caves) if (c.den) for (const p of denWolves(c.tile, map.w)) spawnAnimal(s, p.x, p.y, 'wolf');
+  // Each raider camp's band keeps its fire as home (what ties them together).
+  // Their ids come from a range of their own, so a camp on the map renumbers nothing else.
+  let band = 0;
+  for (const c of map.camps) {
+    for (let k = 0; k < RAIDER.guards; k++) {
+      const a = spawnAnimal(s, c.x + (k - 1) * 0.6, c.y + (k === 1 ? 0.5 : 0), 'raider');
+      s.nextId--;
+      a.id = RAIDER.idBase + band++;
+      a.homeX = c.x;
+      a.homeY = c.y;
+    }
+  }
   countPop(s);
   updateVision(s);
   // Everyone knows the lie of the land around home.

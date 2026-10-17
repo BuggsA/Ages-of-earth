@@ -355,7 +355,7 @@ export interface Landmark {
 export interface Animal {
   id: number;
   /** Deer bolt; mammoths and wolves (#171) fight; sheep (#308) belong to a people and graze by its camp. */
-  kind: 'deer' | 'mammoth' | 'wolf' | 'boar' | 'sheep';
+  kind: 'deer' | 'mammoth' | 'wolf' | 'boar' | 'sheep' | 'raider';
   x: number;
   y: number;
   px: number;
@@ -548,6 +548,8 @@ export type GameEvent =
   | { k: 'wildCry'; id: number; kind: Animal['kind']; x: number; y: number }
   /** A mammoth gores, or a wolf bites, someone. */
   | { k: 'wildStrike'; id: number; kind: Animal['kind']; target: number; x: number; y: number }
+  /** A raider camp (own pitch) stands empty: whose people cleared it, and the plunder they took. */
+  | { k: 'campCleared'; owner: number; x: number; y: number; gold: number; food: number; wood: number }
   | { k: 'trained'; id: number; owner: number; type: UnitType }
   | { k: 'researched'; owner: number; tech: TechId }
   /** A survey's answer (#39): whether what it looks for lies anywhere in this world. */

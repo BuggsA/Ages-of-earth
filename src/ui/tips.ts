@@ -47,7 +47,7 @@ const waterNear = (s: GameState, me: number) => {
 };
 const secsIn = (s: GameState) => s.tick / 20;
 /** Whether the player can see a beast of the wild (#171). */
-const sighted = (s: GameState, me: number, kind: 'mammoth' | 'wolf' | 'boar') => s.animals.some((a) => a.kind === kind && s.players[me].vis[Math.floor(a.y) * s.w + Math.floor(a.x)]);
+const sighted = (s: GameState, me: number, kind: 'mammoth' | 'wolf' | 'boar' | 'raider') => s.animals.some((a) => a.kind === kind && s.players[me].vis[Math.floor(a.y) * s.w + Math.floor(a.x)]);
 
 const TIPS: Tip[] = [
   { id: 'gather', when: (s) => secsIn(s) > 2, text: 'Drag a box around your <b>citizens</b>, then <b>right-click</b> berry bushes, trees or a deer to gather food and wood.' },
@@ -59,6 +59,7 @@ const TIPS: Tip[] = [
   { id: 'store', when: (s) => secsIn(s) > 110, text: 'Long walks waste time. Build a <b>Storehouse</b> (<kbd>B</kbd> <kbd>S</kbd>) next to the woods or a mine. It also teaches better tools.' },
   { id: 'mammoth', when: (s, me) => sighted(s, me, 'mammoth'), text: 'A <b>mammoth</b>! Its carcass feeds a town for a long while, but it charges when speared. Send <b>five or more</b> citizens together, or put a couple of soldiers in front.' },
   { id: 'boar', when: (s, me) => sighted(s, me, 'boar'), text: 'A <b>wild boar</b> guards that berry patch and charges anyone who comes close. One citizen will lose; send <b>three</b> to spear it, and its carcass pays better than a deer. Or leave the berries and gather elsewhere.' },
+  { id: 'raiders', when: (s, me) => sighted(s, me, 'raider'), text: 'A <b>raider camp</b>: a band of spearmen who guard their fire and loot, and they all turn on anyone who comes near. Citizens alone will lose. Bring <b>soldiers</b> (a few clubmen will do) and strike the band together: whoever fells the last raider takes the camp\'s <b>gold, food and wood</b>. Or leave them be, and keep clear.' },
   { id: 'rot', when: (s) => !!s.carcasses?.some((c) => s.tick - c.born > secs(ROT.grace)), text: '<b>Meat spoils.</b> A carcass left too long rots away: put more hands on it, or research <b>Drying Racks</b> at the Town Center to keep it on your own land. Out in the open, turning meat draws <b>wolves</b> from dens nearby.' },
   { id: 'huntcamp', when: (s, me) => !s.scenario && !!s.carcasses?.some((c) => s.tick - c.born > secs(ROT.grace)) && !has(s, me, 'huntcamp'), text: '<b>A Hunting Camp</b> (economy menu, N) takes in food and holds a little land round it: raise one by a far kill or the herd, and the meat is safe from wolves and kept by your Drying Racks.' },
   { id: 'seasons', when: (s) => secsIn(s) > 150, text: '<b>The year turns</b> every 2½ minutes (the icon by the clock). <b>Summer</b> berries are heavy but meat spoils fast; in <b>winter</b> berries fail, meat keeps and hungry wolves range further: hunt, and dry your meat, before the cold.' },

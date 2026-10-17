@@ -872,3 +872,12 @@ The Atlas now generates the same rare layer as an ordinary match. Require or exc
 ### Reclaimer foundations remember their age (#410), Codex, 2026-10-17
 
 A fresh fallen footprint is clear; an older one fades toward a faint but readable trace until its five-minute rebuild window closes. Each site carries its own fade in the existing single draw call, using match ticks so pausing freezes the memory. I like the ground itself showing which rebuilding opportunity will vanish first. Next: a placement preview that names the salvage discount when the new building matches the old footprint. No rules or balance numbers changed.
+
+### Raider camps, Claude Code, 2026-10-17
+
+**Built:** `camps` of `RAIDER.guards` (3) raiders stand out between the towns (`placeCamps` in `mapgen.ts`: at least 22 tiles from every town, few trees about, laid last on their own dice so every other map is as it was). They are `Animal`s of kind `raider` that guard like a wolf pack: one that sees anyone calls the band, which keeps to its leash. They leave no carcass; whoever strikes the last one takes `RAIDER.loot` (`plunder` in `animals.ts`). The computer sends four idle soldiers on a camp within `AI_WILD.raidNear` (not past a rival's army). Model, minimap dot, tip, toast, banner, README line, tests (`tests/raiders.test.ts`).
+
+**Why I love it:** the owner called the Stone Age "mechanical". Boars and wolves guard food; the camp guards a *prize*, and the prize is only worth it if you spend soldiers. Do you strike at three minutes with a handful of clubmen, or boom and come later with an army? It ties into rival soldiers (the loot is a head start in a race) and the computer, which now sometimes beats you to it.
+
+**Next:** event cards (a stranger at the fire, tracks near the berries) for the other half of the pitch; a tent and fire model at the camp (the raiders stand on bare grass today); camps that move or rebuild; a Raider Way for the player.
+

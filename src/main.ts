@@ -2090,7 +2090,7 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         if (ev.owner === viewer) {
           music.stir(0.5);
           lastAlert = { x: ev.x, y: ev.y };
-          hud.toast(ev.wild === 'wolf' ? 'Wolves are attacking your people! (Space to look)' : ev.wild === 'boar' ? 'A wild boar is charging your people! (Space to look)' : ev.wild === 'mammoth' ? 'A mammoth has turned on your hunters! (Space to look)' : ev.hunter ? 'Raiders fall on your hunters! (Space to look)' : ev.building ? 'A building is under attack! (Space to look)' : 'You are under attack! (Space to look)', 'alert');
+          hud.toast(ev.wild === 'wolf' ? 'Wolves are attacking your people! (Space to look)' : ev.wild === 'boar' ? 'A wild boar is charging your people! (Space to look)' : ev.wild === 'raider' ? 'A raider camp has turned on your people! (Space to look)' : ev.wild === 'mammoth' ? 'A mammoth has turned on your hunters! (Space to look)' : ev.hunter ? 'Raiders fall on your hunters! (Space to look)' : ev.building ? 'A building is under attack! (Space to look)' : 'You are under attack! (Space to look)', 'alert');
           play('alert');
         }
         break;
@@ -2336,6 +2336,11 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         } else if (view.sees(ev.x, ev.y)) hud.toast(`${s.players[ev.owner].name} dug out the ruins`, 'info');
         break;
       }
+      case 'campCleared':
+        // A raider camp falls (own pitch): the plunder, for whoever struck the last blow.
+        if (ev.owner === viewer) hud.banner('Raider camp cleared', `Your people took the plunder: +${ev.gold} gold, +${ev.food} food, +${ev.wood} wood.`, 4500);
+        else if (view.sees(ev.x, ev.y)) hud.toast(`${s.players[ev.owner].name} cleared a raider camp`, 'info');
+        break;
       case 'landmark': {
         const name = LANDMARK_KINDS[ev.kind].name;
         const team = s.players[viewer].team;

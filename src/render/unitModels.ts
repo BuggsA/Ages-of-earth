@@ -1223,6 +1223,40 @@ function boar(): Kit {
   return k;
 }
 
+/** A raider of the wild camps: a lean man in a hide kilt, war paint across the shoulders, a flint spear thrust forward to strike. */
+function raider(): Kit {
+  const k = new Kit();
+  const skin = '#a8714a';
+  const hide = '#5a3f2a';
+  const dark = '#2d2118';
+  const paint = '#b23a2a';
+  const LEG = 0.24;
+  for (const [x, rig] of [[-0.05, RIG_LEG_A], [0.05, RIG_LEG_B]] as [number, number][]) {
+    const g = k.limb(k.group(0, 0, 0), rig, LEG, 0);
+    k.box(0.05, LEG, 0.05, skin, x, 0, 0, g);
+    k.box(0.055, 0.03, 0.08, dark, x, 0, 0.01, g);
+  }
+  k.box(0.2, 0.07, 0.12, hide, 0, LEG - 0.03, 0);
+  k.box(0.18, 0.2, 0.1, skin, 0, LEG + 0.04, 0);
+  k.box(0.2, 0.05, 0.11, paint, 0, LEG + 0.19, 0);
+  k.blob(0.07, skin, 0, LEG + 0.34, 0.01);
+  k.box(0.14, 0.04, 0.09, dark, 0, LEG + 0.4, 0);
+  // The spear arm: it drives forward on the blow.
+  const arm = k.limb(k.group(0, 0, 0), RIG_ARM, LEG + 0.2, 0.05);
+  k.box(0.04, 0.04, 0.16, skin, 0.11, LEG + 0.18, 0.08, arm);
+  k.cyl(0.012, 0.012, 0.5, 4, '#6b4a2a', 0.11, LEG + 0.18, 0.2, arm).rotation.x = Math.PI / 2;
+  k.cone(0.026, 0.09, 4, '#cfcac0', 0.11, LEG + 0.18, 0.5, arm).rotation.x = Math.PI / 2;
+  return k;
+}
+
+let raiderGeo: THREE.BufferGeometry | null = null;
+
+/** The raider, rigged to stride and thrust. */
+export function raiderGeometry(): THREE.BufferGeometry {
+  raiderGeo ??= bake(raider().root);
+  return raiderGeo;
+}
+
 let boarGeo: THREE.BufferGeometry | null = null;
 let mammothGeo: THREE.BufferGeometry | null = null;
 let wolfGeo: THREE.BufferGeometry | null = null;
