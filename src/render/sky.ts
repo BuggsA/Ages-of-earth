@@ -54,15 +54,15 @@ const fragment = /* glsl */ `
       col += vec3(0.55, 0.62, 0.9) * milk * 0.07 * uNight * up;
       col += vec3(0.85, 0.9, 1.0) * stars(dir) * uNight * up * 1.4;
       // The moon: a disc with its phase eaten out of it, and a halo that shows through thin cloud.
-      vec3 md = normalize(uSunDir);
+      vec3 md = normalize(vec3(-0.62, 0.42, 0.52)); // low enough for the gaze key to reach
       vec3 q = dir - md * dot(dir, md);
-      float r = 0.07;
+      float r = 0.045;
       vec3 e = normalize(cross(md, vec3(0.0, 1.0, 0.0)));
       float inDisc = step(dot(dir, md), 0.0) < 0.5 ? smoothstep(r, r * 0.92, length(q)) : 0.0;
       float bite = smoothstep(r * 0.96, r * 1.04, length(q - e * r * (2.0 - uPhase * 2.1)));
       float lit = inDisc * mix(1.0, bite, step(0.001, uPhase));
-      float crater = 0.88 + 0.12 * hash(floor(q * 220.0));
-      col += vec3(0.95, 0.96, 0.88) * (lit * crater * 1.1 + inDisc * 0.1);
+      float crater = 0.8 + 0.2 * hash(floor(q * 140.0));
+      col += vec3(0.95, 0.96, 0.88) * (lit * crater * 0.85 + inDisc * 0.04);
       col += vec3(0.5, 0.58, 0.85) * pow(max(dot(dir, md), 0.0), 40.0) * 0.18 * (1.0 - uPhase * 0.5);
       // Aurora: curtains of green and violet that sway along the northern sky.
       if (uAurora > 0.01) {
