@@ -3273,7 +3273,7 @@ function relicRace(s: GameState, p: Player): boolean {
  * the army (healing as they go) and turn the enemy's best units.
  */
 /**
- * The rite a Blood-rite priest should chant now (`AI_RITE`), or null: a curse on the target with the most uncursed soldiers around it,
+ * The rite a Blood-rite priest should chant now (`AI_RITE`), or null: a curse on the target with the most uncursed soldiers around it (one pinned in a fight counts double),
  * else, with the store low, a sacrifice of the dearest victim worth `dear` blood. Looks only at the bleeding enemy within 9 tiles.
  */
 export function riteWork(s: GameState, p: Player, pr: Unit): { target: Unit; how: 'sacrifice' | 'curse' } | null {
@@ -3285,15 +3285,27 @@ export function riteWork(s: GameState, p: Player, pr: Unit): { target: Unit; how
   const soldier = (u: Unit) => u.type !== 'citizen' && u.type !== 'priest' && u.type !== 'trader';
   const r2 = RITE.spread * RITE.spread;
   const rich = bloodOf(p) >= RITE.curse + AI_RITE.keep;
+  // Mine within `pinned` tiles of a rival soldier hold it in the fight: it can't step back from a curse (#434, `answerCurse`), so it counts double.
+  const mine = s.ents.filter((e): e is Unit => e.kind === 'unit' && e.hp > 0 && !e.inside && e.owner === p.id && soldier(e));
+  const pin2 = AI_RITE.pinned * AI_RITE.pinned;
+  const pinned = new Set<number>();
+  for (const o of foes) if (soldier(o) && mine.some((m) => (m.x - o.x) * (m.x - o.x) + (m.y - o.y) * (m.y - o.y) <= pin2)) pinned.add(o.id);
   let curseAt: Unit | null = null;
   let packed = 0;
+  let best = 0;
   let offer: Unit | null = null;
   let dear = 0;
   for (const e of foes) {
     if (rich && riteProblem(s, p.id, 'curse', e) === null) {
       let n = 0;
-      for (const o of foes) if (soldier(o) && !cursed(s, o) && (o.x - e.x) * (o.x - e.x) + (o.y - e.y) * (o.y - e.y) <= r2) n++;
-      if (n > packed) {
+      let score = 0;
+      for (const o of foes) {
+        if (!soldier(o) || cursed(s, o) || (o.x - e.x) * (o.x - e.x) + (o.y - e.y) * (o.y - e.y) > r2) continue;
+        n++;
+        score += pinned.has(o.id) ? 2 : 1;
+      }
+      if (score > best) {
+        best = score;
         packed = n;
         curseAt = e;
       }
