@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { ageOf } from '../sim/ages';
-import { BUILDINGS, SNARE } from '../sim/data';
+import { BUILDINGS, CIVS, SNARE } from '../sim/data';
+import { flooded } from '../sim/flood';
 import { catchIn } from '../sim/snares';
 import type { AgeId, Building, BuildingType, GameState } from '../sim/types';
 import { buildingGeometry, heirloomsFor, foundationGeometry, rubbleGeometry, scaffoldGeometry } from './buildingModels';
@@ -42,6 +43,8 @@ interface View {
   scaffold: THREE.Mesh | null;
   key: string;
   base: number;
+  /** A flood people's field under the river in its flood season (#501 s1). */
+  flood: THREE.Mesh | null;
 }
 
 interface Ruin {
@@ -134,6 +137,7 @@ export class BuildingsView {
       v.body.scale.set(1, k.built ? 1 : 0.12 + 0.88 * p, 1);
       if (v.site) v.site.visible = !k.built;
       if (v.scaffold) v.scaffold.visible = !k.built && p > 0.02 && k.type !== 'farm';
+      if (v.flood) v.flood.visible = flooded(s, k.owner);
     }
     for (const [id, v] of this.views) {
       if (this.known.has(id)) continue;
@@ -189,8 +193,17 @@ export class BuildingsView {
         group.add(plinth);
       }
     }
+    // The Nile flood (#501 s1): a sheet of brown river water over the field, shown while it lies under the flood.
+    let flood: THREE.Mesh | null = null;
+    if (k.type === 'farm' && CIVS[s.players[k.owner]?.civ]?.flood) {
+      flood = new THREE.Mesh(new THREE.PlaneGeometry(k.size - 0.15, k.size - 0.15), floodMaterial);
+      flood.rotation.x = -Math.PI / 2;
+      flood.position.y = 0.14;
+      flood.visible = false;
+      group.add(flood);
+    }
     this.group.add(group);
-    return { group, body, site, scaffold, key, base };
+    return { group, body, site, scaffold, key, base, flood };
   }
 
   /** Where a building's top is, for health bars and effects. */
@@ -207,6 +220,7 @@ export class BuildingsView {
   }
 }
 
+const floodMaterial = new THREE.MeshStandardMaterial({ color: '#6f8f86', roughness: 0.35, metalness: 0.05, transparent: true, opacity: 0.82 });
 const plinthMaterial = inject(new THREE.MeshStandardMaterial({ color: '#8d7a62', flatShading: true, roughness: 1 }), {});
 
 const HEIGHT: Record<BuildingType, number> = {

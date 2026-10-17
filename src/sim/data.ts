@@ -1393,10 +1393,25 @@ export interface Civ {
   blurb: string;
   add?: Partial<Mods>;
   mul?: Partial<Mods>;
+  /** The Nile flood (#501 s1, `FLOOD`): each year in the flood season its fields yield nothing and its builders work faster. */
+  flood?: boolean;
 }
 
+/**
+ * The Nile flood (#501 s1): in season `season` (summer) the fields of a flood people lie under the river and yield nothing,
+ * and the corvée makes its builders work `build` times as fast. The computer moves up to `move` farmers a think to other work.
+ */
+export const FLOOD = { season: 1, build: 2, move: 3 };
+
 export const CIVS: Record<CivId, Civ> = {
-  egyptians: { name: 'Egyptians', blurb: 'Farmers of the great river: farms work 15% faster and wonders cost a quarter less.', mul: { farm: 1.15, wonderCost: 0.75 } },
+  egyptians: {
+    name: 'Egyptians',
+    blurb: 'A people of the great river, whose year turns on the flood. Each summer the Nile lies over the fields: they yield nothing, but the corvée calls the farmers to build, and every Egyptian builder works twice as fast. Lay food up in spring, and build in the flood. The black silt makes farms work half again as fast the rest of the year, and wonders cost a quarter less.',
+    verb: 'Each summer, take your farmers off the flooded fields and build: the corvée raises buildings twice as fast while the river is up',
+    door: 'No farm yields anything in the flood, so food must be laid up before it',
+    flood: true,
+    mul: { farm: 1.5, wonderCost: 0.75 },
+  },
   greeks: { name: 'Greeks', blurb: 'Hoplites: foot soldiers have 15% more health and +1 melee armor.', add: { infantryArmor: 1 }, mul: { infantryHp: 1.15 } },
   romans: { name: 'Romans', blurb: 'Builders of roads and forts: buildings are 20% sturdier and go up 25% faster.', mul: { buildingHp: 1.2, buildSpeed: 1.25 } },
   mongols: { name: 'Mongols', blurb: 'Riders of the steppe: cavalry ride 15% faster and hunters work 40% faster.', mul: { cavalrySpeed: 1.15, hunt: 1.4 } },
@@ -1412,7 +1427,7 @@ export const CIV_IDS = Object.keys(CIVS) as CivId[];
  */
 export const VERB_GAPS: { ages: Partial<Record<AgeId, number>>; civs: Partial<Record<CivId, number>> } = {
   ages: { warband: 502, reclaimer: 503 },
-  civs: { egyptians: 501, greeks: 501, romans: 501, mongols: 501, chinese: 501, britons: 501 },
+  civs: { greeks: 501, romans: 501, mongols: 501, chinese: 501, britons: 501 },
 };
 
 /**
@@ -1479,7 +1494,7 @@ export const BEACON = {
 };
 
 export const WORKS: Record<CivId, GreatWork> = {
-  egyptians: { name: 'The Nile Flood', icon: '🌊', use: 'eco', blurb: 'The river rises and leaves its black silt: farms work 60% faster.', mul: { farm: 1.6 } },
+  egyptians: { name: 'The Shaduf Sweeps', icon: '🪣', use: 'eco', blurb: 'Every bank is lined with shadufs lifting the river onto the fields: farms work 60% faster. Wasted while the fields lie under the flood.', mul: { farm: 1.6 } },
   greeks: { name: 'The Phalanx', icon: '🛡', use: 'war', blurb: 'Shields locked, spears level: foot soldiers have +2 melee armor and strike +2 harder.', add: { infantryArmor: 2, infantryAttack: 2 } },
   romans: { name: 'The Roman Road', icon: '🛣', use: 'eco', blurb: 'Legions and labourers lay the road: buildings go up 75% faster and citizens walk a quarter faster.', mul: { buildSpeed: 1.75, citizenSpeed: 1.25 } },
   mongols: { name: 'The Yam Relay', icon: '🐎', use: 'war', blurb: 'Fresh mounts waiting at every post: cavalry ride 40% faster and see 3 tiles farther, and citizens walk 15% faster.', add: { riderSight: 3 }, mul: { cavalrySpeed: 1.4, citizenSpeed: 1.15 } },

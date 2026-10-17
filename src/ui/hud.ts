@@ -1,5 +1,6 @@
 import { crestSvg } from './crests';
 import { seasonAt, seasonOf } from '../sim/seasons';
+import { flooded } from '../sim/flood';
 import { scenarioById } from '../sim/campaign';
 import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
@@ -110,6 +111,7 @@ function orderWords(s: GameState, u: Unit): string {
       return `Going to gather ${what}`;
     }
     case 'farm':
+      if (flooded(s, u.owner)) return 'Waiting out the flood: the field is under the river';
       return o.phase === 'drop' ? 'Carrying grain home' : o.phase === 'work' ? 'Farming' : 'Going to the fields';
     case 'build': {
       const target = s.byId.get(o.target);
