@@ -1569,6 +1569,12 @@ export const AI_WONDER = { share: 0.4, least: 3, most: 14, stay: 6, reach: 26 };
  */
 export const AI_FAIR = { ring: 10, markets: 2 };
 /**
+ * The computer and sorties (#379): when the enemy building it means to bomb lies more than `gap` tiles from its nearest
+ * finished Airfield (so its aircraft would turn for home before they arrive, `SORTIE.turn`), it raises another Airfield
+ * `step` tiles nearer, searching `search` tiles round that point, up to `fields` in all.
+ */
+export const AI_SORTIE = { gap: 26, step: 18, search: 6, fields: 3 };
+/**
  * The computer and vigils (#379 s2): in the Age of Pilgrims a clever computer keeps `VIGIL.most` priests at its relic Temple,
  * training them on top of those it sends with the army, and walks a keeper back once it strays past `VIGIL.reach` less `slack` tiles.
  */
