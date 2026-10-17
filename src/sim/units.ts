@@ -234,6 +234,14 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
       }
       if (next >= 0) break;
     }
+    // The player's workers look further before they stand idle (#344): the next grove, mine or bush is a longer walk, not another order.
+    if (next < 0 && !s.players[u.owner].ai && !o.rare && u.type !== 'fisher') {
+      for (const want of wants) {
+        if (want === R_MEAT || want === R_FISH) continue;
+        next = findResource(s, want, (o.tile % s.w) + 0.5, Math.floor(o.tile / s.w) + 0.5, SPREAD.far);
+        if (next >= 0) break;
+      }
+    }
     if (next >= 0) {
       o.tile = next;
       o.phase = 'go';
