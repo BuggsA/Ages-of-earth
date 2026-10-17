@@ -1821,9 +1821,10 @@ export interface AiLevel {
   armyWait: number;
   /**
    * The town bell (#113): it rings when `ring` enemy soldiers are near and the army can't meet half of
-   * them, and the citizens come back out once `quiet` or fewer are left, the bell `hold` seconds rung.
+   * them, and the citizens come back out once `quiet` or fewer are left, the bell `hold` seconds rung. A siege that parks
+   * outside doesn't hold them in for good (#487): after `patience` seconds rung, only foes within `reach` tiles count.
    */
-  bell: { ring: number; quiet: number; hold: number };
+  bell: { ring: number; quiet: number; hold: number; patience: number; reach: number };
   /** Whether a clever computer raises a forward Tower as a foothold (#132 s5); `scripts/ai-ab.ts` sets it back to compare. */
   fort: boolean;
   /** Off, a clever computer leaves its own Wonder unguarded (#374); `scripts/ai-ab.ts` sets it so to compare. */
@@ -1859,10 +1860,10 @@ export interface AiLevel {
  * moved: `easy` is shown as Normal, `normal` as Hard, `hard` as Expert (the campaign proof's level).
  */
 export const AI_LEVELS: Record<Difficulty, AiLevel> = {
-  gentle: { label: 'Easy', gather: 0.65, citizens: 12, firstAttack: 1080, wave: 4, waveGrowth: 2, think: 2, towers: 0, clever: false, traders: 1, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true },
-  easy: { label: 'Normal', gather: 0.8, citizens: 16, firstAttack: 720, wave: 6, waveGrowth: 3, think: 1.5, towers: 0, clever: false, traders: 2, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true },
-  normal: { label: 'Hard', gather: 1, citizens: 24, firstAttack: 480, wave: 8, waveGrowth: 4, think: 1, towers: 1, clever: true, traders: 5, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true },
-  hard: { label: 'Expert', gather: 1.15, citizens: 32, firstAttack: 330, wave: 9, waveGrowth: 5, think: 0.5, towers: 2, clever: true, traders: 8, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true },
+  gentle: { label: 'Easy', gather: 0.65, citizens: 12, firstAttack: 1080, wave: 4, waveGrowth: 2, think: 2, towers: 0, clever: false, traders: 1, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20, patience: 90, reach: 7 }, fort: true, worthy: true, detour: true },
+  easy: { label: 'Normal', gather: 0.8, citizens: 16, firstAttack: 720, wave: 6, waveGrowth: 3, think: 1.5, towers: 0, clever: false, traders: 2, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20, patience: 90, reach: 7 }, fort: true, worthy: true, detour: true },
+  normal: { label: 'Hard', gather: 1, citizens: 24, firstAttack: 480, wave: 8, waveGrowth: 4, think: 1, towers: 1, clever: true, traders: 5, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20, patience: 90, reach: 7 }, fort: true, worthy: true, detour: true },
+  hard: { label: 'Expert', gather: 1.15, citizens: 32, firstAttack: 330, wave: 9, waveGrowth: 5, think: 0.5, towers: 2, clever: true, traders: 8, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20, patience: 90, reach: 7 }, fort: true, worthy: true, detour: true },
 };
 
 /**

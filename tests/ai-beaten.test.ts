@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ageOf } from '../src/sim/ages';
 import { AI_LEVELS, AI_WEB, secs } from '../src/sim/data';
 import { createGame, step } from '../src/sim/game';
+import { distToRect } from '../src/sim/grid';
 import type { AgeId, CivId, GameState, Unit } from '../src/sim/types';
 import { spawnUnit } from '../src/sim/world';
 
@@ -74,6 +75,37 @@ describe('the town bell comes down for stragglers (#113)', () => {
     band.length = 2;
     run(s, AI_LEVELS.hard.bell.hold + 10, () => hold() || s.ai[0].bell < 0);
     expect(AI_LEVELS.hard.bell.quiet).toBeGreaterThanOrEqual(2);
+    expect(s.ai[0].bell).toBe(-1);
+  });
+});
+
+describe('a siege that only parks does not keep the bell rung for good (#487)', () => {
+  it('lets the citizens out after `patience` once the band stands beyond `reach` of every building', () => {
+    const s = game('romans', 1);
+    town(s, 1);
+    const tc = tcOf(s);
+    const band: Unit[] = [];
+    for (let i = 0; i < 6; i++) band.push(spawnUnit(s, 1, 'infantry', tc.x, tc.y));
+    // The band stands about nine tiles off the town's nearest wall: past `reach`, inside the ring that rings the bell.
+    const walls = () => s.ents.filter((e) => e.kind === 'building' && e.owner === 0 && e.hp > 0);
+    const off = (x: number, y: number) => Math.min(...walls().map((e) => (e.kind === 'building' ? distToRect(x, y, e) : Infinity)));
+    const hold = () => {
+      let x = tc.x;
+      while (off(x, tc.y) < 9) x += 0.5;
+      band.forEach((u, i) => {
+        u.x = x + (i % 3) * 0.5;
+        u.y = tc.y + (i < 3 ? -1 : 1) * 0.5;
+        u.hp = 1e6;
+        u.order = { k: 'idle' };
+      });
+      return false;
+    };
+    run(s, 10, () => hold() || s.ai[0].bell >= 0);
+    expect(s.ai[0].bell).toBeGreaterThanOrEqual(0);
+    const bell = AI_LEVELS.hard.bell;
+    run(s, bell.hold + 10, () => hold());
+    expect(s.ai[0].bell).toBeGreaterThanOrEqual(0);
+    run(s, bell.patience + 10, () => hold() || s.ai[0].bell < 0);
     expect(s.ai[0].bell).toBe(-1);
   });
 });

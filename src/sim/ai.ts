@@ -2388,7 +2388,7 @@ function wonderThreat(s: GameState, p: Player, w: Building): Unit | null {
 }
 
 /** Enemy soldiers close to home, and the nearest of them. */
-function threatNear(s: GameState, v: View): { unit: Unit | null; count: number } {
+function threatNear(s: GameState, v: View, within = 12): { unit: Unit | null; count: number } {
   let threat: Unit | null = null;
   let threatD = Infinity;
   let n = 0;
@@ -2397,7 +2397,7 @@ function threatNear(s: GameState, v: View): { unit: Unit | null; count: number }
     let near = Infinity;
     // Snares out in the woods (#485) are not the town: foes by them don't ring its bell.
     for (const b of v.buildings) if (b.type !== 'snare') near = Math.min(near, distToRect(e.x, e.y, b));
-    if (near < 12) {
+    if (near < within) {
       n++;
       if (near < threatD) {
         threatD = near;
@@ -2494,9 +2494,10 @@ function townBell(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   if (mem.bell < 0 && t.count >= bell.ring && defenders < t.count / 2) {
     issue({ t: 'bell', p: v.p.id, ring: true });
     mem.bell = s.tick;
-  } else if (mem.bell >= 0 && t.count <= bell.quiet && s.tick - mem.bell > secs(bell.hold)) {
+  } else if (mem.bell >= 0 && s.tick - mem.bell > secs(bell.hold) && (t.count <= bell.quiet || (s.tick - mem.bell > secs(bell.patience) && threatNear(s, v, bell.reach).count <= bell.quiet))) {
     // A straggler or two is the Town Center's arrows to deal with (#113): waiting for none at all, a
-    // beaten town kept fifteen citizens inside for nine minutes while a rival's trickle came and went.
+    // beaten town kept fifteen citizens inside for nine minutes while a rival's trickle came and went. Foes that only
+    // park by an outlying house (#487) stop counting once the bell has rung `patience` seconds.
     issue({ t: 'bell', p: v.p.id, ring: false });
     mem.bell = -1;
   }
