@@ -1,5 +1,5 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
@@ -235,6 +235,8 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
     const spot = !recent && afford(v, cost) ? findSpot(s, 'airfield', home.x, home.y, 6, 22) : null;
     if (!spot || !construct(s, v, mem, 'airfield', spot, 3, issue)) spend(v, cost);
   }
+
+  forwardField(s, v, mem, issue);
 
   townBell(s, v, mem, issue);
   greatWork(s, v, mem, issue);
@@ -1937,6 +1939,36 @@ function countFish(s: GameState, x: number, y: number, r: number): number {
 function enemyDock(s: GameState, p: Player): Building | null {
   for (const e of s.ents) if (e.kind === 'building' && e.type === 'dock' && e.hp > 0 && isEnemy(s, p.id, e.owner) && p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) return e;
   return null;
+}
+
+/**
+ * A spot for a forward Airfield (#379): when the enemy building worth bombing lies beyond `AI_SORTIE.gap` of our nearest
+ * finished Airfield, a spot `step` tiles from that Airfield toward it. Null when the target is in reach, unknown, or
+ * we already hold `fields` Airfields.
+ */
+export function forwardFieldSpot(s: GameState, v: View): { tx: number; ty: number } | null {
+  if (!ageDef(v.p).sortie || v.buildings.filter((b) => b.type === 'airfield').length >= AI_SORTIE.fields) return null;
+  const target = enemyTarget(s, v.p);
+  if (!target) return null;
+  let from: Building | null = null;
+  let best = Infinity;
+  for (const b of v.buildings) {
+    if (b.type !== 'airfield' || !b.built) continue;
+    const d = (b.x - target.x) * (b.x - target.x) + (b.y - target.y) * (b.y - target.y);
+    if (d < best) { best = d; from = b; }
+  }
+  if (!from || best <= AI_SORTIE.gap * AI_SORTIE.gap) return null;
+  const l = Math.sqrt(best);
+  const at = { x: from.x + ((target.x - from.x) / l) * AI_SORTIE.step, y: from.y + ((target.y - from.y) / l) * AI_SORTIE.step };
+  return findSpot(s, 'airfield', at.x, at.y, 0, AI_SORTIE.search);
+}
+
+/** Sorties (the Age of Aeronauts): a clever computer with an Airfield raises another toward the enemy, so its bombers can reach. */
+function forwardField(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  if (!AI_LEVELS[v.p.ai!].clever || v.citizens.length < 20 || s.tick - (mem.ordered.airfield ?? -99999) < secs(60)) return;
+  if (v.buildings.some((b) => b.type === 'airfield' && !b.built)) return;
+  const spot = forwardFieldSpot(s, v);
+  if (spot) construct(s, v, mem, 'airfield', spot, 3, issue);
 }
 
 /** Fighters to keep the sky clear, bombers to break the enemy's town. */
