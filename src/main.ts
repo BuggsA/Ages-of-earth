@@ -2141,7 +2141,13 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         if (ev.owner === viewer) {
           music.stir(0.5);
           lastAlert = { x: ev.x, y: ev.y };
-          hud.toast(ev.wild === 'wolf' ? 'Wolves are attacking your people! (Space to look)' : ev.wild === 'boar' ? 'A wild boar is charging your people! (Space to look)' : ev.wild === 'raider' ? 'A raider camp has turned on your people! (Space to look)' : ev.wild === 'mammoth' ? 'A mammoth has turned on your hunters! (Space to look)' : ev.hunter ? 'Raiders fall on your hunters! (Space to look)' : ev.building ? 'A building is under attack! (Space to look)' : 'You are under attack! (Space to look)', 'alert');
+          hud.toast(ev.heart ? 'Your Town Center is under attack! (Space to look)' : ev.wild === 'wolf' ? 'Wolves are attacking your people! (Space to look)' : ev.wild === 'boar' ? 'A wild boar is charging your people! (Space to look)' : ev.wild === 'raider' ? 'A raider camp has turned on your people! (Space to look)' : ev.wild === 'mammoth' ? 'A mammoth has turned on your hunters! (Space to look)' : ev.hunter ? 'Raiders fall on your hunters! (Space to look)' : ev.building ? 'A building is under attack! (Space to look)' : 'You are under attack! (Space to look)', 'alert');
+          play('alert');
+        }
+        break;
+      case 'heartless':
+        if (ev.owner === viewer) {
+          hud.toast(`Your last Town Center has fallen! Raise another within ${ev.left} seconds, or your people is lost.`, 'alert');
           play('alert');
         }
         break;
