@@ -425,8 +425,19 @@ function setupFromTitle(seed: number): GameSetup {
 }
 
 /** The opening of a new match (wonder): the haze lifts off the home valley while a pad swells. */
-function dawn(): void {
+const DAWN_HAZE: Record<MapType, [string, string, string]> = {
+  continental: ['255, 214, 140', '150, 170, 200', '60, 80, 120'],
+  highlands: ['255, 196, 150', '170, 160, 190', '70, 70, 110'],
+  lakes: ['255, 226, 170', '150, 185, 210', '50, 90, 130'],
+  forest: ['230, 220, 130', '120, 160, 140', '30, 70, 70'],
+  plains: ['255, 205, 110', '190, 180, 160', '90, 90, 100'],
+  sea: ['255, 200, 160', '140, 190, 215', '40, 90, 140'],
+};
+
+function dawn(mapType: MapType = 'continental'): void {
   const el = $('dawn');
+  const [glow, mid, deep] = DAWN_HAZE[mapType];
+  el.style.background = `radial-gradient(ellipse at 50% 85%, rgba(${glow}, 0.85), rgba(${mid}, 0.75) 60%, rgba(${deep}, 0.9))`;
   el.classList.remove('lift');
   void el.offsetWidth;
   el.classList.add('lift');
@@ -497,7 +508,7 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
     setSelection([tc.id]);
     view.rig.focus(tc.x, tc.y + 3, true);
   }
-  if (!saved) dawn();
+  if (!saved) dawn(setup.mapType ?? 'continental');
   tips.start(saved ? 9999 : 0);
   $('chat-lines').innerHTML = '';
   document.body.classList.toggle('online', online);
