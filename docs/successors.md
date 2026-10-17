@@ -14,13 +14,13 @@ When a Claude Code session finishes a task, it starts the next session itself, s
 
 ## When and how
 
-- **When:** after the task's pull request is merged and the handoff is posted.
+- **When:** after the task's pull request is pushed and the handoff is posted. Merged is not required (the owner, 2026-10-17): a slow `ci` or a conflict must not stall the chain. An open pull request goes in the prompt's "Waiting to merge" line, and the successor finishes it first.
 - **How:** `create_session` (the claude-code-remote tools) on this repo, in the same environment. If you don't have it, say so in the handoff.
 
 ## Before spawning
 
 Check cheaply (one `list_issues` by label with `minimal_output`, and `main`'s last `ci`), never by rereading the docs.
-- **Don't spawn** if #2 is labelled `paused`, you merged nothing, `create_session` failed twice, a cap below stops you, or nothing waits in your lane and your chain's last two sessions each shipped only a minor tweak.
+- **Don't spawn** if #2 is labelled `paused`, your chain's last two sessions each merged nothing (a session with a pull request still open counts as merged nothing until it lands), `create_session` failed twice, a cap below stops you, or nothing waits in your lane and your chain's last two sessions each shipped only a minor tweak.
 - **Don't spawn** from an owner-started chat or one-off, unless asked.
 - **Otherwise spawn.** Its task, in order: a red `ci-periodic` or `ci` on `main`, an `owner-ask`, a `ready` issue in your lane, else its own pitch.
 - Take related next steps yourself first (`docs/team.md`, "Small and often").
