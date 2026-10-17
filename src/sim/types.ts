@@ -35,7 +35,7 @@ export type TechId =
   | 'wheelbarrow' | 'handcart' | 'axes' | 'saws' | 'picks' | 'shafts' | 'plow' | 'irrigation' | 'masonry'
   | 'conscription' | 'husbandry' | 'theology' | 'chemistry'
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
-  | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder';
+  | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
 export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite';
 
@@ -362,7 +362,7 @@ export interface Landmark {
 export interface Animal {
   id: number;
   /** Deer bolt; mammoths and wolves (#171) fight; sheep (#308) belong to a people and graze by its camp. */
-  kind: 'deer' | 'mammoth' | 'wolf' | 'boar' | 'sheep';
+  kind: 'deer' | 'mammoth' | 'wolf' | 'boar' | 'sheep' | 'raider';
   x: number;
   y: number;
   px: number;
@@ -561,6 +561,8 @@ export type GameEvent =
   | { k: 'wildCry'; id: number; kind: Animal['kind']; x: number; y: number }
   /** A mammoth gores, or a wolf bites, someone. */
   | { k: 'wildStrike'; id: number; kind: Animal['kind']; target: number; x: number; y: number }
+  /** A raider camp (own pitch) stands empty: whose people cleared it, and the plunder they took. */
+  | { k: 'campCleared'; owner: number; x: number; y: number; gold: number; food: number; wood: number }
   | { k: 'trained'; id: number; owner: number; type: UnitType }
   | { k: 'researched'; owner: number; tech: TechId }
   /** A survey's answer (#39): whether what it looks for lies anywhere in this world. */
@@ -743,6 +745,8 @@ export interface AiMemory {
   landing?: { ship: number; ids: number[]; since: number; phase: 'load' | 'sail' };
   /** Tick its last landing set out. */
   landed?: number;
+  /** Tick a Blood-rite priest began holding a curse for the army to pin the pack (#439); cleared when it casts or nothing is held. */
+  riteWait?: number;
   /** Its traders on the road last turn: trader id → post id (to notice the ones lost on the way). */
   caravans?: Record<number, number>;
   /** Post id → the tick a trader was last lost on the road to it, so it keeps off that road a while. */

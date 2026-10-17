@@ -191,7 +191,7 @@ export class Minimap {
     for (const a of s.animals) {
       if (!reveal && !p.vis[Math.floor(a.y) * s.w + Math.floor(a.x)]) continue;
       // Deer pale; a mammoth (#171) big and brown; wolves a warning red.
-      ctx.fillStyle = a.kind === 'mammoth' ? '#9a6a3c' : a.kind === 'wolf' ? '#d2493a' : a.kind === 'boar' ? '#b8622e' : '#e8c79a';
+      ctx.fillStyle = a.kind === 'mammoth' ? '#9a6a3c' : a.kind === 'wolf' ? '#d2493a' : a.kind === 'boar' ? '#b8622e' : a.kind === 'raider' ? '#e0a31f' : '#e8c79a';
       // A flock (#308): wool white, ringed in its people's colour.
       if (a.kind === 'sheep' && a.owner !== undefined) {
         const r = Math.max(1.5, sx * 0.7);

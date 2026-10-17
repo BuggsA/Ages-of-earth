@@ -93,7 +93,7 @@ const TECH_ORDER: TechId[] = [
   // one opens it is the prize of the road the computer chose for it, so it is bought before anything else.
   'bellFoundry', 'ironHulls', 'jointStock', 'masonsLodge', 'stElmo', 'telegraphy', 'galvanic', 'galvanicBlood', 'militaryOrders',
   'plow', 'drying', 'hounds', 'axes', 'wheelbarrow', 'picks', 'forging', 'bloomery', 'scaleArmor', 'fletching', 'husbandry', 'irrigation', 'saws', 'shafts', 'handcart',
-  'ironCasting', 'chainMail', 'bodkin', 'masonry', 'theology', 'conscription', 'blastFurnace', 'plateArmor', 'chemistry', 'blackPowder',
+  'ironCasting', 'chainMail', 'bodkin', 'masonry', 'theology', 'conscription', 'blastFurnace', 'plateArmor', 'chemistry', 'blackPowder', 'saltCuring',
   'gillnets', 'shipwright', 'lighthouse', 'steamEngine', 'rifling', 'aviation', 'caravan', 'banking', 'pilgrimage', 'credit', 'ropewalk', 'litany',
 ];
 /** Seconds a computer keeps its traders off a road after losing one on it. */
@@ -1357,12 +1357,19 @@ function wilds(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void
       if (party.length === AI_WILD.boarParty) issue({ t: 'hunt', p: v.p.id, ids: party.map((u) => u.id), target: b.id });
     }
   }
-  if (mem.attacking || v.army.some((u) => hunting(u, 'wolf'))) return;
+  if (mem.attacking || v.army.some((u) => hunting(u, 'wolf') || hunting(u, 'raider'))) return;
   const wolf = nearestBeast(s, 'wolf', v.home.x, v.home.y, AI_WILD.clear);
-  if (!wolf) return;
   const free = v.army.filter((u) => !u.inside && (u.order.k === 'idle' || (u.order.k === 'move' && !u.order.amove)) && u.type !== 'siege');
-  const need = cold && seasonAt(s) === 3 ? AI_WILD.pack - AI_WINTER.pack : AI_WILD.pack;
-  if (free.length >= need) issue({ t: 'hunt', p: v.p.id, ids: free.map((u) => u.id), target: wolf.id });
+  if (wolf) {
+    const need = cold && seasonAt(s) === 3 ? AI_WILD.pack - AI_WINTER.pack : AI_WILD.pack;
+    if (free.length >= need) issue({ t: 'hunt', p: v.p.id, ids: free.map((u) => u.id), target: wolf.id });
+    return;
+  }
+  // A raider camp within reach: its loot is worth a squad, once the town has soldiers to spare (and no rival is by it).
+  const camp = nearestBeast(s, 'raider', v.home.x, v.home.y, AI_WILD.raidNear);
+  if (camp && camp.state !== 'fight' && free.length >= AI_WILD.raid && !ruinDanger(s, v.p, camp, AI_WILD.safe)) {
+    issue({ t: 'hunt', p: v.p.id, ids: free.map((u) => u.id), target: camp.id });
+  }
 }
 
 // ---- The steppe (#320) --------------------------------------------------------------------------------
@@ -3323,7 +3330,17 @@ export function riteWork(s: GameState, p: Player, pr: Unit): { target: Unit; how
       }
     }
   }
-  if (curseAt && packed >= AI_RITE.pack && !(unpinned(curseAt) && closing(curseAt))) return { target: curseAt, how: 'curse' };
+  if (curseAt && packed >= AI_RITE.pack) {
+    // The wait has a limit: a marching soldier that never lands can't hold the curse past `patience` seconds.
+    const mem = memory(s, p.id);
+    if (unpinned(curseAt) && closing(curseAt)) {
+      mem.riteWait ??= s.tick;
+      if (s.tick - mem.riteWait < secs(AI_RITE.patience)) return offer ? { target: offer, how: 'sacrifice' } : null;
+    }
+    delete mem.riteWait;
+    return { target: curseAt, how: 'curse' };
+  }
+  if (s.ai[p.id]) delete s.ai[p.id].riteWait;
   return offer ? { target: offer, how: 'sacrifice' } : null;
 }
 

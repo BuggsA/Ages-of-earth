@@ -1308,6 +1308,7 @@ export const TECHS: Record<TechId, Tech> = {
   theology: { name: 'Theology', at: 'temple', epoch: 2, cost: { gold: 200 }, time: 40, mul: { priest: 1.5 }, blurb: 'Priests convert and heal half again as fast.', icon: '✨' },
   chemistry: { name: 'Chemistry', at: 'workshop', epoch: 3, cost: { food: 300, gold: 200 }, time: 45, add: { siegeRange: 1 }, mul: { siegeAttack: 1.2 }, blurb: 'Siege hits 20% harder and reaches 1 tile farther.', icon: '🧪' },
   blackPowder: { name: 'Black Powder', at: 'workshop', epoch: 3, ore: { id: 'saltpetre', n: 40 }, cost: { food: 250, gold: 150 }, time: 45, add: { rangedAttack: 1 }, mul: { siegeAttack: 1.15 }, blurb: 'Only where saltpetre lies: once your citizens have mined 40, the powder-makers grind it fine. Musketeers and all ranged soldiers hit for 1 more and siege 15% harder, on top of Chemistry. Where there is none, the plain road stays open.', icon: '💥' },
+  saltCuring: { name: 'Salt Curing', at: 'storehouse', epoch: 1, ore: { id: 'salt', n: 30 }, cost: { food: 100, wood: 60 }, time: 30, add: { carry: 2 }, mul: { hunt: 1.25, forage: 1.15 }, blurb: 'Only where salt lies: once your citizens have mined 30, meat keeps and berries dry. Game is butchered 25% faster and berries gathered 15% faster, and every citizen carries 2 more. Where there is none, hunting stays as it was.', icon: '🧂' },
   gillnets: { name: 'Gillnets', at: 'dock', epoch: 1, cost: { food: 100, wood: 100 }, time: 30, mul: { fish: 1.25 }, blurb: 'Fishing boats fish 25% faster.', icon: '🐟' },
   lighthouse: { name: 'Lighthouse', at: 'dock', epoch: 2, cost: { wood: 200, gold: 120 }, time: 35, needs: 'gillnets', add: { portReach: 4 }, blurb: 'A beacon on the headland: trading posts up to 4 tiles farther from the water become ports for your merchant ships.', icon: '🗼' },
   shipwright: { name: 'Shipwright', at: 'dock', epoch: 2, cost: { wood: 250, gold: 150 }, time: 40, add: { shipRange: 1 }, mul: { shipHp: 1.2 }, blurb: 'Ships are 20% sturdier, and warships shoot 1 tile farther.', icon: '⚓' },
@@ -1581,6 +1582,16 @@ export const WOLF = { hunt: 7, hp: 20, walk: 0.9, run: 2.1, bite: 3, reach: 0.35
    */
   scent: 15, gnaw: 3, dens: { small: 2, medium: 3, large: 4 } as Record<MapSize, number> };
 
+/**
+ * Raider camps (own pitch): `camps` of them stand out between the towns, each a band of `guards` raiders
+ * (a Stone Age war party that fell on no one yet). They keep watch like a wolf pack: one that notices
+ * anyone within `notice` tiles calls the whole band, which chases no further than `leash` from its fire.
+ * They leave no carcass; when the last falls, whoever struck it takes the camp's `loot`. A lone citizen
+ * loses, two or three soldiers win, and the band is worth a fight only if the loot buys more than the wounds.
+ */
+export const RAIDER = { hp: 30, walk: 0.8, run: 2.2, bite: 4, reach: 0.4, reload: 1.1, notice: 3.8, leash: 6.5, roam: 1.3, radius: 0.24, guards: 3, home: 22, fair: 10, spacing: 18,
+  idBase: 1_000_000_000, loot: { gold: 120, food: 80, wood: 60 }, camps: { small: 1, medium: 2, large: 3 } as Record<MapSize, number> };
+
 /** Market: gold per 100 of a resource to start, how much each trade moves it, and the cut when selling. */
 export const MARKET = { start: { food: 100, wood: 100, stone: 130 }, step: 4, min: 20, max: 600, sellRate: 0.75, lot: 100,
   /** Every `every` seconds each price moves this far back toward where it started, so a glut or a shortage fades. */
@@ -1794,9 +1805,9 @@ export const AI_FORK = { living: 0.6, hemo: 0.5, stay: 300, patience: 1200, back
  * uncursed and the store would still hold `keep` blood after paying; failing that, while the store is under `AI_FORK.store`, it
  * sacrifices the dearest victim whose offering is at least `dear` blood. Everything else is converted as before. A soldier held within
  * `pinned` tiles of one of ours counts double; and a pack none of ours holds yet, with our foot soldiers marching on it within `closing`
- * tiles, is left uncursed a beat, until they land.
+ * tiles, is left uncursed a beat, until they land or `patience` seconds pass.
  */
-export const AI_RITE = { pack: 3, keep: 40, dear: 30, pinned: 2, closing: 7 };
+export const AI_RITE = { pack: 3, keep: 40, dear: 30, pinned: 2, closing: 7, patience: 6 };
 
 /**
  * A clever computer answers a curse on its own army (#434). For the last `late` seconds of a curse, a cursed soldier that isn't winning
@@ -1926,7 +1937,9 @@ export const AI_WILD = { mammothAt: 10, party: 5, mammothNear: 22, pack: 3, clea
   /** A mammoth `mammothNear` to `far` tiles from home is hunted too, by a clever computer, with `escort` idle soldiers sent along (beyond a guard of `guard` at home) and no rival soldier seen within `safe` tiles of it. */
   far: 38, escort: 2, guard: 3, safe: 12,
   /** A clever computer past the Stone Age raises a Watch Tower within `towerNear` tiles of a far kill (22 to `campNear` tiles from home) whose Hunting Camp stands. */
-  towerNear: 6 };
+  towerNear: 6,
+  /** A computer with `raid` soldiers idle at hand marches on a raider camp within `raidNear` tiles of home. */
+  raid: 4, raidNear: 34 };
 
 /**
  * The computer on the steppe (#320, s5a of #297). A clever computer whose people the steppe neither suits nor

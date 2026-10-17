@@ -859,11 +859,12 @@ export class View {
         }
         case 'wildCry':
           // The wild (#171): a mammoth trumpets, a pack howls as it turns to fight.
-          if (this.sees(ev.x, ev.y)) this.cue(ev.kind === 'mammoth' ? 'mammoth' : ev.kind === 'boar' ? 'snarl' : 'howl', ev.x, ev.y, 1);
+          if (this.sees(ev.x, ev.y)) this.cue(ev.kind === 'mammoth' ? 'mammoth' : ev.kind === 'boar' ? 'snarl' : ev.kind === 'raider' ? 'rally' : 'howl', ev.x, ev.y, 1);
           break;
         case 'wildStrike':
           if (!this.sees(ev.x, ev.y)) break;
-          if (ev.kind === 'wolf' || ev.kind === 'boar') this.cue('snarl', ev.x, ev.y, 0.8);
+          if (ev.kind === 'raider') this.cue('spear', ev.x, ev.y, 0.8);
+          else if (ev.kind === 'wolf' || ev.kind === 'boar') this.cue('snarl', ev.x, ev.y, 0.8);
           else this.effects.burst(this.ground(s, ev.x, ev.y, 0.2), { count: 8, speed: 1, up: 0.8, life: 0.7, size: 0.06, grow: 1.5, gravity: -0.5, drag: 1.5, soft: true, colors: ['#a08a68', '#c8b590'] });
           break;
         case 'animalDie':
@@ -935,6 +936,15 @@ export class View {
             this.effects.burst(at.clone().setY(at.y + 1.2), { count: 18, speed: 1.2, up: 1.2, life: 1.2, size: 0.05, gravity: 2.2, colors: ['#ffd166', '#f2cf4a', '#fff3c4'] });
             if (ev.owner === this.viewer) this.cue('tradePaid', ev.x, ev.y, 1);
           } else this.cue('tradeLoad', ev.x, ev.y, 0.7);
+          break;
+        }
+        case 'campCleared': {
+          // The plunder is taken: a spill of gold sparks and a coin chime.
+          if (ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;
+          const at = this.ground(s, ev.x, ev.y, 0.4);
+          this.effects.burst(at, { count: 26, speed: 1.2, up: 1.6, life: 1.6, size: 0.06, gravity: -0.5, colors: ['#ffd166', '#f2cf4a', '#fff3c4'] });
+          this.effects.ring(at, '#ffd166', 2.2, 1);
+          this.cue('coin', ev.x, ev.y, ev.owner === this.viewer ? 1 : 0.6);
           break;
         }
         case 'ruin': {

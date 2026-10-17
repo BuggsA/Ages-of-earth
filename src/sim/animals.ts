@@ -1,5 +1,5 @@
 import { landOwnerAt } from './borders';
-import { AMOUNT, BOAR, DEER, DT, FLOCK, MAMMOTH, ROT, TICK_HZ, WOLF, domainOf, secs } from './data';
+import { AMOUNT, BOAR, DEER, DT, FLOCK, MAMMOTH, RAIDER, ROT, TICK_HZ, WOLF, domainOf, secs } from './data';
 import { clearResource, walkable } from './grid';
 import type { Spatial } from './spatial';
 import type { Animal, GameState, Order, Unit } from './types';
@@ -30,7 +30,7 @@ export const DIRS = [
   [1, 0], [0.7071, 0.7071], [0, 1], [-0.7071, 0.7071], [-1, 0], [-0.7071, -0.7071], [0, -1], [0.7071, -0.7071],
 ] as const;
 
-const HP: Record<Animal['kind'], number> = { deer: DEER.hp, mammoth: MAMMOTH.hp, wolf: WOLF.hp, boar: BOAR.hp, sheep: FLOCK.hp };
+const HP: Record<Animal['kind'], number> = { deer: DEER.hp, mammoth: MAMMOTH.hp, wolf: WOLF.hp, boar: BOAR.hp, sheep: FLOCK.hp, raider: RAIDER.hp };
 
 export function spawnAnimal(s: GameState, x: number, y: number, kind: Animal['kind'] = 'deer'): Animal {
   const a: Animal = { id: s.nextId++, kind, x, y, px: x, py: y, fx: 0, fy: 1, hp: HP[kind], state: 'graze', t: secs(2) + (s.nextId % 40), tx: x, ty: y, homeX: x, homeY: y, hurt: -999 };
@@ -47,7 +47,7 @@ export function spawnAnimal(s: GameState, x: number, y: number, kind: Animal['ki
 
 /** How wide an animal is, from its middle. */
 export function animalRadius(a: Animal): number {
-  return a.kind === 'mammoth' ? MAMMOTH.radius : a.kind === 'wolf' ? WOLF.radius : a.kind === 'boar' ? BOAR.radius : a.kind === 'sheep' && a.lamb !== undefined ? 0.14 : 0.2;
+  return a.kind === 'mammoth' ? MAMMOTH.radius : a.kind === 'wolf' ? WOLF.radius : a.kind === 'boar' ? BOAR.radius : a.kind === 'raider' ? RAIDER.radius : a.kind === 'sheep' && a.lamb !== undefined ? 0.14 : 0.2;
 }
 
 /** Who can stand up to a beast: citizens with their spears, and soldiers on foot or horse. */
@@ -265,11 +265,12 @@ function beastStep(s: GameState, sp: Spatial | undefined, a: Animal): void {
   }
   const wolf = a.kind === 'wolf';
   if (wolf && a.prey !== undefined && !wolfHunt(s, a)) a.prey = undefined;
-  const guard = wolf || a.kind === 'boar';
+  const raider = a.kind === 'raider';
+  const guard = wolf || raider || a.kind === 'boar';
   // A pack keeps watch (so does a boar by its patch): anyone who comes near is set upon.
   if (guard && (s.tick + a.id) % 4 === 0) {
     const c = anchor(s, a);
-    const u = nearestPrey(s, sp, a.x, a.y, (wolf ? WOLF.notice : BOAR.notice) * seasonOf(s).bold, { x: c.x, y: c.y, r: wolf ? WOLF.leash : BOAR.leash });
+    const u = nearestPrey(s, sp, a.x, a.y, (wolf ? WOLF.notice : raider ? RAIDER.notice : BOAR.notice) * seasonOf(s).bold, { x: c.x, y: c.y, r: wolf ? WOLF.leash : raider ? RAIDER.leash : BOAR.leash });
     if (u) {
       rouse(s, a, u);
       return;
@@ -307,19 +308,26 @@ function beastStep(s: GameState, sp: Spatial | undefined, a: Animal): void {
     }
   }
   if (wolf && a.prey !== undefined) return;
-  const roam = wolf ? WOLF.roam : a.kind === 'boar' ? BOAR.roam : MAMMOTH.roam;
+  const roam = wolf ? WOLF.roam : raider ? RAIDER.roam : a.kind === 'boar' ? BOAR.roam : MAMMOTH.roam;
+  // A band's idling never touches the match's dice, so a camp on the map moves nothing else.
+  let n = 0;
+  const dice = (): number => {
+    if (!raider) return roll(s);
+    const h = Math.imul(Math.imul(s.tick + 1, 0x9e3779b1) ^ (Math.imul(a.id, 0x85ebca6b) + Math.imul(++n, 0xc2b2ae35)), 0x27d4eb2d);
+    return ((h ^ (h >>> 15)) >>> 0) / 4294967296;
+  };
   if (a.state === 'graze') {
     if (a.t <= 0) {
-      const d = DIRS[Math.floor(roll(s) * 8)];
-      const r = 0.5 + roll(s) * roam;
+      const d = DIRS[Math.floor(dice() * 8)];
+      const r = 0.5 + dice() * roam;
       a.tx = a.homeX + d[0] * r;
       a.ty = a.homeY + d[1] * r;
       a.state = 'walk';
       a.t = secs(10);
     }
-  } else if (stepToward(s, a, a.tx, a.ty, wolf ? WOLF.walk : a.kind === 'boar' ? BOAR.walk : MAMMOTH.walk) || a.t <= 0) {
+  } else if (stepToward(s, a, a.tx, a.ty, wolf ? WOLF.walk : raider ? RAIDER.walk : a.kind === 'boar' ? BOAR.walk : MAMMOTH.walk) || a.t <= 0) {
     a.state = 'graze';
-    a.t = secs(guard ? 2 : 4) + Math.floor(roll(s) * secs(6));
+    a.t = secs(guard ? 2 : 4) + Math.floor(dice() * secs(6));
   }
 }
 
@@ -361,7 +369,7 @@ function wolfHunt(s: GameState, a: Animal): boolean {
 
 /** Turn to fight `u`: a wolf brings its whole pack. */
 function rouse(s: GameState, a: Animal, u: Unit): void {
-  const pack = a.kind === 'wolf' ? s.animals.filter((b) => b.kind === 'wolf' && b.hp > 0 && b.homeX === a.homeX && b.homeY === a.homeY) : [a];
+  const pack = a.kind === 'wolf' || a.kind === 'raider' ? s.animals.filter((b) => b.kind === a.kind && b.hp > 0 && b.homeX === a.homeX && b.homeY === a.homeY) : [a];
   if (a.state !== 'fight') s.events.push({ k: 'wildCry', id: a.id, kind: a.kind, x: a.x, y: a.y });
   for (const b of pack) {
     if (b.state === 'fight' && b !== a) continue;
@@ -383,14 +391,15 @@ function calm(a: Animal): void {
 function fightStep(s: GameState, sp: Spatial | undefined, a: Animal): void {
   const wolf = a.kind === 'wolf';
   const boar = a.kind === 'boar';
+  const raider = a.kind === 'raider';
   const home = anchor(s, a);
-  const leash = wolf ? { x: home.x, y: home.y, r: WOLF.leash } : boar ? { x: a.homeX, y: a.homeY, r: BOAR.leash } : undefined;
+  const leash = wolf ? { x: home.x, y: home.y, r: WOLF.leash } : raider ? { x: a.homeX, y: a.homeY, r: RAIDER.leash } : boar ? { x: a.homeX, y: a.homeY, r: BOAR.leash } : undefined;
   const u = a.foe !== undefined ? s.byId.get(a.foe) : undefined;
   let foe = u && u.kind === 'unit' && prey(u) ? u : null;
   if (foe && leash && (foe.x - leash.x) * (foe.x - leash.x) + (foe.y - leash.y) * (foe.y - leash.y) > leash.r * leash.r) foe = null;
   // A mammoth's rage cools some seconds after its last wound.
   if (a.kind === 'mammoth' && a.t <= 0) foe = null;
-  else if (!foe) foe = nearestPrey(s, sp, a.x, a.y, wolf ? WOLF.notice * seasonOf(s).bold : boar ? BOAR.notice * seasonOf(s).bold : 6, leash);
+  else if (!foe) foe = nearestPrey(s, sp, a.x, a.y, wolf ? WOLF.notice * seasonOf(s).bold : raider ? RAIDER.notice * seasonOf(s).bold : boar ? BOAR.notice * seasonOf(s).bold : 6, leash);
   if (!foe) {
     calm(a);
     return;
@@ -399,23 +408,23 @@ function fightStep(s: GameState, sp: Spatial | undefined, a: Animal): void {
   const dx = foe.x - a.x;
   const dy = foe.y - a.y;
   const d = Math.sqrt(dx * dx + dy * dy) - animalRadius(a) - statsOf(s, foe).radius;
-  if (d <= (wolf ? WOLF.reach : boar ? BOAR.reach : MAMMOTH.reach)) {
+  if (d <= (wolf ? WOLF.reach : raider ? RAIDER.reach : boar ? BOAR.reach : MAMMOTH.reach)) {
     const n = Math.sqrt(dx * dx + dy * dy) || 1;
     a.fx = dx / n;
     a.fy = dy / n;
     if (!a.cool) {
       maul(s, a, foe);
-      a.cool = secs(wolf ? WOLF.reload : boar ? BOAR.reload : MAMMOTH.reload);
+      a.cool = secs(wolf ? WOLF.reload : raider ? RAIDER.reload : boar ? BOAR.reload : MAMMOTH.reload);
     }
     return;
   }
-  stepToward(s, a, foe.x, foe.y, wolf ? WOLF.run : boar ? BOAR.run : MAMMOTH.charge);
+  stepToward(s, a, foe.x, foe.y, wolf ? WOLF.run : raider ? RAIDER.run : boar ? BOAR.run : MAMMOTH.charge);
 }
 
 /** A wolf bites, or a mammoth gores: armor helps; the bitten fight back. */
 function maul(s: GameState, a: Animal, u: Unit): void {
   const st = statsOf(s, u);
-  const damage = Math.max(1, (a.kind === 'wolf' ? WOLF.bite : a.kind === 'boar' ? BOAR.bite : MAMMOTH.gore) - st.armor) * modsOf(s, u.owner).beastWard;
+  const damage = Math.max(1, (a.kind === 'wolf' ? WOLF.bite : a.kind === 'raider' ? RAIDER.bite : a.kind === 'boar' ? BOAR.bite : MAMMOTH.gore) - st.armor) * modsOf(s, u.owner).beastWard;
   u.hp -= damage;
   u.hurt = s.tick;
   s.events.push({ k: 'wildStrike', id: a.id, kind: a.kind, target: u.id, x: u.x, y: u.y });
@@ -440,7 +449,7 @@ function fightBack(u: Unit, a: Animal): void {
   if (u.stance === 'stand' && u.type !== 'citizen') return;
   const o = u.order;
   if (o.k !== 'idle') u.queue.unshift(o.k === 'gather' || o.k === 'farm' || o.k === 'milk' ? { ...o, phase: 'go' } : o);
-  u.order = { k: 'hunt', target: a.id, fight: a.kind === 'wolf' };
+  u.order = { k: 'hunt', target: a.id, fight: a.kind === 'wolf' || a.kind === 'raider' };
   u.path = null;
   u.goal = null;
   u.wantPath = false;
@@ -461,6 +470,21 @@ function thrower(s: GameState, x: number, y: number): Unit | null {
     }
   }
   return best;
+}
+
+/** A raider falls without a carcass; when the last of its band is gone, whoever struck it takes the camp's loot. */
+function plunder(s: GameState, a: Animal, fromX: number, fromY: number): void {
+  s.events.push({ k: 'animalDie', id: a.id, x: a.x, y: a.y, fx: a.fx, fy: a.fy, kind: a.kind });
+  s.animals = s.animals.filter((x) => x !== a);
+  if (s.animals.some((b) => b.kind === 'raider' && b.homeX === a.homeX && b.homeY === a.homeY && b.hp > 0)) return;
+  const u = thrower(s, fromX, fromY);
+  if (!u) return;
+  const p = s.players[u.owner];
+  p.res.gold += RAIDER.loot.gold;
+  p.res.food += RAIDER.loot.food;
+  p.res.wood += RAIDER.loot.wood;
+  p.stats.gathered += RAIDER.loot.gold + RAIDER.loot.food + RAIDER.loot.wood;
+  s.events.push({ k: 'campCleared', owner: u.owner, x: a.homeX, y: a.homeY, ...RAIDER.loot });
 }
 
 /** A spear finds its mark: the deer bolts, or falls and leaves a carcass. A mammoth or wolf turns to fight. */
@@ -487,6 +511,10 @@ export function hitAnimal(s: GameState, a: Animal, damage: number, fromX: number
     a.fy = dy / d;
     a.state = 'flee';
     a.t = secs(2.5);
+    return;
+  }
+  if (a.kind === 'raider') {
+    plunder(s, a, fromX, fromY);
     return;
   }
   // A carcass where it fell (or on the nearest open tile).
