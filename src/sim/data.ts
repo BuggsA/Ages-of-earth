@@ -1782,9 +1782,11 @@ export const AI_FORK = { living: 0.6, hemo: 0.5, stay: 300, patience: 1200, back
  * A clever computer's priests in the Blood-rite (#355 s4) work its rites. An idle priest within 9 tiles of the enemy curses the target
  * with the most of their soldiers (no citizens, priests or traders) within `RITE.spread` tiles of it, when `pack` or more stand there
  * uncursed and the store would still hold `keep` blood after paying; failing that, while the store is under `AI_FORK.store`, it
- * sacrifices the dearest victim whose offering is at least `dear` blood. Everything else is converted as before.
+ * sacrifices the dearest victim whose offering is at least `dear` blood. Everything else is converted as before. A soldier held within
+ * `pinned` tiles of one of ours counts double; and a pack none of ours holds yet, with our foot soldiers marching on it within `closing`
+ * tiles, is left uncursed a beat, until they land.
  */
-export const AI_RITE = { pack: 3, keep: 40, dear: 30, pinned: 2 };
+export const AI_RITE = { pack: 3, keep: 40, dear: 30, pinned: 2, closing: 7 };
 
 /**
  * A clever computer answers a curse on its own army (#434). For the last `late` seconds of a curse, a cursed soldier that isn't winning
