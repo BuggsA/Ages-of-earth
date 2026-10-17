@@ -182,7 +182,10 @@ export function aiKin(s: GameState, p: Player, b: Building, reserve: number): bo
  * off `RAID.take` food a point, as much as the rival holds.
  */
 export function raidBlow(s: GameState, target: Building, damage: number, by: number, attacker: Unit | null): void {
-  if (!attacker || attacker.type === 'citizen' || s.players[by]?.way !== 'warband' || !RAID.at.includes(target.type) || !isEnemy(s, by, target.owner)) return;
+  if (!attacker || attacker.type === 'citizen' || s.players[by]?.way !== 'warband' || !isEnemy(s, by, target.owner)) return;
+  // A snare struck (#485): the raiders take the whole catch in its noose, not the rival's stores.
+  if (target.type === 'snare') return carryOff(s, s.players[target.owner], by, Math.floor(target.snared ?? 0), target.x, target.y, target);
+  if (!RAID.at.includes(target.type)) return;
   carryOff(s, s.players[target.owner], by, damage * RAID.take, target.x, target.y);
 }
 
@@ -198,10 +201,11 @@ export function raidSlain(s: GameState, target: Unit, by: number): void {
   carryOff(s, s.players[target.owner], by, RAID.slain, target.x, target.y);
 }
 
-function carryOff(s: GameState, victim: Player, by: number, amount: number, x: number, y: number): void {
-  const food = Math.min(victim.res.food, amount);
+function carryOff(s: GameState, victim: Player, by: number, amount: number, x: number, y: number, snare?: Building): void {
+  const food = Math.min(snare ? (snare.snared ?? 0) : victim.res.food, amount);
   if (food <= 0) return;
-  victim.res.food -= food;
+  if (snare) snare.snared = (snare.snared ?? 0) - food;
+  else victim.res.food -= food;
   s.players[by].res.food += food;
   const p = s.players[by];
   p.stats.raided = (p.stats.raided ?? 0) + food;

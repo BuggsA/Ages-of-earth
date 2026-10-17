@@ -19,7 +19,7 @@ export type UnitType =
 export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
   | 'towncenter' | 'house' | 'storehouse' | 'farm' | 'barracks' | 'range' | 'stable' | 'tower'
-  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai' | 'drainrig' | 'transfusion' | 'bloodtower';
+  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai' | 'drainrig' | 'transfusion' | 'bloodtower' | 'snare';
 /** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
 export type Difficulty = 'gentle' | 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
@@ -122,6 +122,8 @@ export type Order =
   | { k: 'hunt'; target: number; fight?: boolean }
   /** Milk a sheep of the people's flock (#308), carry the milk to a drop site, and back. */
   | { k: 'milk'; target: number; phase: 'go' | 'work' | 'drop' }
+  /** Walk the trap line (#485): empty a snare of its people's, on to the next with game in it, and the catch home. */
+  | { k: 'snare'; target: number; phase: 'go' | 'work' | 'drop' }
   /**
    * A priest turning an enemy to your side: `done` ticks of chanting so far. A Blood-rite priest (#355 s4) may instead chant a `rite`
    * over a living enemy: to `sacrifice` it for its blood, or to `curse` it.
@@ -302,6 +304,8 @@ export interface Building {
   captives?: { p: number; left: number }[];
   /** A Hunters' kill camp (#463 s1): raised for nothing and quickly, so a cancelled site refunds nothing. */
   kill?: boolean;
+  /** A Snare (#485): the food caught in it so far, waiting for a tender. Absent: none. */
+  snared?: number;
 }
 
 export type Ent = Unit | Building;
@@ -490,6 +494,8 @@ export interface PlayerStats {
   hunted?: number;
   /** Milk drawn from the flock by citizens (the Age of the Horde's deed, #318); absent in older saves. */
   milked?: number;
+  /** Food taken from snares (#485); absent in older saves. */
+  snared?: number;
   /** Gold taken as tribute by riders standing in rivals' land (#318); absent in older saves. */
   tribute?: number;
   /** Gold the Silk Road's caravans earned for the ground the camp covered while they were out (#326); absent in older saves. */

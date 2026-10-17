@@ -1,4 +1,4 @@
-import { AI_LEVELS, AUTO_WORK, BUILDINGS, EXPLORE, PATROL, CARRY, CONSECRATE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SPREAD, TRADE, domainOf, secs } from './data';
+import { AI_LEVELS, AUTO_WORK, BUILDINGS, EXPLORE, PATROL, CARRY, CONSECRATE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SNARE, SPREAD, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
@@ -12,6 +12,7 @@ import { RES, R_BERRY, R_BLOODIRON, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_SAL
 import { carriedBy, relicAt } from './relics';
 import { animalRadius, hitAnimal } from './animals';
 import { milkable } from './flocks';
+import { catchIn, nextSnare } from './snares';
 import { dig, ruinAt } from './ruins';
 import { fordMarch, groveBoost, keptOf, kinBonus } from './landmarks';
 import { chant, chantedOver, consecrateProblem, consecrates, turnBuilding } from './consecrate';
@@ -517,7 +518,7 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
   if (u.resume) {
     const back = u.resume;
     u.resume = null;
-    if (back.k === 'gather' || back.k === 'farm') {
+    if (back.k === 'gather' || back.k === 'farm' || back.k === 'snare') {
       setOrder(u, back);
       return;
     }
@@ -529,6 +530,11 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
       setOrder(u, { k: 'farm', target: f.id, phase: 'go' });
       return;
     }
+  }
+  // A new snare (#485): a person's builder walks the trap line (the computer picks its own tenders).
+  if (b.type === 'snare' && !s.players[u.owner].ai) {
+    setOrder(u, { k: 'snare', target: b.id, phase: 'go' });
+    return;
   }
   if (b.type === 'storehouse') {
     // Work whatever lies closest to the new storehouse.
@@ -1099,6 +1105,79 @@ function milkStep(s: GameState, u: Unit, o: Extract<Order, { k: 'milk' }>): void
     return;
   }
   if (!approach(u, g)) setOrder(u, { k: 'idle' });
+}
+
+/**
+ * Walk the trap line (#485): empty this snare into the basket, go on to the next of the people's snares with game in
+ * it, and carry the catch home when the basket is full or the line is bare; with nothing anywhere, wait by the snare.
+ */
+function snareStep(s: GameState, u: Unit, o: Extract<Order, { k: 'snare' }>): void {
+  if (u.carryRes !== 'food') {
+    u.carry = 0;
+    u.frac = 0;
+    u.carryRes = 'food';
+  }
+  if (o.phase === 'drop') {
+    const r = dropOff(s, u);
+    if (r === 'done') {
+      const next = nextSnare(s, u.owner, u.x, u.y, 0, u.id);
+      if (next) o.target = next.id;
+      o.phase = 'go';
+      u.miss = 0;
+    } else if (r === 'none') setOrder(u, { k: 'idle' });
+    return;
+  }
+  let b = s.byId.get(o.target);
+  if (!b || b.kind !== 'building' || b.type !== 'snare' || b.hp <= 0 || b.owner !== u.owner) {
+    const next = nextSnare(s, u.owner, u.x, u.y, 0, u.id);
+    if (next) {
+      o.target = next.id;
+      b = next;
+    } else {
+      if (u.carry > 0) o.phase = 'drop';
+      else setOrder(u, { k: 'idle' });
+      return;
+    }
+  }
+  if (!b.built) {
+    setOrder(u, { k: 'build', target: b.id });
+    return;
+  }
+  const cap = carryCap(s, u);
+  if (distToRect(u.x, u.y, b) - statsOf(s, u).radius <= REACH + 0.3) {
+    if (walking(u)) stopWalking(u);
+    face(u, b.x, b.y);
+    u.miss = 0;
+    if (catchIn(b) >= 1 && u.carry < cap) {
+      o.phase = 'work';
+      u.act = 'forage';
+      u.frac += SNARE.take * DT;
+      while (u.frac >= 1 && u.carry < cap && (b.snared ?? 0) >= 1) {
+        u.frac -= 1;
+        u.carry++;
+        b.snared = (b.snared ?? 0) - 1;
+        const st = s.players[u.owner].stats;
+        st.snared = (st.snared ?? 0) + 1;
+      }
+      workEvent(s, u, 'forage', b.x, b.y);
+      if (u.carry < cap && catchIn(b) >= 1) return;
+    }
+    u.frac = 0;
+    if (u.carry >= cap) {
+      o.phase = 'drop';
+      return;
+    }
+    // Emptied: on round the line. A bare line is looked over again now and then, not every tick.
+    o.phase = 'go';
+    u.act = 'idle';
+    if (u.carry === 0 && (s.tick + u.id) % 20 !== 0) return;
+    const next = nextSnare(s, u.owner, b.x, b.y, b.id, u.id);
+    if (next) o.target = next.id;
+    else if (u.carry > 0) o.phase = 'drop';
+    return;
+  }
+  o.phase = 'go';
+  if (!approach(u, goalForBuilding(b))) setOrder(u, { k: 'idle' });
 }
 
 // ---- Priests ---------------------------------------------------------------------------------------
@@ -1797,6 +1876,9 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
       break;
     case 'milk':
       milkStep(s, u, o);
+      break;
+    case 'snare':
+      snareStep(s, u, o);
       break;
     case 'convert':
       convertStep(s, u, o);

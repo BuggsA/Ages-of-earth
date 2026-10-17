@@ -29,6 +29,8 @@ import { consecrateProblem, consecrates } from './consecrate';
 import { sees } from './vision';
 import { seasonAt } from './seasons';
 import { catchOf, herdsOut, yarding } from './year';
+import { SNARE } from './data';
+import { treesNear } from './snares';
 import { isMobile } from './steppe';
 import { isRider, standing } from './tribute';
 import { flockCap, flockOf, grassy, milkable } from './flocks';
@@ -285,6 +287,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   research(s, v, citizens.length >= wantCitizens - 2, issue);
   trade(s, v, issue);
   planBuildings(s, v, mem, issue);
+  trapLine(s, v, mem, issue);
   hemoBuild(s, v, mem, issue);
   excavate(s, v, mem, issue);
   claimWalk(s, v, mem, issue);
@@ -1208,7 +1211,7 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
 function jobOf(u: Unit): Res | 'build' | null {
   const o = u.order;
   if (o.k === 'gather') return o.res;
-  if (o.k === 'farm' || o.k === 'hunt' || o.k === 'milk') return 'food';
+  if (o.k === 'farm' || o.k === 'hunt' || o.k === 'milk' || o.k === 'snare') return 'food';
   if (o.k === 'build') return 'build';
   return null;
 }
@@ -1401,9 +1404,47 @@ function assignCitizens(s: GameState, v: View, issue: (c: Command) => void): voi
     }
   }
   if (over && under) {
-    const mover = v.citizens.find((u) => jobOf(u) === over && u.carry <= 2 && u.order.k !== 'farm' && u.order.k !== 'hunt' && u.order.k !== 'milk' && !u.inside && !v.diggers.has(u.id));
+    const mover = v.citizens.find((u) => jobOf(u) === over && u.carry <= 2 && u.order.k !== 'farm' && u.order.k !== 'hunt' && u.order.k !== 'milk' && u.order.k !== 'snare' && !u.inside && !v.diggers.has(u.id));
     if (mover) sendTo(s, v, mover, under, issue);
   }
+}
+
+// ---- Snares in the wood (#485) ----------------------------------------------------------------------
+
+/**
+ * In the Deep Wood a clever computer with `SNARE.aiAt` citizens, from its second year (`SNARE.aiFrom`), lays a trap line: up to `SNARE.ai` snares, one at a
+ * time, in thick woods (`SNARE.aiTrees`) at least `SNARE.aiFar` tiles from any tree its people are felling, and keeps `SNARE.aiTenders`
+ * citizens walking it, taken off the berries first. Elsewhere the woods are left to the axe.
+ */
+function trapLine(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  if (!AI_LEVELS[v.p.ai!].clever || s.homeland !== 'wood' || isMobile(v.p) || v.citizens.length < SNARE.aiAt || s.tick < secs(SNARE.aiFrom)) return;
+  const snares = v.buildings.filter((b) => b.type === 'snare');
+  if (snares.length < SNARE.ai && snares.every((b) => b.built) && s.tick - (mem.ordered.snare ?? -99999) > secs(20)) {
+    const felling: number[] = [];
+    for (const u of v.citizens) if (u.order.k === 'gather' && u.order.res === 'wood') felling.push(u.order.tile);
+    const far = (tx: number, ty: number) => felling.every((t) => Math.max(Math.abs((t % s.w) - tx), Math.abs(Math.floor(t / s.w) - ty)) >= SNARE.aiFar);
+    const spot = findSpot(s, 'snare', v.home.x, v.home.y, 4, 16, 0, (tx, ty) => treesNear(s, tx, ty) >= SNARE.aiTrees && far(tx, ty) && !placeProblem(s, 'snare', tx, ty, true, v.p.id));
+    if (spot) construct(s, v, mem, 'snare', spot, 1, issue);
+  }
+  const line = snares.find((b) => b.built);
+  if (!line) return;
+  let tenders = 0;
+  for (const u of v.citizens) if (u.order.k === 'snare') tenders++;
+  if (tenders >= SNARE.aiTenders) return;
+  let best: Unit | null = null;
+  let bestD = Infinity;
+  for (const pass of [(u: Unit) => u.order.k === 'gather' && s.res[u.order.tile] === R_BERRY, (u: Unit) => u.order.k === 'gather' && u.order.res === 'food']) {
+    for (const u of v.citizens) {
+      if (u.inside || u.queue.length || v.diggers.has(u.id) || !pass(u)) continue;
+      const d = (u.x - line.x) * (u.x - line.x) + (u.y - line.y) * (u.y - line.y);
+      if (d < bestD) {
+        bestD = d;
+        best = u;
+      }
+    }
+    if (best) break;
+  }
+  if (best) issue({ t: 'work', p: v.p.id, ids: [best.id], target: line.id });
 }
 
 // ---- The wild (#171) ---------------------------------------------------------------------------------
@@ -2354,7 +2395,8 @@ function threatNear(s: GameState, v: View): { unit: Unit | null; count: number }
   for (const e of s.ents) {
     if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !isEnemy(s, v.p.id, e.owner) || e.type === 'citizen' || e.type === 'trader') continue;
     let near = Infinity;
-    for (const b of v.buildings) near = Math.min(near, distToRect(e.x, e.y, b));
+    // Snares out in the woods (#485) are not the town: foes by them don't ring its bell.
+    for (const b of v.buildings) if (b.type !== 'snare') near = Math.min(near, distToRect(e.x, e.y, b));
     if (near < 12) {
       n++;
       if (near < threatD) {

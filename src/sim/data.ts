@@ -1167,6 +1167,8 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   tower: { name: 'Watch Tower', size: 2, hp: 1000, cost: { wood: 50, stone: 125 }, time: 45, pop: 0, sight: 9, trains: [], drop: [], epoch: 1, guns: { damage: 8, range: 8, reload: 1.8 }, garrison: 5, menu: 'mil', key: 'W', blurb: 'Sees far and shoots at enemies nearby, aircraft too. Shelter soldiers inside for more arrows.' },
   dock: { name: 'Dock', size: 3, hp: 1800, cost: { wood: 150 }, time: 35, pop: 0, sight: 6, trains: ['fisher', 'transport', 'warship', 'cog'], drop: ['food'], epoch: 0, shore: true, menu: 'eco', key: 'D', blurb: 'Builds fishing boats, transports, warships and merchant ships, and takes in fish. Build it on the shore.' },
   huntcamp: { name: 'Hunting Camp', size: 2, hp: 500, cost: { wood: 45 }, time: 14, pop: 0, sight: 5, trains: [], drop: ['food'], epoch: 0, menu: 'eco', key: 'N', blurb: 'A drop-off for food, and a small claim on the land round it. Raise it by the herd or a far kill: meat inside your border is safe from wolves, and Drying Racks keep it.' },
+  // Snares in the wood (#485): set among standing trees, they fill with small game by themselves (`SNARE`, `src/sim/snares.ts`).
+  snare: { name: 'Snare', size: 1, hp: 60, cost: { wood: 30 }, time: 6, pop: 0, sight: 2, trains: [], drop: [], epoch: 0, open: true, menu: 'eco', key: 'J', blurb: 'A noose on a bent sapling, set among standing trees. It fills with small game by itself, faster the more trees stand round it and fastest in winter, until it is full. A citizen sent to it walks the trap line, emptying each snare in turn. Fell the trees round it and it starves.' },
   // The Path of Blood (#303): pitched by foot soldiers where the army stands, enemy land too; burns when left alone (`WARCAMP`).
   warcamp: { name: 'War Camp', size: 2, hp: 700, cost: { wood: 100, gold: 40 }, time: 30, pop: 0, sight: 6, trains: ['infantry'], drop: [], epoch: 3, ages: ['ironblood', 'totalwar'], builders: ['infantry'], menu: 'mil', key: 'Q', blurb: 'Tents, a stockade and a war standard, pitched by foot soldiers where the army stands, in enemy land too. Trains foot soldiers at the front and holds the land round it, so the army there is fed. Left without soldiers nearby, it burns.' },
   // The Silk Road (#334): a waystation by the road, raised in no one's land too; it rests traders, holds the land round it, and makes a near post pay more (`SERAI`).
@@ -1670,6 +1672,17 @@ export const AI_SHORE = { dockAt: 4, boats: 2 };
  *   `yardHunters` more hunters in winter.
  * Deer on the move walk for up to `walk` seconds.
  */
+/**
+ * Snares in the wood (#485), the Deep Wood's own verb. A Snare goes only where at least `need` trees stand
+ * within `r` tiles, and `apart` tiles from any other snare. Each second it fills by `rate` food times the trees
+ * round it over `full` (at most 1), times `winter` in winter, up to `cap`; a full snare catches nothing more.
+ * A tender empties `take` food a second into its basket, then walks on to the next of its people's snares
+ * within `round` tiles holding at least `worth`, and carries the catch home when its basket is full or the
+ * line is empty. The computer lays up to `ai` snares in the Deep Wood once it has `aiAt` citizens and `aiFrom` seconds
+ * have passed (its first year it hunts the winter yard with every hand), at least
+ * `aiFar` tiles from its lumber where at least `aiTrees` trees stand, with `aiTenders` tenders.
+ */
+export const SNARE = { r: 3, need: 6, full: 16, apart: 5, rate: 0.15, winter: 1.5, cap: 24, take: 3, round: 14, worth: 4, ai: 4, aiAt: 9, aiFrom: 600, aiFar: 5, aiTrees: 14, aiTenders: 1 };
 export const YEAR = { home: 16, out: 26, trek: 6, calves: 1, herdMax: 6, spare: 2, follow: 34, run: 1.3, ice: 0.3, yard: 5, from: 20, enter: 8, yardMin: 7, yardMax: 12, trees: 3, yardHunters: 2, walk: 45, breed: 1, seedAt: 1, spawn: 0.5, crowd: 8, crowdIn: 4, fishSpare: 60, fishHungry: 150 };
 /**
  * Caves (#356): on a world that holds any rare ore, `count` caves for the map's size are cut into open ground at least
