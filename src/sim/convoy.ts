@@ -1,4 +1,4 @@
-import { CONVOY } from './data';
+import { CONVOY, PRIZE } from './data';
 import { ageDef } from './ages';
 import { statsOf } from './world';
 import type { GameState, Unit } from './types';
@@ -13,4 +13,11 @@ export function convoyShare(s: GameState, ship: Unit): number {
     if ((e.x - ship.x) * (e.x - ship.x) + (e.y - ship.y) * (e.y - ship.y) <= r2) return CONVOY.pay;
   }
   return 1;
+}
+
+/** The gold a sunk merchant ship's killer keeps: `PRIZE.share` of its cargo, if the killer's people are in the Age of Sail. */
+export function prizeOf(s: GameState, target: Unit, by: number): number {
+  if (target.type !== 'cog' || target.carryRes !== 'gold' || target.carry <= 0) return 0;
+  if (!ageDef(s.players[by]).prizes) return 0;
+  return Math.floor(target.carry * PRIZE.share);
 }

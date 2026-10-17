@@ -104,6 +104,8 @@ export interface Age {
   fairs?: boolean;
   /** Escorted merchant ships carry more (the Age of Sail): see `CONVOY` (`convoy.ts`). */
   convoys?: boolean;
+  /** A merchant ship this people sinks gives up part of its cargo as prize money (the Age of Sail): see `PRIZE` (`convoy.ts`). */
+  prizes?: boolean;
   /** Priests keeping vigil at a relic Temple add to its gold (the Age of Pilgrims): see `VIGIL` (`vigil.ts`). */
   vigils?: boolean;
 }
@@ -240,6 +242,7 @@ export const AGES: Record<AgeId, Age> = {
     price: { ship: 0.75 },
     ironTrade: IRON_TRADE,
     convoys: true,
+    prizes: true,
   },
   lightning: {
     name: 'Age of Lightning',
@@ -1032,6 +1035,8 @@ export const FAIR = { every: 240, open: 60, reach: 12, pay: 1.5, purse: 150 };
  * tiles carries `pay` times the gold. Send the fleet with the cogs: the escort is also what the rival's raiders meet.
  */
 export const CONVOY = { reach: 6, pay: 1.4 };
+/** Prize money (the Age of Sail): a merchant ship sunk by a people in the Age of Sail gives the sinker `share` of the gold it carried. */
+export const PRIZE = { share: 0.5 };
 /**
  * Vigils (the Age of Pilgrims): each own priest standing within `reach` tiles of a finished Temple that keeps a
  * relic adds `each` gold to that relic's payment, for at most `most` priests; the toast tells of it at most every `toast` seconds. A priest at the shrine is a priest
@@ -1642,6 +1647,8 @@ export interface AiLevel {
   fork?: boolean;
   /** Off: a Blood-rite computer's priests neither curse nor sacrifice (#355 s4; only `scripts/ai-ab.ts` turns it off). */
   rite?: boolean;
+  /** Off: a priest that has taken up healing by itself is left at it, as before (only `scripts/ai-ab.ts` turns it off). */
+  healers?: boolean;
 }
 
 /**
@@ -1750,7 +1757,7 @@ export const RITE = {
  * Station or Blood Tower seen within `hunt` tiles (its warships for one by the shore), and a rival with one (or `grafted` grafted soldiers
  * seen) gets `siege` engines more. Its bombers count a rival Station `bomb` squared tiles nearer than it is (a Blood Tower half that).
  */
-export const AI_HEMO = { town: 24, army: 6, rig: 6, watch: 26, foes: 2, again: 60, towers: 2, tower: 10, gap: 45, spread: 6, living: 0.6, near: 16, batch: 2, spare: 1, levyGap: 12, hunt: 22, grafted: 3, siege: 2, bomb: 2500 };
+export const AI_HEMO = { town: 24, army: 6, rig: 6, watch: 26, foes: 2, again: 60, towers: 2, tower: 10, gap: 45, spread: 6, living: 0.6, near: 16, batch: 2, spare: 1, levyGap: 12, hunt: 22, grafted: 3, siege: 2, bomb: 2500, forward: 12 };
 
 /**
  * The computer at the fork (#355 s5). A clever computer in Total War picks its branch once its town has grown (`AI_HEMO.town`): the Blood-rite when

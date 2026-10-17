@@ -2,6 +2,7 @@ import { AURA, RALLY, BONUS, BLOOD_TOWER, BUILDINGS, DEER, LIGHTNING, VETERANCY,
 import { hasCoils } from './ages';
 import { bleeds, curseTaken, drawBlood, hemoBlow, hemoTaken } from './blood';
 import { fairPurse } from './fair';
+import { prizeOf } from './convoy';
 import { distToRect } from './grid';
 import type { Spatial } from './spatial';
 import { modsOf, statsFor } from './stats';
@@ -95,6 +96,12 @@ function plunder(s: GameState, target: Unit, by: number): void {
   const p = s.players[by];
   p.stats.slain = (p.stats.slain ?? 0) + 1;
   drawBlood(s, target, by);
+  const prize = prizeOf(s, target, by);
+  if (prize > 0) {
+    p.res.gold += prize;
+    p.stats.plunder = (p.stats.plunder ?? 0) + prize;
+    s.events.push({ k: 'plunder', owner: by, x: target.x, y: target.y, gold: prize });
+  }
   const share = modsOf(s, by).plunder;
   if (share <= 0) return;
   const c = statsOf(s, target).cost;

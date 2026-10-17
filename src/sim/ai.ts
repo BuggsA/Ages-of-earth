@@ -2452,6 +2452,33 @@ function pitchCamp(s: GameState, v: View, mem: AiMemory, wave: Unit[], enemy: { 
   blood.camp = s.tick;
 }
 
+/**
+ * A forward Transfusion Station (#355 s5): once the wave's War Camp stands out at the front, a Station is raised beside it, so grafted
+ * soldiers fight within `HEMO.reach` of a feed instead of running dry. One at a time, and not again for `AI_HEMO.again` seconds.
+ */
+function pitchStation(s: GameState, v: View, mem: AiMemory, wave: Unit[], issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!hemoPlay(p) || ageOf(p) !== 'totalwar' || buildBarred(p, 'transfusion')) return;
+  const far2 = (AI_BLOOD.home + 12) * (AI_BLOOD.home + 12);
+  const camp = v.buildings.find((b) => b.type === 'warcamp' && b.built && b.hp > 0 && (b.x - v.home.x) * (b.x - v.home.x) + (b.y - v.home.y) * (b.y - v.home.y) > far2);
+  if (!camp) return;
+  const near2 = AI_HEMO.forward * AI_HEMO.forward;
+  if (stationsOf(s, p.id).some((b) => (b.x - camp.x) * (b.x - camp.x) + (b.y - camp.y) * (b.y - camp.y) <= near2)) return;
+  if (v.buildings.some((b) => b.type === 'transfusion' && !b.built)) return;
+  if (s.tick - (mem.ordered.transfusion ?? -99999) < secs(AI_HEMO.again)) return;
+  const foot = wave.filter((u) => u.type === 'infantry' && !u.inside);
+  if (foot.length < 2) return;
+  const spot = findSpot(s, 'transfusion', camp.x, camp.y, 2, AI_HEMO.forward - 2);
+  if (!spot) return;
+  const cost = raiseCost(s, p.id, 'transfusion', spot.tx, spot.ty);
+  if (!afford(v, cost)) return;
+  const d = (u: Unit) => (u.x - spot.tx) * (u.x - spot.tx) + (u.y - spot.ty) * (u.y - spot.ty);
+  const crew = foot.sort((a, b) => d(a) - d(b) || a.id - b.id).slice(0, 3);
+  issue({ t: 'build', p: p.id, ids: crew.map((u) => u.id), type: 'transfusion', tx: spot.tx, ty: spot.ty });
+  spend(v, cost);
+  mem.ordered.transfusion = s.tick;
+}
+
 /** The nearest rival War Camp the computer has seen within `AI_BLOOD.answer` tiles of home, or null. */
 export function rivalWarCamp(s: GameState, p: Player, home: { x: number; y: number }): Building | null {
   let best: Building | null = null;
@@ -3005,6 +3032,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   if (L.clever && L.hemo !== false && mem.attacking) machinesAtBlood(s, v, onAttack, issue);
   if (L.clever && !mem.attacking) pitchHomeCamp(s, v, mem, issue);
   if (L.clever && mem.attacking) pitchCamp(s, v, mem, onAttack, enemy, issue);
+  if (L.clever && mem.attacking) pitchStation(s, v, mem, onAttack, issue);
   // A rival's War Camp in reach is a raid worth more than a house (#307): kill its keepers and it burns.
   if (L.clever && !mem.attacking && !plan.hold ) {
     const camp = rivalWarCamp(s, p, v.home);
@@ -3301,7 +3329,10 @@ function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     }
   }
   for (const pr of v.priests) {
-    if (pr.order.k !== 'idle' || pr.inside || ritual.has(pr.id)) continue;
+    // An idle priest takes up healing by itself within ticks of seeing anyone hurt (`units.ts`), and the computer gives no heal
+    // orders, so a healing priest is one between jobs too: a relic, a ward or a conversion comes first, but not a walk away.
+    const healing = pr.order.k === 'heal' && AI_LEVELS[v.p.ai!].healers !== false;
+    if (!(pr.order.k === 'idle' || healing) || pr.inside || ritual.has(pr.id)) continue;
     const held = carriedBy(s, pr);
     if (held) {
       const t = nearestTemple(s, v.p.id, pr.x, pr.y);
@@ -3365,6 +3396,8 @@ function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
       if ((pr.x - shrine.x) * (pr.x - shrine.x) + (pr.y - shrine.y) * (pr.y - shrine.y) > r * r) issue({ t: 'move', p: v.p.id, ids: [pr.id], x: shrine.x, y: shrine.y });
       continue;
     }
+    // Healing is the work a priest keeps up with the army for: it stays at it.
+    if (healing) continue;
     // Against a pilgrim rival, a spare priest stands by a tower, gate or Temple.
     if (ward) {
       issue({ t: 'move', p: v.p.id, ids: [pr.id], x: ward.b.x, y: ward.b.y });
