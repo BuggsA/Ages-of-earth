@@ -579,6 +579,10 @@ export interface Player {
   startY: number;
   /** Tick of the last "under attack" alert, so they come at most every few seconds. */
   alert: number;
+  /** Tick of the last Town Center alert (#452). */
+  tcAlert?: number;
+  /** The tick by which a people with no Town Center must have a new one under way, or be lost (#452). */
+  heartless?: number;
 }
 
 export type GameEvent =
@@ -643,7 +647,7 @@ export type GameEvent =
   /** A rival trader of `from`'s paid `owner` a toll of `gold` for safe passage across its land (#334). */
   | { k: 'toll'; owner: number; from: number; gold: number; id: number; x: number; y: number }
   | { k: 'campAlone'; owner: number; id: number; x: number; y: number; struck: boolean }
-  | { k: 'alert'; owner: number; x: number; y: number; building: boolean; wild?: Animal['kind']; /** A rival's soldiers fell on a citizen out hunting. */ hunter?: boolean }
+  | { k: 'alert'; owner: number; x: number; y: number; building: boolean; /** The Town Center is struck. */ heart?: boolean; wild?: Animal['kind']; /** A rival's soldiers fell on a citizen out hunting. */ hunter?: boolean }
   | { k: 'converted'; id: number; from: number; to: number; x: number; y: number }
   /** A building chanted over to a pilgrim people (#209). */
   | { k: 'consecrated'; id: number; from: number; to: number; x: number; y: number; type: BuildingType; size: number }
@@ -673,6 +677,7 @@ export type GameEvent =
   | { k: 'wonderRising'; owner: number; id: number; x: number; y: number }
   | { k: 'trade'; owner: number; res: Res; buy: boolean }
   | { k: 'defeated'; owner: number }
+  | { k: 'heartless'; owner: number; left: number }
   | { k: 'over'; winner: number; how: 'conquest' | 'wonder' | 'relics' | 'lands' | 'resign' | 'time' | 'scenario' }
   /** A relic picked up, kept in a Temple, or let go where it lies. */
   | { k: 'relic'; id: number; owner: number; what: 'taken' | 'kept' | 'dropped'; x: number; y: number }

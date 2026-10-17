@@ -10,7 +10,7 @@ import { hitAnimal, spawnAnimal, updateAnimals } from './animals';
 import { markGoals, scenarioStep, startScenario } from './campaign';
 import { buildingGuns, updateShots } from './combat';
 import { applyCommand } from './commands';
-import { AGES, AURA, AUTO_WORK, unitEpoch, CIV_IDS, LANDMARKS, RAIDER, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
+import { AGES, AURA, AUTO_WORK, unitEpoch, CIV_IDS, HEART, LANDMARKS, RAIDER, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
 import { AIR, NAVAL, stampBuilding } from './grid';
 import { denWolves, generateMap } from './mapgen';
 import { Spatial } from './spatial';
@@ -427,6 +427,22 @@ function checkVictory(s: GameState): void {
       for (const e of s.ents) if (e.owner === p.id) e.hp = 0;
       s.events.push({ k: 'defeated', owner: p.id });
       continue;
+    }
+    // The heart (#452): with no Town Center standing, started or on a wagon, a people has `HEART.grace` seconds
+    // to lay a new foundation. Regicide has its King, and a campaign chapter its own goals.
+    if (s.mode !== 'regicide' && !s.scenario) {
+      const heart = s.ents.some((e) => e.owner === p.id && e.hp > 0 && ((e.kind === 'building' && e.type === 'towncenter') || (e.kind === 'unit' && e.packed === 'towncenter')));
+      if (heart) {
+        if (p.heartless !== undefined) delete p.heartless;
+      } else if (p.heartless === undefined) {
+        p.heartless = s.tick + secs(HEART.grace);
+        s.events.push({ k: 'heartless', owner: p.id, left: HEART.grace });
+      } else if (s.tick >= p.heartless) {
+        p.defeated = true;
+        for (const e of s.ents) if (e.owner === p.id) e.hp = 0;
+        s.events.push({ k: 'defeated', owner: p.id });
+        continue;
+      }
     }
     // Fields and walls alone don't keep a people alive, nor do unarmed boats (fishing boats, merchant
     // ships): none of them can build or fight, so a people down to them can never come back, and a rival

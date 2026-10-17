@@ -991,6 +991,12 @@ export const CONSECRATE = {
  * the land is within `fair` tiles of as far from the two nearest towns, at least `spacing` apart. A
  * relic kept in a Temple brings its owner `gold` every `every` seconds, and `score` to their score.
  */
+/**
+ * The Town Center is the heart of a people (#452): when the last one falls (finished, under construction, or packed
+ * on a steppe wagon all count as standing), a people has `grace` seconds to lay a new foundation before it is lost.
+ * The alert for an attack on a Town Center comes at least every `alert` seconds, whatever else is being struck.
+ */
+export const HEART = { grace: 45, alert: 8 };
 export const RELIC = { home: 20, fair: 3, spacing: 12, extra: { small: 1, medium: 2, large: 3 } as Record<MapSize, number>, gold: 1, every: 2, score: 60 };
 /**
  * Trade: `posts` trading posts (by map size) stand within `edge` tiles of the map's edge (at least 3),
@@ -1144,7 +1150,7 @@ export interface BuildingStats {
 }
 
 export const BUILDINGS: Record<BuildingType, BuildingStats> = {
-  towncenter: { name: 'Town Center', size: 4, hp: 2400, cost: { wood: 275, stone: 150 }, time: 110, pop: 10, sight: 8, trains: ['citizen', 'hero'], drop: ['food', 'wood', 'stone', 'gold'], epoch: 0, guns: { damage: 6, range: 7, reload: 2 }, garrison: 15, menu: 'eco', key: 'T', blurb: 'Trains citizens and heroes, takes in every resource and leads your people into the next epoch. Citizens shelter here when the bell rings.' },
+  towncenter: { name: 'Town Center', size: 4, hp: 2800, cost: { wood: 275, stone: 150 }, time: 110, pop: 10, sight: 8, trains: ['citizen', 'hero'], drop: ['food', 'wood', 'stone', 'gold'], epoch: 0, guns: { damage: 6, range: 7, reload: 2 }, garrison: 15, menu: 'eco', key: 'T', blurb: 'Trains citizens and heroes, takes in every resource and leads your people into the next epoch. Citizens shelter here when the bell rings. Lose your last one and you have 45 seconds to raise another, or your people is lost: build a second far from the first.' },
   house: { name: 'House', size: 2, hp: 600, cost: { wood: 35 }, time: 18, pop: 5, sight: 3, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'E', blurb: 'Room for 5 more people.' },
   storehouse: { name: 'Storehouse', size: 2, hp: 800, cost: { wood: 75 }, time: 22, pop: 0, sight: 4, trains: [], drop: ['food', 'wood', 'stone', 'gold'], epoch: 0, menu: 'eco', key: 'S', blurb: 'A drop-off for every resource, and better tools for gatherers. Build it by woods and mines.' },
   farm: { name: 'Farm', size: 3, hp: 300, cost: { wood: 55 }, time: 12, pop: 0, sight: 2, trains: [], drop: [], epoch: 0, open: true, menu: 'eco', key: 'F', blurb: 'Food that never runs out, worked by one citizen.' },
