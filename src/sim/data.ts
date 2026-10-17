@@ -72,6 +72,8 @@ export interface Age {
    * more, counting at most `most` such steps. Iron dug on the way here still counts (the web's link).
    */
   ironTrade?: { per: number; each: number; most: number };
+  /** Blades forged from bog iron (the Iron Age): foot soldiers strike `attack` harder for every `per` bars dug, up to `most` steps. */
+  forge?: { base: number; per: number; attack: number; most: number };
   /**
    * Power broadcast from coils (the Age of Lightning, #231): Watch Towers become Coil Towers, whose field
    * speeds the work of buildings near them and slows every building outside, and whose shot is a leaping
@@ -160,6 +162,12 @@ const trunkAge = (e: number): Age => ({ name: EPOCHS[e].name, short: EPOCHS[e].s
 /** Iron wares: bog iron dug (any age) raises trade in the trading ages (Merchants, Fairs, Sail): +8% a 75 bars, to +40%. */
 export const IRON_TRADE = { per: 75, each: 0.08, most: 5 };
 
+/**
+ * The Iron Age's forge: every `per` bars of bog iron dug past the `base` that opened the road (the Iron Age's deed)
+ * sharpen foot soldiers' edges by `attack`, up to `most` steps. The marsh is the armoury.
+ */
+export const IRON_FORGE = { base: 150, per: 50, attack: 1, most: 3 };
+
 export const AGES: Record<AgeId, Age> = {
   stone: trunkAge(0),
   bronze: trunkAge(1),
@@ -195,10 +203,11 @@ export const AGES: Record<AgeId, Age> = {
     name: 'Iron Age',
     short: 'Iron',
     tier: 1,
-    blurb: 'Iron spears, iron hoes and iron axes, but no horse: cheap, hard-hitting foot soldiers and quicker farms and woodcutters, and every scrap of bog iron dug pays twice its gold, so the marsh is worth holding; cavalry waits for the Middle Ages.',
+    blurb: 'Iron spears, iron hoes and iron axes, but no horse: cheap, hard-hitting foot soldiers and quicker farms and woodcutters, and every scrap of bog iron dug pays twice its gold and, every 50 bars past the first 150 sharpen every spearman\'s edge by 1 (up to 3), so the marsh is worth holding and an army is only as keen as the iron behind it; cavalry waits for the Middle Ages.',
     add: { infantryAttack: 1 },
     mul: { farm: 1.1, wood: 1.1, bogGold: 2 },
     price: { infantry: 0.75 },
+    forge: IRON_FORGE,
     no: { units: ['cavalry'], why: 'No horses in the Iron Age: cavalry waits for the Middle Ages' },
   },
   pilgrim: {

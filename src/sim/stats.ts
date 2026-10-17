@@ -32,6 +32,9 @@ function apply(m: Mods, add?: Partial<Mods>, mul?: Partial<Mods>): void {
   if (mul) for (const k of Object.keys(mul) as (keyof Mods)[]) m[k] *= mul[k]!;
 }
 
+/** How many forge steps a player's bog iron dug has reached. */
+export const ironSteps = (p: Player, f: { base: number; per: number; most: number }): number => Math.min(f.most, Math.max(0, Math.floor(((p.stats.iron ?? 0) - f.base) / f.per)));
+
 export function computeMods(p: Player): Mods {
   const m: Mods = { ...NO_MODS };
   const civ = CIVS[p.civ];
@@ -43,6 +46,7 @@ export function computeMods(p: Player): Mods {
   const age = ageDef(p);
   for (const t of p.techs) if (!TECHS[t].only || TECHS[t].only === ageOf(p)) apply(m, TECHS[t].add, TECHS[t].mul);
   apply(m, age.add, age.mul);
+  if (age.forge) m.infantryAttack += age.forge.attack * ironSteps(p, age.forge);
   const carry = pathCarry(p);
   if (carry) for (let i = 0; i < carry.times; i++) apply(m, PATHS[carry.path].carry);
   if (p.workEnd !== undefined) apply(m, WORKS[p.civ].add, WORKS[p.civ].mul);
