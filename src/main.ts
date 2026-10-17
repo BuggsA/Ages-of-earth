@@ -94,7 +94,7 @@ let placeAt: { tx: number; ty: number; ok: boolean } | null = null;
 /** A wall being dragged out, from tile to tile. */
 let wallDrag: { x0: number; y0: number; x1: number; y1: number } | null = null;
 /** The next left click picks a target: where to attack-move, or a building to shelter in. */
-let targetMode: 'amove' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | null = null;
+let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | null = null;
 let paused = false;
 const SPEEDS = [1, 1.5, 2, 3];
 let speedIdx = 0;
@@ -127,6 +127,10 @@ const hud = new Hud({
   },
   attackMove: () => {
     targetMode = 'amove';
+    placing = null;
+  },
+  patrolMode: () => {
+    targetMode = 'patrol';
     placing = null;
   },
   riteMode: (how) => {
@@ -1366,6 +1370,18 @@ function board(s: GameState, units: Unit[], ship: Unit, queue: true | undefined)
 }
 
 /** Sail the selected transports to a shore and land their passengers. */
+/** Patrol between where the selection stands and the ground under the pointer (#454); Shift adds a waypoint. */
+function patrolAt(clientX: number, clientY: number, queue: boolean): void {
+  const s = game;
+  if (!s) return;
+  const g = view.groundAt(clientX, clientY);
+  const units = selectedUnits(s).filter((u) => !u.inside);
+  if (!g || !units.length) return;
+  issue({ t: 'patrol', p: viewer, ids: units.map((u) => u.id), x: g.x, y: g.y, queue: queue || undefined });
+  view.marker(s, g.x, g.y, true);
+  play('move');
+}
+
 function unloadAt(clientX: number, clientY: number, queue: boolean): void {
   const s = game;
   if (!s) return;
@@ -1534,6 +1550,11 @@ canvas.addEventListener('pointerdown', (e) => {
   }
   if (targetMode === 'amove') {
     order(e.clientX, e.clientY, true, e.shiftKey);
+    if (!e.shiftKey) targetMode = null;
+    return;
+  }
+  if (targetMode === 'patrol') {
+    patrolAt(e.clientX, e.clientY, e.shiftKey);
     if (!e.shiftKey) targetMode = null;
     return;
   }
@@ -1729,7 +1750,8 @@ minimap.onCommand = (x, y) => {
   if (!s || mode !== 'play') return;
   const ids = selectedUnits(s).map((u) => u.id);
   if (!ids.length) return;
-  issue({ t: 'move', p: viewer, ids, x, y, amove: targetMode === 'amove' });
+  if (targetMode === 'patrol') issue({ t: 'patrol', p: viewer, ids, x, y });
+  else issue({ t: 'move', p: viewer, ids, x, y, amove: targetMode === 'amove' });
   targetMode = null;
   play('move');
 };
@@ -2546,7 +2568,7 @@ function refreshHud(): void {
 
 function cursorFor(s: GameState): string {
   if (placing) return 'cur-place';
-  if (targetMode === 'amove') return 'cur-amove';
+  if (targetMode === 'amove' || targetMode === 'patrol') return 'cur-amove';
   if (targetMode === 'garrison') return 'cur-garrison';
   if (targetMode === 'sacrifice' || targetMode === 'curse') return 'cur-convert';
   if (targetMode === 'unload') return 'cur-garrison';

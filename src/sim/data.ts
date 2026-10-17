@@ -1527,6 +1527,16 @@ export const SEASONS = [
  */
 export const SPREAD = { reach: 5, perNode: 2, foe: 4, perFoe: 3, far: 18 };
 /**
+ * Patrol and explore (#454). Soldiers on either look for foes every `scan` ticks: an aggressive one as far
+ * as it sees, a defensive one within `provoke` of its sight, one standing its ground only within reach.
+ * A patrol gives up after `misses` legs in a row end short of their point; it holds at most `points`.
+ * An explorer picks unseen ground on a grid every `grid` tiles, keeps `apart` tiles from where its fellows
+ * are headed, and passes over ground within `shun` tiles of a tile it couldn't reach; `fails` such tiles in a row
+ * (with nothing new seen between) and it stops.
+ */
+export const PATROL = { scan: 6, provoke: 0.5, misses: 4, points: 8 };
+export const EXPLORE = { grid: 4, apart: 12, fails: 8, shun: 6 };
+/**
  * Idle hands find work (#344), for the player's people only (the computer sets its own to work):
  * - `trained`: a citizen trained with no rally point takes the nearest node within this many tiles;
  * - `rally`: a rally flag on a resource that has since run out sends new hands to the nearest of its kind

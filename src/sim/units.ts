@@ -1,4 +1,4 @@
-import { AI_LEVELS, AUTO_WORK, BUILDINGS, CARRY, CONSECRATE, DEER, DT, FLOCK, GALVANIC, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SPREAD, TRADE, domainOf, secs } from './data';
+import { AI_LEVELS, AUTO_WORK, BUILDINGS, EXPLORE, PATROL, CARRY, CONSECRATE, DEER, DT, FLOCK, GALVANIC, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SPREAD, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
@@ -619,11 +619,133 @@ function findTarget(s: GameState, sp: Spatial, u: Unit, r: number, buildings: bo
   return best;
 }
 
+/** A patrol or exploration taken up again after a fight: it sets off afresh toward where it was going. */
+function resumed(o: Order): Order {
+  return o.k === 'patrol' || o.k === 'explore' ? { ...o, started: false } : o;
+}
+
+/**
+ * A soldier on patrol or exploring looks for a fight by its stance (#454): an aggressive one as far as it
+ * sees, a defensive one only close by, one standing its ground only within reach. True if it turned to fight.
+ */
+function roundFight(s: GameState, sp: Spatial, u: Unit, o: Order): boolean {
+  if (!MILITARY.includes(u.type) || (s.tick + u.id) % PATROL.scan !== 0) return false;
+  const st = statsOf(s, u);
+  const reach = u.stance === 'stand' ? st.range + st.radius + 0.6 : u.stance === 'defensive' ? st.sight * PATROL.provoke : st.sight;
+  const t = findTarget(s, sp, u, reach, u.stance === 'aggressive' || !!st.buildingsOnly);
+  if (!t) return false;
+  // The fight's leash (defensive units) is measured from where the round was left.
+  u.guardX = u.x;
+  u.guardY = u.y;
+  setOrder(u, { k: 'attack', target: t.id, auto: true, then: null, back: o });
+  return true;
+}
+
+function patrolStep(s: GameState, sp: Spatial, u: Unit, o: Extract<Order, { k: 'patrol' }>): void {
+  if (roundFight(s, sp, u, o)) return;
+  const pt = o.pts[o.i];
+  if (!o.started) {
+    o.started = true;
+    goTo(u, goalForPoint(s, pt.x, pt.y, passOf(s, u)));
+    return;
+  }
+  if (walking(u)) return;
+  // A leg is done: on to the next point. Legs that keep ending far short (no way there) end the patrol.
+  const dx = pt.x - u.x;
+  const dy = pt.y - u.y;
+  o.miss = dx * dx + dy * dy > 4 ? o.miss + 1 : 0;
+  if (o.miss >= PATROL.misses) {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  o.i = (o.i + 1) % o.pts.length;
+  o.started = false;
+}
+
+/**
+ * The unseen tile an explorer heads for next (#454): on a grid over the map, the nearest one its people
+ * have never seen that it could stand on, away from where its fellow explorers are headed and from tiles
+ * it already failed to reach. -1 when the whole map has been seen.
+ */
+function nearFail(s: GameState, x: number, y: number, fails: readonly number[]): boolean {
+  for (const f of fails) {
+    const fx = f % s.w;
+    const fy = Math.floor(f / s.w);
+    if ((fx - x) * (fx - x) + (fy - y) * (fy - y) <= EXPLORE.shun * EXPLORE.shun) return true;
+  }
+  return false;
+}
+
+export function exploreTarget(s: GameState, u: Unit, fails: readonly number[] = []): number {
+  const seen = s.players[u.owner].seen;
+  const pass = passOf(s, u);
+  const others: number[] = [];
+  for (const e of s.ents) {
+    if (e.kind === 'unit' && e.id !== u.id && e.owner === u.owner && e.hp > 0 && e.order.k === 'explore' && e.order.x >= 0) others.push(e.order.x, e.order.y);
+  }
+  const apart = EXPLORE.apart * EXPLORE.apart;
+  const g = EXPLORE.grid;
+  let best = -1;
+  let bestD = Infinity;
+  for (let y = g >> 1; y < s.h; y += g) {
+    for (let x = g >> 1; x < s.w; x += g) {
+      const i = y * s.w + x;
+      if (seen[i] || !walkable(s, x, y, pass) || nearFail(s, x, y, fails)) continue;
+      let d = (x + 0.5 - u.x) * (x + 0.5 - u.x) + (y + 0.5 - u.y) * (y + 0.5 - u.y);
+      // Ground a fellow is headed for counts as much further off, so a band of scouts fans out.
+      for (let k = 0; k < others.length; k += 2) {
+        if ((others[k] - x) * (others[k] - x) + (others[k + 1] - y) * (others[k + 1] - y) < apart) {
+          d += apart * 16;
+          break;
+        }
+      }
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    }
+  }
+  return best;
+}
+
+function exploreStep(s: GameState, sp: Spatial, u: Unit, o: Extract<Order, { k: 'explore' }>): void {
+  if (roundFight(s, sp, u, o)) return;
+  const seen = s.players[u.owner].seen;
+  const here = o.x >= 0 ? o.y * s.w + o.x : -1;
+  // Seen at last: a step made, so the ground it failed to reach may be worth another try later.
+  if (here >= 0 && seen[here]) o.fails = [];
+  if (here < 0 || seen[here]) {
+    const t = exploreTarget(s, u, o.fails);
+    if (t < 0) {
+      setOrder(u, { k: 'idle' });
+      return;
+    }
+    o.x = t % s.w;
+    o.y = Math.floor(t / s.w);
+    o.started = false;
+  }
+  if (!o.started) {
+    o.started = true;
+    goTo(u, goalForPoint(s, o.x + 0.5, o.y + 0.5, passOf(s, u)));
+    return;
+  }
+  if (walking(u)) return;
+  // Stopped with the tile still unseen: no way there. Remember it and try elsewhere; give up after a run of them.
+  o.fails.push(o.y * s.w + o.x);
+  if (o.fails.length >= EXPLORE.fails) {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  o.x = -1;
+  o.y = -1;
+}
+
 function attackStep(s: GameState, sp: Spatial, u: Unit, o: Extract<Order, { k: 'attack' }>): void {
   const t = s.byId.get(o.target);
   const st = statsOf(s, u);
   const done = () => {
     if (o.then) setOrder(u, { k: 'move', x: o.then.x, y: o.then.y, amove: true, started: false });
+    else if (o.back) setOrder(u, resumed(o.back));
     else if (u.stance === 'defensive') setOrder(u, { k: 'move', x: u.guardX, y: u.guardY, amove: false, started: false });
     else setOrder(u, { k: 'idle' });
   };
@@ -1557,6 +1679,12 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
       break;
     case 'attack':
       attackStep(s, sp, u, o);
+      break;
+    case 'patrol':
+      patrolStep(s, sp, u, o);
+      break;
+    case 'explore':
+      exploreStep(s, sp, u, o);
       break;
     case 'gather':
       gatherStep(s, u, o);

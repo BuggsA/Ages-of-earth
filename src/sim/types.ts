@@ -96,7 +96,18 @@ export type Order =
   /** Walk to a point. With `amove`, fight anything met on the way. */
   | { k: 'move'; x: number; y: number; amove: boolean; started: boolean }
   /** Fight a unit or building. `auto` when picked by the unit itself (it gives up sooner); `then` resumes an attack-move. */
-  | { k: 'attack'; target: number; auto: boolean; then: { x: number; y: number } | null }
+  | { k: 'attack'; target: number; auto: boolean; then: { x: number; y: number } | null; back?: Order }
+  /**
+   * Walk the points in turn, round and round (#454). Soldiers fight what they meet by their stance and come
+   * back to the round (`back` on the attack). `miss` counts legs that ended short of their point.
+   */
+  | { k: 'patrol'; pts: { x: number; y: number }[]; i: number; started: boolean; miss: number }
+  /**
+   * Go and see (#454): head for the nearest ground its people have never seen, and on to the next when it
+   * comes into sight. `x`, `y` is the tile it heads for (-1 before the first); `fails` holds tiles it could
+   * not reach, so it doesn't try them again.
+   */
+  | { k: 'explore'; x: number; y: number; started: boolean; fails: number[] }
   /** Gather a resource tile: walk there, work it, carry the load to a drop site, and back. */
   | { k: 'gather'; tile: number; res: Res; phase: 'go' | 'work' | 'drop'; bog?: boolean; rare?: RareId; meat?: boolean }
   | { k: 'build'; target: number }
@@ -879,6 +890,10 @@ export type Command =
   /** A rare ore (#356) can only be sold, a lot of it for gold at a flat price. */
   | { t: 'trade'; p: number; res: 'food' | 'wood' | 'stone' | RareId; buy: boolean }
   | { t: 'stop'; p: number; ids: number[] }
+  /** Patrol between where each unit stands and the point (#454); with `queue`, add the point to a patrol under way. */
+  | ({ t: 'patrol'; p: number; ids: number[]; x: number; y: number } & Queued)
+  /** Explore on their own (#454). */
+  | ({ t: 'explore'; p: number; ids: number[] } & Queued)
   | { t: 'delete'; p: number; ids: number[] }
   | { t: 'resign'; p: number }
   /** Priests set down the relics they carry, where they stand. */
