@@ -31,7 +31,7 @@ const advance = (s: GameState, to?: AgeId) => {
 describe('heirlooms (#224)', () => {
   it('each names two different side ages and a building, and is never also a one-age craft', () => {
     const heirs = TECH_IDS.filter((t) => TECHS[t].walked);
-    expect(heirs.sort()).toEqual(['bellFoundry', 'galvanic', 'ironHulls', 'jointStock', 'masonsLodge', 'stElmo', 'telegraphy']);
+    expect(heirs.sort()).toEqual(['bellFoundry', 'galvanic', 'galvanicBlood', 'ironHulls', 'jointStock', 'masonsLodge', 'militaryOrders', 'stElmo', 'telegraphy']);
     for (const t of heirs) {
       const [a, b] = TECHS[t].walked!;
       expect(a).not.toBe(b);
