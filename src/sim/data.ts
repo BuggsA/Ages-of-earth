@@ -1563,6 +1563,12 @@ export const AI_LEVELS: Record<Difficulty, AiLevel> = {
  */
 export const AI_WONDER = { share: 0.4, least: 3, most: 14, stay: 6, reach: 26 };
 
+/**
+ * The computer and feast days (#379 s1): a clever computer raises its Market on the fairground, searching up to `ring`
+ * tiles round its relic Temple, and in the Age of Fairs keeps up to `markets` Markets so one stands there.
+ */
+export const AI_FAIR = { ring: 10, markets: 2 };
+
 /** The computer and the rare ores (#356 s5): the crew it sends to dig the ore a road's door asks for, and how far from home it will look for the vein. */
 export const AI_ORE = { crew: 3, reach: 40 };
 
