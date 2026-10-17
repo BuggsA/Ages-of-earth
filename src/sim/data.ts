@@ -1594,7 +1594,7 @@ export const HOMELANDS: Record<HomelandId, Homeland> = {
   shore: {
     name: 'The Shore', icon: '🌊', short: 'few berries; fish the mere from a Dock',
     blurb: 'A rich shoal just off home and only a thin berry bush. Food comes by boat: raise a Dock and launch canoes early, so the opening is hungry for wood, and a rival who burns the Dock starves you.',
-    berries: 3, thicket: 0, deer: 3, herd2: 0, grove: 0, mammoth: 17, fish: 8, mere: 5,
+    berries: 3, thicket: 0, deer: 3, herd2: 0, grove: 0, mammoth: 17, fish: 8, mere: 6,
     weight: { continental: 2, highlands: 1, lakes: 3, forest: 1, plains: 1, sea: 3 },
   },
   herds: {
@@ -1610,7 +1610,7 @@ export const HOMELANDS: Record<HomelandId, Homeland> = {
     weight: { continental: 2, highlands: 3, lakes: 2, forest: 4, plains: 0, sea: 1 },
   },
 };
-export const HOMELAND = { mereAt: 15 };
+export const HOMELAND = { mereAt: 16 };
 /** The computer on the Shore (#473): it raises its Dock once it has `dockAt` citizens and keeps `boats` more fishing boats. */
 export const AI_SHORE = { dockAt: 4, boats: 2 };
 /**

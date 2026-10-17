@@ -1,31 +1,34 @@
 /**
  * Goal 1's measure (#463): two computer players on one seed, each held to a different Way, played side by
  * side, so the first minutes of their openings can be set next to each other.
- *   npx tsx scripts/opening.ts [seed] [wayA] [wayB] [minutes] [size]
+ *   npx tsx scripts/opening.ts [seed] [wayA] [wayB] [minutes] [size] [homeland]
  *   npx tsx scripts/opening.ts 3 hunt hearth 15
+ *   npx tsx scripts/opening.ts 3 hunt hunt 15 medium shore   (one homeland, #473; 'random' rolls the seed's)
  * Prints a row a minute (citizens, soldiers, buildings, stockpile, the meat and gathering so far, kills) and,
  * after it, when each kind of building first stood (`first`), so two openings that only differ in numbers
  * look the same and two that differ in what the people do do not. Ways are those in `WAYS` (`data.ts`).
  */
-import { AGES, WAYS, WAY_IDS } from '../src/sim/data';
+import { AGES, HOMELANDS, WAYS, WAY_IDS } from '../src/sim/data';
 import { ageOf } from '../src/sim/ages';
 import { createGame, step } from '../src/sim/game';
 import { takeWay } from '../src/sim/ways';
-import type { WayId } from '../src/sim/types';
+import type { HomelandId, WayId } from '../src/sim/types';
 
 const seed = Number(process.argv[2] ?? 1);
 const picks = [process.argv[3] ?? WAY_IDS[0], process.argv[4] ?? WAY_IDS[1]] as WayId[];
 const minutes = Number(process.argv[5] ?? 15);
 const size = (process.argv[6] ?? 'medium') as 'small' | 'medium' | 'large';
+const homeland = (process.argv[7] ?? 'glade') as HomelandId | 'random';
 for (const w of picks) if (!WAYS[w]) throw new Error(`no Way "${w}"; try ${WAY_IDS.join(', ')}`);
-const s = createGame({ seed, size, players: picks.map((w, i) => ({ name: WAYS[w].name + (picks[0] === picks[1] ? ` ${i + 1}` : ''), ai: 'hard' })) });
+if (homeland !== 'random' && !HOMELANDS[homeland]) throw new Error(`no homeland "${homeland}"; try ${Object.keys(HOMELANDS).join(', ')} or random`);
+const s = createGame({ seed, size, homeland, players: picks.map((w, i) => ({ name: WAYS[w].name + (picks[0] === picks[1] ? ` ${i + 1}` : ''), ai: 'hard' })) });
 s.players.forEach((p, i) => takeWay(s, p, picks[i]));
 /** Per player: the minute each building type first stood, and each age was reached. */
 const first = s.players.map(() => new Map<string, number>());
 const ages = s.players.map((p) => [`${AGES[ageOf(p)].short}@0m`]);
 const at = s.players.map((p) => ageOf(p));
 const col = (t: string) => t.padEnd(46);
-console.log(`seed ${seed}, ${size}: ${s.players.map((p) => p.name).join(' vs ')}`);
+console.log(`seed ${seed}, ${size}, ${HOMELANDS[s.homeland ?? 'glade'].name}: ${s.players.map((p) => p.name).join(' vs ')}`);
 console.log(`min  ${s.players.map((p) => col(`${p.name}: cit/sol/bld  food wood stone gold  hunted kills`)).join(' ')}`);
 for (let i = 0; i <= minutes * 60 * 20 && !s.over; i++) {
   if (i) step(s);

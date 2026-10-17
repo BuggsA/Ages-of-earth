@@ -1043,7 +1043,9 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   const freeFields = v.buildings.filter((b) => b.type === 'farm' && !v.citizens.some((u) => u.order.k === 'farm' && u.order.target === b.id)).length;
   // Autumn onward the clever computer plans for winter: berries fail in the cold, so fields go up first.
   const coldComing_ = coldComing(s, v);
-  const foodWanted = Math.round(wanted(v).food) - (berries >= 0 && !coldComing_ ? 6 : 0) + (coldComing_ ? AI_WINTER.fields : 0);
+  // On the Shore (#473) each fishing boat feeds the town in a farmer's place, and its wood is wanted for the next age.
+  const boatsFeed = s.homeland === 'shore' ? v.fishers.length : 0;
+  const foodWanted = Math.round(wanted(v).food) - (berries >= 0 && !coldComing_ ? 6 : 0) + (coldComing_ ? AI_WINTER.fields : 0) - boatsFeed;
   if (farms < foodWanted && freeFields < 2 && !recently('farm', 2) && !buildBarred(p, 'farm')) {
     const spot = findSpot(s, 'farm', home.x, home.y, 3, 16);
     if (spot && construct(s, v, mem, 'farm', spot, 1, issue)) return;
