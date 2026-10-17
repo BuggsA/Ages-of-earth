@@ -1026,9 +1026,10 @@ export const SORTIE = { rearm: 4, mend: 0.08, turn: 30, reach: 36, burn: 0.04 };
 /**
  * Feast days (the Age of Fairs): every `every` seconds a feast opens for `open` seconds. A trade trip paid at a
  * Market within `reach` tiles of a standing Temple that keeps a relic (the fairground) pays `pay` times as much
- * while it lasts. The calendar is the same for everyone, so the computer's traders profit too.
+ * while it lasts. The calendar is the same for everyone, so the computer's traders profit too. A fairground Market
+ * burned by a rival on a feast day pays that rival `purse` gold: the takings are in the stalls.
  */
-export const FAIR = { every: 240, open: 60, reach: 12, pay: 1.5 };
+export const FAIR = { every: 240, open: 60, reach: 12, pay: 1.5, purse: 150 };
 /**
  * Convoys (the Age of Sail): a merchant ship that loads at a port with a warship of its owner's within `reach`
  * tiles carries `pay` times the gold. Send the fleet with the cogs: the escort is also what the rival's raiders meet.
@@ -1646,6 +1647,8 @@ export interface AiLevel {
   fork?: boolean;
   /** Off: a Blood-rite computer's priests neither curse nor sacrifice (#355 s4; only `scripts/ai-ab.ts` turns it off). */
   rite?: boolean;
+  /** Off: a priest that has taken up healing by itself is left at it, as before (only `scripts/ai-ab.ts` turns it off). */
+  healers?: boolean;
 }
 
 /**
@@ -1755,7 +1758,7 @@ export const RITE = {
  * Station or Blood Tower seen within `hunt` tiles (its warships for one by the shore), and a rival with one (or `grafted` grafted soldiers
  * seen) gets `siege` engines more. Its bombers count a rival Station `bomb` squared tiles nearer than it is (a Blood Tower half that).
  */
-export const AI_HEMO = { town: 24, army: 6, rig: 6, watch: 26, foes: 2, again: 60, towers: 2, tower: 10, gap: 45, spread: 6, living: 0.6, near: 16, batch: 2, spare: 1, levyGap: 12, hunt: 22, grafted: 3, siege: 2, bomb: 2500 };
+export const AI_HEMO = { town: 24, army: 6, rig: 6, watch: 26, foes: 2, again: 60, towers: 2, tower: 10, gap: 45, spread: 6, living: 0.6, near: 16, batch: 2, spare: 1, levyGap: 12, hunt: 22, grafted: 3, siege: 2, bomb: 2500, forward: 12 };
 
 /**
  * The computer at the fork (#355 s5). A clever computer in Total War picks its branch once its town has grown (`AI_HEMO.town`): the Blood-rite when
