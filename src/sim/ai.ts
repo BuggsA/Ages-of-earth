@@ -1,12 +1,13 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
-import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_ORE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, ROADS, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, CALL_UP, AI_PROWL, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_ORE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
-import { ageOf, barred, buildBarred, deedsDone, oreDone, hasCoils, hasWalked, deedsProgress, hiresAt, inField, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
+import { ageDef, ageOf, barred, buildBarred, deedsDone, oreDone, hasCoils, hasWalked, deedsProgress, hiresAt, inField, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
 import { carriedBy } from './relics';
+import { fairground } from './fair';
 import { claimants, favours, landmarkAt } from './landmarks';
 import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple, TILE_OF_RARE } from './units';
 import { goalForPost, nearestMarket, portSpot, tripGold } from './trade';
@@ -816,6 +817,18 @@ function construct(s: GameState, v: View, mem: AiMemory, type: BuildingType, spo
   return true;
 }
 
+/**
+ * A spot for a Market on the fairground (#379 s1): within `FAIR.reach` of our lowest-id finished Temple
+ * that keeps a relic, so feast days pay it in the Age of Fairs (`fair.ts`). Null when no Temple keeps one.
+ */
+export function fairSpot(s: GameState, v: View): { tx: number; ty: number } | null {
+  const id = v.p.id;
+  const shrine = v.buildings.find((b) => b.type === 'temple' && b.built && b.hp > 0 && s.relics.some((r) => r.temple === b.id));
+  if (!shrine) return null;
+  const half = BUILDINGS.market.size / 2;
+  return findSpot(s, 'market', shrine.x, shrine.y, 2, AI_FAIR.ring, 1, (tx, ty) => fairground(s, id, { x: tx + half, y: ty + half }));
+}
+
 function count(v: View, type: BuildingType, builtOnly = false): number {
   return v.buildings.filter((b) => b.type === type && (!builtOnly || b.built)).length;
 }
@@ -937,9 +950,15 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   // there, the Market's wood starved the Bronze Age army and the town stalled behind army-first.
   if (s.posts.length && (p.epoch >= 2 || (merchantBound(s, v, mem) && !v.armyFirst)) && n >= 18 && count(v, 'market') === 0 && !recently('market', 25)) {
     const cost = buildingCostFor(s, p.id, 'market');
-    const spot = afford(v, cost) ? findSpot(s, 'market', home.x, home.y, 6, 18) : null;
+    const spot = afford(v, cost) ? (clever && fairSpot(s, v)) || findSpot(s, 'market', home.x, home.y, 6, 18) : null;
     if (spot && construct(s, v, mem, 'market', spot, 3, issue)) return;
     spend(v, cost);
+  }
+
+  // In the Age of Fairs, a Market on the fairground if none stands there yet (#379 s1): the feast pays only there.
+  if (clever && ageDef(p).fairs && count(v, 'market') < AI_FAIR.markets && !recently('market', 25) && !v.buildings.some((b) => b.type === 'market' && fairground(s, p.id, b))) {
+    const spot = fairSpot(s, v);
+    if (spot && construct(s, v, mem, 'market', spot, 3, issue)) return;
   }
 
   // A dock, where there is fish and water to sail near home.
@@ -978,7 +997,7 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     const lines = BUILDINGS[type].trains;
     if (lines.length && lines.every((u) => barred(p, u))) continue;
     const at = type === 'tower' ? towardEnemy(9) : type === 'market' || type === 'temple' ? home : towardEnemy(6);
-    const spot = (type !== 'tower' && ageOf(p) === 'lightning' && fieldSpot(s, v, type)) || findSpot(s, type, at.x, at.y, type === 'market' || type === 'temple' ? 6 : 0, 18);
+    const spot = (type !== 'tower' && ageOf(p) === 'lightning' && fieldSpot(s, v, type)) || (type === 'market' && fairSpot(s, v)) || findSpot(s, type, at.x, at.y, type === 'market' || type === 'temple' ? 6 : 0, 18);
     if (spot && construct(s, v, mem, type, spot, type === 'tower' ? 2 : 3, issue)) return;
   }
 
