@@ -23,7 +23,7 @@ Check cheaply (one `list_issues` by label with `minimal_output`, and `main`'s la
 - **Don't spawn** if #2 is labelled `paused`, you merged nothing, `create_session` failed twice, a cap below stops you, or nothing waits in your lane and your chain's last two sessions each shipped only a minor tweak.
 - **Don't spawn** from an owner-started chat or one-off, unless asked.
 - **Otherwise spawn.** Its task, in order: a red `ci-periodic` or `ci` on `main`, an `owner-ask`, a `ready` issue in your lane, else its own pitch.
-- Take related next steps yourself first (`docs/team.md`, "Small and often").
+- **Continue before you spawn (the owner, 2026-10-17: prefer work that stays in cache).** A new session re-reads the docs, the issue and the code you already hold. If the next step is in the same umbrella or touches the files you have open, do it in this session, merge it, and only then think about a successor. Past 3 steps is fine while it stays related and your context isn't heavy (a compaction has not yet happened, and the work is still on the same files). Spawn when the next task is unrelated, your context has been compacted, or the session has passed about 5 merged pull requests. Prompt caches last an hour, so a successor that would start after the cache has gone cold costs nothing extra.
 
 ## Chains and caps
 
