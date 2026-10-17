@@ -35,3 +35,8 @@ export function fairStep(s: GameState): void {
     }
   }
 }
+
+/** The gold a rival takes for razing this Market on a feast day at its owner's fairground: `FAIR.purse`, else 0. */
+export function fairPurse(s: GameState, market: { type: string; owner: number; x: number; y: number }): number {
+  return market.type === 'market' && fairShare(s, market.owner, market) > 1 ? FAIR.purse : 0;
+}
