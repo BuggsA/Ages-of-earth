@@ -1,6 +1,6 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { aiTiding } from './tidings';
-import { AGES, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
@@ -2388,7 +2388,7 @@ function wonderThreat(s: GameState, p: Player, w: Building): Unit | null {
 }
 
 /** Enemy soldiers close to home, and the nearest of them. */
-function threatNear(s: GameState, v: View): { unit: Unit | null; count: number } {
+function threatNear(s: GameState, v: View): { unit: Unit | null; count: number; dist: number } {
   let threat: Unit | null = null;
   let threatD = Infinity;
   let n = 0;
@@ -2405,7 +2405,7 @@ function threatNear(s: GameState, v: View): { unit: Unit | null; count: number }
       }
     }
   }
-  return { unit: threat, count: n };
+  return { unit: threat, count: n, dist: threatD };
 }
 
 /**
@@ -2494,11 +2494,19 @@ function townBell(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   if (mem.bell < 0 && t.count >= bell.ring && defenders < t.count / 2) {
     issue({ t: 'bell', p: v.p.id, ring: true });
     mem.bell = s.tick;
-  } else if (mem.bell >= 0 && t.count <= bell.quiet && s.tick - mem.bell > secs(bell.hold)) {
+    mem.bellNear = t.dist;
+    mem.bellMoved = s.tick;
+  } else if (mem.bell >= 0 && t.dist < (mem.bellNear ?? Infinity) - 1) {
+    mem.bellNear = t.dist;
+    mem.bellMoved = s.tick;
+  } else if (mem.bell >= 0 && s.tick - mem.bell > secs(bell.hold) && (t.count <= bell.quiet || (t.dist >= AI_BELL.far && s.tick - (mem.bellMoved ?? mem.bell) > secs(AI_BELL.stale)))) {
+    // Or a siege that has stopped coming (#487): foes parked outside the Town Center's reach for a minute
+    // kept a whole town sheltered for eight minutes. Anyone who steps closer starts the minute afresh.
     // A straggler or two is the Town Center's arrows to deal with (#113): waiting for none at all, a
     // beaten town kept fifteen citizens inside for nine minutes while a rival's trickle came and went.
     issue({ t: 'bell', p: v.p.id, ring: false });
     mem.bell = -1;
+    mem.bellNear = undefined;
   }
 }
 
