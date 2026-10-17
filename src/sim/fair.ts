@@ -6,6 +6,9 @@ import type { GameState } from './types';
 /** Whether a feast day is open now (the Age of Fairs): the first `open` seconds of every `every`. */
 export const feastOpen = (s: GameState): boolean => s.tick % secs(FAIR.every) < secs(FAIR.open);
 
+/** Ticks until the next feast day opens (0 while one is open). */
+export const nextFeastIn = (s: GameState): number => (feastOpen(s) ? 0 : secs(FAIR.every) - (s.tick % secs(FAIR.every)));
+
 /** Whether a Market stands within reach of a standing Temple of the owner's that keeps a relic: a fairground. */
 export function fairground(s: GameState, owner: number, at: { x: number; y: number }): boolean {
   const r2 = FAIR.reach * FAIR.reach;
