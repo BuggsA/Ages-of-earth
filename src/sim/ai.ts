@@ -1971,6 +1971,22 @@ function forwardField(s: GameState, v: View, mem: AiMemory, issue: (c: Command) 
   if (spot) construct(s, v, mem, 'airfield', spot, 3, issue);
 }
 
+/** Idle fighters park over the forward Airfield (the built one nearest the enemy, when it isn't the first), so bombers staging there are covered (#379). */
+function guardForwardField(s: GameState, v: View, idle: Unit[], issue: (c: Command) => void): void {
+  const fields = v.buildings.filter((b) => b.type === 'airfield' && b.built);
+  const target = enemyTarget(s, v.p);
+  if (fields.length < 2 || !target) return;
+  let fwd = fields[0];
+  let best = Infinity;
+  for (const b of fields) {
+    const d = (b.x - target.x) * (b.x - target.x) + (b.y - target.y) * (b.y - target.y);
+    if (d < best) { best = d; fwd = b; }
+  }
+  if (fwd === fields[0]) return;
+  const far = idle.filter((u) => (u.x - fwd.x) * (u.x - fwd.x) + (u.y - fwd.y) * (u.y - fwd.y) > 8 * 8);
+  if (far.length) issue({ t: 'move', p: v.p.id, ids: far.map((u) => u.id), x: fwd.x, y: fwd.y });
+}
+
 /** Fighters to keep the sky clear, bombers to break the enemy's town. */
 function airforce(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
@@ -1993,6 +2009,7 @@ function airforce(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const enemyAir = s.ents.find((e): e is Unit => e.kind === 'unit' && e.hp > 0 && (e.type === 'fighter' || e.type === 'bomber') && isEnemy(s, p.id, e.owner) && (e.x - v.home.x) * (e.x - v.home.x) + (e.y - v.home.y) * (e.y - v.home.y) < 30 * 30);
   const freeFighters = fighters.filter((u) => u.order.k === 'idle');
   if (enemyAir && freeFighters.length) issue({ t: 'attack', p: p.id, ids: freeFighters.map((u) => u.id), target: enemyAir.id });
+  else if (freeFighters.length && AI_LEVELS[p.ai!].clever && AI_LEVELS[p.ai!].fieldGuard !== false) guardForwardField(s, v, freeFighters, issue);
   // Bombers set out in a group against the enemy's town when the army attacks, or every couple of minutes.
   const ready = bombers.filter((u) => u.order.k === 'idle');
   // In a chapter whose goal is a Town Center, bombers fly with the army, at it: alone they only feed the enemy's guns.
