@@ -216,10 +216,13 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
       spend(v, cost);
     } else if (yard) spend(v, trainCostFor(s, p.id, 'infantry', 'barracks', yard));
   }
-  // The Hearth Way (#463 s1) grows by calling its kin, two at a time (three in winter), once its first hands are at work.
+  // The Hearth Way (#463 s1) grows by calling its kin, two at a time (three in winter). Out of winter two kin cost more
+  // a head than one citizen trained alone (#486), so it calls them then only with `kinKeep` food to spare and trains
+  // citizens as anyone does; in winter, once its first hands are at work, it trains none alone and saves for the call.
   const hearth = L.clever && p.way === 'hearth';
-  const kinOnly = hearth && p.epoch === 0 && citizens.length >= AI_WAYS.kinFrom && citizens.length + queuedCitizens + KIN.winter <= wantCitizens && p.cap - p.pop >= KIN.winter;
-  if (hearth && tc && !advancing && citizens.length + queuedCitizens + KIN.winter <= wantCitizens && aiKin(s, p, tc, seasonAt(s) === 3 ? 0 : AI_WAYS.kinKeep)) {
+  const winter = seasonAt(s) === 3;
+  const kinOnly = hearth && winter && p.epoch === 0 && citizens.length >= AI_WAYS.kinFrom && citizens.length + queuedCitizens + KIN.winter <= wantCitizens && p.cap - p.pop >= KIN.winter;
+  if (hearth && tc && !advancing && citizens.length + queuedCitizens + KIN.winter <= wantCitizens && aiKin(s, p, tc, winter ? 0 : AI_WAYS.kinKeep)) {
     issue({ t: 'kin', p: p.id, building: tc.id });
     spend(v, KIN.cost);
   } else if (kinOnly && !advancing && !threatNear(s, v).unit) {
@@ -1256,18 +1259,23 @@ function huntTheYear(s: GameState, v: View, issue: (c: Command) => void): void {
 /**
  * On the Herd Plains a clever computer leaves `YEAR.spare` of each of its own home herds alive, so they come
  * home in spring with calves (#479). A rival's herd it hunts down gladly. Undefined where nothing is spared.
+ * The Hunters' Way spares none in the Stone Age (#486): no Farm stands while the herd grazes at home (`wayBarred`),
+ * so a herd spared there is a town that never sows, and it hunts the herd out to open the fields.
  */
 function spared(s: GameState, v: View): ((a: Animal) => boolean) | undefined {
-  if (s.homeland !== 'herds' || !AI_LEVELS[v.p.ai!].clever) return undefined;
+  if (s.homeland !== 'herds' || !AI_LEVELS[v.p.ai!].clever || (v.p.way === 'hunt' && v.p.epoch === 0)) return undefined;
   const left = new Map<number, number>();
   for (const a of s.animals) if (a.kind === 'deer' && a.town === v.p.id && a.hp > 0) left.set(a.herd ?? a.id, (left.get(a.herd ?? a.id) ?? 0) + 1);
   if (!left.size) return undefined;
   return (a) => a.town === v.p.id && (left.get(a.herd ?? a.id) ?? 0) <= YEAR.spare;
 }
 
-/** Autumn onward, a clever computer plans for the winter ahead (`AI_WINTER`). */
+/**
+ * Autumn onward, a clever computer plans for the winter ahead (`AI_WINTER`), unless its larder is full already (#486):
+ * a town with the winter's food laid by, planning anyway, raised a field a citizen with the wood the next age wanted.
+ */
 function coldComing(s: GameState, v: View): boolean {
-  return AI_LEVELS[v.p.ai!].clever && seasonAt(s) >= AI_WINTER.from;
+  return AI_LEVELS[v.p.ai!].clever && seasonAt(s) >= AI_WINTER.from && v.p.res.food < AI_WINTER.larder;
 }
 
 /** How many citizens each resource should have now: the epoch's shares, leaning away from what piles up. */
@@ -3444,6 +3452,8 @@ export function rivalCamp(s: GameState, p: Player, home: { x: number; y: number 
     const d = (e.x - home.x) * (e.x - home.x) + (e.y - home.y) * (e.y - home.y);
     if (d >= bestD) continue;
     if (s.ents.some((f) => f.kind === 'building' && f.hp > 0 && f.built && f.owner === e.owner && (f.type === 'towncenter' || f.type === 'tower') && distToRect(e.x, e.y, f) <= safe)) continue;
+    // A raid (#486) also passes over a larder with rival soldiers standing by it: the band would only be thrown away.
+    if (raid && s.ents.some((f) => f.kind === 'unit' && f.hp > 0 && !f.inside && isEnemy(s, p.id, f.owner) && armed(f) && (f.x - e.x) * (f.x - e.x) + (f.y - e.y) * (f.y - e.y) <= P.guard * P.guard)) continue;
     bestD = d;
     best = e;
   }

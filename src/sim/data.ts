@@ -1468,8 +1468,8 @@ export const WAY_LEAN: Record<CivId, WayId> = { mongols: 'hunt', britons: 'hunt'
 
 export const WAYS: Record<WayId, Way> = {
   hunt: { name: 'The Hunters\' Way', icon: '🦌', blurb: 'Camp where the kill falls: a Hunting Camp pitched within 6 tiles of game or a fresh kill costs nothing and goes up three times as fast. Hunting yields 25% more, and wolves, boars and mammoths bite 30% softer. But a people that follows the herds sows nothing where they graze: in the Stone Age no Farm is raised while deer, boars or mammoths live within 24 tiles of your Town Center. Hunt the home herd out to open the fields, or spare it and range for your meat. Berries are gathered 10% slower.', mul: { hunt: 1.25, beastWard: 0.7, forage: 0.9 }, herdShuts: ['farm'], deep: { mul: { hunt: 1.15, beastWard: 0.85, forage: 0.9 }, blurb: 'Hunting yields another 15%, beasts bite another 15% softer; berries are gathered 10% slower.' } },
-  hearth: { name: 'The Hearth Way', icon: '🔥', blurb: 'The hearth that keeps: Call the Kin at a Town Center, 120 food for 2 citizens in 16 seconds, and 3 in winter, so lay food up for the lean season. Berries yield 20% more and farms 10%. But a people of the hearth keeps no camps in the wild: no Hunting Camps, hunting is 20% slower and beasts bite 20% harder.', mul: { forage: 1.2, farm: 1.1, hunt: 0.8, beastWard: 1.2 }, shuts: ['huntcamp'], deep: { mul: { forage: 1.15, farm: 1.1, wood: 1.05, hunt: 0.9 }, blurb: 'Berries yield another 15%, farms another 10%, wood 5%; hunting another 10% slower.' } },
-  warband: { name: 'The Warband Way', icon: '🗡', blurb: 'Feed on the raid: every blow your soldiers land on a rival Town Center, Storehouse, Hunting Camp, Dock or Farm carries off food from the rival\'s store, and a rival citizen slain gives up its load. Soldiers train 15% faster and strike 1 harder in melee. But a warband does not hide: the town bell does not ring, and berries and hunting are 15% slower.', add: { meleeAttack: 1 }, mul: { militaryTrain: 0.85, forage: 0.85, hunt: 0.85 }, noBell: true, deep: { add: { meleeAttack: 1 }, mul: { militaryTrain: 0.9, forage: 0.9, hunt: 0.9 }, blurb: 'Soldiers train another 10% faster and strike 1 harder again; berries and hunting another 10% slower.' } },
+  hearth: { name: 'The Hearth Way', icon: '🔥', blurb: 'The hearth that keeps: Call the Kin at a Town Center, 120 food for 2 citizens in 16 seconds, and 3 in winter, so lay food up for the lean season. Berries yield 20% more, farms 10% and wood 10%, for the fire that burns all winter. But a people of the hearth keeps no camps in the wild: no Hunting Camps, hunting is 20% slower and beasts bite 20% harder.', mul: { forage: 1.2, farm: 1.1, wood: 1.1, hunt: 0.8, beastWard: 1.2 }, shuts: ['huntcamp'], deep: { mul: { forage: 1.15, farm: 1.1, wood: 1.05, hunt: 0.9 }, blurb: 'Berries yield another 15%, farms another 10%, wood 5%; hunting another 10% slower.' } },
+  warband: { name: 'The Warband Way', icon: '🗡', blurb: 'Feed on the raid: every blow your soldiers land on a rival Town Center, Storehouse, Hunting Camp, Dock or Farm carries off food from the rival\'s store, and a rival citizen slain gives up its load. Soldiers train 15% faster and strike 1 harder in melee. But a warband does not hide: the town bell does not ring, and berries and hunting are 5% slower.', add: { meleeAttack: 1 }, mul: { militaryTrain: 0.85, forage: 0.95, hunt: 0.95 }, noBell: true, deep: { add: { meleeAttack: 1 }, mul: { militaryTrain: 0.9, forage: 0.9, hunt: 0.9 }, blurb: 'Soldiers train another 10% faster and strike 1 harder again; berries and hunting another 10% slower.' } },
 };
 
 /**
@@ -1579,7 +1579,8 @@ export const EXPLORE = { grid: 4, apart: 12, fails: 8, shun: 6, wary: 2, army: 4
  * - `farm`: a food gatherer whose bushes and game are gone takes an unworked field within this many tiles.
  */
 export const AUTO_WORK = { trained: 14, rally: 8, herd: 8, farm: 12 };
-export const AI_WINTER = { from: 2, fields: 2, hunters: 3, pack: 1, food: 0.3 };
+/** The clever computer plans for winter from season `from` (`coldComing` in `ai.ts`), unless its larder already holds `larder` food (#486). */
+export const AI_WINTER = { from: 2, fields: 2, hunters: 3, pack: 1, food: 0.3, larder: 500 };
 
 /**
  * Faith takes the walls (#209), for the computer: a pilgrim computer keeps `priests` priests once its army
@@ -2108,11 +2109,11 @@ export const AI_BLOOD = { take: 0.6, patience: 480, stay: 360, reach: 40, clear:
 export const AI_RAID = { weary: 0.5, calm: 7, fort: 15, pop: 24, flame: 24, stage: 36 };
 /**
  * The computer and the Ways' verbs (#463 s1). Hunters: up to `hunters` chase deer within `huntReach` of home, and it pitches kill camps by any kill of `campMeat` or more once it has `campAt` citizens,
- * up to `camps`, one each `campAgain` seconds. Hearth: kin called with `kinKeep` food left over (none in winter), and in the Stone Age no citizen trained alone once it has `kinFrom`. Warband: a Barracks and soldiers from `barracksAt` citizens, a band of `band` foot before more citizens once it has `bandAt` (in the Stone Age, out of a treaty), and up to epoch `raidUntil`
+ * up to `camps`, one each `campAgain` seconds. Hearth: out of winter kin called only with `kinKeep` food left over, and in a Stone Age winter none trained alone once it has `kinFrom` (#486). Warband: a Barracks and soldiers from `barracksAt` citizens, a band of `band` foot before more citizens once it has `bandAt` (in the Stone Age, out of a treaty), and up to epoch `raidUntil`
  * its band goes out every `raidEvery` seconds, first for a rival food building of `raidAt` within `raidReach` of home and
  * `raidSafe` tiles clear of its forts, with `raidTime` seconds for the walk.
  */
-export const AI_WAYS = { hunters: 12, huntReach: 34, campAt: 5, camps: 5, campAgain: 12, campMeat: 40, kinKeep: 0, kinFrom: 8, barracksAt: 6, bandAt: 9, band: 4, raidUntil: 1, raidEvery: 45, raidAt: ['storehouse', 'huntcamp', 'farm', 'dock'] as BuildingType[], raidReach: 90, raidSafe: 8, raidTime: 100 };
+export const AI_WAYS = { hunters: 12, huntReach: 34, campAt: 5, camps: 5, campAgain: 12, campMeat: 40, kinKeep: 150, kinFrom: 8, barracksAt: 6, bandAt: 9, band: 4, raidUntil: 1, raidEvery: 45, raidAt: ['storehouse', 'huntcamp', 'farm', 'dock'] as BuildingType[], raidReach: 90, raidSafe: 8, raidTime: 100 };
 /**
  * Hunters hunted (#260): between waves a clever computer sends `band` to `most` idle soldiers at a rival citizen
  * its own units see working within `reach` tiles of its home, more than `safe` tiles from any rival Town Center
