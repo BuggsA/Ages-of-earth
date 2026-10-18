@@ -1,4 +1,4 @@
-import { AGES, BUILDINGS, LIGHTNING, PATHS, ROADS, STEP_BACK, TECHS, TICK_HZ, TRUNK, WAYS, secs, stepBackCost, type Age, type Deed, type Road } from './data';
+import { AGES, BUILDINGS, CIVS, LIGHTNING, PATHS, ROADS, STEP_BACK, TECHS, TICK_HZ, TRUNK, WAYS, secs, stepBackCost, type Age, type Deed, type Road } from './data';
 import type { AgeId, PathId, Building, BuildingType, Cost, GameState, Player, TechId, UnitType } from './types';
 
 /**
@@ -142,8 +142,10 @@ export function trainsAt(p: Player, at: BuildingType): UnitType[] {
 
 export const isHire = (p: Player, at: BuildingType, unit: UnitType): boolean => hiresAt(p, at).includes(unit);
 
-/** Why a player's age won't let them train a line at all (the Iron Age has no horses), or null. */
-export function barred(p: Player, unit: UnitType): string | null {
+/** Why a player's age or people won't let them train a line (the Iron Age has no horses), at a building if given, or null. */
+export function barred(p: Player, unit: UnitType, at?: BuildingType): string | null {
+  // The polis (#501): a Greek city trains no foot soldiers; its citizens take up arms. It may still hire foreign foot for gold.
+  if (unit === 'infantry' && CIVS[p.civ].polis && !(at && isHire(p, at, unit))) return 'A Greek city trains no foot soldiers: select citizens and take up arms (H)';
   const no = ageDef(p).no;
   return no && no.units.includes(unit) ? no.why : null;
 }

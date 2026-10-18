@@ -106,7 +106,7 @@ describe('the computer walks the web of ages (#50)', () => {
 
   it('reads a rival on the iron road and masses archers against its foot', () => {
     const archers = (rivalAge: AgeId) => {
-      const s = game('greeks', 1);
+      const s = game('romans', 1);
       // On what its own citizens gather: with gold to burn, every building trains all the time.
       ready(s, 40, 0);
       for (const type of ['barracks', 'range', 'stable'] as const) raise(s, type);

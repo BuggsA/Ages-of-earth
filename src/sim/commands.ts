@@ -17,6 +17,7 @@ import { callWork, workProblem } from './works';
 import { callKin, killCamp, kinProblem, takeVow, takeWay, vowProblem, wayBarred, wayProblem } from './ways';
 import { beaconProblem, lightBeacon } from './beacon';
 import { callUp, callUpProblem } from './warcamp';
+import { arm, armProblem, disarm, disarmProblem } from './polis';
 import { bloodOf, bloodShort, levy, levyProblem, sworn } from './blood';
 import { riteProblem } from './fork';
 import { rallyCry, rallyProblem } from './rally';
@@ -721,7 +722,7 @@ export function applyCommand(s: GameState, c: Command): void {
       const struck = buildBarred(p, b.type);
       if (struck) return refuse(s, c.p, struck);
       if (unitEpoch(c.unit) > p.epoch) return refuse(s, c.p, `Needs the ${EPOCHS[unitEpoch(c.unit)].name}`);
-      const no = barred(p, c.unit);
+      const no = barred(p, c.unit, b.type);
       if (no) return refuse(s, c.p, no);
       if (b.queue.length >= MAX_QUEUE) return refuse(s, c.p, 'The queue is full');
       if (c.unit === 'hero' && heroBusy(s, c.p)) return refuse(s, c.p, 'You can lead with one hero at a time');
@@ -860,6 +861,13 @@ export function applyCommand(s: GameState, c: Command): void {
         giveOrder(u, { k: 'explore', x: -1, y: -1, started: false, fails: [] }, c.queue);
       }
       break;
+    case 'arm':
+    case 'disarm': {
+      const units = myUnits(s, c.p, c.ids);
+      const done = c.t === 'arm' ? arm(s, p, units) : disarm(s, p, units);
+      if (!done.length && units.length) refuse(s, c.p, (c.t === 'arm' ? armProblem(p, units[0]) : disarmProblem(s, p, units[0])) ?? 'Nobody could');
+      break;
+    }
     case 'stop':
       for (const u of myUnits(s, c.p, c.ids)) {
         u.queue = [];

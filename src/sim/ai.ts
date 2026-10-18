@@ -29,8 +29,9 @@ import { consecrateProblem, consecrates } from './consecrate';
 import { sees } from './vision';
 import { seasonAt } from './seasons';
 import { flooded } from './flood';
+import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
-import { DEER, FLOOD, SNARE, SPOILS } from './data';
+import { DEER, FLOOD, POLIS, SNARE, SPOILS } from './data';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
 import { isRider, standing } from './tribute';
@@ -301,6 +302,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   // Ships and aircraft are few and dear: they get first call on the treasury.
   seafaring(s, v, mem, issue);
   airforce(s, v, mem, issue);
+  polisArms(s, v, mem, issue);
   military(s, v, mem, issue);
   priestly(s, v, mem, issue);
 }
@@ -1416,6 +1418,49 @@ function assignCitizens(s: GameState, v: View, issue: (c: Command) => void): voi
   }
 }
 
+// ---- The polis (#501) ---------------------------------------------------------------------------
+
+/**
+ * A Greek computer trains no foot soldiers, so it arms its citizens: when rivals reach the town (those nearest them), and when a wave
+ * is due and the citizens it may spare would fill it (those nearest home). It arms at most `POLIS.aiShare` of its people and keeps
+ * `POLIS.aiKeep` at work. When no wave is out and no foe is near, `POLIS.aiRest` seconds after it last armed, the citizens it armed
+ * (`levy`) standing idle near home lay their arms down and go back to work.
+ */
+function polisArms(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!isPolis(p)) return;
+  const L = AI_LEVELS[p.ai!];
+  const hoplites = v.army.filter((u) => u.type === 'infantry');
+  const free = v.citizens.filter((u) => !u.inside);
+  const most = Math.floor((v.citizens.length + hoplites.length) * POLIS.aiShare) - hoplites.length;
+  const spare = Math.max(0, Math.min(most, v.citizens.length - POLIS.aiKeep, Math.floor(p.res.wood / (POLIS.arm.wood ?? 1))));
+  const threat = threatNear(s, v);
+  const call = (n: number, x: number, y: number) => {
+    const picked = free
+      .map((u) => ({ u, d: (u.x - x) * (u.x - x) + (u.y - y) * (u.y - y) }))
+      .sort((a, b) => a.d - b.d || a.u.id - b.u.id)
+      .slice(0, n)
+      .map((e) => e.u.id);
+    if (!picked.length) return;
+    issue({ t: 'arm', p: p.id, ids: picked });
+    mem.polisAt = s.tick;
+  };
+  if (threat.unit && threat.count >= POLIS.aiThreat) {
+    const have = v.army.length;
+    if (spare > 0 && have < threat.count + 2) call(Math.min(spare, threat.count + 2 - have), threat.unit.x, threat.unit.y);
+    return;
+  }
+  const waveSize = v.plan.wave || L.wave + mem.wave * L.waveGrowth;
+  const due = !v.plan.hold && (v.plan.wave ? true : s.tick >= secs(L.firstAttack)) && s.tick >= s.peaceUntil;
+  if (due && !mem.attacking && v.army.length < waveSize && v.army.length + spare >= waveSize) {
+    call(waveSize - v.army.length, v.home.x, v.home.y);
+    return;
+  }
+  if (mem.attacking || s.tick - (mem.polisAt ?? -99999) < secs(POLIS.aiRest)) return;
+  const home = hoplites.filter((u) => u.levy && u.order.k === 'idle' && !disarmProblem(s, p, u)).map((u) => u.id);
+  if (home.length && (!due || v.army.length + spare < waveSize)) issue({ t: 'disarm', p: p.id, ids: home });
+}
+
 // ---- The Nile flood (#501 s1) --------------------------------------------------------------------
 
 /**
@@ -2390,7 +2435,7 @@ export function enemyTarget(s: GameState, p: Player): Building | null {
 }
 
 function pickUnit(v: View, mem: AiMemory, building: Building): UnitType | null {
-  const trains = lines(v.p, building).filter((t) => t !== 'citizen' && t !== 'hero' && unitEpoch(t) <= v.p.epoch && !barred(v.p, t));
+  const trains = lines(v.p, building).filter((t) => t !== 'citizen' && t !== 'hero' && unitEpoch(t) <= v.p.epoch && !barred(v.p, t, building.type));
   if (!trains.length) return null;
   return trains[mem.unitTurn++ % trains.length];
 }
@@ -3226,13 +3271,13 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     if (b.type === 'workshop') unit = siege < Math.max(v.plan.siege, p.epoch >= 2 ? 3 : 2) + lodge + bleeds && (v.army.length >= 6 || siege < v.plan.siege) ? 'siege' : null;
     else if (b.type === 'temple') unit = v.priests.length < (v.army.length >= 6 ? Math.max(consecrates(s, p.id) ? AI_FAITH.priests : 2, L.clever && ageDef(p).rite ? AI_FORK.priests : 0) : 0) + (looseRelics(s) > 0 ? 1 : 0) + (vigilPost(s, v) ? VIGIL.most : 0) ? 'priest' : null;
     else {
-      unit = counter && trains.includes(counter) && unitEpoch(counter) <= p.epoch && !barred(p, counter) && roll(s) < counterOdds ? counter : pickUnit(v, mem, b);
+      unit = counter && trains.includes(counter) && unitEpoch(counter) <= p.epoch && !barred(p, counter, b.type) && roll(s) < counterOdds ? counter : pickUnit(v, mem, b);
       if (unit && unitEpoch(unit) > p.epoch) unit = pickUnit(v, mem, b);
       // Play to the people's strength: when not countering, favour the signature line about half the time.
       const sig = SIGNATURES[p.civ].type;
-      if (unit !== counter && sig !== 'siege' && sig !== 'priest' && trains.includes(sig) && unitEpoch(sig) <= p.epoch && !barred(p, sig) && roll(s) < (sig === 'cavalry' && riderless ? AI_HORDE.cavalry : 0.5)) unit = sig;
+      if (unit !== counter && sig !== 'siege' && sig !== 'priest' && trains.includes(sig) && unitEpoch(sig) <= p.epoch && !barred(p, sig, b.type) && roll(s) < (sig === 'cavalry' && riderless ? AI_HORDE.cavalry : 0.5)) unit = sig;
     }
-    if (!unit || unitEpoch(unit) > p.epoch || barred(p, unit)) continue;
+    if (!unit || unitEpoch(unit) > p.epoch || barred(p, unit, b.type)) continue;
     // Just before a feast opens, a clever computer with an army in hand holds its muster at the fairground to buy it at the levy (#356).
     // What it costs here: a levy, an age's price or a hire for gold (#37).
     const cost = trainCostFor(s, p.id, unit, b.type, b);
