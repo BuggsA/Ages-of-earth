@@ -5,6 +5,7 @@ import { findRoute } from './path';
 import type { Spatial } from './spatial';
 import { buildTimeFor, buildingCostFor, modsOf } from './stats';
 import { flooded } from './flood';
+import { mineable } from './household';
 import { ageDef, canRaise, inField } from './ages';
 import { legionKind, legionary } from './legion';
 import type { Act, Animal, Building, Cost, Ent, GameState, Goal, Order, RareId, Res, Unit } from './types';
@@ -549,6 +550,7 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
     // The player's builders fan over the nodes by the new storehouse instead of all taking the nearest (#266).
     const load = s.players[u.owner].ai ? null : gatherLoad(s, u);
     for (const kind of [R_TREE, R_GOLD, R_STONE, R_BERRY, R_BOG]) {
+      if (!mineable(s.players[u.owner], kind)) continue;
       const t = findResource(s, kind, b.x, b.y, 8, load ? (i) => (load.get(i) ?? 0) >= SPREAD.perNode : undefined);
       if (t < 0) continue;
       const d = distToTile(b.x, b.y, t, s.w);

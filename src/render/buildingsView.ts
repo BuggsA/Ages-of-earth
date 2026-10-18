@@ -45,6 +45,8 @@ interface View {
   base: number;
   /** A flood people's field under the river in its flood season (#501 s1). */
   flood: THREE.Mesh | null;
+  /** A household people's house wears a red lantern on a pole once it pays the tax (#501). */
+  lantern: THREE.Group | null;
 }
 
 interface Ruin {
@@ -138,6 +140,7 @@ export class BuildingsView {
       if (v.site) v.site.visible = !k.built;
       if (v.scaffold) v.scaffold.visible = !k.built && p > 0.02 && k.type !== 'farm';
       if (v.flood) v.flood.visible = flooded(s, k.owner);
+      if (v.lantern) v.lantern.visible = k.built;
     }
     for (const [id, v] of this.views) {
       if (this.known.has(id)) continue;
@@ -202,8 +205,22 @@ export class BuildingsView {
       flood.visible = false;
       group.add(flood);
     }
+    // The household tax (#501): a red lantern on a pole at the corner of each house that pays it.
+    let lantern: THREE.Group | null = null;
+    if (k.type === 'house' && CIVS[s.players[k.owner]?.civ]?.household) {
+      lantern = new THREE.Group();
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.2, 5), lanternPole);
+      pole.position.y = 0.6;
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.17, 7, 5), lanternRed);
+      lamp.scale.y = 1.25;
+      lamp.position.y = 1.2;
+      lantern.add(pole, lamp);
+      lantern.position.set(k.size / 2 - 0.2, 0, k.size / 2 - 0.2);
+      lantern.visible = false;
+      group.add(lantern);
+    }
     this.group.add(group);
-    return { group, body, site, scaffold, key, base, flood };
+    return { group, body, site, scaffold, key, base, flood, lantern };
   }
 
   /** Where a building's top is, for health bars and effects. */
@@ -221,6 +238,8 @@ export class BuildingsView {
 }
 
 const floodMaterial = new THREE.MeshStandardMaterial({ color: '#6f8f86', roughness: 0.35, metalness: 0.05, transparent: true, opacity: 0.82 });
+const lanternPole = new THREE.MeshStandardMaterial({ color: '#5a3b24', flatShading: true });
+const lanternRed = new THREE.MeshStandardMaterial({ color: '#c9382e', emissive: '#7a1a14', flatShading: true });
 const plinthMaterial = inject(new THREE.MeshStandardMaterial({ color: '#8d7a62', flatShading: true, roughness: 1 }), {});
 
 const HEIGHT: Record<BuildingType, number> = {

@@ -1420,6 +1420,8 @@ export interface Civ {
   polis?: boolean;
   /** The legion (#501, `LEGION`): few citizens; its foot soldiers fell timber, quarry stone and raise buildings between wars. */
   legion?: boolean;
+  /** The household tax (#501, `HOUSEHOLD`): its citizens mine no gold; every house pays it, more on a built-up street. */
+  household?: boolean;
 }
 
 /**
@@ -1438,6 +1440,15 @@ export const POLIS = { arm: { wood: 20 } as Cost, home: 14, aiShare: 0.5, aiKeep
  * soldiers off the work (and only through epoch `aiUntil`: after it the army is wanted for war and rites), trains foot until it has `aiHands` + `aiHandsEpoch` for each epoch, sends `aiStone` of its working soldiers to stone, and surveys for bog iron from `aiSurvey` hands (its citizens are few).
  */
 export const LEGION = { citizens: 12, perEpoch: 3, rate: 0.8, watch: 0.8, aiCitizenWood: 0.25, aiGuard: 4, aiHands: 10, aiHandsEpoch: 4, aiStone: 0.3, aiUntil: 2, aiSurvey: 14 };
+
+/**
+ * The household tax (#501, the Chinese): a household people's citizens mine no gold or bog iron. Instead every `every` seconds each
+ * finished house pays `gold` a second at full occupancy (the people's population over its room), `street` more for each house within
+ * `reach` tiles (at most `streetMax`; a finished Market counts as `market` of them), so a built-up ward is worth more than a scatter.
+ * A house felled by a rival's hands costs its owner `raid` gold, which the raider takes. The computer lays its houses in streets
+ * (within `aiStreet` tiles of its others), and wants no gold miners.
+ */
+export const HOUSEHOLD = { every: 5, gold: 0.12, street: 0.04, streetMax: 4, reach: 3, market: 2, raid: 25, aiStreet: 4 };
 
 /**
  * The Nile flood (#501 s1): in season `season` (summer) the fields of a flood people lie under the river and yield nothing,
@@ -1472,7 +1483,15 @@ export const CIVS: Record<CivId, Civ> = {
     mul: { buildingHp: 1.2, buildSpeed: 1.25 },
   },
   mongols: { name: 'Mongols', blurb: 'Riders of the steppe: cavalry ride 15% faster and hunters work 40% faster.', mul: { cavalrySpeed: 1.15, hunt: 1.4 } },
-  chinese: { name: 'Chinese', blurb: 'A great people: start with 2 more citizens, and technologies cost 15% less.', add: { extraCitizens: 2 }, mul: { techCost: 0.85 } },
+  chinese: {
+    name: 'Chinese',
+    blurb: 'The household tax. Nobody mines gold here: every house pays it, in proportion to the people who live in it, and more for each neighbour on its street (a Market counts as two). A town built close is rich, and a rival who burns your houses takes gold from your treasury. Start with 2 more citizens, and technologies cost 15% less.',
+    verb: 'Lay your houses out in streets and wards to fill the treasury: gold is people and housing, not mines',
+    door: 'Citizens mine no gold, so a scattered or thin town is poor, and a raid on the houses empties the treasury',
+    household: true,
+    add: { extraCitizens: 2 },
+    mul: { techCost: 0.85 },
+  },
   britons: { name: 'Britons', blurb: 'Longbowmen: archers and their heirs reach 1 tile farther, and archery ranges train 25% faster.', add: { range: 1 }, mul: { rangedTrain: 0.75 } },
 };
 
@@ -1484,7 +1503,7 @@ export const CIV_IDS = Object.keys(CIVS) as CivId[];
  */
 export const VERB_GAPS: { ages: Partial<Record<AgeId, number>>; civs: Partial<Record<CivId, number>> } = {
   ages: {},
-  civs: { mongols: 501, chinese: 501, britons: 501 },
+  civs: { mongols: 501, britons: 501 },
 };
 
 /**
