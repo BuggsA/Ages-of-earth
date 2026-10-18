@@ -1726,8 +1726,9 @@ export const EXPLORE = { grid: 4, apart: 12, fails: 8, shun: 6, wary: 2, army: 4
  *   within this many tiles of the flag (then `SPREAD.far`);
  * - `herd`: a hunter done with a carcass spears the next deer within this many tiles of it;
  * - `farm`: a food gatherer whose bushes and game are gone takes an unworked field within this many tiles.
+ * - `retry`: a laden citizen jammed on the way home tries the road again this often, instead of standing idle.
  */
-export const AUTO_WORK = { trained: 14, rally: 8, herd: 8, farm: 12 };
+export const AUTO_WORK = { trained: 14, rally: 8, herd: 8, farm: 12, retry: secs(4) };
 /** The clever computer plans for winter from season `from` (`coldComing` in `ai.ts`); in the Stone Age it raises no winter fields while its larder holds `larder` food (#486). */
 export const AI_WINTER = { from: 2, fields: 2, hunters: 3, pack: 1, food: 0.3, larder: 500 };
 
