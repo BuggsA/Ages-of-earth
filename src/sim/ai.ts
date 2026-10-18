@@ -29,9 +29,10 @@ import { consecrateProblem, consecrates } from './consecrate';
 import { sees } from './vision';
 import { seasonAt } from './seasons';
 import { flooded } from './flood';
+import { isHousehold } from './household';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
-import { DEER, FLOOD, LEGION, POLIS, SNARE, SPOILS } from './data';
+import { DEER, FLOOD, HOUSEHOLD, LEGION, POLIS, SNARE, SPOILS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
@@ -672,6 +673,8 @@ function forkTurn(s: GameState, v: View, mem: AiMemory): Journey | null {
  */
 function ironRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
+  // A household people (#501) digs no bog iron.
+  if (isHousehold(p)) return;
   const road = roadsFrom(p).find((r) => r.to === 'iron');
   // Once the deed is dug, or the road given up, bog iron is only a poor gold mine: diggers go back to
   // what the town needs (#79). Left to it, they walked from one bog to the next all through the Stone Age.
@@ -1064,7 +1067,11 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   const housesBuilding = pending.filter((b) => b.type === 'house').length;
   const room = p.cap - p.pop;
   if (p.cap < POP_MAX && room <= 3 + p.epoch * 2 && housesBuilding < (p.pop > 40 ? 2 : 1) && !recently('house', 4)) {
-    const spot = findSpot(s, 'house', home.x, home.y, 5, 22);
+    // A household people (#501) lays its houses in streets: beside its others, a lane apart, for the tax is paid by the street.
+    const street = isHousehold(p) && v.buildings.some((b) => b.type === 'house')
+      ? (tx: number, ty: number) => v.buildings.some((b) => b.type === 'house' && Math.abs(b.tx - tx) <= HOUSEHOLD.aiStreet && Math.abs(b.ty - ty) <= HOUSEHOLD.aiStreet)
+      : undefined;
+    const spot = (street && findSpot(s, 'house', home.x, home.y, 3, 22, 1, street)) || findSpot(s, 'house', home.x, home.y, 5, 22);
     if (spot) construct(s, v, mem, 'house', spot, 1, issue);
   }
   if (pending.length > 2) return;
@@ -1310,7 +1317,7 @@ function wanted(v: View, cold = false): Record<Res, number> {
   for (const r of RES) {
     const stock = v.p.res[r];
     const lean = stock > 1200 ? 0.15 : stock > 700 ? 0.4 : stock > 400 ? 0.7 : stock < 80 ? 1.4 : 1;
-    weight[r] = share[r] * lean * (cold && r === 'food' ? 1 + AI_WINTER.food : 1) * (legionAtWork(v) && (r === 'wood' || r === 'stone') ? LEGION.aiCitizenWood : 1);
+    weight[r] = share[r] * lean * (cold && r === 'food' ? 1 + AI_WINTER.food : 1) * (legionAtWork(v) && (r === 'wood' || r === 'stone') ? LEGION.aiCitizenWood : 1) * (r === 'gold' && isHousehold(v.p) ? 0 : 1);
     total += weight[r];
   }
   const n = v.citizens.filter((u) => u.order.k !== 'build' && !u.inside).length;
@@ -1370,6 +1377,7 @@ function sendTo(s: GameState, v: View, u: Unit, res: Res, issue: (c: Command) =>
     }
     return false;
   }
+  if (res === 'gold' && isHousehold(v.p)) return false;
   const from = nearestDropTo(v, u);
   let tile = findResource(s, TILE_OF[res], from.x, from.y, 26);
   if (tile < 0) tile = findResource(s, TILE_OF[res], u.x, u.y, 60);

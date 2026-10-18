@@ -1,4 +1,4 @@
-import { AGES, CIVS, HOMELANDS, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, secs } from '../sim/data';
+import { AGES, CIVS, HOMELANDS, HOUSEHOLD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, secs } from '../sim/data';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, mainRoad, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
 import type { AgeId, Building, GameState, Unit } from '../sim/types';
@@ -82,6 +82,8 @@ const TIPS: Tip[] = [
   { id: 'rustle', when: (s, me) => s.animals.some((a) => a.kind === 'sheep' && a.owner !== undefined && a.owner !== me && s.players[me].team !== s.players[a.owner].team && s.players[me].vis[Math.floor(a.y) * s.w + Math.floor(a.x)]), text: 'A rival\'s <b>flock</b>. Sheep with none of their people near can be <b>driven off</b>: stand a rider or a citizen right beside one and it follows them home to your Town Center.' },
   // The legion (#501): a Roman town keeps few citizens, and its foot soldiers are its hands.
   { id: 'legion', when: (s, me) => !!CIVS[s.players[me].civ].legion && secsIn(s) > 30, text: `🦅 <b>The legion builds.</b> A Roman town keeps only ${LEGION.citizens} citizens (three more each epoch): leave them the food and the gold. Raise a <b>Barracks</b> early, and put your foot soldiers to work: select them and <b>right-click a tree or a stone</b> to fell and quarry, or <b>right-click a building site</b> to raise it. A soldier at work still keeps watch and drops his tools for a foe who comes near, but a wave marched off to war leaves the wood-line empty.` },
+  // The household tax (#501): a Chinese town's gold is owed by its houses, not dug.
+  { id: 'household', when: (s, me) => !!CIVS[s.players[me].civ].household && secsIn(s) > 30, text: `🏮 <b>The household tax.</b> Nobody here mines gold: every <b>house</b> pays it every ${HOUSEHOLD.every} seconds, in proportion to how full your town is, and <b>more for each house on its street</b> (within ${HOUSEHOLD.reach} tiles, a Market counting as two). Build houses in lanes close together and keep the town full of people; hover the gold to see the tax a minute. A rival who <b>burns your houses</b> takes ${HOUSEHOLD.raid} gold from the treasury for each, so guard the streets.` },
   { id: 'army', when: (s) => secsIn(s) > 200, text: 'Rivals will come. Build a <b>Barracks</b> (<kbd>V</kbd> <kbd>B</kbd>) and train soldiers. Infantry beat cavalry, archers beat infantry, cavalry beat archers.' },
   { id: 'farm', when: (s, me) => secsIn(s) > 260 && !has(s, me, 'farm'), text: 'Berries and deer run out. <b>Farms</b> (<kbd>B</kbd> <kbd>F</kbd>) give food forever; build them near your Town Center.' },
   {

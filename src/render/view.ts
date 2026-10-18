@@ -1192,6 +1192,19 @@ export class View {
           }
           break;
         }
+        case 'tax': {
+          // The household tax (#501): coins rise from each paying house of the viewer's, and one soft chime.
+          if (ev.owner !== this.viewer) break;
+          let first: Ent | undefined;
+          for (const id of ev.ids.slice(0, 12)) {
+            const b = s.byId.get(id);
+            if (!b || b.kind !== 'building') continue;
+            first ??= b;
+            this.effects.burst(this.ground(s, b.x, b.y, 1.2), { count: 3, speed: 0.4, up: 1.0, life: 0.9, size: 0.045, gravity: 1.2, colors: ['#ffd166', '#f2cf4a', '#c9382e'] });
+          }
+          if (first) this.cue('coin', first.x, first.y, 0.25);
+          break;
+        }
         case 'toll': {
           // Safe passage (#334): coins spill from the rival trader's load, and the taker hears them counted.
           if (ev.owner !== this.viewer && ev.from !== this.viewer && !this.sees(ev.x, ev.y)) break;

@@ -50,3 +50,4 @@ Its one copy, with the levers and anti-patterns: **`docs/verbs.md`**. Ask it of 
 - 2026-10-17: the verbs rubric (`docs/verbs.md`, #500) and an audit of the existing game against it (#500): peoples #501, Warband #502, Reclaimers #503, road victories seed #504.
 - 2026-10-17: the owner names the shared core loop as the main problem (Goal 1b); #501 reshaped into six economies. s1, the Egyptians' Nile flood, merged in #516.
 - 2026-10-18: the Romans' legion (#501): few citizens, foot soldiers who fell, quarry and build. Greeks (#522) and Romans are the two peoples with a different core loop.
+- 2026-10-18: the Chinese household tax (#501): no gold mines, houses pay it by the street. Greeks, Romans and Chinese now have a different core loop.

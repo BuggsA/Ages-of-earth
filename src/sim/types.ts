@@ -527,6 +527,8 @@ export interface PlayerStats {
   snared?: number;
   /** Gold taken as tribute by riders standing in rivals' land (#318); absent in older saves. */
   tribute?: number;
+  /** Gold a household people's houses paid it (#501). */
+  taxed?: number;
   /** Gold the Silk Road's caravans earned for the ground the camp covered while they were out (#326); absent in older saves. */
   caravan?: number;
   /** Gold taken in tolls from rival traders crossing the people's land (#334); absent in older saves. */
@@ -702,6 +704,8 @@ export type GameEvent =
   /** Citizens called up at a War Camp (#313): each became the foot soldier `id` where it stood. */
   | { k: 'callUp'; owner: number; camp: number; ids: number[]; x: number; y: number }
   /** Riders of a horde (#318) took `gold` in tribute from `from`, standing in its land: `ids` are the riders counted. */
+  /** A household people's payday (#501): `gold` came in from the houses `ids`. */
+  | { k: 'tax'; owner: number; gold: number; ids: number[] }
   | { k: 'tribute'; owner: number; from: number; gold: number; ids: number[]; x: number; y: number }
   /** A rival trader of `from`'s paid `owner` a toll of `gold` for safe passage across its land (#334). */
   | { k: 'toll'; owner: number; from: number; gold: number; id: number; x: number; y: number }
