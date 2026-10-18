@@ -230,7 +230,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   } else if (kinOnly && !advancing && !threatNear(s, v).unit) {
     // Saving for the next call: the army and the rest wait on the food it needs, unless raiders are at the door.
     spend(v, KIN.cost);
-  } else if (tc && !advancing && !v.packing && !kinOnly && citizens.length + queuedCitizens < wantCitizens && tc.queue.length < (hearth ? 1 : 2)) {
+  } else if (tc && !advancing && !v.packing && !kinOnly && citizens.length + queuedCitizens < wantCitizens && tc.queue.length < (hearth && winter ? 1 : 2)) {
     const cost = unitStats('citizen', p.epoch).cost;
     if (afford(v, cost)) {
       issue({ t: 'train', p: p.id, building: tc.id, unit: 'citizen' });
@@ -1074,8 +1074,9 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   const berries = findResource(s, R_BERRY, home.x, home.y, 14);
   const farms = count(v, 'farm');
   const freeFields = v.buildings.filter((b) => b.type === 'farm' && !v.citizens.some((u) => u.order.k === 'farm' && u.order.target === b.id)).length;
-  // Autumn onward the clever computer plans for winter: berries fail in the cold, so fields go up first.
-  const coldComing_ = coldComing(s, v);
+  // Autumn onward the clever computer plans for winter: berries fail in the cold, so fields go up first, unless the
+  // larder holds the winter's food already (#486): planning anyway, it raised a field a citizen with the next age's wood.
+  const coldComing_ = coldComing(s, v) && p.res.food < AI_WINTER.larder;
   // On the Shore (#473) each fishing boat feeds the town in a farmer's place, and its wood is wanted for the next age.
   // The turning year (#479): ice ahead (autumn, for the clever) or on the mere, a boat feeds a third as many.
   const boatsFeed = s.homeland === 'shore' ? Math.round(v.fishers.length * (coldComing_ || catchOf(s) < 1 ? YEAR.ice : 1)) : 0;
@@ -1264,26 +1265,20 @@ function huntTheYear(s: GameState, v: View, issue: (c: Command) => void): void {
  * A clever computer leaves `YEAR.spare` of each of its own home herds alive on the Herd Plains, so they come
  * home in spring with calves (#479), and a pair (`DEER.pair`) of every wild herd in the Stone Age, when game is
  * what it lives on; a wild herd breeds each spring (#491). A rival's herd it hunts down gladly. Undefined where nothing is spared.
- * The Hunters' Way spares none of its home herds in the Stone Age (#486): no Farm stands while the herd grazes at home
- * (`wayBarred`), so a herd spared there is a town that never sows, and it hunts the herd out to open the fields.
  */
 export function spared(s: GameState, p: Player): ((a: Animal) => boolean) | undefined {
   if (!AI_LEVELS[p.ai!].clever) return undefined;
-  const sows = !(p.way === 'hunt' && p.epoch === 0);
   // A herd is spared at its own count: a town's at `YEAR.spare`, a wild one at `DEER.pair`.
-  const keep = (a: Animal) => (a.town === p.id && s.homeland === 'herds' ? (sows ? YEAR.spare : -1) : a.town === undefined && p.epoch === 0 ? DEER.pair : -1);
+  const keep = (a: Animal) => (a.town === p.id && s.homeland === 'herds' ? YEAR.spare : a.town === undefined && p.epoch === 0 ? DEER.pair : -1);
   const left = new Map<number, number>();
   for (const a of s.animals) if (a.kind === 'deer' && a.hp > 0 && keep(a) >= 0) left.set(a.herd ?? a.id, (left.get(a.herd ?? a.id) ?? 0) + 1);
   if (!left.size) return undefined;
   return (a) => (left.get(a.herd ?? a.id) ?? Infinity) <= keep(a);
 }
 
-/**
- * Autumn onward, a clever computer plans for the winter ahead (`AI_WINTER`), unless its larder is full already (#486):
- * a town with the winter's food laid by, planning anyway, raised a field a citizen with the wood the next age wanted.
- */
+/** Autumn onward, a clever computer plans for the winter ahead (`AI_WINTER`). */
 function coldComing(s: GameState, v: View): boolean {
-  return AI_LEVELS[v.p.ai!].clever && seasonAt(s) >= AI_WINTER.from && v.p.res.food < AI_WINTER.larder;
+  return AI_LEVELS[v.p.ai!].clever && seasonAt(s) >= AI_WINTER.from;
 }
 
 /** How many citizens each resource should have now: the epoch's shares, leaning away from what piles up. */
