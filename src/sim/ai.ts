@@ -28,8 +28,9 @@ import { rallyProblem } from './rally';
 import { consecrateProblem, consecrates } from './consecrate';
 import { sees } from './vision';
 import { seasonAt } from './seasons';
+import { flooded } from './flood';
 import { catchOf, herdsOut, yarding } from './year';
-import { DEER, SNARE } from './data';
+import { DEER, FLOOD, SNARE, SPOILS } from './data';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
 import { isRider, standing } from './tribute';
@@ -291,6 +292,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   trade(s, v, issue);
   planBuildings(s, v, mem, issue);
   trapLine(s, v, mem, issue);
+  floodWork(s, v, issue);
   hemoBuild(s, v, mem, issue);
   excavate(s, v, mem, issue);
   salvage(s, v, mem, issue);
@@ -1185,7 +1187,7 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     ['stable', p.epoch >= 3 && n >= 26 && count(v, 'stable') < 2],
   ];
   for (const [type, ok] of want) {
-    if (!ok || recently(type, 25) || BUILDINGS[type].epoch > p.epoch) continue;
+    if (!ok || recently(type, 25) || BUILDINGS[type].epoch > p.epoch || buildBarred(p, type)) continue;
     // Not a building whose every line the age bars (a Stable in the Iron Age).
     const lines = BUILDINGS[type].trains;
     if (lines.length && lines.every((u) => barred(p, u))) continue;
@@ -1341,7 +1343,8 @@ function sendTo(s: GameState, v: View, u: Unit, res: Res, issue: (c: Command) =>
       issue({ t: 'gather', p: v.p.id, ids: [u.id], tile: berry });
       return true;
     }
-    const farm = freeFarm(s, v.p.id, v.home.x, v.home.y, 24);
+    // The Nile flood (#501 s1): no one is sent to a field under the river.
+    const farm = flooded(s, v.p.id) ? null : freeFarm(s, v.p.id, v.home.x, v.home.y, 24);
     if (farm) {
       issue({ t: 'work', p: v.p.id, ids: [u.id], target: farm.id });
       return true;
@@ -1414,6 +1417,23 @@ function assignCitizens(s: GameState, v: View, issue: (c: Command) => void): voi
   if (over && under) {
     const mover = v.citizens.find((u) => jobOf(u) === over && u.carry <= 2 && u.order.k !== 'farm' && u.order.k !== 'hunt' && u.order.k !== 'milk' && u.order.k !== 'snare' && !u.inside && !v.diggers.has(u.id));
     if (mover) sendTo(s, v, mover, under, issue);
+  }
+}
+
+// ---- The Nile flood (#501 s1) --------------------------------------------------------------------
+
+/**
+ * While its fields lie under the river, a flood people's computer takes `FLOOD.move` farmers a think off the fields: to berries or
+ * the hunt if any are near, else to the wood, where its builders are pulled from, so the corvée raises what it builds. When the
+ * river falls they go back to the fields as usual.
+ */
+function floodWork(s: GameState, v: View, issue: (c: Command) => void): void {
+  if (!flooded(s, v.p.id)) return;
+  let moved = 0;
+  for (const u of v.citizens) {
+    if (moved >= FLOOD.move) return;
+    if (u.order.k !== 'farm' || u.inside) continue;
+    if (sendTo(s, v, u, 'food', issue) || sendTo(s, v, u, 'wood', issue)) moved++;
   }
 }
 
@@ -2461,6 +2481,7 @@ function greatWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   const w = WORKS[p.civ];
   const busy = p.civ === 'chinese' ? v.traders.length >= 3 : v.citizens.length >= 14;
   const fight = (mem.attacking && v.army.length >= 6) || threatNear(s, v).count >= 4;
+  if (w.mul?.farm && flooded(s, p.id)) return; // a farming work is wasted while the fields lie under the river
   if (w.use === 'eco' ? busy : fight) issue({ t: 'greatWork', p: p.id });
 }
 
@@ -2629,6 +2650,21 @@ function callToArms(s: GameState, v: View, issue: (c: Command) => void): void {
   }
   if (!camp) return;
   issue({ t: 'callUp', p: p.id, building: camp.id, n: Math.min(CALL_UP.most, spare) });
+}
+
+/**
+ * The Warband's verb (#502): a soldier carrying `SPOILS.home` gold or more, and not mid-blow, turns for home to bank it, since a laden
+ * soldier felled in the field hands its pack to the rival. Returns the soldiers still free for the wave.
+ */
+function haulHome(v: View, fighters: Unit[], issue: (c: Command) => void): Unit[] {
+  const { p } = v;
+  if (!ageDef(p).haul) return fighters;
+  const laden = fighters.filter((u) => (u.spoils ?? 0) >= SPOILS.home && u.order.k !== 'attack');
+  if (!laden.length) return fighters;
+  const fresh = laden.filter((u) => !(u.order.k === 'move' && !u.order.amove)).map((u) => u.id);
+  if (fresh.length) issue({ t: 'move', p: p.id, ids: fresh, x: v.home.x, y: v.home.y });
+  const going = new Set(laden.map((u) => u.id));
+  return fighters.filter((u) => !going.has(u.id));
 }
 
 /** Soldiers a War Camp counts as keepers: the people's land fighters, as `warcamp.ts` reads them. */
@@ -3260,6 +3296,8 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     return;
   }
 
+  // The Warband hauls its plunder home (#502): a laden soldier leaves the wave and walks to the Town Center to bank it.
+  if (L.clever) fighters = haulHome(v, fighters, issue);
   // Between waves, soldiers go into a Transfusion Station to be grafted (#355 s5); those on their way in are not the wave's.
   if (L.clever && !mem.attacking) transfuse(s, v, mem, fighters.filter((u) => u.order.k === 'idle'), issue);
   fighters = fighters.filter((u) => !bound(s, u));
@@ -4178,7 +4216,7 @@ function chapterGoals(s: GameState, v: View, mem: AiMemory, issue: (c: Command) 
       plan.allIn = sc.limit ? left < sc.limit * 0.45 : false;
     } else if (o.kind === 'build' && now < goal && o.type) {
       const type = o.type as BuildingType;
-      if (BUILDINGS[type].epoch > p.epoch) continue;
+      if (BUILDINGS[type].epoch > p.epoch || buildBarred(p, type)) continue;
       const placed = count(v, type);
       if (placed >= goal) continue;
       const cost = buildingCostFor(s, p.id, type);

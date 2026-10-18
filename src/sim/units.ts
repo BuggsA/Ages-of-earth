@@ -4,6 +4,7 @@ import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWa
 import { findRoute } from './path';
 import type { Spatial } from './spatial';
 import { buildTimeFor, buildingCostFor, modsOf } from './stats';
+import { flooded } from './flood';
 import { ageDef, canRaise, inField } from './ages';
 import type { Act, Animal, Building, Cost, Ent, GameState, Goal, Order, RareId, Res, Unit } from './types';
 import { seasonOf } from './seasons';
@@ -100,6 +101,7 @@ function face(u: Unit, x: number, y: number): void {
 }
 
 export function gatherRate(s: GameState, u: Unit, kind: number | 'farm'): number {
+  if (kind === 'farm' && flooded(s, u.owner)) return 0;
   const p = s.players[u.owner];
   const m = modsOf(s, u.owner);
   const ai = p.ai ? AI_LEVELS[p.ai].gather : 1;

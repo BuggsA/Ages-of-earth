@@ -5,6 +5,7 @@ import { fairPurse } from './fair';
 import { raidBlow, raidSlain } from './ways';
 import { takeCaptive } from './thralls';
 import { prizeOf } from './convoy';
+import { looted, pack } from './spoils';
 import { distToRect } from './grid';
 import type { Spatial } from './spatial';
 import { modsOf, statsFor } from './stats';
@@ -106,6 +107,14 @@ function plunder(s: GameState, target: Unit, by: number, credit: Unit | null): v
   drawBlood(s, target, by, credit);
   raidSlain(s, target, by);
   takeCaptive(s, target, by);
+  // A laden Warband soldier's pack goes to whoever fells it (#502).
+  const pack0 = looted(target, by);
+  if (pack0 > 0) {
+    p.res.gold += pack0;
+    p.stats.plunder = (p.stats.plunder ?? 0) + pack0;
+    s.events.push({ k: 'plunder', owner: by, x: target.x, y: target.y, gold: pack0 });
+    delete target.spoils;
+  }
   const prize = prizeOf(s, target, by);
   if (prize > 0) {
     p.res.gold += prize;
@@ -117,6 +126,7 @@ function plunder(s: GameState, target: Unit, by: number, credit: Unit | null): v
   const c = statsOf(s, target).cost;
   const gold = Math.floor(((c.food ?? 0) + (c.wood ?? 0) + (c.gold ?? 0) + (c.stone ?? 0)) * share);
   if (gold <= 0) return;
+  if (pack(s, credit, by, gold)) return;
   p.res.gold += gold;
   p.stats.plunder = (p.stats.plunder ?? 0) + gold;
   s.events.push({ k: 'plunder', owner: by, x: target.x, y: target.y, gold });

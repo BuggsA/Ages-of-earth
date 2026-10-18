@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ageOf, barred, roadKnown, roadProblem, roadTo, roadsFrom } from '../src/sim/ages';
+import { ageOf, barred, buildBarred, roadKnown, roadProblem, roadTo, roadsFrom } from '../src/sim/ages';
 import { AGES, ROADS, secs } from '../src/sim/data';
 import { createGame, step } from '../src/sim/game';
 import { deserialize, serialize } from '../src/sim/save';
@@ -94,5 +94,40 @@ describe('the Age of Sail', () => {
       const dressed = buildingGeometry(type, AGES.sail.tier, '#cc3333', 0, 'sail');
       expect(dressed.getAttribute('position').count, type).toBeGreaterThan(plain.getAttribute('position').count);
     }
+  });
+});
+
+describe('the Age of Sail raises no walls (the fleet is the wall)', () => {
+  it('bars walls and gates while sailing, and lets them back on the road home', () => {
+    const s = createGame({ seed: 2, size: 'small', mapType: 'lakes', players: [{ name: 'A', ai: null }, { name: 'B', ai: null }] });
+    const p = s.players[0];
+    p.epoch = 2;
+    p.res = { food: 9000, wood: 9000, stone: 9000, gold: 9000 };
+    expect(buildBarred(p, 'wall')).toBeNull();
+    p.age = 'sail';
+    expect(buildBarred(p, 'wall')).toContain('fleet is the wall');
+    expect(buildBarred(p, 'gate')).toBeTruthy();
+    expect(buildBarred(p, 'farm')).toBeNull();
+    expect(buildBarred(p, 'dock')).toBeNull();
+    const ids = s.ents.filter((e) => e.kind === 'unit' && e.owner === 0 && e.type === 'citizen').map((u) => u.id);
+    step(s, [{ t: 'wall', p: 0, ids, x0: p.startX + 7, y0: p.startY + 9, x1: p.startX + 10, y1: p.startY + 9 }]);
+    expect(s.ents.some((e) => e.kind === 'building' && e.type === 'wall')).toBe(false);
+    p.age = 'middle';
+    expect(buildBarred(p, 'wall')).toBeNull();
+  });
+});
+
+describe('the Age of Merchants stables no horses (cavalry is for hire)', () => {
+  it('bars the Stable but not the hired horse, and lifts on the road home', () => {
+    const s = createGame({ seed: 2, size: 'small', mapType: 'lakes', players: [{ name: 'A', ai: null }, { name: 'B', ai: null }] });
+    const p = s.players[0];
+    p.epoch = 2;
+    expect(buildBarred(p, 'stable')).toBeNull();
+    p.age = 'merchant';
+    expect(buildBarred(p, 'stable')).toContain('stables no horses');
+    expect(buildBarred(p, 'barracks')).toBeNull();
+    expect(barred(p, 'cavalry')).toBeNull();
+    p.age = 'middle';
+    expect(buildBarred(p, 'stable')).toBeNull();
   });
 });

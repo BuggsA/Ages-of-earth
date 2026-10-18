@@ -17,6 +17,10 @@ Two good Stone Age openings should look different by minute 3 and play different
 
 Umbrella: [#463](https://github.com/BuggsA/Ages-of-earth/issues/463).
 
+## Goal 1b: different economies at the core (the owner, 2026-10-17)
+
+The owner: the main problem is that "every people gathers the same four resources with citizens, builds the same buildings and trains from the same queues … makes it feel procedural." So each people gets a different core loop: who works, how resources come in, how soldiers are made (`docs/verbs.md`, lever 1). Not a twist on the shared loop. Umbrella: [#501](https://github.com/BuggsA/Ages-of-earth/issues/501). Prefer depth (one people done fully, the computer playing it) over six thin ones.
+
 ## Goal 2: deepen, don't widen
 
 - **No new ages** (main-road or side) until the existing ones pass the verbs test (`docs/verbs.md`). Exception: the owner's own ask #391 (6–7 epochs), which should pass the test too.
@@ -44,3 +48,4 @@ Its one copy, with the levers and anti-patterns: **`docs/verbs.md`**. Ask it of 
 - 2026-10-17: snares in the wood (#485): the Deep Wood's own verb, a trap line among trees you keep standing. On seed 3 (medium, Deep Wood) both computers lay one at 10.3 minutes.
 - 2026-10-17: re-measured after s1–s3 (`opening.ts 3 hunt warband 15`, medium Glade): Warband has 2 soldiers at minute 1 and 11 kills by minute 12 against the Hunters' 3, with a Hunting Camp at 0.3 min against 5.5, and the Steppe at 12.5 min. The timelines now differ from minute 1, not minute 8. Still unseen by the owner: "done when" waits on their play.
 - 2026-10-17: the verbs rubric (`docs/verbs.md`, #500) and an audit of the existing game against it (#500): peoples #501, Warband #502, Reclaimers #503, road victories seed #504.
+- 2026-10-17: the owner names the shared core loop as the main problem (Goal 1b); #501 reshaped into six economies. s1, the Egyptians' Nile flood, merged in #516.
