@@ -1416,7 +1416,17 @@ export interface Civ {
   mul?: Partial<Mods>;
   /** The Nile flood (#501 s1, `FLOOD`): each year in the flood season its fields yield nothing and its builders work faster. */
   flood?: boolean;
+  /** The polis (#501, `POLIS`): its citizens are its foot soldiers, armed and disarmed in place; it trains none. */
+  polis?: boolean;
 }
+
+/**
+ * The polis (#501, the Greeks): a citizen takes up arms where it stands for `arm`, becoming a foot soldier with its health share
+ * (what it carried is dropped), and a foot soldier lays them down within `home` tiles of one of its Town Centers. The computer
+ * arms at most `aiShare` of its citizens and keeps `aiKeep` at work, answers a raid of `aiThreat` or more, and lays arms down `aiRest`
+ * seconds after arming at the soonest.
+ */
+export const POLIS = { arm: { wood: 20 } as Cost, home: 14, aiShare: 0.5, aiKeep: 8, aiRest: 90, aiThreat: 3 };
 
 /**
  * The Nile flood (#501 s1): in season `season` (summer) the fields of a flood people lie under the river and yield nothing,
@@ -1433,7 +1443,15 @@ export const CIVS: Record<CivId, Civ> = {
     flood: true,
     mul: { farm: 1.5, wonderCost: 0.75 },
   },
-  greeks: { name: 'Greeks', blurb: 'Hoplites: foot soldiers have 15% more health and +1 melee armor.', add: { infantryArmor: 1 }, mul: { infantryHp: 1.15 } },
+  greeks: {
+    name: 'Greeks',
+    blurb: 'Citizens of the polis, who are its army. A Greek city trains no foot soldiers: any citizen takes up shield and spear where it stands (H), and lays them down at home to go back to work (L). Every campaign empties the fields, and every farmer can hold the line. Hoplites have 15% more health and +1 melee armor.',
+    verb: 'Arm your citizens where they stand when war comes, and send them home to lay their arms down and work again',
+    door: 'No foot soldiers are trained: the army is the workforce, so a long campaign starves the town',
+    polis: true,
+    add: { infantryArmor: 1 },
+    mul: { infantryHp: 1.15 },
+  },
   romans: { name: 'Romans', blurb: 'Builders of roads and forts: buildings are 20% sturdier and go up 25% faster.', mul: { buildingHp: 1.2, buildSpeed: 1.25 } },
   mongols: { name: 'Mongols', blurb: 'Riders of the steppe: cavalry ride 15% faster and hunters work 40% faster.', mul: { cavalrySpeed: 1.15, hunt: 1.4 } },
   chinese: { name: 'Chinese', blurb: 'A great people: start with 2 more citizens, and technologies cost 15% less.', add: { extraCitizens: 2 }, mul: { techCost: 0.85 } },
@@ -1448,7 +1466,7 @@ export const CIV_IDS = Object.keys(CIVS) as CivId[];
  */
 export const VERB_GAPS: { ages: Partial<Record<AgeId, number>>; civs: Partial<Record<CivId, number>> } = {
   ages: {},
-  civs: { greeks: 501, romans: 501, mongols: 501, chinese: 501, britons: 501 },
+  civs: { romans: 501, mongols: 501, chinese: 501, britons: 501 },
 };
 
 /**
