@@ -49,3 +49,4 @@ Its one copy, with the levers and anti-patterns: **`docs/verbs.md`**. Ask it of 
 - 2026-10-17: re-measured after s1–s3 (`opening.ts 3 hunt warband 15`, medium Glade): Warband has 2 soldiers at minute 1 and 11 kills by minute 12 against the Hunters' 3, with a Hunting Camp at 0.3 min against 5.5, and the Steppe at 12.5 min. The timelines now differ from minute 1, not minute 8. Still unseen by the owner: "done when" waits on their play.
 - 2026-10-17: the verbs rubric (`docs/verbs.md`, #500) and an audit of the existing game against it (#500): peoples #501, Warband #502, Reclaimers #503, road victories seed #504.
 - 2026-10-17: the owner names the shared core loop as the main problem (Goal 1b); #501 reshaped into six economies. s1, the Egyptians' Nile flood, merged in #516.
+- 2026-10-18: the Romans' legion (#501): few citizens, foot soldiers who fell, quarry and build. Greeks (#522) and Romans are the two peoples with a different core loop.

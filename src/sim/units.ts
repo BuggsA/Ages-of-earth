@@ -1,4 +1,4 @@
-import { AI_LEVELS, AUTO_WORK, BUILDINGS, EXPLORE, PATROL, CARRY, CONSECRATE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TRADE, domainOf, secs } from './data';
+import { AI_LEVELS, AUTO_WORK, BUILDINGS, EXPLORE, PATROL, CARRY, CONSECRATE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, LEGION, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
@@ -6,6 +6,7 @@ import type { Spatial } from './spatial';
 import { buildTimeFor, buildingCostFor, modsOf } from './stats';
 import { flooded } from './flood';
 import { ageDef, canRaise, inField } from './ages';
+import { legionKind, legionary } from './legion';
 import type { Act, Animal, Building, Cost, Ent, GameState, Goal, Order, RareId, Res, Unit } from './types';
 import { seasonOf } from './seasons';
 import { catchOf } from './year';
@@ -112,7 +113,9 @@ export function gatherRate(s: GameState, u: Unit, kind: number | 'farm'): number
   const season = kind === 'farm' ? sn.field : kind === R_BERRY ? sn.plant : kind === R_FISH ? catchOf(s) : 1;
   // A Flint Scatter sharpens its keeper's axes and picks.
   const tools = (kind === R_TREE || kind === R_STONE || kind === R_GOLD || kind === R_BOG) && keptOf(s, u.owner, 'flint') > 0 ? 1 + kinBonus(s, u.owner, 'flint', LANDMARKS.flint.tools - 1) : 1;
-  return base * mod * (1 + p.epoch * EPOCH_GATHER_BONUS) * ai * season * tools;
+  // A legionary (#501) works timber and stone at a fraction of a citizen's pace.
+  const legion = legionary(s, u) ? LEGION.rate : 1;
+  return base * mod * (1 + p.epoch * EPOCH_GATHER_BONUS) * ai * season * tools * legion;
 }
 
 const carryCap = (s: GameState, u: Unit) =>
@@ -224,7 +227,7 @@ export function autoWork(s: GameState, u: Unit, x: number, y: number, reach: num
 export function rallyNode(s: GameState, u: Unit, rally: NonNullable<Building['rally']>): number {
   if (rally.kind === undefined || s.players[u.owner].ai) return -1;
   const fish = u.type === 'fisher';
-  if (fish !== (rally.kind === R_FISH) || (u.type !== 'citizen' && !fish)) return -1;
+  if (fish !== (rally.kind === R_FISH) || (u.type !== 'citizen' && !fish && !(legionary(s, u) && legionKind(rally.kind)))) return -1;
   const kinds = rally.kind === R_MEAT ? [R_MEAT, R_BERRY] : [rally.kind];
   const load = gatherLoad(s, u);
   const busy = (i: number) => (load.get(i) ?? 0) >= SPREAD.perNode;
@@ -491,7 +494,7 @@ export function completeBuilding(s: GameState, b: Building): void {
 
 /** What a builder does once the building is up. */
 function afterBuilding(s: GameState, u: Unit, b: Building): void {
-  if (b.type === 'farm' && !farmTaken(s, b) && !u.queue.length) {
+  if (b.type === 'farm' && u.type === 'citizen' && !farmTaken(s, b) && !u.queue.length) {
     setOrder(u, { k: 'farm', target: b.id, phase: 'go' });
     return;
   }
@@ -504,7 +507,7 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
   let next: Building | null = null;
   let bestD = b.type === 'wall' || b.type === 'gate' ? 4 : 14;
   for (const e of s.ents) {
-    if (e.kind !== 'building' || e.owner !== u.owner || e.built || e.hp <= 0 || !canRaise(u.type, e.type)) continue;
+    if (e.kind !== 'building' || e.owner !== u.owner || e.built || e.hp <= 0 || !canRaise(u.type, e.type, s.players[u.owner].civ)) continue;
     const d = distToRect(u.x, u.y, e);
     if (d < bestD) {
       bestD = d;
@@ -527,7 +530,7 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
     }
   }
   // A farm that is already worked: the player's builder takes a free field nearby rather than standing idle (#344).
-  if (b.type === 'farm' && !s.players[u.owner].ai) {
+  if (b.type === 'farm' && u.type === 'citizen' && !s.players[u.owner].ai) {
     const f = freeFarm(s, u.owner, u.x, u.y, 10, headedFarms(s, u));
     if (f) {
       setOrder(u, { k: 'farm', target: f.id, phase: 'go' });
@@ -669,6 +672,21 @@ function roundFight(s: GameState, sp: Spatial, u: Unit, o: Order): boolean {
   u.guardX = u.x;
   u.guardY = u.y;
   setOrder(u, { k: 'attack', target: t.id, auto: true, then: null, back: o });
+  return true;
+}
+
+/**
+ * A legionary at work keeps watch (#501): an enemy within `LEGION.watch` times his sight makes him drop his tools and take it on,
+ * and when the fight is done he goes back to the work. True if he turned to fight.
+ */
+function sentry(s: GameState, sp: Spatial, u: Unit, o: Order): boolean {
+  if ((s.tick + u.id) % PATROL.scan !== 0 || u.stance === 'run') return false;
+  const st = statsOf(s, u);
+  const t = findTarget(s, sp, u, u.stance === 'stand' ? st.range + st.radius + 0.6 : st.sight * LEGION.watch, false);
+  if (!t) return false;
+  u.guardX = u.x;
+  u.guardY = u.y;
+  setOrder(u, { k: 'attack', target: t.id, auto: true, then: null, back: o.k === 'gather' ? { ...o, phase: 'go' } : o });
   return true;
 }
 
@@ -1892,12 +1910,14 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
       exploreStep(s, sp, u, o);
       break;
     case 'gather':
+      if (legionary(s, u) && sentry(s, sp, u, o)) break;
       gatherStep(s, u, o);
       break;
     case 'farm':
       farmStep(s, u, o);
       break;
     case 'build':
+      if (legionary(s, u) && sentry(s, sp, u, o)) break;
       buildStep(s, u, o);
       break;
     case 'deliver':

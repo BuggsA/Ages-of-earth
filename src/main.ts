@@ -25,6 +25,7 @@ import { LANDMARK_KINDS, landmarkAt } from './sim/landmarks';
 import { postAt } from './sim/trade';
 import { chantedOver, consecrateProblem, consecrates } from './sim/consecrate';
 import { riteProblem } from './sim/fork';
+import { legionKind, legionary } from './sim/legion';
 import { ageDef, ageOf, canRaise, heirloomsOpened, isSideRoad, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
 import { NetClient, newRoomCode, saveName, savedName } from './net/client';
 import { HASH_EVERY, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
@@ -1340,7 +1341,7 @@ function order(clientX: number, clientY: number, forceAttack = false, queue = fa
     if (t.kind === 'building' && t.owner === viewer) {
       issue({ t: 'work', p: viewer, ids, target: t.id, queue: q });
       view.marker(s, t.x, t.y, false);
-      play(units.some((u) => u.type === 'citizen') && (!t.built || t.hp < maxHp(s, t)) ? 'hammer' : 'move');
+      play(units.some((u) => u.type === 'citizen' || legionary(s, u)) && (!t.built || t.hp < maxHp(s, t)) ? 'hammer' : 'move');
       return;
     }
     issue({ t: 'move', p: viewer, ids, x: t.x, y: t.y, amove: forceAttack, queue: q });
@@ -1518,7 +1519,7 @@ function placeHere(shift: boolean): void {
   }
   // Citizens raise everything; foot soldiers pitch War Camps (#303).
   const kind = placing;
-  const ids = selectedUnits(s).filter((u) => canRaise(u.type, kind)).map((u) => u.id);
+  const ids = selectedUnits(s).filter((u) => canRaise(u.type, kind, s.players[viewer].civ)).map((u) => u.id);
   issue({ t: 'build', p: viewer, ids, type: placing, tx: placeAt.tx, ty: placeAt.ty, queue: shift || undefined });
   if (!shift) {
     placing = null;
@@ -1657,7 +1658,7 @@ canvas.addEventListener('pointerup', (e) => {
       play('error');
       return;
     }
-    const ids = selectedUnits(s).filter((u) => u.type === 'citizen').map((u) => u.id);
+    const ids = selectedUnits(s).filter((u) => u.type === 'citizen' || legionary(s, u)).map((u) => u.id);
     issue({ t: 'wall', p: viewer, ids, x0: d.x0, y0: d.y0, x1: d.x1, y1: d.y1, queue: e.shiftKey || undefined });
     if (!e.shiftKey) {
       placing = null;
@@ -2669,7 +2670,7 @@ function cursorFor(s: GameState): string {
     if (!t) return '';
     const foe = s.players[t.owner].team !== s.players[viewer].team;
     if (units.length && foe) return units.every((u) => u.type === 'priest') && (t.kind === 'unit' || !consecrateProblem(s, viewer, t)) ? 'cur-convert' : 'cur-attack';
-    if (units.some((u) => u.type === 'citizen') && t.kind === 'building' && t.owner === viewer && (!t.built || t.hp < maxHp(s, t) || t.type === 'farm')) return 'cur-build';
+    if (units.some((u) => u.type === 'citizen' || legionary(s, u)) && t.kind === 'building' && t.owner === viewer && (!t.built || t.hp < maxHp(s, t) || t.type === 'farm')) return 'cur-build';
     if (t.kind === 'building' && t.owner === viewer && chantedOver(s, t) && consecrates(s, viewer) && units.some((u) => u.type === 'priest' && !carriedBy(s, u))) return 'cur-gather';
     if (units.length && t.kind === 'building' && t.owner === viewer && t.built && BUILDINGS[t.type].garrison) return 'cur-garrison';
     if (t.kind === 'building' && t.type === 'temple' && t.owner === viewer && t.built && units.some((u) => u.type === 'priest' && carriedBy(s, u))) return 'cur-gather';
@@ -2677,7 +2678,7 @@ function cursorFor(s: GameState): string {
     if (t.kind === 'unit' && t.type === 'transport' && t.owner === viewer && units.some((u) => domainOf(u.type) === 'land')) return 'cur-garrison';
     return 'cur-select';
   }
-  if (pk.kind === 'resource' && units.some((u) => u.type === 'citizen' || (u.type === 'fisher' && s.res[pk.tile] === R_FISH))) return 'cur-gather';
+  if (pk.kind === 'resource' && units.some((u) => u.type === 'citizen' || (u.type === 'fisher' && s.res[pk.tile] === R_FISH) || (legionary(s, u) && legionKind(s.res[pk.tile])))) return 'cur-gather';
   if (pk.kind === 'ground' && units.some((u) => u.type === 'transport' && u.cargo.length) && walkable(s, Math.floor(pk.x), Math.floor(pk.y))) return 'cur-garrison';
   return '';
 }

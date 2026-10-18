@@ -1,4 +1,4 @@
-import { AGES, HOMELANDS, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, secs } from '../sim/data';
+import { AGES, CIVS, HOMELANDS, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, secs } from '../sim/data';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, mainRoad, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
 import type { AgeId, Building, GameState, Unit } from '../sim/types';
@@ -80,6 +80,8 @@ const TIPS: Tip[] = [
   { id: 'wolves', when: (s, me) => sighted(s, me, 'wolf'), text: '<b>Wolves</b> keep a den out here, often by wild gold, and fall on anyone who comes near. A lone citizen won\'t survive them: send a few soldiers, or a band of citizens, to clear the den first.' },
   { id: 'flock', when: (s, me) => s.animals.some((a) => a.kind === 'sheep' && a.owner === me), text: 'Your <b>flock</b> grazes by the Town Center. <b>Right-click</b> a sheep with citizens to <b>milk</b> it: slow food that comes back. A sheep left unmilked fattens and bears lambs; <kbd>A</kbd> then click one to <b>slaughter</b> it for meat. Each bite crops the grass bare a while: when the flock goes hungry, strike camp (<kbd>J</kbd>) and move on, and the sheep follow.' },
   { id: 'rustle', when: (s, me) => s.animals.some((a) => a.kind === 'sheep' && a.owner !== undefined && a.owner !== me && s.players[me].team !== s.players[a.owner].team && s.players[me].vis[Math.floor(a.y) * s.w + Math.floor(a.x)]), text: 'A rival\'s <b>flock</b>. Sheep with none of their people near can be <b>driven off</b>: stand a rider or a citizen right beside one and it follows them home to your Town Center.' },
+  // The legion (#501): a Roman town keeps few citizens, and its foot soldiers are its hands.
+  { id: 'legion', when: (s, me) => !!CIVS[s.players[me].civ].legion && secsIn(s) > 30, text: `🦅 <b>The legion builds.</b> A Roman town keeps only ${LEGION.citizens} citizens (three more each epoch): leave them the food and the gold. Raise a <b>Barracks</b> early, and put your foot soldiers to work: select them and <b>right-click a tree or a stone</b> to fell and quarry, or <b>right-click a building site</b> to raise it. A soldier at work still keeps watch and drops his tools for a foe who comes near, but a wave marched off to war leaves the wood-line empty.` },
   { id: 'army', when: (s) => secsIn(s) > 200, text: 'Rivals will come. Build a <b>Barracks</b> (<kbd>V</kbd> <kbd>B</kbd>) and train soldiers. Infantry beat cavalry, archers beat infantry, cavalry beat archers.' },
   { id: 'farm', when: (s, me) => secsIn(s) > 260 && !has(s, me, 'farm'), text: 'Berries and deer run out. <b>Farms</b> (<kbd>B</kbd> <kbd>F</kbd>) give food forever; build them near your Town Center.' },
   {

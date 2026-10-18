@@ -18,6 +18,7 @@ import { callKin, killCamp, kinProblem, takeVow, takeWay, vowProblem, wayBarred,
 import { beaconProblem, lightBeacon } from './beacon';
 import { callUp, callUpProblem } from './warcamp';
 import { arm, armProblem, disarm, disarmProblem } from './polis';
+import { citizenProblem, legionKind, legionary } from './legion';
 import { bloodOf, bloodShort, levy, levyProblem, sworn } from './blood';
 import { riteProblem } from './fork';
 import { rallyCry, rallyProblem } from './rally';
@@ -204,9 +205,9 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
 }
 
 /** Send citizens to build, remembering the work they were doing to go back to it after. */
-function assignBuilders(units: Unit[], b: Building, queue: boolean): void {
+function assignBuilders(s: GameState, units: Unit[], b: Building, queue: boolean): void {
   for (const u of units) {
-    if (u.thrall || !canRaise(u.type, b.type)) continue;
+    if (u.thrall || !canRaise(u.type, b.type, s.players[u.owner].civ)) continue;
     const o = u.order;
     const back: Order | null = o.k === 'gather' ? { ...o, phase: 'go' } : o.k === 'farm' || o.k === 'snare' ? { ...o, phase: 'go' } : o.k === 'build' ? u.resume : null;
     giveOrder(u, { k: 'build', target: b.id }, queue);
@@ -300,7 +301,7 @@ export function applyCommand(s: GameState, c: Command): void {
       if (c.tile < 0 || c.tile >= s.w * s.h || kind === R_NONE) return;
       const units = myUnits(s, c.p, c.ids);
       // Citizens work the land; fishing boats fish.
-      const workers = units.filter((u) => (kind === R_FISH ? u.type === 'fisher' : u.type === 'citizen'));
+      const workers = units.filter((u) => (kind === R_FISH ? u.type === 'fisher' : u.type === 'citizen' || (legionary(s, u) && legionKind(kind))));
       const nodes = c.spread && kind !== R_MEAT && workers.length > 1 ? nodesNear(s, c.tile, kind) : [c.tile];
       const load = new Map<number, number>();
       for (const u of workers) {
@@ -463,14 +464,14 @@ export function applyCommand(s: GameState, c: Command): void {
           giveOrder(u, { k: 'deliver' }, c.queue);
           continue;
         }
-        // Foot soldiers finish a War Camp they or others pitched (#303).
-        if (u.type !== 'citizen' && !b.built && canRaise(u.type, b.type)) {
-          assignBuilders([u], b, !!c.queue);
+        // Foot soldiers finish a War Camp they or others pitched (#303); a legion's raise and mend every building (#501).
+        if (u.type !== 'citizen' && (!b.built || (legionary(s, u) && b.hp < maxHp(s, b))) && canRaise(u.type, b.type, p.civ)) {
+          assignBuilders(s, [u], b, !!c.queue);
           continue;
         }
         if (u.type === 'citizen') {
           if (!b.built || b.hp < maxHp(s, b)) {
-            assignBuilders([u], b, !!c.queue);
+            assignBuilders(s, [u], b, !!c.queue);
             continue;
           }
           if (b.type === 'farm') {
@@ -693,7 +694,7 @@ export function applyCommand(s: GameState, c: Command): void {
         const w = s.bldAt[c.ty * s.w + c.tx - 1] || s.bldAt[c.ty * s.w + c.tx + 2];
         b.dir = w ? 0 : 1;
       }
-      assignBuilders(myUnits(s, c.p, c.ids), b, !!c.queue);
+      assignBuilders(s, myUnits(s, c.p, c.ids), b, !!c.queue);
       break;
     }
     case 'wall': {
@@ -712,7 +713,7 @@ export function applyCommand(s: GameState, c: Command): void {
       if (!placed.length) return;
       const units = myUnits(s, c.p, c.ids);
       // Builders start from the near end.
-      assignBuilders(units, placed[0], !!c.queue);
+      assignBuilders(s, units, placed[0], !!c.queue);
       break;
     }
     case 'train': {
@@ -726,6 +727,9 @@ export function applyCommand(s: GameState, c: Command): void {
       if (no) return refuse(s, c.p, no);
       if (b.queue.length >= MAX_QUEUE) return refuse(s, c.p, 'The queue is full');
       if (c.unit === 'hero' && heroBusy(s, c.p)) return refuse(s, c.p, 'You can lead with one hero at a time');
+      // The legion (#501): a Roman town keeps few citizens.
+      const full = c.unit === 'citizen' ? citizenProblem(s, p) : null;
+      if (full) return refuse(s, c.p, full);
       const cost = trainCostFor(s, c.p, c.unit, b.type, b);
       const short = shortfall(p, cost);
       if (short) return refuse(s, c.p, short);

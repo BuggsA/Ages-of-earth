@@ -38,6 +38,7 @@ import { costHtml, icon } from './icons';
 import { buildingPicture, unitPicture } from './thumbs';
 import { idleCitizens } from './idle';
 import { workforce, WORKFORCE_JOBS } from './workforce';
+import { citizenProblem, isLegion } from '../sim/legion';
 
 /**
  * The heads-up display: resources and population along the top with the epoch and the clock, and along
@@ -351,7 +352,7 @@ export class Hud {
   private drawWorkforce(s: GameState, viewer: number): void {
     const jobs = workforce(s, viewer);
     const total = WORKFORCE_JOBS.reduce((n, job) => n + (jobs.get(job.key)?.length ?? 0), 0);
-    this.workforcePanel.innerHTML = `<div class="workforce-head">Workforce <span>${total} citizens</span></div>` +
+    this.workforcePanel.innerHTML = `<div class="workforce-head">Workforce <span>${total} ${isLegion(s.players[viewer]) ? 'hands' : 'citizens'}</span></div>` +
       WORKFORCE_JOBS.map((job) => {
         const n = jobs.get(job.key)?.length ?? 0;
         return `<button type="button" data-job="${job.key}" ${n ? '' : 'disabled'} title="Select ${job.label.toLowerCase()} citizens"><span>${job.icon} ${job.label}</span><strong>${n}</strong></button>`;
@@ -769,13 +770,15 @@ export class Hud {
     const mine = ents.filter((e) => e.owner === viewer);
     const units = mine.filter((e): e is Unit => e.kind === 'unit');
     const citizens = units.filter((u) => u.type === 'citizen');
+    // Who may raise buildings: citizens, and a legion's foot soldiers too (#501).
+    const builders = units.filter((u) => canRaise(u.type, 'house', p.civ));
     const soldiers = units.filter((u) => u.type !== 'citizen' && u.type !== 'fisher' && u.type !== 'transport' && u.type !== 'trader' && u.type !== 'cog' && u.type !== 'wagon');
     const walkers = units.filter((u) => domainOf(u.type) === 'land');
     const transports = units.filter((u) => u.type === 'transport');
     const cmds: Cmd[] = [];
-    if (!citizens.length) this.buildMenu = null;
+    if (!builders.length) this.buildMenu = null;
 
-    if (citizens.length && this.buildMenu) {
+    if (builders.length && this.buildMenu) {
       for (const type of BUILDING_TYPES) {
         const def = BUILDINGS[type];
         if (def.menu !== this.buildMenu) continue;
@@ -799,13 +802,13 @@ export class Hud {
       }
       cmds.push({ key: 'ESCAPE', pic: '', glyph: '↩', title: 'Back', desc: 'Back to the commands.', ok: true, run: () => (this.buildMenu = null) });
     } else if (units.length) {
-      if (citizens.length) {
+      if (builders.length) {
         cmds.push({ key: 'B', pic: '', glyph: '🏠', title: 'Build (economy)', desc: 'Houses, farms, storehouses, markets, temples, walls and wonders.', ok: true, run: () => ((this.buildMenu = 'eco'), this.act.sound('open')) });
         cmds.push({ key: 'V', pic: '', glyph: '🛡', title: 'Build (military)', desc: 'Barracks, ranges, stables, forges, siege workshops and towers.', ok: true, run: () => ((this.buildMenu = 'mil'), this.act.sound('open')) });
       }
       // The Age of Iron and Blood (#303): foot soldiers pitch a War Camp where they stand.
       const pitchers = units.filter((u) => u.type !== 'citizen' && canRaise(u.type, 'warcamp'));
-      if (pitchers.length && !citizens.length && !buildBarred(p, 'warcamp')) {
+      if (pitchers.length && !builders.length && !buildBarred(p, 'warcamp')) {
         const cost = buildingCostFor(s, viewer, 'warcamp');
         const short = shortfall(p, cost);
         cmds.push({
@@ -896,7 +899,7 @@ export class Hud {
           const levied = !hired && !!age.levy && JSON.stringify(cost) !== JSON.stringify(st.cost);
           const priced = !hired && age.price?.[st.cls];
           const locked = unitEpoch(unit) > p.epoch;
-          const no = barred(p, unit, b.type) ?? buildBarred(p, b.type);
+          const no = barred(p, unit, b.type) ?? buildBarred(p, b.type) ?? (unit === 'citizen' ? citizenProblem(s, p) : null);
           const short = shortfall(p, cost);
           const hero = unit === 'hero' && (heroBusy(s, viewer) || b.queue.some((q) => q.unit === 'hero'));
           cmds.push({
