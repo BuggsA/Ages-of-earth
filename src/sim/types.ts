@@ -153,6 +153,8 @@ export type Order =
 export type Act = 'idle' | 'walk' | 'attack' | 'chop' | 'mine' | 'forage' | 'farm' | 'build' | 'chant' | 'fish';
 
 export interface Unit {
+  /** A citizen of a polis who took up arms (#501): its people's computer sends only these home to lay arms down. */
+  levy?: boolean;
   id: number;
   owner: number;
   kind: 'unit';
@@ -541,6 +543,8 @@ export interface PlayerStats {
   campTrained?: number;
   /** Citizens called to arms at War Camps in the Age of Total War (#313); absent in older saves. */
   calledUp?: number;
+  /** Citizens of a polis who took up arms (#501). */
+  armed?: number;
   /** Blood drawn at Drain Rigs, from the slain and by the levy (#355); absent in older saves. */
   blood?: number;
   /** Citizens given to the levy at Drain Rigs (#355); absent in older saves. */
@@ -835,6 +839,8 @@ export interface GameState {
 
 export interface AiMemory {
   next: number;
+  /** The tick a polis computer last armed its citizens (#501). */
+  polisAt?: number;
   wave: number;
   attacking: boolean;
   /** Where the army gathers between attacks. */
@@ -964,6 +970,9 @@ export type Command =
   /** A rare ore (#356) can only be sold, a lot of it for gold at a flat price. */
   | { t: 'trade'; p: number; res: 'food' | 'wood' | 'stone' | RareId; buy: boolean }
   | { t: 'stop'; p: number; ids: number[] }
+  /** The polis (#501): citizens take up arms where they stand, or soldiers lay them down near home. */
+  | { t: 'arm'; p: number; ids: number[] }
+  | { t: 'disarm'; p: number; ids: number[] }
   /**
    * Patrol between where each unit stands and the point (#454); with `queue`, add the point to a patrol under way.
    * With `post`, guard that trading post's road instead: back and forth between the nearest Market and the post (s3).

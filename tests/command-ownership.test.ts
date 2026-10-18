@@ -39,6 +39,8 @@ describe('one player never commands another’s people', () => {
     // One of each: a command type added later without a line here fails to compile.
     const every: { [K in Command['t']]: Extract<Command, { t: K }> } = {
       move: { t: 'move', p: 1, ids, x, y },
+      arm: { t: 'arm', p: 1, ids },
+      disarm: { t: 'disarm', p: 1, ids },
       attack: { t: 'attack', p: 1, ids, target: tc.id },
       gather: { t: 'gather', p: 1, ids, tile },
       work: { t: 'work', p: 1, ids, target: tc.id },

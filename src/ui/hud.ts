@@ -1,12 +1,13 @@
 import { crestSvg } from './crests';
 import { seasonAt, seasonOf } from '../sim/seasons';
 import { flooded } from '../sim/flood';
+import { armProblem, disarmProblem, isPolis } from '../sim/polis';
 import { scenarioById } from '../sim/campaign';
 import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
 import { RARE_OF_TILE } from '../sim/units';
-import { SPOILS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, SNARE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, SNARE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -827,6 +828,18 @@ export class Hud {
         cmds.push({ key: 'E', pic: '', glyph: '🧭', title: 'Explore', desc: `Go and see: each heads for the nearest ground your people have never seen, and on to the next, fanning out from one another${fights ? '. Aggressive soldiers fall on what they find; defensive ones fight only what comes close; those standing their ground only what is in reach' : ''}. They keep clear of enemy towers they have seen, report armies they come on, and stop when there is nothing left they can reach.`, ok: true, run: () => this.act.issue({ t: 'explore', p: viewer, ids: rovers.map((u) => u.id) }) });
       }
       cmds.push({ key: 'S', pic: '', glyph: '✋', title: 'Stop', desc: 'Stop what they are doing (and forget queued orders).', ok: true, run: () => this.act.issue({ t: 'stop', p: viewer, ids: units.map((u) => u.id) }) });
+      // The polis (#501): Greek citizens take up arms where they stand, and their soldiers lay them down at home.
+      if (isPolis(p)) {
+        if (citizens.length) {
+          const why = armProblem(p, citizens[0]);
+          cmds.push({ key: 'H', pic: unitPicture('infantry', p.epoch, p.color), title: citizens.length > 1 ? `Take up arms (${citizens.length})` : 'Take up arms', desc: `Each citizen becomes a hoplite where it stands, paying its own shield and spear; what it carries is dropped. A Greek city trains no foot soldiers: its citizens are its army. Lay the arms down within ${POLIS.home} tiles of a Town Center (L) to go back to work.`, cost: POLIS.arm, ok: !why, why: why ?? undefined, run: () => (this.act.issue({ t: 'arm', p: viewer, ids: citizens.map((u) => u.id) }), this.act.sound('queue')) });
+        }
+        const hoplites = units.filter((u) => u.type === 'infantry');
+        if (hoplites.length) {
+          const why = hoplites.some((u) => !disarmProblem(s, p, u)) ? null : disarmProblem(s, p, hoplites[0]);
+          cmds.push({ key: 'L', pic: '', glyph: '🌾', title: 'Lay down arms', desc: `Soldiers within ${POLIS.home} tiles of a Town Center lay down shield and spear and are citizens again, ready to work. The arms are not given back.`, ok: !why, why: why ?? undefined, run: () => (this.act.issue({ t: 'disarm', p: viewer, ids: hoplites.map((u) => u.id) }), this.act.sound('queue')) });
+        }
+      }
       const holding = units.filter((u) => u.type === 'priest' && carriedBy(s, u));
       // The Blood-rite (#355 s4): a priest may offer an enemy up, or curse it.
       const chanters = units.filter((u) => u.type === 'priest' && !carriedBy(s, u));
@@ -873,7 +886,7 @@ export class Hud {
       if (b.built) {
         // The Market's Q W E and A S D buy and sell: its trader and technologies go on T and R F.
         // Soldiers an age hires here (the merchants' Market) go on Z X C.
-        const unitKeys = b.type === 'towncenter' ? ['Q', 'E'] : b.type === 'market' ? ['T', 'Z', 'X', 'C'] : ['Q', 'W', 'E'];
+        const unitKeys = b.type === 'towncenter' ? ['Q', 'E'] : b.type === 'market' ? ['T', 'Z', 'X', 'C'] : ['Q', 'W', 'E', 'R'];
         trainsAt(p, b.type).forEach((unit, i) => {
           const st = statsFor(s, viewer, unit);
           const hired = isHire(p, b.type, unit);
@@ -883,11 +896,11 @@ export class Hud {
           const levied = !hired && !!age.levy && JSON.stringify(cost) !== JSON.stringify(st.cost);
           const priced = !hired && age.price?.[st.cls];
           const locked = unitEpoch(unit) > p.epoch;
-          const no = barred(p, unit) ?? buildBarred(p, b.type);
+          const no = barred(p, unit, b.type) ?? buildBarred(p, b.type);
           const short = shortfall(p, cost);
           const hero = unit === 'hero' && (heroBusy(s, viewer) || b.queue.some((q) => q.unit === 'hero'));
           cmds.push({
-            key: unitKeys[i],
+            key: unitKeys[i] ?? '',
             pic: unitPicture(unit, Math.max(p.epoch, unitEpoch(unit)), p.color),
             title: `${hired ? 'Hire' : 'Train'} ${st.name}`,
             desc: hired
