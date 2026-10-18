@@ -1523,6 +1523,11 @@ function distTo(u: { x: number; y: number }, at: { x: number; y: number }): numb
 
 // ---- The polis (#501) ---------------------------------------------------------------------------
 
+/** The polis brings its harvest in before it marches: in `POLIS.harvest` season its citizens stay at the fields, unless the wave is all-in. */
+function polisHarvest(s: GameState, v: View): boolean {
+  return isPolis(v.p) && seasonAt(s) === POLIS.harvest && !v.plan.allIn;
+}
+
 /**
  * A Greek computer trains no foot soldiers, so it arms its citizens: when rivals reach the town (those nearest them), and when a wave
  * is due and the citizens it may spare would fill it (those nearest home). It arms at most `POLIS.aiShare` of its people and keeps
@@ -1554,7 +1559,7 @@ function polisArms(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
     return;
   }
   const waveSize = v.plan.wave || L.wave + mem.wave * L.waveGrowth;
-  const due = !v.plan.hold && (v.plan.wave ? true : s.tick >= secs(L.firstAttack)) && s.tick >= s.peaceUntil;
+  const due = !v.plan.hold && !polisHarvest(s, v) && (v.plan.wave ? true : s.tick >= secs(L.firstAttack)) && s.tick >= s.peaceUntil;
   if (due && !mem.attacking && v.army.length < waveSize && v.army.length + spare >= waveSize) {
     call(waveSize - v.army.length, v.home.x, v.home.y);
     return;
@@ -3498,7 +3503,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
       return;
     }
   }
-  const due = !plan.hold && (plan.wave ? true : s.tick >= secs(L.firstAttack)) && s.tick >= s.peaceUntil;
+  const due = !plan.hold && !polisHarvest(s, v) && (plan.wave ? true : s.tick >= secs(L.firstAttack)) && s.tick >= s.peaceUntil;
   if (due && !mem.attacking && (fighters.length >= waveSize || (wonderRace && fighters.length >= 4) || (plan.allIn && fighters.length >= 12))) {
     issue({ t: 'move', p: p.id, ids: fighters.map((u) => u.id), x: enemy.x, y: enemy.y, amove: true });
     mem.attacking = true;
