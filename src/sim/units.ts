@@ -6,6 +6,7 @@ import type { Spatial } from './spatial';
 import { buildTimeFor, buildingCostFor, modsOf } from './stats';
 import { flooded } from './flood';
 import { mineable } from './household';
+import { isNomad } from './nomad';
 import { ageDef, canRaise, inField } from './ages';
 import { legionKind, legionary } from './legion';
 import type { Act, Animal, Building, Cost, Ent, GameState, Goal, Order, RareId, Res, Unit } from './types';
@@ -1060,7 +1061,9 @@ function huntStep(s: GameState, u: Unit, o: Extract<Order, { k: 'hunt' }>): void
 
 /** How fast a citizen milks, a little quicker in each epoch like all gathering. */
 export function milkRate(s: GameState, u: Unit): number {
-  return FLOCK.milkRate * (1 + s.players[u.owner].epoch * EPOCH_GATHER_BONUS);
+  // A people born on the move (#501) tills no field: the Plow and Irrigation go into its dairy instead.
+  const dairy = isNomad(s.players[u.owner]) ? modsOf(s, u.owner).farm : 1;
+  return FLOCK.milkRate * (1 + s.players[u.owner].epoch * EPOCH_GATHER_BONUS) * dairy;
 }
 
 /**

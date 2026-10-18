@@ -1422,7 +1422,26 @@ export interface Civ {
   legion?: boolean;
   /** The household tax (#501, `HOUSEHOLD`): its citizens mine no gold; every house pays it, more on a built-up street. */
   household?: boolean;
+  /** Born on the move (#501, `NOMAD`): the camp is on wagons and the flock walks with it from the first minute; no fields and no quarry. */
+  nomad?: boolean;
 }
+
+/**
+ * Born on the move (#501, the Mongols): the camp packs onto wagons and the flock grazes with it from the first minute, in every age
+ * (the Steppe Road's town on wheels, `STEPPE` and `FLOCK`, is theirs from the start), beginning with `start` sheep. No Farm is ever
+ * tilled and no stone quarried. The flock is the field: each House, standing or on its wagon, keeps `house` more sheep; a nomad
+ * flock grazes `range` tiles from camp, each bite gives `milk` times the milk, and the grass it crops grows back in `regrow` of the
+ * usual time, though a big flock still crops a camp out. The farming technologies (the `farm` mod) speed its milking instead.
+ * Stone comes by the Market and as tribute: riders standing in a rival's land take `stone` stone for each gold of tribute due.
+ *
+ * The computer: buys stone at the Market below `aiStone` with more than `aiGold` gold, and food below `aiFood` while a lot costs
+ * under `aiFoodPrice`; raises its Market from the Bronze Age at `aiMarket` citizens; sends its stone share of hands to the gold.
+ * It raises a lamb whenever it holds `aiSpare` food more than one costs while the flock is under `aiFlock` (after that, from what
+ * its savings spare), and keeps a milker for every `aiPerMilker` grown sheep. It strikes camp at most every `aiEvery` seconds, once
+ * the flock has been hungry for `aiHungry`, looking for fresh grass up to `aiFar` tiles out and `aiSideways` tiles nearer the rival.
+ * Off the Steppe Road its tribute band is `aiRiders` riders, gathered at home, and it may stand outside its own supply.
+ */
+export const NOMAD = { house: 2, stone: 0.6, aiStone: 160, aiGold: 220, aiMarket: 12, aiRiders: 4, aiFood: 500, aiFoodPrice: 260, aiSpare: 30, aiFlock: 14, aiPerMilker: 2, aiEvery: 90, aiHungry: 30, aiFar: 30, aiSideways: 8, regrow: 0.25, milk: 2, range: 8, start: 4 };
 
 /**
  * The polis (#501, the Greeks): a citizen takes up arms where it stands for `arm`, becoming a foot soldier with its health share
@@ -1482,7 +1501,15 @@ export const CIVS: Record<CivId, Civ> = {
     legion: true,
     mul: { buildingHp: 1.2, buildSpeed: 1.25 },
   },
-  mongols: { name: 'Mongols', blurb: 'Riders of the steppe: cavalry ride 15% faster and hunters work 40% faster.', mul: { cavalrySpeed: 1.15, hunt: 1.4 } },
+  mongols: {
+    name: 'Mongols',
+    blurb: `Born on the move. A Mongol camp is on wagons from the first minute: Town Centers and Houses pack up (J) and are pitched again wherever the grass is, and a flock walks with it, milked for food and raising lambs. Every House keeps ${NOMAD.house} more sheep. No Farm is ever tilled and no stone quarried: stone is bought at the Market or taken as tribute, for riders who stand in a rival's land take stone with the gold. Cavalry ride 15% faster and hunters work 40% faster.`,
+    verb: 'Drive your camp and its flock to fresh grass from the first minute, and take your stone as tribute from the settled',
+    door: 'No fields and no quarry, ever: food walks with the flock, and every stone is bought or taken',
+    nomad: true,
+    add: { tribute: 0.15 },
+    mul: { cavalrySpeed: 1.15, hunt: 1.4 },
+  },
   chinese: {
     name: 'Chinese',
     blurb: 'The household tax. Nobody mines gold here: every house pays it, in proportion to the people who live in it, and more for each neighbour on its street (a Market counts as two). A town built close is rich, and a rival who burns your houses takes gold from your treasury. Start with 2 more citizens, and technologies cost 15% less.',
@@ -1503,7 +1530,7 @@ export const CIV_IDS = Object.keys(CIVS) as CivId[];
  */
 export const VERB_GAPS: { ages: Partial<Record<AgeId, number>>; civs: Partial<Record<CivId, number>> } = {
   ages: {},
-  civs: { mongols: 501, britons: 501 },
+  civs: { britons: 501 },
 };
 
 /**

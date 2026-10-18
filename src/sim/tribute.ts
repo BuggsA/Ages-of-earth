@@ -1,6 +1,7 @@
 import { TRIBUTE, secs, unitStats } from './data';
 import { borderMap } from './borders';
 import { modsOf } from './stats';
+import { stoneTribute } from './nomad';
 import { isEnemy } from './world';
 import type { GameState, Unit } from './types';
 
@@ -47,12 +48,19 @@ export function tributeStep(s: GameState): void {
     const counted = riders.get(key)!.slice(0, TRIBUTE.most);
     const due = counted.length * modsOf(s, owner).tribute * TRIBUTE.every;
     const rival = s.players[from];
-    const gold = Math.min(due, Math.max(0, rival.res.gold));
-    if (gold <= 0) continue;
-    rival.res.gold -= gold;
     const p = s.players[owner];
+    const gold = Math.min(due, Math.max(0, rival.res.gold));
+    // A nomad people (#501) takes cut stone with the gold, by what was due, so a rival with an empty purse still pays in stone.
+    const stone = Math.min(stoneTribute(p, due), Math.max(0, rival.res.stone));
+    if (gold <= 0 && stone <= 0) continue;
+    rival.res.gold -= gold;
     p.res.gold += gold;
     p.stats.tribute = (p.stats.tribute ?? 0) + gold;
-    s.events.push({ k: 'tribute', owner, from, gold, ids: counted.map((u) => u.id), x: counted[0].x, y: counted[0].y });
+    if (stone > 0) {
+      rival.res.stone -= stone;
+      p.res.stone += stone;
+      p.stats.tributeStone = (p.stats.tributeStone ?? 0) + stone;
+    }
+    s.events.push({ k: 'tribute', owner, from, gold, ...(stone > 0 ? { stone } : {}), ids: counted.map((u) => u.id), x: counted[0].x, y: counted[0].y });
   }
 }
