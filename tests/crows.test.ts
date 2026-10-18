@@ -19,4 +19,19 @@ describe('carrion crows', () => {
     s.amount[t] = 0;
     expect(spoilingSites(s, () => true)).toHaveLength(1);
   });
+
+  it('land once the meat is nearly gone', () => {
+    const s = createGame({ seed: 3, size: 'small', players: [{ people: 'romans', ai: false }, { people: 'britons', ai: 'medium' }] } as never);
+    const t = 5 * s.w + 5;
+    s.carcasses = [{ tile: t, born: 0, full: 100 }];
+    s.tick = ROT.grace * TICK_HZ;
+    s.amount[t] = 100;
+    expect(spoilingSites(s, () => true)[0].perch).toBe(0);
+    s.amount[t] = 5;
+    expect(spoilingSites(s, () => true)[0].perch).toBe(1);
+    s.amount[t] = 32;
+    const mid = spoilingSites(s, () => true)[0].perch;
+    expect(mid).toBeGreaterThan(0);
+    expect(mid).toBeLessThan(1);
+  });
 });
