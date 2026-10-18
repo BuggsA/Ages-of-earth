@@ -1475,6 +1475,9 @@ export const HOUSEHOLD = { every: 5, gold: 0.12, street: 0.04, streetMax: 4, rea
  */
 export const FLOOD = { season: 1, build: 2, move: 3 };
 
+/** The clever Egyptian computer plays the flood's rhythm (#517): in the spring before it leans `food` more of its hands to food, and it keeps its wonder for the river. (Extra spring fields and a held house line were tried: they cost epochs and a lost match, so they're left out.) */
+export const AI_FLOOD = { food: 0.4 };
+
 export const CIVS: Record<CivId, Civ> = {
   egyptians: {
     name: 'Egyptians',
