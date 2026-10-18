@@ -14,7 +14,7 @@ const versus = (process.argv[3] ?? 'greeks') as CivId;
 const first = Number(process.argv[4] ?? 1);
 const seeds = Number(process.argv[5] ?? 4);
 const minutes = Number(process.argv[6] ?? 25);
-if (process.argv[7] === 'off') for (const k of ['legion', 'polis', 'flood'] as const) delete CIVS[civ][k];
+if (process.argv[7] === 'off') for (const k of ['legion', 'polis', 'flood', 'household'] as const) delete CIVS[civ][k];
 const tally = { won: 0, lost: 0, ahead: 0, behind: 0 };
 for (let game = 0; game < seeds * 2; game++) {
   const seed = first + (game >> 1);

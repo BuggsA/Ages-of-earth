@@ -19,6 +19,7 @@ import { beaconProblem, lightBeacon } from './beacon';
 import { callUp, callUpProblem } from './warcamp';
 import { arm, armProblem, disarm, disarmProblem } from './polis';
 import { citizenProblem, legionKind, legionary } from './legion';
+import { mineable } from './household';
 import { bloodOf, bloodShort, levy, levyProblem, sworn } from './blood';
 import { riteProblem } from './fork';
 import { rallyCry, rallyProblem } from './rally';
@@ -301,7 +302,7 @@ export function applyCommand(s: GameState, c: Command): void {
       if (c.tile < 0 || c.tile >= s.w * s.h || kind === R_NONE) return;
       const units = myUnits(s, c.p, c.ids);
       // Citizens work the land; fishing boats fish.
-      const workers = units.filter((u) => (kind === R_FISH ? u.type === 'fisher' : u.type === 'citizen' || (legionary(s, u) && legionKind(kind))));
+      const workers = units.filter((u) => (kind === R_FISH ? u.type === 'fisher' : (u.type === 'citizen' && mineable(s.players[u.owner], kind)) || (legionary(s, u) && legionKind(kind))));
       const nodes = c.spread && kind !== R_MEAT && workers.length > 1 ? nodesNear(s, c.tile, kind) : [c.tile];
       const load = new Map<number, number>();
       for (const u of workers) {

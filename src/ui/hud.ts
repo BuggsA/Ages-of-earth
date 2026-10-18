@@ -39,6 +39,7 @@ import { buildingPicture, unitPicture } from './thumbs';
 import { idleCitizens } from './idle';
 import { workforce, WORKFORCE_JOBS } from './workforce';
 import { citizenProblem, isLegion } from '../sim/legion';
+import { isHousehold, streetOf, taxRate } from '../sim/household';
 
 /**
  * The heads-up display: resources and population along the top with the epoch and the clock, and along
@@ -368,7 +369,7 @@ export class Hud {
     const age = ageDef(p);
     const idleTechs = suspendedTechs(p).map((t) => TECHS[t].name);
     const scores = s.players.map((q) => scoreOf(s, q));
-    const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${RARES.map((r) => Math.floor(p.rare?.[r] ?? 0)).join(',')}|${Math.floor(bloodOf(p))}|${p.pop}/${p.cap}|${ageOf(p)}|${adv}|${p.way ?? ''}${p.deep ? '+' : ''}${p.vowed ? 'v' : ''}|${idleTechs.length}|${idle}|${speed}|${scores.join(',')}`;
+    const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${RARES.map((r) => Math.floor(p.rare?.[r] ?? 0)).join(',')}|${Math.floor(bloodOf(p))}|${p.pop}/${p.cap}|${ageOf(p)}|${adv}|${p.way ?? ''}${p.deep ? '+' : ''}${p.vowed ? 'v' : ''}|${idleTechs.length}|${idle}|${speed}|${scores.join(',')}|${isHousehold(p) ? Math.round(taxRate(s, viewer) * 60) : ''}`;
     const sn = seasonOf(s);
     this.clockEl.textContent = `${sn.icon} ${fmtTime(s.tick)}`;
     const hl = s.homeland ? HOMELANDS[s.homeland] : undefined;
@@ -378,7 +379,7 @@ export class Hud {
     if (sig === this.topSig) return;
     this.topSig = sig;
     this.resEl.innerHTML =
-      RES.map((r) => `<div class="res" data-tip="<b>${RES_LABEL[r]}</b>${resHint(r)}">${icon(r)}${Math.floor(p.res[r])}</div>`).join('') +
+      RES.map((r) => `<div class="res" data-tip="<b>${RES_LABEL[r]}</b>${r === 'gold' && isHousehold(p) ? householdHint(s, viewer) : resHint(r)}">${icon(r)}${Math.floor(p.res[r])}</div>`).join('') +
       RARES.filter((r) => (p.rare?.[r] ?? 0) > 0)
         .map((r) => `<div class="res" data-tip="<b>${RARE[r].name}</b>${RARE[r].blurb} Mined from deep veins that only some worlds hold.">${RARE_ICON[r]}${Math.floor(p.rare![r]!)}</div>`)
         .join('') +
@@ -689,6 +690,7 @@ export class Hud {
       const resting = s.ents.filter((e) => e.kind === 'unit' && restsAt(s, e, b) && e.hp < statsFor(s, e.owner, e.type).hp).length;
       status = `<span data-tip="<b>Waystation</b>Your traders' trips to a trading post within ${SERAI.near} tiles of a Caravanserai pay ${Math.round((SERAI.pay - 1) * 100)}% more. Traders and wagons within ${SERAI.rest} tiles mend ${SERAI.heal} a second.">🐫 ${posts ? `${posts} post${posts > 1 ? 's' : ''} near: trips there +${Math.round((SERAI.pay - 1) * 100)}%` : `No post within ${SERAI.near} tiles`}</span>${resting ? ` · ${resting} resting` : ''}`;
     }
+    else if (b.type === 'house' && b.built && isHousehold(p)) status = `<span data-tip="<b>The household tax</b>Each house pays gold in proportion to how full your town is, and more for every house on its street (a Market counts as two): a lane apart is a street.">🏮 ${streetOf(s, b)} on its street</span>`;
     else if (b.type === 'dock') status = 'Fishing boats bring their catch here';
     else if (b.type === 'storehouse' && p.techs.includes('survey')) status = surveyFinds(s, 'survey') ? '🧭 Bog iron lies somewhere in this world' : '🧭 No bog iron in this world';
     else if (b.type === 'temple' && keptIn(s, b)) status = `Keeps ${keptIn(s, b)} relic${keptIn(s, b) > 1 ? 's' : ''}: ${icon('gold', 14)}${Math.round((60 / RELIC.every) * Math.round(RELIC.gold * modsOf(s, b.owner).relicGold) * keptIn(s, b))} a minute`;
@@ -1195,6 +1197,11 @@ function hpBar(hp: number, max: number, frac: number): string {
 }
 
 const RARE_ICON = { salt: '🧂', saltpetre: '💎', bloodiron: '🩸' } as const;
+
+function householdHint(s: GameState, viewer: number): string {
+  const rate = Math.round(taxRate(s, viewer) * 60);
+  return `Nobody mines it here: your houses pay it, <b>${rate} a minute</b> now, more for each house on a street and the fuller your town. Cavalry, later soldiers and the later epochs.`;
+}
 
 function resHint(r: string): string {
   return {

@@ -6,6 +6,7 @@ import { raidBlow, raidSlain } from './ways';
 import { takeCaptive } from './thralls';
 import { prizeOf } from './convoy';
 import { looted, pack } from './spoils';
+import { raided } from './household';
 import { distToRect } from './grid';
 import type { Spatial } from './spatial';
 import { modsOf, statsFor } from './stats';
@@ -76,6 +77,14 @@ export function hurt(s: GameState, target: Ent, damage: number, by: number, atta
     if (target.kind === 'building') {
       s.players[by].stats.razed++;
       const purse = by !== target.owner ? fairPurse(s, target) : 0;
+      // A household people's house razed by a rival takes the raid from the treasury (#501).
+      const levy = by !== target.owner ? raided(s, target) : 0;
+      if (levy > 0) {
+        s.players[target.owner].res.gold -= levy;
+        s.players[by].res.gold += levy;
+        s.players[by].stats.plunder = (s.players[by].stats.plunder ?? 0) + levy;
+        s.events.push({ k: 'plunder', owner: by, x: target.x, y: target.y, gold: levy });
+      }
       if (purse > 0) {
         s.players[by].res.gold += purse;
         s.players[by].stats.plunder = (s.players[by].stats.plunder ?? 0) + purse;
