@@ -1066,3 +1066,14 @@ What I'd do next: a yurt camp that packs Houses with the Town Center in one orde
 Built: on the Herd Plains a town's own home herd no longer shuts the Hunters' fields while it is out on its autumn trek (`herdAtHome` in `src/sim/ways.ts`); wild game and a rival's herd still do, and the HUD tells a Hunter in spring that the ground opens in autumn. The computer uses it: in summer it puts by the wood for `AI_WAYS.trekFields` fields, and as a Hunter there it spares no wild deer inside the 24-tile ring, since they would keep the fields shut. Its own herd stays spared (`ai-turning-year`).
 Why I love it: the Hunters' door and the Herd Plains' year now meet in a rhythm you can read and plan for: hunt the calves when the herd comes home, sow when it leaves. Before, a spared herd that stopped two tiles short on its trek, or one straggler, shut the fields all year, and the computer starved between its two rules.
 Next: the Hunters on other homelands still spare wild pairs by home and so never sow in the Stone Age; a herd that trampled unfenced fields when it comes home in spring would make the Palisade part of the rhythm.
+
+## Designers' notes: the Sickness (#541, 2026-10-18, lane rules)
+
+Built: a town pays for its size. From the Bronze Age a big, full town with houses shoulder to shoulder builds taint; at 1 a fever breaks out that slows work, kills citizens when it runs hot, is nursed down by priests at a Temple, and travels by the trade roads (a sick town's trader fouls a post; any trader loading there carries it home). Quarantine at the Town Center shuts the roads. `src/sim/sickness.ts`, `SICKNESS` in `data.ts`, the computer in `ai.ts` (`ailing`, `nurse`), the chips and the `N` button in `hud.ts`, 12 tests in `tests/sickness.test.ts`.
+
+Why I love it: every other system here makes you stronger. This one is what being big costs, paid in layout and tempo, not a flat tax. It makes priests more than a conversion tool, the Temple more than a relic shelf, and a trade road a risk as well as a payout. It meets the Chinese loop head on: their treasury is dense streets, and dense streets are exactly what the Sickness feeds on, so a Chinese player chooses between purse and health. A Mongol camp on the move is spared half.
+
+Seen: unit tests, a headless computer-vs-computer sweep (seeds 1-3, 40 minutes: towns of 30-95 build taint 0.1-0.9 and mostly stay well, so the computer is only occasionally sick), the browser smoke test (no page errors). Not seen: the chips, toasts and `N` button on screen; the fever with a human-sized town; whether 45% slowdown or one citizen in twenty seconds is the right sting. Numbers are all new; they are in `SICKNESS` for the owner to tune.
+
+Next: soldiers carrying the fever home from a sick land (campaign fever), sick citizens tinted in `unitsView`, a Hospice building, a Reclaimer reading (stripped rubble is foul), Hemocraft's drains as sanitation, and a rival's way to foul a road on purpose.
+
