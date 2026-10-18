@@ -220,8 +220,8 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
     } else if (yard) spend(v, trainCostFor(s, p.id, 'infantry', 'barracks', yard));
   }
   // The Hearth Way (#463 s1) grows by calling its kin, two at a time (three in winter). Out of winter two kin cost more
-  // a head than one citizen trained alone (#486), so it calls them then only with `kinKeep` food to spare and trains
-  // citizens as anyone does; in winter, once its first hands are at work, it trains none alone and saves for the call.
+  // a head than one citizen trained alone (#486), so it doesn't wait on them then: it calls them when it holds the food
+  // and trains a citizen when it doesn't. In a Stone Age winter, once its first hands are at work, it saves for the call.
   const hearth = L.clever && p.way === 'hearth';
   const winter = seasonAt(s) === 3;
   const kinOnly = hearth && winter && p.epoch === 0 && citizens.length >= AI_WAYS.kinFrom && citizens.length + queuedCitizens + KIN.winter <= wantCitizens && p.cap - p.pop >= KIN.winter;
@@ -231,7 +231,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   } else if (kinOnly && !advancing && !threatNear(s, v).unit) {
     // Saving for the next call: the army and the rest wait on the food it needs, unless raiders are at the door.
     spend(v, KIN.cost);
-  } else if (tc && !advancing && !v.packing && !kinOnly && citizens.length + queuedCitizens < wantCitizens && tc.queue.length < (hearth && winter ? 1 : 2)) {
+  } else if (tc && !advancing && !v.packing && !kinOnly && citizens.length + queuedCitizens < wantCitizens && tc.queue.length < (hearth ? 1 : 2)) {
     const cost = unitStats('citizen', p.epoch).cost;
     if (afford(v, cost)) {
       issue({ t: 'train', p: p.id, building: tc.id, unit: 'citizen' });
