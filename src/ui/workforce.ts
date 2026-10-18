@@ -1,3 +1,4 @@
+import { legionary } from '../sim/legion';
 import type { GameState, Unit } from '../sim/types';
 
 /** Job categories are exhaustive for living citizens, with no change to their orders. */
@@ -27,11 +28,11 @@ export function citizenJob(u: Unit): WorkforceJob {
   }
 }
 
-/** Ordered citizen ids for selection; includes only this player's living citizens. */
+/** Ordered ids for selection: this player's living citizens, and a legion's foot soldiers, who are its hands too (#501). */
 export function workforce(s: GameState, owner: number): Map<string, number[]> {
   const jobs = new Map<string, number[]>(WORKFORCE_JOBS.map((job) => [job.key, []]));
   for (const e of s.ents) {
-    if (e.kind !== 'unit' || e.type !== 'citizen' || e.owner !== owner || e.hp <= 0) continue;
+    if (e.kind !== 'unit' || e.owner !== owner || e.hp <= 0 || (e.type !== 'citizen' && !legionary(s, e))) continue;
     jobs.get(citizenJob(e))!.push(e.id);
   }
   return jobs;

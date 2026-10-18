@@ -39,6 +39,7 @@ import { KIN } from './data';
 import { isHire, barred, journeyOf, noteWalked, surveyFinds, trainsAt, workSteps } from './ages';
 import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, HomelandId, MapSize, MapType, Player, UnitType } from './types';
 import { RES, R_FISH, R_NONE } from './types';
+import { legionKind, legionary } from './legion';
 import { RES_OF_TILE, autoWork, rallyNode, carryCargo, checkStuck, collide, findResource, routeUnits, separate, setOrder, think, ungarrison, walk } from './units';
 import { updateVision } from './vision';
 import { countPop, exitSpot, maxHp, placeBuilding, refund, restat, spawnUnit } from './world';
@@ -347,7 +348,7 @@ function bringOut(s: GameState, p: Player, b: Building, unit: UnitType): void {
   if (b.type === 'warcamp') p.stats.campTrained = (p.stats.campTrained ?? 0) + 1;
   s.events.push({ k: 'trained', id: u.id, owner: p.id, type: unit });
   const fishing = (t: number) => u.type === 'fisher' && t >= 0 && s.res[t] === R_FISH;
-  const working = (t: number) => u.type === 'citizen' && t >= 0 && s.res[t] !== R_NONE && s.res[t] !== R_FISH;
+  const working = (t: number) => t >= 0 && s.res[t] !== R_NONE && s.res[t] !== R_FISH && (u.type === 'citizen' || (legionary(s, u) && legionKind(s.res[t])));
   // A rally point on a trading post puts new traders straight on the road.
   const post = u.type === 'trader' && b.rally ? s.posts.find((t) => atPost(t, b.rally!.x, b.rally!.y)) : undefined;
   if (post) setOrder(u, { k: 'trade', post: post.id, market: b.type === 'market' ? b.id : 0, phase: 'go' });

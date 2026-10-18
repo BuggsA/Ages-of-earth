@@ -1418,6 +1418,8 @@ export interface Civ {
   flood?: boolean;
   /** The polis (#501, `POLIS`): its citizens are its foot soldiers, armed and disarmed in place; it trains none. */
   polis?: boolean;
+  /** The legion (#501, `LEGION`): few citizens; its foot soldiers fell timber, quarry stone and raise buildings between wars. */
+  legion?: boolean;
 }
 
 /**
@@ -1427,6 +1429,15 @@ export interface Civ {
  * seconds after arming at the soonest.
  */
 export const POLIS = { arm: { wood: 20 } as Cost, home: 14, aiShare: 0.5, aiKeep: 8, aiRest: 90, aiThreat: 3 };
+
+/**
+ * The legion (#501, the Romans): a legion people keeps only `citizens` (+ `perEpoch` for each epoch past the first) citizens, so its
+ * foot soldiers are its hands: they fell timber and quarry stone at `rate` times a citizen's pace and raise any building, and a
+ * working soldier drops its tools for an enemy within `watch` times its sight, going back to the work after. The computer keeps
+ * `aiCitizenWood` of the share of wood and stone its citizens would take, since the soldiers carry them, keeps `aiGuard` idle
+ * soldiers off the work (and only through epoch `aiUntil`: after it the army is wanted for war and rites), trains foot until it has `aiHands` + `aiHandsEpoch` for each epoch, sends `aiStone` of its working soldiers to stone, and surveys for bog iron from `aiSurvey` hands (its citizens are few).
+ */
+export const LEGION = { citizens: 12, perEpoch: 3, rate: 0.8, watch: 0.8, aiCitizenWood: 0.25, aiGuard: 4, aiHands: 10, aiHandsEpoch: 4, aiStone: 0.3, aiUntil: 2, aiSurvey: 14 };
 
 /**
  * The Nile flood (#501 s1): in season `season` (summer) the fields of a flood people lie under the river and yield nothing,
@@ -1452,7 +1463,14 @@ export const CIVS: Record<CivId, Civ> = {
     add: { infantryArmor: 1 },
     mul: { infantryHp: 1.15 },
   },
-  romans: { name: 'Romans', blurb: 'Builders of roads and forts: buildings are 20% sturdier and go up 25% faster.', mul: { buildingHp: 1.2, buildSpeed: 1.25 } },
+  romans: {
+    name: 'Romans',
+    blurb: 'The legion builds. A Roman town keeps few citizens (twelve at first, three more each epoch), for its foot soldiers are its hands: they fell timber, quarry stone and raise any building, and an idle army is a working army. A legionary at work drops his tools for a foe who comes near and goes back to them after. Buildings are 20% sturdier and go up 25% faster.',
+    verb: 'Put your foot soldiers to the axe, the quarry and the trowel between wars, and raise a town with a legion instead of a crowd',
+    door: 'Few citizens: food and gold come slowly, and every soldier at the quarry is not at the front',
+    legion: true,
+    mul: { buildingHp: 1.2, buildSpeed: 1.25 },
+  },
   mongols: { name: 'Mongols', blurb: 'Riders of the steppe: cavalry ride 15% faster and hunters work 40% faster.', mul: { cavalrySpeed: 1.15, hunt: 1.4 } },
   chinese: { name: 'Chinese', blurb: 'A great people: start with 2 more citizens, and technologies cost 15% less.', add: { extraCitizens: 2 }, mul: { techCost: 0.85 } },
   britons: { name: 'Britons', blurb: 'Longbowmen: archers and their heirs reach 1 tile farther, and archery ranges train 25% faster.', add: { range: 1 }, mul: { rangedTrain: 0.75 } },
@@ -1466,7 +1484,7 @@ export const CIV_IDS = Object.keys(CIVS) as CivId[];
  */
 export const VERB_GAPS: { ages: Partial<Record<AgeId, number>>; civs: Partial<Record<CivId, number>> } = {
   ages: {},
-  civs: { romans: 501, mongols: 501, chinese: 501, britons: 501 },
+  civs: { mongols: 501, chinese: 501, britons: 501 },
 };
 
 /**
