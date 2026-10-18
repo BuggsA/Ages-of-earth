@@ -7,7 +7,7 @@ import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
 import { RARE_OF_TILE } from '../sim/units';
-import { SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, SNARE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, SNARE, SICKNESS, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -40,6 +40,7 @@ import { idleCitizens } from './idle';
 import { workforce, WORKFORCE_JOBS } from './workforce';
 import { citizenProblem, isLegion } from '../sim/legion';
 import { isHousehold, streetOf, taxRate } from '../sim/household';
+import { pressure, tenders } from '../sim/sickness';
 import { isNomad } from '../sim/nomad';
 
 /**
@@ -370,7 +371,7 @@ export class Hud {
     const age = ageDef(p);
     const idleTechs = suspendedTechs(p).map((t) => TECHS[t].name);
     const scores = s.players.map((q) => scoreOf(s, q));
-    const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${RARES.map((r) => Math.floor(p.rare?.[r] ?? 0)).join(',')}|${Math.floor(bloodOf(p))}|${p.pop}/${p.cap}|${ageOf(p)}|${adv}|${p.way ?? ''}${p.deep ? '+' : ''}${p.vowed ? 'v' : ''}|${idleTechs.length}|${idle}|${speed}|${scores.join(',')}|${isHousehold(p) ? Math.round(taxRate(s, viewer) * 60) : ''}`;
+    const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${RARES.map((r) => Math.floor(p.rare?.[r] ?? 0)).join(',')}|${Math.floor(bloodOf(p))}|${p.pop}/${p.cap}|${ageOf(p)}|${adv}|${p.way ?? ''}${p.deep ? '+' : ''}${p.vowed ? 'v' : ''}|${idleTechs.length}|${idle}|${speed}|${scores.join(',')}|${isHousehold(p) ? Math.round(taxRate(s, viewer) * 60) : ''}|${p.fever ? Math.round(p.fever.sev * 50) : ''}|${Math.round((p.taint ?? 0) * 20)}|${p.quarantine ? 'q' : ''}|${p.fever ? tenders(s, viewer) : ''}`;
     const sn = seasonOf(s);
     this.clockEl.textContent = `${sn.icon} ${fmtTime(s.tick)}`;
     const hl = s.homeland ? HOMELANDS[s.homeland] : undefined;
@@ -385,7 +386,8 @@ export class Hud {
         .map((r) => `<div class="res" data-tip="<b>${RARE[r].name}</b>${RARE[r].blurb} Mined from deep veins that only some worlds hold.">${RARE_ICON[r]}${Math.floor(p.rare![r]!)}</div>`)
         .join('') +
       (p.blood !== undefined ? `<div class="res" data-tip="<b>Blood</b>Drawn at Drain Rigs from the enemy who fall near them, and from citizens given to the levy. Spent to raise Blood Towers, and at Transfusion Stations to graft soldiers. In Hemocraft the rigs also bleed the living enemy who stand near them; in the Blood-rite every Temple draws as a rig does, and spends blood to mend your own.">🩸${Math.floor(bloodOf(p))}</div>` : '') +
-      `<div class="res pop ${p.pop >= p.cap ? 'full' : ''}" data-tip="<b>Population</b>People and soldiers you have, and room for. Houses add 5 each, a Town Center 10 (150 at most).">${icon('pop')}${p.pop}/${p.cap}</div>`;
+      `<div class="res pop ${p.pop >= p.cap ? 'full' : ''}" data-tip="<b>Population</b>People and soldiers you have, and room for. Houses add 5 each, a Town Center 10 (150 at most).">${icon('pop')}${p.pop}/${p.cap}</div>` +
+      sicknessChip(s, viewer);
     const civ = CIVS[p.civ];
     const board = s.players
       .map((q, i) => `<div><span class='swatch' style='background:${q.color}'></span>${q.name}${q.defeated ? ' (out)' : ''}: ${q.id === viewer || q.team === p.team ? scores[i] : '?'}</div>`)
@@ -1076,6 +1078,10 @@ export class Hud {
             const n = kinCount(s);
             cmds.push({ key: 'K', pic: '', glyph: '🔥', title: `Call the Kin (${n})`, cost: KIN.cost, desc: `${n} citizens come to the hearth together after ${KIN.time} seconds in this Town Center's queue${n > KIN.n ? ': it is winter, and the winter call draws more' : `; in winter, ${KIN.winter}`}. They need room under your cap.`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'kin', p: viewer, building: b.id }) });
           }
+          if (p.epoch >= SICKNESS.fromEpoch && !s.scenario) {
+            const q = !!p.quarantine;
+            cmds.push({ key: 'N', pic: '', glyph: '🚧', title: q ? 'Lift quarantine' : 'Quarantine', desc: q ? 'Traders may load at the posts again.' : `Your traders stay home, no taint comes to you by the roads, and a fever drains ${Math.round(SICKNESS.quarantineWane / SICKNESS.wane * 100)}% faster. Costs the caravans' gold.`, ok: true, run: () => this.act.issue({ t: 'quarantine', p: viewer, on: !q }) });
+          }
           const sheltering = s.ents.some((e) => e.kind === 'unit' && e.owner === viewer && e.type === 'citizen' && (e.inside || e.order.k === 'garrison'));
           cmds.push({ key: 'T', pic: '', glyph: '🕊', title: 'All clear', desc: 'Citizens come out of shelter and go back to work.', ok: sheltering, why: 'Nobody is sheltering', run: () => this.act.issue({ t: 'bell', p: viewer, ring: false }) });
         }
@@ -1195,6 +1201,19 @@ export class Hud {
 
 function hpBar(hp: number, max: number, frac: number): string {
   return `<div class="hp ${frac < 0.3 ? 'low' : frac < 0.6 ? 'mid' : ''}"><i style="width:${Math.max(0, Math.min(100, frac * 100))}%"></i><span>${Math.ceil(hp)} / ${max}</span></div>`;
+}
+
+/** The Sickness (#541) on the top bar: a fever with its severity, or taint building in a crowded town, and quarantine when it is kept. */
+function sicknessChip(s: GameState, viewer: number): string {
+  const p = s.players[viewer];
+  const q = p.quarantine ? '<div class="res" data-tip="<b>Quarantine</b>Your traders stay home and no taint comes by the roads, and a fever drains faster. Lift it at the Town Center (<kbd>N</kbd>).">🚧</div>' : '';
+  if (p.fever) {
+    const n = tenders(s, viewer);
+    return `${q}<div class="res sick" data-tip="<b>The Sickness: ${Math.round(p.fever.sev * 100)}%</b>Your citizens work and build ${Math.round(p.fever.sev * SICKNESS.slow * 100)}% slower${p.fever.sev >= SICKNESS.deadly ? ', and it is taking them' : ''}. ${n ? `${n} priest${n > 1 ? 's are' : ' is'} nursing it at your Temple.` : 'Priests standing by a finished Temple nurse it down: you have none there.'} Thin your streets, and keep your traders home (quarantine) if a road is foul.">🤒${Math.round(p.fever.sev * 100)}%</div>`;
+  }
+  const t = p.taint ?? 0;
+  if (t < 0.25) return q;
+  return `${q}<div class="res" data-tip="<b>Taint ${Math.round(t * 100)}%</b>A big, full town with houses shoulder to shoulder builds the Sickness; at 100% it breaks out (now ${Math.round(pressure(s, p) * 100)}% pressure). A Temple eases it, thin streets and spare room slow it, and winter sharpens it.">☣${Math.round(t * 100)}%</div>`;
 }
 
 const RARE_ICON = { salt: '🧂', saltpetre: '💎', bloodiron: '🩸' } as const;

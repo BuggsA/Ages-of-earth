@@ -34,6 +34,7 @@ import { modsOf, trainTimeFor } from './stats';
 import { attrition } from './borders';
 import { tributeStep } from './tribute';
 import { householdStep } from './household';
+import { sickStep } from './sickness';
 import { seraiStep, tollStep } from './passage';
 import { mercStep } from './merc';
 import { KIN, NOMAD } from './data';
@@ -560,6 +561,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   attrition(s);
   tributeStep(s);
   householdStep(s);
+  sickStep(s);
   tollStep(s);
   mercStep(s);
   seraiStep(s);
@@ -638,6 +640,10 @@ export function checksum(s: GameState): number {
     mix(m.owner);
     mix(m.claim);
     mix(m.by);
+  }
+  for (const p of s.players) {
+    mix(p.taint ?? 0);
+    mix(p.fever?.sev ?? 0);
   }
   for (const p of s.players) for (const r of RES) mix(p.res[r]);
   for (const sh of s.shots) mix(sh.t);

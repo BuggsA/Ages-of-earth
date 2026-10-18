@@ -5,6 +5,7 @@ import { findRoute } from './path';
 import type { Spatial } from './spatial';
 import { buildTimeFor, buildingCostFor, modsOf } from './stats';
 import { flooded } from './flood';
+import { loadAt, workShare } from './sickness';
 import { mineable } from './household';
 import { isNomad } from './nomad';
 import { ageDef, canRaise, inField } from './ages';
@@ -117,7 +118,7 @@ export function gatherRate(s: GameState, u: Unit, kind: number | 'farm'): number
   const tools = (kind === R_TREE || kind === R_STONE || kind === R_GOLD || kind === R_BOG) && keptOf(s, u.owner, 'flint') > 0 ? 1 + kinBonus(s, u.owner, 'flint', LANDMARKS.flint.tools - 1) : 1;
   // A legionary (#501) works timber and stone at a fraction of a citizen's pace.
   const legion = legionary(s, u) ? LEGION.rate : 1;
-  return base * mod * (1 + p.epoch * EPOCH_GATHER_BONUS) * ai * season * tools * legion;
+  return base * mod * (1 + p.epoch * EPOCH_GATHER_BONUS) * ai * season * tools * legion * workShare(s, u.owner);
 }
 
 const carryCap = (s: GameState, u: Unit) =>
@@ -591,7 +592,7 @@ function buildStep(s: GameState, u: Unit, o: Extract<Order, { k: 'build' }>): vo
     // Galvanic Revival: a repair inside a Tower's field is free and quicker.
     const wired = b.built && !!modsOf(s, u.owner).galvanic && inField(s, b);
     // A Hunters' kill camp (#463 s1) goes up in a fraction of the time.
-    const step = (DT / (buildTimeFor(s, u.owner, b.type) * (b.kill && !b.built ? KILL_CAMP.time : 1))) * (wired ? GALVANIC.repair : 1);
+    const step = (DT / (buildTimeFor(s, u.owner, b.type) * (b.kill && !b.built ? KILL_CAMP.time : 1))) * (wired ? GALVANIC.repair : 1) * workShare(s, u.owner);
     const max = maxHp(s, b);
     const hp = Math.min(max, b.hp + max * step);
     if (b.built && !wired) {
@@ -1606,6 +1607,12 @@ function tradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>): vo
     const m = marketOf(s, u.owner, o.market) ?? caravanOf(s, u.owner, o.market) ?? homeMarket(s, u.owner, post.x, post.y) ?? nearestCaravan(s, u.owner, post.x, post.y);
     if (!m) {
       s.events.push({ k: 'refused', owner: u.owner, why: 'Build a Market to trade from' });
+      setOrder(u, { k: 'idle' });
+      return;
+    }
+    // Quarantine (#541) keeps the trader from loading; at a foul post it would bring the Sickness home.
+    if (!loadAt(s, u.owner, post)) {
+      s.events.push({ k: 'refused', owner: u.owner, why: 'The town is in quarantine: the traders stay home' });
       setOrder(u, { k: 'idle' });
       return;
     }

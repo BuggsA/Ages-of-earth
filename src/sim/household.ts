@@ -15,7 +15,7 @@ export const mineable = (p: Player, kind: number): boolean => (!isHousehold(p) |
 
 
 /** The finished houses of a player, and its finished Markets, in id order. */
-function homes(s: GameState, owner: number): { houses: Building[]; markets: Building[] } {
+export function homes(s: GameState, owner: number): { houses: Building[]; markets: Building[] } {
   const houses: Building[] = [];
   const markets: Building[] = [];
   for (const e of s.ents) {
@@ -27,7 +27,7 @@ function homes(s: GameState, owner: number): { houses: Building[]; markets: Buil
 }
 
 /** How many neighbours a house has on its street: other finished houses within `reach` tiles, a Market counting as `market`. */
-function street(b: Building, houses: Building[], markets: Building[]): number {
+export function street(b: Building, houses: Building[], markets: Building[]): number {
   const r = HOUSEHOLD.reach;
   let n = 0;
   for (const h of houses) if (h !== b && Math.abs(h.tx - b.tx) <= r && Math.abs(h.ty - b.ty) <= r) n++;

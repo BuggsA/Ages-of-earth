@@ -1,4 +1,4 @@
-import { BUILDINGS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, SNARE, SPREAD, TECHS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
+import { BUILDINGS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, SICKNESS, SNARE, SPREAD, TECHS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
 import { peace } from './combat';
 import { placeProblem, stampBuilding, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
@@ -372,7 +372,8 @@ export function applyCommand(s: GameState, c: Command): void {
       if (!post) return;
       const units = myUnits(s, c.p, c.ids);
       const traders = units.filter((u) => u.type === 'trader');
-      if (traders.length && !homeMarket(s, c.p, post.x, post.y) && !nearestCaravan(s, c.p, post.x, post.y)) refuse(s, c.p, 'Build a Market to trade from');
+      if (traders.length && p.quarantine) refuse(s, c.p, 'The town is in quarantine: the traders stay home');
+      else if (traders.length && !homeMarket(s, c.p, post.x, post.y) && !nearestCaravan(s, c.p, post.x, post.y)) refuse(s, c.p, 'Build a Market to trade from');
       else {
         for (const u of traders) {
           // Each trades from the Market nearest it (on the Silk Road, the one on its wagon too, #326); one already
@@ -572,6 +573,14 @@ export function applyCommand(s: GameState, c: Command): void {
         }
       }
       s.events.push({ k: 'bell', owner: c.p, ring: c.ring });
+      break;
+    }
+    case 'quarantine': {
+      if (c.on === !!p.quarantine) return;
+      if (c.on && p.epoch < SICKNESS.fromEpoch) return refuse(s, c.p, 'No sickness yet to quarantine against');
+      if (c.on) p.quarantine = true;
+      else delete p.quarantine;
+      s.events.push({ k: 'quarantine', owner: c.p, on: c.on });
       break;
     }
     case 'beacon': {
