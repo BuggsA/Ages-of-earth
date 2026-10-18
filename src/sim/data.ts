@@ -1727,7 +1727,7 @@ export const EXPLORE = { grid: 4, apart: 12, fails: 8, shun: 6, wary: 2, army: 4
  * - `herd`: a hunter done with a carcass spears the next deer within this many tiles of it;
  * - `farm`: a food gatherer whose bushes and game are gone takes an unworked field within this many tiles.
  */
-export const AUTO_WORK = { trained: 14, rally: 8, herd: 8, farm: 12 };
+export const AUTO_WORK = { trained: 14, rally: 8, herd: 8, farm: 12, retry: secs(4) };
 export const AI_WINTER = { from: 2, fields: 2, hunters: 3, pack: 1, food: 0.3 };
 
 /**

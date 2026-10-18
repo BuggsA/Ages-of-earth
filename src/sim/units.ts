@@ -276,7 +276,12 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
     if (r === 'done') {
       o.phase = 'go';
       u.miss = 0;
-    } else if (r === 'none') setOrder(u, { k: 'idle' });
+    } else if (r === 'none') {
+      // The player's laden citizen jammed on the way home (a crowd at a doorway) keeps its load and tries again, instead of standing idle for an order (#344).
+      if (!s.players[u.owner].ai && u.carry > 0 && nearestDrop(s, u.owner, u.carryRes ?? '', u.x, u.y, u.type === 'fisher')) {
+        if ((s.tick + u.id) % AUTO_WORK.retry === 0) u.miss = 0;
+      } else setOrder(u, { k: 'idle' });
+    }
     return;
   }
   const kind = s.res[o.tile];
