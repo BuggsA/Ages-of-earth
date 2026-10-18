@@ -240,10 +240,13 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
       spend(v, cost);
     } else if (yard) spend(v, trainCostFor(s, p.id, 'infantry', 'barracks', yard));
   }
-  // The Hearth Way (#463 s1) grows by calling its kin, two at a time (three in winter), once its first hands are at work.
+  // The Hearth Way (#463 s1) grows by calling its kin, two at a time (three in winter). Out of winter two kin cost more
+  // a head than one citizen trained alone (#486), so it doesn't wait on them then: it calls them when it holds the food
+  // and trains a citizen when it doesn't. In a Stone Age winter, once its first hands are at work, it saves for the call.
   const hearth = L.clever && p.way === 'hearth';
-  const kinOnly = hearth && p.epoch === 0 && citizens.length >= AI_WAYS.kinFrom && citizens.length + queuedCitizens + KIN.winter <= wantCitizens && p.cap - p.pop >= KIN.winter;
-  if (hearth && tc && !advancing && citizens.length + queuedCitizens + KIN.winter <= wantCitizens && aiKin(s, p, tc, seasonAt(s) === 3 ? 0 : AI_WAYS.kinKeep)) {
+  const winter = seasonAt(s) === 3;
+  const kinOnly = hearth && winter && p.epoch === 0 && citizens.length >= AI_WAYS.kinFrom && citizens.length + queuedCitizens + KIN.winter <= wantCitizens && p.cap - p.pop >= KIN.winter;
+  if (hearth && tc && !advancing && citizens.length + queuedCitizens + KIN.winter <= wantCitizens && aiKin(s, p, tc, winter ? 0 : AI_WAYS.kinKeep)) {
     issue({ t: 'kin', p: p.id, building: tc.id });
     spend(v, KIN.cost);
   } else if (kinOnly && !advancing && !threatNear(s, v).unit) {
@@ -1103,8 +1106,10 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   const berries = findResource(s, R_BERRY, home.x, home.y, 14);
   const farms = count(v, 'farm');
   const freeFields = v.buildings.filter((b) => b.type === 'farm' && !v.citizens.some((u) => u.order.k === 'farm' && u.order.target === b.id)).length;
-  // Autumn onward the clever computer plans for winter: berries fail in the cold, so fields go up first.
-  const coldComing_ = coldComing(s, v);
+  // Autumn onward the clever computer plans for winter: berries fail in the cold, so fields go up first, unless in the
+  // Stone Age the larder holds the winter's food already (#486): planning anyway, it raised a field a citizen with the
+  // wood the Bronze Age wanted. Later a town's stock is no larder: its people eat from the fields.
+  const coldComing_ = coldComing(s, v) && (p.epoch > 0 || p.res.food < AI_WINTER.larder);
   // On the Shore (#473) each fishing boat feeds the town in a farmer's place, and its wood is wanted for the next age.
   // The turning year (#479): ice ahead (autumn, for the clever) or on the mere, a boat feeds a third as many.
   const boatsFeed = s.homeland === 'shore' ? Math.round(v.fishers.length * (coldComing_ || catchOf(s) < 1 ? YEAR.ice : 1)) : 0;
@@ -3675,6 +3680,8 @@ export function rivalCamp(s: GameState, p: Player, home: { x: number; y: number 
     const d = (e.x - home.x) * (e.x - home.x) + (e.y - home.y) * (e.y - home.y);
     if (d >= bestD) continue;
     if (s.ents.some((f) => f.kind === 'building' && f.hp > 0 && f.built && f.owner === e.owner && (f.type === 'towncenter' || f.type === 'tower') && distToRect(e.x, e.y, f) <= safe)) continue;
+    // A raid (#486) also passes over a larder with rival soldiers standing by it: the band would only be thrown away.
+    if (raid && s.ents.some((f) => f.kind === 'unit' && f.hp > 0 && !f.inside && isEnemy(s, p.id, f.owner) && armed(f) && (f.x - e.x) * (f.x - e.x) + (f.y - e.y) * (f.y - e.y) <= P.guard * P.guard)) continue;
     bestD = d;
     best = e;
   }
