@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { AMOUNT, RARE } from '../sim/data';
+import { AMOUNT, RARE, ROT, TICK_HZ } from '../sim/data';
 import { RARE_OF_TILE } from '../sim/units';
 import { hash2 } from '../sim/rng';
 import type { GameState } from '../sim/types';
@@ -25,6 +25,7 @@ export class ResourcesView {
   private tiles = new Map<THREE.InstancedMesh, number[]>();
   private dirty = true;
   private since = 0;
+  private rottenCount = 0;
 
   markDirty(): void {
     this.dirty = true;
@@ -51,6 +52,13 @@ export class ResourcesView {
 
   update(s: GameState, dt: number): void {
     this.since += dt;
+    if (!this.dirty && this.since >= 1) {
+      // A carcass turning is slow and raises no event: look for it once a second.
+      let n = 0;
+      for (const c of s.carcasses ?? []) if (s.tick - c.born >= ROT.grace * TICK_HZ) n++;
+      if (n !== this.rottenCount) this.dirty = true;
+      this.since = 0;
+    }
     if (!this.dirty || this.since < 0.25) return;
     this.dirty = false;
     this.since = 0;
@@ -60,6 +68,9 @@ export class ResourcesView {
       if (!l) lists.set(kind, (l = []));
       l.push({ tile, m });
     };
+    const rotten = new Set<number>();
+    for (const c of s.carcasses ?? []) if (s.tick - c.born >= ROT.grace * TICK_HZ) rotten.add(c.tile);
+    this.rottenCount = rotten.size;
     const q = new THREE.Quaternion();
     const up = new THREE.Vector3(0, 1, 0);
     for (let ty = 0; ty < s.h; ty++) {
@@ -90,7 +101,7 @@ export class ResourcesView {
         } else if (r === R_MEAT) {
           // A carcass shrinks as it is butchered; a mammoth's (#171) lies the bigger for all its meat.
           const sc = UNIT_SCALE * (0.6 + 0.4 * Math.max(0, Math.min(1, frac))) * Math.min(2, Math.max(1, Math.sqrt(frac)));
-          add('carcass', i, new THREE.Matrix4().compose(new THREE.Vector3(tx + 0.5, gy, ty + 0.5), q, new THREE.Vector3(sc, sc, sc)));
+          add(rotten.has(i) ? 'carcassRotten' : 'carcass', i, new THREE.Matrix4().compose(new THREE.Vector3(tx + 0.5, gy, ty + 0.5), q, new THREE.Vector3(sc, sc, sc)));
         } else {
           const kind: NatureKind = s.caves?.some((c) => c.tile === i) ? 'caveMouth' : r === R_BERRY ? 'berryBush' : r === R_STONE ? 'stoneDeposit' : r === R_BOG ? 'bogIron' : r === R_SALT ? 'saltVein' : r === R_SALTPETRE ? 'saltpetreVein' : r === R_BLOODIRON ? 'bloodIronVein' : 'goldDeposit';
           const sc = (0.55 + 0.5 * Math.max(0, Math.min(1, frac))) * (r === R_BERRY ? 1 : 1.25);
