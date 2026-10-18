@@ -79,6 +79,7 @@ function roll(s: GameState): number {
 /**
  * A coin of its own for one decision, from the match's seed, the player and the question (#320): tossing it
  * leaves the match's dice where they were, so a match where nobody heads for the steppe plays as it did.
+ * A nomad people (#501) throws it for every road: its flock draws on the shared dice from the first minute.
  */
 function coin(s: GameState, id: number, salt: number): number {
   let t = (s.seed + Math.imul(id + 1, 0x9e3779b9) + salt) >>> 0;
@@ -382,7 +383,9 @@ function trade(s: GameState, v: View, issue: (c: Command) => void): void {
         return;
       }
     }
-    if (p.res.stone < NOMAD.aiStone && p.res.gold >= s.market.stone + NOMAD.aiKeep) {
+    // Stone is bought for the next road's price (and gold left over for it), or to keep a small store.
+    const road = mainRoad(p);
+    if (p.res.stone < Math.max(NOMAD.aiStone, road?.cost.stone ?? 0) && p.res.gold >= s.market.stone + NOMAD.aiKeep + (road?.cost.gold ?? 0)) {
       issue({ t: 'trade', p: p.id, res: 'stone', buy: true });
       return;
     }
@@ -470,7 +473,7 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
     const f = fit(p, to);
     // The steppe tosses a coin of its own: asked early by every clever town, it would shift the dice of every match.
     if (f === 0 && AGES[to].mobile && !heirloomAhead(p, to)) roads[to] = coin(s, p.id, 0x57e9) < AI_STEPPE.take;
-    else roads[to] = f > 0 || (f === 0 && roll(s) < (AGES[to].path === 'blood' ? AI_BLOOD.take : heirloomAhead(p, to) ? AI_WEB.heir : AI_WEB.take));
+    else roads[to] = f > 0 || (f === 0 && (isNomad(p) ? coin(s, p.id, 0x303 + Object.keys(AGES).indexOf(to) * 977) : roll(s)) < (AGES[to].path === 'blood' ? AI_BLOOD.take : heirloomAhead(p, to) ? AI_WEB.heir : AI_WEB.take));
   }
   return roads[to]!;
 }
@@ -1294,7 +1297,7 @@ function readYear(s: GameState, v: View): void {
  * `v.hunt.n` on the hunt. Elsewhere its hunters come only from people newly sent to food (#479).
  */
 function huntTheYear(s: GameState, v: View, issue: (c: Command) => void): void {
-  if (!AI_LEVELS[v.p.ai!].clever || !(s.homeland === 'herds' || yarding(s)) || isMobile(v.p)) return;
+  if (!AI_LEVELS[v.p.ai!].clever || !(s.homeland === 'herds' || yarding(s)) || (isMobile(v.p) && !isNomad(v.p))) return;
   let hunting = 0;
   for (const u of v.citizens) if (u.order.k === 'hunt' || (u.order.k === 'gather' && s.res[u.order.tile] === R_MEAT)) hunting++;
   if (hunting >= v.hunt.n) return;
@@ -1571,7 +1574,7 @@ function floodWork(s: GameState, v: View, issue: (c: Command) => void): void {
  * citizens walking it, taken off the berries first. Elsewhere the woods are left to the axe.
  */
 function trapLine(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
-  if (!AI_LEVELS[v.p.ai!].clever || s.homeland !== 'wood' || isMobile(v.p) || v.citizens.length < SNARE.aiAt || s.tick < secs(SNARE.aiFrom)) return;
+  if (!AI_LEVELS[v.p.ai!].clever || s.homeland !== 'wood' || (isMobile(v.p) && !isNomad(v.p)) || v.citizens.length < SNARE.aiAt || s.tick < secs(SNARE.aiFrom)) return;
   const snares = v.buildings.filter((b) => b.type === 'snare');
   if (snares.length < SNARE.ai && snares.every((b) => b.built) && s.tick - (mem.ordered.snare ?? -99999) > secs(20)) {
     const felling: number[] = [];

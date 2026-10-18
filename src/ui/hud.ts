@@ -380,7 +380,7 @@ export class Hud {
     if (sig === this.topSig) return;
     this.topSig = sig;
     this.resEl.innerHTML =
-      RES.map((r) => `<div class="res" data-tip="<b>${RES_LABEL[r]}</b>${r === 'gold' && isHousehold(p) ? householdHint(s, viewer) : isNomad(p) && (r === 'gold' || r === 'stone') ? nomadHint(r) : resHint(r)}">${icon(r)}${Math.floor(p.res[r])}</div>`).join('') +
+      RES.map((r) => `<div class="res" data-tip="<b>${RES_LABEL[r]}</b>${r === 'gold' && isHousehold(p) ? householdHint(s, viewer) : isNomad(p) && r === 'stone' ? nomadHint() : resHint(r)}">${icon(r)}${Math.floor(p.res[r])}</div>`).join('') +
       RARES.filter((r) => (p.rare?.[r] ?? 0) > 0)
         .map((r) => `<div class="res" data-tip="<b>${RARE[r].name}</b>${RARE[r].blurb} Mined from deep veins that only some worlds hold.">${RARE_ICON[r]}${Math.floor(p.rare![r]!)}</div>`)
         .join('') +
@@ -1204,10 +1204,8 @@ function householdHint(s: GameState, viewer: number): string {
   return `Nobody mines it here: your houses pay it, <b>${rate} a minute</b> now, more for each house on a street and the fuller your town. Cavalry, later soldiers and the later epochs.`;
 }
 
-function nomadHint(r: 'gold' | 'stone'): string {
-  return r === 'gold'
-    ? 'Nobody digs it here. Riders standing in a rival\'s land take it from the rival\'s treasury; sell your flock\'s meat and your timber at a Market (a trade post pays too).'
-    : 'Nobody quarries it here. Riders standing in a rival\'s land take it from the rival\'s stores; buy it at a Market with gold.';
+function nomadHint(): string {
+  return 'Nobody quarries it here. Riders standing in a rival\'s land take it from the rival\'s stores; buy it at a Market with gold.';
 }
 
 function resHint(r: string): string {

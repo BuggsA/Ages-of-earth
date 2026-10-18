@@ -1422,7 +1422,7 @@ export interface Civ {
   legion?: boolean;
   /** The household tax (#501, `HOUSEHOLD`): its citizens mine no gold; every house pays it, more on a built-up street. */
   household?: boolean;
-  /** Born on the move (#501, `NOMAD`): its camp rolls on wagons from the first minute, it keeps flocks and tills no fields, quarries no stone and digs no gold: riders take tribute. */
+  /** Born on the move (#501, `NOMAD`): its camp rolls on wagons from the first minute, it keeps flocks and tills no fields and quarries no stone: riders take tribute, gold and stone. */
   nomad?: boolean;
 }
 
@@ -1455,7 +1455,7 @@ export const HOUSEHOLD = { every: 5, gold: 0.12, street: 0.04, streetMax: 4, rea
 /**
  * Born on the move (#501, the Mongols): a nomad people's camp packs onto wagons from the Stone Age, it is given its first flock at the
  * start (`start` sheep for each Town Center, room for `cap` rather than `FLOCK.cap`, `milk` a bite rather than `FLOCK.milk`, citizens that milk `milkSpeed` times as fast, and the grass back in
- * `regrow` seconds rather than `FLOCK.regrow`: the flock is its farm), and its citizens dig no stone, gold or bog iron (`mineable`) and till and wall nothing (`noBuild`). Its riders take tribute
+ * `regrow` seconds rather than `FLOCK.regrow`: the flock is its farm), and its citizens quarry no stone and dig no bog iron (`mineable`) and till and wall nothing (`noBuild`). Its riders take tribute
  * from the first Stable (the civ's `tribute` mod) and also `stone` times as much in stone, from the rival's stores. The computer raises
  * lambs before citizens until the flock is `aiLambs` and one for each `aiPerSheep` citizens (one milker for each `aiPerMilker` grown sheep), raises
  * a Market from `aiMarket` citizens, sells food and wood over `aiSell` while its gold is under `aiGold`, and buys stone when it has
@@ -1498,9 +1498,9 @@ export const CIVS: Record<CivId, Civ> = {
   },
   mongols: {
     name: 'Mongols',
-    blurb: 'Born on the move. The Mongol camp rolls on wagons from the first minute (J), and two sheep walk with it; the flock is the food, with the hunt and the berries. No fields are tilled, no walls raised and no stone or gold is dug: riders who stand their ground in a rival\'s land take tribute from its treasury, gold and stone, from the Bronze Age on, and the herd sells at the Market. Cavalry ride 15% faster and hunters work 40% faster.',
-    verb: 'Drive your whole camp to fresh pasture and ride out to take tribute from a rival\'s land, instead of digging in and mining',
-    door: 'No fields, walls, stone or gold mines: a camp in a rival\'s reach, or a flock grazed bare, cannot be mended by building',
+    blurb: 'Born on the move. The Mongol camp rolls on wagons from the first minute (J), and two sheep walk with it; the flock is the food, with the hunt and the berries. No fields are tilled, no walls raised and no stone is quarried: riders who stand their ground in a rival\'s land take tribute from its treasury, gold and stone, from the Bronze Age on, and a Market sells stone for the herd\'s gold. Cavalry ride 15% faster and hunters work 40% faster.',
+    verb: 'Drive your whole camp to fresh pasture and ride out to take tribute and stone from a rival\'s land, instead of digging in and quarrying',
+    door: 'No fields, walls or quarries: stone comes only by tribute or the Market, and a flock grazed bare cannot be mended by building',
     nomad: true,
     add: { tribute: 0.2 },
     mul: { cavalrySpeed: 1.15, hunt: 1.4 },

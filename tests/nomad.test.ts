@@ -65,11 +65,11 @@ describe('born on the move', () => {
     expect(s.ents.some((e) => e.kind === 'building' && e.owner === 0 && e.type === 'farm')).toBe(false);
   });
 
-  it('digs no stone or gold, and a citizen sent to a seam stays idle; timber is fine', () => {
+  it('quarries no stone, and a citizen sent to the quarry stays idle; gold and timber are fine', () => {
     const s = game();
     const tc = tcOf(s);
     expect(mineable(s.players[0], R_STONE)).toBe(false);
-    expect(mineable(s.players[0], R_GOLD)).toBe(false);
+    expect(mineable(s.players[0], R_GOLD)).toBe(true);
     expect(mineable(s.players[0], R_TREE)).toBe(true);
     expect(mineable(s.players[1], R_STONE)).toBe(true);
     const stone = findResource(s, R_STONE, tc.x, tc.y, 60);
