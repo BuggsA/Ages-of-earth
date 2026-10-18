@@ -36,12 +36,13 @@ import { tributeStep } from './tribute';
 import { householdStep } from './household';
 import { seraiStep, tollStep } from './passage';
 import { mercStep } from './merc';
-import { KIN } from './data';
+import { KIN, NOMAD } from './data';
 import { isHire, barred, journeyOf, noteWalked, surveyFinds, trainsAt, workSteps } from './ages';
 import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, HomelandId, MapSize, MapType, Player, UnitType } from './types';
 import { RES, R_FISH, R_NONE } from './types';
 import { legionKind, legionary } from './legion';
 import { mineable } from './household';
+import { isNomad } from './nomad';
 import { RES_OF_TILE, autoWork, rallyNode, carryCargo, checkStuck, collide, findResource, routeUnits, separate, setOrder, think, ungarrison, walk } from './units';
 import { updateVision } from './vision';
 import { countPop, exitSpot, maxHp, placeBuilding, refund, restat, spawnUnit } from './world';
@@ -208,6 +209,8 @@ export function createGame(setup: GameSetup): GameState {
       a.homeY = c.y;
     }
   }
+  // Born on the move (#501): a nomad people starts with its flock about the camp.
+  for (const p of s.players) if (isNomad(p)) giftFlock(s, p, NOMAD.start);
   countPop(s);
   updateVision(s);
   // Everyone knows the lie of the land around home.

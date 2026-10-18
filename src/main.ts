@@ -2349,13 +2349,14 @@ function onEvents(s: GameState, list: GameEvent[]): void {
       case 'tribute': {
         // A horde's riders standing in a rival's land (#318).
         const fresh = (at: number, gap: number) => s.tick - at > gap * TICK_HZ || s.tick < at;
-        const rate = (ev.gold / TRIBUTE.every).toFixed(1);
+        // A nomad people (#501) takes cut stone with the gold.
+        const rate = `${(ev.gold / TRIBUTE.every).toFixed(1)} gold${ev.stone ? ` and ${(ev.stone / TRIBUTE.every).toFixed(1)} stone` : ''}`;
         if (ev.owner === viewer && fresh(tributeToast.took, 60)) {
           tributeToast.took = s.tick;
-          hud.toast(`🐎 Your riders exact tribute from ${s.players[ev.from].name}: ${rate} gold a second while they stand in its land`, 'good');
+          hud.toast(`🐎 Your riders exact tribute from ${s.players[ev.from].name}: ${rate} a second while they stand in its land`, 'good');
         } else if (ev.from === viewer && fresh(tributeToast.paid, 30)) {
           tributeToast.paid = s.tick;
-          hud.toast(`🐎 ${s.players[ev.owner].name}'s horde exacts tribute in your land (${rate} gold a second): drive its riders off with spears and towers`, 'alert');
+          hud.toast(`🐎 ${s.players[ev.owner].name}'s horde exacts tribute in your land (${rate} a second): drive its riders off with spears and towers`, 'alert');
           lastAlert = { x: ev.x, y: ev.y };
         }
         break;

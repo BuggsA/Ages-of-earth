@@ -1,8 +1,9 @@
-import { DT, FLOCK, TICK_HZ, domainOf, secs } from './data';
+import { DT, FLOCK, NOMAD, TICK_HZ, domainOf, secs } from './data';
 import { DIRS, roll, spawnAnimal } from './animals';
 import { walkable } from './grid';
 import { seasonOf } from './seasons';
 import { isMobile } from './steppe';
+import { isNomad, yurtRoom } from './nomad';
 import type { Spatial } from './spatial';
 import type { Animal, Building, GameState, Player, Unit } from './types';
 import { R_NONE, T_GRASS } from './types';
@@ -32,14 +33,17 @@ export function flockOf(s: GameState, owner: number): number {
   return n;
 }
 
-/** How many sheep a people can keep: `FLOCK.cap` for each Town Center, standing or on a wagon. */
+/** How many sheep a people can keep: `FLOCK.cap` for each Town Center, standing or on a wagon, and a nomad people's Houses' room (#501). */
 export function flockCap(s: GameState, owner: number): number {
+  const p = s.players[owner];
   let n = 0;
+  let more = 0;
   for (const e of s.ents) {
     if (e.owner !== owner || e.hp <= 0) continue;
     if (e.kind === 'building' ? e.type === 'towncenter' : e.type === 'wagon' && e.packed === 'towncenter') n++;
+    else if (p) more += yurtRoom(p, e);
   }
-  return n * FLOCK.cap;
+  return n * FLOCK.cap + more;
 }
 
 /** A flock's camp: the nearest Town Center of its people, standing or packed on a wagon, within `FLOCK.follow` tiles. */
@@ -94,12 +98,12 @@ export function raiseLamb(s: GameState, b: Building): Animal {
   return a;
 }
 
-/** A people new to the steppe drives its first sheep in: `FLOCK.start` beside each of its Town Centers. */
-export function giftFlock(s: GameState, p: Player): void {
+/** A people new to the steppe drives its first sheep in: `FLOCK.start` beside each of its Town Centers (`n` for a people born to it, #501). */
+export function giftFlock(s: GameState, p: Player, n = FLOCK.start): void {
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.owner !== p.id || e.type !== 'towncenter' || !e.built || e.hp <= 0) continue;
-    for (let k = 0; k < FLOCK.start; k++) {
-      const spot = exitSpot(s, e, e.x + (k ? 3 : -3), e.y + 4);
+    for (let k = 0; k < n; k++) {
+      const spot = exitSpot(s, e, e.x + (k % 2 ? 3 : -3), e.y + 4 + (k >> 1));
       addSheep(s, p.id, spot.x, spot.y, false);
     }
   }
@@ -158,12 +162,16 @@ function amble(s: GameState, a: Animal, tx: number, ty: number, speed: number): 
 /** The eight tiles around one, going round. */
 const RING = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]] as const;
 
-/** The nearest fresh grass to a sheep that lies within `FLOCK.range` of its camp, ring by ring, or null. */
+/** How far from its camp a people's flock grazes: `FLOCK.range`, or `NOMAD.range` for a people born to the herd (#501). */
+export const grazeRange = (s: GameState, owner: number): number => (s.players[owner] && isNomad(s.players[owner]) ? NOMAD.range : FLOCK.range);
+
+/** The nearest fresh grass to a sheep that lies within its people's grazing range of its camp, ring by ring, or null. */
 function freshGrass(s: GameState, a: Animal): { x: number; y: number } | null {
   const cx = Math.floor(a.x);
   const cy = Math.floor(a.y);
-  const reach = FLOCK.range + 0.5;
-  const most = FLOCK.range * 2 + 1;
+  const range = grazeRange(s, a.owner!);
+  const reach = range + 0.5;
+  const most = range * 2 + 1;
   const near = (x: number, y: number) => {
     const hx = x + 0.5 - a.homeX;
     const hy = y + 0.5 - a.homeY;
@@ -234,7 +242,7 @@ function lookAbout(s: GameState, sp: Spatial | undefined, a: Animal): void {
   }
   if (a.lead !== undefined) {
     const u = s.byId.get(a.lead);
-    const near = camp && (camp.x - a.x) * (camp.x - a.x) + (camp.y - a.y) * (camp.y - a.y) <= FLOCK.range * FLOCK.range;
+    const near = camp && (camp.x - a.x) * (camp.x - a.x) + (camp.y - a.y) * (camp.y - a.y) <= grazeRange(s, owner) * grazeRange(s, owner);
     if (near || !u || u.kind !== 'unit' || u.hp <= 0 || u.inside || u.owner !== a.owner) delete a.lead;
     else {
       a.homeX = u.x;
@@ -254,10 +262,11 @@ function crop(s: GameState, a: Animal): boolean {
   const y = Math.floor(a.y);
   if (!grassy(s, x, y)) return false;
   s.grazed ??= new Int32Array(s.w * s.h);
-  s.grazed[y * s.w + x] = s.tick + secs(FLOCK.regrow / seasonOf(s).grass);
+  // A people born to the herd (#501) grazes in turn about the camp, and its grass comes back sooner.
+  s.grazed[y * s.w + x] = s.tick + secs((FLOCK.regrow * (isNomad(s.players[a.owner!]) ? NOMAD.regrow : 1)) / seasonOf(s).grass);
   if (a.lamb !== undefined) return true;
   if ((a.milk ?? 0) < FLOCK.udder) {
-    a.milk = Math.min(FLOCK.udder, (a.milk ?? 0) + FLOCK.milk);
+    a.milk = Math.min(FLOCK.udder, (a.milk ?? 0) + FLOCK.milk * (isNomad(s.players[a.owner!]) ? NOMAD.milk : 1));
     return true;
   }
   a.fat = Math.min(FLOCK.breed, (a.fat ?? 0) + FLOCK.fat);
@@ -287,7 +296,7 @@ export function sheepStep(s: GameState, sp: Spatial | undefined, a: Animal): voi
   const held = a.held !== undefined && s.tick - a.held <= 1;
   const hx = a.homeX - a.x;
   const hy = a.homeY - a.y;
-  const keep = a.lead !== undefined ? 1.5 : FLOCK.range + 1;
+  const keep = a.lead !== undefined ? 1.5 : grazeRange(s, a.owner!) + 1;
   if (!held && hx * hx + hy * hy > keep * keep) {
     // Left behind: trot after the camp (or the rustler) before grazing again.
     a.state = 'walk';

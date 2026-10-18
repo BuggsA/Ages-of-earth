@@ -1185,6 +1185,8 @@ export class View {
             const u = s.byId.get(id);
             if (!u || (ev.owner !== this.viewer && !this.sees(u.x, u.y))) continue;
             this.effects.burst(this.ground(s, u.x, u.y, 1.5), { count: 3, speed: 0.3, up: 0.8, life: 0.8, size: 0.045, gravity: 1.2, colors: ['#ffd166', '#f2cf4a', '#fff3c4'] });
+            // A nomad's tribute (#501) is paid in cut stone too: grey chips with the gold.
+            if (ev.stone) this.effects.burst(this.ground(s, u.x, u.y, 1.4), { count: 2, speed: 0.25, up: 0.6, life: 0.7, size: 0.05, gravity: 1.6, colors: ['#b8b2a6', '#8f8a80'] });
           }
           if (ev.owner === this.viewer && (s.tick - this.tributeCue > TICK_HZ * 6 || s.tick < this.tributeCue)) {
             this.tributeCue = s.tick;

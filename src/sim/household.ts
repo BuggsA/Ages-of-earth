@@ -1,4 +1,5 @@
 import { CIVS, HOUSEHOLD, secs } from './data';
+import { quarries } from './nomad';
 import { R_BOG, R_GOLD } from './types';
 import type { Building, GameState, Player } from './types';
 
@@ -9,8 +10,8 @@ import type { Building, GameState, Player } from './types';
  */
 export const isHousehold = (p: Player): boolean => !!CIVS[p.civ].household;
 
-/** Whether this player's citizens may work a tile of this kind: a household people mines no gold and digs no bog iron. */
-export const mineable = (p: Player, kind: number): boolean => !isHousehold(p) || (kind !== R_GOLD && kind !== R_BOG);
+/** Whether this player's citizens may work a tile of this kind: a household people mines no gold and digs no bog iron, a nomad people quarries no stone (#501). */
+export const mineable = (p: Player, kind: number): boolean => (!isHousehold(p) || (kind !== R_GOLD && kind !== R_BOG)) && quarries(p, kind);
 
 
 /** The finished houses of a player, and its finished Markets, in id order. */

@@ -7,7 +7,7 @@ import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
 import { RARE_OF_TILE } from '../sim/units';
-import { SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, SNARE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, SNARE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -30,7 +30,7 @@ import { buildingCostFor, buildingMaxHp, modsOf, statsFor, techCostFor, techProb
 import { isMobile, packProblem, packsOf, pitchProblem } from '../sim/steppe';
 import { exacting, isRider } from '../sim/tribute';
 import { landOwnerAt } from '../sim/borders';
-import { flockCap, flockOf, lambProblem } from '../sim/flocks';
+import { flockCap, flockOf, grazeRange, lambProblem } from '../sim/flocks';
 import { ageDef, ageOf, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, oreClue, oreDone, oreOnly, ironTradeShare, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, pathLine, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, surveyFinds, suspendedTechs, trainsAt, windowsOf } from '../sim/ages';
 import type { Building, BuildingType, Command, Cost, Ent, GameState, Landmark, Player, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
 import { RARES, RES, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
@@ -40,6 +40,7 @@ import { idleCitizens } from './idle';
 import { workforce, WORKFORCE_JOBS } from './workforce';
 import { citizenProblem, isLegion } from '../sim/legion';
 import { isHousehold, streetOf, taxRate } from '../sim/household';
+import { isNomad } from '../sim/nomad';
 
 /**
  * The heads-up display: resources and population along the top with the epoch and the clock, and along
@@ -379,7 +380,7 @@ export class Hud {
     if (sig === this.topSig) return;
     this.topSig = sig;
     this.resEl.innerHTML =
-      RES.map((r) => `<div class="res" data-tip="<b>${RES_LABEL[r]}</b>${r === 'gold' && isHousehold(p) ? householdHint(s, viewer) : resHint(r)}">${icon(r)}${Math.floor(p.res[r])}</div>`).join('') +
+      RES.map((r) => `<div class="res" data-tip="<b>${RES_LABEL[r]}</b>${r === 'gold' && isHousehold(p) ? householdHint(s, viewer) : r === 'stone' && isNomad(p) ? NOMAD_STONE : r === 'food' && isNomad(p) ? NOMAD_FOOD : resHint(r)}">${icon(r)}${Math.floor(p.res[r])}</div>`).join('') +
       RARES.filter((r) => (p.rare?.[r] ?? 0) > 0)
         .map((r) => `<div class="res" data-tip="<b>${RARE[r].name}</b>${RARE[r].blurb} Mined from deep veins that only some worlds hold.">${RARE_ICON[r]}${Math.floor(p.rare![r]!)}</div>`)
         .join('') +
@@ -1109,7 +1110,7 @@ export class Hud {
             const no = lambProblem(s, p, b);
             const herd = s.animals.filter((a) => a.kind === 'sheep' && a.owner === viewer);
             const hungry = herd.filter((a) => a.hungry).length;
-            cmds.push({ key: 'L', pic: '', glyph: '🐑', title: `Raise a lamb (${flockOf(s, viewer)}/${flockCap(s, viewer)})`, cost: FLOCK.cost, desc: `A lamb for the flock, grown in ${FLOCK.lamb} seconds. Sheep graze within ${FLOCK.range} tiles of the nearest Town Center and follow it when camp is struck. Right-click one with citizens to <b>milk</b> it (slow food that comes back); a sheep left unmilked fattens and bears lambs; attack-move (A) onto one to <b>slaughter</b> it for meat. Each bite crops the grass bare for a while, so a flock grazes its ground out and must move on.${hungry ? ` <b>${hungry} of your sheep are hungry:</b> the grass here is gone.` : ''} Wolves take sheep near their dens (Hounds keep them off near camp), and rivals drive off sheep left with no one by them. Up to ${FLOCK.cap} sheep for each Town Center.`, ok: !no, why: no ?? undefined, run: () => this.act.issue({ t: 'lamb', p: viewer, building: b.id }) });
+            cmds.push({ key: 'L', pic: '', glyph: '🐑', title: `Raise a lamb (${flockOf(s, viewer)}/${flockCap(s, viewer)})`, cost: FLOCK.cost, desc: `A lamb for the flock, grown in ${FLOCK.lamb} seconds. Sheep graze within ${grazeRange(s, viewer)} tiles of the nearest Town Center and follow it when camp is struck. Right-click one with citizens to <b>milk</b> it (slow food that comes back); a sheep left unmilked fattens and bears lambs; attack-move (A) onto one to <b>slaughter</b> it for meat. Each bite crops the grass bare for a while, so a flock grazes its ground out and must move on.${hungry ? ` <b>${hungry} of your sheep are hungry:</b> the grass here is gone.` : ''} Wolves take sheep near their dens (Hounds keep them off near camp), and rivals drive off sheep left with no one by them. Up to ${FLOCK.cap} sheep for each Town Center${isNomad(p) ? ` and ${NOMAD.house} for each House` : ''}.`, ok: !no, why: no ?? undefined, run: () => this.act.issue({ t: 'lamb', p: viewer, building: b.id }) });
           }
           cmds.push({ key: 'J', pic: '', glyph: '🛞', title: 'Strike camp', desc: b.type === 'market' ? `Pack this Market onto a wagon and take it along the road. Your traders come home to it wherever it rolls, and every tile it covers while they are out pays their trip ${Math.round(SILK.each * 100)}% more (up to ${Math.round(SILK.each * SILK.most * 100)}%). While it rolls nobody buys or sells and no trader is trained, and riders run it down.` : `Pack this ${def.name} onto a wagon, with everyone sheltering inside stepping out. Drive it to new ground and pitch it there (P). While it rolls it gives no room, takes in nothing and trains no one, and riders run it down.`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'pack', p: viewer, building: b.id }) });
         }
@@ -1202,6 +1203,10 @@ function householdHint(s: GameState, viewer: number): string {
   const rate = Math.round(taxRate(s, viewer) * 60);
   return `Nobody mines it here: your houses pay it, <b>${rate} a minute</b> now, more for each house on a street and the fuller your town. Cavalry, later soldiers and the later epochs.`;
 }
+
+// Born on the move (#501): a Mongol camp quarries no stone and tills no field.
+const NOMAD_STONE = 'Nobody quarries it here: buy it at a Market, or take it as tribute, for riders who stand still in a rival\'s land take stone with the gold. Town Centers, towers and the later epochs.';
+const NOMAD_FOOD = 'From your flock (milk it, and slaughter the fat), the hunt, berries and fishing; never fields. Each Town Center keeps a flock, each House a little more: move camp when the grass is grazed out.';
 
 function resHint(r: string): string {
   return {

@@ -30,14 +30,15 @@ import { sees } from './vision';
 import { seasonAt } from './seasons';
 import { flooded } from './flood';
 import { isHousehold } from './household';
+import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
-import { DEER, FLOOD, HOUSEHOLD, LEGION, POLIS, SNARE, SPOILS } from './data';
+import { DEER, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SNARE, SPOILS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
 import { isRider, standing } from './tribute';
-import { flockCap, flockOf, grassy, milkable } from './flocks';
+import { flockCap, flockOf, grassy, grazeRange, milkable } from './flocks';
 import { progress, scenarioById } from './campaign';
 
 /**
@@ -360,7 +361,19 @@ function research(s: GameState, v: View, peopleEnough: boolean, issue: (c: Comma
 
 function trade(s: GameState, v: View, issue: (c: Command) => void): void {
   const { p } = v;
-  if (!AI_LEVELS[p.ai!].clever || !v.buildings.some((b) => b.type === 'market' && b.built)) return;
+  const nomad = isNomad(p);
+  if (!(AI_LEVELS[p.ai!].clever || nomad) || !v.buildings.some((b) => b.type === 'market' && b.built)) return;
+  // A nomad people (#501) quarries no stone: it buys a lot whenever it runs short and has the gold.
+  if (nomad && p.res.stone < NOMAD.aiStone && p.res.gold >= Math.max(NOMAD.aiGold, s.market.stone + 40)) {
+    issue({ t: 'trade', p: p.id, res: 'stone', buy: true });
+    return;
+  }
+  // And it has no fields: grain is bought from the settled with the gold it mines and takes.
+  if (nomad && p.res.food < NOMAD.aiFood && p.res.gold >= Math.max(NOMAD.aiGold, s.market.food + 40) && s.market.food < NOMAD.aiFoodPrice) {
+    issue({ t: 'trade', p: p.id, res: 'food', buy: true });
+    return;
+  }
+  if (!AI_LEVELS[p.ai!].clever) return;
   // Ore in hand sells at once: the doors count what was mined, not what is kept.
   for (const r of RARES) {
     // Blood-iron is kept for grafts while a Station stands to quench them with it.
@@ -509,7 +522,7 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   }
   delete mem.waiting;
   // The steppe (#320) is kept a while, so the flock it came for pays.
-  if (walksWeb(v) && isMobile(p) && s.tick - (mem.steppe?.since ?? s.tick) < secs(AI_STEPPE.stay)) return null;
+  if (walksWeb(v) && ageDef(p).mobile && s.tick - (mem.steppe?.since ?? s.tick) < secs(AI_STEPPE.stay)) return null;
   // The Horde stays `stay` seconds before it climbs on: tribute is what it came for (#322).
   if (walksWeb(v) && ageOf(p) === 'horde') {
     const st = (mem.steppe ??= {});
@@ -1206,6 +1219,8 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     ['temple', clever && p.epoch >= 1 && n >= 16 && count(v, 'temple') === 0 && looseRelics(s) > 0],
     ['tower', p.epoch >= 1 && count(v, 'tower') < L.towers && n >= 16],
     ['market', clever && p.epoch >= 1 && n >= 20 && count(v, 'market') === 0],
+    // A nomad people (#501) buys its stone: its Market comes early, at every level of play.
+    ['market', isNomad(p) && p.epoch >= 1 && n >= NOMAD.aiMarket && count(v, 'market') === 0],
     ['workshop', clever && p.epoch >= 2 && n >= 20 && count(v, 'workshop') === 0],
     ['temple', clever && p.epoch >= 2 && n >= 22 && count(v, 'temple') === 0],
     ['barracks', p.epoch >= 2 && n >= 22 && count(v, 'barracks') < 2],
@@ -1309,6 +1324,9 @@ function coldComing(s: GameState, v: View): boolean {
   return AI_LEVELS[v.p.ai!].clever && seasonAt(s) >= AI_WINTER.from;
 }
 
+/** A nomad people's lean on the epoch's shares (#501): it quarries no stone, so the stone hands go to the gold that buys it. */
+const nomadShare = (r: Res, share: Record<Res, number>): number => (r === 'stone' ? 0 : r === 'gold' ? 1 + share.stone / Math.max(0.01, share.gold) : 1);
+
 /** How many citizens each resource should have now: the epoch's shares, leaning away from what piles up. */
 function wanted(v: View, cold = false): Record<Res, number> {
   const share = SHARE[v.p.epoch];
@@ -1317,7 +1335,7 @@ function wanted(v: View, cold = false): Record<Res, number> {
   for (const r of RES) {
     const stock = v.p.res[r];
     const lean = stock > 1200 ? 0.15 : stock > 700 ? 0.4 : stock > 400 ? 0.7 : stock < 80 ? 1.4 : 1;
-    weight[r] = share[r] * lean * (cold && r === 'food' ? 1 + AI_WINTER.food : 1) * (legionAtWork(v) && (r === 'wood' || r === 'stone') ? LEGION.aiCitizenWood : 1) * (r === 'gold' && isHousehold(v.p) ? 0 : 1);
+    weight[r] = share[r] * lean * (cold && r === 'food' ? 1 + AI_WINTER.food : 1) * (legionAtWork(v) && (r === 'wood' || r === 'stone') ? LEGION.aiCitizenWood : 1) * (r === 'gold' && isHousehold(v.p) ? 0 : 1) * (isNomad(v.p) ? nomadShare(r, share) : 1);
     total += weight[r];
   }
   const n = v.citizens.filter((u) => u.order.k !== 'build' && !u.inside).length;
@@ -1378,6 +1396,8 @@ function sendTo(s: GameState, v: View, u: Unit, res: Res, issue: (c: Command) =>
     return false;
   }
   if (res === 'gold' && isHousehold(v.p)) return false;
+  // A nomad people (#501) quarries no stone: it buys it or takes it.
+  if (res === 'stone' && isNomad(v.p)) return false;
   const from = nearestDropTo(v, u);
   let tile = findResource(s, TILE_OF[res], from.x, from.y, 26);
   if (tile < 0) tile = findResource(s, TILE_OF[res], u.x, u.y, 60);
@@ -1682,7 +1702,8 @@ function steppeRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) =>
   if (isMobile(p)) {
     (mem.steppe ??= {}).since ??= s.tick;
     v.hunt = { n: AI_STEPPE.hunters, r: AI_STEPPE.reach };
-    return;
+    // A people born on the move (#501) still rides for the Steppe Road from the Stone Age, and follows its clue to the deer.
+    if (ageDef(p).mobile) return;
   }
   if (p.epoch !== 0 || !walksWeb(v) || v.citizens.length < AI_STEPPE.at) return;
   const road = roadsFrom(p).find((r) => AGES[r.to].mobile);
@@ -1719,7 +1740,9 @@ function hordeClimb(s: GameState, v: View, mem: AiMemory): Road | null {
 function milkersWanted(s: GameState, v: View): number {
   const grown = grownSheep(s, v.p.id).length;
   const mem = s.ai[v.p.id];
-  return mem && hordeClimb(s, v, mem) ? Math.min(AI_HORDE.milkers, grown) : Math.ceil(grown / AI_STEPPE.perMilker);
+  if (mem && hordeClimb(s, v, mem)) return Math.min(AI_HORDE.milkers, grown);
+  // A people with no fields (#501) draws all the milk there is.
+  return Math.ceil(grown / (isNomad(v.p) ? NOMAD.aiPerMilker : AI_STEPPE.perMilker));
 }
 
 /**
@@ -1733,7 +1756,9 @@ function tendFlock(s: GameState, v: View, issue: (c: Command) => void): void {
   const climb = mobile ? hordeClimb(s, v, s.ai[p.id] ?? ({} as AiMemory)) : null;
   const hordeWanted = !!climb;
   if (!mobile && !grown.length) return;
-  if (mobile && v.tc && flockOf(s, p.id) < flockCap(s, p.id) && v.budget.food >= (FLOCK.cost.food ?? 0) + (hordeWanted ? AI_HORDE.spare : AI_STEPPE.spare)) {
+  // A people born on the move (#501) has no fields: its first lambs are its farms, raised ahead of the savings for the next epoch.
+  const purse = isNomad(p) && flockOf(s, p.id) < NOMAD.aiFlock ? p.res.food - NOMAD.aiSpare : v.budget.food - (hordeWanted ? AI_HORDE.spare : AI_STEPPE.spare);
+  if (mobile && v.tc && flockOf(s, p.id) < flockCap(s, p.id) && purse >= (FLOCK.cost.food ?? 0)) {
     issue({ t: 'lamb', p: p.id, building: v.tc.id });
     spend(v, FLOCK.cost);
   }
@@ -1772,10 +1797,9 @@ const COMPASS: [number, number][] = [
 ];
 
 /** How good a pasture lies around a point: its fresh grass within a flock's range, and the deer and berries by it. */
-function pasture(s: GameState, x: number, y: number): number {
+function pasture(s: GameState, x: number, y: number, r = FLOCK.range): number {
   const cx = Math.floor(x);
   const cy = Math.floor(y);
-  const r = FLOCK.range;
   let n = 0;
   for (let dy = -r; dy <= r; dy++) {
     for (let dx = -r; dx <= r; dx++) {
@@ -1803,15 +1827,18 @@ function pitchable(s: GameState, owner: number, x: number, y: number): boolean {
 function newPasture(s: GameState, v: View): { x: number; y: number } | null {
   const enemy = enemyHome(s, v.p);
   const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
-  const away = dist(v.home, enemy) - 2;
+  // A people born on the move (#501) has the whole of the land to graze: it looks farther, and goes sideways to the rival too.
+  const nomad = isNomad(v.p);
+  const away = dist(v.home, enemy) - (nomad ? NOMAD.aiSideways : 2);
   let best: { x: number; y: number } | null = null;
-  let score = pasture(s, v.home.x, v.home.y) * 1.25 + 10;
-  for (const d of [AI_STEPPE.move, (AI_STEPPE.move + AI_STEPPE.far) / 2, AI_STEPPE.far]) {
+  const r = grazeRange(s, v.p.id);
+  let score = pasture(s, v.home.x, v.home.y, r) * 1.25 + 10;
+  for (const d of nomad ? [AI_STEPPE.move, AI_STEPPE.far, NOMAD.aiFar] : [AI_STEPPE.move, (AI_STEPPE.move + AI_STEPPE.far) / 2, AI_STEPPE.far]) {
     for (const [ux, uy] of COMPASS) {
       const at = { x: Math.floor(v.home.x + ux * d) + 0.5, y: Math.floor(v.home.y + uy * d) + 0.5 };
       if (at.x < 4 || at.y < 4 || at.x > s.w - 4 || at.y > s.h - 4 || !walkable(s, Math.floor(at.x), Math.floor(at.y))) continue;
       if (dist(at, enemy) < away || !pitchable(s, v.p.id, at.x, at.y)) continue;
-      const n = pasture(s, at.x, at.y);
+      const n = pasture(s, at.x, at.y, r);
       if (n > score) {
         score = n;
         best = at;
@@ -1851,7 +1878,8 @@ function strikeCamp(s: GameState, v: View, mem: AiMemory, issue: (c: Command) =>
     return;
   }
   const st = mem.steppe;
-  if (!st || !isMobile(p) || !walksWeb(v)) {
+  // A people born on the move (#501) strikes camp at every level of play: it is how it eats.
+  if (!st || !isMobile(p) || !(walksWeb(v) || isNomad(p))) {
     if (st) delete st.pack;
     return;
   }
@@ -1870,19 +1898,28 @@ function strikeCamp(s: GameState, v: View, mem: AiMemory, issue: (c: Command) =>
     delete st.pack;
     return;
   }
-  if (!tc || tc.advance >= 0 || s.tick - (st.struck ?? st.since ?? s.tick) < secs(AI_STEPPE.every)) return;
+  // A people born on the move (#501) lives by its flock alone, and moves on sooner.
+  const every = isNomad(p) ? NOMAD.aiEvery : AI_STEPPE.every;
+  if (!tc || tc.advance >= 0 || s.tick - (st.struck ?? st.since ?? s.tick) < secs(every)) return;
   const grown = grownSheep(s, p.id);
   const hungry = grown.filter((a) => a.hungry).length;
   const grazedOut = grown.length >= 2 && hungry >= grown.length * AI_STEPPE.hungry;
   const huntedOut = !nearestDeer(s, v.home.x, v.home.y, AI_STEPPE.bare) && findResource(s, R_BERRY, v.home.x, v.home.y, AI_STEPPE.bare) < 0;
+  // A people born on the move (#501) packs for a flock that stays hungry, not one caught between two mouthfuls.
+  if (isNomad(p) && !ageDef(p).mobile && !huntedOut) {
+    if (!grazedOut) delete st.starved;
+    else st.starved ??= s.tick;
+    if (s.tick - (st.starved ?? s.tick) < secs(NOMAD.aiHungry)) return;
+  }
   if ((!grazedOut && !huntedOut) || threatNear(s, v).count) return;
   const to = newPasture(s, v);
   // None worth it: look again in half a minute.
   if (!to) {
-    st.struck = s.tick - secs(AI_STEPPE.every - 30);
+    st.struck = s.tick - secs(every - 30);
     return;
   }
   st.pack = { x: to.x, y: to.y, at: s.tick };
+  delete st.starved;
 }
 
 // ---- Ancient ruins (#64) -----------------------------------------------------------------------------
@@ -3207,13 +3244,16 @@ function exactTribute(s: GameState, v: View, mem: AiMemory, issue: (c: Command) 
   }
   if (s.tick < s.peaceUntil || s.tick - (mine.recalled ?? -1e9) < secs(AI_HORDE.redo) || mem.attacking || !v.tc) return held;
   const riders = v.army.filter((u) => u.type === 'cavalry' && !u.inside && u.order.k === 'idle' && isRider(u) && standing(u)).sort((a, b) => a.id - b.id);
-  if (riders.length < AI_HORDE.riders) return held;
-  // The nearest rival with gold, and a spot of its land on our side of its Town Center.
+  // A people born on the move (#501), off the Steppe Road, sends a smaller band and stands it past its own supply: it takes stone
+  // as well as gold, and needs it from the Bronze Age. In the Horde it rides in force, as any horde does.
+  const nomad = isNomad(p) && !ageDef(p).mobile;
+  if (riders.length < (nomad ? NOMAD.aiRiders : AI_HORDE.riders)) return held;
+  // The nearest rival with gold (or, for a nomad people, stone), and a spot of its land on our side of its Town Center.
   const own = borderMap(s);
   let best: { x: number; y: number } | null = null;
   let bestD = Infinity;
   for (const b of s.ents) {
-    if (b.kind !== 'building' || b.type !== 'towncenter' || !b.built || b.hp <= 0 || !isEnemy(s, p.id, b.owner) || s.players[b.owner].res.gold < 50) continue;
+    if (b.kind !== 'building' || b.type !== 'towncenter' || !b.built || b.hp <= 0 || !isEnemy(s, p.id, b.owner) || (s.players[b.owner].res.gold < 50 && !(nomad && s.players[b.owner].res.stone >= 50))) continue;
     const dx = v.home.x - b.x;
     const dy = v.home.y - b.y;
     const dl = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -3223,7 +3263,7 @@ function exactTribute(s: GameState, v: View, mem: AiMemory, issue: (c: Command) 
       const y = b.y + (dy / dl) * r;
       const tx = Math.floor(x);
       const ty = Math.floor(y);
-      if (tx < 0 || ty < 0 || tx >= s.w || ty >= s.h || own[ty * s.w + tx] !== b.owner || !walkable(s, tx, ty) || !suppliedAt(s, own, p.team, tx, ty)) continue;
+      if (tx < 0 || ty < 0 || tx >= s.w || ty >= s.h || own[ty * s.w + tx] !== b.owner || !walkable(s, tx, ty) || (!nomad && !suppliedAt(s, own, p.team, tx, ty))) continue;
       const covered = s.ents.some((e) => e.kind === 'building' && e.hp > 0 && e.built && e.owner === b.owner && (e.type === 'towncenter' || e.type === 'tower') && (e.x - x) * (e.x - x) + (e.y - y) * (e.y - y) < AI_HORDE.clear * AI_HORDE.clear);
       if (covered || foesWithin(s, p, x, y, AI_HORDE.alarm).length >= AI_HORDE.foes) continue;
       best = { x, y };
@@ -3388,8 +3428,10 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     return;
   }
 
-  // A horde's riders wait at home for their band (#322): the waves leave them be until it sets out.
-  if (L.clever && !mem.steppe?.band && modsOf(s, p.id).tribute > 0 && fighters.filter((u) => u.type === 'cavalry').length < TRIBUTE.most) fighters = fighters.filter((u) => u.type !== 'cavalry');
+  // A horde's riders wait at home for their band (#322): the waves leave them be until it sets out. A people born on the move (#501),
+  // off the Steppe Road, gathers a smaller band, and a merchant rival's trade road calls its riders out before it.
+  const gathering = isNomad(p) && !ageDef(p).mobile ? !watchPost(s, p) && fighters.filter((u) => u.type === 'cavalry').length < NOMAD.aiRiders : fighters.filter((u) => u.type === 'cavalry').length < TRIBUTE.most;
+  if (L.clever && !mem.steppe?.band && modsOf(s, p.id).tribute > 0 && gathering) fighters = fighters.filter((u) => u.type !== 'cavalry');
   // Riders standing in our land take our gold (#322): the army rides out to drive them off.
   if (L.clever && answerRiders(s, v, fighters, issue)) {
     mem.attacking = false;

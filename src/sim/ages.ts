@@ -158,6 +158,8 @@ export function barred(p: Player, unit: UnitType, at?: BuildingType): string | n
 export function buildBarred(p: Player, type: BuildingType): string | null {
   const no = ageDef(p).noBuild;
   if (no && no.buildings.includes(type)) return no.why;
+  // Born on the move (#501): a Mongol camp never tills a field, in any age.
+  if (type === 'farm' && CIVS[p.civ].nomad) return 'A Mongol camp tills no fields: its food walks with the flock';
   const way = p.way ? WAYS[p.way] : undefined;
   if (way?.shuts?.includes(type)) return `${way.name} raises no ${BUILDINGS[type].name}`;
   const only = BUILDINGS[type].ages;

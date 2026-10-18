@@ -527,6 +527,8 @@ export interface PlayerStats {
   snared?: number;
   /** Gold taken as tribute by riders standing in rivals' land (#318); absent in older saves. */
   tribute?: number;
+  /** Stone taken as tribute by a nomad people's riders (#501); absent in older saves. */
+  tributeStone?: number;
   /** Gold a household people's houses paid it (#501). */
   taxed?: number;
   /** Gold the Silk Road's caravans earned for the ground the camp covered while they were out (#326); absent in older saves. */
@@ -706,7 +708,7 @@ export type GameEvent =
   /** Riders of a horde (#318) took `gold` in tribute from `from`, standing in its land: `ids` are the riders counted. */
   /** A household people's payday (#501): `gold` came in from the houses `ids`. */
   | { k: 'tax'; owner: number; gold: number; ids: number[] }
-  | { k: 'tribute'; owner: number; from: number; gold: number; ids: number[]; x: number; y: number }
+  | { k: 'tribute'; owner: number; from: number; gold: number; stone?: number; ids: number[]; x: number; y: number }
   /** A rival trader of `from`'s paid `owner` a toll of `gold` for safe passage across its land (#334). */
   | { k: 'toll'; owner: number; from: number; gold: number; id: number; x: number; y: number }
   | { k: 'campAlone'; owner: number; id: number; x: number; y: number; struck: boolean }
@@ -914,7 +916,7 @@ export interface AiMemory {
    * move to while its Town Center's queue empties (`pack`), and, while the wagon is on the road, where it is
    * driving (with the tick it set out) and the camp it left.
    */
-  steppe?: { band?: number[]; at?: { x: number; y: number }; out?: number; recalled?: number; horde?: number; since?: number; struck?: number; pack?: { x: number; y: number; at: number }; to?: { x: number; y: number; at: number }; from?: { x: number; y: number } };
+  steppe?: { band?: number[]; at?: { x: number; y: number }; out?: number; recalled?: number; horde?: number; since?: number; struck?: number; /** When a nomad flock (#501) was first seen grazed out, this time. */ starved?: number; pack?: { x: number; y: number; at: number }; to?: { x: number; y: number; at: number }; from?: { x: number; y: number } };
 }
 
 /** Orders that can be given with Shift held to queue them after the current one. */
