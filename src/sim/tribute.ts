@@ -1,4 +1,6 @@
-import { TRIBUTE, secs, unitStats } from './data';
+import { NOMAD, TRIBUTE, secs, unitStats } from './data';
+import { isNomad } from './nomad';
+import { ageDef } from './ages';
 import { borderMap } from './borders';
 import { modsOf } from './stats';
 import { isEnemy } from './world';
@@ -18,7 +20,7 @@ export const standing = (u: Unit): boolean => u.path === null && !u.wantPath;
 
 /** Whether this rider is exacting tribute now: its people's age takes tribute, and it stands on a rival's land. */
 export function exacting(s: GameState, u: Unit, landOwner: number): boolean {
-  return u.hp > 0 && !u.inside && isRider(u) && standing(u) && modsOf(s, u.owner).tribute > 0 && landOwner >= 0 && isEnemy(s, u.owner, landOwner);
+  return u.hp > 0 && !u.inside && isRider(u) && standing(u) && modsOf(s, u.owner).tribute > 0 && !ageDef(s.players[u.owner]).caravans && landOwner >= 0 && isEnemy(s, u.owner, landOwner);
 }
 
 /** Every `TRIBUTE.every` seconds outside the peace: each horde's standing riders take their tribute. */
@@ -48,11 +50,17 @@ export function tributeStep(s: GameState): void {
     const due = counted.length * modsOf(s, owner).tribute * TRIBUTE.every;
     const rival = s.players[from];
     const gold = Math.min(due, Math.max(0, rival.res.gold));
-    if (gold <= 0) continue;
-    rival.res.gold -= gold;
     const p = s.players[owner];
+    // A nomad people (#501) takes stone as well, `NOMAD.stone` of the gold due, from a rival's store.
+    const stone = isNomad(p) ? Math.min(due * NOMAD.stone, Math.max(0, rival.res.stone)) : 0;
+    if (gold <= 0 && stone <= 0) continue;
+    rival.res.gold -= gold;
     p.res.gold += gold;
+    if (stone > 0) {
+      rival.res.stone -= stone;
+      p.res.stone += stone;
+    }
     p.stats.tribute = (p.stats.tribute ?? 0) + gold;
-    s.events.push({ k: 'tribute', owner, from, gold, ids: counted.map((u) => u.id), x: counted[0].x, y: counted[0].y });
+    s.events.push({ k: 'tribute', owner, from, gold, ids: counted.map((u) => u.id), x: counted[0].x, y: counted[0].y, ...(stone > 0 ? { stone } : {}) });
   }
 }

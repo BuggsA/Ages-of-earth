@@ -706,7 +706,7 @@ export type GameEvent =
   /** Riders of a horde (#318) took `gold` in tribute from `from`, standing in its land: `ids` are the riders counted. */
   /** A household people's payday (#501): `gold` came in from the houses `ids`. */
   | { k: 'tax'; owner: number; gold: number; ids: number[] }
-  | { k: 'tribute'; owner: number; from: number; gold: number; ids: number[]; x: number; y: number }
+  | { k: 'tribute'; owner: number; from: number; gold: number; ids: number[]; x: number; y: number; stone?: number }
   /** A rival trader of `from`'s paid `owner` a toll of `gold` for safe passage across its land (#334). */
   | { k: 'toll'; owner: number; from: number; gold: number; id: number; x: number; y: number }
   | { k: 'campAlone'; owner: number; id: number; x: number; y: number; struck: boolean }

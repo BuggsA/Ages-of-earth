@@ -1,8 +1,9 @@
-import { DT, FLOCK, TICK_HZ, domainOf, secs } from './data';
+import { DT, FLOCK, NOMAD, TICK_HZ, domainOf, secs } from './data';
 import { DIRS, roll, spawnAnimal } from './animals';
 import { walkable } from './grid';
 import { seasonOf } from './seasons';
 import { isMobile } from './steppe';
+import { isNomad } from './nomad';
 import type { Spatial } from './spatial';
 import type { Animal, Building, GameState, Player, Unit } from './types';
 import { R_NONE, T_GRASS } from './types';
@@ -32,14 +33,17 @@ export function flockOf(s: GameState, owner: number): number {
   return n;
 }
 
-/** How many sheep a people can keep: `FLOCK.cap` for each Town Center, standing or on a wagon. */
+/** How many sheep a Town Center keeps: `FLOCK.cap`, and `NOMAD.cap` for a people born on the move. */
+export const capOf = (p: Player): number => (isNomad(p) ? NOMAD.cap : FLOCK.cap);
+
+/** How many sheep a people can keep: `capOf` for each Town Center, standing or on a wagon. */
 export function flockCap(s: GameState, owner: number): number {
   let n = 0;
   for (const e of s.ents) {
     if (e.owner !== owner || e.hp <= 0) continue;
     if (e.kind === 'building' ? e.type === 'towncenter' : e.type === 'wagon' && e.packed === 'towncenter') n++;
   }
-  return n * FLOCK.cap;
+  return n * capOf(s.players[owner]);
 }
 
 /** A flock's camp: the nearest Town Center of its people, standing or packed on a wagon, within `FLOCK.follow` tiles. */
@@ -79,7 +83,7 @@ export function lambProblem(s: GameState, p: Player, b: Building): string | null
   if (!isMobile(p)) return 'Only a steppe people raises flocks';
   if (b.type !== 'towncenter') return 'Lambs are raised at a Town Center';
   if (!b.built || b.hp <= 0) return 'It must stand finished first';
-  if (flockOf(s, p.id) >= flockCap(s, p.id)) return `The flock is full: ${FLOCK.cap} sheep for each Town Center`;
+  if (flockOf(s, p.id) >= flockCap(s, p.id)) return `The flock is full: ${capOf(p)} sheep for each Town Center`;
   if (!canAfford(p, FLOCK.cost)) return 'Not enough food';
   return null;
 }
@@ -94,12 +98,12 @@ export function raiseLamb(s: GameState, b: Building): Animal {
   return a;
 }
 
-/** A people new to the steppe drives its first sheep in: `FLOCK.start` beside each of its Town Centers. */
+/** A people new to the steppe drives its first sheep in: `FLOCK.start` beside each of its Town Centers (`NOMAD.start` for a people born on the move). */
 export function giftFlock(s: GameState, p: Player): void {
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.owner !== p.id || e.type !== 'towncenter' || !e.built || e.hp <= 0) continue;
-    for (let k = 0; k < FLOCK.start; k++) {
-      const spot = exitSpot(s, e, e.x + (k ? 3 : -3), e.y + 4);
+    for (let k = 0; k < (isNomad(p) ? NOMAD.start : FLOCK.start); k++) {
+      const spot = exitSpot(s, e, e.x + (k % 2 ? 3 : -3) + (k >> 1), e.y + 4 + (k >> 1));
       addSheep(s, p.id, spot.x, spot.y, false);
     }
   }
@@ -254,10 +258,10 @@ function crop(s: GameState, a: Animal): boolean {
   const y = Math.floor(a.y);
   if (!grassy(s, x, y)) return false;
   s.grazed ??= new Int32Array(s.w * s.h);
-  s.grazed[y * s.w + x] = s.tick + secs(FLOCK.regrow / seasonOf(s).grass);
+  s.grazed[y * s.w + x] = s.tick + secs((isNomad(s.players[a.owner!]) ? NOMAD.regrow : FLOCK.regrow) / seasonOf(s).grass);
   if (a.lamb !== undefined) return true;
   if ((a.milk ?? 0) < FLOCK.udder) {
-    a.milk = Math.min(FLOCK.udder, (a.milk ?? 0) + FLOCK.milk);
+    a.milk = Math.min(FLOCK.udder, (a.milk ?? 0) + (isNomad(s.players[a.owner!]) ? NOMAD.milk : FLOCK.milk));
     return true;
   }
   a.fat = Math.min(FLOCK.breed, (a.fat ?? 0) + FLOCK.fat);

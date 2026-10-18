@@ -1,4 +1,4 @@
-import { AGES, BUILDINGS, CIVS, LIGHTNING, PATHS, ROADS, STEP_BACK, TECHS, TICK_HZ, TRUNK, WAYS, secs, stepBackCost, type Age, type Deed, type Road } from './data';
+import { AGES, BUILDINGS, CIVS, LIGHTNING, NOMAD, PATHS, ROADS, STEP_BACK, TECHS, TICK_HZ, TRUNK, WAYS, secs, stepBackCost, type Age, type Deed, type Road } from './data';
 import type { AgeId, CivId, PathId, Building, BuildingType, Cost, GameState, Player, TechId, UnitType } from './types';
 
 /**
@@ -158,6 +158,7 @@ export function barred(p: Player, unit: UnitType, at?: BuildingType): string | n
 export function buildBarred(p: Player, type: BuildingType): string | null {
   const no = ageDef(p).noBuild;
   if (no && no.buildings.includes(type)) return no.why;
+  if (CIVS[p.civ].nomad && NOMAD.noBuild.includes(type)) return 'A people born on the move tills no fields and raises no walls';
   const way = p.way ? WAYS[p.way] : undefined;
   if (way?.shuts?.includes(type)) return `${way.name} raises no ${BUILDINGS[type].name}`;
   const only = BUILDINGS[type].ages;

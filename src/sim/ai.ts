@@ -29,10 +29,11 @@ import { consecrateProblem, consecrates } from './consecrate';
 import { sees } from './vision';
 import { seasonAt } from './seasons';
 import { flooded } from './flood';
-import { isHousehold } from './household';
+import { isHousehold, mineable } from './household';
+import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
-import { DEER, FLOOD, HOUSEHOLD, LEGION, POLIS, SNARE, SPOILS } from './data';
+import { DEER, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SNARE, SPOILS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
@@ -227,6 +228,9 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
     v.budget = { ...p.res };
   }
 
+  // A people born on the move (#501) raises its flock before its crowd: the sheep are its farm.
+  nomadLambs(s, v, issue);
+
   // People first: a growing town pays for everything else.
   const advancing = buildings.some((b) => b.advance >= 0);
   const queuedCitizens = buildings.reduce((n, b) => n + b.queue.filter((q) => q.unit === 'citizen').length, 0);
@@ -367,6 +371,19 @@ function trade(s: GameState, v: View, issue: (c: Command) => void): void {
     if (r === 'bloodiron' && stationsOf(s, p.id).length) continue;
     if ((p.rare?.[r] ?? 0) >= ORE_TRADE.lot) {
       issue({ t: 'trade', p: p.id, res: r, buy: false });
+      return;
+    }
+  }
+  // A nomad people (#501) digs no gold or stone: the herd and the timber are sold for gold, and stone is bought with it.
+  if (isNomad(p)) {
+    for (const r of ['food', 'wood'] as const) {
+      if (p.res[r] > NOMAD.aiSell && p.res.gold < NOMAD.aiGold && s.market[r] > MARKET.min + 10) {
+        issue({ t: 'trade', p: p.id, res: r, buy: false });
+        return;
+      }
+    }
+    if (p.res.stone < NOMAD.aiStone && p.res.gold >= s.market.stone + NOMAD.aiKeep) {
+      issue({ t: 'trade', p: p.id, res: 'stone', buy: true });
       return;
     }
   }
@@ -673,8 +690,8 @@ function forkTurn(s: GameState, v: View, mem: AiMemory): Journey | null {
  */
 function ironRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
-  // A household people (#501) digs no bog iron.
-  if (isHousehold(p)) return;
+  // A household people (#501) digs no bog iron, and nor does a nomad people.
+  if (isHousehold(p) || isNomad(p)) return;
   const road = roadsFrom(p).find((r) => r.to === 'iron');
   // Once the deed is dug, or the road given up, bog iron is only a poor gold mine: diggers go back to
   // what the town needs (#79). Left to it, they walked from one bog to the next all through the Stone Age.
@@ -1057,6 +1074,17 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     }
   }
 
+  // A nomad people (#501) pitches a second camp beside the first once the flock is full: the start's stone pays for it, and each camp feeds its own sheep.
+  if (isNomad(p) && L.clever && v.tc && !v.packing && !mem.steppe?.pack && v.citizens.length >= NOMAD.aiCampAt && v.buildings.filter((b) => b.type === 'towncenter').length < NOMAD.aiCamps && flockOf(s, p.id) >= flockCap(s, p.id) - 2 && !recently('towncenter', AI_HEART.retry)) {
+    const cost = raiseCost(s, p.id, 'towncenter', 0, 0);
+    if (RES.every((r) => !cost[r] || v.budget[r] >= cost[r]!)) {
+      const far = (tx: number, ty: number) => (tx - enemy.x) * (tx - enemy.x) + (ty - enemy.y) * (ty - enemy.y) >= (home.x - enemy.x) * (home.x - enemy.x) + (home.y - enemy.y) * (home.y - enemy.y);
+      const spot = findSpot(s, 'towncenter', home.x, home.y, NOMAD.aiCampFrom, NOMAD.aiCampTo, 1, far);
+      if (spot && construct(s, v, mem, 'towncenter', spot, AI_HEART.builders, issue)) return;
+      mem.ordered.towncenter = s.tick;
+    }
+  }
+
   // A reclaiming people raises what fell on the same ground again, at a fraction of the price.
   for (const f of s.fallen ?? []) {
     if (f.owner !== p.id || f.until <= s.tick || pending.length > 1 || recently(f.type, 8)) continue;
@@ -1205,7 +1233,7 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     // Relics lying loose are worth a Temple early.
     ['temple', clever && p.epoch >= 1 && n >= 16 && count(v, 'temple') === 0 && looseRelics(s) > 0],
     ['tower', p.epoch >= 1 && count(v, 'tower') < L.towers && n >= 16],
-    ['market', clever && p.epoch >= 1 && n >= 20 && count(v, 'market') === 0],
+    ['market', clever && p.epoch >= 1 && n >= (isNomad(p) ? NOMAD.aiMarket : 20) && count(v, 'market') === 0],
     ['workshop', clever && p.epoch >= 2 && n >= 20 && count(v, 'workshop') === 0],
     ['temple', clever && p.epoch >= 2 && n >= 22 && count(v, 'temple') === 0],
     ['barracks', p.epoch >= 2 && n >= 22 && count(v, 'barracks') < 2],
@@ -1317,7 +1345,7 @@ function wanted(v: View, cold = false): Record<Res, number> {
   for (const r of RES) {
     const stock = v.p.res[r];
     const lean = stock > 1200 ? 0.15 : stock > 700 ? 0.4 : stock > 400 ? 0.7 : stock < 80 ? 1.4 : 1;
-    weight[r] = share[r] * lean * (cold && r === 'food' ? 1 + AI_WINTER.food : 1) * (legionAtWork(v) && (r === 'wood' || r === 'stone') ? LEGION.aiCitizenWood : 1) * (r === 'gold' && isHousehold(v.p) ? 0 : 1);
+    weight[r] = share[r] * lean * (cold && r === 'food' ? 1 + AI_WINTER.food : 1) * (legionAtWork(v) && (r === 'wood' || r === 'stone') ? LEGION.aiCitizenWood : 1) * (!mineable(v.p, TILE_OF[r]) ? 0 : 1);
     total += weight[r];
   }
   const n = v.citizens.filter((u) => u.order.k !== 'build' && !u.inside).length;
@@ -1377,7 +1405,7 @@ function sendTo(s: GameState, v: View, u: Unit, res: Res, issue: (c: Command) =>
     }
     return false;
   }
-  if (res === 'gold' && isHousehold(v.p)) return false;
+  if (!mineable(v.p, TILE_OF[res])) return false;
   const from = nearestDropTo(v, u);
   let tile = findResource(s, TILE_OF[res], from.x, from.y, 26);
   if (tile < 0) tile = findResource(s, TILE_OF[res], u.x, u.y, 60);
@@ -1682,7 +1710,8 @@ function steppeRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) =>
   if (isMobile(p)) {
     (mem.steppe ??= {}).since ??= s.tick;
     v.hunt = { n: AI_STEPPE.hunters, r: AI_STEPPE.reach };
-    return;
+    // A people born on the move (#501) still raises the Hunting Camp that opens the steppe road, in the Stone Age.
+    if (!isNomad(p) || p.epoch !== 0) return;
   }
   if (p.epoch !== 0 || !walksWeb(v) || v.citizens.length < AI_STEPPE.at) return;
   const road = roadsFrom(p).find((r) => AGES[r.to].mobile);
@@ -1719,7 +1748,7 @@ function hordeClimb(s: GameState, v: View, mem: AiMemory): Road | null {
 function milkersWanted(s: GameState, v: View): number {
   const grown = grownSheep(s, v.p.id).length;
   const mem = s.ai[v.p.id];
-  return mem && hordeClimb(s, v, mem) ? Math.min(AI_HORDE.milkers, grown) : Math.ceil(grown / AI_STEPPE.perMilker);
+  return mem && hordeClimb(s, v, mem) ? Math.min(AI_HORDE.milkers, grown) : Math.ceil(grown / (isNomad(v.p) ? NOMAD.aiPerMilker : AI_STEPPE.perMilker));
 }
 
 /**
@@ -1763,6 +1792,19 @@ function tendFlock(s: GameState, v: View, issue: (c: Command) => void): void {
     .filter((u) => !u.inside && !u.queue.length && u.carry <= 2 && !v.diggers.has(u.id) && !v.claimers.has(u.id) && (u.order.k === 'idle' || u.order.k === 'milk' || (u.order.k === 'gather' && u.order.res === 'food')))
     .sort((a, b) => near(a, prey) - near(b, prey) || a.id - b.id)[0];
   if (butcher) issue({ t: 'hunt', p: p.id, ids: [butcher.id], target: prey.id });
+}
+
+/**
+ * A nomad computer (#501) raises a lamb whenever the flock is under `NOMAD.aiLambs` plus a sheep for every `NOMAD.aiPerSheep` citizens (and under its cap)
+ * and the food is there, ahead of the citizens the Town Center trains: a lamb pays for itself in milk before a citizen would in the fields.
+ */
+function nomadLambs(s: GameState, v: View, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!isNomad(p) || !v.tc || v.tc.advance >= 0 || v.packing) return;
+  const have = flockOf(s, p.id);
+  if (have >= flockCap(s, p.id) || have >= NOMAD.aiLambs + v.citizens.length / NOMAD.aiPerSheep || v.budget.food < (FLOCK.cost.food ?? 0)) return;
+  issue({ t: 'lamb', p: p.id, building: v.tc.id });
+  spend(v, FLOCK.cost);
 }
 
 /** Sixteen ways out from camp, a compass's points and the points between them (unit length, no trigonometry). */

@@ -34,6 +34,7 @@ import { modsOf, trainTimeFor } from './stats';
 import { attrition } from './borders';
 import { tributeStep } from './tribute';
 import { householdStep } from './household';
+import { isNomad } from './nomad';
 import { seraiStep, tollStep } from './passage';
 import { mercStep } from './merc';
 import { KIN } from './data';
@@ -178,6 +179,8 @@ export function createGame(setup: GameSetup): GameState {
       u.guardX = u.x;
       u.guardY = u.y;
     }
+    // Born on the move (#501): a nomad people starts with its flock about the camp.
+    if (isNomad(p)) giftFlock(s, p);
   }
   if (s.mode === 'regicide') {
     // Each people's King starts by the Town Center.
@@ -242,7 +245,7 @@ function spatial(s: GameState): Spatial {
 export function enterAge(s: GameState, p: Player, to: AgeId, back = false): void {
   const tier = AGES[to].tier;
   // The first steps onto the steppe bring the herds (#308).
-  const herds = !!AGES[to].mobile && !p.walked?.includes(to);
+  const herds = !!AGES[to].mobile && !p.walked?.includes(to) && !isNomad(p);
   restat(s, p, () => {
     p.epoch = tier;
     p.age = to;

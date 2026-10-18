@@ -1184,7 +1184,7 @@ export class View {
           for (const id of ev.ids) {
             const u = s.byId.get(id);
             if (!u || (ev.owner !== this.viewer && !this.sees(u.x, u.y))) continue;
-            this.effects.burst(this.ground(s, u.x, u.y, 1.5), { count: 3, speed: 0.3, up: 0.8, life: 0.8, size: 0.045, gravity: 1.2, colors: ['#ffd166', '#f2cf4a', '#fff3c4'] });
+            this.effects.burst(this.ground(s, u.x, u.y, 1.5), { count: 3, speed: 0.3, up: 0.8, life: 0.8, size: 0.045, gravity: 1.2, colors: ev.stone ? ['#ffd166', '#f2cf4a', '#a8a39a'] : ['#ffd166', '#f2cf4a', '#fff3c4'] });
           }
           if (ev.owner === this.viewer && (s.tick - this.tributeCue > TICK_HZ * 6 || s.tick < this.tributeCue)) {
             this.tributeCue = s.tick;

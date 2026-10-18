@@ -219,6 +219,23 @@ export class BuildingsView {
       lantern.visible = false;
       group.add(lantern);
     }
+    // Born on the move (#501): the Mongol camp plants a horsetail standard (the tug) before its Town Center.
+    if (k.type === 'towncenter' && CIVS[s.players[k.owner]?.civ]?.nomad) {
+      const tug = new THREE.Group();
+      const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 2.3, 5), lanternPole);
+      staff.position.y = 1.15;
+      const crown = new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 4), tugTail);
+      crown.position.y = 2.35;
+      tug.add(staff, crown);
+      for (let i = 0; i < 4; i++) {
+        const tail = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.8, 4), i % 2 ? tugTail : tugPale);
+        tail.position.set(Math.cos(i * 1.57) * 0.14, 1.95, Math.sin(i * 1.57) * 0.14);
+        tail.rotation.set(Math.sin(i * 1.57) * 0.25, 0, -Math.cos(i * 1.57) * 0.25);
+        tug.add(tail);
+      }
+      tug.position.set(-k.size / 2 - 0.4, 0, k.size / 2 + 0.2);
+      group.add(tug);
+    }
     this.group.add(group);
     return { group, body, site, scaffold, key, base, flood, lantern };
   }
@@ -239,6 +256,8 @@ export class BuildingsView {
 
 const floodMaterial = new THREE.MeshStandardMaterial({ color: '#6f8f86', roughness: 0.35, metalness: 0.05, transparent: true, opacity: 0.82 });
 const lanternPole = new THREE.MeshStandardMaterial({ color: '#5a3b24', flatShading: true });
+const tugTail = new THREE.MeshStandardMaterial({ color: '#2a2018', flatShading: true });
+const tugPale = new THREE.MeshStandardMaterial({ color: '#e8e0cc', flatShading: true });
 const lanternRed = new THREE.MeshStandardMaterial({ color: '#c9382e', emissive: '#7a1a14', flatShading: true });
 const plinthMaterial = inject(new THREE.MeshStandardMaterial({ color: '#8d7a62', flatShading: true, roughness: 1 }), {});
 

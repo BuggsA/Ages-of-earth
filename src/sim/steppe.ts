@@ -1,5 +1,6 @@
 import { BUILDINGS, DT, STEPPE } from './data';
 import { ageDef } from './ages';
+import { isNomad } from './nomad';
 import { placeProblem, stampBuilding } from './grid';
 import { ungarrison } from './units';
 import { maxHp, placeBuilding, spawnUnit } from './world';
@@ -10,8 +11,8 @@ import type { Building, BuildingType, GameState, Player, Unit } from './types';
  * and pitched again, where it raises itself. The numbers are `STEPPE` in `data.ts`.
  */
 
-/** Whether the player's age lets them pack their town onto wagons. */
-export const isMobile = (p: Player): boolean => !!ageDef(p).mobile;
+/** Whether the player's age lets them pack their town onto wagons, or their people was born on the move (#501: the Mongols, from the Stone Age). */
+export const isMobile = (p: Player): boolean => !!ageDef(p).mobile || isNomad(p);
 
 /** What the player's age packs onto wagons: Town Centers and Houses, and on the Silk Road the Market (#326). */
 export const packsOf = (p: Player): BuildingType[] => {

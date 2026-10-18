@@ -2352,7 +2352,7 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         const rate = (ev.gold / TRIBUTE.every).toFixed(1);
         if (ev.owner === viewer && fresh(tributeToast.took, 60)) {
           tributeToast.took = s.tick;
-          hud.toast(`🐎 Your riders exact tribute from ${s.players[ev.from].name}: ${rate} gold a second while they stand in its land`, 'good');
+          hud.toast(`🐎 Your riders exact tribute from ${s.players[ev.from].name}: ${rate} gold${ev.stone ? ` and ${(ev.stone / TRIBUTE.every).toFixed(1)} stone` : ''} a second while they stand in its land`, 'good');
         } else if (ev.from === viewer && fresh(tributeToast.paid, 30)) {
           tributeToast.paid = s.tick;
           hud.toast(`🐎 ${s.players[ev.owner].name}'s horde exacts tribute in your land (${rate} gold a second): drive its riders off with spears and towers`, 'alert');
