@@ -5,7 +5,7 @@ import { heightAt } from './terrain';
 
 /**
  * Carrion crows: by day a few black crows wheel over each carcass that has begun to turn (past `ROT.grace`)
- * and perch near it once it is mostly gone, a tell you can read from the camera that meat is spoiling and
+ * and land and hop about it once it is mostly gone, a tell you can read from the camera that meat is spoiling and
  * that wolves may come. Render only: nothing in the rules sees them.
  */
 
@@ -15,6 +15,7 @@ const PER = 5;
 const vertex = /* glsl */ `
   attribute vec4 aSeed;
   attribute vec3 aSite;
+  attribute float aPerch;
   uniform float uTime;
   uniform float uScale;
   varying float vAlpha;
@@ -26,12 +27,15 @@ const vertex = /* glsl */ `
     float a = t * (0.45 + s.x * 0.3) * (s.y > 0.5 ? 1.0 : -1.0) + s.z * 6.283;
     float r = 1.2 + s.y * 1.4 + 0.4 * sin(t * 0.3 + s.z * 20.0);
     float h = 2.0 + s.x * 1.6 + sin(t * 0.9 + s.z * 30.0) * 0.4;
-    vec3 p = aSite + vec3(cos(a) * r, h, sin(a) * r);
+    // Once the meat is nearly gone they drop to the ground and hop about it.
+    float pr = 0.35 + s.y * 0.7;
+    vec3 ground = vec3(cos(s.z * 6.283) * pr, 0.08 + max(0.0, sin(uTime * (2.0 + s.x * 2.0) + s.z * 50.0)) * 0.12 * step(0.8, fract(s.x * 7.0 + uTime * 0.15)), sin(s.z * 6.283) * pr);
+    vec3 p = aSite + mix(vec3(cos(a) * r, h, sin(a) * r), ground, aPerch);
     vec4 mv = viewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * mv;
     gl_PointSize = clamp(uScale * 0.8 / max(0.5, -mv.z), 6.0, 40.0);
     vAlpha = aSite.y < -500.0 ? 0.0 : 1.0;
-    vFlap = sin(uTime * (7.0 + aSeed.w * 3.0) + s.x * 60.0);
+    vFlap = mix(sin(uTime * (7.0 + aSeed.w * 3.0) + s.x * 60.0), -0.6, aPerch);
   }
 `;
 
@@ -52,14 +56,23 @@ const fragment = /* glsl */ `
   }
 `;
 
+/** A spoiling carcass on the ground; `perch` is 0 while crows circle and 1 once the meat is nearly gone and they have landed. */
+export class Site extends THREE.Vector3 {
+  perch = 0;
+}
+
 /** The tiles of carcasses that have begun to turn and are in sight, as world positions on the ground. */
-export function spoilingSites(s: GameState, sees: (x: number, y: number) => boolean): THREE.Vector3[] {
-  const out: THREE.Vector3[] = [];
+export function spoilingSites(s: GameState, sees: (x: number, y: number) => boolean): Site[] {
+  const out: Site[] = [];
   for (const c of s.carcasses ?? []) {
     if (s.tick - c.born < ROT.grace * TICK_HZ) continue;
     const x = (c.tile % s.w) + 0.5;
     const y = Math.floor(c.tile / s.w) + 0.5;
-    if (s.amount[c.tile] > 0 && sees(x, y)) out.push(new THREE.Vector3(x, heightAt(s, x, y), y));
+    if (s.amount[c.tile] > 0 && sees(x, y)) {
+      const site = new Site(x, heightAt(s, x, y), y);
+      site.perch = Math.max(0, Math.min(1, (0.4 - s.amount[c.tile] / Math.max(1, c.full)) / 0.15));
+      out.push(site);
+    }
   }
   return out;
 }
@@ -68,6 +81,7 @@ export class Crows {
   readonly points: THREE.Points;
   private u: Record<string, THREE.IUniform>;
   private site: THREE.BufferAttribute;
+  private perch: THREE.BufferAttribute;
   /** The spoiling carcass nearest the camera while crows are drawn, for their calls; else null. */
   nearest: THREE.Vector3 | null = null;
 
@@ -79,6 +93,8 @@ export class Crows {
     g.setAttribute('aSeed', new THREE.BufferAttribute(seed, 4));
     this.site = new THREE.BufferAttribute(new Float32Array(SITES * PER * 3).fill(-1000), 3);
     g.setAttribute('aSite', this.site);
+    this.perch = new THREE.BufferAttribute(new Float32Array(SITES * PER), 1);
+    g.setAttribute('aPerch', this.perch);
     this.u = { uTime: { value: 0 }, uScale: { value: 600 }, uOpacity: { value: 0 } };
     this.points = new THREE.Points(
       g,
@@ -94,7 +110,7 @@ export class Crows {
   }
 
   /** The nearest `SITES` spoiling carcasses to the camera draw crows. */
-  update(time: number, sites: readonly THREE.Vector3[], target: THREE.Vector3, pixelRatio: number, viewHeight: number, on: boolean): void {
+  update(time: number, sites: readonly Site[], target: THREE.Vector3, pixelRatio: number, viewHeight: number, on: boolean): void {
     this.points.visible = on && sites.length > 0 && (this.u.uOpacity.value as number) > 0.05;
     this.nearest = null;
     if (!this.points.visible) return;
@@ -112,6 +128,9 @@ export class Crows {
       }
     }
     this.nearest = near[0] ?? null;
+    const pa = this.perch.array as Float32Array;
+    for (let i = 0; i < SITES; i++) for (let j = 0; j < PER; j++) pa[i * PER + j] = near[i]?.perch ?? 0;
     this.site.needsUpdate = true;
+    this.perch.needsUpdate = true;
   }
 }
