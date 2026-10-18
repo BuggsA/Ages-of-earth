@@ -1459,10 +1459,10 @@ export const HOUSEHOLD = { every: 5, gold: 0.12, street: 0.04, streetMax: 4, rea
  * from the first Stable (the civ's `tribute` mod) and also `stone` times as much in stone, from the rival's stores. The computer raises
  * lambs before citizens until the flock is `aiLambs` and one for each `aiPerSheep` citizens (one milker for each `aiPerMilker` grown sheep), raises
  * a Market from `aiMarket` citizens, sells food and wood over `aiSell` while its gold is under `aiGold`, and buys stone when it has
- * under `aiStone` and a Keep's worth (`aiKeep`) of gold to spare. With `aiCampAt` citizens and a full flock it pitches a second camp
+ * under `aiStone` and a Keep's worth (`aiKeep`) of gold to spare. From `aiCampAfter` seconds, with `aiCampAt` citizens and a full flock it pitches a second camp
  * (up to `aiCamps` Town Centers) `aiCampFrom` to `aiCampTo` tiles from the first, paid with the stone it started with.
  */
-export const NOMAD = { noBuild: ['farm', 'wall', 'gate'] as BuildingType[], stone: 0.5, start: 4, cap: 12, milk: 4, milkSpeed: 1.8, regrow: 20, aiLambs: 2, aiPerSheep: 3, aiPerMilker: 2, aiCampAt: 16, aiCamps: 2, aiCampFrom: 9, aiCampTo: 16, aiMarket: 12, aiSell: 450, aiGold: 800, aiStone: 80, aiKeep: 150 };
+export const NOMAD = { noBuild: ['farm', 'wall', 'gate'] as BuildingType[], stone: 0.5, start: 4, cap: 12, milk: 4, milkSpeed: 1.8, regrow: 20, aiLambs: 2, aiPerSheep: 3, aiPerMilker: 2, aiCampAfter: 180, aiCampAt: 16, aiCamps: 2, aiCampFrom: 9, aiCampTo: 16, aiMarket: 12, aiSell: 450, aiGold: 800, aiStone: 80, aiKeep: 150 };
 
 /**
  * The Nile flood (#501 s1): in season `season` (summer) the fields of a flood people lie under the river and yield nothing,

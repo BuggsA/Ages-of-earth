@@ -1078,7 +1078,7 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   }
 
   // A nomad people (#501) pitches a second camp beside the first once the flock is full: the start's stone pays for it, and each camp feeds its own sheep.
-  if (isNomad(p) && L.clever && v.tc && !v.packing && !mem.steppe?.pack && v.citizens.length >= NOMAD.aiCampAt && v.buildings.filter((b) => b.type === 'towncenter').length < NOMAD.aiCamps && flockOf(s, p.id) >= flockCap(s, p.id) - 2 && !recently('towncenter', AI_HEART.retry)) {
+  if (isNomad(p) && L.clever && s.tick >= secs(NOMAD.aiCampAfter) && v.tc && !v.packing && !mem.steppe?.pack && v.citizens.length >= NOMAD.aiCampAt && v.buildings.filter((b) => b.type === 'towncenter').length < NOMAD.aiCamps && flockOf(s, p.id) >= flockCap(s, p.id) - 2 && !recently('towncenter', AI_HEART.retry)) {
     const cost = raiseCost(s, p.id, 'towncenter', 0, 0);
     if (RES.every((r) => !cost[r] || v.budget[r] >= cost[r]!)) {
       const far = (tx: number, ty: number) => (tx - enemy.x) * (tx - enemy.x) + (ty - enemy.y) * (ty - enemy.y) >= (home.x - enemy.x) * (home.x - enemy.x) + (home.y - enemy.y) * (home.y - enemy.y);
