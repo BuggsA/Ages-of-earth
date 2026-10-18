@@ -1449,7 +1449,7 @@ export const NOMAD = { house: 2, stone: 0.6, aiStone: 160, aiGold: 220, aiMarket
  * arms at most `aiShare` of its citizens and keeps `aiKeep` at work, answers a raid of `aiThreat` or more, and lays arms down `aiRest`
  * seconds after arming at the soonest.
  */
-export const POLIS = { arm: { wood: 20 } as Cost, home: 14, aiShare: 0.5, aiKeep: 8, aiRest: 90, aiThreat: 3 };
+export const POLIS = { arm: { wood: 20 } as Cost, home: 14, aiShare: 0.5, aiKeep: 8, aiRest: 90, aiThreat: 3, harvest: 2 };
 
 /**
  * The legion (#501, the Romans): a legion people keeps only `citizens` (+ `perEpoch` for each epoch past the first) citizens, so its
