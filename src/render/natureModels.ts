@@ -207,6 +207,25 @@ function carcass(): Kit {
   return k;
 }
 
+/** A carcass that has begun to turn (#521's crows come for it): greyed hide, ribs showing, the pool gone dark. */
+function carcassRotten(): Kit {
+  const k = new Kit();
+  const coat = '#7d6d58';
+  const body = k.group(0, 0.07, 0);
+  body.rotation.z = Math.PI / 2;
+  k.box(0.12, 0.11, 0.34, coat, 0, 0, 0, body);
+  for (let i = 0; i < 4; i++) k.box(0.1, 0.012, 0.02, '#ddd4bf', -0.02, 0.06, -0.1 + i * 0.07, body);
+  for (const [z, a] of [[0.12, 0.3], [-0.12, -0.2]]) {
+    const leg = k.box(0.24, 0.03, 0.035, coat, 0.17, 0.05 + a * 0.02, z);
+    leg.rotation.y = a;
+  }
+  const head = k.box(0.07, 0.06, 0.13, '#6e6050', -0.02, 0.04, 0.26);
+  head.rotation.y = 0.4;
+  k.box(0.14, 0.012, 0.12, '#3c2a22', 0.05, 0.0, -0.05);
+  k.box(0.06, 0.012, 0.08, '#4a3326', -0.12, 0.0, 0.08);
+  return k;
+}
+
 /** A shoal of fish at the surface: a dark patch, silver backs breaking the water, one leaping. */
 function fish(): Kit {
   const k = new Kit();
@@ -229,7 +248,7 @@ function fish(): Kit {
   return k;
 }
 
-const MAKERS = { pine, broadleaf, birch, palm, felled, berryBush, stoneDeposit, goldDeposit, bogIron, saltVein, caveMouth, saltpetreVein, bloodIronVein, carcass, tuft, flowers, pebbles, boulder, fish };
+const MAKERS = { pine, broadleaf, birch, palm, felled, berryBush, stoneDeposit, goldDeposit, bogIron, saltVein, caveMouth, saltpetreVein, bloodIronVein, carcass, carcassRotten, tuft, flowers, pebbles, boulder, fish };
 export type NatureKind = keyof typeof MAKERS;
 
 const cache = new Map<NatureKind, THREE.BufferGeometry>();
