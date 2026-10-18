@@ -14,7 +14,7 @@ import { claimants, favours, landmarkAt } from './landmarks';
 import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple, TILE_OF_RARE } from './units';
 import { goalForPost, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { findRoute } from './path';
-import { isEnemy, maxHp } from './world';
+import { isEnemy, maxHp, townCenters } from './world';
 import { callUpProblem } from './warcamp';
 import { GRAFTABLE, bleeds, bloodOf, cursed, grafted, levyProblem, levyWait, sworn } from './blood';
 import { offeringOf, riteProblem } from './fork';
@@ -22,7 +22,7 @@ import { graftCost, stationsOf, waiting } from './hemo';
 import { borderMap, landOwnerAt, suppliedAt } from './borders';
 import { workProblem } from './works';
 import { aiKin, aiVow, aiWay, wayBarred } from './ways';
-import { AI_WAYS, KIN, WAYS } from './data';
+import { AI_WAYS, KILL_CAMP, KIN, WAYS } from './data';
 import { beaconProblem, lit } from './beacon';
 import { rallyProblem } from './rally';
 import { consecrateProblem, consecrates } from './consecrate';
@@ -1114,6 +1114,11 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   // The turning year (#479): ice ahead (autumn, for the clever) or on the mere, a boat feeds a third as many.
   const boatsFeed = s.homeland === 'shore' ? Math.round(v.fishers.length * (coldComing_ || catchOf(s) < 1 ? YEAR.ice : 1)) : 0;
   const foodWanted = Math.round(wanted(v).food) - (berries >= 0 && !coldComing_ ? 6 : 0) + (coldComing_ ? AI_WINTER.fields : 0) - boatsFeed;
+  // The Hunters on the Herd Plains (#529) sow while their spared herd is away on its autumn trek: in summer, its ground
+  // still shut, they put by the wood for `AI_WAYS.trekFields` fields, so the fields go up as soon as the herd is gone.
+  if (L.clever && p.way === 'hunt' && p.epoch === 0 && s.homeland === 'herds' && seasonAt(s) === 1 && farms < AI_WAYS.trekFields && wayBarred(s, p, 'farm')) {
+    spend(v, { wood: (buildingCostFor(s, p.id, 'farm').wood ?? 0) * (AI_WAYS.trekFields - farms) });
+  }
   if (farms < foodWanted && freeFields < 2 && !recently('farm', 2) && !buildBarred(p, 'farm') && !wayBarred(s, p, 'farm')) {
     const spot = findSpot(s, 'farm', home.x, home.y, 3, 16);
     if (spot && construct(s, v, mem, 'farm', spot, 1, issue)) return;
@@ -1298,11 +1303,16 @@ function huntTheYear(s: GameState, v: View, issue: (c: Command) => void): void {
  * A clever computer leaves `YEAR.spare` of each of its own home herds alive on the Herd Plains, so they come
  * home in spring with calves (#479), and a pair (`DEER.pair`) of every wild herd in the Stone Age, when game is
  * what it lives on; a wild herd breeds each spring (#491). A rival's herd it hunts down gladly. Undefined where nothing is spared.
+ * A people of the Hunters' Way on the Herd Plains spares no wild deer within `KILL_CAMP.home` of its Town Centers (#529):
+ * they bar the fields it sows while its own herd is away on the trek.
  */
 export function spared(s: GameState, p: Player): ((a: Animal) => boolean) | undefined {
   if (!AI_LEVELS[p.ai!].clever) return undefined;
+  const tcs = p.way === 'hunt' && p.epoch === 0 && s.homeland === 'herds' ? townCenters(s, p.id) : [];
+  const r2 = KILL_CAMP.home * KILL_CAMP.home;
+  const fields = (a: Animal) => tcs.some((b) => (a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y) <= r2);
   // A herd is spared at its own count: a town's at `YEAR.spare`, a wild one at `DEER.pair`.
-  const keep = (a: Animal) => (a.town === p.id && s.homeland === 'herds' ? YEAR.spare : a.town === undefined && p.epoch === 0 ? DEER.pair : -1);
+  const keep = (a: Animal) => (a.town === p.id && s.homeland === 'herds' ? YEAR.spare : a.town === undefined && p.epoch === 0 && !fields(a) ? DEER.pair : -1);
   const left = new Map<number, number>();
   for (const a of s.animals) if (a.kind === 'deer' && a.hp > 0 && keep(a) >= 0) left.set(a.herd ?? a.id, (left.get(a.herd ?? a.id) ?? 0) + 1);
   if (!left.size) return undefined;

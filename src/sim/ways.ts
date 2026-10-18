@@ -2,6 +2,7 @@ import { BUILDINGS, KILL_CAMP, KIN, RAID, WAY, WAYS, WAY_IDS, WAY_LEAN, secs } f
 import { seasonAt } from './seasons';
 import { canAfford, isEnemy, pay, restat, townCenters } from './world';
 import { RES, R_BERRY, R_MEAT } from './types';
+import { herdsOut } from './year';
 import type { Building, BuildingType, GameState, Player, Unit, WayId } from './types';
 
 /** Ways (#336): why a people can't take this one now, or null if they can. */
@@ -126,13 +127,18 @@ export function killCamp(s: GameState, owner: number, type: BuildingType, tx: nu
 /** As long as a Town Center's queue may grow (`MAX_QUEUE` in `commands.ts`). */
 const KIN_QUEUE = 6;
 
-/** Game (deer, boars, mammoths) living within `KILL_CAMP.home` tiles of one of `owner`'s Town Centers. */
+/**
+ * Game (deer, boars, mammoths) living within `KILL_CAMP.home` tiles of one of `owner`'s Town Centers. On the Herd Plains a
+ * town's own herd is away on its trek in autumn and winter (#529), wherever its stragglers graze: its ground lies open to
+ * the plough until the herd comes home. Wild game and a rival's herd count all year.
+ */
 export function herdAtHome(s: GameState, owner: number): number {
   const r2 = KILL_CAMP.home * KILL_CAMP.home;
   const tcs = townCenters(s, owner);
+  const away = herdsOut(s);
   let n = 0;
   for (const a of s.animals) {
-    if (a.hp <= 0 || (a.kind !== 'deer' && a.kind !== 'boar' && a.kind !== 'mammoth')) continue;
+    if (a.hp <= 0 || (a.kind !== 'deer' && a.kind !== 'boar' && a.kind !== 'mammoth') || (away && a.town === owner)) continue;
     if (tcs.some((b) => (a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y) <= r2)) n++;
   }
   return n;
@@ -146,7 +152,9 @@ export function wayBarred(s: GameState, p: Player, type: BuildingType): string |
   const way = p.way ? WAYS[p.way] : undefined;
   if (p.epoch !== 0 || !way?.herdShuts?.includes(type)) return null;
   const n = herdAtHome(s, p.id);
-  return n ? `${way.name} sows nothing where the herd grazes: ${n} ${n === 1 ? 'beast lives' : 'beasts live'} within ${KILL_CAMP.home} tiles of your Town Center` : null;
+  // On the Herd Plains, a town whose own herd is all that bars it is told when the ground opens (#529).
+  const trek = s.homeland === 'herds' && !herdsOut(s) && s.animals.some((a) => a.town === p.id && a.hp > 0) ? '; your herd treks out in autumn, and the ground opens till spring' : '';
+  return n ? `${way.name} sows nothing where the herd grazes: ${n} ${n === 1 ? 'beast lives' : 'beasts live'} within ${KILL_CAMP.home} tiles of your Town Center${trek}` : null;
 }
 
 /** How many kin answer a call now: more in winter, when the hearth is warmest. */
