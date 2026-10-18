@@ -68,6 +68,8 @@ export class Crows {
   readonly points: THREE.Points;
   private u: Record<string, THREE.IUniform>;
   private site: THREE.BufferAttribute;
+  /** The spoiling carcass nearest the camera while crows are drawn, for their calls; else null. */
+  nearest: THREE.Vector3 | null = null;
 
   constructor() {
     const seed = new Float32Array(SITES * PER * 4);
@@ -94,6 +96,7 @@ export class Crows {
   /** The nearest `SITES` spoiling carcasses to the camera draw crows. */
   update(time: number, sites: readonly THREE.Vector3[], target: THREE.Vector3, pixelRatio: number, viewHeight: number, on: boolean): void {
     this.points.visible = on && sites.length > 0 && (this.u.uOpacity.value as number) > 0.05;
+    this.nearest = null;
     if (!this.points.visible) return;
     this.u.uTime.value = time;
     this.u.uScale.value = viewHeight * pixelRatio;
@@ -108,6 +111,7 @@ export class Crows {
         a[k + 2] = r ? r.z : 0;
       }
     }
+    this.nearest = near[0] ?? null;
     this.site.needsUpdate = true;
   }
 }
