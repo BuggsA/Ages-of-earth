@@ -130,6 +130,7 @@ export class View {
   private crows = new Crows();
   private owlLevel = 0;
   private nextHoot = 12;
+  private nextCaw = 6;
   private nextGull = 8;
   private nextSong = 5;
   private nextHum = 3;
@@ -477,6 +478,12 @@ export class View {
     this.birds.update(this.time, dt, this.rig.target, this.rig.distance);
     this.fireflies.update(this.time, this.rig.target, this.rig.distance, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
     this.owls.update(this.time, this.rig.target, this.rig.distance, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
+    // By day, over a turning carcass, the crows call.
+    const crowSite = this.crows.nearest;
+    if (crowSite && this.time > this.nextCaw) {
+      this.nextCaw = this.time + 7 + Math.random() * 12;
+      this.cue('caw', crowSite.x, crowSite.z, 0.5);
+    }
     // Now and then, from somewhere in the dark, a hoot.
     if (this.owlLevel > 0.3 && this.time > this.nextHoot) {
       this.nextHoot = this.time + 18 + Math.random() * 30;
