@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { rankOf } from '../sim/combat';
+import { legionary } from '../sim/legion';
 import { BOAR, MAMMOTH, RAIDER, SIGNATURES, TICK_HZ, WOLF, domainOf, unitStats } from '../sim/data';
 import type { Animal, CivId, GameState, Unit, UnitType } from '../sim/types';
 import { unitMaterial } from './materials';
 import { heightAt } from './terrain';
-import { boarGeometry, deerGeometry, mammothGeometry, raiderGeometry, sheepGeometry, THRALL_MODEL, unitGeometry, wolfGeometry } from './unitModels';
+import { boarGeometry, deerGeometry, mammothGeometry, raiderGeometry, sheepGeometry, LEGION_MODEL, THRALL_MODEL, unitGeometry, wolfGeometry } from './unitModels';
 import { WATER_Y } from './water';
 
 /** Units are drawn a little larger than their footprint in the rules, so they read well from above. */
@@ -279,7 +280,7 @@ export class UnitsView {
       // Those sheltering inside a building aren't drawn.
       if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !visible(e)) continue;
       show.push(e);
-      const key = `${e.type}:${modelEpoch(e, s.players[e.owner].epoch)}:${markOf(s, e.type, e.owner) ?? ''}`;
+      const key = `${e.type}:${modelEpoch(s, e, s.players[e.owner].epoch)}:${markOf(s, e.type, e.owner) ?? ''}`;
       need.set(key, (need.get(key) ?? 0) + 1);
     }
     for (const c of this.corpses) {
@@ -420,7 +421,7 @@ export class UnitsView {
         bob = 0;
         lift = 0;
       }
-      const b = this.batch(u.type, modelEpoch(u, epoch), markOf(s, u.type, u.owner));
+      const b = this.batch(u.type, modelEpoch(s, u, epoch), markOf(s, u.type, u.owner));
       const i = b.count++;
       this.e.set(pitch, yaw, roll);
       this.q.setFromEuler(this.e);
@@ -512,15 +513,17 @@ export class UnitsView {
   }
 }
 
-/** Which model to draw: a trader heading home with gold has its own (the epoch plus 10). */
 /** The people whose mark a unit wears: only a signature line carries one. */
 function markOf(s: GameState, type: UnitType, owner: number): CivId | undefined {
   const civ = s.players[owner].civ;
   return SIGNATURES[civ].type === type ? civ : undefined;
 }
 
-function modelEpoch(u: Unit, epoch: number): number {
+/** Which model to draw: a trader heading home with gold (the epoch plus 10), a thrall or a legionary at work have their own. */
+function modelEpoch(s: GameState, u: Unit, epoch: number): number {
   if (u.thrall && u.type === 'citizen') return epoch + THRALL_MODEL;
+  // A legionary at the axe, the quarry or a foundation (#501) carries his tools on his back.
+  if (legionary(s, u) && (u.order.k === 'gather' || u.order.k === 'build')) return epoch + LEGION_MODEL;
   // A loaded trader is drawn with its gold; a wagon carrying a Market (the Silk Road, #326) as the caravan cart.
   return u.type === 'trader' && u.carry > 0 ? epoch + 10 : u.type === 'wagon' && u.packed === 'market' ? epoch + 20 : epoch;
 }

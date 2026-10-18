@@ -1124,7 +1124,22 @@ const MAKERS: Record<UnitType, (epoch: number) => Kit> = { citizen, infantry, ra
 /** Epoch + 30 asks for the citizen as a thrall (the same offset trick as the trader's gold and the caravan cart). */
 export const THRALL_MODEL = 30;
 
+/** Epoch + 40 asks for a foot soldier at work: the legion's tools on his back (#501). */
+export const LEGION_MODEL = 40;
+
+function legionary(epoch: number): Kit {
+  const k = infantry(epoch);
+  // A satchel on the back, an axe hafted through its strap, and a coil of rope: a Roman soldier carries his own tools.
+  k.box(0.11, 0.12, 0.05, LEATHER, 0, 0.24, -0.1);
+  k.box(0.115, 0.02, 0.055, '#5a3c20', 0, 0.3, -0.1);
+  k.cyl(0.011, 0.011, 0.3, 4, WOOD, 0.06, 0.28, -0.13).rotation.z = 0.35;
+  k.box(0.07, 0.045, 0.012, STEEL, 0.13, 0.42, -0.13).rotation.z = 0.35;
+  k.cyl(0.03, 0.03, 0.04, 8, '#b09a6a', -0.06, 0.2, -0.14).rotation.x = Math.PI / 2;
+  return k;
+}
+
 function makeUnit(type: UnitType, epoch: number): Kit {
+  if (type === 'infantry' && epoch >= LEGION_MODEL) return legionary(epoch - LEGION_MODEL);
   return type === 'citizen' && epoch >= THRALL_MODEL ? thrall(epoch - THRALL_MODEL) : MAKERS[type](epoch);
 }
 

@@ -31,7 +31,8 @@ import { seasonAt } from './seasons';
 import { flooded } from './flood';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
-import { DEER, FLOOD, POLIS, SNARE, SPOILS } from './data';
+import { DEER, FLOOD, LEGION, POLIS, SNARE, SPOILS } from './data';
+import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
 import { isRider, standing } from './tribute';
@@ -148,6 +149,24 @@ interface View {
   hunt: { n: number; r: number };
   /** About to strike camp (#320): the Town Center starts nothing new, so its queue empties and it can pack. */
   packing: boolean;
+  /** The town's working hands: its citizens, and a legion's foot soldiers too (#501). */
+  hands: number;
+}
+
+/** A foot soldier of a legion's town counts among its hands (#501). */
+const legionHand = (u: Unit): boolean => u.type === 'infantry' && !u.thrall && !u.inside;
+
+/** A legion's soldier at the axe or the quarry with little in hand: free for a hunt or a raid like an idle one (#501). */
+const atTheAxe = (v: View, u: Unit): boolean => isLegion(v.p) && legionHand(u) && u.order.k === 'gather' && u.carry <= 2;
+
+/** The legion's soldiers free to work: idle or already at the axe, the quarry or a foundation (never those in a fight or a wave). */
+/** Whether a legion's town is far enough along for its soldiers to carry the wood and stone: at least two are already at the axe or the quarry, in an epoch the computer works them in. */
+function legionAtWork(v: View): boolean {
+  return isLegion(v.p) && v.p.epoch <= LEGION.aiUntil && v.army.filter((u) => legionHand(u) && u.order.k === 'gather').length >= 2;
+}
+
+function legionHands(v: View): Unit[] {
+  return isLegion(v.p) && v.p.epoch <= LEGION.aiUntil ? v.army.filter((u) => legionHand(u) && (u.order.k === 'idle' || u.order.k === 'gather' || u.order.k === 'build')) : [];
 }
 
 function afford(v: View, cost: Cost): boolean {
@@ -186,7 +205,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   // A steppe camp on the move (#320): home is where its Town Center is being driven or pitched.
   const moving = tc ? null : (buildings.find((b) => b.type === 'towncenter' && b.pitch !== undefined) ?? wagons.find((w) => w.packed === 'towncenter') ?? null);
   const home = tc ? { x: tc.x, y: tc.y } : moving ? { x: moving.x, y: moving.y } : { x: p.startX, y: p.startY };
-  const v: View = { p, citizens, army, priests, traders, cogs, fishers, navy, planes, buildings, home, tc, budget: { ...p.res }, plan: NO_PLAN, diggers: new Set(), armyFirst: false, claimers: new Set(), wagons, hunt: { n: 3, r: 16 }, packing: !!mem.steppe?.pack };
+  const v: View = { p, citizens, army, priests, traders, cogs, fishers, navy, planes, buildings, home, tc, budget: { ...p.res }, plan: NO_PLAN, diggers: new Set(), armyFirst: false, claimers: new Set(), wagons, hunt: { n: 3, r: 16 }, packing: !!mem.steppe?.pack, hands: citizens.length + (isLegion(p) && p.epoch <= LEGION.aiUntil ? army.filter(legionHand).length : 0) };
   // The Hunters' Way (#463 s1) lives by the chase in the Stone Age: more hunters, ranging farther, with camps pitched at the kill.
   if (p.way === 'hunt' && p.epoch === 0) v.hunt = { n: AI_WAYS.hunters, r: AI_WAYS.huntReach };
   const issue = (c: Command) => applyCommand(s, c);
@@ -210,7 +229,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   // People first: a growing town pays for everything else.
   const advancing = buildings.some((b) => b.advance >= 0);
   const queuedCitizens = buildings.reduce((n, b) => n + b.queue.filter((q) => q.unit === 'citizen').length, 0);
-  const wantCitizens = Math.min(L.citizens + p.epoch * 3, 60);
+  const wantCitizens = Math.min(L.citizens + p.epoch * 3, isLegion(p) ? citizenCap(p) : 60);
   // The Warband Way (#463 s1) eats by raiding: in the Stone Age, out of a treaty, its first band of foot comes before more hands (once; later bands come as soldiers do).
   if (L.clever && p.way === 'warband' && p.epoch === 0 && s.tick >= s.peaceUntil && !mem.prowl && mem.prowled === undefined && citizens.length >= AI_WAYS.bandAt && army.filter(prowler).length < AI_WAYS.band) {
     const yard = buildings.find((b) => b.type === 'barracks' && b.built && b.queue.length === 0);
@@ -256,7 +275,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   const armyFirst = short && (!mem.short || s.tick - mem.short.since <= secs(L.armyWait));
   v.armyFirst = armyFirst;
   // Which road it takes is the web's to say (#50): the trunk, or a side road it has chosen once it opens.
-  const wantEpoch = p.epoch < Math.min(LAST_EPOCH, v.plan.maxEpoch) && !advancing && !armyFirst && citizens.length >= ADVANCE_AT[p.epoch] && s.tick > secs(150 + p.epoch * 150);
+  const wantEpoch = p.epoch < Math.min(LAST_EPOCH, v.plan.maxEpoch) && !advancing && !armyFirst && citizens.length + (isLegion(p) && p.epoch > 0 ? army.filter(legionHand).length : 0) >= ADVANCE_AT[p.epoch] && s.tick > secs(150 + p.epoch * 150);
   // Patience for a road's deeds counts only while the Town Center holds for them (#113): army-first
   // kept a town from holding for minutes, and it came back out of patience at once.
   if (!wantEpoch) delete mem.waiting;
@@ -269,7 +288,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   }
 
   // In the age of flight, save up for an airfield before anything smaller takes the wood.
-  if (L.clever && p.epoch >= 4 && citizens.length >= 24 && !buildings.some((b) => b.type === 'airfield') && !lightningBound(s, v, mem)) {
+  if (L.clever && p.epoch >= 4 && v.hands >= 24 && !buildings.some((b) => b.type === 'airfield') && !lightningBound(s, v, mem)) {
     const cost = buildingCostFor(s, p.id, 'airfield');
     const recent = s.tick - (mem.ordered.airfield ?? -99999) < secs(40);
     const spot = !recent && afford(v, cost) ? findSpot(s, 'airfield', home.x, home.y, 6, 22) : null;
@@ -286,7 +305,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   lightBeacons(s, v, issue);
   beaconsForLightning(s, v, mem, issue);
   rallyTheLine(s, v, issue);
-  research(s, v, citizens.length >= wantCitizens - 2, issue);
+  research(s, v, v.hands >= wantCitizens - 2, issue);
   trade(s, v, issue);
   planBuildings(s, v, mem, issue);
   trapLine(s, v, mem, issue);
@@ -303,6 +322,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   seafaring(s, v, mem, issue);
   airforce(s, v, mem, issue);
   polisArms(s, v, mem, issue);
+  legionWork(s, v, mem, issue);
   military(s, v, mem, issue);
   priestly(s, v, mem, issue);
 }
@@ -326,7 +346,7 @@ function research(s: GameState, v: View, peopleEnough: boolean, issue: (c: Comma
     const at = v.buildings.find((b) => b.type === TECHS[tech].at && b.built && b.queue.length < room && b.advance < 0);
     if (!at) continue;
     // The Town Center trains citizens first, and learns nothing while it waits to strike camp.
-    if (at.type === 'towncenter' && ((!peopleEnough && v.citizens.length < 12) || v.packing)) continue;
+    if (at.type === 'towncenter' && ((!peopleEnough && v.hands < 12) || v.packing)) continue;
     const cost = techCostFor(s, p.id, tech);
     // Keep something back for soldiers and the next epoch.
     const keep: Cost = { food: 100, wood: 100, gold: 50 };
@@ -661,7 +681,7 @@ function ironRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     releaseDiggers(s, v, issue);
     return;
   }
-  if (p.epoch !== 0 || !walksWeb(v) || v.citizens.length < AI_WEB.survey || count(v, 'barracks', true) === 0 || fit(p, 'iron') < 0) return;
+  if (p.epoch !== 0 || !walksWeb(v) || v.hands < (isLegion(p) ? LEGION.aiSurvey : AI_WEB.survey) || count(v, 'barracks', true) === 0 || fit(p, 'iron') < 0) return;
   if (!road.found) return;
   if (!p.techs.includes(road.found)) {
     if (!wants(s, p, mem, 'iron') || techProblem(s, p.id, road.found)) return;
@@ -673,7 +693,7 @@ function ironRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     return;
   }
   if (!roadKnown(s, p, road) || !wants(s, p, mem, 'iron') || deedsDone(p, road, s)) return;
-  for (const u of v.citizens) if (u.order.k === 'gather' && (u.order.bog || s.res[u.order.tile] === R_BOG)) v.diggers.add(u.id);
+  for (const u of [...v.citizens, ...legionHands(v)]) if (u.order.k === 'gather' && (u.order.bog || s.res[u.order.tile] === R_BOG)) v.diggers.add(u.id);
   // Holding the Town Center for the deed, it digs harder (#79): idle savings are the dearest wait.
   const crew = mem.waiting !== undefined ? AI_WEB.diggers * 2 : AI_WEB.diggers;
   if (v.diggers.size >= crew) return;
@@ -682,7 +702,7 @@ function ironRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   if (bog < 0) return;
   const bx = (bog % s.w) + 0.5;
   const by = Math.floor(bog / s.w) + 0.5;
-  const free = v.citizens
+  const free = [...v.citizens, ...legionHands(v)]
     .filter((u) => !u.inside && !v.diggers.has(u.id) && u.carry <= 2 && (u.order.k === 'idle' || (u.order.k === 'gather' && (u.order.res === 'wood' || u.order.res === 'gold'))))
     .sort((a, c) => (a.x - bx) * (a.x - bx) + (a.y - by) * (a.y - by) - ((c.x - bx) * (c.x - bx) + (c.y - by) * (c.y - by)) || a.id - c.id);
   const ids = free.slice(0, crew - v.diggers.size).map((u) => u.id);
@@ -926,9 +946,10 @@ function construct(s: GameState, v: View, mem: AiMemory, type: BuildingType, spo
     const job = o.k === 'idle' ? 0 : o.k === 'gather' && o.res === 'wood' ? 1 : o.k === 'gather' ? 2 : o.k === 'build' ? 4 : 3;
     const dx = u.x - cx;
     const dy = u.y - cy;
-    return job * 1000 + Math.sqrt(dx * dx + dy * dy);
+    // A legion's soldiers raise the town before its few citizens leave the fields.
+    return job * 1000 + Math.sqrt(dx * dx + dy * dy) - (legionary(s, u) ? 500 : 0);
   };
-  const crew = v.citizens
+  const crew = [...v.citizens, ...legionHands(v)]
     .filter((u) => !(u.order.k === 'farm' && u.order.phase === 'work') && u.order.k !== 'build' && !u.inside)
     .sort((a, b) => rank(a) - rank(b) || a.id - b.id)
     .slice(0, builders);
@@ -1086,7 +1107,7 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     if (spot && construct(s, v, mem, 'farm', spot, 1, issue)) return;
   }
 
-  const n = v.citizens.length;
+  const n = v.hands;
   const clever = L.clever;
 
   // A Storehouse to survey from, for a people the Iron Age would suit (#50); after the Barracks, so the
@@ -1289,7 +1310,7 @@ function wanted(v: View, cold = false): Record<Res, number> {
   for (const r of RES) {
     const stock = v.p.res[r];
     const lean = stock > 1200 ? 0.15 : stock > 700 ? 0.4 : stock > 400 ? 0.7 : stock < 80 ? 1.4 : 1;
-    weight[r] = share[r] * lean * (cold && r === 'food' ? 1 + AI_WINTER.food : 1);
+    weight[r] = share[r] * lean * (cold && r === 'food' ? 1 + AI_WINTER.food : 1) * (legionAtWork(v) && (r === 'wood' || r === 'stone') ? LEGION.aiCitizenWood : 1);
     total += weight[r];
   }
   const n = v.citizens.filter((u) => u.order.k !== 'build' && !u.inside).length;
@@ -1366,8 +1387,8 @@ function assignCitizens(s: GameState, v: View, issue: (c: Command) => void): voi
   }
   // Foundations nobody is working on get the nearest wood cutter.
   for (const b of v.buildings) {
-    if (b.built || v.citizens.some((u) => u.order.k === 'build' && u.order.target === b.id)) continue;
-    const helper = v.citizens
+    if (b.built || v.citizens.some((u) => u.order.k === 'build' && u.order.target === b.id) || legionHands(v).some((u) => u.order.k === 'build' && u.order.target === b.id)) continue;
+    const helper = [...v.citizens, ...legionHands(v)]
       .filter((u) => !u.inside && !v.claimers.has(u.id) && (u.order.k === 'idle' || (u.order.k === 'gather' && u.order.res === 'wood')))
       .sort((a, c) => distToRect(a.x, a.y, b) - distToRect(c.x, c.y, b) || a.id - c.id)[0];
     if (helper) issue({ t: 'work', p: v.p.id, ids: [helper.id], target: b.id });
@@ -1416,6 +1437,34 @@ function assignCitizens(s: GameState, v: View, issue: (c: Command) => void): voi
     const mover = v.citizens.find((u) => jobOf(u) === over && u.carry <= 2 && u.order.k !== 'farm' && u.order.k !== 'hunt' && u.order.k !== 'milk' && u.order.k !== 'snare' && !u.inside && !v.diggers.has(u.id));
     if (mover) sendTo(s, v, mover, under, issue);
   }
+}
+
+// ---- The legion (#501) --------------------------------------------------------------------------
+
+/**
+ * A Roman computer's idle foot soldiers go to work between waves: all but the `LEGION.aiGuard` lowest-id ones (the standing guard
+ * the other duties draw on) walk to timber, or to stone for `LEGION.aiStone` of them, near home. A wave or a raid takes them off
+ * the work with the rest of the army, and the survivors go back after.
+ */
+function legionWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  if (!isLegion(v.p) || v.p.epoch > LEGION.aiUntil || mem.attacking || threatNear(s, v).unit) return;
+  const hands = v.army.filter(legionHand).sort((a, b) => a.id - b.id);
+  const crew = hands.slice(LEGION.aiGuard).filter((u) => u.order.k === 'idle' && !u.queue.length && !v.claimers.has(u.id) && distTo(u, v.home) <= 40);
+  let stone = hands.filter((u) => u.order.k === 'gather' && u.order.res === 'stone').length;
+  let all = hands.filter((u) => u.order.k === 'gather').length;
+  for (const u of crew) {
+    const res: Res = stone < (all + 1) * LEGION.aiStone ? 'stone' : 'wood';
+    if (sendTo(s, v, u, res, issue) || sendTo(s, v, u, res === 'stone' ? 'wood' : 'stone', issue)) {
+      if (res === 'stone') stone++;
+      all++;
+    }
+  }
+}
+
+function distTo(u: { x: number; y: number }, at: { x: number; y: number }): number {
+  const dx = u.x - at.x;
+  const dy = u.y - at.y;
+  return Math.sqrt(dx * dx + dy * dy);
 }
 
 // ---- The polis (#501) ---------------------------------------------------------------------------
@@ -1570,7 +1619,7 @@ function wilds(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void
     let escort: Unit[] = [];
     if (!m && AI_LEVELS[v.p.ai!].clever && v.p.epoch <= 2 && s.tick >= s.peaceUntil) {
       const far = nearestBeast(s, 'mammoth', v.home.x, v.home.y, AI_WILD.far);
-      const idle = v.army.filter((u) => !u.inside && u.order.k === 'idle' && u.type !== 'siege' && u.type !== 'hero');
+      const idle = v.army.filter((u) => !u.inside && (u.order.k === 'idle' || atTheAxe(v, u)) && u.type !== 'siege' && u.type !== 'hero');
       if (far && far.state !== 'fight' && idle.length >= AI_WILD.escort + AI_WILD.guard && !ruinDanger(s, v.p, far, AI_WILD.safe)) {
         m = far;
         escort = idle.sort((a, b) => (a.x - far.x) * (a.x - far.x) + (a.y - far.y) * (a.y - far.y) - ((b.x - far.x) * (b.x - far.x) + (b.y - far.y) * (b.y - far.y)) || a.id - b.id).slice(0, AI_WILD.escort);
@@ -1600,7 +1649,7 @@ function wilds(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void
   }
   if (mem.attacking || v.army.some((u) => hunting(u, 'wolf') || hunting(u, 'raider'))) return;
   const wolf = nearestBeast(s, 'wolf', v.home.x, v.home.y, AI_WILD.clear);
-  const free = v.army.filter((u) => !u.inside && (u.order.k === 'idle' || (u.order.k === 'move' && !u.order.amove)) && u.type !== 'siege');
+  const free = v.army.filter((u) => !u.inside && (u.order.k === 'idle' || atTheAxe(v, u) || (u.order.k === 'move' && !u.order.amove)) && u.type !== 'siege');
   if (wolf) {
     const need = cold && seasonAt(s) === 3 ? AI_WILD.pack - AI_WINTER.pack : AI_WILD.pack;
     if (free.length >= need) issue({ t: 'hunt', p: v.p.id, ids: free.map((u) => u.id), target: wolf.id });
@@ -2333,7 +2382,7 @@ export function forwardFieldSpot(s: GameState, v: View): { tx: number; ty: numbe
 
 /** Sorties (the Age of Aeronauts): a clever computer with an Airfield raises another toward the enemy, so its bombers can reach. */
 function forwardField(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
-  if (!AI_LEVELS[v.p.ai!].clever || v.citizens.length < 20 || s.tick - (mem.ordered.airfield ?? -99999) < secs(60)) return;
+  if (!AI_LEVELS[v.p.ai!].clever || v.hands < 20 || s.tick - (mem.ordered.airfield ?? -99999) < secs(60)) return;
   if (v.buildings.some((b) => b.type === 'airfield' && !b.built)) return;
   const spot = forwardFieldSpot(s, v);
   if (spot) construct(s, v, mem, 'airfield', spot, 3, issue);
@@ -2520,7 +2569,7 @@ function greatWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   const { p } = v;
   if (!AI_LEVELS[p.ai!].clever || workProblem(s, p)) return;
   const w = WORKS[p.civ];
-  const busy = p.civ === 'chinese' ? v.traders.length >= 3 : v.citizens.length >= 14;
+  const busy = p.civ === 'chinese' ? v.traders.length >= 3 : v.hands >= 14;
   const fight = (mem.attacking && v.army.length >= 6) || threatNear(s, v).count >= 4;
   if (w.mul?.farm && flooded(s, p.id)) return; // a farming work is wasted while the fields lie under the river
   if (w.use === 'eco' ? busy : fight) issue({ t: 'greatWork', p: p.id });
@@ -3277,6 +3326,8 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
       const sig = SIGNATURES[p.civ].type;
       if (unit !== counter && sig !== 'siege' && sig !== 'priest' && trains.includes(sig) && unitEpoch(sig) <= p.epoch && !barred(p, sig, b.type) && roll(s) < (sig === 'cavalry' && riderless ? AI_HORDE.cavalry : 0.5)) unit = sig;
     }
+    // A legion's town keeps its hands in foot soldiers (#501): the barracks trains them until it has enough to work and fight.
+    if (isLegion(p) && p.epoch <= LEGION.aiUntil && b.type === 'barracks' && trains.includes('infantry') && v.army.filter(legionHand).length < LEGION.aiHands + p.epoch * LEGION.aiHandsEpoch) unit = 'infantry';
     if (!unit || unitEpoch(unit) > p.epoch || barred(p, unit, b.type)) continue;
     // Just before a feast opens, a clever computer with an army in hand holds its muster at the fairground to buy it at the levy (#356).
     // What it costs here: a levy, an age's price or a hire for gold (#37).
@@ -3446,7 +3497,7 @@ function scouting(s: GameState, v: View, mem: AiMemory, ready: Unit[], issue: (c
     return u && walking(u);
   });
   const pool = ready.filter((u) => (u.type === 'infantry' || u.type === 'ranged') && u.id !== mem.scout?.id);
-  if (guards.length < AI_SCOUT.guards && ready.length >= AI_SCOUT.army && pool.length) {
+  if (guards.length < AI_SCOUT.guards && (legionAtWork(v) ? v.army.length : ready.length) >= AI_SCOUT.army && pool.length) {
     const band = pool.slice(0, AI_SCOUT.guards - guards.length);
     const market = v.buildings.some((b) => b.type === 'market' && b.built);
     let post: TradePost | null = null;
@@ -4305,7 +4356,7 @@ function chapterGoals(s: GameState, v: View, mem: AiMemory, issue: (c: Command) 
       }
       const cost = unitStats(type, p.epoch).cost;
       // Dear units wait for a town that can pay for them and still grow.
-      if ((cost.wood ?? 0) + (cost.gold ?? 0) + (cost.food ?? 0) > 300 && v.citizens.length < 25) continue;
+      if ((cost.wood ?? 0) + (cost.gold ?? 0) + (cost.food ?? 0) > 300 && v.hands < 25) continue;
       const queued = where.reduce((n, b) => n + b.queue.filter((q) => q.unit === type).length, 0);
       // Keep a few spare: some will be lost before the count is reached.
       if (now + queued >= goal + (o.bonus ? 0 : 1)) continue;
@@ -4319,7 +4370,7 @@ function chapterGoals(s: GameState, v: View, mem: AiMemory, issue: (c: Command) 
   if (plan.wave) {
     plan.hold = false;
     // Food and wood piling up while the rival town stands: more places to train soldiers.
-    if (v.budget.food > 800 && v.budget.wood > 600 && v.citizens.length >= 30) {
+    if (v.budget.food > 800 && v.budget.wood > 600 && v.hands >= 30) {
       for (const type of ['barracks', 'range', 'stable'] as BuildingType[]) {
         if (count(v, type) >= 4 || recently(type, 30) || BUILDINGS[type].epoch > p.epoch) continue;
         const spot = findSpot(s, type, v.home.x + fx * 6, v.home.y + fy * 6, 0, 20);

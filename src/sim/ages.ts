@@ -1,5 +1,5 @@
 import { AGES, BUILDINGS, CIVS, LIGHTNING, PATHS, ROADS, STEP_BACK, TECHS, TICK_HZ, TRUNK, WAYS, secs, stepBackCost, type Age, type Deed, type Road } from './data';
-import type { AgeId, PathId, Building, BuildingType, Cost, GameState, Player, TechId, UnitType } from './types';
+import type { AgeId, CivId, PathId, Building, BuildingType, Cost, GameState, Player, TechId, UnitType } from './types';
 
 /**
  * Ages as a web (#37): which age a people is in, the roads out of it, and what that age lets them
@@ -323,5 +323,6 @@ export function pathCarry(p: Player): { path: PathId; times: number } | null {
   return path && PATHS[path].carry && times > 0 ? { path, times } : null;
 }
 
-/** Whether a unit may raise this building: citizens raise them all, and some buildings name others (#303). */
-export const canRaise = (unit: UnitType, type: BuildingType): boolean => unit === 'citizen' || !!BUILDINGS[type].builders?.includes(unit);
+/** Whether a unit may raise this building: citizens raise them all, some buildings name others (#303), and a legion's foot soldiers raise any (#501). */
+export const canRaise = (unit: UnitType, type: BuildingType, civ?: CivId): boolean =>
+  unit === 'citizen' || !!BUILDINGS[type].builders?.includes(unit) || (unit === 'infantry' && !!civ && !!CIVS[civ].legion);
