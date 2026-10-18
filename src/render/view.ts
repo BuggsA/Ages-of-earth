@@ -43,6 +43,7 @@ import { Bats } from './bats';
 import { Owls } from './owls';
 import { Roosts } from './roosts';
 import { Perches } from './perches';
+import { Crows, spoilingSites } from './crows';
 import { armyNear, coilDistance, coilHumGain, COIL_HUM_RANGE, nearWater, voiceFits, wet, type CreatureVoice } from './ambience';
 
 /**
@@ -126,6 +127,7 @@ export class View {
   private owls = new Owls();
   private roosts = new Roosts();
   private perches = new Perches();
+  private crows = new Crows();
   private owlLevel = 0;
   private nextHoot = 12;
   private nextGull = 8;
@@ -180,7 +182,7 @@ export class View {
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sky.mesh, this.hemi, this.fill, this.sun, this.sun.target);
-    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.rubble.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points);
+    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.rubble.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
     this.scene.add(this.rangeGuides.mesh, this.borders.mesh, this.graze.mesh, this.foundations.mesh);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.post = new Post(this.renderer, this.scene, this.rig.camera);
@@ -345,6 +347,7 @@ export class View {
     this.roosts.setDusk(l.moon, this.weather.day.kind === 'clear');
     this.perches.setNight(l.moon, this.weather.day.kind === 'clear');
     this.owls.setNight(l.moon, this.weather.day.kind === 'clear');
+    this.crows.setDay(this.weather.day.kind === 'clear' ? Math.max(0, 1 - l.moon * 3) : 0);
     this.dayLevel = this.weather.day.kind === 'clear' ? Math.max(0, 1 - l.moon * 3) : 0;
     this.owlLevel = Owls.level(l.moon, this.weather.day.kind === 'clear');
     // Windows and torches light up as the sun sets: the old strength by day, near double by night.
@@ -515,6 +518,7 @@ export class View {
     }
     this.roosts.update(this.time, this.ruins.standingAt, this.rig.target, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
     this.perches.update(this.time, this.ruins.standingAt, this.rig.target, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
+    if (this.state) this.crows.update(this.time, spoilingSites(this.state, (x, y) => this.reveal || this.sees(x, y)), this.rig.target, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
     this.bats.update(this.time, this.rig.target, this.rig.distance, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
     this.effects.placeTexts(this.rig.camera, this.width, this.height);
 
