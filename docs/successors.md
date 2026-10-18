@@ -23,7 +23,7 @@ Check cheaply (one `list_issues` by label with `minimal_output`, and `main`'s la
 - **Don't spawn** if #2 is labelled `paused`, your chain's last two sessions each pushed nothing (a pushed pull request counts, merged or not), `create_session` failed twice, or a cap below stops you. A small last task, or an empty lane, is not a reason: the successor pitches its own idea (AGENTS.md §2).
 - **Don't spawn** from an owner-started chat or one-off, unless asked.
 - **Otherwise spawn, without asking the owner and without waiting to be told** (the owner, 2026-10-17: starting the next session is the default, not a request). Ending the chain is the exception, and the handoff names the rule that stopped it. Its task, in order: a red `ci-periodic` or `ci` on `main`, an `owner-ask`, a `ready` issue in your lane, else its own pitch.
-- Take related next steps yourself first (`docs/team.md`, "Small and often").
+- **Continue before you spawn** (owner, 2026-10-17: keep work in cache). Next step in the same umbrella or files: do it here, past 3 steps while related and uncompacted. Spawn when it's unrelated, you've compacted, or ~5 pull requests have merged.
 
 ## Chains and caps
 

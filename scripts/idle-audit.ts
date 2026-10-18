@@ -37,12 +37,13 @@ function nearestDeer(s: GameState, u: Unit, r: number) {
 }
 
 export function audit(seed: number, minutes: number, size: 'small' | 'medium' | 'large') {
-  const s: GameState = createGame({ seed, size, peaceMinutes: minutes, players: [{ name: 'You', civ: 'egyptians' }, { name: 'Easy', ai: 'easy' }] });
+  const s: GameState = createGame({ seed, size, peaceMinutes: minutes, players: [{ name: 'You', ai: null, civ: 'egyptians' }, { name: 'Easy', ai: 'easy' }] });
   const last = new Map<number, string>();
   const idleSince = new Map<number, number>();
   const causes = new Map<string, number>();
   let idleTicks = 0;
   let orders = 0;
+  let laden = 0;
   const tc = () => townCenters(s, 0).find((b) => b.built);
   const label = (o: Order): string => {
     if (o.k === 'gather') return `gather ${o.res}`;
@@ -72,7 +73,11 @@ export function audit(seed: number, minutes: number, size: 'small' | 'medium' | 
       const was = last.get(u.id);
       if (now) {
         idleTicks++;
-        if (was && was !== 'idle') causes.set(was, (causes.get(was) ?? 0) + 1);
+        if (was && was !== 'idle') {
+          causes.set(was, (causes.get(was) ?? 0) + 1);
+          // A full basket and nothing to do: a citizen stuck on the way home, not one whose patch ran out.
+          if (u.carry > 0) laden++;
+        }
         if (!idleSince.has(u.id)) idleSince.set(u.id, s.tick);
         if (home && s.tick - idleSince.get(u.id)! >= REACT) {
           const food = p.res.food <= p.res.wood;
@@ -94,9 +99,12 @@ export function audit(seed: number, minutes: number, size: 'small' | 'medium' | 
     step(s, cmds);
   }
   const cit = s.ents.filter((e) => e.kind === 'unit' && e.owner === 0 && e.type === 'citizen').length;
-  return { causes, idleSec: idleTicks / 20, orders, cit };
+  return { causes, idleSec: idleTicks / 20, orders, cit, laden };
 }
 
-const r = audit(seed, minutes, size);
-console.log(`seed ${seed}, ${minutes} min: ${r.cit} citizens, ${r.orders} orders given, ${Math.round(r.idleSec)} citizen-seconds idle`);
-for (const [k, n] of [...r.causes].sort((a, b) => b[1] - a[1])) console.log(`  ${String(n).padStart(4)}  fell idle after: ${k}`);
+// Run as a script, not when a test imports `audit`.
+if (process.argv[1]?.endsWith('idle-audit.ts')) {
+  const r = audit(seed, minutes, size);
+  console.log(`seed ${seed}, ${minutes} min: ${r.cit} citizens, ${r.orders} orders given, ${Math.round(r.idleSec)} citizen-seconds idle, ${r.laden} left idle laden`);
+  for (const [k, n] of [...r.causes].sort((a, b) => b[1] - a[1])) console.log(`  ${String(n).padStart(4)}  fell idle after: ${k}`);
+}
