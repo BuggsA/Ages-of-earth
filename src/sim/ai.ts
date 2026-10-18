@@ -1099,9 +1099,10 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   const berries = findResource(s, R_BERRY, home.x, home.y, 14);
   const farms = count(v, 'farm');
   const freeFields = v.buildings.filter((b) => b.type === 'farm' && !v.citizens.some((u) => u.order.k === 'farm' && u.order.target === b.id)).length;
-  // Autumn onward the clever computer plans for winter: berries fail in the cold, so fields go up first, unless the
-  // larder holds the winter's food already (#486): planning anyway, it raised a field a citizen with the next age's wood.
-  const coldComing_ = coldComing(s, v) && p.res.food < AI_WINTER.larder;
+  // Autumn onward the clever computer plans for winter: berries fail in the cold, so fields go up first, unless in the
+  // Stone Age the larder holds the winter's food already (#486): planning anyway, it raised a field a citizen with the
+  // wood the Bronze Age wanted. Later a town's stock is no larder: its people eat from the fields.
+  const coldComing_ = coldComing(s, v) && (p.epoch > 0 || p.res.food < AI_WINTER.larder);
   // On the Shore (#473) each fishing boat feeds the town in a farmer's place, and its wood is wanted for the next age.
   // The turning year (#479): ice ahead (autumn, for the clever) or on the mere, a boat feeds a third as many.
   const boatsFeed = s.homeland === 'shore' ? Math.round(v.fishers.length * (coldComing_ || catchOf(s) < 1 ? YEAR.ice : 1)) : 0;

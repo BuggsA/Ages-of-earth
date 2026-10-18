@@ -1709,7 +1709,7 @@ export const EXPLORE = { grid: 4, apart: 12, fails: 8, shun: 6, wary: 2, army: 4
  * - `farm`: a food gatherer whose bushes and game are gone takes an unworked field within this many tiles.
  */
 export const AUTO_WORK = { trained: 14, rally: 8, herd: 8, farm: 12 };
-/** The clever computer plans for winter from season `from` (`coldComing` in `ai.ts`); it raises no winter fields while its larder holds `larder` food (#486). */
+/** The clever computer plans for winter from season `from` (`coldComing` in `ai.ts`); in the Stone Age it raises no winter fields while its larder holds `larder` food (#486). */
 export const AI_WINTER = { from: 2, fields: 2, hunters: 3, pack: 1, food: 0.3, larder: 500 };
 
 /**
