@@ -389,6 +389,11 @@ function trade(s: GameState, v: View, issue: (c: Command) => void): void {
       issue({ t: 'trade', p: p.id, res: 'stone', buy: true });
       return;
     }
+    // The flock is the lean side of the table: food short of the next road's price, and gold piled past what the road asks, is spent on food.
+    if (p.res.food < Math.max(NOMAD.aiFood, road?.cost.food ?? 0) && p.res.gold >= (road?.cost.gold ?? 0) + NOMAD.aiRich && s.market.food < NOMAD.aiFoodPrice) {
+      issue({ t: 'trade', p: p.id, res: 'food', buy: true });
+      return;
+    }
   }
   // Sell what piles up for gold; buy what is short when gold piles up. On a chapter's clock, a smaller pile is worth selling.
   const pile = v.plan.wave ? 600 : 1500;
@@ -473,6 +478,9 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
     const f = fit(p, to);
     // The steppe tosses a coin of its own: asked early by every clever town, it would shift the dice of every match.
     if (f === 0 && AGES[to].mobile && !heirloomAhead(p, to)) roads[to] = coin(s, p.id, 0x57e9) < AI_STEPPE.take;
+    // A nomad host (#501) lives by tribute and plunder: the Path of Blood is its road, the trading posts are not (the dice below are its own for the rest).
+    else if (isNomad(p) && f === 0 && AGES[to].path === 'blood') roads[to] = true;
+    else if (isNomad(p) && to === 'merchant') roads[to] = false;
     else roads[to] = f > 0 || (f === 0 && (isNomad(p) ? coin(s, p.id, 0x303 + Object.keys(AGES).indexOf(to) * 977) : roll(s)) < (AGES[to].path === 'blood' ? AI_BLOOD.take : heirloomAhead(p, to) ? AI_WEB.heir : AI_WEB.take));
   }
   return roads[to]!;
@@ -1785,7 +1793,9 @@ function tendFlock(s: GameState, v: View, issue: (c: Command) => void): void {
   const ids = new Set(grown.map((a) => a.id));
   if (v.citizens.some((u) => u.order.k === 'hunt' && ids.has(u.order.target))) return;
   // The Horde's hunting deed counts butchered sheep (#322): once the milk is in and the meat is short, the flock is culled, down to `AI_HORDE.least`.
-  const butchery = !!climb && grown.length > AI_HORDE.least && deedsProgress(p, climb).every((d) => d.deed.stat === 'hunted' || d.have >= d.need) && deedsProgress(p, climb).some((d) => d.deed.stat === 'hunted' && d.have < d.need);
+  const butchery = (!!climb && grown.length > AI_HORDE.least && deedsProgress(p, climb).every((d) => d.deed.stat === 'hunted' || d.have >= d.need) && deedsProgress(p, climb).some((d) => d.deed.stat === 'hunted' && d.have < d.need))
+    // A nomad camp (#501) a long way from the Deep Wood's winter yard kills its surplus sheep for meat while the deer are far off.
+    || (isNomad(p) && yarding(s) && grown.length > AI_HORDE.least);
   if (mobile && flockOf(s, p.id) < flockCap(s, p.id) && !butchery) return;
   let fat: Animal | null = null;
   for (const a of grown) if (((a.fat ?? 0) >= FLOCK.breed || butchery) && (!fat || (a.fat ?? 0) > (fat.fat ?? 0))) fat = a;
