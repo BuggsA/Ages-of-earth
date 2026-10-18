@@ -367,13 +367,20 @@ function trade(s: GameState, v: View, issue: (c: Command) => void): void {
   const nomad = isNomad(p);
   if (!(AI_LEVELS[p.ai!].clever || nomad) || !v.buildings.some((b) => b.type === 'market' && b.built)) return;
   // A nomad people (#501) quarries no stone: it buys a lot whenever it runs short and has the gold.
-  if (nomad && p.res.stone < NOMAD.aiStone && p.res.gold >= Math.max(NOMAD.aiGold, s.market.stone + 40)) {
+  // The next road's stone is bought ahead of the road (the climb from the Warband asks more than a small store).
+  const road = nomad ? mainRoad(p) : undefined;
+  if (nomad && p.res.stone < Math.max(NOMAD.aiStone, road?.cost.stone ?? 0) && p.res.gold >= Math.max(NOMAD.aiGold, s.market.stone + 40 + (road?.cost.gold ?? 0))) {
     issue({ t: 'trade', p: p.id, res: 'stone', buy: true });
     return;
   }
   // And it has no fields: grain is bought from the settled with the gold it mines and takes.
   if (nomad && p.res.food < NOMAD.aiFood && p.res.gold >= Math.max(NOMAD.aiGold, s.market.food + 40) && s.market.food < NOMAD.aiFoodPrice) {
     issue({ t: 'trade', p: p.id, res: 'food', buy: true });
+    return;
+  }
+  // Its timber has no field to feed and piles up while the gold runs short: the surplus is sold, down to a price worth taking.
+  if (nomad && p.res.wood > NOMAD.aiSellWood && p.res.gold < NOMAD.aiGoldShort && s.market.wood > NOMAD.aiWoodFloor) {
+    issue({ t: 'trade', p: p.id, res: 'wood', buy: false });
     return;
   }
   if (!AI_LEVELS[p.ai!].clever) return;
@@ -469,6 +476,9 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
     const f = fit(p, to);
     // The steppe tosses a coin of its own: asked early by every clever town, it would shift the dice of every match.
     if (f === 0 && AGES[to].mobile && !heirloomAhead(p, to)) roads[to] = coin(s, p.id, 0x57e9) < AI_STEPPE.take;
+    // A nomad host (#501) lives by tribute and plunder: the Path of Blood is its road, the trading posts are not.
+    else if (isNomad(p) && f === 0 && AGES[to].path === 'blood') roads[to] = true;
+    else if (isNomad(p) && to === 'merchant') roads[to] = false;
     else roads[to] = f > 0 || (f === 0 && roll(s) < (AGES[to].path === 'blood' ? AI_BLOOD.take : heirloomAhead(p, to) ? AI_WEB.heir : AI_WEB.take));
   }
   return roads[to]!;
@@ -1282,7 +1292,8 @@ function jobOf(u: Unit): Res | 'build' | null {
 function readYear(s: GameState, v: View): void {
   if (!AI_LEVELS[v.p.ai!].clever) return;
   if (herdsOut(s)) v.hunt = { n: v.hunt.n, r: Math.max(v.hunt.r, YEAR.follow) };
-  if (yarding(s)) v.hunt = { n: v.hunt.n + YEAR.yardHunters, r: v.hunt.r };
+  // A nomad camp (#501) drifts with the grass, so the yard may lie a long way off: its hunters range as far as the deer walk.
+  if (yarding(s)) v.hunt = { n: v.hunt.n + YEAR.yardHunters, r: isNomad(v.p) ? Math.max(v.hunt.r, YEAR.walk) : v.hunt.r };
 }
 
 /**
@@ -1793,7 +1804,9 @@ function tendFlock(s: GameState, v: View, issue: (c: Command) => void): void {
   const ids = new Set(grown.map((a) => a.id));
   if (v.citizens.some((u) => u.order.k === 'hunt' && ids.has(u.order.target))) return;
   // The Horde's hunting deed counts butchered sheep (#322): once the milk is in and the meat is short, the flock is culled, down to `AI_HORDE.least`.
-  const butchery = !!climb && grown.length > AI_HORDE.least && deedsProgress(p, climb).every((d) => d.deed.stat === 'hunted' || d.have >= d.need) && deedsProgress(p, climb).some((d) => d.deed.stat === 'hunted' && d.have < d.need);
+  const butchery = (!!climb && grown.length > AI_HORDE.least && deedsProgress(p, climb).every((d) => d.deed.stat === 'hunted' || d.have >= d.need) && deedsProgress(p, climb).some((d) => d.deed.stat === 'hunted' && d.have < d.need))
+    // A nomad camp (#501) a long way from the Deep Wood's winter yard kills its surplus sheep for meat while the deer are far off.
+    || (isNomad(p) && yarding(s) && grown.length > AI_HORDE.least);
   if (mobile && flockOf(s, p.id) < flockCap(s, p.id) && !butchery) return;
   let fat: Animal | null = null;
   for (const a of grown) if (((a.fat ?? 0) >= FLOCK.breed || butchery) && (!fat || (a.fat ?? 0) > (fat.fat ?? 0))) fat = a;

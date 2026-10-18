@@ -1441,7 +1441,7 @@ export interface Civ {
  * the flock has been hungry for `aiHungry`, looking for fresh grass up to `aiFar` tiles out and `aiSideways` tiles nearer the rival.
  * Off the Steppe Road its tribute band is `aiRiders` riders, gathered at home, and it may stand outside its own supply.
  */
-export const NOMAD = { house: 2, stone: 0.6, aiStone: 160, aiGold: 220, aiMarket: 12, aiRiders: 4, aiFood: 500, aiFoodPrice: 260, aiSpare: 30, aiFlock: 14, aiPerMilker: 2, aiEvery: 90, aiHungry: 30, aiFar: 30, aiSideways: 8, regrow: 0.25, milk: 2, range: 8, start: 4 };
+export const NOMAD = { house: 2, stone: 0.6, aiStone: 160, aiGold: 220, aiMarket: 12, aiRiders: 4, aiFood: 500, aiFoodPrice: 260, aiSellWood: 500, aiGoldShort: 600, aiWoodFloor: 60, aiSpare: 30, aiFlock: 14, aiPerMilker: 2, aiEvery: 90, aiHungry: 30, aiFar: 30, aiSideways: 8, regrow: 0.25, milk: 2, range: 8, start: 4 };
 
 /**
  * The polis (#501, the Greeks): a citizen takes up arms where it stands for `arm`, becoming a foot soldier with its health share
