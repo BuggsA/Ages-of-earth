@@ -3431,7 +3431,9 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   }
 
   // A horde's riders wait at home for their band (#322): the waves leave them be until it sets out.
-  if (L.clever && !mem.steppe?.band && modsOf(s, p.id).tribute > 0 && fighters.filter((u) => u.type === 'cavalry').length < TRIBUTE.most) fighters = fighters.filter((u) => u.type !== 'cavalry');
+  const riding = fighters.filter((u) => u.type === 'cavalry').length;
+  // A people born on the move (#501) takes tribute from the Bronze Age, but holds its riders back only once there are enough for a band.
+  if (L.clever && !mem.steppe?.band && modsOf(s, p.id).tribute > 0 && riding < TRIBUTE.most && (!isNomad(p) || ageOf(p) === 'horde' || riding >= AI_HORDE.riders)) fighters = fighters.filter((u) => u.type !== 'cavalry');
   // Riders standing in our land take our gold (#322): the army rides out to drive them off.
   if (L.clever && answerRiders(s, v, fighters, issue)) {
     mem.attacking = false;
