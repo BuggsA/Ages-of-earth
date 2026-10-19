@@ -5,9 +5,10 @@ import { armProblem, disarmProblem, isPolis } from '../sim/polis';
 import { scenarioById } from '../sim/campaign';
 import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
-import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
+import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
+import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE } from '../sim/units';
-import { SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, SNARE, SICKNESS, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, SNARE, SICKNESS, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -32,7 +33,7 @@ import { exacting, isRider } from '../sim/tribute';
 import { landOwnerAt } from '../sim/borders';
 import { flockCap, flockOf, grazeRange, lambProblem } from '../sim/flocks';
 import { ageDef, ageOf, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, oreClue, oreDone, oreOnly, ironTradeShare, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, pathLine, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, surveyFinds, suspendedTechs, trainsAt, windowsOf } from '../sim/ages';
-import type { Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Player, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
+import type { Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Player, Res, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
 import { RARES, RES, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
 import { buildingPicture, unitPicture } from './thumbs';
@@ -235,6 +236,12 @@ export class Hud {
       this.workforcePanel.classList.add('hidden');
       this.workforceBtn.setAttribute('aria-expanded', 'false');
     });
+    this.noticeEl.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-hands]');
+      if (!b) return;
+      this.sendWorkers(b.dataset.hands as Job, Number(b.dataset.n) || 1);
+      b.closest('.shortage')?.remove();
+    });
     this.cmdEl.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest<HTMLElement>('[data-i]');
       if (!b) return;
@@ -288,8 +295,11 @@ export class Hud {
 
   private runCmd(c: Cmd): void {
     if (!c.ok) {
-      this.toast(c.why ?? "Can't do that now", 'bad');
       this.act.sound('error');
+      const p = this.state?.players[this.viewer];
+      // Short of resources: say so with a way to put hands on what is missing, right there.
+      if (p && c.cost && c.why && c.why === shortfall(p, c.cost)) this.shortageCard(shortages(p, c.cost), c.why);
+      else this.toast(c.why ?? "Can't do that now", 'bad');
       return;
     }
     c.run();
@@ -315,6 +325,22 @@ export class Hud {
     while (this.noticeEl.children.length > 4) this.noticeEl.firstChild!.remove();
     setTimeout(() => (el.style.opacity = '0'), 2600);
     setTimeout(() => el.remove(), 3200);
+  }
+
+  /** A notice for a button you can't pay for: what is missing, and one button per resource to send the hands it takes. */
+  private shortageCard(short: { res: Res; need: number }[], why: string): void {
+    this.noticeEl.querySelector('.shortage')?.remove();
+    const el = document.createElement('div');
+    el.className = 'notice bad shortage';
+    const label = (r: Res) => WORKFORCE_JOBS.find((j) => j.key === r)!;
+    el.innerHTML = `<span>${why}${short.length > 1 ? ` (and ${short.length - 1} more)` : ''}</span>` + short.map((m) => {
+      const n = handsFor(m.res, m.need);
+      return `<button type="button" data-hands="${m.res}" data-n="${n}" title="Put ${n} on ${label(m.res).label.toLowerCase()}: about ${LABOR.window} seconds of work covers ${m.need}">${label(m.res).icon} Send ${n}</button>`;
+    }).join('');
+    this.noticeEl.appendChild(el);
+    while (this.noticeEl.children.length > 4) this.noticeEl.firstChild!.remove();
+    setTimeout(() => (el.style.opacity = '0'), 6500);
+    setTimeout(() => el.remove(), 7200);
   }
 
   banner(title: string, sub = '', ms = 3200): void {
@@ -398,8 +424,8 @@ export class Hud {
       this.workforcePanel.innerHTML = '<div class="workforce-head" id="wf-head"></div><div id="wf-rows"></div>' +
         `<div class="wf-move"><div class="wf-line">Move <input id="wf-n" type="number" min="1" max="200" value="5" aria-label="How many"></div>` +
         `<div class="wf-line">from <select id="wf-from" aria-label="From job">${opt(['wood', 'food', 'stone', 'gold', 'build', 'idle'])}</select></div>` +
-        `<div class="wf-line">to <select id="wf-to" aria-label="To job">${opt(['food', 'wood', 'stone', 'gold'])}</select> <button type="button" class="wf-go" data-go>Go</button></div></div>` +
-        '<div class="workforce-note">Choose a row to select its citizens. + sends one (Shift: five) from the idle first, else the biggest job. Move sends the idle and empty-handed first.</div>';
+        `<div class="wf-line">to <select id="wf-to" aria-label="To job">${opt(['food', 'wood', 'stone', 'gold', 'build'])}</select> <button type="button" class="wf-go" data-go>Go</button></div></div>` +
+        '<div class="workforce-note">Choose a row to select its citizens. + sends one (Shift: five) from the idle first, else the biggest job; on Building it joins the nearest unfinished building and goes back to its old work after. Move sends the idle and empty-handed first.</div>';
     }
     // Written only when it changes: rebuilding a button between a press and its release would swallow the click.
     const set = (sel: string, html: string) => {
@@ -410,7 +436,7 @@ export class Hud {
     set('#wf-head', `Workforce <span>${total} ${isLegion(s.players[viewer]) ? 'hands' : 'citizens'}</span>`);
     set('#wf-rows', WORKFORCE_JOBS.map((job) => {
       const n = jobs.get(job.key)?.length ?? 0;
-      const plus = ['food', 'wood', 'stone', 'gold'].includes(job.key) ? `<button type="button" class="wf-add" data-add="${job.key}" title="Send one more to ${job.label.toLowerCase()} (Shift: five)" aria-label="Send one more to ${job.label.toLowerCase()}">+</button>` : '';
+      const plus = ['food', 'wood', 'stone', 'gold', 'build'].includes(job.key) ? `<button type="button" class="wf-add" data-add="${job.key}" title="Send one more to ${job.label.toLowerCase()} (Shift: five)" aria-label="Send one more to ${job.label.toLowerCase()}">+</button>` : '';
       return `<div class="wf-row"><button type="button" data-job="${job.key}" ${n ? '' : 'disabled'} title="Select ${job.label.toLowerCase()} citizens"><span>${job.icon} ${job.label}</span><strong>${n}</strong></button>${plus}</div>`;
     }).join(''));
   }

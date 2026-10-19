@@ -7,8 +7,9 @@ Owner ask: move 10 woodcutters to 5 food and 5 building without selecting anyone
 **Numbers:** `LABOR` (new) in `data.ts`; none changed.
 **Tests:** `tests/reassign.test.ts` (new). `tests/command-ownership.test.ts` got one line for the new command, as its comment asks.
 
+**Step 2:** Building is a destination (`to: 'build'`: nearest unfinished building, `LABOR.crew` 5 to a site, the old gather order kept in `resume` as `assignBuilders` does; "Nothing is being built" when no site). Clicking a button you can't pay for now shows a notice with the shortfall and a **Send N** button per missing resource (`shortageCard` in `hud.ts`, `shortages` in `commands.ts`, `handsFor` in `labor.ts`: N = ceil(need / (rate x `LABOR.window` 30 s)), a field's pace for food). Tests added to `tests/reassign.test.ts`; seen in Chromium: "Need 25 more wood | Send 2" put two idle citizens on wood.
+
 **Not done:**
-- Building as a destination: it needs a site, so it isn't offered yet.
-- The "Get 40 wood" button on a button you can't afford.
-- A tip for first-time players.
-- Browser unseen unless the pull request says otherwise.
+- A first-game tip.
+- The card shows only for buttons with a cost shown (build and train, research); Way and tiding costs aren't covered.
+- Legion towns (Romans) and online play unseen.
