@@ -18,128 +18,148 @@
       <div id="loading" class="loading">Ages of Earth</div>
 
       <div id="title" class="screen hidden">
+        <div class="fx" aria-hidden="true"><div class="fx-sun"></div><div class="fx-embers" id="embers"></div><div class="fx-grain"></div></div>
+        <div class="cine cine-top" aria-hidden="true"></div>
+        <div class="cine cine-bottom" aria-hidden="true"></div>
         <p id="title-caption" class="title-caption" aria-hidden="true"></p>
-        <div class="title-card">
+        <div class="title-main">
+          <p class="kicker">A real-time strategy game</p>
           <h1>Ages <span>of</span> Earth</h1>
-          <p class="tagline">Lead your people from the Stone Age to the age of steam.</p>
+          <p class="tagline">Five ages. Six peoples. One world to win.</p>
           <ol class="age-ribbon" aria-hidden="true"><li style="--c:#9a8a6a">Stone</li><li style="--c:#b8793a">Bronze</li><li style="--c:#8a96a8">Medieval</li><li style="--c:#a85a4a">Gunpowder</li><li style="--c:#5f7f94">Industrial</li></ol>
-          <div class="setup">
-            <label>Your people
-              <select id="opt-civ"></select>
-            </label>
-            <label>Difficulty
-              <select id="opt-diff">
-                <option value="gentle">Easy: a first game</option>
-                <option value="easy" selected>Normal</option>
-                <option value="normal">Hard</option>
-                <option value="hard">Expert</option>
-              </select>
-            </label>
-            <label>Map seed
-              <span class="seed-row"><input id="opt-seed" type="number" min="1" /><button class="btn small" data-act="reroll" title="A new map">🎲</button><button class="btn small" data-act="copy-world" title="Copy a link to this world (seed, size, map, foes)">🔗</button></span>
-            </label>
-            <div class="civ-row"><span id="civ-crest" class="civ-crest"></span><div id="civ-blurb" class="civ-blurb"></div></div>
-            <details class="more-opts wide" id="more-opts">
-              <summary>More options: rivals, map, game type, graphics</summary>
-              <div class="more-grid">
-                <label>Color
-              <select id="opt-color"></select>
-            </label>
-                <label>Opponents
-              <select id="opt-foes">
-                <option value="1" selected>1 rival</option>
-                <option value="2">2 rivals</option>
-                <option value="3">3 rivals</option>
-              </select>
-            </label>
-                <label>Teams
-              <select id="opt-teams">
-                <option value="ffa" selected>Everyone for themselves</option>
-                <option value="ally">You and a computer ally</option>
-              </select>
-            </label>
-                <label>Map
-              <select id="opt-map"></select>
-            </label>
-                <label>Homeland
-              <select id="opt-homeland"></select>
-            </label>
-                <label>Map size
-              <select id="opt-size">
-                <option value="small">Small</option>
-                <option value="medium" selected>Medium</option>
-                <option value="large">Large</option>
-              </select>
-            </label>
-                <label>Start in
-              <select id="opt-epoch">
-                <option value="0" selected>Stone Age</option>
-                <option value="1">Bronze Age</option>
-                <option value="2">Middle Ages</option>
-                <option value="3">Gunpowder Age</option>
-                <option value="4">Industrial Age</option>
-              </select>
-            </label>
-                <label>Game
-              <select id="opt-mode">
-                <option value="conquest" selected>Conquest</option>
-                <option value="regicide">Regicide: protect your King</option>
-                <option value="deathmatch">Deathmatch: start rich</option>
-                <option value="lords">Lords of the Land: hold every landmark</option>
-              </select>
-            </label>
-                <label>Peace treaty
-              <select id="opt-peace">
-                <option value="0" selected>None</option>
-                <option value="5">5 minutes</option>
-                <option value="10">10 minutes</option>
-                <option value="20">20 minutes</option>
-              </select>
-            </label>
-                <label>Graphics
-              <select id="opt-quality">
-                <option value="high">High: shadows, bloom</option>
-                <option value="medium">Medium: shadows</option>
-                <option value="low">Low: fastest</option>
-              </select>
-            </label>
-              </div>
-            </details>
-          </div>
           <div class="title-buttons">
-            <button class="btn primary big" data-act="start">Play</button>
-            <button class="btn big" data-act="campaign">Campaign</button>
-            <button class="btn big" data-act="web-map">Web of Ages</button>
-            <button class="btn big" data-act="online">Play online</button>
-            <button class="btn big hidden" id="continue-btn" data-act="continue">Continue saved game</button>
+            <button class="btn primary big" data-act="start"><span>Play</span><small>Begin a new adventure</small></button>
+            <button class="btn big hidden" id="continue-btn" data-act="continue"><span>Continue saved game</span></button>
+            <div class="title-roads">
+              <button class="btn big" data-act="campaign"><span>Campaign</span><small>Six chapters, Stone Age to flight</small></button>
+              <button class="btn big" data-act="web-map"><span>Web of Ages</span><small>Chart your road through the ages</small></button>
+              <button class="btn big" data-act="online"><span>Play online</span><small>A room, a code, your friends</small></button>
+            </div>
           </div>
-          <div class="title-links">
-            <button class="link" data-act="cloud">Cloud saves</button>
-            <button class="link hidden" id="replay-last-btn" data-act="replay-last">Watch your last match</button>
-            <button class="link" data-act="replay-open">Open a replay file…</button>
-          </div>
-          <details class="howto">
-            <summary>How to play</summary>
-            <ul>
-              <li><b>Goal:</b> destroy every rival town (walls, farms and gates don't count), or build a Wonder and keep it standing until its countdown ends.</li>
-              <li><b>Select</b> with a left click, or drag a box around units. Shift adds to the selection; double-click picks every unit of that kind on screen.</li>
-              <li><b>Command</b> with a right click: on the ground to move, on an enemy to attack, on trees, berries, stone or gold to gather, on a deer to hunt it, on your building site to help build, on your damaged building to repair it with citizens, on a healthy farm to work it, on a healthy Town Center or tower to shelter inside. Use <kbd>G</kbd> to shelter in a damaged Town Center or tower. Hold <kbd>Shift</kbd> to queue orders one after another.</li>
-              <li><b>Citizens</b> gather food, wood, stone and gold and carry it to your Town Center or a Storehouse. With citizens selected, <kbd>B</kbd> opens the town buildings and <kbd>V</kbd> the military ones. Drag to lay out a wall.</li>
-              <li><b>Technologies</b> at the Town Center, Storehouse, Forge and others make your people faster and your soldiers stronger. <b>Priests</b> heal and convert enemies, and carry the <b>relics</b> found about the map to a Temple, where they bring in gold; a <b>hero</b> inspires the soldiers near them. The <b>Market</b> trades goods for gold, and trains <b>traders</b>: right-click a <b>trading post</b> out on the map and they bring back gold each trip, more the farther the Market stands from it.</li>
-              <li><b>Danger?</b> Ring the town bell at the Town Center (<kbd>R</kbd>): citizens run inside and the Town Center shoots more arrows.</li>
-              <li><b>Houses</b> make room for 5 more people. <b>Farms</b> never run out once the berries do.</li>
-              <li><b>The triangle:</b> infantry beat cavalry, archers beat infantry, cavalry beat archers and siege. Siege engines smash buildings. Mix your army; set stances with <kbd>Z</kbd> <kbd>X</kbd> <kbd>C</kbd>.</li>
-              <li><b>Epochs:</b> at the Town Center, advance from the Stone Age to the Bronze Age, the Middle Ages, the Gunpowder Age and the Industrial Age. Every unit re-arms and every building is rebuilt in the new style.</li>
-              <li><b>Ships:</b> a citizen builds a <b>Dock</b> on the shore (<kbd>D</kbd> in the town buildings). Fishing boats catch fish from the shoals and bring it back; warships rule the water and shell the coast. Right-click your <b>transport</b> with soldiers selected to board, then right-click a far shore to land them (<kbd>U</kbd> unloads where it is).</li>
-              <li><b>Aircraft:</b> in the Industrial Age an <b>Airfield</b> trains fighters and bombers. They fly over water, woods and walls. Only missiles reach them: fighters, archers to riflemen, towers and warships.</li>
-              <li><b>Camera:</b> arrow keys, the screen edges, middle-drag or Space+drag to pan; the wheel zooms; <kbd>[</kbd> and <kbd>]</kbd> turn the view and <kbd>Backspace</kbd> straightens it. Click the minimap to jump. <b>Scout Flags:</b> <kbd>Ctrl</kbd> + right-click explored ground or the minimap to mark a place; add <kbd>Shift</kbd> for a red danger flag. Repeat to remove; up to six per match.</li>
-              <li><b>Land and warning:</b> every town, tower, dock and airfield claims the land about it, drawn as thin coloured lines (<kbd>O</kbd> hides them). Soldiers marching deep into a rival's land, far from their own, wear down, so strike fast or creep forward by forts. Select a finished Watch Tower and press <kbd>F</kbd> to light a beacon: it sees farther, but every rival sees the ground around it. The minimap remembers the ruins and relics you have seen.</li>
-              <li><b>Keys:</b> <kbd>.</kbd> next idle citizen, <kbd>Shift</kbd>+<kbd>.</kbd> all available idle citizens, <kbd>,</kbd> your whole army, <kbd>H</kbd> Town Center, <kbd>Ctrl</kbd>+<kbd>1</kbd>–<kbd>9</kbd> make a group and <kbd>1</kbd>–<kbd>9</kbd> recall it, <kbd>A</kbd> attack-move, <kbd>Del</kbd> delete, <kbd>P</kbd> pause, <kbd>Alt</kbd> shows all health bars and selected troops' weapon reach (cyan; dashed amber marks siege dead zones). Defense placement previews firing reach. Guides stop at fog; target size and type still matter. <kbd>F10</kbd> menu.</li>
-            </ul>
-          </details>
-          <p class="footnote">Best on a laptop or desktop with a mouse. All sound is made live in your browser.</p>
+          <p class="match-line"><span id="match-line">Random people · Normal</span> <button class="link" data-act="customize" aria-controls="drawer" aria-expanded="false">Customize</button></p>
         </div>
+        <div class="drawer" id="drawer" aria-label="Your match">
+          <div class="drawer-head"><h2>Your match</h2><button class="btn small" data-act="customize">Done</button></div>
+            <div class="setup">
+              <label>Your people
+                <select id="opt-civ"></select>
+              </label>
+              <label>Difficulty
+                <select id="opt-diff">
+                  <option value="gentle">Easy: a first game</option>
+                  <option value="easy" selected>Normal</option>
+                  <option value="normal">Hard</option>
+                  <option value="hard">Expert</option>
+                </select>
+              </label>
+              <div class="civ-row"><span id="civ-crest" class="civ-crest"></span><div id="civ-blurb" class="civ-blurb"></div></div>
+              <details class="more-opts wide" id="more-opts">
+                <summary>More options: map seed, rivals, map, game type, graphics</summary>
+                <div class="more-grid">
+                  <label>Map seed
+                <span class="seed-row"><input id="opt-seed" type="number" min="1" /><button class="btn small" data-act="reroll" title="A new map">🎲</button><button class="btn small" data-act="copy-world" title="Copy a link to this world (seed, size, map, foes)">🔗</button></span>
+              </label>
+                  <label>Color
+                <select id="opt-color"></select>
+              </label>
+                  <label>Opponents
+                <select id="opt-foes">
+                  <option value="1" selected>1 rival</option>
+                  <option value="2">2 rivals</option>
+                  <option value="3">3 rivals</option>
+                </select>
+              </label>
+                  <label>Teams
+                <select id="opt-teams">
+                  <option value="ffa" selected>Everyone for themselves</option>
+                  <option value="ally">You and a computer ally</option>
+                </select>
+              </label>
+                  <label>Map
+                <select id="opt-map"></select>
+              </label>
+                  <label>Homeland
+                <select id="opt-homeland"></select>
+              </label>
+                  <label>Map size
+                <select id="opt-size">
+                  <option value="small">Small</option>
+                  <option value="medium" selected>Medium</option>
+                  <option value="large">Large</option>
+                </select>
+              </label>
+                  <label>Start in
+                <select id="opt-epoch">
+                  <option value="0" selected>Stone Age</option>
+                  <option value="1">Bronze Age</option>
+                  <option value="2">Middle Ages</option>
+                  <option value="3">Gunpowder Age</option>
+                  <option value="4">Industrial Age</option>
+                </select>
+              </label>
+                  <label>Game
+                <select id="opt-mode">
+                  <option value="conquest" selected>Conquest</option>
+                  <option value="regicide">Regicide: protect your King</option>
+                  <option value="deathmatch">Deathmatch: start rich</option>
+                  <option value="lords">Lords of the Land: hold every landmark</option>
+                </select>
+              </label>
+                  <label>Peace treaty
+                <select id="opt-peace">
+                  <option value="0" selected>None</option>
+                  <option value="5">5 minutes</option>
+                  <option value="10">10 minutes</option>
+                  <option value="20">20 minutes</option>
+                </select>
+              </label>
+                  <label>Graphics
+                <select id="opt-quality">
+                  <option value="high">High: shadows, bloom</option>
+                  <option value="medium">Medium: shadows</option>
+                  <option value="low">Low: fastest</option>
+                </select>
+              </label>
+                </div>
+              </details>
+            </div>
+            <div class="title-links">
+              <button class="link" data-act="cloud">Cloud saves</button>
+              <button class="link hidden" id="replay-last-btn" data-act="replay-last">Watch your last match</button>
+              <button class="link" data-act="replay-open">Open a replay file…</button>
+            <button class="link" data-act="replay-intro">Watch the intro</button>
+            </div>
+            <details class="howto">
+              <summary>How to play</summary>
+              <ul>
+                <li><b>Goal:</b> destroy every rival town (walls, farms and gates don't count), or build a Wonder and keep it standing until its countdown ends.</li>
+                <li><b>Select</b> with a left click, or drag a box around units. Shift adds to the selection; double-click picks every unit of that kind on screen.</li>
+                <li><b>Command</b> with a right click: on the ground to move, on an enemy to attack, on trees, berries, stone or gold to gather, on a deer to hunt it, on your building site to help build, on your damaged building to repair it with citizens, on a healthy farm to work it, on a healthy Town Center or tower to shelter inside. Use <kbd>G</kbd> to shelter in a damaged Town Center or tower. Hold <kbd>Shift</kbd> to queue orders one after another.</li>
+                <li><b>Citizens</b> gather food, wood, stone and gold and carry it to your Town Center or a Storehouse. With citizens selected, <kbd>B</kbd> opens the town buildings and <kbd>V</kbd> the military ones. Drag to lay out a wall.</li>
+                <li><b>Technologies</b> at the Town Center, Storehouse, Forge and others make your people faster and your soldiers stronger. <b>Priests</b> heal and convert enemies, and carry the <b>relics</b> found about the map to a Temple, where they bring in gold; a <b>hero</b> inspires the soldiers near them. The <b>Market</b> trades goods for gold, and trains <b>traders</b>: right-click a <b>trading post</b> out on the map and they bring back gold each trip, more the farther the Market stands from it.</li>
+                <li><b>Danger?</b> Ring the town bell at the Town Center (<kbd>R</kbd>): citizens run inside and the Town Center shoots more arrows.</li>
+                <li><b>Houses</b> make room for 5 more people. <b>Farms</b> never run out once the berries do.</li>
+                <li><b>The triangle:</b> infantry beat cavalry, archers beat infantry, cavalry beat archers and siege. Siege engines smash buildings. Mix your army; set stances with <kbd>Z</kbd> <kbd>X</kbd> <kbd>C</kbd>.</li>
+                <li><b>Epochs:</b> at the Town Center, advance from the Stone Age to the Bronze Age, the Middle Ages, the Gunpowder Age and the Industrial Age. Every unit re-arms and every building is rebuilt in the new style.</li>
+                <li><b>Ships:</b> a citizen builds a <b>Dock</b> on the shore (<kbd>D</kbd> in the town buildings). Fishing boats catch fish from the shoals and bring it back; warships rule the water and shell the coast. Right-click your <b>transport</b> with soldiers selected to board, then right-click a far shore to land them (<kbd>U</kbd> unloads where it is).</li>
+                <li><b>Aircraft:</b> in the Industrial Age an <b>Airfield</b> trains fighters and bombers. They fly over water, woods and walls. Only missiles reach them: fighters, archers to riflemen, towers and warships.</li>
+                <li><b>Camera:</b> arrow keys, the screen edges, middle-drag or Space+drag to pan; the wheel zooms; <kbd>[</kbd> and <kbd>]</kbd> turn the view and <kbd>Backspace</kbd> straightens it. Click the minimap to jump. <b>Scout Flags:</b> <kbd>Ctrl</kbd> + right-click explored ground or the minimap to mark a place; add <kbd>Shift</kbd> for a red danger flag. Repeat to remove; up to six per match.</li>
+                <li><b>Land and warning:</b> every town, tower, dock and airfield claims the land about it, drawn as thin coloured lines (<kbd>O</kbd> hides them). Soldiers marching deep into a rival's land, far from their own, wear down, so strike fast or creep forward by forts. Select a finished Watch Tower and press <kbd>F</kbd> to light a beacon: it sees farther, but every rival sees the ground around it. The minimap remembers the ruins and relics you have seen.</li>
+                <li><b>Keys:</b> <kbd>.</kbd> next idle citizen, <kbd>Shift</kbd>+<kbd>.</kbd> all available idle citizens, <kbd>,</kbd> your whole army, <kbd>H</kbd> Town Center, <kbd>Ctrl</kbd>+<kbd>1</kbd>–<kbd>9</kbd> make a group and <kbd>1</kbd>–<kbd>9</kbd> recall it, <kbd>A</kbd> attack-move, <kbd>Del</kbd> delete, <kbd>P</kbd> pause, <kbd>Alt</kbd> shows all health bars and selected troops' weapon reach (cyan; dashed amber marks siege dead zones). Defense placement previews firing reach. Guides stop at fog; target size and type still matter. <kbd>F10</kbd> menu.</li>
+              </ul>
+            </details>
+            <p class="footnote">Best on a laptop or desktop with a mouse. All sound is made live in your browser.</p>
+        </div>
+        <div class="intro" id="intro" aria-hidden="true">
+          <p class="beat" style="--t:0.7s"><b>Every empire began with a fire.</b></p>
+          <p class="beat" style="--t:3.1s"><b>Five ages.</b><small>Stone · Bronze · Medieval · Gunpowder · Industrial</small></p>
+          <p class="beat" style="--t:5.5s"><b>Six peoples.</b><small>Egyptians · Greeks · Romans · Mongols · Chinese · Britons</small></p>
+          <p class="beat" style="--t:7.9s"><b>One world to win.</b></p>
+          <div class="slam"><span class="slam-flash"></span><h2>Ages <i>of</i> Earth</h2></div>
+        </div>
+        <button class="skip" id="skip-intro" data-act="skip-intro" type="button">Skip ›</button>
       </div>
+      <div class="adventure" id="adventure" aria-hidden="true"><div class="adv-card"><small id="adv-kicker">The adventure begins</small><b id="adv-people"></b><i id="adv-age"></i></div></div>
 
       <div id="online" class="screen hidden"></div>
       <div id="campaign" class="screen hidden"></div>

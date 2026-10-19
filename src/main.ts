@@ -1,3 +1,4 @@
+import { Prologue } from './ui/prologue';
 import './ui/style.css';
 import { Music } from './audio/music';
 import { sound, type SoundName } from './audio/sound';
@@ -1034,7 +1035,12 @@ document.addEventListener('click', (e) => {
   switch (act) {
     case 'start':
       sound.play('click');
-      startMatch(setupFromTitle(Number(seedInput.value) || newSeed()));
+      prologue.stepIn(() => {
+        startMatch(setupFromTitle(Number(seedInput.value) || newSeed()));
+        sound.play('epoch');
+        const me = game!.players[viewer];
+        return { people: `You lead the ${CIVS[me.civ].name}`, age: ageDef(me).name };
+      });
       break;
     case 'continue': {
       const saved = loadGame();
@@ -2935,12 +2941,23 @@ function frame(now: number): void {
 };
 
 $('loading').classList.add('hidden');
+const prologue = new Prologue($('title'), $('adventure'));
+for (const id of ['opt-civ', 'opt-diff']) $(id).addEventListener('change', summarize);
+function summarize(): void {
+  const text = (id: string) => $<HTMLSelectElement>(id).selectedOptions[0]?.textContent?.split(':')[0].trim() ?? '';
+  const people = text('opt-civ');
+  prologue.summary(people === 'Random' ? 'Random people' : `The ${people}`, text('opt-diff'));
+}
+summarize();
 // A shared room link: straight into the room (or back into a match after a reload).
 const roomCode = new URLSearchParams(location.search).get('room')?.toUpperCase() ?? '';
 startAttract(roomCode.length !== 5);
 if (roomCode.length === 5 && savedName()) connectRoom(roomCode, savedName(), new URLSearchParams(location.search).get('watch') === '1');
 else if (roomCode.length === 5) lobby.showEntry(roomCode);
-else $('title').classList.remove('hidden');
+else {
+  prologue.begin();
+  $('title').classList.remove('hidden');
+}
 requestAnimationFrame(frame);
 // A scanned save-key link (#vault=KEY): the key leaves the address bar at once, then the player is asked.
 {

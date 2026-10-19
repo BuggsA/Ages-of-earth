@@ -86,7 +86,6 @@ kbd {
     width: min(560px, 44vw); max-height: none; height: 100%; padding: 4vh 56px 2vh 6vw; display: flex; flex-direction: column; justify-content: flex-start;
     background: none; border: 0; border-radius: 0; box-shadow: none; backdrop-filter: none; text-align: left;
   }
-  .title-card::after { content: ''; position: absolute; top: 8%; bottom: 8%; left: min(560px, 44vw); width: 1px; background: linear-gradient(transparent, var(--edge) 30%, var(--edge) 70%, transparent); opacity: 0.55; pointer-events: none; }
   .title-card > * { order: 5; flex: none; }
   .title-card h1 { order: 0; font-size: 64px; line-height: 0.95; }
   .tagline { order: 1; }
@@ -459,3 +458,124 @@ body.online .tip-box { bottom: 330px; }
 .notice.shortage { display: flex; align-items: center; gap: 8px; }
 .notice.shortage button { pointer-events: auto; cursor: pointer; padding: 3px 10px; color: var(--gold-2); background: rgba(255, 255, 255, 0.08); border: 1px solid var(--gold); border-radius: 7px; font: 800 13px 'Nunito', sans-serif; }
 .notice.shortage button:hover { background: rgba(232, 196, 106, 0.2); }
+
+/* The title screen (#title only; the campaign, lobby and Web screens keep .title-card).
+   Layers: the live world, light and embers, letterbox bars, the menu (or the trailer over it), the Customize panel. */
+#title.screen { display: block; overflow: hidden; background: none; padding: 0; --bar: 5vh; }
+#title.screen::before { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 120% 100% at 60% 45%, transparent 45%, rgba(3, 5, 9, 0.7) 100%), linear-gradient(90deg, rgba(5, 7, 12, 0.9) 0, rgba(5, 7, 12, 0.62) 34%, rgba(5, 7, 12, 0.08) 62%, transparent 76%), linear-gradient(0deg, rgba(5, 7, 12, 0.55), transparent 30%); }
+#title .fx { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+#title .fx-sun { position: absolute; inset: 0; mix-blend-mode: screen; background: radial-gradient(ellipse 55% 45% at 80% 14%, rgba(255, 190, 100, 0.30), transparent 70%); animation: sun-breathe 9s ease-in-out infinite alternate; }
+@keyframes sun-breathe { from { opacity: 0.55; } to { opacity: 1; } }
+#title .fx-grain { position: absolute; inset: -50%; opacity: 0.07; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E"); animation: grain 0.9s steps(4) infinite; }
+@keyframes grain { 25% { transform: translate(-3%, 2%); } 50% { transform: translate(2%, -3%); } 75% { transform: translate(-2%, -1%); } }
+#title .fx-embers i { position: absolute; bottom: -12px; left: var(--x); width: var(--s); height: var(--s); border-radius: 50%; background: radial-gradient(#ffe9a8, #ff9a3a 55%, transparent 72%); opacity: 0; animation: ember var(--d) linear var(--t) infinite; }
+@keyframes ember { 0% { opacity: 0; transform: translate(0, 0); } 10% { opacity: 0.9; } 70% { opacity: 0.55; } 100% { opacity: 0; transform: translate(var(--w), -105vh); } }
+#title .cine { position: absolute; left: 0; right: 0; height: var(--bar); background: #000; pointer-events: none; transition: height 1.2s cubic-bezier(0.3, 0, 0.2, 1); z-index: 6; }
+#title .cine-top { top: 0; }
+#title .cine-bottom { bottom: 0; }
+#title.intro-run { --bar: 12vh; }
+#title.intro-run .cine { animation: bars-open 2.2s cubic-bezier(0.3, 0, 0.2, 1) both; }
+@keyframes bars-open { from { height: 50vh; } }
+#title.stepping { --bar: 17vh; }
+#title .title-caption { z-index: 3; bottom: calc(var(--bar) + 14px); }
+#title.intro-run .title-caption, #title.stepping .title-caption { display: none; }
+
+/* The menu: the wordmark, the roads in, what Play will start. */
+#title .title-main { position: absolute; z-index: 3; left: 50%; top: 50%; width: min(560px, calc(100% - 40px)); display: flex; flex-direction: column; text-align: center; pointer-events: auto; transform: translate(-50%, -50%); transition: opacity 0.6s, transform 0.6s; }
+#title .title-main > * { order: 0; }
+#title:not(.intro-done) .title-main { opacity: 0; pointer-events: none; transform: translate(-50%, calc(-50% + 24px)); }
+#title.intro-done .title-main > * { animation: rise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+#title.intro-done .title-main > :nth-child(1) { animation-delay: 0.05s; }
+#title.intro-done .title-main > :nth-child(2) { animation-delay: 0.15s; }
+#title.intro-done .title-main > :nth-child(3) { animation-delay: 0.3s; }
+#title.intro-done .title-main > :nth-child(4) { animation-delay: 0.4s; }
+#title.intro-done .title-main > :nth-child(5) { animation-delay: 0.5s; }
+#title.intro-done .title-main > :nth-child(6) { animation-delay: 0.65s; }
+@keyframes rise { from { opacity: 0; transform: translateY(22px); } }
+#title.customizing .title-main { opacity: 0.18; pointer-events: none; filter: blur(2px); }
+#title.stepping .title-main { opacity: 0; transform: translate(-50%, -50%) scale(0.96); pointer-events: none; transition-duration: 0.7s; }
+#title .kicker { margin: 0 0 6px; font: 800 12px 'Nunito', sans-serif; letter-spacing: 0.42em; text-transform: uppercase; color: var(--gold-2); text-shadow: 0 1px 8px #000; }
+#title h1 { margin: 0; font: 800 min(12vh, 17vw, 96px) 'Cinzel', serif; line-height: 0.88; letter-spacing: 2px; background: linear-gradient(#fff6d2, #f0cd78 48%, #b07d26); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 3px 0 #3e2c0c) drop-shadow(0 8px 28px rgba(240, 190, 90, 0.4)); }
+#title h1 span { display: flex; align-items: center; justify-content: center; gap: 14px; font-size: 0.24em; letter-spacing: 0.5em; margin: 0.3em 0 0.25em; -webkit-text-fill-color: var(--gold-2); }
+#title h1 span::before, #title h1 span::after { content: ''; flex: 0 1 70px; height: 1px; background: linear-gradient(90deg, transparent, var(--gold)); }
+#title h1 span::after { transform: scaleX(-1); }
+#title .tagline { margin: 14px 0 12px; font: 800 18px 'Cinzel', serif; letter-spacing: 0.6px; color: var(--ink); text-shadow: 0 2px 12px #000; text-wrap: balance; }
+#title .age-ribbon { margin: 0 0 18px; }
+#title .age-ribbon li { padding: 4px 0 3px; font-size: 8.5px; letter-spacing: 0; text-align: center; }
+#title .title-buttons { display: flex; flex-direction: column; gap: 10px; margin: 0; }
+#title .title-buttons .btn.big { width: 100%; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 2px; letter-spacing: 1px; }
+#title .title-buttons .btn.big small { font: 700 12px 'Nunito', sans-serif; letter-spacing: 0; text-transform: none; opacity: 0.75; }
+#title .title-buttons .btn.big.primary { position: relative; overflow: hidden; padding: 18px 20px 15px; font-size: 32px; border-radius: 12px; background: linear-gradient(#e6b74c, #a56f1d); box-shadow: 0 0 0 1px #f8e19b inset, 0 6px 0 #5a3f0e, 0 16px 44px rgba(240, 190, 90, 0.38); color: #1c1408; transition: transform 0.12s, box-shadow 0.12s, filter 0.12s; }
+#title .title-buttons .btn.big.primary small { opacity: 0.8; font-size: 13px; }
+#title .title-buttons .btn.big.primary::after { content: ''; position: absolute; top: 0; bottom: 0; left: -40%; width: 30%; background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.5), transparent); transform: skewX(-18deg); animation: play-sheen 5.5s ease-in-out 1.6s infinite; pointer-events: none; }
+#title .title-buttons .btn.big.primary:hover { transform: translateY(-2px); filter: brightness(1.1); padding: 18px 20px 15px; background: linear-gradient(#efc258, #b07a22); box-shadow: 0 0 0 1px #f8e19b inset, 0 8px 0 #5a3f0e, 0 20px 56px rgba(240, 190, 90, 0.55); }
+#title .title-buttons .btn.big.primary:active { transform: translateY(4px); box-shadow: 0 0 0 1px #f8e19b inset, 0 2px 0 #5a3f0e, 0 6px 18px rgba(240, 190, 90, 0.3); }
+@keyframes play-sheen { 0%, 68% { left: -40%; } 100% { left: 130%; } }
+#title .title-roads { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+#title .title-roads .btn.big { padding: 11px 6px 9px; font-size: 13px; letter-spacing: 0; background: rgba(18, 22, 32, 0.62); backdrop-filter: blur(5px); border-color: rgba(255, 255, 255, 0.14); transition: transform 0.12s, border-color 0.12s, background 0.12s; }
+#title .title-roads .btn.big:hover { padding: 11px 6px 9px; transform: translateY(-2px); border-color: var(--gold); background: rgba(70, 56, 28, 0.7); }
+#title .title-roads .btn.big small { font-size: 11px; line-height: 1.3; }
+#title .match-line { margin: 14px 0 0; font-weight: 700; font-size: 13px; color: var(--muted); text-shadow: 0 1px 8px #000; }
+#title .match-line .link { margin-left: 6px; }
+
+/* Customize: the match settings, over the menu. */
+#title .drawer { position: absolute; z-index: 4; left: 50%; top: 50%; width: min(520px, calc(100% - 28px)); max-height: calc(100% - var(--bar) * 2 - 24px); overflow: auto; box-sizing: border-box; padding: 18px 20px 14px; text-align: left; background: rgba(14, 17, 26, 0.9); border: 1px solid var(--edge); border-radius: 16px; box-shadow: var(--shadow); backdrop-filter: blur(10px); opacity: 0; pointer-events: none; transform: translate(-50%, calc(-50% + 18px)); transition: opacity 0.35s, transform 0.35s; }
+#title.customizing .drawer { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%); }
+#title .drawer-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+#title .drawer-head h2 { margin: 0; font: 800 22px 'Cinzel', serif; color: var(--gold); }
+#title .drawer .setup { margin-bottom: 8px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+#title .drawer .setup select, #title .drawer .setup input, #title .drawer .more-grid select { min-width: 0; width: 100%; box-sizing: border-box; }
+#title .drawer .seed-row { display: flex; gap: 8px; min-width: 0; }
+#title .drawer .seed-row input { flex: 1; width: auto; }
+#title .drawer .more-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+#title .drawer .civ-blurb { min-width: 0; overflow-wrap: anywhere; }
+#title .drawer .title-links { justify-content: flex-start; flex-wrap: wrap; margin: 6px 0 0; }
+
+/* The trailer: dark, four beats, the wordmark lands. Any key or click skips it. */
+#title .intro, #title .skip { display: none; }
+#title.intro-run .intro { display: block; position: absolute; inset: 0; z-index: 5; pointer-events: auto; cursor: pointer; }
+#title.intro-run .intro::before { content: ''; position: absolute; inset: 0; background: #000; animation: unfade 2.4s ease-out both; }
+@keyframes unfade { from { opacity: 1; } to { opacity: 0; } }
+#title.intro-run .intro::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.2) 60%, transparent); }
+#title .beat { position: absolute; z-index: 1; inset: 0; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; padding: 0 6vw; opacity: 0; animation: beat 2.5s ease-in-out var(--t) both; }
+#title .beat b { font: 800 clamp(26px, 5vw, 64px) 'Cinzel', serif; letter-spacing: 0.1em; color: #fff3cf; text-shadow: 0 0 40px rgba(240, 190, 90, 0.55), 0 3px 14px #000; }
+#title .beat small { font: 800 clamp(11px, 1.3vw, 15px) 'Nunito', sans-serif; letter-spacing: 0.32em; text-transform: uppercase; color: var(--gold-2); text-shadow: 0 2px 10px #000; }
+@keyframes beat { 0% { opacity: 0; transform: scale(1.06); filter: blur(10px); } 24% { opacity: 1; transform: scale(1); filter: blur(0); } 78% { opacity: 1; transform: scale(0.99); } 100% { opacity: 0; transform: scale(0.97); filter: blur(6px); } }
+#title .slam { position: absolute; z-index: 1; inset: 0; display: grid; place-items: center; opacity: 0; animation: slam 2.5s cubic-bezier(0.2, 0.7, 0.2, 1) 10.1s both; }
+#title .slam h2 { margin: 0; font: 800 min(18vh, 12vw, 150px) 'Cinzel', serif; line-height: 0.9; letter-spacing: 3px; text-align: center; background: linear-gradient(#fff6d2, #f0cd78 48%, #b07d26); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 4px 0 #3e2c0c) drop-shadow(0 10px 50px rgba(240, 190, 90, 0.7)); }
+#title .slam h2 i { display: block; font-style: normal; font-size: 0.26em; letter-spacing: 0.6em; margin: 0.15em 0; -webkit-text-fill-color: var(--gold-2); }
+#title .slam-flash { position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(255, 236, 190, 0.85), transparent 60%); opacity: 0; animation: flash 1.4s ease-out 10.2s both; }
+@keyframes slam { 0% { opacity: 0; transform: scale(1.5); filter: blur(14px); } 20% { opacity: 1; transform: scale(1); filter: blur(0); } 80% { opacity: 1; transform: scale(1.015); } 100% { opacity: 0; transform: scale(1.04); } }
+@keyframes flash { 0% { opacity: 0; } 12% { opacity: 1; } 100% { opacity: 0; } }
+#title.intro-run .skip { display: block; position: absolute; z-index: 7; right: 28px; bottom: calc(var(--bar) + 16px); padding: 8px 16px; pointer-events: auto; cursor: pointer; font: 800 13px 'Nunito', sans-serif; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255, 255, 255, 0.82); background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 999px; opacity: 0; animation: fade-in 0.8s ease 1.6s both; }
+#title.intro-run .skip:hover { color: #fff; border-color: var(--gold); }
+@keyframes fade-in { to { opacity: 1; } }
+
+/* Stepping in: the world pushes toward you and goes dark, the match starts under it, the dark lifts on whom you lead. */
+body.stepping #world { transform: scale(1.3); filter: brightness(0.55) blur(2px); transition: transform 1.6s cubic-bezier(0.5, 0, 0.9, 0.5), filter 1.4s ease-in; }
+body.adventure-in #world { animation: adventure-in 3s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@keyframes adventure-in { from { transform: scale(1.18); filter: brightness(0.6); } to { transform: none; filter: none; } }
+.adventure { position: fixed; inset: 0; z-index: 80; pointer-events: none; display: grid; place-items: center; background: radial-gradient(ellipse at center, #17140d, #000 75%); opacity: 0; transition: opacity 1.4s ease; }
+.adventure.dark { opacity: 1; transition-duration: 1.1s; }
+.adventure .adv-card { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding: 0 6vw; opacity: 0; transform: scale(0.96); transition: opacity 0.8s ease 0.1s, transform 1.6s ease; }
+.adventure.show .adv-card { opacity: 1; transform: scale(1); }
+.adventure small { font: 800 13px 'Nunito', sans-serif; letter-spacing: 0.42em; text-transform: uppercase; color: var(--gold-2); }
+.adventure b { font: 800 clamp(30px, 6vw, 72px) 'Cinzel', serif; color: #fff3cf; text-shadow: 0 0 44px rgba(240, 190, 90, 0.5); }
+.adventure i { font: italic 700 clamp(16px, 2vw, 24px) 'Cinzel', serif; color: var(--muted); }
+
+/* A wide screen steps the menu to the left, and the live world gets the right. */
+@media (min-width: 900px) {
+  #title .title-main { left: 7vw; transform: translateY(-50%); text-align: left; }
+  #title:not(.intro-done) .title-main { transform: translateY(calc(-50% + 24px)); }
+  #title.stepping .title-main { transform: translateY(-50%) scale(0.96); }
+  #title h1 span { justify-content: flex-start; margin-left: 0.3em; }
+  #title h1 span::before { display: none; }
+  #title h1 span::after { transform: none; background: linear-gradient(90deg, var(--gold), transparent); flex: 0 1 110px; }
+  #title .title-roads .btn.big { font-size: 15px; letter-spacing: 1px; }
+  #title .age-ribbon li { font-size: 9.5px; letter-spacing: 0.4px; }
+  #title .drawer { left: auto; right: 6vw; transform: translate(0, calc(-50% + 18px)); }
+  #title.customizing .drawer { transform: translate(0, -50%); }
+}
+@media (max-height: 700px) { #title .age-ribbon { display: none; } #title .tagline { margin: 10px 0 12px; } }
+@media (max-width: 899px) { #title.screen::before { background: radial-gradient(ellipse 120% 100% at 50% 45%, transparent 40%, rgba(3, 5, 9, 0.7) 100%), linear-gradient(0deg, rgba(5, 7, 12, 0.88), rgba(5, 7, 12, 0.55) 55%, rgba(5, 7, 12, 0.25)); } #title .kicker { font-size: 10px; } #title .title-roads small { display: none; } #title .title-roads .btn.big { padding: 12px 4px; } }
+@media (prefers-reduced-motion: reduce) { #title .fx-embers, #title .fx-grain, #title .title-buttons .btn.big.primary::after { display: none; } }
