@@ -1077,3 +1077,7 @@ Seen: unit tests, a headless computer-vs-computer sweep (seeds 1-3, 40 minutes: 
 
 Next: soldiers carrying the fever home from a sick land (campaign fever), sick citizens tinted in `unitsView`, a Hospice building, a Reclaimer reading (stripped rubble is foul), Hemocraft's drains as sanitation, and a rival's way to foul a road on purpose.
 
+
+## Designers' notes: move workers by the dozen (2026-10-19, Claude Code)
+
+Built: the Workers panel can now move people. **+** on a resource row sends one more (Shift: five); "Move N from A to B" sends a number between jobs. The sim picks who: the idle, then the empty-handed, each to the nearest free node. Why I love it: a town of forty is managed by its shape (more wood, fewer berries), not by clicking forty people, and it works the same online because it is one command. Next: Building as a destination (nearest unfinished site), a "Get 40 wood" button on any button you can't afford that calls this command for the shortfall, and a first-game tip.

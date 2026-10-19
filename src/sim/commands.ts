@@ -20,6 +20,7 @@ import { callUp, callUpProblem } from './warcamp';
 import { arm, armProblem, disarm, disarmProblem } from './polis';
 import { citizenProblem, legionKind, legionary } from './legion';
 import { mineable } from './household';
+import { reassign } from './labor';
 import { bloodOf, bloodShort, levy, levyProblem, sworn } from './blood';
 import { riteProblem } from './fork';
 import { rallyCry, rallyProblem } from './rally';
@@ -313,6 +314,11 @@ export function applyCommand(s: GameState, c: Command): void {
       }
       const others = units.filter((u) => !workers.includes(u));
       if (others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: (c.tile % s.w) + 0.5, y: Math.floor(c.tile / s.w) + 0.5, queue: c.queue });
+      break;
+    }
+    case 'reassign': {
+      const r = reassign(s, c.p, c.from, c.to, c.n);
+      if (r.why) refuse(s, c.p, r.why);
       break;
     }
     case 'hunt': {

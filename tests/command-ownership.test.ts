@@ -82,6 +82,7 @@ describe('one player never commands another’s people', () => {
       dropRelic: { t: 'dropRelic', p: 1, ids },
       dig: { t: 'dig', p: 1, ids, target: 0 },
       salvage: { t: 'salvage', p: 1, ids, target: 0 },
+      reassign: { t: 'reassign', p: 1, from: 'idle', to: 'wood', n: 5 },
       tiding: { t: 'tiding', p: 1, card: 'traveller', take: true },
       // Last: these end player 1's part in the match, which must leave player 0 as it was too.
       resign: { t: 'resign', p: 1 },
