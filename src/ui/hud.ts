@@ -5,9 +5,10 @@ import { armProblem, disarmProblem, isPolis } from '../sim/polis';
 import { scenarioById } from '../sim/campaign';
 import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
-import { heroBusy, shortfall, MAX_QUEUE } from '../sim/commands';
+import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
+import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE } from '../sim/units';
-import { SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, SNARE, SICKNESS, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, SNARE, SICKNESS, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -32,7 +33,7 @@ import { exacting, isRider } from '../sim/tribute';
 import { landOwnerAt } from '../sim/borders';
 import { flockCap, flockOf, grazeRange, lambProblem } from '../sim/flocks';
 import { ageDef, ageOf, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, oreClue, oreDone, oreOnly, ironTradeShare, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, pathLine, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, surveyFinds, suspendedTechs, trainsAt, windowsOf } from '../sim/ages';
-import type { Building, BuildingType, Command, Cost, Ent, GameState, Landmark, Player, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
+import type { Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Player, Res, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
 import { RARES, RES, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
 import { buildingPicture, unitPicture } from './thumbs';
@@ -188,6 +189,7 @@ export class Hud {
   private idleEl = document.getElementById('idle-btn')!;
   private workforceBtn = document.getElementById('workforce-btn') as HTMLButtonElement;
   private workforcePanel = document.getElementById('workforce-panel')!;
+  private wfDrawn = new Map<string, string>();
   private selEl = document.getElementById('selection')!;
   private cmdEl = document.getElementById('commands')!;
   private tipEl = document.getElementById('tooltip')!;
@@ -213,16 +215,32 @@ export class Hud {
       if (!open && this.state) this.drawWorkforce(this.state, this.viewer);
     });
     this.workforcePanel.addEventListener('click', (e) => {
-      const row = (e.target as HTMLElement).closest<HTMLElement>('[data-job]');
-      if (!row || !this.state) return;
+      const target = e.target as HTMLElement;
+      if (!this.state) return;
+      const add = target.closest<HTMLElement>('[data-add]');
+      if (add) return this.sendWorkers(add.dataset.add as Job, e.shiftKey ? 5 : 1);
+      if (target.closest('[data-go]')) {
+        const n = Number((this.workforcePanel.querySelector('#wf-n') as HTMLInputElement).value);
+        const from = (this.workforcePanel.querySelector('#wf-from') as HTMLSelectElement).value as Job;
+        const to = (this.workforcePanel.querySelector('#wf-to') as HTMLSelectElement).value as Job;
+        return this.moveWorkers(from, to, n);
+      }
+      const row = target.closest<HTMLElement>('[data-job]');
+      if (!row) return;
       const job = row.dataset.job;
-      const ids = workforce(this.state, this.viewer).get(job ?? '') ?? [];
+      const ids = workforce(this.state, this.viewer).get(job as Job) ?? [];
       if (ids.length) {
         this.act.select(ids);
         this.act.sound('click');
       }
       this.workforcePanel.classList.add('hidden');
       this.workforceBtn.setAttribute('aria-expanded', 'false');
+    });
+    this.noticeEl.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-hands]');
+      if (!b) return;
+      this.sendWorkers(b.dataset.hands as Job, Number(b.dataset.n) || 1);
+      b.closest('.shortage')?.remove();
     });
     this.cmdEl.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest<HTMLElement>('[data-i]');
@@ -277,8 +295,11 @@ export class Hud {
 
   private runCmd(c: Cmd): void {
     if (!c.ok) {
-      this.toast(c.why ?? "Can't do that now", 'bad');
       this.act.sound('error');
+      const p = this.state?.players[this.viewer];
+      // Short of resources: say so with a way to put hands on what is missing, right there.
+      if (p && c.cost && c.why && c.why === shortfall(p, c.cost)) this.shortageCard(shortages(p, c.cost), c.why);
+      else this.toast(c.why ?? "Can't do that now", 'bad');
       return;
     }
     c.run();
@@ -304,6 +325,22 @@ export class Hud {
     while (this.noticeEl.children.length > 4) this.noticeEl.firstChild!.remove();
     setTimeout(() => (el.style.opacity = '0'), 2600);
     setTimeout(() => el.remove(), 3200);
+  }
+
+  /** A notice for a button you can't pay for: what is missing, and one button per resource to send the hands it takes. */
+  private shortageCard(short: { res: Res; need: number }[], why: string): void {
+    this.noticeEl.querySelector('.shortage')?.remove();
+    const el = document.createElement('div');
+    el.className = 'notice bad shortage';
+    const label = (r: Res) => WORKFORCE_JOBS.find((j) => j.key === r)!;
+    el.innerHTML = `<span>${why}${short.length > 1 ? ` (and ${short.length - 1} more)` : ''}</span>` + short.map((m) => {
+      const n = handsFor(m.res, m.need);
+      return `<button type="button" data-hands="${m.res}" data-n="${n}" title="Put ${n} on ${label(m.res).label.toLowerCase()}: about ${LABOR.window} seconds of work covers ${m.need}">${label(m.res).icon} Send ${n}</button>`;
+    }).join('');
+    this.noticeEl.appendChild(el);
+    while (this.noticeEl.children.length > 4) this.noticeEl.firstChild!.remove();
+    setTimeout(() => (el.style.opacity = '0'), 6500);
+    setTimeout(() => el.remove(), 7200);
   }
 
   banner(title: string, sub = '', ms = 3200): void {
@@ -352,14 +389,56 @@ export class Hud {
     if (bar) bar.style.width = `${(left * 100).toFixed(1)}%`;
   }
 
+  /** Ask the sim to move `n` citizens between jobs; it picks who (idle first) and where they go. */
+  private moveWorkers(from: Job, to: Job, n: number): void {
+    if (!Number.isFinite(n) || n < 1) return;
+    this.act.issue({ t: 'reassign', p: this.viewer, from, to, n: Math.floor(n) });
+    this.act.sound('click');
+  }
+
+  /** The "+" on a job: bring `n` hands to it, from the idle first, then from the biggest other job. */
+  private sendWorkers(to: Job, n: number): void {
+    if (!this.state) return;
+    const jobs = workforce(this.state, this.viewer);
+    const sources = (['idle', 'food', 'wood', 'stone', 'gold'] as const).filter((j) => j !== to && (jobs.get(j)?.length ?? 0) > 0);
+    sources.sort((a, b) => (a === 'idle' ? -1 : b === 'idle' ? 1 : (jobs.get(b)?.length ?? 0) - (jobs.get(a)?.length ?? 0)));
+    let left = n;
+    for (const from of sources) {
+      if (left <= 0) break;
+      const take = Math.min(left, jobs.get(from)!.length);
+      this.moveWorkers(from, to, take);
+      left -= take;
+    }
+    if (left === n) {
+      this.act.sound('error');
+      this.toast('No one to spare from another job', 'bad');
+    }
+  }
+
   private drawWorkforce(s: GameState, viewer: number): void {
     const jobs = workforce(s, viewer);
     const total = WORKFORCE_JOBS.reduce((n, job) => n + (jobs.get(job.key)?.length ?? 0), 0);
-    this.workforcePanel.innerHTML = `<div class="workforce-head">Workforce <span>${total} ${isLegion(s.players[viewer]) ? 'hands' : 'citizens'}</span></div>` +
-      WORKFORCE_JOBS.map((job) => {
-        const n = jobs.get(job.key)?.length ?? 0;
-        return `<button type="button" data-job="${job.key}" ${n ? '' : 'disabled'} title="Select ${job.label.toLowerCase()} citizens"><span>${job.icon} ${job.label}</span><strong>${n}</strong></button>`;
-      }).join('') + '<div class="workforce-note">Choose a row to select its citizens. No orders are changed.</div>';
+    const opt = (keys: readonly string[]) => WORKFORCE_JOBS.filter((j) => keys.includes(j.key)).map((j) => `<option value="${j.key}">${j.icon} ${j.label}</option>`).join('');
+    // The skeleton is built once so the number box and the pickers keep what the player set while the counts refresh.
+    if (!this.workforcePanel.querySelector('#wf-rows')) {
+      this.workforcePanel.innerHTML = '<div class="workforce-head" id="wf-head"></div><div id="wf-rows"></div>' +
+        `<div class="wf-move"><div class="wf-line">Move <input id="wf-n" type="number" min="1" max="200" value="5" aria-label="How many"></div>` +
+        `<div class="wf-line">from <select id="wf-from" aria-label="From job">${opt(['wood', 'food', 'stone', 'gold', 'build', 'idle'])}</select></div>` +
+        `<div class="wf-line">to <select id="wf-to" aria-label="To job">${opt(['food', 'wood', 'stone', 'gold', 'build'])}</select> <button type="button" class="wf-go" data-go>Go</button></div></div>` +
+        '<div class="workforce-note">Choose a row to select its citizens. + sends one (Shift: five) from the idle first, else the biggest job; on Building it joins the nearest unfinished building and goes back to its old work after. Move sends the idle and empty-handed first.</div>';
+    }
+    // Written only when it changes: rebuilding a button between a press and its release would swallow the click.
+    const set = (sel: string, html: string) => {
+      if (this.wfDrawn.get(sel) === html) return;
+      this.wfDrawn.set(sel, html);
+      this.workforcePanel.querySelector(sel)!.innerHTML = html;
+    };
+    set('#wf-head', `Workforce <span>${total} ${isLegion(s.players[viewer]) ? 'hands' : 'citizens'}</span>`);
+    set('#wf-rows', WORKFORCE_JOBS.map((job) => {
+      const n = jobs.get(job.key)?.length ?? 0;
+      const plus = ['food', 'wood', 'stone', 'gold', 'build'].includes(job.key) ? `<button type="button" class="wf-add" data-add="${job.key}" title="Send one more to ${job.label.toLowerCase()} (Shift: five)" aria-label="Send one more to ${job.label.toLowerCase()}">+</button>` : '';
+      return `<div class="wf-row"><button type="button" data-job="${job.key}" ${n ? '' : 'disabled'} title="Select ${job.label.toLowerCase()} citizens"><span>${job.icon} ${job.label}</span><strong>${n}</strong></button>${plus}</div>`;
+    }).join(''));
   }
 
   private top(s: GameState, viewer: number, speed: number): void {

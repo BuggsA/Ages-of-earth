@@ -449,3 +449,13 @@ body.online .tip-box { bottom: 330px; }
 @keyframes dawn-lift { 0% { opacity: 1; } 35% { opacity: 0.85; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .dawn.lift { animation-duration: 1.5s; } }
 #timers .timer.urgent { animation: pulse 0.8s infinite; border-color: var(--bad); }
+.wf-row { display: flex; align-items: center; gap: 4px; }
+.wf-row > button[data-job] { flex: 1; width: auto; }
+.workforce-panel .wf-add { width: 26px; justify-content: center; padding: 4px 0; color: var(--gold-2); border: 1px solid var(--edge); }
+.wf-move { border-top: 1px solid var(--edge); margin-top: 6px; padding: 8px 6px 2px; color: var(--ink); font: 700 12px 'Nunito', sans-serif; }
+.wf-line { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.wf-move input, .wf-move select { flex: 1; min-width: 0; color: var(--ink); background: rgba(255, 255, 255, 0.06); border: 1px solid var(--edge); border-radius: 6px; padding: 4px 6px; font: inherit; }
+.workforce-panel .wf-go { width: auto; justify-content: center; padding: 5px 12px; border: 1px solid var(--gold); color: var(--gold-2); }
+.notice.shortage { display: flex; align-items: center; gap: 8px; }
+.notice.shortage button { pointer-events: auto; cursor: pointer; padding: 3px 10px; color: var(--gold-2); background: rgba(255, 255, 255, 0.08); border: 1px solid var(--gold); border-radius: 7px; font: 800 13px 'Nunito', sans-serif; }
+.notice.shortage button:hover { background: rgba(232, 196, 106, 0.2); }

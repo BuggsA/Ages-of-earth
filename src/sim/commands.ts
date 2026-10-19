@@ -5,7 +5,7 @@ import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats
 import { packCamp, packProblem, pitchCamp, pitchProblem } from './steppe';
 import { lambProblem, raiseLamb } from './flocks';
 import { backProblem, backTo, barred, buildBarred, canRaise, journeyOf, roadProblem, roadTo, trainsAt } from './ages';
-import type { Building, BuildingType, Command, Ent, Cost, GameState, Order, Player, Unit } from './types';
+import type { Building, BuildingType, Command, Ent, Cost, GameState, Order, Player, Res, Unit } from './types';
 import { RES, R_FISH, R_MEAT, R_NONE } from './types';
 import { RES_OF_TILE, cargoRoom, findResource, freeFarm, garrisonRoom, giveOrder, landing, setOrder, ungarrison } from './units';
 import { carriedBy, letGo, relicAt } from './relics';
@@ -20,6 +20,7 @@ import { callUp, callUpProblem } from './warcamp';
 import { arm, armProblem, disarm, disarmProblem } from './polis';
 import { citizenProblem, legionKind, legionary } from './legion';
 import { mineable } from './household';
+import { reassign } from './labor';
 import { bloodOf, bloodShort, levy, levyProblem, sworn } from './blood';
 import { riteProblem } from './fork';
 import { rallyCry, rallyProblem } from './rally';
@@ -39,6 +40,16 @@ export const MAX_QUEUE = 6;
 
 function refuse(s: GameState, p: number, why: string): void {
   s.events.push({ k: 'refused', owner: p, why });
+}
+
+/** Every resource short of a cost, with how much, in the usual order. */
+export function shortages(p: Player, cost: Cost): { res: Res; need: number }[] {
+  const out: { res: Res; need: number }[] = [];
+  for (const r of RES) {
+    const need = Math.ceil((cost[r] ?? 0) - p.res[r]);
+    if (need > 0) out.push({ res: r, need });
+  }
+  return out;
 }
 
 /** What's missing to pay a cost, in words ("Need 40 more wood"), or null when it can be paid. */
@@ -313,6 +324,11 @@ export function applyCommand(s: GameState, c: Command): void {
       }
       const others = units.filter((u) => !workers.includes(u));
       if (others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: (c.tile % s.w) + 0.5, y: Math.floor(c.tile / s.w) + 0.5, queue: c.queue });
+      break;
+    }
+    case 'reassign': {
+      const r = reassign(s, c.p, c.from, c.to, c.n);
+      if (r.why) refuse(s, c.p, r.why);
       break;
     }
     case 'hunt': {

@@ -931,6 +931,9 @@ export interface AiMemory {
 }
 
 /** Orders that can be given with Shift held to queue them after the current one. */
+/** What a citizen is doing, by the order they follow (the Workers panel and `reassign`). */
+export type Job = 'food' | 'wood' | 'stone' | 'gold' | 'build' | 'idle' | 'shelter' | 'other';
+
 type Queued = { queue?: boolean };
 
 export type Command =
@@ -986,6 +989,8 @@ export type Command =
   /** Step back an age (#47), to the trunk age one tier down. */
   | { t: 'stepBack'; p: number; building: number }
   | { t: 'rally'; p: number; building: number; x: number; y: number }
+  /** Move `n` citizens from one job to another without picking them: idle first, then those carrying nothing, in id order. */
+  | { t: 'reassign'; p: number; from: Job; to: Job; n: number }
   /** A rare ore (#356) can only be sold, a lot of it for gold at a flat price. */
   | { t: 'trade'; p: number; res: 'food' | 'wood' | 'stone' | RareId; buy: boolean }
   | { t: 'stop'; p: number; ids: number[] }

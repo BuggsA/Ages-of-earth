@@ -1756,6 +1756,11 @@ export const SEASONS = [
  */
 export const SPREAD = { reach: 5, perNode: 2, foe: 4, perFoe: 3, far: 18 };
 /**
+ * Moving citizens between jobs from the Workers panel: the farthest a citizen is sent to a node, in tiles, the most moved at once,
+ * the builders sent to one unfinished building before the next gets any (`crew`), and the seconds of work a "Get more" suggestion aims to cover (`window`).
+ */
+export const LABOR = { reach: 30, most: 200, crew: 5, window: 30 };
+/**
  * Patrol and explore (#454). Soldiers on either look for foes every `scan` ticks: an aggressive one as far
  * as it sees, a defensive one within `provoke` of its sight, one standing its ground only within reach.
  * A patrol gives up after `misses` legs in a row end short of their point; it holds at most `points`.
