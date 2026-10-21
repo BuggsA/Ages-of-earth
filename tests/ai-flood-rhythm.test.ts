@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { aiStep, floodBuildHeld, floodComing } from '../src/sim/ai';
+import { aiStep, floodBuildHeld } from '../src/sim/ai';
 import { FLOOD, SEASON, secs } from '../src/sim/data';
 import { createGame } from '../src/sim/game';
 import type { Building, GameState } from '../src/sim/types';
 
-// The Egyptian computer plays the flood's rhythm (#517): big builds wait for the river, food is laid up in spring.
+// The Egyptian computer plays the flood's rhythm (#517): the wonder waits for the river.
 const inSeason = (i: number) => secs(SEASON.len) * i + 1;
 
 function rich(civ: 'egyptians' | 'romans', season: number): GameState {
@@ -42,18 +42,16 @@ describe('the Egyptian computer and the flood (#517)', () => {
     expect(built(s, 'wonder')).toBe(1);
   });
 
-  it('leans to food in the spring before the flood, and keeps its wonder for the river', () => {
+  it('holds its wonder outside the flood, for the clever flood-people computer only', () => {
     for (let season = 0; season < 4; season++) {
       const s = rich('egyptians', season);
       const p = s.players[0];
-      expect(floodComing(s, p), `season ${season}`).toBe(season === (FLOOD.season + 3) % 4);
       expect(floodBuildHeld(s, p), `season ${season}`).toBe(season !== FLOOD.season);
       // Not for another people, nor for the plain computer.
       const r = rich('romans', season);
-      expect(floodComing(r, r.players[0])).toBe(false);
       expect(floodBuildHeld(r, r.players[0])).toBe(false);
       p.ai = 'easy';
-      expect(floodComing(s, p)).toBe(false);
+      expect(floodBuildHeld(s, p)).toBe(false);
     }
   });
 });
