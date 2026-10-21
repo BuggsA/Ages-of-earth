@@ -2300,8 +2300,10 @@ function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   const L = AI_LEVELS[p.ai!];
   const dock = v.buildings.find((b) => b.type === 'dock' && b.built);
   if (!dock) return;
-  // On the Shore a clever computer spares each shoal its seed for spring (#482), unless it's hungry.
-  const sparing = L.clever && s.homeland === 'shore' && p.res.food >= YEAR.fishHungry;
+  // On the Shore a clever computer spares each shoal its seed for spring (#482), unless it's hungry. A people
+  // born on the move (#501) turns spare food into lambs at once, so its flock counts as food in store.
+  const larder = p.res.food + (isNomad(p) ? flockOf(s, p.id) * (FLOCK.cost.food ?? 0) : 0);
+  const sparing = L.clever && s.homeland === 'shore' && larder >= YEAR.fishHungry;
   const thin = (i: number) => sparing && s.amount[i] <= YEAR.fishSpare;
   // Fishing boats: as many as there are shoals near the dock (that it would fish), up to a few.
   const shoals = countFish(s, dock.x, dock.y, 14, thin);

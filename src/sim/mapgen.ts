@@ -105,7 +105,7 @@ function shuffle<T>(rng: Rng, a: T[]): T[] {
   return a;
 }
 
-/** `deposits` false leaves out what only some seeds hold (bog iron, ruins): campaign maps stay as they were made. `veins` adds the deep veins (#356); `createGame` turns it on for ordinary matches. */
+/** `deposits` false leaves out what only some seeds hold (bog iron, ruins): campaign maps stay as they were made. `veins` adds the deep veins (#356); `createGame` turns it on for ordinary matches. The homeland is rolled only when both are on. */
 export function generateMap(seed: number, size: MapSize, players = 2, type: MapType = 'continental', deposits = true, veins = false, want?: HomelandId): MapData {
   const R = RECIPES[type];
   const WL = R.water;
@@ -304,9 +304,10 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
   };
   for (let y = 0; y <= h; y++) for (let x = 0; x <= w; x++) corner(x, y);
 
-  // The homeland (#473): on dice of its own, so the ground is the same whichever comes up. Campaign maps
-  // (no deposits) stay Glades, as they were drawn.
-  const homeland: HomelandId = want ?? (deposits ? rollHomeland(seed, type) : 'glade');
+  // The homeland (#473): on dice of its own, so the ground is the same whichever comes up. Only a full match
+  // (deposits and veins, as `createGame` asks for one) rolls it; campaign maps stay Glades, as they were drawn,
+  // and so does a map asked for without its extras, so leaving those out changes nothing else on it.
+  const homeland: HomelandId = want ?? (deposits && veins ? rollHomeland(seed, type) : 'glade');
   const HL = HOMELANDS[homeland];
 
   // Resources.
