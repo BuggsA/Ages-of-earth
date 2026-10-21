@@ -1305,10 +1305,23 @@ function readYear(s: GameState, v: View): void {
  */
 function huntTheYear(s: GameState, v: View, issue: (c: Command) => void): void {
   if (!AI_LEVELS[v.p.ai!].clever || !(s.homeland === 'herds' || yarding(s)) || isMobile(v.p)) return;
+  // The hunt keeps clear of a rival's soldiers (#546): a hunter whose game or kill has one within `AI_WINTER.shy` tiles goes
+  // back to the woodpile until the field is clear, and no hunter is sent after such game.
+  const foes: Unit[] = [];
+  for (const e of s.ents) if (e.kind === 'unit' && e.hp > 0 && !e.inside && e.type !== 'citizen' && e.type !== 'trader' && isEnemy(s, v.p.id, e.owner)) foes.push(e);
+  const shy = AI_WINTER.shy * AI_WINTER.shy;
+  const unsafe = (x: number, y: number) => foes.some((f) => (f.x - x) * (f.x - x) + (f.y - y) * (f.y - y) < shy);
   let hunting = 0;
-  for (const u of v.citizens) if (u.order.k === 'hunt' || (u.order.k === 'gather' && s.res[u.order.tile] === R_MEAT)) hunting++;
+  for (const u of v.citizens) {
+    const o = u.order;
+    const at = o.k === 'hunt' ? s.animals.find((a) => a.id === o.target) : o.k === 'gather' && s.res[o.tile] === R_MEAT ? { x: (o.tile % s.w) + 0.5, y: Math.floor(o.tile / s.w) + 0.5 } : undefined;
+    if (!at) continue;
+    if (!u.inside && u.carry <= 2 && unsafe(at.x, at.y) && sendTo(s, v, u, 'wood', issue)) continue;
+    hunting++;
+  }
   if (hunting >= v.hunt.n) return;
-  const deer = nearestDeer(s, v.home.x, v.home.y, v.hunt.r, spared(s, v.p));
+  const skip = spared(s, v.p);
+  const deer = nearestDeer(s, v.home.x, v.home.y, v.hunt.r, (a) => !!skip?.(a) || unsafe(a.x, a.y));
   if (!deer) return;
   const pick = (ok: (u: Unit) => boolean) => {
     let best: Unit | null = null;
@@ -1323,7 +1336,8 @@ function huntTheYear(s: GameState, v: View, issue: (c: Command) => void): void {
     }
     return best;
   };
-  const u = pick((c) => c.order.k === 'gather' && s.res[c.order.tile] === R_BERRY) ?? pick((c) => c.order.k === 'farm');
+  // In the yard's winter a town without fields to spare takes its woodcutters too (#546): the yard is the winter's food.
+  const u = pick((c) => c.order.k === 'gather' && s.res[c.order.tile] === R_BERRY) ?? pick((c) => c.order.k === 'farm') ?? (yarding(s) ? pick((c) => c.order.k === 'gather' && c.order.res === 'wood' && c.carry <= 2) : null);
   if (u) issue({ t: 'hunt', p: v.p.id, ids: [u.id], target: deer.id });
 }
 
