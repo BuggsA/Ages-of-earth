@@ -33,7 +33,7 @@ import { isHousehold } from './household';
 import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
-import { DEER, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SNARE, SPOILS } from './data';
+import { CIVS, DEER, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SNARE, SPOILS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
@@ -1267,7 +1267,7 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   }
 
   // A wonder, when rich in the last epoch.
-  if (clever && p.epoch >= 3 && count(v, 'wonder') === 0 && !recently('wonder', 60)) {
+  if (clever && p.epoch >= 3 && count(v, 'wonder') === 0 && !recently('wonder', 60) && !floodBuildHeld(s, v.p)) {
     const cost = buildingCostFor(s, p.id, 'wonder');
     if (RES.every((r) => !cost[r] || v.budget[r] >= cost[r]! + 200)) {
       const spot = findSpot(s, 'wonder', home.x, home.y, 6, 20);
@@ -1364,6 +1364,11 @@ export function spared(s: GameState, p: Player): ((a: Animal) => boolean) | unde
 /** Autumn onward, a clever computer plans for the winter ahead (`AI_WINTER`). */
 function coldComing(s: GameState, v: View): boolean {
   return AI_LEVELS[v.p.ai!].clever && seasonAt(s) >= AI_WINTER.from;
+}
+
+/** Whether a clever flood people's computer keeps its wonder for the river, when the corvée builds twice as fast (#517). */
+export function floodBuildHeld(s: GameState, p: Player): boolean {
+  return AI_LEVELS[p.ai!].clever && !!CIVS[p.civ].flood && !flooded(s, p.id);
 }
 
 /** A nomad people's lean on the epoch's shares (#501): it quarries no stone, so the stone hands go to the gold that buys it. */
