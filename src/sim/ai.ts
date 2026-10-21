@@ -33,7 +33,7 @@ import { isHousehold } from './household';
 import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
-import { DEER, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SNARE, SPOILS } from './data';
+import { AI_FLOOD, CIVS, DEER, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SNARE, SPOILS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
@@ -757,7 +757,7 @@ function oreRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => vo
   if (open) {
     const idle = crew.filter((u) => u.carry <= 2 && !u.inside);
     if (idle.length) {
-      const want = wanted(v, coldComing(s, v));
+      const want = wanted(v, coldComing(s, v), floodComing(s, v.p));
       const have: Record<Res, number> = { food: 0, wood: 0, gold: 0, stone: 0 };
       for (const u of v.citizens) {
         const j = jobOf(u);
@@ -792,7 +792,7 @@ function oreRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => vo
 function releaseDiggers(s: GameState, v: View, issue: (c: Command) => void): void {
   const bog = v.citizens.filter((u) => u.order.k === 'gather' && (u.order.bog || s.res[u.order.tile] === R_BOG) && u.carry <= 2 && !u.inside);
   if (!bog.length) return;
-  const want = wanted(v, coldComing(s, v));
+  const want = wanted(v, coldComing(s, v), floodComing(s, v.p));
   const have: Record<Res, number> = { food: 0, wood: 0, gold: 0, stone: 0 };
   for (const u of v.citizens) {
     const j = jobOf(u);
@@ -1267,7 +1267,7 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   }
 
   // A wonder, when rich in the last epoch.
-  if (clever && p.epoch >= 3 && count(v, 'wonder') === 0 && !recently('wonder', 60)) {
+  if (clever && p.epoch >= 3 && count(v, 'wonder') === 0 && !recently('wonder', 60) && !floodBuildHeld(s, v.p)) {
     const cost = buildingCostFor(s, p.id, 'wonder');
     if (RES.every((r) => !cost[r] || v.budget[r] >= cost[r]! + 200)) {
       const spot = findSpot(s, 'wonder', home.x, home.y, 6, 20);
@@ -1366,18 +1366,28 @@ function coldComing(s: GameState, v: View): boolean {
   return AI_LEVELS[v.p.ai!].clever && seasonAt(s) >= AI_WINTER.from;
 }
 
+/** Spring, for a clever computer of a flood people (#517): the river is coming, and the fields will yield nothing under it. */
+export function floodComing(s: GameState, p: Player): boolean {
+  return AI_LEVELS[p.ai!].clever && !!CIVS[p.civ].flood && seasonAt(s) === (FLOOD.season + 3) % 4;
+}
+
+/** Whether a clever flood people's computer keeps its wonder for the river, when the corvée builds twice as fast (#517). */
+export function floodBuildHeld(s: GameState, p: Player): boolean {
+  return AI_LEVELS[p.ai!].clever && !!CIVS[p.civ].flood && !flooded(s, p.id);
+}
+
 /** A nomad people's lean on the epoch's shares (#501): it quarries no stone, so the stone hands go to the gold that buys it. */
 const nomadShare = (r: Res, share: Record<Res, number>): number => (r === 'stone' ? 0 : r === 'gold' ? 1 + share.stone / Math.max(0.01, share.gold) : 1);
 
 /** How many citizens each resource should have now: the epoch's shares, leaning away from what piles up. */
-function wanted(v: View, cold = false): Record<Res, number> {
+function wanted(v: View, cold = false, flood = false): Record<Res, number> {
   const share = SHARE[v.p.epoch];
   const weight: Record<Res, number> = { food: 0, wood: 0, gold: 0, stone: 0 };
   let total = 0;
   for (const r of RES) {
     const stock = v.p.res[r];
     const lean = stock > 1200 ? 0.15 : stock > 700 ? 0.4 : stock > 400 ? 0.7 : stock < 80 ? 1.4 : 1;
-    weight[r] = share[r] * lean * (cold && r === 'food' ? 1 + AI_WINTER.food : 1) * (legionAtWork(v) && (r === 'wood' || r === 'stone') ? LEGION.aiCitizenWood : 1) * (r === 'gold' && isHousehold(v.p) ? 0 : 1) * (isNomad(v.p) ? nomadShare(r, share) : 1);
+    weight[r] = share[r] * lean * (cold && r === 'food' ? 1 + AI_WINTER.food : 1) * (flood && r === 'food' ? 1 + AI_FLOOD.food : 1) * (legionAtWork(v) && (r === 'wood' || r === 'stone') ? LEGION.aiCitizenWood : 1) * (r === 'gold' && isHousehold(v.p) ? 0 : 1) * (isNomad(v.p) ? nomadShare(r, share) : 1);
     total += weight[r];
   }
   const n = v.citizens.filter((u) => u.order.k !== 'build' && !u.inside).length;
@@ -1449,7 +1459,7 @@ function sendTo(s: GameState, v: View, u: Unit, res: Res, issue: (c: Command) =>
 }
 
 function assignCitizens(s: GameState, v: View, issue: (c: Command) => void): void {
-  const want = wanted(v, coldComing(s, v));
+  const want = wanted(v, coldComing(s, v), floodComing(s, v.p));
   const have: Record<Res, number> = { food: 0, wood: 0, gold: 0, stone: 0 };
   for (const u of v.citizens) {
     const j = jobOf(u);
