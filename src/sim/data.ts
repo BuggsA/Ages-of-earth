@@ -1782,8 +1782,11 @@ export const EXPLORE = { grid: 4, apart: 12, fails: 8, shun: 6, wary: 2, army: 4
  * - `retry`: a laden citizen jammed on the way home tries the road again this often, instead of standing idle.
  */
 export const AUTO_WORK = { trained: 14, rally: 8, herd: 8, farm: 12, retry: secs(4) };
-/** The clever computer plans for winter from season `from` (`coldComing` in `ai.ts`); in the Stone Age it raises no winter fields while its larder holds `larder` food (#486). */
-export const AI_WINTER = { from: 2, fields: 2, hunters: 3, pack: 1, food: 0.3, larder: 500 };
+/**
+ * The clever computer plans for winter from season `from` (`coldComing` in `ai.ts`); in the Stone Age it raises no winter fields while its larder holds `larder` food (#486).
+ * Its hunters of the turning year (#546) keep `shy` tiles from a rival's soldiers.
+ */
+export const AI_WINTER = { from: 2, fields: 2, hunters: 3, pack: 1, food: 0.3, larder: 500, shy: 8 };
 
 /**
  * Faith takes the walls (#209), for the computer: a pilgrim computer keeps `priests` priests once its army
@@ -1896,7 +1899,7 @@ export const AI_SHORE = { dockAt: 4, boats: 2 };
  * `aiFar` tiles from its lumber where at least `aiTrees` trees stand, with `aiTenders` tenders.
  */
 export const SNARE = { r: 3, need: 6, full: 16, apart: 5, rate: 0.15, winter: 1.5, cap: 24, take: 3, round: 14, worth: 4, ai: 4, aiAt: 9, aiFrom: 600, aiFar: 5, aiTrees: 14, aiTenders: 1 };
-export const YEAR = { home: 16, out: 26, trek: 6, calves: 1, herdMax: 6, spare: 2, follow: 34, run: 1.3, ice: 0.3, yard: 5, from: 20, enter: 8, yardMin: 7, yardMax: 12, trees: 3, yardHunters: 2, walk: 45, breed: 1, seedAt: 1, spawn: 0.5, crowd: 8, crowdIn: 4, fishSpare: 60, fishHungry: 150 };
+export const YEAR = { home: 16, out: 26, trek: 6, calves: 1, herdMax: 6, spare: 2, follow: 34, run: 1.3, ice: 0.3, yard: 5, from: 20, enter: 8, yardMin: 7, yardMax: 12, trees: 3, yardHunters: 4, walk: 45, breed: 1, seedAt: 1, spawn: 0.5, crowd: 8, crowdIn: 4, fishSpare: 60, fishHungry: 150 };
 /**
  * Caves (#356): on a world that holds any rare ore, `count` caves for the map's size are cut into open ground at least
  * `away` tiles from every town and `apart` from each other. Each is a single tile of one of the world's ores, `rich` times
