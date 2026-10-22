@@ -2546,6 +2546,13 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         }
         break;
       }
+      case 'oreBuy':
+        // A load of rare ore bought at a post (#573).
+        if (ev.owner === viewer) {
+          hud.toast(`Bought ${ev.n} ${RARE[ev.ore].name.toLowerCase()} for ${ev.gold} gold: guard your trader on the road home`, 'info');
+          play('tradeLoad');
+        }
+        break;
       case 'salvage':
         if (ev.owner !== viewer) break;
         if (ev.what === 'stripped') hud.toast(`Stripped the rubble of a ${BUILDINGS[ev.type].name}: ${RES.filter((r) => ev.gain?.[r]).map((r) => `+${ev.gain![r]} ${r}`).join(', ')}`, 'good');

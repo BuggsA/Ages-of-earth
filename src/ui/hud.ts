@@ -8,11 +8,12 @@ import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE } from '../sim/units';
-import { PROSPECTOR, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, SNARE, SICKNESS, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { ORE_POST, PROSPECTOR, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, SNARE, SICKNESS, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
 import { restsAt } from '../sim/passage';
+import { loadPrice, sellerNear } from '../sim/oretrade';
 import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
 import { LANDMARK_KINDS, claimWork, claimants, favours, landmarkAt } from '../sim/landmarks';
 import { workProblem } from '../sim/works';
@@ -32,8 +33,9 @@ import { isMobile, packProblem, packsOf, pitchProblem } from '../sim/steppe';
 import { exacting, isRider } from '../sim/tribute';
 import { landOwnerAt } from '../sim/borders';
 import { flockCap, flockOf, grazeRange, lambProblem } from '../sim/flocks';
+import { soldAt } from '../sim/ages';
 import { ageDef, ageOf, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, oreClue, oreDone, oreOnly, ironTradeShare, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, pathLine, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, suspendedTechs, assayed, diggersAt, holdingsOf, holds, keyOf, lacking, opensOf, prospected, trainsAt, windowsOf, leadsOn, leadsTo } from '../sim/ages';
-import type { AgeId, KeyId, Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Player, Res, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
+import type { AgeId, KeyId, RareId, Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Player, Res, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
 import { KEYS, RARES, RES, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
 import { buildingPicture, unitPicture } from './thumbs';
@@ -160,6 +162,8 @@ function orderWords(s: GameState, u: Unit): string {
       return u.act === 'mine' ? 'Digging at the ruins' : 'Going to dig at the ruins';
     case 'trade':
       if (u.type === 'cog') return o.phase === 'back' ? (u.carry > 0 ? 'Sailing gold home to the Dock' : 'Going home to the Dock') : 'Sailing goods to the port';
+      // Buying rare ore at a post (#573).
+      if (o.buy) return o.phase === 'back' && u.ore ? `Bringing ${u.ore.n} ${RARE[u.ore.id].name.toLowerCase()} home to the Market` : o.phase === 'back' ? 'Going home to the Market' : `Going to buy ${RARE[o.buy].name.toLowerCase()} at the trading post`;
       return o.phase === 'back' ? (u.carry > 0 ? 'Bringing gold home to the Market' : 'Going home to the Market') : 'Taking goods to the trading post';
     default:
       if (carriedBy(s, u)) return 'Holding a relic';
@@ -218,12 +222,14 @@ const prospectLine = (s: GameState, p: Player) => {
           const h = holdingsOf(o);
           const n = [...dig.values()].filter((w) => w === o.id).length;
           // Names come from players online: nothing in one may become markup in the tip.
-          return `<br>${o.name.replace(/[<>&"']/g, '')}: ${(['salt', 'saltpetre', 'bloodiron'] as const).map((k) => `${h[k]} ${PROSPECTOR.keys[k].name.toLowerCase()}`).join(', ')}; ${h.bogIron} bog iron dug${n ? `; digging ${n} key tile${n > 1 ? 's' : ''} now` : ''}.`;
+          return `<br>${o.name.replace(/[<>&"']/g, '')}: ${(['salt', 'saltpetre', 'bloodiron'] as const).map((k) => `${h[k]} ${PROSPECTOR.keys[k].name.toLowerCase()}`).join(', ')}; ${h.bogIron} bog iron dug${n ? `; digging ${n} key tile${n > 1 ? 's' : ''} now` : ''}${o.stats.bought ? `; ${o.stats.bought} key ore bought at the posts` : ''}.`;
         })
         .join('')
     : '';
   const chart = p.chart ? `<br>Charted: ${KEYS.filter((k) => marks(k)).map((k) => `${marks(k)} ${PROSPECTOR.keys[k].name.toLowerCase()}`).join(', ')} marked on your map, under the fog too.` : '';
-  const tip = KEYS.map((k) => `${PROSPECTOR.keys[k].icon} ${PROSPECTOR.keys[k].name}: ${holds(s, k) ? 'yes' : 'none in this world'}. Opens ${opensText(k)}.`).join('<br>');
+  // A rare ore this world lacks is sold at a trading post (#573): the lodge says so, and at what price.
+  const sold = (k: KeyId) => (RARES as readonly string[]).includes(k) && soldAt(s, k as RareId) ? `, but a trading post sells it (${icon('gold', 12)}${loadPrice(s, k as RareId)} a load of ${ORE_POST.lot})` : '';
+  const tip = KEYS.map((k) => `${PROSPECTOR.keys[k].icon} ${PROSPECTOR.keys[k].name}: ${holds(s, k) ? 'yes' : `none in this world${sold(k)}`}. Opens ${opensText(k)}.`).join('<br>');
   return `<span data-tip="<b>What this world holds</b>${tip}${chart || '<br>Yes or no only: not where, nor how much. Chart the Veins (Bronze Age) marks where.'}${assay ? `<br>Assayed:${assay}` : ''}">🧭 ${KEYS.map((k) => `${PROSPECTOR.keys[k].icon}${holds(s, k) ? '✔' : '✘'}`).join(' ')}${p.chart ? (assayed(p) ? ' · ⚖️ assayed' : ' · 🗺️ charted') : ''}</span>`;
 };
 
@@ -715,7 +721,9 @@ export class Hud {
     const pay = m ? tripGold(s, viewer, m, post) : 0;
     const mine = s.ents.filter((e) => e.kind === 'unit' && e.owner === viewer && (e.type === 'trader' || e.type === 'cog') && e.order.k === 'trade' && e.order.post === post.id).length;
     const flood = Math.round(glutNow(s, post) * 100);
-    const status = m ? `From your nearest Market: ${icon('gold', 14)}${pay} a trip${flood ? ` (${flood}% glut)` : ''}` : 'Build a Market to trade here';
+    // A post that sells rare ore this world lacks (#573).
+    const sells = (post.sells ?? []).map((r) => `${RARE[r].name} ${icon('gold', 14)}${loadPrice(s, r)} a load of ${ORE_POST.lot}`).join(', ');
+    const status = (m ? `From your nearest Market: ${icon('gold', 14)}${pay} a trip${flood ? ` (${flood}% glut)` : ''}` : 'Build a Market to trade here') + (sells ? ` · Sells ${sells}` : '');
     const html = `<div class="sel-portrait"><span style="font-size:54px">🐪</span></div>
       <div class="sel-info"><div class="sel-name">Trading Post</div><div class="sel-sub">${status}</div>
       <div class="stats"><span data-tip="<b>Your traders</b>On the road to this post.">🐪<em>Your traders</em> ${mine}</span><span data-tip="<b>Most a trip</b>The farthest roads pay up to this.">${icon('gold')}<em>At most</em> ${TRADE.max}</span></div>
@@ -975,6 +983,18 @@ export class Hud {
         const fights = rovers.some((u) => MILITARY.includes(u.type));
         cmds.push({ key: 'Q', pic: '', glyph: '🔁', title: 'Patrol', desc: `Then click on the map: walk back and forth between here and there${fights ? ', fighting what comes by their stance and then taking up the round again' : ''}. <b>Shift-click</b> to add more waypoints to the round. Click a <b>trading post</b> or a trader to guard its road.`, ok: true, run: () => this.act.patrolMode() });
         cmds.push({ key: 'E', pic: '', glyph: '🧭', title: 'Explore', desc: `Go and see: each heads for the nearest ground your people have never seen, and on to the next, fanning out from one another${fights ? '. Aggressive soldiers fall on what they find; defensive ones fight only what comes close; those standing their ground only what is in reach' : ''}. They keep clear of enemy towers they have seen, report armies they come on, and stop when there is nothing left they can reach.`, ok: true, run: () => this.act.issue({ t: 'explore', p: viewer, ids: rovers.map((u) => u.id) }) });
+      }
+      // Posts that sell what the map lacks (#573): traders go to buy a load at the nearest post selling it.
+      const buyers = units.filter((u) => u.type === 'trader');
+      if (buyers.length) {
+        const keys = ['Z', 'X', 'C'];
+        RARES.filter((r) => soldAt(s, r)).forEach((r, i) => {
+          const name = RARE[r].name.toLowerCase();
+          const post = sellerNear(s, r, buyers[0].x, buyers[0].y)!;
+          const gold = loadPrice(s, r);
+          const roads = ROADS.filter((x) => x.ore?.id === r).map((x) => `${x.ore!.n} opens the road to the ${AGES[x.to].name} without its deeds`).join('; ');
+          cmds.push({ key: keys[i], pic: '', glyph: PROSPECTOR.keys[r].icon, title: `Buy ${name}`, desc: `This world has no ${name}, but a trading post sells it. The traders walk there, pay ${gold} gold for each load of ${ORE_POST.lot} (dearer by ${Math.round(ORE_POST.rise * 100)}% with every load anyone buys) and carry it home to the Market, again and again until stopped. It counts as mined ore: ${roads}. A trader felled on the way drops its load for anyone to carry off: guard the road.`, ok: p.res.gold >= gold, why: p.res.gold >= gold ? undefined : `A load costs ${gold} gold`, run: () => this.act.issue({ t: 'route', p: viewer, ids: buyers.map((u) => u.id), post: post.id, buy: r }) });
+        });
       }
       cmds.push({ key: 'S', pic: '', glyph: '✋', title: 'Stop', desc: 'Stop what they are doing (and forget queued orders).', ok: true, run: () => this.act.issue({ t: 'stop', p: viewer, ids: units.map((u) => u.id) }) });
       // The polis (#501): Greek citizens take up arms where they stand, and their soldiers lay them down at home.

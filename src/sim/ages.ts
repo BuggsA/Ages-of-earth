@@ -1,5 +1,5 @@
 import { AGES, BUILDINGS, CIVS, LIGHTNING, PATHS, ROADS, STEP_BACK, TECHS, TICK_HZ, TRUNK, WAYS, secs, stepBackCost, type Age, type Deed, type Road } from './data';
-import { KEYS, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, type AgeId, type CivId, type PathId, type Building, type BuildingType, type Cost, type GameState, type KeyId, type Player, type TechId, type UnitType } from './types';
+import { KEYS, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, type AgeId, type CivId, type PathId, type RareId, type Building, type BuildingType, type Cost, type GameState, type KeyId, type Player, type TechId, type UnitType } from './types';
 
 /**
  * Ages as a web (#37): which age a people is in, the roads out of it, and what that age lets them
@@ -199,6 +199,9 @@ export function deedProgress(p: Player, r: Road): { have: number; need: number }
 
 /** Whether the people has mined enough of the ore a road's ore door asks for (#356 s3). Only a world that holds the ore lets anyone. */
 export const oreDone = (p: Player, r: Road): boolean => !!r.ore && (p.stats.mined?.[r.ore.id] ?? 0) >= r.ore.n;
+
+/** Whether a trading post sells this rare ore (#573): only in a world that lacks it. */
+export const soldAt = (s: GameState, ore: RareId): boolean => s.posts.some((t) => !!t.sells?.includes(ore));
 
 /** The ore door a player may see: the ore is in this world and they have mined some (the clue comes by digging, not a checklist). */
 export function oreClue(s: GameState, p: Player, r: Road): Road['ore'] | null {

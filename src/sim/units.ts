@@ -21,6 +21,7 @@ import { catchIn, nextSnare } from './snares';
 import { dig, ruinAt } from './ruins';
 import { rubbleAt, salvages, strip } from './salvage';
 import { bank, cacheAt, lift } from './caches';
+import { buyLoad } from './oretrade';
 import { fordMarch, groveBoost, keptOf, kinBonus } from './landmarks';
 import { chant, chantedOver, consecrateProblem, consecrates, turnBuilding } from './consecrate';
 import { convoyShare } from './convoy';
@@ -1614,6 +1615,8 @@ function tradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>): vo
     const gap = m.kind === 'building' ? distToRect(u.x, u.y, m) : Math.sqrt((m.x - u.x) * (m.x - u.x) + (m.y - u.y) * (m.y - u.y)) - statsOf(s, m).radius;
     if (gap - statsOf(s, u).radius <= REACH + 0.2) {
       stopWalking(u);
+      // Rare ore bought at the post (#573) goes into the stock, as carried-home ore does.
+      if (u.ore) bank(s, u);
       if (u.carry > 0) payTrip(s, u, m, false, o.from);
       u.carry = 0;
       u.carryRes = null;
@@ -1660,6 +1663,17 @@ function tradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>): vo
       return;
     }
     o.market = m.id;
+    // Buying rare ore (#573): paid in gold here, carried home instead of gold.
+    if (o.buy) {
+      const why = u.ore ? null : buyLoad(s, u, post, o.buy);
+      if (why) {
+        s.events.push({ k: 'refused', owner: u.owner, why });
+        setOrder(u, { k: 'idle' });
+        return;
+      }
+      o.phase = 'back';
+      return;
+    }
     if (!o.from && ageDef(s.players[u.owner]).caravans) o.from = { x: m.x, y: m.y };
     // A fresh load owes every toll on the way home again (#334).
     delete u.tolled;

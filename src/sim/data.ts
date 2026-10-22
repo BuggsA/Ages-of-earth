@@ -2359,6 +2359,15 @@ export const AI_ORDERS = { reach: 14, riders: 2 };
 
 /** Selling rare ore at a Market (#356 s5): a lot of `lot` pays `gold[ore]` gold at a flat price. Ore mined still counts toward its doors; only the stock in hand is spent. */
 export const ORE_TRADE = { lot: 20, gold: { salt: 40, saltpetre: 55, bloodiron: 90 } as Record<'salt' | 'saltpetre' | 'bloodiron', number> };
+/**
+ * Posts that sell what the map lacks (#573, the age road s13): on a world without one of the `ores` a road's ore door asks
+ * for, a trading post sells it (one lacking ore to a post, in post order; none in campaign chapters). A trader told to buy
+ * pays for a load of `lot` there, at `markup` times what the Market pays for that ore, dearer by `rise` with every load anyone
+ * has bought, and carries it home to its Market: bought ore opens the road's door as mined ore does. Saltpetre opens no road
+ * yet, and the ore technologies stay open only where the world holds their ore, so it is not sold. The computer keeps
+ * `traders` buying for a road it has planned whose ore this world lacks.
+ */
+export const ORE_POST = { lot: 10, markup: 1.5, rise: 0.1, traders: 1, ores: ['salt', 'bloodiron'] as RareId[] };
 
 /** The computer and the rare ores (#356 s5): the crew it sends to dig the ore a road's door asks for, and how far from home it will look for the vein. */
 export const AI_ORE = { crew: 3, reach: 70 };
