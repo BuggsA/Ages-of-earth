@@ -237,10 +237,23 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
     v.budget = { ...p.res };
   }
 
+  // Epochs: once there are enough people, set the cost aside (so the army doesn't eat it) and advance;
+  // but when an attack is due and the army is short of it, soldiers come first.
+  const waveSize = L.wave + mem.wave * L.waveGrowth;
+  const short = s.tick > secs(L.firstAttack - 150) && army.length < waveSize && !mem.attacking;
+  // A beaten town (#113): once a wave has gone out, an army that stays short of the next one holds the
+  // next age back only so long. Waiting longer, it lost every soldier it trained to the rival at its
+  // gates and stayed an age behind for ten minutes and more, food-starved.
+  if (!short || mem.wave === 0) delete mem.short;
+  else if (!mem.short || mem.short.epoch !== p.epoch) mem.short = { since: s.tick, epoch: p.epoch };
+  const armyFirst = short && (!mem.short || s.tick - mem.short.since <= secs(L.armyWait));
+  v.armyFirst = armyFirst;
   // People first: a growing town pays for everything else.
   const advancing = buildings.some((b) => b.advance >= 0);
   const queuedCitizens = buildings.reduce((n, b) => n + b.queue.filter((q) => q.unit === 'citizen').length, 0);
   const wantCitizens = Math.min(L.citizens + p.epoch * 3, isLegion(p) ? citizenCap(p) : 60);
+  // A climb paid for stops the hands being trained (#555): training on past the hands the climb needs spent its price and kept the Town Center's queue full, till a raid caught the town in the Stone Age (`scripts/route-ab.ts navy 103`).
+  const climbReady = L.climbHold !== false && !advancing && p.epoch < LAST_EPOCH && !!tc && citizens.length >= ADVANCE_AT[p.epoch] && s.tick > secs(150 + p.epoch * 150) && afford(v, mainRoad(p)!.cost);
   // The Warband Way (#463 s1) eats by raiding: in the Stone Age, out of a treaty, its first band of foot comes before more hands (once; later bands come as soldiers do).
   if (L.clever && p.way === 'warband' && p.epoch === 0 && s.tick >= s.peaceUntil && !mem.prowl && mem.prowled === undefined && citizens.length >= AI_WAYS.bandAt && army.filter(prowler).length < AI_WAYS.band) {
     const yard = buildings.find((b) => b.type === 'barracks' && b.built && b.queue.length === 0);
@@ -262,7 +275,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   } else if (kinOnly && !advancing && !threatNear(s, v).unit) {
     // Saving for the next call: the army and the rest wait on the food it needs, unless raiders are at the door.
     spend(v, KIN.cost);
-  } else if (tc && !advancing && !v.packing && !kinOnly && citizens.length + queuedCitizens < wantCitizens && tc.queue.length < (hearth ? 1 : 2)) {
+  } else if (tc && !advancing && !v.packing && !kinOnly && !climbReady && citizens.length + queuedCitizens < wantCitizens && tc.queue.length < (hearth ? 1 : 2)) {
     const cost = unitStats('citizen', p.epoch).cost;
     if (afford(v, cost)) {
       issue({ t: 'train', p: p.id, building: tc.id, unit: 'citizen' });
@@ -277,17 +290,6 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   // In a campaign chapter, its goals come before the epoch's savings.
   v.plan = chapterGoals(s, v, mem, issue);
 
-  // Epochs: once there are enough people, set the cost aside (so the army doesn't eat it) and advance;
-  // but when an attack is due and the army is short of it, soldiers come first.
-  const waveSize = L.wave + mem.wave * L.waveGrowth;
-  const short = s.tick > secs(L.firstAttack - 150) && army.length < waveSize && !mem.attacking;
-  // A beaten town (#113): once a wave has gone out, an army that stays short of the next one holds the
-  // next age back only so long. Waiting longer, it lost every soldier it trained to the rival at its
-  // gates and stayed an age behind for ten minutes and more, food-starved.
-  if (!short || mem.wave === 0) delete mem.short;
-  else if (!mem.short || mem.short.epoch !== p.epoch) mem.short = { since: s.tick, epoch: p.epoch };
-  const armyFirst = short && (!mem.short || s.tick - mem.short.since <= secs(L.armyWait));
-  v.armyFirst = armyFirst;
   // Which road it takes is the web's to say (#50): the trunk, or a side road it has chosen once it opens.
   const wantEpoch = p.epoch < Math.min(LAST_EPOCH, v.plan.maxEpoch) && !advancing && !armyFirst && citizens.length + (isLegion(p) && p.epoch > 0 ? army.filter(legionHand).length : 0) >= ADVANCE_AT[p.epoch] && s.tick > secs(150 + p.epoch * 150);
   // Patience for a road's deeds counts only while the Town Center holds for them (#113): army-first
