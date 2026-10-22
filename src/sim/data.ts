@@ -127,6 +127,10 @@ export interface Age {
   vigils?: boolean;
   /** Rival citizens slain by this people's forces are taken captive and work its fields (the Age of the Warband): see `THRALL` (`thralls.ts`). */
   thralls?: boolean;
+  /** Siege Workshops are powder mills that grind saltpetre into kegs (the Age of Alchemy, #577): see `KEG` (`powder.ts`). */
+  mills?: boolean;
+  /** Citizens and foot soldiers lay powder kegs at rival buildings (the Age of Sappers, #577): see `KEG` (`powder.ts`). */
+  sappers?: boolean;
 }
 
 /**
@@ -460,6 +464,36 @@ export const AGES: Record<AgeId, Age> = {
     caravans: true,
     noBuild: { buildings: ['farm', 'wall', 'gate'], why: 'A caravan people tills no fields and raises no walls: they wait until it settles in the Gunpowder Age' },
   },
+  // The first gateway age (#577, the age road s5, `docs/age-roads.md` rule 3): saltpetre's only door, weak on its own, and the
+  // only road to the Age of Sappers. A turn off the Middle Ages, at its tier.
+  alchemy: {
+    verb: 'Grind mined saltpetre into powder kegs at your Siege Workshops, which turn mills instead of building engines',
+    door: 'No siege engines, and soldiers train slower: the town is busy with its mills',
+    good: 'The only road to the Age of Sappers: the powder its mills grind is what the sappers carry',
+    routes: [],
+    gateway: true,
+    name: 'Age of Alchemy',
+    short: 'Alchemy',
+    tier: 2,
+    blurb: 'As the alchemists of Tang China found while seeking an elixir of long life: saltpetre, sulphur and charcoal ground together burn like nothing else. Every Siege Workshop becomes a powder mill: each grinds a keg from 20 saltpetre in your store every 30 seconds, up to 20 kegs. The mills build no rams or catapults, and soldiers train 15% slower while the town learns its new craft. Weak on its own: what it is for is the Age of Sappers, the one age where kegs are laid, and only here are they ground.',
+    mul: { militaryTrain: 1.15 },
+    no: { units: ['siege'], why: 'The Siege Workshops turn powder mills in the Age of Alchemy: rams and catapults wait until your people leaves it' },
+    mills: true,
+  },
+  // The strong age behind the gateway (#577): open only from the Age of Alchemy, at the Gunpowder Age's tier.
+  sapper: {
+    verb: 'Carry powder kegs to the foot of a rival\'s walls, towers and halls, and blow them open when the fuse burns down',
+    door: 'No new kegs are ground here: the powder you bring is all there is, and siege engines cost dear',
+    good: 'Breaking any town: a keg laid at a wall, a tower or a Town Center blows it open',
+    routes: [],
+    name: 'Age of Sappers',
+    short: 'Sappers',
+    tier: 3,
+    blurb: 'As the sappers of the great sieges of the 1500s, from Vienna to Chittor, dug under walls and laid powder beneath them: citizens and foot soldiers carry a keg from your store to the foot of a rival building and light it. Eight seconds later it blows, wrecking every rival building within two tiles and hurting the soldiers near it, but any rival who reaches a burning fuse stamps it out. Ranged soldiers hit 1 harder for the powder in their pouches; siege engines cost 30% more. No new kegs are ground: to grind more, go back to the Middle Ages and turn into Alchemy again.',
+    add: { rangedAttack: 1 },
+    price: { siege: 1.3 },
+    sappers: true,
+  },
 };
 
 // ---- What the side ages give ----------------------------------------------------------------------
@@ -582,6 +616,11 @@ export interface Road {
    * deeds, and the clue shows once the people has mined any. In a world without the ore the deeds are the only road.
    */
   ore?: { id: RareId; n: number; text: string };
+  /**
+   * A vein door (#577, spine §3's "only road"): the road opens only once the people has mined `n` of this rare ore, and only in a
+   * world that holds it. It is seen once the people has prospected or dug any; where the world holds none, it stays shut.
+   */
+  vein?: { id: RareId; n: number; text: string };
   /**
    * More deeds, every one needed as well (#49): a hybrid age asks for deeds in two systems at once.
    * A list of tallies rather than a new kind of condition, because every system already keeps its
@@ -833,6 +872,31 @@ export const ROADS: Road[] = [
     blurb: 'A turn, not a climb: one branch of the fork at the end of the Path of Blood, where blood becomes a sacrament. Every Temple is an altar that takes blood from the enemy who fall near it and mends your own with it; priests come cheaper and work faster. What it gives up: the Transfusion Station, trade, some harvest, and siege at a dearer price. Take it, and Hemocraft is closed to your people for good.',
   },
   { from: 'bloodrite', to: 'industrial', cost: { food: 300, gold: 200 }, time: 30, blurb: 'Put out the altar fires: the ordinary Industrial Age, with trade, full fields and siege at its usual price. The plunder ends and the Temples are Temples again. Hemocraft stays closed.' },
+  // The first gateway (#577, the age road s5): saltpetre's only door, a turn off the Middle Ages into the Age of Alchemy, and from
+  // there the only road to the Age of Sappers. A Siege Workshop is the clue; kegs ground at the mills are the Sappers' deed.
+  {
+    from: 'middle',
+    to: 'alchemy',
+    cost: { food: 300, wood: 150, gold: 150 },
+    time: 35,
+    clue: 'workshop',
+    vein: { id: 'saltpetre', n: 40, text: 'Your citizens mine 40 saltpetre for the alchemists' },
+    blurb: 'A turn, not a climb, and only where the world holds saltpetre: the same soldiers and technologies as the Middle Ages, but every Siege Workshop becomes a powder mill that grinds the saltpetre in your store into kegs. What it gives up: siege engines, and soldiers train 15% slower. Weak on its own; it is the only road to the Age of Sappers.',
+  },
+  { from: 'alchemy', to: 'middle', cost: { food: 150, stone: 100 }, time: 25, blurb: 'Shut the mills: the ordinary Middle Ages, with siege engines and the usual training time. The kegs already ground are kept.' },
+  {
+    from: 'alchemy',
+    to: 'sapper',
+    cost: { food: 900, gold: 650, stone: 150 },
+    time: 60,
+    clue: 'workshop',
+    gate: 'hard',
+    deed: { stat: 'ground', n: 4, text: 'Your mills grind 4 kegs of powder' },
+    blurb: 'Instead of the Gunpowder Age, for a people that has ground its powder: citizens and foot soldiers carry kegs to the foot of a rival\'s walls, towers and halls and blow them open. Ranged soldiers hit 1 harder; siege engines cost 30% more. What it gives up: the mills. No new kegs are ground, so the powder you bring is all there is.',
+  },
+  { from: 'alchemy', to: 'gunpowder', cost: EPOCHS[3].cost, time: EPOCHS[3].time, blurb: 'Rejoin the main road at the Gunpowder Age for the ordinary price: the mills shut, the siege engines return as cannon, and the kegs already ground are kept for a sapper\'s day.' },
+  { from: 'sapper', to: 'industrial', cost: { food: 1400, gold: 800, stone: 400 }, time: 80, blurb: 'Rejoin the main road at the Industrial Age: no more kegs are laid, siege engines cost their usual price, and the kegs left are kept.' },
+  { from: 'sapper', to: 'gunpowder', cost: { food: 300, gold: 150 }, time: 30, blurb: 'Lay down the kegs: the ordinary Gunpowder Age, with siege engines at their usual price. The kegs left are kept.' },
 ];
 
 /**
@@ -2450,6 +2514,25 @@ export const SPOILS = { cap: 90, bank: 5, homes: ['towncenter', 'barracks'] as B
 export const CACHE = { share: 0.5, load: 20, bank: 1.5, merge: 1.5 };
 /** The computer and caches (#570): it sends up to `hands` citizens for a cache within `near` tiles of home with no rival soldier within `safe` of it; assayed, it aims a wave at a rival's ore store once that rival holds `worth` ore. */
 export const AI_CACHE = { near: 20, hands: 3, safe: 6, worth: 30 };
+
+/**
+ * Powder (#577, the age road's first gateway). In the Age of Alchemy every finished Siege Workshop is a mill: each second it adds
+ * one to the people's milling, and every `time` seconds of milling grind a keg from `ore` saltpetre in store, up to `most` kegs
+ * held (milling waits while the store is short or full). In the Age of Sappers a citizen or foot soldier carries a keg to within
+ * `lay` tiles of a rival building and lays it; `fuse` seconds later it blows, and every rival building within `reach` tiles of it
+ * takes `building`, every rival unit on the ground within `reach` takes `unit`. A rival unit on the ground within `douse` tiles of
+ * a burning keg stamps it out (the keg is lost).
+ */
+export const KEG = { ore: 20, time: 30, most: 20, lay: 1.2, fuse: 8, reach: 2, building: 600, unit: 30, douse: 1 };
+/**
+ * The computer and powder (#577): a people whose coin falls under `take` (and whose strength siege isn't) means to walk the
+ * gateway. It digs saltpetre until it holds `ore` in store and the road's door is open, then turns into Alchemy; there it keeps
+ * `mills` Siege Workshops and digs on until it has ground (or holds the saltpetre for) `kegs`, and holds the climb for the
+ * Sappers' deed up to `hold` seconds. In the Sappers, every `every` seconds, it sends up to `sappers` foot soldiers out on
+ * campaign with a keg each at the nearest rival building within `near` tiles of them, towers and Town Centers first, passing over
+ * any with a rival standing within `guard` tiles of it.
+ */
+export const AI_KEG = { take: 0.5, ore: 80, kegs: 6, mills: 2, hold: 180, sappers: 2, near: 12, guard: 4, every: 2 };
 
 export const WARCAMP = { watch: 8, grace: 10, burn: 0.05, train: 1.2 };
 

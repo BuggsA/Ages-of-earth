@@ -1,4 +1,4 @@
-import { AGES, CIVS, HOMELANDS, HOUSEHOLD, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SICKNESS, SILK, STEP_BACK, TRIBUTE, WAY, secs } from '../sim/data';
+import { AGES, CIVS, KEG, HOMELANDS, HOUSEHOLD, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SICKNESS, SILK, STEP_BACK, TRIBUTE, WAY, secs } from '../sim/data';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, findsOf, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
 import type { AgeId, Building, GameState, Unit } from '../sim/types';
@@ -15,6 +15,8 @@ const MERCHANT_ROAD = ROADS.find((r) => r.to === 'merchant')!;
 const IRON_ROAD = ROADS.find((r) => r.to === 'iron')!;
 const PILGRIM_ROAD = ROADS.find((r) => r.to === 'pilgrim')!;
 const SAIL_ROAD = ROADS.find((r) => r.to === 'sail')!;
+const ALCHEMY_ROAD = ROADS.find((r) => r.to === 'alchemy')!;
+const SAPPER_ROAD = ROADS.find((r) => r.to === 'sapper')!;
 const WARBAND_ROAD = ROADS.find((r) => r.to === 'warband')!;
 const IRONBLOOD_ROAD = ROADS.find((r) => r.to === 'ironblood')!;
 const TOTALWAR_ROAD = ROADS.find((r) => r.to === 'totalwar')!;
@@ -197,6 +199,27 @@ const TIPS: Tip[] = [
     // Faith takes the walls (#209): a pilgrim people with priests to send.
     when: (s, me) => ageOf(s.players[me]) === 'pilgrim' && s.ents.some((e) => e.kind === 'unit' && e.owner === me && e.type === 'priest'),
     text: 'A pilgrim people takes walls by faith. Select several priests and right-click a rival\'s <b>tower, gate or Temple</b>: they chant it over together, faster with every voice, and a Temple brings its relics. Soldiers sheltering inside slow them, and towers shoot back, so keep an escort near. Town Centers and Wonders never turn.',
+  },
+  {
+    id: 'alchemy',
+    // The first gateway (#577): saltpetre in this world, known of, and a Siege Workshop standing in the Middle Ages.
+    when: (s, me) => {
+      const p = s.players[me];
+      return ageOf(p) === 'middle' && roadKnown(s, p, ALCHEMY_ROAD);
+    },
+    text: `This world holds saltpetre. Mine ${ALCHEMY_ROAD.vein!.n} of it, and the Town Center (🔀) can turn your people into the <b>${AGES.alchemy.name}</b>: your Siege Workshops become mills that grind the saltpetre in store into powder kegs, but build no engines, and soldiers train slower. Weak on its own: it is the only road to the <b>${AGES.sapper.name}</b>, where kegs blow walls and towers open.`,
+  },
+  {
+    id: 'mills',
+    // In Alchemy: the mills and the climb they are for.
+    when: (s, me) => ageOf(s.players[me]) === 'alchemy',
+    text: `Every Siege Workshop is a powder mill now: each grinds a keg from ${KEG.ore} saltpetre in store every ${KEG.time} seconds (🧨 at the top). Once ${SAPPER_ROAD.deed!.n} are ground, the Town Center can climb to the <b>${AGES.sapper.name}</b>, but no keg is ground there: stay longer for more powder, or go sooner and give a rival less time to punish a town without engines.`,
+  },
+  {
+    id: 'sappers',
+    // In the Sappers with kegs to lay.
+    when: (s, me) => ageOf(s.players[me]) === 'sapper' && (s.players[me].kegs ?? 0) > 0,
+    text: `Select citizens or foot soldiers and press <kbd>K</kbd>, then click a rival building: each carries a keg to its foot and lights it. ${KEG.fuse} seconds later it blows, wrecking every rival building within ${KEG.reach} tiles. A rival who reaches a burning keg stamps it out, so lay it where your army holds the ground, or where nobody is looking.`,
   },
   {
     id: 'sail',

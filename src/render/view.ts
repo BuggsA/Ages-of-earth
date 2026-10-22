@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { SoundName } from '../audio/sound';
 import { ageDef, ageOf } from '../sim/ages';
 import { fairground, feastOpen } from '../sim/fair';
-import { AURA, BUILDINGS, RALLY, RITE, SIGNATURES, TICK_HZ, LANDMARKS, RUINS, TRADE, domainOf } from '../sim/data';
+import { AURA, BUILDINGS, KEG, RALLY, RITE, SIGNATURES, TICK_HZ, LANDMARKS, RUINS, TRADE, domainOf } from '../sim/data';
 import { buildingMaxHp, statsFor } from '../sim/stats';
 import type { AgeId, BuildingType, CivId, Ent, GameEvent, GameState, Unit } from '../sim/types';
 import type { ScoutFlag } from '../ui/scoutFlags';
@@ -27,6 +27,7 @@ import { VigilCandlesView } from './vigilCandlesView';
 import { RuinsView } from './ruinsView';
 import { RubbleView } from './rubbleView';
 import { CacheView } from './cacheView';
+import { KegView } from './kegView';
 import { LandmarksView } from './landmarksView';
 import { GrazeView } from './grazeView';
 import { BorderView } from './borderView';
@@ -111,6 +112,7 @@ export class View {
   readonly ruins = new RuinsView();
   readonly rubble = new RubbleView();
   readonly caches = new CacheView();
+  readonly kegs = new KegView();
   readonly landmarks = new LandmarksView();
   /** When ground relics next sparkle. */
   private relicGlint = 0;
@@ -185,7 +187,7 @@ export class View {
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sky.mesh, this.hemi, this.fill, this.sun, this.sun.target);
-    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.rubble.group, this.caches.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
+    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.rubble.group, this.caches.group, this.kegs.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
     this.scene.add(this.rangeGuides.mesh, this.borders.mesh, this.graze.mesh, this.foundations.mesh);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.post = new Post(this.renderer, this.scene, this.rig.camera);
@@ -254,6 +256,7 @@ export class View {
     this.ruins.clear();
     this.rubble.clear();
     this.caches.clear();
+    this.kegs.clear();
     this.landmarks.clear();
     const colors = s.players.map((p) => p.color);
     this.units.setColors(colors);
@@ -459,6 +462,7 @@ export class View {
     this.vigilCandles.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, this.time);
     this.rubble.update(s, !!ageDef(p).salvage, (x, y) => this.reveal || this.sees(x, y));
     this.caches.update(s, (x, y) => this.reveal || this.sees(x, y), (id) => this.units.drawn.get(id) ?? null);
+    this.kegs.update(s, (x, y) => this.reveal || this.sees(x, y), (id) => this.units.drawn.get(id) ?? null);
     this.ruins.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     this.landmarks.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     if (!this.reveal) {
@@ -866,6 +870,26 @@ export class View {
           const end = pts[pts.length - 1];
           this.effects.burst(end, { count: 6, speed: 1.8, life: 0.3, size: 0.03, gravity: 2, colors: ['#e8f6ff', '#8fd8ff'] });
           this.cue('zap', x0, y0, 0.7);
+          break;
+        }
+        case 'keg': {
+          // Powder (#577): a keg laid with its fuse lit, blown, or stamped out; grinding at the mills is the HUD's to tell.
+          if (ev.what === 'ground' || !this.sees(ev.x, ev.y)) break;
+          const at = this.ground(s, ev.x, ev.y, 0.3);
+          if (ev.what === 'laid') {
+            this.effects.burst(at, { count: 10, speed: 1.2, up: 1, life: 0.5, size: 0.03, gravity: 3, colors: ['#fff2a8', '#ffc94a', '#ff8a2a'] });
+            this.cue('kegLit', ev.x, ev.y, 0.8);
+          } else if (ev.what === 'doused') {
+            this.effects.burst(at, { count: 8, speed: 0.6, up: 1, life: 1.4, size: 0.1, grow: 2, gravity: -0.6, drag: 1, soft: true, colors: ['#bdb6a8', '#8f887c'] });
+            this.cue('kegDoused', ev.x, ev.y, 0.8);
+          } else {
+            // The blast: a fireball low and wide, a black pall, stone and timber thrown, a ring out to its reach.
+            this.effects.burst(at, { count: 30, speed: 3, up: 0.6, life: 0.8, size: 0.14, grow: 2.2, gravity: -1, drag: 1.2, colors: ['#ffe08a', '#ff9a3c', '#e0471f'] });
+            this.effects.burst(at, { count: 26, speed: 1.6, up: 1.1, life: 3.6, size: 0.26, grow: 3.5, gravity: -0.4, drag: 1, soft: true, colors: ['#2a2624', '#45403b', '#5e574f'] });
+            this.effects.burst(at, { count: 22, speed: 4, up: 1.2, life: 1.4, size: 0.07, gravity: 7, drag: 0.3, colors: ['#7d7468', '#5a4a3a', '#9a8a74'] });
+            this.effects.ring(at, '#ffcf7a', KEG.reach + 0.5, 0.9);
+            this.cue('kegBlow', ev.x, ev.y, 1);
+          }
           break;
         }
         case 'splash': {

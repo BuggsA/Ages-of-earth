@@ -13,6 +13,7 @@ import { caravanOf, dockOf, homeMarket, marketOf, nearestCaravan, nearestDock, p
 import { ruinAt } from './ruins';
 import { rubbleAt, salvages } from './salvage';
 import { cacheAt } from './caches';
+import { carriesKegs, kegProblem } from './powder';
 import { raise, raiseCost } from './reclaim';
 import { callWork, workProblem } from './works';
 import { callKin, killCamp, kinProblem, takeVow, takeWay, vowProblem, wayBarred, wayProblem } from './ways';
@@ -437,6 +438,18 @@ export function applyCommand(s: GameState, c: Command): void {
       for (const u of hands) giveOrder(u, { k: 'cache', target: c.target }, c.queue);
       const others = units.filter((u) => u.type !== 'citizen');
       if (k && others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: k.x, y: k.y, queue: c.queue });
+      break;
+    }
+    case 'keg': {
+      // The Age of Sappers (#577): citizens and foot soldiers carry a keg each to the foot of a rival building.
+      const why = kegProblem(s, c.p, s.byId.get(c.target));
+      const units = myUnits(s, c.p, c.ids).filter(carriesKegs);
+      if (!units.length) return;
+      if (why) {
+        refuse(s, c.p, why);
+        return;
+      }
+      for (const u of units) giveOrder(u, { k: 'keg', target: c.target }, c.queue);
       break;
     }
     case 'dig': {

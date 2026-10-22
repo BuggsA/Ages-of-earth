@@ -9,6 +9,7 @@ import { wallLine } from './sim/commands';
 import { AGES, BUILDINGS, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
 import { crestSvg } from './ui/crests';
 import { isEnemy } from './sim/world';
+import { carriesKegs, kegProblem } from './sim/powder';
 import { jumpAge, rush, topUp } from './sim/god';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
 import { placeProblem, walkable } from './sim/grid';
@@ -96,7 +97,7 @@ let placeAt: { tx: number; ty: number; ok: boolean } | null = null;
 /** A wall being dragged out, from tile to tile. */
 let wallDrag: { x0: number; y0: number; x1: number; y1: number } | null = null;
 /** The next left click picks a target: where to attack-move, or a building to shelter in. */
-let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | null = null;
+let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | 'keg' | null = null;
 let paused = false;
 const SPEEDS = [1, 1.5, 2, 3];
 let speedIdx = 0;
@@ -141,6 +142,10 @@ const hud = new Hud({
   },
   garrisonMode: () => {
     targetMode = 'garrison';
+    placing = null;
+  },
+  kegMode: () => {
+    targetMode = 'keg';
     placing = null;
   },
   unloadMode: () => {
@@ -1460,6 +1465,24 @@ function riteAt(clientX: number, clientY: number, how: 'sacrifice' | 'curse', qu
   play('move');
 }
 
+/** The Age of Sappers (#577): the selected citizens and foot soldiers carry a keg each to the rival building clicked. */
+function kegAt(clientX: number, clientY: number, queue: boolean): void {
+  const s = game;
+  if (!s) return;
+  const pk = view.pick(clientX, clientY);
+  const b = pk && pk.kind === 'building' ? s.byId.get(pk.id) : undefined;
+  const why = kegProblem(s, viewer, b);
+  if (!b || why) {
+    hud.toast(why ?? 'Pick a rival building', 'bad');
+    play('error');
+    return;
+  }
+  const ids = selectedUnits(s).filter((u) => !u.inside && carriesKegs(u)).map((u) => u.id);
+  issue({ t: 'keg', p: viewer, ids, target: b.id, queue: queue || undefined });
+  view.marker(s, b.x, b.y, true);
+  play('move');
+}
+
 function garrisonAt(clientX: number, clientY: number, queue: boolean): void {
   const s = game;
   if (!s) return;
@@ -1613,6 +1636,11 @@ canvas.addEventListener('pointerdown', (e) => {
   }
   if (targetMode === 'sacrifice' || targetMode === 'curse') {
     riteAt(e.clientX, e.clientY, targetMode, e.shiftKey);
+    if (!e.shiftKey) targetMode = null;
+    return;
+  }
+  if (targetMode === 'keg') {
+    kegAt(e.clientX, e.clientY, e.shiftKey);
     if (!e.shiftKey) targetMode = null;
     return;
   }
@@ -2546,6 +2574,20 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         }
         break;
       }
+      case 'keg':
+        // Powder (#577): ground at the mills, laid, blown, or stamped out.
+        if (ev.what === 'ground') {
+          if (ev.owner === viewer) {
+            hud.toast(`The mills grind a keg of powder: ${s.players[viewer].kegs ?? 0} in store`, 'good');
+            play('kegGround');
+          }
+        } else if (ev.what === 'laid' && ev.owner !== viewer && s.players[ev.owner] && isEnemy(s, viewer, ev.owner) && view.sees(ev.x, ev.y)) {
+          hud.toast(`${s.players[ev.owner].name}'s sappers have lit a powder keg by your walls: reach it before it blows`, 'bad');
+        } else if (ev.what === 'doused') {
+          if (ev.owner === viewer) hud.toast(`${s.players[ev.by ?? 0].name} stamped out your keg's fuse: cover the next one`, 'alert');
+          else if (ev.by === viewer) hud.toast('Your people stamped out a burning keg', 'good');
+        } else if (ev.what === 'blown' && ev.owner === viewer) hud.toast('A keg blows: what stood by it is shaken to its footings', 'good');
+        break;
       case 'oreBuy':
         // A load of rare ore bought at a post (#573).
         if (ev.owner === viewer) {
@@ -2713,6 +2755,7 @@ function cursorFor(s: GameState): string {
   if (targetMode === 'garrison') return 'cur-garrison';
   if (targetMode === 'sacrifice' || targetMode === 'curse') return 'cur-convert';
   if (targetMode === 'unload') return 'cur-garrison';
+  if (targetMode === 'keg') return 'cur-attack';
   if (!pointer.inside || boxing) return '';
   const units = selectedUnits(s);
   const pk: Pick | null = view.pick(pointer.x, pointer.y);

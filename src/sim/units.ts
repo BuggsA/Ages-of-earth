@@ -22,6 +22,7 @@ import { dig, ruinAt } from './ruins';
 import { rubbleAt, salvages, strip } from './salvage';
 import { bank, cacheAt, lift } from './caches';
 import { buyLoad } from './oretrade';
+import { atFoot, carriesKegs, kegProblem, layKeg } from './powder';
 import { fordMarch, groveBoost, keptOf, kinBonus } from './landmarks';
 import { chant, chantedOver, consecrateProblem, consecrates, turnBuilding } from './consecrate';
 import { convoyShare } from './convoy';
@@ -1497,6 +1498,28 @@ function cacheOrderStep(s: GameState, u: Unit, o: Extract<Order, { k: 'cache' }>
 }
 
 /**
+ * Lay a powder keg (#577, the Age of Sappers): walk to the foot of the rival building and lay a keg from the store there, its fuse
+ * lit. Then the carrier is free: whether to stand by it or run is the player's call. Gives up if the building falls, the age is
+ * left or the store runs dry on the way.
+ */
+function kegOrderStep(s: GameState, u: Unit, o: Extract<Order, { k: 'keg' }>): void {
+  const b = s.byId.get(o.target);
+  const why = carriesKegs(u) ? kegProblem(s, u.owner, b) : 'Only citizens and foot soldiers carry kegs';
+  if (why || !b || b.kind !== 'building') {
+    if (why && b && b.hp > 0) s.events.push({ k: 'refused', owner: u.owner, why });
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  if (atFoot(u, b, statsOf(s, u).radius)) {
+    stopWalking(u);
+    layKeg(s, u);
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  if (!approach(u, goalForBuilding(b))) setOrder(u, { k: 'idle' });
+}
+
+/**
  * Pay a trader's (or merchant ship's) load in at the Market (or Dock) it came home to, and cut in the allies.
  * On the Silk Road (#326) the ground its Market covered since it set out (`from`) pays more, the owner's alone.
  */
@@ -2035,6 +2058,9 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
       break;
     case 'cache':
       cacheOrderStep(s, u, o);
+      break;
+    case 'keg':
+      kegOrderStep(s, u, o);
       break;
     case 'salvage':
       salvageStep(s, u, o);
