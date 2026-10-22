@@ -26,6 +26,7 @@ On the simple routes (same chat): "you should be able to follow some basic branc
 7. **Wiki-worthy, not hidden.** Recipes should make sense from the fiction (salt for caravans, saltpetre for powder), be learnable over many matches, and reward knowing them. A route few players know about is the goal; one nobody can find is a bug.
 8. **Never locked, only unknown.** A new player can reach any age in their first match: nothing carries over between matches to unlock it. What stands in the way is knowing it exists, knowing how to get there, and whether this map holds its resource. Ages a player has reached are remembered only for display: the main menu's web of ages (and maybe other places, like a match's end report), never as a gate.
 9. **Going back is a move, not a mistake.** A people can go back an age (§5) to undo a turn that went wrong, to pick up a road it passed, or to carry something from one branch into another. Some niche ages *need* it: they open only to a people that has walked two branches that leave from the same age, so it must turn, earn something, come back and turn again. Going back costs time and leaves a window a rival can punish.
+10. **Trade bridges what your land lacks.** A key resource missing from your map closes no age for good: it can be bought, dear and rising in price, at a trading post that holds it, or traded for, raided off a rival's caravans, or taken from their mine. Trade's new job is moving the materials of the road, not more gold.
 
 ## Built already (extend these; don't start over)
 
@@ -80,7 +81,7 @@ A key resource is anything only some seeds place that opens an age or a technolo
 | Blood-iron (`RARE.bloodiron`) | 35% | Iron & Blood (shortcut); Blood-Forged Blades | shortcut |
 | An ancient ruin (`RUINS`) | every map (2–4 by size) | **Reclaimers** (only to the people who dug it) | the only road, but a race, not a roll: whoever digs first |
 
-Rules for new ones: a key resource is placed on at least about a third of seeds (never "crazy hard"), and when placed, every player can reach some of it; it makes sense in the fiction; it is one of three kinds of door: **only road** (a rare age), **shortcut** (skips a basic age's deeds), or **tech** (a stronger version of something). Basic-route ages are never "only road". New kinds beyond ores are welcome: a creature, a landmark, a ruin type.
+A world that lacks one can still get it by trade (rule 10, §6), so "this map has none" means a dearer road, not a closed one. Rules for new ones: a key resource is placed on at least about a third of seeds (never "crazy hard"), and when placed, every player can reach some of it; it makes sense in the fiction; it is one of three kinds of door: **only road** (a rare age), **shortcut** (skips a basic age's deeds), or **tech** (a stronger version of something). Basic-route ages are never "only road". New kinds beyond ores are welcome: a creature, a landmark, a ruin type.
 
 ### 4. The prospector (s1–s3)
 
@@ -117,6 +118,16 @@ New: each side age may name **one keepsake building** that stays *kept* after yo
 | **Age of Missions** | Pilgrim + Sail (Medieval) | sail priests to far shores to raise mission Temples that claim land and turn coastal towns |
 
 Rules: a crossing age turns off the age its siblings share, keeps the `walked` gate for both (extend `Road.walked` to a pair, as heirlooms do), says on its panel which two roads it needs once the player has walked one of them, and the computer plans it the way it plans heirlooms (walk one, go back, walk the other). No crossing age sits on a basic route.
+
+### 6. Trade carries the road's materials (rule 10, the owner 2026-10-22)
+
+Trade today is one verb with many bonuses: traders walk to a trading post and come home with gold. Its new job is to carry key resources, so the economy route supplies (or starves) the rare roads.
+
+- **Posts that sell what the map lacks (first step).** On a world without a key resource, one or two neutral trading posts sell it: a trader who loads there brings it home instead of gold, paying in gold at the post. The price starts dear and rises with every load anyone buys (*start*: 3 gold a unit, +10% a load), so a rival can bid it up on you. A world that holds the resource has no such post.
+- **The road can be cut.** A trader carrying a key resource drops it when it falls, and a rival may carry it home (rule 6). Patrols on the trade road (#454), convoys at sea and Caravanserai tolls apply as they do to gold.
+- **The lodge shows the market.** Prospector level 1 names which posts sell what; level 3 shows who has been buying.
+- **The computer buys too,** for the road it has planned, and raids a rival's resource caravans.
+- **Later, if the first step plays well:** trade between players (offers and acceptance, which needs its own screen, so not first) and a people's Market selling its own mined surplus to others.
 
 ## Still open (decide by building, then note it here)
 
