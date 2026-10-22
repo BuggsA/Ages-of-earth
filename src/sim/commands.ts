@@ -390,6 +390,7 @@ export function applyCommand(s: GameState, c: Command): void {
       const units = myUnits(s, c.p, c.ids);
       const traders = units.filter((u) => u.type === 'trader');
       if (traders.length && p.quarantine) refuse(s, c.p, 'The town is in quarantine: the traders stay home');
+      else if (traders.length && c.buy && !post.sells?.includes(c.buy)) refuse(s, c.p, `This post sells no ${RARE[c.buy].name.toLowerCase()}`);
       else if (traders.length && !homeMarket(s, c.p, post.x, post.y) && !nearestCaravan(s, c.p, post.x, post.y)) refuse(s, c.p, 'Build a Market to trade from');
       else {
         for (const u of traders) {
@@ -397,7 +398,10 @@ export function applyCommand(s: GameState, c: Command): void {
           // carrying gold takes it home first, and a caravan keeps where its Market stood when it set out.
           const o = u.order.k === 'trade' ? u.order : null;
           const m = (o ? (marketOf(s, c.p, o.market) ?? caravanOf(s, c.p, o.market)) : null) ?? homeMarket(s, c.p, u.x, u.y) ?? nearestCaravan(s, c.p, u.x, u.y);
-          giveOrder(u, o?.from ? { k: 'trade', post: post.id, market: m ? m.id : 0, phase: u.carry > 0 ? 'back' : 'go', from: o.from } : { k: 'trade', post: post.id, market: m ? m.id : 0, phase: u.carry > 0 ? 'back' : 'go' }, c.queue);
+          // A trader told to buy rare ore (#573) pays for it at the post and carries it home instead of gold.
+          const buy = c.buy ? { buy: c.buy } : {};
+          const phase = u.carry > 0 || u.ore ? 'back' : 'go';
+          giveOrder(u, o?.from ? { k: 'trade', post: post.id, market: m ? m.id : 0, phase, from: o.from, ...buy } : { k: 'trade', post: post.id, market: m ? m.id : 0, phase, ...buy }, c.queue);
         }
       }
       // Merchant ships sail to a port post from their nearest Dock.

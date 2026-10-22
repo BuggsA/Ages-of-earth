@@ -133,6 +133,11 @@ const TIPS: Tip[] = [
     text: 'A building has fallen and left <b>rubble</b> (a heap of stone and beams). In the Age of Reclaimers, select <b>citizens</b> and right-click it to <b>strip</b> it: half the building\'s price goes into your stock. Rubble of your own is a choice: strip it now, or leave the foundations to raise the building again for 40% of the price. A rival\'s rubble lies where the fighting was, so send an escort.',
   },
   {
+    id: 'orePost',
+    when: (s, me) => s.players[me].epoch >= 1 && s.ents.some((e) => e.kind === 'unit' && e.owner === me && e.type === 'trader') && s.posts.some((t) => !!t.sells),
+    text: 'This world lacks a <b>key ore</b>, but a <b>trading post</b> sells it (its heart on the map is the ore\'s colour). Select <b>traders</b> and press <b>Buy</b>: they pay gold at the post for each load and carry it home to the Market, where it counts as mined ore toward the road it opens (salt: the Age of Merchants; blood-iron: Iron and Blood). Every load anyone buys makes the next dearer, and a trader felled on the road drops its load for anyone to carry off.',
+  },
+  {
     id: 'cache',
     when: (s, me) => !!s.caches?.some((c) => s.players[me].vis[Math.floor(c.y) * s.w + Math.floor(c.x)] === 1),
     text: '<b>Key ore</b> lies spilled on the ground (a split sack of salt, saltpetre or blood-iron). Salt, saltpetre and blood-iron are kept in your <b>Town Center</b> and <b>Storehouses</b>: when one falls, half of what you hold spills out, shared across the stores standing, and a fallen digger drops its basket. Select <b>citizens</b> and right-click the ore to carry it home, anyone\'s: what you carry home counts toward your ore doors, and what you lose sets yours back. Assay the Holdings shows who holds the most, and where it spills.',

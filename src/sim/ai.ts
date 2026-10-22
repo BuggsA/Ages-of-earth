@@ -6,9 +6,10 @@ import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Rubble, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
-import { ageDef, ageOf, barred, buildBarred, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadsFrom } from './ages';
+import { ageDef, ageOf, barred, buildBarred, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadsFrom, soldAt } from './ages';
 import { carriedBy } from './relics';
 import { storesOre } from './caches';
+import { loadPrice, sellerNear } from './oretrade';
 import { swordsOf } from './merc';
 import { fairground, feastOpen, nextFeastIn } from './fair';
 import { claimants, favours, landmarkAt } from './landmarks';
@@ -34,7 +35,7 @@ import { isHousehold } from './household';
 import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
-import { AI_ASSAY, AI_CACHE, CACHE, CIVS, DEER, MILITARY, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SNARE, SPOILS } from './data';
+import { AI_ASSAY, AI_CACHE, CACHE, CIVS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SNARE, SPOILS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
@@ -833,7 +834,8 @@ function rivalDigger(s: GameState, v: View, r: number): Unit | null {
   let best: Unit | null = null;
   let bestD = r * r;
   for (const e of s.ents) {
-    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || e.order.k !== 'gather' || !keyAt(s, e.order.tile) || !isEnemy(s, v.p.id, e.owner)) continue;
+    // A digger at a key vein, or anyone carrying key ore home: a bought load (#573) or a spill (#570).
+    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !(e.ore || (e.order.k === 'gather' && keyAt(s, e.order.tile))) || !isEnemy(s, v.p.id, e.owner)) continue;
     const d = (e.x - v.home.x) * (e.x - v.home.x) + (e.y - v.home.y) * (e.y - v.home.y);
     if (d < bestD) {
       bestD = d;
@@ -4503,6 +4505,7 @@ function merchants(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
       spend(v, cost);
     }
   }
+  if (L.clever) buyOre(s, v, mem, market, issue);
   // Idle traders take the best road; those on a road that has just cost one turn onto a better one.
   for (const u of v.traders) {
     if (u.inside || !(u.order.k === 'idle' || (u.order.k === 'trade' && shunned(u.order.post)))) continue;
@@ -4512,12 +4515,33 @@ function merchants(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   }
   // A post flooded by its own traders (#493): move one to the fresher post when that pays a fifth more.
   for (const u of v.traders) {
-    if (u.inside || u.order.k !== 'trade' || u.order.phase === 'back' || shunned(u.order.post)) continue;
+    if (u.inside || u.order.k !== 'trade' || u.order.phase === 'back' || u.order.buy || shunned(u.order.post)) continue;
     const cur = postAt(s, u.order.post);
     const from = nearestMarket(s, p.id, u.x, u.y) ?? market;
     const best = postAt(s, bestRoad(from).post);
     if (cur && best && best.id !== cur.id && tripGold(s, p.id, from, best) > tripGold(s, p.id, from, cur) * 1.2) issue({ t: 'route', p: p.id, ids: [u.id], post: best.id });
   }
+}
+
+/**
+ * Posts that sell what the map lacks (#573): bound for a road whose ore this world has none of, a clever computer keeps
+ * `ORE_POST.traders` buying it at the post while it has gold for two loads; once the road is open they trade for gold again.
+ */
+function buyOre(s: GameState, v: View, mem: AiMemory, market: Building, issue: (c: Command) => void): void {
+  const { p } = v;
+  const road = roadsFrom(p).find((r) => r.ore && !s.rares?.includes(r.ore.id) && soldAt(s, r.ore.id) && roadKnown(s, p, r) && mem.roads?.[r.to] === true && !deedsDone(p, r, s));
+  const buyers = v.traders.filter((u) => u.order.k === 'trade' && u.order.buy);
+  if (!road) {
+    for (const u of buyers) if (u.order.k === 'trade') issue({ t: 'route', p: p.id, ids: [u.id], post: u.order.post });
+    return;
+  }
+  const ore = road.ore!.id;
+  if (buyers.length >= ORE_POST.traders || p.res.gold < 2 * loadPrice(s, ore)) return;
+  const post = sellerNear(s, ore, market.x, market.y);
+  if (!post) return;
+  const d2 = (u: Unit) => (u.x - post.x) * (u.x - post.x) + (u.y - post.y) * (u.y - post.y);
+  const free = v.traders.filter((u) => !u.inside && !u.ore && u.carry === 0).sort((a, b) => d2(a) - d2(b) || a.id - b.id);
+  if (free.length) issue({ t: 'route', p: p.id, ids: [free[0].id], post: post.id, buy: ore });
 }
 
 /**

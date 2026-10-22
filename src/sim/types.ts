@@ -146,7 +146,7 @@ export type Order =
    * A trader running the road between a Market and a trading post: out to the post (`go`), where it
    * loads gold worth the distance from the Market, and back to the Market to pay it in (`back`).
    */
-  | { k: 'trade'; post: number; market: number; phase: 'go' | 'back'; from?: { x: number; y: number }; /** Loaded this step: the post floods on the next (#493). */ flood?: true }
+  | { k: 'trade'; post: number; market: number; phase: 'go' | 'back'; from?: { x: number; y: number }; /** Loaded this step: the post floods on the next (#493). */ flood?: true; /** Buying this rare ore at the post instead of trading for gold (#573). */ buy?: RareId }
   /** A citizen digging at an ancient ruin (#64). */
   | { k: 'dig'; target: number }
   /** A citizen stripping the rubble of a fallen building (#503). */
@@ -355,6 +355,8 @@ export interface TradePost {
   glutAt?: number;
   /** Tick until which a sick people's trader has left this post foul (#541); absent until one has. */
   foul?: number;
+  /** Rare ores this world lacks that the post sells (#573); absent where it sells none. */
+  sells?: RareId[];
 }
 
 /** What lies under a ruin (#64): gold, a technology, a map of the whole land, or a relic. */
@@ -562,6 +564,8 @@ export interface PlayerStats {
   plunder?: number;
   /** Key ore carried home from rivals' caches (#570); absent in older saves. */
   seized?: number;
+  /** Rare ore bought at the trading posts (#573); absent in older saves. */
+  bought?: number;
   /** Food a Warband's soldiers carried off from rivals (#463 s1); absent in older saves. */
   raided?: number;
   /** Gold paid in wages to hired swords (the Age of Merchants); absent in older saves. */
@@ -708,6 +712,8 @@ export type GameEvent =
   | { k: 'salvage'; owner: number; x: number; y: number; type: BuildingType; what: 'left' | 'stripped'; gain?: Cost }
   /** Key ore (#570): `spilled` from `from`'s store or basket, `taken` up by `owner`'s citizen, `kept` (banked) by `owner`. */
   | { k: 'cache'; owner: number; from: number; ore: RareId; n: number; x: number; y: number; what: 'spilled' | 'taken' | 'kept' }
+  /** A trader bought a load of rare ore at a post (#573). */
+  | { k: 'oreBuy'; owner: number; ore: RareId; n: number; gold: number; x: number; y: number }
   | { k: 'ruin'; id: number; owner: number; find: RuinFind; tech?: TechId; x: number; y: number }
   /** A landmark changed hands: `owner` keeps it now (-1: nobody, after `from` was driven off). */
   | { k: 'landmark'; id: number; kind: LandmarkKind; owner: number; from: number; x: number; y: number }
@@ -854,6 +860,8 @@ export interface GameState {
   fallen?: Fallen[];
   /** Rubble of fallen buildings a salvaging people may strip (`salvage.ts`); absent until one falls. */
   rubble?: Rubble[];
+  /** Loads of each rare ore bought at the trading posts, by anyone (#573): each makes the next dearer. Absent until one is bought. */
+  oreSold?: Partial<Record<RareId, number>>;
   /** Key ore knocked loose and lying on the ground (#570, `caches.ts`); absent until some spills. */
   caches?: OreCache[];
   /** Contested landmarks; absent in older saves and in campaign chapters (none). */
@@ -981,7 +989,7 @@ export type Command =
   /** Priests: fetch a relic and take it to the nearest Temple. */
   | ({ t: 'relic'; p: number; ids: number[]; target: number } & Queued)
   /** Traders: run the road between their Market and a trading post. */
-  | ({ t: 'route'; p: number; ids: number[]; post: number } & Queued)
+  | ({ t: 'route'; p: number; ids: number[]; post: number; /** Buy this rare ore there instead of trading for gold (#573). */ buy?: RareId } & Queued)
   /** Go aboard a transport ship. */
   | ({ t: 'board'; p: number; ids: number[]; target: number } & Queued)
   /** Transports: sail to the shore nearest a point and put everyone ashore. */

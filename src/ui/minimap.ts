@@ -1,4 +1,4 @@
-import { ageOf, assayed, diggersAt } from '../sim/ages';
+import { ageOf, assayed, diggersAt, prospected } from '../sim/ages';
 import { domainOf } from '../sim/data';
 import type { AgeId, GameState, KeyId } from '../sim/types';
 import type { ScoutFlag } from './scoutFlags';
@@ -243,14 +243,16 @@ export class Minimap {
     }
     // Trading posts the viewer has found: a sand-coloured square with a dark rim and a camel-brown dot.
     for (const t of s.posts) {
-      if (!reveal && !p.seen[Math.floor(t.y) * s.w + Math.floor(t.x)]) continue;
+      // A post that sells rare ore (#573) is named by the viewer's lodge, seen or not, and wears the ore's colour at its heart.
+      const sells = t.sells?.[0];
+      if (!reveal && !p.seen[Math.floor(t.y) * s.w + Math.floor(t.x)] && !(sells && prospected(p))) continue;
       const rr = Math.max(3, sx * 1.8);
       ctx.fillStyle = '#e8d2a0';
       ctx.fillRect(t.x * sx - rr, t.y * sy - rr, rr * 2, rr * 2);
       ctx.strokeStyle = 'rgba(40,24,0,0.85)';
       ctx.lineWidth = 1;
       ctx.strokeRect(t.x * sx - rr, t.y * sy - rr, rr * 2, rr * 2);
-      ctx.fillStyle = '#8a5a2e';
+      ctx.fillStyle = sells ? CHART_COLOR[sells] : '#8a5a2e';
       ctx.fillRect(t.x * sx - rr * 0.4, t.y * sy - rr * 0.4, rr * 0.8, rr * 0.8);
     }
     // Ancient ruins the viewer has found (#64): a pale stone column mark with a dark rim.

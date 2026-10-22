@@ -26,6 +26,7 @@ import { bloodStep, freeCaptives } from './blood';
 import { reclaimStep, remember } from './reclaim';
 import { leaveRubble, salvageStep } from './salvage';
 import { cacheStep, dropOre, spillStore } from './caches';
+import { stockPosts } from './oretrade';
 import { sortieStep } from './sortie';
 import { fairStep } from './fair';
 import { landmarkStep } from './landmarks';
@@ -41,7 +42,7 @@ import { mercStep } from './merc';
 import { KIN, NOMAD } from './data';
 import { chartLand, isHire, barred, journeyOf, noteWalked, trainsAt, workSteps } from './ages';
 import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, HomelandId, MapSize, MapType, Player, UnitType } from './types';
-import { RES, R_FISH, R_NONE } from './types';
+import { RARES, RES, R_FISH, R_NONE } from './types';
 import { legionKind, legionary } from './legion';
 import { mineable } from './household';
 import { isNomad } from './nomad';
@@ -193,6 +194,7 @@ export function createGame(setup: GameSetup): GameState {
   for (const d of map.deer) spawnAnimal(s, d.x, d.y);
   for (const r of map.relics) s.relics.push({ id: s.nextId++, x: r.x, y: r.y, carrier: 0, temple: 0 });
   for (const t of map.posts) s.posts.push({ id: s.nextId++, x: t.x, y: t.y });
+  if (!setup.scenario) stockPosts(s);
   if (map.ruins.length) s.ruins = map.ruins.map((r) => ({ id: s.nextId++, x: r.x, y: r.y, find: r.find, dug: 0, by: -1 }));
   for (const b of map.wild) spawnAnimal(s, b.x, b.y, b.kind);
   markHomeHerds(s);
@@ -644,6 +646,7 @@ export function checksum(s: GameState): number {
     mix(c.id);
     mix(c.n);
   }
+  for (const r of RARES) mix(s.oreSold?.[r] ?? 0);
   for (const m of s.landmarks ?? []) {
     mix(m.owner);
     mix(m.claim);
