@@ -1,12 +1,12 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { aiTiding } from './tidings';
-import { AGES, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_CLIMB, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Rubble, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
-import { ageDef, ageOf, barred, buildBarred, deedsDone, oreDone, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
+import { ageDef, ageOf, barred, buildBarred, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
 import { carriedBy } from './relics';
 import { swordsOf } from './merc';
 import { fairground, feastOpen, nextFeastIn } from './fair';
@@ -290,6 +290,14 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
     // The main road forward goes without a target, as it always has; any other road is named.
     if (!wait && tc && tc.queue.length === 0 && afford(v, road.cost)) issue({ t: 'advance', p: p.id, building: tc.id, ...(road === mainRoad(p) ? {} : { to: road.to }) });
     spend(v, road.cost);
+    // A nomad people buys its road's stone (#532): the gold for it is set aside too, or the army spends all but the road's own gold and the stone waits.
+    if (isNomad(p)) spend(v, { gold: stoneGold(s, p, road.cost) });
+  } else if (armyFirst && !advancing && !s.scenario && p.epoch < LAST_EPOCH && banked(p) && !armyDeed(s, p, mem)) {
+    // A climb nearly paid for keeps its savings while the army comes first (#532): a wave that came home short spent the whole price on soldiers, minutes from the next age.
+    // Not in a campaign chapter: its goals and its rival's strength were tuned to the old way.
+    const road = mainRoad(p)!;
+    spend(v, road.cost);
+    if (isNomad(p)) spend(v, { gold: stoneGold(s, p, road.cost) });
   }
 
   // In the age of flight, save up for an airfield before anything smaller takes the wood.
@@ -369,7 +377,7 @@ function trade(s: GameState, v: View, issue: (c: Command) => void): void {
   // A nomad people (#501) quarries no stone: it buys a lot whenever it runs short and has the gold.
   // The next road's stone is bought ahead of the road (the climb from the Warband asks more than a small store).
   const road = nomad ? mainRoad(p) : undefined;
-  if (nomad && p.res.stone < Math.max(NOMAD.aiStone, road?.cost.stone ?? 0) && p.res.gold >= Math.max(NOMAD.aiGold, s.market.stone + 40 + (road?.cost.gold ?? 0))) {
+  if (nomad && p.res.stone < Math.max(NOMAD.aiStone, road?.cost.stone ?? 0) && p.res.gold >= Math.max(NOMAD.aiGold, s.market.stone + NOMAD.aiMargin + (road?.cost.gold ?? 0))) {
     issue({ t: 'trade', p: p.id, res: 'stone', buy: true });
     return;
   }
@@ -408,6 +416,34 @@ function trade(s: GameState, v: View, issue: (c: Command) => void): void {
       return;
     }
   }
+}
+
+/** Whether a Path of Blood road it has chosen still waits on a deed its army must earn (the slain, the plunder): its soldiers are that road's price. */
+function armyDeed(s: GameState, p: Player, mem: AiMemory): boolean {
+  // Undecided counts as bound: the choice is made when it is first ready to climb, which army-first puts off.
+  const ahead = ageOf(p) === 'warband' ? ROADS.filter((r) => r.from === 'gunpowder' && r.to === 'ironblood') : roadsFrom(p).filter((r) => AGES[r.to].path === 'blood' && roadKnown(s, p, r));
+  return ahead.some((r) => mem.roads?.[r.to] !== false && !!r.deed && !oreOnly(s, r) && !deedsDone(p, r, s));
+}
+
+/** Whether a `banked` share of the main road's whole price is in hand. */
+function banked(p: Player): boolean {
+  const road = mainRoad(p);
+  if (!road) return false;
+  let need = 0;
+  let have = 0;
+  for (const r of RES) {
+    need += road.cost[r] ?? 0;
+    have += Math.min(p.res[r], road.cost[r] ?? 0);
+  }
+  return need > 0 && have >= need * AI_CLIMB.banked;
+}
+
+/** The gold a nomad people (#501) needs at the Market for the stone a price asks beyond its store: each lot dearer than the last, and the margin `trade` keeps. */
+function stoneGold(s: GameState, p: Player, cost: Cost): number {
+  const lots = Math.ceil(Math.max(0, (cost.stone ?? 0) - p.res.stone) / MARKET.lot);
+  let gold = 0;
+  for (let i = 0; i < lots; i++) gold += Math.min(MARKET.max, s.market.stone + i * MARKET.step);
+  return lots > 0 ? gold + NOMAD.aiMargin : 0;
 }
 
 // ---- The web of ages (#50) ---------------------------------------------------------------------------
@@ -635,6 +671,9 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
       continue;
     }
     if (r.to !== 'pilgrim' || kept < AI_WEB.relics || !roadKnown(s, p, r) || !deedsDone(p, r, s) || !wants(s, p, mem, r.to)) continue;
+    // Bound for the Path of Blood, it doesn't turn pilgrim (#532): the pilgrims' age shuts the Warband, which waits on its slain or comes next.
+    const warband = roadsFrom(p).find((w) => w.to === 'warband');
+    if (warband && roadKnown(s, p, warband) && wants(s, p, mem, 'warband')) continue;
     return { road: r, wait: false };
   }
   return null;
