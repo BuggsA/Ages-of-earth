@@ -1200,6 +1200,13 @@ export class View {
           if (ev.owner === this.viewer) this.cue('tradePaid', ev.x, ev.y, 0.4);
           break;
         }
+        case 'stow': {
+          // A Sea-Raider's pack handed into a ship's hold (#585): a few coins tossed toward the water, a soft clink for its people.
+          if (ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;
+          this.effects.burst(this.ground(s, ev.x, ev.y, 0.9), { count: 5, speed: 0.6, up: 1.4, life: 0.8, size: 0.045, gravity: 2.4, colors: ['#ffd166', '#f2cf4a', '#7fb3c9'] });
+          if (ev.owner === this.viewer) this.cue('tradePaid', ev.x, ev.y, 0.25);
+          break;
+        }
         case 'thrall': {
           // A rival citizen taken captive (#502): dust and a flash of rope where the thrall rises.
           if (ev.owner !== this.viewer && ev.from !== this.viewer && !this.sees(ev.x, ev.y)) break;

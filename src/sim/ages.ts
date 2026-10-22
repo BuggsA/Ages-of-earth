@@ -34,6 +34,19 @@ export function heirloomsOpened(p: Player, age: AgeId): TechId[] {
   return out;
 }
 
+/** The sibling a crossing road (#585) still wants walked, or null when both are walked (or the road is no crossing). */
+export function crossingLeft(p: Player, r: Road): AgeId | null {
+  return r.crossing?.find((a) => !hasWalked(p, a)) ?? null;
+}
+
+/**
+ * The crossing roads (#585) that walking `to` would open: `to` is one sibling, the other is walked and the crossing age not yet, as
+ * `heirloomsOpened` says for crafts. What the HUD's plan lines and the computer's road plan read.
+ */
+export function crossingsAhead(p: Player, to: AgeId): Road[] {
+  return ROADS.filter((r) => r.crossing?.includes(to) && !hasWalked(p, to) && !hasWalked(p, r.to) && r.crossing.every((a) => a === to || hasWalked(p, a)));
+}
+
 /** Every road out of the player's age, known or not. */
 export function roadsFrom(p: Player): Road[] {
   const here = ageOf(p);
@@ -175,6 +188,7 @@ export function lacking(s: GameState, p: Player, age: AgeId): { key: KeyId; only
  */
 export function roadKnown(s: GameState, p: Player, r: Road): boolean {
   if (r.walked && !hasWalked(p, r.walked)) return false;
+  if (r.crossing && !r.crossing.some((a) => hasWalked(p, a))) return false;
   if (r.vein && !veinSeen(s, p, r)) return false;
   if (r.ruin && !s.ruins?.some((ruin) => ruin.by === p.id)) return false;
   if (r.found && !(p.techs.includes(r.found) && surveyFinds(s, r.found))) return false;
@@ -236,6 +250,7 @@ export const deedsDone = (p: Player, r: Road, s?: GameState): boolean => veinDon
 export function roadProblem(s: GameState, p: Player, r: Road): string | null {
   if (!roadKnown(s, p, r)) {
     if (r.walked && !hasWalked(p, r.walked)) return `Only a people that walked the ${AGES[r.walked].name} finds this road`;
+    if (r.crossing && !r.crossing.some((a) => hasWalked(p, a))) return `Only a people that walked the ${AGES[r.crossing[0]].name} or the ${AGES[r.crossing[1]].name} finds this road`;
     if (r.ruin) return 'Your citizens must finish excavating an ancient ruin';
     if (r.found && !p.techs.includes(r.found)) return `Needs ${TECHS[r.found].name}`;
     if (r.found && !surveyFinds(s, r.found)) return 'There is none in this world';
@@ -244,6 +259,9 @@ export function roadProblem(s: GameState, p: Player, r: Road): string | null {
     return `Needs a ${BUILDINGS[r.clue!].name}`;
   }
   if (r.shuns && hasWalked(p, r.shuns)) return `Your people took the ${AGES[r.shuns].name}: this road is closed to it for good`;
+  // A crossing (#585): seen with one sibling walked, open only with both. The road back to the age they share, and on into the other, is the price.
+  const other = crossingLeft(p, r);
+  if (other) return `Needs both the ${AGES[r.crossing![0]].name} and the ${AGES[r.crossing![1]].name} walked: come back to the ${AGES[r.from].name} and walk the ${AGES[other].name}`;
   if (!veinDone(p, r)) return `${r.vein!.text} (${Math.floor(p.stats.mined?.[r.vein!.id] ?? 0)}/${r.vein!.n})`;
   if (oreDone(p, r)) return null;
   if (oreOnly(s, r)) {
