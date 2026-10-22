@@ -25,6 +25,7 @@ The owner: the main problem is that "every people gathers the same four resource
 
 Building your strategy should be as fun as beating your rival. Your route through the ages is a deck drafted during the match: each age is good at some things and bad at others, some are weak gateways to strong ones, and an age opens only where the land holds its key resource, which the player finds out by building and upgrading a prospector. The design and what's built: **`docs/age-deck.md`**. Umbrella: [#555](https://github.com/BuggsA/Ages-of-earth/issues/555).
 
+- **Basic routes stay first-class:** an army, a navy or an economy route works on every map with no exploring, and a player who sticks to one style stays competitive (the owner, 2026-10-22).
 - **New ages are welcome again** (the 2026-10-17 pause is lifted): every side age now has a verb, so the existing web is fleshed out enough to grow. Each new age still passes `docs/verbs.md`, and says what it's good at, what it's bad at, and what it leads to.
 - **The start shows it** (the owner liked steps 1–3 of the start plan on #555): one Play button and peoples picked by their loop, a first minute only that people has, finds in scouting range that open roads.
 - Deepening an existing age stays good work: the Sail and the six peoples (#501, the Britons last) first.
