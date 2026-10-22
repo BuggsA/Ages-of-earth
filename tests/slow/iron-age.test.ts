@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ageOf, barred, mainRoad, roadKnown, roadProblem, roadTo, roadsFrom } from '../../src/sim/ages';
-import { AMOUNT, BOG_IRON, EPOCHS, ROADS, TECHS, secs, unitStats } from '../../src/sim/data';
+import { AMOUNT, BOG_IRON, BUILDINGS, EPOCHS, ROADS, secs, unitStats } from '../../src/sim/data';
 import { createGame, step } from '../../src/sim/game';
 import { generateMap } from '../../src/sim/mapgen';
 import { deserialize, serialize } from '../../src/sim/save';
@@ -31,21 +31,20 @@ const mine = <T extends Building['type']>(s: GameState, type: T) =>
   s.ents.find((e): e is Building => e.kind === 'building' && e.owner === 0 && e.type === type);
 const tc = (s: GameState) => mine(s, 'towncenter')!;
 const citizens = (s: GameState) => s.ents.filter((e): e is Unit => e.kind === 'unit' && e.owner === 0 && e.type === 'citizen');
-/** Research the survey at the Town Center's side (a Storehouse is placed for it). */
+/**
+ * Survey the land: raise a Prospector's Lodge by the Town Center (#562; the owner allowed this swap from the Storehouse's
+ * research, #563) and return its answer about bog iron.
+ */
 const survey = (s: GameState) => {
   rich(s);
   const p = s.players[0];
-  // A finished Storehouse right by the Town Center, as a citizen would leave it.
-  const store = s.ents.find((e): e is Building => e.kind === 'building' && e.owner === 0 && e.type === 'storehouse');
-  if (!store) {
-    const spot = findSpot(s, 'storehouse', p.startX, p.startY, 4, 20)!;
-    placeBuilding(s, 0, 'storehouse', spot.tx, spot.ty, true);
-  }
+  const spot = findSpot(s, 'prospector', p.startX, p.startY, 4, 20)!;
+  const ids = citizens(s).map((u) => u.id);
   const events: { found: boolean }[] = [];
-  step(s, [{ t: 'research', p: 0, building: mine(s, 'storehouse')!.id, tech: 'survey' }]);
-  for (let i = 0; i < secs(TECHS.survey.time) + 2; i++) {
+  step(s, [{ t: 'build', p: 0, ids, type: 'prospector', tx: spot.tx, ty: spot.ty }]);
+  for (let i = 0; i < secs(BUILDINGS.prospector.time + 40) && !events.length; i++) {
     step(s);
-    for (const ev of s.events) if (ev.k === 'survey' && ev.owner === 0) events.push(ev);
+    for (const ev of s.events) if (ev.k === 'prospect' && ev.owner === 0) events.push({ found: ev.finds.includes('bogIron') });
   }
   expect(p.techs).toContain('survey');
   return events;

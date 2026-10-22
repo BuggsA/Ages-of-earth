@@ -38,7 +38,7 @@ import { sickStep } from './sickness';
 import { seraiStep, tollStep } from './passage';
 import { mercStep } from './merc';
 import { KIN, NOMAD } from './data';
-import { chartLand, isHire, barred, journeyOf, noteWalked, surveyFinds, trainsAt, workSteps } from './ages';
+import { chartLand, isHire, barred, journeyOf, noteWalked, trainsAt, workSteps } from './ages';
 import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, HomelandId, MapSize, MapType, Player, UnitType } from './types';
 import { RES, R_FISH, R_NONE } from './types';
 import { legionKind, legionary } from './legion';
@@ -316,7 +316,6 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
     restat(s, p, () => p.techs.push(tech));
     p.stats.techs++;
     s.events.push({ k: 'researched', owner: p.id, tech });
-    if (TECHS[tech].survey) s.events.push({ k: 'survey', owner: p.id, tech, found: surveyFinds(s, tech) });
     if (tech === 'chart') chartLand(s, p);
     return;
   }

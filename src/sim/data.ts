@@ -1413,8 +1413,8 @@ export interface Tech {
   /** A survey (#39): when done, it answers whether this world holds what the state's flag records. */
   survey?: 'bogIron';
   /**
-   * No longer offered (#562): kept in the rules only so saves and replays that hold it still play. Survey the Land is
-   * now what a finished Prospector's Lodge knows; a Storehouse no longer shows it, and the computer raises a lodge.
+   * Never researched (#562, #563): only granted. Survey the Land is what a finished Prospector's Lodge knows; no building
+   * offers it and a `research` command for it is refused. Kept as a technology so saves and the iron road read it.
    */
   legacy?: true;
   /** Learned and worked only while the people stands in this age (a craft of one road); it lapses when they leave and returns if they come back. */
@@ -1483,7 +1483,7 @@ export const TECHS: Record<TechId, Tech> = {
   chart: { name: 'Chart the Veins', at: 'prospector', epoch: 1, needs: 'survey', cost: { food: 150, gold: 100 }, time: 30, blurb: 'The prospectors map what they found: every patch of bog iron, every vein of salt, saltpetre and blood-iron, every cave mouth and every ancient ruin is marked on your map, under the fog too. A mark, not sight: the map shows the land as it was charted, not who digs there now.', icon: '🗺️' },
   // The Prospector's Lodge, level 3 (#568, spine §4): who digs each vein now, and what each people holds (`diggersAt`, `holdingsOf`).
   assay: { name: 'Assay the Holdings', at: 'prospector', epoch: 2, needs: 'chart', cost: { gold: 200, stone: 100 }, time: 35, blurb: 'Assayers follow the ore to market and back: on your map every charted vein is ringed in the colour of the people digging it now, and the lodge tells how much salt, saltpetre and blood-iron each people holds, and how much bog iron it has dug. Read a rival\'s road before it takes it, and know whose diggers to fall on.', icon: '⚖️' },
-  survey: { name: 'Survey the Land', at: 'storehouse', epoch: 0, cost: { food: 50, wood: 50 }, time: 15, survey: 'bogIron', legacy: true, blurb: "What a Prospector's Lodge learns when it is raised: which key resources lie anywhere in this world, bog iron among them. Yes or no; not where, nor how much.", icon: '🧭' },
+  survey: { name: 'Survey the Land', at: 'prospector', epoch: 0, cost: {}, time: 0, survey: 'bogIron', legacy: true, blurb: "What a Prospector's Lodge learns when it is raised: which key resources lie anywhere in this world, bog iron among them. Yes or no; not where, nor how much.", icon: '🧭' },
 };
 
 export const TECH_IDS = Object.keys(TECHS) as TechId[];
