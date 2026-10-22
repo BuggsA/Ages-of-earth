@@ -2274,21 +2274,6 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           hud.banner('The holdings are assayed', 'Every charted vein someone digs is ringed in their colour on your map, and the lodge tells what each people holds of salt, saltpetre and blood-iron, and how much bog iron it has dug.', 7000);
         } else hud.toast(`${TECHS[ev.tech].name} researched`, 'good');
         break;
-      case 'survey':
-        // The survey's answer (#39): yes or no, never where.
-        if (ev.owner !== viewer) break;
-        if (!ev.found) hud.toast('The prospectors found no bog iron anywhere in this world', 'info');
-        else {
-          const road = roadsFrom(s.players[viewer]).find((r) => r.found === ev.tech);
-          hud.banner(
-            'Bog iron',
-            road
-              ? `There is bog iron somewhere in this world: rust-red ore in the marshes. Find it and dig it, and the Town Center can lead you into the ${AGES[road.to].name} instead of the Bronze Age.`
-              : 'There is bog iron somewhere in this world: rust-red ore in the marshes, paid in as gold. The road to the Iron Age closed with the Stone Age.',
-            6000,
-          );
-        }
-        break;
       case 'prospect': {
         // The Prospector's Lodge reports (#562): yes or no for every key resource, never where.
         if (ev.owner !== viewer) break;

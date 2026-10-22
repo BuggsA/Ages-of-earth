@@ -184,6 +184,8 @@ export function techProblem(s: GameState, owner: number, tech: TechId): string |
   const t = TECHS[tech];
   if (p.techs.includes(tech)) return 'Already researched';
   if (isSuspended(p, tech)) return `Researched, but suspended until the ${EPOCHS[t.epoch].name}`;
+  // Survey the Land is granted by a finished Prospector's Lodge, never researched (#562, #563).
+  if (t.legacy) return "Learned when a Prospector's Lodge is raised";
   if (t.epoch > p.epoch) return `Needs the ${EPOCHS[t.epoch].name}`;
   if (t.only && ageOf(p) !== t.only) return `Only in the ${AGES[t.only].name}`;
   if (t.walked) {
