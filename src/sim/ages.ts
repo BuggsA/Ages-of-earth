@@ -384,6 +384,56 @@ export const suspendedTechs = (p: Player): TechId[] => p.suspended ?? [];
 /** The technologies a step back down to a tier would suspend. */
 export const suspendedBelow = (p: Player, tier: number): TechId[] => p.techs.filter((t) => TECHS[t].epoch > tier);
 
+/**
+ * Whether a building sleeps (#555 s10, `docs/age-roads.md` §5): it is raised only in some ages (`BUILDINGS[].ages`) and its people
+ * stands outside them, so it stands idle (no guns, no blood, no grafts, no waystation) until they return to one. War Camps burn
+ * instead (`burns`, `warcamp.ts`).
+ */
+export function asleep(s: GameState, b: Building): boolean {
+  const only = BUILDINGS[b.type].ages;
+  return !!only && !only.includes(ageOf(s.players[b.owner]));
+}
+
+/** Why a sleeping building stands idle, for refusals and the HUD. */
+export const sleepWhy = (b: Building): string => `It sleeps until your people returns to the ${(BUILDINGS[b.type].ages ?? []).map((a) => AGES[a].name).join(' or ')}`;
+
+/** Buildings by type, with how many, in the order they were first raised. */
+export type Tally = [BuildingType, number][];
+
+/** What leaving the age for `to` does (#555 s10): shown on the step-back button and the roads, so going back reads as a plan. */
+export interface Leaving {
+  /** The side age left: it counts as walked for good (its heirlooms and the roads that need it). */
+  walked?: AgeId;
+  /** Technologies a step back suspends until the people climbs again. */
+  suspend: TechId[];
+  /** Standing buildings that fall asleep, wake, or are lost (War Camps burn). */
+  sleep: Tally;
+  wake: Tally;
+  lost: Tally;
+}
+
+/** What a people gives up, keeps and gets back by leaving its age for `to` (a step back when `back`). */
+export function leaving(s: GameState, p: Player, to: AgeId, back: boolean): Leaving {
+  const from = ageOf(p);
+  const out: Leaving = { suspend: back ? suspendedBelow(p, AGES[to].tier) : [], sleep: [], wake: [], lost: [] };
+  if (from === to) return out;
+  if (!TRUNK.includes(from)) out.walked = from;
+  const add = (t: Tally, type: BuildingType) => {
+    const row = t.find((r) => r[0] === type);
+    if (row) row[1]++;
+    else t.push([type, 1]);
+  };
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.owner !== p.id || e.hp <= 0) continue;
+    const def = BUILDINGS[e.type];
+    if (!def.ages) continue;
+    const now = def.ages.includes(from), then = def.ages.includes(to);
+    if (now && !then) add(def.burns ? out.lost : out.sleep, e.type);
+    else if (!now && then && !def.burns) add(out.wake, e.type);
+  }
+  return out;
+}
+
 /** Where a Town Center's advance leads: along a road, or a step back. */
 export interface Journey {
   to: AgeId;

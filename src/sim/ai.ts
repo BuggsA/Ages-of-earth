@@ -6,7 +6,7 @@ import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Rubble, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
-import { ageDef, ageOf, barred, buildBarred, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
+import { ageDef, ageOf, asleep, barred, buildBarred, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
 import { kegsOf, millProblem, mills, sappers } from './powder';
 import { carriedBy } from './relics';
 import { storesOre } from './caches';
@@ -3423,7 +3423,7 @@ function bleedTown(s: GameState, v: View, mem: AiMemory, short: number, issue: (
   const spare = v.citizens.length - Math.max(AI_BLOOD.held, want - AI_HEMO.spare);
   const n = Math.min(spare, deed ? 1 : BLOOD.levyMost, Math.ceil(short / BLOOD.levy));
   if (n < 1 || (!deed && v.budget.food < unitStats('citizen', p.epoch).cost.food! * n)) return;
-  const rig = v.buildings.find((b) => b.type === 'drainrig' && b.built && b.hp > 0);
+  const rig = v.buildings.find((b) => b.type === 'drainrig' && b.built && b.hp > 0 && !asleep(s, b));
   if (!rig || levyWait(s, rig) > 0) return;
   blood.levy = s.tick;
   if (!levyProblem(s, p, rig)) {

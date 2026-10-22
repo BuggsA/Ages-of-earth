@@ -1334,6 +1334,8 @@ export interface BuildingStats {
   blood?: number;
   /** Units besides citizens that may raise it (the War Camp is pitched by foot soldiers, #303). */
   builders?: UnitType[];
+  /** Burns, rather than sleeps, when its people leaves its `ages` (the War Camp, #303; #555 s10). */
+  burns?: boolean;
   /** Which build menu it is in, and its key there. */
   menu: 'eco' | 'mil';
   key: string;
@@ -1363,7 +1365,7 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   // The age road (#562, `docs/age-roads.md` spine §4): raised in the Stone Age, it answers which key resources this world holds (`PROSPECTOR`).
   prospector: { name: "Prospector's Lodge", size: 2, hp: 500, cost: { food: 50, wood: 75 }, time: 20, pop: 0, sight: 6, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'P', blurb: 'A lodge of prospectors who walk the streams, scrape the rock and dig at old mounds. Once it stands it tells you which key resources this world holds (bog iron, salt, saltpetre, blood-iron, ancient ruins): yes or no for each, never where. Some ages open only with them; a world that lacks one shuts that door.' },
   // The Path of Blood (#303): pitched by foot soldiers where the army stands, enemy land too; burns when left alone (`WARCAMP`).
-  warcamp: { name: 'War Camp', size: 2, hp: 700, cost: { wood: 100, gold: 40 }, time: 30, pop: 0, sight: 6, trains: ['infantry'], drop: [], epoch: 3, ages: ['ironblood', 'totalwar'], builders: ['infantry'], menu: 'mil', key: 'Q', blurb: 'Tents, a stockade and a war standard, pitched by foot soldiers where the army stands, in enemy land too. Trains foot soldiers at the front and holds the land round it, so the army there is fed. Left without soldiers nearby, it burns.' },
+  warcamp: { name: 'War Camp', size: 2, hp: 700, cost: { wood: 100, gold: 40 }, time: 30, pop: 0, sight: 6, trains: ['infantry'], drop: [], epoch: 3, ages: ['ironblood', 'totalwar'], burns: true, builders: ['infantry'], menu: 'mil', key: 'Q', blurb: 'Tents, a stockade and a war standard, pitched by foot soldiers where the army stands, in enemy land too. Trains foot soldiers at the front and holds the land round it, so the army there is fed. Left without soldiers nearby, it burns.' },
   // The Silk Road (#334): a waystation by the road, raised in no one's land too; it rests traders, holds the land round it, and makes a near post pay more (`SERAI`).
   drainrig: { name: 'Drain Rig', size: 2, hp: 600, cost: { wood: 120, gold: 60 }, time: 30, pop: 0, sight: 6, trains: [], drop: [], epoch: 3, ages: ['ironblood', 'totalwar', 'hemocraft', 'bloodrite'], menu: 'mil', key: 'H', blurb: 'Copper troughs, a windlass and a rack of pale jars on trampled ground. Every living enemy who falls within 14 tiles of a finished rig gives up a fifth of its price as blood; a beast slain there gives a fifth of its meat. An enemy citizen your soldiers strike down within 14 tiles is taken here alive instead, up to 6 at once, and bled a blood a second until its 45 are spent; raze the rig and they go free. Your own sheep grazing within 6 tiles are bled instead of milked. Citizens within 6 tiles can be given to the levy (C): each is gone, and pays 30 blood. Blood raises Blood Towers and, in Total War and Hemocraft, grafts soldiers at Transfusion Stations. In Hemocraft the rig drains: living enemies standing within 6 tiles bleed into the store.' },
   // Hemocraft (#355 s3): blood spent. The Station grafts the soldiers sheltered inside (`HEMO`); the Blood Tower pays blood once and fires on the living (`BLOOD_TOWER`).

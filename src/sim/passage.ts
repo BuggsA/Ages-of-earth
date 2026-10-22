@@ -1,5 +1,6 @@
 import { SERAI, TOLL, secs } from './data';
 import { borderMap } from './borders';
+import { asleep } from './ages';
 import { modsOf } from './stats';
 import { isEnemy, maxHp } from './world';
 import type { Building, GameState, Unit } from './types';
@@ -47,8 +48,8 @@ export function tollStep(s: GameState): void {
   }
 }
 
-/** A player's finished Caravanserais, in id order. */
-const serais = (s: GameState): Building[] => s.ents.filter((e): e is Building => e.kind === 'building' && e.type === 'caravanserai' && e.built && e.hp > 0);
+/** The finished Caravanserais that are awake (one sleeps while its people is off the Silk Road, #555 s10), in id order. */
+const serais = (s: GameState): Building[] => s.ents.filter((e): e is Building => e.kind === 'building' && e.type === 'caravanserai' && e.built && e.hp > 0 && !asleep(s, e));
 
 /** Whether a unit rests at a Caravanserai: a trader or wagon of its owner's or an ally's, hurt, within `SERAI.rest` tiles. */
 export function restsAt(s: GameState, u: Unit, b: Building): boolean {

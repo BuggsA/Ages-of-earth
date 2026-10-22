@@ -1,5 +1,5 @@
 import { fairShare } from './fair';
-import { ageDef, ageOf, ironTradeShare, relicTradeShare } from './ages';
+import { ageDef, ageOf, asleep, ironTradeShare, relicTradeShare } from './ages';
 import { LAST_EPOCH, SERAI, SILK, TICK_HZ, TRADE } from './data';
 import { NAVAL, distToRect, nearestWalkable } from './grid';
 import { modsOf } from './stats';
@@ -196,7 +196,7 @@ export function caravanBonus(s: GameState, owner: number, carry: number, from: {
 export function seraiNear(s: GameState, owner: number, post: { x: number; y: number }): Building | null {
   const r = SERAI.near;
   for (const e of s.ents) {
-    if (e.kind !== 'building' || e.type !== 'caravanserai' || e.owner !== owner || !e.built || e.hp <= 0) continue;
+    if (e.kind !== 'building' || e.type !== 'caravanserai' || e.owner !== owner || !e.built || e.hp <= 0 || asleep(s, e)) continue;
     const dx = e.x - post.x, dy = e.y - post.y;
     if (dx * dx + dy * dy <= r * r) return e;
   }
