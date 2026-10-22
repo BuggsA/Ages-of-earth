@@ -1,6 +1,6 @@
 import { AGES, CIVS, HOMELANDS, HOUSEHOLD, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SICKNESS, SILK, STEP_BACK, TRIBUTE, WAY, secs } from '../sim/data';
 import { ageDef } from '../sim/ages';
-import { ageOf, backTo, hasWalked, deedProgress, deedsDone, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
+import { ageOf, backTo, hasWalked, deedProgress, deedsDone, findsOf, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
 import type { AgeId, Building, GameState, Unit } from '../sim/types';
 import { R_FISH } from '../sim/types';
 import { isIdleCitizen } from './idle';
@@ -151,6 +151,12 @@ const TIPS: Tip[] = [
     // Some worlds hold bog iron, salt, saltpetre, blood-iron (#39, #356): a Prospector's Lodge answers, while the Stone Age lasts (#562).
     when: (s, me) => !s.scenario && ageOf(s.players[me]) === 'stone' && secsIn(s) > 140 && !has(s, me, 'prospector') && !prospected(s.players[me]),
     text: `Some worlds hold <b>bog iron</b>, salt, saltpetre or blood-iron, and some don't; some ages open only with them. A <b>${BUILDINGS.prospector.name}</b> (<kbd>B</kbd> <kbd>${BUILDINGS.prospector.key}</kbd>, a little food and wood) answers yes or no for each, never where.`,
+  },
+  {
+    id: 'chart',
+    // A lodge in the Bronze Age (#565): Chart the Veins marks where each key resource lies.
+    when: (s, me) => !s.scenario && s.players[me].epoch >= 1 && has(s, me, 'prospector') && !s.players[me].chart && findsOf(s).some((k) => k !== 'ruin'),
+    text: 'Your <b>Prospector\'s Lodge</b> can <b>Chart the Veins</b> (🗺️) now: every patch of bog iron, salt, saltpetre and blood-iron, and every ruin, marked on your map under the fog. Know where to dig, and where your rival will.',
   },
   {
     id: 'iron',
