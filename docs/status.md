@@ -11,7 +11,7 @@ Full list, in the owner's words: `docs/rulings.md`.
 - **Rich play, not a mechanical race** (2026-10-14): give players real choices (`docs/design-notes.md`, "Richness").
 - **Seeds** (2026-10-14) and **the vision** (`docs/vision.md`) are inspiration, not rules.
 - **Goals** (2026-10-17): branch the opening (#463), every PR names the decision it adds (`docs/goals.md`).
-- **The age deck** (2026-10-22): draft your strategy through ages the land unlocks; new ages welcome again (#555, `docs/age-deck.md`).
+- **The age deck** (2026-10-22): draft your strategy through ages the land unlocks; new ages welcome again (#555, `docs/age-roads.md`).
 - **Save tokens** (2026-10-16): short docs, focused tests while building, spawn successors only when worth it.
 
 ## Checks
