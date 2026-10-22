@@ -2254,7 +2254,7 @@ export const MERC = { every: 15, wage: 2, patience: 2, first: 45 };
 export const AI_MERC = { reserve: 6 };
 
 /** A climb `banked` paid for (that share of its whole price in hand, #532) is not spent on the next wave: army-first lets it go ahead. */
-export const AI_CLIMB = { banked: 0.7 };
+export const AI_CLIMB = { banked: 0.6 };
 
 export const AI_WEB = { take: 0.6, heir: 1, survey: 22, diggers: 3, nearly: 0.5, patience: 90, close: 0.75, relics: 2, raid: 18, raidNear: 30, riders: 4, read: 0.85, lodge: 1, hulls: 1, bell: 900 };
 

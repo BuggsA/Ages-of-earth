@@ -1081,3 +1081,7 @@ Next: soldiers carrying the fever home from a sick land (campaign fever), sick c
 ## Designers' notes: move workers by the dozen (2026-10-19, Claude Code)
 
 Built: the Workers panel can now move people. **+** on a resource row sends one more (Shift: five); "Move N from A to B" sends a number between jobs. The sim picks who: the idle, then the empty-handed, each to the nearest free node. Why I love it: a town of forty is managed by its shape (more wood, fewer berries), not by clicking forty people, and it works the same online because it is one command. *Step 2:* Building is a destination (nearest unfinished site, five to a site, old work remembered), and an unaffordable button now says what is missing with a **Send N** button per resource that calls the same command, N sized to cover the shortfall in 30 seconds. Next: a first-game tip, and the same card for Way and tiding costs.
+
+## Designers' notes: a climb nearly paid for (#532, 2026-10-22, chain 1021-1545 s4, lane ai)
+
+Built: the computer stops throwing away a climb it has nearly paid for. When its wave comes home short, it still raises soldiers first, but from what it has beyond the next age's price. A nomad sets aside the gold for its road's stone, and a town that chose the Path of Blood takes the Warband over the Pilgrims. Why I love it: the Mongol host now plays like a war-people that means it: on 24 maps it walked the Warband 16 times instead of 11 and lost no match, so a player meets the Blood road far more often. Next: a nomad's food while it saves 1000 for Gunpowder is milk alone.
