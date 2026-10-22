@@ -1576,9 +1576,10 @@ export const SICKNESS = {
 
 /**
  * The Nile flood (#501 s1): in season `season` (summer) the fields of a flood people lie under the river and yield nothing,
- * and the corvée makes its builders work `build` times as fast. The computer moves up to `move` farmers a think to other work.
+ * and the corvée makes its builders work `build` times as fast. The computer moves up to `move` farmers a think to other work,
+ * and once the river falls sends up to `back` berry pickers a think to the fields it left empty (#517).
  */
-export const FLOOD = { season: 1, build: 2, move: 3 };
+export const FLOOD = { season: 1, build: 2, move: 3, back: 3 };
 
 export const CIVS: Record<CivId, Civ> = {
   egyptians: {

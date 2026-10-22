@@ -1735,10 +1735,24 @@ function polisArms(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
 /**
  * While its fields lie under the river, a flood people's computer takes `FLOOD.move` farmers a think off the fields: to berries or
  * the hunt if any are near, else to the wood, where its builders are pulled from, so the corvée raises what it builds. When the
- * river falls they go back to the fields as usual.
+ * river falls, up to `FLOOD.back` berry pickers a think go back to the fields it left empty (#517): left to the usual order of
+ * things (game and berries before fields), the fields stood empty all year, no new one was raised beside an empty one, and the
+ * town met its first winter, and the first rush, on the last of the berries.
  */
 function floodWork(s: GameState, v: View, issue: (c: Command) => void): void {
-  if (!flooded(s, v.p.id)) return;
+  if (!CIVS[v.p.civ].flood) return;
+  if (!flooded(s, v.p.id)) {
+    const taken = new Set<number>();
+    for (const u of v.citizens) {
+      if (taken.size >= FLOOD.back) return;
+      if (u.inside || u.order.k !== 'gather' || s.res[u.order.tile] !== R_BERRY) continue;
+      const farm = freeFarm(s, v.p.id, v.home.x, v.home.y, 24, taken);
+      if (!farm) return;
+      issue({ t: 'work', p: v.p.id, ids: [u.id], target: farm.id });
+      taken.add(farm.id);
+    }
+    return;
+  }
   let moved = 0;
   for (const u of v.citizens) {
     if (moved >= FLOOD.move) return;
