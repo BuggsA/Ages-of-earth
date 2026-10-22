@@ -6,7 +6,7 @@ import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Rubble, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
-import { ageDef, ageOf, barred, buildBarred, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, prospected, relicsKept, roadKnown, roadsFrom } from './ages';
+import { ageDef, ageOf, barred, buildBarred, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, charted, holds, keyOf, prospected, relicsKept, roadKnown, roadsFrom } from './ages';
 import { carriedBy } from './relics';
 import { swordsOf } from './merc';
 import { fairground, feastOpen, nextFeastIn } from './fair';
@@ -216,6 +216,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   // It waits for a town of `survey` citizens (#79): at ten, it held up the citizens of a town that might
   // find no bog at all, the very ones that win the first fight.
   ironRoad(s, v, mem, issue);
+  chartRoad(s, v, mem, issue);
   oreRoad(s, v, mem, issue);
   steppeRoad(s, v, mem, issue);
   readYear(s, v);
@@ -730,6 +731,22 @@ function forkTurn(s: GameState, v: View, mem: AiMemory): Journey | null {
   const both: Cost = {};
   for (const r of RES) if (peace.cost[r] || ready.cost[r]) both[r] = (peace.cost[r] ?? 0) + (ready.cost[r] ?? 0);
   return { road: { ...peace, cost: both }, wait: false };
+}
+
+/**
+ * Chart the Veins (#565): a people with a Prospector's Lodge charts the land once it has settled on a road whose key
+ * resource this world holds (read from its mind made up, never asking it anew), so it knows where to send its diggers.
+ */
+function chartRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (p.epoch < TECHS.chart.epoch || charted(p) || techProblem(s, p.id, 'chart')) return;
+  const rare = (to: AgeId) => ROADS.some((r) => r.to === to && AGES[r.from].tier >= p.epoch && !hasWalked(p, to) && keyOf(r) && holds(s, keyOf(r)!.key));
+  if (!Object.entries(mem.roads ?? {}).some(([to, on]) => on && rare(to as AgeId))) return;
+  const at = v.buildings.find((b) => b.type === 'prospector' && b.built && b.queue.length === 0);
+  const cost = techCostFor(s, p.id, 'chart');
+  if (!at || !afford(v, cost)) return;
+  issue({ t: 'research', p: p.id, building: at.id, tech: 'chart' });
+  spend(v, cost);
 }
 
 /**

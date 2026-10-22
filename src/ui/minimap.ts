@@ -1,6 +1,6 @@
 import { ageOf } from '../sim/ages';
 import { domainOf } from '../sim/data';
-import type { AgeId, GameState } from '../sim/types';
+import type { AgeId, GameState, KeyId } from '../sim/types';
 import type { ScoutFlag } from './scoutFlags';
 import { iceCover, lookFor, mapTint } from '../render/seasonLook';
 import { Waymarks } from './waymarks';
@@ -11,6 +11,9 @@ import { R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEA
  * units in sight, the camera's view and pings where things happen. Click or drag to look somewhere;
  * right-click to send the selected units there.
  */
+
+/** The chart's marks (#565): each key resource in the colour its ground shows on this map. */
+const CHART_COLOR: Record<KeyId, string> = { bogIron: '#c0622a', salt: '#f4f1e8', saltpetre: '#d8d27a', bloodiron: '#a01c2c', ruin: '#d8cfb8' };
 
 /** A side age rings its owner's buildings on the map, so a rival's road shows at a glance (#55). */
 const AGE_BLIP: Partial<Record<AgeId, string>> = { merchant: '#ffd166', iron: '#ff7a2a', pilgrim: '#f4efe4', fair: '#e0524a', sail: '#3fb8c8', lightning: '#8fd8ff', warband: '#9b1c2c', ironblood: '#6e0f1c', totalwar: '#4a0a12', hemocraft: '#b0182c', bloodrite: '#5e1a4a', horde: '#c8a24a', silk: '#b8462e' };
@@ -178,6 +181,27 @@ export class Minimap {
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(this.base, 0, 0, cw, ch);
 
+    // The Prospector's Lodge's chart (#565): every key-resource tile as it was charted, a small diamond in the ore's
+    // colour wherever the viewer can't see the ground now (where it can, the land itself shows the truth).
+    if (!reveal && p.chart) {
+      const rr = Math.max(2.8, sx * 1.3);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(10,8,4,0.85)';
+      for (const c of p.chart) {
+        if (p.vis[c.tile]) continue;
+        const x = ((c.tile % s.w) + 0.5) * sx;
+        const y = (Math.floor(c.tile / s.w) + 0.5) * sy;
+        ctx.fillStyle = CHART_COLOR[c.key];
+        ctx.beginPath();
+        ctx.moveTo(x, y - rr);
+        ctx.lineTo(x + rr, y);
+        ctx.lineTo(x, y + rr);
+        ctx.lineTo(x - rr, y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
     for (const b of buildings) {
       const pl = s.players[b.owner];
       ctx.fillStyle = pl.color;
@@ -222,7 +246,9 @@ export class Minimap {
     // A dug ruin is hollow and rimmed in its digger's colour; one still standing is a pale column pair.
     // Under fog each shows as it was when last seen (waymarks, #152).
     for (const r of s.ruins ?? []) {
-      const by = reveal ? r.by : this.waymarks.ruins.get(r.id);
+      let by = reveal ? r.by : this.waymarks.ruins.get(r.id);
+      // A ruin never seen but charted by the viewer's lodge (#565): drawn as one still standing.
+      if (by === undefined && p.chart) by = -1;
       if (by === undefined) continue;
       const rr = Math.max(2.4, sx * 1.4);
       const dug = by >= 0;

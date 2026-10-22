@@ -1,5 +1,5 @@
 import { AGES, BUILDINGS, CIVS, LIGHTNING, PATHS, ROADS, STEP_BACK, TECHS, TICK_HZ, TRUNK, WAYS, secs, stepBackCost, type Age, type Deed, type Road } from './data';
-import { KEYS, type AgeId, type CivId, type PathId, type Building, type BuildingType, type Cost, type GameState, type KeyId, type Player, type TechId, type UnitType } from './types';
+import { KEYS, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, type AgeId, type CivId, type PathId, type Building, type BuildingType, type Cost, type GameState, type KeyId, type Player, type TechId, type UnitType } from './types';
 
 /**
  * Ages as a web (#37): which age a people is in, the roads out of it, and what that age lets them
@@ -80,6 +80,28 @@ export function prospect(s: GameState, owner: number): void {
   p.techs.push('survey');
   p.statsVersion++;
   s.events.push({ k: 'prospect', owner, finds: findsOf(s) });
+}
+
+/** The key resource a tile holds (#565), or null: bog iron and the rare ores. Ruins aren't tiles; the chart reads `s.ruins`. */
+export function keyAt(s: GameState, tile: number): KeyId | null {
+  const r = s.res[tile];
+  return r === R_BOG ? 'bogIron' : r === R_SALT ? 'salt' : r === R_SALTPETRE ? 'saltpetre' : r === R_BLOODIRON ? 'bloodiron' : null;
+}
+
+/** Whether the people has charted the land (#565): Chart the Veins learned at its Prospector's Lodge. */
+export const charted = (p: Player): boolean => !!p.chart;
+
+/**
+ * Chart the Veins is learned (#565): the people keeps a picture of every key-resource tile in the world as it is now,
+ * in tile order. Kept if the lodge falls or the people steps back: what was drawn stays drawn.
+ */
+export function chartLand(s: GameState, p: Player): void {
+  const out: { tile: number; key: KeyId }[] = [];
+  for (let i = 0; i < s.res.length; i++) {
+    const key = keyAt(s, i);
+    if (key) out.push({ tile: i, key });
+  }
+  p.chart = out;
 }
 
 /** The key resources this world holds, in the lodge's order: what a lodge reports when it is raised. */

@@ -2262,7 +2262,13 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         } else hud.toast(`${s.players[ev.owner].name} has been defeated`, s.players[ev.owner].team === s.players[viewer].team ? 'bad' : 'good');
         break;
       case 'researched':
-        if (ev.owner === viewer) hud.toast(`${TECHS[ev.tech].name} researched`, 'good');
+        if (ev.owner !== viewer) break;
+        // The Prospector's Lodge's chart (#565): where each key resource lies, now marked on the map.
+        if (ev.tech === 'chart') {
+          play('prospect');
+          const n = s.players[viewer].chart?.length ?? 0;
+          hud.banner('The land is charted', `${n ? `${n} spots of rare ore` : 'No rare ore'}${s.ruins?.length ? ` and ${s.ruins.length} ancient ruins` : ''} are marked on your map, under the fog too: the land as it lay when charted, not who digs there now.`, 7000);
+        } else hud.toast(`${TECHS[ev.tech].name} researched`, 'good');
         break;
       case 'survey':
         // The survey's answer (#39): yes or no, never where.

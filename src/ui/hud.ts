@@ -200,10 +200,15 @@ const opensText = (k: KeyId) => {
   return parts.length ? parts.join(', ') : 'nothing yet';
 };
 
-/** The Prospector's Lodge's answer (#562): yes or no for every key resource, and what each opens, in the tip. */
-const prospectLine = (s: GameState) => {
+/**
+ * The Prospector's Lodge's answer (#562): yes or no for every key resource, and what each opens, in the tip. Once
+ * charted (#565), how many places of each the map marks.
+ */
+const prospectLine = (s: GameState, p: Player) => {
+  const marks = (k: KeyId) => (k === 'ruin' ? (s.ruins?.length ?? 0) : (p.chart ?? []).filter((c) => c.key === k).length);
+  const chart = p.chart ? `<br>Charted: ${KEYS.filter((k) => marks(k)).map((k) => `${marks(k)} ${PROSPECTOR.keys[k].name.toLowerCase()}`).join(', ')} marked on your map, under the fog too.` : '';
   const tip = KEYS.map((k) => `${PROSPECTOR.keys[k].icon} ${PROSPECTOR.keys[k].name}: ${holds(s, k) ? 'yes' : 'none in this world'}. Opens ${opensText(k)}.`).join('<br>');
-  return `<span data-tip="<b>What this world holds</b>${tip}<br>Yes or no only: not where, nor how much.">🧭 ${KEYS.map((k) => `${PROSPECTOR.keys[k].icon}${holds(s, k) ? '✔' : '✘'}`).join(' ')}</span>`;
+  return `<span data-tip="<b>What this world holds</b>${tip}${chart || '<br>Yes or no only: not where, nor how much. Chart the Veins (Bronze Age) marks where.'}">🧭 ${KEYS.map((k) => `${PROSPECTOR.keys[k].icon}${holds(s, k) ? '✔' : '✘'}`).join(' ')}${p.chart ? ' · 🗺️ charted' : ''}</span>`;
 };
 
 /** A road's route, for the age-up button's title: a side route by name, nothing for the plain road. */
@@ -815,7 +820,7 @@ export class Hud {
     }
     else if (b.type === 'house' && b.built && isHousehold(p)) status = `<span data-tip="<b>The household tax</b>Each house pays gold in proportion to how full your town is, and more for every house on its street (a Market counts as two): a lane apart is a street.">🏮 ${streetOf(s, b)} on its street</span>`;
     else if (b.type === 'dock') status = 'Fishing boats bring their catch here';
-    else if (b.type === 'prospector' && b.built && prospected(p)) status = prospectLine(s);
+    else if (b.type === 'prospector' && b.built && prospected(p)) status = prospectLine(s, p);
     else if (b.type === 'temple' && keptIn(s, b)) status = `Keeps ${keptIn(s, b)} relic${keptIn(s, b) > 1 ? 's' : ''}: ${icon('gold', 14)}${Math.round((60 / RELIC.every) * Math.round(RELIC.gold * modsOf(s, b.owner).relicGold) * keptIn(s, b))} a minute`;
     else status = def.drop.length ? 'Drop-off for every resource' : def.pop ? `Room for ${def.pop}` : 'Ready';
     if (!mine) status = `<span class="swatch" style="background:${p.color}"></span>${p.name}${b.type === 'wonder' && b.timer >= 0 ? `: wins in ${fmtTime(b.timer)}` : ''}${b.type === 'temple' && keptIn(s, b) ? `: keeps ${keptIn(s, b)} relic${keptIn(s, b) > 1 ? 's' : ''}` : ''}`;
