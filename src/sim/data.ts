@@ -2172,6 +2172,8 @@ export interface AiLevel {
   hemo?: boolean;
   /** Off: the computer never takes the fork past Total War (#355 s5; only `scripts/ai-ab.ts` turns it off). */
   fork?: boolean;
+  /** Off: the town trains hands on while a climb is paid for (#555; only `scripts/ai-ab.ts` turns it off). */
+  climbHold?: boolean;
   /** Off: a Blood-rite computer's priests neither curse nor sacrifice (#355 s4; only `scripts/ai-ab.ts` turns it off). */
   rite?: boolean;
   /** Off: a priest that has taken up healing by itself is left at it, as before (only `scripts/ai-ab.ts` turns it off). */
