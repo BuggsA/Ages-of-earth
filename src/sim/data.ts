@@ -136,6 +136,11 @@ export interface Age {
   mills?: boolean;
   /** Citizens and foot soldiers lay powder kegs at rival buildings (the Age of Sappers, #577): see `KEG` (`powder.ts`). */
   sappers?: boolean;
+  /**
+   * Plunder hauled to the ships (#585, the Age of Sea-Raiders): packs are carried as the Warband's are (`SPOILS`), but banked only by
+   * handing them into a transport's hold, which pays out at a Dock (`SEA_RAID`, `spoils.ts`). Town Centers and Barracks bank nothing.
+   */
+  raid?: boolean;
 }
 
 /**
@@ -508,6 +513,23 @@ export const AGES: Record<AgeId, Age> = {
     price: { siege: 1.3 },
     sappers: true,
   },
+  // The first crossing age (#585, the age road s12, `docs/age-roads.md` §5): a turn off the Middle Ages open only to a people that
+  // walked both the Warband and the Sail, its two sibling branches, so it must turn, come back and turn again. At the Middle Ages' tier.
+  searaider: {
+    verb: 'Carry the plunder to your ships, not home: a soldier\'s pack goes into the hold of a transport it reaches, and the ship banks its hold at a Dock',
+    door: 'No Town Center or Barracks banks plunder, and no traders or merchant cogs: a raid far from the sea pays nothing until it walks back to a ship, and a laden ship sunk pays its hold to the rival',
+    good: 'Raids from the sea: the war-host lands where it likes and leaves with the gold by ship',
+    routes: [],
+    name: 'Age of Sea-Raiders',
+    short: 'Sea-Raiders',
+    tier: 2,
+    blurb: 'As the Norse of the 800s came out of the fjords: the Warband\'s plunder and the Sail\'s ships made one trade. Every enemy unit your forces slay earns a fifth of its price in plunder, carried in the killer\'s pack (up to 90 gold), and a pack is banked only by ship: a soldier who comes within 5 tiles of one of your transports, or rides in one, hands its pack into the hold (up to 400 gold a ship), and a ship banks its hold when it comes within 6 tiles of a Dock of yours. A rival who sinks a laden ship takes its hold; the packs of those aboard go down with it. Ships cost a fifth less and soldiers train 10% faster. But Town Centers and Barracks bank nothing, and a raiding people sends out no traders and no merchant cogs.',
+    add: { plunder: 0.2 },
+    mul: { militaryTrain: 0.9 },
+    price: { ship: 0.8 },
+    raid: true,
+    no: { units: ['trader', 'cog'], why: 'A people of sea-raiders trades with no one: traders and merchant cogs wait until it comes ashore in the Middle Ages or climbs on' },
+  },
 };
 
 // ---- What the side ages give ----------------------------------------------------------------------
@@ -645,6 +667,11 @@ export interface Road {
   blurb?: string;
   /** Closed for good to a people that has walked this age (#355 s2): the two branches of a fork shut each other. */
   shuns?: AgeId;
+  /**
+   * A crossing age's door (#585, `docs/age-roads.md` §5): two sibling ages, branches off the same age, that the people must both have
+   * walked. Seen once either is walked, open only with both. (`walked` stays one age: read-only tests read it as one.)
+   */
+  crossing?: [AgeId, AgeId];
   /**
    * How hard the door is (#348): an easy on-ramp (a small deed, a modest price) invites a people to try the
    * web; a hard gate (a dear price, a long journey) marks the special ages. Most roads carry neither, and
@@ -911,7 +938,28 @@ export const ROADS: Road[] = [
   { from: 'alchemy', to: 'gunpowder', cost: EPOCHS[3].cost, time: EPOCHS[3].time, blurb: 'Rejoin the main road at the Gunpowder Age for the ordinary price: the mills shut, the siege engines return as cannon, and the kegs already ground are kept for a sapper\'s day.' },
   { from: 'sapper', to: 'industrial', cost: { food: 1400, gold: 800, stone: 400 }, time: 80, blurb: 'Rejoin the main road at the Industrial Age: no more kegs are laid, siege engines cost their usual price, and the kegs left are kept.' },
   { from: 'sapper', to: 'gunpowder', cost: { food: 300, gold: 150 }, time: 30, blurb: 'Lay down the kegs: the ordinary Gunpowder Age, with siege engines at their usual price. The kegs left are kept.' },
+  // The first crossing (#585, the age road s12): off the Middle Ages, for a people that walked the Warband and the Sail, the two turns
+  // off it, so it went into one, came back and went into the other. A Dock is the clue; the journey is the price.
+  {
+    from: 'middle',
+    to: 'searaider',
+    cost: { food: 400, wood: 400, gold: 200 },
+    time: 45,
+    clue: 'dock',
+    gate: 'hard',
+    crossing: ['warband', 'sail'],
+    blurb: 'A turn, not a climb, for a people that has walked both the Warband and the Sail: the war-host takes to the longships. Plunder is carried as in the Warband, but banked only by ship: packs go into a transport\'s hold, and the hold pays out at a Dock. Ships cost a fifth less and soldiers train 10% faster. What it gives up: traders and merchant cogs, and every Town Center and Barracks as a place to bank. A raid far from the sea pays nothing until it walks back to a ship, and a laden ship sunk pays the rival.',
+  },
+  { from: 'searaider', to: 'middle', cost: { food: 200, wood: 150 }, time: 25, blurb: 'Draw the longships up: the ordinary Middle Ages, with traders, and plunder no longer taken. Gold still in packs and holds is banked where it stands.' },
+  { from: 'searaider', to: 'gunpowder', cost: { food: 900, wood: 500, gold: 500, stone: 150 }, time: 65, blurb: 'Climb to the Gunpowder Age: the raids end, traders return, and every pack and hold still laden is banked where it stands (more wood and less gold than from the Middle Ages: the fortune was in the ships).' },
 ];
+
+/**
+ * The Age of Sea-Raiders (#585): a ship banks its hold within `dock` tiles of a finished Dock of its people, and holds `hold` gold at
+ * most (a soldier's pack is `SPOILS.cap`; what a full hold can't take stays in the pack). A soldier hands its pack in within
+ * `SPOILS.bank` tiles of a transport, or aboard it. The computer sails a ship home once its hold reaches `home`.
+ */
+export const SEA_RAID = { hold: 400, dock: 6, home: 150 };
 
 /**
  * Stepping back an age (#47), at a Town Center: down to the trunk age one tier below, whatever road
@@ -2553,6 +2601,13 @@ export const KEG = { ore: 20, time: 30, most: 20, lay: 1.2, fuse: 8, reach: 2, b
  * any with a rival standing within `guard` tiles of it.
  */
 export const AI_KEG = { take: 0.5, ore: 80, kegs: 6, mills: 2, hold: 180, sappers: 2, near: 12, guard: 4, every: 2 };
+
+/**
+ * The computer and the first crossing (#585): a people that has walked the Warband or the Sail and keeps a Dock decides once, at
+ * `take` odds on a coin of its own, to walk the other and turn Sea-Raider. It stays `stay` seconds in each sibling before it goes back
+ * to the Middle Ages, and `raid` seconds in the Sea-Raiders before it climbs on.
+ */
+export const AI_SEA = { take: 0.6, stay: 120, raid: 300 };
 
 export const WARCAMP = { watch: 8, grace: 10, burn: 0.05, train: 1.2 };
 

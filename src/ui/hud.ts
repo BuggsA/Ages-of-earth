@@ -8,7 +8,7 @@ import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE } from '../sim/units';
-import { KEG, ORE_POST, PROSPECTOR, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, SNARE, SICKNESS, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, SNARE, SICKNESS, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -35,7 +35,7 @@ import { exacting, isRider } from '../sim/tribute';
 import { landOwnerAt } from '../sim/borders';
 import { flockCap, flockOf, grazeRange, lambProblem } from '../sim/flocks';
 import { soldAt } from '../sim/ages';
-import { ageDef, ageOf, asleep, keepsakeProblem, leaving, sleepWhy, type Tally, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, oreClue, oreDone, oreOnly, ironTradeShare, isHire, isSideRoad, journeyOf, mainRoad, pathLine, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, suspendedTechs, assayed, diggersAt, holdingsOf, holds, keyOf, lacking, opensOf, prospected, trainsAt, windowsOf, leadsOn, leadsTo } from '../sim/ages';
+import { ageDef, ageOf, asleep, crossingLeft, crossingsAhead, keepsakeProblem, leaving, sleepWhy, type Tally, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, oreClue, oreDone, oreOnly, ironTradeShare, isHire, isSideRoad, journeyOf, mainRoad, pathLine, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, suspendedTechs, assayed, diggersAt, holdingsOf, holds, keyOf, lacking, opensOf, prospected, trainsAt, windowsOf, leadsOn, leadsTo } from '../sim/ages';
 import type { AgeId, KeyId, RareId, Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Player, Res, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
 import { KEYS, RARES, RES, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
@@ -258,6 +258,12 @@ const planLines = (s: GameState, p: Player, to: AgeId, back: boolean): string =>
   if (l.keepsake && k) lines.push(`🏺 Kept: your ${BUILDINGS[l.keepsake.type].name}${l.keepsake.keep === ageOf(p) ? ' (the one you chose)' : ' (the oldest; select another and press J to choose it)'} keeps ${k.does}.`);
   else if (k && ageOf(p) !== to) lines.push(`🏺 No keepsake: raise a ${BUILDINGS[k.building].name} before you leave and it keeps ${k.does}.`);
   if (back && l.walked) lines.push(`🏺 Kept: the ${AGES[l.walked].name} counts as walked for good (its heirlooms and the roads that need it), but its own ways rest until you return.`);
+  // A crossing (#585): half walked shows what the other half opens; the second sibling's road says it completes one.
+  if (l.walked) for (const r of ROADS) {
+    const other: AgeId | null = r.crossing?.includes(l.walked) ? crossingLeft(p, r) : null;
+    if (other && other !== l.walked && !hasWalked(p, r.to)) lines.push(`🔀 Half a crossing: walk the ${AGES[other].name} too, and the ${AGES[r.to].name} opens from the ${AGES[r.from].name}.`);
+  }
+  for (const r of crossingsAhead(p, to)) lines.push(`🔀 Opens a crossing: with the ${AGES[to].name} walked as well, the ${AGES[r.to].name} opens from the ${AGES[r.from].name}.`);
   if (l.suspend.length) lines.push(`💤 Sleeps until you climb again: ${l.suspend.map((t) => TECHS[t].name).join(', ')}.`);
   if (l.sleep.length) lines.push(`💤 Sleeps until you return: ${tally(l.sleep)}, standing idle.`);
   if (l.wake.length) lines.push(`☀️ Wakes: ${tally(l.wake)}.`);
@@ -798,7 +804,16 @@ export class Hud {
     // A sword for hire (the Age of Merchants): paid by the day, and gone if left unpaid.
     const sword = u.merc !== undefined ? `<span data-tip="<b>Sword for hire</b>Draws ${MERC.wage} gold every ${MERC.every} seconds from ${mine ? 'your' : 'its people\'s'} treasury${u.merc ? `, and has gone unpaid ${u.merc} payday${u.merc > 1 ? 's' : ''}: it walks off at ${MERC.patience}` : `; one left unpaid ${MERC.patience} paydays walks off`}.">💰<em>${u.merc ? 'Unpaid' : 'Hired'}</em></span>` : '';
     // The Warband hauls its plunder home (#502).
-    const pack = u.spoils ? `<span data-tip="<b>Spoils</b>${u.spoils} gold of plunder in the pack (up to ${SPOILS.cap}). ${mine ? 'It is yours only once the soldier walks within' : 'Fell it and the pack is yours; its people has it only once it reaches home, within'} ${SPOILS.bank} tiles of a Town Center or Barracks.">💰<em>Spoils</em> ${u.spoils}</span>` : '';
+    // The Sea-Raiders (#585) bank by ship: a soldier's pack goes into a transport's hold, and a ship's hold is banked at a Dock.
+    const raider = !!ageDef(s.players[u.owner]).raid;
+    const ship = domainOf(u.type) === 'water';
+    const pack = !u.spoils
+      ? ''
+      : ship
+        ? `<span data-tip="<b>Hold</b>${u.spoils} gold of plunder in the hold (up to ${SEA_RAID.hold}). ${mine ? 'It is yours once the ship comes' : 'Sink it and the hold is yours; its people has it only once the ship comes'} within ${SEA_RAID.dock} tiles of a Dock. Soldiers within ${SPOILS.bank} tiles, or aboard, hand their packs in.">💰<em>Hold</em> ${u.spoils}</span>`
+        : raider
+          ? `<span data-tip="<b>Spoils</b>${u.spoils} gold of plunder in the pack (up to ${SPOILS.cap}). ${mine ? 'A sea-raider banks by ship: walk it within' : 'Fell it and the pack is yours; its people banks it only by ship, within'} ${SPOILS.bank} tiles of a transport of ${mine ? 'yours' : 'theirs'}, or aboard one, and the hold pays out at a Dock. A Town Center or Barracks banks nothing.">💰<em>Spoils</em> ${u.spoils}</span>`
+          : `<span data-tip="<b>Spoils</b>${u.spoils} gold of plunder in the pack (up to ${SPOILS.cap}). ${mine ? 'It is yours only once the soldier walks within' : 'Fell it and the pack is yours; its people has it only once it reaches home, within'} ${SPOILS.bank} tiles of a Town Center or Barracks.">💰<em>Spoils</em> ${u.spoils}</span>`;
     // A thrall (#502): a taken citizen, bound and drab, who works but never builds.
     const bond = u.thrall ? `<span data-tip="<b>Thrall</b>A citizen taken by a Warband people: it works a field for ${mine ? 'you' : p.name} but never builds or repairs. Slay it, or guard your workers so none are taken.">⛓<em>Thrall</em></span>` : '';
     const held = u.type === 'priest' && carriedBy(s, u) ? `<span data-tip="<b>Relic</b>Carried to a Temple, it brings in gold. Hands full: no healing or converting until it is set down (D).">⚱<em>Relic</em></span>` : '';
@@ -1159,7 +1174,7 @@ export class Hud {
               pic: '',
               glyph: isMain ? '⏫' : '🔀',
               title: `${toward} the ${to.name}${routeTag(road.to)}`,
-              desc: `${road.gate === 'easy' ? '<i>An easy on-ramp: a small deed and a modest price.</i><br>' : road.gate === 'hard' ? '<i>A hard gate: a dear price and a long journey, for something special.</i><br>' : ''}${road.blurb ?? to.blurb}${isSideRoad(road) ? ` Opens only from ${windowsOf(road.to).map((a) => `the ${AGES[a].name}`).join(' or ')}.` : ''}${(oreOnly(s, road) ? [] : deeds).map((d) => `<br>${oreDone(p, road) || d.have >= d.need ? '✔' : '…'} ${d.deed.text}: ${Math.min(d.have, d.need)}/${d.need}.`).join('')}${(() => { const door = oreClue(s, p, road); return door ? `<br>${oreDone(p, road) ? '✔' : '…'} ${oreOnly(s, road) ? '' : '<i>Or</i> '}${door.text.charAt(0).toLowerCase()}${door.text.slice(1)}: ${Math.min(Math.floor(p.stats.mined?.[door.id] ?? 0), door.n)}/${door.n}.` : ''; })()}${back.length ? `<br>Brings back ${back.map((t) => TECHS[t].name).join(', ')}.` : ''}${planLines(s, p, road.to, false)}<br>Takes ${road.time}s. Every unit re-arms and every building is rebuilt in the new style.${agePanel(s, p, road.to)}`,
+              desc: `${road.gate === 'easy' ? '<i>An easy on-ramp: a small deed and a modest price.</i><br>' : road.gate === 'hard' ? '<i>A hard gate: a dear price and a long journey, for something special.</i><br>' : ''}${road.blurb ?? to.blurb}${isSideRoad(road) ? ` Opens only from ${windowsOf(road.to).map((a) => `the ${AGES[a].name}`).join(' or ')}.` : ''}${(oreOnly(s, road) ? [] : deeds).map((d) => `<br>${oreDone(p, road) || d.have >= d.need ? '✔' : '…'} ${d.deed.text}: ${Math.min(d.have, d.need)}/${d.need}.`).join('')}${(() => { const door = oreClue(s, p, road); return door ? `<br>${oreDone(p, road) ? '✔' : '…'} ${oreOnly(s, road) ? '' : '<i>Or</i> '}${door.text.charAt(0).toLowerCase()}${door.text.slice(1)}: ${Math.min(Math.floor(p.stats.mined?.[door.id] ?? 0), door.n)}/${door.n}.` : ''; })()}${(road.crossing ?? []).map((a) => `<br>${hasWalked(p, a) ? '✔' : '…'} A crossing: walk the ${AGES[a].name}.`).join('')}${back.length ? `<br>Brings back ${back.map((t) => TECHS[t].name).join(', ')}.` : ''}${planLines(s, p, road.to, false)}<br>Takes ${road.time}s. Every unit re-arms and every building is rebuilt in the new style.${agePanel(s, p, road.to)}`,
               cost: road.cost,
               ok: !advancing && !problem && !short && b.queue.length === 0,
               on: b.advance >= 0 && !b.back && journeyOf(p, b)?.to === road.to,
