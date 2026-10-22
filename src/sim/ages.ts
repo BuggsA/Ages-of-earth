@@ -391,7 +391,49 @@ export const suspendedBelow = (p: Player, tier: number): TechId[] => p.techs.fil
  */
 export function asleep(s: GameState, b: Building): boolean {
   const only = BUILDINGS[b.type].ages;
-  return !!only && !only.includes(ageOf(s.players[b.owner]));
+  // A keepsake (#555 s11) never sleeps.
+  return !!only && !b.keep && !only.includes(ageOf(s.players[b.owner]));
+}
+
+/**
+ * The building that is (or would be, on leaving) a people's keepsake of an age (#555 s11): the standing one marked for it, else the
+ * oldest finished standing one of its kind that keeps no other age. Undefined when the age names none, or none stands.
+ */
+export function keepsakeOf(s: GameState, p: Player, age: AgeId): Building | undefined {
+  const k = AGES[age].keepsake;
+  if (!k) return undefined;
+  let oldest: Building | undefined;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.owner !== p.id || e.hp <= 0) continue;
+    if (e.keep === age) return e;
+    if (!oldest && e.type === k.building && e.built && !e.keep) oldest = e;
+  }
+  return oldest;
+}
+
+/** A people leaves an age (#555 s11): its keepsake, if one stands, is marked to keep that age's work from now on. */
+export function markKeepsake(s: GameState, p: Player, age: AgeId): Building | undefined {
+  const b = keepsakeOf(s, p, age);
+  if (b) b.keep = age;
+  return b;
+}
+
+/** Why a building can't be chosen as its people's keepsake now, or null. */
+export function keepsakeProblem(p: Player, b: Building): string | null {
+  const age = ageOf(p);
+  const k = AGES[age].keepsake;
+  if (!k) return `The ${AGES[age].name} leaves no keepsake`;
+  if (b.type !== k.building) return `The ${AGES[age].name}'s keepsake is a ${BUILDINGS[k.building].name}`;
+  if (!b.built || b.hp <= 0) return 'Finish it first';
+  if (b.keep && b.keep !== age) return `It is already the keepsake of the ${AGES[b.keep].name}`;
+  return null;
+}
+
+/** Choose a building as the keepsake of its people's age: it, and no other, keeps that age's work once they leave. */
+export function chooseKeepsake(s: GameState, p: Player, b: Building): void {
+  const age = ageOf(p);
+  for (const e of s.ents) if (e.kind === 'building' && e.owner === p.id && e.keep === age) delete e.keep;
+  b.keep = age;
 }
 
 /** Why a sleeping building stands idle, for refusals and the HUD. */
@@ -404,6 +446,8 @@ export type Tally = [BuildingType, number][];
 export interface Leaving {
   /** The side age left: it counts as walked for good (its heirlooms and the roads that need it). */
   walked?: AgeId;
+  /** The building that keeps the age left at work (#555 s11): its keepsake. */
+  keepsake?: Building;
   /** Technologies a step back suspends until the people climbs again. */
   suspend: TechId[];
   /** Standing buildings that fall asleep, wake, or are lost (War Camps burn). */
@@ -418,6 +462,7 @@ export function leaving(s: GameState, p: Player, to: AgeId, back: boolean): Leav
   const out: Leaving = { suspend: back ? suspendedBelow(p, AGES[to].tier) : [], sleep: [], wake: [], lost: [] };
   if (from === to) return out;
   if (!TRUNK.includes(from)) out.walked = from;
+  out.keepsake = keepsakeOf(s, p, from);
   const add = (t: Tally, type: BuildingType) => {
     const row = t.find((r) => r[0] === type);
     if (row) row[1]++;
@@ -426,7 +471,8 @@ export function leaving(s: GameState, p: Player, to: AgeId, back: boolean): Leav
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.owner !== p.id || e.hp <= 0) continue;
     const def = BUILDINGS[e.type];
-    if (!def.ages) continue;
+    // A keepsake neither sleeps nor wakes: it works on every road.
+    if (!def.ages || e.keep || e === out.keepsake) continue;
     const now = def.ages.includes(from), then = def.ages.includes(to);
     if (now && !then) add(def.burns ? out.lost : out.sleep, e.type);
     else if (!now && then && !def.burns) add(out.wake, e.type);
@@ -467,11 +513,24 @@ export function inField(s: GameState, b: { x: number; y: number; owner: number }
 
 /**
  * How fast a building trains and researches, in hundredths: 100 in every age but Lightning, where a building
- * in a coil's field works at `LIGHTNING.lit` and one outside every field at `LIGHTNING.dark`.
+ * in a coil's field works at `LIGHTNING.lit` and one outside every field at `LIGHTNING.dark` (elsewhere, `lit` in a kept coil's field).
  */
 export function workRate(s: GameState, b: Building): number {
-  if (!hasCoils(s.players[b.owner])) return 100;
+  const p = s.players[b.owner];
+  // Off Lightning, only the coil kept as its keepsake (#555 s11) still lights a field, and nothing is dark.
+  if (!hasCoils(p)) return p.walked?.includes('lightning') && inKeptCoil(s, b) ? LIGHTNING.lit : 100;
   return inField(s, b) ? LIGHTNING.lit : LIGHTNING.dark;
+}
+
+/** Whether a building stands in the field of its owner's coil kept from the Age of Lightning (#555 s11). */
+export function inKeptCoil(s: GameState, b: { x: number; y: number; owner: number }): boolean {
+  const r2 = LIGHTNING.reach * LIGHTNING.reach;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.keep !== 'lightning' || e.owner !== b.owner || !e.built || e.hp <= 0) continue;
+    const dx = e.x - b.x, dy = e.y - b.y;
+    if (dx * dx + dy * dy <= r2) return true;
+  }
+  return false;
 }
 
 /**

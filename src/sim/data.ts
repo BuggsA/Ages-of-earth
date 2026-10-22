@@ -45,6 +45,11 @@ export interface Age {
   routes?: RouteId[];
   /** A gateway age (rule 3): weak on its own, taken for the road on. Its panel says so. */
   gateway?: boolean;
+  /**
+   * The age's keepsake (#555 s11, `docs/age-roads.md` §5): one building of this kind (the one chosen while here, else the oldest)
+   * keeps this age's work after the people leaves; `does` says what, after "keeps". The rest sleep or lose the age's work.
+   */
+  keepsake?: { building: BuildingType; does: string };
   short: string;
   tier: number;
   blurb: string;
@@ -273,6 +278,7 @@ export const AGES: Record<AgeId, Age> = {
     door: 'No siege engines',
     good: 'Winning a rival over without a fight: priests take towers, gates and Temples',
     routes: ['faith'],
+    keepsake: { building: 'temple', does: 'its vigils: priests beside it swell its relics\' gold' },
     name: 'Age of Pilgrims',
     short: 'Pilgrim',
     tier: 2,
@@ -288,6 +294,7 @@ export const AGES: Record<AgeId, Age> = {
     door: 'Towns grown open round the fairground stand weaker',
     good: 'The richest trade: caravans home on the feast day pay the most',
     routes: ['economy', 'faith'],
+    keepsake: { building: 'market', does: 'its feast day: on a fairground, its trips home on the feast pay the fair\'s share' },
     name: 'Age of Fairs',
     short: 'Fairs',
     tier: 3,
@@ -318,6 +325,7 @@ export const AGES: Record<AgeId, Age> = {
     door: 'No aircraft',
     good: 'The quickest town: inside a coil\'s field every building works faster',
     routes: ['economy'],
+    keepsake: { building: 'tower', does: 'its coil: it looses bolts, and buildings in its field work faster' },
     name: 'Age of Lightning',
     short: 'Lightning',
     tier: 4,
@@ -348,6 +356,7 @@ export const AGES: Record<AgeId, Age> = {
     door: 'No traders, and a camp left without soldiers burns',
     good: 'Fighting far from home: foot soldiers trained where the army stands',
     routes: ['army'],
+    keepsake: { building: 'bloodtower', does: 'loosing its barbed bolts' },
     name: 'Age of Iron and Blood',
     short: 'Iron & Blood',
     tier: 3,
@@ -364,6 +373,7 @@ export const AGES: Record<AgeId, Age> = {
     door: 'No traders, and the fields and learning suffer',
     good: 'The biggest army in a moment: every citizen by a War Camp can take up arms',
     routes: ['army'],
+    keepsake: { building: 'transfusion', does: 'grafting soldiers and feeding grafts' },
     name: 'Age of Total War',
     short: 'Total War',
     tier: 4,
@@ -382,6 +392,7 @@ export const AGES: Record<AgeId, Age> = {
     door: 'No priests and no traders; machines bleed nothing, so a rival answers with steel; the Blood-rite is closed for good',
     good: 'Grafted soldiers fed on blood: hard to kill, quick, and self-mending',
     routes: ['army'],
+    keepsake: { building: 'drainrig', does: 'drawing blood from the fallen, the flock, captives and the levy' },
     name: 'Age of Hemocraft',
     short: 'Hemocraft',
     tier: 4,
@@ -398,6 +409,7 @@ export const AGES: Record<AgeId, Age> = {
     door: 'No Transfusion Station and no traders; Hemocraft is closed for good',
     good: 'Your own mend at every altar while your enemies bleed there',
     routes: ['army'],
+    keepsake: { building: 'temple', does: 'its altar: it draws blood from the fallen and takes captives as a rig does, and mends the soldiers by it' },
     name: 'Age of the Blood-rite',
     short: 'Blood-rite',
     tier: 4,
@@ -450,6 +462,7 @@ export const AGES: Record<AgeId, Age> = {
     door: 'No tribute, no fields and no walls',
     good: 'Trade that rolls with the town, and a toll on every rival trader in your land',
     routes: ['horse'],
+    keepsake: { building: 'caravanserai', does: 'its waystation: trips to the posts near it pay more, and caravans rest there' },
     name: 'Age of the Silk Road',
     short: 'Silk Road',
     tier: 3,
@@ -471,6 +484,7 @@ export const AGES: Record<AgeId, Age> = {
     door: 'No siege engines, and soldiers train slower: the town is busy with its mills',
     good: 'The only road to the Age of Sappers: the powder its mills grind is what the sappers carry',
     routes: [],
+    keepsake: { building: 'workshop', does: 'grinding powder, one mill\'s worth, from the saltpetre in store' },
     gateway: true,
     name: 'Age of Alchemy',
     short: 'Alchemy',

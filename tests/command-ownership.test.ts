@@ -73,6 +73,7 @@ describe('one player never commands another’s people', () => {
       cancel: { t: 'cancel', p: 1, building: tc.id, index: 0 },
       advance: { t: 'advance', p: 1, building: tc.id },
       stepBack: { t: 'stepBack', p: 1, building: tc.id },
+      keepsake: { t: 'keepsake', p: 1, building: tc.id },
       rally: { t: 'rally', p: 1, building: tc.id, x, y },
       trade: { t: 'trade', p: 1, res: 'food', buy: true },
       stop: { t: 'stop', p: 1, ids },
