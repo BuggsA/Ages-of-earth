@@ -1461,6 +1461,8 @@ export const TECHS: Record<TechId, Tech> = {
   masonsLodge: { name: 'Masons\' Lodge', at: 'temple', epoch: 2, walked: ['pilgrim', 'reclaimer'], cost: { wood: 200, stone: 150 }, time: 40, mul: { buildSpeed: 1.2, buildingHp: 1.15 }, blurb: 'Heirloom of the Age of Pilgrims and the Age of Reclaimers: the builders who studied the old ruins raise the great churches, and keep their lodge. Buildings go up 20% faster and are 15% sturdier. Kept for good, on any road.', icon: '⛪' },
   // The Prospector's Lodge, level 2 (#565, spine §4): where each key resource lies, marked on the map (`chart` in `ages.ts`).
   chart: { name: 'Chart the Veins', at: 'prospector', epoch: 1, needs: 'survey', cost: { food: 150, gold: 100 }, time: 30, blurb: 'The prospectors map what they found: every patch of bog iron, every vein of salt, saltpetre and blood-iron, every cave mouth and every ancient ruin is marked on your map, under the fog too. A mark, not sight: the map shows the land as it was charted, not who digs there now.', icon: '🗺️' },
+  // The Prospector's Lodge, level 3 (#568, spine §4): who digs each vein now, and what each people holds (`diggersAt`, `holdingsOf`).
+  assay: { name: 'Assay the Holdings', at: 'prospector', epoch: 2, needs: 'chart', cost: { gold: 200, stone: 100 }, time: 35, blurb: 'Assayers follow the ore to market and back: on your map every charted vein is ringed in the colour of the people digging it now, and the lodge tells how much salt, saltpetre and blood-iron each people holds, and how much bog iron it has dug. Read a rival\'s road before it takes it, and know whose diggers to fall on.', icon: '⚖️' },
   survey: { name: 'Survey the Land', at: 'storehouse', epoch: 0, cost: { food: 50, wood: 50 }, time: 15, survey: 'bogIron', legacy: true, blurb: "What a Prospector's Lodge learns when it is raised: which key resources lie anywhere in this world, bog iron among them. Yes or no; not where, nor how much.", icon: '🧭' },
 };
 
@@ -2335,6 +2337,11 @@ export const AI_MERC = { reserve: 6 };
 /** A climb `banked` paid for (that share of its whole price in hand, #532) is not spent on the next wave: army-first lets it go ahead. */
 export const AI_CLIMB = { banked: 0.6 };
 
+/**
+ * The computer and the lodge's third level (#568): a clever computer assays once a rival stands in an age a key resource
+ * opens; assayed, `riders` idle riders fall on a rival's digger at a key-resource tile within `reach` tiles of home.
+ */
+export const AI_ASSAY = { reach: 36, riders: 3 };
 export const AI_WEB = { take: 0.6, heir: 1, survey: 22, diggers: 3, nearly: 0.5, patience: 90, close: 0.75, relics: 2, raid: 18, raidNear: 30, riders: 4, read: 0.85, lodge: 1, hulls: 1, bell: 900 };
 
 export const PLAYER_COLORS = ['#2f7fe0', '#e0473a', '#e8b630', '#3aa35a', '#9b59d0', '#e07a2f'];

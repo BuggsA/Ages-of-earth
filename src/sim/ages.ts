@@ -104,6 +104,27 @@ export function chartLand(s: GameState, p: Player): void {
   p.chart = out;
 }
 
+/** Whether the people has assayed the holdings (#568): Assay the Holdings learned at its Prospector's Lodge. */
+export const assayed = (p: Player): boolean => p.techs.includes('assay');
+
+/**
+ * Who digs each key-resource tile now (#568): tile to the people of the first living citizen (in id order) working
+ * it or walking to it. Live, unlike the chart: this is what the third level shows.
+ */
+export function diggersAt(s: GameState): Map<number, number> {
+  const out = new Map<number, number>();
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.hp <= 0 || e.order.k !== 'gather' || out.has(e.order.tile) || !keyAt(s, e.order.tile)) continue;
+    out.set(e.order.tile, e.owner);
+  }
+  return out;
+}
+
+/** What a people holds of each key resource (#568): its stock of each rare ore, and the bog iron it has dug (paid in as gold). */
+export function holdingsOf(p: Player): Record<Exclude<KeyId, 'ruin'>, number> {
+  return { bogIron: Math.floor(p.stats.iron ?? 0), salt: Math.floor(p.rare?.salt ?? 0), saltpetre: Math.floor(p.rare?.saltpetre ?? 0), bloodiron: Math.floor(p.rare?.bloodiron ?? 0) };
+}
+
 /** The key resources this world holds, in the lodge's order: what a lodge reports when it is raised. */
 export const findsOf = (s: GameState): KeyId[] => KEYS.filter((k) => holds(s, k));
 

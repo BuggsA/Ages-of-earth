@@ -159,6 +159,12 @@ const TIPS: Tip[] = [
     text: 'Your <b>Prospector\'s Lodge</b> can <b>Chart the Veins</b> (🗺️) now: every patch of bog iron, salt, saltpetre and blood-iron, and every ruin, marked on your map under the fog. Know where to dig, and where your rival will.',
   },
   {
+    id: 'assay',
+    // A charted lodge in the Middle Ages (#568): Assay the Holdings shows who digs where and what each people holds.
+    when: (s, me) => !s.scenario && s.players[me].epoch >= 2 && !!s.players[me].chart && !s.players[me].techs.includes('assay'),
+    text: 'Your <b>Prospector\'s Lodge</b> can <b>Assay the Holdings</b> (⚖️): see whose citizens dig each charted vein, and how much of each rare ore every people holds. Know a rival\'s road before it gets there.',
+  },
+  {
     id: 'iron',
     // The survey said yes, and the Stone Age lasts: the road to the Iron Age is in view.
     when: (s, me) => {
