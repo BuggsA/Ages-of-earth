@@ -277,7 +277,8 @@ export function buildingGuns(s: GameState, sp: Spatial, b: Building): void {
   b.cool = secs(g.reload);
   const power = (g.damage + m.rangedAttack) * (1 + epoch * 0.2);
   // A Coil Tower (the Age of Lightning, #231) looses a bolt in place of its own arrow; those sheltering inside still shoot.
-  const coil = b.type === 'tower' && hasCoils(s.players[b.owner]);
+  // A tower kept as Lightning's keepsake (#555 s11) is still a coil on any road.
+  const coil = b.type === 'tower' && (hasCoils(s.players[b.owner]) || b.keep === 'lightning');
   if (coil) arc(s, sp, b, t, power);
   const arrows = 1 + Math.min(10, b.garrison.length);
   // Extra arrows go to others nearby when there are any, so a volley spreads over a crowd.

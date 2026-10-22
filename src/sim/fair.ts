@@ -1,7 +1,7 @@
 import { FAIR, MILITARY, secs } from './data';
 import { ageDef } from './ages';
 import { isEnemy, maxHp } from './world';
-import type { GameState } from './types';
+import type { AgeId, GameState } from './types';
 
 /** Whether a feast day is open now (the Age of Fairs): the first `open` seconds of every `every`. */
 export const feastOpen = (s: GameState): boolean => s.tick % secs(FAIR.every) < secs(FAIR.open);
@@ -22,8 +22,9 @@ export function fairground(s: GameState, owner: number, at: { x: number; y: numb
 }
 
 /** What a trip paid at this Market is multiplied by now: `FAIR.pay` on a feast day at a fairground, else 1. */
-export function fairShare(s: GameState, owner: number, market: { x: number; y: number }): number {
-  return ageDef(s.players[owner]).fairs && feastOpen(s) && fairground(s, owner, market) ? FAIR.pay : 1;
+export function fairShare(s: GameState, owner: number, market: { x: number; y: number; keep?: AgeId }): number {
+  // A Market kept as the Fairs' keepsake (#555 s11) keeps its feast day on any road.
+  return (ageDef(s.players[owner]).fairs || market.keep === 'fair') && feastOpen(s) && fairground(s, owner, market) ? FAIR.pay : 1;
 }
 
 /**

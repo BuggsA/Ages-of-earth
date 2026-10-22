@@ -62,7 +62,7 @@ export function forkStep(s: GameState): void {
     if (e.kind !== 'building' || !e.built || e.hp <= 0) continue;
     if (e.type === 'drainrig') {
       if (!calm && ageDef(s.players[e.owner]).hemocraft) drain(s, e);
-    } else if (e.type === 'temple' && ageDef(s.players[e.owner]).rite) mend(s, e);
+    } else if (e.type === 'temple' && (ageDef(s.players[e.owner]).rite || e.keep === 'bloodrite')) mend(s, e);
   }
 }
 

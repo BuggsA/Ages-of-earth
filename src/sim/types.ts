@@ -277,6 +277,11 @@ export interface Building {
   advanceTo?: AgeId;
   /** Set while the advance is a step back (#47) to the trunk age one tier down; absent otherwise. */
   back?: boolean;
+  /**
+   * The side age whose keepsake this is (#555 s11, `AGES[].keepsake`): chosen while its people stands there (or the oldest, marked as
+   * it leaves), it keeps that age's work on any road after. Absent: no keepsake (and older saves).
+   */
+  keep?: AgeId;
   /** Where new units go. `kind` is the resource the flag was set on (absent on bare ground), so it outlives its tile (#344). */
   rally: { x: number; y: number; tile: number; kind?: number } | null;
   cool: number;
@@ -766,6 +771,8 @@ export type GameEvent =
   | { k: 'captive'; owner: number; from: number; x: number; y: number; what: 'taken' | 'freed' | 'spent' }
   /** A soldier grafted at a Transfusion Station (#355 s3), or a graft run dry far from every Station (`crash`). */
   | { k: 'graft'; owner: number; id: number; x: number; y: number; how: 'made' | 'crash' }
+  /** A people left an age (#555 s11): this building, its keepsake, keeps that age's work. */
+  | { k: 'keepsake'; owner: number; id: number; age: AgeId; x: number; y: number }
   /** A War Camp left without its soldiers (#303): it burns after a grace, or at once if its people left the path (`struck`). */
   /** Citizens called up at a War Camp (#313): each became the foot soldier `id` where it stood. */
   | { k: 'callUp'; owner: number; camp: number; ids: number[]; x: number; y: number }
@@ -1054,6 +1061,8 @@ export type Command =
   | { t: 'advance'; p: number; building: number; to?: AgeId }
   /** Step back an age (#47), to the trunk age one tier down. */
   | { t: 'stepBack'; p: number; building: number }
+  /** Choose this building as the keepsake of the age its people stands in (#555 s11): the one that keeps working after they leave. */
+  | { t: 'keepsake'; p: number; building: number }
   | { t: 'rally'; p: number; building: number; x: number; y: number }
   /** Move `n` citizens from one job to another without picking them: idle first, then those carrying nothing, in id order. */
   | { t: 'reassign'; p: number; from: Job; to: Job; n: number }

@@ -41,7 +41,7 @@ import { sickStep } from './sickness';
 import { seraiStep, tollStep } from './passage';
 import { mercStep } from './merc';
 import { KIN, NOMAD } from './data';
-import { chartLand, isHire, barred, journeyOf, noteWalked, trainsAt, workSteps } from './ages';
+import { ageOf, chartLand, isHire, barred, journeyOf, markKeepsake, noteWalked, trainsAt, workSteps } from './ages';
 import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, HomelandId, MapSize, MapType, Player, UnitType } from './types';
 import { RARES, RES, R_FISH, R_NONE } from './types';
 import { legionKind, legionary } from './legion';
@@ -249,11 +249,14 @@ function spatial(s: GameState): Spatial {
  */
 export function enterAge(s: GameState, p: Player, to: AgeId, back = false): void {
   const tier = AGES[to].tier;
+  const from = ageOf(p);
   // The first steps onto the steppe bring the herds (#308).
   const herds = !!AGES[to].mobile && !p.walked?.includes(to);
   restat(s, p, () => {
     p.epoch = tier;
     p.age = to;
+    // The age left counts as walked for good, even one the people began in (#555 s11: the step-back plan says so).
+    noteWalked(p, from);
     noteWalked(p, to);
     // A step back suspends what lies above the new tier; any change of age brings back what fits.
     const off = back ? p.techs.filter((t) => TECHS[t].epoch > tier) : [];
@@ -266,6 +269,11 @@ export function enterAge(s: GameState, p: Player, to: AgeId, back = false): void
   });
   if (back) p.backAt = s.tick;
   if (herds) giftFlock(s, p);
+  // The age left keeps one building at its work (#555 s11).
+  if (from !== to) {
+    const kept = markKeepsake(s, p, from);
+    if (kept) s.events.push({ k: 'keepsake', owner: p.id, id: kept.id, age: from, x: kept.x, y: kept.y });
+  }
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.owner !== p.id || !e.queue.length) continue;
     const keep = e.queue.filter((q) =>

@@ -4,7 +4,7 @@ import { placeProblem, stampBuilding, walkable } from './grid';
 import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
 import { packCamp, packProblem, pitchCamp, pitchProblem } from './steppe';
 import { lambProblem, raiseLamb } from './flocks';
-import { backProblem, backTo, barred, buildBarred, canRaise, journeyOf, roadProblem, roadTo, trainsAt } from './ages';
+import { backProblem, backTo, barred, buildBarred, canRaise, chooseKeepsake, journeyOf, keepsakeProblem, roadProblem, roadTo, trainsAt } from './ages';
 import type { Building, BuildingType, Command, Ent, Cost, GameState, Order, Player, Res, Unit } from './types';
 import { RES, R_FISH, R_MEAT, R_NONE } from './types';
 import { RES_OF_TILE, cargoRoom, findResource, freeFarm, garrisonRoom, giveOrder, landing, setOrder, ungarrison } from './units';
@@ -851,6 +851,14 @@ export function applyCommand(s: GameState, c: Command): void {
       pay(p, cost);
       b.advance = 0;
       b.back = true;
+      break;
+    }
+    case 'keepsake': {
+      const b = myBuilding(s, c.p, c.building);
+      if (!b) return;
+      const no = keepsakeProblem(p, b);
+      if (no) return refuse(s, c.p, no);
+      chooseKeepsake(s, p, b);
       break;
     }
     case 'rally': {

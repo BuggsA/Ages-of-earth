@@ -2438,6 +2438,14 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         }
         break;
       }
+      case 'keepsake':
+        // A people left an age (#555 s11): one building keeps its work.
+        if (ev.owner === viewer) {
+          const k = AGES[ev.age].keepsake;
+          if (k) hud.toast(`🏺 Your ${BUILDINGS[k.building].name} keeps ${k.does}: the ${AGES[ev.age].name}'s keepsake`, 'good');
+          lastAlert = { x: ev.x, y: ev.y };
+        }
+        break;
       case 'campAlone':
         // A War Camp left without its soldiers (#303).
         if (ev.owner === viewer) {

@@ -111,9 +111,11 @@ export function gainBlood(s: GameState, p: Player, n: number, x: number, y: numb
  */
 function drawers(s: GameState, by: number, x: number, y: number): Building[] {
   const age = ageDef(s.players[by]);
-  // Off the ages of blood every rig sleeps (#555 s10), so nothing draws.
+  // Off the ages of blood every rig sleeps (#555 s10), so nothing draws, but for the keepsakes (#555 s11): a rig kept from Hemocraft,
+  // or a Temple kept as the Blood-rite's altar.
   const rigs = rigsOf(s, by);
-  if (!age.blood && !rigs.length) return [];
+  const altars = standing(s, by, 'temple').filter((b) => age.rite || b.keep === 'bloodrite');
+  if (!age.blood && !rigs.length && !altars.length) return [];
   const r2 = BLOOD.reach * BLOOD.reach;
   const near: { b: Building; d: number }[] = [];
   const look = (b: Building) => {
@@ -121,7 +123,7 @@ function drawers(s: GameState, by: number, x: number, y: number): Building[] {
     if (d <= r2) near.push({ b, d });
   };
   rigs.forEach(look);
-  if (age.rite) standing(s, by, 'temple').forEach(look);
+  altars.forEach(look);
   near.sort((a, c) => a.d - c.d || a.b.id - c.b.id);
   return near.map((n) => n.b);
 }

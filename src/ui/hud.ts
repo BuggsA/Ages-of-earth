@@ -35,7 +35,7 @@ import { exacting, isRider } from '../sim/tribute';
 import { landOwnerAt } from '../sim/borders';
 import { flockCap, flockOf, grazeRange, lambProblem } from '../sim/flocks';
 import { soldAt } from '../sim/ages';
-import { ageDef, ageOf, asleep, leaving, sleepWhy, type Tally, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, oreClue, oreDone, oreOnly, ironTradeShare, isHire, isSideRoad, journeyOf, mainRoad, pathLine, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, suspendedTechs, assayed, diggersAt, holdingsOf, holds, keyOf, lacking, opensOf, prospected, trainsAt, windowsOf, leadsOn, leadsTo } from '../sim/ages';
+import { ageDef, ageOf, asleep, keepsakeProblem, leaving, sleepWhy, type Tally, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, oreClue, oreDone, oreOnly, ironTradeShare, isHire, isSideRoad, journeyOf, mainRoad, pathLine, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, suspendedTechs, assayed, diggersAt, holdingsOf, holds, keyOf, lacking, opensOf, prospected, trainsAt, windowsOf, leadsOn, leadsTo } from '../sim/ages';
 import type { AgeId, KeyId, RareId, Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Player, Res, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
 import { KEYS, RARES, RES, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
@@ -201,6 +201,7 @@ const agePanel = (s: GameState, p: Player, id: AgeId) => {
     (a.verb ? `<br><b>You now:</b> ${a.verb}.` : '') +
     (a.good ? `<br><b>Good at:</b> ${a.good}.` : '') +
     (a.door ? `<br><b>It shuts:</b> ${a.door}.` : '') +
+    (a.keepsake ? `<br><b>Keepsake:</b> one ${BUILDINGS[a.keepsake.building].name} keeps ${a.keepsake.does} after you leave.` : '') +
     (on.length ? `<br><b>Leads to:</b> ${on.map((t) => `the ${AGES[t].name}`).join(', ')}${hidden ? ', and roads you have not found' : ''}.` : hidden ? '<br><b>Leads to:</b> roads you have not found.' : '')
   );
 };
@@ -252,6 +253,10 @@ const planLines = (s: GameState, p: Player, to: AgeId, back: boolean): string =>
   const l = leaving(s, p, to, back);
   const tally = (t: Tally) => t.map(([type, n]) => `${n} ${BUILDINGS[type].name}${n > 1 ? 's' : ''}`).join(', ');
   const lines: string[] = [];
+  // The age's keepsake (#555 s11): the one building that keeps its work, or the nudge to raise one before leaving.
+  const k = AGES[ageOf(p)].keepsake;
+  if (l.keepsake && k) lines.push(`🏺 Kept: your ${BUILDINGS[l.keepsake.type].name}${l.keepsake.keep === ageOf(p) ? ' (the one you chose)' : ' (the oldest; select another and press J to choose it)'} keeps ${k.does}.`);
+  else if (k && ageOf(p) !== to) lines.push(`🏺 No keepsake: raise a ${BUILDINGS[k.building].name} before you leave and it keeps ${k.does}.`);
   if (back && l.walked) lines.push(`🏺 Kept: the ${AGES[l.walked].name} counts as walked for good (its heirlooms and the roads that need it), but its own ways rest until you return.`);
   if (l.suspend.length) lines.push(`💤 Sleeps until you climb again: ${l.suspend.map((t) => TECHS[t].name).join(', ')}.`);
   if (l.sleep.length) lines.push(`💤 Sleeps until you return: ${tally(l.sleep)}, standing idle.`);
@@ -871,9 +876,15 @@ export class Hud {
     else status = def.drop.length ? 'Drop-off for every resource' : def.pop ? `Room for ${def.pop}` : 'Ready';
     // A building of other ages (#555 s10): it stands idle until its people returns to them.
     const sleeping = b.built && asleep(s, b);
+    // A keepsake (#555 s11): the one building that keeps its age's work after its people leaves.
+    const keptBy = b.keep && b.built ? AGES[b.keep] : undefined;
+    if (mine && keptBy?.keepsake) status += ageOf(p) === b.keep
+      ? ` · <span data-tip="<b>Your keepsake</b>When your people leaves the ${keptBy.name}, this ${def.name} keeps ${keptBy.keepsake.does}. The others of its kind lose the age's work.">🏺 Your keepsake of the ${keptBy.short}</span>`
+      : ` · <span data-tip="<b>Keepsake</b>Kept from the ${keptBy.name}: it keeps ${keptBy.keepsake.does}, on any road. Raze it and the keepsake is gone.">🏺 Keepsake of the ${keptBy.short}</span>`;
     if (sleeping) status = `<span data-tip="<b>Asleep</b>${sleepWhy(b)}. Until then it does nothing, but it stands, and wakes the moment you return.">💤 Asleep: wakes in the ${(def.ages ?? []).map((a) => AGES[a].short).join(' or ')}</span>`;
     if (!mine) status = `<span class="swatch" style="background:${p.color}"></span>${p.name}${b.type === 'wonder' && b.timer >= 0 ? `: wins in ${fmtTime(b.timer)}` : ''}${b.type === 'temple' && keptIn(s, b) ? `: keeps ${keptIn(s, b)} relic${keptIn(s, b) > 1 ? 's' : ''}` : ''}`;
     // A rival's sleeping building tells its story: that people walked an age it has since left.
+    if (!mine && keptBy && ageOf(p) !== b.keep) status += ` · <span data-tip="<b>Keepsake</b>Kept from the ${keptBy.name}: it keeps that age's work. Raze it and the keepsake is gone.">🏺 keepsake of the ${keptBy.short}</span>`;
     if (!mine && sleeping) status += ` · <span data-tip="<b>Asleep</b>Its people raised it in an age they have left. It does nothing until they return.">💤 asleep</span>`;
     // Faith takes the walls (#209): how near rival priests have chanted it over.
     const faith = faithOf(b);
@@ -906,7 +917,7 @@ export class Hud {
       if (!struck && ageDef(p).callUp) status += wait > 0 ? ` · <span data-tip="<b>Mustering</b>The camp is arming the last citizens it called.">📯 Mustering: ${wait}s</span>` : ` · <span data-tip="<b>Muster ground</b>Citizens within ${CALL_UP.reach} tiles can be called to arms here (C, or V for ${CALL_UP.most}).">📯 Muster ground</span>`;
     }
     // A powder mill (#577): what it grinds, or why it stands still.
-    if (mine && b.built && b.type === 'workshop' && mills(p)) {
+    if (mine && b.built && b.type === 'workshop' && (mills(p) || b.keep === 'alchemy')) {
       const still = millProblem(s, p);
       status += ` · <span data-tip="<b>Powder mill</b>In the Age of Alchemy every Siege Workshop grinds: together they make a keg from ${KEG.ore} saltpetre every ${KEG.time} seconds a mill, up to ${KEG.most} in store. Kegs are laid in the Age of Sappers.">${still ? `⚠ ${still}` : `🧨 Grinding powder: ${kegsOf(p)} kegs`}</span>`;
     }
@@ -1345,6 +1356,12 @@ export class Hud {
         if (b.type === 'tower') {
           const why = beaconProblem(s, p, b);
           cmds.push({ key: 'F', pic: '', glyph: '🔥', title: 'Light the beacon', desc: `A fire on the roof: this tower sees ${BEACON.sight} tiles farther for ${BEACON.duration} seconds, but every rival sees the ground around it. Costs ${BEACON.cost.wood} wood; it can be lit again after ${BEACON.cooldown} seconds.`, ok: !why, why: why ?? undefined, on: lit(s, b), run: () => this.act.issue({ t: 'beacon', p: viewer, building: b.id }) });
+        }
+        // Choosing the keepsake (#555 s11): which of this age's buildings keeps its work once the people leaves.
+        const k = ageDef(p).keepsake;
+        if (k && k.building === b.type) {
+          const why = keepsakeProblem(p, b);
+          cmds.push({ key: 'J', pic: '', glyph: '🏺', title: 'Keep this one', desc: `Make this ${def.name} the ${ageDef(p).name}'s keepsake: when your people leaves the age, it keeps ${k.does}, on any road. Only one is kept; unchosen, the oldest is. Raze it and the keepsake is gone.`, ok: !why && b.keep !== ageOf(p), on: b.keep === ageOf(p), why: why ?? 'Already your keepsake', run: () => this.act.issue({ t: 'keepsake', p: viewer, building: b.id }) });
         }
         if (def.garrison) {
           cmds.push({ key: 'U', pic: '', glyph: '🚪', title: 'Let them out', desc: `Everyone sheltering here comes out (${b.garrison.length}/${def.garrison}).`, ok: b.garrison.length > 0, why: 'Nobody is inside', count: b.garrison.length || undefined, run: () => this.act.issue({ t: 'ungarrison', p: viewer, building: b.id }) });

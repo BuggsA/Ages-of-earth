@@ -7,7 +7,7 @@ import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from 
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Rubble, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { ageDef, ageOf, asleep, barred, buildBarred, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
-import { kegsOf, millProblem, mills, sappers } from './powder';
+import { grindersOf, kegsOf, millProblem, mills, sappers } from './powder';
 import { carriedBy } from './relics';
 import { storesOre } from './caches';
 import { loadPrice, sellerNear } from './oretrade';
@@ -410,8 +410,8 @@ function trade(s: GameState, v: View, issue: (c: Command) => void): void {
   for (const r of RARES) {
     // Blood-iron is kept for grafts while a Station stands to quench them with it.
     if (r === 'bloodiron' && stationsOf(s, p.id).length) continue;
-    // Saltpetre is kept for the mills while it means to grind powder (#577).
-    if (r === 'saltpetre' && grindsPowder(p, s.ai[p.id])) continue;
+    // Saltpetre is kept for the mills while it means to grind powder (#577), or while Alchemy's old mill still grinds (#555 s11).
+    if (r === 'saltpetre' && (grindsPowder(p, s.ai[p.id]) || grindersOf(s, p).length > 0)) continue;
     if ((p.rare?.[r] ?? 0) >= ORE_TRADE.lot) {
       issue({ t: 'trade', p: p.id, res: r, buy: false });
       return;

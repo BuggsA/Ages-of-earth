@@ -26,9 +26,18 @@ export function millsOf(s: GameState, owner: number): Building[] {
   return out;
 }
 
+/**
+ * The mills that grind for a people now: every finished, standing Siege Workshop in the Age of Alchemy; elsewhere only the old mill,
+ * Alchemy's keepsake (#555 s11), if it still stands.
+ */
+export function grindersOf(s: GameState, p: Player): Building[] {
+  const all = millsOf(s, p.id);
+  return mills(p) ? all : all.filter((b) => b.keep === 'alchemy');
+}
+
 /** Why the mills stand still, or null while they grind. */
 export function millProblem(s: GameState, p: Player): string | null {
-  if (!mills(p)) return 'Kegs are ground only in the Age of Alchemy';
+  if (!mills(p) && !grindersOf(s, p).length) return 'Kegs are ground only in the Age of Alchemy, or at the old mill its people kept';
   if (kegsOf(p) >= KEG.most) return `The store holds ${KEG.most} kegs: lay some before more are ground`;
   if ((p.rare?.saltpetre ?? 0) < KEG.ore) return `Each keg takes ${KEG.ore} saltpetre: dig more`;
   if (!millsOf(s, p.id).length) return 'Raise a Siege Workshop: in this age it is a powder mill';
@@ -36,14 +45,14 @@ export function millProblem(s: GameState, p: Player): string | null {
 }
 
 /**
- * Once a second, in player order: every mill of a people in the Age of Alchemy adds a second of milling, and each `KEG.time` of it
+ * Once a second, in player order: every mill of a people in the Age of Alchemy (elsewhere, its old mill: `grindersOf`) adds a second of milling, and each `KEG.time` of it
  * grinds a keg from `KEG.ore` saltpetre. Milling never runs ahead of the store: short of saltpetre or full of kegs, it waits.
  */
 export function millStep(s: GameState): void {
   if (s.tick === 0 || s.tick % TICK_HZ !== 0) return;
   for (const p of s.players) {
-    if (!mills(p) || p.defeated) continue;
-    const at = millsOf(s, p.id);
+    if (p.defeated) continue;
+    const at = grindersOf(s, p);
     if (!at.length) continue;
     let grind = (p.grind ?? 0) + at.length;
     while (grind >= KEG.time && kegsOf(p) < KEG.most && (p.rare?.saltpetre ?? 0) >= KEG.ore) {
