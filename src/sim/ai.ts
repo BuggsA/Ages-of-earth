@@ -1,6 +1,6 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { aiTiding } from './tidings';
-import { AGES, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_CLIMB, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
@@ -292,6 +292,11 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
     spend(v, road.cost);
     // A nomad people buys its road's stone (#532): the gold for it is set aside too, or the army spends all but the road's own gold and the stone waits.
     if (isNomad(p)) spend(v, { gold: stoneGold(s, p, road.cost) });
+  } else if (armyFirst && !advancing && p.epoch < Math.min(LAST_EPOCH, v.plan.maxEpoch) && banked(p)) {
+    // A climb nearly paid for keeps its savings while the army comes first (#532): a wave that came home short spent the whole price on soldiers, minutes from the next age.
+    const road = mainRoad(p)!;
+    spend(v, road.cost);
+    if (isNomad(p)) spend(v, { gold: stoneGold(s, p, road.cost) });
   }
 
   // In the age of flight, save up for an airfield before anything smaller takes the wood.
@@ -410,6 +415,19 @@ function trade(s: GameState, v: View, issue: (c: Command) => void): void {
       return;
     }
   }
+}
+
+/** Whether a `banked` share of the main road's whole price is in hand. */
+function banked(p: Player): boolean {
+  const road = mainRoad(p);
+  if (!road) return false;
+  let need = 0;
+  let have = 0;
+  for (const r of RES) {
+    need += road.cost[r] ?? 0;
+    have += Math.min(p.res[r], road.cost[r] ?? 0);
+  }
+  return need > 0 && have >= need * AI_CLIMB.banked;
 }
 
 /** The gold a nomad people (#501) needs at the Market for the stone a price asks beyond its store: each lot dearer than the last, and the margin `trade` keeps. */
