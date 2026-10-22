@@ -280,6 +280,57 @@ function huntcamp(k: Kit, e: number, st: Style): void {
   banner(k, 0.85, 0, 0.8, 0.8);
 }
 
+// ---- Prospector's Lodge (#562) -------------------------------------------------------------------------
+
+/**
+ * A low log lodge with a lean-to roof, and before it what prospectors bring home: a sluice trough with a pan, a heap
+ * of sample stones in the key resources' colours (rust bog iron, white salt, pale saltpetre, dark blood-iron), a pick
+ * leaning on the wall and a surveyor's pole. Later epochs add a stone assay furnace, then a brass theodolite.
+ */
+function prospector(k: Kit, e: number, st: Style): void {
+  pad(k, 2, st.base);
+  // The lodge: log walls, a single-pitch roof falling to the back, a dark door.
+  k.box(1.3, 0.62, 0.9, st.wall, -0.15, 0, -0.35);
+  for (const y of [0.15, 0.32, 0.49]) k.box(1.34, 0.04, 0.04, st.wall2, -0.15, y, 0.11);
+  const roof = k.box(1.5, 0.08, 1.12, e >= 2 ? st.roof : '#7d8a4a', -0.15, 0.78, -0.35);
+  roof.rotation.x = -0.28;
+  k.box(0.28, 0.42, 0.03, st.window, -0.35, 0, 0.11);
+  // A pick leaning by the door.
+  const haft = k.cyl(0.02, 0.02, 0.62, 4, WOOD, 0.08, 0.28, 0.16);
+  haft.rotation.z = 0.25;
+  k.box(0.28, 0.04, 0.04, e >= 1 ? '#8a8f96' : '#6f6a62', 0.0, 0.58, 0.16).rotation.z = 0.25;
+  // The sluice: a sloped trough on trestles, a pan of grit at its foot.
+  const trough = k.box(0.22, 0.08, 0.95, WOOD, 0.75, 0.32, -0.15);
+  trough.rotation.x = 0.2;
+  for (const z of [-0.5, 0.2]) k.box(0.2, z < 0 ? 0.42 : 0.22, 0.04, st.post, 0.75, 0, z);
+  k.cyl(0.17, 0.12, 0.06, 8, e >= 2 ? '#7a6a58' : '#8a6a44', 0.75, 0.0, 0.5);
+  k.cyl(0.13, 0.13, 0.02, 8, '#5d7f96', 0.75, 0.05, 0.5);
+  // The samples: a small heap of each key resource's colour.
+  for (const [x, z, c] of [[-0.6, 0.45, '#a0482a'], [-0.42, 0.62, '#eeeae0'], [-0.22, 0.48, '#d9d2b0'], [-0.48, 0.32, '#6a1f24'], [-0.3, 0.32, '#8d8579']] as [number, number, string][]) {
+    k.sphere(0.075, c, x, 0.04, z).scale.set(1, 0.7, 1);
+  }
+  // The surveyor's pole, banded so it reads from afar, and the people's cloth on it.
+  k.cyl(0.02, 0.025, 1.35, 5, '#d8d0b8', -0.9, 0, 0.55);
+  for (const y of [0.3, 0.7, 1.1]) k.cyl(0.026, 0.026, 0.14, 5, '#b8433a', -0.9, y, 0.55);
+  k.team(k.box(0.012, 0.18, 0.26, TEAM, -0.9, 1.15, 0.68));
+  if (e >= 2) {
+    // An assay furnace of stone at the lodge's side, its chimney smoking.
+    k.box(0.4, 0.45, 0.4, STONE, 0.72, 0, -0.75);
+    k.cyl(0.08, 0.1, 0.5, 6, STONE, 0.72, 0.45, -0.75);
+    k.box(0.14, 0.14, 0.03, '#e5742a', 0.72, 0.08, -0.54);
+  }
+  if (e >= 3) {
+    // A brass theodolite on its tripod, aimed at the hills.
+    for (const r of [0, 2.1, 4.2]) {
+      const leg = k.cyl(0.012, 0.012, 0.55, 3, WOOD, 0.35 + Math.cos(r) * 0.08, 0, 0.62 + Math.sin(r) * 0.08);
+      leg.rotation.z = Math.cos(r) * 0.2;
+      leg.rotation.x = -Math.sin(r) * 0.2;
+    }
+    k.cyl(0.04, 0.04, 0.16, 6, '#c9a245', 0.35, 0.56, 0.62).rotation.z = Math.PI / 2;
+  }
+  if (e >= 4) lamp(k, 0.2, 0, 0.62, 0.7);
+}
+
 // ---- Snare (#485) ---------------------------------------------------------------------------------
 
 /** A noose on a bent sapling among the trees, a forked trigger peg and bait; with `full`, a hare lies caught in it. */
@@ -1903,7 +1954,7 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
 }
 
 const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare'>, (k: Kit, e: number, st: Style) => void> = {
-  towncenter, house, storehouse, huntcamp, warcamp, drainrig, transfusion, bloodtower, caravanserai, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield,
+  towncenter, house, storehouse, huntcamp, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield,
 };
 
 const cache = new Map<string, THREE.BufferGeometry>();

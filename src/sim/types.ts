@@ -19,7 +19,7 @@ export type UnitType =
 export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
   | 'towncenter' | 'house' | 'storehouse' | 'farm' | 'barracks' | 'range' | 'stable' | 'tower'
-  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai' | 'drainrig' | 'transfusion' | 'bloodtower' | 'snare';
+  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai' | 'drainrig' | 'transfusion' | 'bloodtower' | 'snare' | 'prospector';
 /** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
 export type Difficulty = 'gentle' | 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
@@ -68,6 +68,9 @@ export const R_SALTPETRE = 9;
 export const R_BLOODIRON = 10;
 export type RareId = 'salt' | 'saltpetre' | 'bloodiron';
 export const RARES: readonly RareId[] = ['salt', 'saltpetre', 'bloodiron'];
+/** A key resource (#555 spine §3): something only some worlds place that opens an age or a technology. The Prospector's Lodge answers for each. */
+export type KeyId = 'bogIron' | RareId | 'ruin';
+export const KEYS: readonly KeyId[] = ['bogIron', ...RARES, 'ruin'];
 /** A cave mouth (#356): one rich tile of a rare ore, sometimes with a wolf pack in it. The ore is mined like any vein. */
 export interface Cave {
   tile: number;
@@ -667,6 +670,8 @@ export type GameEvent =
   | { k: 'researched'; owner: number; tech: TechId }
   /** A survey's answer (#39): whether what it looks for lies anywhere in this world. */
   | { k: 'survey'; owner: number; tech: TechId; found: boolean }
+  /** A Prospector's Lodge finished (#562): the key resources this world holds, for the people who raised it. */
+  | { k: 'prospect'; owner: number; finds: KeyId[] }
   /**
    * Tidings at the fire (#443): a card came (`come`), was answered by paying (`took`), was passed by (`passed`,
    * answered or faded), or a passed storm or fever struck (`struck`, `n` houses or citizens hit) or spared them (`spared`).

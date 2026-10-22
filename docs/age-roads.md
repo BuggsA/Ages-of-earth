@@ -32,7 +32,7 @@ On the simple routes (same chat): "you should be able to follow some basic branc
 
 - Rare ores only some seeds hold: bog iron, salt, saltpetre, blood-iron, in caves (`R_BOG`, `RARES` in `src/sim/types.ts`, #39, #356).
 - Ages and techs that need them (`ore` on ages and techs in `src/sim/data.ts`); roads hidden until a clue building, a ruin or a survey (`clue`, `ruin`, `found` on `Road`).
-- A one-question survey: "Survey the Land" answers yes or no for bog iron only (`TECHS.survey`).
+- The Prospector's Lodge, level 1 (#562, s1): a building raised in the Stone Age (`BUILDINGS.prospector`, `PROSPECTOR`) answers yes or no for every key resource (`KEYS`: bog iron, salt, saltpetre, blood-iron, ruins). Finishing it marks Survey the Land as known (`prospect`, `prospected` in `src/sim/ages.ts`), so the iron road's `found: 'survey'` gate and older saves read it unchanged. `keyOf`, `opensOf` and `lacking` say what each key resource opens and what this world lacks; the age panel adds "This world lacks …" and the Town Center shows an only-road the world can't open greyed, with the reason. Survey the Land at the Storehouse is retired (`legacy`: not offered, not used by the computer) but stays in the rules for old saves and replays and for `tests/slow/iron-age.test.ts` until the owner allows that test to raise a lodge instead (#563).
 - The age web: about 20 ages and 28 roads, every side age with a verb (`VERB_GAPS.ages` is empty).
 - Going back: a Town Center **steps back** one main-road tier (`STEP_BACK`: 100 food and 50 gold a tier, 25 s, then 5 minutes before the next); units fall back to their older form, technologies above the tier are suspended, not lost. Most side ages also have a cheap **road back** to the age they left (Sail, Pilgrim, Warband, Merchant → Medieval).
 - Routes and the age panel (#560, s0+s4): `Age.routes` (`ROUTES`), `Age.good`, `Age.gateway`, and `leadsOn`/`leadsTo` in `src/sim/ages.ts`. The Town Center's age-up buttons name the route and show the four lines; `tests/age-panel.test.ts` holds every route reachable with no rare find. Not yet: s0's sweeps, the computer picking a route, the web map's panel.
@@ -76,7 +76,7 @@ A key resource is anything only some seeds place that opens an age or a technolo
 
 | Key resource | Seeds that hold it | Opens today | Kind of door |
 | --- | --- | --- | --- |
-| Bog iron (`BOG_IRON`) | 50% | the **Iron** age (Stone → Iron), via Survey the Land | the **only** road: Iron is today's one rare age |
+| Bog iron (`BOG_IRON`) | 50% | the **Iron** age (Stone → Iron), once a Prospector's Lodge finds it | the **only** road: Iron is today's one rare age |
 | Salt (`RARE.salt`) | 70% | Merchant (shortcut past its deeds); Salt Curing | shortcut |
 | Saltpetre (`RARE.saltpetre`) | 50% | Black Powder (tech) | **opens no age yet**: a free slot for a gateway or rare age |
 | Blood-iron (`RARE.bloodiron`) | 35% | Iron & Blood (shortcut); Blood-Forged Blades | shortcut |
@@ -134,7 +134,7 @@ Trade today is one verb with many bonuses: traders walk to a trading post and co
 
 - Which current ages become gateways, and what saltpetre opens.
 - How the player sees an age's strengths, weaknesses and where it leads, without a wiki.
-- How the computer chooses its road from what its prospector finds.
+- How the computer chooses its road from what its prospector finds. (s1: it raises a lodge when the Iron Age suits its people, as it once surveyed, and digs only after a yes; its reading of salt and blood-iron for shortcuts still looks at the world directly.)
 - How the age-up buttons point a player along a route (the data is §1–2; the look is open).
 - How taking resources back plays (s3).
 - Which building each side age keeps, and which crossing ages to build first.

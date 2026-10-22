@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -706,6 +706,15 @@ export class Sound {
         this.tone(out, t, { f: 120, type: 'triangle', dur: 2.4, peak: 0.03, attack: 0.9 });
         this.tone(out, t + 0.2, { f: 3200, to: 3320, dur: 1.8, peak: 0.004, attack: 0.8 });
         this.noise(out, t, { dur: 2.2, filter: 'bandpass', f: 900, q: 2, peak: 0.006, attack: 0.8 });
+        break;
+      case 'prospect':
+        // The Prospector's Lodge reports (#562): two taps of a pick on rock, the swirl of grit in a pan, then glints in it.
+        for (let i = 0; i < 2; i++) {
+          this.tone(out, t + i * 0.16, { f: 1900, to: 1400, dur: 0.05, peak: 0.06 });
+          this.noise(out, t + i * 0.16, { dur: 0.05, filter: 'bandpass', f: 2600, q: 2, peak: 0.04 });
+        }
+        this.noise(out, t + 0.36, { dur: 0.6, filter: 'bandpass', f: 900, q: 1.2, peak: 0.035, attack: 0.15 });
+        [N.E5, N.G5, N.B5].forEach((f, i) => this.bell(out, t + 0.8 + i * 0.13, f, 0.7, 0.035));
         break;
       case 'ruinFind':
         // Struck stone: the spade rings on something hard, earth slides, then an old mode rises out of it.

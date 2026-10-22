@@ -1,6 +1,6 @@
 import { AGES, CIVS, HOMELANDS, HOUSEHOLD, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SICKNESS, SILK, STEP_BACK, TRIBUTE, WAY, secs } from '../sim/data';
 import { ageDef } from '../sim/ages';
-import { ageOf, backTo, hasWalked, deedProgress, deedsDone, mainRoad, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
+import { ageOf, backTo, hasWalked, deedProgress, deedsDone, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
 import type { AgeId, Building, GameState, Unit } from '../sim/types';
 import { R_FISH } from '../sim/types';
 import { isIdleCitizen } from './idle';
@@ -148,9 +148,9 @@ const TIPS: Tip[] = [
   },
   {
     id: 'survey',
-    // Some worlds hold bog iron (#39): a cheap question at the Storehouse, asked while the Stone Age lasts.
-    when: (s, me) => !s.scenario && ageOf(s.players[me]) === 'stone' && secsIn(s) > 140 && has(s, me, 'storehouse') && !s.players[me].techs.includes('survey'),
-    text: 'Some worlds hold <b>bog iron</b> and some don\'t. A Storehouse can <b>Survey the Land</b> (🧭) for a little food and wood: the answer is yes or no, never where.',
+    // Some worlds hold bog iron, salt, saltpetre, blood-iron (#39, #356): a Prospector's Lodge answers, while the Stone Age lasts (#562).
+    when: (s, me) => !s.scenario && ageOf(s.players[me]) === 'stone' && secsIn(s) > 140 && !has(s, me, 'prospector') && !prospected(s.players[me]),
+    text: `Some worlds hold <b>bog iron</b>, salt, saltpetre or blood-iron, and some don't; some ages open only with them. A <b>${BUILDINGS.prospector.name}</b> (<kbd>B</kbd> <kbd>${BUILDINGS.prospector.key}</kbd>, a little food and wood) answers yes or no for each, never where.`,
   },
   {
     id: 'iron',

@@ -1,4 +1,4 @@
-import type { AgeId, PathId, LandmarkKind, BuildingType, CivId, Cost, Difficulty, Domain, MapSize, MapType, Res, TechId, UnitType, PlayerStats, RareId, WayId, HomelandId } from './types';
+import type { AgeId, PathId, LandmarkKind, BuildingType, CivId, Cost, Difficulty, Domain, MapSize, MapType, Res, TechId, UnitType, PlayerStats, RareId, KeyId, WayId, HomelandId } from './types';
 
 /** Every number in the game lives here. */
 
@@ -1276,6 +1276,8 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   huntcamp: { name: 'Hunting Camp', size: 2, hp: 500, cost: { wood: 45 }, time: 14, pop: 0, sight: 5, trains: [], drop: ['food'], epoch: 0, menu: 'eco', key: 'N', blurb: 'A drop-off for food, and a small claim on the land round it. Raise it by the herd or a far kill: meat inside your border is safe from wolves, and Drying Racks keep it.' },
   // Snares in the wood (#485): set among standing trees, they fill with small game by themselves (`SNARE`, `src/sim/snares.ts`).
   snare: { name: 'Snare', size: 1, hp: 60, cost: { wood: 30 }, time: 6, pop: 0, sight: 2, trains: [], drop: [], epoch: 0, open: true, menu: 'eco', key: 'J', blurb: 'A noose on a bent sapling, set among standing trees. It fills with small game by itself, faster the more trees stand round it and fastest in winter, until it is full. A citizen sent to it walks the trap line, emptying each snare in turn. Fell the trees round it and it starves.' },
+  // The age road (#562, `docs/age-roads.md` spine §4): raised in the Stone Age, it answers which key resources this world holds (`PROSPECTOR`).
+  prospector: { name: "Prospector's Lodge", size: 2, hp: 500, cost: { food: 50, wood: 75 }, time: 20, pop: 0, sight: 6, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'P', blurb: 'A lodge of prospectors who walk the streams, scrape the rock and dig at old mounds. Once it stands it tells you which key resources this world holds (bog iron, salt, saltpetre, blood-iron, ancient ruins): yes or no for each, never where. Some ages open only with them; a world that lacks one shuts that door.' },
   // The Path of Blood (#303): pitched by foot soldiers where the army stands, enemy land too; burns when left alone (`WARCAMP`).
   warcamp: { name: 'War Camp', size: 2, hp: 700, cost: { wood: 100, gold: 40 }, time: 30, pop: 0, sight: 6, trains: ['infantry'], drop: [], epoch: 3, ages: ['ironblood', 'totalwar'], builders: ['infantry'], menu: 'mil', key: 'Q', blurb: 'Tents, a stockade and a war standard, pitched by foot soldiers where the army stands, in enemy land too. Trains foot soldiers at the front and holds the land round it, so the army there is fed. Left without soldiers nearby, it burns.' },
   // The Silk Road (#334): a waystation by the road, raised in no one's land too; it rests traders, holds the land round it, and makes a near post pay more (`SERAI`).
@@ -1390,6 +1392,11 @@ export interface Tech {
   icon: string;
   /** A survey (#39): when done, it answers whether this world holds what the state's flag records. */
   survey?: 'bogIron';
+  /**
+   * No longer offered (#562): kept in the rules only so saves and replays that hold it still play. Survey the Land is
+   * now what a finished Prospector's Lodge knows; a Storehouse no longer shows it, and the computer raises a lodge.
+   */
+  legacy?: true;
   /** Learned and worked only while the people stands in this age (a craft of one road); it lapses when they leave and returns if they come back. */
   only?: AgeId;
   /**
@@ -1452,7 +1459,7 @@ export const TECHS: Record<TechId, Tech> = {
   galvanicBlood: { name: 'Galvanic Blood', at: 'workshop', epoch: 4, walked: ['lightning', 'hemocraft'], cost: { wood: 200, gold: 250 }, time: 50, add: { veins: 1 }, blurb: 'Heirloom of the Age of Lightning and the Age of Hemocraft: the coil\'s current runs the pumps, and the grafts drink it. A grafted soldier standing in a Watch Tower\'s reach (10 tiles) is fed as at a Transfusion Station, in any age, so a grafted army lives on wherever the towers stand, after Hemocraft too. Bring the towers down and it runs dry. Kept for good, on any road.', icon: '⚡' },
   militaryOrders: { name: 'Military Orders', at: 'temple', epoch: 2, walked: ['pilgrim', 'warband'], cost: { food: 200, gold: 200 }, time: 40, add: { sworn: 1 }, blurb: 'Heirloom of the Age of Pilgrims and the Age of the Warband: warriors who took a rule of prayer, sworn to the shrine and the sword. A soldier within 6 tiles of one of your priests is sworn: no rival\'s priest can turn it, offer it up or curse it, and your priests mend soldiers half again as fast. Walk the priests with the army. Kept for good, on any road.', icon: '⚜' },
   masonsLodge: { name: 'Masons\' Lodge', at: 'temple', epoch: 2, walked: ['pilgrim', 'reclaimer'], cost: { wood: 200, stone: 150 }, time: 40, mul: { buildSpeed: 1.2, buildingHp: 1.15 }, blurb: 'Heirloom of the Age of Pilgrims and the Age of Reclaimers: the builders who studied the old ruins raise the great churches, and keep their lodge. Buildings go up 20% faster and are 15% sturdier. Kept for good, on any road.', icon: '⛪' },
-  survey: { name: 'Survey the Land', at: 'storehouse', epoch: 0, cost: { food: 50, wood: 50 }, time: 15, survey: 'bogIron', blurb: 'Prospectors walk the streams and marshes and answer one question: is there bog iron anywhere in this world? Yes or no; not where, nor how much.', icon: '🧭' },
+  survey: { name: 'Survey the Land', at: 'storehouse', epoch: 0, cost: { food: 50, wood: 50 }, time: 15, survey: 'bogIron', legacy: true, blurb: "What a Prospector's Lodge learns when it is raised: which key resources lie anywhere in this world, bog iron among them. Yes or no; not where, nor how much.", icon: '🧭' },
 };
 
 export const TECH_IDS = Object.keys(TECHS) as TechId[];
@@ -1960,6 +1967,20 @@ export const YEAR = { home: 16, out: 26, trek: 6, calves: 1, herdMax: 6, spare: 
  * guarded. Mined like any vein, and the wolves are the ordinary kind (they hold the ground round their den).
  */
 export const CAVE = { count: { small: 1, medium: 2, large: 3 } as Record<MapSize, number>, rich: 3, den: { small: 0, medium: 0.5, large: 0.5 } as Record<MapSize, number>, away: 18, apart: 24 };
+/**
+ * The Prospector's Lodge (#562, `docs/age-roads.md` spine §4), level 1: raised, it answers yes or no for every key
+ * resource (`KeyId`), ruins included. What each is called and what it means for a people, on the lodge and in the toast.
+ * Its price is the building's (`BUILDINGS.prospector`). Levels 2 (where) and 3 (who) come later.
+ */
+export const PROSPECTOR: { keys: Record<KeyId, { name: string; icon: string }> } = {
+  keys: {
+    bogIron: { name: 'Bog iron', icon: '🟤' },
+    salt: { name: 'Salt', icon: '🧂' },
+    saltpetre: { name: 'Saltpetre', icon: '⚗️' },
+    bloodiron: { name: 'Blood-iron', icon: '🩸' },
+    ruin: { name: 'Ancient ruins', icon: '🏛️' },
+  },
+};
 /**
  * Deep veins (#356): rare ores that only some seeds hold. Each is rolled by its own dice (`chance`), then laid as
  * `veins` neutral veins of `tiles` tiles, `amount` an ore tile, out between the towns (at least `away` tiles from
