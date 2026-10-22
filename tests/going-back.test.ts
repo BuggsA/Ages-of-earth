@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { asleep, leaving } from '../src/sim/ages';
 import { levyProblem } from '../src/sim/blood';
 import { applyCommand } from '../src/sim/commands';
-import { STEP_BACK, TICK_HZ } from '../src/sim/data';
-import { createGame, enterAge, step } from '../src/sim/game';
+import { AGES, STEP_BACK, TICK_HZ } from '../src/sim/data';
+import { createGame, step } from '../src/sim/game';
 import { stationsOf } from '../src/sim/hemo';
 import { placeProblem } from '../src/sim/grid';
 import { seraiNear } from '../src/sim/trade';
-import { placeBuilding, spawnUnit } from '../src/sim/world';
+import { placeBuilding, restat, spawnUnit } from '../src/sim/world';
 import type { AgeId, Building, BuildingType, GameState } from '../src/sim/types';
 
 /** Going back as a plan (#555 s10): buildings of other ages sleep while their people stands outside them, and wake on return. */
@@ -34,15 +34,15 @@ const raise = (s: GameState, type: BuildingType, dy = 6): Building => {
       }
   throw new Error('no room');
 };
-/** Moves player 0 into an age as a finished journey would, without the price or the wait. */
-const into = (s: GameState, age: AgeId, back = false) => enterAge(s, s.players[0], age, back);
+/** Stands player 0 in an age outright: no journey, so nothing is marked kept on the way out (keepsakes, #555 s11, are their own tests). */
+const into = (s: GameState, age: AgeId) => restat(s, s.players[0], () => { s.players[0].age = age; s.players[0].epoch = AGES[age].tier; });
 
 describe('buildings of other ages sleep (#555 s10)', () => {
   it('a Drain Rig sleeps off the ages of blood and wakes on return', () => {
     const s = game();
     const rig = raise(s, 'drainrig');
     expect(asleep(s, rig)).toBe(false);
-    into(s, 'gunpowder', true);
+    into(s, 'gunpowder');
     expect(asleep(s, rig)).toBe(true);
     expect(levyProblem(s, s.players[0], rig)).toMatch(/sleeps until your people returns/);
     into(s, 'ironblood');
@@ -68,7 +68,7 @@ describe('buildings of other ages sleep (#555 s10)', () => {
     const s = game();
     const st = raise(s, 'transfusion');
     expect(stationsOf(s, 0)).toContain(st);
-    into(s, 'gunpowder', true);
+    into(s, 'gunpowder');
     expect(stationsOf(s, 0)).toEqual([]);
   });
 
@@ -77,7 +77,7 @@ describe('buildings of other ages sleep (#555 s10)', () => {
     const post = s.posts[0];
     const serai = placeBuilding(s, 0, 'caravanserai', Math.round(post.x) + 3, Math.round(post.y) + 3, true);
     expect(seraiNear(s, 0, post)).toBe(serai);
-    into(s, 'middle', true);
+    into(s, 'middle');
     expect(seraiNear(s, 0, post)).toBe(null);
     into(s, 'silk');
     expect(seraiNear(s, 0, post)).toBe(serai);
@@ -86,7 +86,7 @@ describe('buildings of other ages sleep (#555 s10)', () => {
   it('ordinary buildings never sleep', () => {
     const s = game();
     const forge = raise(s, 'forge');
-    into(s, 'stone', true);
+    into(s, 'stone');
     expect(asleep(s, forge)).toBe(false);
   });
 });
