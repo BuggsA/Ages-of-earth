@@ -135,6 +135,7 @@ export const findsOf = (s: GameState): KeyId[] => KEYS.filter((k) => holds(s, k)
 export function keyOf(r: Road): { key: KeyId; only: boolean } | null {
   if (r.found && TECHS[r.found].survey) return { key: TECHS[r.found].survey!, only: true };
   if (r.ruin) return { key: 'ruin', only: true };
+  if (r.vein) return { key: r.vein.id, only: true };
   if (r.ore) return { key: r.ore.id, only: false };
   return null;
 }
@@ -174,6 +175,7 @@ export function lacking(s: GameState, p: Player, age: AgeId): { key: KeyId; only
  */
 export function roadKnown(s: GameState, p: Player, r: Road): boolean {
   if (r.walked && !hasWalked(p, r.walked)) return false;
+  if (r.vein && !veinSeen(s, p, r)) return false;
   if (r.ruin && !s.ruins?.some((ruin) => ruin.by === p.id)) return false;
   if (r.found && !(p.techs.includes(r.found) && surveyFinds(s, r.found))) return false;
   return !r.clue || s.ents.some((e) => e.kind === 'building' && e.owner === p.id && e.type === r.clue && e.built);
@@ -200,6 +202,16 @@ export function deedProgress(p: Player, r: Road): { have: number; need: number }
 /** Whether the people has mined enough of the ore a road's ore door asks for (#356 s3). Only a world that holds the ore lets anyone. */
 export const oreDone = (p: Player, r: Road): boolean => !!r.ore && (p.stats.mined?.[r.ore.id] ?? 0) >= r.ore.n;
 
+/**
+ * A vein door (#577): the world holds the ore, and the people has learned it (a Prospector's Lodge stands, or it has dug some).
+ * Where the world holds none, the road is never seen.
+ */
+export const veinSeen = (s: GameState, p: Player, r: Road): boolean =>
+  !!r.vein && !!s.rares?.includes(r.vein.id) && (prospected(p) || (p.stats.mined?.[r.vein.id] ?? 0) > 0);
+
+/** Whether a vein door is open (#577): enough of its ore mined. True for a road with none. */
+export const veinDone = (p: Player, r: Road): boolean => !r.vein || (p.stats.mined?.[r.vein.id] ?? 0) >= r.vein.n;
+
 /** Whether a trading post sells this rare ore (#573): only in a world that lacks it. */
 export const soldAt = (s: GameState, ore: RareId): boolean => s.posts.some((t) => !!t.sells?.includes(ore));
 
@@ -218,7 +230,7 @@ export const oreOnly = (s: GameState, r: Road): boolean => !!r.ore && !!s.rares?
  * Whether every deed a road asks for is done, or its ore door has been opened. Pass the state to let an ore the
  * world holds be the only door (the player's rules and the computer do); without it the deeds also open the road.
  */
-export const deedsDone = (p: Player, r: Road, s?: GameState): boolean => oreDone(p, r) || ((!s || !oreOnly(s, r)) && deedsProgress(p, r).every((d) => d.have >= d.need));
+export const deedsDone = (p: Player, r: Road, s?: GameState): boolean => veinDone(p, r) && (oreDone(p, r) || ((!s || !oreOnly(s, r)) && deedsProgress(p, r).every((d) => d.have >= d.need)));
 
 /** What, besides its price, keeps a player off a road, or null. */
 export function roadProblem(s: GameState, p: Player, r: Road): string | null {
@@ -227,9 +239,12 @@ export function roadProblem(s: GameState, p: Player, r: Road): string | null {
     if (r.ruin) return 'Your citizens must finish excavating an ancient ruin';
     if (r.found && !p.techs.includes(r.found)) return `Needs ${TECHS[r.found].name}`;
     if (r.found && !surveyFinds(s, r.found)) return 'There is none in this world';
+    if (r.vein && !s.rares?.includes(r.vein.id)) return `There is no ${r.vein.id} in this world`;
+    if (r.vein && !veinSeen(s, p, r)) return `Raise a Prospector's Lodge, or dig ${r.vein.id}, to learn of this road`;
     return `Needs a ${BUILDINGS[r.clue!].name}`;
   }
   if (r.shuns && hasWalked(p, r.shuns)) return `Your people took the ${AGES[r.shuns].name}: this road is closed to it for good`;
+  if (!veinDone(p, r)) return `${r.vein!.text} (${Math.floor(p.stats.mined?.[r.vein!.id] ?? 0)}/${r.vein!.n})`;
   if (oreDone(p, r)) return null;
   if (oreOnly(s, r)) {
     const door = oreClue(s, p, r);

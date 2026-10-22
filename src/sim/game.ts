@@ -26,6 +26,7 @@ import { bloodStep, freeCaptives } from './blood';
 import { reclaimStep, remember } from './reclaim';
 import { leaveRubble, salvageStep } from './salvage';
 import { cacheStep, dropOre, spillStore } from './caches';
+import { kegStep, millStep } from './powder';
 import { stockPosts } from './oretrade';
 import { sortieStep } from './sortie';
 import { fairStep } from './fair';
@@ -562,6 +563,8 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   reclaimStep(s);
   salvageStep(s);
   cacheStep(s);
+  millStep(s);
+  kegStep(s);
   sortieStep(s);
   fairStep(s);
   attrition(s);
@@ -647,6 +650,10 @@ export function checksum(s: GameState): number {
     mix(c.n);
   }
   for (const r of RARES) mix(s.oreSold?.[r] ?? 0);
+  for (const k of s.kegs ?? []) {
+    mix(k.id);
+    mix(k.at);
+  }
   for (const m of s.landmarks ?? []) {
     mix(m.owner);
     mix(m.claim);
@@ -655,6 +662,8 @@ export function checksum(s: GameState): number {
   for (const p of s.players) {
     mix(p.taint ?? 0);
     mix(p.fever?.sev ?? 0);
+    mix(p.kegs ?? 0);
+    mix(p.grind ?? 0);
   }
   for (const p of s.players) for (const r of RES) mix(p.res[r]);
   for (const sh of s.shots) mix(sh.t);

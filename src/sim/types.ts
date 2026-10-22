@@ -39,7 +39,7 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'chart' | 'assay' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'alchemy' | 'sapper';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
 export type PathId = 'blood' | 'steppe' | 'hemocraft' | 'rite';
@@ -152,7 +152,9 @@ export type Order =
   /** A citizen stripping the rubble of a fallen building (#503). */
   | { k: 'salvage'; target: number }
   /** A citizen lifting key ore from a cache (#570) and carrying it to the nearest Town Center or Storehouse. */
-  | { k: 'cache'; target: number };
+  | { k: 'cache'; target: number }
+  /** A sapper carrying a powder keg to a rival building to lay it at its foot (#577, `powder.ts`). */
+  | { k: 'keg'; target: number };
 
 /** What a unit is visibly doing, for the renderer's animation. */
 export type Act = 'idle' | 'walk' | 'attack' | 'chop' | 'mine' | 'forage' | 'farm' | 'build' | 'chant' | 'fish';
@@ -394,6 +396,16 @@ export interface Rubble {
   until: number;
 }
 
+/** A powder keg laid at the foot of a building, its fuse burning (#577, the Age of Sappers, `powder.ts`). */
+export interface Keg {
+  id: number;
+  x: number;
+  y: number;
+  owner: number;
+  /** The tick it blows. */
+  at: number;
+}
+
 /** Key ore knocked loose (#570): spilled from a fallen ore store or a fallen digger, there for any people's citizens to carry home (`caches.ts`). */
 export interface OreCache {
   id: number;
@@ -564,6 +576,10 @@ export interface PlayerStats {
   plunder?: number;
   /** Key ore carried home from rivals' caches (#570); absent in older saves. */
   seized?: number;
+  /** Powder kegs ground at the mills in the Age of Alchemy (#577): the Age of Sappers' deed; absent in older saves. */
+  ground?: number;
+  /** Kegs that blew at a rival's building (#577); absent in older saves. */
+  blown?: number;
   /** Rare ore bought at the trading posts (#573); absent in older saves. */
   bought?: number;
   /** Food a Warband's soldiers carried off from rivals (#463 s1); absent in older saves. */
@@ -620,6 +636,10 @@ export interface Player {
   blood?: number;
   /** Rare ores mined (#356); absent until the first is brought home. */
   rare?: Partial<Record<RareId, number>>;
+  /** Powder kegs in store (#577): ground in the Age of Alchemy, laid in the Age of Sappers; absent until the first is ground. */
+  kegs?: number;
+  /** Seconds of milling toward the next keg (#577); absent when none is under way. */
+  grind?: number;
   epoch: number;
   /** The age within the web (#37); its tier is `epoch`. Absent, or out of step with `epoch`, means the trunk age of `epoch` (see `ageOf`). */
   age?: AgeId;
@@ -712,6 +732,8 @@ export type GameEvent =
   | { k: 'salvage'; owner: number; x: number; y: number; type: BuildingType; what: 'left' | 'stripped'; gain?: Cost }
   /** Key ore (#570): `spilled` from `from`'s store or basket, `taken` up by `owner`'s citizen, `kept` (banked) by `owner`. */
   | { k: 'cache'; owner: number; from: number; ore: RareId; n: number; x: number; y: number; what: 'spilled' | 'taken' | 'kept' }
+  /** A powder keg (#577): `ground` at the mills, `laid` at a building's foot, `blown`, or `doused` by a rival who reached it. */
+  | { k: 'keg'; owner: number; x: number; y: number; what: 'ground' | 'laid' | 'blown' | 'doused'; by?: number }
   /** A trader bought a load of rare ore at a post (#573). */
   | { k: 'oreBuy'; owner: number; ore: RareId; n: number; gold: number; x: number; y: number }
   | { k: 'ruin'; id: number; owner: number; find: RuinFind; tech?: TechId; x: number; y: number }
@@ -864,6 +886,8 @@ export interface GameState {
   oreSold?: Partial<Record<RareId, number>>;
   /** Key ore knocked loose and lying on the ground (#570, `caches.ts`); absent until some spills. */
   caches?: OreCache[];
+  /** Powder kegs laid with their fuses burning (#577, `powder.ts`); absent until one is laid. */
+  kegs?: Keg[];
   /** Contested landmarks; absent in older saves and in campaign chapters (none). */
   landmarks?: Landmark[];
   /** Whether this world holds bog iron (#39), decided by the seed; absent in older saves (none). */
@@ -942,6 +966,10 @@ export interface AiMemory {
   roads?: Partial<Record<AgeId, boolean>>;
   /** Tick it last lit a beacon toward the Age of Lightning's deed (#231). */
   zap?: number;
+  /** When it began holding the Middle Ages to dig saltpetre for Alchemy (#577). */
+  powder?: number;
+  /** When it last sent sappers with kegs (#577). */
+  kegAt?: number;
   /** Tick it began holding its Town Center for a side road's last deeds, so it holds only so long. */
   waiting?: number;
   /**
@@ -1052,6 +1080,8 @@ export type Command =
   | ({ t: 'salvage'; p: number; ids: number[]; target: number } & Queued)
   /** Citizens carry key ore home from a cache (#570); the target is a cache id. */
   | ({ t: 'cache'; p: number; ids: number[]; target: number } & Queued)
+  /** Citizens or foot soldiers carry a powder keg to a rival building and lay it there (#577, the Age of Sappers); the target is a building id. */
+  | ({ t: 'keg'; p: number; ids: number[]; target: number } & Queued)
   /** Answer the card of tidings waiting at the fire (#443): `take` pays its price, otherwise it is passed by. */
   | { t: 'tiding'; p: number; card: TidingId; take: boolean }
   /** A player left an online match: the computer takes over their people. */

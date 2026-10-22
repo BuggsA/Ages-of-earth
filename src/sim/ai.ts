@@ -6,7 +6,8 @@ import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Rubble, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
-import { ageDef, ageOf, barred, buildBarred, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadsFrom, soldAt } from './ages';
+import { ageDef, ageOf, barred, buildBarred, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
+import { kegsOf, millProblem, mills, sappers } from './powder';
 import { carriedBy } from './relics';
 import { storesOre } from './caches';
 import { loadPrice, sellerNear } from './oretrade';
@@ -24,7 +25,7 @@ import { graftCost, stationsOf, waiting } from './hemo';
 import { borderMap, landOwnerAt, suppliedAt } from './borders';
 import { workProblem } from './works';
 import { aiKin, aiVow, aiWay, wayBarred } from './ways';
-import { AI_WAYS, KILL_CAMP, KIN, SICKNESS, WAYS } from './data';
+import { AI_WAYS, AI_KEG, KEG, KILL_CAMP, KIN, SICKNESS, WAYS } from './data';
 import { beaconProblem, lit } from './beacon';
 import { rallyProblem } from './rally';
 import { consecrateProblem, consecrates } from './consecrate';
@@ -226,6 +227,8 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   assayRoad(s, v, issue);
   carryCaches(s, v, issue);
   oreRoad(s, v, mem, issue);
+  powderRoad(s, v, mem, issue);
+  sapKegs(s, v, mem, issue);
   steppeRoad(s, v, mem, issue);
   readYear(s, v);
   huntTheYear(s, v, issue);
@@ -405,6 +408,8 @@ function trade(s: GameState, v: View, issue: (c: Command) => void): void {
   for (const r of RARES) {
     // Blood-iron is kept for grafts while a Station stands to quench them with it.
     if (r === 'bloodiron' && stationsOf(s, p.id).length) continue;
+    // Saltpetre is kept for the mills while it means to grind powder (#577).
+    if (r === 'saltpetre' && grindsPowder(p, s.ai[p.id])) continue;
     if ((p.rare?.[r] ?? 0) >= ORE_TRADE.lot) {
       issue({ t: 'trade', p: p.id, res: r, buy: false });
       return;
@@ -508,6 +513,12 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   if (roads[to] === undefined && to === 'horde') {
     // The Horde is the steppe's second step (#322): a people that rode the steppe goes on, as the Path of Blood's later steps do.
     roads[to] = hasWalked(p, 'steppe');
+  } else if (roads[to] === undefined && to === 'sapper') {
+    // The gateway's road on (#577): Alchemy is walked for the Sappers, so a people that turned into it goes on.
+    roads[to] = hasWalked(p, 'alchemy');
+  } else if (roads[to] === undefined && to === 'alchemy') {
+    // A coin of its own (as the steppe's): the gateway is asked only where saltpetre lies, and shifts no other match's dice.
+    roads[to] = fit(p, to) >= 0 && coin(s, p.id, 0xa1c4) < AI_KEG.take;
   } else if (roads[to] === undefined && (to === 'ironblood' || to === 'totalwar')) {
     // The later steps of the Path of Blood are no new coin toss: a people that walked the step before goes on.
     roads[to] = hasWalked(p, to === 'ironblood' ? 'warband' : 'ironblood');
@@ -540,7 +551,9 @@ function worthWaiting(s: GameState, v: View, mem: AiMemory, r: Road): boolean {
   const underWay = (d: DeedProgress) =>
     d.have >= d.need * AI_WEB.nearly ||
     (d.deed.stat === 'relicGold' && relicsKept(s, p.id) > 0) ||
-    (d.deed.stat === 'iron' && v.diggers.size > 0);
+    (d.deed.stat === 'iron' && v.diggers.size > 0) ||
+    // The mills grinding (#577): each keg is the Sappers' deed coming.
+    (d.deed.stat === 'ground' && !millProblem(s, p));
   const deeds = deedsProgress(p, r);
   // An ore door under way (#356 s5): a crew is digging the ore, so the road is worth holding for.
   const digging = !!r.ore && !!s.rares?.includes(r.ore.id) && v.citizens.some((u) => u.order.k === 'gather' && u.order.rare === r.ore!.id);
@@ -549,7 +562,7 @@ function worthWaiting(s: GameState, v: View, mem: AiMemory, r: Road): boolean {
   // A deed nearly done earns more patience (#113): a Greek town gave up its dig at 135 bog iron of 150,
   // seconds from the Iron Age, with the price of it banked.
   const close = deeds.every((d) => d.have >= d.need * AI_WEB.close);
-  if (s.tick - mem.waiting <= secs((r.to === 'horde' ? AI_HORDE.hold : AI_WEB.patience) * (close ? 2 : 1))) return true;
+  if (s.tick - mem.waiting <= secs((r.to === 'horde' ? AI_HORDE.hold : r.to === 'sapper' ? AI_KEG.hold : AI_WEB.patience) * (close ? 2 : 1))) return true;
   mem.roads![r.to] = false;
   delete mem.waiting;
   return false;
@@ -568,6 +581,14 @@ interface Journey {
 function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   const { p } = v;
   const main = mainRoad(p);
+  // Bound for Alchemy (#577), it holds the Middle Ages while its diggers fill the store and its Siege Workshop goes up, `AI_KEG.hold`
+  // seconds at most: the gateway turns off here and nowhere else (`turnRoad` takes it once open).
+  if (ageOf(p) === 'middle' && alchemyBound(s, v, mem)) {
+    mem.powder ??= s.tick;
+    // Nothing set aside while it holds: the wood goes to the Siege Workshop that is the road's clue.
+    if (s.tick - mem.powder <= secs(AI_KEG.hold)) return null;
+    mem.roads!.alchemy = false;
+  }
   if (walksWeb(v)) {
     for (const r of roadsFrom(p)) {
       if (!isSideRoad(r) || AGES[r.to].tier <= p.epoch || !roadKnown(s, p, r) || !wants(s, p, mem, r.to)) continue;
@@ -643,8 +664,11 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   // the Middle Ages to take it, and doesn't turn pilgrim again on the way (the road to Sail is the plan).
   const sailRoad = ROADS.find((r) => r.from === 'middle' && r.to === 'sail');
   const toSail = AI_LEVELS[p.ai!].detour && !!sailRoad && !!heirloomAhead(p, 'sail') && count(v, 'dock', true) > 0 && deedsDone(p, sailRoad, s) && wants(s, p, mem, 'sail');
+  // Bound for Alchemy (#577), it takes no other turn off the Middle Ages first: each one shuts the gateway's window.
+  const toAlchemy = here === 'middle' && mem.roads?.alchemy === true && veinSeen(s, p, ALCHEMY_ROAD);
   for (const r of roadsFrom(p)) {
     if (AGES[r.to].tier !== p.epoch || (forking && r.to === 'totalwar')) continue;
+    if (toAlchemy && r.to !== 'alchemy' && isSideRoad(r)) continue;
     if (toSail && here === 'pilgrim' && r.to === 'middle') return { road: r, wait: false };
     if (toSail && r.to === 'pilgrim') continue;
     if (r.to === 'aeronaut' && v.planes.length > 0 && roadKnown(s, p, r) && wants(s, p, mem, r.to)) return { road: r, wait: false };
@@ -660,6 +684,11 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
       mem.roads ??= {};
       mem.roads.lightning = false;
       return { road: r, wait: false };
+    }
+    // The gateway (#577): with its saltpetre door open and the store to grind from, it turns into Alchemy.
+    if (r.to === 'alchemy') {
+      if (roadKnown(s, p, r) && deedsDone(p, r, s) && (p.rare?.saltpetre ?? 0) >= AI_KEG.ore && wants(s, p, mem, r.to)) return { road: r, wait: false };
+      continue;
     }
     // A people that settled in the Middle Ages after the steppe turns horde again once the herd's deeds are done (#322).
     if (r.to === 'horde') {
@@ -895,7 +924,9 @@ function oreRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => vo
   if (!s.rares?.length || !walksWeb(v)) return;
   // The Warband is held for the Iron and Blood road before it is on offer (bloodHold), so its ore is dug from there.
   const road = roadsFrom(p).find((r) => r.ore && s.rares!.includes(r.ore.id)) ?? (ageOf(p) === 'warband' ? ROADS.find((r) => r.from === 'gunpowder' && r.to === 'ironblood' && r.ore && s.rares!.includes(r.ore.id)) : undefined);
-  const crew = v.citizens.filter((u) => u.order.k === 'gather' && u.order.rare !== undefined);
+  // Saltpetre dug for the gateway (#577) is `powderRoad`'s crew, not this one's.
+  const powder = powderBound(s, v, mem);
+  const crew = v.citizens.filter((u) => u.order.k === 'gather' && u.order.rare !== undefined && !(powder && u.order.rare === 'saltpetre'));
   for (const u of crew) v.diggers.add(u.id);
   const open = !road || oreDone(p, road) || deedsDone(p, road, s) || mem.roads?.[road.to] === false || !roadKnown(s, p, road);
   if (open) {
@@ -930,6 +961,105 @@ function oreRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => vo
   if (!ids.length) return;
   issue({ t: 'gather', p: p.id, ids, tile: vein });
   for (const id of ids) v.diggers.add(id);
+}
+
+/**
+ * Whether it digs saltpetre for the gateway (#577): from the Bronze Age, knowing of the vein and meaning to walk Alchemy, until its door
+ * is open and `AI_KEG.ore` is in store; in Alchemy, until what it has ground and holds would make `AI_KEG.kegs`.
+ */
+function powderBound(s: GameState, v: View, mem: AiMemory): boolean {
+  const { p } = v;
+  const stock = p.rare?.saltpetre ?? 0;
+  if (ageOf(p) === 'alchemy') return walksWeb(v) && (p.stats.ground ?? 0) + Math.floor(stock / KEG.ore) < AI_KEG.kegs;
+  return alchemyBound(s, v, mem) && !(veinDone(p, ALCHEMY_ROAD) && stock >= AI_KEG.ore);
+}
+
+const ALCHEMY_ROAD = ROADS.find((r) => r.from === 'middle' && r.to === 'alchemy')!;
+
+/**
+ * Whether it means to turn into Alchemy (#577): in the Bronze or Middle Ages, knowing of the vein, its coin for the gateway fallen.
+ * The merchants' road skips the Middle Ages, where Alchemy turns off, so a Bronze Age town bound for it isn't bound here.
+ */
+function alchemyBound(s: GameState, v: View, mem: AiMemory): boolean {
+  const { p } = v;
+  const here = ageOf(p);
+  if (!walksWeb(v) || (here !== 'bronze' && here !== 'middle') || mem.roads?.alchemy === false) return false;
+  if (here === 'bronze' && mem.roads?.merchant === true) return false;
+  return veinSeen(s, p, ALCHEMY_ROAD) && wants(s, p, mem, 'alchemy');
+}
+
+/** Whether it keeps its saltpetre for Alchemy's mills (#577): bound there (the Bronze or Middle Ages, of a mind to walk it) or grinding. */
+function grindsPowder(p: Player, mem: AiMemory | undefined): boolean {
+  const here = ageOf(p);
+  return here === 'alchemy' || ((here === 'bronze' || here === 'middle') && mem?.roads?.alchemy === true);
+}
+
+/** The gateway's diggers (#577): a crew of `AI_ORE.crew` on the nearest saltpetre while `powderBound` holds, as `oreRoad` digs. */
+function powderRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!powderBound(s, v, mem) || count(v, 'storehouse', true) === 0) return;
+  const crew = v.citizens.filter((u) => u.order.k === 'gather' && u.order.rare === 'saltpetre');
+  for (const u of crew) v.diggers.add(u.id);
+  if (crew.length >= AI_ORE.crew) return;
+  const vein = findResource(s, TILE_OF_RARE.saltpetre, v.home.x, v.home.y, AI_ORE.reach);
+  if (vein < 0) return;
+  const bx = (vein % s.w) + 0.5;
+  const by = Math.floor(vein / s.w) + 0.5;
+  const free = v.citizens
+    .filter((u) => !u.inside && !v.diggers.has(u.id) && u.carry <= 2 && (u.order.k === 'idle' || (u.order.k === 'gather' && (u.order.res === 'wood' || u.order.res === 'gold'))))
+    .sort((a, c) => (a.x - bx) * (a.x - bx) + (a.y - by) * (a.y - by) - ((c.x - bx) * (c.x - bx) + (c.y - by) * (c.y - by)) || a.id - c.id);
+  const ids = free.slice(0, AI_ORE.crew - crew.length).map((u) => u.id);
+  if (!ids.length) return;
+  issue({ t: 'gather', p: p.id, ids, tile: vein });
+  for (const id of ids) v.diggers.add(id);
+}
+
+const KEG_FIRST: Partial<Record<BuildingType, number>> = { tower: 0, towncenter: 0, gate: 1, wall: 1 };
+
+/** Whether a rival on the ground stands within `AI_KEG.guard` tiles of a building's foot: a keg laid there would be stamped out. */
+function guarded(s: GameState, owner: number, b: Building): boolean {
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !isEnemy(s, owner, e.owner) || domainOf(e.type) !== 'land') continue;
+    if (distToRect(e.x, e.y, b) <= AI_KEG.guard) return true;
+  }
+  return false;
+}
+
+/**
+ * The Sappers lay their kegs (#577): every `AI_KEG.every` seconds, foot soldiers out on campaign (far from home) who stand within
+ * `AI_KEG.near` tiles of a rival building carry a keg to it, up to `AI_KEG.sappers` at a time: towers and Town Centers first, then
+ * gates and walls, then the nearest, and never one a rival stands guard by (`guarded`).
+ */
+export function sapKegs(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!sappers(p) || kegsOf(p) < 1 || s.tick - (mem.kegAt ?? -99999) < secs(AI_KEG.every)) return;
+  mem.kegAt = s.tick;
+  const out = v.army.filter((u) => u.type === 'infantry' && !u.inside && u.order.k !== 'keg');
+  let busy = v.army.filter((u) => u.order.k === 'keg').length;
+  let left = kegsOf(p) - busy;
+  const near2 = AI_KEG.near * AI_KEG.near;
+  for (const u of out) {
+    if (busy >= AI_KEG.sappers || left < 1) return;
+    const hx = u.x - v.home.x, hy = u.y - v.home.y;
+    if (hx * hx + hy * hy < near2 * 4) continue;
+    let best: Building | null = null;
+    let bestScore = Infinity;
+    for (const e of s.ents) {
+      if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
+      const dx = e.x - u.x, dy = e.y - u.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 > near2 || guarded(s, p.id, e)) continue;
+      const score = (KEG_FIRST[e.type] ?? 2) * 10000 + d2;
+      if (score < bestScore) {
+        bestScore = score;
+        best = e;
+      }
+    }
+    if (!best) continue;
+    issue({ t: 'keg', p: p.id, ids: [u.id], target: best.id });
+    busy++;
+    left--;
+  }
 }
 
 /** Citizens still digging bog iron when no deed needs it go to the resource the town is shortest of (#79). */
@@ -1371,6 +1501,10 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   }
 
   const want: [BuildingType, boolean][] = [
+    // Alchemy's mills (#577), first in line: a Siege Workshop is the gateway's clue (raised from the Bronze Age, while the wood is
+    // there), and in Alchemy each one grinds kegs.
+    ['workshop', count(v, 'workshop') === 0 && alchemyBound(s, v, mem)],
+    ['workshop', mills(p) && count(v, 'workshop') < AI_KEG.mills],
     // A Warband (#463 s1) raises its Barracks early: its soldiers are how it eats.
     ['barracks', n >= (p.way === 'warband' ? AI_WAYS.barracksAt : 8) && count(v, 'barracks') === 0],
     ['range', n >= 12 && count(v, 'range') === 0],
@@ -1395,7 +1529,7 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     if (!ok || recently(type, 25) || BUILDINGS[type].epoch > p.epoch || buildBarred(p, type)) continue;
     // Not a building whose every line the age bars (a Stable in the Iron Age).
     const lines = BUILDINGS[type].trains;
-    if (lines.length && lines.every((u) => barred(p, u))) continue;
+    if (lines.length && lines.every((u) => barred(p, u)) && !(type === 'workshop' && mills(p))) continue;
     const at = type === 'tower' ? towardEnemy(9) : type === 'market' || type === 'temple' ? home : towardEnemy(6);
     const spot = (type !== 'tower' && ageOf(p) === 'lightning' && fieldSpot(s, v, type)) || (type === 'market' && fairSpot(s, v)) || findSpot(s, type, at.x, at.y, type === 'market' || type === 'temple' ? 6 : 0, 18);
     if (spot && construct(s, v, mem, type, spot, type === 'tower' ? 2 : 3, issue)) return;
