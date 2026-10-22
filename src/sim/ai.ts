@@ -58,6 +58,8 @@ import { progress, scenarioById } from './campaign';
  * the same), with the match's own seeded dice, so it plays the same way in every browser.
  */
 
+// ---- Memory and dice ------------------------------------------------------------------------------
+
 function memory(s: GameState, id: number): AiMemory {
   let mem = s.ai[id];
   if (!mem) {
@@ -109,6 +111,8 @@ const TECH_ORDER: TechId[] = [
 /** Seconds a computer keeps its traders off a road after losing one on it. */
 const TRADER_WARY = 240;
 const ECONOMY: TechId[] = ['plow', 'axes', 'wheelbarrow', 'picks', 'irrigation', 'saws', 'shafts', 'handcart', 'gillnets', 'steamEngine'];
+
+// ---- The turn -------------------------------------------------------------------------------------
 
 export function aiStep(s: GameState): void {
   for (const p of s.players) {
@@ -2572,6 +2576,8 @@ function airforce(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   }
 }
 
+// ---- Targets and what to train --------------------------------------------------------------------
+
 /** How many of a rival's buildings go dark if this coil falls (#231): in its field and in no other coil's. 0 for anything but a finished coil. */
 function darkened(s: GameState, b: Building): number {
   if (b.type !== 'tower' || !b.built || !hasCoils(s.players[b.owner])) return 0;
@@ -2649,6 +2655,8 @@ function enemyMix(s: GameState, p: Player): Record<'infantry' | 'ranged' | 'cava
   }
   return mix;
 }
+
+// ---- Wonders, beacons and the town bell -----------------------------------------------------------
 
 /** The computer's own Wonder while it rises or counts down: the one it has to hold (#374). */
 function ownWonder(v: View): Building | null {
@@ -2793,6 +2801,8 @@ function townBell(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     mem.bellNear = undefined;
   }
 }
+
+// ---- War camps ------------------------------------------------------------------------------------
 
 /** An Old Ford we keep, on the way to the rival (within `AI_RAID.stage` of home and nearer to it than home is): waves muster there. */
 export function stagingFord(s: GameState, owner: number, home: { x: number; y: number }, enemy: { x: number; y: number }): Landmark | null {
@@ -3389,6 +3399,8 @@ function answerRiders(s: GameState, v: View, fighters: Unit[], issue: (c: Comman
   return true;
 }
 
+// ---- Attack waves ---------------------------------------------------------------------------------
+
 function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
   const L = AI_LEVELS[p.ai!];
@@ -3604,6 +3616,8 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   });
   if (strays.length) issue({ t: 'move', p: p.id, ids: strays.map((u) => u.id), x: mem.muster.x, y: mem.muster.y });
 }
+
+// ---- Scouts and prowlers --------------------------------------------------------------------------
 
 /**
  * One rider scouts by itself (explore) and a pair of soldiers patrol the trade road to the nearest trading post, or the border
@@ -3832,6 +3846,8 @@ export function wornDeep(s: GameState, p: Player, wave: Unit[]): boolean {
   return !s.ents.some((e) => e.kind === 'unit' && e.hp > 0 && !e.inside && isEnemy(s, p.id, e.owner) && (e.x - cx) * (e.x - cx) + (e.y - cy) * (e.y - cy) <= r2);
 }
 
+// ---- Relics and rites -----------------------------------------------------------------------------
+
 /** Relics on the ground, for anyone to take. */
 function looseRelics(s: GameState): number {
   let n = 0;
@@ -4002,6 +4018,8 @@ export function breakOath(s: GameState, v: View, fighters: Unit[], issue: (c: Co
     .slice(0, Math.max(0, AI_ORDERS.riders - on));
   if (go.length) issue({ t: 'attack', p: p.id, ids: go.map((h) => h.id), target: target.id });
 }
+
+// ---- Priests and sickness -------------------------------------------------------------------------
 
 /** Whether the town is sick, or soon will be (#541): fever, or taint past `SICKNESS.aiTemple`. */
 const ailing = (p: Player): boolean => !!p.fever || (p.taint ?? 0) >= SICKNESS.aiTemple;
