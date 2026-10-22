@@ -8,7 +8,7 @@ import { flooded } from './flood';
 import { loadAt, workShare } from './sickness';
 import { mineable } from './household';
 import { isNomad } from './nomad';
-import { ageDef, canRaise, inField } from './ages';
+import { ageDef, canRaise, inField, prospect } from './ages';
 import { legionKind, legionary } from './legion';
 import type { Act, Animal, Building, Cost, Ent, GameState, Goal, Order, RareId, Res, Unit } from './types';
 import { seasonOf } from './seasons';
@@ -498,6 +498,7 @@ export function completeBuilding(s: GameState, b: Building): void {
     s.events.push({ k: 'wonder', owner: b.owner, id: b.id, x: b.x, y: b.y, ticks: b.timer });
   }
   s.events.push({ k: 'built', id: b.id, owner: b.owner, type: b.type });
+  if (b.type === 'prospector') prospect(s, b.owner);
 }
 
 /** What a builder does once the building is up. */

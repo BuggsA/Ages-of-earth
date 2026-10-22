@@ -6,7 +6,7 @@ import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Rubble, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
-import { ageDef, ageOf, barred, buildBarred, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, relicsKept, roadKnown, roadsFrom } from './ages';
+import { ageDef, ageOf, barred, buildBarred, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, prospected, relicsKept, roadKnown, roadsFrom } from './ages';
 import { carriedBy } from './relics';
 import { swordsOf } from './merc';
 import { fairground, feastOpen, nextFeastIn } from './fair';
@@ -733,8 +733,8 @@ function forkTurn(s: GameState, v: View, mem: AiMemory): Journey | null {
 }
 
 /**
- * The iron road (#39), in the Stone Age: a people the Iron Age would suit has the land surveyed at a
- * Storehouse; if the survey finds bog iron, it keeps a few citizens digging until the deed is done.
+ * The iron road (#39), in the Stone Age: a people the Iron Age would suit raises a Prospector's Lodge (#562); if
+ * the lodge finds bog iron, it keeps a few citizens digging until the deed is done.
  */
 function ironRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
@@ -750,16 +750,8 @@ function ironRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     return;
   }
   if (p.epoch !== 0 || !walksWeb(v) || v.hands < (isLegion(p) ? LEGION.aiSurvey : AI_WEB.survey) || count(v, 'barracks', true) === 0 || fit(p, 'iron') < 0) return;
-  if (!road.found) return;
-  if (!p.techs.includes(road.found)) {
-    if (!wants(s, p, mem, 'iron') || techProblem(s, p.id, road.found)) return;
-    const at = v.buildings.find((b) => b.type === TECHS[road.found!].at && b.built && b.queue.length === 0);
-    const cost = techCostFor(s, p.id, road.found);
-    if (!at || !afford(v, cost)) return;
-    issue({ t: 'research', p: p.id, building: at.id, tech: road.found });
-    spend(v, cost);
-    return;
-  }
+  // Until its Prospector's Lodge stands (#562, raised in `buildings`), it doesn't know whether the world holds bog iron.
+  if (!road.found || !prospected(p)) return;
   if (!roadKnown(s, p, road) || !wants(s, p, mem, 'iron') || deedsDone(p, road, s)) return;
   for (const u of [...v.citizens, ...legionHands(v)]) if (u.order.k === 'gather' && (u.order.bog || s.res[u.order.tile] === R_BOG)) v.diggers.add(u.id);
   // Holding the Town Center for the deed, it digs harder (#79): idle savings are the dearest wait.
@@ -1189,13 +1181,11 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   const n = v.hands;
   const clever = L.clever;
 
-  // A Storehouse to survey from, for a people the Iron Age would suit (#50); after the Barracks, so the
-  // town can defend itself before it spends on prospecting.
-  if (p.epoch === 0 && walksWeb(v) && n >= AI_WEB.survey && count(v, 'barracks', true) > 0 && !p.techs.includes('survey') && count(v, 'storehouse') === 0 && !recently('storehouse', 30) && wants(s, p, mem, 'iron')) {
-    const tree = findResource(s, R_TREE, home.x, home.y, 16);
-    const near = tree >= 0 ? { x: (tree % s.w) + 0.5, y: Math.floor(tree / s.w) + 0.5 } : home;
-    const spot = findSpot(s, 'storehouse', near.x, near.y, 2, 6);
-    if (spot && construct(s, v, mem, 'storehouse', spot, 2, issue)) return;
+  // A Prospector's Lodge (#562), for a people the Iron Age would suit (#50): it reads the lodge's answer to choose
+  // the iron road. After the Barracks, so the town can defend itself before it spends on prospecting.
+  if (p.epoch === 0 && walksWeb(v) && n >= (isLegion(p) ? LEGION.aiSurvey : AI_WEB.survey) && count(v, 'barracks', true) > 0 && !prospected(p) && count(v, 'prospector') === 0 && !recently('prospector', 30) && wants(s, p, mem, 'iron')) {
+    const spot = findSpot(s, 'prospector', home.x, home.y, 4, 12);
+    if (spot && construct(s, v, mem, 'prospector', spot, 2, issue)) return;
   }
   // A Hunting Camp by a far kill, so the butchers carry meat a short way and the land round it is held against wolves.
   if (p.epoch === 0 || s.carcasses?.length) {

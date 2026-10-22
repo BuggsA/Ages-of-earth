@@ -1,5 +1,5 @@
 import { AGES, BUILDINGS, CIVS, LIGHTNING, PATHS, ROADS, STEP_BACK, TECHS, TICK_HZ, TRUNK, WAYS, secs, stepBackCost, type Age, type Deed, type Road } from './data';
-import type { AgeId, CivId, PathId, Building, BuildingType, Cost, GameState, Player, TechId, UnitType } from './types';
+import { KEYS, type AgeId, type CivId, type PathId, type Building, type BuildingType, type Cost, type GameState, type KeyId, type Player, type TechId, type UnitType } from './types';
 
 /**
  * Ages as a web (#37): which age a people is in, the roads out of it, and what that age lets them
@@ -55,6 +55,74 @@ export function roadTo(p: Player, to?: AgeId): Road | undefined {
 export function surveyFinds(s: GameState, tech: TechId): boolean {
   const what = TECHS[tech].survey;
   return !!what && s[what] === true;
+}
+
+/**
+ * Whether the people knows what a Prospector's Lodge finds (#562): it raised one (a finished lodge marks Survey the
+ * Land as known), or, in an older save or replay, surveyed at a Storehouse.
+ */
+export const prospected = (p: Player): boolean => p.techs.includes('survey');
+
+/** Whether this world holds a key resource (#562): bog iron and the rare ores by the seed, ruins wherever any were placed. */
+export function holds(s: GameState, k: KeyId): boolean {
+  if (k === 'bogIron') return s.bogIron === true;
+  if (k === 'ruin') return !!s.ruins?.length;
+  return !!s.rares?.includes(k);
+}
+
+/**
+ * A Prospector's Lodge stands finished (#562): its people learns what this world holds, once (a second lodge adds
+ * nothing until levels 2 and 3 come). Kept as Survey the Land among its technologies, so saves and the iron road read it.
+ */
+export function prospect(s: GameState, owner: number): void {
+  const p = s.players[owner];
+  if (prospected(p)) return;
+  p.techs.push('survey');
+  p.statsVersion++;
+  s.events.push({ k: 'prospect', owner, finds: findsOf(s) });
+}
+
+/** The key resources this world holds, in the lodge's order: what a lodge reports when it is raised. */
+export const findsOf = (s: GameState): KeyId[] => KEYS.filter((k) => holds(s, k));
+
+/**
+ * The key resource a road wants, and the kind of door it is (spine §3): `only` when nothing else opens the road (a
+ * survey's find, a ruin), else a shortcut past its deeds (an ore door). Null for a road that wants none.
+ */
+export function keyOf(r: Road): { key: KeyId; only: boolean } | null {
+  if (r.found && TECHS[r.found].survey) return { key: TECHS[r.found].survey!, only: true };
+  if (r.ruin) return { key: 'ruin', only: true };
+  if (r.ore) return { key: r.ore.id, only: false };
+  return null;
+}
+
+/** What a key resource opens: ages it is the only road to, ages it is a shortcut to, and technologies that need it. */
+export function opensOf(k: KeyId): { only: AgeId[]; shortcut: AgeId[]; techs: TechId[] } {
+  const only: AgeId[] = [];
+  const shortcut: AgeId[] = [];
+  for (const r of ROADS) {
+    const door = keyOf(r);
+    if (door?.key !== k) continue;
+    const list = door.only ? only : shortcut;
+    if (!list.includes(r.to)) list.push(r.to);
+  }
+  const techs = (Object.keys(TECHS) as TechId[]).filter((t) => TECHS[t].ore?.id === k);
+  return { only, shortcut, techs };
+}
+
+/**
+ * The key resources this world lacks that a road into `age` wants (#562), once the people has prospected (before, it
+ * doesn't know): `only` when that shuts the road, else the shortcut is gone and the deeds remain.
+ */
+export function lacking(s: GameState, p: Player, age: AgeId): { key: KeyId; only: boolean }[] {
+  if (!prospected(p)) return [];
+  const out: { key: KeyId; only: boolean }[] = [];
+  for (const r of ROADS) {
+    if (r.to !== age) continue;
+    const door = keyOf(r);
+    if (door && !holds(s, door.key) && !out.some((d) => d.key === door.key)) out.push(door);
+  }
+  return out;
 }
 
 /**

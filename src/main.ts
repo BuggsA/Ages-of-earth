@@ -6,7 +6,7 @@ import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { SIGHT_LORE } from './render/sightings';
 import { wallLine } from './sim/commands';
-import { AGES, BUILDINGS, CIVS, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
+import { AGES, BUILDINGS, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
 import { crestSvg } from './ui/crests';
 import { isEnemy } from './sim/world';
 import { jumpAge, rush, topUp } from './sim/god';
@@ -16,7 +16,7 @@ import { findDockSpot, findSpot } from './sim/ai';
 import { maxHp, placeBuilding, spawnUnit } from './sim/world';
 import { arrivalText, epochArrivals } from './ui/endReport';
 import type { AgeId, BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, HomelandId, MapSize, MapType, Unit } from './sim/types';
-import { R_FISH, R_NONE, RES } from './sim/types';
+import { KEYS, R_FISH, R_NONE, RES } from './sim/types';
 import { carriedBy, relicAt } from './sim/relics';
 import { RUIN_FINDS, ruinAt } from './sim/ruins';
 import { salvages } from './sim/salvage';
@@ -26,7 +26,7 @@ import { postAt } from './sim/trade';
 import { chantedOver, consecrateProblem, consecrates } from './sim/consecrate';
 import { riteProblem } from './sim/fork';
 import { legionKind, legionary } from './sim/legion';
-import { ageDef, ageOf, canRaise, heirloomsOpened, isSideRoad, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
+import { ageDef, ageOf, canRaise, heirloomsOpened, isSideRoad, opensOf, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
 import { NetClient, newRoomCode, saveName, savedName } from './net/client';
 import { HASH_EVERY, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
 import { deserialize, serialize } from './sim/save';
@@ -2279,6 +2279,23 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           );
         }
         break;
+      case 'prospect': {
+        // The Prospector's Lodge reports (#562): yes or no for every key resource, never where.
+        if (ev.owner !== viewer) break;
+        play('prospect');
+        const name = (k: (typeof KEYS)[number]) => `${PROSPECTOR.keys[k].icon} ${PROSPECTOR.keys[k].name.toLowerCase()}`;
+        const shut = KEYS.filter((k) => !ev.finds.includes(k) && opensOf(k).only.length);
+        const iron = ev.finds.includes('bogIron') && roadsFrom(s.players[viewer]).some((r) => r.to === 'iron');
+        hud.banner(
+          'What this world holds',
+          `The prospectors are back. ${ev.finds.length ? `They found ${ev.finds.map(name).join(', ')}.` : 'They found nothing rare.'}` +
+            `${KEYS.length > ev.finds.length ? ` No ${KEYS.filter((k) => !ev.finds.includes(k)).map(name).join(', no ')} anywhere.` : ''}` +
+            `${shut.length ? ` Shut for good: ${shut.flatMap((k) => opensOf(k).only).map((a) => `the ${AGES[a].name}`).join(', ')}.` : ''}` +
+            `${iron ? ` Dig the bog iron and the Town Center can lead you into the ${AGES.iron.name} instead of the Bronze Age.` : ''} Select the lodge to read it again.`,
+          8000,
+        );
+        break;
+      }
       case 'left':
         hud.toast(`${s.players[ev.owner].name} has left: the computer leads their people now`, 'info');
         break;

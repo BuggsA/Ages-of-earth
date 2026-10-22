@@ -1,5 +1,5 @@
 import { ageOf, deedsOf, isSideRoad, roadKnown } from '../sim/ages';
-import { AGES, BUILDINGS, ROADS, TECHS, TRUNK, type Road } from '../sim/data';
+import { AGES, BUILDINGS, PROSPECTOR, ROADS, TECHS, TRUNK, type Road } from '../sim/data';
 import type { AgeId, GameState } from '../sim/types';
 import { getCloudWeb, putCloudWeb, vaultKey } from '../net/cloud';
 import { mergeWeb } from '../net/vault';
@@ -126,7 +126,8 @@ const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 /** A road's label: its window, its clue and its deeds. */
 export function roadLabel(r: Road): string {
   const bits = [`Opens from the ${AGES[r.from].name}`];
-  if (r.found) bits.push(`after ${TECHS[r.found].name}`);
+  // The survey is a Prospector's Lodge's now (#562): the road shows once a lodge finds what it wants.
+  if (r.found) bits.push(TECHS[r.found].survey ? `once a ${BUILDINGS.prospector.name} finds ${PROSPECTOR.keys[TECHS[r.found].survey!].name.toLowerCase()} in the world` : `after ${TECHS[r.found].name}`);
   if (r.ruin) bits.push('after your citizens finish excavating an ancient ruin');
   if (r.clue) bits.push(`seen once you have a ${BUILDINGS[r.clue].name}`);
   const deeds = deedsOf(r).map((x) => x.text);

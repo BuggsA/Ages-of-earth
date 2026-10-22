@@ -8,7 +8,7 @@ import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE } from '../sim/units';
-import { ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, SNARE, SICKNESS, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { PROSPECTOR, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, SNARE, SICKNESS, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -32,9 +32,9 @@ import { isMobile, packProblem, packsOf, pitchProblem } from '../sim/steppe';
 import { exacting, isRider } from '../sim/tribute';
 import { landOwnerAt } from '../sim/borders';
 import { flockCap, flockOf, grazeRange, lambProblem } from '../sim/flocks';
-import { ageDef, ageOf, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, oreClue, oreDone, oreOnly, ironTradeShare, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, pathLine, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, surveyFinds, suspendedTechs, trainsAt, windowsOf, leadsOn, leadsTo } from '../sim/ages';
-import type { AgeId, Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Player, Res, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
-import { RARES, RES, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
+import { ageDef, ageOf, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, oreClue, oreDone, oreOnly, ironTradeShare, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, pathLine, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, suspendedTechs, holds, keyOf, lacking, opensOf, prospected, trainsAt, windowsOf, leadsOn, leadsTo } from '../sim/ages';
+import type { AgeId, KeyId, Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Player, Res, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
+import { KEYS, RARES, RES, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
 import { buildingPicture, unitPicture } from './thumbs';
 import { idleCitizens } from './idle';
@@ -180,7 +180,10 @@ const agePanel = (s: GameState, p: Player, id: AgeId) => {
   const routes = a.routes ?? [];
   const on = leadsTo(s, p, id);
   const hidden = new Set(leadsOn(id).map((r) => r.to)).size > on.length;
+  // What the Prospector's Lodge found missing (#562): a door this world can't open, said where the road is read.
+  const lacks = lacking(s, p, id).map((d) => `<br><b>This world lacks ${PROSPECTOR.keys[d.key].name.toLowerCase()}:</b> ${d.only ? 'this road stays shut' : 'only the deeds open it'}.`);
   return (
+    lacks.join('') +
     (routes.length ? `<br><b>${routes.map((r) => ROUTES[r].name).join(' and ')}:</b> ${routes.map((r) => ROUTES[r].blurb).join('; ')}.` : '<br><b>Off the basic routes:</b> only a rare find opens it.') +
     (a.gateway ? '<br><i>Weak on its own: the road on is why you come.</i>' : '') +
     (a.verb ? `<br><b>You now:</b> ${a.verb}.` : '') +
@@ -188,6 +191,19 @@ const agePanel = (s: GameState, p: Player, id: AgeId) => {
     (a.door ? `<br><b>It shuts:</b> ${a.door}.` : '') +
     (on.length ? `<br><b>Leads to:</b> ${on.map((t) => `the ${AGES[t].name}`).join(', ')}${hidden ? ', and roads you have not found' : ''}.` : hidden ? '<br><b>Leads to:</b> roads you have not found.' : '')
   );
+};
+
+/** What a key resource opens (#562), in a few words: the ages it is the only road to, the shortcuts and the crafts. */
+const opensText = (k: KeyId) => {
+  const o = opensOf(k);
+  const parts = [...o.only.map((a) => `the ${AGES[a].name}`), ...o.shortcut.map((a) => `a shortcut to the ${AGES[a].name}`), ...o.techs.map((t) => TECHS[t].name)];
+  return parts.length ? parts.join(', ') : 'nothing yet';
+};
+
+/** The Prospector's Lodge's answer (#562): yes or no for every key resource, and what each opens, in the tip. */
+const prospectLine = (s: GameState) => {
+  const tip = KEYS.map((k) => `${PROSPECTOR.keys[k].icon} ${PROSPECTOR.keys[k].name}: ${holds(s, k) ? 'yes' : 'none in this world'}. Opens ${opensText(k)}.`).join('<br>');
+  return `<span data-tip="<b>What this world holds</b>${tip}<br>Yes or no only: not where, nor how much.">🧭 ${KEYS.map((k) => `${PROSPECTOR.keys[k].icon}${holds(s, k) ? '✔' : '✘'}`).join(' ')}</span>`;
 };
 
 /** A road's route, for the age-up button's title: a side route by name, nothing for the plain road. */
@@ -583,7 +599,7 @@ export class Hud {
       sig = `res:${tile}:${s.amount[tile]}`;
       html = `<div class="sel-portrait"><span style="font-size:54px">${kind === R_TREE ? '🌳' : kind === R_BERRY ? '🫐' : kind === R_MEAT ? '🍖' : kind === R_FISH ? '🐟' : kind === R_GOLD ? icon('gold', 64) : kind === R_BOG ? '🟤' : RARE_OF_TILE[kind] ? RARE_ICON[RARE_OF_TILE[kind]] : icon('stone', 64)}</span></div>
         <div class="sel-info"><div class="sel-name">${name}</div><div class="stats"><span>${icon(res as 'wood')}${s.amount[tile]} left</span></div>
-        <div class="blurb">${kind === R_FISH ? 'Select fishing boats (from a Dock) and right-click it to fish.' : RARE_OF_TILE[kind] ? `${RARE[RARE_OF_TILE[kind]].blurb} Only some worlds hold it.${s.caves?.some((c) => c.tile === tile && c.den) ? ' Wolves lair here.' : ''} Select citizens and right-click it to mine; it is kept apart from your other stores.` : kind === R_BOG ? 'Rust-red ore in the wetland mud, smelted into iron bars and paid in as gold. Digging it opens the Iron Age to a people who have surveyed the land (Storehouse), in the Stone Age.' : 'Select citizens and right-click it to gather.'}</div></div>`;
+        <div class="blurb">${kind === R_FISH ? 'Select fishing boats (from a Dock) and right-click it to fish.' : RARE_OF_TILE[kind] ? `${RARE[RARE_OF_TILE[kind]].blurb} Only some worlds hold it.${s.caves?.some((c) => c.tile === tile && c.den) ? ' Wolves lair here.' : ''} Select citizens and right-click it to mine; it is kept apart from your other stores.` : kind === R_BOG ? 'Rust-red ore in the wetland mud, smelted into iron bars and paid in as gold. Digging it opens the Iron Age, in the Stone Age, to a people whose Prospector\'s Lodge has found it.' : 'Select citizens and right-click it to gather.'}</div></div>`;
     } else if (!ents.length) {
       const p = s.players[viewer];
       sig = `none:${ageOf(p)}`;
@@ -799,7 +815,7 @@ export class Hud {
     }
     else if (b.type === 'house' && b.built && isHousehold(p)) status = `<span data-tip="<b>The household tax</b>Each house pays gold in proportion to how full your town is, and more for every house on its street (a Market counts as two): a lane apart is a street.">🏮 ${streetOf(s, b)} on its street</span>`;
     else if (b.type === 'dock') status = 'Fishing boats bring their catch here';
-    else if (b.type === 'storehouse' && p.techs.includes('survey')) status = surveyFinds(s, 'survey') ? '🧭 Bog iron lies somewhere in this world' : '🧭 No bog iron in this world';
+    else if (b.type === 'prospector' && b.built && prospected(p)) status = prospectLine(s);
     else if (b.type === 'temple' && keptIn(s, b)) status = `Keeps ${keptIn(s, b)} relic${keptIn(s, b) > 1 ? 's' : ''}: ${icon('gold', 14)}${Math.round((60 / RELIC.every) * Math.round(RELIC.gold * modsOf(s, b.owner).relicGold) * keptIn(s, b))} a minute`;
     else status = def.drop.length ? 'Drop-off for every resource' : def.pop ? `Room for ${def.pop}` : 'Ready';
     if (!mine) status = `<span class="swatch" style="background:${p.color}"></span>${p.name}${b.type === 'wonder' && b.timer >= 0 ? `: wins in ${fmtTime(b.timer)}` : ''}${b.type === 'temple' && keptIn(s, b) ? `: keeps ${keptIn(s, b)} relic${keptIn(s, b) > 1 ? 's' : ''}` : ''}`;
@@ -1034,7 +1050,13 @@ export class Hud {
           const main = mainRoad(p);
           const sideKeys = ['Y', 'X', 'C'];
           for (const road of roadsFrom(p)) {
-            if (!roadKnown(s, p, road)) continue;
+            if (!roadKnown(s, p, road)) {
+              // A road the Prospector's Lodge found this world can't open (#562): shown greyed, with the reason.
+              const door = keyOf(road);
+              if (door?.only && prospected(p) && !holds(s, door.key))
+                cmds.push({ key: '', pic: '', glyph: '🚫', title: `The ${AGES[road.to].name}`, desc: `${road.blurb ?? AGES[road.to].blurb}${agePanel(s, p, road.to)}`, cost: road.cost, ok: false, why: `This world holds no ${PROSPECTOR.keys[door.key].name.toLowerCase()}`, run: () => {} });
+              continue;
+            }
             const to = AGES[road.to];
             const isMain = road === main;
             const problem = roadProblem(s, p, road);
@@ -1364,9 +1386,9 @@ function nextTechs(p: Player, at: BuildingType): TechId[] {
     // An heirloom (#224) shows only once one of its two ages is walked: the clue that it is there.
     const pair = TECHS[line[0]].walked;
     if (pair && !pair.some((a) => hasWalked(p, a))) continue;
-    // A suspended step (#47) shows greyed, with when it returns.
+    // A suspended step (#47) shows greyed, with when it returns. A retired one (Survey the Land, #562) isn't offered.
     const next = line.find((t) => !p.techs.includes(t));
-    if (next) out.push(next);
+    if (next && !TECHS[next].legacy) out.push(next);
   }
   return out;
 }
