@@ -1,4 +1,4 @@
-import { ageOf } from '../sim/ages';
+import { ageOf, assayed, diggersAt } from '../sim/ages';
 import { domainOf } from '../sim/data';
 import type { AgeId, GameState, KeyId } from '../sim/types';
 import type { ScoutFlag } from './scoutFlags';
@@ -200,6 +200,17 @@ export class Minimap {
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
+      }
+      // Assayed (#568): each charted vein someone digs now is ringed in that people's colour, in sight or not.
+      if (assayed(p)) {
+        const dig = diggersAt(s);
+        ctx.lineWidth = 1.5;
+        for (const c of p.chart) {
+          const who = dig.get(c.tile);
+          if (who === undefined) continue;
+          ctx.strokeStyle = s.players[who].color;
+          ctx.strokeRect(((c.tile % s.w) + 0.5) * sx - rr * 1.4, (Math.floor(c.tile / s.w) + 0.5) * sy - rr * 1.4, rr * 2.8, rr * 2.8);
+        }
       }
     }
     for (const b of buildings) {

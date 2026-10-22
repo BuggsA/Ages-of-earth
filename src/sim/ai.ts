@@ -6,7 +6,7 @@ import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Rubble, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
-import { ageDef, ageOf, barred, buildBarred, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, charted, holds, keyOf, prospected, relicsKept, roadKnown, roadsFrom } from './ages';
+import { ageDef, ageOf, barred, buildBarred, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadsFrom } from './ages';
 import { carriedBy } from './relics';
 import { swordsOf } from './merc';
 import { fairground, feastOpen, nextFeastIn } from './fair';
@@ -33,7 +33,7 @@ import { isHousehold } from './household';
 import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
-import { CIVS, DEER, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SNARE, SPOILS } from './data';
+import { AI_ASSAY, CIVS, DEER, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SNARE, SPOILS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
@@ -217,6 +217,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   // find no bog at all, the very ones that win the first fight.
   ironRoad(s, v, mem, issue);
   chartRoad(s, v, mem, issue);
+  assayRoad(s, v, issue);
   oreRoad(s, v, mem, issue);
   steppeRoad(s, v, mem, issue);
   readYear(s, v);
@@ -747,6 +748,37 @@ function chartRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   if (!at || !afford(v, cost)) return;
   issue({ t: 'research', p: p.id, building: at.id, tech: 'chart' });
   spend(v, cost);
+}
+
+/**
+ * Assay the Holdings (#568): a clever computer that has charted assays once a rival stands in an age a key resource
+ * opens (its town shows it), so it knows whose diggers feed that road.
+ */
+function assayRoad(s: GameState, v: View, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!AI_LEVELS[p.ai!].clever || !charted(p) || assayed(p) || techProblem(s, p.id, 'assay')) return;
+  const rare = (o: Player) => ROADS.some((r) => r.to === ageOf(o) && keyOf(r));
+  if (!s.players.some((o) => !o.defeated && isEnemy(s, p.id, o.id) && rare(o))) return;
+  const at = v.buildings.find((b) => b.type === 'prospector' && b.built && b.queue.length === 0);
+  const cost = techCostFor(s, p.id, 'assay');
+  if (!at || !afford(v, cost)) return;
+  issue({ t: 'research', p: p.id, building: at.id, tech: 'assay' });
+  spend(v, cost);
+}
+
+/** A rival's citizen digging a key resource within `r` tiles of a point (#568), nearest first; only to a computer that has assayed. */
+function rivalDigger(s: GameState, v: View, r: number): Unit | null {
+  let best: Unit | null = null;
+  let bestD = r * r;
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || e.order.k !== 'gather' || !keyAt(s, e.order.tile) || !isEnemy(s, v.p.id, e.owner)) continue;
+    const d = (e.x - v.home.x) * (e.x - v.home.x) + (e.y - v.home.y) * (e.y - v.home.y);
+    if (d < bestD) {
+      bestD = d;
+      best = e;
+    }
+  }
+  return best;
 }
 
 /**
@@ -3595,6 +3627,12 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     const prey = riders.length ? enemyTrader(s, v, v.home, AI_WEB.raidNear, false) : null;
     if (prey) {
       issue({ t: 'attack', p: p.id, ids: riders.slice(0, 3).map((u) => u.id), target: prey.id });
+      return;
+    }
+    // Assayed (#568), it knows whose diggers work the key veins: a few riders fall on a rival's digger near home.
+    const digger = riders.length && assayed(p) ? rivalDigger(s, v, AI_ASSAY.reach) : null;
+    if (digger) {
+      issue({ t: 'attack', p: p.id, ids: riders.slice(0, AI_ASSAY.riders).map((u) => u.id), target: digger.id });
       return;
     }
     // A merchant rival's age stands on its trade (#50), and a Joint-Stock Company keeps it so on any road (#242): a band of riders lies in wait by the trading

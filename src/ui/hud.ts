@@ -32,7 +32,7 @@ import { isMobile, packProblem, packsOf, pitchProblem } from '../sim/steppe';
 import { exacting, isRider } from '../sim/tribute';
 import { landOwnerAt } from '../sim/borders';
 import { flockCap, flockOf, grazeRange, lambProblem } from '../sim/flocks';
-import { ageDef, ageOf, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, oreClue, oreDone, oreOnly, ironTradeShare, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, pathLine, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, suspendedTechs, holds, keyOf, lacking, opensOf, prospected, trainsAt, windowsOf, leadsOn, leadsTo } from '../sim/ages';
+import { ageDef, ageOf, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, oreClue, oreDone, oreOnly, ironTradeShare, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, pathLine, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, suspendedTechs, assayed, diggersAt, holdingsOf, holds, keyOf, lacking, opensOf, prospected, trainsAt, windowsOf, leadsOn, leadsTo } from '../sim/ages';
 import type { AgeId, KeyId, Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Player, Res, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
 import { KEYS, RARES, RES, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
@@ -206,9 +206,22 @@ const opensText = (k: KeyId) => {
  */
 const prospectLine = (s: GameState, p: Player) => {
   const marks = (k: KeyId) => (k === 'ruin' ? (s.ruins?.length ?? 0) : (p.chart ?? []).filter((c) => c.key === k).length);
+  // Assayed (#568): what each people holds of each key resource, and how many key tiles its citizens dig now.
+  const dig = assayed(p) ? diggersAt(s) : null;
+  const assay = dig
+    ? s.players
+        .filter((o) => !o.defeated)
+        .map((o) => {
+          const h = holdingsOf(o);
+          const n = [...dig.values()].filter((w) => w === o.id).length;
+          // Names come from players online: nothing in one may become markup in the tip.
+          return `<br>${o.name.replace(/[<>&"']/g, '')}: ${(['salt', 'saltpetre', 'bloodiron'] as const).map((k) => `${h[k]} ${PROSPECTOR.keys[k].name.toLowerCase()}`).join(', ')}; ${h.bogIron} bog iron dug${n ? `; digging ${n} key tile${n > 1 ? 's' : ''} now` : ''}.`;
+        })
+        .join('')
+    : '';
   const chart = p.chart ? `<br>Charted: ${KEYS.filter((k) => marks(k)).map((k) => `${marks(k)} ${PROSPECTOR.keys[k].name.toLowerCase()}`).join(', ')} marked on your map, under the fog too.` : '';
   const tip = KEYS.map((k) => `${PROSPECTOR.keys[k].icon} ${PROSPECTOR.keys[k].name}: ${holds(s, k) ? 'yes' : 'none in this world'}. Opens ${opensText(k)}.`).join('<br>');
-  return `<span data-tip="<b>What this world holds</b>${tip}${chart || '<br>Yes or no only: not where, nor how much. Chart the Veins (Bronze Age) marks where.'}">🧭 ${KEYS.map((k) => `${PROSPECTOR.keys[k].icon}${holds(s, k) ? '✔' : '✘'}`).join(' ')}${p.chart ? ' · 🗺️ charted' : ''}</span>`;
+  return `<span data-tip="<b>What this world holds</b>${tip}${chart || '<br>Yes or no only: not where, nor how much. Chart the Veins (Bronze Age) marks where.'}${assay ? `<br>Assayed:${assay}` : ''}">🧭 ${KEYS.map((k) => `${PROSPECTOR.keys[k].icon}${holds(s, k) ? '✔' : '✘'}`).join(' ')}${p.chart ? (assayed(p) ? ' · ⚖️ assayed' : ' · 🗺️ charted') : ''}</span>`;
 };
 
 /** A road's route, for the age-up button's title: a side route by name, nothing for the plain road. */

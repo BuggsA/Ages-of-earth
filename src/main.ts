@@ -2268,6 +2268,10 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           play('prospect');
           const n = s.players[viewer].chart?.length ?? 0;
           hud.banner('The land is charted', `${n ? `${n} spots of rare ore` : 'No rare ore'}${s.ruins?.length ? ` and ${s.ruins.length} ancient ruins` : ''} are marked on your map, under the fog too: the land as it lay when charted, not who digs there now.`, 7000);
+        } else if (ev.tech === 'assay') {
+          // The third level (#568): who digs where, and what each people holds.
+          play('prospect');
+          hud.banner('The holdings are assayed', 'Every charted vein someone digs is ringed in their colour on your map, and the lodge tells what each people holds of salt, saltpetre and blood-iron, and how much bog iron it has dug.', 7000);
         } else hud.toast(`${TECHS[ev.tech].name} researched`, 'good');
         break;
       case 'survey':
