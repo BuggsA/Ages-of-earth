@@ -11,11 +11,13 @@ export default defineConfig(({ mode }) => ({
   // Two test tiers (AGENTS.md, "Checks"): `npm test` runs the quick tests in tests/, and
   // `npm run test:slow` (mode "slow") the long ones in tests/slow/, which CI runs on a schedule.
   // 15 s per test, not vitest's 5 s: a test taking ~3 s alone (trading posts on 18 maps) timed
-  // out when the whole quick tier ran in parallel on a loaded machine.
+  // out when the whole quick tier ran in parallel on a loaded machine. The slow tier gets 60 s: its
+  // tests are long by definition, and `periodic` runs them side by side on a runner whose speed varies
+  // twofold from day to day, so the 54-map sweeps (~8 s alone) timed out at 15 s (#540).
   test: {
     include: [mode === 'slow' ? 'tests/slow/**/*.test.ts' : 'tests/*.test.ts'],
     environment: 'node',
-    testTimeout: 15000,
+    testTimeout: mode === 'slow' ? 60_000 : 15000,
     // Each world is generated once per test file and copied after (tests/setup/map-cache.ts).
     setupFiles: ['tests/setup/map-cache.ts'],
   },
