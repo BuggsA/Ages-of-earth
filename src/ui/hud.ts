@@ -152,6 +152,8 @@ function orderWords(s: GameState, u: Unit): string {
       return u.cargo.length ? 'Sailing to land passengers' : 'Moving';
     case 'relic':
       return carriedBy(s, u) ? 'Carrying a relic to the Temple' : 'Going for a relic';
+    case 'cache':
+      return u.ore ? `Carrying ${u.ore.n} ${RARE[u.ore.id].name.toLowerCase()} home` : 'Going for the spilled ore';
     case 'salvage':
       return u.act === 'mine' ? 'Stripping the rubble' : 'Going to strip the rubble';
     case 'dig':
@@ -161,6 +163,7 @@ function orderWords(s: GameState, u: Unit): string {
       return o.phase === 'back' ? (u.carry > 0 ? 'Bringing gold home to the Market' : 'Going home to the Market') : 'Taking goods to the trading post';
     default:
       if (carriedBy(s, u)) return 'Holding a relic';
+      if (u.ore) return `Holding ${u.ore.n} ${RARE[u.ore.id].name.toLowerCase()}: right-click a Storehouse or Town Center`;
       if (u.type === 'trader' && u.carry > 0) return 'Waiting with gold: right-click a Market';
       if (u.type === 'cog' && u.carry > 0) return 'Waiting with gold: right-click a Dock';
       if (u.type === 'wagon') return 'Packed for the road: press P to pitch camp';

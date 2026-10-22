@@ -12,6 +12,7 @@ import { carriedBy, letGo, relicAt } from './relics';
 import { caravanOf, dockOf, homeMarket, marketOf, nearestCaravan, nearestDock, portSpot, postAt } from './trade';
 import { ruinAt } from './ruins';
 import { rubbleAt, salvages } from './salvage';
+import { cacheAt } from './caches';
 import { raise, raiseCost } from './reclaim';
 import { callWork, workProblem } from './works';
 import { callKin, killCamp, kinProblem, takeVow, takeWay, vowProblem, wayBarred, wayProblem } from './ways';
@@ -422,6 +423,16 @@ export function applyCommand(s: GameState, c: Command): void {
       } else for (const u of units) if (u.type === 'citizen') giveOrder(u, { k: 'salvage', target: r.id }, c.queue);
       const others = units.filter((u) => u.type !== 'citizen');
       if (others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: r.x, y: r.y, queue: c.queue });
+      break;
+    }
+    case 'cache': {
+      // Any people's citizens may carry a cache home (#570); one already carrying ore takes that home first.
+      const k = cacheAt(s, c.target);
+      const units = myUnits(s, c.p, c.ids);
+      const hands = units.filter((u) => u.type === 'citizen' && (k || u.ore));
+      for (const u of hands) giveOrder(u, { k: 'cache', target: c.target }, c.queue);
+      const others = units.filter((u) => u.type !== 'citizen');
+      if (k && others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: k.x, y: k.y, queue: c.queue });
       break;
     }
     case 'dig': {

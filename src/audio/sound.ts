@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -715,6 +715,20 @@ export class Sound {
         }
         this.noise(out, t + 0.36, { dur: 0.6, filter: 'bandpass', f: 900, q: 1.2, peak: 0.035, attack: 0.15 });
         [N.E5, N.G5, N.B5].forEach((f, i) => this.bell(out, t + 0.8 + i * 0.13, f, 0.7, 0.035));
+        break;
+      case 'oreSpill':
+        // A store of key ore knocked loose (#570): a sack splits, crystal and rock clatter out and roll, a low thud under it.
+        this.tone(out, t, { f: 95, to: 55, dur: 0.22, peak: 0.1 });
+        this.noise(out, t, { dur: 0.18, filter: 'bandpass', f: 520, q: 1.5, peak: 0.07 });
+        for (let i = 0; i < 6; i++) this.tone(out, t + 0.08 + i * 0.055 + (i % 2) * 0.02, { f: 2100 - i * 170, to: 1500 - i * 120, dur: 0.045, peak: 0.045 - i * 0.005 });
+        this.noise(out, t + 0.1, { dur: 0.5, filter: 'bandpass', f: 3200, q: 1.1, peak: 0.025, attack: 0.05 });
+        break;
+      case 'oreHome':
+        // Carried home and tipped into the store: a heavy basket set down, the rattle of ore poured, one low bell of a thing won back.
+        this.tone(out, t, { f: 120, to: 80, dur: 0.12, peak: 0.08 });
+        for (let i = 0; i < 4; i++) this.tone(out, t + 0.06 + i * 0.05, { f: 1500 + ((i * 263) % 500), dur: 0.05, peak: 0.035 });
+        this.bell(out, t + 0.32, N.D4, 1.2, 0.05);
+        this.bell(out, t + 0.32, N.A4, 0.9, 0.025);
         break;
       case 'ruinFind':
         // Struck stone: the spade rings on something hard, earth slides, then an old mode rises out of it.

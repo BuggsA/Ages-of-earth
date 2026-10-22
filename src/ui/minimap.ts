@@ -313,6 +313,20 @@ export class Minimap {
       ctx.stroke();
       ctx.globalAlpha = 1;
     }
+    // Spilled key ore (#570): a small square in the ore's colour where the viewer sees it, and everywhere, dimmed under fog, once assayed.
+    const assay = assayed(p);
+    for (const c of s.caches ?? []) {
+      const live = reveal || p.vis[Math.floor(c.y) * s.w + Math.floor(c.x)];
+      if (!live && !assay) continue;
+      const rr = Math.max(2, sx * 1.1);
+      ctx.globalAlpha = live ? 1 : 0.7;
+      ctx.fillStyle = CHART_COLOR[c.ore];
+      ctx.fillRect(c.x * sx - rr, c.y * sy - rr, rr * 2, rr * 2);
+      ctx.strokeStyle = 'rgba(30,18,6,0.9)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(c.x * sx - rr, c.y * sy - rr, rr * 2, rr * 2);
+      ctx.globalAlpha = 1;
+    }
     for (const e of s.ents) {
       if (e.kind !== 'unit' || e.hp <= 0 || e.inside) continue;
       if (e.owner !== viewer && !reveal && !p.vis[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;

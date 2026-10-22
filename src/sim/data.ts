@@ -1482,7 +1482,7 @@ export const TECHS: Record<TechId, Tech> = {
   // The Prospector's Lodge, level 2 (#565, spine §4): where each key resource lies, marked on the map (`chart` in `ages.ts`).
   chart: { name: 'Chart the Veins', at: 'prospector', epoch: 1, needs: 'survey', cost: { food: 150, gold: 100 }, time: 30, blurb: 'The prospectors map what they found: every patch of bog iron, every vein of salt, saltpetre and blood-iron, every cave mouth and every ancient ruin is marked on your map, under the fog too. A mark, not sight: the map shows the land as it was charted, not who digs there now.', icon: '🗺️' },
   // The Prospector's Lodge, level 3 (#568, spine §4): who digs each vein now, and what each people holds (`diggersAt`, `holdingsOf`).
-  assay: { name: 'Assay the Holdings', at: 'prospector', epoch: 2, needs: 'chart', cost: { gold: 200, stone: 100 }, time: 35, blurb: 'Assayers follow the ore to market and back: on your map every charted vein is ringed in the colour of the people digging it now, and the lodge tells how much salt, saltpetre and blood-iron each people holds, and how much bog iron it has dug. Read a rival\'s road before it takes it, and know whose diggers to fall on.', icon: '⚖️' },
+  assay: { name: 'Assay the Holdings', at: 'prospector', epoch: 2, needs: 'chart', cost: { gold: 200, stone: 100 }, time: 35, blurb: 'Assayers follow the ore to market and back: on your map every charted vein is ringed in the colour of the people digging it now, and the lodge tells how much salt, saltpetre and blood-iron each people holds, and how much bog iron it has dug. Read a rival\'s road before it takes it, know whose diggers to fall on, and whose store to break: ore spilled from a fallen store is marked on your map wherever it lies.', icon: '⚖️' },
   survey: { name: 'Survey the Land', at: 'prospector', epoch: 0, cost: {}, time: 0, survey: 'bogIron', legacy: true, blurb: "What a Prospector's Lodge learns when it is raised: which key resources lie anywhere in this world, bog iron among them. Yes or no; not where, nor how much.", icon: '🧭' },
 };
 
@@ -2428,6 +2428,16 @@ export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, 
  * spoils pay you in full. The computer sends a soldier home once it carries `home` gold.
  */
 export const SPOILS = { cap: 90, bank: 5, homes: ['towncenter', 'barracks'] as BuildingType[], home: 45 };
+
+/**
+ * Take it back (#570, the age road s3): a people's mined key ore (salt, saltpetre, blood-iron) is kept in its ore stores, the
+ * buildings that take stone in. One that falls spills `share` of each ore, split across the stores standing, as a cache on the
+ * ground; a fallen digger or carrier drops its basket. Any people's citizen lifts up to `load` at a time and banks it within
+ * `bank` tiles of its own ore store. Spilled ore is taken off the loser's ore door too, and counts toward the taker's.
+ */
+export const CACHE = { share: 0.5, load: 20, bank: 1.5, merge: 1.5 };
+/** The computer and caches (#570): it sends up to `hands` citizens for a cache within `near` tiles of home with no rival soldier within `safe` of it; assayed, it aims a wave at a rival's ore store once that rival holds `worth` ore. */
+export const AI_CACHE = { near: 20, hands: 3, safe: 6, worth: 30 };
 
 export const WARCAMP = { watch: 8, grace: 10, burn: 0.05, train: 1.2 };
 

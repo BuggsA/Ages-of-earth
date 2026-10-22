@@ -20,6 +20,7 @@ import { milkable } from './flocks';
 import { catchIn, nextSnare } from './snares';
 import { dig, ruinAt } from './ruins';
 import { rubbleAt, salvages, strip } from './salvage';
+import { bank, cacheAt, lift } from './caches';
 import { fordMarch, groveBoost, keptOf, kinBonus } from './landmarks';
 import { chant, chantedOver, consecrateProblem, consecrates, turnBuilding } from './consecrate';
 import { convoyShare } from './convoy';
@@ -1454,6 +1455,47 @@ function salvageStep(s: GameState, u: Unit, o: Extract<Order, { k: 'salvage' }>)
 }
 
 /**
+ * Carry key ore home (#570): lift a load from the cache, take it to the nearest Town Center or Storehouse of the citizen's
+ * people and bank it, then back for more while the cache lasts.
+ */
+function cacheOrderStep(s: GameState, u: Unit, o: Extract<Order, { k: 'cache' }>): void {
+  if (u.type !== 'citizen') {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  if (u.ore) {
+    const b = nearestDrop(s, u.owner, 'stone', u.x, u.y);
+    if (!b) {
+      s.events.push({ k: 'refused', owner: u.owner, why: 'Build a Storehouse or Town Center to keep the ore in' });
+      setOrder(u, { k: 'idle' });
+      return;
+    }
+    if (distToRect(u.x, u.y, b) - statsOf(s, u).radius <= REACH + 0.2) {
+      stopWalking(u);
+      bank(s, u);
+      if (!cacheAt(s, o.target)) setOrder(u, { k: 'idle' });
+      return;
+    }
+    if (!approach(u, goalForBuilding(b))) setOrder(u, { k: 'idle' });
+    return;
+  }
+  const c = cacheAt(s, o.target);
+  if (!c) {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  const dx = c.x - u.x;
+  const dy = c.y - u.y;
+  if (dx * dx + dy * dy <= 0.8 * 0.8) {
+    stopWalking(u);
+    lift(s, u, c);
+    u.miss = 0;
+    return;
+  }
+  if (!approach(u, goalForPoint(s, c.x, c.y, passOf(s, u)))) setOrder(u, { k: 'idle' });
+}
+
+/**
  * Pay a trader's (or merchant ship's) load in at the Market (or Dock) it came home to, and cut in the allies.
  * On the Silk Road (#326) the ground its Market covered since it set out (`from`) pays more, the owner's alone.
  */
@@ -1976,6 +2018,9 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
       break;
     case 'dig':
       digStep(s, u, o);
+      break;
+    case 'cache':
+      cacheOrderStep(s, u, o);
       break;
     case 'salvage':
       salvageStep(s, u, o);

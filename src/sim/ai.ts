@@ -8,6 +8,7 @@ import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, Ga
 import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { ageDef, ageOf, barred, buildBarred, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadsFrom } from './ages';
 import { carriedBy } from './relics';
+import { storesOre } from './caches';
 import { swordsOf } from './merc';
 import { fairground, feastOpen, nextFeastIn } from './fair';
 import { claimants, favours, landmarkAt } from './landmarks';
@@ -33,7 +34,7 @@ import { isHousehold } from './household';
 import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
-import { AI_ASSAY, CIVS, DEER, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SNARE, SPOILS } from './data';
+import { AI_ASSAY, AI_CACHE, CACHE, CIVS, DEER, MILITARY, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SNARE, SPOILS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
@@ -222,6 +223,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   ironRoad(s, v, mem, issue);
   chartRoad(s, v, mem, issue);
   assayRoad(s, v, issue);
+  carryCaches(s, v, issue);
   oreRoad(s, v, mem, issue);
   steppeRoad(s, v, mem, issue);
   readYear(s, v);
@@ -768,6 +770,62 @@ function assayRoad(s: GameState, v: View, issue: (c: Command) => void): void {
   if (!at || !afford(v, cost)) return;
   issue({ t: 'research', p: p.id, building: at.id, tech: 'assay' });
   spend(v, cost);
+}
+
+/**
+ * Take it back (#570): key ore lying near home is worth a few hands. For each cache the computer sees (or spilled from its own
+ * store) within `AI_CACHE.near` of home, with no rival soldier within `AI_CACHE.safe` of it, the nearest free citizens go for
+ * it, one a load and `AI_CACHE.hands` at most. A citizen pulled off with ore in hand is sent home with it first.
+ */
+function carryCaches(s: GameState, v: View, issue: (c: Command) => void): void {
+  const { p } = v;
+  const astray = v.citizens.filter((u) => u.ore && u.order.k !== 'cache' && !u.inside);
+  if (astray.length && v.buildings.some((b) => b.hp > 0 && storesOre(b))) issue({ t: 'cache', p: p.id, ids: astray.map((u) => u.id), target: 0 });
+  if (!s.caches) return;
+  const busy = new Map<number, number>();
+  for (const u of v.citizens) if (u.order.k === 'cache') busy.set(u.order.target, (busy.get(u.order.target) ?? 0) + 1);
+  for (const c of s.caches) {
+    if ((c.x - v.home.x) * (c.x - v.home.x) + (c.y - v.home.y) * (c.y - v.home.y) > AI_CACHE.near * AI_CACHE.near) continue;
+    if (c.from !== p.id && !p.vis[Math.floor(c.y) * s.w + Math.floor(c.x)]) continue;
+    const want = Math.min(AI_CACHE.hands, Math.ceil(c.n / CACHE.load)) - (busy.get(c.id) ?? 0);
+    if (want <= 0) continue;
+    const r2 = AI_CACHE.safe * AI_CACHE.safe;
+    if (s.ents.some((e) => e.kind === 'unit' && e.hp > 0 && !e.inside && MILITARY.includes(e.type) && isEnemy(s, p.id, e.owner) && (e.x - c.x) * (e.x - c.x) + (e.y - c.y) * (e.y - c.y) <= r2)) continue;
+    const d2 = (u: Unit) => (u.x - c.x) * (u.x - c.x) + (u.y - c.y) * (u.y - c.y);
+    const free = v.citizens.filter((u) => !u.inside && !u.ore && u.order.k !== 'cache' && u.order.k !== 'build').sort((a, b) => d2(a) - d2(b) || a.id - b.id);
+    if (!free.length) return;
+    issue({ t: 'cache', p: p.id, ids: free.slice(0, want).map((u) => u.id), target: c.id });
+    busy.set(c.id, (busy.get(c.id) ?? 0) + Math.min(want, free.length));
+  }
+}
+
+/**
+ * Where an assayed computer's wave goes (#570): the ore store nearest home of the rival holding the most key ore, once it
+ * holds `AI_CACHE.worth` or more. Felled, the store spills its share for the computer's citizens to carry off.
+ */
+export function oreTarget(s: GameState, p: Player, home: { x: number; y: number }): { x: number; y: number } | null {
+  let rich = -1;
+  let most = AI_CACHE.worth - 1;
+  for (const o of s.players) {
+    if (o.defeated || !isEnemy(s, p.id, o.id)) continue;
+    const n = (o.rare?.salt ?? 0) + (o.rare?.saltpetre ?? 0) + (o.rare?.bloodiron ?? 0);
+    if (n > most) {
+      most = n;
+      rich = o.id;
+    }
+  }
+  if (rich < 0) return null;
+  let best: Building | null = null;
+  let bestD = Infinity;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.owner !== rich || e.hp <= 0 || !storesOre(e)) continue;
+    const d = (e.x - home.x) * (e.x - home.x) + (e.y - home.y) * (e.y - home.y);
+    if (d < bestD) {
+      bestD = d;
+      best = e;
+    }
+  }
+  return best ? { x: best.x, y: best.y } : null;
 }
 
 /** A rival's citizen digging a key resource within `r` tiles of a point (#568), nearest first; only to a computer that has assayed. */
@@ -3453,7 +3511,7 @@ function answerRiders(s: GameState, v: View, fighters: Unit[], issue: (c: Comman
 function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
   const L = AI_LEVELS[p.ai!];
-  const enemy = v.plan.target ?? enemyHome(s, p);
+  const enemy = v.plan.target ?? (L.clever && assayed(p) ? oreTarget(s, p, v.home) : null) ?? enemyHome(s, p);
   const dx = enemy.x - v.home.x;
   const dy = enemy.y - v.home.y;
   const dl = Math.sqrt(dx * dx + dy * dy) || 1;

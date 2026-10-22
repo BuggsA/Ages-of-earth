@@ -150,7 +150,9 @@ export type Order =
   /** A citizen digging at an ancient ruin (#64). */
   | { k: 'dig'; target: number }
   /** A citizen stripping the rubble of a fallen building (#503). */
-  | { k: 'salvage'; target: number };
+  | { k: 'salvage'; target: number }
+  /** A citizen lifting key ore from a cache (#570) and carrying it to the nearest Town Center or Storehouse. */
+  | { k: 'cache'; target: number };
 
 /** What a unit is visibly doing, for the renderer's animation. */
 export type Act = 'idle' | 'walk' | 'attack' | 'chop' | 'mine' | 'forage' | 'farm' | 'build' | 'chant' | 'fish';
@@ -220,6 +222,8 @@ export interface Unit {
   cryReady?: number;
   /** Plunder (gold) a Warband soldier has taken but not yet carried home (#502): banked at a Town Center or Barracks, lost to whoever fells it. */
   spoils?: number;
+  /** Key ore a citizen has lifted from a cache (#570) and is carrying home: banked at its people's Town Center or Storehouse, dropped where it falls. */
+  ore?: { id: RareId; n: number; from: number };
   /** Enemy soldiers it has defeated (older saves lack it). */
   vet?: number;
   /** A citizen taken captive in the Age of the Warband (#502): it gathers and farms but never builds. */
@@ -388,6 +392,18 @@ export interface Rubble {
   until: number;
 }
 
+/** Key ore knocked loose (#570): spilled from a fallen ore store or a fallen digger, there for any people's citizens to carry home (`caches.ts`). */
+export interface OreCache {
+  id: number;
+  x: number;
+  y: number;
+  ore: RareId;
+  /** How much is left in it. */
+  n: number;
+  /** Whose store or basket it spilled from. */
+  from: number;
+}
+
 export interface Ruin {
   id: number;
   /** The center of its tile. */
@@ -544,6 +560,8 @@ export interface PlayerStats {
   slain?: number;
   /** Gold taken as plunder from the enemy dead (#299); absent in older saves. */
   plunder?: number;
+  /** Key ore carried home from rivals' caches (#570); absent in older saves. */
+  seized?: number;
   /** Food a Warband's soldiers carried off from rivals (#463 s1); absent in older saves. */
   raided?: number;
   /** Gold paid in wages to hired swords (the Age of Merchants); absent in older saves. */
@@ -688,6 +706,8 @@ export type GameEvent =
   | { k: 'vigil'; owner: number; x: number; y: number; priests: number }
   | { k: 'foundation'; owner: number; type: BuildingType; x: number; y: number; what: 'kept' | 'raised' }
   | { k: 'salvage'; owner: number; x: number; y: number; type: BuildingType; what: 'left' | 'stripped'; gain?: Cost }
+  /** Key ore (#570): `spilled` from `from`'s store or basket, `taken` up by `owner`'s citizen, `kept` (banked) by `owner`. */
+  | { k: 'cache'; owner: number; from: number; ore: RareId; n: number; x: number; y: number; what: 'spilled' | 'taken' | 'kept' }
   | { k: 'ruin'; id: number; owner: number; find: RuinFind; tech?: TechId; x: number; y: number }
   /** A landmark changed hands: `owner` keeps it now (-1: nobody, after `from` was driven off). */
   | { k: 'landmark'; id: number; kind: LandmarkKind; owner: number; from: number; x: number; y: number }
@@ -834,6 +854,8 @@ export interface GameState {
   fallen?: Fallen[];
   /** Rubble of fallen buildings a salvaging people may strip (`salvage.ts`); absent until one falls. */
   rubble?: Rubble[];
+  /** Key ore knocked loose and lying on the ground (#570, `caches.ts`); absent until some spills. */
+  caches?: OreCache[];
   /** Contested landmarks; absent in older saves and in campaign chapters (none). */
   landmarks?: Landmark[];
   /** Whether this world holds bog iron (#39), decided by the seed; absent in older saves (none). */
@@ -1020,6 +1042,8 @@ export type Command =
   | ({ t: 'dig'; p: number; ids: number[]; target: number } & Queued)
   /** Citizens strip the rubble of a fallen building (#503); the target is a rubble id. */
   | ({ t: 'salvage'; p: number; ids: number[]; target: number } & Queued)
+  /** Citizens carry key ore home from a cache (#570); the target is a cache id. */
+  | ({ t: 'cache'; p: number; ids: number[]; target: number } & Queued)
   /** Answer the card of tidings waiting at the fire (#443): `take` pays its price, otherwise it is passed by. */
   | { t: 'tiding'; p: number; card: TidingId; take: boolean }
   /** A player left an online match: the computer takes over their people. */

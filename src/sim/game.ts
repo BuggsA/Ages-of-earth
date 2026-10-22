@@ -25,6 +25,7 @@ import { forkStep } from './fork';
 import { bloodStep, freeCaptives } from './blood';
 import { reclaimStep, remember } from './reclaim';
 import { leaveRubble, salvageStep } from './salvage';
+import { cacheStep, dropOre, spillStore } from './caches';
 import { sortieStep } from './sortie';
 import { fairStep } from './fair';
 import { landmarkStep } from './landmarks';
@@ -405,8 +406,10 @@ function removeDead(s: GameState): void {
       stampBuilding(s, e, false);
       remember(s, e);
       leaveRubble(s, e);
+      spillStore(s, e);
       s.events.push({ k: 'die', id: e.id, owner: e.owner, type: e.type, x: e.x, y: e.y, building: true, size: e.size, epoch: p.epoch, fx: e.dir, fy: 1 });
     } else {
+      dropOre(s, e);
       if (e.inside) {
         const b = s.byId.get(e.inside);
         if (b && b.kind === 'building') b.garrison = b.garrison.filter((id) => id !== e.id);
@@ -556,6 +559,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   galvanicStep(s);
   reclaimStep(s);
   salvageStep(s);
+  cacheStep(s);
   sortieStep(s);
   fairStep(s);
   attrition(s);
@@ -635,6 +639,10 @@ export function checksum(s: GameState): number {
     mix(r.id);
     mix(r.done);
     mix(r.until);
+  }
+  for (const c of s.caches ?? []) {
+    mix(c.id);
+    mix(c.n);
   }
   for (const m of s.landmarks ?? []) {
     mix(m.owner);

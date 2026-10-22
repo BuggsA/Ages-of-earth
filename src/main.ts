@@ -1271,6 +1271,17 @@ function order(clientX: number, clientY: number, forceAttack = false, queue = fa
       return;
     }
   }
+  // Citizens sent onto spilled key ore carry it home (#570), whoever's it was.
+  if (pk.kind === 'ground' && !forceAttack && s.caches && units.some((u) => u.type === 'citizen')) {
+    const c = s.caches.find((x) => Math.abs(pk.x - x.x) <= 1.2 && Math.abs(pk.y - x.y) <= 1.2 && view.sees(x.x, x.y));
+    if (c) {
+      issue({ t: 'cache', p: viewer, ids, target: c.id, queue: q });
+      view.marker(s, c.x, c.y, false);
+      play('move');
+      ack('move');
+      return;
+    }
+  }
   if (pk.kind === 'animal') {
     const a = s.animals.find((x) => x.id === pk.id);
     if (!a) return;
@@ -2519,6 +2530,22 @@ function onEvents(s: GameState, list: GameEvent[]): void {
       case 'sortie':
         if (ev.owner === viewer) hud.toast(ev.what === 'home' ? 'Low fuel: aircraft turn for their Airfield. Raise a forward Airfield to reach farther' : 'An aircraft ran out of fuel and fell', ev.what === 'lost' ? 'bad' : 'alert');
         break;
+      case 'cache': {
+        // Key ore knocked loose and carried off (#570).
+        const ore = RARE[ev.ore].name.toLowerCase();
+        if (ev.what === 'spilled' && ev.from === viewer) {
+          hud.toast(`${ev.n} of your ${ore} lies spilled on the ground: send citizens to carry it back before a rival does`, 'alert');
+          play('oreSpill');
+        } else if (ev.what === 'spilled' && view.sees(ev.x, ev.y)) {
+          hud.toast(`${ev.n} ${ore} of ${s.players[ev.from].name}'s lies spilled: select citizens and right-click it to carry it home`, 'good');
+          play('oreSpill');
+        } else if (ev.what === 'taken' && ev.from === viewer && ev.owner !== viewer) hud.toast(`${s.players[ev.owner].name} is carrying off your ${ore}! Fell the carrier and it drops it`, 'bad');
+        else if (ev.what === 'kept' && ev.owner === viewer) {
+          hud.toast(`${ev.n} ${ore} carried home${ev.from !== viewer ? ` from ${s.players[ev.from].name}'s store: it counts toward your ore doors` : ''}`, 'good');
+          play('oreHome');
+        }
+        break;
+      }
       case 'salvage':
         if (ev.owner !== viewer) break;
         if (ev.what === 'stripped') hud.toast(`Stripped the rubble of a ${BUILDINGS[ev.type].name}: ${RES.filter((r) => ev.gain?.[r]).map((r) => `+${ev.gain![r]} ${r}`).join(', ')}`, 'good');
