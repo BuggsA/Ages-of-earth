@@ -1,6 +1,6 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { aiTiding } from './tidings';
-import { AGES, AI_CLIMB, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_CLIMB, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, AI_QUARRY, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
@@ -144,6 +144,10 @@ interface View {
   tc: Building | null;
   /** Spendable after setting aside what the next epoch costs. */
   budget: Record<Res, number>;
+  /** The stone a road in hand still lacks, while the town saves for it (the quarry gets more hands). */
+  stoneShort: number;
+  /** The gold that road asks too, kept back when stone is bought for it. */
+  roadGold: number;
   /** What a campaign chapter's goals ask of the army (only for the chapter's own seat). */
   plan: Plan;
   /** Citizens digging bog iron toward the Iron Age's deed, kept at it while it is unfinished (#50). */
@@ -214,7 +218,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   // A steppe camp on the move (#320): home is where its Town Center is being driven or pitched.
   const moving = tc ? null : (buildings.find((b) => b.type === 'towncenter' && b.pitch !== undefined) ?? wagons.find((w) => w.packed === 'towncenter') ?? null);
   const home = tc ? { x: tc.x, y: tc.y } : moving ? { x: moving.x, y: moving.y } : { x: p.startX, y: p.startY };
-  const v: View = { p, citizens, army, priests, traders, cogs, fishers, navy, planes, buildings, home, tc, budget: { ...p.res }, plan: NO_PLAN, diggers: new Set(), armyFirst: false, claimers: new Set(), wagons, hunt: { n: 3, r: 16 }, packing: !!mem.steppe?.pack, hands: citizens.length + (isLegion(p) && p.epoch <= LEGION.aiUntil ? army.filter(legionHand).length : 0) };
+  const v: View = { p, citizens, army, priests, traders, cogs, fishers, navy, planes, buildings, home, tc, budget: { ...p.res }, plan: NO_PLAN, stoneShort: 0, roadGold: 0, diggers: new Set(), armyFirst: false, claimers: new Set(), wagons, hunt: { n: 3, r: 16 }, packing: !!mem.steppe?.pack, hands: citizens.length + (isLegion(p) && p.epoch <= LEGION.aiUntil ? army.filter(legionHand).length : 0) };
   // The Hunters' Way (#463 s1) lives by the chase in the Stone Age: more hunters, ranging farther, with camps pitched at the kill.
   if (p.way === 'hunt' && p.epoch === 0) v.hunt = { n: AI_WAYS.hunters, r: AI_WAYS.huntReach };
   const issue = (c: Command) => applyCommand(s, c);
@@ -304,6 +308,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
     // The main road forward goes without a target, as it always has; any other road is named.
     if (!wait && tc && tc.queue.length === 0 && afford(v, road.cost)) issue({ t: 'advance', p: p.id, building: tc.id, ...(road === mainRoad(p) ? {} : { to: road.to }) });
     spend(v, road.cost);
+    if (L.quarry) { v.stoneShort = Math.max(0, (road.cost.stone ?? 0) - p.res.stone); v.roadGold = road.cost.gold ?? 0; }
     // A nomad people buys its road's stone (#532): the gold for it is set aside too, or the army spends all but the road's own gold and the stone waits.
     if (isNomad(p)) spend(v, { gold: stoneGold(s, p, road.cost) });
   } else if (armyFirst && !advancing && !s.scenario && p.epoch < LAST_EPOCH && banked(p) && !armyDeed(s, p, mem)) {
@@ -312,6 +317,12 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
     const road = mainRoad(p)!;
     spend(v, road.cost);
     if (isNomad(p)) spend(v, { gold: stoneGold(s, p, road.cost) });
+  }
+
+  // Bound for lightning, the quarry works ahead of the road: its stone is the dearest to come by, and the beacons take minutes.
+  if (L.quarry && !journey && ageOf(p) === 'industrial' && lightningBound(s, v, mem)) {
+    const road = roadsFrom(p).find((r) => r.to === 'lightning');
+    if (road) { v.stoneShort = Math.max(0, (road.cost.stone ?? 0) - p.res.stone); v.roadGold = road.cost.gold ?? 0; }
   }
 
   // In the age of flight, save up for an airfield before anything smaller takes the wood.
@@ -415,6 +426,20 @@ function trade(s: GameState, v: View, issue: (c: Command) => void): void {
     if ((p.rare?.[r] ?? 0) >= ORE_TRADE.lot) {
       issue({ t: 'trade', p: p.id, res: r, buy: false });
       return;
+    }
+  }
+  // The road's stone, once the quarry runs dry or far: bought with the gold above the road's own price, the surplus sold to make it.
+  if (v.stoneShort > 0) {
+    const keep = v.roadGold + s.market.stone;
+    if (p.res.gold >= keep) {
+      issue({ t: 'trade', p: p.id, res: 'stone', buy: true });
+      return;
+    }
+    for (const r of ['food', 'wood'] as const) {
+      if (p.res[r] > AI_QUARRY.sell && s.market[r] > MARKET.min + 10) {
+        issue({ t: 'trade', p: p.id, res: r, buy: false });
+        return;
+      }
     }
   }
   // Sell what piles up for gold; buy what is short when gold piles up. On a chapter's clock, a smaller pile is worth selling.
@@ -1381,7 +1406,7 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   // Drop sites by the woods and mines being worked far from any.
   for (const res of ['wood', 'gold', 'stone'] as Res[]) {
     const workers = v.citizens.filter((u) => u.order.k === 'gather' && u.order.res === res);
-    if (workers.length < 3 || count(v, 'storehouse') >= 5 || recently('storehouse', 30)) continue;
+    if (workers.length < 3 || count(v, 'storehouse') >= AI_QUARRY.houses + (res === 'wood' || !L.quarry ? 0 : AI_QUARRY.spare) || recently('storehouse', 30)) continue;
     const far = workers.filter((u) => {
       const o = u.order as Extract<Unit['order'], { k: 'gather' }>;
       const tx = (o.tile % s.w) + 0.5;
@@ -1660,7 +1685,7 @@ function wanted(v: View, cold = false): Record<Res, number> {
   for (const r of RES) {
     const stock = v.p.res[r];
     const lean = stock > 1200 ? 0.15 : stock > 700 ? 0.4 : stock > 400 ? 0.7 : stock < 80 ? 1.4 : 1;
-    weight[r] = share[r] * lean * (cold && r === 'food' ? 1 + AI_WINTER.food : 1) * (legionAtWork(v) && (r === 'wood' || r === 'stone') ? LEGION.aiCitizenWood : 1) * (r === 'gold' && isHousehold(v.p) ? 0 : 1) * (isNomad(v.p) ? nomadShare(r, share) : 1);
+    weight[r] = share[r] * lean * (cold && r === 'food' ? 1 + AI_WINTER.food : 1) * (legionAtWork(v) && (r === 'wood' || r === 'stone') ? LEGION.aiCitizenWood : 1) * (r === 'gold' && isHousehold(v.p) ? 0 : 1) * (isNomad(v.p) ? nomadShare(r, share) : 1) * (r === 'stone' && v.stoneShort > 0 ? AI_QUARRY.push : 1);
     total += weight[r];
   }
   const n = v.citizens.filter((u) => u.order.k !== 'build' && !u.inside).length;

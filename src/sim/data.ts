@@ -2246,6 +2246,8 @@ export interface AiLevel {
   fieldGuard?: boolean;
   /** A pilgrim town detours to the Age of Sail for an heirloom (#232); off only in `scripts/ai-ab.ts`. */
   detour: boolean;
+  /** A town whose next road's stone is short sends more hands to the quarry (`AI_QUARRY`); off only in `scripts/ai-ab.ts`. */
+  quarry: boolean;
   /** Whether a landmark's worth follows what the town needs (`AI_MARK.worth`); off, every one counts the same. `scripts/ai-ab.ts` sets it back to compare. */
   worthy: boolean;
   /** Off, a clever computer neither draws nor spends blood, nor sends machines at a rival's Hemocraft (#355 s5); off only in `scripts/ai-ab.ts`. */
@@ -2278,10 +2280,10 @@ export interface AiLevel {
 export const AI_BELL = { stale: 60, far: 8 };
 
 export const AI_LEVELS: Record<Difficulty, AiLevel> = {
-  gentle: { label: 'Easy', gather: 0.65, citizens: 12, firstAttack: 1080, wave: 4, waveGrowth: 2, think: 2, towers: 0, clever: false, traders: 1, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true },
-  easy: { label: 'Normal', gather: 0.8, citizens: 16, firstAttack: 720, wave: 6, waveGrowth: 3, think: 1.5, towers: 0, clever: false, traders: 2, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true },
-  normal: { label: 'Hard', gather: 1, citizens: 24, firstAttack: 480, wave: 8, waveGrowth: 4, think: 1, towers: 1, clever: true, traders: 5, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true },
-  hard: { label: 'Expert', gather: 1.15, citizens: 32, firstAttack: 330, wave: 9, waveGrowth: 5, think: 0.5, towers: 2, clever: true, traders: 8, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true },
+  gentle: { label: 'Easy', gather: 0.65, citizens: 12, firstAttack: 1080, wave: 4, waveGrowth: 2, think: 2, towers: 0, clever: false, traders: 1, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true, quarry: true },
+  easy: { label: 'Normal', gather: 0.8, citizens: 16, firstAttack: 720, wave: 6, waveGrowth: 3, think: 1.5, towers: 0, clever: false, traders: 2, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true, quarry: true },
+  normal: { label: 'Hard', gather: 1, citizens: 24, firstAttack: 480, wave: 8, waveGrowth: 4, think: 1, towers: 1, clever: true, traders: 5, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true, quarry: true },
+  hard: { label: 'Expert', gather: 1.15, citizens: 32, firstAttack: 330, wave: 9, waveGrowth: 5, think: 0.5, towers: 2, clever: true, traders: 8, armyWait: 90, bell: { ring: 5, quiet: 2, hold: 20 }, fort: true, worthy: true, detour: true, quarry: true },
 };
 
 /**
@@ -2586,6 +2588,10 @@ export const ATTRITION = { every: 5, deep: 9, loss: 0.02 };
  * the deed. In the age it raises a coil by a dark workshop, `gap` seconds apart, up to `most` towers.
  * `raid`: a rival's coil that is the only one lighting some buildings draws a raid, `raid` tiles² of pull for each building it alone keeps lit.
  */
+/** The quarry (the economy route's stall): while a road's price asks more stone than the store holds, the stone hands weigh `push` times as much. */
+export const AI_QUARRY = { push: 4, houses: 5, spare: 2, sell: 900 };
+// `sell`: the food or wood above this is sold for the road's gold while its stone is short. `houses`: the Storehouses it raises by the woods and mines; `spare`: how many more a far quarry or gold seam may have.
+
 export const AI_LIGHTNING = { towers: 2, every: 40, gap: 45, most: 6, raid: 150 };
 
 /**
