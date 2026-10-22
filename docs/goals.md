@@ -21,10 +21,13 @@ Umbrella: [#463](https://github.com/BuggsA/Ages-of-earth/issues/463).
 
 The owner: the main problem is that "every people gathers the same four resources with citizens, builds the same buildings and trains from the same queues … makes it feel procedural." So each people gets a different core loop: who works, how resources come in, how soldiers are made (`docs/verbs.md`, lever 1). Not a twist on the shared loop. Umbrella: [#501](https://github.com/BuggsA/Ages-of-earth/issues/501). Prefer depth (one people done fully, the computer playing it) over six thin ones.
 
-## Goal 2: deepen, don't widen
+## Goal 2: the age deck (the owner, 2026-10-22)
 
-- **No new ages** (main-road or side) until the existing ones pass the verbs test (`docs/verbs.md`). Exception: the owner's own ask #391 (6–7 epochs), which should pass the test too.
-- Deepening an existing age into a different verb is the best work after Goal 1. The weakest by the audit on #500: the six peoples (#501), the Age of the Warband (#502), Reclaimers (#503), then Sail. The Steppe and Hemocraft are the models.
+Building your strategy should be as fun as beating your rival. Your route through the ages is a deck drafted during the match: each age is good at some things and bad at others, some are weak gateways to strong ones, and an age opens only where the land holds its key resource, which the player finds out by building and upgrading a prospector. The design and what's built: **`docs/age-deck.md`**. Umbrella: [#555](https://github.com/BuggsA/Ages-of-earth/issues/555).
+
+- **New ages are welcome again** (the 2026-10-17 pause is lifted): every side age now has a verb, so the existing web is fleshed out enough to grow. Each new age still passes `docs/verbs.md`, and says what it's good at, what it's bad at, and what it leads to.
+- **The start shows it** (the owner liked steps 1–3 of the start plan on #555): one Play button and peoples picked by their loop, a first minute only that people has, finds in scouting range that open roads.
+- Deepening an existing age stays good work: the Sail and the six peoples (#501, the Britons last) first.
 
 ## Goal 3: every change gives a decision
 
@@ -52,3 +55,4 @@ Its one copy, with the levers and anti-patterns: **`docs/verbs.md`**. Ask it of 
 - 2026-10-18: the Romans' legion (#501): few citizens, foot soldiers who fell, quarry and build. Greeks (#522) and Romans are the two peoples with a different core loop.
 - 2026-10-18: the Chinese household tax (#501): no gold mines, houses pay it by the street. Greeks, Romans and Chinese now have a different core loop.
 - 2026-10-18: the Mongols born on the move (#501): camp on wagons and a flock from minute 1, no fields, no quarry, stone by tribute and the Market. Only the Britons are left in `VERB_GAPS`.
+- 2026-10-22: the owner sets the age deck (Goal 2) and lifts the pause on new ages; `docs/age-deck.md`.
