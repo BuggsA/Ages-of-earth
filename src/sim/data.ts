@@ -2,6 +2,8 @@ import type { AgeId, PathId, LandmarkKind, BuildingType, CivId, Cost, Difficulty
 
 /** Every number in the game lives here. */
 
+// ---- Time and epochs ------------------------------------------------------------------------------
+
 export const TICK_HZ = 20;
 export const DT = 1 / TICK_HZ;
 export const secs = (s: number) => Math.round(s * TICK_HZ);
@@ -23,6 +25,8 @@ export const EPOCHS: Epoch[] = [
   { name: 'Industrial Age', short: 'Industrial', cost: { food: 1400, gold: 900, stone: 400 }, time: 80, blurb: 'Rifles, field guns, ironclads, and the first aeroplanes.' },
 ];
 export const LAST_EPOCH = EPOCHS.length - 1;
+
+// ---- Ages and paths -------------------------------------------------------------------------------
 
 /**
  * Ages as a web (#37). An age is where a people stands; its tier is the epoch that every
@@ -458,6 +462,8 @@ export const AGES: Record<AgeId, Age> = {
   },
 };
 
+// ---- What the side ages give ----------------------------------------------------------------------
+
 /**
  * The Age of the Steppe (#297): a town on wheels. A Town Center or House that stands finished, with nothing
  * in training, can be packed onto a wagon in an instant (its sheltering people step out). A wagon pitches
@@ -539,6 +545,8 @@ export const FLOCK = {
   guard: 6,
   steal: 2,
 };
+
+// ---- Roads between ages ---------------------------------------------------------------------------
 
 /** Something a people must have done before a road opens: a tally from its stats reaching `n`. */
 export interface Deed {
@@ -845,6 +853,8 @@ export const stepBackCost = (tier: number): Cost => ({ food: STEP_BACK.food * ti
  */
 export const BOG_IRON = { chance: 0.5, home: 22, tiles: 5 };
 
+// ---- Units ----------------------------------------------------------------------------------------
+
 export type UnitClass = 'citizen' | 'infantry' | 'ranged' | 'cavalry' | 'siege' | 'priest' | 'hero' | 'ship' | 'fighter' | 'bomber' | 'trader';
 
 export interface UnitStats {
@@ -1038,6 +1048,8 @@ export const BONUS: Record<UnitClass, Record<Target, number>> = {
 /** The best counter to each class, for the computer opponent and the tips. */
 export const COUNTER: Record<'infantry' | 'ranged' | 'cavalry', UnitType> = { infantry: 'ranged', ranged: 'cavalry', cavalry: 'infantry' };
 
+// ---- Heroes, priests and relics -------------------------------------------------------------------
+
 /** A hero's presence: soldiers within this many tiles strike harder and heal. */
 export const AURA = { radius: 6, attack: 1.2, heal: 1.5 };
 /**
@@ -1123,6 +1135,9 @@ export const RELIC = { home: 20, fair: 3, spacing: 12, extra: { small: 1, medium
  * remembered for `window` seconds. Raising the same building on the same spot again costs `cost` of the
  * usual price and starts `head` built (hit points to match). Walls, gates and wonders leave nothing to build on.
  */
+
+// ---- Aircraft, fairs, convoys and salvage ---------------------------------------------------------
+
 /**
  * Sorties (the Age of Aeronauts): aircraft of a sortie people fly on fuel from their finished Airfields. Within
  * `rearm` tiles of one they are rearmed and mended (`mend` of full health a second); more than `turn` tiles
@@ -1160,6 +1175,8 @@ export const VIGIL = { reach: 5, each: 1, most: 3, toast: 30 };
  */
 export const SALVAGE = { share: 0.5, work: 10, window: 150, reach: 2.2, find: 40 };
 export const RECLAIM = { window: 300, cost: 0.4, head: 0.5, skip: ['wall', 'gate', 'wonder'] as string[] };
+
+// ---- Ruins, landmarks and trade -------------------------------------------------------------------
 
 export const RUINS = { count: { small: 2, medium: 3, large: 4 } as Record<MapSize, number>, home: 24, fair: 4, spacing: 14, dig: 40, gold: 300, reach: 1.7, clear: 1 };
 /**
@@ -1215,6 +1232,9 @@ export const AI_MARK = { /** In a Lords of the Land match: reach over the whole 
     kin: 1.4,
     /** Soldiers weigh a rival's kept Old Ford this many times more: it quickens the strikes against them, so it is taken before a war. */
     fordRival: 1.6 } };
+
+// ---- Buildings ------------------------------------------------------------------------------------
+
 /** Repairs: restoring a building's whole health costs this share of its price, paid as the hammers work. */
 export const REPAIR_SHARE = 0.4;
 export const TRADE = { posts: { small: 2, medium: 2, large: 3 } as Record<MapSize, number>, edge: 9, fair: 4, far: 0.3, spacing: 0.4, plaza: 1, reach: 1.8, gold: 0.012, epoch: 0.08, max: 180, ally: 0.25, harbor: { reach: 12, mul: 1.3 }, sea: { reach: 7, mul: 1.2 }, glut: { each: 0.12, heal: 0.003, max: 0.5 } };
@@ -1813,6 +1833,9 @@ export const SEASONS = [
  * the cold), wants `fields` more fields and `food` more of its people on food, hunts mammoths and boars with `hunters` fewer citizens (meat
  * keeps in the cold) and, in the winter itself, clears wolves with `pack` fewer soldiers.
  */
+
+// ---- Citizens at work -----------------------------------------------------------------------------
+
 /**
  * A bulk order from the player spreads (#266): gatherers fan over nodes of that resource within `reach` tiles
  * of the one clicked, `perNode` to a node; attackers fall on foes within `foe` tiles of the one clicked,
@@ -1863,6 +1886,9 @@ export const AI_WINTER = { from: 2, fields: 2, hunters: 3, pack: 1, food: 0.3, l
  */
 export const AI_FAITH = { priests: 6, band: 3, reach: 14, keep: 6, wall: 0.4, relic: 0.6, ward: 30 };
 export const AMOUNT = { tree: 80, berry: 125, stone: 300, gold: 400, meat: 140, fish: 250, bog: 300 };
+
+// ---- Homelands ------------------------------------------------------------------------------------
+
 /**
  * Homelands (#473, Goal 1 s2): what lies round every town at the start. The seed rolls one (by `weight` for
  * the map type) and every town gets the same, so the start stays fair while the best opening changes by map.
@@ -1952,6 +1978,9 @@ export const AI_SHORE = { dockAt: 4, boats: 2 };
  *   `yardHunters` more hunters in winter.
  * Deer on the move walk for up to `walk` seconds.
  */
+
+// ---- The wild: snares, herds, caves and beasts ----------------------------------------------------
+
 /**
  * Snares in the wood (#485), the Deep Wood's own verb. A Snare goes only where at least `need` trees stand
  * within `r` tiles, and `apart` tiles from any other snare. Each second it fills by `rate` food times the trees
@@ -2041,6 +2070,8 @@ export const WOLF = { hunt: 7, hp: 20, walk: 0.9, run: 2.1, bite: 3, reach: 0.35
 export const RAIDER = { hp: 30, walk: 0.8, run: 2.2, bite: 4, reach: 0.4, reload: 1.1, notice: 3.8, leash: 6.5, roam: 1.3, radius: 0.24, guards: 3, home: 22, fair: 10, spacing: 18,
   idBase: 1_000_000_000, loot: { gold: 120, food: 80, wood: 60 }, camps: { small: 1, medium: 2, large: 3 } as Record<MapSize, number> };
 
+// ---- Tidings, the market and starting resources ---------------------------------------------------
+
 /**
  * Tidings at the fire (#443): twice in the Stone Age a card comes to each people with a choice that costs
  * something. `at` is when each draw comes (seconds, plus up to `jitter` more, by the seed), `fade` how long
@@ -2076,6 +2107,8 @@ export const START_CITIZENS = 5;
 /** Deathmatch: everyone starts rich. */
 export const DEATHMATCH_RES = { food: 20000, wood: 20000, stone: 5000, gold: 20000 };
 
+// ---- Match settings -------------------------------------------------------------------------------
+
 /** A finished wonder wins if it stands this long (seconds). */
 export const WONDER_SECONDS = 300;
 
@@ -2093,6 +2126,8 @@ export const MAP_TYPES: Record<MapType, { label: string; blurb: string }> = {
   plains: { label: 'Plains', blurb: 'Open grassland, few trees, nowhere to hide.' },
   sea: { label: 'Inland Sea', blurb: 'A great sea in the middle, full of fish: rule the water, land round the shore.' },
 };
+
+// ---- Computer opponent levels ---------------------------------------------------------------------
 
 export interface AiLevel {
   label: string;
@@ -2206,6 +2241,8 @@ export const AI_VIGIL = { slack: 1.5 };
  */
 export const AI_CONVOY = { escorts: 1, stay: 3 };
 
+// ---- Blood and hemocraft --------------------------------------------------------------------------
+
 /**
  * Blood (#355 s1): a living enemy who falls within `reach` tiles of the killer's finished Drain Rig gives up `share` of its price as blood.
  * The levy takes up to `levyMost` citizens within `levyReach` tiles of a rig at once, `levy` blood each, and rests the rig `rest` seconds for each.
@@ -2318,6 +2355,8 @@ export const AI_CURSE = { late: 14, hurt: 0.7, near: 5, riders: 3, reach: 14 };
 export const AI_HEART = { epoch: { gentle: 2, easy: 1, normal: 1, hard: 1 } as Record<Difficulty, number>, away: 24, reach: 8, builders: 3, reserve: 100, retry: 40 };
 export const AI_ORDERS = { reach: 14, riders: 2 };
 
+// ---- Rare ore and mercenaries ---------------------------------------------------------------------
+
 /** Selling rare ore at a Market (#356 s5): a lot of `lot` pays `gold[ore]` gold at a flat price. Ore mined still counts toward its doors; only the stock in hand is spent. */
 export const ORE_TRADE = { lot: 20, gold: { salt: 40, saltpetre: 55, bloodiron: 90 } as Record<'salt' | 'saltpetre' | 'bloodiron', number> };
 
@@ -2344,6 +2383,8 @@ export const AI_CLIMB = { banked: 0.6 };
 export const AI_ASSAY = { reach: 36, riders: 3 };
 export const AI_WEB = { take: 0.6, heir: 1, survey: 22, diggers: 3, nearly: 0.5, patience: 90, close: 0.75, relics: 2, raid: 18, raidNear: 30, riders: 4, read: 0.85, lodge: 1, hulls: 1, bell: 900 };
 
+// ---- Colours, names and lookups -------------------------------------------------------------------
+
 export const PLAYER_COLORS = ['#2f7fe0', '#e0473a', '#e8b630', '#3aa35a', '#9b59d0', '#e07a2f'];
 export const PLAYER_NAMES = ['You', 'Rival'];
 
@@ -2364,6 +2405,8 @@ export function unitEpoch(type: UnitType): number {
   return UNITS[type].findIndex((s) => s !== null);
 }
 
+
+// ---- Borders, war camps and attrition -------------------------------------------------------------
 
 /**
  * Borders (#132 s1): a finished building claims the land within `radius` tiles; a tile belongs to the
@@ -2411,6 +2454,9 @@ export const ATTRITION = { every: 5, deep: 9, loss: 0.02 };
  * `flame`: a clever computer that sees a rival's beacon burning within this many tiles of one of its Towers lights that Tower's own.
  * `stage`: a clever computer that keeps an Old Ford up to this many tiles from home, on the rival's side of it, musters its waves there, so they march out already forward.
  */
+
+// ---- Computer tuning for each Way -----------------------------------------------------------------
+
 /**
  * The computer and the Age of Lightning (#231): it takes the road with at least `towers` finished towers and no
  * aircraft, and while it walks the web in the Industrial Age it lights a beacon every `every` seconds toward
