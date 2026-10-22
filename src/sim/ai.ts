@@ -290,6 +290,8 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
     // The main road forward goes without a target, as it always has; any other road is named.
     if (!wait && tc && tc.queue.length === 0 && afford(v, road.cost)) issue({ t: 'advance', p: p.id, building: tc.id, ...(road === mainRoad(p) ? {} : { to: road.to }) });
     spend(v, road.cost);
+    // A nomad people buys its road's stone (#532): the gold for it is set aside too, or the army spends all but the road's own gold and the stone waits.
+    if (isNomad(p)) spend(v, { gold: stoneGold(s, p, road.cost) });
   }
 
   // In the age of flight, save up for an airfield before anything smaller takes the wood.
@@ -369,7 +371,7 @@ function trade(s: GameState, v: View, issue: (c: Command) => void): void {
   // A nomad people (#501) quarries no stone: it buys a lot whenever it runs short and has the gold.
   // The next road's stone is bought ahead of the road (the climb from the Warband asks more than a small store).
   const road = nomad ? mainRoad(p) : undefined;
-  if (nomad && p.res.stone < Math.max(NOMAD.aiStone, road?.cost.stone ?? 0) && p.res.gold >= Math.max(NOMAD.aiGold, s.market.stone + 40 + (road?.cost.gold ?? 0))) {
+  if (nomad && p.res.stone < Math.max(NOMAD.aiStone, road?.cost.stone ?? 0) && p.res.gold >= Math.max(NOMAD.aiGold, s.market.stone + NOMAD.aiMargin + (road?.cost.gold ?? 0))) {
     issue({ t: 'trade', p: p.id, res: 'stone', buy: true });
     return;
   }
@@ -408,6 +410,14 @@ function trade(s: GameState, v: View, issue: (c: Command) => void): void {
       return;
     }
   }
+}
+
+/** The gold a nomad people (#501) needs at the Market for the stone a price asks beyond its store: each lot dearer than the last, and the margin `trade` keeps. */
+function stoneGold(s: GameState, p: Player, cost: Cost): number {
+  const lots = Math.ceil(Math.max(0, (cost.stone ?? 0) - p.res.stone) / MARKET.lot);
+  let gold = 0;
+  for (let i = 0; i < lots; i++) gold += Math.min(MARKET.max, s.market.stone + i * MARKET.step);
+  return lots > 0 ? gold + NOMAD.aiMargin : 0;
 }
 
 // ---- The web of ages (#50) ---------------------------------------------------------------------------
