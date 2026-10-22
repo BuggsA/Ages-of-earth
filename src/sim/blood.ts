@@ -1,5 +1,5 @@
 import { BLOOD, BUILDINGS, HEMO, ORDERS, RITE, secs, TICK_HZ, type UnitClass } from './data';
-import { ageDef } from './ages';
+import { ageDef, asleep, sleepWhy } from './ages';
 import { modsOf } from './stats';
 import { exitSpot, spawnUnit, statsOf } from './world';
 import type { Animal, Building, BuildingType, Ent, GameState, Player, Unit, UnitType } from './types';
@@ -90,11 +90,12 @@ function standing(s: GameState, owner: number, type: BuildingType): Building[] {
   return out;
 }
 
-const rigsOf = (s: GameState, owner: number): Building[] => standing(s, owner, 'drainrig');
+/** The people's Drain Rigs at work: standing, and awake (a rig sleeps off the ages of blood, #555 s10). */
+const rigsOf = (s: GameState, owner: number): Building[] => standing(s, owner, 'drainrig').filter((b) => !asleep(s, b));
 
-/** Whether the player has a Drain Rig standing, so the blood store shows. */
+/** Whether the player has a Drain Rig standing, awake or asleep, so the blood store shows. */
 export function hasRig(s: GameState, owner: number): boolean {
-  return rigsOf(s, owner).length > 0;
+  return standing(s, owner, 'drainrig').length > 0;
 }
 
 /** Blood comes into a people's store, and the tally that the fork's deeds and the end report read. */
@@ -110,14 +111,16 @@ export function gainBlood(s: GameState, p: Player, n: number, x: number, y: numb
  */
 function drawers(s: GameState, by: number, x: number, y: number): Building[] {
   const age = ageDef(s.players[by]);
-  if (!age.blood) return [];
+  // Off the ages of blood every rig sleeps (#555 s10), so nothing draws.
+  const rigs = rigsOf(s, by);
+  if (!age.blood && !rigs.length) return [];
   const r2 = BLOOD.reach * BLOOD.reach;
   const near: { b: Building; d: number }[] = [];
   const look = (b: Building) => {
     const d = (b.x - x) * (b.x - x) + (b.y - y) * (b.y - y);
     if (d <= r2) near.push({ b, d });
   };
-  rigsOf(s, by).forEach(look);
+  rigs.forEach(look);
   if (age.rite) standing(s, by, 'temple').forEach(look);
   near.sort((a, c) => a.d - c.d || a.b.id - c.b.id);
   return near.map((n) => n.b);
@@ -192,7 +195,8 @@ export function bledFlock(s: GameState, b: Building): Animal[] {
 export function bloodStep(s: GameState): void {
   if (s.tick % TICK_HZ !== 0) return;
   for (const b of s.ents) {
-    if (b.kind !== 'building' || !b.built || b.hp <= 0) continue;
+    // A sleeping rig (#555 s10) bleeds neither flock nor captives: they wait for its people to return.
+    if (b.kind !== 'building' || !b.built || b.hp <= 0 || asleep(s, b)) continue;
     const p = s.players[b.owner];
     if (b.type === 'drainrig') {
       for (const a of bledFlock(s, b)) {
@@ -237,6 +241,7 @@ export function levyWait(s: GameState, b: Building): number {
 /** Why this rig can't take a levy now, or null. */
 export function levyProblem(s: GameState, p: Player, b: Building): string | null {
   if (b.owner !== p.id || b.type !== 'drainrig' || !b.built || b.hp <= 0) return `Only a finished ${BUILDINGS.drainrig.name} takes a levy`;
+  if (asleep(s, b)) return sleepWhy(b);
   const wait = levyWait(s, b);
   if (wait > 0) return `The rig is still drawing the last levy: ${wait}s`;
   if (!levyReach(s, b).length) return `No citizen of yours within ${BLOOD.levyReach} tiles`;

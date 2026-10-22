@@ -35,7 +35,7 @@ import { exacting, isRider } from '../sim/tribute';
 import { landOwnerAt } from '../sim/borders';
 import { flockCap, flockOf, grazeRange, lambProblem } from '../sim/flocks';
 import { soldAt } from '../sim/ages';
-import { ageDef, ageOf, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, oreClue, oreDone, oreOnly, ironTradeShare, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, pathLine, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, suspendedTechs, assayed, diggersAt, holdingsOf, holds, keyOf, lacking, opensOf, prospected, trainsAt, windowsOf, leadsOn, leadsTo } from '../sim/ages';
+import { ageDef, ageOf, asleep, leaving, sleepWhy, type Tally, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, oreClue, oreDone, oreOnly, ironTradeShare, isHire, isSideRoad, journeyOf, mainRoad, pathLine, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, suspendedTechs, assayed, diggersAt, holdingsOf, holds, keyOf, lacking, opensOf, prospected, trainsAt, windowsOf, leadsOn, leadsTo } from '../sim/ages';
 import type { AgeId, KeyId, RareId, Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Player, Res, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
 import { KEYS, RARES, RES, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
@@ -242,6 +242,22 @@ const prospectLine = (s: GameState, p: Player) => {
 const routeTag = (id: AgeId) => {
   const side = (AGES[id].routes ?? []).filter((r) => r !== 'plain');
   return side.length ? ` · ${side.map((r) => ROUTES[r].name).join(', ')}` : '';
+};
+
+/**
+ * Going back as a plan (#555 s10, `docs/age-roads.md` §5): what leaving this age for `to` keeps, puts to sleep, wakes and loses,
+ * for the step-back button and the roads. What is kept for good shows on a step back only.
+ */
+const planLines = (s: GameState, p: Player, to: AgeId, back: boolean): string => {
+  const l = leaving(s, p, to, back);
+  const tally = (t: Tally) => t.map(([type, n]) => `${n} ${BUILDINGS[type].name}${n > 1 ? 's' : ''}`).join(', ');
+  const lines: string[] = [];
+  if (back && l.walked) lines.push(`🏺 Kept: the ${AGES[l.walked].name} counts as walked for good (its heirlooms and the roads that need it), but its own ways rest until you return.`);
+  if (l.suspend.length) lines.push(`💤 Sleeps until you climb again: ${l.suspend.map((t) => TECHS[t].name).join(', ')}.`);
+  if (l.sleep.length) lines.push(`💤 Sleeps until you return: ${tally(l.sleep)}, standing idle.`);
+  if (l.wake.length) lines.push(`☀️ Wakes: ${tally(l.wake)}.`);
+  if (l.lost.length) lines.push(`🔥 Lost: ${tally(l.lost)}, burned.`);
+  return lines.map((x) => `<br>${x}`).join('');
 };
 
 const fmtTime = (ticks: number) => {
@@ -853,7 +869,12 @@ export class Hud {
     else if (b.type === 'prospector' && b.built && prospected(p)) status = prospectLine(s, p);
     else if (b.type === 'temple' && keptIn(s, b)) status = `Keeps ${keptIn(s, b)} relic${keptIn(s, b) > 1 ? 's' : ''}: ${icon('gold', 14)}${Math.round((60 / RELIC.every) * Math.round(RELIC.gold * modsOf(s, b.owner).relicGold) * keptIn(s, b))} a minute`;
     else status = def.drop.length ? 'Drop-off for every resource' : def.pop ? `Room for ${def.pop}` : 'Ready';
+    // A building of other ages (#555 s10): it stands idle until its people returns to them.
+    const sleeping = b.built && asleep(s, b);
+    if (sleeping) status = `<span data-tip="<b>Asleep</b>${sleepWhy(b)}. Until then it does nothing, but it stands, and wakes the moment you return.">💤 Asleep: wakes in the ${(def.ages ?? []).map((a) => AGES[a].short).join(' or ')}</span>`;
     if (!mine) status = `<span class="swatch" style="background:${p.color}"></span>${p.name}${b.type === 'wonder' && b.timer >= 0 ? `: wins in ${fmtTime(b.timer)}` : ''}${b.type === 'temple' && keptIn(s, b) ? `: keeps ${keptIn(s, b)} relic${keptIn(s, b) > 1 ? 's' : ''}` : ''}`;
+    // A rival's sleeping building tells its story: that people walked an age it has since left.
+    if (!mine && sleeping) status += ` · <span data-tip="<b>Asleep</b>Its people raised it in an age they have left. It does nothing until they return.">💤 asleep</span>`;
     // Faith takes the walls (#209): how near rival priests have chanted it over.
     const faith = faithOf(b);
     if (faith > 0 && b.faithBy !== undefined) status += ` · <span data-tip="<b>Faith</b>${b.faithBy === viewer ? 'Your priests are chanting it over: keep them at it, or the faith fades.' : 'Rival priests are chanting it over. Strike them down, or shelter soldiers inside and stand your own priests beside it to slow them (pilgrim priests sing back and wear the faith down).'}">✨ ${Math.floor(faith * 100)}% ${b.faithBy === viewer ? 'won over' : `to ${s.players[b.faithBy].name}`}</span>`;
@@ -890,7 +911,7 @@ export class Hud {
       status += ` · <span data-tip="<b>Powder mill</b>In the Age of Alchemy every Siege Workshop grinds: together they make a keg from ${KEG.ore} saltpetre every ${KEG.time} seconds a mill, up to ${KEG.most} in store. Kegs are laid in the Age of Sappers.">${still ? `⚠ ${still}` : `🧨 Grinding powder: ${kegsOf(p)} kegs`}</span>`;
     }
     // A Transfusion Station (#355 s3): who waits for a graft, and whether there is blood for it.
-    if (mine && b.built && b.type === 'transfusion') {
+    if (mine && b.built && !sleeping && b.type === 'transfusion') {
       const cost = graftCost(p);
       const queued = waiting(s, b).length;
       const wait = graftWait(s, b);
@@ -904,7 +925,7 @@ export class Hud {
     if (mine && b.built && b.type === 'drainrig' && ageDef(p).hemocraft)
       status += ` · <span data-tip="<b>Draining</b>Each second, up to ${HEMOCRAFT.most} living enemies within ${HEMOCRAFT.drain} tiles bleed ${HEMOCRAFT.bleed} health into your store, ${HEMOCRAFT.yield} blood a point, and those who die of it pay their blood again. Machines, ships and aircraft bleed nothing.">🩸 Draining the living within ${HEMOCRAFT.drain} tiles</span>`;
     // Beasts, flocks and captives (#355): what a rig (or altar) holds and bleeds. A rival is told when it holds some of their people.
-    if (b.built && b.type === 'drainrig' && mine) {
+    if (b.built && !sleeping && b.type === 'drainrig' && mine) {
       const flock = bledFlock(s, b).length;
       if (flock) status += ` · <span data-tip="<b>Bleeding the flock</b>Each second your sheep grazing within ${BLOOD.flockReach} tiles give up to ${BLOOD.flockMilk} of their milk to the rig, ${BLOOD.flockYield} blood for each, instead of to your milkers. Graze them farther off to milk them.">🐑 Bleeding ${flock} sheep</span>`;
     }
@@ -1127,7 +1148,7 @@ export class Hud {
               pic: '',
               glyph: isMain ? '⏫' : '🔀',
               title: `${toward} the ${to.name}${routeTag(road.to)}`,
-              desc: `${road.gate === 'easy' ? '<i>An easy on-ramp: a small deed and a modest price.</i><br>' : road.gate === 'hard' ? '<i>A hard gate: a dear price and a long journey, for something special.</i><br>' : ''}${road.blurb ?? to.blurb}${isSideRoad(road) ? ` Opens only from ${windowsOf(road.to).map((a) => `the ${AGES[a].name}`).join(' or ')}.` : ''}${(oreOnly(s, road) ? [] : deeds).map((d) => `<br>${oreDone(p, road) || d.have >= d.need ? '✔' : '…'} ${d.deed.text}: ${Math.min(d.have, d.need)}/${d.need}.`).join('')}${(() => { const door = oreClue(s, p, road); return door ? `<br>${oreDone(p, road) ? '✔' : '…'} ${oreOnly(s, road) ? '' : '<i>Or</i> '}${door.text.charAt(0).toLowerCase()}${door.text.slice(1)}: ${Math.min(Math.floor(p.stats.mined?.[door.id] ?? 0), door.n)}/${door.n}.` : ''; })()}${back.length ? `<br>Brings back ${back.map((t) => TECHS[t].name).join(', ')}.` : ''} Takes ${road.time}s. Every unit re-arms and every building is rebuilt in the new style.${agePanel(s, p, road.to)}`,
+              desc: `${road.gate === 'easy' ? '<i>An easy on-ramp: a small deed and a modest price.</i><br>' : road.gate === 'hard' ? '<i>A hard gate: a dear price and a long journey, for something special.</i><br>' : ''}${road.blurb ?? to.blurb}${isSideRoad(road) ? ` Opens only from ${windowsOf(road.to).map((a) => `the ${AGES[a].name}`).join(' or ')}.` : ''}${(oreOnly(s, road) ? [] : deeds).map((d) => `<br>${oreDone(p, road) || d.have >= d.need ? '✔' : '…'} ${d.deed.text}: ${Math.min(d.have, d.need)}/${d.need}.`).join('')}${(() => { const door = oreClue(s, p, road); return door ? `<br>${oreDone(p, road) ? '✔' : '…'} ${oreOnly(s, road) ? '' : '<i>Or</i> '}${door.text.charAt(0).toLowerCase()}${door.text.slice(1)}: ${Math.min(Math.floor(p.stats.mined?.[door.id] ?? 0), door.n)}/${door.n}.` : ''; })()}${back.length ? `<br>Brings back ${back.map((t) => TECHS[t].name).join(', ')}.` : ''}${planLines(s, p, road.to, false)}<br>Takes ${road.time}s. Every unit re-arms and every building is rebuilt in the new style.${agePanel(s, p, road.to)}`,
               cost: road.cost,
               ok: !advancing && !problem && !short && b.queue.length === 0,
               on: b.advance >= 0 && !b.back && journeyOf(p, b)?.to === road.to,
@@ -1144,7 +1165,6 @@ export class Hud {
             const cost = stepBackCost(p.epoch);
             const problem = backProblem(s, p);
             const short = shortfall(p, cost);
-            const idle = suspendedBelow(p, AGES[down].tier);
             const opens = roadsFrom({ ...p, age: down, epoch: AGES[down].tier }).filter((r) => isSideRoad(r) && roadKnown(s, p, r));
             cmds.push({
               key: 'Z',
@@ -1153,7 +1173,8 @@ export class Hud {
               title: `Step back to the ${AGES[down].name}`,
               desc:
                 `Return to the older ways. Every unit falls back to its ${AGES[down].name} form and every building to its style.` +
-                (idle.length ? ` Suspended, not lost, until you climb again: ${idle.map((t) => TECHS[t].name).join(', ')}.` : ' Technologies above it are suspended, not lost, until you climb again.') +
+                ' Technologies above it are suspended, not lost, until you climb again.' +
+                planLines(s, p, down, true) +
                 (opens.length ? `<br>Reopens the road to the ${opens.map((r) => AGES[r.to].name).join(' and the ')}.` : '') +
                 `<br>Takes ${STEP_BACK.time}s; climbing again costs the full price. Then ${Math.round(STEP_BACK.cooldown / 60)} minutes before you may step back again.`,
               cost,

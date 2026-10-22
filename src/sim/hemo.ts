@@ -1,5 +1,5 @@
 import { HEMO, HEMO_IRON, HEMOCRAFT, TICK_HZ, secs } from './data';
-import { ageDef, inField } from './ages';
+import { ageDef, asleep, inField } from './ages';
 import { modsOf } from './stats';
 import { GRAFTABLE, bloodOf, grafted } from './blood';
 import { ungarrison } from './units';
@@ -14,10 +14,10 @@ import type { Building, GameState, Player, Unit } from './types';
  * With Galvanic Blood (#355 s6) a Watch Tower's reach feeds a graft too, in any age.
  */
 
-/** The people's finished, standing Transfusion Stations. */
+/** The people's finished, standing Transfusion Stations that are awake (a Station sleeps outside its ages, #555 s10). */
 export function stationsOf(s: GameState, owner: number): Building[] {
   const out: Building[] = [];
-  for (const e of s.ents) if (e.kind === 'building' && e.type === 'transfusion' && e.owner === owner && e.built && e.hp > 0) out.push(e);
+  for (const e of s.ents) if (e.kind === 'building' && e.type === 'transfusion' && e.owner === owner && e.built && e.hp > 0 && !asleep(s, e)) out.push(e);
   return out;
 }
 
@@ -85,7 +85,7 @@ function station(s: GameState, b: Building): void {
 /** Each tick: the Stations at work; each second, every graft fed, mended or run dry. */
 export function hemoStep(s: GameState): void {
   const by = new Map<number, Building[]>();
-  for (const e of s.ents) if (e.kind === 'building' && e.type === 'transfusion' && e.built && e.hp > 0 && e.garrison.length) station(s, e);
+  for (const e of s.ents) if (e.kind === 'building' && e.type === 'transfusion' && e.built && e.hp > 0 && e.garrison.length && !asleep(s, e)) station(s, e);
   if (s.tick % TICK_HZ !== 0) return;
   for (const u of s.ents) {
     if (u.kind !== 'unit' || u.hemo === undefined || u.hp <= 0) continue;

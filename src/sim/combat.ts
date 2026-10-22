@@ -1,5 +1,5 @@
 import { AURA, RALLY, BONUS, BLOOD_TOWER, BUILDINGS, DEER, LIGHTNING, VETERANCY, TICK_HZ, domainOf, secs, HEART, type UnitStats } from './data';
-import { hasCoils } from './ages';
+import { asleep, hasCoils } from './ages';
 import { bleeds, curseTaken, drawBlood, hemoBlow, hemoTaken } from './blood';
 import { fairPurse } from './fair';
 import { raidBlow, raidSlain } from './ways';
@@ -261,7 +261,8 @@ export function nearestEnemyUnit(s: GameState, sp: Spatial, owner: number, x: nu
 /** Town Centers and towers shoot at the nearest enemies in range, one more arrow for each unit sheltering inside. */
 export function buildingGuns(s: GameState, sp: Spatial, b: Building): void {
   const g = BUILDINGS[b.type].guns;
-  if (!g || !b.built || peace(s)) return;
+  // A tower raised only in some ages (the Blood Tower) holds its fire while its people stands outside them (#555 s10).
+  if (!g || !b.built || peace(s) || asleep(s, b)) return;
   if (b.cool > 0) {
     b.cool--;
     return;
