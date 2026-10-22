@@ -292,8 +292,9 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
     spend(v, road.cost);
     // A nomad people buys its road's stone (#532): the gold for it is set aside too, or the army spends all but the road's own gold and the stone waits.
     if (isNomad(p)) spend(v, { gold: stoneGold(s, p, road.cost) });
-  } else if (armyFirst && !advancing && p.epoch < Math.min(LAST_EPOCH, v.plan.maxEpoch) && banked(p) && !armyDeed(s, p, mem)) {
+  } else if (armyFirst && !advancing && !v.plan.wave && p.epoch < Math.min(LAST_EPOCH, v.plan.maxEpoch) && banked(p) && !armyDeed(s, p, mem)) {
     // A climb nearly paid for keeps its savings while the army comes first (#532): a wave that came home short spent the whole price on soldiers, minutes from the next age.
+    // Not in a chapter that wants the rival town gone: there the army is the goal.
     const road = mainRoad(p)!;
     spend(v, road.cost);
     if (isNomad(p)) spend(v, { gold: stoneGold(s, p, road.cost) });
