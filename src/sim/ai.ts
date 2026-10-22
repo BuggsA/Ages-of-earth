@@ -1487,12 +1487,12 @@ function huntTheYear(s: GameState, v: View, issue: (c: Command) => void): void {
  * A clever computer leaves `YEAR.spare` of each of its own home herds alive on the Herd Plains, so they come
  * home in spring with calves (#479), and a pair (`DEER.pair`) of every wild herd in the Stone Age, when game is
  * what it lives on; a wild herd breeds each spring (#491). A rival's herd it hunts down gladly. Undefined where nothing is spared.
- * A people of the Hunters' Way on the Herd Plains spares no wild deer within `KILL_CAMP.home` of its Town Centers (#529):
- * they bar the fields it sows while its own herd is away on the trek.
+ * A people of the Hunters' Way spares no wild deer within `KILL_CAMP.home` of its Town Centers (#529), on any land:
+ * they bar the fields it sows (`wayBarred`), and a town on the glade that spared them never tilled a field (seed 104, Greeks).
  */
 export function spared(s: GameState, p: Player): ((a: Animal) => boolean) | undefined {
   if (!AI_LEVELS[p.ai!].clever) return undefined;
-  const tcs = p.way === 'hunt' && p.epoch === 0 && s.homeland === 'herds' ? townCenters(s, p.id) : [];
+  const tcs = p.way === 'hunt' && p.epoch === 0 && (s.homeland === 'herds' || AI_LEVELS[p.ai!].fieldsClear !== false) ? townCenters(s, p.id) : [];
   const r2 = KILL_CAMP.home * KILL_CAMP.home;
   const fields = (a: Animal) => tcs.some((b) => (a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y) <= r2);
   // A herd is spared at its own count: a town's at `YEAR.spare`, a wild one at `DEER.pair`.
