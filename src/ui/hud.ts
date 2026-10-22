@@ -8,7 +8,7 @@ import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE } from '../sim/units';
-import { LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, SNARE, SICKNESS, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, SNARE, SICKNESS, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -32,8 +32,8 @@ import { isMobile, packProblem, packsOf, pitchProblem } from '../sim/steppe';
 import { exacting, isRider } from '../sim/tribute';
 import { landOwnerAt } from '../sim/borders';
 import { flockCap, flockOf, grazeRange, lambProblem } from '../sim/flocks';
-import { ageDef, ageOf, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, oreClue, oreDone, oreOnly, ironTradeShare, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, pathLine, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, surveyFinds, suspendedTechs, trainsAt, windowsOf } from '../sim/ages';
-import type { Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Player, Res, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
+import { ageDef, ageOf, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, oreClue, oreDone, oreOnly, ironTradeShare, isHire, isSideRoad, journeyOf, suspendedBelow, mainRoad, pathLine, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, surveyFinds, suspendedTechs, trainsAt, windowsOf, leadsOn, leadsTo } from '../sim/ages';
+import type { AgeId, Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Player, Res, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
 import { RARES, RES, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
 import { buildingPicture, unitPicture } from './thumbs';
@@ -170,6 +170,31 @@ function orderWords(s: GameState, u: Unit): string {
 
 /** The verbs rubric's line on a choice (#506): what the player will do, and what it shuts. */
 const verbLine = (e: { verb?: string; door?: string }) => (e.verb ? `<br><b>You now:</b> ${e.verb}. <b>It shuts:</b> ${e.door}.` : '');
+
+/**
+ * The age panel (#555 s4, `docs/age-roads.md` spine §2): the route an age stands on, what you will do there, what it is
+ * good at, what it shuts and, as far as you know, where it leads. A turn of your town, said in a few lines.
+ */
+const agePanel = (s: GameState, p: Player, id: AgeId) => {
+  const a = AGES[id];
+  const routes = a.routes ?? [];
+  const on = leadsTo(s, p, id);
+  const hidden = new Set(leadsOn(id).map((r) => r.to)).size > on.length;
+  return (
+    (routes.length ? `<br><b>${routes.map((r) => ROUTES[r].name).join(' and ')}:</b> ${routes.map((r) => ROUTES[r].blurb).join('; ')}.` : '<br><b>Off the basic routes:</b> only a rare find opens it.') +
+    (a.gateway ? '<br><i>Weak on its own: the road on is why you come.</i>' : '') +
+    (a.verb ? `<br><b>You now:</b> ${a.verb}.` : '') +
+    (a.good ? `<br><b>Good at:</b> ${a.good}.` : '') +
+    (a.door ? `<br><b>It shuts:</b> ${a.door}.` : '') +
+    (on.length ? `<br><b>Leads to:</b> ${on.map((t) => `the ${AGES[t].name}`).join(', ')}${hidden ? ', and roads you have not found' : ''}.` : hidden ? '<br><b>Leads to:</b> roads you have not found.' : '')
+  );
+};
+
+/** A road's route, for the age-up button's title: a side route by name, nothing for the plain road. */
+const routeTag = (id: AgeId) => {
+  const side = (AGES[id].routes ?? []).filter((r) => r !== 'plain');
+  return side.length ? ` · ${side.map((r) => ROUTES[r].name).join(', ')}` : '';
+};
 
 const fmtTime = (ticks: number) => {
   const sec = Math.floor(ticks / TICK_HZ);
@@ -1021,8 +1046,8 @@ export class Hud {
               key: isMain ? 'W' : (sideKeys.shift() ?? ''),
               pic: '',
               glyph: isMain ? '⏫' : '🔀',
-              title: `${toward} the ${to.name}`,
-              desc: `${road.gate === 'easy' ? '<i>An easy on-ramp: a small deed and a modest price.</i><br>' : road.gate === 'hard' ? '<i>A hard gate: a dear price and a long journey, for something special.</i><br>' : ''}${road.blurb ?? to.blurb}${isSideRoad(road) ? ` Opens only from ${windowsOf(road.to).map((a) => `the ${AGES[a].name}`).join(' or ')}.` : ''}${(oreOnly(s, road) ? [] : deeds).map((d) => `<br>${oreDone(p, road) || d.have >= d.need ? '✔' : '…'} ${d.deed.text}: ${Math.min(d.have, d.need)}/${d.need}.`).join('')}${(() => { const door = oreClue(s, p, road); return door ? `<br>${oreDone(p, road) ? '✔' : '…'} ${oreOnly(s, road) ? '' : '<i>Or</i> '}${door.text.charAt(0).toLowerCase()}${door.text.slice(1)}: ${Math.min(Math.floor(p.stats.mined?.[door.id] ?? 0), door.n)}/${door.n}.` : ''; })()}${back.length ? `<br>Brings back ${back.map((t) => TECHS[t].name).join(', ')}.` : ''} Takes ${road.time}s. Every unit re-arms and every building is rebuilt in the new style.${verbLine(to)}`,
+              title: `${toward} the ${to.name}${routeTag(road.to)}`,
+              desc: `${road.gate === 'easy' ? '<i>An easy on-ramp: a small deed and a modest price.</i><br>' : road.gate === 'hard' ? '<i>A hard gate: a dear price and a long journey, for something special.</i><br>' : ''}${road.blurb ?? to.blurb}${isSideRoad(road) ? ` Opens only from ${windowsOf(road.to).map((a) => `the ${AGES[a].name}`).join(' or ')}.` : ''}${(oreOnly(s, road) ? [] : deeds).map((d) => `<br>${oreDone(p, road) || d.have >= d.need ? '✔' : '…'} ${d.deed.text}: ${Math.min(d.have, d.need)}/${d.need}.`).join('')}${(() => { const door = oreClue(s, p, road); return door ? `<br>${oreDone(p, road) ? '✔' : '…'} ${oreOnly(s, road) ? '' : '<i>Or</i> '}${door.text.charAt(0).toLowerCase()}${door.text.slice(1)}: ${Math.min(Math.floor(p.stats.mined?.[door.id] ?? 0), door.n)}/${door.n}.` : ''; })()}${back.length ? `<br>Brings back ${back.map((t) => TECHS[t].name).join(', ')}.` : ''} Takes ${road.time}s. Every unit re-arms and every building is rebuilt in the new style.${agePanel(s, p, road.to)}`,
               cost: road.cost,
               ok: !advancing && !problem && !short && b.queue.length === 0,
               on: b.advance >= 0 && !b.back && journeyOf(p, b)?.to === road.to,
@@ -1070,7 +1095,7 @@ export class Hud {
               pic: '',
               glyph: '🔒',
               title: `The ${AGES[road.to].name}`,
-              desc: `${road.blurb ?? AGES[road.to].blurb}<br>This road opens only from ${windows}.${verbLine(AGES[road.to])}`,
+              desc: `${road.blurb ?? AGES[road.to].blurb}<br>This road opens only from ${windows}.${agePanel(s, p, road.to)}`,
               cost: road.cost,
               ok: false,
               why: from.tier < p.epoch ? `Shut: step back to the ${from.name} to take it` : `Shut: it opens only from ${windows}`,

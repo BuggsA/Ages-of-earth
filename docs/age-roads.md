@@ -35,6 +35,7 @@ On the simple routes (same chat): "you should be able to follow some basic branc
 - A one-question survey: "Survey the Land" answers yes or no for bog iron only (`TECHS.survey`).
 - The age web: about 20 ages and 28 roads, every side age with a verb (`VERB_GAPS.ages` is empty).
 - Going back: a Town Center **steps back** one main-road tier (`STEP_BACK`: 100 food and 50 gold a tier, 25 s, then 5 minutes before the next); units fall back to their older form, technologies above the tier are suspended, not lost. Most side ages also have a cheap **road back** to the age they left (Sail, Pilgrim, Warband, Merchant → Medieval).
+- Routes and the age panel (#560, s0+s4): `Age.routes` (`ROUTES`), `Age.good`, `Age.gateway`, and `leadsOn`/`leadsTo` in `src/sim/ages.ts`. The Town Center's age-up buttons name the route and show the four lines; `tests/age-panel.test.ts` holds every route reachable with no rare find. Not yet: s0's sweeps, the computer picking a route, the web map's panel.
 - What two roads teach together: six **heirlooms** (`walked: [a, b]` on a technology, #224), crafts opened only to a people that walked both ages, kept for good on any road. The computer plans for them.
 
 ## The spine (fixed 2026-10-22; build on it, change it only with the reason on #555)

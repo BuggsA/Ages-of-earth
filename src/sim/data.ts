@@ -35,6 +35,12 @@ export interface Age {
   /** The verbs rubric (`docs/verbs.md`, #506): what the player now does, in words and never a number, and the door it shuts. */
   verb?: string;
   door?: string;
+  /** The age panel (#555 s4, `docs/age-roads.md` spine §2): what this age is good at, in one line, the reason to pick it. */
+  good?: string;
+  /** The basic routes (#555 s0, spine §1) this age stands on; empty for a rare age, one that only a rare find opens. */
+  routes?: RouteId[];
+  /** A gateway age (rule 3): weak on its own, taken for the road on. Its panel says so. */
+  gateway?: boolean;
   short: string;
   tier: number;
   blurb: string;
@@ -168,7 +174,22 @@ export const PATHS: Record<PathId, Path> = {
 
 export const TRUNK: AgeId[] = ['stone', 'bronze', 'middle', 'gunpowder', 'industrial'];
 
-const trunkAge = (e: number): Age => ({ name: EPOCHS[e].name, short: EPOCHS[e].short, tier: e, blurb: EPOCHS[e].blurb });
+/**
+ * The basic routes (#555 s0, `docs/age-roads.md` spine §1): a plain style a player can pick and follow to a win on any
+ * map, with no prospecting and no rare find. Each age names the routes it stands on (`Age.routes`); the age-up button
+ * says which route a road is on. A route may cross the plain road between its own ages.
+ */
+export type RouteId = 'plain' | 'army' | 'navy' | 'economy' | 'horse' | 'faith';
+export const ROUTES: Record<RouteId, { name: string; blurb: string }> = {
+  plain: { name: 'Plain road', blurb: 'the classic climb, open on every map; every route can fall back to it' },
+  army: { name: 'Army route', blurb: 'plunder carried home, camps at the front, a whole people at war' },
+  navy: { name: 'Navy route', blurb: 'convoys and prize money at sea, then reach from the air; it wants water' },
+  economy: { name: 'Economy route', blurb: 'gold that hires swords, feast-day trade, a town laid out round its coils' },
+  horse: { name: 'Horse route', blurb: 'a town on wagons, tribute from a rival\'s land, tolls on the trade road' },
+  faith: { name: 'Faith route', blurb: 'priests who win a rival\'s towers and Temples over' },
+};
+
+const trunkAge = (e: number, good: string): Age => ({ name: EPOCHS[e].name, short: EPOCHS[e].short, tier: e, blurb: EPOCHS[e].blurb, good, routes: ['plain'] });
 
 /** Iron wares: bog iron dug (any age) raises trade in the trading ages (Merchants, Fairs, Sail): +8% a 75 bars, to +40%. */
 export const IRON_TRADE = { per: 75, each: 0.08, most: 5 };
@@ -180,14 +201,16 @@ export const IRON_TRADE = { per: 75, each: 0.08, most: 5 };
 export const IRON_FORGE = { base: 150, per: 50, attack: 1, most: 3 };
 
 export const AGES: Record<AgeId, Age> = {
-  stone: trunkAge(0),
-  bronze: trunkAge(1),
-  middle: trunkAge(2),
-  gunpowder: trunkAge(3),
-  industrial: trunkAge(4),
+  stone: trunkAge(0, 'Where every road begins: gather, settle and choose your way'),
+  bronze: trunkAge(1, 'The dependable step: Markets and Temples, stronger arms, and nothing shut'),
+  middle: trunkAge(2, 'The crossroads: most side roads turn off here, and nothing is shut'),
+  gunpowder: trunkAge(3, 'Guns and cannon that break any wall, and every road comes back to it'),
+  industrial: trunkAge(4, 'The strongest plain arms and the deepest economy, with nothing shut'),
   aeronaut: {
     verb: 'Fight from forward Airfields: aircraft fly sorties on fuel, so where you build an Airfield is how far you reach',
     door: 'Foot, ranged, cavalry and siege cost more',
+    good: 'Air power: cheap fighters and bombers that strike far from a forward Airfield',
+    routes: ['navy'],
     name: 'Age of Aeronauts', short: 'Aeronauts', tier: 4,
     blurb: 'A future built around the airfield: fighters and bombers cost 25% less and train in 25% less time. Foot, ranged, cavalry and siege units cost 20% more. But aircraft fly on fuel: they turn for home 30 tiles from an Airfield of yours and burn out beyond 36, and they are rearmed and mended while they sit at one. A long reach means a forward Airfield. Aircraft keep Industrial combat strength; riflemen, towers, ironclads and enemy fighters still answer them.',
     price: { fighter: 0.75, bomber: 0.75, infantry: 1.2, ranged: 1.2, cavalry: 1.2, siege: 1.2 },
@@ -197,6 +220,8 @@ export const AGES: Record<AgeId, Age> = {
   reclaimer: {
     verb: 'Strip the rubble of fallen buildings, a rival\'s or your own, into stock, or leave your own to raise again',
     door: 'Soldiers take longer to train',
+    good: 'A town that rises from ruin: rubble becomes stock, and what fell can be raised again',
+    routes: [],
     name: 'Age of Reclaimers',
     short: 'Reclaimers',
     tier: 3,
@@ -208,6 +233,8 @@ export const AGES: Record<AgeId, Age> = {
   merchant: {
     verb: 'Hire swords at the Market for gold, and keep paying them by the day or lose them',
     door: 'No Stables: cavalry is for hire or not at all',
+    good: 'Gold becomes an army at once: swords hired at the Market',
+    routes: ['economy'],
     name: 'Age of Merchants',
     short: 'Merchant',
     tier: 2,
@@ -221,6 +248,8 @@ export const AGES: Record<AgeId, Age> = {
   iron: {
     verb: 'Dig the marsh: bog iron sharpens every spearman, so the bog is worth holding',
     door: 'No cavalry until the Middle Ages',
+    good: 'The hardest early foot soldiers, sharpened by the marsh\'s iron',
+    routes: [],
     name: 'Iron Age',
     short: 'Iron',
     tier: 1,
@@ -234,6 +263,8 @@ export const AGES: Record<AgeId, Age> = {
   pilgrim: {
     verb: 'Send chanting priests to win a rival\'s towers, gates and Temples over, and keep vigils by your relics',
     door: 'No siege engines',
+    good: 'Winning a rival over without a fight: priests take towers, gates and Temples',
+    routes: ['faith'],
     name: 'Age of Pilgrims',
     short: 'Pilgrim',
     tier: 2,
@@ -247,6 +278,8 @@ export const AGES: Record<AgeId, Age> = {
   fair: {
     verb: 'Time your traders to come home on the feast day, to a Market built by a Temple that keeps a relic',
     door: 'Towns grown open round the fairground stand weaker',
+    good: 'The richest trade: caravans home on the feast day pay the most',
+    routes: ['economy', 'faith'],
     name: 'Age of Fairs',
     short: 'Fairs',
     tier: 3,
@@ -259,6 +292,8 @@ export const AGES: Record<AgeId, Age> = {
   sail: {
     verb: 'Send warships with the merchant cogs in convoy, and sink a rival\'s cogs for prize money',
     door: 'No walls or gates: the fleet is the wall',
+    good: 'Sea power: convoys carry more, and a rival\'s sunk cogs pay you',
+    routes: ['navy'],
     name: 'Age of Sail',
     short: 'Sail',
     tier: 2,
@@ -273,6 +308,8 @@ export const AGES: Record<AgeId, Age> = {
   lightning: {
     verb: 'Lay the town out round Coil Towers: inside a coil\'s field everything works faster, outside it slower',
     door: 'No aircraft',
+    good: 'The quickest town: inside a coil\'s field every building works faster',
+    routes: ['economy'],
     name: 'Age of Lightning',
     short: 'Lightning',
     tier: 4,
@@ -292,6 +329,8 @@ export const AGES: Record<AgeId, Age> = {
     haul: true,
     verb: 'Carry the plunder home: the soldier who makes a kill packs the gold and must walk it back to a Town Center or Barracks to bank it, so raids are timed, convoys guarded, and the war-host comes home between blows',
     door: 'A laden soldier felled in the field hands its pack to the rival, and no pack holds more than a few kills: a host that never turns home banks nothing, and a host that hurries home gives up the front',
+    good: 'Raids that pay: plunder carried home, and captives to work your fields',
+    routes: ['army'],
     mul: { militaryTrain: 0.85, farm: 0.9 },
     no: { units: ['trader'], why: 'A warband trades with no one: traders wait until your people leave the Path of Blood' },
   },
@@ -299,6 +338,8 @@ export const AGES: Record<AgeId, Age> = {
   ironblood: {
     verb: 'Pitch War Camps where the army stands, even in enemy land, and train foot soldiers at the front',
     door: 'No traders, and a camp left without soldiers burns',
+    good: 'Fighting far from home: foot soldiers trained where the army stands',
+    routes: ['army'],
     name: 'Age of Iron and Blood',
     short: 'Iron & Blood',
     tier: 3,
@@ -313,6 +354,8 @@ export const AGES: Record<AgeId, Age> = {
   totalwar: {
     verb: 'Call citizens to arms at a War Camp: each becomes a foot soldier where it stands',
     door: 'No traders, and the fields and learning suffer',
+    good: 'The biggest army in a moment: every citizen by a War Camp can take up arms',
+    routes: ['army'],
     name: 'Age of Total War',
     short: 'Total War',
     tier: 4,
@@ -329,6 +372,8 @@ export const AGES: Record<AgeId, Age> = {
   hemocraft: {
     verb: 'Bleed living enemies near your Drain Rigs into a blood store, and spend it on grafts',
     door: 'No priests and no traders; machines bleed nothing, so a rival answers with steel; the Blood-rite is closed for good',
+    good: 'Grafted soldiers fed on blood: hard to kill, quick, and self-mending',
+    routes: ['army'],
     name: 'Age of Hemocraft',
     short: 'Hemocraft',
     tier: 4,
@@ -343,6 +388,8 @@ export const AGES: Record<AgeId, Age> = {
   bloodrite: {
     verb: 'Make every Temple an altar: sacrifice or curse bleeding enemies with priests, and mend your own with the blood',
     door: 'No Transfusion Station and no traders; Hemocraft is closed for good',
+    good: 'Your own mend at every altar while your enemies bleed there',
+    routes: ['army'],
     name: 'Age of the Blood-rite',
     short: 'Blood-rite',
     tier: 4,
@@ -358,6 +405,8 @@ export const AGES: Record<AgeId, Age> = {
   steppe: {
     verb: 'Pack your Town Centers and Houses onto wagons and pitch them where the herds and the fight are',
     door: 'No fields and no walls',
+    good: 'Speed and reach: a town on wagons goes where the herds and the fight are',
+    routes: ['horse'],
     name: 'Age of the Steppe',
     short: 'Steppe',
     tier: 1,
@@ -373,6 +422,8 @@ export const AGES: Record<AgeId, Age> = {
   horde: {
     verb: 'Stand riders in a rival\'s land to take tribute from their treasury',
     door: 'No fields and no walls',
+    good: 'Riders standing in a rival\'s land drain its treasury into yours',
+    routes: ['horse'],
     name: 'Age of the Horde',
     short: 'Horde',
     tier: 2,
@@ -389,6 +440,8 @@ export const AGES: Record<AgeId, Age> = {
   silk: {
     verb: 'Roll the Market on a wagon with the town, raise Caravanserais, and toll rival traders who cross your land',
     door: 'No tribute, no fields and no walls',
+    good: 'Trade that rolls with the town, and a toll on every rival trader in your land',
+    routes: ['horse'],
     name: 'Age of the Silk Road',
     short: 'Silk Road',
     tier: 3,

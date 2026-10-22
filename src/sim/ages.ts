@@ -210,6 +210,22 @@ export function shutRoads(s: GameState, p: Player): Road[] {
   });
 }
 
+/**
+ * The roads on from an age (#555 s4, the age panel's "Leads to"): every road out of it to a later tier, or a turn into a
+ * side age at the same tier, in `ROADS` order. Roads back (to an earlier tier, or home to the trunk) are not where it leads.
+ */
+export const leadsOn = (from: AgeId): Road[] => ROADS.filter((r) => r.from === from && (AGES[r.to].tier > AGES[from].tier || (AGES[r.to].tier === AGES[from].tier && isSideRoad(r))));
+
+/**
+ * Where an age leads, as this player may know it: the roads on from it that they know of from here or have walked, so
+ * the panel tells no more than the Town Center's buttons would.
+ */
+export function leadsTo(s: GameState, p: Player, from: AgeId): AgeId[] {
+  const out: AgeId[] = [];
+  for (const r of leadsOn(from)) if (!out.includes(r.to) && (hasWalked(p, r.to) || roadKnown(s, p, r))) out.push(r.to);
+  return out;
+}
+
 /** Every age a shut road's destination can be reached from: its windows (#47, #49). */
 export const windowsOf = (to: AgeId): AgeId[] => ROADS.filter((r) => r.to === to).map((r) => r.from);
 
