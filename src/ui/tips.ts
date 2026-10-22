@@ -1,4 +1,4 @@
-import { AGES, CIVS, KEG, HOMELANDS, HOUSEHOLD, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SICKNESS, SILK, STEP_BACK, TRIBUTE, WAY, secs } from '../sim/data';
+import { AGES, CIVS, KEG, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SICKNESS, SILK, STEP_BACK, TRIBUTE, WAY, secs } from '../sim/data';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, findsOf, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
 import type { AgeId, Building, GameState, Unit } from '../sim/types';
@@ -17,6 +17,7 @@ const PILGRIM_ROAD = ROADS.find((r) => r.to === 'pilgrim')!;
 const SAIL_ROAD = ROADS.find((r) => r.to === 'sail')!;
 const ALCHEMY_ROAD = ROADS.find((r) => r.to === 'alchemy')!;
 const SAPPER_ROAD = ROADS.find((r) => r.to === 'sapper')!;
+const SEA_ROAD = ROADS.find((r) => r.to === 'searaider')!;
 const WARBAND_ROAD = ROADS.find((r) => r.to === 'warband')!;
 const IRONBLOOD_ROAD = ROADS.find((r) => r.to === 'ironblood')!;
 const TOTALWAR_ROAD = ROADS.find((r) => r.to === 'totalwar')!;
@@ -243,6 +244,20 @@ const TIPS: Tip[] = [
     id: 'plunder',
     when: (s, me) => ageOf(s.players[me]) === 'warband',
     text: 'Your warband lives on plunder, but it is carried: each kill fills the killer\'s pack (💰 in its panel), and the gold is yours only once that soldier walks home to a Town Center or Barracks; a laden soldier felled in the field hands its pack to the rival. And a rival citizen who falls is taken, not lost: a <b>thrall</b> rises where it fell, yours, to work your fields (up to 8; it never builds). Raid the rival\'s workers, and guard your own.',
+  },
+  {
+    id: 'crossing',
+    // The first crossing (#585): a people that has walked one of its two sibling ages, back in the Middle Ages with a Dock.
+    when: (s, me) => {
+      const p = s.players[me];
+      return ageOf(p) === 'middle' && roadKnown(s, p, SEA_ROAD) && !SEA_ROAD.crossing!.every((a) => hasWalked(p, a));
+    },
+    text: `A crossing: your people has walked one of the <b>${AGES.warband.name}</b> and the <b>${AGES.sail.name}</b>. Walk the other too, then come back to the Middle Ages, and the Town Center (🔀) can turn your people into the <b>${AGES.searaider.name}</b>: the war-host raids from the ships. The way back is the price.`,
+  },
+  {
+    id: 'searaider',
+    when: (s, me) => ageOf(s.players[me]) === 'searaider',
+    text: `Sea-raiders bank their plunder by ship. A kill fills the killer's pack (💰), and the pack goes into the hold of a transport the soldier comes within ${SPOILS.bank} tiles of, or rides in (up to ${SEA_RAID.hold} gold a ship). The ship banks its hold at a Dock of yours, within ${SEA_RAID.dock} tiles. A Town Center or Barracks banks nothing, and a rival who sinks a laden ship takes the hold: land, raid, re-embark, sail home.`,
   },
   {
     id: 'ironblood',

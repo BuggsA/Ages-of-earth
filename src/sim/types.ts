@@ -39,7 +39,7 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'chart' | 'assay' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'alchemy' | 'sapper';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'alchemy' | 'sapper' | 'searaider';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
 export type PathId = 'blood' | 'steppe' | 'hemocraft' | 'rite';
@@ -222,7 +222,10 @@ export interface Unit {
   /** Tick a Rallying Cry stirring it ends; on a hero, the tick it may cry again. */
   cry?: number;
   cryReady?: number;
-  /** Plunder (gold) a Warband soldier has taken but not yet carried home (#502): banked at a Town Center or Barracks, lost to whoever fells it. */
+  /**
+   * Plunder (gold) a Warband soldier has taken but not yet carried home (#502): banked at a Town Center or Barracks, lost to whoever fells it.
+   * On a Sea-Raider ship (#585), its hold: soldiers' packs handed in, banked at a Dock, lost to whoever sinks it.
+   */
   spoils?: number;
   /** Key ore a citizen has lifted from a cache (#570) and is carrying home: banked at its people's Town Center or Storehouse, dropped where it falls. */
   ore?: { id: RareId; n: number; from: number };
@@ -760,6 +763,8 @@ export type GameEvent =
   | { k: 'rank'; id: number; owner: number; x: number; y: number; rank: number }
   /** Gold taken from an enemy unit slain by a people with a plunder share (the Path of Blood, #299). */
   | { k: 'plunder'; owner: number; x: number; y: number; gold: number }
+  /** A Sea-Raider soldier's pack handed into a ship's hold (#585): `gold` moved into transport `ship`, at the soldier's spot. */
+  | { k: 'stow'; owner: number; x: number; y: number; gold: number; ship: number }
   /** A rival citizen taken captive by a Warband people (#502): a thrall of `owner` rises at the spot, taken from `from`. */
   | { k: 'thrall'; owner: number; from: number; x: number; y: number }
   /**
@@ -975,6 +980,8 @@ export interface AiMemory {
   zap?: number;
   /** When it began holding the Middle Ages to dig saltpetre for Alchemy (#577). */
   powder?: number;
+  /** The first crossing (#585): the age it stands in on the way to the Sea-Raiders, and since when (each sibling, and the age itself). */
+  sea?: { at: AgeId; since: number };
   /** When it last sent sappers with kegs (#577). */
   kegAt?: number;
   /** Tick it began holding its Town Center for a side road's last deeds, so it holds only so long. */
