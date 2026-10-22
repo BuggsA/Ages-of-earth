@@ -691,8 +691,6 @@ export type GameEvent =
   | { k: 'campCleared'; owner: number; x: number; y: number; gold: number; food: number; wood: number }
   | { k: 'trained'; id: number; owner: number; type: UnitType }
   | { k: 'researched'; owner: number; tech: TechId }
-  /** A survey's answer (#39): whether what it looks for lies anywhere in this world. */
-  | { k: 'survey'; owner: number; tech: TechId; found: boolean }
   /** A Prospector's Lodge finished (#562): the key resources this world holds, for the people who raised it. */
   | { k: 'prospect'; owner: number; finds: KeyId[] }
   /**
