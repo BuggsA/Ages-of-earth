@@ -3,6 +3,7 @@ import { asleep, keepsakeOf, leaving, workRate } from '../src/sim/ages';
 import { findSpot } from '../src/sim/ai';
 import { applyCommand } from '../src/sim/commands';
 import { AGES, BUILDINGS, KEG, LIGHTNING, TICK_HZ, TRUNK } from '../src/sim/data';
+import { trainCostFor } from '../src/sim/stats';
 import { fairShare } from '../src/sim/fair';
 import { createGame, enterAge, step } from '../src/sim/game';
 import { millProblem } from '../src/sim/powder';
@@ -176,5 +177,16 @@ describe('keepsakes that keep an age\'s power', () => {
     const far = raise(s, 'stable', LIGHTNING.reach + 4, coil);
     expect(workRate(s, near)).toBe(LIGHTNING.lit);
     expect(workRate(s, far)).toBe(100);
+  });
+});
+
+describe('the Sea-Raiders keep their longship yard', () => {
+  it('a Dock kept from the Sea-Raiders launches ships a fifth cheaper on any road; one not kept pays full', () => {
+    const s = game('middle', 3);
+    expect(AGES.searaider.keepsake!.building).toBe('dock');
+    const full = trainCostFor(s, 0, 'transport', 'dock', { x: 0, y: 0 });
+    const kept = trainCostFor(s, 0, 'transport', 'dock', { x: 0, y: 0, keep: 'searaider' });
+    expect(kept.wood).toBe(Math.round(full.wood! * 0.8));
+    expect(trainCostFor(s, 0, 'transport', 'dock', { x: 0, y: 0, keep: 'alchemy' })).toEqual(full);
   });
 });
