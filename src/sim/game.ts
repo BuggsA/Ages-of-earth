@@ -40,6 +40,7 @@ import { modsOf, trainTimeFor } from './stats';
 import { attrition } from './borders';
 import { tributeStep } from './tribute';
 import { householdStep } from './household';
+import { longbowStep } from './longbow';
 import { sickStep } from './sickness';
 import { seraiStep, tollStep } from './passage';
 import { mercStep } from './merc';
@@ -585,6 +586,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   attrition(s);
   tributeStep(s);
   householdStep(s);
+  longbowStep(s);
   sickStep(s);
   tollStep(s);
   mercStep(s);

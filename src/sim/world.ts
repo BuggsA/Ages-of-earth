@@ -2,13 +2,15 @@ import { kinBonus } from './landmarks';
 import { BUILDINGS, LANDMARKS, POP_MAX, domainOf, type UnitStats } from './data';
 import { AIR, NAVAL, distToRect, nearestWalkable, stampBuilding, walkable } from './grid';
 import { buildingMaxHp, statsFor } from './stats';
+import { isSet, setStats } from './longbow';
 import type { Building, BuildingType, Cost, Ent, GameState, Goal, Player, Unit, UnitType } from './types';
 import { RES } from './types';
 
 /** Making, finding and removing units and buildings. */
 
 export function statsOf(s: GameState, u: Unit): UnitStats {
-  return statsFor(s, u.owner, u.type);
+  const st = statsFor(s, u.owner, u.type);
+  return u.rest && isSet(s, u) ? setStats(st) : st;
 }
 
 export function maxHp(s: GameState, e: Ent): number {

@@ -231,6 +231,8 @@ export interface Unit {
   ore?: { id: RareId; n: number; from: number };
   /** Enemy soldiers it has defeated (older saves lack it). */
   vet?: number;
+  /** The set line (#501): where a longbow people's bowman last stood, and the tick it came to rest there. */
+  rest?: { x: number; y: number; at: number };
   /** A citizen taken captive in the Age of the Warband (#502): it gathers and farms but never builds. */
   thrall?: boolean;
   /** A wagon (#297): the building it carries, and that building's health as a share of its full health. */
