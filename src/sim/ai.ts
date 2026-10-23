@@ -132,6 +132,8 @@ export function aiStep(s: GameState): void {
 
 interface View {
   p: Player;
+  /** The price held for the engine a Masons' Lodge rival calls for (#242), until the Workshop's turn (`lodgeEngine`). */
+  engine?: Cost | null;
   citizens: Unit[];
   army: Unit[];
   priests: Unit[];
@@ -187,6 +189,13 @@ function afford(v: View, cost: Cost): boolean {
 
 function spend(v: View, cost: Cost): void {
   for (const r of RES) v.budget[r] -= cost[r] ?? 0;
+}
+
+/** Hands back the price held for a Masons' Lodge rival's engine (#242), once. */
+function release(v: View): void {
+  if (!v.engine) return;
+  for (const r of RES) v.budget[r] += v.engine[r] ?? 0;
+  v.engine = null;
 }
 
 function think(s: GameState, p: Player, mem: AiMemory): void {
@@ -341,9 +350,9 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   rallyTheLine(s, v, issue);
   research(s, v, v.hands >= wantCitizens - 2, issue);
   trade(s, v, issue);
-  // The engine a Masons' Lodge rival calls for (#242) is saved from the town's buildings, and handed back to the army below.
-  const engine = lodgeEngine(s, v);
-  if (engine) spend(v, engine);
+  // The engine a Masons' Lodge rival calls for (#242) is saved from the town's buildings and soldiers, and handed back at the Workshop.
+  v.engine = lodgeEngine(s, v);
+  if (v.engine) spend(v, v.engine);
   planBuildings(s, v, mem, issue);
   if (!managedWood(s, v, mem, issue)) trapLine(s, v, mem, issue);
   floodWork(s, v, issue);
@@ -362,8 +371,8 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   airforce(s, v, mem, issue);
   polisArms(s, v, mem, issue);
   legionWork(s, v, mem, issue);
-  if (engine) for (const r of RES) v.budget[r] += engine[r] ?? 0;
   military(s, v, mem, issue);
+  release(v);
   priestly(s, v, mem, issue);
 }
 
@@ -4137,6 +4146,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     // The Market hires (#37) only in an age that hires there, after the traders have had first call on its queue.
     if (b.type === 'market' && !hiresAt(p, b.type).length) continue;
     let unit: UnitType | null;
+    if (b.type === 'workshop') release(v);
     if (b.type === 'workshop') unit = siege < Math.max(v.plan.siege, p.epoch >= 2 ? 3 : 2) + lodge + bleeds && (v.army.length >= 6 || siege < v.plan.siege) ? 'siege' : null;
     else if (b.type === 'temple') unit = v.priests.length < (ailing(p) ? SICKNESS.tendMost : 0) + (v.army.length >= 6 ? Math.max(consecrates(s, p.id) ? AI_FAITH.priests : 2, L.clever && ageDef(p).rite ? AI_FORK.priests : 0) : 0) + (looseRelics(s) > 0 ? 1 : 0) + (vigilPost(s, v) ? VIGIL.most : 0) + (ageDef(p).missions ? 1 : 0) ? 'priest' : null;
     else {
