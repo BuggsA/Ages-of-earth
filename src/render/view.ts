@@ -364,6 +364,8 @@ export class View {
     this.sun.intensity = this.baseSun;
     this.hemi.intensity = this.baseHemi;
     (this.scene.fog as THREE.Fog).color.copy(this.horizon);
+    // The title looks low over the land, out past the map's edge: there the edge melts into the sky.
+    this.terrain.skirtTint(this.titleHour !== null ? this.horizon : null);
   }
 
   /** See the match through another player's eyes, or (with `reveal`) everyone's (replays). */
@@ -427,8 +429,10 @@ export class View {
     cam.updateProjectionMatrix();
     this.sky.mesh.position.copy(this.rig.camera.position);
     const fog = this.scene.fog as THREE.Fog;
-    fog.near = this.rig.distance * 2.2 * this.reach;
-    fog.far = (this.rig.distance * 5 + 60) * this.reach;
+    // The title's low camera looks far across the land: let the haze begin farther off, so a misty day stays a view.
+    const far = this.titleHour === null ? 1 : 1.6;
+    fog.near = this.rig.distance * 2.2 * this.reach * far;
+    fog.far = (this.rig.distance * 5 + 60) * this.reach * far;
     this.weather.show(this.quality !== 'low');
     const sky = this.weather.update(this.time, dt, this.rig.target, this.rig.distance, this.renderer.getPixelRatio(), this.height);
     if (sky.thunder >= 0) {
@@ -658,7 +662,7 @@ export class View {
       }
     }
     this.overlays.setRings(rings);
-    this.borders.update(s, this.viewer, this.reveal, this.showBorders);
+    this.borders.update(s, this.viewer, this.reveal, this.showBorders && this.titleHour === null); // the title's film shows no map lines
     this.graze.update(s, this.viewer, this.reveal);
     this.foundations.update(s, this.viewer, (x, y) => this.reveal || s.players[this.viewer].vis[Math.floor(y) * s.w + Math.floor(x)] > 0);
     this.rangeGuides.update(s, guides, (x, y) => this.reveal || s.players[this.viewer].vis[Math.floor(y) * s.w + Math.floor(x)] > 0);

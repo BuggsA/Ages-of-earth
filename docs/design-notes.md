@@ -1129,3 +1129,12 @@ Built: the first age you can only reach by going back. The **Age of Sea-Raiders*
 Why I love it: it takes two things the game already had, packs and transports that land on any shore, and makes them one raid with a shape. Land on a beach, burn a farm line, walk back to the boat, sail home. The rival's answer is plain and fun too: a warship or two off your Dock, waiting for the laden longship. And the crossing makes going back a plan you have to want, not just a way out of a mistake.
 
 Next: a keepsake (a Dock that keeps banking holds after you leave?), longship looks (dragon prows, a striped sail: lane look), the computer meeting its landing parties with the ship instead of waiting at the Dock, and the other two crossings in the spine (Chariots: Iron + Steppe; Missions: Pilgrim + Sail). Not yet seen in a browser: the hold chip, the stow coins, the tips.
+
+## Designers' notes: the title as an opening shot (#421, 2026-10-23)
+
+Built: the owner found the #424 column "reads worse" and asked for research before pixels. What the research and the games I know agree on: the best front pages are one strong image of the game's own world with depth and light (a horizon, not a floor), a name that owns the screen, very few choices in plain words, a little motion and sound on arrival, and setup kept for later (BioShock's lighthouse, the menus of Civilization and Age of Empires). Ours had a high noon camera on flat grass, a dark slab over a third of the screen, and HTML form fields on the first page. Now the camera sits low at the golden hour and aims into the land with a slow sway; the map's edge melts into the sky and its borders are hidden; the name and five ways in rise in; the setup and the rules live in sheets, with the peoples as crests.
+
+Why I love it: the first thing a player sees is now the game they're about to play, seen the way a painting would see it: thatched huts by a lake, a mill under rain, a brick town on a hill.
+
+Next: a few chosen camera shots (a dock at dusk, an army crossing a ford) instead of always the town; the theme swelling when the name lands; the peoples' tiles showing a figure of each people's soldier; a "Continue" that shows the saved town's crest.
+
