@@ -38,9 +38,22 @@ export function snareSpot(s: GameState, tx: number, ty: number): 'woods' | 'snar
 /** Whether a snare's people keeps a managed wood (#501, the Britons): its snares are its fields. */
 const managed = (s: GameState, b: Building): boolean => !!CIVS[s.players[b.owner]?.civ]?.coppice;
 
+/** Growing coppice stools and saplings (#501) within `SNARE.r` tiles of a tile: young wood is cover for game too. */
+function stoolsNear(s: GameState, tx: number, ty: number): number {
+  let n = 0;
+  for (const t of s.stools ?? []) if (Math.abs((t.tile % s.w) - tx) <= SNARE.r && Math.abs(Math.floor(t.tile / s.w) - ty) <= SNARE.r) n++;
+  return n;
+}
+
+/** How much wood a snare's game lives in, counted as trees: standing trees, and for a managed wood (#501) its growing stools too. */
+export const snareWoods = (s: GameState, b: Building): number => treesNear(s, b.tx, b.ty) + (managed(s, b) ? stoolsNear(s, b.tx, b.ty) : 0);
+
+/** The wood a snare needs round it to catch its fastest: `SNARE.full` trees, `COPPICE.full` in a managed wood (#501). */
+export const snareFull = (s: GameState, b: Building): number => (managed(s, b) ? COPPICE.full : SNARE.full);
+
 /** Food a second a snare catches now: its woods, the season; a managed wood's snares (#501) catch `COPPICE.snare` times as fast, and gain as fields do from farming. */
 export function snareRate(s: GameState, b: Building): number {
-  const woods = Math.min(1, treesNear(s, b.tx, b.ty) / SNARE.full);
+  const woods = Math.min(1, snareWoods(s, b) / snareFull(s, b));
   const kept = managed(s, b) ? COPPICE.snare * modsOf(s, b.owner).farm : 1;
   return SNARE.rate * woods * kept * (seasonAt(s) === 3 ? SNARE.winter : 1);
 }

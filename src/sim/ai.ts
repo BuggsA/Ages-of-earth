@@ -33,10 +33,11 @@ import { sees } from './vision';
 import { seasonAt } from './seasons';
 import { flooded } from './flood';
 import { isHousehold } from './household';
+import { isCoppice } from './coppice';
 import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
-import { AI_ASSAY, AI_CACHE, CACHE, CIVS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SNARE, SPOILS } from './data';
+import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SNARE, SPOILS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
@@ -335,8 +336,11 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   rallyTheLine(s, v, issue);
   research(s, v, v.hands >= wantCitizens - 2, issue);
   trade(s, v, issue);
+  // The engine a Masons' Lodge rival calls for (#242) is saved from the town's buildings, and handed back to the army below.
+  const engine = lodgeEngine(s, v);
+  if (engine) spend(v, engine);
   planBuildings(s, v, mem, issue);
-  trapLine(s, v, mem, issue);
+  if (!managedWood(s, v, mem, issue)) trapLine(s, v, mem, issue);
   floodWork(s, v, issue);
   hemoBuild(s, v, mem, issue);
   excavate(s, v, mem, issue);
@@ -353,6 +357,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   airforce(s, v, mem, issue);
   polisArms(s, v, mem, issue);
   legionWork(s, v, mem, issue);
+  if (engine) for (const r of RES) v.budget[r] += engine[r] ?? 0;
   military(s, v, mem, issue);
   priestly(s, v, mem, issue);
 }
@@ -1217,6 +1222,20 @@ function rivalIn(s: GameState, p: Player, ages: AgeId[]): boolean {
 }
 
 /** Whether a living rival has learned a craft (#242): an heirloom shows in what a people does, and the clever computer reads it. */
+/**
+ * The price of the extra engine a rival's Masons' Lodge calls for (#242), while a clever computer with a Workshop is short of it,
+ * or null. Its buildings came first, and a town busy building never kept the engine's wood for it.
+ */
+function lodgeEngine(s: GameState, v: View): Cost | null {
+  const { p } = v;
+  if (!AI_LEVELS[p.ai!].clever || AI_LEVELS[p.ai!].lodgeEngine === false || !rivalHas(s, p, 'masonsLodge')) return null;
+  const shop = v.buildings.find((b) => b.type === 'workshop' && b.built);
+  if (!shop || unitEpoch('siege') > p.epoch || barred(p, 'siege', 'workshop')) return null;
+  const siege = v.army.filter((u) => u.type === 'siege').length + v.buildings.reduce((n, b) => n + b.queue.filter((q) => q.unit === 'siege').length, 0);
+  if (siege >= Math.max(v.plan.siege, p.epoch >= 2 ? 3 : 2) + AI_WEB.lodge) return null;
+  return trainCostFor(s, p.id, 'siege', 'workshop', shop);
+}
+
 function rivalHas(s: GameState, p: Player, tech: TechId): boolean {
   return s.players.some((o) => !o.defeated && isEnemy(s, p.id, o.id) && o.techs.includes(tech));
 }
@@ -1551,7 +1570,9 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   if (L.clever && p.way === 'hunt' && p.epoch === 0 && s.homeland === 'herds' && seasonAt(s) === 1 && farms < AI_WAYS.trekFields && wayBarred(s, p, 'farm')) {
     spend(v, { wood: (buildingCostFor(s, p.id, 'farm').wood ?? 0) * (AI_WAYS.trekFields - farms) });
   }
-  if (farms < foodWanted && freeFields < 2 && !recently('farm', 2) && !buildBarred(p, 'farm') && !wayBarred(s, p, 'farm')) {
+  if (isCoppice(p) && !isMobile(p)) {
+    if (laySnare(s, v, mem, foodWanted, issue)) return;
+  } else if (farms < foodWanted && freeFields < 2 && !recently('farm', 2) && !buildBarred(p, 'farm') && !wayBarred(s, p, 'farm')) {
     const spot = findSpot(s, 'farm', home.x, home.y, 3, 16);
     if (spot && construct(s, v, mem, 'farm', spot, 1, issue)) return;
   }
@@ -1841,6 +1862,17 @@ function sendTo(s: GameState, v: View, u: Unit, res: Res, issue: (c: Command) =>
       issue({ t: 'gather', p: v.p.id, ids: [u.id], tile: berry });
       return true;
     }
+    // A managed wood (#501) has no fields: a hand for food walks the snare line, while it has fewer tenders than snares.
+    if (isCoppice(v.p)) {
+      const line = v.buildings.filter((b) => b.type === 'snare' && b.built);
+      let tenders = 0;
+      for (const c of v.citizens) if (c.order.k === 'snare') tenders++;
+      const near = line.length > tenders ? nearestTo(line, u.x, u.y) : null;
+      if (near) {
+        issue({ t: 'work', p: v.p.id, ids: [u.id], target: near.id });
+        return true;
+      }
+    }
     // The Nile flood (#501 s1): no one is sent to a field under the river.
     const farm = flooded(s, v.p.id) ? null : freeFarm(s, v.p.id, v.home.x, v.home.y, 24);
     if (farm) {
@@ -2045,14 +2077,21 @@ function trapLine(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     const spot = findSpot(s, 'snare', v.home.x, v.home.y, 4, 16, 0, (tx, ty) => treesNear(s, tx, ty) >= SNARE.aiTrees && far(tx, ty) && !placeProblem(s, 'snare', tx, ty, true, v.p.id));
     if (spot) construct(s, v, mem, 'snare', spot, 1, issue);
   }
+  tendLine(s, v, snares, SNARE.aiTenders, false, issue);
+}
+
+/** Keeps `want` citizens walking a trap line, taking one off the berries first, then off other food (and for a managed wood, off the axe). */
+function tendLine(s: GameState, v: View, snares: Building[], want: number, wood: boolean, issue: (c: Command) => void): void {
   const line = snares.find((b) => b.built);
   if (!line) return;
   let tenders = 0;
   for (const u of v.citizens) if (u.order.k === 'snare') tenders++;
-  if (tenders >= SNARE.aiTenders) return;
+  if (tenders >= want) return;
   let best: Unit | null = null;
   let bestD = Infinity;
-  for (const pass of [(u: Unit) => u.order.k === 'gather' && s.res[u.order.tile] === R_BERRY, (u: Unit) => u.order.k === 'gather' && u.order.res === 'food']) {
+  const passes = [(u: Unit) => u.order.k === 'gather' && s.res[u.order.tile] === R_BERRY, (u: Unit) => u.order.k === 'gather' && u.order.res === 'food'];
+  if (wood) passes.push((u: Unit) => u.order.k === 'idle' || (u.order.k === 'gather' && u.order.res === 'wood' && u.carry <= 2));
+  for (const pass of passes) {
     for (const u of v.citizens) {
       if (u.inside || u.queue.length || v.diggers.has(u.id) || !pass(u)) continue;
       const d = (u.x - line.x) * (u.x - line.x) + (u.y - line.y) * (u.y - line.y);
@@ -2064,6 +2103,75 @@ function trapLine(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     if (best) break;
   }
   if (best) issue({ t: 'work', p: v.p.id, ids: [best.id], target: line.id });
+}
+
+// ---- The managed wood (#501, the Britons) -------------------------------------------------------------
+
+/** The building of a list nearest a point, or null for an empty list (ties to the first, in id order). */
+function nearestTo(list: Building[], x: number, y: number): Building | null {
+  let best: Building | null = null;
+  let bestD = Infinity;
+  for (const b of list) {
+    const d = (b.x - x) * (b.x - x) + (b.y - y) * (b.y - y);
+    if (d < bestD) {
+      bestD = d;
+      best = b;
+    }
+  }
+  return best;
+}
+
+/**
+ * A managed wood's fields (#501): where another town would sow a Field, it lays a snare, `COPPICE.aiPerFood` for each field its
+ * food wants (at most `COPPICE.aiMax`; `COPPICE.aiStone` in the Stone Age while berries grow by home, which feed it while its wood
+ * goes to the climb). Asked at the farm's place in `planBuildings`, a snare a think, so its wood comes before the savings as a field's does.
+ */
+function laySnare(s: GameState, v: View, mem: AiMemory, fields: number, issue: (c: Command) => void): boolean {
+  const snares = v.buildings.filter((b) => b.type === 'snare');
+  const berries = v.p.epoch === 0 && findResource(s, R_BERRY, v.home.x, v.home.y, 14) >= 0;
+  const want = Math.min(berries ? COPPICE.aiStone : COPPICE.aiMax, Math.ceil(Math.max(0, fields) * COPPICE.aiPerFood));
+  // Snares go up as fields do, one a think while they're wanted, and food hands are sent to walk them (`sendTo`).
+  if (snares.length < want && snares.filter((b) => !b.built).length < 2 && s.tick - (mem.ordered.snare ?? -99999) > secs(2)) {
+    const felling: number[] = [];
+    for (const u of v.citizens) if (u.order.k === 'gather' && u.order.res === 'wood') felling.push(u.order.tile);
+    const far = (tx: number, ty: number) => felling.every((t) => Math.max(Math.abs((t % s.w) - tx), Math.abs(Math.floor(t / s.w) - ty)) >= SNARE.aiFar);
+    const wood = (n: number) => (tx: number, ty: number) => treesNear(s, tx, ty) >= n && !placeProblem(s, 'snare', tx, ty, true, v.p.id);
+    let spot: { tx: number; ty: number } | null = null;
+    for (const [n, r] of [[COPPICE.aiThick, COPPICE.aiNear], [COPPICE.aiTrees, COPPICE.aiNear], [COPPICE.aiTrees, COPPICE.aiNear + 10], [SNARE.need, COPPICE.aiNear + 10]]) {
+      const ok = wood(n);
+      spot = findSpot(s, 'snare', v.home.x, v.home.y, 3, r, 0, (tx, ty) => ok(tx, ty) && far(tx, ty)) ?? findSpot(s, 'snare', v.home.x, v.home.y, 3, r, 0, ok);
+      if (spot) break;
+    }
+    return !!spot && construct(s, v, mem, 'snare', spot, 1, issue);
+  }
+  return false;
+}
+
+/**
+ * A coppice people's computer (#501) tills no fields: its snares (`laySnare`) feed it. Here it raises a Hunting Camp by a snare far
+ * from a food drop, plants saplings round a snare whose woods run thin, and keeps a tender for every `COPPICE.aiPerTender` snares.
+ * Returns whether it played the wood (so the Deep Wood's own trap line is not laid besides).
+ */
+function managedWood(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): boolean {
+  if (!isCoppice(v.p) || isMobile(v.p)) return false;
+  const snares = v.buildings.filter((b) => b.type === 'snare');
+  // A Hunting Camp by a snare far from any food drop, so the catch isn't walked home across the map.
+  const dropFar = snares.find((b) => b.built && !v.buildings.some((d) => d.built && BUILDINGS[d.type].drop.includes('food') && distToRect(b.x, b.y, d) <= COPPICE.aiDrop));
+  if (dropFar && count(v, 'huntcamp') < COPPICE.aiCamps && !v.buildings.some((d) => d.type === 'huntcamp' && !d.built) && s.tick - (mem.ordered.huntcamp ?? -99999) > secs(20)) {
+    const spot = findSpot(s, 'huntcamp', dropFar.x, dropFar.y, 2, 6);
+    if (spot) construct(s, v, mem, 'huntcamp', spot, 1, issue);
+  }
+  const growing = v.buildings.filter((b) => b.type === 'sapling').length;
+  // Saplings only from wood to spare once the town is armed: in the Stone Age wood is what the Barracks and the climb wait on.
+  if (growing < COPPICE.aiPlant && v.budget.wood >= COPPICE.aiPlantWood && count(v, 'barracks', true) + count(v, 'range', true) > 0 && s.tick - (mem.ordered.sapling ?? -99999) > secs(3)) {
+    const thin = snares.find((b) => b.built && treesNear(s, b.tx, b.ty) < COPPICE.aiThin);
+    const r = SNARE.r;
+    const spot = thin && findSpot(s, 'sapling', thin.x, thin.y, 1, r + 1, 0, (tx, ty) => Math.abs(tx - thin.tx) <= r && Math.abs(ty - thin.ty) <= r && !placeProblem(s, 'sapling', tx, ty, true, v.p.id));
+    if (spot) construct(s, v, mem, 'sapling', spot, 1, issue);
+  }
+  const built = snares.filter((b) => b.built).length;
+  tendLine(s, v, snares, Math.ceil(built / COPPICE.aiPerTender), true, issue);
+  return true;
 }
 
 // ---- The wild (#171) ---------------------------------------------------------------------------------

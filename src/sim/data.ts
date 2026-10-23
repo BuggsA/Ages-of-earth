@@ -1481,14 +1481,15 @@ export interface BuildingStats {
  * stands on it then, `retry` seconds after). A rival's axe, or its own far from a store, clears the tree for good, and a building
  * raised over a stool grubs it out. Its citizens plant a Sapling (a 1-tile building) on open ground, which roots as a stool and is
  * a full tree `grow` seconds later. Its snares fill `snare` times as fast (and as much faster again as its farming technologies
- * make fields), and hold `cap` times as much: the snare line among the standing wood is its field, and the trees it fells for
+ * make fields), at their fastest with `full` trees round them (growing stools count, for young coppice is cover for game too), and hold `cap` times as much, and its tenders carry a game bag `bag` times a basket: the snare line among the standing wood is its field, and the trees it fells for
  * timber starve the snares beside them until they grow back.
  *
- * The computer: lays `aiPerFood` snares for each hand its food wants (at most `aiMax`), in woods of at least `aiTrees` trees, keeps
- * one tender for each `aiPerTender` snares, and plants up to `aiPlant` saplings at a time round a snare with fewer than `aiThin`
- * trees standing near it.
+ * The computer: lays `aiPerFood` snares for each field its food wants (at most `aiMax`, `aiStone` in the Stone Age while berries grow by home), within `aiNear` tiles of home in woods of
+ * `aiThick` trees if it can find them, else `aiTrees`, else any wood a snare may stand in, out to `aiNear` + 10 tiles; raises a Hunting Camp by a snare with no food drop within `aiDrop` tiles (while it has fewer than `aiCamps`); keeps
+ * one tender for each `aiPerTender` snares, and once it has a Barracks or a Range and `aiPlantWood` wood to spare, plants up to
+ * `aiPlant` saplings at a time round a snare with fewer than `aiThin` trees standing near it.
  */
-export const COPPICE = { reach: 8, regrow: 120, retry: 5, grow: 90, snare: 2, cap: 1.5, aiPerFood: 1.5, aiMax: 16, aiTrees: 10, aiPerTender: 3, aiPlant: 3, aiThin: 12 };
+export const COPPICE = { reach: 8, regrow: 120, retry: 5, grow: 90, snare: 2, cap: 1.5, bag: 2, full: 12, aiPerFood: 1.5, aiMax: 16, aiTrees: 10, aiThick: 14, aiNear: 14, aiDrop: 7, aiPerTender: 2, aiStone: 6, aiCamps: 2, aiPlant: 3, aiThin: 12, aiPlantWood: 120 };
 
 export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   towncenter: { name: 'Town Center', size: 4, hp: 2800, cost: { wood: 275, stone: 150 }, time: 110, pop: 10, sight: 8, trains: ['citizen', 'hero'], drop: ['food', 'wood', 'stone', 'gold'], epoch: 0, guns: { damage: 6, range: 7, reload: 2 }, garrison: 15, menu: 'eco', key: 'T', blurb: 'Trains citizens and heroes, takes in every resource and leads your people into the next epoch. Citizens shelter here when the bell rings. Lose your last one and you have 45 seconds to raise another, or your people is lost: build a second far from the first.' },
@@ -2436,6 +2437,8 @@ export interface AiLevel {
   lodgeHold?: boolean;
   /** Off: the Workshop counts only the engines out, not those in the queues, against the number wanted (#540; only `scripts/ai-ab.ts` turns it off). */
   siegeQueued?: boolean;
+  /** Off: the engine a Masons' Lodge rival calls for is not saved from the town's buildings (#242, #501; only `scripts/ai-ab.ts` turns it off). */
+  lodgeEngine?: boolean;
   /** Off: a Hunters' Way town on the glade or elsewhere spares the wild pair near home, which bars its fields (#555; only `scripts/ai-ab.ts` turns it off). */
   fieldsClear?: boolean;
   /** Off: a Blood-rite computer's priests neither curse nor sacrifice (#355 s4; only `scripts/ai-ab.ts` turns it off). */
