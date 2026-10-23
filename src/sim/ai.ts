@@ -1,6 +1,6 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { aiTiding } from './tidings';
-import { AGES, AI_CLIMB, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_SEA, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, SEA_RAID, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_CLIMB, AI_FIND, FINDS, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_SEA, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, SEA_RAID, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
@@ -341,6 +341,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   excavate(s, v, mem, issue);
   salvage(s, v, mem, issue);
   claimWalk(s, v, mem, issue);
+  findWalk(s, v, mem, issue);
   strikeCamp(s, v, mem, issue);
   tendFlock(s, v, issue);
   assignCitizens(s, v, issue);
@@ -2524,6 +2525,35 @@ function claimWalk(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   mem.markWalker = { id: m.id, unit: walker.id, since: s.tick };
   v.claimers.add(walker.id);
   issue({ t: 'move', p: v.p.id, ids: [walker.id], x: m.x, y: m.y });
+}
+
+/**
+ * One citizen walks out to the find that stands near its town (#588) once the town has `FINDS.citizens` and sees no danger,
+ * and comes home to work when it is claimed (by anyone) or the walk has taken too long.
+ */
+function findWalk(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const f = s.finds?.find((x) => x.near === v.p.id && x.by < 0);
+  const w = mem.findWalker;
+  if (w) {
+    const u = s.byId.get(w.unit);
+    const alive = u && u.kind === 'unit' && u.hp > 0 && !u.inside;
+    if (!alive || !f || s.tick - w.since > secs(AI_FIND.walk) || ruinDanger(s, v.p, u, 7) || (u.order.k !== 'idle' && u.order.k !== 'move')) {
+      delete mem.findWalker;
+      if (alive && f) issue({ t: 'stop', p: v.p.id, ids: [u.id] });
+      return;
+    }
+    v.claimers.add(u.id);
+    if (u.order.k === 'idle') issue({ t: 'move', p: v.p.id, ids: [u.id], x: f.x, y: f.y });
+    return;
+  }
+  if (!f || v.p.epoch > FINDS.until || s.tick < secs(FINDS.after) || v.citizens.length < FINDS.citizens || threatNear(s, v).count) return;
+  const walker = v.citizens
+    .filter((u) => !u.inside && !u.queue.length && u.carry <= 2 && !v.diggers.has(u.id) && !v.claimers.has(u.id) && (u.order.k === 'idle' || (u.order.k === 'gather' && u.order.res === 'wood')))
+    .sort((a, b) => a.id - b.id)[0];
+  if (!walker) return;
+  mem.findWalker = { unit: walker.id, since: s.tick };
+  v.claimers.add(walker.id);
+  issue({ t: 'move', p: v.p.id, ids: [walker.id], x: f.x, y: f.y });
 }
 
 /**
