@@ -6,7 +6,7 @@ import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { SIGHT_LORE } from './render/sightings';
 import { wallLine } from './sim/commands';
-import { AGES, BUILDINGS, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
+import { AGES, BUILDINGS, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
 import { crestSvg } from './ui/crests';
 import { isEnemy } from './sim/world';
 import { carriesKegs, kegProblem } from './sim/powder';
@@ -412,7 +412,7 @@ const LEADERS: Record<CivId, string> = { egyptians: 'Hatshepsut', greeks: 'Peric
 function setupFromTitle(seed: number): GameSetup {
   const val = (id: string) => $<HTMLSelectElement>(id).value;
   const diff = val('opt-diff') as Difficulty;
-  const foes = Number(val('opt-foes'));
+  const foes = Number($<HTMLSelectElement>('opt-foes').value);
   const ally = val('opt-teams') === 'ally' && foes >= 2;
   const color = Number(val('opt-color'));
   const civChoice = val('opt-civ');
@@ -629,7 +629,7 @@ function showContinue(): void {
   }
   const btn = $('continue-btn');
   btn.classList.toggle('hidden', !info);
-  btn.textContent = `Continue (${info})`;
+  btn.innerHTML = `Continue<small>The match you saved, ${escHtml(info)}</small>`;
 }
 
 /** Keep a save as the match goes, and when the page is hidden or closed. */
@@ -1007,11 +1007,40 @@ const civBlurb = () => {
   const c = civSel.value;
   const m = MAP_TYPES[mapSel.value as MapType];
   const hl = homeSel.value === 'random' ? undefined : HOMELANDS[homeSel.value as HomelandId];
+  showTiles();
+  playSum();
   $('civ-crest').innerHTML = crestSvg(c as CivId | 'random', PLAYER_COLORS[Number(colorSel.value)] ?? PLAYER_COLORS[0]);
-  $('civ-blurb').innerHTML = `${c === 'random' ? 'A people chosen at random.' : `<b>${CIVS[c as CivId].name}:</b> ${CIVS[c as CivId].blurb.split(': ').slice(1).join(': ') || CIVS[c as CivId].blurb}`}<br><b>${m.label}:</b> ${m.blurb}<br>${hl ? `<b>${hl.icon} ${hl.name}:</b> ${hl.blurb}` : '<b>Homeland:</b> the seed decides what lies round every town: the Glade, the Shore, the Herd Plains or the Deep Wood.'}`;
+  const people = c === 'random' ? undefined : CIVS[c as CivId];
+  // A people is told by its core loop (`verb`) and its catch (`door`); the long account sits one click down.
+  const peopleHtml = !people ? 'A people chosen at random.'
+    : people.verb ? `<b>${people.name}:</b> ${people.verb}.${people.door ? `<br><span class="civ-catch"><b>The catch:</b> ${people.door}.</span>` : ''}<details class="civ-more"><summary>More about the ${people.name}</summary>${people.blurb}</details>`
+    : `<b>${people.name}:</b> ${people.blurb}`;
+  $('civ-blurb').innerHTML = `${peopleHtml}<br><b>${m.label}:</b> ${m.blurb}<br>${hl ? `<b>${hl.icon} ${hl.name}:</b> ${hl.blurb}` : '<b>Homeland:</b> the seed decides what lies round every town: the Glade, the Shore, the Herd Plains or the Deep Wood.'}`;
+};
+const civTiles = $('civ-tiles');
+const showTiles = () => {
+  const color = PLAYER_COLORS[Number(colorSel.value)] ?? PLAYER_COLORS[0];
+  civTiles.innerHTML = (['random', ...CIV_IDS] as (CivId | 'random')[]).map((c) =>
+    `<button class="civ-tile" type="button" role="radio" aria-checked="${civSel.value === c}" data-civ="${c}" title="${c === 'random' ? 'A people chosen at random' : (CIVS[c].verb ?? CIVS[c].name).replace(/"/g, '&quot;')}">${crestSvg(c, color, 40)}${c === 'random' ? 'Random' : CIVS[c].name}</button>`).join('');
+};
+civTiles.addEventListener('click', (e) => {
+  const tile = (e.target as HTMLElement).closest<HTMLElement>('[data-civ]');
+  if (!tile || civSel.value === tile.dataset.civ) return;
+  sound.unlock();
+  sound.play('select');
+  civSel.value = tile.dataset.civ!;
+  civSel.dispatchEvent(new Event('change'));
+});
+/** One line under Play saying what it will start; a click opens the setup. */
+const playSum = () => {
+  const civ = civSel.value === 'random' ? 'Any people' : CIVS[civSel.value as CivId].name;
+  const diff = $<HTMLSelectElement>('opt-diff').selectedOptions[0]?.text.split(':')[0] ?? '';
+  const foes = Number($<HTMLSelectElement>('opt-foes').value);
+  $('play-sum').innerHTML = `<b>${civ}</b> · ${diff} · ${MAP_TYPES[mapSel.value as MapType].label} · ${foes} ${foes === 1 ? 'rival' : 'rivals'} <span aria-hidden="true">✎</span>`;
 };
 civSel.addEventListener('change', civBlurb);
 colorSel.addEventListener('change', civBlurb);
+for (const id of ['opt-diff', 'opt-foes']) $(id).addEventListener('change', playSum);
 showContinue();
 showReplayButton();
 mapSel.addEventListener('change', civBlurb);
@@ -1033,6 +1062,27 @@ const qualitySel = $<HTMLSelectElement>('opt-quality');
 qualitySel.value = view.qualityName;
 qualitySel.addEventListener('change', () => view.setQuality(qualitySel.value as QualityName));
 
+/** The title's two sheets, the match's setup and the rules: one open at a time. */
+function openSheet(id: 'title-setup' | 'title-howto'): void {
+  const open = !$(id).classList.contains('hidden');
+  closeSheets();
+  if (open) return;
+  sound.play('open');
+  $(id).classList.remove('hidden');
+}
+function closeSheets(): void {
+  $('title-setup').classList.add('hidden');
+  $('title-howto').classList.add('hidden');
+}
+// A soft pluck as the mouse finds a way in, once per button it enters.
+let hovered: Element | null = null;
+$('title').addEventListener('pointerover', (e) => {
+  const btn = (e.target as HTMLElement).closest('.title-buttons .btn, .civ-tile');
+  if (btn === hovered) return;
+  hovered = btn;
+  if (btn) sound.play('menuHover');
+});
+
 document.addEventListener('click', (e) => {
   const el = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
   if (!el) return;
@@ -1041,8 +1091,17 @@ document.addEventListener('click', (e) => {
   if (act.startsWith('cloud')) return cloudAct(act, el);
   switch (act) {
     case 'start':
+    case 'start-setup':
       sound.play('click');
+      closeSheets();
       startMatch(setupFromTitle(Number(seedInput.value) || newSeed()));
+      break;
+    case 'setup':
+    case 'howto':
+      openSheet(act === 'setup' ? 'title-setup' : 'title-howto');
+      break;
+    case 'sheet-close':
+      closeSheets();
       break;
     case 'continue': {
       const saved = loadGame();
@@ -1120,10 +1179,12 @@ document.addEventListener('click', (e) => {
       break;
     case 'campaign':
       sound.play('click');
+      closeSheets();
       showCampaign(chapterListHtml());
       break;
     case 'web-map':
       sound.play('click');
+      closeSheets();
       showCampaign(webMapHtml(loadDiscovery()));
       break;
     case 'camp-back':
@@ -1153,6 +1214,7 @@ document.addEventListener('click', (e) => {
     }
     case 'online':
       sound.play('click');
+      closeSheets();
       $('title').classList.add('hidden');
       lobby.showEntry();
       break;
@@ -1865,6 +1927,7 @@ window.addEventListener('keydown', (e) => {
   if ((e.target as HTMLElement).closest('input, select, textarea')) return;
   sound.unlock();
   const k = e.key;
+  if (mode === 'title' && k === 'Escape') closeSheets();
   if (k === 'Alt') {
     altHeld = true;
     e.preventDefault();
@@ -2626,6 +2689,16 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         } else if (view.sees(ev.x, ev.y)) hud.toast(`${s.players[ev.owner].name} dug out the ruins`, 'info');
         break;
       }
+      case 'find': {
+        // A find claimed (#588): the finder learns what the world holds; a rival's claim, if we watched it.
+        if (ev.owner === viewer) {
+          const kind = FINDS.kinds[ev.kind];
+          const gain = RES.filter((r) => kind.reward[r]).map((r) => `+${kind.reward[r]} ${r}`).join(', ');
+          hud.banner(kind.name, `${kind.hint} (${gain}.)${ev.key ? ' A mark on the map shows where.' : ''}`, 5000);
+          play('ruinFind');
+        } else if (view.sees(ev.x, ev.y)) hud.toast(`${s.players[ev.owner].name} has found ${FINDS.kinds[ev.kind].name.toLowerCase()}`, 'info');
+        break;
+      }
       case 'tiding': {
         // Tidings at the fire (#443): the card itself is the HUD's; here the cue and what the answer brought.
         if (ev.owner !== viewer) break;
@@ -2883,12 +2956,20 @@ function frame(now: number): void {
       const army = s.ents.filter((e) => e.kind === 'unit' && e.type !== 'citizen' && e.owner === who.id && e.order.k !== 'idle');
       const at = army.length >= 4 ? army[0] : (tc ?? { x: who.startX, y: who.startY });
       view.rig.focus(at.x, at.y);
-      view.rig.rotate(dt * 0.05);
+      // Look from the town toward the middle of the map, so the far side is land and sky, not the map's
+      // edge, swaying slowly to either side as a camera on a crane would.
+      const lookX = s.w / 2 - at.x;
+      const lookZ = s.h / 2 - at.y;
+      if (lookX * lookX + lookZ * lookZ > 4) view.rig.aim(Math.atan2(-lookX, -lookZ) + Math.sin(attractT * 0.06) * 0.45);
+      else view.rig.rotate(dt * 0.05);
       // A whole day in eight minutes, opening at the golden hour.
       view.titleHour = (16 + attractT / 20) % 24;
+      // Low over the land, as a film opens, so the sky and the far woods frame the town.
+      view.rig.cinematic = 0.36;
       captionTown(who, army.length >= 4);
     } else {
       view.titleHour = null;
+      view.rig.cinematic = null;
       // Keyboard and screen-edge panning.
       const sp = view.rig.panSpeed * dt;
       let px = 0;

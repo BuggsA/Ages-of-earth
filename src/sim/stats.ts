@@ -48,7 +48,7 @@ export function computeMods(p: Player): Mods {
   const age = ageDef(p);
   for (const t of p.techs) if (!TECHS[t].only || TECHS[t].only === ageOf(p)) apply(m, TECHS[t].add, TECHS[t].mul);
   apply(m, age.add, age.mul);
-  if (age.forge) m.infantryAttack += age.forge.attack * ironSteps(p, age.forge);
+  if (age.forge) m[age.forge.riders ? 'cavalryAttack' : 'infantryAttack'] += age.forge.attack * ironSteps(p, age.forge);
   const carry = pathCarry(p);
   if (carry) for (let i = 0; i < carry.times; i++) apply(m, PATHS[carry.path].carry);
   if (p.workEnd !== undefined) apply(m, WORKS[p.civ].add, WORKS[p.civ].mul);
@@ -75,6 +75,8 @@ export function statsFor(s: GameState, owner: number, type: UnitType): UnitStats
     for (const k of Object.keys(sig.add ?? {}) as (keyof NonNullable<typeof sig.add>)[]) st[k] += sig.add![k]!;
     for (const k of Object.keys(sig.mul ?? {}) as (keyof NonNullable<typeof sig.mul>)[]) st[k] = k === 'hp' ? Math.round(st[k] * sig.mul![k]!) : st[k] * sig.mul![k]!;
   }
+  const rename = ageDef(p).names?.[type];
+  if (rename && base.cls !== 'citizen') st.name = rename;
   const soldier = base.cls === 'infantry' || base.cls === 'cavalry' || base.cls === 'ranged' || base.cls === 'hero';
   if (base.cls === 'infantry' || base.cls === 'cavalry' || base.cls === 'hero') st.attack += m.meleeAttack;
   if (base.cls === 'ranged') {
@@ -91,6 +93,7 @@ export function statsFor(s: GameState, owner: number, type: UnitType): UnitStats
     st.armor += m.infantryArmor;
     st.attack += m.infantryAttack;
   }
+  if (base.cls === 'cavalry') st.attack += m.cavalryAttack;
   if (base.cls === 'cavalry' || (base.cls === 'hero' && base.mounted)) {
     st.speed *= m.cavalrySpeed;
     st.sight += m.riderSight;

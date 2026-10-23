@@ -76,6 +76,9 @@ export function surveyFinds(s: GameState, tech: TechId): boolean {
  */
 export const prospected = (p: Player): boolean => p.techs.includes('survey');
 
+/** Whether a find has taught the people that this world holds a key resource (#588). */
+export const led = (p: Player, key: KeyId): boolean => !!p.leads?.some((l) => l.key === key);
+
 /** Whether this world holds a key resource (#562): bog iron and the rare ores by the seed, ruins wherever any were placed. */
 export function holds(s: GameState, k: KeyId): boolean {
   if (k === 'bogIron') return s.bogIron === true;
@@ -191,7 +194,7 @@ export function roadKnown(s: GameState, p: Player, r: Road): boolean {
   if (r.crossing && !r.crossing.some((a) => hasWalked(p, a))) return false;
   if (r.vein && !veinSeen(s, p, r)) return false;
   if (r.ruin && !s.ruins?.some((ruin) => ruin.by === p.id)) return false;
-  if (r.found && !(p.techs.includes(r.found) && surveyFinds(s, r.found))) return false;
+  if (r.found && !((p.techs.includes(r.found) || led(p, TECHS[r.found].survey!)) && surveyFinds(s, r.found))) return false;
   return !r.clue || s.ents.some((e) => e.kind === 'building' && e.owner === p.id && e.type === r.clue && e.built);
 }
 
@@ -599,4 +602,4 @@ export function pathCarry(p: Player): { path: PathId; times: number } | null {
 
 /** Whether a unit may raise this building: citizens raise them all, some buildings name others (#303), and a legion's foot soldiers raise any (#501). */
 export const canRaise = (unit: UnitType, type: BuildingType, civ?: CivId): boolean =>
-  unit === 'citizen' || !!BUILDINGS[type].builders?.includes(unit) || (unit === 'infantry' && !!civ && !!CIVS[civ].legion);
+  (unit === 'citizen' && !BUILDINGS[type].only) || !!BUILDINGS[type].builders?.includes(unit) || (unit === 'infantry' && !!civ && !!CIVS[civ].legion);

@@ -279,6 +279,37 @@ export class Minimap {
         ctx.stroke();
       }
     }
+    // Finds (#588): a pale amber ring with a dark rim once the viewer has seen one, hollow in its finder's colour once claimed.
+    // What a claimed find taught the viewer (`leads`) shows as a dashed ring in the key resource's colour at the nearest of it.
+    for (const f of s.finds ?? []) {
+      if (!reveal && !p.seen[Math.floor(f.y) * s.w + Math.floor(f.x)]) continue;
+      const rr = Math.max(2.6, sx * 1.5);
+      ctx.beginPath();
+      ctx.arc(f.x * sx, f.y * sy, rr, 0, Math.PI * 2);
+      if (f.by < 0) {
+        ctx.fillStyle = '#f0c25a';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(50,30,0,0.9)';
+        ctx.lineWidth = 1.2;
+      } else {
+        ctx.strokeStyle = s.players[f.by].color;
+        ctx.lineWidth = 1.8;
+      }
+      ctx.stroke();
+    }
+    if (!reveal) {
+      for (const l of p.leads ?? []) {
+        if (!l.at) continue;
+        const rr = Math.max(3.2, sx * 2);
+        ctx.beginPath();
+        ctx.setLineDash([2, 2]);
+        ctx.arc(l.at.x * sx, l.at.y * sy, rr, 0, Math.PI * 2);
+        ctx.strokeStyle = CHART_COLOR[l.key];
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
     // Landmarks the viewer has found: a stone-grey triangle, filled in its keeper's colour (as last seen).
     for (const m of s.landmarks ?? []) {
       const keeper = reveal ? m.owner : this.waymarks.landmarks.get(m.id);

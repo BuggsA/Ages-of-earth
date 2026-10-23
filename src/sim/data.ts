@@ -1,4 +1,4 @@
-import type { AgeId, PathId, LandmarkKind, BuildingType, CivId, Cost, Difficulty, Domain, MapSize, MapType, Res, TechId, UnitType, PlayerStats, RareId, KeyId, WayId, HomelandId } from './types';
+import type { AgeId, PathId, FindKind, LandmarkKind, BuildingType, CivId, Cost, Difficulty, Domain, MapSize, MapType, Res, TechId, UnitType, PlayerStats, RareId, KeyId, WayId, HomelandId } from './types';
 
 /** Every number in the game lives here. */
 
@@ -91,7 +91,7 @@ export interface Age {
    */
   ironTrade?: { per: number; each: number; most: number };
   /** Blades forged from bog iron (the Iron Age): foot soldiers strike `attack` harder for every `per` bars dug, up to `most` steps. */
-  forge?: { base: number; per: number; attack: number; most: number };
+  forge?: { base: number; per: number; attack: number; most: number; riders?: boolean };
   /**
    * Power broadcast from coils (the Age of Lightning, #231): Watch Towers become Coil Towers, whose field
    * speeds the work of buildings near them and slows every building outside, and whose shot is a leaping
@@ -141,6 +141,10 @@ export interface Age {
    * handing them into a transport's hold, which pays out at a Dock (`SEA_RAID`, `spoils.ts`). Town Centers and Barracks bank nothing.
    */
   raid?: boolean;
+  /** Priests raise Missions on far shores, and each pays a tithe that grows with its distance from home (the Age of Missions, #555 s12): see `MISSION` (`missions.ts`). */
+  missions?: boolean;
+  /** What a line of soldiers is called here (the Age of Chariots' riders are chariots, #555 s12). */
+  names?: Partial<Record<UnitType, string>>;
 }
 
 /**
@@ -217,6 +221,8 @@ export const IRON_TRADE = { per: 75, each: 0.08, most: 5 };
  * sharpen foot soldiers' edges by `attack`, up to `most` steps. The marsh is the armoury.
  */
 export const IRON_FORGE = { base: 150, per: 50, attack: 1, most: 3 };
+/** The Age of Chariots' forge (#555 s12): the same bars, edging riders. */
+export const CHARIOT_FORGE = { ...IRON_FORGE, riders: true };
 
 export const AGES: Record<AgeId, Age> = {
   stone: trunkAge(0, 'Where every road begins: gather, settle and choose your way'),
@@ -529,6 +535,39 @@ export const AGES: Record<AgeId, Age> = {
     price: { ship: 0.8 },
     raid: true,
     no: { units: ['trader', 'cog'], why: 'A people of sea-raiders trades with no one: traders and merchant cogs wait until it comes ashore in the Middle Ages or climbs on' },
+  },
+  // The third crossing (#555 s12): the Iron Age's marsh and the Steppe's herds made one road. Open only to a people that walked both.
+  chariots: {
+    verb: 'Dig bog iron to edge your chariots: the marsh and the herd together make riders that strike harder with every bar of iron dug',
+    door: 'No archers, walls or gates: the charioteer rides open ground, and a rival\'s spearmen are what you fear',
+    good: 'The hardest early riders: fast, cheap, sharpened by the marsh, and strongest against bows and men on foot who have no spears',
+    routes: [],
+    name: 'Age of Chariots',
+    short: 'Chariots',
+    tier: 1,
+    blurb: 'The Iron Age\'s marsh and the Steppe\'s herds made one road: iron-tyred chariots. Riders (the Stable\'s cavalry, here chariots) cost a tenth less and train a fifth faster, and every 50 bars of bog iron dug past the first 150 sharpens every chariot\'s strike by 1 (up to 3), so the marsh is worth holding. What it gives up: archers, walls and gates, and a chariot is beaten by any spearman who stands firm.',
+    price: { cavalry: 0.9 },
+    training: { cavalry: 0.8 },
+    forge: CHARIOT_FORGE,
+    names: { cavalry: 'Chariot' },
+    noBuild: { buildings: ['wall', 'gate'], why: 'A chariot people raises no walls or gates: it rides open ground. They wait until it settles in the Bronze Age or climbs on' },
+    no: { units: ['ranged'], why: 'No archers behind a chariot\'s dust: bows wait until the people settles in the Bronze Age or climbs on' },
+  },
+  // The second crossing (#555 s12): the Pilgrims' priests and the Sail's ships made one trade. Open only to a people that walked both.
+  missions: {
+    verb: 'Sail priests to far shores and raise Missions there: each claims land, trains priests, and pays a tithe that grows with its distance from home',
+    door: 'No walls or gates, and no siege engines: the faith goes out unarmed, and what it raises far away stands on its own',
+    good: 'Reaching: a foothold on any shore, claimed land beside a rival, and gold from places no road crosses',
+    routes: [],
+    keepsake: { building: 'mission', does: 'its tithe, and its claim on the shore' },
+    name: 'Age of Missions',
+    short: 'Missions',
+    tier: 2,
+    blurb: 'As the Jesuits and the Franciscans went out in the 1500s: the Pilgrims\' priests and the Sail\'s ships made one trade. Priests raise Missions (O) on any shore no rival holds, however far from home: each holds the land round it, trains priests, and every five seconds pays a tithe of 1 gold and 0.12 more for every tile it stands from your nearest Town Center (up to 8, for the three farthest Missions). A Mission is only a chapel, though: nothing in it shoots, and a rival who reaches it razes it. Priests come a third cheaper; ships a tenth. No walls, gates or siege engines are raised.',
+    price: { priest: 0.67, ship: 0.9 },
+    missions: true,
+    noBuild: { buildings: ['wall', 'gate'], why: 'A missionary people raises no walls or gates: its faith goes out unarmed. They wait until it comes home to the Middle Ages or climbs on' },
+    no: { units: ['siege'], why: 'A missionary people builds no siege engines: rams and catapults wait until it leaves the missions\' road' },
   },
 };
 
@@ -950,6 +989,33 @@ export const ROADS: Road[] = [
     crossing: ['warband', 'sail'],
     blurb: 'A turn, not a climb, for a people that has walked both the Warband and the Sail: the war-host takes to the longships. Plunder is carried as in the Warband, but banked only by ship: packs go into a transport\'s hold, and the hold pays out at a Dock. Ships cost a fifth less and soldiers train 10% faster. What it gives up: traders and merchant cogs, and every Town Center and Barracks as a place to bank. A raid far from the sea pays nothing until it walks back to a ship, and a laden ship sunk pays the rival.',
   },
+  // The third crossing (#555 s12): off the Stone Age, for a people that walked the Iron Age and the Steppe, the two turns off it. The way back
+  // to the Stone Age is a step back (`STEP_BACK`). A Forge is the clue; the journey is the price.
+  {
+    from: 'stone',
+    to: 'chariots',
+    cost: { food: 350, wood: 250, gold: 100 },
+    time: 40,
+    clue: 'forge',
+    gate: 'hard',
+    crossing: ['iron', 'steppe'],
+    blurb: 'A turn, not a climb, for a people that has walked both the Iron Age and the Steppe: the marsh\'s iron on the herd\'s wheels. Riders are chariots, a tenth cheaper and a fifth quicker to train, and every 50 bars of bog iron dug past the first 150 sharpens each one by 1 (up to 3). What it gives up: archers, walls and gates, and the horse is no match for a spear that stands firm.',
+  },
+  { from: 'chariots', to: 'bronze', cost: { food: 150, wood: 150 }, time: 20, blurb: 'Unyoke the chariots: the Bronze Age, with archers, walls and gates, and riders at their usual price and edge.' },
+  { from: 'chariots', to: 'middle', cost: EPOCHS[2].cost, time: EPOCHS[2].time, blurb: 'Rejoin the main road at the Middle Ages, for the same price as from the Bronze Age: archers, walls and gates return, and the chariots become ordinary cavalry.' },
+  // The second crossing (#555 s12): off the Middle Ages, for a people that walked the Pilgrims and the Sail. A Temple is the clue.
+  {
+    from: 'middle',
+    to: 'missions',
+    cost: { food: 400, wood: 300, gold: 300 },
+    time: 45,
+    clue: 'temple',
+    gate: 'hard',
+    crossing: ['pilgrim', 'sail'],
+    blurb: 'A turn, not a climb, for a people that has walked both the Pilgrims and the Sail: the priests take ship. Priests raise Missions on far shores that hold the land round them, train priests and pay a tithe that grows with the distance from home. Priests come a third cheaper and ships a tenth. What it gives up: walls, gates and siege engines, and a Mission is only a chapel, razed by any rival who reaches it.',
+  },
+  { from: 'missions', to: 'middle', cost: { food: 200, wood: 100 }, time: 25, blurb: 'Bring the priests home: the ordinary Middle Ages. The Missions stand, asleep, until your people turns missionary again.' },
+  { from: 'missions', to: 'gunpowder', cost: { food: 900, wood: 400, gold: 500, stone: 200 }, time: 65, blurb: 'Climb to the Gunpowder Age: the Missions sleep, their tithe unpaid, and wake if your people turns missionary again.' },
   { from: 'searaider', to: 'middle', cost: { food: 200, wood: 150 }, time: 25, blurb: 'Draw the longships up: the ordinary Middle Ages, with traders, and plunder no longer taken. Gold still in packs and holds is banked where it stands.' },
   { from: 'searaider', to: 'gunpowder', cost: { food: 900, wood: 500, gold: 500, stone: 150 }, time: 65, blurb: 'Climb to the Gunpowder Age: the raids end, traders return, and every pack and hold still laden is banked where it stands (more wood and less gold than from the Middle Ages: the fortune was in the ships).' },
 ];
@@ -1349,6 +1415,8 @@ export const LANDMARKS = {
  * it sends up to `guard` of them to take (or take back) the nearest landmark in reach that a rival keeps
  * or is claiming, and holds them there until it's no longer the rival's, or `hold` seconds pass.
  */
+/** The computer and its find (#588): seconds a citizen may spend walking out to it. */
+export const AI_FIND = { walk: 120 };
 export const AI_MARK = { /** In a Lords of the Land match: reach over the whole map, and the band that goes after a landmark. */ lordsReach: 400, lordsParty: 2, escort: 2, far: 28, townAt: 8, near: 44, rival: 0.75, walk: 150, party: 3, guard: 5, hold: 120, linger: 20,
   /** The walker halts when its escort trails it by more than this many tiles, and goes on once they close up. */
   lead: 9,
@@ -1396,6 +1464,8 @@ export interface BuildingStats {
   blood?: number;
   /** Units besides citizens that may raise it (the War Camp is pitched by foot soldiers, #303). */
   builders?: UnitType[];
+  /** Only its `builders` raise it, citizens too not (the Mission, #555 s12). */
+  only?: boolean;
   /** Burns, rather than sleeps, when its people leaves its `ages` (the War Camp, #303; #555 s10). */
   burns?: boolean;
   /** Which build menu it is in, and its key there. */
@@ -1433,6 +1503,8 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   // Hemocraft (#355 s3): blood spent. The Station grafts the soldiers sheltered inside (`HEMO`); the Blood Tower pays blood once and fires on the living (`BLOOD_TOWER`).
   transfusion: { name: 'Transfusion Station', size: 2, hp: 800, cost: { wood: 100, stone: 60, gold: 80 }, time: 35, pop: 0, sight: 6, trains: [], drop: [], epoch: 4, garrison: 5, ages: ['totalwar', 'hemocraft'], menu: 'mil', key: 'T', blurb: 'A riveted iron shed of glass tanks, pumps and cots. Soldiers sent inside (foot, archers, riders and heroes) are grafted one at a time, 40 blood each: faster, harder-hitting and self-mending, deaf to conversion, and shrugging off blades, arrows and hooves, but machines (siege, ships, aircraft, a coil\'s bolt) hit them harder. A graft stays fed within 10 tiles of a standing Station and runs dry 150 seconds away from one: then the soldier crashes, losing a third of its health.' },
   bloodtower: { name: 'Blood Tower', size: 2, hp: 1000, cost: { wood: 60, stone: 150 }, blood: 60, time: 45, pop: 0, sight: 9, trains: [], drop: [], epoch: 3, guns: { damage: 8, range: 8, reload: 2 }, ages: ['ironblood', 'totalwar', 'hemocraft', 'bloodrite'], menu: 'mil', key: 'L', blurb: 'A squat tower of black brick crowned with a copper cistern, paid for once with 60 blood. Its barbed bolts tear the living (soldiers, riders, citizens, priests) for three times a Watch Tower\'s harm, but glance off what does not bleed: siege, ships, aircraft and wagons take almost nothing. It takes no one inside.' },
+  // The Age of Missions (#555 s12): raised by priests on a shore, in no rival's land; claims land, trains priests, pays a tithe (`MISSION`).
+  mission: { name: 'Mission', size: 2, hp: 1000, cost: { wood: 100, gold: 60 }, time: 30, pop: 0, sight: 7, trains: ['priest'], drop: [], epoch: 2, shore: true, ages: ['missions'], builders: ['priest'], only: true, menu: 'eco', key: 'O', blurb: 'A whitewashed chapel and a bell on a far shore, raised by priests. Holds the land round it, trains priests, and pays a tithe that grows with its distance from your Town Center. Nothing in it shoots: a rival who reaches it razes it.' },
   caravanserai: { name: 'Caravanserai', size: 2, hp: 900, cost: { wood: 90, gold: 30 }, time: 25, pop: 0, sight: 6, trains: [], drop: [], epoch: 3, ages: ['silk'], menu: 'eco', key: 'C', blurb: 'A walled courtyard by the road where caravans rest. Raise it by a far trading post, in no one\'s land too: your traders\' trips to a post within 8 tiles of it pay a quarter more, traders and wagons within 4 tiles of it mend, and the land round it is yours, so rival traders crossing it pay your toll.' },
   airfield: { name: 'Airfield', size: 4, hp: 2200, cost: { wood: 250, stone: 100, gold: 150 }, time: 60, pop: 0, sight: 8, trains: ['fighter', 'bomber'], drop: [], epoch: 4, menu: 'mil', key: 'F', blurb: 'Builds fighters and bombers. Fighters hunt aircraft; bombers wreck towns.' },
 };
@@ -1473,6 +1545,8 @@ export interface Mods {
   infantryArmor: number;
   /** Added to foot soldiers' blows (the Iron Age). */
   infantryAttack: number;
+  /** Added to cavalry's blows (the Age of Chariots, #555 s12). */
+  cavalryAttack: number;
   priest: number;
   /** Multiplies the strength of a priest's chant over a rival's building (Litany), not its healing or converting. */
   chant: number;
@@ -1521,7 +1595,7 @@ export interface Mods {
 
 export const NO_MODS: Mods = {
   meleeAttack: 0, rangedAttack: 0, armor: 0, parmor: 0, range: 0, carry: 0, citizenSpeed: 1, wood: 1, mine: 1, farm: 1, forage: 1, hunt: 1,
-  buildingHp: 1, buildSpeed: 1, militaryTrain: 1, rangedTrain: 1, cavalrySpeed: 1, infantryHp: 1, infantryArmor: 0, infantryAttack: 0, priest: 1, chant: 1,
+  buildingHp: 1, buildSpeed: 1, militaryTrain: 1, rangedTrain: 1, cavalrySpeed: 1, infantryHp: 1, infantryArmor: 0, infantryAttack: 0, cavalryAttack: 0, priest: 1, chant: 1,
   siegeAttack: 1, siegeRange: 0, techCost: 1, wonderCost: 1, extraCitizens: 0, fish: 1, shipHp: 1, shipRange: 0, airSpeed: 1, airHp: 1,
   traderSpeed: 1, tradeGold: 1, relicGold: 1, bogGold: 1, rot: 1, beastWard: 1, portReach: 0, riderSight: 0, consecrate: 0, elmo: 0, telegraph: 0, galvanic: 0, plunder: 0, tribute: 0, toll: 0, veins: 0, sworn: 0,
 };
@@ -2144,6 +2218,33 @@ export const PROSPECTOR: { keys: Record<KeyId, { name: string; icon: string }> }
   },
 };
 /**
+ * Finds (#588, `docs/age-roads.md` rule 5): one mark of the land stands near each town, `ring[size]` tiles out (the
+ * same for every town, within `fair`; looser only when the map allows nothing better), at least `spacing` tiles from
+ * anything else laid on the map. Each speaks of one key resource this world holds, dealt from a shuffled hand of
+ * what the world holds, so a hint never points at a shut road (a world that holds none has hunters' stashes, which say so). The first people to put a land unit within `reach`
+ * tiles of one takes its `reward` and learns of the resource (`Player.leads`): the lodge's yes for that one resource,
+ * and a mark on the minimap at the nearest of it. The computer sends its first idle soldier or citizen when its
+ * town has `citizens`, after `after` seconds.
+ */
+export const FINDS = {
+  ring: { small: 18, medium: 21, large: 24 } as Record<MapSize, number>,
+  fair: 0.75,
+  spacing: 7,
+  reach: 1.6,
+  after: 90,
+  citizens: 8,
+  until: 1,
+  idBase: 1_100_000_000,
+  kinds: {
+    wreck: { key: 'bogIron', name: 'A nailed wreck', icon: '⚓', reward: { wood: 80 }, hint: "The ribs of an old boat, held together with rust-red nails. Bog iron lies in this land." },
+    cairn: { key: 'bloodiron', name: 'A battlefield cairn', icon: '🗿', reward: { stone: 60 }, hint: 'Spear-heads piled under stones, dark as dried blood. Blood-iron lies in this land.' },
+    lick: { key: 'salt', name: 'A salt lick', icon: '🧂', reward: { food: 100 }, hint: 'Every game trail runs to this white crust. Salt lies in this land.' },
+    meteor: { key: 'saltpetre', name: 'A fallen star', icon: '☄️', reward: { stone: 60 }, hint: 'A black stone in a scorched hollow, pale crystals on the grass round it. Saltpetre lies in this land.' },
+    stash: { key: null, name: "A hunters' stash", icon: '🧺', reward: { food: 100 }, hint: 'A cache the first hunters left: dried meat and bone needles, and nothing else. No hidden roads lie in this land: the plain ones are the ones to take.' },
+    shrine: { key: 'ruin', name: "A hermit's shrine", icon: '🛖', reward: { gold: 40 }, hint: 'A hermit tends stones older than any town and tells you where they stand. Ancient ruins lie in this land.' },
+  } as Record<FindKind, { key: KeyId | null; name: string; icon: string; reward: Cost; hint: string }>,
+};
+/**
  * Deep veins (#356): rare ores that only some seeds hold. Each is rolled by its own dice (`chance`), then laid as
  * `veins` neutral veins of `tiles` tiles, `amount` an ore tile, out between the towns (at least `away` tiles from
  * any town, `apart` from each other), where every town can walk to them. `rate` is how fast a citizen mines one.
@@ -2555,7 +2656,7 @@ export function unitEpoch(type: UnitType): number {
  * nearest claimant (ties go to the older building). Shown only, so far; attrition and building limits
  * are later steps of the seed.
  */
-export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6, huntcamp: 4, warcamp: 3, caravanserai: 5 };
+export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6, huntcamp: 4, warcamp: 3, caravanserai: 5, mission: 5 };
 
 /**
  * War Camps (#303): a finished camp with none of its people's soldiers (land units that fight) within
@@ -2605,6 +2706,15 @@ export const AI_KEG = { take: 0.5, ore: 80, kegs: 6, mills: 2, hold: 180, sapper
  * `take` odds on a coin of its own, to walk the other and turn Sea-Raider. It stays `stay` seconds in each sibling before it goes back
  * to the Middle Ages, and `raid` seconds in the Sea-Raiders before it climbs on.
  */
+/**
+ * The Age of Missions (#555 s12): every `every` seconds each finished, awake Mission of a people pays `base` plus `perTile` gold for each tile
+ * it stands from the people's nearest finished Town Center, at most `cap`, for the `most` farthest Missions it keeps. The computer raises one
+ * on a shore `AI_MISSION.far` tiles or more out (up to `most`), sending a priest to raise it.
+ */
+export const MISSION = { every: 5, base: 1, perTile: 0.12, cap: 8, most: 3 };
+export const AI_MISSION = { far: 18, search: 10, take: 0.6, stay: 120, hold: 240, gap: 45 };
+/** The computer and the Age of Chariots (#555 s12): the odds it plans the crossing once it has walked one sibling, and its stay in each. */
+export const AI_CHARIOT = { take: 0.6, stay: 120 };
 export const AI_SEA = { take: 0.6, stay: 120, raid: 300 };
 
 export const WARCAMP = { watch: 8, grace: 10, burn: 0.05, train: 1.2 };

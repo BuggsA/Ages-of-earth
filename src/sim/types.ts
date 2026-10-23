@@ -19,7 +19,7 @@ export type UnitType =
 export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
   | 'towncenter' | 'house' | 'storehouse' | 'farm' | 'barracks' | 'range' | 'stable' | 'tower'
-  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai' | 'drainrig' | 'transfusion' | 'bloodtower' | 'snare' | 'prospector';
+  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai' | 'drainrig' | 'transfusion' | 'bloodtower' | 'snare' | 'prospector' | 'mission';
 /** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
 export type Difficulty = 'gentle' | 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
@@ -39,7 +39,7 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'chart' | 'assay' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'alchemy' | 'sapper' | 'searaider';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
 export type PathId = 'blood' | 'steppe' | 'hemocraft' | 'rite';
@@ -426,6 +426,33 @@ export interface OreCache {
   from: number;
 }
 
+/** What a find is (#588): a mark of the land near home that names one key resource this world holds. */
+export type FindKind = 'wreck' | 'cairn' | 'lick' | 'meteor' | 'shrine' | 'stash';
+
+/**
+ * A find (#588): one stands near each town, the same distance out for every town. The first people to put a unit on it
+ * takes a small reward and learns of a key resource this world holds, with a mark on the minimap toward it.
+ */
+export interface Find {
+  id: number;
+  /** The center of its tile. */
+  x: number;
+  y: number;
+  kind: FindKind;
+  /** The key resource it speaks of; null for a stash, on a world that holds none. */
+  key: KeyId | null;
+  /** The town it stands near (it belongs to no one, but this is whose scout the computer sends). */
+  near: number;
+  /** The player who found it, or -1 while it lies. */
+  by: number;
+}
+
+/** What a people's find taught it (#588): a key resource this world holds, and the nearest of it to the find (null once none is left). */
+export interface Lead {
+  key: KeyId;
+  at: { x: number; y: number } | null;
+}
+
 export interface Ruin {
   id: number;
   /** The center of its tile. */
@@ -558,6 +585,8 @@ export interface PlayerStats {
   mined?: Partial<Record<RareId, number>>;
   /** Gold brought in by relics kept in Temples (#49); absent in older saves. */
   relicGold?: number;
+  /** Gold paid in tithes by Missions (#555 s12). */
+  tithe?: number;
   /** Fish landed by boats (the Age of Sail's deed); absent in older saves. */
   fished?: number;
   /** Beacons lit on the people's towers, relays included (the Age of Lightning's deed, #231); absent in older saves. */
@@ -658,6 +687,8 @@ export interface Player {
    * minimap marks under fog. A picture of that moment, not sight: a vein dug out since still shows. Absent until charted.
    */
   chart?: { tile: number; key: KeyId }[];
+  /** What the finds this people has claimed taught it (#588); absent until one is. */
+  leads?: Lead[];
   /** Epochs whose great work this player has called (seed #133); absent if none. */
   works?: number[];
   /** The Way this people chose in the Stone Age (#336); absent if none. */
@@ -725,6 +756,8 @@ export type GameEvent =
   | { k: 'researched'; owner: number; tech: TechId }
   /** A Prospector's Lodge finished (#562): the key resources this world holds, for the people who raised it. */
   | { k: 'prospect'; owner: number; finds: KeyId[] }
+  /** A find claimed (#588): by whom, what it was, the key resource it speaks of, and its reward. */
+  | { k: 'find'; id: number; owner: number; kind: FindKind; key: KeyId | null; x: number; y: number; reward: Cost }
   /**
    * Tidings at the fire (#443): a card came (`come`), was answered by paying (`took`), was passed by (`passed`,
    * answered or faded), or a passed storm or fever struck (`struck`, `n` houses or citizens hit) or spared them (`spared`).
@@ -890,6 +923,8 @@ export interface GameState {
   posts: TradePost[];
   /** Ancient ruins (#64); absent in older saves and in campaign chapters (none). */
   ruins?: Ruin[];
+  /** Finds near the towns (#588); absent in older saves and in campaign chapters (none). */
+  finds?: Find[];
   /** Foundations of fallen buildings a reclaiming people may raise again (`reclaim.ts`); absent until one falls. */
   fallen?: Fallen[];
   /** Rubble of fallen buildings a salvaging people may strip (`salvage.ts`); absent until one falls. */
@@ -965,6 +1000,8 @@ export interface AiMemory {
   ruinFled?: Record<number, number>;
   /** A citizen sent to claim a landmark nobody keeps: which landmark, which citizen, since when. */
   markWalker?: { id: number; unit: number; since: number };
+  /** The citizen walking out to its town's find (#588), and the tick it set out. */
+  findWalker?: { unit: number; since: number };
   /** Soldiers sent to take (or take back) a landmark, held there until it is the computer's. */
   markGuard?: { id: number; ids: number[]; since: number };
   /** Soldiers sent along on a far mammoth hunt; once idle (the beast down) they walk home. */
@@ -982,6 +1019,8 @@ export interface AiMemory {
   powder?: number;
   /** The first crossing (#585): the age it stands in on the way to the Sea-Raiders, and since when (each sibling, and the age itself). */
   sea?: { at: AgeId; since: number };
+  /** Tick it last tried to raise a Mission (#555 s12). */
+  mission?: number;
   /** When it last sent sappers with kegs (#577). */
   kegAt?: number;
   /** Tick it began holding its Town Center for a side road's last deeds, so it holds only so long. */

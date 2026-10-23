@@ -14,6 +14,8 @@ export class CameraRig {
   yaw = 0;
   private goalYaw = 0;
   private bounds = { minX: 0, maxX: 100, minZ: 0, maxZ: 100 };
+  /** A fixed low tilt (radians above the ground) for the title screen's film-like view; null in play. */
+  cinematic: number | null = null;
   /** Ground height under the target, so hills don't swallow the view. */
   groundAt: (x: number, z: number) => number = () => 0;
 
@@ -52,6 +54,12 @@ export class CameraRig {
     this.goalYaw += delta;
   }
 
+  /** Turn toward a heading, the short way round from wherever the view is now. */
+  aim(yaw: number): void {
+    const turn = Math.PI * 2;
+    this.goalYaw = yaw + Math.round((this.goalYaw - yaw) / turn) * turn;
+  }
+
   resetYaw(): void {
     this.goalYaw = Math.round(this.goalYaw / (Math.PI * 2)) * Math.PI * 2;
   }
@@ -83,14 +91,19 @@ export class CameraRig {
     const ground = Math.max(0, this.groundAt(this.target.x, this.target.z));
     this.target.y += (ground - this.target.y) * k;
     // Close in, the view tilts toward the horizon; far out it looks more straight down.
-    const pitch = 0.8 + this.zoomT * 0.35;
+    const pitch = this.cinematic ?? 0.8 + this.zoomT * 0.35;
     const d = this.distance;
     this.camera.position.set(
       this.target.x + Math.sin(this.yaw) * Math.cos(pitch) * d,
       this.target.y + Math.sin(pitch) * d,
       this.target.z + Math.cos(this.yaw) * Math.cos(pitch) * d,
     );
-    this.camera.lookAt(this.target);
+    if (this.cinematic === null) this.camera.lookAt(this.target);
+    else {
+      // Low over the land: keep clear of the hill under the lens, and lift the gaze a little so the sky shows.
+      this.camera.position.y = Math.max(this.camera.position.y, this.groundAt(this.camera.position.x, this.camera.position.z) + 3);
+      this.camera.lookAt(this.target.x, this.target.y + d * 0.1, this.target.z);
+    }
   }
 
   /** Where the four screen corners meet the ground (for the minimap's view box). */
