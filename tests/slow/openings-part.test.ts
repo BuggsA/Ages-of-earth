@@ -12,15 +12,21 @@ import type { HomelandId, WayId } from '../../src/sim/types';
  * Two seeds, two seats each: four comparisons a homeland. A claim that held in every comparison over three
  * seeds and every rival (`scripts/opening.ts`, the #481 log) must hold in all four; one that slipped once must
  * hold in three. Nothing here rests on one seed's numbers.
+ *
+ * The seeds seat only peoples who open by their Way: the Romans, Greeks and Mongols (#501) open by their own economy
+ * (fish for the legion, no foot for the polis, no fields for the camp), so seats of theirs test the people, not the
+ * Way (the owner's ruling on #535, 2026-10-23). Seed 5 seats Britons and Chinese, seed 6 Egyptians and Britons.
+ * The spared herd's claim is the land's, not a Way's, and keeps the seeds it was written on.
  */
 
-const SEEDS = [3, 8];
+const SEEDS = [5, 6];
+const HERD_SEEDS = [3, 8];
 const MIN = 10;
 
 /** Seat-matched comparisons: [the town under `a`, the same seat under `b`], two per seed. */
-function pairs(homeland: HomelandId, a: Pick, b: Pick, minutes = MIN): [Opening, Opening][] {
+function pairs(homeland: HomelandId, a: Pick, b: Pick, minutes = MIN, seeds = SEEDS): [Opening, Opening][] {
   const out: [Opening, Opening][] = [];
-  for (const seed of SEEDS) {
+  for (const seed of seeds) {
     const ab = playOpening({ seed, picks: [a, b], minutes, size: 'small', homeland }).towns;
     const ba = playOpening({ seed, picks: [b, a], minutes, size: 'small', homeland }).towns;
     out.push([ab[0], ba[0]], [ba[1], ab[1]]);
@@ -75,7 +81,7 @@ describe('two openings part ways by minute 15 (#481)', () => {
 
   it('herds: a town that spares its herd eats from it in the second spring; one that feasts has none left', () => {
     // From #480: the home herds trek out in autumn and come home in spring, each deer with a calf; the second spring is minutes 10-12.5.
-    const ps = pairs('herds', way('hunt'), { way: 'hunt', feast: true }, 12);
+    const ps = pairs('herds', way('hunt'), { way: 'hunt', feast: true }, 12, HERD_SEEDS);
     const spring = (t: Opening) => t.hunted[12] - t.hunted[10];
     for (const [spare, feast] of ps) {
       console.log(`herds  spare ${spare.herd.join(' ')} | feast ${feast.herd.join(' ')} | meat in the second spring ${spring(spare)} vs ${spring(feast)} | first farm ${at(spare, 'farm')} vs ${at(feast, 'farm')}`);

@@ -581,6 +581,18 @@ function clueRising(s: GameState, p: Player, r: Road): boolean {
   return s.ents.some((e) => e.kind === 'building' && e.owner === p.id && e.type === r.clue && !e.built);
 }
 
+/**
+ * A Prospector's Lodge is due (#562): a Stone Age town that walks the web, with the hands (`AI_WEB.survey`, a legion's
+ * `LEGION.aiSurvey`) and a Barracks, means to take the iron road and hasn't yet had the lodge's answer.
+ */
+function lodgeDue(s: GameState, v: View, mem: AiMemory): boolean {
+  const { p } = v;
+  return p.epoch === 0 && walksWeb(v) && v.hands >= (isLegion(p) ? LEGION.aiSurvey : AI_WEB.survey) && count(v, 'barracks', true) > 0 && !prospected(p) && wants(s, p, mem, 'iron');
+}
+
+/** Whether the climb is waiting on the lodge (#540): from the first turn it was due when the town would climb, `AI_WEB.lodgeWait` seconds. */
+const lodgeHeld = (s: GameState, mem: AiMemory): boolean => mem.lodgeHold !== undefined && s.tick - mem.lodgeHold < secs(AI_WEB.lodgeWait);
+
 /** A road to take, and whether to hold off taking it for now. */
 interface Journey {
   road: Road;
@@ -596,6 +608,11 @@ interface Journey {
 function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   const { p } = v;
   const main = mainRoad(p);
+  // The lodge is what shows the iron road (#562): the climb holds for it, `AI_WEB.lodgeWait` seconds at most (#540), as the trunk waits for a Market going up.
+  if (AI_LEVELS[p.ai!].lodgeHold !== false && lodgeDue(s, v, mem)) {
+    mem.lodgeHold ??= s.tick;
+    if (lodgeHeld(s, mem)) return null;
+  }
   // Bound for Alchemy (#577), it holds the Middle Ages while its diggers fill the store and its Siege Workshop goes up, `AI_KEG.hold`
   // seconds at most: the gateway turns off here and nowhere else (`turnRoad` takes it once open).
   if (ageOf(p) === 'middle' && alchemyBound(s, v, mem)) {
@@ -1505,6 +1522,18 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     const spot = afford(v, cost) ? findSpot(s, 'stable', home.x, home.y, 4, 18) : null;
     if (!spot || !construct(s, v, mem, 'stable', spot, 3, issue)) spend(v, cost);
   }
+  // A Prospector's Lodge (#562), for a people the Iron Age would suit (#50): it reads the lodge's answer to choose
+  // the iron road. After the Barracks, so the town can defend itself before it spends on prospecting. While the climb
+  // waits on it (#540), its price is saved before the small things take it, as the Stable's is.
+  const lodgeHolds = L.lodgeHold !== false;
+  const raiseLodge = (save: boolean): boolean => {
+    if (!lodgeDue(s, v, mem) || count(v, 'prospector') > 0 || recently('prospector', 30)) return false;
+    const spot = findSpot(s, 'prospector', home.x, home.y, 4, 12);
+    if (spot && construct(s, v, mem, 'prospector', spot, 2, issue)) return true;
+    if (spot && save && lodgeHeld(s, mem)) spend(v, raiseCost(s, p.id, 'prospector', spot.tx, spot.ty));
+    return false;
+  };
+  if (lodgeHolds && raiseLodge(true)) return;
   // Fields once the berries near home run short of feeding everyone who should be on food.
   const berries = findResource(s, R_BERRY, home.x, home.y, 14);
   const farms = count(v, 'farm');
@@ -1529,13 +1558,9 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
 
   const n = v.hands;
   const clever = L.clever;
+  // Where the lodge stood before it held the climb (#540), for `scripts/ai-ab.ts`.
+  if (!lodgeHolds && raiseLodge(false)) return;
 
-  // A Prospector's Lodge (#562), for a people the Iron Age would suit (#50): it reads the lodge's answer to choose
-  // the iron road. After the Barracks, so the town can defend itself before it spends on prospecting.
-  if (p.epoch === 0 && walksWeb(v) && n >= (isLegion(p) ? LEGION.aiSurvey : AI_WEB.survey) && count(v, 'barracks', true) > 0 && !prospected(p) && count(v, 'prospector') === 0 && !recently('prospector', 30) && wants(s, p, mem, 'iron')) {
-    const spot = findSpot(s, 'prospector', home.x, home.y, 4, 12);
-    if (spot && construct(s, v, mem, 'prospector', spot, 2, issue)) return;
-  }
   // A Hunting Camp by a far kill, so the butchers carry meat a short way and the land round it is held against wolves.
   if (p.epoch === 0 || s.carcasses?.length) {
     // The Hunters' Way (#463 s1) pitches its camps for nothing at the kill, so it pitches them early and often, by any
@@ -3890,7 +3915,8 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const keepCitizensGrowing = v.citizens.length < (p.way === 'warband' ? AI_WAYS.barracksAt : 8);
   // A horde (#322) wants riders to stand in rival land: it trains them more often until it has a full band.
   const riderless = L.clever && modsOf(s, p.id).tribute > 0 && v.army.filter((u) => u.type === 'cavalry').length < TRIBUTE.most + 2;
-  const siege = v.army.filter((u) => u.type === 'siege').length;
+  // Engines in the queues count (#540): counting only those out, a Workshop queued one past the number wanted.
+  let siege = v.army.filter((u) => u.type === 'siege').length + (L.siegeQueued !== false ? v.buildings.reduce((n, b) => n + b.queue.filter((q) => q.unit === 'siege').length, 0) : 0);
   // A rival with the Masons' Lodge raises sturdier buildings (+15%): one more engine to break them (#242).
   const lodge = L.clever && rivalHas(s, p, 'masonsLodge') ? AI_WEB.lodge : 0;
   // A rival on Hemocraft (#355 s5) is answered with machines: flesh can't stand its grafted soldiers, and its Stations are their lifeline.
@@ -3927,6 +3953,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     issue({ t: 'train', p: p.id, building: b.id, unit });
     spend(v, cost);
     tally(unit);
+    if (unit === 'siege') siege++;
     // A War Camp's trainees stay by it, its guard (#307).
     const rally = b.type === 'warcamp' ? { x: b.x, y: b.y + b.size / 2 + 1 } : mem.muster;
     if (!b.rally || Math.abs(b.rally.x - rally.x) > 1 || Math.abs(b.rally.y - rally.y) > 1) issue({ t: 'rally', p: p.id, building: b.id, x: rally.x, y: rally.y });

@@ -2404,6 +2404,10 @@ export interface AiLevel {
   fork?: boolean;
   /** Off: the town trains hands on while a climb is paid for (#555; only `scripts/ai-ab.ts` turns it off). */
   climbHold?: boolean;
+  /** Off: the Stone Age climb neither waits on a Prospector's Lodge that is due nor saves its price (#540; only `scripts/ai-ab.ts` turns it off). */
+  lodgeHold?: boolean;
+  /** Off: the Workshop counts only the engines out, not those in the queues, against the number wanted (#540; only `scripts/ai-ab.ts` turns it off). */
+  siegeQueued?: boolean;
   /** Off: a Hunters' Way town on the glade or elsewhere spares the wild pair near home, which bars its fields (#555; only `scripts/ai-ab.ts` turns it off). */
   fieldsClear?: boolean;
   /** Off: a Blood-rite computer's priests neither curse nor sacrifice (#355 s4; only `scripts/ai-ab.ts` turns it off). */
@@ -2625,7 +2629,8 @@ export const AI_CLIMB = { banked: 0.6 };
  * opens; assayed, `riders` idle riders fall on a rival's digger at a key-resource tile within `reach` tiles of home.
  */
 export const AI_ASSAY = { reach: 36, riders: 3 };
-export const AI_WEB = { take: 0.6, heir: 1, survey: 22, diggers: 3, nearly: 0.5, patience: 90, close: 0.75, relics: 2, raid: 18, raidNear: 30, riders: 4, read: 0.85, lodge: 1, hulls: 1, bell: 900 };
+/** `lodgeWait`: seconds at most the Stone Age climb is held while a Prospector's Lodge it means to raise is due (#540). */
+export const AI_WEB = { lodgeWait: 120, take: 0.6, heir: 1, survey: 22, diggers: 3, nearly: 0.5, patience: 90, close: 0.75, relics: 2, raid: 18, raidNear: 30, riders: 4, read: 0.85, lodge: 1, hulls: 1, bell: 900 };
 
 // ---- Colours, names and lookups -------------------------------------------------------------------
 
