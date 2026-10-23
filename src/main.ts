@@ -1007,13 +1007,18 @@ const civBlurb = () => {
   showTiles();
   playSum();
   $('civ-crest').innerHTML = crestSvg(c as CivId | 'random', PLAYER_COLORS[Number(colorSel.value)] ?? PLAYER_COLORS[0]);
-  $('civ-blurb').innerHTML = `${c === 'random' ? 'A people chosen at random.' : `<b>${CIVS[c as CivId].name}:</b> ${CIVS[c as CivId].blurb.split(': ').slice(1).join(': ') || CIVS[c as CivId].blurb}`}<br><b>${m.label}:</b> ${m.blurb}<br>${hl ? `<b>${hl.icon} ${hl.name}:</b> ${hl.blurb}` : '<b>Homeland:</b> the seed decides what lies round every town: the Glade, the Shore, the Herd Plains or the Deep Wood.'}`;
+  const people = c === 'random' ? undefined : CIVS[c as CivId];
+  // A people is told by its core loop (`verb`) and its catch (`door`); the long account sits one click down.
+  const peopleHtml = !people ? 'A people chosen at random.'
+    : people.verb ? `<b>${people.name}:</b> ${people.verb}.${people.door ? `<br><span class="civ-catch"><b>The catch:</b> ${people.door}.</span>` : ''}<details class="civ-more"><summary>More about the ${people.name}</summary>${people.blurb}</details>`
+    : `<b>${people.name}:</b> ${people.blurb}`;
+  $('civ-blurb').innerHTML = `${peopleHtml}<br><b>${m.label}:</b> ${m.blurb}<br>${hl ? `<b>${hl.icon} ${hl.name}:</b> ${hl.blurb}` : '<b>Homeland:</b> the seed decides what lies round every town: the Glade, the Shore, the Herd Plains or the Deep Wood.'}`;
 };
 const civTiles = $('civ-tiles');
 const showTiles = () => {
   const color = PLAYER_COLORS[Number(colorSel.value)] ?? PLAYER_COLORS[0];
   civTiles.innerHTML = (['random', ...CIV_IDS] as (CivId | 'random')[]).map((c) =>
-    `<button class="civ-tile" type="button" role="radio" aria-checked="${civSel.value === c}" data-civ="${c}">${crestSvg(c, color, 40)}${c === 'random' ? 'Random' : CIVS[c].name}</button>`).join('');
+    `<button class="civ-tile" type="button" role="radio" aria-checked="${civSel.value === c}" data-civ="${c}" title="${c === 'random' ? 'A people chosen at random' : (CIVS[c].verb ?? CIVS[c].name).replace(/"/g, '&quot;')}">${crestSvg(c, color, 40)}${c === 'random' ? 'Random' : CIVS[c].name}</button>`).join('');
 };
 civTiles.addEventListener('click', (e) => {
   const tile = (e.target as HTMLElement).closest<HTMLElement>('[data-civ]');
