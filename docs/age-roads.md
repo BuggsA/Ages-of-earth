@@ -146,5 +146,5 @@ Trade today is one verb with many bonuses: traders walk to a trading post and co
 - How the computer chooses its road from what its prospector finds. (s1: it raises a lodge when the Iron Age suits its people, as it once surveyed, and digs only after a yes; its reading of salt and blood-iron for shortcuts still looks at the world directly.)
 - How the age-up buttons point a player along a route (the data is §1–2; the look is open).
 - How taking resources back plays (s3).
-- Which crossing ages to build first. (s12: the Sea-Raiders, Warband + Sail, then the Missions, Pilgrim + Sail, then the Chariots, Iron + Steppe. Keepsakes: ten ages name one, s11 and the Sea-Raiders' Dock; the rest are listed under "Built already".)
+- Which crossing ages to build first. (s12: the Sea-Raiders, Warband + Sail, then the Missions, Pilgrim + Sail, then the Chariots, Iron + Steppe. Keepsakes: eleven ages name one, s11, the Sea-Raiders' Dock and the Chariots' Stable; the rest are listed under "Built already".)
 - A measure to aim for, proposed (2026-10-22, not ruled): four to six real road decisions a match, the first by minute 5; one headless match had the first at minute 21. Going back and crossing ages count.
