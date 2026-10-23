@@ -1147,6 +1147,14 @@ Why I love it: it makes distance the thing you spend. Every other economy in the
 Next: the Chariots crossing; a Mission that turns the coastal town beside it (the old "turn coastal towns" idea) with a slow conversion; priests ferried by a transport on purpose (the computer now only walks them); its own tune and bell; trade between missions.
 Not yet seen in a browser: the Mission's model, the O button, the tip. The tithe has no toast or sound yet.
 
+## Designers' notes: the third crossing, the Age of Chariots (#555 s12, 2026-10-23, chain 1023-0115 s3)
+
+Built: the marsh and the herd meet. A people that walked the Iron Age and the Steppe (both off the Stone Age, so the road between them is a step back) can turn charioteer: riders are chariots, cheaper and quicker, sharpened by every 50 bars of bog iron dug, so the marsh stays worth holding after the Iron Age is left. Bows, walls and gates are shut.
+
+Why I love it: Iron gave up the horse and the Steppe gave up the plough; this gives the horse back to the people who also kept the iron. It is a different answer to the same question as the rest: it is strongest against archers and loose foot, and a firm line of spearmen beats it, with no bows to answer them.
+
+Next: a real chariot model (two wheels, a driver), a keepsake (the Stable keeps edging riders after you leave?), and a tip when the forge steps up. Not seen in a browser: the tips and the web-map node.
+
 ## Designers' notes: the title as an opening shot (#421, 2026-10-23)
 
 Built: the owner found the #424 column "reads worse" and asked for research before pixels. What the research and the games I know agree on: the best front pages are one strong image of the game's own world with depth and light (a horizon, not a floor), a name that owns the screen, very few choices in plain words, a little motion and sound on arrival, and setup kept for later (BioShock's lighthouse, the menus of Civilization and Age of Empires). Ours had a high noon camera on flat grass, a dark slab over a third of the screen, and HTML form fields on the first page. Now the camera sits low at the golden hour and aims into the land with a slow sway; the map's edge melts into the sky and its borders are hidden; the name and five ways in rise in; the setup and the rules live in sheets, with the peoples as crests.
