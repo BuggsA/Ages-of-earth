@@ -8,7 +8,7 @@ import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, Ga
 import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { backProblem, backTo, ageDef, ageOf, asleep, barred, buildBarred, crossingLeft, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
 import { grindersOf, kegsOf, millProblem, mills, sappers } from './powder';
-import { launchProblem, loaded, silosOf } from './silo';
+import { launchProblem, loaded, rulesOf, silosOf } from './silo';
 import { carriedBy } from './relics';
 import { storesOre } from './caches';
 import { loadPrice, sellerNear } from './oretrade';
@@ -747,6 +747,14 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
       mem.roads.lightning = false;
       return { road: r, wait: false };
     }
+    // The fork past the Atomic Age (#605 s3): a people with a silo, on a coin of its own, takes Fission or Fusion once its silo has stood
+    // `AI_SILO.forkAfter` seconds and the town holds half the road's price (so the price it sets aside is soon paid, and Fusion's dear road starves no one for long).
+    if (r.to === 'fission' || r.to === 'fusion') {
+      const first = silosOf(s, p.id)[0];
+      const held = RES.every((res) => !r.cost[res] || p.res[res] >= r.cost[res]! * 0.5);
+      if (first && s.tick - first.born >= secs(AI_SILO.forkAfter) && held && roadKnown(s, p, r) && coin(s, p.id, 0x5110) < AI_SILO.fork && (coin(s, p.id, 0x5111) < AI_SILO.fusion ? 'fusion' : 'fission') === r.to) return { road: r, wait: false };
+      continue;
+    }
     // The gateway (#577): with its saltpetre door open and the store to grind from, it turns into Alchemy.
     if (r.to === 'alchemy') {
       if (roadKnown(s, p, r) && deedsDone(p, r, s) && (p.rare?.saltpetre ?? 0) >= AI_KEG.ore && wants(s, p, mem, r.to)) return { road: r, wait: false };
@@ -1254,7 +1262,7 @@ function fireSilo(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   if (why === null) {
     issue({ t: 'launch', p: p.id, silo: silo.id, x: aim.x, y: aim.y });
     mem.siloAim = undefined;
-  } else if (why.startsWith("A warhead's fuel")) spend(v, SILO.fuel);
+  } else if (why.startsWith("A warhead's fuel")) spend(v, rulesOf(p).fuel);
 }
 
 /**
@@ -1265,7 +1273,7 @@ function fleeWarhead(s: GameState, v: View, issue: (c: Command) => void): void {
   if (s.tick % (TICK_HZ / 2) !== 0) return;
   const zones = [...(s.launches ?? []).filter((l) => isEnemy(s, v.p.id, l.owner)), ...(s.fallout ?? [])];
   for (const l of zones) {
-    const r = SILO.reach + AI_SILO.margin;
+    const r = ((l as { r?: number }).r ?? SILO.reach) + AI_SILO.margin;
     const out = [...v.army, ...v.citizens].filter((u) => !u.inside && (u.x - l.x) * (u.x - l.x) + (u.y - l.y) * (u.y - l.y) <= r * r && domainOf(u.type) === 'land');
     if (!out.length) continue;
     const dx = v.home.x - l.x, dy = v.home.y - l.y;

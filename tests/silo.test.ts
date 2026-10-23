@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { AGES, EPOCHS, FALLOUT, LAST_EPOCH, ROADS, SILO, secs } from '../src/sim/data';
+import { AGES, EPOCHS, FALLOUT, FISSION, FUSION, LAST_EPOCH, ROADS, SILO, secs } from '../src/sim/data';
 import { createGame, step } from '../src/sim/game';
 import { deserialize, serialize } from '../src/sim/save';
 import { inFallout, launchProblem, loaded } from '../src/sim/silo';
-import { placeBuilding, spawnUnit } from '../src/sim/world';
+import { placeBuilding, restat, spawnUnit } from '../src/sim/world';
 import { buildingGeometry } from '../src/render/buildingModels';
 import type { Building, GameState } from '../src/sim/types';
 
@@ -117,5 +117,55 @@ describe('the Atomic Age', () => {
     expect(silo.hp).toBe(hp);
     run(s, FALLOUT.time);
     expect(s.fallout).toBeUndefined();
+  });
+
+  describe('the fork past it', () => {
+    const turn = (s: GameState, age: 'fission' | 'fusion') => restat(s, s.players[0], () => { s.players[0].age = age; });
+
+    it('is two roads off the Atomic Age, behind a silo, each shutting the other, each with a road back', () => {
+      for (const [to, shuns] of [['fission', 'fusion'], ['fusion', 'fission']] as const) {
+        const road = ROADS.find((r) => r.from === 'atomic' && r.to === to)!;
+        expect(road.clue).toBe('silo');
+        expect(road.shuns).toBe(shuns);
+        expect(ROADS.some((r) => r.from === to && r.to === 'atomic')).toBe(true);
+      }
+      const s = game(); rich(s);
+      step(s, [{ t: 'advance', p: 0, building: tc(s, 0).id, to: 'fission' }]);
+      expect(tc(s, 0).advanceTo).toBeUndefined();
+      siloFor(s);
+      step(s, [{ t: 'advance', p: 0, building: tc(s, 0).id, to: 'fission' }]);
+      expect(tc(s, 0).advanceTo).toBe('fission');
+    });
+
+    it('Fission: a short clock and a short refuel, and each launch poisons the ground round your own silo', () => {
+      const s = game(); rich(s); turn(s, 'fission');
+      const silo = siloFor(s);
+      const t = tc(s, 1);
+      step(s, [{ t: 'launch', p: 0, silo: silo.id, x: t.x, y: t.y }]);
+      expect(s.launches![0].at - s.tick).toBeLessThanOrEqual(secs(FISSION.fuse));
+      expect(silo.rearm! - s.tick).toBeLessThanOrEqual(secs(FISSION.refuel));
+      const own = s.fallout!.find((f) => f.x === silo.x && f.y === silo.y)!;
+      expect(own.r).toBe(FISSION.reach);
+      expect(inFallout(s, silo.x + 1, silo.y)).toBe(true);
+      expect(inFallout(s, silo.x + FISSION.reach + 2, silo.y)).toBe(false);
+      run(s, FISSION.ownFallout + 1);
+      expect(inFallout(s, silo.x + 1, silo.y)).toBe(false);
+    });
+
+    it('Fusion: up to three warheads aloft from one silo, no refuel, a long clock, and nothing struck is poisoned', () => {
+      const s = game(); rich(s); turn(s, 'fusion');
+      const silo = siloFor(s);
+      const t = tc(s, 1);
+      const gold = s.players[0].res.gold;
+      for (let i = 0; i < FUSION.air; i++) step(s, [{ t: 'launch', p: 0, silo: silo.id, x: t.x, y: t.y }]);
+      expect(s.launches).toHaveLength(FUSION.air);
+      expect(s.players[0].res.gold).toBe(gold - FUSION.air * FUSION.fuel.gold!);
+      expect(launchProblem(s, 0, silo, t.x, t.y)).toMatch(/already in the air/);
+      expect(s.fallout).toBeUndefined();
+      run(s, FUSION.fuse + 2);
+      expect(s.launches).toBeUndefined();
+      expect(s.fallout).toBeUndefined();
+      expect(launchProblem(s, 0, silo, t.x, t.y)).toBeNull();
+    });
   });
 });

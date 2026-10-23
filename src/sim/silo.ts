@@ -1,4 +1,5 @@
-import { FALLOUT, SILO, TICK_HZ, domainOf, secs } from './data';
+import { FALLOUT, FISSION, FUSION, SILO, TICK_HZ, domainOf, secs } from './data';
+import { ageDef } from './ages';
 import { hurt, peace } from './combat';
 import { distToRect } from './grid';
 import { canAfford, isEnemy, pay } from './world';
@@ -10,6 +11,14 @@ import type { Building, Ent, GameState, Player } from './types';
  * (paid when the launch is made) over `SILO.refuel` seconds before it can fire again. The numbers are `SILO`.
  */
 
+/** How a people works its silos: the plain Atomic Age's rules, or the fork's (Fission: quick and leaky; Fusion: clean, limitless and slow). */
+export function rulesOf(p: Player): { fuse: number; refuel: number; fuel: typeof SILO.fuel; air: number; clean: boolean; leak: number } {
+  const a = ageDef(p);
+  if (a.fission) return { fuse: FISSION.fuse, refuel: FISSION.refuel, fuel: SILO.fuel, air: 1, clean: false, leak: FISSION.ownFallout };
+  if (a.fusion) return { fuse: FUSION.fuse, refuel: FUSION.refuel, fuel: FUSION.fuel, air: FUSION.air, clean: true, leak: 0 };
+  return { fuse: SILO.fuse, refuel: SILO.refuel, fuel: SILO.fuel, air: 1, clean: false, leak: 0 };
+}
+
 /** The people's finished, standing silos, in id order. */
 export function silosOf(s: GameState, owner: number): Building[] {
   const out: Building[] = [];
@@ -18,7 +27,7 @@ export function silosOf(s: GameState, owner: number): Building[] {
 }
 
 /** Whether a silo has fuel for a launch now: no warhead in the air from it, and refuelling done. */
-export const loaded = (s: GameState, b: Building): boolean => s.tick >= (b.rearm ?? 0) && !(s.launches ?? []).some((l) => l.silo === b.id);
+export const loaded = (s: GameState, b: Building): boolean => s.tick >= (b.rearm ?? 0) && (s.launches ?? []).filter((l) => l.silo === b.id).length < rulesOf(s.players[b.owner]).air;
 
 /** Why this silo can't launch at this point, or null. */
 export function launchProblem(s: GameState, owner: number, silo: Building | undefined, x: number, y: number): string | null {
@@ -27,25 +36,27 @@ export function launchProblem(s: GameState, owner: number, silo: Building | unde
   if (!silo.built || silo.hp <= 0) return 'The silo is not finished';
   if (p.epoch < 5) return 'Silos fire only in the Atomic Age';
   if (peace(s)) return 'Not while the peace holds';
-  if ((s.launches ?? []).some((l) => l.silo === silo.id)) return 'A warhead from this silo is already in the air';
+  if ((s.launches ?? []).filter((l) => l.silo === silo.id).length >= rulesOf(p).air) return 'A warhead from this silo is already in the air';
   if (s.tick < (silo.rearm ?? 0)) return `Refuelling: ${Math.ceil(((silo.rearm ?? 0) - s.tick) / TICK_HZ)}s to go`;
   if (!(x >= 0 && y >= 0 && x < s.w && y < s.h)) return 'Pick a point on the map';
-  if (!canAfford(p, SILO.fuel)) return `A warhead's fuel takes ${costText()}`;
+  if (!canAfford(p, rulesOf(p).fuel)) return `A warhead's fuel takes ${costText(rulesOf(p).fuel)}`;
   return null;
 }
 
-const costText = (): string => Object.entries(SILO.fuel).map(([r, n]) => `${n} ${r}`).join(' and ');
+const costText = (fuel: typeof SILO.fuel): string => Object.entries(fuel).map(([r, n]) => `${n} ${r}`).join(' and ');
 
-/** Fire: pay the fuel, start the clock, tell the map. */
+/** Fire: pay the fuel, start the clock, tell the map. Fission also poisons the ground round the silo. */
 export function launch(s: GameState, owner: number, silo: Building, x: number, y: number): void {
-  pay(s.players[owner], SILO.fuel);
-  silo.rearm = s.tick + secs(SILO.refuel);
-  (s.launches ??= []).push({ id: s.nextId++, owner, silo: silo.id, x, y, at: s.tick + secs(SILO.fuse) });
-  s.events.push({ k: 'silo', owner, x, y, what: 'launched' });
+  const r = rulesOf(s.players[owner]);
+  pay(s.players[owner], r.fuel);
+  silo.rearm = s.tick + secs(r.refuel);
+  (s.launches ??= []).push({ id: s.nextId++, owner, silo: silo.id, x, y, at: s.tick + secs(r.fuse), ...(r.clean ? { clean: true } : {}) });
+  if (r.leak > 0) (s.fallout ??= []).push({ id: s.nextId++, owner, x: silo.x, y: silo.y, r: FISSION.reach, until: s.tick + secs(r.leak) });
+  s.events.push({ k: 'silo', owner, x, y, what: 'launched', fuse: r.fuse });
 }
 
 /** The warhead lands: every rival building and rival unit on the ground within `SILO.reach` is hit. */
-function strike(s: GameState, owner: number, x: number, y: number): void {
+function strike(s: GameState, owner: number, x: number, y: number, clean = false): void {
   const r2 = SILO.reach * SILO.reach;
   const hit: Ent[] = [];
   for (const e of s.ents) {
@@ -58,7 +69,7 @@ function strike(s: GameState, owner: number, x: number, y: number): void {
     }
   }
   for (const e of hit) hurt(s, e, e.kind === 'building' ? SILO.building : SILO.unit, owner, null);
-  (s.fallout ??= []).push({ id: s.nextId++, owner, x, y, until: s.tick + secs(FALLOUT.time) });
+  if (!clean) (s.fallout ??= []).push({ id: s.nextId++, owner, x, y, until: s.tick + secs(FALLOUT.time) });
   s.events.push({ k: 'silo', owner, x, y, what: 'struck' });
 }
 
@@ -70,7 +81,7 @@ export function siloStep(s: GameState): void {
   for (const l of s.launches) {
     const b = s.byId.get(l.silo);
     if (!b || b.kind !== 'building' || b.hp <= 0) s.events.push({ k: 'silo', owner: l.owner, x: l.x, y: l.y, what: 'scrubbed' });
-    else if (s.tick >= l.at) strike(s, l.owner, l.x, l.y);
+    else if (s.tick >= l.at) strike(s, l.owner, l.x, l.y, l.clean);
     else left.push(l);
   }
   if (left.length) s.launches = left;
@@ -79,7 +90,7 @@ export function siloStep(s: GameState): void {
 
 /** Whether (x, y) stands in poisoned ground. */
 export const inFallout = (s: GameState, x: number, y: number): boolean =>
-  (s.fallout ?? []).some((f) => (f.x - x) * (f.x - x) + (f.y - y) * (f.y - y) <= SILO.reach * SILO.reach);
+  (s.fallout ?? []).some((f) => (f.x - x) * (f.x - x) + (f.y - y) * (f.y - y) <= (f.r ?? SILO.reach) * (f.r ?? SILO.reach));
 
 /** Once a second: spent fallout clears; every land unit left in the rest takes `FALLOUT.dps`, whoever's it is. */
 function falloutStep(s: GameState): void {
@@ -90,7 +101,7 @@ function falloutStep(s: GameState): void {
   if (!s.fallout || s.tick % TICK_HZ !== 0) return;
   for (const e of s.ents) {
     if (e.kind !== 'unit' || e.hp <= 0 || e.inside || domainOf(e.type) !== 'land') continue;
-    const f = s.fallout.find((z) => (z.x - e.x) * (z.x - e.x) + (z.y - e.y) * (z.y - e.y) <= SILO.reach * SILO.reach);
+    const f = s.fallout.find((z) => (z.x - e.x) * (z.x - e.x) + (z.y - e.y) * (z.y - e.y) <= (z.r ?? SILO.reach) * (z.r ?? SILO.reach));
     if (f) hurt(s, e, FALLOUT.dps, f.owner, null);
   }
 }
