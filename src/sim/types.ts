@@ -19,7 +19,7 @@ export type UnitType =
 export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
   | 'towncenter' | 'house' | 'storehouse' | 'farm' | 'barracks' | 'range' | 'stable' | 'tower'
-  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai' | 'drainrig' | 'transfusion' | 'bloodtower' | 'snare' | 'prospector' | 'mission';
+  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai' | 'drainrig' | 'transfusion' | 'bloodtower' | 'snare' | 'prospector' | 'mission' | 'silo';
 /** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
 export type Difficulty = 'gentle' | 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
@@ -39,7 +39,7 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'chart' | 'assay' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
 export type PathId = 'blood' | 'steppe' | 'hemocraft' | 'rite';
@@ -278,6 +278,8 @@ export interface Building {
   advance: number;
   /** The age it is advancing into; absent means the trunk's next epoch (and older saves). */
   advanceTo?: AgeId;
+  /** The tick a Missile Silo is refuelled and can launch again (#605); absent until its first launch. */
+  rearm?: number;
   /** Set while the advance is a step back (#47) to the trunk age one tier down; absent otherwise. */
   back?: boolean;
   /**
@@ -402,6 +404,16 @@ export interface Rubble {
   done: number;
   /** The tick it is cleared away. */
   until: number;
+}
+
+/** A warhead in the air (#605, `silo.ts`): launched from `silo`, it lands at (`x`, `y`) on tick `at`. */
+export interface Launch {
+  id: number;
+  owner: number;
+  silo: number;
+  x: number;
+  y: number;
+  at: number;
 }
 
 /** A powder keg laid at the foot of a building, its fuse burning (#577, the Age of Sappers, `powder.ts`). */
@@ -775,6 +787,8 @@ export type GameEvent =
   | { k: 'cache'; owner: number; from: number; ore: RareId; n: number; x: number; y: number; what: 'spilled' | 'taken' | 'kept' }
   /** A powder keg (#577): `ground` at the mills, `laid` at a building's foot, `blown`, or `doused` by a rival who reached it. */
   | { k: 'keg'; owner: number; x: number; y: number; what: 'ground' | 'laid' | 'blown' | 'doused'; by?: number }
+  /** A Missile Silo's warhead (#605): `launched` (the clock starts), `scrubbed` (the silo fell) or `struck`. */
+  | { k: 'silo'; owner: number; x: number; y: number; what: 'launched' | 'scrubbed' | 'struck' }
   /** A trader bought a load of rare ore at a post (#573). */
   | { k: 'oreBuy'; owner: number; ore: RareId; n: number; gold: number; x: number; y: number }
   | { k: 'ruin'; id: number; owner: number; find: RuinFind; tech?: TechId; x: number; y: number }
@@ -935,6 +949,8 @@ export interface GameState {
   caches?: OreCache[];
   /** Powder kegs laid with their fuses burning (#577, `powder.ts`); absent until one is laid. */
   kegs?: Keg[];
+  /** Warheads in the air (#605, `silo.ts`); absent until one is launched. */
+  launches?: Launch[];
   /** Contested landmarks; absent in older saves and in campaign chapters (none). */
   landmarks?: Landmark[];
   /** Whether this world holds bog iron (#39), decided by the seed; absent in older saves (none). */
@@ -1025,6 +1041,10 @@ export interface AiMemory {
   mission?: number;
   /** When it last sent sappers with kegs (#577). */
   kegAt?: number;
+  /** When an Industrial computer bound for a side future began to hold off the Atomic Age (#605). */
+  sideHold?: number;
+  /** Where a loaded silo means to strike, chosen once a second (#605). */
+  siloAim?: { x: number; y: number; at: number };
   /** Tick it began holding its Town Center for a side road's last deeds, so it holds only so long. */
   waiting?: number;
   /**
@@ -1139,6 +1159,8 @@ export type Command =
   | ({ t: 'cache'; p: number; ids: number[]; target: number } & Queued)
   /** Citizens or foot soldiers carry a powder keg to a rival building and lay it there (#577, the Age of Sappers); the target is a building id. */
   | ({ t: 'keg'; p: number; ids: number[]; target: number } & Queued)
+  /** A Missile Silo launches at a point (#605, the Atomic Age). */
+  | { t: 'launch'; p: number; silo: number; x: number; y: number }
   /** Answer the card of tidings waiting at the fire (#443): `take` pays its price, otherwise it is passed by. */
   | { t: 'tiding'; p: number; card: TidingId; take: boolean }
   /** A player left an online match: the computer takes over their people. */

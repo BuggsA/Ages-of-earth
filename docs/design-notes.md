@@ -1162,3 +1162,11 @@ Built: the owner found the #424 column "reads worse" and asked for research befo
 Why I love it: the first thing a player sees is now the game they're about to play, seen the way a painting would see it: thatched huts by a lake, a mill under rain, a brick town on a hill.
 
 Next: a few chosen camera shots (a dock at dusk, an army crossing a ford) instead of always the town; the theme swelling when the name lands; the peoples' tiles showing a figure of each people's soldier; a "Continue" that shows the saved town's crest.
+
+## Designers' notes: the Atomic Age and the Missile Silo (#391 s1, #605, 2026-10-23, lane rules)
+
+Built: a sixth trunk epoch and one building in it. The Silo's launch names a point on the map, runs a public 45-second clock, then flattens a 5-tile ring (rival buildings and soldiers only). A silo that falls mid-count scrubs the launch; a launch empties it for 240 seconds and costs 600 gold and 200 stone. The computer raises a silo, aims at the best-covered rival spot and runs from rival warheads.
+
+Why I love it: deterrence is a different verb from fighting. Everyone watches the same clock, so the answer is a decision (scatter, guard, or hit their silo first), and the cost (a town that stalls to fuel one blow) is a door. Aeronauts and Lightning stay side roads off the Industrial.
+
+Next: the fission/fusion fork and fallout from seed #533, a seventh epoch (the Information Age: sight as the weapon), and a keepsake for the silo. Not seen: the feel of the clock in a real match, or the sound levels; headless runs only.

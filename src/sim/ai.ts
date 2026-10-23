@@ -1,6 +1,6 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { aiTiding } from './tidings';
-import { AGES, AI_CLIMB, AI_FIND, FINDS, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_SEA, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, SEA_RAID, MISSION, AI_MISSION, AI_CHARIOT, STEP_BACK, stepBackCost, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_SILO, SILO, TICK_HZ, AI_CLIMB, AI_FIND, FINDS, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_SEA, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, SEA_RAID, MISSION, AI_MISSION, AI_CHARIOT, STEP_BACK, stepBackCost, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
@@ -8,6 +8,7 @@ import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, Ga
 import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { backProblem, backTo, ageDef, ageOf, asleep, barred, buildBarred, crossingLeft, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
 import { grindersOf, kegsOf, millProblem, mills, sappers } from './powder';
+import { launchProblem, loaded, silosOf } from './silo';
 import { carriedBy } from './relics';
 import { storesOre } from './caches';
 import { loadPrice, sellerNear } from './oretrade';
@@ -98,9 +99,10 @@ const SHARE: Record<Res, number>[] = [
   { food: 0.4, wood: 0.3, gold: 0.23, stone: 0.07 },
   { food: 0.38, wood: 0.3, gold: 0.26, stone: 0.06 },
   { food: 0.36, wood: 0.3, gold: 0.28, stone: 0.06 },
+  { food: 0.3, wood: 0.22, gold: 0.34, stone: 0.14 },
 ];
 /** Citizens wanted before advancing out of each epoch. */
-const ADVANCE_AT = [11, 17, 22, 28];
+const ADVANCE_AT = [11, 17, 22, 28, 32];
 const TILE_OF: Record<Res, number> = { food: R_BERRY, wood: R_TREE, stone: R_STONE, gold: R_GOLD };
 /** Technologies in the order the opponent wants them (economy first). */
 const TECH_ORDER: TechId[] = [
@@ -229,6 +231,9 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   oreRoad(s, v, mem, issue);
   powderRoad(s, v, mem, issue);
   sapKegs(s, v, mem, issue);
+  siloRoad(s, v, mem, issue);
+  fireSilo(s, v, mem, issue);
+  fleeWarhead(s, v, issue);
   steppeRoad(s, v, mem, issue);
   readYear(s, v);
   huntTheYear(s, v, issue);
@@ -256,7 +261,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   const queuedCitizens = buildings.reduce((n, b) => n + b.queue.filter((q) => q.unit === 'citizen').length, 0);
   const wantCitizens = Math.min(L.citizens + p.epoch * 3, isLegion(p) ? citizenCap(p) : 60);
   // A climb paid for stops the hands being trained (#555): training on past the hands the climb needs spent its price and kept the Town Center's queue full, till a raid caught the town in the Stone Age (`scripts/route-ab.ts navy 103`).
-  const climbReady = L.climbHold !== false && !advancing && p.epoch < LAST_EPOCH && !!tc && citizens.length >= ADVANCE_AT[p.epoch] && s.tick > secs(150 + p.epoch * 150) && afford(v, mainRoad(p)!.cost);
+  const climbReady = L.climbHold !== false && !advancing && p.epoch < LAST_EPOCH && !!mainRoad(p) && !!tc && citizens.length >= ADVANCE_AT[p.epoch] && s.tick > secs(150 + p.epoch * 150) && afford(v, mainRoad(p)!.cost);
   // The Warband Way (#463 s1) eats by raiding: in the Stone Age, out of a treaty, its first band of foot comes before more hands (once; later bands come as soldiers do).
   if (L.clever && p.way === 'warband' && p.epoch === 0 && s.tick >= s.peaceUntil && !mem.prowl && mem.prowled === undefined && citizens.length >= AI_WAYS.bandAt && army.filter(prowler).length < AI_WAYS.band) {
     const yard = buildings.find((b) => b.type === 'barracks' && b.built && b.queue.length === 0);
@@ -294,7 +299,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   v.plan = chapterGoals(s, v, mem, issue);
 
   // Which road it takes is the web's to say (#50): the trunk, or a side road it has chosen once it opens.
-  const wantEpoch = p.epoch < Math.min(LAST_EPOCH, v.plan.maxEpoch) && !advancing && !armyFirst && citizens.length + (isLegion(p) && p.epoch > 0 ? army.filter(legionHand).length : 0) >= ADVANCE_AT[p.epoch] && s.tick > secs(150 + p.epoch * 150);
+  const wantEpoch = p.epoch < Math.min(LAST_EPOCH, v.plan.maxEpoch) && !!mainRoad(p) && !advancing && !armyFirst && citizens.length + (isLegion(p) && p.epoch > 0 ? army.filter(legionHand).length : 0) >= ADVANCE_AT[p.epoch] && s.tick > secs(150 + p.epoch * 150);
   // Patience for a road's deeds counts only while the Town Center holds for them (#113): army-first
   // kept a town from holding for minutes, and it came back out of patience at once.
   if (!wantEpoch) delete mem.waiting;
@@ -307,7 +312,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
     spend(v, road.cost);
     // A nomad people buys its road's stone (#532): the gold for it is set aside too, or the army spends all but the road's own gold and the stone waits.
     if (isNomad(p)) spend(v, { gold: stoneGold(s, p, road.cost) });
-  } else if (armyFirst && !advancing && !s.scenario && p.epoch < LAST_EPOCH && banked(p) && !armyDeed(s, p, mem)) {
+  } else if (armyFirst && !advancing && !s.scenario && p.epoch < LAST_EPOCH && !!mainRoad(p) && banked(p) && !armyDeed(s, p, mem)) {
     // A climb nearly paid for keeps its savings while the army comes first (#532): a wave that came home short spent the whole price on soldiers, minutes from the next age.
     // Not in a campaign chapter: its goals and its rival's strength were tuned to the old way.
     const road = mainRoad(p)!;
@@ -634,6 +639,11 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
     }
   }
   delete mem.waiting;
+  // An Industrial town bound for one of the two futures (Aeronauts, Lightning) doesn't climb on to the Atomic Age first (#605): `AI_SILO.hold` seconds at most.
+  if (walksWeb(v) && p.epoch === 4 && roadsFrom(p).some((r) => isSideRoad(r) && AGES[r.to].tier === p.epoch && mem.roads?.[r.to] === true && roadKnown(s, p, r))) {
+    mem.sideHold ??= s.tick;
+    if (s.tick - mem.sideHold < secs(AI_SILO.hold)) return null;
+  }
   // The steppe (#320) is kept a while, so the flock it came for pays.
   if (walksWeb(v) && ageDef(p).mobile && s.tick - (mem.steppe?.since ?? s.tick) < secs(AI_STEPPE.stay)) return null;
   // Bound for a crossing (#585, #555 s12), a sibling doesn't climb on: its way is back to the Middle Ages (`seaTurn`).
@@ -1182,6 +1192,83 @@ export function sapKegs(s: GameState, v: View, mem: AiMemory, issue: (c: Command
     issue({ t: 'keg', p: p.id, ids: [u.id], target: best.id });
     busy++;
     left--;
+  }
+}
+
+/** The Atomic Age (#605): a clever computer with a big enough town raises one Missile Silo near home. */
+function siloRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p, home } = v;
+  if (!AI_LEVELS[p.ai!].clever || p.epoch < 5 || v.hands < AI_SILO.hands || v.buildings.some((b) => b.type === 'silo')) return;
+  if (s.tick - (mem.ordered.silo ?? -99999) < secs(40)) return;
+  const cost = buildingCostFor(s, p.id, 'silo');
+  if (!afford(v, cost)) {
+    spend(v, cost);
+    return;
+  }
+  const spot = findSpot(s, 'silo', home.x, home.y, 6, 22);
+  if (!spot || !construct(s, v, mem, 'silo', spot, 3, issue)) spend(v, cost);
+}
+
+/** Rival buildings and soldiers a warhead landing at (x, y) would catch, as the computer weighs them. */
+function siloWorth(s: GameState, owner: number, x: number, y: number): number {
+  let worth = 0;
+  const r2 = SILO.reach * SILO.reach;
+  for (const e of s.ents) {
+    if (e.hp <= 0 || !isEnemy(s, owner, e.owner)) continue;
+    if (e.kind === 'building') {
+      if (distToRect(x, y, e) <= SILO.reach) worth += e.type === 'towncenter' ? AI_SILO.heart : 1;
+    } else if (!e.inside && domainOf(e.type) === 'land') {
+      const dx = e.x - x, dy = e.y - y;
+      if (dx * dx + dy * dy <= r2) worth += MILITARY.includes(e.type) ? AI_SILO.soldier : 0;
+    }
+  }
+  return worth;
+}
+
+/**
+ * A loaded silo launches at the rival building whose ring catches the most (`siloWorth`), once its worth reaches `AI_SILO.worth`.
+ * The aim is chosen once a second; while it holds and the silo is short only of fuel, the town sets the fuel aside every tick
+ * (it is ruinous, and soldiers would spend the gold first).
+ */
+function fireSilo(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (p.epoch < 5) return;
+  const silo = silosOf(s, p.id).find((b) => s.tick - b.born >= secs(BUILDINGS.silo.time + AI_SILO.wait) && loaded(s, b));
+  if (!silo) return;
+  if (s.tick % TICK_HZ === 0) {
+    let best: { x: number; y: number; at: number } | null = null;
+    let bestWorth = AI_SILO.worth - 1;
+    for (const e of s.ents) {
+      if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
+      const w = siloWorth(s, p.id, e.x, e.y);
+      if (w > bestWorth) {
+        bestWorth = w;
+        best = { x: e.x, y: e.y, at: s.tick };
+      }
+    }
+    mem.siloAim = best ?? undefined;
+  }
+  const aim = mem.siloAim;
+  if (!aim || s.tick - aim.at > TICK_HZ * 2) return;
+  const why = launchProblem(s, p.id, silo, aim.x, aim.y);
+  if (why === null) {
+    issue({ t: 'launch', p: p.id, silo: silo.id, x: aim.x, y: aim.y });
+    mem.siloAim = undefined;
+  } else if (why.startsWith("A warhead's fuel")) spend(v, SILO.fuel);
+}
+
+/** Soldiers and citizens inside the ring of a rival warhead in the air run for home (the answer to a public clock). */
+function fleeWarhead(s: GameState, v: View, issue: (c: Command) => void): void {
+  if (!s.launches || s.tick % (TICK_HZ / 2) !== 0) return;
+  for (const l of s.launches) {
+    if (!isEnemy(s, v.p.id, l.owner)) continue;
+    const r = SILO.reach + AI_SILO.margin;
+    const out = [...v.army, ...v.citizens].filter((u) => !u.inside && (u.x - l.x) * (u.x - l.x) + (u.y - l.y) * (u.y - l.y) <= r * r && domainOf(u.type) === 'land');
+    if (!out.length) continue;
+    const dx = v.home.x - l.x, dy = v.home.y - l.y;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const x = l.x + (dx / len) * (r + 2), y = l.y + (dy / len) * (r + 2);
+    issue({ t: 'move', p: v.p.id, ids: out.map((u) => u.id), x, y });
   }
 }
 

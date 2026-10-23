@@ -43,7 +43,7 @@ const merchantReady = () => {
 
 describe('ages as a web (#37)', () => {
   it('keeps the trunk: every epoch is a trunk age, and a plain advance walks it at the old prices', () => {
-    expect(TRUNK.map((a) => AGES[a].tier)).toEqual([0, 1, 2, 3, 4]);
+    expect(TRUNK.map((a) => AGES[a].tier)).toEqual([0, 1, 2, 3, 4, 5]);
     for (let e = 1; e < EPOCHS.length; e++) {
       const road = ROADS.find((r) => r.from === TRUNK[e - 1] && r.to === TRUNK[e])!;
       expect(road.cost).toEqual(EPOCHS[e].cost);
@@ -57,13 +57,13 @@ describe('ages as a web (#37)', () => {
     expect(ageOf(s.players[0])).toBe('bronze');
     expect(s.players[0].res.food).toBe(before.food - EPOCHS[1].cost.food!);
     for (let e = 2; e < EPOCHS.length; e++) advance(s);
-    expect(ageOf(s.players[0])).toBe('industrial');
+    expect(ageOf(s.players[0])).toBe('atomic');
     expect(mainRoad(s.players[0])).toBeUndefined();
   });
 
   it('leaves no age without a road out, except the last on the trunk', () => {
     for (const id of Object.keys(AGES) as AgeId[]) {
-      if (id === 'industrial') continue;
+      if (id === 'atomic') continue;
       expect(ROADS.some((r) => r.from === id), id).toBe(true);
     }
     // And every side age can be reached.
