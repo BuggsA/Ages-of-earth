@@ -1184,3 +1184,10 @@ Built: a bar over each fight, your strength against what you can see of the foe'
 Why I love it: the decisions that make a fight fun (reinforce, hold, fall back) need a read, and until now the first read a player got was the last soldier falling. With two fronts at once, the horn and the bar are what let a player be a general rather than a spectator.
 
 Next: the computer could use the same read to decide when its waves fall back (today each wave has its own rule); a faint line from the bar to the nearest idle soldiers who could join; a tide for sieges that counts the walls' hit points apart.
+## Designers' notes: Fission or Fusion (#605 s3, grows seed #533, 2026-10-23, lane rules)
+
+Built: two side ages off the Atomic Age, behind a silo, each shutting the other. Fission works the silo fast (25 s clock, 100 s refuel) and pays in your own ground: every launch poisons 3 tiles round the silo for a minute, so the layout of silos matters. Fusion is the opposite: a 70 s clock, a road that costs the earth and takes 150 s, but then up to three warheads aloft, no refuel, a cheaper shot, and a clean strike your army can follow.
+
+Why I love it: the same building plays two ways. Fission is a town that has to lay itself out around a hazard; Fusion is a patient economy that wins by volume and by walking in behind its own blasts. A rival answers Fusion by scattering from a long clock or by finding the silo during the 150 s the climb leaves the town open.
+
+Next: wind drift, a hardened unit, a deed for each road (seed #533), and a seventh epoch. Not seen: the feel of either branch in a real match.

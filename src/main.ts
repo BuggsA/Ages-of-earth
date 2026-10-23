@@ -2696,9 +2696,9 @@ function onEvents(s: GameState, list: GameEvent[]): void {
       case 'silo':
         // The Atomic Age (#605): the clock is public, so every player is told when a warhead goes up and where it will land.
         if (ev.what === 'launched') {
-          if (ev.owner === viewer) hud.toast(`Warhead away: it lands in ${SILO.fuse} seconds`, 'good');
+          if (ev.owner === viewer) hud.toast(`Warhead away: it lands in ${ev.fuse ?? SILO.fuse} seconds`, 'good');
           else if (isEnemy(s, viewer, ev.owner)) {
-            hud.toast(`${s.players[ev.owner].name} has launched a warhead: it lands in ${SILO.fuse} seconds. Clear the ring, or destroy the silo`, 'bad');
+            hud.toast(`${s.players[ev.owner].name} has launched a warhead: it lands in ${ev.fuse ?? SILO.fuse} seconds. Clear the ring, or destroy the silo`, 'bad');
             view.marker(s, ev.x, ev.y, false);
           }
           play('siloLaunch');
