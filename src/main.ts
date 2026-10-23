@@ -44,6 +44,7 @@ import { Lobby } from './ui/lobby';
 import { Hud, nameOf } from './ui/hud';
 import { Minimap } from './ui/minimap';
 import { Tips } from './ui/tips';
+import { openingFor } from './ui/opening';
 
 /**
  * The game in the browser: a title screen over a live match between two computer players, then a
@@ -517,6 +518,8 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   }
   if (!saved) dawn();
   tips.start(saved ? 9999 : 0);
+  const opening = !saved && !chapter ? openingFor(game, viewer) : undefined;
+  if (opening) tips.open(opening);
   $('chat-lines').innerHTML = '';
   document.body.classList.toggle('online', online);
   if (online) chatLine('', 0, 'Online match: press Enter to chat.');
