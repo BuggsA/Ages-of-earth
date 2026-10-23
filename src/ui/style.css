@@ -529,3 +529,6 @@ body.online .tip-box { bottom: 330px; }
 .notice.shortage { display: flex; align-items: center; gap: 8px; }
 .notice.shortage button { pointer-events: auto; cursor: pointer; padding: 3px 10px; color: var(--gold-2); background: rgba(255, 255, 255, 0.08); border: 1px solid var(--gold); border-radius: 7px; font: 800 13px 'Nunito', sans-serif; }
 .notice.shortage button:hover { background: rgba(232, 196, 106, 0.2); }
+.civ-catch { display: block; margin-top: 3px; opacity: 0.8; }
+.civ-more { margin-top: 4px; font-weight: 600; font-size: 12px; }
+.civ-more summary { cursor: pointer; color: var(--gold-2); }
