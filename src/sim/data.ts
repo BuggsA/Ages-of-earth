@@ -526,6 +526,7 @@ export const AGES: Record<AgeId, Age> = {
     door: 'No Town Center or Barracks banks plunder, and no traders or merchant cogs: a raid far from the sea pays nothing until it walks back to a ship, and a laden ship sunk pays its hold to the rival',
     good: 'Raids from the sea: the war-host lands where it likes and leaves with the gold by ship',
     routes: [],
+    keepsake: { building: 'dock', does: 'its longship yard: ships launched there cost a fifth less' },
     name: 'Age of Sea-Raiders',
     short: 'Sea-Raiders',
     tier: 2,

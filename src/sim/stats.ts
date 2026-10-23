@@ -2,7 +2,7 @@ import { AGES, BUILDINGS, CIVS, WAYS, WORKS, SIGNATURES, EPOCHS, FLOOD, NO_MODS,
 import { fairLevy } from './fair';
 import { flooded } from './flood';
 import { ageDef, ageOf, hasWalked, isHire, isSuspended, pathCarry } from './ages';
-import type { BuildingType, Cost, GameState, Player, TechId, UnitType } from './types';
+import type { AgeId, BuildingType, Cost, GameState, Player, TechId, UnitType } from './types';
 import { RES } from './types';
 
 /**
@@ -131,7 +131,7 @@ const LEVIED = new Set(['infantry', 'ranged', 'cavalry']);
  * age hires it there, dearer where their age makes levies cost more (#37), and scaled by what their
  * age charges for its class (the Iron Age's cheap foot soldiers, #39).
  */
-export function trainCostFor(s: GameState, owner: number, type: UnitType, at: BuildingType, where?: { x: number; y: number }): Cost {
+export function trainCostFor(s: GameState, owner: number, type: UnitType, at: BuildingType, where?: { x: number; y: number; keep?: AgeId }): Cost {
   const p = s.players[owner];
   const base = unitStats(type, p.epoch).cost;
   const age = ageDef(p);
@@ -142,7 +142,8 @@ export function trainCostFor(s: GameState, owner: number, type: UnitType, at: Bu
   }
   const cls = unitStats(type, p.epoch).cls;
   const levied = age.levy && LEVIED.has(cls) ? scale(base, age.levy) : base;
-  const price = age.price?.[cls];
+  // A Dock kept as the Sea-Raiders' keepsake (#555 s12) still launches ships at the longship yard's price, on any road.
+  const price = age.price?.[cls] ?? (at === 'dock' && where?.keep === 'searaider' ? AGES.searaider.price?.[cls] : undefined);
   const priced = price ? scale(levied, price) : levied;
   return scale(priced, fairLevy(s, owner, type, where));
 }
