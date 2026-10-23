@@ -7,7 +7,7 @@
  *   npx tsx scripts/route-ab.ts <army|navy|economy|faith|horde> <first seed> <seeds> <minutes>
  * Prints a `route {…}` line a match (to tot up runs side by side), then the route seat's record: wins, losses, who leads
  * the undecided (the age reached, then kills less losses), the gathering over the trunk's (geometric mean) and the
- * share of matches in which it walked the route's last age, which says whether the computer can play the route at all.
+ * shares of matches in which it entered the route's first age and walked its last, which says whether the computer can play the route at all.
  */
 import { AGES } from '../src/sim/data';
 import type { AgeId } from '../src/sim/types';
@@ -30,7 +30,7 @@ const seeds = Number(process.argv[4] ?? 6);
 const minutes = Number(process.argv[5] ?? 30);
 const wanted = ROUTE_ROADS[route];
 if (!wanted) throw new Error(`no route called ${route}: ${Object.keys(ROUTE_ROADS).join(', ')}`);
-const tally = { won: 0, lost: 0, ahead: 0, behind: 0, gather: [] as number[], ages: 0, goal: 0 };
+const tally = { won: 0, lost: 0, ahead: 0, behind: 0, gather: [] as number[], ages: 0, goal: 0, entered: 0 };
 for (let game = 0; game < seeds * 2; game++) {
   const seed = first + (game >> 1);
   const seat = game & 1;
@@ -58,8 +58,9 @@ for (let game = 0; game < seeds * 2; game++) {
   tally.gather.push(Math.log(n.stats.gathered / o.stats.gathered));
   tally.ages += n.epoch - o.epoch;
   tally.goal += goal ? 1 : 0;
+  tally.entered += hasWalked(n, wanted[0]) ? 1 : 0;
   console.log(`route ${JSON.stringify({ route, seed, seat, civ: n.civ, won: s.winner < 0 ? null : s.winner === seat, margin, goal, trail: trail.join('→') })}`);
 }
 const g = tally.gather;
 const mean = g.reduce((a, b) => a + b, 0) / g.length;
-console.log(`${route} ${tally.won}–${tally.lost} of ${g.length}; undecided: ahead in ${tally.ahead}, behind in ${tally.behind}; gathered ×${Math.exp(mean).toFixed(3)}; ages ahead ${(tally.ages / g.length).toFixed(2)}; reached ${wanted[wanted.length - 1]} in ${tally.goal} of ${g.length}`);
+console.log(`${route} ${tally.won}–${tally.lost} of ${g.length}; undecided: ahead in ${tally.ahead}, behind in ${tally.behind}; gathered ×${Math.exp(mean).toFixed(3)}; ages ahead ${(tally.ages / g.length).toFixed(2)}; entered ${wanted[0]} in ${tally.entered} of ${g.length}, reached ${wanted[wanted.length - 1]} in ${tally.goal}`);
