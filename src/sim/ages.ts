@@ -602,4 +602,4 @@ export function pathCarry(p: Player): { path: PathId; times: number } | null {
 
 /** Whether a unit may raise this building: citizens raise them all, some buildings name others (#303), and a legion's foot soldiers raise any (#501). */
 export const canRaise = (unit: UnitType, type: BuildingType, civ?: CivId): boolean =>
-  unit === 'citizen' || !!BUILDINGS[type].builders?.includes(unit) || (unit === 'infantry' && !!civ && !!CIVS[civ].legion);
+  (unit === 'citizen' && !BUILDINGS[type].only) || !!BUILDINGS[type].builders?.includes(unit) || (unit === 'infantry' && !!civ && !!CIVS[civ].legion);

@@ -996,6 +996,7 @@ export class Hud {
         if (def.menu !== this.buildMenu) continue;
         // A path's own building (the War Camp, #303) shows only to the people standing on that step.
         if (def.ages && !def.ages.includes(ageOf(p))) continue;
+        if (def.only && !builders.some((u) => canRaise(u.type, type, p.civ))) continue;
         const locked = def.epoch > p.epoch;
         const no = buildBarred(p, type) ?? wayBarred(s, p, type);
         const cost = buildingCostFor(s, viewer, type);
@@ -1032,6 +1033,22 @@ export class Hud {
           ok: !short,
           why: short ?? undefined,
           run: () => this.act.place('warcamp'),
+        });
+      }
+      // The Age of Missions (#555 s12): priests raise a Mission on a far shore.
+      const sowers = units.filter((u) => canRaise(u.type, 'mission', p.civ));
+      if (sowers.length && !builders.length && !buildBarred(p, 'mission')) {
+        const cost = buildingCostFor(s, viewer, 'mission');
+        const short = shortfall(p, cost);
+        cmds.push({
+          key: 'O',
+          pic: buildingPicture('mission', p.epoch, p.color),
+          title: 'Raise a Mission',
+          desc: `${BUILDINGS.mission.blurb} Then click a shore, in your own land or no one's: the farther from home, the bigger the tithe.`,
+          cost,
+          ok: !short,
+          why: short ?? undefined,
+          run: () => this.act.place('mission'),
         });
       }
       if (soldiers.length) cmds.push({ key: 'A', pic: '', glyph: '⚔', title: 'Attack-move', desc: 'Then click on the map: march there, fighting every enemy met on the way.', ok: true, run: () => this.act.attackMove() });

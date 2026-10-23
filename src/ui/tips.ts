@@ -1,4 +1,4 @@
-import { AGES, CIVS, KEG, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SICKNESS, SILK, STEP_BACK, TRIBUTE, WAY, secs } from '../sim/data';
+import { AGES, CIVS, KEG, MISSION, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SICKNESS, SILK, STEP_BACK, TRIBUTE, WAY, secs } from '../sim/data';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, findsOf, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
 import type { AgeId, Building, GameState, Unit } from '../sim/types';
@@ -18,6 +18,7 @@ const SAIL_ROAD = ROADS.find((r) => r.to === 'sail')!;
 const ALCHEMY_ROAD = ROADS.find((r) => r.to === 'alchemy')!;
 const SAPPER_ROAD = ROADS.find((r) => r.to === 'sapper')!;
 const SEA_ROAD = ROADS.find((r) => r.to === 'searaider')!;
+const MISSIONS_ROAD = ROADS.find((r) => r.to === 'missions')!;
 const WARBAND_ROAD = ROADS.find((r) => r.to === 'warband')!;
 const IRONBLOOD_ROAD = ROADS.find((r) => r.to === 'ironblood')!;
 const TOTALWAR_ROAD = ROADS.find((r) => r.to === 'totalwar')!;
@@ -258,6 +259,20 @@ const TIPS: Tip[] = [
     id: 'searaider',
     when: (s, me) => ageOf(s.players[me]) === 'searaider',
     text: `Sea-raiders bank their plunder by ship. A kill fills the killer's pack (💰), and the pack goes into the hold of a transport the soldier comes within ${SPOILS.bank} tiles of, or rides in (up to ${SEA_RAID.hold} gold a ship). The ship banks its hold at a Dock of yours, within ${SEA_RAID.dock} tiles. A Town Center or Barracks banks nothing, and a rival who sinks a laden ship takes the hold: land, raid, re-embark, sail home.`,
+  },
+  {
+    id: 'crossing-missions',
+    // The second crossing (#555 s12): a people that has walked the Pilgrims or the Sail, back in the Middle Ages.
+    when: (s, me) => {
+      const p = s.players[me];
+      return ageOf(p) === 'middle' && roadKnown(s, p, MISSIONS_ROAD) && !MISSIONS_ROAD.crossing!.every((a) => hasWalked(p, a));
+    },
+    text: `A crossing: your people has walked one of the <b>${AGES.pilgrim.name}</b> and the <b>${AGES.sail.name}</b>. Walk the other too, then come back to the Middle Ages, and the Town Center (🔀) can turn your people into the <b>${AGES.missions.name}</b>: priests take ship and raise Missions on far shores. The way back is the price.`,
+  },
+  {
+    id: 'missions',
+    when: (s, me) => ageOf(s.players[me]) === 'missions',
+    text: `Select a priest and press <b>O</b> to raise a <b>Mission</b> on a shore in your own land or no one's. It holds the land round it, trains priests, and every ${MISSION.every} seconds pays a tithe that grows with its distance from your Town Center (up to ${MISSION.cap} gold, for your ${MISSION.most} farthest). It is only a chapel: nothing in it shoots, and a rival who reaches it razes it. Carry a priest across the water in a transport.`,
   },
   {
     id: 'ironblood',

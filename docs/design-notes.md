@@ -1137,3 +1137,12 @@ Built: a mark of the land near every town, the same distance out for each: a nai
 Why I love it: the first minutes had a scout with nothing to find. Now the opening forks: send a citizen out to chase the hint (a road, a vein to dig, or a ruin to dig out early), or leave it and play the plain roads. A rival can walk onto yours, so the walk is a small gamble. And because a find only ever speaks of what the world holds, it is a clue and never a lie.
 
 Next: the lodge and the age panel reading leads for every key, a find that can stand in for the lodge's "this world lacks" answer, finds on the web map, a find that is a short fight (a den beside it), and a tip that points a new player at theirs.
+
+## Designers' notes: the second crossing, the Age of Missions (#555 s12, 2026-10-23, chain 1023-0115 s1)
+
+Built: the Pilgrims and the Sail meet. A people that walked both turns can become missionary: priests alone raise **Missions** on any shore a rival doesn't hold, however far from home. Each claims the land round it, trains priests and pays a tithe that grows with its distance from your Town Center (the three farthest count). It is a chapel, not a fort: nothing in it shoots.
+
+Why I love it: it makes distance the thing you spend. Every other economy in the game pays for staying close; this one pays for reaching. A Mission beside a rival's coast is income, a foothold for priests, and an insult in one, and the answer is plain: a few soldiers and a torch. It also shares its Sail sibling with the Sea-Raiders, so one walk of the Sail opens a real choice of crossing (warband or faith), and the computer picks one at a time.
+
+Next: the Chariots crossing; a Mission that turns the coastal town beside it (the old "turn coastal towns" idea) with a slow conversion; priests ferried by a transport on purpose (the computer now only walks them); its own tune and bell; trade between missions.
+Not yet seen in a browser: the Mission's model, the O button, the tip. The tithe has no toast or sound yet.
