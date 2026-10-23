@@ -190,3 +190,15 @@ describe('the Sea-Raiders keep their longship yard', () => {
     expect(trainCostFor(s, 0, 'transport', 'dock', { x: 0, y: 0, keep: 'alchemy' })).toEqual(full);
   });
 });
+
+describe('the Chariots keep their yard', () => {
+  it('a Stable kept from the Chariots trains cavalry a tenth cheaper on any road; one not kept, or a Barracks, pays full', () => {
+    const s = game('middle', 3);
+    expect(AGES.chariots.keepsake!.building).toBe('stable');
+    const full = trainCostFor(s, 0, 'cavalry', 'stable', { x: 0, y: 0 });
+    const kept = trainCostFor(s, 0, 'cavalry', 'stable', { x: 0, y: 0, keep: 'chariots' });
+    expect(kept.food).toBeLessThan(full.food!);
+    expect(trainCostFor(s, 0, 'cavalry', 'stable', { x: 0, y: 0, keep: 'alchemy' })).toEqual(full);
+    expect(trainCostFor(s, 0, 'cavalry', 'barracks', { x: 0, y: 0, keep: 'chariots' })).toEqual(full);
+  });
+});

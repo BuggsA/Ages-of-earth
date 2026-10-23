@@ -543,6 +543,7 @@ export const AGES: Record<AgeId, Age> = {
     door: 'No archers, walls or gates: the charioteer rides open ground, and a rival\'s spearmen are what you fear',
     good: 'The hardest early riders: fast, cheap, sharpened by the marsh, and strongest against bows and men on foot who have no spears',
     routes: [],
+    keepsake: { building: 'stable', does: 'its chariot yard: cavalry trained there cost a tenth less' },
     name: 'Age of Chariots',
     short: 'Chariots',
     tier: 1,
