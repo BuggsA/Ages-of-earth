@@ -91,7 +91,7 @@ export interface Age {
    */
   ironTrade?: { per: number; each: number; most: number };
   /** Blades forged from bog iron (the Iron Age): foot soldiers strike `attack` harder for every `per` bars dug, up to `most` steps. */
-  forge?: { base: number; per: number; attack: number; most: number };
+  forge?: { base: number; per: number; attack: number; most: number; riders?: boolean };
   /**
    * Power broadcast from coils (the Age of Lightning, #231): Watch Towers become Coil Towers, whose field
    * speeds the work of buildings near them and slows every building outside, and whose shot is a leaping
@@ -143,6 +143,8 @@ export interface Age {
   raid?: boolean;
   /** Priests raise Missions on far shores, and each pays a tithe that grows with its distance from home (the Age of Missions, #555 s12): see `MISSION` (`missions.ts`). */
   missions?: boolean;
+  /** What a line of soldiers is called here (the Age of Chariots' riders are chariots, #555 s12). */
+  names?: Partial<Record<UnitType, string>>;
 }
 
 /**
@@ -219,6 +221,8 @@ export const IRON_TRADE = { per: 75, each: 0.08, most: 5 };
  * sharpen foot soldiers' edges by `attack`, up to `most` steps. The marsh is the armoury.
  */
 export const IRON_FORGE = { base: 150, per: 50, attack: 1, most: 3 };
+/** The Age of Chariots' forge (#555 s12): the same bars, edging riders. */
+export const CHARIOT_FORGE = { ...IRON_FORGE, riders: true };
 
 export const AGES: Record<AgeId, Age> = {
   stone: trunkAge(0, 'Where every road begins: gather, settle and choose your way'),
@@ -531,6 +535,23 @@ export const AGES: Record<AgeId, Age> = {
     price: { ship: 0.8 },
     raid: true,
     no: { units: ['trader', 'cog'], why: 'A people of sea-raiders trades with no one: traders and merchant cogs wait until it comes ashore in the Middle Ages or climbs on' },
+  },
+  // The third crossing (#555 s12): the Iron Age's marsh and the Steppe's herds made one road. Open only to a people that walked both.
+  chariots: {
+    verb: 'Dig bog iron to edge your chariots: the marsh and the herd together make riders that strike harder with every bar of iron dug',
+    door: 'No archers, walls or gates: the charioteer rides open ground, and a rival\'s spearmen are what you fear',
+    good: 'The hardest early riders: fast, cheap, sharpened by the marsh, and strongest against bows and men on foot who have no spears',
+    routes: [],
+    name: 'Age of Chariots',
+    short: 'Chariots',
+    tier: 1,
+    blurb: 'The Iron Age\'s marsh and the Steppe\'s herds made one road: iron-tyred chariots. Riders (the Stable\'s cavalry, here chariots) cost a tenth less and train a fifth faster, and every 50 bars of bog iron dug past the first 150 sharpens every chariot\'s strike by 1 (up to 3), so the marsh is worth holding. What it gives up: archers, walls and gates, and a chariot is beaten by any spearman who stands firm.',
+    price: { cavalry: 0.9 },
+    training: { cavalry: 0.8 },
+    forge: CHARIOT_FORGE,
+    names: { cavalry: 'Chariot' },
+    noBuild: { buildings: ['wall', 'gate'], why: 'A chariot people raises no walls or gates: it rides open ground. They wait until it settles in the Bronze Age or climbs on' },
+    no: { units: ['ranged'], why: 'No archers behind a chariot\'s dust: bows wait until the people settles in the Bronze Age or climbs on' },
   },
   // The second crossing (#555 s12): the Pilgrims' priests and the Sail's ships made one trade. Open only to a people that walked both.
   missions: {
@@ -968,6 +989,20 @@ export const ROADS: Road[] = [
     crossing: ['warband', 'sail'],
     blurb: 'A turn, not a climb, for a people that has walked both the Warband and the Sail: the war-host takes to the longships. Plunder is carried as in the Warband, but banked only by ship: packs go into a transport\'s hold, and the hold pays out at a Dock. Ships cost a fifth less and soldiers train 10% faster. What it gives up: traders and merchant cogs, and every Town Center and Barracks as a place to bank. A raid far from the sea pays nothing until it walks back to a ship, and a laden ship sunk pays the rival.',
   },
+  // The third crossing (#555 s12): off the Stone Age, for a people that walked the Iron Age and the Steppe, the two turns off it. The way back
+  // to the Stone Age is a step back (`STEP_BACK`). A Forge is the clue; the journey is the price.
+  {
+    from: 'stone',
+    to: 'chariots',
+    cost: { food: 350, wood: 250, gold: 100 },
+    time: 40,
+    clue: 'forge',
+    gate: 'hard',
+    crossing: ['iron', 'steppe'],
+    blurb: 'A turn, not a climb, for a people that has walked both the Iron Age and the Steppe: the marsh\'s iron on the herd\'s wheels. Riders are chariots, a tenth cheaper and a fifth quicker to train, and every 50 bars of bog iron dug past the first 150 sharpens each one by 1 (up to 3). What it gives up: archers, walls and gates, and the horse is no match for a spear that stands firm.',
+  },
+  { from: 'chariots', to: 'bronze', cost: { food: 150, wood: 150 }, time: 20, blurb: 'Unyoke the chariots: the Bronze Age, with archers, walls and gates, and riders at their usual price and edge.' },
+  { from: 'chariots', to: 'middle', cost: EPOCHS[2].cost, time: EPOCHS[2].time, blurb: 'Rejoin the main road at the Middle Ages, for the same price as from the Bronze Age: archers, walls and gates return, and the chariots become ordinary cavalry.' },
   // The second crossing (#555 s12): off the Middle Ages, for a people that walked the Pilgrims and the Sail. A Temple is the clue.
   {
     from: 'middle',
@@ -1510,6 +1545,8 @@ export interface Mods {
   infantryArmor: number;
   /** Added to foot soldiers' blows (the Iron Age). */
   infantryAttack: number;
+  /** Added to cavalry's blows (the Age of Chariots, #555 s12). */
+  cavalryAttack: number;
   priest: number;
   /** Multiplies the strength of a priest's chant over a rival's building (Litany), not its healing or converting. */
   chant: number;
@@ -1558,7 +1595,7 @@ export interface Mods {
 
 export const NO_MODS: Mods = {
   meleeAttack: 0, rangedAttack: 0, armor: 0, parmor: 0, range: 0, carry: 0, citizenSpeed: 1, wood: 1, mine: 1, farm: 1, forage: 1, hunt: 1,
-  buildingHp: 1, buildSpeed: 1, militaryTrain: 1, rangedTrain: 1, cavalrySpeed: 1, infantryHp: 1, infantryArmor: 0, infantryAttack: 0, priest: 1, chant: 1,
+  buildingHp: 1, buildSpeed: 1, militaryTrain: 1, rangedTrain: 1, cavalrySpeed: 1, infantryHp: 1, infantryArmor: 0, infantryAttack: 0, cavalryAttack: 0, priest: 1, chant: 1,
   siegeAttack: 1, siegeRange: 0, techCost: 1, wonderCost: 1, extraCitizens: 0, fish: 1, shipHp: 1, shipRange: 0, airSpeed: 1, airHp: 1,
   traderSpeed: 1, tradeGold: 1, relicGold: 1, bogGold: 1, rot: 1, beastWard: 1, portReach: 0, riderSight: 0, consecrate: 0, elmo: 0, telegraph: 0, galvanic: 0, plunder: 0, tribute: 0, toll: 0, veins: 0, sworn: 0,
 };
@@ -2676,6 +2713,8 @@ export const AI_KEG = { take: 0.5, ore: 80, kegs: 6, mills: 2, hold: 180, sapper
  */
 export const MISSION = { every: 5, base: 1, perTile: 0.12, cap: 8, most: 3 };
 export const AI_MISSION = { far: 18, search: 10, take: 0.6, stay: 120, hold: 240, gap: 45 };
+/** The computer and the Age of Chariots (#555 s12): the odds it plans the crossing once it has walked one sibling, and its stay in each. */
+export const AI_CHARIOT = { take: 0.6, stay: 120 };
 export const AI_SEA = { take: 0.6, stay: 120, raid: 300 };
 
 export const WARCAMP = { watch: 8, grace: 10, burn: 0.05, train: 1.2 };

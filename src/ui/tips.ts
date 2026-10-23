@@ -1,4 +1,4 @@
-import { AGES, CIVS, KEG, MISSION, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SICKNESS, SILK, STEP_BACK, TRIBUTE, WAY, secs } from '../sim/data';
+import { AGES, CIVS, CHARIOT_FORGE, KEG, MISSION, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SICKNESS, SILK, STEP_BACK, TRIBUTE, WAY, secs } from '../sim/data';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, findsOf, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
 import type { AgeId, Building, GameState, Unit } from '../sim/types';
@@ -18,6 +18,7 @@ const SAIL_ROAD = ROADS.find((r) => r.to === 'sail')!;
 const ALCHEMY_ROAD = ROADS.find((r) => r.to === 'alchemy')!;
 const SAPPER_ROAD = ROADS.find((r) => r.to === 'sapper')!;
 const SEA_ROAD = ROADS.find((r) => r.to === 'searaider')!;
+const CHARIOTS_ROAD = ROADS.find((r) => r.to === 'chariots')!;
 const MISSIONS_ROAD = ROADS.find((r) => r.to === 'missions')!;
 const WARBAND_ROAD = ROADS.find((r) => r.to === 'warband')!;
 const IRONBLOOD_ROAD = ROADS.find((r) => r.to === 'ironblood')!;
@@ -265,6 +266,20 @@ const TIPS: Tip[] = [
     id: 'searaider',
     when: (s, me) => ageOf(s.players[me]) === 'searaider',
     text: `Sea-raiders bank their plunder by ship. A kill fills the killer's pack (💰), and the pack goes into the hold of a transport the soldier comes within ${SPOILS.bank} tiles of, or rides in (up to ${SEA_RAID.hold} gold a ship). The ship banks its hold at a Dock of yours, within ${SEA_RAID.dock} tiles. A Town Center or Barracks banks nothing, and a rival who sinks a laden ship takes the hold: land, raid, re-embark, sail home.`,
+  },
+  {
+    id: 'crossing-chariots',
+    // The third crossing (#555 s12): a people that has walked the Iron Age or the Steppe, back in the Stone Age.
+    when: (s, me) => {
+      const p = s.players[me];
+      return ageOf(p) === 'stone' && roadKnown(s, p, CHARIOTS_ROAD) && !CHARIOTS_ROAD.crossing!.every((a) => hasWalked(p, a));
+    },
+    text: `A crossing: your people has walked one of the <b>${AGES.iron.name}</b> and the <b>${AGES.steppe.name}</b>. Walk the other too, then come back to the Stone Age (a step back), and the Town Center (🔀) can turn your people into the <b>${AGES.chariots.name}</b>: riders sharpened by the marsh's iron.`,
+  },
+  {
+    id: 'chariots',
+    when: (s, me) => ageOf(s.players[me]) === 'chariots',
+    text: `Your riders are <b>chariots</b>. Every ${CHARIOT_FORGE.per} bars of bog iron dug past the first ${CHARIOT_FORGE.base} sharpen each one by ${CHARIOT_FORGE.attack}, up to ${CHARIOT_FORGE.most}: keep citizens in the marsh. They beat archers and men on foot with no spears, but a firm line of spearmen beats them, and you have no archers, walls or gates to answer with.`,
   },
   {
     id: 'crossing-missions',

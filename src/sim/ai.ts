@@ -1,12 +1,12 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { aiTiding } from './tidings';
-import { AGES, AI_CLIMB, AI_FIND, FINDS, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_SEA, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, SEA_RAID, MISSION, AI_MISSION, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_CLIMB, AI_FIND, FINDS, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_SEA, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, SEA_RAID, MISSION, AI_MISSION, AI_CHARIOT, STEP_BACK, stepBackCost, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Rubble, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
-import { ageDef, ageOf, asleep, barred, buildBarred, crossingLeft, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
+import { backProblem, backTo, ageDef, ageOf, asleep, barred, buildBarred, crossingLeft, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
 import { grindersOf, kegsOf, millProblem, mills, sappers } from './powder';
 import { carriedBy } from './relics';
 import { storesOre } from './caches';
@@ -302,7 +302,8 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   if (journey) {
     const { road, wait } = journey;
     // The main road forward goes without a target, as it always has; any other road is named.
-    if (!wait && tc && tc.queue.length === 0 && afford(v, road.cost)) issue({ t: 'advance', p: p.id, building: tc.id, ...(road === mainRoad(p) ? {} : { to: road.to }) });
+    if (!wait && tc && tc.queue.length === 0 && afford(v, road.cost) && journey.back) issue({ t: 'stepBack', p: p.id, building: tc.id });
+    else if (!wait && tc && tc.queue.length === 0 && afford(v, road.cost)) issue({ t: 'advance', p: p.id, building: tc.id, ...(road === mainRoad(p) ? {} : { to: road.to }) });
     spend(v, road.cost);
     // A nomad people buys its road's stone (#532): the gold for it is set aside too, or the army spends all but the road's own gold and the stone waits.
     if (isNomad(p)) spend(v, { gold: stoneGold(s, p, road.cost) });
@@ -576,6 +577,8 @@ function worthWaiting(s: GameState, v: View, mem: AiMemory, r: Road): boolean {
 interface Journey {
   road: Road;
   wait: boolean;
+  /** A step back to an older age (#47), the way between siblings off the Stone Age (#555 s12): `road` only names where it leads and what it costs. */
+  back?: boolean;
 }
 
 /**
@@ -745,6 +748,7 @@ const CROSSINGS = ROADS.filter((r) => r.crossing);
 const CROSS_PLAN: Partial<Record<AgeId, { salt: number; keeps: BuildingType[]; take: number; stay: number }>> = {
   searaider: { salt: 0x5ea7, keeps: ['dock'], take: AI_SEA.take, stay: AI_SEA.stay },
   missions: { salt: 0x4d15, keeps: ['dock', 'temple'], take: AI_MISSION.take, stay: AI_MISSION.stay },
+  chariots: { salt: 0xc4a1, keeps: ['forge'], take: AI_CHARIOT.take, stay: AI_CHARIOT.stay },
 };
 
 /**
@@ -803,7 +807,10 @@ function seaTurn(s: GameState, v: View, mem: AiMemory): Journey | null {
   if (mem.sea?.at !== here) mem.sea = { at: here, since: s.tick };
   if (s.tick - mem.sea.since < secs(CROSS_PLAN[cross.to]!.stay)) return null;
   const back = roadsFrom(p).find((r) => r.to === cross.from);
-  return back ? { road: back, wait: false } : null;
+  if (back) return { road: back, wait: false };
+  // Off the Stone Age there is no road back, only a step back (#555 s12).
+  if (backTo(p) !== cross.from || backProblem(s, p)) return null;
+  return { road: { from: here, to: cross.from, cost: stepBackCost(p.epoch), time: STEP_BACK.time }, wait: false, back: true };
 }
 
 /** The road into the branch of the fork (#355 s5) the computer chose, out of the Industrial Age; undefined before Total War, or given up. */
