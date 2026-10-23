@@ -1,9 +1,10 @@
-import { AGES, CIVS, KEG, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SICKNESS, SILK, STEP_BACK, TRIBUTE, WAY, secs } from '../sim/data';
+import { AGES, CIVS, CIV_IDS, KEG, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SICKNESS, SILK, STEP_BACK, TRIBUTE, WAY, secs } from '../sim/data';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, findsOf, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
 import type { AgeId, Building, GameState, Unit } from '../sim/types';
 import { R_FISH } from '../sim/types';
 import { isIdleCitizen } from './idle';
+import { laterTip, type Opening } from './opening';
 import { seasonAt } from '../sim/seasons';
 
 /**
@@ -55,6 +56,8 @@ const secsIn = (s: GameState) => s.tick / 20;
 const sighted = (s: GameState, me: number, kind: 'mammoth' | 'wolf' | 'boar' | 'raider') => s.animals.some((a) => a.kind === kind && s.players[me].vis[Math.floor(a.y) * s.w + Math.floor(a.x)]);
 
 const TIPS: Tip[] = [
+  // The people's own loop, a minute in, once the opening card has been read (#555 s8).
+  ...CIV_IDS.map((c): Tip => ({ id: `people-loop-${c}`, when: (s, me) => s.players[me].civ === c && secsIn(s) > 70, text: laterTip(c) })),
   { id: 'gather', when: (s) => secsIn(s) > 2, text: 'Drag a box around your <b>citizens</b>, then <b>right-click</b> berry bushes, trees or a deer to gather food and wood.' },
   { id: 'shore', when: (s, me) => s.homeland === 'shore' && secsIn(s) > 8 && !has(s, me, 'dock'), text: `${HOMELANDS.shore.icon} <b>The Shore</b>: few berries, but a rich shoal in the mere by home. Raise a <b>Dock</b> on its bank (<kbd>B</kbd> <kbd>D</kbd>) and train <b>fishing canoes</b>; they feed you while your citizens cut the wood they cost.` },
   { id: 'herds', when: (s) => s.homeland === 'herds' && secsIn(s) > 8, text: `${HOMELANDS.herds.icon} <b>The Herd Plains</b>: deer and a mammoth close by, few berries. Hunt with several citizens, put a <b>Hunting Camp</b> by the kills so meat doesn't spoil on the walk, and follow the herds out when they thin.` },
@@ -444,6 +447,15 @@ export class Tips {
     this.hide();
     this.gameTipsLeft = limit || 99;
     this.since = 0;
+  }
+
+  /** The first minute's card (#555 s8): shown at once, ahead of the hints, for a new match only. */
+  open(o: Opening): void {
+    if (this.off) return;
+    this.current = 'opening';
+    this.since = 0;
+    this.el.innerHTML = `<div class="tip-head">🧭 Your first minute: the ${o.people}</div><div>${o.lines.join('<br>')}</div><div class="tip-btns"><button data-tip-act="next">Got it</button><button data-tip-act="off">No more tips</button></div>`;
+    this.el.classList.remove('hidden');
   }
 
   update(s: GameState, me: number, dt: number): void {
