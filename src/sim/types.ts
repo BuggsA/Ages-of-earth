@@ -1002,6 +1002,8 @@ export interface AiMemory {
   markWalker?: { id: number; unit: number; since: number };
   /** The citizen walking out to its town's find (#588), and the tick it set out. */
   findWalker?: { unit: number; since: number };
+  /** The tick a Stone Age climb began to wait on the Prospector's Lodge (#540). */
+  lodgeHold?: number;
   /** Soldiers sent to take (or take back) a landmark, held there until it is the computer's. */
   markGuard?: { id: number; ids: number[]; since: number };
   /** Soldiers sent along on a far mammoth hunt; once idle (the beast down) they walk home. */
