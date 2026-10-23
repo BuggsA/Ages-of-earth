@@ -1170,3 +1170,33 @@ Built: the owner found the #424 column "reads worse" and asked for research befo
 Why I love it: the first thing a player sees is now the game they're about to play, seen the way a painting would see it: thatched huts by a lake, a mill under rain, a brick town on a hill.
 
 Next: a few chosen camera shots (a dock at dusk, an army crossing a ford) instead of always the town; the theme swelling when the name lands; the peoples' tiles showing a figure of each people's soldier; a "Continue" that shows the saved town's crest.
+
+## Designers' notes: the Atomic Age and the Missile Silo (#391 s1, #605, 2026-10-23, lane rules)
+
+Built: a sixth trunk epoch and one building in it. The Silo's launch names a point on the map, runs a public 45-second clock, then flattens a 5-tile ring (rival buildings and soldiers only). A silo that falls mid-count scrubs the launch; a launch empties it for 240 seconds and costs 600 gold and 200 stone. The computer raises a silo, aims at the best-covered rival spot and runs from rival warheads.
+
+Why I love it: deterrence is a different verb from fighting. Everyone watches the same clock, so the answer is a decision (scatter, guard, or hit their silo first), and the cost (a town that stalls to fuel one blow) is a door. Aeronauts and Lightning stay side roads off the Industrial.
+
+Next: the fission/fusion fork and fallout from seed #533, a seventh epoch (the Information Age: sight as the weapon), and a keepsake for the silo. Not seen: the feel of the clock in a real match, or the sound levels; headless runs only.
+
+## Designers' notes: fallout (#605 s2, grows seed #533, 2026-10-23, lane rules)
+
+Built: the ring a warhead struck stays poisoned for 90 seconds; every land unit in it, whoever's, loses 4 health a second. Buildings are spared, so the strike still pays for itself but the ground it wins can't be walked into at once. The computer pulls its people out of the ring.
+
+Why I love it: a strike now has a second beat. The attacker must choose between pressing in with a follow-up army and waiting out the haze; the defender gets a window to rebuild elsewhere. Next: wind-drift and a hardened unit (seed #533), the fission/fusion fork.
+
+## Designers' notes: the tide of battle (#606, own pitch, 2026-10-23, lane look)
+
+Built: a bar over each fight, your strength against what you can see of the foe's, with a word and a swing arrow; a click on it picks up your fighters there; a fight that turns from even to losing out of sight sounds a sagging horn, pings the minimap and sets Space to look. The read is Lanchester's square law (hit points × damage a second, each side), through the same `damageOf` the blows use, so counters, armour, veterancy and heroes all count; towers count with their garrisons' arrows. Fog holds: unseen foes are left out.
+
+Why I love it: the decisions that make a fight fun (reinforce, hold, fall back) need a read, and until now the first read a player got was the last soldier falling. With two fronts at once, the horn and the bar are what let a player be a general rather than a spectator.
+
+Next: the computer could use the same read to decide when its waves fall back (today each wave has its own rule); a faint line from the bar to the nearest idle soldiers who could join; a tide for sieges that counts the walls' hit points apart.
+
+## Designers' notes: Fission or Fusion (#605 s3, grows seed #533, 2026-10-23, lane rules)
+
+Built: two side ages off the Atomic Age, behind a silo, each shutting the other. Fission works the silo fast (25 s clock, 100 s refuel) and pays in your own ground: every launch poisons 3 tiles round the silo for a minute, so the layout of silos matters. Fusion is the opposite: a 70 s clock, a road that costs the earth and takes 150 s, but then up to three warheads aloft, no refuel, a cheaper shot, and a clean strike your army can follow.
+
+Why I love it: the same building plays two ways. Fission is a town that has to lay itself out around a hazard; Fusion is a patient economy that wins by volume and by walking in behind its own blasts. A rival answers Fusion by scattering from a long clock or by finding the silo during the 150 s the climb leaves the town open.
+
+Next: wind drift, a hardened unit, a deed for each road (seed #533), and a seventh epoch. Not seen: the feel of either branch in a real match.

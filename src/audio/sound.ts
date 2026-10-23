@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'tideTurns';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -492,6 +492,12 @@ export class Sound {
         this.brass(out, t + 0.55, N.G3, 0.7, 0.11);
         this.drum(out, t, 0.18);
         break;
+      case 'tideTurns':
+        // A fight turns against you (#606): one horn call that sags a fourth, over a muffled drum.
+        this.tone(out, t, { f: N.C4, to: N.G3, type: 'sawtooth', dur: 0.9, peak: 0.08, attack: 0.08, lp: 1100 });
+        this.tone(out, t, { f: N.C4 * 1.004, to: N.G3, type: 'sawtooth', dur: 0.9, peak: 0.05, attack: 0.1, lp: 800 });
+        this.drum(out, t + 0.05, 0.12);
+        break;
       case 'coin':
         this.tone(out, t, { f: 2093, dur: 0.09, peak: 0.08 });
         this.tone(out, t + 0.06, { f: 2637, dur: 0.18, peak: 0.07 });
@@ -749,6 +755,28 @@ export class Sound {
         this.tone(out, t, { f: 62, to: 22, dur: 1.8, peak: 0.6 });
         this.tone(out, t + 0.02, { f: 120, to: 40, dur: 0.6, peak: 0.25 });
         for (let i = 0; i < 9; i++) this.noise(out, t + 0.4 + i * 0.13 + (i % 2) * 0.04, { dur: 0.07, filter: 'bandpass', f: 1100 - i * 70, q: 2, peak: 0.07 - i * 0.005 });
+        break;
+      case 'siloLaunch':
+        // A warhead away (#605): a klaxon's two falling notes, then the long roar of the motor lighting.
+        for (let i = 0; i < 3; i++) {
+          this.tone(out, t + i * 0.9, { f: 880, to: 880, type: 'square', dur: 0.4, peak: 0.07 });
+          this.tone(out, t + 0.45 + i * 0.9, { f: 620, to: 620, type: 'square', dur: 0.4, peak: 0.07 });
+        }
+        this.noise(out, t + 2.4, { dur: 2.6, filter: 'lowpass', f: 300, to: 1400, q: 0.8, peak: 0.3, attack: 0.6 });
+        this.tone(out, t + 2.4, { f: 45, to: 90, dur: 2.6, peak: 0.25, attack: 0.5 });
+        break;
+      case 'siloBlast':
+        // The warhead lands (#605): a white crack, then a sub-bass swell that rolls out for seconds.
+        this.noise(out, t, { dur: 0.12, filter: 'highpass', f: 800, peak: 0.9 });
+        this.noise(out, t, { dur: 4, f: 700, to: 30, peak: 0.9, attack: 0.002 });
+        this.tone(out, t, { f: 48, to: 16, dur: 4, peak: 0.8 });
+        this.tone(out, t + 0.05, { f: 96, to: 28, dur: 1.4, peak: 0.3 });
+        break;
+      case 'siloScrub':
+        // A launch scrubbed (#605): the klaxon chokes off and a hollow thud of the hatch giving way.
+        this.tone(out, t, { f: 620, to: 140, type: 'square', dur: 0.5, peak: 0.06 });
+        this.tone(out, t + 0.3, { f: 70, to: 30, dur: 0.9, peak: 0.3 });
+        this.noise(out, t + 0.3, { dur: 0.7, filter: 'lowpass', f: 400, peak: 0.2 });
         break;
       case 'kegDoused':
         // A fuse stamped out (#577): a boot on the cord, the hiss choked off.

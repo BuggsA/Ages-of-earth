@@ -1497,6 +1497,23 @@ function dock(k: Kit, e: number, st: Style): void {
 
 // ---- Airfield --------------------------------------------------------------------------------------
 
+function silo(k: Kit, _e: number, st: Style): void {
+  // The Missile Silo (#605): a concrete collar round a hatch, the two doors thrown back on a pale warhead nose, hazard stripes and a red beacon.
+  k.box(2.9, 0.12, 2.9, '#6e6d66', 0, -0.02, 0);
+  k.cyl(1.25, 1.35, 0.35, 16, '#9b9a92', 0, 0, 0);
+  k.cyl(0.95, 0.95, 0.04, 16, '#17181c', 0, 0.35, 0);
+  k.cone(0.34, 1.3, 10, '#d9d9d2', 0, 0.2, 0);
+  k.cyl(0.35, 0.35, 0.08, 10, '#c0382c', 0, 1.0, 0);
+  const l = k.box(0.9, 0.06, 1.6, '#4a4d54', -0.75, 0.58, 0);
+  l.rotation.z = 0.9;
+  const r = k.box(0.9, 0.06, 1.6, '#4a4d54', 0.75, 0.58, 0);
+  r.rotation.z = -0.9;
+  for (let i = 0; i < 8; i++) k.box(0.18, 0.02, 0.1, i % 2 ? '#e6c22a' : '#1d1e24', -1.1 + i * 0.3, 0.37, 1.25);
+  k.team(k.box(0.7, 0.14, 0.04, TEAM, 0, 0.1, 1.38));
+  k.box(0.35, 0.9, 0.35, st.wall, 1.2, 0, -1.2);
+  k.glow(k.sphere(0.07, '#ff3a2a', 1.2, 1.0, -1.2));
+}
+
 function airfield(k: Kit, _e: number, st: Style): void {
   // A grass strip with a painted runway, a hangar with a curved roof, a control tower and a windsock.
   k.box(3.9, 0.05, 3.9, '#7f9a5a', 0, -0.02, 0);
@@ -1996,7 +2013,7 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
 
 const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare'>, (k: Kit, e: number, st: Style) => void> = {
   sapling: (k, e) => sapling(k, e),
-  towncenter, house, storehouse, huntcamp, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield,
+  towncenter, house, storehouse, huntcamp, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo,
 };
 
 const cache = new Map<string, THREE.BufferGeometry>();
@@ -2159,7 +2176,9 @@ function wayTouch(k: Kit, way: string, deep = false): void {
 }
 
 /** The baked model of a building in an epoch, in a player's color (`variant`: which way a wall piece joins its neighbors). */
-export function buildingGeometry(type: BuildingType, epoch: number, color: string, variant = 0, age?: AgeId, heirloom = ''): THREE.BufferGeometry {
+export function buildingGeometry(type: BuildingType, epochIn: number, color: string, variant = 0, age?: AgeId, heirloom = ''): THREE.BufferGeometry {
+  // The Atomic Age (#605) has one building of its own; every other model keeps its Industrial look.
+  const epoch = type === 'silo' ? epochIn : Math.min(epochIn, 4);
   const look = age && DRESSED_AGES.includes(age) && type !== 'wall' ? age : undefined;
   const held = heirloom.split(',');
   const marks = heirloomsFor(type).filter((id) => held.includes(id));
@@ -2168,9 +2187,9 @@ export function buildingGeometry(type: BuildingType, epoch: number, color: strin
   let g = cache.get(key);
   if (!g) {
     const k = new Kit();
-    if (type === 'wall') wall(k, epoch, STYLES[epoch], variant);
+    if (type === 'wall') wall(k, epoch, STYLES[Math.min(epoch, 4)], variant);
     else if (type === 'snare') snare(k, epoch, variant === 1);
-    else MAKERS[type](k, epoch, STYLES[epoch]);
+    else MAKERS[type](k, epoch, STYLES[Math.min(epoch, 4)]);
     const stack = STACKS[type];
     if (epoch >= 4 && stack) smokestack(k, stack[0], stack[1], stack[2]);
     if (look) ageTouches(k, type, look);

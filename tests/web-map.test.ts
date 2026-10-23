@@ -46,6 +46,6 @@ describe('web map', () => {
     expect(loadDiscovery()).toEqual(none());
     expect(() => saveDiscovery(none())).not.toThrow();
     expect(roadKey(ROADS[0])).toBe('stone>bronze');
-    expect(visibleAges(none())).toHaveLength(5);
+    expect(visibleAges(none())).toHaveLength(6);
   });
 });

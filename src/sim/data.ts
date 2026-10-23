@@ -23,6 +23,7 @@ export const EPOCHS: Epoch[] = [
   { name: 'Middle Ages', short: 'Medieval', cost: { food: 700, gold: 250, stone: 100 }, time: 50, blurb: 'Pikes, crossbows, knights, catapults and stone keeps.' },
   { name: 'Gunpowder Age', short: 'Gunpowder', cost: { food: 1000, gold: 600, stone: 250 }, time: 65, blurb: 'Muskets, cuirassiers, galleons, cannon and brick and tile.' },
   { name: 'Industrial Age', short: 'Industrial', cost: { food: 1400, gold: 900, stone: 400 }, time: 80, blurb: 'Rifles, field guns, ironclads, and the first aeroplanes.' },
+  { name: 'Atomic Age', short: 'Atomic', cost: { food: 1800, gold: 1500, stone: 700 }, time: 95, blurb: 'The Missile Silo: one warhead, a public countdown, and a town that guards it.' },
 ];
 export const LAST_EPOCH = EPOCHS.length - 1;
 
@@ -116,6 +117,9 @@ export interface Age {
    * it, and pays it out to mend the people's own living near it. The numbers are `RITE` (`fork.ts`).
    */
   rite?: boolean;
+  /** The fork past the Atomic Age (#605 s3): fission, raw power now (`FISSION`), or fusion, clean and limitless but slow (`FUSION`), in `silo.ts`. */
+  fission?: boolean;
+  fusion?: boolean;
   /** A people that raises again on the foundations of what fell (the Age of Reclaimers): see `RECLAIM` (`reclaim.ts`). */
   reclaim?: boolean;
   /** Citizens strip the rubble of fallen buildings into stock (the Age of Reclaimers, #503): see `SALVAGE` (`salvage.ts`). */
@@ -194,7 +198,7 @@ export const PATHS: Record<PathId, Path> = {
   },
 };
 
-export const TRUNK: AgeId[] = ['stone', 'bronze', 'middle', 'gunpowder', 'industrial'];
+export const TRUNK: AgeId[] = ['stone', 'bronze', 'middle', 'gunpowder', 'industrial', 'atomic'];
 
 /**
  * The basic routes (#555 s0, `docs/age-roads.md` spine §1): a plain style a player can pick and follow to a win on any
@@ -230,6 +234,7 @@ export const AGES: Record<AgeId, Age> = {
   middle: trunkAge(2, 'The crossroads: most side roads turn off here, and nothing is shut'),
   gunpowder: trunkAge(3, 'Guns and cannon that break any wall, and every road comes back to it'),
   industrial: trunkAge(4, 'The strongest plain arms and the deepest economy, with nothing shut'),
+  atomic: trunkAge(5, 'One warhead the whole map watches fall: a Missile Silo, dear to raise and to refuel'),
   aeronaut: {
     verb: 'Fight from forward Airfields: aircraft fly sorties on fuel, so where you build an Airfield is how far you reach',
     door: 'Foot, ranged, cavalry and siege cost more',
@@ -320,6 +325,7 @@ export const AGES: Record<AgeId, Age> = {
     door: 'No walls or gates: the fleet is the wall',
     good: 'Sea power: convoys carry more, and a rival\'s sunk cogs pay you',
     routes: ['navy'],
+    keepsake: { building: 'dock', does: 'its convoy yard: merchant ships trading from it sail escorted by warships on any road' },
     name: 'Age of Sail',
     short: 'Sail',
     tier: 2,
@@ -432,6 +438,29 @@ export const AGES: Record<AgeId, Age> = {
     no: { units: ['trader'], why: 'A people of the Blood-rite trades with no one: traders wait until it leaves the rite' },
     blood: true,
     rite: true,
+  },
+  // The fork past the Atomic Age (#605 s3, seed #533): two turns off it, each shunning the other, each changing how a silo is worked.
+  fission: {
+    verb: 'Fire the silo in half the time and again soon, and lay your silos far from home: each launch poisons the ground round your own',
+    door: 'Every launch poisons the ground round your own silo for a minute; Fusion is closed for good',
+    good: 'The quickest strike: a short clock and a short refuel, at a price in your own ground',
+    routes: ['army'],
+    name: 'Age of Fission',
+    short: 'Fission',
+    tier: 5,
+    blurb: 'Raw power now. A Missile Silo\'s clock is 25 seconds, not 45, and it refuels in 100, not 240. But the reactor leaks: each launch poisons 3 tiles round your own silo for 60 seconds, as fallout does (4 health a second to every land unit in it, yours too). Lay your silos away from your town and your fields. Take it, and the Age of Fusion is closed for good.',
+    fission: true,
+  },
+  fusion: {
+    verb: 'Keep several warheads in the air at once from one silo, clean: nothing you strike is poisoned, and the silo never needs refuelling',
+    door: 'A road that costs the earth and takes two and a half minutes, leaving the town exposed; a long 70 second clock; Fission is closed for good',
+    good: 'Limitless, clean strikes: up to three warheads aloft from one silo, and your armies may follow them in',
+    routes: ['economy'],
+    name: 'Age of Fusion',
+    short: 'Fusion',
+    tier: 5,
+    blurb: 'Clean and limitless, and ruinously dear. A Missile Silo keeps up to three warheads in the air at once and never needs refuelling, a launch costs 450 gold and 120 stone, and nothing it strikes is poisoned, so your army can follow the blast in. But the clock is 70 seconds, long enough for a rival to scatter or to find the silo, and the road here costs a fortune and takes 150 seconds in which the town is exposed. Take it, and the Age of Fission is closed for good.',
+    fusion: true,
   },
   steppe: {
     verb: 'Pack your Town Centers and Houses onto wagons and pitch them where the herds and the fight are',
@@ -952,6 +981,11 @@ export const ROADS: Road[] = [
     deed: { stat: 'levied', n: 6, text: 'Your people give 6 of their own to the levy' },
     blurb: 'A turn, not a climb: one branch of the fork at the end of the Path of Blood, where blood becomes a sacrament. Every Temple is an altar that takes blood from the enemy who fall near it and mends your own with it; priests come cheaper and work faster. What it gives up: the Transfusion Station, trade, some harvest, and siege at a dearer price. Take it, and Hemocraft is closed to your people for good.',
   },
+  // The fork past the Atomic Age (#605 s3): a Missile Silo is the clue; each branch shuns the other; each has a road back to the Atomic Age.
+  { from: 'atomic', to: 'fission', cost: { food: 1000, gold: 1200, stone: 600 }, time: 60, clue: 'silo', shuns: 'fusion', blurb: 'A turn, not a climb: raw power now. A silo\'s clock is 25 seconds and it refuels in 100, but every launch poisons the ground round your own silo for a minute. Take it, and Fusion is closed for good.' },
+  { from: 'fission', to: 'atomic', cost: { food: 300, gold: 300 }, time: 30, blurb: 'Shut the reactor: the ordinary Atomic Age, a 45 second clock and a 240 second refuel, and no poison round your own silos. Fusion stays closed.' },
+  { from: 'atomic', to: 'fusion', cost: { food: 2400, gold: 3000, stone: 1500 }, time: 150, clue: 'silo', shuns: 'fission', blurb: 'A turn, not a climb: clean and limitless, and ruinously dear. A silo keeps up to three warheads aloft and never needs refuelling, and nothing it strikes is poisoned, but the clock is 70 seconds and the road costs a fortune and 150 seconds. Take it, and Fission is closed for good.' },
+  { from: 'fusion', to: 'atomic', cost: { food: 300, gold: 300 }, time: 30, blurb: 'Quench the plasma: the ordinary Atomic Age, a 45 second clock, one warhead at a time, and fallout where you strike. Fission stays closed.' },
   { from: 'bloodrite', to: 'industrial', cost: { food: 300, gold: 200 }, time: 30, blurb: 'Put out the altar fires: the ordinary Industrial Age, with trade, full fields and siege at its usual price. The plunder ends and the Temples are Temples again. Hemocraft stays closed.' },
   // The first gateway (#577, the age road s5): saltpetre's only door, a turn off the Middle Ages into the Age of Alchemy, and from
   // there the only road to the Age of Sappers. A Siege Workshop is the clue; kegs ground at the mills are the Sappers' deed.
@@ -1085,7 +1119,7 @@ export interface UnitStats {
 
 /** Each line has one version per epoch (null where it isn't available yet). Units re-arm when their owner advances. */
 export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
-  citizen: [0, 1, 2, 3, 4].map((e) => ({
+  citizen: [0, 1, 2, 3, 4, 5].map((e) => ({
     name: 'Citizen',
     cls: 'citizen' as const,
     hp: 40 + e * 5,
@@ -1525,6 +1559,7 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   // The Age of Missions (#555 s12): raised by priests on a shore, in no rival's land; claims land, trains priests, pays a tithe (`MISSION`).
   mission: { name: 'Mission', size: 2, hp: 1000, cost: { wood: 100, gold: 60 }, time: 30, pop: 0, sight: 7, trains: ['priest'], drop: [], epoch: 2, shore: true, ages: ['missions'], builders: ['priest'], only: true, menu: 'eco', key: 'O', blurb: 'A whitewashed chapel and a bell on a far shore, raised by priests. Holds the land round it, trains priests, and pays a tithe that grows with its distance from your Town Center. Nothing in it shoots: a rival who reaches it razes it.' },
   caravanserai: { name: 'Caravanserai', size: 2, hp: 900, cost: { wood: 90, gold: 30 }, time: 25, pop: 0, sight: 6, trains: [], drop: [], epoch: 3, ages: ['silk'], menu: 'eco', key: 'C', blurb: 'A walled courtyard by the road where caravans rest. Raise it by a far trading post, in no one\'s land too: your traders\' trips to a post within 8 tiles of it pay a quarter more, traders and wagons within 4 tiles of it mend, and the land round it is yours, so rival traders crossing it pay your toll.' },
+  silo: { name: 'Missile Silo', size: 3, hp: 3000, cost: { wood: 300, stone: 400, gold: 700 }, time: 80, pop: 0, sight: 8, trains: [], drop: [], epoch: 5, menu: 'mil', key: 'M', blurb: 'A concrete collar round a hatch in the ground. Launch (M) names any point on the map: after a countdown every rival can see, the warhead flattens what stands there. Destroy the silo while it counts and the launch is scrubbed. Emptied by a launch, it must be refuelled before it can fire again.' },
   airfield: { name: 'Airfield', size: 4, hp: 2200, cost: { wood: 250, stone: 100, gold: 150 }, time: 60, pop: 0, sight: 8, trains: ['fighter', 'bomber'], drop: [], epoch: 4, menu: 'mil', key: 'F', blurb: 'Builds fighters and bombers. Fighters hunt aircraft; bombers wreck towns.' },
 };
 
@@ -1731,6 +1766,8 @@ export interface Civ {
   nomad?: boolean;
   /** The managed wood (#501, `COPPICE`): no farms; its felled trees grow back near its stores, it plants saplings, and its snares feed it. */
   coppice?: boolean;
+  /** The set line (#501, `LONGBOW`): its bowmen who stand still `LONGBOW.after` seconds draw farther and harder; a step breaks it. */
+  longbow?: boolean;
 }
 
 
@@ -1767,6 +1804,13 @@ export const POLIS = { arm: { wood: 20 } as Cost, home: 14, aiShare: 0.2, aiKeep
  * soldiers off the work (and only through epoch `aiUntil`: after it the army is wanted for war and rites), trains foot until it has `aiHands` + `aiHandsEpoch` for each epoch, sends `aiStone` of its working soldiers to stone, and surveys for bog iron from `aiSurvey` hands (its citizens are few).
  */
 export const LEGION = { citizens: 12, perEpoch: 3, rate: 0.8, watch: 0.8, aiCitizenWood: 0.25, aiGuard: 4, aiHands: 10, aiHandsEpoch: 4, aiStone: 0.3, aiUntil: 2, aiSurvey: 14 };
+
+/**
+ * The set line (#501, the Britons): a ranged soldier (not siege) of a longbow people that has not moved for `after` seconds is set,
+ * and shoots `range` tiles farther and `attack` harder until it moves again. The computer needs no new play, for its archers
+ * already stop to shoot, but a rival's cavalry and ranged soldiers can answer it: charge before the line sets, or out-reach it.
+ */
+export const LONGBOW = { after: 3, range: 1.5, attack: 3 };
 
 /**
  * The household tax (#501, the Chinese): a household people's citizens mine no gold or bog iron. Instead every `every` seconds each
@@ -1851,10 +1895,11 @@ export const CIVS: Record<CivId, Civ> = {
   },
   britons: {
     name: 'Britons',
-    blurb: `The managed wood. A British town tills no fields: its food is the wood's. Snares among standing trees fill ${COPPICE.snare} times as fast and hold half again as much, and gain from every farming technology; a tree felled near your stores is coppiced, its stool growing a full tree again in ${COPPICE.regrow / 60} minutes, and citizens plant Saplings (I) to grow a wood where you want one. Fell a stand for timber and the snares beside it starve until it grows back; a rival who fells your wood clears it for good. Archers and their heirs reach 1 tile farther, and archery ranges train 25% faster.`,
-    verb: 'Work the wood in turns: fell one stand for timber while the snares in the next feed you, and plant saplings where you want a wood',
-    door: 'No Farm is ever tilled: food is the snares, the hunt and the berries, and a wood felled or lost is a field lost',
+    blurb: `The managed wood and the set line. A British town tills no fields: its food is the wood's. Snares among standing trees fill ${COPPICE.snare} times as fast and hold half again as much, and gain from every farming technology; a tree felled near your stores is coppiced, its stool growing a full tree again in ${COPPICE.regrow / 60} minutes, and citizens plant Saplings (I) to grow a wood where you want one. Fell a stand for timber and the snares beside it starve until it grows back; a rival who fells your wood clears it for good. In war, a Briton bowman who has stood still ${LONGBOW.after} seconds is set: he draws the longbow to the full, reaching ${LONGBOW.range} tiles farther and striking ${LONGBOW.attack} harder, until he takes a step. Archers reach 1 tile farther always, and archery ranges train 25% faster.`,
+    verb: 'Work the wood in turns, felling one stand for timber while the snares in the next feed you; and in war pick your ground and plant the line, for bowmen who stand still draw the longbow to the full',
+    door: 'No Farm is ever tilled, so a wood felled or lost is a field lost; and a bowman on the move is plain, so a line caught marching or charged before it sets breaks the longbow',
     coppice: true,
+    longbow: true,
     add: { range: 1 },
     mul: { rangedTrain: 0.75 },
   },
@@ -2037,9 +2082,9 @@ export const SIGNATURES: Record<CivId, Signature> = {
 // ---- Economy ---------------------------------------------------------------------------------------
 
 export const POP_MAX = 150;
-export const CARRY = [10, 12, 14, 16, 18];
+export const CARRY = [10, 12, 14, 16, 18, 18];
 /** What a fishing boat holds, by epoch. */
-export const FISH_CARRY = [15, 18, 21, 24, 30];
+export const FISH_CARRY = [15, 18, 21, 24, 30, 30];
 /** Gathering per second, before the epoch bonus. */
 export const GATHER: Record<'tree' | 'berry' | 'stone' | 'gold' | 'farm' | 'meat' | 'fish' | 'bog', number> = { tree: 0.65, berry: 0.8, stone: 0.55, gold: 0.55, farm: 0.6, meat: 1.0, fish: 0.75, bog: 0.45 };
 export const EPOCH_GATHER_BONUS = 0.1;
@@ -2362,6 +2407,7 @@ export const EPOCH_START_RES = [
   { food: 600, wood: 500, stone: 300, gold: 450 },
   { food: 900, wood: 700, stone: 500, gold: 700 },
   { food: 1200, wood: 900, stone: 650, gold: 950 },
+  { food: 1500, wood: 1000, stone: 800, gold: 1300 },
 ];
 export const START_CITIZENS = 5;
 /** Deathmatch: everyone starts rich. */
@@ -2693,7 +2739,7 @@ export function unitEpoch(type: UnitType): number {
  * nearest claimant (ties go to the older building). Shown only, so far; attrition and building limits
  * are later steps of the seed.
  */
-export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6, huntcamp: 4, warcamp: 3, caravanserai: 5, mission: 5 };
+export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6, silo: 5, huntcamp: 4, warcamp: 3, caravanserai: 5, mission: 5 };
 
 /**
  * War Camps (#303): a finished camp with none of its people's soldiers (land units that fight) within
@@ -2736,6 +2782,34 @@ export const KEG = { ore: 20, time: 30, most: 20, lay: 1.2, fuse: 8, reach: 2, b
  * campaign with a keg each at the nearest rival building within `near` tiles of them, towers and Town Centers first, passing over
  * any with a rival standing within `guard` tiles of it.
  */
+/**
+ * The Missile Silo (#605, the Atomic Age): `launch` names a point; `fuse` seconds later (a countdown every player sees) the warhead
+ * lands: every rival building within `reach` tiles takes `building`, every rival unit on the ground within `reach` takes `unit`.
+ * Destroying the silo while it counts scrubs the launch. A launch empties the silo; refuelling costs `fuel` and takes `refuel`
+ * seconds, paid when the launch is made. A people may hold `most` standing silos' worth of warheads at once.
+ */
+/**
+ * Fallout (#605 s2, grows seed #533): the ring a warhead struck stays poisoned for `time` seconds. Every second each land unit
+ * standing in it, whoever's it is, takes `dps` damage; buildings are not hurt. A town can be flattened and still not be walked into.
+ */
+export const FALLOUT = { time: 90, dps: 4 };
+/**
+ * The Age of Fission (#605 s3, seed #533): raw power now. A silo's fuse is `fuse` seconds, it refuels in `refuel`, and each launch
+ * poisons `reach` tiles round your own silo for `ownFallout` seconds (`silo.ts`). The Age of Fusion: clean and limitless but slow.
+ * The fuse is `fuse` seconds, a silo refuels at once and keeps up to `air` warheads aloft, a launch costs `fuel`, and nothing it
+ * strikes is poisoned. Its road costs the earth and takes `road` seconds, leaving the town exposed while it builds.
+ */
+export const FISSION = { fuse: 25, refuel: 100, ownFallout: 60, reach: 3 };
+export const FUSION = { fuse: 70, refuel: 0, air: 3, fuel: { gold: 450, stone: 120 } };
+export const SILO = { fuse: 45, reach: 5, building: 1500, unit: 400, fuel: { gold: 600, stone: 200 }, refuel: 240, most: 2 };
+/**
+ * The computer and the silo (#605): in the Atomic Age a clever computer raises one silo once it has `hands` citizens, waits `wait`
+ * seconds after it stands, then launches whenever a point would catch `worth` or more of a rival's buildings (a Town Center counts
+ * `heart`) and soldiers (each counts `soldier`) inside the ring. Its soldiers and citizens run from the ring of a rival warhead
+ * in the air, `margin` tiles past its edge. On a coin of its own it takes the fork (`fork` odds, then `fusion` odds of Fusion over Fission)
+ * once its silo has stood `forkAfter` seconds and it holds half the road's price. An Industrial computer bound for Aeronauts or Lightning holds off the climb `hold` seconds.
+ */
+export const AI_SILO = { fork: 0.7, fusion: 0.4, forkAfter: 120, hold: 300, hands: 20, wait: 20, worth: 6, heart: 4, soldier: 2, margin: 1.5 };
 export const AI_KEG = { take: 0.5, ore: 80, kegs: 6, mills: 2, hold: 180, sappers: 2, near: 12, guard: 4, every: 2 };
 
 /**
@@ -2867,3 +2941,14 @@ export const AI_WILD = { mammothAt: 10, party: 5, mammothNear: 22, pack: 3, clea
 export const AI_HORDE = { milkers: 5, spare: 40, least: 3, hold: 300, stay: 300, cavalry: 0.9, riders: 6, clear: 12, weary: 3, foes: 4, alarm: 9, redo: 150, answer: 2 };
 
 export const AI_STEPPE = { take: 0.35, at: 12, campFrom: 8, campTo: 30, hunters: 6, reach: 26, spare: 100, perMilker: 3, every: 150, hungry: 0.5, bare: 16, move: 10, far: 18, drive: 40, stay: 90 };
+
+/**
+ * The tide of battle (#606), a read of each fight a player can see. A fight is where a unit of theirs or a foe they
+ * see struck or was struck within `recent` seconds with one of the other side within `near` tiles; such units
+ * within `join` tiles of a fight's middle are one fight, and every fighter within `reach` of it is counted. Each
+ * side's strength is its hit points times its damage a second (Lanchester's square law); the share of the two is
+ * the tide. The words: `crushing` and over, `winning`, `even` down to `losing`, then routed. A fight whose tide
+ * falls under `turn` that was at least `even` warns the player, no more often than every `warnEvery` seconds; a
+ * side counts at most `most` fighters' blows against at most `most` targets (a sample, so a huge melee stays cheap).
+ */
+export const BATTLE = { recent: 3, near: 8, join: 9, reach: 10, crushing: 0.8, winning: 0.6, even: 0.4, losing: 0.2, turn: 0.38, warnEvery: 20, most: 48 };
