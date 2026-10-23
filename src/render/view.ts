@@ -115,6 +115,7 @@ export class View {
   readonly rubble = new RubbleView();
   readonly caches = new CacheView();
   readonly kegs = new KegView();
+  private falloutTick = -1;
   readonly landmarks = new LandmarksView();
   /** When ground relics next sparkle. */
   private relicGlint = 0;
@@ -470,6 +471,17 @@ export class View {
     this.rubble.update(s, !!ageDef(p).salvage, (x, y) => this.reveal || this.sees(x, y));
     this.caches.update(s, (x, y) => this.reveal || this.sees(x, y), (id) => this.units.drawn.get(id) ?? null);
     this.kegs.update(s, (x, y) => this.reveal || this.sees(x, y), (id) => this.units.drawn.get(id) ?? null);
+    // Fallout (#605 s2): poisoned ground breathes a sickly green haze and drifting motes, a few times a second, where the viewer sees.
+    if (s.fallout && s.tick !== this.falloutTick && s.tick % 4 === 0) {
+      this.falloutTick = s.tick;
+      for (const f of s.fallout) {
+        if (!this.reveal && !this.sees(f.x, f.y)) continue;
+        const a = (s.tick * 0.37 + f.id) % 6.283;
+        const r = SILO.reach * (0.3 + ((s.tick / 4 + f.id) % 7) / 10);
+        const at = this.ground(s, f.x + Math.cos(a) * r, f.y + Math.sin(a) * r, 0.2);
+        this.effects.burst(at, { count: 2, speed: 0.25, up: 0.5, life: 2.2, size: 0.4, grow: 1.4, gravity: -0.15, drag: 1, soft: true, colors: ['#8fae3a', '#6f8c2e', '#a6bf4e'] });
+      }
+    }
     this.ruins.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     this.finds.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     this.landmarks.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));

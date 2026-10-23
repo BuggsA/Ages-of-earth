@@ -1170,3 +1170,9 @@ Built: a sixth trunk epoch and one building in it. The Silo's launch names a poi
 Why I love it: deterrence is a different verb from fighting. Everyone watches the same clock, so the answer is a decision (scatter, guard, or hit their silo first), and the cost (a town that stalls to fuel one blow) is a door. Aeronauts and Lightning stay side roads off the Industrial.
 
 Next: the fission/fusion fork and fallout from seed #533, a seventh epoch (the Information Age: sight as the weapon), and a keepsake for the silo. Not seen: the feel of the clock in a real match, or the sound levels; headless runs only.
+
+## Designers' notes: fallout (#605 s2, grows seed #533, 2026-10-23, lane rules)
+
+Built: the ring a warhead struck stays poisoned for 90 seconds; every land unit in it, whoever's, loses 4 health a second. Buildings are spared, so the strike still pays for itself but the ground it wins can't be walked into at once. The computer pulls its people out of the ring.
+
+Why I love it: a strike now has a second beat. The attacker must choose between pressing in with a follow-up army and waiting out the haze; the defender gets a window to rebuild elsewhere. Next: wind-drift and a hardened unit (seed #533), the fission/fusion fork.
