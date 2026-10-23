@@ -166,6 +166,12 @@ const TIPS: Tip[] = [
     text: `Some worlds hold <b>bog iron</b>, salt, saltpetre or blood-iron, and some don't; some ages open only with them. A <b>${BUILDINGS.prospector.name}</b> (<kbd>B</kbd> <kbd>${BUILDINGS.prospector.key}</kbd>, a little food and wood) answers yes or no for each, never where.`,
   },
   {
+    id: 'find',
+    // A find (#588) lies unclaimed near home and the player has seen its tile.
+    when: (s, me) => !s.scenario && secsIn(s) > 60 && !!s.finds?.some((f) => f.by < 0 && f.near === me && s.players[me].seen[Math.floor(f.y) * s.w + Math.floor(f.x)] === 1),
+    text: 'Something odd stands a short walk from home: a wreck, a cairn, a salt lick, a fallen star, a hermit\'s shrine or a hunters\' stash (a ringed dot on the minimap). Send a <b>citizen</b> to stand on it: it pays a little, and tells you what this land holds.',
+  },
+  {
     id: 'chart',
     // A lodge in the Bronze Age (#565): Chart the Veins marks where each key resource lies.
     when: (s, me) => !s.scenario && s.players[me].epoch >= 1 && has(s, me, 'prospector') && !s.players[me].chart && findsOf(s).some((k) => k !== 'ruin'),
