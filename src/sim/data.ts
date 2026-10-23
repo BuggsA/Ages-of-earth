@@ -1,4 +1,4 @@
-import type { AgeId, PathId, LandmarkKind, BuildingType, CivId, Cost, Difficulty, Domain, MapSize, MapType, Res, TechId, UnitType, PlayerStats, RareId, KeyId, WayId, HomelandId } from './types';
+import type { AgeId, PathId, FindKind, LandmarkKind, BuildingType, CivId, Cost, Difficulty, Domain, MapSize, MapType, Res, TechId, UnitType, PlayerStats, RareId, KeyId, WayId, HomelandId } from './types';
 
 /** Every number in the game lives here. */
 
@@ -1349,6 +1349,8 @@ export const LANDMARKS = {
  * it sends up to `guard` of them to take (or take back) the nearest landmark in reach that a rival keeps
  * or is claiming, and holds them there until it's no longer the rival's, or `hold` seconds pass.
  */
+/** The computer and its find (#588): seconds a citizen may spend walking out to it. */
+export const AI_FIND = { walk: 120 };
 export const AI_MARK = { /** In a Lords of the Land match: reach over the whole map, and the band that goes after a landmark. */ lordsReach: 400, lordsParty: 2, escort: 2, far: 28, townAt: 8, near: 44, rival: 0.75, walk: 150, party: 3, guard: 5, hold: 120, linger: 20,
   /** The walker halts when its escort trails it by more than this many tiles, and goes on once they close up. */
   lead: 9,
@@ -2142,6 +2144,33 @@ export const PROSPECTOR: { keys: Record<KeyId, { name: string; icon: string }> }
     bloodiron: { name: 'Blood-iron', icon: '🩸' },
     ruin: { name: 'Ancient ruins', icon: '🏛️' },
   },
+};
+/**
+ * Finds (#588, `docs/age-roads.md` rule 5): one mark of the land stands near each town, `ring[size]` tiles out (the
+ * same for every town, within `fair`; looser only when the map allows nothing better), at least `spacing` tiles from
+ * anything else laid on the map. Each speaks of one key resource this world holds, dealt from a shuffled hand of
+ * what the world holds, so a hint never points at a shut road (a world that holds none has hunters' stashes, which say so). The first people to put a land unit within `reach`
+ * tiles of one takes its `reward` and learns of the resource (`Player.leads`): the lodge's yes for that one resource,
+ * and a mark on the minimap at the nearest of it. The computer sends its first idle soldier or citizen when its
+ * town has `citizens`, after `after` seconds.
+ */
+export const FINDS = {
+  ring: { small: 18, medium: 21, large: 24 } as Record<MapSize, number>,
+  fair: 0.75,
+  spacing: 7,
+  reach: 1.6,
+  after: 90,
+  citizens: 8,
+  until: 1,
+  idBase: 1_100_000_000,
+  kinds: {
+    wreck: { key: 'bogIron', name: 'A nailed wreck', icon: '⚓', reward: { wood: 80 }, hint: "The ribs of an old boat, held together with rust-red nails. Bog iron lies in this land." },
+    cairn: { key: 'bloodiron', name: 'A battlefield cairn', icon: '🗿', reward: { stone: 60 }, hint: 'Spear-heads piled under stones, dark as dried blood. Blood-iron lies in this land.' },
+    lick: { key: 'salt', name: 'A salt lick', icon: '🧂', reward: { food: 100 }, hint: 'Every game trail runs to this white crust. Salt lies in this land.' },
+    meteor: { key: 'saltpetre', name: 'A fallen star', icon: '☄️', reward: { stone: 60 }, hint: 'A black stone in a scorched hollow, pale crystals on the grass round it. Saltpetre lies in this land.' },
+    stash: { key: null, name: "A hunters' stash", icon: '🧺', reward: { food: 100 }, hint: 'A cache the first hunters left: dried meat and bone needles, and nothing else. No hidden roads lie in this land: the plain ones are the ones to take.' },
+    shrine: { key: 'ruin', name: "A hermit's shrine", icon: '🛖', reward: { gold: 40 }, hint: 'A hermit tends stones older than any town and tells you where they stand. Ancient ruins lie in this land.' },
+  } as Record<FindKind, { key: KeyId | null; name: string; icon: string; reward: Cost; hint: string }>,
 };
 /**
  * Deep veins (#356): rare ores that only some seeds hold. Each is rolled by its own dice (`chance`), then laid as

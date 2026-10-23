@@ -1130,6 +1130,14 @@ Why I love it: it takes two things the game already had, packs and transports th
 
 Next: a keepsake (a Dock that keeps banking holds after you leave?), longship looks (dragon prows, a striped sail: lane look), the computer meeting its landing parties with the ship instead of waiting at the Dock, and the other two crossings in the spine (Chariots: Iron + Steppe; Missions: Pilgrim + Sail). Not yet seen in a browser: the hold chip, the stow coins, the tips.
 
+## Designers' notes: finds in scouting range (#588, #555 s9, 2026-10-23)
+
+Built: a mark of the land near every town, the same distance out for each: a nailed wreck, a battlefield cairn, a salt lick, a fallen star, a hermit's shrine. The first people to walk a unit onto one takes a small gift and learns, without a lodge, that this world holds the resource it speaks of, with a dashed ring on the minimap at the nearest of it. A world that holds none has a hunters' stash that says so.
+
+Why I love it: the first minutes had a scout with nothing to find. Now the opening forks: send a citizen out to chase the hint (a road, a vein to dig, or a ruin to dig out early), or leave it and play the plain roads. A rival can walk onto yours, so the walk is a small gamble. And because a find only ever speaks of what the world holds, it is a clue and never a lie.
+
+Next: the lodge and the age panel reading leads for every key, a find that can stand in for the lodge's "this world lacks" answer, finds on the web map, a find that is a short fight (a den beside it), and a tip that points a new player at theirs.
+
 ## Designers' notes: the title as an opening shot (#421, 2026-10-23)
 
 Built: the owner found the #424 column "reads worse" and asked for research before pixels. What the research and the games I know agree on: the best front pages are one strong image of the game's own world with depth and light (a horizon, not a floor), a name that owns the screen, very few choices in plain words, a little motion and sound on arrival, and setup kept for later (BioShock's lighthouse, the menus of Civilization and Age of Empires). Ours had a high noon camera on flat grass, a dark slab over a third of the screen, and HTML form fields on the first page. Now the camera sits low at the golden hour and aims into the land with a slow sway; the map's edge melts into the sky and its borders are hidden; the name and five ways in rise in; the setup and the rules live in sheets, with the peoples as crests.
@@ -1137,4 +1145,3 @@ Built: the owner found the #424 column "reads worse" and asked for research befo
 Why I love it: the first thing a player sees is now the game they're about to play, seen the way a painting would see it: thatched huts by a lake, a mill under rain, a brick town on a hill.
 
 Next: a few chosen camera shots (a dock at dusk, an army crossing a ford) instead of always the town; the theme swelling when the name lands; the peoples' tiles showing a figure of each people's soldier; a "Continue" that shows the saved town's crest.
-

@@ -31,6 +31,7 @@ import { stockPosts } from './oretrade';
 import { sortieStep } from './sortie';
 import { fairStep } from './fair';
 import { landmarkStep } from './landmarks';
+import { findStep } from './finds';
 import { tidingStep } from './tidings';
 import { atPost } from './trade';
 import { modsOf, trainTimeFor } from './stats';
@@ -40,7 +41,7 @@ import { householdStep } from './household';
 import { sickStep } from './sickness';
 import { seraiStep, tollStep } from './passage';
 import { mercStep } from './merc';
-import { KIN, NOMAD } from './data';
+import { FINDS, KIN, NOMAD } from './data';
 import { ageOf, chartLand, isHire, barred, journeyOf, markKeepsake, noteWalked, trainsAt, workSteps } from './ages';
 import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, HomelandId, MapSize, MapType, Player, UnitType } from './types';
 import { RARES, RES, R_FISH, R_NONE } from './types';
@@ -214,6 +215,8 @@ export function createGame(setup: GameSetup): GameState {
       a.homeY = c.y;
     }
   }
+  // Finds (#588) take ids from a range of their own too, so they renumber nothing.
+  if (map.finds.length) s.finds = map.finds.map((f, k) => ({ id: FINDS.idBase + k, x: f.x, y: f.y, kind: f.kind, key: f.key, near: f.near, by: -1 }));
   // Born on the move (#501): a nomad people starts with its flock about the camp.
   for (const p of s.players) if (isNomad(p)) giftFlock(s, p, NOMAD.start);
   countPop(s);
@@ -566,6 +569,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   updateShots(s, sp, (a, damage, x, y) => hitAnimal(s, a, damage, x, y));
   updateRelics(s);
   landmarkStep(s);
+  findStep(s);
   elmoStep(s);
   galvanicStep(s);
   reclaimStep(s);
