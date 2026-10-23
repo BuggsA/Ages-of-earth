@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { asleep, keepsakeOf, leaving, workRate } from '../src/sim/ages';
 import { findSpot } from '../src/sim/ai';
 import { applyCommand } from '../src/sim/commands';
-import { AGES, BUILDINGS, KEG, LIGHTNING, TICK_HZ, TRUNK } from '../src/sim/data';
+import { AGES, BUILDINGS, CONVOY, KEG, LIGHTNING, TICK_HZ, TRUNK } from '../src/sim/data';
+import { convoyShare } from '../src/sim/convoy';
 import { trainCostFor } from '../src/sim/stats';
 import { fairShare } from '../src/sim/fair';
 import { createGame, enterAge, step } from '../src/sim/game';
@@ -188,5 +189,17 @@ describe('the Sea-Raiders keep their longship yard', () => {
     const kept = trainCostFor(s, 0, 'transport', 'dock', { x: 0, y: 0, keep: 'searaider' });
     expect(kept.wood).toBe(Math.round(full.wood! * 0.8));
     expect(trainCostFor(s, 0, 'transport', 'dock', { x: 0, y: 0, keep: 'alchemy' })).toEqual(full);
+  });
+});
+
+describe('the Sail keeps its convoy yard', () => {
+  it('a Dock kept from the Sail still sends an escorted cog out for more, on any road', () => {
+    const s = game('middle', 3);
+    expect(AGES.sail.keepsake!.building).toBe('dock');
+    const cog = spawnUnit(s, 0, 'cog', tc(s).x, tc(s).y);
+    spawnUnit(s, 0, 'warship', tc(s).x + 1, tc(s).y);
+    expect(convoyShare(s, cog, {})).toBe(1);
+    expect(convoyShare(s, cog, { keep: 'alchemy' })).toBe(1);
+    expect(convoyShare(s, cog, { keep: 'sail' })).toBe(CONVOY.pay);
   });
 });

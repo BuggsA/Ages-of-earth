@@ -322,6 +322,7 @@ export const AGES: Record<AgeId, Age> = {
     door: 'No walls or gates: the fleet is the wall',
     good: 'Sea power: convoys carry more, and a rival\'s sunk cogs pay you',
     routes: ['navy'],
+    keepsake: { building: 'dock', does: 'its convoy yard: merchant ships trading from it sail escorted by warships on any road' },
     name: 'Age of Sail',
     short: 'Sail',
     tier: 2,

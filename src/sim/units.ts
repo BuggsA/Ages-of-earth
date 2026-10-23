@@ -1598,7 +1598,7 @@ function seaTradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>):
       return;
     }
     o.market = d.id;
-    const escort = convoyShare(s, u);
+    const escort = convoyShare(s, u, d);
     u.carry = Math.max(1, Math.min(TRADE.max, Math.floor(tripGold(s, u.owner, d, post, true) * escort)));
     u.carryRes = 'gold';
     o.flood = true;
