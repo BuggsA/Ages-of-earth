@@ -7,6 +7,7 @@ import { buildTimeFor, buildingCostFor, modsOf } from './stats';
 import { flooded } from './flood';
 import { loadAt, workShare } from './sickness';
 import { mineable } from './household';
+import { felled } from './coppice';
 import { isNomad } from './nomad';
 import { ageDef, canRaise, inField, prospect } from './ages';
 import { legionKind, legionary } from './legion';
@@ -382,6 +383,8 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
     workEvent(s, u, u.act, tx, ty);
     if (s.amount[o.tile] <= 0) {
       clearResource(s, o.tile);
+      // The managed wood (#501): a coppice people's stool stays to grow again, near its stores.
+      if (kind === R_TREE) felled(s, u.owner, o.tile);
       s.events.push({ k: 'depleted', tile: o.tile });
     }
     if (u.carry >= cap) {

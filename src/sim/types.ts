@@ -19,7 +19,7 @@ export type UnitType =
 export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
   | 'towncenter' | 'house' | 'storehouse' | 'farm' | 'barracks' | 'range' | 'stable' | 'tower'
-  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai' | 'drainrig' | 'transfusion' | 'bloodtower' | 'snare' | 'prospector' | 'mission';
+  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai' | 'drainrig' | 'transfusion' | 'bloodtower' | 'snare' | 'prospector' | 'mission' | 'sapling';
 /** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
 export type Difficulty = 'gentle' | 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
@@ -402,6 +402,13 @@ export interface Rubble {
   done: number;
   /** The tick it is cleared away. */
   until: number;
+}
+
+/** A tree growing on a tile (#501, the managed wood): from the tick it was cut or planted to the tick it stands full again. */
+export interface Stool {
+  tile: number;
+  from: number;
+  at: number;
 }
 
 /** A powder keg laid at the foot of a building, its fuse burning (#577, the Age of Sappers, `powder.ts`). */
@@ -788,6 +795,8 @@ export type GameEvent =
   | { k: 'deliver'; owner: number; res: Res; amount: number; x: number; y: number; rare?: RareId }
   | { k: 'work'; id: number; owner: number; act: Act; x: number; y: number }
   | { k: 'depleted'; tile: number }
+  /** A coppice stool or a planted sapling (#501) grew into a full tree on `tile`. */
+  | { k: 'regrown'; tile: number }
   /** The Shore's spring (#482): the shoals left grew by `grew` fish in all, and `seeded` new shoals were laid. */
   | { k: 'spawned'; grew: number; seeded: number }
   | { k: 'season'; i: number }
@@ -910,6 +919,8 @@ export interface GameState {
   animals: Animal[];
   /** Carcasses that are spoiling: the tile, the tick it fell, what it held (old saves have none). */
   carcasses?: { tile: number; born: number; full: number }[];
+  /** Coppice stools and planted saplings growing into trees (#501, `coppice.ts`), in the order they were cut or planted; absent until the first. */
+  stools?: Stool[];
   /** Per tile: the tick cropped grass grows back (#308), made when the first sheep is; absent until then. */
   grazed?: Int32Array;
   relics: Relic[];

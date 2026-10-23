@@ -39,6 +39,7 @@ import { modsOf, trainTimeFor } from './stats';
 import { attrition } from './borders';
 import { tributeStep } from './tribute';
 import { householdStep } from './household';
+import { coppiceStep } from './coppice';
 import { sickStep } from './sickness';
 import { seraiStep, tollStep } from './passage';
 import { mercStep } from './merc';
@@ -493,7 +494,7 @@ function checkVictory(s: GameState): void {
     // Fields, snares and walls alone don't keep a people alive, nor do unarmed boats (fishing boats, merchant
     // ships): none of them can build or fight, so a people down to them can never come back, and a rival
     // at its population cap with no fleet could never sink them.
-    const alive = s.ents.some((e) => e.owner === p.id && e.hp > 0 && !(e.kind === 'building' && (e.type === 'farm' || e.type === 'wall' || e.type === 'gate' || e.type === 'snare')) && !(e.kind === 'unit' && (e.type === 'fisher' || e.type === 'cog')));
+    const alive = s.ents.some((e) => e.owner === p.id && e.hp > 0 && !(e.kind === 'building' && (e.type === 'farm' || e.type === 'wall' || e.type === 'gate' || e.type === 'snare' || e.type === 'sapling')) && !(e.kind === 'unit' && (e.type === 'fisher' || e.type === 'cog')));
     if (alive) continue;
     p.defeated = true;
     for (const e of s.ents) if (e.owner === p.id) e.hp = 0;
@@ -583,6 +584,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   attrition(s);
   tributeStep(s);
   householdStep(s);
+  coppiceStep(s);
   sickStep(s);
   tollStep(s);
   mercStep(s);

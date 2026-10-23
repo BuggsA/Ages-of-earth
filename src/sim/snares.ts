@@ -1,4 +1,5 @@
-import { SNARE, secs } from './data';
+import { CIVS, COPPICE, SNARE, secs } from './data';
+import { modsOf } from './stats';
 import { seasonAt } from './seasons';
 import { R_TREE } from './types';
 import type { Building, GameState } from './types';
@@ -34,11 +35,18 @@ export function snareSpot(s: GameState, tx: number, ty: number): 'woods' | 'snar
   return treesNear(s, tx, ty) < SNARE.need ? 'woods' : null;
 }
 
-/** Food a second a snare catches now: its woods, the season. */
+/** Whether a snare's people keeps a managed wood (#501, the Britons): its snares are its fields. */
+const managed = (s: GameState, b: Building): boolean => !!CIVS[s.players[b.owner]?.civ]?.coppice;
+
+/** Food a second a snare catches now: its woods, the season; a managed wood's snares (#501) catch `COPPICE.snare` times as fast, and gain as fields do from farming. */
 export function snareRate(s: GameState, b: Building): number {
   const woods = Math.min(1, treesNear(s, b.tx, b.ty) / SNARE.full);
-  return SNARE.rate * woods * (seasonAt(s) === 3 ? SNARE.winter : 1);
+  const kept = managed(s, b) ? COPPICE.snare * modsOf(s, b.owner).farm : 1;
+  return SNARE.rate * woods * kept * (seasonAt(s) === 3 ? SNARE.winter : 1);
 }
+
+/** The most food a snare holds: half again as much in a managed wood (#501). */
+export const snareCap = (s: GameState, b: Building): number => SNARE.cap * (managed(s, b) ? COPPICE.cap : 1);
 
 /** Run each tick: once a second every finished snare fills by its rate, up to its cap. */
 export function fillSnares(s: GameState): void {
@@ -46,8 +54,9 @@ export function fillSnares(s: GameState): void {
   for (const e of s.ents) {
     if (!isSnare(e) || !e.built) continue;
     const had = e.snared ?? 0;
-    if (had >= SNARE.cap) continue;
-    e.snared = Math.min(SNARE.cap, had + snareRate(s, e));
+    const cap = snareCap(s, e);
+    if (had >= cap) continue;
+    e.snared = Math.min(cap, had + snareRate(s, e));
   }
 }
 
