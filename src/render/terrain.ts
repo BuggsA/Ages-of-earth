@@ -44,6 +44,11 @@ export class TerrainView {
   readonly group = new THREE.Group();
   private mesh: THREE.Mesh | null = null;
   private skirt: THREE.Mesh | null = null;
+
+  /** Paint the world's edge: the unexplored slate in play, or a colour given (the title's horizon), so the land fades into the sky. */
+  skirtTint(c: THREE.Color | null): void {
+    (this.skirt?.material as THREE.MeshBasicMaterial | undefined)?.color.copy(c ?? fogUniforms.uUnexplored.value);
+  }
   private decor: THREE.InstancedMesh[] = [];
 
   build(s: GameState): void {

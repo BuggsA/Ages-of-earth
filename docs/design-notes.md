@@ -1146,3 +1146,11 @@ Why I love it: it makes distance the thing you spend. Every other economy in the
 
 Next: the Chariots crossing; a Mission that turns the coastal town beside it (the old "turn coastal towns" idea) with a slow conversion; priests ferried by a transport on purpose (the computer now only walks them); its own tune and bell; trade between missions.
 Not yet seen in a browser: the Mission's model, the O button, the tip. The tithe has no toast or sound yet.
+
+## Designers' notes: the title as an opening shot (#421, 2026-10-23)
+
+Built: the owner found the #424 column "reads worse" and asked for research before pixels. What the research and the games I know agree on: the best front pages are one strong image of the game's own world with depth and light (a horizon, not a floor), a name that owns the screen, very few choices in plain words, a little motion and sound on arrival, and setup kept for later (BioShock's lighthouse, the menus of Civilization and Age of Empires). Ours had a high noon camera on flat grass, a dark slab over a third of the screen, and HTML form fields on the first page. Now the camera sits low at the golden hour and aims into the land with a slow sway; the map's edge melts into the sky and its borders are hidden; the name and five ways in rise in; the setup and the rules live in sheets, with the peoples as crests.
+
+Why I love it: the first thing a player sees is now the game they're about to play, seen the way a painting would see it: thatched huts by a lake, a mill under rain, a brick town on a hill.
+
+Next: a few chosen camera shots (a dock at dusk, an army crossing a ford) instead of always the town; the theme swelling when the name lands; the peoples' tiles showing a figure of each people's soldier; a "Continue" that shows the saved town's crest.

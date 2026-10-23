@@ -9,7 +9,7 @@
  */
 
 export type SoundName =
-  | 'click' | 'open' | 'select' | 'selectBuilding' | 'move' | 'attack' | 'strike' | 'thud' | 'hit' | 'hitBuilding' | 'bow' | 'sling' | 'musket'
+  | 'click' | 'menuHover' | 'open' | 'select' | 'selectBuilding' | 'move' | 'attack' | 'strike' | 'thud' | 'hit' | 'hitBuilding' | 'bow' | 'sling' | 'musket'
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
@@ -120,7 +120,7 @@ export class Sound {
 
   /** Every sound there is. */
   static readonly names: SoundName[] = [
-    'click', 'open', 'select', 'selectBuilding', 'move', 'attack', 'strike', 'thud', 'hit', 'hitBuilding', 'bow', 'sling', 'musket', 'fall',
+    'click', 'menuHover', 'open', 'select', 'selectBuilding', 'move', 'attack', 'strike', 'thud', 'hit', 'hitBuilding', 'bow', 'sling', 'musket', 'fall',
     'collapse', 'built', 'place', 'ready', 'readyCitizen', 'chop', 'mine', 'hammer', 'rustle', 'epoch', 'alert', 'victory', 'defeat', 'error', 'coin', 'queue',
     'catapult', 'cannon', 'impact', 'spear', 'chant', 'convert', 'heal', 'townBell', 'allClear', 'research', 'wonder', 'wonderRising', 'shelter',
     'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind', 'thunder', 'owl', 'caw', 'gull', 'cricket', 'frog', 'birdsong', 'greatWork', 'beacon', 'rally', 'mammoth', 'howl', 'snarl', 'landmarkTaken', 'landmarkLost', 'consecrate', 'heirloom', 'zap', 'coilHum', 'heroFall', 'callUp', 'tribute', 'caravanBells', 'toll', 'wayHunters', 'wayHearth', 'wayWarband', 'blood', 'graft', 'crash', 'drain', 'sacrifice', 'curse', 'shackle', 'thrall', 'unshackle', 'sighting', 'dawn',
@@ -360,6 +360,11 @@ export class Sound {
     switch (name) {
       case 'click':
         this.tone(out, t, { f: 1250, to: 900, dur: 0.05, peak: 0.08 });
+        break;
+      case 'menuHover':
+        // A finger on a lute string: low, short and soft, so running the mouse down the menu never nags.
+        this.tone(out, t, { f: N.E4, type: 'triangle', dur: 0.14, peak: 0.035, attack: 0.004, lp: 1800 });
+        this.tone(out, t, { f: N.E5, type: 'sine', dur: 0.09, peak: 0.012, attack: 0.002 });
         break;
       case 'open':
         this.noise(out, t, { dur: 0.16, filter: 'bandpass', f: 2200, to: 800, q: 1.2, peak: 0.06 });
