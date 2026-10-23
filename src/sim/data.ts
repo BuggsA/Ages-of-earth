@@ -1711,6 +1711,8 @@ export interface Civ {
   household?: boolean;
   /** Born on the move (#501, `NOMAD`): the camp is on wagons and the flock walks with it from the first minute; no fields and no quarry. */
   nomad?: boolean;
+  /** The set line (#501, `LONGBOW`): its bowmen who stand still `LONGBOW.after` seconds draw farther and harder; a step breaks it. */
+  longbow?: boolean;
 }
 
 /**
@@ -1746,6 +1748,13 @@ export const POLIS = { arm: { wood: 20 } as Cost, home: 14, aiShare: 0.2, aiKeep
  * soldiers off the work (and only through epoch `aiUntil`: after it the army is wanted for war and rites), trains foot until it has `aiHands` + `aiHandsEpoch` for each epoch, sends `aiStone` of its working soldiers to stone, and surveys for bog iron from `aiSurvey` hands (its citizens are few).
  */
 export const LEGION = { citizens: 12, perEpoch: 3, rate: 0.8, watch: 0.8, aiCitizenWood: 0.25, aiGuard: 4, aiHands: 10, aiHandsEpoch: 4, aiStone: 0.3, aiUntil: 2, aiSurvey: 14 };
+
+/**
+ * The set line (#501, the Britons): a ranged soldier (not siege) of a longbow people that has not moved for `after` seconds is set,
+ * and shoots `range` tiles farther and `attack` harder until it moves again. The computer needs no new play, for its archers
+ * already stop to shoot, but a rival's cavalry and ranged soldiers can answer it: charge before the line sets, or out-reach it.
+ */
+export const LONGBOW = { after: 3, range: 1.5, attack: 3 };
 
 /**
  * The household tax (#501, the Chinese): a household people's citizens mine no gold or bog iron. Instead every `every` seconds each
@@ -1828,7 +1837,15 @@ export const CIVS: Record<CivId, Civ> = {
     add: { extraCitizens: 2 },
     mul: { techCost: 0.85 },
   },
-  britons: { name: 'Britons', blurb: 'Longbowmen: archers and their heirs reach 1 tile farther, and archery ranges train 25% faster.', add: { range: 1 }, mul: { rangedTrain: 0.75 } },
+  britons: {
+    name: 'Britons',
+    blurb: `The set line. A Briton bowman who has stood still ${LONGBOW.after} seconds is set: he draws the longbow to the full, reaching ${LONGBOW.range} tiles farther and striking ${LONGBOW.attack} harder, until he takes a step. Pick the ground, plant the line, let the foe walk onto it; a line that chases is only archers. Archers reach 1 tile farther always, and archery ranges train 25% faster.`,
+    verb: 'Pick your ground and plant the line: bowmen who stand still draw the longbow to the full, so a battle is held, not chased',
+    door: 'A bowman on the move is plain: a line caught marching, a flank charged before it sets, or a foe that stays out of reach and wins, breaks the longbow',
+    longbow: true,
+    add: { range: 1 },
+    mul: { rangedTrain: 0.75 },
+  },
 };
 
 export const CIV_IDS = Object.keys(CIVS) as CivId[];
@@ -1839,7 +1856,7 @@ export const CIV_IDS = Object.keys(CIVS) as CivId[];
  */
 export const VERB_GAPS: { ages: Partial<Record<AgeId, number>>; civs: Partial<Record<CivId, number>> } = {
   ages: {},
-  civs: { britons: 501 },
+  civs: {},
 };
 
 /**
