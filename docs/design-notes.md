@@ -1171,6 +1171,12 @@ Why I love it: deterrence is a different verb from fighting. Everyone watches th
 
 Next: the fission/fusion fork and fallout from seed #533, a seventh epoch (the Information Age: sight as the weapon), and a keepsake for the silo. Not seen: the feel of the clock in a real match, or the sound levels; headless runs only.
 
+## Designers' notes: fallout (#605 s2, grows seed #533, 2026-10-23, lane rules)
+
+Built: the ring a warhead struck stays poisoned for 90 seconds; every land unit in it, whoever's, loses 4 health a second. Buildings are spared, so the strike still pays for itself but the ground it wins can't be walked into at once. The computer pulls its people out of the ring.
+
+Why I love it: a strike now has a second beat. The attacker must choose between pressing in with a follow-up army and waiting out the haze; the defender gets a window to rebuild elsewhere. Next: wind-drift and a hardened unit (seed #533), the fission/fusion fork.
+
 ## Designers' notes: the tide of battle (#606, own pitch, 2026-10-23, lane look)
 
 Built: a bar over each fight, your strength against what you can see of the foe's, with a word and a swing arrow; a click on it picks up your fighters there; a fight that turns from even to losing out of sight sounds a sagging horn, pings the minimap and sets Space to look. The read is Lanchester's square law (hit points × damage a second, each side), through the same `damageOf` the blows use, so counters, armour, veterancy and heroes all count; towers count with their garrisons' arrows. Fog holds: unseen foes are left out.

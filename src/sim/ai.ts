@@ -1257,11 +1257,14 @@ function fireSilo(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   } else if (why.startsWith("A warhead's fuel")) spend(v, SILO.fuel);
 }
 
-/** Soldiers and citizens inside the ring of a rival warhead in the air run for home (the answer to a public clock). */
+/**
+ * Soldiers and citizens inside the ring of a rival warhead in the air, or on poisoned ground (#605 s2), run out of it, away from
+ * its centre toward home (the answer to a public clock, and to the fallout after).
+ */
 function fleeWarhead(s: GameState, v: View, issue: (c: Command) => void): void {
-  if (!s.launches || s.tick % (TICK_HZ / 2) !== 0) return;
-  for (const l of s.launches) {
-    if (!isEnemy(s, v.p.id, l.owner)) continue;
+  if (s.tick % (TICK_HZ / 2) !== 0) return;
+  const zones = [...(s.launches ?? []).filter((l) => isEnemy(s, v.p.id, l.owner)), ...(s.fallout ?? [])];
+  for (const l of zones) {
     const r = SILO.reach + AI_SILO.margin;
     const out = [...v.army, ...v.citizens].filter((u) => !u.inside && (u.x - l.x) * (u.x - l.x) + (u.y - l.y) * (u.y - l.y) <= r * r && domainOf(u.type) === 'land');
     if (!out.length) continue;

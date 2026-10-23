@@ -1,4 +1,4 @@
-import { SILO, TICK_HZ, domainOf, secs } from './data';
+import { FALLOUT, SILO, TICK_HZ, domainOf, secs } from './data';
 import { hurt, peace } from './combat';
 import { distToRect } from './grid';
 import { canAfford, isEnemy, pay } from './world';
@@ -58,11 +58,13 @@ function strike(s: GameState, owner: number, x: number, y: number): void {
     }
   }
   for (const e of hit) hurt(s, e, e.kind === 'building' ? SILO.building : SILO.unit, owner, null);
+  (s.fallout ??= []).push({ id: s.nextId++, owner, x, y, until: s.tick + secs(FALLOUT.time) });
   s.events.push({ k: 'silo', owner, x, y, what: 'struck' });
 }
 
 /** Every tick, in the order they were launched: a warhead whose silo has fallen is scrubbed; one whose clock has run out lands. */
 export function siloStep(s: GameState): void {
+  falloutStep(s);
   if (!s.launches) return;
   const left = [];
   for (const l of s.launches) {
@@ -73,6 +75,24 @@ export function siloStep(s: GameState): void {
   }
   if (left.length) s.launches = left;
   else delete s.launches;
+}
+
+/** Whether (x, y) stands in poisoned ground. */
+export const inFallout = (s: GameState, x: number, y: number): boolean =>
+  (s.fallout ?? []).some((f) => (f.x - x) * (f.x - x) + (f.y - y) * (f.y - y) <= SILO.reach * SILO.reach);
+
+/** Once a second: spent fallout clears; every land unit left in the rest takes `FALLOUT.dps`, whoever's it is. */
+function falloutStep(s: GameState): void {
+  if (!s.fallout) return;
+  const live = s.fallout.filter((f) => s.tick < f.until);
+  if (live.length) s.fallout = live;
+  else delete s.fallout;
+  if (!s.fallout || s.tick % TICK_HZ !== 0) return;
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || domainOf(e.type) !== 'land') continue;
+    const f = s.fallout.find((z) => (z.x - e.x) * (z.x - e.x) + (z.y - e.y) * (z.y - e.y) <= SILO.reach * SILO.reach);
+    if (f) hurt(s, e, FALLOUT.dps, f.owner, null);
+  }
 }
 
 /** Seconds of a warhead's clock left (for the HUD and the computer), or null. */

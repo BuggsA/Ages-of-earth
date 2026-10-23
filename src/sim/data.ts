@@ -2732,6 +2732,11 @@ export const KEG = { ore: 20, time: 30, most: 20, lay: 1.2, fuse: 8, reach: 2, b
  * Destroying the silo while it counts scrubs the launch. A launch empties the silo; refuelling costs `fuel` and takes `refuel`
  * seconds, paid when the launch is made. A people may hold `most` standing silos' worth of warheads at once.
  */
+/**
+ * Fallout (#605 s2, grows seed #533): the ring a warhead struck stays poisoned for `time` seconds. Every second each land unit
+ * standing in it, whoever's it is, takes `dps` damage; buildings are not hurt. A town can be flattened and still not be walked into.
+ */
+export const FALLOUT = { time: 90, dps: 4 };
 export const SILO = { fuse: 45, reach: 5, building: 1500, unit: 400, fuel: { gold: 600, stone: 200 }, refuel: 240, most: 2 };
 /**
  * The computer and the silo (#605): in the Atomic Age a clever computer raises one silo once it has `hands` citizens, waits `wait`
