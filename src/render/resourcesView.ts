@@ -57,6 +57,8 @@ export class ResourcesView {
       let n = 0;
       for (const c of s.carcasses ?? []) if (s.tick - c.born >= ROT.grace * TICK_HZ) n++;
       if (n !== this.rottenCount) this.dirty = true;
+      // Coppice stools and saplings (#501) grow slowly: redrawn once a second while any grows.
+      if (s.stools?.length) this.dirty = true;
       this.since = 0;
     }
     if (!this.dirty || this.since < 0.25) return;
@@ -108,6 +110,17 @@ export class ResourcesView {
           add(kind, i, new THREE.Matrix4().compose(new THREE.Vector3(tx + 0.5, gy, ty + 0.5), q, new THREE.Vector3(sc, sc, sc)));
         }
       }
+    }
+    // The managed wood (#501): a coppiced stool or a planted sapling grows from a whip to a young tree, then stands full as a tree.
+    for (const t of s.stools ?? []) {
+      const tx = t.tile % s.w;
+      const ty = Math.floor(t.tile / s.w);
+      const grown = Math.max(0, Math.min(1, (s.tick - t.from) / Math.max(1, t.at - t.from)));
+      const x = tx + 0.5 + (hash2(tx, ty, 31) - 0.5) * 0.3;
+      const y = ty + 0.5 + (hash2(tx, ty, 32) - 0.5) * 0.3;
+      q.setFromAxisAngle(up, hash2(tx, ty, 33) * Math.PI * 2);
+      const sc = 0.2 + 0.6 * grown;
+      add('broadleaf', -1, new THREE.Matrix4().compose(new THREE.Vector3(x, heightAt(s, x, y), y), q, new THREE.Vector3(sc, sc * 0.9, sc)));
     }
     for (const [kind, list] of lists) {
       let mesh = this.meshes.get(kind);

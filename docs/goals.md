@@ -58,3 +58,4 @@ Its one copy, with the levers and anti-patterns: **`docs/verbs.md`**. Ask it of 
 - 2026-10-18: the Mongols born on the move (#501): camp on wagons and a flock from minute 1, no fields, no quarry, stone by tribute and the Market. Only the Britons are left in `VERB_GAPS`.
 - 2026-10-22: the owner sets the age deck (Goal 2) and lifts the pause on new ages; `docs/age-roads.md`.
 - 2026-10-22: the owner: ages are what your town becomes, not cards; going back is a move, and some niche ages need it. `docs/age-deck.md` renamed `docs/age-roads.md`, with keepsakes and crossing ages (§5).
+- 2026-10-23: the Britons' managed wood (#501): no fields; woods felled near the stores are coppiced and grow back, saplings are planted, and the snares in the standing wood are the farm. All six peoples now have their own core loop; `VERB_GAPS.civs` is empty.

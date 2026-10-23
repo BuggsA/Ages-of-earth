@@ -364,6 +364,27 @@ function snare(k: Kit, e: number, full: boolean): void {
   }
 }
 
+// ---- Sapling (#501, the managed wood) --------------------------------------------------------------
+
+/** A young tree just set in the ground: a ring of turned earth, a whip of a trunk tied to its stake, a wicker guard against the deer. */
+function sapling(k: Kit, e: number): void {
+  k.box(0.6, 0.04, 0.6, '#5b4630', 0, -0.01, 0);
+  k.box(0.36, 0.06, 0.36, '#6e5638', 0, 0, 0);
+  const bark = '#6b5232';
+  k.cyl(0.018, 0.026, 0.62, 4, bark, 0, 0, 0);
+  k.cyl(0.012, 0.016, 0.7, 4, '#8a7350', 0.07, 0, 0.02);
+  for (const [x, y, z, r] of [[0, 0.62, 0, 0.13], [-0.07, 0.5, 0.05, 0.1], [0.06, 0.46, -0.06, 0.09]]) k.cone(r, 0.22, 5, '#5f8f42', x, y, z);
+  k.box(0.03, 0.03, 0.03, '#d8c9a0', 0.035, 0.32, 0.01);
+  // The guard: woven withies round the whip, later a ring of iron.
+  const guard = e >= 3 ? '#4a4e54' : '#8c6e44';
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    k.cyl(0.008, 0.008, 0.3, 3, guard, Math.cos(a) * 0.12, 0, Math.sin(a) * 0.12);
+  }
+  // The people's cloth tied on the stake, so its planter knows it.
+  k.team(k.box(0.05, 0.06, 0.05, TEAM, 0.07, 0.55, 0.02));
+}
+
 // ---- War Camp (#303) -------------------------------------------------------------------------------
 
 function warcamp(k: Kit, e: number, st: Style): void {
@@ -1991,6 +2012,7 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
 }
 
 const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare'>, (k: Kit, e: number, st: Style) => void> = {
+  sapling: (k, e) => sapling(k, e),
   towncenter, house, storehouse, huntcamp, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo,
 };
 

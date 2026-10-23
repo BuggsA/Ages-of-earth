@@ -310,6 +310,9 @@ export function buildBarred(p: Player, type: BuildingType): string | null {
   if (no && no.buildings.includes(type)) return no.why;
   // Born on the move (#501): a Mongol camp never tills a field, in any age.
   if (type === 'farm' && CIVS[p.civ].nomad) return 'A Mongol camp tills no fields: its food walks with the flock';
+  // The managed wood (#501): the Britons till no fields, and only they plant woods.
+  if (type === 'farm' && CIVS[p.civ].coppice) return 'A British town tills no fields: its food is the snares in its woods';
+  if (type === 'sapling' && !CIVS[p.civ].coppice) return 'Only the Britons plant and coppice their woods';
   const way = p.way ? WAYS[p.way] : undefined;
   if (way?.shuts?.includes(type)) return `${way.name} raises no ${BUILDINGS[type].name}`;
   const only = BUILDINGS[type].ages;

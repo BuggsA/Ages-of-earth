@@ -1223,6 +1223,7 @@ export class View {
           }
           break;
         }
+        case 'regrown':
         case 'depleted':
         case 'spawned':
           this.resources.markDirty();
