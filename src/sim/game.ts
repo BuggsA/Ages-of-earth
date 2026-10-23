@@ -28,6 +28,7 @@ import { reclaimStep, remember } from './reclaim';
 import { leaveRubble, salvageStep } from './salvage';
 import { cacheStep, dropOre, spillStore } from './caches';
 import { kegStep, millStep } from './powder';
+import { siloStep } from './silo';
 import { stockPosts } from './oretrade';
 import { sortieStep } from './sortie';
 import { fairStep } from './fair';
@@ -579,6 +580,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   cacheStep(s);
   millStep(s);
   kegStep(s);
+  siloStep(s);
   sortieStep(s);
   fairStep(s);
   attrition(s);

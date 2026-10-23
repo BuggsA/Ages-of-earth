@@ -1138,7 +1138,9 @@ function legionary(epoch: number): Kit {
   return k;
 }
 
-function makeUnit(type: UnitType, epoch: number): Kit {
+function makeUnit(type: UnitType, epochIn: number): Kit {
+  // The Atomic Age (#605) has no soldiers of its own yet: its people keep their Industrial look.
+  const epoch = epochIn === 5 ? 4 : epochIn;
   if (type === 'infantry' && epoch >= LEGION_MODEL) return legionary(epoch - LEGION_MODEL);
   return type === 'citizen' && epoch >= THRALL_MODEL ? thrall(epoch - THRALL_MODEL) : MAKERS[type](epoch);
 }

@@ -23,6 +23,7 @@ export const EPOCHS: Epoch[] = [
   { name: 'Middle Ages', short: 'Medieval', cost: { food: 700, gold: 250, stone: 100 }, time: 50, blurb: 'Pikes, crossbows, knights, catapults and stone keeps.' },
   { name: 'Gunpowder Age', short: 'Gunpowder', cost: { food: 1000, gold: 600, stone: 250 }, time: 65, blurb: 'Muskets, cuirassiers, galleons, cannon and brick and tile.' },
   { name: 'Industrial Age', short: 'Industrial', cost: { food: 1400, gold: 900, stone: 400 }, time: 80, blurb: 'Rifles, field guns, ironclads, and the first aeroplanes.' },
+  { name: 'Atomic Age', short: 'Atomic', cost: { food: 1800, gold: 1500, stone: 700 }, time: 95, blurb: 'The Missile Silo: one warhead, a public countdown, and a town that guards it.' },
 ];
 export const LAST_EPOCH = EPOCHS.length - 1;
 
@@ -194,7 +195,7 @@ export const PATHS: Record<PathId, Path> = {
   },
 };
 
-export const TRUNK: AgeId[] = ['stone', 'bronze', 'middle', 'gunpowder', 'industrial'];
+export const TRUNK: AgeId[] = ['stone', 'bronze', 'middle', 'gunpowder', 'industrial', 'atomic'];
 
 /**
  * The basic routes (#555 s0, `docs/age-roads.md` spine §1): a plain style a player can pick and follow to a win on any
@@ -230,6 +231,7 @@ export const AGES: Record<AgeId, Age> = {
   middle: trunkAge(2, 'The crossroads: most side roads turn off here, and nothing is shut'),
   gunpowder: trunkAge(3, 'Guns and cannon that break any wall, and every road comes back to it'),
   industrial: trunkAge(4, 'The strongest plain arms and the deepest economy, with nothing shut'),
+  atomic: trunkAge(5, 'One warhead the whole map watches fall: a Missile Silo, dear to raise and to refuel'),
   aeronaut: {
     verb: 'Fight from forward Airfields: aircraft fly sorties on fuel, so where you build an Airfield is how far you reach',
     door: 'Foot, ranged, cavalry and siege cost more',
@@ -1085,7 +1087,7 @@ export interface UnitStats {
 
 /** Each line has one version per epoch (null where it isn't available yet). Units re-arm when their owner advances. */
 export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
-  citizen: [0, 1, 2, 3, 4].map((e) => ({
+  citizen: [0, 1, 2, 3, 4, 5].map((e) => ({
     name: 'Citizen',
     cls: 'citizen' as const,
     hp: 40 + e * 5,
@@ -1507,6 +1509,7 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   // The Age of Missions (#555 s12): raised by priests on a shore, in no rival's land; claims land, trains priests, pays a tithe (`MISSION`).
   mission: { name: 'Mission', size: 2, hp: 1000, cost: { wood: 100, gold: 60 }, time: 30, pop: 0, sight: 7, trains: ['priest'], drop: [], epoch: 2, shore: true, ages: ['missions'], builders: ['priest'], only: true, menu: 'eco', key: 'O', blurb: 'A whitewashed chapel and a bell on a far shore, raised by priests. Holds the land round it, trains priests, and pays a tithe that grows with its distance from your Town Center. Nothing in it shoots: a rival who reaches it razes it.' },
   caravanserai: { name: 'Caravanserai', size: 2, hp: 900, cost: { wood: 90, gold: 30 }, time: 25, pop: 0, sight: 6, trains: [], drop: [], epoch: 3, ages: ['silk'], menu: 'eco', key: 'C', blurb: 'A walled courtyard by the road where caravans rest. Raise it by a far trading post, in no one\'s land too: your traders\' trips to a post within 8 tiles of it pay a quarter more, traders and wagons within 4 tiles of it mend, and the land round it is yours, so rival traders crossing it pay your toll.' },
+  silo: { name: 'Missile Silo', size: 3, hp: 3000, cost: { wood: 300, stone: 400, gold: 700 }, time: 80, pop: 0, sight: 8, trains: [], drop: [], epoch: 5, menu: 'mil', key: 'M', blurb: 'A concrete collar round a hatch in the ground. Launch (M) names any point on the map: after a countdown every rival can see, the warhead flattens what stands there. Destroy the silo while it counts and the launch is scrubbed. Emptied by a launch, it must be refuelled before it can fire again.' },
   airfield: { name: 'Airfield', size: 4, hp: 2200, cost: { wood: 250, stone: 100, gold: 150 }, time: 60, pop: 0, sight: 8, trains: ['fighter', 'bomber'], drop: [], epoch: 4, menu: 'mil', key: 'F', blurb: 'Builds fighters and bombers. Fighters hunt aircraft; bombers wreck towns.' },
 };
 
@@ -2025,9 +2028,9 @@ export const SIGNATURES: Record<CivId, Signature> = {
 // ---- Economy ---------------------------------------------------------------------------------------
 
 export const POP_MAX = 150;
-export const CARRY = [10, 12, 14, 16, 18];
+export const CARRY = [10, 12, 14, 16, 18, 18];
 /** What a fishing boat holds, by epoch. */
-export const FISH_CARRY = [15, 18, 21, 24, 30];
+export const FISH_CARRY = [15, 18, 21, 24, 30, 30];
 /** Gathering per second, before the epoch bonus. */
 export const GATHER: Record<'tree' | 'berry' | 'stone' | 'gold' | 'farm' | 'meat' | 'fish' | 'bog', number> = { tree: 0.65, berry: 0.8, stone: 0.55, gold: 0.55, farm: 0.6, meat: 1.0, fish: 0.75, bog: 0.45 };
 export const EPOCH_GATHER_BONUS = 0.1;
@@ -2350,6 +2353,7 @@ export const EPOCH_START_RES = [
   { food: 600, wood: 500, stone: 300, gold: 450 },
   { food: 900, wood: 700, stone: 500, gold: 700 },
   { food: 1200, wood: 900, stone: 650, gold: 950 },
+  { food: 1500, wood: 1000, stone: 800, gold: 1300 },
 ];
 export const START_CITIZENS = 5;
 /** Deathmatch: everyone starts rich. */
@@ -2679,7 +2683,7 @@ export function unitEpoch(type: UnitType): number {
  * nearest claimant (ties go to the older building). Shown only, so far; attrition and building limits
  * are later steps of the seed.
  */
-export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6, huntcamp: 4, warcamp: 3, caravanserai: 5, mission: 5 };
+export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6, silo: 5, huntcamp: 4, warcamp: 3, caravanserai: 5, mission: 5 };
 
 /**
  * War Camps (#303): a finished camp with none of its people's soldiers (land units that fight) within
@@ -2722,6 +2726,20 @@ export const KEG = { ore: 20, time: 30, most: 20, lay: 1.2, fuse: 8, reach: 2, b
  * campaign with a keg each at the nearest rival building within `near` tiles of them, towers and Town Centers first, passing over
  * any with a rival standing within `guard` tiles of it.
  */
+/**
+ * The Missile Silo (#605, the Atomic Age): `launch` names a point; `fuse` seconds later (a countdown every player sees) the warhead
+ * lands: every rival building within `reach` tiles takes `building`, every rival unit on the ground within `reach` takes `unit`.
+ * Destroying the silo while it counts scrubs the launch. A launch empties the silo; refuelling costs `fuel` and takes `refuel`
+ * seconds, paid when the launch is made. A people may hold `most` standing silos' worth of warheads at once.
+ */
+export const SILO = { fuse: 45, reach: 5, building: 1500, unit: 400, fuel: { gold: 600, stone: 200 }, refuel: 240, most: 2 };
+/**
+ * The computer and the silo (#605): in the Atomic Age a clever computer raises one silo once it has `hands` citizens, waits `wait`
+ * seconds after it stands, then launches whenever a point would catch `worth` or more of a rival's buildings (a Town Center counts
+ * `heart`) and soldiers (each counts `soldier`) inside the ring. Its soldiers and citizens run from the ring of a rival warhead
+ * in the air, `margin` tiles past its edge. An Industrial computer bound for Aeronauts or Lightning holds off the climb `hold` seconds.
+ */
+export const AI_SILO = { hold: 300, hands: 20, wait: 20, worth: 6, heart: 4, soldier: 2, margin: 1.5 };
 export const AI_KEG = { take: 0.5, ore: 80, kegs: 6, mills: 2, hold: 180, sappers: 2, near: 12, guard: 4, every: 2 };
 
 /**
