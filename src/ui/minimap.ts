@@ -117,7 +117,7 @@ export class Minimap {
     s: GameState,
     viewer: number,
     reveal: boolean,
-    buildings: Iterable<{ owner: number; x: number; y: number; size: number }>,
+    buildings: Iterable<{ owner: number; x: number; y: number; size: number; type?: string }>,
     footprint: { x: number; z: number }[],
     selected: Set<number>,
     scoutFlags: readonly ScoutFlag[] = [],
@@ -213,7 +213,12 @@ export class Minimap {
         }
       }
     }
+    const hearts: { owner: number; x: number; y: number }[] = [];
     for (const b of buildings) {
+      if (b.type === 'towncenter') {
+        hearts.push(b);
+        continue;
+      }
       const pl = s.players[b.owner];
       ctx.fillStyle = pl.color;
       const age = ageOf(pl);
@@ -223,6 +228,21 @@ export class Minimap {
       const half = (b.size / 2) * sx;
       ctx.fillRect(b.x * sx - half, b.y * sy - half, half * 2, half * 2);
       ctx.strokeRect(b.x * sx - half, b.y * sy - half, half * 2, half * 2);
+    }
+    // Every Town Center the viewer knows of, last: a big square in its people's colour with a pale rim and a dark heart, so a found
+    // town reads at a glance among the small buildings, and an enemy one is a target to find.
+    const dpr = this.canvas.width / (this.canvas.clientWidth || 184);
+    for (const h of hearts) {
+      const half = Math.max(4.5 * dpr, 2.2 * sx);
+      const x = h.x * sx;
+      const y = h.y * sy;
+      ctx.fillStyle = s.players[h.owner].color;
+      ctx.fillRect(x - half, y - half, half * 2, half * 2);
+      ctx.lineWidth = 1.5 * dpr;
+      ctx.strokeStyle = '#f5ecd2';
+      ctx.strokeRect(x - half, y - half, half * 2, half * 2);
+      ctx.fillStyle = 'rgba(10,14,20,0.85)';
+      ctx.fillRect(x - half * 0.3, y - half * 0.3, half * 0.6, half * 0.6);
     }
     // Game, where the viewer can see it.
     for (const a of s.animals) {
