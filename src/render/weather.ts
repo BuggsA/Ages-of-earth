@@ -101,6 +101,23 @@ export function forcedWeather(): WeatherDay | null {
   return { kind: k, strength: k === 'clear' ? 0 : 0.9 };
 }
 
+/** Minutes a mist takes to thin out and thicken again. */
+const MIST_PERIOD = 8;
+/** How much of its strength a mist keeps at its thinnest. */
+const MIST_THIN = 0.3;
+
+/**
+ * A mist breathes: it starts the match at full strength, thins to `MIST_THIN` of it half a period on and thickens again, so a misty
+ * day is no wall that never lifts. Other days are the same all match. Strength is rounded to 0.05, so the sky is redrawn rarely.
+ */
+export function breathe(day: WeatherDay, minutes: number): WeatherDay {
+  if (day.kind !== 'mist') return day;
+  const phase = (minutes / MIST_PERIOD) % 1;
+  const t = Math.abs(phase * 2 - 1);
+  const f = MIST_THIN + (1 - MIST_THIN) * t * t * (3 - 2 * t);
+  return { kind: 'mist', strength: Math.round(day.strength * f * 20) / 20 };
+}
+
 /** What a day does to the light: how far the sky greys, the sun dims, the horizon closes in. */
 export interface Mood {
   /** 0 (blue sky) to 1 (flat grey). */
@@ -123,7 +140,7 @@ export function moodOf(day: WeatherDay): Mood {
     case 'snow':
       return { grey: 0.5 + 0.25 * k, sun: 0.65 - 0.2 * k, sky: 0.95, reach: 0.75 - 0.3 * k, tint: '#b9c4cf' };
     case 'mist':
-      return { grey: 0.45 + 0.3 * k, sun: 0.7 - 0.2 * k, sky: 0.95, reach: 0.55 - 0.3 * k, tint: '#cfd8dc' };
+      return { grey: 0.45 + 0.3 * k, sun: 0.7 - 0.2 * k, sky: 0.95, reach: 0.7 - 0.25 * k, tint: '#cfd8dc' };
     default:
       return { grey: 0, sun: 1, sky: 1, reach: 1, tint: '#ffffff' };
   }
