@@ -532,3 +532,14 @@ body.online .tip-box { bottom: 330px; }
 .civ-catch { display: block; margin-top: 3px; opacity: 0.8; }
 .civ-more { margin-top: 4px; font-weight: 600; font-size: 12px; }
 .civ-more summary { cursor: pointer; color: var(--gold-2); }
+
+/* The tide of battle (#606) */
+.tide { position: absolute; left: 0; top: 0; pointer-events: auto; cursor: pointer; display: grid; justify-items: center; gap: 2px; transition: opacity 0.3s; }
+.tide-word { font: 900 11px 'Nunito', sans-serif; letter-spacing: 0.04em; text-transform: uppercase; color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); white-space: nowrap; }
+.tide-bar { width: 64px; height: 6px; border-radius: 3px; overflow: hidden; box-shadow: 0 0 0 1.5px rgba(10, 12, 18, 0.85), 0 2px 6px rgba(0, 0, 0, 0.5); }
+.tide-fill { height: 100%; transition: width 0.45s ease-out; box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.85); }
+.tide:hover .tide-bar { box-shadow: 0 0 0 1.5px var(--gold-2), 0 2px 6px rgba(0, 0, 0, 0.5); }
+.tide[data-tide='crushing'] .tide-word, .tide[data-tide='winning'] .tide-word { color: #b9ffb0; }
+.tide[data-tide='losing'] .tide-word { color: #ffb08a; }
+.tide[data-tide='routed'] .tide-word { color: #ff6a5a; animation: tide-pulse 0.9s ease-in-out infinite alternate; }
+@keyframes tide-pulse { from { opacity: 1; } to { opacity: 0.55; } }

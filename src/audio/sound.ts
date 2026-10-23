@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'tideTurns';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -491,6 +491,12 @@ export class Sound {
         this.brass(out, t, N.G3, 0.5, 0.11);
         this.brass(out, t + 0.55, N.G3, 0.7, 0.11);
         this.drum(out, t, 0.18);
+        break;
+      case 'tideTurns':
+        // A fight turns against you (#606): one horn call that sags a fourth, over a muffled drum.
+        this.tone(out, t, { f: N.C4, to: N.G3, type: 'sawtooth', dur: 0.9, peak: 0.08, attack: 0.08, lp: 1100 });
+        this.tone(out, t, { f: N.C4 * 1.004, to: N.G3, type: 'sawtooth', dur: 0.9, peak: 0.05, attack: 0.1, lp: 800 });
+        this.drum(out, t + 0.05, 0.12);
         break;
       case 'coin':
         this.tone(out, t, { f: 2093, dur: 0.09, peak: 0.08 });
