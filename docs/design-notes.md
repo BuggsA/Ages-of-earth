@@ -1138,6 +1138,15 @@ Why I love it: the first minutes had a scout with nothing to find. Now the openi
 
 Next: the lodge and the age panel reading leads for every key, a find that can stand in for the lodge's "this world lacks" answer, finds on the web map, a find that is a short fight (a den beside it), and a tip that points a new player at theirs.
 
+## Designers' notes: the second crossing, the Age of Missions (#555 s12, 2026-10-23, chain 1023-0115 s1)
+
+Built: the Pilgrims and the Sail meet. A people that walked both turns can become missionary: priests alone raise **Missions** on any shore a rival doesn't hold, however far from home. Each claims the land round it, trains priests and pays a tithe that grows with its distance from your Town Center (the three farthest count). It is a chapel, not a fort: nothing in it shoots.
+
+Why I love it: it makes distance the thing you spend. Every other economy in the game pays for staying close; this one pays for reaching. A Mission beside a rival's coast is income, a foothold for priests, and an insult in one, and the answer is plain: a few soldiers and a torch. It also shares its Sail sibling with the Sea-Raiders, so one walk of the Sail opens a real choice of crossing (warband or faith), and the computer picks one at a time.
+
+Next: the Chariots crossing; a Mission that turns the coastal town beside it (the old "turn coastal towns" idea) with a slow conversion; priests ferried by a transport on purpose (the computer now only walks them); its own tune and bell; trade between missions.
+Not yet seen in a browser: the Mission's model, the O button, the tip. The tithe has no toast or sound yet.
+
 ## Designers' notes: the title as an opening shot (#421, 2026-10-23)
 
 Built: the owner found the #424 column "reads worse" and asked for research before pixels. What the research and the games I know agree on: the best front pages are one strong image of the game's own world with depth and light (a horizon, not a floor), a name that owns the screen, very few choices in plain words, a little motion and sound on arrival, and setup kept for later (BioShock's lighthouse, the menus of Civilization and Age of Empires). Ours had a high noon camera on flat grass, a dark slab over a third of the screen, and HTML form fields on the first page. Now the camera sits low at the golden hour and aims into the land with a slow sway; the map's edge melts into the sky and its borders are hidden; the name and five ways in rise in; the setup and the rules live in sheets, with the peoples as crests.

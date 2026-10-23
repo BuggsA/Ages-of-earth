@@ -3,6 +3,7 @@ import { workStep } from './works';
 import { beaconStep } from './beacon';
 import { warCampStep } from './warcamp';
 import { spoilsStep } from './spoils';
+import { missionStep } from './missions';
 import { raiseCamps } from './steppe';
 import { giftFlock, sheepStep } from './flocks';
 import { faithStep } from './consecrate';
@@ -589,6 +590,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   workStep(s);
   beaconStep(s);
   warCampStep(s);
+  missionStep(s);
   spoilsStep(s);
   hemoStep(s);
   forkStep(s);

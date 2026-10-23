@@ -141,6 +141,8 @@ export interface Age {
    * handing them into a transport's hold, which pays out at a Dock (`SEA_RAID`, `spoils.ts`). Town Centers and Barracks bank nothing.
    */
   raid?: boolean;
+  /** Priests raise Missions on far shores, and each pays a tithe that grows with its distance from home (the Age of Missions, #555 s12): see `MISSION` (`missions.ts`). */
+  missions?: boolean;
 }
 
 /**
@@ -529,6 +531,22 @@ export const AGES: Record<AgeId, Age> = {
     price: { ship: 0.8 },
     raid: true,
     no: { units: ['trader', 'cog'], why: 'A people of sea-raiders trades with no one: traders and merchant cogs wait until it comes ashore in the Middle Ages or climbs on' },
+  },
+  // The second crossing (#555 s12): the Pilgrims' priests and the Sail's ships made one trade. Open only to a people that walked both.
+  missions: {
+    verb: 'Sail priests to far shores and raise Missions there: each claims land, trains priests, and pays a tithe that grows with its distance from home',
+    door: 'No walls or gates, and no siege engines: the faith goes out unarmed, and what it raises far away stands on its own',
+    good: 'Reaching: a foothold on any shore, claimed land beside a rival, and gold from places no road crosses',
+    routes: [],
+    keepsake: { building: 'mission', does: 'its tithe, and its claim on the shore' },
+    name: 'Age of Missions',
+    short: 'Missions',
+    tier: 2,
+    blurb: 'As the Jesuits and the Franciscans went out in the 1500s: the Pilgrims\' priests and the Sail\'s ships made one trade. Priests raise Missions (O) on any shore no rival holds, however far from home: each holds the land round it, trains priests, and every five seconds pays a tithe of 1 gold and 0.12 more for every tile it stands from your nearest Town Center (up to 8, for the three farthest Missions). A Mission is only a chapel, though: nothing in it shoots, and a rival who reaches it razes it. Priests come a third cheaper; ships a tenth. No walls, gates or siege engines are raised.',
+    price: { priest: 0.67, ship: 0.9 },
+    missions: true,
+    noBuild: { buildings: ['wall', 'gate'], why: 'A missionary people raises no walls or gates: its faith goes out unarmed. They wait until it comes home to the Middle Ages or climbs on' },
+    no: { units: ['siege'], why: 'A missionary people builds no siege engines: rams and catapults wait until it leaves the missions\' road' },
   },
 };
 
@@ -950,6 +968,19 @@ export const ROADS: Road[] = [
     crossing: ['warband', 'sail'],
     blurb: 'A turn, not a climb, for a people that has walked both the Warband and the Sail: the war-host takes to the longships. Plunder is carried as in the Warband, but banked only by ship: packs go into a transport\'s hold, and the hold pays out at a Dock. Ships cost a fifth less and soldiers train 10% faster. What it gives up: traders and merchant cogs, and every Town Center and Barracks as a place to bank. A raid far from the sea pays nothing until it walks back to a ship, and a laden ship sunk pays the rival.',
   },
+  // The second crossing (#555 s12): off the Middle Ages, for a people that walked the Pilgrims and the Sail. A Temple is the clue.
+  {
+    from: 'middle',
+    to: 'missions',
+    cost: { food: 400, wood: 300, gold: 300 },
+    time: 45,
+    clue: 'temple',
+    gate: 'hard',
+    crossing: ['pilgrim', 'sail'],
+    blurb: 'A turn, not a climb, for a people that has walked both the Pilgrims and the Sail: the priests take ship. Priests raise Missions on far shores that hold the land round them, train priests and pay a tithe that grows with the distance from home. Priests come a third cheaper and ships a tenth. What it gives up: walls, gates and siege engines, and a Mission is only a chapel, razed by any rival who reaches it.',
+  },
+  { from: 'missions', to: 'middle', cost: { food: 200, wood: 100 }, time: 25, blurb: 'Bring the priests home: the ordinary Middle Ages. The Missions stand, asleep, until your people turns missionary again.' },
+  { from: 'missions', to: 'gunpowder', cost: { food: 900, wood: 400, gold: 500, stone: 200 }, time: 65, blurb: 'Climb to the Gunpowder Age: the Missions sleep, their tithe unpaid, and wake if your people turns missionary again.' },
   { from: 'searaider', to: 'middle', cost: { food: 200, wood: 150 }, time: 25, blurb: 'Draw the longships up: the ordinary Middle Ages, with traders, and plunder no longer taken. Gold still in packs and holds is banked where it stands.' },
   { from: 'searaider', to: 'gunpowder', cost: { food: 900, wood: 500, gold: 500, stone: 150 }, time: 65, blurb: 'Climb to the Gunpowder Age: the raids end, traders return, and every pack and hold still laden is banked where it stands (more wood and less gold than from the Middle Ages: the fortune was in the ships).' },
 ];
@@ -1398,6 +1429,8 @@ export interface BuildingStats {
   blood?: number;
   /** Units besides citizens that may raise it (the War Camp is pitched by foot soldiers, #303). */
   builders?: UnitType[];
+  /** Only its `builders` raise it, citizens too not (the Mission, #555 s12). */
+  only?: boolean;
   /** Burns, rather than sleeps, when its people leaves its `ages` (the War Camp, #303; #555 s10). */
   burns?: boolean;
   /** Which build menu it is in, and its key there. */
@@ -1435,6 +1468,8 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   // Hemocraft (#355 s3): blood spent. The Station grafts the soldiers sheltered inside (`HEMO`); the Blood Tower pays blood once and fires on the living (`BLOOD_TOWER`).
   transfusion: { name: 'Transfusion Station', size: 2, hp: 800, cost: { wood: 100, stone: 60, gold: 80 }, time: 35, pop: 0, sight: 6, trains: [], drop: [], epoch: 4, garrison: 5, ages: ['totalwar', 'hemocraft'], menu: 'mil', key: 'T', blurb: 'A riveted iron shed of glass tanks, pumps and cots. Soldiers sent inside (foot, archers, riders and heroes) are grafted one at a time, 40 blood each: faster, harder-hitting and self-mending, deaf to conversion, and shrugging off blades, arrows and hooves, but machines (siege, ships, aircraft, a coil\'s bolt) hit them harder. A graft stays fed within 10 tiles of a standing Station and runs dry 150 seconds away from one: then the soldier crashes, losing a third of its health.' },
   bloodtower: { name: 'Blood Tower', size: 2, hp: 1000, cost: { wood: 60, stone: 150 }, blood: 60, time: 45, pop: 0, sight: 9, trains: [], drop: [], epoch: 3, guns: { damage: 8, range: 8, reload: 2 }, ages: ['ironblood', 'totalwar', 'hemocraft', 'bloodrite'], menu: 'mil', key: 'L', blurb: 'A squat tower of black brick crowned with a copper cistern, paid for once with 60 blood. Its barbed bolts tear the living (soldiers, riders, citizens, priests) for three times a Watch Tower\'s harm, but glance off what does not bleed: siege, ships, aircraft and wagons take almost nothing. It takes no one inside.' },
+  // The Age of Missions (#555 s12): raised by priests on a shore, in no rival's land; claims land, trains priests, pays a tithe (`MISSION`).
+  mission: { name: 'Mission', size: 2, hp: 1000, cost: { wood: 100, gold: 60 }, time: 30, pop: 0, sight: 7, trains: ['priest'], drop: [], epoch: 2, shore: true, ages: ['missions'], builders: ['priest'], only: true, menu: 'eco', key: 'O', blurb: 'A whitewashed chapel and a bell on a far shore, raised by priests. Holds the land round it, trains priests, and pays a tithe that grows with its distance from your Town Center. Nothing in it shoots: a rival who reaches it razes it.' },
   caravanserai: { name: 'Caravanserai', size: 2, hp: 900, cost: { wood: 90, gold: 30 }, time: 25, pop: 0, sight: 6, trains: [], drop: [], epoch: 3, ages: ['silk'], menu: 'eco', key: 'C', blurb: 'A walled courtyard by the road where caravans rest. Raise it by a far trading post, in no one\'s land too: your traders\' trips to a post within 8 tiles of it pay a quarter more, traders and wagons within 4 tiles of it mend, and the land round it is yours, so rival traders crossing it pay your toll.' },
   airfield: { name: 'Airfield', size: 4, hp: 2200, cost: { wood: 250, stone: 100, gold: 150 }, time: 60, pop: 0, sight: 8, trains: ['fighter', 'bomber'], drop: [], epoch: 4, menu: 'mil', key: 'F', blurb: 'Builds fighters and bombers. Fighters hunt aircraft; bombers wreck towns.' },
 };
@@ -2584,7 +2619,7 @@ export function unitEpoch(type: UnitType): number {
  * nearest claimant (ties go to the older building). Shown only, so far; attrition and building limits
  * are later steps of the seed.
  */
-export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6, huntcamp: 4, warcamp: 3, caravanserai: 5 };
+export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6, huntcamp: 4, warcamp: 3, caravanserai: 5, mission: 5 };
 
 /**
  * War Camps (#303): a finished camp with none of its people's soldiers (land units that fight) within
@@ -2634,6 +2669,13 @@ export const AI_KEG = { take: 0.5, ore: 80, kegs: 6, mills: 2, hold: 180, sapper
  * `take` odds on a coin of its own, to walk the other and turn Sea-Raider. It stays `stay` seconds in each sibling before it goes back
  * to the Middle Ages, and `raid` seconds in the Sea-Raiders before it climbs on.
  */
+/**
+ * The Age of Missions (#555 s12): every `every` seconds each finished, awake Mission of a people pays `base` plus `perTile` gold for each tile
+ * it stands from the people's nearest finished Town Center, at most `cap`, for the `most` farthest Missions it keeps. The computer raises one
+ * on a shore `AI_MISSION.far` tiles or more out (up to `most`), sending a priest to raise it.
+ */
+export const MISSION = { every: 5, base: 1, perTile: 0.12, cap: 8, most: 3 };
+export const AI_MISSION = { far: 18, search: 10, take: 0.6, stay: 120, hold: 240, gap: 45 };
 export const AI_SEA = { take: 0.6, stay: 120, raid: 300 };
 
 export const WARCAMP = { watch: 8, grace: 10, burn: 0.05, train: 1.2 };

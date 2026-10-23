@@ -1,6 +1,6 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { aiTiding } from './tidings';
-import { AGES, AI_CLIMB, AI_FIND, FINDS, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_SEA, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, SEA_RAID, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_CLIMB, AI_FIND, FINDS, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_SEA, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, SEA_RAID, MISSION, AI_MISSION, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
@@ -16,7 +16,7 @@ import { fairground, feastOpen, nextFeastIn } from './fair';
 import { claimants, favours, landmarkAt } from './landmarks';
 import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple, TILE_OF_RARE } from './units';
 import { goalForPost, nearestMarket, portSpot, postAt, tripGold } from './trade';
-import { findRoute } from './path';
+import { findPath, findRoute } from './path';
 import { isEnemy, maxHp, townCenters } from './world';
 import { callUpProblem } from './warcamp';
 import { GRAFTABLE, bleeds, bloodOf, cursed, grafted, levyProblem, levyWait, sworn } from './blood';
@@ -339,6 +339,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   floodWork(s, v, issue);
   hemoBuild(s, v, mem, issue);
   excavate(s, v, mem, issue);
+  if (AI_LEVELS[v.p.ai!].clever) raiseMission(s, v, mem, issue);
   salvage(s, v, mem, issue);
   claimWalk(s, v, mem, issue);
   findWalk(s, v, mem, issue);
@@ -605,12 +606,18 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   delete mem.waiting;
   // The steppe (#320) is kept a while, so the flock it came for pays.
   if (walksWeb(v) && ageDef(p).mobile && s.tick - (mem.steppe?.since ?? s.tick) < secs(AI_STEPPE.stay)) return null;
-  // Bound for the Sea-Raiders (#585), a sibling doesn't climb on: its way is back to the Middle Ages (`seaTurn`).
-  if (walksWeb(v) && SEA_ROAD.crossing!.includes(ageOf(p)) && raidBound(s, v, mem)) return null;
+  // Bound for a crossing (#585, #555 s12), a sibling doesn't climb on: its way is back to the Middle Ages (`seaTurn`).
+  const crossing = walksWeb(v) ? crossBound(s, v, mem) : null;
+  if (crossing?.crossing!.includes(ageOf(p))) return null;
   // The Sea-Raiders stay `AI_SEA.raid` seconds before they climb on (#585): the raids by ship are what the crossing was for.
   if (walksWeb(v) && ageOf(p) === 'searaider') {
     if (mem.sea?.at !== 'searaider') mem.sea = { at: 'searaider', since: s.tick };
     if (s.tick - mem.sea.since < secs(AI_SEA.raid)) return null;
+  }
+  // The Missions stay `AI_MISSION.hold` seconds: the tithe is what the crossing was for (#555 s12).
+  if (walksWeb(v) && ageOf(p) === 'missions') {
+    if (mem.sea?.at !== 'missions') mem.sea = { at: 'missions', since: s.tick };
+    if (s.tick - mem.sea.since < secs(AI_MISSION.hold)) return null;
   }
   // The Horde stays `stay` seconds before it climbs on: tribute is what it came for (#322).
   if (walksWeb(v) && ageOf(p) === 'horde') {
@@ -669,7 +676,7 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   if (fork) return fork;
   const sea = seaTurn(s, v, mem);
   if (sea) return sea;
-  const seaBound = raidBound(s, v, mem);
+  const seaBound = crossBound(s, v, mem);
   // Bound for the fork, Industry doesn't turn back to Total War.
   const forking = here === 'industrial' && !!forkRoad(s, p, mem);
   const kept = relicsKept(s, p.id);
@@ -682,7 +689,7 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   for (const r of roadsFrom(p)) {
     if (AGES[r.to].tier !== p.epoch || (forking && r.to === 'totalwar')) continue;
     // Bound for the Sea-Raiders (#585), it doesn't turn again into a sibling it has walked: the other is the plan.
-    if (seaBound && SEA_ROAD.crossing!.includes(r.to) && hasWalked(p, r.to)) continue;
+    if (seaBound?.crossing!.includes(r.to) && hasWalked(p, r.to)) continue;
     if (toAlchemy && r.to !== 'alchemy' && isSideRoad(r)) continue;
     if (toSail && here === 'pilgrim' && r.to === 'middle') return { road: r, wait: false };
     if (toSail && r.to === 'pilgrim') continue;
@@ -732,44 +739,59 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   return null;
 }
 
-const SEA_ROAD = ROADS.find((r) => r.to === 'searaider')!;
+const CROSSINGS = ROADS.filter((r) => r.crossing);
+
+/** What each crossing wants and how often the computer takes it: its salt for the coin, the building its people must keep, its odds and its stay in a sibling. */
+const CROSS_PLAN: Partial<Record<AgeId, { salt: number; keeps: BuildingType[]; take: number; stay: number }>> = {
+  searaider: { salt: 0x5ea7, keeps: ['dock'], take: AI_SEA.take, stay: AI_SEA.stay },
+  missions: { salt: 0x4d15, keeps: ['dock', 'temple'], take: AI_MISSION.take, stay: AI_MISSION.stay },
+};
 
 /**
- * The first crossing (#585): a people that has walked the Warband or the Sail, keeps a Dock and could open the other's road now, decides
- * once on a coin of its own (asked of no other town, so no other match's dice shift) to walk the other sibling and turn Sea-Raider.
- * False once it has, and before it has walked either.
+ * Whether the computer plans this crossing (#585, #555 s12): a people that has walked one sibling, keeps what the crossing wants and could
+ * open the other's road now, decides once on a coin of its own (asked of no other town, so no other match's dice shift) to walk the other
+ * sibling and turn. False once it has turned, and before it has walked either.
  */
-function raidBound(s: GameState, v: View, mem: AiMemory): boolean {
+function crossPlanned(s: GameState, v: View, mem: AiMemory, road: Road): boolean {
   const { p } = v;
-  if (hasWalked(p, 'searaider') || !AI_LEVELS[p.ai!].detour) return false;
+  const plan = CROSS_PLAN[road.to]!;
+  if (hasWalked(p, road.to) || !AI_LEVELS[p.ai!].detour) return false;
   const roads = (mem.roads ??= {});
-  if (roads.searaider === undefined) {
+  if (roads[road.to] === undefined) {
     // Asked only once the other sibling's road is known and its deeds are done (as the heirloom detour asks the catch landed): the
     // plan is a real one, and a sailor or a warband with no reason to cross is left to its road.
-    const left = crossingLeft(p, SEA_ROAD);
-    const other = left ? ROADS.find((r) => r.from === 'middle' && r.to === left) : undefined;
-    if (!SEA_ROAD.crossing!.some((a) => hasWalked(p, a)) || count(v, 'dock', true) === 0) return false;
+    const left = crossingLeft(p, road);
+    const other = left ? ROADS.find((r) => r.from === road.from && r.to === left) : undefined;
+    if (!road.crossing!.some((a) => hasWalked(p, a)) || plan.keeps.some((b) => count(v, b, true) === 0)) return false;
     if (other && !(roadKnown(s, p, other) && deedsDone(p, other, s))) return false;
-    roads.searaider = coin(s, p.id, 0x5ea7) < AI_SEA.take;
+    roads[road.to] = coin(s, p.id, plan.salt) < plan.take;
     // The plan is the other sibling's road too, whatever the coin once said of it; giving that road up gives the crossing up.
-    if (roads.searaider) for (const a of SEA_ROAD.crossing!) if (!hasWalked(p, a)) roads[a] = true;
+    if (roads[road.to]) for (const a of road.crossing!) if (!hasWalked(p, a)) roads[a] = true;
   }
-  return roads.searaider === true;
+  return roads[road.to] === true;
+}
+
+/** The crossing road the computer plans, if any: one plan at a time, the first decided (a plan made already stands). */
+function crossBound(s: GameState, v: View, mem: AiMemory): Road | null {
+  for (const r of CROSSINGS) if (mem.roads?.[r.to] === true && !hasWalked(v.p, r.to)) return r;
+  for (const r of CROSSINGS) if (crossPlanned(s, v, mem, r)) return r;
+  return null;
 }
 
 /**
- * The crossing planned like an heirloom (#585): walk one sibling, go back to the Middle Ages, walk the other, go back, turn. It stays
- * `AI_SEA.stay` seconds in each sibling first, and holds the Middle Ages for the other sibling's deed as a chosen road's deeds are held.
+ * A crossing planned like an heirloom (#585): walk one sibling, go back to the Middle Ages, walk the other, go back, turn. It stays its
+ * `stay` seconds in each sibling first, and holds the Middle Ages for the other sibling's deed as a chosen road's deeds are held.
  */
 function seaTurn(s: GameState, v: View, mem: AiMemory): Journey | null {
   const { p } = v;
-  if (!raidBound(s, v, mem)) return null;
+  const cross = crossBound(s, v, mem);
+  if (!cross) return null;
   const here = ageOf(p);
-  const left = crossingLeft(p, SEA_ROAD);
-  if (here === 'middle') {
-    if (!left) return roadKnown(s, p, SEA_ROAD) && deedsDone(p, SEA_ROAD, s) ? { road: SEA_ROAD, wait: false } : null;
+  const left = crossingLeft(p, cross);
+  if (here === cross.from) {
+    if (!left) return roadKnown(s, p, cross) && deedsDone(p, cross, s) ? { road: cross, wait: false } : null;
     if (mem.roads![left] === false) {
-      mem.roads!.searaider = false;
+      mem.roads![cross.to] = false;
       return null;
     }
     const r = roadsFrom(p).find((x) => x.to === left);
@@ -777,10 +799,10 @@ function seaTurn(s: GameState, v: View, mem: AiMemory): Journey | null {
     if (deedsDone(p, r, s)) return { road: r, wait: false };
     return worthWaiting(s, v, mem, r) ? { road: r, wait: true } : null;
   }
-  if (!SEA_ROAD.crossing!.includes(here)) return null;
+  if (!cross.crossing!.includes(here)) return null;
   if (mem.sea?.at !== here) mem.sea = { at: here, since: s.tick };
-  if (s.tick - mem.sea.since < secs(AI_SEA.stay)) return null;
-  const back = roadsFrom(p).find((r) => r.to === 'middle');
+  if (s.tick - mem.sea.since < secs(CROSS_PLAN[cross.to]!.stay)) return null;
+  const back = roadsFrom(p).find((r) => r.to === cross.from);
   return back ? { road: back, wait: false } : null;
 }
 
@@ -3259,6 +3281,27 @@ function haulHome(v: View, fighters: Unit[], issue: (c: Command) => void): Unit[
  * The Sea-Raiders' ships (#585): with a Dock and no transport, it builds one to take the packs; a transport whose hold has reached
  * `SEA_RAID.home`, idle and not carrying a landing, sails to the nearest Dock to bank it.
  */
+/**
+ * The Age of Missions (#555 s12): a missionary computer sends an idle priest to raise a Mission on a shore `AI_MISSION.far` tiles or more
+ * from home (up to `MISSION.most` Missions, one raising at a time, and not again for `gap` seconds). The tithe grows with the distance.
+ */
+function raiseMission(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!ageDef(p).missions || buildBarred(p, 'mission')) return;
+  const mine = v.buildings.filter((b) => b.type === 'mission' && b.hp > 0);
+  if (mine.length >= MISSION.most || mine.some((b) => !b.built)) return;
+  if (mem.mission !== undefined && s.tick - mem.mission < secs(AI_MISSION.gap)) return;
+  const priest = v.priests.find((u) => !u.inside && !carriedBy(s, u) && (u.order.k === 'idle' || u.order.k === 'heal'));
+  const cost = buildingCostFor(s, p.id, 'mission');
+  if (!priest || !afford(v, cost)) return;
+  const spot = findSpot(s, 'mission', v.home.x, v.home.y, AI_MISSION.far, AI_MISSION.far + AI_MISSION.search, 0);
+  mem.mission = s.tick;
+  // A shore the priest can't walk to (across water, or past a wall of rock) is let go until the next try picks another.
+  if (!spot || !findPath(s, priest.x, priest.y, { x0: spot.tx, y0: spot.ty, x1: spot.tx + 1, y1: spot.ty + 1, px: spot.tx + 1, py: spot.ty + 1 }, 6000).complete) return;
+  issue({ t: 'build', p: p.id, ids: [priest.id], type: 'mission', tx: spot.tx, ty: spot.ty });
+  spend(v, cost);
+}
+
 function raidShips(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
   if (!ageDef(p).raid) return;
@@ -3846,7 +3889,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     if (b.type === 'market' && !hiresAt(p, b.type).length) continue;
     let unit: UnitType | null;
     if (b.type === 'workshop') unit = siege < Math.max(v.plan.siege, p.epoch >= 2 ? 3 : 2) + lodge + bleeds && (v.army.length >= 6 || siege < v.plan.siege) ? 'siege' : null;
-    else if (b.type === 'temple') unit = v.priests.length < (ailing(p) ? SICKNESS.tendMost : 0) + (v.army.length >= 6 ? Math.max(consecrates(s, p.id) ? AI_FAITH.priests : 2, L.clever && ageDef(p).rite ? AI_FORK.priests : 0) : 0) + (looseRelics(s) > 0 ? 1 : 0) + (vigilPost(s, v) ? VIGIL.most : 0) ? 'priest' : null;
+    else if (b.type === 'temple') unit = v.priests.length < (ailing(p) ? SICKNESS.tendMost : 0) + (v.army.length >= 6 ? Math.max(consecrates(s, p.id) ? AI_FAITH.priests : 2, L.clever && ageDef(p).rite ? AI_FORK.priests : 0) : 0) + (looseRelics(s) > 0 ? 1 : 0) + (vigilPost(s, v) ? VIGIL.most : 0) + (ageDef(p).missions ? 1 : 0) ? 'priest' : null;
     else {
       unit = counter && trains.includes(counter) && unitEpoch(counter) <= p.epoch && !barred(p, counter, b.type) && roll(s) < counterOdds ? counter : pickUnit(v, mem, b);
       if (unit && unitEpoch(unit) > p.epoch) unit = pickUnit(v, mem, b);
