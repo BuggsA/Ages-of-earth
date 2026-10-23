@@ -6,17 +6,18 @@ import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { SIGHT_LORE } from './render/sightings';
 import { wallLine } from './sim/commands';
-import { AGES, BUILDINGS, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
+import { AGES, BUILDINGS, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, SILO, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
 import { crestSvg } from './ui/crests';
 import { isEnemy } from './sim/world';
 import { carriesKegs, kegProblem } from './sim/powder';
+import { launchProblem } from './sim/silo';
 import { jumpAge, rush, topUp } from './sim/god';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
 import { placeProblem, walkable } from './sim/grid';
 import { findDockSpot, findSpot } from './sim/ai';
 import { maxHp, placeBuilding, spawnUnit } from './sim/world';
 import { arrivalText, epochArrivals } from './ui/endReport';
-import type { AgeId, BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, HomelandId, MapSize, MapType, Unit } from './sim/types';
+import type { AgeId, Building, BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, HomelandId, MapSize, MapType, Unit } from './sim/types';
 import { KEYS, R_FISH, R_NONE, RES } from './sim/types';
 import { carriedBy, relicAt } from './sim/relics';
 import { RUIN_FINDS, ruinAt } from './sim/ruins';
@@ -99,7 +100,8 @@ let placeAt: { tx: number; ty: number; ok: boolean } | null = null;
 /** A wall being dragged out, from tile to tile. */
 let wallDrag: { x0: number; y0: number; x1: number; y1: number } | null = null;
 /** The next left click picks a target: where to attack-move, or a building to shelter in. */
-let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | 'keg' | null = null;
+let launchSilo = 0;
+let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | 'keg' | 'launch' | null = null;
 let paused = false;
 const SPEEDS = [1, 1.5, 2, 3];
 let speedIdx = 0;
@@ -149,6 +151,11 @@ const hud = new Hud({
   },
   kegMode: () => {
     targetMode = 'keg';
+    placing = null;
+  },
+  launchMode: (silo) => {
+    launchSilo = silo;
+    targetMode = 'launch';
     placing = null;
   },
   unloadMode: () => {
@@ -1717,6 +1724,22 @@ canvas.addEventListener('pointerdown', (e) => {
     if (!e.shiftKey) targetMode = null;
     return;
   }
+  if (targetMode === 'launch') {
+    const g = view.groundAt(e.clientX, e.clientY);
+    const s = game;
+    if (g && s) {
+      const why = launchProblem(s, viewer, s.byId.get(launchSilo) as Building | undefined, g.x, g.y);
+      if (why) {
+        hud.toast(why, 'bad');
+        play('error');
+      } else {
+        issue({ t: 'launch', p: viewer, silo: launchSilo, x: g.x, y: g.y });
+        view.marker(s, g.x, g.y, true);
+      }
+    }
+    targetMode = null;
+    return;
+  }
   if (targetMode === 'unload') {
     unloadAt(e.clientX, e.clientY, e.shiftKey);
     targetMode = null;
@@ -2670,6 +2693,22 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           else if (ev.by === viewer) hud.toast('Your people stamped out a burning keg', 'good');
         } else if (ev.what === 'blown' && ev.owner === viewer) hud.toast('A keg blows: what stood by it is shaken to its footings', 'good');
         break;
+      case 'silo':
+        // The Atomic Age (#605): the clock is public, so every player is told when a warhead goes up and where it will land.
+        if (ev.what === 'launched') {
+          if (ev.owner === viewer) hud.toast(`Warhead away: it lands in ${SILO.fuse} seconds`, 'good');
+          else if (isEnemy(s, viewer, ev.owner)) {
+            hud.toast(`${s.players[ev.owner].name} has launched a warhead: it lands in ${SILO.fuse} seconds. Clear the ring, or destroy the silo`, 'bad');
+            view.marker(s, ev.x, ev.y, false);
+          }
+          play('siloLaunch');
+        } else if (ev.what === 'scrubbed') {
+          hud.toast(ev.owner === viewer ? 'Your silo fell: the launch is scrubbed' : `${s.players[ev.owner].name}'s silo fell: the launch is scrubbed`, ev.owner === viewer ? 'alert' : 'good');
+          play('siloScrub');
+        } else {
+          play('siloBlast');
+        }
+        break;
       case 'oreBuy':
         // A load of rare ore bought at a post (#573).
         if (ev.owner === viewer) {
@@ -2847,7 +2886,7 @@ function cursorFor(s: GameState): string {
   if (targetMode === 'garrison') return 'cur-garrison';
   if (targetMode === 'sacrifice' || targetMode === 'curse') return 'cur-convert';
   if (targetMode === 'unload') return 'cur-garrison';
-  if (targetMode === 'keg') return 'cur-attack';
+  if (targetMode === 'keg' || targetMode === 'launch') return 'cur-attack';
   if (!pointer.inside || boxing) return '';
   const units = selectedUnits(s);
   const pk: Pick | null = view.pick(pointer.x, pointer.y);

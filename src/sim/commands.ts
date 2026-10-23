@@ -14,6 +14,7 @@ import { ruinAt } from './ruins';
 import { rubbleAt, salvages } from './salvage';
 import { cacheAt } from './caches';
 import { carriesKegs, kegProblem } from './powder';
+import { launch, launchProblem } from './silo';
 import { raise, raiseCost } from './reclaim';
 import { callWork, workProblem } from './works';
 import { callKin, killCamp, kinProblem, takeVow, takeWay, vowProblem, wayBarred, wayProblem } from './ways';
@@ -438,6 +439,17 @@ export function applyCommand(s: GameState, c: Command): void {
       for (const u of hands) giveOrder(u, { k: 'cache', target: c.target }, c.queue);
       const others = units.filter((u) => u.type !== 'citizen');
       if (k && others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: k.x, y: k.y, queue: c.queue });
+      break;
+    }
+    case 'launch': {
+      // The Atomic Age (#605): a Missile Silo names a point; the warhead lands after its public countdown.
+      const silo = s.byId.get(c.silo);
+      const why = launchProblem(s, c.p, silo as Building | undefined, c.x, c.y);
+      if (why) {
+        refuse(s, c.p, why);
+        return;
+      }
+      launch(s, c.p, silo as Building, c.x, c.y);
       break;
     }
     case 'keg': {
