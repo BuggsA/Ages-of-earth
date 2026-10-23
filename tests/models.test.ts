@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildingGeometry } from '../src/render/buildingModels';
 import { unitGeometry } from '../src/render/unitModels';
+import { findGeometry, FIND_KINDS } from '../src/render/findsView';
 import { BUILDING_TYPES, UNIT_TYPES } from '../src/sim/data';
 
 /**
@@ -26,5 +27,15 @@ describe('models', () => {
   });
   it('every building builds in every epoch', () => {
     for (const t of BUILDING_TYPES) for (let e = 0; e < 5; e++) sound(buildingGeometry(t, e, '#cc3333'), 12);
+  });
+  it('every find builds fresh and taken', () => {
+    expect(FIND_KINDS.length).toBe(6);
+    for (const kind of FIND_KINDS) for (const taken of [false, true]) {
+      const g = findGeometry(kind, taken);
+      const pos = g.getAttribute('position');
+      expect(pos.count).toBeGreaterThan(0);
+      for (let i = 0; i < pos.count * 3; i++) expect(Number.isFinite(pos.array[i])).toBe(true);
+      expect(g.getAttribute('color')).toBeDefined();
+    }
   });
 });
