@@ -37,7 +37,7 @@ import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, coilField
 import { ResourcesView } from './resourcesView';
 import { Sky } from './sky';
 import { forcedHour, hourAt, lightAt, moonPhase } from './daylight';
-import { Weather, describeWeather, forcedWeather, moodOf, seasonalDay, weatherFor, windFor, type WeatherDay } from './weather';
+import { Weather, breathe, describeWeather, forcedWeather, moodOf, seasonalDay, weatherFor, windFor, type WeatherDay } from './weather';
 import { FogTexture, TerrainView, heightAt } from './terrain';
 import { AIR_ALT, UnitsView } from './unitsView';
 import { WATER_Y, WaterView } from './water';
@@ -285,7 +285,8 @@ export class View {
     this.forcedDay = this.baseWeather !== null;
     this.baseWeather ??= weatherFor(s.seed, s.mapType);
     this.weatherSeason = this.currentSeason();
-    this.setWeather(this.forcedDay ? this.baseWeather : seasonalDay(this.baseWeather, this.weatherSeason));
+    this.seasonDay = this.forcedDay ? this.baseWeather : seasonalDay(this.baseWeather, this.weatherSeason);
+    this.setWeather(this.seasonDay);
   }
 
   /** Today's weather, in words for the opening banner ('' on a clear day). */
@@ -297,6 +298,8 @@ export class View {
   private baseWeather: WeatherDay | null = null;
   private forcedDay = false;
   private weatherSeason = 0;
+  /** The day the season sets, before a mist thins or thickens. */
+  private seasonDay: WeatherDay | null = null;
   private heardSeason = -1;
   /** Told when the season turns, so the sound can follow it. */
   /** Called when the viewer's people first see a ruin, relic or landmark (the HUD tells its lore). */
@@ -407,10 +410,16 @@ export class View {
     if (sn !== this.weatherSeason && this.baseWeather && !this.forcedDay) {
       this.weatherSeason = sn;
       const day = seasonalDay(this.baseWeather, sn);
-      if (day.kind !== this.weather.day.kind || day.strength !== this.weather.day.strength) {
+      if (day.kind !== this.seasonDay?.kind || day.strength !== this.seasonDay?.strength) {
+        this.seasonDay = day;
         this.setWeather(day);
         this.onWeather?.(day);
       }
+    }
+    // A mist thins and thickens over the match (never on a forced day, and not on the title's backdrop).
+    if (this.seasonDay?.kind === 'mist' && !this.forcedDay && this.titleHour === null) {
+      const day = breathe(this.seasonDay, s.tick / TICK_HZ / 60);
+      if (day.strength !== this.weather.day.strength) this.setWeather(day);
     }
     this.rig.update(dt);
     const p = s.players[this.viewer];
@@ -434,7 +443,8 @@ export class View {
     const fog = this.scene.fog as THREE.Fog;
     // The title's low camera looks far across the land: let the haze begin farther off, so a misty day stays a view.
     const far = this.titleHour === null ? 1 : 1.6;
-    fog.near = this.rig.distance * 2.2 * this.reach * far;
+    // Whatever the weather, the ground the player is looking at stays clear: the haze never starts before the camera's target.
+    fog.near = Math.max(this.rig.distance * 2.2 * this.reach * far, this.rig.distance * 1.25);
     fog.far = (this.rig.distance * 5 + 60) * this.reach * far;
     this.weather.show(this.quality !== 'low');
     const sky = this.weather.update(this.time, dt, this.rig.target, this.rig.distance, this.renderer.getPixelRatio(), this.height);
