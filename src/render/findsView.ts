@@ -51,7 +51,7 @@ function cairn(k: Kit, taken: boolean): void {
 
 /** A white crust on bare ground, hoof-trodden; claimed, the crust is scraped to grey. */
 function lick(k: Kit, taken: boolean): void {
-  k.box(1.1, 0.03, 0.9, '#7c6a4a', 0, 0, 0);
+  k.cyl(0.5, 0.58, 0.03, 8, '#7c6a4a', 0, 0, 0);
   const crust = taken ? '#b9b3a3' : '#f1ede2';
   for (const [x, z, w, d] of [[-0.2, -0.1, 0.55, 0.4], [0.3, 0.15, 0.4, 0.3], [-0.05, 0.3, 0.3, 0.2]]) k.box(w, taken ? 0.02 : 0.06, d, crust, x, 0.03, z);
   if (!taken) for (const [x, z, r] of [[-0.3, 0, 0.07], [0.15, -0.2, 0.06], [0.4, 0.2, 0.05]]) k.rock(r, '#ffffff', x, 0.08, z);
@@ -60,16 +60,16 @@ function lick(k: Kit, taken: boolean): void {
 
 /** A black stone in a scorched hollow, pale crystals round it; claimed, the stone is gone and the hollow is bare. */
 function meteor(k: Kit, taken: boolean): void {
-  k.cyl(0.6, 0.7, 0.04, 9, '#2c2622', 0, 0, 0);
-  k.cyl(0.38, 0.5, 0.05, 9, '#1c1816', 0, 0.02, 0);
+  k.cyl(0.42, 0.5, 0.04, 9, '#2c2622', 0, 0, 0);
+  k.cyl(0.26, 0.34, 0.05, 9, '#1c1816', 0, 0.02, 0);
   if (!taken) {
-    k.rock(0.28, '#1a1a1f', 0, 0.02, 0);
-    for (const [x, z, h] of [[0.4, 0.2, 0.2], [-0.4, 0.15, 0.16], [0.1, -0.45, 0.22], [-0.15, 0.45, 0.14]]) {
-      const c = k.cone(0.05, h, 5, '#e9ecf4', x, 0.03, z);
+    k.rock(0.2, '#1a1a1f', 0, 0.02, 0);
+    for (const [x, z, h] of [[0.3, 0.15, 0.26], [-0.3, 0.12, 0.2], [0.08, -0.32, 0.28], [-0.1, 0.32, 0.18]]) {
+      const c = k.cone(0.06, h, 5, '#e9ecf4', x, 0.03, z);
       c.rotation.z = x * 0.6;
     }
   } else {
-    k.rock(0.06, '#e9ecf4', 0.45, 0.03, 0.2);
+    k.rock(0.06, '#e9ecf4', 0.32, 0.03, 0.15);
   }
 }
 
