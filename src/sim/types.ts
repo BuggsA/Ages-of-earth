@@ -418,6 +418,15 @@ export interface Launch {
   at: number;
 }
 
+/** Ground poisoned by a warhead that struck at (`x`, `y`) for `owner`, until tick `until` (#605 s2, `silo.ts`). */
+export interface Fallout {
+  id: number;
+  owner: number;
+  x: number;
+  y: number;
+  until: number;
+}
+
 /** A powder keg laid at the foot of a building, its fuse burning (#577, the Age of Sappers, `powder.ts`). */
 export interface Keg {
   id: number;
@@ -953,6 +962,8 @@ export interface GameState {
   kegs?: Keg[];
   /** Warheads in the air (#605, `silo.ts`); absent until one is launched. */
   launches?: Launch[];
+  /** Ground poisoned by warheads that have struck (#605 s2); absent until one does. */
+  fallout?: Fallout[];
   /** Contested landmarks; absent in older saves and in campaign chapters (none). */
   landmarks?: Landmark[];
   /** Whether this world holds bog iron (#39), decided by the seed; absent in older saves (none). */

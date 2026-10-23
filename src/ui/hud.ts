@@ -1397,7 +1397,7 @@ export class Hud {
         // The Atomic Age (#605): a Missile Silo names a point and the whole map watches the clock.
         if (b.type === 'silo') {
           const why = launchProblem(s, viewer, b, b.x, b.y);
-          cmds.push({ key: 'M', pic: '', glyph: '☢', title: 'Launch', desc: `Then click anywhere on the map: ${SILO.fuse} seconds later the warhead lands, wrecking every rival building within ${SILO.reach} tiles (${SILO.building} each) and hurting the rival soldiers there. Every player sees the clock, and a silo destroyed before it runs out scrubs the launch. Costs ${Object.entries(SILO.fuel).map(([r, n]) => `${n} ${r}`).join(' and ')}; the silo needs ${SILO.refuel} seconds to refuel after.`, ok: !why, why: why ?? undefined, on: !loaded(s, b), run: () => this.act.launchMode(b.id) });
+          cmds.push({ key: 'M', pic: '', glyph: '☢', title: 'Launch', desc: `Then click anywhere on the map: ${SILO.fuse} seconds later the warhead lands, wrecking every rival building within ${SILO.reach} tiles (${SILO.building} each) and hurting the rival soldiers there; the ground stays poisoned after, hurting every land unit in it. Every player sees the clock, and a silo destroyed before it runs out scrubs the launch. Costs ${Object.entries(SILO.fuel).map(([r, n]) => `${n} ${r}`).join(' and ')}; the silo needs ${SILO.refuel} seconds to refuel after.`, ok: !why, why: why ?? undefined, on: !loaded(s, b), run: () => this.act.launchMode(b.id) });
         }
         if (b.type === 'tower') {
           const why = beaconProblem(s, p, b);

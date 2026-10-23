@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { AGES, EPOCHS, LAST_EPOCH, ROADS, SILO, secs } from '../src/sim/data';
+import { AGES, EPOCHS, FALLOUT, LAST_EPOCH, ROADS, SILO, secs } from '../src/sim/data';
 import { createGame, step } from '../src/sim/game';
 import { deserialize, serialize } from '../src/sim/save';
-import { launchProblem, loaded } from '../src/sim/silo';
-import { placeBuilding } from '../src/sim/world';
+import { inFallout, launchProblem, loaded } from '../src/sim/silo';
+import { placeBuilding, spawnUnit } from '../src/sim/world';
 import { buildingGeometry } from '../src/render/buildingModels';
 import type { Building, GameState } from '../src/sim/types';
 
@@ -95,5 +95,27 @@ describe('the Atomic Age', () => {
     const back = deserialize(serialize(s));
     expect(back.launches).toEqual(s.launches);
     expect(buildingGeometry('silo', 5, '#c33').getAttribute('position').count).toBeGreaterThan(0);
+  });
+
+  it('leaves fallout where it struck: land units in it take damage from anyone, buildings do not, and it clears', () => {
+    const s = game(); rich(s);
+    const silo = siloFor(s);
+    const t = tc(s, 1);
+    const outside = spawnUnit(s, 1, 'citizen', t.x + SILO.reach + 6, t.y);
+    step(s, [{ t: 'launch', p: 0, silo: silo.id, x: t.x, y: t.y }]);
+    run(s, SILO.fuse + 2);
+    expect(s.fallout).toHaveLength(1);
+    expect(inFallout(s, t.x, t.y)).toBe(true);
+    expect(inFallout(s, outside.x, outside.y)).toBe(false);
+    // The strike itself may have killed the units; place fresh ones on the poisoned ground.
+    const a = spawnUnit(s, 0, 'citizen', t.x + 1, t.y + 1), b = spawnUnit(s, 1, 'citizen', t.x - 1, t.y - 1);
+    const ha = a.hp, hb = b.hp, ho = outside.hp, hp = silo.hp;
+    run(s, 5);
+    expect(a.hp).toBeLessThan(ha);
+    expect(b.hp).toBeLessThan(hb);
+    expect(outside.hp).toBeGreaterThanOrEqual(ho);
+    expect(silo.hp).toBe(hp);
+    run(s, FALLOUT.time);
+    expect(s.fallout).toBeUndefined();
   });
 });
