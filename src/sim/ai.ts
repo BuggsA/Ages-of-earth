@@ -558,16 +558,24 @@ function worthWaiting(s: GameState, v: View, mem: AiMemory, r: Road): boolean {
     (d.deed.stat === 'ground' && !millProblem(s, p));
   const deeds = deedsProgress(p, r);
   // An ore door under way (#356 s5): a crew is digging the ore, so the road is worth holding for.
-  const digging = !!r.ore && !!s.rares?.includes(r.ore.id) && v.citizens.some((u) => u.order.k === 'gather' && u.order.rare === r.ore!.id);
+  // (A built Storehouse counts as the crew on its way: the Market opens the road a tick before `oreRoad` sends it.)
+  const digging = !!r.ore && !!s.rares?.includes(r.ore.id) && (count(v, 'storehouse', true) > 0 || v.citizens.some((u) => u.order.k === 'gather' && u.order.rare === r.ore!.id));
   if (!digging && !deeds.every(underWay)) return false;
   mem.waiting ??= s.tick;
   // A deed nearly done earns more patience (#113): a Greek town gave up its dig at 135 bog iron of 150,
   // seconds from the Iron Age, with the price of it banked.
-  const close = deeds.every((d) => d.have >= d.need * AI_WEB.close);
+  // A salt crew past `close` of its ore (#555) is as near: 60 salt took a crew of three some 110 seconds, and the patience ran out at 90.
+  const close = deeds.every((d) => d.have >= d.need * AI_WEB.close) || (!!r.ore && (p.stats.mined?.[r.ore.id] ?? 0) >= r.ore.n * AI_WEB.close);
   if (s.tick - mem.waiting <= secs((r.to === 'horde' ? AI_HORDE.hold : r.to === 'sapper' ? AI_KEG.hold : AI_WEB.patience) * (close ? 2 : 1))) return true;
   mem.roads![r.to] = false;
   delete mem.waiting;
   return false;
+}
+
+/** Whether a road's clue building is under construction and nothing else hides the road (#555). */
+function clueRising(s: GameState, p: Player, r: Road): boolean {
+  if (!r.clue || r.vein || r.ruin || r.found || (r.walked && !hasWalked(p, r.walked)) || (r.crossing && !r.crossing.some((a) => hasWalked(p, a)))) return false;
+  return s.ents.some((e) => e.kind === 'building' && e.owner === p.id && e.type === r.clue && !e.built);
 }
 
 /** A road to take, and whether to hold off taking it for now. */
@@ -593,7 +601,9 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   }
   if (walksWeb(v)) {
     for (const r of roadsFrom(p)) {
-      if (!isSideRoad(r) || AGES[r.to].tier <= p.epoch || !roadKnown(s, p, r) || !wants(s, p, mem, r.to)) continue;
+      if (!isSideRoad(r) || AGES[r.to].tier <= p.epoch || !(roadKnown(s, p, r) || clueRising(s, p, r)) || !wants(s, p, mem, r.to)) continue;
+      // Its clue is going up (#555): the trunk waits for the Market, as it waits for a road's deeds, rather than leaving the tick before the road is seen.
+      if (!roadKnown(s, p, r)) return { road: r, wait: true };
       if (deedsDone(p, r, s)) {
         delete mem.waiting;
         return { road: r, wait: false };
