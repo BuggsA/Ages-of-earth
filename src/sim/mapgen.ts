@@ -1,6 +1,6 @@
-import { AMOUNT, BOAR, BOG_IRON, CAVE, HOMELAND, HOMELAND_IDS, HOMELANDS, LANDMARKS, RARE, MAMMOTH, MAP_SIZES, RAIDER, RELIC, RUINS, TRADE, WOLF } from './data';
+import { AMOUNT, BOAR, BOG_IRON, CAVE, FINDS, HOMELAND, HOMELAND_IDS, HOMELANDS, LANDMARKS, RARE, MAMMOTH, MAP_SIZES, RAIDER, RELIC, RUINS, TRADE, WOLF } from './data';
 import { fbm, mulberry32, type Rng } from './rng';
-import type { Cave, HomelandId, LandmarkKind, MapSize, MapType, RareId, RuinFind } from './types';
+import type { Cave, FindKind, HomelandId, KeyId, LandmarkKind, MapSize, MapType, RareId, RuinFind } from './types';
 import { B_RES, B_TERRAIN, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_NONE, R_STONE, R_TREE, T_GRASS, T_ROCK, T_SAND, T_WATER } from './types';
 
 /**
@@ -65,6 +65,8 @@ export interface MapData {
   camps: { x: number; y: number }[];
   /** What lies round every town at the start (#473). */
   homeland: HomelandId;
+  /** One find near each town (#588): where it stands (tile center), what it is, and which town it stands near. Empty on campaign maps. */
+  finds: { x: number; y: number; kind: FindKind; key: KeyId | null; near: number }[];
 }
 
 const DIR8 = [
@@ -671,6 +673,11 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
     ? placeCamps(seed, size, w, h, terrain, res, starts, [...deer, ...relics, ...posts, ...ruins, ...wild, ...landmarks, ...caves.map((c) => ({ x: c.tile % w, y: Math.floor(c.tile / w) }))], later)
     : [];
 
+  // Finds are laid after everything else, on dice of their own, and touch no tile.
+  const finds = deposits
+    ? placeFinds(seed, size, w, h, terrain, res, starts, later, bogIron, rares, ruins.length > 0, [...deer, ...relics, ...posts, ...ruins, ...wild, ...landmarks, ...camps, ...caves.map((c) => ({ x: c.tile % w, y: Math.floor(c.tile / w) }))])
+    : [];
+
   // Resources nobody could stand next to are cleared away.
   const block = new Uint8Array(w * h);
   for (let i = 0; i < w * h; i++) {
@@ -678,7 +685,7 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
     if (res[i] !== R_NONE) block[i] |= B_RES;
   }
 
-  return { w, h, terrain, height, res, amount, block, starts, deer, relics, posts, bogIron, rares, caves, ruins, wild, landmarks, camps, homeland };
+  return { w, h, terrain, height, res, amount, block, starts, deer, relics, posts, bogIron, rares, caves, ruins, wild, landmarks, camps, homeland, finds };
 }
 
 /** The homeland a seed rolls for a map type (#473): by each one's `weight` there, on dice of its own. */
@@ -1182,6 +1189,75 @@ function placeRuins(
     finds.push(...hand);
   }
   return out.map((p, k) => ({ x: p.x + 0.5, y: p.y + 0.5, find: finds[k] }));
+}
+
+/**
+ * Finds (#588), fairly: one for every town, `FINDS.ring` tiles out from it (the same distance for every town, within
+ * `fair` tiles; looser and looser only if the map allows nothing better), nearer its own town than any other, on open
+ * ground that town can walk to and `FINDS.spacing` tiles clear of everything else laid on the map. What each speaks
+ * of is dealt from a shuffled hand of the key resources this world holds. Own dice, no tile touched.
+ */
+function placeFinds(
+  seed: number,
+  size: MapSize,
+  w: number,
+  h: number,
+  terrain: Uint8Array,
+  res: Uint8Array,
+  starts: { x: number; y: number }[],
+  reaches: Uint8Array[],
+  bogIron: boolean,
+  rares: RareId[],
+  ruins: boolean,
+  others: { x: number; y: number }[],
+): { x: number; y: number; kind: FindKind; key: KeyId | null; near: number }[] {
+  const rng = mulberry32(seed ^ 0x2f1d5b);
+  const land = (x: number, y: number) => x >= 2 && y >= 2 && x < w - 2 && y < h - 2 && (terrain[y * w + x] === T_GRASS || terrain[y * w + x] === T_SAND) && res[y * w + x] === R_NONE;
+  const ring = FINDS.ring[size];
+  const placed: { x: number; y: number; near: number }[] = [];
+  let wanted = ring;
+  for (let i = 0; i < starts.length; i++) {
+    const st = starts[i];
+    let pick = -1;
+    for (let pass = 0; pass < 4 && pick < 0; pass++) {
+      const tol = FINDS.fair * (1 + pass * pass);
+      const margin = pass < 2 ? 4 : 1;
+      const candidates: number[] = [];
+      for (let y = 3; y < h - 3; y++) {
+        for (let x = 3; x < w - 3; x++) {
+          const dx = x + 0.5 - st.x;
+          const dy = y + 0.5 - st.y;
+          const d = Math.sqrt(dx * dx + dy * dy);
+          if (Math.abs(d - wanted) > tol || reaches[i][y * w + x] !== 1 || !land(x, y) || !land(x + 1, y) || !land(x - 1, y) || !land(x, y + 1) || !land(x, y - 1)) continue;
+          const ds = nearestTwo(starts, x, y);
+          if (ds[0] < d - 0.01 || (starts.length > 1 && ds[1] - ds[0] < margin)) continue;
+          const clear = (list: { x: number; y: number }[]) => list.every((p) => (p.x - x - 0.5) * (p.x - x - 0.5) + (p.y - y - 0.5) * (p.y - y - 0.5) >= FINDS.spacing * FINDS.spacing);
+          if (!clear(others) || !clear(placed)) continue;
+          candidates.push(y * w + x);
+        }
+      }
+      if (candidates.length) pick = candidates[Math.floor(rng() * candidates.length)];
+    }
+    if (pick < 0) continue;
+    const x = pick % w;
+    const y = (pick - x) / w;
+    // The first sets the distance every later town's find matches.
+    if (i === 0) wanted = Math.sqrt((x + 0.5 - st.x) * (x + 0.5 - st.x) + (y + 0.5 - st.y) * (y + 0.5 - st.y));
+    placed.push({ x: x + 0.5, y: y + 0.5, near: i });
+  }
+  // Deal what each speaks of from a fresh shuffled hand of what this world holds.
+  const held: KeyId[] = [];
+  if (bogIron) held.push('bogIron');
+  for (const r of rares) held.push(r);
+  if (ruins) held.push('ruin');
+  const kindOf = (key: KeyId): FindKind => (Object.keys(FINDS.kinds) as FindKind[]).find((k) => FINDS.kinds[k].key === key)!;
+  if (!held.length) return placed.map((f) => ({ ...f, key: null, kind: 'stash' as FindKind }));
+  const hand: KeyId[] = [];
+  return placed.map((f) => {
+    if (!hand.length) hand.push(...shuffle(rng, [...held]));
+    const key = hand.pop()!;
+    return { ...f, key, kind: kindOf(key) };
+  });
 }
 
 /**

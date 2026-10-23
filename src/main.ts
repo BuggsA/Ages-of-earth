@@ -6,7 +6,7 @@ import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { SIGHT_LORE } from './render/sightings';
 import { wallLine } from './sim/commands';
-import { AGES, BUILDINGS, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
+import { AGES, BUILDINGS, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
 import { crestSvg } from './ui/crests';
 import { isEnemy } from './sim/world';
 import { carriesKegs, kegProblem } from './sim/powder';
@@ -2621,6 +2621,16 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           const first = s.ruins?.filter((r) => r.by === viewer).length === 1;
           hud.banner(RUIN_FINDS[ev.find].name, `Your diggers found ${what}.${first ? ' A new road is revealed: the Age of Reclaimers opens from the Middle Ages at your Town Center.' : ''}`, 5000);
         } else if (view.sees(ev.x, ev.y)) hud.toast(`${s.players[ev.owner].name} dug out the ruins`, 'info');
+        break;
+      }
+      case 'find': {
+        // A find claimed (#588): the finder learns what the world holds; a rival's claim, if we watched it.
+        if (ev.owner === viewer) {
+          const kind = FINDS.kinds[ev.kind];
+          const gain = RES.filter((r) => kind.reward[r]).map((r) => `+${kind.reward[r]} ${r}`).join(', ');
+          hud.banner(kind.name, `${kind.hint} (${gain}.)${ev.key ? ' A mark on the map shows where.' : ''}`, 5000);
+          play('ruinFind');
+        } else if (view.sees(ev.x, ev.y)) hud.toast(`${s.players[ev.owner].name} has found ${FINDS.kinds[ev.kind].name.toLowerCase()}`, 'info');
         break;
       }
       case 'tiding': {

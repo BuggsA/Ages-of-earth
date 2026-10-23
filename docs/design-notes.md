@@ -1129,3 +1129,11 @@ Built: the first age you can only reach by going back. The **Age of Sea-Raiders*
 Why I love it: it takes two things the game already had, packs and transports that land on any shore, and makes them one raid with a shape. Land on a beach, burn a farm line, walk back to the boat, sail home. The rival's answer is plain and fun too: a warship or two off your Dock, waiting for the laden longship. And the crossing makes going back a plan you have to want, not just a way out of a mistake.
 
 Next: a keepsake (a Dock that keeps banking holds after you leave?), longship looks (dragon prows, a striped sail: lane look), the computer meeting its landing parties with the ship instead of waiting at the Dock, and the other two crossings in the spine (Chariots: Iron + Steppe; Missions: Pilgrim + Sail). Not yet seen in a browser: the hold chip, the stow coins, the tips.
+
+## Designers' notes: finds in scouting range (#588, #555 s9, 2026-10-23)
+
+Built: a mark of the land near every town, the same distance out for each: a nailed wreck, a battlefield cairn, a salt lick, a fallen star, a hermit's shrine. The first people to walk a unit onto one takes a small gift and learns, without a lodge, that this world holds the resource it speaks of, with a dashed ring on the minimap at the nearest of it. A world that holds none has a hunters' stash that says so.
+
+Why I love it: the first minutes had a scout with nothing to find. Now the opening forks: send a citizen out to chase the hint (a road, a vein to dig, or a ruin to dig out early), or leave it and play the plain roads. A rival can walk onto yours, so the walk is a small gamble. And because a find only ever speaks of what the world holds, it is a clue and never a lie.
+
+Next: the lodge and the age panel reading leads for every key, a find that can stand in for the lodge's "this world lacks" answer, finds on the web map, a find that is a short fight (a den beside it), and a tip that points a new player at theirs.
