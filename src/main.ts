@@ -43,6 +43,7 @@ import { briefingHtml, chapterListHtml, recordStars, starRow, syncProgress } fro
 import { Lobby } from './ui/lobby';
 import { Hud, nameOf } from './ui/hud';
 import { Minimap } from './ui/minimap';
+import { BattleTide } from './ui/battleTide';
 import { Tips } from './ui/tips';
 import { openingFor } from './ui/opening';
 
@@ -118,6 +119,7 @@ let acc = 0;
 let lastFrame = performance.now();
 let hudTimer = 0;
 let mapTimer = 0;
+let tideTimer = 0;
 let attractT = 0;
 let lastSetup: GameSetup | null = null;
 
@@ -366,6 +368,11 @@ view.onSighting = (what) => {
   hud.banner(look.title, look.lore, 4200);
 };
 view.onPing = (x, y, color, heavy) => minimap.ping(x, y, color, heavy);
+// The tide of battle (#606): a click on a fight's bar picks up your fighters there.
+const tide = new BattleTide(view.labelLayer, (ids) => {
+  setSelection(ids);
+  play('select');
+});
 
 // ---- Starting matches ------------------------------------------------------------------------------
 
@@ -484,6 +491,7 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   cameraBookmarks.reset();
   scoutFlags.reset();
   lastAlert = null;
+  tide.clear();
   acc = 0;
   hud.reset();
   view.setGame(game, viewer);
@@ -3040,6 +3048,21 @@ function frame(now: number): void {
         tips.update(s, viewer, dt);
         autosave();
       }
+      if (mode === 'play' && !watching && !spectating) {
+        tideTimer -= dt;
+        if (tideTimer <= 0) {
+          tideTimer = 0.5;
+          for (const b of tide.read(s, viewer, 0.5)) {
+            // A fight turning against you where you aren't looking: say so, and Space looks.
+            if (tide.onScreen(s, view.rig.camera, b.x, b.y)) continue;
+            lastAlert = { x: b.x, y: b.y };
+            minimap.ping(b.x, b.y, '#ff5a3c', true);
+            hud.toast(`A fight is turning against you: ${b.mine} of yours against ${b.theirs}. (Space to look)`, 'alert');
+            play('tideTurns');
+          }
+        }
+        tide.place(s, view.rig.camera);
+      } else tide.clear();
       mapTimer -= dt;
       if (mapTimer <= 0) {
         mapTimer = 0.2;

@@ -2836,3 +2836,14 @@ export const AI_WILD = { mammothAt: 10, party: 5, mammothNear: 22, pack: 3, clea
 export const AI_HORDE = { milkers: 5, spare: 40, least: 3, hold: 300, stay: 300, cavalry: 0.9, riders: 6, clear: 12, weary: 3, foes: 4, alarm: 9, redo: 150, answer: 2 };
 
 export const AI_STEPPE = { take: 0.35, at: 12, campFrom: 8, campTo: 30, hunters: 6, reach: 26, spare: 100, perMilker: 3, every: 150, hungry: 0.5, bare: 16, move: 10, far: 18, drive: 40, stay: 90 };
+
+/**
+ * The tide of battle (#606), a read of each fight a player can see. A fight is where a unit of theirs or a foe they
+ * see struck or was struck within `recent` seconds with one of the other side within `near` tiles; such units
+ * within `join` tiles of a fight's middle are one fight, and every fighter within `reach` of it is counted. Each
+ * side's strength is its hit points times its damage a second (Lanchester's square law); the share of the two is
+ * the tide. The words: `crushing` and over, `winning`, `even` down to `losing`, then routed. A fight whose tide
+ * falls under `turn` that was at least `even` warns the player, no more often than every `warnEvery` seconds; a
+ * side counts at most `most` fighters' blows against at most `most` targets (a sample, so a huge melee stays cheap).
+ */
+export const BATTLE = { recent: 3, near: 8, join: 9, reach: 10, crushing: 0.8, winning: 0.6, even: 0.4, losing: 0.2, turn: 0.38, warnEvery: 20, most: 48 };
