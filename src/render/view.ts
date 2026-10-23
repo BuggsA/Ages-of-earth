@@ -25,6 +25,7 @@ import { PostsView } from './postsView';
 import { FairBannersView } from './fairBannersView';
 import { VigilCandlesView } from './vigilCandlesView';
 import { RuinsView } from './ruinsView';
+import { FindsView } from './findsView';
 import { RubbleView } from './rubbleView';
 import { CacheView } from './cacheView';
 import { KegView } from './kegView';
@@ -110,6 +111,7 @@ export class View {
   private fairBanners = new FairBannersView();
   private vigilCandles = new VigilCandlesView();
   readonly ruins = new RuinsView();
+  readonly finds = new FindsView();
   readonly rubble = new RubbleView();
   readonly caches = new CacheView();
   readonly kegs = new KegView();
@@ -187,7 +189,7 @@ export class View {
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sky.mesh, this.hemi, this.fill, this.sun, this.sun.target);
-    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.rubble.group, this.caches.group, this.kegs.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
+    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.finds.group, this.rubble.group, this.caches.group, this.kegs.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
     this.scene.add(this.rangeGuides.mesh, this.borders.mesh, this.graze.mesh, this.foundations.mesh);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.post = new Post(this.renderer, this.scene, this.rig.camera);
@@ -254,6 +256,7 @@ export class View {
     this.fairBanners.clear();
     this.vigilCandles.clear();
     this.ruins.clear();
+    this.finds.clear();
     this.rubble.clear();
     this.caches.clear();
     this.kegs.clear();
@@ -468,6 +471,7 @@ export class View {
     this.caches.update(s, (x, y) => this.reveal || this.sees(x, y), (id) => this.units.drawn.get(id) ?? null);
     this.kegs.update(s, (x, y) => this.reveal || this.sees(x, y), (id) => this.units.drawn.get(id) ?? null);
     this.ruins.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
+    this.finds.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     this.landmarks.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     if (!this.reveal) {
       for (const f of this.sightings.scan(s, (x, y) => p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1)) {

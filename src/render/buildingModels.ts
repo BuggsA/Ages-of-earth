@@ -496,6 +496,26 @@ function bloodtower(k: Kit, _e: number, st: Style): void {
 }
 
 /**
+ * The Mission (#555 s12): a whitewashed chapel with a red-tiled roof and a little bell gable, a cross over the door and a
+ * pennant on a pole by the water, on a pad of trodden sand: a foothold, not a fortress.
+ */
+function mission(k: Kit, _e: number, _st: Style): void {
+  const WASH = '#f1ece0';
+  const TILE = '#b4573a';
+  k.box(1.95, 0.05, 1.95, '#cdb98f', 0, -0.02, 0);
+  k.box(1.1, 0.7, 1.4, WASH, 0, 0, -0.1);
+  k.prism(1.3, 0.4, 1.6, TILE, 0, 0.7, -0.1).rotation.y = Math.PI / 2;
+  k.box(0.5, 0.95, 0.12, WASH, 0, 0, 0.62);
+  k.box(0.16, 0.2, 0.1, '#2f2a25', 0, 0.62, 0.69);
+  k.box(0.04, 0.3, 0.04, '#e2b23c', 0, 0.95, 0.62);
+  k.box(0.16, 0.04, 0.04, '#e2b23c', 0, 1.12, 0.62);
+  k.box(0.2, 0.34, 0.04, '#3b2c20', 0, 0, 0.7);
+  k.team(k.box(0.5, 0.05, 0.05, TEAM, 0, 0.78, 0.7));
+  k.box(0.04, 1.1, 0.04, '#6b4b2f', 0.8, 0, 0.7);
+  k.team(k.box(0.34, 0.2, 0.03, TEAM, 0.97, 0.85, 0.7));
+}
+
+/**
  * The Caravanserai (#334): a square mudbrick courtyard with round corner buttresses and a tall arched portal
  * banded in turquoise tile. Inside, a well, bales of dyed cloth, and a camel kneeling to be unloaded.
  */
@@ -1732,7 +1752,7 @@ function hordeTouches(k: Kit, type: BuildingType): void {
  * the Town Center keeps an antlered pole, the herders' trophy of the hunt.
  */
 function steppeTouches(k: Kit, type: BuildingType): void {
-  if (['farm', 'gate', 'tower', 'warcamp', 'drainrig', 'transfusion', 'bloodtower', 'caravanserai'].includes(type)) return;
+  if (['farm', 'gate', 'tower', 'warcamp', 'drainrig', 'transfusion', 'bloodtower', 'caravanserai', 'mission'].includes(type)) return;
   const span = type === 'wonder' ? 2.4 : type === 'towncenter' ? 1.6 : type === 'house' ? 0.6 : 0.95;
   const front = span + 0.08;
   const h = type === 'house' ? 0.5 : type === 'towncenter' || type === 'wonder' ? 0.9 : 0.7;
@@ -1764,7 +1784,7 @@ function steppeTouches(k: Kit, type: BuildingType): void {
  */
 function silkTouches(k: Kit, type: BuildingType): void {
   // The Caravanserai (#334) is already the road's own building.
-  if (['farm', 'gate', 'tower', 'warcamp', 'drainrig', 'transfusion', 'bloodtower', 'caravanserai'].includes(type)) return;
+  if (['farm', 'gate', 'tower', 'warcamp', 'drainrig', 'transfusion', 'bloodtower', 'caravanserai', 'mission'].includes(type)) return;
   const span = type === 'wonder' ? 2.4 : type === 'towncenter' ? 1.6 : type === 'house' ? 0.6 : type === 'market' ? 1.3 : 0.95;
   const h = type === 'house' ? 0.8 : type === 'towncenter' || type === 'wonder' ? 1.5 : 1.15;
   const front = span + 0.1;
@@ -1954,7 +1974,7 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
 }
 
 const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare'>, (k: Kit, e: number, st: Style) => void> = {
-  towncenter, house, storehouse, huntcamp, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield,
+  towncenter, house, storehouse, huntcamp, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield,
 };
 
 const cache = new Map<string, THREE.BufferGeometry>();
