@@ -21,6 +21,8 @@ import { placeProblem, stampBuilding, walkable } from './sim/grid';
 import { findDockSpot, findSpot, millSpotFor } from './sim/ai';
 import { channelPlan, dig, dykePlan, heldBack, waterLine } from './sim/water';
 import { bared, tideMillSpot, wakeTide } from './sim/tides';
+import { barragePlan, isCauseway, kegTileProblem } from './sim/tides';
+import { AI_BARRAGE } from './sim/data';
 import { maxHp, placeBuilding, restat, spawnUnit } from './sim/world';
 import { arrivalText, epochArrivals } from './ui/endReport';
 import { journeyHtml } from './ui/journeyReport';
@@ -132,6 +134,8 @@ let floodToldAt = -99999;
 /** The tide (#739): whether its waking was told, and when the viewer's people were last told they were swept off the flats. */
 let tideTold = false;
 let sweptToldAt = -99999;
+/** When a breached causeway (#748) was last told: one toast a blast. */
+let breachToldAt = -1;
 /** When the flock last told of a lamb born, or of bare ground (#308), so the toasts don't pile up. */
 const flockToast = { born: -1e9, hungry: -1e9 };
 /** When tribute was last told of (#318), taken by the viewer's riders or from the viewer's land. */
@@ -1628,6 +1632,22 @@ function kegAt(clientX: number, clientY: number, queue: boolean): void {
   if (!s) return;
   const pk = view.pick(clientX, clientY);
   const b = pk && pk.kind === 'building' ? s.byId.get(pk.id) : undefined;
+  // A rival's causeway or barrage (#748): the keg is laid on the tile itself, to breach the road.
+  const g = b ? null : view.groundAt(clientX, clientY);
+  const tile = g ? Math.floor(g.y) * s.w + Math.floor(g.x) : -1;
+  if (!b && tile >= 0 && isCauseway(s, tile)) {
+    const no = kegTileProblem(s, viewer, tile);
+    if (no) {
+      hud.toast(no, 'bad');
+      play('error');
+      return;
+    }
+    const ids = selectedUnits(s).filter((u) => !u.inside && carriesKegs(u)).map((u) => u.id);
+    issue({ t: 'kegTile', p: viewer, ids, tile, queue: queue || undefined });
+    view.marker(s, (tile % s.w) + 0.5, Math.floor(tile / s.w) + 0.5, true);
+    play('move');
+    return;
+  }
   const why = kegProblem(s, viewer, b);
   if (!b || why) {
     hud.toast(why ?? 'Pick a rival building', 'bad');
@@ -2503,6 +2523,22 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         }
         break;
       }
+      case 'breached':
+        // Barrages (#748): a causeway of yours torn up, told once a blast; a rival's, once too.
+        if (s.tick !== breachToldAt && (ev.owner === viewer || ev.by === viewer)) {
+          breachToldAt = s.tick;
+          if (ev.owner === viewer) {
+            lastAlert = { x: ev.x, y: ev.y };
+            hud.toast(`${s.players[ev.by]?.name ?? 'A rival'} has breached your causeway${ev.pond ? ': the barrage is open, and its pond drains at the next turn of the tide. Lay causeways in the gap to shut it again' : ': the road over the flats is cut'}. (Space to look)`, 'bad');
+          } else hud.toast(ev.pond ? 'The barrage is breached: its pond drains at the next turn of the tide, and its mills grind half as much' : 'The causeway is breached: the road over the flats is cut', 'good');
+        }
+        break;
+      case 'pond':
+        if (ev.owner === viewer) {
+          hud.toast(`🌊 The barrage holds: ${ev.tiles} tiles of tidal flats are a pond now, wet at every hour. Tide Mills by it grind its flats twice, on the flood and on the ebb.`, 'good');
+          play('pondShut');
+        }
+        break;
       case 'tideSwept':
         if (ev.owner === viewer && s.tick - sweptToldAt > TICK_HZ * 10) {
           sweptToldAt = s.tick;
@@ -2874,6 +2910,7 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           if (ev.owner === viewer) hud.toast(`${s.players[ev.by ?? 0].name} stamped out your keg's fuse: cover the next one`, 'alert');
           else if (ev.by === viewer) hud.toast('Your people stamped out a burning keg', 'good');
         } else if (ev.what === 'blown' && ev.owner === viewer) hud.toast('A keg blows: what stood by it is shaken to its footings', 'good');
+        else if (ev.what === 'drowned' && ev.owner === viewer) hud.toast('🌊 The tide came over your keg and drowned its fuse: lay powder on the flats only with time to spare', 'alert');
         break;
       case 'fire':
         // Fire (`fire.ts`): told once when a living building of yours catches (a spreading fire would tell every second), and when one is beaten out.
@@ -3490,6 +3527,25 @@ function frame(now: number): void {
     if (!spot) return 0;
     view.rig.focus(spot.tx + 1, spot.ty + 1);
     return placeBuilding(s, owner, 'tidemill', spot.tx, spot.ty, true).id;
+  },
+  /**
+   * Barrages (testing, #748): with the tide awake, find the first bay on the map a barrage would shut (scanning for a mill's spot, as the
+   * computer looks by its own), and raise a Tide Mill there and the barrage's whole line, finished. Returns the pond's tidal tiles once
+   * the line settles (0: no bay found). Look at it with the camera.
+   */
+  barrage(owner: number) {
+    if (!game || !game.tidal) return 0;
+    const s = game;
+    for (let y = 4; y < s.h - 4; y += 6)
+      for (let x = 4; x < s.w - 4; x += 6) {
+        const plan = barragePlan(s, { tx: x, ty: y, size: 2 }, AI_BARRAGE, wallLine);
+        if (!plan) continue;
+        for (const t of plan.line) placeBuilding(s, owner, 'causeway', t % s.w, Math.floor(t / s.w), true);
+        if (!placeProblem(s, 'tidemill', x, y, true, owner)) placeBuilding(s, owner, 'tidemill', x, y, true);
+        view.rig.focus(x + 1, y + 1);
+        return plan.pond;
+      }
+    return 0;
   },
   /** A finished line of wall, or of Thornwall (testing). */
   wall(owner: number, x0: number, y0: number, x1: number, y1: number, type: 'wall' | 'thornwall' = 'wall') {

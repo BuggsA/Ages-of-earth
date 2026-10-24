@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'fireLit' | 'fireCatch' | 'fireOut' | 'fireAsh' | 'flow' | 'rush' | 'groan' | 'dart' | 'swarm' | 'hiveHush' | 'sluiceOpen' | 'sluiceShut' | 'spread' | 'tideWash' | 'tideMill' | 'swept';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'fireLit' | 'fireCatch' | 'fireOut' | 'fireAsh' | 'flow' | 'rush' | 'groan' | 'dart' | 'swarm' | 'hiveHush' | 'sluiceOpen' | 'sluiceShut' | 'spread' | 'tideWash' | 'tideMill' | 'swept' | 'pondShut' | 'breach';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -791,6 +791,19 @@ export class Sound {
         this.tone(out, t, { f: 52, to: 47, type: 'triangle', dur: 0.9, peak: 0.04, attack: 0.2, lp: 300 });
         this.noise(out, t + 0.1, { dur: 0.9, filter: 'lowpass', f: 600, q: 0.8, peak: 0.025, attack: 0.2 });
         this.bell(out, t + 0.75, N.E6, 0.25, 0.02);
+        break;
+      case 'pondShut':
+        // A barrage shuts its pond off (#748): the timber gate dropped into its slot, the race behind it stilling, a few slow laps.
+        this.tone(out, t, { f: 90, to: 55, type: 'triangle', dur: 0.35, peak: 0.07, attack: 0.005, lp: 500 });
+        this.noise(out, t, { dur: 0.12, filter: 'bandpass', f: 420, q: 1.5, peak: 0.05 });
+        this.noise(out, t + 0.15, { dur: 1.6, filter: 'lowpass', f: 700, to: 220, q: 0.7, peak: 0.035, attack: 0.1 });
+        for (let i = 0; i < 3; i++) this.tone(out, t + 0.9 + i * 0.42, { f: 520 - i * 60, to: 380 - i * 40, type: 'sine', dur: 0.12, peak: 0.012, attack: 0.02 });
+        break;
+      case 'breach':
+        // A causeway breached (#748): packed stone tumbling into the water, then the sea rushing through the gap.
+        for (let i = 0; i < 5; i++) this.noise(out, t + i * 0.09, { dur: 0.08, filter: 'bandpass', f: 1500 - i * 180, q: 2, peak: 0.045 - i * 0.005 });
+        this.tone(out, t + 0.05, { f: 70, to: 45, type: 'triangle', dur: 0.5, peak: 0.05, attack: 0.01, lp: 300 });
+        this.noise(out, t + 0.4, { dur: 1.8, filter: 'bandpass', f: 600, to: 1400, q: 0.6, peak: 0.05, attack: 0.4 });
         break;
       case 'swept':
         // Caught on the flats by the tide (#739): a wave breaking over them, a churn, and the drag of it pulling back.

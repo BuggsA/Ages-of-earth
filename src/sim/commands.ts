@@ -16,6 +16,7 @@ import { ruinAt } from './ruins';
 import { rubbleAt, salvages } from './salvage';
 import { cacheAt } from './caches';
 import { carriesKegs, kegProblem } from './powder';
+import { kegTileProblem } from './tides';
 import { carriesTorch, onFire, torchProblem } from './fire';
 import { launch, launchProblem } from './silo';
 import { raise, raiseCost } from './reclaim';
@@ -480,6 +481,18 @@ export function applyCommand(s: GameState, c: Command): void {
         return;
       }
       for (const u of units) giveOrder(u, { k: 'keg', target: c.target }, c.queue);
+      break;
+    }
+    case 'kegTile': {
+      // Barrages (#748): a keg carried to a rival's causeway tile and laid on it, to breach the road.
+      const why = kegTileProblem(s, c.p, c.tile);
+      const units = myUnits(s, c.p, c.ids).filter(carriesKegs);
+      if (!units.length) return;
+      if (why) {
+        refuse(s, c.p, why);
+        return;
+      }
+      for (const u of units) giveOrder(u, { k: 'kegTile', tile: c.tile }, c.queue);
       break;
     }
     case 'torch': {

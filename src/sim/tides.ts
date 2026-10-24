@@ -1,8 +1,11 @@
-import { AGES, TIDE, domainOf, secs } from './data';
+import { AGES, AI_EBB, BARRAGE, KEG, TIDE, domainOf, secs } from './data';
 import { ageDef, ageOf, asleep } from './ages';
-import { stampBuilding, walkable } from './grid';
+import { distToTile, stampBuilding, walkable } from './grid';
 import { isChannel, isInund, isPolder, seaAt } from './water';
-import type { Building, GameState, Unit } from './types';
+import { isEnemy } from './world';
+import { kegsOf, sappers } from './powder';
+import { peace } from './combat';
+import type { BarragePlan, Building, GameState, Unit } from './types';
 import { B_TERRAIN, R_NONE, T_SAND, T_WATER } from './types';
 
 /**
@@ -162,9 +165,12 @@ function settle(s: GameState, level: number): { bared: number; covered: number; 
   const t = s.tidal!;
   let nb = 0;
   const wet = new Set<number>();
+  // A barrage's pond (#748) holds its water at every level.
+  recountPonds(s);
+  const pond = s.pond;
   for (let i = 0; i < t.length; i++) {
     if (t[i] === 0 || !free(s, i)) continue;
-    const out = level < tidalLevel(s, i);
+    const out = level < tidalLevel(s, i) && !(pond && pond[i]);
     if (out && s.terrain[i] === T_WATER) {
       bare(s, i);
       nb++;
@@ -255,6 +261,7 @@ function raiseCauseways(s: GameState): void {
     s.byId.delete(b.id);
     const t = b.ty * s.w + b.tx;
     s.tidal[t] = TIDE_CAUSEWAY;
+    (s.causewayBy ??= new Uint8Array(s.w * s.h))[t] = b.owner + 1;
     // The site held the water off; it is the tide's again, at the level it stands.
     if (s.terrain[t] !== T_WATER && s.terrain[t] !== T_SAND) s.terrain[t] = T_WATER;
     s.block[t] |= s.terrain[t] === T_WATER ? B_TERRAIN : 0;
@@ -265,6 +272,7 @@ function raiseCauseways(s: GameState): void {
   const gone = new Set(done.map((b) => b.id));
   s.ents = s.ents.filter((e) => !gone.has(e.id));
   s.blockVersion++;
+  recountPonds(s, true);
 }
 
 // ---- Tide Mills --------------------------------------------------------------------------------
@@ -294,13 +302,18 @@ export function millShares(s: GameState): Map<number, number> {
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.type !== 'tidemill' || !grinds(s, e)) continue;
     let n = 0;
-    for (const t of tidalNear(s, e)) {
-      if (n >= TIDE.mill.most) break;
-      if (taken.has(t)) continue;
-      taken.add(t);
-      n++;
-    }
-    out.set(e.id, (TIDE.mill.gold * n) / TIDE.mill.most);
+    let ponded = 0;
+    // A barrage's pond (#748) is ground first, and `BARRAGE.mill` times over: on the flood and on the ebb.
+    const near = tidalNear(s, e);
+    for (const inPond of [true, false])
+      for (const t of near) {
+        if (n >= TIDE.mill.most) break;
+        if (inPond !== isPond(s, t) || taken.has(t)) continue;
+        taken.add(t);
+        n++;
+        if (inPond) ponded++;
+      }
+    out.set(e.id, (TIDE.mill.gold * (n + (BARRAGE.mill - 1) * ponded)) / TIDE.mill.most);
   }
   return out;
 }
@@ -364,6 +377,7 @@ export function tideStep(s: GameState): void {
       }
     }
     if (wet.size) for (const u of s.ents) if (u.kind === 'unit' && u.hp > 0 && !u.inside && domainOf(u.type) === 'land' && wet.has(Math.floor(u.y) * s.w + Math.floor(u.x))) sweep(s, u);
+    if (wet.size) drownKegs(s, wet);
   } else if (s.tick % 5 === 0) {
     for (const u of s.ents) if (u.kind === 'unit' && u.hp > 0 && !u.inside && domainOf(u.type) === 'land' && caught(s, u.x, u.y)) sweep(s, u);
   }
@@ -414,9 +428,350 @@ export function coveredNext(s: GameState): ((tile: number) => boolean) | null {
   if (!c) return null;
   const now = c.level;
   const next = tideLevel(s, s.tick + Math.ceil(c.next * secs(1)));
-  if (next <= now) return null;
-  return (tile: number) => bared(s, tile) && tidalLevel(s, tile) <= next;
+  // A barrage's pond (#748) fills at the next turn whichever way the tide runs: its bared flats go under too.
+  if (next <= now) return s.pond ? (tile: number) => bared(s, tile) && isPond(s, tile) : null;
+  return (tile: number) => bared(s, tile) && (tidalLevel(s, tile) <= next || isPond(s, tile));
 }
 
 /** Where to step to off the flats before the flood: dry ground above the tide within `TIDE.sweep`, as the sea would sweep it (-1: none). */
 export const shoreNear = (s: GameState, x: number, y: number, team: number): number => shoreFor(s, x, y, team);
+
+// ---- Barrages (#748) ---------------------------------------------------------------------------
+
+/** Whether this tile is tidal ground in a barrage's pond (#748): it stays wet, and the mills grind it twice. */
+export const isPond = (s: GameState, tile: number): boolean => !!s.pond && s.pond[tile] === 1;
+
+/** Who raised this causeway tile (#748), or -1. */
+export const causewayOwner = (s: GameState, tile: number): number => (s.causewayBy ? s.causewayBy[tile] - 1 : -1);
+
+/** Whether a tile is still water to a pond's body: water or tidal ground, but no causeway, no finished building, polder, channel or flood. */
+function holdsWater(s: GameState, i: number): boolean {
+  const t = s.tidal![i];
+  if (t === TIDE_CAUSEWAY) return false;
+  if (t === 0 && s.terrain[i] !== T_WATER) return false;
+  if (s.bldAt[i] !== 0) {
+    const b = s.byId.get(s.bldAt[i]);
+    if (b && b.kind === 'building' && b.built) return false;
+  }
+  return !isPolder(s, i) && !isChannel(s, i) && !isInund(s, i);
+}
+
+const FOUR = [1, 0, -1, 0, 0, 1, 0, -1];
+const WAYS4 = [
+  [1, 0],
+  [0, 1],
+  [1, 1],
+  [1, -1],
+];
+
+/**
+ * The ponds behind the barrages (#748): every body of water and tidal ground (four ways, not through causeways or finished buildings)
+ * that touches no map edge, holds no more than `BARRAGE.most` tiles and borders a causeway; its tidal tiles are the pond. Each tile is
+ * looked at once, in tile order, so a step asks it cheaply.
+ */
+export function pondsOf(s: GameState): Uint8Array {
+  const { w, h } = s;
+  const out = new Uint8Array(w * h);
+  if (!s.tidal) return out;
+  const seen = new Uint8Array(w * h);
+  const body: number[] = [];
+  for (let start = 0; start < w * h; start++) {
+    if (seen[start] || !holdsWater(s, start)) continue;
+    body.length = 0;
+    body.push(start);
+    seen[start] = 1;
+    let open = false;
+    let dam = false;
+    let tidal = false;
+    for (let q = 0; q < body.length; q++) {
+      const i = body[q];
+      const x = i % w;
+      const y = (i - x) / w;
+      if (x === 0 || y === 0 || x === w - 1 || y === h - 1) open = true;
+      if (s.tidal[i] !== 0) tidal = true;
+      for (let d = 0; d < 8; d += 2) {
+        const nx = x + FOUR[d];
+        const ny = y + FOUR[d + 1];
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const n = ny * w + nx;
+        if (s.tidal[n] === TIDE_CAUSEWAY) dam = true;
+        if (seen[n] || !holdsWater(s, n)) continue;
+        seen[n] = 1;
+        body.push(n);
+      }
+    }
+    if (open || !dam || !tidal || body.length > BARRAGE.most) continue;
+    for (const i of body) if (s.tidal[i] !== 0) out[i] = 1;
+  }
+  return out;
+}
+
+/** Count the ponds again (#748). `tell`: say so of a pond that has just been shut off (one event a pond, by whoever's causeway borders it). */
+function recountPonds(s: GameState, tell = false): void {
+  if (!s.tidal) return;
+  const was = s.pond;
+  const now = pondsOf(s);
+  let any = false;
+  let moved = 0;
+  for (let i = 0; i < now.length; i++) {
+    if (now[i]) any = true;
+    if (now[i] !== (was ? was[i] : 0)) moved++;
+  }
+  if (any) s.pond = now;
+  else delete s.pond;
+  // The renderer redraws the shore when this moves.
+  if (moved) s.tideTurns = (s.tideTurns ?? 0) + moved;
+  if (!tell) return;
+  // Each new stretch of pond, told once: its first tile in tile order, and the owner of a causeway beside the pond.
+  const told = new Uint8Array(now.length);
+  for (let i = 0; i < now.length; i++) {
+    if (!now[i] || told[i] || (was && was[i])) continue;
+    const tiles: number[] = [i];
+    told[i] = 1;
+    let owner = -1;
+    for (let q = 0; q < tiles.length; q++) {
+      const j = tiles[q];
+      const x = j % s.w;
+      const y = (j - x) / s.w;
+      for (let d = 0; d < 8; d += 2) {
+        const nx = x + FOUR[d];
+        const ny = y + FOUR[d + 1];
+        if (nx < 0 || ny < 0 || nx >= s.w || ny >= s.h) continue;
+        const n = ny * s.w + nx;
+        if (owner < 0 && s.tidal[n] === TIDE_CAUSEWAY) owner = causewayOwner(s, n);
+        if (now[n] && !told[n]) {
+          told[n] = 1;
+          tiles.push(n);
+        }
+      }
+    }
+    s.events.push({ k: 'pond', owner, tiles: tiles.length, x: (i % s.w) + 0.5, y: Math.floor(i / s.w) + 0.5 });
+  }
+}
+
+/** Powder kegs lying on tiles the water has just covered (#748): the fuse drowns, and the keg is lost. */
+function drownKegs(s: GameState, wet: Set<number>): void {
+  if (!s.kegs) return;
+  const left = s.kegs.filter((k) => {
+    if (!wet.has(Math.floor(k.y) * s.w + Math.floor(k.x))) return true;
+    s.events.push({ k: 'keg', owner: k.owner, x: k.x, y: k.y, what: 'drowned' });
+    return false;
+  });
+  if (left.length) s.kegs = left;
+  else delete s.kegs;
+}
+
+/** The level of tidal ground a tile was before anything was laid on it: from its bed as the tide found it (0: open sea). */
+function bedLevel(s: GameState, tile: number): number {
+  const bed = s.tideBed;
+  if (!bed) return levelFor(bedDepth(s, tile));
+  let sum = 0;
+  for (const c of corners(s, tile)) sum += bed[c];
+  return levelFor(sum / 4);
+}
+
+/**
+ * A blast breaches the causeways round it (#748): every rival causeway tile whose middle lies within `r` of the point sinks back to the
+ * tidal ground (or open sea) it was laid on, at the level the sea stands; whoever stands on one the water now covers is swept, and a
+ * pond it held drains at the next turn of the tide. Called by a keg's blast and a warhead's. Returns how many tiles were breached.
+ */
+export function breachAt(s: GameState, x: number, y: number, r: number, by: number): number {
+  if (!s.tidal) return 0;
+  const level = tideLevel(s);
+  const wet = new Set<number>();
+  let n = 0;
+  for (let ty = Math.max(0, Math.floor(y - r)); ty <= Math.min(s.h - 1, Math.floor(y + r)); ty++)
+    for (let tx = Math.max(0, Math.floor(x - r)); tx <= Math.min(s.w - 1, Math.floor(x + r)); tx++) {
+      const t = ty * s.w + tx;
+      if (s.tidal[t] !== TIDE_CAUSEWAY) continue;
+      const dx = tx + 0.5 - x;
+      const dy = ty + 0.5 - y;
+      if (dx * dx + dy * dy > r * r) continue;
+      const owner = causewayOwner(s, t);
+      if (owner >= 0 && !isEnemy(s, by, owner)) continue;
+      let ponded = false;
+      for (let d = 0; d < 8; d += 2) {
+        const nx = tx + FOUR[d];
+        const ny = ty + FOUR[d + 1];
+        if (nx >= 0 && ny >= 0 && nx < s.w && ny < s.h && isPond(s, ny * s.w + nx)) ponded = true;
+      }
+      s.tidal[t] = bedLevel(s, t);
+      if (s.causewayBy) s.causewayBy[t] = 0;
+      const k = s.tidal[t];
+      if (k > 0 && level < k && !isPond(s, t)) {
+        if (s.terrain[t] !== T_SAND) bare(s, t);
+      } else if (s.terrain[t] === T_SAND || !(s.block[t] & B_TERRAIN)) {
+        cover(s, t);
+        wet.add(t);
+      }
+      n++;
+      s.events.push({ k: 'breached', owner, by, tile: t, x: tx + 0.5, y: ty + 0.5, pond: ponded });
+    }
+  if (!n) return 0;
+  s.blockVersion++;
+  s.tideTurns = (s.tideTurns ?? 0) + n;
+  const p = s.players[by];
+  if (p) p.stats.breached = (p.stats.breached ?? 0) + n;
+  if (wet.size) {
+    for (const u of s.ents) if (u.kind === 'unit' && u.hp > 0 && !u.inside && domainOf(u.type) === 'land' && wet.has(Math.floor(u.y) * s.w + Math.floor(u.x))) sweep(s, u);
+    drownKegs(s, wet);
+  }
+  recountPonds(s);
+  return n;
+}
+
+/** Why a people can't carry a keg to this tile (#748), or null: it must be a rival's causeway, and the people a Sapper's with kegs in store. */
+export function kegTileProblem(s: GameState, owner: number, tile: number): string | null {
+  const p = s.players[owner];
+  if (!sappers(p)) return 'Only a people of the Age of Sappers lays powder kegs';
+  if (kegsOf(p) < 1) return 'No kegs in store: they are ground at the mills in the Age of Alchemy';
+  if (peace(s)) return 'Not while the peace holds';
+  if (tile < 0 || tile >= s.w * s.h || !isCauseway(s, tile)) return 'Pick a rival building, or a rival causeway';
+  const by = causewayOwner(s, tile);
+  if (by >= 0 && !isEnemy(s, owner, by)) return 'That causeway is your own side\'s';
+  return null;
+}
+
+/** Whether a carrier stands close enough to a causeway tile to lay its keg on it (#748). */
+export const atTile = (s: GameState, u: Unit, tile: number, radius: number): boolean => distToTile(u.x, u.y, tile, s.w) - radius <= KEG.lay;
+
+/**
+ * The barrage the computer would lay by a Tide Mill (#748): every tile within `reach` of the mill a causeway may go on is tried as the
+ * middle of a straight line (four ways) running to land or a causeway on both sides, `line` tiles at most in all, every tile of it fit
+ * for a causeway; the line (as `walls` lays it) must shut off a body of tidal ground as `pondsOf` judges it, and `least` of that ground within
+ * a mill's reach of `mill`. Scored by those tiles less `cost` for each tile of line; ties go to the first found, in tile order.
+ */
+export function barragePlan(
+  s: GameState,
+  mill: { tx: number; ty: number; size: number },
+  opts: { reach: number; line: number; least: number; cost: number },
+  walls: (x0: number, y0: number, x1: number, y1: number) => { x: number; y: number }[],
+): BarragePlan | null {
+  if (!s.tidal) return null;
+  const { w, h } = s;
+  const near = new Set(tidalNear(s, mill));
+  const cx = mill.tx + mill.size / 2;
+  const cy = mill.ty + mill.size / 2;
+  const r = opts.reach;
+  const fit = (i: number) => s.bldAt[i] === 0 && s.res[i] === R_NONE && causewaySpot(s, i % w, Math.floor(i / w)) === null;
+  // A shore end: land a causeway runs up onto (no rock, no building), or a causeway already laid.
+  const bank = (i: number) => isCauseway(s, i) || (s.terrain[i] !== T_WATER && !isTidal(s, i) && s.bldAt[i] === 0 && walkable(s, i % w, Math.floor(i / w), -1));
+  let best: BarragePlan | null = null;
+  let bestScore = -Infinity;
+  const tried = new Set<number>();
+  const before = s.tidal;
+  for (let y = Math.max(1, Math.floor(cy - r)); y <= Math.min(h - 2, Math.floor(cy + r)); y++)
+    for (let x = Math.max(1, Math.floor(cx - r)); x <= Math.min(w - 2, Math.floor(cx + r)); x++) {
+      const dx0 = x + 0.5 - cx;
+      const dy0 = y + 0.5 - cy;
+      if (dx0 * dx0 + dy0 * dy0 > r * r || !fit(y * w + x)) continue;
+      // The four ways: along x, along y, and the two diagonals.
+      for (const way of WAYS4) {
+        const end = (sgn: number): { x: number; y: number } | null => {
+          for (let k = 1; k <= opts.line; k++) {
+            const ex = x + way[0] * k * sgn;
+            const ey = y + way[1] * k * sgn;
+            if (ex < 1 || ey < 1 || ex >= w - 1 || ey >= h - 1) return null;
+            const e = ey * w + ex;
+            if (bank(e)) return { x: ex, y: ey };
+            if (!fit(e)) return null;
+          }
+          return null;
+        };
+        const a = end(-1);
+        const b = a && end(1);
+        if (!a || !b) continue;
+        const key = ((a.y * w + a.x) * w + b.x) * h + b.y;
+        if (tried.has(key)) continue;
+        tried.add(key);
+        const line: number[] = [];
+        let ok = true;
+        for (const p of walls(a.x, a.y, b.x, b.y)) {
+          const i = p.y * w + p.x;
+          if (bank(i)) continue;
+          if (!fit(i)) ok = false;
+          line.push(i);
+        }
+        if (!ok || !line.length || line.length > opts.line) continue;
+        // Try the line as laid: the ponds it would make, and how much of them a mill here would grind.
+        const trial = before.slice();
+        for (const i of line) trial[i] = TIDE_CAUSEWAY;
+        s.tidal = trial;
+        const ponds = pondsOf(s);
+        s.tidal = before;
+        let pond = 0;
+        for (const t of near) if (ponds[t] && !isPond(s, t)) pond++;
+        if (pond < opts.least) continue;
+        const score = pond - opts.cost * line.length;
+        if (score > bestScore) {
+          bestScore = score;
+          best = { from: a, to: b, line, pond };
+        }
+      }
+    }
+  return best;
+}
+
+/**
+ * The march across the flats (#748), for the computer: where a straight line from `from` to `to` crosses tidal ground with no open sea on
+ * it, each tidal tile on it (how far along the line, and the level that covers it), the lowest level among them, and the far shore past
+ * the last. Null where it crosses open sea or a pond, or no tidal ground.
+ */
+export function flatsCrossing(s: GameState, from: { x: number; y: number }, to: { x: number; y: number }): { tiles: number; level: number; flats: { d: number; level: number }[]; far: { x: number; y: number } } | null {
+  if (!s.tidal) return null;
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len < 1) return null;
+  const steps = Math.ceil(len * 2);
+  let last = -1;
+  let level = TIDE_TOP;
+  let lastAt = -1;
+  const flats: { d: number; level: number }[] = [];
+  for (let k = 0; k <= steps; k++) {
+    const x = from.x + (dx * k) / steps;
+    const y = from.y + (dy * k) / steps;
+    const tx = Math.floor(x);
+    const ty = Math.floor(y);
+    if (tx < 0 || ty < 0 || tx >= s.w || ty >= s.h) continue;
+    const i = ty * s.w + tx;
+    if (i === last) continue;
+    last = i;
+    if (isTidal(s, i)) {
+      if (isPond(s, i)) return null;
+      const k2 = tidalLevel(s, i);
+      flats.push({ d: (len * k) / steps, level: k2 });
+      level = Math.min(level, k2);
+      lastAt = k;
+    } else if (s.terrain[i] === T_WATER && s.bldAt[i] === 0) return null;
+  }
+  if (!flats.length) return null;
+  return { tiles: flats.length, level, flats, far: { x: from.x + (dx * (lastAt + 2)) / steps, y: from.y + (dy * (lastAt + 2)) / steps } };
+}
+
+/** Whether the sea stands below `level` (the flats of that level bare) through every tick from `t0` to `t1` (#748). The clock is public. */
+export function bareThrough(s: GameState, level: number, t0: number, t1: number): boolean {
+  if (s.tideFrom === undefined) return false;
+  const st = stepTicks();
+  for (let t = t0; t < t1; t += st) if (tideLevel(s, t) >= level) return false;
+  return tideLevel(s, t1) < level;
+}
+
+/**
+ * The low-water strike (#748): whether a march from `from` to `to` at `pace` tiles a second should set out now. Null where the tide is
+ * nothing to it: it crosses fewer than `AI_EBB.across` tiles of tidal ground (or open sea), or no start within `AI_EBB.hold` seconds would
+ * find its flats bare. Otherwise `go` says whether, setting out now, it would find each tile of flats bare as it reaches it, with
+ * `AI_EBB.margin` seconds to spare; `level` (the lowest of them) and `far` are the crossing's, for turning back short of it.
+ */
+export function ebbTiming(s: GameState, from: { x: number; y: number }, to: { x: number; y: number }, pace: number): { go: boolean; level: number; far: { x: number; y: number } } | null {
+  const c = flatsCrossing(s, from, to);
+  if (!c || c.tiles < AI_EBB.across || pace <= 0) return null;
+  const per = secs(AI_EBB.slack / pace + AI_EBB.margin);
+  const fits = (start: number) => c.flats.every((f) => {
+    const at = start + Math.ceil(secs((f.d * AI_EBB.slack) / pace));
+    return bareThrough(s, f.level, at, at + per);
+  });
+  if (fits(s.tick)) return { go: true, level: c.level, far: c.far };
+  for (let t = s.tick + secs(1); t <= s.tick + secs(AI_EBB.hold); t += secs(1)) if (fits(t)) return { go: false, level: c.level, far: c.far };
+  return null;
+}

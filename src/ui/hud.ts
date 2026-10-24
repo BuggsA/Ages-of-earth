@@ -20,6 +20,7 @@ import { carriesKegs, kegProblem, kegsOf, millProblem, mills, millsOf, sappers }
 import { carriesTorch, fireOn } from '../sim/fire';
 import { basinOf, drowned, heldBack, isInund, lets, millIdle, sluiceFed, sluiceProblem, waterLine, wateredAt } from '../sim/water';
 import { aground, millShares, tidalNear, tideClock, tideMillIdle } from '../sim/tides';
+import { isPond } from '../sim/tides';
 import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
 import { LANDMARK_KINDS, claimWork, claimants, favours, landmarkAt } from '../sim/landmarks';
 import { workProblem } from '../sim/works';
@@ -180,6 +181,8 @@ function orderWords(s: GameState, u: Unit): string {
       return carriedBy(s, u) ? 'Carrying a relic to the Temple' : 'Going for a relic';
     case 'keg':
       return 'Carrying a powder keg to lay';
+    case 'kegTile':
+      return 'Carrying a powder keg to a causeway';
     case 'torch':
       return 'Carrying a torch to set alight';
     case 'cache':
@@ -1229,7 +1232,7 @@ export class Hud {
     if (mine && b.built && !sleeping && b.type === 'tidemill') {
       const still = tideMillIdle(s, b);
       const share = millShares(s).get(b.id) ?? 0;
-      status += ` · <span data-tip="<b>Tide Mill</b>Its pond fills on the flood and runs out through the wheel on the ebb: at every turn of the tide it grinds ${TIDE.mill.gold} gold with ${TIDE.mill.most} tiles of tidal ground within ${TIDE.mill.reach} tiles of it, less with fewer. A tile feeds only the first mill raised by it. Causeways count as tidal ground.">${still ? `⚠ ${still}` : `🌊 ${Math.round(share)} gold a turn of the tide (${Math.min(TIDE.mill.most, tidalNear(s, b).length)} tiles of tidal ground)${tideClock(s) ? '' : ': the tide wakes the moment it is raised'}`}</span>`;
+      status += ` · <span data-tip="<b>Tide Mill</b>Its pond fills on the flood and runs out through the wheel on the ebb: at every turn of the tide it grinds ${TIDE.mill.gold} gold with ${TIDE.mill.most} tiles of tidal ground within ${TIDE.mill.reach} tiles of it, less with fewer. A tile feeds only the first mill raised by it. Causeways count as tidal ground. Flats a causeway line shuts off from the sea are a barrage's pond: ground twice, on the flood and on the ebb.">${still ? `⚠ ${still}` : `🌊 ${Math.round(share)} gold a turn of the tide (${Math.min(TIDE.mill.most, tidalNear(s, b).length)} tiles of tidal ground${tidalNear(s, b).some((t) => isPond(s, t)) ? `, ${tidalNear(s, b).filter((t) => isPond(s, t)).length} of them a barrage's pond, ground twice` : ''})${tideClock(s) ? '' : ': the tide wakes the moment it is raised'}`}</span>`;
     }
     // A harbour aground at low water (#739).
     if (mine && b.built && b.type === 'dock' && aground(s, b)) status += ` · <span data-tip="<b>Aground</b>The tide has bared all the water beside this Dock: it launches nothing until the water comes back.">⚓ Aground at low water</span>`;
@@ -1382,7 +1385,7 @@ export class Hud {
       const sappersHere = units.filter(carriesKegs);
       if (sappersHere.length && sappers(p)) {
         const why = kegsOf(p) < 1 ? kegProblem(s, viewer, undefined) : null;
-        cmds.push({ key: 'K', pic: '', glyph: '🧨', title: 'Lay a keg', count: kegsOf(p) || undefined, desc: `Then click a rival building: each one carries a keg from your store to its foot and lights it. ${KEG.fuse} seconds later it blows, wrecking every rival building within ${KEG.reach} tiles (${KEG.building} each) and hurting the soldiers near it. A rival who reaches a burning keg stamps it out: get there quietly, or cover it. Kegs left: ${kegsOf(p)}. More are ground only in the Age of Alchemy.`, ok: !why, why: why ?? undefined, run: () => this.act.kegMode() });
+        cmds.push({ key: 'K', pic: '', glyph: '🧨', title: 'Lay a keg', count: kegsOf(p) || undefined, desc: `Then click a rival building, or a stretch of a rival's causeway: each one carries a keg from your store to its foot and lights it. ${KEG.fuse} seconds later it blows, wrecking every rival building within ${KEG.reach} tiles (${KEG.building} each) and hurting the soldiers near it; a causeway or barrage within reach is breached. A rival who reaches a burning keg stamps it out: get there quietly, or cover it. Kegs left: ${kegsOf(p)}. More are ground only in the Age of Alchemy.`, ok: !why, why: why ?? undefined, run: () => this.act.kegMode() });
       }
       // Fire (`fire.ts`): citizens and foot soldiers carry torches, from the Bronze Age.
       if (units.some(carriesTorch)) {

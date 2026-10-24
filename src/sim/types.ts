@@ -180,7 +180,9 @@ export type Order =
   /** A sapper carrying a powder keg to a rival building to lay it at its foot (#577, `powder.ts`). */
   | { k: 'keg'; target: number }
   /** A torchbearer setting a rival's living building (`target`) or a tree or root (`tile`) alight (`fire.ts`); `t` ticks stood lighting it. */
-  | { k: 'torch'; target?: number; tile?: number; t?: number };
+  | { k: 'torch'; target?: number; tile?: number; t?: number }
+  /** A sapper carrying a powder keg to a rival's causeway or barrage (#748, `tides.ts`) to lay it on the tile, its fuse lit. */
+  | { k: 'kegTile'; tile: number };
 
 /** What a unit is visibly doing, for the renderer's animation. */
 export type Act = 'idle' | 'walk' | 'attack' | 'chop' | 'mine' | 'forage' | 'farm' | 'build' | 'chant' | 'fish';
@@ -704,6 +706,8 @@ export interface PlayerStats {
   milled?: number;
   /** Causeway tiles raised over the flats (#739, the Age of Tides). */
   causeways?: number;
+  /** Rival causeway tiles breached by this people's kegs and warheads (#748). */
+  breached?: number;
   /** Fish landed by boats (the Age of Sail's deed); absent in older saves. */
   fished?: number;
   /** Beacons lit on the people's towers, relays included (the Age of Lightning's deed, #231); absent in older saves. */
@@ -929,7 +933,7 @@ export type GameEvent =
   /** Key ore (#570): `spilled` from `from`'s store or basket, `taken` up by `owner`'s citizen, `kept` (banked) by `owner`. */
   | { k: 'cache'; owner: number; from: number; ore: RareId; n: number; x: number; y: number; what: 'spilled' | 'taken' | 'kept' }
   /** A powder keg (#577): `ground` at the mills, `laid` at a building's foot, `blown`, or `doused` by a rival who reached it. */
-  | { k: 'keg'; owner: number; x: number; y: number; what: 'ground' | 'laid' | 'blown' | 'doused'; by?: number }
+  | { k: 'keg'; owner: number; x: number; y: number; what: 'ground' | 'laid' | 'blown' | 'doused' | 'drowned'; by?: number }
   /** Fire (`fire.ts`): `lit` by a torch or spreading (`tree` when a tree; `owner` the building's), `out` (beaten out), `ash` (a tree burnt down), `root` (a Thornwall root burnt). `by` set the first flame. */
   | { k: 'fire'; what: 'lit' | 'out' | 'ash' | 'root'; x: number; y: number; by: number; owner?: number; torch?: boolean; tree?: boolean }
   /** A Missile Silo's warhead (#605): `launched` (the clock starts), `scrubbed` (the silo fell) or `struck`. */
@@ -969,6 +973,10 @@ export type GameEvent =
   | { k: 'milled'; id: number; owner: number; gold: number; x: number; y: number }
   /** A causeway was finished (#739): `tile` is tidal ground now, raised. */
   | { k: 'causeway'; owner: number; tile: number; x: number; y: number }
+  /** A causeway tile was breached (#748) by `by`'s keg or warhead: it is plain tidal ground again (or open sea), `owner`'s road cut. */
+  | { k: 'breached'; owner: number; by: number; tile: number; x: number; y: number; pond: boolean }
+  /** A barrage shut a pond off from the sea (#748), or a breach let it drain: `tiles` of tidal ground now behind it. */
+  | { k: 'pond'; owner: number; tiles: number; x: number; y: number }
   | { k: 'season'; i: number }
   /** A payday for hired swords (the Age of Merchants): how many went unpaid, and how many of those walked off. */
   | { k: 'wages'; owner: number; late: number; gone: number }
@@ -1110,6 +1118,13 @@ export interface GameState {
   tideFrom?: number;
   /** Tiles the tide has bared or covered, all told (#739): a cheap test for the renderer that the shore moved. */
   tideTurns?: number;
+  /** Who raised each causeway tile (#748): the owner + 1, 0 where none stands. Absent until the first is raised. */
+  causewayBy?: Uint8Array;
+  /**
+   * Barrage ponds (#748): 1 on each tile of tidal ground a causeway line has shut off from the open sea (`pondsOf`, `tides.ts`). Its flats
+   * stay wet, and a Tide Mill grinds them twice. Recounted at each turn of the tide and whenever a causeway is raised or breached.
+   */
+  pond?: Uint8Array;
   /**
    * The Water Line (#701 s4): per tile, where an open sluice let the water out over low ground (now `T_WATER`, waded and not walked dry,
    * no `B_TERRAIN`): 1 + the terrain it had, to give back when the water goes. Absent until the first sluice opens (and in older saves).
@@ -1187,6 +1202,14 @@ export interface GameState {
   /** -1 while the match goes on; the winning team after. */
   winner: number;
   over: boolean;
+}
+
+/** A barrage the computer means to lay (#748, `barragePlan`): the drag's two ends on the shore, its tiles, and the tidal ground it shuts off. */
+export interface BarragePlan {
+  from: { x: number; y: number };
+  to: { x: number; y: number };
+  line: number[];
+  pond: number;
 }
 
 export interface AiMemory {
@@ -1301,6 +1324,12 @@ export interface AiMemory {
   /** The tick it entered the Age of the Hive, kept while it sets its Hives there (`HIVE.aiStay`). */
   hive?: number;
   steppe?: { band?: number[]; at?: { x: number; y: number }; out?: number; recalled?: number; horde?: number; since?: number; struck?: number; /** When a nomad flock (#501) was first seen grazed out, this time. */ starved?: number; pack?: { x: number; y: number; at: number }; to?: { x: number; y: number; at: number }; from?: { x: number; y: number } };
+  /**
+   * The tide (#748): the barrage it means to lay by its mills (null: none worth it, by any of the mills in `seen`); once it stood whole,
+   * a gap in it is mended. `wait` is when a wave across the flats began waiting for low water; `cross` the crossing the wave on the
+   * march took at low water (its far shore, the level that covers it, and the wave's goal), to turn back short of before the flood.
+   */
+  tide?: { plan?: BarragePlan | null; seen?: number[]; raised?: boolean; wait?: number; cross?: { x: number; y: number; level: number; to: { x: number; y: number } } };
 }
 
 /** Orders that can be given with Shift held to queue them after the current one. */
@@ -1401,6 +1430,8 @@ export type Command =
   | ({ t: 'keg'; p: number; ids: number[]; target: number } & Queued)
   /** Citizens or foot soldiers carry torches to a rival's living building (`target`) or to a tree or root (`tile`) and set it alight (`fire.ts`). */
   | ({ t: 'torch'; p: number; ids: number[]; target?: number; tile?: number } & Queued)
+  /** Citizens or foot soldiers carry a powder keg to a rival's causeway tile and lay it there (#748, the Age of Sappers): it breaches the road. */
+  | ({ t: 'kegTile'; p: number; ids: number[]; tile: number } & Queued)
   /** A Missile Silo launches at a point (#605, the Atomic Age). */
   | { t: 'launch'; p: number; silo: number; x: number; y: number }
   /** Answer the card of tidings waiting at the fire (#443): `take` pays its price, otherwise it is passed by. */

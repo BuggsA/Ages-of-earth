@@ -123,6 +123,8 @@ export class View {
   readonly kegs = new KegView();
   readonly fires = new FireView();
   private falloutTick = -1;
+  /** The tick a breach (#748) was last heard: one sound a blast. */
+  private breachHeard = -1;
   readonly landmarks = new LandmarksView();
   /** When ground relics next sparkle. */
   private relicGlint = 0;
@@ -937,6 +939,10 @@ export class View {
           } else if (ev.what === 'doused') {
             this.effects.burst(at, { count: 8, speed: 0.6, up: 1, life: 1.4, size: 0.1, grow: 2, gravity: -0.6, drag: 1, soft: true, colors: ['#bdb6a8', '#8f887c'] });
             this.cue('kegDoused', ev.x, ev.y, 0.8);
+          } else if (ev.what === 'drowned') {
+            // The tide came over a burning keg (#748): a hiss of steam off the water, and it is gone.
+            this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.05, ev.y), { count: 7, speed: 0.4, up: 1.1, life: 1.2, size: 0.08, grow: 2, gravity: -0.5, drag: 1, soft: true, colors: ['#e8eef0', '#c9d3d6'] });
+            this.cue('kegDoused', ev.x, ev.y, 0.6);
           } else {
             // The blast: a fireball low and wide, a black pall, stone and timber thrown, a ring out to its reach.
             this.effects.burst(at, { count: 30, speed: 3, up: 0.6, life: 0.8, size: 0.14, grow: 2.2, gravity: -1, drag: 1.2, colors: ['#ffe08a', '#ff9a3c', '#e0471f'] });
@@ -1355,6 +1361,24 @@ export class View {
           if (ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;
           this.effects.burst(this.ground(s, ev.x, ev.y, 0.6), { count: 7, speed: 0.7, up: 1.2, life: 0.9, size: 0.05, gravity: 2.4, colors: ['#dcefff', '#ffd166', '#f2cf4a'] });
           if (ev.owner === this.viewer) this.cue('tideMill', ev.x, ev.y, 0.4);
+          break;
+        }
+        case 'breached': {
+          // A causeway breached (#748): packed stone thrown up and the sea through the gap; one sound a blast, from its first tile.
+          if (!this.sees(ev.x, ev.y)) break;
+          this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.1, ev.y), { count: 10, speed: 1.6, up: 1.2, life: 1.1, size: 0.07, gravity: 6, drag: 0.3, colors: ['#b8ad96', '#9e9482', '#7d7468'] });
+          this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.05, ev.y), { count: 8, speed: 0.9, up: 0.8, life: 0.9, size: 0.06, gravity: 3, drag: 0.4, colors: ['#ffffff', '#dcefff'] });
+          if (s.tick !== this.breachHeard) {
+            this.breachHeard = s.tick;
+            this.cue('breach', ev.x, ev.y, 0.7);
+          }
+          break;
+        }
+        case 'pond': {
+          // A barrage shuts its pond (#748): the water stills behind it.
+          if (!this.sees(ev.x, ev.y)) break;
+          this.effects.ring(new THREE.Vector3(ev.x, WATER_Y + 0.03, ev.y), '#dcefff', 3, 1.6);
+          if (ev.owner !== this.viewer) this.cue('pondShut', ev.x, ev.y, 0.4);
           break;
         }
         case 'causeway': {

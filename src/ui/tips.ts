@@ -435,6 +435,18 @@ const TIPS: Tip[] = [
     text: 'A rival keeps the sea\'s hours, and the <b>tide</b> has woken for everyone: watch its clock (🌊, top bar). At low water the shallows bare as flats an army can cross, toward you or from you; ships on them sit aground, and a Dock with only flats beside it launches nothing. Whoever stands on the flats when the water comes back is swept ashore, hurt.',
   },
   {
+    id: 'barrage',
+    // Barrages (#748): a Tide Mill stands, and no pond yet.
+    when: (s, me) => ageOf(s.players[me]) === 'tides' && has(s, me, 'tidemill') && !s.pond,
+    text: `<b>Shut a bay.</b> Drag a line of ${BUILDINGS.causeway.name}s (<kbd>V</kbd>) across the mouth of a bay of flats, shore to shore: behind it the bay is a <b>pond</b> whose flats stay wet at every hour, and a Tide Mill by it grinds them twice, on the flood and on the ebb. What it costs: nobody crosses that bay at low water any more, you included, and powder or a warhead on the line lets the pond out.`,
+  },
+  {
+    id: 'breachCauseway',
+    // Barrages (#748): a Sapper people with kegs, and a rival's causeway on the map.
+    when: (s, me) => ageOf(s.players[me]) === 'sapper' && (s.players[me].kegs ?? 0) > 0 && !!s.causewayBy && s.causewayBy.some((o) => o > 0 && o - 1 !== me),
+    text: 'A rival has laid <b>causeways</b> over the flats. Select citizens or foot soldiers, choose <b>Lay a keg</b> (<kbd>K</kbd>), and click a stretch of the causeway: the blast breaches it, cutting the road, and a barrage breached lets its pond drain. Lay it at low water, with time to spare: the flood drowns a burning fuse.',
+  },
+  {
     id: 'hive',
     // The Age of the Hive (`docs/wild-road.md` §3): its first minute.
     when: (s, me) => ageOf(s.players[me]) === 'hive',
