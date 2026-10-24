@@ -10,15 +10,15 @@ At a glance, at the default zoom, a player can tell: ground from objects; a unit
 
 ## Areas: five chains at once
 
-The art is split into areas with their own hot files, so up to five agents work side by side, one claim and one chain per area (`docs/team.md`, "Lanes"). Each area has its own issue under #617.
+The art is split into areas with their own hot files, so up to five agents work side by side, one claim and one chain per area (`docs/team.md`, "Lanes"). Each area has its own issue under #617, with `area:<name>` in its title.
 
 | Area | Its hot files (`src/render/` unless said) | What it answers for |
 | --- | --- | --- |
-| `area:light` | `daylight.ts`, `sky.ts`, `weather.ts`, `post.ts`, `materials.ts`, `camera.ts`, the lights in `view.ts` | light, shadow, sky, haze, rain, tone and colour grading, the camera's angle; **the palette below** |
-| `area:ground` | `terrain.ts`, `water.ts`, `natureModels.ts`, `resourcesView.ts`, `seasonLook.ts`, `grazeView.ts`, `borderView.ts` | ground, water, trees, bushes, mines, borders: the stage everything stands on |
-| `area:units` | `unitModels.ts`, `unitsView.ts`, `kit.ts` | silhouettes and scale of every unit, team colour on units, telling lines apart |
-| `area:buildings` | `buildingModels.ts`, `buildingsView.ts`, `foundationView.ts`, `rubbleView.ts`, the small `*View.ts` props (ruins, landmarks, relics, posts, finds, caches, kegs) | silhouettes of buildings by type and epoch, team colour on buildings |
-| `area:overlays` | `overlays.ts`, `rangeGuides.ts`, `effects.ts`, `src/ui/minimap.ts`, `src/ui/style.css` (in-world readability only) | selection, health bars, hit and death effects, the minimap's colours |
+| `area:light` (#622) | `daylight.ts`, `sky.ts`, `weather.ts`, `post.ts`, `materials.ts`, `camera.ts`, the lights in `view.ts` | light, shadow, sky, haze, rain, tone and colour grading, the camera's angle; **the palette below** |
+| `area:ground` (#623) | `terrain.ts`, `water.ts`, `natureModels.ts`, `resourcesView.ts`, `seasonLook.ts`, `grazeView.ts`, `borderView.ts` | ground, water, trees, bushes, mines, borders: the stage everything stands on |
+| `area:units` (#624) | `unitModels.ts`, `unitsView.ts`, `kit.ts` | silhouettes and scale of every unit, team colour on units, telling lines apart |
+| `area:buildings` (#625) | `buildingModels.ts`, `buildingsView.ts`, `foundationView.ts`, `rubbleView.ts`, the small `*View.ts` props (ruins, landmarks, relics, posts, finds, caches, kegs) | silhouettes of buildings by type and epoch, team colour on buildings |
+| `area:overlays` (#626) | `overlays.ts`, `rangeGuides.ts`, `effects.ts`, `src/ui/minimap.ts`, `src/ui/style.css` (in-world readability only) | selection, health bars, hit and death effects, the minimap's colours |
 
 - **Shared files** (`view.ts`, `kit.ts`, `materials.ts`): add, don't restructure. A change another area depends on goes in its own small pull request, merged first.
 - **Not in this split:** the ambient life (`birds`, `bats`, `owls`, `crows`, `fireflies`), the HUD's layout and icons. Take them as a sixth step once the five have landed.
