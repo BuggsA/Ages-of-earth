@@ -2954,6 +2954,8 @@ export const TOWER_LEVELS: { name: string; epoch: number; cost: Cost; time: numb
 ];
 /** A clever computer raises a tower a step only with this much of each resource left over beyond the step's price. */
 export const AI_TOWER_KEEP = 50;
+/** Nor while the peace has more than this many seconds to run: no one can strike, and the wood is wanted for the town (#720). */
+export const AI_TOWER_PEACE = 90;
 
 /**
  * The Age of Hemocraft (#355 s2): each second a finished Drain Rig bleeds up to `most` living enemies within `drain` tiles (nearest first,

@@ -30,7 +30,7 @@ import { graftCost, stationsOf, waiting } from './hemo';
 import { borderMap, landOwnerAt, suppliedAt } from './borders';
 import { workProblem } from './works';
 import { aiKin, aiVow, aiWay, wayBarred } from './ways';
-import { AI_TOWER_KEEP, AI_WAYS, AI_KEG, AI_DYKE, AI_RIVERS, KEG, KILL_CAMP, KIN, POLDER, TOWER_LEVELS, WAYS } from './data';
+import { AI_TOWER_KEEP, AI_TOWER_PEACE, AI_WAYS, AI_KEG, AI_DYKE, AI_RIVERS, KEG, KILL_CAMP, KIN, POLDER, TOWER_LEVELS, WAYS } from './data';
 import { beaconProblem, lit } from './beacon';
 import { rallyProblem } from './rally';
 import { consecrateProblem, consecrates } from './consecrate';
@@ -423,6 +423,8 @@ function research(s: GameState, v: View, peopleEnough: boolean, issue: (c: Comma
 function raiseTowers(s: GameState, v: View, issue: (c: Command) => void): void {
   const { p } = v;
   if (!AI_LEVELS[p.ai!].clever) return;
+  // Under a long peace no one can strike: the wood goes to the town (a Market, a farm) until the peace is nearly out (#720).
+  if (s.tick + secs(AI_TOWER_PEACE) < s.peaceUntil) return;
   let best: Building | null = null;
   for (const b of v.buildings) {
     if (b.type !== 'tower' || raiseProblem(s, p.id, b) || b.queue.length) continue;
@@ -580,7 +582,8 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   } else if (roads[to] === undefined && to === 'dykes') {
     // The Water Road (#701): only with a dyke worth raising by home, and on a coin of its own, so no other match's dice shift. A people
     // that walked the Age of Rivers is on the road already, and goes on down it more often.
-    roads[to] = coastHeld(s, p) && !!dykeOf(s, p, mem) && coin(s, p.id, 0xd1e5) < (hasWalked(p, 'rivers') ? AI_RIVERS.onward : AI_DYKE.take);
+    // A town that has set its heart on the Sail waits on its catch instead: one water plan at a time (#720).
+    roads[to] = roads.sail !== true && coastHeld(s, p) && !!dykeOf(s, p, mem) && coin(s, p.id, 0xd1e5) < (hasWalked(p, 'rivers') ? AI_RIVERS.onward : AI_DYKE.take);
   } else if (roads[to] === undefined && to === 'rivers') {
     // The Water Road's first age (#701 s1): with a channel worth digging by home, on a coin of its own.
     roads[to] = !!riverOf(s, p, mem) && coin(s, p.id, 0x71e5) < AI_RIVERS.take;
