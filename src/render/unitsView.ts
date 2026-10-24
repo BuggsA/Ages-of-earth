@@ -10,6 +10,8 @@ import { WATER_Y } from './water';
 
 /** Units are drawn a little larger than their footprint in the rules, so they read well from above. */
 export const UNIT_SCALE = 1.3;
+/** Fighters stand larger than workers, so a soldier reads as one at the default zoom (#624). */
+const FIGHTER_SCALE: Partial<Record<UnitType, number>> = { infantry: 1.3, ranged: 1.22, cavalry: 1.2, priest: 1.2, hero: 1.3 };
 /** How high aircraft fly above the ground. */
 export const AIR_ALT = 3.2;
 
@@ -120,7 +122,7 @@ function chevronGeometry(rank: number): THREE.BufferGeometry {
 /** The team ring under every unit on land: the owner's colour at a glance, whatever the model wears. */
 const padMaterial = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.9, depthWrite: false, fog: false, toneMapped: false });
 const padGeometry = (() => {
-  const g = new THREE.RingGeometry(0.62, 1, 18);
+  const g = new THREE.RingGeometry(0.78, 1, 18);
   g.rotateX(-Math.PI / 2);
   return g;
 })();
@@ -465,7 +467,7 @@ export class UnitsView {
       this.e.set(pitch, yaw, roll);
       this.q.setFromEuler(this.e);
       this.p.set(dx, gy, dz);
-      const k = mounted ? UNIT_SCALE * 0.88 : engine ? UNIT_SCALE * 1.1 : UNIT_SCALE;
+      const k = (mounted ? UNIT_SCALE * 0.88 : engine ? UNIT_SCALE * 1.1 : UNIT_SCALE) * (FIGHTER_SCALE[u.type] ?? 1);
       this.m.compose(this.p, this.q, this.sc.set(k, k, k));
       b.mesh.setMatrixAt(i, this.m);
       b.mesh.setColorAt(i, this.colors[u.owner]);
@@ -532,7 +534,7 @@ export class UnitsView {
         this.q.setFromEuler(this.e);
         this.p.set(c.x, heightAt(s, c.x, c.y) + 0.04 - sink, c.y);
       }
-      const k = c.mounted ? UNIT_SCALE * 0.88 : UNIT_SCALE;
+      const k = (c.mounted ? UNIT_SCALE * 0.88 : UNIT_SCALE) * (FIGHTER_SCALE[c.type] ?? 1);
       this.m.compose(this.p, this.q, this.sc.set(k, k, k));
       b.mesh.setMatrixAt(i, this.m);
       b.mesh.setColorAt(i, c.color);

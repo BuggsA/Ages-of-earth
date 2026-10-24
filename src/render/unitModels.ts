@@ -1141,8 +1141,19 @@ function legionary(epoch: number): Kit {
 function makeUnit(type: UnitType, epochIn: number): Kit {
   // The Atomic Age (#605) has no soldiers of its own yet: its people keep their Industrial look.
   const epoch = epochIn === 5 ? 4 : epochIn;
-  if (type === 'infantry' && epoch >= LEGION_MODEL) return legionary(epoch - LEGION_MODEL);
-  return type === 'citizen' && epoch >= THRALL_MODEL ? thrall(epoch - THRALL_MODEL) : MAKERS[type](epoch);
+  if (type === 'infantry' && epoch >= LEGION_MODEL) return lineMark(legionary(epoch - LEGION_MODEL), type);
+  return type === 'citizen' && epoch >= THRALL_MODEL ? thrall(epoch - THRALL_MODEL) : lineMark(MAKERS[type](epoch), type);
+}
+
+/**
+ * What tells a line apart in a crowd (#624), the same in every epoch: foot soldiers wear a team cape that shows
+ * from behind and above, and infantry also a tall team crest, so a spear block reads taller than the archers
+ * behind it; citizens wear neither, so a soldier never looks like a worker.
+ */
+function lineMark(k: Kit, type: UnitType): Kit {
+  if (type === 'infantry' || type === 'ranged') k.team(k.box(0.21, 0.3, 0.03, TEAM, 0, 0.14, -0.085));
+  if (type === 'infantry') k.team(k.box(0.035, 0.15, 0.12, TEAM, 0, 0.58, -0.01));
+  return k;
 }
 
 // ---- Deer ------------------------------------------------------------------------------------------
