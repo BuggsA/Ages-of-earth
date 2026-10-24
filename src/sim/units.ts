@@ -993,6 +993,8 @@ function garrisonStep(s: GameState, u: Unit, o: Extract<Order, { k: 'garrison' }
     u.px = u.x;
     u.py = u.y;
     b.garrison.push(u.id);
+    if (o.flee) u.fled = s.tick;
+    else delete u.fled;
     setOrder(u, { k: 'idle' });
     s.events.push({ k: 'garrison', owner: u.owner, building: b.id, inside: true });
     return;
@@ -1001,11 +1003,17 @@ function garrisonStep(s: GameState, u: Unit, o: Extract<Order, { k: 'garrison' }
 }
 
 /** Everyone out of a building, beside it, and back to whatever the bell pulled them off. */
-export function ungarrison(s: GameState, b: Building): void {
+export function ungarrison(s: GameState, b: Building, only?: (u: Unit) => boolean): void {
   if (!b.garrison.length) return;
+  const stay: number[] = [];
   for (const id of b.garrison) {
     const u = s.byId.get(id);
     if (!u || u.kind !== 'unit') continue;
+    if (only && !only(u)) {
+      stay.push(id);
+      continue;
+    }
+    delete u.fled;
     const spot = exitSpot(s, b, b.x + (u.id % 3) - 1, b.y + b.size);
     u.inside = 0;
     u.x = spot.x + ((u.id % 5) - 2) * 0.12;
@@ -1018,7 +1026,7 @@ export function ungarrison(s: GameState, b: Building): void {
       setOrder(u, back);
     } else setOrder(u, { k: 'idle' });
   }
-  b.garrison = [];
+  b.garrison = stay;
   s.events.push({ k: 'garrison', owner: b.owner, building: b.id, inside: false });
 }
 
