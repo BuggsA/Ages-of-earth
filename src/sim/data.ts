@@ -35,7 +35,7 @@ const HEART_WAKE = 8;
 const BLOOM_RIPEN = 150;
 const BLOOM_GROW = 60;
 const BLOOM_RING = 6;
-const BLOOM_GREEN = 40;
+const BLOOM_GREEN = 35;
 const BLOOM_LEAST = 1000;
 const BLOOM_HOLD = 180;
 
@@ -2175,14 +2175,16 @@ export const WILDWOOD = {
  * Pollen: the first `storm` seconds of each season, rival land units and Watch Towers within `pollen` tiles of a Bloom people's Heart
  * Tree see `blind` as far. The Spreading comes at the start of every season, not only spring (`WILDWOOD.spreadAt`).
  * The computer takes the road on from the Wildwood, stays `aiStay` seconds, raises its Spire within `aiFrom` tiles of home, slings at
- * the rival Town Center it knows, and plants an Orchard every `aiOrchard` seconds while its land is short of green. Against a rooted
+ * the rival building it has seen whose ring would crack the most * (keeping the fuel back from `aiSave` seconds before the Seed is ripe),
+ * and while its land is short of green, every `aiOrchard` seconds plants an Orchard (one to every `aiThorns` Thornwall pieces) or a
+ * line of `aiLine` Thornwall, at the compass points round home `aiRing` tiles out and further. Against a rooted
  * Seed in its town (within `aiNear` tiles of a building of its own) it sends up to `aiHack` citizens to hack it.
  */
 export const BLOOM = {
   ripen: BLOOM_RIPEN,
-  fuel: { food: 400, wood: 400, gold: 300 } as Cost,
+  fuel: { food: 300, wood: 300, gold: 200 } as Cost,
   flight: 10,
-  land: 4,
+  land: 6,
   grow: BLOOM_GROW,
   reach: 1.6,
   root: 90,
@@ -2196,9 +2198,13 @@ export const BLOOM = {
   blind: 0.5,
   aiStay: 600,
   aiFrom: 14,
-  aiOrchard: 25,
+  aiOrchard: 15,
+  aiThorns: 16,
+  aiLine: 7,
+  aiRing: 9,
   aiNear: 6,
   aiHack: 7,
+  aiSave: 40,
 };
 
 export const COPPICE = { reach: 8, regrow: 120, retry: 5, grow: 90, snare: 2, cap: 1.5, bag: 2, full: 12, aiPerFood: 1.5, aiMax: 16, aiTrees: 10, aiThick: 14, aiNear: 14, aiDrop: 7, aiPerTender: 2, aiStone: 6, aiCamps: 2, aiPlant: 3, aiThin: 12, aiPlantWood: 120 };

@@ -202,6 +202,41 @@ describe('the Age of the Bloom', () => {
     expect(pollenMul(s, rival)).toBe(1);
   });
 
+  it('is raced by the computer: a rival computer sends its citizens to hack out a Seed rooted in its town', () => {
+    const s = createGame({ seed: 5, size: 'small', players: [{ name: 'A', ai: null, civ: 'romans' }, { name: 'B', ai: 'normal', civ: 'romans' }] });
+    s.peaceUntil = 0;
+    for (const a of ['wild', 'grove', 'hive', 'wildwood', 'bloom'] as const) enterAge(s, s.players[0], a);
+    const p = s.players[0];
+    p.res = { food: 5000, wood: 5000, stone: 5000, gold: 5000 };
+    placeBuilding(s, 0, 'heart', Math.floor(p.startX) + 6, Math.floor(p.startY) + 6, true);
+    const spire = placeBuilding(s, 0, 'spire', Math.floor(p.startX) - 7, Math.floor(p.startY) - 7, true);
+    spire.ripe = s.tick;
+    run(s, 60);
+    const tc = s.ents.find((e): e is Building => e.kind === 'building' && e.owner === 1 && e.type === 'towncenter')!;
+    run(s, 1, [{ t: 'sling', p: 0, spire: spire.id, x: tc.x + 4, y: tc.y + 4 }]);
+    let hacked = false;
+    for (let i = 0; i < (BLOOM.flight + BLOOM.grow) * TICK_HZ && !hacked; i++) {
+      step(s);
+      hacked = s.events.some((e) => e.k === 'bloom' && e.what === 'hacked');
+    }
+    expect(hacked).toBe(true);
+    expect(alive(s, tc)).toBe(true);
+  });
+
+  it('is played by the computer: it raises its Spire and slings its Seed at a rival', () => {
+    const s = createGame({ seed: 5, size: 'small', players: [{ name: 'A', ai: 'normal', civ: 'romans' }, { name: 'B', ai: null, civ: 'romans' }] });
+    s.peaceUntil = 0;
+    for (const a of ['wild', 'grove', 'hive', 'wildwood', 'bloom'] as const) enterAge(s, s.players[0], a);
+    for (const q of s.players) q.res = { food: 4000, wood: 4000, stone: 1500, gold: 3000 };
+    let slung = false;
+    for (let i = 0; i < 8 * 60 * TICK_HZ && !slung && !s.over; i++) {
+      step(s);
+      slung = s.events.some((e) => e.k === 'bloom' && e.what === 'slung' && e.owner === 0);
+    }
+    expect(s.ents.some((e) => e.kind === 'building' && e.owner === 0 && e.type === 'spire' && e.built)).toBe(true);
+    expect(slung).toBe(true);
+  });
+
   it('spreads its woods at the start of every season, not only in spring', () => {
     const { s, heart, p } = town();
     for (let x = heart.tx - 6; x < heart.tx - 3; x++) for (let y = heart.ty; y < heart.ty + 3; y++) setTile(s, y * s.w + x, true);
