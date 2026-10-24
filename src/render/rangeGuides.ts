@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BUILDINGS, LIGHTNING, SORTIE, type UnitStats } from '../sim/data';
+import { BUILDINGS, INTERCEPT, LIGHTNING, SORTIE, type UnitStats } from '../sim/data';
 import { ageDef, hasCoils } from '../sim/ages';
 import { gunRange, statsFor } from '../sim/stats';
 import type { Building, BuildingType, Ent, GameState } from '../sim/types';
@@ -17,6 +17,7 @@ const RINGS = 3;
 const OUTER = new THREE.Color('#a9e9ff');
 const INNER = new THREE.Color('#ffd166');
 const FIELD = new THREE.Color('#9fb8ff');
+const COVER = new THREE.Color('#6ef0d0');
 const BANDS = { rearm: new THREE.Color('#8dff9a'), turn: new THREE.Color('#ffd166'), reach: new THREE.Color('#ff6a5a') };
 
 export interface RangeGuide {
@@ -28,6 +29,8 @@ export interface RangeGuide {
   field?: boolean;
   /** A fuel band round an Airfield (the Age of Aeronauts, #356): green mended, amber turns home, red burns. */
   band?: 'rearm' | 'turn' | 'reach';
+  /** An Interceptor Battery's cover (#759 s2): drawn in pale teal, and through the fog, as the battery itself is. */
+  cover?: boolean;
 }
 
 function unitReach(st: UnitStats): Pick<RangeGuide, 'reach' | 'minimum'> | null {
@@ -89,6 +92,17 @@ export function sortieRings(s: GameState, viewer: number, near: { x: number; y: 
   return out;
 }
 
+/**
+ * The cover of every finished, standing Interceptor Battery, whoever's (#759 s2): batteries are seen by all, so is their reach. With `at`,
+ * a battery about to be raised there by the viewer too.
+ */
+export function coverRings(s: GameState, at?: { tx: number; ty: number } | null): RangeGuide[] {
+  const out: RangeGuide[] = [];
+  if (at) out.push({ x: at.tx + BUILDINGS.battery.size / 2, y: at.ty + BUILDINGS.battery.size / 2, reach: INTERCEPT.reach, minimum: 0, cover: true });
+  for (const e of s.ents) if (e.kind === 'building' && e.type === 'battery' && e.built && e.hp > 0) out.push({ x: e.x, y: e.y, reach: INTERCEPT.reach, minimum: 0, cover: true });
+  return out;
+}
+
 /** The field a Watch Tower about to be raised would add, in the Age of Lightning. */
 export function placementField(s: GameState, viewer: number, type: BuildingType, tx: number, ty: number): RangeGuide | null {
   if (type !== 'tower' || !hasCoils(s.players[viewer])) return null;
@@ -121,7 +135,8 @@ export class RangeGuides {
       for (const minimum of [false, true]) {
         const base = minimum ? g.minimum : g.reach;
         if (!(base > 0)) continue;
-        const color = g.band ? BANDS[g.band] : g.field ? FIELD : minimum ? INNER : OUTER;
+        const color = g.band ? BANDS[g.band] : g.cover ? COVER : g.field ? FIELD : minimum ? INNER : OUTER;
+        const seen = g.cover ? (x: number, y: number) => x >= 0 && y >= 0 && x < s.w && y < s.h : open;
         for (let ring = 0; ring < RINGS; ring++) {
           const radius = Math.max(0.01, base + (ring - 1) * FLANK);
           const k = ring === 1 ? 1 : FLANK_DIM;
@@ -134,7 +149,7 @@ export class RangeGuides {
             const x1 = g.x + Math.cos(b) * radius;
             const y1 = g.y + Math.sin(b) * radius;
             // Test the midpoint too: don't bridge a hidden tile between two visible endpoints.
-            if (!open(x0, y0) || !open(x1, y1) || !open((x0 + x1) / 2, (y0 + y1) / 2)) continue;
+            if (!seen(x0, y0) || !seen(x1, y1) || !seen((x0 + x1) / 2, (y0 + y1) / 2)) continue;
             for (const [x, y] of [[x0, y0], [x1, y1]]) {
               this.positions.setXYZ(n, x, Math.max(WATER_Y, heightAt(s, x, y)) + LIFT, y);
               this.colors.setXYZ(n++, color.r * k, color.g * k, color.b * k);

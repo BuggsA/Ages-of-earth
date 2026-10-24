@@ -9,13 +9,13 @@ import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE, findResource } from '../sim/units';
-import { FIRE, FISSION, HIVE, WILDWOOD, BLOOM, AUTO_WORK, BREACH, CANAL, DAM, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, SALVO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE } from '../sim/data';
+import { FIRE, FISSION, HIVE, INTERCEPT, WILDWOOD, BLOOM, AUTO_WORK, BREACH, CANAL, DAM, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, SALVO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
 import { restsAt } from '../sim/passage';
 import { loadPrice, sellerNear } from '../sim/oretrade';
-import { clockOf, fuelOf, launchProblem, loaded, nextNuke, revealed, ringsFor, rulesOf, salvoFuel, salvoProblem, stockOf, warheadsOf, WARHEAD_NAMES, type WarheadKind } from '../sim/silo';
+import { charged, clockOf, fuelOf, launchProblem, loaded, nextNuke, revealed, ringsFor, rulesOf, salvoFuel, salvoProblem, stockOf, warheadsOf, WARHEAD_NAMES, type WarheadKind } from '../sim/silo';
 import { carriesKegs, kegProblem, kegsOf, millProblem, mills, millsOf, sappers } from '../sim/powder';
 import { carriesTorch, fireOn } from '../sim/fire';
 import { basinOf, damIdle, drowned, heldBack, isInund, lets, millIdle, sluiceFed, sluiceProblem, waterLine, wateredAt } from '../sim/water';
@@ -348,7 +348,21 @@ function warnTip(s: GameState, l: Launch, viewer: number): string {
   }
   const n = ringsFor(s, l, viewer).length;
   if (revealed(s, l)) return n > 1 ? `${who}'s salvo lands in ${clockOf(s, l)} seconds: all ${n} rings that flash are real.` : `${who}'s warhead lands in ${clockOf(s, l)} seconds, inside the ring that flashes. The decoys are gone.`;
-  return `${who}'s Missile Silo has launched: it lands in ${clockOf(s, l)} seconds. Of the red rings, one is real and the others decoys, unless it is a salvo of three silos firing at once, when all are real. Each ring is set off up to ${SILO.blur} tiles from where it falls. With ${SILO.reveal} seconds left the decoys vanish and the real rings flash. A silo destroyed before then scrubs its warhead.\nWatch the missile: it climbs toward the middle of the rings, then, some seconds before they flash, bends toward where it falls.`;
+  return `${who}'s Missile Silo has launched: it lands in ${clockOf(s, l)} seconds. Of the red rings, one is real and the others decoys, unless it is a salvo of three silos firing at once, when all are real. Each ring is set off up to ${SILO.blur} tiles from where it falls. With ${SILO.reveal} seconds left the decoys vanish and the real rings flash. A silo destroyed before then scrubs its warhead.\nWatch the missile: it climbs toward the middle of the rings, then, some seconds before they flash, bends toward where it falls.${coverLine(s, l, viewer)}`;
+}
+
+/**
+ * Missile defence (#759 s2): how many of the rings this viewer is shown lie in their team's charged batteries' cover. A battery fires at a
+ * warhead whose ring it covers, so a ring in cover is one an interceptor will try to stop.
+ */
+function coverLine(s: GameState, l: Launch, viewer: number): string {
+  const team = s.players[viewer].team;
+  const mine = s.ents.filter((e): e is Building => e.kind === 'building' && e.type === 'battery' && s.players[e.owner].team === team && charged(s, e));
+  if (!mine.length) return '';
+  const R = INTERCEPT.reach * INTERCEPT.reach;
+  const rings = ringsFor(s, l, viewer);
+  const n = rings.filter((g) => mine.some((b) => (b.x - g.x) * (b.x - g.x) + (b.y - g.y) * (b.y - g.y) <= R)).length;
+  return `\n${n ? `${n} of the ${rings.length} rings lie in your Interceptor Batteries' cover: ${INTERCEPT.fire} seconds before it lands, a battery fires at a warhead falling in a ring it covers, and stops it ${Math.round(INTERCEPT.chance * 100)}% of the time.` : `None of the rings lies in your Interceptor Batteries' cover (the teal circles).`}`;
 }
 
 function tideChip(s: GameState): { text: string; tip: string } | null {
@@ -1311,6 +1325,11 @@ export class Hud {
     if (mine && b.built && b.type === 'silo') {
       const next = nextNuke(s, p);
       status += ` · <span data-tip="<b>Warhead store</b>Your people's warheads, fired from any of your silos. One more is made every ${rulesOf(p).refuel} seconds while the store and the warheads in the air number under ${SILO.cap}. Rivals can't see it.">☢ ${stockOf(p)} in store${next === null ? '' : `, next in ${next}s`}</span>`;
+    }
+    // An Interceptor Battery (#759 s2): its charge, read by either side, as the battery and its cover are public.
+    if (b.built && b.type === 'battery') {
+      const left = Math.max(0, Math.ceil(((b.reload ?? 0) - s.tick) / TICK_HZ));
+      status += ` · <span data-tip="<b>Interceptor</b>It covers ${INTERCEPT.reach} tiles round it (the teal circle, shown while a warhead is in the air). ${INTERCEPT.fire} seconds before a rival warhead lands in a ring it covers, it fires by itself and stops it ${Math.round(INTERCEPT.chance * 100)}% of the time: no blast, no fallout. One attempt for each warhead, from the nearest battery; the charge is spent hit or miss and reloads in ${INTERCEPT.reload} seconds.">${left ? `⏳ Reloading: ${left}s` : '🛡 Charged'}</span>`;
     }
     // A harbour aground at low water (#739).
     if (mine && b.built && b.type === 'dock' && aground(s, b)) status += ` · <span data-tip="<b>Aground</b>The tide has bared all the water beside this Dock: it launches nothing until the water comes back.">⚓ Aground at low water</span>`;

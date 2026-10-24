@@ -24,7 +24,7 @@ import { bared, tideMillSpot, wakeTide } from './sim/tides';
 import { barragePlan, isCauseway, kegTileProblem } from './sim/tides';
 import { isTidal, tidalLevel, tideClock, tideLevel } from './sim/tides';
 import { R_COCKLE } from './sim/types';
-import { AI_BARRAGE, BLOOM, SALVO, secs } from './sim/data';
+import { AI_BARRAGE, BLOOM, INTERCEPT, SALVO, secs } from './sim/data';
 import { rooted, slingProblem } from './sim/bloom';
 import { maxHp, placeBuilding, restat, spawnUnit } from './sim/world';
 import { arrivalText, epochArrivals } from './ui/endReport';
@@ -3101,6 +3101,26 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           play('siloBlast');
         }
         break;
+      case 'intercept': {
+        // Missile defence (#759 s2): every player hears an interceptor go up and meet its warhead, as they hear a launch; the two sides are told.
+        const ours = s.players[viewer].team === s.players[ev.owner].team, theirs = s.players[viewer].team === s.players[ev.by].team;
+        const who = s.players[ev.by].name;
+        if (ev.what === 'fired') {
+          if (ours) hud.toast(`${ev.owner === viewer ? 'Your' : `${s.players[ev.owner].name}'s`} Interceptor Battery fires at ${who}'s warhead: ${Math.round(INTERCEPT.chance * 100)}% to stop it`, 'alert');
+          else if (theirs) hud.toast(`An interceptor rises to meet ${ev.by === viewer ? 'your' : `${who}'s`} warhead`, 'alert');
+          play('interceptLaunch');
+        } else if (ev.what === 'hit') {
+          if (ours) hud.toast(`Intercepted! ${who}'s warhead is stopped in the sky: no blast, no fallout`, 'good');
+          else if (theirs) hud.toast(`${ev.by === viewer ? 'Your' : `${who}'s`} warhead was intercepted: no blast`, 'bad');
+          minimap.ping(ev.x, ev.y, '#e8f6ff', true);
+          play('interceptHit');
+        } else {
+          if (ours) hud.toast(`The interceptor missed: ${who}'s warhead flies on`, 'bad');
+          else if (theirs) hud.toast(`Their interceptor missed: ${ev.by === viewer ? 'your' : `${who}'s`} warhead flies on`, 'good');
+          play('interceptMiss');
+        }
+        break;
+      }
       case 'oreBuy':
         // A load of rare ore bought at a post (#573).
         if (ev.owner === viewer) {
