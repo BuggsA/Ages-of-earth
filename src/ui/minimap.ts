@@ -225,7 +225,8 @@ export class Minimap {
       const mark = AGE_BLIP[age];
       ctx.strokeStyle = mark ?? 'rgba(0,0,0,0.6)';
       ctx.lineWidth = mark ? 1.5 : 1;
-      const half = (b.size / 2) * sx;
+      // At least 1.6 px a side, so a small hut still reads as a block of its people's colour (#626).
+      const half = Math.max((b.size / 2) * sx, 1.6);
       ctx.fillRect(b.x * sx - half, b.y * sy - half, half * 2, half * 2);
       ctx.strokeRect(b.x * sx - half, b.y * sy - half, half * 2, half * 2);
     }

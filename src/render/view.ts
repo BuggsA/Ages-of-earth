@@ -1159,6 +1159,9 @@ export class View {
             this.effects.burst(at, { count: 30, speed: 2.2, up: 0.6, life: 2.2, size: 0.22, grow: 3, gravity: -0.2, drag: 1.4, soft: true, colors: ['#8d8072', '#b3a594', '#5a524a'] });
             this.effects.burst(at, { count: 14, speed: 3, up: 0.8, life: 1.1, size: 0.07, gravity: 5, drag: 0.5, colors: ['#6e4f33', '#9a948a'] });
             this.effects.ring(at, '#d9c7a8', ev.size * 1.2, 1.1);
+            // A flash of the owner's colour over the rubble: whose building fell reads even in a crowd (#626).
+            this.effects.ring(this.ground(s, ev.x, ev.y, 0.12), s.players[ev.owner].color, ev.size * 1.8, 0.7);
+            this.effects.burst(at.clone().setY(at.y + 0.5), { count: 10, speed: 1.6, up: 1.2, life: 0.9, size: 0.06, gravity: 3, colors: [s.players[ev.owner].color, '#fff3c4'] });
             this.cue('collapse', ev.x, ev.y, 1);
             this.onPing?.(ev.x, ev.y, '#ff6a5a');
           }
