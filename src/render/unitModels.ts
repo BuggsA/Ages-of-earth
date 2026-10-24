@@ -1416,13 +1416,13 @@ function footGear(k: Kit, civ: CivId): void {
     case 'romans': // Montefortino helm with a neck-guard, a tall red scutum.
       k.dome(0.078, '#9aa0a6', 0, 0.5, 0);
       k.box(0.17, 0.02, 0.05, '#9aa0a6', 0, 0.46, -0.07);
-      k.box(0.02, 0.2, 0.15, '#a3262a', -0.2, 0.22, 0.05).rotation.y = 0.25;
+      k.box(0.02, 0.2, 0.15, '#6e1d22', -0.2, 0.22, 0.05).rotation.y = 0.25;
       k.box(0.03, 0.05, 0.04, '#e0b13c', -0.22, 0.22, 0.05);
       break;
     case 'chinese': // A lacquered cap with ear-flaps, a rectangular lacquered shield.
       k.cone(0.085, 0.06, 8, '#2b2420', 0, 0.54, 0);
       k.box(0.17, 0.025, 0.12, '#2b2420', 0, 0.47, 0);
-      k.box(0.02, 0.2, 0.13, '#8e2a22', -0.2, 0.24, 0.05).rotation.y = 0.25;
+      k.box(0.02, 0.2, 0.13, '#5a2418', -0.2, 0.24, 0.05).rotation.y = 0.25;
       k.box(0.03, 0.14, 0.03, '#f0c43a', -0.21, 0.24, 0.05);
       break;
     case 'egyptians': // A striped nemes-like cap and a hide shield with a notched top.
