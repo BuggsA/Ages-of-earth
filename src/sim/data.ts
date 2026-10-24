@@ -29,6 +29,8 @@ export const LAST_EPOCH = EPOCHS.length - 1;
 /** The Age of the Hive's reach and woods (`HIVE`), named here so the age's and the Hive's words can say them. */
 const HIVE_REACH = 6;
 const HIVE_TREES = 8;
+/** How far round the Heart Tree an old tree can be woken (`WILDWOOD.wake`), named here so the age's and the tree's words can say it. */
+const HEART_WAKE = 8;
 
 // ---- Ages and paths -------------------------------------------------------------------------------
 
@@ -650,6 +652,19 @@ export const AGES: Record<AgeId, Age> = {
     names: { warwolf: 'Dire Wolf' },
     no: { units: ['ranged', 'siege'], why: 'A Hive people carries no guns and casts no cannon: its bowmen are Blowpipe Hunters, and its beasts break walls. Muskets and cannon wait until it climbs to the Industrial Age or settles in the Gunpowder Age' },
   },
+  // The Wild route's fourth age (`docs/wild-road.md` §4, `wildwood.ts`): an army that is also the forest, and green against iron.
+  wildwood: {
+    verb: 'Plant a Heart Tree and wake the old trees round it as Ents that walk, crush and root again; let your woods spread each spring',
+    door: 'No factories or machines: no rifles, field guns or aircraft, so your Ents are your siege; and fire hits your living things twice as hard',
+    good: 'A forest that fights: Ents that break towns and hide as trees, woods that grow back each spring, and an army that runs through its own trees',
+    routes: ['wild'],
+    name: 'Age of the Wildwood',
+    short: 'Wildwood',
+    tier: 4,
+    blurb: `Instead of the Industrial Age: the forest wakes. Plant one Heart Tree, your town's soul; at it, an old tree within ${HEART_WAKE} tiles is woken as an Ent that walks slowly, flings boulders and breaks buildings. An Ent can root where it stands and be a tree again: it mends, it looks like any other tree, and it wakes when a rival comes near. Each spring your woods seed outward round the Heart Tree into your own land, and your Thornwalls thicken. Your people run through the woods round the Heart Tree, and a rival's are slowed there. No rifles, field guns or aircraft; and fire hits your living things twice as hard. If the Heart Tree falls, every Ent roots where it stands and sleeps.`,
+    no: { units: ['ranged', 'siege', 'fighter', 'bomber'], why: 'A Wildwood people builds no machines: no rifles, field guns or aircraft. Its Ents break walls and its Blowpipe Hunters shoot. They wait until it climbs to the Atomic Age or settles in the Industrial Age' },
+    noBuild: { buildings: ['airfield'], why: 'A Wildwood people builds no machines: no Airfield until it climbs to the Atomic Age or settles in the Industrial Age' },
+  },
   // The second crossing (#555 s12): the Pilgrims' priests and the Sail's ships made one trade. Open only to a people that walked both.
   missions: {
     verb: 'Sail priests to far shores and raise Missions there: each claims land, trains priests, and pays a tithe that grows with its distance from home',
@@ -987,6 +1002,19 @@ export const ROADS: Road[] = [
   },
   { from: 'hive', to: 'industrial', cost: EPOCHS[4].cost, time: EPOCHS[4].time, blurb: 'Rejoin the main road at the Industrial Age for the ordinary price. Your Hives keep swarming and your Den keeps its bears; rifles and field guns arrive.' },
   { from: 'hive', to: 'gunpowder', cost: { food: 250, wood: 250 }, time: 30, blurb: 'Settle down in the Gunpowder Age. Your Hives keep swarming and your Den keeps its bears; muskets and cannon return.' },
+  // The Wild route's fourth step (`docs/wild-road.md` §4): a Hive shows it (an old wood humming), and the honey it pays opens it.
+  {
+    from: 'hive',
+    to: 'wildwood',
+    cost: { food: 1200, wood: 900, gold: 600 },
+    time: 75,
+    clue: 'hive',
+    walked: 'hive',
+    deed: { stat: 'honey', n: 250, text: 'Your Hives pay 250 honey or mead' },
+    blurb: 'Instead of the Industrial Age: the forest wakes. A Heart Tree wakes the old trees round it as Ents that walk, break towns and root again as trees; your woods spread each spring. No rifles, field guns or aircraft, and fire hits your living things twice as hard while you stay.',
+  },
+  { from: 'wildwood', to: 'atomic', cost: EPOCHS[5].cost, time: EPOCHS[5].time, blurb: 'Rejoin the main road at the Atomic Age for the ordinary price. Your Heart Tree keeps waking Ents and your woods keep spreading; machines return, and fire burns as it does for anyone.' },
+  { from: 'wildwood', to: 'industrial', cost: { food: 300, wood: 300 }, time: 30, blurb: 'Settle down in the Industrial Age. Your Heart Tree keeps waking Ents and your woods keep spreading; rifles, field guns and aircraft return.' },
   // The other road out of the Stone Age (#297): the hunt, not the bog, opens it.
   {
     from: 'stone',
@@ -1402,6 +1430,14 @@ export const AI_BARRAGE = { reach: 9, line: 10, least: 6, cost: 1, crew: 3 };
 export const AI_EBB = { across: 3, slack: 1.25, margin: 6, hold: 200 };
 
 /**
+ * Routes that read the tide (#755). A land unit's route over the flats is timed against the public tide clock: walking at its pace less
+ * `slack` (its route's length times `slack`), it must find each tidal tile bare from the moment it reaches it until `margin` seconds after
+ * it has crossed it. A route that fails goes round, by a path the tide lets it walk, or waits on the last dry ground before the flats for
+ * the first moment within `hold` seconds it can cross, whichever reaches the goal sooner; with neither, it goes as ordered.
+ */
+export const TIDE_ROUTE = { slack: 1.25, margin: 4, hold: 180 };
+
+/**
  * The breach (#701 s3, the Water Road). Every `every` seconds the sea runs one tile on: each tile of polder four-ways beside water that
  * flows from the open sea (as a mill judges it: a body touching a map edge, or more than `POLDER.most` tiles; a finished dyke holds it,
  * a dyke site does not) floods, all at once, so water let in this step runs on only at the next. A flooded tile is sea again, its corners
@@ -1662,6 +1698,8 @@ export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
   cavebear: beast({ name: 'Cave Bear', cls: 'infantry', hp: 340, attack: 12, armor: 3, parmor: 6, range: 0, reload: 1.8, speed: 1.35, sight: 5, cost: { food: 180, gold: 40 }, time: 32, radius: 0.46, blurb: 'A great bear of the caves raised at your Den: a slow wall of fur that shrugs off arrows and mauls whatever stands before it. Swords, spears and guns bring it down; arrows barely do.' }),
   // The Age of the Hive: its bowmen, trained at the Archery Range by a people that has walked it, from the Gunpowder Age's tier.
   blowpipe: [null, null, null, BLOWPIPE, BLOWPIPE],
+  // The Age of the Wildwood (`WILDWOOD`): an Ent, woken from an old tree at the Heart Tree by a people that has walked the Wildwood.
+  warden: [null, null, null, null, { name: 'Ent', cls: 'siege', hp: 650, attack: 22, armor: 3, parmor: 8, range: 4, reload: 3.2, speed: 0.85, sight: 7, cost: { food: 150, wood: 200, gold: 80 }, time: 40, radius: 0.6, shot: 'boulder', splash: 0.8, blurb: 'An old tree of your woods, woken at the Heart Tree: it walks slowly, tears boulders from the ground and flings them, and breaks buildings and engines. Arrows barely mark its bark, but swords, riders and fire bring it down. Root it (O) and it is a tree again: it mends, and wakes when a rival comes near.' }],
   warmammoth: beast({ name: 'War Mammoth', cls: 'siege', hp: 420, attack: 16, armor: 2, parmor: 4, range: 0, reload: 2.4, speed: 1.1, sight: 6, cost: { food: 260, gold: 60 }, time: 40, radius: 0.55, blurb: 'A woolly mammoth led to war: it tramples walls and buildings as a ram does, and gores soldiers too. Spearmen and riders swarm it.' }),
 };
 
@@ -1669,8 +1707,8 @@ const DOMAINS: Partial<Record<UnitType, Domain>> = { fisher: 'water', warship: '
 /** Where a unit line goes: on foot, on the water or in the air. */
 export const domainOf = (type: UnitType): Domain => DOMAINS[type] ?? 'land';
 
-export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader', 'wagon', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge'];
-export const MILITARY: UnitType[] = ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'warship', 'fighter', 'bomber', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge'];
+export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader', 'wagon', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge', 'warden'];
+export const MILITARY: UnitType[] = ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'warship', 'fighter', 'bomber', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge', 'warden'];
 
 type Target = UnitClass | 'building';
 /** The counter triangle (and its friends): damage multiplier by attacker class against target class. */
@@ -2025,7 +2063,8 @@ export const FIRE = {
   run: [2, 6, 4, 2],
   scorch: 2,
   scorchReach: 0.4,
-  burns: ['thornwall', 'garden', 'orchard', 'sapling', 'hive'] as BuildingType[],
+  burns: ['thornwall', 'garden', 'orchard', 'sapling', 'hive', 'heart'] as BuildingType[],
+  wild: 2,
   aiBearers: 2,
   aiNear: 12,
   aiEvery: 4,
@@ -2068,6 +2107,36 @@ export const HIVE = {
   aiStay: 240,
   aiHives: 3,
   aiFrom: 14,
+};
+
+/**
+ * The Age of the Wildwood (`docs/wild-road.md` §4, `src/sim/wildwood.ts`). A people raises one Heart Tree. There it wakes an Ent
+ * (`warden`) from the standing tree nearest the Heart Tree within `wake` tiles, which gives way to it. An Ent roots on bare ground
+ * (`root`): it is a tree there, mending `mend` of its hit points a second, and it wakes when a rival on the ground comes within
+ * `rouse` tiles, or its tree is cut into; fell or burn the tree and the Ent is gone. While its people has no Heart Tree standing,
+ * every Ent roots where it stands and none wakes.
+ * The Spreading: `spreadAt` seconds into each spring, round each Heart Tree, every bare tile within `spread` tiles that lies in its
+ * people's land, beside a tree and clear of buildings by a tile, takes a seedling on a roll of `seed`, up to `seeds` of them, and it is
+ * a tree `grow` seconds later (a `Stool`). Its people's Thornwalls each grow a stage.
+ * Woodland ways: while a people stands in the Wildwood, its units in a wood (`HIVE.wood`) within `ways.reach` tiles of its Heart Tree
+ * walk at `ways.own` pace, and a rival's at `ways.rival`. Fire burns its living buildings and scorches its units `FIRE.wild` times as hard.
+ * The computer takes the road on from the Hive, stays `aiStay` seconds, plants its Heart Tree by the thickest wood within `aiFrom`
+ * tiles of home (at least `aiTrees` trees to wake), and wakes up to `aiEnts` Ents.
+ */
+export const WILDWOOD = {
+  wake: HEART_WAKE,
+  rouse: 3,
+  mend: 0.02,
+  spreadAt: 20,
+  spread: 10,
+  seed: 0.3,
+  seeds: 18,
+  grow: 60,
+  ways: { reach: 14, own: 1.25, rival: 0.75 },
+  aiStay: 300,
+  aiFrom: 22,
+  aiTrees: 10,
+  aiEnts: 4,
 };
 
 export const COPPICE = { reach: 8, regrow: 120, retry: 5, grow: 90, snare: 2, cap: 1.5, bag: 2, full: 12, aiPerFood: 1.5, aiMax: 16, aiTrees: 10, aiThick: 14, aiNear: 14, aiDrop: 7, aiPerTender: 2, aiStone: 6, aiCamps: 2, aiPlant: 3, aiThin: 12, aiPlantWood: 120 };
@@ -2132,6 +2201,8 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   orchard: { name: 'Orchard', size: 2, hp: 300, cost: { wood: 100 }, time: 20, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, menu: 'eco', key: 'R', blurb: `Fruit trees set near a food store. After ${GROVE.orchardGrow} seconds they bear, and every summer and autumn they drop food into your stores by themselves while a store stands within ${GROVE.orchardReach} tiles. Slow to start, free for years.` },
   // The Age of the Hive (`docs/wild-road.md` §3, `HIVE`): raised by a people that has walked it, in any age after.
   hive: { name: 'Hive', size: 1, hp: 160, cost: { wood: 60, gold: 30 }, time: 15, pop: 0, sight: 4, trains: [], drop: [], epoch: 3, menu: 'eco', key: 'V', blurb: `A straw skep on a stand, set among standing trees (${HIVE_TREES} within 3 tiles). Its bees swarm any rival who walks the woods within ${HIVE_REACH} tiles, stinging past armour and slowing them. It pays honey into your stores, or mead for gold while a Market of yours stands near, and in summer it doubles the Kitchen Gardens beside it. Bees sleep in winter, smoke quiets them, and fire takes the skep. Fell its woods and the bees leave.` },
+  // The Age of the Wildwood (`docs/wild-road.md` §4, `WILDWOOD`): one to a people that has walked it, in any age after.
+  heart: { name: 'Heart Tree', size: 3, hp: 2500, cost: { food: 300, wood: 400, gold: 200 }, time: 90, pop: 0, sight: 8, trains: ['warden'], drop: [], epoch: 4, menu: 'mil', key: 'E', blurb: `A vast old tree planted once, the soul of your town: one to a people. At it an old tree within ${HEART_WAKE} tiles is woken as an Ent. While it stands your woods spread round it each spring and your rooted Ents wake when a rival comes near; if it falls, every Ent roots where it stands and sleeps. It is alive, so fire takes it.` },
   // The age road (#562, `docs/age-roads.md` spine §4): raised in the Stone Age, it answers which key resources this world holds (`PROSPECTOR`).
   prospector: { name: "Prospector's Lodge", size: 2, hp: 500, cost: { food: 50, wood: 75 }, time: 20, pop: 0, sight: 6, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'P', blurb: 'A lodge of prospectors who walk the streams, scrape the rock and dig at old mounds. Once it stands it tells you which key resources this world holds (bog iron, salt, saltpetre, blood-iron, ancient ruins): yes or no for each, never where. Some ages open only with them; a world that lacks one shuts that door.' },
   // The Path of Blood (#303): pitched by foot soldiers where the army stands, enemy land too; burns when left alone (`WARCAMP`).
@@ -3347,7 +3418,7 @@ export function unitEpoch(type: UnitType): number {
  * nearest claimant (ties go to the older building). Shown only, so far; attrition and building limits
  * are later steps of the seed.
  */
-export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6, silo: 5, huntcamp: 4, warcamp: 3, caravanserai: 5, mission: 5 };
+export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6, silo: 5, huntcamp: 4, warcamp: 3, caravanserai: 5, mission: 5, heart: 8 };
 
 /**
  * War Camps (#303): a finished camp with none of its people's soldiers (land units that fight) within

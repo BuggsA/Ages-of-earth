@@ -22,6 +22,7 @@ import { findDockSpot, findSpot, millSpotFor } from './sim/ai';
 import { channelPlan, dig, dykePlan, heldBack, waterLine } from './sim/water';
 import { bared, tideMillSpot, wakeTide } from './sim/tides';
 import { barragePlan, isCauseway, kegTileProblem } from './sim/tides';
+import { isTidal, tidalLevel, tideClock, tideLevel } from './sim/tides';
 import { AI_BARRAGE, SALVO } from './sim/data';
 import { maxHp, placeBuilding, restat, spawnUnit } from './sim/world';
 import { arrivalText, epochArrivals } from './ui/endReport';
@@ -123,6 +124,8 @@ let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curs
 let fireToldAt = -9999;
 /** When a swarm on your people was last told (the Age of the Hive), so a fight in the woods tells it once. */
 let hiveToldAt = -9999;
+/** When a waking Ent was last told (the Age of the Wildwood), so a forest rising round an army tells it once. */
+let entToldAt = -9999;
 let paused = false;
 const SPEEDS = [1, 1.5, 2, 3];
 let speedIdx = 0;
@@ -138,6 +141,7 @@ let floodToldAt = -99999;
 /** The tide (#739): whether its waking was told, and when the viewer's people were last told they were swept off the flats. */
 let tideTold = false;
 let sweptToldAt = -99999;
+let tideHoldToldAt = -99999;
 /** When a breached causeway (#748) was last told: one toast a blast. */
 let breachToldAt = -1;
 /** When the flock last told of a lamb born, or of bare ground (#308), so the toasts don't pile up. */
@@ -2582,6 +2586,14 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           hud.toast(ev.drowned ? '🌊 The tide took some of your people, caught far out on the flats. (Space to look)' : '🌊 The tide swept some of your people off the flats, hurt. (Space to look)', 'bad');
         }
         break;
+      case 'tideHold':
+        // Routes that read the tide (#755): your people stop on the shore rather than walk into the flood, said once in a while.
+        if (ev.owner === viewer && s.tick - tideHoldToldAt > TICK_HZ * 30) {
+          tideHoldToldAt = s.tick;
+          lastAlert = { x: ev.x, y: ev.y };
+          hud.toast(`🌊 Some of your people wait on the shore: the flats ahead go under before they'd be across. They set out in ${Math.ceil((ev.until - s.tick) / TICK_HZ)}s, when the way stands bare. (Space to look)`, 'info');
+        }
+        break;
       case 'sluice':
         // The Water Line (#701 s4): a rival's sluice opened where the viewer can see it, said once in a while.
         if (ev.open && ev.owner !== viewer && view.sees(ev.x, ev.y) && s.tick - sluiceToldAt > TICK_HZ * 30) {
@@ -2965,6 +2977,15 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         } else if (ev.what === 'smoked' && ev.owner === viewer) hud.toast('Smoke has quieted one of your Hives: its bees will wake when it clears', 'alert');
         break;
       }
+      case 'wildwood':
+        // The Age of the Wildwood: a tree that wakes beside your people is told once in a while; your own Ent lost with its tree, and the
+        // spring's Spreading, are told to its people.
+        if (ev.what === 'wake' && ev.owner !== viewer && s.players[viewer]?.vis[Math.floor(ev.y) * s.w + Math.floor(ev.x)] === 1 && s.tick - entToldAt > 20 * TICK_HZ) {
+          entToldAt = s.tick;
+          hud.toast(`A tree wakes! ${s.players[ev.owner]?.name ?? 'A rival'}'s Ent was rooted there: in a Wildwood people's woods, any tree may be one. Fire takes them`, 'alert');
+        } else if (ev.what === 'felled' && ev.owner === viewer) hud.toast('One of your rooted Ents was felled with its tree', 'bad');
+        else if (ev.what === 'spread' && ev.owner === viewer && ev.n) hud.toast(`Spring: your woods spread round the Heart Tree, ${ev.n} seedlings`, 'good');
+        break;
       case 'silo':
         // The Atomic Age (#605): the clock is public, so every player is told when a warhead goes up. A rival is shown three rings, the
         // real zone and two decoys (#762), never the event's point (the attacker's own aim): no marker, ping or camera jump there.
@@ -3600,6 +3621,36 @@ function frame(now: number): void {
         view.rig.focus(x + 1, y + 1);
         return plan.pond;
       }
+    return 0;
+  },
+  /**
+   * Routes that read the tide (testing, #755): with the tide awake, run the rules on to a few seconds before the flood off low water, put
+   * a soldier on the shore five tiles from the deepest flats and send it out to them. Its route can't beat the water, so it waits on the
+   * shore (its panel shows 🌊). Selects it and looks at it; returns its id (0: no such shore on this map).
+   */
+  tideWait(owner: number) {
+    if (!game || !game.tidal) return 0;
+    const s = game;
+    for (let i = 0; i < 400 * TICK_HZ && !(tideLevel(s) === 0 && (tideClock(s)?.next ?? 99) <= 3); i++) {
+      step(s, pending);
+      pending = [];
+    }
+    for (let i = 0; i < s.w * s.h; i++) {
+      const x = i % s.w;
+      const y = (i - x) / s.w;
+      if (x < 8 || y < 8 || x >= s.w - 8 || y >= s.h - 8 || !isTidal(s, i) || tidalLevel(s, i) !== 1 || !bared(s, i)) continue;
+      for (const dx of [-5, 5]) {
+        if (!walkable(s, x + dx, y, s.players[owner].team) || isTidal(s, i + dx)) continue;
+        let open = true;
+        for (let k = x + dx; k !== x; k -= Math.sign(dx)) if (!walkable(s, k, y, s.players[owner].team)) open = false;
+        if (!open) continue;
+        const u = spawnUnit(s, owner, 'infantry', x + dx + 0.5, y + 0.5);
+        issue({ t: 'move', p: owner, ids: [u.id], x: x + 0.5, y: y + 0.5 });
+        setSelection([u.id]);
+        view.rig.focus(x + dx / 2, y);
+        return u.id;
+      }
+    }
     return 0;
   },
   /** A finished line of wall, or of Thornwall (testing). */

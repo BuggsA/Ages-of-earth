@@ -9,7 +9,7 @@ import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE, findResource } from '../sim/units';
-import { FIRE, FISSION, HIVE, AUTO_WORK, BREACH, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, SALVO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE } from '../sim/data';
+import { FIRE, FISSION, HIVE, WILDWOOD, AUTO_WORK, BREACH, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, SALVO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -21,6 +21,7 @@ import { carriesTorch, fireOn } from '../sim/fire';
 import { basinOf, drowned, heldBack, isInund, lets, millIdle, sluiceFed, sluiceProblem, waterLine, wateredAt } from '../sim/water';
 import { aground, millShares, tidalNear, tideClock, tideMillIdle } from '../sim/tides';
 import { isPond } from '../sim/tides';
+import { tideWaitLeft } from '../sim/tides';
 import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
 import { LANDMARK_KINDS, claimWork, claimants, favours, landmarkAt } from '../sim/landmarks';
 import { workProblem } from '../sim/works';
@@ -46,6 +47,7 @@ import { ageDef, ageOf, asleep, crossingLeft, goldenEnds, livesOf, threadsOf, cr
 import type { AgeId, KeyId, RareId, Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Launch, Player, Res, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
 import { GROVE_BUILDINGS, grows } from '../sim/grove';
 import { hiveLine, keepsBees } from '../sim/hive';
+import { heartBarred, heartLine, rootProblem, wakesForest } from '../sim/wildwood';
 import { KEYS, RARES, RES, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
 import { buildingPicture, unitPicture } from './thumbs';
@@ -1075,6 +1077,9 @@ export class Hud {
       : stingLeft
         ? `<span data-tip="<b>Stung</b>A Hive's bees swarm whoever walks its people's woods: ${HIVE.sting} hit points a second past armour, and a slow walk. Keep out of the trees by a Hive, or smoke it quiet with a fire.">🐝<em>Stung</em></span>`
         : '';
+    // Routes that read the tide (#755): waiting on the shore for the flats to bare.
+    const ebbLeft = Math.ceil(tideWaitLeft(s, u));
+    const ebb = ebbLeft ? `<span data-tip="<b>Waiting for the tide</b>The way ${mine ? 'you sent it' : 'it was sent'} runs over tidal flats the sea would cover before it was across, and there is no quicker way round. It waits on the shore and sets out in ${ebbLeft}s, when the flats it needs stand bare until it is over.">🌊<em>Tide</em> ${ebbLeft}s</span>` : '';
     // Military Orders (#355 s6): a soldier with one of its priests at hand is sworn.
     const isSworn = sworn(s, u);
     const oath = isSworn ? `<span data-tip="<b>Sworn</b>Military Orders: one of ${mine ? 'your' : 'its people\'s'} priests stands within ${ORDERS.reach} tiles, so no rival's priest can turn it, offer it up or curse it, and ${mine ? 'your' : 'their'} priests mend it ${Math.round((ORDERS.mend - 1) * 100)}% faster. Leave it without a priest near and the oath no longer holds it.">⚜<em>Sworn</em></span>` : '';
@@ -1094,7 +1099,7 @@ export class Hud {
     // A thrall (#502): a taken citizen, bound and drab, who works but never builds.
     const bond = u.thrall ? `<span data-tip="<b>Thrall</b>A citizen taken by a Warband people: it works a field for ${mine ? 'you' : p.name} but never builds or repairs. Slay it, or guard your workers so none are taken.">⛓<em>Thrall</em></span>` : '';
     const held = u.type === 'priest' && carriedBy(s, u) ? `<span data-tip="<b>Relic</b>Carried to a Temple, it brings in gold. Hands full: no healing or converting until it is set down (D).">⚱<em>Relic</em></span>` : '';
-    const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}:${u.cargo.length}:${rank}:${taking}:${road}:${u.tolled ?? 0}:${hemoLeft}:${curseLeft}:${u.merc ?? -1}:${isSworn}:${!!u.thrall}:${u.spoils ?? 0}:${isLine}`;
+    const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}:${u.cargo.length}:${rank}:${taking}:${road}:${u.tolled ?? 0}:${hemoLeft}:${curseLeft}:${u.merc ?? -1}:${isSworn}:${!!u.thrall}:${u.spoils ?? 0}:${isLine}:${ebbLeft}`;
     const html = `<div class="sel-portrait"><img src="${unitPicture(u.type, u.type === 'wagon' && u.packed === 'market' ? p.epoch + 20 : p.epoch, p.color)}" alt=""></div>
       <div class="sel-info">
         <div class="sel-name">${s.kings.includes(u.id) ? `👑 King (${st.name})` : u.thrall ? `Thrall (${st.name})` : st.name}</div>
@@ -1105,7 +1110,7 @@ export class Hud {
           <span data-tip="<b>Armor</b>Melee / missile armor: taken off every blow or shot.">🛡<em>Armor</em> ${st.armor}/${st.parmor}</span>
           ${st.range ? `<span data-tip="<b>Range</b>How far it shoots, in tiles.">🏹<em>Range</em> ${st.range}</span>` : ''}
           <span data-tip="<b>Speed</b>Tiles per second.">👣<em>Speed</em> ${Math.round(st.speed * 100) / 100}</span>
-          ${carry}${cargo}${load}${stance}${vet}${line}${aura}${graft}${oath}${sword}${pack}${curse}${sting}${bond}${held}${trip}${caravan}${tribute}${toll}
+          ${carry}${cargo}${load}${stance}${vet}${line}${aura}${graft}${oath}${sword}${pack}${curse}${sting}${bond}${held}${trip}${caravan}${tribute}${toll}${ebb}
         </div>
         <div class="blurb">${st.blurb}</div>
       </div>`;
@@ -1158,6 +1163,9 @@ export class Hud {
       const tended = s.ents.some((e) => e.kind === 'unit' && e.owner === b.owner && e.hp > 0 && e.order.k === 'snare');
       const cap = snareCap(s, b);
       status = `Caught ${catchIn(b)} / ${cap} food${catchIn(b) >= cap ? ' (full: it catches no more)' : ''} · ${trees} trees round it: ${perMin} a minute${trees < full ? ` (best with ${full})` : ''}${seasonAt(s) === 3 ? ', winter-hungry' : ''} · ${tended ? 'the line is walked' : 'nobody walks the line'}`;
+    } else if (b.type === 'heart' && b.built) {
+      // The Age of the Wildwood: its Ents awake and rooted, and whether a tree stands near to wake.
+      status = `<span data-tip="<b>${BUILDINGS.heart.name}</b>Train an Ent here and the old tree nearest it within ${WILDWOOD.wake} tiles wakes. While it stands, your rooted Ents wake when a rival comes within ${WILDWOOD.rouse} tiles, and ${WILDWOOD.spreadAt} seconds into each spring your woods within ${WILDWOOD.spread} tiles seed the bare ground beside them in your land. If it falls, every Ent roots where it stands and sleeps.">🌳 ${heartLine(s, b)}</span>`;
     } else if (b.type === 'hive' && b.built) {
       // The Age of the Hive: whether its bees are awake, what it pays, and whether it pollinates.
       status = `<span data-tip="<b>${BUILDINGS.hive.name}</b>Awake, its bees sting any rival standing in a wood within ${HIVE.reach} tiles. It pays honey (food), or mead (gold) while one of your Markets stands within ${HIVE.market} tiles, and in summer doubles your Kitchen Gardens within ${HIVE.bloom} tiles. Bees sleep in winter; a fire within ${HIVE.smoke} tiles smokes them quiet for ${HIVE.quiet} seconds.">🐝 ${hiveLine(s, b)}</span>`;
@@ -1328,8 +1336,9 @@ export class Hud {
         // What the Grove grows shows only to a people that has walked it.
         if (GROVE_BUILDINGS.includes(type) && !grows(p)) continue;
         if (type === 'hive' && !keepsBees(p)) continue;
+        if (type === 'heart' && !wakesForest(p)) continue;
         const locked = def.epoch > p.epoch;
-        const no = buildBarred(p, type) ?? wayBarred(s, p, type);
+        const no = buildBarred(p, type) ?? wayBarred(s, p, type) ?? heartBarred(s, viewer, type);
         const cost = buildingCostFor(s, viewer, type);
         const short = shortfall(p, cost) ?? bloodShort(p, type);
         const wonderUp = type === 'wonder' && s.ents.some((e) => e.kind === 'building' && e.owner === viewer && e.type === 'wonder');
@@ -1444,6 +1453,12 @@ export class Hud {
         const aboard = transports.reduce((n, t) => n + t.cargo.length, 0);
         cmds.push({ key: 'U', pic: '', glyph: '⚓', title: 'Unload', desc: 'Then click a shore: sail there and put everyone aboard on land. (Right-clicking land does the same.)', ok: aboard > 0, why: 'Nobody is aboard', count: aboard || undefined, run: () => this.act.unloadMode() });
         cmds.push({ key: 'Y', pic: '', glyph: '🏖', title: 'Unload here', desc: 'Land everyone aboard on the nearest shore.', ok: aboard > 0, why: 'Nobody is aboard', run: () => transports.forEach((t) => this.act.issue({ t: 'unload', p: viewer, ids: [t.id], x: t.x, y: t.y })) });
+      }
+      // The Age of the Wildwood: Ents root where they stand.
+      const ents = units.filter((u) => u.type === 'warden');
+      if (ents.length) {
+        const why = ents.map((u) => rootProblem(s, u)).find((w) => w) ?? null;
+        cmds.push({ key: 'O', pic: '', glyph: '🌳', title: 'Root', desc: `Root where ${ents.length > 1 ? 'they stand' : 'it stands'} and be a tree again, on bare open ground: it mends ${Math.round(WILDWOOD.mend * 100)}% of its health a second, a rival sees only a tree, and it wakes when a rival comes within ${WILDWOOD.rouse} tiles or an axe bites, while your Heart Tree stands. Fell or burn the tree and the Ent is lost.`, ok: !why || ents.some((u) => !rootProblem(s, u)), why: why ?? undefined, run: () => this.act.issue({ t: 'root', p: viewer, ids: ents.map((u) => u.id) }) });
       }
       const wagons = units.filter((u) => u.type === 'wagon');
       if (wagons.length) {

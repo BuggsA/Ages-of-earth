@@ -1,4 +1,4 @@
-import { AGES, HIVE, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
+import { AGES, HIVE, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
 import { battlesFor } from '../sim/battles';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, findsOf, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
@@ -8,6 +8,7 @@ import { isIdleCitizen } from './idle';
 import { laterTip, type Opening } from './opening';
 import { findResource } from '../sim/units';
 import { seasonAt } from '../sim/seasons';
+import { tideWaitLeft } from '../sim/tides';
 
 /**
  * Advice for a first game, one tip at a time in a corner: what to do next, given how the match is
@@ -435,6 +436,12 @@ const TIPS: Tip[] = [
     text: 'A rival keeps the sea\'s hours, and the <b>tide</b> has woken for everyone: watch its clock (🌊, top bar). At low water the shallows bare as flats an army can cross, toward you or from you; ships on them sit aground, and a Dock with only flats beside it launches nothing. Whoever stands on the flats when the water comes back is swept ashore, hurt.',
   },
   {
+    id: 'tideRoute',
+    // Routes that read the tide (#755): one of the viewer's people stands on the shore waiting for the flats to bare.
+    when: (s, me) => s.tideFrom !== undefined && s.ents.some((e) => e.kind === 'unit' && e.owner === me && tideWaitLeft(s, e) > 0),
+    text: '<b>Your people read the tide.</b> Sent over the flats, a soldier, citizen or trader crosses only if it will be over before the water comes back. Otherwise it goes round by dry ground, or waits on the shore (🌊 and the seconds left, on its panel) for the next low water, whichever is quicker. To be across sooner, send it earlier in the ebb, or lay a causeway: high water alone covers that road.',
+  },
+  {
     id: 'barrage',
     // Barrages (#748): a Tide Mill stands, and no pond yet.
     when: (s, me) => ageOf(s.players[me]) === 'tides' && has(s, me, 'tidemill') && !s.pond,
@@ -453,12 +460,18 @@ const TIPS: Tip[] = [
     text: `Your people keeps bees now. Set a <b>${BUILDINGS.hive.name}</b> (${BUILDINGS.hive.key}) among standing trees (${HIVE.trees} within 3 tiles): its bees sting any rival who walks the woods within ${HIVE.reach} tiles, past armour, and slow them, so a wood by a Hive is a wall. It pays honey, or mead for gold if a Market stands within ${HIVE.market} tiles, and in summer doubles your <b>${BUILDINGS.garden.name}s</b> within ${HIVE.bloom} tiles. Bees sleep in winter, and smoke quiets them: that is when a rival comes, with torches. No muskets or cannon: train <b>Blowpipe Hunters</b> at the Archery Range, whose venom stacks and cuts down riders and beasts, and breed <b>Cave Bears</b> at the Den; your wolves are Dire Wolves now.`,
   },
   {
+    id: 'wildwood',
+    // The Age of the Wildwood (`docs/wild-road.md` §4): its first minute.
+    when: (s, me) => ageOf(s.players[me]) === 'wildwood',
+    text: `The forest wakes for your people now. Plant your one <b>${BUILDINGS.heart.name}</b> (${BUILDINGS.heart.key}) by old woods: at it, train an <b>Ent</b> and the tree nearest it within ${WILDWOOD.wake} tiles wakes, a slow giant that flings boulders and breaks buildings, so it is your siege now. Select Ents and press <kbd>O</kbd> to <b>root</b> them on bare ground: they are trees again, mend, and wake when a rival comes near, an ambush no one sees. Each spring your woods spread round the Heart Tree, and your people run through those woods while a rival's are slowed. No rifles, field guns or aircraft, and fire hits your living things twice as hard: guard the Heart Tree, for if it falls every Ent roots and sleeps.`,
+  },
+  {
     id: 'torch',
     // Fire (`fire.ts`): a rival's living town is in sight, and torches are in hand.
     when: (s, me) =>
       s.players[me].epoch >= FIRE.epoch &&
       s.ents.some((e) => e.kind === 'building' && e.hp > 0 && FIRE.burns.includes(e.type) && e.owner !== me && s.players[e.owner].team !== s.players[me].team && s.players[me].vis[e.ty * s.w + e.tx] === 1),
-    text: `A rival grows its town: Thornwalls, Kitchen Gardens, Orchards and Hives burn. Select citizens or foot soldiers and press <kbd>F</kbd>, then click one: each stands ${FIRE.light} seconds to set it alight, and unless its people beat it out it burns down. A Thornwall that burns leaves no root, and in a dry summer the fire runs along the hedge and through the woods beside it.`,
+    text: `A rival grows its town: Thornwalls, Kitchen Gardens, Orchards, Hives and Heart Trees burn. Select citizens or foot soldiers and press <kbd>F</kbd>, then click one: each stands ${FIRE.light} seconds to set it alight, and unless its people beat it out it burns down. A Thornwall that burns leaves no root, and in a dry summer the fire runs along the hedge and through the woods beside it.`,
   },
   {
     id: 'burning',

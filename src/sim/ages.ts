@@ -376,6 +376,8 @@ export function barred(p: Player, unit: UnitType, at?: BuildingType): string | n
   if (kind && !p.tamed?.includes(kind)) return `Tame a wild ${kind} first: the Den breeds only what your people has tamed`;
   // The Age of the Hive: its darts and its bears belong to a people that has walked it, in any age after.
   if ((unit === 'blowpipe' || unit === 'cavebear') && !hasWalked(p, 'hive')) return `Only a people that has walked the ${AGES.hive.name} ${unit === 'blowpipe' ? 'trains Blowpipe Hunters' : 'breeds Cave Bears'}`;
+  // The Age of the Wildwood: its Ents wake for a people that has walked it, in any age after.
+  if (unit === 'warden' && !hasWalked(p, 'wildwood')) return `Only a people that has walked the ${AGES.wildwood.name} wakes Ents`;
   const no = ageDef(p).no;
   return no && no.units.includes(unit) ? no.why : null;
 }
@@ -398,6 +400,7 @@ export function buildBarred(p: Player, type: BuildingType): string | null {
   // The Age of the Grove: what it grows is planted by a people that has walked it, in any age after.
   if ((type === 'thornwall' || type === 'garden' || type === 'orchard') && !hasWalked(p, 'grove')) return `Only a people that has walked the ${AGES.grove.name} plants a ${BUILDINGS[type].name}`;
   if (type === 'hive' && !hasWalked(p, 'hive')) return `Only a people that has walked the ${AGES.hive.name} keeps bees`;
+  if (type === 'heart' && !hasWalked(p, 'wildwood')) return `Only a people that has walked the ${AGES.wildwood.name} plants a Heart Tree`;
   const way = p.way ? WAYS[p.way] : undefined;
   if (way?.shuts?.includes(type)) return `${way.name} raises no ${BUILDINGS[type].name}`;
   // The breach (#701 s3): a people that has walked the Age of Dykes raises dykes in any age after, to mend its banks.
