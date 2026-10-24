@@ -4,6 +4,7 @@ import { BUILDINGS, CIVS, POLDER, SNARE, secs } from '../sim/data';
 import { flooded } from '../sim/flood';
 import { catchIn } from '../sim/snares';
 import { bearing, orchardGrown, thornStage } from '../sim/grove';
+import { hiveQuiet } from '../sim/hive';
 import { SEAMS, seamOf } from '../sim/shafts';
 import type { AgeId, Building, BuildingType, GameState } from '../sim/types';
 import { T_WATER } from '../sim/types';
@@ -269,7 +270,7 @@ const plinthMaterial = inject(new THREE.MeshStandardMaterial({ color: '#8d7a62',
 
 const HEIGHT: Record<BuildingType, number> = {
   towncenter: 2.9, house: 1.5, storehouse: 1.3, farm: 0.4, barracks: 2.0, range: 1.4, stable: 1.4, tower: 3.4,
-  forge: 2.1, workshop: 1.7, temple: 2.6, market: 1.6, wonder: 4.6, wall: 1.3, gate: 1.8, dock: 1.5, airfield: 1.8, dyke: 0.45, sluice: 1.4, windmill: 3.3, channel: 0.2, huntcamp: 1.4, warcamp: 1.7, caravanserai: 1.3, mission: 1.3, drainrig: 1.9, transfusion: 2.1, bloodtower: 2.9, snare: 0.9, prospector: 1.6, sapling: 0.7, silo: 1.4, shaft: 1.8, den: 1.8, thornwall: 1.3, garden: 0.6, orchard: 1.2,
+  forge: 2.1, workshop: 1.7, temple: 2.6, market: 1.6, wonder: 4.6, wall: 1.3, gate: 1.8, dock: 1.5, airfield: 1.8, dyke: 0.45, sluice: 1.4, windmill: 3.3, channel: 0.2, hive: 0.9, huntcamp: 1.4, warcamp: 1.7, caravanserai: 1.3, mission: 1.3, drainrig: 1.9, transfusion: 2.1, bloodtower: 2.9, snare: 0.9, prospector: 1.6, sapling: 0.7, silo: 1.4, shaft: 1.8, den: 1.8, thornwall: 1.3, garden: 0.6, orchard: 1.2,
 };
 
 /** Which neighboring tiles hold the same owner's wall or gate (for a dyke, #701: its dykes). */
@@ -306,7 +307,8 @@ function snapshot(s: GameState, b: Building): Known {
     progress: b.progress,
     // A snare shows a hare in its noose once it holds a tender's worth (#485), to its owner and to a rival who sees it.
     // A Thornwall shows its stage (the Age of the Grove), a Kitchen Garden what feeds it, an Orchard whether it is grown and in fruit.
-    variant: b.type === 'thornwall' ? wallMask(s, b) + 16 * thornStage(b) : b.type === 'garden' ? (b.fed ?? 0) : b.type === 'orchard' ? (bearing(s, b) ? 2 : orchardGrown(b) ? 1 : 0) : b.type === 'wall' || b.type === 'dyke' || b.type === 'channel' ? wallMask(s, b) : b.type === 'sluice' ? wallMask(s, b) + (b.open ? 16 : 0) : b.type === 'gate' || b.type === 'dock' ? b.dir : b.type === 'snare' ? (catchIn(b) >= SNARE.worth ? 1 : 0) : b.type === 'shaft' ? Math.max(0, SEAMS.indexOf(seamOf(s, b) ?? 'stone')) : b.type === 'tower' ? (b.level ?? 0) : 0,
+    // A Hive shows whether its bees are awake (the Age of the Hive).
+    variant: b.type === 'thornwall' ? wallMask(s, b) + 16 * thornStage(b) : b.type === 'garden' ? (b.fed ?? 0) : b.type === 'hive' ? (hiveQuiet(s, b) ? 1 : 0) : b.type === 'orchard' ? (bearing(s, b) ? 2 : orchardGrown(b) ? 1 : 0) : b.type === 'wall' || b.type === 'dyke' || b.type === 'channel' ? wallMask(s, b) : b.type === 'sluice' ? wallMask(s, b) + (b.open ? 16 : 0) : b.type === 'gate' || b.type === 'dock' ? b.dir : b.type === 'snare' ? (catchIn(b) >= SNARE.worth ? 1 : 0) : b.type === 'shaft' ? Math.max(0, SEAMS.indexOf(seamOf(s, b) ?? 'stone')) : b.type === 'tower' ? (b.level ?? 0) : 0,
   };
 }
 

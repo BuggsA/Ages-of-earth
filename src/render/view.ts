@@ -172,6 +172,8 @@ export class View {
   private chimneys = new Map<number, number>();
   /** When each ship last left foam or smoke behind. */
   private wakes = new Map<number, number>();
+  /** The tick each Hive last buzzed (the Age of the Hive), so a swarm on many rivals is one drone, not a din. */
+  private buzzed = new Map<number, number>();
   /** The next time an aircraft's drone may be heard. */
   private droneAt = 0;
   /** Things to show a moment from now (an aircraft hitting the ground). */
@@ -901,7 +903,7 @@ export class View {
             this.cue(k === 'bomb' ? 'bombDrop' : 'mg', ev.x, ev.y, 0.6);
             break;
           }
-          this.cue(k === 'bullet' ? 'musket' : k === 'ball' ? 'cannon' : k === 'boulder' ? 'catapult' : k === 'spear' ? 'spear' : k === 'stone' ? 'sling' : 'bow', ev.x, ev.y, k === 'ball' ? 0.9 : 0.6);
+          this.cue(k === 'bullet' ? 'musket' : k === 'ball' ? 'cannon' : k === 'boulder' ? 'catapult' : k === 'spear' ? 'spear' : k === 'stone' ? 'sling' : k === 'dart' ? 'dart' : 'bow', ev.x, ev.y, k === 'ball' ? 0.9 : 0.6);
           if (k === 'bullet' || k === 'ball') {
             const big = k === 'ball';
             this.effects.burst(this.ground(s, ev.x, ev.y, 0.5), { count: big ? 10 : 3, speed: big ? 0.9 : 0.4, up: 0.6, life: big ? 2.4 : 1.4, size: big ? 0.16 : 0.08, grow: 3, gravity: -0.2, drag: 1, soft: true, colors: ['#e6e2dc', '#cfcac2'] });
@@ -1017,6 +1019,22 @@ export class View {
             this.effects.burst(at, { count: 8, speed: 0.4, up: 1, life: 1.6, size: 0.12, grow: 2, gravity: -0.5, drag: 1, soft: true, colors: ['#4a4541', '#6a645e'] });
             this.cue('fireCatch', ev.x, ev.y, 0.5);
           }
+          break;
+        }
+        case 'hive': {
+          // The Age of the Hive: a swarm boils round the rival it stings, with one drone a Hive at a time; smoke hushes a Hive in a
+          // grey puff; a Hive waking throws a little ring of amber.
+          if (!this.sees(ev.x, ev.y)) break;
+          if (ev.what === 'swarm') {
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.7), { count: 12, speed: 1.4, up: 0.3, life: 0.9, size: 0.022, gravity: 0, drag: 0.2, colors: ['#1e1a12', '#3a2e14', '#e0a526'] });
+            if (s.tick - (this.buzzed.get(ev.id) ?? -9999) >= TICK_HZ * 2) {
+              this.buzzed.set(ev.id, s.tick);
+              this.cue('swarm', ev.x, ev.y, 0.8);
+            }
+          } else if (ev.what === 'smoked') {
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.6), { count: 10, speed: 0.4, up: 0.8, life: 2, size: 0.14, grow: 2.2, gravity: -0.4, drag: 1, soft: true, colors: ['#cfcac2', '#a8a298'] });
+            this.cue('hiveHush', ev.x, ev.y, 0.7);
+          } else this.effects.ring(this.ground(s, ev.x, ev.y, 0.15), '#e0a526', 0.9, 0.7);
           break;
         }
         case 'sprout':

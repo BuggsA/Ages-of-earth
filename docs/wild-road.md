@@ -1,6 +1,6 @@
 # The Wild route: a people that grows its power
 
-**Status: the owner's idea (2026-10-24), fleshed out here; steps 1, 2 and 3 (fire) built.** The owner: "start a new main branch of ages. Completely new. I was thinking like nature/plant tech. Where you use nature and animals to your advantage." Then: "There should be a way to produce them too, maybe forest wall or tree walls of some kind. Maybe ents later on." "Maybe farms that also yield way more food. Or maybe just more food dense so less area. Be very uniquely creative to fill the gaps, especially the future ages." And: "this goes to 7." Umbrella: #706. Build on it; change it with the reason on the umbrella.
+**Status: the owner's idea (2026-10-24), fleshed out here; steps 1, 2, 3 (fire) and 4 (the Hive) built.** The owner: "start a new main branch of ages. Completely new. I was thinking like nature/plant tech. Where you use nature and animals to your advantage." Then: "There should be a way to produce them too, maybe forest wall or tree walls of some kind. Maybe ents later on." "Maybe farms that also yield way more food. Or maybe just more food dense so less area. Be very uniquely creative to fill the gaps, especially the future ages." And: "this goes to 7." Umbrella: #706. Build on it; change it with the reason on the umbrella.
 
 ## The idea in one line
 
@@ -20,7 +20,7 @@ Stone ─┬─ 1 Wild ── 2 Grove ──── 3 Hive ── 4 Wildwood ─�
 | --- | --- | --- | --- | --- | --- |
 | 1 | 1 | **Wild** (built) | tame wolves, boars and mammoths; breed the tamed kinds at a Beast Den; my Hunting Camps call the wild in | no Stables, no Siege Workshop | an early army that costs food, not gold |
 | 2 | 2 | **Grove** (built) | plant walls that grow; grow dense food in Kitchen Gardens fed by the Den's dung | no stone walls, gates or Watch Towers | a town shut in green on half the ground |
-| 3 | 3 | **Hive** | keep Hives that swarm whoever walks my woods; tip darts in venom; breed dire beasts | no guns or cannon | woods a rival can't walk through |
+| 3 | 3 | **Hive** (built) | keep Hives that swarm whoever walks my woods; tip darts in venom; breed dire beasts | no guns or cannon | woods a rival can't walk through |
 | 4 | 4 | **Wildwood** | wake old trees as Ents that walk, crush and root again; let my woods spread each spring | no factories or machines; fire hits living things twice as hard | an army that is also the forest |
 | 5a | 5 | **Leviathans** | breed giants: Skywhales that carry troops over walls, a Kraken in the deep, a Behemoth with my town on its back | the Heart Tree sleeps: no Ents, no spreading | reach: over walls, under the sea, a capital that walks |
 | 5b | 5 | **Bloom** | fire a Bloom Seed that turns a rival's town to forest; win by the Greening | the Dens go quiet: no new beasts | a second way to win, and a warhead that grows |
@@ -50,7 +50,9 @@ Every age has a cheap road back and a road to the trunk, like every side age. De
 - **Door:** no stone walls, gates or Watch Towers. The town's defence is what it grew.
 - **Two ways to play:** turtle behind Thornwalls and out-eat the rival from a tiny footprint, or boom on Gardens and pour beasts out of the Dens.
 
-### 3. The Age of the Hive: venom and swarms
+### 3. The Age of the Hive: venom and swarms (built, step 4)
+
+- **As built** (`src/sim/hive.ts`, `HIVE`): clue a Kitchen Garden, deed 600 food brought in from Gardens (a new `gardened` stat); roads on to the Industrial Age and back to the Gunpowder Age. Three new things, as the engagement rule asks: the **Hive** (its own building), the **Blowpipe Hunter** (a swap: it takes the musket's place, the door), and the **Cave Bear**; the War Wolf growing **dire** rides along as a rename and a lift, not a new unit. "Inside a wood" is read as **2 trees in the 3-by-3 round a unit**; a Hive needs **8 trees within 3 tiles** to be set and to keep working, so felling or burning its wood sends the bees away. Swarms don't stack: one sting a second, however many Hives. **Mead is chosen by layout, not a button:** a Hive within 10 tiles of a Market of yours pays gold instead of food. **Smoke** is any fire within 4 tiles (`smokeNear` in `fire.ts`); a smoked Hive sleeps 40 s after the last smoke. Blowpipe venom stacks to 5 doses on a target, however many shooters, so darts want to spread their aim.
 
 - **Hives** set among your trees. Bees swarm any rival unit inside a wood near a Hive: damage over time that ignores armour, and a slow. A Hive yields honey (a trickle of food, or mead sold at a Market for gold). Bees sleep in winter, so the right time to raid a Hive town is the cold.
 - **Pollination:** a Hive beside Gardens doubles their summer yield. The second loop of the green economy.
@@ -110,14 +112,15 @@ Every age has a cheap road back and a road to the trunk, like every side age. De
 - **Burning.** A tree burns `tree` seconds and falls to ash (a `Stool` with `ash`), which grows a tree again after `ash` seconds. A living building loses `bld` of its strength a second until it falls (a Thornwall burnt down leaves no root, `Building.burnt`) or is beaten out: each citizen or foot soldier of its own team within `beatReach` beats a second of fire a second, `beat` put it out. One sent to mend it beats first; a gardener at work beats already.
 - **Spreading, deterministic.** Once a second, fires in the order they were lit, each may light each living neighbour (a tree's four sides, a building's edges) on a roll of the match's dice (`roll`, `s.rng`) against `spread[season]`, no more than `run[season]` tiles from the torch: a summer fire takes most of a wood (about 80 trees of a big one), a spring or winter one a handful. Fires lit this second act next second. Whoever stands in the flames is scorched.
 - **The computer** torches a rival's growth with soldiers out on campaign (`torchGrowth`) and sends a citizen to beat out its own (`beatFires`).
-- **Still to come:** smoke that quiets Hives (step 4); the Wildwood's "fire hits living things twice as hard"; beasts that fear fire.
+- **Smoke quiets Hives** (step 4, built): a Hive with a fire within `HIVE.smoke` tiles, or burning itself, sleeps `HIVE.quiet` seconds.
+- **Still to come:** the Wildwood's "fire hits living things twice as hard"; beasts that fear fire.
 
 ## Steps (each one playable)
 
 1. **Wild** (built): taming, the Den, the call of the wild, the computer using it.
 2. **Grove** (built): Thornwall, Kitchen Gardens fed by Den dung or water, Orchards.
 3. **Fire** (built, shared rule, needed by everything after): torchbearers, burning woods and buildings. Smoke waits for the Hive.
-4. **Hive:** Hives, pollination, venom darts, dire beasts and the Cave Bear.
+4. **Hive** (built): Hives, pollination, venom darts, dire beasts and the Cave Bear.
 5. **Wildwood:** the Heart Tree, Ents that root, the Spreading, woodland ways.
 6. **Bloom:** the Seed Spire and the Bloom Seed, the Greening victory, pollen storms.
 7. **Leviathans:** Skywhales and seed-bombs, the Kraken and Reef Ships, the Behemoth.

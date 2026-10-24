@@ -28,6 +28,7 @@ import { atFoot, carriesKegs, kegProblem, layKeg } from './powder';
 import { carriesTorch, ignite, onFire, torchProblem } from './fire';
 import { fieldBoost, wading } from './water';
 import { gardenMul, isField } from './grove';
+import { stungPace } from './hive';
 import { fordMarch, groveBoost, keptOf, kinBonus } from './landmarks';
 import { chant, chantedOver, consecrateProblem, consecrates, turnBuilding } from './consecrate';
 import { convoyShare } from './convoy';
@@ -178,6 +179,9 @@ function deposit(s: GameState, u: Unit, at: Building): void {
     const p = s.players[u.owner];
     p.res[u.carryRes] += u.carry;
     p.stats.gathered += u.carry;
+    // Food from a Kitchen Garden counts toward the Age of the Hive's deed.
+    const field = u.order.k === 'farm' ? s.byId.get(u.order.target) : undefined;
+    if (field && field.kind === 'building' && field.type === 'garden') p.stats.gardened = (p.stats.gardened ?? 0) + u.carry;
     s.events.push({ k: 'deliver', owner: u.owner, res: u.carryRes, amount: u.carry, x: at.x, y: at.y });
   }
   u.carry = 0;
@@ -2293,7 +2297,8 @@ export function routeUnits(s: GameState): void {
 export function walk(s: GameState, u: Unit): void {
   if (!u.path) return;
   // A channel (#701, the Age of Rivers) is waded: a moat on foot.
-  let left = statsOf(s, u).speed * fordMarch(s, u) * hemoPace(s, u) * (domainOf(u.type) === 'land' ? wading(s, u.x, u.y, statsOf(s, u).cls === 'siege') : 1) * DT;
+  // Venom and stings slow it (the Age of the Hive).
+  let left = statsOf(s, u).speed * fordMarch(s, u) * hemoPace(s, u) * stungPace(s, u) * (domainOf(u.type) === 'land' ? wading(s, u.x, u.y, statsOf(s, u).cls === 'siege') : 1) * DT;
   while (left > 1e-9 && u.path) {
     const tx = u.path[u.pathI * 2];
     const ty = u.path[u.pathI * 2 + 1];

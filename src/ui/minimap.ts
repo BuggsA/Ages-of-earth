@@ -134,6 +134,7 @@ export class Minimap {
     footprint: { x: number; z: number }[],
     selected: Set<number>,
     scoutFlags: readonly ScoutFlag[] = [],
+    keepsakes: readonly { owner: number; x: number; y: number }[] = [],
   ): void {
     if (!this.img) return;
     const p = s.players[viewer];
@@ -437,6 +438,19 @@ export class Minimap {
       }
     }
 
+    // A rival's keepsake the viewer has seen (#726): a ring in its people's colour with a pale core, over its building.
+    for (const k of keepsakes) {
+      const x = k.x * sx, y = k.y * sy, r = Math.max(4.5, cw / 46);
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = s.players[k.owner].color;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x, y, r * 0.35, 0, Math.PI * 2);
+      ctx.fillStyle = '#f5ecd2';
+      ctx.fill();
+    }
     // Personal notes stay visible on ground the player has already explored.
     for (const f of scoutFlags) {
       const x = f.x * sx, y = f.y * sy;

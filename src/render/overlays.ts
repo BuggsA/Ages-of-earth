@@ -118,9 +118,13 @@ export class Overlays {
     const bomb = new Kit();
     bomb.sphere(0.06, '#3a3e36', 0, 0, 0).scale.set(1, 1, 2.4);
     for (const r of [0, Math.PI / 2]) bomb.box(0.13, 0.008, 0.06, '#2b2b2e', 0, 0, -0.15).rotation.z = r;
+    // A Blowpipe Hunter's dart (the Age of the Hive): a thin dark thorn with a tuft of kapok at its tail.
+    const dart = new Kit();
+    dart.box(0.012, 0.012, 0.26, '#3b2f22', 0, -0.006, 0);
+    dart.box(0.04, 0.04, 0.05, '#efe6d2', 0, -0.006, -0.12);
     const shotMat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.8 });
     const bulletMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 2.0, 1.2), toneMapped: false });
-    for (const [kind, k] of [['arrow', arrow], ['bolt', bolt], ['stone', stone], ['bullet', bullet], ['spear', spear], ['boulder', boulder], ['ball', ball], ['bomb', bomb]] as const) {
+    for (const [kind, k] of [['arrow', arrow], ['bolt', bolt], ['stone', stone], ['bullet', bullet], ['spear', spear], ['boulder', boulder], ['ball', ball], ['bomb', bomb], ['dart', dart]] as const) {
       const big = kind === 'boulder' || kind === 'ball' || kind === 'bomb';
       const mesh = new THREE.InstancedMesh(bake(k.root), kind === 'bullet' ? bulletMat : shotMat, big ? 64 : 256);
       mesh.castShadow = big;

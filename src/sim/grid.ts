@@ -2,6 +2,7 @@ import { BUILDINGS, LANDMARKS, RUINS, TRADE } from './data';
 import { landOwnerAt } from './borders';
 import { isEnemy } from './world';
 import { snareSpot } from './snares';
+import { hiveSpot } from './hive';
 import { dykeSpot, isChannel, isInund, parched } from './water';
 import type { Building, BuildingType, GameState } from './types';
 import { B_BUILDING, B_GATE, B_RES, B_TERRAIN, R_BLOODIRON, R_GOLD, R_NONE, R_SALT, R_SALTPETRE, R_STONE, T_ROCK, T_WATER } from './types';
@@ -72,7 +73,7 @@ export function groundAt(s: GameState, x: number, y: number): number {
   return a * (1 - fx) * (1 - fy) + b * fx * (1 - fy) + c * (1 - fx) * fy + d * fx * fy;
 }
 
-export type PlaceProblem = null | 'edge' | 'water' | 'rock' | 'blocked' | 'slope' | 'shore' | 'foreign' | 'woods' | 'snares' | 'deep' | 'dry' | 'parched';
+export type PlaceProblem = null | 'edge' | 'water' | 'rock' | 'blocked' | 'slope' | 'shore' | 'foreign' | 'woods' | 'snares' | 'deep' | 'dry' | 'parched' | 'bare' | 'hives';
 
 /** Whether a building of this type could go with its top-left corner on this tile. */
 export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: number, ignoreUnits = true, owner = -1): PlaceProblem {
@@ -111,6 +112,11 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
   // A Snare goes only among standing trees, and apart from the others (#485).
   if (type === 'snare') {
     const why = snareSpot(s, tx, ty);
+    if (why) return why;
+  }
+  // A Hive goes only among standing trees, and apart from the others (the Age of the Hive).
+  if (type === 'hive') {
+    const why = hiveSpot(s, tx, ty);
     if (why) return why;
   }
   // The Age of Rivers (#701): its fields go only by water.
