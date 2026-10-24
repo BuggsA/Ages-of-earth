@@ -20,7 +20,7 @@ import { R_COCKLE } from './types';
 import { AI_BARRAGE, AI_EBB, INTERCEPT, SALVO } from './data';
 import { barragePlan, causewayOwner, ebbTiming, isCauseway, isPond, tideAwake, tideLevel } from './tides';
 import { statsOf } from './world';
-import { aimsOf, blastDamage, charged, flightOf, fuelOf, launchProblem, loaded, missilesAt, revealed, ringsFor, rulesOf, salvoFuel, salvoPeople, salvoProblem, salvoSilos, siloLimit, silosOf, warheadsOf, warnRadius, type WarheadKind } from './silo';
+import { aimsOf, blastDamage, charged, flightOf, fuelOf, held, launchProblem, loaded, missilesAt, revealed, ringsFor, rulesOf, salvoFuel, salvoPeople, salvoProblem, salvoSilos, siloLimit, silosOf, stockOf, warheadsOf, warnRadius, type WarheadKind } from './silo';
 import { carriedBy } from './relics';
 import { storesOre } from './caches';
 import { loadPrice, sellerNear } from './oretrade';
@@ -302,6 +302,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   floatWork(s, v, mem, issue);
   siloRoad(s, v, mem, issue);
   interceptorRoad(s, v, mem, issue);
+  reserveSilo(s, v, mem, issue);
   fireSilo(s, v, mem, issue);
   fleeWarhead(s, v, issue);
   steppeRoad(s, v, mem, issue);
@@ -2257,7 +2258,8 @@ function fireSilo(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const { p } = v;
   if (p.epoch < 5) return;
   const ready = silosOf(s, p.id).filter((b) => s.tick - b.born >= secs(BUILDINGS.silo.time + AI_SILO.wait));
-  const silo = ready.find((b) => loaded(s, b));
+  // A silo held in Reserve (#759 s3) launches only when none other can: it is stood down first, so Reserve never stops the attack.
+  const silo = ready.find((b) => loaded(s, b) && !held(b)) ?? ready.find((b) => loaded(s, b));
   if (!silo) return;
   // Once a second, kept by the clock in memory: a computer thinks on ticks of its own (`memory`), which a tick count need never meet.
   if (s.tick - (mem.siloAt ?? -TICK_HZ) >= TICK_HZ) {
@@ -2292,8 +2294,12 @@ function fireSilo(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const aim = mem.siloAim;
   if (!aim || s.tick - aim.at > TICK_HZ * 2) return;
   if (aim.salvo) {
-    // A salvo planned holds the single strikes until the store holds three (and the fuel is set aside).
+    // A salvo planned holds the single strikes until the store holds three (and the fuel is set aside), and stands down a Reserve silo it needs.
     const from = salvoSilos(s, p.id, silo.id);
+    if (from.length < SALVO.trio) {
+      for (const b of ready) if (held(b)) issue({ t: 'reserve', p: p.id, silo: b.id, on: false });
+      return;
+    }
     const shots = aim.salvo.map((a, i) => ({ silo: from[i]?.id ?? -1, x: a.x, y: a.y }));
     const why = salvoProblem(s, p.id, shots);
     if (why === null) {
@@ -2303,11 +2309,30 @@ function fireSilo(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     return;
   }
   const w = aim.w ?? rulesOf(p).w;
-  const why = launchProblem(s, p.id, silo, aim.x, aim.y, w);
+  const why = launchProblem(s, p.id, held(silo) ? { ...silo, reserve: undefined } : silo, aim.x, aim.y, w);
   if (why === null) {
+    if (held(silo)) issue({ t: 'reserve', p: p.id, silo: silo.id, on: false });
     issue({ t: 'launch', p: p.id, silo: silo.id, x: aim.x, y: aim.y, w });
     mem.siloAim = undefined;
   } else if (why.startsWith("A warhead's fuel")) spend(v, fuelOf(w));
+}
+
+/**
+ * A silo held in Reserve (#759 s3): while a rival stands a silo, the computer holds its last silo (in id order) back to answer a warhead, if
+ * it stands two (the first keeps attacking) or its store is full (none is made while it waits), and not while a salvo pays (it needs all three).
+ * Otherwise it stands its Reserve down. It weighs this once every `INTERCEPT.think` seconds, by a clock in memory; `fireSilo` stands the
+ * silo down at once when it is the only one that can launch.
+ */
+function reserveSilo(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (p.epoch < 5 || s.tick - (mem.reserveAt ?? -99999) < secs(INTERCEPT.think)) return;
+  mem.reserveAt = s.tick;
+  const mine = silosOf(s, p.id);
+  const threat = s.players.some((o) => !o.defeated && isEnemy(s, p.id, o.id) && silosOf(s, o.id).length > 0);
+  const want = threat && mine.length > 0 && (mine.length >= 2 || stockOf(p) >= SILO.cap) && !(mem.salvoPays && salvoPeople(p));
+  const kept = mine.filter(held);
+  if (want && !kept.length) issue({ t: 'reserve', p: p.id, silo: mine[mine.length - 1].id, on: true });
+  else if (!want) for (const b of kept) issue({ t: 'reserve', p: p.id, silo: b.id, on: false });
 }
 
 /**

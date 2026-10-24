@@ -15,7 +15,7 @@ import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
 import { restsAt } from '../sim/passage';
 import { loadPrice, sellerNear } from '../sim/oretrade';
-import { charged, clockOf, fuelOf, launchProblem, loaded, nextNuke, revealed, ringsFor, rulesOf, salvoFuel, salvoProblem, stockOf, warheadsOf, WARHEAD_NAMES, type WarheadKind } from '../sim/silo';
+import { armingOf, charged, clockOf, fuelOf, held as inReserve, launchProblem, loaded, nextNuke, reserveProblem, revealed, ringsFor, rulesOf, salvoFuel, salvoProblem, stockOf, warheadsOf, WARHEAD_NAMES, type WarheadKind } from '../sim/silo';
 import { carriesKegs, kegProblem, kegsOf, millProblem, mills, millsOf, sappers } from '../sim/powder';
 import { carriesTorch, fireOn } from '../sim/fire';
 import { basinOf, damIdle, drowned, heldBack, isInund, lets, millIdle, sluiceFed, sluiceProblem, waterLine, wateredAt } from '../sim/water';
@@ -355,16 +355,20 @@ function warnTip(s: GameState, l: Launch, viewer: number): string {
 
 /**
  * Missile defence (#759 s2): how many of the rings this viewer is shown lie in their team's charged batteries' cover. A battery fires at a
- * warhead whose ring it covers, so a ring in cover is one an interceptor will try to stop.
+ * warhead whose ring it covers, so a ring in cover is one an interceptor will try to stop. And (s3) whether the team holds a silo in Reserve.
  */
 function coverLine(s: GameState, l: Launch, viewer: number): string {
   const team = s.players[viewer].team;
+  // A silo of the team held in Reserve (#759 s3) answers what no battery takes, wherever it falls.
+  const kept = s.ents.filter((e): e is Building => e.kind === 'building' && e.type === 'silo' && s.players[e.owner].team === team && e.built && e.hp > 0 && inReserve(e));
+  const ready = kept.filter((e) => !armingOf(s, e)).length;
+  const back = !kept.length ? '' : `\n${ready ? `${ready === 1 ? 'A silo' : `${ready} silos`} held in Reserve stand${ready === 1 ? 's' : ''} ready: each fires a warhead of its store at one warhead no battery answers, wherever it falls, and stops it ${Math.round(INTERCEPT.chance * 100)}% of the time.` : `Your silos held in Reserve are not ready yet: ${Math.min(...kept.map((e) => armingOf(s, e)))}s.`}`;
   const mine = s.ents.filter((e): e is Building => e.kind === 'building' && e.type === 'battery' && s.players[e.owner].team === team && charged(s, e));
-  if (!mine.length) return '';
+  if (!mine.length) return back;
   const R = INTERCEPT.reach * INTERCEPT.reach;
   const rings = ringsFor(s, l, viewer);
   const n = rings.filter((g) => mine.some((b) => (b.x - g.x) * (b.x - g.x) + (b.y - g.y) * (b.y - g.y) <= R)).length;
-  return `\n${n ? `${n} of the ${rings.length} rings lie in your Interceptor Batteries' cover: ${INTERCEPT.fire} seconds before it lands, a battery fires at a warhead falling in a ring it covers, and stops it ${Math.round(INTERCEPT.chance * 100)}% of the time.` : `None of the rings lies in your Interceptor Batteries' cover (the teal circles).`}`;
+  return back + `\n${n ? `${n} of the ${rings.length} rings lie in your Interceptor Batteries' cover: ${INTERCEPT.fire} seconds before it lands, a battery fires at a warhead falling in a ring it covers, and stops it ${Math.round(INTERCEPT.chance * 100)}% of the time.` : `None of the rings lies in your Interceptor Batteries' cover (the teal circles).`}`;
 }
 
 function tideChip(s: GameState): { text: string; tip: string } | null {
@@ -1334,6 +1338,11 @@ export class Hud {
       const next = nextNuke(s, p);
       status += ` · <span data-tip="<b>Warhead store</b>Your people's warheads, fired from any of your silos. One more is made every ${rulesOf(p).refuel} seconds while the store and the warheads in the air number under ${SILO.cap}. Rivals can't see it.">☢ ${stockOf(p)} in store${next === null ? '' : `, next in ${next}s`}</span>`;
     }
+    // A silo held in Reserve (#759 s3), read by either side as the silo is public: whether it stands ready to answer a warhead.
+    if (b.built && b.type === 'silo' && inReserve(b)) {
+      const left = armingOf(s, b);
+      status += ` · <span data-tip="<b>Held in Reserve</b>This silo launches nothing while held. ${INTERCEPT.fire} seconds before any rival warhead lands that no Interceptor Battery answered, wherever it falls, a ready Reserve silo fires its own warhead at it and stops it ${Math.round(INTERCEPT.chance * 100)}% of the time, spending a warhead from its people's store and the fuel of a launch. It stands ready ${INTERCEPT.arm} seconds after it was held, and again ${INTERCEPT.arm} seconds after each it fires.">${left ? `⏳ Reserve: ready in ${left}s` : '🛡 Reserve: ready'}</span>`;
+    }
     // An Interceptor Battery (#759 s2): its charge, read by either side, as the battery and its cover are public.
     if (b.built && b.type === 'battery') {
       const left = Math.max(0, Math.ceil(((b.reload ?? 0) - s.tick) / TICK_HZ));
@@ -1846,6 +1855,11 @@ export class Hud {
             const pool = ` Warheads come from your people's store, fired from any of your silos: ${stockOf(p)} now, one more every ${r.refuel ? `${r.refuel} seconds` : 'moment a slot frees'} while store and flight number under ${SILO.cap}. A silo that falls takes no stored warhead with it; only the one it is counting down is lost.`;
             cmds.push({ key: own ? 'M' : 'N', pic: '', glyph: w === 'fission' ? '⚛' : w === 'fusion' ? '☀' : '☢', title: kinds.length > 1 ? `Launch ${WARHEAD_NAMES[w]}` : 'Launch', desc: `Then click anywhere on the map: ${r.fuse} seconds later the ${WARHEAD_NAMES[w]} warhead lands, blasting every rival building and soldier within ${R} tiles: ${peak.toLocaleString('en')} damage at the centre, falling off with distance to nothing at the edge (distance is measured to a building's nearest edge)${poison}. Every player sees the clock and the blast, but not which warhead it is: your clock is ${r.fuse} seconds whatever you fire. The fog lifts over the blast for ${SILO.lift} seconds, and a silo destroyed before the clock runs out scrubs the launch.${leak}${pool}`, cost: fuelOf(w), ok: !why, why: why ?? undefined, on: !loaded(s, b), run: () => this.act.launchMode(b.id, w) });
           }
+          // Missile defence (#759 s3): hold the silo back to answer rival warheads with the store's own, or stand it down to launch.
+          const on = inReserve(b);
+          const no = reserveProblem(s, viewer, b, !on);
+          const fuel = Object.entries(fuelOf(r.w)).map(([k, n]) => `${n} ${k}`).join(' and ');
+          cmds.push({ key: 'R', pic: '', glyph: '🛡', title: on ? 'Stand down' : 'Hold in Reserve', desc: on ? `Stand this silo down: it may launch again at once, and answers no warhead. Holding it again takes ${INTERCEPT.arm} seconds to stand ready.` : `Hold this silo back to defend: it launches nothing while held, and ${INTERCEPT.arm} seconds from now it stands ready. ${INTERCEPT.fire} seconds before a rival warhead lands that no Interceptor Battery answered, anywhere on the map, it fires a warhead of your store at it and stops it ${Math.round(INTERCEPT.chance * 100)}% of the time: no blast, no fallout. Each answer spends a warhead and ${fuel} of fuel, hit or miss, and the silo stands ready again ${INTERCEPT.arm} seconds later. Batteries answer first, as they are cheaper; one attempt for each warhead. Every player sees which silos you hold, so a rival may wait, or fire a salvo, or strike the silo.`, ok: !no, why: no ?? undefined, on, run: () => (this.act.issue({ t: 'reserve', p: viewer, silo: b.id, on: !on }), this.act.sound('queue')) });
           // The salvo (#765): three silos, three Atomic warheads, three points, one clock. Launch Control opens it.
           const why = salvoProblem(s, viewer);
           const plain = r.w === 'atomic' ? ` A plain Atomic people pays ${Math.round(SALVO.surcharge * 100)}% more fuel on each; past the fork the silos share a clock for the plain price.` : '';

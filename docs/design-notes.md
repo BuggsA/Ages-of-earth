@@ -1469,3 +1469,13 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 
 **Next:** a pontoon that is a whole wharf (a Dock that floats, so the navy is built where the town is); a floating market that pays more the farther it has been towed (the Silk Road's moving market, at sea); the computer towing its town toward a rival's shore to raid.
 
+## Designers' notes: the silo held in Reserve (#781, s3 of #759, 2026-10-24, chain 1024-1610 s7, lane rules)
+
+**What I built:** a Reserve toggle on each silo (R, an owner-checked `reserve` command). A held silo launches nothing; it stands ready `INTERCEPT.arm` (30) seconds after it is held, and again 30 s after each interceptor it fires. At the 2 s mark, a warhead no battery took draws its one attempt from the nearest ready Reserve silo of a rival, which spends a warhead of its store and its own warhead's launch fuel; the roll is stored in `Launch.icpt` with `silo: true`, so the s2 meet, burst and save path all just work. A teal band, raised doors and an amber-then-teal beacon on the model; HUD lines for owner and rivals; a tip.
+
+**Why I love it:** your next strike and your town's shield are now the same warhead. Holding back is a real cost (a silo that can't attack, and a warhead spent hit or miss), and it is public, so the attacker reads it: strike a town whose rival keeps no silo back, fire a salvo that one ready silo can't fully answer, or go for the silo first.
+
+**Choices I made (the owner may revert):** batteries first (cheaper), as the issue suggested. One interceptor per ready silo, then 30 s to stand ready again, so a salvo against one battery and one silo draws two attempts. Arming takes 30 s but standing down is instant: the cost of keeping a silo back is the time you lose re-arming after you strike, not a lock on attacking. 30 s sits between the clocks: a defender who holds a silo the moment an Atomic (45 s) or Fusion (70 s) launch goes up is ready in time; against Fission's 25 s clock they are not, so Fission's quick clock now has a reason beyond speed. The fuel is the holder's own warhead's, so Fusion defends cheaply and Fission dearly. The Reserve state is public (the silo is).
+
+**Next:** s4, the playtest and numbers. In three computer-vs-computer Atomic starts the computers never held Reserve (one silo each, stores never full); the computer could raise a second silo when a rival stands silos. A rising whistle when a silo's interceptor goes up.
+

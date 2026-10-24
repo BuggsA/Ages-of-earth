@@ -18,7 +18,7 @@ import { cacheAt } from './caches';
 import { carriesKegs, kegProblem } from './powder';
 import { kegTileProblem } from './tides';
 import { carriesTorch, onFire, torchProblem } from './fire';
-import { launch, launchProblem, salvo, salvoProblem, siloLimit } from './silo';
+import { launch, launchProblem, reserveProblem, salvo, salvoProblem, setReserve, siloLimit } from './silo';
 import { raise, raiseCost } from './reclaim';
 import { callWork, workProblem } from './works';
 import { callKin, killCamp, kinProblem, takeVow, takeWay, vowProblem, wayBarred, wayProblem } from './ways';
@@ -483,6 +483,14 @@ export function applyCommand(s: GameState, c: Command): void {
         return;
       }
       launch(s, c.p, silo as Building, c.x, c.y, c.w);
+      break;
+    }
+    case 'reserve': {
+      // Missile defence (#759 s3): hold a silo back to answer rival warheads, or stand it down. Only its owner may.
+      const silo = s.byId.get(c.silo);
+      const why = reserveProblem(s, c.p, silo as Building | undefined, c.on === true);
+      if (why) return refuse(s, c.p, why);
+      setReserve(s, silo as Building, c.on === true);
       break;
     }
     case 'keg': {

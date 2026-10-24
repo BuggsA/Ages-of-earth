@@ -6,6 +6,7 @@ import { catchIn } from '../sim/snares';
 import { bearing, orchardGrown, thornStage } from '../sim/grove';
 import { hiveQuiet } from '../sim/hive';
 import { SEAMS, seamOf } from '../sim/shafts';
+import { armed, held } from '../sim/silo';
 import type { AgeId, Building, BuildingType, GameState } from '../sim/types';
 import { T_WATER } from '../sim/types';
 import { WHEEL_HUB, tideWheel } from './tideModels';
@@ -192,7 +193,7 @@ export class BuildingsView {
     const base = k.type === 'pontoon' ? WATER_Y : dyke || k.type === 'causeway' ? Math.max(0.02, this.baseHeight(s, k)) : this.baseHeight(s, k);
     group.position.set(k.x, base, k.y);
     const wall = k.type === 'wall' || k.type === 'thornwall' || dyke || k.type === 'channel' || k.type === 'causeway';
-    const body = new THREE.Mesh(buildingGeometry(k.type, k.epoch, this.colors[k.owner] ?? '#ffffff', wall || k.type === 'snare' || k.type === 'shaft' || k.type === 'tower' || k.type === 'garden' || k.type === 'orchard' ? k.variant : 0, k.age, k.heirloom), buildingMaterial);
+    const body = new THREE.Mesh(buildingGeometry(k.type, k.epoch, this.colors[k.owner] ?? '#ffffff', wall || k.type === 'snare' || k.type === 'shaft' || k.type === 'silo' || k.type === 'tower' || k.type === 'garden' || k.type === 'orchard' ? k.variant : 0, k.age, k.heirloom), buildingMaterial);
     if (k.type === 'gate' && k.variant) body.rotation.y = Math.PI / 2;
     // A dock's pier reaches out over the water.
     if (k.type === 'dock') body.rotation.y = (k.variant * Math.PI) / 2;
@@ -336,8 +337,8 @@ function snapshot(s: GameState, b: Building): Known {
     progress: b.progress,
     // A snare shows a hare in its noose once it holds a tender's worth (#485), to its owner and to a rival who sees it.
     // A Thornwall shows its stage (the Age of the Grove), a Kitchen Garden what feeds it, an Orchard whether it is grown and in fruit.
-    // A Hive shows whether its bees are awake (the Age of the Hive).
-    variant: b.type === 'thornwall' ? wallMask(s, b) + 16 * thornStage(b) : b.type === 'garden' ? (b.fed ?? 0) : b.type === 'hive' ? (hiveQuiet(s, b) ? 1 : 0) : b.type === 'orchard' ? (bearing(s, b) ? 2 : orchardGrown(b) ? 1 : 0) : b.type === 'wall' || b.type === 'dyke' || b.type === 'channel' || b.type === 'causeway' ? wallMask(s, b) : b.type === 'sluice' ? wallMask(s, b) + (b.open ? 16 : 0) : b.type === 'bridge' ? landMask(s, b) : b.type === 'dam' ? landMask(s, b) + (damTurns(s, b) ? 16 : 0) : b.type === 'gate' || b.type === 'dock' ? b.dir : b.type === 'snare' ? (catchIn(b) >= SNARE.worth ? 1 : 0) : b.type === 'shaft' ? Math.max(0, SEAMS.indexOf(seamOf(s, b) ?? 'stone')) : b.type === 'tower' ? (b.level ?? 0) : 0,
+    // A Hive shows whether its bees are awake (the Age of the Hive). A Missile Silo held in Reserve shows it, arming (1) or ready (2) (#759 s3).
+    variant: b.type === 'silo' ? (held(b) ? (armed(s, b) ? 2 : 1) : 0) : b.type === 'thornwall' ? wallMask(s, b) + 16 * thornStage(b) : b.type === 'garden' ? (b.fed ?? 0) : b.type === 'hive' ? (hiveQuiet(s, b) ? 1 : 0) : b.type === 'orchard' ? (bearing(s, b) ? 2 : orchardGrown(b) ? 1 : 0) : b.type === 'wall' || b.type === 'dyke' || b.type === 'channel' || b.type === 'causeway' ? wallMask(s, b) : b.type === 'sluice' ? wallMask(s, b) + (b.open ? 16 : 0) : b.type === 'bridge' ? landMask(s, b) : b.type === 'dam' ? landMask(s, b) + (damTurns(s, b) ? 16 : 0) : b.type === 'gate' || b.type === 'dock' ? b.dir : b.type === 'snare' ? (catchIn(b) >= SNARE.worth ? 1 : 0) : b.type === 'shaft' ? Math.max(0, SEAMS.indexOf(seamOf(s, b) ?? 'stone')) : b.type === 'tower' ? (b.level ?? 0) : 0,
   };
 }
 
