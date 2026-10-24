@@ -12,6 +12,8 @@ import { WATER_Y } from './water';
 export const UNIT_SCALE = 1.3;
 /** Fighters stand larger than workers, so a soldier reads as one at the default zoom (#624). */
 const FIGHTER_SCALE: Partial<Record<UnitType, number>> = { infantry: 1.3, ranged: 1.22, cavalry: 1.2, priest: 1.2, hero: 1.3 };
+/** Citizens a little larger too, but still smaller than fighters (#617, #624). */
+const CITIZEN_BOOST = 1.15;
 /** How high aircraft fly above the ground. */
 export const AIR_ALT = 3.2;
 
@@ -467,7 +469,7 @@ export class UnitsView {
       this.e.set(pitch, yaw, roll);
       this.q.setFromEuler(this.e);
       this.p.set(dx, gy, dz);
-      const k = (mounted ? UNIT_SCALE * 0.88 : engine ? UNIT_SCALE * 1.1 : UNIT_SCALE) * (FIGHTER_SCALE[u.type] ?? 1);
+      const k = (mounted ? UNIT_SCALE * 0.88 : engine ? UNIT_SCALE * 1.1 : UNIT_SCALE) * (FIGHTER_SCALE[u.type] ?? (u.type === 'citizen' ? CITIZEN_BOOST : 1));
       this.m.compose(this.p, this.q, this.sc.set(k, k, k));
       b.mesh.setMatrixAt(i, this.m);
       b.mesh.setColorAt(i, this.colors[u.owner]);
