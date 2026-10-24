@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'fireLit' | 'fireCatch' | 'fireOut' | 'fireAsh' | 'flow' | 'dart' | 'swarm' | 'hiveHush';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'fireLit' | 'fireCatch' | 'fireOut' | 'fireAsh' | 'flow' | 'rush' | 'groan' | 'dart' | 'swarm' | 'hiveHush';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -806,6 +806,21 @@ export class Sound {
         this.noise(out, t, { dur: 0.9, filter: 'lowpass', f: 520, to: 300, q: 0.8, peak: 0.035, attack: 0.1 });
         for (let i = 0; i < 4; i++) this.tone(out, t + 0.05 + i * 0.11 + (i % 2) * 0.03, { f: 620 + i * 90, to: 880 + i * 120, type: 'sine', dur: 0.07, peak: 0.018 });
         this.noise(out, t + 0.2, { dur: 0.7, filter: 'bandpass', f: 1900, to: 1200, q: 1.1, peak: 0.02, attack: 0.15 });
+        break;
+      case 'rush':
+        // The sea through a breach (#701 s3): a broad roar of water tumbling over the mud, a churning low wash under it, slower to
+        // fade than a channel's gurgle.
+        this.noise(out, t, { dur: 1.6, filter: 'bandpass', f: 1400, to: 600, q: 0.6, peak: 0.06, attack: 0.08 });
+        this.noise(out, t, { dur: 1.9, filter: 'lowpass', f: 300, to: 160, q: 0.8, peak: 0.06, attack: 0.15 });
+        for (let i = 0; i < 3; i++) this.noise(out, t + 0.2 + i * 0.35, { dur: 0.25, filter: 'bandpass', f: 2800 - i * 300, q: 2, peak: 0.02 });
+        break;
+      case 'groan':
+        // A dyke gives way (#701 s3): the earth bank's long low groan as it slumps, a crack of the stone crown, then the water's roar.
+        this.tone(out, t, { f: 58, to: 34, type: 'triangle', dur: 1.6, peak: 0.12, attack: 0.3, lp: 260 });
+        this.tone(out, t + 0.1, { f: 87, to: 51, type: 'sawtooth', dur: 1.2, peak: 0.03, attack: 0.4, lp: 400 });
+        this.noise(out, t + 0.9, { dur: 0.07, filter: 'highpass', f: 1500, peak: 0.12 });
+        this.noise(out, t + 1.0, { dur: 2.2, filter: 'bandpass', f: 1100, to: 500, q: 0.6, peak: 0.08, attack: 0.2 });
+        this.noise(out, t + 1.0, { dur: 2.4, filter: 'lowpass', f: 260, to: 140, q: 0.8, peak: 0.08, attack: 0.3 });
         break;
       case 'kegGround':
         // A keg ground at the mills (#577): a millstone's rumble, the scrape of the scoop, a bung knocked home with a mallet.

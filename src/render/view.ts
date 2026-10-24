@@ -1235,6 +1235,11 @@ export class View {
             this.effects.ring(this.ground(s, ev.x, ev.y, 0.12), s.players[ev.owner].color, ev.size * 1.8, 0.7);
             this.effects.burst(at.clone().setY(at.y + 0.5), { count: 10, speed: 1.6, up: 1.2, life: 0.9, size: 0.06, gravity: 3, colors: [s.players[ev.owner].color, '#fff3c4'] });
             this.cue('collapse', ev.x, ev.y, 1);
+            // A dyke gives way (#701 s3): the bank's long groan, and the first of the sea through the gap.
+            if (ev.type === 'dyke' && this.wet(s, ev.x, ev.y)) {
+              this.effects.burst(this.ground(s, ev.x, ev.y, 0.2), { count: 24, speed: 1.6, up: 1.1, life: 1.3, size: 0.08, grow: 1.4, gravity: 4, drag: 0.4, colors: ['#ffffff', '#dcefff', '#8a7d5c'] });
+              this.cue('groan', ev.x, ev.y, 0.9);
+            }
             this.onPing?.(ev.x, ev.y, '#ff6a5a');
           }
           break;
@@ -1317,6 +1322,16 @@ export class View {
           if (!this.sees(ev.x, ev.y)) break;
           this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.06, ev.y), { count: 6, speed: 0.7, up: 0.9, life: 0.8, size: 0.05, gravity: 3, colors: ['#8a7d5c', '#b8c8c4', '#6f6650'] });
           this.cue('pump', ev.x, ev.y, 0.3);
+          break;
+        }
+        case 'flooded': {
+          // The sea runs back into a tile of polder (#701 s3): white water over the mud, a rush every few tiles, a ping for the land's people.
+          this.resources.markDirty();
+          if (ev.owner === this.viewer && ev.tile % 5 === 0) this.onPing?.(ev.x, ev.y, '#7fb3c9');
+          if (!this.sees(ev.x, ev.y)) break;
+          this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.08, ev.y), { count: 9, speed: 1.1, up: 0.9, life: 0.9, size: 0.06, gravity: 3, drag: 0.4, colors: ['#ffffff', '#dcefff', '#8a7d5c'] });
+          if (ev.drowned) this.cue('splashWater', ev.x, ev.y, 0.7);
+          if (ev.tile % 4 === 0) this.cue('rush', ev.x, ev.y, 0.35);
           break;
         }
         case 'dug': {

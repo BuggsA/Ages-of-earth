@@ -400,6 +400,8 @@ export function buildBarred(p: Player, type: BuildingType): string | null {
   if (type === 'hive' && !hasWalked(p, 'hive')) return `Only a people that has walked the ${AGES.hive.name} keeps bees`;
   const way = p.way ? WAYS[p.way] : undefined;
   if (way?.shuts?.includes(type)) return `${way.name} raises no ${BUILDINGS[type].name}`;
+  // The breach (#701 s3): a people that has walked the Age of Dykes raises dykes in any age after, to mend its banks.
+  if (type === 'dyke' && hasWalked(p, 'dykes')) return null;
   const only = BUILDINGS[type].ages;
   return !only || only.some((a) => standsIn(p, a)) ? null : `Only in the ${only.map((a) => AGES[a].name).join(' or ')}`;
 }
@@ -543,6 +545,63 @@ export function chooseKeepsake(s: GameState, p: Player, b: Building): void {
   const age = ageOf(p);
   for (const e of s.ents) if (e.kind === 'building' && e.owner === p.id && e.keep === age) delete e.keep;
   b.keep = age;
+}
+
+/** One leg of a planned journey (#725): a road, or a step back. */
+export interface RouteStep {
+  from: AgeId;
+  to: AgeId;
+  back: boolean;
+  cost: Cost;
+  /** Seconds on the road, plus any wait for the step-back cooldown. */
+  time: number;
+  /** What, besides its price, still keeps the people off this leg, in `roadProblem`'s words; null when nothing does. */
+  problem: string | null;
+}
+
+/**
+ * The shortest journey by time from the player's age to `goal` (#725), over the roads they know (`roadKnown`, so it shows no
+ * more than the Town Center would) and the step back (`backTo`'s trunk age one tier down, with its cooldown). Empty when already
+ * there, null when no known road leads there. Ties go to the earlier road in `ROADS`, so every machine plans alike.
+ * Roads that only open mid-journey (a window walked on the way) appear once the people is there and the plan is made again.
+ */
+export function routeTo(s: GameState, p: Player, goal: AgeId): RouteStep[] | null {
+  const start = ageOf(p);
+  if (start === goal) return [];
+  // States are (age, whether a step back is already spent); the second step back waits out the whole cooldown.
+  const ages = Object.keys(AGES) as AgeId[];
+  const id = (a: AgeId, used: number) => ages.indexOf(a) * 2 + used;
+  const dist = new Map<number, number>([[id(start, 0), 0]]);
+  const prev = new Map<number, { from: number; step: RouteStep }>();
+  const done = new Set<number>();
+  for (;;) {
+    let cur = -1;
+    for (const [k, d] of dist) if (!done.has(k) && (cur < 0 || d < dist.get(cur)! || (d === dist.get(cur)! && k < cur))) cur = k;
+    if (cur < 0) return null;
+    done.add(cur);
+    const age = ages[cur >> 1], used = cur & 1;
+    if (age === goal) {
+      const out: RouteStep[] = [];
+      for (let k = cur; prev.has(k); k = prev.get(k)!.from) out.unshift(prev.get(k)!.step);
+      return out;
+    }
+    const relax = (step: RouteStep, nextUsed: number) => {
+      const k = id(step.to, nextUsed);
+      const d = dist.get(cur)! + step.time;
+      if (done.has(k) || (dist.has(k) && dist.get(k)! <= d)) return;
+      dist.set(k, d);
+      prev.set(k, { from: cur, step });
+    };
+    for (const r of ROADS) {
+      if (r.from !== age || !roadKnown(s, p, r) || (r.shuns && hasWalked(p, r.shuns))) continue;
+      relax({ from: age, to: r.to, back: false, cost: r.cost, time: r.time, problem: roadProblem(s, p, r) }, used);
+    }
+    const tier = AGES[age].tier;
+    if (tier > 0) {
+      const wait = used ? STEP_BACK.cooldown : age === start ? backWait(s, p) : 0;
+      relax({ from: age, to: TRUNK[Math.min(tier, TRUNK.length) - 1], back: true, cost: stepBackCost(tier), time: STEP_BACK.time + wait, problem: age === start ? backProblem(s, p) : null }, 1);
+    }
+  }
 }
 
 /** Why a sleeping building stands idle, for refusals and the HUD. */

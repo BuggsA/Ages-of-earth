@@ -1,6 +1,7 @@
-import { AGES, DYKE, POLDER, RIVERS, domainOf, secs } from './data';
+import { AGES, BREACH, DYKE, POLDER, RIVERS, domainOf, secs } from './data';
 import { ageDef, ageOf, asleep } from './ages';
-import { stampBuilding } from './grid';
+import { landOwnerAt } from './borders';
+import { nearestWalkable, stampBuilding } from './grid';
 import type { Building, GameState, Player } from './types';
 import { B_RES, B_TERRAIN, R_FISH, R_NONE, T_GRASS, T_ROCK, T_WATER } from './types';
 
@@ -11,7 +12,8 @@ import { B_RES, B_TERRAIN, R_FISH, R_NONE, T_GRASS, T_ROCK, T_WATER } from './ty
  * corners raised just over the water line so the renderer shows the water stepping back. Water flows four ways only, so a dyke line
  * that steps diagonally still holds. A mill pumps only a small basin (a lake, or a bay a dyke has shut off): water that reaches a map
  * edge, or more than `POLDER.most` tiles of it, is the open sea. Drained land is everyone's: a strait drained is a land bridge.
- * The numbers are `DYKE` and `POLDER`. Breaches, sluices and canals are the road's later steps (#701 s2 on).
+ * The numbers are `DYKE` and `POLDER`. A dyke that falls lets the sea back in (`floodStep`, #701 s3, `BREACH`); sluices and canals are
+ * the road's later steps.
  */
 
 /** Whether this tile was dug out into a channel (the Age of Rivers): water a land unit wades and no ship sails. */
@@ -137,6 +139,8 @@ export function drain(s: GameState, tile: number, owner: number, mill: number): 
   const { w } = s;
   s.terrain[tile] = T_GRASS;
   (s.polder ??= new Uint8Array(w * s.h))[tile] = 1;
+  // A channel pumped out is land again, walked at full pace.
+  if (s.channel) s.channel[tile] = 0;
   if (s.res[tile] === R_FISH) {
     s.res[tile] = R_NONE;
     s.amount[tile] = 0;
@@ -174,6 +178,178 @@ export function pumpStep(s: GameState): void {
     drain(s, tile, e.owner, e.id);
     e.pumped = s.tick;
   }
+}
+
+// ---- The breach (#701 s3): the sea taking back the polder ----------
+
+/** Whether a finished, standing dyke holds this tile: the only thing that keeps the sea out (a dyke site does not). */
+function banked(s: GameState, i: number): boolean {
+  const id = s.bldAt[i];
+  if (id === 0) return false;
+  const b = s.byId.get(id);
+  return !!b && b.kind === 'building' && b.type === 'dyke' && b.built && b.hp > 0;
+}
+
+/** Water that runs on: water with no finished dyke on it. */
+const runs = (s: GameState, i: number): boolean => s.terrain[i] === T_WATER && !banked(s, i);
+
+/**
+ * Whether the water on this tile is the open sea, as a mill judges it (`basinOf`): its body (four ways, through water no finished dyke
+ * holds) touches a map edge or passes `POLDER.most` tiles. `known` keeps what each body was found to be, so a step asks each once.
+ */
+export function seaAt(s: GameState, start: number, known: Map<number, boolean> = new Map()): boolean {
+  const k = known.get(start);
+  if (k !== undefined) return k;
+  const { w, h } = s;
+  const out = [start];
+  const seen = new Set(out);
+  let open = false;
+  for (let q = 0; q < out.length && !open; q++) {
+    const t = out[q];
+    if (known.get(t)) {
+      open = true;
+      break;
+    }
+    const tx = t % w;
+    const ty = (t - tx) / w;
+    if (tx === 0 || ty === 0 || tx === w - 1 || ty === h - 1 || out.length > POLDER.most) {
+      open = true;
+      break;
+    }
+    for (let d = 0; d < 8; d += 2) {
+      const n = (ty + FOUR[d + 1]) * w + tx + FOUR[d];
+      if (seen.has(n) || !runs(s, n)) continue;
+      seen.add(n);
+      out.push(n);
+    }
+  }
+  // Closed, `out` is the whole body; open, every tile of it is the sea's too.
+  for (const t of out) known.set(t, open);
+  return open;
+}
+
+/** The polder tiles the sea reaches this step: polder no finished dyke stands on, four-ways beside open sea, in tile order. */
+export function floodFront(s: GameState, known: Map<number, boolean> = new Map()): number[] {
+  const out: number[] = [];
+  if (!s.polder) return out;
+  const { w, h } = s;
+  for (let i = 0; i < w * h; i++) {
+    if (s.polder[i] !== 1 || banked(s, i)) continue;
+    const x = i % w;
+    const y = (i - x) / w;
+    for (let d = 0; d < 8; d += 2) {
+      const nx = x + FOUR[d];
+      const ny = y + FOUR[d + 1];
+      if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+      const n = ny * w + nx;
+      if (runs(s, n) && seaAt(s, n, known)) {
+        out.push(i);
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * The sea takes back a tile of polder (the inverse of `drain`): sea again, sailed and not walked, its corners sunk to `BREACH.bank` (to
+ * `BREACH.bed` where water lies all round), and whatever stands on it drowned. Returns how many buildings it drowned.
+ */
+export function flood(s: GameState, tile: number): number {
+  const { w, h } = s;
+  s.terrain[tile] = T_WATER;
+  s.polder![tile] = 0;
+  s.block[tile] |= B_TERRAIN;
+  const x = tile % w;
+  const y = (tile - x) / w;
+  const W = w + 1;
+  for (let cy = y; cy <= y + 1; cy++)
+    for (let cx = x; cx <= x + 1; cx++) {
+      let all = true;
+      for (let ty = cy - 1; ty <= cy && all; ty++) for (let tx = cx - 1; tx <= cx; tx++) if (tx < 0 || ty < 0 || tx >= w || ty >= h || s.terrain[ty * w + tx] !== T_WATER) all = false;
+      const c = cy * W + cx;
+      const to = all ? BREACH.bed : BREACH.bank;
+      if (s.height[c] > to) s.height[c] = to;
+    }
+  let drowned = 0;
+  const b = s.byId.get(s.bldAt[tile]);
+  if (b && b.kind === 'building' && b.hp > 0) {
+    b.hp = 0;
+    drowned++;
+  }
+  s.blockVersion++;
+  s.flooded = (s.flooded ?? 0) + 1;
+  s.events.push({ k: 'flooded', owner: landOwnerAt(s, x + 0.5, y + 0.5), tile, x: x + 0.5, y: y + 0.5, drowned });
+  return drowned;
+}
+
+/**
+ * Every `BREACH.every` seconds the sea runs one tile on (#701 s3): each tile of polder four-ways beside open sea (a dyke breached, cut
+ * or never finished; a channel dug in from the sea) floods, all at once, in tile order. Those standing there are swept to the nearest dry
+ * ground, hurt, or drowned where there is none within `BREACH.sweep` tiles. Once a finished dyke shuts the gap, the flood stops where it
+ * is, and a windmill can pump the water out again.
+ */
+export function floodStep(s: GameState): void {
+  if (!s.polder || s.tick % secs(BREACH.every) !== 0) return;
+  const front = floodFront(s);
+  if (!front.length) return;
+  const wet = new Set(front);
+  for (const t of front) flood(s, t);
+  for (const u of s.ents) {
+    if (u.kind !== 'unit' || u.hp <= 0 || u.inside || domainOf(u.type) !== 'land' || !wet.has(Math.floor(u.y) * s.w + Math.floor(u.x))) continue;
+    const to = nearestWalkable(s, u.x, u.y, BREACH.sweep, s.players[u.owner]?.team ?? -1);
+    if (to < 0) {
+      u.hp = 0;
+      continue;
+    }
+    u.x = (to % s.w) + 0.5;
+    u.y = Math.floor(to / s.w) + 0.5;
+    u.hp = Math.max(0, u.hp - BREACH.unit);
+  }
+}
+
+/**
+ * What a dyke holds back (#701 s3): the tiles of polder its fall would flood, now or as the water runs on. Zero for a dyke on land, one
+ * with no open sea beside it, or one already breached round. Bounded: the dry side is searched to `4 × POLDER.most` tiles.
+ */
+export function heldBack(s: GameState, b: Building): number {
+  const { w, h } = s;
+  const t = b.ty * w + b.tx;
+  if (b.type !== 'dyke' || s.terrain[t] !== T_WATER || !s.polder) return 0;
+  const known = new Map<number, boolean>();
+  const near: number[] = [];
+  let sea = false;
+  for (let d = 0; d < 8; d += 2) {
+    const nx = b.tx + FOUR[d];
+    const ny = b.ty + FOUR[d + 1];
+    if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+    const n = ny * w + nx;
+    if (runs(s, n) && seaAt(s, n, known)) sea = true;
+    else if (runs(s, n) || (isPolder(s, n) && !banked(s, n))) near.push(n);
+  }
+  if (!sea || !near.length) return 0;
+  // The dry side: polder and the still water among it, reached from beside the dyke without crossing it.
+  const out = [...near];
+  const seen = new Set<number>([t, ...near]);
+  let n = 0;
+  for (let q = 0; q < out.length && out.length <= 4 * POLDER.most; q++) {
+    const c = out[q];
+    if (isPolder(s, c)) n++;
+    const cx = c % w;
+    const cy = (c - cx) / w;
+    for (let d = 0; d < 8; d += 2) {
+      const nx = cx + FOUR[d];
+      const ny = cy + FOUR[d + 1];
+      if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+      const m = ny * w + nx;
+      if (seen.has(m) || banked(s, m) || !(isPolder(s, m) || runs(s, m))) continue;
+      // The open sea is not the dry side: a dyke already breached round holds nothing back.
+      if (runs(s, m) && seaAt(s, m, known)) return 0;
+      seen.add(m);
+      out.push(m);
+    }
+  }
+  return n;
 }
 
 /** Whether a Farm stands on polder: most of its footprint pumped out of the sea. It works `POLDER.farm` times as fast. */

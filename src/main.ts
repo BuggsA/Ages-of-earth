@@ -19,7 +19,7 @@ import { jumpAge, rush, topUp } from './sim/god';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
 import { placeProblem, walkable } from './sim/grid';
 import { findDockSpot, findSpot, millSpotFor } from './sim/ai';
-import { channelPlan, dykePlan } from './sim/water';
+import { channelPlan, dykePlan, heldBack } from './sim/water';
 import { maxHp, placeBuilding, restat, spawnUnit } from './sim/world';
 import { arrivalText, epochArrivals } from './ui/endReport';
 import type { AgeId, Building, BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, HomelandId, MapSize, MapType, Unit, UnitType } from './sim/types';
@@ -49,7 +49,8 @@ import { CameraBookmarks, bookmarkShortcut } from './ui/cameraBookmarks';
 import { ScoutFlags } from './ui/scoutFlags';
 import { briefingHtml, chapterListHtml, recordStars, starRow, syncProgress } from './ui/campaignUi';
 import { Lobby } from './ui/lobby';
-import { Hud, nameOf } from './ui/hud';
+import { Hud, nameOf, planLines } from './ui/hud';
+import { RoadPlanner, loadPlannerPrefs, savePlannerPrefs } from './ui/roadPlanner';
 import { Minimap } from './ui/minimap';
 import { BattleTide } from './ui/battleTide';
 import { Tips } from './ui/tips';
@@ -121,6 +122,8 @@ const cameraBookmarks = new CameraBookmarks();
 const scoutFlags = new ScoutFlags();
 let lastGroupKey = { key: -1, at: 0 };
 let lastAlert: { x: number; y: number } | null = null;
+/** When the sea last broke into the viewer's polder (#701 s3), so a flood is told once, not for every tile. */
+let floodToldAt = -99999;
 /** When the flock last told of a lamb born, or of bare ground (#308), so the toasts don't pile up. */
 const flockToast = { born: -1e9, hungry: -1e9 };
 /** When tribute was last told of (#318), taken by the viewer's riders or from the viewer's land. */
@@ -138,6 +141,7 @@ let attractT = 0;
 let titleClock = 16;
 let lastSetup: GameSetup | null = null;
 
+let planner: RoadPlanner | null = null;
 const hud = new Hud({
   issue: (c) => issue(c),
   place: (type) => {
@@ -522,6 +526,7 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   cameraBookmarks.reset();
   scoutFlags.reset();
   lastAlert = null;
+  floodToldAt = -99999;
   tide.clear();
   acc = 0;
   hud.reset();
@@ -1234,6 +1239,15 @@ document.addEventListener('click', (e) => {
       closeSheets();
       showCampaign(webMapHtml(loadDiscovery()));
       break;
+    case 'plan-pin': {
+      // The web map pins a goal age for the road planner (#725); it opens in the next match.
+      const goal = el.dataset.age as AgeId;
+      if (planner) planner.pin(goal);
+      else savePlannerPrefs({ ...loadPlannerPrefs(), goal });
+      sound.play('click');
+      hud.toast(`Pinned the ${AGES[goal].name} as your goal: the Roads panel plans the way`, 'info');
+      break;
+    }
     case 'camp-back':
       $('campaign').classList.add('hidden');
       $('title').classList.remove('hidden');
@@ -2455,6 +2469,16 @@ function onEvents(s: GameState, list: GameEvent[]): void {
       case 'hit':
         if (view.sees(ev.x, ev.y)) music.stir(0.012);
         break;
+      case 'flooded':
+        // The breach (#701 s3): the sea in your polder, said once a flood, not for every tile.
+        if (ev.owner === viewer && s.tick - floodToldAt > TICK_HZ * 15) {
+          floodToldAt = s.tick;
+          music.stir(0.4);
+          lastAlert = { x: ev.x, y: ev.y };
+          hud.toast('The sea is in your polder! A dyke has given way: raise it again (K) to stop the flood, and a windmill will pump it out. (Space to look)', 'alert');
+          play('alert');
+        }
+        break;
       case 'alert':
         if (ev.owner === viewer) {
           music.stir(0.5);
@@ -3003,6 +3027,8 @@ function refreshHud(): void {
   if (!game || mode === 'title') return;
   pruneSelection(game);
   recordDiscovery(game);
+  planner ??= new RoadPlanner($('roads-btn'), $('roads-panel'), (st, v, to, back) => planLines(st, st.players[v], to, back));
+  planner.update(game, viewer, discovery ?? loadDiscovery());
   hud.update(game, viewer, [...selection], SPEEDS[speedIdx], selectedTile, selectedRelic, selectedPost, selectedRuin !== null ? { id: selectedRuin, dug: view.ruins.dugAsSeen(selectedRuin) } : null, selectedLandmark !== null ? { id: selectedLandmark, keeper: view.landmarks.keeperAsSeen(selectedLandmark) } : null);
 }
 
@@ -3306,6 +3332,28 @@ function frame(now: number): void {
     const first = plan.basin[0];
     view.rig.focus(first % s.w, Math.floor(first / s.w));
     return plan.basin.length;
+  },
+  /**
+   * The breach (testing, #701 s3): bring down the dyke of a player's that holds back the most polder, and watch the sea run back in.
+   * Returns how many tiles it held back (0: none of its dykes holds any; pump some out first with `ages.dykes`).
+   */
+  breach(owner: number) {
+    if (!game) return 0;
+    const s = game;
+    let best: Building | null = null;
+    let most = 0;
+    for (const e of s.ents) {
+      if (e.kind !== 'building' || e.type !== 'dyke' || e.owner !== owner || e.hp <= 0) continue;
+      const n = heldBack(s, e);
+      if (n > most) {
+        most = n;
+        best = e;
+      }
+    }
+    if (!best) return 0;
+    best.hp = 0;
+    view.rig.focus(best.x, best.y);
+    return most;
   },
   /** Point the camera at a spot (testing): a spring head, a dyke line, a fight. */
   look(x: number, y: number) {

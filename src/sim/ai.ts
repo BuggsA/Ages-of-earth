@@ -1,6 +1,6 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { aiTiding } from './tidings';
-import { AGES, AI_SILO, SILO, TICK_HZ, AI_CLIMB, AI_FIND, FINDS, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_SEA, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, SEA_RAID, MISSION, AI_MISSION, AI_CHARIOT, STEP_BACK, stepBackCost, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_SILO, AI_BREACH, SILO, TICK_HZ, AI_CLIMB, AI_FIND, FINDS, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_SEA, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, SEA_RAID, MISSION, AI_MISSION, AI_CHARIOT, STEP_BACK, stepBackCost, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, raiseProblem, techCostFor, techProblem, trainCostFor } from './stats';
@@ -9,7 +9,7 @@ import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_
 import { backProblem, backTo, ageDef, ageOf, asleep, barred, buildBarred, crossingLeft, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, trainsAt, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadProblem, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
 import { grindersOf, kegsOf, millProblem, mills, sappers } from './powder';
 import { beatersAt, burns, onFire } from './fire';
-import { basinOf, channelPlan, coastHeld, dykePlan, isChannel, isPolder, polderField, type ChannelPlan, type DykePlan } from './water';
+import { basinOf, channelPlan, coastHeld, dykePlan, heldBack, isChannel, isPolder, polderField, type ChannelPlan, type DykePlan } from './water';
 import { wallLine } from './commands';
 import { launchProblem, loaded, rulesOf, silosOf } from './silo';
 import { carriedBy } from './relics';
@@ -30,7 +30,7 @@ import { graftCost, stationsOf, waiting } from './hemo';
 import { borderMap, landOwnerAt, suppliedAt } from './borders';
 import { workProblem } from './works';
 import { aiKin, aiVow, aiWay, wayBarred } from './ways';
-import { AI_TOWER_KEEP, AI_WAYS, AI_KEG, AI_DYKE, AI_RIVERS, KEG, KILL_CAMP, KIN, POLDER, TOWER_LEVELS, WAYS } from './data';
+import { AI_TOWER_KEEP, AI_TOWER_PEACE, AI_WAYS, AI_KEG, AI_DYKE, AI_RIVERS, KEG, KILL_CAMP, KIN, POLDER, TOWER_LEVELS, WAYS } from './data';
 import { beaconProblem, lit } from './beacon';
 import { rallyProblem } from './rally';
 import { consecrateProblem, consecrates } from './consecrate';
@@ -425,6 +425,8 @@ function research(s: GameState, v: View, peopleEnough: boolean, issue: (c: Comma
 function raiseTowers(s: GameState, v: View, issue: (c: Command) => void): void {
   const { p } = v;
   if (!AI_LEVELS[p.ai!].clever) return;
+  // Under a long peace no one can strike: the wood goes to the town (a Market, a farm) until the peace is nearly out (#720).
+  if (s.tick + secs(AI_TOWER_PEACE) < s.peaceUntil) return;
   let best: Building | null = null;
   for (const b of v.buildings) {
     if (b.type !== 'tower' || raiseProblem(s, p.id, b) || b.queue.length) continue;
@@ -585,7 +587,8 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   } else if (roads[to] === undefined && to === 'dykes') {
     // The Water Road (#701): only with a dyke worth raising by home, and on a coin of its own, so no other match's dice shift. A people
     // that walked the Age of Rivers is on the road already, and goes on down it more often.
-    roads[to] = coastHeld(s, p) && !!dykeOf(s, p, mem) && coin(s, p.id, 0xd1e5) < (hasWalked(p, 'rivers') ? AI_RIVERS.onward : AI_DYKE.take);
+    // A town that has set its heart on the Sail waits on its catch instead: one water plan at a time (#720).
+    roads[to] = roads.sail !== true && coastHeld(s, p) && !!dykeOf(s, p, mem) && coin(s, p.id, 0xd1e5) < (hasWalked(p, 'rivers') ? AI_RIVERS.onward : AI_DYKE.take);
   } else if (roads[to] === undefined && to === 'rivers') {
     // The Water Road's first age (#701 s1): with a channel worth digging by home, on a coin of its own.
     roads[to] = !!riverOf(s, p, mem) && coin(s, p.id, 0x71e5) < AI_RIVERS.take;
@@ -1356,12 +1359,25 @@ function dykeDone(s: GameState, mem: AiMemory): boolean {
  */
 function dykeWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
-  if (!ageDef(p).pumps) return;
+  // Out of the age, only a line that once stood whole is kept: a gap in it is a breach to mend (#701 s3), while dykes may be raised.
+  const pumping = !!ageDef(p).pumps;
+  if (!pumping && (!mem.dyke?.raised || buildBarred(p, 'dyke'))) return;
   const plan = dykeOf(s, p, mem);
   if (!plan) return;
   const recent = (type: BuildingType, sec: number) => s.tick - (mem.ordered[type] ?? -99999) < secs(sec);
   const dykes = plan.line.map((t) => s.byId.get(s.bldAt[t])).filter((b): b is Building => !!b && b.kind === 'building' && b.type === 'dyke' && b.owner === p.id);
+  if (dykes.length === plan.line.length && dykes.every((b) => b.built)) mem.dyke!.raised = true;
   if (dykes.length < plan.line.length) {
+    // A breach is mended at once, whatever else waits (the sea will not).
+    if (mem.dyke!.raised) {
+      if (recent('dyke', 6)) return;
+      const crew = v.citizens.filter((u) => !u.inside && u.order.k !== 'build').sort((a, b) => a.id - b.id).slice(0, AI_DYKE.crew);
+      const gaps = plan.line.filter((t) => s.bldAt[t] === 0 && !placeProblem(s, 'dyke', t % s.w, Math.floor(t / s.w), true, p.id));
+      if (!crew.length || !gaps.length || !afford(v, buildingCostFor(s, p.id, 'dyke'))) return;
+      gaps.forEach((t, i) => issue({ t: 'build', p: p.id, ids: crew.map((u) => u.id), type: 'dyke', tx: t % s.w, ty: Math.floor(t / s.w), queue: i > 0 || undefined }));
+      mem.ordered.dyke = s.tick;
+      return;
+    }
     const cost = buildingCostFor(s, p.id, 'dyke');
     const need = plan.line.length - dykes.length;
     const all: Cost = {};
@@ -1387,6 +1403,7 @@ function dykeWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     }
     return;
   }
+  if (!pumping) return;
   const mills = v.buildings.filter((b) => b.type === 'windmill').length;
   const want = Math.min(AI_DYKE.mills, Math.ceil(plan.basin.length / AI_DYKE.perMill));
   if (mills < want && !dykeDone(s, mem)) {
@@ -1437,6 +1454,12 @@ export function millSpotFor(s: GameState, owner: number, basin: number[], hx: nu
 
 const KEG_FIRST: Partial<Record<BuildingType, number>> = { tower: 0, towncenter: 0, gate: 1, wall: 1 };
 
+/** Which rival buildings the Sappers carry kegs to first (lowest first): a dyke holding back polder (#701 s3) before all, for one keg there drowns a town's best fields; then towers and Town Centers, then gates and walls, then the rest. */
+export function kegFirst(s: GameState, b: Building): number {
+  if (b.type === 'dyke' && heldBack(s, b) >= AI_BREACH.least) return -1;
+  return KEG_FIRST[b.type] ?? 2;
+}
+
 /** Whether a rival on the ground stands within `AI_KEG.guard` tiles of a building's foot: a keg laid there would be stamped out. */
 function guarded(s: GameState, owner: number, b: Building): boolean {
   for (const e of s.ents) {
@@ -1448,8 +1471,8 @@ function guarded(s: GameState, owner: number, b: Building): boolean {
 
 /**
  * The Sappers lay their kegs (#577): every `AI_KEG.every` seconds, foot soldiers out on campaign (far from home) who stand within
- * `AI_KEG.near` tiles of a rival building carry a keg to it, up to `AI_KEG.sappers` at a time: towers and Town Centers first, then
- * gates and walls, then the nearest, and never one a rival stands guard by (`guarded`).
+ * `AI_KEG.near` tiles of a rival building carry a keg to it, up to `AI_KEG.sappers` at a time, in `kegFirst`'s order (a dyke holding
+ * back polder, towers and Town Centers, gates and walls), then the nearest, and never one a rival stands guard by (`guarded`).
  */
 export function sapKegs(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
@@ -1470,7 +1493,7 @@ export function sapKegs(s: GameState, v: View, mem: AiMemory, issue: (c: Command
       const dx = e.x - u.x, dy = e.y - u.y;
       const d2 = dx * dx + dy * dy;
       if (d2 > near2 || guarded(s, p.id, e)) continue;
-      const score = (KEG_FIRST[e.type] ?? 2) * 10000 + d2;
+      const score = kegFirst(s, e) * 10000 + d2;
       if (score < bestScore) {
         bestScore = score;
         best = e;
@@ -4456,6 +4479,48 @@ function machinesAtBlood(s: GameState, v: View, onAttack: Unit[], issue: (c: Com
   for (const [target, ids] of [...by].sort((a, b) => a[0] - b[0])) issue({ t: 'attack', p: v.p.id, ids, target });
 }
 
+/**
+ * The breach (#701 s3): siege marching with a wave goes for the rival dyke seen nearest it, within `AI_BREACH.hunt` tiles, that holds
+ * back `AI_BREACH.least` tiles of polder or more (`heldBack`). Breaking a bank is worth more than a house: the sea does the rest.
+ */
+function machinesAtDykes(s: GameState, v: View, onAttack: Unit[], issue: (c: Command) => void): void {
+  const { p } = v;
+  const dykes: Building[] = [];
+  for (const e of s.ents) if (e.kind === 'building' && e.type === 'dyke' && e.built && e.hp > 0 && isEnemy(s, p.id, e.owner) && p.seen[e.ty * s.w + e.tx]) dykes.push(e);
+  if (!dykes.length) return;
+  const worth = new Map<number, boolean>();
+  const holds = (b: Building): boolean => {
+    let w = worth.get(b.id);
+    if (w === undefined) worth.set(b.id, (w = heldBack(s, b) >= AI_BREACH.least));
+    return w;
+  };
+  const r2 = AI_BREACH.hunt * AI_BREACH.hunt;
+  const by = new Map<number, number[]>();
+  for (const u of onAttack) {
+    if (u.type !== 'siege') continue;
+    if (u.order.k === 'attack') {
+      const t = s.byId.get(u.order.target);
+      if (t && t.kind === 'building' && t.type === 'dyke') continue;
+    }
+    let best: Building | null = null;
+    let bestD = r2;
+    for (const e of dykes) {
+      const dx = e.x - u.x;
+      const dy = e.y - u.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 <= bestD && (!best || d2 < bestD) && holds(e)) {
+        best = e;
+        bestD = d2;
+      }
+    }
+    if (!best) continue;
+    const ids = by.get(best.id) ?? [];
+    ids.push(u.id);
+    by.set(best.id, ids);
+  }
+  for (const [target, ids] of [...by].sort((a, b) => a[0] - b[0])) issue({ t: 'attack', p: p.id, ids, target });
+}
+
 // ---- The Horde (#322) ----------------------------------------------------------------------------------
 
 /** Rival soldiers (no citizens, priests or traders; no ships) standing within `r` tiles of a point. */
@@ -4729,6 +4794,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     return;
   }
   if (L.clever && L.hemo !== false && mem.attacking) machinesAtBlood(s, v, onAttack, issue);
+  if (L.clever && mem.attacking) machinesAtDykes(s, v, onAttack, issue);
   if (L.clever && !mem.attacking) pitchHomeCamp(s, v, mem, issue);
   if (L.clever && mem.attacking) pitchCamp(s, v, mem, onAttack, enemy, issue);
   if (L.clever && mem.attacking) pitchStation(s, v, mem, onAttack, issue);
