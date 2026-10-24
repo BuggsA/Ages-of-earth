@@ -8,6 +8,8 @@ import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, Ga
 import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { backProblem, backTo, ageDef, ageOf, asleep, barred, buildBarred, crossingLeft, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadProblem, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
 import { grindersOf, kegsOf, millProblem, mills, sappers } from './powder';
+import { basinOf, coastHeld, dykePlan, isPolder, polderField, type DykePlan } from './water';
+import { wallLine } from './commands';
 import { launchProblem, loaded, rulesOf, silosOf } from './silo';
 import { carriedBy } from './relics';
 import { storesOre } from './caches';
@@ -27,7 +29,7 @@ import { graftCost, stationsOf, waiting } from './hemo';
 import { borderMap, landOwnerAt, suppliedAt } from './borders';
 import { workProblem } from './works';
 import { aiKin, aiVow, aiWay, wayBarred } from './ways';
-import { AI_TOWER_KEEP, AI_WAYS, AI_KEG, KEG, KILL_CAMP, KIN, TOWER_LEVELS, WAYS } from './data';
+import { AI_TOWER_KEEP, AI_WAYS, AI_KEG, AI_DYKE, KEG, KILL_CAMP, KIN, POLDER, TOWER_LEVELS, WAYS } from './data';
 import { beaconProblem, lit } from './beacon';
 import { rallyProblem } from './rally';
 import { consecrateProblem, consecrates } from './consecrate';
@@ -242,6 +244,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   oreRoad(s, v, mem, issue);
   powderRoad(s, v, mem, issue);
   sapKegs(s, v, mem, issue);
+  dykeWork(s, v, mem, issue);
   siloRoad(s, v, mem, issue);
   fireSilo(s, v, mem, issue);
   fleeWarhead(s, v, issue);
@@ -558,6 +561,9 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   } else if (roads[to] === undefined && to === 'sapper') {
     // The gateway's road on (#577): Alchemy is walked for the Sappers, so a people that turned into it goes on.
     roads[to] = hasWalked(p, 'alchemy');
+  } else if (roads[to] === undefined && to === 'dykes') {
+    // The Water Road (#701): only with a dyke worth raising by home, and on a coin of its own, so no other match's dice shift.
+    roads[to] = coastHeld(s, p) && !!dykeOf(s, p, mem) && coin(s, p.id, 0xd1e5) < AI_DYKE.take;
   } else if (roads[to] === undefined && to === 'alchemy') {
     // A coin of its own (as the steppe's): the gateway is asked only where saltpetre lies, and shifts no other match's dice.
     roads[to] = fit(p, to) >= 0 && coin(s, p.id, 0xa1c4) < AI_KEG.take;
@@ -673,6 +679,19 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
     // Nothing set aside while it holds: the wood goes to the Siege Workshop that is the road's clue.
     if (s.tick - mem.powder <= secs(AI_KEG.hold)) return null;
     mem.roads!.alchemy = false;
+  }
+  // Bound for the Age of Dykes (#701), the Middle Ages wait while its Dock goes up and the price is gathered, `AI_DYKE.hold` seconds at
+  // most; and in the age, it stays until the basin is dry (or as long again), for the polder is what it came for.
+  if (walksWeb(v) && ageOf(p) === 'middle' && !hasWalked(p, 'dykes') && mem.roads?.dykes === true) {
+    const d = (mem.dyke ??= { plan: null });
+    d.hold ??= s.tick;
+    if (s.tick - d.hold <= secs(AI_DYKE.hold)) return null;
+    mem.roads.dykes = false;
+  }
+  if (walksWeb(v) && ageOf(p) === 'dykes') {
+    const d = (mem.dyke ??= { plan: null });
+    d.since ??= s.tick;
+    if (!dykeDone(s, mem) && s.tick - d.since < secs(AI_DYKE.hold)) return null;
   }
   if (walksWeb(v)) {
     for (const r of roadsFrom(p)) {
@@ -808,6 +827,12 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
       const first = silosOf(s, p.id)[0];
       const held = RES.every((res) => !r.cost[res] || p.res[res] >= r.cost[res]! * 0.5);
       if (first && s.tick - first.born >= secs(AI_SILO.forkAfter) && held && roadKnown(s, p, r) && coin(s, p.id, 0x5110) < AI_SILO.fork && (coin(s, p.id, 0x5111) < AI_SILO.fusion ? 'fusion' : 'fission') === r.to) return { road: r, wait: false };
+      continue;
+    }
+    // The Water Road (#701): a town with a dyke worth raising by home turns into the Age of Dykes once its Dock shows the road
+    // (`clueDue` raises the Dock). Asked before the road is known, so the Dock is raised for it.
+    if (r.to === 'dykes') {
+      if (wants(s, p, mem, r.to) && roadKnown(s, p, r) && !roadProblem(s, p, r)) return { road: r, wait: false };
       continue;
     }
     // The gateway (#577): with its saltpetre door open and the store to grind from, it turns into Alchemy.
@@ -1208,6 +1233,109 @@ function powderRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) =>
   if (!ids.length) return;
   issue({ t: 'gather', p: p.id, ids, tile: vein });
   for (const id of ids) v.diggers.add(id);
+}
+
+/** The dyke it means to raise by home (#701), found once and kept: `dykePlan` round its start, or null where none is worth it. */
+function dykeOf(s: GameState, p: Player, mem: AiMemory): DykePlan | null {
+  const d = (mem.dyke ??= { plan: null });
+  if (!d.looked) {
+    d.looked = true;
+    d.plan = dykePlan(s, p.startX, p.startY, AI_DYKE.reach, AI_DYKE, wallLine);
+  }
+  return d.plan;
+}
+
+/** Whether its dyke's work is done (#701): the basin it shut off is all polder, or it has no plan. */
+function dykeDone(s: GameState, mem: AiMemory): boolean {
+  const plan = mem.dyke?.plan;
+  return !plan || plan.basin.every((t) => isPolder(s, t) || s.bldAt[t] !== 0);
+}
+
+/**
+ * The Age of Dykes at work (#701): lay the planned line (one drag, `AI_DYKE.crew` citizens, the price set aside until it can be
+ * paid whole), then once every dyke on it is finished, a windmill for every `AI_DYKE.perMill` tiles of the basin (at most
+ * `AI_DYKE.mills`), on the nearest spot to home whose pull reaches the basin; then fields on the polder as it dries, one for every
+ * dozen tiles won.
+ */
+function dykeWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!ageDef(p).pumps) return;
+  const plan = dykeOf(s, p, mem);
+  if (!plan) return;
+  const recent = (type: BuildingType, sec: number) => s.tick - (mem.ordered[type] ?? -99999) < secs(sec);
+  const dykes = plan.line.map((t) => s.byId.get(s.bldAt[t])).filter((b): b is Building => !!b && b.kind === 'building' && b.type === 'dyke' && b.owner === p.id);
+  if (dykes.length < plan.line.length) {
+    const cost = buildingCostFor(s, p.id, 'dyke');
+    const need = plan.line.length - dykes.length;
+    const all: Cost = {};
+    for (const r of RES) if (cost[r]) all[r] = cost[r]! * need;
+    if (recent('dyke', 20) || !afford(v, all)) {
+      spend(v, all);
+      return;
+    }
+    const crew = v.citizens.filter((u) => !u.inside && u.order.k !== 'build' && !(u.order.k === 'farm' && u.order.phase === 'work')).sort((a, b) => a.id - b.id).slice(0, AI_DYKE.crew);
+    if (!crew.length) return;
+    issue({ t: 'wall', p: p.id, ids: crew.map((u) => u.id), x0: plan.from.x, y0: plan.from.y, x1: plan.to.x, y1: plan.to.y, dyke: true });
+    spend(v, all);
+    mem.ordered.dyke = s.tick;
+    return;
+  }
+  // Idle builders are sent back to the dykes still rising.
+  const rising = dykes.find((b) => !b.built);
+  if (rising) {
+    if (!recent('dyke', 20)) {
+      const crew = v.citizens.filter((u) => !u.inside && u.order.k === 'idle').slice(0, AI_DYKE.crew);
+      if (crew.length) issue({ t: 'work', p: p.id, ids: crew.map((u) => u.id), target: rising.id });
+      mem.ordered.dyke = s.tick;
+    }
+    return;
+  }
+  const mills = v.buildings.filter((b) => b.type === 'windmill').length;
+  const want = Math.min(AI_DYKE.mills, Math.ceil(plan.basin.length / AI_DYKE.perMill));
+  if (mills < want && !dykeDone(s, mem)) {
+    const cost = buildingCostFor(s, p.id, 'windmill');
+    if (recent('windmill', 25)) return;
+    const spot = millSpotFor(s, p.id, plan.basin, v.home.x, v.home.y);
+    if (!spot || !construct(s, v, mem, 'windmill', spot, 2, issue)) spend(v, cost);
+    return;
+  }
+  // Fields on the polder: one for every dozen tiles won, while there is room and wood.
+  const won = plan.basin.filter((t) => isPolder(s, t));
+  const fields = v.buildings.filter((b) => b.type === 'farm' && polderField(s, b)).length;
+  if (won.length >= 9 && fields < Math.floor(won.length / 12) && !recent('farm', 15) && !buildBarred(p, 'farm')) {
+    for (const t of won) {
+      const tx = t % s.w;
+      const ty = Math.floor(t / s.w);
+      if (placeProblem(s, 'farm', tx, ty, true, p.id)) continue;
+      if (!polderField(s, { tx, ty, size: 3 } as Building)) continue;
+      construct(s, v, mem, 'farm', { tx, ty }, 1, issue);
+      break;
+    }
+  }
+}
+
+/** The spot nearest home for a windmill whose pull reaches a basin (#701): within `POLDER.reach` of one of its tiles, on land it may raise. */
+export function millSpotFor(s: GameState, owner: number, basin: number[], hx: number, hy: number): { tx: number; ty: number } | null {
+  const near = new Set<number>();
+  const r = POLDER.reach;
+  for (const t of basin) {
+    const bx = t % s.w;
+    const by = Math.floor(t / s.w);
+    for (let ty = by - r - 1; ty <= by + r; ty++) for (let tx = bx - r - 1; tx <= bx + r; tx++) if (tx > 0 && ty > 0 && tx < s.w - 2 && ty < s.h - 2) near.add(ty * s.w + tx);
+  }
+  let best: { tx: number; ty: number } | null = null;
+  let bestD = Infinity;
+  for (const i of [...near].sort((a, b) => a - b)) {
+    const tx = i % s.w;
+    const ty = Math.floor(i / s.w);
+    if (placeProblem(s, 'windmill', tx, ty, true, owner)) continue;
+    const d = (tx + 1 - hx) * (tx + 1 - hx) + (ty + 1 - hy) * (ty + 1 - hy);
+    if (d < bestD && basinOf(s, { tx, ty, size: 2 }).some((t) => basin.includes(t))) {
+      bestD = d;
+      best = { tx, ty };
+    }
+  }
+  return best;
 }
 
 const KEG_FIRST: Partial<Record<BuildingType, number>> = { tower: 0, towncenter: 0, gate: 1, wall: 1 };

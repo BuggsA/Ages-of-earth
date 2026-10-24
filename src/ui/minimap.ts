@@ -4,6 +4,11 @@ import type { AgeId, GameState, KeyId } from '../sim/types';
 import type { ScoutFlag } from './scoutFlags';
 import { iceCover, lookFor, mapTint } from '../render/seasonLook';
 import { Waymarks } from './waymarks';
+
+/** Polder on the map (#701): a deep field green. */
+const POLDER_RGB = [86, 128, 62];
+/** Tiles pumped out of the water so far, by every people. */
+const drained = (s: GameState): number => s.players.reduce((n, p) => n + (p.stats.drained ?? 0), 0);
 import { R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE, T_ROCK, T_SAND, T_WATER } from '../sim/types';
 
 /**
@@ -41,6 +46,9 @@ export class Minimap {
   private green: Uint8Array = new Uint8Array(0);
   /** Lake depth under each water tile (0 on land), for the winter ice. */
   private depth: Float32Array = new Float32Array(0);
+  /** The ground as painted, and the tiles pumped out by then (#701): land won from the water is repainted as it comes. */
+  private terr: Uint8Array = new Uint8Array(0);
+  private drainedSeen = 0;
   private img: ImageData | null = null;
   private pings: Ping[] = [];
   private dragging = false;
@@ -100,6 +108,8 @@ export class Minimap {
       if (t === T_WATER) this.depth[i] = Math.max(0, -0.02 - s.height[Math.floor(i / s.w) * (s.w + 1) + (i % s.w)]);
       this.green[i] = t === T_WATER || t === T_SAND || t === T_ROCK ? 0 : 1;
     }
+    this.terr = Uint8Array.from(s.terrain);
+    this.drainedSeen = drained(s);
     this.pings = [];
     this.waymarks.reset();
     const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -124,6 +134,18 @@ export class Minimap {
   ): void {
     if (!this.img) return;
     const p = s.players[viewer];
+    // Polder (#701): water pumped out since the land was painted shows as dark field.
+    const won = drained(s);
+    if (won !== this.drainedSeen) {
+      this.drainedSeen = won;
+      for (let i = 0; i < s.w * s.h; i++) {
+        if (this.terr[i] === s.terrain[i]) continue;
+        this.terr[i] = s.terrain[i];
+        this.land.set(POLDER_RGB, i * 3);
+        this.depth[i] = 0;
+        this.green[i] = 1;
+      }
+    }
     if (!reveal) this.waymarks.update(s, viewer);
     const d = this.img.data;
     // The year on the map: meadow and woods follow the season, snow lies in winter (as in the land's own look).

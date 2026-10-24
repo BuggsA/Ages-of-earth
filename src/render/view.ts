@@ -63,7 +63,7 @@ export interface Selection {
   /** The building whose rally point to show. */
   rallyOf: number | null;
   /** A line of wall being laid out. */
-  wall: { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean } | null;
+  wall: { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean; type: 'wall' | 'dyke' } | null;
   /** Personal notes visible only in this browser. */
   scoutFlags: readonly ScoutFlag[];
 }
@@ -458,6 +458,8 @@ export class View {
     this.hemi.intensity = this.baseHemi + this.flash * 2.2;
     this.sun.intensity = this.baseSun + this.flash * 1.5;
 
+    // The water layer (#701): ground pumped out of the water rises from it, and the shore's foam follows.
+    if (this.terrain.sync(s, dt)) this.water.refreshBed(s, (i) => this.terrain.heightOf(i));
     this.resources.update(s, dt);
     this.buildings.update(s, this.viewer, (b) => this.reveal || seesRect(s, this.viewer, b.tx, b.ty, b.size), dt, this.reveal);
     this.units.update(s, alpha, dt, this.time, this.visibleUnit, this.rig.camera, this.width, this.height, (x, y) => this.sees(x, y));
@@ -699,7 +701,7 @@ export class View {
     this.overlays.setBars(bars, this.rig.camera);
     const p = s.players[this.viewer];
     this.overlays.setGhost(s, sel.ghost ? { ...sel.ghost, epoch: p.epoch, color: p.color } : null);
-    this.overlays.setWallGhost(s, sel.wall?.tiles ?? [], p.epoch, p.color, sel.wall?.alongY ?? false);
+    this.overlays.setWallGhost(s, sel.wall?.tiles ?? [], p.epoch, p.color, sel.wall?.alongY ?? false, sel.wall?.type);
     const rb = sel.rallyOf ? s.byId.get(sel.rallyOf) : undefined;
     this.overlays.setFlag(s, rb && rb.kind === 'building' && rb.rally ? rb.rally : null, p.color, this.time);
     this.overlays.setScoutFlags(s, sel.scoutFlags, this.time);
@@ -1245,6 +1247,14 @@ export class View {
         case 'spawned':
           this.resources.markDirty();
           break;
+        case 'drained': {
+          // A tile of the bay pumped dry (#701): the shoal on it is gone, a spurt of muddy water, the mill's creak and the water running out.
+          this.resources.markDirty();
+          if (!this.sees(ev.x, ev.y)) break;
+          this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.06, ev.y), { count: 6, speed: 0.7, up: 0.9, life: 0.8, size: 0.05, gravity: 3, colors: ['#8a7d5c', '#b8c8c4', '#6f6650'] });
+          this.cue('pump', ev.x, ev.y, 0.3);
+          break;
+        }
         case 'deliver':
           if (ev.owner === this.viewer) this.resources.markDirty();
           break;

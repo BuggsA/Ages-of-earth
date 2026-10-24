@@ -6,7 +6,7 @@ import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { SIGHT_LORE } from './render/sightings';
 import { wallLine } from './sim/commands';
-import { AGES, BUILDINGS, SHAFT, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, SILO, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
+import { AGES, AI_DYKE, BUILDINGS, SHAFT, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, SILO, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
 import { siteGrade } from './sim/shafts';
 import { crestSvg } from './ui/crests';
 import { unitPicture } from './ui/thumbs';
@@ -17,8 +17,9 @@ import { launchProblem } from './sim/silo';
 import { jumpAge, rush, topUp } from './sim/god';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
 import { placeProblem, walkable } from './sim/grid';
-import { findDockSpot, findSpot } from './sim/ai';
-import { maxHp, placeBuilding, spawnUnit } from './sim/world';
+import { findDockSpot, findSpot, millSpotFor } from './sim/ai';
+import { dykePlan } from './sim/water';
+import { maxHp, placeBuilding, restat, spawnUnit } from './sim/world';
 import { arrivalText, epochArrivals } from './ui/endReport';
 import type { AgeId, Building, BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, HomelandId, MapSize, MapType, Unit, UnitType } from './sim/types';
 import { KEYS, R_FISH, R_NONE, RES } from './sim/types';
@@ -592,7 +593,7 @@ function toTitle(): void {
 
 const SAVE_KEY = 'ages-save';
 /** Bumped when the state's shape changes, so an older save is set aside instead of loading broken (2: relics; 3: trading posts). */
-const SAVE_V = 3;
+const SAVE_V = 4;
 
 interface SavedMatch {
   setup: GameSetup;
@@ -1623,17 +1624,21 @@ function gateTurned(s: GameState, tx: number, ty: number): boolean {
   return !(at(tx - 1, ty) || at(tx + 2, ty));
 }
 
-/** The tiles of a planned wall, and whether each can be built. */
-function wallPlan(s: GameState): { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean } | null {
-  if (placing !== 'wall') return null;
+/** Buildings laid out by dragging a line: walls, and dykes (#701). */
+const lined = (t: BuildingType | null): t is 'wall' | 'dyke' => t === 'wall' || t === 'dyke';
+
+/** The tiles of a planned wall (or line of dykes), and whether each can be built. */
+function wallPlan(s: GameState): { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean; type: 'wall' | 'dyke' } | null {
+  if (!lined(placing)) return null;
+  const type = placing;
   const d = wallDrag ?? (placeAt ? { x0: placeAt.tx, y0: placeAt.ty, x1: placeAt.tx, y1: placeAt.ty } : null);
   if (!d) return null;
   const seen = s.players[viewer].seen;
   const tiles = wallLine(d.x0, d.y0, d.x1, d.y1).map((t) => ({
     ...t,
-    ok: t.x >= 0 && t.y >= 0 && t.x < s.w && t.y < s.h && !!seen[t.y * s.w + t.x] && !placeProblem(s, 'wall', t.x, t.y),
+    ok: t.x >= 0 && t.y >= 0 && t.x < s.w && t.y < s.h && !!seen[t.y * s.w + t.x] && !placeProblem(s, type, t.x, t.y),
   }));
-  return { tiles, alongY: Math.abs(d.y1 - d.y0) > Math.abs(d.x1 - d.x0) };
+  return { tiles, alongY: Math.abs(d.y1 - d.y0) > Math.abs(d.x1 - d.x0), type };
 }
 
 /** Where the building being placed would go under the pointer. */
@@ -1731,7 +1736,7 @@ canvas.addEventListener('pointerdown', (e) => {
     return;
   }
   if (e.button !== 0) return;
-  if (placing === 'wall') {
+  if (lined(placing)) {
     updatePlacement(e.clientX, e.clientY);
     if (placeAt) wallDrag = { x0: placeAt.tx, y0: placeAt.ty, x1: placeAt.tx, y1: placeAt.ty };
     return;
@@ -1830,12 +1835,12 @@ canvas.addEventListener('pointerup', (e) => {
     const d = wallDrag;
     wallDrag = null;
     if (!plan || !plan.tiles.some((t) => t.ok)) {
-      hud.toast("Can't build a wall there", 'bad');
+      hud.toast(plan?.type === 'dyke' ? "Can't raise a dyke there: dykes go on shallow water, or on the shore beside it" : "Can't build a wall there", 'bad');
       play('error');
       return;
     }
     const ids = selectedUnits(s).filter((u) => u.type === 'citizen' || legionary(s, u)).map((u) => u.id);
-    issue({ t: 'wall', p: viewer, ids, x0: d.x0, y0: d.y0, x1: d.x1, y1: d.y1, queue: e.shiftKey || undefined });
+    issue({ t: 'wall', p: viewer, ids, x0: d.x0, y0: d.y0, x1: d.x1, y1: d.y1, queue: e.shiftKey || undefined, dyke: plan.type === 'dyke' || undefined });
     if (!e.shiftKey) {
       placing = null;
       placeAt = null;
@@ -3128,7 +3133,7 @@ function frame(now: number): void {
     view.frame(s, alpha, dt, {
       ids: selection,
       allBars: altHeld,
-      ghost: placing && placing !== 'wall' && placeAt ? { type: placing, ...placeAt, turn: placing === 'gate' && gateTurned(s, placeAt.tx, placeAt.ty) } : null,
+      ghost: placing && !lined(placing) && placeAt ? { type: placing, ...placeAt, turn: placing === 'gate' && gateTurned(s, placeAt.tx, placeAt.ty) } : null,
       rallyOf: selection.size === 1 ? [...selection][0] : null,
       wall: wallPlan(s),
       scoutFlags: scoutFlags.all,
@@ -3219,6 +3224,27 @@ function frame(now: number): void {
     const p = game.players[owner];
     const spot = type === 'dock' ? findDockSpot(game, x ?? p.startX, y ?? p.startY, 30) : findSpot(game, type, x ?? p.startX, y ?? p.startY, minR, 24);
     return spot ? placeBuilding(game, owner, type, spot.tx, spot.ty, true).id : null;
+  },
+  /**
+   * The Water Road (testing, #701): turn a player to the Age of Dykes and raise, finished, the dyke line the computer would plan by its
+   * start, and a windmill behind it. Returns the size of the basin it shuts off, or 0 where there is none.
+   */
+  dykes(owner: number) {
+    if (!game) return 0;
+    const s = game;
+    const p = s.players[owner];
+    const plan = dykePlan(s, p.startX, p.startY, AI_DYKE.reach, AI_DYKE, wallLine);
+    if (!plan) return 0;
+    restat(s, p, () => {
+      p.epoch = AGES.dykes.tier;
+      p.age = 'dykes';
+    });
+    for (const t of plan.line) placeBuilding(s, owner, 'dyke', t % s.w, Math.floor(t / s.w), true);
+    const spot = millSpotFor(s, owner, plan.basin, p.startX, p.startY);
+    if (spot) placeBuilding(s, owner, 'windmill', spot.tx, spot.ty, true);
+    const first = plan.basin[0];
+    view.rig.focus(first % s.w, Math.floor(first / s.w));
+    return plan.basin.length;
   },
   /** A finished line of wall (testing). */
   wall(owner: number, x0: number, y0: number, x1: number, y1: number) {
