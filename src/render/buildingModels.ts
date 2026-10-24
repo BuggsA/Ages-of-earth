@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { AgeId, BuildingType } from '../sim/types';
 import { BUILDINGS } from '../sim/data';
 import { Kit, bake, rnd } from './kit';
+import { causewaySite, tidemill } from './tideModels';
 
 /**
  * Every building in every epoch: Stone Age thatch, hide and wattle; Bronze Age mudbrick and terracotta;
@@ -2433,9 +2434,11 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
   }
 }
 
-const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' | 'thornwall' | 'garden' | 'orchard' | 'channel'>, (k: Kit, e: number, st: Style) => void> = {
+const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' | 'thornwall' | 'garden' | 'orchard' | 'channel' | 'causeway'>, (k: Kit, e: number, st: Style) => void> = {
   sapling: (k, e) => sapling(k, e),
   towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, windmill,
+  // The Age of Tides (#739), drawn in `tideModels.ts`.
+  tidemill: (k: Kit, _e: number, st: Style) => tidemill(k, st.base),
 };
 
 const cache = new Map<string, THREE.BufferGeometry>();
@@ -2607,7 +2610,7 @@ const ROOFS: Partial<Record<BuildingType, [string, string]>> = {
 };
 
 /** No plinth or pennant: open or thin pieces, and buildings that already carry their own standards. */
-const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder', 'dyke', 'thornwall', 'garden', 'orchard', 'channel'];
+const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder', 'dyke', 'thornwall', 'garden', 'orchard', 'channel', 'causeway', 'tidemill'];
 
 function roleStyle(type: BuildingType, epoch: number, st: Style): Style {
   const r = ROOFS[type];
@@ -2642,6 +2645,7 @@ export function buildingGeometry(type: BuildingType, epochIn: number, color: str
     if (type === 'wall') wall(k, epoch, STYLES[Math.min(epoch, 4)], variant);
     else if (type === 'dyke') dyke(k, variant);
     else if (type === 'channel') channel(k, variant);
+    else if (type === 'causeway') causewaySite(k, variant);
     else if (type === 'snare') snare(k, epoch, variant === 1);
     else if (type === 'thornwall') thornwall(k, variant);
     else if (type === 'garden') garden(k, epoch, variant);

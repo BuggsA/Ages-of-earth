@@ -832,7 +832,7 @@ export function applyCommand(s: GameState, c: Command): void {
     }
     case 'wall': {
       // A line of wall, or of dykes or a channel (#701) or Thornwall (the Age of the Grove), laid the same way.
-      const type = c.dyke ? 'dyke' : c.thorn ? 'thornwall' : c.channel ? 'channel' : 'wall';
+      const type = c.causeway ? 'causeway' : c.dyke ? 'dyke' : c.thorn ? 'thornwall' : c.channel ? 'channel' : 'wall';
       const tiles = wallLine(c.x0, c.y0, c.x1, c.y1);
       const placed: Building[] = [];
       for (let i = 0; i < tiles.length; i++) {
