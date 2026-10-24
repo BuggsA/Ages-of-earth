@@ -8,7 +8,7 @@ const civ = (q.get('c') ?? undefined) as CivId | undefined;
 const group = q.get('g') ?? 'land';
 const LAND = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'trader', 'wagon'];
 const GEAR = group === 'gear'; // ?g=gear: foot soldiers, a row per people (Greek, Roman, Chinese, Egyptian, Mongol, Briton), epochs 1-3, close and low
-const KINDS: Record<string, UnitType> = { infantry: 'infantry', ranged: 'ranged', priest: 'priest' }; // ?g=gear&k=ranged|priest picks the line
+const KINDS: Record<string, UnitType> = { infantry: 'infantry', ranged: 'ranged', priest: 'priest', cavalry: 'cavalry', hero: 'hero' }; // ?g=gear&k=ranged|priest|cavalry|hero picks the line
 const CIVS: CivId[] = ['greeks', 'romans', 'chinese', 'egyptians', 'mongols', 'britons'];
 const types = UNIT_TYPES.filter((t) => (LAND.includes(t) ? 'land' : 'sea') === group);
 const W = 1600, H = 1000;
