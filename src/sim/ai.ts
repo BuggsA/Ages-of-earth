@@ -4436,7 +4436,8 @@ function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
     issue({ t: 'attack', p: p.id, ids: idle.map((u) => u.id), target: bank.id });
     return;
   }
-  const prey = enemyShips[0] ?? (mem.attacking ? enemyDock(s, p) : null);
+  // A Beggars fleet (#783) goes looking: ships to board lie at a rival's Dock, attack or no attack.
+  const prey = enemyShips[0] ?? (mem.attacking || ageDef(p).boards ? enemyDock(s, p) : null);
   if (prey && idle.length >= Math.min(2, warships.length)) issue({ t: 'move', p: p.id, ids: idle.map((u) => u.id), x: prey.x, y: prey.y, amove: true });
   else {
     const far = idle.filter((u) => (u.x - dock.x) * (u.x - dock.x) + (u.y - dock.y) * (u.y - dock.y) > 100);

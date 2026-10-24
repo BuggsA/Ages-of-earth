@@ -1469,3 +1469,17 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 
 **Next:** a pontoon that is a whole wharf (a Dock that floats, so the navy is built where the town is); a floating market that pays more the farther it has been towed (the Silk Road's moving market, at sea); the computer towing its town toward a rival's shore to raid.
 
+
+## Designers' notes: the Age of the Sea Beggars, and the Water Road whole (the Water Road s8, #783, 2026-10-24, chain 1024-2000 s7, lane rules)
+
+**Built:** the Water Road's crossing, `AGES.beggars`: a people that walked the Age of Dykes and the Age of Sail turns off the Middle Ages into the Watergeuzen. Three new things, no more (`docs/engagement.md`): **boarding** (a rival ship your ships would sink is taken instead, with 35% of its timbers and its hold; `board` in `src/sim/beggars.ts`, called from `hurt`), **cutting** (your ships strike dykes, sluices, dams and causeways at siege strength, eight times a usual ship's blow, so the breach of s3 is a fleet's to start), and the **haven** (the kept Dock boards ships beaten down within 12 tiles of it on any road). The door: walls and gates, fishing boats, and a fifth more for every ship. The Age of Rivers gets the keepsake it lacked (a watered Farm, 30% faster on any road), so all six ages of the trunk keep one building that works off the road (`tests/water-keepsakes.test.ts`).
+
+**Why I love it:** the Water Road built the richest polder towns in the game and nothing preyed on them but siege. The Beggars are the road's own predator: they come from it (you must have built dykes to know where to cut them) and they turn the Sail's sinking into taking. "In this age I mostly take ships instead of building them": a fleet of three that boards a convoy is a fleet of six. And it is a real piece of history, Brielle in 1572 and Leiden in 1574, when the rebels cut their own country's dykes and sailed over the fields.
+
+**What I chose:** boarding is by ships only (a land blow, a tower or a keg still sinks), never a district under tow, and never a transport with soldiers aboard (taking an army whole would be a must-pick; it fights to the last instead). The crossing sits on no basic route, as `docs/age-roads.md` §5 asks. The computer plans it only where its shallows open the Dykes (a coast door on a sibling's road now counts in `crossPlanned`), hunts cogs and fishing boats as a sailor does, and with no fleet in sight sends idle warships at a rival dyke that holds back polder.
+
+**The trunk, swept:** SWEEP_NOTE
+
+**Not done, or not seen:** the boarding sound is unheard (software-rendered browser); a full match where a Beggars computer meets a Water Road polder town was not watched; `waterline → locks` still waits on the owner (#701); the Britons never see Rivers (no Farm, its clue), so on their seeds the bound computer reaches Dykes by the Middle Ages.
+
+**Next:** a prize court (a taken ship sold at a Dock for gold, or kept: a choice per ship); flat-bottomed boats that sail a breach's flood, as at Leiden; the computer reading a rival's polder from its Prospector's Lodge before it chooses the crossing.
