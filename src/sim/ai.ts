@@ -4436,13 +4436,19 @@ function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
     issue({ t: 'attack', p: p.id, ids: idle.map((u) => u.id), target: bank.id });
     return;
   }
-  // A Beggars fleet (#783) goes looking: ships to board lie at a rival's Dock, attack or no attack.
-  const prey = enemyShips[0] ?? (mem.attacking || ageDef(p).boards ? enemyDock(s, p) : null);
+  // A Beggars fleet (#783) goes looking: ships to board lie at a rival's Dock, or on the water nearest its town if no Dock is seen.
+  const prey = enemyShips[0] ?? (mem.attacking ? enemyDock(s, p) : ageDef(p).boards ? (enemyDock(s, p) ?? seaBy(s, enemyHome(s, p))) : null);
   if (prey && idle.length >= Math.min(2, warships.length)) issue({ t: 'move', p: p.id, ids: idle.map((u) => u.id), x: prey.x, y: prey.y, amove: true });
   else {
     const far = idle.filter((u) => (u.x - dock.x) * (u.x - dock.x) + (u.y - dock.y) * (u.y - dock.y) > 100);
     if (far.length) issue({ t: 'move', p: p.id, ids: far.map((u) => u.id), x: dock.x, y: dock.y });
   }
+}
+
+/** The water a ship can sail nearest a point, within `AI_BEGGARS.hunt` tiles of it, or null. */
+function seaBy(s: GameState, at: { x: number; y: number }): { x: number; y: number } | null {
+  const t = nearestWalkable(s, at.x, at.y, AI_BEGGARS.hunt, NAVAL);
+  return t < 0 ? null : { x: (t % s.w) + 0.5, y: Math.floor(t / s.w) + 0.5 };
 }
 
 /** The rival dyke seen within `AI_BEGGARS.hunt` tiles of a Dock, nearest it, that holds back polder worth flooding (#783), or null. */

@@ -67,7 +67,16 @@ No route below needs a prospector or a rare resource: every road on it opens by 
 | *Faith* (also plain) | … Medieval → **Pilgrim** → **Fairs** | priests who win towers and Temples over | any map |
 | **Water road** (#701) | Stone → **Rivers** → **Dykes** → **Water Line** → (Industrial →) **Locks** → **Tides** → **Floating Cities** | dig channels and farm along them, a moat to wade; dykes, windmills and polder; sluices that drown your own fields under an army, gun-barges on the flood; canals that carry ships inland, bridges and dams; the tide's flats, mills and causeways; a town on pontoons that moors and tows | any map to the Locks (a spring by every town); Tides and Floating Cities want a shore |
 
-**The Water Road's sweeps** (#783): SWEEP_TABLE
+**The Water Road's sweeps** (#783): a Hard computer bound to the route (its ages yes, every other side age no) against a Normal computer that walks the web freely, small maps, 40-minute cap, seeds 1 + 101k (`npx tsx scripts/routes.ts --seeds 6 water`; the plain road on the same maps and seeds for comparison).
+
+| Map | Water road won | Plain road won | Water route ages walked (per seed) | Deepest age reached |
+| --- | --- | --- | --- | --- |
+| Lakes | 5/6 | 4/6 | 3/4/2/2/1/2 | Locks |
+| Sea | 4/6 (one unfinished) | 6/6 | 3/5/2/3/2/1 | Tides |
+| Continental | 5/6 | 5/6 | 3/3/0/2/0/1 | Water Line, then Industrial |
+| All | **14/18** | **15/18** | | |
+
+The road wins at the plain road's rate on the maps it names, and walks deep on them (Rivers → Dykes → Water Line on most seeds, Locks and Tides on the long ones). Seeds 203 and 405 seat the Britons (who never farm) and the Mongols on the Hunters' Way (no Farm standing when they climb at minute 7): a Farm is the Age of Rivers' clue, so they never see it, reach the Dykes off the Middle Ages instead, and on dry land give the road up. The same sweep before and after #783 played out identically, match for match. Seed 506 (Romans) loses on every map to an early rush; the plain road loses it on lakes and land too.
 
 Roads deeper in a route ask that its earlier ages were walked (`walked` on `Road`): Iron & Blood needs the Warband, Total War needs Iron & Blood, the blood fork needs Total War. Rules: a route may cross the plain road between its own ages; each route must be able to win on the maps it names (s0 checks it with sweeps, `scripts/campaign.ts` style, against the computer's mix); the computer must be able to play each one start to finish.
 

@@ -1478,8 +1478,8 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 
 **What I chose:** boarding is by ships only (a land blow, a tower or a keg still sinks), never a district under tow, and never a transport with soldiers aboard (taking an army whole would be a must-pick; it fights to the last instead). The crossing sits on no basic route, as `docs/age-roads.md` §5 asks. The computer plans it only where its shallows open the Dykes (a coast door on a sibling's road now counts in `crossPlanned`), hunts cogs and fishing boats as a sailor does, and with no fleet in sight sends idle warships at a rival dyke that holds back polder.
 
-**The trunk, swept:** SWEEP_NOTE
+**The trunk, swept:** a Hard computer bound to the Water Road won 14 of 18 against the Normal mix on lakes, sea and land (the plain road, same seeds, 15 of 18), and walked Rivers → Dykes → Water Line on most seeds, Locks and Tides on the long ones (`docs/age-roads.md` §1). It is a real route, not a trap. Where it falls short: a people whose opening raises no Farm never sees Rivers.
 
-**Not done, or not seen:** the boarding sound is unheard (software-rendered browser); a full match where a Beggars computer meets a Water Road polder town was not watched; `waterline → locks` still waits on the owner (#701); the Britons never see Rivers (no Farm, its clue), so on their seeds the bound computer reaches Dykes by the Middle Ages.
+**Not done, or not seen:** the boarding sound is unheard (software-rendered browser); a full match where a Beggars computer meets a Water Road polder town was not watched; `waterline → locks` still waits on the owner (#701); the Britons and a Hunters' Way people never see Rivers (no Farm, its clue, stands when they climb), so on their seeds the bound computer reaches Dykes by the Middle Ages.
 
 **Next:** a prize court (a taken ship sold at a Dock for gold, or kept: a choice per ship); flat-bottomed boats that sail a breach's flood, as at Leiden; the computer reading a rival's polder from its Prospector's Lodge before it chooses the crossing.
