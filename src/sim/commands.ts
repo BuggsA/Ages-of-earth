@@ -16,6 +16,7 @@ import { ruinAt } from './ruins';
 import { rubbleAt, salvages } from './salvage';
 import { cacheAt } from './caches';
 import { carriesKegs, kegProblem } from './powder';
+import { carriesTorch, onFire, torchProblem } from './fire';
 import { launch, launchProblem } from './silo';
 import { raise, raiseCost } from './reclaim';
 import { callWork, workProblem } from './works';
@@ -480,6 +481,19 @@ export function applyCommand(s: GameState, c: Command): void {
       for (const u of units) giveOrder(u, { k: 'keg', target: c.target }, c.queue);
       break;
     }
+    case 'torch': {
+      // Fire (`fire.ts`): citizens and foot soldiers carry torches to a tree, a root or a rival's living building.
+      const at = c.target !== undefined ? { target: c.target } : { tile: c.tile };
+      const units = myUnits(s, c.p, c.ids).filter(carriesTorch);
+      if (!units.length) return;
+      const why = torchProblem(s, c.p, at);
+      if (why) {
+        refuse(s, c.p, why);
+        return;
+      }
+      for (const u of units) giveOrder(u, { k: 'torch', ...at }, c.queue);
+      break;
+    }
     case 'dig': {
       const r = ruinAt(s, c.target);
       if (!r) return;
@@ -544,7 +558,8 @@ export function applyCommand(s: GameState, c: Command): void {
           continue;
         }
         if (u.type === 'citizen') {
-          if (!b.built || b.hp < maxHp(s, b)) {
+          // A burning building is beaten out by those sent to mend it (`fire.ts`).
+          if (!b.built || b.hp < maxHp(s, b) || onFire(s, b)) {
             assignBuilders(s, [u], b, !!c.queue);
             continue;
           }

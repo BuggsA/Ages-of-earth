@@ -32,6 +32,7 @@ import { reclaimStep, remember } from './reclaim';
 import { leaveRubble, salvageStep } from './salvage';
 import { cacheStep, dropOre, spillStore } from './caches';
 import { kegStep, millStep } from './powder';
+import { fireStep } from './fire';
 import { pumpStep } from './water';
 import { siloStep } from './silo';
 import { stockPosts } from './oretrade';
@@ -639,6 +640,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   attrition(s);
   tributeStep(s);
   householdStep(s);
+  fireStep(s);
   coppiceStep(s);
   callWild(s);
   groveStep(s);
@@ -730,6 +732,11 @@ export function checksum(s: GameState): number {
   for (const k of s.kegs ?? []) {
     mix(k.id);
     mix(k.at);
+  }
+  for (const f of s.fires ?? []) {
+    mix(f.tile);
+    mix(f.gen);
+    mix(f.out ?? -1);
   }
   for (const m of s.landmarks ?? []) {
     mix(m.owner);

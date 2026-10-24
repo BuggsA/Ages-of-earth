@@ -1,6 +1,6 @@
 # The Wild route: a people that grows its power
 
-**Status: the owner's idea (2026-10-24), fleshed out here; steps 1 and 2 built.** The owner: "start a new main branch of ages. Completely new. I was thinking like nature/plant tech. Where you use nature and animals to your advantage." Then: "There should be a way to produce them too, maybe forest wall or tree walls of some kind. Maybe ents later on." "Maybe farms that also yield way more food. Or maybe just more food dense so less area. Be very uniquely creative to fill the gaps, especially the future ages." And: "this goes to 7." Umbrella: #706. Build on it; change it with the reason on the umbrella.
+**Status: the owner's idea (2026-10-24), fleshed out here; steps 1, 2 and 3 (fire) built.** The owner: "start a new main branch of ages. Completely new. I was thinking like nature/plant tech. Where you use nature and animals to your advantage." Then: "There should be a way to produce them too, maybe forest wall or tree walls of some kind. Maybe ents later on." "Maybe farms that also yield way more food. Or maybe just more food dense so less area. Be very uniquely creative to fill the gaps, especially the future ages." And: "this goes to 7." Umbrella: #706. Build on it; change it with the reason on the umbrella.
 
 ## The idea in one line
 
@@ -101,14 +101,22 @@ Every age has a cheap road back and a road to the trunk, like every side age. De
 - **Saplings and coppice** (`coppice.ts`, the Britons): the Thornwall and the Spreading grow from the same rules. The Britons' woodcraft makes them natural Grove keepers.
 - **Seasons** (`seasons.ts`): the call of the wild changes kind with the season, Thornwalls grow fastest in spring, bees sleep in winter, Orchards bear in summer and autumn, the Spreading comes each spring.
 - **The counter triangle** (`BONUS`): war wolves are cavalry, tuskers are foot, mammoths are siege. Nothing new to learn to fight them.
-- **Fire is the answer** to the whole route, from the Hive on: it needs a fire rule in the sim (still open, below).
+- **Fire is the answer** to the whole route (`src/sim/fire.ts`, `FIRE`, built): see "How fire works" below.
 - **The verbs rubric** (`docs/verbs.md`): every age above changes what the player does (tame, plant, swarm, wake, breed giants, bloom, grow a web), closes a door, plays two ways, and is answered by something a rival can see and do.
+
+## How fire works (step 3, built)
+
+- **Torches, for every people from the Bronze Age.** Citizens and foot soldiers carry one (F, then click) to a tree, a rival's Thornwall root, or a rival's living building (Thornwall, Kitchen Garden, Orchard, Sapling: `FIRE.burns`), and stand `light` seconds there to set it alight. A root burns away at once. Only what grows burns: stone and timber halls don't, so the trunk's balance is untouched and green against iron is a real fight.
+- **Burning.** A tree burns `tree` seconds and falls to ash (a `Stool` with `ash`), which grows a tree again after `ash` seconds. A living building loses `bld` of its strength a second until it falls (a Thornwall burnt down leaves no root, `Building.burnt`) or is beaten out: each citizen or foot soldier of its own team within `beatReach` beats a second of fire a second, `beat` put it out. One sent to mend it beats first; a gardener at work beats already.
+- **Spreading, deterministic.** Once a second, fires in the order they were lit, each may light each living neighbour (a tree's four sides, a building's edges) on a roll of the match's dice (`roll`, `s.rng`) against `spread[season]`, no more than `run[season]` tiles from the torch: a summer fire takes most of a wood (about 80 trees of a big one), a spring or winter one a handful. Fires lit this second act next second. Whoever stands in the flames is scorched.
+- **The computer** torches a rival's growth with soldiers out on campaign (`torchGrowth`) and sends a citizen to beat out its own (`beatFires`).
+- **Still to come:** smoke that quiets Hives (step 4); the Wildwood's "fire hits living things twice as hard"; beasts that fear fire.
 
 ## Steps (each one playable)
 
 1. **Wild** (built): taming, the Den, the call of the wild, the computer using it.
 2. **Grove** (built): Thornwall, Kitchen Gardens fed by Den dung or water, Orchards.
-3. **Fire** (shared rule, needed by everything after): torchbearers, burning woods and buildings, smoke.
+3. **Fire** (built, shared rule, needed by everything after): torchbearers, burning woods and buildings. Smoke waits for the Hive.
 4. **Hive:** Hives, pollination, venom darts, dire beasts and the Cave Bear.
 5. **Wildwood:** the Heart Tree, Ents that root, the Spreading, woodland ways.
 6. **Bloom:** the Seed Spire and the Bloom Seed, the Greening victory, pollen storms.
@@ -118,7 +126,5 @@ Every age has a cheap road back and a road to the trunk, like every side age. De
 
 ## Still open (decide by building, then note it here)
 
-- How fire works in the sim (step 3).
 - Whether a rival can tame your beasts back (step 1 tames only wild ones).
 - The computer is weak in the Wild on Normal: it tames and raises a Den, but its economy is thin while it stays (seed 8 at 25 minutes, still in the Wild, its Den lost). Gardens help only once it reaches the Grove; the Wild itself may want an earlier Den or a cheaper one.
-- A rival's citizens can't yet grub out a Thornwall root; fire (step 3) should take roots and gardens both.

@@ -1,4 +1,4 @@
-import { AI_LEVELS, AUTO_WORK, BUILDINGS, EXPLORE, PATROL, CARRY, CONSECRATE, COPPICE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, LEGION, MILITARY, ORDERS, POLDER, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TAME, TRADE, domainOf, secs } from './data';
+import { AI_LEVELS, AUTO_WORK, BUILDINGS, EXPLORE, FIRE, PATROL, CARRY, CONSECRATE, COPPICE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, LEGION, MILITARY, ORDERS, POLDER, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TAME, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
@@ -25,6 +25,7 @@ import { rubbleAt, salvages, strip } from './salvage';
 import { bank, cacheAt, lift } from './caches';
 import { buyLoad } from './oretrade';
 import { atFoot, carriesKegs, kegProblem, layKeg } from './powder';
+import { carriesTorch, ignite, onFire, torchProblem } from './fire';
 import { polderField } from './water';
 import { gardenMul, isField } from './grove';
 import { fordMarch, groveBoost, keptOf, kinBonus } from './landmarks';
@@ -701,7 +702,9 @@ function buildStep(s: GameState, u: Unit, o: Extract<Order, { k: 'build' }>): vo
     setOrder(u, { k: 'idle' });
     return;
   }
-  if (b.built && b.hp >= maxHp(s, b)) {
+  // A burning building (`fire.ts`) is beaten out before it is mended: its menders stand at it, beating, until the fire is out.
+  const burning = b.built && onFire(s, b);
+  if (b.built && b.hp >= maxHp(s, b) && !burning) {
     afterBuilding(s, u, b);
     return;
   }
@@ -710,6 +713,7 @@ function buildStep(s: GameState, u: Unit, o: Extract<Order, { k: 'build' }>): vo
     if (walking(u)) stopWalking(u);
     face(u, b.x, b.y);
     u.act = 'build';
+    if (burning) return;
     // Galvanic Revival: a repair inside a Tower's field is free and quicker.
     const wired = b.built && !!modsOf(s, u.owner).galvanic && inField(s, b);
     // A Hunters' kill camp (#463 s1) goes up in a fraction of the time.
@@ -1683,6 +1687,34 @@ function kegOrderStep(s: GameState, u: Unit, o: Extract<Order, { k: 'keg' }>): v
 }
 
 /**
+ * Carry a torch (`fire.ts`): walk to the tree, root or rival's living building, stand `FIRE.light` seconds within `FIRE.reach` tiles
+ * of it to set it alight, then stand free. Gives up if it catches from elsewhere first, falls, or the peace comes down.
+ */
+function torchStep(s: GameState, u: Unit, o: Extract<Order, { k: 'torch' }>): void {
+  if (!carriesTorch(u) || torchProblem(s, u.owner, o)) {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  const b = o.target !== undefined ? (s.byId.get(o.target) as Building) : null;
+  const tile = b ? b.ty * s.w + b.tx : o.tile!;
+  const d = b ? distToRect(u.x, u.y, b) : distToTile(u.x, u.y, tile, s.w);
+  if (d - statsOf(s, u).radius <= FIRE.reach) {
+    if (walking(u)) stopWalking(u);
+    face(u, b ? b.x : (tile % s.w) + 0.5, b ? b.y : Math.floor(tile / s.w) + 0.5);
+    u.act = 'build';
+    o.t = (o.t ?? 0) + 1;
+    if (o.t < secs(FIRE.light)) return;
+    if (ignite(s, tile, 0, u.owner, true)) {
+      const st = s.players[u.owner].stats;
+      st.torched = (st.torched ?? 0) + 1;
+    }
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  if (!approach(u, b ? goalForBuilding(b) : goalForTile(s, tile))) setOrder(u, { k: 'idle' });
+}
+
+/**
  * Pay a trader's (or merchant ship's) load in at the Market (or Dock) it came home to, and cut in the allies.
  * On the Silk Road (#326) the ground its Market covered since it set out (`from`) pays more, the owner's alone.
  */
@@ -2224,6 +2256,9 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
       break;
     case 'keg':
       kegOrderStep(s, u, o);
+      break;
+    case 'torch':
+      torchStep(s, u, o);
       break;
     case 'salvage':
       salvageStep(s, u, o);

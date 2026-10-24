@@ -8,6 +8,7 @@ import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, Ga
 import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { backProblem, backTo, ageDef, ageOf, asleep, barred, buildBarred, crossingLeft, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadProblem, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
 import { grindersOf, kegsOf, millProblem, mills, sappers } from './powder';
+import { beatersAt, burns, onFire } from './fire';
 import { basinOf, coastHeld, dykePlan, isPolder, polderField, type DykePlan } from './water';
 import { wallLine } from './commands';
 import { launchProblem, loaded, rulesOf, silosOf } from './silo';
@@ -41,7 +42,7 @@ import { isCoppice } from './coppice';
 import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
-import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, TAME, GROVE, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS } from './data';
+import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
@@ -246,6 +247,8 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   oreRoad(s, v, mem, issue);
   powderRoad(s, v, mem, issue);
   sapKegs(s, v, mem, issue);
+  torchGrowth(s, v, mem, issue);
+  beatFires(s, v, issue);
   dykeWork(s, v, mem, issue);
   siloRoad(s, v, mem, issue);
   fireSilo(s, v, mem, issue);
@@ -1399,6 +1402,68 @@ export function sapKegs(s: GameState, v: View, mem: AiMemory, issue: (c: Command
     issue({ t: 'keg', p: p.id, ids: [u.id], target: best.id });
     busy++;
     left--;
+  }
+}
+
+/**
+ * Fire (`fire.ts`): every `FIRE.aiEvery` seconds, foot soldiers out on campaign (far from home) who stand within `FIRE.aiNear` tiles
+ * of a rival's living building (a Thornwall, a Kitchen Garden, an Orchard) carry a torch to the nearest, up to `FIRE.aiBearers` at a time.
+ */
+export function torchGrowth(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (p.epoch < FIRE.epoch || s.tick < s.peaceUntil || s.tick - (mem.torchAt ?? -99999) < secs(FIRE.aiEvery)) return;
+  mem.torchAt = s.tick;
+  let busy = v.army.filter((u) => u.order.k === 'torch').length;
+  if (busy >= FIRE.aiBearers) return;
+  let growth: Building[] | null = null;
+  for (const e of s.ents) if (e.kind === 'building' && e.hp > 0 && burns(e) && isEnemy(s, p.id, e.owner) && !onFire(s, e)) (growth ??= []).push(e);
+  if (!growth) return;
+  const near2 = FIRE.aiNear * FIRE.aiNear;
+  const taken = new Set<number>();
+  for (const u of v.army) {
+    if (busy >= FIRE.aiBearers) return;
+    if (u.type !== 'infantry' || u.inside || u.order.k === 'torch') continue;
+    const hx = u.x - v.home.x, hy = u.y - v.home.y;
+    if (hx * hx + hy * hy < near2 * 4) continue;
+    let best: Building | null = null;
+    let bestD = near2;
+    for (const e of growth) {
+      if (taken.has(e.id)) continue;
+      const dx = e.x - u.x, dy = e.y - u.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bestD) {
+        bestD = d2;
+        best = e;
+      }
+    }
+    if (!best) continue;
+    taken.add(best.id);
+    issue({ t: 'torch', p: p.id, ids: [u.id], target: best.id });
+    busy++;
+  }
+}
+
+/** Fire (`fire.ts`): a burning building of its own with nobody beating at it gets the nearest citizen within `FIRE.aiBeatFrom` tiles, sent to mend it (and so to beat the flames first). */
+function beatFires(s: GameState, v: View, issue: (c: Command) => void): void {
+  if (!s.fires) return;
+  const far2 = FIRE.aiBeatFrom * FIRE.aiBeatFrom;
+  for (const f of s.fires) {
+    if (f.b === undefined) continue;
+    const b = s.byId.get(f.b);
+    if (!b || b.kind !== 'building' || b.owner !== v.p.id || b.hp <= 0 || beatersAt(s, b) > 0) continue;
+    if (v.citizens.some((c) => c.order.k === 'build' && c.order.target === b.id)) continue;
+    let best: Unit | null = null;
+    let bestD = far2;
+    for (const c of v.citizens) {
+      if (c.inside || c.order.k === 'build') continue;
+      const dx = c.x - b.x, dy = c.y - b.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bestD) {
+        bestD = d2;
+        best = c;
+      }
+    }
+    if (best) issue({ t: 'work', p: v.p.id, ids: [best.id], target: b.id });
   }
 }
 

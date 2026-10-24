@@ -29,6 +29,7 @@ import { FindsView } from './findsView';
 import { RubbleView } from './rubbleView';
 import { CacheView } from './cacheView';
 import { KegView } from './kegView';
+import { FireView } from './fireView';
 import { LandmarksView } from './landmarksView';
 import { GrazeView } from './grazeView';
 import { BorderView } from './borderView';
@@ -115,6 +116,7 @@ export class View {
   readonly rubble = new RubbleView();
   readonly caches = new CacheView();
   readonly kegs = new KegView();
+  readonly fires = new FireView();
   private falloutTick = -1;
   readonly landmarks = new LandmarksView();
   /** When ground relics next sparkle. */
@@ -190,7 +192,7 @@ export class View {
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sky.mesh, this.hemi, this.fill, this.sun, this.sun.target);
-    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.finds.group, this.rubble.group, this.caches.group, this.kegs.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
+    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.finds.group, this.rubble.group, this.caches.group, this.kegs.group, this.fires.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
     this.scene.add(this.rangeGuides.mesh, this.borders.mesh, this.graze.mesh, this.foundations.mesh);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.post = new Post(this.renderer, this.scene, this.rig.camera);
@@ -261,6 +263,7 @@ export class View {
     this.rubble.clear();
     this.caches.clear();
     this.kegs.clear();
+    this.fires.clear();
     this.landmarks.clear();
     const colors = s.players.map((p) => p.color);
     this.units.setColors(colors);
@@ -484,6 +487,10 @@ export class View {
     this.rubble.update(s, !!ageDef(p).salvage, (x, y) => this.reveal || this.sees(x, y));
     this.caches.update(s, (x, y) => this.reveal || this.sees(x, y), (id) => this.units.drawn.get(id) ?? null);
     this.kegs.update(s, (x, y) => this.reveal || this.sees(x, y), (id) => this.units.drawn.get(id) ?? null);
+    // Fire (`fire.ts`): flames on what burns, torches in hand, and smoke rising off it all.
+    this.fires.update(s, dt, (x, y) => this.reveal || this.sees(x, y), (id) => this.units.drawn.get(id) ?? null, (at, big) =>
+      this.effects.burst(at, { count: big ? 3 : 2, speed: 0.25, up: 1, life: big ? 3.4 : 2.6, size: big ? 0.22 : 0.16, grow: 3, gravity: -0.5, drag: 0.8, soft: true, colors: ['#3a3532', '#5a544e', '#7a736a'] }),
+    );
     // Fallout (#605 s2): poisoned ground breathes a sickly green haze and drifting motes, a few times a second, where the viewer sees.
     if (s.fallout && s.tick !== this.falloutTick && s.tick % 4 === 0) {
       this.falloutTick = s.tick;
@@ -986,6 +993,28 @@ export class View {
           this.cue('tame', ev.x, ev.y, 1);
           this.cue(ev.kind === 'mammoth' ? 'mammoth' : ev.kind === 'boar' ? 'snarl' : 'howl', ev.x, ev.y, 0.5);
           break;
+        case 'fire': {
+          // Fire (`fire.ts`): a torch put to wood roars up; a tree catching from its neighbour crackles; beaten out, it hisses to steam;
+          // a tree falling to ash throws sparks; a root burnt away smoulders.
+          if (!this.sees(ev.x, ev.y)) break;
+          const at = this.ground(s, ev.x, ev.y, ev.tree ? 0.8 : 0.3);
+          if (ev.what === 'lit') {
+            this.effects.burst(at, { count: ev.torch ? 14 : 6, speed: 1, up: 1.2, life: 0.7, size: 0.04, gravity: -1, drag: 1, colors: ['#fff2a8', '#ffc94a', '#ff7a2a'] });
+            if (ev.torch) this.cue('fireLit', ev.x, ev.y, 0.9);
+            else this.cue('fireCatch', ev.x, ev.y, 0.35);
+          } else if (ev.what === 'out') {
+            this.effects.burst(at, { count: 10, speed: 0.5, up: 1, life: 1.8, size: 0.14, grow: 2.5, gravity: -0.6, drag: 1, soft: true, colors: ['#d8d4cc', '#aaa49a', '#8a847a'] });
+            this.cue('fireOut', ev.x, ev.y, 0.8);
+          } else if (ev.what === 'ash') {
+            this.effects.burst(at, { count: 16, speed: 1.6, up: 1.4, life: 1.1, size: 0.035, gravity: 1.5, drag: 0.6, colors: ['#ffd27a', '#ff8a3a', '#c2451a'] });
+            this.effects.burst(at, { count: 6, speed: 0.6, up: 0.6, life: 2, size: 0.18, grow: 2, gravity: -0.3, drag: 1, soft: true, colors: ['#4a4541', '#6a645e'] });
+            this.cue('fireAsh', ev.x, ev.y, 0.5);
+          } else {
+            this.effects.burst(at, { count: 8, speed: 0.4, up: 1, life: 1.6, size: 0.12, grow: 2, gravity: -0.5, drag: 1, soft: true, colors: ['#4a4541', '#6a645e'] });
+            this.cue('fireCatch', ev.x, ev.y, 0.5);
+          }
+          break;
+        }
         case 'sprout':
           // The Age of the Grove: a fallen Thornwall springs up again from its root.
           if (!this.sees(ev.x, ev.y)) break;

@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'fireLit' | 'fireCatch' | 'fireOut' | 'fireAsh';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -672,6 +672,30 @@ export class Sound {
         // A Thornwall sprouts from its root (the Age of the Grove): a creak of green wood and a rustle of leaves opening.
         this.tone(out, t, { f: 140, to: 220, type: 'triangle', dur: 0.35, peak: 0.05, attack: 0.05, lp: 900, glide: 0.3 });
         this.noise(out, t + 0.1, { dur: 0.6, filter: 'bandpass', f: 2400, q: 1.2, peak: 0.018, attack: 0.15 });
+        break;
+      case 'fireLit':
+        // A torch put to wood (`fire.ts`): the whump of pitch catching, a rising roar of air drawn in, then the crackle taking hold.
+        this.noise(out, t, { dur: 0.25, filter: 'lowpass', f: 300, to: 900, peak: 0.12, attack: 0.02 });
+        this.noise(out, t + 0.05, { dur: 1.6, filter: 'bandpass', f: 700, to: 1600, q: 0.8, peak: 0.05, attack: 0.25 });
+        for (let i = 0; i < 9; i++) this.noise(out, t + 0.3 + i * 0.13 + (i % 3) * 0.04, { dur: 0.015, filter: 'highpass', f: 2500 + (i % 4) * 600, peak: 0.06 - i * 0.004 });
+        break;
+      case 'fireCatch':
+        // Fire leaps to the next tree (`fire.ts`): a short rush and a few pops of green wood.
+        this.noise(out, t, { dur: 0.6, filter: 'bandpass', f: 900, to: 1400, q: 1, peak: 0.03, attack: 0.1 });
+        for (let i = 0; i < 4; i++) this.noise(out, t + 0.1 + i * 0.11 + (i % 2) * 0.05, { dur: 0.012, filter: 'highpass', f: 3000, peak: 0.05 });
+        break;
+      case 'fireOut':
+        // A fire beaten out (`fire.ts`): the slap of a cloak on the flames, twice, and the hiss and sigh of it dying to smoke.
+        this.noise(out, t, { dur: 0.08, filter: 'lowpass', f: 600, peak: 0.1 });
+        this.noise(out, t + 0.22, { dur: 0.08, filter: 'lowpass', f: 600, peak: 0.08 });
+        this.noise(out, t + 0.3, { dur: 1.2, filter: 'bandpass', f: 4200, to: 2400, q: 1.2, peak: 0.03, attack: 0.05 });
+        break;
+      case 'fireAsh':
+        // A burnt tree falls to ash (`fire.ts`): the groan and crack of the trunk giving way, a soft crash, sparks spitting.
+        this.tone(out, t, { f: 120, to: 70, type: 'sawtooth', dur: 0.35, peak: 0.04, lp: 500 });
+        this.noise(out, t + 0.3, { dur: 0.06, filter: 'highpass', f: 1500, peak: 0.08 });
+        this.noise(out, t + 0.35, { dur: 0.7, filter: 'lowpass', f: 700, to: 200, peak: 0.08, attack: 0.01 });
+        for (let i = 0; i < 5; i++) this.noise(out, t + 0.45 + i * 0.09, { dur: 0.01, filter: 'highpass', f: 3500, peak: 0.04 });
         break;
       case 'snarl':
         // A snarl and a snap of jaws.

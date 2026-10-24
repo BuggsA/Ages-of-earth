@@ -1752,6 +1752,39 @@ export const GROVE = {
   aiThornAt: 11,
 };
 
+/**
+ * Fire (`src/sim/fire.ts`, the Wild route's step 3, `docs/wild-road.md`): the answer to a living town, open to every people from
+ * the `epoch`. Citizens and foot soldiers carry torches: one stands `light` seconds within `reach` tiles of a tree, a root, or a
+ * rival's living building (`burns`) to set it alight. A tree burns `tree` seconds and falls to ash, which grows a tree again after
+ * `ash` seconds. A living building loses `bld` of its most hit points a second until it falls (a Thornwall burnt down leaves no
+ * root) or is beaten out: each citizen or foot soldier of its own team within `beatReach` tiles beats a second of fire a second, and
+ * `beat` of them put it out (one sent to mend it beats rather than mends). Once a second each fire lights each living neighbour
+ * on a roll of `spread[season]` (spring, summer, autumn, winter), no more than `run[season]` tiles from where the torch set it,
+ * so a dry summer fire runs and a wet spring one smoulders out. Anyone standing within `scorchReach` of a burning tile loses
+ * `scorch` hit points a second.
+ * The computer sends up to `aiBearers` foot soldiers out on campaign within `aiNear` tiles of a rival's living building to torch
+ * it (every `aiEvery` seconds), and a citizen to beat out any fire on its own, from up to `aiBeatFrom` tiles.
+ */
+export const FIRE = {
+  epoch: 1,
+  light: 3,
+  reach: 1.2,
+  tree: 10,
+  ash: 300,
+  bld: 0.06,
+  beat: 4,
+  beatReach: 1.6,
+  spread: [0.06, 0.2, 0.12, 0.04],
+  run: [2, 6, 4, 2],
+  scorch: 2,
+  scorchReach: 0.4,
+  burns: ['thornwall', 'garden', 'orchard', 'sapling'] as BuildingType[],
+  aiBearers: 2,
+  aiNear: 12,
+  aiEvery: 4,
+  aiBeatFrom: 24,
+};
+
 export const COPPICE = { reach: 8, regrow: 120, retry: 5, grow: 90, snare: 2, cap: 1.5, bag: 2, full: 12, aiPerFood: 1.5, aiMax: 16, aiTrees: 10, aiThick: 14, aiNear: 14, aiDrop: 7, aiPerTender: 2, aiStone: 6, aiCamps: 2, aiPlant: 3, aiThin: 12, aiPlantWood: 120 };
 
 /**
@@ -1809,7 +1842,7 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   // The Age of the Wild (`docs/wild-road.md`): raised by a people that has tamed a beast; breeds the kinds it tamed, in any age after.
   den: { name: 'Beast Den', size: 3, hp: 900, cost: { food: 50, wood: 75 }, time: 35, pop: 0, sight: 6, trains: ['warwolf', 'tusker', 'warmammoth'], drop: [], epoch: 1, menu: 'mil', key: 'D', blurb: 'A ring of earth banks and woven hurdles round a hollow of straw, where tamed beasts whelp and are reared. It breeds only the kinds your people has tamed from the wild: tame one wolf and it raises wolves. Raised only by a people that has tamed a beast, and it keeps breeding after the people leaves the Age of the Wild.' },
   // The Age of the Grove (`docs/wild-road.md` §2, `GROVE`): raised by a people that has walked it, in any age after.
-  thornwall: { name: 'Thornwall', size: 1, hp: 400, cost: { wood: 5 }, time: 3, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, menu: 'eco', key: 'B', blurb: `Drag to plant a line of thorn. It grows a stage every ${GROVE.stage} seconds (twice as fast in spring): seedling, bramble, thicket, then living oak, tougher than stone and mending itself. It parts for your own people and shuts on everyone else, and a piece cut down sprouts again from its root unless the ground is built on.` },
+  thornwall: { name: 'Thornwall', size: 1, hp: 400, cost: { wood: 5 }, time: 3, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, menu: 'eco', key: 'B', blurb: `Drag to plant a line of thorn. It grows a stage every ${GROVE.stage} seconds (twice as fast in spring): seedling, bramble, thicket, then living oak, tougher than stone and mending itself. It parts for your own people and shuts on everyone else, and a piece cut down sprouts again from its root unless the ground is built on. Fire is its bane: a piece that burns down leaves no root.` },
   garden: { name: 'Kitchen Garden', size: 1, hp: 120, cost: { wood: 35 }, time: 8, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, open: true, menu: 'eco', key: 'U', blurb: `Maize, beans and squash grown together on one tile, worked by one gardener. Fed by a Beast Den's dung within ${GROVE.dung} tiles it yields ${Math.round((1 + GROVE.dungMul) * 10) / 10} times a farmer's food; by water within ${GROVE.water} tiles, ${Math.round((1 + GROVE.waterMul) * 10) / 10} times; by both, more. Unfed, it grows at a field's pace. A Den feeds its ${GROVE.dungFeeds} oldest gardens.` },
   orchard: { name: 'Orchard', size: 2, hp: 300, cost: { wood: 100 }, time: 20, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, menu: 'eco', key: 'R', blurb: `Fruit trees set near a food store. After ${GROVE.orchardGrow} seconds they bear, and every summer and autumn they drop food into your stores by themselves while a store stands within ${GROVE.orchardReach} tiles. Slow to start, free for years.` },
   // The age road (#562, `docs/age-roads.md` spine §4): raised in the Stone Age, it answers which key resources this world holds (`PROSPECTOR`).
