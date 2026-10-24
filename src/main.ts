@@ -32,7 +32,7 @@ import { riteProblem } from './sim/fork';
 import { legionKind, legionary } from './sim/legion';
 import { ageDef, ageOf, canRaise, heirloomsOpened, isSideRoad, opensOf, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
 import { NetClient, newRoomCode, saveName, savedName } from './net/client';
-import { HASH_EVERY, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
+import { HASH_EVERY, ROOM_KEEP_HOURS, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
 import { deserialize, serialize } from './sim/save';
 import { VAULT_SLOTS, formatVaultKey, normalizeVaultKey, type CloudSlot } from './net/vault';
 import { qrSvg } from './ui/qr';
@@ -239,7 +239,7 @@ function connectRoom(code: string, name: string, watch = false): void {
     if (net !== n) return;
     net = null;
     if (online && mode !== 'title') {
-      hud.banner('Disconnected', why, 6000);
+      hud.banner('Disconnected', `${why} Reload the page, or join room ${code} again, to pick the match up: the room keeps it for ${ROOM_KEEP_HOURS} hours.`, 9000);
       online = false;
       mode = 'over';
     } else lobby.showEntry(code, why);
@@ -252,7 +252,8 @@ function connectRoom(code: string, name: string, watch = false): void {
 }
 
 function leaveOnline(): void {
-  if (net && online && !spectating && game && !game.over) net.send({ t: 'cmd', c: { t: 'leave', p: viewer } });
+  // Leaving a paused match is stepping away: the room keeps the seat until you come back with its code.
+  if (net && online && !spectating && game && !game.over && !netPaused) net.send({ t: 'cmd', c: { t: 'leave', p: viewer } });
   spectating = false;
   $('replay-bar').classList.add('hidden');
   net?.close();
@@ -270,6 +271,10 @@ function onNet(m: ServerMsg): void {
         $('title').classList.add('hidden');
         lobby.showRoom(m.lobby, m.you);
       }
+      break;
+    case 'open':
+      $('title').classList.add('hidden');
+      lobby.showSeats(m.code, m.seats);
       break;
     case 'start':
       startOnline(m.match, m.you);

@@ -699,6 +699,8 @@ export interface Player {
   civ: CivId;
   /** Controlled by the computer, at this level; null for a person. */
   ai: Difficulty | null;
+  /** A person who left an online match, whose people the computer leads until they come back; absent otherwise. */
+  left?: true;
   team: number;
   res: Stock;
   /** Blood in store (#355): drawn at Drain Rigs from the enemy dead and by the levy; absent until the first drop. */
@@ -1178,6 +1180,7 @@ export type Command =
   | { t: 'launch'; p: number; silo: number; x: number; y: number }
   /** Answer the card of tidings waiting at the fire (#443): `take` pays its price, otherwise it is passed by. */
   | { t: 'tiding'; p: number; card: TidingId; take: boolean }
-  /** A player left an online match: the computer takes over their people. */
-  | { t: 'leave'; p: number };
+  /** A player left an online match: the computer takes over their people. With `back` (sent only by the room, never a browser),
+   * a player who left is back in the room, and takes their people back from the computer. */
+  | { t: 'leave'; p: number; back?: true };
 

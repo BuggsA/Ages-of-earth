@@ -338,6 +338,7 @@ kbd {
 .online-card h3 { margin: 0 0 8px; font: 800 15px 'Cinzel', serif; color: var(--gold-2); }
 .online-card.wide { width: min(720px, calc(100% - 32px)); }
 .online-card .code { letter-spacing: 4px; color: var(--ink); }
+.online-card .seat-pick { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
 .online-card .field { display: grid; gap: 4px; text-align: left; font-size: 13px; font-weight: 800; color: var(--muted); margin: 10px 0; }
 .online-card input, .online-card select {
   font: 700 14px 'Nunito', sans-serif; color: var(--ink); background: #1b2030; border: 1px solid var(--edge-soft); border-radius: 8px; padding: 6px 8px; min-width: 0;
