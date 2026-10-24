@@ -1,11 +1,12 @@
-import { AGES, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, secs } from '../sim/data';
+import { AGES, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, secs } from '../sim/data';
 import { battlesFor } from '../sim/battles';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, findsOf, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
 import type { AgeId, Building, GameState, Unit } from '../sim/types';
-import { R_FISH } from '../sim/types';
+import { R_FISH, R_GOLD, R_STONE } from '../sim/types';
 import { isIdleCitizen } from './idle';
 import { laterTip, type Opening } from './opening';
+import { findResource } from '../sim/units';
 import { seasonAt } from '../sim/seasons';
 
 /**
@@ -76,6 +77,8 @@ const TIPS: Tip[] = [
   { id: 'wayHunt', when: (s, me) => s.players[me].way === 'hunt' && s.players[me].epoch === 0, text: '<b>The Hunters\' Way:</b> follow the herds. Raise a <b>Hunting Camp</b> (<kbd>B</kbd> <kbd>N</kbd>) within ' + KILL_CAMP.near + ' tiles of game or a fresh kill and it costs nothing and goes up fast. In the Stone Age you raise no Farm while game lives within ' + KILL_CAMP.home + ' tiles of your Town Center: hunt the home herd out to open the fields, or spare it and range farther.' },
   { id: 'wayHearth', when: (s, me) => s.players[me].way === 'hearth', text: '<b>The Hearth Way:</b> select your Town Center and <b>Call the Kin</b> (<kbd>K</kbd>): two citizens come together, three in <b>winter</b>. Lay food by in autumn for the winter call, or spend it on the Bronze Age.' },
   { id: 'wayWarband', when: (s, me) => s.players[me].way === 'warband' && s.players[me].epoch <= 1, text: '<b>The Warband Way:</b> your soldiers eat by raiding. Send a few to strike a rival\'s <b>Storehouse</b>, <b>Farms</b> or <b>Hunting Camp</b>: every blow carries food home. Your bell never rings, so keep soldiers by home too.' },
+  // Mine Shafts (#681): once the open stone and gold near home are gone.
+  { id: 'shaft', when: (s, me) => s.players[me].epoch >= 1 && secsIn(s) > 240 && !has(s, me, 'shaft') && !buildings(s, me).some((b) => BUILDINGS[b.type].drop.length && (findResource(s, R_STONE, b.x, b.y, SHAFT.aiNear) >= 0 || findResource(s, R_GOLD, b.x, b.y, SHAFT.aiNear) >= 0)), text: 'No stone or gold left near home? A <b>Mine Shaft</b> (<kbd>B</kbd> <kbd>H</kbd>, 150 wood) digs it from the ground for good. Best over <b>old workings</b> where a deposit was worked out, then beside mountain rock, then plain ground. Right-click it with a citizen and pick the seam.' },
   { id: 'train', when: (s) => secsIn(s) > 25, text: 'More citizens mean a faster economy. Click your <b>Town Center</b> and press <kbd>Q</kbd> to train one (you can queue several).' },
   { id: 'house', when: (s, me) => s.players[me].pop >= s.players[me].cap - 2, text: 'You are nearly out of room. Select a citizen, press <kbd>B</kbd> then <kbd>E</kbd> to build a <b>house</b> (5 more people each).' },
   { id: 'idle', when: (s, me) => secsIn(s) > 60 && s.ents.some((e) => isIdleCitizen(e, me)), text: 'Someone is standing around: press <kbd>.</kbd> to find an idle citizen, or <kbd>Shift</kbd> + <kbd>.</kbd> to select every idle citizen and put them to work.' },

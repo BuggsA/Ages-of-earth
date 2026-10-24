@@ -7,7 +7,8 @@ import { lambProblem, raiseLamb } from './flocks';
 import { backProblem, backTo, barred, buildBarred, canRaise, chooseKeepsake, journeyOf, keepsakeProblem, roadProblem, roadTo, trainsAt } from './ages';
 import type { Building, BuildingType, Command, Ent, Cost, GameState, Order, Player, Res, Unit } from './types';
 import { RES, R_FISH, R_MEAT, R_NONE } from './types';
-import { RES_OF_TILE, cargoRoom, findResource, freeFarm, garrisonRoom, giveOrder, landing, setOrder, ungarrison } from './units';
+import { resOfSeam, seamOf, seamProblem } from './shafts';
+import { RES_OF_TILE, cargoRoom, findResource, freeFarm, freeShaft, garrisonRoom, giveOrder, landing, setOrder, ungarrison } from './units';
 import { carriedBy, letGo, relicAt } from './relics';
 import { caravanOf, dockOf, homeMarket, marketOf, nearestCaravan, nearestDock, portSpot, postAt } from './trade';
 import { ruinAt } from './ruins';
@@ -224,7 +225,7 @@ function assignBuilders(s: GameState, units: Unit[], b: Building, queue: boolean
   for (const u of units) {
     if (u.thrall || !canRaise(u.type, b.type, s.players[u.owner].civ)) continue;
     const o = u.order;
-    const back: Order | null = o.k === 'gather' ? { ...o, phase: 'go' } : o.k === 'farm' || o.k === 'snare' ? { ...o, phase: 'go' } : o.k === 'build' ? u.resume : null;
+    const back: Order | null = o.k === 'gather' ? { ...o, phase: 'go' } : o.k === 'farm' || o.k === 'snare' || o.k === 'shaft' ? { ...o, phase: 'go' } : o.k === 'build' ? u.resume : null;
     giveOrder(u, { k: 'build', target: b.id }, queue);
     if (!queue || u.order.k === 'build') u.resume = back ?? u.resume;
   }
@@ -540,6 +541,16 @@ export function applyCommand(s: GameState, c: Command): void {
             }
             continue;
           }
+          // A Mine Shaft (#681): one miner to a shaft; the rest look for free shafts nearby.
+          if (b.type === 'shaft') {
+            const pit = fieldsGiven.size ? freeShaft(s, c.p, b.x, b.y, 12, fieldsGiven) : b;
+            const seam = pit && seamOf(s, pit);
+            if (pit && seam) {
+              fieldsGiven.add(pit.id);
+              giveOrder(u, { k: 'shaft', target: pit.id, res: resOfSeam(seam), phase: 'go' }, c.queue);
+            }
+            continue;
+          }
           // A snare (#485): walk the trap line from here.
           if (b.type === 'snare') {
             giveOrder(u, { k: 'snare', target: b.id, phase: 'go' }, c.queue);
@@ -613,7 +624,7 @@ export function applyCommand(s: GameState, c: Command): void {
           if (!best) continue;
           room.set(best.id, room.get(best.id)! - 1);
           const o = u.order;
-          u.resume = o.k === 'gather' || o.k === 'farm' || o.k === 'snare' ? { ...o, phase: 'go' } : o.k === 'build' ? o : null;
+          u.resume = o.k === 'gather' || o.k === 'farm' || o.k === 'snare' || o.k === 'shaft' ? { ...o, phase: 'go' } : o.k === 'build' ? o : null;
           u.queue = [];
           setOrder(u, { k: 'garrison', target: best.id });
         }
@@ -628,6 +639,23 @@ export function applyCommand(s: GameState, c: Command): void {
         }
       }
       s.events.push({ k: 'bell', owner: c.p, ring: c.ring });
+      break;
+    }
+    case 'flee': {
+      if (!c.ids) {
+        if (c.on) delete p.noFlee;
+        else p.noFlee = true;
+        break;
+      }
+      for (const u of myUnits(s, c.p, c.ids)) if (u.type === 'citizen') u.flee = c.on;
+      break;
+    }
+    case 'seam': {
+      const b = myBuilding(s, c.p, c.building);
+      if (!b || b.type !== 'shaft') return;
+      const why = seamProblem(s, b, c.seam);
+      if (why) return refuse(s, c.p, why);
+      b.seam = c.seam;
       break;
     }
     case 'beacon': {

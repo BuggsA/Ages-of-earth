@@ -15,7 +15,8 @@ import { loadPrice, sellerNear } from './oretrade';
 import { swordsOf } from './merc';
 import { fairground, feastOpen, nextFeastIn } from './fair';
 import { claimants, favours, landmarkAt } from './landmarks';
-import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple, TILE_OF_RARE } from './units';
+import { cargoRoom, coastNear, findResource, freeFarm, freeShaft, nearestTemple, TILE_OF_RARE } from './units';
+import { seamOf, seamProblem, siteGrade } from './shafts';
 import { goalForPost, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { findPath, findRoute } from './path';
 import { isEnemy, maxHp, townCenters } from './world';
@@ -33,12 +34,12 @@ import { consecrateProblem, consecrates } from './consecrate';
 import { sees } from './vision';
 import { seasonAt } from './seasons';
 import { flooded } from './flood';
-import { isHousehold } from './household';
+import { isHousehold, mineable } from './household';
 import { isCoppice } from './coppice';
 import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
-import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SNARE, SPOILS } from './data';
+import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
@@ -1766,6 +1767,20 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     else if (construct(s, v, mem, 'dock', spot, 2, issue)) return;
   }
 
+  // Mine Shafts (#681): once no deposit of a stock it wants lies near a drop of its own, a shaft near home, over old
+  // workings if it finds them, else by rock, else on open ground. Looked at now and then, not every turn.
+  if (p.epoch >= 1 && n >= 12 && count(v, 'shaft') < SHAFT.aiMax && !recently('shaft', 40) && v.budget.wood >= SHAFT.aiWood && s.tick - (mem.shaftLook ?? -99999) > secs(15)) {
+    mem.shaftLook = s.tick;
+    const want = wanted(v);
+    const drops = v.buildings.filter((b) => b.built && BUILDINGS[b.type].drop.length);
+    const dry = (['gold', 'stone'] as const).filter((r) => want[r] >= 1 && mineable(p, TILE_OF[r]) && !drops.some((b) => findResource(s, TILE_OF[r], b.x, b.y, SHAFT.aiNear) >= 0));
+    if (dry.length && !v.buildings.some((b) => b.type === 'shaft' && !b.built) && !freeShaft(s, p.id, home.x, home.y, s.w + s.h)) {
+      const at = (g: 'old' | 'hill' | null) => findSpot(s, 'shaft', home.x, home.y, 4, SHAFT.aiReach, 1, g ? (tx, ty) => siteGrade(s, { tx, ty, size: 2 }) === g : undefined);
+      const spot = at('old') ?? at('hill') ?? at(null);
+      if (spot && construct(s, v, mem, 'shaft', spot, 1, issue)) return;
+    }
+  }
+
   // In the Age of Lightning a coil goes up by a workshop that stands dark (#231), so its training runs fast again.
   if (ageOf(p) === 'lightning' && count(v, 'tower') < AI_LIGHTNING.most && !recently('tower', AI_LIGHTNING.gap)) {
     const dark = v.buildings.find((b) => b.built && b.type !== 'tower' && BUILDINGS[b.type].trains.length > 0 && !inField(s, b));
@@ -1830,7 +1845,7 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
 
 function jobOf(u: Unit): Res | 'build' | null {
   const o = u.order;
-  if (o.k === 'gather') return o.res;
+  if (o.k === 'gather' || o.k === 'shaft') return o.res;
   if (o.k === 'farm' || o.k === 'hunt' || o.k === 'milk' || o.k === 'snare') return 'food';
   if (o.k === 'build') return 'build';
   return null;
@@ -2007,7 +2022,16 @@ function sendTo(s: GameState, v: View, u: Unit, res: Res, issue: (c: Command) =>
   // A nomad people (#501) quarries no stone: it buys it or takes it.
   if (res === 'stone' && isNomad(v.p)) return false;
   const from = nearestDropTo(v, u);
-  let tile = findResource(s, TILE_OF[res], from.x, from.y, 26);
+  let tile = findResource(s, TILE_OF[res], from.x, from.y, SHAFT.aiNear);
+  // No deposit near a drop (#681): a free Mine Shaft of its own, set to this stock, before the long walk to a far one.
+  if (tile < 0 && v.p.epoch >= 1 && res !== 'wood') {
+    const pit = freeShaft(s, v.p.id, v.home.x, v.home.y, SHAFT.aiReach + 10);
+    if (pit && !seamProblem(s, pit, res)) {
+      if (seamOf(s, pit) !== res) issue({ t: 'seam', p: v.p.id, building: pit.id, seam: res });
+      issue({ t: 'work', p: v.p.id, ids: [u.id], target: pit.id });
+      return true;
+    }
+  }
   if (tile < 0) tile = findResource(s, TILE_OF[res], u.x, u.y, 60);
   if (tile < 0) return false;
   issue({ t: 'gather', p: v.p.id, ids: [u.id], tile });
@@ -2070,7 +2094,7 @@ function assignCitizens(s: GameState, v: View, issue: (c: Command) => void): voi
     }
   }
   if (over && under) {
-    const mover = v.citizens.find((u) => jobOf(u) === over && u.carry <= 2 && u.order.k !== 'farm' && u.order.k !== 'hunt' && u.order.k !== 'milk' && u.order.k !== 'snare' && !u.inside && !v.diggers.has(u.id));
+    const mover = v.citizens.find((u) => jobOf(u) === over && u.carry <= 2 && u.order.k !== 'farm' && u.order.k !== 'shaft' && u.order.k !== 'hunt' && u.order.k !== 'milk' && u.order.k !== 'snare' && !u.inside && !v.diggers.has(u.id));
     if (mover) sendTo(s, v, mover, under, issue);
   }
 }

@@ -3,7 +3,7 @@ import { landOwnerAt } from './borders';
 import { isEnemy } from './world';
 import { snareSpot } from './snares';
 import type { Building, BuildingType, GameState } from './types';
-import { B_BUILDING, B_GATE, B_RES, B_TERRAIN, R_NONE, T_ROCK, T_WATER } from './types';
+import { B_BUILDING, B_GATE, B_RES, B_TERRAIN, R_BLOODIRON, R_GOLD, R_NONE, R_SALT, R_SALTPETRE, R_STONE, T_ROCK, T_WATER } from './types';
 
 /** Tile helpers shared by the rules, the pathfinder and the computer opponent. */
 
@@ -181,6 +181,9 @@ export function stampBuilding(s: GameState, b: Building, on: boolean): void {
 
 /** Take a gathered-out resource off its tile. */
 export function clearResource(s: GameState, tile: number): void {
+  // A worked-out stone, gold or rare-ore deposit leaves old workings, where a Mine Shaft digs best (#681).
+  const k = s.res[tile];
+  if (k === R_STONE || k === R_GOLD || k === R_SALT || k === R_SALTPETRE || k === R_BLOODIRON) (s.spent ??= new Uint8Array(s.w * s.h))[tile] = k;
   s.res[tile] = R_NONE;
   s.amount[tile] = 0;
   s.block[tile] &= ~B_RES;

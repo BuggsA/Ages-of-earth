@@ -7,6 +7,7 @@ import { takeCaptive } from './thralls';
 import { prizeOf } from './convoy';
 import { looted, pack } from './spoils';
 import { raided } from './household';
+import { alarm } from './flee';
 import { distToRect } from './grid';
 import type { Spatial } from './spatial';
 import { gunPower, gunRange, modsOf, statsFor } from './stats';
@@ -102,6 +103,8 @@ export function hurt(s: GameState, target: Ent, damage: number, by: number, atta
   if (attacker && target.kind === 'unit' && target.type !== 'citizen' && target.type !== 'priest' && target.order.k === 'idle' && attacker.hp > 0 && target.stance !== 'stand' && target.stance !== 'run' && canHit(s, target, attacker)) {
     target.order = { k: 'attack', target: attacker.id, auto: true, then: null };
   }
+  // Citizens of a person's people run from whoever strikes them.
+  if (target.kind === 'unit' && target.type === 'citizen' && by !== target.owner) alarm(s, target, credit ?? attacker);
   // The Warband feeds on the raid (#463 s1): blows on a rival's food buildings carry off its food.
   if (target.kind === 'building') raidBlow(s, target, damage, by, attacker);
 }

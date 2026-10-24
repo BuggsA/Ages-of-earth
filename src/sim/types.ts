@@ -19,7 +19,7 @@ export type UnitType =
 export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
   | 'towncenter' | 'house' | 'storehouse' | 'farm' | 'barracks' | 'range' | 'stable' | 'tower'
-  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai' | 'drainrig' | 'transfusion' | 'bloodtower' | 'snare' | 'prospector' | 'mission' | 'silo' | 'sapling';
+  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai' | 'drainrig' | 'transfusion' | 'bloodtower' | 'snare' | 'prospector' | 'mission' | 'silo' | 'sapling' | 'shaft';
 /** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
 export type Difficulty = 'gentle' | 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
@@ -68,6 +68,8 @@ export const R_SALTPETRE = 9;
 export const R_BLOODIRON = 10;
 export type RareId = 'salt' | 'saltpetre' | 'bloodiron';
 export const RARES: readonly RareId[] = ['salt', 'saltpetre', 'bloodiron'];
+/** What a Mine Shaft can dig (#681): stone or gold anywhere, a rare ore only over its old workings. */
+export type SeamId = 'stone' | 'gold' | RareId;
 /** A key resource (#555 spine §3): something only some worlds place that opens an age or a technology. The Prospector's Lodge answers for each. */
 export type KeyId = 'bogIron' | RareId | 'ruin';
 export const KEYS: readonly KeyId[] = ['bogIron', ...RARES, 'ruin'];
@@ -120,13 +122,16 @@ export type Order =
   /** Carry what is held to a drop site, then go idle. */
   | { k: 'deliver' }
   /** Walk into a building to shelter (and add arrows to its volleys). */
-  | { k: 'garrison'; target: number }
+  /** `flee` when a citizen ran for shelter on its own: it comes out again once the danger has passed. */
+  | { k: 'garrison'; target: number; flee?: true }
   /** Hunt an animal; once it falls, butcher it. With `fight`, a wolf fought off: nothing to butcher. */
   | { k: 'hunt'; target: number; fight?: boolean }
   /** Milk a sheep of the people's flock (#308), carry the milk to a drop site, and back. */
   | { k: 'milk'; target: number; phase: 'go' | 'work' | 'drop' }
   /** Walk the trap line (#485): empty a snare of its people's, on to the next with game in it, and the catch home. */
   | { k: 'snare'; target: number; phase: 'go' | 'work' | 'drop' }
+  /** Work a Mine Shaft (#681): dig its seam, carry the load to a drop site, and back. `res` is the stock the seam pays into, kept in step with it. */
+  | { k: 'shaft'; target: number; res: Res; phase: 'go' | 'work' | 'drop' }
   /**
    * A priest turning an enemy to your side: `done` ticks of chanting so far. A Blood-rite priest (#355 s4) may instead chant a `rite`
    * over a living enemy: to `sacrifice` it for its blood, or to `curse` it.
@@ -210,6 +215,10 @@ export interface Unit {
   miss: number;
   /** The work a citizen was pulled off (to build, or by the town bell), to go back to afterward. */
   resume: Order | null;
+  /** Whether this citizen runs from danger, overriding its player's setting; absent follows the player. */
+  flee?: boolean;
+  /** Tick this citizen last ran from danger, or took shelter from it; absent if it is not one that fled. */
+  fled?: number;
   act: Act;
   /** Tick of the last swing or shot (for the strike animation). */
   swing: number;
@@ -339,6 +348,8 @@ export interface Building {
   kill?: boolean;
   /** A Snare (#485): the food caught in it so far, waiting for a tender. Absent: none. */
   snared?: number;
+  /** A Mine Shaft (#681): the seam its miner digs (`SHAFT.seams`). Absent: the best its ground holds (`shafts.ts`). */
+  seam?: SeamId;
 }
 
 export type Ent = Unit | Building;
@@ -705,6 +716,8 @@ export interface Player {
   ai: Difficulty | null;
   /** A person who left an online match, whose people the computer leads until they come back; absent otherwise. */
   left?: true;
+  /** Citizens stand their ground instead of running from danger (see `FLEE`); absent means they run. */
+  noFlee?: true;
   team: number;
   res: Stock;
   /** Blood in store (#355): drawn at Drain Rigs from the enemy dead and by the levy; absent until the first drop. */
@@ -947,6 +960,8 @@ export interface GameState {
   carcasses?: { tile: number; born: number; full: number }[];
   /** Coppice stools and planted saplings growing into trees (#501, `coppice.ts`), in the order they were cut or planted; absent until the first. */
   stools?: Stool[];
+  /** Per tile: the R_* kind of a stone, gold or rare-ore deposit worked out there, or 0 (#681, old workings for a Mine Shaft); absent until the first. */
+  spent?: Uint8Array;
   /** Per tile: the tick cropped grass grows back (#308), made when the first sheep is; absent until then. */
   grazed?: Int32Array;
   relics: Relic[];
@@ -1022,6 +1037,8 @@ export interface AiMemory {
   bellMoved?: number;
   /** Tick it last looked for a dock site and found none (so it doesn't look every turn). */
   dockless?: number;
+  /** Tick it last looked whether the deposits near home are gone, for a Mine Shaft (#681). */
+  shaftLook?: number;
   /** Its scout (#454 s4): the rider sent exploring, the tick it was last sent, and the pair that patrol its border or trade road. */
   scout?: { id: number; sent: number };
   guards?: number[];
@@ -1124,7 +1141,11 @@ export type Command =
   | ({ t: 'unload'; p: number; ids: number[]; x: number; y: number } & Queued)
   | { t: 'ungarrison'; p: number; building: number }
   | { t: 'bell'; p: number; ring: boolean }
+  /** Citizens run from danger (or not): the named citizens, or all of this player's when `ids` is absent. */
+  | { t: 'flee'; p: number; on: boolean; ids?: number[] }
   | { t: 'beacon'; p: number; building: number }
+  /** Choose the seam a Mine Shaft digs (#681). */
+  | { t: 'seam'; p: number; building: number; seam: SeamId }
   /** Call citizens to arms at a War Camp in the Age of Total War (#313): up to `n`, the nearest first. */
   | { t: 'callUp'; p: number; building: number; n?: number }
   /** Strike camp (#297): pack a Town Center or House onto a wagon. */
