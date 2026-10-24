@@ -1,6 +1,6 @@
 import { COCKLE, COCKLER } from '../sim/data';
 import { TIDE_GATE } from '../sim/data';
-import { AGES, BLOOM, HIVE, INTERCEPT, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
+import { AGES, BLOOM, HIVE, INTERCEPT, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, BEGGARS, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
 import { battlesFor } from '../sim/battles';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, findsOf, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
@@ -29,6 +29,7 @@ const SEA_ROAD = ROADS.find((r) => r.to === 'searaider')!;
 const CHARIOTS_ROAD = ROADS.find((r) => r.to === 'chariots')!;
 const GOLDEN_ROAD = ROADS.find((r) => r.to === 'golden')!;
 const MISSIONS_ROAD = ROADS.find((r) => r.to === 'missions')!;
+const BEGGARS_ROAD = ROADS.find((r) => r.to === 'beggars')!;
 const WARBAND_ROAD = ROADS.find((r) => r.to === 'warband')!;
 const IRONBLOOD_ROAD = ROADS.find((r) => r.to === 'ironblood')!;
 const TOTALWAR_ROAD = ROADS.find((r) => r.to === 'totalwar')!;
@@ -331,6 +332,20 @@ const TIPS: Tip[] = [
     id: 'missions',
     when: (s, me) => ageOf(s.players[me]) === 'missions',
     text: `Select a priest and press <b>O</b> to raise a <b>Mission</b> on a shore in your own land or no one's. It holds the land round it, trains priests, and every ${MISSION.every} seconds pays a tithe that grows with its distance from your Town Center (up to ${MISSION.cap} gold, for your ${MISSION.most} farthest). It is only a chapel: nothing in it shoots, and a rival who reaches it razes it. Carry a priest across the water in a transport.`,
+  },
+  {
+    id: 'crossing-beggars',
+    // The fourth crossing (#783): a people that has walked the Dykes or the Sail, back in the Middle Ages.
+    when: (s, me) => {
+      const p = s.players[me];
+      return ageOf(p) === 'middle' && roadKnown(s, p, BEGGARS_ROAD) && !BEGGARS_ROAD.crossing!.every((a) => hasWalked(p, a));
+    },
+    text: `A crossing: your people has walked one of the <b>${AGES.dykes.name}</b> and the <b>${AGES.sail.name}</b>. Walk the other too, then come back to the Middle Ages, and the Town Center (🔀) can turn your people into the <b>${AGES.beggars.name}</b>: your warships board a rival's ships instead of sinking them, and cut its dykes from the sea.`,
+  },
+  {
+    id: 'beggars',
+    when: (s, me) => ageOf(s.players[me]) === 'beggars',
+    text: `Send your warships at a rival's cogs, fishing boats, barges and warships: one beaten down strikes its colours and <b>sails for you</b>, with ${Math.round(BEGGARS.left * 100)}% of its timbers and whatever it carries (a transport with soldiers aboard sinks instead). Your ships also strike a rival's <b>dykes</b> and sluices as hard as siege does: cut a bank that holds back polder and the sea takes the fields behind it. Keep a Dock as you leave, and ships beaten down within ${BEGGARS.haven} tiles of it are still taken.`,
   },
   {
     id: 'ironblood',

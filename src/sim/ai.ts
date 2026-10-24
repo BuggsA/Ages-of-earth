@@ -1,6 +1,6 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { aiTiding } from './tidings';
-import { AGES, AI_SILO, WARHEADS, AI_BREACH, SILO, TICK_HZ, AI_CLIMB, AI_FIND, FINDS, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_SEA, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, SEA_RAID, MISSION, AI_MISSION, AI_CHARIOT, STEP_BACK, stepBackCost, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_SILO, WARHEADS, AI_BREACH, SILO, TICK_HZ, AI_CLIMB, AI_FIND, FINDS, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_SEA, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, SEA_RAID, MISSION, AI_MISSION, AI_CHARIOT, AI_BEGGARS, STEP_BACK, stepBackCost, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, raiseProblem, techCostFor, techProblem, trainCostFor } from './stats';
@@ -849,6 +849,11 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
     if (mem.sea?.at !== 'missions') mem.sea = { at: 'missions', since: s.tick };
     if (s.tick - mem.sea.since < secs(AI_MISSION.hold)) return null;
   }
+  // The Sea Beggars stay `AI_BEGGARS.hold` seconds (#783): the ships taken and the dykes cut are what the crossing was for.
+  if (walksWeb(v) && ageOf(p) === 'beggars') {
+    if (mem.sea?.at !== 'beggars') mem.sea = { at: 'beggars', since: s.tick };
+    if (s.tick - mem.sea.since < secs(AI_BEGGARS.hold)) return null;
+  }
   // The Horde stays `stay` seconds before it climbs on: tribute is what it came for (#322).
   if (walksWeb(v) && ageOf(p) === 'horde') {
     const st = (mem.steppe ??= {});
@@ -1002,6 +1007,7 @@ const CROSS_PLAN: Partial<Record<AgeId, { salt: number; keeps: BuildingType[]; t
   searaider: { salt: 0x5ea7, keeps: ['dock'], take: AI_SEA.take, stay: AI_SEA.stay },
   missions: { salt: 0x4d15, keeps: ['dock', 'temple'], take: AI_MISSION.take, stay: AI_MISSION.stay },
   chariots: { salt: 0xc4a1, keeps: ['forge'], take: AI_CHARIOT.take, stay: AI_CHARIOT.stay },
+  beggars: { salt: 0xbe66, keeps: ['dock'], take: AI_BEGGARS.take, stay: AI_BEGGARS.stay },
 };
 
 /**
@@ -1021,6 +1027,8 @@ function crossPlanned(s: GameState, v: View, mem: AiMemory, road: Road): boolean
     const other = left ? ROADS.find((r) => r.from === road.from && r.to === left) : undefined;
     if (!road.crossing!.some((a) => hasWalked(p, a)) || plan.keeps.some((b) => count(v, b, true) === 0)) return false;
     if (other && !(roadKnown(s, p, other) && deedsDone(p, other, s))) return false;
+    // A sibling behind a coast door (the Dykes, #783) is a plan only for a town with the shallows to take it.
+    if (other?.coast && !coastHeld(s, p)) return false;
     roads[road.to] = coin(s, p.id, plan.salt) < plan.take;
     // The plan is the other sibling's road too, whatever the coin once said of it; giving that road up gives the crossing up.
     if (roads[road.to]) for (const a of road.crossing!) if (!hasWalked(p, a)) roads[a] = true;
@@ -4488,7 +4496,7 @@ function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   const shore = s.homeland === 'shore' ? AI_SHORE.boats : 0;
   const wantBoats = Math.min(shoals, 2 + p.epoch + shore, (L.clever ? 6 : 4) + shore);
   const queued = (u: UnitType) => dock.queue.filter((q) => q.unit === u).length;
-  if (v.fishers.length + queued('fisher') < wantBoats && dock.queue.length < 2) {
+  if (v.fishers.length + queued('fisher') < wantBoats && dock.queue.length < 2 && !barred(p, 'fisher', 'dock')) {
     const cost = unitStats('fisher', p.epoch).cost;
     if (afford(v, cost)) {
       issue({ t: 'train', p: p.id, building: dock.id, unit: 'fisher' });
@@ -4508,7 +4516,7 @@ function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   if (!L.clever || p.epoch < 1) return;
   seaLanding(s, v, mem, dock, issue);
   // A sailor keeps a small fleet and hunts rival merchant ships, since its ships are cheap and sturdy.
-  const sailor = ageOf(p) === 'sail';
+  const sailor = ageOf(p) === 'sail' || !!ageDef(p).boards;
   const enemyShips = s.ents.filter((e): e is Unit => e.kind === 'unit' && e.hp > 0 && isEnemy(s, p.id, e.owner) && (e.type === 'warship' || e.type === 'fisher' || e.type === 'transport' || (sailor && e.type === 'cog')) && p.vis[Math.floor(e.y) * s.w + Math.floor(e.x)] === 1);
   const warships = v.navy.filter((u) => u.type === 'warship');
   const baseShips = s.mapType === 'sea' ? Math.min(2 + p.epoch, 6) : enemyShips.length ? Math.min(2 + Math.floor(enemyShips.length / 2), 5) : sailor ? 2 : 0;
@@ -4537,12 +4545,71 @@ function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
     issue({ t: 'attack', p: p.id, ids: idle.map((u) => u.id), target: works.id });
     return;
   }
-  const prey = enemyShips[0] ?? (mem.attacking ? enemyDock(s, p) : null);
+  // The Sea Beggars (#783) cut a rival's banks from the sea when there is no fleet to board: a dyke that holds back polder.
+  const bank = !enemyShips.length && ageDef(p).boards ? dykeToCut(s, p, dock) : null;
+  if (bank && idle.length >= Math.min(2, warships.length)) {
+    issue({ t: 'attack', p: p.id, ids: idle.map((u) => u.id), target: bank.id });
+    return;
+  }
+  // A Beggars fleet (#783) goes looking: ships to board lie at a rival's Dock, or on the water nearest its town if no Dock is seen.
+  const boards = !!ageDef(p).boards;
+  const prey = enemyShips[0] ?? (mem.attacking || boards ? enemyDock(s, p) : null) ?? (boards ? prowlFor(s, mem, idle[0], enemyHome(s, p)) : null);
   if (prey && idle.length >= Math.min(2, warships.length)) issue({ t: 'move', p: p.id, ids: idle.map((u) => u.id), x: prey.x, y: prey.y, amove: true });
   else {
     const far = idle.filter((u) => (u.x - dock.x) * (u.x - dock.x) + (u.y - dock.y) * (u.y - dock.y) > 100);
     if (far.length) issue({ t: 'move', p: p.id, ids: far.map((u) => u.id), x: dock.x, y: dock.y });
   }
+}
+
+/**
+ * Where a Beggars fleet hunts when it sees no rival ship or Dock (#783): the tile of the water `ship` sails nearest the rival's town,
+ * found once (a flood over that water, four ways) and kept in `mem.beggarSea`. Null when that water comes no nearer than it is.
+ */
+function prowlFor(s: GameState, mem: AiMemory, ship: Unit, at: { x: number; y: number }): { x: number; y: number } | null {
+  const spot = (t: number) => ({ x: (t % s.w) + 0.5, y: Math.floor(t / s.w) + 0.5 });
+  if (mem.beggarSea !== undefined) return mem.beggarSea < 0 ? null : spot(mem.beggarSea);
+  const start = Math.floor(ship.y) * s.w + Math.floor(ship.x);
+  const seen = new Set<number>([start]);
+  const queue = [start];
+  let best = start;
+  let bestD = Infinity;
+  for (let q = 0; q < queue.length; q++) {
+    const i = queue[q];
+    const x = i % s.w;
+    const y = (i - x) / s.w;
+    const d = (x + 0.5 - at.x) * (x + 0.5 - at.x) + (y + 0.5 - at.y) * (y + 0.5 - at.y);
+    if (d < bestD) {
+      bestD = d;
+      best = i;
+    }
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx;
+      const ny = y + dy;
+      const ni = ny * s.w + nx;
+      if (seen.has(ni) || !walkable(s, nx, ny, NAVAL)) continue;
+      seen.add(ni);
+      queue.push(ni);
+    }
+  }
+  mem.beggarSea = best === start ? -1 : best;
+  return best === start ? null : spot(best);
+}
+
+/** The rival dyke seen within `AI_BEGGARS.hunt` tiles of a Dock, nearest it, that holds back polder worth flooding (#783), or null. */
+function dykeToCut(s: GameState, p: Player, dock: Building): Building | null {
+  let best: Building | null = null;
+  let bestD = AI_BEGGARS.hunt * AI_BEGGARS.hunt;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'dyke' || !e.built || e.hp <= 0 || !isEnemy(s, p.id, e.owner) || !p.seen[e.ty * s.w + e.tx]) continue;
+    const dx = e.x - dock.x;
+    const dy = e.y - dock.y;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < bestD && heldBack(s, e) >= AI_BREACH.least) {
+      best = e;
+      bestD = d2;
+    }
+  }
+  return best;
 }
 
 /**
