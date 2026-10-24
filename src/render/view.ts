@@ -1445,6 +1445,13 @@ export class View {
           this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.3, ev.y), { count: 26, speed: 2.2, up: 2.6, life: 1.3, size: 0.08, gravity: 4, colors: ['#e6f1f2', '#bfd9dc', '#9d978d', '#86807a'] });
           this.cue('damBurst', ev.x, ev.y, 1);
           break;
+        case 'pontoon':
+          // A floating district (#770): cast off with a churn at the tug's stern, moored with a bump of the floats, or holed and gone
+          // under in a boil of white water and timber.
+          if (!this.sees(ev.x, ev.y)) break;
+          this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.1, ev.y), ev.act === 'sink' ? { count: 30, speed: 1.6, up: 1.8, life: 1.4, size: 0.08, gravity: 3.5, colors: ['#e6f1f2', '#bfd9dc', '#8a6a46', '#c9b06a'] } : { count: 10, speed: 0.9, up: 0.6, life: 0.9, size: 0.06, gravity: 3, colors: ['#e6f1f2', '#bfd9dc', '#9fc4cf'] });
+          this.cue(ev.act === 'sink' ? 'founder' : ev.act === 'cast' ? 'castOff' : 'moor', ev.x, ev.y, ev.act === 'sink' ? 1 : 0.7);
+          break;
         case 'sluice':
           // A sluice opened or shut (#701 s4): the winch, and the water let out or stilled.
           if (this.sees(ev.x, ev.y)) this.cue(ev.open ? 'sluiceOpen' : 'sluiceShut', ev.x, ev.y, 0.7);

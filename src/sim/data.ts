@@ -181,6 +181,11 @@ export interface Age {
   /** The Age of Locks (#701 s5): a Dam with water beside it turns turbines that drive its people's buildings within `DAM.reach` (`damDrives`). */
   turbines?: boolean;
   /**
+   * The Age of Floating Cities (#770): Pontoons moored on open water are cast off into a tow and moored again elsewhere (the `pack` and
+   * `pitch` orders, the Steppe's wagons on the water), and three or more linked side by side raise citizens. See `FLOAT` (`floating.ts`).
+   */
+  floats?: boolean;
+  /**
    * The Golden Age (#703): every side age the people has walked wakes at once, its verbs and the best of its gifts with none of its
    * doors (`weave` in `ages.ts`), until `GOLDEN.span` runs out and the people wakes in the Gunpowder Age, for good.
    */
@@ -250,7 +255,7 @@ export const ROUTES: Record<RouteId, { name: string; blurb: string }> = {
   horse: { name: 'Horse route', blurb: 'a town on wagons, tribute from a rival\'s land, tolls on the trade road' },
   faith: { name: 'Faith route', blurb: 'priests who win a rival\'s towers and Temples over' },
   wild: { name: 'Wild route', blurb: 'beasts tamed and bred, walls that grow, and one day the forest itself' },
-  water: { name: 'Water road', blurb: 'channels dug from the springs, dykes and polder, then sluices that drown your own fields to stop an army, then canals that carry ships inland and dams that turn turbines: a people that moves the water' },
+  water: { name: 'Water road', blurb: 'channels dug from the springs, dykes and polder, then sluices that drown your own fields to stop an army, then canals that carry ships inland and dams that turn turbines, then the tide's hours, and at last a town afloat that tows itself where it likes: a people that moves the water' },
 };
 
 const trunkAge = (e: number, good: string): Age => ({ name: EPOCHS[e].name, short: EPOCHS[e].short, tier: e, blurb: EPOCHS[e].blurb, good, routes: ['plain'] });
@@ -762,6 +767,21 @@ export const AGES: Record<AgeId, Age> = {
     noBuild: { buildings: ['wall', 'gate'], why: 'A people of the locks raises no stone walls or gates: its canals are the moat and its bridges the gates. They wait until it returns to the Industrial Age or climbs on' },
     canals: true,
     turbines: true,
+  },
+  // The Water Road's seventh age (#770, s7 of #701): past the Age of Tides, the trunk's last tier, a town that floats. Its tier is the
+  // Atomic's (every epoch-based number reads it); it lies a row past the Atomic on the web map only (the reason is on #770).
+  floating: {
+    verb: 'Build your town on the water: moor pontoon districts off the shore, link three or more into a floating town that raises its own citizens, and cast them off to tow a district, people and all, to new water',
+    door: 'Solid ground: no House is raised on land and no Missile Silo, and ships hole a pontoon three times as fast as anything else; those on its deck when it sinks swim for it, or drown',
+    good: 'A town that moves: tow your districts to the fish, to the fight, or out of a warhead\'s reach',
+    routes: ['water'],
+    keepsake: { building: 'pontoon', does: 'casting off and mooring again: one district you can still tow on any road' },
+    name: 'Age of Floating Cities',
+    short: 'Floating',
+    tier: 5,
+    blurb: 'As the Uros have lived for centuries on their reed islands in Lake Titicaca, and the Tanka in their boat towns on the Pearl River: a people whose town floats. Pontoons (E) are moored on open water, beside the shore or beside another of your pontoons: each is a district with room for 10, where every kind of goods is taken in and fishing boats are launched, and your people walk its deck. Moor three or more side by side and they link into a floating town, whose every pontoon raises citizens. Cast a pontoon off (O) and it is taken in tow with up to 10 of those on its deck aboard; moor it again (P) on any open water and it raises itself in a few seconds. A town that floats can leave: for the fishing grounds, for a rival\'s shore, or out of a warhead\'s reach. But no House is raised on land and no Missile Silo at all, and ships hole a pontoon three times as fast as anything else does: those on its deck when it sinks swim for the nearest deck or shore, and drown if it lies too far.',
+    noBuild: { buildings: ['house', 'silo'], why: 'A floating people raises no House on land and no Missile Silo: its homes are its pontoons. It waits until it returns to the Age of Tides or the Atomic Age' },
+    floats: true,
   },
   // The Golden Age (#703): the age that feels almost too good. A turn off the Gunpowder Age for a people that has lived many lives.
   golden: {
@@ -1386,6 +1406,17 @@ export const ROADS: Road[] = [
     blurb: 'Instead of the Atomic Age, on down the Water Road: from carrying ships inland to keeping the sea\'s hours. The tide wakes for the whole world; Tide Mills grind gold on every turn of it, and causeways carry a road over the sea that only high water covers. Paid in wood and stone as well as gold. What it gives up: the Missile Silo, and harbours that ground at low water.',
   },
   { from: 'locks', to: 'atomic', cost: EPOCHS[5].cost, time: EPOCHS[5].time, blurb: 'Rejoin the main road at the Atomic Age for the ordinary price: walls and gates return, the canals stay dug, and the Dams stand still, all but the one you keep.' },
+  // The Water Road's seventh age (#770): on from the Age of Tides only, for a people with open water by home; back to the Tides, or across to the Atomic.
+  {
+    from: 'tides',
+    to: 'floating',
+    cost: { food: 1800, wood: 1600, gold: 1000, stone: 300 },
+    time: 100,
+    coast: 'Needs sea within reach of your first town: a town that floats needs open water to moor on',
+    blurb: 'The Water Road\'s last age, past the Atomic: from keeping the sea\'s hours to living on the sea. Moor pontoon districts on open water, link them into a floating town that raises its own citizens, and cast them off to tow a district, people and all, wherever the water goes. Paid mostly in timber. What it gives up: Houses on land and the Missile Silo, and districts that ships hole fast.',
+  },
+  { from: 'floating', to: 'tides', cost: { food: 300, gold: 300 }, time: 30, blurb: 'Back to the Age of Tides: Houses go up on land again, and the pontoons stay moored and keep their room, but only the one you keep is ever cast off again.' },
+  { from: 'floating', to: 'atomic', cost: { food: 500, gold: 400, stone: 200 }, time: 40, blurb: 'Cross to the ordinary Atomic Age and its Missile Silo: Houses go up on land again, and the pontoons stay moored and keep their room, but only the one you keep is ever cast off again.' },
   // The Golden Age (#703): heard of by a people that has walked two side ages, open to one that has walked three. It ends on its own (`GOLDEN.span`).
   {
     from: 'gunpowder',
@@ -1555,6 +1586,22 @@ export const DAM = { reach: 8, drive: 140, surge: 6, hurt: 40 };
  * `stay` seconds in the age before it climbs on.
  */
 export const AI_LOCKS = { take: 0.6, reach: 14, stay: 360 };
+
+/**
+ * The Age of Floating Cities (#770). A Pontoon is moored on open water a ship sails (`sails`), raised beside the shore or another of its
+ * people's pontoons so its builders can reach it. Pontoons whose sides touch link; a district of `city` or more linked finished pontoons
+ * raises citizens at each. Cast off (the `pack` order), a pontoon is a tow carrying up to `hold` of the people on its deck; the rest
+ * swim to the nearest deck or shore within `swim` tiles, losing `hurt`, or drown. Moored again (the `pitch` order) within `spot` tiles of
+ * where the tow lies, it raises itself as a pitched camp does (`STEPPE.pitch`). Ships do `hull` times their usual damage to a pontoon.
+ */
+export const FLOAT = { city: 3, hold: 10, swim: 4, hurt: 25, spot: 3, hull: 3 };
+/**
+ * The computer in the Age of Floating Cities (#770): it turns from the Age of Tides on its own coin (`take`, `onward` for a Water Road
+ * people) once it has kept the Tides `after` seconds (its mills grinding, its barrage laid), moors at least `most` pontoons in a linked row off the shore nearest home (within `reach` tiles), keeps `fishers` fishing
+ * boats on them and raises citizens at the linked town up to `hands`, and casts a pontoon off and tows it to `flee` tiles from where a
+ * warhead is aimed, when that is within `blast` tiles of it. It stays `stay` seconds.
+ */
+export const AI_FLOAT = { take: 0.5, onward: 0.8, most: 4, reach: 18, fishers: 4, hands: 50, blast: 12, flee: 16, after: 480, stay: 420 };
 
 /**
  * Stepping back an age (#47), at a Town Center: down to the trunk age one tier below, whatever road
@@ -1753,6 +1800,24 @@ export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
     radius: 0.5,
     blurb: 'A Town Center or House packed onto an ox cart: drive it to new ground and pitch it there (P). It shelters, trains and takes in nothing while it rolls, and riders run it down.',
   })),
+  // A pontoon cast off (#770, the Age of Floating Cities): never trained, only made by casting a Pontoon off. Ships hole it as they hole a pontoon.
+  tow: [0, 1, 2, 3, 4, 5].map(() => ({
+    name: 'Pontoon in tow',
+    cls: 'ship' as const,
+    hp: 600,
+    attack: 0,
+    armor: 2,
+    parmor: 8,
+    range: 0,
+    reload: 1,
+    speed: 1.1,
+    sight: 6,
+    cost: {},
+    time: 1,
+    radius: 0.7,
+    capacity: FLOAT.hold,
+    blurb: 'A Pontoon cast off and under tow, with those of its deck aboard: take it to open water and moor it there (P). It shelters, trains and takes in nothing while it is towed, and ships sink it fast.',
+  })),
   trader: [
     null,
     { name: 'Pack Donkey', cls: 'trader', hp: 80, attack: 0, armor: 0, parmor: 1, range: 0, reload: 1, speed: 1.3, sight: 6, cost: { wood: 60, gold: 40 }, time: 20, radius: 0.32, blurb: 'Carries goods to a trading post and brings back gold: the farther its Market from the post, the more. Easy prey for cavalry.' },
@@ -1773,11 +1838,11 @@ export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
   warmammoth: beast({ name: 'War Mammoth', cls: 'siege', hp: 420, attack: 16, armor: 2, parmor: 4, range: 0, reload: 2.4, speed: 1.1, sight: 6, cost: { food: 260, gold: 60 }, time: 40, radius: 0.55, blurb: 'A woolly mammoth led to war: it tramples walls and buildings as a ram does, and gores soldiers too. Spearmen and riders swarm it.' }),
 };
 
-const DOMAINS: Partial<Record<UnitType, Domain>> = { fisher: 'water', warship: 'water', transport: 'water', cog: 'water', barge: 'water', fighter: 'air', bomber: 'air' };
+const DOMAINS: Partial<Record<UnitType, Domain>> = { fisher: 'water', warship: 'water', transport: 'water', cog: 'water', barge: 'water', tow: 'water', fighter: 'air', bomber: 'air' };
 /** Where a unit line goes: on foot, on the water or in the air. */
 export const domainOf = (type: UnitType): Domain => DOMAINS[type] ?? 'land';
 
-export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader', 'wagon', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge', 'warden'];
+export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader', 'wagon', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge', 'warden', 'tow'];
 export const MILITARY: UnitType[] = ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'warship', 'fighter', 'bomber', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge', 'warden'];
 
 type Target = UnitClass | 'building';
@@ -2298,6 +2363,7 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   sluice: { name: 'Sluice', size: 1, hp: 800, cost: { wood: 60, stone: 80 }, time: 20, pop: 0, sight: 4, trains: ['barge'], drop: [], epoch: 3, ages: ['waterline'], menu: 'mil', key: 'S', blurb: 'A timber gate in a dyke, on a channel or on shallow water, raised on its banks by a winch. Shut, it holds the water back as a dyke does, and your own people walk across it. Open it (O) and the water runs out over the low ground round it, a ring a second, up to 7 tiles: soldiers wade the flood at a crawl, siege can hardly cross it, and your gun-barges sail it. Shut it and the water drains away. It launches Gun-barges onto the water beside it.' },
   // The Age of Locks (#701 s5): a swing bridge over a canal, and a dam whose turbines drive the buildings by it (`CANAL`, `DAM`, `water.ts`).
   bridge: { name: 'Bridge', size: 1, hp: 500, cost: { wood: 50, stone: 30 }, time: 12, pop: 0, sight: 2, trains: [], drop: [], epoch: 4, ages: ['locks'], menu: 'eco', key: 'Z', blurb: 'A timber swing bridge on stone piers, laid over a canal or a channel. Your own people cross on it at full pace; rivals can\'t, and must swim the water round it. It swings for ships: every ship and barge passes under it.' },
+  pontoon: { name: 'Pontoon', size: 3, hp: 1500, cost: { wood: 150, gold: 40 }, time: 30, pop: 10, sight: 5, trains: ['citizen', 'fisher'], drop: ['food', 'wood', 'stone', 'gold'], epoch: 5, ages: ['floating'], garrison: 10, menu: 'eco', key: 'E', blurb: 'A district on pontoons, moored on open water beside the shore or beside another of your pontoons: room for 10, every kind of goods taken in, fishing boats launched, and a deck your own people walk. Three or more moored side by side link into a floating town, and each of its pontoons raises citizens. Cast it off (O) to tow it, with up to 10 of those on its deck aboard, and moor it again (P) on any open water. Ships hole it three times as fast as anything else.' },
   dam: { name: 'Dam', size: 1, hp: 1200, cost: { wood: 100, stone: 150 }, time: 30, pop: 0, sight: 4, trains: [], drop: [], epoch: 4, ages: ['locks'], menu: 'mil', key: 'N', blurb: 'A stone dam with a turbine house, raised on a channel, a canal, the shallows or the shore. With still water beside it, its turbines drive every building of yours within 8 tiles: they train and research two fifths faster (one dam\'s worth, however many stand near). Your own people walk across its crown; ships can\'t pass it. If it falls with water behind it, it bursts: the water runs over the low ground below it all at once, up to 6 tiles, hurting all who stand there.' },
   airfield: { name: 'Airfield', size: 4, hp: 2200, cost: { wood: 250, stone: 100, gold: 150 }, time: 60, pop: 0, sight: 8, trains: ['fighter', 'bomber'], drop: [], epoch: 4, menu: 'mil', key: 'F', blurb: 'Builds fighters and bombers. Fighters hunt aircraft; bombers wreck towns.' },
 };

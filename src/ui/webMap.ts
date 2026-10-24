@@ -103,7 +103,7 @@ export function roadView(d: Discovery, r: Road): 'hidden' | 'faint' | 'known' {
 // The Steppe Road (#318) keeps the right column, as the Path of Blood keeps the left: the Steppe over the Horde.
 // The Silk Road (#326), the crossing where the horde meets the merchants, steps in to lane 4 under the Sail, between its two roads.
 // The first gateway (#577) takes a seventh lane, past the Steppe Road: Alchemy at tier 2 over the Sappers it leads to.
-const LANE: Record<AgeId, number> = { iron: 0, reclaimer: 2, stone: 1, bronze: 1, middle: 1, gunpowder: 1, industrial: 1, atomic: 1, fission: 0, fusion: 2, merchant: 2, pilgrim: 3, fair: 3, sail: 4, aeronaut: 2, lightning: 3, warband: 0, steppe: 5, ironblood: 0, totalwar: 0, horde: 5, silk: 4, chariots: 3, hemocraft: 0, bloodrite: 1, alchemy: 6, sapper: 6, searaider: 2, missions: 3, golden: 2, dykes: 5, wild: 4, grove: 4, rivers: 6, hive: 4, waterline: 5, locks: 5, tides: 5, wildwood: 4 };
+const LANE: Record<AgeId, number> = { iron: 0, reclaimer: 2, stone: 1, bronze: 1, middle: 1, gunpowder: 1, industrial: 1, atomic: 1, fission: 0, fusion: 2, merchant: 2, pilgrim: 3, fair: 3, sail: 4, aeronaut: 2, lightning: 3, warband: 0, steppe: 5, ironblood: 0, totalwar: 0, horde: 5, silk: 4, chariots: 3, hemocraft: 0, bloodrite: 1, alchemy: 6, sapper: 6, searaider: 2, missions: 3, golden: 2, dykes: 5, wild: 4, grove: 4, rivers: 6, hive: 4, waterline: 5, locks: 5, tides: 5, wildwood: 4, floating: 5 };
 // The fork at the end of the Path of Blood (#355 s2) stands at Industrial strength, but past Total War: a row of its own under
 // tier 4, Hemocraft below Total War in the path's column and the Blood-rite below the Industrial Age it turns off.
 // The first crossing (#585) sits between its two siblings' tier and the next, under the Merchants: half a row down, off the Middle Ages.
@@ -113,7 +113,7 @@ const LANE: Record<AgeId, number> = { iron: 0, reclaimer: 2, stone: 1, bronze: 1
 // the Wildwood half a row under the Industrial Age's row, below the Hive.
 // The Water Line (#701 s4) follows the Dykes down their column, half a row under the Horde.
 // The Age of Tides (#739) stands at the Atomic's row in the Water Road's column.
-const ROW: Partial<Record<AgeId, number>> = { atomic: 6, fission: 7, fusion: 7, hemocraft: 5, bloodrite: 5, searaider: 2.5, missions: 2.5, chariots: 1.5, golden: 3.5, dykes: 2.5, grove: 2.5, hive: 3.5, waterline: 3.5, locks: 4.5, tides: 6, wildwood: 4.5 };
+const ROW: Partial<Record<AgeId, number>> = { atomic: 6, fission: 7, fusion: 7, hemocraft: 5, bloodrite: 5, searaider: 2.5, missions: 2.5, chariots: 1.5, golden: 3.5, dykes: 2.5, grove: 2.5, hive: 3.5, waterline: 3.5, locks: 4.5, tides: 6, wildwood: 4.5, floating: 7 };
 /** Seven lanes wide: 48 + 6 × 88 + half a node fits in 616 (Alchemy, lane 6, #577); six rows deep with the fork (#355 s2). */
 export const MAP = { w: 616, h: 695, nodeW: 76, nodeH: 34, top: 40, gap: 85 };
 

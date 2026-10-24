@@ -3,6 +3,7 @@ import { BUILDINGS, LANDMARKS, POP_MAX, domainOf, type UnitStats } from './data'
 import { AIR, BARGE, NAVAL, distToRect, nearestWalkable, stampBuilding, walkable } from './grid';
 import { buildingMaxHp, statsFor } from './stats';
 import { isSet, setStats } from './longbow';
+import { deckSpot } from './floating';
 import type { Building, BuildingType, Cost, Ent, GameState, Goal, Player, Unit, UnitType } from './types';
 import { RES } from './types';
 
@@ -159,7 +160,7 @@ export function countPop(s: GameState): void {
     if (e.hp <= 0) continue;
     const p = s.players[e.owner];
     // A wagon (#297) is a packed building, not a person: it takes no room.
-    if (e.kind === 'unit') p.pop += e.type === 'wagon' ? 0 : 1;
+    if (e.kind === 'unit') p.pop += e.type === 'wagon' || e.type === 'tow' ? 0 : 1;
     else if (e.built) p.cap += BUILDINGS[e.type].pop;
   }
   // A rooted Ent (the Age of the Wildwood) is a tree for now, but still one of its people.
@@ -171,6 +172,8 @@ export function countPop(s: GameState): void {
 
 /** A walkable spot beside a building, on the side nearest to a point (open water, for ships from a dock). */
 export function exitSpot(s: GameState, b: Building, towardX: number, towardY: number, pass = s.players[b.owner].team): { x: number; y: number } {
+  // A floating district's people step out onto its own deck (#770), not onto the nearest shore.
+  if (b.type === 'pontoon' && pass >= 0 && walkable(s, b.tx, b.ty, pass)) return deckSpot(b, towardX, towardY);
   let best: { x: number; y: number } | null = null;
   let bestD = Infinity;
   for (let ring = 0; ring < 6 && !best; ring++) {
@@ -203,7 +206,8 @@ export function nearestDrop(s: GameState, owner: number, res: string, x: number,
   let bestD = Infinity;
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.owner !== owner || !e.built || e.hp <= 0) continue;
-    if (naval !== (e.type === 'dock')) continue;
+    // A Pontoon (#770) takes in the catch from its fishing boats as well as every kind of goods its people carry onto its deck.
+    if (naval ? e.type !== 'dock' && e.type !== 'pontoon' : e.type === 'dock') continue;
     if (!BUILDINGS[e.type].drop.includes(res as never)) continue;
     const d = distToRect(x, y, e);
     if (d < bestD) {
