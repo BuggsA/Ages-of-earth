@@ -147,6 +147,8 @@ export interface Inject {
   fog?: boolean;
   /** Cloth tagged by `Kit.cloth` streams downwind and ripples (banners, windsocks). */
   flag?: boolean;
+  /** A pale fresnel rim on edges that turn from the eye, so a figure keeps its outline against grass and shade. */
+  rim?: boolean;
   /** Sway with the wind (trees, crops): vertices higher up move more, by `uTime`. */
   sway?: number;
   /** Show the season: `ground` recolors meadows, `leaf` also leaves, `snow` only lays snow. */
@@ -297,11 +299,12 @@ export function inject<T extends THREE.Material>(mat: T, o: Inject): T {
     if (o.season) fs = fs.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n${SEASON_SNOW(o.season === 'ground')}`);
     let tail = '#include <opaque_fragment>';
     if (o.rig || o.team) tail += '\n  gl_FragColor.rgb += diffuseColor.rgb * vGlow * uGlow;';
+    if (o.rim) tail += '\n  gl_FragColor.rgb += mix(diffuseColor.rgb, vec3(1.0), 0.35) * pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), 3.0) * 0.3;';
     if (o.fog !== false) tail += `\n${FOG_FRAGMENT}`;
     fs = fs.replace('#include <opaque_fragment>', tail);
     shader.fragmentShader = fs;
   };
-  const key = `${o.rig ? 'r' : ''}${o.flag ? 'w' : ''}${o.team ? 't' : ''}${o.fog === false ? '' : 'f'}${o.sway ?? ''}${o.season ?? ''}`;
+  const key = `${o.rig ? 'r' : ''}${o.flag ? 'w' : ''}${o.team ? 't' : ''}${o.rim ? 'm' : ''}${o.fog === false ? '' : 'f'}${o.sway ?? ''}${o.season ?? ''}`;
   const prevKey = mat.customProgramCacheKey?.bind(mat);
   mat.customProgramCacheKey = () => `${prevKey ? prevKey() : ''}|${key}`;
   return mat;
@@ -310,6 +313,6 @@ export function inject<T extends THREE.Material>(mat: T, o: Inject): T {
 /** Everything baked: vertex colors, faceted, with fog of war and glowing parts. */
 export const bakedMaterial = inject(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.85 }), { team: true, flag: true, season: 'snow' });
 /** Units: team colors, swinging limbs, fog of war. */
-export const unitMaterial = inject(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.8 }), { rig: true, team: true, flag: true });
+export const unitMaterial = inject(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.8 }), { rig: true, team: true, flag: true, rim: true });
 /** Trees and crops sway a little in the wind. */
 export const swayMaterial = inject(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.9 }), { team: true, sway: 0.03, season: 'leaf' });
