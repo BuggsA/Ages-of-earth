@@ -4938,7 +4938,8 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     }
   }
   // A rival's weak window after a step back (#749): it was announced to all, and a smaller wave than usual strikes while it is open.
-  if (L.clever && L.strike !== false && !mem.attacking && !plan.hold && s.tick >= s.peaceUntil) {
+  // Not in a campaign chapter, whose play stays as its proof found it.
+  if (L.clever && L.strike !== false && !s.scenario && !mem.attacking && !plan.hold && s.tick >= s.peaceUntil) {
     const weak = windowOpen(s, p);
     if (weak && fighters.length >= Math.max(AI_TEMPER.least, Math.ceil(waveSize * AI_TEMPER.strike))) {
       issue({ t: 'move', p: p.id, ids: fighters.map((u) => u.id), x: weak.x, y: weak.y, amove: true });
