@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { AgeId, BuildingType } from '../sim/types';
+import { BUILDINGS } from '../sim/data';
 import { Kit, bake, rnd } from './kit';
 
 /**
@@ -2175,6 +2176,30 @@ function wayTouch(k: Kit, way: string, deep = false): void {
   }
 }
 
+/** What a building is for, read from its roof (#625): war under cold slate, faith under pale gold, trade under teal, the land's work under ochre. Houses and the Town Center keep their epoch's own red. The Stone Age keeps its thatch and reads by plinth and pennant. */
+const ROOFS: Partial<Record<BuildingType, [string, string]>> = {
+  barracks: ['#4a5668', '#38424f'], range: ['#4a5668', '#38424f'], stable: ['#4a5668', '#38424f'], workshop: ['#4a5668', '#38424f'], forge: ['#4a5668', '#38424f'],
+  tower: ['#4a5668', '#38424f'], warcamp: ['#4a5668', '#38424f'], bloodtower: ['#4a5668', '#38424f'], airfield: ['#4a5668', '#38424f'], silo: ['#4a5668', '#38424f'],
+  temple: ['#e9e2cf', '#d8b25a'], mission: ['#e9e2cf', '#d8b25a'],
+  market: ['#27808a', '#1d6670'], caravanserai: ['#27808a', '#1d6670'], dock: ['#27808a', '#1d6670'],
+  storehouse: ['#c9993a', '#a97d2c'], huntcamp: ['#c9993a', '#a97d2c'], prospector: ['#c9993a', '#a97d2c'],
+};
+
+/** No plinth or pennant: open or thin pieces, and buildings that already carry their own standards. */
+const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder'];
+
+function roleStyle(type: BuildingType, epoch: number, st: Style): Style {
+  const r = ROOFS[type];
+  return r && epoch >= 1 ? { ...st, roof: r[0], roof2: r[1] } : st;
+}
+
+/** A rim of the owner's colour round the pad and a tall pennant at the front corner, so whose a building is reads from above. */
+function teamMarks(k: Kit, type: BuildingType): void {
+  const n = BUILDINGS[type].size;
+  k.team(k.box(n + 0.08, 0.1, n + 0.08, TEAM, 0, -0.07, 0));
+  banner(k, n / 2 - 0.12, 0, n / 2 - 0.45, 1.1 + n * 0.3, 1.3);
+}
+
 /** The baked model of a building in an epoch, in a player's color (`variant`: which way a wall piece joins its neighbors). */
 export function buildingGeometry(type: BuildingType, epochIn: number, color: string, variant = 0, age?: AgeId, heirloom = ''): THREE.BufferGeometry {
   // The Atomic Age (#605) has one building of its own; every other model keeps its Industrial look.
@@ -2189,7 +2214,8 @@ export function buildingGeometry(type: BuildingType, epochIn: number, color: str
     const k = new Kit();
     if (type === 'wall') wall(k, epoch, STYLES[Math.min(epoch, 4)], variant);
     else if (type === 'snare') snare(k, epoch, variant === 1);
-    else MAKERS[type](k, epoch, STYLES[Math.min(epoch, 4)]);
+    else MAKERS[type](k, epoch, roleStyle(type, epoch, STYLES[Math.min(epoch, 4)]));
+    if (!BARE.includes(type)) teamMarks(k, type);
     const stack = STACKS[type];
     if (epoch >= 4 && stack) smokestack(k, stack[0], stack[1], stack[2]);
     if (look) ageTouches(k, type, look);
