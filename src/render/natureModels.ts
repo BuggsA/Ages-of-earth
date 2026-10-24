@@ -8,18 +8,18 @@ const TRUNK = '#7a5636';
 function pine(): Kit {
   const k = new Kit();
   k.cyl(0.05, 0.07, 0.3, 5, TRUNK);
-  k.cone(0.34, 0.5, 7, '#2f6e3a', 0, 0.22);
-  k.cone(0.27, 0.45, 7, '#3a8445', 0, 0.48);
-  k.cone(0.18, 0.38, 7, '#479a50', 0, 0.74);
+  k.cone(0.34, 0.5, 7, '#1f4a34', 0, 0.22);
+  k.cone(0.27, 0.45, 7, '#285a3b', 0, 0.48);
+  k.cone(0.18, 0.38, 7, '#316843', 0, 0.74);
   return k;
 }
 
 function broadleaf(): Kit {
   const k = new Kit();
   k.cyl(0.05, 0.075, 0.45, 5, TRUNK);
-  k.blob(0.32, '#4f9a45', 0, 0.68).scale.set(1, 0.85, 1);
-  k.blob(0.22, '#5fae4f', 0.15, 0.82, 0.08);
-  k.blob(0.2, '#468e3f', -0.14, 0.62, -0.1);
+  k.blob(0.32, '#35693b', 0, 0.68).scale.set(1, 0.85, 1);
+  k.blob(0.22, '#417644', 0.15, 0.82, 0.08);
+  k.blob(0.2, '#2c5c36', -0.14, 0.62, -0.1);
   return k;
 }
 
@@ -27,7 +27,7 @@ function birch(): Kit {
   const k = new Kit();
   k.cyl(0.035, 0.05, 0.6, 5, '#e8e4da');
   k.box(0.072, 0.03, 0.072, '#3a3a3a', 0, 0.25);
-  k.blob(0.24, '#8cc152', 0, 0.78).scale.set(0.9, 1.2, 0.9);
+  k.blob(0.24, '#6f9a4c', 0, 0.78).scale.set(0.9, 1.2, 0.9);
   return k;
 }
 
@@ -38,7 +38,7 @@ function palm(): Kit {
   for (let f = 0; f < 6; f++) {
     const g = k.group(0.04, 0.75, 0);
     g.rotation.y = (f / 6) * Math.PI * 2;
-    const leaf = k.box(0.42, 0.02, 0.1, f % 2 ? '#3f9a4a' : '#55b55c', 0.2, -0.05, 0, g);
+    const leaf = k.box(0.42, 0.02, 0.1, f % 2 ? '#2c6c3c' : '#397c4a', 0.2, -0.05, 0, g);
     leaf.rotation.z = -0.35;
   }
   k.sphere(0.04, '#6b4a2a', 0.05, 0.72, 0.03);
@@ -52,14 +52,14 @@ function felled(): Kit {
   k.cyl(0.06, 0.06, 0.02, 6, '#d8b98a', 0, 0.12);
   const log = k.cyl(0.055, 0.065, 0.6, 6, TRUNK, 0.35, 0.06, 0);
   log.rotation.z = Math.PI / 2;
-  k.cone(0.2, 0.3, 6, '#3a8445', 0.72, 0.06, 0).rotation.z = -Math.PI / 2;
+  k.cone(0.2, 0.3, 6, '#285a3b', 0.72, 0.06, 0).rotation.z = -Math.PI / 2;
   return k;
 }
 
 function berryBush(): Kit {
   const k = new Kit();
-  k.blob(0.26, '#3f7f3a', 0, 0.18).scale.set(1.1, 0.8, 1.1);
-  k.blob(0.18, '#4b9244', 0.14, 0.26, 0.06);
+  k.blob(0.26, '#30613a', 0, 0.18).scale.set(1.1, 0.8, 1.1);
+  k.blob(0.18, '#3b7040', 0.14, 0.26, 0.06);
   for (let i = 0; i < 9; i++) {
     const a = i * 2.4;
     const r = 0.16 + (i % 3) * 0.05;
@@ -156,7 +156,7 @@ function bloodIronVein(): Kit {
 function tuft(): Kit {
   const k = new Kit();
   for (let i = 0; i < 4; i++) {
-    const blade = k.cone(0.02, 0.12 + (i % 2) * 0.05, 3, i % 2 ? '#5c9e3c' : '#6fb24a', (i - 1.5) * 0.03, 0, (i % 2) * 0.02);
+    const blade = k.cone(0.02, 0.12 + (i % 2) * 0.05, 3, i % 2 ? '#587c45' : '#668a4e', (i - 1.5) * 0.03, 0, (i % 2) * 0.02);
     blade.rotation.z = (i - 1.5) * 0.3;
   }
   return k;

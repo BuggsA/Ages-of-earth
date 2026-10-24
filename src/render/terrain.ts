@@ -13,12 +13,12 @@ import { bakedMaterial, fogUniforms, inject, swayMaterial } from './materials';
  */
 
 const C = (hex: string) => new THREE.Color(hex);
-const GRASS = [C('#92b45c'), C('#7ba24e'), C('#a8c670')];
-const DRY = C('#b8b46a');
-const DIRT = C('#9c8a5e');
-const SAND = [C('#e6d39c'), C('#d6c088')];
-const ROCK = [C('#8f8679'), C('#a0988b'), C('#7d756a')];
-const CLIFF = C('#7e7466');
+const GRASS = [C('#6e8c55'), C('#617f4b'), C('#7b9860')];
+const DRY = C('#99996c');
+const DIRT = C('#877a5e');
+const SAND = [C('#cfc29c'), C('#c3b58c')];
+const ROCK = [C('#857d72'), C('#928a7e'), C('#756e64')];
+const CLIFF = C('#6f665a');
 const BED = [C('#b9a87a'), C('#8b9378')];
 
 export const terrainMaterial = inject(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.95 }), { season: 'ground' });
@@ -94,7 +94,7 @@ export class TerrainView {
       }
       if (terr !== T_WATER && steep < 0.8) tmp.lerp(CLIFF, Math.min(1, (0.8 - steep) * 2.6));
       // A whisper of light and shade per facet keeps the low-poly look without the noise.
-      tmp.multiplyScalar(0.975 + n * 0.05);
+      tmp.multiplyScalar(0.985 + n * 0.03);
       for (const [x, y] of pts) {
         pos[k * 3] = x;
         pos[k * 3 + 1] = H(x, y);
