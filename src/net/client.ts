@@ -10,8 +10,6 @@ declare const __BUILD__: string;
 
 const CID_KEY = 'ages-cid';
 const NAME_KEY = 'ages-name';
-/** About ten minutes of trying (the delay between tries tops out at 10 s) before the line is given up for good. */
-const MAX_RETRIES = 60;
 
 /** A lasting id for this browser, so the room knows a player who reloads the page. */
 export function clientId(): string {
@@ -78,8 +76,8 @@ export class NetClient {
   };
 
   connect(): void {
-    document.addEventListener('visibilitychange', this.onVisible);
     this.close();
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', this.onVisible);
     this.closed = false;
     this.retries = 0;
     this.openSocket();
@@ -122,7 +120,7 @@ export class NetClient {
       if (this.closed) return;
       // A policy refusal or an intentional replacement is final. A lobby validation error
       // alone is recoverable and must not poison a later reconnect.
-      if (e.code === 1008 || e.code === 1000 || this.retries >= MAX_RETRIES) {
+      if (e.code === 1008 || e.code === 1000 || this.retries >= 6) {
         this.closed = true;
         this.onClosed?.(e.reason || (e.code === 1008 ? refused : '') || 'Lost the connection to the room.');
         return;
@@ -133,7 +131,7 @@ export class NetClient {
       this.retryTimer = window.setTimeout(() => {
         this.retryTimer = 0;
         if (!this.closed) this.openSocket();
-      }, Math.min(500 * 2 ** this.retries, 10000));
+      }, 500 * 2 ** this.retries);
     });
   }
 
@@ -144,7 +142,7 @@ export class NetClient {
 
   close(): void {
     this.closed = true;
-    document.removeEventListener('visibilitychange', this.onVisible);
+    if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', this.onVisible);
     window.clearTimeout(this.retryTimer);
     this.retryTimer = 0;
     window.clearInterval(this.pinger);
