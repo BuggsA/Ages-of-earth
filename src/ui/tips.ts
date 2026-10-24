@@ -1,4 +1,4 @@
-import { AGES, HIVE, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
+import { AGES, BLOOM, HIVE, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
 import { battlesFor } from '../sim/battles';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, findsOf, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
@@ -464,6 +464,12 @@ const TIPS: Tip[] = [
     // The Age of the Wildwood (`docs/wild-road.md` §4): its first minute.
     when: (s, me) => ageOf(s.players[me]) === 'wildwood',
     text: `The forest wakes for your people now. Plant your one <b>${BUILDINGS.heart.name}</b> (${BUILDINGS.heart.key}) by old woods: at it, train an <b>Ent</b> and the tree nearest it within ${WILDWOOD.wake} tiles wakes, a slow giant that flings boulders and breaks buildings, so it is your siege now. Select Ents and press <kbd>O</kbd> to <b>root</b> them on bare ground: they are trees again, mend, and wake when a rival comes near, an ambush no one sees. Each spring your woods spread round the Heart Tree, and your people run through those woods while a rival's are slowed. No rifles, field guns or aircraft, and fire hits your living things twice as hard: guard the Heart Tree, for if it falls every Ent roots and sleeps.`,
+  },
+  {
+    id: 'bloom',
+    // The Age of the Bloom (`docs/wild-road.md` §5b): its first minute.
+    when: (s, me) => ageOf(s.players[me]) === 'bloom',
+    text: `The plants' end: your people outgrows its rivals now. Raise your one <b>${BUILDINGS.spire.name}</b> (${BUILDINGS.spire.key}): while your Heart Tree stands it ripens a <b>Bloom Seed</b> every ${BLOOM.ripen} seconds. Sling it (G) at a rival town and send your army after it: once it roots, ${BLOOM.grow} seconds later every rival building within ${BLOOM.r} tiles cracks into forest, unless their citizens hack out its heart-root first. Or win by <b>the Greening</b>: keep your Heart Tree while trees, Orchards and Thornwalls grown to living oak cover ${BLOOM.green * 100}% of your land for ${BLOOM.hold / 60} minutes. Your woods spread every season now, and each season opens with a pollen storm that half-blinds rival soldiers and towers near your Heart Tree. Your Dens are quiet and you raise no Missile Silo; rivals will come with fire.`,
   },
   {
     id: 'torch',

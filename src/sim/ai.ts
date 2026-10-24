@@ -47,7 +47,7 @@ import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
 import { AI_TEMPER, ROUTES, TRUNK, type RouteId } from './data';
-import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS } from './data';
+import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
@@ -57,7 +57,9 @@ import { progress, scenarioById } from './campaign';
 import { tames, wildBeast } from './tame';
 import { grows } from './grove';
 import { keepsBees } from './hive';
-import { treeToWake, treesRound, wakesForest } from './wildwood';
+import { heartOf, treeToWake, treesRound, wakesForest } from './wildwood';
+import { inBloom, ringOf, ripeIn, rooted, slingProblem, spireOf } from './bloom';
+import { DIRS } from './animals';
 
 /**
  * The computer opponent. It plays by the same rules and through the same commands as a person: it
@@ -300,6 +302,9 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   groveWork(s, v, mem, issue);
   hiveWork(s, v, mem, issue);
   wildwoodWork(s, v, mem, issue);
+  bloomWork(s, v, mem, issue);
+  hackSeeds(s, v, issue);
+  answerGreening(s, v, issue);
   readYear(s, v);
   huntTheYear(s, v, issue);
 
@@ -628,6 +633,9 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   } else if (roads[to] === undefined && to === 'wildwood') {
     // The Wild route's fourth age: a people that walked the Hive goes on.
     roads[to] = hasWalked(p, 'hive');
+  } else if (roads[to] === undefined && to === 'bloom') {
+    // The Wild route's plants' end: a people that walked the Wildwood goes on.
+    roads[to] = hasWalked(p, 'wildwood');
   } else if (roads[to] === undefined && to === 'dykes') {
     // The Water Road (#701): only with a dyke worth raising by home, and on a coin of its own, so no other match's dice shift. A people
     // that walked the Age of Rivers is on the road already, and goes on down it more often.
@@ -806,6 +814,8 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   if (walksWeb(v) && ageOf(p) === 'hive' && s.tick - (mem.hive ?? s.tick) < secs(HIVE.aiStay)) return null;
   // The Wildwood is kept a while, so its Heart Tree is planted and its Ents woken.
   if (walksWeb(v) && ageOf(p) === 'wildwood' && s.tick - (mem.wildwood ?? s.tick) < secs(WILDWOOD.aiStay)) return null;
+  // The Bloom is kept a while, so its Spire slings and its land greens.
+  if (walksWeb(v) && ageOf(p) === 'bloom' && s.tick - (mem.bloom ?? s.tick) < secs(BLOOM.aiStay)) return null;
   // The steppe (#320) is kept a while, so the flock it came for pays.
   if (walksWeb(v) && ageDef(p).mobile && s.tick - (mem.steppe?.since ?? s.tick) < secs(AI_STEPPE.stay)) return null;
   // Bound for a crossing (#585, #555 s12), a sibling doesn't climb on: its way is back to the Middle Ages (`seaTurn`).
@@ -3415,6 +3425,126 @@ function wildwoodWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) 
   const near = (tx: number, ty: number) => treesRound(s, tx, ty, BUILDINGS.heart.size, WILDWOOD.wake) >= WILDWOOD.aiTrees;
   const spot = findSpot(s, 'heart', v.home.x, v.home.y, 5, WILDWOOD.aiFrom, 0, near) ?? findSpot(s, 'heart', v.home.x, v.home.y, 5, WILDWOOD.aiFrom, 0);
   if (spot) construct(s, v, mem, 'heart', spot, 3, issue);
+}
+
+/**
+ * The Age of the Bloom: a Seed Spire within `BLOOM.aiFrom` tiles of home; each ripe Seed slung at the rival building it has seen
+ * whose ring would crack the most, and its army sent to stand over the heart-root; and while its land is short of green, an Orchard
+ * every `BLOOM.aiOrchard` seconds.
+ */
+function bloomWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!walksWeb(v) || !hasWalked(p, 'bloom') || !v.tc) return;
+  if (ageOf(p) === 'bloom') mem.bloom ??= s.tick;
+  if (!count(v, 'spire') && s.tick - (mem.ordered.spire ?? -99999) >= secs(30) && p.epoch >= BUILDINGS.spire.epoch && afford(v, buildingCostFor(s, p.id, 'spire'))) {
+    const spot = findSpot(s, 'spire', v.home.x, v.home.y, 4, BLOOM.aiFrom);
+    if (spot) construct(s, v, mem, 'spire', spot, 2, issue);
+  }
+  const spire = spireOf(s, p.id);
+  const left = spire && heartOf(s, p.id) ? ripeIn(s, spire) : null;
+  if (spire && left !== null && left <= BLOOM.aiSave) {
+    const aim = !slingProblem(s, p.id, spire, spire.x, spire.y) ? seedAim(s, p) : null;
+    if (aim) issue({ t: 'sling', p: p.id, spire: spire.id, x: aim.x, y: aim.y });
+    // Its fuel is kept back from the rest of the town's spending as the Seed comes ripe, as the silo's is.
+    else spend(v, BLOOM.fuel);
+  }
+  // A Seed of its own rooted: the army stands over the heart-root until it cracks, to cut down the citizens who come to hack it.
+  for (const l of s.blooms ?? []) {
+    if (l.owner !== p.id || !rooted(s, l)) continue;
+    const r2 = (BLOOM.r - 2) * (BLOOM.r - 2);
+    const guard = v.army.filter((u) => !u.inside && domainOf(u.type) === 'land' && (u.x - l.x) * (u.x - l.x) + (u.y - l.y) * (u.y - l.y) > r2 && !(u.order.k === 'move' && u.order.x === l.x && u.order.y === l.y));
+    if (guard.length) issue({ t: 'move', p: p.id, ids: guard.map((u) => u.id), x: l.x, y: l.y, amove: true });
+    break;
+  }
+  if (!inBloom(p) || (p.green ?? 0) >= BLOOM.green * 1000 || s.tick - (mem.orchardAt ?? -99999) < secs(BLOOM.aiOrchard)) return;
+  // Short of green: an Orchard while it has fewer than one for every `aiThorns` pieces of Thornwall, else a line of Thornwall that
+  // grows to living oak, each line a compass point further round home and a ring further out every eight.
+  const thorns = count(v, 'thornwall');
+  if (count(v, 'orchard') * BLOOM.aiThorns < thorns) {
+    if (v.budget.wood < (BUILDINGS.orchard.cost.wood ?? 0) + 100) return;
+    mem.orchardAt = s.tick;
+    const spot = findSpot(s, 'orchard', v.home.x, v.home.y, 5, 16);
+    if (spot) construct(s, v, mem, 'orchard', spot, 1, issue);
+    return;
+  }
+  const len = BLOOM.aiLine;
+  const cost = (buildingCostFor(s, p.id, 'thornwall').wood ?? 0) * len;
+  if (v.budget.wood < cost + 100) return;
+  const crew = v.citizens.filter((u) => !u.inside && u.order.k !== 'build' && !(u.order.k === 'farm' && u.order.phase === 'work') && !v.claimers.has(u.id)).sort((a, b) => a.id - b.id).slice(0, 2);
+  if (!crew.length) return;
+  mem.orchardAt = s.tick;
+  const k = Math.floor(thorns / len);
+  const [dx, dy] = DIRS[(k * 3) % DIRS.length];
+  const r = BLOOM.aiRing + 3 * (Math.floor(k / DIRS.length) % 3);
+  const cx = v.home.x + dx * r;
+  const cy = v.home.y + dy * r;
+  const half = Math.floor(len / 2);
+  issue({ t: 'wall', p: p.id, ids: crew.map((u) => u.id), x0: Math.floor(cx - dy * half), y0: Math.floor(cy + dx * half), x1: Math.floor(cx + dy * half), y1: Math.floor(cy - dx * half), thorn: true });
+  spend(v, { wood: cost });
+}
+
+/** Where a Bloom Seed would crack the most: the centre of the rival building it has seen with the most rival buildings in its ring (else the rival's home). */
+function seedAim(s: GameState, p: Player): { x: number; y: number } | null {
+  let best: Building | null = null;
+  let most = 0;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner) || !p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
+    if ((s.blooms ?? []).some((l) => l.owner === p.id && (l.x - e.x) * (l.x - e.x) + (l.y - e.y) * (l.y - e.y) < BLOOM.r * BLOOM.r)) continue;
+    const n = ringOf(s, { owner: p.id, x: e.x, y: e.y }).length + (e.type === 'towncenter' ? 3 : 0);
+    if (n > most) {
+      most = n;
+      best = e;
+    }
+  }
+  // Nothing seen yet: the rival's home Town Center, where its armies march anyway.
+  const at = best ?? rivalTownCenter(s, p);
+  return at ? { x: at.x, y: at.y } : null;
+}
+
+/**
+ * A rival's Bloom Seed falling or rooted within `BLOOM.r + BLOOM.aiNear` tiles of one of its buildings: up to `BLOOM.aiHack` citizens
+ * (the nearest, counting those already there or on their way) run to its heart-root to hack it out. Every computer, whatever its road.
+ */
+function hackSeeds(s: GameState, v: View, issue: (c: Command) => void): void {
+  if (!s.blooms) return;
+  const reach = BLOOM.r + BLOOM.aiNear;
+  for (const l of s.blooms) {
+    if (!isEnemy(s, v.p.id, l.owner)) continue;
+    let threat = false;
+    for (const e of s.ents) {
+      if (e.kind === 'building' && e.owner === v.p.id && e.hp > 0 && (e.x - l.x) * (e.x - l.x) + (e.y - l.y) * (e.y - l.y) < reach * reach) {
+        threat = true;
+        break;
+      }
+    }
+    if (!threat) continue;
+    const at = (u: Unit) => (u.x - l.x) * (u.x - l.x) + (u.y - l.y) * (u.y - l.y) <= (BLOOM.reach + 1) * (BLOOM.reach + 1) || (u.order.k === 'move' && (u.order.x - l.x) * (u.order.x - l.x) + (u.order.y - l.y) * (u.order.y - l.y) < 1);
+    const free = v.citizens.filter((u) => !u.inside);
+    const going = free.filter(at).length;
+    if (going >= BLOOM.aiHack) continue;
+    const send = free
+      .filter((u) => !at(u))
+      .sort((a, b) => (a.x - l.x) * (a.x - l.x) + (a.y - l.y) * (a.y - l.y) - ((b.x - l.x) * (b.x - l.x) + (b.y - l.y) * (b.y - l.y)) || a.id - b.id)
+      .slice(0, BLOOM.aiHack - going);
+    // Before it comes down they run to the aim; it roots within a few tiles of it, and they are sent on to the root itself.
+    if (send.length) issue({ t: 'move', p: v.p.id, ids: send.map((u) => u.id), x: l.x, y: l.y });
+  }
+}
+
+/** A rival holding the Greening (public, on every screen): the army goes for its Heart Tree, and a foot soldier torches it. */
+function answerGreening(s: GameState, v: View, issue: (c: Command) => void): void {
+  for (const q of s.players) {
+    if (q.greenSince === undefined || !isEnemy(s, v.p.id, q.id)) continue;
+    const heart = heartOf(s, q.id);
+    if (!heart) continue;
+    const army = v.army.filter((u) => !u.inside && domainOf(u.type) === 'land');
+    const torching = army.some((u) => u.order.k === 'torch');
+    const torch = !torching && v.p.epoch >= FIRE.epoch ? army.find((u) => u.type === 'infantry') : undefined;
+    if (torch) issue({ t: 'torch', p: v.p.id, ids: [torch.id], target: heart.id });
+    const go = army.filter((u) => u !== torch && u.order.k !== 'torch' && !(u.order.k === 'attack' && u.order.target === heart.id));
+    if (go.length) issue({ t: 'attack', p: v.p.id, ids: go.map((u) => u.id), target: heart.id });
+    return;
+  }
 }
 
 const grownSheep = (s: GameState, owner: number): Animal[] => s.animals.filter((a) => a.kind === 'sheep' && a.owner === owner && a.hp > 0 && a.lamb === undefined);
