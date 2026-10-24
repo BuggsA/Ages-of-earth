@@ -52,6 +52,17 @@ export function board(s: GameState, target: Unit, by: number, credit: Unit | nul
   return true;
 }
 
+/**
+ * The ship a shot's splash is credited to for boarding (#783): its shooter, when that is a ship of a people that boards somewhere (the age, or a
+ * kept Dock); otherwise null, so splash credits no one, as before.
+ */
+export function boarder(s: GameState, shooter: Unit | null): Unit | null {
+  if (!shooter || domainOf(shooter.type) !== 'water') return null;
+  const p = s.players[shooter.owner];
+  if (p && ageDef(p).boards) return shooter;
+  return s.ents.some((e) => e.kind === 'building' && e.owner === shooter.owner && e.keep === 'beggars') ? shooter : null;
+}
+
 /** How hard a ship of `owner`'s strikes a water-work (dyke, sluice, dam, causeway): `BEGGARS.cut` for a boarding people, else 0 (the usual wall rule). */
 export function cuts(s: GameState, owner: number, b: Building): number {
   if (b.type !== 'dyke' && b.type !== 'sluice' && b.type !== 'dam' && b.type !== 'causeway') return 0;

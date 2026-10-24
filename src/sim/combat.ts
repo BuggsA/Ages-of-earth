@@ -5,7 +5,7 @@ import { fairPurse } from './fair';
 import { raidBlow, raidSlain } from './ways';
 import { takeCaptive } from './thralls';
 import { prizeOf } from './convoy';
-import { board, cuts } from './beggars';
+import { board, boarder, cuts } from './beggars';
 import { looted, pack } from './spoils';
 import { raided } from './household';
 import { alarm } from './flee';
@@ -247,7 +247,7 @@ export function updateShots(s: GameState, sp: Spatial, hitAnimal: (a: Animal, da
         const dx = o.x - sh.tx;
         const dy = o.y - sh.ty;
         if (dx * dx + dy * dy > sh.splash * sh.splash) return;
-        hurt(s, o, st ? damageOf(s, null, st, o, true) * 0.6 : sh.damage * 0.5, sh.owner, null);
+        hurt(s, o, st ? damageOf(s, null, st, o, true) * 0.6 : sh.damage * 0.5, sh.owner, null, boarder(s, shooter && shooter.kind === 'unit' ? shooter : null));
       });
     }
   }
