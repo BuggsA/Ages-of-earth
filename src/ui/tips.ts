@@ -1,3 +1,5 @@
+import { COCKLE, COCKLER } from '../sim/data';
+import { TIDE_GATE } from '../sim/data';
 import { AGES, BLOOM, HIVE, INTERCEPT, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, BEGGARS, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
 import { battlesFor } from '../sim/battles';
 import { ageDef } from '../sim/ages';
@@ -444,7 +446,7 @@ const TIPS: Tip[] = [
     id: 'tides',
     // The Age of Tides (#739): its first minute.
     when: (s, me) => ageOf(s.players[me]) === 'tides',
-    text: `Your people keeps the sea's hours. Watch the tide clock (🌊, top bar): every ${TIDE.period / 60} minutes the sea falls to low water and back, baring the shallows as flats anyone may cross. Raise <b>${BUILDINGS.tidemill.name}s</b> (<kbd>A</kbd>) on the shore where the most tidal ground lies near: each grinds gold at every turn of the tide. Drag <b>${BUILDINGS.causeway.name}s</b> (<kbd>V</kbd>) over the flats or the shallow sea: a road that only high water covers. Get off the flats before the water comes back, and strike across the bay at low water.`,
+    text: `Your people keeps the sea's hours. Watch the tide clock (🌊, top bar): every ${TIDE.period / 60} minutes the sea falls to low water and back, baring the shallows as flats anyone may cross. Raise <b>${BUILDINGS.tidemill.name}s</b> (<kbd>${BUILDINGS.tidemill.key}</kbd>) on the shore where the most tidal ground lies near: each grinds gold at every turn of the tide. Drag <b>${BUILDINGS.causeway.name}s</b> (<kbd>${BUILDINGS.causeway.key}</kbd>) over the flats or the shallow sea: a road that only high water covers. Get off the flats before the water comes back, and strike across the bay at low water.`,
   },
   {
     id: 'tideAwake',
@@ -465,10 +467,22 @@ const TIPS: Tip[] = [
     text: '<b>Cockle beds</b> lie on the deeper flats (pale shells on the wet sand, 🐚 on its panel), bared only as the tide runs low. Send citizens to pick them while they stand bare: food, and each high water brings some back. Your pickers read the clock themselves: before the flood they come ashore with what they have, and go back at the next low water. A barrage that ponds the flats drowns its beds; a causeway goes over one only once it is picked out.',
   },
   {
+    id: 'cocklerHut',
+    // The Cockler's Hut (#779): the viewer's people picks cockles, and has no hut yet.
+    when: (s, me) => !!s.cockles && !!ageDef(s.players[me]).tides && !has(s, me, 'cockler') && s.ents.some((e) => e.kind === 'unit' && e.owner === me && e.order.k === 'gather' && !!e.order.cockle),
+    text: `<b>A hut by the beds.</b> Your pickers carry every basket of cockles home, a long walk past wolves and the flood. Raise a <b>${BUILDINGS.cockler.name}</b> (<kbd>B</kbd> <kbd>${BUILDINGS.cockler.key}</kbd>, ${BUILDINGS.cockler.cost.wood} wood) within ${COCKLER.reach} tiles of a bed: they empty their baskets there, wait beside it on dry ground for low water, and the beds round it come back richer at each high water (${COCKLER.regrow} food, not ${COCKLE.regrow}). It takes cockles only, and stands where a rival crossing at low water will find it.`,
+  },
+  {
     id: 'barrage',
     // Barrages (#748): a Tide Mill stands, and no pond yet.
     when: (s, me) => ageOf(s.players[me]) === 'tides' && has(s, me, 'tidemill') && !s.pond,
-    text: `<b>Shut a bay.</b> Drag a line of ${BUILDINGS.causeway.name}s (<kbd>V</kbd>) across the mouth of a bay of flats, shore to shore: behind it the bay is a <b>pond</b> whose flats stay wet at every hour, and a Tide Mill by it grinds them twice, on the flood and on the ebb. What it costs: nobody crosses that bay at low water any more, you included, and powder or a warhead on the line lets the pond out.`,
+    text: `<b>Shut a bay.</b> Drag a line of ${BUILDINGS.causeway.name}s (<kbd>${BUILDINGS.causeway.key}</kbd>) across the mouth of a bay of flats, shore to shore: behind it the bay is a <b>pond</b> whose flats stay wet at every hour, and a Tide Mill by it grinds them twice, on the flood and on the ebb. What it costs: nobody crosses that bay at low water any more, you included, and powder or a warhead on the line lets the pond out.`,
+  },
+  {
+    id: 'tideGate',
+    // The Tide Gate (#785): the viewer's people has a barrage's pond, and no gate in it yet.
+    when: (s, me) => ageOf(s.players[me]) === 'tides' && !!s.pond && !!s.causewayBy && s.causewayBy.some((o) => o - 1 === me) && !has(s, me, 'tidegate'),
+    text: `<b>A gate in the barrage.</b> Set a <b>${BUILDINGS.tidegate.name}</b> (<kbd>V</kbd> <kbd>${BUILDINGS.tidegate.key}</kbd>) on a causeway tile of your barrage, beside the pond. Shut, the pond holds and the mills grind it twice. At low water, when a rival army walks the flats below it, open it (<kbd>O</kbd>): the pond rushes out over them for ${TIDE_GATE.secs} seconds and sweeps them off, hurt or drowned. Then shut it again, and the next flood fills it. Rivals can read whether it is loaded, and keep off.`,
   },
   {
     id: 'breachCauseway',
@@ -574,6 +588,8 @@ const TIPS: Tip[] = [
   { id: 'salvo', when: (s, me) => s.players[me].epoch >= 5 && s.players[me].techs.includes('launchControl'), text: '<b>Launch Control</b> ties your silos to one clock: raise a third, then select one and press <kbd>B</kbd> to fire a <b>salvo</b>, three Atomic warheads at three points at least 8 tiles apart, all from your store at once. Rivals see three rings, just as for one warhead and two decoys, and learn that all three are real only in the last 3 seconds. Each silo they destroy before then scrubs its own warhead; the others fly on.' },
   { id: 'salvoThreat', when: (s, me) => s.players.some((p) => p.team !== s.players[me].team && !p.defeated && s.ents.filter((e) => e.kind === 'building' && e.owner === p.id && e.type === 'silo' && e.built && e.hp > 0).length >= 3), text: 'A rival stands <b>three Missile Silos</b>: enough for a <b>salvo</b>. When it launches, all three warning rings may be real, not one and two decoys, and you will know only in the last 3 seconds. Spread out, or break a silo: each one that falls scrubs its own warhead.' },
   { id: 'missile', when: (s, me) => (s.launches ?? []).some((l) => !!l.arc && s.players[l.owner].team !== s.players[me].team), text: 'A rival <b>missile</b> is in the air. It climbs toward the middle of the warning rings, so for most of its flight it tells you only the district. Some seconds before the rings flash it <b>bends toward where it falls</b>: watch which way it turns and you can clear the right ring early, or trust it and stay.' },
+  // Missile defence (#759 s3): once you stand a silo and a rival does too, hold one back.
+  { id: 'reserve', when: (s, me) => s.players[me].epoch >= 5 && buildings(s, me).some((b) => b.type === 'silo' && b.built) && s.players.some((p) => p.team !== s.players[me].team && !p.defeated && s.ents.some((e) => e.kind === 'building' && e.owner === p.id && e.type === 'silo' && e.built && e.hp > 0)), text: `A rival stands a <b>Missile Silo</b> too. Select one of yours and press <kbd>R</kbd> to <b>hold it in Reserve</b>: it launches nothing, and after ${INTERCEPT.arm} seconds it stands ready to fire a warhead of your store at any rival warhead no Interceptor Battery answers, anywhere on the map, stopping it ${Math.round(INTERCEPT.chance * 100)}% of the time. Each answer costs a warhead and a launch's fuel. Every player sees the teal band of a silo held back; a quick Fission clock can land before a late Reserve stands ready.` },
   { id: 'interceptors', when: (s, me) => s.players[me].epoch >= 4 && !has(s, me, 'battery') && s.players.some((p) => p.team !== s.players[me].team && !p.defeated && p.epoch >= 5), text: `A rival stands in the <b>Atomic Age</b>. Learn <b>Interceptors</b> at a Siege Workshop, then raise <b>Interceptor Batteries</b> (<kbd>V</kbd> <kbd>I</kbd>) by your towns. Each covers ${INTERCEPT.reach} tiles: when a warhead's ring falls inside that circle, the battery fires by itself ${INTERCEPT.fire} seconds before it lands and stops it ${Math.round(INTERCEPT.chance * 100)}% of the time, blast and fallout both. One charge, then a ${INTERCEPT.reload} second reload: a salvo of three can still get through.` },
   { id: 'airfield', when: (s, me) => s.players[me].epoch >= 4 && !has(s, me, 'airfield'), text: 'The Industrial Age brings flight: an <b>Airfield</b> (<kbd>V</kbd> <kbd>F</kbd>) trains fighters and bombers. Only missiles reach them: fighters, riflemen, towers and warships.' },
 ];

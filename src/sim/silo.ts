@@ -33,6 +33,11 @@ import type { Arc, Building, BuildingType, Cost, Ent, GameState, Launch, Player,
  * tiles. In a launch's last seconds (`interceptStep`): at `INTERCEPT.fire` seconds left the nearest charged battery covering each warhead's
  * ring (as its team is shown it) fires, and the roll is drawn and stored on the launch; at `INTERCEPT.meet` seconds left a hit takes that
  * warhead out of the sky, so it neither blasts nor poisons the ground.
+ *
+ * The silo held in Reserve (#759 s3): a people may hold a standing silo in Reserve (`reserveProblem`, `setReserve`). It launches nothing
+ * while set, and stands ready `INTERCEPT.arm` seconds after it was set (`armed`). Batteries answer first, being cheaper: a warhead no battery
+ * answered draws its one attempt from the nearest armed Reserve silo of any rival of the launcher, whose cover is the whole map. It spends a
+ * warhead from that people's store and its own warhead's launch fuel, and the silo stands ready again `INTERCEPT.arm` seconds later.
  */
 
 /** How a people works its silos: the plain Atomic Age's rules, or the fork's (Fission: quick and leaky; Fusion: clean, limitless and slow). */
@@ -109,6 +114,30 @@ export const shownToAll = (b: { kind: string; type?: string; built?: boolean; hp
 /** Whether this Interceptor Battery holds its charge now (#759 s2): finished, standing, and not reloading. */
 export const charged = (s: GameState, b: Building): boolean => b.type === 'battery' && b.built && b.hp > 0 && (b.reload ?? 0) <= s.tick;
 
+/** Whether this silo is held in Reserve (#759 s3): set, ready or not, it launches nothing. */
+export const held = (b: Building): boolean => b.type === 'silo' && b.reserve !== undefined;
+
+/** Whether this silo, held in Reserve, stands ready to fire an interceptor now (#759 s3): finished, standing, and armed. */
+export const armed = (s: GameState, b: Building): boolean => held(b) && b.built && b.hp > 0 && b.reserve! <= s.tick;
+
+/** Seconds until a Reserve silo stands ready (#759 s3); 0 when it does. */
+export const armingOf = (s: GameState, b: Building): number => Math.max(0, Math.ceil(((b.reserve ?? 0) - s.tick) / TICK_HZ));
+
+/** Why this people can't set (`on`) or lift Reserve on this silo (#759 s3), or null. */
+export function reserveProblem(s: GameState, owner: number, silo: Building | undefined, on: boolean): string | null {
+  if (!silo || silo.kind !== 'building' || silo.type !== 'silo' || silo.owner !== owner) return 'Pick one of your Missile Silos';
+  if (!silo.built || silo.hp <= 0) return 'The silo is not finished';
+  if (on === held(silo)) return on ? 'This silo is already held in Reserve' : 'This silo is not held in Reserve';
+  if (on && s.players[owner].epoch < 5) return 'Silos fire only in the Atomic Age';
+  return null;
+}
+
+/** Hold a silo in Reserve (#759 s3), ready `INTERCEPT.arm` seconds from now, or stand it down at once (checked by `reserveProblem`). */
+export function setReserve(s: GameState, silo: Building, on: boolean): void {
+  if (on) silo.reserve = s.tick + secs(INTERCEPT.arm);
+  else delete silo.reserve;
+}
+
 /** A launch's warhead `shot` (0 for a single strike, else its place in the salvo): its true point. */
 const aimOf = (l: Launch, shot: number): { x: number; y: number } => (l.salvo ? l.salvo[shot] : { x: l.x, y: l.y });
 
@@ -156,6 +185,7 @@ export function launchProblem(s: GameState, owner: number, silo: Building | unde
   const p = s.players[owner];
   if (!silo || silo.kind !== 'building' || silo.type !== 'silo' || silo.owner !== owner) return 'Pick one of your Missile Silos';
   if (!silo.built || silo.hp <= 0) return 'The silo is not finished';
+  if (held(silo)) return 'This silo is held in Reserve: stand it down to launch';
   if (p.epoch < 5) return 'Silos fire only in the Atomic Age';
   if (peace(s)) return 'Not while the peace holds';
   const kind = w ?? rulesOf(p).w;
@@ -210,10 +240,10 @@ export function salvoFuel(p: Player): Cost {
 
 /**
  * The silos a salvo ordered from `first` fires from (#765): that one, then the people's other standing silos in id order, `SALVO.trio`
- * in all; fewer when it stands fewer.
+ * in all; fewer when it stands fewer. A silo held in Reserve (#759 s3) fires none.
  */
 export function salvoSilos(s: GameState, owner: number, first?: number): Building[] {
-  const all = silosOf(s, owner);
+  const all = silosOf(s, owner).filter((b) => !held(b));
   const lead = all.find((b) => b.id === first);
   return (lead ? [lead, ...all.filter((b) => b !== lead)] : all).slice(0, SALVO.trio);
 }
@@ -228,8 +258,9 @@ export function salvoProblem(s: GameState, owner: number, shots?: { silo: number
   if (p.epoch < 5) return 'Silos fire only in the Atomic Age';
   if (!salvoPeople(p)) return 'A salvo needs Launch Control, learned at a Missile Silo';
   if (peace(s)) return 'Not while the peace holds';
-  const standing = silosOf(s, owner).length;
-  if (standing < SALVO.trio) return `A salvo needs ${SALVO.trio} standing Missile Silos: you have ${standing}`;
+  const all = silosOf(s, owner);
+  const standing = all.filter((b) => !held(b)).length;
+  if (standing < SALVO.trio) return `A salvo needs ${SALVO.trio} standing Missile Silos: you have ${standing}${standing < all.length ? ` not held in Reserve (and ${all.length - standing} held)` : ''}`;
   if (stockOf(p) < SALVO.trio) {
     const next = nextNuke(s, p);
     return `A salvo takes ${SALVO.trio} warheads from your store: you have ${Math.max(0, stockOf(p))}${next === null ? ', and the rest are in the air' : `, the next in ${Math.max(1, next)}s`}`;
@@ -241,7 +272,7 @@ export function salvoProblem(s: GameState, owner: number, shots?: { silo: number
   const used = new Set<number>();
   for (const sh of shots) {
     const b = s.byId.get(sh?.silo);
-    if (!b || b.kind !== 'building' || b.type !== 'silo' || b.owner !== owner || !b.built || b.hp <= 0 || used.has(b.id)) return `A salvo fires from ${SALVO.trio} of your standing silos, one warhead each`;
+    if (!b || b.kind !== 'building' || b.type !== 'silo' || b.owner !== owner || !b.built || b.hp <= 0 || used.has(b.id) || held(b)) return `A salvo fires from ${SALVO.trio} of your standing silos not held in Reserve, one warhead each`;
     used.add(b.id);
     if (!(sh.x >= 0 && sh.y >= 0 && sh.x < s.w && sh.y < s.h)) return 'Pick points on the map';
   }
@@ -647,7 +678,10 @@ export function siloStep(s: GameState): void {
  * `INTERCEPT.fire` seconds before a launch lands (#759 s2): each of its live warheads, in order, draws one attempt from the nearest charged
  * battery that covers it (`covers`; the lower id on a tie), whoever's it is among the launcher's rivals. The charge is spent and the roll
  * drawn now, from the match's dice, and stored on the launch: a save, a load or a replay never draws it again. Stacked batteries do not
- * raise the odds; a warhead no charged battery covers draws none.
+ * raise the odds; a warhead no charged battery covers draws none from a battery.
+ *
+ * Batteries go first, being cheaper (#759 s3): a warhead none answered draws its one attempt from the nearest armed Reserve silo of a rival
+ * (`reserveFor`), which spends a warhead from its people's store and the launch fuel, and stands ready again `INTERCEPT.arm` seconds on.
  */
 function fire(s: GameState, l: Launch): void {
   for (const i of shotsOf(l)) {
@@ -659,12 +693,43 @@ function fire(s: GameState, l: Launch): void {
       const d = (g.x - e.x) * (g.x - e.x) + (g.y - e.y) * (g.y - e.y);
       if (d < near) [by, near] = [e, d];
     }
-    if (!by) continue;
-    by.reload = s.tick + secs(INTERCEPT.reload);
+    let silo: true | undefined;
+    if (by) by.reload = s.tick + secs(INTERCEPT.reload);
+    else {
+      by = reserveFor(s, l, i);
+      if (!by) continue;
+      silo = true;
+      const p = s.players[by.owner];
+      spend(s, p);
+      pay(p, fuelOf(rulesOf(p).w));
+      by.reserve = s.tick + secs(INTERCEPT.arm);
+    }
     const hit = roll(s) < INTERCEPT.chance;
-    (l.icpt ??= []).push({ shot: i, battery: by.id, owner: by.owner, x: by.x, y: by.y, hit });
-    s.events.push({ k: 'intercept', owner: by.owner, by: l.owner, id: l.id, shot: i, what: 'fired', x: by.x, y: by.y });
+    (l.icpt ??= []).push({ shot: i, battery: by.id, owner: by.owner, x: by.x, y: by.y, hit, ...(silo ? { silo } : {}) });
+    s.events.push({ k: 'intercept', owner: by.owner, by: l.owner, id: l.id, shot: i, what: 'fired', x: by.x, y: by.y, ...(silo ? { silo } : {}) });
   }
+}
+
+/** Whether this armed Reserve silo's people can pay for an interceptor now (#759 s3): a warhead in store and its launch fuel. */
+export const canAnswer = (s: GameState, b: Building): boolean => {
+  const p = s.players[b.owner];
+  return armed(s, b) && p.epoch >= 5 && stockOf(p) > 0 && canAfford(p, fuelOf(rulesOf(p).w));
+};
+
+/**
+ * The Reserve silo that answers a launch's warhead `shot` no battery took (#759 s3): of the rivals' armed silos whose people can pay
+ * (`canAnswer`), the nearest to the ring its team is shown (the lower id on a tie). Its cover is the whole map.
+ */
+function reserveFor(s: GameState, l: Launch, shot: number): Building | undefined {
+  let by: Building | undefined;
+  let near = Infinity;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'silo' || !isEnemy(s, l.owner, e.owner) || !canAnswer(s, e)) continue;
+    const g = ringOf(l, s.players[e.owner].team, shot);
+    const d = (g.x - e.x) * (g.x - e.x) + (g.y - e.y) * (g.y - e.y);
+    if (d < near) [by, near] = [e, d];
+  }
+  return by;
 }
 
 /**
@@ -676,7 +741,7 @@ function meet(s: GameState, l: Launch): boolean {
   for (const c of l.icpt ?? []) {
     if (l.salvo?.[c.shot]?.gone) continue;
     const m = missileOf(l, c.shot, s.tick) ?? { ...aimOf(l, c.shot), z: 0 };
-    s.events.push({ k: 'intercept', owner: c.owner, by: l.owner, id: l.id, shot: c.shot, what: c.hit ? 'hit' : 'missed', x: m.x, y: m.y, z: m.z });
+    s.events.push({ k: 'intercept', owner: c.owner, by: l.owner, id: l.id, shot: c.shot, what: c.hit ? 'hit' : 'missed', x: m.x, y: m.y, z: m.z, ...(c.silo ? { silo: c.silo } : {}) });
     if (!c.hit) continue;
     if (l.salvo) l.salvo[c.shot].gone = true;
     else left = false;

@@ -21,6 +21,8 @@ import { NAVAL, nearestWalkable, placeProblem, stampBuilding, walkable } from '.
 import { findDockSpot, findSpot, millSpotFor } from './sim/ai';
 import { channelPlan, dig, dykePlan, heldBack, waterLine } from './sim/water';
 import { bared, tideMillSpot, wakeTide } from './sim/tides';
+import { cocklerSpotNear } from './sim/tides';
+import { gateReach, tideGateSpotIn } from './sim/tides';
 import { barragePlan, isCauseway, kegTileProblem } from './sim/tides';
 import { isTidal, tidalLevel, tideClock, tideLevel } from './sim/tides';
 import { AI_FLOAT, FLOAT } from './sim/data';
@@ -2612,11 +2614,22 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         }
         break;
       case 'tideSwept':
+        // A rival's Tide Gate scoured the flats your people stood on (#785).
+        if (ev.by !== undefined && ev.by !== viewer && ev.owner === viewer && s.tick - sweptToldAt > TICK_HZ * 10) {
+          sweptToldAt = s.tick;
+          lastAlert = { x: ev.x, y: ev.y };
+          hud.toast(`🌊 ${s.players[ev.by]?.name ?? 'A rival'} opened a tide gate on your people on the flats: the pond scoured them off${ev.drowned ? ', and some drowned' : ', hurt'}. Read a rival's gate before you cross below it: loaded, it is a weapon. (Space to look)`, 'bad');
+          break;
+        }
         if (ev.owner === viewer && s.tick - sweptToldAt > TICK_HZ * 10) {
           sweptToldAt = s.tick;
           lastAlert = { x: ev.x, y: ev.y };
           hud.toast(ev.drowned ? '🌊 The tide took some of your people, caught far out on the flats. (Space to look)' : '🌊 The tide swept some of your people off the flats, hurt. (Space to look)', 'bad');
         }
+        break;
+      case 'tideGate':
+        // A Tide Gate (#785): your own scour, said with what it caught.
+        if (ev.owner === viewer && ev.open) hud.toast(ev.scour ? `🌊 The gate is open: the pond scours ${ev.scour} tiles of flats below it${ev.swept ? `, sweeping ${ev.swept} off them` : ''}. Shut it (O) to fill the pond on the next flood.` : '🚪 The gate is open: the pond runs with the tide. Shut it (O) to hold the next flood.', ev.swept ? 'good' : 'info');
         break;
       case 'tideAshore':
         // Work on the flats that reads the tide (#767): your workers leave the flats before the flood, said once in a while.
@@ -3128,8 +3141,9 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         const ours = s.players[viewer].team === s.players[ev.owner].team, theirs = s.players[viewer].team === s.players[ev.by].team;
         const who = s.players[ev.by].name;
         if (ev.what === 'fired') {
-          if (ours) hud.toast(`${ev.owner === viewer ? 'Your' : `${s.players[ev.owner].name}'s`} Interceptor Battery fires at ${who}'s warhead: ${Math.round(INTERCEPT.chance * 100)}% to stop it`, 'alert');
-          else if (theirs) hud.toast(`An interceptor rises to meet ${ev.by === viewer ? 'your' : `${who}'s`} warhead`, 'alert');
+          // A silo held in Reserve (#759 s3) fires a warhead of its store as the interceptor.
+          if (ours) hud.toast(`${ev.owner === viewer ? 'Your' : `${s.players[ev.owner].name}'s`} ${ev.silo ? 'Missile Silo, held in Reserve,' : 'Interceptor Battery'} fires at ${who}'s warhead: ${Math.round(INTERCEPT.chance * 100)}% to stop it${ev.silo && ev.owner === viewer ? ' (a warhead of your store spent)' : ''}`, 'alert');
+          else if (theirs) hud.toast(`${ev.silo ? 'A silo held in Reserve fires' : 'An interceptor rises'} to meet ${ev.by === viewer ? 'your' : `${who}'s`} warhead`, 'alert');
           play('interceptLaunch');
         } else if (ev.what === 'hit') {
           if (ours) hud.toast(`Intercepted! ${who}'s warhead is stopped in the sky: no blast, no fallout`, 'good');
@@ -3772,6 +3786,42 @@ function frame(now: number): void {
         }
     }
     return -1;
+  },
+  /**
+   * The Cockler's Hut (testing, #779): after `cockles(owner)` (the tide awake, two pickers on a bared bed), raise a finished hut by that
+   * bed and look at it. Returns the hut's id (0: no bed, or no room by it).
+   */
+  /**
+   * The Tide Gate (testing, #785): a second or so after `barrage(owner)` (once its causeways have settled into the flats), set a finished
+   * gate in the barrage where the computer would, select it and look at it. Open it with O at low water to see the scour. Called again at
+   * low water with `foes`, it puts that many of a rival's soldiers on the flats the gate would scour. Returns its id (0: none).
+   */
+  tideGate(owner: number, foes = 0) {
+    if (!game || !game.causewayBy) return 0;
+    const s = game;
+    const own: number[] = [];
+    const by = s.causewayBy!;
+    for (let i = 0; i < by.length; i++) if (by[i] === owner + 1) own.push(i);
+    const had = s.ents.find((e) => e.kind === 'building' && e.owner === owner && e.type === 'tidegate') as Building | undefined;
+    const spot = had ? null : tideGateSpotIn(s, own, owner);
+    if (!had && !spot) return 0;
+    const gate = had ?? placeBuilding(s, owner, 'tidegate', spot!.tx, spot!.ty, true);
+    const rival = s.players.find((q) => q.id !== owner && isEnemy(s, owner, q.id));
+    const below = gateReach(s, gate);
+    for (let k = 0; k < foes && rival && below.length; k++) spawnUnit(s, rival.id, 'infantry', (below[k % below.length] % s.w) + 0.5, Math.floor(below[k % below.length] / s.w) + 0.5);
+    setSelection([gate.id]);
+    view.rig.focus(gate.x, gate.y);
+    return gate.id;
+  },
+  cocklerHut(owner: number) {
+    if (!game) return 0;
+    const s = game;
+    const bed = (window as unknown as { ages: { cockles(o: number): number } }).ages.cockles(owner);
+    if (bed < 0) return 0;
+    const spot = cocklerSpotNear(s, bed, (x, y) => !placeProblem(s, 'cockler', x, y, true, owner));
+    if (!spot) return 0;
+    view.rig.focus(spot.tx + 1, spot.ty + 1);
+    return placeBuilding(s, owner, 'cockler', spot.tx, spot.ty, true).id;
   },
   /**
    * The Age of Locks (testing, #701 s5): turn a player to the age, dig the channel the computer would plan by its start deep into a

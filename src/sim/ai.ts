@@ -15,12 +15,17 @@ import { castProblem, mooringSpot, raisesCitizens } from './floating';
 import { pitchProblem } from './steppe';
 import { wallLine } from './commands';
 import { AI_COCKLE } from './data';
+import { AI_COCKLER, COCKLER } from './data';
+import { cocklerSpotNear } from './tides';
+import { AI_GATE } from './data';
+import { gateReach, gateRisk, tideGateProblem, tideGateSpotIn } from './tides';
+import { nearestDrop } from './world';
 import { ashoreLeft, bared, bedClock } from './tides';
 import { R_COCKLE } from './types';
 import { AI_BARRAGE, AI_EBB, INTERCEPT, SALVO } from './data';
 import { barragePlan, causewayOwner, ebbTiming, isCauseway, isPond, tideAwake, tideLevel } from './tides';
 import { statsOf } from './world';
-import { aimsOf, blastDamage, charged, flightOf, fuelOf, launchProblem, loaded, missilesAt, revealed, ringsFor, rulesOf, salvoFuel, salvoPeople, salvoProblem, salvoSilos, siloLimit, silosOf, warheadsOf, warnRadius, type WarheadKind } from './silo';
+import { aimsOf, blastDamage, charged, flightOf, fuelOf, held, launchProblem, loaded, missilesAt, revealed, ringsFor, rulesOf, salvoFuel, salvoPeople, salvoProblem, salvoSilos, siloLimit, silosOf, stockOf, warheadsOf, warnRadius, type WarheadKind } from './silo';
 import { carriedBy } from './relics';
 import { storesOre } from './caches';
 import { loadPrice, sellerNear } from './oretrade';
@@ -302,6 +307,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   floatWork(s, v, mem, issue);
   siloRoad(s, v, mem, issue);
   interceptorRoad(s, v, mem, issue);
+  reserveSilo(s, v, mem, issue);
   fireSilo(s, v, mem, issue);
   fleeWarhead(s, v, issue);
   steppeRoad(s, v, mem, issue);
@@ -1824,6 +1830,7 @@ function tideWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     }
   }
   if (ageDef(p).tides) barrageWork(s, v, mem, issue);
+  if (ageDef(p).tides) gateWork(s, v, mem, issue);
   if (ageDef(p).tides) cockleWork(s, v, mem, issue);
   if (!ageDef(p).tides || buildBarred(p, 'tidemill')) return;
   if (v.buildings.filter((b) => b.type === 'tidemill').length >= AI_TIDES.mills) return;
@@ -1857,9 +1864,12 @@ function cockleWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) =>
     const tree = findResource(s, R_TREE, u.x, u.y, 20);
     if (tree >= 0) issue({ t: 'gather', p: p.id, ids: [u.id], tile: tree });
   }
+  // A Cockler's Hut by the busiest bed (#779).
+  if (pickers.length) cocklerHutWork(s, v, mem, pickers, issue);
   if (n >= AI_COCKLE.hands) return;
+  const risk = gateRisk(s, p.id);
   const bed = findResource(s, R_COCKLE, v.home.x, v.home.y, AI_COCKLE.reach, (i) => {
-    if (!bared(s, i)) return true;
+    if (!bared(s, i) || (risk && risk(i))) return true;
     const c = bedClock(s, i);
     return !c || !c.bare || c.secs < AI_COCKLE.least;
   });
@@ -1872,6 +1882,40 @@ function cockleWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) =>
     .sort((a, b) => d(a) - d(b) || a.id - b.id)
     .slice(0, AI_COCKLE.hands - n);
   if (hands.length) issue({ t: 'gather', p: p.id, ids: hands.map((u) => u.id), tile: bed });
+}
+
+/**
+ * The computer's Cockler's Hut (#779): its busiest bed (the most pickers on it, then the lowest tile) that lies more than
+ * `AI_COCKLER.far` tiles from its nearest food store, with no hut of its within `COCKLER.reach`, gets one raised by it, the nearest spot
+ * that fits (`cocklerSpotNear`), no more often than every `AI_COCKLER.every` seconds.
+ */
+function cocklerHutWork(s: GameState, v: View, mem: AiMemory, pickers: Unit[], issue: (c: Command) => void): void {
+  const { p } = v;
+  if (buildBarred(p, 'cockler') || s.tick - (mem.ordered.cockler ?? -99999) < secs(AI_COCKLER.every)) return;
+  const load = new Map<number, number>();
+  for (const u of pickers) if (u.order.k === 'gather') load.set(u.order.tile, (load.get(u.order.tile) ?? 0) + 1);
+  let bed = -1;
+  let most = 0;
+  for (const [t, k] of load) {
+    if (k > most || (k === most && t < bed)) {
+      most = k;
+      bed = t;
+    }
+  }
+  if (bed < 0 || !s.cockles?.[bed]) return;
+  const bx = (bed % s.w) + 0.5;
+  const by = Math.floor(bed / s.w) + 0.5;
+  if (v.buildings.some((b) => b.type === 'cockler' && distToRect(bx, by, b) <= COCKLER.reach)) return;
+  const store = nearestDrop(s, p.id, 'food', bx, by);
+  if (store && distToRect(bx, by, store) <= AI_COCKLER.far) return;
+  mem.ordered.cockler = s.tick;
+  const cost = buildingCostFor(s, p.id, 'cockler');
+  if (!afford(v, cost)) {
+    spend(v, cost);
+    return;
+  }
+  const spot = cocklerSpotNear(s, bed, (tx, ty) => !placeProblem(s, 'cockler', tx, ty, true, p.id));
+  if (!spot || !construct(s, v, mem, 'cockler', spot, 1, issue)) spend(v, cost);
 }
 
 /**
@@ -1923,6 +1967,53 @@ function barrageWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) =
   issue({ t: 'wall', p: p.id, ids: crew.map((u) => u.id), x0: plan.from.x, y0: plan.from.y, x1: plan.to.x, y1: plan.to.y, causeway: true });
   spend(v, all);
   mem.ordered.causeway = s.tick;
+}
+
+/**
+ * The computer's Tide Gate (#785). With a barrage of its own standing and no gate, every `AI_GATE.every` seconds it sets one in it
+ * (`tideGateSpotIn`: of its causeway tiles by a pond, in tile order, the one nearest the middle with the sea on the far side). Every
+ * `AI_GATE.look` seconds after: with the gate shut and loaded, it opens it when `AI_GATE.threat` or more enemy land units stand on the
+ * flats it would scour, more than its own side's there; an open gate it shuts again `AI_GATE.shut` seconds on, to fill on the next flood.
+ */
+function gateWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!s.pond || !s.causewayBy || buildBarred(p, 'tidegate')) return;
+  const gate = v.buildings.find((b) => b.type === 'tidegate');
+  if (!gate) {
+    if (s.tick - (mem.ordered.tidegate ?? -99999) < secs(AI_GATE.every)) return;
+    mem.ordered.tidegate = s.tick;
+    const own: number[] = [];
+    for (let i = 0; i < s.causewayBy.length; i++) if (s.causewayBy[i] === p.id + 1) own.push(i);
+    if (!own.length) return;
+    const cost = buildingCostFor(s, p.id, 'tidegate');
+    if (!afford(v, cost)) {
+      spend(v, cost);
+      return;
+    }
+    const spot = tideGateSpotIn(s, own, p.id);
+    if (!spot || !construct(s, v, mem, 'tidegate', spot, 2, issue)) spend(v, cost);
+    return;
+  }
+  const m = (mem.tide ??= {});
+  if (!gate.built || s.tick - (m.gate ?? -99999) < secs(AI_GATE.look)) return;
+  m.gate = s.tick;
+  if (gate.open) {
+    if (s.tick - (m.opened ?? -99999) >= secs(AI_GATE.shut) && !tideGateProblem(s, gate)) issue({ t: 'pack', p: p.id, building: gate.id });
+    return;
+  }
+  const reach = gateReach(s, gate);
+  if (!reach.length) return;
+  const below = new Set(reach);
+  let foes = 0;
+  let ours = 0;
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || domainOf(e.type) !== 'land' || !below.has(Math.floor(e.y) * s.w + Math.floor(e.x))) continue;
+    if (isEnemy(s, p.id, e.owner)) foes++;
+    else ours++;
+  }
+  if (foes < AI_GATE.threat || foes <= ours) return;
+  issue({ t: 'pack', p: p.id, building: gate.id });
+  m.opened = s.tick;
 }
 
 /**
@@ -2265,7 +2356,8 @@ function fireSilo(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const { p } = v;
   if (p.epoch < 5) return;
   const ready = silosOf(s, p.id).filter((b) => s.tick - b.born >= secs(BUILDINGS.silo.time + AI_SILO.wait));
-  const silo = ready.find((b) => loaded(s, b));
+  // A silo held in Reserve (#759 s3) launches only when none other can: it is stood down first, so Reserve never stops the attack.
+  const silo = ready.find((b) => loaded(s, b) && !held(b)) ?? ready.find((b) => loaded(s, b));
   if (!silo) return;
   // Once a second, kept by the clock in memory: a computer thinks on ticks of its own (`memory`), which a tick count need never meet.
   if (s.tick - (mem.siloAt ?? -TICK_HZ) >= TICK_HZ) {
@@ -2300,8 +2392,12 @@ function fireSilo(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const aim = mem.siloAim;
   if (!aim || s.tick - aim.at > TICK_HZ * 2) return;
   if (aim.salvo) {
-    // A salvo planned holds the single strikes until the store holds three (and the fuel is set aside).
+    // A salvo planned holds the single strikes until the store holds three (and the fuel is set aside), and stands down a Reserve silo it needs.
     const from = salvoSilos(s, p.id, silo.id);
+    if (from.length < SALVO.trio) {
+      for (const b of ready) if (held(b)) issue({ t: 'reserve', p: p.id, silo: b.id, on: false });
+      return;
+    }
     const shots = aim.salvo.map((a, i) => ({ silo: from[i]?.id ?? -1, x: a.x, y: a.y }));
     const why = salvoProblem(s, p.id, shots);
     if (why === null) {
@@ -2311,11 +2407,30 @@ function fireSilo(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     return;
   }
   const w = aim.w ?? rulesOf(p).w;
-  const why = launchProblem(s, p.id, silo, aim.x, aim.y, w);
+  const why = launchProblem(s, p.id, held(silo) ? { ...silo, reserve: undefined } : silo, aim.x, aim.y, w);
   if (why === null) {
+    if (held(silo)) issue({ t: 'reserve', p: p.id, silo: silo.id, on: false });
     issue({ t: 'launch', p: p.id, silo: silo.id, x: aim.x, y: aim.y, w });
     mem.siloAim = undefined;
   } else if (why.startsWith("A warhead's fuel")) spend(v, fuelOf(w));
+}
+
+/**
+ * A silo held in Reserve (#759 s3): while a rival stands a silo, the computer holds its last silo (in id order) back to answer a warhead, if
+ * it stands two (the first keeps attacking) or its store is full (none is made while it waits), and not while a salvo pays (it needs all three).
+ * Otherwise it stands its Reserve down. It weighs this once every `INTERCEPT.think` seconds, by a clock in memory; `fireSilo` stands the
+ * silo down at once when it is the only one that can launch.
+ */
+function reserveSilo(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (p.epoch < 5 || s.tick - (mem.reserveAt ?? -99999) < secs(INTERCEPT.think)) return;
+  mem.reserveAt = s.tick;
+  const mine = silosOf(s, p.id);
+  const threat = s.players.some((o) => !o.defeated && isEnemy(s, p.id, o.id) && silosOf(s, o.id).length > 0);
+  const want = threat && mine.length > 0 && (mine.length >= 2 || stockOf(p) >= SILO.cap) && !(mem.salvoPays && salvoPeople(p));
+  const kept = mine.filter(held);
+  if (want && !kept.length) issue({ t: 'reserve', p: p.id, silo: mine[mine.length - 1].id, on: true });
+  else if (!want) for (const b of kept) issue({ t: 'reserve', p: p.id, silo: b.id, on: false });
 }
 
 /**

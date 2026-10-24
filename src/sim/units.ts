@@ -25,7 +25,7 @@ import { rubbleAt, salvages, strip } from './salvage';
 import { bank, cacheAt, lift } from './caches';
 import { buyLoad } from './oretrade';
 import { atFoot, carriesKegs, kegProblem, layKeg } from './powder';
-import { atTile, idleAshore, kegTileProblem, tideRoute, tideWorkHold } from './tides';
+import { atTile, cocklerDrop, idleAshore, kegTileProblem, tideRoute, tideWorkHold } from './tides';
 import { carriesTorch, ignite, onFire, torchProblem } from './fire';
 import { fieldBoost, wading } from './water';
 import { gardenMul, isField } from './grove';
@@ -196,7 +196,8 @@ function dropOff(s: GameState, u: Unit): 'done' | 'going' | 'none' {
   if (!u.carryRes || u.carry <= 0) return 'done';
   // On the way: the route ends beside the drop site, so look again only now and then (in case it fell).
   if (walking(u) && (s.tick + u.id) % 20 !== 0) return 'going';
-  const drop = nearestDrop(s, u.owner, u.carryRes, u.x, u.y, u.type === 'fisher');
+  // A basket of cockles goes to a Cockler's Hut if one stands nearer (#779).
+  const drop = cocklerDrop(s, u, nearestDrop(s, u.owner, u.carryRes, u.x, u.y, u.type === 'fisher'));
   if (!drop) return 'none';
   const r = statsOf(s, u).radius;
   if (distToRect(u.x, u.y, drop) - r <= REACH) {
@@ -620,7 +621,7 @@ export function completeBuilding(s: GameState, b: Building): void {
   b.hp = Math.min(b.hp, maxHp(s, b));
   s.players[b.owner].stats.built++;
   // A finished gate opens for its own side.
-  if (b.type === 'gate' || b.type === 'dyke' || b.type === 'sluice' || b.type === 'dam' || b.type === 'bridge' || b.type === 'pontoon' || b.type === 'thornwall') stampBuilding(s, b, true);
+  if (b.type === 'gate' || b.type === 'dyke' || b.type === 'sluice' || b.type === 'dam' || b.type === 'bridge' || b.type === 'pontoon' || b.type === 'thornwall' || b.type === 'tidegate') stampBuilding(s, b, true);
   if (b.type === 'wonder') {
     b.timer = s.wonderTime;
     s.events.push({ k: 'wonder', owner: b.owner, id: b.id, x: b.x, y: b.y, ticks: b.timer });
