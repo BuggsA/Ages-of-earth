@@ -41,7 +41,6 @@ import { attrition } from './borders';
 import { tributeStep } from './tribute';
 import { householdStep } from './household';
 import { longbowStep } from './longbow';
-import { sickStep } from './sickness';
 import { seraiStep, tollStep } from './passage';
 import { mercStep } from './merc';
 import { FINDS, KIN, NOMAD } from './data';
@@ -587,7 +586,6 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   tributeStep(s);
   householdStep(s);
   longbowStep(s);
-  sickStep(s);
   tollStep(s);
   mercStep(s);
   seraiStep(s);
@@ -678,8 +676,6 @@ export function checksum(s: GameState): number {
     mix(m.by);
   }
   for (const p of s.players) {
-    mix(p.taint ?? 0);
-    mix(p.fever?.sev ?? 0);
     mix(p.kegs ?? 0);
     mix(p.grind ?? 0);
   }

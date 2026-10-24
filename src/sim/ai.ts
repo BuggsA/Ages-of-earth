@@ -26,7 +26,7 @@ import { graftCost, stationsOf, waiting } from './hemo';
 import { borderMap, landOwnerAt, suppliedAt } from './borders';
 import { workProblem } from './works';
 import { aiKin, aiVow, aiWay, wayBarred } from './ways';
-import { AI_WAYS, AI_KEG, KEG, KILL_CAMP, KIN, SICKNESS, WAYS } from './data';
+import { AI_WAYS, AI_KEG, KEG, KILL_CAMP, KIN, WAYS } from './data';
 import { beaconProblem, lit } from './beacon';
 import { rallyProblem } from './rally';
 import { consecrateProblem, consecrates } from './consecrate';
@@ -1742,8 +1742,6 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     ['forge', p.epoch >= 1 && n >= 16 && count(v, 'forge') === 0],
     // Relics lying loose are worth a Temple early.
     ['temple', clever && p.epoch >= 1 && n >= 16 && count(v, 'temple') === 0 && looseRelics(s) > 0],
-    // The Sickness (#541): a Temple is its clinic, built as soon as the taint builds or the fever breaks.
-    ['temple', clever && p.epoch >= 1 && count(v, 'temple') === 0 && ailing(p)],
     ['tower', p.epoch >= 1 && count(v, 'tower') < L.towers && n >= 16],
     ['market', clever && p.epoch >= 1 && n >= 20 && count(v, 'market') === 0],
     // A nomad people (#501) buys its stone: its Market comes early, at every level of play.
@@ -4030,7 +4028,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     if (b.type === 'market' && !hiresAt(p, b.type).length) continue;
     let unit: UnitType | null;
     if (b.type === 'workshop') unit = siege < Math.max(v.plan.siege, p.epoch >= 2 ? 3 : 2) + lodge + bleeds && (v.army.length >= 6 || siege < v.plan.siege) ? 'siege' : null;
-    else if (b.type === 'temple') unit = v.priests.length < (ailing(p) ? SICKNESS.tendMost : 0) + (v.army.length >= 6 ? Math.max(consecrates(s, p.id) ? AI_FAITH.priests : 2, L.clever && ageDef(p).rite ? AI_FORK.priests : 0) : 0) + (looseRelics(s) > 0 ? 1 : 0) + (vigilPost(s, v) ? VIGIL.most : 0) + (ageDef(p).missions ? 1 : 0) ? 'priest' : null;
+    else if (b.type === 'temple') unit = v.priests.length < (v.army.length >= 6 ? Math.max(consecrates(s, p.id) ? AI_FAITH.priests : 2, L.clever && ageDef(p).rite ? AI_FORK.priests : 0) : 0) + (looseRelics(s) > 0 ? 1 : 0) + (vigilPost(s, v) ? VIGIL.most : 0) + (ageDef(p).missions ? 1 : 0) ? 'priest' : null;
     else {
       unit = counter && trains.includes(counter) && unitEpoch(counter) <= p.epoch && !barred(p, counter, b.type) && roll(s) < counterOdds ? counter : pickUnit(v, mem, b);
       if (unit && unitEpoch(unit) > p.epoch) unit = pickUnit(v, mem, b);
@@ -4594,33 +4592,9 @@ export function breakOath(s: GameState, v: View, fighters: Unit[], issue: (c: Co
   if (go.length) issue({ t: 'attack', p: p.id, ids: go.map((h) => h.id), target: target.id });
 }
 
-// ---- Priests and sickness -------------------------------------------------------------------------
-
-/** Whether the town is sick, or soon will be (#541): fever, or taint past `SICKNESS.aiTemple`. */
-const ailing = (p: Player): boolean => !!p.fever || (p.taint ?? 0) >= SICKNESS.aiTemple;
-
-/**
- * The Sickness (#541): the computer keeps quarantine while the fever runs above `aiQuarantine` and lifts it when the town is well, and
- * while it is sick its priests wait by the Temple (idle ones walk back to it) to nurse the town.
- */
-function nurse(s: GameState, v: View, issue: (c: Command) => void): void {
-  const { p } = v;
-  if (!AI_LEVELS[p.ai!].clever) return;
-  const bad = !!p.fever && p.fever.sev >= SICKNESS.aiQuarantine;
-  if (bad && !p.quarantine && v.traders.length) issue({ t: 'quarantine', p: p.id, on: true });
-  else if (!p.fever && p.quarantine) issue({ t: 'quarantine', p: p.id, on: false });
-  if (!p.fever) return;
-  const temple = v.buildings.find((b) => b.type === 'temple' && b.built && b.hp > 0);
-  if (!temple) return;
-  const near = SICKNESS.aiTend * SICKNESS.aiTend;
-  for (const pr of v.priests) {
-    if (pr.inside || carriedBy(s, pr) || pr.order.k !== 'idle') continue;
-    if ((pr.x - temple.x) * (pr.x - temple.x) + (pr.y - temple.y) * (pr.y - temple.y) > near) issue({ t: 'move', p: p.id, ids: [pr.id], x: temple.x, y: temple.y + 3 });
-  }
-}
+// ---- Priests --------------------------------------------------------------------------------------
 
 function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
-  nurse(s, v, issue);
   if (!v.priests.length) return;
   chantBand(s, v, issue);
   const army = v.army.filter((u) => !u.inside && u.type !== 'siege');
@@ -4913,7 +4887,7 @@ function roadLength(pts: number[]): number {
  */
 function merchants(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
-  if (!s.posts.length || p.epoch < 1 || v.citizens.length < 18 || p.quarantine) return;
+  if (!s.posts.length || p.epoch < 1 || v.citizens.length < 18) return;
   const market = v.buildings.find((b) => b.type === 'market' && b.built);
   if (!market) return;
   // Traders that were on the road last turn and are gone now were lost on it: keep off that road a while.
