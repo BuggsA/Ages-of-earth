@@ -46,6 +46,7 @@ import { isCoppice } from './coppice';
 import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
+import { AI_TEMPER, ROUTES, TRUNK, type RouteId } from './data';
 import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
@@ -129,6 +130,36 @@ const TECH_ORDER: TechId[] = [
 const TRADER_WARY = 240;
 const ECONOMY: TechId[] = ['plow', 'axes', 'wheelbarrow', 'picks', 'irrigation', 'saws', 'shafts', 'handcart', 'gillnets', 'steamEngine'];
 
+// ---- A leaning (#749) -----------------------------------------------------------------------------
+
+/** The side ages standing on a route that suit this people (`fit`), oldest tier first. */
+function leanAges(p: Player, route: RouteId): AgeId[] {
+  return (Object.keys(AGES) as AgeId[]).filter((a) => !TRUNK.includes(a) && AGES[a].routes?.includes(route) && fit(p, a) >= 0).sort((a, b) => AGES[a].tier - AGES[b].tier);
+}
+
+/**
+ * Settled once, on a seat's first turn (#749): a clever computer in a skirmish favours a route `AI_TEMPER.lean` of the time, on
+ * coins of its own so no other choice's dice shift, and chooses that route's side ages from the start, as the route sweeps do
+ * (`src/sim/routePlay.ts`). The rest of the web is left to its usual coins, so it still turns off where the land says to.
+ */
+function settleLean(s: GameState, p: Player, mem: AiMemory): void {
+  mem.lean = 'none';
+  if (s.scenario || !AI_LEVELS[p.ai!].clever || AI_LEVELS[p.ai!].lean === false || coin(s, p.id, 0x7e4a) >= AI_TEMPER.lean) return;
+  const wet = s.mapType === 'lakes' || s.mapType === 'sea';
+  const open = (Object.keys(ROUTES) as RouteId[]).filter((r) => r !== 'plain' && (wet || (r !== 'navy' && r !== 'water')) && leanAges(p, r).length > 0);
+  if (!open.length) return;
+  const route = open[Math.floor(coin(s, p.id, 0x7e4b) * open.length)];
+  mem.lean = route;
+  const roads = (mem.roads ??= {});
+  for (const a of leanAges(p, route)) roads[a] ??= true;
+}
+
+/** The leaning a computer seat has settled on (#749), or null for a person or a seat with an open mind. */
+export function leanOf(s: GameState, owner: number): RouteId | null {
+  const l = s.ai[owner]?.lean;
+  return l && l !== 'none' ? l : null;
+}
+
 // ---- The turn -------------------------------------------------------------------------------------
 
 export function aiStep(s: GameState): void {
@@ -137,6 +168,7 @@ export function aiStep(s: GameState): void {
     const mem = memory(s, p.id);
     if (s.tick < mem.next) continue;
     mem.next = s.tick + secs(AI_LEVELS[p.ai].think);
+    if (mem.lean === undefined) settleLean(s, p, mem);
     think(s, p, mem);
   }
 }
@@ -3737,6 +3769,16 @@ function nearestDropTo(v: View, u: Unit): { x: number; y: number } {
 // ---- Army ------------------------------------------------------------------------------------------
 
 /** Where to strike: an enemy wonder first (it must fall), then a King (or where one shelters), then the nearest Town Center. */
+/** A rival whose weak window after a step back is open now (#749), and where its Town Center stands; in id order, the first. */
+function windowOpen(s: GameState, p: Player): { x: number; y: number } | null {
+  for (const q of s.players) {
+    if (q.defeated || !isEnemy(s, p.id, q.id) || q.backAt === undefined || s.tick - q.backAt >= secs(STEP_BACK.time)) continue;
+    const tc = townCenters(s, q.id)[0];
+    if (tc) return { x: tc.x, y: tc.y };
+  }
+  return null;
+}
+
 function enemyHome(s: GameState, p: Player): { x: number; y: number } {
   let best: { x: number; y: number } | null = null;
   let bestD = Infinity;
@@ -5088,6 +5130,18 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     const band = camp ? ready.filter(prowler) : [];
     if (camp && band.length >= AI_BLOOD.strike) {
       issue({ t: 'move', p: p.id, ids: band.map((u) => u.id), x: camp.x, y: camp.y, amove: true });
+      return;
+    }
+  }
+  // A rival's weak window after a step back (#749): it was announced to all, and a smaller wave than usual strikes while it is open.
+  // Not in a campaign chapter, whose play stays as its proof found it.
+  if (L.clever && L.strike !== false && !s.scenario && !mem.attacking && !plan.hold && s.tick >= s.peaceUntil) {
+    const weak = windowOpen(s, p);
+    if (weak && fighters.length >= Math.max(AI_TEMPER.least, Math.ceil(waveSize * AI_TEMPER.strike))) {
+      issue({ t: 'move', p: p.id, ids: fighters.map((u) => u.id), x: weak.x, y: weak.y, amove: true });
+      mem.attacking = true;
+      mem.wave++;
+      delete mem.prowl;
       return;
     }
   }

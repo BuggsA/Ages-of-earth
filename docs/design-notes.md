@@ -1313,6 +1313,14 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 
 **Next:** Rematch in online rooms (same seats); the codex of roads (#724 step 7) can read the same journey; the computer's temperament (step 4) could be shown here as "Wu Zetian favours the Steppe".
 
+## Designers' notes: rivals with a leaning (2026-10-24, #749)
+
+**Built:** a clever computer in a skirmish settles on its first turn whether it favours a route (on coins of its own, 60% of seats), and if so chooses that route's side ages from the start, the way the route sweeps commit a seat. Its card in Rivals names the leaning once its road gives it away; the end screen always does. And every clever computer now punishes a step back: while a rival's weak window is open it sends a wave half the usual size.
+
+**Why I love it:** the step back was a free move against the computer; now it is a gamble you take with its army in mind. And a rival with a character gives you something to read: once you see the Steppe in its road, you know the wagons are coming again next age.
+
+**Next:** the second half of step 4, a habit with going back (one that hoards crossings, one that never retreats, one that steps back to bait you onto its walls); a rival name that says its leaning before the road does, for players who'd like it said.
+
 ## Designers' notes: the Water Road, the Age of Tides (#739, s6 of #701, 2026-10-24, chain 1024-1330 s1, lane rules)
 
 **Built:** a tide clock in the rules (`src/sim/tides.ts`): asleep until the first people enters the Age of Tides, then running for everyone from high water, a step every 30 seconds through three levels to low water and back. The tidal ground is its own layer (`GameState.tidal`), laid out once when the tide wakes: open sea whose bed (the mean of its corners) is shallow enough, three bands by depth. Bared, a tile is wet sand anyone walks and no ship sails; covered again, it sinks back to its own bed (`tideBed`), exactly. Whoever is on the flats as the water comes back is swept ashore and hurt. Tide Mills grind gold at each turn, from the flats near them, a tile to one mill. Causeways are flats you lay yourself, down to deeper water, that only high water covers. A Dock with no water within two tiles is aground. The computer saves for the turn, raises mills where the flats are widest, and pulls its people off the flats a few seconds before the flood.

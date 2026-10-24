@@ -3052,6 +3052,10 @@ export interface AiLevel {
   hemo?: boolean;
   /** Off: the computer never takes the fork past Total War (#355 s5; only `scripts/ai-ab.ts` turns it off). */
   fork?: boolean;
+  /** Off: no leaning toward a route (#749; only to judge it with `scripts/ai-ab.ts`). */
+  lean?: boolean;
+  /** Off: no wave sent at a rival's weak window after a step back (#749; only to judge it). */
+  strike?: boolean;
   /** Off: the town trains hands on while a climb is paid for (#555; only `scripts/ai-ab.ts` turns it off). */
   climbHold?: boolean;
   /** Off: the Stone Age climb neither waits on a Prospector's Lodge that is due nor saves its price (#540; only `scripts/ai-ab.ts` turns it off). */
@@ -3303,6 +3307,13 @@ export const AI_CLIMB = { banked: 0.6 };
  */
 export const AI_ASSAY = { reach: 36, riders: 3 };
 /** `lodgeWait`: seconds at most the Stone Age climb is held while a Prospector's Lodge it means to raise is due (#540). */
+/**
+ * Rivals with a leaning (#749, `docs/engagement.md` Phase 3): a clever computer in a skirmish favours a route a `lean` share of the
+ * time, choosing that route's side ages from its first turn (the navy and the water road only on a map with water). And while a
+ * rival's weak window after a step back is open, it strikes with `strike` of a full wave (at least `least` soldiers).
+ */
+export const AI_TEMPER = { lean: 0.6, strike: 0.5, least: 6 };
+
 export const AI_WEB = { lodgeWait: 120, take: 0.6, heir: 1, survey: 22, diggers: 3, nearly: 0.5, patience: 90, close: 0.75, relics: 2, raid: 18, raidNear: 30, riders: 4, read: 0.85, lodge: 1, hulls: 1, bell: 900 };
 
 // ---- Colours, names and lookups -------------------------------------------------------------------
