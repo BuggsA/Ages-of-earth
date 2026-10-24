@@ -630,7 +630,7 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
   if (u.resume) {
     const back = u.resume;
     u.resume = null;
-    if (back.k === 'gather' || back.k === 'farm' || back.k === 'snare' || back.k === 'shaft') {
+    if (back.k === 'gather' || back.k === 'farm' || back.k === 'snare' || back.k === 'shaft' || back.k === 'milk') {
       setOrder(u, back);
       return;
     }

@@ -13,6 +13,7 @@ import { findResource, freeFarm } from '../src/sim/units';
 import { workforce } from '../src/sim/labor';
 import { mineable } from '../src/sim/household';
 import { townCenters } from '../src/sim/world';
+import { snareSpot } from '../src/sim/snares';
 import { R_BERRY, R_GOLD, R_STONE, R_TREE } from '../src/sim/types';
 import type { BuildingType, CivId, Command, GameState, Job, Order, Unit } from '../src/sim/types';
 
@@ -39,15 +40,20 @@ export function townAudit(civ: CivId, seed: number, minutes: number, size: 'smal
     const cost = BUILDINGS[type].cost;
     for (const r of ['food', 'wood', 'stone', 'gold'] as const) if ((cost[r] ?? 0) > p.res[r]) return false;
     const u = mine.find((c) => c.order.k === 'gather' && c.order.res === 'wood') ?? mine.find((c) => c.order.k === 'idle') ?? mine[0];
-    const spot = u && findSpot(s, type, x, y, minR, maxR);
+    // A snare goes among standing trees (`snareSpot`), by the wood nearest the hand.
+    const tree = type === 'snare' && u ? findResource(s, R_TREE, u.x, u.y, 30) : -1;
+    if (tree >= 0) { x = (tree % s.w) + 0.5; y = Math.floor(tree / s.w) + 0.5; }
+    const spot = u && findSpot(s, type, x, y, type === 'snare' ? 0 : minR, maxR, 1, type === 'snare' ? (tx, ty) => !snareSpot(s, tx, ty) : undefined);
     if (!u || !spot) return false;
     cmds.push({ t: 'build', p: 0, ids: [u.id], type, tx: spot.tx, ty: spot.ty });
     orders++;
     return true;
   };
   const farmOf = (): BuildingType => (civ === 'britons' ? 'snare' : 'farm');
+  // The Workers panel said last time that it found no food: lay a field (or a snare) as a person would.
+  let starved = false;
   const raising = () => new Set(s.ents.flatMap((e) => (e.kind === 'unit' && e.owner === 0 && e.order.k === 'build' ? [e.order.target] : [])));
-  const foodInReach = (u: Unit): boolean => findResource(s, R_BERRY, u.x, u.y, LABOR.reach) >= 0 || !!freeFarm(s, 0, u.x, u.y, LABOR.reach, raising());
+  const noField = (u: Unit): boolean => findResource(s, R_BERRY, u.x, u.y, LABOR.reach) < 0 && !freeFarm(s, 0, u.x, u.y, LABOR.reach, raising());
   const refused = new Map<string, number>();
   for (let i = 0; i < minutes * 60 * 20 && !s.over; i++) {
     const cmds: Command[] = [];
@@ -78,8 +84,9 @@ export function townAudit(civ: CivId, seed: number, minutes: number, size: 'smal
         const order = SPLIT.filter(([j]) => (j !== 'gold' || mineable(p, R_GOLD))).sort((a, b) => gap(b[0], b[1]) - gap(a[0], a[1]));
         const to = order[0][0];
         // No bush, carcass or free field in reach: a person lays a field (or a snare where fields are barred) with one of them.
-        if (to === 'food' && !foodInReach(ready[0]) && raise(cmds, [ready[0]], farmOf(), ready[0].x, ready[0].y, 1, 10)) ready.shift();
-        if (ready.length) cmds.push({ t: 'reassign', p: 0, from: 'idle', to, n: ready.length });
+        if (to === 'food' && (starved || (civ !== 'britons' && civ !== 'mongols' && noField(ready[0]))) && raise(cmds, [ready[0]], farmOf(), ready[0].x, ready[0].y, 1, 10)) ready.shift();
+        // Failing that, the next job behind: hands the first can't place go on to it (the panel moves only the idle).
+        if (ready.length) for (const [j] of order) cmds.push({ t: 'reassign', p: 0, from: 'idle', to: j, n: ready.length });
         orders++;
         for (const u of ready) idleSince.delete(u.id);
       }
@@ -95,7 +102,8 @@ export function townAudit(civ: CivId, seed: number, minutes: number, size: 'smal
       last.set(u.id, now ? (was === undefined ? 'new' : 'idle') : label(u.order));
     }
     step(s, cmds);
-    for (const e of s.events) if (e.k === 'refused' && e.owner === 0) refused.set(e.why, (refused.get(e.why) ?? 0) + 1);
+    for (const e of s.events) if (e.k === 'refused' && e.owner === 0 && e.why !== 'No one is idle') refused.set(e.why, (refused.get(e.why) ?? 0) + 1);
+    if (i % 20 === 0) starved = s.events.some((e) => e.k === 'refused' && e.owner === 0 && e.why.startsWith('No free food'));
   }
   return { causes, refused, idleSec: idleTicks / 20, orders, cit: s.ents.filter((e) => e.kind === 'unit' && e.owner === 0 && e.type === 'citizen').length };
 }
