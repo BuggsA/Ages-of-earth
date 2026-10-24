@@ -112,7 +112,8 @@ export function spoilsStep(s: GameState): void {
     if (u.kind !== 'unit' || !u.spoils || u.hp <= 0) continue;
     if (raids(s, u.owner)) {
       raidStep(s, u);
-      continue;
+      // A Golden Age (#703) that weaves the Warband too banks a pack at home as well as by ship.
+      if (!u.spoils || !ageDef(s.players[u.owner]).haul || !homeNear(s, u)) continue;
     }
     if (hauls(s, u.owner) && !homeNear(s, u)) continue;
     bank(s, u);

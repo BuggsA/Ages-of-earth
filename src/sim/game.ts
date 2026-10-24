@@ -16,7 +16,7 @@ import { markGoals, scenarioStep, startScenario } from './campaign';
 import { buildingGuns, updateShots } from './combat';
 import { fleeStep } from './flee';
 import { applyCommand } from './commands';
-import { AGES, AURA, AUTO_WORK, unitEpoch, CIV_IDS, HEART, LANDMARKS, RAIDER, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, TOWER_LEVELS, WONDER_SECONDS, secs } from './data';
+import { AGES, AURA, AUTO_WORK, TICK_HZ, unitEpoch, CIV_IDS, HEART, LANDMARKS, RAIDER, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, TOWER_LEVELS, WONDER_SECONDS, secs } from './data';
 import { AIR, NAVAL, stampBuilding } from './grid';
 import { denWolves, generateMap } from './mapgen';
 import { Spatial } from './spatial';
@@ -47,7 +47,7 @@ import { longbowStep } from './longbow';
 import { seraiStep, tollStep } from './passage';
 import { mercStep } from './merc';
 import { FINDS, KIN, NOMAD } from './data';
-import { ageOf, chartLand, isHire, barred, journeyOf, markKeepsake, noteWalked, trainsAt, workSteps } from './ages';
+import { ageOf, goldenEnds, threadsOf, chartLand, isHire, barred, journeyOf, markKeepsake, noteWalked, trainsAt, workSteps } from './ages';
 import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, HomelandId, MapSize, MapType, Player, UnitType } from './types';
 import { RARES, RES, R_FISH, R_NONE } from './types';
 import { legionKind, legionary } from './legion';
@@ -295,6 +295,33 @@ export function enterAge(s: GameState, p: Player, to: AgeId, back = false): void
     e.queue = keep;
   }
   s.events.push({ k: 'epoch', owner: p.id, epoch: p.epoch, age: to, ...(back ? { back: true } : {}) });
+  // The Golden Age (#703): its clock starts, and every people hears of it, with the hour it ends.
+  if (AGES[to].golden && !AGES[from].golden) {
+    p.goldenAt = s.tick;
+    s.events.push({ k: 'golden', owner: p.id, threads: threadsOf(p), ends: goldenEnds(p)! });
+  } else if (AGES[from].golden && !AGES[to].golden) {
+    delete p.goldenAt;
+    s.events.push({ k: 'golden', owner: p.id, threads: [], ends: s.tick, over: true });
+  }
+}
+
+/** Once a second (#703): a Golden Age whose span has run out ends, and its people wakes in the Gunpowder Age. In id order. */
+export function goldenStep(s: GameState): void {
+  if (s.tick % TICK_HZ !== 0) return;
+  for (const p of s.players) {
+    const ends = goldenEnds(p);
+    if (ends === undefined || s.tick < ends) continue;
+    // A journey under way at a Town Center stands down, its price given back: the road it was on is gone.
+    for (const b of s.ents) {
+      if (b.kind !== 'building' || b.owner !== p.id || b.advance < 0) continue;
+      const road = journeyOf(p, b);
+      if (road) refund(p, road.cost);
+      b.advance = -1;
+      delete b.advanceTo;
+      delete b.back;
+    }
+    enterAge(s, p, 'gunpowder');
+  }
 }
 
 function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
@@ -612,6 +639,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   seraiStep(s);
   workStep(s);
   beaconStep(s);
+  goldenStep(s);
   warCampStep(s);
   missionStep(s);
   spoilsStep(s);

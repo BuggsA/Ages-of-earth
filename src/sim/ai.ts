@@ -6,7 +6,7 @@ import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, raiseProblem, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Rubble, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
-import { backProblem, backTo, ageDef, ageOf, asleep, barred, buildBarred, crossingLeft, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
+import { backProblem, backTo, ageDef, ageOf, asleep, barred, buildBarred, crossingLeft, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadProblem, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
 import { grindersOf, kegsOf, millProblem, mills, sappers } from './powder';
 import { launchProblem, loaded, rulesOf, silosOf } from './silo';
 import { carriedBy } from './relics';
@@ -687,6 +687,8 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
     }
   }
   delete mem.waiting;
+  // In a Golden Age (#703) it rides the span out rather than climb, which would end it.
+  if (AGES[ageOf(p)].golden) return null;
   // An Industrial town bound for one of the two futures (Aeronauts, Lightning) doesn't climb on to the Atomic Age first (#605): `AI_SILO.hold` seconds at most.
   if (walksWeb(v) && p.epoch === 4 && roadsFrom(p).some((r) => isSideRoad(r) && AGES[r.to].tier === p.epoch && mem.roads?.[r.to] === true && roadKnown(s, p, r))) {
     mem.sideHold ??= s.tick;
@@ -776,6 +778,11 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   const toAlchemy = here === 'middle' && mem.roads?.alchemy === true && veinSeen(s, p, ALCHEMY_ROAD);
   for (const r of roadsFrom(p)) {
     if (AGES[r.to].tier !== p.epoch || (forking && r.to === 'totalwar')) continue;
+    // The Golden Age (#703): a people that has lived enough lives takes it the moment its road opens. It is too good to pass by.
+    if (r.to === 'golden') {
+      if (!roadProblem(s, p, r)) return { road: r, wait: false };
+      continue;
+    }
     // Bound for the Sea-Raiders (#585), it doesn't turn again into a sibling it has walked: the other is the plan.
     if (seaBound?.crossing!.includes(r.to) && hasWalked(p, r.to)) continue;
     if (toAlchemy && r.to !== 'alchemy' && isSideRoad(r)) continue;

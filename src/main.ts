@@ -2577,6 +2577,24 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         }
         break;
       }
+      case 'golden': {
+        // A Golden Age (#703): told to every people, with the ages it weaves and when it ends.
+        const who = s.players[ev.owner].name;
+        const woven = ev.threads.map((a) => AGES[a].short).join(', ');
+        const mins = Math.round((ev.ends - s.tick) / TICK_HZ / 60);
+        if (ev.over) {
+          if (ev.owner === viewer) hud.banner('The Golden Age ends', 'Your people wakes in the Gunpowder Age. Every thread falls asleep, and the road will not open again.', 5500);
+          else hud.toast(`🌅 The Golden Age of ${who} is over: its threads sleep`, 'good');
+          if (ev.owner === viewer) play('stepBack');
+        } else if (ev.owner === viewer) {
+          setTimeout(() => play('golden'), 1200);
+          hud.toast(`✨ Woven together for ${mins} minutes: ${woven}`, 'good');
+        } else {
+          hud.banner(`${who}: a Golden Age`, `Every way of life ${who} has lived wakes at once (${woven}), with none of their prices, for ${mins} minutes. Hold out, and strike when it ends.`, 6500);
+          play('golden');
+        }
+        break;
+      }
       case 'keepsake':
         // A people left an age (#555 s11): one building keeps its work.
         if (ev.owner === viewer) {

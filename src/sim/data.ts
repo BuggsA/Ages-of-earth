@@ -149,6 +149,11 @@ export interface Age {
   missions?: boolean;
   /** What a line of soldiers is called here (the Age of Chariots' riders are chariots, #555 s12). */
   names?: Partial<Record<UnitType, string>>;
+  /**
+   * The Golden Age (#703): every side age the people has walked wakes at once, its verbs and the best of its gifts with none of its
+   * doors (`weave` in `ages.ts`), until `GOLDEN.span` runs out and the people wakes in the Gunpowder Age, for good.
+   */
+  golden?: boolean;
 }
 
 /**
@@ -599,6 +604,19 @@ export const AGES: Record<AgeId, Age> = {
     noBuild: { buildings: ['wall', 'gate'], why: 'A missionary people raises no walls or gates: its faith goes out unarmed. They wait until it comes home to the Middle Ages or climbs on' },
     no: { units: ['siege'], why: 'A missionary people builds no siege engines: rams and catapults wait until it leaves the missions\' road' },
   },
+  // The Golden Age (#703): the age that feels almost too good. A turn off the Gunpowder Age for a people that has lived many lives.
+  golden: {
+    verb: 'Live every life your people has walked at once: every side age it stood in wakes together, its ways and the best of its gifts, with none of its doors',
+    door: 'It ends: after its span the people wakes in the Gunpowder Age, every thread asleep, and the road never opens again; and every rival is told, with the hour it ends',
+    good: 'Everything at once, for a while: the richer the road you walked, the richer the age',
+    routes: [],
+    name: 'Golden Age',
+    short: 'Golden',
+    tier: 3,
+    blurb: 'Every people tells of one: Pericles\' Athens, the House of Wisdom in Baghdad, the Tang, Mali under Mansa Musa. A people that has lived many lives draws them together: every side age it has walked wakes at once. Hired swords and hauled plunder, chanting priests and a town on wagons, convoys and coils, whatever it learned on the road, all of it, and none of the prices those ages asked. Buildings that slept wake. It burns for 6 minutes, a minute more for every age walked past the third (up to 10), and every rival is told when it began and when it ends. Then it is over for good: the people wakes in the Gunpowder Age with every thread asleep.',
+    mul: { buildSpeed: 1.2 },
+    golden: true,
+  },
 };
 
 // ---- What the side ages give ----------------------------------------------------------------------
@@ -748,6 +766,10 @@ export interface Road {
    * walked. Seen once either is walked, open only with both. (`walked` stays one age: read-only tests read it as one.)
    */
   crossing?: [AgeId, AgeId];
+  /**
+   * A road for a people that has lived many lives (the Golden Age, #703): seen once it has walked `seen` side ages, open with `n`.
+   */
+  lives?: { seen: number; n: number };
   /**
    * How hard the door is (#348): an easy on-ramp (a small deed, a modest price) invites a people to try the
    * web; a hard gate (a dear price, a long journey) marks the special ages. Most roads carry neither, and
@@ -1060,6 +1082,18 @@ export const ROADS: Road[] = [
   { from: 'missions', to: 'gunpowder', cost: { food: 900, wood: 400, gold: 500, stone: 200 }, time: 65, blurb: 'Climb to the Gunpowder Age: the Missions sleep, their tithe unpaid, and wake if your people turns missionary again.' },
   { from: 'searaider', to: 'middle', cost: { food: 200, wood: 150 }, time: 25, blurb: 'Draw the longships up: the ordinary Middle Ages, with traders, and plunder no longer taken. Gold still in packs and holds is banked where it stands.' },
   { from: 'searaider', to: 'gunpowder', cost: { food: 900, wood: 500, gold: 500, stone: 150 }, time: 65, blurb: 'Climb to the Gunpowder Age: the raids end, traders return, and every pack and hold still laden is banked where it stands (more wood and less gold than from the Middle Ages: the fortune was in the ships).' },
+  // The Golden Age (#703): heard of by a people that has walked two side ages, open to one that has walked three. It ends on its own (`GOLDEN.span`).
+  {
+    from: 'gunpowder',
+    to: 'golden',
+    cost: { food: 900, wood: 400, gold: 900, stone: 300 },
+    time: 60,
+    gate: 'hard',
+    lives: { seen: 2, n: 3 },
+    shuns: 'golden',
+    blurb: 'A turn, not a climb, for a people that has lived many lives: every side age it has walked wakes at once, with none of its doors, for a few minutes. Then it ends for good, and every rival knows when.',
+  },
+  { from: 'golden', to: 'industrial', cost: EPOCHS[4].cost, time: EPOCHS[4].time, blurb: 'Climb to the Industrial Age before the gold runs out: the Golden Age ends now, for good, and every thread falls asleep.' },
 ];
 
 /**
@@ -1078,6 +1112,13 @@ export const SEA_RAID = { hold: 400, dock: 6, home: 150 };
  * under the new order. `time` is seconds at the Town Center; `cooldown` is seconds after a step lands
  * before the next may begin, so a people can't flicker between ages to dodge a counter.
  */
+/**
+ * The Golden Age (#703): it burns `span` seconds, `more` seconds longer for every side age walked past the road's `n`, up to `most`.
+ * Mods that are boons below 1 (the rest are boons above it), so the weave takes the best of each thread.
+ */
+export const GOLDEN = { span: 360, more: 60, most: 600 };
+export const LOWER_IS_BETTER: (keyof Mods)[] = ['militaryTrain', 'rangedTrain', 'techCost', 'wonderCost', 'rot', 'beastWard'];
+
 export const STEP_BACK = { food: 100, gold: 50, time: 25, cooldown: 300 };
 export const stepBackCost = (tier: number): Cost => ({ food: STEP_BACK.food * tier, gold: STEP_BACK.gold * tier });
 
