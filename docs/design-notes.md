@@ -1268,6 +1268,21 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 
 **Next:** the Water Line (s4) is this rule run backwards on purpose: sluices that let the sea into your own low ground while the enemy walks across it, and `wading` for flooded fields. A dyke's "holds back" number would make a good tower-like warning ring on the minimap.
 
+## Designers' notes: the Water Road, the Age of the Water Line (#701 s4, 2026-10-24, chain 1024-2000 s4, lane rules)
+
+**Built:** the Water Road's Gunpowder tier. Sluices (a gate in your own dyke, on a channel, or on the shallows) that you open to let the water out over your low ground, a ring a second, up to 7 tiles, and shut to let it drain away. The flood is knee-deep: soldiers wade it at 30%, siege bogs down to 10%, fields under it yield nothing, and buildings, woods and rises stand out of it as islands. Gun-barges, launched from the sluice, sail the sea, the channels and the flood, and pass through any sluice like a lock. The computer climbs to it from the Dykes, sets a sluice where it floods most, keeps two barges and opens the gate while an army stands by it.
+
+**Why I love it:** it's the one defence in the game you have to *time*. A wall is up or it isn't; a sluice is a gamble you take as the enemy army walks onto your fields: too early and they go round and you've drowned your own harvest for nothing, too late and they're through. And for the attacker it reads instantly: the meadow in front of you goes glassy, your rams slow to a crawl, and flat boats with cannon start nosing across it. It's history I find moving too: the Hollandse Waterlinie, a country that made itself an island on purpose.
+
+**Choices I made (the owner may revert):**
+- The flood doesn't touch the ground's heights: it lies over them, and the renderer draws a sheet of water on top. "Low" is relative to the sluice's lowest bank (`INUND.rise` over it), so a sluice on a channel through high meadow floods that meadow, and the age works on dry maps (continental, highlands) as well as on polder. An absolute height would have shut it on every map but lakes.
+- Siege can still enter the flood, at a tenth of its pace, rather than being barred from it: a per-unit pathing rule would have touched every route in the game. It reads as "can't cross" under fire.
+- Only gun-barges sail the flood; galleons and transports stay on the open sea. A barge passes any finished sluice, anyone's, as a lock, so a rival in the same age can come through yours.
+- Opening a sluice reuses the `pack` order at a Sluice: `tests/command-ownership.test.ts` pins the list of command kinds.
+- A sluice holds the sea back from the moment it is laid out (a cofferdam), so setting one into a dyke line never breaches it.
+
+**Next:** the Age of Locks (s5) can build on the barge's pass (`BARGE` in `grid.ts`): canals that bigger ships use too, and a lock as the sluice's grown-up cousin. I'd like the computer to plan its sluice so the flood covers the way rivals come rather than the most ground, and to bring barges into the attack. A flood that slowly takes the fields' fertility, then gives it back richer (the Nile's gift), would tie in the Egyptians.
+
 ## Designers' notes: fire (Wild route step 3, #723, 2026-10-24, chain 1024-1233 s1, lane rules)
 
 **Built:** a shared rule every people uses from the Bronze Age (`src/sim/fire.ts`, `FIRE`). Torches in the hands of citizens and foot soldiers; trees, Thornwall roots and a rival's living buildings (Thornwall, Kitchen Garden, Orchard, Sapling) catch; fire leaps tile by tile on the match's own dice, as far as the season lets it (a summer fire takes most of a wood, a spring one smoulders out in a few trees); a burnt tree is ash for five minutes, then grows again; a building burns until its people beat it out, and a Thornwall burnt down leaves no root. The computer torches a rival's growth with its campaigning soldiers and beats out its own fires.
@@ -1290,6 +1305,61 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 
 **Next:** the Wildwood (step 5): the Heart Tree and Ents that root, the Spreading (which feeds new Hive ground), and "fire hits living things twice as hard"; beasts that fear fire; the computer reading a rival's Hives and raiding in winter or smoking them first.
 
+## Designers' notes: your road at the end (2026-10-24, #743)
+
+**Built:** the rules now keep a `journey` for each people (every change of age, with what fell inside the weak window after a step back), and the end screen draws it on the web: each player's road in their colour, steps back dashed, a line each of time per age, "window struck: lost 4" or "window unstruck", keepsakes carried and crossings walked, then the roads you knew of that nobody took. Beside Play again, **Play this seed again**.
+
+**Why I love it:** the match tells its story at the end. You see that your rival won by the Iron Age's marsh and a step back you never punished, and the button is right there to try that road yourself on the same land. It's the bridge from one match to the next that `docs/engagement.md` found missing.
+
+**Next:** Rematch in online rooms (same seats); the codex of roads (#724 step 7) can read the same journey; the computer's temperament (step 4) could be shown here as "Wu Zetian favours the Steppe".
+
+## Designers' notes: rivals with a leaning (2026-10-24, #749)
+
+**Built:** a clever computer in a skirmish settles on its first turn whether it favours a route (on coins of its own, 60% of seats), and if so chooses that route's side ages from the start, the way the route sweeps commit a seat. Its card in Rivals names the leaning once its road gives it away; the end screen always does. And every clever computer now punishes a step back: while a rival's weak window is open it sends a wave half the usual size.
+
+**Why I love it:** the step back was a free move against the computer; now it is a gamble you take with its army in mind. And a rival with a character gives you something to read: once you see the Steppe in its road, you know the wagons are coming again next age.
+
+**Next:** the second half of step 4, a habit with going back (one that hoards crossings, one that never retreats, one that steps back to bait you onto its walls); a rival name that says its leaning before the road does, for players who'd like it said.
+
+## Designers' notes: the Water Road, the Age of Tides (#739, s6 of #701, 2026-10-24, chain 1024-1330 s1, lane rules)
+
+**Built:** a tide clock in the rules (`src/sim/tides.ts`): asleep until the first people enters the Age of Tides, then running for everyone from high water, a step every 30 seconds through three levels to low water and back. The tidal ground is its own layer (`GameState.tidal`), laid out once when the tide wakes: open sea whose bed (the mean of its corners) is shallow enough, three bands by depth. Bared, a tile is wet sand anyone walks and no ship sails; covered again, it sinks back to its own bed (`tideBed`), exactly. Whoever is on the flats as the water comes back is swept ashore and hurt. Tide Mills grind gold at each turn, from the flats near them, a tile to one mill. Causeways are flats you lay yourself, down to deeper water, that only high water covers. A Dock with no water within two tiles is aground. The computer saves for the turn, raises mills where the flats are widest, and pulls its people off the flats a few seconds before the flood.
+
+**Why I love it:** it is the first rule in the game that runs on a clock everyone can read, and it changes the map's shape twice a cycle. Low water is an invitation: the bay between you and a rival is suddenly a beach, and an army that times it walks straight into their flank, while one that dawdles is caught by the flood. It is fair because it is public: the rival reads the same clock, can meet you on the sand, or wait for the water to come in behind you. And the mills give the age's people a reason to love the flats too: the widest flats grind the most gold, and they are the very ground an enemy lands on.
+
+**Choices I made (the owner may revert):** the tide wakes for the whole world (not only the people in the age): a sea that turns only for one people would be strange, and a public clock is the whole point. It sleeps until then, so every older match and test plays as before. The flats are by mean depth, so the shore's own band bares at most levels (a harbour grounds only when no water lies within two tiles, or every Dock would ground at every ebb). The door is the Missile Silo: a people that keeps the sea's hours trades the warhead for the tide. Numbers: `TIDE = { period: 180, flats: [-1.0, -0.75, -0.5], harbour: 2, dry: 0.08, sweep: 6, hurt: 15, causeway: -1.6, mill: { reach: 5, most: 24, gold: 60 } }`, road 800 food 800 gold 450 stone, 60 s.
+
+**Next:** barrages (a causeway line closing a bay into a tidal pond the mills grind twice from); kegs that breach a causeway; the `locks → tides` road once the Age of Locks lands; ships that can be floated off at the flood by a Tide people; the computer timing an attack across the flats at low water, not just keeping off them. Cockle beds on the flats (food at low water) would give citizens a reason to risk the tide.
+
+## Designers' notes: barrages, breaches and the low-water strike (#748, s6b of #701, 2026-10-24, chain 1024-1330 s2, lane rules)
+
+**Built:** a causeway line that shuts a body of tidal ground off from the open sea makes it a **pond** (`pondsOf`, `GameState.pond`): four ways through water and tidal ground but not causeways, touching no map edge and no larger than a mill's open sea (`BARRAGE.most`), and bordering a causeway. Recounted at every turn of the tide and whenever a causeway rises or falls. Its flats stay wet; a Tide Mill grinds its pond tiles first and twice over. Causeways now remember who raised them (`causewayBy`), so powder can tell a rival's road from its own: a keg's blast and a warhead **breach** every rival causeway tile in reach (`breachAt`), back to the flats or sea it was laid on, sweeping whoever stands where the water now lies. Sappers can carry a keg to a causeway tile (`kegTile`). The flood drowns a keg burning on flats it covers. The computer lays one barrage by its first mill with a bay worth shutting (`barragePlan`, tried as the line would stand), mends it once it stood, sends Sappers to a rival's barrage, and times its waves: `ebbTiming` reads the public clock and checks each tile of flats on the straight march will be bare when the slowest soldier reaches it; `turnBack` recalls the soldiers not yet over when the flood is near.
+
+**Why I love it:** the tide had one verb (cross at low water) and a mill that paid for sitting still. A barrage is the second verb: you reshape the bay, and it costs you the low-water road you just learned to use, so it is a choice about whether you are the one crossing or the one being crossed to. The keg answer makes it a target, and the warhead answer means the Atomic rival, the age next door, can answer it too. And the computer finally plays the clock on the attack: its wave sits at the muster while the sea is up and walks out as the flats drain.
+
+**Choices I made (the owner may revert):** a pond is judged as the mills judge the open sea (an edge or more than 160 tiles is the sea), so the rule is one the player already met with dykes. Pond tiles count twice rather than the mill getting a flat bonus, so a barrage pays only where it shuts real flats near the mill. A breach drains the pond at the next turn of the tide, not at once, so there is a beat to mend it. Powder breaches only a rival's causeways (as it hurts only rival buildings). The low-water strike uses a straight line from the muster: cheap, and wrong only where the bay is never the way; in headless matches on lakes maps few marches cross the flats in a straight line (1 in 40 town pairs), so it is a sharp tool for the maps that have the bay, not a change to every war. The wave waits at most `AI_EBB.hold` seconds, counted only while it stands ready, then goes anyway.
+
+**Next:** the `locks → tides` road once the Age of Locks lands; cockle beds on the flats (food only at low water); a sluice gate in a barrage that a Tide people opens to scour a channel or flood a rival's flats; the computer reading a rival's bay for a strike route by path rather than a straight line; ships floated off at the flood.
+
+## Designers' notes: warheads that scale, and a blast everyone sees (#752, s1 of #751, 2026-10-24, chain 1024-1610 s1, lane rules)
+
+**What I built:** each warhead now has a damage curve, `peak / (1 + (d/2)²)` tapering to zero over its last 2 tiles (Atomic 12,000 over 8 tiles, Fission 20,000 over 10, Fusion 40,000 over 12), replacing the flat 1,500 / 400. Blast radius and fallout radius are separate numbers (`WARHEADS[..].r` against `SILO.reach`). A strike adds a `Blast` that lifts the fog for every player over its radius for `SILO.lift` seconds; everyone gets the flash, the boom and a minimap ping. The computer weighs a target by the share of health the curve takes.
+
+**Why I love it:** a nuke finally ends a town centre instead of scratching it, and the aftermath is a minute everybody can watch: who burned, who survived, who marches in.
+
+**Choices I made (the owner may revert):** a blast also breaches causeways out to its full radius, not the old 5; the AI flees a rival launch's blast radius, not the fallout one.
+
+**Next:** s2, the shared missile pool and the type choice at launch; s3, the three-zone warning with blurred rings.
+
+
+## Designers' notes: one store of warheads, two silos everyone sees, a warhead chosen at launch (#753, s2 of #751, 2026-10-24, chain 1024-1610 s2, lane rules)
+
+**What I built:** a people keeps one store of warheads (`Player.nukes`), not tied to a silo: one when the first silo stands, one more every branch `refuel` (240 / 100 / 0 s) while store plus flight is under `SILO.cap` (3), spent the moment the launch is ordered, fired from any standing silo. A fallen silo loses only the warhead it was counting. At most `SILO.most` (2) silos, rising sites counted. A finished silo is drawn for every player through the fog, with no alert (render-side, so the ground and units round it stay fogged). Past the fork the warhead is chosen at launch (M the branch's own, N Atomic); the clock is the people's whatever goes up, and the launch event names no warhead: its warning ring is the widest the people could send (`warnRadius`), and the computer flees that ring too.
+
+**Choices I made (the owner may revert):** Fusion's "refills at once" counts warheads in the air against the cap, so at most three are aloft (otherwise Fusion fires without limit but its fuel); fuel follows the warhead (Atomic 600/200, Fission now 800/250, Fusion 450/120), so a Fission people weighs a cheap Atomic against its heavy own and a Fusion people its clean giant against an Atomic that poisons the ground; a Fission people's own-silo fallout comes with every launch, whatever it sends, so the poison never tells the warhead; the pool refills with no silo standing. The computer picks the warhead with the most worth per gold, and leaves a town its own warhead already falls on.
+
+**Next:** s3, the three-zone warning with seeded decoys and blurred rings; s4, the salvo and the third silo.
+
 ## Designers' notes: the Age of the Wildwood (Wild route step 5, 2026-10-24)
 
 **Built:** the Wildwood (`AGES.wildwood`, `WILDWOOD`, `src/sim/wildwood.ts`), instead of the Industrial Age for a Hive people whose Hives have paid 250 honey. One **Heart Tree** to a people; at it, an **Ent** is woken from the nearest old tree, a slow siege giant that flings boulders. An Ent can **root**: it becomes a real tree on the map, mends, and wakes when a rival walks within 3 tiles or an axe bites. If the Heart Tree falls, every Ent roots and sleeps. **The Spreading** seeds the bare ground beside its woods each spring and thickens its Thornwalls. Its people run through those woods; a rival wades. The door: no rifles, guns or aircraft, and fire hits its living things twice as hard.
@@ -1298,6 +1368,6 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 
 **What I chose:** an Ent is trained at the Heart Tree (queue, cost, HUD and the computer all come for free) and steps out of a tree, rather than a new "wake this tree" order; a rooted Ent leaves the unit list and is a record plus a real tree, so pathing, fog, sight and selection need no special case, and a felled tree takes the Ent with it. Any bite of an axe wakes it, its own people's too, which keeps the rule one line and gives a reason not to cut by the Heart Tree.
 
-**Not seen:** the Heart Tree and Ent models, the wake and root bursts, the spring swirl, the three sounds and the HUD lines are compiled and built by the model test, not seen in a browser by me (see the PR). The computer never roots an Ent on purpose (only when its Heart Tree falls).
+**Seen and not:** in Chromium (software GL) the Heart Tree, an Ent waking from a tree, rooting on O and waking for a rival, with the HUD lines, all ran without errors; the spring swirl, the felled burst and the three sounds I haven't seen or heard. The computer never roots an Ent on purpose (only when its Heart Tree falls).
 
 **Next:** the computer rooting Ents as an ambush in its woods, and reading a rival's woods as a threat (burning before walking in); the Bloom (step 6) off the Wildwood: the Seed Spire and the Greening, which the Spreading already leans toward; Leviathans (step 7); a mark the owner alone sees on their rooted Ents.

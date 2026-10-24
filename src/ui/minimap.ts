@@ -7,9 +7,11 @@ import { Waymarks } from './waymarks';
 
 /** Polder on the map (#701): a deep field green. */
 const POLDER_RGB = [86, 128, 62];
+/** Tidal flats bared by the falling tide (#739): wet grey sand. */
+const FLATS_RGB = [143, 134, 112];
 const WATER_RGB = [0x2f, 0x7f, 0xae];
 /** Tiles pumped out of the water so far, by every people. */
-const drained = (s: GameState): number => s.players.reduce((n, p) => n + (p.stats.drained ?? 0) + (p.stats.dug ?? 0), s.flooded ?? 0);
+const drained = (s: GameState): number => s.players.reduce((n, p) => n + (p.stats.drained ?? 0) + (p.stats.dug ?? 0), (s.flooded ?? 0) + (s.inundated ?? 0) + (s.tideTurns ?? 0));
 import { R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE, T_ROCK, T_SAND, T_WATER } from '../sim/types';
 
 /**
@@ -147,9 +149,10 @@ export class Minimap {
         this.terr[i] = s.terrain[i];
         // A channel dug (#701, the Age of Rivers) shows as water; land pumped out, as polder.
         const wet = s.terrain[i] === T_WATER;
-        this.land.set(wet ? WATER_RGB : POLDER_RGB, i * 3);
+        // Flats the tide bared (#739) show as wet sand.
+        this.land.set(wet ? WATER_RGB : s.terrain[i] === T_SAND ? FLATS_RGB : POLDER_RGB, i * 3);
         this.depth[i] = wet ? Math.max(0, -0.02 - s.height[Math.floor(i / s.w) * (s.w + 1) + (i % s.w)]) : 0;
-        this.green[i] = wet ? 0 : 1;
+        this.green[i] = wet || s.terrain[i] === T_SAND ? 0 : 1;
       }
     }
     if (!reveal) this.waymarks.update(s, viewer);

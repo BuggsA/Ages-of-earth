@@ -25,6 +25,7 @@ import { rubbleAt, salvages, strip } from './salvage';
 import { bank, cacheAt, lift } from './caches';
 import { buyLoad } from './oretrade';
 import { atFoot, carriesKegs, kegProblem, layKeg } from './powder';
+import { atTile, kegTileProblem } from './tides';
 import { carriesTorch, ignite, onFire, torchProblem } from './fire';
 import { fieldBoost, wading } from './water';
 import { gardenMul, isField } from './grove';
@@ -613,7 +614,7 @@ export function completeBuilding(s: GameState, b: Building): void {
   b.hp = Math.min(b.hp, maxHp(s, b));
   s.players[b.owner].stats.built++;
   // A finished gate opens for its own side.
-  if (b.type === 'gate' || b.type === 'dyke' || b.type === 'thornwall') stampBuilding(s, b, true);
+  if (b.type === 'gate' || b.type === 'dyke' || b.type === 'sluice' || b.type === 'thornwall') stampBuilding(s, b, true);
   if (b.type === 'wonder') {
     b.timer = s.wonderTime;
     s.events.push({ k: 'wonder', owner: b.owner, id: b.id, x: b.x, y: b.y, ticks: b.timer });
@@ -1692,6 +1693,25 @@ function kegOrderStep(s: GameState, u: Unit, o: Extract<Order, { k: 'keg' }>): v
 }
 
 /**
+ * Lay a powder keg on a rival's causeway (#748): walk to the tile (or the nearest ground to it, at high water) and lay a keg from the
+ * store there, its fuse lit. Gives up if the causeway is breached first, the age is left or the store runs dry on the way.
+ */
+function kegTileStep(s: GameState, u: Unit, o: Extract<Order, { k: 'kegTile' }>): void {
+  const why = carriesKegs(u) ? kegTileProblem(s, u.owner, o.tile) : 'Only citizens and foot soldiers carry kegs';
+  if (why) {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  if (atTile(s, u, o.tile, statsOf(s, u).radius)) {
+    stopWalking(u);
+    layKeg(s, u);
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  if (!approach(u, goalForPoint(s, (o.tile % s.w) + 0.5, Math.floor(o.tile / s.w) + 0.5, passOf(s, u)))) setOrder(u, { k: 'idle' });
+}
+
+/**
  * Carry a torch (`fire.ts`): walk to the tree, root or rival's living building, stand `FIRE.light` seconds within `FIRE.reach` tiles
  * of it to set it alight, then stand free. Gives up if it catches from elsewhere first, falls, or the peace comes down.
  */
@@ -2265,6 +2285,9 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
     case 'torch':
       torchStep(s, u, o);
       break;
+    case 'kegTile':
+      kegTileStep(s, u, o);
+      break;
     case 'salvage':
       salvageStep(s, u, o);
       break;
@@ -2299,7 +2322,7 @@ export function walk(s: GameState, u: Unit): void {
   if (!u.path) return;
   // A channel (#701, the Age of Rivers) is waded: a moat on foot.
   // Venom and stings slow it (the Age of the Hive); the woods round a Heart Tree speed its own people and hold back a rival (the Wildwood).
-  let left = statsOf(s, u).speed * fordMarch(s, u) * hemoPace(s, u) * stungPace(s, u) * woodPace(s, u) * (domainOf(u.type) === 'land' ? wading(s, u.x, u.y) : 1) * DT;
+  let left = statsOf(s, u).speed * fordMarch(s, u) * hemoPace(s, u) * stungPace(s, u) * woodPace(s, u) * (domainOf(u.type) === 'land' ? wading(s, u.x, u.y, statsOf(s, u).cls === 'siege') : 1) * DT;
   while (left > 1e-9 && u.path) {
     const tx = u.path[u.pathI * 2];
     const ty = u.path[u.pathI * 2 + 1];
