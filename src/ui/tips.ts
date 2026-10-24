@@ -1,6 +1,6 @@
 import { COCKLE, COCKLER } from '../sim/data';
 import { TIDE_GATE } from '../sim/data';
-import { AGES, BLOOM, LEVIATHANS, UNITS, HIVE, INTERCEPT, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, BEGGARS, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
+import { AGES, BLOOM, LEVIATHANS, UNITS, BLOOMERY, HIVE, INTERCEPT, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, BEGGARS, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
 import { battlesFor } from '../sim/battles';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, findsOf, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
@@ -332,6 +332,11 @@ const TIPS: Tip[] = [
     id: 'missions',
     when: (s, me) => ageOf(s.players[me]) === 'missions',
     text: `Select a priest and press <b>O</b> to raise a <b>Mission</b> on a shore in your own land or no one's. It holds the land round it, trains priests, and every ${MISSION.every} seconds pays a tithe that grows with its distance from your Town Center (up to ${MISSION.cap} gold, for your ${MISSION.most} farthest). It is only a chapel: nothing in it shoots, and a rival who reaches it razes it. Carry a priest across the water in a transport.`,
+  },
+  {
+    id: 'bloomery',
+    when: (s, me) => ageOf(s.players[me]) === 'iron' && s.bogIron === true,
+    text: `Raise a <b>${BUILDINGS.bloomery.name}</b> (<b>I</b>) beside the bog. Bog iron your diggers drop there is smelted hard: every bar counts ${BLOOMERY.smelt} times toward your spearmen's edge, and the hearth arms foot soldiers on the spot. Press <b>J</b> on it before you leave the Iron Age and it goes on arming spearmen at the Iron Age's price on any road. A rival who wants your iron must come to the marsh.`,
   },
   {
     id: 'crossing-beggars',

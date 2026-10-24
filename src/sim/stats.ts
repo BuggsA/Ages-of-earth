@@ -150,7 +150,7 @@ export function trainCostFor(s: GameState, owner: number, type: UnitType, at: Bu
   const cls = unitStats(type, p.epoch).cls;
   const levied = age.levy && LEVIED.has(cls) ? scale(base, age.levy) : base;
   // A Dock kept as the Sea-Raiders' keepsake (#555 s12) still launches ships at the longship yard's price, on any road.
-  const price = age.price?.[cls] ?? (at === 'dock' && where?.keep === 'searaider' ? AGES.searaider.price?.[cls] : undefined);
+  const price = age.price?.[cls] ?? (at === 'dock' && where?.keep === 'searaider' ? AGES.searaider.price?.[cls] : at === 'bloomery' && where?.keep === 'iron' ? AGES.iron.price?.[cls] : undefined);
   const priced = price ? scale(levied, price) : levied;
   return scale(priced, fairLevy(s, owner, type, where));
 }
