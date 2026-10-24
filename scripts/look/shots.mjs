@@ -1,5 +1,6 @@
 // The art umbrella's shared before-and-after shots (#617): the same scenes for every area, so pull requests compare like with like.
 //   npx vite build && (npx vite preview --port 5199 --strictPort &)
+//   SHOT_QUERY="&hour=22" node scripts/look/shots.mjs <dir>   adds to the address (a night, a quality: &quality=…)
 //   node scripts/look/shots.mjs [outDir] [only]     (default test-results/look; `only` is one scene name)
 // Each scene starts a fresh match on seed 7 as the Britons against one rival, sets it up through `window.ages` and frames it.
 // Software GL in a container draws slowly, so each scene waits for the view to catch up before its shot. Fails on any page error.
@@ -91,7 +92,7 @@ for (const [name, setup] of SCENES) {
   if (only && only !== name) continue;
   const page = await b.newPage({ viewport: { width: 1280, height: 800 } });
   page.on('pageerror', (e) => errors.push(`${name}: ${e.message}`));
-  await page.goto('http://localhost:5199/?seed=7&foes=1');
+  await page.goto('http://localhost:5199/?seed=7&foes=1' + (process.env.SHOT_QUERY ?? ''));
   await page.waitForSelector('#title:not(.hidden)', { timeout: 120000 });
   await page.evaluate(() => {
     const s = document.querySelector('#opt-civ');

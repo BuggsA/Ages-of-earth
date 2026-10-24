@@ -91,7 +91,7 @@ export class CameraRig {
     const ground = Math.max(0, this.groundAt(this.target.x, this.target.z));
     this.target.y += (ground - this.target.y) * k;
     // Close in, the view tilts toward the horizon; far out it looks more straight down.
-    const pitch = this.cinematic ?? 0.8 + this.zoomT * 0.35;
+    const pitch = this.cinematic ?? 0.66 + this.zoomT * 0.35;
     const d = this.distance;
     this.camera.position.set(
       this.target.x + Math.sin(this.yaw) * Math.cos(pitch) * d,
