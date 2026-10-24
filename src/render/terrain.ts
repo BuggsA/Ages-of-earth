@@ -3,6 +3,7 @@ import { hash2 } from '../sim/rng';
 import type { GameState } from '../sim/types';
 import { T_GRASS, T_ROCK, T_SAND, T_WATER } from '../sim/types';
 import { isPolder } from '../sim/water';
+import { bared, isCauseway } from '../sim/tides';
 import { natureGeometry, type NatureKind } from './natureModels';
 import { bakedMaterial, fogUniforms, inject, swayMaterial } from './materials';
 
@@ -28,6 +29,9 @@ const SNOWCAP = C('#d6d2ca');
  */
 const POLDER_FIELD = [C('#7ba34a'), C('#69933f'), C('#86704c')];
 const DITCH = C('#5f9a92');
+/** Tidal flats the falling tide bared (#739): wet grey-brown sand with a sheen, ribbed; a causeway's packed pale stone. */
+const WET = [C('#8f8670'), C('#a39878'), C('#6f7466')];
+const PAVING = [C('#b8ad96'), C('#9e9482')];
 const MUD = C('#857a60');
 const DRY_TIME = 20;
 const TMP = new THREE.Color();
@@ -52,8 +56,8 @@ const drainedIn = (s: GameState): number => {
   let n = 0;
   // Pumped out (#701), or dug into a channel: either way the shore moved.
   for (const p of s.players) n += (p.stats.drained ?? 0) + (p.stats.dug ?? 0);
-  // Or taken back by the sea through a breach (#701 s3).
-  return n + (s.flooded ?? 0);
+  // Or taken back by the sea through a breach (#701 s3), or bared or covered by the tide (#739).
+  return n + (s.flooded ?? 0) + (s.tideTurns ?? 0);
 };
 
 export const terrainMaterial = inject(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.95 }), { season: 'ground' });
@@ -213,6 +217,10 @@ export class TerrainView {
       const fine = smooth(x + 0.5, y + 0.5, 2.5, 12);
       if (terr === T_WATER) {
         tmp.copy(BED[0]).lerp(BED[1], Math.min(1, Math.max(0, -avgH * 0.8)));
+      } else if (bared(s, tile)) {
+        // Ribs of wet sand across the flats, darker in the runnels where the water lingers; a causeway's stone is drier and paler.
+        if (isCauseway(s, tile)) tmp.copy(PAVING[0]).lerp(PAVING[1], (x + y) % 2 === 0 ? 0.2 : 0.6 * fine);
+        else tmp.copy(WET[0]).lerp(WET[1], fine).lerp(WET[2], ((x * 3 + y) % 5 === 0 ? 0.5 : 0) + patch * 0.15);
       } else if (isPolder(s, tile)) {
         polderColor(tmp, x, y, t, fine, this.drying.has(tile) ? Math.min(1, (this.clock - this.drying.get(tile)!) / DRY_TIME) : 1);
       } else if (terr === T_SAND) {

@@ -1299,13 +1299,14 @@ export const RIVERS = { fill: 0.25, bank: -0.16, bed: -0.45, wade: 0.4, wet: 2, 
 /**
  * The tide (#739, the Age of Tides; `tides.ts`). It wakes for the whole world when the first people enters the age, at high water, and
  * runs on a public clock: every `period` seconds the sea falls through `flats.length` levels to low water and rises back, a step each
- * `period / (2 × flats.length)` seconds. Open sea whose shallowest bed lies at or above `flats[k - 1]` (its lowest corner) is tidal ground
- * of level k: bared while the tide stands below k. A bared tile is wet sand, its corners raised to `dry`. Who is on the flats when the water
- * comes back is swept to the nearest dry tile within `sweep`, losing `hurt` health, or drowned with none. A causeway may be laid on open
+ * `period / (2 × flats.length)` seconds. Open sea whose bed (the mean of its corners) lies at or above `flats[k - 1]` is tidal ground
+ * of level k: bared while the tide stands below k. A Dock with no open water within `harbour` tiles is aground. A bared tile is wet
+ * sand, its corners raised to `dry`. Who is on the flats when the water comes back is swept to the nearest dry tile within `sweep`,
+ * losing `hurt` health, or drowned with none. A causeway may be laid on open
  * sea down to `causeway` deep, and is tidal ground of the top level. A Tide Mill grinds `mill.gold` gold each turn of the tide with
  * `mill.most` tiles of tidal ground within `mill.reach` of its footprint (less, pro rata, with fewer), each tile feeding the first mill only.
  */
-export const TIDE = { period: 180, flats: [-1.0, -0.85, -0.72], dry: 0.04, sweep: 6, hurt: 15, causeway: -1.6, mill: { reach: 5, most: 24, gold: 60 } };
+export const TIDE = { period: 180, flats: [-1.0, -0.75, -0.5], harbour: 2, dry: 0.08, sweep: 6, hurt: 15, causeway: -1.6, mill: { reach: 5, most: 24, gold: 60 } };
 /** The computer in the Age of Tides (#739): its odds of taking the road (more for a people already on the Water Road), how many Tide Mills it raises, and how much tidal ground a mill's spot must reach. */
 export const AI_TIDES = { take: 0.35, onward: 0.7, mills: 3, least: 8, reach: 20, wary: 12 };
 

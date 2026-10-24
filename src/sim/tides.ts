@@ -81,16 +81,17 @@ export const isCauseway = (s: GameState, tile: number): boolean => !!s.tidal && 
 /** Whether the tide has bared this tile now: tidal ground standing out of the water as wet sand. */
 export const bared = (s: GameState, tile: number): boolean => isTidal(s, tile) && s.terrain[tile] === T_SAND;
 
-/** The shallowest corner of a tile: what decides how early the falling tide bares it. */
-function topCorner(s: GameState, tile: number, h: ArrayLike<number> = s.height): number {
+/** How deep a tile's bed lies: the mean of its corners. What decides how early the falling tide bares it. */
+function bedDepth(s: GameState, tile: number): number {
   const x = tile % s.w;
   const y = (tile - x) / s.w;
   const W = s.w + 1;
   const i = y * W + x;
-  return Math.min(h[i], h[i + 1], h[i + W], h[i + W + 1]);
+  const h = s.height;
+  return (h[i] + h[i + 1] + h[i + W] + h[i + W + 1]) / 4;
 }
 
-/** The level of tidal ground a sea tile of this depth would be: the count of `TIDE.flats` depths at or below its shallowest corner. */
+/** The level of tidal ground a sea tile of this depth would be: the count of `TIDE.flats` depths at or below its bed. */
 function levelFor(depth: number): number {
   let k = 0;
   for (const d of TIDE.flats) if (depth >= d) k++;
@@ -111,13 +112,14 @@ export function wakeTide(s: GameState): void {
   const known = new Map<number, boolean>();
   for (let i = 0; i < w * h; i++) {
     if (s.terrain[i] !== T_WATER || !free(s, i)) continue;
-    const k = levelFor(topCorner(s, i));
+    const k = levelFor(bedDepth(s, i));
     if (k > 0 && seaAt(s, i, known)) tidal[i] = k;
   }
   s.tidal = tidal;
   s.tideBed = Float32Array.from(s.height);
   s.tideFrom = s.tick;
   s.tideTurns ??= 0;
+  s.events.push({ k: 'tide', level: TIDE_TOP, rising: false, bared: 0, covered: 0 });
 }
 
 const DRY = Math.fround(TIDE.dry);
@@ -235,7 +237,7 @@ export function causewaySpot(s: GameState, tx: number, ty: number): 'deep' | 'dr
   if (isCauseway(s, i)) return 'dry';
   if (isTidal(s, i)) return null;
   if (s.terrain[i] !== T_WATER || isChannel(s, i)) return 'dry';
-  if (topCorner(s, i) < TIDE.causeway) return 'deep';
+  if (bedDepth(s, i) < TIDE.causeway) return 'deep';
   return seaAt(s, i) ? null : 'dry';
 }
 
@@ -312,12 +314,16 @@ export function tideMillIdle(s: GameState, b: Building): string | null {
 
 // ---- Harbours aground --------------------------------------------------------------------------
 
-/** Whether a Dock is aground (#739): the tide has bared all the water beside it, so it launches nothing until the water comes back. */
+/**
+ * Whether a Dock is aground (#739): the tide has bared all the water within `TIDE.harbour` tiles of it, so it launches nothing until the
+ * water comes back. The shore's own band bares early; a harbour grounds as the tide runs low, not at every ebb.
+ */
 export function aground(s: GameState, b: Building): boolean {
   if (b.type !== 'dock' || !s.tidal) return false;
   let tidal = false;
-  for (let y = b.ty - 1; y <= b.ty + b.size; y++)
-    for (let x = b.tx - 1; x <= b.tx + b.size; x++) {
+  const r = TIDE.harbour;
+  for (let y = b.ty - r; y < b.ty + b.size + r; y++)
+    for (let x = b.tx - r; x < b.tx + b.size + r; x++) {
       if (x < 0 || y < 0 || x >= s.w || y >= s.h || (x >= b.tx && x < b.tx + b.size && y >= b.ty && y < b.ty + b.size)) continue;
       const i = y * s.w + x;
       if (s.terrain[i] === T_WATER && s.block[i] & B_TERRAIN) return false;
