@@ -2144,7 +2144,7 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   // The Age of Missions (#555 s12): raised by priests on a shore, in no rival's land; claims land, trains priests, pays a tithe (`MISSION`).
   mission: { name: 'Mission', size: 2, hp: 1000, cost: { wood: 100, gold: 60 }, time: 30, pop: 0, sight: 7, trains: ['priest'], drop: [], epoch: 2, shore: true, ages: ['missions'], builders: ['priest'], only: true, menu: 'eco', key: 'O', blurb: 'A whitewashed chapel and a bell on a far shore, raised by priests. Holds the land round it, trains priests, and pays a tithe that grows with its distance from your Town Center. Nothing in it shoots: a rival who reaches it razes it.' },
   caravanserai: { name: 'Caravanserai', size: 2, hp: 900, cost: { wood: 90, gold: 30 }, time: 25, pop: 0, sight: 6, trains: [], drop: [], epoch: 3, ages: ['silk'], menu: 'eco', key: 'C', blurb: 'A walled courtyard by the road where caravans rest. Raise it by a far trading post, in no one\'s land too: your traders\' trips to a post within 8 tiles of it pay a quarter more, traders and wagons within 4 tiles of it mend, and the land round it is yours, so rival traders crossing it pay your toll.' },
-  silo: { name: 'Missile Silo', size: 3, hp: 3000, cost: { wood: 300, stone: 400, gold: 700 }, time: 80, pop: 0, sight: 8, trains: [], drop: [], epoch: 5, menu: 'mil', key: 'M', blurb: 'A concrete collar round a hatch in the ground. Launch (M) names any point on the map: after a countdown every rival can see, the warhead blasts what stands there, hardest at the centre and less with every tile, and every player sees the blast and the fog lifts over it for a minute. Destroy the silo while it counts and the launch is scrubbed, its warhead lost. Warheads come from the people\'s store, not the silo: one at first, one more every 240 seconds, up to 3 counting those in the air, fired from any silo. At most 2 silos, and every player sees a finished one on the map.' },
+  silo: { name: 'Missile Silo', size: 3, hp: 3000, cost: { wood: 300, stone: 400, gold: 700 }, time: 80, pop: 0, sight: 8, trains: [], drop: [], epoch: 5, menu: 'mil', key: 'M', blurb: 'A concrete collar round a hatch in the ground. Launch (M) names any point on the map: after a countdown every rival can see, the warhead blasts what stands there, hardest at the centre and less with every tile, and every player sees the blast and the fog lifts over it for a minute. Destroy the silo while it counts and the launch is scrubbed, its warhead lost. Warheads come from the people\'s store, not the silo: one at first, one more every 240 seconds, up to 3 counting those in the air, fired from any silo. At most 2 silos (3 with Launch Control, researched here, which opens the salvo (B): three silos firing at once), and every player sees a finished one on the map.' },
   // Mine Shafts (#681): one miner digs stone or gold (or a rare ore over its old workings) for good, best where a deposit was worked out (`SHAFT`).
   shaft: { name: 'Mine Shaft', size: 2, hp: 700, cost: { wood: 150 }, time: 30, pop: 0, sight: 4, trains: [], drop: [], epoch: 1, menu: 'eco', key: 'H', blurb: 'A timber headframe over a hole in the ground. One citizen digs stone or gold here for good, slower than an open deposit; best sunk where a deposit was worked out, fair beside mountain rock. Choose its seam on the shaft.' },
   // The Water Road (#701 s1): a bank of earth across the shallows, and the mill that pumps the water out behind it (`DYKE`, `POLDER`, `water.ts`).
@@ -2303,6 +2303,7 @@ export const TECHS: Record<TechId, Tech> = {
   chemistry: { name: 'Chemistry', at: 'workshop', epoch: 3, cost: { food: 300, gold: 200 }, time: 45, add: { siegeRange: 1 }, mul: { siegeAttack: 1.2 }, blurb: 'Siege hits 20% harder and reaches 1 tile farther.', icon: '🧪' },
   blackPowder: { name: 'Black Powder', at: 'workshop', epoch: 3, ore: { id: 'saltpetre', n: 40 }, cost: { food: 250, gold: 150 }, time: 45, add: { rangedAttack: 1 }, mul: { siegeAttack: 1.15 }, blurb: 'Only where saltpetre lies: once your citizens have mined 40, the powder-makers grind it fine. Musketeers and all ranged soldiers hit for 1 more and siege 15% harder, on top of Chemistry. Where there is none, the plain road stays open.', icon: '💥' },
   bloodForged: { name: 'Blood-Forged Blades', at: 'forge', epoch: 3, ore: { id: 'bloodiron', n: 30 }, cost: { food: 250, gold: 175 }, time: 45, needs: 'ironCasting', add: { meleeAttack: 1, armor: 1 }, blurb: 'Only where blood-iron lies: once your citizens have mined 30, the smiths quench blades and plates in it. Foot soldiers, riders and heroes hit for 1 more and wear 1 more melee armor, on top of the plain forge. Where there is none, the plain road stays open.', icon: '🩸' },
+  launchControl: { name: 'Launch Control', at: 'silo', epoch: 5, cost: { food: 600, gold: 900, stone: 400 }, time: 60, blurb: 'A bunker that ties every silo of your people to one clock. You may raise a third Missile Silo, and three standing silos may fire a salvo (B): three Atomic warheads at once, on three points at least 8 tiles apart, on your one clock. A rival sees three rings as for any launch, and cannot tell a salvo from one warhead and two decoys until the last 3 seconds, when all three stay. Each silo that falls scrubs its own warhead. Rivals can count your silos, so three of them is warning enough.', icon: '🎯' },
   saltCuring: { name: 'Salt Curing', at: 'storehouse', epoch: 1, ore: { id: 'salt', n: 30 }, cost: { food: 100, wood: 60 }, time: 30, add: { carry: 2 }, mul: { hunt: 1.25, forage: 1.15 }, blurb: 'Only where salt lies: once your citizens have mined 30, meat keeps and berries dry. Game is butchered 25% faster and berries gathered 15% faster, and every citizen carries 2 more. Where there is none, hunting stays as it was.', icon: '🧂' },
   gillnets: { name: 'Gillnets', at: 'dock', epoch: 1, cost: { food: 100, wood: 100 }, time: 30, mul: { fish: 1.25 }, blurb: 'Fishing boats fish 25% faster.', icon: '🐟' },
   lighthouse: { name: 'Lighthouse', at: 'dock', epoch: 2, cost: { wood: 200, gold: 120 }, time: 35, needs: 'gillnets', add: { portReach: 4 }, blurb: 'A beacon on the headland: trading posts up to 4 tiles farther from the water become ports for your merchant ships.', icon: '🗼' },
@@ -3422,6 +3423,12 @@ export const FUSION = { fuse: 70, refuel: 0, fuel: { gold: 450, stone: 120 } };
  */
 export const SILO = { fuse: 45, reach: 5, fuel: { gold: 600, stone: 200 }, refuel: 240, most: 2, lift: 60, stock: 1, cap: 3, blur: 2, reveal: 3, apart: 8, spread: 24 };
 /**
+ * The salvo (#765): three Atomic warheads from the store at once, one from each of `trio` standing silos, on the people's one clock. Only a
+ * people with Launch Control fires one, and only it may raise a third silo (`trio`). A plain Atomic people pays `surcharge` more fuel for
+ * each of the three (a Fission or Fusion people's silos are built to share a clock).
+ */
+export const SALVO = { trio: 3, surcharge: 0.5 };
+/**
  * The three warheads (#751 s1). A blast does `peak / (1 + (d/half)²)` at distance `d` tiles (from a building's nearest edge, or a unit's
  * position), tapering linearly over the last `taper` tiles to nothing at the blast radius `r`. A people fires its branch's warhead:
  * plain Atomic, Fission or Fusion, and from #753 chooses at launch between Atomic and its branch's own.
@@ -3439,8 +3446,12 @@ export const WARHEADS = {
  * `heart`) and soldiers (each counts `soldier`) inside the ring. Its soldiers and citizens run from the ring of a rival warhead
  * in the air, `margin` tiles past its edge. On a coin of its own it takes the fork (`fork` odds, then `fusion` odds of Fusion over Fission)
  * once its silo has stood `forkAfter` seconds and it holds half the road's price. An Industrial computer bound for Aeronauts or Lightning holds off the climb `hold` seconds.
+ *
+ * The salvo (#765): when three rival targets at least `SILO.apart` apart are each worth a launch and together worth `salvo` times the best
+ * single strike (`salvoPlain` times for a plain Atomic people, who pays the surcharge), the computer raises silos to three, learns Launch
+ * Control, and holds its single strikes until the store holds three.
  */
-export const AI_SILO = { fork: 0.7, fusion: 0.4, forkAfter: 120, hold: 300, hands: 20, wait: 20, worth: 6, heart: 4, soldier: 2, margin: 1.5 };
+export const AI_SILO = { fork: 0.7, fusion: 0.4, forkAfter: 120, hold: 300, hands: 20, wait: 20, worth: 6, heart: 4, soldier: 2, margin: 1.5, salvo: 1.8, salvoPlain: 2.4 };
 export const AI_KEG = { take: 0.5, ore: 80, kegs: 6, mills: 2, hold: 180, sappers: 2, near: 12, guard: 4, every: 2 };
 
 /**

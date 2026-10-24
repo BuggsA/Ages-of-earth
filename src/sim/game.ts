@@ -752,6 +752,13 @@ export function checksum(s: GameState): number {
       mix(w.team * 4 + w.real);
       for (const r of w.rings) mix(r.x * 2 * 0x10000 + r.y * 2);
     }
+    // A salvo's warheads (#765): each silo, its true point, whether it is scrubbed, and which ring stands for it.
+    for (const sh of l.salvo ?? []) {
+      mix(sh.silo * 2 + (sh.gone ? 1 : 0));
+      mix(sh.x);
+      mix(sh.y);
+    }
+    for (const w of l.warn ?? []) for (const i of w.of ?? []) mix(i);
   }
   for (const b of s.blasts ?? []) {
     mix(b.id);

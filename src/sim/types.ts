@@ -55,7 +55,7 @@ export type TechId =
   | 'wheelbarrow' | 'handcart' | 'axes' | 'saws' | 'picks' | 'shafts' | 'plow' | 'irrigation' | 'masonry'
   | 'conscription' | 'husbandry' | 'theology' | 'chemistry'
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'chart' | 'assay' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
-  | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged';
+  | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged' | 'launchControl';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
 export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides';
 
@@ -506,6 +506,19 @@ export interface Launch {
    * order), each blurred off its point, and which of them is real. Absent in older saves (the rivals see the true point).
    */
   warn?: Warning[];
+  /**
+   * A salvo (#765): its three warheads, each with its own silo and true point (the first is `silo`, `x`, `y` above). A fallen silo scrubs
+   * its own (`gone`) and the rest fly on. Absent for a single strike.
+   */
+  salvo?: SalvoShot[];
+}
+
+/** One warhead of a salvo (#765). */
+export interface SalvoShot {
+  silo: number;
+  x: number;
+  y: number;
+  gone?: true;
 }
 
 /** One rival team's warning of a launch (#762, `silo.ts`): the rings it sees, and the index of the real one. */
@@ -513,6 +526,8 @@ export interface Warning {
   team: number;
   rings: { x: number; y: number }[];
   real: number;
+  /** A salvo's rings (#765): which of its warheads (`Launch.salvo`) each ring stands for. All are real. Absent for a single strike. */
+  of?: number[];
 }
 
 /** A blast that lifts the fog for every player over `r` tiles of (`x`, `y`) until tick `until` (#752, `silo.ts`, `vision.ts`). */
@@ -1327,7 +1342,11 @@ export interface AiMemory {
   /** When an Industrial computer bound for a side future began to hold off the Atomic Age (#605). */
   sideHold?: number;
   /** Where a loaded silo means to strike, chosen once a second (#605). */
-  siloAim?: { x: number; y: number; at: number; w?: 'atomic' | 'fission' | 'fusion' };
+  siloAim?: { x: number; y: number; at: number; w?: 'atomic' | 'fission' | 'fusion'; salvo?: { x: number; y: number }[] };
+  /** Whether three rival targets, far enough apart, are each worth a warhead (#765): the town raises silos and Launch Control for a salvo. */
+  salvoPays?: boolean;
+  /** The tick the computer last weighed where to send a warhead (`fireSilo`, once a second). */
+  siloAt?: number;
   /** Tick it began holding its Town Center for a side road's last deeds, so it holds only so long. */
   waiting?: number;
   /**
@@ -1467,7 +1486,8 @@ export type Command =
   /** Citizens or foot soldiers carry a powder keg to a rival's causeway tile and lay it there (#748, the Age of Sappers): it breaches the road. */
   | ({ t: 'kegTile'; p: number; ids: number[]; tile: number } & Queued)
   /** A Missile Silo launches at a point (#605, the Atomic Age); `w` picks the warhead (#753), absent for the people's own branch's. */
-  | { t: 'launch'; p: number; silo: number; x: number; y: number; w?: 'atomic' | 'fission' | 'fusion' }
+  /** With `more` (#765, Launch Control), a salvo: this silo and the two in `more` fire one Atomic warhead each, each at its own point. */
+  | { t: 'launch'; p: number; silo: number; x: number; y: number; w?: 'atomic' | 'fission' | 'fusion'; more?: { silo: number; x: number; y: number }[] }
   /** Answer the card of tidings waiting at the fire (#443): `take` pays its price, otherwise it is passed by. */
   | { t: 'tiding'; p: number; card: TidingId; take: boolean }
   /** A player left an online match: the computer takes over their people. With `back` (sent only by the room, never a browser),

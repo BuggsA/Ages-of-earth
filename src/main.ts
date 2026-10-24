@@ -14,7 +14,7 @@ import { easeHour, SHOT_SECONDS, titleShot } from './ui/titleShots';
 import { isEnemy } from './sim/world';
 import { carriesKegs, kegProblem } from './sim/powder';
 import { carriesTorch, torchProblem } from './sim/fire';
-import { launchProblem, ringsFor, type WarheadKind } from './sim/silo';
+import { apartProblem, launchProblem, ringsFor, salvoProblem, salvoSilos, type WarheadKind } from './sim/silo';
 import { jumpAge, rush, topUp } from './sim/god';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
 import { placeProblem, stampBuilding, walkable } from './sim/grid';
@@ -22,7 +22,7 @@ import { findDockSpot, findSpot, millSpotFor } from './sim/ai';
 import { channelPlan, dig, dykePlan, heldBack, waterLine } from './sim/water';
 import { bared, tideMillSpot, wakeTide } from './sim/tides';
 import { barragePlan, isCauseway, kegTileProblem } from './sim/tides';
-import { AI_BARRAGE } from './sim/data';
+import { AI_BARRAGE, SALVO } from './sim/data';
 import { maxHp, placeBuilding, restat, spawnUnit } from './sim/world';
 import { arrivalText, epochArrivals } from './ui/endReport';
 import { journeyHtml } from './ui/journeyReport';
@@ -116,6 +116,8 @@ let wallDrag: { x0: number; y0: number; x1: number; y1: number } | null = null;
 let launchSilo = 0;
 /** The warhead chosen for the launch being aimed (#753); absent for the people's own. */
 let launchWarhead: WarheadKind | undefined;
+/** A salvo being aimed (#765): the points clicked so far, until there are `SALVO.trio`; null for a single launch. */
+let salvoAims: { x: number; y: number }[] | null = null;
 let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | 'keg' | 'torch' | 'launch' | null = null;
 /** When the viewer was last told one of its living buildings caught fire, so a spreading fire tells once. */
 let fireToldAt = -9999;
@@ -192,7 +194,9 @@ const hud = new Hud({
   },
   launchMode: (silo, w) => {
     launchSilo = silo;
-    launchWarhead = w;
+    launchWarhead = w === 'salvo' ? undefined : w;
+    salvoAims = w === 'salvo' ? [] : null;
+    if (w === 'salvo') hud.toast(`Salvo: click ${SALVO.trio} points, at least ${SILO.apart} tiles apart`, 'info');
     targetMode = 'launch';
     placing = null;
   },
@@ -1862,6 +1866,35 @@ canvas.addEventListener('pointerdown', (e) => {
     if (!e.shiftKey) targetMode = null;
     return;
   }
+  if (targetMode === 'launch' && salvoAims) {
+    // A salvo (#765): three clicks, each checked as it comes; the third fires from this silo and the next two.
+    const g = view.groundAt(e.clientX, e.clientY);
+    const s = game;
+    if (!g || !s) return;
+    const pts = [...salvoAims, { x: g.x, y: g.y }];
+    const near = !(g.x >= 0 && g.y >= 0 && g.x < s.w && g.y < s.h) ? 'Pick points on the map' : apartProblem(pts);
+    if (near) {
+      hud.toast(near, 'bad');
+      play('error');
+      return;
+    }
+    view.marker(s, g.x, g.y, true);
+    if (pts.length < SALVO.trio) {
+      salvoAims = pts;
+      hud.toast(`Salvo: point ${pts.length} of ${SALVO.trio}`, 'info');
+      return;
+    }
+    const from = salvoSilos(s, viewer, launchSilo);
+    const shots = pts.map((a, i) => ({ silo: from[i]?.id ?? -1, x: a.x, y: a.y }));
+    const why = salvoProblem(s, viewer, shots);
+    if (why) {
+      hud.toast(why, 'bad');
+      play('error');
+    } else issue({ t: 'launch', p: viewer, silo: shots[0].silo, x: shots[0].x, y: shots[0].y, more: shots.slice(1) });
+    salvoAims = null;
+    targetMode = null;
+    return;
+  }
   if (targetMode === 'launch') {
     const g = view.groundAt(e.clientX, e.clientY);
     const s = game;
@@ -2936,9 +2969,12 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         // The Atomic Age (#605): the clock is public, so every player is told when a warhead goes up. A rival is shown three rings, the
         // real zone and two decoys (#762), never the event's point (the attacker's own aim): no marker, ping or camera jump there.
         if (ev.what === 'launched') {
-          if (ev.owner === viewer) hud.toast(`Warhead away: it lands in ${ev.fuse ?? SILO.fuse} seconds. Rivals see your target among two decoys until the last ${SILO.reveal}`, 'good');
-          else if (isEnemy(s, viewer, ev.owner)) {
-            hud.toast(`${s.players[ev.owner].name} has launched a warhead: it lands in ${ev.fuse ?? SILO.fuse} seconds, in one of three rings. Clear them, or destroy the silo`, 'bad');
+          // A salvo (#765) is told to its rivals in the same words as one warhead: they learn which only at the reveal.
+          if (ev.owner === viewer) {
+            const many = !!s.launches?.find((k) => k.id === ev.id)?.salvo;
+            hud.toast(many ? `Salvo away: ${SALVO.trio} warheads land in ${ev.fuse ?? SILO.fuse} seconds. Rivals see three rings, as for one warhead and two decoys, until the last ${SILO.reveal}` : `Warhead away: it lands in ${ev.fuse ?? SILO.fuse} seconds. Rivals see your target among two decoys until the last ${SILO.reveal}`, 'good');
+          } else if (isEnemy(s, viewer, ev.owner)) {
+            hud.toast(`${s.players[ev.owner].name} has launched: it lands in ${ev.fuse ?? SILO.fuse} seconds, in three rings, one real and two decoys, or all three real if three silos fired a salvo. Clear them, or destroy the silos`, 'bad');
             const l = s.launches?.find((k) => k.id === ev.id);
             for (const g of l ? ringsFor(s, l, viewer) : []) minimap.ping(g.x, g.y, '#ff4a3a', true);
           }
@@ -2947,12 +2983,16 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           // Exactly SILO.reveal seconds left (#762): the decoys vanish, the real ring flashes where it was drawn, one alarm.
           const l = s.launches?.find((k) => k.id === ev.id);
           if (l && isEnemy(s, viewer, ev.owner)) {
-            hud.toast(`${SILO.reveal} seconds: the decoys are gone. ${s.players[ev.owner].name}'s warhead falls in the ring that flashes`, 'bad');
+            const n = ringsFor(s, l, viewer).length;
+            hud.toast(n > 1 ? `${SILO.reveal} seconds: it is a salvo. ${s.players[ev.owner].name}'s warheads fall in all ${n} rings that flash` : `${SILO.reveal} seconds: the decoys are gone. ${s.players[ev.owner].name}'s warhead falls in the ring that flashes`, 'bad');
             for (const g of ringsFor(s, l, viewer)) minimap.ping(g.x, g.y, '#ff2a1a', true);
             play('siloAlarm');
           }
         } else if (ev.what === 'scrubbed') {
-          hud.toast(ev.owner === viewer ? 'Your silo fell: the launch is scrubbed' : `${s.players[ev.owner].name}'s silo fell: the launch is scrubbed`, ev.owner === viewer ? 'alert' : 'good');
+          // A salvo's silo (#765) scrubs only its own warhead: the launch flies on while any of its silos stands.
+          const rest = s.launches?.some((k) => k.id === ev.id);
+          if (rest) hud.toast(ev.owner === viewer ? 'A silo of your salvo fell: its warhead is scrubbed, the others fly on' : `A silo of ${s.players[ev.owner].name}'s salvo fell: its warhead and its ring are gone, the others fly on`, ev.owner === viewer ? 'alert' : 'good');
+          else hud.toast(ev.owner === viewer ? 'Your silo fell: the launch is scrubbed' : `${s.players[ev.owner].name}'s silo fell: the launch is scrubbed`, ev.owner === viewer ? 'alert' : 'good');
           play('siloScrub');
         } else {
           // The blast is seen by everyone, through the fog (#752): a ping on every minimap, and the boom.

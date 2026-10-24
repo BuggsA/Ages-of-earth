@@ -18,7 +18,7 @@ import { cacheAt } from './caches';
 import { carriesKegs, kegProblem } from './powder';
 import { kegTileProblem } from './tides';
 import { carriesTorch, onFire, torchProblem } from './fire';
-import { launch, launchProblem, siloLimit } from './silo';
+import { launch, launchProblem, salvo, salvoProblem, siloLimit } from './silo';
 import { raise, raiseCost } from './reclaim';
 import { callWork, workProblem } from './works';
 import { callKin, killCamp, kinProblem, takeVow, takeWay, vowProblem, wayBarred, wayProblem } from './ways';
@@ -461,6 +461,17 @@ export function applyCommand(s: GameState, c: Command): void {
       break;
     }
     case 'launch': {
+      if (c.more) {
+        // Launch Control (#765): three silos fire one salvo, one warhead each, on the people's one clock.
+        const shots = Array.isArray(c.more) ? [{ silo: c.silo, x: c.x, y: c.y }, ...c.more] : [];
+        const why = salvoProblem(s, c.p, shots);
+        if (why) {
+          refuse(s, c.p, why);
+          return;
+        }
+        salvo(s, c.p, shots);
+        break;
+      }
       // The Atomic Age (#605): a Missile Silo names a point; the warhead lands after its public countdown.
       const silo = s.byId.get(c.silo);
       const why = launchProblem(s, c.p, silo as Building | undefined, c.x, c.y, c.w);
