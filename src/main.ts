@@ -22,6 +22,7 @@ import { findDockSpot, findSpot, millSpotFor } from './sim/ai';
 import { channelPlan, dig, dykePlan, heldBack, waterLine } from './sim/water';
 import { maxHp, placeBuilding, restat, spawnUnit } from './sim/world';
 import { arrivalText, epochArrivals } from './ui/endReport';
+import { journeyHtml } from './ui/journeyReport';
 import type { AgeId, Building, BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, HomelandId, MapSize, MapType, Unit, UnitType } from './sim/types';
 import { KEYS, R_FISH, R_NONE, RES, T_WATER } from './sim/types';
 import { carriedBy, relicAt } from './sim/relics';
@@ -2390,11 +2391,12 @@ function showEnd(s: GameState, won: boolean, how: EndHow = 'conquest', again = f
     ${extra}
     <div class="chart-tabs">${(Object.keys(METRICS) as Metric[]).map((k) => `<button class="tab ${k === 'score' ? 'on' : ''}" data-metric="${k}">${METRICS[k]}</button>`).join('')}</div>
     <div id="chart">${timeline(s, 'score')}</div>
+    ${journeyHtml(s, viewer, lastEnd?.tick ?? s.tick)}
     <table class="end-stats"><tr><th></th><th>Score</th><th>Epoch</th><th>Gathered</th><th>Traded</th><th>Trained</th><th>Built</th><th>Techs</th><th>Kills</th><th>Lost</th></tr>${rows}</table>
     <div class="row">
       <button class="btn wide" data-act="watch">Look around</button>
       <button class="btn wide" data-act="replay-save">Download the replay</button>
-      ${sc ? (won && nextCh ? `<button class="btn wide primary" data-act="camp-next" data-id="${sc.id}">Next chapter: ${nextCh.title}</button>` : '') + '<button class="btn wide' + (won && nextCh ? '' : ' primary') + '" data-act="restart">Play the chapter again</button>' : online ? '' : '<button class="btn wide primary" data-act="new-map">Play again</button>'}
+      ${sc ? (won && nextCh ? `<button class="btn wide primary" data-act="camp-next" data-id="${sc.id}">Next chapter: ${nextCh.title}</button>` : '') + '<button class="btn wide' + (won && nextCh ? '' : ' primary') + '" data-act="restart">Play the chapter again</button>' : online ? '' : '<button class="btn wide" data-act="restart" title="The same map, peoples and rivals">Play this seed again</button><button class="btn wide primary" data-act="new-map">Play again</button>'}
       <button class="btn wide" data-act="quit">Quit to title</button>
     </div></div>`;
   m.querySelector('.chart-tabs')!.addEventListener('click', (e) => {

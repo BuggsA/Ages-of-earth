@@ -51,7 +51,7 @@ import { coppiceStep } from './coppice';
 import { longbowStep } from './longbow';
 import { seraiStep, tollStep } from './passage';
 import { mercStep } from './merc';
-import { FINDS, KIN, NOMAD } from './data';
+import { FINDS, KIN, NOMAD, STEP_BACK } from './data';
 import { ageOf, goldenEnds, threadsOf, chartLand, isHire, barred, journeyOf, markKeepsake, noteWalked, trainsAt, workSteps } from './ages';
 import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, HomelandId, MapSize, MapType, Player, UnitType } from './types';
 import { RARES, RES, R_FISH, R_NONE } from './types';
@@ -286,6 +286,7 @@ export function enterAge(s: GameState, p: Player, to: AgeId, back = false): void
     else delete p.suspended;
   });
   if (back) p.backAt = s.tick;
+  (p.journey ??= []).push({ tick: s.tick, from, to, ...(back ? { back: true as const } : {}) });
   if (herds) giftFlock(s, p);
   // The age left keeps one building at its work (#555 s11).
   if (from !== to) {
@@ -471,6 +472,9 @@ function removeDead(s: GameState): void {
     any = true;
     const p = s.players[e.owner];
     p.stats.losses++;
+    // A loss inside the weak window after a step back (#743): the end screen says whether a rival struck it.
+    const leg = p.journey?.[p.journey.length - 1];
+    if (leg?.back && s.tick - leg.tick < secs(STEP_BACK.time)) leg.lost = (leg.lost ?? 0) + 1;
     if (e.kind === 'building') {
       // Those inside run out before it falls, and its captives (#355) go free.
       ungarrison(s, e);
