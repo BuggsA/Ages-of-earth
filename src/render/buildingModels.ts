@@ -448,6 +448,43 @@ function heart(k: Kit): void {
   k.team(k.cyl(0.47, 0.49, 0.14, 9, TEAM, 0, 1.2, 0));
 }
 
+// ---- The Age of the Bloom (`docs/wild-road.md` §5b) ---------------------------------------------------
+
+/**
+ * A Seed Spire: three young trunks grown round one another into a tall twisted tower, bound with living withies, rising from a
+ * ring of moss. At the top they open like fingers round a great seed pod, pale green and lit gold from within: the Bloom Seed
+ * ripening. Leaves sprout from the twists all the way up. Its people's cloth is a band round the base.
+ */
+function spire(k: Kit): void {
+  const bark = '#5a4630';
+  const dark = '#3a2c1d';
+  const leaf = ['#3f7a2e', '#5a9238', '#4a8534'];
+  k.lathe([[0, 0.05], [0.95, 0], [0.9, 0.05], [0.6, 0.12], [0, 0.14]], 9, '#5c7c3c', 0, -0.03, 0);
+  // Three trunks wound round the axis, each a stack of short leaning segments.
+  for (let t = 0; t < 3; t++) {
+    for (let i = 0; i < 9; i++) {
+      const a = (t / 3) * Math.PI * 2 + i * 0.55;
+      const r = 0.34 - i * 0.022;
+      const seg = k.cyl(0.07 - i * 0.004, 0.09 - i * 0.004, 0.46, 5, t % 2 ? bark : dark, Math.cos(a) * r, 0.25 + i * 0.4, Math.sin(a) * r);
+      seg.rotation.z = Math.cos(a + 1.2) * 0.35;
+      seg.rotation.x = Math.sin(a + 1.2) * 0.35;
+      if (i % 3 === 1) k.blob(0.13, leaf[(t + i) % 3], Math.cos(a) * (r + 0.12), 0.35 + i * 0.4, Math.sin(a) * (r + 0.12)).scale.set(1, 0.6, 1);
+    }
+  }
+  // The withies binding them, three bands up the tower.
+  for (const y of [0.9, 1.9, 2.9]) k.cyl(0.3 - y * 0.03, 0.31 - y * 0.03, 0.05, 8, '#7a6440', 0, y, 0);
+  // The fingers opening round the pod, and the pod itself, glowing.
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    const f = k.cyl(0.025, 0.05, 0.6, 4, bark, Math.cos(a) * 0.22, 3.85, Math.sin(a) * 0.22);
+    f.rotation.z = Math.cos(a) * -0.5;
+    f.rotation.x = Math.sin(a) * 0.5;
+  }
+  k.glow(k.blob(0.26, '#c8e27a', 0, 4.05, 0)).scale.set(0.8, 1.25, 0.8);
+  k.glow(k.blob(0.12, '#ffd65a', 0, 4.0, 0.12));
+  k.team(k.cyl(0.4, 0.42, 0.14, 9, TEAM, 0, 0.2, 0));
+}
+
 /**
  * An Orchard: four fruit trees in a wattle fence with a picker's basket. Young (`variant` 0) it is whips; grown (1), round crowns;
  * in fruit (2, summer and autumn) the crowns hang red and gold.
@@ -1871,6 +1908,65 @@ function sluice(k: Kit, variant: number): void {
   k.team(k.box(0.13, 0.08, 0.13, TEAM, 0.36, 0.38, -0.26, g));
 }
 
+/**
+ * A swing bridge (#701 s5, the Age of Locks): a timber deck on iron girders over a canal, resting on a stone pier at each bank and
+ * turning on a drum in the middle, with railings and a lamp post in the owner's colour. It spans toward the land (`variant`: which of the
+ * four neighbours are land, as a wall's mask): along x unless the banks lie only north and south.
+ */
+function bridge(k: Kit, variant: number): void {
+  const TIMBER = '#7a5636';
+  const IRON = '#4a4d52';
+  const g = k.group();
+  if (!(variant & 5) && variant & 10) g.rotation.y = Math.PI / 2;
+  // The piers at the banks, down into the water.
+  for (const side of [-1, 1]) {
+    k.box(0.2, 0.9, 0.7, STONE, side * 0.42, -0.75, 0, g);
+    k.box(0.24, 0.05, 0.74, '#8d877b', side * 0.42, 0.15, 0, g);
+  }
+  // The pivot drum, girders and the deck.
+  k.cyl(0.14, 0.16, 0.8, 8, '#6f6a62', 0, -0.62, 0, g);
+  for (const z of [-0.24, 0.24]) k.box(1.04, 0.08, 0.06, IRON, 0, 0.12, z, g);
+  k.box(1.02, 0.05, 0.56, TIMBER, 0, 0.2, 0, g);
+  for (let i = 0; i < 6; i++) k.box(0.02, 0.051, 0.56, '#5b4330', -0.42 + i * 0.17, 0.2, 0, g);
+  // Railings, and the lamp on its post.
+  for (const z of [-0.27, 0.27]) {
+    k.box(1.0, 0.03, 0.03, IRON, 0, 0.42, z, g);
+    for (const x of [-0.45, -0.15, 0.15, 0.45]) k.box(0.025, 0.2, 0.025, IRON, x, 0.25, z, g);
+  }
+  k.cyl(0.02, 0.02, 0.5, 4, IRON, 0.45, 0.25, 0.27, g);
+  k.team(k.box(0.08, 0.08, 0.08, TEAM, 0.45, 0.75, 0.27, g));
+}
+
+/**
+ * A dam (#701 s5, the Age of Locks): a battered stone wall across the water between its banks (`variant` & 15, the land round it as a
+ * bridge's), a brick turbine house on its crown with a slate roof, and a spillway. Turning (`variant` 16 and up), white water pours
+ * from the spillway and a little steam rises from the house.
+ */
+function dam(k: Kit, variant: number): void {
+  const turning = variant >= 16;
+  const mask = variant & 15;
+  const BRICK = '#8f4a36';
+  const g = k.group();
+  if (!(mask & 5) && mask & 10) g.rotation.y = Math.PI / 2;
+  // The wall: broad below, a cut-stone crown.
+  k.box(1.04, 1.0, 0.86, '#86807a', 0, -1.0, 0, g);
+  k.box(1.04, 0.24, 0.62, STONE, 0, 0.0, 0, g);
+  for (let i = 0; i < 5; i++) k.box(0.18, 0.04, 0.64, '#b0aaa0', -0.4 + i * 0.2, 0.22, 0, g);
+  // The turbine house.
+  k.box(0.48, 0.36, 0.4, BRICK, -0.16, 0.24, -0.04, g);
+  k.prism(0.52, 0.18, 0.44, '#4c5560', -0.16, 0.6, -0.04, g);
+  k.box(0.08, 0.26, 0.08, BRICK, -0.3, 0.62, 0.08, g);
+  for (const x of [-0.28, -0.04]) k.box(0.08, 0.12, 0.01, '#e8d9a0', x, 0.36, 0.165, g);
+  // The spillway on the low side, and the race below it.
+  k.box(0.26, 0.06, 0.3, '#6f6a62', 0.3, 0.18, 0.4, g);
+  if (turning) {
+    k.box(0.22, 0.32, 0.06, '#e6f1f2', 0.3, -0.12, 0.56, g);
+    k.box(0.5, 0.03, 0.34, '#cfe3e6', 0.3, -0.14, 0.72, g);
+    k.blob(0.07, '#dfe4e6', -0.3, 0.98, 0.08, g);
+  }
+  k.team(k.box(0.12, 0.08, 0.12, TEAM, 0.36, 0.24, -0.2, g));
+}
+
 /** A windmill (#701): a thatched smock mill on a brick base with a reefing stage, its cap turned to the wind. The sails turn on their own (`windmillSails`). */
 function windmill(k: Kit, _e: number, st: Style): void {
   pad(k, 2, st.base);
@@ -2549,9 +2645,10 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
   }
 }
 
-const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' | 'thornwall' | 'garden' | 'orchard' | 'channel' | 'hive' | 'sluice' | 'causeway'>, (k: Kit, e: number, st: Style) => void> = {
+const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' | 'thornwall' | 'garden' | 'orchard' | 'channel' | 'hive' | 'sluice' | 'causeway' | 'bridge' | 'dam'>, (k: Kit, e: number, st: Style) => void> = {
   sapling: (k, e) => sapling(k, e),
   heart: (k) => heart(k),
+  spire: (k) => spire(k),
   towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, windmill,
   // The Age of Tides (#739), drawn in `tideModels.ts`.
   tidemill: (k: Kit, _e: number, st: Style) => tidemill(k, st.base),
@@ -2726,7 +2823,7 @@ const ROOFS: Partial<Record<BuildingType, [string, string]>> = {
 };
 
 /** No plinth or pennant: open or thin pieces, and buildings that already carry their own standards. */
-const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder', 'dyke', 'thornwall', 'garden', 'orchard', 'channel', 'hive', 'sluice', 'causeway', 'tidemill', 'heart'];
+const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder', 'dyke', 'thornwall', 'garden', 'orchard', 'channel', 'hive', 'sluice', 'causeway', 'tidemill', 'heart', 'bridge', 'dam', 'spire'];
 
 function roleStyle(type: BuildingType, epoch: number, st: Style): Style {
   const r = ROOFS[type];
@@ -2761,6 +2858,8 @@ export function buildingGeometry(type: BuildingType, epochIn: number, color: str
     if (type === 'wall') wall(k, epoch, STYLES[Math.min(epoch, 4)], variant);
     else if (type === 'dyke') dyke(k, variant);
     else if (type === 'sluice') sluice(k, variant);
+    else if (type === 'bridge') bridge(k, variant);
+    else if (type === 'dam') dam(k, variant);
     else if (type === 'channel') channel(k, variant);
     else if (type === 'causeway') causewaySite(k, variant);
     else if (type === 'snare') snare(k, epoch, variant === 1);

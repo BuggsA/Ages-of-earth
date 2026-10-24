@@ -40,7 +40,7 @@ export function damageOf(s: GameState, attacker: Unit | null, st: UnitStats, tar
   const inspired = (attacker && s.tick - attacker.aura < 5 ? AURA.attack : 1) * (attacker && rankOf(attacker) ? VETERANCY.attack[rankOf(attacker) - 1] : 1) * (attacker && stirred(s, attacker) ? RALLY.attack : 1) * hemoBlow(s, attacker);
   if (target.kind === 'building') {
     // Walls shrug off all but siege and heavy blows.
-    const wall = target.type === 'wall' || target.type === 'gate' || target.type === 'dyke' || target.type === 'sluice' ? (st.cls === 'siege' ? 1.2 : st.cls === 'infantry' || st.cls === 'hero' ? 0.5 : 0.15) : 1;
+    const wall = target.type === 'wall' || target.type === 'gate' || target.type === 'dyke' || target.type === 'sluice' || target.type === 'dam' ? (st.cls === 'siege' ? 1.2 : st.cls === 'infantry' || st.cls === 'hero' ? 0.5 : 0.15) : 1;
     return Math.max(1, st.attack * BONUS[st.cls].building * inspired * wall);
   }
   const ts = statsOf(s, target);

@@ -1,6 +1,6 @@
 # The Wild route: a people that grows its power
 
-**Status: the owner's idea (2026-10-24), fleshed out here; steps 1, 2, 3 (fire), 4 (the Hive) and 5 (the Wildwood) built.** The owner: "start a new main branch of ages. Completely new. I was thinking like nature/plant tech. Where you use nature and animals to your advantage." Then: "There should be a way to produce them too, maybe forest wall or tree walls of some kind. Maybe ents later on." "Maybe farms that also yield way more food. Or maybe just more food dense so less area. Be very uniquely creative to fill the gaps, especially the future ages." And: "this goes to 7." Umbrella: #706. Build on it; change it with the reason on the umbrella.
+**Status: the owner's idea (2026-10-24), fleshed out here; steps 1, 2, 3 (fire), 4 (the Hive), 5 (the Wildwood) and 6 (the Bloom) built.** The owner: "start a new main branch of ages. Completely new. I was thinking like nature/plant tech. Where you use nature and animals to your advantage." Then: "There should be a way to produce them too, maybe forest wall or tree walls of some kind. Maybe ents later on." "Maybe farms that also yield way more food. Or maybe just more food dense so less area. Be very uniquely creative to fill the gaps, especially the future ages." And: "this goes to 7." Umbrella: #706. Build on it; change it with the reason on the umbrella.
 
 ## The idea in one line
 
@@ -23,7 +23,7 @@ Stone ─┬─ 1 Wild ── 2 Grove ──── 3 Hive ── 4 Wildwood ─�
 | 3 | 3 | **Hive** (built) | keep Hives that swarm whoever walks my woods; tip darts in venom; breed dire beasts | no guns or cannon | woods a rival can't walk through |
 | 4 | 4 | **Wildwood** (built) | wake old trees as Ents that walk, crush and root again; let my woods spread each spring | no factories or machines; fire hits living things twice as hard | an army that is also the forest |
 | 5a | 5 | **Leviathans** | breed giants: Skywhales that carry troops over walls, a Kraken in the deep, a Behemoth with my town on its back | the Heart Tree sleeps: no Ents, no spreading | reach: over walls, under the sea, a capital that walks |
-| 5b | 5 | **Bloom** | fire a Bloom Seed that turns a rival's town to forest; win by the Greening | the Dens go quiet: no new beasts | a second way to win, and a warhead that grows |
+| 5b | 5 | **Bloom** (built) | fire a Bloom Seed that turns a rival's town to forest; win by the Greening | the Dens go quiet: no new beasts | a second way to win, and a warhead that grows |
 | R | 2 | **Mycelium** (rare) | grow a fungus web under my town: every building on it takes in every stock, my units in it are hidden, rival wood rots on it | soldiers cost a quarter more; fire burns the web | a town that can't be starved; the short road to the Bloom |
 | X | 1½ | **Wild Hunt** (crossing) | ride with wolf packs at heel and hawks overhead; my beasts follow the camp's wagons | no walls, no fields (the steppe's) | raids that see everything and outrun everything |
 
@@ -77,7 +77,14 @@ Every age has a cheap road back and a road to the trunk, like every side age. De
 - **The Behemoth:** one titan turtle per people, carrying a Town Center on its back: a capital that walks (the Steppe's wagons, at the scale of a mountain). Lose it and you lose a Town Center.
 - **Door:** the Heart Tree sleeps. No new Ents, no Spreading.
 
-### 5b. The Age of the Bloom: the plants' end
+### 5b. The Age of the Bloom: the plants' end (built, step 6)
+
+- **As built** (`src/sim/bloom.ts`, `BLOOM`): clue a Heart Tree, deed 12 seedlings from the Spreading (a new `spread` stat); roads on to the Atomic Age (cheap, sideways at tier 5) and back to the Wildwood. Three new things: the **Seed Spire** (its own building, one to a people, alive so fire takes it), the **Bloom Seed** (slung with Sling, G) and **the Greening** (a win). Pollen storms and the Spreading every season are rules of the age. The door is the Dens gone quiet (no War Wolf, Tusker, Mammoth or Cave Bear) **and no Missile Silo**: the Seed is this road's warhead, so a Bloom people can't hold both. How each part reads:
+  - The Spire ripens one Seed every 150 s, **only while the Heart Tree stands** (the clock waits while it is down), so felling the Heart Tree stops both the Seeds and the Greening. Slinging costs 300 food, 300 wood and 200 gold.
+  - The Seed is **public from the moment it is slung**: 10 s in the air (a green ring where it will fall), then it roots on the open tile nearest its point (within 6; none, and it withers). Rooted, a yellow ring marks the **heart-root**: each rival citizen within 1.6 tiles hacks a stroke a second, and 90 strokes cut it out. Only citizens hack, so stopping it costs workers, and the Bloom side's soldiers can cut them down. Uncut after 60 s, every rival building whose nearest edge lies within 6 tiles is destroyed, its footprint planted with seedlings that are trees 8 s later. A rooted Seed is heard growing on every screen.
+  - **The Greening counts a people's own land**, not the world: the forest share of the world at the start is 26–27% on every map size (measured, seeds 1–3), so a world count would turn on the map, not the player. Green tiles are standing trees, Orchards, the Heart Tree and Thornwalls grown to living oak, in its land; the share is over its land's open tiles, counted as at least 1,000 (so a tiny land can't win it). At **35%** (40% in the sketch: the computer's land peaked at 18–32% in trials, and a person with Thornwall gets there faster) with the Heart Tree standing, a 180 s clock starts on every screen; it fades if the share drops or the Heart Tree falls. Measured once a second, with one `borderMap`, only while someone stands in the Bloom.
+  - **Pollen:** the first 30 s of each season, rival land units and Watch Towers within 14 tiles of a Bloom people's Heart Tree see half as far (`pollenMul` in `vision.ts`). Read as "in your land" near the Heart Tree, as the woodland ways are.
+  - **The computer:** goes on from the Wildwood and stays 600 s; raises its Spire, keeps the fuel back as the Seed comes ripe (as the silo's), slings at the rival building it has seen whose ring cracks the most (else the rival's home Town Center), and sends its army to stand over the root. Short of green it plants Orchards and lines of Thornwall round home. **Every** computer, whatever its road, sends up to 7 citizens to hack a rival Seed falling near its buildings, and while a rival holds the Greening its army goes for that Heart Tree with a torch.
 
 - **The Bloom Seed:** the green answer to the Atomic Age's warhead. Raised in a **Seed Spire** and slung across the map, it roots in a rival's town and, over sixty seconds, cracks every building in its ring into forest. The rival's counter is a race: citizens who reach the **heart-root** in time and hack it out stop the Bloom. The whole map hears it growing.
 - **The Greening (a second way to win):** hold the Heart Tree while your woods cover 40% of the land for three minutes. It turns a match from "destroy them" into "outgrow them", and gives the rival a new job: fell and burn.
@@ -116,6 +123,7 @@ Every age has a cheap road back and a road to the trunk, like every side age. De
 - **The computer** torches a rival's growth with soldiers out on campaign (`torchGrowth`) and sends a citizen to beat out its own (`beatFires`).
 - **Smoke quiets Hives** (step 4, built): a Hive with a fire within `HIVE.smoke` tiles, or burning itself, sleeps `HIVE.quiet` seconds.
 - **The Wildwood's door** (step 5, built): a people standing in it burns twice as hard (`FIRE.wild`, `fireMul`); a rooted Ent burns with its tree.
+- **The Bloom** (step 6, built): the Seed Spire is alive and burns; burning a Bloom people's woods is how a rival stops the Greening.
 - **Still to come:** beasts that fear fire.
 
 ## Steps (each one playable)
@@ -125,7 +133,7 @@ Every age has a cheap road back and a road to the trunk, like every side age. De
 3. **Fire** (built, shared rule, needed by everything after): torchbearers, burning woods and buildings. Smoke waits for the Hive.
 4. **Hive** (built): Hives, pollination, venom darts, dire beasts and the Cave Bear.
 5. **Wildwood** (built): the Heart Tree, Ents that root, the Spreading, woodland ways.
-6. **Bloom:** the Seed Spire and the Bloom Seed, the Greening victory, pollen storms.
+6. **Bloom** (built): the Seed Spire and the Bloom Seed, the Greening victory, pollen storms.
 7. **Leviathans:** Skywhales and seed-bombs, the Kraken and Reef Ships, the Behemoth.
 8. **Mycelium** (with the Glowcap hollow key resource) and the **Wild Hunt** crossing.
 9. **The computer plays the whole route**, and campaign sweeps show it can win on any map (rule 0).

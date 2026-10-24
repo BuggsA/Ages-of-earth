@@ -192,7 +192,8 @@ export function wildwoodStep(s: GameState): void {
     }
     if (homeless.has(e.owner) && !rootProblem(s, e)) rootEnt(s, e);
   }
-  if (s.tick >= secs(SEASON.len) && seasonAt(s) === 0 && s.tick % secs(SEASON.len) === secs(WILDWOOD.spreadAt)) spread(s);
+  // The Spreading comes each spring; for a people standing in the Bloom, at the start of every season (`BLOOM`).
+  if (s.tick >= secs(SEASON.len) && s.tick % secs(SEASON.len) === secs(WILDWOOD.spreadAt) && (seasonAt(s) === 0 || s.players.some((p) => ageOf(p) === 'bloom'))) spread(s, seasonAt(s) === 0);
 }
 
 /** Whether any building stands on a tile or beside it. */
@@ -207,13 +208,16 @@ function byBuilding(s: GameState, x: number, y: number): boolean {
   return false;
 }
 
-/** The Spreading: round each standing Heart Tree, in id order, its people's woods seed the bare ground beside them; its Thornwalls thicken. */
-function spread(s: GameState): void {
+/**
+ * The Spreading: round each standing Heart Tree, in id order, its people's woods seed the bare ground beside them; its Thornwalls thicken.
+ * Out of spring (`spring` false) only a people standing in the Bloom spreads.
+ */
+function spread(s: GameState, spring: boolean): void {
   const r = WILDWOOD.spread;
   for (const b of s.ents) {
     if (b.kind !== 'building' || b.type !== 'heart' || !b.built || b.hp <= 0) continue;
     const p = s.players[b.owner];
-    if (!p || p.defeated || !wakesForest(p)) continue;
+    if (!p || p.defeated || !wakesForest(p) || (!spring && ageOf(p) !== 'bloom')) continue;
     let n = 0;
     for (let y = Math.max(1, b.ty - r); y < Math.min(s.h - 1, b.ty + b.size + r) && n < WILDWOOD.seeds; y++) {
       for (let x = Math.max(1, b.tx - r); x < Math.min(s.w - 1, b.tx + b.size + r) && n < WILDWOOD.seeds; x++) {
@@ -230,6 +234,7 @@ function spread(s: GameState): void {
       if (e.kind !== 'building' || e.type !== 'thornwall' || e.owner !== b.owner || !e.built || e.hp <= 0 || (e.level ?? 0) >= 3) continue;
       e.grown = Math.max(e.grown ?? 0, GROVE.stage * ((e.level ?? 0) + 1));
     }
+    p.stats.spread = (p.stats.spread ?? 0) + n;
     s.events.push({ k: 'wildwood', what: 'spread', owner: b.owner, x: b.x, y: b.y, n });
   }
 }

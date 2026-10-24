@@ -4,6 +4,7 @@ import { inField } from './ages';
 import { modsOf } from './stats';
 import type { GameState } from './types';
 import { statsOf } from './world';
+import { pollenMul } from './bloom';
 
 /** Fog of war: which tiles each player sees now, and which they have ever seen. */
 
@@ -62,6 +63,8 @@ export function updateVision(s: GameState): void {
     else r = e.built ? BUILDINGS[e.type].sight + e.size / 2 + (e.beacon !== undefined && s.tick < e.beacon ? BEACON.sight : 0) : 2 + e.size / 2;
     // Wireless Telegraphy: ships and finished Docks inside a Tower's field see farther over the water.
     if ((e.kind === 'unit' ? statsOf(s, e).cls === 'ship' : e.type === 'dock' && e.built) && modsOf(s, e.owner).telegraph && inField(s, e)) r += TELEGRAPH.sight;
+    // A pollen storm (the Age of the Bloom) halves the sight of a rival's soldiers and towers near a Bloom people's Heart Tree.
+    r *= pollenMul(s, e);
     const cx = Math.floor(e.x);
     const cy = Math.floor(e.y);
     stamp(s, p.vis, p.seen, cx, cy, disc(r));

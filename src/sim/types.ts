@@ -36,12 +36,16 @@ export type BuildingType =
   | 'hive'
   /** The Age of the Wildwood (`docs/wild-road.md` §4, `wildwood.ts`): the town's soul, one to a people, where Ents are woken. */
   | 'heart'
+  /** The Age of the Bloom (`docs/wild-road.md` §5b, `bloom.ts`): a living tower, one to a people, that ripens and slings Bloom Seeds. */
+  | 'spire'
   /** The Age of Rivers (#701): a ditch dug from the water, which fills and is gone. */
   | 'channel'
   /** The Age of the Water Line (#701 s4): a gate in a dyke that lets the water out over the low ground, and back. */
   | 'sluice'
   /** The Age of Tides (#739): a raised road over the flats, which becomes tidal ground and is gone; a mill that grinds on the running tide. */
-  | 'causeway' | 'tidemill';
+  | 'causeway' | 'tidemill'
+  /** The Age of Locks (#701 s5): a swing bridge its own people cross a canal by and ships pass under, and a dam whose turbines drive the workshops by it. */
+  | 'bridge' | 'dam';
 /** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
 export type Difficulty = 'gentle' | 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
@@ -59,9 +63,9 @@ export type TechId =
   | 'wheelbarrow' | 'handcart' | 'axes' | 'saws' | 'picks' | 'shafts' | 'plow' | 'irrigation' | 'masonry'
   | 'conscription' | 'husbandry' | 'theology' | 'chemistry'
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'chart' | 'assay' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
-  | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged';
+  | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged' | 'launchControl';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood' | 'locks' | 'bloom';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
 export type PathId = 'blood' | 'steppe' | 'hemocraft' | 'rite';
@@ -355,6 +359,8 @@ export interface Building {
   pumped?: number;
   /** A Tide Mill (#739): the tick it last ground on the running tide, so its wheel shows it at work. Absent: it never has. */
   milled?: number;
+  /** A Seed Spire (the Age of the Bloom, `bloom.ts`): the tick its Bloom Seed is ripe (pushed on while no Heart Tree stands). Absent: not yet begun. */
+  ripe?: number;
   /** A Sluice (#701 s4): standing open, letting the water out over the low ground behind it. Absent: shut. */
   open?: boolean;
   /** Where new units go. `kind` is the resource the flag was set on (absent on bare ground), so it outlives its tile (#344). */
@@ -499,6 +505,21 @@ export interface Fire {
   out?: number;
 }
 
+/**
+ * A Bloom Seed (the Age of the Bloom, `bloom.ts`), slung from `spire`: in the air until tick `lands` (aimed at `x`, `y`), then rooted on
+ * the open tile nearest that point (`x`, `y` move there), cracking its ring on tick `at` unless `cut` strokes reach `BLOOM.root`.
+ */
+export interface BloomSeed {
+  id: number;
+  owner: number;
+  spire: number;
+  x: number;
+  y: number;
+  lands: number;
+  at: number;
+  cut: number;
+}
+
 /** A warhead in the air (#605, `silo.ts`): launched from `silo`, it lands at (`x`, `y`) on tick `at`. */
 export interface Launch {
   id: number;
@@ -516,6 +537,19 @@ export interface Launch {
    * order), each blurred off its point, and which of them is real. Absent in older saves (the rivals see the true point).
    */
   warn?: Warning[];
+  /**
+   * A salvo (#765): its three warheads, each with its own silo and true point (the first is `silo`, `x`, `y` above). A fallen silo scrubs
+   * its own (`gone`) and the rest fly on. Absent for a single strike.
+   */
+  salvo?: SalvoShot[];
+}
+
+/** One warhead of a salvo (#765). */
+export interface SalvoShot {
+  silo: number;
+  x: number;
+  y: number;
+  gone?: true;
 }
 
 /** One rival team's warning of a launch (#762, `silo.ts`): the rings it sees, and the index of the real one. */
@@ -523,6 +557,8 @@ export interface Warning {
   team: number;
   rings: { x: number; y: number }[];
   real: number;
+  /** A salvo's rings (#765): which of its warheads (`Launch.salvo`) each ring stands for. All are real. Absent for a single strike. */
+  of?: number[];
 }
 
 /** A blast that lifts the fog for every player over `r` tiles of (`x`, `y`) until tick `until` (#752, `silo.ts`, `vision.ts`). */
@@ -758,6 +794,8 @@ export interface PlayerStats {
   gardened?: number;
   /** Honey and mead a people's Hives paid in, as food and gold (the Age of the Hive); absent in older saves. */
   honey?: number;
+  /** Seedlings its woods put out round its Heart Tree in the Spreading (the Age of the Wildwood, the Bloom's deed); absent in older saves. */
+  spread?: number;
   /** Food taken from snares (#485); absent in older saves. */
   snared?: number;
   /** Gold taken as tribute by riders standing in rivals' land (#318); absent in older saves. */
@@ -923,6 +961,12 @@ export interface Player {
   tcAlert?: number;
   /** The tick by which a people with no Town Center must have a new one under way, or be lost (#452). */
   heartless?: number;
+  /**
+   * The Greening (the Age of the Bloom, `bloom.ts`): the share of its land that is green, in thousandths, measured once a second while it
+   * stands in the Bloom; and the tick its hold began, while it has its Heart Tree and that share is at least `BLOOM.green`. Absent: not in the Bloom.
+   */
+  green?: number;
+  greenSince?: number;
 }
 
 export type GameEvent =
@@ -947,6 +991,11 @@ export type GameEvent =
    * rooted (its tree cut or burnt); or a people's woods `spread` in spring (`n` seedlings round its Heart Tree).
    */
   | { k: 'wildwood'; what: 'wake' | 'root' | 'felled' | 'spread'; owner: number; x: number; y: number; id?: number; n?: number }
+  /**
+   * The Age of the Bloom (`bloom.ts`): a Seed `slung` (aimed at x, y), `rooted` where it came down, `withered` with no open ground, `hacked`
+   * out by rival citizens, or `cracked` (`n` buildings turned to forest); a people's `storm` of pollen, its Greening `held` or `faded`.
+   */
+  | { k: 'bloom'; what: 'slung' | 'rooted' | 'withered' | 'hacked' | 'cracked' | 'storm' | 'held' | 'faded'; owner: number; x: number; y: number; id?: number; n?: number }
   /** A mammoth gores, or a wolf bites, someone. */
   | { k: 'wildStrike'; id: number; kind: Animal['kind']; target: number; x: number; y: number }
   /** A raider camp (own pitch) stands empty: whose people cleared it, and the plunder they took. */
@@ -1028,6 +1077,8 @@ export type GameEvent =
   | { k: 'breached'; owner: number; by: number; tile: number; x: number; y: number; pond: boolean }
   /** A barrage shut a pond off from the sea (#748), or a breach let it drain: `tiles` of tidal ground now behind it. */
   | { k: 'pond'; owner: number; tiles: number; x: number; y: number }
+  /** A dam fell with water behind it (#701 s5): its surge ran over `tiles` tiles of low ground at once. */
+  | { k: 'burst'; owner: number; id: number; x: number; y: number; tiles: number }
   | { k: 'season'; i: number }
   /** A payday for hired swords (the Age of Merchants): how many went unpaid, and how many of those walked off. */
   | { k: 'wages'; owner: number; late: number; gone: number }
@@ -1098,7 +1149,7 @@ export type GameEvent =
   | { k: 'sighted'; owner: number; x: number; y: number; n: number }
   | { k: 'defeated'; owner: number }
   | { k: 'heartless'; owner: number; left: number }
-  | { k: 'over'; winner: number; how: 'conquest' | 'wonder' | 'relics' | 'lands' | 'resign' | 'time' | 'scenario' }
+  | { k: 'over'; winner: number; how: 'conquest' | 'wonder' | 'relics' | 'lands' | 'greening' | 'resign' | 'time' | 'scenario' }
   /** A relic picked up, kept in a Temple, or let go where it lies. */
   | { k: 'relic'; id: number; owner: number; what: 'taken' | 'kept' | 'dropped'; x: number; y: number }
   /** One side now keeps every relic (its countdown starts), or no longer does (`team` -1). */
@@ -1147,7 +1198,8 @@ export interface GameState {
   polder?: Uint8Array;
   /**
    * The Age of Rivers' channels (#701): per tile, 1 where land was dug out and the water ran in (now `T_WATER`, but wadeable: no
-   * `B_TERRAIN`). Absent until the first ditch fills (and in older saves); `water.ts` reads and writes it.
+   * `B_TERRAIN`), 2 where it was dug deep into a canal in the Age of Locks (#701 s5: ships sail it too, and soldiers swim it slower).
+   * Absent until the first ditch fills (and in older saves); `water.ts` reads and writes it.
    */
   channel?: Uint8Array;
   /**
@@ -1230,6 +1282,8 @@ export interface GameState {
   kegs?: Keg[];
   /** Fires burning, in the order they were lit (`fire.ts`); absent while nothing burns. */
   fires?: Fire[];
+  /** Bloom Seeds in the air or rooted (the Age of the Bloom, `bloom.ts`), in the order they were slung; absent: none. */
+  blooms?: BloomSeed[];
   /** Warheads in the air (#605, `silo.ts`); absent until one is launched. */
   launches?: Launch[];
   /** Ground poisoned by warheads that have struck (#605 s2); absent until one does. */
@@ -1342,6 +1396,8 @@ export interface AiMemory {
    * tick an enemy army last stood by the sluice.
    */
   line?: { since: number; spot?: { tx: number; ty: number } | null; alarm?: number };
+  /** The Age of Locks (#701 s5): since when it has stood in the age, and where it means its dam to go (null: nowhere, once looked). */
+  locks?: { since: number; dam?: { tx: number; ty: number } | null };
   /** The Age of Rivers (#701): the channel it means to dig from water past home (null: none), found when deciding and again on arrival (`fresh`). */
   river?: { plan: ChannelPlan | null; looked?: boolean; fresh?: boolean };
   /** The first crossing (#585): the age it stands in on the way to the Sea-Raiders, and since when (each sibling, and the age itself). */
@@ -1355,7 +1411,11 @@ export interface AiMemory {
   /** When an Industrial computer bound for a side future began to hold off the Atomic Age (#605). */
   sideHold?: number;
   /** Where a loaded silo means to strike, chosen once a second (#605). */
-  siloAim?: { x: number; y: number; at: number; w?: 'atomic' | 'fission' | 'fusion' };
+  siloAim?: { x: number; y: number; at: number; w?: 'atomic' | 'fission' | 'fusion'; salvo?: { x: number; y: number }[] };
+  /** Whether three rival targets, far enough apart, are each worth a warhead (#765): the town raises silos and Launch Control for a salvo. */
+  salvoPays?: boolean;
+  /** The tick the computer last weighed where to send a warhead (`fireSilo`, once a second). */
+  siloAt?: number;
   /** Tick it began holding its Town Center for a side road's last deeds, so it holds only so long. */
   waiting?: number;
   /**
@@ -1387,6 +1447,9 @@ export interface AiMemory {
   hive?: number;
   /** The tick it entered the Age of the Wildwood, kept while it wakes its forest there (`WILDWOOD.aiStay`). */
   wildwood?: number;
+  /** The tick it entered the Age of the Bloom, kept while it slings its Seeds there (`BLOOM.aiStay`); and when it last planted an Orchard for the Greening. */
+  bloom?: number;
+  orchardAt?: number;
   steppe?: { band?: number[]; at?: { x: number; y: number }; out?: number; recalled?: number; horde?: number; since?: number; struck?: number; /** When a nomad flock (#501) was first seen grazed out, this time. */ starved?: number; pack?: { x: number; y: number; at: number }; to?: { x: number; y: number; at: number }; from?: { x: number; y: number } };
   /**
    * The tide (#748): the barrage it means to lay by its mills (null: none worth it, by any of the mills in `seen`); once it stood whole,
@@ -1439,6 +1502,8 @@ export type Command =
   | { t: 'pitch'; p: number; ids: number[] }
   /** Ents root where they stand and become trees again (the Age of the Wildwood). */
   | { t: 'root'; p: number; ids: number[] }
+  /** A Seed Spire slings its ripe Bloom Seed at a point (the Age of the Bloom). */
+  | { t: 'sling'; p: number; spire: number; x: number; y: number }
   /** Citizens milk a sheep of their flock (#308). */
   | ({ t: 'milk'; p: number; ids: number[]; target: number } & Queued)
   /** Citizens tame a wild wolf, boar or mammoth (the Age of the Wild). */
@@ -1499,7 +1564,8 @@ export type Command =
   /** Citizens or foot soldiers carry a powder keg to a rival's causeway tile and lay it there (#748, the Age of Sappers): it breaches the road. */
   | ({ t: 'kegTile'; p: number; ids: number[]; tile: number } & Queued)
   /** A Missile Silo launches at a point (#605, the Atomic Age); `w` picks the warhead (#753), absent for the people's own branch's. */
-  | { t: 'launch'; p: number; silo: number; x: number; y: number; w?: 'atomic' | 'fission' | 'fusion' }
+  /** With `more` (#765, Launch Control), a salvo: this silo and the two in `more` fire one Atomic warhead each, each at its own point. */
+  | { t: 'launch'; p: number; silo: number; x: number; y: number; w?: 'atomic' | 'fission' | 'fusion'; more?: { silo: number; x: number; y: number }[] }
   /** Answer the card of tidings waiting at the fire (#443): `take` pays its price, otherwise it is passed by. */
   | { t: 'tiding'; p: number; card: TidingId; take: boolean }
   /** A player left an online match: the computer takes over their people. With `back` (sent only by the room, never a browser),

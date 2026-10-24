@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'siloAlarm' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'fireLit' | 'fireCatch' | 'fireOut' | 'fireAsh' | 'flow' | 'rush' | 'groan' | 'dart' | 'swarm' | 'hiveHush' | 'sluiceOpen' | 'sluiceShut' | 'spread' | 'tideWash' | 'tideMill' | 'swept' | 'pondShut' | 'breach' | 'entWake' | 'entRoot' | 'spreading';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'siloAlarm' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'fireLit' | 'fireCatch' | 'fireOut' | 'fireAsh' | 'flow' | 'rush' | 'groan' | 'dart' | 'swarm' | 'hiveHush' | 'sluiceOpen' | 'sluiceShut' | 'spread' | 'tideWash' | 'tideMill' | 'swept' | 'pondShut' | 'breach' | 'entWake' | 'entRoot' | 'spreading' | 'damBurst' | 'bloomSling' | 'bloomRoot' | 'bloomGrow' | 'bloomCut' | 'bloomCrack' | 'bloomGreen' | 'bloomStorm';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -868,6 +868,49 @@ export class Sound {
         this.noise(out, t, { dur: 2.2, filter: 'bandpass', f: 1700, to: 2600, q: 0.5, peak: 0.035, attack: 0.7 });
         for (const [d, f] of [[0.5, 2900], [0.68, 3500], [1.4, 3100]] as const) this.tone(out, t + d, { f, to: f * 1.15, type: 'sine', dur: 0.09, peak: 0.03, attack: 0.01 });
         break;
+      case 'bloomSling':
+        // A Bloom Seed slung (the Age of the Bloom): the Spire's woven trunks creak back like a bow, a deep twang, and the seed's whoosh away.
+        this.tone(out, t, { f: 110, to: 70, type: 'sawtooth', dur: 0.5, peak: 0.03, attack: 0.2, lp: 700 });
+        this.tone(out, t + 0.48, { f: 98, to: 62, type: 'triangle', dur: 0.4, peak: 0.12, attack: 0.005 });
+        this.noise(out, t + 0.5, { dur: 1.3, filter: 'bandpass', f: 600, to: 2400, q: 0.9, peak: 0.07, attack: 0.05 });
+        break;
+      case 'bloomRoot':
+        // A Bloom Seed roots, heard by the whole map: a soft deep thud as it bores in, then a low hum swelling, like a held breath.
+        this.tone(out, t, { f: 70, to: 40, type: 'sine', dur: 0.4, peak: 0.18, attack: 0.005 });
+        this.noise(out, t, { dur: 0.3, filter: 'lowpass', f: 380, peak: 0.08 });
+        this.tone(out, t + 0.3, { f: 55, to: 82, type: 'triangle', dur: 2.6, peak: 0.08, attack: 1.2, lp: 320 });
+        this.tone(out, t + 0.3, { f: 110, to: 165, type: 'sine', dur: 2.4, peak: 0.025, attack: 1.4 });
+        break;
+      case 'bloomGrow':
+        // A rooted Seed growing, every ten seconds on every screen: a slow wooden heartbeat, two creaking pulses, the second deeper.
+        for (const [d, f] of [[0, 74], [0.42, 58]] as const) {
+          this.tone(out, t + d, { f, to: f * 0.7, type: 'triangle', dur: 0.35, peak: 0.1, attack: 0.02, lp: 260 });
+          this.tone(out, t + d, { f: f * 2.3, to: f * 1.6, type: 'sawtooth', dur: 0.22, peak: 0.012, lp: 900 });
+        }
+        break;
+      case 'bloomCut':
+        // A heart-root hacked out: four quick axe bites, the root's wet snap, and a sigh going out of it.
+        for (let i = 0; i < 4; i++) this.noise(out, t + i * 0.13, { dur: 0.05, filter: 'bandpass', f: 1800 - i * 120, q: 2.5, peak: 0.08 });
+        this.tone(out, t + 0.55, { f: 260, to: 90, type: 'sawtooth', dur: 0.18, peak: 0.05, lp: 1400 });
+        this.noise(out, t + 0.6, { dur: 1, filter: 'bandpass', f: 900, to: 400, q: 0.7, peak: 0.04, attack: 0.1 });
+        break;
+      case 'bloomCrack':
+        // A town cracks into forest: stone and timber splitting, a roar of leaves bursting out, and a bright open chord over it.
+        for (let i = 0; i < 6; i++) this.noise(out, t + i * 0.09 + (i % 2) * 0.03, { dur: 0.09, filter: 'highpass', f: 1200 + i * 150, peak: 0.07 - i * 0.008 });
+        this.tone(out, t, { f: 60, to: 34, type: 'triangle', dur: 1.2, peak: 0.16, attack: 0.01, lp: 240 });
+        this.noise(out, t + 0.3, { dur: 2.4, filter: 'bandpass', f: 1500, to: 2800, q: 0.5, peak: 0.08, attack: 0.4 });
+        [N.C5, N.E5, N.G5, N.C6].forEach((f, i) => this.tone(out, t + 0.6 + i * 0.1, { f, to: f, type: 'sine', dur: 1.8, peak: 0.03, attack: 0.15 }));
+        break;
+      case 'bloomGreen':
+        // The Greening held (a public clock starts): a rising run of soft reed notes over wind in leaves.
+        this.noise(out, t, { dur: 2.4, filter: 'bandpass', f: 1500, to: 2500, q: 0.5, peak: 0.035, attack: 0.6 });
+        [N.D5, N.G5, N.A5, N.E6].forEach((f, i) => this.tone(out, t + i * 0.22, { f, to: f, type: 'triangle', dur: 0.6, peak: 0.035, attack: 0.08, lp: 2400 }));
+        break;
+      case 'bloomStorm':
+        // A pollen storm: a dry shimmering hiss rising and falling, like wind through a field of seed heads.
+        this.noise(out, t, { dur: 3.2, filter: 'bandpass', f: 3200, to: 4200, q: 0.8, peak: 0.03, attack: 1.2 });
+        this.noise(out, t + 0.4, { dur: 2.6, filter: 'bandpass', f: 900, to: 1300, q: 0.5, peak: 0.025, attack: 1 });
+        break;
       case 'groan':
         // A dyke gives way (#701 s3): the earth bank's long low groan as it slumps, a crack of the stone crown, then the water's roar.
         this.tone(out, t, { f: 58, to: 34, type: 'triangle', dur: 1.6, peak: 0.12, attack: 0.3, lp: 260 });
@@ -890,6 +933,15 @@ export class Sound {
         this.tone(out, t + 0.45, { f: 85, to: 48, dur: 0.25, peak: 0.12 });
         this.noise(out, t + 0.45, { dur: 0.12, filter: 'lowpass', f: 500, q: 1, peak: 0.08 });
         this.noise(out, t + 0.55, { dur: 0.9, filter: 'lowpass', f: 400, to: 180, q: 0.7, peak: 0.025, attack: 0.05 });
+        break;
+      case 'damBurst':
+        // A dam bursts (#701 s5, the Age of Locks): the masonry cracks like a shot, a deep thud as the wall goes, and the pent water
+        // comes through in one long roar that falls away to a rush.
+        this.noise(out, t, { dur: 0.06, filter: 'highpass', f: 1800, peak: 0.14 });
+        this.tone(out, t + 0.02, { f: 70, to: 30, dur: 0.6, peak: 0.16 });
+        this.noise(out, t + 0.05, { dur: 0.5, filter: 'lowpass', f: 600, to: 200, q: 1, peak: 0.1 });
+        this.noise(out, t + 0.3, { dur: 3.0, filter: 'bandpass', f: 900, to: 450, q: 0.5, peak: 0.1, attack: 0.25 });
+        this.noise(out, t + 0.3, { dur: 3.2, filter: 'lowpass', f: 300, to: 120, q: 0.8, peak: 0.11, attack: 0.3 });
         break;
       case 'spread':
         // The Water Line's flood running over the meadow (#701 s4): a shallow, glassy hiss across grass, softer than a breach.
