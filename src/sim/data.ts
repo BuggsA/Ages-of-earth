@@ -31,6 +31,13 @@ const HIVE_REACH = 6;
 const HIVE_TREES = 8;
 /** How far round the Heart Tree an old tree can be woken (`WILDWOOD.wake`), named here so the age's and the tree's words can say it. */
 const HEART_WAKE = 8;
+/** The Bloom's clocks and ring (`BLOOM`), named here so the age's and the Spire's words can say them. */
+const BLOOM_RIPEN = 150;
+const BLOOM_GROW = 60;
+const BLOOM_RING = 6;
+const BLOOM_GREEN = 35;
+const BLOOM_LEAST = 1000;
+const BLOOM_HOLD = 180;
 
 // ---- Ages and paths -------------------------------------------------------------------------------
 
@@ -672,6 +679,19 @@ export const AGES: Record<AgeId, Age> = {
     no: { units: ['ranged', 'siege', 'fighter', 'bomber'], why: 'A Wildwood people builds no machines: no rifles, field guns or aircraft. Its Ents break walls and its Blowpipe Hunters shoot. They wait until it climbs to the Atomic Age or settles in the Industrial Age' },
     noBuild: { buildings: ['airfield'], why: 'A Wildwood people builds no machines: no Airfield until it climbs to the Atomic Age or settles in the Industrial Age' },
   },
+  // The Wild route's plants' end (`docs/wild-road.md` §5b, `bloom.ts`): the green answer to the warhead, and a second way to win.
+  bloom: {
+    verb: 'Raise a Seed Spire and sling Bloom Seeds that crack a rival\'s town into forest unless their citizens hack the root out; win by the Greening, your land kept green',
+    door: 'The Dens go quiet: no new beasts; and no Missile Silo, for the Seed is your warhead',
+    good: 'Outgrowing a rival instead of razing them: a warhead that grows, a forest that wins, and pollen that blinds their towers in your woods',
+    routes: ['wild'],
+    name: 'Age of the Bloom',
+    short: 'Bloom',
+    tier: 5,
+    blurb: `Instead of the Atomic Age: the plants' end. Raise one Seed Spire (G); while your Heart Tree stands it ripens a Bloom Seed every ${BLOOM_RIPEN} seconds. Sling it at any point on the map: everyone sees where it falls, and once it roots, ${BLOOM_GROW} seconds later every rival building within ${BLOOM_RING} tiles of its heart-root cracks into forest, unless their citizens reach the root and hack it out first. The Greening: keep your Heart Tree while trees, Orchards and grown Thornwalls cover ${BLOOM_GREEN}% of your land (counted as at least ${BLOOM_LEAST} tiles) for ${BLOOM_HOLD / 60} minutes, and you win. Your woods spread at the start of every season, not only in spring, and each season opens with a pollen storm that halves the sight of every rival soldier and tower near your Heart Tree. Your Dens go quiet, and you raise no Missile Silo.`,
+    no: { units: ['warwolf', 'tusker', 'warmammoth', 'cavebear'], why: 'A Bloom people breeds no new beasts: its Dens are quiet. They wake if it goes back to the Wildwood or rejoins the Atomic Age' },
+    noBuild: { buildings: ['silo'], why: 'A Bloom people raises no Missile Silo: its warhead is the Bloom Seed. Silos wait until it rejoins the Atomic Age' },
+  },
   // The second crossing (#555 s12): the Pilgrims' priests and the Sail's ships made one trade. Open only to a people that walked both.
   missions: {
     verb: 'Sail priests to far shores and raise Missions there: each claims land, trains priests, and pays a tithe that grows with its distance from home',
@@ -1038,6 +1058,19 @@ export const ROADS: Road[] = [
   },
   { from: 'wildwood', to: 'atomic', cost: EPOCHS[5].cost, time: EPOCHS[5].time, blurb: 'Rejoin the main road at the Atomic Age for the ordinary price. Your Heart Tree keeps waking Ents and your woods keep spreading; machines return, and fire burns as it does for anyone.' },
   { from: 'wildwood', to: 'industrial', cost: { food: 300, wood: 300 }, time: 30, blurb: 'Settle down in the Industrial Age. Your Heart Tree keeps waking Ents and your woods keep spreading; rifles, field guns and aircraft return.' },
+  // The Wild route's fifth step, the plants' end (`docs/wild-road.md` §5b): the Heart Tree shows it, and a spring's Spreading opens it.
+  {
+    from: 'wildwood',
+    to: 'bloom',
+    cost: { food: 1600, wood: 1400, gold: 1200 },
+    time: 90,
+    clue: 'heart',
+    walked: 'wildwood',
+    deed: { stat: 'spread', n: 12, text: 'Your woods spread 12 seedlings round the Heart Tree' },
+    blurb: 'Instead of the Atomic Age: the plants\' end. A Seed Spire slings Bloom Seeds that crack a rival\'s town into forest unless they hack the root out, and the Greening wins the match for a people whose land stays green. No new beasts and no Missile Silo while you stay.',
+  },
+  { from: 'bloom', to: 'atomic', cost: { food: 300, gold: 300 }, time: 30, blurb: 'Rejoin the Atomic Age and its Missile Silo. Your Spire keeps its Seeds and your Dens wake again; the Greening, the pollen storms and the Spreading every season end.' },
+  { from: 'bloom', to: 'wildwood', cost: { food: 300, wood: 300 }, time: 30, blurb: 'Go back into the Wildwood: the Dens wake and fire burns twice as hard again. Your Spire keeps its Seeds; the Greening ends.' },
   // The other road out of the Stone Age (#297): the hunt, not the bog, opens it.
   {
     from: 'stone',
@@ -2133,7 +2166,7 @@ export const FIRE = {
   run: [2, 6, 4, 2],
   scorch: 2,
   scorchReach: 0.4,
-  burns: ['thornwall', 'garden', 'orchard', 'sapling', 'hive', 'heart'] as BuildingType[],
+  burns: ['thornwall', 'garden', 'orchard', 'sapling', 'hive', 'heart', 'spire'] as BuildingType[],
   wild: 2,
   aiBearers: 2,
   aiNear: 12,
@@ -2209,6 +2242,49 @@ export const WILDWOOD = {
   aiEnts: 4,
 };
 
+/**
+ * The Age of the Bloom (`docs/wild-road.md` §5b, `src/sim/bloom.ts`). A people raises one Seed Spire, which ripens a Bloom Seed over
+ * `ripen` seconds while its Heart Tree stands (one held at a time). Slung (`fuel` paid) at any point, the Seed flies `flight` seconds,
+ * then roots on the open tile nearest its point within `land` tiles (none: it withers). Rooted, it grows `grow` seconds; each rival citizen
+ * within `reach` tiles of its heart-root hacks one stroke a second, and `root` strokes cut it out. If it isn't cut out, every rival
+ * building whose nearest edge lies within `r` tiles cracks, and its ground grows forest `sprout` seconds later (`Stool`s).
+ * The Greening: a people standing in the Bloom with its Heart Tree, whose green tiles (trees, Orchards, its Heart Tree, Thornwalls grown to
+ * living oak) cover `green` of its land's open tiles (counted as at least `least`) for `hold` seconds, wins. Measured once a second.
+ * Pollen: the first `storm` seconds of each season, rival land units and Watch Towers within `pollen` tiles of a Bloom people's Heart
+ * Tree see `blind` as far. The Spreading comes at the start of every season, not only spring (`WILDWOOD.spreadAt`).
+ * The computer takes the road on from the Wildwood, stays `aiStay` seconds, raises its Spire within `aiFrom` tiles of home, slings at
+ * the rival building it has seen whose ring would crack the most * (keeping the fuel back from `aiSave` seconds before the Seed is ripe),
+ * and while its land is short of green, every `aiOrchard` seconds plants an Orchard (one to every `aiThorns` Thornwall pieces) or a
+ * line of `aiLine` Thornwall, at the compass points round home `aiRing` tiles out and further. Against a rooted
+ * Seed in its town (within `aiNear` tiles of a building of its own) it sends up to `aiHack` citizens to hack it.
+ */
+export const BLOOM = {
+  ripen: BLOOM_RIPEN,
+  fuel: { food: 300, wood: 300, gold: 200 } as Cost,
+  flight: 10,
+  land: 6,
+  grow: BLOOM_GROW,
+  reach: 1.6,
+  root: 90,
+  r: BLOOM_RING,
+  sprout: 8,
+  green: BLOOM_GREEN / 100,
+  least: BLOOM_LEAST,
+  hold: BLOOM_HOLD,
+  storm: 30,
+  pollen: 14,
+  blind: 0.5,
+  aiStay: 600,
+  aiFrom: 14,
+  aiOrchard: 15,
+  aiThorns: 16,
+  aiLine: 7,
+  aiRing: 9,
+  aiNear: 6,
+  aiHack: 7,
+  aiSave: 40,
+};
+
 export const COPPICE = { reach: 8, regrow: 120, retry: 5, grow: 90, snare: 2, cap: 1.5, bag: 2, full: 12, aiPerFood: 1.5, aiMax: 16, aiTrees: 10, aiThick: 14, aiNear: 14, aiDrop: 7, aiPerTender: 2, aiStone: 6, aiCamps: 2, aiPlant: 3, aiThin: 12, aiPlantWood: 120 };
 
 /**
@@ -2273,6 +2349,8 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   hive: { name: 'Hive', size: 1, hp: 160, cost: { wood: 60, gold: 30 }, time: 15, pop: 0, sight: 4, trains: [], drop: [], epoch: 3, menu: 'eco', key: 'V', blurb: `A straw skep on a stand, set among standing trees (${HIVE_TREES} within 3 tiles). Its bees swarm any rival who walks the woods within ${HIVE_REACH} tiles, stinging past armour and slowing them. It pays honey into your stores, or mead for gold while a Market of yours stands near, and in summer it doubles the Kitchen Gardens beside it. Bees sleep in winter, smoke quiets them, and fire takes the skep. Fell its woods and the bees leave.` },
   // The Age of the Wildwood (`docs/wild-road.md` §4, `WILDWOOD`): one to a people that has walked it, in any age after.
   heart: { name: 'Heart Tree', size: 3, hp: 2500, cost: { food: 300, wood: 400, gold: 200 }, time: 90, pop: 0, sight: 8, trains: ['warden'], drop: [], epoch: 4, menu: 'mil', key: 'E', blurb: `A vast old tree planted once, the soul of your town: one to a people. At it an old tree within ${HEART_WAKE} tiles is woken as an Ent. While it stands your woods spread round it each spring and your rooted Ents wake when a rival comes near; if it falls, every Ent roots where it stands and sleeps. It is alive, so fire takes it.` },
+  // The Age of the Bloom (`docs/wild-road.md` §5b, `BLOOM`): one to a people that has walked it, in any age after.
+  spire: { name: 'Seed Spire', size: 2, hp: 1800, cost: { wood: 600, stone: 200, gold: 400 }, time: 80, pop: 0, sight: 8, trains: [], drop: [], epoch: 5, menu: 'mil', key: 'G', blurb: `A living tower of woven trunks, one to a people. While your Heart Tree stands it ripens a Bloom Seed every ${BLOOM_RIPEN} seconds, one at a time. Sling it (G) at any point on the map: it roots there, and ${BLOOM_GROW} seconds later every rival building within ${BLOOM_RING} tiles of its heart-root cracks into forest, unless their citizens hack the root out first. It is alive, so fire takes it.` },
   // The age road (#562, `docs/age-roads.md` spine §4): raised in the Stone Age, it answers which key resources this world holds (`PROSPECTOR`).
   prospector: { name: "Prospector's Lodge", size: 2, hp: 500, cost: { food: 50, wood: 75 }, time: 20, pop: 0, sight: 6, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'P', blurb: 'A lodge of prospectors who walk the streams, scrape the rock and dig at old mounds. Once it stands it tells you which key resources this world holds (bog iron, salt, saltpetre, blood-iron, ancient ruins): yes or no for each, never where. Some ages open only with them; a world that lacks one shuts that door.' },
   // The Path of Blood (#303): pitched by foot soldiers where the army stands, enemy land too; burns when left alone (`WARCAMP`).

@@ -23,7 +23,8 @@ import { channelPlan, dig, dykePlan, heldBack, waterLine } from './sim/water';
 import { bared, tideMillSpot, wakeTide } from './sim/tides';
 import { barragePlan, isCauseway, kegTileProblem } from './sim/tides';
 import { isTidal, tidalLevel, tideClock, tideLevel } from './sim/tides';
-import { AI_BARRAGE, SALVO } from './sim/data';
+import { AI_BARRAGE, BLOOM, SALVO, secs } from './sim/data';
+import { rooted, slingProblem } from './sim/bloom';
 import { maxHp, placeBuilding, restat, spawnUnit } from './sim/world';
 import { arrivalText, epochArrivals } from './ui/endReport';
 import { journeyHtml } from './ui/journeyReport';
@@ -115,11 +116,13 @@ let placeAt: { tx: number; ty: number; ok: boolean } | null = null;
 let wallDrag: { x0: number; y0: number; x1: number; y1: number } | null = null;
 /** The next left click picks a target: where to attack-move, or a building to shelter in. */
 let launchSilo = 0;
+/** The Seed Spire whose Bloom Seed is being aimed (the Age of the Bloom). */
+let slingSpire = 0;
 /** The warhead chosen for the launch being aimed (#753); absent for the people's own. */
 let launchWarhead: WarheadKind | undefined;
 /** A salvo being aimed (#765): the points clicked so far, until there are `SALVO.trio`; null for a single launch. */
 let salvoAims: { x: number; y: number }[] | null = null;
-let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | 'keg' | 'torch' | 'launch' | null = null;
+let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | 'keg' | 'torch' | 'launch' | 'sling' | null = null;
 /** When the viewer was last told one of its living buildings caught fire, so a spreading fire tells once. */
 let fireToldAt = -9999;
 /** When a swarm on your people was last told (the Age of the Hive), so a fight in the woods tells it once. */
@@ -202,6 +205,11 @@ const hud = new Hud({
     salvoAims = w === 'salvo' ? [] : null;
     if (w === 'salvo') hud.toast(`Salvo: click ${SALVO.trio} points, at least ${SILO.apart} tiles apart`, 'info');
     targetMode = 'launch';
+    placing = null;
+  },
+  slingMode: (spire) => {
+    slingSpire = spire;
+    targetMode = 'sling';
     placing = null;
   },
   unloadMode: () => {
@@ -1915,6 +1923,22 @@ canvas.addEventListener('pointerdown', (e) => {
     targetMode = null;
     return;
   }
+  if (targetMode === 'sling') {
+    const g = view.groundAt(e.clientX, e.clientY);
+    const s = game;
+    if (g && s) {
+      const why = slingProblem(s, viewer, s.byId.get(slingSpire), g.x, g.y);
+      if (why) {
+        hud.toast(why, 'bad');
+        play('error');
+      } else {
+        issue({ t: 'sling', p: viewer, spire: slingSpire, x: g.x, y: g.y });
+        view.marker(s, g.x, g.y, true);
+      }
+    }
+    targetMode = null;
+    return;
+  }
   if (targetMode === 'unload') {
     unloadAt(e.clientX, e.clientY, e.shiftKey);
     targetMode = null;
@@ -2416,7 +2440,7 @@ function timeline(s: GameState, metric: Metric): string {
   return `<svg class="timeline" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${grid}${lines}</svg>`;
 }
 
-type EndHow = 'conquest' | 'wonder' | 'relics' | 'lands' | 'resign' | 'time' | 'scenario';
+type EndHow = 'conquest' | 'wonder' | 'relics' | 'lands' | 'greening' | 'resign' | 'time' | 'scenario';
 /** How the viewer's match ended, so the menu can bring the results back after a look around. */
 let lastEnd: { won: boolean; how: EndHow; tick: number } | null = null;
 
@@ -2447,6 +2471,8 @@ function showEnd(s: GameState, won: boolean, how: EndHow = 'conquest', again = f
       ? won ? 'Your Wonder stood the test of time.' : 'A rival Wonder stood the test of time.'
       : how === 'lands'
         ? won ? 'Every landmark in the land is yours: you are its lord.' : 'A rival became lord of every landmark in the land.'
+      : how === 'greening'
+        ? won ? 'Your land stayed green: the Greening is complete, and the world is a forest again.' : 'A rival kept its land green until the Greening was complete.'
       : how === 'relics'
         ? won ? 'Every relic in the world rests in your temples.' : 'A rival kept every relic in the world.'
         : won ? 'Your rivals have fallen.' : 'Your people are no more.';
@@ -2481,6 +2507,8 @@ function showEnd(s: GameState, won: boolean, how: EndHow = 'conquest', again = f
 function onEvents(s: GameState, list: GameEvent[]): void {
   view.events(s, list);
   if (mode !== 'play') return;
+  // A rooted Bloom Seed is heard growing on every screen, a slow wooden heartbeat every ten seconds (the Age of the Bloom).
+  if (s.tick % secs(10) === 0 && s.blooms?.some((l) => rooted(s, l))) play('bloomGrow');
   for (const ev of list) {
     switch (ev.k) {
       case 'refused':
@@ -2985,6 +3013,41 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         } else if (ev.what === 'smoked' && ev.owner === viewer) hud.toast('Smoke has quieted one of your Hives: its bees will wake when it clears', 'alert');
         break;
       }
+      case 'bloom': {
+        // The Age of the Bloom: every Seed is public, so every player is told when one is slung, where it roots, and how it ends; the
+        // Greening's hold is told to all, as a Wonder's is.
+        const who = s.players[ev.owner]?.name ?? 'A rival';
+        const mine = ev.owner === viewer;
+        const foe = isEnemy(s, viewer, ev.owner);
+        if (ev.what === 'slung') {
+          hud.toast(mine ? `Seed away: it roots in ${BLOOM.flight} seconds, and its ring cracks ${BLOOM.grow} seconds after unless their citizens hack it out. Guard the root` : `${who} has slung a Bloom Seed${foe ? ': it comes down inside the green ring' : ''}`, mine ? 'good' : foe ? 'bad' : 'info');
+          if (foe) minimap.ping(ev.x, ev.y, '#7fd84a', true);
+          play('bloomSling');
+        } else if (ev.what === 'rooted') {
+          if (foe) hud.toast(`${who}'s Bloom Seed has rooted: in ${BLOOM.grow} seconds every building of yours within ${BLOOM.r} tiles turns to forest. Send citizens to hack out its heart-root (the yellow ring)`, 'alert');
+          else if (mine) hud.toast(`Your Seed has rooted: ${BLOOM.grow} seconds to the Bloom`, 'good');
+          minimap.ping(ev.x, ev.y, '#d6f07a', true);
+          play('bloomRoot');
+        } else if (ev.what === 'withered') {
+          if (mine) hud.toast('Your Seed found no open ground to root in and withered', 'bad');
+        } else if (ev.what === 'hacked') {
+          hud.toast(mine ? 'Your Seed was hacked out before it bloomed' : foe ? `The heart-root is cut: ${who}'s Bloom fails` : `${who}'s Seed was hacked out`, mine ? 'bad' : 'good');
+          play('bloomCut');
+        } else if (ev.what === 'cracked') {
+          hud.toast(mine ? `The Bloom! ${ev.n ?? 0} of their buildings crack into forest` : foe ? `${who}'s Bloom cracks ${ev.n ?? 0} of your buildings into forest` : `${who}'s Seed has bloomed`, mine ? 'good' : foe ? 'bad' : 'info');
+          minimap.ping(ev.x, ev.y, '#7fd84a', true);
+          play('bloomCrack');
+        } else if (ev.what === 'held') {
+          hud.toast(mine ? `The Greening: keep your Heart Tree and your land green for ${BLOOM.hold / 60} minutes and you win` : `${who} has begun the Greening: fell and burn their woods, or fell their Heart Tree, within ${BLOOM.hold / 60} minutes`, mine ? 'good' : foe ? 'alert' : 'info');
+          play('bloomGreen');
+        } else if (ev.what === 'faded') {
+          hud.toast(mine ? 'Your Greening has faded: green your land again' : `${who}'s Greening has faded`, mine ? 'bad' : 'good');
+        } else if (ev.what === 'storm' && (mine || s.players[viewer]?.vis[Math.floor(ev.y) * s.w + Math.floor(ev.x)] === 1)) {
+          if (foe) hud.toast(`A pollen storm blows from ${who}'s woods: your soldiers and towers near their Heart Tree see half as far`, 'alert');
+          play('bloomStorm');
+        }
+        break;
+      }
       case 'wildwood':
         // The Age of the Wildwood: a tree that wakes beside your people is told once in a while; your own Ent lost with its tree, and the
         // spring's Spreading, are told to its people.
@@ -3213,7 +3276,7 @@ function cursorFor(s: GameState): string {
   if (targetMode === 'garrison') return 'cur-garrison';
   if (targetMode === 'sacrifice' || targetMode === 'curse') return 'cur-convert';
   if (targetMode === 'unload') return 'cur-garrison';
-  if (targetMode === 'keg' || targetMode === 'torch' || targetMode === 'launch') return 'cur-attack';
+  if (targetMode === 'keg' || targetMode === 'torch' || targetMode === 'launch' || targetMode === 'sling') return 'cur-attack';
   if (!pointer.inside || boxing) return '';
   const units = selectedUnits(s);
   const pk: Pick | null = units.length ? orderPick(s, pointer.x, pointer.y) : view.pick(pointer.x, pointer.y);

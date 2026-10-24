@@ -448,6 +448,43 @@ function heart(k: Kit): void {
   k.team(k.cyl(0.47, 0.49, 0.14, 9, TEAM, 0, 1.2, 0));
 }
 
+// ---- The Age of the Bloom (`docs/wild-road.md` §5b) ---------------------------------------------------
+
+/**
+ * A Seed Spire: three young trunks grown round one another into a tall twisted tower, bound with living withies, rising from a
+ * ring of moss. At the top they open like fingers round a great seed pod, pale green and lit gold from within: the Bloom Seed
+ * ripening. Leaves sprout from the twists all the way up. Its people's cloth is a band round the base.
+ */
+function spire(k: Kit): void {
+  const bark = '#5a4630';
+  const dark = '#3a2c1d';
+  const leaf = ['#3f7a2e', '#5a9238', '#4a8534'];
+  k.lathe([[0, 0.05], [0.95, 0], [0.9, 0.05], [0.6, 0.12], [0, 0.14]], 9, '#5c7c3c', 0, -0.03, 0);
+  // Three trunks wound round the axis, each a stack of short leaning segments.
+  for (let t = 0; t < 3; t++) {
+    for (let i = 0; i < 9; i++) {
+      const a = (t / 3) * Math.PI * 2 + i * 0.55;
+      const r = 0.34 - i * 0.022;
+      const seg = k.cyl(0.07 - i * 0.004, 0.09 - i * 0.004, 0.46, 5, t % 2 ? bark : dark, Math.cos(a) * r, 0.25 + i * 0.4, Math.sin(a) * r);
+      seg.rotation.z = Math.cos(a + 1.2) * 0.35;
+      seg.rotation.x = Math.sin(a + 1.2) * 0.35;
+      if (i % 3 === 1) k.blob(0.13, leaf[(t + i) % 3], Math.cos(a) * (r + 0.12), 0.35 + i * 0.4, Math.sin(a) * (r + 0.12)).scale.set(1, 0.6, 1);
+    }
+  }
+  // The withies binding them, three bands up the tower.
+  for (const y of [0.9, 1.9, 2.9]) k.cyl(0.3 - y * 0.03, 0.31 - y * 0.03, 0.05, 8, '#7a6440', 0, y, 0);
+  // The fingers opening round the pod, and the pod itself, glowing.
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    const f = k.cyl(0.025, 0.05, 0.6, 4, bark, Math.cos(a) * 0.22, 3.85, Math.sin(a) * 0.22);
+    f.rotation.z = Math.cos(a) * -0.5;
+    f.rotation.x = Math.sin(a) * 0.5;
+  }
+  k.glow(k.blob(0.26, '#c8e27a', 0, 4.05, 0)).scale.set(0.8, 1.25, 0.8);
+  k.glow(k.blob(0.12, '#ffd65a', 0, 4.0, 0.12));
+  k.team(k.cyl(0.4, 0.42, 0.14, 9, TEAM, 0, 0.2, 0));
+}
+
 /**
  * An Orchard: four fruit trees in a wattle fence with a picker's basket. Young (`variant` 0) it is whips; grown (1), round crowns;
  * in fruit (2, summer and autumn) the crowns hang red and gold.
@@ -2611,6 +2648,7 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
 const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' | 'thornwall' | 'garden' | 'orchard' | 'channel' | 'hive' | 'sluice' | 'causeway' | 'bridge' | 'dam'>, (k: Kit, e: number, st: Style) => void> = {
   sapling: (k, e) => sapling(k, e),
   heart: (k) => heart(k),
+  spire: (k) => spire(k),
   towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, windmill,
   // The Age of Tides (#739), drawn in `tideModels.ts`.
   tidemill: (k: Kit, _e: number, st: Style) => tidemill(k, st.base),
@@ -2785,7 +2823,7 @@ const ROOFS: Partial<Record<BuildingType, [string, string]>> = {
 };
 
 /** No plinth or pennant: open or thin pieces, and buildings that already carry their own standards. */
-const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder', 'dyke', 'thornwall', 'garden', 'orchard', 'channel', 'hive', 'sluice', 'causeway', 'tidemill', 'heart', 'bridge', 'dam'];
+const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder', 'dyke', 'thornwall', 'garden', 'orchard', 'channel', 'hive', 'sluice', 'causeway', 'tidemill', 'heart', 'bridge', 'dam', 'spire'];
 
 function roleStyle(type: BuildingType, epoch: number, st: Style): Style {
   const r = ROOFS[type];
