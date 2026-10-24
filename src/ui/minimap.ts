@@ -7,8 +7,9 @@ import { Waymarks } from './waymarks';
 
 /** Polder on the map (#701): a deep field green. */
 const POLDER_RGB = [86, 128, 62];
+const WATER_RGB = [0x2f, 0x7f, 0xae];
 /** Tiles pumped out of the water so far, by every people. */
-const drained = (s: GameState): number => s.players.reduce((n, p) => n + (p.stats.drained ?? 0), 0);
+const drained = (s: GameState): number => s.players.reduce((n, p) => n + (p.stats.drained ?? 0) + (p.stats.dug ?? 0), 0);
 import { R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE, T_ROCK, T_SAND, T_WATER } from '../sim/types';
 
 /**
@@ -99,13 +100,15 @@ export class Minimap {
     const grass = rgb('#6fa548');
     const grass2 = rgb('#7fb354');
     const sand = rgb('#d9c48a');
-    const water = rgb('#2f7fae');
+    const water = WATER_RGB;
     const rock = rgb('#8d8579');
     for (let i = 0; i < s.w * s.h; i++) {
       const t = s.terrain[i];
       const c = t === T_WATER ? water : t === T_SAND ? sand : t === T_ROCK ? rock : (i * 7) % 5 ? grass : grass2;
       this.land.set(c, i * 3);
       if (t === T_WATER) this.depth[i] = Math.max(0, -0.02 - s.height[Math.floor(i / s.w) * (s.w + 1) + (i % s.w)]);
+      // A spring head (#701 s1) shows as a speck of water.
+      if (s.springs?.includes(i)) this.land.set(water, i * 3);
       this.green[i] = t === T_WATER || t === T_SAND || t === T_ROCK ? 0 : 1;
     }
     this.terr = Uint8Array.from(s.terrain);
@@ -141,9 +144,11 @@ export class Minimap {
       for (let i = 0; i < s.w * s.h; i++) {
         if (this.terr[i] === s.terrain[i]) continue;
         this.terr[i] = s.terrain[i];
-        this.land.set(POLDER_RGB, i * 3);
-        this.depth[i] = 0;
-        this.green[i] = 1;
+        // A channel dug (#701, the Age of Rivers) shows as water; land pumped out, as polder.
+        const wet = s.terrain[i] === T_WATER;
+        this.land.set(wet ? WATER_RGB : POLDER_RGB, i * 3);
+        this.depth[i] = wet ? Math.max(0, -0.02 - s.height[Math.floor(i / s.w) * (s.w + 1) + (i % s.w)]) : 0;
+        this.green[i] = wet ? 0 : 1;
       }
     }
     if (!reveal) this.waymarks.update(s, viewer);

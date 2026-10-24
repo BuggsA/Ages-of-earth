@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'flow';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -760,6 +760,13 @@ export class Sound {
         this.noise(out, t + 0.05, { dur: 0.35, filter: 'bandpass', f: 1250, to: 900, q: 6, peak: 0.018, attack: 0.08 });
         this.noise(out, t + 0.35, { dur: 1.4, filter: 'bandpass', f: 2600, to: 700, q: 0.7, peak: 0.045, attack: 0.25 });
         this.noise(out, t + 0.4, { dur: 1.1, filter: 'lowpass', f: 420, to: 220, q: 0.9, peak: 0.04, attack: 0.2 });
+        break;
+      case 'flow':
+        // Water let into a dug channel (#701, the Age of Rivers): a soft gurgle and a run of bright trickles over the low wash of it
+        // filling, quieter than a mill.
+        this.noise(out, t, { dur: 0.9, filter: 'lowpass', f: 520, to: 300, q: 0.8, peak: 0.035, attack: 0.1 });
+        for (let i = 0; i < 4; i++) this.tone(out, t + 0.05 + i * 0.11 + (i % 2) * 0.03, { f: 620 + i * 90, to: 880 + i * 120, type: 'sine', dur: 0.07, peak: 0.018 });
+        this.noise(out, t + 0.2, { dur: 0.7, filter: 'bandpass', f: 1900, to: 1200, q: 1.1, peak: 0.02, attack: 0.15 });
         break;
       case 'kegGround':
         // A keg ground at the mills (#577): a millstone's rumble, the scrape of the scoop, a bung knocked home with a mallet.

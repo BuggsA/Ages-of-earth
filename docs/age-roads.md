@@ -64,6 +64,7 @@ No route below needs a prospector or a rare resource: every road on it opens by 
 | **Economy** | … Bronze → **Merchant** → **Fairs** → Industrial → **Lightning** | hired swords, feast-day trade, a town laid out round coils | any map |
 | *Horse* (also plain) | Stone → **Steppe** → **Horde** → Gunpowder → **Silk Road** | a town on wagons, tribute from rivals' land, tolls on the trade road (the Silk Road needs the Steppe walked) | any map |
 | *Faith* (also plain) | … Medieval → **Pilgrim** → **Fairs** | priests who win towers and Temples over | any map |
+| **Water road** (#701) | Stone → **Rivers** → **Dykes** → Gunpowder (the Water Line, Locks, Tides and Floating Cities to come) | dig channels and farm along them, a moat to wade; then dykes, windmills and polder | any map (a spring by every town); wet maps give it more |
 
 Roads deeper in a route ask that its earlier ages were walked (`walked` on `Road`): Iron & Blood needs the Warband, Total War needs Iron & Blood, the blood fork needs Total War. Rules: a route may cross the plain road between its own ages; each route must be able to win on the maps it names (s0 checks it with sweeps, `scripts/campaign.ts` style, against the computer's mix); the computer must be able to play each one start to finish.
 
@@ -78,7 +79,7 @@ What an age's road shows at the Town Center and on the web map (a panel about yo
 | **It shuts…** (the price) | `door` | yes |
 | **Leads to…** | derived from `ROADS`, shown only for roads the player can see or has walked | derived, no field |
 
-Plus `routes: RouteId[]` (`'plain' | 'army' | 'navy' | 'economy' | 'horse' | 'faith'`, empty for a rare age) and, for a gateway, `gateway: true` (the button then says "weak on its own; the road on is why you come"). A test like `tests/verbs.test.ts` fails a side age without `good` and `routes`. The trunk ages get `good` too.
+Plus `routes: RouteId[]` (`'plain' | 'army' | 'navy' | 'economy' | 'horse' | 'faith' | 'water'`, empty for a rare age) and, for a gateway, `gateway: true` (the button then says "weak on its own; the road on is why you come"). A test like `tests/verbs.test.ts` fails a side age without `good` and `routes`. The trunk ages get `good` too.
 
 ### 3. Key resources (rule 4)
 

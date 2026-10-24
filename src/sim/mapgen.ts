@@ -1,4 +1,4 @@
-import { AMOUNT, BOAR, BOG_IRON, CAVE, FINDS, HOMELAND, HOMELAND_IDS, HOMELANDS, LANDMARKS, RARE, MAMMOTH, MAP_SIZES, RAIDER, RELIC, RUINS, TRADE, WOLF } from './data';
+import { AMOUNT, BOAR, BOG_IRON, CAVE, FINDS, HOMELAND, HOMELAND_IDS, HOMELANDS, LANDMARKS, RARE, MAMMOTH, MAP_SIZES, RAIDER, RELIC, RUINS, SPRING, TRADE, WOLF } from './data';
 import { fbm, mulberry32, type Rng } from './rng';
 import type { Cave, FindKind, HomelandId, KeyId, LandmarkKind, MapSize, MapType, RareId, RuinFind } from './types';
 import { B_RES, B_TERRAIN, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_NONE, R_STONE, R_TREE, T_GRASS, T_ROCK, T_SAND, T_WATER } from './types';
@@ -65,6 +65,8 @@ export interface MapData {
   camps: { x: number; y: number }[];
   /** What lies round every town at the start (#473). */
   homeland: HomelandId;
+  /** Spring heads by the towns (#701 s1): one tile each, where a channel dug beside it fills (`GameState.springs`). */
+  springs: number[];
   /** One find near each town (#588): where it stands (tile center), what it is, and which town it stands near. Empty on campaign maps. */
   finds: { x: number; y: number; kind: FindKind; key: KeyId | null; near: number }[];
 }
@@ -678,6 +680,14 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
     ? placeFinds(seed, size, w, h, terrain, res, starts, later, bogIron, rares, ruins.length > 0, [...deer, ...relics, ...posts, ...ruins, ...wild, ...landmarks, ...camps, ...caves.map((c) => ({ x: c.tile % w, y: Math.floor(c.tile / w) }))])
     : [];
 
+  // A spring by every town (#701 s1), last of all and on dice of its own: only a start with no water near gets one, so every
+  // other map is as it was. Campaign maps (no deposits) stay as they were drawn.
+  const springs: number[] = [];
+  if (deposits) {
+    const keep = [...deer, ...relics, ...posts, ...ruins, ...wild, ...landmarks, ...camps, ...finds, ...caves.map((c) => ({ x: c.tile % w, y: Math.floor(c.tile / w) }))];
+    springs.push(...placeSprings(seed, w, h, terrain, res, starts, keep));
+  }
+
   // Resources nobody could stand next to are cleared away.
   const block = new Uint8Array(w * h);
   for (let i = 0; i < w * h; i++) {
@@ -685,7 +695,66 @@ export function generateMap(seed: number, size: MapSize, players = 2, type: MapT
     if (res[i] !== R_NONE) block[i] |= B_RES;
   }
 
-  return { w, h, terrain, height, res, amount, block, starts, deer, relics, posts, bogIron, rares, caves, ruins, wild, landmarks, camps, homeland, finds };
+  return { w, h, terrain, height, res, amount, block, starts, deer, relics, posts, bogIron, rares, caves, ruins, wild, landmarks, camps, homeland, finds, springs };
+}
+
+/**
+ * Spring heads (#701 s1, the Water Road): every start with no water within `SPRING.near` tiles gets one, a single tile of open ground
+ * about `SPRING.at` tiles out, most likely on the side away from the middle of the map, so the Age of Rivers has water to dig from on
+ * every map. It changes no ground: the land, its heights and everything laid on it are as they were, and the spring is only a mark
+ * (a channel dug beside it fills, and it waters the fields round it). It goes where it and the tiles round it are open ground, `keep`
+ * two tiles off. On dice of its own. Returns the tiles.
+ */
+function placeSprings(seed: number, w: number, h: number, terrain: Uint8Array, res: Uint8Array, starts: { x: number; y: number }[], keep: { x: number; y: number }[]): number[] {
+  const out: number[] = [];
+  const rng = mulberry32(seed ^ 0x5b1e6);
+  const near = SPRING.near * SPRING.near;
+  const lo = (SPRING.at - 1) * (SPRING.at - 1);
+  // A first ring about `SPRING.at` out, and a wider one where that is all taken.
+  const bands = [(SPRING.at + 1.5) * (SPRING.at + 1.5), (SPRING.at + 5) * (SPRING.at + 5)];
+  const open = (x: number, y: number) => x >= 2 && y >= 2 && x < w - 2 && y < h - 2 && (terrain[y * w + x] === T_GRASS || terrain[y * w + x] === T_SAND) && res[y * w + x] === R_NONE;
+  for (const st of starts) {
+    let wet = false;
+    for (let y = Math.max(0, st.y - SPRING.near); y <= Math.min(h - 1, st.y + SPRING.near) && !wet; y++)
+      for (let x = Math.max(0, st.x - SPRING.near); x <= Math.min(w - 1, st.x + SPRING.near); x++) {
+        const dx = x - st.x;
+        const dy = y - st.y;
+        if (dx * dx + dy * dy <= near && terrain[y * w + x] === T_WATER) {
+          wet = true;
+          break;
+        }
+      }
+    if (wet) continue;
+    // Away from the middle of the map, give or take the dice.
+    const ox = st.x - w / 2;
+    const oy = st.y - h / 2;
+    const ol = Math.sqrt(ox * ox + oy * oy) || 1;
+    const spots: { x: number; y: number; score: number }[] = [];
+    const r = SPRING.at + 5;
+    for (let y = Math.max(0, st.y - r); y <= Math.min(h - 1, st.y + r); y++)
+      for (let x = Math.max(0, st.x - r); x <= Math.min(w - 1, st.x + r); x++) {
+        const dx = x - st.x;
+        const dy = y - st.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < lo || d2 > bands[1]) continue;
+        // The near ring first: a spot in the wide one counts only once the near ring is all taken.
+        spots.push({ x, y, score: (dx * ox + dy * oy) / (Math.sqrt(d2) * ol) + rng() * 0.9 - (d2 > bands[0] ? 10 : 0) });
+      }
+    spots.sort((a, b) => b.score - a.score || a.y - b.y || a.x - b.x);
+    const fits = (cx: number, cy: number) => {
+      for (let y = cy - 1; y <= cy + 1; y++) for (let x = cx - 1; x <= cx + 1; x++) if (!open(x, y)) return false;
+      for (const o of starts) {
+        const dx = o.x - cx;
+        const dy = o.y - cy;
+        if (dx * dx + dy * dy < lo) return false;
+      }
+      for (const k of keep) if (Math.abs(Math.floor(k.x) - cx) <= 2 && Math.abs(Math.floor(k.y) - cy) <= 2) return false;
+      return true;
+    };
+    const at = spots.find((p) => fits(p.x, p.y));
+    if (at) out.push(at.y * w + at.x);
+  }
+  return out;
 }
 
 /** The homeland a seed rolls for a map type (#473): by each one's `weight` there, on dice of its own. */
