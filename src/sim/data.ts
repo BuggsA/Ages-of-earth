@@ -1822,27 +1822,6 @@ export const LONGBOW = { after: 3, range: 1.5, attack: 3 };
 export const HOUSEHOLD = { every: 5, gold: 0.12, street: 0.04, streetMax: 4, reach: 3, market: 2, raid: 25, aiStreet: 4 };
 
 /**
- * The Sickness (#541): from `fromEpoch` a town of at least `minPop` builds taint a second, up to `crowd` at full pressure. Pressure is
- * half how full its houses are (over `crowdAt`), half how big the town is (from `bigFrom` people, full at `bigFrom + bigSpan`), scaled
- * from `loose` (thin streets) up to 1 (houses shoulder to shoulder, the Chinese treasury's layout). `season` sharpens or eases it by
- * season; each finished Temple (at most `templeMost`) takes `temple` off it; a camp on the move (`nomad`) keeps `nomad` of it. Taint
- * left alone drains `calm` a second. At 1 it breaks: fever starts at `start` and `after` of the taint is left. A fever drains `wane` a
- * second, `tend` more for each priest within `tendReach` tiles of a finished Temple (at most `tendMost`), and grows `feed` a second
- * while the pressure is above `feedAt`. It slows every citizen's gathering and building by its severity times `slow`; from severity
- * `deadly` it takes citizens (not those sheltering) every `die` seconds, one more for each `dieStep` of severity above. A trader that
- * loads at a post in fever's month leaves it foul for `foul` seconds, and a trader loading at a foul post brings `import` taint home
- * (none while the town keeps quarantine). Campaign chapters have none. Quarantine drains a fever `quarantineWane` a second more. The computer builds its first Temple
- * by `aiTemple` taint, keeps its priests within `aiTend` tiles of it while sick, and quarantines at severity `aiQuarantine`.
- */
-export const SICKNESS = {
-  every: 2, fromEpoch: 1, minPop: 25, crowdAt: 0.85, bigFrom: 30, bigSpan: 60, loose: 0.25,
-  crowd: 0.01, season: [1, 0.8, 1, 1.5], templeMost: 2, temple: 0.2, nomad: 0.5, calm: 0.0004,
-  start: 0.35, after: 0.25, wane: 0.0006, tend: 0.003, tendReach: 9, tendMost: 4, feed: 0.002, feedAt: 0.3,
-  slow: 0.45, deadly: 0.5, die: 20, dieStep: 0.15, foul: 150, import: 0.35, quarantineWane: 0.0012,
-  aiTemple: 0.5, aiTend: 6, aiQuarantine: 0.45,
-};
-
-/**
  * The Nile flood (#501 s1): in season `season` (summer) the fields of a flood people lie under the river and yield nothing,
  * and the corvée makes its builders work `build` times as fast. The computer moves up to `move` farmers a think to other work,
  * and once the river falls sends up to `back` berry pickers a think to the fields it left empty (#517).
