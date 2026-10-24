@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ageOf, roadKnown, roadProblem, roadsFrom } from '../src/sim/ages';
-import { board, boardsAt } from '../src/sim/beggars';
+import { board, boarder, boardsAt } from '../src/sim/beggars';
 import { damageOf, hurt } from '../src/sim/combat';
 import { AGES, BEGGARS, ROADS, ROUTES, type RouteId } from '../src/sim/data';
 import { createGame, step } from '../src/sim/game';
@@ -131,6 +131,22 @@ describe('boarding (#783)', () => {
     expect(boardsAt(s, 0, dock.x + 4, dock.y)).toBe(true);
     expect(boardsAt(s, 0, dock.x + BEGGARS.haven + 2, dock.y)).toBe(false);
     expect(ageOf(s.players[0])).toBe('gunpowder');
+  });
+});
+
+describe('splash credit (#783)', () => {
+  it('a Beggars ship\'s splash boards what it beats down; anyone else\'s splash credits no one, as before', () => {
+    const s = game();
+    const mine = ship(s, 0, 'warship');
+    expect(boarder(s, mine)).toBe(mine);
+    expect(boarder(s, spawnUnit(s, 0, 'ranged', s.players[0].startX, s.players[0].startY))).toBeNull();
+    const plain = game('sail', ['sail']);
+    expect(boarder(plain, ship(plain, 0, 'warship'))).toBeNull();
+    // A kept Dock lends its haven's splash too, on any road.
+    const kept = game('gunpowder');
+    placeBuilding(kept, 0, 'dock', 10, 10, true).keep = 'beggars';
+    const k = ship(kept, 0, 'warship');
+    expect(boarder(kept, k)).toBe(k);
   });
 });
 
