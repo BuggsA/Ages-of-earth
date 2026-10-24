@@ -40,6 +40,8 @@ Its one copy, with the levers and anti-patterns: **`docs/verbs.md`**. Ask it of 
 
 ## Owner asks, in order after Goal 1
 
+**First, high priority (the owner, 2026-10-23):** #617, the art. "The game looks mushy. Hard to tell things apart." Research welcome before building; each step shows before-and-after screenshots.
+
 #454 (patrol and auto-explore), #391 (6–7 epochs), #344 (people management). Open owner notes without the `owner-ask` label (#452, #364) are the owner's thoughts for later, not tasks yet.
 
 ## Progress
