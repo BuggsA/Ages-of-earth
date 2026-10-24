@@ -1441,10 +1441,73 @@ function footGear(k: Kit, civ: CivId): void {
   }
 }
 
+/** Archers and crossbowmen of each people: its own cap or hood, and a mantle across the back, so a bow line reads as Greek, Mongol or Chinese before the plume does. */
+function rangedGear(k: Kit, civ: CivId, epoch: number): void {
+  if (epoch === 1) {
+    switch (civ) {
+      case 'greeks': // A brimmed petasos against the sun.
+        k.cyl(0.11, 0.11, 0.012, 10, '#c9b27a', 0, 0.54, 0);
+        k.cone(0.07, 0.06, 8, '#c9b27a', 0, 0.55, 0);
+        break;
+      case 'romans': // An auxiliary's iron cap with a neck-guard.
+        k.dome(0.075, '#9aa0a6', 0, 0.5, 0);
+        k.box(0.15, 0.02, 0.04, '#9aa0a6', 0, 0.46, -0.07);
+        break;
+      case 'chinese': // A wide conical bamboo hat.
+        k.cone(0.14, 0.09, 10, '#d9c27a', 0, 0.55, 0);
+        break;
+      case 'egyptians': // A linen headcloth with two lappets.
+        k.dome(0.075, '#e8e0c8', 0, 0.5, 0);
+        for (const x of [-1, 1]) k.box(0.025, 0.1, 0.04, '#e8e0c8', x * 0.07, 0.46, 0.02);
+        break;
+      case 'mongols': // A fur-lined cap with ear-flaps.
+        k.cone(0.07, 0.09, 6, '#5a3d28', 0, 0.55, 0);
+        for (const x of [-1, 1]) k.box(0.02, 0.07, 0.05, '#5a3d28', x * 0.07, 0.47, 0);
+        break;
+      case 'britons': // Bare-headed, a woad-blue band across the brow.
+        k.cyl(0.07, 0.07, 0.02, 8, '#2f5fa8', 0, 0.52, 0);
+        break;
+    }
+  } else if (epoch === 2) {
+    const mantle: Record<CivId, string> = { greeks: '#b3282d', romans: '#6e1d22', chinese: '#2f6f62', egyptians: '#e0b13c', mongols: '#2f5fa8', britons: '#3d6b4a' };
+    k.box(0.17, 0.24, 0.02, mantle[civ], 0, 0.24, -0.08);
+  }
+}
+
+/** Priests and holy men of each people: a wreath, sash, cap, collar or fur, one a people's own. */
+function priestGear(k: Kit, civ: CivId, epoch: number): void {
+  if (epoch < 1 || epoch > 3) return;
+  switch (civ) {
+    case 'greeks': // A laurel wreath.
+      k.cyl(0.072, 0.072, 0.014, 10, '#4f7a3a', 0, 0.53, 0);
+      break;
+    case 'romans': // A purple-bordered toga fold over the shoulder.
+      k.box(0.05, 0.3, 0.13, '#6e2a6e', -0.06, 0.27, 0.0).rotation.z = 0.5;
+      break;
+    case 'chinese': // A flat black scholar's cap with two wings.
+      k.box(0.14, 0.02, 0.1, '#2b2420', 0, 0.58, 0);
+      for (const x of [-1, 1]) k.box(0.08, 0.012, 0.02, '#2b2420', x * 0.11, 0.58, 0);
+      break;
+    case 'egyptians': // A broad gold collar.
+      k.cyl(0.115, 0.13, 0.03, 10, '#e0b13c', 0, 0.4, 0);
+      break;
+    case 'mongols': // A fur collar and a blue sash.
+      k.cyl(0.1, 0.12, 0.05, 8, '#5a3d28', 0, 0.4, 0);
+      k.box(0.19, 0.03, 0.17, '#2f5fa8', 0, 0.22, 0);
+      break;
+    case 'britons': // A circlet of oak leaves and a green mantle.
+      k.cyl(0.072, 0.072, 0.014, 8, '#3d6b4a', 0, 0.53, 0);
+      k.box(0.2, 0.2, 0.02, '#3d6b4a', 0, 0.3, -0.1);
+      break;
+  }
+}
+
 /** A people's mark on its signature line: a crest, plume, headdress or banner, so its army reads at a glance. */
 function signatureMark(k: Kit, civ: CivId, type: UnitType, epoch = 1): void {
   const y = MARK_Y[type] ?? 0.5;
   if (type === 'infantry' && epoch >= 1 && epoch <= 3) footGear(k, civ);
+  else if (type === 'ranged') rangedGear(k, civ, epoch);
+  else if (type === 'priest') priestGear(k, civ, epoch);
   // Foot soldiers wear it on the head; siege and riders carry it on a pole behind.
   const pole = type === 'siege' || type === 'cavalry';
   const z = pole ? -0.2 : -0.01;
