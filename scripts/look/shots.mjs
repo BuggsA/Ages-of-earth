@@ -69,6 +69,20 @@ const SCENES = [
     }
     return { x: x + 1.6, y: y + 1.4, zoom: 0.35 };
   }],
+  // Citizens standing in the middle of a wood: the crowns should draw in around them (#623).
+  ['wood', ({ g, ages, me }) => {
+    const p = g.players[me];
+    const cands = [];
+    for (let y = 3; y < g.h - 3; y++) for (let x = 3; x < g.w - 3; x++) {
+      let n = 0;
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (g.res[(y + dy) * g.w + x + dx] === 1) n++;
+      if (n >= 14) cands.push([x, y, (x - p.startX) ** 2 + (y - p.startY) ** 2]);
+    }
+    cands.sort((a, b) => a[2] - b[2]);
+    const [wx, wy] = cands[0];
+    for (let i = 0; i < 4; i++) ages.spawn(me, 'citizen', wx + 0.5 + (i % 2) * 0.9, wy + 0.5 + Math.floor(i / 2) * 0.9);
+    return { x: wx + 1, y: wy + 1, zoom: 0.5 };
+  }],
   // The same town in the Stone and Bronze Ages (#625): the early silhouettes of houses, stores and barracks.
   ['stone-town', ({ g, ages, me }) => {
     ages.setEpoch(me, 0);
