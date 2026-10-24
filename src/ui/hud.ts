@@ -9,7 +9,7 @@ import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE, findResource } from '../sim/units';
-import { FIRE, AUTO_WORK, BREACH, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { FIRE, AUTO_WORK, BREACH, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -18,7 +18,7 @@ import { loadPrice, sellerNear } from '../sim/oretrade';
 import { clockOf, launchProblem, loaded, rulesOf } from '../sim/silo';
 import { carriesKegs, kegProblem, kegsOf, millProblem, mills, millsOf, sappers } from '../sim/powder';
 import { carriesTorch, fireOn } from '../sim/fire';
-import { basinOf, heldBack, millIdle, wateredAt } from '../sim/water';
+import { basinOf, drowned, heldBack, isInund, lets, millIdle, sluiceFed, sluiceProblem, waterLine, wateredAt } from '../sim/water';
 import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
 import { LANDMARK_KINDS, claimWork, claimants, favours, landmarkAt } from '../sim/landmarks';
 import { workProblem } from '../sim/works';
@@ -133,6 +133,10 @@ function orderWords(s: GameState, u: Unit): string {
     }
     case 'farm':
       if (flooded(s, u.owner)) return 'Waiting out the flood: the field is under the river';
+      {
+        const f = s.byId.get(o.target);
+        if (f && f.kind === 'building' && drowned(s, f)) return 'Waiting for the water to go: the field is under the sluice\'s flood';
+      }
       if ((s.byId.get(o.target) as Building | undefined)?.type === 'garden') return o.phase === 'drop' ? 'Carrying the harvest home' : o.phase === 'work' ? 'Tending a Kitchen Garden' : 'Going to the garden';
       return o.phase === 'drop' ? 'Carrying grain home' : o.phase === 'work' ? 'Farming' : 'Going to the fields';
     case 'build': {
@@ -1175,6 +1179,11 @@ export class Hud {
       const still = millProblem(s, p);
       status += ` · <span data-tip="<b>Powder mill</b>In the Age of Alchemy every Siege Workshop grinds: together they make a keg from ${KEG.ore} saltpetre every ${KEG.time} seconds a mill, up to ${KEG.most} in store. Kegs are laid in the Age of Sappers.">${still ? `⚠ ${still}` : `🧨 Grinding powder: ${kegsOf(p)} kegs`}</span>`;
     }
+    // A sluice (#701 s4): open or shut, and how far its water reaches.
+    if (b.built && b.type === 'sluice') {
+      const under = waterLine(s, b).filter((t) => isInund(s, t)).length;
+      status += ` · <span data-tip="<b>Sluice</b>Open, the water runs out over the low ground within ${INUND.reach} tiles of it: polder, and meadow no higher than a little over its banks. Soldiers wade it at a crawl, siege bogs down, and gun-barges sail it. Shut, it holds the water back as a dyke does.">${b.open ? (lets(s, b) ? `🌊 Open: ${under} tiles under water` : '⚠ Open, but no water to let out') : sleeping ? '💤 Shut' : `🚪 Shut${under ? `: ${under} tiles still draining` : ''}`}</span>`;
+    }
     // A windmill (#701): how much water is left behind its dykes, or why it stands still.
     if (mine && b.built && !sleeping && b.type === 'windmill') {
       const still = millIdle(s, b);
@@ -1615,6 +1624,12 @@ export class Hud {
           const w = WORKS[p.civ];
           const why = workProblem(s, p);
           cmds.push({ key: 'V', pic: '', glyph: w.icon, title: w.name, desc: `${w.blurb} Free; lasts ${WORK.duration} seconds, once in each epoch.`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'greatWork', p: viewer }) });
+        }
+        // The Water Line (#701 s4): open the sluice, or shut it.
+        if (b.type === 'sluice') {
+          const why = sluiceProblem(s, b);
+          const reach = waterLine(s, b).length;
+          cmds.push({ key: 'O', pic: '', glyph: b.open ? '⛔' : '🌊', title: b.open ? 'Shut the sluice' : 'Open the sluice', desc: b.open ? `Let the gate down: the flood drains away from its edges in, a ring every ${INUND.every} second${INUND.every === 1 ? '' : 's'}, and the fields under it work again. A boat left on the last wet tile runs aground and is lost.` : `Wind the gate up: the water runs out over the low ground round it, a ring every ${INUND.every} second${INUND.every === 1 ? '' : 's'}, up to ${INUND.reach} tiles (${reach} tiles here). Soldiers wade the flood at ${Math.round(INUND.wade * 100)}% of their pace and siege at ${Math.round(INUND.siege * 100)}%; your gun-barges sail it. Fields under it yield nothing while it lies.${sluiceFed(s, b) ? '' : ' <b>No still water lies beside it</b>: set it on a channel, a lake or the shallows.'}`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'pack', p: viewer, building: b.id }) });
         }
         if (isMobile(p) && packsOf(p).includes(b.type)) {
           const why = packProblem(s, p, b);

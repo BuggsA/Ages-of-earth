@@ -1316,6 +1316,17 @@ export class View {
           if (ev.tile % 4 === 0) this.cue('rush', ev.x, ev.y, 0.35);
           break;
         }
+        case 'inundated': {
+          // The Water Line (#701 s4): the flood runs over a tile of meadow (a low spurt of water, a hiss now and then), or leaves it.
+          if (!ev.wet || !this.sees(ev.x, ev.y)) break;
+          this.effects.burst(new THREE.Vector3(ev.x, heightAt(this.state!, ev.x, ev.y) + 0.1, ev.y), { count: 4, speed: 0.5, up: 0.5, life: 0.7, size: 0.045, gravity: 3, colors: ['#bfd9dc', '#e6f1f2', '#7d9a86'] });
+          if (ev.tile % 6 === 0) this.cue('spread', ev.x, ev.y, 0.3);
+          break;
+        }
+        case 'sluice':
+          // A sluice opened or shut (#701 s4): the winch, and the water let out or stilled.
+          if (this.sees(ev.x, ev.y)) this.cue(ev.open ? 'sluiceOpen' : 'sluiceShut', ev.x, ev.y, 0.7);
+          break;
         case 'dug': {
           // Water runs into a dug ditch (#701, the Age of Rivers): a splash at the head of the flow, and a soft gurgle now and then.
           if (!this.sees(ev.x, ev.y)) break;

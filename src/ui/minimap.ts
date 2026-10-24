@@ -9,7 +9,7 @@ import { Waymarks } from './waymarks';
 const POLDER_RGB = [86, 128, 62];
 const WATER_RGB = [0x2f, 0x7f, 0xae];
 /** Tiles pumped out of the water so far, by every people. */
-const drained = (s: GameState): number => s.players.reduce((n, p) => n + (p.stats.drained ?? 0) + (p.stats.dug ?? 0), s.flooded ?? 0);
+const drained = (s: GameState): number => s.players.reduce((n, p) => n + (p.stats.drained ?? 0) + (p.stats.dug ?? 0), (s.flooded ?? 0) + (s.inundated ?? 0));
 import { R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE, T_ROCK, T_SAND, T_WATER } from '../sim/types';
 
 /**

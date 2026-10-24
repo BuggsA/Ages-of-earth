@@ -4,7 +4,8 @@ import { legionary } from '../sim/legion';
 import { BOAR, MAMMOTH, RAIDER, SIGNATURES, TICK_HZ, WOLF, domainOf, unitStats } from '../sim/data';
 import type { Animal, CivId, GameState, Unit, UnitType } from '../sim/types';
 import { unitMaterial } from './materials';
-import { heightAt } from './terrain';
+import { FLOOD_DEPTH, heightAt } from './terrain';
+import { isInund } from '../sim/water';
 import { boarGeometry, deerGeometry, mammothGeometry, raiderGeometry, sheepGeometry, LEGION_MODEL, THRALL_MODEL, unitGeometry, wolfGeometry } from './unitModels';
 import { WATER_Y } from './water';
 
@@ -433,7 +434,8 @@ export class UnitsView {
       if (dom === 'water') {
         // Afloat: riding the swell, oars sweeping, paddle wheels churning, nets dipping.
         // Riding high enough that the hull's sides show above the water.
-        gy = WATER_Y + 0.05 + Math.sin(time * 1.4 + ph) * 0.02;
+        // A gun-barge (#701 s4) on a sluice's flood rides its sheet of water, over the ground wherever that lies.
+        gy = Math.max(WATER_Y, u.type === 'barge' && isInund(s, Math.floor(y) * s.w + Math.floor(x)) ? gy + FLOOD_DEPTH - 0.02 : WATER_Y) + 0.05 + Math.sin(time * 1.4 + ph) * 0.02;
         roll = Math.sin(time * 1.1 + ph) * 0.05;
         pitch = Math.sin(time * 0.9 + ph * 1.3) * 0.03;
         const paddles = u.type === 'transport' && epoch >= 4;
