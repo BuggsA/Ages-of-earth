@@ -1442,8 +1442,10 @@ export class Hud {
     const r = this.tipEl.getBoundingClientRect();
     let x = e.clientX + 14;
     let y = e.clientY - r.height - 12;
-    if (x + r.width > window.innerWidth - 6) x = window.innerWidth - r.width - 6;
     if (y < 46) y = e.clientY + 18;
+    // Keep the whole tip on screen: smaller windows and zoomed pages push it past an edge.
+    y = Math.max(6, Math.min(y, window.innerHeight - r.height - 6));
+    x = Math.max(6, Math.min(x, window.innerWidth - r.width - 6));
     this.tipEl.style.left = `${x}px`;
     this.tipEl.style.top = `${y}px`;
   }
