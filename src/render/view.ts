@@ -1530,7 +1530,7 @@ export class View {
   }
 
   /** Whether the viewer knows of this building (to show it on the minimap). */
-  knownBuildings(): Iterable<{ id: number; owner: number; x: number; y: number; size: number }> {
+  knownBuildings(): Iterable<{ id: number; owner: number; x: number; y: number; size: number; type: string }> {
     return this.buildings.known.values();
   }
 
