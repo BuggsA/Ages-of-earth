@@ -2219,7 +2219,7 @@ const ROOFS: Partial<Record<BuildingType, [string, string]>> = {
   barracks: ['#4a5668', '#38424f'], range: ['#4a5668', '#38424f'], stable: ['#4a5668', '#38424f'], workshop: ['#4a5668', '#38424f'], forge: ['#4a5668', '#38424f'],
   tower: ['#4a5668', '#38424f'], warcamp: ['#4a5668', '#38424f'], bloodtower: ['#4a5668', '#38424f'], airfield: ['#4a5668', '#38424f'], silo: ['#4a5668', '#38424f'],
   temple: ['#e9e2cf', '#d8b25a'], mission: ['#e9e2cf', '#d8b25a'],
-  market: ['#27808a', '#1d6670'], caravanserai: ['#27808a', '#1d6670'], dock: ['#27808a', '#1d6670'],
+  market: ['#1a5961', '#133f46'], caravanserai: ['#1a5961', '#133f46'], dock: ['#1a5961', '#133f46'],
   storehouse: ['#c9993a', '#a97d2c'], huntcamp: ['#c9993a', '#a97d2c'], prospector: ['#c9993a', '#a97d2c'],
 };
 
