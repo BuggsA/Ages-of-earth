@@ -13,12 +13,12 @@ import { bakedMaterial, fogUniforms, inject, swayMaterial } from './materials';
  */
 
 const C = (hex: string) => new THREE.Color(hex);
-const GRASS = [C('#92b45c'), C('#7ba24e'), C('#a8c670')];
-const DRY = C('#b8b46a');
-const DIRT = C('#9c8a5e');
-const SAND = [C('#e6d39c'), C('#d6c088')];
-const ROCK = [C('#8f8679'), C('#a0988b'), C('#7d756a')];
-const CLIFF = C('#7e7466');
+const GRASS = [C('#708b4d'), C('#617d44'), C('#7d975a')];
+const DRY = C('#8e9060');
+const DIRT = C('#7a6c4c');
+const SAND = [C('#cdbb8c'), C('#bca97a')];
+const ROCK = [C('#7a7267'), C('#877f73'), C('#6c655b')];
+const CLIFF = C('#6a6156');
 const BED = [C('#b9a87a'), C('#8b9378')];
 
 export const terrainMaterial = inject(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.95 }), { season: 'ground' });

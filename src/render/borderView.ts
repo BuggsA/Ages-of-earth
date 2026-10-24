@@ -17,7 +17,7 @@ export class BorderView {
 
   constructor() {
     this.mesh = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({
-      vertexColors: true, transparent: true, opacity: 0.7, depthWrite: false, fog: false, toneMapped: false,
+      vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false, fog: false, toneMapped: false,
     }));
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 3;
@@ -48,6 +48,13 @@ export class BorderView {
         const py = y - ny * INSET;
         pos.push(px, Math.max(WATER_Y, heightAt(s, px, py)) + LIFT, py);
         rgb.push(c.r, c.g, c.b);
+      }
+      // A dark line just outside, so the border keeps an edge on any ground.
+      for (const [x, y] of [[x0, y0], [x1, y1]]) {
+        const px = x - nx * (INSET - 0.05);
+        const py = y - ny * (INSET - 0.05);
+        pos.push(px, Math.max(WATER_Y, heightAt(s, px, py)) + LIFT, py);
+        rgb.push(c.r * 0.12, c.g * 0.12, c.b * 0.12);
       }
     };
     for (let y = 0; y < s.h; y++) {
