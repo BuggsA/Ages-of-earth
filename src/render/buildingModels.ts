@@ -1841,6 +1841,27 @@ function dyke(k: Kit, mask: number): void {
   k.team(k.box(0.13, 0.05, 0.13, TEAM, 0.28, 0.44, 0.28));
 }
 
+/** A Bloom Hearth (#727, the Iron Age): a squat clay furnace with a glowing mouth, bellows, a slag heap and a rack of grey bars. */
+function bloomery(k: Kit, _e: number, st: Style): void {
+  pad(k, 2, st.base);
+  // The furnace stack: a clay drum that tapers to a smoking top, with a fire door and a team band.
+  k.cyl(0.6, 0.72, 0.9, 8, '#8a5a3c', -0.15, 0, -0.1);
+  k.cyl(0.36, 0.55, 0.9, 8, '#7a4c34', -0.15, 0.9, -0.1);
+  k.ring(0.64, 0.025, '#4a3a30', 0.45);
+  k.team(k.box(1.1, 0.07, 0.04, TEAM, -0.15, 0.62, 0.45));
+  k.box(0.34, 0.3, 0.06, '#1c1410', -0.15, 0.12, 0.6);
+  k.glow(k.box(0.24, 0.16, 0.04, '#ff8a2a', -0.15, 0.17, 0.64));
+  k.glow(k.sphere(0.09, '#ff9a3c', -0.15, 1.88, -0.1));
+  // Bellows: a hide bag on a frame, its nozzle at the furnace foot.
+  k.box(0.5, 0.22, 0.3, '#5b4330', 0.7, 0.18, 0.2);
+  k.box(0.46, 0.06, 0.26, '#7a5636', 0.7, 0.4, 0.2).rotation.z = -0.15;
+  k.cyl(0.04, 0.04, 0.5, 5, IRON_DARK, 0.42, 0.22, 0.32).rotation.z = Math.PI / 2;
+  // Slag heap and a rack of finished bars.
+  k.cone(0.34, 0.3, 6, '#3a3a3e', -0.85, 0, 0.5);
+  for (let i = 0; i < 4; i++) k.box(0.36, 0.06, 0.1, i < 2 ? '#c8ccd0' : '#d8d0c0', 0.65, 0.06 + (i % 2) * 0.07, -0.45 + (i >> 1) * 0.14);
+  banner(k, 0.95, 0, -0.85, 1.2);
+}
+
 /**
  * A channel being dug (#701, the Age of Rivers): a raw trench of dark earth with the spoil heaped on its banks, running on toward the
  * neighbouring ditches and the water (`mask`, as a wall's), a spade left in the heap and a peg in the owner's colour. Once the water
@@ -2683,7 +2704,7 @@ const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' |
   sapling: (k, e) => sapling(k, e),
   heart: (k) => heart(k),
   spire: (k) => spire(k),
-  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, battery, windmill,
+  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, battery, windmill, bloomery,
   // The Age of Tides (#739), drawn in `tideModels.ts`.
   tidemill: (k: Kit, _e: number, st: Style) => tidemill(k, st.base),
   cockler: (k: Kit, _e: number, st: Style) => cocklerHut(k, st.base),
