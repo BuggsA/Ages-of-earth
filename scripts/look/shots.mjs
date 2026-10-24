@@ -92,6 +92,7 @@ for (const [name, setup] of SCENES) {
   if (only && only !== name) continue;
   const page = await b.newPage({ viewport: { width: 1280, height: 800 } });
   page.on('pageerror', (e) => errors.push(`${name}: ${e.message}`));
+  if (process.env.SHOT_QUALITY) await page.addInitScript((q) => localStorage.setItem('ages-quality', q), process.env.SHOT_QUALITY);
   await page.goto('http://localhost:5199/?seed=7&foes=1' + (process.env.SHOT_QUERY ?? ''));
   await page.waitForSelector('#title:not(.hidden)', { timeout: 120000 });
   await page.evaluate(() => {
