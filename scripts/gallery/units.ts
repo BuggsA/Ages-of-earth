@@ -2,12 +2,13 @@
 import * as THREE from 'three';
 import { unitGeometryColored } from '../../src/render/unitModels';
 import { UNIT_TYPES } from '../../src/sim/data';
-import type { CivId } from '../../src/sim/types';
+import type { CivId, UnitType } from '../../src/sim/types';
 const q = new URLSearchParams(location.search);
 const civ = (q.get('c') ?? undefined) as CivId | undefined;
 const group = q.get('g') ?? 'land';
 const LAND = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'trader', 'wagon'];
 const GEAR = group === 'gear'; // ?g=gear: foot soldiers, a row per people (Greek, Roman, Chinese, Egyptian, Mongol, Briton), epochs 1-3, close and low
+const KINDS: Record<string, UnitType> = { infantry: 'infantry', ranged: 'ranged', priest: 'priest' }; // ?g=gear&k=ranged|priest picks the line
 const CIVS: CivId[] = ['greeks', 'romans', 'chinese', 'egyptians', 'mongols', 'britons'];
 const types = UNIT_TYPES.filter((t) => (LAND.includes(t) ? 'land' : 'sea') === group);
 const W = 1600, H = 1000;
@@ -21,7 +22,7 @@ const sp = group === 'land' ? 2.2 : 3.6;
 if (GEAR) {
   CIVS.forEach((c, row) => [1, 2, 3].forEach((e, col) => {
     for (const [i, a] of [0, 1].entries()) { // front-left and rear-right three-quarter views side by side
-      const m = new THREE.Mesh(unitGeometryColored('infantry', e, '#cc3333', c), new THREE.MeshLambertMaterial({ vertexColors: true }));
+      const m = new THREE.Mesh(unitGeometryColored(KINDS[q.get('k') ?? 'infantry'] ?? 'infantry', e, '#cc3333', c), new THREE.MeshLambertMaterial({ vertexColors: true }));
       m.position.set((col - 1) * 1.3 + (i - 0.5) * 0.55 - 0.1, 0, (row - 2.5) * 1.45);
       m.rotation.y = a ? -2.4 : 0.6;
       scene.add(m);
