@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { hash2 } from '../sim/rng';
 import type { GameState } from '../sim/types';
 import { T_GRASS, T_ROCK, T_SAND, T_WATER } from '../sim/types';
-import { isInund, isPolder } from '../sim/water';
+import { isCanal, isInund, isPolder } from '../sim/water';
 import { natureGeometry, type NatureKind } from './natureModels';
 import { bakedMaterial, fogUniforms, inject, swayMaterial } from './materials';
 
@@ -32,6 +32,9 @@ const MUD = C('#857a60');
 const DRY_TIME = 20;
 /** The Water Line (#701 s4): meadow drowned under a sluice's flood, seen through the sheet of water over it. */
 const DROWNED = [C('#4f6b4a'), C('#5d7752')];
+/** A canal (#701 s5): a bed of cut stone under the water, and the trodden towpath along its banks. */
+const CANAL_BED = [C('#7d7a72'), C('#6a6862')];
+const TOWPATH = C('#a8977a');
 /** How far over the ground a sluice's flood lies, knee-deep, as drawn (`floodSheet`); a gun-barge rides on it. */
 export const FLOOD_DEPTH = 0.09;
 const floodMaterial = inject(new THREE.MeshStandardMaterial({ color: '#6fa7b6', transparent: true, opacity: 0.6, roughness: 0.2, metalness: 0.05, depthWrite: false }), {});
@@ -50,6 +53,11 @@ function polderColor(out: THREE.Color, x: number, y: number, t: number, fine: nu
     out.copy(strip === 2 ? POLDER_FIELD[2] : POLDER_FIELD[strip]).lerp(POLDER_FIELD[1], fine * 0.3);
   }
   if (dried < 1) out.lerp(MUD, (1 - dried) * 0.8);
+}
+
+/** Whether a canal (#701 s5) lies four-ways beside a tile: its bank is a towpath. */
+function besideCanal(s: GameState, x: number, y: number): boolean {
+  return (x > 0 && isCanal(s, y * s.w + x - 1)) || (x < s.w - 1 && isCanal(s, y * s.w + x + 1)) || (y > 0 && isCanal(s, (y - 1) * s.w + x)) || (y < s.h - 1 && isCanal(s, (y + 1) * s.w + x));
 }
 
 /** Tiles pumped out so far, by every people: a cheap test that the water layer changed. */
@@ -93,6 +101,8 @@ export class TerrainView {
   private col = new Float32Array(0);
   /** The ground as last drawn, to spot tiles the rules turned from water to land, and how many tiles had been pumped out then. */
   private drawn = new Uint8Array(0);
+  /** The channels and canals as last drawn (#701 s5: a channel dug deep stays water, but its bed and banks change). */
+  private dug = new Uint8Array(0);
   private drainedSeen = 0;
   /** Corners easing toward their new height. */
   private rising = new Set<number>();
@@ -114,6 +124,7 @@ export class TerrainView {
     this.pos = new Float32Array(w * h * 6 * 3);
     this.col = new Float32Array(w * h * 6 * 3);
     this.drawn = Uint8Array.from(s.terrain);
+    this.dug = s.channel ? Uint8Array.from(s.channel) : new Uint8Array(w * h);
     this.drainedSeen = drainedIn(s);
     this.rising.clear();
     this.drying.clear();
@@ -183,8 +194,10 @@ export class TerrainView {
     if (n !== this.drainedSeen) {
       this.drainedSeen = n;
       for (let i = 0; i < w * h; i++) {
-        if (this.drawn[i] === s.terrain[i]) continue;
+        const dug = s.channel ? s.channel[i] : 0;
+        if (this.drawn[i] === s.terrain[i] && this.dug[i] === dug) continue;
         this.drawn[i] = s.terrain[i];
+        this.dug[i] = dug;
         if (isPolder(s, i)) this.drying.set(i, this.clock);
         const x = i % w;
         const y = (i - x) / w;
@@ -254,6 +267,8 @@ export class TerrainView {
       const fine = smooth(x + 0.5, y + 0.5, 2.5, 12);
       if (isInund(s, tile)) {
         tmp.copy(DROWNED[0]).lerp(DROWNED[1], fine);
+      } else if (terr === T_WATER && isCanal(s, tile)) {
+        tmp.copy(CANAL_BED[0]).lerp(CANAL_BED[1], fine);
       } else if (terr === T_WATER) {
         tmp.copy(BED[0]).lerp(BED[1], Math.min(1, Math.max(0, -avgH * 0.8)));
       } else if (isPolder(s, tile)) {
@@ -270,6 +285,7 @@ export class TerrainView {
         tmp.lerp(DRY, Math.min(0.6, dry));
         if (fine < 0.18 && patch > 0.55) tmp.lerp(DIRT, 0.35);
       }
+      if (terr !== T_WATER && s.channel && besideCanal(s, x, y)) tmp.lerp(TOWPATH, 0.45);
       if (terr !== T_WATER && steep < 0.8) tmp.lerp(CLIFF, Math.min(1, (0.8 - steep) * 2.6));
       // A whisper of light and shade per facet keeps the low-poly look without the noise.
       tmp.multiplyScalar(0.975 + n * 0.05);
