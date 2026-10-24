@@ -89,7 +89,8 @@ function citizen(epoch: number): Kit {
     { legs: '#454952', torso: '#8a7a64', belt: TEAM },
   ];
   const o = outfits[epoch];
-  const b = person(k, { legs: o.legs, torso: o.torso });
+  // The torso wears the people's colour so a worker reads as theirs from the default camera height.
+  const b = person(k, { legs: o.legs, torso: o.torso, torsoTeam: true });
   k.team(k.box(0.176, 0.035, 0.116, TEAM, 0, HIP + 0.02, 0));
   if (epoch === 2) {
     // A team-colored hood.

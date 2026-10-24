@@ -10,6 +10,8 @@ import { WATER_Y } from './water';
 
 /** Units are drawn a little larger than their footprint in the rules, so they read well from above. */
 export const UNIT_SCALE = 1.3;
+/** Citizens are drawn two fifths larger still: the smallest figures on the map, and the ones the eye hunts for. */
+const CITIZEN_BOOST = 1.4;
 /** How high aircraft fly above the ground. */
 export const AIR_ALT = 3.2;
 
@@ -465,7 +467,7 @@ export class UnitsView {
       this.e.set(pitch, yaw, roll);
       this.q.setFromEuler(this.e);
       this.p.set(dx, gy, dz);
-      const k = mounted ? UNIT_SCALE * 0.88 : engine ? UNIT_SCALE * 1.1 : UNIT_SCALE;
+      const k = mounted ? UNIT_SCALE * 0.88 : engine ? UNIT_SCALE * 1.1 : u.type === 'citizen' ? UNIT_SCALE * CITIZEN_BOOST : UNIT_SCALE;
       this.m.compose(this.p, this.q, this.sc.set(k, k, k));
       b.mesh.setMatrixAt(i, this.m);
       b.mesh.setColorAt(i, this.colors[u.owner]);
