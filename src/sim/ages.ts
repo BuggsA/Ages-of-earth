@@ -401,6 +401,8 @@ export function buildBarred(p: Player, type: BuildingType): string | null {
   if ((type === 'thornwall' || type === 'garden' || type === 'orchard') && !hasWalked(p, 'grove')) return `Only a people that has walked the ${AGES.grove.name} plants a ${BUILDINGS[type].name}`;
   if (type === 'hive' && !hasWalked(p, 'hive')) return `Only a people that has walked the ${AGES.hive.name} keeps bees`;
   if (type === 'heart' && !hasWalked(p, 'wildwood')) return `Only a people that has walked the ${AGES.wildwood.name} plants a Heart Tree`;
+  // Missile defence (#759 s2): a battery is raised only after Interceptors.
+  if (type === 'battery' && !p.techs.includes('interceptors')) return `Learn ${TECHS.interceptors.name} at a ${BUILDINGS.workshop.name} first`;
   if (type === 'spire' && !hasWalked(p, 'bloom')) return `Only a people that has walked the ${AGES.bloom.name} raises a Seed Spire`;
   const way = p.way ? WAYS[p.way] : undefined;
   if (way?.shuts?.includes(type)) return `${way.name} raises no ${BUILDINGS[type].name}`;

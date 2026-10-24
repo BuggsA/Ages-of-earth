@@ -2349,6 +2349,12 @@ export const SHAFT = {
   aiMax: 3,
 };
 
+/** The interceptor's numbers (`INTERCEPT`), named here so the battery's words can say them. */
+const INTERCEPT_REACH = 12;
+const INTERCEPT_FIRE = 2;
+const INTERCEPT_PCT = 60;
+const INTERCEPT_RELOAD = 90;
+
 export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   towncenter: { name: 'Town Center', size: 4, hp: 2800, cost: { wood: 275, stone: 150 }, time: 110, pop: 10, sight: 8, trains: ['citizen', 'hero'], drop: ['food', 'wood', 'stone', 'gold'], epoch: 0, guns: { damage: 6, range: 7, reload: 2 }, garrison: 15, menu: 'eco', key: 'T', blurb: 'Trains citizens and heroes, takes in every resource and leads your people into the next epoch. Citizens shelter here when the bell rings. Lose your last one and you have 45 seconds to raise another, or your people is lost: build a second far from the first.' },
   house: { name: 'House', size: 2, hp: 600, cost: { wood: 35 }, time: 18, pop: 5, sight: 3, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'E', blurb: 'Room for 5 more people.' },
@@ -2411,6 +2417,8 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   // The Age of Locks (#701 s5): a swing bridge over a canal, and a dam whose turbines drive the buildings by it (`CANAL`, `DAM`, `water.ts`).
   bridge: { name: 'Bridge', size: 1, hp: 500, cost: { wood: 50, stone: 30 }, time: 12, pop: 0, sight: 2, trains: [], drop: [], epoch: 4, ages: ['locks'], menu: 'eco', key: 'Z', blurb: 'A timber swing bridge on stone piers, laid over a canal or a channel. Your own people cross on it at full pace; rivals can\'t, and must swim the water round it. It swings for ships: every ship and barge passes under it.' },
   dam: { name: 'Dam', size: 1, hp: 1200, cost: { wood: 100, stone: 150 }, time: 30, pop: 0, sight: 4, trains: [], drop: [], epoch: 4, ages: ['locks'], menu: 'mil', key: 'N', blurb: 'A stone dam with a turbine house, raised on a channel, a canal, the shallows or the shore. With still water beside it, its turbines drive every building of yours within 8 tiles: they train and research two fifths faster (one dam\'s worth, however many stand near). Your own people walk across its crown; ships can\'t pass it. If it falls with water behind it, it bursts: the water runs over the low ground below it all at once, up to 6 tiles, hurting all who stand there.' },
+  // Missile defence (#759 s2): after Interceptors, a battery that fires one interceptor at a warhead whose ring falls in its cover (`INTERCEPT`, `silo.ts`).
+  battery: { name: 'Interceptor Battery', size: 2, hp: 1400, cost: { wood: 150, stone: 250, gold: 300 }, time: 50, pop: 0, sight: 8, trains: [], drop: [], epoch: 4, menu: 'mil', key: 'I', blurb: `A concrete pad with a radar dish and one interceptor on its rail, raised after Interceptors. It covers ${INTERCEPT_REACH} tiles round it, a circle every player sees. When a rival warhead's ring as you are shown it lies inside that cover, it fires on its own ${INTERCEPT_FIRE} seconds before the warhead lands and stops it ${INTERCEPT_PCT}% of the time: no blast and no fallout. One attempt for each warhead, however many batteries cover it, and the charge is spent hit or miss: it reloads in ${INTERCEPT_RELOAD} seconds. Every player sees a finished battery.` },
   airfield: { name: 'Airfield', size: 4, hp: 2200, cost: { wood: 250, stone: 100, gold: 150 }, time: 60, pop: 0, sight: 8, trains: ['fighter', 'bomber'], drop: [], epoch: 4, menu: 'mil', key: 'F', blurb: 'Builds fighters and bombers. Fighters hunt aircraft; bombers wreck towns.' },
 };
 
@@ -2559,6 +2567,7 @@ export const TECHS: Record<TechId, Tech> = {
   chemistry: { name: 'Chemistry', at: 'workshop', epoch: 3, cost: { food: 300, gold: 200 }, time: 45, add: { siegeRange: 1 }, mul: { siegeAttack: 1.2 }, blurb: 'Siege hits 20% harder and reaches 1 tile farther.', icon: '🧪' },
   blackPowder: { name: 'Black Powder', at: 'workshop', epoch: 3, ore: { id: 'saltpetre', n: 40 }, cost: { food: 250, gold: 150 }, time: 45, add: { rangedAttack: 1 }, mul: { siegeAttack: 1.15 }, blurb: 'Only where saltpetre lies: once your citizens have mined 40, the powder-makers grind it fine. Musketeers and all ranged soldiers hit for 1 more and siege 15% harder, on top of Chemistry. Where there is none, the plain road stays open.', icon: '💥' },
   bloodForged: { name: 'Blood-Forged Blades', at: 'forge', epoch: 3, ore: { id: 'bloodiron', n: 30 }, cost: { food: 250, gold: 175 }, time: 45, needs: 'ironCasting', add: { meleeAttack: 1, armor: 1 }, blurb: 'Only where blood-iron lies: once your citizens have mined 30, the smiths quench blades and plates in it. Foot soldiers, riders and heroes hit for 1 more and wear 1 more melee armor, on top of the plain forge. Where there is none, the plain road stays open.', icon: '🩸' },
+  interceptors: { name: 'Interceptors', at: 'workshop', epoch: 4, cost: { food: 500, gold: 700, stone: 250 }, time: 60, blurb: `Rockets that climb to meet a falling warhead. Raise Interceptor Batteries (I): each covers ${INTERCEPT_REACH} tiles and stops a warhead whose ring lies in its cover ${INTERCEPT_PCT}% of the time, blast and fallout both.`, icon: '🛡' },
   launchControl: { name: 'Launch Control', at: 'silo', epoch: 5, cost: { food: 600, gold: 900, stone: 400 }, time: 60, blurb: 'A bunker that ties every silo of your people to one clock. You may raise a third Missile Silo, and three standing silos may fire a salvo (B): three Atomic warheads at once, on three points at least 8 tiles apart, on your one clock. A rival sees three rings as for any launch, and cannot tell a salvo from one warhead and two decoys until the last 3 seconds, when all three stay. Each silo that falls scrubs its own warhead. Rivals can count your silos, so three of them is warning enough.', icon: '🎯' },
   saltCuring: { name: 'Salt Curing', at: 'storehouse', epoch: 1, ore: { id: 'salt', n: 30 }, cost: { food: 100, wood: 60 }, time: 30, add: { carry: 2 }, mul: { hunt: 1.25, forage: 1.15 }, blurb: 'Only where salt lies: once your citizens have mined 30, meat keeps and berries dry. Game is butchered 25% faster and berries gathered 15% faster, and every citizen carries 2 more. Where there is none, hunting stays as it was.', icon: '🧂' },
   gillnets: { name: 'Gillnets', at: 'dock', epoch: 1, cost: { food: 100, wood: 100 }, time: 30, mul: { fish: 1.25 }, blurb: 'Fishing boats fish 25% faster.', icon: '🐟' },
@@ -3684,6 +3693,15 @@ export const SILO = { fuse: 45, reach: 5, fuel: { gold: 600, stone: 200 }, refue
  * each of the three (a Fission or Fusion people's silos are built to share a clock).
  */
 export const SALVO = { trio: 3, surcharge: 0.5 };
+/**
+ * Missile defence (#759 s2): a finished Interceptor Battery holds one charge. Exactly `fire` seconds before a rival warhead lands, each of its
+ * live warheads whose ring, as the battery's team is shown it, lies within `reach` tiles of a charged battery draws one attempt: the nearest
+ * such battery fires, its charge spent hit or miss, and the roll (`chance`) is drawn then from the match's dice and stored on the launch.
+ * Exactly `meet` seconds before it lands the interceptor meets it: a hit and that warhead is gone, with no blast and no fallout; a miss and it
+ * flies on. A spent battery reloads in `reload` seconds. The computer learns Interceptors once a rival stands in the Industrial Age or later
+ * and raises `most` batteries, one to cover each of its Town Centers, nearest home first, `gap` seconds apart.
+ */
+export const INTERCEPT = { chance: INTERCEPT_PCT / 100, reach: INTERCEPT_REACH, fire: INTERCEPT_FIRE, meet: 1, reload: INTERCEPT_RELOAD, most: 2, gap: 40 };
 /**
  * A missile's flight (#772): the course every player watches inside the fuse. It climbs toward the middle of a rival's rings (the lure,
  * moved up to `jitter` tiles by the seed) and covers `knee` of the way there, bowing sideways by up to `bow` of that stretch, so the first

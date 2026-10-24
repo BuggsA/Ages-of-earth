@@ -2122,6 +2122,34 @@ function silo(k: Kit, _e: number, st: Style): void {
   k.glow(k.sphere(0.07, '#ff3a2a', 1.2, 1.0, -1.2));
 }
 
+function battery(k: Kit, _e: number, st: Style): void {
+  // The Interceptor Battery (#759 s2): a concrete pad, a slim pale interceptor on a rail raised steeply skyward, a radar dish on a mast
+  // turned to the sky, a low bunker with a team band, and a green lamp (it watches; it does not threaten).
+  k.box(1.9, 0.1, 1.9, '#6e6d66', 0, -0.02, 0);
+  k.box(1.5, 0.05, 1.5, '#8b8a82', 0, 0.08, 0);
+  // The launcher: a turntable, a trunnion, and the rail leaning back toward the sky with its rocket on it.
+  k.cyl(0.38, 0.42, 0.14, 10, '#4a4d54', -0.2, 0.1, 0.15);
+  k.box(0.32, 0.3, 0.3, '#3e4148', -0.2, 0.22, 0.15);
+  const rail = k.group(-0.2, 0.48, 0.15);
+  rail.rotation.x = -0.45;
+  k.box(0.12, 1.25, 0.12, '#55585f', 0, 0, 0, rail);
+  k.cyl(0.07, 0.07, 1.0, 8, '#e8e4dc', 0, 0.14, 0.13, rail);
+  k.cone(0.07, 0.24, 8, '#b8322a', 0, 1.14, 0.13, rail);
+  k.team(k.cyl(0.075, 0.075, 0.08, 8, TEAM, 0, 0.82, 0.13, rail));
+  for (const x of [-1, 1]) k.box(0.02, 0.2, 0.14, '#4a4640', x * 0.08, 0.14, 0.13, rail);
+  // The radar: a mast and a dish turned up and out.
+  k.cyl(0.05, 0.06, 0.95, 6, '#55585f', 0.55, 0.1, -0.5);
+  const dish = k.dome(0.32, '#d8d8d2', 0.55, 1.0, -0.5);
+  dish.rotation.x = 2.3;
+  dish.scale.set(1, 0.45, 1);
+  k.cyl(0.02, 0.02, 0.28, 4, '#3a3632', 0.55, 1.0, -0.38);
+  // The bunker and its team band.
+  k.box(0.75, 0.42, 0.55, st.wall, 0.45, 0.1, 0.5);
+  k.box(0.82, 0.06, 0.62, '#5a5c60', 0.45, 0.52, 0.5);
+  k.team(k.box(0.77, 0.1, 0.04, TEAM, 0.45, 0.3, 0.79));
+  k.glow(k.sphere(0.05, '#5aff7a', 0.75, 0.62, 0.3));
+}
+
 function airfield(k: Kit, _e: number, st: Style): void {
   // A grass strip with a painted runway, a hangar with a curved roof, a control tower and a windsock.
   k.box(3.9, 0.05, 3.9, '#7f9a5a', 0, -0.02, 0);
@@ -2649,7 +2677,7 @@ const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' |
   sapling: (k, e) => sapling(k, e),
   heart: (k) => heart(k),
   spire: (k) => spire(k),
-  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, windmill,
+  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, battery, windmill,
   // The Age of Tides (#739), drawn in `tideModels.ts`.
   tidemill: (k: Kit, _e: number, st: Style) => tidemill(k, st.base),
   cockler: (k: Kit, _e: number, st: Style) => cocklerHut(k, st.base),
@@ -2817,7 +2845,7 @@ function wayTouch(k: Kit, way: string, deep = false): void {
 /** What a building is for, read from its roof (#625): war under cold slate, faith under pale gold, trade under teal, the land's work under ochre. Houses and the Town Center keep their epoch's own red. The Stone Age keeps its thatch and reads by plinth and pennant. */
 const ROOFS: Partial<Record<BuildingType, [string, string]>> = {
   barracks: ['#3e4858', '#2e3641'], range: ['#3e4858', '#2e3641'], stable: ['#3e4858', '#2e3641'], workshop: ['#3e4858', '#2e3641'], forge: ['#3e4858', '#2e3641'],
-  tower: ['#3e4858', '#2e3641'], warcamp: ['#3e4858', '#2e3641'], bloodtower: ['#3e4858', '#2e3641'], airfield: ['#3e4858', '#2e3641'], silo: ['#3e4858', '#2e3641'],
+  tower: ['#3e4858', '#2e3641'], warcamp: ['#3e4858', '#2e3641'], bloodtower: ['#3e4858', '#2e3641'], airfield: ['#3e4858', '#2e3641'], silo: ['#3e4858', '#2e3641'], battery: ['#3e4858', '#2e3641'],
   temple: ['#e9e2cf', '#d8b25a'], mission: ['#e9e2cf', '#d8b25a'],
   market: ['#1a5961', '#133f46'], caravanserai: ['#1a5961', '#133f46'], dock: ['#1a5961', '#133f46'],
   storehouse: ['#e2b855', '#d4a642'], huntcamp: ['#e2b855', '#d4a642'], prospector: ['#e2b855', '#d4a642'], shaft: ['#e2b855', '#d4a642'],
