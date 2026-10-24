@@ -24,7 +24,9 @@ export type UnitType =
   /** The Age of the Hive (`docs/wild-road.md` §3, `hive.ts`): venom darts at the Archery Range, and the Den's Cave Bear. */
   | 'blowpipe' | 'cavebear'
   /** The Age of the Wildwood (`docs/wild-road.md` §4, `wildwood.ts`): an Ent, an old tree woken at the Heart Tree, that roots again. */
-  | 'warden';
+  | 'warden'
+  /** The Age of Floating Cities (#770): a pontoon district cast off and under tow, its people aboard, until it moors again. */
+  | 'tow';
 /** How a unit gets about: on foot, on the water, or in the air. */
 export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
@@ -46,6 +48,8 @@ export type BuildingType =
   | 'causeway' | 'tidemill'
   /** The Age of Locks (#701 s5): a swing bridge its own people cross a canal by and ships pass under, and a dam whose turbines drive the workshops by it. */
   | 'bridge' | 'dam'
+  /** The Age of Floating Cities (#770): a district on pontoons, moored on open water, that is cast off, towed and moored again. */
+  | 'pontoon'
   /** Missile defence (#759 s2): a battery that fires one interceptor at a warhead falling in its cover. */
   | 'battery';
 /** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
@@ -67,7 +71,7 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'chart' | 'assay' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged' | 'launchControl' | 'interceptors';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood' | 'locks' | 'bloom';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood' | 'locks' | 'floating' | 'bloom';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
 export type PathId = 'blood' | 'steppe' | 'hemocraft' | 'rite';
@@ -1175,6 +1179,11 @@ export type GameEvent =
   /** A steppe people struck camp (#297): a building packed onto a wagon, or a wagon pitched as a building. */
   | { k: 'camp'; owner: number; id: number; type: BuildingType; x: number; y: number; pitched: boolean }
   /**
+   * A floating district (#770): cast off into a tow (`id` the tow), moored again (`id` the pontoon), or sunk. `aboard` went with it (or,
+   * sinking, swam clear); `swum` were left to swim (or, sinking, drowned).
+   */
+  | { k: 'pontoon'; owner: number; id: number; x: number; y: number; act: 'cast' | 'moor' | 'sink'; aboard: number; swum: number }
+  /**
    * The flock (#308): a lamb born or raised, a sheep taken by wolves, rustled away (`owner` lost it to `by`),
    * or a flock gone hungry on bare ground.
    */
@@ -1445,6 +1454,8 @@ export interface AiMemory {
   line?: { since: number; spot?: { tx: number; ty: number } | null; alarm?: number };
   /** The Age of Locks (#701 s5): since when it has stood in the age, and where it means its dam to go (null: nowhere, once looked). */
   locks?: { since: number; dam?: { tx: number; ty: number } | null };
+  /** The Age of Floating Cities (#770): when it entered, and the tows it has under way, by id, to where (the water it moors on). */
+  float?: { since: number; tides?: number; tows?: Record<number, { x: number; y: number }>; looked?: number; fished?: number };
   /** The Age of Rivers (#701): the channel it means to dig from water past home (null: none), found when deciding and again on arrival (`fresh`). */
   river?: { plan: ChannelPlan | null; looked?: boolean; fresh?: boolean };
   /** The first crossing (#585): the age it stands in on the way to the Sea-Raiders, and since when (each sibling, and the age itself). */

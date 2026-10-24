@@ -1,4 +1,4 @@
-import { AURA, RALLY, BONUS, BLOOD_TOWER, BUILDINGS, DEER, LIGHTNING, VETERANCY, TICK_HZ, domainOf, secs, HEART, type UnitStats } from './data';
+import { AURA, FLOAT, RALLY, BONUS, BLOOD_TOWER, BUILDINGS, DEER, LIGHTNING, VETERANCY, TICK_HZ, domainOf, secs, HEART, type UnitStats } from './data';
 import { asleep, hasCoils } from './ages';
 import { bleeds, curseTaken, drawBlood, hemoBlow, hemoTaken } from './blood';
 import { fairPurse } from './fair';
@@ -41,7 +41,9 @@ export function damageOf(s: GameState, attacker: Unit | null, st: UnitStats, tar
   if (target.kind === 'building') {
     // Walls shrug off all but siege and heavy blows.
     const wall = target.type === 'wall' || target.type === 'gate' || target.type === 'dyke' || target.type === 'sluice' || target.type === 'dam' ? (st.cls === 'siege' ? 1.2 : st.cls === 'infantry' || st.cls === 'hero' ? 0.5 : 0.15) : 1;
-    return Math.max(1, st.attack * BONUS[st.cls].building * inspired * wall);
+    // Ships hole a floating district (#770) as nothing else does.
+    const hull = target.type === 'pontoon' && st.cls === 'ship' ? FLOAT.hull : 1;
+    return Math.max(1, st.attack * BONUS[st.cls].building * inspired * wall * hull);
   }
   const ts = statsOf(s, target);
   const rank = target.kind === 'unit' ? rankOf(target) : 0;

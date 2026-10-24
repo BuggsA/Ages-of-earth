@@ -1,4 +1,4 @@
-import { BUILDINGS, DT, STEPPE } from './data';
+import { BUILDINGS, DT, FLOAT, STEPPE } from './data';
 import { ageDef } from './ages';
 import { isNomad } from './nomad';
 import { placeProblem, stampBuilding } from './grid';
@@ -54,11 +54,14 @@ export function pitchSpot(s: GameState, w: Unit): { tx: number; ty: number } | n
   const n = BUILDINGS[w.packed].size;
   const bx = Math.round(w.x - n / 2);
   const by = Math.round(w.y - n / 2);
-  for (let d = 0; d <= STEPPE.spot; d++) {
+  const reach = w.packed === 'pontoon' ? FLOAT.spot : STEPPE.spot;
+  for (let d = 0; d <= reach; d++) {
     for (let dy = -d; dy <= d; dy++) {
       for (let dx = -d; dx <= d; dx++) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== d) continue;
-        if (!placeProblem(s, w.packed, bx + dx, by + dy, true, w.owner)) return { tx: bx + dx, ty: by + dy };
+        const why = placeProblem(s, w.packed, bx + dx, by + dy, true, w.owner);
+        // A tow (#770) moors out on the open water too, where no builder could stand.
+        if (!why || why === 'adrift') return { tx: bx + dx, ty: by + dy };
       }
     }
   }
@@ -69,6 +72,7 @@ export function pitchSpot(s: GameState, w: Unit): { tx: number; ty: number } | n
 export function pitchProblem(s: GameState, w: Unit): string | null {
   if (!w.packed || w.hp <= 0) return 'Nothing to pitch';
   if (w.inside) return 'Not while aboard';
+  if (w.packed === 'pontoon') return pitchSpot(s, w) ? null : 'No open water to moor on here, or the water is a rival\'s';
   return pitchSpot(s, w) ? null : 'No room to pitch here, or the land is a rival\'s';
 }
 
@@ -81,7 +85,15 @@ export function pitchCamp(s: GameState, w: Unit): Building | null {
   const b = placeBuilding(s, w.owner, w.packed, spot.tx, spot.ty, false);
   b.pitch = Math.max(0.05, Math.min(1, w.packedHp ?? 1));
   b.hp = Math.max(1, maxHp(s, b) * b.pitch * 0.2);
-  s.events.push({ k: 'camp', owner: w.owner, id: b.id, type: b.type, x: b.x, y: b.y, pitched: true });
+  // Those aboard a tow (#770) shelter in the district while it raises itself, and step out onto its deck once it stands.
+  for (const id of w.cargo) {
+    const u = s.byId.get(id);
+    if (!u || u.kind !== 'unit') continue;
+    u.inside = b.id;
+    b.garrison.push(id);
+  }
+  if (w.packed === 'pontoon') s.events.push({ k: 'pontoon', owner: w.owner, id: b.id, x: b.x, y: b.y, act: 'moor', aboard: w.cargo.length, swum: 0 });
+  else s.events.push({ k: 'camp', owner: w.owner, id: b.id, type: b.type, x: b.x, y: b.y, pitched: true });
   return b;
 }
 
@@ -100,6 +112,11 @@ export function raiseCamps(s: GameState): void {
     if (e.progress >= 1) {
       e.built = true;
       delete e.pitch;
+      // Built, a district is a gate again: its people walk its deck, and those it carried step out onto it.
+      if (e.type === 'pontoon') {
+        stampBuilding(s, e, true);
+        ungarrison(s, e);
+      }
       s.events.push({ k: 'built', id: e.id, owner: e.owner, type: e.type });
     }
   }

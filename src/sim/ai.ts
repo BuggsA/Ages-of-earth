@@ -11,6 +11,8 @@ import { grindersOf, kegsOf, millProblem, mills, sappers } from './powder';
 import { beatersAt, burns, onFire } from './fire';
 import { basinOf, channelPlan, coastHeld, dykePlan, heldBack, isCanal, isChannel, isInund, isPolder, polderField, sluiceFed, sluiceProblem, waterLine, type ChannelPlan, type DykePlan } from './water';
 import { coveredNext, shoreNear, tideClock, tideMillSpot } from './tides';
+import { castProblem, mooringSpot, raisesCitizens } from './floating';
+import { pitchProblem } from './steppe';
 import { wallLine } from './commands';
 import { AI_COCKLE } from './data';
 import { ashoreLeft, bared, bedClock } from './tides';
@@ -37,7 +39,7 @@ import { graftCost, stationsOf, waiting } from './hemo';
 import { borderMap, landOwnerAt, suppliedAt } from './borders';
 import { workProblem } from './works';
 import { aiKin, aiVow, aiWay, wayBarred } from './ways';
-import { AI_TOWER_KEEP, AI_TOWER_PEACE, AI_WAYS, AI_KEG, AI_DYKE, AI_RIVERS, AI_WATERLINE, AI_LOCKS, DAM, KEG, KILL_CAMP, KIN, POLDER, TOWER_LEVELS, WAYS, AI_TIDES } from './data';
+import { AI_TOWER_KEEP, AI_TOWER_PEACE, AI_WAYS, AI_KEG, AI_DYKE, AI_RIVERS, AI_WATERLINE, AI_LOCKS, AI_FLOAT, FLOAT, DAM, KEG, KILL_CAMP, KIN, POLDER, TOWER_LEVELS, WAYS, AI_TIDES } from './data';
 import { beaconProblem, lit } from './beacon';
 import { rallyProblem } from './rally';
 import { consecrateProblem, consecrates } from './consecrate';
@@ -265,7 +267,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
     if (e.kind === 'unit' && s.kings[p.id] === e.id) king = e;
     else if (e.kind === 'unit') {
       const list =
-        e.type === 'citizen' ? citizens : e.type === 'wagon' ? wagons : e.type === 'priest' ? priests : e.type === 'trader' ? traders : e.type === 'cog' ? cogs : e.type === 'fisher' ? fishers : e.type === 'warship' || e.type === 'transport' || e.type === 'barge' ? navy : e.type === 'fighter' || e.type === 'bomber' ? planes : army;
+        e.type === 'citizen' ? citizens : e.type === 'wagon' || e.type === 'tow' ? wagons : e.type === 'priest' ? priests : e.type === 'trader' ? traders : e.type === 'cog' ? cogs : e.type === 'fisher' ? fishers : e.type === 'warship' || e.type === 'transport' || e.type === 'barge' ? navy : e.type === 'fighter' || e.type === 'bomber' ? planes : army;
       list.push(e);
     } else buildings.push(e);
   }
@@ -297,6 +299,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   tideWork(s, v, mem, issue);
   waterLineWork(s, v, mem, issue);
   locksWork(s, v, mem, issue);
+  floatWork(s, v, mem, issue);
   siloRoad(s, v, mem, issue);
   interceptorRoad(s, v, mem, issue);
   reserveSilo(s, v, mem, issue);
@@ -649,6 +652,9 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   } else if (roads[to] === undefined && to === 'tides') {
     // The Water Road's sixth age (#739): a people with a shore, on a coin of its own; one already on the Water Road goes on more often.
     roads[to] = coastHeld(s, p) && coin(s, p.id, 0x71de) < (hasWalked(p, 'rivers') || hasWalked(p, 'dykes') ? AI_TIDES.onward : AI_TIDES.take);
+  } else if (roads[to] === undefined && to === 'floating') {
+    // The Water Road's seventh age (#770): a people with open water by home, on a coin of its own; one that came down the Water Road goes on more often.
+    roads[to] = coastHeld(s, p) && coin(s, p.id, 0xf10a) < (hasWalked(p, 'locks') || hasWalked(p, 'waterline') ? AI_FLOAT.onward : AI_FLOAT.take);
   } else if (roads[to] === undefined && to === 'waterline') {
     // The Water Road's third age (#701 s4): a people that walked the Dykes goes on down it on a coin of its own, so no other match's dice shift.
     roads[to] = hasWalked(p, 'dykes') && coin(s, p.id, 0x5a1c) < AI_WATERLINE.take;
@@ -809,6 +815,8 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   }
   // The Water Line (#701 s4) is kept a while, so its sluice stands and its barges are out before it climbs on.
   if (walksWeb(v) && ageOf(p) === 'waterline' && s.tick - (mem.line?.since ?? s.tick) < secs(AI_WATERLINE.stay)) return null;
+  // The Age of Floating Cities (#770) is the road's end: its town is kept on the water, and it goes back only to the Atomic's silo late.
+  if (walksWeb(v) && ageOf(p) === 'floating' && (!mem.float || mem.float.since < 0 || s.tick - mem.float.since < secs(AI_FLOAT.stay))) return null;
   // So is the Age of Locks (#701 s5), so its canal is dug and its dam turns.
   if (walksWeb(v) && ageOf(p) === 'locks' && s.tick - (mem.locks?.since ?? s.tick) < secs(AI_LOCKS.stay)) return null;
   // The Wild is kept a while, so the beasts it came for are tamed and the Den is breeding.
@@ -1664,6 +1672,121 @@ function dykeWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
 }
 
 const TIDES_ROAD = ROADS.find((r) => r.from === 'atomic' && r.to === 'tides')!;
+const FLOAT_ROAD = ROADS.find((r) => r.from === 'tides' && r.to === 'floating')!;
+
+/**
+ * The Age of Floating Cities at work (#770). From the Age of Tides, a town bound for it (`wants`) saves for the road and turns once the
+ * Town Center is free (at the last epoch it would train hands for ever). In the age: Pontoons moored off the shore nearest home, each
+ * beside the last (`mooringSpot`), `AI_FLOAT.most` of them and more as the people outgrows its room; fishing boats from them; a district
+ * a rival's warhead is aimed at (within `AI_FLOAT.blast` tiles of where the computer reads it will fall) cast off and towed `flee` tiles
+ * away; and a district past the floating town's first `FLOAT.city` with no fish beside it towed to the nearest shoal. A tow moors where it
+ * was sent, once there.
+ */
+function floatWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  // The Tides are kept a while first, so their mills grind and their barrage is laid before the town saves for the water.
+  if (ageOf(p) === 'tides') (mem.float ??= { since: -1 }).tides ??= s.tick;
+  const kept = ageOf(p) === 'tides' && s.tick - (mem.float?.tides ?? s.tick) >= secs(AI_FLOAT.after);
+  if (kept && walksWeb(v) && v.tc && !v.buildings.some((b) => b.advance >= 0) && wants(s, p, mem, 'floating') && roadKnown(s, p, FLOAT_ROAD) && !roadProblem(s, p, FLOAT_ROAD)) {
+    if (v.tc.queue.length === 0 && afford(v, FLOAT_ROAD.cost)) issue({ t: 'advance', p: p.id, building: v.tc.id, to: 'floating' });
+    spend(v, FLOAT_ROAD.cost);
+  }
+  if (!ageDef(p).floats) return;
+  const fm = (mem.float ??= { since: s.tick });
+  if (fm.since < 0) fm.since = s.tick;
+  const tows = (fm.tows ??= {});
+  // Tows under way: moored once they lie where they were sent, or as near as the water lets them.
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.type !== 'tow' || e.owner !== p.id || e.hp <= 0) continue;
+    const to = tows[e.id];
+    const there = !to || (e.x - to.x) * (e.x - to.x) + (e.y - to.y) * (e.y - to.y) <= 2 * 2 || (e.order.k === 'idle' && !e.path);
+    if (there && !pitchProblem(s, e)) {
+      issue({ t: 'pitch', p: p.id, ids: [e.id] });
+      delete tows[e.id];
+    } else if (to && e.order.k === 'idle' && !e.path) issue({ t: 'move', p: p.id, ids: [e.id], x: to.x, y: to.y });
+  }
+  for (const id of Object.keys(tows)) if (!s.byId.has(+id)) delete tows[+id];
+  const pontoons = v.buildings.filter((b) => b.type === 'pontoon');
+  const moored = pontoons.filter((b) => b.built);
+  // Every second: cast off what a warhead is aimed at, or (every 15) a fishing district with nothing left to fish.
+  if (s.tick - (fm.looked ?? -99999) >= secs(1)) {
+    fm.looked = s.tick;
+    const tow = (b: Building, x: number, y: number) => {
+      const t = nearestWalkable(s, x, y, 6, NAVAL);
+      if (t < 0) return false;
+      // What it was training is given up (and paid back): the district can't leave with a queue.
+      for (let i = b.queue.length - 1; i >= 0; i--) issue({ t: 'cancel', p: p.id, building: b.id, index: i });
+      if (castProblem(s, p, b)) return false;
+      issue({ t: 'pack', p: p.id, building: b.id });
+      if (s.byId.has(b.id)) return false;
+      // The tow is the newest of its people's, made this moment.
+      let w: Unit | null = null;
+      for (const e of s.ents) if (e.kind === 'unit' && e.type === 'tow' && e.owner === p.id && (!w || e.id > w.id)) w = e;
+      if (!w) return false;
+      const to = { x: (t % s.w) + 0.5, y: Math.floor(t / s.w) + 0.5 };
+      tows[w.id] = to;
+      issue({ t: 'move', p: p.id, ids: [w.id], x: to.x, y: to.y });
+      return true;
+    };
+    const aimed: { x: number; y: number }[] = [];
+    for (const l of s.launches ?? []) if (isEnemy(s, p.id, l.owner)) aimed.push(...ringsFor(s, l, p.id));
+    for (const b of moored) {
+      const at = aimed.find((g) => (g.x - b.x) * (g.x - b.x) + (g.y - b.y) * (g.y - b.y) <= AI_FLOAT.blast * AI_FLOAT.blast);
+      if (!at) continue;
+      // Away from where it will fall; struck dead on, out from home, away from the shore.
+      const dead = (b.x - at.x) * (b.x - at.x) + (b.y - at.y) * (b.y - at.y) < 1;
+      const dx = dead ? b.x - v.home.x : b.x - at.x;
+      const dy = dead ? b.y - v.home.y : b.y - at.y;
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      if (tow(b, at.x + (dx / len) * AI_FLOAT.flee, at.y + (dy / len) * AI_FLOAT.flee)) return;
+    }
+    if (s.tick - (fm.fished ?? -99999) >= secs(15) && moored.length > FLOAT.city) {
+      fm.fished = s.tick;
+      // The outermost district (the last moored), if no shoal lies within its boats' easy reach.
+      const b = moored[moored.length - 1];
+      if (findResource(s, R_FISH, b.x, b.y, 6) < 0) {
+        const fish = findResource(s, R_FISH, v.home.x, v.home.y, AI_FLOAT.reach + 12);
+        if (fish >= 0 && tow(b, (fish % s.w) + 0.5, Math.floor(fish / s.w) + 0.5)) return;
+      }
+    }
+  }
+  // Fishing boats from the town, while it has none of its own Dock's.
+  const boatsAt = moored.find((b) => b.queue.length === 0);
+  if (boatsAt && v.fishers.length < AI_FLOAT.fishers && !v.buildings.some((b) => b.type === 'dock' && b.built) && findResource(s, R_FISH, boatsAt.x, boatsAt.y, 14) >= 0) {
+    const cost = unitStats('fisher', p.epoch).cost;
+    if (afford(v, cost)) {
+      issue({ t: 'train', p: p.id, building: boatsAt.id, unit: 'fisher' });
+      spend(v, cost);
+    }
+  }
+  if (!v.buildings.some((b) => b.type === 'dock' && b.built))
+    for (const f of v.fishers) {
+      if (f.order.k !== 'idle') continue;
+      const t = findResource(s, R_FISH, f.x, f.y, 18);
+      if (t >= 0) issue({ t: 'gather', p: p.id, ids: [f.id], tile: t });
+    }
+  // Citizens from the floating town, once it is linked.
+  const town = moored.find((b) => b.queue.length === 0 && raisesCitizens(s, b));
+  if (town && p.pop < p.cap && v.citizens.length < AI_FLOAT.hands) {
+    const cost = unitStats('citizen', p.epoch).cost;
+    if (afford(v, cost)) {
+      issue({ t: 'train', p: p.id, building: town.id, unit: 'citizen' });
+      spend(v, cost);
+    }
+  }
+  // More districts: the first few, then one more whenever the people runs short of room.
+  const rising = pontoons.length - moored.length;
+  const want = pontoons.length < AI_FLOAT.most || (p.cap < POP_MAX && p.cap - p.pop <= 8);
+  if (!want || rising > 0 || s.tick - (mem.ordered.pontoon ?? -99999) < secs(20) || buildBarred(p, 'pontoon')) return;
+  const cost = buildingCostFor(s, p.id, 'pontoon');
+  if (!afford(v, cost)) {
+    spend(v, cost);
+    return;
+  }
+  const spot = mooringSpot(s, p.id, v.home.x, v.home.y, AI_FLOAT.reach);
+  mem.ordered.pontoon = s.tick;
+  if (!spot || !construct(s, v, mem, 'pontoon', spot, 2, issue)) spend(v, cost);
+}
 
 /**
  * The computer and the tide (#739). From the Atomic Age, a town bound for the age saves for it and turns. Any people, once the tide is awake: with the flood a step off (`AI_TIDES.wary` seconds), its people
@@ -2590,10 +2713,10 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     if (construct(s, v, mem, f.type, { tx: f.tx, ty: f.ty }, 3, issue)) return;
   }
 
-  // Houses ahead of need (two at once later on).
+  // Houses ahead of need (two at once later on). A floating people's homes are its Pontoons (#770): `floatWork` moors them.
   const housesBuilding = pending.filter((b) => b.type === 'house').length;
   const room = p.cap - p.pop;
-  if (p.cap < POP_MAX && room <= 3 + p.epoch * 2 && housesBuilding < (p.pop > 40 ? 2 : 1) && !recently('house', 4)) {
+  if (p.cap < POP_MAX && room <= 3 + p.epoch * 2 && housesBuilding < (p.pop > 40 ? 2 : 1) && !recently('house', 4) && !buildBarred(p, 'house')) {
     // A household people (#501) lays its houses in streets: beside its others, a lane apart, for the tax is paid by the street.
     const street = isHousehold(p) && v.buildings.some((b) => b.type === 'house')
       ? (tx: number, ty: number) => v.buildings.some((b) => b.type === 'house' && Math.abs(b.tx - tx) <= HOUSEHOLD.aiStreet && Math.abs(b.ty - ty) <= HOUSEHOLD.aiStreet)
