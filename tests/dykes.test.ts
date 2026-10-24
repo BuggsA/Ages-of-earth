@@ -297,6 +297,17 @@ describe('determinism (#701 s1)', () => {
     expect(go()).toBe(go());
   });
 
+  it('the windmill kept on leaving the age pumps on any road (its keepsake)', () => {
+    const { s, o, plan } = planned(true);
+    const at = millSpot(s, o, plan.basin);
+    const mill = placeBuilding(s, o, 'windmill', at.tx, at.ty, true);
+    enter(s, o, 'middle');
+    mill.keep = 'dykes';
+    expect(AGES.dykes.keepsake?.building).toBe('windmill');
+    run(s, POLDER.every + 0.5);
+    expect(s.players[o].stats.drained).toBe(1);
+  });
+
   it('a Golden Age that walked the Dykes keeps pumping (#703)', () => {
     const { s, o, plan } = planned(true);
     const p = s.players[o];

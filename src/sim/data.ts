@@ -613,6 +613,7 @@ export const AGES: Record<AgeId, Age> = {
     door: 'No stone walls or gates: the dykes are your walls, and only on the water\'s edge. Your best fields lie below the sea, behind banks a rival can break',
     good: 'Moving the coast: new land for the best fields in the game, and a land bridge across a strait',
     routes: [],
+    keepsake: { building: 'windmill', does: 'pumping: it drains the water behind its dykes on any road' },
     name: 'Age of Dykes',
     short: 'Dykes',
     tier: 2,

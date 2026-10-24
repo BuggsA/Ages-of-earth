@@ -107,14 +107,17 @@ export function basinOf(s: GameState, b: { tx: number; ty: number; size: number 
   return [];
 }
 
-/** Whether a windmill works now: finished, standing, and its people in the Age of Dykes (a mill outside it sleeps, `asleep`). */
+/**
+ * Whether a windmill works now: finished, standing, and its people in the Age of Dykes, or it is the mill the people kept when it left
+ * (the age's keepsake, #555 s11). Any other mill sleeps outside the age (`asleep`).
+ */
 export function pumps(s: GameState, b: Building): boolean {
-  return b.type === 'windmill' && b.built && b.hp > 0 && !!ageDef(s.players[b.owner]).pumps && !asleep(s, b);
+  return b.type === 'windmill' && b.built && b.hp > 0 && (!!ageDef(s.players[b.owner]).pumps || b.keep === 'dykes') && !asleep(s, b);
 }
 
 /** Why a finished windmill stands still, or null while it pumps. */
 export function millIdle(s: GameState, b: Building): string | null {
-  if (!ageDef(s.players[b.owner]).pumps) return 'Windmills pump only in the Age of Dykes';
+  if (!ageDef(s.players[b.owner]).pumps && b.keep !== 'dykes') return 'Windmills pump only in the Age of Dykes, or the one your people kept on leaving it';
   if (!basinOf(s, b).length) return 'No water to pump here: raise it by a lake, or by a bay your dykes have shut off from the open sea';
   return null;
 }
