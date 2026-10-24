@@ -100,10 +100,10 @@ export function cairnGeometry(): THREE.BufferGeometry {
 /** A keeper's banner on a tall pole, cloth in the keeper's colour. */
 export function bannerGeometry(): THREE.BufferGeometry {
   const k = new Kit();
-  k.cyl(0.03, 0.035, 1.4, 5, '#5b4330', 0, 0, 0);
-  k.cone(0.05, 0.08, 5, '#c8a84a', 0, 1.4, 0);
-  k.cloth(k.team(k.box(0.015, 0.34, 0.5, TEAM, 0, 1.0, 0.25)), 0.5, 0);
-  k.team(k.box(0.06, 0.04, 0.06, TEAM, 0, 0.95, 0));
+  k.cyl(0.04, 0.045, 2.0, 5, '#5b4330', 0, 0, 0);
+  k.cone(0.06, 0.1, 5, '#c8a84a', 0, 2.0, 0);
+  k.cloth(k.team(k.box(0.02, 0.55, 0.8, TEAM, 0, 1.55, 0.4)), 0.8, 0);
+  k.team(k.box(0.08, 0.05, 0.08, TEAM, 0, 1.45, 0));
   return bake(k.root);
 }
 
@@ -159,7 +159,7 @@ export function groveGeometry(): THREE.BufferGeometry {
 
 const GEOMETRY: Record<LandmarkKind, () => THREE.BufferGeometry> = { spring: springGeometry, crag: cragGeometry, cairn: cairnGeometry, flint: flintGeometry, grove: groveGeometry, ford: fordGeometry };
 /** Where each kind's banner stands, in model space. */
-const BANNER: Record<LandmarkKind, [number, number, number]> = { spring: [0.75, 0, 0.75], crag: [0.25, 1.4, -0.35], cairn: [1.25, 0, -0.35], flint: [0.7, 0, 0.7], grove: [0.5, 0, 0.7], ford: [0.9, 0, 0.55] };
+const BANNER: Record<LandmarkKind, [number, number, number]> = { spring: [0.75, 0, 0.75], crag: [0.25, 1.1, -0.35], cairn: [1.25, 0, -0.35], flint: [0.7, 0, 0.7], grove: [0.5, 0, 0.7], ford: [0.9, 0, 0.55] };
 
 export class LandmarksView {
   readonly group = new THREE.Group();
