@@ -1,4 +1,5 @@
-import { AGES, BUILDINGS, ROADS, STEP_BACK, TICK_HZ, TRUNK, secs } from '../sim/data';
+import { AGES, BUILDINGS, ROADS, ROUTES, STEP_BACK, TICK_HZ, TRUNK, secs, type RouteId } from '../sim/data';
+import { leanOf } from '../sim/ai';
 import { ageOf, hasWalked } from '../sim/ages';
 import type { AgeId, GameState } from '../sim/types';
 
@@ -86,6 +87,16 @@ export function halfCrossings(s: GameState, owner: number): { to: AgeId; missing
   return out;
 }
 
+/**
+ * A computer rival's leaning (#749), once its road gives it away: it has walked a side age on the route it favours, which every
+ * player was told as it happened. Null before then, and for a person or a rival with an open mind.
+ */
+export function shownLean(s: GameState, owner: number): RouteId | null {
+  const lean = leanOf(s, owner);
+  const p = s.players[owner];
+  return lean && (Object.keys(AGES) as AgeId[]).some((a) => !TRUNK.includes(a) && AGES[a].routes?.includes(lean) && hasWalked(p, a)) ? lean : null;
+}
+
 const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 /** One rival's card. */
@@ -100,6 +111,8 @@ export function rivalCardHtml(s: GameState, owner: number, ledger: RivalLedger):
   const left = ledger.windowLeft(s, owner);
   if (left > 0) out.push(`<p class="rv-window">↩ Stepped back: its soldiers fall back to their older form for ${left} s. A chance to strike.</p>`);
   out.push(`<p class="rv-road">${road}</p>`);
+  const lean = shownLean(s, owner);
+  if (lean) out.push(`<p class="rv-lean">🧭 Favours the ${esc(ROUTES[lean].name.toLowerCase())}: ${esc(ROUTES[lean].blurb)}. Expect it to keep to it.</p>`);
   for (const c of halfCrossings(s, owner)) out.push(`<p class="rv-cross">🔀 Half-way to the ${esc(AGES[c.to].name)}: it still needs the ${esc(AGES[c.missing].name)}.</p>`);
   for (const k of ledger.keepsakes(owner)) {
     const b = s.ents.find((e) => e.id === k.id);

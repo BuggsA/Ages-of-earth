@@ -1312,3 +1312,11 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 **Why I love it:** the match tells its story at the end. You see that your rival won by the Iron Age's marsh and a step back you never punished, and the button is right there to try that road yourself on the same land. It's the bridge from one match to the next that `docs/engagement.md` found missing.
 
 **Next:** Rematch in online rooms (same seats); the codex of roads (#724 step 7) can read the same journey; the computer's temperament (step 4) could be shown here as "Wu Zetian favours the Steppe".
+
+## Designers' notes: rivals with a leaning (2026-10-24, #749)
+
+**Built:** a clever computer in a skirmish settles on its first turn whether it favours a route (on coins of its own, 60% of seats), and if so chooses that route's side ages from the start, the way the route sweeps commit a seat. Its card in Rivals names the leaning once its road gives it away; the end screen always does. And every clever computer now punishes a step back: while a rival's weak window is open it sends a wave half the usual size.
+
+**Why I love it:** the step back was a free move against the computer; now it is a gamble you take with its army in mind. And a rival with a character gives you something to read: once you see the Steppe in its road, you know the wagons are coming again next age.
+
+**Next:** the second half of step 4, a habit with going back (one that hoards crossings, one that never retreats, one that steps back to bait you onto its walls); a rival name that says its leaning before the road does, for players who'd like it said.

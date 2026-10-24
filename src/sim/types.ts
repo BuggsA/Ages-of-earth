@@ -5,6 +5,7 @@
 
 import type { ScenarioRun } from './campaign';
 import type { ChannelPlan, DykePlan } from './water';
+import type { RouteId } from './data';
 
 export type Res = 'food' | 'wood' | 'stone' | 'gold';
 export const RES: readonly Res[] = ['food', 'wood', 'stone', 'gold'];
@@ -1183,6 +1184,8 @@ export interface AiMemory {
   shaftLook?: number;
   /** Its scout (#454 s4): the rider sent exploring, the tick it was last sent, and the pair that patrol its border or trade road. */
   scout?: { id: number; sent: number };
+  /** The route this seat favours (#749): its side ages chosen from the start; 'none' for a seat that keeps an open mind. Settled on its first turn. */
+  lean?: RouteId | 'none';
   guards?: number[];
   /** Tick its bombers last set out. */
   sortie?: number;
