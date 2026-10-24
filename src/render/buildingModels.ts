@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { AgeId, BuildingType } from '../sim/types';
+import { BUILDINGS } from '../sim/data';
 import { Kit, bake, rnd } from './kit';
 
 /**
@@ -2018,6 +2019,26 @@ const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare'>, (k: Kit, e: number
 
 const cache = new Map<string, THREE.BufferGeometry>();
 
+/** Roofs by trade (#625), so a street reads by colour before its shapes: soldiers' halls slate-dark, stores and yards in thatch gold, markets ochre, faith teal, smithies charcoal. Walls and the epoch's style stay. */
+const TRADE_ROOFS: Partial<Record<BuildingType, [string, string]>> = {
+  barracks: ['#3d4552', '#2f3640'], range: ['#3d4552', '#2f3640'], stable: ['#3d4552', '#2f3640'], tower: ['#3d4552', '#2f3640'], warcamp: ['#3d4552', '#2f3640'],
+  storehouse: ['#c9a24a', '#b08a38'], huntcamp: ['#c9a24a', '#b08a38'], prospector: ['#c9a24a', '#b08a38'], dock: ['#c9a24a', '#b08a38'],
+  market: ['#d2822c', '#b66c22'], caravanserai: ['#d2822c', '#b66c22'],
+  temple: ['#3f8a8f', '#32727a'], mission: ['#3f8a8f', '#32727a'],
+  forge: ['#3a3838', '#2c2a2a'], workshop: ['#3a3838', '#2c2a2a'],
+};
+
+/** Every building's team mark (#625): a frame of its owner's colour round the pad, seen from above at any zoom, and a tall pennant at the front corner, seen across the map. */
+function teamMark(k: Kit, type: BuildingType): void {
+  if (type === 'wall' || type === 'gate' || type === 'snare' || type === 'sapling' || type === 'farm') return;
+  const n = BUILDINGS[type].size;
+  const h = n / 2 - 0.06;
+  const t = 0.13;
+  for (const z of [-h, h]) k.team(k.box(n - 0.1, 0.1, t, TEAM, 0, 0, z));
+  for (const x of [-h, h]) k.team(k.box(t, 0.1, n - 0.1 - 2 * t, TEAM, x, 0, 0));
+  banner(k, -n / 2 + 0.2, 0, n / 2 - 0.2, 1.1 + n * 0.3, 1.5 + n * 0.15);
+}
+
 /** The Way a people lives by (#336) shows at its Town Center, so a rival who scouts the town can read it. */
 export const WAY_MARKS = ['way:hunt', 'way:hearth', 'way:warband'];
 
@@ -2189,7 +2210,12 @@ export function buildingGeometry(type: BuildingType, epochIn: number, color: str
     const k = new Kit();
     if (type === 'wall') wall(k, epoch, STYLES[Math.min(epoch, 4)], variant);
     else if (type === 'snare') snare(k, epoch, variant === 1);
-    else MAKERS[type](k, epoch, STYLES[Math.min(epoch, 4)]);
+    else {
+      const base = STYLES[Math.min(epoch, 4)];
+      const roof = TRADE_ROOFS[type];
+      MAKERS[type](k, epoch, roof && epoch > 0 ? { ...base, roof: roof[0], roof2: roof[1] } : base);
+      teamMark(k, type);
+    }
     const stack = STACKS[type];
     if (epoch >= 4 && stack) smokestack(k, stack[0], stack[1], stack[2]);
     if (look) ageTouches(k, type, look);
