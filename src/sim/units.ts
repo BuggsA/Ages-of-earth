@@ -1,4 +1,4 @@
-import { AI_LEVELS, AUTO_WORK, BUILDINGS, EXPLORE, PATROL, CARRY, CONSECRATE, COPPICE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, LEGION, MILITARY, ORDERS, POLDER, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TAME, TRADE, domainOf, secs } from './data';
+import { AI_LEVELS, BLOOMERY, AUTO_WORK, BUILDINGS, EXPLORE, PATROL, CARRY, CONSECRATE, COPPICE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, LEGION, MILITARY, ORDERS, POLDER, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TAME, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
@@ -175,6 +175,11 @@ function deposit(s: GameState, u: Unit, at: Building): void {
     s.events.push({ k: 'deliver', owner: u.owner, res: u.carryRes, amount: u.carry, x: at.x, y: at.y, rare: u.carryRare });
   } else if (u.carry > 0 && u.carryRes) {
     const p = s.players[u.owner];
+    // Bog iron smelted at a Bloom Hearth (#727) counts again toward the Iron Age's edge.
+    if (at.type === 'bloomery' && u.order.k === 'gather' && u.order.bog) {
+      p.stats.iron = (p.stats.iron ?? 0) + Math.round((u.carry / modsOf(s, u.owner).bogGold) * (BLOOMERY.smelt - 1));
+      p.statsVersion++;
+    }
     p.res[u.carryRes] += u.carry;
     p.stats.gathered += u.carry;
     s.events.push({ k: 'deliver', owner: u.owner, res: u.carryRes, amount: u.carry, x: at.x, y: at.y });

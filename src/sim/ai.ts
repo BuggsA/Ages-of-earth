@@ -368,6 +368,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   hemoBuild(s, v, mem, issue);
   excavate(s, v, mem, issue);
   if (AI_LEVELS[v.p.ai!].clever) raiseMission(s, v, mem, issue);
+  raiseBloomery(s, v, mem, issue);
   salvage(s, v, mem, issue);
   claimWalk(s, v, mem, issue);
   findWalk(s, v, mem, issue);
@@ -3880,6 +3881,20 @@ function raiseMission(s: GameState, v: View, mem: AiMemory, issue: (c: Command) 
   if (!spot || !findPath(s, priest.x, priest.y, { x0: spot.tx, y0: spot.ty, x1: spot.tx + 1, y1: spot.ty + 1, px: spot.tx + 1, py: spot.ty + 1 }, 6000).complete) return;
   issue({ t: 'build', p: p.id, ids: [priest.id], type: 'mission', tx: spot.tx, ty: spot.ty });
   spend(v, cost);
+}
+
+/**
+ * The Iron Age's Bloom Hearth (#727): a computer in the age with bog iron within reach and diggers at it raises one beside the
+ * bog, so the bars it digs are smelted and count twice toward the edge. One at a time, and not again for 30 seconds.
+ */
+function raiseBloomery(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (ageOf(p) !== 'iron' || buildBarred(p, 'bloomery') || count(v, 'bloomery') > 0) return;
+  if (s.tick - (mem.ordered.bloomery ?? -99999) < secs(30)) return;
+  const bog = findResource(s, R_BOG, v.home.x, v.home.y, 40);
+  if (bog < 0) return;
+  const spot = findSpot(s, 'bloomery', (bog % s.w) + 0.5, Math.floor(bog / s.w) + 0.5, 2, 8);
+  if (spot) construct(s, v, mem, 'bloomery', spot, 2, issue);
 }
 
 function raidShips(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
