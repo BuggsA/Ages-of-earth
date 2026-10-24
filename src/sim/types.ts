@@ -262,6 +262,8 @@ export interface TrainItem {
   tech?: TechId;
   /** The Hearth's kin (#463 s1): this many citizens come out together when the work is done. */
   kin?: number;
+  /** A Watch Tower raised one step (the tower line, `TOWER_LEVELS`): true while this item is that work. */
+  rise?: true;
   /** Ticks of work done. */
   done: number;
   /** What was paid, refunded if it is cancelled. */
@@ -298,6 +300,8 @@ export interface Building {
    * it leaves), it keeps that age's work on any road after. Absent: no keepsake (and older saves).
    */
   keep?: AgeId;
+  /** A Watch Tower's step on the tower line (`TOWER_LEVELS`): 1 Guard Tower, 2 Keep, 3 Bastion. Absent: a plain Watch Tower (and older saves). */
+  level?: number;
   /** Where new units go. `kind` is the resource the flag was set on (absent on bare ground), so it outlives its tile (#344). */
   rally: { x: number; y: number; tile: number; kind?: number } | null;
   cool: number;
@@ -795,6 +799,8 @@ export type GameEvent =
   | { k: 'campCleared'; owner: number; x: number; y: number; gold: number; food: number; wood: number }
   | { k: 'trained'; id: number; owner: number; type: UnitType }
   | { k: 'researched'; owner: number; tech: TechId }
+  /** A Watch Tower finished a step on the tower line (`TOWER_LEVELS`). */
+  | { k: 'raised'; owner: number; id: number; level: number; x: number; y: number }
   /** A Prospector's Lodge finished (#562): the key resources this world holds, for the people who raised it. */
   | { k: 'prospect'; owner: number; finds: KeyId[] }
   /** A find claimed (#588): by whom, what it was, the key resource it speaks of, and its reward. */
@@ -1162,6 +1168,8 @@ export type Command =
   | { t: 'stance'; p: number; ids: number[]; stance: Stance }
   | { t: 'train'; p: number; building: number; unit: UnitType }
   | { t: 'research'; p: number; building: number; tech: TechId }
+  /** Raise this Watch Tower one step on the tower line (`TOWER_LEVELS`). */
+  | { t: 'raiseTower'; p: number; building: number }
   | { t: 'cancel'; p: number; building: number; index: number }
   /** Into the next age: `to` picks a road (#37); without it, the trunk's next epoch. */
   | { t: 'advance'; p: number; building: number; to?: AgeId }
