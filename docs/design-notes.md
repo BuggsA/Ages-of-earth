@@ -1351,3 +1351,11 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 
 **Next:** s2, the shared missile pool and the type choice at launch; s3, the three-zone warning with blurred rings.
 
+
+## Designers' notes: one store of warheads, two silos everyone sees, a warhead chosen at launch (#753, s2 of #751, 2026-10-24, chain 1024-1610 s2, lane rules)
+
+**What I built:** a people keeps one store of warheads (`Player.nukes`), not tied to a silo: one when the first silo stands, one more every branch `refuel` (240 / 100 / 0 s) while store plus flight is under `SILO.cap` (3), spent the moment the launch is ordered, fired from any standing silo. A fallen silo loses only the warhead it was counting. At most `SILO.most` (2) silos, rising sites counted. A finished silo is drawn for every player through the fog, with no alert (render-side, so the ground and units round it stay fogged). Past the fork the warhead is chosen at launch (M the branch's own, N Atomic); the clock is the people's whatever goes up, and the launch event names no warhead: its warning ring is the widest the people could send (`warnRadius`), and the computer flees that ring too.
+
+**Choices I made (the owner may revert):** Fusion's "refills at once" counts warheads in the air against the cap, so at most three are aloft (otherwise Fusion fires without limit but its fuel); fuel follows the warhead (Atomic 600/200, Fission now 800/250, Fusion 450/120), so a Fission people weighs a cheap Atomic against its heavy own and a Fusion people its clean giant against an Atomic that poisons the ground; a Fission people's own-silo fallout comes with every launch, whatever it sends, so the poison never tells the warhead; the pool refills with no silo standing. The computer picks the warhead with the most worth per gold, and leaves a town its own warhead already falls on.
+
+**Next:** s3, the three-zone warning with seeded decoys and blurred rings; s4, the salvo and the third silo.

@@ -14,7 +14,7 @@ import { easeHour, SHOT_SECONDS, titleShot } from './ui/titleShots';
 import { isEnemy } from './sim/world';
 import { carriesKegs, kegProblem } from './sim/powder';
 import { carriesTorch, torchProblem } from './sim/fire';
-import { launchProblem } from './sim/silo';
+import { launchProblem, type WarheadKind } from './sim/silo';
 import { jumpAge, rush, topUp } from './sim/god';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
 import { placeProblem, stampBuilding, walkable } from './sim/grid';
@@ -114,6 +114,8 @@ let placeAt: { tx: number; ty: number; ok: boolean } | null = null;
 let wallDrag: { x0: number; y0: number; x1: number; y1: number } | null = null;
 /** The next left click picks a target: where to attack-move, or a building to shelter in. */
 let launchSilo = 0;
+/** The warhead chosen for the launch being aimed (#753); absent for the people's own. */
+let launchWarhead: WarheadKind | undefined;
 let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | 'keg' | 'torch' | 'launch' | null = null;
 /** When the viewer was last told one of its living buildings caught fire, so a spreading fire tells once. */
 let fireToldAt = -9999;
@@ -188,8 +190,9 @@ const hud = new Hud({
     targetMode = 'torch';
     placing = null;
   },
-  launchMode: (silo) => {
+  launchMode: (silo, w) => {
     launchSilo = silo;
+    launchWarhead = w;
     targetMode = 'launch';
     placing = null;
   },
@@ -622,7 +625,7 @@ function toTitle(): void {
 
 const SAVE_KEY = 'ages-save';
 /** Bumped when the state's shape changes, so an older save is set aside instead of loading broken (2: relics; 3: trading posts). */
-const SAVE_V = 5;
+const SAVE_V = 6;
 
 interface SavedMatch {
   setup: GameSetup;
@@ -1863,12 +1866,12 @@ canvas.addEventListener('pointerdown', (e) => {
     const g = view.groundAt(e.clientX, e.clientY);
     const s = game;
     if (g && s) {
-      const why = launchProblem(s, viewer, s.byId.get(launchSilo) as Building | undefined, g.x, g.y);
+      const why = launchProblem(s, viewer, s.byId.get(launchSilo) as Building | undefined, g.x, g.y, launchWarhead);
       if (why) {
         hud.toast(why, 'bad');
         play('error');
       } else {
-        issue({ t: 'launch', p: viewer, silo: launchSilo, x: g.x, y: g.y });
+        issue({ t: 'launch', p: viewer, silo: launchSilo, x: g.x, y: g.y, ...(launchWarhead ? { w: launchWarhead } : {}) });
         view.marker(s, g.x, g.y, true);
       }
     }

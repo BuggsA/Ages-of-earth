@@ -11,6 +11,7 @@ import { stirred } from '../sim/combat';
 import { cursed, grafted } from '../sim/blood';
 import { graftLast } from '../sim/hemo';
 import { seesRect } from '../sim/vision';
+import { shownToAll } from '../sim/silo';
 import { BuildingsView } from './buildingsView';
 import { CameraRig } from './camera';
 import { Birds, Effects } from './effects';
@@ -474,7 +475,13 @@ export class View {
     // The water layer (#701): ground pumped out of the water rises from it, and the shore's foam follows.
     if (this.terrain.sync(s, dt)) this.water.refreshBed(s, (i) => this.terrain.heightOf(i));
     this.resources.update(s, dt);
-    this.buildings.update(s, this.viewer, (b) => this.reveal || seesRect(s, this.viewer, b.tx, b.ty, b.size), dt, this.reveal);
+    // A finished Missile Silo is seen by every player through the fog (#753), and one that falls is forgotten wherever it stood.
+    const silo = (b: { id?: number; type?: string }): boolean => {
+      if (b.type !== 'silo' || b.id === undefined) return false;
+      const e = s.byId.get(b.id);
+      return !e || e.hp <= 0 || shownToAll(e);
+    };
+    this.buildings.update(s, this.viewer, (b) => this.reveal || seesRect(s, this.viewer, b.tx, b.ty, b.size) || silo(b as { id?: number; type?: string }), dt, this.reveal);
     this.units.update(s, alpha, dt, this.time, this.visibleUnit, this.rig.camera, this.width, this.height, (x, y) => this.sees(x, y));
     this.relics.update(
       s,
@@ -486,7 +493,7 @@ export class View {
       (id) => this.units.drawn.get(id) ?? null,
       (id) => {
         const b = s.byId.get(id);
-        if (!b || b.kind !== 'building' || !(b.owner === this.viewer || this.reveal || seesRect(s, this.viewer, b.tx, b.ty, b.size))) return null;
+        if (!b || b.kind !== 'building' || !(b.owner === this.viewer || this.reveal || seesRect(s, this.viewer, b.tx, b.ty, b.size) || shownToAll(b))) return null;
         return this.buildings.topOf(id);
       },
     );
@@ -957,7 +964,8 @@ export class View {
           // The Atomic Age (#605): a ring on the target the moment a warhead goes up, a dome of fire where it lands.
           const at = this.ground(s, ev.x, ev.y, 0.3);
           const R = WARHEADS[ev.w ?? 'atomic'].r;
-          if (ev.what === 'launched') this.effects.ring(at, '#ff4a3a', R + 0.5, 1.4);
+          // The warning ring is the widest its people could send (#753), so it never says which warhead is coming.
+          if (ev.what === 'launched') this.effects.ring(at, '#ff4a3a', (ev.ring ?? R) + 0.5, 1.4);
           else if (ev.what === 'struck') {
             // Every player sees the blast, through the fog (#752); it grows with the warhead (Atomic 1, Fusion 1.5).
             const big = R / WARHEADS.atomic.r;

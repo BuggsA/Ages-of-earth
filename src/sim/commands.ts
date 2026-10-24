@@ -18,7 +18,7 @@ import { cacheAt } from './caches';
 import { carriesKegs, kegProblem } from './powder';
 import { kegTileProblem } from './tides';
 import { carriesTorch, onFire, torchProblem } from './fire';
-import { launch, launchProblem } from './silo';
+import { launch, launchProblem, siloLimit } from './silo';
 import { raise, raiseCost } from './reclaim';
 import { callWork, workProblem } from './works';
 import { callKin, killCamp, kinProblem, takeVow, takeWay, vowProblem, wayBarred, wayProblem } from './ways';
@@ -186,7 +186,7 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
     if (!quiet) refuse(s, p, `Needs the ${EPOCHS[def.epoch].name}`);
     return null;
   }
-  const no = buildBarred(player, type) ?? wayBarred(s, player, type);
+  const no = buildBarred(player, type) ?? wayBarred(s, player, type) ?? siloLimit(s, p, type);
   if (no) {
     if (!quiet) refuse(s, p, no);
     return null;
@@ -463,12 +463,12 @@ export function applyCommand(s: GameState, c: Command): void {
     case 'launch': {
       // The Atomic Age (#605): a Missile Silo names a point; the warhead lands after its public countdown.
       const silo = s.byId.get(c.silo);
-      const why = launchProblem(s, c.p, silo as Building | undefined, c.x, c.y);
+      const why = launchProblem(s, c.p, silo as Building | undefined, c.x, c.y, c.w);
       if (why) {
         refuse(s, c.p, why);
         return;
       }
-      launch(s, c.p, silo as Building, c.x, c.y);
+      launch(s, c.p, silo as Building, c.x, c.y, c.w);
       break;
     }
     case 'keg': {
