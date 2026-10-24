@@ -641,6 +641,11 @@ export function applyCommand(s: GameState, c: Command): void {
       s.events.push({ k: 'bell', owner: c.p, ring: c.ring });
       break;
     }
+    case 'shepherd': {
+      if (c.on) p.shepherd = true;
+      else delete p.shepherd;
+      break;
+    }
     case 'flee': {
       if (!c.ids) {
         if (c.on) delete p.noFlee;

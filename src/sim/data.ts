@@ -685,6 +685,13 @@ export const FLOCK = {
   steal: 2,
 };
 
+/**
+ * The self-managed flock: for a person's steppe people, once every `every` seconds the camp raises a lamb while
+ * the flock has room and the larder holds `reserve` food beyond its cost, idle citizens within `reach` tiles of
+ * a camp take to milking, and one slaughters a sheep fattened past breeding once the flock is full.
+ */
+export const SHEPHERD = { every: 2, reserve: 80, reach: 14 };
+
 // ---- Roads between ages ---------------------------------------------------------------------------
 
 /** Something a people must have done before a road opens: a tally from its stats reaching `n`. */

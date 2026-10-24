@@ -315,6 +315,7 @@ function startOnline(match: MatchStart, you: number): void {
     color: PLAYER_COLORS[seat.color],
     team: seat.team,
     civ: match.civs[i],
+    shepherd: true,
   }));
   netTurns = [];
   netReach = 0;
@@ -446,7 +447,7 @@ function setupFromTitle(seed: number): GameSetup {
   const colors = [PLAYER_COLORS[color], ...PLAYER_COLORS.filter((_, i) => i !== color)];
   // Rivals each get a different people where possible.
   const others = CIV_IDS.filter((c) => c !== civ).sort(() => Math.random() - 0.5);
-  const players: PlayerSetup[] = [{ name: 'You', ai: null, color: colors[0], team: 0, civ }];
+  const players: PlayerSetup[] = [{ name: 'You', ai: null, color: colors[0], team: 0, civ, shepherd: true }];
   for (let i = 0; i < foes; i++) {
     const c = others[i % others.length];
     const friend = ally && i === 0;

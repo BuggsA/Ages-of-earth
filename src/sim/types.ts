@@ -714,6 +714,8 @@ export interface Player {
   left?: true;
   /** Citizens stand their ground instead of running from danger (see `FLEE`); absent means they run. */
   noFlee?: true;
+  /** The flock tends itself (see `SHEPHERD`); set at the start of a game for a person's people, absent means by hand. */
+  shepherd?: true;
   team: number;
   res: Stock;
   /** Blood in store (#355): drawn at Drain Rigs from the enemy dead and by the levy; absent until the first drop. */
@@ -1137,6 +1139,8 @@ export type Command =
   | { t: 'bell'; p: number; ring: boolean }
   /** Citizens run from danger (or not): the named citizens, or all of this player's when `ids` is absent. */
   | { t: 'flee'; p: number; on: boolean; ids?: number[] }
+  /** A person's flock is tended on its own (or not). */
+  | { t: 'shepherd'; p: number; on: boolean }
   | { t: 'beacon'; p: number; building: number }
   /** Choose the seam a Mine Shaft digs (#681). */
   | { t: 'seam'; p: number; building: number; seam: SeamId }
