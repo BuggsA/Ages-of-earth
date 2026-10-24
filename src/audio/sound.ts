@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'fireLit' | 'fireCatch' | 'fireOut' | 'fireAsh' | 'flow' | 'rush' | 'groan' | 'dart' | 'swarm' | 'hiveHush' | 'sluiceOpen' | 'sluiceShut' | 'spread' | 'tideWash' | 'tideMill' | 'swept' | 'pondShut' | 'breach';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'siloAlarm' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'fireLit' | 'fireCatch' | 'fireOut' | 'fireAsh' | 'flow' | 'rush' | 'groan' | 'dart' | 'swarm' | 'hiveHush' | 'sluiceOpen' | 'sluiceShut' | 'spread' | 'tideWash' | 'tideMill' | 'swept' | 'pondShut' | 'breach' | 'entWake' | 'entRoot' | 'spreading';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -849,6 +849,25 @@ export class Sound {
         this.noise(out, t, { dur: 1.9, filter: 'lowpass', f: 300, to: 160, q: 0.8, peak: 0.06, attack: 0.15 });
         for (let i = 0; i < 3; i++) this.noise(out, t + 0.2 + i * 0.35, { dur: 0.25, filter: 'bandpass', f: 2800 - i * 300, q: 2, peak: 0.02 });
         break;
+      case 'entWake':
+        // An Ent wakes (the Age of the Wildwood): old wood creaks as it bends, a deep slow groan from inside the trunk, and the leaves shake.
+        for (let i = 0; i < 5; i++) this.tone(out, t + i * 0.07, { f: 140 + (i % 3) * 37, to: 95 + i * 11, type: 'sawtooth', dur: 0.12, peak: 0.025, lp: 900 });
+        this.tone(out, t + 0.3, { f: 52, to: 71, type: 'triangle', dur: 1.5, peak: 0.13, attack: 0.35, lp: 300, glide: 0.8 });
+        this.tone(out, t + 0.35, { f: 78, to: 104, type: 'sawtooth', dur: 1.2, peak: 0.025, attack: 0.4, lp: 420 });
+        this.noise(out, t + 0.5, { dur: 1.1, filter: 'bandpass', f: 2600, to: 1800, q: 0.7, peak: 0.04, attack: 0.15 });
+        break;
+      case 'entRoot':
+        // An Ent roots: a long creak settling down, the thud of roots going into the earth, and a sigh through the leaves.
+        this.tone(out, t, { f: 120, to: 62, type: 'sawtooth', dur: 0.9, peak: 0.03, attack: 0.05, lp: 700 });
+        this.tone(out, t + 0.7, { f: 60, to: 38, type: 'sine', dur: 0.35, peak: 0.16, attack: 0.01 });
+        this.noise(out, t + 0.7, { dur: 0.25, filter: 'lowpass', f: 300, peak: 0.08 });
+        this.noise(out, t + 0.9, { dur: 1.2, filter: 'bandpass', f: 2200, to: 1400, q: 0.6, peak: 0.03, attack: 0.3 });
+        break;
+      case 'spreading':
+        // The Spreading (the Wildwood, spring): a soft swell of wind in new leaves, and two high notes of a woodland bird.
+        this.noise(out, t, { dur: 2.2, filter: 'bandpass', f: 1700, to: 2600, q: 0.5, peak: 0.035, attack: 0.7 });
+        for (const [d, f] of [[0.5, 2900], [0.68, 3500], [1.4, 3100]] as const) this.tone(out, t + d, { f, to: f * 1.15, type: 'sine', dur: 0.09, peak: 0.03, attack: 0.01 });
+        break;
       case 'groan':
         // A dyke gives way (#701 s3): the earth bank's long low groan as it slumps, a crack of the stone crown, then the water's roar.
         this.tone(out, t, { f: 58, to: 34, type: 'triangle', dur: 1.6, peak: 0.12, attack: 0.3, lp: 260 });
@@ -914,6 +933,14 @@ export class Sound {
         this.noise(out, t, { dur: 4, f: 700, to: 30, peak: 0.9, attack: 0.002 });
         this.tone(out, t, { f: 48, to: 16, dur: 4, peak: 0.8 });
         this.tone(out, t + 0.05, { f: 96, to: 28, dur: 1.4, peak: 0.3 });
+        break;
+      case 'siloAlarm':
+        // The reveal (#762): three seconds left, the decoys gone. A fast two-tone whoop over a low throb, urgent and unlike the launch klaxon.
+        for (let i = 0; i < 6; i++) {
+          this.tone(out, t + i * 0.24, { f: 520, to: 1180, type: 'sawtooth', dur: 0.2, peak: 0.06 });
+          this.tone(out, t + i * 0.24, { f: 1040, to: 2360, type: 'square', dur: 0.12, peak: 0.02 });
+        }
+        this.tone(out, t, { f: 55, to: 55, dur: 1.5, peak: 0.22, attack: 0.02 });
         break;
       case 'siloScrub':
         // A launch scrubbed (#605): the klaxon chokes off and a hollow thud of the hatch giving way.

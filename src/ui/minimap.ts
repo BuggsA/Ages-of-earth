@@ -13,6 +13,7 @@ const WATER_RGB = [0x2f, 0x7f, 0xae];
 /** Tiles pumped out of the water so far, by every people. */
 const drained = (s: GameState): number => s.players.reduce((n, p) => n + (p.stats.drained ?? 0) + (p.stats.dug ?? 0), (s.flooded ?? 0) + (s.inundated ?? 0) + (s.tideTurns ?? 0));
 import { R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE, T_ROCK, T_SAND, T_WATER } from '../sim/types';
+import { revealed, ringsFor, warnRadius } from '../sim/silo';
 
 /**
  * The overview map: the land through the player's fog, woods and mines, the buildings they know of,
@@ -441,6 +442,19 @@ export class Minimap {
       }
     }
 
+    // Your own rooted Ents (the Age of the Wildwood): your colour round a leaf-green core, so you know which trees are yours to wake.
+    // A rival sees only a tree.
+    for (const w of s.wardens ?? []) {
+      if (w.owner !== viewer && !reveal) continue;
+      const x = ((w.tile % s.w) + 0.5) * sx;
+      const y = (Math.floor(w.tile / s.w) + 0.5) * sy;
+      const r = Math.max(1.6, sx * 0.8);
+      ctx.fillStyle = s.players[w.owner].color;
+      ctx.fillRect(x - r - 0.7, y - r - 0.7, r * 2 + 1.4, r * 2 + 1.4);
+      ctx.fillStyle = '#5f9a3a';
+      ctx.fillRect(x - r * 0.6, y - r * 0.6, r * 1.2, r * 1.2);
+    }
+
     // A rival's keepsake the viewer has seen (#726): a ring in its people's colour with a pale core, over its building.
     for (const k of keepsakes) {
       const x = k.x * sx, y = k.y * sy, r = Math.max(4.5, cw / 46);
@@ -480,6 +494,22 @@ export class Minimap {
       footprint.forEach((f, i) => (i ? ctx.lineTo(f.x * sx, f.z * sy) : ctx.moveTo(f.x * sx, f.z * sy)));
       ctx.closePath();
       ctx.stroke();
+    }
+
+    // Warheads in the air (#762): the rings this viewer is shown, all alike (a rival's three, or the real one flashing once revealed;
+    // the launcher's own side its aim, in amber). Never the hidden point.
+    for (const l of s.launches ?? []) {
+      const own = s.players[viewer].team === s.players[l.owner].team;
+      const flash = !own && revealed(s, l);
+      ctx.strokeStyle = own ? '#ffb03a' : '#ff3a2a';
+      ctx.globalAlpha = flash ? 0.5 + 0.5 * Math.abs(Math.sin(performance.now() / 70)) : 0.85;
+      ctx.lineWidth = Math.max(1.5, cw / 120);
+      for (const g of ringsFor(s, l, viewer)) {
+        ctx.beginPath();
+        ctx.arc(g.x * sx, g.y * sy, warnRadius(s, l.owner) * sx, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
     }
 
     const now = performance.now();

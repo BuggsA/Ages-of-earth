@@ -1,6 +1,6 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { aiTiding } from './tidings';
-import { AGES, AI_SILO, AI_BREACH, SILO, TICK_HZ, AI_CLIMB, AI_FIND, FINDS, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_SEA, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, SEA_RAID, MISSION, AI_MISSION, AI_CHARIOT, STEP_BACK, stepBackCost, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_SILO, WARHEADS, AI_BREACH, SILO, TICK_HZ, AI_CLIMB, AI_FIND, FINDS, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_SEA, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, SEA_RAID, MISSION, AI_MISSION, AI_CHARIOT, STEP_BACK, stepBackCost, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, raiseProblem, techCostFor, techProblem, trainCostFor } from './stats';
@@ -15,7 +15,7 @@ import { wallLine } from './commands';
 import { AI_BARRAGE, AI_EBB } from './data';
 import { barragePlan, causewayOwner, ebbTiming, isCauseway, isPond, tideAwake, tideLevel } from './tides';
 import { statsOf } from './world';
-import { launchProblem, loaded, rulesOf, silosOf } from './silo';
+import { blastDamage, fuelOf, launchProblem, loaded, ringsFor, rulesOf, silosOf, warheadsOf, warnRadius, type WarheadKind } from './silo';
 import { carriedBy } from './relics';
 import { storesOre } from './caches';
 import { loadPrice, sellerNear } from './oretrade';
@@ -46,7 +46,8 @@ import { isCoppice } from './coppice';
 import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
-import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS } from './data';
+import { AI_TEMPER, ROUTES, TRUNK, type RouteId } from './data';
+import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
@@ -56,6 +57,7 @@ import { progress, scenarioById } from './campaign';
 import { tames, wildBeast } from './tame';
 import { grows } from './grove';
 import { keepsBees } from './hive';
+import { treeToWake, treesRound, wakesForest } from './wildwood';
 
 /**
  * The computer opponent. It plays by the same rules and through the same commands as a person: it
@@ -129,6 +131,36 @@ const TECH_ORDER: TechId[] = [
 const TRADER_WARY = 240;
 const ECONOMY: TechId[] = ['plow', 'axes', 'wheelbarrow', 'picks', 'irrigation', 'saws', 'shafts', 'handcart', 'gillnets', 'steamEngine'];
 
+// ---- A leaning (#749) -----------------------------------------------------------------------------
+
+/** The side ages standing on a route that suit this people (`fit`), oldest tier first. */
+function leanAges(p: Player, route: RouteId): AgeId[] {
+  return (Object.keys(AGES) as AgeId[]).filter((a) => !TRUNK.includes(a) && AGES[a].routes?.includes(route) && fit(p, a) >= 0).sort((a, b) => AGES[a].tier - AGES[b].tier);
+}
+
+/**
+ * Settled once, on a seat's first turn (#749): a clever computer in a skirmish favours a route `AI_TEMPER.lean` of the time, on
+ * coins of its own so no other choice's dice shift, and chooses that route's side ages from the start, as the route sweeps do
+ * (`src/sim/routePlay.ts`). The rest of the web is left to its usual coins, so it still turns off where the land says to.
+ */
+function settleLean(s: GameState, p: Player, mem: AiMemory): void {
+  mem.lean = 'none';
+  if (s.scenario || !AI_LEVELS[p.ai!].clever || AI_LEVELS[p.ai!].lean === false || coin(s, p.id, 0x7e4a) >= AI_TEMPER.lean) return;
+  const wet = s.mapType === 'lakes' || s.mapType === 'sea';
+  const open = (Object.keys(ROUTES) as RouteId[]).filter((r) => r !== 'plain' && (wet || (r !== 'navy' && r !== 'water')) && leanAges(p, r).length > 0);
+  if (!open.length) return;
+  const route = open[Math.floor(coin(s, p.id, 0x7e4b) * open.length)];
+  mem.lean = route;
+  const roads = (mem.roads ??= {});
+  for (const a of leanAges(p, route)) roads[a] ??= true;
+}
+
+/** The leaning a computer seat has settled on (#749), or null for a person or a seat with an open mind. */
+export function leanOf(s: GameState, owner: number): RouteId | null {
+  const l = s.ai[owner]?.lean;
+  return l && l !== 'none' ? l : null;
+}
+
 // ---- The turn -------------------------------------------------------------------------------------
 
 export function aiStep(s: GameState): void {
@@ -137,6 +169,7 @@ export function aiStep(s: GameState): void {
     const mem = memory(s, p.id);
     if (s.tick < mem.next) continue;
     mem.next = s.tick + secs(AI_LEVELS[p.ai].think);
+    if (mem.lean === undefined) settleLean(s, p, mem);
     think(s, p, mem);
   }
 }
@@ -265,6 +298,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   wildRoad(s, v, mem, issue);
   groveWork(s, v, mem, issue);
   hiveWork(s, v, mem, issue);
+  wildwoodWork(s, v, mem, issue);
   readYear(s, v);
   huntTheYear(s, v, issue);
 
@@ -590,6 +624,9 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   } else if (roads[to] === undefined && to === 'hive') {
     // The Wild route's third age: a people that walked the Grove goes on.
     roads[to] = hasWalked(p, 'grove');
+  } else if (roads[to] === undefined && to === 'wildwood') {
+    // The Wild route's fourth age: a people that walked the Hive goes on.
+    roads[to] = hasWalked(p, 'hive');
   } else if (roads[to] === undefined && to === 'dykes') {
     // The Water Road (#701): only with a dyke worth raising by home, and on a coin of its own, so no other match's dice shift. A people
     // that walked the Age of Rivers is on the road already, and goes on down it more often.
@@ -761,6 +798,8 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   if (walksWeb(v) && ageOf(p) === 'grove' && s.tick - (mem.grove ?? s.tick) < secs(GROVE.aiStay)) return null;
   // The Hive is kept a while, so its Hives are set and swarming.
   if (walksWeb(v) && ageOf(p) === 'hive' && s.tick - (mem.hive ?? s.tick) < secs(HIVE.aiStay)) return null;
+  // The Wildwood is kept a while, so its Heart Tree is planted and its Ents woken.
+  if (walksWeb(v) && ageOf(p) === 'wildwood' && s.tick - (mem.wildwood ?? s.tick) < secs(WILDWOOD.aiStay)) return null;
   // The steppe (#320) is kept a while, so the flock it came for pays.
   if (walksWeb(v) && ageDef(p).mobile && s.tick - (mem.steppe?.since ?? s.tick) < secs(AI_STEPPE.stay)) return null;
   // Bound for a crossing (#585, #555 s12), a sibling doesn't climb on: its way is back to the Middle Ages (`seaTurn`).
@@ -1866,26 +1905,45 @@ function siloRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   if (!spot || !construct(s, v, mem, 'silo', spot, 3, issue)) spend(v, cost);
 }
 
-/** Rival buildings and soldiers a warhead landing at (x, y) would catch, as the computer weighs them. */
-function siloWorth(s: GameState, owner: number, x: number, y: number): number {
+/**
+ * What a `w` warhead landing at (x, y) would cost the rivals, as the computer weighs it: each building (a Town Center counts `heart`)
+ * and soldier (counts `soldier`) is worth its weight times the share of its health the blast takes, never more than all of it.
+ */
+function siloWorth(s: GameState, owner: number, x: number, y: number, w: WarheadKind): number {
   let worth = 0;
-  const r2 = SILO.reach * SILO.reach;
+  const R = WARHEADS[w].r;
   for (const e of s.ents) {
     if (e.hp <= 0 || !isEnemy(s, owner, e.owner)) continue;
     if (e.kind === 'building') {
-      if (distToRect(x, y, e) <= SILO.reach) worth += e.type === 'towncenter' ? AI_SILO.heart : 1;
-    } else if (!e.inside && domainOf(e.type) === 'land') {
+      const d = distToRect(x, y, e);
+      if (d < R) worth += (e.type === 'towncenter' ? AI_SILO.heart : 1) * Math.min(1, blastDamage(w, d) / e.hp);
+    } else if (!e.inside && domainOf(e.type) === 'land' && MILITARY.includes(e.type)) {
       const dx = e.x - x, dy = e.y - y;
-      if (dx * dx + dy * dy <= r2) worth += MILITARY.includes(e.type) ? AI_SILO.soldier : 0;
+      if (dx * dx + dy * dy < R * R) worth += AI_SILO.soldier * Math.min(1, blastDamage(w, Math.sqrt(dx * dx + dy * dy)) / e.hp);
     }
   }
   return worth;
 }
 
 /**
+ * Which warhead the computer would send at (x, y) (#753): of those its people may fire, the one with the most worth (`siloWorth`) for
+ * each gold of its fuel, if any reaches `AI_SILO.worth`; ties go to the cheaper Atomic. Null when none is worth a launch.
+ */
+export function warheadFor(s: GameState, p: Player, x: number, y: number): { w: WarheadKind; worth: number; rate: number } | null {
+  let best: { w: WarheadKind; worth: number; rate: number } | null = null;
+  for (const w of warheadsOf(p)) {
+    const worth = siloWorth(s, p.id, x, y, w);
+    const rate = worth / (fuelOf(w).gold ?? 1);
+    if (worth >= AI_SILO.worth && (!best || rate > best.rate)) best = { w, worth, rate };
+  }
+  return best;
+}
+
+/**
  * A loaded silo launches at the rival building whose ring catches the most (`siloWorth`), once its worth reaches `AI_SILO.worth`.
- * The aim is chosen once a second; while it holds and the silo is short only of fuel, the town sets the fuel aside every tick
- * (it is ruinous, and soldiers would spend the gold first).
+ * Past the fork it weighs both warheads it may fire (#753) and takes the one with the most worth for its gold, so a Fission town
+ * sends a cheap Atomic warhead at a lone Town Center and its own at a crowd. The aim is chosen once a second; while it holds and the
+ * people is short only of fuel, the town sets the fuel aside every tick (it is ruinous, and soldiers would spend the gold first).
  */
 function fireSilo(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
@@ -1893,36 +1951,44 @@ function fireSilo(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const silo = silosOf(s, p.id).find((b) => s.tick - b.born >= secs(BUILDINGS.silo.time + AI_SILO.wait) && loaded(s, b));
   if (!silo) return;
   if (s.tick % TICK_HZ === 0) {
-    let best: { x: number; y: number; at: number } | null = null;
-    let bestWorth = AI_SILO.worth - 1;
+    let best: { x: number; y: number; at: number; w: WarheadKind } | null = null;
+    let bestRate = 0;
+    // A town one of its own warheads already falls on is left to it (Fusion keeps three aloft: they go to three towns, not one).
+    const aloft = (s.launches ?? []).filter((l) => l.owner === p.id);
     for (const e of s.ents) {
       if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
-      const w = siloWorth(s, p.id, e.x, e.y);
-      if (w > bestWorth) {
-        bestWorth = w;
-        best = { x: e.x, y: e.y, at: s.tick };
+      if (aloft.some((l) => (l.x - e.x) * (l.x - e.x) + (l.y - e.y) * (l.y - e.y) < WARHEADS[l.w ?? 'atomic'].r * WARHEADS[l.w ?? 'atomic'].r)) continue;
+      const pick = warheadFor(s, p, e.x, e.y);
+      if (pick && pick.rate > bestRate) {
+        bestRate = pick.rate;
+        best = { x: e.x, y: e.y, at: s.tick, w: pick.w };
       }
     }
     mem.siloAim = best ?? undefined;
   }
   const aim = mem.siloAim;
   if (!aim || s.tick - aim.at > TICK_HZ * 2) return;
-  const why = launchProblem(s, p.id, silo, aim.x, aim.y);
+  const w = aim.w ?? rulesOf(p).w;
+  const why = launchProblem(s, p.id, silo, aim.x, aim.y, w);
   if (why === null) {
-    issue({ t: 'launch', p: p.id, silo: silo.id, x: aim.x, y: aim.y });
+    issue({ t: 'launch', p: p.id, silo: silo.id, x: aim.x, y: aim.y, w });
     mem.siloAim = undefined;
-  } else if (why.startsWith("A warhead's fuel")) spend(v, rulesOf(p).fuel);
+  } else if (why.startsWith("A warhead's fuel")) spend(v, fuelOf(w));
 }
 
 /**
- * Soldiers and citizens inside the ring of a rival warhead in the air, or on poisoned ground (#605 s2), run out of it, away from
- * its centre toward home (the answer to a public clock, and to the fallout after).
+ * Soldiers and citizens inside a ring of a rival warhead in the air, or on poisoned ground (#605 s2), run out of it, away from
+ * its centre toward home (the answer to a public clock, and to the fallout after). A warhead's rings are the three its team is shown
+ * (#762, `ringsFor`: the real zone and two decoys, blurred, then the real one alone for the last seconds), each as wide as every rival is
+ * warned of (`warnRadius`): never the hidden point or its real blast, so the computer knows no more than a person would.
  */
 function fleeWarhead(s: GameState, v: View, issue: (c: Command) => void): void {
   if (s.tick % (TICK_HZ / 2) !== 0) return;
-  const zones = [...(s.launches ?? []).filter((l) => isEnemy(s, v.p.id, l.owner)), ...(s.fallout ?? [])];
+  const zones: { x: number; y: number; r: number }[] = [];
+  for (const l of s.launches ?? []) if (isEnemy(s, v.p.id, l.owner)) for (const g of ringsFor(s, l, v.p.id)) zones.push({ ...g, r: warnRadius(s, l.owner) });
+  for (const f of s.fallout ?? []) zones.push({ x: f.x, y: f.y, r: f.r ?? SILO.reach });
   for (const l of zones) {
-    const r = ((l as { r?: number }).r ?? SILO.reach) + AI_SILO.margin;
+    const r = l.r + AI_SILO.margin;
     const out = [...v.army, ...v.citizens].filter((u) => !u.inside && (u.x - l.x) * (u.x - l.x) + (u.y - l.y) * (u.y - l.y) <= r * r && domainOf(u.type) === 'land');
     if (!out.length) continue;
     const dx = v.home.x - l.x, dy = v.home.y - l.y;
@@ -3206,6 +3272,22 @@ function hiveWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   if (spot) construct(s, v, mem, 'hive', spot, 1, issue);
 }
 
+/**
+ * The Age of the Wildwood: one Heart Tree within `WILDWOOD.aiFrom` tiles of home, by a wood with at least `aiTrees` old trees round
+ * it to wake where one has room (else anywhere it fits, and the Spreading brings the trees). Its Ents are trained at it with the rest of the army (`military`).
+ */
+function wildwoodWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!walksWeb(v) || !wakesForest(p) || !v.tc) return;
+  if (ageOf(p) === 'wildwood') mem.wildwood ??= s.tick;
+  if (count(v, 'heart') || s.tick - (mem.ordered.heart ?? -99999) < secs(30) || p.epoch < BUILDINGS.heart.epoch) return;
+  const cost = buildingCostFor(s, p.id, 'heart');
+  if (!afford(v, cost)) return;
+  const near = (tx: number, ty: number) => treesRound(s, tx, ty, BUILDINGS.heart.size, WILDWOOD.wake) >= WILDWOOD.aiTrees;
+  const spot = findSpot(s, 'heart', v.home.x, v.home.y, 5, WILDWOOD.aiFrom, 0, near) ?? findSpot(s, 'heart', v.home.x, v.home.y, 5, WILDWOOD.aiFrom, 0);
+  if (spot) construct(s, v, mem, 'heart', spot, 3, issue);
+}
+
 const grownSheep = (s: GameState, owner: number): Animal[] => s.animals.filter((a) => a.kind === 'sheep' && a.owner === owner && a.hp > 0 && a.lamb === undefined);
 
 /** The road from the steppe into the Horde (#322), while the computer wants it and its deeds are not yet done; null otherwise. */
@@ -3737,6 +3819,16 @@ function nearestDropTo(v: View, u: Unit): { x: number; y: number } {
 // ---- Army ------------------------------------------------------------------------------------------
 
 /** Where to strike: an enemy wonder first (it must fall), then a King (or where one shelters), then the nearest Town Center. */
+/** A rival whose weak window after a step back is open now (#749), and where its Town Center stands; in id order, the first. */
+function windowOpen(s: GameState, p: Player): { x: number; y: number } | null {
+  for (const q of s.players) {
+    if (q.defeated || !isEnemy(s, p.id, q.id) || q.backAt === undefined || s.tick - q.backAt >= secs(STEP_BACK.time)) continue;
+    const tc = townCenters(s, q.id)[0];
+    if (tc) return { x: tc.x, y: tc.y };
+  }
+  return null;
+}
+
 function enemyHome(s: GameState, p: Player): { x: number; y: number } {
   let best: { x: number; y: number } | null = null;
   let bestD = Infinity;
@@ -4984,6 +5076,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     let unit: UnitType | null;
     if (b.type === 'workshop') release(v);
     if (b.type === 'workshop') unit = siege < Math.max(v.plan.siege, p.epoch >= 2 ? 3 : 2) + lodge + bleeds && (v.army.length >= 6 || siege < v.plan.siege) ? 'siege' : null;
+    else if (b.type === 'heart') unit = v.army.filter((u) => u.type === 'warden').length + b.queue.length < WILDWOOD.aiEnts && treeToWake(s, b) >= 0 ? 'warden' : null;
     else if (b.type === 'temple') unit = v.priests.length < (v.army.length >= 6 ? Math.max(consecrates(s, p.id) ? AI_FAITH.priests : 2, L.clever && ageDef(p).rite ? AI_FORK.priests : 0) : 0) + (looseRelics(s) > 0 ? 1 : 0) + (vigilPost(s, v) ? VIGIL.most : 0) + (ageDef(p).missions ? 1 : 0) ? 'priest' : null;
     else {
       unit = counter && trains.includes(counter) && unitEpoch(counter) <= p.epoch && !barred(p, counter, b.type) && roll(s) < counterOdds ? counter : pickUnit(v, mem, b);
@@ -5088,6 +5181,18 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     const band = camp ? ready.filter(prowler) : [];
     if (camp && band.length >= AI_BLOOD.strike) {
       issue({ t: 'move', p: p.id, ids: band.map((u) => u.id), x: camp.x, y: camp.y, amove: true });
+      return;
+    }
+  }
+  // A rival's weak window after a step back (#749): it was announced to all, and a smaller wave than usual strikes while it is open.
+  // Not in a campaign chapter, whose play stays as its proof found it.
+  if (L.clever && L.strike !== false && !s.scenario && !mem.attacking && !plan.hold && s.tick >= s.peaceUntil) {
+    const weak = windowOpen(s, p);
+    if (weak && fighters.length >= Math.max(AI_TEMPER.least, Math.ceil(waveSize * AI_TEMPER.strike))) {
+      issue({ t: 'move', p: p.id, ids: fighters.map((u) => u.id), x: weak.x, y: weak.y, amove: true });
+      mem.attacking = true;
+      mem.wave++;
+      delete mem.prowl;
       return;
     }
   }

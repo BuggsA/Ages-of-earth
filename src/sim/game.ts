@@ -1,6 +1,7 @@
 import { callWild } from './tame';
 import { groveStep, rootThorn } from './grove';
 import { hiveStep } from './hive';
+import { treeToWake, wakeTree, wildwoodStep, WAKE_NONE } from './wildwood';
 import { aiStep } from './ai';
 import { workStep } from './works';
 import { beaconStep } from './beacon';
@@ -408,6 +409,14 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
     }
     return;
   }
+  // An Ent (the Age of the Wildwood) wakes from a tree by the Heart Tree: with none standing, it waits for one.
+  if (unit === 'warden' && treeToWake(s, b) < 0) {
+    if (item.done === need) {
+      item.done = need + 1;
+      s.events.push({ k: 'refused', owner: p.id, why: WAKE_NONE });
+    }
+    return;
+  }
   b.queue.shift();
   for (let i = 0; i < kin; i++) bringOut(s, p, b, unit);
   if (item.kin) s.events.push({ k: 'kin', owner: p.id, n: kin, x: b.x, y: b.y });
@@ -420,7 +429,8 @@ function bringOut(s: GameState, p: Player, b: Building, unit: UnitType): void {
   // Ships put out onto the water by their dock; aircraft take off from anywhere about the field.
   // A gun-barge (#701 s4) puts out onto any water beside its Sluice: a channel, the flood or the sea.
   const spot = exitSpot(s, b, toward.x, toward.y, unit === 'barge' ? BARGE : domain === 'water' ? NAVAL : domain === 'air' ? AIR : undefined);
-  const u = spawnUnit(s, p.id, unit, spot.x, spot.y);
+  // An Ent steps out of the tree it was (the Age of the Wildwood), not out of the Heart Tree.
+  const u = (unit === 'warden' && wakeTree(s, b)) || spawnUnit(s, p.id, unit, spot.x, spot.y);
   p.pop++;
   p.stats.trained++;
   // A soldier hired for gold at the Market is a sword for hire (`MERC`): it draws wages from now on.
@@ -660,6 +670,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   callWild(s);
   groveStep(s);
   hiveStep(s);
+  wildwoodStep(s);
   longbowStep(s);
   tollStep(s);
   mercStep(s);
@@ -743,6 +754,19 @@ export function checksum(s: GameState): number {
     mix(f.tx);
     mix(f.ty);
     mix(f.until);
+  }
+  for (const l of s.launches ?? []) {
+    mix(l.id);
+    mix(l.at);
+    // The rings each rival team is shown (#762): every centre is a tile's centre, so twice it is whole.
+    for (const w of l.warn ?? []) {
+      mix(w.team * 4 + w.real);
+      for (const r of w.rings) mix(r.x * 2 * 0x10000 + r.y * 2);
+    }
+  }
+  for (const b of s.blasts ?? []) {
+    mix(b.id);
+    mix(b.until);
   }
   for (const r of s.rubble ?? []) {
     mix(r.id);

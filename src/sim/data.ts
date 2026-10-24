@@ -23,12 +23,14 @@ export const EPOCHS: Epoch[] = [
   { name: 'Middle Ages', short: 'Medieval', cost: { food: 700, gold: 250, stone: 100 }, time: 50, blurb: 'Pikes, crossbows, knights, catapults and stone keeps.' },
   { name: 'Gunpowder Age', short: 'Gunpowder', cost: { food: 1000, gold: 600, stone: 250 }, time: 65, blurb: 'Muskets, cuirassiers, galleons, cannon and brick and tile.' },
   { name: 'Industrial Age', short: 'Industrial', cost: { food: 1400, gold: 900, stone: 400 }, time: 80, blurb: 'Rifles, field guns, ironclads, and the first aeroplanes.' },
-  { name: 'Atomic Age', short: 'Atomic', cost: { food: 1800, gold: 1500, stone: 700 }, time: 95, blurb: 'The Missile Silo: one warhead, a public countdown, and a town that guards it.' },
+  { name: 'Atomic Age', short: 'Atomic', cost: { food: 1800, gold: 1500, stone: 700 }, time: 95, blurb: 'The Missile Silo: one warhead (12,000 at the centre, 8 tiles of blast), a public countdown, and a town that guards it.' },
 ];
 export const LAST_EPOCH = EPOCHS.length - 1;
 /** The Age of the Hive's reach and woods (`HIVE`), named here so the age's and the Hive's words can say them. */
 const HIVE_REACH = 6;
 const HIVE_TREES = 8;
+/** How far round the Heart Tree an old tree can be woken (`WILDWOOD.wake`), named here so the age's and the tree's words can say it. */
+const HEART_WAKE = 8;
 
 // ---- Ages and paths -------------------------------------------------------------------------------
 
@@ -263,7 +265,7 @@ export const AGES: Record<AgeId, Age> = {
   middle: trunkAge(2, 'The crossroads: most side roads turn off here, and nothing is shut'),
   gunpowder: trunkAge(3, 'Guns and cannon that break any wall, and every road comes back to it'),
   industrial: trunkAge(4, 'The strongest plain arms and the deepest economy, with nothing shut'),
-  atomic: trunkAge(5, 'One warhead the whole map watches fall: a Missile Silo, dear to raise and to refuel'),
+  atomic: trunkAge(5, 'One warhead the whole map watches fall: a Missile Silo, dear to raise and seen by all, and a store of warheads slow to fill'),
   aeronaut: {
     verb: 'Fight from forward Airfields: aircraft fly sorties on fuel, so where you build an Airfield is how far you reach',
     door: 'Foot, ranged, cavalry and siege cost more',
@@ -470,25 +472,25 @@ export const AGES: Record<AgeId, Age> = {
   },
   // The fork past the Atomic Age (#605 s3, seed #533): two turns off it, each shunning the other, each changing how a silo is worked.
   fission: {
-    verb: 'Fire the silo in half the time and again soon, and lay your silos far from home: each launch poisons the ground round your own',
+    verb: 'Strike in half the time and make warheads again soon, choosing a cheap Atomic or your own heavy Fission at each launch, and lay your silos far from home: each launch poisons the ground round your own',
     door: 'Every launch poisons the ground round your own silo for a minute; Fusion is closed for good',
-    good: 'The quickest strike: a short clock and a short refuel, at a price in your own ground',
+    good: 'The quickest strike: a short clock and warheads made quickly, at a price in your own ground',
     routes: ['army'],
     name: 'Age of Fission',
     short: 'Fission',
     tier: 5,
-    blurb: 'Raw power now. A Missile Silo\'s clock is 25 seconds, not 45, and it refuels in 100, not 240. But the reactor leaks: each launch poisons 3 tiles round your own silo for 60 seconds, as fallout does (4 health a second to every land unit in it, yours too). Lay your silos away from your town and your fields. Take it, and the Age of Fusion is closed for good.',
+    blurb: 'Raw power now. Every launch\'s clock is 25 seconds, not 45, your people makes a warhead every 100 seconds, not 240, and at each launch you choose an Atomic warhead (600 gold, 200 stone) or your own Fission one, dearer (800 gold, 250 stone) but harder and farther (20,000 at the centre, 10 tiles of blast). But the reactor leaks: each launch poisons 3 tiles round your own silo for 60 seconds, as fallout does (4 health a second to every land unit in it, yours too). Lay your silos away from your town and your fields. Take it, and the Age of Fusion is closed for good.',
     fission: true,
   },
   fusion: {
-    verb: 'Keep several warheads in the air at once from one silo, clean: nothing you strike is poisoned, and the silo never needs refuelling',
+    verb: 'Keep three warheads in the air at once, clean: nothing a Fusion warhead strikes is poisoned, and a new one is made the moment one lands; or send an Atomic one to poison the ground',
     door: 'A road that costs the earth and takes two and a half minutes, leaving the town exposed; a long 70 second clock; Fission is closed for good',
-    good: 'Limitless, clean strikes: up to three warheads aloft from one silo, and your armies may follow them in',
+    good: 'Limitless, clean strikes: up to three warheads aloft, made again at once, and your armies may follow them in',
     routes: ['economy'],
     name: 'Age of Fusion',
     short: 'Fusion',
     tier: 5,
-    blurb: 'Clean and limitless, and ruinously dear. A Missile Silo keeps up to three warheads in the air at once and never needs refuelling, a launch costs 450 gold and 120 stone, and nothing it strikes is poisoned, so your army can follow the blast in. But the clock is 70 seconds, long enough for a rival to scatter or to find the silo, and the road here costs a fortune and takes 150 seconds in which the town is exposed. Take it, and the Age of Fission is closed for good.',
+    blurb: 'Clean and limitless, and ruinously dear. Your people keeps up to three warheads in the air at once and makes a new one the moment one lands, each the biggest there is (40,000 at the centre, 12 tiles of blast), a Fusion launch costs 450 gold and 120 stone, and nothing it strikes is poisoned (an Atomic one may still be sent, for 600 gold and 200 stone, to poison the ground), so your army can follow the blast in. But the clock is 70 seconds, long enough for a rival to scatter or to find the silo, and the road here costs a fortune and takes 150 seconds in which the town is exposed. Take it, and the Age of Fission is closed for good.',
     fusion: true,
   },
   steppe: {
@@ -649,6 +651,19 @@ export const AGES: Record<AgeId, Age> = {
     blurb: `Instead of the Gunpowder Age: a people that keeps bees. A Hive is set among standing trees, and its bees swarm any rival who walks the woods within ${HIVE_REACH} tiles of it, stinging past armour and slowing them; bees sleep in winter, and smoke from any fire near a Hive quiets it a while. A Hive pays honey into your stores, or mead for gold when a Market of yours stands near, and in summer it doubles the yield of the Kitchen Gardens beside it. Your ranged soldiers are Blowpipe Hunters, whose darts stack venom that ignores armour and slows; your Den breeds the Cave Bear, and your War Wolves grow dire. No guns and no cannon.`,
     names: { warwolf: 'Dire Wolf' },
     no: { units: ['ranged', 'siege'], why: 'A Hive people carries no guns and casts no cannon: its bowmen are Blowpipe Hunters, and its beasts break walls. Muskets and cannon wait until it climbs to the Industrial Age or settles in the Gunpowder Age' },
+  },
+  // The Wild route's fourth age (`docs/wild-road.md` §4, `wildwood.ts`): an army that is also the forest, and green against iron.
+  wildwood: {
+    verb: 'Plant a Heart Tree and wake the old trees round it as Ents that walk, crush and root again; let your woods spread each spring',
+    door: 'No factories or machines: no rifles, field guns or aircraft, so your Ents are your siege; and fire hits your living things twice as hard',
+    good: 'A forest that fights: Ents that break towns and hide as trees, woods that grow back each spring, and an army that runs through its own trees',
+    routes: ['wild'],
+    name: 'Age of the Wildwood',
+    short: 'Wildwood',
+    tier: 4,
+    blurb: `Instead of the Industrial Age: the forest wakes. Plant one Heart Tree, your town's soul; at it, an old tree within ${HEART_WAKE} tiles is woken as an Ent that walks slowly, flings boulders and breaks buildings. An Ent can root where it stands and be a tree again: it mends, it looks like any other tree, and it wakes when a rival comes near. Each spring your woods seed outward round the Heart Tree into your own land, and your Thornwalls thicken. Your people run through the woods round the Heart Tree, and a rival's are slowed there. No rifles, field guns or aircraft; and fire hits your living things twice as hard. If the Heart Tree falls, every Ent roots where it stands and sleeps.`,
+    no: { units: ['ranged', 'siege', 'fighter', 'bomber'], why: 'A Wildwood people builds no machines: no rifles, field guns or aircraft. Its Ents break walls and its Blowpipe Hunters shoot. They wait until it climbs to the Atomic Age or settles in the Industrial Age' },
+    noBuild: { buildings: ['airfield'], why: 'A Wildwood people builds no machines: no Airfield until it climbs to the Atomic Age or settles in the Industrial Age' },
   },
   // The second crossing (#555 s12): the Pilgrims' priests and the Sail's ships made one trade. Open only to a people that walked both.
   missions: {
@@ -987,6 +1002,19 @@ export const ROADS: Road[] = [
   },
   { from: 'hive', to: 'industrial', cost: EPOCHS[4].cost, time: EPOCHS[4].time, blurb: 'Rejoin the main road at the Industrial Age for the ordinary price. Your Hives keep swarming and your Den keeps its bears; rifles and field guns arrive.' },
   { from: 'hive', to: 'gunpowder', cost: { food: 250, wood: 250 }, time: 30, blurb: 'Settle down in the Gunpowder Age. Your Hives keep swarming and your Den keeps its bears; muskets and cannon return.' },
+  // The Wild route's fourth step (`docs/wild-road.md` §4): a Hive shows it (an old wood humming), and the honey it pays opens it.
+  {
+    from: 'hive',
+    to: 'wildwood',
+    cost: { food: 1200, wood: 900, gold: 600 },
+    time: 75,
+    clue: 'hive',
+    walked: 'hive',
+    deed: { stat: 'honey', n: 250, text: 'Your Hives pay 250 honey or mead' },
+    blurb: 'Instead of the Industrial Age: the forest wakes. A Heart Tree wakes the old trees round it as Ents that walk, break towns and root again as trees; your woods spread each spring. No rifles, field guns or aircraft, and fire hits your living things twice as hard while you stay.',
+  },
+  { from: 'wildwood', to: 'atomic', cost: EPOCHS[5].cost, time: EPOCHS[5].time, blurb: 'Rejoin the main road at the Atomic Age for the ordinary price. Your Heart Tree keeps waking Ents and your woods keep spreading; machines return, and fire burns as it does for anyone.' },
+  { from: 'wildwood', to: 'industrial', cost: { food: 300, wood: 300 }, time: 30, blurb: 'Settle down in the Industrial Age. Your Heart Tree keeps waking Ents and your woods keep spreading; rifles, field guns and aircraft return.' },
   // The other road out of the Stone Age (#297): the hunt, not the bog, opens it.
   {
     from: 'stone',
@@ -1176,9 +1204,9 @@ export const ROADS: Road[] = [
     blurb: 'A turn, not a climb: one branch of the fork at the end of the Path of Blood, where blood becomes a sacrament. Every Temple is an altar that takes blood from the enemy who fall near it and mends your own with it; priests come cheaper and work faster. What it gives up: the Transfusion Station, trade, some harvest, and siege at a dearer price. Take it, and Hemocraft is closed to your people for good.',
   },
   // The fork past the Atomic Age (#605 s3): a Missile Silo is the clue; each branch shuns the other; each has a road back to the Atomic Age.
-  { from: 'atomic', to: 'fission', cost: { food: 1000, gold: 1200, stone: 600 }, time: 60, clue: 'silo', shuns: 'fusion', blurb: 'A turn, not a climb: raw power now. A silo\'s clock is 25 seconds and it refuels in 100, but every launch poisons the ground round your own silo for a minute. Take it, and Fusion is closed for good.' },
-  { from: 'fission', to: 'atomic', cost: { food: 300, gold: 300 }, time: 30, blurb: 'Shut the reactor: the ordinary Atomic Age, a 45 second clock and a 240 second refuel, and no poison round your own silos. Fusion stays closed.' },
-  { from: 'atomic', to: 'fusion', cost: { food: 2400, gold: 3000, stone: 1500 }, time: 150, clue: 'silo', shuns: 'fission', blurb: 'A turn, not a climb: clean and limitless, and ruinously dear. A silo keeps up to three warheads aloft and never needs refuelling, and nothing it strikes is poisoned, but the clock is 70 seconds and the road costs a fortune and 150 seconds. Take it, and Fission is closed for good.' },
+  { from: 'atomic', to: 'fission', cost: { food: 1000, gold: 1200, stone: 600 }, time: 60, clue: 'silo', shuns: 'fusion', blurb: 'A turn, not a climb: raw power now. Every clock is 25 seconds and a warhead is made every 100, but every launch poisons the ground round your own silo for a minute. Take it, and Fusion is closed for good.' },
+  { from: 'fission', to: 'atomic', cost: { food: 300, gold: 300 }, time: 30, blurb: 'Shut the reactor: the ordinary Atomic Age, a 45 second clock and a warhead every 240 seconds, and no poison round your own silos. Fusion stays closed.' },
+  { from: 'atomic', to: 'fusion', cost: { food: 2400, gold: 3000, stone: 1500 }, time: 150, clue: 'silo', shuns: 'fission', blurb: 'A turn, not a climb: clean and limitless, and ruinously dear. Up to three warheads aloft, each made again the moment one lands, and nothing a Fusion warhead strikes is poisoned, but the clock is 70 seconds and the road costs a fortune and 150 seconds. Take it, and Fission is closed for good.' },
   // The Water Road's sixth age (#739): a turn off the Atomic Age for a people with a shore, until the Age of Locks (#701 s5) leads in.
   {
     from: 'atomic',
@@ -1670,6 +1698,8 @@ export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
   cavebear: beast({ name: 'Cave Bear', cls: 'infantry', hp: 340, attack: 12, armor: 3, parmor: 6, range: 0, reload: 1.8, speed: 1.35, sight: 5, cost: { food: 180, gold: 40 }, time: 32, radius: 0.46, blurb: 'A great bear of the caves raised at your Den: a slow wall of fur that shrugs off arrows and mauls whatever stands before it. Swords, spears and guns bring it down; arrows barely do.' }),
   // The Age of the Hive: its bowmen, trained at the Archery Range by a people that has walked it, from the Gunpowder Age's tier.
   blowpipe: [null, null, null, BLOWPIPE, BLOWPIPE],
+  // The Age of the Wildwood (`WILDWOOD`): an Ent, woken from an old tree at the Heart Tree by a people that has walked the Wildwood.
+  warden: [null, null, null, null, { name: 'Ent', cls: 'siege', hp: 650, attack: 22, armor: 3, parmor: 8, range: 4, reload: 3.2, speed: 0.85, sight: 7, cost: { food: 150, wood: 200, gold: 80 }, time: 40, radius: 0.6, shot: 'boulder', splash: 0.8, blurb: 'An old tree of your woods, woken at the Heart Tree: it walks slowly, tears boulders from the ground and flings them, and breaks buildings and engines. Arrows barely mark its bark, but swords, riders and fire bring it down. Root it (O) and it is a tree again: it mends, and wakes when a rival comes near.' }],
   warmammoth: beast({ name: 'War Mammoth', cls: 'siege', hp: 420, attack: 16, armor: 2, parmor: 4, range: 0, reload: 2.4, speed: 1.1, sight: 6, cost: { food: 260, gold: 60 }, time: 40, radius: 0.55, blurb: 'A woolly mammoth led to war: it tramples walls and buildings as a ram does, and gores soldiers too. Spearmen and riders swarm it.' }),
 };
 
@@ -1677,8 +1707,8 @@ const DOMAINS: Partial<Record<UnitType, Domain>> = { fisher: 'water', warship: '
 /** Where a unit line goes: on foot, on the water or in the air. */
 export const domainOf = (type: UnitType): Domain => DOMAINS[type] ?? 'land';
 
-export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader', 'wagon', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge'];
-export const MILITARY: UnitType[] = ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'warship', 'fighter', 'bomber', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge'];
+export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader', 'wagon', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge', 'warden'];
+export const MILITARY: UnitType[] = ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'warship', 'fighter', 'bomber', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge', 'warden'];
 
 type Target = UnitClass | 'building';
 /** The counter triangle (and its friends): damage multiplier by attacker class against target class. */
@@ -2033,7 +2063,8 @@ export const FIRE = {
   run: [2, 6, 4, 2],
   scorch: 2,
   scorchReach: 0.4,
-  burns: ['thornwall', 'garden', 'orchard', 'sapling', 'hive'] as BuildingType[],
+  burns: ['thornwall', 'garden', 'orchard', 'sapling', 'hive', 'heart'] as BuildingType[],
+  wild: 2,
   aiBearers: 2,
   aiNear: 12,
   aiEvery: 4,
@@ -2076,6 +2107,36 @@ export const HIVE = {
   aiStay: 240,
   aiHives: 3,
   aiFrom: 14,
+};
+
+/**
+ * The Age of the Wildwood (`docs/wild-road.md` §4, `src/sim/wildwood.ts`). A people raises one Heart Tree. There it wakes an Ent
+ * (`warden`) from the standing tree nearest the Heart Tree within `wake` tiles, which gives way to it. An Ent roots on bare ground
+ * (`root`): it is a tree there, mending `mend` of its hit points a second, and it wakes when a rival on the ground comes within
+ * `rouse` tiles, or its tree is cut into; fell or burn the tree and the Ent is gone. While its people has no Heart Tree standing,
+ * every Ent roots where it stands and none wakes.
+ * The Spreading: `spreadAt` seconds into each spring, round each Heart Tree, every bare tile within `spread` tiles that lies in its
+ * people's land, beside a tree and clear of buildings by a tile, takes a seedling on a roll of `seed`, up to `seeds` of them, and it is
+ * a tree `grow` seconds later (a `Stool`). Its people's Thornwalls each grow a stage.
+ * Woodland ways: while a people stands in the Wildwood, its units in a wood (`HIVE.wood`) within `ways.reach` tiles of its Heart Tree
+ * walk at `ways.own` pace, and a rival's at `ways.rival`. Fire burns its living buildings and scorches its units `FIRE.wild` times as hard.
+ * The computer takes the road on from the Hive, stays `aiStay` seconds, plants its Heart Tree by the thickest wood within `aiFrom`
+ * tiles of home (at least `aiTrees` trees to wake), and wakes up to `aiEnts` Ents.
+ */
+export const WILDWOOD = {
+  wake: HEART_WAKE,
+  rouse: 3,
+  mend: 0.02,
+  spreadAt: 20,
+  spread: 10,
+  seed: 0.3,
+  seeds: 18,
+  grow: 60,
+  ways: { reach: 14, own: 1.25, rival: 0.75 },
+  aiStay: 300,
+  aiFrom: 22,
+  aiTrees: 10,
+  aiEnts: 4,
 };
 
 export const COPPICE = { reach: 8, regrow: 120, retry: 5, grow: 90, snare: 2, cap: 1.5, bag: 2, full: 12, aiPerFood: 1.5, aiMax: 16, aiTrees: 10, aiThick: 14, aiNear: 14, aiDrop: 7, aiPerTender: 2, aiStone: 6, aiCamps: 2, aiPlant: 3, aiThin: 12, aiPlantWood: 120 };
@@ -2140,6 +2201,8 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   orchard: { name: 'Orchard', size: 2, hp: 300, cost: { wood: 100 }, time: 20, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, menu: 'eco', key: 'R', blurb: `Fruit trees set near a food store. After ${GROVE.orchardGrow} seconds they bear, and every summer and autumn they drop food into your stores by themselves while a store stands within ${GROVE.orchardReach} tiles. Slow to start, free for years.` },
   // The Age of the Hive (`docs/wild-road.md` §3, `HIVE`): raised by a people that has walked it, in any age after.
   hive: { name: 'Hive', size: 1, hp: 160, cost: { wood: 60, gold: 30 }, time: 15, pop: 0, sight: 4, trains: [], drop: [], epoch: 3, menu: 'eco', key: 'V', blurb: `A straw skep on a stand, set among standing trees (${HIVE_TREES} within 3 tiles). Its bees swarm any rival who walks the woods within ${HIVE_REACH} tiles, stinging past armour and slowing them. It pays honey into your stores, or mead for gold while a Market of yours stands near, and in summer it doubles the Kitchen Gardens beside it. Bees sleep in winter, smoke quiets them, and fire takes the skep. Fell its woods and the bees leave.` },
+  // The Age of the Wildwood (`docs/wild-road.md` §4, `WILDWOOD`): one to a people that has walked it, in any age after.
+  heart: { name: 'Heart Tree', size: 3, hp: 2500, cost: { food: 300, wood: 400, gold: 200 }, time: 90, pop: 0, sight: 8, trains: ['warden'], drop: [], epoch: 4, menu: 'mil', key: 'E', blurb: `A vast old tree planted once, the soul of your town: one to a people. At it an old tree within ${HEART_WAKE} tiles is woken as an Ent. While it stands your woods spread round it each spring and your rooted Ents wake when a rival comes near; if it falls, every Ent roots where it stands and sleeps. It is alive, so fire takes it.` },
   // The age road (#562, `docs/age-roads.md` spine §4): raised in the Stone Age, it answers which key resources this world holds (`PROSPECTOR`).
   prospector: { name: "Prospector's Lodge", size: 2, hp: 500, cost: { food: 50, wood: 75 }, time: 20, pop: 0, sight: 6, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'P', blurb: 'A lodge of prospectors who walk the streams, scrape the rock and dig at old mounds. Once it stands it tells you which key resources this world holds (bog iron, salt, saltpetre, blood-iron, ancient ruins): yes or no for each, never where. Some ages open only with them; a world that lacks one shuts that door.' },
   // The Path of Blood (#303): pitched by foot soldiers where the army stands, enemy land too; burns when left alone (`WARCAMP`).
@@ -2152,7 +2215,7 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   // The Age of Missions (#555 s12): raised by priests on a shore, in no rival's land; claims land, trains priests, pays a tithe (`MISSION`).
   mission: { name: 'Mission', size: 2, hp: 1000, cost: { wood: 100, gold: 60 }, time: 30, pop: 0, sight: 7, trains: ['priest'], drop: [], epoch: 2, shore: true, ages: ['missions'], builders: ['priest'], only: true, menu: 'eco', key: 'O', blurb: 'A whitewashed chapel and a bell on a far shore, raised by priests. Holds the land round it, trains priests, and pays a tithe that grows with its distance from your Town Center. Nothing in it shoots: a rival who reaches it razes it.' },
   caravanserai: { name: 'Caravanserai', size: 2, hp: 900, cost: { wood: 90, gold: 30 }, time: 25, pop: 0, sight: 6, trains: [], drop: [], epoch: 3, ages: ['silk'], menu: 'eco', key: 'C', blurb: 'A walled courtyard by the road where caravans rest. Raise it by a far trading post, in no one\'s land too: your traders\' trips to a post within 8 tiles of it pay a quarter more, traders and wagons within 4 tiles of it mend, and the land round it is yours, so rival traders crossing it pay your toll.' },
-  silo: { name: 'Missile Silo', size: 3, hp: 3000, cost: { wood: 300, stone: 400, gold: 700 }, time: 80, pop: 0, sight: 8, trains: [], drop: [], epoch: 5, menu: 'mil', key: 'M', blurb: 'A concrete collar round a hatch in the ground. Launch (M) names any point on the map: after a countdown every rival can see, the warhead flattens what stands there. Destroy the silo while it counts and the launch is scrubbed. Emptied by a launch, it must be refuelled before it can fire again.' },
+  silo: { name: 'Missile Silo', size: 3, hp: 3000, cost: { wood: 300, stone: 400, gold: 700 }, time: 80, pop: 0, sight: 8, trains: [], drop: [], epoch: 5, menu: 'mil', key: 'M', blurb: 'A concrete collar round a hatch in the ground. Launch (M) names any point on the map: after a countdown every rival can see, the warhead blasts what stands there, hardest at the centre and less with every tile, and every player sees the blast and the fog lifts over it for a minute. Destroy the silo while it counts and the launch is scrubbed, its warhead lost. Warheads come from the people\'s store, not the silo: one at first, one more every 240 seconds, up to 3 counting those in the air, fired from any silo. At most 2 silos, and every player sees a finished one on the map.' },
   // Mine Shafts (#681): one miner digs stone or gold (or a rare ore over its old workings) for good, best where a deposit was worked out (`SHAFT`).
   shaft: { name: 'Mine Shaft', size: 2, hp: 700, cost: { wood: 150 }, time: 30, pop: 0, sight: 4, trains: [], drop: [], epoch: 1, menu: 'eco', key: 'H', blurb: 'A timber headframe over a hole in the ground. One citizen digs stone or gold here for good, slower than an open deposit; best sunk where a deposit was worked out, fair beside mountain rock. Choose its seam on the shaft.' },
   // The Water Road (#701 s1): a bank of earth across the shallows, and the mill that pumps the water out behind it (`DYKE`, `POLDER`, `water.ts`).
@@ -3060,6 +3123,10 @@ export interface AiLevel {
   hemo?: boolean;
   /** Off: the computer never takes the fork past Total War (#355 s5; only `scripts/ai-ab.ts` turns it off). */
   fork?: boolean;
+  /** Off: no leaning toward a route (#749; only to judge it with `scripts/ai-ab.ts`). */
+  lean?: boolean;
+  /** Off: no wave sent at a rival's weak window after a step back (#749; only to judge it). */
+  strike?: boolean;
   /** Off: the town trains hands on while a climb is paid for (#555; only `scripts/ai-ab.ts` turns it off). */
   climbHold?: boolean;
   /** Off: the Stone Age climb neither waits on a Prospector's Lodge that is due nor saves its price (#540; only `scripts/ai-ab.ts` turns it off). */
@@ -3311,6 +3378,13 @@ export const AI_CLIMB = { banked: 0.6 };
  */
 export const AI_ASSAY = { reach: 36, riders: 3 };
 /** `lodgeWait`: seconds at most the Stone Age climb is held while a Prospector's Lodge it means to raise is due (#540). */
+/**
+ * Rivals with a leaning (#749, `docs/engagement.md` Phase 3): a clever computer in a skirmish favours a route a `lean` share of the
+ * time, choosing that route's side ages from its first turn (the navy and the water road only on a map with water). And while a
+ * rival's weak window after a step back is open, it strikes with `strike` of a full wave (at least `least` soldiers).
+ */
+export const AI_TEMPER = { lean: 0.6, strike: 0.5, least: 6 };
+
 export const AI_WEB = { lodgeWait: 120, take: 0.6, heir: 1, survey: 22, diggers: 3, nearly: 0.5, patience: 90, close: 0.75, relics: 2, raid: 18, raidNear: 30, riders: 4, read: 0.85, lodge: 1, hulls: 1, bell: 900 };
 
 // ---- Colours, names and lookups -------------------------------------------------------------------
@@ -3343,7 +3417,7 @@ export function unitEpoch(type: UnitType): number {
  * nearest claimant (ties go to the older building). Shown only, so far; attrition and building limits
  * are later steps of the seed.
  */
-export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6, silo: 5, huntcamp: 4, warcamp: 3, caravanserai: 5, mission: 5 };
+export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6, silo: 5, huntcamp: 4, warcamp: 3, caravanserai: 5, mission: 5, heart: 8 };
 
 /**
  * War Camps (#303): a finished camp with none of its people's soldiers (land units that fight) within
@@ -3389,8 +3463,8 @@ export const KEG = { ore: 20, time: 30, most: 20, lay: 1.2, fuse: 8, reach: 2, b
 /**
  * The Missile Silo (#605, the Atomic Age): `launch` names a point; `fuse` seconds later (a countdown every player sees) the warhead
  * lands: every rival building within `reach` tiles takes `building`, every rival unit on the ground within `reach` takes `unit`.
- * Destroying the silo while it counts scrubs the launch. A launch empties the silo; refuelling costs `fuel` and takes `refuel`
- * seconds, paid when the launch is made. A people may hold `most` standing silos' worth of warheads at once.
+ * Destroying the silo while it counts scrubs the launch. A launch spends a warhead from the people's pool (#753) and costs `fuel`,
+ * paid when the launch is made.
  */
 /**
  * Fallout (#605 s2, grows seed #533): the ring a warhead struck stays poisoned for `time` seconds. Every second each land unit
@@ -3398,14 +3472,38 @@ export const KEG = { ore: 20, time: 30, most: 20, lay: 1.2, fuse: 8, reach: 2, b
  */
 export const FALLOUT = { time: 90, dps: 4 };
 /**
- * The Age of Fission (#605 s3, seed #533): raw power now. A silo's fuse is `fuse` seconds, it refuels in `refuel`, and each launch
- * poisons `reach` tiles round your own silo for `ownFallout` seconds (`silo.ts`). The Age of Fusion: clean and limitless but slow.
- * The fuse is `fuse` seconds, a silo refuels at once and keeps up to `air` warheads aloft, a launch costs `fuel`, and nothing it
- * strikes is poisoned. Its road costs the earth and takes `road` seconds, leaving the town exposed while it builds.
+ * The Age of Fission (#605 s3, seed #533): raw power now. Every launch's clock is `fuse` seconds, the pool makes a warhead every
+ * `refuel`, a Fission warhead's fuel is `fuel`, and each launch, whatever the warhead, poisons `reach` tiles round your own silo for
+ * `ownFallout` seconds (`silo.ts`). The Age of Fusion: clean and limitless but slow. Every clock is `fuse` seconds, the pool refills
+ * at once, a Fusion warhead's fuel is `fuel`, and nothing it strikes is poisoned. Its road costs the earth, leaving the town exposed while it builds.
  */
-export const FISSION = { fuse: 25, refuel: 100, ownFallout: 60, reach: 3 };
-export const FUSION = { fuse: 70, refuel: 0, air: 3, fuel: { gold: 450, stone: 120 } };
-export const SILO = { fuse: 45, reach: 5, building: 1500, unit: 400, fuel: { gold: 600, stone: 200 }, refuel: 240, most: 2 };
+export const FISSION = { fuse: 25, refuel: 100, ownFallout: 60, reach: 3, fuel: { gold: 800, stone: 250 } };
+export const FUSION = { fuse: 70, refuel: 0, fuel: { gold: 450, stone: 120 } };
+/**
+ * The Missile Silo. `reach` is the radius of the fallout a strike leaves at its impact point; how far the blast itself carries is the
+ * warhead's own `r` (`WARHEADS`). `lift` is how many seconds a blast clears the fog for every player over its radius (#752).
+ * The missile pool (#753): a people keeps one store of warheads, fired from any of its silos. It holds `stock` when its first silo
+ * stands, and makes one more every `refuel` seconds (the plain Atomic Age's; Fission and Fusion have their own) while the warheads in
+ * store and in the air number under `cap`. `fuel` is an Atomic warhead's. A people raises at most `most` silos; every player sees a finished one.
+ */
+/**
+ * The three-zone warning (#762): a rival is shown the real zone and two decoys `apart` tiles or more from it and each other, each ring's
+ * centre moved by a whole number of tiles up to `blur` on each axis; at `reveal` seconds left the decoys vanish. A town too sparse to
+ * draw decoys from falls back to points within `spread` tiles of the target.
+ */
+export const SILO = { fuse: 45, reach: 5, fuel: { gold: 600, stone: 200 }, refuel: 240, most: 2, lift: 60, stock: 1, cap: 3, blur: 2, reveal: 3, apart: 8, spread: 24 };
+/**
+ * The three warheads (#751 s1). A blast does `peak / (1 + (d/half)²)` at distance `d` tiles (from a building's nearest edge, or a unit's
+ * position), tapering linearly over the last `taper` tiles to nothing at the blast radius `r`. A people fires its branch's warhead:
+ * plain Atomic, Fission or Fusion, and from #753 chooses at launch between Atomic and its branch's own.
+ */
+export const WARHEADS = {
+  atomic: { peak: 12000, r: 8 },
+  fission: { peak: 20000, r: 10 },
+  fusion: { peak: 40000, r: 12 },
+  half: 2,
+  taper: 2,
+};
 /**
  * The computer and the silo (#605): in the Atomic Age a clever computer raises one silo once it has `hands` citizens, waits `wait`
  * seconds after it stands, then launches whenever a point would catch `worth` or more of a rival's buildings (a Town Center counts

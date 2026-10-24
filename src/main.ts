@@ -14,7 +14,7 @@ import { easeHour, SHOT_SECONDS, titleShot } from './ui/titleShots';
 import { isEnemy } from './sim/world';
 import { carriesKegs, kegProblem } from './sim/powder';
 import { carriesTorch, torchProblem } from './sim/fire';
-import { launchProblem } from './sim/silo';
+import { launchProblem, ringsFor, type WarheadKind } from './sim/silo';
 import { jumpAge, rush, topUp } from './sim/god';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
 import { placeProblem, stampBuilding, walkable } from './sim/grid';
@@ -115,11 +115,15 @@ let placeAt: { tx: number; ty: number; ok: boolean } | null = null;
 let wallDrag: { x0: number; y0: number; x1: number; y1: number } | null = null;
 /** The next left click picks a target: where to attack-move, or a building to shelter in. */
 let launchSilo = 0;
+/** The warhead chosen for the launch being aimed (#753); absent for the people's own. */
+let launchWarhead: WarheadKind | undefined;
 let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | 'keg' | 'torch' | 'launch' | null = null;
 /** When the viewer was last told one of its living buildings caught fire, so a spreading fire tells once. */
 let fireToldAt = -9999;
 /** When a swarm on your people was last told (the Age of the Hive), so a fight in the woods tells it once. */
 let hiveToldAt = -9999;
+/** When a waking Ent was last told (the Age of the Wildwood), so a forest rising round an army tells it once. */
+let entToldAt = -9999;
 let paused = false;
 const SPEEDS = [1, 1.5, 2, 3];
 let speedIdx = 0;
@@ -190,8 +194,9 @@ const hud = new Hud({
     targetMode = 'torch';
     placing = null;
   },
-  launchMode: (silo) => {
+  launchMode: (silo, w) => {
     launchSilo = silo;
+    launchWarhead = w;
     targetMode = 'launch';
     placing = null;
   },
@@ -624,7 +629,7 @@ function toTitle(): void {
 
 const SAVE_KEY = 'ages-save';
 /** Bumped when the state's shape changes, so an older save is set aside instead of loading broken (2: relics; 3: trading posts). */
-const SAVE_V = 5;
+const SAVE_V = 6;
 
 interface SavedMatch {
   setup: GameSetup;
@@ -1865,12 +1870,12 @@ canvas.addEventListener('pointerdown', (e) => {
     const g = view.groundAt(e.clientX, e.clientY);
     const s = game;
     if (g && s) {
-      const why = launchProblem(s, viewer, s.byId.get(launchSilo) as Building | undefined, g.x, g.y);
+      const why = launchProblem(s, viewer, s.byId.get(launchSilo) as Building | undefined, g.x, g.y, launchWarhead);
       if (why) {
         hud.toast(why, 'bad');
         play('error');
       } else {
-        issue({ t: 'launch', p: viewer, silo: launchSilo, x: g.x, y: g.y });
+        issue({ t: 'launch', p: viewer, silo: launchSilo, x: g.x, y: g.y, ...(launchWarhead ? { w: launchWarhead } : {}) });
         view.marker(s, g.x, g.y, true);
       }
     }
@@ -2939,19 +2944,40 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         } else if (ev.what === 'smoked' && ev.owner === viewer) hud.toast('Smoke has quieted one of your Hives: its bees will wake when it clears', 'alert');
         break;
       }
+      case 'wildwood':
+        // The Age of the Wildwood: a tree that wakes beside your people is told once in a while; your own Ent lost with its tree, and the
+        // spring's Spreading, are told to its people.
+        if (ev.what === 'wake' && ev.owner !== viewer && s.players[viewer]?.vis[Math.floor(ev.y) * s.w + Math.floor(ev.x)] === 1 && s.tick - entToldAt > 20 * TICK_HZ) {
+          entToldAt = s.tick;
+          hud.toast(`A tree wakes! ${s.players[ev.owner]?.name ?? 'A rival'}'s Ent was rooted there: in a Wildwood people's woods, any tree may be one. Fire takes them`, 'alert');
+        } else if (ev.what === 'felled' && ev.owner === viewer) hud.toast('One of your rooted Ents was felled with its tree', 'bad');
+        else if (ev.what === 'spread' && ev.owner === viewer && ev.n) hud.toast(`Spring: your woods spread round the Heart Tree, ${ev.n} seedlings`, 'good');
+        break;
       case 'silo':
-        // The Atomic Age (#605): the clock is public, so every player is told when a warhead goes up and where it will land.
+        // The Atomic Age (#605): the clock is public, so every player is told when a warhead goes up. A rival is shown three rings, the
+        // real zone and two decoys (#762), never the event's point (the attacker's own aim): no marker, ping or camera jump there.
         if (ev.what === 'launched') {
-          if (ev.owner === viewer) hud.toast(`Warhead away: it lands in ${ev.fuse ?? SILO.fuse} seconds`, 'good');
+          if (ev.owner === viewer) hud.toast(`Warhead away: it lands in ${ev.fuse ?? SILO.fuse} seconds. Rivals see your target among two decoys until the last ${SILO.reveal}`, 'good');
           else if (isEnemy(s, viewer, ev.owner)) {
-            hud.toast(`${s.players[ev.owner].name} has launched a warhead: it lands in ${ev.fuse ?? SILO.fuse} seconds. Clear the ring, or destroy the silo`, 'bad');
-            view.marker(s, ev.x, ev.y, false);
+            hud.toast(`${s.players[ev.owner].name} has launched a warhead: it lands in ${ev.fuse ?? SILO.fuse} seconds, in one of three rings. Clear them, or destroy the silo`, 'bad');
+            const l = s.launches?.find((k) => k.id === ev.id);
+            for (const g of l ? ringsFor(s, l, viewer) : []) minimap.ping(g.x, g.y, '#ff4a3a', true);
           }
           play('siloLaunch');
+        } else if (ev.what === 'revealed') {
+          // Exactly SILO.reveal seconds left (#762): the decoys vanish, the real ring flashes where it was drawn, one alarm.
+          const l = s.launches?.find((k) => k.id === ev.id);
+          if (l && isEnemy(s, viewer, ev.owner)) {
+            hud.toast(`${SILO.reveal} seconds: the decoys are gone. ${s.players[ev.owner].name}'s warhead falls in the ring that flashes`, 'bad');
+            for (const g of ringsFor(s, l, viewer)) minimap.ping(g.x, g.y, '#ff2a1a', true);
+            play('siloAlarm');
+          }
         } else if (ev.what === 'scrubbed') {
           hud.toast(ev.owner === viewer ? 'Your silo fell: the launch is scrubbed' : `${s.players[ev.owner].name}'s silo fell: the launch is scrubbed`, ev.owner === viewer ? 'alert' : 'good');
           play('siloScrub');
         } else {
+          // The blast is seen by everyone, through the fog (#752): a ping on every minimap, and the boom.
+          minimap.ping(ev.x, ev.y, '#ffd25a', true);
           play('siloBlast');
         }
         break;

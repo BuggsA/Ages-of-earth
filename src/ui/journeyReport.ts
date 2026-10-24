@@ -1,5 +1,6 @@
 import { ageOf, hasWalked, isSideRoad, roadKnown } from '../sim/ages';
-import { AGES, ROADS, TICK_HZ, TRUNK } from '../sim/data';
+import { AGES, ROADS, ROUTES, TICK_HZ, TRUNK } from '../sim/data';
+import { leanOf } from '../sim/ai';
 import type { AgeId, GameState, Player } from '../sim/types';
 import { MAP, layout } from './webMap';
 
@@ -104,7 +105,8 @@ export function journeyHtml(s: GameState, viewer: number, end: number): string {
   const rows = s.players
     .map((p) => {
       const kept = keepsakesCarried(s, p), cross = crossingsWalked(p);
-      const bits = [kept.length ? `Keepsakes carried: ${kept.map((a) => AGES[a].name).join(', ')}` : '', cross.length ? `Crossings walked: ${cross.map((a) => AGES[a].name).join(', ')}` : ''].filter(Boolean);
+      const lean = leanOf(s, p.id);
+      const bits = [lean ? `Favoured the ${ROUTES[lean].name.toLowerCase()}` : '', kept.length ? `Keepsakes carried: ${kept.map((a) => AGES[a].name).join(', ')}` : '', cross.length ? `Crossings walked: ${cross.map((a) => AGES[a].name).join(', ')}` : ''].filter(Boolean);
       return `<li><span class="swatch" style="background:${p.color}"></span><b>${esc(p.name)}</b> ${esc(roadLine(p, end))}${bits.length ? `<div class="jr-sub">${esc(bits.join('. '))}</div>` : ''}</li>`;
     })
     .join('');

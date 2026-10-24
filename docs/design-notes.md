@@ -1313,6 +1313,14 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 
 **Next:** Rematch in online rooms (same seats); the codex of roads (#724 step 7) can read the same journey; the computer's temperament (step 4) could be shown here as "Wu Zetian favours the Steppe".
 
+## Designers' notes: rivals with a leaning (2026-10-24, #749)
+
+**Built:** a clever computer in a skirmish settles on its first turn whether it favours a route (on coins of its own, 60% of seats), and if so chooses that route's side ages from the start, the way the route sweeps commit a seat. Its card in Rivals names the leaning once its road gives it away; the end screen always does. And every clever computer now punishes a step back: while a rival's weak window is open it sends a wave half the usual size.
+
+**Why I love it:** the step back was a free move against the computer; now it is a gamble you take with its army in mind. And a rival with a character gives you something to read: once you see the Steppe in its road, you know the wagons are coming again next age.
+
+**Next:** the second half of step 4, a habit with going back (one that hoards crossings, one that never retreats, one that steps back to bait you onto its walls); a rival name that says its leaning before the road does, for players who'd like it said.
+
 ## Designers' notes: the Water Road, the Age of Tides (#739, s6 of #701, 2026-10-24, chain 1024-1330 s1, lane rules)
 
 **Built:** a tide clock in the rules (`src/sim/tides.ts`): asleep until the first people enters the Age of Tides, then running for everyone from high water, a step every 30 seconds through three levels to low water and back. The tidal ground is its own layer (`GameState.tidal`), laid out once when the tide wakes: open sea whose bed (the mean of its corners) is shallow enough, three bands by depth. Bared, a tile is wet sand anyone walks and no ship sails; covered again, it sinks back to its own bed (`tideBed`), exactly. Whoever is on the flats as the water comes back is swept ashore and hurt. Tide Mills grind gold at each turn, from the flats near them, a tile to one mill. Causeways are flats you lay yourself, down to deeper water, that only high water covers. A Dock with no water within two tiles is aground. The computer saves for the turn, raises mills where the flats are widest, and pulls its people off the flats a few seconds before the flood.
@@ -1333,6 +1341,47 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 
 **Next:** the `locks → tides` road once the Age of Locks lands; cockle beds on the flats (food only at low water); a sluice gate in a barrage that a Tide people opens to scour a channel or flood a rival's flats; the computer reading a rival's bay for a strike route by path rather than a straight line; ships floated off at the flood.
 
+## Designers' notes: warheads that scale, and a blast everyone sees (#752, s1 of #751, 2026-10-24, chain 1024-1610 s1, lane rules)
+
+**What I built:** each warhead now has a damage curve, `peak / (1 + (d/2)²)` tapering to zero over its last 2 tiles (Atomic 12,000 over 8 tiles, Fission 20,000 over 10, Fusion 40,000 over 12), replacing the flat 1,500 / 400. Blast radius and fallout radius are separate numbers (`WARHEADS[..].r` against `SILO.reach`). A strike adds a `Blast` that lifts the fog for every player over its radius for `SILO.lift` seconds; everyone gets the flash, the boom and a minimap ping. The computer weighs a target by the share of health the curve takes.
+
+**Why I love it:** a nuke finally ends a town centre instead of scratching it, and the aftermath is a minute everybody can watch: who burned, who survived, who marches in.
+
+**Choices I made (the owner may revert):** a blast also breaches causeways out to its full radius, not the old 5; the AI flees a rival launch's blast radius, not the fallout one.
+
+**Next:** s2, the shared missile pool and the type choice at launch; s3, the three-zone warning with blurred rings.
+
+
+## Designers' notes: one store of warheads, two silos everyone sees, a warhead chosen at launch (#753, s2 of #751, 2026-10-24, chain 1024-1610 s2, lane rules)
+
+**What I built:** a people keeps one store of warheads (`Player.nukes`), not tied to a silo: one when the first silo stands, one more every branch `refuel` (240 / 100 / 0 s) while store plus flight is under `SILO.cap` (3), spent the moment the launch is ordered, fired from any standing silo. A fallen silo loses only the warhead it was counting. At most `SILO.most` (2) silos, rising sites counted. A finished silo is drawn for every player through the fog, with no alert (render-side, so the ground and units round it stay fogged). Past the fork the warhead is chosen at launch (M the branch's own, N Atomic); the clock is the people's whatever goes up, and the launch event names no warhead: its warning ring is the widest the people could send (`warnRadius`), and the computer flees that ring too.
+
+**Choices I made (the owner may revert):** Fusion's "refills at once" counts warheads in the air against the cap, so at most three are aloft (otherwise Fusion fires without limit but its fuel); fuel follows the warhead (Atomic 600/200, Fission now 800/250, Fusion 450/120), so a Fission people weighs a cheap Atomic against its heavy own and a Fusion people its clean giant against an Atomic that poisons the ground; a Fission people's own-silo fallout comes with every launch, whatever it sends, so the poison never tells the warhead; the pool refills with no silo standing. The computer picks the warhead with the most worth per gold, and leaves a town its own warhead already falls on.
+
+**Next:** s3, the three-zone warning with seeded decoys and blurred rings; s4, the salvo and the third silo.
+
+## Designers' notes: three rings, one real (#762, s3 of #751, 2026-10-24, chain 1024-1610 s3, lane rules)
+
+**What I built:** a rival never sees a warhead's target, only three red rings on the ground and the minimap: the real zone and two decoys, drawn at launch from the match's own dice and frozen on the launch (`warningsOf`, `Launch.warn`). Decoys are drawn where a real attacker might aim: every rival building the attacker's eyes have ever seen and every rival soldier or citizen they see now is a candidate tile, weighted by what the people's widest warhead would take there (replacement cost × the share of health the curve takes, capped at health). Each ring, the real one too, sits on a tile centre moved up to `SILO.blur` (2) tiles on each axis. One set per rival team. With exactly `SILO.reveal` (3) seconds left the decoys vanish, the real ring flashes where it was drawn (it never snaps), one alarm sounds; the blast lands on the true point. The attacker's side sees its own aim in amber. The computer defender runs from the three rings it is shown.
+
+**Why I love it:** the public clock used to have one answer, step out of the circle. Now a town under a warhead has to decide what to save, and a lone Town Center sits in a ring whose centre may be two tiles off.
+
+**Choices I made (the owner may revert):** decoys are at least `SILO.apart` (8) tiles from the target and each other, before the blur, so in a small town the rings overlap; a town too sparse to draw from falls back to any known asset, then to points within `SILO.spread` (24) tiles of the target, then to compass points, then a map corner (documented on `decoy` in `silo.ts`); every ring centre is snapped to a tile centre so a click's fractions can't single out the real one; the attacker's own allies see its aim, not the decoys; no save bump (a launch from an older save shows its true point).
+
+**Next:** s4, the salvo: three silos, three real zones blurred the same way, scrubbing per silo. Then #759, missile defence, which reads the displayed rings.
+
+## Designers' notes: the Age of the Wildwood (Wild route step 5, 2026-10-24)
+
+**Built:** the Wildwood (`AGES.wildwood`, `WILDWOOD`, `src/sim/wildwood.ts`), instead of the Industrial Age for a Hive people whose Hives have paid 250 honey. One **Heart Tree** to a people; at it, an **Ent** is woken from the nearest old tree, a slow siege giant that flings boulders. An Ent can **root**: it becomes a real tree on the map, mends, and wakes when a rival walks within 3 tiles or an axe bites. If the Heart Tree falls, every Ent roots and sleeps. **The Spreading** seeds the bare ground beside its woods each spring and thickens its Thornwalls. Its people run through those woods; a rival wades. The door: no rifles, guns or aircraft, and fire hits its living things twice as hard.
+
+**Why I love it:** a rooted Ent is a tree in every way the rules know: same tile, same wood, same fire. So the trick is *information*: a rival looking at a wood by a Wildwood town can't know which trees are Ents, and has three honest answers: walk round, send someone cheap in first, or burn it (and burn twice as hard while the Wildwood people stays). The Ents also make the woods matter both ways: they're woken *from* your trees, so every tree you spare by the Heart Tree is a soldier in waiting, and the Spreading grows more of them. Green against iron is real now: the Industrial rival keeps its guns, and the Wildwood has to close in through its own trees to use its Ents.
+
+**What I chose:** an Ent is trained at the Heart Tree (queue, cost, HUD and the computer all come for free) and steps out of a tree, rather than a new "wake this tree" order; a rooted Ent leaves the unit list and is a record plus a real tree, so pathing, fog, sight and selection need no special case, and a felled tree takes the Ent with it. Any bite of an axe wakes it, its own people's too, which keeps the rule one line and gives a reason not to cut by the Heart Tree.
+
+**Seen and not:** in Chromium (software GL) the Heart Tree, an Ent waking from a tree, rooting on O and waking for a rival, with the HUD lines, all ran without errors; the spring swirl, the felled burst and the three sounds I haven't seen or heard. The computer never roots an Ent on purpose (only when its Heart Tree falls).
+
+**Next:** the computer rooting Ents as an ambush in its woods, and reading a rival's woods as a threat (burning before walking in); the Bloom (step 6) off the Wildwood: the Seed Spire and the Greening, which the Spreading already leans toward; Leviathans (step 7); a mark the owner alone sees on their rooted Ents.
+
 ## Designers' notes: routes that read the tide (#755, s6c of #701, 2026-10-24, chain 1024-1330 s3, lane rules)
 
 **Built:** a land unit's new route is read against the tide clock as `routeUnits` lays it (`tideRoute` in `tides.ts`). Walking it at its speed less `TIDE_ROUTE.slack`, it must find each tidal tile bare from the moment it gets there until `margin` seconds after it is past (`bareThrough`: the clock is pure, so any future tick can be read). A route that fails tries two answers: **round**, an A* whose new `veto` turns down a tidal tile the water would cover by the time the walk reaches it (time-dependent: the veto is asked with the distance walked so far, and it covers a diagonal step's corner tiles and the taut-pulled smoothing too); and **wait**, on the middle of the last dry tile before the flats, until the first tick (within `hold`) the whole crossing stays bare from setting out to being past. It takes whichever reaches the goal sooner. With neither it goes as ordered, as before. A waiting unit keeps its order and counts as walking (`wantPath` with `Unit.tideWait`), so moves don't turn idle and chases don't give up; a new order ends the wait. At every turn of the tide, units already walking whose route ahead is now doomed (held up on the way) work it out again.
@@ -1342,4 +1391,3 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 **Choices I made (the owner may revert):** go round vs wait is decided by arrival time alone, nothing cleverer. A departure must find the whole crossing bare from the moment it sets out (not just as each tile is reached), so the route laid at that moment is the one that was checked. The waiting tile is the last dry tile on the route, never a tidal one; a unit standing on the flats with no dry ground ahead keeps its route (going on is better than standing). A crossing that can't be made within `hold` (180 s, a whole tide) goes as ordered, as before, rather than standing for ever. No sound for a wait: the computer's armies wait often, and it would chatter.
 
 **Next:** cockle beds (food on the flats gathered only at low water, the gatherers reading the tide as they work): opened as its own step. Builders on causeway sites out on the flats are the last ones swept: their work could read the tide the same way. A rally point or waypoint that shows the wait before the order is given.
-

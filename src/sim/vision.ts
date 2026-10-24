@@ -86,6 +86,13 @@ export function updateVision(s: GameState): void {
       stamp(s, p.vis, p.seen, cx, cy, d);
     }
   }
+  // A warhead's blast clears the fog for everyone over its radius for a while (#752): all can watch what burned and what stands.
+  for (const b of s.blasts ?? []) {
+    const d = disc(b.r);
+    const cx = Math.floor(b.x);
+    const cy = Math.floor(b.y);
+    for (const p of s.players) stamp(s, p.vis, p.seen, cx, cy, d);
+  }
   // Allies share what they see.
   for (let a = 0; a < s.players.length; a++) {
     const pa = s.players[a];
