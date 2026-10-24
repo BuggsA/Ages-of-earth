@@ -13,7 +13,7 @@ import { bakedMaterial, fogUniforms, inject, swayMaterial } from './materials';
  */
 
 const C = (hex: string) => new THREE.Color(hex);
-const GRASS = [C('#76b04a'), C('#5f9c40'), C('#8cc25a')];
+const GRASS = [C('#92b45c'), C('#7ba24e'), C('#a8c670')];
 const DRY = C('#b8b46a');
 const DIRT = C('#9c8a5e');
 const SAND = [C('#e6d39c'), C('#d6c088')];
