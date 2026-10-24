@@ -55,6 +55,21 @@ const SCENES = [
     for (let i = 0; i < 8; i++) ages.spawn(me, 'citizen', p.startX + 3 + (i % 4), p.startY + 3 + Math.floor(i / 4));
     return { x: wx + 1.5, y: wy + 0.7, zoom: 0.6 };
   }],
+  // The same town in the Stone and Bronze Ages (#625): the early silhouettes of houses, stores and barracks.
+  ['stone-town', ({ g, ages, me }) => {
+    ages.setEpoch(me, 0);
+    for (const t of ['house', 'house', 'house', 'storehouse', 'barracks', 'range', 'stable', 'tower', 'temple', 'market', 'farm', 'farm']) ages.build(me, t);
+    const p = g.players[me];
+    for (let i = 0; i < 8; i++) ages.spawn(me, 'citizen', p.startX + 4 + (i % 4), p.startY + 4 + Math.floor(i / 4));
+    return { zoom: 1.4 };
+  }],
+  ['bronze-town', ({ g, ages, me }) => {
+    ages.setEpoch(me, 1);
+    for (const t of ['house', 'house', 'house', 'storehouse', 'barracks', 'range', 'stable', 'tower', 'temple', 'market', 'farm', 'farm']) ages.build(me, t);
+    const p = g.players[me];
+    for (let i = 0; i < 8; i++) ages.spawn(me, 'citizen', p.startX + 4 + (i % 4), p.startY + 4 + Math.floor(i / 4));
+    return { zoom: 1.4 };
+  }],
 ];
 
 const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
