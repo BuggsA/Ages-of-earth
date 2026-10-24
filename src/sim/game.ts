@@ -744,6 +744,14 @@ export function checksum(s: GameState): number {
     mix(f.ty);
     mix(f.until);
   }
+  for (const l of s.launches ?? []) {
+    mix(l.id);
+    mix(l.at);
+  }
+  for (const b of s.blasts ?? []) {
+    mix(b.id);
+    mix(b.until);
+  }
   for (const r of s.rubble ?? []) {
     mix(r.id);
     mix(r.done);

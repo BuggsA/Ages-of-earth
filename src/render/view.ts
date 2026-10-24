@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { SoundName } from '../audio/sound';
 import { ageDef, ageOf } from '../sim/ages';
 import { fairground, feastOpen } from '../sim/fair';
-import { AURA, BUILDINGS, KEG, SILO, RALLY, RITE, SIGNATURES, TICK_HZ, LANDMARKS, RUINS, TRADE, domainOf } from '../sim/data';
+import { AURA, BUILDINGS, KEG, SILO, WARHEADS, RALLY, RITE, SIGNATURES, TICK_HZ, LANDMARKS, RUINS, TRADE, domainOf } from '../sim/data';
 import { buildingMaxHp, statsFor } from '../sim/stats';
 import type { AgeId, BuildingType, CivId, Ent, GameEvent, GameState, Unit } from '../sim/types';
 import type { ScoutFlag } from '../ui/scoutFlags';
@@ -956,11 +956,14 @@ export class View {
         case 'silo': {
           // The Atomic Age (#605): a ring on the target the moment a warhead goes up, a dome of fire where it lands.
           const at = this.ground(s, ev.x, ev.y, 0.3);
-          if (ev.what === 'launched') this.effects.ring(at, '#ff4a3a', SILO.reach + 0.5, 1.4);
-          else if (ev.what === 'struck' && this.sees(ev.x, ev.y)) {
-            this.effects.burst(at, { count: 60, speed: 5, up: 1.2, life: 1.2, size: 0.3, grow: 3, gravity: -1.4, drag: 1, colors: ['#fff6d0', '#ffd25a', '#ff7a2a'] });
-            this.effects.burst(at, { count: 50, speed: 2.2, up: 2.6, life: 5, size: 0.5, grow: 5, gravity: -0.6, drag: 0.8, soft: true, colors: ['#3a3430', '#524a44', '#6c625a'] });
-            this.effects.ring(at, '#ffe9a8', SILO.reach + 1, 1.6);
+          const R = WARHEADS[ev.w ?? 'atomic'].r;
+          if (ev.what === 'launched') this.effects.ring(at, '#ff4a3a', R + 0.5, 1.4);
+          else if (ev.what === 'struck') {
+            // Every player sees the blast, through the fog (#752); it grows with the warhead (Atomic 1, Fusion 1.5).
+            const big = R / WARHEADS.atomic.r;
+            this.effects.burst(at, { count: Math.round(60 * big), speed: 5 * big, up: 1.2, life: 1.2, size: 0.3, grow: 3 * big, gravity: -1.4, drag: 1, colors: ev.w === 'fusion' ? ['#ffffff', '#cfe6ff', '#8fc4ff'] : ['#fff6d0', '#ffd25a', '#ff7a2a'] });
+            this.effects.burst(at, { count: Math.round(50 * big), speed: 2.2 * big, up: 2.6 * big, life: 5, size: 0.5, grow: 5 * big, gravity: -0.6, drag: 0.8, soft: true, colors: ['#3a3430', '#524a44', '#6c625a'] });
+            this.effects.ring(at, '#ffe9a8', R + 1, 1.6);
             this.cue('kegBlow', ev.x, ev.y, 1);
           }
           break;

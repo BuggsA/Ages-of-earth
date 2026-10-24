@@ -1340,3 +1340,14 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 **Choices I made (the owner may revert):** a pond is judged as the mills judge the open sea (an edge or more than 160 tiles is the sea), so the rule is one the player already met with dykes. Pond tiles count twice rather than the mill getting a flat bonus, so a barrage pays only where it shuts real flats near the mill. A breach drains the pond at the next turn of the tide, not at once, so there is a beat to mend it. Powder breaches only a rival's causeways (as it hurts only rival buildings). The low-water strike uses a straight line from the muster: cheap, and wrong only where the bay is never the way; in headless matches on lakes maps few marches cross the flats in a straight line (1 in 40 town pairs), so it is a sharp tool for the maps that have the bay, not a change to every war. The wave waits at most `AI_EBB.hold` seconds, counted only while it stands ready, then goes anyway.
 
 **Next:** the `locks → tides` road once the Age of Locks lands; cockle beds on the flats (food only at low water); a sluice gate in a barrage that a Tide people opens to scour a channel or flood a rival's flats; the computer reading a rival's bay for a strike route by path rather than a straight line; ships floated off at the flood.
+
+## Designers' notes: warheads that scale, and a blast everyone sees (#752, s1 of #751, 2026-10-24, chain 1024-1610 s1, lane rules)
+
+**What I built:** each warhead now has a damage curve, `peak / (1 + (d/2)²)` tapering to zero over its last 2 tiles (Atomic 12,000 over 8 tiles, Fission 20,000 over 10, Fusion 40,000 over 12), replacing the flat 1,500 / 400. Blast radius and fallout radius are separate numbers (`WARHEADS[..].r` against `SILO.reach`). A strike adds a `Blast` that lifts the fog for every player over its radius for `SILO.lift` seconds; everyone gets the flash, the boom and a minimap ping. The computer weighs a target by the share of health the curve takes.
+
+**Why I love it:** a nuke finally ends a town centre instead of scratching it, and the aftermath is a minute everybody can watch: who burned, who survived, who marches in.
+
+**Choices I made (the owner may revert):** a blast also breaches causeways out to its full radius, not the old 5; the AI flees a rival launch's blast radius, not the fallout one.
+
+**Next:** s2, the shared missile pool and the type choice at launch; s3, the three-zone warning with blurred rings.
+
