@@ -1289,3 +1289,11 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 **Not seen:** none of it in a browser yet (models, the swarm cloud, the dart, the drone and hush, the HUD lines are unit-tested or compiled only). Sound levels want an ear.
 
 **Next:** the Wildwood (step 5): the Heart Tree and Ents that root, the Spreading (which feeds new Hive ground), and "fire hits living things twice as hard"; beasts that fear fire; the computer reading a rival's Hives and raiding in winter or smoking them first.
+
+## Designers' notes: your road at the end (2026-10-24, #743)
+
+**Built:** the rules now keep a `journey` for each people (every change of age, with what fell inside the weak window after a step back), and the end screen draws it on the web: each player's road in their colour, steps back dashed, a line each of time per age, "window struck: lost 4" or "window unstruck", keepsakes carried and crossings walked, then the roads you knew of that nobody took. Beside Play again, **Play this seed again**.
+
+**Why I love it:** the match tells its story at the end. You see that your rival won by the Iron Age's marsh and a step back you never punished, and the button is right there to try that road yourself on the same land. It's the bridge from one match to the next that `docs/engagement.md` found missing.
+
+**Next:** Rematch in online rooms (same seats); the codex of roads (#724 step 7) can read the same journey; the computer's temperament (step 4) could be shown here as "Wu Zetian favours the Steppe".

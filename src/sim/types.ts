@@ -775,6 +775,15 @@ export interface HistoryPoint {
 /** The cards of tidings that come to the fire in the Stone Age (#443). */
 export type TidingId = 'traveller' | 'hunter' | 'tale' | 'storm' | 'fever';
 
+/** One change of age (#743). `lost` counts what the people lost inside the weak window after a step back (`STEP_BACK.time`). */
+export interface JourneyLeg {
+  tick: number;
+  from: AgeId;
+  to: AgeId;
+  back?: true;
+  lost?: number;
+}
+
 export interface Player {
   id: number;
   name: string;
@@ -830,6 +839,8 @@ export interface Player {
   told?: TidingId[];
   /** Tick its last step back (#47) landed, for the cooldown; absent if it never stepped back. */
   backAt?: number;
+  /** Every change of age, in order (#743): the end screen draws the road walked from it. Absent before the first (and in older saves). */
+  journey?: JourneyLeg[];
   /** The tick the people's Golden Age began (#703); gone once it ends. */
   goldenAt?: number;
   techs: TechId[];
