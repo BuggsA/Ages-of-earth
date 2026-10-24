@@ -174,7 +174,8 @@ export function webMapHtml(d: Discovery): string {
         .map((r) => `<li>${esc(roadLabel(r))}</li>`)
         .join('');
       const body = v === 'grey' ? '<p class="wm-dim">Not yet reached.</p>' : `<p>${esc(AGES[a].blurb)}</p>${roads ? `<ul class="wm-roads">${roads}</ul>` : ''}`;
-      return `<div class="wm-card ${v}"><h3>${esc(AGES[a].name)} <small>tier ${AGES[a].tier + 1}</small></h3>${v === 'known' ? '<p class="wm-dim">A road leads here, not yet taken.</p>' : ''}${body}</div>`;
+      const pin = v === 'grey' ? '' : ` <button class="btn" data-act="plan-pin" data-age="${a}" title="Pin as the goal of the road planner (the Roads button in a match)">📍</button>`;
+      return `<div class="wm-card ${v}"><h3>${esc(AGES[a].name)} <small>tier ${AGES[a].tier + 1}</small>${pin}</h3>${v === 'known' ? '<p class="wm-dim">A road leads here, not yet taken.</p>' : ''}${body}</div>`;
     })
     .join('');
   const hidden = (Object.keys(AGES) as AgeId[]).length - ages.length;

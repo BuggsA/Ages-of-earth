@@ -266,7 +266,7 @@ const routeTag = (id: AgeId) => {
  * Going back as a plan (#555 s10, `docs/age-roads.md` §5): what leaving this age for `to` keeps, puts to sleep, wakes and loses,
  * for the step-back button and the roads. What is kept for good shows on a step back only.
  */
-const planLines = (s: GameState, p: Player, to: AgeId, back: boolean): string => {
+export const planLines = (s: GameState, p: Player, to: AgeId, back: boolean): string => {
   const l = leaving(s, p, to, back);
   const tally = (t: Tally) => t.map(([type, n]) => `${n} ${BUILDINGS[type].name}${n > 1 ? 's' : ''}`).join(', ');
   const lines: string[] = [];
