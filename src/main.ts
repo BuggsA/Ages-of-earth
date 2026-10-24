@@ -2381,7 +2381,7 @@ function timeline(s: GameState, metric: Metric): string {
   return `<svg class="timeline" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${grid}${lines}</svg>`;
 }
 
-type EndHow = 'conquest' | 'wonder' | 'relics' | 'lands' | 'resign' | 'time' | 'scenario';
+type EndHow = 'conquest' | 'wonder' | 'relics' | 'lands' | 'greening' | 'resign' | 'time' | 'scenario';
 /** How the viewer's match ended, so the menu can bring the results back after a look around. */
 let lastEnd: { won: boolean; how: EndHow; tick: number } | null = null;
 
@@ -2412,6 +2412,8 @@ function showEnd(s: GameState, won: boolean, how: EndHow = 'conquest', again = f
       ? won ? 'Your Wonder stood the test of time.' : 'A rival Wonder stood the test of time.'
       : how === 'lands'
         ? won ? 'Every landmark in the land is yours: you are its lord.' : 'A rival became lord of every landmark in the land.'
+      : how === 'greening'
+        ? won ? 'Your land stayed green: the Greening is complete, and the world is a forest again.' : 'A rival kept its land green until the Greening was complete.'
       : how === 'relics'
         ? won ? 'Every relic in the world rests in your temples.' : 'A rival kept every relic in the world.'
         : won ? 'Your rivals have fallen.' : 'Your people are no more.';
