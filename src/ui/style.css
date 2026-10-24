@@ -268,6 +268,8 @@ kbd {
 }
 .tb-btn:hover { border-color: var(--gold); }
 .tb-btn.alert { border-color: var(--gold); color: var(--gold-2); animation: pulse 1.6s infinite; }
+.tb-btn.alert.rise { animation: idle-rise 0.9s ease-out 1, pulse 1.6s 0.9s infinite; }
+@keyframes idle-rise { 0% { transform: scale(1); } 30% { transform: scale(1.18); background: var(--gold); color: #1a1208; } 100% { transform: scale(1); } }
 @keyframes pulse { 50% { box-shadow: 0 0 0 3px rgba(232, 196, 106, 0.25); } }
 
 #bottom { position: absolute; left: 0; right: 0; bottom: 0; height: 176px; display: flex; gap: 8px; padding: 8px; pointer-events: none; align-items: flex-end; }
