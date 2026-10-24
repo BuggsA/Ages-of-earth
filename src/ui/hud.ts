@@ -9,7 +9,7 @@ import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE, findResource } from '../sim/units';
-import { FIRE, FISSION, HIVE, WILDWOOD, AUTO_WORK, BREACH, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, SALVO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE } from '../sim/data';
+import { FIRE, FISSION, HIVE, WILDWOOD, AUTO_WORK, BREACH, CANAL, DAM, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, SALVO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -18,7 +18,7 @@ import { loadPrice, sellerNear } from '../sim/oretrade';
 import { clockOf, fuelOf, launchProblem, loaded, nextNuke, revealed, ringsFor, rulesOf, salvoFuel, salvoProblem, stockOf, warheadsOf, WARHEAD_NAMES, type WarheadKind } from '../sim/silo';
 import { carriesKegs, kegProblem, kegsOf, millProblem, mills, millsOf, sappers } from '../sim/powder';
 import { carriesTorch, fireOn } from '../sim/fire';
-import { basinOf, drowned, heldBack, isInund, lets, millIdle, sluiceFed, sluiceProblem, waterLine, wateredAt } from '../sim/water';
+import { basinOf, damIdle, drowned, heldBack, isInund, lets, millIdle, sluiceFed, sluiceProblem, waterLine, wateredAt } from '../sim/water';
 import { aground, millShares, tidalNear, tideClock, tideMillIdle } from '../sim/tides';
 import { isPond } from '../sim/tides';
 import { tideWaitLeft } from '../sim/tides';
@@ -1154,7 +1154,7 @@ export class Hud {
       if (ageDef(s.players[b.owner]).rivers) status += wateredAt(s, b.tx, b.ty, b.size) ? ` · <span data-tip="<b>Watered</b>Water lies within ${RIVERS.wet} tiles: in the Age of Rivers the field works ${Math.round((RIVERS.farm - 1) * 100)}% faster.">💧 Watered</span>` : ` · <span data-tip="<b>Dry</b>No water within ${RIVERS.wet} tiles. Dig a Channel (Q) to it and it works faster.">Dry field</span>`;
     } else if (b.type === 'channel' && b.built) {
       // A dug ditch (#701) waiting for the water: it fills once water lies beside it.
-      status = 'Dug, and dry: the water runs in once a channel or water lies beside it. Dig on toward the water.';
+      status = ageDef(s.players[b.owner]).canals ? 'Dug, and dry: the water runs in once water lies beside it, deep enough for ships. Dig on toward the water.' : 'Dug, and dry: the water runs in once a channel or water lies beside it. Dig on toward the water.';
     } else if (b.type === 'snare' && b.built) {
       // Snares in the wood (#485): what it holds, how fast its woods fill it, and whether anyone walks the line.
       const trees = snareWoods(s, b);
@@ -1247,6 +1247,14 @@ export class Hud {
       const under = waterLine(s, b).filter((t) => isInund(s, t)).length;
       status += ` · <span data-tip="<b>Sluice</b>Open, the water runs out over the low ground within ${INUND.reach} tiles of it: polder, and meadow no higher than a little over its banks. Soldiers wade it at a crawl, siege bogs down, and gun-barges sail it. Shut, it holds the water back as a dyke does.">${b.open ? (lets(s, b) ? `🌊 Open: ${under} tiles under water` : '⚠ Open, but no water to let out') : sleeping ? '💤 Shut' : `🚪 Shut${under ? `: ${under} tiles still draining` : ''}`}</span>`;
     }
+    // A dam (#701 s5): whether its turbines turn, how many of its owner's buildings they drive, and the burst it holds back.
+    if (b.built && b.type === 'dam') {
+      const still = damIdle(s, b);
+      const r2 = DAM.reach * DAM.reach;
+      const driven = s.ents.filter((e) => e.kind === 'building' && e.owner === b.owner && e.built && e.hp > 0 && BUILDINGS[e.type].trains.length > 0 && (e.x - b.x) * (e.x - b.x) + (e.y - b.y) * (e.y - b.y) <= r2).length;
+      status += ` · <span data-tip="<b>Dam</b>With still water beside it, its turbines drive every building of yours within ${DAM.reach} tiles: they train and research ${DAM.drive - 100}% faster (one dam's worth, however many stand near). If it falls with water behind it, it bursts over the low ground round it, up to ${DAM.surge} tiles, and all who stand there lose ${DAM.hurt} health.">${still ? `⚠ ${still}` : `⚙ Turning: drives ${driven} building${driven === 1 ? ' that trains' : 's that train'}`}</span>`;
+    }
+    if (b.built && b.type === 'bridge') status += ` · <span data-tip="<b>Bridge</b>Your own people cross here at full pace; rivals can't, and swim the water round it at ${Math.round(CANAL.wade * 100)}% of their pace in a canal. Every ship and barge passes under it.">🌉 Swings for ships</span>`;
     // A windmill (#701): how much water is left behind its dykes, or why it stands still.
     if (mine && b.built && !sleeping && b.type === 'windmill') {
       const still = millIdle(s, b);
@@ -1345,7 +1353,8 @@ export class Hud {
         cmds.push({
           key: def.key,
           pic: buildingPicture(type, p.epoch, p.color),
-          title: def.name,
+          // In the Age of Locks (#701 s5) a channel is dug deep, as a canal.
+          title: type === 'channel' && ageDef(p).canals ? 'Canal' : def.name,
           desc: def.blurb + (type === 'wall' || type === 'thornwall' ? ' Click and drag to lay out a line.' : '') + (def.blood ? ` Costs 🩸${def.blood} blood besides.` : ''),
           cost,
           ok: !locked && !no && !short && !wonderUp,

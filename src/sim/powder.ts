@@ -114,7 +114,7 @@ function blow(s: GameState, k: Keg): void {
     }
   }
   // A dyke (#701 s3) is earth: powder at its foot tears it open, and the sea does the rest.
-  for (const e of hit) hurt(s, e, e.kind === 'building' ? KEG.building * (e.type === 'dyke' || e.type === 'sluice' ? BREACH.keg : 1) : KEG.unit, k.owner, null);
+  for (const e of hit) hurt(s, e, e.kind === 'building' ? KEG.building * (e.type === 'dyke' || e.type === 'sluice' || e.type === 'dam' ? BREACH.keg : 1) : KEG.unit, k.owner, null);
   // A rival's causeway or barrage (#748) is packed stone on the sand: the blast breaches it.
   breachAt(s, k.x, k.y, KEG.reach, k.owner);
   const p = s.players[k.owner];

@@ -1,9 +1,10 @@
 import { BUILDINGS, LANDMARKS, RUINS, TRADE } from './data';
+import { ageDef } from './ages';
 import { landOwnerAt } from './borders';
 import { isEnemy } from './world';
 import { snareSpot } from './snares';
 import { hiveSpot } from './hive';
-import { dykeSpot, isChannel, isInund, parched } from './water';
+import { bridgeSpot, dykeSpot, isChannel, isDug, isInund, parched } from './water';
 import { bared, causewaySpot } from './tides';
 import type { Building, BuildingType, GameState } from './types';
 import { B_BUILDING, B_GATE, B_RES, B_TERRAIN, R_BLOODIRON, R_GOLD, R_NONE, R_SALT, R_SALTPETRE, R_STONE, T_ROCK, T_WATER } from './types';
@@ -30,16 +31,37 @@ export function walkable(s: GameState, x: number, y: number, team = -1): boolean
   if (x < 0 || y < 0 || x >= s.w || y >= s.h) return false;
   const i = y * s.w + x;
   const b = s.block[i];
-  if (team === NAVAL) return b === B_TERRAIN && s.terrain[i] === T_WATER;
+  if (team === NAVAL) return sails(s, i);
   if (team === BARGE) return s.terrain[i] === T_WATER && (b === B_TERRAIN || b === 0 || (b === B_GATE && lock(s, i)));
   if (team === AIR) return true;
   return b === 0 || (b === B_GATE && team >= 0 && s.gateTeam[i] === team);
 }
 
-/** Whether a finished sluice stands on this tile (#701 s4): a gun-barge passes through it, as through a lock. */
+/**
+ * Whether a finished sluice stands on this tile (#701 s4): a gun-barge passes through it, as through a lock. So it does under a finished
+ * bridge (#701 s5), as every ship does.
+ */
 export function lock(s: GameState, i: number): boolean {
   const b = s.byId.get(s.bldAt[i]);
-  return !!b && b.kind === 'building' && b.type === 'sluice' && b.built && b.hp > 0;
+  return !!b && b.kind === 'building' && (b.type === 'sluice' || b.type === 'bridge') && b.built && b.hp > 0;
+}
+
+/** Whether a finished bridge stands on this tile (#701 s5): it swings for ships. */
+export function underBridge(s: GameState, i: number): boolean {
+  const b = s.byId.get(s.bldAt[i]);
+  return !!b && b.kind === 'building' && b.type === 'bridge' && b.built && b.hp > 0;
+}
+
+/**
+ * Whether a ship sails this tile: open water (`B_TERRAIN` water with nothing on it), a canal (#701 s5: water a people dug deep, no
+ * `B_TERRAIN`, that land units swim), or under a finished bridge. The path fields (`path.ts`) read the same test.
+ */
+export function sails(s: GameState, i: number): boolean {
+  if (s.terrain[i] !== T_WATER) return false;
+  const b = s.block[i];
+  if (b === B_TERRAIN) return true;
+  if (!s.channel || s.channel[i] !== 2) return false;
+  return b === 0 || (b === B_GATE && underBridge(s, i));
 }
 
 /** Open water tiles beside a footprint (a dock needs some). */
@@ -85,11 +107,18 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
   // The computer asks this of hundreds of tiles a search; most are nowhere near a relic, post, ruin or landmark.
   const near = keepClearNear(s, tx, ty, n);
   // A dyke (#701) goes on shallow water, or on the shore beside it; so does a sluice (#701 s4), on a channel too, or into its own dyke line.
-  const dyke = type === 'dyke' || type === 'sluice';
+  // A dam (#701 s5) goes where a sluice does; a bridge over water a people dug, and a channel, in the Age of Locks, over an old channel
+  // to dig it deep.
+  const dyke = type === 'dyke' || type === 'sluice' || type === 'dam';
   if (dyke) {
     const why = dykeSpot(s, tx, ty);
     if (why) return why;
   }
+  if (type === 'bridge') {
+    const why = bridgeSpot(s, tx, ty);
+    if (why) return why;
+  }
+  const deepen = type === 'channel' && owner >= 0 && !!s.players[owner] && !!ageDef(s.players[owner]).canals;
   // A causeway (#739) goes on the shallow sea or the tidal flats; nothing else is raised on ground the tide comes back to.
   const cause = type === 'causeway';
   if (cause) {
@@ -100,7 +129,7 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
     for (let x = tx; x < tx + n; x++) {
       const i = y * s.w + x;
       if (!cause && !dyke && bared(s, i)) return 'tidal';
-      if (s.terrain[i] === T_WATER && (!dyke || isInund(s, i)) && !cause) return 'water';
+      if (s.terrain[i] === T_WATER && !cause && ((!dyke && type !== 'bridge' && !(deepen && isChannel(s, i))) || isInund(s, i))) return 'water';
       if (s.terrain[i] === T_ROCK) return 'rock';
       if (s.res[i] !== R_NONE || (near && (relicOnTile(s, x, y) || postOnTile(s, x, y) || ruinOnTile(s, x, y) || landmarkOnTile(s, x, y)))) return 'blocked';
       // A gate may go into its owner's own wall, replacing the pieces it covers.
@@ -115,7 +144,7 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
     }
   }
   // Walls follow the land (and docks the shore); everything else wants it fairly level.
-  if (hi - lo > (type === 'wall' || type === 'gate' || type === 'dock' || type === 'channel' || dyke || cause ? 2.2 : 1.1)) return 'slope';
+  if (hi - lo > (type === 'wall' || type === 'gate' || type === 'dock' || type === 'channel' || type === 'bridge' || dyke || cause ? 2.2 : 1.1)) return 'slope';
   if (BUILDINGS[type].shore && shoreWater(s, tx, ty, n) < 3) return 'shore';
   // A Snare goes only among standing trees, and apart from the others (#485).
   if (type === 'snare') {
@@ -201,7 +230,8 @@ export function stampBuilding(s: GameState, b: Building, on: boolean): void {
   // Only new blockages matter to cached distance fields: an opened tile just leaves a route a little long.
   if (!open && on) s.blockVersion++;
   // A dyke (#701) is a gate along its whole length: its own team walks its crown, over water too, and nothing else passes.
-  const dyke = b.type === 'dyke' || b.type === 'sluice';
+  // So is a dam, and a bridge (#701 s5) for those who walk it; a ship passes under a bridge (`sails`).
+  const dyke = b.type === 'dyke' || b.type === 'sluice' || b.type === 'dam' || b.type === 'bridge';
   // A Thornwall (the Age of the Grove) parts for its own team as a gate does.
   const gate = b.type === 'gate' || b.type === 'thornwall' || dyke;
   if (dyke) s.blockVersion++;
@@ -219,7 +249,7 @@ export function stampBuilding(s: GameState, b: Building, on: boolean): void {
           s.gateTeam[i] = team;
         } else if (on) s.block[i] |= B_BUILDING;
         // Water or rock under a dyke is crossed while it stands, and is water or rock again once it is gone.
-        if (dyke) s.block[i] = on && b.built ? s.block[i] & ~B_TERRAIN : (s.terrain[i] === T_WATER && !isChannel(s, i)) || s.terrain[i] === T_ROCK ? s.block[i] | B_TERRAIN : s.block[i];
+        if (dyke) s.block[i] = on && b.built ? s.block[i] & ~B_TERRAIN : (s.terrain[i] === T_WATER && !isDug(s, i)) || s.terrain[i] === T_ROCK ? s.block[i] | B_TERRAIN : s.block[i];
       } else if (!open) s.block[i] = on ? s.block[i] | B_BUILDING : s.block[i] & ~B_BUILDING;
     }
   }

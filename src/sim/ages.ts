@@ -1,6 +1,6 @@
-import { AGES, BUILDINGS, CIVS, GOLDEN, LIGHTNING, LOWER_IS_BETTER, PATHS, ROADS, STEP_BACK, TECHS, TICK_HZ, TRUNK, WAYS, secs, stepBackCost, type Age, type Deed, type Mods, type Road, type UnitClass } from './data';
+import { AGES, BUILDINGS, CIVS, DAM, GOLDEN, LIGHTNING, LOWER_IS_BETTER, PATHS, ROADS, STEP_BACK, TECHS, TICK_HZ, TRUNK, WAYS, secs, stepBackCost, type Age, type Deed, type Mods, type Road, type UnitClass } from './data';
 import { KEYS, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, type AgeId, type CivId, type PathId, type RareId, type Building, type BuildingType, type Cost, type GameState, type KeyId, type Player, type TechId, type UnitType } from './types';
-import { coastHeld } from './water';
+import { coastHeld, driven } from './water';
 
 /**
  * Ages as a web (#37): which age a people is in, the roads out of it, and what that age lets them
@@ -34,7 +34,7 @@ const boon = (key: keyof Mods, v: number): boolean => (LOWER_IS_BETTER.includes(
 /** What an age's verbs are, beyond its numbers and its doors: carried whole into a Golden Age. */
 const VERB_KEYS = [
   'hire', 'mobile', 'packs', 'caravans', 'relicTrade', 'ironTrade', 'forge', 'coils', 'callUp', 'haul', 'blood', 'hemocraft', 'rite', 'fission', 'fusion',
-  'reclaim', 'salvage', 'sortie', 'fairs', 'convoys', 'prizes', 'vigils', 'thralls', 'mills', 'sappers', 'raid', 'missions', 'names', 'pumps', 'rivers', 'sluices',
+  'reclaim', 'salvage', 'sortie', 'fairs', 'convoys', 'prizes', 'vigils', 'thralls', 'mills', 'sappers', 'raid', 'missions', 'names', 'pumps', 'rivers', 'sluices', 'canals', 'turbines',
 ] as const;
 
 const woven = new Map<string, Age>();
@@ -689,6 +689,14 @@ export function inField(s: GameState, b: { x: number; y: number; owner: number }
  * in a coil's field works at `LIGHTNING.lit` and one outside every field at `LIGHTNING.dark` (elsewhere, `lit` in a kept coil's field).
  */
 export function workRate(s: GameState, b: Building): number {
+  const p = s.players[b.owner];
+  // A dam's turbines (#701 s5, the Age of Locks) drive the work beside it, on top of the coils: only a people that has walked the age has one.
+  const dam = (ageDef(p).turbines || p.walked?.includes('locks')) && driven(s, b) ? DAM.drive : 100;
+  return dam === 100 ? coilRate(s, b) : Math.round((coilRate(s, b) * dam) / 100);
+}
+
+/** The coils' part of `workRate` (the Age of Lightning, #231). */
+function coilRate(s: GameState, b: Building): number {
   const p = s.players[b.owner];
   // Off Lightning, only the coil kept as its keepsake (#555 s11) still lights a field, and nothing is dark.
   if (!hasCoils(p)) return p.walked?.includes('lightning') && inKeptCoil(s, b) ? LIGHTNING.lit : 100;

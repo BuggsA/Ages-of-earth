@@ -1,4 +1,4 @@
-import { AGES, BREACH, DYKE, INUND, POLDER, RIVERS, domainOf, secs } from './data';
+import { AGES, BREACH, CANAL, DAM, DYKE, INUND, POLDER, RIVERS, domainOf, secs } from './data';
 import { ageDef, ageOf, asleep } from './ages';
 import { landOwnerAt } from './borders';
 import { nearestWalkable, stampBuilding } from './grid';
@@ -12,12 +12,18 @@ import { B_RES, B_TERRAIN, R_FISH, R_NONE, T_GRASS, T_ROCK, T_SAND, T_WATER } fr
  * corners raised just over the water line so the renderer shows the water stepping back. Water flows four ways only, so a dyke line
  * that steps diagonally still holds. A mill pumps only a small basin (a lake, or a bay a dyke has shut off): water that reaches a map
  * edge, or more than `POLDER.most` tiles of it, is the open sea. Drained land is everyone's: a strait drained is a land bridge.
- * The numbers are `DYKE` and `POLDER`. A dyke that falls lets the sea back in (`floodStep`, #701 s3, `BREACH`); sluices and canals are
- * the road's later steps.
+ * The numbers are `DYKE` and `POLDER`. A dyke that falls lets the sea back in (`floodStep`, #701 s3, `BREACH`); sluices let a flood
+ * out over the low ground (#701 s4, `INUND`); canals carry ships inland, and dams turn turbines and can burst (#701 s5, `CANAL`, `DAM`).
  */
 
 /** Whether this tile was dug out into a channel (the Age of Rivers): water a land unit wades and no ship sails. */
 export const isChannel = (s: GameState, tile: number): boolean => !!s.channel && s.channel[tile] === 1;
+
+/** Whether this tile was dug deep into a canal (#701 s5, the Age of Locks): water every ship sails and a land unit swims. */
+export const isCanal = (s: GameState, tile: number): boolean => !!s.channel && s.channel[tile] === 2;
+
+/** Whether this tile is water a people dug, a channel or a canal: what a Bridge is laid over. */
+export const isDug = (s: GameState, tile: number): boolean => !!s.channel && s.channel[tile] !== 0;
 
 /** Whether a spring head (#701 s1) lies on this tile: a channel dug beside it fills from it. */
 export const isSpring = (s: GameState, tile: number): boolean => !!s.springs && s.springs.includes(tile);
@@ -195,7 +201,8 @@ function banked(s: GameState, i: number): boolean {
   const id = s.bldAt[i];
   if (id === 0) return false;
   const b = s.byId.get(id);
-  return !!b && b.kind === 'building' && ((b.type === 'dyke' && b.built) || b.type === 'sluice') && b.hp > 0;
+  // A finished dam (#701 s5) is a dyke with a turbine house in it.
+  return !!b && b.kind === 'building' && (((b.type === 'dyke' || b.type === 'dam') && b.built) || b.type === 'sluice') && b.hp > 0;
 }
 
 /** Water that runs on: water with no finished dyke on it (a sluice's flood is not the sea's). */
@@ -537,18 +544,24 @@ export function fieldBoost(s: GameState, b: Building): number {
 export function wading(s: GameState, x: number, y: number, siege = false): number {
   const i = Math.floor(y) * s.w + Math.floor(x);
   if (s.inund && s.inund[i] !== 0) return siege ? INUND.siege : INUND.wade;
-  if (!s.channel) return 1;
-  return s.channel[i] === 1 && s.bldAt[i] === 0 ? RIVERS.wade : 1;
+  if (!s.channel || s.channel[i] === 0 || s.bldAt[i] !== 0) return 1;
+  // A canal (#701 s5) is swum, slower than a channel is waded; a bridge or a dam over either is walked.
+  return s.channel[i] === 2 ? CANAL.wade : RIVERS.wade;
 }
 
 /**
  * Let the water into a dug tile (the inverse of `drain`): it becomes a channel, `T_WATER` that land units wade (no `B_TERRAIN`) and no
  * ship sails, any polder it was forgotten, and its corners sink to `RIVERS.bank`, or to `RIVERS.bed` where water lies all round them.
+ * Dug `deep` (the Age of Locks, #701 s5), it is a canal: every ship sails it too, and its corners sink to `CANAL.bank` and `CANAL.bed`.
  */
-export function dig(s: GameState, tile: number, owner: number): void {
+export function dig(s: GameState, tile: number, owner: number, deep = false): void {
   const { w, h } = s;
   s.terrain[tile] = T_WATER;
-  (s.channel ??= new Uint8Array(w * h))[tile] = 1;
+  // A sluice's flood over the tile is the canal's water now.
+  if (s.inund) s.inund[tile] = 0;
+  (s.channel ??= new Uint8Array(w * h))[tile] = deep ? 2 : 1;
+  // Ships may now pass: routes are drawn again.
+  if (deep) s.blockVersion++;
   if (s.polder) s.polder[tile] = 0;
   s.block[tile] &= ~B_TERRAIN;
   const x = tile % w;
@@ -559,7 +572,7 @@ export function dig(s: GameState, tile: number, owner: number): void {
       let all = true;
       for (let ty = cy - 1; ty <= cy && all; ty++) for (let tx = cx - 1; tx <= cx; tx++) if (tx < 0 || ty < 0 || tx >= w || ty >= h || s.terrain[ty * w + tx] !== T_WATER) all = false;
       const c = cy * W + cx;
-      const to = all ? RIVERS.bed : RIVERS.bank;
+      const to = deep ? (all ? CANAL.bed : CANAL.bank) : all ? RIVERS.bed : RIVERS.bank;
       if (s.height[c] > to) s.height[c] = to;
     }
   const p = s.players[owner];
@@ -570,7 +583,8 @@ export function dig(s: GameState, tile: number, owner: number): void {
 /**
  * Every `RIVERS.fill` seconds the water runs one tile on: each finished Channel (a dug ditch) with water (or a spring head) four-ways
  * beside it fills, in id order, all at once, so water let in this step runs on only at the next. The ditch gives way to the water and
- * is gone; a spring head it was dug from opens into the channel with it.
+ * is gone; a spring head it was dug from opens into the channel with it. A ditch whose people stands in the Age of Locks (#701 s5)
+ * fills as a canal.
  */
 export function ditchStep(s: GameState): void {
   if (s.tick % secs(RIVERS.fill) !== 0) return;
@@ -591,14 +605,15 @@ export function ditchStep(s: GameState): void {
   for (const b of full) {
     stampBuilding(s, b, false);
     s.byId.delete(b.id);
+    const deep = !!s.players[b.owner] && !!ageDef(s.players[b.owner]).canals;
     for (let d = 0; d < 8; d += 2) {
       const t = (b.ty + FOUR[d + 1]) * w + b.tx + FOUR[d];
       if (isSpring(s, t)) {
         s.springs = s.springs!.filter((x) => x !== t);
-        dig(s, t, b.owner);
+        dig(s, t, b.owner, deep);
       }
     }
-    dig(s, b.ty * w + b.tx, b.owner);
+    dig(s, b.ty * w + b.tx, b.owner, deep);
   }
   const gone = new Set<number>(full.map((b) => b.id));
   s.ents = s.ents.filter((e) => !gone.has(e.id));
@@ -762,16 +777,16 @@ export function floodable(s: GameState, t: number, top = POLDER.ground + INUND.r
 
 /**
  * The ground a sluice's flood covers when it has run its full course: every tile reached from the sluice, four ways, through low
- * ground (`floodable`) or water already let out, within `INUND.reach` steps, in the order reached.
+ * ground (`floodable`) or water already let out, within `reach` steps (`INUND.reach`; a dam's burst, `DAM.surge`), in the order reached.
  */
-export function waterLine(s: GameState, b: { tx: number; ty: number }): number[] {
+export function waterLine(s: GameState, b: { tx: number; ty: number }, reach = INUND.reach): number[] {
   const { w, h } = s;
   const top = waterTop(s, b);
   const start = b.ty * w + b.tx;
   const out: number[] = [];
   let ring = [start];
   const seen = new Set(ring);
-  for (let r = 0; r < INUND.reach && ring.length; r++) {
+  for (let r = 0; r < reach && ring.length; r++) {
     const next: number[] = [];
     for (const t of ring) {
       const tx = t % w;
@@ -874,4 +889,61 @@ export function sluiceStep(s: GameState): void {
   const dry = new Set(fall);
   for (const t of fall) ebb(s, t);
   for (const u of s.ents) if (u.kind === 'unit' && u.hp > 0 && domainOf(u.type) === 'water' && dry.has(Math.floor(u.y) * w + Math.floor(u.x))) u.hp = 0;
+}
+
+// ---- The Age of Locks (#701 s5): canals deep enough for ships, bridges over them, and dams that turn turbines ----------
+
+/**
+ * Why a Bridge can't be laid on this tile, or null: it goes over a channel or a canal (water a people dug), and never on a flood. The
+ * whole footprint is one tile.
+ */
+export function bridgeSpot(s: GameState, tx: number, ty: number): 'dry' | 'water' | null {
+  const i = ty * s.w + tx;
+  if (s.terrain[i] !== T_WATER || !isDug(s, i)) return 'dry';
+  return isInund(s, i) ? 'water' : null;
+}
+
+/**
+ * Whether a dam turns: standing, finished, its people in the Age of Locks (or it is the dam kept on leaving it), awake, and with still
+ * water four-ways beside it (`sluiceFed`).
+ */
+export function damTurns(s: GameState, b: Building): boolean {
+  return b.type === 'dam' && b.built && b.hp > 0 && (!!ageDef(s.players[b.owner]).turbines || b.keep === 'locks') && !asleep(s, b) && sluiceFed(s, b);
+}
+
+/** Why a finished dam stands still, or null while it turns. */
+export function damIdle(s: GameState, b: Building): string | null {
+  if (!ageDef(s.players[b.owner]).turbines && b.keep !== 'locks') return `Dams turn only in the ${AGES.locks.name}, or the one your people kept on leaving it`;
+  if (!sluiceFed(s, b)) return 'No still water lies beside it: raise it on a channel, a canal, the shallows or the shore';
+  return null;
+}
+
+/** Whether a turning dam of the building's owner stands within `DAM.reach` of it (centre to centre): its work is driven. */
+export function driven(s: GameState, b: { x: number; y: number; owner: number }): boolean {
+  const r2 = DAM.reach * DAM.reach;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'dam' || e.owner !== b.owner) continue;
+    const dx = e.x - b.x;
+    const dy = e.y - b.y;
+    if (dx * dx + dy * dy <= r2 && damTurns(s, e)) return true;
+  }
+  return false;
+}
+
+/**
+ * A dam falls (#701 s5): if it held water (finished, with still water beside it), it bursts. The low ground round it (`waterLine`,
+ * `DAM.surge` steps) goes under at once; land units standing there lose `DAM.hurt`. The water then drains as any flood does
+ * (`sluiceStep`). Called as the dam is taken off the map. Returns how many tiles went under.
+ */
+export function burst(s: GameState, b: Building): number {
+  if (b.type !== 'dam' || !b.built || !sluiceFed(s, b)) return 0;
+  const tiles = waterLine(s, b, DAM.surge);
+  for (const t of tiles) if (s.terrain[t] !== T_WATER) inundate(s, t, b.owner);
+  const wet = new Set(tiles);
+  for (const u of s.ents) {
+    if (u.kind !== 'unit' || u.hp <= 0 || u.inside || domainOf(u.type) !== 'land' || !wet.has(Math.floor(u.y) * s.w + Math.floor(u.x))) continue;
+    u.hp = Math.max(0, u.hp - DAM.hurt);
+  }
+  s.events.push({ k: 'burst', owner: b.owner, id: b.id, x: b.x, y: b.y, tiles: tiles.length });
+  return tiles.length;
 }
