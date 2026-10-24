@@ -739,6 +739,8 @@ export function checksum(s: GameState): number {
       mix(e.progress);
       // An Interceptor Battery's reload (#759 s2).
       if (e.reload !== undefined) mix(e.reload);
+      // A Missile Silo held in Reserve (#759 s3): the tick it stands ready.
+      if (e.reserve !== undefined) mix(e.reserve);
     }
   }
   for (const a of s.animals) {
@@ -792,6 +794,8 @@ export function checksum(s: GameState): number {
     // Its interceptors (#759 s2): which battery fired at which warhead, and the roll it drew.
     for (const c of l.icpt ?? []) {
       mix(c.battery * 4 + c.shot * 2 + (c.hit ? 1 : 0));
+      // Fired by a Reserve silo (#759 s3).
+      if (c.silo) mix(1);
       mix(c.x);
       mix(c.y);
     }

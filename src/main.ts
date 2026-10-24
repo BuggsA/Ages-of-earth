@@ -3106,8 +3106,9 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         const ours = s.players[viewer].team === s.players[ev.owner].team, theirs = s.players[viewer].team === s.players[ev.by].team;
         const who = s.players[ev.by].name;
         if (ev.what === 'fired') {
-          if (ours) hud.toast(`${ev.owner === viewer ? 'Your' : `${s.players[ev.owner].name}'s`} Interceptor Battery fires at ${who}'s warhead: ${Math.round(INTERCEPT.chance * 100)}% to stop it`, 'alert');
-          else if (theirs) hud.toast(`An interceptor rises to meet ${ev.by === viewer ? 'your' : `${who}'s`} warhead`, 'alert');
+          // A silo held in Reserve (#759 s3) fires a warhead of its store as the interceptor.
+          if (ours) hud.toast(`${ev.owner === viewer ? 'Your' : `${s.players[ev.owner].name}'s`} ${ev.silo ? 'Missile Silo, held in Reserve,' : 'Interceptor Battery'} fires at ${who}'s warhead: ${Math.round(INTERCEPT.chance * 100)}% to stop it${ev.silo && ev.owner === viewer ? ' (a warhead of your store spent)' : ''}`, 'alert');
+          else if (theirs) hud.toast(`${ev.silo ? 'A silo held in Reserve fires' : 'An interceptor rises'} to meet ${ev.by === viewer ? 'your' : `${who}'s`} warhead`, 'alert');
           play('interceptLaunch');
         } else if (ev.what === 'hit') {
           if (ours) hud.toast(`Intercepted! ${who}'s warhead is stopped in the sky: no blast, no fallout`, 'good');

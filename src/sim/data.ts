@@ -3686,8 +3686,13 @@ export const SALVO = { trio: 3, surcharge: 0.5 };
  * Exactly `meet` seconds before it lands the interceptor meets it: a hit and that warhead is gone, with no blast and no fallout; a miss and it
  * flies on. A spent battery reloads in `reload` seconds. The computer learns Interceptors once a rival stands in the Industrial Age or later
  * and raises `most` batteries, one to cover each of its Town Centers, nearest home first, `gap` seconds apart.
+ *
+ * A silo held in Reserve (#759 s3): a warhead no battery answered draws one attempt from a rival's Reserve silo instead, anywhere on the map,
+ * at the same chance; it spends a warhead from that people's store and its own warhead's launch fuel. A silo set to Reserve stands ready
+ * `arm` seconds later, and again `arm` seconds after each interceptor it fires; it may stand down at once, but launches nothing while set.
+ * The computer holds a silo in Reserve while a rival stands a silo and it stands two (or its store is full), deciding once every `think` seconds.
  */
-export const INTERCEPT = { chance: INTERCEPT_PCT / 100, reach: INTERCEPT_REACH, fire: INTERCEPT_FIRE, meet: 1, reload: INTERCEPT_RELOAD, most: 2, gap: 40 };
+export const INTERCEPT = { chance: INTERCEPT_PCT / 100, reach: INTERCEPT_REACH, fire: INTERCEPT_FIRE, meet: 1, reload: INTERCEPT_RELOAD, most: 2, gap: 40, arm: 30, think: 10 };
 /**
  * A missile's flight (#772): the course every player watches inside the fuse. It climbs toward the middle of a rival's rings (the lure,
  * moved up to `jitter` tiles by the seed) and covers `knee` of the way there, bowing sideways by up to `bow` of that stretch, so the first
