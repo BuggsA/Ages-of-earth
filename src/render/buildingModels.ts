@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { AgeId, BuildingType } from '../sim/types';
 import { BUILDINGS } from '../sim/data';
 import { Kit, bake, rnd } from './kit';
-import { causewaySite, tidemill } from './tideModels';
+import { causewaySite, cocklerHut, tidemill } from './tideModels';
 
 /**
  * Every building in every epoch: Stone Age thatch, hide and wattle; Bronze Age mudbrick and terracotta;
@@ -2652,6 +2652,7 @@ const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' |
   towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, windmill,
   // The Age of Tides (#739), drawn in `tideModels.ts`.
   tidemill: (k: Kit, _e: number, st: Style) => tidemill(k, st.base),
+  cockler: (k: Kit, _e: number, st: Style) => cocklerHut(k, st.base),
 };
 
 const cache = new Map<string, THREE.BufferGeometry>();
@@ -2823,7 +2824,7 @@ const ROOFS: Partial<Record<BuildingType, [string, string]>> = {
 };
 
 /** No plinth or pennant: open or thin pieces, and buildings that already carry their own standards. */
-const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder', 'dyke', 'thornwall', 'garden', 'orchard', 'channel', 'hive', 'sluice', 'causeway', 'tidemill', 'heart', 'bridge', 'dam', 'spire'];
+const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder', 'dyke', 'thornwall', 'garden', 'orchard', 'channel', 'hive', 'sluice', 'causeway', 'tidemill', 'cockler', 'heart', 'bridge', 'dam', 'spire'];
 
 function roleStyle(type: BuildingType, epoch: number, st: Style): Style {
   const r = ROOFS[type];

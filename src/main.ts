@@ -21,6 +21,7 @@ import { NAVAL, placeProblem, stampBuilding, walkable } from './sim/grid';
 import { findDockSpot, findSpot, millSpotFor } from './sim/ai';
 import { channelPlan, dig, dykePlan, heldBack, waterLine } from './sim/water';
 import { bared, tideMillSpot, wakeTide } from './sim/tides';
+import { cocklerSpotNear } from './sim/tides';
 import { barragePlan, isCauseway, kegTileProblem } from './sim/tides';
 import { isTidal, tidalLevel, tideClock, tideLevel } from './sim/tides';
 import { R_COCKLE } from './sim/types';
@@ -3730,6 +3731,20 @@ function frame(now: number): void {
         }
     }
     return -1;
+  },
+  /**
+   * The Cockler's Hut (testing, #779): after `cockles(owner)` (the tide awake, two pickers on a bared bed), raise a finished hut by that
+   * bed and look at it. Returns the hut's id (0: no bed, or no room by it).
+   */
+  cocklerHut(owner: number) {
+    if (!game) return 0;
+    const s = game;
+    const bed = (window as unknown as { ages: { cockles(o: number): number } }).ages.cockles(owner);
+    if (bed < 0) return 0;
+    const spot = cocklerSpotNear(s, bed, (x, y) => !placeProblem(s, 'cockler', x, y, true, owner));
+    if (!spot) return 0;
+    view.rig.focus(spot.tx + 1, spot.ty + 1);
+    return placeBuilding(s, owner, 'cockler', spot.tx, spot.ty, true).id;
   },
   /**
    * The Age of Locks (testing, #701 s5): turn a player to the age, dig the channel the computer would plan by its start deep into a

@@ -23,6 +23,8 @@ import { aground, millShares, tidalNear, tideClock, tideMillIdle } from '../sim/
 import { isPond } from '../sim/tides';
 import { tideWaitLeft } from '../sim/tides';
 import { ashoreLeft, bedClock } from '../sim/tides';
+import { hutBeds, hutWorks } from '../sim/tides';
+import { COCKLER } from '../sim/data';
 import { COCKLE } from '../sim/data';
 import { R_COCKLE } from '../sim/types';
 import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
@@ -1306,6 +1308,11 @@ export class Hud {
       const still = tideMillIdle(s, b);
       const share = millShares(s).get(b.id) ?? 0;
       status += ` · <span data-tip="<b>Tide Mill</b>Its pond fills on the flood and runs out through the wheel on the ebb: at every turn of the tide it grinds ${TIDE.mill.gold} gold with ${TIDE.mill.most} tiles of tidal ground within ${TIDE.mill.reach} tiles of it, less with fewer. A tile feeds only the first mill raised by it. Causeways count as tidal ground. Flats a causeway line shuts off from the sea are a barrage's pond: ground twice, on the flood and on the ebb.">${still ? `⚠ ${still}` : `🌊 ${Math.round(share)} gold a turn of the tide (${Math.min(TIDE.mill.most, tidalNear(s, b).length)} tiles of tidal ground${tidalNear(s, b).some((t) => isPond(s, t)) ? `, ${tidalNear(s, b).filter((t) => isPond(s, t)).length} of them a barrage's pond, ground twice` : ''})${tideClock(s) ? '' : ': the tide wakes the moment it is raised'}`}</span>`;
+    }
+    // A Cockler's Hut (#779): the beds it tends.
+    if (mine && b.built && b.type === 'cockler') {
+      const n = hutBeds(s, b);
+      status += ` · <span data-tip="<b>Cockler's Hut</b>Your pickers empty their baskets of cockles here (it takes nothing else) when it is nearer than a food store, and wait beside it, on dry ground, for the tide to bare their bed. Each high water brings ${COCKLER.regrow} food back to every bed within ${COCKLER.reach} tiles of it instead of ${COCKLE.regrow}.">${hutWorks(s, b) ? `🐚 Tends ${n} bed${n === 1 ? '' : 's'}` : '⚠ Idle outside the Age of Tides'}</span>`;
     }
     // The missile pool (#753): the store is the owner's alone to read.
     if (mine && b.built && b.type === 'silo') {
