@@ -28,7 +28,7 @@ Building your strategy should be as fun as beating your rival. Your road through
 - **Basic routes stay first-class:** an army, a navy or an economy route works on every map with no exploring, and a player who sticks to one style stays competitive (the owner, 2026-10-22).
 - **New ages are welcome again** (the 2026-10-17 pause is lifted): every side age now has a verb, so the existing web is fleshed out enough to grow. Each new age still passes `docs/verbs.md`, and says what it's good at, what it's bad at, and what it leads to.
 - **The start shows it** (the owner liked steps 1–3 of the start plan on #555): one Play button and peoples picked by their loop, a first minute only that people has, finds in scouting range that open roads.
-- **The Water Road** (#701, the owner 2026-10-24: a new, uncliché line that feels good to play, "almost as prevalent as the stone, bronze, medieval … not one offs"): a third main trunk, Stone → Rivers → Dykes → Water Line → Locks, open on every map as the basic `water` route, crossing to and from the plain road at every tier. Your people move the water. Its chain goes first among new ages.
+- **The Water Road** (#701, the owner 2026-10-24: a new, uncliché line that feels good to play, "almost as prevalent as the stone, bronze, medieval … not one offs"): a third main trunk of seven ages, Stone → Rivers → Dykes → Water Line → Locks → Tides → Floating Cities (a seventh tier past the Atomic, #391), open on every map as the basic `water` route, crossing to and from the plain road at every tier. Your people move the water. Its chain goes first among new ages.
 - Deepening an existing age stays good work: the Sail and the six peoples (#501, the Britons last) first.
 
 ## Goal 3: every change gives a decision
