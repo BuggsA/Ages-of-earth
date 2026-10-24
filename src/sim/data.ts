@@ -147,6 +147,8 @@ export interface Age {
   raid?: boolean;
   /** Priests raise Missions on far shores, and each pays a tithe that grows with its distance from home (the Age of Missions, #555 s12): see `MISSION` (`missions.ts`). */
   missions?: boolean;
+  /** Citizens tame wild wolves, boars and mammoths into beasts of war (the Age of the Wild, `TAME`, `src/sim/tame.ts`). */
+  tames?: boolean;
   /** What a line of soldiers is called here (the Age of Chariots' riders are chariots, #555 s12). */
   names?: Partial<Record<UnitType, string>>;
   /** Windmills pump the water out from behind the dykes, tile by tile, into polder (the Age of Dykes, #701): see `POLDER` (`water.ts`). */
@@ -217,7 +219,7 @@ export const TRUNK: AgeId[] = ['stone', 'bronze', 'middle', 'gunpowder', 'indust
  * map, with no prospecting and no rare find. Each age names the routes it stands on (`Age.routes`); the age-up button
  * says which route a road is on. A route may cross the plain road between its own ages.
  */
-export type RouteId = 'plain' | 'army' | 'navy' | 'economy' | 'horse' | 'faith' | 'water';
+export type RouteId = 'plain' | 'army' | 'navy' | 'economy' | 'horse' | 'faith' | 'wild' | 'water';
 export const ROUTES: Record<RouteId, { name: string; blurb: string }> = {
   plain: { name: 'Plain road', blurb: 'the classic climb, open on every map; every route can fall back to it' },
   army: { name: 'Army route', blurb: 'plunder carried home, camps at the front, a whole people at war' },
@@ -225,6 +227,7 @@ export const ROUTES: Record<RouteId, { name: string; blurb: string }> = {
   economy: { name: 'Economy route', blurb: 'gold that hires swords, feast-day trade, a town laid out round its coils' },
   horse: { name: 'Horse route', blurb: 'a town on wagons, tribute from a rival\'s land, tolls on the trade road' },
   faith: { name: 'Faith route', blurb: 'priests who win a rival\'s towers and Temples over' },
+  wild: { name: 'Wild route', blurb: 'beasts tamed and bred, walls that grow, and one day the forest itself' },
   water: { name: 'Water road', blurb: 'channels dug from the springs, then dykes and polder: a people that moves the water' },
 };
 
@@ -596,6 +599,31 @@ export const AGES: Record<AgeId, Age> = {
     noBuild: { buildings: ['wall', 'gate'], why: 'A chariot people raises no walls or gates: it rides open ground. They wait until it settles in the Bronze Age or climbs on' },
     no: { units: ['ranged'], why: 'No archers behind a chariot\'s dust: bows wait until the people settles in the Bronze Age or climbs on' },
   },
+  // The Wild route (`docs/wild-road.md`), first step: the wild beasts of the map become an army, and the Den breeds more.
+  wild: {
+    verb: 'Tame wolves, boars and mammoths with your citizens, then breed the kinds you tamed at a Beast Den',
+    door: 'No Stables and no Siege Workshop: your beasts are your riders and your rams',
+    good: 'An early army of beasts that costs food rather than gold, and a race for the wild ground',
+    routes: ['wild'],
+    name: 'Age of the Wild',
+    short: 'Wild',
+    tier: 1,
+    blurb: 'Instead of the Bronze Age: a people that keeps company with the wild. Citizens sent at a wolf, a boar or a mammoth sing it calm and lead it home as a beast of war: a War Wolf that runs down archers, a Tusker that breaks riders, a War Mammoth that tramples walls. The beast being tamed stands still for its tamer, but its pack does not, and a wound breaks the song. Once a kind is tamed, a Beast Den breeds more of it for food. No horses are stabled and no rams are built: the beasts are both.',
+    tames: true,
+    noBuild: { buildings: ['stable', 'workshop'], why: 'A people of the Wild keeps no horses and builds no rams: its beasts are both. They wait until it climbs to the Middle Ages or settles in the Bronze Age' },
+  },
+  // The Wild route's second age (`docs/wild-road.md` §2): the town is shut in what it grew, and fed from a ninth of the ground.
+  grove: {
+    verb: 'Plant Thornwalls that grow into living oak, feed one-tile Kitchen Gardens on Den dung or water, and set Orchards that bear each summer',
+    door: 'No stone walls, gates or Watch Towers: the town is defended by what it grew',
+    good: 'A town shut in green on a small footprint: the cheapest wall that heals, and food dense where beasts and water are',
+    routes: ['wild'],
+    name: 'Age of the Grove',
+    short: 'Grove',
+    tier: 2,
+    blurb: 'Instead of the Middle Ages: a people that grows what others build. A Thornwall is planted for a little wood and grows over two minutes from seedling to living oak, tougher than stone and mending itself; it parts for your own people, and a piece cut down sprouts again from its root unless the ground is built on. Kitchen Gardens grow maize, beans and squash together on one tile: fed by a Beast Den\'s dung or a stream beside them, a gardener brings in two or three times a farmer\'s food. Orchards bear fruit in summer and autumn, slow to start, then free for years. No stone walls, gates or towers: what guards the town must grow.',
+    noBuild: { buildings: ['wall', 'gate', 'tower'], why: 'A Grove people raises no stone walls, gates or towers: it plants Thornwalls. They wait until it climbs to the Gunpowder Age or settles in the Middle Ages' },
+  },
   // The second crossing (#555 s12): the Pilgrims' priests and the Sail's ships made one trade. Open only to a people that walked both.
   missions: {
     verb: 'Sail priests to far shores and raise Missions there: each claims land, trains priests, and pays a tithe that grows with its distance from home',
@@ -863,6 +891,32 @@ export const ROADS: Road[] = [
     deed: { stat: 'iron', n: 150, text: 'Your citizens dig 150 bog iron' },
     blurb: 'Instead of the Bronze Age, as many peoples of Africa went from stone straight to iron: foot soldiers cost a quarter less and strike 1 harder, and iron hoes and axes make farms and woodcutters 10% quicker. Bog iron keeps paying double gold as iron bars, so the marsh is worth guarding. What it gives up: the horse. The Stable trains no cavalry until the Middle Ages.',
   },
+  // The Wild route (`docs/wild-road.md`): the third road out of the Stone Age. A Hunting Camp shows it (where a people learns the
+  // beasts, as the Steppe's riders do); foraging the wild bushes opens it.
+  {
+    from: 'stone',
+    to: 'wild',
+    cost: { food: 300, wood: 150 },
+    time: 35,
+    clue: 'huntcamp',
+    deed: { stat: 'foraged', n: 250, text: 'Your gatherers forage 250 food from wild bushes' },
+    blurb: 'Instead of the Bronze Age: keep company with the wild. Citizens tame wolves, boars and mammoths into beasts of war, and a Beast Den breeds the kinds they tamed, for food. No Stables and no Siege Workshop while you stay.',
+  },
+  { from: 'wild', to: 'middle', cost: EPOCHS[2].cost, time: EPOCHS[2].time, blurb: 'Rejoin the main road at the Middle Ages, for the same price as from the Bronze Age. Your beasts and Dens stay, Stables and Siege Workshops return, and no more beasts are tamed.' },
+  { from: 'wild', to: 'bronze', cost: { food: 150, wood: 150 }, time: 20, blurb: 'Settle down: leave the wild for the Bronze Age. Your beasts and Dens stay, Stables and Siege Workshops return, and no more beasts are tamed.' },
+  // The Wild route's second step (`docs/wild-road.md` §2): a Den shows it, and the beasts it rears open it (their dung feeds the gardens).
+  {
+    from: 'wild',
+    to: 'grove',
+    cost: { food: 500, wood: 300, gold: 60 },
+    time: 45,
+    clue: 'den',
+    walked: 'wild',
+    deed: { stat: 'bred', n: 5, text: 'Your Dens rear 5 beasts' },
+    blurb: 'Instead of the Middle Ages: grow the town. Thornwalls that grow into living oak and part for your people, Kitchen Gardens fed on Den dung or water, Orchards that bear each summer. No stone walls, gates or Watch Towers while you stay.',
+  },
+  { from: 'grove', to: 'gunpowder', cost: EPOCHS[3].cost, time: EPOCHS[3].time, blurb: 'Rejoin the main road at the Gunpowder Age for the ordinary price. Your Thornwalls, Gardens and Orchards keep growing, and stone walls, gates and towers return.' },
+  { from: 'grove', to: 'middle', cost: { food: 200, wood: 200 }, time: 25, blurb: 'Settle down in the Middle Ages. Your Thornwalls, Gardens and Orchards keep growing, and stone walls, gates and towers return.' },
   // The other road out of the Stone Age (#297): the hunt, not the bog, opens it.
   {
     from: 'stone',
@@ -1286,6 +1340,9 @@ export interface UnitStats {
   blurb: string;
 }
 
+/** A beast of the Wild: the same from the Bronze tier on, for it does not re-arm. */
+const beast = (u: UnitStats): (UnitStats | null)[] => [null, u, u, u, u];
+
 /** Each line has one version per epoch (null where it isn't available yet). Units re-arm when their owner advances. */
 export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
   citizen: [0, 1, 2, 3, 4, 5].map((e) => ({
@@ -1416,14 +1473,19 @@ export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
     { name: 'Covered Wagon', cls: 'trader', hp: 140, attack: 0, armor: 1, parmor: 2, range: 0, reload: 1, speed: 1.45, sight: 7, cost: { wood: 80, gold: 50 }, time: 20, radius: 0.42, blurb: 'Carries goods to a trading post and brings back gold: the farther its Market from the post, the more. Easy prey for cavalry.' },
     { name: 'Traction Engine', cls: 'trader', hp: 180, attack: 0, armor: 2, parmor: 3, range: 0, reload: 1, speed: 1.65, sight: 7, cost: { wood: 60, gold: 60 }, time: 20, radius: 0.45, blurb: 'Steams goods to a trading post and brings back gold: the farther its Market from the post, the more. Easy prey for cavalry.' },
   ],
+  // ---- Beasts of the Age of the Wild (`docs/wild-road.md`) ----
+  // Tamed from the wild (`TAME`) or bred at a Beast Den once the kind is tamed. A beast is a beast: it does not re-arm with the epochs.
+  warwolf: beast({ name: 'War Wolf', cls: 'cavalry', hp: 75, attack: 6, armor: 0, parmor: 1, range: 0, reload: 1.2, speed: 2.8, sight: 8, cost: { food: 65 }, time: 15, radius: 0.26, blurb: 'A wolf of the wild that answers to your people: fast and cheap, it runs down archers, priests and citizens. Spears break it.' }),
+  tusker: beast({ name: 'Tusker', cls: 'infantry', hp: 120, attack: 7, armor: 2, parmor: 1, range: 0, reload: 1.4, speed: 1.9, sight: 5, cost: { food: 80, wood: 20 }, time: 18, radius: 0.32, blurb: 'A tame boar with a hide like bark: it holds a line and breaks riders on its tusks. Archers thin it.' }),
+  warmammoth: beast({ name: 'War Mammoth', cls: 'siege', hp: 420, attack: 16, armor: 2, parmor: 4, range: 0, reload: 2.4, speed: 1.1, sight: 6, cost: { food: 260, gold: 60 }, time: 40, radius: 0.55, blurb: 'A woolly mammoth led to war: it tramples walls and buildings as a ram does, and gores soldiers too. Spearmen and riders swarm it.' }),
 };
 
 const DOMAINS: Partial<Record<UnitType, Domain>> = { fisher: 'water', warship: 'water', transport: 'water', cog: 'water', fighter: 'air', bomber: 'air' };
 /** Where a unit line goes: on foot, on the water or in the air. */
 export const domainOf = (type: UnitType): Domain => DOMAINS[type] ?? 'land';
 
-export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader', 'wagon'];
-export const MILITARY: UnitType[] = ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'warship', 'fighter', 'bomber'];
+export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader', 'wagon', 'warwolf', 'tusker', 'warmammoth'];
+export const MILITARY: UnitType[] = ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'warship', 'fighter', 'bomber', 'warwolf', 'tusker', 'warmammoth'];
 
 type Target = UnitClass | 'building';
 /** The counter triangle (and its friends): damage multiplier by attacker class against target class. */
@@ -1692,6 +1754,66 @@ export interface BuildingStats {
  * one tender for each `aiPerTender` snares, and once it has a Barracks or a Range and `aiPlantWood` wood to spare, plants up to
  * `aiPlant` saplings at a time round a snare with fewer than `aiThin` trees standing near it.
  */
+/**
+ * Taming (the Age of the Wild, `docs/wild-road.md`, `src/sim/tame.ts`): a citizen within `reach` tiles of a wild wolf, boar or mammoth
+ * sings to it for `secs[kind]` seconds and it becomes a beast of war of that people (`unit[kind]`). The beast stands calm for its tamer
+ * while the song lasts and the tamer is within `calm` tiles (from the moment the tamer sets out); a beast hurt within `wary` seconds
+ * won't take the hand. The call of the wild (`callWild`): a Wild people's Hunting Camps draw a beast each season (`call*`).
+ * The computer takes the road on a coin of `aiTake` (raising the Hunting Camp that shows it once `aiClue` of the deed is in), tames within `aiNear` tiles of home (a wolf only with
+ * `aiEscort` soldiers sent ahead at its pack), raises `aiDen` Dens and stays `aiStay` seconds before it climbs on.
+ */
+export const TAME = {
+  reach: 1.1,
+  calm: 6,
+  wary: 8,
+  secs: { wolf: 6, boar: 10, mammoth: 24 } as Record<'wolf' | 'boar' | 'mammoth', number>,
+  unit: { wolf: 'warwolf', boar: 'tusker', mammoth: 'warmammoth' } as Record<'wolf' | 'boar' | 'mammoth', UnitType>,
+  callAt: 20,
+  callFrom: 7,
+  callNear: 10,
+  callCap: 2,
+  aiNear: 40,
+  aiEscort: 4,
+  aiTake: 0.3,
+  aiClue: 0.8,
+  aiDen: 1,
+  aiStay: 150,
+};
+
+/**
+ * The Age of the Grove (`docs/wild-road.md` §2, `src/sim/grove.ts`). A Thornwall grows a stage each `stage` seconds (`spring` times as
+ * fast in spring) from seedling to living oak; its most hit points are `hp[stage]` of a wall's; a living oak mends `mend` hit points a
+ * second once unhurt for `calm` seconds. A Thornwall cut down sprouts again from its root after `regrow` seconds (`retry` while stood on).
+ * A Kitchen Garden works at a Farm's pace, plus `dungMul` if a finished Den stands within `dung` tiles (a Den feeds its `dungFeeds`
+ * oldest gardens in reach) and `waterMul` if water lies within `water` tiles. An Orchard bears after `orchardGrow` seconds and then, in
+ * summer and autumn, pays `orchardFood` food each `orchardEvery` seconds while a food store stands within `orchardReach` tiles.
+ * The computer takes the road on once it walked the Wild, stays `aiStay` seconds, keeps up to `aiGardens` gardens about each Den, sets
+ * `aiOrchards` Orchards, and plants a Thornwall line of `aiThorn` pieces across the way the nearest rival comes, `aiThornAt` tiles out.
+ */
+export const GROVE = {
+  stage: 40,
+  spring: 2,
+  hp: [0.25, 0.6, 1, 1.6],
+  mend: 3,
+  calm: 5,
+  regrow: 45,
+  retry: 5,
+  dung: 6,
+  dungFeeds: 6,
+  dungMul: 1.2,
+  water: 3,
+  waterMul: 0.6,
+  orchardGrow: 120,
+  orchardFood: 3,
+  orchardEvery: 10,
+  orchardReach: 8,
+  aiStay: 180,
+  aiGardens: 6,
+  aiOrchards: 2,
+  aiThorn: 9,
+  aiThornAt: 11,
+};
+
 export const COPPICE = { reach: 8, regrow: 120, retry: 5, grow: 90, snare: 2, cap: 1.5, bag: 2, full: 12, aiPerFood: 1.5, aiMax: 16, aiTrees: 10, aiThick: 14, aiNear: 14, aiDrop: 7, aiPerTender: 2, aiStone: 6, aiCamps: 2, aiPlant: 3, aiThin: 12, aiPlantWood: 120 };
 
 /**
@@ -1746,6 +1868,12 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   snare: { name: 'Snare', size: 1, hp: 60, cost: { wood: 30 }, time: 6, pop: 0, sight: 2, trains: [], drop: [], epoch: 0, open: true, menu: 'eco', key: 'J', blurb: 'A noose on a bent sapling, set among standing trees. It fills with small game by itself, faster the more trees stand round it and fastest in winter, until it is full. A citizen sent to it walks the trap line, emptying each snare in turn. Fell the trees round it and it starves.' },
   // The managed wood (#501): a coppice people plants it on open ground; it roots as a stool and grows into a tree (`COPPICE`, `src/sim/coppice.ts`).
   sapling: { name: 'Sapling', size: 1, hp: 30, cost: { wood: 10 }, time: 5, pop: 0, sight: 1, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'I', blurb: `A young tree set in open ground. Once planted it roots and grows into a full tree in ${COPPICE.grow} seconds: wood to fell, and woods for snares. A row of them grows into a hedge no one walks through.` },
+  // The Age of the Wild (`docs/wild-road.md`): raised by a people that has tamed a beast; breeds the kinds it tamed, in any age after.
+  den: { name: 'Beast Den', size: 3, hp: 900, cost: { food: 50, wood: 75 }, time: 35, pop: 0, sight: 6, trains: ['warwolf', 'tusker', 'warmammoth'], drop: [], epoch: 1, menu: 'mil', key: 'D', blurb: 'A ring of earth banks and woven hurdles round a hollow of straw, where tamed beasts whelp and are reared. It breeds only the kinds your people has tamed from the wild: tame one wolf and it raises wolves. Raised only by a people that has tamed a beast, and it keeps breeding after the people leaves the Age of the Wild.' },
+  // The Age of the Grove (`docs/wild-road.md` §2, `GROVE`): raised by a people that has walked it, in any age after.
+  thornwall: { name: 'Thornwall', size: 1, hp: 400, cost: { wood: 5 }, time: 3, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, menu: 'eco', key: 'B', blurb: `Drag to plant a line of thorn. It grows a stage every ${GROVE.stage} seconds (twice as fast in spring): seedling, bramble, thicket, then living oak, tougher than stone and mending itself. It parts for your own people and shuts on everyone else, and a piece cut down sprouts again from its root unless the ground is built on.` },
+  garden: { name: 'Kitchen Garden', size: 1, hp: 120, cost: { wood: 35 }, time: 8, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, open: true, menu: 'eco', key: 'U', blurb: `Maize, beans and squash grown together on one tile, worked by one gardener. Fed by a Beast Den's dung within ${GROVE.dung} tiles it yields ${Math.round((1 + GROVE.dungMul) * 10) / 10} times a farmer's food; by water within ${GROVE.water} tiles, ${Math.round((1 + GROVE.waterMul) * 10) / 10} times; by both, more. Unfed, it grows at a field's pace. A Den feeds its ${GROVE.dungFeeds} oldest gardens.` },
+  orchard: { name: 'Orchard', size: 2, hp: 300, cost: { wood: 100 }, time: 20, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, menu: 'eco', key: 'R', blurb: `Fruit trees set near a food store. After ${GROVE.orchardGrow} seconds they bear, and every summer and autumn they drop food into your stores by themselves while a store stands within ${GROVE.orchardReach} tiles. Slow to start, free for years.` },
   // The age road (#562, `docs/age-roads.md` spine §4): raised in the Stone Age, it answers which key resources this world holds (`PROSPECTOR`).
   prospector: { name: "Prospector's Lodge", size: 2, hp: 500, cost: { food: 50, wood: 75 }, time: 20, pop: 0, sight: 6, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'P', blurb: 'A lodge of prospectors who walk the streams, scrape the rock and dig at old mounds. Once it stands it tells you which key resources this world holds (bog iron, salt, saltpetre, blood-iron, ancient ruins): yes or no for each, never where. Some ages open only with them; a world that lacks one shuts that door.' },
   // The Path of Blood (#303): pitched by foot soldiers where the army stands, enemy land too; burns when left alone (`WARCAMP`).

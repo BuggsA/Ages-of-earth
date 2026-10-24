@@ -32,6 +32,7 @@ import { postAt } from './sim/trade';
 import { chantedOver, consecrateProblem, consecrates } from './sim/consecrate';
 import { riteProblem } from './sim/fork';
 import { legionKind, legionary } from './sim/legion';
+import { tames, wildBeast } from './sim/tame';
 import { ageDef, ageOf, canRaise, heirloomsOpened, isSideRoad, opensOf, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
 import { NetClient, newRoomCode, saveName, savedName } from './net/client';
 import { HASH_EVERY, ROOM_KEEP_HOURS, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
@@ -1405,6 +1406,14 @@ function order(clientX: number, clientY: number, forceAttack = false, queue = fa
   if (pk.kind === 'animal') {
     const a = s.animals.find((x) => x.id === pk.id);
     if (!a) return;
+    // The Age of the Wild: citizens tame a wild wolf, boar or mammoth; attack-move (A) hunts it instead.
+    if (!forceAttack && tames(s.players[viewer]) && wildBeast(a) && units.some((u) => u.type === 'citizen')) {
+      issue({ t: 'tame', p: viewer, ids, target: a.id, queue: q });
+      view.marker(s, a.x, a.y, false);
+      play('move');
+      ack('move');
+      return;
+    }
     // Your own flock (#308): citizens milk it; attack-move (A) slaughters it.
     if (a.kind === 'sheep' && a.owner === viewer && !forceAttack && units.some((u) => u.type === 'citizen')) {
       issue({ t: 'milk', p: viewer, ids, target: a.id, queue: q });
@@ -1624,11 +1633,11 @@ function gateTurned(s: GameState, tx: number, ty: number): boolean {
   return !(at(tx - 1, ty) || at(tx + 2, ty));
 }
 
-/** Buildings laid out by dragging a line: walls, dykes and channels (#701). */
-const lined = (t: BuildingType | null): t is 'wall' | 'dyke' | 'channel' => t === 'wall' || t === 'dyke' || t === 'channel';
+/** Buildings laid out by dragging a line: walls, dykes and channels (#701) and Thornwalls (the Age of the Grove). */
+const lined = (t: BuildingType | null): t is 'wall' | 'dyke' | 'thornwall' | 'channel' => t === 'wall' || t === 'dyke' || t === 'thornwall' || t === 'channel';
 
 /** The tiles of a planned wall (or line of dykes), and whether each can be built. */
-function wallPlan(s: GameState): { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean; type: 'wall' | 'dyke' | 'channel' } | null {
+function wallPlan(s: GameState): { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean; type: 'wall' | 'dyke' | 'thornwall' | 'channel' } | null {
   if (!lined(placing)) return null;
   const type = placing;
   const d = wallDrag ?? (placeAt ? { x0: placeAt.tx, y0: placeAt.ty, x1: placeAt.tx, y1: placeAt.ty } : null);
@@ -1840,7 +1849,7 @@ canvas.addEventListener('pointerup', (e) => {
       return;
     }
     const ids = selectedUnits(s).filter((u) => u.type === 'citizen' || legionary(s, u)).map((u) => u.id);
-    issue({ t: 'wall', p: viewer, ids, x0: d.x0, y0: d.y0, x1: d.x1, y1: d.y1, queue: e.shiftKey || undefined, dyke: plan.type === 'dyke' || undefined, channel: plan.type === 'channel' || undefined });
+    issue({ t: 'wall', p: viewer, ids, x0: d.x0, y0: d.y0, x1: d.x1, y1: d.y1, queue: e.shiftKey || undefined, dyke: plan.type === 'dyke' || undefined, thorn: plan.type === 'thornwall' || undefined, channel: plan.type === 'channel' || undefined });
     if (!e.shiftKey) {
       placing = null;
       placeAt = null;
@@ -3268,13 +3277,13 @@ function frame(now: number): void {
     view.rig.focus(plan.from.x, plan.from.y);
     return plan.tiles.length;
   },
-  /** A finished line of wall (testing). */
-  wall(owner: number, x0: number, y0: number, x1: number, y1: number) {
+  /** A finished line of wall, or of Thornwall (testing). */
+  wall(owner: number, x0: number, y0: number, x1: number, y1: number, type: 'wall' | 'thornwall' = 'wall') {
     if (!game) return 0;
     let n = 0;
     for (const t of wallLine(x0, y0, x1, y1)) {
-      if (placeProblem(game, 'wall', t.x, t.y)) continue;
-      placeBuilding(game, owner, 'wall', t.x, t.y, true);
+      if (placeProblem(game, type, t.x, t.y)) continue;
+      placeBuilding(game, owner, type, t.x, t.y, true);
       n++;
     }
     return n;

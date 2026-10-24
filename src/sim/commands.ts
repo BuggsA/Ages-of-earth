@@ -33,6 +33,8 @@ import { chantedOver, consecrateProblem, consecrates } from './consecrate';
 import { sees } from './vision';
 import { canHit, isEnemy, maxHp, pay, placeBuilding, refund } from './world';
 import { fightsBeasts } from './animals';
+import { tameProblem } from './tame';
+import { isField } from './grove';
 import { answerTiding, tidingProblem } from './tidings';
 
 /**
@@ -546,8 +548,8 @@ export function applyCommand(s: GameState, c: Command): void {
             assignBuilders(s, [u], b, !!c.queue);
             continue;
           }
-          if (b.type === 'farm') {
-            // One farmer per field; the rest look for free fields nearby.
+          if (isField(b.type)) {
+            // One farmer per field (a Kitchen Garden too); the rest look for free fields nearby.
             const field = fieldsGiven.size ? freeFarm(s, c.p, b.x, b.y, 12, fieldsGiven) : b;
             if (field) {
               fieldsGiven.add(field.id);
@@ -720,6 +722,18 @@ export function applyCommand(s: GameState, c: Command): void {
       if (others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: a.x, y: a.y, queue: c.queue });
       break;
     }
+    case 'tame': {
+      // The Age of the Wild: citizens sing a wild wolf, boar or mammoth calm and lead it home as a beast of war.
+      const a = s.animals.find((x) => x.id === c.target);
+      const why = tameProblem(s, p, a);
+      if (why) return refuse(s, c.p, why);
+      const units = myUnits(s, c.p, c.ids);
+      const tamers = units.filter((u) => u.type === 'citizen');
+      for (const u of tamers) giveOrder(u, { k: 'tame', target: a!.id, t: 0 }, c.queue);
+      const others = units.filter((u) => !tamers.includes(u));
+      if (others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: a!.x, y: a!.y, queue: c.queue });
+      break;
+    }
     case 'lamb': {
       const b = myBuilding(s, c.p, c.building);
       if (!b) return;
@@ -790,7 +804,7 @@ export function applyCommand(s: GameState, c: Command): void {
       }
       break;
     case 'build': {
-      if (c.type === 'wall' || c.type === 'dyke' || c.type === 'channel') return applyCommand(s, { t: 'wall', p: c.p, ids: c.ids, x0: c.tx, y0: c.ty, x1: c.tx, y1: c.ty, queue: c.queue, dyke: c.type === 'dyke' || undefined, channel: c.type === 'channel' || undefined });
+      if (c.type === 'wall' || c.type === 'dyke' || c.type === 'thornwall' || c.type === 'channel') return applyCommand(s, { t: 'wall', p: c.p, ids: c.ids, x0: c.tx, y0: c.ty, x1: c.tx, y1: c.ty, queue: c.queue, dyke: c.type === 'dyke' || undefined, thorn: c.type === 'thornwall' || undefined, channel: c.type === 'channel' || undefined });
       const b = placeSite(s, c.p, c.type, c.tx, c.ty);
       if (!b) return;
       if (c.type === 'gate') {
@@ -802,8 +816,8 @@ export function applyCommand(s: GameState, c: Command): void {
       break;
     }
     case 'wall': {
-      // A line of wall, or of dykes or a channel (#701), laid the same way.
-      const type = c.dyke ? 'dyke' : c.channel ? 'channel' : 'wall';
+      // A line of wall, or of dykes or a channel (#701) or Thornwall (the Age of the Grove), laid the same way.
+      const type = c.dyke ? 'dyke' : c.thorn ? 'thornwall' : c.channel ? 'channel' : 'wall';
       const tiles = wallLine(c.x0, c.y0, c.x1, c.y1);
       const placed: Building[] = [];
       for (let i = 0; i < tiles.length; i++) {
@@ -1013,6 +1027,8 @@ export function applyCommand(s: GameState, c: Command): void {
           if (!e.kill) refund(p, buildingCostFor(s, c.p, e.type));
           if (BUILDINGS[e.type].blood) p.blood = bloodOf(p) + BUILDINGS[e.type].blood!;
         }
+        // A Thornwall its own people takes down is grubbed out, root and all (`rootThorn`).
+        if (e.kind === 'building' && e.type === 'thornwall') e.grub = true;
         e.hp = 0;
       }
       break;

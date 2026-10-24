@@ -306,8 +306,8 @@ export class Overlays {
     this.ghost.visible = true;
   }
 
-  /** Show a planned line of wall, or of dykes or a channel (#701) (an empty list hides it). */
-  setWallGhost(s: GameState, tiles: { x: number; y: number; ok: boolean }[], epoch: number, color: string, alongY: boolean, type: 'wall' | 'dyke' | 'channel' = 'wall'): void {
+  /** Show a planned line of wall, or of dykes or a channel (#701), or of Thornwall (an empty list hides it). */
+  setWallGhost(s: GameState, tiles: { x: number; y: number; ok: boolean }[], epoch: number, color: string, alongY: boolean, type: 'wall' | 'dyke' | 'thornwall' | 'channel' = 'wall'): void {
     const key = `${type}:${epoch}:${color}:${alongY ? 1 : 0}`;
     if (key !== this.wallKey) {
       this.wallKey = key;

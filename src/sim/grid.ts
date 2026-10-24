@@ -173,7 +173,8 @@ export function stampBuilding(s: GameState, b: Building, on: boolean): void {
   if (!open && on) s.blockVersion++;
   // A dyke (#701) is a gate along its whole length: its own team walks its crown, over water too, and nothing else passes.
   const dyke = b.type === 'dyke';
-  const gate = b.type === 'gate' || dyke;
+  // A Thornwall (the Age of the Grove) parts for its own team as a gate does.
+  const gate = b.type === 'gate' || b.type === 'thornwall' || dyke;
   if (dyke) s.blockVersion++;
   const team = s.players[b.owner]?.team ?? -1;
   for (let y = b.ty; y < b.ty + b.size; y++) {

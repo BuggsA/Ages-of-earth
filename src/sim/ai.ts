@@ -41,13 +41,15 @@ import { isCoppice } from './coppice';
 import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
-import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS } from './data';
+import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, TAME, GROVE, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
 import { isRider, standing } from './tribute';
 import { flockCap, flockOf, grassy, grazeRange, milkable } from './flocks';
 import { progress, scenarioById } from './campaign';
+import { tames, wildBeast } from './tame';
+import { grows } from './grove';
 
 /**
  * The computer opponent. It plays by the same rules and through the same commands as a person: it
@@ -250,6 +252,8 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   fireSilo(s, v, mem, issue);
   fleeWarhead(s, v, issue);
   steppeRoad(s, v, mem, issue);
+  wildRoad(s, v, mem, issue);
+  groveWork(s, v, mem, issue);
   readYear(s, v);
   huntTheYear(s, v, issue);
 
@@ -528,6 +532,8 @@ function fit(p: Player, to: AgeId): number {
   if (age.path === 'blood') return cls === 'infantry' || cls === 'cavalry' ? 0 : -1;
   // The Silk Road (#326) waits until the computer knows how to move its Market with the camp.
   if (to === 'silk') return -1;
+  // The Age of the Wild shuts the Stable and the Siege Workshop: a people whose strength is riders or engines keeps away.
+  if (age.tames) return cls === 'cavalry' || cls === 'siege' ? -1 : 0;
   // The Steppe Road (#320): its first age is judged as any side age; the Horde follows it (#322, see `wants`).
   if (age.no?.units.includes(sig)) return -1;
   return (age.price?.[cls] ?? 1) < 1 ? 1 : 0;
@@ -562,6 +568,12 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   } else if (roads[to] === undefined && to === 'sapper') {
     // The gateway's road on (#577): Alchemy is walked for the Sappers, so a people that turned into it goes on.
     roads[to] = hasWalked(p, 'alchemy');
+  } else if (roads[to] === undefined && to === 'wild') {
+    // The Wild route (`docs/wild-road.md`): a coin of its own, as the steppe's, so asking shifts no other match's dice.
+    roads[to] = fit(p, to) >= 0 && coin(s, p.id, 0x3d17) < TAME.aiTake;
+  } else if (roads[to] === undefined && to === 'grove') {
+    // The Wild route's second age: a people that walked the Wild goes on, as the Horde follows the Steppe.
+    roads[to] = hasWalked(p, 'wild');
   } else if (roads[to] === undefined && to === 'dykes') {
     // The Water Road (#701): only with a dyke worth raising by home, and on a coin of its own, so no other match's dice shift. A people
     // that walked the Age of Rivers is on the road already, and goes on down it more often.
@@ -718,6 +730,10 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
     mem.sideHold ??= s.tick;
     if (s.tick - mem.sideHold < secs(AI_SILO.hold)) return null;
   }
+  // The Wild is kept a while, so the beasts it came for are tamed and the Den is breeding.
+  if (walksWeb(v) && ageOf(p) === 'wild' && s.tick - (mem.wild ?? s.tick) < secs(TAME.aiStay)) return null;
+  // The Grove is kept a while, so its gardens are fed, its Orchards set and its Thornwall grown.
+  if (walksWeb(v) && ageOf(p) === 'grove' && s.tick - (mem.grove ?? s.tick) < secs(GROVE.aiStay)) return null;
   // The steppe (#320) is kept a while, so the flock it came for pays.
   if (walksWeb(v) && ageDef(p).mobile && s.tick - (mem.steppe?.since ?? s.tick) < secs(AI_STEPPE.stay)) return null;
   // Bound for a crossing (#585, #555 s12), a sibling doesn't climb on: its way is back to the Middle Ages (`seaTurn`).
@@ -1902,8 +1918,8 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   if (lodgeHolds && raiseLodge(true)) return;
   // Fields once the berries near home run short of feeding everyone who should be on food.
   const berries = findResource(s, R_BERRY, home.x, home.y, 14);
-  const farms = count(v, 'farm');
-  const freeFields = v.buildings.filter((b) => b.type === 'farm' && !v.citizens.some((u) => u.order.k === 'farm' && u.order.target === b.id)).length;
+  const farms = count(v, 'farm') + count(v, 'garden');
+  const freeFields = v.buildings.filter((b) => (b.type === 'farm' || b.type === 'garden') && !v.citizens.some((u) => u.order.k === 'farm' && u.order.target === b.id)).length;
   // Autumn onward the clever computer plans for winter: berries fail in the cold, so fields go up first, unless in the
   // Stone Age the larder holds the winter's food already (#486): planning anyway, it raised a field a citizen with the
   // wood the Bronze Age wanted. Later a town's stock is no larder: its people eat from the fields.
@@ -1919,6 +1935,8 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   }
   if (isCoppice(p) && !isMobile(p)) {
     if (laySnare(s, v, mem, foodWanted, issue)) return;
+  } else if (farms < foodWanted && freeFields < 2 && !recently('farm', 2) && !recently('garden', 2) && grows(p) && plantGarden(s, v, mem, issue)) {
+    return;
   } else if (farms < foodWanted && freeFields < 2 && !recently('farm', 2) && !buildBarred(p, 'farm') && !wayBarred(s, p, 'farm')) {
     // In the Age of Rivers (#701) a field goes only by water: the search asks the people's own rule, and looks a little farther.
     const rivers = !!AGES[ageOf(p)].rivers;
@@ -2601,7 +2619,9 @@ function wilds(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void
     if (home.length) issue({ t: 'move', p: v.p.id, ids: home, x: v.home.x, y: v.home.y });
     mem.huntEscort = out.length ? out : undefined;
   }
-  if (v.citizens.length >= AI_WILD.mammothAt - eager && !v.citizens.some((u) => hunting(u, 'mammoth'))) {
+  // A Wild town (`wildRoad`) tames the beasts it would hunt: mammoths, boars and wolves are spared the spear.
+  const taming = tames(v.p);
+  if (!taming && v.citizens.length >= AI_WILD.mammothAt - eager && !v.citizens.some((u) => hunting(u, 'mammoth'))) {
     let m = nearestBeast(s, 'mammoth', v.home.x, v.home.y, AI_WILD.mammothNear);
     // A clever computer also goes for a far mammoth, with soldiers along to take the charge, if no rival is by it.
     let escort: Unit[] = [];
@@ -2625,7 +2645,7 @@ function wilds(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void
     }
   }
   // A boar guarding berries near home: three citizens spear it together, once the town has six.
-  if (v.citizens.length >= AI_WILD.boarAt - eager && !v.citizens.some((u) => hunting(u, 'boar'))) {
+  if (!taming && v.citizens.length >= AI_WILD.boarAt - eager && !v.citizens.some((u) => hunting(u, 'boar'))) {
     const b = nearestBeast(s, 'boar', v.home.x, v.home.y, AI_WILD.boarNear);
     if (b && b.state !== 'fight') {
       const party = v.citizens
@@ -2636,7 +2656,7 @@ function wilds(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void
     }
   }
   if (mem.attacking || v.army.some((u) => hunting(u, 'wolf') || hunting(u, 'raider'))) return;
-  const wolf = nearestBeast(s, 'wolf', v.home.x, v.home.y, AI_WILD.clear);
+  const wolf = taming ? null : nearestBeast(s, 'wolf', v.home.x, v.home.y, AI_WILD.clear);
   const free = v.army.filter((u) => !u.inside && (u.order.k === 'idle' || atTheAxe(v, u) || (u.order.k === 'move' && !u.order.amove)) && u.type !== 'siege');
   if (wolf) {
     const need = cold && seasonAt(s) === 3 ? AI_WILD.pack - AI_WINTER.pack : AI_WILD.pack;
@@ -2684,6 +2704,110 @@ function steppeRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) =>
   if (!herd) return;
   const spot = findSpot(s, clue, herd.x, herd.y, 2, 5);
   if (spot) construct(s, v, mem, clue, spot, 2, issue);
+}
+
+/**
+ * The Wild route (`docs/wild-road.md`). Bound for it in the Stone Age, the computer raises the Hunting Camp that shows the road.
+ * In the Age of the Wild it tames: one citizen at a time sings to the nearest wild beast within `TAME.aiNear` tiles of home (a boar
+ * or a mammoth alone; a wolf only with `TAME.aiEscort` soldiers sent ahead to take on its pack), and once a kind is tamed it raises
+ * a Beast Den (`pickUnit` then breeds from it like any building that trains).
+ */
+function wildRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!walksWeb(v)) return;
+  if (p.epoch === 0) {
+    const road = roadsFrom(p).find((r) => r.to === 'wild');
+    // The camp that shows the road goes up once the foraging deed is mostly in, so the opening's wood goes where it always went.
+    if (!road?.clue || !road.deed || (p.stats.foraged ?? 0) < road.deed.n * TAME.aiClue || v.citizens.length < AI_STEPPE.at || !wants(s, p, mem, 'wild') || count(v, road.clue) > 0 || s.tick - (mem.ordered[road.clue] ?? -99999) < secs(25)) return;
+    const spot = findSpot(s, road.clue, v.home.x, v.home.y, 6, 14);
+    if (spot) construct(s, v, mem, road.clue, spot, 1, issue);
+    return;
+  }
+  if (!tames(p)) return;
+  mem.wild ??= s.tick;
+  const singers = v.citizens.filter((u) => u.order.k === 'tame');
+  for (const u of singers) v.claimers.add(u.id);
+  if (p.tamed?.length && count(v, 'den') < TAME.aiDen && s.tick - (mem.ordered.den ?? -99999) >= secs(25)) {
+    // The Den is what the Wild was for: it may spend what is set aside for the climb.
+    const spot = findSpot(s, 'den', v.home.x, v.home.y, 6, 14);
+    if (spot) {
+      const kept = v.budget;
+      v.budget = { ...p.res };
+      const raised = construct(s, v, mem, 'den', spot, 2, issue);
+      v.budget = kept;
+      if (raised) spend(v, BUILDINGS.den.cost);
+    }
+  }
+  if (singers.length) return;
+  const escort = v.army.filter((u) => !u.inside && (u.order.k === 'idle' || u.order.k === 'move'));
+  let best: Animal | null = null;
+  let bestD = TAME.aiNear * TAME.aiNear;
+  for (const a of s.animals) {
+    if (!wildBeast(a) || s.tick - a.hurt < secs(TAME.wary) || (a.kind === 'wolf' && escort.length < TAME.aiEscort)) continue;
+    const d = (a.x - v.home.x) * (a.x - v.home.x) + (a.y - v.home.y) * (a.y - v.home.y);
+    if (d < bestD) {
+      bestD = d;
+      best = a;
+    }
+  }
+  if (!best) return;
+  const tamer = v.citizens
+    .filter((u) => !u.inside && !u.queue.length && u.carry <= 2 && !v.diggers.has(u.id) && !v.claimers.has(u.id) && (u.order.k === 'idle' || u.order.k === 'gather'))
+    .sort((a, b) => distTo(a, best!) - distTo(b, best!) || a.id - b.id)[0];
+  if (!tamer) return;
+  if (best.kind === 'wolf') issue({ t: 'move', p: p.id, ids: escort.slice(0, TAME.aiEscort).map((u) => u.id), x: best.x, y: best.y, amove: true });
+  issue({ t: 'tame', p: p.id, ids: [tamer.id], target: best.id });
+  v.claimers.add(tamer.id);
+}
+
+/**
+ * A Kitchen Garden (the Age of the Grove) where a Den's dung will feed it: beside a finished Den of its own that feeds fewer than
+ * `GROVE.aiGardens` gardens. False where no Den has room, so the town raises a Farm instead.
+ */
+function plantGarden(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): boolean {
+  const gardens = v.buildings.filter((b) => b.type === 'garden');
+  for (const den of v.buildings) {
+    if (den.type !== 'den' || !den.built) continue;
+    const near = (tx: number, ty: number) => Math.max(Math.abs(tx - den.x + 0.5), Math.abs(ty - den.y + 0.5)) <= GROVE.dung;
+    if (gardens.filter((g) => near(g.tx, g.ty)).length >= Math.min(GROVE.aiGardens, GROVE.dungFeeds)) continue;
+    const spot = findSpot(s, 'garden', den.x, den.y, 2, GROVE.dung, 0, near);
+    if (spot) return construct(s, v, mem, 'garden', spot, 1, issue);
+  }
+  return false;
+}
+
+/**
+ * The Age of the Grove: up to `GROVE.aiOrchards` Orchards by the Town Center, and one Thornwall line of `GROVE.aiThorn` pieces across
+ * the way the nearest rival comes, `GROVE.aiThornAt` tiles out (the Grove raises no stone wall). Gardens go up with the fields (`plantGarden`).
+ */
+function groveWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!walksWeb(v) || !grows(p) || !v.tc) return;
+  if (ageOf(p) === 'grove') mem.grove ??= s.tick;
+  const recent = (t: BuildingType, sec: number) => s.tick - (mem.ordered[t] ?? -99999) < secs(sec);
+  if (count(v, 'orchard') < GROVE.aiOrchards && !recent('orchard', 30) && v.budget.wood >= (BUILDINGS.orchard.cost.wood ?? 0) + 50) {
+    const spot = findSpot(s, 'orchard', v.home.x, v.home.y, 4, 10);
+    if (spot) construct(s, v, mem, 'orchard', spot, 1, issue);
+  }
+  if (count(v, 'thornwall') > 0 || recent('thornwall', 60)) return;
+  const rival = rivalTownCenter(s, p);
+  if (!rival) return;
+  const dx = rival.x - v.home.x;
+  const dy = rival.y - v.home.y;
+  const d = Math.sqrt(dx * dx + dy * dy);
+  if (d < GROVE.aiThornAt * 2) return;
+  const fx = dx / d;
+  const fy = dy / d;
+  const cost = buildingCostFor(s, p.id, 'thornwall');
+  if ((cost.wood ?? 0) * GROVE.aiThorn > v.budget.wood) return;
+  const cx = v.home.x + fx * GROVE.aiThornAt;
+  const cy = v.home.y + fy * GROVE.aiThornAt;
+  const half = Math.floor(GROVE.aiThorn / 2);
+  const crew = v.citizens.filter((u) => !u.inside && u.order.k !== 'build' && !(u.order.k === 'farm' && u.order.phase === 'work') && !v.claimers.has(u.id)).sort((a, b) => a.id - b.id).slice(0, 3);
+  if (!crew.length) return;
+  issue({ t: 'wall', p: p.id, ids: crew.map((u) => u.id), x0: Math.floor(cx - fy * half), y0: Math.floor(cy + fx * half), x1: Math.floor(cx + fy * half), y1: Math.floor(cy - fx * half), thorn: true });
+  spend(v, { wood: (cost.wood ?? 0) * GROVE.aiThorn });
+  mem.ordered.thornwall = s.tick;
 }
 
 const grownSheep = (s: GameState, owner: number): Animal[] => s.animals.filter((a) => a.kind === 'sheep' && a.owner === owner && a.hp > 0 && a.lamb === undefined);

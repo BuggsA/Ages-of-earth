@@ -8,8 +8,8 @@ import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
-import { RARE_OF_TILE } from '../sim/units';
-import { POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { RARE_OF_TILE, findResource } from '../sim/units';
+import { AUTO_WORK, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -41,6 +41,7 @@ import { flockCap, flockOf, grazeRange, lambProblem } from '../sim/flocks';
 import { soldAt } from '../sim/ages';
 import { ageDef, ageOf, asleep, crossingLeft, goldenEnds, livesOf, threadsOf, crossingsAhead, keepsakeProblem, leaving, sleepWhy, type Tally, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, oreClue, oreDone, oreOnly, ironTradeShare, isHire, isSideRoad, journeyOf, mainRoad, pathLine, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, suspendedTechs, assayed, diggersAt, holdingsOf, holds, keyOf, lacking, opensOf, prospected, trainsAt, windowsOf, leadsOn, leadsTo } from '../sim/ages';
 import type { AgeId, KeyId, RareId, Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Player, Res, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
+import { GROVE_BUILDINGS, grows } from '../sim/grove';
 import { KEYS, RARES, RES, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
 import { buildingPicture, unitPicture } from './thumbs';
@@ -129,6 +130,7 @@ function orderWords(s: GameState, u: Unit): string {
     }
     case 'farm':
       if (flooded(s, u.owner)) return 'Waiting out the flood: the field is under the river';
+      if ((s.byId.get(o.target) as Building | undefined)?.type === 'garden') return o.phase === 'drop' ? 'Carrying the harvest home' : o.phase === 'work' ? 'Tending a Kitchen Garden' : 'Going to the garden';
       return o.phase === 'drop' ? 'Carrying grain home' : o.phase === 'work' ? 'Farming' : 'Going to the fields';
     case 'build': {
       const target = s.byId.get(o.target);
@@ -149,6 +151,8 @@ function orderWords(s: GameState, u: Unit): string {
       return 'Hunting';
     case 'milk':
       return o.phase === 'drop' ? 'Carrying milk home' : o.phase === 'work' ? 'Milking the flock' : 'Going to milk the flock';
+    case 'tame':
+      return u.act === 'chant' ? 'Singing a wild beast calm' : 'Going to tame a wild beast';
     case 'snare':
       return o.phase === 'drop' ? 'Carrying the catch home' : o.phase === 'work' ? 'Emptying a snare' : u.act === 'idle' ? 'Waiting by the snares for game' : 'Walking the trap line';
     case 'shaft':
@@ -295,6 +299,7 @@ export class Hud {
   private epochEl = document.getElementById('epoch-chip')!;
   private clockEl = document.getElementById('clock')!;
   private idleEl = document.getElementById('idle-btn')!;
+  private idleSeen = 0;
   private workforceBtn = document.getElementById('workforce-btn') as HTMLButtonElement;
   private workforcePanel = document.getElementById('workforce-panel')!;
   private wfDrawn = new Map<string, string>();
@@ -345,6 +350,30 @@ export class Hud {
       this.workforceBtn.setAttribute('aria-expanded', 'false');
     });
     this.noticeEl.addEventListener('click', (e) => {
+      const f = (e.target as HTMLElement).closest<HTMLElement>('[data-fields]');
+      if (f) {
+        this.moveWorkers('idle', 'food', Number(f.dataset.fields) || 1);
+        f.closest('.notice')?.remove();
+        return;
+      }
+      const m = (e.target as HTMLElement).closest<HTMLElement>('[data-mine]');
+      if (m) {
+        this.moveWorkers('idle', m.dataset.mine as Job, Number(m.dataset.n) || 1);
+        m.closest('.notice')?.remove();
+        return;
+      }
+      const g = (e.target as HTMLElement).closest<HTMLElement>('[data-forage]');
+      if (g) {
+        this.moveWorkers('idle', 'food', Number(g.dataset.forage) || 1);
+        g.closest('.notice')?.remove();
+        return;
+      }
+      const fi = (e.target as HTMLElement).closest<HTMLElement>('[data-fish]');
+      if (fi) {
+        this.findFish(fi.dataset.fish ?? '');
+        fi.closest('.notice')?.remove();
+        return;
+      }
       const b = (e.target as HTMLElement).closest<HTMLElement>('[data-hands]');
       if (!b) return;
       this.sendWorkers(b.dataset.hands as Job, Number(b.dataset.n) || 1);
@@ -451,6 +480,169 @@ export class Hud {
     setTimeout(() => el.remove(), 7200);
   }
 
+  /** Citizens standing idle (bushes picked dry, #344): after a few seconds, one button lays them fields (`reassign` idle→food does it). */
+  private idleSince = new Map<number, number>();
+  private idleCardAt = 0;
+  private foraged = new Set<number>();
+  private idleFieldCard(s: GameState, viewer: number): void {
+    const p = s.players[viewer];
+    const now = performance.now();
+    this.idleMinersCard(s, viewer, now);
+    this.idleHuntersCard(s, viewer, now);
+    this.idleFishersCard(s, viewer, now);
+    this.idleBuildersCard(s, viewer, now);
+    const idle = idleCitizens(s, viewer);
+    const next = new Map<number, number>();
+    for (const u of idle) next.set(u.id, this.idleSince.get(u.id) ?? now);
+    this.idleSince = next;
+    // Only hands that foraged or farmed and ran dry: the starting five stand idle until the player orders them, and no card scolds that.
+    for (const e of s.ents) {
+      if (e.kind !== 'unit' || e.owner !== viewer) continue;
+      if (e.order.k === 'farm' || (e.order.k === 'gather' && e.order.res === 'food')) this.foraged.add(e.id);
+    }
+    const waiting = idle.filter((u) => this.foraged.has(u.id) && now - next.get(u.id)! > 5000).length;
+    if (!p || waiting < 3 || now < this.idleCardAt || buildBarred(p, 'farm')) return;
+    if (s.ents.some((e) => e.kind === 'building' && e.owner === viewer && e.type === 'farm' && !e.built && e.hp > 0)) return;
+    this.idleCardAt = now + 30000;
+    const n = Math.min(waiting, AUTO_WORK.lay);
+    this.noticeEl.querySelector('.idle-fields')?.remove();
+    const el = document.createElement('div');
+    el.className = 'notice alert shortage idle-fields';
+    el.innerHTML = `<span>${waiting} hands stand idle with nothing to forage.</span><button type="button" data-fields="${n}" title="Lay ${n} ${n === 1 ? 'field' : 'fields'} near them, paid in wood, and put them to farm">🌾 Lay ${n} ${n === 1 ? 'field' : 'fields'}</button>`;
+    this.noticeEl.appendChild(el);
+    while (this.noticeEl.children.length > 4) this.noticeEl.firstChild!.remove();
+    setTimeout(() => (el.style.opacity = '0'), 8000);
+    setTimeout(() => el.remove(), 8700);
+  }
+
+  /** Miners whose seam ran dry (#344): remember what each digger last dug; 3+ idle for 5 s offer one button that sends them to the nearest other seam or free shaft. */
+  private mining = new Map<number, 'stone' | 'gold'>();
+  private minersCardAt = 0;
+  private idleMinersCard(s: GameState, viewer: number, now: number): void {
+    const idle = new Set(idleCitizens(s, viewer).map((u) => u.id));
+    const spent: Record<'stone' | 'gold', number> = { stone: 0, gold: 0 };
+    for (const e of s.ents) {
+      if (e.kind !== 'unit' || e.owner !== viewer || e.hp <= 0) continue;
+      const o = e.order;
+      if ((o.k === 'gather' || o.k === 'shaft') && (o.res === 'stone' || o.res === 'gold')) this.mining.set(e.id, o.res);
+      else if (idle.has(e.id) && this.mining.has(e.id)) {
+        if (now - (this.idleSince.get(e.id) ?? now) > 5000) spent[this.mining.get(e.id)!]++;
+      } else this.mining.delete(e.id);
+    }
+    const res = spent.gold > spent.stone ? 'gold' : 'stone';
+    const waiting = spent.stone + spent.gold;
+    if (waiting < 3 || now < this.minersCardAt) return;
+    this.minersCardAt = now + 30000;
+    const n = Math.min(waiting, AUTO_WORK.lay);
+    this.noticeEl.querySelector('.idle-miners')?.remove();
+    const el = document.createElement('div');
+    el.className = 'notice alert shortage idle-miners';
+    el.innerHTML = `<span>${waiting} miners stand idle: their seam is spent.</span><button type="button" data-mine="${res}" data-n="${n}" title="Send ${n} to the nearest ${res} seam, or a free Mine Shaft">⛏ Find more ${res}</button>`;
+    this.noticeEl.appendChild(el);
+    while (this.noticeEl.children.length > 4) this.noticeEl.firstChild!.remove();
+    setTimeout(() => (el.style.opacity = '0'), 8000);
+    setTimeout(() => el.remove(), 8700);
+  }
+
+  /** Hunters whose game is gone (#344): remember who last hunted; 2+ idle for 5 s offer one button that sends them for berries, a field or meat (`reassign` idle→food). */
+  private hunting = new Set<number>();
+  private huntersCardAt = 0;
+  private idleHuntersCard(s: GameState, viewer: number, now: number): void {
+    const idle = new Set(idleCitizens(s, viewer).map((u) => u.id));
+    let waiting = 0;
+    for (const e of s.ents) {
+      if (e.kind !== 'unit' || e.owner !== viewer || e.hp <= 0) continue;
+      if (e.order.k === 'hunt') this.hunting.add(e.id);
+      else if (idle.has(e.id) && this.hunting.has(e.id)) {
+        if (!this.foraged.has(e.id) && now - (this.idleSince.get(e.id) ?? now) > 5000) waiting++;
+      } else this.hunting.delete(e.id);
+    }
+    if (waiting < 2 || now < this.huntersCardAt) return;
+    this.huntersCardAt = now + 30000;
+    const n = Math.min(waiting, AUTO_WORK.lay);
+    this.noticeEl.querySelector('.idle-hunters')?.remove();
+    const el = document.createElement('div');
+    el.className = 'notice alert shortage idle-hunters';
+    el.innerHTML = `<span>${waiting} hunters stand idle: the game is gone.</span><button type="button" data-forage="${n}" title="Send ${n} for berries, a free field or meat nearby; a field is laid if there is none">🍖 Find more food</button>`;
+    this.noticeEl.appendChild(el);
+    while (this.noticeEl.children.length > 4) this.noticeEl.firstChild!.remove();
+    setTimeout(() => (el.style.opacity = '0'), 8000);
+    setTimeout(() => el.remove(), 8700);
+  }
+
+  /** Builders whose work is done (#344): remember who last built; 3+ idle for 5 s offer one button that sends them to the trees (`reassign` idle→wood). */
+  private building = new Set<number>();
+  private buildersCardAt = 0;
+  private idleBuildersCard(s: GameState, viewer: number, now: number): void {
+    const idle = new Set(idleCitizens(s, viewer).map((u) => u.id));
+    let waiting = 0;
+    for (const e of s.ents) {
+      if (e.kind !== 'unit' || e.owner !== viewer || e.hp <= 0) continue;
+      if (e.order.k === 'build') this.building.add(e.id);
+      else if (idle.has(e.id) && this.building.has(e.id)) {
+        if (now - (this.idleSince.get(e.id) ?? now) > 5000) waiting++;
+      } else this.building.delete(e.id);
+    }
+    if (waiting < 3 || now < this.buildersCardAt) return;
+    this.buildersCardAt = now + 30000;
+    const n = Math.min(waiting, AUTO_WORK.lay);
+    this.noticeEl.querySelector('.idle-builders')?.remove();
+    const el = document.createElement('div');
+    el.className = 'notice alert shortage idle-builders';
+    el.innerHTML = `<span>${waiting} builders stand idle: the work is done.</span><button type="button" data-mine="wood" data-n="${n}" title="Send ${n} to the nearest trees">🪓 Fell timber</button>`;
+    this.noticeEl.appendChild(el);
+    while (this.noticeEl.children.length > 4) this.noticeEl.firstChild!.remove();
+    setTimeout(() => (el.style.opacity = '0'), 8000);
+    setTimeout(() => el.remove(), 8700);
+  }
+
+  /** Fishing boats whose shoal is spent (#344): they are not citizens, so they get their own watch; 2+ idle for 5 s offer one button that sends them to the nearest shoal in the sea. */
+  private fishing = new Set<number>();
+  private fishersSince = new Map<number, number>();
+  private fishersCardAt = 0;
+  private idleFishersCard(s: GameState, viewer: number, now: number): void {
+    const next = new Map<number, number>();
+    const spent: number[] = [];
+    for (const e of s.ents) {
+      if (e.kind !== 'unit' || e.owner !== viewer || e.type !== 'fisher' || e.hp <= 0) continue;
+      if (e.order.k === 'gather') this.fishing.add(e.id);
+      else if (e.order.k === 'idle' && !e.queue.length && this.fishing.has(e.id)) {
+        const since = this.fishersSince.get(e.id) ?? now;
+        next.set(e.id, since);
+        if (now - since > 5000) spent.push(e.id);
+      } else this.fishing.delete(e.id);
+    }
+    this.fishersSince = next;
+    if (spent.length < 2 || now < this.fishersCardAt) return;
+    this.fishersCardAt = now + 30000;
+    this.noticeEl.querySelector('.idle-fishers')?.remove();
+    const el = document.createElement('div');
+    el.className = 'notice alert shortage idle-fishers';
+    el.innerHTML = `<span>${spent.length} fishing boats lie idle: their shoal is spent.</span><button type="button" data-fish="${spent.join(',')}" title="Send them to the nearest shoal still in the sea">🐟 Find more fish</button>`;
+    this.noticeEl.appendChild(el);
+    while (this.noticeEl.children.length > 4) this.noticeEl.firstChild!.remove();
+    setTimeout(() => (el.style.opacity = '0'), 8000);
+    setTimeout(() => el.remove(), 8700);
+  }
+
+  /** Send the listed idle boats to the shoal nearest their middle, anywhere on the map; they fan over the shoals near it. */
+  private findFish(list: string): void {
+    const s = this.state;
+    if (!s) return;
+    const boats = list.split(',').map((x) => s.byId.get(Number(x))).filter((e): e is Unit => !!e && e.kind === 'unit' && e.owner === this.viewer && e.type === 'fisher' && e.hp > 0 && e.order.k === 'idle');
+    if (!boats.length) return;
+    const x = boats.reduce((a, b) => a + b.x, 0) / boats.length;
+    const y = boats.reduce((a, b) => a + b.y, 0) / boats.length;
+    const tile = findResource(s, R_FISH, x, y, Math.max(s.w, s.h));
+    if (tile < 0) {
+      this.act.sound('error');
+      this.toast('No shoal is left in the sea', 'bad');
+      return;
+    }
+    this.act.issue({ t: 'gather', p: this.viewer, ids: boats.map((b) => b.id), tile, spread: true });
+    this.act.sound('click');
+  }
+
   banner(title: string, sub = '', ms = 3200): void {
     this.bannerEl.innerHTML = `${title}${sub ? `<small>${sub}</small>` : ''}`;
     this.bannerEl.classList.add('show');
@@ -467,6 +659,7 @@ export class Hud {
     this.lastIds = ids;
     this.top(s, viewer, speed);
     this.tidingCard(s, viewer);
+    this.idleFieldCard(s, viewer);
     if (!this.workforcePanel.classList.contains('hidden')) this.drawWorkforce(s, viewer);
     const ents = ids.map((id) => s.byId.get(id)).filter((e): e is Ent => !!e && e.hp > 0);
     this.selection(s, viewer, ents, selectedTile, selectedRelic, selectedPost, selectedRuin, selectedLandmark);
@@ -586,6 +779,13 @@ export class Hud {
       : `<span data-tip="<b>${age.name}</b>${age.blurb}${age.path ? `<br><i>${PATHS[age.path].name}: step ${pathDepth(p)} of ${pathLine(age.path).length + (PATHS[age.path].planned?.length ?? 0)}.${age.hemocraft || age.rite ? ` Blood drawn: ${Math.floor(p.stats.blood ?? 0)}.${age.rite ? ` Health mended at the altars: ${Math.floor(p.stats.riteMended ?? 0)}.` : ''}` : ''} ${age.path === 'steppe' ? `Tribute taken: ${Math.floor(p.stats.tribute ?? 0)} gold.${age.caravans ? ` Gold the caravans earned on the move: ${p.stats.caravan ?? 0}. Tolls taken from rival traders: ${p.stats.toll ?? 0}.` : ''}` : `Plunder taken: ${p.stats.plunder ?? 0} gold.`}</i>` : ''}${idleTechs.length ? `<br>Suspended until you climb again: ${idleTechs.join(', ')}.` : ''}${mainRoad(p) ? `<br><span class='hint'>Advance at a Town Center.</span>` : ''}">${age.name}</span>`;
     this.idleEl.textContent = `Idle ${idle}`;
     this.idleEl.classList.toggle('alert', idle > 0);
+    if (idle > this.idleSeen) {
+      // One bright flash each time more hands fall idle, so a dry bush or spent seam is noticed.
+      this.idleEl.classList.remove('rise');
+      void this.idleEl.offsetWidth;
+      this.idleEl.classList.add('rise');
+    }
+    this.idleSeen = idle;
     document.getElementById('speed-btn')!.textContent = `${speed}×`;
   }
 
@@ -1036,6 +1236,8 @@ export class Hud {
         if (def.only && !builders.some((u) => canRaise(u.type, type, p.civ))) continue;
         // Only a managed wood's people (#501, the Britons) plants saplings: no one else is shown the button.
         if (type === 'sapling' && !CIVS[p.civ].coppice) continue;
+        // What the Grove grows shows only to a people that has walked it.
+        if (GROVE_BUILDINGS.includes(type) && !grows(p)) continue;
         const locked = def.epoch > p.epoch;
         const no = buildBarred(p, type) ?? wayBarred(s, p, type);
         const cost = buildingCostFor(s, viewer, type);
@@ -1045,7 +1247,7 @@ export class Hud {
           key: def.key,
           pic: buildingPicture(type, p.epoch, p.color),
           title: def.name,
-          desc: def.blurb + (type === 'wall' ? ' Click and drag to lay out a line.' : '') + (def.blood ? ` Costs 🩸${def.blood} blood besides.` : ''),
+          desc: def.blurb + (type === 'wall' || type === 'thornwall' ? ' Click and drag to lay out a line.' : '') + (def.blood ? ` Costs 🩸${def.blood} blood besides.` : ''),
           cost,
           ok: !locked && !no && !short && !wonderUp,
           why: locked ? `Needs the ${EPOCHS[def.epoch].name}` : no ? no : wonderUp ? 'You already have a wonder' : (short ?? undefined),
@@ -1587,7 +1789,7 @@ function nextTechs(p: Player, at: BuildingType): TechId[] {
 }
 
 function plural(name: string): string {
-  return name.endsWith('man') ? `${name.slice(0, -3)}men` : name.endsWith('ry') ? `${name.slice(0, -1)}ies` : `${name}s`;
+  return name.endsWith('man') ? `${name.slice(0, -3)}men` : name.endsWith('olf') ? `${name.slice(0, -1)}ves` : name.endsWith('ry') ? `${name.slice(0, -1)}ies` : `${name}s`;
 }
 
 /** Why a Town Center's other buttons wait while it is busy changing age. */
