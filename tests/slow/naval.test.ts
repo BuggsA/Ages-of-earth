@@ -171,7 +171,7 @@ describe('aircraft', () => {
   it('the Industrial Age follows the Gunpowder Age and re-arms everyone', () => {
     const s = game({ startEpoch: 3, mapType: 'plains' });
     rich(s);
-    expect(EPOCHS.length).toBe(5);
+    expect(EPOCHS[4].name).toBe('Industrial Age');
     const tc = s.ents.find((e): e is Building => e.kind === 'building' && e.owner === 0 && e.type === 'towncenter')!;
     run(s, EPOCHS[4].time + 2, [{ t: 'advance', p: 0, building: tc.id }]);
     expect(s.players[0].epoch).toBe(4);
