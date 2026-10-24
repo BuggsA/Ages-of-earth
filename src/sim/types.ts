@@ -122,7 +122,8 @@ export type Order =
   /** Carry what is held to a drop site, then go idle. */
   | { k: 'deliver' }
   /** Walk into a building to shelter (and add arrows to its volleys). */
-  | { k: 'garrison'; target: number }
+  /** `flee` when a citizen ran for shelter on its own: it comes out again once the danger has passed. */
+  | { k: 'garrison'; target: number; flee?: true }
   /** Hunt an animal; once it falls, butcher it. With `fight`, a wolf fought off: nothing to butcher. */
   | { k: 'hunt'; target: number; fight?: boolean }
   /** Milk a sheep of the people's flock (#308), carry the milk to a drop site, and back. */
@@ -214,6 +215,10 @@ export interface Unit {
   miss: number;
   /** The work a citizen was pulled off (to build, or by the town bell), to go back to afterward. */
   resume: Order | null;
+  /** Whether this citizen runs from danger, overriding its player's setting; absent follows the player. */
+  flee?: boolean;
+  /** Tick this citizen last ran from danger, or took shelter from it; absent if it is not one that fled. */
+  fled?: number;
   act: Act;
   /** Tick of the last swing or shot (for the strike animation). */
   swing: number;
@@ -707,6 +712,8 @@ export interface Player {
   ai: Difficulty | null;
   /** A person who left an online match, whose people the computer leads until they come back; absent otherwise. */
   left?: true;
+  /** Citizens stand their ground instead of running from danger (see `FLEE`); absent means they run. */
+  noFlee?: true;
   team: number;
   res: Stock;
   /** Blood in store (#355): drawn at Drain Rigs from the enemy dead and by the levy; absent until the first drop. */
@@ -1128,6 +1135,8 @@ export type Command =
   | ({ t: 'unload'; p: number; ids: number[]; x: number; y: number } & Queued)
   | { t: 'ungarrison'; p: number; building: number }
   | { t: 'bell'; p: number; ring: boolean }
+  /** Citizens run from danger (or not): the named citizens, or all of this player's when `ids` is absent. */
+  | { t: 'flee'; p: number; on: boolean; ids?: number[] }
   | { t: 'beacon'; p: number; building: number }
   /** Choose the seam a Mine Shaft digs (#681). */
   | { t: 'seam'; p: number; building: number; seam: SeamId }

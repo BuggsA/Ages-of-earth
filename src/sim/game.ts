@@ -13,6 +13,7 @@ import { fillSnares } from './snares';
 import { hitAnimal, spawnAnimal, updateAnimals } from './animals';
 import { markGoals, scenarioStep, startScenario } from './campaign';
 import { buildingGuns, updateShots } from './combat';
+import { fleeStep } from './flee';
 import { applyCommand } from './commands';
 import { AGES, AURA, AUTO_WORK, unitEpoch, CIV_IDS, HEART, LANDMARKS, RAIDER, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
 import { AIR, NAVAL, stampBuilding } from './grid';
@@ -603,6 +604,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   faithStep(s);
   tidingStep(s);
   removeDead(s);
+  fleeStep(s);
   if (s.tick % 4 === 0) updateVision(s);
   if (s.tick % 20 === 0) {
     scenarioStep(s);

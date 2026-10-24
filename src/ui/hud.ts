@@ -3,6 +3,7 @@ import { seasonAt, seasonOf } from '../sim/seasons';
 import { flooded } from '../sim/flood';
 import { armProblem, disarmProblem, isPolis } from '../sim/polis';
 import { scenarioById } from '../sim/campaign';
+import { flees } from '../sim/flee';
 import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
@@ -1100,6 +1101,10 @@ export class Hud {
         cmds.push({ key: 'K', pic: '', glyph: '🧨', title: 'Lay a keg', count: kegsOf(p) || undefined, desc: `Then click a rival building: each one carries a keg from your store to its foot and lights it. ${KEG.fuse} seconds later it blows, wrecking every rival building within ${KEG.reach} tiles (${KEG.building} each) and hurting the soldiers near it. A rival who reaches a burning keg stamps it out: get there quietly, or cover it. Kegs left: ${kegsOf(p)}. More are ground only in the Age of Alchemy.`, ok: !why, why: why ?? undefined, run: () => this.act.kegMode() });
       }
       cmds.push({ key: 'S', pic: '', glyph: '✋', title: 'Stop', desc: 'Stop what they are doing (and forget queued orders).', ok: true, run: () => this.act.issue({ t: 'stop', p: viewer, ids: units.map((u) => u.id) }) });
+      if (citizens.length && !p.ai) {
+        const runs = citizens.every((u) => flees(s, u));
+        cmds.push({ key: '', pic: '', glyph: '🏃', title: runs ? 'Runs from danger' : 'Stands ground', desc: `${runs ? 'These citizens run from danger' : 'These citizens stand their ground'}: struck by soldiers they dash into the nearest shelter, and shot at by a tower they step out of its reach. Click to ${runs ? 'make them stand their ground' : 'let them run again'}. The Town Center turns it on or off for every citizen at once.`, ok: true, on: runs, run: () => this.act.issue({ t: 'flee', p: viewer, on: !runs, ids: citizens.map((u) => u.id) }) });
+      }
       // The polis (#501): Greek citizens take up arms where they stand, and their soldiers lay them down at home.
       if (isPolis(p)) {
         if (citizens.length) {
@@ -1348,6 +1353,7 @@ export class Hud {
             const n = kinCount(s);
             cmds.push({ key: 'K', pic: '', glyph: '🔥', title: `Call the Kin (${n})`, cost: KIN.cost, desc: `${n} citizens come to the hearth together after ${KIN.time} seconds in this Town Center's queue${n > KIN.n ? ': it is winter, and the winter call draws more' : `; in winter, ${KIN.winter}`}. They need room under your cap.`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'kin', p: viewer, building: b.id }) });
           }
+          cmds.push({ key: '', pic: '', glyph: '🏃', title: p.noFlee ? 'Citizens stand ground' : 'Citizens run from danger', desc: `${p.noFlee ? 'Your citizens stand their ground when attacked, unless one is told to run.' : 'Your citizens run from danger on their own: struck by soldiers they dash into the nearest shelter, and shot at by a tower they step out of its reach. They come out when it has passed.'} Click to ${p.noFlee ? 'let them run' : 'make them stand'}. Only your own citizens; select one to set it alone.`, ok: true, on: !p.noFlee, run: () => this.act.issue({ t: 'flee', p: viewer, on: !!p.noFlee }) });
           const sheltering = s.ents.some((e) => e.kind === 'unit' && e.owner === viewer && e.type === 'citizen' && (e.inside || e.order.k === 'garrison'));
           cmds.push({ key: 'T', pic: '', glyph: '🕊', title: 'All clear', desc: 'Citizens come out of shelter and go back to work.', ok: sheltering, why: 'Nobody is sheltering', run: () => this.act.issue({ t: 'bell', p: viewer, ring: false }) });
         }

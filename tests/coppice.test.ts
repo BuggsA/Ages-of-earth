@@ -40,6 +40,8 @@ function fell(s: GameState, owner: number, t: number): void {
   const u = citizenOf(s, owner);
   u.x = (t % s.w) + 1.5;
   u.y = Math.floor(t / s.w) + 0.5;
+  // Stands its ground: the tile may lie under a rival's Town Center, whose arrows would send a fleeing citizen off.
+  applyCommand(s, { t: 'flee', p: owner, on: false, ids: [u.id] });
   applyCommand(s, { t: 'gather', p: owner, ids: [u.id], tile: t });
   for (let i = 0; i < secs(20) && s.res[t] === R_TREE; i++) step(s);
   expect(s.res[t]).toBe(R_NONE);

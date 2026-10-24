@@ -641,6 +641,15 @@ export function applyCommand(s: GameState, c: Command): void {
       s.events.push({ k: 'bell', owner: c.p, ring: c.ring });
       break;
     }
+    case 'flee': {
+      if (!c.ids) {
+        if (c.on) delete p.noFlee;
+        else p.noFlee = true;
+        break;
+      }
+      for (const u of myUnits(s, c.p, c.ids)) if (u.type === 'citizen') u.flee = c.on;
+      break;
+    }
     case 'seam': {
       const b = myBuilding(s, c.p, c.building);
       if (!b || b.type !== 'shaft') return;

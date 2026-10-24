@@ -2963,3 +2963,11 @@ export const AI_STEPPE = { take: 0.35, at: 12, campFrom: 8, campTo: 30, hunters:
  * side counts at most `most` fighters' blows against at most `most` targets (a sample, so a huge melee stays cheap).
  */
 export const BATTLE = { recent: 3, near: 8, join: 9, reach: 10, crushing: 0.8, winning: 0.6, even: 0.4, losing: 0.2, turn: 0.38, warnEvery: 20, most: 48 };
+
+/**
+ * Citizens run from danger on their own (a person's people only; the computer's citizens stand their ground):
+ * struck by a soldier, one makes for the nearest shelter within `shelter` tiles, or runs `run` tiles from it if
+ * none has room; shot by a tower or Town Center, one steps `pad` tiles past its reach. Sheltered, they come out
+ * once nothing armed and hostile is within `clear` tiles of the building and `hold` seconds have passed.
+ */
+export const FLEE = { shelter: 14, run: 8, pad: 3, clear: 10, hold: 6 };
