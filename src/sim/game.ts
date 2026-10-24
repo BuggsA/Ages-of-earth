@@ -39,6 +39,7 @@ import { kegStep, millStep } from './powder';
 import { fireStep } from './fire';
 import { burst, ditchStep, floodStep, pumpStep, sluiceStep } from './water';
 import { aground, tideStep } from './tides';
+import { linkProblem, sink } from './floating';
 import { siloStep } from './silo';
 import { stockPosts } from './oretrade';
 import { sortieStep } from './sortie';
@@ -404,6 +405,8 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
   }
   // A harbour aground at low water (#739) launches nothing until the tide comes back.
   if (domainOf(unit) === 'water' && aground(s, b)) return;
+  // A district cut off from its town (#770) raises no citizens until it is linked again.
+  if (unit === 'citizen' && linkProblem(s, b)) return;
   if (p.pop + kin > p.cap) {
     if (item.done === need) {
       item.done = need + 1;
@@ -499,6 +502,8 @@ function removeDead(s: GameState): void {
       stampBuilding(s, e, false);
       // A dam that falls with water behind it bursts (#701 s5).
       if (e.type === 'dam') burst(s, e);
+      // A floating district that sinks (#770) leaves its deck-hands in the water.
+      if (e.type === 'pontoon') sink(s, e);
       remember(s, e);
       leaveRubble(s, e);
       spillStore(s, e);
@@ -738,7 +743,13 @@ export function checksum(s: GameState): number {
     mix(e.x);
     mix(e.y);
     if (e.kind === 'unit') mix(e.carry);
-    else mix(e.progress);
+    else {
+      mix(e.progress);
+      // An Interceptor Battery's reload (#759 s2).
+      if (e.reload !== undefined) mix(e.reload);
+      // A Missile Silo held in Reserve (#759 s3): the tick it stands ready.
+      if (e.reserve !== undefined) mix(e.reserve);
+    }
   }
   for (const a of s.animals) {
     mix(a.x);
@@ -786,6 +797,16 @@ export function checksum(s: GameState): number {
       mix(sh.y);
     }
     for (const w of l.warn ?? []) for (const i of w.of ?? []) mix(i);
+    // The missile's course (#772): its start, lure and bow, frozen at launch.
+    if (l.arc) for (const v of [l.arc.x, l.arc.y, l.arc.t0, l.arc.lx, l.arc.ly, l.arc.bow]) mix(v);
+    // Its interceptors (#759 s2): which battery fired at which warhead, and the roll it drew.
+    for (const c of l.icpt ?? []) {
+      mix(c.battery * 4 + c.shot * 2 + (c.hit ? 1 : 0));
+      // Fired by a Reserve silo (#759 s3).
+      if (c.silo) mix(1);
+      mix(c.x);
+      mix(c.y);
+    }
   }
   // Bloom Seeds (the Age of the Bloom): where each came down, when it cracks, and how far it is hacked.
   for (const l of s.blooms ?? []) {

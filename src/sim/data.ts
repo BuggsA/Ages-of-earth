@@ -192,6 +192,11 @@ export interface Age {
   /** The Age of Locks (#701 s5): a Dam with water beside it turns turbines that drive its people's buildings within `DAM.reach` (`damDrives`). */
   turbines?: boolean;
   /**
+   * The Age of Floating Cities (#770): Pontoons moored on open water are cast off into a tow and moored again elsewhere (the `pack` and
+   * `pitch` orders, the Steppe's wagons on the water), and three or more linked side by side raise citizens. See `FLOAT` (`floating.ts`).
+   */
+  floats?: boolean;
+  /**
    * The Golden Age (#703): every side age the people has walked wakes at once, its verbs and the best of its gifts with none of its
    * doors (`weave` in `ages.ts`), until `GOLDEN.span` runs out and the people wakes in the Gunpowder Age, for good.
    */
@@ -261,7 +266,7 @@ export const ROUTES: Record<RouteId, { name: string; blurb: string }> = {
   horse: { name: 'Horse route', blurb: 'a town on wagons, tribute from a rival\'s land, tolls on the trade road' },
   faith: { name: 'Faith route', blurb: 'priests who win a rival\'s towers and Temples over' },
   wild: { name: 'Wild route', blurb: 'beasts tamed and bred, walls that grow, and one day the forest itself' },
-  water: { name: 'Water road', blurb: 'channels dug from the springs, dykes and polder, then sluices that drown your own fields to stop an army, then canals that carry ships inland and dams that turn turbines: a people that moves the water' },
+  water: { name: 'Water road', blurb: 'channels dug from the springs, dykes and polder, then sluices that drown your own fields to stop an army, then canals that carry ships inland and dams that turn turbines, then the tide\'s hours, and at last a town afloat that tows itself where it likes: a people that moves the water' },
 };
 
 const trunkAge = (e: number, good: string): Age => ({ name: EPOCHS[e].name, short: EPOCHS[e].short, tier: e, blurb: EPOCHS[e].blurb, good, routes: ['plain'] });
@@ -799,6 +804,21 @@ export const AGES: Record<AgeId, Age> = {
     noBuild: { buildings: ['wall', 'gate'], why: 'A people of the locks raises no stone walls or gates: its canals are the moat and its bridges the gates. They wait until it returns to the Industrial Age or climbs on' },
     canals: true,
     turbines: true,
+  },
+  // The Water Road's seventh age (#770, s7 of #701): past the Age of Tides, the trunk's last tier, a town that floats. Its tier is the
+  // Atomic's (every epoch-based number reads it); it lies a row past the Atomic on the web map only (the reason is on #770).
+  floating: {
+    verb: 'Build your town on the water: moor pontoon districts off the shore, link three or more into a floating town that raises its own citizens, and cast them off to tow a district, people and all, to new water',
+    door: 'Solid ground: no House is raised on land and no Missile Silo, and ships hole a pontoon three times as fast as anything else; those on its deck when it sinks swim for it, or drown',
+    good: 'A town that moves: tow your districts to the fish, to the fight, or out of a warhead\'s reach',
+    routes: ['water'],
+    keepsake: { building: 'pontoon', does: 'casting off and mooring again: one district you can still tow on any road' },
+    name: 'Age of Floating Cities',
+    short: 'Floating',
+    tier: 5,
+    blurb: 'As the Uros have lived for centuries on their reed islands in Lake Titicaca, and the Tanka in their boat towns on the Pearl River: a people whose town floats. Pontoons (E) are moored on open water, beside the shore or beside another of your pontoons: each is a district with room for 10, where every kind of goods is taken in and fishing boats are launched, and your people walk its deck. Moor three or more side by side and they link into a floating town, whose every pontoon raises citizens. Cast a pontoon off (O) and it is taken in tow with up to 10 of those on its deck aboard; moor it again (P) on any open water and it raises itself in a few seconds. A town that floats can leave: for the fishing grounds, for a rival\'s shore, or out of a warhead\'s reach. But no House is raised on land and no Missile Silo at all, and ships hole a pontoon three times as fast as anything else does: those on its deck when it sinks swim for the nearest deck or shore, and drown if it lies too far.',
+    noBuild: { buildings: ['house', 'silo'], why: 'A floating people raises no House on land and no Missile Silo: its homes are its pontoons. It waits until it returns to the Age of Tides or the Atomic Age' },
+    floats: true,
   },
   // The Golden Age (#703): the age that feels almost too good. A turn off the Gunpowder Age for a people that has lived many lives.
   golden: {
@@ -1452,6 +1472,17 @@ export const ROADS: Road[] = [
     blurb: 'Instead of the Atomic Age, on down the Water Road: from carrying ships inland to keeping the sea\'s hours. The tide wakes for the whole world; Tide Mills grind gold on every turn of it, and causeways carry a road over the sea that only high water covers. Paid in wood and stone as well as gold. What it gives up: the Missile Silo, and harbours that ground at low water.',
   },
   { from: 'locks', to: 'atomic', cost: EPOCHS[5].cost, time: EPOCHS[5].time, blurb: 'Rejoin the main road at the Atomic Age for the ordinary price: walls and gates return, the canals stay dug, and the Dams stand still, all but the one you keep.' },
+  // The Water Road's seventh age (#770): on from the Age of Tides only, for a people with open water by home; back to the Tides, or across to the Atomic.
+  {
+    from: 'tides',
+    to: 'floating',
+    cost: { food: 1800, wood: 1600, gold: 1000, stone: 300 },
+    time: 100,
+    coast: 'Needs sea within reach of your first town: a town that floats needs open water to moor on',
+    blurb: 'The Water Road\'s last age, past the Atomic: from keeping the sea\'s hours to living on the sea. Moor pontoon districts on open water, link them into a floating town that raises its own citizens, and cast them off to tow a district, people and all, wherever the water goes. Paid mostly in timber. What it gives up: Houses on land and the Missile Silo, and districts that ships hole fast.',
+  },
+  { from: 'floating', to: 'tides', cost: { food: 300, gold: 300 }, time: 30, blurb: 'Back to the Age of Tides: Houses go up on land again, and the pontoons stay moored and keep their room, but only the one you keep is ever cast off again.' },
+  { from: 'floating', to: 'atomic', cost: { food: 500, gold: 400, stone: 200 }, time: 40, blurb: 'Cross to the ordinary Atomic Age and its Missile Silo: Houses go up on land again, and the pontoons stay moored and keep their room, but only the one you keep is ever cast off again.' },
   // The Golden Age (#703): heard of by a people that has walked two side ages, open to one that has walked three. It ends on its own (`GOLDEN.span`).
   {
     from: 'gunpowder',
@@ -1549,6 +1580,26 @@ export const AI_EBB = { across: 3, slack: 1.25, margin: 6, hold: 200 };
 export const TIDE_ROUTE = { slack: 1.25, margin: 4, hold: 180 };
 
 /**
+ * Cockle beds (#767). When the tide wakes, a patch of beds is laid round each tile of the deeper flats (tidal ground of level `deep` or
+ * lower: bared only as the tide runs low) that the map's seed picks, one in `chance`: the tile and those beside it four ways on ground as
+ * deep. A bed holds `amount` food, picked by citizens at `rate` a second only while the tide has bared it, and each high water brings
+ * `regrow` more back, up to `amount`, to a bed that stands open to the sea: not in a barrage's pond, not under a site or causeway.
+ */
+export const COCKLE = { deep: 2, chance: 0.006, amount: 60, regrow: 25, rate: 1.0 };
+/**
+ * Work on the flats that reads the tide (#767). A citizen picking a cockle bed or building out on the flats looks at the clock every
+ * `check` ticks: when the water would cover the ground it stands on before it could walk to the shore (its route's pace, `TIDE_ROUTE.slack`)
+ * with `margin` seconds to spare, it steps ashore, a gatherer with its basket going home first, and goes back once the ground bares again.
+ */
+export const TIDE_WORK = { check: 5, margin: 6 };
+/**
+ * The computer and cockle beds (#767). Every `every` seconds a people in the Age of Tides with a bed bared within `reach` tiles of home,
+ * staying bare at least `least` seconds more, sends up to `hands` of its wood or berry gatherers to pick it; one that waits ashore longer
+ * than `idle` seconds goes back to the woods.
+ */
+export const AI_COCKLE = { every: 5, reach: 26, least: 25, hands: 3, idle: 25 };
+
+/**
  * The breach (#701 s3, the Water Road). Every `every` seconds the sea runs one tile on: each tile of polder four-ways beside water that
  * flows from the open sea (as a mill judges it: a body touching a map edge, or more than `POLDER.most` tiles; a finished dyke holds it,
  * a dyke site does not) floods, all at once, so water let in this step runs on only at the next. A flooded tile is sea again, its corners
@@ -1621,6 +1672,22 @@ export const DAM = { reach: 8, drive: 140, surge: 6, hurt: 40 };
  * `stay` seconds in the age before it climbs on.
  */
 export const AI_LOCKS = { take: 0.6, reach: 14, stay: 360 };
+
+/**
+ * The Age of Floating Cities (#770). A Pontoon is moored on open water a ship sails (`sails`), raised beside the shore or another of its
+ * people's pontoons so its builders can reach it. Pontoons whose sides touch link; a district of `city` or more linked finished pontoons
+ * raises citizens at each. Cast off (the `pack` order), a pontoon is a tow carrying up to `hold` of the people on its deck; the rest
+ * swim to the nearest deck or shore within `swim` tiles, losing `hurt`, or drown. Moored again (the `pitch` order) within `spot` tiles of
+ * where the tow lies, it raises itself as a pitched camp does (`STEPPE.pitch`). Ships do `hull` times their usual damage to a pontoon.
+ */
+export const FLOAT = { city: 3, hold: 10, swim: 4, hurt: 25, spot: 3, hull: 3 };
+/**
+ * The computer in the Age of Floating Cities (#770): it turns from the Age of Tides on its own coin (`take`, `onward` for a Water Road
+ * people) once it has kept the Tides `after` seconds (its mills grinding, its barrage laid), moors at least `most` pontoons in a linked row off the shore nearest home (within `reach` tiles), keeps `fishers` fishing
+ * boats on them and raises citizens at the linked town up to `hands`, and casts a pontoon off and tows it to `flee` tiles from where a
+ * warhead is aimed, when that is within `blast` tiles of it. It stays `stay` seconds.
+ */
+export const AI_FLOAT = { take: 0.5, onward: 0.8, most: 4, reach: 18, fishers: 4, hands: 50, blast: 12, flee: 16, after: 480, stay: 420 };
 
 /**
  * Stepping back an age (#47), at a Town Center: down to the trunk age one tier below, whatever road
@@ -1819,6 +1886,24 @@ export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
     radius: 0.5,
     blurb: 'A Town Center or House packed onto an ox cart: drive it to new ground and pitch it there (P). It shelters, trains and takes in nothing while it rolls, and riders run it down.',
   })),
+  // A pontoon cast off (#770, the Age of Floating Cities): never trained, only made by casting a Pontoon off. Ships hole it as they hole a pontoon.
+  tow: [0, 1, 2, 3, 4, 5].map(() => ({
+    name: 'Pontoon in tow',
+    cls: 'ship' as const,
+    hp: 600,
+    attack: 0,
+    armor: 2,
+    parmor: 8,
+    range: 0,
+    reload: 1,
+    speed: 1.1,
+    sight: 6,
+    cost: {},
+    time: 1,
+    radius: 0.7,
+    capacity: FLOAT.hold,
+    blurb: 'A Pontoon cast off and under tow, with those of its deck aboard: take it to open water and moor it there (P). It shelters, trains and takes in nothing while it is towed, and ships sink it fast.',
+  })),
   trader: [
     null,
     { name: 'Pack Donkey', cls: 'trader', hp: 80, attack: 0, armor: 0, parmor: 1, range: 0, reload: 1, speed: 1.3, sight: 6, cost: { wood: 60, gold: 40 }, time: 20, radius: 0.32, blurb: 'Carries goods to a trading post and brings back gold: the farther its Market from the post, the more. Easy prey for cavalry.' },
@@ -1842,11 +1927,11 @@ export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
   warmammoth: beast({ name: 'War Mammoth', cls: 'siege', hp: 420, attack: 16, armor: 2, parmor: 4, range: 0, reload: 2.4, speed: 1.1, sight: 6, cost: { food: 260, gold: 60 }, time: 40, radius: 0.55, blurb: 'A woolly mammoth led to war: it tramples walls and buildings as a ram does, and gores soldiers too. Spearmen and riders swarm it.' }),
 };
 
-const DOMAINS: Partial<Record<UnitType, Domain>> = { fisher: 'water', warship: 'water', transport: 'water', cog: 'water', barge: 'water', fighter: 'air', bomber: 'air', skywhale: 'air' };
+const DOMAINS: Partial<Record<UnitType, Domain>> = { fisher: 'water', warship: 'water', transport: 'water', cog: 'water', barge: 'water', tow: 'water', fighter: 'air', bomber: 'air', skywhale: 'air' };
 /** Where a unit line goes: on foot, on the water or in the air. */
 export const domainOf = (type: UnitType): Domain => DOMAINS[type] ?? 'land';
 
-export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader', 'wagon', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge', 'warden', 'skywhale', 'behemoth'];
+export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader', 'wagon', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge', 'warden', 'tow', 'skywhale', 'behemoth'];
 export const MILITARY: UnitType[] = ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'warship', 'fighter', 'bomber', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge', 'warden', 'behemoth'];
 
 type Target = UnitClass | 'building';
@@ -2382,6 +2467,12 @@ export const SHAFT = {
   aiMax: 3,
 };
 
+/** The interceptor's numbers (`INTERCEPT`), named here so the battery's words can say them. */
+const INTERCEPT_REACH = 12;
+const INTERCEPT_FIRE = 2;
+const INTERCEPT_PCT = 60;
+const INTERCEPT_RELOAD = 90;
+
 export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   towncenter: { name: 'Town Center', size: 4, hp: 2800, cost: { wood: 275, stone: 150 }, time: 110, pop: 10, sight: 8, trains: ['citizen', 'hero'], drop: ['food', 'wood', 'stone', 'gold'], epoch: 0, guns: { damage: 6, range: 7, reload: 2 }, garrison: 15, menu: 'eco', key: 'T', blurb: 'Trains citizens and heroes, takes in every resource and leads your people into the next epoch. Citizens shelter here when the bell rings. Lose your last one and you have 45 seconds to raise another, or your people is lost: build a second far from the first.' },
   house: { name: 'House', size: 2, hp: 600, cost: { wood: 35 }, time: 18, pop: 5, sight: 3, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'E', blurb: 'Room for 5 more people.' },
@@ -2443,7 +2534,10 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   sluice: { name: 'Sluice', size: 1, hp: 800, cost: { wood: 60, stone: 80 }, time: 20, pop: 0, sight: 4, trains: ['barge'], drop: [], epoch: 3, ages: ['waterline'], menu: 'mil', key: 'S', blurb: 'A timber gate in a dyke, on a channel or on shallow water, raised on its banks by a winch. Shut, it holds the water back as a dyke does, and your own people walk across it. Open it (O) and the water runs out over the low ground round it, a ring a second, up to 7 tiles: soldiers wade the flood at a crawl, siege can hardly cross it, and your gun-barges sail it. Shut it and the water drains away. It launches Gun-barges onto the water beside it.' },
   // The Age of Locks (#701 s5): a swing bridge over a canal, and a dam whose turbines drive the buildings by it (`CANAL`, `DAM`, `water.ts`).
   bridge: { name: 'Bridge', size: 1, hp: 500, cost: { wood: 50, stone: 30 }, time: 12, pop: 0, sight: 2, trains: [], drop: [], epoch: 4, ages: ['locks'], menu: 'eco', key: 'Z', blurb: 'A timber swing bridge on stone piers, laid over a canal or a channel. Your own people cross on it at full pace; rivals can\'t, and must swim the water round it. It swings for ships: every ship and barge passes under it.' },
+  pontoon: { name: 'Pontoon', size: 3, hp: 1500, cost: { wood: 150, gold: 40 }, time: 30, pop: 10, sight: 5, trains: ['citizen', 'fisher'], drop: ['food', 'wood', 'stone', 'gold'], epoch: 5, ages: ['floating'], garrison: 10, menu: 'eco', key: 'E', blurb: 'A district on pontoons, moored on open water beside the shore or beside another of your pontoons: room for 10, every kind of goods taken in, fishing boats launched, and a deck your own people walk. Three or more moored side by side link into a floating town, and each of its pontoons raises citizens. Cast it off (O) to tow it, with up to 10 of those on its deck aboard, and moor it again (P) on any open water. Ships hole it three times as fast as anything else.' },
   dam: { name: 'Dam', size: 1, hp: 1200, cost: { wood: 100, stone: 150 }, time: 30, pop: 0, sight: 4, trains: [], drop: [], epoch: 4, ages: ['locks'], menu: 'mil', key: 'N', blurb: 'A stone dam with a turbine house, raised on a channel, a canal, the shallows or the shore. With still water beside it, its turbines drive every building of yours within 8 tiles: they train and research two fifths faster (one dam\'s worth, however many stand near). Your own people walk across its crown; ships can\'t pass it. If it falls with water behind it, it bursts: the water runs over the low ground below it all at once, up to 6 tiles, hurting all who stand there.' },
+  // Missile defence (#759 s2): after Interceptors, a battery that fires one interceptor at a warhead whose ring falls in its cover (`INTERCEPT`, `silo.ts`).
+  battery: { name: 'Interceptor Battery', size: 2, hp: 1400, cost: { wood: 150, stone: 250, gold: 300 }, time: 50, pop: 0, sight: 8, trains: [], drop: [], epoch: 4, menu: 'mil', key: 'I', blurb: `A concrete pad with a radar dish and one interceptor on its rail, raised after Interceptors. It covers ${INTERCEPT_REACH} tiles round it, a circle every player sees. When a rival warhead's ring as you are shown it lies inside that cover, it fires on its own ${INTERCEPT_FIRE} seconds before the warhead lands and stops it ${INTERCEPT_PCT}% of the time: no blast and no fallout. One attempt for each warhead, however many batteries cover it, and the charge is spent hit or miss: it reloads in ${INTERCEPT_RELOAD} seconds. Every player sees a finished battery.` },
   airfield: { name: 'Airfield', size: 4, hp: 2200, cost: { wood: 250, stone: 100, gold: 150 }, time: 60, pop: 0, sight: 8, trains: ['fighter', 'bomber'], drop: [], epoch: 4, menu: 'mil', key: 'F', blurb: 'Builds fighters and bombers. Fighters hunt aircraft; bombers wreck towns.' },
 };
 
@@ -2592,6 +2686,7 @@ export const TECHS: Record<TechId, Tech> = {
   chemistry: { name: 'Chemistry', at: 'workshop', epoch: 3, cost: { food: 300, gold: 200 }, time: 45, add: { siegeRange: 1 }, mul: { siegeAttack: 1.2 }, blurb: 'Siege hits 20% harder and reaches 1 tile farther.', icon: '🧪' },
   blackPowder: { name: 'Black Powder', at: 'workshop', epoch: 3, ore: { id: 'saltpetre', n: 40 }, cost: { food: 250, gold: 150 }, time: 45, add: { rangedAttack: 1 }, mul: { siegeAttack: 1.15 }, blurb: 'Only where saltpetre lies: once your citizens have mined 40, the powder-makers grind it fine. Musketeers and all ranged soldiers hit for 1 more and siege 15% harder, on top of Chemistry. Where there is none, the plain road stays open.', icon: '💥' },
   bloodForged: { name: 'Blood-Forged Blades', at: 'forge', epoch: 3, ore: { id: 'bloodiron', n: 30 }, cost: { food: 250, gold: 175 }, time: 45, needs: 'ironCasting', add: { meleeAttack: 1, armor: 1 }, blurb: 'Only where blood-iron lies: once your citizens have mined 30, the smiths quench blades and plates in it. Foot soldiers, riders and heroes hit for 1 more and wear 1 more melee armor, on top of the plain forge. Where there is none, the plain road stays open.', icon: '🩸' },
+  interceptors: { name: 'Interceptors', at: 'workshop', epoch: 4, cost: { food: 500, gold: 700, stone: 250 }, time: 60, blurb: `Rockets that climb to meet a falling warhead. Raise Interceptor Batteries (I): each covers ${INTERCEPT_REACH} tiles and stops a warhead whose ring lies in its cover ${INTERCEPT_PCT}% of the time, blast and fallout both.`, icon: '🛡' },
   launchControl: { name: 'Launch Control', at: 'silo', epoch: 5, cost: { food: 600, gold: 900, stone: 400 }, time: 60, blurb: 'A bunker that ties every silo of your people to one clock. You may raise a third Missile Silo, and three standing silos may fire a salvo (B): three Atomic warheads at once, on three points at least 8 tiles apart, on your one clock. A rival sees three rings as for any launch, and cannot tell a salvo from one warhead and two decoys until the last 3 seconds, when all three stay. Each silo that falls scrubs its own warhead. Rivals can count your silos, so three of them is warning enough.', icon: '🎯' },
   saltCuring: { name: 'Salt Curing', at: 'storehouse', epoch: 1, ore: { id: 'salt', n: 30 }, cost: { food: 100, wood: 60 }, time: 30, add: { carry: 2 }, mul: { hunt: 1.25, forage: 1.15 }, blurb: 'Only where salt lies: once your citizens have mined 30, meat keeps and berries dry. Game is butchered 25% faster and berries gathered 15% faster, and every citizen carries 2 more. Where there is none, hunting stays as it was.', icon: '🧂' },
   gillnets: { name: 'Gillnets', at: 'dock', epoch: 1, cost: { food: 100, wood: 100 }, time: 30, mul: { fish: 1.25 }, blurb: 'Fishing boats fish 25% faster.', icon: '🐟' },
@@ -3718,6 +3813,29 @@ export const SILO = { fuse: 45, reach: 5, fuel: { gold: 600, stone: 200 }, refue
  */
 export const SALVO = { trio: 3, surcharge: 0.5 };
 /**
+ * Missile defence (#759 s2): a finished Interceptor Battery holds one charge. Exactly `fire` seconds before a rival warhead lands, each of its
+ * live warheads whose ring, as the battery's team is shown it, lies within `reach` tiles of a charged battery draws one attempt: the nearest
+ * such battery fires, its charge spent hit or miss, and the roll (`chance`) is drawn then from the match's dice and stored on the launch.
+ * Exactly `meet` seconds before it lands the interceptor meets it: a hit and that warhead is gone, with no blast and no fallout; a miss and it
+ * flies on. A spent battery reloads in `reload` seconds. The computer learns Interceptors once a rival stands in the Industrial Age or later
+ * and raises `most` batteries, one to cover each of its Town Centers, nearest home first, `gap` seconds apart.
+ *
+ * A silo held in Reserve (#759 s3): a warhead no battery answered draws one attempt from a rival's Reserve silo instead, anywhere on the map,
+ * at the same chance; it spends a warhead from that people's store and its own warhead's launch fuel. A silo set to Reserve stands ready
+ * `arm` seconds later, and again `arm` seconds after each interceptor it fires; it may stand down at once, but launches nothing while set.
+ * The computer holds a silo in Reserve while a rival stands a silo and it stands two (or its store is full), deciding once every `think` seconds.
+ */
+export const INTERCEPT = { chance: INTERCEPT_PCT / 100, reach: INTERCEPT_REACH, fire: INTERCEPT_FIRE, meet: 1, reload: INTERCEPT_RELOAD, most: 2, gap: 40, arm: 30, think: 10 };
+/**
+ * A missile's flight (#772): the course every player watches inside the fuse. It climbs toward the middle of a rival's rings (the lure,
+ * moved up to `jitter` tiles by the seed) and covers `knee` of the way there, bowing sideways by up to `bow` of that stretch, so the first
+ * part reads as a district, not a point. Then it bends onto its true point (`lead`: how far past the bend's start the curve leans on along
+ * its old heading) and dives. The bend starts `read` seconds before the reveal, scaled by the lure's distance over `ref` tiles (between `lo`
+ * and `hi` of it): a sharp eye reads the target in that window. The arc peaks at `rise` of the lure's distance, between `low` and `high`
+ * tiles, at the bend. A lure nearer the silo than `near` tiles is replaced by the target.
+ */
+export const FLIGHT = { knee: 0.55, bow: 0.3, jitter: 3, lead: 0.5, read: 8, ref: 40, lo: 0.6, hi: 1.5, rise: 0.18, low: 4, high: 9, near: 6 };
+/**
  * The three warheads (#751 s1). A blast does `peak / (1 + (d/half)²)` at distance `d` tiles (from a building's nearest edge, or a unit's
  * position), tapering linearly over the last `taper` tiles to nothing at the blast radius `r`. A people fires its branch's warhead:
  * plain Atomic, Fission or Fusion, and from #753 chooses at launch between Atomic and its branch's own.
@@ -3739,8 +3857,11 @@ export const WARHEADS = {
  * The salvo (#765): when three rival targets at least `SILO.apart` apart are each worth a launch and together worth `salvo` times the best
  * single strike (`salvoPlain` times for a plain Atomic people, who pays the surcharge), the computer raises silos to three, learns Launch
  * Control, and holds its single strikes until the store holds three.
+ *
+ * The flight (#772): `read` seconds after a rival missile starts to bend, the computer reads its course as a player would (where it is,
+ * where it is going, how it turns) and stops clearing the rings the course has ruled out.
  */
-export const AI_SILO = { fork: 0.7, fusion: 0.4, forkAfter: 120, hold: 300, hands: 20, wait: 20, worth: 6, heart: 4, soldier: 2, margin: 1.5, salvo: 1.8, salvoPlain: 2.4 };
+export const AI_SILO = { fork: 0.7, fusion: 0.4, forkAfter: 120, hold: 300, hands: 20, wait: 20, worth: 6, heart: 4, soldier: 2, margin: 1.5, salvo: 1.8, salvoPlain: 2.4, read: 5 };
 export const AI_KEG = { take: 0.5, ore: 80, kegs: 6, mills: 2, hold: 180, sappers: 2, near: 12, guard: 4, every: 2 };
 
 /**

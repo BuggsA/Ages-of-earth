@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { CivId, UnitType } from '../sim/types';
 import { Kit, RIG_ARM, RIG_LEG_A, RIG_LEG_B, bake } from './kit';
+import { towKit } from './floatModels';
 
 /**
  * Every unit, in every epoch, built from primitives. Models face +z, stand on y = 0 and are about
@@ -1365,7 +1366,8 @@ function behemoth(): Kit {
   return k;
 }
 
-const MAKERS: Record<UnitType, (epoch: number) => Kit> = { citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, cog, fighter, bomber, trader, wagon, warwolf, tusker, warmammoth, blowpipe, cavebear, barge, warden, skywhale, behemoth };
+const MAKERS: Record<UnitType, (epoch: number) => Kit> = {
+  tow: () => towKit(), citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, cog, fighter, bomber, trader, wagon, warwolf, tusker, warmammoth, blowpipe, cavebear, barge, warden, skywhale, behemoth };
 
 /** Epoch + 30 asks for the citizen as a thrall (the same offset trick as the trader's gold and the caravan cart). */
 export const THRALL_MODEL = 30;

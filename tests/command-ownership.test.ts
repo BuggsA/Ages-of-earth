@@ -95,6 +95,7 @@ describe('one player never commands another’s people', () => {
       torch: { t: 'torch', p: 1, ids, tile },
       kegTile: { t: 'kegTile', p: 1, ids, tile },
       launch: { t: 'launch', p: 1, silo: tc.id, x, y },
+      reserve: { t: 'reserve', p: 1, silo: tc.id, on: true },
       reassign: { t: 'reassign', p: 1, from: 'idle', to: 'wood', n: 5 },
       tiding: { t: 'tiding', p: 1, card: 'traveller', take: true },
       // Last: these end player 1's part in the match, which must leave player 0 as it was too.

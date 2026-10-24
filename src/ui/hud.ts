@@ -9,19 +9,22 @@ import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE, findResource } from '../sim/units';
-import { FIRE, FISSION, HIVE, WILDWOOD, BLOOM, LEVIATHANS, AUTO_WORK, BREACH, CANAL, DAM, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, SALVO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE } from '../sim/data';
+import { FIRE, FISSION, HIVE, INTERCEPT, WILDWOOD, BLOOM, LEVIATHANS, AUTO_WORK, BREACH, CANAL, DAM, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, SALVO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE, FLOAT } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
 import { restsAt } from '../sim/passage';
 import { loadPrice, sellerNear } from '../sim/oretrade';
-import { clockOf, fuelOf, launchProblem, loaded, nextNuke, revealed, ringsFor, rulesOf, salvoFuel, salvoProblem, stockOf, warheadsOf, WARHEAD_NAMES, type WarheadKind } from '../sim/silo';
+import { armingOf, charged, clockOf, fuelOf, held as inReserve, launchProblem, loaded, nextNuke, reserveProblem, revealed, ringsFor, rulesOf, salvoFuel, salvoProblem, stockOf, warheadsOf, WARHEAD_NAMES, type WarheadKind } from '../sim/silo';
 import { carriesKegs, kegProblem, kegsOf, millProblem, mills, millsOf, sappers } from '../sim/powder';
 import { carriesTorch, fireOn } from '../sim/fire';
 import { basinOf, damIdle, drowned, heldBack, isInund, lets, millIdle, sluiceFed, sluiceProblem, waterLine, wateredAt } from '../sim/water';
 import { aground, millShares, tidalNear, tideClock, tideMillIdle } from '../sim/tides';
 import { isPond } from '../sim/tides';
 import { tideWaitLeft } from '../sim/tides';
+import { ashoreLeft, bedClock } from '../sim/tides';
+import { COCKLE } from '../sim/data';
+import { R_COCKLE } from '../sim/types';
 import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
 import { LANDMARK_KINDS, claimWork, claimants, favours, landmarkAt } from '../sim/landmarks';
 import { workProblem } from '../sim/works';
@@ -39,6 +42,7 @@ import { stirred as stirredNow } from '../sim/combat';
 import { sees } from '../sim/vision';
 import { buildingCostFor, buildingMaxHp, gunPower, gunRange, modsOf, raiseProblem, statsFor, techCostFor, techProblem, trainCostFor, trainTimeFor } from '../sim/stats';
 import { isMobile, packProblem, packsOf, pitchProblem } from '../sim/steppe';
+import { castProblem, districtOf } from '../sim/floating';
 import { exacting, isRider } from '../sim/tribute';
 import { landOwnerAt } from '../sim/borders';
 import { flockCap, flockOf, grazeRange, lambProblem } from '../sim/flocks';
@@ -136,6 +140,9 @@ function orderWords(s: GameState, u: Unit): string {
   switch (o.k) {
     case 'gather': {
       const kind = s.res[o.tile];
+      // Cockle beds (#767): the picker reads the tide.
+      if (ashoreLeft(s, u) > 0) return o.phase === 'drop' ? 'Off the flats with the cockles, before the flood' : 'Waiting ashore for the cockle beds to bare';
+      if (kind === R_COCKLE || o.cockle) return o.phase === 'drop' ? 'Carrying cockles home' : o.phase === 'work' ? 'Picking cockles' : 'Going out to the cockle beds';
       if (kind === R_FISH || u.type === 'fisher') return o.phase === 'drop' ? 'Bringing the catch to the dock' : o.phase === 'work' ? 'Fishing' : 'Sailing to the fishing grounds';
       const what = o.res === 'food' ? (kind === R_MEAT ? 'meat' : 'berries') : o.res === 'wood' ? 'wood' : kind === R_BOG || o.bog ? 'bog iron' : o.res;
       if (o.phase === 'drop') return `Carrying ${what} home`;
@@ -151,6 +158,7 @@ function orderWords(s: GameState, u: Unit): string {
       if ((s.byId.get(o.target) as Building | undefined)?.type === 'garden') return o.phase === 'drop' ? 'Carrying the harvest home' : o.phase === 'work' ? 'Tending a Kitchen Garden' : 'Going to the garden';
       return o.phase === 'drop' ? 'Carrying grain home' : o.phase === 'work' ? 'Farming' : 'Going to the fields';
     case 'build': {
+      if (ashoreLeft(s, u) > 0) return 'Waiting ashore for the tide to go out again';
       const target = s.byId.get(o.target);
       if (target?.kind === 'building' && target.built) return u.act === 'build' ? 'Repairing' : 'Going to repair';
       return u.act === 'build' ? 'Building' : 'Going to build';
@@ -210,6 +218,7 @@ function orderWords(s: GameState, u: Unit): string {
       if (u.type === 'trader' && u.carry > 0) return 'Waiting with gold: right-click a Market';
       if (u.type === 'cog' && u.carry > 0) return 'Waiting with gold: right-click a Dock';
       if (u.type === 'wagon') return 'Packed for the road: press P to pitch camp';
+      if (u.type === 'tow') return `Under tow with ${u.cargo.length} aboard: press P to moor`;
       if (u.type === 'behemoth') return 'Carrying your Town Center: press P to kneel';
       return ACT_WORDS[u.act] ?? 'Standing by';
   }
@@ -344,7 +353,25 @@ function warnTip(s: GameState, l: Launch, viewer: number): string {
   }
   const n = ringsFor(s, l, viewer).length;
   if (revealed(s, l)) return n > 1 ? `${who}'s salvo lands in ${clockOf(s, l)} seconds: all ${n} rings that flash are real.` : `${who}'s warhead lands in ${clockOf(s, l)} seconds, inside the ring that flashes. The decoys are gone.`;
-  return `${who}'s Missile Silo has launched: it lands in ${clockOf(s, l)} seconds. Of the red rings, one is real and the others decoys, unless it is a salvo of three silos firing at once, when all are real. Each ring is set off up to ${SILO.blur} tiles from where it falls. With ${SILO.reveal} seconds left the decoys vanish and the real rings flash. A silo destroyed before then scrubs its warhead.`;
+  return `${who}'s Missile Silo has launched: it lands in ${clockOf(s, l)} seconds. Of the red rings, one is real and the others decoys, unless it is a salvo of three silos firing at once, when all are real. Each ring is set off up to ${SILO.blur} tiles from where it falls. With ${SILO.reveal} seconds left the decoys vanish and the real rings flash. A silo destroyed before then scrubs its warhead.\nWatch the missile: it climbs toward the middle of the rings, then, some seconds before they flash, bends toward where it falls.${coverLine(s, l, viewer)}`;
+}
+
+/**
+ * Missile defence (#759 s2): how many of the rings this viewer is shown lie in their team's charged batteries' cover. A battery fires at a
+ * warhead whose ring it covers, so a ring in cover is one an interceptor will try to stop. And (s3) whether the team holds a silo in Reserve.
+ */
+function coverLine(s: GameState, l: Launch, viewer: number): string {
+  const team = s.players[viewer].team;
+  // A silo of the team held in Reserve (#759 s3) answers what no battery takes, wherever it falls.
+  const kept = s.ents.filter((e): e is Building => e.kind === 'building' && e.type === 'silo' && s.players[e.owner].team === team && e.built && e.hp > 0 && inReserve(e));
+  const ready = kept.filter((e) => !armingOf(s, e)).length;
+  const back = !kept.length ? '' : `\n${ready ? `${ready === 1 ? 'A silo' : `${ready} silos`} held in Reserve stand${ready === 1 ? 's' : ''} ready: each fires a warhead of its store at one warhead no battery answers, wherever it falls, and stops it ${Math.round(INTERCEPT.chance * 100)}% of the time.` : `Your silos held in Reserve are not ready yet: ${Math.min(...kept.map((e) => armingOf(s, e)))}s.`}`;
+  const mine = s.ents.filter((e): e is Building => e.kind === 'building' && e.type === 'battery' && s.players[e.owner].team === team && charged(s, e));
+  if (!mine.length) return back;
+  const R = INTERCEPT.reach * INTERCEPT.reach;
+  const rings = ringsFor(s, l, viewer);
+  const n = rings.filter((g) => mine.some((b) => (b.x - g.x) * (b.x - g.x) + (b.y - g.y) * (b.y - g.y) <= R)).length;
+  return back + `\n${n ? `${n} of the ${rings.length} rings lie in your Interceptor Batteries' cover: ${INTERCEPT.fire} seconds before it lands, a battery fires at a warhead falling in a ring it covers, and stops it ${Math.round(INTERCEPT.chance * 100)}% of the time.` : `None of the rings lies in your Interceptor Batteries' cover (the teal circles).`}`;
 }
 
 function tideChip(s: GameState): { text: string; tip: string } | null {
@@ -512,7 +539,8 @@ export class Hud {
   /** Press a command's hotkey. Returns whether one was found. */
   hotkey(key: string): boolean {
     const k = key.toUpperCase();
-    const c = this.cmds.find((x) => x.key === k);
+    // Two buttons may share a key where one is shut (the Pontoon takes the House's E in the Age of Floating Cities, #770): the open one wins.
+    const c = this.cmds.find((x) => x.key === k && x.ok) ?? this.cmds.find((x) => x.key === k);
     if (!c) return false;
     this.runCmd(c);
     return true;
@@ -944,12 +972,15 @@ export class Hud {
     else if (post) [html, sig] = this.postPanel(s, viewer, post);
     else if (!ents.length && tile !== null && s.res[tile]) {
       const kind = s.res[tile];
-      const name = kind === R_TREE ? 'Tree' : kind === R_BERRY ? 'Berry bush' : kind === R_MEAT ? (s.amount[tile] > BOAR.meat ? 'Mammoth carcass' : s.amount[tile] > AMOUNT.meat ? 'Boar carcass' : 'Carcass') + (s.carcasses?.some((c) => c.tile === tile && s.tick - c.born >= secs(ROT.grace)) ? ' (spoiling)' : '') : kind === R_FISH ? 'Fish shoal' : kind === R_GOLD ? 'Gold mine' : kind === R_BOG ? 'Bog iron' : kind === R_SALT || kind === R_SALTPETRE || kind === R_BLOODIRON ? (s.caves?.some((c) => c.tile === tile) ? `${RARE[RARE_OF_TILE[kind]].name} cave` : `${RARE[RARE_OF_TILE[kind]].name} vein`) : 'Stone quarry';
-      const res = RARE_OF_TILE[kind] ? 'stone' : kind === R_TREE ? 'wood' : kind === R_BERRY || kind === R_MEAT || kind === R_FISH ? 'food' : kind === R_GOLD || kind === R_BOG ? 'gold' : 'stone';
-      sig = `res:${tile}:${s.amount[tile]}`;
-      html = `<div class="sel-portrait"><span style="font-size:54px">${kind === R_TREE ? '🌳' : kind === R_BERRY ? '🫐' : kind === R_MEAT ? '🍖' : kind === R_FISH ? '🐟' : kind === R_GOLD ? icon('gold', 64) : kind === R_BOG ? '🟤' : RARE_OF_TILE[kind] ? RARE_ICON[RARE_OF_TILE[kind]] : icon('stone', 64)}</span></div>
+      const name = kind === R_COCKLE ? 'Cockle bed' : kind === R_TREE ? 'Tree' : kind === R_BERRY ? 'Berry bush' : kind === R_MEAT ? (s.amount[tile] > BOAR.meat ? 'Mammoth carcass' : s.amount[tile] > AMOUNT.meat ? 'Boar carcass' : 'Carcass') + (s.carcasses?.some((c) => c.tile === tile && s.tick - c.born >= secs(ROT.grace)) ? ' (spoiling)' : '') : kind === R_FISH ? 'Fish shoal' : kind === R_GOLD ? 'Gold mine' : kind === R_BOG ? 'Bog iron' : kind === R_SALT || kind === R_SALTPETRE || kind === R_BLOODIRON ? (s.caves?.some((c) => c.tile === tile) ? `${RARE[RARE_OF_TILE[kind]].name} cave` : `${RARE[RARE_OF_TILE[kind]].name} vein`) : 'Stone quarry';
+      const res = RARE_OF_TILE[kind] ? 'stone' : kind === R_TREE ? 'wood' : kind === R_BERRY || kind === R_MEAT || kind === R_FISH || kind === R_COCKLE ? 'food' : kind === R_GOLD || kind === R_BOG ? 'gold' : 'stone';
+      // A cockle bed (#767) tells its tide: bared for so long, or under water until so long.
+      const bed = kind === R_COCKLE ? bedClock(s, tile) : null;
+      const bedLine = !bed ? '' : bed.pond ? 'Shut in a barrage\'s pond, it stays under water: no one picks it until the barrage is breached.' : bed.bare ? `Bared by the tide for ${Math.ceil(bed.secs)}s more. Select citizens and right-click it to pick; they come ashore before the flood, and go back at the next low water.` : `Under water: the tide bares it in ${Math.ceil(bed.secs)}s. Citizens sent to it wait ashore until then.`;
+      sig = `res:${tile}:${s.amount[tile]}:${bed ? Math.ceil(bed.secs) : ''}`;
+      html = `<div class="sel-portrait"><span style="font-size:54px">${kind === R_COCKLE ? '🐚' : kind === R_TREE ? '🌳' : kind === R_BERRY ? '🫐' : kind === R_MEAT ? '🍖' : kind === R_FISH ? '🐟' : kind === R_GOLD ? icon('gold', 64) : kind === R_BOG ? '🟤' : RARE_OF_TILE[kind] ? RARE_ICON[RARE_OF_TILE[kind]] : icon('stone', 64)}</span></div>
         <div class="sel-info"><div class="sel-name">${name}</div><div class="stats"><span>${icon(res as 'wood')}${s.amount[tile]} left</span></div>
-        <div class="blurb">${kind === R_FISH ? 'Select fishing boats (from a Dock) and right-click it to fish.' : RARE_OF_TILE[kind] ? `${RARE[RARE_OF_TILE[kind]].blurb} Only some worlds hold it.${s.caves?.some((c) => c.tile === tile && c.den) ? ' Wolves lair here.' : ''} Select citizens and right-click it to mine; it is kept apart from your other stores.` : kind === R_BOG ? 'Rust-red ore in the wetland mud, smelted into iron bars and paid in as gold. Digging it opens the Iron Age, in the Stone Age, to a people whose Prospector\'s Lodge has found it.' : 'Select citizens and right-click it to gather.'}</div></div>`;
+        <div class="blurb">${bed ? `Cockles in the wet sand of the deeper flats, picked by hand as the tide runs low. Each high water brings ${COCKLE.regrow} back, up to ${COCKLE.amount}, to a bed open to the sea. ${bedLine}` : kind === R_FISH ? 'Select fishing boats (from a Dock) and right-click it to fish.' : RARE_OF_TILE[kind] ? `${RARE[RARE_OF_TILE[kind]].blurb} Only some worlds hold it.${s.caves?.some((c) => c.tile === tile && c.den) ? ' Wolves lair here.' : ''} Select citizens and right-click it to mine; it is kept apart from your other stores.` : kind === R_BOG ? 'Rust-red ore in the wetland mud, smelted into iron bars and paid in as gold. Digging it opens the Iron Age, in the Stone Age, to a people whose Prospector\'s Lodge has found it.' : 'Select citizens and right-click it to gather.'}</div></div>`;
     } else if (!ents.length) {
       const p = s.players[viewer];
       // A Golden Age (#703) counts down here, with what it weaves.
@@ -1106,6 +1137,9 @@ export class Hud {
         : '';
     // Routes that read the tide (#755): waiting on the shore for the flats to bare.
     const ebbLeft = Math.ceil(tideWaitLeft(s, u));
+    // Work on the flats that reads the tide (#767): stepped ashore before the flood, back when its ground bares.
+    const ashoreSecs = Math.ceil(ashoreLeft(s, u));
+    const ashore = ashoreSecs && !ebbLeft ? `<span data-tip="<b>Ashore for the tide</b>${mine ? 'It' : 'This one'} was working out on the flats and came ashore before the water could cover them. It goes back to its work in ${ashoreSecs}s, when the ground bares again. A new order ends the wait.">🌊<em>Ashore</em> ${ashoreSecs}s</span>` : '';
     const ebb = ebbLeft ? `<span data-tip="<b>Waiting for the tide</b>The way ${mine ? 'you sent it' : 'it was sent'} runs over tidal flats the sea would cover before it was across, and there is no quicker way round. It waits on the shore and sets out in ${ebbLeft}s, when the flats it needs stand bare until it is over.">🌊<em>Tide</em> ${ebbLeft}s</span>` : '';
     // Military Orders (#355 s6): a soldier with one of its priests at hand is sworn.
     const isSworn = sworn(s, u);
@@ -1137,7 +1171,7 @@ export class Hud {
           <span data-tip="<b>Armor</b>Melee / missile armor: taken off every blow or shot.">🛡<em>Armor</em> ${st.armor}/${st.parmor}</span>
           ${st.range ? `<span data-tip="<b>Range</b>How far it shoots, in tiles.">🏹<em>Range</em> ${st.range}</span>` : ''}
           <span data-tip="<b>Speed</b>Tiles per second.">👣<em>Speed</em> ${Math.round(st.speed * 100) / 100}</span>
-          ${carry}${cargo}${load}${stance}${vet}${line}${aura}${graft}${oath}${sword}${pack}${curse}${sting}${bond}${held}${trip}${caravan}${tribute}${toll}${ebb}
+          ${carry}${cargo}${load}${stance}${vet}${line}${aura}${graft}${oath}${sword}${pack}${curse}${sting}${bond}${held}${trip}${caravan}${tribute}${toll}${ebb}${ashore}
         </div>
         <div class="blurb">${st.blurb}</div>
       </div>`;
@@ -1285,6 +1319,11 @@ export class Hud {
       const driven = s.ents.filter((e) => e.kind === 'building' && e.owner === b.owner && e.built && e.hp > 0 && BUILDINGS[e.type].trains.length > 0 && (e.x - b.x) * (e.x - b.x) + (e.y - b.y) * (e.y - b.y) <= r2).length;
       status += ` · <span data-tip="<b>Dam</b>With still water beside it, its turbines drive every building of yours within ${DAM.reach} tiles: they train and research ${DAM.drive - 100}% faster (one dam's worth, however many stand near). If it falls with water behind it, it bursts over the low ground round it, up to ${DAM.surge} tiles, and all who stand there lose ${DAM.hurt} health.">${still ? `⚠ ${still}` : `⚙ Turning: drives ${driven} building${driven === 1 ? ' that trains' : 's that train'}`}</span>`;
     }
+    // A floating district (#770): how many lie linked with it, and whether they raise citizens.
+    if (mine && b.built && b.type === 'pontoon') {
+      const n = districtOf(s, b).length;
+      status += ` · <span data-tip="<b>Floating town</b>Pontoons moored side by side link into one town, and a town of ${FLOAT.city} or more raises citizens at each of its pontoons. Corners alone don't link. Ships hole a pontoon ${FLOAT.hull} times as fast as anything else does, and those on its deck when it sinks swim for the nearest deck or shore within ${FLOAT.swim} tiles, or drown.">${n >= FLOAT.city ? `⛵ A floating town of ${n}: raises citizens` : `⚓ ${n === 1 ? 'Alone' : `Linked to ${n - 1}`}: moor ${FLOAT.city - n} more beside it to raise citizens`}</span>`;
+    }
     if (b.built && b.type === 'bridge') status += ` · <span data-tip="<b>Bridge</b>Your own people cross here at full pace; rivals can't, and swim the water round it at ${Math.round(CANAL.wade * 100)}% of their pace in a canal. Every ship and barge passes under it.">🌉 Swings for ships</span>`;
     // A windmill (#701): how much water is left behind its dykes, or why it stands still.
     if (mine && b.built && !sleeping && b.type === 'windmill') {
@@ -1301,6 +1340,16 @@ export class Hud {
     if (mine && b.built && b.type === 'silo') {
       const next = nextNuke(s, p);
       status += ` · <span data-tip="<b>Warhead store</b>Your people's warheads, fired from any of your silos. One more is made every ${rulesOf(p).refuel} seconds while the store and the warheads in the air number under ${SILO.cap}. Rivals can't see it.">☢ ${stockOf(p)} in store${next === null ? '' : `, next in ${next}s`}</span>`;
+    }
+    // A silo held in Reserve (#759 s3), read by either side as the silo is public: whether it stands ready to answer a warhead.
+    if (b.built && b.type === 'silo' && inReserve(b)) {
+      const left = armingOf(s, b);
+      status += ` · <span data-tip="<b>Held in Reserve</b>This silo launches nothing while held. ${INTERCEPT.fire} seconds before any rival warhead lands that no Interceptor Battery answered, wherever it falls, a ready Reserve silo fires its own warhead at it and stops it ${Math.round(INTERCEPT.chance * 100)}% of the time, spending a warhead from its people's store and the fuel of a launch. It stands ready ${INTERCEPT.arm} seconds after it was held, and again ${INTERCEPT.arm} seconds after each it fires.">${left ? `⏳ Reserve: ready in ${left}s` : '🛡 Reserve: ready'}</span>`;
+    }
+    // An Interceptor Battery (#759 s2): its charge, read by either side, as the battery and its cover are public.
+    if (b.built && b.type === 'battery') {
+      const left = Math.max(0, Math.ceil(((b.reload ?? 0) - s.tick) / TICK_HZ));
+      status += ` · <span data-tip="<b>Interceptor</b>It covers ${INTERCEPT.reach} tiles round it (the teal circle, shown while a warhead is in the air). ${INTERCEPT.fire} seconds before a rival warhead lands in a ring it covers, it fires by itself and stops it ${Math.round(INTERCEPT.chance * 100)}% of the time: no blast, no fallout. One attempt for each warhead, from the nearest battery; the charge is spent hit or miss and reloads in ${INTERCEPT.reload} seconds.">${left ? `⏳ Reloading: ${left}s` : '🛡 Charged'}</span>`;
     }
     // A harbour aground at low water (#739).
     if (mine && b.built && b.type === 'dock' && aground(s, b)) status += ` · <span data-tip="<b>Aground</b>The tide has bared all the water beside this Dock: it launches nothing until the water comes back.">⚓ Aground at low water</span>`;
@@ -1357,7 +1406,7 @@ export class Hud {
     const citizens = units.filter((u) => u.type === 'citizen');
     // Who may raise buildings: citizens, and a legion's foot soldiers too (#501).
     const builders = units.filter((u) => canRaise(u.type, 'house', p.civ));
-    const soldiers = units.filter((u) => u.type !== 'citizen' && u.type !== 'fisher' && u.type !== 'transport' && u.type !== 'trader' && u.type !== 'cog' && u.type !== 'wagon');
+    const soldiers = units.filter((u) => u.type !== 'citizen' && u.type !== 'fisher' && u.type !== 'transport' && u.type !== 'trader' && u.type !== 'cog' && u.type !== 'wagon' && u.type !== 'tow');
     const walkers = units.filter((u) => domainOf(u.type) === 'land');
     // A Skywhale (the Age of Leviathans) carries people as a transport does, and sets them down anywhere there is ground.
     const transports = units.filter((u) => isCarrier(u.type));
@@ -1513,6 +1562,11 @@ export class Hud {
       if (titan) {
         const why = kneelProblem(s, titan);
         cmds.push({ key: 'P', pic: '', glyph: '🐢', title: 'Kneel', desc: 'Kneel here, on any ground a rival does not hold: the Town Center on its back stands at once, finished and working, with the health the Behemoth has. It trains, takes in every stock and claims the land; select it and Rise (P) to walk on.', ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'pitch', p: viewer, ids: [titan.id] }) });
+      }
+      const tows = units.filter((u) => u.type === 'tow');
+      if (tows.length) {
+        const why = tows.map((w) => pitchProblem(s, w)).find((w) => w) ?? null;
+        cmds.push({ key: 'P', pic: '', glyph: '⚓', title: 'Moor', desc: `Moor the ${tows.length > 1 ? 'districts' : 'district'} here, on open water within ${FLOAT.spot} tiles that no rival holds. It raises itself in ${STEPPE.pitch} seconds with the health it had, and those aboard step out onto its deck. Moored side by side with ${FLOAT.city - 1} more of your pontoons, it raises citizens again.`, ok: !why || tows.some((w) => !pitchProblem(s, w)), why: why ?? undefined, run: () => this.act.issue({ t: 'pitch', p: viewer, ids: tows.map((w) => w.id) }) });
       }
       const wagons = units.filter((u) => u.type === 'wagon');
       if (wagons.length) {
@@ -1774,6 +1828,11 @@ export class Hud {
           const why = riseProblem(b);
           cmds.push({ key: 'P', pic: '', glyph: '🐢', title: 'Rise', desc: 'The Behemoth rises with this Town Center on its back, and everyone sheltering inside steps out. It walks and tramples, and counts as a Town Center while it walks; kneel it (P) where you want your capital next. While it walks it trains no one and takes in nothing.', ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'pack', p: viewer, building: b.id }) });
         }
+        // The Age of Floating Cities (#770): cast the district off into a tow.
+        if (b.type === 'pontoon' && (ageDef(p).floats || b.keep === 'floating')) {
+          const why = castProblem(s, p, b);
+          cmds.push({ key: 'O', pic: '', glyph: '⛵', title: 'Cast off', desc: `Slip this district's moorings and take it in tow, with those sheltering in it and then those of your people on its deck aboard, up to ${FLOAT.hold}; anyone else on the deck swims for the nearest deck or shore within ${FLOAT.swim} tiles. Tow it over open water and moor it again (P) wherever you like, out of any builder's reach too. While it is towed it gives no room, takes in nothing and raises no one, and ships sink it fast. A floating town split up raises no citizens until ${FLOAT.city} pontoons lie side by side again.`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'pack', p: viewer, building: b.id }) });
+        }
         if (isMobile(p) && packsOf(p).includes(b.type)) {
           const why = packProblem(s, p, b);
           // Flocks (#308): the Town Center raises lambs.
@@ -1817,6 +1876,11 @@ export class Hud {
             const pool = ` Warheads come from your people's store, fired from any of your silos: ${stockOf(p)} now, one more every ${r.refuel ? `${r.refuel} seconds` : 'moment a slot frees'} while store and flight number under ${SILO.cap}. A silo that falls takes no stored warhead with it; only the one it is counting down is lost.`;
             cmds.push({ key: own ? 'M' : 'N', pic: '', glyph: w === 'fission' ? '⚛' : w === 'fusion' ? '☀' : '☢', title: kinds.length > 1 ? `Launch ${WARHEAD_NAMES[w]}` : 'Launch', desc: `Then click anywhere on the map: ${r.fuse} seconds later the ${WARHEAD_NAMES[w]} warhead lands, blasting every rival building and soldier within ${R} tiles: ${peak.toLocaleString('en')} damage at the centre, falling off with distance to nothing at the edge (distance is measured to a building's nearest edge)${poison}. Every player sees the clock and the blast, but not which warhead it is: your clock is ${r.fuse} seconds whatever you fire. The fog lifts over the blast for ${SILO.lift} seconds, and a silo destroyed before the clock runs out scrubs the launch.${leak}${pool}`, cost: fuelOf(w), ok: !why, why: why ?? undefined, on: !loaded(s, b), run: () => this.act.launchMode(b.id, w) });
           }
+          // Missile defence (#759 s3): hold the silo back to answer rival warheads with the store's own, or stand it down to launch.
+          const on = inReserve(b);
+          const no = reserveProblem(s, viewer, b, !on);
+          const fuel = Object.entries(fuelOf(r.w)).map(([k, n]) => `${n} ${k}`).join(' and ');
+          cmds.push({ key: 'R', pic: '', glyph: '🛡', title: on ? 'Stand down' : 'Hold in Reserve', desc: on ? `Stand this silo down: it may launch again at once, and answers no warhead. Holding it again takes ${INTERCEPT.arm} seconds to stand ready.` : `Hold this silo back to defend: it launches nothing while held, and ${INTERCEPT.arm} seconds from now it stands ready. ${INTERCEPT.fire} seconds before a rival warhead lands that no Interceptor Battery answered, anywhere on the map, it fires a warhead of your store at it and stops it ${Math.round(INTERCEPT.chance * 100)}% of the time: no blast, no fallout. Each answer spends a warhead and ${fuel} of fuel, hit or miss, and the silo stands ready again ${INTERCEPT.arm} seconds later. Batteries answer first, as they are cheaper; one attempt for each warhead. Every player sees which silos you hold, so a rival may wait, or fire a salvo, or strike the silo.`, ok: !no, why: no ?? undefined, on, run: () => (this.act.issue({ t: 'reserve', p: viewer, silo: b.id, on: !on }), this.act.sound('queue')) });
           // The salvo (#765): three silos, three Atomic warheads, three points, one clock. Launch Control opens it.
           const why = salvoProblem(s, viewer);
           const plain = r.w === 'atomic' ? ` A plain Atomic people pays ${Math.round(SALVO.surcharge * 100)}% more fuel on each; past the fork the silos share a clock for the plain price.` : '';

@@ -17,13 +17,16 @@ import { carriesTorch, torchProblem } from './sim/fire';
 import { apartProblem, launchProblem, ringsFor, salvoProblem, salvoSilos, type WarheadKind } from './sim/silo';
 import { jumpAge, rush, topUp } from './sim/god';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
-import { NAVAL, placeProblem, stampBuilding, walkable } from './sim/grid';
+import { NAVAL, nearestWalkable, placeProblem, stampBuilding, walkable } from './sim/grid';
 import { findDockSpot, findSpot, millSpotFor } from './sim/ai';
 import { channelPlan, dig, dykePlan, heldBack, waterLine } from './sim/water';
 import { bared, tideMillSpot, wakeTide } from './sim/tides';
 import { barragePlan, isCauseway, kegTileProblem } from './sim/tides';
 import { isTidal, tidalLevel, tideClock, tideLevel } from './sim/tides';
-import { AI_BARRAGE, BLOOM, SALVO, secs } from './sim/data';
+import { AI_FLOAT, FLOAT } from './sim/data';
+import { mooringSpot } from './sim/floating';
+import { R_COCKLE } from './sim/types';
+import { AI_BARRAGE, BLOOM, INTERCEPT, SALVO, secs } from './sim/data';
 import { rooted, slingProblem } from './sim/bloom';
 import { isCarrier } from './sim/units';
 import { maxHp, placeBuilding, restat, spawnUnit } from './sim/world';
@@ -148,6 +151,7 @@ let floodToldAt = -99999;
 let tideTold = false;
 let sweptToldAt = -99999;
 let tideHoldToldAt = -99999;
+let tideAshoreToldAt = -99999;
 /** When a breached causeway (#748) was last told: one toast a blast. */
 let breachToldAt = -1;
 /** When the flock last told of a lamb born, or of bare ground (#308), so the toasts don't pile up. */
@@ -2617,6 +2621,13 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           hud.toast(ev.drowned ? '🌊 The tide took some of your people, caught far out on the flats. (Space to look)' : '🌊 The tide swept some of your people off the flats, hurt. (Space to look)', 'bad');
         }
         break;
+      case 'tideAshore':
+        // Work on the flats that reads the tide (#767): your workers leave the flats before the flood, said once in a while.
+        if (ev.owner === viewer && s.tick - tideAshoreToldAt > TICK_HZ * 60) {
+          tideAshoreToldAt = s.tick;
+          hud.toast('🌊 Your workers on the flats come ashore before the flood. They go back to their work when the ground bares.', 'info');
+        }
+        break;
       case 'tideHold':
         // Routes that read the tide (#755): your people stop on the shore rather than walk into the flood, said once in a while.
         if (ev.owner === viewer && s.tick - tideHoldToldAt > TICK_HZ * 30) {
@@ -2631,6 +2642,19 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           sluiceToldAt = s.tick;
           lastAlert = { x: ev.x, y: ev.y };
           hud.toast(`${s.players[ev.owner].name} has opened a sluice: the low ground round it is going under water. Soldiers wade it at a crawl and siege bogs down; go round, or wait for it to drain. (Space to look)`, 'alert');
+        }
+        break;
+      case 'pontoon':
+        // A floating district (#770): its owner hears where it went and who went with it; a sinking is told to a rival who sees it too.
+        if (ev.act === 'sink' && (ev.owner === viewer || view.sees(ev.x, ev.y))) {
+          lastAlert = { x: ev.x, y: ev.y };
+          const lost = ev.swum ? ` ${ev.swum} on its deck drowned.` : ev.aboard ? ' Those on its deck swam for it.' : '';
+          hud.toast(ev.owner === viewer ? `A pontoon of yours is holed and sunk!${lost} (Space to look)` : `${s.players[ev.owner].name}'s pontoon is holed and sunk.${lost} (Space to look)`, ev.owner === viewer ? 'alert' : 'good');
+          if (ev.owner === viewer) music.stir(0.3);
+        } else if (ev.owner === viewer && ev.act === 'cast') {
+          hud.toast(`⛵ Cast off: the district is under tow with ${ev.aboard} aboard${ev.swum ? `, and ${ev.swum} left to swim for it` : ''}. Take it to open water and moor it there (P).`, 'info');
+        } else if (ev.owner === viewer && ev.act === 'moor') {
+          hud.toast(`⚓ Moored: the district raises itself in ${STEPPE.pitch}s${ev.aboard ? `, and the ${ev.aboard} aboard step out onto its deck` : ''}.`, 'info');
         }
         break;
       case 'burst':
@@ -3077,7 +3101,7 @@ function onEvents(s: GameState, list: GameEvent[]): void {
             const many = !!s.launches?.find((k) => k.id === ev.id)?.salvo;
             hud.toast(many ? `Salvo away: ${SALVO.trio} warheads land in ${ev.fuse ?? SILO.fuse} seconds. Rivals see three rings, as for one warhead and two decoys, until the last ${SILO.reveal}` : `Warhead away: it lands in ${ev.fuse ?? SILO.fuse} seconds. Rivals see your target among two decoys until the last ${SILO.reveal}`, 'good');
           } else if (isEnemy(s, viewer, ev.owner)) {
-            hud.toast(`${s.players[ev.owner].name} has launched: it lands in ${ev.fuse ?? SILO.fuse} seconds, in three rings, one real and two decoys, or all three real if three silos fired a salvo. Clear them, or destroy the silos`, 'bad');
+            hud.toast(`${s.players[ev.owner].name} has launched: it lands in ${ev.fuse ?? SILO.fuse} seconds, in three rings, one real and two decoys, or all three real if three silos fired a salvo. Clear them, or destroy the silos. Watch the missile: late in its flight it bends toward where it falls`, 'bad');
             const l = s.launches?.find((k) => k.id === ev.id);
             for (const g of l ? ringsFor(s, l, viewer) : []) minimap.ping(g.x, g.y, '#ff4a3a', true);
           }
@@ -3103,6 +3127,27 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           play('siloBlast');
         }
         break;
+      case 'intercept': {
+        // Missile defence (#759 s2): every player hears an interceptor go up and meet its warhead, as they hear a launch; the two sides are told.
+        const ours = s.players[viewer].team === s.players[ev.owner].team, theirs = s.players[viewer].team === s.players[ev.by].team;
+        const who = s.players[ev.by].name;
+        if (ev.what === 'fired') {
+          // A silo held in Reserve (#759 s3) fires a warhead of its store as the interceptor.
+          if (ours) hud.toast(`${ev.owner === viewer ? 'Your' : `${s.players[ev.owner].name}'s`} ${ev.silo ? 'Missile Silo, held in Reserve,' : 'Interceptor Battery'} fires at ${who}'s warhead: ${Math.round(INTERCEPT.chance * 100)}% to stop it${ev.silo && ev.owner === viewer ? ' (a warhead of your store spent)' : ''}`, 'alert');
+          else if (theirs) hud.toast(`${ev.silo ? 'A silo held in Reserve fires' : 'An interceptor rises'} to meet ${ev.by === viewer ? 'your' : `${who}'s`} warhead`, 'alert');
+          play('interceptLaunch');
+        } else if (ev.what === 'hit') {
+          if (ours) hud.toast(`Intercepted! ${who}'s warhead is stopped in the sky: no blast, no fallout`, 'good');
+          else if (theirs) hud.toast(`${ev.by === viewer ? 'Your' : `${who}'s`} warhead was intercepted: no blast`, 'bad');
+          minimap.ping(ev.x, ev.y, '#e8f6ff', true);
+          play('interceptHit');
+        } else {
+          if (ours) hud.toast(`The interceptor missed: ${who}'s warhead flies on`, 'bad');
+          else if (theirs) hud.toast(`Their interceptor missed: ${ev.by === viewer ? 'your' : `${who}'s`} warhead flies on`, 'good');
+          play('interceptMiss');
+        }
+        break;
+      }
       case 'oreBuy':
         // A load of rare ore bought at a post (#573).
         if (ev.owner === viewer) {
@@ -3706,6 +3751,34 @@ function frame(now: number): void {
     return 0;
   },
   /**
+   * Cockle beds (testing, #767): with the tide awake, run the rules on to low water, put two citizens on dry ground by the first bared bed
+   * with land near it, and send them to pick it. Selects them and looks at the bed; returns its tile (-1: no bed by the shore).
+   */
+  cockles(owner: number) {
+    if (!game || !game.tidal) return -1;
+    const s = game;
+    for (let i = 0; i < 400 * TICK_HZ && tideLevel(s) !== 0; i++) {
+      step(s, pending);
+      pending = [];
+    }
+    const team = s.players[owner].team;
+    for (let bed = 0; bed < s.w * s.h; bed++) {
+      if (!s.cockles?.[bed] || s.res[bed] !== R_COCKLE || !bared(s, bed)) continue;
+      const x = bed % s.w;
+      const y = (bed - x) / s.w;
+      for (let r = 2; r <= 5; r++)
+        for (const [dx, dy] of [[r, 0], [-r, 0], [0, r], [0, -r]]) {
+          if (!walkable(s, x + dx, y + dy, team) || isTidal(s, (y + dy) * s.w + x + dx)) continue;
+          const ids = [0, 1].map((k) => spawnUnit(s, owner, 'citizen', x + dx + 0.5, y + dy + 0.3 + k * 0.4).id);
+          issue({ t: 'gather', p: owner, ids, tile: bed });
+          setSelection(ids);
+          view.rig.focus(x + 0.5, y + 0.5);
+          return bed;
+        }
+    }
+    return -1;
+  },
+  /**
    * The Age of Locks (testing, #701 s5): turn a player to the age, dig the channel the computer would plan by its start deep into a
    * canal (at once), raise a finished Dam on its middle and a Bridge nearer home, and launch a warship onto it. Returns the canal's length,
    * or 0 where there is none.
@@ -3733,6 +3806,34 @@ function frame(now: number): void {
     if (sea !== undefined) spawnUnit(s, owner, 'warship', (sea % s.w) + 0.5, Math.floor(sea / s.w) + 0.5);
     view.rig.focus(at(mid).tx + 0.5, at(mid).ty + 0.5);
     return n;
+  },
+  /**
+   * The Age of Floating Cities (testing, #770): turn a player to the age, stock it, moor three finished Pontoons in a linked town where
+   * the computer would, put a few citizens on their decks, and launch a fishing boat. Returns how many were moored (0: no open water near
+   * home). Look at it with the camera; select a Pontoon and cast it off (J), then moor the tow (P).
+   */
+  floating(owner: number) {
+    if (!game) return 0;
+    const s = game;
+    const p = s.players[owner];
+    restat(s, p, () => {
+      p.epoch = AGES.floating.tier;
+      p.age = 'floating';
+      p.walked = [...new Set([...(p.walked ?? []), 'tides' as const, 'floating' as const])];
+    });
+    p.res = { food: 5000, wood: 5000, stone: 5000, gold: 5000 };
+    const town: Building[] = [];
+    for (let i = 0; i < FLOAT.city; i++) {
+      const spot = mooringSpot(s, owner, p.startX, p.startY, AI_FLOAT.reach);
+      if (!spot) break;
+      town.push(placeBuilding(s, owner, 'pontoon', spot.tx, spot.ty, true));
+    }
+    if (!town.length) return 0;
+    for (const b of town) spawnUnit(s, owner, 'citizen', b.x, b.y);
+    const sea = nearestWalkable(s, town[0].x, town[0].y + 2, 6, NAVAL);
+    if (sea >= 0) spawnUnit(s, owner, 'fisher', (sea % s.w) + 0.5, Math.floor(sea / s.w) + 0.5);
+    view.rig.focus(town[0].x, town[0].y);
+    return town.length;
   },
   /**
    * Routes that read the tide (testing, #755): with the tide awake, run the rules on to a few seconds before the flood off low water, put

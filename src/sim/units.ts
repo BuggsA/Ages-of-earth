@@ -1,4 +1,4 @@
-import { AI_LEVELS, AUTO_WORK, BUILDINGS, GIANTS, EXPLORE, FIRE, PATROL, CARRY, CONSECRATE, COPPICE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, LEGION, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TAME, TRADE, domainOf, secs } from './data';
+import { COCKLE, AI_LEVELS, AUTO_WORK, BUILDINGS, GIANTS, EXPLORE, FIRE, PATROL, CARRY, CONSECRATE, COPPICE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, LEGION, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TAME, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
@@ -13,7 +13,7 @@ import { legionKind, legionary } from './legion';
 import type { Act, Animal, Building, Cost, Ent, GameState, Goal, Order, RareId, Res, Unit, UnitType } from './types';
 import { seasonOf } from './seasons';
 import { catchOf } from './year';
-import { RES, R_BERRY, R_BLOODIRON, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_SALT, R_SALTPETRE, R_STONE, R_TREE } from './types';
+import { RES, R_BERRY, R_BLOODIRON, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_SALT, R_SALTPETRE, R_STONE, R_TREE, R_COCKLE } from './types';
 import { carriedBy, relicAt } from './relics';
 import { animalRadius, hitAnimal } from './animals';
 import { milkable } from './flocks';
@@ -25,7 +25,7 @@ import { rubbleAt, salvages, strip } from './salvage';
 import { bank, cacheAt, lift } from './caches';
 import { buyLoad } from './oretrade';
 import { atFoot, carriesKegs, kegProblem, layKeg } from './powder';
-import { atTile, kegTileProblem, tideRoute } from './tides';
+import { atTile, idleAshore, kegTileProblem, tideRoute, tideWorkHold } from './tides';
 import { carriesTorch, ignite, onFire, torchProblem } from './fire';
 import { fieldBoost, wading } from './water';
 import { gardenMul, isField } from './grove';
@@ -54,12 +54,12 @@ const PATH_BUDGET = 60000;
 const LEASH = 7;
 
 /** Bog iron is paid in as gold: iron bars were money across much of West Africa. */
-export const RES_OF_TILE: Record<number, Res> = { [R_TREE]: 'wood', [R_BERRY]: 'food', [R_STONE]: 'stone', [R_GOLD]: 'gold', [R_MEAT]: 'food', [R_FISH]: 'food', [R_BOG]: 'gold', [R_SALT]: 'stone', [R_SALTPETRE]: 'stone', [R_BLOODIRON]: 'stone' };
+export const RES_OF_TILE: Record<number, Res> = { [R_TREE]: 'wood', [R_BERRY]: 'food', [R_STONE]: 'stone', [R_GOLD]: 'gold', [R_MEAT]: 'food', [R_FISH]: 'food', [R_BOG]: 'gold', [R_SALT]: 'stone', [R_SALTPETRE]: 'stone', [R_BLOODIRON]: 'stone', [R_COCKLE]: 'food' };
 /** The rare ore a tile holds, if any (#356). */
 export const RARE_OF_TILE: Record<number, RareId> = { [R_SALT]: 'salt', [R_SALTPETRE]: 'saltpetre', [R_BLOODIRON]: 'bloodiron' };
 export const TILE_OF_RARE: Record<RareId, number> = { salt: R_SALT, saltpetre: R_SALTPETRE, bloodiron: R_BLOODIRON };
-const ACT_OF_TILE: Record<number, Act> = { [R_TREE]: 'chop', [R_BERRY]: 'forage', [R_STONE]: 'mine', [R_GOLD]: 'mine', [R_MEAT]: 'forage', [R_FISH]: 'fish', [R_BOG]: 'mine', [R_SALT]: 'mine', [R_SALTPETRE]: 'mine', [R_BLOODIRON]: 'mine' };
-const RATE_OF_TILE: Record<number, number> = { [R_TREE]: GATHER.tree, [R_BERRY]: GATHER.berry, [R_STONE]: GATHER.stone, [R_GOLD]: GATHER.gold, [R_MEAT]: GATHER.meat, [R_FISH]: GATHER.fish, [R_BOG]: GATHER.bog, [R_SALT]: RARE.salt.rate, [R_SALTPETRE]: RARE.saltpetre.rate, [R_BLOODIRON]: RARE.bloodiron.rate };
+const ACT_OF_TILE: Record<number, Act> = { [R_TREE]: 'chop', [R_BERRY]: 'forage', [R_STONE]: 'mine', [R_GOLD]: 'mine', [R_MEAT]: 'forage', [R_FISH]: 'fish', [R_BOG]: 'mine', [R_SALT]: 'mine', [R_SALTPETRE]: 'mine', [R_BLOODIRON]: 'mine', [R_COCKLE]: 'forage' };
+const RATE_OF_TILE: Record<number, number> = { [R_TREE]: GATHER.tree, [R_BERRY]: GATHER.berry, [R_STONE]: GATHER.stone, [R_GOLD]: GATHER.gold, [R_MEAT]: GATHER.meat, [R_FISH]: GATHER.fish, [R_BOG]: GATHER.bog, [R_SALT]: RARE.salt.rate, [R_SALTPETRE]: RARE.saltpetre.rate, [R_BLOODIRON]: RARE.bloodiron.rate, [R_COCKLE]: COCKLE.rate };
 
 export function setOrder(u: Unit, order: Order): void {
   u.order = order;
@@ -68,6 +68,7 @@ export function setOrder(u: Unit, order: Order): void {
   u.wantPath = false;
   u.stuck = 0;
   u.miss = 0;
+  u.ashore = undefined;
 }
 
 /** Give an order now, or (with `queue`) after the ones already lined up. */
@@ -274,6 +275,10 @@ function nearestDeer(s: GameState, x: number, y: number, r: number): Animal | nu
 }
 
 function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): void {
+  // Work on the flats that reads the tide (#767): a cockle bed under water, or the flood coming, sends its picker ashore.
+  if (tideWorkHold(s, u, o)) return;
+  if (s.res[o.tile] === R_COCKLE) o.cockle = true;
+  else if (s.res[o.tile] !== R_NONE && o.cockle) delete o.cockle;
   // A rare ore (#356) rides on the order, learned from the tile while it still holds ore, so the next vein is the same ore.
   const here = RARE_OF_TILE[s.res[o.tile]];
   if (here) o.rare = here;
@@ -304,7 +309,7 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
   const kind = s.res[o.tile];
   if (kind === R_NONE || RES_OF_TILE[kind] !== o.res) {
     // Run out: the next one nearby of the same kind (game first, then berries, for food; boats fish).
-    const wants = o.rare ? [TILE_OF_RARE[o.rare]] : u.type === 'fisher' ? [R_FISH] : o.res === 'wood' ? [R_TREE] : o.res === 'food' ? [R_MEAT, R_BERRY] : o.res === 'stone' ? [R_STONE] : o.bog ? [R_BOG, R_GOLD] : [R_GOLD];
+    const wants = o.rare ? [TILE_OF_RARE[o.rare]] : o.cockle ? [R_COCKLE, R_MEAT, R_BERRY] : u.type === 'fisher' ? [R_FISH] : o.res === 'wood' ? [R_TREE] : o.res === 'food' ? [R_MEAT, R_BERRY] : o.res === 'stone' ? [R_STONE] : o.bog ? [R_BOG, R_GOLD] : [R_GOLD];
     let next = -1;
     for (const want of wants) {
       const fx = (o.tile % s.w) + 0.5;
@@ -615,7 +620,7 @@ export function completeBuilding(s: GameState, b: Building): void {
   b.hp = Math.min(b.hp, maxHp(s, b));
   s.players[b.owner].stats.built++;
   // A finished gate opens for its own side.
-  if (b.type === 'gate' || b.type === 'dyke' || b.type === 'sluice' || b.type === 'dam' || b.type === 'bridge' || b.type === 'thornwall') stampBuilding(s, b, true);
+  if (b.type === 'gate' || b.type === 'dyke' || b.type === 'sluice' || b.type === 'dam' || b.type === 'bridge' || b.type === 'pontoon' || b.type === 'thornwall') stampBuilding(s, b, true);
   if (b.type === 'wonder') {
     b.timer = s.wonderTime;
     s.events.push({ k: 'wonder', owner: b.owner, id: b.id, x: b.x, y: b.y, ticks: b.timer });
@@ -709,6 +714,8 @@ function buildStep(s: GameState, u: Unit, o: Extract<Order, { k: 'build' }>): vo
     setOrder(u, { k: 'idle' });
     return;
   }
+  // A builder out on the flats steps ashore before the flood (#767).
+  if (tideWorkHold(s, u, o)) return;
   // A burning building (`fire.ts`) is beaten out before it is mended: its menders stand at it, beating, until the fire is out.
   const burning = b.built && onFire(s, b);
   if (b.built && b.hp >= maxHp(s, b) && !burning) {
@@ -2210,6 +2217,8 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
         const w = woundedNear(s, sp, u, statsOf(s, u).sight);
         if (w) setOrder(u, { k: 'heal', target: w.id });
       }
+      // An idle citizen out on the flats walks ashore before the flood (#767).
+      if (u.type === 'citizen' && s.tidal) idleAshore(s, u);
       break;
     case 'move':
       if (!o.started) {

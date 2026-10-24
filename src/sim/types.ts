@@ -25,6 +25,8 @@ export type UnitType =
   | 'blowpipe' | 'cavebear'
   /** The Age of the Wildwood (`docs/wild-road.md` §4, `wildwood.ts`): an Ent, an old tree woken at the Heart Tree, that roots again. */
   | 'warden'
+  /** The Age of Floating Cities (#770): a pontoon district cast off and under tow, its people aboard, until it moors again. */
+  | 'tow'
   /**
    * The Age of Leviathans (`docs/wild-road.md` §5a, `leviathans.ts`): bred at a Great Den. A Skywhale, a living airship that carries
    * soldiers over walls and drops seed-bombs; a Behemoth, one titan turtle a people with a Town Center on its back.
@@ -52,7 +54,11 @@ export type BuildingType =
   /** The Age of Tides (#739): a raised road over the flats, which becomes tidal ground and is gone; a mill that grinds on the running tide. */
   | 'causeway' | 'tidemill'
   /** The Age of Locks (#701 s5): a swing bridge its own people cross a canal by and ships pass under, and a dam whose turbines drive the workshops by it. */
-  | 'bridge' | 'dam';
+  | 'bridge' | 'dam'
+  /** The Age of Floating Cities (#770): a district on pontoons, moored on open water, that is cast off, towed and moored again. */
+  | 'pontoon'
+  /** Missile defence (#759 s2): a battery that fires one interceptor at a warhead falling in its cover. */
+  | 'battery';
 /** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
 export type Difficulty = 'gentle' | 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
@@ -70,9 +76,9 @@ export type TechId =
   | 'wheelbarrow' | 'handcart' | 'axes' | 'saws' | 'picks' | 'shafts' | 'plow' | 'irrigation' | 'masonry'
   | 'conscription' | 'husbandry' | 'theology' | 'chemistry'
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'chart' | 'assay' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
-  | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged' | 'launchControl';
+  | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged' | 'launchControl' | 'interceptors';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood' | 'locks' | 'bloom' | 'leviathans';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood' | 'locks' | 'floating' | 'leviathans' | 'bloom';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
 export type PathId = 'blood' | 'steppe' | 'hemocraft' | 'rite';
@@ -99,6 +105,8 @@ export const R_BOG = 7;
 export const R_SALT = 8;
 export const R_SALTPETRE = 9;
 export const R_BLOODIRON = 10;
+/** A cockle bed (#767) on the deeper tidal flats: food picked by citizens only while the tide has bared it, back each high water. */
+export const R_COCKLE = 11;
 export type RareId = 'salt' | 'saltpetre' | 'bloodiron';
 export const RARES: readonly RareId[] = ['salt', 'saltpetre', 'bloodiron'];
 /** What a Mine Shaft can dig (#681): stone or gold anywhere, a rare ore only over its old workings. */
@@ -149,7 +157,7 @@ export type Order =
    */
   | { k: 'explore'; x: number; y: number; started: boolean; fails: number[]; told?: number }
   /** Gather a resource tile: walk there, work it, carry the load to a drop site, and back. */
-  | { k: 'gather'; tile: number; res: Res; phase: 'go' | 'work' | 'drop'; bog?: boolean; rare?: RareId; meat?: boolean }
+  | { k: 'gather'; tile: number; res: Res; phase: 'go' | 'work' | 'drop'; bog?: boolean; rare?: RareId; meat?: boolean; cockle?: boolean }
   | { k: 'build'; target: number }
   | { k: 'farm'; target: number; phase: 'go' | 'work' | 'drop' }
   /** Carry what is held to a drop site, then go idle. */
@@ -305,6 +313,8 @@ export interface Unit {
   stung?: number;
   /** Waiting on the shore for the tide (#755): the tick its route is worked out again. Absent: not waiting. */
   tideWait?: number;
+  /** Stepped ashore off the flats for the tide (#767): the tick it goes back to its work. Absent: not ashore. */
+  ashore?: number;
 }
 
 export interface TrainItem {
@@ -364,6 +374,13 @@ export interface Building {
   pumped?: number;
   /** A Tide Mill (#739): the tick it last ground on the running tide, so its wheel shows it at work. Absent: it never has. */
   milled?: number;
+  /** An Interceptor Battery (#759 s2): the tick its charge is ready again after firing. Absent: charged. */
+  reload?: number;
+  /**
+   * A Missile Silo held in Reserve (#759 s3): the tick it stands ready to answer a rival warhead (`INTERCEPT.arm` seconds after it was set,
+   * and again after each interceptor it fires). While set it launches nothing. Absent: not in Reserve.
+   */
+  reserve?: number;
   /** A Seed Spire (the Age of the Bloom, `bloom.ts`): the tick its Bloom Seed is ripe (pushed on while no Heart Tree stands). Absent: not yet begun. */
   ripe?: number;
   /** A Town Center knelt from a Behemoth (the Age of Leviathans, `leviathans.ts`): it rises onto the titan's back again. */
@@ -549,6 +566,39 @@ export interface Launch {
    * its own (`gone`) and the rest fly on. Absent for a single strike.
    */
   salvo?: SalvoShot[];
+  /** The missile's flight (#772, `flightOf`), drawn at launch and frozen. Absent in older saves (no missile is drawn). */
+  arc?: Arc;
+  /** The interceptors fired at it (#759 s2), one at most for each warhead, in the order they fired; each roll drawn once, when it fired. */
+  icpt?: Intercept[];
+}
+
+/**
+ * One interceptor (#759 s2): fired by a battery (`battery`, of `owner`, standing at `x`, `y`) at a launch's warhead `shot` (0 for a single
+ * strike, else its place in `Launch.salvo`), `INTERCEPT.fire` seconds before it lands. `hit` is the roll, drawn as it fired and never again.
+ */
+export interface Intercept {
+  shot: number;
+  battery: number;
+  owner: number;
+  x: number;
+  y: number;
+  hit: boolean;
+  /** Fired by a Missile Silo held in Reserve (#759 s3), spending a warhead from its people's store; `battery` is then the silo's id. */
+  silo?: true;
+}
+
+/**
+ * The course a missile flies (#772, `silo.ts`): from the silo (`x`, `y`), launched on tick `t0`, it climbs toward the lure (`lx`, `ly`, the
+ * middle of a rival's rings, moved a little by the seed) on a gentle sideways bow (`bow`, a fraction of the climb's length), then bends onto
+ * its true point. Every player sees the same course.
+ */
+export interface Arc {
+  x: number;
+  y: number;
+  t0: number;
+  lx: number;
+  ly: number;
+  bow: number;
 }
 
 /** One warhead of a salvo (#765). */
@@ -1044,6 +1094,11 @@ export type GameEvent =
    * fell) or `struck`. Before it strikes, (`x`, `y`) is the attacker's own aim: a rival's screen reads its rings from launch `id` (`ringsFor`).
    */
   | { k: 'silo'; owner: number; x: number; y: number; what: 'launched' | 'revealed' | 'scrubbed' | 'struck'; id?: number; fuse?: number; w?: 'atomic' | 'fission' | 'fusion'; ring?: number }
+  /**
+   * Missile defence (#759 s2): a battery of `owner`'s `fired` at launch `id` of `by`'s (at the battery, `x`, `y`), then the interceptor met
+   * the warhead (`hit`: it is gone; `missed`: it flies on) where the missile is, `z` tiles up.
+   */
+  | { k: 'intercept'; owner: number; by: number; id: number; shot: number; what: 'fired' | 'hit' | 'missed'; x: number; y: number; z?: number; silo?: true }
   /** A trader bought a load of rare ore at a post (#573). */
   | { k: 'oreBuy'; owner: number; ore: RareId; n: number; gold: number; x: number; y: number }
   | { k: 'ruin'; id: number; owner: number; find: RuinFind; tech?: TechId; x: number; y: number }
@@ -1077,6 +1132,10 @@ export type GameEvent =
   | { k: 'tideSwept'; id: number; owner: number; x: number; y: number; drowned: boolean }
   /** A land unit stops on the shore to wait for the tide (#755), until tick `until`. */
   | { k: 'tideHold'; id: number; owner: number; x: number; y: number; until: number }
+  /** A worker on the flats steps ashore before the flood (#767), until tick `until` (-1: home with its basket first). */
+  | { k: 'tideAshore'; id: number; owner: number; x: number; y: number; until: number }
+  /** The high water brought `food` back to the cockle beds (#767), over `beds` beds. */
+  | { k: 'cockles'; beds: number; food: number }
   /** A Tide Mill ground `gold` on the running tide (#739). */
   | { k: 'milled'; id: number; owner: number; gold: number; x: number; y: number }
   /** A causeway was finished (#739): `tile` is tidal ground now, raised. */
@@ -1135,6 +1194,11 @@ export type GameEvent =
   | { k: 'beacon'; owner: number; building: number; x: number; y: number; on: boolean }
   /** A steppe people struck camp (#297): a building packed onto a wagon, or a wagon pitched as a building. */
   | { k: 'camp'; owner: number; id: number; type: BuildingType; x: number; y: number; pitched: boolean }
+  /**
+   * A floating district (#770): cast off into a tow (`id` the tow), moored again (`id` the pontoon), or sunk. `aboard` went with it (or,
+   * sinking, swam clear); `swum` were left to swim (or, sinking, drowned).
+   */
+  | { k: 'pontoon'; owner: number; id: number; x: number; y: number; act: 'cast' | 'moor' | 'sink'; aboard: number; swum: number }
   /**
    * The flock (#308): a lamb born or raised, a sheep taken by wolves, rustled away (`owner` lost it to `by`),
    * or a flock gone hungry on bare ground.
@@ -1236,6 +1300,8 @@ export interface GameState {
    * stay wet, and a Tide Mill grinds them twice. Recounted at each turn of the tide and whenever a causeway is raised or breached.
    */
   pond?: Uint8Array;
+  /** Cockle beds (#767): 1 on each tile laid as a bed when the tide woke, picked out or not, so a bed grows back where it was. Absent where none were laid. */
+  cockles?: Uint8Array;
   /**
    * The Water Line (#701 s4): per tile, where an open sluice let the water out over low ground (now `T_WATER`, waded and not walked dry,
    * no `B_TERRAIN`): 1 + the terrain it had, to give back when the water goes. Absent until the first sluice opens (and in older saves).
@@ -1404,6 +1470,8 @@ export interface AiMemory {
   line?: { since: number; spot?: { tx: number; ty: number } | null; alarm?: number };
   /** The Age of Locks (#701 s5): since when it has stood in the age, and where it means its dam to go (null: nowhere, once looked). */
   locks?: { since: number; dam?: { tx: number; ty: number } | null };
+  /** The Age of Floating Cities (#770): when it entered, and the tows it has under way, by id, to where (the water it moors on). */
+  float?: { since: number; tides?: number; tows?: Record<number, { x: number; y: number }>; looked?: number; fished?: number };
   /** The Age of Rivers (#701): the channel it means to dig from water past home (null: none), found when deciding and again on arrival (`fresh`). */
   river?: { plan: ChannelPlan | null; looked?: boolean; fresh?: boolean };
   /** The first crossing (#585): the age it stands in on the way to the Sea-Raiders, and since when (each sibling, and the age itself). */
@@ -1422,6 +1490,8 @@ export interface AiMemory {
   salvoPays?: boolean;
   /** The tick the computer last weighed where to send a warhead (`fireSilo`, once a second). */
   siloAt?: number;
+  /** The tick it last weighed holding a silo in Reserve (#759 s3, `reserveSilo`, once every `INTERCEPT.think` seconds). */
+  reserveAt?: number;
   /** Tick it began holding its Town Center for a side road's last deeds, so it holds only so long. */
   waiting?: number;
   /**
@@ -1464,7 +1534,7 @@ export interface AiMemory {
    * a gap in it is mended. `wait` is when a wave across the flats began waiting for low water; `cross` the crossing the wave on the
    * march took at low water (its far shore, the level that covers it, and the wave's goal), to turn back short of before the flood.
    */
-  tide?: { plan?: BarragePlan | null; seen?: number[]; raised?: boolean; wait?: number; cross?: { x: number; y: number; level: number; to: { x: number; y: number } } };
+  tide?: { plan?: BarragePlan | null; seen?: number[]; raised?: boolean; wait?: number; cross?: { x: number; y: number; level: number; to: { x: number; y: number } }; cockle?: number };
 }
 
 /** Orders that can be given with Shift held to queue them after the current one. */
@@ -1576,6 +1646,8 @@ export type Command =
   /** A Missile Silo launches at a point (#605, the Atomic Age); `w` picks the warhead (#753), absent for the people's own branch's. */
   /** With `more` (#765, Launch Control), a salvo: this silo and the two in `more` fire one Atomic warhead each, each at its own point. */
   | { t: 'launch'; p: number; silo: number; x: number; y: number; w?: 'atomic' | 'fission' | 'fusion'; more?: { silo: number; x: number; y: number }[] }
+  /** Hold a Missile Silo in Reserve (#759 s3), to answer rival warheads with its people's own, or stand it down to launch again. */
+  | { t: 'reserve'; p: number; silo: number; on: boolean }
   /** Answer the card of tidings waiting at the fire (#443): `take` pays its price, otherwise it is passed by. */
   | { t: 'tiding'; p: number; card: TidingId; take: boolean }
   /** A player left an online match: the computer takes over their people. With `back` (sent only by the room, never a browser),

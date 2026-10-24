@@ -6,8 +6,12 @@ import type { Animal, CivId, GameState, Unit, UnitType } from '../sim/types';
 import { unitMaterial } from './materials';
 import { FLOOD_DEPTH, heightAt } from './terrain';
 import { isInund } from '../sim/water';
+import { isDeck } from '../sim/floating';
 import { boarGeometry, deerGeometry, mammothGeometry, raiderGeometry, sheepGeometry, LEGION_MODEL, THRALL_MODEL, unitGeometry, wolfGeometry } from './unitModels';
 import { WATER_Y } from './water';
+
+/** How far over the water a Pontoon's deck lies (`floatModels.ts`). */
+const DECK_TOP = 0.22;
 
 /** Units are drawn a little larger than their footprint in the rules, so they read well from above. */
 export const UNIT_SCALE = 1.3;
@@ -424,6 +428,8 @@ export class UnitsView {
       }
 
       let gy = heightAt(s, x, y);
+      // On a floating district's deck (#770), its people walk the planks, not the sea bed below.
+      if (domainOf(u.type) === 'land' && x >= 0 && y >= 0 && x < s.w && y < s.h && isDeck(s, Math.floor(y) * s.w + Math.floor(x))) gy = Math.max(gy, WATER_Y + DECK_TOP);
       let dx = x;
       let dz = y;
       let yaw = a.yaw;

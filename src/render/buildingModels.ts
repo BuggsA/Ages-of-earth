@@ -3,6 +3,7 @@ import type { AgeId, BuildingType } from '../sim/types';
 import { BUILDINGS } from '../sim/data';
 import { Kit, bake, rnd } from './kit';
 import { causewaySite, tidemill } from './tideModels';
+import { pontoon } from './floatModels';
 
 /**
  * Every building in every epoch: Stone Age thatch, hide and wattle; Bronze Age mudbrick and terracotta;
@@ -2150,21 +2151,53 @@ function dock(k: Kit, e: number, st: Style): void {
 
 // ---- Airfield --------------------------------------------------------------------------------------
 
-function silo(k: Kit, _e: number, st: Style): void {
+function silo(k: Kit, _e: number, st: Style, variant = 0): void {
   // The Missile Silo (#605): a concrete collar round a hatch, the two doors thrown back on a pale warhead nose, hazard stripes and a red beacon.
+  // Held in Reserve (#759 s3, `variant` 1 arming, 2 ready): the doors stand up on guard, a teal band (the colour of missile defence) rings
+  // the collar, and the beacon burns amber while it arms, teal once it stands ready, so every player can read it from afar.
+  const kept = variant > 0;
   k.box(2.9, 0.12, 2.9, '#6e6d66', 0, -0.02, 0);
   k.cyl(1.25, 1.35, 0.35, 16, '#9b9a92', 0, 0, 0);
   k.cyl(0.95, 0.95, 0.04, 16, '#17181c', 0, 0.35, 0);
   k.cone(0.34, 1.3, 10, '#d9d9d2', 0, 0.2, 0);
-  k.cyl(0.35, 0.35, 0.08, 10, '#c0382c', 0, 1.0, 0);
-  const l = k.box(0.9, 0.06, 1.6, '#4a4d54', -0.75, 0.58, 0);
-  l.rotation.z = 0.9;
-  const r = k.box(0.9, 0.06, 1.6, '#4a4d54', 0.75, 0.58, 0);
-  r.rotation.z = -0.9;
+  k.cyl(0.35, 0.35, 0.08, 10, kept ? '#2fa8a2' : '#c0382c', 0, 1.0, 0);
+  const l = k.box(0.9, 0.06, 1.6, '#4a4d54', kept ? -1.0 : -0.75, kept ? 0.78 : 0.58, 0);
+  l.rotation.z = kept ? 1.35 : 0.9;
+  const r = k.box(0.9, 0.06, 1.6, '#4a4d54', kept ? 1.0 : 0.75, kept ? 0.78 : 0.58, 0);
+  r.rotation.z = kept ? -1.35 : -0.9;
   for (let i = 0; i < 8; i++) k.box(0.18, 0.02, 0.1, i % 2 ? '#e6c22a' : '#1d1e24', -1.1 + i * 0.3, 0.37, 1.25);
+  if (kept) k.cyl(1.37, 1.37, 0.08, 16, '#3fc6c0', 0, 0.2, 0);
   k.team(k.box(0.7, 0.14, 0.04, TEAM, 0, 0.1, 1.38));
   k.box(0.35, 0.9, 0.35, st.wall, 1.2, 0, -1.2);
-  k.glow(k.sphere(0.07, '#ff3a2a', 1.2, 1.0, -1.2));
+  k.glow(k.sphere(kept ? 0.09 : 0.07, variant === 2 ? '#5affe8' : kept ? '#ffb02a' : '#ff3a2a', 1.2, 1.0, -1.2));
+}
+
+function battery(k: Kit, _e: number, st: Style): void {
+  // The Interceptor Battery (#759 s2): a concrete pad, a slim pale interceptor on a rail raised steeply skyward, a radar dish on a mast
+  // turned to the sky, a low bunker with a team band, and a green lamp (it watches; it does not threaten).
+  k.box(1.9, 0.1, 1.9, '#6e6d66', 0, -0.02, 0);
+  k.box(1.5, 0.05, 1.5, '#8b8a82', 0, 0.08, 0);
+  // The launcher: a turntable, a trunnion, and the rail leaning back toward the sky with its rocket on it.
+  k.cyl(0.38, 0.42, 0.14, 10, '#4a4d54', -0.2, 0.1, 0.15);
+  k.box(0.32, 0.3, 0.3, '#3e4148', -0.2, 0.22, 0.15);
+  const rail = k.group(-0.2, 0.48, 0.15);
+  rail.rotation.x = -0.45;
+  k.box(0.12, 1.25, 0.12, '#55585f', 0, 0, 0, rail);
+  k.cyl(0.07, 0.07, 1.0, 8, '#e8e4dc', 0, 0.14, 0.13, rail);
+  k.cone(0.07, 0.24, 8, '#b8322a', 0, 1.14, 0.13, rail);
+  k.team(k.cyl(0.075, 0.075, 0.08, 8, TEAM, 0, 0.82, 0.13, rail));
+  for (const x of [-1, 1]) k.box(0.02, 0.2, 0.14, '#4a4640', x * 0.08, 0.14, 0.13, rail);
+  // The radar: a mast and a dish turned up and out.
+  k.cyl(0.05, 0.06, 0.95, 6, '#55585f', 0.55, 0.1, -0.5);
+  const dish = k.dome(0.32, '#d8d8d2', 0.55, 1.0, -0.5);
+  dish.rotation.x = 2.3;
+  dish.scale.set(1, 0.45, 1);
+  k.cyl(0.02, 0.02, 0.28, 4, '#3a3632', 0.55, 1.0, -0.38);
+  // The bunker and its team band.
+  k.box(0.75, 0.42, 0.55, st.wall, 0.45, 0.1, 0.5);
+  k.box(0.82, 0.06, 0.62, '#5a5c60', 0.45, 0.52, 0.5);
+  k.team(k.box(0.77, 0.1, 0.04, TEAM, 0.45, 0.3, 0.79));
+  k.glow(k.sphere(0.05, '#5aff7a', 0.75, 0.62, 0.3));
 }
 
 function airfield(k: Kit, _e: number, st: Style): void {
@@ -2695,9 +2728,11 @@ const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' |
   heart: (k) => heart(k),
   spire: (k) => spire(k),
   greatden,
-  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, windmill,
+  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, battery, windmill,
   // The Age of Tides (#739), drawn in `tideModels.ts`.
   tidemill: (k: Kit, _e: number, st: Style) => tidemill(k, st.base),
+  // The Age of Floating Cities (#770), drawn in `floatModels.ts`.
+  pontoon: (k: Kit) => pontoon(k),
 };
 
 const cache = new Map<string, THREE.BufferGeometry>();
@@ -2862,14 +2897,14 @@ function wayTouch(k: Kit, way: string, deep = false): void {
 /** What a building is for, read from its roof (#625): war under cold slate, faith under pale gold, trade under teal, the land's work under ochre. Houses and the Town Center keep their epoch's own red. The Stone Age keeps its thatch and reads by plinth and pennant. */
 const ROOFS: Partial<Record<BuildingType, [string, string]>> = {
   barracks: ['#3e4858', '#2e3641'], range: ['#3e4858', '#2e3641'], stable: ['#3e4858', '#2e3641'], workshop: ['#3e4858', '#2e3641'], forge: ['#3e4858', '#2e3641'],
-  tower: ['#3e4858', '#2e3641'], warcamp: ['#3e4858', '#2e3641'], bloodtower: ['#3e4858', '#2e3641'], airfield: ['#3e4858', '#2e3641'], silo: ['#3e4858', '#2e3641'],
+  tower: ['#3e4858', '#2e3641'], warcamp: ['#3e4858', '#2e3641'], bloodtower: ['#3e4858', '#2e3641'], airfield: ['#3e4858', '#2e3641'], silo: ['#3e4858', '#2e3641'], battery: ['#3e4858', '#2e3641'],
   temple: ['#e9e2cf', '#d8b25a'], mission: ['#e9e2cf', '#d8b25a'],
   market: ['#1a5961', '#133f46'], caravanserai: ['#1a5961', '#133f46'], dock: ['#1a5961', '#133f46'],
   storehouse: ['#e2b855', '#d4a642'], huntcamp: ['#e2b855', '#d4a642'], prospector: ['#e2b855', '#d4a642'], shaft: ['#e2b855', '#d4a642'],
 };
 
 /** No plinth or pennant: open or thin pieces, and buildings that already carry their own standards. */
-const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder', 'dyke', 'thornwall', 'garden', 'orchard', 'channel', 'hive', 'sluice', 'causeway', 'tidemill', 'heart', 'bridge', 'dam', 'spire'];
+const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder', 'dyke', 'thornwall', 'garden', 'orchard', 'channel', 'hive', 'sluice', 'causeway', 'tidemill', 'heart', 'bridge', 'dam', 'pontoon', 'spire'];
 
 function roleStyle(type: BuildingType, epoch: number, st: Style): Style {
   const r = ROOFS[type];
@@ -2914,6 +2949,7 @@ export function buildingGeometry(type: BuildingType, epochIn: number, color: str
     else if (type === 'orchard') orchard(k, epoch, variant);
     else if (type === 'hive') hive(k, epoch, variant);
     else if (type === 'shaft') shaft(k, epoch, roleStyle(type, epoch, STYLES[Math.min(epoch, 4)]), variant);
+    else if (type === 'silo') silo(k, epoch, roleStyle(type, epoch, STYLES[Math.min(epoch, 4)]), variant);
     else MAKERS[type](k, epoch, roleStyle(type, epoch, STYLES[Math.min(epoch, 4)]));
     // A Watch Tower's `variant` is its step on the tower line; a Town Center's 1, that it was knelt from a Behemoth.
     if (type === 'tower' && variant) towerLevel(k, variant);

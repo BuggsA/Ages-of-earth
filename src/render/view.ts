@@ -12,6 +12,7 @@ import { cursed, grafted } from '../sim/blood';
 import { graftLast } from '../sim/hemo';
 import { seesRect } from '../sim/vision';
 import { revealed, ringsFor, shownToAll, warnRadius } from '../sim/silo';
+import { MissileView } from './missileView';
 import { rooted } from '../sim/bloom';
 import { BuildingsView } from './buildingsView';
 import { CameraRig } from './camera';
@@ -38,7 +39,7 @@ import { LandmarksView } from './landmarksView';
 import { GrazeView } from './grazeView';
 import { BorderView } from './borderView';
 import { FoundationView } from './foundationView';
-import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, coilFields, placementField, sortieRings, type RangeGuide } from './rangeGuides';
+import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, coilFields, placementField, sortieRings, coverRings, type RangeGuide } from './rangeGuides';
 import { ResourcesView } from './resourcesView';
 import { Sky } from './sky';
 import { forcedHour, hourAt, lightAt, moonPhase } from './daylight';
@@ -123,6 +124,7 @@ export class View {
   readonly rubble = new RubbleView();
   readonly caches = new CacheView();
   readonly kegs = new KegView();
+  readonly missiles = new MissileView();
   readonly fires = new FireView();
   private falloutTick = -1;
   /** The tick a breach (#748) was last heard: one sound a blast. */
@@ -203,7 +205,7 @@ export class View {
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sky.mesh, this.hemi, this.fill, this.sun, this.sun.target);
-    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.finds.group, this.springs.group, this.tides.group, this.rubble.group, this.caches.group, this.kegs.group, this.fires.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
+    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.finds.group, this.springs.group, this.tides.group, this.rubble.group, this.caches.group, this.kegs.group, this.missiles.group, this.fires.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
     this.scene.add(this.rangeGuides.mesh, this.borders.mesh, this.graze.mesh, this.foundations.mesh);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.post = new Post(this.renderer, this.scene, this.rig.camera);
@@ -275,6 +277,7 @@ export class View {
     this.rubble.clear();
     this.caches.clear();
     this.kegs.clear();
+    this.missiles.clear();
     this.fires.clear();
     this.landmarks.clear();
     const colors = s.players.map((p) => p.color);
@@ -476,9 +479,10 @@ export class View {
     // The water layer (#701): ground pumped out of the water rises from it, and the shore's foam follows.
     if (this.terrain.sync(s, dt)) this.water.refreshBed(s, (i) => this.terrain.heightOf(i));
     this.resources.update(s, dt);
-    // A finished Missile Silo is seen by every player through the fog (#753), and one that falls is forgotten wherever it stood.
+    // A finished Missile Silo is seen by every player through the fog (#753), and one that falls is forgotten wherever it stood. So is an
+    // Interceptor Battery (#759 s2): its cover is public.
     const silo = (b: { id?: number; type?: string }): boolean => {
-      if (b.type !== 'silo' || b.id === undefined) return false;
+      if ((b.type !== 'silo' && b.type !== 'battery') || b.id === undefined) return false;
       const e = s.byId.get(b.id);
       return !e || e.hp <= 0 || shownToAll(e);
     };
@@ -505,6 +509,8 @@ export class View {
     this.rubble.update(s, !!ageDef(p).salvage, (x, y) => this.reveal || this.sees(x, y));
     this.caches.update(s, (x, y) => this.reveal || this.sees(x, y), (id) => this.units.drawn.get(id) ?? null);
     this.kegs.update(s, (x, y) => this.reveal || this.sees(x, y), (id) => this.units.drawn.get(id) ?? null);
+    // Missiles in the air (#772): seen by every player, through the fog, between the last tick and this one.
+    this.missiles.update(s, s.tick - 1 + alpha, dt, this.effects);
     // Fire (`fire.ts`): flames on what burns, torches in hand, and smoke rising off it all.
     this.fires.update(s, dt, (x, y) => this.reveal || this.sees(x, y), (id) => this.units.drawn.get(id) ?? null, (at, big) =>
       this.effects.burst(at, { count: big ? 3 : 2, speed: 0.25, up: 1, life: big ? 3.4 : 2.6, size: big ? 0.22 : 0.16, grow: 3, gravity: -0.5, drag: 0.8, soft: true, colors: ['#3a3532', '#5a544e', '#7a736a'] }),
@@ -616,6 +622,13 @@ export class View {
       const f = placementField(s, this.viewer, sel.ghost.type, sel.ghost.tx, sel.ghost.ty);
       if (f) guides.push(f);
     }
+    // Missile defence (#759 s2): every battery's cover, whoever's, while a warhead is in the air, while placing a battery, or while a silo
+    // or a battery is selected (aiming a launch: read the rival's cover first).
+    const covering = !!s.launches?.length || sel.ghost?.type === 'battery' || [...sel.ids].some((id) => {
+      const e = s.byId.get(id);
+      return !!e && e.kind === 'building' && (e.type === 'battery' || (e.type === 'silo' && e.owner === this.viewer));
+    });
+    if (covering) for (const g of coverRings(s, sel.ghost?.type === 'battery' ? sel.ghost : null)) if (guides.length < MAX_RANGE_GUIDES) guides.push(g);
     // In the Age of Lightning every finished coil shows its field.
     for (const f of coilFields(s, this.viewer)) if (guides.length < MAX_RANGE_GUIDES) guides.push(f);
     // Selecting your own aircraft in the Age of Aeronauts shows the fuel bands round the nearest Airfields.
@@ -962,12 +975,38 @@ export class View {
           }
           break;
         }
+        case 'intercept': {
+          // Missile defence (#759 s2), seen by every player as the missile is: the battery's flash and smoke as it fires, then where the two
+          // meet a clean white burst high overhead on a hit, or a small dark puff beside the missile on a miss.
+          if (ev.what === 'fired') {
+            const o = this.ground(s, ev.x, ev.y, 0.8);
+            this.effects.burst(o, { count: 14, speed: 1, up: 1.4, life: 0.5, size: 0.1, grow: 1.5, gravity: -1, drag: 1.2, colors: ['#ffffff', '#cfe9ff', '#ffd25a'] });
+            this.effects.burst(o, { count: 22, speed: 1.4, up: 0.3, life: 2.6, size: 0.26, grow: 2.6, gravity: -0.2, drag: 1.1, soft: true, colors: ['#f2efe9', '#d8d3cb'] });
+          } else {
+            const at = this.ground(s, ev.x, ev.y, ev.z ?? 0);
+            if (ev.what === 'hit') {
+              this.effects.burst(at, { count: 40, speed: 3.2, up: 0.4, life: 0.7, size: 0.12, grow: 1.6, gravity: 0, drag: 1.4, colors: ['#ffffff', '#fff6d0', '#cfe9ff'] });
+              this.effects.burst(at, { count: 24, speed: 1.4, up: 0.2, life: 3.2, size: 0.3, grow: 3, gravity: -0.1, drag: 1, soft: true, colors: ['#eeeae4', '#cfcac2', '#a9a39a'] });
+              this.effects.burst(at, { count: 18, speed: 2.4, up: 0.6, life: 1.6, size: 0.05, gravity: 4, drag: 0.4, colors: ['#ffd25a', '#ff9a3c', '#5a5450'] });
+            } else {
+              this.effects.burst(at.clone().add(new THREE.Vector3(0.6, 0.3, 0.4)), { count: 12, speed: 0.8, up: 0.3, life: 1.6, size: 0.18, grow: 2.2, gravity: -0.1, drag: 1, soft: true, colors: ['#5a5450', '#7a736a'] });
+            }
+          }
+          break;
+        }
         case 'silo': {
           // The Atomic Age (#605): a ring on the target the moment a warhead goes up, a dome of fire where it lands.
           const at = this.ground(s, ev.x, ev.y, 0.3);
           const R = WARHEADS[ev.w ?? 'atomic'].r;
           // The warning ring is the widest its people could send (#753), so it never says which warhead is coming.
           const l = s.launches?.find((k) => k.id === ev.id);
+          if (ev.what === 'launched' && l?.arc) {
+            // The ignition (#772), seen by all as the silo is: a flash in the hatch, a column of white smoke rolling out round its foot.
+            const o = this.ground(s, l.arc.x, l.arc.y, 0.6);
+            this.effects.burst(o, { count: 26, speed: 1.4, up: 1.6, life: 0.9, size: 0.14, grow: 1.8, gravity: -1, drag: 1.2, colors: ['#fff6d0', '#ffd25a', '#ff8a2a'] });
+            this.effects.burst(o, { count: 40, speed: 2.2, up: 0.15, life: 4.5, size: 0.4, grow: 3.2, gravity: -0.15, drag: 1.1, soft: true, colors: ['#f2efe9', '#d8d3cb', '#bdb6ab'] });
+            this.effects.burst(o, { count: 18, speed: 0.6, up: 1, life: 3.5, size: 0.3, grow: 3, gravity: -0.8, drag: 0.9, soft: true, colors: ['#e9e5de', '#cfc9c0'] });
+          }
           if (ev.what === 'launched' || ev.what === 'revealed') {
             // Never at the event's point, which is the attacker's own aim (#762): at the rings this viewer is shown, all alike. At the
             // reveal the real ring flashes where it was drawn; the launcher's own side sees nothing new.
@@ -1436,6 +1475,12 @@ export class View {
           this.effects.burst(this.ground(s, ev.x, ev.y, 0.05), { count: 5, speed: 0.5, up: 0.4, life: 0.8, size: 0.05, gravity: 1.5, drag: 0.6, colors: ['#ffffff', '#cfe8f5'] });
           break;
         }
+        case 'tideAshore': {
+          // Work on the flats that reads the tide (#767): one of yours leaves its work for the shore, a splash of wet sand at its heels.
+          if (ev.owner !== this.viewer || !this.sees(ev.x, ev.y)) break;
+          this.effects.burst(this.ground(s, ev.x, ev.y, 0.05), { count: 4, speed: 0.4, up: 0.35, life: 0.7, size: 0.045, gravity: 1.5, drag: 0.6, colors: ['#cfe8f5', '#a8996f'] });
+          break;
+        }
         case 'milled': {
           // A Tide Mill grinds on the running tide (#739): spray off the wheel, a few coins for its people.
           if (ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;
@@ -1479,6 +1524,13 @@ export class View {
           if (!this.sees(ev.x, ev.y)) break;
           this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.3, ev.y), { count: 26, speed: 2.2, up: 2.6, life: 1.3, size: 0.08, gravity: 4, colors: ['#e6f1f2', '#bfd9dc', '#9d978d', '#86807a'] });
           this.cue('damBurst', ev.x, ev.y, 1);
+          break;
+        case 'pontoon':
+          // A floating district (#770): cast off with a churn at the tug's stern, moored with a bump of the floats, or holed and gone
+          // under in a boil of white water and timber.
+          if (!this.sees(ev.x, ev.y)) break;
+          this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.1, ev.y), ev.act === 'sink' ? { count: 30, speed: 1.6, up: 1.8, life: 1.4, size: 0.08, gravity: 3.5, colors: ['#e6f1f2', '#bfd9dc', '#8a6a46', '#c9b06a'] } : { count: 10, speed: 0.9, up: 0.6, life: 0.9, size: 0.06, gravity: 3, colors: ['#e6f1f2', '#bfd9dc', '#9fc4cf'] });
+          this.cue(ev.act === 'sink' ? 'founder' : ev.act === 'cast' ? 'castOff' : 'moor', ev.x, ev.y, ev.act === 'sink' ? 1 : 0.7);
           break;
         case 'sluice':
           // A sluice opened or shut (#701 s4): the winch, and the water let out or stilled.

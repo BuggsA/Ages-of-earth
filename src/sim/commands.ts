@@ -18,7 +18,7 @@ import { cacheAt } from './caches';
 import { carriesKegs, kegProblem } from './powder';
 import { kegTileProblem } from './tides';
 import { carriesTorch, onFire, torchProblem } from './fire';
-import { launch, launchProblem, salvo, salvoProblem, siloLimit } from './silo';
+import { launch, launchProblem, reserveProblem, salvo, salvoProblem, setReserve, siloLimit } from './silo';
 import { raise, raiseCost } from './reclaim';
 import { callWork, workProblem } from './works';
 import { callKin, killCamp, kinProblem, takeVow, takeWay, vowProblem, wayBarred, wayProblem } from './ways';
@@ -42,6 +42,7 @@ import { behemothBusy, kneel, kneelProblem, rise, riseProblem, seedBomb, seedBom
 import { isField } from './grove';
 import { answerTiding, tidingProblem } from './tidings';
 import { sluiceProblem } from './water';
+import { castOff, castProblem, linkProblem } from './floating';
 
 /**
  * Everything a player can do, as plain data. A person's clicks and the computer opponent both go
@@ -196,7 +197,7 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
   }
   const problem = placeProblem(s, type, tx, ty, true, p);
   if (problem) {
-    if (!quiet) refuse(s, p, problem === 'slope' ? 'Too steep to build there' : problem === 'foreign' ? "That's enemy land: only a Tower can be raised there" : problem === 'woods' ? `A snare needs ${SNARE.need} trees standing within ${SNARE.r} tiles` : problem === 'snares' ? `Too near another snare: keep them ${SNARE.apart} tiles apart` : problem === 'parched' ? `In the Age of Rivers a Farm is laid only by water: within ${RIVERS.wet} tiles of a channel, spring, lake or shore` : problem === 'bare' ? `A Hive needs ${HIVE.trees} trees standing within ${SNARE.r} tiles` : problem === 'hives' ? `Too near another Hive: keep them ${HIVE.apart} tiles apart` : "Can't build there");
+    if (!quiet) refuse(s, p, problem === 'slope' ? 'Too steep to build there' : problem === 'foreign' ? "That's enemy land: only a Tower can be raised there" : problem === 'woods' ? `A snare needs ${SNARE.need} trees standing within ${SNARE.r} tiles` : problem === 'snares' ? `Too near another snare: keep them ${SNARE.apart} tiles apart` : problem === 'parched' ? `In the Age of Rivers a Farm is laid only by water: within ${RIVERS.wet} tiles of a channel, spring, lake or shore` : problem === 'bare' ? `A Hive needs ${HIVE.trees} trees standing within ${SNARE.r} tiles` : problem === 'hives' ? `Too near another Hive: keep them ${HIVE.apart} tiles apart` : problem === 'adrift' ? 'A Pontoon is raised beside the shore or beside another of your pontoons, where its builders can stand: to set one farther out, cast it off and tow it' : type === 'pontoon' && (problem === 'dry' || problem === 'water') ? 'A Pontoon is moored on open water that ships sail' : "Can't build there");
     return null;
   }
   const cost = raiseCost(s, p, type, tx, ty);
@@ -487,6 +488,14 @@ export function applyCommand(s: GameState, c: Command): void {
       launch(s, c.p, silo as Building, c.x, c.y, c.w);
       break;
     }
+    case 'reserve': {
+      // Missile defence (#759 s3): hold a silo back to answer rival warheads, or stand it down. Only its owner may.
+      const silo = s.byId.get(c.silo);
+      const why = reserveProblem(s, c.p, silo as Building | undefined, c.on === true);
+      if (why) return refuse(s, c.p, why);
+      setReserve(s, silo as Building, c.on === true);
+      break;
+    }
     case 'keg': {
       // The Age of Sappers (#577): citizens and foot soldiers carry a keg each to the foot of a rival building.
       const why = kegProblem(s, c.p, s.byId.get(c.target));
@@ -770,6 +779,13 @@ export function applyCommand(s: GameState, c: Command): void {
         rise(s, b);
         break;
       }
+      // At a Pontoon (#770) it casts the district off into a tow.
+      if (b.type === 'pontoon') {
+        const no = castProblem(s, p, b);
+        if (no) return refuse(s, c.p, no);
+        castOff(s, b);
+        break;
+      }
       const why = packProblem(s, p, b);
       if (why) return refuse(s, c.p, why);
       packCamp(s, b);
@@ -826,7 +842,8 @@ export function applyCommand(s: GameState, c: Command): void {
       break;
     }
     case 'pitch': {
-      const wagons = myUnits(s, c.p, c.ids).filter((u) => u.type === 'wagon' || u.type === 'behemoth');
+      // Wagons pitch camp; tows (#770) moor their districts; a Behemoth (the Age of Leviathans) kneels.
+      const wagons = myUnits(s, c.p, c.ids).filter((u) => u.type === 'wagon' || u.type === 'tow' || u.type === 'behemoth');
       let why: string | null = null;
       for (const w of wagons) {
         // A Behemoth (the Age of Leviathans) kneels: its Town Center stands at once.
@@ -953,7 +970,7 @@ export function applyCommand(s: GameState, c: Command): void {
       if (c.unit === 'hero' && heroBusy(s, c.p)) return refuse(s, c.p, 'You can lead with one hero at a time');
       if (c.unit === 'behemoth' && behemothBusy(s, c.p)) return refuse(s, c.p, 'Your people has its Behemoth: one to a people');
       // The legion (#501): a Roman town keeps few citizens.
-      const full = c.unit === 'citizen' ? citizenProblem(s, p) : null;
+      const full = c.unit === 'citizen' ? citizenProblem(s, p) ?? linkProblem(s, b) : null;
       if (full) return refuse(s, c.p, full);
       const cost = trainCostFor(s, c.p, c.unit, b.type, b);
       const short = shortfall(p, cost);

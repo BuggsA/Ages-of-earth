@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'siloAlarm' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'fireLit' | 'fireCatch' | 'fireOut' | 'fireAsh' | 'flow' | 'rush' | 'groan' | 'dart' | 'swarm' | 'hiveHush' | 'sluiceOpen' | 'sluiceShut' | 'spread' | 'tideWash' | 'tideMill' | 'swept' | 'pondShut' | 'breach' | 'entWake' | 'entRoot' | 'spreading' | 'damBurst' | 'bloomSling' | 'bloomRoot' | 'bloomGrow' | 'bloomCut' | 'bloomCrack' | 'bloomGreen' | 'bloomStorm' | 'whaleSong' | 'seedBomb' | 'behemothKneel' | 'behemothRise';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'siloAlarm' | 'interceptLaunch' | 'interceptHit' | 'interceptMiss' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'fireLit' | 'fireCatch' | 'fireOut' | 'fireAsh' | 'flow' | 'rush' | 'groan' | 'dart' | 'swarm' | 'hiveHush' | 'sluiceOpen' | 'sluiceShut' | 'spread' | 'tideWash' | 'tideMill' | 'swept' | 'pondShut' | 'breach' | 'entWake' | 'entRoot' | 'spreading' | 'damBurst' | 'castOff' | 'moor' | 'founder' | 'bloomSling' | 'bloomRoot' | 'bloomGrow' | 'bloomCut' | 'bloomCrack' | 'bloomGreen' | 'bloomStorm' | 'whaleSong' | 'seedBomb' | 'behemothKneel' | 'behemothRise';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -971,6 +971,33 @@ export class Sound {
         this.noise(out, t + 0.3, { dur: 3.0, filter: 'bandpass', f: 900, to: 450, q: 0.5, peak: 0.1, attack: 0.25 });
         this.noise(out, t + 0.3, { dur: 3.2, filter: 'lowpass', f: 300, to: 120, q: 0.8, peak: 0.11, attack: 0.3 });
         break;
+      case 'castOff':
+        // A floating district cast off (#770): mooring lines slipped with a slap on the water, the tug's whistle, two short and one
+        // long, and the deep chug of its engine taking up the strain while the floats creak.
+        this.noise(out, t, { dur: 0.12, filter: 'bandpass', f: 900, q: 1.2, peak: 0.07 });
+        for (const [d, len] of [[0.2, 0.12], [0.4, 0.12], [0.6, 0.5]] as const) this.tone(out, t + d, { f: 392, to: 386, type: 'triangle', dur: len, peak: 0.05, attack: 0.02, lp: 1400 });
+        this.tone(out, t + 0.6, { f: 588, to: 579, type: 'sine', dur: 0.5, peak: 0.02, attack: 0.02 });
+        for (let i = 0; i < 6; i++) this.tone(out, t + 1.1 + i * 0.18, { f: 62, to: 52, dur: 0.12, peak: 0.07 });
+        this.tone(out, t + 1.2, { f: 150, to: 120, type: 'sawtooth', dur: 0.6, peak: 0.025, attack: 0.2, lp: 700 });
+        break;
+      case 'moor':
+        // A district moored again (#770): the floats bump against their neighbours with a hollow wooden knock, a line thrown and made
+        // fast round a bollard with a creak, and the water settling under the deck.
+        this.tone(out, t, { f: 120, to: 82, type: 'triangle', dur: 0.22, peak: 0.14 });
+        this.noise(out, t, { dur: 0.1, filter: 'lowpass', f: 500, peak: 0.07 });
+        this.tone(out, t + 0.28, { f: 110, to: 76, type: 'triangle', dur: 0.18, peak: 0.09 });
+        this.noise(out, t + 0.5, { dur: 0.18, filter: 'bandpass', f: 1600, q: 2, peak: 0.03 });
+        this.tone(out, t + 0.6, { f: 230, to: 170, type: 'sawtooth', dur: 0.35, peak: 0.025, lp: 900 });
+        this.noise(out, t + 0.8, { dur: 1.2, filter: 'lowpass', f: 380, to: 220, q: 0.7, peak: 0.03, attack: 0.3 });
+        break;
+      case 'founder':
+        // A floating district holed and sinking (#770): timbers splitting, air bursting up from the floats in a run of glugs, and
+        // the water closing over the deck.
+        this.noise(out, t, { dur: 0.1, filter: 'highpass', f: 1400, peak: 0.1 });
+        this.tone(out, t + 0.05, { f: 160, to: 70, type: 'sawtooth', dur: 0.5, peak: 0.04, lp: 700 });
+        for (let i = 0; i < 7; i++) this.tone(out, t + 0.4 + i * 0.16 + (i % 2) * 0.04, { f: 260 - i * 14, to: 420 - i * 20, type: 'sine', dur: 0.07, peak: 0.06 });
+        this.noise(out, t + 0.5, { dur: 1.8, filter: 'lowpass', f: 420, to: 160, q: 0.8, peak: 0.08, attack: 0.25 });
+        break;
       case 'spread':
         // The Water Line's flood running over the meadow (#701 s4): a shallow, glassy hiss across grass, softer than a breach.
         this.noise(out, t, { dur: 1.1, filter: 'bandpass', f: 2200, to: 1500, q: 0.8, peak: 0.022, attack: 0.25 });
@@ -1021,6 +1048,26 @@ export class Sound {
           this.tone(out, t + i * 0.24, { f: 1040, to: 2360, type: 'square', dur: 0.12, peak: 0.02 });
         }
         this.tone(out, t, { f: 55, to: 55, dur: 1.5, peak: 0.22, attack: 0.02 });
+        break;
+      case 'interceptLaunch':
+        // An interceptor away (#759 s2): a sharp ignition crack, then a quick rising hiss, thinner and faster than a warhead's roar.
+        this.noise(out, t, { dur: 0.06, filter: 'highpass', f: 2000, peak: 0.25 });
+        this.noise(out, t + 0.02, { dur: 1.1, filter: 'bandpass', f: 900, to: 4200, q: 0.9, peak: 0.16, attack: 0.04 });
+        this.tone(out, t + 0.02, { f: 180, to: 520, type: 'sawtooth', dur: 0.9, peak: 0.04, attack: 0.05 });
+        break;
+      case 'interceptHit':
+        // A warhead stopped high overhead (#759 s2): a bright, clean crack and a high flat bang that rolls off, with no deep ground swell
+        // under it, so the ear tells it from a blast; then a soft rain of debris.
+        this.noise(out, t, { dur: 0.1, filter: 'highpass', f: 1500, peak: 0.6 });
+        this.noise(out, t, { dur: 1.6, filter: 'bandpass', f: 1400, to: 300, q: 0.7, peak: 0.35, attack: 0.003 });
+        this.tone(out, t, { f: 220, to: 70, dur: 0.8, peak: 0.25 });
+        this.bell(out, t + 0.05, N.A4, 1.4, 0.03);
+        for (let i = 0; i < 6; i++) this.noise(out, t + 0.6 + i * 0.17, { dur: 0.05, filter: 'highpass', f: 3000 - i * 200, peak: 0.03 });
+        break;
+      case 'interceptMiss':
+        // A near miss (#759 s2): a dull pop off to the side and a sour falling note, then nothing: the warhead flies on.
+        this.noise(out, t, { dur: 0.25, filter: 'bandpass', f: 600, q: 1.2, peak: 0.12 });
+        this.tone(out, t + 0.05, { f: 440, to: 300, type: 'triangle', dur: 0.5, peak: 0.06 });
         break;
       case 'siloScrub':
         // A launch scrubbed (#605): the klaxon chokes off and a hollow thud of the hatch giving way.
