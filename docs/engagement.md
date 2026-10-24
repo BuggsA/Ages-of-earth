@@ -2,6 +2,8 @@
 
 The owner's chat with Claude Code, 2026-10-24 (session `session_01Lj8tw7uVgg1gJ7n23WG3pn`): "help plan out meaningful engagement improvements". Then, on the plan: "I like phase 1, but you should be able to go back ages. So consider that in the plan." Dilemma cards: "I don't think they add a ton of value even if advanced … I am happy to just have research to it." "The campaign is on pause for right now. I think most people play computer or with friends."
 
+Umbrella: [#724](https://github.com/BuggsA/Ages-of-earth/issues/724) (steps #725 #726 road, #727 #728 town, research #729).
+
 ## The diagnosis
 
 The game isn't short of depth: six core loops, a web of ages with crossings, paths and going back, the Water Road under way. What's thin is what lies around that depth:
