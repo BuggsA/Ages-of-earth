@@ -1202,7 +1202,53 @@ function cavebear(): Kit {
   return k;
 }
 
-const MAKERS: Record<UnitType, (epoch: number) => Kit> = { citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, cog, fighter, bomber, trader, wagon, warwolf, tusker, warmammoth, blowpipe, cavebear };
+/**
+ * An Ent (the Age of the Wildwood): an old tree woken, walking on two root-legs. A trunk of dark furrowed bark with a lighter heartwood
+ * face, two eyes of amber sap that glow, branch arms that swing as it walks with twigs at their ends, a heavy crown of leaves, and a
+ * sash of moss-woven cloth in its people's colour. Tall: half again a man.
+ */
+function warden(): Kit {
+  const k = new Kit();
+  const bark = '#4b3a28';
+  const furrow = '#33271b';
+  const heart = '#8a6a44';
+  const leaf = ['#3f6a2e', '#4f7d36', '#355a28'];
+  const LEG = 0.34;
+  for (const [x, rig] of [[-0.11, RIG_LEG_A], [0.11, RIG_LEG_B]] as [number, number][]) {
+    const g = k.limb(k.group(0, 0, 0), rig, LEG, 0);
+    k.cyl(0.07, 0.1, LEG, 6, bark, x, LEG / 2, 0, g);
+    // Root toes splayed on the ground.
+    for (const a of [-0.6, 0, 0.6]) {
+      const toe = k.box(0.035, 0.035, 0.16, furrow, x + Math.sin(a) * 0.06, 0.02, Math.cos(a) * 0.07, g);
+      toe.rotation.y = a;
+    }
+  }
+  // The trunk, a little bent, its bark in long furrows.
+  k.cyl(0.15, 0.19, 0.62, 7, bark, 0, LEG + 0.3, 0);
+  for (const a of [0.4, 1.6, 2.8, 4.1, 5.3]) k.box(0.025, 0.5, 0.03, furrow, Math.cos(a) * 0.17, LEG + 0.3, Math.sin(a) * 0.17).rotation.y = -a;
+  // The face: a pale scar of heartwood, a knot of a nose, and eyes of glowing sap.
+  k.box(0.16, 0.16, 0.04, heart, 0, LEG + 0.5, 0.15);
+  k.box(0.04, 0.06, 0.05, furrow, 0, LEG + 0.48, 0.18);
+  for (const x of [-0.045, 0.045]) k.glow(k.sphere(0.022, '#ffc24a', x, LEG + 0.54, 0.175));
+  k.team(k.box(0.36, 0.05, 0.36, TEAM, 0, LEG + 0.12, 0)).rotation.y = 0.785;
+  // Branch arms, long and crooked, with twigs and a few leaves at the ends.
+  for (const side of [-1, 1]) {
+    const g = k.limb(k.group(0, 0, 0), RIG_ARM, LEG + 0.52, 0);
+    const arm = k.cyl(0.035, 0.05, 0.5, 5, bark, side * 0.22, LEG + 0.32, 0.04, g);
+    arm.rotation.z = side * 0.25;
+    for (const dz of [-0.04, 0.05]) k.box(0.02, 0.12, 0.02, furrow, side * 0.3, LEG + 0.06, dz, g).rotation.z = side * 0.6;
+    k.blob(0.07, leaf[side > 0 ? 1 : 2], side * 0.29, LEG + 0.08, 0.02, g);
+  }
+  // The crown: heaped leaves over the brow, a branch or two through them.
+  k.blob(0.26, leaf[0], 0, LEG + 0.78, -0.02).scale.set(1.15, 0.8, 1);
+  k.blob(0.17, leaf[1], -0.15, LEG + 0.9, 0.04);
+  k.blob(0.16, leaf[2], 0.14, LEG + 0.92, -0.06);
+  k.blob(0.12, leaf[1], 0.02, LEG + 1.04, 0.02);
+  k.cyl(0.02, 0.03, 0.3, 4, bark, 0.12, LEG + 0.82, 0.08).rotation.z = -0.6;
+  return k;
+}
+
+const MAKERS: Record<UnitType, (epoch: number) => Kit> = { citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, cog, fighter, bomber, trader, wagon, warwolf, tusker, warmammoth, blowpipe, cavebear, warden };
 
 /** Epoch + 30 asks for the citizen as a thrall (the same offset trick as the trader's gold and the caravan cart). */
 export const THRALL_MODEL = 30;

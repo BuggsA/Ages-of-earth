@@ -1289,3 +1289,15 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 **Not seen:** none of it in a browser yet (models, the swarm cloud, the dart, the drone and hush, the HUD lines are unit-tested or compiled only). Sound levels want an ear.
 
 **Next:** the Wildwood (step 5): the Heart Tree and Ents that root, the Spreading (which feeds new Hive ground), and "fire hits living things twice as hard"; beasts that fear fire; the computer reading a rival's Hives and raiding in winter or smoking them first.
+
+## Designers' notes: the Age of the Wildwood (Wild route step 5, 2026-10-24)
+
+**Built:** the Wildwood (`AGES.wildwood`, `WILDWOOD`, `src/sim/wildwood.ts`), instead of the Industrial Age for a Hive people whose Hives have paid 250 honey. One **Heart Tree** to a people; at it, an **Ent** is woken from the nearest old tree, a slow siege giant that flings boulders. An Ent can **root**: it becomes a real tree on the map, mends, and wakes when a rival walks within 3 tiles or an axe bites. If the Heart Tree falls, every Ent roots and sleeps. **The Spreading** seeds the bare ground beside its woods each spring and thickens its Thornwalls. Its people run through those woods; a rival wades. The door: no rifles, guns or aircraft, and fire hits its living things twice as hard.
+
+**Why I love it:** a rooted Ent is a tree in every way the rules know: same tile, same wood, same fire. So the trick is *information*: a rival looking at a wood by a Wildwood town can't know which trees are Ents, and has three honest answers: walk round, send someone cheap in first, or burn it (and burn twice as hard while the Wildwood people stays). The Ents also make the woods matter both ways: they're woken *from* your trees, so every tree you spare by the Heart Tree is a soldier in waiting, and the Spreading grows more of them. Green against iron is real now: the Industrial rival keeps its guns, and the Wildwood has to close in through its own trees to use its Ents.
+
+**What I chose:** an Ent is trained at the Heart Tree (queue, cost, HUD and the computer all come for free) and steps out of a tree, rather than a new "wake this tree" order; a rooted Ent leaves the unit list and is a record plus a real tree, so pathing, fog, sight and selection need no special case, and a felled tree takes the Ent with it. Any bite of an axe wakes it, its own people's too, which keeps the rule one line and gives a reason not to cut by the Heart Tree.
+
+**Not seen:** the Heart Tree and Ent models, the wake and root bursts, the spring swirl, the three sounds and the HUD lines are compiled and built by the model test, not seen in a browser by me (see the PR). The computer never roots an Ent on purpose (only when its Heart Tree falls).
+
+**Next:** the computer rooting Ents as an ambush in its woods, and reading a rival's woods as a threat (burning before walking in); the Bloom (step 6) off the Wildwood: the Seed Spire and the Greening, which the Spreading already leans toward; Leviathans (step 7); a mark the owner alone sees on their rooted Ents.

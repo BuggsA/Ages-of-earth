@@ -42,7 +42,7 @@ import { isCoppice } from './coppice';
 import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
-import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS } from './data';
+import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
@@ -52,6 +52,7 @@ import { progress, scenarioById } from './campaign';
 import { tames, wildBeast } from './tame';
 import { grows } from './grove';
 import { keepsBees } from './hive';
+import { treeToWake, treesRound, wakesForest } from './wildwood';
 
 /**
  * The computer opponent. It plays by the same rules and through the same commands as a person: it
@@ -259,6 +260,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   wildRoad(s, v, mem, issue);
   groveWork(s, v, mem, issue);
   hiveWork(s, v, mem, issue);
+  wildwoodWork(s, v, mem, issue);
   readYear(s, v);
   huntTheYear(s, v, issue);
 
@@ -584,6 +586,9 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   } else if (roads[to] === undefined && to === 'hive') {
     // The Wild route's third age: a people that walked the Grove goes on.
     roads[to] = hasWalked(p, 'grove');
+  } else if (roads[to] === undefined && to === 'wildwood') {
+    // The Wild route's fourth age: a people that walked the Hive goes on.
+    roads[to] = hasWalked(p, 'hive');
   } else if (roads[to] === undefined && to === 'dykes') {
     // The Water Road (#701): only with a dyke worth raising by home, and on a coin of its own, so no other match's dice shift. A people
     // that walked the Age of Rivers is on the road already, and goes on down it more often.
@@ -747,6 +752,8 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   if (walksWeb(v) && ageOf(p) === 'grove' && s.tick - (mem.grove ?? s.tick) < secs(GROVE.aiStay)) return null;
   // The Hive is kept a while, so its Hives are set and swarming.
   if (walksWeb(v) && ageOf(p) === 'hive' && s.tick - (mem.hive ?? s.tick) < secs(HIVE.aiStay)) return null;
+  // The Wildwood is kept a while, so its Heart Tree is planted and its Ents woken.
+  if (walksWeb(v) && ageOf(p) === 'wildwood' && s.tick - (mem.wildwood ?? s.tick) < secs(WILDWOOD.aiStay)) return null;
   // The steppe (#320) is kept a while, so the flock it came for pays.
   if (walksWeb(v) && ageDef(p).mobile && s.tick - (mem.steppe?.since ?? s.tick) < secs(AI_STEPPE.stay)) return null;
   // Bound for a crossing (#585, #555 s12), a sibling doesn't climb on: its way is back to the Middle Ages (`seaTurn`).
@@ -2922,6 +2929,22 @@ function hiveWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   if (spot) construct(s, v, mem, 'hive', spot, 1, issue);
 }
 
+/**
+ * The Age of the Wildwood: one Heart Tree within `WILDWOOD.aiFrom` tiles of home, by a wood with at least `aiTrees` old trees round
+ * it to wake where one has room (else anywhere it fits, and the Spreading brings the trees). Its Ents are trained at it with the rest of the army (`military`).
+ */
+function wildwoodWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!walksWeb(v) || !wakesForest(p) || !v.tc) return;
+  if (ageOf(p) === 'wildwood') mem.wildwood ??= s.tick;
+  if (count(v, 'heart') || s.tick - (mem.ordered.heart ?? -99999) < secs(30) || p.epoch < BUILDINGS.heart.epoch) return;
+  const cost = buildingCostFor(s, p.id, 'heart');
+  if (!afford(v, cost)) return;
+  const near = (tx: number, ty: number) => treesRound(s, tx, ty, BUILDINGS.heart.size, WILDWOOD.wake) >= WILDWOOD.aiTrees;
+  const spot = findSpot(s, 'heart', v.home.x, v.home.y, 5, WILDWOOD.aiFrom, 0, near) ?? findSpot(s, 'heart', v.home.x, v.home.y, 5, WILDWOOD.aiFrom, 0);
+  if (spot) construct(s, v, mem, 'heart', spot, 3, issue);
+}
+
 const grownSheep = (s: GameState, owner: number): Animal[] => s.animals.filter((a) => a.kind === 'sheep' && a.owner === owner && a.hp > 0 && a.lamb === undefined);
 
 /** The road from the steppe into the Horde (#322), while the computer wants it and its deeds are not yet done; null otherwise. */
@@ -4700,6 +4723,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     let unit: UnitType | null;
     if (b.type === 'workshop') release(v);
     if (b.type === 'workshop') unit = siege < Math.max(v.plan.siege, p.epoch >= 2 ? 3 : 2) + lodge + bleeds && (v.army.length >= 6 || siege < v.plan.siege) ? 'siege' : null;
+    else if (b.type === 'heart') unit = v.army.filter((u) => u.type === 'warden').length + b.queue.length < WILDWOOD.aiEnts && treeToWake(s, b) >= 0 ? 'warden' : null;
     else if (b.type === 'temple') unit = v.priests.length < (v.army.length >= 6 ? Math.max(consecrates(s, p.id) ? AI_FAITH.priests : 2, L.clever && ageDef(p).rite ? AI_FORK.priests : 0) : 0) + (looseRelics(s) > 0 ? 1 : 0) + (vigilPost(s, v) ? VIGIL.most : 0) + (ageDef(p).missions ? 1 : 0) ? 'priest' : null;
     else {
       unit = counter && trains.includes(counter) && unitEpoch(counter) <= p.epoch && !barred(p, counter, b.type) && roll(s) < counterOdds ? counter : pickUnit(v, mem, b);

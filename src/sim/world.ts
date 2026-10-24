@@ -162,6 +162,8 @@ export function countPop(s: GameState): void {
     if (e.kind === 'unit') p.pop += e.type === 'wagon' ? 0 : 1;
     else if (e.built) p.cap += BUILDINGS[e.type].pop;
   }
+  // A rooted Ent (the Age of the Wildwood) is a tree for now, but still one of its people.
+  for (const w of s.wardens ?? []) if (s.players[w.owner]) s.players[w.owner].pop++;
   // An Ancestors' Cairn gives its keeper room for more.
   for (const m of s.landmarks ?? []) if (m.kind === 'cairn' && m.owner >= 0) s.players[m.owner].cap += Math.round(kinBonus(s, m.owner, 'cairn', LANDMARKS.cairn.pop));
   for (const p of s.players) p.cap = Math.min(POP_MAX, p.cap);

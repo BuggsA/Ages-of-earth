@@ -4,13 +4,14 @@ import { hurt, peace } from './combat';
 import { clearResource, distToRect, distToTile } from './grid';
 import { seasonAt } from './seasons';
 import { isEnemy, maxHp } from './world';
+import { fireMul } from './wildwood';
 import type { Building, Fire, GameState, Unit } from './types';
 import { R_TREE } from './types';
 
 /**
  * Fire (`docs/wild-road.md`, the Wild route's step 3): the answer to a living town, and a tool for every people from the Bronze Age.
  * Citizens and foot soldiers carry torches to a tree, a Thornwall's root, or a rival's living building (`FIRE.burns`: Thornwalls,
- * Kitchen Gardens, Orchards, Saplings, Hives) and stand a moment to set it alight. A burning tree falls to ash that grows back slowly (a
+ * Kitchen Gardens, Orchards, Saplings, Hives, Heart Trees) and stand a moment to set it alight. A burning tree falls to ash that grows back slowly (a
  * `Stool` with `ash`); a burning building loses hit points every second until it falls (a Thornwall burnt down leaves no root) or its
  * own people beat it out. Once a second every fire may light each living neighbour, on a roll of the match's own dice (`roll`),
  * further in a dry summer than a wet spring, but never more than `FIRE.run` tiles from the torch. Fires act in the order they were
@@ -58,7 +59,7 @@ export function torchProblem(s: GameState, owner: number, at: { target?: number;
     const b = s.byId.get(at.target);
     if (!b || b.kind !== 'building' || b.hp <= 0) return pick;
     if (!isEnemy(s, owner, b.owner)) return "Fire is set only to a rival's buildings";
-    if (!burns(b)) return 'Fire takes only what grows: Thornwalls, Kitchen Gardens, Orchards, Saplings and Hives';
+    if (!burns(b)) return 'Fire takes only what grows: Thornwalls, Kitchen Gardens, Orchards, Saplings, Hives and Heart Trees';
     return onFire(s, b) ? 'It is already burning' : null;
   }
   const tile = at.tile ?? -1;
@@ -184,7 +185,8 @@ export function fireStep(s: GameState): void {
       gone.add(f);
       continue;
     }
-    hurt(s, b, Math.max(1, maxHp(s, b) * FIRE.bld), f.by, null);
+    // The Wildwood's door: a people standing in it burns twice as hard.
+    hurt(s, b, Math.max(1, maxHp(s, b) * FIRE.bld) * fireMul(s, b.owner), f.by, null);
     if (b.hp <= 0) {
       b.burnt = true;
       gone.add(f);
@@ -222,6 +224,6 @@ function scorch(s: GameState, fires: Fire[]): void {
         }
       }
     }
-    if (who >= 0) hurt(s, u, FIRE.scorch, who, null);
+    if (who >= 0) hurt(s, u, FIRE.scorch * fireMul(s, u.owner), who, null);
   }
 }

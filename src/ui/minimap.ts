@@ -438,6 +438,19 @@ export class Minimap {
       }
     }
 
+    // Your own rooted Ents (the Age of the Wildwood): your colour round a leaf-green core, so you know which trees are yours to wake.
+    // A rival sees only a tree.
+    for (const w of s.wardens ?? []) {
+      if (w.owner !== viewer && !reveal) continue;
+      const x = ((w.tile % s.w) + 0.5) * sx;
+      const y = (Math.floor(w.tile / s.w) + 0.5) * sy;
+      const r = Math.max(1.6, sx * 0.8);
+      ctx.fillStyle = s.players[w.owner].color;
+      ctx.fillRect(x - r - 0.7, y - r - 0.7, r * 2 + 1.4, r * 2 + 1.4);
+      ctx.fillStyle = '#5f9a3a';
+      ctx.fillRect(x - r * 0.6, y - r * 0.6, r * 1.2, r * 1.2);
+    }
+
     // A rival's keepsake the viewer has seen (#726): a ring in its people's colour with a pale core, over its building.
     for (const k of keepsakes) {
       const x = k.x * sx, y = k.y * sy, r = Math.max(4.5, cw / 46);

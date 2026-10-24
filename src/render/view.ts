@@ -1037,6 +1037,24 @@ export class View {
           } else this.effects.ring(this.ground(s, ev.x, ev.y, 0.15), '#e0a526', 0.9, 0.7);
           break;
         }
+        case 'wildwood':
+          // The Age of the Wildwood: an Ent tears free of its tree in a burst of bark and leaves, or sinks back into the ground and
+          // roots in a puff of earth; a rooted Ent felled drops leaves; the Spreading is a rising swirl of seed round the Heart Tree.
+          if (!this.sees(ev.x, ev.y)) break;
+          if (ev.what === 'wake') {
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.6), { count: 18, speed: 1.4, up: 1.6, life: 1.2, size: 0.06, gravity: 1, drag: 1.2, colors: ['#4b3a28', '#3f6a2e', '#6f8f3e', '#8a6a44'] });
+            this.cue('entWake', ev.x, ev.y, 0.9);
+          } else if (ev.what === 'root') {
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.1), { count: 12, speed: 0.7, up: 0.6, life: 1.4, size: 0.12, grow: 1.8, gravity: 0.2, drag: 1.2, soft: true, colors: ['#6b5a40', '#56763a'] });
+            this.cue('entRoot', ev.x, ev.y, 0.8);
+          } else if (ev.what === 'felled') {
+            this.effects.burst(this.ground(s, ev.x, ev.y, 1.2), { count: 14, speed: 0.6, up: 0.2, life: 2, size: 0.05, gravity: 0.5, drag: 1.5, colors: ['#6a5a2e', '#3f6a2e'] });
+            this.cue('fall', ev.x, ev.y, 0.8);
+          } else if (ev.n) {
+            this.effects.burst(this.ground(s, ev.x, ev.y, 2), { count: 30, speed: 2.2, up: 0.8, life: 2.4, size: 0.035, gravity: -0.1, drag: 0.6, soft: true, colors: ['#e8e2b8', '#9cc25a', '#f4f0d8'] });
+            this.cue('spreading', ev.x, ev.y, 0.7);
+          }
+          break;
         case 'sprout':
           // The Age of the Grove: a fallen Thornwall springs up again from its root.
           if (!this.sees(ev.x, ev.y)) break;

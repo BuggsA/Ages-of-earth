@@ -35,6 +35,7 @@ import { sees } from './vision';
 import { canHit, isEnemy, maxHp, pay, placeBuilding, refund } from './world';
 import { fightsBeasts } from './animals';
 import { tameProblem } from './tame';
+import { heartBarred, rootEnt, rootProblem } from './wildwood';
 import { isField } from './grove';
 import { answerTiding, tidingProblem } from './tidings';
 
@@ -184,7 +185,7 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
     if (!quiet) refuse(s, p, `Needs the ${EPOCHS[def.epoch].name}`);
     return null;
   }
-  const no = buildBarred(player, type) ?? wayBarred(s, player, type);
+  const no = buildBarred(player, type) ?? wayBarred(s, player, type) ?? heartBarred(s, p, type);
   if (no) {
     if (!quiet) refuse(s, p, no);
     return null;
@@ -755,6 +756,16 @@ export function applyCommand(s: GameState, c: Command): void {
       const why = lambProblem(s, p, b);
       if (why) return refuse(s, c.p, why);
       raiseLamb(s, b);
+      break;
+    }
+    case 'root': {
+      // The Age of the Wildwood: Ents root where they stand, and are trees again.
+      let why: string | null = null;
+      for (const u of myUnits(s, c.p, c.ids).filter((x) => x.type === 'warden')) {
+        why = rootProblem(s, u);
+        if (!why) rootEnt(s, u);
+      }
+      if (why) refuse(s, c.p, why);
       break;
     }
     case 'pitch': {
