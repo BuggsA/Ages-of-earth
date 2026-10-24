@@ -1398,9 +1398,52 @@ const cache = new Map<string, THREE.BufferGeometry>();
 /** How high a unit line's head (or its banner pole) reaches, where a people's mark sits. */
 const MARK_Y: Partial<Record<UnitType, number>> = { infantry: 0.5, ranged: 0.5, priest: 0.5, cavalry: 0.98, siege: 0.8 };
 
+/** A people's own helmet shell and shield on its foot soldier, so Greek, Roman and Chinese ranks differ in outline and not only in plume. */
+function footGear(k: Kit, civ: CivId): void {
+  const shield = (r: number, col: string, boss: string, rot = 0.25): void => {
+    const s = k.cyl(r, r, 0.03, 10, col, -0.2, 0.24, 0.05);
+    s.rotation.z = Math.PI / 2;
+    s.rotation.y = rot;
+    k.cyl(0.03, 0.03, 0.04, 6, boss, -0.22, 0.24, 0.05).rotation.z = Math.PI / 2;
+  };
+  switch (civ) {
+    case 'greeks': // Corinthian helm with cheek-guards, a big bronze hoplon.
+      k.dome(0.082, BRONZE, 0, 0.5, 0.005);
+      k.box(0.03, 0.07, 0.02, BRONZE, 0, 0.47, 0.075);
+      shield(0.13, '#b88a3c', '#e8d08a');
+      break;
+    case 'romans': // Montefortino helm with a neck-guard, a tall red scutum.
+      k.dome(0.078, '#9aa0a6', 0, 0.5, 0);
+      k.box(0.17, 0.02, 0.05, '#9aa0a6', 0, 0.46, -0.07);
+      k.box(0.02, 0.2, 0.15, '#a3262a', -0.2, 0.22, 0.05).rotation.y = 0.25;
+      k.box(0.03, 0.05, 0.04, '#e0b13c', -0.22, 0.22, 0.05);
+      break;
+    case 'chinese': // A lacquered cap with ear-flaps, a rectangular lacquered shield.
+      k.cone(0.085, 0.06, 8, '#2b2420', 0, 0.54, 0);
+      k.box(0.17, 0.025, 0.12, '#2b2420', 0, 0.47, 0);
+      k.box(0.02, 0.2, 0.13, '#8e2a22', -0.2, 0.24, 0.05).rotation.y = 0.25;
+      k.box(0.03, 0.14, 0.03, '#f0c43a', -0.21, 0.24, 0.05);
+      break;
+    case 'egyptians': // A striped nemes-like cap and a hide shield with a notched top.
+      k.dome(0.08, '#e8e0c8', 0, 0.5, 0);
+      k.box(0.02, 0.1, 0.02, '#2f5fa8', 0, 0.47, 0.07);
+      shield(0.11, '#8a5a30', '#e0b13c');
+      break;
+    case 'mongols': // A fur-rimmed cap and a small round leather buckler.
+      k.cyl(0.085, 0.085, 0.03, 8, '#5a3d28', 0, 0.5, 0);
+      shield(0.08, '#6e5038', '#c9c2b0');
+      break;
+    case 'britons': // Bare-headed with a torque, a long painted oval shield.
+      k.cyl(0.075, 0.075, 0.012, 8, '#e0b13c', 0, 0.44, 0);
+      k.blob(0.1, '#3d6b4a', -0.2, 0.26, 0.05).scale.set(0.2, 1.5, 0.9);
+      break;
+  }
+}
+
 /** A people's mark on its signature line: a crest, plume, headdress or banner, so its army reads at a glance. */
-function signatureMark(k: Kit, civ: CivId, type: UnitType): void {
+function signatureMark(k: Kit, civ: CivId, type: UnitType, epoch = 1): void {
   const y = MARK_Y[type] ?? 0.5;
+  if (type === 'infantry' && epoch >= 1 && epoch <= 3) footGear(k, civ);
   // Foot soldiers wear it on the head; siege and riders carry it on a pole behind.
   const pole = type === 'siege' || type === 'cavalry';
   const z = pole ? -0.2 : -0.01;
@@ -1440,7 +1483,7 @@ export function unitGeometry(type: UnitType, epoch: number, civ?: CivId): THREE.
   let g = cache.get(key);
   if (!g) {
     const kit = makeUnit(type, epoch);
-    if (civ) signatureMark(kit, civ, type);
+    if (civ) signatureMark(kit, civ, type, epoch);
     g = bake(kit.root);
     cache.set(key, g);
   }
@@ -1450,6 +1493,6 @@ export function unitGeometry(type: UnitType, epoch: number, civ?: CivId): THREE.
 /** The same model with the team color baked in (for portraits). */
 export function unitGeometryColored(type: UnitType, epoch: number, color: string, civ?: CivId): THREE.BufferGeometry {
   const kit = makeUnit(type, epoch);
-  if (civ) signatureMark(kit, civ, type);
+  if (civ) signatureMark(kit, civ, type, epoch);
   return bake(kit.root, color);
 }
