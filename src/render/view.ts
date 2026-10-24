@@ -871,6 +871,8 @@ export class View {
           this.effects.burst(at, ev.building
             ? { count: 4, speed: 1.2, life: 0.6, size: 0.06, colors: ['#9a8a74', '#c9b79c'], soft: true }
             : { count: 5, speed: 1.4, life: 0.35, size: 0.03, colors: ['#ffe2a8', '#ffffff'] });
+          // A blink of white at the wound, so a blow reads even when the sparks are small (#626).
+          if (!ev.building) this.effects.burst(at, { count: 1, speed: 0, life: 0.12, size: 0.2, grow: 0.3, gravity: 0, drag: 1, colors: ['#ffffff'] });
           this.cue(ev.building ? 'hitBuilding' : 'hit', ev.x, ev.y, 0.7);
           break;
         }
@@ -1144,7 +1146,10 @@ export class View {
               this.cue('fall', ev.x, ev.y, 0.6);
               this.cue('heroFall', ev.x, ev.y, 0.9);
             } else {
-              this.effects.burst(this.ground(s, ev.x, ev.y, 0.1), { count: 4, speed: 0.5, up: 0.4, life: 0.8, size: 0.05, grow: 1.8, gravity: -0.1, drag: 1.5, soft: true, colors: ['#bba98a', '#d6c7aa'] });
+              const grave = this.ground(s, ev.x, ev.y, 0.1);
+              this.effects.burst(grave, { count: 4, speed: 0.5, up: 0.4, life: 0.8, size: 0.05, grow: 1.8, gravity: -0.1, drag: 1.5, soft: true, colors: ['#bba98a', '#d6c7aa'] });
+              // A ring in the fallen's colour: a battle shows whose people are dying (#626).
+              this.effects.ring(grave, s.players[ev.owner].color, 0.9, 0.6);
               this.cue('fall', ev.x, ev.y, 0.6);
             }
           } else {
