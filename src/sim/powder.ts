@@ -113,7 +113,7 @@ function blow(s: GameState, k: Keg): void {
     }
   }
   // A dyke (#701 s3) is earth: powder at its foot tears it open, and the sea does the rest.
-  for (const e of hit) hurt(s, e, e.kind === 'building' ? KEG.building * (e.type === 'dyke' || e.type === 'sluice' ? BREACH.keg : 1) : KEG.unit, k.owner, null);
+  for (const e of hit) hurt(s, e, e.kind === 'building' ? KEG.building * (e.type === 'dyke' || e.type === 'sluice' || e.type === 'dam' ? BREACH.keg : 1) : KEG.unit, k.owner, null);
   const p = s.players[k.owner];
   p.stats.blown = (p.stats.blown ?? 0) + 1;
   s.events.push({ k: 'keg', owner: k.owner, x: k.x, y: k.y, what: 'blown' });

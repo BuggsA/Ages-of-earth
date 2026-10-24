@@ -34,7 +34,7 @@ import { leaveRubble, salvageStep } from './salvage';
 import { cacheStep, dropOre, spillStore } from './caches';
 import { kegStep, millStep } from './powder';
 import { fireStep } from './fire';
-import { ditchStep, floodStep, pumpStep, sluiceStep } from './water';
+import { burst, ditchStep, floodStep, pumpStep, sluiceStep } from './water';
 import { siloStep } from './silo';
 import { stockPosts } from './oretrade';
 import { sortieStep } from './sortie';
@@ -476,6 +476,8 @@ function removeDead(s: GameState): void {
       ungarrison(s, e);
       freeCaptives(s, e);
       stampBuilding(s, e, false);
+      // A dam that falls with water behind it bursts (#701 s5).
+      if (e.type === 'dam') burst(s, e);
       remember(s, e);
       leaveRubble(s, e);
       spillStore(s, e);
