@@ -8,7 +8,7 @@ import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
-import { RARE_OF_TILE } from '../sim/units';
+import { RARE_OF_TILE, findResource } from '../sim/units';
 import { AUTO_WORK, POLDER, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
@@ -359,6 +359,18 @@ export class Hud {
         m.closest('.notice')?.remove();
         return;
       }
+      const g = (e.target as HTMLElement).closest<HTMLElement>('[data-forage]');
+      if (g) {
+        this.moveWorkers('idle', 'food', Number(g.dataset.forage) || 1);
+        g.closest('.notice')?.remove();
+        return;
+      }
+      const fi = (e.target as HTMLElement).closest<HTMLElement>('[data-fish]');
+      if (fi) {
+        this.findFish(fi.dataset.fish ?? '');
+        fi.closest('.notice')?.remove();
+        return;
+      }
       const b = (e.target as HTMLElement).closest<HTMLElement>('[data-hands]');
       if (!b) return;
       this.sendWorkers(b.dataset.hands as Job, Number(b.dataset.n) || 1);
@@ -473,6 +485,8 @@ export class Hud {
     const p = s.players[viewer];
     const now = performance.now();
     this.idleMinersCard(s, viewer, now);
+    this.idleHuntersCard(s, viewer, now);
+    this.idleFishersCard(s, viewer, now);
     const idle = idleCitizens(s, viewer);
     const next = new Map<number, number>();
     for (const u of idle) next.set(u.id, this.idleSince.get(u.id) ?? now);
@@ -524,6 +538,79 @@ export class Hud {
     while (this.noticeEl.children.length > 4) this.noticeEl.firstChild!.remove();
     setTimeout(() => (el.style.opacity = '0'), 8000);
     setTimeout(() => el.remove(), 8700);
+  }
+
+  /** Hunters whose game is gone (#344): remember who last hunted; 2+ idle for 5 s offer one button that sends them for berries, a field or meat (`reassign` idle→food). */
+  private hunting = new Set<number>();
+  private huntersCardAt = 0;
+  private idleHuntersCard(s: GameState, viewer: number, now: number): void {
+    const idle = new Set(idleCitizens(s, viewer).map((u) => u.id));
+    let waiting = 0;
+    for (const e of s.ents) {
+      if (e.kind !== 'unit' || e.owner !== viewer || e.hp <= 0) continue;
+      if (e.order.k === 'hunt') this.hunting.add(e.id);
+      else if (idle.has(e.id) && this.hunting.has(e.id)) {
+        if (!this.foraged.has(e.id) && now - (this.idleSince.get(e.id) ?? now) > 5000) waiting++;
+      } else this.hunting.delete(e.id);
+    }
+    if (waiting < 2 || now < this.huntersCardAt) return;
+    this.huntersCardAt = now + 30000;
+    const n = Math.min(waiting, AUTO_WORK.lay);
+    this.noticeEl.querySelector('.idle-hunters')?.remove();
+    const el = document.createElement('div');
+    el.className = 'notice alert shortage idle-hunters';
+    el.innerHTML = `<span>${waiting} hunters stand idle: the game is gone.</span><button type="button" data-forage="${n}" title="Send ${n} for berries, a free field or meat nearby; a field is laid if there is none">🍖 Find more food</button>`;
+    this.noticeEl.appendChild(el);
+    while (this.noticeEl.children.length > 4) this.noticeEl.firstChild!.remove();
+    setTimeout(() => (el.style.opacity = '0'), 8000);
+    setTimeout(() => el.remove(), 8700);
+  }
+
+  /** Fishing boats whose shoal is spent (#344): they are not citizens, so they get their own watch; 2+ idle for 5 s offer one button that sends them to the nearest shoal in the sea. */
+  private fishing = new Set<number>();
+  private fishersSince = new Map<number, number>();
+  private fishersCardAt = 0;
+  private idleFishersCard(s: GameState, viewer: number, now: number): void {
+    const next = new Map<number, number>();
+    const spent: number[] = [];
+    for (const e of s.ents) {
+      if (e.kind !== 'unit' || e.owner !== viewer || e.type !== 'fisher' || e.hp <= 0) continue;
+      if (e.order.k === 'gather') this.fishing.add(e.id);
+      else if (e.order.k === 'idle' && !e.queue.length && this.fishing.has(e.id)) {
+        const since = this.fishersSince.get(e.id) ?? now;
+        next.set(e.id, since);
+        if (now - since > 5000) spent.push(e.id);
+      } else this.fishing.delete(e.id);
+    }
+    this.fishersSince = next;
+    if (spent.length < 2 || now < this.fishersCardAt) return;
+    this.fishersCardAt = now + 30000;
+    this.noticeEl.querySelector('.idle-fishers')?.remove();
+    const el = document.createElement('div');
+    el.className = 'notice alert shortage idle-fishers';
+    el.innerHTML = `<span>${spent.length} fishing boats lie idle: their shoal is spent.</span><button type="button" data-fish="${spent.join(',')}" title="Send them to the nearest shoal still in the sea">🐟 Find more fish</button>`;
+    this.noticeEl.appendChild(el);
+    while (this.noticeEl.children.length > 4) this.noticeEl.firstChild!.remove();
+    setTimeout(() => (el.style.opacity = '0'), 8000);
+    setTimeout(() => el.remove(), 8700);
+  }
+
+  /** Send the listed idle boats to the shoal nearest their middle, anywhere on the map; they fan over the shoals near it. */
+  private findFish(list: string): void {
+    const s = this.state;
+    if (!s) return;
+    const boats = list.split(',').map((x) => s.byId.get(Number(x))).filter((e): e is Unit => !!e && e.kind === 'unit' && e.owner === this.viewer && e.type === 'fisher' && e.hp > 0 && e.order.k === 'idle');
+    if (!boats.length) return;
+    const x = boats.reduce((a, b) => a + b.x, 0) / boats.length;
+    const y = boats.reduce((a, b) => a + b.y, 0) / boats.length;
+    const tile = findResource(s, R_FISH, x, y, Math.max(s.w, s.h));
+    if (tile < 0) {
+      this.act.sound('error');
+      this.toast('No shoal is left in the sea', 'bad');
+      return;
+    }
+    this.act.issue({ t: 'gather', p: this.viewer, ids: boats.map((b) => b.id), tile, spread: true });
+    this.act.sound('click');
   }
 
   banner(title: string, sub = '', ms = 3200): void {
