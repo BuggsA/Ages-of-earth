@@ -933,7 +933,7 @@ export const ROADS: Road[] = [
     time: 35,
     clue: 'barracks',
     walked: 'warband',
-    deed: { stat: 'plunder', n: 300, text: 'Your forces take 300 gold in plunder' },
+    deed: { stat: 'plunder', n: 600, text: 'Your forces take 600 gold in plunder' },
     ore: { id: 'bloodiron', n: 50, text: 'Your citizens mine 50 blood-iron for the war-hosts\' blades' },
     blurb: 'A turn, not a climb: the second step on the Path of Blood. Foot soldiers pitch War Camps where the army stands, even in enemy land, that train foot soldiers at the front and keep the army fed; plunder grows (the Warband walked adds to it). What it gives up: trade, a sixth of the harvest and a fifth more for every technology. A camp left without soldiers burns. Where the seed holds blood-iron, only the blades forged of it open this road, not plunder; where it does not, plunder does.',
   },
