@@ -89,8 +89,8 @@ function postGeometry(): THREE.BufferGeometry {
   k.box(0.26, 0.24, 0.26, '#a07a4a', 1.15, 0.05, 0.1);
   k.box(0.2, 0.18, 0.2, '#8a6440', 1.2, 0.29, 0.12);
   camel(k, 1.05, 1.0, -0.6);
-  pennant(k, 1.35, -1.35, 2.2, '#e0b030');
-  pennant(k, -1.45, 0.0, 1.7, '#3a6aa8');
+  pennant(k, 1.35, -1.35, 3.0, '#e0b030');
+  pennant(k, -1.45, 0.0, 2.2, '#3a6aa8');
   return bake(k.root);
 }
 
