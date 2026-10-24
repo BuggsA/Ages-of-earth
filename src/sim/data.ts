@@ -2711,7 +2711,7 @@ export const AI_WEB = { lodgeWait: 120, take: 0.6, heir: 1, survey: 22, diggers:
 
 // ---- Colours, names and lookups -------------------------------------------------------------------
 
-export const PLAYER_COLORS = ['#2f7fe0', '#e0473a', '#e8b630', '#3aa35a', '#9b59d0', '#e07a2f'];
+export const PLAYER_COLORS = ['#2f7fe0', '#d9364a', '#f0c828', '#3aa35a', '#9b59d0', '#e8702a'];
 export const PLAYER_NAMES = ['You', 'Rival'];
 
 export const RES_LABEL: Record<Res, string> = { food: 'Food', wood: 'Wood', stone: 'Stone', gold: 'Gold' };

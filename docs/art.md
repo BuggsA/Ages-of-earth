@@ -32,7 +32,24 @@ Readability comes mostly from *value* (light against dark), then saturation, the
 - **Team colour** is the most saturated colour on a unit, big enough to read at the default zoom, and never used by the land.
 - **Weather and haze** never hide the play area at the default zoom; they colour it.
 
-Write the measured palette here (values for ground, woods, water, each team colour) when it lands.
+### Measured palette (area:light, 2026-10-24)
+
+Luminance `L` is WCAG relative luminance of the sRGB value (0 black, 1 white); `S` is HSV saturation. Measured on the 2026-10-24 build: grass `#92b45c` is L 0.40 / S 0.49, a tree canopy `#4f9a45` is about L 0.25, and a unit's brown is about L 0.2: everything sits in one band (L 0.2–0.4), which is the mush. The bands below pull the layers apart; build to them.
+
+| Layer | L | S | Notes |
+| --- | --- | --- | --- |
+| Open ground (grass, dry, dirt) | 0.16–0.26 | ≤ 0.40 | Today's `GRASS` is too bright and too green by a third: aim near `#6f8a4c` (L 0.22). Sand and snow may run lighter (to 0.55) as they are rare |
+| Woods floor, under trees | 0.10–0.16 | ≤ 0.40 | A clearing reads by being one step lighter than the woods |
+| Water | 0.10–0.30 | 0.35–0.60 | Cooler than land (hue 190–220°) and darker than grass at the shore; foam is the only bright thing |
+| Tree canopies, bushes | 0.08–0.20 | 0.40–0.55 | Darker than the ground; berries and ore are the bright spots |
+| Buildings and walls | ≥ 0.42 (walls, thatch, stone) or ≤ 0.08 (roofs in shadow) | ≤ 0.45 | Lighter than the ground by ≥ 0.15 L, never green |
+| Unit body (skin, cloth, armour) | ≥ 0.40 or ≤ 0.08 | ≤ 0.45 | Same rule; no mid-brown on mid-green |
+| Team colour | 0.18–0.50 | ≥ 0.65 | Set by `PLAYER_COLORS` (`src/sim/data.ts`; red, gold and orange moved apart in hue): blue `#2f7fe0`, red `#d9364a`, gold `#f0c828`, green `#3aa35a`, violet `#9b59d0`, orange `#e8702a`. A test holds them ≥ 0.55 S and 20° apart in hue |
+| Never in the land | | | Pure blues, reds, violets, oranges at S ≥ 0.55 (the team hues), except flowers and berries under 0.3 m wide |
+
+**Light** (this area's own numbers, in `view.ts` and `daylight.ts`): keep the sun strong and low enough to cast a readable shadow, and let the fill and sky lights stay under the sun so shapes have a lit and a shaded side. Weather lowers contrast but must leave ground and objects ≥ 0.1 L apart.
+
+**Checking a change:** colours are linear in the shader, so measure the *screenshot*: the ground and an object beside it should differ by 0.15 L or more at the default zoom.
 
 ## How each step works
 
