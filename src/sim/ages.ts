@@ -355,10 +355,14 @@ export function hiresAt(p: Player, at: BuildingType): UnitType[] {
   return h && h.at === at ? h.units.filter((u) => !BUILDINGS[at].trains.includes(u)) : [];
 }
 
+/** What a people's past adds to a building's lines: a Den breeds Cave Bears for a people that has walked the Age of the Hive. */
+const BRED: UnitType[] = ['cavebear'];
+
 /** Everything a player can train at a building now. */
 export function trainsAt(p: Player, at: BuildingType): UnitType[] {
   const hires = hiresAt(p, at);
-  return hires.length ? [...BUILDINGS[at].trains, ...hires] : BUILDINGS[at].trains;
+  const own = at === 'den' && hasWalked(p, 'hive') ? [...BUILDINGS[at].trains, ...BRED] : BUILDINGS[at].trains;
+  return hires.length ? [...own, ...hires] : own;
 }
 
 export const isHire = (p: Player, at: BuildingType, unit: UnitType): boolean => hiresAt(p, at).includes(unit);
@@ -370,6 +374,8 @@ export function barred(p: Player, unit: UnitType, at?: BuildingType): string | n
   // The Beast Den (the Age of the Wild): it breeds only the kinds this people has tamed.
   const kind = unit === 'warwolf' ? 'wolf' : unit === 'tusker' ? 'boar' : unit === 'warmammoth' ? 'mammoth' : null;
   if (kind && !p.tamed?.includes(kind)) return `Tame a wild ${kind} first: the Den breeds only what your people has tamed`;
+  // The Age of the Hive: its darts and its bears belong to a people that has walked it, in any age after.
+  if ((unit === 'blowpipe' || unit === 'cavebear') && !hasWalked(p, 'hive')) return `Only a people that has walked the ${AGES.hive.name} ${unit === 'blowpipe' ? 'trains Blowpipe Hunters' : 'breeds Cave Bears'}`;
   const no = ageDef(p).no;
   return no && no.units.includes(unit) ? no.why : null;
 }
@@ -391,6 +397,7 @@ export function buildBarred(p: Player, type: BuildingType): string | null {
   if (type === 'den' && !p.tamed?.length) return 'Tame a wild beast first: a Den is raised only by a people that has tamed one (the Age of the Wild)';
   // The Age of the Grove: what it grows is planted by a people that has walked it, in any age after.
   if ((type === 'thornwall' || type === 'garden' || type === 'orchard') && !hasWalked(p, 'grove')) return `Only a people that has walked the ${AGES.grove.name} plants a ${BUILDINGS[type].name}`;
+  if (type === 'hive' && !hasWalked(p, 'hive')) return `Only a people that has walked the ${AGES.hive.name} keeps bees`;
   const way = p.way ? WAYS[p.way] : undefined;
   if (way?.shuts?.includes(type)) return `${way.name} raises no ${BUILDINGS[type].name}`;
   const only = BUILDINGS[type].ages;

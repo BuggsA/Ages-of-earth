@@ -1,5 +1,6 @@
 import { callWild } from './tame';
 import { groveStep, rootThorn } from './grove';
+import { hiveStep } from './hive';
 import { aiStep } from './ai';
 import { workStep } from './works';
 import { beaconStep } from './beacon';
@@ -647,6 +648,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   coppiceStep(s);
   callWild(s);
   groveStep(s);
+  hiveStep(s);
   longbowStep(s);
   tollStep(s);
   mercStep(s);

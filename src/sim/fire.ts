@@ -10,7 +10,7 @@ import { R_TREE } from './types';
 /**
  * Fire (`docs/wild-road.md`, the Wild route's step 3): the answer to a living town, and a tool for every people from the Bronze Age.
  * Citizens and foot soldiers carry torches to a tree, a Thornwall's root, or a rival's living building (`FIRE.burns`: Thornwalls,
- * Kitchen Gardens, Orchards, Saplings) and stand a moment to set it alight. A burning tree falls to ash that grows back slowly (a
+ * Kitchen Gardens, Orchards, Saplings, Hives) and stand a moment to set it alight. A burning tree falls to ash that grows back slowly (a
  * `Stool` with `ash`); a burning building loses hit points every second until it falls (a Thornwall burnt down leaves no root) or its
  * own people beat it out. Once a second every fire may light each living neighbour, on a roll of the match's own dice (`roll`),
  * further in a dry summer than a wet spring, but never more than `FIRE.run` tiles from the torch. Fires act in the order they were
@@ -58,7 +58,7 @@ export function torchProblem(s: GameState, owner: number, at: { target?: number;
     const b = s.byId.get(at.target);
     if (!b || b.kind !== 'building' || b.hp <= 0) return pick;
     if (!isEnemy(s, owner, b.owner)) return "Fire is set only to a rival's buildings";
-    if (!burns(b)) return 'Fire takes only what grows: Thornwalls, Kitchen Gardens, Orchards and Saplings';
+    if (!burns(b)) return 'Fire takes only what grows: Thornwalls, Kitchen Gardens, Orchards, Saplings and Hives';
     return onFire(s, b) ? 'It is already burning' : null;
   }
   const tile = at.tile ?? -1;
@@ -110,6 +110,23 @@ function around(s: GameState, f: Fire, b: Building | null): number[] {
   for (let i = 0; i < n; i++) add(x0 + n, y0 + i);
   for (let i = 0; i < n; i++) add(x0 + i, y0 + n);
   return out;
+}
+
+/**
+ * Smoke (the Age of the Hive, `hive.ts`): whether any fire burns within `r` tiles of a building, a burning tree or a burning
+ * building's edge counted alike. A Hive in the smoke goes quiet.
+ */
+export function smokeNear(s: GameState, b: Building, r: number): boolean {
+  for (const f of s.fires ?? []) {
+    const fx = f.tile % s.w;
+    const fy = Math.floor(f.tile / s.w);
+    const e = f.b !== undefined ? s.byId.get(f.b) : undefined;
+    const n = e && e.kind === 'building' ? e.size : 1;
+    const dx = Math.max(0, fx - (b.tx + b.size - 1), b.tx - (fx + n - 1));
+    const dy = Math.max(0, fy - (b.ty + b.size - 1), b.ty - (fy + n - 1));
+    if (Math.max(dx, dy) <= r) return true;
+  }
+  return false;
 }
 
 /** Citizens and foot soldiers of a building's own team standing close enough to beat at its flames. */
