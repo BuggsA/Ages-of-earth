@@ -351,6 +351,12 @@ export class Hud {
         f.closest('.notice')?.remove();
         return;
       }
+      const m = (e.target as HTMLElement).closest<HTMLElement>('[data-mine]');
+      if (m) {
+        this.moveWorkers('idle', m.dataset.mine as Job, Number(m.dataset.n) || 1);
+        m.closest('.notice')?.remove();
+        return;
+      }
       const b = (e.target as HTMLElement).closest<HTMLElement>('[data-hands]');
       if (!b) return;
       this.sendWorkers(b.dataset.hands as Job, Number(b.dataset.n) || 1);
@@ -463,6 +469,7 @@ export class Hud {
   private idleFieldCard(s: GameState, viewer: number): void {
     const p = s.players[viewer];
     const now = performance.now();
+    this.idleMinersCard(s, viewer, now);
     const idle = idleCitizens(s, viewer);
     const next = new Map<number, number>();
     for (const u of idle) next.set(u.id, this.idleSince.get(u.id) ?? now);
@@ -476,6 +483,35 @@ export class Hud {
     const el = document.createElement('div');
     el.className = 'notice alert shortage idle-fields';
     el.innerHTML = `<span>${waiting} hands stand idle with nothing to forage.</span><button type="button" data-fields="${n}" title="Lay ${n} ${n === 1 ? 'field' : 'fields'} near them, paid in wood, and put them to farm">🌾 Lay ${n} ${n === 1 ? 'field' : 'fields'}</button>`;
+    this.noticeEl.appendChild(el);
+    while (this.noticeEl.children.length > 4) this.noticeEl.firstChild!.remove();
+    setTimeout(() => (el.style.opacity = '0'), 8000);
+    setTimeout(() => el.remove(), 8700);
+  }
+
+  /** Miners whose seam ran dry (#344): remember what each digger last dug; 3+ idle for 5 s offer one button that sends them to the nearest other seam or free shaft. */
+  private mining = new Map<number, 'stone' | 'gold'>();
+  private minersCardAt = 0;
+  private idleMinersCard(s: GameState, viewer: number, now: number): void {
+    const idle = new Set(idleCitizens(s, viewer).map((u) => u.id));
+    const spent: Record<'stone' | 'gold', number> = { stone: 0, gold: 0 };
+    for (const e of s.ents) {
+      if (e.kind !== 'unit' || e.owner !== viewer || e.hp <= 0) continue;
+      const o = e.order;
+      if ((o.k === 'gather' || o.k === 'shaft') && (o.res === 'stone' || o.res === 'gold')) this.mining.set(e.id, o.res);
+      else if (idle.has(e.id) && this.mining.has(e.id)) {
+        if (now - (this.idleSince.get(e.id) ?? now) > 5000) spent[this.mining.get(e.id)!]++;
+      } else this.mining.delete(e.id);
+    }
+    const res = spent.gold > spent.stone ? 'gold' : 'stone';
+    const waiting = spent.stone + spent.gold;
+    if (waiting < 3 || now < this.minersCardAt) return;
+    this.minersCardAt = now + 30000;
+    const n = Math.min(waiting, AUTO_WORK.lay);
+    this.noticeEl.querySelector('.idle-miners')?.remove();
+    const el = document.createElement('div');
+    el.className = 'notice alert shortage idle-miners';
+    el.innerHTML = `<span>${waiting} miners stand idle: their seam is spent.</span><button type="button" data-mine="${res}" data-n="${n}" title="Send ${n} to the nearest ${res} seam, or a free Mine Shaft">⛏ Find more ${res}</button>`;
     this.noticeEl.appendChild(el);
     while (this.noticeEl.children.length > 4) this.noticeEl.firstChild!.remove();
     setTimeout(() => (el.style.opacity = '0'), 8000);
