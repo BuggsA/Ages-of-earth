@@ -378,6 +378,8 @@ export function barred(p: Player, unit: UnitType, at?: BuildingType): string | n
   if ((unit === 'blowpipe' || unit === 'cavebear') && !hasWalked(p, 'hive')) return `Only a people that has walked the ${AGES.hive.name} ${unit === 'blowpipe' ? 'trains Blowpipe Hunters' : 'breeds Cave Bears'}`;
   // The Age of the Wildwood: its Ents wake for a people that has walked it, in any age after.
   if (unit === 'warden' && !hasWalked(p, 'wildwood')) return `Only a people that has walked the ${AGES.wildwood.name} wakes Ents`;
+  // The Age of Leviathans: its giants are bred for a people that has walked it, in any age after.
+  if ((unit === 'skywhale' || unit === 'behemoth') && !hasWalked(p, 'leviathans')) return `Only a people that has walked the ${AGES.leviathans.name} breeds giants`;
   const no = ageDef(p).no;
   return no && no.units.includes(unit) ? no.why : null;
 }
@@ -404,6 +406,7 @@ export function buildBarred(p: Player, type: BuildingType): string | null {
   // Missile defence (#759 s2): a battery is raised only after Interceptors.
   if (type === 'battery' && !p.techs.includes('interceptors')) return `Learn ${TECHS.interceptors.name} at a ${BUILDINGS.workshop.name} first`;
   if (type === 'spire' && !hasWalked(p, 'bloom')) return `Only a people that has walked the ${AGES.bloom.name} raises a Seed Spire`;
+  if (type === 'greatden' && !hasWalked(p, 'leviathans')) return `Only a people that has walked the ${AGES.leviathans.name} raises a Great Den`;
   const way = p.way ? WAYS[p.way] : undefined;
   if (way?.shuts?.includes(type)) return `${way.name} raises no ${BUILDINGS[type].name}`;
   // The breach (#701 s3): a people that has walked the Age of Dykes raises dykes in any age after, to mend its banks.

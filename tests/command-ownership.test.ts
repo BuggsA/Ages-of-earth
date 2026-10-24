@@ -68,6 +68,7 @@ describe('one player never commands another’s people', () => {
       pitch: { t: 'pitch', p: 1, ids },
       root: { t: 'root', p: 1, ids },
       sling: { t: 'sling', p: 1, spire: tc.id, x: 5, y: 5 },
+      seedbomb: { t: 'seedbomb', p: 1, ids },
       milk: { t: 'milk', p: 1, ids, target: s.animals[0]?.id ?? 0 },
       tame: { t: 'tame', p: 1, ids, target: s.animals[0]?.id ?? 0 },
       lamb: { t: 'lamb', p: 1, building: tc.id },

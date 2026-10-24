@@ -1,4 +1,4 @@
-import { AUTO_WORK, BUILDINGS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, RIVERS, SNARE, HIVE, COCKLER, SPREAD, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
+import { AUTO_WORK, BUILDINGS, GIANTS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, RIVERS, SNARE, HIVE, COCKLER, SPREAD, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
 import { peace } from './combat';
 import { findSpot } from './ai';
 import { placeProblem, stampBuilding, walkable } from './grid';
@@ -9,7 +9,7 @@ import { backProblem, backTo, barred, buildBarred, canRaise, chooseKeepsake, jou
 import type { Building, BuildingType, Command, Ent, Cost, GameState, Order, Player, Res, Unit } from './types';
 import { RES, R_FISH, R_MEAT, R_NONE } from './types';
 import { resOfSeam, seamOf, seamProblem } from './shafts';
-import { RES_OF_TILE, cargoRoom, findResource, freeFarm, freeShaft, garrisonRoom, giveOrder, landing, setOrder, ungarrison } from './units';
+import { RES_OF_TILE, cargoRoom, findResource, freeFarm, freeShaft, garrisonRoom, giveOrder, isCarrier, landing, setOrder, ungarrison } from './units';
 import { carriedBy, letGo, relicAt } from './relics';
 import { caravanOf, dockOf, homeMarket, marketOf, nearestCaravan, nearestDock, portSpot, postAt } from './trade';
 import { ruinAt } from './ruins';
@@ -38,6 +38,7 @@ import { fightsBeasts } from './animals';
 import { tameProblem } from './tame';
 import { heartBarred, rootEnt, rootProblem } from './wildwood';
 import { sling, slingProblem, spireBarred } from './bloom';
+import { behemothBusy, kneel, kneelProblem, rise, riseProblem, seedBomb, seedBombProblem } from './leviathans';
 import { isField } from './grove';
 import { answerTiding, tidingProblem } from './tidings';
 import { sluiceProblem } from './water';
@@ -386,6 +387,8 @@ export function applyCommand(s: GameState, c: Command): void {
         const why = consecrateProblem(s, c.p, t);
         if (why) return refuse(s, c.p, why);
       } else if (sworn(s, t)) return refuse(s, c.p, 'Sworn to a Military Order: its priest stands by it, and it cannot be turned');
+      else if (!c.rite && t.cargo.length) return refuse(s, c.p, 'Those aboard stand by it: a carrier with people in it cannot be turned');
+      else if (!c.rite && GIANTS.includes(t.type)) return refuse(s, c.p, 'A giant answers only to the people that bred it: it cannot be turned');
       for (const u of myUnits(s, c.p, c.ids)) if (u.type === 'priest' && !carriedBy(s, u)) giveOrder(u, { k: 'convert', target: t.id, done: 0, ...(c.rite ? { rite: c.rite } : {}) }, c.queue);
       break;
     }
@@ -645,10 +648,15 @@ export function applyCommand(s: GameState, c: Command): void {
     }
     case 'board': {
       const ship = s.byId.get(c.target);
-      if (!ship || ship.kind !== 'unit' || ship.owner !== c.p || ship.type !== 'transport' || ship.hp <= 0) return;
+      if (!ship || ship.kind !== 'unit' || ship.owner !== c.p || !isCarrier(ship.type) || ship.hp <= 0) return;
       const riders = myUnits(s, c.p, c.ids).filter((u) => domainOf(u.type) === 'land');
       if (!riders.length) return;
       if (cargoRoom(s, ship) < riders.length) refuse(s, c.p, `Room aboard for ${Math.max(0, cargoRoom(s, ship))} more`);
+      // A Skywhale (the Age of Leviathans) needs no shore: they walk to where it hovers, and it comes down over them.
+      if (ship.type === 'skywhale') {
+        for (const u of riders.slice(0, Math.max(0, cargoRoom(s, ship)))) giveOrder(u, { k: 'board', target: ship.id }, c.queue);
+        break;
+      }
       // They meet on the shore nearest them that the ship can sail to; an idle ship comes in to it.
       let cx = 0;
       let cy = 0;
@@ -662,7 +670,7 @@ export function applyCommand(s: GameState, c: Command): void {
       break;
     }
     case 'unload':
-      for (const u of myUnits(s, c.p, c.ids)) if (u.type === 'transport' && u.cargo.length) giveOrder(u, { k: 'unload', x: c.x, y: c.y }, c.queue);
+      for (const u of myUnits(s, c.p, c.ids)) if (isCarrier(u.type) && u.cargo.length) giveOrder(u, { k: 'unload', x: c.x, y: c.y }, c.queue);
       break;
     case 'ungarrison': {
       const b = myBuilding(s, c.p, c.building);
@@ -765,6 +773,13 @@ export function applyCommand(s: GameState, c: Command): void {
         s.events.push({ k: 'sluice', owner: c.p, id: b.id, open: !!b.open, x: b.x, y: b.y });
         break;
       }
+      // A Town Center knelt from a Behemoth (the Age of Leviathans) rises onto its back, in any age.
+      if (b.behemoth) {
+        const no = riseProblem(b);
+        if (no) return refuse(s, c.p, no);
+        rise(s, b);
+        break;
+      }
       // At a Tide Gate (#785) it opens the gate, or shuts it: opened on a loaded pond, the pond scours the flats below.
       if (b.type === 'tidegate') {
         const no = tideGateProblem(s, b);
@@ -835,14 +850,35 @@ export function applyCommand(s: GameState, c: Command): void {
       break;
     }
     case 'pitch': {
-      // Wagons pitch camp; tows (#770) moor their districts.
-      const wagons = myUnits(s, c.p, c.ids).filter((u) => u.type === 'wagon' || u.type === 'tow');
+      // Wagons pitch camp; tows (#770) moor their districts; a Behemoth (the Age of Leviathans) kneels.
+      const wagons = myUnits(s, c.p, c.ids).filter((u) => u.type === 'wagon' || u.type === 'tow' || u.type === 'behemoth');
       let why: string | null = null;
       for (const w of wagons) {
+        // A Behemoth (the Age of Leviathans) kneels: its Town Center stands at once.
+        if (w.type === 'behemoth') {
+          why = kneelProblem(s, w);
+          if (!why) kneel(s, w);
+          continue;
+        }
         why = pitchProblem(s, w);
         if (!why) pitchCamp(s, w);
       }
       if (why) refuse(s, c.p, why);
+      break;
+    }
+    case 'seedbomb': {
+      // The Age of Leviathans: each Skywhale drops a seed-bomb of Thornwall where it hovers.
+      let why: string | null = null;
+      let dropped = false;
+      for (const u of myUnits(s, c.p, c.ids).filter((x) => x.type === 'skywhale')) {
+        const no = seedBombProblem(s, u);
+        if (no) why = no;
+        else {
+          seedBomb(s, u);
+          dropped = true;
+        }
+      }
+      if (why && !dropped) refuse(s, c.p, why);
       break;
     }
     case 'cry': {
@@ -940,6 +976,7 @@ export function applyCommand(s: GameState, c: Command): void {
       if (no) return refuse(s, c.p, no);
       if (b.queue.length >= MAX_QUEUE) return refuse(s, c.p, 'The queue is full');
       if (c.unit === 'hero' && heroBusy(s, c.p)) return refuse(s, c.p, 'You can lead with one hero at a time');
+      if (c.unit === 'behemoth' && behemothBusy(s, c.p)) return refuse(s, c.p, 'Your people has its Behemoth: one to a people');
       // The legion (#501): a Roman town keeps few citizens.
       const full = c.unit === 'citizen' ? citizenProblem(s, p) ?? linkProblem(s, b) : null;
       if (full) return refuse(s, c.p, full);

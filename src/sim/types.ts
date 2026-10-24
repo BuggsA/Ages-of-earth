@@ -26,7 +26,12 @@ export type UnitType =
   /** The Age of the Wildwood (`docs/wild-road.md` §4, `wildwood.ts`): an Ent, an old tree woken at the Heart Tree, that roots again. */
   | 'warden'
   /** The Age of Floating Cities (#770): a pontoon district cast off and under tow, its people aboard, until it moors again. */
-  | 'tow';
+  | 'tow'
+  /**
+   * The Age of Leviathans (`docs/wild-road.md` §5a, `leviathans.ts`): bred at a Great Den. A Skywhale, a living airship that carries
+   * soldiers over walls and drops seed-bombs; a Behemoth, one titan turtle a people with a Town Center on its back.
+   */
+  | 'skywhale' | 'behemoth';
 /** How a unit gets about: on foot, on the water, or in the air. */
 export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
@@ -40,6 +45,8 @@ export type BuildingType =
   | 'heart'
   /** The Age of the Bloom (`docs/wild-road.md` §5b, `bloom.ts`): a living tower, one to a people, that ripens and slings Bloom Seeds. */
   | 'spire'
+  /** The Age of Leviathans (`docs/wild-road.md` §5a, `leviathans.ts`): a great earthen den where Skywhales and the Behemoth are bred. */
+  | 'greatden'
   /** The Age of Rivers (#701): a ditch dug from the water, which fills and is gone. */
   | 'channel'
   /** The Age of the Water Line (#701 s4): a gate in a dyke that lets the water out over the low ground, and back. */
@@ -75,7 +82,7 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'chart' | 'assay' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged' | 'launchControl' | 'interceptors';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood' | 'locks' | 'floating' | 'bloom' | 'beggars';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood' | 'locks' | 'floating' | 'bloom' | 'beggars' | 'leviathans';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
 export type PathId = 'blood' | 'steppe' | 'hemocraft' | 'rite';
@@ -291,6 +298,8 @@ export interface Unit {
   /** A wagon (#297): the building it carries, and that building's health as a share of its full health. */
   packed?: BuildingType;
   packedHp?: number;
+  /** A Skywhale (the Age of Leviathans): the tick its next seed-bomb is ready. Absent: ready now. */
+  bombAt?: number;
   /** A hemo-engineered soldier (#355 s3): the tick its graft runs dry unless a Transfusion Station tops it up; absent when ungrafted. */
   hemo?: number;
   /** Quenched in blood-iron (#356): the graft lasts longer, mends faster and crashes softer; cleared when it runs dry. */
@@ -378,6 +387,8 @@ export interface Building {
   reserve?: number;
   /** A Seed Spire (the Age of the Bloom, `bloom.ts`): the tick its Bloom Seed is ripe (pushed on while no Heart Tree stands). Absent: not yet begun. */
   ripe?: number;
+  /** A Town Center knelt from a Behemoth (the Age of Leviathans, `leviathans.ts`): it rises onto the titan's back again. */
+  behemoth?: boolean;
   /** A Sluice (#701 s4): standing open, letting the water out over the low ground behind it. Absent: shut. A Tide Gate (#785): open, its pond running with the tide. */
   open?: boolean;
   /** Where new units go. `kind` is the resource the flag was set on (absent on bare ground), so it outlives its tile (#344). */
@@ -1050,6 +1061,11 @@ export type GameEvent =
    * out by rival citizens, or `cracked` (`n` buildings turned to forest); a people's `storm` of pollen, its Greening `held` or `faded`.
    */
   | { k: 'bloom'; what: 'slung' | 'rooted' | 'withered' | 'hacked' | 'cracked' | 'storm' | 'held' | 'faded'; owner: number; x: number; y: number; id?: number; n?: number }
+  /**
+   * The Age of Leviathans (`leviathans.ts`): a Skywhale's seed-bomb (`n` Thornwall seedlings sprouting under it), or a Behemoth that
+   * `kneel`s (its Town Center set down) or `rise`s (taken up again); `id` is what it became.
+   */
+  | { k: 'leviathan'; what: 'bomb' | 'kneel' | 'rise'; owner: number; x: number; y: number; id: number; n?: number }
   /** A mammoth gores, or a wolf bites, someone. */
   | { k: 'wildStrike'; id: number; kind: Animal['kind']; target: number; x: number; y: number }
   /** A raider camp (own pitch) stands empty: whose people cleared it, and the plunder they took. */
@@ -1531,6 +1547,8 @@ export interface AiMemory {
   /** The tick it entered the Age of the Bloom, kept while it slings its Seeds there (`BLOOM.aiStay`); and when it last planted an Orchard for the Greening. */
   bloom?: number;
   orchardAt?: number;
+  /** The tick it entered the Age of Leviathans, kept while it breeds and flies its giants there (`LEVIATHANS.aiStay`). */
+  leviathans?: number;
   steppe?: { band?: number[]; at?: { x: number; y: number }; out?: number; recalled?: number; horde?: number; since?: number; struck?: number; /** When a nomad flock (#501) was first seen grazed out, this time. */ starved?: number; pack?: { x: number; y: number; at: number }; to?: { x: number; y: number; at: number }; from?: { x: number; y: number } };
   /**
    * The tide (#748): the barrage it means to lay by its mills (null: none worth it, by any of the mills in `seen`); once it stood whole,
@@ -1585,6 +1603,8 @@ export type Command =
   | { t: 'root'; p: number; ids: number[] }
   /** A Seed Spire slings its ripe Bloom Seed at a point (the Age of the Bloom). */
   | { t: 'sling'; p: number; spire: number; x: number; y: number }
+  /** Skywhales drop a seed-bomb each where they hover: Thornwall that sprouts on the ground below (the Age of Leviathans). */
+  | { t: 'seedbomb'; p: number; ids: number[] }
   /** Citizens milk a sheep of their flock (#308). */
   | ({ t: 'milk'; p: number; ids: number[]; target: number } & Queued)
   /** Citizens tame a wild wolf, boar or mammoth (the Age of the Wild). */

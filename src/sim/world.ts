@@ -159,8 +159,8 @@ export function countPop(s: GameState): void {
   for (const e of s.ents) {
     if (e.hp <= 0) continue;
     const p = s.players[e.owner];
-    // A wagon (#297) is a packed building, not a person: it takes no room.
-    if (e.kind === 'unit') p.pop += e.type === 'wagon' || e.type === 'tow' ? 0 : 1;
+    // A wagon (#297) is a packed building, not a person: it takes no room; nor does a tow (#770), nor the Behemoth that carries a Town Center.
+    if (e.kind === 'unit') p.pop += e.type === 'wagon' || e.type === 'tow' || e.type === 'behemoth' ? 0 : 1;
     else if (e.built) p.cap += BUILDINGS[e.type].pop;
   }
   // A rooted Ent (the Age of the Wildwood) is a tree for now, but still one of its people.

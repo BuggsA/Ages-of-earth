@@ -1146,6 +1146,20 @@ export class View {
             this.cue('spreading', ev.x, ev.y, 0.7);
           }
           break;
+        case 'leviathan':
+          // The Age of Leviathans: a seed-bomb falls from a Skywhale as a spray of husks and green, and the ground bursts with thorn
+          // where it lands; a Behemoth kneeling or rising throws up a ring of dust round its feet.
+          if (!this.sees(ev.x, ev.y)) break;
+          if (ev.what === 'bomb') {
+            this.effects.burst(this.ground(s, ev.x, ev.y, 3), { count: 26, speed: 0.8, up: -1.2, life: 1.2, size: 0.07, gravity: 2.4, drag: 0.6, colors: ['#6b5a40', '#8fc24a', '#4a7a2e'] });
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.2), { count: 22, speed: 1.6, up: 1.4, life: 1.4, size: 0.07, grow: 1.4, gravity: 0.8, drag: 1.1, colors: ['#3f6a2e', '#6f8f3e', '#9cc25a'] });
+            this.cue('seedBomb', ev.x, ev.y, 1);
+          } else {
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.2), { count: 36, speed: 2.4, up: 0.5, life: 1.8, size: 0.14, grow: 2.2, gravity: 0.2, drag: 1.2, soft: true, colors: ['#8a7a5a', '#a8946c', '#6d6a4c'] });
+            this.effects.ring(this.ground(s, ev.x, ev.y, 0.15), '#a8946c', 3, 1.1);
+            this.cue(ev.what === 'kneel' ? 'behemothKneel' : 'behemothRise', ev.x, ev.y, 1);
+          }
+          break;
         case 'sprout':
           // The Age of the Grove: a fallen Thornwall springs up again from its root.
           if (!this.sees(ev.x, ev.y)) break;
@@ -1385,7 +1399,7 @@ export class View {
           if (!u || ev.owner !== this.viewer) break;
           this.effects.ring(this.ground(s, u.x, u.y, 0.05), '#ffffff', 0.8, 0.6);
           const dom = domainOf(ev.type);
-          this.cue(dom === 'water' ? 'shipHorn' : dom === 'air' ? 'engine' : ev.type === 'citizen' ? 'readyCitizen' : 'ready', u.x, u.y, 0.9);
+          this.cue(ev.type === 'skywhale' ? 'whaleSong' : ev.type === 'behemoth' ? 'behemothRise' : dom === 'water' ? 'shipHorn' : dom === 'air' ? 'engine' : ev.type === 'citizen' ? 'readyCitizen' : 'ready', u.x, u.y, 0.9);
           break;
         }
         case 'epoch': {
