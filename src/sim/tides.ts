@@ -1,8 +1,9 @@
-import { AGES, AI_EBB, BARRAGE, KEG, TIDE, domainOf, secs } from './data';
+import { AGES, AI_EBB, BARRAGE, KEG, TIDE, TIDE_ROUTE, domainOf, secs } from './data';
 import { ageDef, ageOf, asleep } from './ages';
 import { distToTile, stampBuilding, walkable } from './grid';
 import { isChannel, isInund, isPolder, seaAt } from './water';
-import { isEnemy } from './world';
+import { isEnemy, statsOf } from './world';
+import { findPath } from './path';
 import { kegsOf, sappers } from './powder';
 import { peace } from './combat';
 import type { BarragePlan, Building, GameState, Unit } from './types';
@@ -378,6 +379,7 @@ export function tideStep(s: GameState): void {
     }
     if (wet.size) for (const u of s.ents) if (u.kind === 'unit' && u.hp > 0 && !u.inside && domainOf(u.type) === 'land' && wet.has(Math.floor(u.y) * s.w + Math.floor(u.x))) sweep(s, u);
     if (wet.size) drownKegs(s, wet);
+    if (s.tick !== s.tideFrom) rereadRoutes(s);
   } else if (s.tick % 5 === 0) {
     for (const u of s.ents) if (u.kind === 'unit' && u.hp > 0 && !u.inside && domainOf(u.type) === 'land' && caught(s, u.x, u.y)) sweep(s, u);
   }
@@ -774,4 +776,160 @@ export function ebbTiming(s: GameState, from: { x: number; y: number }, to: { x:
   if (fits(s.tick)) return { go: true, level: c.level, far: c.far };
   for (let t = s.tick + secs(1); t <= s.tick + secs(AI_EBB.hold); t += secs(1)) if (fits(t)) return { go: false, level: c.level, far: c.far };
   return null;
+}
+
+// ---- Routes that read the tide (#755) ----------------------------------------------------------
+
+/** A tidal tile on a route: how far along it lies, and the tile. */
+interface Flat {
+  d: number;
+  tile: number;
+}
+
+/**
+ * How a route crosses the tide (#755): walking from `x, y` through the waypoints `pts` (from point `from` on), each tidal tile it steps
+ * onto (bared now, so walkable, with no building on it) and how far along; the first of them the water would cover before it is past
+ * (`doom`, -1: none) when it sets out at tick `t0` at `pace` tiles a second; and the middle of the last dry tile before that one (`stop`,
+ * with `n`, the waypoints before it), where it can wait for the tide. The tile it stands on now it can't help, so it is never doomed.
+ */
+function passage(
+  s: GameState,
+  x: number,
+  y: number,
+  pts: readonly number[],
+  from: number,
+  pace: number,
+  t0: number,
+): { flats: Flat[]; doom: number; stop: { x: number; y: number; d: number; n: number } | null; length: number } {
+  const w = s.w;
+  const here = Math.floor(y) * w + Math.floor(x);
+  const flats: Flat[] = [];
+  let doom = -1;
+  let stop: { x: number; y: number; d: number; n: number } | null = here >= 0 && here < w * s.h && !isTidal(s, here) ? { x, y, d: 0, n: 0 } : null;
+  let last = here;
+  let d = 0;
+  let ax = x;
+  let ay = y;
+  for (let k = from; k * 2 < pts.length; k++) {
+    const bx = pts[k * 2];
+    const by = pts[k * 2 + 1];
+    const dx = bx - ax;
+    const dy = by - ay;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const n = Math.max(1, Math.ceil(len * 4));
+    for (let j = 1; j <= n; j++) {
+      const px = ax + (dx * j) / n;
+      const py = ay + (dy * j) / n;
+      const tx = Math.floor(px);
+      const ty = Math.floor(py);
+      if (tx < 0 || ty < 0 || tx >= w || ty >= s.h) continue;
+      const i = ty * w + tx;
+      if (i === last) continue;
+      last = i;
+      const at = d + (len * j) / n;
+      if (isTidal(s, i) && s.bldAt[i] === 0 && s.terrain[i] !== T_WATER) {
+        flats.push({ d: at, tile: i });
+        if (doom < 0 && !safeOver(s, i, t0, at, pace)) doom = at;
+      } else if (doom < 0 && !isTidal(s, i)) stop = { x: tx + 0.5, y: ty + 0.5, d: at, n: k };
+    }
+    d += len;
+    ax = bx;
+    ay = by;
+  }
+  return { flats, doom, stop, length: d };
+}
+
+/** Whether a tidal tile `at` tiles along a walk setting out at `t0`, at `pace`, is bare from then until `TIDE_ROUTE.margin` seconds after it's crossed. */
+function safeOver(s: GameState, tile: number, t0: number, at: number, pace: number): boolean {
+  if (isPond(s, tile)) return false;
+  const a = t0 + Math.ceil(secs(at / pace));
+  return bareThrough(s, tidalLevel(s, tile), a, a + Math.ceil(secs(1.5 / pace + TIDE_ROUTE.margin)));
+}
+
+/** The pace a land unit's route is timed at (#755): its speed, less `TIDE_ROUTE.slack`. */
+const routePace = (s: GameState, u: Unit): number => statsOf(s, u).speed / TIDE_ROUTE.slack;
+
+/**
+ * The first tick from `t` (on, at most `TIDE_ROUTE.hold` seconds) a walk from `stop` can set out and find every tidal tile beyond it bare
+ * from that moment until it has crossed it (#755), so the way it was laid is open the whole time. -1: none.
+ */
+function ebbFrom(s: GameState, flats: Flat[], stop: number, pace: number, t: number, until: number): number {
+  const ahead = flats.filter((f) => f.d > stop);
+  for (let at = t; at <= until; at += secs(1)) {
+    let ok = true;
+    for (const f of ahead) {
+      if (isPond(s, f.tile) || !bareThrough(s, tidalLevel(s, f.tile), at, at + Math.ceil(secs((f.d - stop + 1.5) / pace + TIDE_ROUTE.margin)))) {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) return at;
+  }
+  return -1;
+}
+
+/**
+ * Read the tide into a land unit's new route (#755), called as `routeUnits` lays it. A route that finds every tidal tile on it bare as it
+ * gets there stands. One the water would cover first goes round, by a path the tide lets it walk, or walks to the last dry ground before
+ * the flats and waits there (`Unit.tideWait`) for the first moment it can cross, whichever reaches the goal sooner; with neither (no way
+ * round, and no crossing within `TIDE_ROUTE.hold` seconds) it goes as ordered. Every rule reads only the tick and the state, so online
+ * play sees the same choice. Returns the route budget it spent.
+ */
+export function tideRoute(s: GameState, u: Unit, team: number, budget: number): number {
+  if (!u.path || !u.goal || !tideAwake(s) || domainOf(u.type) !== 'land') return 0;
+  const pace = routePace(s, u);
+  if (pace <= 0) return 0;
+  const t0 = s.tick;
+  const p = passage(s, u.x, u.y, u.path, 0, pace, t0);
+  if (p.doom < 0) return 0;
+  let cost = 0;
+  // Round: a path that turns down every tidal tile the water would cover before the unit is past it.
+  let round: { pts: number[]; time: number } | null = null;
+  const limit = Math.min(12000, Math.max(800, budget));
+  const r = findPath(s, u.x, u.y, u.goal, limit, team, (i, g) => isTidal(s, i) && s.bldAt[i] === 0 && !safeOver(s, i, t0, g, pace));
+  cost += r.cost;
+  if (r.complete && r.points.length) {
+    const q = passage(s, u.x, u.y, r.points, 0, pace, t0);
+    if (q.doom < 0) round = { pts: r.points, time: q.length / pace };
+  }
+  // Wait: on the last dry ground before the flats, for the first moment the whole crossing stays bare.
+  let wait: { at: number; time: number } | null = null;
+  if (p.stop) {
+    const reach = t0 + Math.ceil(secs(p.stop.d / pace));
+    const at = ebbFrom(s, p.flats, p.stop.d, pace, reach, t0 + secs(TIDE_ROUTE.hold));
+    if (at >= 0) wait = { at, time: (at - t0) / secs(1) + (p.length - p.stop.d) / pace };
+  }
+  if (round && (!wait || round.time <= wait.time)) {
+    u.path = round.pts;
+    u.pathI = 0;
+    return cost;
+  }
+  if (wait && p.stop) {
+    const pts = u.path.slice(0, p.stop.n * 2);
+    pts.push(p.stop.x, p.stop.y);
+    u.path = pts;
+    u.pathI = 0;
+    u.wantPath = true;
+    u.tideWait = wait.at;
+    s.events.push({ k: 'tideHold', id: u.id, owner: u.owner, x: p.stop.x, y: p.stop.y, until: wait.at });
+  }
+  return cost;
+}
+
+/**
+ * At each turn of the tide (#755): a land unit already on its way whose route ahead the water would now cover before it is past (held up
+ * on the way, or laid before the turn) works it out again, to go round or wait.
+ */
+function rereadRoutes(s: GameState): void {
+  for (const u of s.ents) {
+    if (u.kind !== 'unit' || u.hp <= 0 || u.inside || !u.path || u.wantPath || !u.goal || domainOf(u.type) !== 'land') continue;
+    const pace = routePace(s, u);
+    if (pace <= 0) continue;
+    if (passage(s, u.x, u.y, u.path, u.pathI, pace, s.tick).doom >= 0) u.wantPath = true;
+  }
+}
+
+/** Whether a unit is waiting on the shore for the tide (#755), and for how many seconds more (0: not waiting). */
+export function tideWaitLeft(s: GameState, u: Unit): number {
+  return u.tideWait !== undefined && u.wantPath && u.tideWait > s.tick ? (u.tideWait - s.tick) / secs(1) : 0;
 }

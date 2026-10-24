@@ -1395,6 +1395,12 @@ export class View {
           this.cue('swept', ev.x, ev.y, 0.5);
           break;
         }
+        case 'tideHold': {
+          // Routes that read the tide (#755): one of yours halts at the water's edge, a little lap of foam at its feet.
+          if (ev.owner !== this.viewer || !this.sees(ev.x, ev.y)) break;
+          this.effects.burst(this.ground(s, ev.x, ev.y, 0.05), { count: 5, speed: 0.5, up: 0.4, life: 0.8, size: 0.05, gravity: 1.5, drag: 0.6, colors: ['#ffffff', '#cfe8f5'] });
+          break;
+        }
         case 'milled': {
           // A Tide Mill grinds on the running tide (#739): spray off the wheel, a few coins for its people.
           if (ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;
