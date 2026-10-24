@@ -13,6 +13,7 @@ const WATER_RGB = [0x2f, 0x7f, 0xae];
 /** Tiles pumped out of the water so far, by every people. */
 const drained = (s: GameState): number => s.players.reduce((n, p) => n + (p.stats.drained ?? 0) + (p.stats.dug ?? 0), (s.flooded ?? 0) + (s.inundated ?? 0) + (s.tideTurns ?? 0));
 import { R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE, T_ROCK, T_SAND, T_WATER } from '../sim/types';
+import { R_COCKLE } from '../sim/types';
 import { revealed, ringsFor, warnRadius } from '../sim/silo';
 
 /**
@@ -167,6 +168,8 @@ export class Minimap {
     const stone = rgb('#d8d3c8');
     const berry = rgb('#e0405a');
     const fish = rgb('#8fe3f2');
+    // Cockle beds (#767), while the tide has bared them.
+    const cockle = rgb('#f0dcb8');
     const bog = rgb('#c0622a');
     const salt = rgb('#f4f1e8');
     const petre = rgb('#d8d27a');
@@ -194,6 +197,7 @@ export class Minimap {
       else if (res === R_STONE) [r, g, b] = stone;
       else if (res === R_BERRY || res === R_MEAT) [r, g, b] = berry;
       else if (res === R_FISH) [r, g, b] = fish;
+      else if (res === R_COCKLE && s.terrain[i] === T_SAND) [r, g, b] = cockle;
       else if (res === R_BOG) [r, g, b] = bog;
       else if (res === R_SALT) [r, g, b] = salt;
       else if (res === R_SALTPETRE) [r, g, b] = petre;

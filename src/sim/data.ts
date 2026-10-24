@@ -1438,6 +1438,26 @@ export const AI_EBB = { across: 3, slack: 1.25, margin: 6, hold: 200 };
 export const TIDE_ROUTE = { slack: 1.25, margin: 4, hold: 180 };
 
 /**
+ * Cockle beds (#767). When the tide wakes, a patch of beds is laid round each tile of the deeper flats (tidal ground of level `deep` or
+ * lower: bared only as the tide runs low) that the map's seed picks, one in `chance`: the tile and those beside it four ways on ground as
+ * deep. A bed holds `amount` food, picked by citizens at `rate` a second only while the tide has bared it, and each high water brings
+ * `regrow` more back, up to `amount`, to a bed that stands open to the sea: not in a barrage's pond, not under a site or causeway.
+ */
+export const COCKLE = { deep: 2, chance: 0.006, amount: 60, regrow: 25, rate: 1.0 };
+/**
+ * Work on the flats that reads the tide (#767). A citizen picking a cockle bed or building out on the flats looks at the clock every
+ * `check` ticks: when the water would cover the ground it stands on before it could walk to the shore (its route's pace, `TIDE_ROUTE.slack`)
+ * with `margin` seconds to spare, it steps ashore, a gatherer with its basket going home first, and goes back once the ground bares again.
+ */
+export const TIDE_WORK = { check: 5, margin: 6 };
+/**
+ * The computer and cockle beds (#767). Every `every` seconds a people in the Age of Tides with a bed bared within `reach` tiles of home,
+ * staying bare at least `least` seconds more, sends up to `hands` of its wood or berry gatherers to pick it; one that waits ashore longer
+ * than `idle` seconds goes back to the woods.
+ */
+export const AI_COCKLE = { every: 5, reach: 26, least: 25, hands: 3, idle: 25 };
+
+/**
  * The breach (#701 s3, the Water Road). Every `every` seconds the sea runs one tile on: each tile of polder four-ways beside water that
  * flows from the open sea (as a mill judges it: a body touching a map edge, or more than `POLDER.most` tiles; a finished dyke holds it,
  * a dyke site does not) floods, all at once, so water let in this step runs on only at the next. A flooded tile is sea again, its corners

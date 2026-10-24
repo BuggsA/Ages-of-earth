@@ -13,6 +13,9 @@ import { basinOf, channelPlan, coastHeld, dykePlan, heldBack, isChannel, isInund
 import { coveredNext, shoreNear, tideClock, tideMillSpot } from './tides';
 import { wallLine } from './commands';
 import { AI_BARRAGE, AI_EBB } from './data';
+import { AI_COCKLE } from './data';
+import { ashoreLeft, bared, bedClock } from './tides';
+import { R_COCKLE } from './types';
 import { barragePlan, causewayOwner, ebbTiming, isCauseway, isPond, tideAwake, tideLevel } from './tides';
 import { statsOf } from './world';
 import { blastDamage, fuelOf, launchProblem, loaded, ringsFor, rulesOf, silosOf, warheadsOf, warnRadius, type WarheadKind } from './silo';
@@ -1592,13 +1595,15 @@ function tideWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     if (wet) {
       const team = p.team;
       for (const u of [...v.citizens, ...v.army, ...v.priests, ...v.traders]) {
-        if (u.inside || !wet(Math.floor(u.y) * s.w + Math.floor(u.x))) continue;
+        // Pickers and builders read the tide themselves (#767), and keep their work.
+        if (u.inside || u.order.k === 'gather' || u.order.k === 'build' || !wet(Math.floor(u.y) * s.w + Math.floor(u.x))) continue;
         const to = shoreNear(s, u.x, u.y, team);
         if (to >= 0) issue({ t: 'move', p: p.id, ids: [u.id], x: (to % s.w) + 0.5, y: Math.floor(to / s.w) + 0.5 });
       }
     }
   }
   if (ageDef(p).tides) barrageWork(s, v, mem, issue);
+  if (ageDef(p).tides) cockleWork(s, v, mem, issue);
   if (!ageDef(p).tides || buildBarred(p, 'tidemill')) return;
   if (v.buildings.filter((b) => b.type === 'tidemill').length >= AI_TIDES.mills) return;
   if (s.tick - (mem.ordered.tidemill ?? -99999) < secs(25)) return;
@@ -1610,6 +1615,42 @@ function tideWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const spot = tideMillSpot(s, p.id, v.home.x, v.home.y, AI_TIDES.reach, AI_TIDES.least, (tx, ty) => !placeProblem(s, 'tidemill', tx, ty, true, p.id));
   mem.ordered.tidemill = s.tick;
   if (!spot || !construct(s, v, mem, 'tidemill', spot, 2, issue)) spend(v, cost);
+}
+
+/**
+ * Cockle beds (#767), every `AI_COCKLE.every` seconds: a picker waiting ashore longer than `AI_COCKLE.idle` seconds goes back to the woods;
+ * with fewer than `AI_COCKLE.hands` picking, the nearest bed to home within `AI_COCKLE.reach` that the tide has bared, and keeps bare at
+ * least `AI_COCKLE.least` seconds more, takes the wood and berry gatherers nearest it (ties by id). The pickers read the tide themselves.
+ */
+function cockleWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!s.cockles || s.tick - (mem.tide?.cockle ?? -99999) < secs(AI_COCKLE.every)) return;
+  (mem.tide ??= {}).cockle = s.tick;
+  const pickers = v.citizens.filter((u) => !u.inside && u.order.k === 'gather' && (u.order.cockle || s.res[u.order.tile] === R_COCKLE));
+  let n = 0;
+  for (const u of pickers) {
+    if (ashoreLeft(s, u) <= AI_COCKLE.idle) {
+      n++;
+      continue;
+    }
+    const tree = findResource(s, R_TREE, u.x, u.y, 20);
+    if (tree >= 0) issue({ t: 'gather', p: p.id, ids: [u.id], tile: tree });
+  }
+  if (n >= AI_COCKLE.hands) return;
+  const bed = findResource(s, R_COCKLE, v.home.x, v.home.y, AI_COCKLE.reach, (i) => {
+    if (!bared(s, i)) return true;
+    const c = bedClock(s, i);
+    return !c || !c.bare || c.secs < AI_COCKLE.least;
+  });
+  if (bed < 0) return;
+  const bx = (bed % s.w) + 0.5;
+  const by = Math.floor(bed / s.w) + 0.5;
+  const d = (u: Unit) => (u.x - bx) * (u.x - bx) + (u.y - by) * (u.y - by);
+  const hands = v.citizens
+    .filter((u) => !u.inside && u.order.k === 'gather' && u.order.phase !== 'drop' && (u.order.res === 'wood' || s.res[u.order.tile] === R_BERRY))
+    .sort((a, b) => d(a) - d(b) || a.id - b.id)
+    .slice(0, AI_COCKLE.hands - n);
+  if (hands.length) issue({ t: 'gather', p: p.id, ids: hands.map((u) => u.id), tile: bed });
 }
 
 /**

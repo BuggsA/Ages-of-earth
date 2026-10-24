@@ -88,6 +88,8 @@ export const R_BOG = 7;
 export const R_SALT = 8;
 export const R_SALTPETRE = 9;
 export const R_BLOODIRON = 10;
+/** A cockle bed (#767) on the deeper tidal flats: food picked by citizens only while the tide has bared it, back each high water. */
+export const R_COCKLE = 11;
 export type RareId = 'salt' | 'saltpetre' | 'bloodiron';
 export const RARES: readonly RareId[] = ['salt', 'saltpetre', 'bloodiron'];
 /** What a Mine Shaft can dig (#681): stone or gold anywhere, a rare ore only over its old workings. */
@@ -138,7 +140,7 @@ export type Order =
    */
   | { k: 'explore'; x: number; y: number; started: boolean; fails: number[]; told?: number }
   /** Gather a resource tile: walk there, work it, carry the load to a drop site, and back. */
-  | { k: 'gather'; tile: number; res: Res; phase: 'go' | 'work' | 'drop'; bog?: boolean; rare?: RareId; meat?: boolean }
+  | { k: 'gather'; tile: number; res: Res; phase: 'go' | 'work' | 'drop'; bog?: boolean; rare?: RareId; meat?: boolean; cockle?: boolean }
   | { k: 'build'; target: number }
   | { k: 'farm'; target: number; phase: 'go' | 'work' | 'drop' }
   /** Carry what is held to a drop site, then go idle. */
@@ -292,6 +294,8 @@ export interface Unit {
   stung?: number;
   /** Waiting on the shore for the tide (#755): the tick its route is worked out again. Absent: not waiting. */
   tideWait?: number;
+  /** Stepped ashore off the flats for the tide (#767): the tick it goes back to its work. Absent: not ashore. */
+  ashore?: number;
 }
 
 export interface TrainItem {
@@ -1012,6 +1016,10 @@ export type GameEvent =
   | { k: 'tideSwept'; id: number; owner: number; x: number; y: number; drowned: boolean }
   /** A land unit stops on the shore to wait for the tide (#755), until tick `until`. */
   | { k: 'tideHold'; id: number; owner: number; x: number; y: number; until: number }
+  /** A worker on the flats steps ashore before the flood (#767), until tick `until` (-1: home with its basket first). */
+  | { k: 'tideAshore'; id: number; owner: number; x: number; y: number; until: number }
+  /** The high water brought `food` back to the cockle beds (#767), over `beds` beds. */
+  | { k: 'cockles'; beds: number; food: number }
   /** A Tide Mill ground `gold` on the running tide (#739). */
   | { k: 'milled'; id: number; owner: number; gold: number; x: number; y: number }
   /** A causeway was finished (#739): `tile` is tidal ground now, raised. */
@@ -1168,6 +1176,8 @@ export interface GameState {
    * stay wet, and a Tide Mill grinds them twice. Recounted at each turn of the tide and whenever a causeway is raised or breached.
    */
   pond?: Uint8Array;
+  /** Cockle beds (#767): 1 on each tile laid as a bed when the tide woke, picked out or not, so a bed grows back where it was. Absent where none were laid. */
+  cockles?: Uint8Array;
   /**
    * The Water Line (#701 s4): per tile, where an open sluice let the water out over low ground (now `T_WATER`, waded and not walked dry,
    * no `B_TERRAIN`): 1 + the terrain it had, to give back when the water goes. Absent until the first sluice opens (and in older saves).
@@ -1383,7 +1393,7 @@ export interface AiMemory {
    * a gap in it is mended. `wait` is when a wave across the flats began waiting for low water; `cross` the crossing the wave on the
    * march took at low water (its far shore, the level that covers it, and the wave's goal), to turn back short of before the flood.
    */
-  tide?: { plan?: BarragePlan | null; seen?: number[]; raised?: boolean; wait?: number; cross?: { x: number; y: number; level: number; to: { x: number; y: number } } };
+  tide?: { plan?: BarragePlan | null; seen?: number[]; raised?: boolean; wait?: number; cross?: { x: number; y: number; level: number; to: { x: number; y: number } }; cockle?: number };
 }
 
 /** Orders that can be given with Shift held to queue them after the current one. */

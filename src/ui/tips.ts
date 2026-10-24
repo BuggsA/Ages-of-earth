@@ -9,6 +9,8 @@ import { laterTip, type Opening } from './opening';
 import { findResource } from '../sim/units';
 import { seasonAt } from '../sim/seasons';
 import { tideWaitLeft } from '../sim/tides';
+import { bared } from '../sim/tides';
+import { R_COCKLE } from '../sim/types';
 
 /**
  * Advice for a first game, one tip at a time in a corner: what to do next, given how the match is
@@ -440,6 +442,12 @@ const TIPS: Tip[] = [
     // Routes that read the tide (#755): one of the viewer's people stands on the shore waiting for the flats to bare.
     when: (s, me) => s.tideFrom !== undefined && s.ents.some((e) => e.kind === 'unit' && e.owner === me && tideWaitLeft(s, e) > 0),
     text: '<b>Your people read the tide.</b> Sent over the flats, a soldier, citizen or trader crosses only if it will be over before the water comes back. Otherwise it goes round by dry ground, or waits on the shore (🌊 and the seconds left, on its panel) for the next low water, whichever is quicker. To be across sooner, send it earlier in the ebb, or lay a causeway: high water alone covers that road.',
+  },
+  {
+    id: 'cockles',
+    // Cockle beds (#767): the viewer's people keeps the sea's hours, and the tide has bared a bed.
+    when: (s, me) => !!s.cockles && !!ageDef(s.players[me]).tides && s.cockles.some((b, i) => b === 1 && s.res[i] === R_COCKLE && bared(s, i)),
+    text: '<b>Cockle beds</b> lie on the deeper flats (pale shells on the wet sand, 🐚 on its panel), bared only as the tide runs low. Send citizens to pick them while they stand bare: food, and each high water brings some back. Your pickers read the clock themselves: before the flood they come ashore with what they have, and go back at the next low water. A barrage that ponds the flats drowns its beds; a causeway goes over one only once it is picked out.',
   },
   {
     id: 'barrage',
