@@ -651,7 +651,7 @@ export const AGES: Record<AgeId, Age> = {
     name: 'Age of Dykes',
     short: 'Dykes',
     tier: 2,
-    blurb: 'As the Frisians and the Hollanders did from the 1100s: banks of earth crowned with stone across the shallows, and windmills to lift the water out behind them. Dykes (K) are raised on shallow water or on the shore beside it, dragged out in a line like a wall; your own people walk along their crowns, and no rival or ship gets past. A Windmill (W) by water a dyke has shut off from the open sea pumps it dry, a tile every few seconds, nearest first: the bay becomes polder, low black ground where a Farm yields half again as much. Drain a strait and you have made a land bridge, for everyone. Only small water can be pumped: a lake or a dyked-off bay, never the open sea. No stone walls or gates are raised: the dykes are the walls.',
+    blurb: 'As the Frisians and the Hollanders did from the 1100s: banks of earth crowned with stone across the shallows, and windmills to lift the water out behind them. Dykes (K) are raised on shallow water or on the shore beside it, dragged out in a line like a wall; your own people walk along their crowns, and no rival or ship gets past. A Windmill (W) by water a dyke has shut off from the open sea pumps it dry, a tile every few seconds, nearest first: the bay becomes polder, low black ground where a Farm yields half again as much. Drain a strait and you have made a land bridge, for everyone. Only small water can be pumped: a lake or a dyked-off bay, never the open sea. No stone walls or gates are raised: the dykes are the walls. And a wall here guards more than a gate: breach a dyke and the sea pours back into the polder behind it, drowning fields and all, until the gap is closed and the mills pump it out again.',
     noBuild: { buildings: ['wall', 'gate'], why: 'A people of dykes raises no stone walls or gates: the dykes are its walls. They wait until it returns to the Middle Ages or climbs on' },
     pumps: true,
   },
@@ -1264,6 +1264,23 @@ export const AI_DYKE = { take: 0.5, line: 9, reach: 18, least: 14, cost: 3, crew
  * of its footprint is watered: in the age it works `farm` times as fast, and in the age no Farm is laid without water so near.
  */
 export const RIVERS = { fill: 0.25, bank: -0.16, bed: -0.45, wade: 0.4, wet: 2, farm: 1.3 };
+
+/**
+ * The breach (#701 s3, the Water Road). Every `every` seconds the sea runs one tile on: each tile of polder four-ways beside water that
+ * flows from the open sea (as a mill judges it: a body touching a map edge, or more than `POLDER.most` tiles; a finished dyke holds it,
+ * a dyke site does not) floods, all at once, so water let in this step runs on only at the next. A flooded tile is sea again, its corners
+ * sunk to `bank` (to `bed` where water lies all round them). A building on it is drowned; a land unit on it is swept to the nearest dry
+ * ground within `sweep` tiles and hurt `unit`, or drowned where there is none. A keg's blast harms a dyke `keg` times as much as any
+ * other building. A people that has walked the Age of Dykes may raise dykes in any age after, to mend its banks.
+ */
+export const BREACH = { every: 0.5, bank: -0.16, bed: -0.4, sweep: 16, unit: 15, keg: 2 };
+
+/**
+ * The computer and the breach (#701 s3). A dyke is worth breaching when its fall would flood `least` tiles of polder or more
+ * (`heldBack`). On campaign, siege goes for such a dyke within `hunt` tiles of it, and Sappers carry their kegs to one first. A people
+ * whose line once stood whole mends any gap in it, in any age, before anything else on the water.
+ */
+export const AI_BREACH = { least: 8, hunt: 12 };
 
 /**
  * A spring by every town (#701 s1): a start with no water within `near` tiles gets a spring head about `at` tiles away, on dice of
@@ -1923,7 +1940,7 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   // Mine Shafts (#681): one miner digs stone or gold (or a rare ore over its old workings) for good, best where a deposit was worked out (`SHAFT`).
   shaft: { name: 'Mine Shaft', size: 2, hp: 700, cost: { wood: 150 }, time: 30, pop: 0, sight: 4, trains: [], drop: [], epoch: 1, menu: 'eco', key: 'H', blurb: 'A timber headframe over a hole in the ground. One citizen digs stone or gold here for good, slower than an open deposit; best sunk where a deposit was worked out, fair beside mountain rock. Choose its seam on the shaft.' },
   // The Water Road (#701 s1): a bank of earth across the shallows, and the mill that pumps the water out behind it (`DYKE`, `POLDER`, `water.ts`).
-  dyke: { name: 'Dyke', size: 1, hp: 700, cost: { wood: 2, stone: 4 }, time: 7, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, ages: ['dykes'], menu: 'eco', key: 'K', blurb: 'A bank of earth with a stone crown, raised on shallow water or on the shore beside it. Drag to lay out a line. Your own people walk along its crown; rivals and ships can\'t pass. Shut a bay or a strait off from the open sea with dykes, then set a Windmill by it to pump it dry.' },
+  dyke: { name: 'Dyke', size: 1, hp: 700, cost: { wood: 2, stone: 4 }, time: 7, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, ages: ['dykes'], menu: 'eco', key: 'K', blurb: 'A bank of earth with a stone crown, raised on shallow water or on the shore beside it. Drag to lay out a line. Your own people walk along its crown; rivals and ships can\'t pass. Shut a bay or a strait off from the open sea with dykes, then set a Windmill by it to pump it dry. A dyke that falls (to siege, or a Sapper\'s keg) lets the sea back in: it floods the polder ring by ring until a dyke stands in the gap again. A people that has walked the Age of Dykes raises dykes in any age after, to mend its banks.' },
   channel: { name: 'Channel', size: 1, hp: 150, cost: { wood: 4 }, time: 8, pop: 0, sight: 1, trains: [], drop: [], epoch: 1, ages: ['rivers'], open: true, menu: 'eco', key: 'Q', blurb: 'A ditch dug out from water across the land. Drag to lay out a line from a spring, stream, lake or shore: as each stretch is dug the water runs into it and it stays. Farms within 2 tiles of water work faster in the Age of Rivers. Soldiers wade a channel at well under half their pace, and no ship sails it.' },
   windmill: { name: 'Windmill', size: 2, hp: 600, cost: { wood: 120, stone: 40 }, time: 30, pop: 0, sight: 5, trains: [], drop: [], epoch: 2, ages: ['dykes'], menu: 'eco', key: 'W', blurb: 'A post mill whose sails turn a scoop wheel. Raised by water a dyke has shut off from the open sea (or a small lake), it pumps it dry a tile every few seconds, nearest first, into polder: low black ground where a Farm yields half again as much. Two mills drain twice as fast. The open sea is too big to pump.' },
   airfield: { name: 'Airfield', size: 4, hp: 2200, cost: { wood: 250, stone: 100, gold: 150 }, time: 60, pop: 0, sight: 8, trains: ['fighter', 'bomber'], drop: [], epoch: 4, menu: 'mil', key: 'F', blurb: 'Builds fighters and bombers. Fighters hunt aircraft; bombers wreck towns.' },

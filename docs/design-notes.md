@@ -1258,6 +1258,16 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 
 **Next:** watermills (a mill on a channel that grinds faster), houses by water, a keepsake (the channel's head, a sluice), and the breach (s3): channels let a rival's flood in too. The Water Line (s4) can reuse `wading` for flooded low ground.
 
+## Designers' notes: the Water Road, the breach (#701 s3, 2026-10-24, chain 1024-2000 s3, lane rules)
+
+**Built:** the sea comes back. Polder beside open sea floods, a ring every half second, nearest the gap first; whatever stands there drowns, and people out on it are swept to dry ground. One rule, kept in no list: a dyke broken by siege or a keg, a dyke its owner deleted, a channel cut in from the sea. A finished dyke in the gap stops the water where it is (a site doesn't), and the mill pumps it out again. A people that walked the Dykes may raise dykes in any later age to mend its banks. A selected dyke says how much polder it holds back, to its owner and to the rival.
+
+**Why I love it:** it turns the Age of Dykes' door into a real fight. Polder is the richest land in the game, and now everyone can see where it's weak: the one dyke holding back forty tiles is the point a whole war turns on. A Sapper creeping along the shore with one keg is a threat to a whole economy, and the defender's answer is fast and physical: citizens running to the gap with stone while the water spreads behind them, and the mill thumping away afterwards to win it back. And the attacker gets something odd: your ships sail in where the fields were.
+
+**Choices I made (the owner may revert):** a keg does double to a dyke, so one keg is one breach. Drowned buildings give no kill credit (the sea did it). Mending in any age is broad (any dyke, not just in a gap); it's the Grove's rule, and dykes only go on the water's edge anyway.
+
+**Next:** the Water Line (s4) is this rule run backwards on purpose: sluices that let the sea into your own low ground while the enemy walks across it, and `wading` for flooded fields. A dyke's "holds back" number would make a good tower-like warning ring on the minimap.
+
 ## Designers' notes: fire (Wild route step 3, #723, 2026-10-24, chain 1024-1233 s1, lane rules)
 
 **Built:** a shared rule every people uses from the Bronze Age (`src/sim/fire.ts`, `FIRE`). Torches in the hands of citizens and foot soldiers; trees, Thornwall roots and a rival's living buildings (Thornwall, Kitchen Garden, Orchard, Sapling) catch; fire leaps tile by tile on the match's own dice, as far as the season lets it (a summer fire takes most of a wood, a spring one smoulders out in a few trees); a burnt tree is ash for five minutes, then grows again; a building burns until its people beat it out, and a Thornwall burnt down leaves no root. The computer torches a rival's growth with its campaigning soldiers and beats out its own fires.

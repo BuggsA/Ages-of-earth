@@ -908,6 +908,8 @@ export type GameEvent =
   | { k: 'drained'; owner: number; mill: number; tile: number; x: number; y: number }
   /** Water ran into a dug ditch (#701, the Age of Rivers): `tile` is the new channel. */
   | { k: 'dug'; owner: number; tile: number; x: number; y: number }
+  /** The sea ran back into a tile of polder (#701 s3, the breach): `owner` holds the land there (-1: no one), `drowned` the buildings it took. */
+  | { k: 'flooded'; owner: number; tile: number; x: number; y: number; drowned: number }
   | { k: 'season'; i: number }
   /** A payday for hired swords (the Age of Merchants): how many went unpaid, and how many of those walked off. */
   | { k: 'wages'; owner: number; late: number; gone: number }
@@ -1035,6 +1037,8 @@ export interface GameState {
    * it fills from it, and it opens into the channel (leaving this list); it waters the fields round it. Absent where there are none.
    */
   springs?: number[];
+  /** Tiles of polder the sea has taken back (#701 s3, the breach), by any breach: a cheap test for the renderer that the shore moved. Absent until the first. */
+  flooded?: number;
   players: Player[];
   /** Every unit and building, in the order they were made (ids rise). */
   ents: Ent[];
@@ -1169,7 +1173,7 @@ export interface AiMemory {
    * The Water Road (#701): the dyke it means to raise by home (null: none worth it), found once; when it began holding the Middle
    * Ages for the road's Dock, and since when it has stood in the Age of Dykes.
    */
-  dyke?: { plan: DykePlan | null; looked?: boolean; hold?: number; since?: number };
+  dyke?: { plan: DykePlan | null; looked?: boolean; hold?: number; since?: number; /** Its line once stood whole (#701 s3): from then on a gap in it is a breach to mend, in any age. */ raised?: boolean };
   /** The Age of Rivers (#701): the channel it means to dig from water past home (null: none), found when deciding and again on arrival (`fresh`). */
   river?: { plan: ChannelPlan | null; looked?: boolean; fresh?: boolean };
   /** The first crossing (#585): the age it stands in on the way to the Sea-Raiders, and since when (each sibling, and the age itself). */
