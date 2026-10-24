@@ -4,7 +4,7 @@ import { AGES, AI_SILO, WARHEADS, AI_BREACH, SILO, TICK_HZ, AI_CLIMB, AI_FIND, F
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, raiseProblem, techCostFor, techProblem, trainCostFor } from './stats';
-import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Rubble, Ruin, TechId, TradePost, Unit, UnitType } from './types';
+import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Launch, Player, Res, Rubble, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE, T_WATER } from './types';
 import { backProblem, backTo, ageDef, ageOf, asleep, barred, buildBarred, crossingLeft, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, trainsAt, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadProblem, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
 import { grindersOf, kegsOf, millProblem, mills, sappers } from './powder';
@@ -15,7 +15,7 @@ import { wallLine } from './commands';
 import { AI_BARRAGE, AI_EBB, SALVO } from './data';
 import { barragePlan, causewayOwner, ebbTiming, isCauseway, isPond, tideAwake, tideLevel } from './tides';
 import { statsOf } from './world';
-import { aimsOf, blastDamage, fuelOf, launchProblem, loaded, ringsFor, rulesOf, salvoFuel, salvoPeople, salvoProblem, salvoSilos, siloLimit, silosOf, warheadsOf, warnRadius, type WarheadKind } from './silo';
+import { aimsOf, blastDamage, flightOf, fuelOf, launchProblem, loaded, missilesAt, revealed, ringsFor, rulesOf, salvoFuel, salvoPeople, salvoProblem, salvoSilos, siloLimit, silosOf, warheadsOf, warnRadius, type WarheadKind } from './silo';
 import { carriedBy } from './relics';
 import { storesOre } from './caches';
 import { loadPrice, sellerNear } from './oretrade';
@@ -2124,7 +2124,7 @@ function salvoAims(spots: { x: number; y: number; worth: number }[]): { x: numbe
  */
 function fleeWarhead(s: GameState, v: View, issue: (c: Command) => void): void {
   const zones: { x: number; y: number; r: number }[] = [];
-  for (const l of s.launches ?? []) if (isEnemy(s, v.p.id, l.owner)) for (const g of ringsFor(s, l, v.p.id)) zones.push({ ...g, r: warnRadius(s, l.owner) });
+  for (const l of s.launches ?? []) if (isEnemy(s, v.p.id, l.owner)) for (const g of ringsToClear(s, l, v.p.id)) zones.push({ ...g, r: warnRadius(s, l.owner) });
   for (const f of s.fallout ?? []) zones.push({ x: f.x, y: f.y, r: f.r ?? SILO.reach });
   for (const l of zones) {
     const r = l.r + AI_SILO.margin;
@@ -2135,6 +2135,34 @@ function fleeWarhead(s: GameState, v: View, issue: (c: Command) => void): void {
     const x = l.x + (dx / len) * (r + 2), y = l.y + (dy / len) * (r + 2);
     issue({ t: 'move', p: v.p.id, ids: out.map((u) => u.id), x, y });
   }
+}
+
+/**
+ * The rings a computer still clears for a rival launch (#772): every ring it is shown, until `AI_SILO.read` seconds into the missile's
+ * bend; then only those the course points at, read as a player reads it (never the stored target): where each missile is drawn now and
+ * was a half and a whole second ago, carried on, turning as it turns, to the end of the public clock. The ring nearest each guess stays,
+ * and any ring a guess falls in. While the missiles split (a salvo), or after the reveal, it clears all it is shown.
+ */
+function ringsToClear(s: GameState, l: Launch, viewer: number): { x: number; y: number }[] {
+  const rings = ringsFor(s, l, viewer);
+  const f = flightOf(l);
+  if (!f || rings.length < 2 || revealed(s, l) || s.tick < f.tk + AI_SILO.read * TICK_HZ) return rings;
+  const dt = TICK_HZ / 2;
+  const [a, b, c] = [s.tick - 2 * dt, s.tick - dt, s.tick].map((t) => missilesAt(l, t));
+  if (a.length !== c.length || b.length !== c.length) return rings;
+  const left = l.at - s.tick;
+  const r = warnRadius(s, l.owner);
+  const keep = new Set<number>();
+  c.forEach((p, i) => {
+    const vx = (p.x - b[i].x) / dt, vy = (p.y - b[i].y) / dt;
+    const ax = (p.x - 2 * b[i].x + a[i].x) / (dt * dt), ay = (p.y - 2 * b[i].y + a[i].y) / (dt * dt);
+    const gx = p.x + vx * left + 0.5 * ax * left * left, gy = p.y + vy * left + 0.5 * ay * left * left;
+    const d = rings.map((g) => (g.x - gx) * (g.x - gx) + (g.y - gy) * (g.y - gy));
+    d.forEach((n, j) => {
+      if (n <= r * r || n === Math.min(...d)) keep.add(j);
+    });
+  });
+  return rings.filter((_, j) => keep.has(j));
 }
 
 /** Citizens still digging bog iron when no deed needs it go to the resource the town is shortest of (#79). */

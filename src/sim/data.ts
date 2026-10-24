@@ -3651,6 +3651,15 @@ export const SILO = { fuse: 45, reach: 5, fuel: { gold: 600, stone: 200 }, refue
  */
 export const SALVO = { trio: 3, surcharge: 0.5 };
 /**
+ * A missile's flight (#772): the course every player watches inside the fuse. It climbs toward the middle of a rival's rings (the lure,
+ * moved up to `jitter` tiles by the seed) and covers `knee` of the way there, bowing sideways by up to `bow` of that stretch, so the first
+ * part reads as a district, not a point. Then it bends onto its true point (`lead`: how far past the bend's start the curve leans on along
+ * its old heading) and dives. The bend starts `read` seconds before the reveal, scaled by the lure's distance over `ref` tiles (between `lo`
+ * and `hi` of it): a sharp eye reads the target in that window. The arc peaks at `rise` of the lure's distance, between `low` and `high`
+ * tiles, at the bend. A lure nearer the silo than `near` tiles is replaced by the target.
+ */
+export const FLIGHT = { knee: 0.55, bow: 0.3, jitter: 3, lead: 0.5, read: 8, ref: 40, lo: 0.6, hi: 1.5, rise: 0.18, low: 4, high: 9, near: 6 };
+/**
  * The three warheads (#751 s1). A blast does `peak / (1 + (d/half)²)` at distance `d` tiles (from a building's nearest edge, or a unit's
  * position), tapering linearly over the last `taper` tiles to nothing at the blast radius `r`. A people fires its branch's warhead:
  * plain Atomic, Fission or Fusion, and from #753 chooses at launch between Atomic and its branch's own.
@@ -3672,8 +3681,11 @@ export const WARHEADS = {
  * The salvo (#765): when three rival targets at least `SILO.apart` apart are each worth a launch and together worth `salvo` times the best
  * single strike (`salvoPlain` times for a plain Atomic people, who pays the surcharge), the computer raises silos to three, learns Launch
  * Control, and holds its single strikes until the store holds three.
+ *
+ * The flight (#772): `read` seconds after a rival missile starts to bend, the computer reads its course as a player would (where it is,
+ * where it is going, how it turns) and stops clearing the rings the course has ruled out.
  */
-export const AI_SILO = { fork: 0.7, fusion: 0.4, forkAfter: 120, hold: 300, hands: 20, wait: 20, worth: 6, heart: 4, soldier: 2, margin: 1.5, salvo: 1.8, salvoPlain: 2.4 };
+export const AI_SILO = { fork: 0.7, fusion: 0.4, forkAfter: 120, hold: 300, hands: 20, wait: 20, worth: 6, heart: 4, soldier: 2, margin: 1.5, salvo: 1.8, salvoPlain: 2.4, read: 5 };
 export const AI_KEG = { take: 0.5, ore: 80, kegs: 6, mills: 2, hold: 180, sappers: 2, near: 12, guard: 4, every: 2 };
 
 /**

@@ -538,6 +538,22 @@ export interface Launch {
    * its own (`gone`) and the rest fly on. Absent for a single strike.
    */
   salvo?: SalvoShot[];
+  /** The missile's flight (#772, `flightOf`), drawn at launch and frozen. Absent in older saves (no missile is drawn). */
+  arc?: Arc;
+}
+
+/**
+ * The course a missile flies (#772, `silo.ts`): from the silo (`x`, `y`), launched on tick `t0`, it climbs toward the lure (`lx`, `ly`, the
+ * middle of a rival's rings, moved a little by the seed) on a gentle sideways bow (`bow`, a fraction of the climb's length), then bends onto
+ * its true point. Every player sees the same course.
+ */
+export interface Arc {
+  x: number;
+  y: number;
+  t0: number;
+  lx: number;
+  ly: number;
+  bow: number;
 }
 
 /** One warhead of a salvo (#765). */

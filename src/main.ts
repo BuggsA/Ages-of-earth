@@ -3066,7 +3066,7 @@ function onEvents(s: GameState, list: GameEvent[]): void {
             const many = !!s.launches?.find((k) => k.id === ev.id)?.salvo;
             hud.toast(many ? `Salvo away: ${SALVO.trio} warheads land in ${ev.fuse ?? SILO.fuse} seconds. Rivals see three rings, as for one warhead and two decoys, until the last ${SILO.reveal}` : `Warhead away: it lands in ${ev.fuse ?? SILO.fuse} seconds. Rivals see your target among two decoys until the last ${SILO.reveal}`, 'good');
           } else if (isEnemy(s, viewer, ev.owner)) {
-            hud.toast(`${s.players[ev.owner].name} has launched: it lands in ${ev.fuse ?? SILO.fuse} seconds, in three rings, one real and two decoys, or all three real if three silos fired a salvo. Clear them, or destroy the silos`, 'bad');
+            hud.toast(`${s.players[ev.owner].name} has launched: it lands in ${ev.fuse ?? SILO.fuse} seconds, in three rings, one real and two decoys, or all three real if three silos fired a salvo. Clear them, or destroy the silos. Watch the missile: late in its flight it bends toward where it falls`, 'bad');
             const l = s.launches?.find((k) => k.id === ev.id);
             for (const g of l ? ringsFor(s, l, viewer) : []) minimap.ping(g.x, g.y, '#ff4a3a', true);
           }

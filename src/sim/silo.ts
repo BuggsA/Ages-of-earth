@@ -1,11 +1,11 @@
-import { BUILDINGS, FALLOUT, FISSION, FUSION, SALVO, SILO, TICK_HZ, WARHEADS, domainOf, secs } from './data';
+import { BUILDINGS, FALLOUT, FISSION, FLIGHT, FUSION, SALVO, SILO, TICK_HZ, WARHEADS, domainOf, secs } from './data';
 import { ageDef } from './ages';
 import { DIRS, roll } from './animals';
 import { hurt, peace } from './combat';
 import { distToRect } from './grid';
 import { canAfford, isEnemy, maxHp, pay, statsOf } from './world';
 import { breachAt } from './tides';
-import type { Building, BuildingType, Cost, Ent, GameState, Launch, Player, SalvoShot, Warning } from './types';
+import type { Arc, Building, BuildingType, Cost, Ent, GameState, Launch, Player, SalvoShot, Warning } from './types';
 
 /**
  * The Missile Silo (#605, the Atomic Age). `launch` names a point on the map; the warhead lands after its people's clock, a
@@ -25,6 +25,9 @@ import type { Building, BuildingType, Cost, Ent, GameState, Launch, Player, Salv
  * Atomic warheads from the store, one from each silo, each at its own point, all on one launch and the people's one clock. A rival sees
  * three rings drawn by the same rule as a single strike's, but all three are real; at the reveal all three stay. A fallen silo scrubs its
  * own warhead and its ring; the others fly on.
+ *
+ * The flight (#772): every launch carries a course (`Launch.arc`, `flightOf`) that every player watches: a missile climbing toward the
+ * middle of a rival's rings, then bending onto its true point in the last seconds before the reveal (`missilesAt`).
  */
 
 /** How a people works its silos: the plain Atomic Age's rules, or the fork's (Fission: quick and leaky; Fusion: clean, limitless and slow). */
@@ -157,7 +160,8 @@ export function launch(s: GameState, owner: number, silo: Building, x: number, y
   spend(s, p);
   pay(p, fuelOf(kind));
   const id = s.nextId++;
-  (s.launches ??= []).push({ id, owner, silo: silo.id, x, y, w: kind, at: s.tick + secs(r.fuse), ...(cleanOf(kind) ? { clean: true } : {}), warn: warningsOf(s, owner, [{ x, y }]) });
+  const warn = warningsOf(s, owner, [{ x, y }]);
+  (s.launches ??= []).push({ id, owner, silo: silo.id, x, y, w: kind, at: s.tick + secs(r.fuse), ...(cleanOf(kind) ? { clean: true } : {}), warn, arc: arcOf(s, id, silo, warn, [{ x, y }]) });
   if (r.leak > 0) (s.fallout ??= []).push({ id: s.nextId++, owner, x: silo.x, y: silo.y, r: FISSION.reach, until: s.tick + secs(r.leak) });
   // The event names no warhead: every player is warned of the same ring whatever was sent (`warnRadius`). Its point is the attacker's
   // own aim; a rival's screen draws the launch's rings for its team instead (`ringsFor`).
@@ -233,7 +237,8 @@ export function salvo(s: GameState, owner: number, shots: { silo: number; x: num
   const id = s.nextId++;
   const [{ silo, x, y }] = shots;
   const salvo = shots.map((sh) => ({ silo: sh.silo, x: sh.x, y: sh.y }));
-  (s.launches ??= []).push({ id, owner, silo, x, y, w: 'atomic', at: s.tick + secs(r.fuse), warn: warningsOf(s, owner, salvo), salvo });
+  const warn = warningsOf(s, owner, salvo);
+  (s.launches ??= []).push({ id, owner, silo, x, y, w: 'atomic', at: s.tick + secs(r.fuse), warn, salvo, arc: arcOf(s, id, s.byId.get(silo)!, warn, salvo) });
   if (r.leak > 0) {
     const b = s.byId.get(silo)!;
     (s.fallout ??= []).push({ id: s.nextId++, owner, x: b.x, y: b.y, r: FISSION.reach, until: s.tick + secs(r.leak) });
@@ -367,6 +372,111 @@ export function warningsOf(s: GameState, owner: number, aims: { x: number; y: nu
     }
     return { team, rings, real: of.indexOf(0), ...(aims.length > 1 ? { of } : {}) };
   });
+}
+
+/**
+ * The course of a launch (#772), drawn once at launch from its own seed (the match's dice state and the launch id, so no die is spent and
+ * older replays keep their draws): it starts at the silo, and its lure is the middle of one rival team's rings (the team picked by the seed),
+ * moved up to `FLIGHT.jitter` tiles, so the early heading points at a district that holds every ring, not at the real one. With no rival
+ * set the lure is the middle of the aims. A lure too near the silo gives way to the first aim. The bow is drawn too.
+ */
+function arcOf(s: GameState, id: number, silo: { x: number; y: number }, warn: Warning[], aims: { x: number; y: number }[]): Arc {
+  let h = (s.rng ^ Math.imul(id + 1, 0x9e3779b1)) >>> 0;
+  const draw = (): number => {
+    h = (h + 0x6d2b79f5) >>> 0;
+    let t = h;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const set = warn.length ? warn[Math.min(warn.length - 1, Math.floor(draw() * warn.length))].rings : aims;
+  let lx = set.reduce((n, p) => n + p.x, 0) / set.length + (draw() * 2 - 1) * FLIGHT.jitter;
+  let ly = set.reduce((n, p) => n + p.y, 0) / set.length + (draw() * 2 - 1) * FLIGHT.jitter;
+  const bow = (draw() * 2 - 1) * FLIGHT.bow;
+  if ((lx - silo.x) * (lx - silo.x) + (ly - silo.y) * (ly - silo.y) < FLIGHT.near * FLIGHT.near) [lx, ly] = [aims[0].x, aims[0].y];
+  lx = Math.max(0.5, Math.min(s.w - 0.5, lx));
+  ly = Math.max(0.5, Math.min(s.h - 0.5, ly));
+  return { x: silo.x, y: silo.y, t0: s.tick, lx, ly, bow };
+}
+
+/** A launch's course worked out (#772, `flightOf`): the climb from `o` through `m` to the bend `k`, on ticks `t0` to `tk`; heading `d` there. */
+export interface Flight {
+  o: { x: number; y: number };
+  m: { x: number; y: number };
+  k: { x: number; y: number };
+  d: { x: number; y: number };
+  t0: number;
+  tk: number;
+  at: number;
+  /** The arc's peak, in tiles, reached at the bend. */
+  h: number;
+}
+
+/**
+ * A launch's course (#772), or null for one from an older save. Only + − × ÷ and square roots, so it is the same on every machine.
+ * - The climb (ticks `t0` to `tk`): a parabola from the silo `o` through the bowed control `m` to `k`, `FLIGHT.knee` of the way to the lure;
+ *   none of it depends on the true point, so it reads as a district.
+ * - The bend (`tk` to `at`, `bendAt`): from `k`, still on the climb's heading `d`, onto the true point.
+ * - The bend starts `FLIGHT.read` seconds before the reveal, scaled by the lure's distance (not the target's, so the climb's pace says
+ *   nothing of where it falls), and never in the first two-fifths of the fuse.
+ */
+export function flightOf(l: Launch): Flight | null {
+  const a = l.arc;
+  if (!a) return null;
+  const o = { x: a.x, y: a.y };
+  const lx = a.lx - a.x, ly = a.ly - a.y;
+  const far = Math.sqrt(lx * lx + ly * ly);
+  const k = { x: a.x + lx * FLIGHT.knee, y: a.y + ly * FLIGHT.knee };
+  // The bow: the climb's control point stands off its middle, square to it, by `bow` of its length.
+  const m = { x: (o.x + k.x) / 2 - ly * FLIGHT.knee * a.bow, y: (o.y + k.y) / 2 + lx * FLIGHT.knee * a.bow };
+  const dx = k.x - m.x, dy = k.y - m.y;
+  const dl = Math.sqrt(dx * dx + dy * dy);
+  const d = dl > 0 ? { x: dx / dl, y: dy / dl } : { x: 0, y: 0 };
+  const read = FLIGHT.read * Math.max(FLIGHT.lo, Math.min(FLIGHT.hi, far / FLIGHT.ref));
+  const fuse = l.at - a.t0;
+  const tk = Math.max(a.t0 + fuse * 0.4, l.at - (SILO.reveal + read) * TICK_HZ);
+  return { o, m, k, d, t0: a.t0, tk, at: l.at, h: Math.max(FLIGHT.low, Math.min(FLIGHT.high, far * FLIGHT.rise)) };
+}
+
+/** A quadratic curve from `a` through control `c` to `b`, at `u` (0 to 1). */
+const quad = (a: { x: number; y: number }, c: { x: number; y: number }, b: { x: number; y: number }, u: number): { x: number; y: number } => ({
+  x: (1 - u) * (1 - u) * a.x + 2 * u * (1 - u) * c.x + u * u * b.x,
+  y: (1 - u) * (1 - u) * a.y + 2 * u * (1 - u) * c.y + u * u * b.y,
+});
+
+/**
+ * Where a missile on the bend toward `to` is at tick `t` (`tk` ≤ t ≤ `at`, #772): a parabola from `k`, leaning on along the climb's heading
+ * (its control `FLIGHT.lead` of the way to the target out ahead), ending exactly on `to` at `at`. Its pace starts at the climb's and changes
+ * evenly (a polynomial in time), so the turn never jumps. The height falls on a parabola from the peak to the ground.
+ */
+function bendAt(f: Flight, to: { x: number; y: number }, t: number): { x: number; y: number; z: number } {
+  const rx = to.x - f.k.x, ry = to.y - f.k.y;
+  const rest = Math.sqrt(rx * rx + ry * ry);
+  const c = { x: f.k.x + f.d.x * FLIGHT.lead * rest, y: f.k.y + f.d.y * FLIGHT.lead * rest };
+  // The climb ends at 2|k − m| tiles per unit of its time; the bend starts at 2·lead·rest per unit of its own, times `a`.
+  const kx = f.k.x - f.m.x, ky = f.k.y - f.m.y;
+  const climb = Math.sqrt(kx * kx + ky * ky) / (f.tk - f.t0);
+  const pace = rest > 0 ? (climb * (f.at - f.tk)) / (FLIGHT.lead * rest) : 1;
+  const a = Math.max(0.2, Math.min(1.8, pace));
+  const g = Math.max(0, Math.min(1, (t - f.tk) / (f.at - f.tk)));
+  const p = quad(f.k, c, to, a * g + (1 - a) * g * g);
+  return { x: p.x, y: p.y, z: f.h * (1 - g * g) };
+}
+
+/**
+ * The missiles drawn for a launch at tick `t` (a fraction of a tick is fine, for drawing), as every player sees them (#772): one on the
+ * climb, then one per live warhead on the bend. Each is a ground point and a height in tiles. A salvo climbs as one missile from its first
+ * silo and splits at the bend. Empty for a launch from an older save, or once it has landed.
+ */
+export function missilesAt(l: Launch, t: number): { x: number; y: number; z: number }[] {
+  const f = flightOf(l);
+  if (!f || t > f.at) return [];
+  if (t < f.tk) {
+    const u = Math.max(0, (t - f.t0) / (f.tk - f.t0));
+    const p = quad(f.o, f.m, f.k, u);
+    return [{ x: p.x, y: p.y, z: f.h * (1 - (1 - u) * (1 - u)) }];
+  }
+  return aimsOf(l).map((to) => bendAt(f, to, t));
 }
 
 /**

@@ -783,6 +783,8 @@ export function checksum(s: GameState): number {
       mix(sh.y);
     }
     for (const w of l.warn ?? []) for (const i of w.of ?? []) mix(i);
+    // The missile's course (#772): its start, lure and bow, frozen at launch.
+    if (l.arc) for (const v of [l.arc.x, l.arc.y, l.arc.t0, l.arc.lx, l.arc.ly, l.arc.bow]) mix(v);
   }
   // Bloom Seeds (the Age of the Bloom): where each came down, when it cracks, and how far it is hacked.
   for (const l of s.blooms ?? []) {
