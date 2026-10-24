@@ -1577,6 +1577,21 @@ export const COCKLER = { reach: 6, wait: 10, regrow: 40 };
  * from its nearest food store and has no hut of its within `COCKLER.reach`, it raises one by it, no more often than every `every` seconds.
  */
 export const AI_COCKLER = { far: 12, every: 30 };
+/**
+ * The Tide Gate (#785), set into a causeway tile of its owner's barrage. Shut, the pond holds as ever. Opened while the pond holds water the
+ * sea outside has left (`least` tiles of it or more, its head), the pond rushes out through the gate as a scour: up to `spread` tiles of
+ * bared flats for each tile of head, the nearest first, within `reach` tiles of the gate on its sea side, go under for `secs` seconds;
+ * whoever stands there is swept off, `hurt` health lost (or drowned with no shore near). An open gate's pond runs with the tide like
+ * the open flats; shut again, it holds what the next flood brings in. Workers keep off the flats below a rival's loaded gate, looking
+ * again every `wary` seconds, and a route over them counts as unsafe.
+ */
+export const TIDE_GATE = { least: 4, spread: 2, reach: 7, secs: 5, hurt: 40, wary: 8 };
+/**
+ * The computer's Tide Gate (#785): once its barrage stands whole it sets a gate in it (looked for every `every` seconds), the line's tile
+ * nearest its middle with the pond on one side and the sea on the other. Every `look` seconds, with the gate shut and loaded, it opens it
+ * when at least `threat` enemy land units stand on the flats it would scour, more than its own there; it shuts it again `shut` seconds on.
+ */
+export const AI_GATE = { every: 20, look: 1, threat: 3, shut: 8 };
 
 /**
  * The breach (#701 s3, the Water Road). Every `every` seconds the sea runs one tile on: each tile of polder four-ways beside water that
@@ -2476,6 +2491,8 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   tidemill: { name: 'Tide Mill', size: 2, hp: 900, cost: { wood: 200, stone: 150 }, time: 35, pop: 0, sight: 5, trains: [], drop: [], epoch: 5, ages: ['tides'], shore: true, menu: 'eco', key: 'A', blurb: 'A mill on the shore whose pond fills on the flood and runs out through its wheel on the ebb. Every time the tide turns it grinds gold, more for every tile of tidal ground within 5 tiles (up to 24), each tile feeding one mill only. Flats a causeway line has shut off from the sea (a barrage\'s pond) are ground twice, on the flood and on the ebb. Only in the Age of Tides, or the one your people kept on leaving it.' },
   // The Cockler's Hut (#779): a drop for cockles by the beds, where pickers wait for low water (`COCKLER`, `tides.ts`).
   cockler: { name: "Cockler's Hut", size: 2, hp: 350, cost: { wood: 60 }, time: 15, pop: 0, sight: 6, trains: [], drop: [], epoch: 5, ages: ['tides'], menu: 'eco', key: 'C', blurb: `A hut of driftwood and thatch on the shore by the cockle beds, raised within ${COCKLER.reach} tiles of one. Pickers empty their baskets of cockles here instead of walking them home (it takes nothing else), and wait beside it, on dry ground, for the tide to bare their bed again. The beds within ${COCKLER.reach} tiles of it are tended: each high water brings back ${COCKLER.regrow} food to them instead of ${COCKLE.regrow}. Only in the Age of Tides.` },
+  // The Tide Gate (#785): a gate in a barrage that holds the pond, or lets it out over the flats below as a scour (`TIDE_GATE`, `tides.ts`).
+  tidegate: { name: 'Tide Gate', size: 1, hp: 600, cost: { wood: 80, stone: 120 }, time: 20, pop: 0, sight: 5, trains: [], drop: [], epoch: 5, ages: ['tides'], menu: 'mil', key: 'U', blurb: `A timber gate between stone piers, set into a causeway tile of your own barrage, beside its pond. Shut, the barrage holds as ever: the pond stays wet at every hour and the Tide Mills by it grind it twice. Open it (O) at low water and the pond rushes out through it as a scour: the flats below the gate, up to ${TIDE_GATE.reach} tiles out, go under for ${TIDE_GATE.secs} seconds, and whoever stands there is swept off, hurt (${TIDE_GATE.hurt}), or drowned with no shore near. The bigger the head of water held above the sea, the farther it runs. Then the pond runs with the tide (its mills grind it once) until you shut the gate and the next flood fills it again. Your own people walk across it at every hour. Everyone can see whether it is loaded. Only in the Age of Tides.` },
   windmill: { name: 'Windmill', size: 2, hp: 600, cost: { wood: 120, stone: 40 }, time: 30, pop: 0, sight: 5, trains: [], drop: [], epoch: 2, ages: ['dykes'], menu: 'eco', key: 'W', blurb: 'A post mill whose sails turn a scoop wheel. Raised by water a dyke has shut off from the open sea (or a small lake), it pumps it dry a tile every few seconds, nearest first, into polder: low black ground where a Farm yields half again as much. Two mills drain twice as fast. The open sea is too big to pump.' },
   // The Water Line (#701 s4): a gate in a dyke or a channel that lets the water out over the low ground behind it (`INUND`, `water.ts`).
   sluice: { name: 'Sluice', size: 1, hp: 800, cost: { wood: 60, stone: 80 }, time: 20, pop: 0, sight: 4, trains: ['barge'], drop: [], epoch: 3, ages: ['waterline'], menu: 'mil', key: 'S', blurb: 'A timber gate in a dyke, on a channel or on shallow water, raised on its banks by a winch. Shut, it holds the water back as a dyke does, and your own people walk across it. Open it (O) and the water runs out over the low ground round it, a ring a second, up to 7 tiles: soldiers wade the flood at a crawl, siege can hardly cross it, and your gun-barges sail it. Shut it and the water drains away. It launches Gun-barges onto the water beside it.' },
