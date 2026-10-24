@@ -31,7 +31,7 @@ export type UnitType =
 export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
   | 'towncenter' | 'house' | 'storehouse' | 'farm' | 'barracks' | 'range' | 'stable' | 'tower'
-  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai' | 'drainrig' | 'transfusion' | 'bloodtower' | 'snare' | 'prospector' | 'mission' | 'silo' | 'sapling' | 'shaft' | 'dyke' | 'windmill' | 'den'
+  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai' | 'drainrig' | 'transfusion' | 'bloodtower' | 'snare' | 'prospector' | 'mission' | 'silo' | 'sapling' | 'shaft' | 'dyke' | 'windmill' | 'den' | 'bloomery'
   /** The Age of the Grove (`docs/wild-road.md`, `grove.ts`): a wall that grows, a one-tile garden, fruit trees. */
   | 'thornwall' | 'garden' | 'orchard'
   /** The Age of the Hive (`docs/wild-road.md` §3, `hive.ts`): a skep of bees set among the trees. */
@@ -75,7 +75,7 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'chart' | 'assay' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged' | 'launchControl' | 'interceptors';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood' | 'locks' | 'floating' | 'bloom';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood' | 'locks' | 'floating' | 'bloom' | 'beggars';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
 export type PathId = 'blood' | 'steppe' | 'hemocraft' | 'rite';
@@ -816,6 +816,8 @@ export interface PlayerStats {
   relicGold?: number;
   /** Gold paid in tithes by Missions (#555 s12). */
   tithe?: number;
+  /** Rival ships boarded and taken (the Sea Beggars, #783). */
+  boarded?: number;
   /** Tiles of water pumped out into polder (#701). */
   drained?: number;
   /** Tiles of land dug out into channels, filled with water (#701, the Age of Rivers). */
@@ -1173,6 +1175,8 @@ export type GameEvent =
   | { k: 'campAlone'; owner: number; id: number; x: number; y: number; struck: boolean }
   | { k: 'alert'; owner: number; x: number; y: number; building: boolean; /** The Town Center is struck. */ heart?: boolean; wild?: Animal['kind']; /** A rival's soldiers fell on a citizen out hunting. */ hunter?: boolean }
   | { k: 'converted'; id: number; from: number; to: number; x: number; y: number }
+  /** A rival ship beaten down and boarded, taken for the Sea Beggars (#783): it sails for `to` now. */
+  | { k: 'boarded'; id: number; from: number; to: number; x: number; y: number; type: UnitType }
   /** A building chanted over to a pilgrim people (#209). */
   | { k: 'consecrated'; id: number; from: number; to: number; x: number; y: number; type: BuildingType; size: number }
   /** Rival priests have begun chanting at one of `owner`'s buildings (#209). */
@@ -1475,6 +1479,8 @@ export interface AiMemory {
   river?: { plan: ChannelPlan | null; looked?: boolean; fresh?: boolean };
   /** The first crossing (#585): the age it stands in on the way to the Sea-Raiders, and since when (each sibling, and the age itself). */
   sea?: { at: AgeId; since: number };
+  /** The Sea Beggars (#783): the tile of its fleet's water nearest the rival's town, where it hunts when no rival ship or Dock is seen. */
+  beggarSea?: number;
   /** Tick it last tried to raise a Mission (#555 s12). */
   mission?: number;
   /** When it last sent sappers with kegs (#577). */

@@ -193,6 +193,11 @@ export interface Age {
    */
   floats?: boolean;
   /**
+   * The Age of the Sea Beggars (#783): a rival ship this people's ships beat down is boarded and taken rather than sunk, and its ships
+   * strike dykes, sluices, dams and causeways as siege does. See `BEGGARS` (`beggars.ts`).
+   */
+  boards?: boolean;
+  /**
    * The Golden Age (#703): every side age the people has walked wakes at once, its verbs and the best of its gifts with none of its
    * doors (`weave` in `ages.ts`), until `GOLDEN.span` runs out and the people wakes in the Gunpowder Age, for good.
    */
@@ -326,6 +331,7 @@ export const AGES: Record<AgeId, Age> = {
   },
   iron: {
     verb: 'Dig the marsh: bog iron sharpens every spearman, so the bog is worth holding',
+    keepsake: { building: 'bloomery', does: 'its hearth: spearmen trained there keep the Iron Age\'s price, on any road' },
     door: 'No cavalry until the Middle Ages',
     good: 'The hardest early foot soldiers, sharpened by the marsh\'s iron',
     routes: [],
@@ -735,6 +741,7 @@ export const AGES: Record<AgeId, Age> = {
     door: 'No new Farm away from water: the town grows along its channels, so its shape is plain to see and a raid knows where to cut',
     good: 'Fields where you choose: dig the water to them, and ring the town with a moat',
     routes: ['water'],
+    keepsake: { building: 'farm', does: 'its watering: by water, it works 30% faster on any road' },
     name: 'Age of Rivers',
     short: 'Rivers',
     tier: 1,
@@ -802,6 +809,23 @@ export const AGES: Record<AgeId, Age> = {
     blurb: 'As the Uros have lived for centuries on their reed islands in Lake Titicaca, and the Tanka in their boat towns on the Pearl River: a people whose town floats. Pontoons (E) are moored on open water, beside the shore or beside another of your pontoons: each is a district with room for 10, where every kind of goods is taken in and fishing boats are launched, and your people walk its deck. Moor three or more side by side and they link into a floating town, whose every pontoon raises citizens. Cast a pontoon off (O) and it is taken in tow with up to 10 of those on its deck aboard; moor it again (P) on any open water and it raises itself in a few seconds. A town that floats can leave: for the fishing grounds, for a rival\'s shore, or out of a warhead\'s reach. But no House is raised on land and no Missile Silo at all, and ships hole a pontoon three times as fast as anything else does: those on its deck when it sinks swim for the nearest deck or shore, and drown if it lies too far.',
     noBuild: { buildings: ['house', 'silo'], why: 'A floating people raises no House on land and no Missile Silo: its homes are its pontoons. It waits until it returns to the Age of Tides or the Atomic Age' },
     floats: true,
+  },
+  // The fourth crossing (#783, s8 of the Water Road #701): the Dykes' banks and the Sail's ships made one war. Open only to a people
+  // that walked both, off the Middle Ages they share. The Water Road's predator: polder towns and merchant fleets are its prey.
+  beggars: {
+    verb: 'Board a rival\'s ships instead of sinking them: a ship your warships beat down strikes its colours and sails for you, hold and all; and cut a rival\'s dykes from the sea, so the water takes back its polder',
+    door: 'No walls or gates, no fishing boats launched, and every ship a fifth dearer: the fleet grows by what it takes, and a people at war on the sea lands no herring',
+    good: 'Hunting a rival\'s fleet and its polder: its cogs, barges and warships become yours, and its dykes are your road in',
+    routes: [],
+    keepsake: { building: 'dock', does: 'its haven: rival ships beaten down within 12 tiles of it are boarded and taken, on any road' },
+    name: 'Age of the Sea Beggars',
+    short: 'Sea Beggars',
+    tier: 2,
+    blurb: 'As the Watergeuzen did, the Dutch rebels who sailed under letters of marque from 1568: they took Brielle from the sea in 1572, and in 1574 they cut the dykes round besieged Leiden and sailed their flat boats over the drowned fields to its walls. A rival ship your warships beat down is boarded instead of sunk: it strikes its colours and sails for you with a third of its timbers whole, with whatever it carries, gold, catch or plunder (a transport with soldiers aboard fights to the last and goes down). Your ships strike dykes, sluices, dams and causeways as hard as siege does, so a polder town\'s banks are a fleet\'s to cut, and the sea does the rest. What it gives up: walls and gates, every ship costs a fifth more, and no fishing boats are launched while the people is at war on the sea.',
+    price: { ship: 1.2 },
+    boards: true,
+    noBuild: { buildings: ['wall', 'gate'], why: 'A people of sea beggars raises no walls or gates: its fleet is its wall. They wait until it comes home to the Middle Ages or climbs on' },
+    no: { units: ['fisher'], why: 'A people at war on the sea lands no herring: fishing boats wait until it comes home to the Middle Ages or climbs on' },
   },
   // The Golden Age (#703): the age that feels almost too good. A turn off the Gunpowder Age for a people that has lived many lives.
   golden: {
@@ -1450,6 +1474,20 @@ export const ROADS: Road[] = [
   },
   { from: 'floating', to: 'tides', cost: { food: 300, gold: 300 }, time: 30, blurb: 'Back to the Age of Tides: Houses go up on land again, and the pontoons stay moored and keep their room, but only the one you keep is ever cast off again.' },
   { from: 'floating', to: 'atomic', cost: { food: 500, gold: 400, stone: 200 }, time: 40, blurb: 'Cross to the ordinary Atomic Age and its Missile Silo: Houses go up on land again, and the pontoons stay moored and keep their room, but only the one you keep is ever cast off again.' },
+  // The fourth crossing (#783, the Water Road's s8): off the Middle Ages, for a people that walked the Age of Dykes and the Age of Sail,
+  // the two turns off it. A Dock is the clue; the journey is the price.
+  {
+    from: 'middle',
+    to: 'beggars',
+    cost: { food: 400, wood: 450, gold: 150 },
+    time: 45,
+    clue: 'dock',
+    gate: 'hard',
+    crossing: ['dykes', 'sail'],
+    blurb: 'A turn, not a climb, for a people that has walked both the Age of Dykes and the Age of Sail: the dyke-builders take to the sea against their rivals. A rival ship your warships beat down is boarded and taken, hold and all, and your ships cut a rival\'s dykes as siege does. What it gives up: walls and gates, fishing boats, and a fifth more for every ship.',
+  },
+  { from: 'beggars', to: 'middle', cost: { food: 200, wood: 150 }, time: 25, blurb: 'Lay up the beggar fleet: the ordinary Middle Ages, with walls, gates and fishing boats. The ships you took are yours to keep.' },
+  { from: 'beggars', to: 'gunpowder', cost: { food: 900, wood: 500, gold: 450, stone: 150 }, time: 65, blurb: 'Climb to the Gunpowder Age: the boarding ends, walls, gates and fishing boats return, and the ships you took sail on as your own (more wood and less gold than from the Middle Ages: the fortune was in the ships).' },
   // The Golden Age (#703): heard of by a people that has walked two side ages, open to one that has walked three. It ends on its own (`GOLDEN.span`).
   {
     from: 'gunpowder',
@@ -2501,6 +2539,7 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   cockler: { name: "Cockler's Hut", size: 2, hp: 350, cost: { wood: 60 }, time: 15, pop: 0, sight: 6, trains: [], drop: [], epoch: 5, ages: ['tides'], menu: 'eco', key: 'C', blurb: `A hut of driftwood and thatch on the shore by the cockle beds, raised within ${COCKLER.reach} tiles of one. Pickers empty their baskets of cockles here instead of walking them home (it takes nothing else), and wait beside it, on dry ground, for the tide to bare their bed again. The beds within ${COCKLER.reach} tiles of it are tended: each high water brings back ${COCKLER.regrow} food to them instead of ${COCKLE.regrow}. Only in the Age of Tides.` },
   // The Tide Gate (#785): a gate in a barrage that holds the pond, or lets it out over the flats below as a scour (`TIDE_GATE`, `tides.ts`).
   tidegate: { name: 'Tide Gate', size: 1, hp: 600, cost: { wood: 80, stone: 120 }, time: 20, pop: 0, sight: 5, trains: [], drop: [], epoch: 5, ages: ['tides'], menu: 'mil', key: 'U', blurb: `A timber gate between stone piers, set into a causeway tile of your own barrage, beside its pond. Shut, the barrage holds as ever: the pond stays wet at every hour and the Tide Mills by it grind it twice. Open it (O) at low water and the pond rushes out through it as a scour: the flats below the gate, up to ${TIDE_GATE.reach} tiles out, go under for ${TIDE_GATE.secs} seconds, and whoever stands there is swept off, hurt (${TIDE_GATE.hurt}), or drowned with no shore near. The bigger the head of water held above the sea, the farther it runs. Then the pond runs with the tide (its mills grind it once) until you shut the gate and the next flood fills it again. Your own people walk across it at every hour; a rival's must go round it, or break it. Everyone can see whether it is loaded. Only in the Age of Tides.` },
+  bloomery: { name: 'Bloom Hearth', size: 2, hp: 900, cost: { wood: 100, stone: 40 }, time: 30, pop: 0, sight: 5, trains: ['infantry'], drop: ['gold'], epoch: 1, ages: ['iron'], menu: 'mil', key: 'I', blurb: 'A clay hearth and bellows raised beside the marsh. Bog iron dropped here is smelted hard: every bar counts twice toward your spearmen\'s edge, and the hearth arms foot soldiers on the spot. Raise it by the bog and a rival who wants the iron must come to it. Kept (J) when your people leaves the Iron Age, it goes on arming spearmen at the Iron Age\'s price.' },
   windmill: { name: 'Windmill', size: 2, hp: 600, cost: { wood: 120, stone: 40 }, time: 30, pop: 0, sight: 5, trains: [], drop: [], epoch: 2, ages: ['dykes'], menu: 'eco', key: 'W', blurb: 'A post mill whose sails turn a scoop wheel. Raised by water a dyke has shut off from the open sea (or a small lake), it pumps it dry a tile every few seconds, nearest first, into polder: low black ground where a Farm yields half again as much. Two mills drain twice as fast. The open sea is too big to pump.' },
   // The Water Line (#701 s4): a gate in a dyke or a channel that lets the water out over the low ground behind it (`INUND`, `water.ts`).
   sluice: { name: 'Sluice', size: 1, hp: 800, cost: { wood: 60, stone: 80 }, time: 20, pop: 0, sight: 4, trains: ['barge'], drop: [], epoch: 3, ages: ['waterline'], menu: 'mil', key: 'S', blurb: 'A timber gate in a dyke, on a channel or on shallow water, raised on its banks by a winch. Shut, it holds the water back as a dyke does, and your own people walk across it. Open it (O) and the water runs out over the low ground round it, a ring a second, up to 7 tiles: soldiers wade the flood at a crawl, siege can hardly cross it, and your gun-barges sail it. Shut it and the water drains away. It launches Gun-barges onto the water beside it.' },
@@ -3846,11 +3885,25 @@ export const AI_KEG = { take: 0.5, ore: 80, kegs: 6, mills: 2, hold: 180, sapper
  * it stands from the people's nearest finished Town Center, at most `cap`, for the `most` farthest Missions it keeps. The computer raises one
  * on a shore `AI_MISSION.far` tiles or more out (up to `most`), sending a priest to raise it.
  */
+/** The Iron Age's Bloomery (#727): each bar of bog iron hauled to its hearth counts this many times toward the edge. */
+export const BLOOMERY = { smelt: 2 };
 export const MISSION = { every: 5, base: 1, perTile: 0.12, cap: 8, most: 3 };
 export const AI_MISSION = { far: 18, search: 10, take: 0.6, stay: 120, hold: 240, gap: 45 };
 /** The computer and the Age of Chariots (#555 s12): the odds it plans the crossing once it has walked one sibling, and its stay in each. */
 export const AI_CHARIOT = { take: 0.6, stay: 120 };
 export const AI_SEA = { take: 0.6, stay: 120, raid: 300 };
+
+/**
+ * The Age of the Sea Beggars (#783). A rival ship (a district under tow aside) that a ship of a boarding people would sink is taken
+ * instead, with `left` of its full health, unless it carries soldiers. A Dock kept as the age's keepsake boards ships beaten down within
+ * `haven` tiles of it on any road. A boarding people's ships strike dykes, sluices, dams and causeways with `cut` of their blow, as siege does.
+ */
+export const BEGGARS = { left: 0.35, haven: 12, cut: 1.2 };
+/**
+ * The computer and the Sea Beggars (#783): the odds it plans the crossing once it has walked one sibling (`take`), its stay in each
+ * (`stay`) and in the age itself (`hold`); there its idle warships cut the rival dyke seen within `hunt` tiles of its Dock that holds back polder.
+ */
+export const AI_BEGGARS = { take: 0.5, stay: 120, hold: 300, hunt: 30 };
 
 export const WARCAMP = { watch: 8, grace: 10, burn: 0.05, train: 1.2 };
 
