@@ -22,6 +22,7 @@ const ALCHEMY_ROAD = ROADS.find((r) => r.to === 'alchemy')!;
 const SAPPER_ROAD = ROADS.find((r) => r.to === 'sapper')!;
 const SEA_ROAD = ROADS.find((r) => r.to === 'searaider')!;
 const CHARIOTS_ROAD = ROADS.find((r) => r.to === 'chariots')!;
+const GOLDEN_ROAD = ROADS.find((r) => r.to === 'golden')!;
 const MISSIONS_ROAD = ROADS.find((r) => r.to === 'missions')!;
 const WARBAND_ROAD = ROADS.find((r) => r.to === 'warband')!;
 const IRONBLOOD_ROAD = ROADS.find((r) => r.to === 'ironblood')!;
@@ -278,6 +279,25 @@ const TIPS: Tip[] = [
     id: 'searaider',
     when: (s, me) => ageOf(s.players[me]) === 'searaider',
     text: `Sea-raiders bank their plunder by ship. A kill fills the killer's pack (💰), and the pack goes into the hold of a transport the soldier comes within ${SPOILS.bank} tiles of, or rides in (up to ${SEA_RAID.hold} gold a ship). The ship banks its hold at a Dock of yours, within ${SEA_RAID.dock} tiles. A Town Center or Barracks banks nothing, and a rival who sinks a laden ship takes the hold: land, raid, re-embark, sail home.`,
+  },
+  {
+    id: 'golden-heard',
+    // The Golden Age (#703): heard of by a people that has walked two side ages.
+    when: (s, me) => {
+      const p = s.players[me];
+      return roadKnown(s, p, GOLDEN_ROAD) && !hasWalked(p, 'golden');
+    },
+    text: `✨ Your people has lived ${GOLDEN_ROAD.lives!.seen} lives, and hears of a <b>${AGES.golden.name}</b>: walk ${GOLDEN_ROAD.lives!.n} side ages in all (go back a step and take another road), and from the Gunpowder Age every one of them wakes at once, with none of their prices, for a few minutes. Every age you walk is one more thread, and a minute more of gold.`,
+  },
+  {
+    id: 'golden',
+    when: (s, me) => !!ageDef(s.players[me]).golden,
+    text: `✨ <b>The ${AGES.golden.name}.</b> Everything your people learned on its road works at once: build what those ages built, train what they trained, and use what they did, with none of their doors shut. It will not last: spend it. Click empty ground to see the clock. When it ends you wake in the Gunpowder Age, and the road never opens again.`,
+  },
+  {
+    id: 'golden-rival',
+    when: (s, me) => s.players.some((o) => o.id !== me && !!ageDef(o).golden),
+    text: `✨ A rival is in its <b>${AGES.golden.name}</b>: every way of life it has walked, at once, and nothing shut. It ends on its own in a few minutes, and then every thread sleeps: hold your walls, and strike when the gold runs out.`,
   },
   {
     id: 'crossing-chariots',
