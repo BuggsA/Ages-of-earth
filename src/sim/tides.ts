@@ -1,4 +1,4 @@
-import { AGES, AI_EBB, BARRAGE, COCKLE, COCKLER, KEG, TIDE, TIDE_GATE, TIDE_ROUTE, TIDE_WORK, domainOf, secs } from './data';
+import { AGES, AI_EBB, AI_GATE_ANSWER, BARRAGE, COCKLE, COCKLER, KEG, TIDE, TIDE_GATE, TIDE_ROUTE, TIDE_WORK, domainOf, secs } from './data';
 import { ageDef, ageOf, asleep } from './ages';
 import { distToRect, distToTile, stampBuilding, walkable } from './grid';
 import { isChannel, isInund, isPolder, seaAt } from './water';
@@ -603,7 +603,10 @@ export function breachAt(s: GameState, x: number, y: number, r: number, by: numb
       if (s.tidal[t] !== TIDE_CAUSEWAY) continue;
       const dx = tx + 0.5 - x;
       const dy = ty + 0.5 - y;
-      if (dx * dx + dy * dy > r * r) continue;
+      // A Tide Gate stands over its whole tile (#792): a blast that reaches any of it reaches the road under it. A keg is laid by the gate.
+      const on = s.bldAt[t] ? s.byId.get(s.bldAt[t]) : undefined;
+      const gated = !!on && on.kind === 'building' && on.type === 'tidegate';
+      if (gated ? distToTile(x, y, t, s.w) > r : dx * dx + dy * dy > r * r) continue;
       const owner = causewayOwner(s, t);
       if (owner >= 0 && !isEnemy(s, by, owner)) continue;
       let ponded = false;
@@ -1591,17 +1594,17 @@ function endScours(s: GameState): void {
 }
 
 /** Each working shut gate's scour reach, worked out once a tick (and again whenever the shore moves): what workers and routes read. */
-const reachMemo = new WeakMap<GameState, { tick: number; turns: number; zones: { owner: number; tiles: Set<number> }[] }>();
+const reachMemo = new WeakMap<GameState, { tick: number; turns: number; zones: { owner: number; gate: number; tiles: Set<number> }[] }>();
 
-function gateZones(s: GameState): { owner: number; tiles: Set<number> }[] {
+function gateZones(s: GameState): { owner: number; gate: number; tiles: Set<number> }[] {
   const m = reachMemo.get(s);
   const turns = s.tideTurns ?? 0;
   if (m && m.tick === s.tick && m.turns === turns) return m.zones;
-  const zones: { owner: number; tiles: Set<number> }[] = [];
+  const zones: { owner: number; gate: number; tiles: Set<number> }[] = [];
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.type !== 'tidegate') continue;
     const tiles = gateReach(s, e);
-    if (tiles.length) zones.push({ owner: e.owner, tiles: new Set(tiles) });
+    if (tiles.length) zones.push({ owner: e.owner, gate: e.id, tiles: new Set(tiles) });
   }
   reachMemo.set(s, { tick: s.tick, turns, zones });
   return zones;
@@ -1616,6 +1619,69 @@ export function gateRisk(s: GameState, owner: number): ((tile: number) => boolea
   const zones = gateZones(s).filter((z) => isEnemy(s, owner, z.owner));
   if (!zones.length) return null;
   return (tile: number) => zones.some((z) => z.tiles.has(tile));
+}
+
+/**
+ * The first tile of a rival's loaded gate's reach a walk from `x, y` along the waypoints `pts` (from point `from` on) steps onto (#792),
+ * and whose gate it is. The tile it stands on now is not counted: it can't help that. Null: none.
+ */
+export function gateAhead(s: GameState, owner: number, x: number, y: number, pts: readonly number[], from = 0): { gate: number; tile: number } | null {
+  if (!s.tidal || !s.pond) return null;
+  const zones = gateZones(s).filter((z) => isEnemy(s, owner, z.owner));
+  if (!zones.length) return null;
+  const w = s.w;
+  let last = Math.floor(y) * w + Math.floor(x);
+  let ax = x;
+  let ay = y;
+  for (let k = from; k * 2 < pts.length; k++) {
+    const bx = pts[k * 2];
+    const by = pts[k * 2 + 1];
+    const n = Math.max(1, Math.ceil(Math.sqrt((bx - ax) * (bx - ax) + (by - ay) * (by - ay)) * 4));
+    for (let j = 1; j <= n; j++) {
+      const tx = Math.floor(ax + ((bx - ax) * j) / n);
+      const ty = Math.floor(ay + ((by - ay) * j) / n);
+      if (tx < 0 || ty < 0 || tx >= w || ty >= s.h) continue;
+      const i = ty * w + tx;
+      if (i === last) continue;
+      last = i;
+      for (const z of zones) if (z.tiles.has(i)) return { gate: z.gate, tile: i };
+    }
+    ax = bx;
+    ay = by;
+  }
+  return null;
+}
+
+/** How long a walk from `x, y` along the waypoints `pts` is, in tiles. */
+function walkLength(x: number, y: number, pts: readonly number[]): number {
+  let d = 0;
+  for (let k = 0; k * 2 < pts.length; k++) {
+    const dx = pts[k * 2] - x;
+    const dy = pts[k * 2 + 1] - y;
+    d += Math.sqrt(dx * dx + dy * dy);
+    x = pts[k * 2];
+    y = pts[k * 2 + 1];
+  }
+  return d;
+}
+
+/**
+ * The rival's loaded Tide Gate a march from `from` to `to` would walk under (#792), as the computer reads it before it sets out: the gate
+ * whose reach the plain way there steps onto first, unless a way round that keeps off every rival gate's reach is no more than
+ * `AI_GATE_ANSWER.round` times as long (then the march just goes round, as each soldier's own route does). Null: no gate on the way.
+ */
+export function gateOnWay(s: GameState, owner: number, team: number, from: { x: number; y: number }, to: { x: number; y: number }): Building | null {
+  const risk = gateRisk(s, owner);
+  if (!risk) return null;
+  const goal = goalForPoint(s, to.x, to.y, team);
+  const plain = findPath(s, from.x, from.y, goal, AI_GATE_ANSWER.search, team);
+  if (!plain.points.length) return null;
+  const hit = gateAhead(s, owner, from.x, from.y, plain.points);
+  if (!hit) return null;
+  const round = findPath(s, from.x, from.y, goal, AI_GATE_ANSWER.search, team, (i) => risk(i));
+  if (round.complete && round.points.length && walkLength(from.x, from.y, round.points) <= walkLength(from.x, from.y, plain.points) * AI_GATE_ANSWER.round) return null;
+  const g = s.byId.get(hit.gate);
+  return g && g.kind === 'building' ? g : null;
 }
 
 /** Why a Tide Gate can't go on this tile (#785), or null: it goes on a causeway tile of its owner's own, beside a barrage's pond. */

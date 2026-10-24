@@ -1592,6 +1592,14 @@ export const TIDE_GATE = { least: 4, spread: 2, reach: 7, secs: 5, hurt: 40, war
  * when at least `threat` enemy land units stand on the flats it would scour, more than its own there; it shuts it again `shut` seconds on.
  */
 export const AI_GATE = { every: 20, look: 1, threat: 3, shut: 8 };
+/**
+ * The computer answers a rival's loaded Tide Gate on its way (#792). Every `look` seconds a wave ready to march works out whether its way
+ * steps onto the flats a rival gate would scour (a path search of `search` steps; a way round no more than `round` times as long is just
+ * taken). Then, in order: a Sapper people carries a keg to the gate and holds the wave up to `keg` seconds for the blast; a wave of
+ * `bait` + `spare` or more sends its `bait` weakest onto the flats and holds `baitWait` seconds for the gate to fire on them; else (or
+ * after) it holds at the muster `wait` seconds while the gate stays loaded, then goes anyway.
+ */
+export const AI_GATE_ANSWER = { look: 2, search: 12000, round: 1.6, keg: 45, bait: 3, spare: 4, baitWait: 20, wait: 90 };
 
 /**
  * The breach (#701 s3, the Water Road). Every `every` seconds the sea runs one tile on: each tile of polder four-ways beside water that

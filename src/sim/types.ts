@@ -1531,7 +1531,7 @@ export interface AiMemory {
    * a gap in it is mended. `wait` is when a wave across the flats began waiting for low water; `cross` the crossing the wave on the
    * march took at low water (its far shore, the level that covers it, and the wave's goal), to turn back short of before the flood.
    */
-  tide?: { plan?: BarragePlan | null; seen?: number[]; raised?: boolean; wait?: number; cross?: { x: number; y: number; level: number; to: { x: number; y: number } }; cockle?: number; /** Tide Gates (#785): when it last looked to fire its gate, and when it opened it. */ gate?: number; opened?: number };
+  tide?: { plan?: BarragePlan | null; seen?: number[]; raised?: boolean; wait?: number; cross?: { x: number; y: number; level: number; to: { x: number; y: number } }; cockle?: number; /** Tide Gates (#785): when it last looked to fire its gate, and when it opened it. */ gate?: number; opened?: number; /** A rival's gate on its way (#792): when it last looked and the gate it found (-1: none); its answer, how and since when, and who it sent; a gate it goes past anyway. */ onWay?: { at: number; gate: number }; answer?: { gate: number; how: 'keg' | 'bait' | 'wait'; at: number; ids: number[] }; dare?: number; /** When a gate answered went down (fired, wrecked or let down), when it last looked for one ahead of a marching wave, and the gate it turned back from. */ sprung?: number; back?: number; turned?: number };
 }
 
 /** Orders that can be given with Shift held to queue them after the current one. */

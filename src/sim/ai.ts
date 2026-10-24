@@ -19,6 +19,9 @@ import { AI_COCKLER, COCKLER } from './data';
 import { cocklerSpotNear } from './tides';
 import { AI_GATE } from './data';
 import { gateReach, gateRisk, tideGateProblem, tideGateSpotIn } from './tides';
+import { AI_GATE_ANSWER } from './data';
+import { gateAhead, gateLoaded, gateOnWay, kegTileProblem } from './tides';
+import { carriesKegs } from './powder';
 import { nearestDrop } from './world';
 import { ashoreLeft, bared, bedClock } from './tides';
 import { R_COCKLE } from './types';
@@ -1809,6 +1812,7 @@ function tideWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const clock = tideClock(s);
   if (!clock) return;
   if (s.tick % secs(1) === p.id % secs(1)) turnBack(s, v, mem, issue);
+  gateBack(s, v, mem, issue);
   if (s.tick % secs(1) === p.id % secs(1) && clock.next <= AI_TIDES.wary) {
     const wet = coveredNext(s);
     if (wet) {
@@ -2062,6 +2066,147 @@ function turnBack(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const back = marching.filter((u) => (u.x - c.to.x) * (u.x - c.to.x) + (u.y - c.to.y) * (u.y - c.to.y) > far);
   if (!back.length) return;
   issue({ t: 'move', p: v.p.id, ids: back.map((u) => u.id), x: mem.muster.x, y: mem.muster.y });
+  if (back.length === marching.length) mem.attacking = false;
+}
+
+/** A rival's gate that has fired, been wrecked or let down while the wave answered it (#792): within `AI_GATE_ANSWER.baitWait` seconds of it, a wave that lost its bait still goes. */
+export function gateSprung(s: GameState, mem: AiMemory): boolean {
+  const at = mem.tide?.sprung;
+  return at !== undefined && s.tick - at <= secs(AI_GATE_ANSWER.baitWait);
+}
+
+/** Whose soldiers stand on a rival gate's flats as the computer's bait (#792), so the muster leaves them there. */
+export function baitIds(mem: AiMemory): Set<number> | null {
+  const a = mem.tide?.answer;
+  return a && a.how === 'bait' ? new Set(a.ids) : null;
+}
+
+/** The keg run on a rival's gate (#792): the soldier of the wave nearest the gate who can carry a keg to it (ties by id), or null. */
+function kegRun(s: GameState, p: Player, wave: Unit[], gate: Building, issue: (c: Command) => void): number[] | null {
+  const tile = gate.ty * s.w + gate.tx;
+  if (!sappers(p) || kegsOf(p) < 1 || kegTileProblem(s, p.id, tile) || guarded(s, p.id, gate)) return null;
+  let best: Unit | null = null;
+  let bestD = Infinity;
+  for (const u of wave) {
+    if (u.inside || !carriesKegs(u)) continue;
+    const d = (u.x - gate.x) * (u.x - gate.x) + (u.y - gate.y) * (u.y - gate.y);
+    if (d < bestD || (d === bestD && best && u.id < best.id)) {
+      bestD = d;
+      best = u;
+    }
+  }
+  if (!best) return null;
+  issue({ t: 'kegTile', p: p.id, ids: [best.id], tile });
+  return [best.id];
+}
+
+/**
+ * The bait (#792): with a wave of `AI_GATE_ANSWER.bait` + `.spare` or more, its `bait` weakest land soldiers (least health first, ties
+ * by id) walk onto the flats the gate would scour, each to its own tile of them, the nearest the muster first. Null: too small a wave.
+ */
+function baitRun(s: GameState, p: Player, mem: AiMemory, wave: Unit[], gate: Building, issue: (c: Command) => void): number[] | null {
+  const n = AI_GATE_ANSWER.bait;
+  const free = wave.filter((u) => !u.inside && domainOf(u.type) === 'land' && u.order.k !== 'kegTile');
+  if (free.length < n + AI_GATE_ANSWER.spare || !mem.muster) return null;
+  const m = mem.muster;
+  const d = (t: number) => ((t % s.w) + 0.5 - m.x) * ((t % s.w) + 0.5 - m.x) + (Math.floor(t / s.w) + 0.5 - m.y) * (Math.floor(t / s.w) + 0.5 - m.y);
+  const flats = gateReach(s, gate).sort((a, b) => d(a) - d(b) || a - b);
+  if (!flats.length) return null;
+  const weak = free.sort((a, b) => statsOf(s, a).hp - statsOf(s, b).hp || a.id - b.id).slice(0, n);
+  weak.forEach((u, k) => {
+    const t = flats[k % flats.length];
+    issue({ t: 'move', p: p.id, ids: [u.id], x: (t % s.w) + 0.5, y: Math.floor(t / s.w) + 0.5 });
+  });
+  return weak.map((u) => u.id);
+}
+
+/**
+ * The computer answers a rival's loaded Tide Gate on its wave's way (#792): whether the wave holds at the muster for it. Every
+ * `AI_GATE_ANSWER.look` seconds it reads the way (`gateOnWay`: a gate whose reach the march steps onto, with no fair way round). While one
+ * stands loaded there it answers it, in turn: a Sapper people carries a keg to the gate (a breach wrecks it), holding up to `.keg` seconds
+ * while the keg is on its way or lit; a big enough wave sends its weakest onto the flats below and holds `.baitWait` seconds for the gate
+ * to fire on them (fired, it is spent until the next flood fills it); else, or after, it holds `.wait` seconds for the gate to be let down,
+ * then goes anyway. The gate fired, wrecked or let down after an answer, the wave goes at once (`gateSprung`).
+ */
+export function gateAnswer(s: GameState, p: Player, mem: AiMemory, wave: Unit[], to: { x: number; y: number }, issue: (c: Command) => void): boolean {
+  const t = mem.tide;
+  if (!tideAwake(s) || !wave.length || !mem.muster) {
+    if (t) delete t.answer;
+    return false;
+  }
+  const m = (mem.tide ??= {});
+  let gate: Building | null = null;
+  if (m.onWay && s.tick - m.onWay.at < secs(AI_GATE_ANSWER.look)) {
+    const g = m.onWay.gate >= 0 ? s.byId.get(m.onWay.gate) : undefined;
+    gate = g && g.kind === 'building' && gateLoaded(s, g) ? g : null;
+  } else {
+    gate = gateOnWay(s, p.id, p.team, mem.muster, to);
+    m.onWay = { at: s.tick, gate: gate ? gate.id : -1 };
+  }
+  if (!gate) {
+    if (m.answer) m.sprung = s.tick;
+    delete m.answer;
+    delete m.dare;
+    return false;
+  }
+  if (m.dare === gate.id) return false;
+  let a = m.answer && m.answer.gate === gate.id ? m.answer : undefined;
+  if (!a) {
+    const keg = kegRun(s, p, wave, gate, issue);
+    a = m.answer = keg ? { gate: gate.id, how: 'keg', at: s.tick, ids: keg } : { gate: gate.id, how: 'bait', at: s.tick, ids: baitRun(s, p, mem, wave, gate, issue) ?? [] };
+    if (!keg && !a.ids.length) a.how = 'wait';
+    return true;
+  }
+  if (a.how === 'keg') {
+    const u = s.byId.get(a.ids[0]);
+    const going = !!u && u.kind === 'unit' && u.hp > 0 && u.order.k === 'kegTile';
+    const r = KEG.reach + 1;
+    const lit = !!s.kegs?.some((k) => k.owner === p.id && (k.x - gate.x) * (k.x - gate.x) + (k.y - gate.y) * (k.y - gate.y) <= r * r);
+    if ((going || lit) && s.tick - a.at < secs(AI_GATE_ANSWER.keg)) return true;
+    const ids = baitRun(s, p, mem, wave, gate, issue);
+    a = m.answer = { gate: gate.id, how: ids ? 'bait' : 'wait', at: s.tick, ids: ids ?? [] };
+    return true;
+  }
+  if (a.how === 'bait') {
+    if (s.tick - a.at < secs(AI_GATE_ANSWER.baitWait)) return true;
+    a = m.answer = { gate: gate.id, how: 'wait', at: s.tick, ids: [] };
+    return true;
+  }
+  if (s.tick - a.at < secs(AI_GATE_ANSWER.wait)) return true;
+  // Waited it out and the gate still stands loaded: it goes anyway.
+  delete m.answer;
+  m.dare = gate.id;
+  return false;
+}
+
+/**
+ * Turn back short of a rival's gate (#792), every second: soldiers of a wave on the march whose way ahead steps onto the flats a rival's
+ * loaded gate would scour (not those on them already) turn back to the muster, once for each gate, and not for a gate the wave chose to go
+ * past (`gateAnswer`'s dare). All of the wave turned back, the attack is off, and the wave answers the gate from the muster.
+ */
+function gateBack(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  if (!mem.attacking || !mem.muster) return;
+  const t = (mem.tide ??= {});
+  if (s.tick - (t.back ?? -99999) < secs(1)) return;
+  t.back = s.tick;
+  const risk = gateRisk(s, v.p.id);
+  if (!risk) {
+    delete t.turned;
+    return;
+  }
+  const marching = v.army.filter((u) => !u.inside && domainOf(u.type) === 'land' && (u.order.k === 'attack' || (u.order.k === 'move' && u.order.amove)));
+  const back: number[] = [];
+  let gate = -1;
+  for (const u of marching) {
+    if (!u.path || risk(Math.floor(u.y) * s.w + Math.floor(u.x))) continue;
+    const hit = gateAhead(s, v.p.id, u.x, u.y, u.path, u.pathI);
+    if (!hit || hit.gate === t.dare || hit.gate === t.turned) continue;
+    if (gate < 0) gate = hit.gate;
+    if (hit.gate === gate) back.push(u.id);
+  }
+  if (!back.length) return;
+  t.turned = gate;
+  issue({ t: 'move', p: v.p.id, ids: back, x: mem.muster.x, y: mem.muster.y });
   if (back.length === marching.length) mem.attacking = false;
 }
 
@@ -5808,11 +5953,15 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   }
   const due = !plan.hold && !polisHarvest(s, v) && (plan.wave ? true : s.tick >= secs(L.firstAttack)) && s.tick >= s.peaceUntil;
   // The low-water strike (#748): a wave (or its reinforcements) ready to march over the flats waits for the tide to bare them.
-  const launch = due && !mem.attacking && (fighters.length >= waveSize || (wonderRace && fighters.length >= 4) || (plan.allIn && fighters.length >= 12));
+  // A rival's gate answered (#792): the wave that spent its bait on it still goes.
+  const sprung = L.clever && gateSprung(s, mem) && fighters.length >= Math.max(4, waveSize - AI_GATE_ANSWER.bait);
+  const launch = due && !mem.attacking && (fighters.length >= waveSize || (wonderRace && fighters.length >= 4) || (plan.allIn && fighters.length >= 12) || sprung);
   const reinforce = mem.attacking && ready.length >= (plan.allIn ? 1 : 4);
-  const ebb = L.clever && !plan.allIn && !wonderRace && (launch || reinforce) && ebbWait(s, mem, launch ? fighters : ready, enemy);
+  // A rival's loaded Tide Gate on the way is answered first (#792): a keg, bait, or a wait.
+  const ebb = L.clever && !plan.allIn && !wonderRace && (launch || reinforce) && (gateAnswer(s, p, mem, launch ? fighters : ready, enemy, issue) || ebbWait(s, mem, launch ? fighters : ready, enemy));
   // The wait is counted from when the wave stood ready: one that broke up to do other work starts again.
   if (!launch && !reinforce && mem.tide) delete mem.tide.wait;
+  if (!launch && !reinforce && mem.tide?.answer) delete mem.tide.answer;
   if (launch && !ebb) {
     issue({ t: 'move', p: p.id, ids: fighters.map((u) => u.id), x: enemy.x, y: enemy.y, amove: true });
     mem.attacking = true;
@@ -5859,8 +6008,9 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     }
   }
   if (L.clever) for (const id of guardMarks(s, v, mem, ready.filter((u) => !watching.has(u.id)), issue)) watching.add(id);
+  const bait = baitIds(mem);
   const strays = ready.filter((u) => {
-    if (watching.has(u.id)) return false;
+    if (watching.has(u.id) || bait?.has(u.id)) return false;
     const ox = u.x - mem.muster!.x;
     const oy = u.y - mem.muster!.y;
     return ox * ox + oy * oy > 36 && u.order.k === 'idle';
