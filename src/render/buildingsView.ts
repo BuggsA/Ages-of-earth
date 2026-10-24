@@ -169,7 +169,7 @@ export class BuildingsView {
     const base = this.baseHeight(s, k);
     group.position.set(k.x, base, k.y);
     const wall = k.type === 'wall';
-    const body = new THREE.Mesh(buildingGeometry(k.type, k.epoch, this.colors[k.owner] ?? '#ffffff', wall || k.type === 'snare' || k.type === 'shaft' ? k.variant : 0, k.age, k.heirloom), buildingMaterial);
+    const body = new THREE.Mesh(buildingGeometry(k.type, k.epoch, this.colors[k.owner] ?? '#ffffff', wall || k.type === 'snare' || k.type === 'shaft' || k.type === 'tower' ? k.variant : 0, k.age, k.heirloom), buildingMaterial);
     if (k.type === 'gate' && k.variant) body.rotation.y = Math.PI / 2;
     // A dock's pier reaches out over the water.
     if (k.type === 'dock') body.rotation.y = (k.variant * Math.PI) / 2;
@@ -282,7 +282,7 @@ function snapshot(s: GameState, b: Building): Known {
     built: b.built,
     progress: b.progress,
     // A snare shows a hare in its noose once it holds a tender's worth (#485), to its owner and to a rival who sees it.
-    variant: b.type === 'wall' ? wallMask(s, b) : b.type === 'gate' || b.type === 'dock' ? b.dir : b.type === 'snare' ? (catchIn(b) >= SNARE.worth ? 1 : 0) : b.type === 'shaft' ? Math.max(0, SEAMS.indexOf(seamOf(s, b) ?? 'stone')) : 0,
+    variant: b.type === 'wall' ? wallMask(s, b) : b.type === 'gate' || b.type === 'dock' ? b.dir : b.type === 'snare' ? (catchIn(b) >= SNARE.worth ? 1 : 0) : b.type === 'shaft' ? Math.max(0, SEAMS.indexOf(seamOf(s, b) ?? 'stone')) : b.type === 'tower' ? (b.level ?? 0) : 0,
   };
 }
 

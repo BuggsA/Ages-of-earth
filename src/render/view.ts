@@ -988,6 +988,11 @@ export class View {
           this.effects.burst(this.ground(s, ev.x, ev.y, 0.1), { count: 5, speed: 0.6, up: 0.4, life: 0.8, size: 0.05, grow: 1.8, gravity: -0.1, drag: 1.5, soft: true, colors: ['#bba98a', '#d6c7aa'] });
           this.resources.markDirty();
           break;
+        case 'raised':
+          // The tower line: a tower raised a step shakes off a puff of mortar dust as its new walls go up.
+          if (ev.owner === this.viewer) this.onCue?.('research', 0, 1);
+          if (this.sees(ev.x, ev.y)) this.effects.burst(this.ground(s, ev.x, ev.y, 1.2), { count: 14, speed: 1.2, up: 0.6, life: 1, size: 0.08, grow: 1.6, gravity: -0.2, drag: 1.5, soft: true, colors: ['#bdb6a8', '#d8d1c2', '#9d978d'] });
+          break;
         case 'researched':
           if (ev.owner === this.viewer) this.onCue?.('research', 0, 1);
           break;

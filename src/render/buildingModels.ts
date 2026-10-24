@@ -1057,6 +1057,40 @@ function tower(k: Kit, e: number, st: Style): void {
   banner(k, 0, 2.6, 0, 0.8, 0.8);
 }
 
+/**
+ * The tower line (`TOWER_LEVELS`): what each step adds round any epoch's tower, so a raised tower reads at a glance.
+ * Guard Tower: a timber gallery (hoarding) braced out from the shaft. Keep: a stone skirt and four corner buttresses.
+ * Bastion: a low, wide, eight-sided gun platform with a cannon at each face.
+ */
+function towerLevel(k: Kit, level: number): void {
+  if (level >= 1) {
+    k.box(1.5, 0.26, 1.5, WOOD, 0, 1.22, 0);
+    k.box(1.56, 0.05, 1.56, '#5e4128', 0, 1.48, 0);
+    for (const [x, z] of [[-0.62, -0.62], [0.62, -0.62], [-0.62, 0.62], [0.62, 0.62]]) {
+      const strut = k.box(0.06, 0.5, 0.06, '#5e4128', x * 0.85, 0.82, z * 0.85);
+      strut.rotation.z = x > 0 ? -0.5 : 0.5;
+    }
+    k.team(k.box(1.52, 0.06, 1.52, TEAM, 0, 1.3, 0));
+  }
+  if (level >= 2) {
+    k.box(1.6, 0.5, 1.6, STONE, 0, 0, 0);
+    k.box(1.68, 0.06, 1.68, '#8f897f', 0, 0.5, 0);
+    // Merlons along the skirt's edge, and a buttress at each corner.
+    for (const t of [-0.5, -0.17, 0.17, 0.5]) for (const [x, z] of [[t, 0.76], [t, -0.76], [0.76, t], [-0.76, t]]) k.box(0.14, 0.16, 0.14, STONE, x, 0.56, z);
+    for (const [x, z] of [[-0.74, -0.74], [0.74, -0.74], [-0.74, 0.74], [0.74, 0.74]]) k.box(0.3, 1.15, 0.3, STONE, x, 0, z);
+  }
+  if (level >= 3) {
+    // Star-fort points: an angled bastion at each corner, a cannon in each looking out along the diagonal.
+    for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      k.box(0.62, 0.42, 0.62, '#7d776d', x * 0.62, 0, z * 0.62).rotation.y = Math.PI / 4;
+      k.box(0.66, 0.05, 0.66, '#a59f94', x * 0.62, 0.42, z * 0.62).rotation.y = Math.PI / 4;
+      const gun = k.cyl(0.05, 0.07, 0.42, 6, IRON_DARK, x * 0.78, 0.55, z * 0.78);
+      gun.rotation.order = 'YXZ';
+      gun.rotation.set(Math.PI / 2, Math.atan2(x, z), 0);
+    }
+  }
+}
+
 // ---- Forge -----------------------------------------------------------------------------------------
 
 function anvil(k: Kit, x: number, z: number): void {
@@ -2331,6 +2365,8 @@ export function buildingGeometry(type: BuildingType, epochIn: number, color: str
     else if (type === 'snare') snare(k, epoch, variant === 1);
     else if (type === 'shaft') shaft(k, epoch, roleStyle(type, epoch, STYLES[Math.min(epoch, 4)]), variant);
     else MAKERS[type](k, epoch, roleStyle(type, epoch, STYLES[Math.min(epoch, 4)]));
+    // A Watch Tower's `variant` is its step on the tower line.
+    if (type === 'tower' && variant) towerLevel(k, variant);
     if (!BARE.includes(type)) teamMarks(k, type);
     const stack = STACKS[type];
     if (epoch >= 4 && stack) smokestack(k, stack[0], stack[1], stack[2]);
