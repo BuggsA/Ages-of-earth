@@ -747,7 +747,7 @@ function underGuns(s: GameState, u: Unit, x: number, y: number): boolean {
     if (e.kind !== 'building' || e.hp <= 0 || !e.built || !isEnemy(s, u.owner, e.owner)) continue;
     const g = BUILDINGS[e.type].guns;
     if (!g || !seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
-    const r = gunRange(s, e.owner, e.type) + EXPLORE.wary + BUILDINGS[e.type].size / 2;
+    const r = gunRange(s, e.owner, e.type, e.level) + EXPLORE.wary + BUILDINGS[e.type].size / 2;
     if ((e.x - x) * (e.x - x) + (e.y - y) * (e.y - y) <= r * r) return true;
   }
   return false;

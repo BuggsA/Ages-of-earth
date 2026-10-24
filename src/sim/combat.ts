@@ -267,13 +267,13 @@ export function buildingGuns(s: GameState, sp: Spatial, b: Building): void {
     b.cool--;
     return;
   }
-  const reach = gunRange(s, b.owner, b.type) + b.size / 2;
+  const reach = gunRange(s, b.owner, b.type, b.level) + b.size / 2;
   // A Blood Tower (#355 s3) looks for the living first, and spends its bolts on the bloodless only when nothing else is near.
   const blood = b.type === 'bloodtower';
   const t = (blood ? nearestEnemyUnit(s, sp, b.owner, b.x, b.y, reach, bleeds) : null) ?? nearestEnemyUnit(s, sp, b.owner, b.x, b.y, reach);
   if (!t) return;
   b.cool = secs(g.reload);
-  const power = gunPower(s, b.owner, b.type);
+  const power = gunPower(s, b.owner, b.type, b.level);
   // A Coil Tower (the Age of Lightning, #231) looses a bolt in place of its own arrow; those sheltering inside still shoot.
   // A tower kept as Lightning's keepsake (#555 s11) is still a coil on any road.
   const coil = b.type === 'tower' && (hasCoils(s.players[b.owner]) || b.keep === 'lightning');

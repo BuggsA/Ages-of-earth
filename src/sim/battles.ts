@@ -45,7 +45,7 @@ function dps(s: GameState, a: Fighter, t: Fighter): number {
   }
   const g = BUILDINGS[a.type].guns;
   if (!g || t.kind !== 'unit' || asleep(s, a)) return 0;
-  const power = gunPower(s, a.owner, a.type);
+  const power = gunPower(s, a.owner, a.type, a.level);
   return (Math.max(1, power - statsOf(s, t).parmor) * (1 + Math.min(10, a.garrison.length))) / g.reload;
 }
 

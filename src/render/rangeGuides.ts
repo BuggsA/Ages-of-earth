@@ -42,7 +42,7 @@ export function selectedRange(s: GameState, viewer: number, e: Ent): RangeGuide 
     return reach ? { x: e.x, y: e.y, ...reach } : null;
   }
   if (!e.built) return null;
-  return BUILDINGS[e.type].guns ? { x: e.x, y: e.y, reach: gunRange(s, e.owner, e.type) + e.size / 2, minimum: 0 } : null;
+  return BUILDINGS[e.type].guns ? { x: e.x, y: e.y, reach: gunRange(s, e.owner, e.type, e.level) + e.size / 2, minimum: 0 } : null;
 }
 
 /** A defense's future reach, including this player's researched range. */

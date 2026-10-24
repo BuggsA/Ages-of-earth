@@ -14,7 +14,7 @@ export function statsOf(s: GameState, u: Unit): UnitStats {
 }
 
 export function maxHp(s: GameState, e: Ent): number {
-  return e.kind === 'unit' ? statsOf(s, e).hp : buildingMaxHp(s, e.owner, e.type);
+  return e.kind === 'unit' ? statsOf(s, e).hp : buildingMaxHp(s, e.owner, e.type, e.level);
 }
 
 /** The team a player is on (gates open for their own team). */

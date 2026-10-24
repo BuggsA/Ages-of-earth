@@ -14,7 +14,7 @@ import { hitAnimal, spawnAnimal, updateAnimals } from './animals';
 import { markGoals, scenarioStep, startScenario } from './campaign';
 import { buildingGuns, updateShots } from './combat';
 import { applyCommand } from './commands';
-import { AGES, AURA, AUTO_WORK, unitEpoch, CIV_IDS, HEART, LANDMARKS, RAIDER, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, WONDER_SECONDS, secs } from './data';
+import { AGES, AURA, AUTO_WORK, unitEpoch, CIV_IDS, HEART, LANDMARKS, RAIDER, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, TOWER_LEVELS, WONDER_SECONDS, secs } from './data';
 import { AIR, NAVAL, stampBuilding } from './grid';
 import { denWolves, generateMap } from './mapgen';
 import { Spatial } from './spatial';
@@ -283,7 +283,7 @@ export function enterAge(s: GameState, p: Player, to: AgeId, back = false): void
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.owner !== p.id || !e.queue.length) continue;
     const keep = e.queue.filter((q) =>
-      q.tech ? TECHS[q.tech].epoch <= p.epoch : trainsAt(p, e.type).includes(q.unit!) && unitEpoch(q.unit!) <= p.epoch && !barred(p, q.unit!),
+      q.rise ? TOWER_LEVELS[e.level ?? 0].epoch <= p.epoch : q.tech ? TECHS[q.tech].epoch <= p.epoch : trainsAt(p, e.type).includes(q.unit!) && unitEpoch(q.unit!) <= p.epoch && !barred(p, q.unit!),
     );
     if (keep.length === e.queue.length) continue;
     for (const q of e.queue) if (!keep.includes(q)) refund(p, q.paid);
@@ -326,6 +326,19 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
   if (!item) return;
   // In the Age of Lightning a coil's field speeds the work and the dark slows it (#231); elsewhere one step a tick.
   const steps = workSteps(s, b);
+  if (item.rise) {
+    // The tower line: this tower alone climbs one step, its health rising with its walls.
+    const next = TOWER_LEVELS[b.level ?? 0];
+    item.done += steps;
+    if (next && item.done < secs(next.time)) return;
+    b.queue.shift();
+    if (!next) return;
+    const was = maxHp(s, b);
+    b.level = (b.level ?? 0) + 1;
+    b.hp = (b.hp * maxHp(s, b)) / was;
+    s.events.push({ k: 'raised', owner: p.id, id: b.id, level: b.level, x: b.x, y: b.y });
+    return;
+  }
   if (item.tech) {
     item.done += steps;
     if (item.done < secs(TECHS[item.tech].time)) return;

@@ -69,6 +69,7 @@ describe('one player never commands another’s people', () => {
       stance: { t: 'stance', p: 1, ids, stance: 'stand' },
       train: { t: 'train', p: 1, building: tc.id, unit: 'citizen' },
       research: { t: 'research', p: 1, building: tc.id, tech: 'wheelbarrow' },
+      raiseTower: { t: 'raiseTower', p: 1, building: tc.id },
       cancel: { t: 'cancel', p: 1, building: tc.id, index: 0 },
       advance: { t: 'advance', p: 1, building: tc.id },
       stepBack: { t: 'stepBack', p: 1, building: tc.id },
