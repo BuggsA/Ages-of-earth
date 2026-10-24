@@ -487,6 +487,7 @@ export class Hud {
     this.idleMinersCard(s, viewer, now);
     this.idleHuntersCard(s, viewer, now);
     this.idleFishersCard(s, viewer, now);
+    this.idleBuildersCard(s, viewer, now);
     const idle = idleCitizens(s, viewer);
     const next = new Map<number, number>();
     for (const u of idle) next.set(u.id, this.idleSince.get(u.id) ?? now);
@@ -560,6 +561,32 @@ export class Hud {
     const el = document.createElement('div');
     el.className = 'notice alert shortage idle-hunters';
     el.innerHTML = `<span>${waiting} hunters stand idle: the game is gone.</span><button type="button" data-forage="${n}" title="Send ${n} for berries, a free field or meat nearby; a field is laid if there is none">🍖 Find more food</button>`;
+    this.noticeEl.appendChild(el);
+    while (this.noticeEl.children.length > 4) this.noticeEl.firstChild!.remove();
+    setTimeout(() => (el.style.opacity = '0'), 8000);
+    setTimeout(() => el.remove(), 8700);
+  }
+
+  /** Builders whose work is done (#344): remember who last built; 3+ idle for 5 s offer one button that sends them to the trees (`reassign` idle→wood). */
+  private building = new Set<number>();
+  private buildersCardAt = 0;
+  private idleBuildersCard(s: GameState, viewer: number, now: number): void {
+    const idle = new Set(idleCitizens(s, viewer).map((u) => u.id));
+    let waiting = 0;
+    for (const e of s.ents) {
+      if (e.kind !== 'unit' || e.owner !== viewer || e.hp <= 0) continue;
+      if (e.order.k === 'build') this.building.add(e.id);
+      else if (idle.has(e.id) && this.building.has(e.id)) {
+        if (now - (this.idleSince.get(e.id) ?? now) > 5000) waiting++;
+      } else this.building.delete(e.id);
+    }
+    if (waiting < 3 || now < this.buildersCardAt) return;
+    this.buildersCardAt = now + 30000;
+    const n = Math.min(waiting, AUTO_WORK.lay);
+    this.noticeEl.querySelector('.idle-builders')?.remove();
+    const el = document.createElement('div');
+    el.className = 'notice alert shortage idle-builders';
+    el.innerHTML = `<span>${waiting} builders stand idle: the work is done.</span><button type="button" data-mine="wood" data-n="${n}" title="Send ${n} to the nearest trees">🪓 Fell timber</button>`;
     this.noticeEl.appendChild(el);
     while (this.noticeEl.children.length > 4) this.noticeEl.firstChild!.remove();
     setTimeout(() => (el.style.opacity = '0'), 8000);
