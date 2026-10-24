@@ -155,6 +155,9 @@ export interface Inject {
   season?: 'ground' | 'leaf' | 'snow';
 }
 
+/** How much an edge-on surface darkens (0 none, 1 black): the edge that sets models off the ground. */
+const RIM_DARK = 0.45;
+
 export const timeUniform = { value: 0 };
 
 /** Add the world's shader parts to a material. */
@@ -293,6 +296,7 @@ export function inject<T extends THREE.Material>(mat: T, o: Inject): T {
     const parsF: string[] = [];
     if (o.fog !== false) parsF.push(FOG_PARS_FRAGMENT);
     if (o.rig || o.team) parsF.push('varying float vGlow;\nuniform float uGlow;');
+    if (o.rig || o.team || o.sway) parsF.push(`#define RIM_DARK ${RIM_DARK.toFixed(2)}`);
     if (o.season) parsF.push(SEASON_PARS_FRAGMENT);
     fs = fs.replace('#include <common>', `#include <common>\n${parsF.join('\n')}`);
     if (o.season && o.season !== 'snow') fs = fs.replace('#include <color_fragment>', `#include <color_fragment>\n${SEASON_COLOR(o.season === 'leaf')}`);
@@ -300,6 +304,8 @@ export function inject<T extends THREE.Material>(mat: T, o: Inject): T {
     let tail = '#include <opaque_fragment>';
     if (o.rig || o.team) tail += '\n  gl_FragColor.rgb += diffuseColor.rgb * vGlow * uGlow;';
     if (o.rim) tail += '\n  gl_FragColor.rgb += mix(diffuseColor.rgb, vec3(1.0), 0.35) * pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), 3.0) * 0.3;';
+    // A dark rim where a surface turns edge-on to the camera, so models read against the ground even with no shadows (Low).
+    if (o.rig || o.team || o.sway) tail += '\n  gl_FragColor.rgb *= 1.0 - RIM_DARK * pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 2.0);';
     if (o.fog !== false) tail += `\n${FOG_FRAGMENT}`;
     fs = fs.replace('#include <opaque_fragment>', tail);
     shader.fragmentShader = fs;
