@@ -15,6 +15,9 @@ import { heightAt } from './terrain';
  * scaffolding. Ruins smoulder a while where buildings fell.
  */
 
+/** Buildings carry a pale rim on edges that turn from the eye, so walls and roofs keep an outline against grass and shade (#617). */
+const buildingMaterial = inject(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.85 }), { team: true, flag: true, season: 'snow', rim: true });
+
 /** What the viewer last saw of a building. */
 export interface Known {
   id: number;
@@ -165,7 +168,7 @@ export class BuildingsView {
     const base = this.baseHeight(s, k);
     group.position.set(k.x, base, k.y);
     const wall = k.type === 'wall';
-    const body = new THREE.Mesh(buildingGeometry(k.type, k.epoch, this.colors[k.owner] ?? '#ffffff', wall || k.type === 'snare' ? k.variant : 0, k.age, k.heirloom), bakedMaterial);
+    const body = new THREE.Mesh(buildingGeometry(k.type, k.epoch, this.colors[k.owner] ?? '#ffffff', wall || k.type === 'snare' ? k.variant : 0, k.age, k.heirloom), buildingMaterial);
     if (k.type === 'gate' && k.variant) body.rotation.y = Math.PI / 2;
     // A dock's pier reaches out over the water.
     if (k.type === 'dock') body.rotation.y = (k.variant * Math.PI) / 2;
