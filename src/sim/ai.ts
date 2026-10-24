@@ -10,6 +10,7 @@ import { backProblem, backTo, ageDef, ageOf, asleep, barred, buildBarred, crossi
 import { grindersOf, kegsOf, millProblem, mills, sappers } from './powder';
 import { beatersAt, burns, onFire } from './fire';
 import { basinOf, channelPlan, coastHeld, dykePlan, heldBack, isChannel, isInund, isPolder, polderField, sluiceFed, sluiceProblem, waterLine, type ChannelPlan, type DykePlan } from './water';
+import { coveredNext, shoreNear, tideClock, tideMillSpot } from './tides';
 import { wallLine } from './commands';
 import { launchProblem, loaded, rulesOf, silosOf } from './silo';
 import { carriedBy } from './relics';
@@ -30,7 +31,7 @@ import { graftCost, stationsOf, waiting } from './hemo';
 import { borderMap, landOwnerAt, suppliedAt } from './borders';
 import { workProblem } from './works';
 import { aiKin, aiVow, aiWay, wayBarred } from './ways';
-import { AI_TOWER_KEEP, AI_TOWER_PEACE, AI_WAYS, AI_KEG, AI_DYKE, AI_RIVERS, AI_WATERLINE, KEG, KILL_CAMP, KIN, POLDER, TOWER_LEVELS, WAYS } from './data';
+import { AI_TOWER_KEEP, AI_TOWER_PEACE, AI_WAYS, AI_KEG, AI_DYKE, AI_RIVERS, AI_WATERLINE, KEG, KILL_CAMP, KIN, POLDER, TOWER_LEVELS, WAYS, AI_TIDES } from './data';
 import { beaconProblem, lit } from './beacon';
 import { rallyProblem } from './rally';
 import { consecrateProblem, consecrates } from './consecrate';
@@ -252,6 +253,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   beatFires(s, v, issue);
   dykeWork(s, v, mem, issue);
   riverWork(s, v, mem, issue);
+  tideWork(s, v, mem, issue);
   waterLineWork(s, v, mem, issue);
   siloRoad(s, v, mem, issue);
   fireSilo(s, v, mem, issue);
@@ -590,6 +592,9 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
     // that walked the Age of Rivers is on the road already, and goes on down it more often.
     // A town that has set its heart on the Sail waits on its catch instead: one water plan at a time (#720).
     roads[to] = roads.sail !== true && coastHeld(s, p) && !!dykeOf(s, p, mem) && coin(s, p.id, 0xd1e5) < (hasWalked(p, 'rivers') ? AI_RIVERS.onward : AI_DYKE.take);
+  } else if (roads[to] === undefined && to === 'tides') {
+    // The Water Road's sixth age (#739): a people with a shore, on a coin of its own; one already on the Water Road goes on more often.
+    roads[to] = coastHeld(s, p) && coin(s, p.id, 0x71de) < (hasWalked(p, 'rivers') || hasWalked(p, 'dykes') ? AI_TIDES.onward : AI_TIDES.take);
   } else if (roads[to] === undefined && to === 'waterline') {
     // The Water Road's third age (#701 s4): a people that walked the Dykes goes on down it on a coin of its own, so no other match's dice shift.
     roads[to] = hasWalked(p, 'dykes') && coin(s, p.id, 0x5a1c) < AI_WATERLINE.take;
@@ -872,6 +877,12 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
     // The Water Road (#701): a town with a dyke worth raising by home turns into the Age of Dykes once its Dock shows the road
     // (`clueDue` raises the Dock). Asked before the road is known, so the Dock is raised for it.
     if (r.to === 'dykes') {
+      if (wants(s, p, mem, r.to) && roadKnown(s, p, r) && !roadProblem(s, p, r)) return { road: r, wait: false };
+      continue;
+    }
+    // The Age of Tides (#739): a town with a shore turns into it once its Dock shows the road (`clueDue` raises the Dock), asked
+    // before the road is known so the Dock goes up for it, and only with the road's price in hand.
+    if (r.to === 'tides') {
       if (wants(s, p, mem, r.to) && roadKnown(s, p, r) && !roadProblem(s, p, r)) return { road: r, wait: false };
       continue;
     }
@@ -1516,6 +1527,47 @@ function dykeWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   }
 }
 
+const TIDES_ROAD = ROADS.find((r) => r.from === 'atomic' && r.to === 'tides')!;
+
+/**
+ * The computer and the tide (#739). From the Atomic Age, a town bound for the age saves for it and turns. Any people, once the tide is awake: with the flood a step off (`AI_TIDES.wary` seconds), its people
+ * standing on flats the water will cover step ashore first. In the Age of Tides (or holding a kept mill): Tide Mills, up to
+ * `AI_TIDES.mills`, each where it reaches the most tidal ground no mill reaches yet (`tideMillSpot`).
+ */
+function tideWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  // Bound for the age from the Atomic (`wants`): its price is set aside before anything else spends it (the Town Center would train
+  // hands for ever, at the last epoch), and the turn is taken once the Town Center is free.
+  if (ageOf(p) === 'atomic' && walksWeb(v) && v.tc && !v.buildings.some((b) => b.advance >= 0) && wants(s, p, mem, 'tides') && roadKnown(s, p, TIDES_ROAD) && !roadProblem(s, p, TIDES_ROAD)) {
+    if (v.tc.queue.length === 0 && afford(v, TIDES_ROAD.cost)) issue({ t: 'advance', p: p.id, building: v.tc.id, to: 'tides' });
+    spend(v, TIDES_ROAD.cost);
+  }
+  const clock = tideClock(s);
+  if (!clock) return;
+  if (s.tick % secs(1) === p.id % secs(1) && clock.next <= AI_TIDES.wary) {
+    const wet = coveredNext(s);
+    if (wet) {
+      const team = p.team;
+      for (const u of [...v.citizens, ...v.army, ...v.priests, ...v.traders]) {
+        if (u.inside || !wet(Math.floor(u.y) * s.w + Math.floor(u.x))) continue;
+        const to = shoreNear(s, u.x, u.y, team);
+        if (to >= 0) issue({ t: 'move', p: p.id, ids: [u.id], x: (to % s.w) + 0.5, y: Math.floor(to / s.w) + 0.5 });
+      }
+    }
+  }
+  if (!ageDef(p).tides || buildBarred(p, 'tidemill')) return;
+  if (v.buildings.filter((b) => b.type === 'tidemill').length >= AI_TIDES.mills) return;
+  if (s.tick - (mem.ordered.tidemill ?? -99999) < secs(25)) return;
+  const cost = buildingCostFor(s, p.id, 'tidemill');
+  if (!afford(v, cost)) {
+    spend(v, cost);
+    return;
+  }
+  const spot = tideMillSpot(s, p.id, v.home.x, v.home.y, AI_TIDES.reach, AI_TIDES.least, (tx, ty) => !placeProblem(s, 'tidemill', tx, ty, true, p.id));
+  mem.ordered.tidemill = s.tick;
+  if (!spot || !construct(s, v, mem, 'tidemill', spot, 2, issue)) spend(v, cost);
+}
+
 /** The spot nearest home for a windmill whose pull reaches a basin (#701): within `POLDER.reach` of one of its tiles, on land it may raise. */
 export function millSpotFor(s: GameState, owner: number, basin: number[], hx: number, hy: number): { tx: number; ty: number } | null {
   const near = new Set<number>();
@@ -1659,7 +1711,7 @@ function beatFires(s: GameState, v: View, issue: (c: Command) => void): void {
 /** The Atomic Age (#605): a clever computer with a big enough town raises one Missile Silo near home. */
 function siloRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p, home } = v;
-  if (!AI_LEVELS[p.ai!].clever || p.epoch < 5 || v.hands < AI_SILO.hands || v.buildings.some((b) => b.type === 'silo')) return;
+  if (!AI_LEVELS[p.ai!].clever || p.epoch < 5 || v.hands < AI_SILO.hands || v.buildings.some((b) => b.type === 'silo') || buildBarred(p, 'silo')) return;
   if (s.tick - (mem.ordered.silo ?? -99999) < secs(40)) return;
   const cost = buildingCostFor(s, p.id, 'silo');
   if (!afford(v, cost)) {

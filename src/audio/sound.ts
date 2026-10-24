@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'fireLit' | 'fireCatch' | 'fireOut' | 'fireAsh' | 'flow' | 'rush' | 'groan' | 'dart' | 'swarm' | 'hiveHush' | 'sluiceOpen' | 'sluiceShut' | 'spread';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'fireLit' | 'fireCatch' | 'fireOut' | 'fireAsh' | 'flow' | 'rush' | 'groan' | 'dart' | 'swarm' | 'hiveHush' | 'sluiceOpen' | 'sluiceShut' | 'spread' | 'tideWash' | 'tideMill' | 'swept';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -775,6 +775,28 @@ export class Sound {
         this.tone(out, t, { f: 120, type: 'triangle', dur: 2.4, peak: 0.03, attack: 0.9 });
         this.tone(out, t + 0.2, { f: 3200, to: 3320, dur: 1.8, peak: 0.004, attack: 0.8 });
         this.noise(out, t, { dur: 2.2, filter: 'bandpass', f: 900, q: 2, peak: 0.006, attack: 0.8 });
+        break;
+      case 'tideWash':
+        // The tide turns a step (#739): the slow wash of the sea over the flats, a long swell that rises and falls back, a hiss of foam
+        // running up the sand, and a gull far off.
+        this.noise(out, t, { dur: 3.2, filter: 'lowpass', f: 380, to: 520, q: 0.7, peak: 0.05, attack: 1.3 });
+        this.noise(out, t + 0.6, { dur: 2.4, filter: 'bandpass', f: 1600, to: 2400, q: 0.5, peak: 0.025, attack: 1.0 });
+        this.noise(out, t + 1.9, { dur: 1.4, filter: 'highpass', f: 3200, peak: 0.012, attack: 0.5 });
+        this.tone(out, t + 1.4, { f: 1450, to: 1180, type: 'sine', dur: 0.32, peak: 0.008, attack: 0.05 });
+        break;
+      case 'tideMill':
+        // A Tide Mill grinds on the running tide (#739): the undershot wheel's paddles slapping the race, the stones' low rumble, a
+        // coin's chink for the gold.
+        for (let i = 0; i < 4; i++) this.noise(out, t + i * 0.18, { dur: 0.09, filter: 'bandpass', f: 700 + (i % 2) * 160, q: 2.2, peak: 0.03 });
+        this.tone(out, t, { f: 52, to: 47, type: 'triangle', dur: 0.9, peak: 0.04, attack: 0.2, lp: 300 });
+        this.noise(out, t + 0.1, { dur: 0.9, filter: 'lowpass', f: 600, q: 0.8, peak: 0.025, attack: 0.2 });
+        this.bell(out, t + 0.75, N.E6, 0.25, 0.02);
+        break;
+      case 'swept':
+        // Caught on the flats by the tide (#739): a wave breaking over them, a churn, and the drag of it pulling back.
+        this.noise(out, t, { dur: 0.5, filter: 'bandpass', f: 1300, to: 700, q: 0.8, peak: 0.07, attack: 0.03 });
+        this.noise(out, t + 0.1, { dur: 1.1, filter: 'lowpass', f: 340, to: 180, q: 0.9, peak: 0.06, attack: 0.1 });
+        this.noise(out, t + 0.7, { dur: 0.8, filter: 'highpass', f: 2600, to: 1800, peak: 0.02, attack: 0.2 });
         break;
       case 'prospect':
         // The Prospector's Lodge reports (#562): two taps of a pick on rock, the swirl of grit in a pan, then glints in it.

@@ -26,6 +26,7 @@ import { FairBannersView } from './fairBannersView';
 import { VigilCandlesView } from './vigilCandlesView';
 import { RuinsView } from './ruinsView';
 import { FindsView } from './findsView';
+import { TidesView } from './tidesView';
 import { SpringsView } from './springsView';
 import { RubbleView } from './rubbleView';
 import { CacheView } from './cacheView';
@@ -65,7 +66,7 @@ export interface Selection {
   /** The building whose rally point to show. */
   rallyOf: number | null;
   /** A line of wall being laid out. */
-  wall: { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean; type: 'wall' | 'dyke' | 'thornwall' | 'channel' } | null;
+  wall: { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean; type: 'wall' | 'dyke' | 'thornwall' | 'channel' | 'causeway' } | null;
   /** Personal notes visible only in this browser. */
   scoutFlags: readonly ScoutFlag[];
 }
@@ -115,6 +116,8 @@ export class View {
   readonly ruins = new RuinsView();
   readonly finds = new FindsView();
   readonly springs = new SpringsView();
+  /** Causeways under the tide (#739). */
+  readonly tides = new TidesView();
   readonly rubble = new RubbleView();
   readonly caches = new CacheView();
   readonly kegs = new KegView();
@@ -196,7 +199,7 @@ export class View {
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sky.mesh, this.hemi, this.fill, this.sun, this.sun.target);
-    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.finds.group, this.springs.group, this.rubble.group, this.caches.group, this.kegs.group, this.fires.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
+    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.finds.group, this.springs.group, this.tides.group, this.rubble.group, this.caches.group, this.kegs.group, this.fires.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
     this.scene.add(this.rangeGuides.mesh, this.borders.mesh, this.graze.mesh, this.foundations.mesh);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.post = new Post(this.renderer, this.scene, this.rig.camera);
@@ -510,6 +513,7 @@ export class View {
     this.ruins.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     this.finds.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     this.springs.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1);
+    this.tides.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1);
     this.landmarks.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     if (!this.reveal) {
       for (const f of this.sightings.scan(s, (x, y) => p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1)) {
@@ -1332,6 +1336,31 @@ export class View {
           this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.08, ev.y), { count: 9, speed: 1.1, up: 0.9, life: 0.9, size: 0.06, gravity: 3, drag: 0.4, colors: ['#ffffff', '#dcefff', '#8a7d5c'] });
           if (ev.drowned) this.cue('splashWater', ev.x, ev.y, 0.7);
           if (ev.tile % 4 === 0) this.cue('rush', ev.x, ev.y, 0.35);
+          break;
+        }
+        case 'tide':
+          // The tide turns a step (#739): its slow wash, heard by everyone, a little louder on the turn at low and high water.
+          this.cue('tideWash', this.rig.target.x, this.rig.target.z, ev.level === 0 || ev.bared === 0 ? 0.45 : 0.3);
+          this.resources.markDirty();
+          break;
+        case 'tideSwept': {
+          // Caught on the flats (#739): a wave breaking over them where they stood.
+          if (!this.sees(ev.x, ev.y)) break;
+          this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.1, ev.y), { count: 10, speed: 1.2, up: 1, life: 0.9, size: 0.06, gravity: 3, drag: 0.4, colors: ['#ffffff', '#dcefff', '#8f8670'] });
+          this.cue('swept', ev.x, ev.y, 0.5);
+          break;
+        }
+        case 'milled': {
+          // A Tide Mill grinds on the running tide (#739): spray off the wheel, a few coins for its people.
+          if (ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;
+          this.effects.burst(this.ground(s, ev.x, ev.y, 0.6), { count: 7, speed: 0.7, up: 1.2, life: 0.9, size: 0.05, gravity: 2.4, colors: ['#dcefff', '#ffd166', '#f2cf4a'] });
+          if (ev.owner === this.viewer) this.cue('tideMill', ev.x, ev.y, 0.4);
+          break;
+        }
+        case 'causeway': {
+          // A stretch of causeway laid (#739): grit thrown up off the packed stone.
+          if (!this.sees(ev.x, ev.y)) break;
+          this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.08, ev.y), { count: 6, speed: 0.6, up: 0.8, life: 0.7, size: 0.05, gravity: 3, colors: ['#b8ad96', '#9e9482', '#dcefff'] });
           break;
         }
         case 'inundated': {

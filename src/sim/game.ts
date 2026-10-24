@@ -35,6 +35,7 @@ import { cacheStep, dropOre, spillStore } from './caches';
 import { kegStep, millStep } from './powder';
 import { fireStep } from './fire';
 import { ditchStep, floodStep, pumpStep, sluiceStep } from './water';
+import { aground, tideStep } from './tides';
 import { siloStep } from './silo';
 import { stockPosts } from './oretrade';
 import { sortieStep } from './sortie';
@@ -398,6 +399,8 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
     item.done = Math.min(need, item.done + steps);
     if (item.done < need) return;
   }
+  // A harbour aground at low water (#739) launches nothing until the tide comes back.
+  if (domainOf(unit) === 'water' && aground(s, b)) return;
   if (p.pop + kin > p.cap) {
     if (item.done === need) {
       item.done = need + 1;
@@ -644,6 +647,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   pumpStep(s);
   ditchStep(s);
   floodStep(s);
+  tideStep(s);
   sluiceStep(s);
   siloStep(s);
   sortieStep(s);
@@ -729,6 +733,8 @@ export function checksum(s: GameState): number {
   // The Water Line (#701 s4): every tile under a sluice's flood.
   if (s.inund) for (let i = 0; i < s.inund.length; i++) if (s.inund[i]) mix(i + 0x80000);
   for (const t of s.springs ?? []) mix(t);
+  // The tide (#739): the tidal ground and where it stands bared.
+  if (s.tidal) for (let i = 0; i < s.tidal.length; i++) if (s.tidal[i]) mix(i * 4 + s.terrain[i] + s.tidal[i] * 0x100000);
   for (const f of s.fallen ?? []) {
     mix(f.owner);
     mix(f.tx);

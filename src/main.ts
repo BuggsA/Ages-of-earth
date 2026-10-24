@@ -6,7 +6,7 @@ import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { SIGHT_LORE } from './render/sightings';
 import { wallLine } from './sim/commands';
-import { AGES, AI_DYKE, AI_RIVERS, BUILDINGS, SHAFT, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, SILO, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
+import { AGES, AI_DYKE, AI_RIVERS, AI_TIDES, TIDE, BUILDINGS, SHAFT, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, SILO, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
 import { siteGrade } from './sim/shafts';
 import { crestSvg } from './ui/crests';
 import { unitPicture } from './ui/thumbs';
@@ -20,6 +20,7 @@ import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup }
 import { placeProblem, stampBuilding, walkable } from './sim/grid';
 import { findDockSpot, findSpot, millSpotFor } from './sim/ai';
 import { channelPlan, dig, dykePlan, heldBack, waterLine } from './sim/water';
+import { bared, tideMillSpot, wakeTide } from './sim/tides';
 import { maxHp, placeBuilding, restat, spawnUnit } from './sim/world';
 import { arrivalText, epochArrivals } from './ui/endReport';
 import { journeyHtml } from './ui/journeyReport';
@@ -128,6 +129,9 @@ let lastAlert: { x: number; y: number } | null = null;
 let sluiceToldAt = -Infinity;
 /** When the sea last broke into the viewer's polder (#701 s3), so a flood is told once, not for every tile. */
 let floodToldAt = -99999;
+/** The tide (#739): whether its waking was told, and when the viewer's people were last told they were swept off the flats. */
+let tideTold = false;
+let sweptToldAt = -99999;
 /** When the flock last told of a lamb born, or of bare ground (#308), so the toasts don't pile up. */
 const flockToast = { born: -1e9, hungry: -1e9 };
 /** When tribute was last told of (#318), taken by the viewer's riders or from the viewer's land. */
@@ -1684,10 +1688,10 @@ function gateTurned(s: GameState, tx: number, ty: number): boolean {
 }
 
 /** Buildings laid out by dragging a line: walls, dykes and channels (#701) and Thornwalls (the Age of the Grove). */
-const lined = (t: BuildingType | null): t is 'wall' | 'dyke' | 'thornwall' | 'channel' => t === 'wall' || t === 'dyke' || t === 'thornwall' || t === 'channel';
+const lined = (t: BuildingType | null): t is 'wall' | 'dyke' | 'thornwall' | 'channel' | 'causeway' => t === 'wall' || t === 'dyke' || t === 'thornwall' || t === 'channel' || t === 'causeway';
 
 /** The tiles of a planned wall (or line of dykes), and whether each can be built. */
-function wallPlan(s: GameState): { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean; type: 'wall' | 'dyke' | 'thornwall' | 'channel' } | null {
+function wallPlan(s: GameState): { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean; type: 'wall' | 'dyke' | 'thornwall' | 'channel' | 'causeway' } | null {
   if (!lined(placing)) return null;
   const type = placing;
   const d = wallDrag ?? (placeAt ? { x0: placeAt.tx, y0: placeAt.ty, x1: placeAt.tx, y1: placeAt.ty } : null);
@@ -1725,7 +1729,8 @@ function placeHere(shift: boolean): void {
   const s = game;
   if (!s || !placing || !placeAt) return;
   if (!placeAt.ok) {
-    hud.toast("Can't build there", 'bad');
+    // Ground the tide comes back to (#739) is said as such: it looks like land at low water.
+    hud.toast(placeProblem(s, placing, placeAt.tx, placeAt.ty, true, viewer) === 'tidal' ? "Can't build on the tidal flats: the sea comes back over them" : "Can't build there", 'bad');
     play('error');
     return;
   }
@@ -1899,12 +1904,12 @@ canvas.addEventListener('pointerup', (e) => {
     const d = wallDrag;
     wallDrag = null;
     if (!plan || !plan.tiles.some((t) => t.ok)) {
-      hud.toast(plan?.type === 'dyke' ? "Can't raise a dyke there: dykes go on shallow water, or on the shore beside it" : plan?.type === 'channel' ? "Can't dig a channel there: channels go across open land, starting beside water" : "Can't build a wall there", 'bad');
+      hud.toast(plan?.type === 'causeway' ? "Can't lay a causeway there: causeways go over the tidal flats or the shallow open sea" : plan?.type === 'dyke' ? "Can't raise a dyke there: dykes go on shallow water, or on the shore beside it" : plan?.type === 'channel' ? "Can't dig a channel there: channels go across open land, starting beside water" : "Can't build a wall there", 'bad');
       play('error');
       return;
     }
     const ids = selectedUnits(s).filter((u) => u.type === 'citizen' || legionary(s, u)).map((u) => u.id);
-    issue({ t: 'wall', p: viewer, ids, x0: d.x0, y0: d.y0, x1: d.x1, y1: d.y1, queue: e.shiftKey || undefined, dyke: plan.type === 'dyke' || undefined, thorn: plan.type === 'thornwall' || undefined, channel: plan.type === 'channel' || undefined });
+    issue({ t: 'wall', p: viewer, ids, x0: d.x0, y0: d.y0, x1: d.x1, y1: d.y1, queue: e.shiftKey || undefined, dyke: plan.type === 'dyke' || undefined, thorn: plan.type === 'thornwall' || undefined, channel: plan.type === 'channel' || undefined, causeway: plan.type === 'causeway' || undefined });
     if (!e.shiftKey) {
       placing = null;
       placeAt = null;
@@ -2479,6 +2484,31 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         break;
       case 'hit':
         if (view.sees(ev.x, ev.y)) music.stir(0.012);
+        break;
+      case 'tide': {
+        // The tide (#739): its waking told once, and the flood told to a people with feet on the flats.
+        if (!tideTold) {
+          tideTold = true;
+          const who = s.players.find((q) => AGES[ageOf(q)].tides);
+          hud.toast(`🌊 The tide has woken${who ? `: ${who.id === viewer ? 'your people keeps' : `${who.name} keeps`} the sea's hours` : ''}. Every ${TIDE.period / 60} minutes the sea falls to low water and back: the shallows bare as wet flats anyone may cross, and drown again. The clock is at the top of the screen.`, 'info');
+          break;
+        }
+        if (ev.level === 0) hud.toast('🌊 Low water: the flats are bare. Ships on them sit aground until the water comes back.', 'info');
+        else if (ev.rising && ev.level === 1) {
+          const caught = s.ents.some((u) => u.kind === 'unit' && u.owner === viewer && u.hp > 0 && !u.inside && bared(s, Math.floor(u.y) * s.w + Math.floor(u.x)));
+          if (caught) {
+            hud.toast('🌊 The tide is coming in! Get your people off the flats before the water reaches them.', 'alert');
+            play('alert');
+          }
+        }
+        break;
+      }
+      case 'tideSwept':
+        if (ev.owner === viewer && s.tick - sweptToldAt > TICK_HZ * 10) {
+          sweptToldAt = s.tick;
+          lastAlert = { x: ev.x, y: ev.y };
+          hud.toast(ev.drowned ? '🌊 The tide took some of your people, caught far out on the flats. (Space to look)' : '🌊 The tide swept some of your people off the flats, hurt. (Space to look)', 'bad');
+        }
         break;
       case 'sluice':
         // The Water Line (#701 s4): a rival's sluice opened where the viewer can see it, said once in a while.
@@ -3441,6 +3471,25 @@ function frame(now: number): void {
     b.open = true;
     view.rig.focus(b.x, b.y);
     return waterLine(s, b).length;
+  },
+  /**
+   * The Age of Tides (testing, #739): turn a player to the age (the tide wakes on the next tick), stock it, and raise, finished, a Tide
+   * Mill where the computer would. Returns the mill's id, or 0 where there is no tidal ground near home. Look at it with the camera.
+   */
+  tides(owner: number) {
+    if (!game) return 0;
+    const s = game;
+    const p = s.players[owner];
+    restat(s, p, () => {
+      p.epoch = AGES.tides.tier;
+      p.age = 'tides';
+    });
+    p.res = { food: 5000, wood: 5000, stone: 5000, gold: 5000 };
+    wakeTide(s);
+    const spot = tideMillSpot(s, owner, p.startX, p.startY, AI_TIDES.reach, AI_TIDES.least, (x, y) => !placeProblem(s, 'tidemill', x, y, true, owner));
+    if (!spot) return 0;
+    view.rig.focus(spot.tx + 1, spot.ty + 1);
+    return placeBuilding(s, owner, 'tidemill', spot.tx, spot.ty, true).id;
   },
   /** A finished line of wall, or of Thornwall (testing). */
   wall(owner: number, x0: number, y0: number, x1: number, y1: number, type: 'wall' | 'thornwall' = 'wall') {
