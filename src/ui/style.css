@@ -36,9 +36,30 @@ kbd {
 }
 
 .loading {
-  position: absolute; inset: 0; display: grid; place-items: center; font: 800 42px 'Cinzel', serif; color: var(--gold);
-  letter-spacing: 2px; background: radial-gradient(circle at 50% 40%, #1e2a3a, #0e1621);
+  position: absolute; inset: 0; display: grid; place-items: center; color: var(--gold);
+  background: radial-gradient(circle at 50% 38%, #26364a, #0e1621 75%);
 }
+.loading-card { text-align: center; padding: 0 16px; animation: loading-in 0.8s ease-out both; }
+.loading h1 {
+  margin: 0; font: 800 clamp(34px, 7vw, 64px) 'Cinzel', serif; letter-spacing: 2px;
+  background: linear-gradient(#fff1c2, #e8c46a 55%, #b98a30); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 3px 0 #4a3510) drop-shadow(0 6px 22px rgba(232, 196, 106, 0.3));
+}
+.loading h1 span { font-size: 0.6em; -webkit-text-fill-color: #9aa3b5; }
+.loading p { margin: 10px 0 0; font: 700 clamp(13px, 2vw, 17px) 'Nunito', sans-serif; letter-spacing: 3px; text-transform: uppercase; color: #9aa3b5; }
+/* The five epochs, as a row of lamps that light one after another. */
+.loading-ages { display: flex; gap: 10px; justify-content: center; margin-bottom: 18px; }
+.loading-ages i { width: 10px; height: 10px; transform: rotate(45deg); background: #3a4256; border: 1px solid #6b5a2e; animation: loading-lamp 2.5s ease-in-out infinite; }
+.loading-ages i:nth-child(2) { animation-delay: 0.3s; }
+.loading-ages i:nth-child(3) { animation-delay: 0.6s; }
+.loading-ages i:nth-child(4) { animation-delay: 0.9s; }
+.loading-ages i:nth-child(5) { animation-delay: 1.2s; }
+.loading-bar { width: min(260px, 70vw); height: 3px; margin: 26px auto 0; border-radius: 2px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.loading-bar b { display: block; width: 40%; height: 100%; background: linear-gradient(90deg, transparent, #e8c46a, transparent); animation: loading-sweep 1.4s ease-in-out infinite; }
+@keyframes loading-in { from { opacity: 0; transform: translateY(8px); } }
+@keyframes loading-lamp { 0%, 100% { background: #3a4256; box-shadow: none; } 30%, 60% { background: #e8c46a; box-shadow: 0 0 10px rgba(232, 196, 106, 0.7); } }
+@keyframes loading-sweep { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+@media (prefers-reduced-motion: reduce) { .loading-card, .loading-ages i, .loading-bar b { animation: none; } .loading-ages i { background: #e8c46a; } }
 
 /* Cursors for what a right click would do. */
 #world.cur-attack canvas { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Cpath d='M4 4l11 11M4 4l5 1M4 4l1 5' stroke='%23ff5a4a' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3Cpath d='M14 17l3-3 6 6-3 3z' fill='%23ff5a4a'/%3E%3C/svg%3E") 3 3, crosshair; }
