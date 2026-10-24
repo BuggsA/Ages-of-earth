@@ -82,11 +82,11 @@ function hairOrHat(k: Kit, y: number, hat?: (k: Kit, y: number) => void, at?: TH
 function citizen(epoch: number): Kit {
   const k = new Kit();
   const outfits = [
-    { legs: SKIN, torso: FUR, belt: TEAM },
+    { legs: SKIN, torso: '#c9a47a', belt: TEAM },
     { legs: SKIN, torso: LINEN, belt: TEAM },
-    { legs: '#6b5a48', torso: '#8c7a5a', belt: TEAM },
-    { legs: '#5a5f6b', torso: LINEN, belt: TEAM },
-    { legs: '#454952', torso: '#8a7a64', belt: TEAM },
+    { legs: '#3f342a', torso: '#cdb98a', belt: TEAM },
+    { legs: '#2f333c', torso: LINEN, belt: TEAM },
+    { legs: '#3a3d45', torso: '#c8b898', belt: TEAM },
   ];
   const o = outfits[epoch];
   const b = person(k, { legs: o.legs, torso: o.torso });
@@ -243,7 +243,7 @@ function ranged(epoch: number): Kit {
   }
   if (epoch === 0) {
     // Slinger: furs, team headband, a sling and a pouch of stones.
-    const b = person(k, { legs: SKIN, torso: FUR, belt: TEAM });
+    const b = person(k, { legs: SKIN, torso: '#c9a47a', belt: TEAM });
     k.team(k.box(0.176, 0.035, 0.116, TEAM, 0, HIP + 0.02, 0));
     hairOrHat(k, 0);
     k.team(k.cyl(0.07, 0.07, 0.022, 8, TEAM, 0, 0.53, 0));
@@ -1163,6 +1163,11 @@ function lineMark(k: Kit, type: UnitType): Kit {
   if (type === 'siege') {
     k.cyl(0.01, 0.01, 0.4, 4, WOOD, 0, 0.55, -0.2);
     k.team(k.box(0.012, 0.13, 0.2, TEAM, 0, 0.7, -0.3));
+  }
+  // A ship flies a team ensign from a stern staff, so a fleet reads by owner from above as well as from the side.
+  if (type === 'warship' || type === 'transport' || type === 'cog') {
+    k.cyl(0.01, 0.01, 0.5, 4, WOOD, 0, 0.35, -0.62);
+    k.team(k.box(0.012, 0.12, 0.2, TEAM, 0, 0.55, -0.72));
   }
   return k;
 }
