@@ -1577,7 +1577,7 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   stable: { name: 'Stable', size: 3, hp: 1400, cost: { wood: 150, gold: 50 }, time: 40, pop: 0, sight: 5, trains: ['cavalry'], drop: [], epoch: 1, menu: 'mil', key: 'C', blurb: 'Trains cavalry, who beat archers, priests and siege.' },
   forge: { name: 'Forge', size: 3, hp: 1600, cost: { wood: 175 }, time: 40, pop: 0, sight: 5, trains: [], drop: [], epoch: 1, menu: 'mil', key: 'R', blurb: 'Better weapons and armor for every soldier.' },
   workshop: { name: 'Siege Workshop', size: 3, hp: 1400, cost: { wood: 200 }, time: 40, pop: 0, sight: 5, trains: ['siege'], drop: [], epoch: 1, menu: 'mil', key: 'K', blurb: 'Builds rams, catapults and cannon to break towns.' },
-  tower: { name: 'Watch Tower', size: 2, hp: 600, cost: { wood: 50, stone: 125 }, time: 45, pop: 0, sight: 9, trains: [], drop: [], epoch: 1, guns: { damage: 5, range: 7, reload: 2 }, garrison: 5, menu: 'mil', key: 'W', blurb: 'Sees far and shoots at enemies nearby, aircraft too, but a raw tower is a lookout more than a fort: raise each one to a Guard Tower, a Keep and a Bastion. Shelter soldiers inside for more arrows.' },
+  tower: { name: 'Watch Tower', size: 2, hp: 250, cost: { wood: 50, stone: 125 }, time: 45, pop: 0, sight: 9, trains: [], drop: [], epoch: 1, guns: { damage: 5, range: 7, reload: 2 }, garrison: 5, menu: 'mil', key: 'W', blurb: 'Sees far and shoots at enemies nearby, aircraft too, but a raw tower is a lookout more than a fort: raise each one to a Guard Tower, a Keep and a Bastion. Shelter soldiers inside for more arrows.' },
   dock: { name: 'Dock', size: 3, hp: 1800, cost: { wood: 150 }, time: 35, pop: 0, sight: 6, trains: ['fisher', 'transport', 'warship', 'cog'], drop: ['food'], epoch: 0, shore: true, menu: 'eco', key: 'D', blurb: 'Builds fishing boats, transports, warships and merchant ships, and takes in fish. Build it on the shore.' },
   huntcamp: { name: 'Hunting Camp', size: 2, hp: 500, cost: { wood: 45 }, time: 14, pop: 0, sight: 5, trains: [], drop: ['food'], epoch: 0, menu: 'eco', key: 'N', blurb: 'A drop-off for food, and a small claim on the land round it. Raise it by the herd or a far kill: meat inside your border is safe from wolves, and Drying Racks keep it.' },
   // Snares in the wood (#485): set among standing trees, they fill with small game by themselves (`SNARE`, `src/sim/snares.ts`).
@@ -2621,9 +2621,9 @@ export const GUNS = { epoch: 0.2, towerEpoch: 0.1 };
  * raised the tower still shoots. A tower taken over (priests, reclaim) keeps its level.
  */
 export const TOWER_LEVELS: { name: string; epoch: number; cost: Cost; time: number; attack: number; range: number; hp: number; icon: string; blurb: string }[] = [
-  { name: 'Guard Tower', epoch: 1, cost: { wood: 100, stone: 50 }, time: 30, attack: 2, range: 0, hp: 1.25, icon: '🗼', blurb: 'A second storey of timber: +2 arrow attack and 25% more hit points, for this tower.' },
-  { name: 'Keep', epoch: 2, cost: { wood: 100, stone: 125 }, time: 40, attack: 2, range: 1, hp: 1.25, icon: '🏰', blurb: 'Stone walls and a fighting top: +2 arrow attack, +1 range and 25% more hit points, for this tower.' },
-  { name: 'Bastion', epoch: 3, cost: { wood: 100, gold: 75, stone: 175 }, time: 50, attack: 2, range: 0, hp: 1.2, icon: '🛡', blurb: 'Low, thick, angled walls that shrug off shot: +2 arrow attack and 20% more hit points, for this tower.' },
+  { name: 'Guard Tower', epoch: 1, cost: { wood: 100, stone: 50 }, time: 30, attack: 2, range: 0, hp: 1.5, icon: '🗼', blurb: 'A timber gallery braced out from the walls: +2 arrow attack and 50% more hit points, for this tower.' },
+  { name: 'Keep', epoch: 2, cost: { wood: 100, stone: 125 }, time: 40, attack: 2, range: 1, hp: 1.5, icon: '🏰', blurb: 'A stone skirt and buttresses: +2 arrow attack, +1 range and 50% more hit points, for this tower.' },
+  { name: 'Bastion', epoch: 3, cost: { wood: 100, gold: 75, stone: 175 }, time: 50, attack: 2, range: 0, hp: 1.4, icon: '🛡', blurb: 'A low, wide, angled gun platform that shrugs off shot: +2 arrow attack and 40% more hit points, for this tower.' },
 ];
 /** A clever computer raises a tower a step only with this much of each resource left over beyond the step's price. */
 export const AI_TOWER_KEEP = 50;
