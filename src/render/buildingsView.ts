@@ -12,6 +12,7 @@ import { WHEEL_HUB, tideWheel } from './tideModels';
 import { SAIL_HUB, buildingGeometry, heirloomsFor, foundationGeometry, rubbleGeometry, scaffoldGeometry, windmillSails } from './buildingModels';
 import { bakedMaterial, inject } from './materials';
 import { heightAt } from './terrain';
+import { WATER_Y } from './water';
 import { damTurns } from '../sim/water';
 
 /**
@@ -187,7 +188,8 @@ export class BuildingsView {
     group.userData.building = k.id;
     // A dyke (#701) stands up out of the water: its bank reaches down to the bed, its crown above the water line.
     const dyke = k.type === 'dyke' || k.type === 'sluice';
-    const base = dyke || k.type === 'causeway' ? Math.max(0.02, this.baseHeight(s, k)) : this.baseHeight(s, k);
+    // A Pontoon (#770) floats: it sits on the water line whatever the bed below it.
+    const base = k.type === 'pontoon' ? WATER_Y : dyke || k.type === 'causeway' ? Math.max(0.02, this.baseHeight(s, k)) : this.baseHeight(s, k);
     group.position.set(k.x, base, k.y);
     const wall = k.type === 'wall' || k.type === 'thornwall' || dyke || k.type === 'channel' || k.type === 'causeway';
     const body = new THREE.Mesh(buildingGeometry(k.type, k.epoch, this.colors[k.owner] ?? '#ffffff', wall || k.type === 'snare' || k.type === 'shaft' || k.type === 'tower' || k.type === 'garden' || k.type === 'orchard' ? k.variant : 0, k.age, k.heirloom), buildingMaterial);
@@ -211,7 +213,7 @@ export class BuildingsView {
     }
     // A plinth so a level building doesn't float over the low side of a slope.
     // Fields and hedges (a Kitchen Garden, a Thornwall) lie on the ground as it falls.
-    if (k.type !== 'farm' && k.type !== 'garden' && k.type !== 'thornwall' && !dyke && k.type !== 'causeway') {
+    if (k.type !== 'farm' && k.type !== 'garden' && k.type !== 'thornwall' && !dyke && k.type !== 'causeway' && k.type !== 'pontoon') {
       let lo = Infinity;
       for (let y = k.ty; y <= k.ty + k.size; y++) for (let x = k.tx; x <= k.tx + k.size; x++) lo = Math.min(lo, s.height[y * (s.w + 1) + x]);
       const drop = base - lo;
@@ -284,7 +286,7 @@ const plinthMaterial = inject(new THREE.MeshStandardMaterial({ color: '#8d7a62',
 
 const HEIGHT: Record<BuildingType, number> = {
   towncenter: 2.9, house: 1.5, storehouse: 1.3, farm: 0.4, barracks: 2.0, range: 1.4, stable: 1.4, tower: 3.4,
-  forge: 2.1, workshop: 1.7, temple: 2.6, market: 1.6, wonder: 4.6, wall: 1.3, gate: 1.8, dock: 1.5, airfield: 1.8, dyke: 0.45, sluice: 1.4, bridge: 0.8, dam: 1.2, windmill: 3.3, channel: 0.2, hive: 0.9, heart: 5.2, huntcamp: 1.4, warcamp: 1.7, caravanserai: 1.3, mission: 1.3, drainrig: 1.9, transfusion: 2.1, bloodtower: 2.9, snare: 0.9, prospector: 1.6, sapling: 0.7, silo: 1.4, shaft: 1.8, den: 1.8, thornwall: 1.3, garden: 0.6, orchard: 1.2, causeway: 0.2, tidemill: 2.0, battery: 1.9, spire: 4.4, cockler: 1.4,
+  forge: 2.1, workshop: 1.7, temple: 2.6, market: 1.6, wonder: 4.6, wall: 1.3, gate: 1.8, dock: 1.5, airfield: 1.8, dyke: 0.45, sluice: 1.4, bridge: 0.8, dam: 1.2, windmill: 3.3, channel: 0.2, hive: 0.9, heart: 5.2, huntcamp: 1.4, warcamp: 1.7, caravanserai: 1.3, mission: 1.3, drainrig: 1.9, transfusion: 2.1, bloodtower: 2.9, snare: 0.9, prospector: 1.6, sapling: 0.7, silo: 1.4, shaft: 1.8, den: 1.8, thornwall: 1.3, garden: 0.6, orchard: 1.2, causeway: 0.2, tidemill: 2.0, pontoon: 1.6, battery: 1.9, spire: 4.4, cockler: 1.4,
 };
 
 /** Which neighbouring tiles are land (#701 s5): the banks a bridge spans to, and a dam runs between. */

@@ -38,6 +38,7 @@ import { kegStep, millStep } from './powder';
 import { fireStep } from './fire';
 import { burst, ditchStep, floodStep, pumpStep, sluiceStep } from './water';
 import { aground, holdShore, tideStep } from './tides';
+import { linkProblem, sink } from './floating';
 import { siloStep } from './silo';
 import { stockPosts } from './oretrade';
 import { sortieStep } from './sortie';
@@ -403,6 +404,8 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
   }
   // A harbour aground at low water (#739) launches nothing until the tide comes back.
   if (domainOf(unit) === 'water' && aground(s, b)) return;
+  // A district cut off from its town (#770) raises no citizens until it is linked again.
+  if (unit === 'citizen' && linkProblem(s, b)) return;
   if (p.pop + kin > p.cap) {
     if (item.done === need) {
       item.done = need + 1;
@@ -496,6 +499,8 @@ function removeDead(s: GameState): void {
       stampBuilding(s, e, false);
       // A dam that falls with water behind it bursts (#701 s5).
       if (e.type === 'dam') burst(s, e);
+      // A floating district that sinks (#770) leaves its deck-hands in the water.
+      if (e.type === 'pontoon') sink(s, e);
       remember(s, e);
       leaveRubble(s, e);
       spillStore(s, e);
