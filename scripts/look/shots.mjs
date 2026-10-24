@@ -55,6 +55,19 @@ const SCENES = [
     for (let i = 0; i < 8; i++) ages.spawn(me, 'citizen', p.startX + 3 + (i % 4), p.startY + 3 + Math.floor(i / 4));
     return { x: wx + 1.5, y: wy + 0.7, zoom: 0.6 };
   }],
+  // Citizens close up: the player's in the Industrial Age, the rival's in the Bronze Age, in rows on open grass.
+  ['citizens', ({ g, ages, me, rv }) => {
+    ages.setEpoch(me, 4);
+    ages.setEpoch(rv, 1);
+    const p = g.players[me];
+    const x = p.startX + 8;
+    const y = p.startY + 8;
+    for (let i = 0; i < 10; i++) {
+      ages.spawn(me, 'citizen', x + (i % 5) * 0.8, y + Math.floor(i / 5) * 0.8);
+      ages.spawn(rv, 'citizen', x + (i % 5) * 0.8, y + 2 + Math.floor(i / 5) * 0.8);
+    }
+    return { x: x + 1.6, y: y + 1.4, zoom: 0.35 };
+  }],
   // The same town in the Stone and Bronze Ages (#625): the early silhouettes of houses, stores and barracks.
   ['stone-town', ({ g, ages, me }) => {
     ages.setEpoch(me, 0);
