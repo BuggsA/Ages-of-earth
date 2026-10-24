@@ -8,6 +8,7 @@ import { isIdleCitizen } from './idle';
 import { laterTip, type Opening } from './opening';
 import { findResource } from '../sim/units';
 import { seasonAt } from '../sim/seasons';
+import { tideWaitLeft } from '../sim/tides';
 
 /**
  * Advice for a first game, one tip at a time in a corner: what to do next, given how the match is
@@ -433,6 +434,12 @@ const TIPS: Tip[] = [
     // The tide (#739) woke for a people that is not in the age: it runs for everyone.
     when: (s, me) => s.tideFrom !== undefined && ageOf(s.players[me]) !== 'tides',
     text: 'A rival keeps the sea\'s hours, and the <b>tide</b> has woken for everyone: watch its clock (🌊, top bar). At low water the shallows bare as flats an army can cross, toward you or from you; ships on them sit aground, and a Dock with only flats beside it launches nothing. Whoever stands on the flats when the water comes back is swept ashore, hurt.',
+  },
+  {
+    id: 'tideRoute',
+    // Routes that read the tide (#755): one of the viewer's people stands on the shore waiting for the flats to bare.
+    when: (s, me) => s.tideFrom !== undefined && s.ents.some((e) => e.kind === 'unit' && e.owner === me && tideWaitLeft(s, e) > 0),
+    text: '<b>Your people read the tide.</b> Sent over the flats, a soldier, citizen or trader crosses only if it will be over before the water comes back. Otherwise it goes round by dry ground, or waits on the shore (🌊 and the seconds left, on its panel) for the next low water, whichever is quicker. To be across sooner, send it earlier in the ebb, or lay a causeway: high water alone covers that road.',
   },
   {
     id: 'barrage',

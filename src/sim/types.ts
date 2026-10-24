@@ -292,6 +292,8 @@ export interface Unit {
   venom?: { n: number; end: number; by: number };
   /** Stung by a Hive's swarm (`hive.ts`): the tick the stings wear off, until when it walks slow. Absent: never stung. */
   stung?: number;
+  /** Waiting on the shore for the tide (#755): the tick its route is worked out again. Absent: not waiting. */
+  tideWait?: number;
 }
 
 export interface TrainItem {
@@ -1010,6 +1012,8 @@ export type GameEvent =
   | { k: 'tide'; level: number; rising: boolean; bared: number; covered: number }
   /** A unit caught on the flats by the rising tide (#739) was swept ashore and hurt (`drowned`: no shore near, it was lost). */
   | { k: 'tideSwept'; id: number; owner: number; x: number; y: number; drowned: boolean }
+  /** A land unit stops on the shore to wait for the tide (#755), until tick `until`. */
+  | { k: 'tideHold'; id: number; owner: number; x: number; y: number; until: number }
   /** A Tide Mill ground `gold` on the running tide (#739). */
   | { k: 'milled'; id: number; owner: number; gold: number; x: number; y: number }
   /** A causeway was finished (#739): `tile` is tidal ground now, raised. */

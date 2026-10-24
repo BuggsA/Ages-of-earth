@@ -57,8 +57,11 @@ export interface PathResult {
   cost: number;
 }
 
-/** Find a route from a point to a goal rectangle. */
-export function findPath(s: GameState, sx: number, sy: number, goal: Goal, limit = 8000, team = -1): PathResult {
+/**
+ * Find a route from a point to a goal rectangle. `veto` (#755, routes that read the tide) turns down a step onto a tile reached `g` tiles
+ * along the way, so a route can ask about a tile at the moment it would get there.
+ */
+export function findPath(s: GameState, sx: number, sy: number, goal: Goal, limit = 8000, team = -1, veto?: (tile: number, g: number) => boolean): PathResult {
   const w = s.w;
   ensure(s.w * s.h);
   gen++;
@@ -146,6 +149,8 @@ export function findPath(s: GameState, sx: number, sy: number, goal: Goal, limit
       if (closed[ni] === gen) continue;
       const ng = gc + DIRS[d][2];
       if (stamp[ni] === gen && ng >= gScore[ni]) continue;
+      // A diagonal step brushes both tiles at its corner, so a veto asks about them too.
+      if (veto && (veto(ni, ng) || (dx !== 0 && dy !== 0 && (veto(cy * w + nx, ng) || veto(ny * w + cx, ng))))) continue;
       stamp[ni] = gen;
       gScore[ni] = ng;
       parent[ni] = cur;
@@ -171,11 +176,28 @@ export function findPath(s: GameState, sx: number, sy: number, goal: Goal, limit
     pts[pts.length - 2] = px;
     pts[pts.length - 1] = py;
   }
-  return { points: smooth(s, sx, sy, pts, team), complete: found >= 0, cost };
+  return { points: smooth(s, sx, sy, pts, team, veto), complete: found >= 0, cost };
 }
 
-/** Pull a stair-step route taut: keep only the waypoints where the straight view ahead is blocked. */
-function smooth(s: GameState, sx: number, sy: number, pts: number[], team: number): number[] {
+/** Whether a straight walk from one point to another, starting `g0` tiles along the way, steps on no tile `veto` turns down (#755). */
+function lineSafe(s: GameState, x0: number, y0: number, x1: number, y1: number, g0: number, veto: (tile: number, g: number) => boolean): boolean {
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  const steps = Math.max(1, Math.ceil(len * 3));
+  let last = -1;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const tile = Math.floor(y0 + dy * t) * s.w + Math.floor(x0 + dx * t);
+    if (tile === last) continue;
+    last = tile;
+    if (veto(tile, g0 + len * t)) return false;
+  }
+  return true;
+}
+
+/** Pull a stair-step route taut: keep only the waypoints where the straight view ahead is blocked (or, with a `veto`, turned down). */
+function smooth(s: GameState, sx: number, sy: number, pts: number[], team: number, veto?: (tile: number, g: number) => boolean): number[] {
   const n = pts.length / 2;
   if (n <= 1) return pts;
   const out: number[] = [];
@@ -187,10 +209,13 @@ function smooth(s: GameState, sx: number, sy: number, pts: number[], team: numbe
     ax = pts[2];
     ay = pts[3];
   }
+  // How far along the kept waypoints run, for a veto that asks about the moment a tile is reached.
+  let g = 0;
   for (let i = out.length ? 2 : 1; i < n; i++) {
-    if (lineClear(s, ax, ay, pts[i * 2], pts[i * 2 + 1], team)) continue;
+    if (lineClear(s, ax, ay, pts[i * 2], pts[i * 2 + 1], team) && (!veto || lineSafe(s, ax, ay, pts[i * 2], pts[i * 2 + 1], g, veto))) continue;
     const px = pts[(i - 1) * 2];
     const py = pts[(i - 1) * 2 + 1];
+    if (veto) g += Math.sqrt((px - ax) * (px - ax) + (py - ay) * (py - ay));
     out.push(px, py);
     ax = px;
     ay = py;
