@@ -1,5 +1,6 @@
 import { COCKLE, COCKLER } from '../sim/data';
 import { TIDE_GATE } from '../sim/data';
+import { AI_GATE_ANSWER } from '../sim/data';
 import { AGES, BLOOM, LEVIATHANS, UNITS, BLOOMERY, HIVE, INTERCEPT, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, BEGGARS, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
 import { battlesFor } from '../sim/battles';
 import { ageDef } from '../sim/ages';
@@ -488,6 +489,12 @@ const TIPS: Tip[] = [
     // The Tide Gate (#785): the viewer's people has a barrage's pond, and no gate in it yet.
     when: (s, me) => ageOf(s.players[me]) === 'tides' && !!s.pond && !!s.causewayBy && s.causewayBy.some((o) => o - 1 === me) && !has(s, me, 'tidegate'),
     text: `<b>A gate in the barrage.</b> Set a <b>${BUILDINGS.tidegate.name}</b> (<kbd>V</kbd> <kbd>${BUILDINGS.tidegate.key}</kbd>) on a causeway tile of your barrage, beside the pond. Shut, the pond holds and the mills grind it twice. At low water, when a rival army walks the flats below it, open it (<kbd>O</kbd>): the pond rushes out over them for ${TIDE_GATE.secs} seconds and sweeps them off, hurt or drowned. Then shut it again, and the next flood fills it. Rivals can read whether it is loaded, and keep off.`,
+  },
+  {
+    id: 'gateRead',
+    // The computer answers a rival's gate (#792): the viewer has a Tide Gate standing.
+    when: (s, me) => ageOf(s.players[me]) === 'tides' && has(s, me, 'tidegate'),
+    text: `<b>Your gate is read.</b> A loaded ${BUILDINGS.tidegate.name} shapes when a rival crosses, even shut: the computer holds its army back at the muster, sends ${AI_GATE_ANSWER.bait} of its weakest onto the flats below to draw your scour (fire on them and the gate is spent until the next flood fills it), or, a Sapper people, carries a keg to the gate. A guard by the gate stamps a keg out. Letting the bait walk is a choice too.`,
   },
   {
     id: 'breachCauseway',
