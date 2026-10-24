@@ -1,13 +1,14 @@
-import { AGES, AI_EBB, BARRAGE, KEG, TIDE, TIDE_ROUTE, domainOf, secs } from './data';
+import { AGES, AI_EBB, BARRAGE, COCKLE, KEG, TIDE, TIDE_ROUTE, TIDE_WORK, domainOf, secs } from './data';
 import { ageDef, ageOf, asleep } from './ages';
 import { distToTile, stampBuilding, walkable } from './grid';
 import { isChannel, isInund, isPolder, seaAt } from './water';
-import { isEnemy, statsOf } from './world';
+import { goalForPoint, isEnemy, statsOf } from './world';
+import { hash2 } from './rng';
 import { findPath } from './path';
 import { kegsOf, sappers } from './powder';
 import { peace } from './combat';
-import type { BarragePlan, Building, GameState, Unit } from './types';
-import { B_TERRAIN, R_NONE, T_SAND, T_WATER } from './types';
+import type { BarragePlan, Building, GameState, Order, Unit } from './types';
+import { B_TERRAIN, R_COCKLE, R_NONE, T_SAND, T_WATER } from './types';
 
 /**
  * The tide (#739, s6 of the Water Road #701, the Age of Tides). Until the first people enters the age the sea stands still at high water,
@@ -103,7 +104,7 @@ function levelFor(depth: number): number {
 }
 
 /** Whether nothing on a tile keeps the tide off it: no building or site, no polder, channel or sluice's flood (#701 s4), no shoal. */
-const free = (s: GameState, i: number): boolean => s.bldAt[i] === 0 && s.res[i] === R_NONE && !isPolder(s, i) && !isChannel(s, i) && !isInund(s, i);
+const free = (s: GameState, i: number): boolean => s.bldAt[i] === 0 && (s.res[i] === R_NONE || s.res[i] === R_COCKLE) && !isPolder(s, i) && !isChannel(s, i) && !isInund(s, i);
 
 /**
  * Wake the tide (#739): lay out the tidal ground and start the clock at high water. Called once, the tick the first people stands in the
@@ -121,6 +122,7 @@ export function wakeTide(s: GameState): void {
   }
   s.tidal = tidal;
   s.tideBed = Float32Array.from(s.height);
+  layCockles(s);
   s.tideFrom = s.tick;
   s.tideTurns ??= 0;
   s.events.push({ k: 'tide', level: TIDE_TOP, rising: false, bared: 0, covered: 0 });
@@ -273,7 +275,10 @@ function raiseCauseways(s: GameState): void {
   const gone = new Set(done.map((b) => b.id));
   s.ents = s.ents.filter((e) => !gone.has(e.id));
   s.blockVersion++;
+  const was = s.pond;
   recountPonds(s, true);
+  // A new pond fills at the next turn (#767): whoever's way runs over it works it out again.
+  if (s.pond && s.pond !== was) rereadRoutes(s);
 }
 
 // ---- Tide Mills --------------------------------------------------------------------------------
@@ -367,6 +372,7 @@ export function tideStep(s: GameState): void {
     const { bared: nb, covered, wet } = settle(s, level);
     if (s.tick !== s.tideFrom) {
       s.events.push({ k: 'tide', level, rising: level > tideLevel(s, s.tick - 1), bared: nb, covered });
+      if (level === TIDE_TOP) regrowCockles(s);
       for (const [id, gold] of millShares(s)) {
         if (gold <= 0) continue;
         const b = s.byId.get(id) as Building;
@@ -932,4 +938,227 @@ function rereadRoutes(s: GameState): void {
 /** Whether a unit is waiting on the shore for the tide (#755), and for how many seconds more (0: not waiting). */
 export function tideWaitLeft(s: GameState, u: Unit): number {
   return u.tideWait !== undefined && u.wantPath && u.tideWait > s.tick ? (u.tideWait - s.tick) / secs(1) : 0;
+}
+
+// ---- Cockle beds, and work on the flats that reads the tide (#767) ------------------------------
+
+const FOUR_OF = (s: GameState, i: number): number[] => {
+  const x = i % s.w;
+  const y = (i - x) / s.w;
+  const out: number[] = [];
+  for (let d = 0; d < 8; d += 2) {
+    const nx = x + FOUR[d];
+    const ny = y + FOUR[d + 1];
+    if (nx >= 0 && ny >= 0 && nx < s.w && ny < s.h) out.push(ny * s.w + nx);
+  }
+  return out;
+};
+
+/**
+ * Lay the cockle beds (#767), once, as the tide wakes: round each tile of the deeper flats (level `COCKLE.deep` or lower) the map's seed
+ * picks, one in `COCKLE.chance`, a patch of beds on it and on the ground as deep beside it four ways. In tile order, from the seed alone.
+ */
+function layCockles(s: GameState): void {
+  const t = s.tidal!;
+  const n = s.w * s.h;
+  const open = (i: number) => t[i] !== 0 && t[i] !== TIDE_CAUSEWAY && t[i] <= COCKLE.deep && s.res[i] === R_NONE && s.bldAt[i] === 0;
+  let beds: Uint8Array | null = null;
+  for (let i = 0; i < n; i++) {
+    if (!open(i)) continue;
+    const x = i % s.w;
+    if (hash2(x, (i - x) / s.w, s.seed + 767) >= COCKLE.chance) continue;
+    for (const j of [i, ...FOUR_OF(s, i)]) {
+      if (!open(j)) continue;
+      (beds ??= new Uint8Array(n))[j] = 1;
+      s.res[j] = R_COCKLE;
+      s.amount[j] = COCKLE.amount;
+    }
+  }
+  if (beds) s.cockles = beds;
+}
+
+/** Whether a cockle bed lies open to the sea (#767): no site or building on it, no causeway over it, not shut in a barrage's pond. */
+export const bedOpen = (s: GameState, tile: number): boolean =>
+  !!s.cockles && s.cockles[tile] === 1 && !!s.tidal && s.tidal[tile] !== 0 && s.tidal[tile] !== TIDE_CAUSEWAY && s.bldAt[tile] === 0 && !isPond(s, tile) && (s.res[tile] === R_NONE || s.res[tile] === R_COCKLE);
+
+/** High water brings the cockles back (#767): each open bed, picked out or not, gains `COCKLE.regrow`, up to `COCKLE.amount`. */
+function regrowCockles(s: GameState): void {
+  const beds = s.cockles;
+  if (!beds) return;
+  let n = 0;
+  let food = 0;
+  for (let i = 0; i < beds.length; i++) {
+    if (!beds[i] || !bedOpen(s, i)) continue;
+    const was = s.res[i] === R_COCKLE ? s.amount[i] : 0;
+    const now = Math.min(COCKLE.amount, was + COCKLE.regrow);
+    if (now <= was) continue;
+    s.res[i] = R_COCKLE;
+    s.amount[i] = now;
+    n++;
+    food += now - was;
+  }
+  if (n) s.events.push({ k: 'cockles', beds: n, food });
+}
+
+/** The first tick from `t` on that the sea stands below `level`, so ground of that level is bare (#767); -1 where it never is. */
+export function baresAt(s: GameState, level: number, t: number): number {
+  if (s.tideFrom === undefined) return -1;
+  if (tideLevel(s, t) < level) return t;
+  const st = stepTicks();
+  let at = s.tideFrom + (Math.floor((Math.max(t, s.tideFrom) - s.tideFrom) / st) + 1) * st;
+  for (let k = 0; k < 2 * TIDE_TOP; k++, at += st) if (tideLevel(s, at) < level) return at;
+  return -1;
+}
+
+/** The first tick from `t` on that the sea stands at or above `level`, covering ground of that level (#767); -1 where it never does. */
+function coversAt(s: GameState, level: number, t: number): number {
+  if (s.tideFrom === undefined) return -1;
+  if (tideLevel(s, t) >= level) return t;
+  const st = stepTicks();
+  let at = s.tideFrom + (Math.floor((Math.max(t, s.tideFrom) - s.tideFrom) / st) + 1) * st;
+  for (let k = 0; k < 2 * TIDE_TOP; k++, at += st) if (tideLevel(s, at) >= level) return at;
+  return -1;
+}
+
+/** The tick a bared tidal tile goes under (#767): when the tide reaches its level, or, in a barrage's pond, at the next turn. -1: not soon. */
+function wetAt(s: GameState, tile: number): number {
+  if (s.tideFrom === undefined) return -1;
+  if (isPond(s, tile)) {
+    const st = stepTicks();
+    return s.tideFrom + (Math.floor((s.tick - s.tideFrom) / st) + 1) * st;
+  }
+  return coversAt(s, tidalLevel(s, tile), s.tick);
+}
+
+/** A cockle bed's state for the HUD (#767): bared (and for how many seconds more) or under water (and bared in how many). */
+export function bedClock(s: GameState, tile: number): { bare: boolean; secs: number; pond: boolean } | null {
+  if (!s.cockles || !s.cockles[tile] || !s.tidal) return null;
+  const level = tidalLevel(s, tile);
+  if (isPond(s, tile)) return { bare: false, secs: 0, pond: true };
+  if (bared(s, tile)) {
+    const at = coversAt(s, level, s.tick);
+    return { bare: true, secs: at < 0 ? 0 : (at - s.tick) / secs(1), pond: false };
+  }
+  const at = baresAt(s, level, s.tick);
+  return { bare: false, secs: at < 0 ? 0 : (at - s.tick) / secs(1), pond: false };
+}
+
+const walkingNow = (u: Unit): boolean => u.path !== null || u.wantPath;
+
+/** Send a worker ashore (#767): to `to` (a tile; -1 stays where it stands), there to wait until tick `until`. */
+function goAshore(s: GameState, u: Unit, to: number, until: number): void {
+  if (to >= 0) {
+    u.goal = goalForPoint(s, (to % s.w) + 0.5, Math.floor(to / s.w) + 0.5, s.players[u.owner]?.team ?? -1);
+    u.path = null;
+    u.wantPath = true;
+    u.tideWait = undefined;
+    u.stuck = 0;
+  } else {
+    u.path = null;
+    u.goal = null;
+    u.wantPath = false;
+  }
+  u.ashore = until;
+  s.events.push({ k: 'tideAshore', id: u.id, owner: u.owner, x: to >= 0 ? (to % s.w) + 0.5 : u.x, y: to >= 0 ? Math.floor(to / s.w) + 0.5 : u.y, until });
+}
+
+/**
+ * Work on the flats that reads the tide (#767), asked by a gatherer's and a builder's step before it works. A worker sent ashore waits
+ * there until its tick. A cockle bed under water sends its picker to the dry ground by it (or keeps it where it stands, if near), to wait
+ * until the bed bares. A worker standing on the flats (a picker walking home with its basket too), every `TIDE_WORK.check` ticks, looks at
+ * the clock: if the water would cover its ground before it could walk to the nearest dry ground with `TIDE_WORK.margin` seconds to spare,
+ * it goes there, and comes back once that ground bares again; a picker with cockles in its basket goes on home with them from the shore.
+ * Reads only the tick and the state. True: it holds off its work this tick.
+ */
+export function tideWorkHold(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }> | Extract<Order, { k: 'build' }>): boolean {
+  if (!s.tidal) return false;
+  if (u.ashore !== undefined) {
+    if (u.ashore > s.tick) return true;
+    u.ashore = undefined;
+  }
+  const drop = o.k === 'gather' && o.phase === 'drop';
+  const bed = o.k === 'gather' && !drop && s.res[o.tile] === R_COCKLE ? o.tile : -1;
+  const here = Math.floor(u.y) * s.w + Math.floor(u.x);
+  const flats = here >= 0 && here < s.w * s.h && isTidal(s, here) && s.terrain[here] === T_SAND && s.bldAt[here] === 0;
+  if (bed < 0 && !flats) return false;
+  const team = s.players[u.owner]?.team ?? -1;
+  const basket = o.k === 'gather' && u.carry > 0;
+  /** Step to dry ground `to`: a picker with a basket then goes home with it; anyone else waits there until `until`. */
+  const ashore = (to: number, until: number): boolean => {
+    if (basket) {
+      (o as Extract<Order, { k: 'gather' }>).phase = 'drop';
+      const dx = (to % s.w) + 0.5 - u.x;
+      const dy = Math.floor(to / s.w) + 0.5 - u.y;
+      goAshore(s, u, to, s.tick + Math.max(1, Math.ceil(secs(Math.sqrt(dx * dx + dy * dy) / Math.max(0.1, routePace(s, u))))));
+      return true;
+    }
+    goAshore(s, u, to, until);
+    return true;
+  };
+  // The bed is under water: wait by it, on dry ground, until it bares. One in a pond never bares; the usual search finds another.
+  if (bed >= 0 && !bared(s, bed)) {
+    if (isPond(s, bed)) return false;
+    const until = baresAt(s, tidalLevel(s, bed), s.tick);
+    const to = shoreFor(s, flats ? u.x : (bed % s.w) + 0.5, flats ? u.y : Math.floor(bed / s.w) + 0.5, team);
+    const dry = to >= 0 && !isTidal(s, to);
+    if (basket && !flats) {
+      o.phase = 'drop';
+      return false;
+    }
+    const near = dry && Math.abs((to % s.w) + 0.5 - u.x) + Math.abs(Math.floor(to / s.w) + 0.5 - u.y) < 2;
+    if (!dry || near) {
+      if (basket) {
+        o.phase = 'drop';
+        return false;
+      }
+      goAshore(s, u, -1, until < 0 ? s.tick + secs(TIDE.period) : until);
+      return true;
+    }
+    return ashore(to, until < 0 ? s.tick + secs(TIDE.period) : until);
+  }
+  if (!flats || (walkingNow(u) && !drop) || (s.tick + u.id) % TIDE_WORK.check !== 0) return false;
+  const go = fleeFlood(s, u, here);
+  if (!go) return false;
+  const back = isPond(s, here) ? -1 : baresAt(s, tidalLevel(s, here), go.wet);
+  return ashore(go.to, back < 0 ? s.tick + secs(TIDE.period) : back);
+}
+
+/**
+ * Whether a land unit standing on bared flats at `here` must leave for the flood now (#767): the dry tile to walk to, and the tick the
+ * water reaches it, when the water would cover its ground before it could walk there (at its route's pace) with `TIDE_WORK.margin`
+ * seconds to spare. Null: it can stay, or there is no dry ground within `TIDE.sweep` to go to.
+ */
+function fleeFlood(s: GameState, u: Unit, here: number): { to: number; wet: number } | null {
+  const pace = routePace(s, u);
+  if (pace <= 0) return null;
+  const wet = wetAt(s, here);
+  // Cheap first: bare long enough to walk the farthest the shore is looked for.
+  if (wet < 0 || wet - s.tick > Math.ceil(secs((TIDE.sweep * 1.5) / pace + TIDE_WORK.margin))) return null;
+  const to = shoreFor(s, u.x, u.y, s.players[u.owner]?.team ?? -1);
+  if (to < 0 || isTidal(s, to)) return null;
+  const dx = (to % s.w) + 0.5 - u.x;
+  const dy = Math.floor(to / s.w) + 0.5 - u.y;
+  if (wet - s.tick > Math.ceil(secs(Math.sqrt(dx * dx + dy * dy) / pace + TIDE_WORK.margin))) return null;
+  return { to, wet };
+}
+
+/**
+ * An idle citizen standing on the flats (#767), one whose work out there is done, walks to dry ground before the flood: every
+ * `TIDE_WORK.check` ticks, as a worker reads the clock. Called from an idle citizen's step.
+ */
+export function idleAshore(s: GameState, u: Unit): void {
+  if (!s.tidal || (s.tick + u.id) % TIDE_WORK.check !== 0 || u.path !== null || u.wantPath) return;
+  const here = Math.floor(u.y) * s.w + Math.floor(u.x);
+  if (here < 0 || here >= s.w * s.h || !isTidal(s, here) || s.terrain[here] !== T_SAND || s.bldAt[here] !== 0) return;
+  const go = fleeFlood(s, u, here);
+  if (!go) return;
+  u.order = { k: 'move', x: (go.to % s.w) + 0.5, y: Math.floor(go.to / s.w) + 0.5, amove: false, started: false };
+  u.stuck = 0;
+  u.miss = 0;
+  s.events.push({ k: 'tideAshore', id: u.id, owner: u.owner, x: u.order.x, y: u.order.y, until: s.tick });
+}
+
+/** Whether a worker stands ashore for the tide (#767), and for how many seconds more (0: not). */
+export function ashoreLeft(s: GameState, u: Unit): number {
+  return u.ashore !== undefined && u.ashore > s.tick ? (u.ashore - s.tick) / secs(1) : 0;
 }

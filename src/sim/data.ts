@@ -31,6 +31,13 @@ const HIVE_REACH = 6;
 const HIVE_TREES = 8;
 /** How far round the Heart Tree an old tree can be woken (`WILDWOOD.wake`), named here so the age's and the tree's words can say it. */
 const HEART_WAKE = 8;
+/** The Bloom's clocks and ring (`BLOOM`), named here so the age's and the Spire's words can say them. */
+const BLOOM_RIPEN = 150;
+const BLOOM_GROW = 60;
+const BLOOM_RING = 6;
+const BLOOM_GREEN = 35;
+const BLOOM_LEAST = 1000;
+const BLOOM_HOLD = 180;
 
 // ---- Ages and paths -------------------------------------------------------------------------------
 
@@ -255,7 +262,7 @@ export const ROUTES: Record<RouteId, { name: string; blurb: string }> = {
   horse: { name: 'Horse route', blurb: 'a town on wagons, tribute from a rival\'s land, tolls on the trade road' },
   faith: { name: 'Faith route', blurb: 'priests who win a rival\'s towers and Temples over' },
   wild: { name: 'Wild route', blurb: 'beasts tamed and bred, walls that grow, and one day the forest itself' },
-  water: { name: 'Water road', blurb: 'channels dug from the springs, dykes and polder, then sluices that drown your own fields to stop an army, then canals that carry ships inland and dams that turn turbines, then the tide's hours, and at last a town afloat that tows itself where it likes: a people that moves the water' },
+  water: { name: 'Water road', blurb: 'channels dug from the springs, dykes and polder, then sluices that drown your own fields to stop an army, then canals that carry ships inland and dams that turn turbines, then the tide\'s hours, and at last a town afloat that tows itself where it likes: a people that moves the water' },
 };
 
 const trunkAge = (e: number, good: string): Age => ({ name: EPOCHS[e].name, short: EPOCHS[e].short, tier: e, blurb: EPOCHS[e].blurb, good, routes: ['plain'] });
@@ -677,6 +684,19 @@ export const AGES: Record<AgeId, Age> = {
     no: { units: ['ranged', 'siege', 'fighter', 'bomber'], why: 'A Wildwood people builds no machines: no rifles, field guns or aircraft. Its Ents break walls and its Blowpipe Hunters shoot. They wait until it climbs to the Atomic Age or settles in the Industrial Age' },
     noBuild: { buildings: ['airfield'], why: 'A Wildwood people builds no machines: no Airfield until it climbs to the Atomic Age or settles in the Industrial Age' },
   },
+  // The Wild route's plants' end (`docs/wild-road.md` §5b, `bloom.ts`): the green answer to the warhead, and a second way to win.
+  bloom: {
+    verb: 'Raise a Seed Spire and sling Bloom Seeds that crack a rival\'s town into forest unless their citizens hack the root out; win by the Greening, your land kept green',
+    door: 'The Dens go quiet: no new beasts; and no Missile Silo, for the Seed is your warhead',
+    good: 'Outgrowing a rival instead of razing them: a warhead that grows, a forest that wins, and pollen that blinds their towers in your woods',
+    routes: ['wild'],
+    name: 'Age of the Bloom',
+    short: 'Bloom',
+    tier: 5,
+    blurb: `Instead of the Atomic Age: the plants' end. Raise one Seed Spire (G); while your Heart Tree stands it ripens a Bloom Seed every ${BLOOM_RIPEN} seconds. Sling it at any point on the map: everyone sees where it falls, and once it roots, ${BLOOM_GROW} seconds later every rival building within ${BLOOM_RING} tiles of its heart-root cracks into forest, unless their citizens reach the root and hack it out first. The Greening: keep your Heart Tree while trees, Orchards and grown Thornwalls cover ${BLOOM_GREEN}% of your land (counted as at least ${BLOOM_LEAST} tiles) for ${BLOOM_HOLD / 60} minutes, and you win. Your woods spread at the start of every season, not only in spring, and each season opens with a pollen storm that halves the sight of every rival soldier and tower near your Heart Tree. Your Dens go quiet, and you raise no Missile Silo.`,
+    no: { units: ['warwolf', 'tusker', 'warmammoth', 'cavebear'], why: 'A Bloom people breeds no new beasts: its Dens are quiet. They wake if it goes back to the Wildwood or rejoins the Atomic Age' },
+    noBuild: { buildings: ['silo'], why: 'A Bloom people raises no Missile Silo: its warhead is the Bloom Seed. Silos wait until it rejoins the Atomic Age' },
+  },
   // The second crossing (#555 s12): the Pilgrims' priests and the Sail's ships made one trade. Open only to a people that walked both.
   missions: {
     verb: 'Sail priests to far shores and raise Missions there: each claims land, trains priests, and pays a tithe that grows with its distance from home',
@@ -1058,6 +1078,19 @@ export const ROADS: Road[] = [
   },
   { from: 'wildwood', to: 'atomic', cost: EPOCHS[5].cost, time: EPOCHS[5].time, blurb: 'Rejoin the main road at the Atomic Age for the ordinary price. Your Heart Tree keeps waking Ents and your woods keep spreading; machines return, and fire burns as it does for anyone.' },
   { from: 'wildwood', to: 'industrial', cost: { food: 300, wood: 300 }, time: 30, blurb: 'Settle down in the Industrial Age. Your Heart Tree keeps waking Ents and your woods keep spreading; rifles, field guns and aircraft return.' },
+  // The Wild route's fifth step, the plants' end (`docs/wild-road.md` §5b): the Heart Tree shows it, and a spring's Spreading opens it.
+  {
+    from: 'wildwood',
+    to: 'bloom',
+    cost: { food: 1600, wood: 1400, gold: 1200 },
+    time: 90,
+    clue: 'heart',
+    walked: 'wildwood',
+    deed: { stat: 'spread', n: 12, text: 'Your woods spread 12 seedlings round the Heart Tree' },
+    blurb: 'Instead of the Atomic Age: the plants\' end. A Seed Spire slings Bloom Seeds that crack a rival\'s town into forest unless they hack the root out, and the Greening wins the match for a people whose land stays green. No new beasts and no Missile Silo while you stay.',
+  },
+  { from: 'bloom', to: 'atomic', cost: { food: 300, gold: 300 }, time: 30, blurb: 'Rejoin the Atomic Age and its Missile Silo. Your Spire keeps its Seeds and your Dens wake again; the Greening, the pollen storms and the Spreading every season end.' },
+  { from: 'bloom', to: 'wildwood', cost: { food: 300, wood: 300 }, time: 30, blurb: 'Go back into the Wildwood: the Dens wake and fire burns twice as hard again. Your Spire keeps its Seeds; the Greening ends.' },
   // The other road out of the Stone Age (#297): the hunt, not the bog, opens it.
   {
     from: 'stone',
@@ -1512,6 +1545,26 @@ export const AI_EBB = { across: 3, slack: 1.25, margin: 6, hold: 200 };
  * the first moment within `hold` seconds it can cross, whichever reaches the goal sooner; with neither, it goes as ordered.
  */
 export const TIDE_ROUTE = { slack: 1.25, margin: 4, hold: 180 };
+
+/**
+ * Cockle beds (#767). When the tide wakes, a patch of beds is laid round each tile of the deeper flats (tidal ground of level `deep` or
+ * lower: bared only as the tide runs low) that the map's seed picks, one in `chance`: the tile and those beside it four ways on ground as
+ * deep. A bed holds `amount` food, picked by citizens at `rate` a second only while the tide has bared it, and each high water brings
+ * `regrow` more back, up to `amount`, to a bed that stands open to the sea: not in a barrage's pond, not under a site or causeway.
+ */
+export const COCKLE = { deep: 2, chance: 0.006, amount: 60, regrow: 25, rate: 1.0 };
+/**
+ * Work on the flats that reads the tide (#767). A citizen picking a cockle bed or building out on the flats looks at the clock every
+ * `check` ticks: when the water would cover the ground it stands on before it could walk to the shore (its route's pace, `TIDE_ROUTE.slack`)
+ * with `margin` seconds to spare, it steps ashore, a gatherer with its basket going home first, and goes back once the ground bares again.
+ */
+export const TIDE_WORK = { check: 5, margin: 6 };
+/**
+ * The computer and cockle beds (#767). Every `every` seconds a people in the Age of Tides with a bed bared within `reach` tiles of home,
+ * staying bare at least `least` seconds more, sends up to `hands` of its wood or berry gatherers to pick it; one that waits ashore longer
+ * than `idle` seconds goes back to the woods.
+ */
+export const AI_COCKLE = { every: 5, reach: 26, least: 25, hands: 3, idle: 25 };
 
 /**
  * The breach (#701 s3, the Water Road). Every `every` seconds the sea runs one tile on: each tile of polder four-ways beside water that
@@ -2198,7 +2251,7 @@ export const FIRE = {
   run: [2, 6, 4, 2],
   scorch: 2,
   scorchReach: 0.4,
-  burns: ['thornwall', 'garden', 'orchard', 'sapling', 'hive', 'heart'] as BuildingType[],
+  burns: ['thornwall', 'garden', 'orchard', 'sapling', 'hive', 'heart', 'spire'] as BuildingType[],
   wild: 2,
   aiBearers: 2,
   aiNear: 12,
@@ -2274,6 +2327,49 @@ export const WILDWOOD = {
   aiEnts: 4,
 };
 
+/**
+ * The Age of the Bloom (`docs/wild-road.md` §5b, `src/sim/bloom.ts`). A people raises one Seed Spire, which ripens a Bloom Seed over
+ * `ripen` seconds while its Heart Tree stands (one held at a time). Slung (`fuel` paid) at any point, the Seed flies `flight` seconds,
+ * then roots on the open tile nearest its point within `land` tiles (none: it withers). Rooted, it grows `grow` seconds; each rival citizen
+ * within `reach` tiles of its heart-root hacks one stroke a second, and `root` strokes cut it out. If it isn't cut out, every rival
+ * building whose nearest edge lies within `r` tiles cracks, and its ground grows forest `sprout` seconds later (`Stool`s).
+ * The Greening: a people standing in the Bloom with its Heart Tree, whose green tiles (trees, Orchards, its Heart Tree, Thornwalls grown to
+ * living oak) cover `green` of its land's open tiles (counted as at least `least`) for `hold` seconds, wins. Measured once a second.
+ * Pollen: the first `storm` seconds of each season, rival land units and Watch Towers within `pollen` tiles of a Bloom people's Heart
+ * Tree see `blind` as far. The Spreading comes at the start of every season, not only spring (`WILDWOOD.spreadAt`).
+ * The computer takes the road on from the Wildwood, stays `aiStay` seconds, raises its Spire within `aiFrom` tiles of home, slings at
+ * the rival building it has seen whose ring would crack the most * (keeping the fuel back from `aiSave` seconds before the Seed is ripe),
+ * and while its land is short of green, every `aiOrchard` seconds plants an Orchard (one to every `aiThorns` Thornwall pieces) or a
+ * line of `aiLine` Thornwall, at the compass points round home `aiRing` tiles out and further. Against a rooted
+ * Seed in its town (within `aiNear` tiles of a building of its own) it sends up to `aiHack` citizens to hack it.
+ */
+export const BLOOM = {
+  ripen: BLOOM_RIPEN,
+  fuel: { food: 300, wood: 300, gold: 200 } as Cost,
+  flight: 10,
+  land: 6,
+  grow: BLOOM_GROW,
+  reach: 1.6,
+  root: 90,
+  r: BLOOM_RING,
+  sprout: 8,
+  green: BLOOM_GREEN / 100,
+  least: BLOOM_LEAST,
+  hold: BLOOM_HOLD,
+  storm: 30,
+  pollen: 14,
+  blind: 0.5,
+  aiStay: 600,
+  aiFrom: 14,
+  aiOrchard: 15,
+  aiThorns: 16,
+  aiLine: 7,
+  aiRing: 9,
+  aiNear: 6,
+  aiHack: 7,
+  aiSave: 40,
+};
+
 export const COPPICE = { reach: 8, regrow: 120, retry: 5, grow: 90, snare: 2, cap: 1.5, bag: 2, full: 12, aiPerFood: 1.5, aiMax: 16, aiTrees: 10, aiThick: 14, aiNear: 14, aiDrop: 7, aiPerTender: 2, aiStone: 6, aiCamps: 2, aiPlant: 3, aiThin: 12, aiPlantWood: 120 };
 
 /**
@@ -2338,6 +2434,8 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   hive: { name: 'Hive', size: 1, hp: 160, cost: { wood: 60, gold: 30 }, time: 15, pop: 0, sight: 4, trains: [], drop: [], epoch: 3, menu: 'eco', key: 'V', blurb: `A straw skep on a stand, set among standing trees (${HIVE_TREES} within 3 tiles). Its bees swarm any rival who walks the woods within ${HIVE_REACH} tiles, stinging past armour and slowing them. It pays honey into your stores, or mead for gold while a Market of yours stands near, and in summer it doubles the Kitchen Gardens beside it. Bees sleep in winter, smoke quiets them, and fire takes the skep. Fell its woods and the bees leave.` },
   // The Age of the Wildwood (`docs/wild-road.md` §4, `WILDWOOD`): one to a people that has walked it, in any age after.
   heart: { name: 'Heart Tree', size: 3, hp: 2500, cost: { food: 300, wood: 400, gold: 200 }, time: 90, pop: 0, sight: 8, trains: ['warden'], drop: [], epoch: 4, menu: 'mil', key: 'E', blurb: `A vast old tree planted once, the soul of your town: one to a people. At it an old tree within ${HEART_WAKE} tiles is woken as an Ent. While it stands your woods spread round it each spring and your rooted Ents wake when a rival comes near; if it falls, every Ent roots where it stands and sleeps. It is alive, so fire takes it.` },
+  // The Age of the Bloom (`docs/wild-road.md` §5b, `BLOOM`): one to a people that has walked it, in any age after.
+  spire: { name: 'Seed Spire', size: 2, hp: 1800, cost: { wood: 600, stone: 200, gold: 400 }, time: 80, pop: 0, sight: 8, trains: [], drop: [], epoch: 5, menu: 'mil', key: 'G', blurb: `A living tower of woven trunks, one to a people. While your Heart Tree stands it ripens a Bloom Seed every ${BLOOM_RIPEN} seconds, one at a time. Sling it (G) at any point on the map: it roots there, and ${BLOOM_GROW} seconds later every rival building within ${BLOOM_RING} tiles of its heart-root cracks into forest, unless their citizens hack the root out first. It is alive, so fire takes it.` },
   // The age road (#562, `docs/age-roads.md` spine §4): raised in the Stone Age, it answers which key resources this world holds (`PROSPECTOR`).
   prospector: { name: "Prospector's Lodge", size: 2, hp: 500, cost: { food: 50, wood: 75 }, time: 20, pop: 0, sight: 6, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'P', blurb: 'A lodge of prospectors who walk the streams, scrape the rock and dig at old mounds. Once it stands it tells you which key resources this world holds (bog iron, salt, saltpetre, blood-iron, ancient ruins): yes or no for each, never where. Some ages open only with them; a world that lacks one shuts that door.' },
   // The Path of Blood (#303): pitched by foot soldiers where the army stands, enemy land too; burns when left alone (`WARCAMP`).
@@ -2350,7 +2448,7 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   // The Age of Missions (#555 s12): raised by priests on a shore, in no rival's land; claims land, trains priests, pays a tithe (`MISSION`).
   mission: { name: 'Mission', size: 2, hp: 1000, cost: { wood: 100, gold: 60 }, time: 30, pop: 0, sight: 7, trains: ['priest'], drop: [], epoch: 2, shore: true, ages: ['missions'], builders: ['priest'], only: true, menu: 'eco', key: 'O', blurb: 'A whitewashed chapel and a bell on a far shore, raised by priests. Holds the land round it, trains priests, and pays a tithe that grows with its distance from your Town Center. Nothing in it shoots: a rival who reaches it razes it.' },
   caravanserai: { name: 'Caravanserai', size: 2, hp: 900, cost: { wood: 90, gold: 30 }, time: 25, pop: 0, sight: 6, trains: [], drop: [], epoch: 3, ages: ['silk'], menu: 'eco', key: 'C', blurb: 'A walled courtyard by the road where caravans rest. Raise it by a far trading post, in no one\'s land too: your traders\' trips to a post within 8 tiles of it pay a quarter more, traders and wagons within 4 tiles of it mend, and the land round it is yours, so rival traders crossing it pay your toll.' },
-  silo: { name: 'Missile Silo', size: 3, hp: 3000, cost: { wood: 300, stone: 400, gold: 700 }, time: 80, pop: 0, sight: 8, trains: [], drop: [], epoch: 5, menu: 'mil', key: 'M', blurb: 'A concrete collar round a hatch in the ground. Launch (M) names any point on the map: after a countdown every rival can see, the warhead blasts what stands there, hardest at the centre and less with every tile, and every player sees the blast and the fog lifts over it for a minute. Destroy the silo while it counts and the launch is scrubbed, its warhead lost. Warheads come from the people\'s store, not the silo: one at first, one more every 240 seconds, up to 3 counting those in the air, fired from any silo. At most 2 silos, and every player sees a finished one on the map.' },
+  silo: { name: 'Missile Silo', size: 3, hp: 3000, cost: { wood: 300, stone: 400, gold: 700 }, time: 80, pop: 0, sight: 8, trains: [], drop: [], epoch: 5, menu: 'mil', key: 'M', blurb: 'A concrete collar round a hatch in the ground. Launch (M) names any point on the map: after a countdown every rival can see, the warhead blasts what stands there, hardest at the centre and less with every tile, and every player sees the blast and the fog lifts over it for a minute. Destroy the silo while it counts and the launch is scrubbed, its warhead lost. Warheads come from the people\'s store, not the silo: one at first, one more every 240 seconds, up to 3 counting those in the air, fired from any silo. At most 2 silos (3 with Launch Control, researched here, which opens the salvo (B): three silos firing at once), and every player sees a finished one on the map.' },
   // Mine Shafts (#681): one miner digs stone or gold (or a rare ore over its old workings) for good, best where a deposit was worked out (`SHAFT`).
   shaft: { name: 'Mine Shaft', size: 2, hp: 700, cost: { wood: 150 }, time: 30, pop: 0, sight: 4, trains: [], drop: [], epoch: 1, menu: 'eco', key: 'H', blurb: 'A timber headframe over a hole in the ground. One citizen digs stone or gold here for good, slower than an open deposit; best sunk where a deposit was worked out, fair beside mountain rock. Choose its seam on the shaft.' },
   // The Water Road (#701 s1): a bank of earth across the shallows, and the mill that pumps the water out behind it (`DYKE`, `POLDER`, `water.ts`).
@@ -2513,6 +2611,7 @@ export const TECHS: Record<TechId, Tech> = {
   chemistry: { name: 'Chemistry', at: 'workshop', epoch: 3, cost: { food: 300, gold: 200 }, time: 45, add: { siegeRange: 1 }, mul: { siegeAttack: 1.2 }, blurb: 'Siege hits 20% harder and reaches 1 tile farther.', icon: '🧪' },
   blackPowder: { name: 'Black Powder', at: 'workshop', epoch: 3, ore: { id: 'saltpetre', n: 40 }, cost: { food: 250, gold: 150 }, time: 45, add: { rangedAttack: 1 }, mul: { siegeAttack: 1.15 }, blurb: 'Only where saltpetre lies: once your citizens have mined 40, the powder-makers grind it fine. Musketeers and all ranged soldiers hit for 1 more and siege 15% harder, on top of Chemistry. Where there is none, the plain road stays open.', icon: '💥' },
   bloodForged: { name: 'Blood-Forged Blades', at: 'forge', epoch: 3, ore: { id: 'bloodiron', n: 30 }, cost: { food: 250, gold: 175 }, time: 45, needs: 'ironCasting', add: { meleeAttack: 1, armor: 1 }, blurb: 'Only where blood-iron lies: once your citizens have mined 30, the smiths quench blades and plates in it. Foot soldiers, riders and heroes hit for 1 more and wear 1 more melee armor, on top of the plain forge. Where there is none, the plain road stays open.', icon: '🩸' },
+  launchControl: { name: 'Launch Control', at: 'silo', epoch: 5, cost: { food: 600, gold: 900, stone: 400 }, time: 60, blurb: 'A bunker that ties every silo of your people to one clock. You may raise a third Missile Silo, and three standing silos may fire a salvo (B): three Atomic warheads at once, on three points at least 8 tiles apart, on your one clock. A rival sees three rings as for any launch, and cannot tell a salvo from one warhead and two decoys until the last 3 seconds, when all three stay. Each silo that falls scrubs its own warhead. Rivals can count your silos, so three of them is warning enough.', icon: '🎯' },
   saltCuring: { name: 'Salt Curing', at: 'storehouse', epoch: 1, ore: { id: 'salt', n: 30 }, cost: { food: 100, wood: 60 }, time: 30, add: { carry: 2 }, mul: { hunt: 1.25, forage: 1.15 }, blurb: 'Only where salt lies: once your citizens have mined 30, meat keeps and berries dry. Game is butchered 25% faster and berries gathered 15% faster, and every citizen carries 2 more. Where there is none, hunting stays as it was.', icon: '🧂' },
   gillnets: { name: 'Gillnets', at: 'dock', epoch: 1, cost: { food: 100, wood: 100 }, time: 30, mul: { fish: 1.25 }, blurb: 'Fishing boats fish 25% faster.', icon: '🐟' },
   lighthouse: { name: 'Lighthouse', at: 'dock', epoch: 2, cost: { wood: 200, gold: 120 }, time: 35, needs: 'gillnets', add: { portReach: 4 }, blurb: 'A beacon on the headland: trading posts up to 4 tiles farther from the water become ports for your merchant ships.', icon: '🗼' },
@@ -3632,6 +3731,21 @@ export const FUSION = { fuse: 70, refuel: 0, fuel: { gold: 450, stone: 120 } };
  */
 export const SILO = { fuse: 45, reach: 5, fuel: { gold: 600, stone: 200 }, refuel: 240, most: 2, lift: 60, stock: 1, cap: 3, blur: 2, reveal: 3, apart: 8, spread: 24 };
 /**
+ * The salvo (#765): three Atomic warheads from the store at once, one from each of `trio` standing silos, on the people's one clock. Only a
+ * people with Launch Control fires one, and only it may raise a third silo (`trio`). A plain Atomic people pays `surcharge` more fuel for
+ * each of the three (a Fission or Fusion people's silos are built to share a clock).
+ */
+export const SALVO = { trio: 3, surcharge: 0.5 };
+/**
+ * A missile's flight (#772): the course every player watches inside the fuse. It climbs toward the middle of a rival's rings (the lure,
+ * moved up to `jitter` tiles by the seed) and covers `knee` of the way there, bowing sideways by up to `bow` of that stretch, so the first
+ * part reads as a district, not a point. Then it bends onto its true point (`lead`: how far past the bend's start the curve leans on along
+ * its old heading) and dives. The bend starts `read` seconds before the reveal, scaled by the lure's distance over `ref` tiles (between `lo`
+ * and `hi` of it): a sharp eye reads the target in that window. The arc peaks at `rise` of the lure's distance, between `low` and `high`
+ * tiles, at the bend. A lure nearer the silo than `near` tiles is replaced by the target.
+ */
+export const FLIGHT = { knee: 0.55, bow: 0.3, jitter: 3, lead: 0.5, read: 8, ref: 40, lo: 0.6, hi: 1.5, rise: 0.18, low: 4, high: 9, near: 6 };
+/**
  * The three warheads (#751 s1). A blast does `peak / (1 + (d/half)²)` at distance `d` tiles (from a building's nearest edge, or a unit's
  * position), tapering linearly over the last `taper` tiles to nothing at the blast radius `r`. A people fires its branch's warhead:
  * plain Atomic, Fission or Fusion, and from #753 chooses at launch between Atomic and its branch's own.
@@ -3649,8 +3763,15 @@ export const WARHEADS = {
  * `heart`) and soldiers (each counts `soldier`) inside the ring. Its soldiers and citizens run from the ring of a rival warhead
  * in the air, `margin` tiles past its edge. On a coin of its own it takes the fork (`fork` odds, then `fusion` odds of Fusion over Fission)
  * once its silo has stood `forkAfter` seconds and it holds half the road's price. An Industrial computer bound for Aeronauts or Lightning holds off the climb `hold` seconds.
+ *
+ * The salvo (#765): when three rival targets at least `SILO.apart` apart are each worth a launch and together worth `salvo` times the best
+ * single strike (`salvoPlain` times for a plain Atomic people, who pays the surcharge), the computer raises silos to three, learns Launch
+ * Control, and holds its single strikes until the store holds three.
+ *
+ * The flight (#772): `read` seconds after a rival missile starts to bend, the computer reads its course as a player would (where it is,
+ * where it is going, how it turns) and stops clearing the rings the course has ruled out.
  */
-export const AI_SILO = { fork: 0.7, fusion: 0.4, forkAfter: 120, hold: 300, hands: 20, wait: 20, worth: 6, heart: 4, soldier: 2, margin: 1.5 };
+export const AI_SILO = { fork: 0.7, fusion: 0.4, forkAfter: 120, hold: 300, hands: 20, wait: 20, worth: 6, heart: 4, soldier: 2, margin: 1.5, salvo: 1.8, salvoPlain: 2.4, read: 5 };
 export const AI_KEG = { take: 0.5, ore: 80, kegs: 6, mills: 2, hold: 180, sappers: 2, near: 12, guard: 4, every: 2 };
 
 /**

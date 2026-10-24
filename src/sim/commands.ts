@@ -18,7 +18,7 @@ import { cacheAt } from './caches';
 import { carriesKegs, kegProblem } from './powder';
 import { kegTileProblem } from './tides';
 import { carriesTorch, onFire, torchProblem } from './fire';
-import { launch, launchProblem, siloLimit } from './silo';
+import { launch, launchProblem, salvo, salvoProblem, siloLimit } from './silo';
 import { raise, raiseCost } from './reclaim';
 import { callWork, workProblem } from './works';
 import { callKin, killCamp, kinProblem, takeVow, takeWay, vowProblem, wayBarred, wayProblem } from './ways';
@@ -37,6 +37,7 @@ import { canHit, isEnemy, maxHp, pay, placeBuilding, refund } from './world';
 import { fightsBeasts } from './animals';
 import { tameProblem } from './tame';
 import { heartBarred, rootEnt, rootProblem } from './wildwood';
+import { sling, slingProblem, spireBarred } from './bloom';
 import { isField } from './grove';
 import { answerTiding, tidingProblem } from './tidings';
 import { sluiceProblem } from './water';
@@ -188,7 +189,7 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
     if (!quiet) refuse(s, p, `Needs the ${EPOCHS[def.epoch].name}`);
     return null;
   }
-  const no = buildBarred(player, type) ?? wayBarred(s, player, type) ?? siloLimit(s, p, type) ?? heartBarred(s, p, type);
+  const no = buildBarred(player, type) ?? wayBarred(s, player, type) ?? siloLimit(s, p, type) ?? heartBarred(s, p, type) ?? spireBarred(s, p, type);
   if (no) {
     if (!quiet) refuse(s, p, no);
     return null;
@@ -463,6 +464,17 @@ export function applyCommand(s: GameState, c: Command): void {
       break;
     }
     case 'launch': {
+      if (c.more) {
+        // Launch Control (#765): three silos fire one salvo, one warhead each, on the people's one clock.
+        const shots = Array.isArray(c.more) ? [{ silo: c.silo, x: c.x, y: c.y }, ...c.more] : [];
+        const why = salvoProblem(s, c.p, shots);
+        if (why) {
+          refuse(s, c.p, why);
+          return;
+        }
+        salvo(s, c.p, shots);
+        break;
+      }
       // The Atomic Age (#605): a Missile Silo names a point; the warhead lands after its public countdown.
       const silo = s.byId.get(c.silo);
       const why = launchProblem(s, c.p, silo as Building | undefined, c.x, c.y, c.w);
@@ -796,6 +808,14 @@ export function applyCommand(s: GameState, c: Command): void {
         if (!why) rootEnt(s, u);
       }
       if (why) refuse(s, c.p, why);
+      break;
+    }
+    case 'sling': {
+      // The Age of the Bloom: a Seed Spire slings its ripe Seed at a point.
+      const b = s.byId.get(c.spire);
+      const why = slingProblem(s, c.p, b, c.x, c.y);
+      if (why) refuse(s, c.p, why);
+      else sling(s, c.p, b as Building, c.x, c.y);
       break;
     }
     case 'pitch': {

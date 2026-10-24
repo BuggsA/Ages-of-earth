@@ -2,6 +2,7 @@ import { callWild } from './tame';
 import { groveStep, rootThorn } from './grove';
 import { hiveStep } from './hive';
 import { treeToWake, wakeTree, wildwoodStep, WAKE_NONE } from './wildwood';
+import { bloomStep } from './bloom';
 import { aiStep } from './ai';
 import { workStep } from './works';
 import { beaconStep } from './beacon';
@@ -54,7 +55,7 @@ import { coppiceStep } from './coppice';
 import { longbowStep } from './longbow';
 import { seraiStep, tollStep } from './passage';
 import { mercStep } from './merc';
-import { FINDS, KIN, NOMAD, STEP_BACK } from './data';
+import { BLOOM, FINDS, KIN, NOMAD, STEP_BACK } from './data';
 import { ageOf, goldenEnds, threadsOf, chartLand, isHire, barred, journeyOf, markKeepsake, noteWalked, trainsAt, workSteps } from './ages';
 import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, HomelandId, MapSize, MapType, Player, UnitType } from './types';
 import { RARES, RES, R_FISH, R_NONE } from './types';
@@ -546,6 +547,15 @@ function checkVictory(s: GameState): void {
     s.events.push({ k: 'over', winner: s.winner, how: 'lands' });
     return;
   }
+  // And so does keeping one's land green long enough (the Greening, the Age of the Bloom, `bloom.ts`).
+  for (const p of s.players) {
+    if (p.defeated || p.greenSince === undefined || s.tick - p.greenSince < secs(BLOOM.hold)) continue;
+    s.over = true;
+    s.winner = p.team;
+    for (const q of s.players) if (q.team !== s.winner) q.defeated = true;
+    s.events.push({ k: 'over', winner: s.winner, how: 'greening' });
+    return;
+  }
   for (const p of s.players) {
     if (p.defeated) continue;
     // Regicide: a people whose King has fallen is lost.
@@ -678,6 +688,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   groveStep(s);
   hiveStep(s);
   wildwoodStep(s);
+  bloomStep(s);
   longbowStep(s);
   tollStep(s);
   mercStep(s);
@@ -770,6 +781,23 @@ export function checksum(s: GameState): number {
       mix(w.team * 4 + w.real);
       for (const r of w.rings) mix(r.x * 2 * 0x10000 + r.y * 2);
     }
+    // A salvo's warheads (#765): each silo, its true point, whether it is scrubbed, and which ring stands for it.
+    for (const sh of l.salvo ?? []) {
+      mix(sh.silo * 2 + (sh.gone ? 1 : 0));
+      mix(sh.x);
+      mix(sh.y);
+    }
+    for (const w of l.warn ?? []) for (const i of w.of ?? []) mix(i);
+    // The missile's course (#772): its start, lure and bow, frozen at launch.
+    if (l.arc) for (const v of [l.arc.x, l.arc.y, l.arc.t0, l.arc.lx, l.arc.ly, l.arc.bow]) mix(v);
+  }
+  // Bloom Seeds (the Age of the Bloom): where each came down, when it cracks, and how far it is hacked.
+  for (const l of s.blooms ?? []) {
+    mix(l.id);
+    mix(l.x);
+    mix(l.y);
+    mix(l.at);
+    mix(l.cut);
   }
   for (const b of s.blasts ?? []) {
     mix(b.id);
