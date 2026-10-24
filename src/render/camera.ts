@@ -46,6 +46,11 @@ export class CameraRig {
     this.clamp(this.goal);
   }
 
+  /** Glide to stand this far from what it looks at. */
+  frame(distance: number): void {
+    this.goalDistance = Math.max(CameraRig.MIN, Math.min(CameraRig.MAX, distance));
+  }
+
   zoom(factor: number): void {
     this.goalDistance = Math.max(CameraRig.MIN, Math.min(CameraRig.MAX, this.goalDistance * factor));
   }
