@@ -18,6 +18,7 @@ await page.evaluate(() => {
   const g = a.game;
   a.build(0, 'dock');
   a.build(1, 'dock');
+  for (let i = 0; i < 6; i++) a.build(0, 'house');
   g.landmarks ??= [];
   // The nearest landmark to the rival's town becomes the Old Ford, or one is made on open ground nearby.
   const p = g.players[1];
@@ -28,9 +29,9 @@ await page.evaluate(() => {
     for (let i = 0; i < 8; i++) a.spawn(i % 3 ? 1 : 0, i % 2 ? 'infantry' : 'ranged', m.x - 6 + (i % 4) * 0.9, m.y - 1 + Math.floor(i / 4) * 0.9);
   }
 });
-for (const [name, at] of [['town', 0], ['dock-dusk', 24], ['ford-morning', 72]]) {
+for (const [name, at] of [['town', 0], ['dock-dusk', 24], ['ford-morning', 72], ['town-night', 96]]) {
   await page.evaluate((t) => window.ages.titleAt(t), at);
-  await page.waitForTimeout(14000); // the light eases for ~5 s; software GL draws slowly
+  await page.waitForTimeout(name === 'town-night' ? 40000 : 14000); // the light eases for ~5 s; software GL draws slowly
   await page.screenshot({ path: `${out}/title-${name}.png` });
   console.log(`${out}/title-${name}.png`);
 }
