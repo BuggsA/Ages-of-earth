@@ -37,6 +37,24 @@ const SCENES = [
     for (let i = 0; i < 12; i++) ages.spawn(me, 'citizen', p.startX + 4 + (i % 4), p.startY + 4 + Math.floor(i / 4));
     return { zoom: 1.4 };
   }],
+  // Fleets on the nearest sea in the Gunpowder Age: warships, transports and cogs of both sides, to see their ensigns and sails.
+  ['sea', ({ g, ages, me, rv }) => {
+    ages.setEpoch(me, 3);
+    ages.setEpoch(rv, 3);
+    const p = g.players[me];
+    const water = [];
+    for (let y = 1; y < g.h - 1; y++) for (let x = 1; x < g.w - 1; x++) if (g.terrain[y * g.w + x] === 2 && g.block[y * g.w + x] === 1) water.push([x, y]);
+    // The water tiles nearest the start whose neighbours are water too.
+    const open = water.filter(([x, y]) => [[1, 0], [-1, 0], [0, 1], [0, -1], [2, 0], [0, 2]].every(([dx, dy]) => g.terrain[(y + dy) * g.w + x + dx] === 2));
+    open.sort((a, b) => (a[0] - p.startX) ** 2 + (a[1] - p.startY) ** 2 - (b[0] - p.startX) ** 2 - (b[1] - p.startY) ** 2);
+    const [wx, wy] = open[0];
+    const types = ['warship', 'transport', 'cog'];
+    for (let i = 0; i < 6; i++) {
+      ages.spawn(i % 2 ? rv : me, types[i % 3], wx + (i % 3) * 1.4, wy + Math.floor(i / 3) * 1.4);
+    }
+    for (let i = 0; i < 8; i++) ages.spawn(me, 'citizen', p.startX + 3 + (i % 4), p.startY + 3 + Math.floor(i / 4));
+    return { x: wx + 1.5, y: wy + 0.7, zoom: 0.6 };
+  }],
 ];
 
 const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
