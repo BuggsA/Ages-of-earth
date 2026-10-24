@@ -362,3 +362,55 @@ export function tideStep(s: GameState): void {
     for (const u of s.ents) if (u.kind === 'unit' && u.hp > 0 && !u.inside && domainOf(u.type) === 'land' && caught(s, u.x, u.y)) sweep(s, u);
   }
 }
+
+// ---- For the computer --------------------------------------------------------------------------
+
+/**
+ * The best spot for a Tide Mill within `reach` of a point (#739): where it would reach the most tidal ground no standing mill reaches
+ * yet, at least `least` tiles; ties go to the nearer, then the first in tile order. Null when there is none.
+ */
+export function tideMillSpot(s: GameState, owner: number, cx: number, cy: number, reach: number, least: number, fits: (tx: number, ty: number) => boolean): { tx: number; ty: number } | null {
+  if (!s.tidal) return null;
+  const claimed = new Set<number>();
+  for (const e of s.ents) if (e.kind === 'building' && e.type === 'tidemill' && e.hp > 0) for (const t of tidalNear(s, e)) claimed.add(t);
+  let best: { tx: number; ty: number } | null = null;
+  let top = least - 1;
+  let bestD = Infinity;
+  for (let ty = Math.max(1, Math.floor(cy - reach)); ty <= Math.min(s.h - 3, Math.floor(cy + reach)); ty++)
+    for (let tx = Math.max(1, Math.floor(cx - reach)); tx <= Math.min(s.w - 3, Math.floor(cx + reach)); tx++) {
+      const dx = tx + 1 - cx;
+      const dy = ty + 1 - cy;
+      const d = dx * dx + dy * dy;
+      if (d > reach * reach) continue;
+      // Cheap first: a mill stands on the shore, so tidal ground must lie beside it.
+      let shore = false;
+      for (let y = ty - 1; y <= ty + 2 && !shore; y++) for (let x = tx - 1; x <= tx + 2; x++) if (x >= 0 && y >= 0 && x < s.w && y < s.h && s.tidal[y * s.w + x] !== 0) shore = true;
+      if (!shore || !fits(tx, ty)) continue;
+      let n = 0;
+      for (const t of tidalNear(s, { tx, ty, size: 2 })) if (!claimed.has(t)) n++;
+      n = Math.min(n, TIDE.mill.most);
+      if (n > top || (n === top && d < bestD)) {
+        top = n;
+        bestD = d;
+        best = { tx, ty };
+      }
+    }
+  void owner;
+  return best;
+}
+
+/**
+ * The tiles of tidal ground the water will cover at the next step of the tide (#739), or none while it falls or stands at high water: what
+ * the computer clears its people off before the flood.
+ */
+export function coveredNext(s: GameState): ((tile: number) => boolean) | null {
+  const c = tideClock(s);
+  if (!c) return null;
+  const now = c.level;
+  const next = tideLevel(s, s.tick + Math.ceil(c.next * secs(1)));
+  if (next <= now) return null;
+  return (tile: number) => bared(s, tile) && tidalLevel(s, tile) <= next;
+}
+
+/** Where to step to off the flats before the flood: dry ground above the tide within `TIDE.sweep`, as the sea would sweep it (-1: none). */
+export const shoreNear = (s: GameState, x: number, y: number, team: number): number => shoreFor(s, x, y, team);

@@ -1133,7 +1133,7 @@ export const ROADS: Road[] = [
   {
     from: 'atomic',
     to: 'tides',
-    cost: { food: 900, wood: 700, stone: 500 },
+    cost: { food: 800, gold: 800, stone: 450 },
     time: 60,
     clue: 'dock',
     coast: 'Needs shallow sea within reach of your first town: the tide has nothing to bare on a dry shore',
@@ -1305,7 +1305,7 @@ export const RIVERS = { fill: 0.25, bank: -0.16, bed: -0.45, wade: 0.4, wet: 2, 
  * sea down to `causeway` deep, and is tidal ground of the top level. A Tide Mill grinds `mill.gold` gold each turn of the tide with
  * `mill.most` tiles of tidal ground within `mill.reach` of its footprint (less, pro rata, with fewer), each tile feeding the first mill only.
  */
-export const TIDE = { period: 180, flats: [-1.0, -0.85, -0.72], dry: 0.04, sweep: 6, hurt: 15, causeway: -1.6, mill: { reach: 5, most: 24, gold: 40 } };
+export const TIDE = { period: 180, flats: [-1.0, -0.85, -0.72], dry: 0.04, sweep: 6, hurt: 15, causeway: -1.6, mill: { reach: 5, most: 24, gold: 60 } };
 /** The computer in the Age of Tides (#739): its odds of taking the road (more for a people already on the Water Road), how many Tide Mills it raises, and how much tidal ground a mill's spot must reach. */
 export const AI_TIDES = { take: 0.35, onward: 0.7, mills: 3, least: 8, reach: 20, wary: 12 };
 
