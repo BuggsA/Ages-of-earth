@@ -4437,7 +4437,8 @@ function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
     return;
   }
   // A Beggars fleet (#783) goes looking: ships to board lie at a rival's Dock, or on the water nearest its town if no Dock is seen.
-  const prey = enemyShips[0] ?? (mem.attacking ? enemyDock(s, p) : ageDef(p).boards ? (enemyDock(s, p) ?? prowlFor(s, mem, idle[0], enemyHome(s, p))) : null);
+  const boards = !!ageDef(p).boards;
+  const prey = enemyShips[0] ?? (mem.attacking || boards ? enemyDock(s, p) : null) ?? (boards ? prowlFor(s, mem, idle[0], enemyHome(s, p)) : null);
   if (prey && idle.length >= Math.min(2, warships.length)) issue({ t: 'move', p: p.id, ids: idle.map((u) => u.id), x: prey.x, y: prey.y, amove: true });
   else {
     const far = idle.filter((u) => (u.x - dock.x) * (u.x - dock.x) + (u.y - dock.y) * (u.y - dock.y) > 100);
