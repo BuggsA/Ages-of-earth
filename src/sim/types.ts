@@ -322,8 +322,6 @@ export interface Building {
   advance: number;
   /** The age it is advancing into; absent means the trunk's next epoch (and older saves). */
   advanceTo?: AgeId;
-  /** The tick a Missile Silo is refuelled and can launch again (#605); absent until its first launch. */
-  rearm?: number;
   /** Set while the advance is a step back (#47) to the trunk age one tier down; absent otherwise. */
   back?: boolean;
   /**
@@ -837,6 +835,11 @@ export interface Player {
   kegs?: number;
   /** Seconds of milling toward the next keg (#577); absent when none is under way. */
   grind?: number;
+  /**
+   * The people's missile pool (#753, `silo.ts`): `n` warheads in store, fired from any silo of theirs; `next` is the tick the next one is
+   * ready while store and flight together are under the cap. Absent until their first silo stands (then `SILO.stock`). Hidden from rivals.
+   */
+  nukes?: { n: number; next?: number };
   epoch: number;
   /** The age within the web (#37); its tier is `epoch`. Absent, or out of step with `epoch`, means the trunk age of `epoch` (see `ageOf`). */
   age?: AgeId;
@@ -949,7 +952,7 @@ export type GameEvent =
   /** Fire (`fire.ts`): `lit` by a torch or spreading (`tree` when a tree; `owner` the building's), `out` (beaten out), `ash` (a tree burnt down), `root` (a Thornwall root burnt). `by` set the first flame. */
   | { k: 'fire'; what: 'lit' | 'out' | 'ash' | 'root'; x: number; y: number; by: number; owner?: number; torch?: boolean; tree?: boolean }
   /** A Missile Silo's warhead (#605): `launched` (the clock starts), `scrubbed` (the silo fell) or `struck`. */
-  | { k: 'silo'; owner: number; x: number; y: number; what: 'launched' | 'scrubbed' | 'struck'; fuse?: number; w?: 'atomic' | 'fission' | 'fusion' }
+  | { k: 'silo'; owner: number; x: number; y: number; what: 'launched' | 'scrubbed' | 'struck'; fuse?: number; w?: 'atomic' | 'fission' | 'fusion'; ring?: number }
   /** A trader bought a load of rare ore at a post (#573). */
   | { k: 'oreBuy'; owner: number; ore: RareId; n: number; gold: number; x: number; y: number }
   | { k: 'ruin'; id: number; owner: number; find: RuinFind; tech?: TechId; x: number; y: number }
@@ -1309,7 +1312,7 @@ export interface AiMemory {
   /** When an Industrial computer bound for a side future began to hold off the Atomic Age (#605). */
   sideHold?: number;
   /** Where a loaded silo means to strike, chosen once a second (#605). */
-  siloAim?: { x: number; y: number; at: number };
+  siloAim?: { x: number; y: number; at: number; w?: 'atomic' | 'fission' | 'fusion' };
   /** Tick it began holding its Town Center for a side road's last deeds, so it holds only so long. */
   waiting?: number;
   /**
@@ -1448,8 +1451,8 @@ export type Command =
   | ({ t: 'torch'; p: number; ids: number[]; target?: number; tile?: number } & Queued)
   /** Citizens or foot soldiers carry a powder keg to a rival's causeway tile and lay it there (#748, the Age of Sappers): it breaches the road. */
   | ({ t: 'kegTile'; p: number; ids: number[]; tile: number } & Queued)
-  /** A Missile Silo launches at a point (#605, the Atomic Age). */
-  | { t: 'launch'; p: number; silo: number; x: number; y: number }
+  /** A Missile Silo launches at a point (#605, the Atomic Age); `w` picks the warhead (#753), absent for the people's own branch's. */
+  | { t: 'launch'; p: number; silo: number; x: number; y: number; w?: 'atomic' | 'fission' | 'fusion' }
   /** Answer the card of tidings waiting at the fire (#443): `take` pays its price, otherwise it is passed by. */
   | { t: 'tiding'; p: number; card: TidingId; take: boolean }
   /** A player left an online match: the computer takes over their people. With `back` (sent only by the room, never a browser),

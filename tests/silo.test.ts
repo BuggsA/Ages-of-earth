@@ -148,7 +148,7 @@ describe('the Atomic Age', () => {
       const t = tc(s, 1);
       step(s, [{ t: 'launch', p: 0, silo: silo.id, x: t.x, y: t.y }]);
       expect(s.launches![0].at - s.tick).toBeLessThanOrEqual(secs(FISSION.fuse));
-      expect(silo.rearm! - s.tick).toBeLessThanOrEqual(secs(FISSION.refuel));
+      expect(s.players[0].nukes!.next! - s.tick).toBeLessThanOrEqual(secs(FISSION.refuel));
       const own = s.fallout!.find((f) => f.x === silo.x && f.y === silo.y)!;
       expect(own.r).toBe(FISSION.reach);
       expect(inFallout(s, silo.x + 1, silo.y)).toBe(true);
@@ -162,9 +162,9 @@ describe('the Atomic Age', () => {
       const silo = siloFor(s);
       const t = tc(s, 1);
       const gold = s.players[0].res.gold;
-      for (let i = 0; i < FUSION.air; i++) step(s, [{ t: 'launch', p: 0, silo: silo.id, x: t.x, y: t.y }]);
-      expect(s.launches).toHaveLength(FUSION.air);
-      expect(s.players[0].res.gold).toBe(gold - FUSION.air * FUSION.fuel.gold!);
+      for (let i = 0; i < SILO.cap; i++) step(s, [{ t: 'launch', p: 0, silo: silo.id, x: t.x, y: t.y }]);
+      expect(s.launches).toHaveLength(SILO.cap);
+      expect(s.players[0].res.gold).toBe(gold - SILO.cap * FUSION.fuel.gold!);
       expect(launchProblem(s, 0, silo, t.x, t.y)).toMatch(/already in the air/);
       expect(s.fallout).toBeUndefined();
       run(s, FUSION.fuse + 2);

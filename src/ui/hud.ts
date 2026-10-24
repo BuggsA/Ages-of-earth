@@ -9,13 +9,13 @@ import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE, findResource } from '../sim/units';
-import { FIRE, HIVE, AUTO_WORK, BREACH, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE } from '../sim/data';
+import { FIRE, FISSION, HIVE, AUTO_WORK, BREACH, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
 import { restsAt } from '../sim/passage';
 import { loadPrice, sellerNear } from '../sim/oretrade';
-import { clockOf, launchProblem, loaded, rulesOf } from '../sim/silo';
+import { clockOf, fuelOf, launchProblem, loaded, nextNuke, rulesOf, stockOf, warheadsOf, WARHEAD_NAMES, type WarheadKind } from '../sim/silo';
 import { carriesKegs, kegProblem, kegsOf, millProblem, mills, millsOf, sappers } from '../sim/powder';
 import { carriesTorch, fireOn } from '../sim/fire';
 import { basinOf, drowned, heldBack, isInund, lets, millIdle, sluiceFed, sluiceProblem, waterLine, wateredAt } from '../sim/water';
@@ -77,7 +77,7 @@ export interface HudActions {
   /** Wait for a left click on a tree, a root or a rival's living building, for torchbearers to set alight (`fire.ts`). */
   torchMode(): void;
   /** Wait for a left click on the map, for this Missile Silo to launch at (#605). */
-  launchMode(silo: number): void;
+  launchMode(silo: number, w?: WarheadKind): void;
   /** Wait for a left click on a building to shelter in (or a transport to board). */
   garrisonMode(): void;
   /** Wait for a left click on a shore to land a transport's passengers. */
@@ -1234,6 +1234,11 @@ export class Hud {
       const share = millShares(s).get(b.id) ?? 0;
       status += ` · <span data-tip="<b>Tide Mill</b>Its pond fills on the flood and runs out through the wheel on the ebb: at every turn of the tide it grinds ${TIDE.mill.gold} gold with ${TIDE.mill.most} tiles of tidal ground within ${TIDE.mill.reach} tiles of it, less with fewer. A tile feeds only the first mill raised by it. Causeways count as tidal ground. Flats a causeway line shuts off from the sea are a barrage's pond: ground twice, on the flood and on the ebb.">${still ? `⚠ ${still}` : `🌊 ${Math.round(share)} gold a turn of the tide (${Math.min(TIDE.mill.most, tidalNear(s, b).length)} tiles of tidal ground${tidalNear(s, b).some((t) => isPond(s, t)) ? `, ${tidalNear(s, b).filter((t) => isPond(s, t)).length} of them a barrage's pond, ground twice` : ''})${tideClock(s) ? '' : ': the tide wakes the moment it is raised'}`}</span>`;
     }
+    // The missile pool (#753): the store is the owner's alone to read.
+    if (mine && b.built && b.type === 'silo') {
+      const next = nextNuke(s, p);
+      status += ` · <span data-tip="<b>Warhead store</b>Your people's warheads, fired from any of your silos. One more is made every ${rulesOf(p).refuel} seconds while the store and the warheads in the air number under ${SILO.cap}. Rivals can't see it.">☢ ${stockOf(p)} in store${next === null ? '' : `, next in ${next}s`}</span>`;
+    }
     // A harbour aground at low water (#739).
     if (mine && b.built && b.type === 'dock' && aground(s, b)) status += ` · <span data-tip="<b>Aground</b>The tide has bared all the water beside this Dock: it launches nothing until the water comes back.">⚓ Aground at low water</span>`;
     // A dyke (#701 s3): what it holds back, read by either side: the rival's eye for a breach, its owner's for a weak bank.
@@ -1710,8 +1715,18 @@ export class Hud {
         }
         // The Atomic Age (#605): a Missile Silo names a point and the whole map watches the clock.
         if (b.type === 'silo') {
-          const why = launchProblem(s, viewer, b, b.x, b.y);
-          cmds.push({ key: 'M', pic: '', glyph: '☢', title: 'Launch', desc: `Then click anywhere on the map: ${rulesOf(p).fuse} seconds later the warhead lands, blasting every rival building and soldier within ${WARHEADS[rulesOf(p).w].r} tiles: ${WARHEADS[rulesOf(p).w].peak.toLocaleString('en')} damage at the centre, falling off with distance to nothing at the edge (distance is measured to a building's nearest edge)${rulesOf(p).clean ? '; nothing it strikes is poisoned' : `; the ground within ${SILO.reach} tiles of the point stays poisoned after, hurting every land unit in it`}. Every player sees the clock and the blast, and the fog lifts over it for ${SILO.lift} seconds, and a silo destroyed before it runs out scrubs the launch. Costs ${Object.entries(rulesOf(p).fuel).map(([r, n]) => `${n} ${r}`).join(' and ')}; the silo needs ${rulesOf(p).refuel} seconds to refuel after${rulesOf(p).air > 1 ? `, and holds up to ${rulesOf(p).air} warheads aloft` : ''}.`, ok: !why, why: why ?? undefined, on: !loaded(s, b), run: () => this.act.launchMode(b.id) });
+          // The warhead is chosen at launch (#753): the branch's own on M, and past the fork an Atomic one on N. One clock either way.
+          const r = rulesOf(p);
+          const kinds = warheadsOf(p);
+          for (const w of [...kinds].reverse()) {
+            const why = launchProblem(s, viewer, b, b.x, b.y, w);
+            const own = w === r.w;
+            const { peak, r: R } = WARHEADS[w];
+            const poison = w === 'fusion' ? '; nothing it strikes is poisoned' : `; the ground within ${SILO.reach} tiles of the point stays poisoned after, hurting every land unit in it`;
+            const leak = r.leak > 0 ? ` Every launch of your people's poisons ${FISSION.reach} tiles round the silo for ${FISSION.ownFallout} seconds.` : '';
+            const pool = ` Warheads come from your people's store, fired from any of your silos: ${stockOf(p)} now, one more every ${r.refuel ? `${r.refuel} seconds` : 'moment a slot frees'} while store and flight number under ${SILO.cap}. A silo that falls takes no stored warhead with it; only the one it is counting down is lost.`;
+            cmds.push({ key: own ? 'M' : 'N', pic: '', glyph: w === 'fission' ? '⚛' : w === 'fusion' ? '☀' : '☢', title: kinds.length > 1 ? `Launch ${WARHEAD_NAMES[w]}` : 'Launch', desc: `Then click anywhere on the map: ${r.fuse} seconds later the ${WARHEAD_NAMES[w]} warhead lands, blasting every rival building and soldier within ${R} tiles: ${peak.toLocaleString('en')} damage at the centre, falling off with distance to nothing at the edge (distance is measured to a building's nearest edge)${poison}. Every player sees the clock and the blast, but not which warhead it is: your clock is ${r.fuse} seconds whatever you fire. The fog lifts over the blast for ${SILO.lift} seconds, and a silo destroyed before the clock runs out scrubs the launch.${leak}${pool}`, cost: fuelOf(w), ok: !why, why: why ?? undefined, on: !loaded(s, b), run: () => this.act.launchMode(b.id, w) });
+          }
         }
         // The seam a Mine Shaft digs (#681).
         if (b.type === 'shaft') {

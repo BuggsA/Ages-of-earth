@@ -15,7 +15,7 @@ import { wallLine } from './commands';
 import { AI_BARRAGE, AI_EBB } from './data';
 import { barragePlan, causewayOwner, ebbTiming, isCauseway, isPond, tideAwake, tideLevel } from './tides';
 import { statsOf } from './world';
-import { blastDamage, launchProblem, loaded, rulesOf, silosOf, type WarheadKind } from './silo';
+import { blastDamage, fuelOf, launchProblem, loaded, rulesOf, silosOf, warheadsOf, warnRadius, type WarheadKind } from './silo';
 import { carriedBy } from './relics';
 import { storesOre } from './caches';
 import { loadPrice, sellerNear } from './oretrade';
@@ -1919,9 +1919,24 @@ function siloWorth(s: GameState, owner: number, x: number, y: number, w: Warhead
 }
 
 /**
+ * Which warhead the computer would send at (x, y) (#753): of those its people may fire, the one with the most worth (`siloWorth`) for
+ * each gold of its fuel, if any reaches `AI_SILO.worth`; ties go to the cheaper Atomic. Null when none is worth a launch.
+ */
+export function warheadFor(s: GameState, p: Player, x: number, y: number): { w: WarheadKind; worth: number; rate: number } | null {
+  let best: { w: WarheadKind; worth: number; rate: number } | null = null;
+  for (const w of warheadsOf(p)) {
+    const worth = siloWorth(s, p.id, x, y, w);
+    const rate = worth / (fuelOf(w).gold ?? 1);
+    if (worth >= AI_SILO.worth && (!best || rate > best.rate)) best = { w, worth, rate };
+  }
+  return best;
+}
+
+/**
  * A loaded silo launches at the rival building whose ring catches the most (`siloWorth`), once its worth reaches `AI_SILO.worth`.
- * The aim is chosen once a second; while it holds and the silo is short only of fuel, the town sets the fuel aside every tick
- * (it is ruinous, and soldiers would spend the gold first).
+ * Past the fork it weighs both warheads it may fire (#753) and takes the one with the most worth for its gold, so a Fission town
+ * sends a cheap Atomic warhead at a lone Town Center and its own at a crowd. The aim is chosen once a second; while it holds and the
+ * people is short only of fuel, the town sets the fuel aside every tick (it is ruinous, and soldiers would spend the gold first).
  */
 function fireSilo(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
@@ -1929,36 +1944,41 @@ function fireSilo(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const silo = silosOf(s, p.id).find((b) => s.tick - b.born >= secs(BUILDINGS.silo.time + AI_SILO.wait) && loaded(s, b));
   if (!silo) return;
   if (s.tick % TICK_HZ === 0) {
-    let best: { x: number; y: number; at: number } | null = null;
-    let bestWorth = AI_SILO.worth - 1;
+    let best: { x: number; y: number; at: number; w: WarheadKind } | null = null;
+    let bestRate = 0;
+    // A town one of its own warheads already falls on is left to it (Fusion keeps three aloft: they go to three towns, not one).
+    const aloft = (s.launches ?? []).filter((l) => l.owner === p.id);
     for (const e of s.ents) {
       if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
-      const w = siloWorth(s, p.id, e.x, e.y, rulesOf(p).w);
-      if (w > bestWorth) {
-        bestWorth = w;
-        best = { x: e.x, y: e.y, at: s.tick };
+      if (aloft.some((l) => (l.x - e.x) * (l.x - e.x) + (l.y - e.y) * (l.y - e.y) < WARHEADS[l.w ?? 'atomic'].r * WARHEADS[l.w ?? 'atomic'].r)) continue;
+      const pick = warheadFor(s, p, e.x, e.y);
+      if (pick && pick.rate > bestRate) {
+        bestRate = pick.rate;
+        best = { x: e.x, y: e.y, at: s.tick, w: pick.w };
       }
     }
     mem.siloAim = best ?? undefined;
   }
   const aim = mem.siloAim;
   if (!aim || s.tick - aim.at > TICK_HZ * 2) return;
-  const why = launchProblem(s, p.id, silo, aim.x, aim.y);
+  const w = aim.w ?? rulesOf(p).w;
+  const why = launchProblem(s, p.id, silo, aim.x, aim.y, w);
   if (why === null) {
-    issue({ t: 'launch', p: p.id, silo: silo.id, x: aim.x, y: aim.y });
+    issue({ t: 'launch', p: p.id, silo: silo.id, x: aim.x, y: aim.y, w });
     mem.siloAim = undefined;
-  } else if (why.startsWith("A warhead's fuel")) spend(v, rulesOf(p).fuel);
+  } else if (why.startsWith("A warhead's fuel")) spend(v, fuelOf(w));
 }
 
 /**
  * Soldiers and citizens inside the ring of a rival warhead in the air, or on poisoned ground (#605 s2), run out of it, away from
- * its centre toward home (the answer to a public clock, and to the fallout after).
+ * its centre toward home (the answer to a public clock, and to the fallout after). A warhead's ring is the one every rival is warned
+ * of (`warnRadius`), never its real blast: the computer knows no more than a person would.
  */
 function fleeWarhead(s: GameState, v: View, issue: (c: Command) => void): void {
   if (s.tick % (TICK_HZ / 2) !== 0) return;
   const zones = [...(s.launches ?? []).filter((l) => isEnemy(s, v.p.id, l.owner)), ...(s.fallout ?? [])];
   for (const l of zones) {
-    const r = ('silo' in l ? WARHEADS[(l as Launch).w ?? 'atomic'].r : (l as Fallout).r ?? SILO.reach) + AI_SILO.margin;
+    const r = ('silo' in l ? warnRadius(s, (l as Launch).owner) : (l as Fallout).r ?? SILO.reach) + AI_SILO.margin;
     const out = [...v.army, ...v.citizens].filter((u) => !u.inside && (u.x - l.x) * (u.x - l.x) + (u.y - l.y) * (u.y - l.y) <= r * r && domainOf(u.type) === 'land');
     if (!out.length) continue;
     const dx = v.home.x - l.x, dy = v.home.y - l.y;
