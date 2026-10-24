@@ -1,5 +1,6 @@
 import { AGES, BUILDINGS, CIVS, LIGHTNING, PATHS, ROADS, STEP_BACK, TECHS, TICK_HZ, TRUNK, WAYS, secs, stepBackCost, type Age, type Deed, type Road } from './data';
 import { KEYS, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, type AgeId, type CivId, type PathId, type RareId, type Building, type BuildingType, type Cost, type GameState, type KeyId, type Player, type TechId, type UnitType } from './types';
+import { coastHeld } from './water';
 
 /**
  * Ages as a web (#37): which age a people is in, the roads out of it, and what that age lets them
@@ -261,6 +262,8 @@ export function roadProblem(s: GameState, p: Player, r: Road): string | null {
     if (r.vein && !veinSeen(s, p, r)) return `Raise a Prospector's Lodge, or dig ${r.vein.id}, to learn of this road`;
     return `Needs a ${BUILDINGS[r.clue!].name}`;
   }
+  // A coast door (#701): the land's shape, not an ore, keeps the Age of Dykes from a people with no shallows by its town.
+  if (r.coast && !coastHeld(s, p)) return r.coast;
   if (r.shuns && hasWalked(p, r.shuns)) return `Your people took the ${AGES[r.shuns].name}: this road is closed to it for good`;
   // A crossing (#585): seen with one sibling walked, open only with both. The road back to the age they share, and on into the other, is the price.
   const other = crossingLeft(p, r);

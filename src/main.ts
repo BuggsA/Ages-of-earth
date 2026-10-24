@@ -592,7 +592,7 @@ function toTitle(): void {
 
 const SAVE_KEY = 'ages-save';
 /** Bumped when the state's shape changes, so an older save is set aside instead of loading broken (2: relics; 3: trading posts). */
-const SAVE_V = 3;
+const SAVE_V = 4;
 
 interface SavedMatch {
   setup: GameSetup;

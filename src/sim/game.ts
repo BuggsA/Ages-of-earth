@@ -30,6 +30,7 @@ import { reclaimStep, remember } from './reclaim';
 import { leaveRubble, salvageStep } from './salvage';
 import { cacheStep, dropOre, spillStore } from './caches';
 import { kegStep, millStep } from './powder';
+import { pumpStep } from './water';
 import { siloStep } from './silo';
 import { stockPosts } from './oretrade';
 import { sortieStep } from './sortie';
@@ -513,7 +514,7 @@ function checkVictory(s: GameState): void {
     // Fields, snares and walls alone don't keep a people alive, nor do unarmed boats (fishing boats, merchant
     // ships): none of them can build or fight, so a people down to them can never come back, and a rival
     // at its population cap with no fleet could never sink them.
-    const alive = s.ents.some((e) => e.owner === p.id && e.hp > 0 && !(e.kind === 'building' && (e.type === 'farm' || e.type === 'wall' || e.type === 'gate' || e.type === 'snare' || e.type === 'sapling')) && !(e.kind === 'unit' && (e.type === 'fisher' || e.type === 'cog')));
+    const alive = s.ents.some((e) => e.owner === p.id && e.hp > 0 && !(e.kind === 'building' && (e.type === 'farm' || e.type === 'wall' || e.type === 'gate' || e.type === 'dyke' || e.type === 'snare' || e.type === 'sapling')) && !(e.kind === 'unit' && (e.type === 'fisher' || e.type === 'cog')));
     if (alive) continue;
     p.defeated = true;
     for (const e of s.ents) if (e.owner === p.id) e.hp = 0;
@@ -599,6 +600,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   cacheStep(s);
   millStep(s);
   kegStep(s);
+  pumpStep(s);
   siloStep(s);
   sortieStep(s);
   fairStep(s);
@@ -672,6 +674,8 @@ export function checksum(s: GameState): number {
     mix(r.dug);
     mix(r.by);
   }
+  // The water layer (#701): every tile pumped out, by where it lies.
+  if (s.polder) for (let i = 0; i < s.polder.length; i++) if (s.polder[i]) mix(i);
   for (const f of s.fallen ?? []) {
     mix(f.owner);
     mix(f.tx);

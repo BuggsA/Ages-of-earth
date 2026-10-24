@@ -1,4 +1,4 @@
-import { AI_LEVELS, AUTO_WORK, BUILDINGS, EXPLORE, PATROL, CARRY, CONSECRATE, COPPICE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, LEGION, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TRADE, domainOf, secs } from './data';
+import { AI_LEVELS, AUTO_WORK, BUILDINGS, EXPLORE, PATROL, CARRY, CONSECRATE, COPPICE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, LEGION, MILITARY, ORDERS, POLDER, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
@@ -24,6 +24,7 @@ import { rubbleAt, salvages, strip } from './salvage';
 import { bank, cacheAt, lift } from './caches';
 import { buyLoad } from './oretrade';
 import { atFoot, carriesKegs, kegProblem, layKeg } from './powder';
+import { polderField } from './water';
 import { fordMarch, groveBoost, keptOf, kinBonus } from './landmarks';
 import { chant, chantedOver, consecrateProblem, consecrates, turnBuilding } from './consecrate';
 import { convoyShare } from './convoy';
@@ -445,7 +446,8 @@ function farmStep(s: GameState, u: Unit, o: Extract<Order, { k: 'farm' }>): void
     o.phase = 'work';
     u.miss = 0;
     u.act = 'farm';
-    u.frac += gatherRate(s, u, 'farm') * DT;
+    // A field on polder (#701) works half again as fast: the richest ground there is.
+    u.frac += gatherRate(s, u, 'farm') * (polderField(s, f) ? POLDER.farm : 1) * DT;
     while (u.frac >= 1) {
       u.frac -= 1;
       u.carry++;
@@ -583,7 +585,7 @@ export function completeBuilding(s: GameState, b: Building): void {
   b.hp = Math.min(b.hp, maxHp(s, b));
   s.players[b.owner].stats.built++;
   // A finished gate opens for its own side.
-  if (b.type === 'gate') stampBuilding(s, b, true);
+  if (b.type === 'gate' || b.type === 'dyke') stampBuilding(s, b, true);
   if (b.type === 'wonder') {
     b.timer = s.wonderTime;
     s.events.push({ k: 'wonder', owner: b.owner, id: b.id, x: b.x, y: b.y, ticks: b.timer });
@@ -605,7 +607,7 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
   }
   // Help with other foundations nearby (a wall goes up piece by piece).
   let next: Building | null = null;
-  let bestD = b.type === 'wall' || b.type === 'gate' ? 4 : 14;
+  let bestD = b.type === 'wall' || b.type === 'gate' || b.type === 'dyke' ? 4 : 14;
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.owner !== u.owner || e.built || e.hp <= 0 || !canRaise(u.type, e.type, s.players[u.owner].civ)) continue;
     const d = distToRect(u.x, u.y, e);
@@ -729,7 +731,7 @@ function findTarget(s: GameState, sp: Spatial, u: Unit, r: number, buildings: bo
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, u.owner, e.owner)) continue;
     // Walls only matter when they are in the way.
-    const wall = e.type === 'wall' || e.type === 'gate';
+    const wall = e.type === 'wall' || e.type === 'gate' || e.type === 'dyke';
     const d = distToRect(u.x, u.y, e) + (wall ? 3 : 0);
     if (d < bestD) {
       bestD = d;
