@@ -33,9 +33,9 @@ function groundRelic(): THREE.BufferGeometry {
   k.box(0.1, 0.02, 0.12, '#6f8f4a', 0.17, 0.08, 0.17);
   k.box(0.08, 0.02, 0.06, '#6f8f4a', -0.2, 0.08, -0.18);
   casket(k, 0.24);
-  // A tall stake with a gold pennon: a casket is small, and a relic in the grass is worth finding.
+  // A tall stake with a pale ivory pennon (gold is a player's colour): a casket is small, and a relic in the grass is worth finding.
   k.cyl(0.015, 0.015, 1.0, 4, '#e8dcc0', -0.3, 0, -0.22);
-  k.glow(k.box(0.3, 0.17, 0.02, '#f2cf6a', -0.15, 0.82, -0.22));
+  k.glow(k.box(0.3, 0.17, 0.02, '#f4ead0', -0.15, 0.82, -0.22));
   return bake(k.root);
 }
 
