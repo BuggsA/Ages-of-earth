@@ -17,7 +17,7 @@ import { carriesTorch, torchProblem } from './sim/fire';
 import { launchProblem, ringsFor, type WarheadKind } from './sim/silo';
 import { jumpAge, rush, topUp } from './sim/god';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
-import { placeProblem, stampBuilding, walkable } from './sim/grid';
+import { NAVAL, placeProblem, stampBuilding, walkable } from './sim/grid';
 import { findDockSpot, findSpot, millSpotFor } from './sim/ai';
 import { channelPlan, dig, dykePlan, heldBack, waterLine } from './sim/water';
 import { bared, tideMillSpot, wakeTide } from './sim/tides';
@@ -2569,6 +2569,14 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           hud.toast(`${s.players[ev.owner].name} has opened a sluice: the low ground round it is going under water. Soldiers wade it at a crawl and siege bogs down; go round, or wait for it to drain. (Space to look)`, 'alert');
         }
         break;
+      case 'burst':
+        // A dam bursts (#701 s5): told to its owner, and to a rival who sees it.
+        if (ev.owner === viewer || view.sees(ev.x, ev.y)) {
+          lastAlert = { x: ev.x, y: ev.y };
+          hud.toast(ev.owner === viewer ? `Your dam has burst! The water is over ${ev.tiles} tiles of low ground below it, and all who stood there are hurt. It drains away; raise a new Dam (N) for the turbines. (Space to look)` : `${s.players[ev.owner].name}'s dam has burst: the water is over the low ground below it. (Space to look)`, 'alert');
+          if (ev.owner === viewer) music.stir(0.4);
+        }
+        break;
       case 'flooded':
         // The breach (#701 s3): the sea in your polder, said once a flood, not for every tile.
         if (ev.owner === viewer && s.tick - floodToldAt > TICK_HZ * 15) {
@@ -3582,6 +3590,35 @@ function frame(now: number): void {
         return plan.pond;
       }
     return 0;
+  },
+  /**
+   * The Age of Locks (testing, #701 s5): turn a player to the age, dig the channel the computer would plan by its start deep into a
+   * canal (at once), raise a finished Dam on its middle and a Bridge nearer home, and launch a warship onto it. Returns the canal's length,
+   * or 0 where there is none.
+   */
+  locks(owner: number) {
+    if (!game) return 0;
+    const s = game;
+    const p = s.players[owner];
+    restat(s, p, () => {
+      p.epoch = AGES.locks.tier;
+      p.age = 'locks';
+      p.walked = [...new Set([...(p.walked ?? []), 'waterline' as const, 'locks' as const])];
+    });
+    const plan = channelPlan(s, p.startX, p.startY, AI_RIVERS, wallLine, (x, y) => !placeProblem(s, 'channel', x, y));
+    if (!plan) return 0;
+    for (const t of plan.tiles) dig(s, t, owner, true);
+    const n = plan.tiles.length;
+    const at = (t: number) => ({ tx: t % s.w, ty: Math.floor(t / s.w) });
+    const mid = plan.tiles[n >> 1];
+    if (!placeProblem(s, 'dam', at(mid).tx, at(mid).ty, true, owner)) placeBuilding(s, owner, 'dam', at(mid).tx, at(mid).ty, true);
+    const near = plan.tiles[Math.max(0, n - 2)];
+    if (near !== mid && !placeProblem(s, 'bridge', at(near).tx, at(near).ty, true, owner)) placeBuilding(s, owner, 'bridge', at(near).tx, at(near).ty, true);
+    const head = plan.tiles[0];
+    const sea = [1, -1, s.w, -s.w].map((d) => head + d).find((t) => walkable(s, t % s.w, Math.floor(t / s.w), NAVAL));
+    if (sea !== undefined) spawnUnit(s, owner, 'warship', (sea % s.w) + 0.5, Math.floor(sea / s.w) + 0.5);
+    view.rig.focus(at(mid).tx + 0.5, at(mid).ty + 0.5);
+    return n;
   },
   /**
    * Routes that read the tide (testing, #755): with the tide awake, run the rules on to a few seconds before the flood off low water, put
