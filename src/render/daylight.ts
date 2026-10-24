@@ -86,7 +86,7 @@ export function lightAt(hour: number): Light {
   const up = Math.max(0, Math.sin(Math.PI * t));
   const moon = num(a.moon, b.moon);
   const x = -Math.cos(Math.PI * t);
-  const y = 0.3 + 0.56 * up + 0.2 * moon;
+  const y = 0.24 + 0.46 * up + 0.2 * moon;
   const z = 0.36;
   const len = Math.sqrt(x * x + y * y + z * z);
   return {

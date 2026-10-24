@@ -136,11 +136,11 @@ export function moodOf(day: WeatherDay): Mood {
   const k = day.strength;
   switch (day.kind) {
     case 'rain':
-      return { grey: 0.55 + 0.3 * k, sun: 0.55 - 0.25 * k, sky: 0.85 - 0.2 * k, reach: 0.8 - 0.3 * k, tint: '#6d7782' };
+      return { grey: 0.55 + 0.3 * k, sun: 0.75 - 0.25 * k, sky: 0.8 - 0.2 * k, reach: 0.8 - 0.3 * k, tint: '#6d7782' };
     case 'snow':
-      return { grey: 0.5 + 0.25 * k, sun: 0.65 - 0.2 * k, sky: 0.95, reach: 0.75 - 0.3 * k, tint: '#b9c4cf' };
+      return { grey: 0.5 + 0.25 * k, sun: 0.78 - 0.2 * k, sky: 0.85, reach: 0.75 - 0.3 * k, tint: '#b9c4cf' };
     case 'mist':
-      return { grey: 0.45 + 0.3 * k, sun: 0.7 - 0.2 * k, sky: 0.95, reach: 0.7 - 0.25 * k, tint: '#cfd8dc' };
+      return { grey: 0.45 + 0.3 * k, sun: 0.78 - 0.2 * k, sky: 0.85, reach: 0.7 - 0.25 * k, tint: '#cfd8dc' };
     default:
       return { grey: 0, sun: 1, sky: 1, reach: 1, tint: '#ffffff' };
   }
