@@ -2298,20 +2298,6 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           play('error');
         }
         break;
-      case 'sick':
-        // The Sickness (#541): it broke out, ran its course, or took citizens.
-        if (ev.owner === viewer) {
-          if (ev.what === 'broke') hud.toast('🤒 The Sickness has broken out. Your people work slower: keep priests by a Temple to nurse them, and think about closing the roads (quarantine, Town Center, N).', 'bad');
-          else if (ev.what === 'ended') hud.toast('🤒 The Sickness has passed.', 'good');
-          else hud.toast(`🤒 The Sickness has taken ${ev.n} of your people.`, 'bad');
-          play(ev.what === 'ended' ? 'allClear' : 'toll');
-        } else if (ev.what === 'broke' && s.players[ev.owner]?.team !== s.players[viewer]?.team) {
-          hud.toast(`🤒 The Sickness has broken out in ${s.players[ev.owner].name}'s town. Their posts will run foul: a trader of yours loading there brings it home.`, 'info');
-        }
-        break;
-      case 'quarantine':
-        if (ev.owner === viewer) hud.toast(ev.on ? '🚧 Quarantine: your traders stay home.' : '🚧 Quarantine lifted.', 'info');
-        break;
       case 'epoch':
         if (ev.owner === viewer) {
           const age = ev.age ? AGES[ev.age] : EPOCHS[ev.epoch];

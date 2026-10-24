@@ -1,4 +1,4 @@
-import { AGES, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SICKNESS, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, secs } from '../sim/data';
+import { AGES, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, secs } from '../sim/data';
 import { battlesFor } from '../sim/battles';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, findsOf, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
@@ -111,7 +111,6 @@ const TIPS: Tip[] = [
     },
     text: 'You can afford the next epoch! Select the Town Center and press <kbd>W</kbd>. New epochs bring stronger units and new buildings.',
   },
-  { id: 'sickness', when: (s, me) => (s.players[me].taint ?? 0) >= 0.4 || !!s.players[me].fever, text: `🤒 <b>The Sickness.</b> A big town with full houses packed close builds taint (the chip by your population); at 100% it breaks out and your people work slower, and some die in a bad fever. Keep <b>priests by a finished Temple</b> to nurse it down, space your houses out, and mind the roads: a sick town's trader leaves its trading post foul for ${SICKNESS.foul} seconds and a trader of yours loading there brings it home. <b>Quarantine</b> (Town Center, <kbd>N</kbd>) keeps your traders at home.` },
   { id: 'bell', when: (s, me) => s.players[me].alert > 0 && s.tick - s.players[me].alert < 40, text: 'Under attack? Ring the <b>town bell</b> (Town Center, <kbd>R</kbd>): citizens shelter inside and the Town Center shoots more arrows. <kbd>T</kbd> sends them back to work.' },
   { id: 'heart', when: (s, me) => !s.scenario && s.mode !== 'regicide' && s.players[me].epoch >= 1 && buildings(s, me).filter((b) => b.type === 'towncenter').length === 1 && secsIn(s) > 300, text: 'Your Town Center is your <b>heart</b>: if the last one falls you have 45 seconds to lay a new foundation, or your people is lost. A second Town Center (<kbd>B</kbd>) is cheap insurance.' },
   { id: 'forge', when: (s, me) => s.players[me].epoch >= 1 && secsIn(s) > 30 && !has(s, me, 'forge'), text: `A <b>Forge</b> (<kbd>V</kbd> <kbd>R</kbd>) makes every soldier hit harder and take less damage. The <b>${BUILDINGS.market.name}</b> trades surplus goods for gold.` },
