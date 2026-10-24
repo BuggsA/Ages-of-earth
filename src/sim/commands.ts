@@ -18,6 +18,7 @@ import { cacheAt } from './caches';
 import { carriesKegs, kegProblem } from './powder';
 import { kegTileProblem } from './tides';
 import { carriesTorch, onFire, torchProblem } from './fire';
+import { stockadeLimit } from './thralls';
 import { launch, launchProblem, reserveProblem, salvo, salvoProblem, setReserve, siloLimit } from './silo';
 import { raise, raiseCost } from './reclaim';
 import { callWork, workProblem } from './works';
@@ -190,7 +191,7 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
     if (!quiet) refuse(s, p, `Needs the ${EPOCHS[def.epoch].name}`);
     return null;
   }
-  const no = buildBarred(player, type) ?? wayBarred(s, player, type) ?? siloLimit(s, p, type) ?? heartBarred(s, p, type) ?? spireBarred(s, p, type);
+  const no = buildBarred(player, type) ?? wayBarred(s, player, type) ?? siloLimit(s, p, type) ?? stockadeLimit(s, p, type) ?? heartBarred(s, p, type) ?? spireBarred(s, p, type);
   if (no) {
     if (!quiet) refuse(s, p, no);
     return null;

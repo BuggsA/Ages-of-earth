@@ -1,5 +1,5 @@
 import { SEA_RAID, SPOILS, TICK_HZ, domainOf } from './data';
-import { ageDef } from './ages';
+import { ageDef, asleep } from './ages';
 import { distToRect } from './grid';
 import type { Building, GameState, Unit } from './types';
 
@@ -34,10 +34,14 @@ export function looted(u: Unit, by: number): number {
   return by !== u.owner && u.spoils ? u.spoils : 0;
 }
 
-/** The home building (Town Center or Barracks, finished) of the unit's people within `SPOILS.bank` tiles of it, if any. */
+/**
+ * The home building (Town Center or Barracks, finished) of the unit's people within `SPOILS.bank` tiles of it, if any. The Warband's
+ * Spoils Stockade (#727) banks a pack too, out where the host fights, while it is awake.
+ */
 function homeNear(s: GameState, u: Unit): Building | null {
   for (const e of s.ents) {
-    if (e.kind !== 'building' || e.owner !== u.owner || !e.built || e.hp <= 0 || !SPOILS.homes.includes(e.type)) continue;
+    if (e.kind !== 'building' || e.owner !== u.owner || !e.built || e.hp <= 0) continue;
+    if (e.type === 'stockade' ? asleep(s, e) : !SPOILS.homes.includes(e.type)) continue;
     if (distToRect(u.x, u.y, e) <= SPOILS.bank) return e;
   }
   return null;

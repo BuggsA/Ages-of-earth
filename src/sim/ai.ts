@@ -14,7 +14,8 @@ import { coveredNext, shoreNear, tideClock, tideMillSpot } from './tides';
 import { castProblem, mooringSpot, raisesCitizens } from './floating';
 import { pitchProblem } from './steppe';
 import { wallLine } from './commands';
-import { AI_COCKLE } from './data';
+import { AI_COCKLE, STOCKADE } from './data';
+import { stockadeLimit } from './thralls';
 import { AI_COCKLER, COCKLER } from './data';
 import { cocklerSpotNear } from './tides';
 import { AI_GATE } from './data';
@@ -434,6 +435,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   excavate(s, v, mem, issue);
   if (AI_LEVELS[v.p.ai!].clever) raiseMission(s, v, mem, issue);
   raiseBloomery(s, v, mem, issue);
+  raiseStockade(s, v, mem, issue);
   salvage(s, v, mem, issue);
   claimWalk(s, v, mem, issue);
   findWalk(s, v, mem, issue);
@@ -5133,6 +5135,19 @@ function raiseBloomery(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   if (bog < 0) return;
   const spot = findSpot(s, 'bloomery', (bog % s.w) + 0.5, Math.floor(bog / s.w) + 0.5, 2, 8);
   if (spot) construct(s, v, mem, 'bloomery', spot, 2, issue);
+}
+
+/**
+ * The Warband's Spoils Stockade (#727): a computer in the age with an army raises one `STOCKADE.out` tiles from home toward the rival,
+ * so the packs its soldiers win at the front are banked there. One at a time, and not again for 30 seconds.
+ */
+function raiseStockade(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (ageOf(p) !== 'warband' || buildBarred(p, 'stockade') || stockadeLimit(s, p.id, 'stockade') || v.army.length < 4) return;
+  if (s.tick - (mem.ordered.stockade ?? -99999) < secs(30)) return;
+  const at = toward(v.home, enemyHome(s, p), STOCKADE.out);
+  const spot = findSpot(s, 'stockade', at.x, at.y, 0, 8);
+  if (spot) construct(s, v, mem, 'stockade', spot, 2, issue);
 }
 
 function raidShips(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {

@@ -288,7 +288,7 @@ const plinthMaterial = inject(new THREE.MeshStandardMaterial({ color: '#8d7a62',
 
 const HEIGHT: Record<BuildingType, number> = {
   towncenter: 2.9, house: 1.5, storehouse: 1.3, farm: 0.4, barracks: 2.0, range: 1.4, stable: 1.4, tower: 3.4,
-  forge: 2.1, workshop: 1.7, temple: 2.6, market: 1.6, wonder: 4.6, wall: 1.3, gate: 1.8, dock: 1.5, airfield: 1.8, dyke: 0.45, sluice: 1.4, bridge: 0.8, dam: 1.2, windmill: 3.3, bloomery: 2.0, channel: 0.2, hive: 0.9, heart: 5.2, huntcamp: 1.4, warcamp: 1.7, caravanserai: 1.3, mission: 1.3, drainrig: 1.9, transfusion: 2.1, bloodtower: 2.9, snare: 0.9, prospector: 1.6, sapling: 0.7, silo: 1.4, shaft: 1.8, den: 1.8, thornwall: 1.3, garden: 0.6, orchard: 1.2, causeway: 0.2, tidemill: 2.0, pontoon: 1.6, battery: 1.9, spire: 4.4, cockler: 1.4, tidegate: 1.3,
+  forge: 2.1, workshop: 1.7, temple: 2.6, market: 1.6, wonder: 4.6, wall: 1.3, gate: 1.8, dock: 1.5, airfield: 1.8, dyke: 0.45, sluice: 1.4, bridge: 0.8, dam: 1.2, windmill: 3.3, bloomery: 2.0, stockade: 1.9, channel: 0.2, hive: 0.9, heart: 5.2, huntcamp: 1.4, warcamp: 1.7, caravanserai: 1.3, mission: 1.3, drainrig: 1.9, transfusion: 2.1, bloodtower: 2.9, snare: 0.9, prospector: 1.6, sapling: 0.7, silo: 1.4, shaft: 1.8, den: 1.8, thornwall: 1.3, garden: 0.6, orchard: 1.2, causeway: 0.2, tidemill: 2.0, pontoon: 1.6, battery: 1.9, spire: 4.4, cockler: 1.4, tidegate: 1.3,
 };
 
 /** Which neighbouring tiles are land (#701 s5): the banks a bridge spans to, and a dam runs between. */

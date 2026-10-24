@@ -1990,6 +1990,31 @@ function dam(k: Kit, variant: number): void {
   k.team(k.box(0.12, 0.08, 0.12, TEAM, 0.36, 0.24, -0.2, g));
 }
 
+/** A Spoils Stockade (#727, the Warband): a ring of sharpened stakes round a hurdle pen, a lookout post and a heap of bundled plunder under a war standard. */
+function stockade(k: Kit, _e: number, st: Style): void {
+  pad(k, 2, st.base);
+  const WOOD = '#6b4b2f';
+  // The palisade: stakes round three sides, the gate side left open on the south.
+  for (let i = 0; i < 9; i++) {
+    const x = -0.8 + i * 0.2;
+    const h = 0.9 + (i % 3) * 0.12;
+    k.cone(0.07, h, 5, WOOD, x, 0, -0.85);
+    if (i < 8) k.cone(0.07, h, 5, WOOD, i % 2 ? -0.85 : 0.85, 0, -0.7 + i * 0.2);
+  }
+  for (const x of [-0.8, -0.6, 0.6, 0.8]) k.cone(0.07, 1.0, 5, WOOD, x, 0, 0.85);
+  k.team(k.box(1.7, 0.06, 0.05, TEAM, 0, 0.55, -0.88));
+  // The lookout: four posts, a platform and a rail at the back corner.
+  for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) k.cyl(0.04, 0.04, 1.4, 4, WOOD, 0.45 + dx * 0.18, 0, -0.35 + dz * 0.18);
+  k.box(0.5, 0.06, 0.5, '#7a5636', 0.45, 1.4, -0.35);
+  k.box(0.5, 0.12, 0.04, '#5b4330', 0.45, 1.5, -0.1);
+  // Inside: bundled plunder, a sack heap and a hurdle pen.
+  k.box(0.34, 0.26, 0.26, '#8a5a3c', -0.35, 0.02, 0.1);
+  k.box(0.26, 0.2, 0.26, '#a0522d', -0.1, 0.02, 0.3);
+  k.blob(0.16, '#c8a64a', -0.4, 0.05, -0.2).scale.set(1.2, 0.8, 1.2);
+  k.box(0.5, 0.2, 0.04, '#7a5c3a', -0.3, 0, -0.5);
+  banner(k, -0.95, 0, 0.95, 1.7);
+}
+
 /** A windmill (#701): a thatched smock mill on a brick base with a reefing stage, its cap turned to the wind. The sails turn on their own (`windmillSails`). */
 function windmill(k: Kit, _e: number, st: Style): void {
   pad(k, 2, st.base);
@@ -2704,7 +2729,7 @@ const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' |
   sapling: (k, e) => sapling(k, e),
   heart: (k) => heart(k),
   spire: (k) => spire(k),
-  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, battery, windmill, bloomery,
+  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, battery, windmill, bloomery, stockade,
   // The Age of Tides (#739), drawn in `tideModels.ts`.
   tidemill: (k: Kit, _e: number, st: Style) => tidemill(k, st.base),
   cockler: (k: Kit, _e: number, st: Style) => cocklerHut(k, st.base),
