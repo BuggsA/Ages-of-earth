@@ -1153,6 +1153,17 @@ function makeUnit(type: UnitType, epochIn: number): Kit {
 function lineMark(k: Kit, type: UnitType): Kit {
   if (type === 'infantry' || type === 'ranged') k.team(k.box(0.21, 0.3, 0.03, TEAM, 0, 0.14, -0.085));
   if (type === 'infantry') k.team(k.box(0.035, 0.15, 0.12, TEAM, 0, 0.58, -0.01));
+  // Riders, priests and heroes carry a team pennant on a short staff behind the shoulder; a hero's is the tallest.
+  if (type === 'cavalry' || type === 'priest' || type === 'hero') {
+    const top = type === 'hero' ? 0.98 : type === 'cavalry' ? 0.92 : 0.8;
+    k.cyl(0.008, 0.008, top - 0.3, 4, WOOD, 0.07, 0.3 + (top - 0.3) / 2, -0.1);
+    k.team(k.box(0.012, type === 'hero' ? 0.15 : 0.11, type === 'hero' ? 0.2 : 0.15, TEAM, 0.07, top - 0.06, -0.19));
+  }
+  // An engine flies a team flag from its frame, so a siege line is told apart from a cart.
+  if (type === 'siege') {
+    k.cyl(0.01, 0.01, 0.4, 4, WOOD, 0, 0.55, -0.2);
+    k.team(k.box(0.012, 0.13, 0.2, TEAM, 0, 0.7, -0.3));
+  }
   return k;
 }
 
