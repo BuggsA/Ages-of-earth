@@ -402,6 +402,52 @@ function hive(k: Kit, e: number, variant: number): void {
   k.team(k.box(0.5, 0.12, 0.015, TEAM, 0, 0.22, 0.265));
 }
 
+// ---- The Age of the Wildwood (`docs/wild-road.md` §4) --------------------------------------------------
+
+/**
+ * A Heart Tree: a vast old tree on a mound of moss, its roots flung out as buttresses over the whole plot, a hollow at its foot
+ * lit amber from within, and a crown of leaves wider than a house, heaped in three tiers. Ribbons of its people's cloth hang from
+ * the lowest bough. It stands taller than a Wonder: the town's soul, seen from anywhere.
+ */
+function heart(k: Kit): void {
+  const bark = '#4a3826';
+  const furrow = '#2f2419';
+  const moss = '#56763a';
+  const leaf = ['#2f5a26', '#3d6c2c', '#4c7d34', '#36612a'];
+  k.lathe([[0, 0.06], [1.45, 0], [1.4, 0.05], [1.05, 0.14], [0.6, 0.2], [0, 0.22]], 10, moss, 0, -0.03, 0);
+  // Buttress roots running out to the plot's edge.
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 7) * Math.PI * 2 + 0.3;
+    const r = k.box(0.16, 0.22, 1.0, i % 2 ? bark : furrow, Math.cos(a) * 0.7, 0.08, Math.sin(a) * 0.7);
+    r.rotation.y = -a + Math.PI / 2;
+    r.rotation.x = 0.18;
+  }
+  // The trunk: flared at the foot, a slight twist of furrows up it.
+  k.lathe([[0, 0], [0.62, 0], [0.5, 0.35], [0.42, 1.0], [0.38, 1.8], [0.33, 2.6], [0, 2.7]], 9, bark, 0, 0.1, 0);
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    k.box(0.06, 2.2, 0.08, furrow, Math.cos(a) * 0.43, 1.25, Math.sin(a) * 0.43).rotation.y = -a;
+  }
+  // The hollow at its foot, glowing.
+  k.box(0.32, 0.5, 0.1, '#1a120b', 0, 0.45, 0.5);
+  k.glow(k.box(0.2, 0.34, 0.06, '#ffb43e', 0, 0.42, 0.53));
+  // Great boughs out from the trunk into the crown.
+  for (const [a, y, len] of [[0.4, 2.0, 1.1], [2.3, 2.2, 1.0], [4.2, 1.9, 1.2], [5.5, 2.5, 0.8]] as [number, number, number][]) {
+    const b = k.cyl(0.07, 0.13, len, 5, bark, Math.cos(a) * len * 0.45, y + 0.25, Math.sin(a) * len * 0.45);
+    b.rotation.z = Math.cos(a) * -1.0;
+    b.rotation.x = Math.sin(a) * 1.0;
+  }
+  // The crown in three tiers.
+  for (const [x, y, z, r, c] of [
+    [0, 2.9, 0, 1.15, 0], [-0.85, 2.55, 0.3, 0.75, 1], [0.8, 2.6, -0.35, 0.8, 2], [0.2, 2.5, 0.9, 0.7, 3], [-0.3, 2.6, -0.9, 0.7, 1],
+    [0.4, 3.55, 0.2, 0.8, 2], [-0.45, 3.5, -0.25, 0.7, 3], [0, 4.15, 0, 0.6, 0],
+  ] as [number, number, number, number, number][]) k.blob(r, leaf[c], x, y, z).scale.set(1, 0.72, 1);
+  // Its people's ribbons from the lowest bough.
+  for (const x of [-0.25, 0.05, 0.3]) k.team(k.box(0.09, 0.6, 0.02, TEAM, 0.6 + x * 0.3, 1.65, 0.55 + x));
+  // A ring of its people's cloth tied round the trunk, the mark a rival reads from afar.
+  k.team(k.cyl(0.47, 0.49, 0.14, 9, TEAM, 0, 1.2, 0));
+}
+
 /**
  * An Orchard: four fruit trees in a wattle fence with a picker's basket. Young (`variant` 0) it is whips; grown (1), round crowns;
  * in fruit (2, summer and autumn) the crowns hang red and gold.
@@ -2505,6 +2551,7 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
 
 const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' | 'thornwall' | 'garden' | 'orchard' | 'channel' | 'hive' | 'sluice' | 'causeway'>, (k: Kit, e: number, st: Style) => void> = {
   sapling: (k, e) => sapling(k, e),
+  heart: (k) => heart(k),
   towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, windmill,
   // The Age of Tides (#739), drawn in `tideModels.ts`.
   tidemill: (k: Kit, _e: number, st: Style) => tidemill(k, st.base),
@@ -2679,7 +2726,7 @@ const ROOFS: Partial<Record<BuildingType, [string, string]>> = {
 };
 
 /** No plinth or pennant: open or thin pieces, and buildings that already carry their own standards. */
-const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder', 'dyke', 'thornwall', 'garden', 'orchard', 'channel', 'hive', 'sluice', 'causeway', 'tidemill'];
+const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder', 'dyke', 'thornwall', 'garden', 'orchard', 'channel', 'hive', 'sluice', 'causeway', 'tidemill', 'heart'];
 
 function roleStyle(type: BuildingType, epoch: number, st: Style): Style {
   const r = ROOFS[type];

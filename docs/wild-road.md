@@ -1,6 +1,6 @@
 # The Wild route: a people that grows its power
 
-**Status: the owner's idea (2026-10-24), fleshed out here; steps 1, 2, 3 (fire) and 4 (the Hive) built.** The owner: "start a new main branch of ages. Completely new. I was thinking like nature/plant tech. Where you use nature and animals to your advantage." Then: "There should be a way to produce them too, maybe forest wall or tree walls of some kind. Maybe ents later on." "Maybe farms that also yield way more food. Or maybe just more food dense so less area. Be very uniquely creative to fill the gaps, especially the future ages." And: "this goes to 7." Umbrella: #706. Build on it; change it with the reason on the umbrella.
+**Status: the owner's idea (2026-10-24), fleshed out here; steps 1, 2, 3 (fire), 4 (the Hive) and 5 (the Wildwood) built.** The owner: "start a new main branch of ages. Completely new. I was thinking like nature/plant tech. Where you use nature and animals to your advantage." Then: "There should be a way to produce them too, maybe forest wall or tree walls of some kind. Maybe ents later on." "Maybe farms that also yield way more food. Or maybe just more food dense so less area. Be very uniquely creative to fill the gaps, especially the future ages." And: "this goes to 7." Umbrella: #706. Build on it; change it with the reason on the umbrella.
 
 ## The idea in one line
 
@@ -21,7 +21,7 @@ Stone ─┬─ 1 Wild ── 2 Grove ──── 3 Hive ── 4 Wildwood ─�
 | 1 | 1 | **Wild** (built) | tame wolves, boars and mammoths; breed the tamed kinds at a Beast Den; my Hunting Camps call the wild in | no Stables, no Siege Workshop | an early army that costs food, not gold |
 | 2 | 2 | **Grove** (built) | plant walls that grow; grow dense food in Kitchen Gardens fed by the Den's dung | no stone walls, gates or Watch Towers | a town shut in green on half the ground |
 | 3 | 3 | **Hive** (built) | keep Hives that swarm whoever walks my woods; tip darts in venom; breed dire beasts | no guns or cannon | woods a rival can't walk through |
-| 4 | 4 | **Wildwood** | wake old trees as Ents that walk, crush and root again; let my woods spread each spring | no factories or machines; fire hits living things twice as hard | an army that is also the forest |
+| 4 | 4 | **Wildwood** (built) | wake old trees as Ents that walk, crush and root again; let my woods spread each spring | no factories or machines; fire hits living things twice as hard | an army that is also the forest |
 | 5a | 5 | **Leviathans** | breed giants: Skywhales that carry troops over walls, a Kraken in the deep, a Behemoth with my town on its back | the Heart Tree sleeps: no Ents, no spreading | reach: over walls, under the sea, a capital that walks |
 | 5b | 5 | **Bloom** | fire a Bloom Seed that turns a rival's town to forest; win by the Greening | the Dens go quiet: no new beasts | a second way to win, and a warhead that grows |
 | R | 2 | **Mycelium** (rare) | grow a fungus web under my town: every building on it takes in every stock, my units in it are hidden, rival wood rots on it | soldiers cost a quarter more; fire burns the web | a town that can't be starved; the short road to the Bloom |
@@ -60,7 +60,9 @@ Every age has a cheap road back and a road to the trunk, like every side age. De
 - **Dire beasts:** the Den breeds Dire Wolves and **Cave Bears** (a new beast, a slow wall of fur that shrugs off arrows).
 - **Door:** no guns or cannon. **The answer:** fire and smoke. A rival's torchbearers smoke Hives quiet and burn the woods they sit in.
 
-### 4. The Age of the Wildwood: the forest wakes
+### 4. The Age of the Wildwood: the forest wakes (built, step 5)
+
+- **As built** (`src/sim/wildwood.ts`, `WILDWOOD`): clue a Hive, deed 250 honey or mead (the `honey` stat); roads on to the Atomic Age and back to the Industrial Age. Three new things: the **Heart Tree** (its own building, one to a people, claims 8 tiles of land), the **Ent** (`warden`, siege class: it takes the field gun's place, the door), and **the Spreading**; woodland ways and the doubled fire are rules of the age, not things to build. An Ent is **trained at the Heart Tree**, and when it is done the standing tree nearest the Heart Tree (within 8 tiles) gives way to it; with no tree left the training waits. **Rooting** removes the unit and stands a real tree on its tile (`GameState.wardens` keeps whose and its health; it still takes room in the town). It wakes for a rival on the ground within 3 tiles, or for any axe that bites its tree (its own people's too: don't cut your Ents). The Spreading is seedlings planted as `Stool`s, so they grow as the coppice's do and wait for whoever stands on them; never beside a building, only in its people's land (`landOwnerAt`). **Woodland ways** count "a wood" as the Hive does (2 trees in the 3-by-3) within 14 tiles of the Heart Tree. **Fire twice as hard**: a Wildwood people's burning buildings lose `FIRE.bld` twice over, and its units in the flames are scorched twice over (`fireMul` in `fireStep`).
 
 - **The Heart Tree,** planted once like a Wonder: a vast old tree that is the town's soul. Around it, old trees in your land can be **woken as Ents** (Wardens) for food, wood and a long time. An Ent walks slowly, crushes buildings and siege, flings boulders torn from the ground, and can **root**: it becomes a tree again, heals, can be felled for wood by a rival who doesn't know, and wakes when an enemy passes. A forest you can't trust.
 - **The Spreading:** each spring your woods seed outward into your own land (never onto buildings, fields or roads), regrowing timber, thickening Thornwalls and making new Hive ground.
@@ -113,7 +115,8 @@ Every age has a cheap road back and a road to the trunk, like every side age. De
 - **Spreading, deterministic.** Once a second, fires in the order they were lit, each may light each living neighbour (a tree's four sides, a building's edges) on a roll of the match's dice (`roll`, `s.rng`) against `spread[season]`, no more than `run[season]` tiles from the torch: a summer fire takes most of a wood (about 80 trees of a big one), a spring or winter one a handful. Fires lit this second act next second. Whoever stands in the flames is scorched.
 - **The computer** torches a rival's growth with soldiers out on campaign (`torchGrowth`) and sends a citizen to beat out its own (`beatFires`).
 - **Smoke quiets Hives** (step 4, built): a Hive with a fire within `HIVE.smoke` tiles, or burning itself, sleeps `HIVE.quiet` seconds.
-- **Still to come:** the Wildwood's "fire hits living things twice as hard"; beasts that fear fire.
+- **The Wildwood's door** (step 5, built): a people standing in it burns twice as hard (`FIRE.wild`, `fireMul`); a rooted Ent burns with its tree.
+- **Still to come:** beasts that fear fire.
 
 ## Steps (each one playable)
 
@@ -121,7 +124,7 @@ Every age has a cheap road back and a road to the trunk, like every side age. De
 2. **Grove** (built): Thornwall, Kitchen Gardens fed by Den dung or water, Orchards.
 3. **Fire** (built, shared rule, needed by everything after): torchbearers, burning woods and buildings. Smoke waits for the Hive.
 4. **Hive** (built): Hives, pollination, venom darts, dire beasts and the Cave Bear.
-5. **Wildwood:** the Heart Tree, Ents that root, the Spreading, woodland ways.
+5. **Wildwood** (built): the Heart Tree, Ents that root, the Spreading, woodland ways.
 6. **Bloom:** the Seed Spire and the Bloom Seed, the Greening victory, pollen storms.
 7. **Leviathans:** Skywhales and seed-bombs, the Kraken and Reef Ships, the Behemoth.
 8. **Mycelium** (with the Glowcap hollow key resource) and the **Wild Hunt** crossing.

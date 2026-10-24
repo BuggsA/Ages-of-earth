@@ -9,7 +9,7 @@ import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE, findResource } from '../sim/units';
-import { FIRE, FISSION, HIVE, AUTO_WORK, BREACH, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE } from '../sim/data';
+import { FIRE, FISSION, HIVE, WILDWOOD, AUTO_WORK, BREACH, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -46,6 +46,7 @@ import { ageDef, ageOf, asleep, crossingLeft, goldenEnds, livesOf, threadsOf, cr
 import type { AgeId, KeyId, RareId, Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Launch, Player, Res, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
 import { GROVE_BUILDINGS, grows } from '../sim/grove';
 import { hiveLine, keepsBees } from '../sim/hive';
+import { heartBarred, heartLine, rootProblem, wakesForest } from '../sim/wildwood';
 import { KEYS, RARES, RES, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
 import { buildingPicture, unitPicture } from './thumbs';
@@ -1150,6 +1151,9 @@ export class Hud {
       const tended = s.ents.some((e) => e.kind === 'unit' && e.owner === b.owner && e.hp > 0 && e.order.k === 'snare');
       const cap = snareCap(s, b);
       status = `Caught ${catchIn(b)} / ${cap} food${catchIn(b) >= cap ? ' (full: it catches no more)' : ''} · ${trees} trees round it: ${perMin} a minute${trees < full ? ` (best with ${full})` : ''}${seasonAt(s) === 3 ? ', winter-hungry' : ''} · ${tended ? 'the line is walked' : 'nobody walks the line'}`;
+    } else if (b.type === 'heart' && b.built) {
+      // The Age of the Wildwood: its Ents awake and rooted, and whether a tree stands near to wake.
+      status = `<span data-tip="<b>${BUILDINGS.heart.name}</b>Train an Ent here and the old tree nearest it within ${WILDWOOD.wake} tiles wakes. While it stands, your rooted Ents wake when a rival comes within ${WILDWOOD.rouse} tiles, and ${WILDWOOD.spreadAt} seconds into each spring your woods within ${WILDWOOD.spread} tiles seed the bare ground beside them in your land. If it falls, every Ent roots where it stands and sleeps.">🌳 ${heartLine(s, b)}</span>`;
     } else if (b.type === 'hive' && b.built) {
       // The Age of the Hive: whether its bees are awake, what it pays, and whether it pollinates.
       status = `<span data-tip="<b>${BUILDINGS.hive.name}</b>Awake, its bees sting any rival standing in a wood within ${HIVE.reach} tiles. It pays honey (food), or mead (gold) while one of your Markets stands within ${HIVE.market} tiles, and in summer doubles your Kitchen Gardens within ${HIVE.bloom} tiles. Bees sleep in winter; a fire within ${HIVE.smoke} tiles smokes them quiet for ${HIVE.quiet} seconds.">🐝 ${hiveLine(s, b)}</span>`;
@@ -1320,8 +1324,9 @@ export class Hud {
         // What the Grove grows shows only to a people that has walked it.
         if (GROVE_BUILDINGS.includes(type) && !grows(p)) continue;
         if (type === 'hive' && !keepsBees(p)) continue;
+        if (type === 'heart' && !wakesForest(p)) continue;
         const locked = def.epoch > p.epoch;
-        const no = buildBarred(p, type) ?? wayBarred(s, p, type);
+        const no = buildBarred(p, type) ?? wayBarred(s, p, type) ?? heartBarred(s, viewer, type);
         const cost = buildingCostFor(s, viewer, type);
         const short = shortfall(p, cost) ?? bloodShort(p, type);
         const wonderUp = type === 'wonder' && s.ents.some((e) => e.kind === 'building' && e.owner === viewer && e.type === 'wonder');
@@ -1436,6 +1441,12 @@ export class Hud {
         const aboard = transports.reduce((n, t) => n + t.cargo.length, 0);
         cmds.push({ key: 'U', pic: '', glyph: '⚓', title: 'Unload', desc: 'Then click a shore: sail there and put everyone aboard on land. (Right-clicking land does the same.)', ok: aboard > 0, why: 'Nobody is aboard', count: aboard || undefined, run: () => this.act.unloadMode() });
         cmds.push({ key: 'Y', pic: '', glyph: '🏖', title: 'Unload here', desc: 'Land everyone aboard on the nearest shore.', ok: aboard > 0, why: 'Nobody is aboard', run: () => transports.forEach((t) => this.act.issue({ t: 'unload', p: viewer, ids: [t.id], x: t.x, y: t.y })) });
+      }
+      // The Age of the Wildwood: Ents root where they stand.
+      const ents = units.filter((u) => u.type === 'warden');
+      if (ents.length) {
+        const why = ents.map((u) => rootProblem(s, u)).find((w) => w) ?? null;
+        cmds.push({ key: 'O', pic: '', glyph: '🌳', title: 'Root', desc: `Root where ${ents.length > 1 ? 'they stand' : 'it stands'} and be a tree again, on bare open ground: it mends ${Math.round(WILDWOOD.mend * 100)}% of its health a second, a rival sees only a tree, and it wakes when a rival comes within ${WILDWOOD.rouse} tiles or an axe bites, while your Heart Tree stands. Fell or burn the tree and the Ent is lost.`, ok: !why || ents.some((u) => !rootProblem(s, u)), why: why ?? undefined, run: () => this.act.issue({ t: 'root', p: viewer, ids: ents.map((u) => u.id) }) });
       }
       const wagons = units.filter((u) => u.type === 'wagon');
       if (wagons.length) {

@@ -121,6 +121,8 @@ let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curs
 let fireToldAt = -9999;
 /** When a swarm on your people was last told (the Age of the Hive), so a fight in the woods tells it once. */
 let hiveToldAt = -9999;
+/** When a waking Ent was last told (the Age of the Wildwood), so a forest rising round an army tells it once. */
+let entToldAt = -9999;
 let paused = false;
 const SPEEDS = [1, 1.5, 2, 3];
 let speedIdx = 0;
@@ -2932,6 +2934,15 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         } else if (ev.what === 'smoked' && ev.owner === viewer) hud.toast('Smoke has quieted one of your Hives: its bees will wake when it clears', 'alert');
         break;
       }
+      case 'wildwood':
+        // The Age of the Wildwood: a tree that wakes beside your people is told once in a while; your own Ent lost with its tree, and the
+        // spring's Spreading, are told to its people.
+        if (ev.what === 'wake' && ev.owner !== viewer && s.players[viewer]?.vis[Math.floor(ev.y) * s.w + Math.floor(ev.x)] === 1 && s.tick - entToldAt > 20 * TICK_HZ) {
+          entToldAt = s.tick;
+          hud.toast(`A tree wakes! ${s.players[ev.owner]?.name ?? 'A rival'}'s Ent was rooted there: in a Wildwood people's woods, any tree may be one. Fire takes them`, 'alert');
+        } else if (ev.what === 'felled' && ev.owner === viewer) hud.toast('One of your rooted Ents was felled with its tree', 'bad');
+        else if (ev.what === 'spread' && ev.owner === viewer && ev.n) hud.toast(`Spring: your woods spread round the Heart Tree, ${ev.n} seedlings`, 'good');
+        break;
       case 'silo':
         // The Atomic Age (#605): the clock is public, so every player is told when a warhead goes up. A rival is shown three rings, the
         // real zone and two decoys (#762), never the event's point (the attacker's own aim): no marker, ping or camera jump there.

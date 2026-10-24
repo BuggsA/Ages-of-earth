@@ -1,6 +1,6 @@
 /**
  * Which computer opponents take the Age of the Wild, and what they tame and breed there; and of those, which go on into the Grove
- * and what they grow there, and which go on into the Hive and what they keep there (`docs/wild-road.md`).
+ * and what they grow there, which go on into the Hive and what they keep there, and which into the Wildwood (`docs/wild-road.md`).
  *   npx tsx scripts/wild-scan.ts [seeds] [minutes]
  */
 import { AGES } from '../src/sim/data';
@@ -19,8 +19,9 @@ for (let seed = 1; seed <= seeds; seed++) {
     const of = (t: string) => s.ents.filter((e) => e.kind === 'building' && e.owner === p.id && e.type === t && e.hp > 0) as Building[];
     const grove = hasWalked(p, 'grove') ? `, Grove: ${of('garden').length} gardens (${of('garden').filter((b) => b.fed).length} fed), ${of('orchard').length} orchards, ${of('thornwall').length} thorn (${of('thornwall').filter((b) => (b.level ?? 0) >= 3).length} oak)` : '';
     const unitsOf = (t: string) => s.ents.filter((e) => e.kind === 'unit' && e.owner === p.id && e.type === t && e.hp > 0).length;
+    const wood = hasWalked(p, 'wildwood') ? `, Wildwood: ${of('heart').length} heart, ${unitsOf('warden')} Ents awake, ${s.wardens?.filter((w) => w.owner === p.id).length ?? 0} rooted` : '';
     const hive = hasWalked(p, 'hive') ? `, Hive: ${of('hive').length} hives, ${p.stats.honey ?? 0} honey, ${unitsOf('blowpipe')} blowpipes, ${unitsOf('cavebear')} bears` : p.stats.gardened ? `, gardened ${p.stats.gardened}` : '';
-    return `${p.name}: ${AGES[ageOf(p)].short}${hasWalked(p, 'wild') ? ' (walked the Wild)' : ''}, tamed ${p.stats.tamed ?? 0} [${(p.tamed ?? []).join(' ')}], bred ${p.stats.bred ?? 0}, ${beasts} beasts, ${dens} dens${grove}${hive}`;
+    return `${p.name}: ${AGES[ageOf(p)].short}${hasWalked(p, 'wild') ? ' (walked the Wild)' : ''}, tamed ${p.stats.tamed ?? 0} [${(p.tamed ?? []).join(' ')}], bred ${p.stats.bred ?? 0}, ${beasts} beasts, ${dens} dens${grove}${hive}${wood}`;
   });
   console.log(`seed ${seed} ${(s.tick / 1200).toFixed(1)}m winner ${s.winner >= 0 ? s.players[s.winner].name : '-'}  ${line.join('  |  ')}`);
 }

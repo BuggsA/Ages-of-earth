@@ -22,7 +22,9 @@ export type UnitType =
   /** The Age of the Water Line (#701 s4): a flat boat with a gun in its bow, that sails the flood and the channels as well as the sea. */
   | 'barge'
   /** The Age of the Hive (`docs/wild-road.md` §3, `hive.ts`): venom darts at the Archery Range, and the Den's Cave Bear. */
-  | 'blowpipe' | 'cavebear';
+  | 'blowpipe' | 'cavebear'
+  /** The Age of the Wildwood (`docs/wild-road.md` §4, `wildwood.ts`): an Ent, an old tree woken at the Heart Tree, that roots again. */
+  | 'warden';
 /** How a unit gets about: on foot, on the water, or in the air. */
 export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
@@ -32,6 +34,8 @@ export type BuildingType =
   | 'thornwall' | 'garden' | 'orchard'
   /** The Age of the Hive (`docs/wild-road.md` §3, `hive.ts`): a skep of bees set among the trees. */
   | 'hive'
+  /** The Age of the Wildwood (`docs/wild-road.md` §4, `wildwood.ts`): the town's soul, one to a people, where Ents are woken. */
+  | 'heart'
   /** The Age of Rivers (#701): a ditch dug from the water, which fills and is gone. */
   | 'channel'
   /** The Age of the Water Line (#701 s4): a gate in a dyke that lets the water out over the low ground, and back. */
@@ -57,7 +61,7 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'chart' | 'assay' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
 export type PathId = 'blood' | 'steppe' | 'hemocraft' | 'rite';
@@ -932,6 +936,11 @@ export type GameEvent =
    * a fire, `wake` again after smoke or winter.
    */
   | { k: 'hive'; what: 'swarm' | 'smoked' | 'wake'; id: number; owner: number; x: number; y: number; target?: number }
+  /**
+   * The Age of the Wildwood (`wildwood.ts`): an Ent `what`: `wake` from its tree (the unit `id`), `root` back into one, `felled` while
+   * rooted (its tree cut or burnt); or a people's woods `spread` in spring (`n` seedlings round its Heart Tree).
+   */
+  | { k: 'wildwood'; what: 'wake' | 'root' | 'felled' | 'spread'; owner: number; x: number; y: number; id?: number; n?: number }
   /** A mammoth gores, or a wolf bites, someone. */
   | { k: 'wildStrike'; id: number; kind: Animal['kind']; target: number; x: number; y: number }
   /** A raider camp (own pitch) stands empty: whose people cleared it, and the plunder they took. */
@@ -1173,6 +1182,11 @@ export interface GameState {
   stools?: Stool[];
   /** Roots of fallen Thornwalls (the Age of the Grove, `grove.ts`) waiting to sprout again at tick `at`; absent until the first. */
   roots?: { tile: number; owner: number; at: number }[];
+  /**
+   * Ents rooted as trees (the Age of the Wildwood, `wildwood.ts`), in the order they rooted: the tile of the tree each stands as,
+   * whose it is, and its hit points (they mend while it stands). Each still takes room in its people's town. Absent: none.
+   */
+  wardens?: { tile: number; owner: number; hp: number }[];
   /** Per tile: the R_* kind of a stone, gold or rare-ore deposit worked out there, or 0 (#681, old workings for a Mine Shaft); absent until the first. */
   spent?: Uint8Array;
   /** Per tile: the tick cropped grass grows back (#308), made when the first sheep is; absent until then. */
@@ -1357,6 +1371,8 @@ export interface AiMemory {
   grove?: number;
   /** The tick it entered the Age of the Hive, kept while it sets its Hives there (`HIVE.aiStay`). */
   hive?: number;
+  /** The tick it entered the Age of the Wildwood, kept while it wakes its forest there (`WILDWOOD.aiStay`). */
+  wildwood?: number;
   steppe?: { band?: number[]; at?: { x: number; y: number }; out?: number; recalled?: number; horde?: number; since?: number; struck?: number; /** When a nomad flock (#501) was first seen grazed out, this time. */ starved?: number; pack?: { x: number; y: number; at: number }; to?: { x: number; y: number; at: number }; from?: { x: number; y: number } };
   /**
    * The tide (#748): the barrage it means to lay by its mills (null: none worth it, by any of the mills in `seen`); once it stood whole,
@@ -1407,6 +1423,8 @@ export type Command =
   | { t: 'pack'; p: number; building: number }
   /** Pitch camp (#297): wagons set down the building they carry where they stand. */
   | { t: 'pitch'; p: number; ids: number[] }
+  /** Ents root where they stand and become trees again (the Age of the Wildwood). */
+  | { t: 'root'; p: number; ids: number[] }
   /** Citizens milk a sheep of their flock (#308). */
   | ({ t: 'milk'; p: number; ids: number[]; target: number } & Queued)
   /** Citizens tame a wild wolf, boar or mammoth (the Age of the Wild). */
