@@ -41,7 +41,7 @@ import { isCoppice } from './coppice';
 import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
-import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, TAME, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS } from './data';
+import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, TAME, GROVE, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
@@ -49,6 +49,7 @@ import { isRider, standing } from './tribute';
 import { flockCap, flockOf, grassy, grazeRange, milkable } from './flocks';
 import { progress, scenarioById } from './campaign';
 import { tames, wildBeast } from './tame';
+import { grows } from './grove';
 
 /**
  * The computer opponent. It plays by the same rules and through the same commands as a person: it
@@ -251,6 +252,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   fleeWarhead(s, v, issue);
   steppeRoad(s, v, mem, issue);
   wildRoad(s, v, mem, issue);
+  groveWork(s, v, mem, issue);
   readYear(s, v);
   huntTheYear(s, v, issue);
 
@@ -568,6 +570,9 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   } else if (roads[to] === undefined && to === 'wild') {
     // The Wild route (`docs/wild-road.md`): a coin of its own, as the steppe's, so asking shifts no other match's dice.
     roads[to] = fit(p, to) >= 0 && coin(s, p.id, 0x3d17) < TAME.aiTake;
+  } else if (roads[to] === undefined && to === 'grove') {
+    // The Wild route's second age: a people that walked the Wild goes on, as the Horde follows the Steppe.
+    roads[to] = hasWalked(p, 'wild');
   } else if (roads[to] === undefined && to === 'dykes') {
     // The Water Road (#701): only with a dyke worth raising by home, and on a coin of its own, so no other match's dice shift.
     roads[to] = coastHeld(s, p) && !!dykeOf(s, p, mem) && coin(s, p.id, 0xd1e5) < AI_DYKE.take;
@@ -722,6 +727,8 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   }
   // The Wild is kept a while, so the beasts it came for are tamed and the Den is breeding.
   if (walksWeb(v) && ageOf(p) === 'wild' && s.tick - (mem.wild ?? s.tick) < secs(TAME.aiStay)) return null;
+  // The Grove is kept a while, so its gardens are fed, its Orchards set and its Thornwall grown.
+  if (walksWeb(v) && ageOf(p) === 'grove' && s.tick - (mem.grove ?? s.tick) < secs(GROVE.aiStay)) return null;
   // The steppe (#320) is kept a while, so the flock it came for pays.
   if (walksWeb(v) && ageDef(p).mobile && s.tick - (mem.steppe?.since ?? s.tick) < secs(AI_STEPPE.stay)) return null;
   // Bound for a crossing (#585, #555 s12), a sibling doesn't climb on: its way is back to the Middle Ages (`seaTurn`).
@@ -1840,8 +1847,8 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   if (lodgeHolds && raiseLodge(true)) return;
   // Fields once the berries near home run short of feeding everyone who should be on food.
   const berries = findResource(s, R_BERRY, home.x, home.y, 14);
-  const farms = count(v, 'farm');
-  const freeFields = v.buildings.filter((b) => b.type === 'farm' && !v.citizens.some((u) => u.order.k === 'farm' && u.order.target === b.id)).length;
+  const farms = count(v, 'farm') + count(v, 'garden');
+  const freeFields = v.buildings.filter((b) => (b.type === 'farm' || b.type === 'garden') && !v.citizens.some((u) => u.order.k === 'farm' && u.order.target === b.id)).length;
   // Autumn onward the clever computer plans for winter: berries fail in the cold, so fields go up first, unless in the
   // Stone Age the larder holds the winter's food already (#486): planning anyway, it raised a field a citizen with the
   // wood the Bronze Age wanted. Later a town's stock is no larder: its people eat from the fields.
@@ -1857,6 +1864,8 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   }
   if (isCoppice(p) && !isMobile(p)) {
     if (laySnare(s, v, mem, foodWanted, issue)) return;
+  } else if (farms < foodWanted && freeFields < 2 && !recently('farm', 2) && !recently('garden', 2) && grows(p) && plantGarden(s, v, mem, issue)) {
+    return;
   } else if (farms < foodWanted && freeFields < 2 && !recently('farm', 2) && !buildBarred(p, 'farm') && !wayBarred(s, p, 'farm')) {
     const spot = findSpot(s, 'farm', home.x, home.y, 3, 16);
     if (spot && construct(s, v, mem, 'farm', spot, 1, issue)) return;
@@ -2676,6 +2685,56 @@ function wildRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   if (best.kind === 'wolf') issue({ t: 'move', p: p.id, ids: escort.slice(0, TAME.aiEscort).map((u) => u.id), x: best.x, y: best.y, amove: true });
   issue({ t: 'tame', p: p.id, ids: [tamer.id], target: best.id });
   v.claimers.add(tamer.id);
+}
+
+/**
+ * A Kitchen Garden (the Age of the Grove) where a Den's dung will feed it: beside a finished Den of its own that feeds fewer than
+ * `GROVE.aiGardens` gardens. False where no Den has room, so the town raises a Farm instead.
+ */
+function plantGarden(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): boolean {
+  const gardens = v.buildings.filter((b) => b.type === 'garden');
+  for (const den of v.buildings) {
+    if (den.type !== 'den' || !den.built) continue;
+    const near = (tx: number, ty: number) => Math.max(Math.abs(tx - den.x + 0.5), Math.abs(ty - den.y + 0.5)) <= GROVE.dung;
+    if (gardens.filter((g) => near(g.tx, g.ty)).length >= Math.min(GROVE.aiGardens, GROVE.dungFeeds)) continue;
+    const spot = findSpot(s, 'garden', den.x, den.y, 2, GROVE.dung, 0, near);
+    if (spot) return construct(s, v, mem, 'garden', spot, 1, issue);
+  }
+  return false;
+}
+
+/**
+ * The Age of the Grove: up to `GROVE.aiOrchards` Orchards by the Town Center, and one Thornwall line of `GROVE.aiThorn` pieces across
+ * the way the nearest rival comes, `GROVE.aiThornAt` tiles out (the Grove raises no stone wall). Gardens go up with the fields (`plantGarden`).
+ */
+function groveWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!walksWeb(v) || !grows(p) || !v.tc) return;
+  if (ageOf(p) === 'grove') mem.grove ??= s.tick;
+  const recent = (t: BuildingType, sec: number) => s.tick - (mem.ordered[t] ?? -99999) < secs(sec);
+  if (count(v, 'orchard') < GROVE.aiOrchards && !recent('orchard', 30) && v.budget.wood >= (BUILDINGS.orchard.cost.wood ?? 0) + 50) {
+    const spot = findSpot(s, 'orchard', v.home.x, v.home.y, 4, 10);
+    if (spot) construct(s, v, mem, 'orchard', spot, 1, issue);
+  }
+  if (count(v, 'thornwall') > 0 || recent('thornwall', 60)) return;
+  const rival = rivalTownCenter(s, p);
+  if (!rival) return;
+  const dx = rival.x - v.home.x;
+  const dy = rival.y - v.home.y;
+  const d = Math.sqrt(dx * dx + dy * dy);
+  if (d < GROVE.aiThornAt * 2) return;
+  const fx = dx / d;
+  const fy = dy / d;
+  const cost = buildingCostFor(s, p.id, 'thornwall');
+  if ((cost.wood ?? 0) * GROVE.aiThorn > v.budget.wood) return;
+  const cx = v.home.x + fx * GROVE.aiThornAt;
+  const cy = v.home.y + fy * GROVE.aiThornAt;
+  const half = Math.floor(GROVE.aiThorn / 2);
+  const crew = v.citizens.filter((u) => !u.inside && u.order.k !== 'build' && !(u.order.k === 'farm' && u.order.phase === 'work') && !v.claimers.has(u.id)).sort((a, b) => a.id - b.id).slice(0, 3);
+  if (!crew.length) return;
+  issue({ t: 'wall', p: p.id, ids: crew.map((u) => u.id), x0: Math.floor(cx - fy * half), y0: Math.floor(cy + fx * half), x1: Math.floor(cx + fy * half), y1: Math.floor(cy - fx * half), thorn: true });
+  spend(v, { wood: (cost.wood ?? 0) * GROVE.aiThorn });
+  mem.ordered.thornwall = s.tick;
 }
 
 const grownSheep = (s: GameState, owner: number): Animal[] => s.animals.filter((a) => a.kind === 'sheep' && a.owner === owner && a.hp > 0 && a.lamb === undefined);

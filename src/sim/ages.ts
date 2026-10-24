@@ -389,6 +389,8 @@ export function buildBarred(p: Player, type: BuildingType): string | null {
   if (type === 'sapling' && !CIVS[p.civ].coppice) return 'Only the Britons plant and coppice their woods';
   // The Beast Den (the Age of the Wild): raised by a people that has tamed a beast, in any age after.
   if (type === 'den' && !p.tamed?.length) return 'Tame a wild beast first: a Den is raised only by a people that has tamed one (the Age of the Wild)';
+  // The Age of the Grove: what it grows is planted by a people that has walked it, in any age after.
+  if ((type === 'thornwall' || type === 'garden' || type === 'orchard') && !hasWalked(p, 'grove')) return `Only a people that has walked the ${AGES.grove.name} plants a ${BUILDINGS[type].name}`;
   const way = p.way ? WAYS[p.way] : undefined;
   if (way?.shuts?.includes(type)) return `${way.name} raises no ${BUILDINGS[type].name}`;
   const only = BUILDINGS[type].ages;
