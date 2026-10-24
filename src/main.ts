@@ -32,6 +32,7 @@ import { postAt } from './sim/trade';
 import { chantedOver, consecrateProblem, consecrates } from './sim/consecrate';
 import { riteProblem } from './sim/fork';
 import { legionKind, legionary } from './sim/legion';
+import { tames, wildBeast } from './sim/tame';
 import { ageDef, ageOf, canRaise, heirloomsOpened, isSideRoad, opensOf, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
 import { NetClient, newRoomCode, saveName, savedName } from './net/client';
 import { HASH_EVERY, ROOM_KEEP_HOURS, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
@@ -1405,6 +1406,14 @@ function order(clientX: number, clientY: number, forceAttack = false, queue = fa
   if (pk.kind === 'animal') {
     const a = s.animals.find((x) => x.id === pk.id);
     if (!a) return;
+    // The Age of the Wild: citizens tame a wild wolf, boar or mammoth; attack-move (A) hunts it instead.
+    if (!forceAttack && tames(s.players[viewer]) && wildBeast(a) && units.some((u) => u.type === 'citizen')) {
+      issue({ t: 'tame', p: viewer, ids, target: a.id, queue: q });
+      view.marker(s, a.x, a.y, false);
+      play('move');
+      ack('move');
+      return;
+    }
     // Your own flock (#308): citizens milk it; attack-move (A) slaughters it.
     if (a.kind === 'sheep' && a.owner === viewer && !forceAttack && units.some((u) => u.type === 'citizen')) {
       issue({ t: 'milk', p: viewer, ids, target: a.id, queue: q });

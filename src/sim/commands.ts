@@ -33,6 +33,7 @@ import { chantedOver, consecrateProblem, consecrates } from './consecrate';
 import { sees } from './vision';
 import { canHit, isEnemy, maxHp, pay, placeBuilding, refund } from './world';
 import { fightsBeasts } from './animals';
+import { tameProblem } from './tame';
 import { answerTiding, tidingProblem } from './tidings';
 
 /**
@@ -718,6 +719,18 @@ export function applyCommand(s: GameState, c: Command): void {
       for (const u of milkers) giveOrder(u, { k: 'milk', target: a.id, phase: 'go' }, c.queue);
       const others = units.filter((u) => !milkers.includes(u));
       if (others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: a.x, y: a.y, queue: c.queue });
+      break;
+    }
+    case 'tame': {
+      // The Age of the Wild: citizens sing a wild wolf, boar or mammoth calm and lead it home as a beast of war.
+      const a = s.animals.find((x) => x.id === c.target);
+      const why = tameProblem(s, p, a);
+      if (why) return refuse(s, c.p, why);
+      const units = myUnits(s, c.p, c.ids);
+      const tamers = units.filter((u) => u.type === 'citizen');
+      for (const u of tamers) giveOrder(u, { k: 'tame', target: a!.id, t: 0 }, c.queue);
+      const others = units.filter((u) => !tamers.includes(u));
+      if (others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: a!.x, y: a!.y, queue: c.queue });
       break;
     }
     case 'lamb': {

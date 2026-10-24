@@ -1120,7 +1120,39 @@ function caravanCart(epoch: number): Kit {
   return k;
 }
 
-const MAKERS: Record<UnitType, (epoch: number) => Kit> = { citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, cog, fighter, bomber, trader, wagon };
+/** A War Wolf (the Age of the Wild): the wolf of the den, a size larger for good feeding, in its people's collar and a hide harness. */
+function warwolf(): Kit {
+  const k = wolf();
+  k.team(k.box(0.12, 0.035, 0.05, TEAM, 0, 0.27, 0.15));
+  k.box(0.115, 0.02, 0.18, LEATHER, 0, 0.275, -0.02);
+  return k;
+}
+
+/** A Tusker (the Age of the Wild): the boar of the berry patch under a saddle-cloth of its people's colour, its tusks capped in bone. */
+function tusker(): Kit {
+  const k = boar();
+  k.team(k.box(0.2, 0.025, 0.2, TEAM, 0, 0.36, -0.02));
+  for (const x of [-0.1, 0.1]) k.box(0.02, 0.1, 0.18, LEATHER, x, 0.27, -0.02);
+  return k;
+}
+
+/** A War Mammoth (the Age of the Wild): a howdah of lashed poles on a team blanket, a pennant, and a driver on its neck. */
+function warmammoth(): Kit {
+  const k = mammoth();
+  const top = 0.72;
+  k.team(k.box(0.5, 0.03, 0.55, TEAM, 0, top - 0.04, -0.05));
+  k.box(0.36, 0.14, 0.36, WOOD, 0, top, -0.08);
+  for (const [x, z] of [[-0.17, -0.25], [0.17, -0.25], [-0.17, 0.09], [0.17, 0.09]]) k.cyl(0.012, 0.012, 0.22, 4, WOOD, x, top + 0.1, z);
+  k.cyl(0.01, 0.01, 0.45, 4, WOOD, 0.15, top + 0.1, -0.24);
+  k.team(k.box(0.015, 0.1, 0.16, TEAM, 0.15, top + 0.45, -0.32));
+  // The driver: a hunched figure in furs with a goad.
+  k.box(0.08, 0.12, 0.08, '#7a5a3a', 0, top + 0.02, 0.25);
+  k.blob(0.04, '#c69a74', 0, top + 0.17, 0.26);
+  k.cyl(0.006, 0.006, 0.3, 3, WOOD, 0.06, top + 0.05, 0.3).rotation.x = 0.9;
+  return k;
+}
+
+const MAKERS: Record<UnitType, (epoch: number) => Kit> = { citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, cog, fighter, bomber, trader, wagon, warwolf, tusker, warmammoth };
 
 /** Epoch + 30 asks for the citizen as a thrall (the same offset trick as the trader's gold and the caravan cart). */
 export const THRALL_MODEL = 30;

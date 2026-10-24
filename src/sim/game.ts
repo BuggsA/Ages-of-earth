@@ -1,3 +1,4 @@
+import { callWild } from './tame';
 import { aiStep } from './ai';
 import { workStep } from './works';
 import { beaconStep } from './beacon';
@@ -635,6 +636,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   tributeStep(s);
   householdStep(s);
   coppiceStep(s);
+  callWild(s);
   longbowStep(s);
   tollStep(s);
   mercStep(s);

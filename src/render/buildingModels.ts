@@ -253,6 +253,45 @@ function storehouse(k: Kit, e: number, st: Style): void {
 
 // ---- Hunting Camp ----------------------------------------------------------------------------------
 
+/**
+ * The Beast Den (the Age of the Wild, `docs/wild-road.md`): a ring of turf banks and woven hurdles round a straw hollow, an old
+ * oak in the middle hung with a wolf's skull, and gnawed bones by the gap. A rival reads it from afar: these people keep beasts.
+ */
+function den(k: Kit, e: number, st: Style): void {
+  pad(k, 3, st.base);
+  const turf = '#5f7a3a';
+  const earth = '#6e5638';
+  // The ring of banks, broken by a gap at the front.
+  for (let i = 0; i < 10; i++) {
+    if (i === 2) continue;
+    const a = (i / 10) * Math.PI * 2;
+    const x = Math.sin(a) * 1.15;
+    const z = Math.cos(a) * 1.15;
+    k.blob(0.32, i % 2 ? earth : turf, x, 0.05, z).scale.set(1.2, 0.55, 1.2);
+    // Hurdles of woven withies along the top of each bank.
+    const h = k.box(0.55, 0.32, 0.05, '#8a6a3e', x * 0.92, 0.28, z * 0.92);
+    h.rotation.y = a;
+    k.box(0.56, 0.03, 0.06, '#6b4e2a', x * 0.92, 0.36, z * 0.92).rotation.y = a;
+  }
+  // The straw hollow, and a whelp-hut of hides on bent poles.
+  k.cyl(0.75, 0.8, 0.06, 10, '#c9a85a', 0, 0, 0);
+  k.blob(0.38, e >= 2 ? st.roof : '#9a7a52', -0.35, 0.05, -0.35).scale.set(1, 0.75, 1);
+  k.box(0.18, 0.22, 0.04, '#2a2018', -0.25, 0.02, -0.04);
+  // The old oak in the middle, with a wolf's skull on its trunk.
+  k.cyl(0.08, 0.13, 1.2, 6, '#5a4228', 0.35, 0, 0.2);
+  k.cyl(0.04, 0.06, 0.5, 5, '#5a4228', 0.5, 0.95, 0.2).rotation.z = -0.7;
+  k.cyl(0.04, 0.06, 0.5, 5, '#5a4228', 0.2, 1.0, 0.2).rotation.z = 0.7;
+  k.blob(0.42, '#3f6b2e', 0.35, 1.35, 0.2).scale.set(1.2, 0.8, 1.2);
+  k.blob(0.28, '#4d7d36', 0.7, 1.15, 0.0);
+  k.box(0.12, 0.09, 0.16, '#e7dfcc', 0.35, 0.75, 0.33);
+  // Gnawed bones by the gap, and a water trough.
+  for (const [x, z, r] of [[0.85, 0.75, 0.4], [0.6, 0.95, -0.6], [0.95, 0.5, 1.1]]) k.box(0.04, 0.04, 0.3, '#e7dfcc', x, 0.04, z).rotation.y = r;
+  k.box(0.5, 0.14, 0.2, WOOD, -0.5, 0.02, 0.5);
+  k.box(0.44, 0.02, 0.15, '#4a7ab0', -0.5, 0.14, 0.5);
+  k.team(k.box(0.7, 0.05, 0.06, TEAM, 0, 0.42, -1.05));
+  banner(k, 1.2, 0, -0.9, 0.9);
+}
+
 function huntcamp(k: Kit, e: number, st: Style): void {
   pad(k, 2, st.base);
   // A lean-to of hide on poles, a drying rack of meat beside it, a pile of antlers and a fire ring.
@@ -2255,7 +2294,7 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
 
 const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke'>, (k: Kit, e: number, st: Style) => void> = {
   sapling: (k, e) => sapling(k, e),
-  towncenter, house, storehouse, huntcamp, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, windmill,
+  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, windmill,
 };
 
 const cache = new Map<string, THREE.BufferGeometry>();
