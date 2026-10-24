@@ -68,8 +68,16 @@ export class NetClient {
     private watch = false,
   ) {}
 
+  onVisible = (): void => {
+    if (document.hidden || this.closed || !this.retryTimer) return;
+    window.clearTimeout(this.retryTimer);
+    this.retryTimer = 0;
+    this.openSocket();
+  };
+
   connect(): void {
     this.close();
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', this.onVisible);
     this.closed = false;
     this.retries = 0;
     this.openSocket();
@@ -134,6 +142,7 @@ export class NetClient {
 
   close(): void {
     this.closed = true;
+    if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', this.onVisible);
     window.clearTimeout(this.retryTimer);
     this.retryTimer = 0;
     window.clearInterval(this.pinger);
