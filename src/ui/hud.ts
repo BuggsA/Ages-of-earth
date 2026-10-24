@@ -1573,7 +1573,7 @@ function nextTechs(p: Player, at: BuildingType): TechId[] {
 }
 
 function plural(name: string): string {
-  return name.endsWith('man') ? `${name.slice(0, -3)}men` : name.endsWith('ry') ? `${name.slice(0, -1)}ies` : `${name}s`;
+  return name.endsWith('man') ? `${name.slice(0, -3)}men` : name.endsWith('olf') ? `${name.slice(0, -1)}ves` : name.endsWith('ry') ? `${name.slice(0, -1)}ies` : `${name}s`;
 }
 
 /** Why a Town Center's other buttons wait while it is busy changing age. */
