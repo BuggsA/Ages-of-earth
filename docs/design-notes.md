@@ -1277,3 +1277,15 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 **What I chose:** fire takes only what grows (no houses or farms), so the trunk's balance stays as it was; anyone's woods burn, so a torched woodline is a raid on wood too. Torches are free: their cost is the three seconds standing at the target, and the scorch for whoever lingers.
 
 **Next:** smoke that quiets Hives (step 4); the Wildwood's door ("fire hits living things twice as hard"); beasts that fear fire; the computer felling a firebreak in summer, or burning a rival's woodline before a long war; farms as dry grain in autumn, maybe.
+
+## Designers' notes: the Age of the Hive (Wild route step 4, 2026-10-24)
+
+**Built:** the Hive age (`AGES.hive`, `HIVE`, `src/sim/hive.ts`), instead of the Gunpowder Age for a Grove people whose Gardens have brought in 600 food. A **Hive** set among trees stings any rival standing in a wood within 6 tiles (past armour, and a slow), pays honey, or mead for gold by a Market, and doubles the Gardens beside it in summer. Bees sleep in winter; smoke from any fire within 4 tiles quiets a Hive for 40 s, and the skep burns. **Blowpipe Hunters** take the musket's place: short reach, stacking venom that burns past armour and slows. The Den breeds the **Cave Bear**, and War Wolves grow **dire**. The door is guns and cannon. The computer goes on from the Grove, sets Hives by its gardens and trains darts and bears; its torches already reach a rival's Hives.
+
+**Why I love it:** the Grove shut a town in green; the Hive makes the green *bite*. Woods have always been a thing you cut. Now a wood by a rival's Hive is a wall you can see but not cross, and the map's dark patches change meaning by whose Hive is in them. It hangs off what's there: the year (winter is when you raid a Hive town), fire (a torchbearer smokes the bees before the army walks in), the Gardens (the Hive's second loop doubles them in summer), the Market (mead is a layout choice), and the counter triangle (venom answers the heavy riders and beasts a Hive town can't shoot with muskets).
+
+**What I chose:** mead by layout instead of a toggle button, so the choice is where you put a Hive and a Market, and there's no new command. Venom is capped per target, not per shooter, so a blowpipe line spreads its darts rather than all on one knight. The Dire Wolf is the War Wolf grown, not a new unit, to keep to three new things.
+
+**Not seen:** none of it in a browser yet (models, the swarm cloud, the dart, the drone and hush, the HUD lines are unit-tested or compiled only). Sound levels want an ear.
+
+**Next:** the Wildwood (step 5): the Heart Tree and Ents that root, the Spreading (which feeds new Hive ground), and "fire hits living things twice as hard"; beasts that fear fire; the computer reading a rival's Hives and raiding in winter or smoking them first.

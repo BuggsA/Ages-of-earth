@@ -26,6 +26,9 @@ export const EPOCHS: Epoch[] = [
   { name: 'Atomic Age', short: 'Atomic', cost: { food: 1800, gold: 1500, stone: 700 }, time: 95, blurb: 'The Missile Silo: one warhead, a public countdown, and a town that guards it.' },
 ];
 export const LAST_EPOCH = EPOCHS.length - 1;
+/** The Age of the Hive's reach and woods (`HIVE`), named here so the age's and the Hive's words can say them. */
+const HIVE_REACH = 6;
+const HIVE_TREES = 8;
 
 // ---- Ages and paths -------------------------------------------------------------------------------
 
@@ -624,6 +627,19 @@ export const AGES: Record<AgeId, Age> = {
     blurb: 'Instead of the Middle Ages: a people that grows what others build. A Thornwall is planted for a little wood and grows over two minutes from seedling to living oak, tougher than stone and mending itself; it parts for your own people, and a piece cut down sprouts again from its root unless the ground is built on. Kitchen Gardens grow maize, beans and squash together on one tile: fed by a Beast Den\'s dung or a stream beside them, a gardener brings in two or three times a farmer\'s food. Orchards bear fruit in summer and autumn, slow to start, then free for years. No stone walls, gates or towers: what guards the town must grow.',
     noBuild: { buildings: ['wall', 'gate', 'tower'], why: 'A Grove people raises no stone walls, gates or towers: it plants Thornwalls. They wait until it climbs to the Gunpowder Age or settles in the Middle Ages' },
   },
+  // The Wild route's third age (`docs/wild-road.md` §3, `hive.ts`): woods a rival can't walk through, and Gardens the bees double.
+  hive: {
+    verb: 'Set Hives among your trees, so that any rival who walks your woods is swarmed; take their honey as food, or as mead by a Market for gold; and tip your darts in venom',
+    door: 'No guns or cannon: no Musketeers and no Bombards, so your ranged line is the Blowpipe Hunter, short of reach, and your walls are broken by beasts',
+    good: 'Woods a rival cannot walk through, Gardens that double in summer, and venom that cuts down heavy riders and beasts',
+    routes: ['wild'],
+    name: 'Age of the Hive',
+    short: 'Hive',
+    tier: 3,
+    blurb: `Instead of the Gunpowder Age: a people that keeps bees. A Hive is set among standing trees, and its bees swarm any rival who walks the woods within ${HIVE_REACH} tiles of it, stinging past armour and slowing them; bees sleep in winter, and smoke from any fire near a Hive quiets it a while. A Hive pays honey into your stores, or mead for gold when a Market of yours stands near, and in summer it doubles the yield of the Kitchen Gardens beside it. Your ranged soldiers are Blowpipe Hunters, whose darts stack venom that ignores armour and slows; your Den breeds the Cave Bear, and your War Wolves grow dire. No guns and no cannon.`,
+    names: { warwolf: 'Dire Wolf' },
+    no: { units: ['ranged', 'siege'], why: 'A Hive people carries no guns and casts no cannon: its bowmen are Blowpipe Hunters, and its beasts break walls. Muskets and cannon wait until it climbs to the Industrial Age or settles in the Gunpowder Age' },
+  },
   // The second crossing (#555 s12): the Pilgrims' priests and the Sail's ships made one trade. Open only to a people that walked both.
   missions: {
     verb: 'Sail priests to far shores and raise Missions there: each claims land, trains priests, and pays a tithe that grows with its distance from home',
@@ -917,6 +933,19 @@ export const ROADS: Road[] = [
   },
   { from: 'grove', to: 'gunpowder', cost: EPOCHS[3].cost, time: EPOCHS[3].time, blurb: 'Rejoin the main road at the Gunpowder Age for the ordinary price. Your Thornwalls, Gardens and Orchards keep growing, and stone walls, gates and towers return.' },
   { from: 'grove', to: 'middle', cost: { food: 200, wood: 200 }, time: 25, blurb: 'Settle down in the Middle Ages. Your Thornwalls, Gardens and Orchards keep growing, and stone walls, gates and towers return.' },
+  // The Wild route's third step (`docs/wild-road.md` §3): a Kitchen Garden shows it (the bees come to its flowers), and its harvest opens it.
+  {
+    from: 'grove',
+    to: 'hive',
+    cost: { food: 900, wood: 400, gold: 400 },
+    time: 60,
+    clue: 'garden',
+    walked: 'grove',
+    deed: { stat: 'gardened', n: 600, text: 'Your Kitchen Gardens bring in 600 food' },
+    blurb: 'Instead of the Gunpowder Age: keep bees. Hives set among your trees swarm any rival who walks your woods, pay honey or mead, and double your Gardens in summer. Blowpipe Hunters, the Cave Bear and Dire Wolves. No guns or cannon while you stay.',
+  },
+  { from: 'hive', to: 'industrial', cost: EPOCHS[4].cost, time: EPOCHS[4].time, blurb: 'Rejoin the main road at the Industrial Age for the ordinary price. Your Hives keep swarming and your Den keeps its bears; rifles and field guns arrive.' },
+  { from: 'hive', to: 'gunpowder', cost: { food: 250, wood: 250 }, time: 30, blurb: 'Settle down in the Gunpowder Age. Your Hives keep swarming and your Den keeps its bears; muskets and cannon return.' },
   // The other road out of the Stone Age (#297): the hunt, not the bog, opens it.
   {
     from: 'stone',
@@ -1345,7 +1374,7 @@ export interface UnitStats {
   /** Seconds to train. */
   time: number;
   radius: number;
-  shot?: 'stone' | 'arrow' | 'bolt' | 'bullet' | 'boulder' | 'ball' | 'bomb';
+  shot?: 'stone' | 'arrow' | 'bolt' | 'bullet' | 'boulder' | 'ball' | 'bomb' | 'dart';
   /** Damage spread over this radius where a shot lands. */
   splash?: number;
   /** Only attacks buildings (and other siege), like a ram. */
@@ -1359,6 +1388,7 @@ export interface UnitStats {
 
 /** A beast of the Wild: the same from the Bronze tier on, for it does not re-arm. */
 const beast = (u: UnitStats): (UnitStats | null)[] => [null, u, u, u, u];
+const BLOWPIPE: UnitStats = { name: 'Blowpipe Hunter', cls: 'ranged', hp: 50, attack: 3, armor: 0, parmor: 1, range: 4, reload: 1.6, speed: 1.7, sight: 7, cost: { food: 35, wood: 40 }, time: 14, radius: 0.24, shot: 'dart', blurb: 'A hunter with a long cane blowpipe and darts tipped in venom. Short of reach, but every dart adds venom that burns past armour and slows: death to heavy riders, bears and mammoths. Riders who reach it first cut it down.' };
 
 /** Each line has one version per epoch (null where it isn't available yet). Units re-arm when their owner advances. */
 export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
@@ -1494,6 +1524,10 @@ export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
   // Tamed from the wild (`TAME`) or bred at a Beast Den once the kind is tamed. A beast is a beast: it does not re-arm with the epochs.
   warwolf: beast({ name: 'War Wolf', cls: 'cavalry', hp: 75, attack: 6, armor: 0, parmor: 1, range: 0, reload: 1.2, speed: 2.8, sight: 8, cost: { food: 65 }, time: 15, radius: 0.26, blurb: 'A wolf of the wild that answers to your people: fast and cheap, it runs down archers, priests and citizens. Spears break it.' }),
   tusker: beast({ name: 'Tusker', cls: 'infantry', hp: 120, attack: 7, armor: 2, parmor: 1, range: 0, reload: 1.4, speed: 1.9, sight: 5, cost: { food: 80, wood: 20 }, time: 18, radius: 0.32, blurb: 'A tame boar with a hide like bark: it holds a line and breaks riders on its tusks. Archers thin it.' }),
+  // The Age of the Hive (`HIVE`): the Cave Bear is bred at the Den (`trainsAt`) by a people that has walked the Hive, no taming needed.
+  cavebear: beast({ name: 'Cave Bear', cls: 'infantry', hp: 340, attack: 12, armor: 3, parmor: 6, range: 0, reload: 1.8, speed: 1.35, sight: 5, cost: { food: 180, gold: 40 }, time: 32, radius: 0.46, blurb: 'A great bear of the caves raised at your Den: a slow wall of fur that shrugs off arrows and mauls whatever stands before it. Swords, spears and guns bring it down; arrows barely do.' }),
+  // The Age of the Hive: its bowmen, trained at the Archery Range by a people that has walked it, from the Gunpowder Age's tier.
+  blowpipe: [null, null, null, BLOWPIPE, BLOWPIPE],
   warmammoth: beast({ name: 'War Mammoth', cls: 'siege', hp: 420, attack: 16, armor: 2, parmor: 4, range: 0, reload: 2.4, speed: 1.1, sight: 6, cost: { food: 260, gold: 60 }, time: 40, radius: 0.55, blurb: 'A woolly mammoth led to war: it tramples walls and buildings as a ram does, and gores soldiers too. Spearmen and riders swarm it.' }),
 };
 
@@ -1501,8 +1535,8 @@ const DOMAINS: Partial<Record<UnitType, Domain>> = { fisher: 'water', warship: '
 /** Where a unit line goes: on foot, on the water or in the air. */
 export const domainOf = (type: UnitType): Domain => DOMAINS[type] ?? 'land';
 
-export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader', 'wagon', 'warwolf', 'tusker', 'warmammoth'];
-export const MILITARY: UnitType[] = ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'warship', 'fighter', 'bomber', 'warwolf', 'tusker', 'warmammoth'];
+export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader', 'wagon', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear'];
+export const MILITARY: UnitType[] = ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'warship', 'fighter', 'bomber', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear'];
 
 type Target = UnitClass | 'building';
 /** The counter triangle (and its friends): damage multiplier by attacker class against target class. */
@@ -1857,11 +1891,49 @@ export const FIRE = {
   run: [2, 6, 4, 2],
   scorch: 2,
   scorchReach: 0.4,
-  burns: ['thornwall', 'garden', 'orchard', 'sapling'] as BuildingType[],
+  burns: ['thornwall', 'garden', 'orchard', 'sapling', 'hive'] as BuildingType[],
   aiBearers: 2,
   aiNear: 12,
   aiEvery: 4,
   aiBeatFrom: 24,
+};
+
+/**
+ * The Age of the Hive (`docs/wild-road.md` §3, `src/sim/hive.ts`). A Hive goes where `trees` trees stand within `SNARE.r` tiles,
+ * `apart` tiles from any other Hive, and works while they stand. Awake (not winter, not smoked, not burning), its bees sting each
+ * rival land unit within `reach` tiles of it that stands in a wood (`wood` trees in the 3-by-3 round it), `sting` hit points a
+ * second past armour, and slow it to `slow` of its pace for `stingFor` seconds. Every `every` seconds it pays `honey` food, or
+ * `mead` gold while a finished Market of its people stands within `market` tiles. In summer it doubles (`pollen`) the yield of its
+ * people's Kitchen Gardens within `bloom` tiles. A fire within `smoke` tiles quiets it for `quiet` seconds.
+ * A Blowpipe Hunter's dart adds a dose of venom (up to `doses`), each dose `dose` hit points a second past armour, lasting `venomFor`
+ * seconds after the last dart; a unit with venom in it also walks at `slow`. A people that has walked the Hive breeds Cave Bears
+ * at its Den and its War Wolves are Dire Wolves: `dire.hp` times the hit points, `dire.attack` more attack.
+ * The computer takes the road on from the Grove, stays `aiStay` seconds, and sets up to `aiHives` Hives in the woods within `aiFrom`
+ * tiles of home, by its Kitchen Gardens where it can; its Range and Den train darts and bears in turn with the rest.
+ */
+export const HIVE = {
+  trees: HIVE_TREES,
+  apart: 4,
+  reach: HIVE_REACH,
+  wood: 2,
+  sting: 3,
+  stingFor: 3,
+  slow: 0.6,
+  every: 10,
+  honey: 3,
+  mead: 2,
+  market: 10,
+  pollen: 2,
+  bloom: 5,
+  smoke: 4,
+  quiet: 40,
+  doses: 5,
+  dose: 1,
+  venomFor: 5,
+  dire: { hp: 1.35, attack: 2 },
+  aiStay: 240,
+  aiHives: 3,
+  aiFrom: 14,
 };
 
 export const COPPICE = { reach: 8, regrow: 120, retry: 5, grow: 90, snare: 2, cap: 1.5, bag: 2, full: 12, aiPerFood: 1.5, aiMax: 16, aiTrees: 10, aiThick: 14, aiNear: 14, aiDrop: 7, aiPerTender: 2, aiStone: 6, aiCamps: 2, aiPlant: 3, aiThin: 12, aiPlantWood: 120 };
@@ -1907,7 +1979,7 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   wall: { name: 'Wall', size: 1, hp: 500, cost: { wood: 3 }, costByEpoch: [{ wood: 3 }, { stone: 4 }, { stone: 4 }, { stone: 5 }, { stone: 5 }], time: 5, pop: 0, sight: 2, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'L', blurb: 'Drag to raise a line of wall: a palisade of logs in the Stone Age, stone after.' },
   gate: { name: 'Gate', size: 2, hp: 1200, cost: { stone: 30 }, costByEpoch: [{ wood: 30 }, { stone: 30 }, { stone: 30 }, { stone: 40 }, { stone: 40 }], time: 20, pop: 0, sight: 3, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'G', blurb: 'Opens for your people and allies only. Put it in a wall.' },
   barracks: { name: 'Barracks', size: 3, hp: 1400, cost: { wood: 150 }, time: 35, pop: 0, sight: 5, trains: ['infantry'], drop: [], epoch: 0, menu: 'mil', key: 'B', blurb: 'Trains foot soldiers, who beat cavalry and siege.' },
-  range: { name: 'Archery Range', size: 3, hp: 1400, cost: { wood: 150 }, time: 35, pop: 0, sight: 5, trains: ['ranged'], drop: [], epoch: 0, menu: 'mil', key: 'A', blurb: 'Trains slingers, archers and their heirs, who beat infantry.' },
+  range: { name: 'Archery Range', size: 3, hp: 1400, cost: { wood: 150 }, time: 35, pop: 0, sight: 5, trains: ['ranged', 'blowpipe'], drop: [], epoch: 0, menu: 'mil', key: 'A', blurb: 'Trains slingers, archers and their heirs, who beat infantry.' },
   stable: { name: 'Stable', size: 3, hp: 1400, cost: { wood: 150, gold: 50 }, time: 40, pop: 0, sight: 5, trains: ['cavalry'], drop: [], epoch: 1, menu: 'mil', key: 'C', blurb: 'Trains cavalry, who beat archers, priests and siege.' },
   forge: { name: 'Forge', size: 3, hp: 1600, cost: { wood: 175 }, time: 40, pop: 0, sight: 5, trains: [], drop: [], epoch: 1, menu: 'mil', key: 'R', blurb: 'Better weapons and armor for every soldier.' },
   workshop: { name: 'Siege Workshop', size: 3, hp: 1400, cost: { wood: 200 }, time: 40, pop: 0, sight: 5, trains: ['siege'], drop: [], epoch: 1, menu: 'mil', key: 'K', blurb: 'Builds rams, catapults and cannon to break towns.' },
@@ -1919,11 +1991,13 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   // The managed wood (#501): a coppice people plants it on open ground; it roots as a stool and grows into a tree (`COPPICE`, `src/sim/coppice.ts`).
   sapling: { name: 'Sapling', size: 1, hp: 30, cost: { wood: 10 }, time: 5, pop: 0, sight: 1, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'I', blurb: `A young tree set in open ground. Once planted it roots and grows into a full tree in ${COPPICE.grow} seconds: wood to fell, and woods for snares. A row of them grows into a hedge no one walks through.` },
   // The Age of the Wild (`docs/wild-road.md`): raised by a people that has tamed a beast; breeds the kinds it tamed, in any age after.
-  den: { name: 'Beast Den', size: 3, hp: 900, cost: { food: 50, wood: 75 }, time: 35, pop: 0, sight: 6, trains: ['warwolf', 'tusker', 'warmammoth'], drop: [], epoch: 1, menu: 'mil', key: 'D', blurb: 'A ring of earth banks and woven hurdles round a hollow of straw, where tamed beasts whelp and are reared. It breeds only the kinds your people has tamed from the wild: tame one wolf and it raises wolves. Raised only by a people that has tamed a beast, and it keeps breeding after the people leaves the Age of the Wild.' },
+  den: { name: 'Beast Den', size: 3, hp: 900, cost: { food: 50, wood: 75 }, time: 35, pop: 0, sight: 6, trains: ['warwolf', 'tusker', 'warmammoth'], drop: [], epoch: 1, menu: 'mil', key: 'D', blurb: 'A ring of earth banks and woven hurdles round a hollow of straw, where tamed beasts whelp and are reared. It breeds only the kinds your people has tamed from the wild: tame one wolf and it raises wolves. Raised only by a people that has tamed a beast, and it keeps breeding after the people leaves the Age of the Wild. A people that has walked the Age of the Hive breeds Cave Bears here too.' },
   // The Age of the Grove (`docs/wild-road.md` §2, `GROVE`): raised by a people that has walked it, in any age after.
   thornwall: { name: 'Thornwall', size: 1, hp: 400, cost: { wood: 5 }, time: 3, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, menu: 'eco', key: 'B', blurb: `Drag to plant a line of thorn. It grows a stage every ${GROVE.stage} seconds (twice as fast in spring): seedling, bramble, thicket, then living oak, tougher than stone and mending itself. It parts for your own people and shuts on everyone else, and a piece cut down sprouts again from its root unless the ground is built on. Fire is its bane: a piece that burns down leaves no root.` },
   garden: { name: 'Kitchen Garden', size: 1, hp: 120, cost: { wood: 35 }, time: 8, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, open: true, menu: 'eco', key: 'U', blurb: `Maize, beans and squash grown together on one tile, worked by one gardener. Fed by a Beast Den's dung within ${GROVE.dung} tiles it yields ${Math.round((1 + GROVE.dungMul) * 10) / 10} times a farmer's food; by water within ${GROVE.water} tiles, ${Math.round((1 + GROVE.waterMul) * 10) / 10} times; by both, more. Unfed, it grows at a field's pace. A Den feeds its ${GROVE.dungFeeds} oldest gardens.` },
   orchard: { name: 'Orchard', size: 2, hp: 300, cost: { wood: 100 }, time: 20, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, menu: 'eco', key: 'R', blurb: `Fruit trees set near a food store. After ${GROVE.orchardGrow} seconds they bear, and every summer and autumn they drop food into your stores by themselves while a store stands within ${GROVE.orchardReach} tiles. Slow to start, free for years.` },
+  // The Age of the Hive (`docs/wild-road.md` §3, `HIVE`): raised by a people that has walked it, in any age after.
+  hive: { name: 'Hive', size: 1, hp: 160, cost: { wood: 60, gold: 30 }, time: 15, pop: 0, sight: 4, trains: [], drop: [], epoch: 3, menu: 'eco', key: 'V', blurb: `A straw skep on a stand, set among standing trees (${HIVE_TREES} within 3 tiles). Its bees swarm any rival who walks the woods within ${HIVE_REACH} tiles, stinging past armour and slowing them. It pays honey into your stores, or mead for gold while a Market of yours stands near, and in summer it doubles the Kitchen Gardens beside it. Bees sleep in winter, smoke quiets them, and fire takes the skep. Fell its woods and the bees leave.` },
   // The age road (#562, `docs/age-roads.md` spine §4): raised in the Stone Age, it answers which key resources this world holds (`PROSPECTOR`).
   prospector: { name: "Prospector's Lodge", size: 2, hp: 500, cost: { food: 50, wood: 75 }, time: 20, pop: 0, sight: 6, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'P', blurb: 'A lodge of prospectors who walk the streams, scrape the rock and dig at old mounds. Once it stands it tells you which key resources this world holds (bog iron, salt, saltpetre, blood-iron, ancient ruins): yes or no for each, never where. Some ages open only with them; a world that lacks one shuts that door.' },
   // The Path of Blood (#303): pitched by foot soldiers where the army stands, enemy land too; burns when left alone (`WARCAMP`).

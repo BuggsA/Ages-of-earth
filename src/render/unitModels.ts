@@ -1152,7 +1152,57 @@ function warmammoth(): Kit {
   return k;
 }
 
-const MAKERS: Record<UnitType, (epoch: number) => Kit> = { citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, cog, fighter, bomber, trader, wagon, warwolf, tusker, warmammoth };
+/**
+ * A Blowpipe Hunter (the Age of the Hive): bare-armed, in a bark-cloth kilt of its people's colour and a band of three feathers, a
+ * bamboo quiver of darts at the hip, and a long cane blowpipe raised level to the lips.
+ */
+function blowpipe(): Kit {
+  const k = new Kit();
+  const skin = '#a8754e';
+  const b = person(k, { legs: skin, torso: skin, belt: '#5a3f2a', boots: '#6a4a30' });
+  k.team(k.box(0.18, 0.09, 0.12, TEAM, 0, HIP - 0.02, 0));
+  k.box(0.17, 0.02, 0.11, '#5a3f2a', 0, 0.36, 0.0).rotation.z = 0.7;
+  k.team(k.cyl(0.07, 0.07, 0.025, 8, TEAM, 0, 0.52, 0));
+  k.sphere(0.064, '#2a2018', 0, 0.535, -0.015).scale.set(1, 0.65, 1);
+  for (const [x, c] of [[-0.03, '#d8b23a'], [0, '#2f6a3a'], [0.03, '#b23a2a']] as [number, string][]) k.box(0.014, 0.1, 0.01, c, x, 0.6, -0.06);
+  // The quiver: a joint of bamboo with a gourd of kapok tied to it, and the dart tails showing.
+  k.cyl(0.022, 0.022, 0.18, 6, '#c8b070', 0.1, 0.17, -0.05);
+  k.sphere(0.03, '#b88a4a', 0.1, 0.09, -0.02);
+  for (const dx of [-0.008, 0.008]) k.box(0.01, 0.03, 0.01, '#efe6d2', 0.1 + dx, 0.27, -0.05);
+  held(b, (kk, g) => {
+    kk.cyl(0.009, 0.012, 0.82, 6, '#b59a5a', 0, 0.04, 0.3, g).rotation.x = Math.PI / 2;
+    kk.cyl(0.016, 0.016, 0.03, 6, '#5a3f2a', 0, 0.04, -0.08, g).rotation.x = Math.PI / 2;
+  }, SHOULDER - 0.1, 1.55);
+  return k;
+}
+
+/**
+ * A Cave Bear (the Age of the Hive): bred at the Den, a great humped bear of dark fur with a pale muzzle, short ears and a hide
+ * collar in its people's colour. A slow wall of fur.
+ */
+function cavebear(): Kit {
+  const k = new Kit();
+  const fur = '#4a3626';
+  const dark = '#2c2016';
+  const LEG = 0.17;
+  for (const [x, z, rig] of [[-0.09, 0.14, RIG_LEG_A], [0.09, 0.14, RIG_LEG_B], [-0.09, -0.14, RIG_LEG_B], [0.09, -0.14, RIG_LEG_A]] as [number, number, number][]) {
+    const g = k.limb(k.group(0, 0, 0), rig, LEG, z);
+    k.box(0.08, LEG, 0.08, fur, x, 0, z, g);
+    k.box(0.09, 0.03, 0.1, dark, x, 0, z + 0.01, g);
+  }
+  k.blob(0.24, fur, 0, LEG + 0.15, -0.02).scale.set(0.95, 0.85, 1.45);
+  // The hump over the shoulders, the mark of a cave bear.
+  k.blob(0.16, fur, 0, LEG + 0.28, 0.1).scale.set(0.9, 0.75, 1);
+  const head = k.limb(k.group(0, 0, 0), RIG_ARM, LEG + 0.18, 0.28);
+  k.blob(0.12, fur, 0, LEG + 0.2, 0.33, head).scale.set(1, 0.9, 1.05);
+  k.box(0.09, 0.08, 0.1, '#8a6a4a', 0, LEG + 0.16, 0.44, head);
+  k.box(0.04, 0.03, 0.02, '#1a1410', 0, LEG + 0.19, 0.5, head);
+  for (const x of [-0.07, 0.07]) k.sphere(0.03, dark, x, LEG + 0.3, 0.3, head);
+  k.team(k.box(0.24, 0.04, 0.06, TEAM, 0, LEG + 0.2, 0.22));
+  return k;
+}
+
+const MAKERS: Record<UnitType, (epoch: number) => Kit> = { citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, cog, fighter, bomber, trader, wagon, warwolf, tusker, warmammoth, blowpipe, cavebear };
 
 /** Epoch + 30 asks for the citizen as a thrall (the same offset trick as the trader's gold and the caravan cart). */
 export const THRALL_MODEL = 30;

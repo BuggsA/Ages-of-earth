@@ -11,7 +11,7 @@ import { WATER_Y } from './water';
 /** Units are drawn a little larger than their footprint in the rules, so they read well from above. */
 export const UNIT_SCALE = 1.3;
 /** Fighters stand larger than workers, so a soldier reads as one at the default zoom (#624). */
-const FIGHTER_SCALE: Partial<Record<UnitType, number>> = { infantry: 1.3, ranged: 1.22, cavalry: 1.2, priest: 1.2, hero: 1.3, warwolf: 1.3, tusker: 1.25, warmammoth: 1.1 };
+const FIGHTER_SCALE: Partial<Record<UnitType, number>> = { infantry: 1.3, ranged: 1.22, cavalry: 1.2, priest: 1.2, hero: 1.3, warwolf: 1.3, tusker: 1.25, warmammoth: 1.1, blowpipe: 1.22, cavebear: 1.15 };
 /** Citizens a little larger too, but still smaller than fighters (#617, #624). */
 const CITIZEN_BOOST = 1.15;
 /** How high aircraft fly above the ground. */

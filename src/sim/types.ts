@@ -17,7 +17,9 @@ export type UnitType =
   /** A packed Town Center or House on the move (the Age of the Steppe, #297). */
   | 'wagon'
   /** Beasts of the Age of the Wild (`docs/wild-road.md`): tamed from the wild, or bred at a Beast Den once a kind is tamed. */
-  | 'warwolf' | 'tusker' | 'warmammoth';
+  | 'warwolf' | 'tusker' | 'warmammoth'
+  /** The Age of the Hive (`docs/wild-road.md` §3, `hive.ts`): venom darts at the Archery Range, and the Den's Cave Bear. */
+  | 'blowpipe' | 'cavebear';
 /** How a unit gets about: on foot, on the water, or in the air. */
 export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
@@ -25,6 +27,8 @@ export type BuildingType =
   | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai' | 'drainrig' | 'transfusion' | 'bloodtower' | 'snare' | 'prospector' | 'mission' | 'silo' | 'sapling' | 'shaft' | 'dyke' | 'windmill' | 'den'
   /** The Age of the Grove (`docs/wild-road.md`, `grove.ts`): a wall that grows, a one-tile garden, fruit trees. */
   | 'thornwall' | 'garden' | 'orchard'
+  /** The Age of the Hive (`docs/wild-road.md` §3, `hive.ts`): a skep of bees set among the trees. */
+  | 'hive'
   /** The Age of Rivers (#701): a ditch dug from the water, which fills and is gone. */
   | 'channel';
 /** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
@@ -46,7 +50,7 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'chart' | 'assay' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
 export type PathId = 'blood' | 'steppe' | 'hemocraft' | 'rite';
@@ -266,6 +270,13 @@ export interface Unit {
   merc?: number;
   /** Cursed by a Blood-rite priest (#355 s4): the tick the curse lifts. Until then every blow on it lands harder (`RITE.taken`). */
   cursed?: number;
+  /**
+   * The Age of the Hive (`hive.ts`): venom in it from Blowpipe darts, `n` doses deep (each one a sting a second, past armour),
+   * until tick `end`, set by player `by`. Absent: none.
+   */
+  venom?: { n: number; end: number; by: number };
+  /** Stung by a Hive's swarm (`hive.ts`): the tick the stings wear off, until when it walks slow. Absent: never stung. */
+  stung?: number;
 }
 
 export interface TrainItem {
@@ -321,6 +332,8 @@ export interface Building {
   grub?: boolean;
   /** Burnt down (`fire.ts`): a Thornwall that burns leaves no root. */
   burnt?: boolean;
+  /** A Hive smoked quiet by a fire near it (`hive.ts`): the tick its bees wake again. Absent: never smoked. */
+  smoked?: number;
   /** A Windmill (#701): the tick it last pumped a tile dry, so its sails show it at work. Absent: it never has. */
   pumped?: number;
   /** Where new units go. `kind` is the resource the flag was set on (absent on bare ground), so it outlives its tile (#344). */
@@ -631,7 +644,7 @@ export interface Animal {
 export interface Shot {
   id: number;
   owner: number;
-  kind: 'stone' | 'arrow' | 'bolt' | 'bullet' | 'spear' | 'boulder' | 'ball' | 'bomb';
+  kind: 'stone' | 'arrow' | 'bolt' | 'bullet' | 'spear' | 'boulder' | 'ball' | 'bomb' | 'dart';
   /** Where it was loosed from, and the target it flies at. */
   x0: number;
   y0: number;
@@ -691,6 +704,10 @@ export interface PlayerStats {
   tamed?: number;
   /** Beasts reared at a Beast Den (the Age of the Grove's deed); absent in older saves. */
   bred?: number;
+  /** Food brought in from Kitchen Gardens (the Age of the Hive's deed); absent in older saves. */
+  gardened?: number;
+  /** Honey and mead a people's Hives paid in, as food and gold (the Age of the Hive); absent in older saves. */
+  honey?: number;
   /** Food taken from snares (#485); absent in older saves. */
   snared?: number;
   /** Gold taken as tribute by riders standing in rivals' land (#318); absent in older saves. */
@@ -854,6 +871,11 @@ export type GameEvent =
   | { k: 'tamed'; owner: number; kind: Animal['kind']; x: number; y: number }
   /** A fallen Thornwall sprouts again from its root (the Age of the Grove). */
   | { k: 'sprout'; owner: number; x: number; y: number }
+  /**
+   * The Age of the Hive (`hive.ts`): a Hive's bees `what`: `swarm` on a rival unit in its woods (the unit `target`), `smoked` quiet by
+   * a fire, `wake` again after smoke or winter.
+   */
+  | { k: 'hive'; what: 'swarm' | 'smoked' | 'wake'; id: number; owner: number; x: number; y: number; target?: number }
   /** A mammoth gores, or a wolf bites, someone. */
   | { k: 'wildStrike'; id: number; kind: Animal['kind']; target: number; x: number; y: number }
   /** A raider camp (own pitch) stands empty: whose people cleared it, and the plunder they took. */
@@ -1215,6 +1237,8 @@ export interface AiMemory {
   wild?: number;
   /** The tick it entered the Age of the Grove, kept while it plants there (`GROVE.aiStay`). */
   grove?: number;
+  /** The tick it entered the Age of the Hive, kept while it sets its Hives there (`HIVE.aiStay`). */
+  hive?: number;
   steppe?: { band?: number[]; at?: { x: number; y: number }; out?: number; recalled?: number; horde?: number; since?: number; struck?: number; /** When a nomad flock (#501) was first seen grazed out, this time. */ starved?: number; pack?: { x: number; y: number; at: number }; to?: { x: number; y: number; at: number }; from?: { x: number; y: number } };
 }
 

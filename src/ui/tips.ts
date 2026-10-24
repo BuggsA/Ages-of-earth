@@ -1,4 +1,4 @@
-import { AGES, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs } from '../sim/data';
+import { AGES, HIVE, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs } from '../sim/data';
 import { battlesFor } from '../sim/battles';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, findsOf, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
@@ -423,12 +423,18 @@ const TIPS: Tip[] = [
     text: `Your people grows its town now. Plant a <b>${BUILDINGS.thornwall.name}</b> line (drag, like a wall): it grows from seedling to living oak in about ${GROVE.stage * 3} seconds (twice as fast in spring), parts for your own people, and sprouts again from its root if cut down. Set <b>${BUILDINGS.garden.name}s</b> within ${GROVE.dung} tiles of a ${BUILDINGS.den.name} or ${GROVE.water} of water: fed, a gardener brings in far more than a farmer. <b>${BUILDINGS.orchard.name}s</b> by a store bear food by themselves each summer and autumn.`,
   },
   {
+    id: 'hive',
+    // The Age of the Hive (`docs/wild-road.md` §3): its first minute.
+    when: (s, me) => ageOf(s.players[me]) === 'hive',
+    text: `Your people keeps bees now. Set a <b>${BUILDINGS.hive.name}</b> (${BUILDINGS.hive.key}) among standing trees (${HIVE.trees} within 3 tiles): its bees sting any rival who walks the woods within ${HIVE.reach} tiles, past armour, and slow them, so a wood by a Hive is a wall. It pays honey, or mead for gold if a Market stands within ${HIVE.market} tiles, and in summer doubles your <b>${BUILDINGS.garden.name}s</b> within ${HIVE.bloom} tiles. Bees sleep in winter, and smoke quiets them: that is when a rival comes, with torches. No muskets or cannon: train <b>Blowpipe Hunters</b> at the Archery Range, whose venom stacks and cuts down riders and beasts, and breed <b>Cave Bears</b> at the Den; your wolves are Dire Wolves now.`,
+  },
+  {
     id: 'torch',
     // Fire (`fire.ts`): a rival's living town is in sight, and torches are in hand.
     when: (s, me) =>
       s.players[me].epoch >= FIRE.epoch &&
       s.ents.some((e) => e.kind === 'building' && e.hp > 0 && FIRE.burns.includes(e.type) && e.owner !== me && s.players[e.owner].team !== s.players[me].team && s.players[me].vis[e.ty * s.w + e.tx] === 1),
-    text: `A rival grows its town: Thornwalls, Kitchen Gardens and Orchards burn. Select citizens or foot soldiers and press <kbd>F</kbd>, then click one: each stands ${FIRE.light} seconds to set it alight, and unless its people beat it out it burns down. A Thornwall that burns leaves no root, and in a dry summer the fire runs along the hedge and through the woods beside it.`,
+    text: `A rival grows its town: Thornwalls, Kitchen Gardens, Orchards and Hives burn. Select citizens or foot soldiers and press <kbd>F</kbd>, then click one: each stands ${FIRE.light} seconds to set it alight, and unless its people beat it out it burns down. A Thornwall that burns leaves no root, and in a dry summer the fire runs along the hedge and through the woods beside it.`,
   },
   {
     id: 'burning',

@@ -1,4 +1,4 @@
-import { AGES, BUILDINGS, CIVS, GUNS, GROVE, TOWER_LEVELS, WAYS, WORKS, SIGNATURES, EPOCHS, FLOOD, NO_MODS, PATHS, RARE, TECHS, WARCAMP, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
+import { AGES, BUILDINGS, CIVS, GUNS, GROVE, HIVE, TOWER_LEVELS, WAYS, WORKS, SIGNATURES, EPOCHS, FLOOD, NO_MODS, PATHS, RARE, TECHS, WARCAMP, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
 import { fairLevy } from './fair';
 import { flooded } from './flood';
 import { ageDef, ageOf, hasWalked, isHire, isSuspended, pathCarry, threadsOf } from './ages';
@@ -78,6 +78,12 @@ export function statsFor(s: GameState, owner: number, type: UnitType): UnitStats
   }
   const rename = ageDef(p).names?.[type];
   if (rename && base.cls !== 'citizen') st.name = rename;
+  // Dire Wolves (the Age of the Hive, `HIVE.dire`): a people that has walked the Hive breeds its wolves bigger, in any age after.
+  if (type === 'warwolf' && hasWalked(p, 'hive')) {
+    st.name = 'Dire Wolf';
+    st.hp = Math.round(st.hp * HIVE.dire.hp);
+    st.attack += HIVE.dire.attack;
+  }
   const soldier = base.cls === 'infantry' || base.cls === 'cavalry' || base.cls === 'ranged' || base.cls === 'hero';
   if (base.cls === 'infantry' || base.cls === 'cavalry' || base.cls === 'hero') st.attack += m.meleeAttack;
   if (base.cls === 'ranged') {

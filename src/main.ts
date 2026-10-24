@@ -113,6 +113,8 @@ let launchSilo = 0;
 let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | 'keg' | 'torch' | 'launch' | null = null;
 /** When the viewer was last told one of its living buildings caught fire, so a spreading fire tells once. */
 let fireToldAt = -9999;
+/** When a swarm on your people was last told (the Age of the Hive), so a fight in the woods tells it once. */
+let hiveToldAt = -9999;
 let paused = false;
 const SPEEDS = [1, 1.5, 2, 3];
 let speedIdx = 0;
@@ -2839,6 +2841,15 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         } else if (ev.what === 'out' && ev.owner === viewer) hud.toast('The fire is beaten out', 'good');
         else if (ev.what === 'root' && ev.owner === viewer) hud.toast('Fire took a Thornwall root: it will not grow again', 'bad');
         break;
+      case 'hive': {
+        // The Age of the Hive: told once in a while when a swarm finds your people in a rival's woods, and when your Hive is smoked quiet.
+        const victim = ev.what === 'swarm' ? s.byId.get(ev.target ?? 0) : undefined;
+        if (victim && victim.owner === viewer && s.tick - hiveToldAt > 20 * TICK_HZ) {
+          hiveToldAt = s.tick;
+          hud.toast(`Bees! ${s.players[ev.owner]?.name ?? 'A rival'}'s Hive swarms your people in its woods: keep out of the trees there, or smoke it quiet with a fire`, 'alert');
+        } else if (ev.what === 'smoked' && ev.owner === viewer) hud.toast('Smoke has quieted one of your Hives: its bees will wake when it clears', 'alert');
+        break;
+      }
       case 'silo':
         // The Atomic Age (#605): the clock is public, so every player is told when a warhead goes up and where it will land.
         if (ev.what === 'launched') {

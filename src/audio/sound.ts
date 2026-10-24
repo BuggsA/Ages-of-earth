@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'fireLit' | 'fireCatch' | 'fireOut' | 'fireAsh' | 'flow' | 'rush' | 'groan';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'fireLit' | 'fireCatch' | 'fireOut' | 'fireAsh' | 'flow' | 'rush' | 'groan' | 'dart' | 'swarm' | 'hiveHush';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -678,6 +678,21 @@ export class Sound {
         this.noise(out, t, { dur: 0.25, filter: 'lowpass', f: 300, to: 900, peak: 0.12, attack: 0.02 });
         this.noise(out, t + 0.05, { dur: 1.6, filter: 'bandpass', f: 700, to: 1600, q: 0.8, peak: 0.05, attack: 0.25 });
         for (let i = 0; i < 9; i++) this.noise(out, t + 0.3 + i * 0.13 + (i % 3) * 0.04, { dur: 0.015, filter: 'highpass', f: 2500 + (i % 4) * 600, peak: 0.06 - i * 0.004 });
+        break;
+      case 'dart':
+        // A Blowpipe Hunter's dart (the Age of the Hive): a short hard puff of breath down the cane, and the tick of the dart leaving it.
+        this.noise(out, t, { dur: 0.09, filter: 'bandpass', f: 1600, to: 700, q: 1.6, peak: 0.1, attack: 0.003 });
+        this.noise(out, t + 0.02, { dur: 0.012, filter: 'highpass', f: 4200, peak: 0.05 });
+        break;
+      case 'swarm':
+        // A Hive's swarm on a rival (the Age of the Hive): many wings, a low thick drone a little out of tune with itself, rising as it comes.
+        for (const [f, d] of [[186, 0], [203, 0.04], [228, 0.09], [251, 0.13]] as const) this.tone(out, t + d, { f, to: f * 1.08, type: 'sawtooth', dur: 0.9, peak: 0.016, attack: 0.18, lp: 1300, glide: 0.6 });
+        this.noise(out, t, { dur: 1, filter: 'bandpass', f: 3200, q: 2, peak: 0.012, attack: 0.25 });
+        break;
+      case 'hiveHush':
+        // A Hive smoked quiet (the Age of the Hive): the drone sinks and slows under a hiss of smoke.
+        for (const f of [210, 236]) this.tone(out, t, { f, to: f * 0.55, type: 'sawtooth', dur: 1.4, peak: 0.018, attack: 0.05, lp: 900 });
+        this.noise(out, t + 0.1, { dur: 1.3, filter: 'bandpass', f: 4500, to: 2600, q: 1, peak: 0.02, attack: 0.2 });
         break;
       case 'fireCatch':
         // Fire leaps to the next tree (`fire.ts`): a short rush and a few pops of green wood.
