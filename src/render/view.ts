@@ -1193,6 +1193,16 @@ export class View {
           this.cue('convert', ev.x, ev.y, 1);
           break;
         }
+        case 'boarded': {
+          // A ship taken by the Sea Beggars (#783): a splash of white water at its side and the old colours drifting down in smoke.
+          if (!this.sees(ev.x, ev.y) && ev.from !== this.viewer && ev.to !== this.viewer) break;
+          const at = this.ground(s, ev.x, ev.y, 0.2);
+          this.effects.ring(at, '#e8f4ff', 1.3, 1);
+          this.effects.burst(at.clone().setY(at.y + 0.5), { count: 18, speed: 1.4, up: 0.9, life: 1.1, size: 0.06, gravity: 0.6, colors: ['#ffffff', '#cfe6f7', '#9bb8cc'] });
+          this.effects.burst(at.clone().setY(at.y + 1.4), { count: 10, speed: 0.5, up: 0.4, life: 1.8, size: 0.08, grow: 1.5, gravity: -0.2, drag: 1.5, soft: true, colors: ['#8a8a8a', '#b0aca4'] });
+          this.cue('boarded', ev.x, ev.y, 1);
+          break;
+        }
         case 'consecrated': {
           // The building turns (#209): a wide ring of light at its foot and a fountain of gold over it.
           if (!this.sees(ev.x, ev.y) && ev.from !== this.viewer && ev.to !== this.viewer) break;

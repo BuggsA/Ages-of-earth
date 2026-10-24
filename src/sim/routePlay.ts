@@ -16,8 +16,8 @@ export function routeAges(route: RouteId): AgeId[] {
     .sort((a, b) => AGES[a].tier - AGES[b].tier);
 }
 
-/** The maps a route names (`docs/age-roads.md` spine §1): the navy wants water, every other route is for any map. */
-export const routeMaps = (route: RouteId): MapType[] => (route === 'navy' ? ['lakes', 'sea'] : ['continental']);
+/** The maps a route names (`docs/age-roads.md` spine §1): the navy wants water, the Water Road is swept on lakes, sea and land (#783), every other route is for any map. */
+export const routeMaps = (route: RouteId): MapType[] => (route === 'navy' ? ['lakes', 'sea'] : route === 'water' ? ['lakes', 'sea', 'continental'] : ['continental']);
 
 export interface RouteMatch {
   route: RouteId;

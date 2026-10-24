@@ -527,13 +527,16 @@ export function parched(s: GameState, owner: number, tx: number, ty: number, siz
   return !wateredAt(s, tx, ty, size, true, owner);
 }
 
-/** How fast a Farm works for where it lies: polder (#701) at `POLDER.farm`, a watered field in the Age of Rivers at `RIVERS.farm`. */
+/**
+ * How fast a Farm works for where it lies: polder (#701) at `POLDER.farm`, a watered field in the Age of Rivers at `RIVERS.farm` (and the
+ * Farm kept as that age's keepsake, on any road, #783).
+ */
 export function fieldBoost(s: GameState, b: Building): number {
   // Under a sluice's flood (#701 s4) a field yields nothing until the water goes.
   if (drowned(s, b)) return 0;
   let k = polderField(s, b) ? POLDER.farm : 1;
   const p = s.players[b.owner];
-  if (p && ageDef(p).rivers && wateredAt(s, b.tx, b.ty, b.size)) k = Math.max(k, RIVERS.farm);
+  if (p && (ageDef(p).rivers || b.keep === 'rivers') && wateredAt(s, b.tx, b.ty, b.size)) k = Math.max(k, RIVERS.farm);
   return k;
 }
 

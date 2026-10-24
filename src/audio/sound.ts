@@ -14,7 +14,7 @@ export type SoundName =
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
   | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'siloAlarm' | 'interceptLaunch' | 'interceptHit' | 'interceptMiss' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'fireLit' | 'fireCatch' | 'fireOut' | 'fireAsh' | 'flow' | 'rush' | 'groan' | 'dart' | 'swarm' | 'hiveHush' | 'sluiceOpen' | 'sluiceShut' | 'spread' | 'tideWash' | 'tideMill' | 'swept' | 'pondShut' | 'breach' | 'entWake' | 'entRoot' | 'spreading' | 'damBurst' | 'castOff' | 'moor' | 'founder' | 'bloomSling' | 'bloomRoot' | 'bloomGrow' | 'bloomCut' | 'bloomCrack' | 'bloomGreen' | 'bloomStorm'
-  | 'scour' | 'whaleSong' | 'seedBomb' | 'behemothKneel' | 'behemothRise';
+  | 'scour' | 'boarded' | 'whaleSong' | 'seedBomb' | 'behemothKneel' | 'behemothRise';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -980,6 +980,18 @@ export class Sound {
         this.noise(out, t + 0.05, { dur: 0.5, filter: 'lowpass', f: 600, to: 200, q: 1, peak: 0.1 });
         this.noise(out, t + 0.3, { dur: 3.0, filter: 'bandpass', f: 900, to: 450, q: 0.5, peak: 0.1, attack: 0.25 });
         this.noise(out, t + 0.3, { dur: 3.2, filter: 'lowpass', f: 300, to: 120, q: 0.8, peak: 0.11, attack: 0.3 });
+        break;
+      case 'boarded':
+        // A ship boarded and taken (#783, the Sea Beggars): two grappling irons bite the rail with a clank, a rush of feet over the
+        // planking, a short scuffle, and the bosun's whistle rising as the colours come down.
+        for (const d of [0, 0.16]) {
+          this.noise(out, t + d, { dur: 0.05, filter: 'bandpass', f: 3400, q: 6, peak: 0.07 });
+          this.tone(out, t + d, { f: 1180, to: 1120, type: 'triangle', dur: 0.25, peak: 0.025 });
+        }
+        for (let i = 0; i < 6; i++) this.noise(out, t + 0.35 + i * 0.07 + (i % 2) * 0.02, { dur: 0.05, filter: 'bandpass', f: 520, q: 2.5, peak: 0.1 });
+        this.noise(out, t + 0.8, { dur: 0.5, filter: 'bandpass', f: 1300, to: 900, q: 0.8, peak: 0.03, attack: 0.05 });
+        this.tone(out, t + 1.2, { f: 1760, to: 2350, type: 'sine', dur: 0.45, peak: 0.035, attack: 0.03 });
+        this.tone(out, t + 1.65, { f: 2350, to: 2350, type: 'sine', dur: 0.3, peak: 0.03 });
         break;
       case 'castOff':
         // A floating district cast off (#770): mooring lines slipped with a slap on the water, the tug's whistle, two short and one
