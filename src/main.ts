@@ -40,6 +40,7 @@ import { deleteCloud, listCloud, loadCloud, saveCloud, useVaultKey, vaultKey } f
 import { SCENARIOS, scenarioById, starsFor } from './sim/campaign';
 import { loadDiscovery, observe, pushDiscovery, saveDiscovery, syncDiscovery, webMapHtml } from './ui/webMap';
 import { idleCitizens, idleSelection, idleShortcut } from './ui/idle';
+import { NO_TAP, doubleOrder, type Tap } from './ui/doubleOrder';
 import { CameraBookmarks, bookmarkShortcut } from './ui/cameraBookmarks';
 import { ScoutFlags } from './ui/scoutFlags';
 import { briefingHtml, chapterListHtml, recordStars, starRow, syncProgress } from './ui/campaignUi';
@@ -1666,6 +1667,7 @@ let spaceDown = false;
 let spaceDragged = false;
 let pointer = { x: 0, y: 0, inside: false };
 let lastClick = { at: 0, id: -1 };
+let lastTap: Tap = NO_TAP;
 
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 // Right-click on the speed button slows the game a step.
@@ -1826,7 +1828,21 @@ canvas.addEventListener('pointerup', (e) => {
       play('select');
       ack('select');
     }
-  } else clickSelect(e.clientX, e.clientY, e.shiftKey, e.ctrlKey);
+  } else {
+    // A double-click on anything but your own unit is a right-click for the units selected before it (`doubleOrder`).
+    const pk = view.pick(e.clientX, e.clientY);
+    const hit = pk?.kind === 'unit' ? s.byId.get(pk.id) : undefined;
+    const now = performance.now();
+    const again = doubleOrder(lastTap, now, e.clientX, e.clientY, hit?.owner === viewer);
+    if (again) {
+      lastTap = NO_TAP;
+      setSelection(again);
+      order(e.clientX, e.clientY, false, e.shiftKey);
+    } else {
+      lastTap = { at: now, x: e.clientX, y: e.clientY, before: selectedUnits(s).map((u) => u.id) };
+      clickSelect(e.clientX, e.clientY, e.shiftKey, e.ctrlKey);
+    }
+  }
   boxStart = null;
   boxing = false;
   dragbox.classList.add('hidden');
