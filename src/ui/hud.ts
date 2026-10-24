@@ -9,7 +9,7 @@ import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE, findResource } from '../sim/units';
-import { FIRE, AUTO_WORK, POLDER, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { FIRE, AUTO_WORK, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -18,7 +18,7 @@ import { loadPrice, sellerNear } from '../sim/oretrade';
 import { clockOf, launchProblem, loaded, rulesOf } from '../sim/silo';
 import { carriesKegs, kegProblem, kegsOf, millProblem, mills, millsOf, sappers } from '../sim/powder';
 import { carriesTorch, fireOn } from '../sim/fire';
-import { basinOf, millIdle } from '../sim/water';
+import { basinOf, millIdle, wateredAt } from '../sim/water';
 import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
 import { LANDMARK_KINDS, claimWork, claimants, favours, landmarkAt } from '../sim/landmarks';
 import { workProblem } from '../sim/works';
@@ -1089,6 +1089,11 @@ export class Hud {
     } else if (b.type === 'farm' && b.built) {
       const f = b.farmer ? s.byId.get(b.farmer) : undefined;
       status = f && f.kind === 'unit' && f.order.k === 'farm' && f.order.target === b.id ? 'Worked by a citizen' : 'Waiting for a farmer';
+      // The Age of Rivers (#701): a field with water near works faster.
+      if (ageDef(s.players[b.owner]).rivers) status += wateredAt(s, b.tx, b.ty, b.size) ? ` · <span data-tip="<b>Watered</b>Water lies within ${RIVERS.wet} tiles: in the Age of Rivers the field works ${Math.round((RIVERS.farm - 1) * 100)}% faster.">💧 Watered</span>` : ` · <span data-tip="<b>Dry</b>No water within ${RIVERS.wet} tiles. Dig a Channel (Q) to it and it works faster.">Dry field</span>`;
+    } else if (b.type === 'channel' && b.built) {
+      // A dug ditch (#701) waiting for the water: it fills once water lies beside it.
+      status = 'Dug, and dry: the water runs in once a channel or water lies beside it. Dig on toward the water.';
     } else if (b.type === 'snare' && b.built) {
       // Snares in the wood (#485): what it holds, how fast its woods fill it, and whether anyone walks the line.
       const trees = snareWoods(s, b);

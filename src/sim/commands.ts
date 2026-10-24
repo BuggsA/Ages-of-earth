@@ -1,4 +1,4 @@
-import { AUTO_WORK, BUILDINGS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, SNARE, SPREAD, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
+import { AUTO_WORK, BUILDINGS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, RIVERS, SNARE, SPREAD, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
 import { peace } from './combat';
 import { findSpot } from './ai';
 import { placeProblem, stampBuilding, walkable } from './grid';
@@ -191,7 +191,7 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
   }
   const problem = placeProblem(s, type, tx, ty, true, p);
   if (problem) {
-    if (!quiet) refuse(s, p, problem === 'slope' ? 'Too steep to build there' : problem === 'foreign' ? "That's enemy land: only a Tower can be raised there" : problem === 'woods' ? `A snare needs ${SNARE.need} trees standing within ${SNARE.r} tiles` : problem === 'snares' ? `Too near another snare: keep them ${SNARE.apart} tiles apart` : "Can't build there");
+    if (!quiet) refuse(s, p, problem === 'slope' ? 'Too steep to build there' : problem === 'foreign' ? "That's enemy land: only a Tower can be raised there" : problem === 'woods' ? `A snare needs ${SNARE.need} trees standing within ${SNARE.r} tiles` : problem === 'snares' ? `Too near another snare: keep them ${SNARE.apart} tiles apart` : problem === 'parched' ? `In the Age of Rivers a Farm is laid only by water: within ${RIVERS.wet} tiles of a channel, spring, lake or shore` : "Can't build there");
     return null;
   }
   const cost = raiseCost(s, p, type, tx, ty);
@@ -819,7 +819,7 @@ export function applyCommand(s: GameState, c: Command): void {
       }
       break;
     case 'build': {
-      if (c.type === 'wall' || c.type === 'dyke' || c.type === 'thornwall') return applyCommand(s, { t: 'wall', p: c.p, ids: c.ids, x0: c.tx, y0: c.ty, x1: c.tx, y1: c.ty, queue: c.queue, dyke: c.type === 'dyke' || undefined, thorn: c.type === 'thornwall' || undefined });
+      if (c.type === 'wall' || c.type === 'dyke' || c.type === 'thornwall' || c.type === 'channel') return applyCommand(s, { t: 'wall', p: c.p, ids: c.ids, x0: c.tx, y0: c.ty, x1: c.tx, y1: c.ty, queue: c.queue, dyke: c.type === 'dyke' || undefined, thorn: c.type === 'thornwall' || undefined, channel: c.type === 'channel' || undefined });
       const b = placeSite(s, c.p, c.type, c.tx, c.ty);
       if (!b) return;
       if (c.type === 'gate') {
@@ -831,8 +831,8 @@ export function applyCommand(s: GameState, c: Command): void {
       break;
     }
     case 'wall': {
-      // A line of wall, or of dykes (#701) or Thornwall (the Age of the Grove), laid the same way.
-      const type = c.dyke ? 'dyke' : c.thorn ? 'thornwall' : 'wall';
+      // A line of wall, or of dykes or a channel (#701) or Thornwall (the Age of the Grove), laid the same way.
+      const type = c.dyke ? 'dyke' : c.thorn ? 'thornwall' : c.channel ? 'channel' : 'wall';
       const tiles = wallLine(c.x0, c.y0, c.x1, c.y1);
       const placed: Building[] = [];
       for (let i = 0; i < tiles.length; i++) {

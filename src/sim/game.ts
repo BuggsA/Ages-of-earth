@@ -33,7 +33,7 @@ import { leaveRubble, salvageStep } from './salvage';
 import { cacheStep, dropOre, spillStore } from './caches';
 import { kegStep, millStep } from './powder';
 import { fireStep } from './fire';
-import { pumpStep } from './water';
+import { ditchStep, pumpStep } from './water';
 import { siloStep } from './silo';
 import { stockPosts } from './oretrade';
 import { sortieStep } from './sortie';
@@ -124,6 +124,8 @@ export function createGame(setup: GameSetup): GameState {
     res: map.res,
     amount: map.amount,
     block: map.block,
+    // Spring heads by the towns (#701 s1): where the Age of Rivers digs from on a dry map.
+    ...(map.springs.length ? { springs: [...map.springs] } : {}),
     bldAt: new Int32Array(n),
     gateTeam: new Int8Array(n).fill(-1),
     blockVersion: 0,
@@ -634,6 +636,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   millStep(s);
   kegStep(s);
   pumpStep(s);
+  ditchStep(s);
   siloStep(s);
   sortieStep(s);
   fairStep(s);
@@ -713,6 +716,8 @@ export function checksum(s: GameState): number {
   }
   // The water layer (#701): every tile pumped out, by where it lies.
   if (s.polder) for (let i = 0; i < s.polder.length; i++) if (s.polder[i]) mix(i);
+  if (s.channel) for (let i = 0; i < s.channel.length; i++) if (s.channel[i]) mix(i + 0x40000);
+  for (const t of s.springs ?? []) mix(t);
   for (const f of s.fallen ?? []) {
     mix(f.owner);
     mix(f.tx);
