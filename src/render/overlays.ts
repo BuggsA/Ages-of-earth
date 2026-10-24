@@ -306,17 +306,18 @@ export class Overlays {
     this.ghost.visible = true;
   }
 
-  /** Show a planned line of wall (an empty list hides it). */
-  setWallGhost(s: GameState, tiles: { x: number; y: number; ok: boolean }[], epoch: number, color: string, alongY: boolean): void {
-    const key = `${epoch}:${color}:${alongY ? 1 : 0}`;
+  /** Show a planned line of wall, or of dykes (#701) (an empty list hides it). */
+  setWallGhost(s: GameState, tiles: { x: number; y: number; ok: boolean }[], epoch: number, color: string, alongY: boolean, type: 'wall' | 'dyke' = 'wall'): void {
+    const key = `${type}:${epoch}:${color}:${alongY ? 1 : 0}`;
     if (key !== this.wallKey) {
       this.wallKey = key;
-      this.wallBody.geometry = buildingGeometry('wall', epoch, color, alongY ? 10 : 5);
+      this.wallBody.geometry = buildingGeometry(type, epoch, color, alongY ? 10 : 5);
     }
     const n = Math.min(tiles.length, 64);
     for (let i = 0; i < n; i++) {
       const t = tiles[i];
-      const hgt = heightAt(s, t.x + 0.5, t.y + 0.5);
+      // A dyke's ghost floats on the water it would stand in.
+      const hgt = type === 'dyke' ? Math.max(0.02, heightAt(s, t.x + 0.5, t.y + 0.5)) : heightAt(s, t.x + 0.5, t.y + 0.5);
       this.m.compose(this.p.set(t.x + 0.5, hgt + 0.04, t.y + 0.5), this.q.identity(), this.sc.set(0.96, 1, 0.96));
       this.wallPads.setMatrixAt(i, this.m);
       this.wallPads.setColorAt(i, this.c.set(t.ok ? '#5cff7a' : '#ff5050'));
