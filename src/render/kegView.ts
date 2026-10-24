@@ -23,6 +23,9 @@ function kegGeometry(): THREE.BufferGeometry {
   fuse.rotation.z = -0.5;
   k.octa(0.045, '#ffd34a', 0.1, 0.6, 0);
   k.octa(0.025, '#fff6c8', 0.11, 0.62, 0.01);
+  // A pennant of the layer's colour on a pale pole, so a keg reads from afar and says whose it is.
+  k.cyl(0.012, 0.012, 0.9, 4, '#e8dcc0', -0.2, 0, 0);
+  k.team(k.box(0.3, 0.17, 0.02, '#ffffff', -0.05, 0.72, 0));
   return bake(k.root);
 }
 
@@ -33,6 +36,7 @@ export class KegView {
   private q = new THREE.Quaternion();
   private p = new THREE.Vector3();
   private sc = new THREE.Vector3();
+  private c = new THREE.Color();
   private up = new THREE.Vector3(0, 1, 0);
 
   private ensure(n: number): THREE.InstancedMesh {
@@ -61,7 +65,8 @@ export class KegView {
       const shake = left < 3 ? Math.sin(s.tick * 2.3 + k.id) * 0.04 * (3 - left) : 0;
       this.q.setFromAxisAngle(this.up, (k.id % 8) * (Math.PI / 4) + shake);
       this.p.set(k.x + shake * 0.3, heightAt(s, k.x, k.y), k.y);
-      this.m.compose(this.p, this.q, this.sc.setScalar(1.2));
+      this.m.compose(this.p, this.q, this.sc.setScalar(1.5));
+      mesh.setColorAt(a, this.c.set(s.players[k.owner].color));
       mesh.setMatrixAt(a++, this.m);
     }
     for (const u of carried) {
@@ -71,10 +76,12 @@ export class KegView {
       this.q.setFromAxisAngle(this.up, Math.atan2(u.fx, u.fy));
       this.p.set(at.x - u.fy * 0.12, at.y + 0.74 * UNIT_SCALE, at.z + u.fx * 0.12);
       this.m.compose(this.p, this.q, this.sc.setScalar(0.5 * UNIT_SCALE));
+      mesh.setColorAt(a, this.c.set(s.players[u.owner].color));
       mesh.setMatrixAt(a++, this.m);
     }
     mesh.count = a;
     mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }
 
   clear(): void {

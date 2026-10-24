@@ -34,6 +34,9 @@ function cacheGeometry(ore: RareId): THREE.BufferGeometry {
       m.rotation.z = (i % 3) * 0.3 - 0.3;
     } else k.rock(r, c, x, r * 0.6, z);
   });
+  // A stake with a pale flag: a spill is small and ore is pale or dark, so the mark is what the eye finds.
+  k.cyl(0.012, 0.012, 0.75, 4, '#e8dcc0', -0.3, 0, 0.12);
+  k.box(0.26, 0.15, 0.02, '#f2c94a', -0.17, 0.6, 0.12);
   return bake(k.root);
 }
 
@@ -72,7 +75,7 @@ export class CacheView {
         if (c.ore !== ore || !sees(c.x, c.y)) continue;
         this.q.setFromAxisAngle(this.up, (c.id % 8) * (Math.PI / 4));
         this.p.set(c.x, heightAt(s, c.x, c.y), c.y);
-        this.m.compose(this.p, this.q, this.sc.setScalar(1.1 + Math.min(c.n, 60) / 80));
+        this.m.compose(this.p, this.q, this.sc.setScalar(1.3 + Math.min(c.n, 60) / 80));
         mesh.setMatrixAt(a++, this.m);
       }
       for (const u of held) {
