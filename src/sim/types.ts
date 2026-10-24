@@ -501,6 +501,18 @@ export interface Launch {
   x: number;
   y: number;
   at: number;
+  /**
+   * What each rival team is shown (#762), drawn at launch and frozen: three ring centres (the real zone and two decoys, in a shuffled
+   * order), each blurred off its point, and which of them is real. Absent in older saves (the rivals see the true point).
+   */
+  warn?: Warning[];
+}
+
+/** One rival team's warning of a launch (#762, `silo.ts`): the rings it sees, and the index of the real one. */
+export interface Warning {
+  team: number;
+  rings: { x: number; y: number }[];
+  real: number;
 }
 
 /** A blast that lifts the fog for every player over `r` tiles of (`x`, `y`) until tick `until` (#752, `silo.ts`, `vision.ts`). */
@@ -951,8 +963,11 @@ export type GameEvent =
   | { k: 'keg'; owner: number; x: number; y: number; what: 'ground' | 'laid' | 'blown' | 'doused' | 'drowned'; by?: number }
   /** Fire (`fire.ts`): `lit` by a torch or spreading (`tree` when a tree; `owner` the building's), `out` (beaten out), `ash` (a tree burnt down), `root` (a Thornwall root burnt). `by` set the first flame. */
   | { k: 'fire'; what: 'lit' | 'out' | 'ash' | 'root'; x: number; y: number; by: number; owner?: number; torch?: boolean; tree?: boolean }
-  /** A Missile Silo's warhead (#605): `launched` (the clock starts), `scrubbed` (the silo fell) or `struck`. */
-  | { k: 'silo'; owner: number; x: number; y: number; what: 'launched' | 'scrubbed' | 'struck'; fuse?: number; w?: 'atomic' | 'fission' | 'fusion'; ring?: number }
+  /**
+   * A Missile Silo's warhead (#605): `launched` (the clock starts), `revealed` (3 s left: the decoys vanish, #762), `scrubbed` (the silo
+   * fell) or `struck`. Before it strikes, (`x`, `y`) is the attacker's own aim: a rival's screen reads its rings from launch `id` (`ringsFor`).
+   */
+  | { k: 'silo'; owner: number; x: number; y: number; what: 'launched' | 'revealed' | 'scrubbed' | 'struck'; id?: number; fuse?: number; w?: 'atomic' | 'fission' | 'fusion'; ring?: number }
   /** A trader bought a load of rare ore at a post (#573). */
   | { k: 'oreBuy'; owner: number; ore: RareId; n: number; gold: number; x: number; y: number }
   | { k: 'ruin'; id: number; owner: number; find: RuinFind; tech?: TechId; x: number; y: number }
