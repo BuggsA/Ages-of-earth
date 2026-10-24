@@ -9,6 +9,7 @@ import { looted, pack } from './spoils';
 import { raided } from './household';
 import { alarm } from './flee';
 import { distToRect } from './grid';
+import { envenom } from './hive';
 import type { Spatial } from './spatial';
 import { gunPower, gunRange, modsOf, statsFor } from './stats';
 import type { Animal, Building, Ent, GameState, Shot, Unit } from './types';
@@ -16,7 +17,7 @@ import { canHit, isEnemy, radiusOf, statsOf } from './world';
 
 /** Blows, shots, towers, the damage triangle, splash and the hunt. */
 
-const SHOT_SPEED: Record<Shot['kind'], number> = { stone: 10, arrow: 13, bolt: 15, bullet: 32, spear: 9, boulder: 8, ball: 20, bomb: 6 };
+const SHOT_SPEED: Record<Shot['kind'], number> = { stone: 10, arrow: 13, bolt: 15, bullet: 32, spear: 9, boulder: 8, ball: 20, bomb: 6, dart: 16 };
 
 /** Whether a peace treaty still holds (no fighting between players). */
 export const peace = (s: GameState) => s.tick < s.peaceUntil;
@@ -39,7 +40,7 @@ export function damageOf(s: GameState, attacker: Unit | null, st: UnitStats, tar
   const inspired = (attacker && s.tick - attacker.aura < 5 ? AURA.attack : 1) * (attacker && rankOf(attacker) ? VETERANCY.attack[rankOf(attacker) - 1] : 1) * (attacker && stirred(s, attacker) ? RALLY.attack : 1) * hemoBlow(s, attacker);
   if (target.kind === 'building') {
     // Walls shrug off all but siege and heavy blows.
-    const wall = target.type === 'wall' || target.type === 'gate' || target.type === 'dyke' ? (st.cls === 'siege' ? 1.2 : st.cls === 'infantry' || st.cls === 'hero' ? 0.5 : 0.15) : 1;
+    const wall = target.type === 'wall' || target.type === 'gate' || target.type === 'dyke' || target.type === 'sluice' ? (st.cls === 'siege' ? 1.2 : st.cls === 'infantry' || st.cls === 'hero' ? 0.5 : 0.15) : 1;
     return Math.max(1, st.attack * BONUS[st.cls].building * inspired * wall);
   }
   const ts = statsOf(s, target);
@@ -228,6 +229,8 @@ export function updateShots(s: GameState, sp: Spatial, hitAnimal: (a: Animal, da
     }
     const shooter = sh.src ? s.byId.get(sh.src) : undefined;
     if (t && t.hp > 0) hurt(s, t, sh.damage, sh.owner, null, shooter && shooter.kind === 'unit' ? shooter : null);
+    // A Blowpipe Hunter's dart leaves venom in what it hits (the Age of the Hive).
+    if (sh.kind === 'dart' && t && t.kind === 'unit' && t.hp > 0) envenom(s, t, sh.owner);
     if (sh.splash > 0) {
       s.events.push({ k: 'splash', x: sh.tx, y: sh.ty, owner: sh.owner, kind: sh.kind });
       const st = sh.from ? statsFor(s, sh.owner, sh.from) : null;

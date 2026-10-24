@@ -17,7 +17,11 @@ export type UnitType =
   /** A packed Town Center or House on the move (the Age of the Steppe, #297). */
   | 'wagon'
   /** Beasts of the Age of the Wild (`docs/wild-road.md`): tamed from the wild, or bred at a Beast Den once a kind is tamed. */
-  | 'warwolf' | 'tusker' | 'warmammoth';
+  | 'warwolf' | 'tusker' | 'warmammoth'
+  /** The Age of the Water Line (#701 s4): a flat boat with a gun in its bow, that sails the flood and the channels as well as the sea. */
+  | 'barge'
+  /** The Age of the Hive (`docs/wild-road.md` §3, `hive.ts`): venom darts at the Archery Range, and the Den's Cave Bear. */
+  | 'blowpipe' | 'cavebear';
 /** How a unit gets about: on foot, on the water, or in the air. */
 export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
@@ -25,8 +29,12 @@ export type BuildingType =
   | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai' | 'drainrig' | 'transfusion' | 'bloodtower' | 'snare' | 'prospector' | 'mission' | 'silo' | 'sapling' | 'shaft' | 'dyke' | 'windmill' | 'den'
   /** The Age of the Grove (`docs/wild-road.md`, `grove.ts`): a wall that grows, a one-tile garden, fruit trees. */
   | 'thornwall' | 'garden' | 'orchard'
+  /** The Age of the Hive (`docs/wild-road.md` §3, `hive.ts`): a skep of bees set among the trees. */
+  | 'hive'
   /** The Age of Rivers (#701): a ditch dug from the water, which fills and is gone. */
   | 'channel'
+  /** The Age of the Water Line (#701 s4): a gate in a dyke that lets the water out over the low ground, and back. */
+  | 'sluice'
   /** The Age of Tides (#739): a raised road over the flats, which becomes tidal ground and is gone; a mill that grinds on the running tide. */
   | 'causeway' | 'tidemill';
 /** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
@@ -48,7 +56,7 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'chart' | 'assay' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'tides';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
 export type PathId = 'blood' | 'steppe' | 'hemocraft' | 'rite';
@@ -268,6 +276,13 @@ export interface Unit {
   merc?: number;
   /** Cursed by a Blood-rite priest (#355 s4): the tick the curse lifts. Until then every blow on it lands harder (`RITE.taken`). */
   cursed?: number;
+  /**
+   * The Age of the Hive (`hive.ts`): venom in it from Blowpipe darts, `n` doses deep (each one a sting a second, past armour),
+   * until tick `end`, set by player `by`. Absent: none.
+   */
+  venom?: { n: number; end: number; by: number };
+  /** Stung by a Hive's swarm (`hive.ts`): the tick the stings wear off, until when it walks slow. Absent: never stung. */
+  stung?: number;
 }
 
 export interface TrainItem {
@@ -323,10 +338,14 @@ export interface Building {
   grub?: boolean;
   /** Burnt down (`fire.ts`): a Thornwall that burns leaves no root. */
   burnt?: boolean;
+  /** A Hive smoked quiet by a fire near it (`hive.ts`): the tick its bees wake again. Absent: never smoked. */
+  smoked?: number;
   /** A Windmill (#701): the tick it last pumped a tile dry, so its sails show it at work. Absent: it never has. */
   pumped?: number;
   /** A Tide Mill (#739): the tick it last ground on the running tide, so its wheel shows it at work. Absent: it never has. */
   milled?: number;
+  /** A Sluice (#701 s4): standing open, letting the water out over the low ground behind it. Absent: shut. */
+  open?: boolean;
   /** Where new units go. `kind` is the resource the flag was set on (absent on bare ground), so it outlives its tile (#344). */
   rally: { x: number; y: number; tile: number; kind?: number } | null;
   cool: number;
@@ -635,7 +654,7 @@ export interface Animal {
 export interface Shot {
   id: number;
   owner: number;
-  kind: 'stone' | 'arrow' | 'bolt' | 'bullet' | 'spear' | 'boulder' | 'ball' | 'bomb';
+  kind: 'stone' | 'arrow' | 'bolt' | 'bullet' | 'spear' | 'boulder' | 'ball' | 'bomb' | 'dart';
   /** Where it was loosed from, and the target it flies at. */
   x0: number;
   y0: number;
@@ -699,6 +718,10 @@ export interface PlayerStats {
   tamed?: number;
   /** Beasts reared at a Beast Den (the Age of the Grove's deed); absent in older saves. */
   bred?: number;
+  /** Food brought in from Kitchen Gardens (the Age of the Hive's deed); absent in older saves. */
+  gardened?: number;
+  /** Honey and mead a people's Hives paid in, as food and gold (the Age of the Hive); absent in older saves. */
+  honey?: number;
   /** Food taken from snares (#485); absent in older saves. */
   snared?: number;
   /** Gold taken as tribute by riders standing in rivals' land (#318); absent in older saves. */
@@ -766,6 +789,15 @@ export interface HistoryPoint {
 /** The cards of tidings that come to the fire in the Stone Age (#443). */
 export type TidingId = 'traveller' | 'hunter' | 'tale' | 'storm' | 'fever';
 
+/** One change of age (#743). `lost` counts what the people lost inside the weak window after a step back (`STEP_BACK.time`). */
+export interface JourneyLeg {
+  tick: number;
+  from: AgeId;
+  to: AgeId;
+  back?: true;
+  lost?: number;
+}
+
 export interface Player {
   id: number;
   name: string;
@@ -821,6 +853,8 @@ export interface Player {
   told?: TidingId[];
   /** Tick its last step back (#47) landed, for the cooldown; absent if it never stepped back. */
   backAt?: number;
+  /** Every change of age, in order (#743): the end screen draws the road walked from it. Absent before the first (and in older saves). */
+  journey?: JourneyLeg[];
   /** The tick the people's Golden Age began (#703); gone once it ends. */
   goldenAt?: number;
   techs: TechId[];
@@ -862,6 +896,11 @@ export type GameEvent =
   | { k: 'tamed'; owner: number; kind: Animal['kind']; x: number; y: number }
   /** A fallen Thornwall sprouts again from its root (the Age of the Grove). */
   | { k: 'sprout'; owner: number; x: number; y: number }
+  /**
+   * The Age of the Hive (`hive.ts`): a Hive's bees `what`: `swarm` on a rival unit in its woods (the unit `target`), `smoked` quiet by
+   * a fire, `wake` again after smoke or winter.
+   */
+  | { k: 'hive'; what: 'swarm' | 'smoked' | 'wake'; id: number; owner: number; x: number; y: number; target?: number }
   /** A mammoth gores, or a wolf bites, someone. */
   | { k: 'wildStrike'; id: number; kind: Animal['kind']; target: number; x: number; y: number }
   /** A raider camp (own pitch) stands empty: whose people cleared it, and the plunder they took. */
@@ -916,6 +955,10 @@ export type GameEvent =
   | { k: 'drained'; owner: number; mill: number; tile: number; x: number; y: number }
   /** Water ran into a dug ditch (#701, the Age of Rivers): `tile` is the new channel. */
   | { k: 'dug'; owner: number; tile: number; x: number; y: number }
+  /** The Water Line (#701 s4): an open sluice of `owner`'s let the water over a tile of low ground (`wet`), or the water left it again. */
+  | { k: 'inundated'; owner: number; tile: number; x: number; y: number; wet: boolean }
+  /** A sluice was opened or shut (#701 s4). */
+  | { k: 'sluice'; owner: number; id: number; open: boolean; x: number; y: number }
   /** The sea ran back into a tile of polder (#701 s3, the breach): `owner` holds the land there (-1: no one), `drowned` the buildings it took. */
   | { k: 'flooded'; owner: number; tile: number; x: number; y: number; drowned: number }
   /** The tide turned to a new level (#739): `level` 0 is low water, `TIDE.flats.length` high; `rising` while it floods. `bared` tiles came out, `covered` went under. */
@@ -1067,6 +1110,13 @@ export interface GameState {
   tideFrom?: number;
   /** Tiles the tide has bared or covered, all told (#739): a cheap test for the renderer that the shore moved. */
   tideTurns?: number;
+  /**
+   * The Water Line (#701 s4): per tile, where an open sluice let the water out over low ground (now `T_WATER`, waded and not walked dry,
+   * no `B_TERRAIN`): 1 + the terrain it had, to give back when the water goes. Absent until the first sluice opens (and in older saves).
+   */
+  inund?: Uint8Array;
+  /** Tiles the sluices have flooded or given back, all told (#701 s4): a cheap test for the renderer that the water moved. */
+  inundated?: number;
   players: Player[];
   /** Every unit and building, in the order they were made (ids rise). */
   ents: Ent[];
@@ -1202,6 +1252,11 @@ export interface AiMemory {
    * Ages for the road's Dock, and since when it has stood in the Age of Dykes.
    */
   dyke?: { plan: DykePlan | null; looked?: boolean; hold?: number; since?: number; /** Its line once stood whole (#701 s3): from then on a gap in it is a breach to mend, in any age. */ raised?: boolean };
+  /**
+   * The Water Line (#701 s4): since when it has stood in the age, where it means its sluice to go (null: nowhere, once looked), and the
+   * tick an enemy army last stood by the sluice.
+   */
+  line?: { since: number; spot?: { tx: number; ty: number } | null; alarm?: number };
   /** The Age of Rivers (#701): the channel it means to dig from water past home (null: none), found when deciding and again on arrival (`fresh`). */
   river?: { plan: ChannelPlan | null; looked?: boolean; fresh?: boolean };
   /** The first crossing (#585): the age it stands in on the way to the Sea-Raiders, and since when (each sibling, and the age itself). */
@@ -1243,6 +1298,8 @@ export interface AiMemory {
   wild?: number;
   /** The tick it entered the Age of the Grove, kept while it plants there (`GROVE.aiStay`). */
   grove?: number;
+  /** The tick it entered the Age of the Hive, kept while it sets its Hives there (`HIVE.aiStay`). */
+  hive?: number;
   steppe?: { band?: number[]; at?: { x: number; y: number }; out?: number; recalled?: number; horde?: number; since?: number; struck?: number; /** When a nomad flock (#501) was first seen grazed out, this time. */ starved?: number; pack?: { x: number; y: number; at: number }; to?: { x: number; y: number; at: number }; from?: { x: number; y: number } };
 }
 
@@ -1283,7 +1340,7 @@ export type Command =
   | { t: 'seam'; p: number; building: number; seam: SeamId }
   /** Call citizens to arms at a War Camp in the Age of Total War (#313): up to `n`, the nearest first. */
   | { t: 'callUp'; p: number; building: number; n?: number }
-  /** Strike camp (#297): pack a Town Center or House onto a wagon. */
+  /** Strike camp (#297): pack a Town Center or House onto a wagon. At a Sluice (#701 s4) it opens or shuts the gate instead. */
   | { t: 'pack'; p: number; building: number }
   /** Pitch camp (#297): wagons set down the building they carry where they stand. */
   | { t: 'pitch'; p: number; ids: number[] }

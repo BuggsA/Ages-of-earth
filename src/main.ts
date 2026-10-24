@@ -17,14 +17,15 @@ import { carriesTorch, torchProblem } from './sim/fire';
 import { launchProblem } from './sim/silo';
 import { jumpAge, rush, topUp } from './sim/god';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
-import { placeProblem, walkable } from './sim/grid';
+import { placeProblem, stampBuilding, walkable } from './sim/grid';
 import { findDockSpot, findSpot, millSpotFor } from './sim/ai';
-import { channelPlan, dykePlan, heldBack } from './sim/water';
+import { channelPlan, dig, dykePlan, heldBack, waterLine } from './sim/water';
 import { bared, tideMillSpot, wakeTide } from './sim/tides';
 import { maxHp, placeBuilding, restat, spawnUnit } from './sim/world';
 import { arrivalText, epochArrivals } from './ui/endReport';
+import { journeyHtml } from './ui/journeyReport';
 import type { AgeId, Building, BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, HomelandId, MapSize, MapType, Unit, UnitType } from './sim/types';
-import { KEYS, R_FISH, R_NONE, RES } from './sim/types';
+import { KEYS, R_FISH, R_NONE, RES, T_WATER } from './sim/types';
 import { carriedBy, relicAt } from './sim/relics';
 import { RUIN_FINDS, ruinAt } from './sim/ruins';
 import { salvages } from './sim/salvage';
@@ -51,6 +52,7 @@ import { ScoutFlags } from './ui/scoutFlags';
 import { briefingHtml, chapterListHtml, recordStars, starRow, syncProgress } from './ui/campaignUi';
 import { Lobby } from './ui/lobby';
 import { Hud, nameOf, planLines } from './ui/hud';
+import { RivalLedger, RivalPanel } from './ui/rivalRoad';
 import { RoadPlanner, loadPlannerPrefs, savePlannerPrefs } from './ui/roadPlanner';
 import { Minimap } from './ui/minimap';
 import { BattleTide } from './ui/battleTide';
@@ -113,6 +115,8 @@ let launchSilo = 0;
 let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | 'keg' | 'torch' | 'launch' | null = null;
 /** When the viewer was last told one of its living buildings caught fire, so a spreading fire tells once. */
 let fireToldAt = -9999;
+/** When a swarm on your people was last told (the Age of the Hive), so a fight in the woods tells it once. */
+let hiveToldAt = -9999;
 let paused = false;
 const SPEEDS = [1, 1.5, 2, 3];
 let speedIdx = 0;
@@ -121,6 +125,8 @@ const cameraBookmarks = new CameraBookmarks();
 const scoutFlags = new ScoutFlags();
 let lastGroupKey = { key: -1, at: 0 };
 let lastAlert: { x: number; y: number } | null = null;
+/** When a rival's sluice was last told (#701 s4), so a Water Line is told once in a while, not every time it opens. */
+let sluiceToldAt = -Infinity;
 /** When the sea last broke into the viewer's polder (#701 s3), so a flood is told once, not for every tile. */
 let floodToldAt = -99999;
 /** The tide (#739): whether its waking was told, and when the viewer's people were last told they were swept off the flats. */
@@ -144,6 +150,8 @@ let titleClock = 16;
 let lastSetup: GameSetup | null = null;
 
 let planner: RoadPlanner | null = null;
+const rivalLedger = new RivalLedger();
+let rivalPanel: RivalPanel | null = null;
 const hud = new Hud({
   issue: (c) => issue(c),
   place: (type) => {
@@ -2388,11 +2396,12 @@ function showEnd(s: GameState, won: boolean, how: EndHow = 'conquest', again = f
     ${extra}
     <div class="chart-tabs">${(Object.keys(METRICS) as Metric[]).map((k) => `<button class="tab ${k === 'score' ? 'on' : ''}" data-metric="${k}">${METRICS[k]}</button>`).join('')}</div>
     <div id="chart">${timeline(s, 'score')}</div>
+    ${journeyHtml(s, viewer, lastEnd?.tick ?? s.tick)}
     <table class="end-stats"><tr><th></th><th>Score</th><th>Epoch</th><th>Gathered</th><th>Traded</th><th>Trained</th><th>Built</th><th>Techs</th><th>Kills</th><th>Lost</th></tr>${rows}</table>
     <div class="row">
       <button class="btn wide" data-act="watch">Look around</button>
       <button class="btn wide" data-act="replay-save">Download the replay</button>
-      ${sc ? (won && nextCh ? `<button class="btn wide primary" data-act="camp-next" data-id="${sc.id}">Next chapter: ${nextCh.title}</button>` : '') + '<button class="btn wide' + (won && nextCh ? '' : ' primary') + '" data-act="restart">Play the chapter again</button>' : online ? '' : '<button class="btn wide primary" data-act="new-map">Play again</button>'}
+      ${sc ? (won && nextCh ? `<button class="btn wide primary" data-act="camp-next" data-id="${sc.id}">Next chapter: ${nextCh.title}</button>` : '') + '<button class="btn wide' + (won && nextCh ? '' : ' primary') + '" data-act="restart">Play the chapter again</button>' : online ? '' : '<button class="btn wide" data-act="restart" title="The same map, peoples and rivals">Play this seed again</button><button class="btn wide primary" data-act="new-map">Play again</button>'}
       <button class="btn wide" data-act="quit">Quit to title</button>
     </div></div>`;
   m.querySelector('.chart-tabs')!.addEventListener('click', (e) => {
@@ -2446,7 +2455,11 @@ function onEvents(s: GameState, list: GameEvent[]): void {
             if (opened.length) setTimeout(() => play('heirloom'), 900);
             for (const t of opened) hud.toast(`${TECHS[t].icon} An heirloom opens: ${TECHS[t].name}, at the ${BUILDINGS[TECHS[t].at].name}`, 'good');
           }
-        } else hud.toast(`${s.players[ev.owner].name} has ${ev.back ? 'stepped back to' : 'reached'} the ${ageName(ev)}`, 'info');
+        } else {
+          // A rival's road (#726): remembered, and a click on the notice opens its card.
+          if (ev.age) rivalLedger.note(ev.owner, ev.age, !!ev.back, s.tick);
+          hud.toast(`${s.players[ev.owner].name} has ${ev.back ? 'stepped back to' : 'reached'} the ${ageName(ev)}${ev.back ? ': a chance to strike' : ''} (click to read)`, 'info', () => rivalPanel?.show(true));
+        }
         break;
       case 'wages':
         if (ev.owner === viewer) {
@@ -2495,6 +2508,14 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           sweptToldAt = s.tick;
           lastAlert = { x: ev.x, y: ev.y };
           hud.toast(ev.drowned ? '🌊 The tide took some of your people, caught far out on the flats. (Space to look)' : '🌊 The tide swept some of your people off the flats, hurt. (Space to look)', 'bad');
+        }
+        break;
+      case 'sluice':
+        // The Water Line (#701 s4): a rival's sluice opened where the viewer can see it, said once in a while.
+        if (ev.open && ev.owner !== viewer && view.sees(ev.x, ev.y) && s.tick - sluiceToldAt > TICK_HZ * 30) {
+          sluiceToldAt = s.tick;
+          lastAlert = { x: ev.x, y: ev.y };
+          hud.toast(`${s.players[ev.owner].name} has opened a sluice: the low ground round it is going under water. Soldiers wade it at a crawl and siege bogs down; go round, or wait for it to drain. (Space to look)`, 'alert');
         }
         break;
       case 'flooded':
@@ -2862,6 +2883,15 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         } else if (ev.what === 'out' && ev.owner === viewer) hud.toast('The fire is beaten out', 'good');
         else if (ev.what === 'root' && ev.owner === viewer) hud.toast('Fire took a Thornwall root: it will not grow again', 'bad');
         break;
+      case 'hive': {
+        // The Age of the Hive: told once in a while when a swarm finds your people in a rival's woods, and when your Hive is smoked quiet.
+        const victim = ev.what === 'swarm' ? s.byId.get(ev.target ?? 0) : undefined;
+        if (victim && victim.owner === viewer && s.tick - hiveToldAt > 20 * TICK_HZ) {
+          hiveToldAt = s.tick;
+          hud.toast(`Bees! ${s.players[ev.owner]?.name ?? 'A rival'}'s Hive swarms your people in its woods: keep out of the trees there, or smoke it quiet with a fire`, 'alert');
+        } else if (ev.what === 'smoked' && ev.owner === viewer) hud.toast('Smoke has quieted one of your Hives: its bees will wake when it clears', 'alert');
+        break;
+      }
       case 'silo':
         // The Atomic Age (#605): the clock is public, so every player is told when a warhead goes up and where it will land.
         if (ev.what === 'launched') {
@@ -3048,6 +3078,11 @@ function refreshHud(): void {
   recordDiscovery(game);
   planner ??= new RoadPlanner($('roads-btn'), $('roads-panel'), (st, v, to, back) => planLines(st, st.players[v], to, back));
   planner.update(game, viewer, discovery ?? loadDiscovery());
+  rivalPanel ??= new RivalPanel($('rivals-btn'), $('rivals-panel'), rivalLedger);
+  for (const k of rivalLedger.scan(game, viewer, (x, y) => view.sees(x, y))) {
+    hud.toast(`🏺 You see ${game.players[k.owner].name}'s ${BUILDINGS[(game.ents.find((e) => e.id === k.id) as { type: keyof typeof BUILDINGS }).type].name}: they have walked the ${AGES[k.age].name}`, 'info', () => rivalPanel?.show(true));
+  }
+  rivalPanel.update(game, viewer);
   hud.update(game, viewer, [...selection], SPEEDS[speedIdx], selectedTile, selectedRelic, selectedPost, selectedRuin !== null ? { id: selectedRuin, dug: view.ruins.dugAsSeen(selectedRuin) } : null, selectedLandmark !== null ? { id: selectedLandmark, keeper: view.landmarks.keeperAsSeen(selectedLandmark) } : null);
 }
 
@@ -3274,7 +3309,7 @@ function frame(now: number): void {
       mapTimer -= dt;
       if (mapTimer <= 0) {
         mapTimer = 0.2;
-        minimap.draw(s, viewer, mode === 'over' || !!watching?.all || (spectating && spectateAll), [...view.knownBuildings()], view.rig.footprint(), selection, scoutFlags.all);
+        minimap.draw(s, viewer, mode === 'over' || !!watching?.all || (spectating && spectateAll), [...view.knownBuildings()], view.rig.footprint(), selection, scoutFlags.all, rivalLedger.keepsakes());
       }
       cursorTimer -= dt;
       if (cursorTimer <= 0) {
@@ -3395,6 +3430,47 @@ function frame(now: number): void {
     for (const t of plan.tiles) placeBuilding(s, owner, 'channel', t % s.w, Math.floor(t / s.w), true);
     view.rig.focus(plan.from.x, plan.from.y);
     return plan.tiles.length;
+  },
+  /**
+   * The Water Line (testing, #701 s4): turn a player to the age and open, finished, a sluice: in the middle of its dyke line if it has
+   * one (`ages.dykes` first), else on the channel the computer would dig by its start (dug at once). Returns how many tiles its water
+   * reaches, or 0 where there is nowhere to set one.
+   */
+  waterline(owner: number) {
+    if (!game) return 0;
+    const s = game;
+    const p = s.players[owner];
+    restat(s, p, () => {
+      p.epoch = AGES.waterline.tier;
+      p.age = 'waterline';
+      p.walked = [...new Set([...(p.walked ?? []), 'dykes' as const, 'waterline' as const])];
+    });
+    const line = s.ents.filter((e): e is Building => e.kind === 'building' && e.type === 'dyke' && e.owner === owner && e.built && e.hp > 0 && s.terrain[e.ty * s.w + e.tx] === T_WATER);
+    let at = -1;
+    if (line.length) {
+      // The dyke whose sluice would flood the most.
+      let most = -1;
+      for (const d of line) {
+        const n = waterLine(s, d).length;
+        if (n > most) {
+          most = n;
+          at = d.ty * s.w + d.tx;
+        }
+      }
+      const d = s.byId.get(s.bldAt[at]) as Building;
+      stampBuilding(s, d, false);
+      s.byId.delete(d.id);
+      s.ents = s.ents.filter((e) => e !== d);
+    } else {
+      const plan = channelPlan(s, p.startX, p.startY, AI_RIVERS, wallLine, (x, y) => !placeProblem(s, 'channel', x, y));
+      if (!plan) return 0;
+      for (const t of plan.tiles) dig(s, t, owner);
+      at = plan.tiles.reduce((a, t) => (waterLine(s, { tx: t % s.w, ty: Math.floor(t / s.w) }).length > waterLine(s, { tx: a % s.w, ty: Math.floor(a / s.w) }).length ? t : a));
+    }
+    const b = placeBuilding(s, owner, 'sluice', at % s.w, Math.floor(at / s.w), true);
+    b.open = true;
+    view.rig.focus(b.x, b.y);
+    return waterLine(s, b).length;
   },
   /**
    * The Age of Tides (testing, #739): turn a player to the age (the tide wakes on the next tick), stock it, and raise, finished, a Tide

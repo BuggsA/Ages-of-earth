@@ -1,7 +1,7 @@
 import { AGES, TIDE, domainOf, secs } from './data';
 import { ageDef, ageOf, asleep } from './ages';
 import { stampBuilding, walkable } from './grid';
-import { isChannel, isPolder, seaAt } from './water';
+import { isChannel, isInund, isPolder, seaAt } from './water';
 import type { Building, GameState, Unit } from './types';
 import { B_TERRAIN, R_NONE, T_SAND, T_WATER } from './types';
 
@@ -98,8 +98,8 @@ function levelFor(depth: number): number {
   return k;
 }
 
-/** Whether nothing on a tile keeps the tide off it: no building or site, no polder or channel, no shoal. */
-const free = (s: GameState, i: number): boolean => s.bldAt[i] === 0 && s.res[i] === R_NONE && !isPolder(s, i) && !isChannel(s, i);
+/** Whether nothing on a tile keeps the tide off it: no building or site, no polder, channel or sluice's flood (#701 s4), no shoal. */
+const free = (s: GameState, i: number): boolean => s.bldAt[i] === 0 && s.res[i] === R_NONE && !isPolder(s, i) && !isChannel(s, i) && !isInund(s, i);
 
 /**
  * Wake the tide (#739): lay out the tidal ground and start the clock at high water. Called once, the tick the first people stands in the
@@ -236,7 +236,7 @@ export function causewaySpot(s: GameState, tx: number, ty: number): 'deep' | 'dr
   const i = ty * s.w + tx;
   if (isCauseway(s, i)) return 'dry';
   if (isTidal(s, i)) return null;
-  if (s.terrain[i] !== T_WATER || isChannel(s, i)) return 'dry';
+  if (s.terrain[i] !== T_WATER || isChannel(s, i) || isInund(s, i)) return 'dry';
   if (bedDepth(s, i) < TIDE.causeway) return 'deep';
   return seaAt(s, i) ? null : 'dry';
 }

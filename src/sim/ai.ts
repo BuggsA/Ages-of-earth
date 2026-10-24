@@ -5,11 +5,11 @@ import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable 
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, raiseProblem, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Rubble, Ruin, TechId, TradePost, Unit, UnitType } from './types';
-import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
-import { backProblem, backTo, ageDef, ageOf, asleep, barred, buildBarred, crossingLeft, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadProblem, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
+import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE, T_WATER } from './types';
+import { backProblem, backTo, ageDef, ageOf, asleep, barred, buildBarred, crossingLeft, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, trainsAt, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadProblem, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
 import { grindersOf, kegsOf, millProblem, mills, sappers } from './powder';
 import { beatersAt, burns, onFire } from './fire';
-import { basinOf, channelPlan, coastHeld, dykePlan, heldBack, isChannel, isPolder, polderField, type ChannelPlan, type DykePlan } from './water';
+import { basinOf, channelPlan, coastHeld, dykePlan, heldBack, isChannel, isInund, isPolder, polderField, sluiceFed, sluiceProblem, waterLine, type ChannelPlan, type DykePlan } from './water';
 import { coveredNext, shoreNear, tideClock, tideMillSpot } from './tides';
 import { wallLine } from './commands';
 import { launchProblem, loaded, rulesOf, silosOf } from './silo';
@@ -31,7 +31,7 @@ import { graftCost, stationsOf, waiting } from './hemo';
 import { borderMap, landOwnerAt, suppliedAt } from './borders';
 import { workProblem } from './works';
 import { aiKin, aiVow, aiWay, wayBarred } from './ways';
-import { AI_TOWER_KEEP, AI_TOWER_PEACE, AI_WAYS, AI_KEG, AI_DYKE, AI_RIVERS, AI_TIDES, KEG, KILL_CAMP, KIN, POLDER, TOWER_LEVELS, WAYS } from './data';
+import { AI_TOWER_KEEP, AI_TOWER_PEACE, AI_WAYS, AI_KEG, AI_DYKE, AI_RIVERS, AI_WATERLINE, KEG, KILL_CAMP, KIN, POLDER, TOWER_LEVELS, WAYS, AI_TIDES } from './data';
 import { beaconProblem, lit } from './beacon';
 import { rallyProblem } from './rally';
 import { consecrateProblem, consecrates } from './consecrate';
@@ -43,7 +43,7 @@ import { isCoppice } from './coppice';
 import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
-import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS } from './data';
+import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
@@ -52,6 +52,7 @@ import { flockCap, flockOf, grassy, grazeRange, milkable } from './flocks';
 import { progress, scenarioById } from './campaign';
 import { tames, wildBeast } from './tame';
 import { grows } from './grove';
+import { keepsBees } from './hive';
 
 /**
  * The computer opponent. It plays by the same rules and through the same commands as a person: it
@@ -223,7 +224,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
     if (e.kind === 'unit' && s.kings[p.id] === e.id) king = e;
     else if (e.kind === 'unit') {
       const list =
-        e.type === 'citizen' ? citizens : e.type === 'wagon' ? wagons : e.type === 'priest' ? priests : e.type === 'trader' ? traders : e.type === 'cog' ? cogs : e.type === 'fisher' ? fishers : e.type === 'warship' || e.type === 'transport' ? navy : e.type === 'fighter' || e.type === 'bomber' ? planes : army;
+        e.type === 'citizen' ? citizens : e.type === 'wagon' ? wagons : e.type === 'priest' ? priests : e.type === 'trader' ? traders : e.type === 'cog' ? cogs : e.type === 'fisher' ? fishers : e.type === 'warship' || e.type === 'transport' || e.type === 'barge' ? navy : e.type === 'fighter' || e.type === 'bomber' ? planes : army;
       list.push(e);
     } else buildings.push(e);
   }
@@ -253,12 +254,14 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   dykeWork(s, v, mem, issue);
   riverWork(s, v, mem, issue);
   tideWork(s, v, mem, issue);
+  waterLineWork(s, v, mem, issue);
   siloRoad(s, v, mem, issue);
   fireSilo(s, v, mem, issue);
   fleeWarhead(s, v, issue);
   steppeRoad(s, v, mem, issue);
   wildRoad(s, v, mem, issue);
   groveWork(s, v, mem, issue);
+  hiveWork(s, v, mem, issue);
   readYear(s, v);
   huntTheYear(s, v, issue);
 
@@ -581,6 +584,9 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   } else if (roads[to] === undefined && to === 'grove') {
     // The Wild route's second age: a people that walked the Wild goes on, as the Horde follows the Steppe.
     roads[to] = hasWalked(p, 'wild');
+  } else if (roads[to] === undefined && to === 'hive') {
+    // The Wild route's third age: a people that walked the Grove goes on.
+    roads[to] = hasWalked(p, 'grove');
   } else if (roads[to] === undefined && to === 'dykes') {
     // The Water Road (#701): only with a dyke worth raising by home, and on a coin of its own, so no other match's dice shift. A people
     // that walked the Age of Rivers is on the road already, and goes on down it more often.
@@ -589,6 +595,9 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   } else if (roads[to] === undefined && to === 'tides') {
     // The Water Road's sixth age (#739): a people with a shore, on a coin of its own; one already on the Water Road goes on more often.
     roads[to] = coastHeld(s, p) && coin(s, p.id, 0x71de) < (hasWalked(p, 'rivers') || hasWalked(p, 'dykes') ? AI_TIDES.onward : AI_TIDES.take);
+  } else if (roads[to] === undefined && to === 'waterline') {
+    // The Water Road's third age (#701 s4): a people that walked the Dykes goes on down it on a coin of its own, so no other match's dice shift.
+    roads[to] = hasWalked(p, 'dykes') && coin(s, p.id, 0x5a1c) < AI_WATERLINE.take;
   } else if (roads[to] === undefined && to === 'rivers') {
     // The Water Road's first age (#701 s1): with a channel worth digging by home, on a coin of its own.
     roads[to] = !!riverOf(s, p, mem) && coin(s, p.id, 0x71e5) < AI_RIVERS.take;
@@ -741,10 +750,14 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
     mem.sideHold ??= s.tick;
     if (s.tick - mem.sideHold < secs(AI_SILO.hold)) return null;
   }
+  // The Water Line (#701 s4) is kept a while, so its sluice stands and its barges are out before it climbs on.
+  if (walksWeb(v) && ageOf(p) === 'waterline' && s.tick - (mem.line?.since ?? s.tick) < secs(AI_WATERLINE.stay)) return null;
   // The Wild is kept a while, so the beasts it came for are tamed and the Den is breeding.
   if (walksWeb(v) && ageOf(p) === 'wild' && s.tick - (mem.wild ?? s.tick) < secs(TAME.aiStay)) return null;
   // The Grove is kept a while, so its gardens are fed, its Orchards set and its Thornwall grown.
   if (walksWeb(v) && ageOf(p) === 'grove' && s.tick - (mem.grove ?? s.tick) < secs(GROVE.aiStay)) return null;
+  // The Hive is kept a while, so its Hives are set and swarming.
+  if (walksWeb(v) && ageOf(p) === 'hive' && s.tick - (mem.hive ?? s.tick) < secs(HIVE.aiStay)) return null;
   // The steppe (#320) is kept a while, so the flock it came for pays.
   if (walksWeb(v) && ageDef(p).mobile && s.tick - (mem.steppe?.since ?? s.tick) < secs(AI_STEPPE.stay)) return null;
   // Bound for a crossing (#585, #555 s12), a sibling doesn't climb on: its way is back to the Middle Ages (`seaTurn`).
@@ -1349,6 +1362,87 @@ function riverWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   }
 }
 
+/**
+ * Where it sets its sluice (#701 s4): within `AI_WATERLINE.reach` tiles of its start, on a dyke of its own line or on water a sluice
+ * may stand on, with still water beside it; the spot whose flood would cover the most ground, the nearest home on a tie. Found once.
+ */
+function sluiceSpot(s: GameState, p: Player, mem: AiMemory): { tx: number; ty: number } | null {
+  const line = (mem.line ??= { since: s.tick });
+  if (line.spot !== undefined) return line.spot;
+  const r = AI_WATERLINE.reach;
+  const cx = Math.floor(p.startX);
+  const cy = Math.floor(p.startY);
+  let best: { tx: number; ty: number } | null = null;
+  let top = 0;
+  let bestD = Infinity;
+  for (let ty = Math.max(1, cy - r); ty <= Math.min(s.h - 2, cy + r); ty++)
+    for (let tx = Math.max(1, cx - r); tx <= Math.min(s.w - 2, cx + r); tx++) {
+      const t = ty * s.w + tx;
+      if (s.terrain[t] !== T_WATER || isInund(s, t)) continue;
+      const d = (tx - cx) * (tx - cx) + (ty - cy) * (ty - cy);
+      if (d > r * r || placeProblem(s, 'sluice', tx, ty, true, p.id)) continue;
+      const spot = { tx, ty, size: 1 } as Building;
+      if (!sluiceFed(s, spot)) continue;
+      const n = waterLine(s, spot).length;
+      if (n > top || (n === top && d < bestD)) {
+        top = n;
+        bestD = d;
+        best = { tx, ty };
+      }
+    }
+  line.spot = top >= 8 ? best : null;
+  return line.spot;
+}
+
+/**
+ * The Age of the Water Line at work (#701 s4): set one sluice where its flood covers the most ground (`sluiceSpot`), keep
+ * `AI_WATERLINE.barges` gun-barges, and open the sluice while an enemy army of `threat` or more stands within `near` tiles of it,
+ * shutting it `calm` seconds after the last has gone. With the water out, idle barges shell the nearest enemy by the sluice.
+ */
+function waterLineWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!ageDef(p).sluices) return;
+  const line = (mem.line ??= { since: s.tick });
+  const sluice = v.buildings.find((b) => b.type === 'sluice');
+  if (!sluice) {
+    if (s.tick - (mem.ordered.sluice ?? -99999) < secs(25)) return;
+    const spot = sluiceSpot(s, p, mem);
+    if (!spot) return;
+    if (!construct(s, v, mem, 'sluice', spot, 2, issue)) spend(v, buildingCostFor(s, p.id, 'sluice'));
+    return;
+  }
+  if (!sluice.built) return;
+  if (s.tick % secs(1) !== (p.id * 3) % secs(1)) return;
+  // The alarm: an enemy army by the sluice.
+  const r2 = AI_WATERLINE.near * AI_WATERLINE.near;
+  const foes: Unit[] = [];
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !MILITARY.includes(e.type) || domainOf(e.type) !== 'land' || !isEnemy(s, p.id, e.owner)) continue;
+    const dx = e.x - sluice.x;
+    const dy = e.y - sluice.y;
+    if (dx * dx + dy * dy <= r2) foes.push(e);
+  }
+  if (foes.length >= AI_WATERLINE.threat) line.alarm = s.tick;
+  const alarmed = line.alarm !== undefined && s.tick - line.alarm < secs(AI_WATERLINE.calm);
+  if (alarmed !== !!sluice.open && !sluiceProblem(s, sluice)) issue({ t: 'pack', p: p.id, building: sluice.id });
+  // The barges: kept up at the sluice, and sent at the nearest foe while the water is out.
+  const barges = v.navy.filter((u) => u.type === 'barge');
+  const queued = sluice.queue.filter((q) => q.unit === 'barge').length;
+  if (barges.length + queued < AI_WATERLINE.barges && !queued) {
+    const cost = unitStats('barge', p.epoch).cost;
+    if (afford(v, cost)) issue({ t: 'train', p: p.id, building: sluice.id, unit: 'barge' });
+    else spend(v, cost);
+  }
+  if (sluice.open && foes.length) {
+    const idle = barges.filter((u) => u.order.k === 'idle');
+    if (idle.length) {
+      const d2 = (u: Unit) => (u.x - sluice.x) * (u.x - sluice.x) + (u.y - sluice.y) * (u.y - sluice.y);
+      const near = foes.reduce((a, b) => (d2(a) <= d2(b) ? a : b));
+      issue({ t: 'attack', p: p.id, ids: idle.map((u) => u.id), target: near.id });
+    }
+  }
+}
+
 /** Whether its dyke's work is done (#701): the basin it shut off is all polder, or it has no plan. */
 function dykeDone(s: GameState, mem: AiMemory): boolean {
   const plan = mem.dyke?.plan;
@@ -1369,7 +1463,8 @@ function dykeWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const plan = dykeOf(s, p, mem);
   if (!plan) return;
   const recent = (type: BuildingType, sec: number) => s.tick - (mem.ordered[type] ?? -99999) < secs(sec);
-  const dykes = plan.line.map((t) => s.byId.get(s.bldAt[t])).filter((b): b is Building => !!b && b.kind === 'building' && b.type === 'dyke' && b.owner === p.id);
+  // A sluice set in the line (#701 s4) holds it as a dyke does.
+  const dykes = plan.line.map((t) => s.byId.get(s.bldAt[t])).filter((b): b is Building => !!b && b.kind === 'building' && (b.type === 'dyke' || b.type === 'sluice') && b.owner === p.id);
   if (dykes.length === plan.line.length && dykes.every((b) => b.built)) mem.dyke!.raised = true;
   if (dykes.length < plan.line.length) {
     // A breach is mended at once, whatever else waits (the sea will not).
@@ -2950,6 +3045,23 @@ function groveWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   mem.ordered.thornwall = s.tick;
 }
 
+/**
+ * The Age of the Hive: up to `HIVE.aiHives` Hives in the woods within `HIVE.aiFrom` tiles of home, by a Kitchen Garden where one
+ * has room (so the bees pollinate it), else by the Town Center. Its Range and Den train darts and bears in turn (`pickUnit`).
+ */
+function hiveWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!walksWeb(v) || !keepsBees(p) || !v.tc) return;
+  if (ageOf(p) === 'hive') mem.hive ??= s.tick;
+  if (count(v, 'hive') >= HIVE.aiHives || s.tick - (mem.ordered.hive ?? -99999) < secs(30)) return;
+  const cost = buildingCostFor(s, p.id, 'hive');
+  if (v.budget.wood < (cost.wood ?? 0) + 50 || v.budget.gold < (cost.gold ?? 0)) return;
+  const near = (tx: number, ty: number) => Math.abs(tx - v.home.x) <= HIVE.aiFrom && Math.abs(ty - v.home.y) <= HIVE.aiFrom;
+  const garden = v.buildings.find((b) => b.type === 'garden' && !v.buildings.some((h) => h.type === 'hive' && Math.abs(h.tx - b.tx) <= HIVE.bloom && Math.abs(h.ty - b.ty) <= HIVE.bloom));
+  const spot = (garden && findSpot(s, 'hive', garden.x, garden.y, 1, HIVE.bloom, 0, near)) || findSpot(s, 'hive', v.home.x, v.home.y, 3, HIVE.aiFrom, 0, near);
+  if (spot) construct(s, v, mem, 'hive', spot, 1, issue);
+}
+
 const grownSheep = (s: GameState, owner: number): Animal[] => s.animals.filter((a) => a.kind === 'sheep' && a.owner === owner && a.hp > 0 && a.lamb === undefined);
 
 /** The road from the steppe into the Horde (#322), while the computer wants it and its deeds are not yet done; null otherwise. */
@@ -3811,7 +3923,7 @@ function bestAllowed(p: Player, arm: 'infantry' | 'ranged' | 'cavalry'): UnitTyp
 /** The soldiers a building gives an army: its own lines, or at a hiring building (the merchants' Market, #37) the hired ones. */
 function lines(p: Player, b: Building): UnitType[] {
   const hires = hiresAt(p, b.type);
-  return hires.length ? hires : BUILDINGS[b.type].trains;
+  return hires.length ? hires : trainsAt(p, b.type);
 }
 
 /** What the enemy fields most of, to counter it. */
@@ -4695,6 +4807,8 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   // An age that bars the answer (the horse, in the Iron Age) answers with the best line it keeps (#79):
   // archers against archers, rather than foot that archers cut down twice as fast.
   if (counter && mix[main] >= 3 && barred(p, counter)) counter = bestAllowed(p, main);
+  // A Hive people's bowmen are its Blowpipe Hunters (the Age of the Hive): the answer to foot is darts.
+  if (counter === 'ranged' && barred(p, 'ranged') && !barred(p, 'blowpipe') && unitEpoch('blowpipe') <= p.epoch) counter = 'blowpipe';
   const counterOdds = ironRival && counter === COUNTER.infantry ? AI_WEB.read : 0.7;
   const answer = { archers: 0, others: 0 };
   const tally = (u: UnitType) => {

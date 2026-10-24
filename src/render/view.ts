@@ -175,6 +175,8 @@ export class View {
   private chimneys = new Map<number, number>();
   /** When each ship last left foam or smoke behind. */
   private wakes = new Map<number, number>();
+  /** The tick each Hive last buzzed (the Age of the Hive), so a swarm on many rivals is one drone, not a din. */
+  private buzzed = new Map<number, number>();
   /** The next time an aircraft's drone may be heard. */
   private droneAt = 0;
   /** Things to show a moment from now (an aircraft hitting the ground). */
@@ -905,7 +907,7 @@ export class View {
             this.cue(k === 'bomb' ? 'bombDrop' : 'mg', ev.x, ev.y, 0.6);
             break;
           }
-          this.cue(k === 'bullet' ? 'musket' : k === 'ball' ? 'cannon' : k === 'boulder' ? 'catapult' : k === 'spear' ? 'spear' : k === 'stone' ? 'sling' : 'bow', ev.x, ev.y, k === 'ball' ? 0.9 : 0.6);
+          this.cue(k === 'bullet' ? 'musket' : k === 'ball' ? 'cannon' : k === 'boulder' ? 'catapult' : k === 'spear' ? 'spear' : k === 'stone' ? 'sling' : k === 'dart' ? 'dart' : 'bow', ev.x, ev.y, k === 'ball' ? 0.9 : 0.6);
           if (k === 'bullet' || k === 'ball') {
             const big = k === 'ball';
             this.effects.burst(this.ground(s, ev.x, ev.y, 0.5), { count: big ? 10 : 3, speed: big ? 0.9 : 0.4, up: 0.6, life: big ? 2.4 : 1.4, size: big ? 0.16 : 0.08, grow: 3, gravity: -0.2, drag: 1, soft: true, colors: ['#e6e2dc', '#cfcac2'] });
@@ -1021,6 +1023,22 @@ export class View {
             this.effects.burst(at, { count: 8, speed: 0.4, up: 1, life: 1.6, size: 0.12, grow: 2, gravity: -0.5, drag: 1, soft: true, colors: ['#4a4541', '#6a645e'] });
             this.cue('fireCatch', ev.x, ev.y, 0.5);
           }
+          break;
+        }
+        case 'hive': {
+          // The Age of the Hive: a swarm boils round the rival it stings, with one drone a Hive at a time; smoke hushes a Hive in a
+          // grey puff; a Hive waking throws a little ring of amber.
+          if (!this.sees(ev.x, ev.y)) break;
+          if (ev.what === 'swarm') {
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.7), { count: 12, speed: 1.4, up: 0.3, life: 0.9, size: 0.022, gravity: 0, drag: 0.2, colors: ['#1e1a12', '#3a2e14', '#e0a526'] });
+            if (s.tick - (this.buzzed.get(ev.id) ?? -9999) >= TICK_HZ * 2) {
+              this.buzzed.set(ev.id, s.tick);
+              this.cue('swarm', ev.x, ev.y, 0.8);
+            }
+          } else if (ev.what === 'smoked') {
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.6), { count: 10, speed: 0.4, up: 0.8, life: 2, size: 0.14, grow: 2.2, gravity: -0.4, drag: 1, soft: true, colors: ['#cfcac2', '#a8a298'] });
+            this.cue('hiveHush', ev.x, ev.y, 0.7);
+          } else this.effects.ring(this.ground(s, ev.x, ev.y, 0.15), '#e0a526', 0.9, 0.7);
           break;
         }
         case 'sprout':
@@ -1345,6 +1363,17 @@ export class View {
           this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.08, ev.y), { count: 6, speed: 0.6, up: 0.8, life: 0.7, size: 0.05, gravity: 3, colors: ['#b8ad96', '#9e9482', '#dcefff'] });
           break;
         }
+        case 'inundated': {
+          // The Water Line (#701 s4): the flood runs over a tile of meadow (a low spurt of water, a hiss now and then), or leaves it.
+          if (!ev.wet || !this.sees(ev.x, ev.y)) break;
+          this.effects.burst(new THREE.Vector3(ev.x, heightAt(this.state!, ev.x, ev.y) + 0.1, ev.y), { count: 4, speed: 0.5, up: 0.5, life: 0.7, size: 0.045, gravity: 3, colors: ['#bfd9dc', '#e6f1f2', '#7d9a86'] });
+          if (ev.tile % 6 === 0) this.cue('spread', ev.x, ev.y, 0.3);
+          break;
+        }
+        case 'sluice':
+          // A sluice opened or shut (#701 s4): the winch, and the water let out or stilled.
+          if (this.sees(ev.x, ev.y)) this.cue(ev.open ? 'sluiceOpen' : 'sluiceShut', ev.x, ev.y, 0.7);
+          break;
         case 'dug': {
           // Water runs into a dug ditch (#701, the Age of Rivers): a splash at the head of the flow, and a soft gurgle now and then.
           if (!this.sees(ev.x, ev.y)) break;

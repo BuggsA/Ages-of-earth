@@ -372,8 +372,34 @@ function garden(k: Kit, e: number, variant: number): void {
     k.cyl(0.07, 0.09, 0.2, 7, '#b0643a', -0.36, 0.04, 0.36);
     k.box(0.04, 0.02, 0.7, '#4a7ab0', -0.42, 0.06, -0.02);
   }
+  // Pollinated by a Hive in summer (`fed & 4`, the Age of the Hive): squash flowers open gold and the bean vines bloom white.
+  if (fed & 4) for (const [x, z] of [[-0.12, 0.3], [0.3, -0.05], [-0.3, -0.08], [0.08, -0.3], [0.05, 0.05]]) {
+    k.cone(0.045, 0.05, 5, '#f2c43a', x, 0.12, z).rotation.x = Math.PI;
+    k.sphere(0.02, '#fff6dc', x + 0.05, 0.34, z - 0.04);
+  }
   k.cyl(0.012, 0.012, 0.36, 3, WOOD, -0.4, 0, -0.4);
   k.team(k.box(0.08, 0.06, 0.02, TEAM, -0.4, 0.3, -0.4));
+}
+
+// ---- The Age of the Hive (`docs/wild-road.md` §3) ------------------------------------------------------
+
+/**
+ * A Hive: a coiled straw skep, banded where its coils were bound, on a plank stand under a little bark roof, its people's cloth
+ * hung from the stand. Awake (`variant` 0) a few bees hang at the door; quiet (1: winter or smoke) the door is stopped with clay.
+ */
+function hive(k: Kit, e: number, variant: number): void {
+  k.box(0.7, 0.04, 0.7, '#5f7a3a', 0, -0.02, 0);
+  for (const [x, z] of [[-0.22, -0.2], [0.22, -0.2], [-0.22, 0.2], [0.22, 0.2]]) k.cyl(0.025, 0.03, 0.3, 4, BARK, x, 0, z);
+  k.box(0.58, 0.04, 0.52, e >= 3 ? '#8a6a42' : WOOD, 0, 0.3, 0);
+  const straw = '#d9b45a';
+  k.lathe([[0, 0], [0.22, 0], [0.24, 0.08], [0.23, 0.18], [0.19, 0.28], [0.12, 0.36], [0.04, 0.4], [0, 0.41]], 10, straw, 0, 0.32, 0);
+  for (const [y, r] of [[0.09, 0.245], [0.19, 0.23], [0.28, 0.195]] as [number, number][]) k.cyl(r, r, 0.022, 10, '#a8843a', 0, 0.32 + y, 0);
+  // The door at the foot of the skep, facing out; open and busy when awake, stopped with clay when quiet.
+  k.box(0.08, 0.05, 0.03, variant ? '#8a6a4a' : '#1e1810', 0, 0.35, 0.225);
+  if (!variant) for (const [x, y, z] of [[0.08, 0.5, 0.32], [-0.1, 0.62, 0.28], [0.02, 0.74, 0.18], [0.16, 0.42, 0.26]]) k.sphere(0.018, '#2a2010', x, y, z);
+  // A little roof of bark against the rain.
+  for (const s of [-1, 1]) k.box(0.36, 0.025, 0.6, '#5a4228', s * 0.15, 0.8, 0).rotation.z = s * -0.55;
+  k.team(k.box(0.5, 0.12, 0.015, TEAM, 0, 0.22, 0.265));
 }
 
 /**
@@ -1756,6 +1782,49 @@ function channel(k: Kit, mask: number): void {
   k.team(k.box(0.08, 0.06, 0.04, TEAM, -0.34, 0.26, -0.34));
 }
 
+/**
+ * A sluice (#701 s4): a dyke's bank cut through by a timber gate between stone piers, its leaf hung from a beam on a winch. Shut
+ * (`variant` under 16) the leaf stands down in the water; open, it is wound up under the beam and the water pours white through the
+ * gap. The bank runs on to the neighbouring dykes (`variant` & 15, as a wall's).
+ */
+function sluice(k: Kit, variant: number): void {
+  const open = variant >= 16;
+  const mask = variant & 15;
+  const EARTH = '#6e5a3e';
+  const TURF = '#6f8a45';
+  const TIMBER = '#5b4330';
+  // The bank and its arms, as a dyke's.
+  k.box(1.02, 0.95, 1.02, EARTH, 0, -0.95, 0);
+  for (const [bit, dx, dz] of ARMS) {
+    if (!(mask & bit)) continue;
+    k.box(Math.abs(dx) * 0.3 + Math.abs(dz) * 0.72, 0.12, Math.abs(dz) * 0.3 + Math.abs(dx) * 0.72, TURF, dx * 0.35, 0.19, dz * 0.35);
+  }
+  // Across the line the bank runs: the gate faces along x unless the dykes meet it from north or south.
+  const ns = !(mask & 5) && !!(mask & 10);
+  const g = k.group();
+  if (ns) g.rotation.y = Math.PI / 2;
+  // Two stone piers, a walkway beam between them, and the winch on top.
+  for (const side of [-1, 1]) {
+    k.box(0.3, 1.25, 0.6, STONE, side * 0.36, -0.35, 0, g);
+    k.box(0.34, 0.06, 0.64, '#8d877b', side * 0.36, 0.3, 0, g);
+    k.cyl(0.03, 0.03, 0.9, 4, TIMBER, side * 0.36, 0.33, 0.18, g);
+  }
+  k.box(1.0, 0.07, 0.14, TIMBER, 0, 0.78, 0.18, g);
+  k.box(0.9, 0.05, 0.3, '#7a5636', 0, 0.3, -0.12, g);
+  k.cyl(0.06, 0.06, 0.5, 6, TIMBER, 0, 0.88, 0.18, g).rotation.z = Math.PI / 2;
+  for (const side of [-1, 1]) k.box(0.03, 0.22, 0.03, TIMBER, side * 0.27, 0.92, 0.26, g);
+  // The leaf: planks on iron straps, down in the water or wound up under the beam.
+  const up = open ? 0.62 : 0;
+  k.box(0.44, 0.62, 0.06, '#6b4b2f', 0, -0.18 + up, 0.18, g);
+  for (const y of [-0.38, -0.14, 0.1]) k.box(0.46, 0.04, 0.07, '#4a4d52', 0, y + up, 0.18, g);
+  // Open: white water pouring through the gap and spreading below it.
+  if (open) {
+    k.box(0.42, 0.04, 0.7, '#e6f1f2', 0, -0.06, 0.05, g);
+    k.box(0.6, 0.03, 0.3, '#cfe3e6', 0, -0.09, -0.42, g);
+  }
+  k.team(k.box(0.13, 0.08, 0.13, TEAM, 0.36, 0.38, -0.26, g));
+}
+
 /** A windmill (#701): a thatched smock mill on a brick base with a reefing stage, its cap turned to the wind. The sails turn on their own (`windmillSails`). */
 function windmill(k: Kit, _e: number, st: Style): void {
   pad(k, 2, st.base);
@@ -2434,7 +2503,7 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
   }
 }
 
-const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' | 'thornwall' | 'garden' | 'orchard' | 'channel' | 'causeway'>, (k: Kit, e: number, st: Style) => void> = {
+const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' | 'thornwall' | 'garden' | 'orchard' | 'channel' | 'hive' | 'sluice' | 'causeway'>, (k: Kit, e: number, st: Style) => void> = {
   sapling: (k, e) => sapling(k, e),
   towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, windmill,
   // The Age of Tides (#739), drawn in `tideModels.ts`.
@@ -2610,7 +2679,7 @@ const ROOFS: Partial<Record<BuildingType, [string, string]>> = {
 };
 
 /** No plinth or pennant: open or thin pieces, and buildings that already carry their own standards. */
-const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder', 'dyke', 'thornwall', 'garden', 'orchard', 'channel', 'causeway', 'tidemill'];
+const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder', 'dyke', 'thornwall', 'garden', 'orchard', 'channel', 'hive', 'sluice', 'causeway', 'tidemill'];
 
 function roleStyle(type: BuildingType, epoch: number, st: Style): Style {
   const r = ROOFS[type];
@@ -2644,12 +2713,14 @@ export function buildingGeometry(type: BuildingType, epochIn: number, color: str
     const k = new Kit();
     if (type === 'wall') wall(k, epoch, STYLES[Math.min(epoch, 4)], variant);
     else if (type === 'dyke') dyke(k, variant);
+    else if (type === 'sluice') sluice(k, variant);
     else if (type === 'channel') channel(k, variant);
     else if (type === 'causeway') causewaySite(k, variant);
     else if (type === 'snare') snare(k, epoch, variant === 1);
     else if (type === 'thornwall') thornwall(k, variant);
     else if (type === 'garden') garden(k, epoch, variant);
     else if (type === 'orchard') orchard(k, epoch, variant);
+    else if (type === 'hive') hive(k, epoch, variant);
     else if (type === 'shaft') shaft(k, epoch, roleStyle(type, epoch, STYLES[Math.min(epoch, 4)]), variant);
     else MAKERS[type](k, epoch, roleStyle(type, epoch, STYLES[Math.min(epoch, 4)]));
     // A Watch Tower's `variant` is its step on the tower line.

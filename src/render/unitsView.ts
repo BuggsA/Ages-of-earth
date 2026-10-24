@@ -4,14 +4,15 @@ import { legionary } from '../sim/legion';
 import { BOAR, MAMMOTH, RAIDER, SIGNATURES, TICK_HZ, WOLF, domainOf, unitStats } from '../sim/data';
 import type { Animal, CivId, GameState, Unit, UnitType } from '../sim/types';
 import { unitMaterial } from './materials';
-import { heightAt } from './terrain';
+import { FLOOD_DEPTH, heightAt } from './terrain';
+import { isInund } from '../sim/water';
 import { boarGeometry, deerGeometry, mammothGeometry, raiderGeometry, sheepGeometry, LEGION_MODEL, THRALL_MODEL, unitGeometry, wolfGeometry } from './unitModels';
 import { WATER_Y } from './water';
 
 /** Units are drawn a little larger than their footprint in the rules, so they read well from above. */
 export const UNIT_SCALE = 1.3;
 /** Fighters stand larger than workers, so a soldier reads as one at the default zoom (#624). */
-const FIGHTER_SCALE: Partial<Record<UnitType, number>> = { infantry: 1.3, ranged: 1.22, cavalry: 1.2, priest: 1.2, hero: 1.3, warwolf: 1.3, tusker: 1.25, warmammoth: 1.1 };
+const FIGHTER_SCALE: Partial<Record<UnitType, number>> = { infantry: 1.3, ranged: 1.22, cavalry: 1.2, priest: 1.2, hero: 1.3, warwolf: 1.3, tusker: 1.25, warmammoth: 1.1, blowpipe: 1.22, cavebear: 1.15 };
 /** Citizens a little larger too, but still smaller than fighters (#617, #624). */
 const CITIZEN_BOOST = 1.15;
 /** How high aircraft fly above the ground. */
@@ -433,7 +434,8 @@ export class UnitsView {
       if (dom === 'water') {
         // Afloat: riding the swell, oars sweeping, paddle wheels churning, nets dipping.
         // Riding high enough that the hull's sides show above the water.
-        gy = WATER_Y + 0.05 + Math.sin(time * 1.4 + ph) * 0.02;
+        // A gun-barge (#701 s4) on a sluice's flood rides its sheet of water, over the ground wherever that lies.
+        gy = Math.max(WATER_Y, u.type === 'barge' && isInund(s, Math.floor(y) * s.w + Math.floor(x)) ? gy + FLOOD_DEPTH - 0.02 : WATER_Y) + 0.05 + Math.sin(time * 1.4 + ph) * 0.02;
         roll = Math.sin(time * 1.1 + ph) * 0.05;
         pitch = Math.sin(time * 0.9 + ph * 1.3) * 0.03;
         const paddles = u.type === 'transport' && epoch >= 4;

@@ -1,4 +1,4 @@
-import { AGES, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, TIDE, secs } from '../sim/data';
+import { AGES, HIVE, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
 import { battlesFor } from '../sim/battles';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, findsOf, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
@@ -435,12 +435,18 @@ const TIPS: Tip[] = [
     text: 'A rival keeps the sea\'s hours, and the <b>tide</b> has woken for everyone: watch its clock (🌊, top bar). At low water the shallows bare as flats an army can cross, toward you or from you; ships on them sit aground, and a Dock with only flats beside it launches nothing. Whoever stands on the flats when the water comes back is swept ashore, hurt.',
   },
   {
+    id: 'hive',
+    // The Age of the Hive (`docs/wild-road.md` §3): its first minute.
+    when: (s, me) => ageOf(s.players[me]) === 'hive',
+    text: `Your people keeps bees now. Set a <b>${BUILDINGS.hive.name}</b> (${BUILDINGS.hive.key}) among standing trees (${HIVE.trees} within 3 tiles): its bees sting any rival who walks the woods within ${HIVE.reach} tiles, past armour, and slow them, so a wood by a Hive is a wall. It pays honey, or mead for gold if a Market stands within ${HIVE.market} tiles, and in summer doubles your <b>${BUILDINGS.garden.name}s</b> within ${HIVE.bloom} tiles. Bees sleep in winter, and smoke quiets them: that is when a rival comes, with torches. No muskets or cannon: train <b>Blowpipe Hunters</b> at the Archery Range, whose venom stacks and cuts down riders and beasts, and breed <b>Cave Bears</b> at the Den; your wolves are Dire Wolves now.`,
+  },
+  {
     id: 'torch',
     // Fire (`fire.ts`): a rival's living town is in sight, and torches are in hand.
     when: (s, me) =>
       s.players[me].epoch >= FIRE.epoch &&
       s.ents.some((e) => e.kind === 'building' && e.hp > 0 && FIRE.burns.includes(e.type) && e.owner !== me && s.players[e.owner].team !== s.players[me].team && s.players[me].vis[e.ty * s.w + e.tx] === 1),
-    text: `A rival grows its town: Thornwalls, Kitchen Gardens and Orchards burn. Select citizens or foot soldiers and press <kbd>F</kbd>, then click one: each stands ${FIRE.light} seconds to set it alight, and unless its people beat it out it burns down. A Thornwall that burns leaves no root, and in a dry summer the fire runs along the hedge and through the woods beside it.`,
+    text: `A rival grows its town: Thornwalls, Kitchen Gardens, Orchards and Hives burn. Select citizens or foot soldiers and press <kbd>F</kbd>, then click one: each stands ${FIRE.light} seconds to set it alight, and unless its people beat it out it burns down. A Thornwall that burns leaves no root, and in a dry summer the fire runs along the hedge and through the woods beside it.`,
   },
   {
     id: 'burning',
@@ -500,6 +506,9 @@ const TIPS: Tip[] = [
   { id: 'dock', when: (s, me) => secsIn(s) > 150 && !has(s, me, 'dock') && waterNear(s, me), text: 'Water nearby! A <b>Dock</b> (<kbd>B</kbd> <kbd>D</kbd>) on the shore trains <b>fishing boats</b>: fish shoals feed you for a long time. Later, warships and transports.' },
   { id: 'aeronaut', when: (s, me) => s.players[me].epoch === 4 && buildings(s, me).some((b) => b.type === 'airfield' && b.built), text: 'Your Airfield reveals the <b>Age of Aeronauts</b> at the Town Center: aircraft cost and training time fall by 25%, but foot, ranged, cavalry and siege units cost 20% more. Riflemen and towers still shoot them down. A paid road returns to Industrial.' },
   { id: 'lightning', when: (s, me) => s.players[me].epoch === 4 && buildings(s, me).some((b) => b.type === 'tower' && b.built), text: 'Your Watch Towers point the way to the <b>Age of Lightning</b>: once they have lit 6 beacons (<kbd>F</kbd>; relays count), the Town Center can take it. Every tower becomes a <b>Coil Tower</b>: buildings in its field train and research faster, those outside run slower, and its bolt leaps through crowded armies. No aircraft fly there.' },
+  // The Water Line (#701 s4): its first minute is a sluice, and the first time the water is let out.
+  { id: 'waterline', when: (s, me) => ageOf(s.players[me]) === 'waterline' && !has(s, me, 'sluice'), text: 'The <b>Age of the Water Line</b>: raise a <b>Sluice</b> (<kbd>V</kbd> <kbd>S</kbd>) in your dyke line, on a channel, or on shallow water. Open it (<kbd>O</kbd>) when an army comes: the low ground round it goes under knee-deep water that soldiers wade at a crawl and siege can hardly cross. Shut it and the water goes. Fields under the flood yield nothing, so open it only when it pays.' },
+  { id: 'barge', when: (s, me) => ageOf(s.players[me]) === 'waterline' && buildings(s, me).some((b) => b.type === 'sluice' && b.built), text: 'Your Sluice launches <b>Gun-barges</b>: flat boats with a cannon that sail the sea, the channels and the flood alike. With the sluice open they shell an army wading your fields; they pass through any sluice, as through a lock. Shut the sluice with a barge far out on the flood and it may be left aground.' },
   { id: 'cog', when: (s, me) => units(s, me).some((u) => u.type === 'cog'), text: 'A <b>merchant ship</b> sails from your Dock to a trading post with water near it (a <b>port</b>) and brings back gold, 20% more than the land road. Select it and right-click the post. Warships are its enemy.' },
   { id: 'transport', when: (s, me) => units(s, me).some((u) => u.type === 'transport'), text: 'To cross the water, select soldiers and <b>right-click your transport</b> to board. Then select the transport and right-click a far shore to land them.' },
   { id: 'silo', when: (s, me) => s.players[me].epoch >= 5 && !has(s, me, 'silo'), text: 'The <b>Atomic Age</b> brings the <b>Missile Silo</b> (<kbd>V</kbd> <kbd>M</kbd>), dear to raise. Select it, press <kbd>M</kbd> and click any point on the map: after 45 seconds the warhead lands, and every player sees the clock. Guard your silo: if it falls while the clock runs, the launch is scrubbed. The ring stays poisoned for 90 seconds after, for your own army too.' },

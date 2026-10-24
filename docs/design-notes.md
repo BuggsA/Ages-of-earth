@@ -1268,6 +1268,21 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 
 **Next:** the Water Line (s4) is this rule run backwards on purpose: sluices that let the sea into your own low ground while the enemy walks across it, and `wading` for flooded fields. A dyke's "holds back" number would make a good tower-like warning ring on the minimap.
 
+## Designers' notes: the Water Road, the Age of the Water Line (#701 s4, 2026-10-24, chain 1024-2000 s4, lane rules)
+
+**Built:** the Water Road's Gunpowder tier. Sluices (a gate in your own dyke, on a channel, or on the shallows) that you open to let the water out over your low ground, a ring a second, up to 7 tiles, and shut to let it drain away. The flood is knee-deep: soldiers wade it at 30%, siege bogs down to 10%, fields under it yield nothing, and buildings, woods and rises stand out of it as islands. Gun-barges, launched from the sluice, sail the sea, the channels and the flood, and pass through any sluice like a lock. The computer climbs to it from the Dykes, sets a sluice where it floods most, keeps two barges and opens the gate while an army stands by it.
+
+**Why I love it:** it's the one defence in the game you have to *time*. A wall is up or it isn't; a sluice is a gamble you take as the enemy army walks onto your fields: too early and they go round and you've drowned your own harvest for nothing, too late and they're through. And for the attacker it reads instantly: the meadow in front of you goes glassy, your rams slow to a crawl, and flat boats with cannon start nosing across it. It's history I find moving too: the Hollandse Waterlinie, a country that made itself an island on purpose.
+
+**Choices I made (the owner may revert):**
+- The flood doesn't touch the ground's heights: it lies over them, and the renderer draws a sheet of water on top. "Low" is relative to the sluice's lowest bank (`INUND.rise` over it), so a sluice on a channel through high meadow floods that meadow, and the age works on dry maps (continental, highlands) as well as on polder. An absolute height would have shut it on every map but lakes.
+- Siege can still enter the flood, at a tenth of its pace, rather than being barred from it: a per-unit pathing rule would have touched every route in the game. It reads as "can't cross" under fire.
+- Only gun-barges sail the flood; galleons and transports stay on the open sea. A barge passes any finished sluice, anyone's, as a lock, so a rival in the same age can come through yours.
+- Opening a sluice reuses the `pack` order at a Sluice: `tests/command-ownership.test.ts` pins the list of command kinds.
+- A sluice holds the sea back from the moment it is laid out (a cofferdam), so setting one into a dyke line never breaches it.
+
+**Next:** the Age of Locks (s5) can build on the barge's pass (`BARGE` in `grid.ts`): canals that bigger ships use too, and a lock as the sluice's grown-up cousin. I'd like the computer to plan its sluice so the flood covers the way rivals come rather than the most ground, and to bring barges into the attack. A flood that slowly takes the fields' fertility, then gives it back richer (the Nile's gift), would tie in the Egyptians.
+
 ## Designers' notes: fire (Wild route step 3, #723, 2026-10-24, chain 1024-1233 s1, lane rules)
 
 **Built:** a shared rule every people uses from the Bronze Age (`src/sim/fire.ts`, `FIRE`). Torches in the hands of citizens and foot soldiers; trees, Thornwall roots and a rival's living buildings (Thornwall, Kitchen Garden, Orchard, Sapling) catch; fire leaps tile by tile on the match's own dice, as far as the season lets it (a summer fire takes most of a wood, a spring one smoulders out in a few trees); a burnt tree is ash for five minutes, then grows again; a building burns until its people beat it out, and a Thornwall burnt down leaves no root. The computer torches a rival's growth with its campaigning soldiers and beats out its own fires.
@@ -1278,6 +1293,26 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 
 **Next:** smoke that quiets Hives (step 4); the Wildwood's door ("fire hits living things twice as hard"); beasts that fear fire; the computer felling a firebreak in summer, or burning a rival's woodline before a long war; farms as dry grain in autumn, maybe.
 
+## Designers' notes: the Age of the Hive (Wild route step 4, 2026-10-24)
+
+**Built:** the Hive age (`AGES.hive`, `HIVE`, `src/sim/hive.ts`), instead of the Gunpowder Age for a Grove people whose Gardens have brought in 600 food. A **Hive** set among trees stings any rival standing in a wood within 6 tiles (past armour, and a slow), pays honey, or mead for gold by a Market, and doubles the Gardens beside it in summer. Bees sleep in winter; smoke from any fire within 4 tiles quiets a Hive for 40 s, and the skep burns. **Blowpipe Hunters** take the musket's place: short reach, stacking venom that burns past armour and slows. The Den breeds the **Cave Bear**, and War Wolves grow **dire**. The door is guns and cannon. The computer goes on from the Grove, sets Hives by its gardens and trains darts and bears; its torches already reach a rival's Hives.
+
+**Why I love it:** the Grove shut a town in green; the Hive makes the green *bite*. Woods have always been a thing you cut. Now a wood by a rival's Hive is a wall you can see but not cross, and the map's dark patches change meaning by whose Hive is in them. It hangs off what's there: the year (winter is when you raid a Hive town), fire (a torchbearer smokes the bees before the army walks in), the Gardens (the Hive's second loop doubles them in summer), the Market (mead is a layout choice), and the counter triangle (venom answers the heavy riders and beasts a Hive town can't shoot with muskets).
+
+**What I chose:** mead by layout instead of a toggle button, so the choice is where you put a Hive and a Market, and there's no new command. Venom is capped per target, not per shooter, so a blowpipe line spreads its darts rather than all on one knight. The Dire Wolf is the War Wolf grown, not a new unit, to keep to three new things.
+
+**Not seen:** none of it in a browser yet (models, the swarm cloud, the dart, the drone and hush, the HUD lines are unit-tested or compiled only). Sound levels want an ear.
+
+**Next:** the Wildwood (step 5): the Heart Tree and Ents that root, the Spreading (which feeds new Hive ground), and "fire hits living things twice as hard"; beasts that fear fire; the computer reading a rival's Hives and raiding in winter or smoking them first.
+
+## Designers' notes: your road at the end (2026-10-24, #743)
+
+**Built:** the rules now keep a `journey` for each people (every change of age, with what fell inside the weak window after a step back), and the end screen draws it on the web: each player's road in their colour, steps back dashed, a line each of time per age, "window struck: lost 4" or "window unstruck", keepsakes carried and crossings walked, then the roads you knew of that nobody took. Beside Play again, **Play this seed again**.
+
+**Why I love it:** the match tells its story at the end. You see that your rival won by the Iron Age's marsh and a step back you never punished, and the button is right there to try that road yourself on the same land. It's the bridge from one match to the next that `docs/engagement.md` found missing.
+
+**Next:** Rematch in online rooms (same seats); the codex of roads (#724 step 7) can read the same journey; the computer's temperament (step 4) could be shown here as "Wu Zetian favours the Steppe".
+
 ## Designers' notes: the Water Road, the Age of Tides (#739, s6 of #701, 2026-10-24, chain 1024-1330 s1, lane rules)
 
 **Built:** a tide clock in the rules (`src/sim/tides.ts`): asleep until the first people enters the Age of Tides, then running for everyone from high water, a step every 30 seconds through three levels to low water and back. The tidal ground is its own layer (`GameState.tidal`), laid out once when the tide wakes: open sea whose bed (the mean of its corners) is shallow enough, three bands by depth. Bared, a tile is wet sand anyone walks and no ship sails; covered again, it sinks back to its own bed (`tideBed`), exactly. Whoever is on the flats as the water comes back is swept ashore and hurt. Tide Mills grind gold at each turn, from the flats near them, a tile to one mill. Causeways are flats you lay yourself, down to deeper water, that only high water covers. A Dock with no water within two tiles is aground. The computer saves for the turn, raises mills where the flats are widest, and pulls its people off the flats a few seconds before the flood.
@@ -1287,4 +1322,3 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 **Choices I made (the owner may revert):** the tide wakes for the whole world (not only the people in the age): a sea that turns only for one people would be strange, and a public clock is the whole point. It sleeps until then, so every older match and test plays as before. The flats are by mean depth, so the shore's own band bares at most levels (a harbour grounds only when no water lies within two tiles, or every Dock would ground at every ebb). The door is the Missile Silo: a people that keeps the sea's hours trades the warhead for the tide. Numbers: `TIDE = { period: 180, flats: [-1.0, -0.75, -0.5], harbour: 2, dry: 0.08, sweep: 6, hurt: 15, causeway: -1.6, mill: { reach: 5, most: 24, gold: 60 } }`, road 800 food 800 gold 450 stone, 60 s.
 
 **Next:** barrages (a causeway line closing a bay into a tidal pond the mills grind twice from); kegs that breach a causeway; the `locks → tides` road once the Age of Locks lands; ships that can be floated off at the flood by a Tide people; the computer timing an attack across the flats at low water, not just keeping off them. Cockle beds on the flats (food at low water) would give citizens a reason to risk the tide.
-

@@ -1,6 +1,7 @@
-import { BUILDINGS, GROVE, secs } from './data';
+import { BUILDINGS, GROVE, HIVE, secs } from './data';
 import { hasWalked } from './ages';
 import { seasonAt } from './seasons';
+import { pollinated, pollinators } from './hive';
 import { buildingMaxHp } from './stats';
 import type { Building, BuildingType, GameState, Player } from './types';
 import { R_NONE, T_WATER } from './types';
@@ -12,7 +13,7 @@ import { placeBuilding } from './world';
  *   seconds pile up, faster in spring; its hit points rise with it (`buildingMaxHp`), and a living oak mends. It parts for its
  *   own team as a gate does (`stampBuilding`). Cut down, it leaves a root (`GameState.roots`) that sprouts a seedling again.
  * - A Kitchen Garden is a one-tile field (`isField`) whose gardener works faster when it is fed (`Building.fed`): by a Den's dung
- *   or by water beside it.
+ *   or by water beside it, and in summer twice over beside a Hive (`hive.ts`).
  * - An Orchard bears once grown, and in summer and autumn drops food into its owner's stores by itself.
  * Each is raised by a people that has walked the Grove, in any age after (`buildBarred`). The numbers are `GROVE`.
  */
@@ -26,11 +27,14 @@ export const grows = (p: Player): boolean => hasWalked(p, 'grove');
 /** A field worked by one citizen for food: a Farm, or a Kitchen Garden. */
 export const isField = (t: BuildingType): boolean => t === 'farm' || t === 'garden';
 
-/** What a Kitchen Garden's gardener works at, as a share of a farmer's pace: 1 unfed, more for dung, more for water. */
+/**
+ * What a Kitchen Garden's gardener works at, as a share of a farmer's pace: 1 unfed, more for dung, more for water, and all of it
+ * `HIVE.pollen` times over while a Hive pollinates it in summer (the Age of the Hive).
+ */
 export function gardenMul(b: Building): number {
   if (b.type !== 'garden') return 1;
   const fed = b.fed ?? 0;
-  return 1 + (fed & 1 ? GROVE.dungMul : 0) + (fed & 2 ? GROVE.waterMul : 0);
+  return (1 + (fed & 1 ? GROVE.dungMul : 0) + (fed & 2 ? GROVE.waterMul : 0)) * (fed & 4 ? HIVE.pollen : 1);
 }
 
 /** Whether a Thornwall's stage has come: 0 seedling, 1 bramble, 2 thicket, 3 living oak. */
@@ -100,7 +104,9 @@ export function groveStep(s: GameState): void {
       }
     }
   }
-  // What feeds each Kitchen Garden, in id order: a Den feeds its `dungFeeds` oldest gardens in reach; water feeds any beside it.
+  // What feeds each Kitchen Garden, in id order: a Den feeds its `dungFeeds` oldest gardens in reach; water feeds any beside it;
+  // in summer a Hive near it pollinates it (4).
+  const hives = pollinators(s);
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.type !== 'garden' || e.hp <= 0) continue;
     let fed = waterNear(s, e, GROVE.water) ? 2 : 0;
@@ -114,6 +120,7 @@ export function groveStep(s: GameState): void {
         break;
       }
     }
+    if (hives.length && pollinated(s, e, hives)) fed |= 4;
     if (fed) e.fed = fed;
     else delete e.fed;
   }

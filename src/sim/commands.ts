@@ -1,4 +1,4 @@
-import { AUTO_WORK, BUILDINGS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, RIVERS, SNARE, SPREAD, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
+import { AUTO_WORK, BUILDINGS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, RIVERS, SNARE, HIVE, SPREAD, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
 import { peace } from './combat';
 import { findSpot } from './ai';
 import { placeProblem, stampBuilding, walkable } from './grid';
@@ -37,6 +37,7 @@ import { fightsBeasts } from './animals';
 import { tameProblem } from './tame';
 import { isField } from './grove';
 import { answerTiding, tidingProblem } from './tidings';
+import { sluiceProblem } from './water';
 
 /**
  * Everything a player can do, as plain data. A person's clicks and the computer opponent both go
@@ -191,7 +192,7 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
   }
   const problem = placeProblem(s, type, tx, ty, true, p);
   if (problem) {
-    if (!quiet) refuse(s, p, problem === 'slope' ? 'Too steep to build there' : problem === 'foreign' ? "That's enemy land: only a Tower can be raised there" : problem === 'woods' ? `A snare needs ${SNARE.need} trees standing within ${SNARE.r} tiles` : problem === 'snares' ? `Too near another snare: keep them ${SNARE.apart} tiles apart` : problem === 'parched' ? `In the Age of Rivers a Farm is laid only by water: within ${RIVERS.wet} tiles of a channel, spring, lake or shore` : "Can't build there");
+    if (!quiet) refuse(s, p, problem === 'slope' ? 'Too steep to build there' : problem === 'foreign' ? "That's enemy land: only a Tower can be raised there" : problem === 'woods' ? `A snare needs ${SNARE.need} trees standing within ${SNARE.r} tiles` : problem === 'snares' ? `Too near another snare: keep them ${SNARE.apart} tiles apart` : problem === 'parched' ? `In the Age of Rivers a Farm is laid only by water: within ${RIVERS.wet} tiles of a channel, spring, lake or shore` : problem === 'bare' ? `A Hive needs ${HIVE.trees} trees standing within ${SNARE.r} tiles` : problem === 'hives' ? `Too near another Hive: keep them ${HIVE.apart} tiles apart` : "Can't build there");
     return null;
   }
   const cost = raiseCost(s, p, type, tx, ty);
@@ -720,6 +721,14 @@ export function applyCommand(s: GameState, c: Command): void {
     case 'pack': {
       const b = myBuilding(s, c.p, c.building);
       if (!b) return;
+      // At a Sluice (#701 s4) the same order opens the gate, or shuts it.
+      if (b.type === 'sluice') {
+        const shut = sluiceProblem(s, b);
+        if (shut) return refuse(s, c.p, shut);
+        b.open = !b.open || undefined;
+        s.events.push({ k: 'sluice', owner: c.p, id: b.id, open: !!b.open, x: b.x, y: b.y });
+        break;
+      }
       const why = packProblem(s, p, b);
       if (why) return refuse(s, c.p, why);
       packCamp(s, b);
