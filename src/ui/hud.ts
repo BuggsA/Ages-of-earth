@@ -9,7 +9,7 @@ import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE } from '../sim/units';
-import { SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { AUTO_WORK, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -344,6 +344,12 @@ export class Hud {
       this.workforceBtn.setAttribute('aria-expanded', 'false');
     });
     this.noticeEl.addEventListener('click', (e) => {
+      const f = (e.target as HTMLElement).closest<HTMLElement>('[data-fields]');
+      if (f) {
+        this.moveWorkers('idle', 'food', Number(f.dataset.fields) || 1);
+        f.closest('.notice')?.remove();
+        return;
+      }
       const b = (e.target as HTMLElement).closest<HTMLElement>('[data-hands]');
       if (!b) return;
       this.sendWorkers(b.dataset.hands as Job, Number(b.dataset.n) || 1);
@@ -450,6 +456,31 @@ export class Hud {
     setTimeout(() => el.remove(), 7200);
   }
 
+  /** Citizens standing idle (bushes picked dry, #344): after a few seconds, one button lays them fields (`reassign` idle→food does it). */
+  private idleSince = new Map<number, number>();
+  private idleCardAt = 0;
+  private idleFieldCard(s: GameState, viewer: number): void {
+    const p = s.players[viewer];
+    const now = performance.now();
+    const idle = idleCitizens(s, viewer);
+    const next = new Map<number, number>();
+    for (const u of idle) next.set(u.id, this.idleSince.get(u.id) ?? now);
+    this.idleSince = next;
+    const waiting = idle.filter((u) => now - next.get(u.id)! > 5000).length;
+    if (!p || waiting < 3 || now < this.idleCardAt || buildBarred(p, 'farm')) return;
+    if (s.ents.some((e) => e.kind === 'building' && e.owner === viewer && e.type === 'farm' && !e.built && e.hp > 0)) return;
+    this.idleCardAt = now + 30000;
+    const n = Math.min(waiting, AUTO_WORK.lay);
+    this.noticeEl.querySelector('.idle-fields')?.remove();
+    const el = document.createElement('div');
+    el.className = 'notice alert shortage idle-fields';
+    el.innerHTML = `<span>${waiting} hands stand idle with nothing to forage.</span><button type="button" data-fields="${n}" title="Lay ${n} ${n === 1 ? 'field' : 'fields'} near them, paid in wood, and put them to farm">🌾 Lay ${n} ${n === 1 ? 'field' : 'fields'}</button>`;
+    this.noticeEl.appendChild(el);
+    while (this.noticeEl.children.length > 4) this.noticeEl.firstChild!.remove();
+    setTimeout(() => (el.style.opacity = '0'), 8000);
+    setTimeout(() => el.remove(), 8700);
+  }
+
   banner(title: string, sub = '', ms = 3200): void {
     this.bannerEl.innerHTML = `${title}${sub ? `<small>${sub}</small>` : ''}`;
     this.bannerEl.classList.add('show');
@@ -466,6 +497,7 @@ export class Hud {
     this.lastIds = ids;
     this.top(s, viewer, speed);
     this.tidingCard(s, viewer);
+    this.idleFieldCard(s, viewer);
     if (!this.workforcePanel.classList.contains('hidden')) this.drawWorkforce(s, viewer);
     const ents = ids.map((id) => s.byId.get(id)).filter((e): e is Ent => !!e && e.hp > 0);
     this.selection(s, viewer, ents, selectedTile, selectedRelic, selectedPost, selectedRuin, selectedLandmark);
