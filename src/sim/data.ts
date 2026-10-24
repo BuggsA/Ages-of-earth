@@ -1540,7 +1540,7 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   stable: { name: 'Stable', size: 3, hp: 1400, cost: { wood: 150, gold: 50 }, time: 40, pop: 0, sight: 5, trains: ['cavalry'], drop: [], epoch: 1, menu: 'mil', key: 'C', blurb: 'Trains cavalry, who beat archers, priests and siege.' },
   forge: { name: 'Forge', size: 3, hp: 1600, cost: { wood: 175 }, time: 40, pop: 0, sight: 5, trains: [], drop: [], epoch: 1, menu: 'mil', key: 'R', blurb: 'Better weapons and armor for every soldier.' },
   workshop: { name: 'Siege Workshop', size: 3, hp: 1400, cost: { wood: 200 }, time: 40, pop: 0, sight: 5, trains: ['siege'], drop: [], epoch: 1, menu: 'mil', key: 'K', blurb: 'Builds rams, catapults and cannon to break towns.' },
-  tower: { name: 'Watch Tower', size: 2, hp: 1000, cost: { wood: 50, stone: 125 }, time: 45, pop: 0, sight: 9, trains: [], drop: [], epoch: 1, guns: { damage: 8, range: 8, reload: 1.8 }, garrison: 5, menu: 'mil', key: 'W', blurb: 'Sees far and shoots at enemies nearby, aircraft too. Shelter soldiers inside for more arrows.' },
+  tower: { name: 'Watch Tower', size: 2, hp: 600, cost: { wood: 50, stone: 125 }, time: 45, pop: 0, sight: 9, trains: [], drop: [], epoch: 1, guns: { damage: 5, range: 7, reload: 2 }, garrison: 5, menu: 'mil', key: 'W', blurb: 'Sees far and shoots at enemies nearby, aircraft too, but a raw tower is a lookout more than a fort: raise it to a Guard Tower, a Keep and a Bastion at the tower itself. Shelter soldiers inside for more arrows.' },
   dock: { name: 'Dock', size: 3, hp: 1800, cost: { wood: 150 }, time: 35, pop: 0, sight: 6, trains: ['fisher', 'transport', 'warship', 'cog'], drop: ['food'], epoch: 0, shore: true, menu: 'eco', key: 'D', blurb: 'Builds fishing boats, transports, warships and merchant ships, and takes in fish. Build it on the shore.' },
   huntcamp: { name: 'Hunting Camp', size: 2, hp: 500, cost: { wood: 45 }, time: 14, pop: 0, sight: 5, trains: [], drop: ['food'], epoch: 0, menu: 'eco', key: 'N', blurb: 'A drop-off for food, and a small claim on the land round it. Raise it by the herd or a far kill: meat inside your border is safe from wolves, and Drying Racks keep it.' },
   // Snares in the wood (#485): set among standing trees, they fill with small game by themselves (`SNARE`, `src/sim/snares.ts`).
@@ -1645,13 +1645,19 @@ export interface Mods {
   veins: number;
   /** Above 0, a soldier near one of the people's priests is sworn: no rival priest can turn, offer up or curse it (Military Orders, #355 s6; `ORDERS`). */
   sworn: number;
+  /** Added to a Watch Tower's arrows (the tower line: Guard Tower, Keep, Bastion; `TOWER`). */
+  towerAttack: number;
+  /** Added to a Watch Tower's reach in tiles (the tower line). */
+  towerRange: number;
+  /** Multiplies a Watch Tower's hit points (the tower line). */
+  towerHp: number;
 }
 
 export const NO_MODS: Mods = {
   meleeAttack: 0, rangedAttack: 0, armor: 0, parmor: 0, range: 0, carry: 0, citizenSpeed: 1, wood: 1, mine: 1, farm: 1, forage: 1, hunt: 1,
   buildingHp: 1, buildSpeed: 1, militaryTrain: 1, rangedTrain: 1, cavalrySpeed: 1, infantryHp: 1, infantryArmor: 0, infantryAttack: 0, cavalryAttack: 0, priest: 1, chant: 1,
   siegeAttack: 1, siegeRange: 0, techCost: 1, wonderCost: 1, extraCitizens: 0, fish: 1, shipHp: 1, shipRange: 0, airSpeed: 1, airHp: 1,
-  traderSpeed: 1, tradeGold: 1, relicGold: 1, bogGold: 1, rot: 1, beastWard: 1, portReach: 0, riderSight: 0, consecrate: 0, elmo: 0, telegraph: 0, galvanic: 0, plunder: 0, tribute: 0, toll: 0, veins: 0, sworn: 0,
+  traderSpeed: 1, tradeGold: 1, relicGold: 1, bogGold: 1, rot: 1, beastWard: 1, portReach: 0, riderSight: 0, consecrate: 0, elmo: 0, telegraph: 0, galvanic: 0, plunder: 0, tribute: 0, toll: 0, veins: 0, sworn: 0, towerAttack: 0, towerRange: 0, towerHp: 1,
 };
 
 export interface Tech {
@@ -1697,6 +1703,10 @@ export const TECHS: Record<TechId, Tech> = {
   handcart: { name: 'Handcart', at: 'towncenter', epoch: 2, cost: { food: 300, wood: 200 }, time: 45, needs: 'wheelbarrow', add: { carry: 4 }, mul: { citizenSpeed: 1.1 }, blurb: 'Citizens carry 4 more and walk 10% faster again.', icon: '🛒' },
   plow: { name: 'Plow', at: 'towncenter', epoch: 0, cost: { food: 75, wood: 75 }, time: 25, mul: { farm: 1.2, forage: 1.15, hunt: 1.15 }, blurb: 'Farms work 20% faster; berries and game 15%.', icon: '🌾' },
   irrigation: { name: 'Irrigation', at: 'towncenter', epoch: 2, cost: { food: 250, wood: 150 }, time: 40, needs: 'plow', mul: { farm: 1.25 }, blurb: 'Farms work 25% faster again.', icon: '🌾' },
+  // The tower line (owner, 2026-10-24: towers were too strong from the start): a Watch Tower starts weak and is raised at the tower.
+  guardTower: { name: 'Guard Tower', at: 'tower', epoch: 1, cost: { food: 100, wood: 150 }, time: 35, add: { towerAttack: 2 }, mul: { towerHp: 1.25 }, blurb: 'Every Watch Tower is raised a storey: +2 arrow attack and 25% more hit points.', icon: '🗼' },
+  keep: { name: 'Keep', at: 'tower', epoch: 2, needs: 'guardTower', cost: { food: 200, wood: 150, stone: 100 }, time: 45, add: { towerAttack: 2, towerRange: 1 }, mul: { towerHp: 1.25 }, blurb: 'Stone walls and a fighting top: every Watch Tower gets +2 arrow attack, +1 range and 25% more hit points.', icon: '🏰' },
+  bastion: { name: 'Bastion', at: 'tower', epoch: 3, needs: 'keep', cost: { food: 300, gold: 200, stone: 200 }, time: 55, add: { towerAttack: 2 }, mul: { towerHp: 1.2 }, blurb: 'Low, thick, angled walls that shrug off shot: every Watch Tower gets +2 arrow attack and 20% more hit points.', icon: '🛡' },
   masonry: { name: 'Masonry', at: 'towncenter', epoch: 2, cost: { wood: 175, stone: 150 }, time: 40, mul: { buildingHp: 1.2 }, blurb: 'Every building is 20% sturdier.', icon: '🧱' },
   axes: { name: 'Double-Bit Axe', at: 'storehouse', epoch: 0, cost: { food: 100, wood: 50 }, time: 25, mul: { wood: 1.2 }, blurb: 'Citizens cut wood 20% faster.', icon: '🪓' },
   saws: { name: 'Two-Man Saw', at: 'storehouse', epoch: 2, cost: { food: 300, wood: 200 }, time: 40, needs: 'axes', mul: { wood: 1.2 }, blurb: 'Wood 20% faster again.', icon: '🪓' },
@@ -1922,7 +1932,8 @@ export const WORK = {
  * The Age of Lightning (#231). `reach`: tiles from a finished Watch (Coil) Tower's centre within which a
  * building's centre is in its field. `lit` and `dark`: how fast a building in a field, and one outside every
  * field, trains and researches, in hundredths. The arc: one bolt strikes at most `strikes` enemies, leaping
- * at most `leap` tiles from one to the next, and keeps `keep` of its strength at each leap.
+ * at most `leap` tiles from one to the next, and keeps `keep` of its strength at each leap. Its first strike is `bolt` times
+ * the tower's arrow, so a coil keeps the bite it had before the tower line weakened raw towers (2026-10-24).
  */
 /** St. Elmo's Fire (#240): soldiers within `reach` tiles of a Temple in a Tower's field mend `heal` of their health every `every` seconds. */
 export const ELMO = { reach: 6, heal: 0.04, every: 2 };
@@ -1936,7 +1947,7 @@ export const TELEGRAPH = { sight: 5 };
 /** Galvanic Revival (#240): repairs in a Tower's field cost nothing and go `repair` times as fast; a dug ruin in a field pays `gold` every `every` seconds. */
 export const GALVANIC = { repair: 1.5, gold: 25, every: 30 };
 
-export const LIGHTNING = { reach: 10, lit: 135, dark: 75, strikes: 4, leap: 2.5, keep: 0.7 };
+export const LIGHTNING = { reach: 10, lit: 135, dark: 75, strikes: 4, leap: 2.5, keep: 0.7, bolt: 2 };
 
 /**
  * Signal beacons (own pitch): a built Watch Tower can light a fire on its roof. While it burns the tower sees
@@ -2568,6 +2579,11 @@ export const HEMO_IRON = { cost: 3, last: 2, mend: 1.5, crash: 0.5 };
 
 /** The Blood Tower (#355 s3): its bolts hit the living `living` times as hard as a Watch Tower's arrows, the bloodless `bloodless` times. */
 export const BLOOD_TOWER = { living: 3, bloodless: 0.15 };
+/**
+ * Guns on buildings: a Town Center's (and a Blood Tower's) arrows hit `epoch` harder for each epoch its people has reached.
+ * A Watch Tower gains only `towerEpoch` an epoch by itself; the rest it earns through the tower line (Guard Tower, Keep, Bastion).
+ */
+export const GUNS = { epoch: 0.2, towerEpoch: 0.1 };
 
 /**
  * The Age of Hemocraft (#355 s2): each second a finished Drain Rig bleeds up to `most` living enemies within `drain` tiles (nearest first,

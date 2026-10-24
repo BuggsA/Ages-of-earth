@@ -110,8 +110,8 @@ const TECH_ORDER: TechId[] = [
   // Heirlooms first (#224, #232): techProblem keeps them shut until both their ages are walked, and once
   // one opens it is the prize of the road the computer chose for it, so it is bought before anything else.
   'bellFoundry', 'ironHulls', 'jointStock', 'masonsLodge', 'stElmo', 'telegraphy', 'galvanic', 'galvanicBlood', 'militaryOrders',
-  'plow', 'drying', 'hounds', 'axes', 'wheelbarrow', 'picks', 'forging', 'bloomery', 'scaleArmor', 'fletching', 'husbandry', 'irrigation', 'saws', 'shafts', 'handcart',
-  'ironCasting', 'chainMail', 'bodkin', 'masonry', 'theology', 'conscription', 'blastFurnace', 'plateArmor', 'chemistry', 'blackPowder', 'saltCuring', 'bloodForged',
+  'plow', 'drying', 'hounds', 'axes', 'wheelbarrow', 'picks', 'forging', 'bloomery', 'scaleArmor', 'fletching', 'husbandry', 'guardTower', 'irrigation', 'saws', 'shafts', 'handcart',
+  'ironCasting', 'chainMail', 'bodkin', 'masonry', 'keep', 'theology', 'conscription', 'blastFurnace', 'plateArmor', 'chemistry', 'blackPowder', 'bastion', 'saltCuring', 'bloodForged',
   'gillnets', 'shipwright', 'lighthouse', 'steamEngine', 'rifling', 'aviation', 'caravan', 'banking', 'pilgrimage', 'credit', 'ropewalk', 'litany',
 ];
 /** Seconds a computer keeps its traders off a road after losing one on it. */

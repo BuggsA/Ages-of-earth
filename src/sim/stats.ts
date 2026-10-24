@@ -1,4 +1,4 @@
-import { AGES, BUILDINGS, CIVS, WAYS, WORKS, SIGNATURES, EPOCHS, FLOOD, NO_MODS, PATHS, RARE, TECHS, WARCAMP, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
+import { AGES, BUILDINGS, CIVS, GUNS, WAYS, WORKS, SIGNATURES, EPOCHS, FLOOD, NO_MODS, PATHS, RARE, TECHS, WARCAMP, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
 import { fairLevy } from './fair';
 import { flooded } from './flood';
 import { ageDef, ageOf, hasWalked, isHire, isSuspended, pathCarry } from './ages';
@@ -160,7 +160,26 @@ export function trainTimeFor(s: GameState, owner: number, type: UnitType, at: Bu
 
 export function buildingMaxHp(s: GameState, owner: number, type: BuildingType): number {
   const p = s.players[owner];
-  return Math.round(buildingHp(type, p.epoch) * cacheOf(p).mods.buildingHp);
+  const m = cacheOf(p).mods;
+  return Math.round(buildingHp(type, p.epoch) * m.buildingHp * (type === 'tower' ? m.towerHp : 1));
+}
+
+/** The strength of one arrow from a building's guns (before armour), for its owner now; 0 if it has none. */
+export function gunPower(s: GameState, owner: number, type: BuildingType): number {
+  const g = BUILDINGS[type].guns;
+  if (!g) return 0;
+  const p = s.players[owner];
+  const m = cacheOf(p).mods;
+  const tower = type === 'tower';
+  return (g.damage + m.rangedAttack + (tower ? m.towerAttack : 0)) * (1 + p.epoch * (tower ? GUNS.towerEpoch : GUNS.epoch));
+}
+
+/** How far a building's guns shoot for its owner now, from its edge (add half its size for its centre); 0 if it has none. */
+export function gunRange(s: GameState, owner: number, type: BuildingType): number {
+  const g = BUILDINGS[type].guns;
+  if (!g) return 0;
+  const m = cacheOf(s.players[owner]).mods;
+  return g.range + m.range + (type === 'tower' ? m.towerRange : 0);
 }
 
 /** What a building costs a player now (walls change with the epoch; some civilizations pay less for wonders). */

@@ -3,7 +3,7 @@ import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
 import type { Spatial } from './spatial';
-import { buildTimeFor, buildingCostFor, modsOf } from './stats';
+import { buildTimeFor, buildingCostFor, gunRange, modsOf } from './stats';
 import { flooded } from './flood';
 import { mineable } from './household';
 import { felled, isCoppice } from './coppice';
@@ -747,7 +747,7 @@ function underGuns(s: GameState, u: Unit, x: number, y: number): boolean {
     if (e.kind !== 'building' || e.hp <= 0 || !e.built || !isEnemy(s, u.owner, e.owner)) continue;
     const g = BUILDINGS[e.type].guns;
     if (!g || !seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
-    const r = g.range + EXPLORE.wary + BUILDINGS[e.type].size / 2;
+    const r = gunRange(s, e.owner, e.type) + EXPLORE.wary + BUILDINGS[e.type].size / 2;
     if ((e.x - x) * (e.x - x) + (e.y - y) * (e.y - y) <= r * r) return true;
   }
   return false;

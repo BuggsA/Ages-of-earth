@@ -30,7 +30,7 @@ import { chantedOver, consecrates, faithOf } from '../sim/consecrate';
 import { rallyProblem } from '../sim/rally';
 import { stirred as stirredNow } from '../sim/combat';
 import { sees } from '../sim/vision';
-import { buildingCostFor, buildingMaxHp, modsOf, statsFor, techCostFor, techProblem, trainCostFor, trainTimeFor } from '../sim/stats';
+import { buildingCostFor, buildingMaxHp, gunPower, gunRange, modsOf, statsFor, techCostFor, techProblem, trainCostFor, trainTimeFor } from '../sim/stats';
 import { isMobile, packProblem, packsOf, pitchProblem } from '../sim/steppe';
 import { exacting, isRider } from '../sim/tribute';
 import { landOwnerAt } from '../sim/borders';
@@ -981,7 +981,7 @@ export class Hud {
         ${mine && b.type === 'market' && b.built ? `<div class="blurb">Prices shared by all players. ↑ recovers upward, ↓ downward, → steady. Drift: ${MARKET.recover} gold every ${MARKET.every}s toward the starting quote; trades move it immediately.</div>` : ''}
         ${mine && b.built && b.hp < max ? `<div class="blurb">Select citizens and right-click to repair (a full repair costs ${Math.round(REPAIR_SHARE * 100)}% of its price).${def.garrison ? ' Press G to shelter instead.' : ''}</div>` : ''}
         ${inside}
-        ${queue || `<div class="blurb">${def.blurb}${def.guns ? ` Shoots ${def.guns.range} tiles.` : ''}</div>`}
+        ${queue || `<div class="blurb">${def.blurb}${def.guns ? ` Shoots ${gunRange(s, b.owner, b.type)} tiles, ${Math.round(gunPower(s, b.owner, b.type))} an arrow.` : ''}</div>`}
       </div>`;
     return [html, sig];
   }

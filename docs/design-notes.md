@@ -1208,3 +1208,7 @@ Built: the title's film used to circle each town in turn. Every 24 s it now pick
 Why I love it: the film becomes a few framed pictures of the world's own story (a quay at sunset, a column reaching a landmark), not a tour of the same town. The match behind it is real, so what it shows is whatever the two computers are doing.
 
 Seen: headless Chromium (software GL), a lakes map, a dock and an army put in by hand: `docs/screenshots/title-dock-dusk.jpg`, `title-ford-morning.jpg`. Not seen: the cuts in motion, or a real computer-vs-computer ford; in 24 matches of 450 s a dock stood in 13 and an army sat near a ford in 5, so about half the loops have a dock shot and a fifth a ford shot. Foreground buildings can crowd the dock shot. Next: a harbour shot with ships, a night shot of a lit town, a camera that waits for the first clash.
+
+## Designers' notes: the tower line (2026-10-24)
+
+Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and grows through Guard Tower, Keep and Bastion researched at the tower itself. Why I like it: a tower rush stays possible but is cheap to answer, and a tower wall becomes an investment you choose to make (stone and research instead of soldiers) rather than a free scaling with the epoch. Next: give each step its own model (a second storey, stone walls, a low angled bastion), and maybe a fork at the Bastion (more arrows for the garrison, or walls that shrug off siege).
