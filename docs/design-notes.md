@@ -1530,3 +1530,18 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 **Seen and not:** headless only (tests and the probe). Not watched in a browser: the bait walking out, or a whole match where a computer meets a human's gate.
 
 **Next:** the defender's side of the duel (the computer holding its fire when the "army" on its flats is only bait, and a bigger wave stands at the muster); boats in the scour; a wave that times its march for the hour just after a rival's gate has fired.
+
+## Designers' notes: the computer's gate reads bait (#796, s6h of #701, 2026-10-24, chain 1024-1330 s8, lane rules)
+
+**Built:** the defender's half of the gate duel. `gateRead` (`ai.ts`) weighs who stands on the flats a loaded gate would scour against the rival soldiers on the shore within 9 tiles of them. Fewer than 6 on the flats, with twice their health or more waiting ashore, is bait: the gate **holds**. It **fires late** once 2 more rivals than it held for have stepped onto the flats (it remembers every one it has seen there, so an army streaming across counts even as the first step off the far side), once the shore's share falls short (the army is crossing, or has gone), or 2 s before the rising tide would leave its head too low to scour (`gateFading`, `tides.ts`). And a **guard** (`gateGuard`): a rival of a Sapper people within 14 tiles of the gate draws its nearest foot soldier (within 40) to stand beside it, kept out of the army's orders for 15 s at a time (`gatePost`), and a lit keg by the gate sends it running to stamp the fuse out. Numbers: `AI_GATE_READ`. Tip `gateHolds`.
+
+**Why I love it:** a gate that always takes the bait is a puzzle solved once. Now the moment the sea is let out is a bluff from both ends: the human who baits a computer must keep the army out of sight (over 9 tiles back) for the bait to look like all there is, and must time a keg for when no guard stands by.
+
+**Probe** (`npx tsx scripts/gate-probe.ts 16 4`, 8 of 16 seeds; a computer owns the gate, a wave of 10 answers it as the computer does). Before → after, 4 minutes: straight in, 19 → 19 dead; the computer's bait, 14 → 26 dead (the gate holds, the wave waits and crosses late, often into the flood); the keg with 3 of the gate's soldiers 4–8 tiles off, kegs blown 7 → 2, stamped out 0 → 4. A guard 12–20 tiles off is too late for a carrier that starts 4 tiles from the gate (8 s fuse).
+
+**Gave up on:** "a lone carrier" only. A Sapper wave mustering by the gate is exactly when a guard is needed, so any number draws one.
+
+**Seen and not:** headless only (tests, the probe). Not watched in a browser; the tip is tested headlessly, not seen on screen.
+
+**Next:** the attacker reading the hold (pull the muster back past 9 tiles, or send the bait from far off); a guard posted before any Sapper comes near; boats in the scour.
+

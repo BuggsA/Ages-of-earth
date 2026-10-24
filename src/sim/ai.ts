@@ -20,6 +20,8 @@ import { cocklerSpotNear } from './tides';
 import { AI_GATE } from './data';
 import { gateReach, gateRisk, tideGateProblem, tideGateSpotIn } from './tides';
 import { AI_GATE_ANSWER } from './data';
+import { AI_GATE_READ } from './data';
+import { gateFading, isTidal } from './tides';
 import { gateAhead, gateLoaded, gateOnWay, kegTileProblem } from './tides';
 import { carriesKegs } from './powder';
 import { nearestDrop } from './world';
@@ -1977,8 +1979,9 @@ function barrageWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) =
 /**
  * The computer's Tide Gate (#785). With a barrage of its own standing and no gate, every `AI_GATE.every` seconds it sets one in it
  * (`tideGateSpotIn`: of its causeway tiles by a pond, in tile order, the one nearest the middle with the sea on the far side). Every
- * `AI_GATE.look` seconds after: with the gate shut and loaded, it opens it when `AI_GATE.threat` or more enemy land units stand on the
- * flats it would scour, more than its own side's there; an open gate it shuts again `AI_GATE.shut` seconds on, to fill on the next flood.
+ * `AI_GATE.look` seconds after: a lone keg-carrier near the gate draws a guard (`gateGuard`, #796); with the gate shut and loaded, it
+ * opens it when `gateRead` says fire (rivals on the flats, and not bait while their army waits on the shore); an open gate it shuts again
+ * `AI_GATE.shut` seconds on, to fill on the next flood.
  */
 function gateWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
@@ -2002,23 +2005,175 @@ function gateWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const m = (mem.tide ??= {});
   if (!gate.built || s.tick - (m.gate ?? -99999) < secs(AI_GATE.look)) return;
   m.gate = s.tick;
+  gateGuard(s, v, m, gate, issue);
   if (gate.open) {
+    delete m.hold;
     if (s.tick - (m.opened ?? -99999) >= secs(AI_GATE.shut) && !tideGateProblem(s, gate)) issue({ t: 'pack', p: p.id, building: gate.id });
     return;
   }
-  const reach = gateReach(s, gate);
-  if (!reach.length) return;
-  const below = new Set(reach);
-  let foes = 0;
-  let ours = 0;
-  for (const e of s.ents) {
-    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || domainOf(e.type) !== 'land' || !below.has(Math.floor(e.y) * s.w + Math.floor(e.x))) continue;
-    if (isEnemy(s, p.id, e.owner)) foes++;
-    else ours++;
-  }
-  if (foes < AI_GATE.threat || foes <= ours) return;
+  if (gateRead(s, p.id, gate, m) !== 'fire') return;
   issue({ t: 'pack', p: p.id, building: gate.id });
   m.opened = s.tick;
+  delete m.hold;
+}
+
+/** Whether a rival unit counts toward an army on the shore (#796): a soldier on the ground, not a citizen, priest, trader or wagon. */
+const soldierOnFoot = (e: Unit): boolean =>
+  domainOf(e.type) === 'land' && e.type !== 'citizen' && e.type !== 'priest' && e.type !== 'trader' && e.type !== 'wagon' && e.type !== 'tow';
+
+/**
+ * Whether the computer's shut gate should fire now (#796), from public state only (who stands where, their health, the tide):
+ * - nothing to fire on (null): its gate unloaded, under `AI_GATE.threat` rivals on the flats it would scour, or no more than its own there;
+ * - 'hold': fewer than `AI_GATE_READ.full` rivals on the flats while rival soldiers on the shore within `near` tiles of them (not on them)
+ *   hold `army` times their health or more: bait, with the army it was sent for waiting to cross. It keeps when it began to hold, the
+ *   count then, and every rival it has seen on the flats since, in `m.hold`;
+ * - 'fire' otherwise, and late, while holding: `rise` more rivals seen on the flats than stood there when it began (bait stands; an army
+ *   crossing brings fresh feet), the army's share fallen short (it is crossing, or gone), or the tide `lose` seconds from leaving the
+ *   head too low to scour (`gateFading`).
+ * Reads `s.ents` in id order; arithmetic only.
+ */
+export function gateRead(s: GameState, owner: number, gate: Building, m: NonNullable<AiMemory['tide']>): 'fire' | 'hold' | null {
+  const reach = gateReach(s, gate);
+  if (!reach.length) {
+    delete m.hold;
+    return null;
+  }
+  const below = new Set(reach);
+  const R = AI_GATE_READ.near;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const t of reach) {
+    const x = t % s.w, y = Math.floor(t / s.w);
+    x0 = Math.min(x0, x);
+    y0 = Math.min(y0, y);
+    x1 = Math.max(x1, x);
+    y1 = Math.max(y1, y);
+  }
+  let foes = 0;
+  let ours = 0;
+  let onFlats = 0;
+  let ashore = 0;
+  const on: number[] = [];
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || domainOf(e.type) !== 'land') continue;
+    const tile = Math.floor(e.y) * s.w + Math.floor(e.x);
+    const foe = isEnemy(s, owner, e.owner);
+    if (below.has(tile)) {
+      if (foe) {
+        foes++;
+        onFlats += e.hp;
+        on.push(e.id);
+      } else ours++;
+      continue;
+    }
+    if (!foe || !soldierOnFoot(e) || e.x < x0 - R || e.x > x1 + 1 + R || e.y < y0 - R || e.y > y1 + 1 + R) continue;
+    for (const t of reach) {
+      const dx = (t % s.w) + 0.5 - e.x, dy = Math.floor(t / s.w) + 0.5 - e.y;
+      if (dx * dx + dy * dy > R * R) continue;
+      ashore += e.hp;
+      break;
+    }
+  }
+  if (foes < AI_GATE.threat || foes <= ours) {
+    delete m.hold;
+    return null;
+  }
+  const bait = foes < AI_GATE_READ.full && ashore >= AI_GATE_READ.army * onFlats;
+  if (!bait) return 'fire';
+  // Bait stands still; an army crossing brings fresh feet onto the flats, even while as many step off the far side.
+  const h = (m.hold ??= { at: s.tick, n: foes, seen: [] });
+  const seen = new Set(h.seen);
+  for (const id of on) seen.add(id);
+  h.seen = [...seen].sort((a, b) => a - b);
+  if (h.seen.length >= h.n + AI_GATE_READ.rise) return 'fire';
+  if (gateFading(s, gate, AI_GATE_READ.lose)) return 'fire';
+  return 'hold';
+}
+
+/** The soldier the computer last sent to guard its Tide Gate (#796), while it lives and was sent within `AI_GATE_READ.again` seconds; -1: none. */
+export function gatePost(s: GameState, mem: AiMemory): number {
+  const g = mem.tide?.guard;
+  if (!g || s.tick - g.at >= secs(AI_GATE_READ.again)) return -1;
+  const u = s.byId.get(g.id);
+  return u && u.kind === 'unit' && u.hp > 0 ? g.id : -1;
+}
+
+/**
+ * A guard for the computer's gate (#796): with a rival who could carry a keg (a Sapper people's citizens and foot soldiers) within
+ * `AI_GATE_READ.watch` tiles of the gate, and none of its own side on the ground within `AI_KEG.guard` tiles of it, its soldier
+ * on foot nearest the gate within `call` tiles (ties by id) goes to stand by it: on the dry ground or causeway beside the gate nearest the
+ * rival, off the flats, fighting whoever it meets. Once each `again` seconds while the one sent still lives. And a rival's keg lit by
+ * the gate (within `KEG.reach` + 1 tiles), the guard, or else its soldier on foot nearest the keg, runs to it to stamp it out.
+ */
+function gateGuard(s: GameState, v: View, m: NonNullable<AiMemory['tide']>, gate: Building, issue: (c: Command) => void): void {
+  const { p } = v;
+  const g = m.guard ? s.byId.get(m.guard.id) : undefined;
+  // A rival's keg burning by the gate: its soldier on foot nearest it runs to stamp it out (the guard first, while it lives).
+  const keg = s.kegs?.find((k) => isEnemy(s, p.id, k.owner) && distToRect(k.x, k.y, gate) <= KEG.reach + 1);
+  if (keg) {
+    let by: Unit | null = g && g.kind === 'unit' && g.hp > 0 && !g.inside ? g : null;
+    if (!by) {
+      let bestD = Infinity;
+      for (const u of v.army) {
+        if (u.inside || !soldierOnFoot(u) || u.type === 'siege') continue;
+        const d = (u.x - keg.x) * (u.x - keg.x) + (u.y - keg.y) * (u.y - keg.y);
+        if (d <= AI_GATE_READ.call * AI_GATE_READ.call && d < bestD) {
+          bestD = d;
+          by = u;
+        }
+      }
+    }
+    if (by) {
+      issue({ t: 'move', p: p.id, ids: [by.id], x: keg.x, y: keg.y });
+      m.guard = { id: by.id, at: s.tick };
+      return;
+    }
+  }
+  if (m.guard && g && g.kind === 'unit' && g.hp > 0 && s.tick - m.guard.at < secs(AI_GATE_READ.again)) return;
+  let near: Unit | null = null;
+  let nearD = Infinity;
+  let kept = false;
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || domainOf(e.type) !== 'land') continue;
+    const d = distToRect(e.x, e.y, gate);
+    if (!isEnemy(s, p.id, e.owner)) {
+      if (d <= AI_KEG.guard) kept = true;
+      continue;
+    }
+    if (d > AI_GATE_READ.watch || !carriesKegs(e) || !sappers(s.players[e.owner])) continue;
+    if (d < nearD) {
+      nearD = d;
+      near = e;
+    }
+  }
+  if (!near || kept) return;
+  let best: Unit | null = null;
+  let bestD = Infinity;
+  for (const u of v.army) {
+    if (u.inside || !soldierOnFoot(u) || u.type === 'siege') continue;
+    const d = distToRect(u.x, u.y, gate);
+    if (d <= AI_GATE_READ.call && d < bestD) {
+      bestD = d;
+      best = u;
+    }
+  }
+  if (!best) return;
+  const below = new Set(gateReach(s, gate));
+  let spot = -1;
+  let spotD = Infinity;
+  for (let ty = gate.ty - 2; ty <= gate.ty + 2; ty++)
+    for (let tx = gate.tx - 2; tx <= gate.tx + 2; tx++) {
+      if (tx < 1 || ty < 1 || tx > s.w - 2 || ty > s.h - 2) continue;
+      const t = ty * s.w + tx;
+      if (below.has(t) || (isTidal(s, t) && !isCauseway(s, t)) || !walkable(s, tx, ty, -1)) continue;
+      const d = (tx + 0.5 - near.x) * (tx + 0.5 - near.x) + (ty + 0.5 - near.y) * (ty + 0.5 - near.y);
+      if (d < spotD) {
+        spotD = d;
+        spot = t;
+      }
+    }
+  if (spot < 0) return;
+  issue({ t: 'move', p: p.id, ids: [best.id], x: (spot % s.w) + 0.5, y: Math.floor(spot / s.w) + 0.5, amove: true });
+  m.guard = { id: best.id, at: s.tick };
 }
 
 /**
@@ -5950,6 +6105,9 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const guards = L.clever ? campGuards(v) : new Set<number>();
   // The horde's riders in a rival's land (#322) are held there, out of the waves' orders.
   if (L.clever) for (const id of exactTribute(s, v, mem, issue)) guards.add(id);
+  // The guard sent to its Tide Gate (#796) keeps its post, out of the army's orders, while that post is fresh.
+  const gateKeeper = gatePost(s, mem);
+  if (gateKeeper >= 0) guards.add(gateKeeper);
   let fighters = v.army.filter((u) => !u.inside && !sailing.has(u.id) && !guards.has(u.id));
   if (L.clever && L.curseAnswer !== false) fighters = answerCurse(s, v, mem, fighters, issue);
   if (L.clever && L.breakOath !== false) breakOath(s, v, fighters, issue);
