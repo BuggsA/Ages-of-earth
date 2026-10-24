@@ -26,9 +26,9 @@ const SNOWCAP = C('#d6d2ca');
  * Polder (#701): land pumped out of the water. Long strips of field in rich dark green and black loam, cut by straight ditches of
  * still water every few tiles; fresh from the water it is wet grey-brown mud, drying to field over `DRY_TIME` seconds.
  */
-const POLDER_FIELD = [C('#5d7a3a'), C('#4a6a30'), C('#4c4231')];
-const DITCH = C('#3f6a6a');
-const MUD = C('#5e5848');
+const POLDER_FIELD = [C('#7ba34a'), C('#69933f'), C('#86704c')];
+const DITCH = C('#5f9a92');
+const MUD = C('#857a60');
 const DRY_TIME = 20;
 const TMP = new THREE.Color();
 const A = new THREE.Vector3();
@@ -37,14 +37,14 @@ const V = new THREE.Vector3();
 
 /** A polder facet's colour: ditch, loam or field by where it lies, wet mud until it has dried (`dried` 0 to 1). */
 function polderColor(out: THREE.Color, x: number, y: number, t: number, fine: number, dried: number): void {
-  // Ditches run straight along every fifth column; one facet of the tile, so the water line is thin.
-  if (x % 5 === 0 && t === 0) out.copy(DITCH);
+  // Ditches run straight along every fifth column.
+  if (x % 5 === 0) out.copy(DITCH).lerp(POLDER_FIELD[1], t * 0.15);
   else {
     // Strips two tiles wide across the ditches: field, field, loam.
     const strip = Math.floor(y / 2) % 3;
     out.copy(strip === 2 ? POLDER_FIELD[2] : POLDER_FIELD[strip]).lerp(POLDER_FIELD[1], fine * 0.3);
   }
-  if (dried < 1) out.lerp(MUD, (1 - dried) * 0.85);
+  if (dried < 1) out.lerp(MUD, (1 - dried) * 0.8);
 }
 
 /** Tiles pumped out so far, by every people: a cheap test that the water layer changed. */
