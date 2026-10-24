@@ -1503,7 +1503,6 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 
 **Next:** a scour that carries boats aground or off; a sapper's keg aimed at a loaded gate (the computer doesn't yet target it); the computer luring a rival's gate open before it crosses.
 
-
 ## Designers' notes: the Age of the Sea Beggars, and the Water Road whole (the Water Road s8, #783, 2026-10-24, chain 1024-2000 s7, lane rules)
 
 **Built:** the Water Road's crossing, `AGES.beggars`: a people that walked the Age of Dykes and the Age of Sail turns off the Middle Ages into the Watergeuzen. Three new things, no more (`docs/engagement.md`): **boarding** (a rival ship your ships would sink is taken instead, with 35% of its timbers and its hold; `board` in `src/sim/beggars.ts`, called from `hurt`), **cutting** (your ships strike dykes, sluices, dams and causeways at siege strength, eight times a usual ship's blow, so the breach of s3 is a fleet's to start), and the **haven** (the kept Dock boards ships beaten down within 12 tiles of it on any road). The door: walls and gates, fishing boats, and a fifth more for every ship. The Age of Rivers gets the keepsake it lacked (a watered Farm, 30% faster on any road), so all six ages of the trunk keep one building that works off the road (`tests/water-keepsakes.test.ts`).
