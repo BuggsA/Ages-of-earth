@@ -8,7 +8,7 @@ import { T_WATER } from '../sim/types';
  */
 
 export interface TitleShot {
-  kind: 'town' | 'dock' | 'ford';
+  kind: 'town' | 'dock' | 'ford' | 'night';
   /** The player whose town or army it is, for the caption. */
   who: number;
   /** Where the camera looks at. */
@@ -29,10 +29,14 @@ export interface TitleShot {
 
 /** Each slot is 24 s; the cycle of shots, falling back to the next player's town when a shot isn't on offer. */
 export const SHOT_SECONDS = 24;
-const CYCLE: TitleShot['kind'][] = ['town', 'dock', 'town', 'ford'];
+const CYCLE: TitleShot['kind'][] = ['town', 'dock', 'town', 'ford', 'night'];
 /** Dusk and early morning. */
 export const DUSK = 19.2;
 export const MORNING = 7.4;
+/** The small hours, when the moon is high and the windows are lit. */
+export const MIDNIGHT = 23.4;
+/** A town shows at night once it has this many finished buildings besides the town centre. */
+const NIGHT_BUILDINGS = 5;
 /** An army within this many tiles of a ford counts as at it. */
 const FORD_RANGE = 14;
 
@@ -64,6 +68,14 @@ export function titleShot(s: GameState, slot: number): TitleShot {
       const dock = s.ents.find((e) => e.kind === 'building' && e.type === 'dock' && e.owner === p.id && e.built);
       const sea = dock && seaward(s, dock.x, dock.y);
       if (dock && sea) return { kind, who: p.id, x: dock.x, y: dock.y, lookX: sea.x, lookY: sea.y, hour: DUSK, distance: 15, note: 'a dock at dusk', marching: false };
+    }
+  }
+  if (kind === 'night') {
+    for (let i = 0; i < s.players.length; i++) {
+      const p = s.players[(who.id + i) % s.players.length];
+      const tc = s.ents.find((e) => e.kind === 'building' && e.type === 'towncenter' && e.owner === p.id);
+      const homes = s.ents.filter((e) => e.kind === 'building' && e.owner === p.id && e.built && e.type !== 'towncenter').length;
+      if (tc && homes >= NIGHT_BUILDINGS) return { kind, who: p.id, x: tc.x, y: tc.y, lookX: s.w / 2 - tc.x, lookY: s.h / 2 - tc.y, hour: MIDNIGHT, distance: 21, note: 'a town at night', marching: false };
     }
   }
   if (kind === 'ford') {

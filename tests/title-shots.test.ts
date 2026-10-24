@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createGame } from '../src/sim/game';
 import { placeProblem } from '../src/sim/grid';
-import { DUSK, MORNING, easeHour, titleShot } from '../src/ui/titleShots';
+import { DUSK, MIDNIGHT, MORNING, easeHour, titleShot } from '../src/ui/titleShots';
 import type { GameState } from '../src/sim/types';
 import { placeBuilding, spawnUnit } from '../src/sim/world';
 
@@ -61,6 +61,24 @@ describe('the title\'s chosen shots (#267)', () => {
     expect(shot.lookX).toBeGreaterThan(0); // the ford lies east of the men
     expect(shot.x).toBeGreaterThan(24);
     expect(shot.x).toBeLessThan(30.5);
+  });
+
+  it('frames a built-up town at night, lit by the moon', () => {
+    const s = lakes();
+    expect(titleShot(s, 4).kind).toBe('town');
+    const p = s.players[0];
+    for (let i = 0; i < 6; i++) {
+      for (let k = 0; k < 400; k++) {
+        const tx = Math.floor(p.startX) + 4 + (k % 20) * 3;
+        const ty = Math.floor(p.startY) - 8 + Math.floor(k / 20) * 3;
+        if (tx < s.w - 2 && ty > 1 && ty < s.h - 2 && !placeProblem(s, 'house', tx, ty)) { placeBuilding(s, 0, 'house', tx, ty, true); break; }
+      }
+    }
+    const shot = titleShot(s, 4);
+    expect(shot.kind).toBe('night');
+    expect(shot.who).toBe(0);
+    expect(shot.hour).toBe(MIDNIGHT);
+    expect(shot.note).toBe('a town at night');
   });
 
   it('eases the hour the short way round, and drifts when a shot has no hour', () => {
