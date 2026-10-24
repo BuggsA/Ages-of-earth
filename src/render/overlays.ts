@@ -64,11 +64,11 @@ export class Overlays {
   private c = new THREE.Color();
 
   constructor() {
-    const ring = new THREE.RingGeometry(0.86, 1, 40);
+    const ring = new THREE.RingGeometry(0.92, 1, 40);
     ring.rotateX(-Math.PI / 2);
     const mat = () => new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.9, depthWrite: false, fog: false, toneMapped: false });
     this.rings = new THREE.InstancedMesh(ring, mat(), MAX_RINGS);
-    const sq = new THREE.RingGeometry(0.93, 1, 4, 1);
+    const sq = new THREE.RingGeometry(0.95, 1, 4, 1);
     sq.rotateZ(Math.PI / 4);
     sq.rotateX(-Math.PI / 2);
     this.squares = new THREE.InstancedMesh(sq, mat(), 64);
@@ -211,10 +211,19 @@ export class Overlays {
     const n = Math.min(list.length, MAX_BARS);
     camera.getWorldQuaternion(this.q);
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.q);
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(this.q);
+    // In a melee the bars of neighbours land on one line and fuse into a stripe: bars that fall in the same
+    // patch of screen stack upward instead, so each stays a bar you can read.
+    const cells = new Map<number, number>();
     for (let i = 0; i < n; i++) {
       const b = list[i];
       const h = 0.07;
-      this.m.compose(b.at, this.q, this.sc.set(b.width + 0.04, h + 0.035, 1));
+      this.p.copy(b.at).project(camera);
+      const key = Math.round(this.p.x * 28) * 4096 + Math.round(this.p.y * 40);
+      const stack = cells.get(key) ?? 0;
+      cells.set(key, stack + 1);
+      if (stack) b.at = b.at.clone().addScaledVector(up, Math.min(stack, 4) * (h + 0.05));
+      this.m.compose(b.at, this.q, this.sc.set(b.width + 0.07, h + 0.07, 1));
       this.barBack.setMatrixAt(i, this.m);
       this.barBack.setColorAt(i, this.c.set('#141414'));
       const f = Math.max(0, Math.min(1, b.frac));

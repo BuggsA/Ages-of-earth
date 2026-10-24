@@ -21,9 +21,9 @@ interface Style {
 }
 
 const STYLES: Style[] = [
-  { wall: '#a8865e', wall2: '#8f6f4a', roof: '#d1ae62', roof2: '#b8954d', trim: '#6e4f33', base: '#8d7a62', post: '#6b4b2f', window: '#3a2b20' },
-  { wall: '#dbb07e', wall2: '#c99a66', roof: '#bb5f37', roof2: '#a24c2a', trim: '#f0e4c8', base: '#b9a58a', post: '#8a6a44', window: '#3a2b20' },
-  { wall: '#ece4d2', wall2: '#a9a397', roof: '#56616f', roof2: '#47515d', trim: '#4a3426', base: '#9a948a', post: '#4a3426', window: '#2c3440' },
+  { wall: '#a8865e', wall2: '#8f6f4a', roof: '#d6b868', roof2: '#c9a857', trim: '#6e4f33', base: '#8d7a62', post: '#6b4b2f', window: '#3a2b20' },
+  { wall: '#dbb07e', wall2: '#c99a66', roof: '#6a3220', roof2: '#55291a', trim: '#f0e4c8', base: '#b9a58a', post: '#8a6a44', window: '#3a2b20' },
+  { wall: '#ece4d2', wall2: '#a9a397', roof: '#444e5b', roof2: '#38414c', trim: '#4a3426', base: '#9a948a', post: '#4a3426', window: '#2c3440' },
   { wall: '#b45c42', wall2: '#efe8da', roof: '#713c2d', roof2: '#5c3024', trim: '#f2ece0', base: '#8d8579', post: '#4a3426', window: '#3b4a5a' },
   { wall: '#8a3c2c', wall2: '#d8d0c0', roof: '#4a5058', roof2: '#3a4048', trim: '#e8e2d4', base: '#7a756c', post: '#3a3a3e', window: '#2c3440' },
 ];
@@ -148,7 +148,8 @@ function towncenter(k: Kit, e: number, st: Style): void {
 function house(k: Kit, e: number, st: Style): void {
   pad(k, 2, st.base);
   if (e === 0) {
-    hut(k, st, -0.1, -0.05, 0.55, 0.5);
+    hut(k, st, -0.3, -0.15, 0.5, 0.45);
+    hut(k, st, 0.5, -0.05, 0.28, 0.3);
     k.cyl(0.03, 0.03, 0.4, 4, st.post, 0.7, 0, 0.55);
     k.team(k.box(0.02, 0.14, 0.2, TEAM, 0.7, 0.24, 0.65));
     k.box(0.3, 0.12, 0.2, '#6d4a2e', 0.55, 0, -0.6);
@@ -224,6 +225,14 @@ function storehouse(k: Kit, e: number, st: Style): void {
   k.sphere(0.08, '#cfa030', 0.45, 0.07, 0.25);
   k.cyl(0.12, 0.1, 0.25, 7, '#b08a4e', -0.4, 0, 0.6);
   k.team(k.box(1.62, 0.05, 0.06, TEAM, 0, 0.74, 0.55));
+  if (e === 1) {
+    // Beehive granaries of baked clay behind the shed: round domes that no other Bronze building has.
+    for (const x of [-0.45, 0.45]) {
+      k.cyl(0.38, 0.4, 0.55, 9, st.wall, x, 0, -0.35);
+      k.dome(0.4, st.roof2, x, 0.55, -0.35);
+    }
+    k.box(0.14, 0.2, 0.03, '#3a2b20', -0.45, 0, -0.02);
+  }
   if (e === 3) {
     // A warehouse loft: a gabled upper room with a hatch, so the shed rises above the houses' roofs.
     k.box(1.1, 0.5, 0.9, st.wall, 0, 1.15, -0.1);
@@ -288,6 +297,77 @@ function huntcamp(k: Kit, e: number, st: Style): void {
     if (e >= 4) lamp(k, 0.9, 0, 0.9, 0.75);
   }
   banner(k, 0.85, 0, 0.8, 0.8);
+}
+
+// ---- Mine Shaft (#681) ---------------------------------------------------------------------------------
+
+/** The spoil heap's colours by seam (`SEAMS` order: stone, gold, salt, saltpetre, blood-iron): the rock, and the flecks of what is dug. */
+const SPOIL: [string, string][] = [['#8d8579', '#b3aca0'], ['#7d7466', '#e8c040'], ['#9a948a', '#eeeae0'], ['#8f8a7c', '#d9d2b0'], ['#5e5650', '#6a1f24']];
+
+/**
+ * A shaft collar of squared timbers round a dark hole, the headframe over it, and a spoil heap beside it that shows the seam:
+ * grey rock for stone, gold-flecked ore for gold, a rare ore's colour over its old workings. Bronze and Iron: an A-frame with
+ * a windlass and a hanging bucket; Gunpowder: a taller timber frame with a sheave wheel; Industrial: an iron lattice headframe,
+ * a winding-engine house and its stack. A rail of ore tubs runs from the collar.
+ */
+function shaft(k: Kit, e: number, st: Style, seam: number): void {
+  pad(k, 2, st.base);
+  const [rock, fleck] = SPOIL[Math.min(Math.max(seam, 0), SPOIL.length - 1)];
+  // The collar and the hole.
+  k.box(0.62, 0.03, 0.62, '#1c1712', -0.25, 0.02, -0.2);
+  for (const [w, d, x, z] of [[0.82, 0.1, -0.25, -0.56], [0.82, 0.1, -0.25, 0.16], [0.1, 0.62, -0.61, -0.2], [0.1, 0.62, 0.11, -0.2]] as [number, number, number, number][]) {
+    k.box(w, 0.12, d, e >= 3 ? STONE : WOOD, x, 0, z);
+  }
+  const frame = e >= 4 ? '#3a3e44' : st.post;
+  const top = e >= 3 ? 1.75 : 1.25;
+  // Two A-frames over the hole, joined at the top by the axle beam.
+  for (const z of [-0.5, 0.1]) {
+    for (const sx of [-1, 1]) {
+      const leg = k.cyl(0.035, 0.045, Math.sqrt(0.36 * 0.36 + top * top), 5, frame, -0.25 + sx * 0.18, 0, z);
+      leg.rotation.z = sx * 0.36 / top;
+    }
+  }
+  k.box(0.08, 0.08, 0.72, frame, -0.25, top - 0.06, -0.2);
+  if (e >= 3) {
+    // The sheave wheel, its rope down the shaft.
+    const wheel = k.cyl(0.26, 0.26, 0.05, 12, e >= 4 ? '#6a6e74' : WOOD, -0.25, top - 0.3, -0.2);
+    wheel.rotation.z = Math.PI / 2;
+    k.box(0.015, top - 0.35, 0.015, '#c9b98f', -0.25, 0.15, -0.2);
+  } else {
+    // A windlass with its crank, the rope and a bucket of ore halfway up.
+    const drum = k.cyl(0.07, 0.07, 0.62, 6, WOOD, -0.25, 0.62, -0.2);
+    drum.rotation.x = Math.PI / 2;
+    for (const z of [-0.55, 0.15]) k.box(0.06, 0.66, 0.06, st.post, -0.25, 0, z);
+    k.box(0.04, 0.18, 0.04, st.post, -0.25, 0.62, 0.22);
+    k.box(0.015, 0.3, 0.015, '#c9b98f', -0.25, 0.32, -0.2);
+    k.cyl(0.08, 0.06, 0.12, 6, WOOD, -0.25, 0.2, -0.2);
+  }
+  if (e >= 4) {
+    // The winding-engine house and its stack, a cable running to the wheel.
+    k.box(0.6, 0.55, 0.5, st.wall, 0.6, 0, -0.55);
+    k.prism(0.64, 0.22, 0.54, st.roof, 0.6, 0.55, -0.55);
+    k.cyl(0.07, 0.09, 1.2, 6, '#7a3a2c', 0.82, 0, -0.72);
+    const cable = k.box(0.012, 0.012, 1.1, '#2b2b2e', 0.2, 1.05, -0.38);
+    cable.rotation.y = 1.1;
+    cable.rotation.z = 0.5;
+  }
+  // The spoil heap: the seam shows in it.
+  k.sphere(0.42, rock, 0.55, 0.0, 0.42).scale.set(1, 0.55, 1);
+  k.sphere(0.24, rock, 0.25, 0.0, 0.7).scale.set(1, 0.5, 1);
+  for (const [x, y, z] of [[0.45, 0.17, 0.3], [0.62, 0.15, 0.55], [0.72, 0.1, 0.25], [0.35, 0.12, 0.55], [0.22, 0.06, 0.75]] as [number, number, number][]) {
+    k.octa(0.055, fleck, x, y, z);
+  }
+  // Ore tubs on a short rail from the collar.
+  for (const x of [-0.85, -0.45]) k.box(0.025, 0.02, 0.62, '#4a4a4e', x, 0, 0.6);
+  for (const z of [0.45, 0.78]) {
+    k.box(0.36, 0.2, 0.22, e >= 3 ? '#4a4a4e' : WOOD, -0.65, 0.04, z);
+    k.sphere(0.1, fleck, -0.65, 0.24, z).scale.set(1.3, 0.5, 0.8);
+  }
+  // A pick and a shovel against the collar.
+  const haft = k.cyl(0.018, 0.018, 0.55, 4, WOOD, 0.25, 0.0, -0.75);
+  haft.rotation.x = 0.35;
+  k.box(0.24, 0.035, 0.035, '#8a8f96', 0.25, 0.5, -0.66);
+  k.team(k.box(0.012, 0.16, 0.24, TEAM, -0.25, top - 0.3, 0.16));
 }
 
 // ---- Prospector's Lodge (#562) -------------------------------------------------------------------------
@@ -671,8 +751,15 @@ function barracks(k: Kit, e: number, st: Style): void {
     return;
   }
   if (e === 1) {
+    // A fortress barracks: a tall stepped gate tower between two crenellated wings, so it stands up out of the rows of low roofs.
     k.box(2.6, 0.8, 1.4, st.wall, 0, 0, -0.6);
     k.box(2.7, 0.07, 1.5, st.trim, 0, 0.8, -0.6);
+    for (const x of [-1.2, -0.9, -0.6, 0.6, 0.9, 1.2]) k.box(0.2, 0.16, 0.16, st.wall, x, 0.87, -1.2);
+    k.box(1.0, 1.6, 0.9, st.wall, 0, 0, -0.55);
+    k.box(1.1, 0.08, 1.0, st.trim, 0, 1.6, -0.55);
+    k.box(0.7, 0.5, 0.7, st.wall2, 0, 1.68, -0.55);
+    k.box(0.8, 0.06, 0.8, st.trim, 0, 2.18, -0.55);
+    for (const [x, z] of [[-0.35, -0.9], [0.35, -0.9], [-0.35, -0.2], [0.35, -0.2]]) k.box(0.16, 0.16, 0.16, st.wall, x, 2.24, z);
     k.box(2.6, 0.08, 0.7, st.roof, 0, 0.75, 0.45);
     for (let i = 0; i < 5; i++) k.cyl(0.06, 0.07, 0.75, 7, st.trim, -1.15 + i * 0.575, 0, 0.75);
     k.box(0.4, 0.55, 0.04, '#3a2b20', 0, 0, 0.11);
@@ -773,6 +860,11 @@ function range(k: Kit, e: number, st: Style): void {
     for (const x of [-0.7, 0.7]) k.box(0.1, 0.4, 0.04, '#2b2b2e', x, 0.2, -0.33);
     for (let i = 0; i < 3; i++) k.cyl(0.015, 0.015, 0.55, 4, WOOD, -1.2 + i * 0.1, 0, 0.35).rotation.z = 0.2;
     k.prism(1.4, 0.35, 0.4, st.wall2, 0, 0, 1.45);
+    // A tall archers' mast with a gong ring and a pennon: the one vertical on a long, low court.
+    k.cyl(0.04, 0.05, 2.0, 5, st.post, 1.25, 0, -0.25);
+    k.cyl(0.2, 0.2, 0.05, 10, '#c89a3a', 1.25, 1.55, -0.18).rotation.x = Math.PI / 2;
+    k.cone(0.07, 0.2, 5, st.roof2, 1.25, 2.0, -0.25);
+    k.box(0.8, 0.05, 0.3, st.roof2, 0, 0.82, -1.0).rotation.x = -0.2;
   } else if (e === 2) {
     // A timber-framed archery hall: arrow slits, an overhanging hoarding, a quiver barrel and straw butts.
     k.box(2.6, 0.85, 1.0, st.wall, 0, 0, -0.85);
@@ -860,6 +952,9 @@ function stable(k: Kit, e: number, st: Style): void {
     // Mudbrick stalls: a flat-roofed row with arched openings, a roof-beam fringe and a clay trough.
     k.box(2.7, 0.75, 1.3, st.wall, 0, 0, -0.65);
     k.box(2.8, 0.08, 1.4, st.trim, 0, 0.75, -0.65);
+    // A gabled terracotta roof with a hay-loft door, so the stalls read as a long barn against the flat-topped halls.
+    k.prism(2.8, 0.55, 1.4, st.roof, 0, 0.83, -0.65);
+    k.box(0.34, 0.3, 0.03, '#3a2b20', 0, 1.02, 0.07);
     for (let i = 0; i < 6; i++) k.cyl(0.035, 0.035, 0.2, 5, st.post, -1.25 + i * 0.5, 0.68, 0.08).rotation.x = Math.PI / 2;
     for (let i = 0; i < 4; i++) {
       const x = -1.0 + i * 0.66;
@@ -2026,7 +2121,7 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
   }
 }
 
-const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare'>, (k: Kit, e: number, st: Style) => void> = {
+const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft'>, (k: Kit, e: number, st: Style) => void> = {
   sapling: (k, e) => sapling(k, e),
   towncenter, house, storehouse, huntcamp, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo,
 };
@@ -2192,11 +2287,11 @@ function wayTouch(k: Kit, way: string, deep = false): void {
 
 /** What a building is for, read from its roof (#625): war under cold slate, faith under pale gold, trade under teal, the land's work under ochre. Houses and the Town Center keep their epoch's own red. The Stone Age keeps its thatch and reads by plinth and pennant. */
 const ROOFS: Partial<Record<BuildingType, [string, string]>> = {
-  barracks: ['#4a5668', '#38424f'], range: ['#4a5668', '#38424f'], stable: ['#4a5668', '#38424f'], workshop: ['#4a5668', '#38424f'], forge: ['#4a5668', '#38424f'],
-  tower: ['#4a5668', '#38424f'], warcamp: ['#4a5668', '#38424f'], bloodtower: ['#4a5668', '#38424f'], airfield: ['#4a5668', '#38424f'], silo: ['#4a5668', '#38424f'],
+  barracks: ['#3e4858', '#2e3641'], range: ['#3e4858', '#2e3641'], stable: ['#3e4858', '#2e3641'], workshop: ['#3e4858', '#2e3641'], forge: ['#3e4858', '#2e3641'],
+  tower: ['#3e4858', '#2e3641'], warcamp: ['#3e4858', '#2e3641'], bloodtower: ['#3e4858', '#2e3641'], airfield: ['#3e4858', '#2e3641'], silo: ['#3e4858', '#2e3641'],
   temple: ['#e9e2cf', '#d8b25a'], mission: ['#e9e2cf', '#d8b25a'],
-  market: ['#27808a', '#1d6670'], caravanserai: ['#27808a', '#1d6670'], dock: ['#27808a', '#1d6670'],
-  storehouse: ['#c9993a', '#a97d2c'], huntcamp: ['#c9993a', '#a97d2c'], prospector: ['#c9993a', '#a97d2c'],
+  market: ['#1a5961', '#133f46'], caravanserai: ['#1a5961', '#133f46'], dock: ['#1a5961', '#133f46'],
+  storehouse: ['#e2b855', '#d4a642'], huntcamp: ['#e2b855', '#d4a642'], prospector: ['#e2b855', '#d4a642'], shaft: ['#e2b855', '#d4a642'],
 };
 
 /** No plinth or pennant: open or thin pieces, and buildings that already carry their own standards. */
@@ -2234,6 +2329,7 @@ export function buildingGeometry(type: BuildingType, epochIn: number, color: str
     const k = new Kit();
     if (type === 'wall') wall(k, epoch, STYLES[Math.min(epoch, 4)], variant);
     else if (type === 'snare') snare(k, epoch, variant === 1);
+    else if (type === 'shaft') shaft(k, epoch, roleStyle(type, epoch, STYLES[Math.min(epoch, 4)]), variant);
     else MAKERS[type](k, epoch, roleStyle(type, epoch, STYLES[Math.min(epoch, 4)]));
     if (!BARE.includes(type)) teamMarks(k, type);
     const stack = STACKS[type];

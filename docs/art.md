@@ -43,6 +43,7 @@ Luminance `L` is WCAG relative luminance of the sRGB value (0 black, 1 white); `
 | Water | 0.10–0.30 | 0.35–0.60 | Cooler than land (hue 190–220°) and darker than grass at the shore; foam is the only bright thing |
 | Tree canopies, bushes | 0.08–0.20 | 0.40–0.55 | Darker than the ground; berries and ore are the bright spots |
 | Buildings and walls | ≥ 0.42 (walls, thatch, stone) or ≤ 0.08 (roofs in shadow) | ≤ 0.45 | Lighter than the ground by ≥ 0.15 L, never green |
+| Roofs (every epoch) | ≤ 0.07 or ≥ 0.37 | ≤ 0.55 | WCAG L at least 0.15 from grass `#6f8a4c` (L 0.221). Held in `STYLES` and `ROOFS` (`buildingModels.ts`); teal trade `#1a5961`, war slate `#3e4858`, storehouse gold `#e2b855` (#617) |
 | Unit body (skin, cloth, armour) | ≥ 0.40 or ≤ 0.08 | ≤ 0.45 | Same rule; no mid-brown on mid-green |
 | Team colour | 0.18–0.50 | ≥ 0.65 | Set by `PLAYER_COLORS` (`src/sim/data.ts`; red, gold and orange moved apart in hue): blue `#2f7fe0`, red `#d9364a`, gold `#f0c828`, green `#3aa35a`, violet `#9b59d0`, orange `#e8702a`. A test holds them ≥ 0.55 S and 20° apart in hue |
 | Never in the land | | | Pure blues, reds, violets, oranges at S ≥ 0.55 (the team hues), except flowers and berries under 0.3 m wide |

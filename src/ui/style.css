@@ -36,9 +36,30 @@ kbd {
 }
 
 .loading {
-  position: absolute; inset: 0; display: grid; place-items: center; font: 800 42px 'Cinzel', serif; color: var(--gold);
-  letter-spacing: 2px; background: radial-gradient(circle at 50% 40%, #1e2a3a, #0e1621);
+  position: absolute; inset: 0; display: grid; place-items: center; color: var(--gold);
+  background: radial-gradient(circle at 50% 38%, #26364a, #0e1621 75%);
 }
+.loading-card { text-align: center; padding: 0 16px; animation: loading-in 0.8s ease-out both; }
+.loading h1 {
+  margin: 0; font: 800 clamp(34px, 7vw, 64px) 'Cinzel', serif; letter-spacing: 2px;
+  background: linear-gradient(#fff1c2, #e8c46a 55%, #b98a30); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 3px 0 #4a3510) drop-shadow(0 6px 22px rgba(232, 196, 106, 0.3));
+}
+.loading h1 span { font-size: 0.6em; -webkit-text-fill-color: #9aa3b5; }
+.loading p { margin: 10px 0 0; font: 700 clamp(13px, 2vw, 17px) 'Nunito', sans-serif; letter-spacing: 3px; text-transform: uppercase; color: #9aa3b5; }
+/* The five epochs, as a row of lamps that light one after another. */
+.loading-ages { display: flex; gap: 10px; justify-content: center; margin-bottom: 18px; }
+.loading-ages i { width: 10px; height: 10px; transform: rotate(45deg); background: #3a4256; border: 1px solid #6b5a2e; animation: loading-lamp 2.5s ease-in-out infinite; }
+.loading-ages i:nth-child(2) { animation-delay: 0.3s; }
+.loading-ages i:nth-child(3) { animation-delay: 0.6s; }
+.loading-ages i:nth-child(4) { animation-delay: 0.9s; }
+.loading-ages i:nth-child(5) { animation-delay: 1.2s; }
+.loading-bar { width: min(260px, 70vw); height: 3px; margin: 26px auto 0; border-radius: 2px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.loading-bar b { display: block; width: 40%; height: 100%; background: linear-gradient(90deg, transparent, #e8c46a, transparent); animation: loading-sweep 1.4s ease-in-out infinite; }
+@keyframes loading-in { from { opacity: 0; transform: translateY(8px); } }
+@keyframes loading-lamp { 0%, 100% { background: #3a4256; box-shadow: none; } 30%, 60% { background: #e8c46a; box-shadow: 0 0 10px rgba(232, 196, 106, 0.7); } }
+@keyframes loading-sweep { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+@media (prefers-reduced-motion: reduce) { .loading-card, .loading-ages i, .loading-bar b { animation: none; } .loading-ages i { background: #e8c46a; } }
 
 /* Cursors for what a right click would do. */
 #world.cur-attack canvas { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Cpath d='M4 4l11 11M4 4l5 1M4 4l1 5' stroke='%23ff5a4a' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3Cpath d='M14 17l3-3 6 6-3 3z' fill='%23ff5a4a'/%3E%3C/svg%3E") 3 3, crosshair; }
@@ -302,7 +323,7 @@ kbd {
 
 /* Tooltip */
 .tooltip {
-  position: absolute; z-index: 20; max-width: 300px; padding: 9px 11px; border-radius: 10px; pointer-events: none;
+  position: absolute; z-index: 20; max-width: min(300px, calc(100vw - 12px)); padding: 9px 11px; border-radius: 10px; pointer-events: none;
   background: rgba(16, 19, 27, 0.97); border: 1px solid var(--edge); box-shadow: var(--shadow); font-size: 13px; font-weight: 700; line-height: 1.35;
 }
 .tooltip b { color: var(--gold-2); font: 800 15px 'Cinzel', serif; display: block; margin-bottom: 3px; }
@@ -317,6 +338,7 @@ kbd {
 .online-card h3 { margin: 0 0 8px; font: 800 15px 'Cinzel', serif; color: var(--gold-2); }
 .online-card.wide { width: min(720px, calc(100% - 32px)); }
 .online-card .code { letter-spacing: 4px; color: var(--ink); }
+.online-card .seat-pick { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
 .online-card .field { display: grid; gap: 4px; text-align: left; font-size: 13px; font-weight: 800; color: var(--muted); margin: 10px 0; }
 .online-card input, .online-card select {
   font: 700 14px 'Nunito', sans-serif; color: var(--ink); background: #1b2030; border: 1px solid var(--edge-soft); border-radius: 8px; padding: 6px 8px; min-width: 0;
@@ -346,7 +368,7 @@ body.online .tip-box { bottom: 330px; }
 
 /* Tips */
 .tip-box {
-  position: absolute; left: 10px; bottom: 214px; width: 290px; padding: 10px 12px; border-radius: 12px; font-size: 14px; font-weight: 700; line-height: 1.4;
+  position: absolute; left: 10px; bottom: 214px; width: 290px; max-width: calc(100% - 20px); max-height: calc(100% - 270px); overflow-y: auto; box-sizing: border-box; padding: 10px 12px; border-radius: 12px; font-size: 14px; font-weight: 700; line-height: 1.4;
   background: linear-gradient(rgba(36, 42, 58, 0.95), rgba(24, 28, 38, 0.95)); border: 1px solid var(--edge); box-shadow: var(--shadow); animation: notice-in 0.3s ease-out;
 }
 .tip-head { font: 800 13px 'Cinzel', serif; color: var(--gold-2); margin-bottom: 4px; }

@@ -568,7 +568,7 @@ export class View {
     this.bats.update(this.time, this.rig.target, this.rig.distance, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
     this.effects.placeTexts(this.rig.camera, this.width, this.height);
 
-    if (QUALITY[this.quality].post) this.post.render();
+    if (QUALITY[this.quality].post) this.post.render(QUALITY[this.quality].bloom);
     else this.renderer.render(this.scene, this.rig.camera);
   }
 
@@ -669,9 +669,12 @@ export class View {
     }
     // Health: the selected, the recently hurt, or everyone while asked.
     const recent = s.tick - TICK_HZ * 4;
+    // With a crowd on screen, "show all" keeps bars for the hurt and the selected only: a full bar says nothing.
+    const crowded = sel.allBars && s.ents.length > 120;
     for (const e of s.ents) {
       if (e.hp <= 0) continue;
-      const show = sel.ids.has(e.id) || sel.allBars || e.hurt > recent;
+      const hurtNow = e.hurt > recent || (e.kind === 'unit' && e.hp < statsFor(s, e.owner, e.type).hp);
+      const show = sel.ids.has(e.id) || (sel.allBars && (!crowded || hurtNow)) || e.hurt > recent;
       if (!show) continue;
       if (e.kind === 'unit') {
         const at = this.units.drawn.get(e.id);
@@ -869,6 +872,8 @@ export class View {
           this.effects.burst(at, ev.building
             ? { count: 4, speed: 1.2, life: 0.6, size: 0.06, colors: ['#9a8a74', '#c9b79c'], soft: true }
             : { count: 5, speed: 1.4, life: 0.35, size: 0.03, colors: ['#ffe2a8', '#ffffff'] });
+          // A blink of white at the wound, so a blow reads even when the sparks are small (#626).
+          if (!ev.building) this.effects.burst(at, { count: 1, speed: 0, life: 0.12, size: 0.2, grow: 0.3, gravity: 0, drag: 1, colors: ['#ffffff'] });
           this.cue(ev.building ? 'hitBuilding' : 'hit', ev.x, ev.y, 0.7);
           break;
         }
@@ -1142,7 +1147,10 @@ export class View {
               this.cue('fall', ev.x, ev.y, 0.6);
               this.cue('heroFall', ev.x, ev.y, 0.9);
             } else {
-              this.effects.burst(this.ground(s, ev.x, ev.y, 0.1), { count: 4, speed: 0.5, up: 0.4, life: 0.8, size: 0.05, grow: 1.8, gravity: -0.1, drag: 1.5, soft: true, colors: ['#bba98a', '#d6c7aa'] });
+              const grave = this.ground(s, ev.x, ev.y, 0.1);
+              this.effects.burst(grave, { count: 4, speed: 0.5, up: 0.4, life: 0.8, size: 0.05, grow: 1.8, gravity: -0.1, drag: 1.5, soft: true, colors: ['#bba98a', '#d6c7aa'] });
+              // A ring in the fallen's colour: a battle shows whose people are dying (#626).
+              this.effects.ring(grave, s.players[ev.owner].color, 0.9, 0.6);
               this.cue('fall', ev.x, ev.y, 0.6);
             }
           } else {
@@ -1152,6 +1160,9 @@ export class View {
             this.effects.burst(at, { count: 30, speed: 2.2, up: 0.6, life: 2.2, size: 0.22, grow: 3, gravity: -0.2, drag: 1.4, soft: true, colors: ['#8d8072', '#b3a594', '#5a524a'] });
             this.effects.burst(at, { count: 14, speed: 3, up: 0.8, life: 1.1, size: 0.07, gravity: 5, drag: 0.5, colors: ['#6e4f33', '#9a948a'] });
             this.effects.ring(at, '#d9c7a8', ev.size * 1.2, 1.1);
+            // A flash of the owner's colour over the rubble: whose building fell reads even in a crowd (#626).
+            this.effects.ring(this.ground(s, ev.x, ev.y, 0.12), s.players[ev.owner].color, ev.size * 1.8, 0.7);
+            this.effects.burst(at.clone().setY(at.y + 0.5), { count: 10, speed: 1.6, up: 1.2, life: 0.9, size: 0.06, gravity: 3, colors: [s.players[ev.owner].color, '#fff3c4'] });
             this.cue('collapse', ev.x, ev.y, 1);
             this.onPing?.(ev.x, ev.y, '#ff6a5a');
           }
@@ -1447,8 +1458,8 @@ export class View {
     return null;
   }
 
-  /** What is under the pointer: a unit, a building, a resource, or the ground. */
-  pick(clientX: number, clientY: number): Pick | null {
+  /** What is under the pointer: a unit, a building, a resource, or the ground. Units `through` says yes to are looked past, to what they stand at. */
+  pick(clientX: number, clientY: number, through?: (id: number) => boolean): Pick | null {
     const s = this.state;
     if (!s) return null;
     const r = this.renderer.domElement.getBoundingClientRect();
@@ -1457,6 +1468,7 @@ export class View {
     let best: number | null = null;
     let bestD = Infinity;
     for (const u of this.units.screen) {
+      if (through?.(u.id)) continue;
       const d = Math.hypot(u.sx - px, u.sy - py);
       if (d < u.r * 1.3 && d < bestD) {
         bestD = d;

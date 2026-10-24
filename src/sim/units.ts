@@ -18,6 +18,7 @@ import { carriedBy, relicAt } from './relics';
 import { animalRadius, hitAnimal } from './animals';
 import { milkable } from './flocks';
 import { catchIn, nextSnare } from './snares';
+import { TILE_OF_SEAM, resOfSeam, seamOf, shaftShare } from './shafts';
 import { dig, ruinAt } from './ruins';
 import { rubbleAt, salvages, strip } from './salvage';
 import { bank, cacheAt, lift } from './caches';
@@ -461,6 +462,91 @@ function farmStep(s: GameState, u: Unit, o: Extract<Order, { k: 'farm' }>): void
   if (!approach(u, { ...goalForBuilding(f, true), px: f.tx + 0.9 + spot * 3, py: f.ty + 0.9 + spot * 2 })) setOrder(u, { k: 'idle' });
 }
 
+/** A Mine Shaft's miner (#681): one to a shaft, digging its seam for good and hauling it to a drop site, as a farmer works a field. */
+function shaftStep(s: GameState, u: Unit, o: Extract<Order, { k: 'shaft' }>): void {
+  const b = s.byId.get(o.target);
+  if (!b || b.kind !== 'building' || b.hp <= 0 || b.type !== 'shaft' || b.owner !== u.owner) {
+    if (u.carry > 0) setOrder(u, { k: 'deliver' });
+    else setOrder(u, { k: 'idle' });
+    return;
+  }
+  if (!b.built) {
+    setOrder(u, { k: 'build', target: b.id });
+    return;
+  }
+  const holder = b.farmer ? s.byId.get(b.farmer) : undefined;
+  if (holder && holder !== u && holder.hp > 0 && holder.kind === 'unit' && holder.order.k === 'shaft' && holder.order.target === b.id) {
+    // Someone already works it: another free shaft nearby, or stand by.
+    const other = freeShaft(s, u.owner, b.x, b.y, 12);
+    if (other) setOrder(u, { k: 'shaft', target: other.id, res: resOfSeam(seamOf(s, other) ?? 'stone'), phase: 'go' });
+    else setOrder(u, { k: 'idle' });
+    return;
+  }
+  const seam = seamOf(s, b);
+  if (!seam) {
+    if (u.carry > 0) setOrder(u, { k: 'deliver' });
+    else setOrder(u, { k: 'idle' });
+    return;
+  }
+  b.farmer = u.id;
+  const res = resOfSeam(seam);
+  const rare = seam === 'stone' || seam === 'gold' ? null : seam;
+  o.res = res;
+  if (o.phase === 'drop') {
+    const r = dropOff(s, u);
+    if (r === 'done') {
+      o.phase = 'go';
+      u.miss = 0;
+    } else if (r === 'none') setOrder(u, { k: 'idle' });
+    return;
+  }
+  // A new seam: what was in the basket is set down, as when a gatherer turns to another stock.
+  if (u.carryRes !== res || (u.carryRare ?? null) !== rare) {
+    u.carry = 0;
+    u.frac = 0;
+    u.carryRes = res;
+    u.carryRare = rare;
+  }
+  const r = statsOf(s, u).radius;
+  if (distToRect(u.x, u.y, b) - r <= REACH + 0.3) {
+    if (walking(u)) stopWalking(u);
+    face(u, b.x, b.y);
+    o.phase = 'work';
+    u.miss = 0;
+    u.act = 'mine';
+    u.frac += gatherRate(s, u, TILE_OF_SEAM[seam]) * shaftShare(s, b, seam) * DT;
+    while (u.frac >= 1) {
+      u.frac -= 1;
+      u.carry++;
+    }
+    workEvent(s, u, 'mine', b.x, b.y);
+    if (u.carry >= carryCap(s, u)) {
+      u.frac = 0;
+      o.phase = 'drop';
+    }
+    return;
+  }
+  o.phase = 'go';
+  if (!approach(u, goalForBuilding(b))) setOrder(u, { k: 'idle' });
+}
+
+/** The nearest built shaft of a people's within `r` tiles that no one works, or null. */
+export function freeShaft(s: GameState, owner: number, x: number, y: number, r: number, skip?: Set<number>): Building | null {
+  let best: Building | null = null;
+  let bestD = r;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'shaft' || e.owner !== owner || e.hp <= 0 || !e.built || skip?.has(e.id)) continue;
+    const holder = e.farmer ? s.byId.get(e.farmer) : undefined;
+    if (holder && holder.hp > 0 && holder.kind === 'unit' && holder.order.k === 'shaft' && holder.order.target === e.id) continue;
+    const d = distToRect(x, y, e);
+    if (d < bestD) {
+      bestD = d;
+      best = e;
+    }
+  }
+  return best;
+}
+
 export function freeFarm(s: GameState, owner: number, x: number, y: number, r: number, skip?: Set<number>): Building | null {
   let best: Building | null = null;
   let bestD = r;
@@ -538,7 +624,7 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
   if (u.resume) {
     const back = u.resume;
     u.resume = null;
-    if (back.k === 'gather' || back.k === 'farm' || back.k === 'snare') {
+    if (back.k === 'gather' || back.k === 'farm' || back.k === 'snare' || back.k === 'shaft') {
       setOrder(u, back);
       return;
     }
@@ -550,6 +636,11 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
       setOrder(u, { k: 'farm', target: f.id, phase: 'go' });
       return;
     }
+  }
+  // A new Mine Shaft (#681): a person's builder goes down it.
+  if (b.type === 'shaft' && u.type === 'citizen' && !s.players[u.owner].ai && freeShaft(s, u.owner, b.x, b.y, 1) === b) {
+    setOrder(u, { k: 'shaft', target: b.id, res: resOfSeam(seamOf(s, b) ?? 'stone'), phase: 'go' });
+    return;
   }
   // A new snare (#485): a person's builder walks the trap line (the computer picks its own tenders).
   if (b.type === 'snare' && !s.players[u.owner].ai) {
@@ -2010,6 +2101,9 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
       break;
     case 'farm':
       farmStep(s, u, o);
+      break;
+    case 'shaft':
+      shaftStep(s, u, o);
       break;
     case 'build':
       if (legionary(s, u) && sentry(s, sp, u, o)) break;

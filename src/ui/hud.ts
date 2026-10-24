@@ -8,7 +8,7 @@ import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE } from '../sim/units';
-import { LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -23,6 +23,7 @@ import { TIDING_CARDS, tidingCost, tidingProblem } from '../sim/tidings';
 import { kinCount, kinProblem, vowProblem, wayBarred, wayProblem } from '../sim/ways';
 import { catchIn, snareCap, snareFull, snareRate, snareWoods } from '../sim/snares';
 import { beaconProblem, lit } from '../sim/beacon';
+import { SEAMS, groundAt, seamOf, seamProblem, seamsAt, shaftShare } from '../sim/shafts';
 import { callUpProblem, callUpReach, campGrace, musterWait } from '../sim/warcamp';
 import { bledFlock, bloodOf, bloodShort, captivesOf, cursed, grafted, levyProblem, sworn, levyReach } from '../sim/blood';
 import { feedReach, graftCost, graftLast, graftWait, waiting } from '../sim/hemo';
@@ -148,6 +149,8 @@ function orderWords(s: GameState, u: Unit): string {
       return o.phase === 'drop' ? 'Carrying milk home' : o.phase === 'work' ? 'Milking the flock' : 'Going to milk the flock';
     case 'snare':
       return o.phase === 'drop' ? 'Carrying the catch home' : o.phase === 'work' ? 'Emptying a snare' : u.act === 'idle' ? 'Waiting by the snares for game' : 'Walking the trap line';
+    case 'shaft':
+      return o.phase === 'drop' ? `Carrying ${o.res === 'gold' ? 'gold' : 'stone'} up from the shaft` : o.phase === 'work' ? 'Digging the seam' : 'Going down the shaft';
     case 'convert':
       return o.rite === 'sacrifice' ? (u.act === 'chant' ? 'Sacrificing' : 'Going to sacrifice') : o.rite === 'curse' ? (u.act === 'chant' ? 'Cursing' : 'Going to curse') : u.act === 'chant' ? 'Converting' : 'Going to convert';
     case 'heal':
@@ -880,6 +883,14 @@ export class Hud {
       const tended = s.ents.some((e) => e.kind === 'unit' && e.owner === b.owner && e.hp > 0 && e.order.k === 'snare');
       const cap = snareCap(s, b);
       status = `Caught ${catchIn(b)} / ${cap} food${catchIn(b) >= cap ? ' (full: it catches no more)' : ''} · ${trees} trees round it: ${perMin} a minute${trees < full ? ` (best with ${full})` : ''}${seasonAt(s) === 3 ? ', winter-hungry' : ''} · ${tended ? 'the line is walked' : 'nobody walks the line'}`;
+    } else if (b.type === 'shaft' && b.built) {
+      // Mine Shaft (#681): the seam it digs, the ground's grade and whether a miner is down it.
+      const seam = seamOf(s, b);
+      const grade = seam ? groundAt(s, b)[seam] : null;
+      const f = b.farmer ? s.byId.get(b.farmer) : undefined;
+      const manned = !!f && f.kind === 'unit' && f.order.k === 'shaft' && f.order.target === b.id;
+      const ground = { old: 'Old workings', hill: 'Mountain rock', open: 'Open ground' };
+      status = seam && grade ? `<span data-tip="<b>${ground[grade]}</b>A shaft digs at ${Math.round(SHAFT.grade[grade] * 100)}% of an open deposit's pace. Old workings (a deposit worked out nearby) are best, then rock beside it, then plain ground.">${ground[grade]}: ${SHAFT.seams[seam].name.toLowerCase()} at ${Math.round(SHAFT.grade[grade] * 100)}%</span> · ${manned ? 'a miner works it' : 'waiting for a miner (right-click it with a citizen)'}` : 'Your people can dig nothing here';
     } else if (b.type === 'wonder' && b.timer >= 0) status = `Stands ${fmtTime(b.timer)} more for victory`;
     else if (b.type === 'market') {
       const traders = s.ents.filter((e) => e.kind === 'unit' && e.owner === b.owner && e.type === 'trader' && e.order.k === 'trade' && e.order.market === b.id).length;
@@ -1397,6 +1408,17 @@ export class Hud {
           const why = launchProblem(s, viewer, b, b.x, b.y);
           cmds.push({ key: 'M', pic: '', glyph: '☢', title: 'Launch', desc: `Then click anywhere on the map: ${rulesOf(p).fuse} seconds later the warhead lands, wrecking every rival building within ${SILO.reach} tiles (${SILO.building} each) and hurting the rival soldiers there; the ground stays poisoned after, hurting every land unit in it. Every player sees the clock, and a silo destroyed before it runs out scrubs the launch. Costs ${Object.entries(rulesOf(p).fuel).map(([r, n]) => `${n} ${r}`).join(' and ')}; the silo needs ${rulesOf(p).refuel} seconds to refuel after${rulesOf(p).air > 1 ? `, and holds up to ${rulesOf(p).air} warheads aloft` : ''}.`, ok: !why, why: why ?? undefined, on: !loaded(s, b), run: () => this.act.launchMode(b.id) });
         }
+        // The seam a Mine Shaft digs (#681).
+        if (b.type === 'shaft') {
+          const now = seamOf(s, b);
+          const can = seamsAt(s, b);
+          SEAMS.forEach((m, i) => {
+            if (!can.includes(m)) return;
+            const why = seamProblem(s, b, m);
+            const name = SHAFT.seams[m].name;
+            cmds.push({ key: 'QWERT'[i], pic: '', glyph: m === 'gold' ? '🪙' : m === 'stone' ? '🪨' : '💎', title: `Dig ${name.toLowerCase()}`, desc: `Set this shaft to dig ${name.toLowerCase()} at ${Math.round(shaftShare(s, b, m) * 100)}% of an open deposit's pace${m === 'gold' || m === 'stone' ? '' : ', over the old workings of that vein'}. Its miner switches at the next trip.`, ok: !why, why: why ?? undefined, on: now === m, run: () => (this.act.issue({ t: 'seam', p: viewer, building: b.id, seam: m }), this.act.sound('queue')) });
+          });
+        }
         if (b.type === 'tower') {
           const why = beaconProblem(s, p, b);
           cmds.push({ key: 'F', pic: '', glyph: '🔥', title: 'Light the beacon', desc: `A fire on the roof: this tower sees ${BEACON.sight} tiles farther for ${BEACON.duration} seconds, but every rival sees the ground around it. Costs ${BEACON.cost.wood} wood; it can be lit again after ${BEACON.cooldown} seconds.`, ok: !why, why: why ?? undefined, on: lit(s, b), run: () => this.act.issue({ t: 'beacon', p: viewer, building: b.id }) });
@@ -1442,8 +1464,10 @@ export class Hud {
     const r = this.tipEl.getBoundingClientRect();
     let x = e.clientX + 14;
     let y = e.clientY - r.height - 12;
-    if (x + r.width > window.innerWidth - 6) x = window.innerWidth - r.width - 6;
     if (y < 46) y = e.clientY + 18;
+    // Keep the whole tip on screen: smaller windows and zoomed pages push it past an edge.
+    y = Math.max(6, Math.min(y, window.innerHeight - r.height - 6));
+    x = Math.max(6, Math.min(x, window.innerWidth - r.width - 6));
     this.tipEl.style.left = `${x}px`;
     this.tipEl.style.top = `${y}px`;
   }

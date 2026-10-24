@@ -221,9 +221,10 @@ const snowVertex = /* glsl */ `
     vec3 p = vec3(uCenter.x + (wrapped.x - 0.5) * uBox.x + sin(sway) * 0.5, uCenter.y + h * uBox.y, uCenter.z + (wrapped.y - 0.5) * uBox.x + cos(sway * 0.8) * 0.5);
     vec4 mv = viewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * mv;
-    gl_PointSize = clamp(uScale * (0.13 + aSeed.w * 0.12) / max(0.5, -mv.z), 2.0, 22.0);
+    gl_PointSize = clamp(uScale * (0.13 + aSeed.w * 0.12) / max(0.5, -mv.z), 2.0, 9.0);
     float edge = min(1.0 - abs(wrapped.x * 2.0 - 1.0), 1.0 - abs(wrapped.y * 2.0 - 1.0));
-    vAlpha = smoothstep(0.0, 0.25, edge) * smoothstep(0.0, 0.1, h) * smoothstep(1.0, 0.85, h);
+    // Flakes close to the camera fade, so none hangs as a white blob over the fight.
+    vAlpha = smoothstep(0.0, 0.25, edge) * smoothstep(0.0, 0.1, h) * smoothstep(1.0, 0.85, h) * smoothstep(6.0, 16.0, -mv.z);
   }
 `;
 

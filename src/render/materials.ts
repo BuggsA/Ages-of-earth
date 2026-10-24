@@ -126,7 +126,8 @@ const SEASON_COLOR = (leaf: boolean) => /* glsl */ `
 
 /**
  * Snow on whatever faces the sky, patchy as it settles and melts. On the ground some patches stay bare even in
- * deep winter; on models only the flattest tops take it, so stone and ore still read by their sides.
+ * deep winter, and the snow is a dusky blue-grey, so roofs and walls (brighter snow) stand off it; on models only
+ * the flattest tops take it, so stone and ore still read by their sides.
  */
 const SEASON_SNOW = (ground: boolean) => /* glsl */ `
   if (uSnow > 0.0) {
@@ -134,7 +135,7 @@ const SEASON_SNOW = (ground: boolean) => /* glsl */ `
     float up = dot(normal, upV);
     float n = seasonHash(floor(vSeasonPos * 1.5)) * 0.6 + seasonHash(floor(vSeasonPos * 4.0)) * 0.4;
     float cover = ${ground ? 'smoothstep(0.35, 0.75, up) * smoothstep(n - 0.05, n + 0.05, uSnow * 0.85)' : 'smoothstep(0.6, 0.9, up) * smoothstep(n - 0.05, n + 0.05, uSnow) * 0.85'};
-    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.74, 0.78, 0.86), cover * (1.0 - vSeasonBare));
+    diffuseColor.rgb = mix(diffuseColor.rgb, ${ground ? 'vec3(0.40, 0.45, 0.56)' : 'vec3(0.74, 0.78, 0.86)'}, cover * (1.0 - vSeasonBare));
   }
 `;
 
@@ -147,11 +148,16 @@ export interface Inject {
   fog?: boolean;
   /** Cloth tagged by `Kit.cloth` streams downwind and ripples (banners, windsocks). */
   flag?: boolean;
+  /** A pale fresnel rim on edges that turn from the eye, so a figure keeps its outline against grass and shade. */
+  rim?: boolean;
   /** Sway with the wind (trees, crops): vertices higher up move more, by `uTime`. */
   sway?: number;
   /** Show the season: `ground` recolors meadows, `leaf` also leaves, `snow` only lays snow. */
   season?: 'ground' | 'leaf' | 'snow';
 }
+
+/** How much an edge-on surface darkens (0 none, 1 black): the edge that sets models off the ground. */
+const RIM_DARK = 0.45;
 
 export const timeUniform = { value: 0 };
 
@@ -291,17 +297,21 @@ export function inject<T extends THREE.Material>(mat: T, o: Inject): T {
     const parsF: string[] = [];
     if (o.fog !== false) parsF.push(FOG_PARS_FRAGMENT);
     if (o.rig || o.team) parsF.push('varying float vGlow;\nuniform float uGlow;');
+    if (o.rig || o.team || o.sway) parsF.push(`#define RIM_DARK ${RIM_DARK.toFixed(2)}`);
     if (o.season) parsF.push(SEASON_PARS_FRAGMENT);
     fs = fs.replace('#include <common>', `#include <common>\n${parsF.join('\n')}`);
     if (o.season && o.season !== 'snow') fs = fs.replace('#include <color_fragment>', `#include <color_fragment>\n${SEASON_COLOR(o.season === 'leaf')}`);
     if (o.season) fs = fs.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n${SEASON_SNOW(o.season === 'ground')}`);
     let tail = '#include <opaque_fragment>';
     if (o.rig || o.team) tail += '\n  gl_FragColor.rgb += diffuseColor.rgb * vGlow * uGlow;';
+    if (o.rim) tail += '\n  gl_FragColor.rgb += mix(diffuseColor.rgb, vec3(1.0), 0.35) * pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), 3.0) * 0.3;';
+    // A dark rim where a surface turns edge-on to the camera, so models read against the ground even with no shadows (Low).
+    if (o.rig || o.team || o.sway) tail += '\n  gl_FragColor.rgb *= 1.0 - RIM_DARK * pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 2.0);';
     if (o.fog !== false) tail += `\n${FOG_FRAGMENT}`;
     fs = fs.replace('#include <opaque_fragment>', tail);
     shader.fragmentShader = fs;
   };
-  const key = `${o.rig ? 'r' : ''}${o.flag ? 'w' : ''}${o.team ? 't' : ''}${o.fog === false ? '' : 'f'}${o.sway ?? ''}${o.season ?? ''}`;
+  const key = `${o.rig ? 'r' : ''}${o.flag ? 'w' : ''}${o.team ? 't' : ''}${o.rim ? 'm' : ''}${o.fog === false ? '' : 'f'}${o.sway ?? ''}${o.season ?? ''}`;
   const prevKey = mat.customProgramCacheKey?.bind(mat);
   mat.customProgramCacheKey = () => `${prevKey ? prevKey() : ''}|${key}`;
   return mat;
@@ -310,6 +320,6 @@ export function inject<T extends THREE.Material>(mat: T, o: Inject): T {
 /** Everything baked: vertex colors, faceted, with fog of war and glowing parts. */
 export const bakedMaterial = inject(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.85 }), { team: true, flag: true, season: 'snow' });
 /** Units: team colors, swinging limbs, fog of war. */
-export const unitMaterial = inject(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.8 }), { rig: true, team: true, flag: true });
+export const unitMaterial = inject(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.8 }), { rig: true, team: true, flag: true, rim: true });
 /** Trees and crops sway a little in the wind. */
 export const swayMaterial = inject(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.9 }), { team: true, sway: 0.03, season: 'leaf' });

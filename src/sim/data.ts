@@ -1525,6 +1525,36 @@ export interface BuildingStats {
  */
 export const COPPICE = { reach: 8, regrow: 120, retry: 5, grow: 90, snare: 2, cap: 1.5, bag: 2, full: 12, aiPerFood: 1.5, aiMax: 16, aiTrees: 10, aiThick: 14, aiNear: 14, aiDrop: 7, aiPerTender: 2, aiStone: 6, aiCamps: 2, aiPlant: 3, aiThin: 12, aiPlantWood: 120 };
 
+/**
+ * Mine Shafts (#681): stone and gold dug from the ground once the open deposits are gone. A shaft is worked by one miner, like a
+ * field, and never runs out; what it digs is its seam, chosen on the shaft. How well depends on the ground round it (within
+ * `near` tiles of its footprint), its grade, as a share of an open deposit's pace (`GATHER`, with every mining technology):
+ * - `old`: old workings, a deposit of that seam worked out there (the shaft follows the vein down);
+ * - `hill`: mountain rock beside it (stone and gold only);
+ * - `open`: plain ground (stone and gold only).
+ * A rare ore (`RARE`) is dug only over its own old workings, and counts toward its ore gate like any mined. Each seam: its
+ * name, and whether only old workings hold it. A later seam is one more entry here and in `SeamId`.
+ *
+ * The computer: once no deposit of a stock it wants lies within `aiNear` tiles of a drop of its own, it sinks a shaft (from
+ * the Bronze Age, with `aiWood` wood in hand, at most `aiMax`), on old workings or by rock within `aiReach` tiles of home if it
+ * can find them, and sends its hands for that stock to the free shafts, setting the seam it needs.
+ */
+export const SHAFT = {
+  near: 2,
+  grade: { old: 0.75, hill: 0.5, open: 0.3 },
+  seams: {
+    stone: { name: 'Stone', old: false },
+    gold: { name: 'Gold', old: false },
+    salt: { name: 'Salt', old: true },
+    saltpetre: { name: 'Saltpetre', old: true },
+    bloodiron: { name: 'Blood-iron', old: true },
+  } as Record<'stone' | 'gold' | RareId, { name: string; old: boolean }>,
+  aiNear: 26,
+  aiReach: 18,
+  aiWood: 250,
+  aiMax: 3,
+};
+
 export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   towncenter: { name: 'Town Center', size: 4, hp: 2800, cost: { wood: 275, stone: 150 }, time: 110, pop: 10, sight: 8, trains: ['citizen', 'hero'], drop: ['food', 'wood', 'stone', 'gold'], epoch: 0, guns: { damage: 6, range: 7, reload: 2 }, garrison: 15, menu: 'eco', key: 'T', blurb: 'Trains citizens and heroes, takes in every resource and leads your people into the next epoch. Citizens shelter here when the bell rings. Lose your last one and you have 45 seconds to raise another, or your people is lost: build a second far from the first.' },
   house: { name: 'House', size: 2, hp: 600, cost: { wood: 35 }, time: 18, pop: 5, sight: 3, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'E', blurb: 'Room for 5 more people.' },
@@ -1560,6 +1590,8 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   mission: { name: 'Mission', size: 2, hp: 1000, cost: { wood: 100, gold: 60 }, time: 30, pop: 0, sight: 7, trains: ['priest'], drop: [], epoch: 2, shore: true, ages: ['missions'], builders: ['priest'], only: true, menu: 'eco', key: 'O', blurb: 'A whitewashed chapel and a bell on a far shore, raised by priests. Holds the land round it, trains priests, and pays a tithe that grows with its distance from your Town Center. Nothing in it shoots: a rival who reaches it razes it.' },
   caravanserai: { name: 'Caravanserai', size: 2, hp: 900, cost: { wood: 90, gold: 30 }, time: 25, pop: 0, sight: 6, trains: [], drop: [], epoch: 3, ages: ['silk'], menu: 'eco', key: 'C', blurb: 'A walled courtyard by the road where caravans rest. Raise it by a far trading post, in no one\'s land too: your traders\' trips to a post within 8 tiles of it pay a quarter more, traders and wagons within 4 tiles of it mend, and the land round it is yours, so rival traders crossing it pay your toll.' },
   silo: { name: 'Missile Silo', size: 3, hp: 3000, cost: { wood: 300, stone: 400, gold: 700 }, time: 80, pop: 0, sight: 8, trains: [], drop: [], epoch: 5, menu: 'mil', key: 'M', blurb: 'A concrete collar round a hatch in the ground. Launch (M) names any point on the map: after a countdown every rival can see, the warhead flattens what stands there. Destroy the silo while it counts and the launch is scrubbed. Emptied by a launch, it must be refuelled before it can fire again.' },
+  // Mine Shafts (#681): one miner digs stone or gold (or a rare ore over its old workings) for good, best where a deposit was worked out (`SHAFT`).
+  shaft: { name: 'Mine Shaft', size: 2, hp: 700, cost: { wood: 150 }, time: 30, pop: 0, sight: 4, trains: [], drop: [], epoch: 1, menu: 'eco', key: 'H', blurb: 'A timber headframe over a hole in the ground. One citizen digs stone or gold here for good, slower than an open deposit; best sunk where a deposit was worked out, fair beside mountain rock. Choose its seam on the shaft.' },
   airfield: { name: 'Airfield', size: 4, hp: 2200, cost: { wood: 250, stone: 100, gold: 150 }, time: 60, pop: 0, sight: 8, trains: ['fighter', 'bomber'], drop: [], epoch: 4, menu: 'mil', key: 'F', blurb: 'Builds fighters and bombers. Fighters hunt aircraft; bombers wreck towns.' },
 };
 

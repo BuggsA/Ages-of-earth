@@ -13,6 +13,8 @@ export const TURN_TICKS = 2;
 export const TURN_MS = 100;
 /** Browsers report a checksum this often (in turns), so a match that drifts apart is caught. */
 export const HASH_EVERY = 50;
+/** A match's room keeps it this long after the last player leaves, so everyone can come back to it with the same code. */
+export const ROOM_KEEP_HOURS = 36;
 export const MAX_SEATS = 4;
 
 export interface Seat {
@@ -56,7 +58,9 @@ export type ClientMsg =
   | { t: 'hash'; n: number; h: number }
   | { t: 'pause'; on: boolean }
   | { t: 'chat'; text: string }
-  | { t: 'ping'; at: number };
+  | { t: 'ping'; at: number }
+  /** Come back into a match under way as the player of this seat (one of the `open` seats). */
+  | { t: 'claim'; seat: number };
 
 export interface MatchStart {
   /** Seat order is player order. */
@@ -77,7 +81,17 @@ export type ServerMsg =
   | { t: 'chat'; from: string; color: number; text: string }
   | { t: 'desync'; n: number }
   | { t: 'error'; why: string }
-  | { t: 'pong'; at: number };
+  | { t: 'pong'; at: number }
+  /** A match under way that this browser holds no seat in: the seats whose players are away, for it to pick one (`claim`). */
+  | { t: 'open'; code: string; seats: OpenSeat[] };
+
+/** A seat a returning player may take: its player is not connected (the owner's ruling, 2026-10-24: a free pick). */
+export interface OpenSeat {
+  seat: number;
+  name: string;
+  civ: CivId;
+  color: number;
+}
 
 /** Room codes: easy to read out loud (no 0/O, 1/I). */
 export const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';

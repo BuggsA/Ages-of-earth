@@ -8,18 +8,18 @@ const TRUNK = '#7a5636';
 function pine(): Kit {
   const k = new Kit();
   k.cyl(0.05, 0.07, 0.3, 5, TRUNK);
-  k.cone(0.32, 0.46, 7, '#2a6234', 0, 0.2);
-  k.cone(0.25, 0.42, 7, '#3f8a48', 0, 0.5);
-  k.cone(0.16, 0.36, 7, '#6cb85c', 0, 0.8);
+  k.cone(0.32, 0.46, 7, '#1c4a2a', 0, 0.2);
+  k.cone(0.25, 0.42, 7, '#2a6636', 0, 0.5);
+  k.cone(0.16, 0.36, 7, '#4a8e42', 0, 0.8);
   return k;
 }
 
 function broadleaf(): Kit {
   const k = new Kit();
   k.cyl(0.05, 0.075, 0.45, 5, TRUNK);
-  k.blob(0.3, '#3d8240', 0, 0.62).scale.set(1, 0.8, 1);
-  k.blob(0.22, '#7cc45a', 0.14, 0.86, 0.08);
-  k.blob(0.18, '#5aa44a', -0.14, 0.7, -0.1);
+  k.blob(0.3, '#2b6334', 0, 0.62).scale.set(1, 0.8, 1);
+  k.blob(0.22, '#559a44', 0.14, 0.86, 0.08);
+  k.blob(0.18, '#3f7e3c', -0.14, 0.7, -0.1);
   return k;
 }
 
@@ -27,7 +27,7 @@ function birch(): Kit {
   const k = new Kit();
   k.cyl(0.035, 0.05, 0.6, 5, '#e8e4da');
   k.box(0.072, 0.03, 0.072, '#3a3a3a', 0, 0.25);
-  k.blob(0.22, '#a4d65e', 0, 0.8).scale.set(0.85, 1.2, 0.85);
+  k.blob(0.22, '#7fb24a', 0, 0.8).scale.set(0.85, 1.2, 0.85);
   return k;
 }
 
@@ -58,8 +58,8 @@ function felled(): Kit {
 
 function berryBush(): Kit {
   const k = new Kit();
-  k.blob(0.26, '#3f7f3a', 0, 0.18).scale.set(1.1, 0.8, 1.1);
-  k.blob(0.18, '#4b9244', 0.14, 0.26, 0.06);
+  k.blob(0.26, '#2d6230', 0, 0.18).scale.set(1.1, 0.8, 1.1);
+  k.blob(0.18, '#387a38', 0.14, 0.26, 0.06);
   for (let i = 0; i < 9; i++) {
     const a = i * 2.4;
     const r = 0.16 + (i % 3) * 0.05;
@@ -79,11 +79,11 @@ function stoneDeposit(): Kit {
 
 function goldDeposit(): Kit {
   const k = new Kit();
-  k.rock(0.3, '#8a7b5c', 0, 0.15);
-  k.rock(0.2, '#7d6f52', 0.24, 0.1, 0.1);
+  k.rock(0.3, '#4f4536', 0, 0.15);
+  k.rock(0.2, '#463d2f', 0.24, 0.1, 0.1);
   for (let i = 0; i < 6; i++) {
     const a = i * 1.7;
-    k.glow(k.octa(0.06 + (i % 3) * 0.02, i % 2 ? '#ffd24a' : '#f2b830', Math.cos(a) * 0.2, 0.22 + (i % 3) * 0.08, Math.sin(a) * 0.2));
+    k.glow(k.octa(0.06 + (i % 3) * 0.02, i % 2 ? '#ffe066' : '#ffc82e', Math.cos(a) * 0.2, 0.22 + (i % 3) * 0.08, Math.sin(a) * 0.2));
   }
   return k;
 }
@@ -118,9 +118,9 @@ function saltVein(): Kit {
 /** A cave mouth (#356): a hump of rock with a dark opening, a glint of ore at the lip. */
 function caveMouth(): Kit {
   const k = new Kit();
-  k.rock(0.46, '#6e6a62', 0, 0.2).scale.set(1.15, 0.9, 1);
-  k.rock(0.3, '#7d786e', -0.3, 0.12, 0.12);
-  k.rock(0.26, '#625e57', 0.32, 0.1, -0.1);
+  k.rock(0.46, '#8a867c', 0, 0.2).scale.set(1.15, 0.9, 1);
+  k.rock(0.3, '#9a958a', -0.3, 0.12, 0.12);
+  k.rock(0.26, '#767269', 0.32, 0.1, -0.1);
   k.box(0.3, 0.26, 0.2, '#0d0b0a', 0, 0.13, 0.36);
   k.rock(0.09, '#e8e2c8', 0.18, 0.05, 0.5);
   k.rock(0.07, '#d8cf9a', -0.16, 0.04, 0.52);

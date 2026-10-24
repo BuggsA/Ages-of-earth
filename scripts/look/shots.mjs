@@ -1,5 +1,6 @@
 // The art umbrella's shared before-and-after shots (#617): the same scenes for every area, so pull requests compare like with like.
 //   npx vite build && (npx vite preview --port 5199 --strictPort &)
+//   SHOT_QUERY="&hour=22" node scripts/look/shots.mjs <dir>   adds to the address (a night, a quality: &quality=…)
 //   node scripts/look/shots.mjs [outDir] [only]     (default test-results/look; `only` is one scene name)
 // Each scene starts a fresh match on seed 7 as the Britons against one rival, sets it up through `window.ages` and frames it.
 // Software GL in a container draws slowly, so each scene waits for the view to catch up before its shot. Fails on any page error.
@@ -37,6 +38,66 @@ const SCENES = [
     for (let i = 0; i < 12; i++) ages.spawn(me, 'citizen', p.startX + 4 + (i % 4), p.startY + 4 + Math.floor(i / 4));
     return { zoom: 1.4 };
   }],
+  // Fleets on the nearest sea in the Gunpowder Age: warships, transports and cogs of both sides, to see their ensigns and sails.
+  ['sea', ({ g, ages, me, rv }) => {
+    ages.setEpoch(me, 3);
+    ages.setEpoch(rv, 3);
+    const p = g.players[me];
+    const water = [];
+    for (let y = 1; y < g.h - 1; y++) for (let x = 1; x < g.w - 1; x++) if (g.terrain[y * g.w + x] === 2 && g.block[y * g.w + x] === 1) water.push([x, y]);
+    // The water tiles nearest the start whose neighbours are water too.
+    const open = water.filter(([x, y]) => [[1, 0], [-1, 0], [0, 1], [0, -1], [2, 0], [0, 2]].every(([dx, dy]) => g.terrain[(y + dy) * g.w + x + dx] === 2));
+    open.sort((a, b) => (a[0] - p.startX) ** 2 + (a[1] - p.startY) ** 2 - (b[0] - p.startX) ** 2 - (b[1] - p.startY) ** 2);
+    const [wx, wy] = open[0];
+    const types = ['warship', 'transport', 'cog'];
+    for (let i = 0; i < 6; i++) {
+      ages.spawn(i % 2 ? rv : me, types[i % 3], wx + (i % 3) * 1.4, wy + Math.floor(i / 3) * 1.4);
+    }
+    for (let i = 0; i < 8; i++) ages.spawn(me, 'citizen', p.startX + 3 + (i % 4), p.startY + 3 + Math.floor(i / 4));
+    return { x: wx + 1.5, y: wy + 0.7, zoom: 0.6 };
+  }],
+  // Citizens close up: the player's in the Industrial Age, the rival's in the Bronze Age, in rows on open grass.
+  ['citizens', ({ g, ages, me, rv }) => {
+    ages.setEpoch(me, 4);
+    ages.setEpoch(rv, 1);
+    const p = g.players[me];
+    const x = p.startX + 8;
+    const y = p.startY + 8;
+    for (let i = 0; i < 10; i++) {
+      ages.spawn(me, 'citizen', x + (i % 5) * 0.8, y + Math.floor(i / 5) * 0.8);
+      ages.spawn(rv, 'citizen', x + (i % 5) * 0.8, y + 2 + Math.floor(i / 5) * 0.8);
+    }
+    return { x: x + 1.6, y: y + 1.4, zoom: 0.35 };
+  }],
+  // Citizens standing in the middle of a wood: the crowns should draw in around them (#623).
+  ['wood', ({ g, ages, me }) => {
+    const p = g.players[me];
+    const cands = [];
+    for (let y = 3; y < g.h - 3; y++) for (let x = 3; x < g.w - 3; x++) {
+      let n = 0;
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (g.res[(y + dy) * g.w + x + dx] === 1) n++;
+      if (n >= 14) cands.push([x, y, (x - p.startX) ** 2 + (y - p.startY) ** 2]);
+    }
+    cands.sort((a, b) => a[2] - b[2]);
+    const [wx, wy] = cands[0];
+    for (let i = 0; i < 4; i++) ages.spawn(me, 'citizen', wx + 0.5 + (i % 2) * 0.9, wy + 0.5 + Math.floor(i / 2) * 0.9);
+    return { x: wx + 1, y: wy + 1, zoom: 0.5 };
+  }],
+  // The same town in the Stone and Bronze Ages (#625): the early silhouettes of houses, stores and barracks.
+  ['stone-town', ({ g, ages, me }) => {
+    ages.setEpoch(me, 0);
+    for (const t of ['house', 'house', 'house', 'storehouse', 'barracks', 'range', 'stable', 'tower', 'temple', 'market', 'farm', 'farm']) ages.build(me, t);
+    const p = g.players[me];
+    for (let i = 0; i < 8; i++) ages.spawn(me, 'citizen', p.startX + 4 + (i % 4), p.startY + 4 + Math.floor(i / 4));
+    return { zoom: 1.4 };
+  }],
+  ['bronze-town', ({ g, ages, me }) => {
+    ages.setEpoch(me, 1);
+    for (const t of ['house', 'house', 'house', 'storehouse', 'barracks', 'range', 'stable', 'tower', 'temple', 'market', 'farm', 'farm']) ages.build(me, t);
+    const p = g.players[me];
+    for (let i = 0; i < 8; i++) ages.spawn(me, 'citizen', p.startX + 4 + (i % 4), p.startY + 4 + Math.floor(i / 4));
+    return { zoom: 1.4 };
+  }],
 ];
 
 const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox'] });
@@ -45,7 +106,8 @@ for (const [name, setup] of SCENES) {
   if (only && only !== name) continue;
   const page = await b.newPage({ viewport: { width: 1280, height: 800 } });
   page.on('pageerror', (e) => errors.push(`${name}: ${e.message}`));
-  await page.goto('http://localhost:5199/?seed=7&foes=1');
+  if (process.env.SHOT_QUALITY) await page.addInitScript((q) => localStorage.setItem('ages-quality', q), process.env.SHOT_QUALITY);
+  await page.goto('http://localhost:5199/?seed=7&foes=1' + (process.env.SHOT_QUERY ?? ''));
   await page.waitForSelector('#title:not(.hidden)', { timeout: 120000 });
   await page.evaluate(() => {
     const s = document.querySelector('#opt-civ');
