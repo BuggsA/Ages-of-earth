@@ -456,17 +456,21 @@ export class Hud {
     return true;
   }
 
-  toast(msg: string, kind: 'bad' | 'good' | 'info' | 'alert' = 'info'): void {
+  toast(msg: string, kind: 'bad' | 'good' | 'info' | 'alert' = 'info', onClick?: () => void): void {
     const now = performance.now();
     if ((this.recent.get(msg) ?? 0) > now - 2500) return;
     this.recent.set(msg, now);
     const el = document.createElement('div');
     el.className = `notice ${kind}`;
     el.textContent = msg;
+    if (onClick) {
+      el.classList.add('clickable');
+      el.addEventListener('click', () => (onClick(), el.remove()));
+    }
     this.noticeEl.appendChild(el);
     while (this.noticeEl.children.length > 4) this.noticeEl.firstChild!.remove();
-    setTimeout(() => (el.style.opacity = '0'), 2600);
-    setTimeout(() => el.remove(), 3200);
+    setTimeout(() => (el.style.opacity = '0'), onClick ? 5600 : 2600);
+    setTimeout(() => el.remove(), onClick ? 6200 : 3200);
   }
 
   /** A notice for a button you can't pay for: what is missing, and one button per resource to send the hands it takes. */

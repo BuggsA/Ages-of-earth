@@ -582,3 +582,15 @@ body.online .tip-box { bottom: 330px; }
 .tide[data-tide='losing'] .tide-word { color: #ffb08a; }
 .tide[data-tide='routed'] .tide-word { color: #ff6a5a; animation: tide-pulse 0.9s ease-in-out infinite alternate; }
 @keyframes tide-pulse { from { opacity: 1; } to { opacity: 0.55; } }
+
+/* Reading the rival's road (#726): cards in the roads panel's frame. */
+.roads-panel .rv-card { padding: 4px 0 8px; border-bottom: 1px solid var(--edge); }
+.roads-panel .rv-card:last-child { border-bottom: 0; }
+.roads-panel .rv-head { font: 800 13px 'Cinzel', serif; color: var(--gold-2); }
+.roads-panel .rv-head i { display: inline-block; width: 9px; height: 9px; margin-right: 6px; border-radius: 2px; }
+.roads-panel .rv-head span { color: var(--muted); font: 700 11px 'Nunito', sans-serif; margin-left: 6px; }
+.roads-panel .rv-card p { margin: 3px 0; }
+.roads-panel .rv-door, .roads-panel .rv-dim { color: var(--muted); }
+.roads-panel .rv-window { color: #ff9a8a; font-weight: 800; }
+.roads-panel .rv-road { color: var(--gold-2); }
+.notice.clickable { pointer-events: auto; cursor: pointer; text-decoration: underline dotted; }
