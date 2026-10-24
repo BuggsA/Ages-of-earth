@@ -468,6 +468,7 @@ export class Hud {
   /** Citizens standing idle (bushes picked dry, #344): after a few seconds, one button lays them fields (`reassign` idle→food does it). */
   private idleSince = new Map<number, number>();
   private idleCardAt = 0;
+  private foraged = new Set<number>();
   private idleFieldCard(s: GameState, viewer: number): void {
     const p = s.players[viewer];
     const now = performance.now();
@@ -476,7 +477,12 @@ export class Hud {
     const next = new Map<number, number>();
     for (const u of idle) next.set(u.id, this.idleSince.get(u.id) ?? now);
     this.idleSince = next;
-    const waiting = idle.filter((u) => now - next.get(u.id)! > 5000).length;
+    // Only hands that foraged or farmed and ran dry: the starting five stand idle until the player orders them, and no card scolds that.
+    for (const e of s.ents) {
+      if (e.kind !== 'unit' || e.owner !== viewer) continue;
+      if (e.order.k === 'farm' || (e.order.k === 'gather' && e.order.res === 'food')) this.foraged.add(e.id);
+    }
+    const waiting = idle.filter((u) => this.foraged.has(u.id) && now - next.get(u.id)! > 5000).length;
     if (!p || waiting < 3 || now < this.idleCardAt || buildBarred(p, 'farm')) return;
     if (s.ents.some((e) => e.kind === 'building' && e.owner === viewer && e.type === 'farm' && !e.built && e.hp > 0)) return;
     this.idleCardAt = now + 30000;
