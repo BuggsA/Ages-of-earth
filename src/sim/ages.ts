@@ -393,6 +393,8 @@ export function buildBarred(p: Player, type: BuildingType): string | null {
   if ((type === 'thornwall' || type === 'garden' || type === 'orchard') && !hasWalked(p, 'grove')) return `Only a people that has walked the ${AGES.grove.name} plants a ${BUILDINGS[type].name}`;
   const way = p.way ? WAYS[p.way] : undefined;
   if (way?.shuts?.includes(type)) return `${way.name} raises no ${BUILDINGS[type].name}`;
+  // The breach (#701 s3): a people that has walked the Age of Dykes raises dykes in any age after, to mend its banks.
+  if (type === 'dyke' && hasWalked(p, 'dykes')) return null;
   const only = BUILDINGS[type].ages;
   return !only || only.some((a) => standsIn(p, a)) ? null : `Only in the ${only.map((a) => AGES[a].name).join(' or ')}`;
 }

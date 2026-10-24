@@ -1257,3 +1257,13 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 **Choices I made (the owner may revert):** the `middle → dykes` turn keeps its coast door (`tests/dykes.test.ts` pins it), so only the trunk road from Rivers is never shut. There is no `bronze → rivers` crossing: `tests/step-back.test.ts` pins Bronze's roads, so a Bronze people steps back to the Stone Age to take the water road. Springs began as 7-tile pools of real water; that broke five seeded tests (a Dock on a pool with nowhere to sail, "the nearest water is the sea", a town short of room in its coil fields), so a spring is now a single head that changes no ground until a channel is dug from it.
 
 **Next:** watermills (a mill on a channel that grinds faster), houses by water, a keepsake (the channel's head, a sluice), and the breach (s3): channels let a rival's flood in too. The Water Line (s4) can reuse `wading` for flooded low ground.
+
+## Designers' notes: the Water Road, the breach (#701 s3, 2026-10-24, chain 1024-2000 s3, lane rules)
+
+**Built:** the sea comes back. Polder beside open sea floods, a ring every half second, nearest the gap first; whatever stands there drowns, and people out on it are swept to dry ground. One rule, kept in no list: a dyke broken by siege or a keg, a dyke its owner deleted, a channel cut in from the sea. A finished dyke in the gap stops the water where it is (a site doesn't), and the mill pumps it out again. A people that walked the Dykes may raise dykes in any later age to mend its banks. A selected dyke says how much polder it holds back, to its owner and to the rival.
+
+**Why I love it:** it turns the Age of Dykes' door into a real fight. Polder is the richest land in the game, and now everyone can see where it's weak: the one dyke holding back forty tiles is the point a whole war turns on. A Sapper creeping along the shore with one keg is a threat to a whole economy, and the defender's answer is fast and physical: citizens running to the gap with stone while the water spreads behind them, and the mill thumping away afterwards to win it back. And the attacker gets something odd: your ships sail in where the fields were.
+
+**Choices I made (the owner may revert):** a keg does double to a dyke, so one keg is one breach. Drowned buildings give no kill credit (the sea did it). Mending in any age is broad (any dyke, not just in a gap); it's the Grove's rule, and dykes only go on the water's edge anyway.
+
+**Next:** the Water Line (s4) is this rule run backwards on purpose: sluices that let the sea into your own low ground while the enemy walks across it, and `wading` for flooded fields. A dyke's "holds back" number would make a good tower-like warning ring on the minimap.

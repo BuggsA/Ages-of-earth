@@ -1,4 +1,4 @@
-import { KEG, TICK_HZ, domainOf, secs } from './data';
+import { BREACH, KEG, TICK_HZ, domainOf, secs } from './data';
 import { ageDef } from './ages';
 import { hurt, peace } from './combat';
 import { distToRect } from './grid';
@@ -99,7 +99,7 @@ function douser(s: GameState, k: Keg): Unit | null {
   return null;
 }
 
-/** A keg blows: every rival building within reach takes `KEG.building`, every rival on the ground within reach `KEG.unit`. */
+/** A keg blows: every rival building within reach takes `KEG.building` (a dyke `BREACH.keg` times that), every rival on the ground within reach `KEG.unit`. */
 function blow(s: GameState, k: Keg): void {
   const r2 = KEG.reach * KEG.reach;
   const hit: Ent[] = [];
@@ -112,7 +112,8 @@ function blow(s: GameState, k: Keg): void {
       if (dx * dx + dy * dy <= r2) hit.push(e);
     }
   }
-  for (const e of hit) hurt(s, e, e.kind === 'building' ? KEG.building : KEG.unit, k.owner, null);
+  // A dyke (#701 s3) is earth: powder at its foot tears it open, and the sea does the rest.
+  for (const e of hit) hurt(s, e, e.kind === 'building' ? KEG.building * (e.type === 'dyke' ? BREACH.keg : 1) : KEG.unit, k.owner, null);
   const p = s.players[k.owner];
   p.stats.blown = (p.stats.blown ?? 0) + 1;
   s.events.push({ k: 'keg', owner: k.owner, x: k.x, y: k.y, what: 'blown' });

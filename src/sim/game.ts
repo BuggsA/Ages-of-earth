@@ -32,7 +32,7 @@ import { reclaimStep, remember } from './reclaim';
 import { leaveRubble, salvageStep } from './salvage';
 import { cacheStep, dropOre, spillStore } from './caches';
 import { kegStep, millStep } from './powder';
-import { ditchStep, pumpStep } from './water';
+import { ditchStep, floodStep, pumpStep } from './water';
 import { siloStep } from './silo';
 import { stockPosts } from './oretrade';
 import { sortieStep } from './sortie';
@@ -636,6 +636,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   kegStep(s);
   pumpStep(s);
   ditchStep(s);
+  floodStep(s);
   siloStep(s);
   sortieStep(s);
   fairStep(s);
