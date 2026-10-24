@@ -1445,6 +1445,16 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 
 **Next:** Leviathans (step 7), the beasts' end; the computer escorting a Seed with its whole wave instead of whoever is free; a felt warning when a rival's land passes 25% green; pollen that also slows bees' victims.
 
+## Designers' notes: the Interceptor Battery (#777, s2 of #759, 2026-10-24, chain 1024-1610 s6, lane rules)
+
+**What I built:** Interceptors (Siege Workshop, Industrial) and the Interceptor Battery. At 2 s left the nearest charged battery whose cover holds a warhead's ring, as its team is shown it, fires; the roll is drawn then and stored on the launch (`Launch.icpt`); at 1 s left it meets the missile where s1 draws it, and a hit takes that warhead out of the sky (a salvo's shot is marked gone, its ring with it). Teal cover circles, public like the battery; a rocket that climbs off the rail and curves onto the missile; a white burst on a hit, a dark puff on a miss; three new synthesized sounds.
+
+**Why I love it:** the last three seconds now hold a bet both sides watch. The defender who paid for cover can stay; the attacker reads the teal circles before choosing a target, waits out a reload (the HUD shows a battery's charge to everyone), or fires a salvo that one charge can't answer.
+
+**Choices I made (the owner may revert):** a battery's charge and reload are public, so "launch while it reloads" is a real play; the reload costs time, not resources (90 s, shorter than a warhead's 240 s refuel); the nearest covering battery fires, lowest id on a tie; a battery destroyed after it fired still lets its interceptor fly. The computer's defender still clears a covered ring, since 60% is no shelter; its attacker discounts a covered point by the odds.
+
+**Next:** s3, the silo held in Reserve (#759). A battery model whose rail stands empty while it reloads; a whistle on the dive.
+
 ## Designers' notes: the Age of Floating Cities (the Water Road s7, #770, 2026-10-24, chain 1024-2000 s6, lane rules)
 
 **Built:** the Water Road's last age (`AGES.floating`), past the Age of Tides. Three new things: the **Pontoon** (a 3×3 district moored on open water, stamped as a gate so its people walk its deck), **towing** (the Steppe's `pack` and `pitch` orders on the water: a pontoon cast off is a `tow` unit carrying its deck's people, moored again anywhere a ship goes), and **linking** (three pontoons side by side are a floating town that raises citizens). It swaps rather than piles on: the Pontoon takes the House's place and key, since no House is raised on land in this age.

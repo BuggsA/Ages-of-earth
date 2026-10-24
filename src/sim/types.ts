@@ -49,7 +49,9 @@ export type BuildingType =
   /** The Age of Locks (#701 s5): a swing bridge its own people cross a canal by and ships pass under, and a dam whose turbines drive the workshops by it. */
   | 'bridge' | 'dam'
   /** The Age of Floating Cities (#770): a district on pontoons, moored on open water, that is cast off, towed and moored again. */
-  | 'pontoon';
+  | 'pontoon'
+  /** Missile defence (#759 s2): a battery that fires one interceptor at a warhead falling in its cover. */
+  | 'battery';
 /** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
 export type Difficulty = 'gentle' | 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
@@ -67,7 +69,7 @@ export type TechId =
   | 'wheelbarrow' | 'handcart' | 'axes' | 'saws' | 'picks' | 'shafts' | 'plow' | 'irrigation' | 'masonry'
   | 'conscription' | 'husbandry' | 'theology' | 'chemistry'
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'chart' | 'assay' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
-  | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged' | 'launchControl';
+  | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged' | 'launchControl' | 'interceptors';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
 export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood' | 'locks' | 'floating' | 'bloom';
 
@@ -363,6 +365,8 @@ export interface Building {
   pumped?: number;
   /** A Tide Mill (#739): the tick it last ground on the running tide, so its wheel shows it at work. Absent: it never has. */
   milled?: number;
+  /** An Interceptor Battery (#759 s2): the tick its charge is ready again after firing. Absent: charged. */
+  reload?: number;
   /** A Seed Spire (the Age of the Bloom, `bloom.ts`): the tick its Bloom Seed is ripe (pushed on while no Heart Tree stands). Absent: not yet begun. */
   ripe?: number;
   /** A Sluice (#701 s4): standing open, letting the water out over the low ground behind it. Absent: shut. */
@@ -548,6 +552,21 @@ export interface Launch {
   salvo?: SalvoShot[];
   /** The missile's flight (#772, `flightOf`), drawn at launch and frozen. Absent in older saves (no missile is drawn). */
   arc?: Arc;
+  /** The interceptors fired at it (#759 s2), one at most for each warhead, in the order they fired; each roll drawn once, when it fired. */
+  icpt?: Intercept[];
+}
+
+/**
+ * One interceptor (#759 s2): fired by a battery (`battery`, of `owner`, standing at `x`, `y`) at a launch's warhead `shot` (0 for a single
+ * strike, else its place in `Launch.salvo`), `INTERCEPT.fire` seconds before it lands. `hit` is the roll, drawn as it fired and never again.
+ */
+export interface Intercept {
+  shot: number;
+  battery: number;
+  owner: number;
+  x: number;
+  y: number;
+  hit: boolean;
 }
 
 /**
@@ -1052,6 +1071,11 @@ export type GameEvent =
    * fell) or `struck`. Before it strikes, (`x`, `y`) is the attacker's own aim: a rival's screen reads its rings from launch `id` (`ringsFor`).
    */
   | { k: 'silo'; owner: number; x: number; y: number; what: 'launched' | 'revealed' | 'scrubbed' | 'struck'; id?: number; fuse?: number; w?: 'atomic' | 'fission' | 'fusion'; ring?: number }
+  /**
+   * Missile defence (#759 s2): a battery of `owner`'s `fired` at launch `id` of `by`'s (at the battery, `x`, `y`), then the interceptor met
+   * the warhead (`hit`: it is gone; `missed`: it flies on) where the missile is, `z` tiles up.
+   */
+  | { k: 'intercept'; owner: number; by: number; id: number; shot: number; what: 'fired' | 'hit' | 'missed'; x: number; y: number; z?: number }
   /** A trader bought a load of rare ore at a post (#573). */
   | { k: 'oreBuy'; owner: number; ore: RareId; n: number; gold: number; x: number; y: number }
   | { k: 'ruin'; id: number; owner: number; find: RuinFind; tech?: TechId; x: number; y: number }

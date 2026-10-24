@@ -740,7 +740,11 @@ export function checksum(s: GameState): number {
     mix(e.x);
     mix(e.y);
     if (e.kind === 'unit') mix(e.carry);
-    else mix(e.progress);
+    else {
+      mix(e.progress);
+      // An Interceptor Battery's reload (#759 s2).
+      if (e.reload !== undefined) mix(e.reload);
+    }
   }
   for (const a of s.animals) {
     mix(a.x);
@@ -790,6 +794,12 @@ export function checksum(s: GameState): number {
     for (const w of l.warn ?? []) for (const i of w.of ?? []) mix(i);
     // The missile's course (#772): its start, lure and bow, frozen at launch.
     if (l.arc) for (const v of [l.arc.x, l.arc.y, l.arc.t0, l.arc.lx, l.arc.ly, l.arc.bow]) mix(v);
+    // Its interceptors (#759 s2): which battery fired at which warhead, and the roll it drew.
+    for (const c of l.icpt ?? []) {
+      mix(c.battery * 4 + c.shot * 2 + (c.hit ? 1 : 0));
+      mix(c.x);
+      mix(c.y);
+    }
   }
   // Bloom Seeds (the Age of the Bloom): where each came down, when it cracks, and how far it is hacked.
   for (const l of s.blooms ?? []) {

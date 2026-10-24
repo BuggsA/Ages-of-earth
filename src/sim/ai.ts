@@ -17,10 +17,10 @@ import { wallLine } from './commands';
 import { AI_COCKLE } from './data';
 import { ashoreLeft, bared, bedClock } from './tides';
 import { R_COCKLE } from './types';
-import { AI_BARRAGE, AI_EBB, SALVO } from './data';
+import { AI_BARRAGE, AI_EBB, INTERCEPT, SALVO } from './data';
 import { barragePlan, causewayOwner, ebbTiming, isCauseway, isPond, tideAwake, tideLevel } from './tides';
 import { statsOf } from './world';
-import { aimsOf, blastDamage, flightOf, fuelOf, launchProblem, loaded, missilesAt, revealed, ringsFor, rulesOf, salvoFuel, salvoPeople, salvoProblem, salvoSilos, siloLimit, silosOf, warheadsOf, warnRadius, type WarheadKind } from './silo';
+import { aimsOf, blastDamage, charged, flightOf, fuelOf, launchProblem, loaded, missilesAt, revealed, ringsFor, rulesOf, salvoFuel, salvoPeople, salvoProblem, salvoSilos, siloLimit, silosOf, warheadsOf, warnRadius, type WarheadKind } from './silo';
 import { carriedBy } from './relics';
 import { storesOre } from './caches';
 import { loadPrice, sellerNear } from './oretrade';
@@ -301,6 +301,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   locksWork(s, v, mem, issue);
   floatWork(s, v, mem, issue);
   siloRoad(s, v, mem, issue);
+  interceptorRoad(s, v, mem, issue);
   fireSilo(s, v, mem, issue);
   fleeWarhead(s, v, issue);
   steppeRoad(s, v, mem, issue);
@@ -2171,6 +2172,47 @@ function siloRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   if (!spot || !construct(s, v, mem, 'silo', spot, 3, issue)) spend(v, cost);
 }
 
+/** Whether (x, y) lies in the cover of a charged Interceptor Battery of a rival of `owner`'s (#759 s2). */
+function shielded(s: GameState, owner: number, x: number, y: number): boolean {
+  const R = INTERCEPT.reach * INTERCEPT.reach;
+  return s.ents.some((e) => e.kind === 'building' && e.type === 'battery' && isEnemy(s, owner, e.owner) && charged(s, e) && (e.x - x) * (e.x - x) + (e.y - y) * (e.y - y) <= R);
+}
+
+/**
+ * Missile defence (#759 s2): once a rival stands in the Industrial Age or later, a clever Industrial computer learns Interceptors at a Siege
+ * Workshop and raises Interceptor Batteries, one beside each of its Town Centers not yet in a battery's cover, nearest home first, up to
+ * `INTERCEPT.most`, one every `INTERCEPT.gap` seconds. They fire by themselves.
+ */
+function interceptorRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p, home } = v;
+  if (!AI_LEVELS[p.ai!].clever || p.epoch < 4) return;
+  if (!s.players.some((o) => !o.defeated && isEnemy(s, p.id, o.id) && o.epoch >= 4)) return;
+  if (!p.techs.includes('interceptors')) {
+    const at = v.buildings.find((b) => b.type === 'workshop' && b.built && !b.queue.length);
+    const cost = techCostFor(s, p.id, 'interceptors');
+    if (!at || techProblem(s, p.id, 'interceptors') || v.buildings.some((b) => b.queue.some((q) => q.tech === 'interceptors'))) return;
+    if (afford(v, cost)) issue({ t: 'research', p: p.id, building: at.id, tech: 'interceptors' });
+    spend(v, cost);
+    return;
+  }
+  const batteries = v.buildings.filter((b) => b.type === 'battery');
+  if (batteries.length >= INTERCEPT.most || buildBarred(p, 'battery') || s.tick - (mem.ordered.battery ?? -99999) < secs(INTERCEPT.gap)) return;
+  const near = (a: { x: number; y: number }) => (a.x - home.x) * (a.x - home.x) + (a.y - home.y) * (a.y - home.y);
+  const r2 = (INTERCEPT.reach - 3) * (INTERCEPT.reach - 3);
+  const bare = townCenters(s, p.id)
+    .filter((t) => !batteries.some((b) => (b.x - t.x) * (b.x - t.x) + (b.y - t.y) * (b.y - t.y) <= r2))
+    .sort((a, b) => near(a) - near(b) || a.id - b.id)[0];
+  if (!bare) return;
+  const cost = buildingCostFor(s, p.id, 'battery');
+  if (!afford(v, cost)) {
+    spend(v, cost);
+    return;
+  }
+  const spot = findSpot(s, 'battery', bare.x, bare.y, 3, 9);
+  mem.ordered.battery = s.tick;
+  if (!spot || !construct(s, v, mem, 'battery', spot, 2, issue)) spend(v, cost);
+}
+
 /**
  * What a `w` warhead landing at (x, y) would cost the rivals, as the computer weighs it: each building (a Town Center counts `heart`)
  * and soldier (counts `soldier`) is worth its weight times the share of its health the blast takes, never more than all of it.
@@ -2231,9 +2273,11 @@ function fireSilo(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
       if (aloft.some((a) => (a.x - e.x) * (a.x - e.x) + (a.y - e.y) * (a.y - e.y) < a.r * a.r)) continue;
       const pick = warheadFor(s, p, e.x, e.y);
       if (!pick) continue;
-      if (pick.rate > bestRate) {
-        bestRate = pick.rate;
-        bestWorth = pick.worth;
+      // A point in a charged rival battery's cover (#759 s2, public as the battery is) is worth only what gets through.
+      const through = shielded(s, p.id, e.x, e.y) ? 1 - INTERCEPT.chance : 1;
+      if (pick.rate * through > bestRate) {
+        bestRate = pick.rate * through;
+        bestWorth = pick.worth * through;
         best = { x: e.x, y: e.y, at: s.tick, w: pick.w };
       }
       const worth = pick.w === 'atomic' ? pick.worth : siloWorth(s, p.id, e.x, e.y, 'atomic');
