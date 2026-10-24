@@ -9,13 +9,13 @@ import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE, findResource } from '../sim/units';
-import { FIRE, FISSION, HIVE, WILDWOOD, AUTO_WORK, BREACH, CANAL, DAM, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE } from '../sim/data';
+import { FIRE, FISSION, HIVE, WILDWOOD, AUTO_WORK, BREACH, CANAL, DAM, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, SALVO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
 import { restsAt } from '../sim/passage';
 import { loadPrice, sellerNear } from '../sim/oretrade';
-import { clockOf, fuelOf, launchProblem, loaded, nextNuke, revealed, rulesOf, stockOf, warheadsOf, WARHEAD_NAMES, type WarheadKind } from '../sim/silo';
+import { clockOf, fuelOf, launchProblem, loaded, nextNuke, revealed, ringsFor, rulesOf, salvoFuel, salvoProblem, stockOf, warheadsOf, WARHEAD_NAMES, type WarheadKind } from '../sim/silo';
 import { carriesKegs, kegProblem, kegsOf, millProblem, mills, millsOf, sappers } from '../sim/powder';
 import { carriesTorch, fireOn } from '../sim/fire';
 import { basinOf, damIdle, drowned, heldBack, isInund, lets, millIdle, sluiceFed, sluiceProblem, waterLine, wateredAt } from '../sim/water';
@@ -79,7 +79,8 @@ export interface HudActions {
   /** Wait for a left click on a tree, a root or a rival's living building, for torchbearers to set alight (`fire.ts`). */
   torchMode(): void;
   /** Wait for a left click on the map, for this Missile Silo to launch at (#605). */
-  launchMode(silo: number, w?: WarheadKind): void;
+  /** Aim a launch from this silo: one warhead (`w`, the people's own if absent), or a salvo's three points (#765). */
+  launchMode(silo: number, w?: WarheadKind | 'salvo'): void;
   /** Wait for a left click on a building to shelter in (or a transport to board). */
   garrisonMode(): void;
   /** Wait for a left click on a shore to land a transport's passengers. */
@@ -314,12 +315,19 @@ const tideSig = (s: GameState): string => {
 };
 
 /** The public tide clock (#739), beside the game clock on every screen once the tide has woken: where the sea stands, which way, and when it turns. */
-/** The ☢ chip's words for a warhead in the air (#762): a rival is told of three rings, one real, and never which until the last seconds. */
+/**
+ * The ☢ chip's words for a warhead in the air (#762): a rival is told of three rings and never which are real until the last seconds. The
+ * words are the same for a salvo (#765) as for one warhead, so the chip never tells them apart before the reveal.
+ */
 function warnTip(s: GameState, l: Launch, viewer: number): string {
   const who = s.players[l.owner].name;
-  if (s.players[viewer].team === s.players[l.owner].team) return `${l.owner === viewer ? 'Your' : `${who}'s`} warhead lands on the amber ring in ${clockOf(s, l)} seconds. Rivals see it among two decoys, each ring set off up to ${SILO.blur} tiles from its point, until the last ${SILO.reveal} seconds.`;
-  if (revealed(s, l)) return `${who}'s warhead lands in ${clockOf(s, l)} seconds, inside the ring that flashes. The decoys are gone.`;
-  return `${who}'s Missile Silo has launched: it lands in ${clockOf(s, l)} seconds, inside one of the three red rings; the other two are decoys. Each ring is set off up to ${SILO.blur} tiles from where it falls. With ${SILO.reveal} seconds left the decoys vanish and the real ring flashes.`;
+  if (s.players[viewer].team === s.players[l.owner].team) {
+    if (l.salvo) return `${l.owner === viewer ? 'Your' : `${who}'s`} salvo lands on the amber rings in ${clockOf(s, l)} seconds. Rivals see three rings, as for one warhead and two decoys, each set off up to ${SILO.blur} tiles from its point; all three stay at the last ${SILO.reveal} seconds. A silo destroyed before then scrubs its own warhead.`;
+    return `${l.owner === viewer ? 'Your' : `${who}'s`} warhead lands on the amber ring in ${clockOf(s, l)} seconds. Rivals see it among two decoys, each ring set off up to ${SILO.blur} tiles from its point, until the last ${SILO.reveal} seconds. A silo destroyed before then scrubs the launch.`;
+  }
+  const n = ringsFor(s, l, viewer).length;
+  if (revealed(s, l)) return n > 1 ? `${who}'s salvo lands in ${clockOf(s, l)} seconds: all ${n} rings that flash are real.` : `${who}'s warhead lands in ${clockOf(s, l)} seconds, inside the ring that flashes. The decoys are gone.`;
+  return `${who}'s Missile Silo has launched: it lands in ${clockOf(s, l)} seconds. Of the red rings, one is real and the others decoys, unless it is a salvo of three silos firing at once, when all are real. Each ring is set off up to ${SILO.blur} tiles from where it falls. With ${SILO.reveal} seconds left the decoys vanish and the real rings flash. A silo destroyed before then scrubs its warhead.`;
 }
 
 function tideChip(s: GameState): { text: string; tip: string } | null {
@@ -797,7 +805,7 @@ export class Hud {
     const age = ageDef(p);
     const idleTechs = suspendedTechs(p).map((t) => TECHS[t].name);
     const scores = s.players.map((q) => scoreOf(s, q));
-    const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${RARES.map((r) => Math.floor(p.rare?.[r] ?? 0)).join(',')}|${Math.floor(bloodOf(p))}|${p.pop}/${p.cap}|${ageOf(p)}|${adv}|${p.way ?? ''}${p.deep ? '+' : ''}${p.vowed ? 'v' : ''}|${idleTechs.length}|${idle}|${speed}|${scores.join(',')}|${isHousehold(p) ? Math.round(taxRate(s, viewer) * 60) : ''}|${p.kegs ?? ''}|${(s.launches ?? []).map((l) => `${l.id}:${clockOf(s, l)}${revealed(s, l) ? '!' : ''}`).join(',')}|${tideSig(s)}`;
+    const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${RARES.map((r) => Math.floor(p.rare?.[r] ?? 0)).join(',')}|${Math.floor(bloodOf(p))}|${p.pop}/${p.cap}|${ageOf(p)}|${adv}|${p.way ?? ''}${p.deep ? '+' : ''}${p.vowed ? 'v' : ''}|${idleTechs.length}|${idle}|${speed}|${scores.join(',')}|${isHousehold(p) ? Math.round(taxRate(s, viewer) * 60) : ''}|${p.kegs ?? ''}|${(s.launches ?? []).map((l) => `${l.id}:${clockOf(s, l)}${revealed(s, l) ? '!' : ''}${ringsFor(s, l, viewer).length}`).join(',')}|${tideSig(s)}`;
     const sn = seasonOf(s);
     const tide = tideChip(s);
     this.clockEl.textContent = `${sn.icon} ${fmtTime(s.tick)}${tide ? `  ${tide.text}` : ''}`;
@@ -813,7 +821,7 @@ export class Hud {
         .map((r) => `<div class="res" data-tip="<b>${RARE[r].name}</b>${RARE[r].blurb} Mined from deep veins that only some worlds hold.">${RARE_ICON[r]}${Math.floor(p.rare![r]!)}</div>`)
         .join('') +
       (p.blood !== undefined ? `<div class="res" data-tip="<b>Blood</b>Drawn at Drain Rigs from the enemy who fall near them, and from citizens given to the levy. Spent to raise Blood Towers, and at Transfusion Stations to graft soldiers. In Hemocraft the rigs also bleed the living enemy who stand near them; in the Blood-rite every Temple draws as a rig does, and spends blood to mend your own.">🩸${Math.floor(bloodOf(p))}</div>` : '') +
-      (s.launches ?? []).map((l) => `<div class="res" data-tip="<b>Warhead in the air</b>${warnTip(s, l, viewer)} A silo destroyed before then scrubs the launch.">☢ ${s.players[l.owner].name} ${clockOf(s, l)}s${s.players[viewer].team !== s.players[l.owner].team && !revealed(s, l) ? ' · 1 of 3' : ''}</div>`).join('') +
+      (s.launches ?? []).map((l) => `<div class="res" data-tip="<b>Warhead in the air</b>${warnTip(s, l, viewer)}">☢ ${s.players[l.owner].name} ${clockOf(s, l)}s${s.players[viewer].team !== s.players[l.owner].team && !revealed(s, l) ? ` · ${ringsFor(s, l, viewer).length} rings` : ''}</div>`).join('') +
       (p.kegs !== undefined || mills(p) || sappers(p) ? `<div class="res" data-tip="<b>Powder kegs</b>Ground from saltpetre at the Siege Workshops in the Age of Alchemy, ${KEG.ore} a keg, up to ${KEG.most} in store. In the Age of Sappers citizens and foot soldiers lay them at a rival building (K): ${KEG.fuse} seconds later each blows, wrecking every rival building within ${KEG.reach} tiles, unless a rival reaches it first and stamps it out.${mills(p) ? `<br>${millProblem(s, p) ?? `The mills grind: next keg in ${Math.max(0, Math.ceil((KEG.time - (p.grind ?? 0)) / Math.max(1, millsOf(s, viewer).length)))}s.`}` : ''}">🧨${kegsOf(p)}</div>` : '') +
       `<div class="res pop ${p.pop >= p.cap ? 'full' : ''}" data-tip="<b>Population</b>People and soldiers you have, and room for. Houses add 5 each, a Town Center 10 (150 at most).">${icon('pop')}${p.pop}/${p.cap}</div>`;
     const civ = CIVS[p.civ];
@@ -1759,6 +1767,10 @@ export class Hud {
             const pool = ` Warheads come from your people's store, fired from any of your silos: ${stockOf(p)} now, one more every ${r.refuel ? `${r.refuel} seconds` : 'moment a slot frees'} while store and flight number under ${SILO.cap}. A silo that falls takes no stored warhead with it; only the one it is counting down is lost.`;
             cmds.push({ key: own ? 'M' : 'N', pic: '', glyph: w === 'fission' ? '⚛' : w === 'fusion' ? '☀' : '☢', title: kinds.length > 1 ? `Launch ${WARHEAD_NAMES[w]}` : 'Launch', desc: `Then click anywhere on the map: ${r.fuse} seconds later the ${WARHEAD_NAMES[w]} warhead lands, blasting every rival building and soldier within ${R} tiles: ${peak.toLocaleString('en')} damage at the centre, falling off with distance to nothing at the edge (distance is measured to a building's nearest edge)${poison}. Every player sees the clock and the blast, but not which warhead it is: your clock is ${r.fuse} seconds whatever you fire. The fog lifts over the blast for ${SILO.lift} seconds, and a silo destroyed before the clock runs out scrubs the launch.${leak}${pool}`, cost: fuelOf(w), ok: !why, why: why ?? undefined, on: !loaded(s, b), run: () => this.act.launchMode(b.id, w) });
           }
+          // The salvo (#765): three silos, three Atomic warheads, three points, one clock. Launch Control opens it.
+          const why = salvoProblem(s, viewer);
+          const plain = r.w === 'atomic' ? ` A plain Atomic people pays ${Math.round(SALVO.surcharge * 100)}% more fuel on each; past the fork the silos share a clock for the plain price.` : '';
+          cmds.push({ key: 'B', pic: '', glyph: '☄', title: 'Salvo', desc: `Then click ${SALVO.trio} points on the map, at least ${SILO.apart} tiles apart: this silo and your next ${SALVO.trio - 1} standing silos fire one Atomic warhead each, ${SALVO.trio} from your store, on your ${r.fuse} second clock. Each point takes the Atomic blast (${WARHEADS.atomic.peak.toLocaleString('en')} at the centre, ${WARHEADS.atomic.r} tiles out) and its fallout. Rivals see three rings, as for one warhead and two decoys, and learn all three are real only in the last ${SILO.reveal} seconds. Each silo destroyed before then scrubs its own warhead and its ring; the others fly on. Needs Launch Control and ${SALVO.trio} standing silos.${plain}`, cost: salvoFuel(p), ok: !why, why: why ?? undefined, run: () => this.act.launchMode(b.id, 'salvo') });
         }
         // The seam a Mine Shaft digs (#681).
         if (b.type === 'shaft') {

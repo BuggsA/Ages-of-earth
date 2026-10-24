@@ -12,10 +12,10 @@ import { beatersAt, burns, onFire } from './fire';
 import { basinOf, channelPlan, coastHeld, dykePlan, heldBack, isCanal, isChannel, isInund, isPolder, polderField, sluiceFed, sluiceProblem, waterLine, type ChannelPlan, type DykePlan } from './water';
 import { coveredNext, shoreNear, tideClock, tideMillSpot } from './tides';
 import { wallLine } from './commands';
-import { AI_BARRAGE, AI_EBB } from './data';
+import { AI_BARRAGE, AI_EBB, SALVO } from './data';
 import { barragePlan, causewayOwner, ebbTiming, isCauseway, isPond, tideAwake, tideLevel } from './tides';
 import { statsOf } from './world';
-import { blastDamage, fuelOf, launchProblem, loaded, ringsFor, rulesOf, silosOf, warheadsOf, warnRadius, type WarheadKind } from './silo';
+import { aimsOf, blastDamage, fuelOf, launchProblem, loaded, ringsFor, rulesOf, salvoFuel, salvoPeople, salvoProblem, salvoSilos, siloLimit, silosOf, warheadsOf, warnRadius, type WarheadKind } from './silo';
 import { carriedBy } from './relics';
 import { storesOre } from './caches';
 import { loadPrice, sellerNear } from './oretrade';
@@ -1970,11 +1970,24 @@ function beatFires(s: GameState, v: View, issue: (c: Command) => void): void {
   }
 }
 
-/** The Atomic Age (#605): a clever computer with a big enough town raises one Missile Silo near home. */
+/**
+ * The Atomic Age (#605): a clever computer with a big enough town raises one Missile Silo near home. Once a salvo would pay (#765,
+ * `mem.salvoPays`, weighed in `fireSilo`) it learns Launch Control at a silo and raises silos up to three.
+ */
 function siloRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p, home } = v;
-  if (!AI_LEVELS[p.ai!].clever || p.epoch < 5 || v.hands < AI_SILO.hands || v.buildings.some((b) => b.type === 'silo') || buildBarred(p, 'silo')) return;
-  if (s.tick - (mem.ordered.silo ?? -99999) < secs(40)) return;
+  if (!AI_LEVELS[p.ai!].clever || p.epoch < 5 || v.hands < AI_SILO.hands || buildBarred(p, 'silo')) return;
+  const silos = v.buildings.filter((b) => b.type === 'silo');
+  if (silos.length && !mem.salvoPays) return;
+  if (silos.length && !salvoPeople(p)) {
+    const at = silos.find((b) => b.built && !b.queue.length);
+    const cost = techCostFor(s, p.id, 'launchControl');
+    if (!at || techProblem(s, p.id, 'launchControl')) return;
+    if (afford(v, cost)) issue({ t: 'research', p: p.id, building: at.id, tech: 'launchControl' });
+    spend(v, cost);
+    return;
+  }
+  if (siloLimit(s, p.id, 'silo') || s.tick - (mem.ordered.silo ?? -99999) < secs(40)) return;
   const cost = buildingCostFor(s, p.id, 'silo');
   if (!afford(v, cost)) {
     spend(v, cost);
@@ -2027,26 +2040,50 @@ export function warheadFor(s: GameState, p: Player, x: number, y: number): { w: 
 function fireSilo(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
   if (p.epoch < 5) return;
-  const silo = silosOf(s, p.id).find((b) => s.tick - b.born >= secs(BUILDINGS.silo.time + AI_SILO.wait) && loaded(s, b));
+  const ready = silosOf(s, p.id).filter((b) => s.tick - b.born >= secs(BUILDINGS.silo.time + AI_SILO.wait));
+  const silo = ready.find((b) => loaded(s, b));
   if (!silo) return;
-  if (s.tick % TICK_HZ === 0) {
+  // Once a second, kept by the clock in memory: a computer thinks on ticks of its own (`memory`), which a tick count need never meet.
+  if (s.tick - (mem.siloAt ?? -TICK_HZ) >= TICK_HZ) {
+    mem.siloAt = s.tick;
     let best: { x: number; y: number; at: number; w: WarheadKind } | null = null;
     let bestRate = 0;
+    let bestWorth = 0;
+    const spots: { x: number; y: number; worth: number }[] = [];
     // A town one of its own warheads already falls on is left to it (Fusion keeps three aloft: they go to three towns, not one).
-    const aloft = (s.launches ?? []).filter((l) => l.owner === p.id);
+    const aloft = (s.launches ?? []).filter((l) => l.owner === p.id).flatMap((l) => aimsOf(l).map((a) => ({ ...a, r: WARHEADS[l.w ?? 'atomic'].r })));
     for (const e of s.ents) {
       if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
-      if (aloft.some((l) => (l.x - e.x) * (l.x - e.x) + (l.y - e.y) * (l.y - e.y) < WARHEADS[l.w ?? 'atomic'].r * WARHEADS[l.w ?? 'atomic'].r)) continue;
+      if (aloft.some((a) => (a.x - e.x) * (a.x - e.x) + (a.y - e.y) * (a.y - e.y) < a.r * a.r)) continue;
       const pick = warheadFor(s, p, e.x, e.y);
-      if (pick && pick.rate > bestRate) {
+      if (!pick) continue;
+      if (pick.rate > bestRate) {
         bestRate = pick.rate;
+        bestWorth = pick.worth;
         best = { x: e.x, y: e.y, at: s.tick, w: pick.w };
       }
+      const worth = pick.w === 'atomic' ? pick.worth : siloWorth(s, p.id, e.x, e.y, 'atomic');
+      if (worth >= AI_SILO.worth) spots.push({ x: e.x, y: e.y, worth });
     }
-    mem.siloAim = best ?? undefined;
+    // The salvo (#765): three targets, each worth a warhead, together worth well more than the best single strike.
+    const trio = salvoAims(spots);
+    const sum = trio ? trio.reduce((n, a) => n + a.worth, 0) : 0;
+    mem.salvoPays = !!trio && sum >= (rulesOf(p).w === 'atomic' ? AI_SILO.salvoPlain : AI_SILO.salvo) * bestWorth;
+    mem.siloAim = mem.salvoPays && ready.length >= SALVO.trio && salvoPeople(p) ? { x: trio![0].x, y: trio![0].y, at: s.tick, salvo: trio!.map(({ x, y }) => ({ x, y })) } : (best ?? undefined);
   }
   const aim = mem.siloAim;
   if (!aim || s.tick - aim.at > TICK_HZ * 2) return;
+  if (aim.salvo) {
+    // A salvo planned holds the single strikes until the store holds three (and the fuel is set aside).
+    const from = salvoSilos(s, p.id, silo.id);
+    const shots = aim.salvo.map((a, i) => ({ silo: from[i]?.id ?? -1, x: a.x, y: a.y }));
+    const why = salvoProblem(s, p.id, shots);
+    if (why === null) {
+      issue({ t: 'launch', p: p.id, silo: shots[0].silo, x: shots[0].x, y: shots[0].y, more: shots.slice(1) });
+      mem.siloAim = undefined;
+    } else if (why.startsWith("A salvo's fuel")) spend(v, salvoFuel(p));
+    return;
+  }
   const w = aim.w ?? rulesOf(p).w;
   const why = launchProblem(s, p.id, silo, aim.x, aim.y, w);
   if (why === null) {
@@ -2056,13 +2093,26 @@ function fireSilo(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
 }
 
 /**
+ * A salvo's three aims (#765): the worthiest target, then the worthiest at least `SILO.apart` tiles from those taken, and once more (ties
+ * in the order found, which is id order); null when there are not three.
+ */
+function salvoAims(spots: { x: number; y: number; worth: number }[]): { x: number; y: number; worth: number }[] | null {
+  const A = SILO.apart * SILO.apart;
+  const out: { x: number; y: number; worth: number }[] = [];
+  for (const c of [...spots].sort((a, b) => b.worth - a.worth)) {
+    if (out.every((o) => (o.x - c.x) * (o.x - c.x) + (o.y - c.y) * (o.y - c.y) >= A)) out.push(c);
+    if (out.length === SALVO.trio) return out;
+  }
+  return null;
+}
+
+/**
  * Soldiers and citizens inside a ring of a rival warhead in the air, or on poisoned ground (#605 s2), run out of it, away from
  * its centre toward home (the answer to a public clock, and to the fallout after). A warhead's rings are the three its team is shown
  * (#762, `ringsFor`: the real zone and two decoys, blurred, then the real one alone for the last seconds), each as wide as every rival is
  * warned of (`warnRadius`): never the hidden point or its real blast, so the computer knows no more than a person would.
  */
 function fleeWarhead(s: GameState, v: View, issue: (c: Command) => void): void {
-  if (s.tick % (TICK_HZ / 2) !== 0) return;
   const zones: { x: number; y: number; r: number }[] = [];
   for (const l of s.launches ?? []) if (isEnemy(s, v.p.id, l.owner)) for (const g of ringsFor(s, l, v.p.id)) zones.push({ ...g, r: warnRadius(s, l.owner) });
   for (const f of s.fallout ?? []) zones.push({ x: f.x, y: f.y, r: f.r ?? SILO.reach });
