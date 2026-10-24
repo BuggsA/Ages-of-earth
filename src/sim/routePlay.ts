@@ -27,6 +27,10 @@ export interface RouteMatch {
   walked: AgeId[];
   /** The age it ended in. */
   ended: AgeId;
+  /** Every age it stood in, with the minute it got there. */
+  reached: { age: AgeId; minute: number }[];
+  /** Route ages it chose and later gave up (patience out, or a countered road), with the age it was in and the minute. */
+  gaveUp: { age: AgeId; in: AgeId; minute: number }[];
 }
 
 /**
@@ -34,18 +38,26 @@ export interface RouteMatch {
  * side age: the route's ages yes, all others no, so it climbs the route and the trunk and nothing else) against a Normal
  * computer that walks the web as it likes, the mix a player meets. Deterministic for a seed.
  */
-export function playRoute(route: RouteId, seed: number, map: MapType = routeMaps(route)[0], maxMinutes = 40, size: 'small' | 'medium' = 'small', level: Difficulty = 'hard'): RouteMatch {
-  const s = createGame({ seed, size, mapType: map, players: [{ name: 'Route', ai: level }, { name: 'Mix', ai: 'normal' }] });
+export function playRoute(route: RouteId, seed: number, map: MapType = routeMaps(route)[0], maxMinutes = 40, size: 'small' | 'medium' = 'small', level: Difficulty = 'hard', startEpoch = 0): RouteMatch {
+  const s = createGame({ seed, size, mapType: map, startEpoch, players: [{ name: 'Route', ai: level }, { name: 'Mix', ai: 'normal' }] });
   step(s);
   const mine = routeAges(route);
   const roads: Partial<Record<AgeId, boolean>> = {};
   for (const a of Object.keys(AGES) as AgeId[]) if (!TRUNK.includes(a) && !FORK.includes(a)) roads[a] = mine.includes(a);
   s.ai[0].roads = { ...s.ai[0].roads, ...roads };
-  while (!s.over && s.tick < 1200 * maxMinutes) step(s);
-  return summary(s, route, seed, map);
+  const reached: RouteMatch['reached'] = [{ age: ageOf(s.players[0]), minute: 0 }];
+  const gaveUp: RouteMatch['gaveUp'] = [];
+  while (!s.over && s.tick < 1200 * maxMinutes) {
+    step(s);
+    const here = ageOf(s.players[0]);
+    const minute = s.tick / 1200;
+    if (here !== reached[reached.length - 1].age) reached.push({ age: here, minute });
+    for (const a of mine) if (s.ai[0].roads![a] === false && !gaveUp.some((g) => g.age === a)) gaveUp.push({ age: a, in: here, minute });
+  }
+  return { ...summary(s, route, seed, map), reached, gaveUp };
 }
 
-function summary(s: GameState, route: RouteId, seed: number, map: MapType): RouteMatch {
+function summary(s: GameState, route: RouteId, seed: number, map: MapType): Omit<RouteMatch, 'reached' | 'gaveUp'> {
   const me = s.players[0];
   const ended = ageOf(me);
   return {

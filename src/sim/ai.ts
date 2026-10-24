@@ -619,6 +619,22 @@ function clueRising(s: GameState, p: Player, r: Road): boolean {
 }
 
 /**
+ * The clue building of a side road it has already chosen and not yet raised (#555 s0): the Barracks that shows the Warband, the
+ * Market the merchants'. Left to the town's usual order it lost the wood to cheaper buildings and the road was never seen, so
+ * the town takes the trunk; it is raised first and its wood set aside. Only a road its age leads to (a turn at its own tier too), with no vein, ruin or find to wait on; the steppe's camp has its own order (`steppeRoad`).
+ */
+function clueDue(v: View, mem: AiMemory): BuildingType | null {
+  const { p } = v;
+  if (!walksWeb(v)) return null;
+  for (const r of roadsFrom(p)) {
+    if (!isSideRoad(r) || AGES[r.to].tier < p.epoch || hasWalked(p, r.to) || !r.clue || mem.roads?.[r.to] !== true || r.vein || r.ruin || r.found || AGES[r.to].mobile) continue;
+    if ((r.walked && !hasWalked(p, r.walked)) || (r.crossing && !r.crossing.some((a) => hasWalked(p, a)))) continue;
+    if (count(v, r.clue) === 0 && BUILDINGS[r.clue].epoch <= p.epoch && !buildBarred(p, r.clue)) return r.clue;
+  }
+  return null;
+}
+
+/**
  * A Prospector's Lodge is due (#562): a Stone Age town that walks the web, with the hands (`AI_WEB.survey`, a legion's
  * `LEGION.aiSurvey`) and a Barracks, means to take the iron road and hasn't yet had the lodge's answer.
  */
@@ -1814,13 +1830,22 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     ['range', p.epoch >= 2 && n >= 24 && count(v, 'range') < 2],
     ['stable', p.epoch >= 3 && n >= 26 && count(v, 'stable') < 2],
   ];
+  const due = clueDue(v, mem);
+  if (due) want.unshift([due, true]);
   for (const [type, ok] of want) {
     if (!ok || recently(type, 25) || BUILDINGS[type].epoch > p.epoch || buildBarred(p, type)) continue;
-    // Not a building whose every line the age bars (a Stable in the Iron Age).
+    // Not a building whose every line the age bars (a Stable in the Iron Age); a road's clue is raised all the same (a Greek city's Barracks hires foreign foot).
     const lines = BUILDINGS[type].trains;
-    if (lines.length && lines.every((u) => barred(p, u)) && !(type === 'workshop' && mills(p))) continue;
+    if (type !== due && lines.length && lines.every((u) => barred(p, u)) && !(type === 'workshop' && mills(p))) continue;
     const at = type === 'tower' ? towardEnemy(9) : type === 'market' || type === 'temple' ? home : towardEnemy(6);
     const spot = (type !== 'tower' && ageOf(p) === 'lightning' && fieldSpot(s, v, type)) || (type === 'market' && fairSpot(s, v)) || findSpot(s, type, at.x, at.y, type === 'market' || type === 'temple' ? 6 : 0, 18);
+    // The road's clue comes before the climb's savings: what the town holds pays for it, and until it does, nothing cheaper takes the wood (as the Market's, above).
+    if (spot && type === due) {
+      const cost = raiseCost(s, p.id, type, spot.tx, spot.ty);
+      if (RES.every((r) => !cost[r] || p.res[r] >= cost[r]!)) for (const r of RES) v.budget[r] = Math.max(v.budget[r], cost[r] ?? 0);
+      if (!construct(s, v, mem, type, spot, 3, issue)) spend(v, cost);
+      return;
+    }
     if (spot && construct(s, v, mem, type, spot, type === 'tower' ? 2 : 3, issue)) return;
   }
 
