@@ -148,7 +148,8 @@ function towncenter(k: Kit, e: number, st: Style): void {
 function house(k: Kit, e: number, st: Style): void {
   pad(k, 2, st.base);
   if (e === 0) {
-    hut(k, st, -0.1, -0.05, 0.55, 0.5);
+    hut(k, st, -0.3, -0.15, 0.5, 0.45);
+    hut(k, st, 0.5, -0.05, 0.28, 0.3);
     k.cyl(0.03, 0.03, 0.4, 4, st.post, 0.7, 0, 0.55);
     k.team(k.box(0.02, 0.14, 0.2, TEAM, 0.7, 0.24, 0.65));
     k.box(0.3, 0.12, 0.2, '#6d4a2e', 0.55, 0, -0.6);
@@ -224,6 +225,14 @@ function storehouse(k: Kit, e: number, st: Style): void {
   k.sphere(0.08, '#cfa030', 0.45, 0.07, 0.25);
   k.cyl(0.12, 0.1, 0.25, 7, '#b08a4e', -0.4, 0, 0.6);
   k.team(k.box(1.62, 0.05, 0.06, TEAM, 0, 0.74, 0.55));
+  if (e === 1) {
+    // Beehive granaries of baked clay behind the shed: round domes that no other Bronze building has.
+    for (const x of [-0.45, 0.45]) {
+      k.cyl(0.38, 0.4, 0.55, 9, st.wall, x, 0, -0.35);
+      k.dome(0.4, st.roof2, x, 0.55, -0.35);
+    }
+    k.box(0.14, 0.2, 0.03, '#3a2b20', -0.45, 0, -0.02);
+  }
   if (e === 3) {
     // A warehouse loft: a gabled upper room with a hatch, so the shed rises above the houses' roofs.
     k.box(1.1, 0.5, 0.9, st.wall, 0, 1.15, -0.1);
@@ -671,8 +680,15 @@ function barracks(k: Kit, e: number, st: Style): void {
     return;
   }
   if (e === 1) {
+    // A fortress barracks: a tall stepped gate tower between two crenellated wings, so it stands up out of the rows of low roofs.
     k.box(2.6, 0.8, 1.4, st.wall, 0, 0, -0.6);
     k.box(2.7, 0.07, 1.5, st.trim, 0, 0.8, -0.6);
+    for (const x of [-1.2, -0.9, -0.6, 0.6, 0.9, 1.2]) k.box(0.2, 0.16, 0.16, st.wall, x, 0.87, -1.2);
+    k.box(1.0, 1.6, 0.9, st.wall, 0, 0, -0.55);
+    k.box(1.1, 0.08, 1.0, st.trim, 0, 1.6, -0.55);
+    k.box(0.7, 0.5, 0.7, st.wall2, 0, 1.68, -0.55);
+    k.box(0.8, 0.06, 0.8, st.trim, 0, 2.18, -0.55);
+    for (const [x, z] of [[-0.35, -0.9], [0.35, -0.9], [-0.35, -0.2], [0.35, -0.2]]) k.box(0.16, 0.16, 0.16, st.wall, x, 2.24, z);
     k.box(2.6, 0.08, 0.7, st.roof, 0, 0.75, 0.45);
     for (let i = 0; i < 5; i++) k.cyl(0.06, 0.07, 0.75, 7, st.trim, -1.15 + i * 0.575, 0, 0.75);
     k.box(0.4, 0.55, 0.04, '#3a2b20', 0, 0, 0.11);
@@ -773,6 +789,11 @@ function range(k: Kit, e: number, st: Style): void {
     for (const x of [-0.7, 0.7]) k.box(0.1, 0.4, 0.04, '#2b2b2e', x, 0.2, -0.33);
     for (let i = 0; i < 3; i++) k.cyl(0.015, 0.015, 0.55, 4, WOOD, -1.2 + i * 0.1, 0, 0.35).rotation.z = 0.2;
     k.prism(1.4, 0.35, 0.4, st.wall2, 0, 0, 1.45);
+    // A tall archers' mast with a gong ring and a pennon: the one vertical on a long, low court.
+    k.cyl(0.04, 0.05, 2.0, 5, st.post, 1.25, 0, -0.25);
+    k.cyl(0.2, 0.2, 0.05, 10, '#c89a3a', 1.25, 1.55, -0.18).rotation.x = Math.PI / 2;
+    k.cone(0.07, 0.2, 5, st.roof2, 1.25, 2.0, -0.25);
+    k.box(0.8, 0.05, 0.3, st.roof2, 0, 0.82, -1.0).rotation.x = -0.2;
   } else if (e === 2) {
     // A timber-framed archery hall: arrow slits, an overhanging hoarding, a quiver barrel and straw butts.
     k.box(2.6, 0.85, 1.0, st.wall, 0, 0, -0.85);
@@ -860,6 +881,9 @@ function stable(k: Kit, e: number, st: Style): void {
     // Mudbrick stalls: a flat-roofed row with arched openings, a roof-beam fringe and a clay trough.
     k.box(2.7, 0.75, 1.3, st.wall, 0, 0, -0.65);
     k.box(2.8, 0.08, 1.4, st.trim, 0, 0.75, -0.65);
+    // A gabled terracotta roof with a hay-loft door, so the stalls read as a long barn against the flat-topped halls.
+    k.prism(2.8, 0.55, 1.4, st.roof, 0, 0.83, -0.65);
+    k.box(0.34, 0.3, 0.03, '#3a2b20', 0, 1.02, 0.07);
     for (let i = 0; i < 6; i++) k.cyl(0.035, 0.035, 0.2, 5, st.post, -1.25 + i * 0.5, 0.68, 0.08).rotation.x = Math.PI / 2;
     for (let i = 0; i < 4; i++) {
       const x = -1.0 + i * 0.66;
