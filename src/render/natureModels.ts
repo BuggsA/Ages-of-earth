@@ -8,18 +8,18 @@ const TRUNK = '#7a5636';
 function pine(): Kit {
   const k = new Kit();
   k.cyl(0.05, 0.07, 0.3, 5, TRUNK);
-  k.cone(0.34, 0.5, 7, '#2f6e3a', 0, 0.22);
-  k.cone(0.27, 0.45, 7, '#3a8445', 0, 0.48);
-  k.cone(0.18, 0.38, 7, '#479a50', 0, 0.74);
+  k.cone(0.32, 0.46, 7, '#2a6234', 0, 0.2);
+  k.cone(0.25, 0.42, 7, '#3f8a48', 0, 0.5);
+  k.cone(0.16, 0.36, 7, '#6cb85c', 0, 0.8);
   return k;
 }
 
 function broadleaf(): Kit {
   const k = new Kit();
   k.cyl(0.05, 0.075, 0.45, 5, TRUNK);
-  k.blob(0.32, '#4f9a45', 0, 0.68).scale.set(1, 0.85, 1);
-  k.blob(0.22, '#5fae4f', 0.15, 0.82, 0.08);
-  k.blob(0.2, '#468e3f', -0.14, 0.62, -0.1);
+  k.blob(0.3, '#3d8240', 0, 0.62).scale.set(1, 0.8, 1);
+  k.blob(0.22, '#7cc45a', 0.14, 0.86, 0.08);
+  k.blob(0.18, '#5aa44a', -0.14, 0.7, -0.1);
   return k;
 }
 
@@ -27,7 +27,7 @@ function birch(): Kit {
   const k = new Kit();
   k.cyl(0.035, 0.05, 0.6, 5, '#e8e4da');
   k.box(0.072, 0.03, 0.072, '#3a3a3a', 0, 0.25);
-  k.blob(0.24, '#8cc152', 0, 0.78).scale.set(0.9, 1.2, 0.9);
+  k.blob(0.22, '#a4d65e', 0, 0.8).scale.set(0.85, 1.2, 0.85);
   return k;
 }
 

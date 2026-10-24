@@ -269,7 +269,7 @@ export class Weather {
       uWind: { value: new THREE.Vector2(4, 1.5) },
       uLen: { value: 0.045 },
       uColor: { value: new THREE.Color('#c4d8ea') },
-      uOpacity: { value: 0.4 },
+      uOpacity: { value: 0.24 },
     };
     this.rain = new THREE.LineSegments(
       rg,
