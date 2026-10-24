@@ -17,6 +17,8 @@ import { wallLine } from './commands';
 import { AI_COCKLE } from './data';
 import { AI_COCKLER, COCKLER } from './data';
 import { cocklerSpotNear } from './tides';
+import { AI_GATE } from './data';
+import { gateReach, gateRisk, tideGateProblem, tideGateSpotIn } from './tides';
 import { nearestDrop } from './world';
 import { ashoreLeft, bared, bedClock } from './tides';
 import { R_COCKLE } from './types';
@@ -1820,6 +1822,7 @@ function tideWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     }
   }
   if (ageDef(p).tides) barrageWork(s, v, mem, issue);
+  if (ageDef(p).tides) gateWork(s, v, mem, issue);
   if (ageDef(p).tides) cockleWork(s, v, mem, issue);
   if (!ageDef(p).tides || buildBarred(p, 'tidemill')) return;
   if (v.buildings.filter((b) => b.type === 'tidemill').length >= AI_TIDES.mills) return;
@@ -1856,8 +1859,9 @@ function cockleWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) =>
   // A Cockler's Hut by the busiest bed (#779).
   if (pickers.length) cocklerHutWork(s, v, mem, pickers, issue);
   if (n >= AI_COCKLE.hands) return;
+  const risk = gateRisk(s, p.id);
   const bed = findResource(s, R_COCKLE, v.home.x, v.home.y, AI_COCKLE.reach, (i) => {
-    if (!bared(s, i)) return true;
+    if (!bared(s, i) || (risk && risk(i))) return true;
     const c = bedClock(s, i);
     return !c || !c.bare || c.secs < AI_COCKLE.least;
   });
@@ -1955,6 +1959,53 @@ function barrageWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) =
   issue({ t: 'wall', p: p.id, ids: crew.map((u) => u.id), x0: plan.from.x, y0: plan.from.y, x1: plan.to.x, y1: plan.to.y, causeway: true });
   spend(v, all);
   mem.ordered.causeway = s.tick;
+}
+
+/**
+ * The computer's Tide Gate (#785). With a barrage of its own standing and no gate, every `AI_GATE.every` seconds it sets one in it
+ * (`tideGateSpotIn`: of its causeway tiles by a pond, in tile order, the one nearest the middle with the sea on the far side). Every
+ * `AI_GATE.look` seconds after: with the gate shut and loaded, it opens it when `AI_GATE.threat` or more enemy land units stand on the
+ * flats it would scour, more than its own side's there; an open gate it shuts again `AI_GATE.shut` seconds on, to fill on the next flood.
+ */
+function gateWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!s.pond || !s.causewayBy || buildBarred(p, 'tidegate')) return;
+  const gate = v.buildings.find((b) => b.type === 'tidegate');
+  if (!gate) {
+    if (s.tick - (mem.ordered.tidegate ?? -99999) < secs(AI_GATE.every)) return;
+    mem.ordered.tidegate = s.tick;
+    const own: number[] = [];
+    for (let i = 0; i < s.causewayBy.length; i++) if (s.causewayBy[i] === p.id + 1) own.push(i);
+    if (!own.length) return;
+    const cost = buildingCostFor(s, p.id, 'tidegate');
+    if (!afford(v, cost)) {
+      spend(v, cost);
+      return;
+    }
+    const spot = tideGateSpotIn(s, own, p.id);
+    if (!spot || !construct(s, v, mem, 'tidegate', spot, 2, issue)) spend(v, cost);
+    return;
+  }
+  const m = (mem.tide ??= {});
+  if (!gate.built || s.tick - (m.gate ?? -99999) < secs(AI_GATE.look)) return;
+  m.gate = s.tick;
+  if (gate.open) {
+    if (s.tick - (m.opened ?? -99999) >= secs(AI_GATE.shut) && !tideGateProblem(s, gate)) issue({ t: 'pack', p: p.id, building: gate.id });
+    return;
+  }
+  const reach = gateReach(s, gate);
+  if (!reach.length) return;
+  const below = new Set(reach);
+  let foes = 0;
+  let ours = 0;
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || domainOf(e.type) !== 'land' || !below.has(Math.floor(e.y) * s.w + Math.floor(e.x))) continue;
+    if (isEnemy(s, p.id, e.owner)) foes++;
+    else ours++;
+  }
+  if (foes < AI_GATE.threat || foes <= ours) return;
+  issue({ t: 'pack', p: p.id, building: gate.id });
+  m.opened = s.tick;
 }
 
 /**

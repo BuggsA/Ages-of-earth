@@ -261,3 +261,52 @@ function millsFor(s: GameState, gate: Building): { id: number; gold: number } | 
   }
   return null;
 }
+
+describe('the computer and its Tide Gate', () => {
+  /** Player 0 a computer in the Age of Tides with a barrage of its own laid, the tide awake; player 1 a rival with no computer. */
+  function aiBarrage(): { s: GameState; plan: BarragePlan } {
+    const s = createGame({ seed: 1, size: 'medium', mapType: 'lakes', players: [{ name: 'A', ai: 'hard' }, { name: 'B', ai: null }] });
+    s.peaceUntil = 0;
+    s.animals = [];
+    enter(s, 0, 'tides');
+    s.players[0].res = { food: 5000, wood: 5000, stone: 5000, gold: 5000 };
+    step(s);
+    const plan = bay(s);
+    for (const t of plan.line) placeBuilding(s, 0, 'causeway', t % s.w, Math.floor(t / s.w), true);
+    // A few idle hands on the shore by it: a new town's are all at work raising houses.
+    for (let k = 0; k < 4; k++) spawnUnit(s, 0, 'citizen', plan.from.x + 0.5, plan.from.y + 0.5);
+    run(s, 1);
+    return { s, plan };
+  }
+
+  it('sets a gate in its barrage', () => {
+    const { s } = aiBarrage();
+    run(s, 40);
+    const gate = s.ents.find((e) => e.kind === 'building' && e.type === 'tidegate' && e.owner === 0) as Building | undefined;
+    expect(gate).toBeDefined();
+    expect(isCauseway(s, gate!.ty * s.w + gate!.tx)).toBe(true);
+    expect(pondBehind(s, gate!).length).toBeGreaterThan(0);
+  });
+
+  it('opens it on a rival army standing on the flats below at low water, and shuts it again after', () => {
+    const { s, plan } = aiBarrage();
+    const spot = tideGateSpotIn(s, plan.line, 0)!;
+    const gate = placeBuilding(s, 0, 'tidegate', spot.tx, spot.ty, true);
+    toLevel(s, 0);
+    const reach = gateReach(s, gate);
+    expect(reach.length).toBeGreaterThan(0);
+    // One rival soldier is not worth the pond; an army is.
+    spawnUnit(s, 1, 'infantry', (reach[0] % s.w) + 0.5, Math.floor(reach[0] / s.w) + 0.5);
+    run(s, 2);
+    expect(gate.open).toBeUndefined();
+    for (let k = 1; k < 4; k++) {
+      const t = reach[k % reach.length];
+      spawnUnit(s, 1, 'infantry', (t % s.w) + 0.5, Math.floor(t / s.w) + 0.5);
+    }
+    heard.length = 0;
+    run(s, 2);
+    expect(heard.some((e) => e.k === 'tideGate' && e.owner === 0 && e.open && e.scour > 0 && e.swept >= 3)).toBe(true);
+    run(s, 10);
+    expect(gate.open).toBeUndefined();
+  });
+});

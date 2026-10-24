@@ -1455,6 +1455,22 @@ export class View {
           this.cue('swept', ev.x, ev.y, 0.5);
           break;
         }
+        case 'tideGate': {
+          // A Tide Gate (#785): opened on a loaded pond, white water bursts through it and a ring runs out over the flats; shut, the
+          // leaves knock to.
+          if (!this.sees(ev.x, ev.y)) break;
+          if (ev.open && ev.scour) {
+            const at = new THREE.Vector3(ev.x, WATER_Y + 0.12, ev.y);
+            this.effects.burst(at, { count: 22, speed: 2.2, up: 1.4, life: 1.4, size: 0.08, gravity: 4, drag: 0.3, colors: ['#ffffff', '#e6f1f2', '#cfe3e6'] });
+            this.effects.ring(new THREE.Vector3(ev.x, WATER_Y + 0.03, ev.y), '#e6f1f2', 4, 1.6);
+            this.effects.ring(new THREE.Vector3(ev.x, WATER_Y + 0.03, ev.y), '#ffffff', 7, 2.4);
+            this.cue('scour', ev.x, ev.y, 0.8);
+          } else {
+            this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.1, ev.y), { count: 6, speed: 0.7, up: 0.6, life: 0.8, size: 0.05, gravity: 3, colors: ['#dcefff', '#ffffff'] });
+            this.cue('pondShut', ev.x, ev.y, 0.35);
+          }
+          break;
+        }
         case 'tideHold': {
           // Routes that read the tide (#755): one of yours halts at the water's edge, a little lap of foam at its feet.
           if (ev.owner !== this.viewer || !this.sees(ev.x, ev.y)) break;
