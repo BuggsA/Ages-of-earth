@@ -454,14 +454,14 @@ function maul(s: GameState, a: Animal, u: Unit): void {
 export const sheepMeat = (a: Animal): number => (a.lamb !== undefined ? FLOCK.lambMeat : FLOCK.meat + (a.fat ?? 0) * 2);
 
 /** Work an order can be set down for, and picked up again after the fight. */
-const WORK: Order['k'][] = ['idle', 'gather', 'farm', 'build', 'deliver', 'dig', 'salvage', 'milk'];
+const WORK: Order['k'][] = ['idle', 'gather', 'farm', 'shaft', 'build', 'deliver', 'dig', 'salvage', 'milk'];
 
 /** Someone bitten or gored at their work turns on the beast, then goes back to it. */
 function fightBack(u: Unit, a: Animal): void {
   if (!fightsBeasts(u) || !WORK.includes(u.order.k)) return;
   if ((u.stance === 'stand' || u.stance === 'run') && u.type !== 'citizen') return;
   const o = u.order;
-  if (o.k !== 'idle') u.queue.unshift(o.k === 'gather' || o.k === 'farm' || o.k === 'milk' ? { ...o, phase: 'go' } : o);
+  if (o.k !== 'idle') u.queue.unshift(o.k === 'gather' || o.k === 'farm' || o.k === 'shaft' || o.k === 'milk' ? { ...o, phase: 'go' } : o);
   u.order = { k: 'hunt', target: a.id, fight: a.kind === 'wolf' || a.kind === 'raider' };
   u.path = null;
   u.goal = null;

@@ -299,6 +299,77 @@ function huntcamp(k: Kit, e: number, st: Style): void {
   banner(k, 0.85, 0, 0.8, 0.8);
 }
 
+// ---- Mine Shaft (#681) ---------------------------------------------------------------------------------
+
+/** The spoil heap's colours by seam (`SEAMS` order: stone, gold, salt, saltpetre, blood-iron): the rock, and the flecks of what is dug. */
+const SPOIL: [string, string][] = [['#8d8579', '#b3aca0'], ['#7d7466', '#e8c040'], ['#9a948a', '#eeeae0'], ['#8f8a7c', '#d9d2b0'], ['#5e5650', '#6a1f24']];
+
+/**
+ * A shaft collar of squared timbers round a dark hole, the headframe over it, and a spoil heap beside it that shows the seam:
+ * grey rock for stone, gold-flecked ore for gold, a rare ore's colour over its old workings. Bronze and Iron: an A-frame with
+ * a windlass and a hanging bucket; Gunpowder: a taller timber frame with a sheave wheel; Industrial: an iron lattice headframe,
+ * a winding-engine house and its stack. A rail of ore tubs runs from the collar.
+ */
+function shaft(k: Kit, e: number, st: Style, seam: number): void {
+  pad(k, 2, st.base);
+  const [rock, fleck] = SPOIL[Math.min(Math.max(seam, 0), SPOIL.length - 1)];
+  // The collar and the hole.
+  k.box(0.62, 0.03, 0.62, '#1c1712', -0.25, 0.02, -0.2);
+  for (const [w, d, x, z] of [[0.82, 0.1, -0.25, -0.56], [0.82, 0.1, -0.25, 0.16], [0.1, 0.62, -0.61, -0.2], [0.1, 0.62, 0.11, -0.2]] as [number, number, number, number][]) {
+    k.box(w, 0.12, d, e >= 3 ? STONE : WOOD, x, 0, z);
+  }
+  const frame = e >= 4 ? '#3a3e44' : st.post;
+  const top = e >= 3 ? 1.75 : 1.25;
+  // Two A-frames over the hole, joined at the top by the axle beam.
+  for (const z of [-0.5, 0.1]) {
+    for (const sx of [-1, 1]) {
+      const leg = k.cyl(0.035, 0.045, Math.sqrt(0.36 * 0.36 + top * top), 5, frame, -0.25 + sx * 0.18, 0, z);
+      leg.rotation.z = sx * 0.36 / top;
+    }
+  }
+  k.box(0.08, 0.08, 0.72, frame, -0.25, top - 0.06, -0.2);
+  if (e >= 3) {
+    // The sheave wheel, its rope down the shaft.
+    const wheel = k.cyl(0.26, 0.26, 0.05, 12, e >= 4 ? '#6a6e74' : WOOD, -0.25, top - 0.3, -0.2);
+    wheel.rotation.z = Math.PI / 2;
+    k.box(0.015, top - 0.35, 0.015, '#c9b98f', -0.25, 0.15, -0.2);
+  } else {
+    // A windlass with its crank, the rope and a bucket of ore halfway up.
+    const drum = k.cyl(0.07, 0.07, 0.62, 6, WOOD, -0.25, 0.62, -0.2);
+    drum.rotation.x = Math.PI / 2;
+    for (const z of [-0.55, 0.15]) k.box(0.06, 0.66, 0.06, st.post, -0.25, 0, z);
+    k.box(0.04, 0.18, 0.04, st.post, -0.25, 0.62, 0.22);
+    k.box(0.015, 0.3, 0.015, '#c9b98f', -0.25, 0.32, -0.2);
+    k.cyl(0.08, 0.06, 0.12, 6, WOOD, -0.25, 0.2, -0.2);
+  }
+  if (e >= 4) {
+    // The winding-engine house and its stack, a cable running to the wheel.
+    k.box(0.6, 0.55, 0.5, st.wall, 0.6, 0, -0.55);
+    k.prism(0.64, 0.22, 0.54, st.roof, 0.6, 0.55, -0.55);
+    k.cyl(0.07, 0.09, 1.2, 6, '#7a3a2c', 0.82, 0, -0.72);
+    const cable = k.box(0.012, 0.012, 1.1, '#2b2b2e', 0.2, 1.05, -0.38);
+    cable.rotation.y = 1.1;
+    cable.rotation.z = 0.5;
+  }
+  // The spoil heap: the seam shows in it.
+  k.sphere(0.42, rock, 0.55, 0.0, 0.42).scale.set(1, 0.55, 1);
+  k.sphere(0.24, rock, 0.25, 0.0, 0.7).scale.set(1, 0.5, 1);
+  for (const [x, y, z] of [[0.45, 0.17, 0.3], [0.62, 0.15, 0.55], [0.72, 0.1, 0.25], [0.35, 0.12, 0.55], [0.22, 0.06, 0.75]] as [number, number, number][]) {
+    k.octa(0.055, fleck, x, y, z);
+  }
+  // Ore tubs on a short rail from the collar.
+  for (const x of [-0.85, -0.45]) k.box(0.025, 0.02, 0.62, '#4a4a4e', x, 0, 0.6);
+  for (const z of [0.45, 0.78]) {
+    k.box(0.36, 0.2, 0.22, e >= 3 ? '#4a4a4e' : WOOD, -0.65, 0.04, z);
+    k.sphere(0.1, fleck, -0.65, 0.24, z).scale.set(1.3, 0.5, 0.8);
+  }
+  // A pick and a shovel against the collar.
+  const haft = k.cyl(0.018, 0.018, 0.55, 4, WOOD, 0.25, 0.0, -0.75);
+  haft.rotation.x = 0.35;
+  k.box(0.24, 0.035, 0.035, '#8a8f96', 0.25, 0.5, -0.66);
+  k.team(k.box(0.012, 0.16, 0.24, TEAM, -0.25, top - 0.3, 0.16));
+}
+
 // ---- Prospector's Lodge (#562) -------------------------------------------------------------------------
 
 /**
@@ -2050,7 +2121,7 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
   }
 }
 
-const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare'>, (k: Kit, e: number, st: Style) => void> = {
+const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft'>, (k: Kit, e: number, st: Style) => void> = {
   sapling: (k, e) => sapling(k, e),
   towncenter, house, storehouse, huntcamp, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo,
 };
@@ -2220,7 +2291,7 @@ const ROOFS: Partial<Record<BuildingType, [string, string]>> = {
   tower: ['#3e4858', '#2e3641'], warcamp: ['#3e4858', '#2e3641'], bloodtower: ['#3e4858', '#2e3641'], airfield: ['#3e4858', '#2e3641'], silo: ['#3e4858', '#2e3641'],
   temple: ['#e9e2cf', '#d8b25a'], mission: ['#e9e2cf', '#d8b25a'],
   market: ['#1a5961', '#133f46'], caravanserai: ['#1a5961', '#133f46'], dock: ['#1a5961', '#133f46'],
-  storehouse: ['#e2b855', '#d4a642'], huntcamp: ['#e2b855', '#d4a642'], prospector: ['#e2b855', '#d4a642'],
+  storehouse: ['#e2b855', '#d4a642'], huntcamp: ['#e2b855', '#d4a642'], prospector: ['#e2b855', '#d4a642'], shaft: ['#e2b855', '#d4a642'],
 };
 
 /** No plinth or pennant: open or thin pieces, and buildings that already carry their own standards. */
@@ -2258,6 +2329,7 @@ export function buildingGeometry(type: BuildingType, epochIn: number, color: str
     const k = new Kit();
     if (type === 'wall') wall(k, epoch, STYLES[Math.min(epoch, 4)], variant);
     else if (type === 'snare') snare(k, epoch, variant === 1);
+    else if (type === 'shaft') shaft(k, epoch, roleStyle(type, epoch, STYLES[Math.min(epoch, 4)]), variant);
     else MAKERS[type](k, epoch, roleStyle(type, epoch, STYLES[Math.min(epoch, 4)]));
     if (!BARE.includes(type)) teamMarks(k, type);
     const stack = STACKS[type];
