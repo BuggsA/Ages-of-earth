@@ -109,12 +109,12 @@ export function giftFlock(s: GameState, p: Player, n = FLOCK.start): void {
   }
 }
 
-/** The nearest grown sheep of a people with milk to give, within `r` tiles. */
-export function milkable(s: GameState, owner: number, x: number, y: number, r: number, skip?: number): Animal | null {
+/** The nearest grown sheep of a people with milk to give, within `r` tiles, but for `skip` and the ids in `not`. */
+export function milkable(s: GameState, owner: number, x: number, y: number, r: number, skip?: number, not?: Set<number>): Animal | null {
   let best: Animal | null = null;
   let bestD = r * r;
   for (const a of s.animals) {
-    if (a.kind !== 'sheep' || a.owner !== owner || a.hp <= 0 || a.lamb !== undefined || (a.milk ?? 0) < 1 || a.id === skip) continue;
+    if (a.kind !== 'sheep' || a.owner !== owner || a.hp <= 0 || a.lamb !== undefined || (a.milk ?? 0) < 1 || a.id === skip || not?.has(a.id)) continue;
     const d = (a.x - x) * (a.x - x) + (a.y - y) * (a.y - y);
     if (d < bestD) {
       best = a;

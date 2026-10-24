@@ -6,6 +6,7 @@ import { spoilsStep } from './spoils';
 import { missionStep } from './missions';
 import { raiseCamps } from './steppe';
 import { giftFlock, sheepStep } from './flocks';
+import { tendFlocks } from './shepherd';
 import { faithStep } from './consecrate';
 import { turnSeason } from './seasons';
 import { markHomeHerds, turnYear } from './year';
@@ -70,6 +71,8 @@ export interface PlayerSetup {
   team?: number;
   /** A civilization, or left out for one picked by the seed. */
   civ?: CivId;
+  /** The flock tends itself (`SHEPHERD`): lambs, milking and slaughter without a click. For a person's people. */
+  shepherd?: true;
 }
 
 export interface GameSetup {
@@ -154,6 +157,7 @@ export function createGame(setup: GameSetup): GameState {
       color: ps.color ?? PLAYER_COLORS[i % PLAYER_COLORS.length],
       civ: ps.civ ?? CIV_IDS[(setup.seed + i * 7919) % CIV_IDS.length],
       ai: ps.ai,
+      ...(ps.shepherd && !ps.ai ? { shepherd: true as const } : {}),
       team: ps.team ?? i,
       res: mode === 'deathmatch' ? { ...DEATHMATCH_RES } : { food: START_RES.food + extra.food, wood: START_RES.wood + extra.wood, stone: START_RES.stone + extra.stone, gold: START_RES.gold + extra.gold },
       epoch: startEpoch,
@@ -572,6 +576,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   routeUnits(s);
   for (const e of s.ents) if (e.kind === 'unit' && e.hp > 0 && !e.inside) walk(s, e);
   updateAnimals(s, sp, (a) => sheepStep(s, sp, a));
+  tendFlocks(s);
   turnSeason(s);
   turnYear(s);
   fillSnares(s);
