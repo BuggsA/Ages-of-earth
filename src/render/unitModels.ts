@@ -1471,6 +1471,42 @@ function rangedGear(k: Kit, civ: CivId, epoch: number): void {
   } else if (epoch === 2) {
     const mantle: Record<CivId, string> = { greeks: '#b3282d', romans: '#6e1d22', chinese: '#2f6f62', egyptians: '#e0b13c', mongols: '#2f5fa8', britons: '#3d6b4a' };
     k.box(0.17, 0.24, 0.02, mantle[civ], 0, 0.24, -0.08);
+  } else if (epoch === 3) musketGear(k, civ);
+}
+
+/** Musketeers of each people: a band, plume, sash or kit on the common wide hat and coat, so a firing line reads as Greek, Mongol or Briton as the archers did. */
+function musketGear(k: Kit, civ: CivId): void {
+  switch (civ) {
+    case 'greeks': // A white fustanella kilt, a red cockade and a tall white plume.
+      k.cyl(0.095, 0.12, 0.1, 10, '#f1ece0', 0, 0.06, 0);
+      k.cyl(0.062, 0.072, 0.014, 8, '#b3282d', 0, 0.55, 0);
+      k.cone(0.012, 0.16, 4, '#f1ece0', 0.06, 0.62, -0.03).rotation.z = -0.5;
+      break;
+    case 'romans': // A gilt gorget at the throat, a crimson sash and a red hackle.
+      k.box(0.13, 0.03, 0.03, '#e0b13c', 0, 0.4, 0.07);
+      k.box(0.02, 0.22, 0.13, '#8a1c24', 0.04, 0.24, 0.0).rotation.z = -0.6;
+      k.box(0.2, 0.05, 0.02, '#c0302f', 0, 0.6, 0);
+      break;
+    case 'chinese': // A bright banner-coat badge on the chest, a conical lacquered crown and a red tassel.
+      k.cyl(0.05, 0.05, 0.012, 10, '#f0c43a', 0, 0.26, 0.062).rotation.x = Math.PI / 2;
+      k.cone(0.07, 0.07, 8, '#2b2420', 0, 0.63, 0);
+      k.cone(0.02, 0.08, 4, '#c0302f', 0, 0.7, 0);
+      break;
+    case 'egyptians': // A white turban wound round the crown, a blue sash and a red tarboosh tassel.
+      k.cyl(0.075, 0.075, 0.035, 10, '#e8e0c8', 0, 0.58, 0);
+      k.box(0.19, 0.04, 0.13, '#2f5fa8', 0, 0.14, 0);
+      k.cone(0.01, 0.1, 4, '#c0302f', 0.07, 0.56, -0.03).rotation.z = -0.9;
+      break;
+    case 'mongols': // A fur-lined hat brim, a quiver at the hip beside the musket and a blue sash.
+      k.cyl(0.125, 0.13, 0.025, 10, '#5a3d28', 0, 0.53, 0);
+      k.box(0.19, 0.03, 0.13, '#2f5fa8', 0, 0.15, 0);
+      k.cyl(0.03, 0.025, 0.2, 6, LEATHER, -0.1, 0.18, -0.08).rotation.x = -0.3;
+      break;
+    case 'britons': // A broad blue bonnet with a red pompon, and a green tartan sash across the chest.
+      k.cyl(0.095, 0.1, 0.03, 10, '#2f5fa8', 0, 0.58, 0);
+      k.blob(0.02, '#c0302f', 0, 0.61, 0);
+      k.box(0.02, 0.26, 0.13, '#3d6b4a', -0.04, 0.24, 0.0).rotation.z = 0.65;
+      break;
   }
 }
 
