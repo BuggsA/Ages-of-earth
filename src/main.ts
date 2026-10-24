@@ -25,6 +25,7 @@ import { barragePlan, isCauseway, kegTileProblem } from './sim/tides';
 import { isTidal, tidalLevel, tideClock, tideLevel } from './sim/tides';
 import { AI_BARRAGE, BLOOM, SALVO, secs } from './sim/data';
 import { rooted, slingProblem } from './sim/bloom';
+import { isCarrier } from './sim/units';
 import { maxHp, placeBuilding, restat, spawnUnit } from './sim/world';
 import { arrivalText, epochArrivals } from './ui/endReport';
 import { journeyHtml } from './ui/journeyReport';
@@ -129,6 +130,8 @@ let fireToldAt = -9999;
 let hiveToldAt = -9999;
 /** When a waking Ent was last told (the Age of the Wildwood), so a forest rising round an army tells it once. */
 let entToldAt = -9999;
+/** When a rival seed-bomb was last told (the Age of Leviathans), so a whale working a street tells it once. */
+let whaleToldAt = -9999;
 let paused = false;
 const SPEEDS = [1, 1.5, 2, 3];
 let speedIdx = 0;
@@ -1408,7 +1411,7 @@ function selectArmy(): void {
 function orderPick(s: GameState, clientX: number, clientY: number): Pick | null {
   const pk = view.pick(clientX, clientY, (id) => {
     const u = s.byId.get(id);
-    return !!u && u.kind === 'unit' && s.players[u.owner].team === s.players[viewer].team && !(u.type === 'transport' && u.owner === viewer);
+    return !!u && u.kind === 'unit' && s.players[u.owner].team === s.players[viewer].team && !(isCarrier(u.type) && u.owner === viewer);
   });
   return pk?.kind === 'ground' ? view.pick(clientX, clientY) : pk;
 }
@@ -1526,7 +1529,7 @@ function order(clientX: number, clientY: number, forceAttack = false, queue = fa
     const t = s.byId.get(pk.id);
     if (!t) return;
     // Your own transport: those on foot go aboard.
-    if (t.kind === 'unit' && t.type === 'transport' && t.owner === viewer && board(s, units, t, q)) return;
+    if (t.kind === 'unit' && isCarrier(t.type) && t.owner === viewer && board(s, units, t, q)) return;
     if (t.owner !== viewer && s.players[t.owner].team !== s.players[viewer].team) {
       issue({ t: 'attack', p: viewer, ids, target: t.id, queue: q, spread: true });
       view.marker(s, t.x, t.y, true);
@@ -1553,7 +1556,7 @@ function order(clientX: number, clientY: number, forceAttack = false, queue = fa
     return;
   }
   // Loaded transports sent onto land put their passengers ashore there; everyone else moves.
-  const loaded = forceAttack ? [] : units.filter((u) => u.type === 'transport' && u.cargo.length);
+  const loaded = forceAttack ? [] : units.filter((u) => isCarrier(u.type) && u.cargo.length);
   if (loaded.length && walkable(s, Math.floor(pk.x), Math.floor(pk.y))) {
     issue({ t: 'unload', p: viewer, ids: loaded.map((u) => u.id), x: pk.x, y: pk.y, queue: q });
     const rest = ids.filter((id) => !loaded.some((u) => u.id === id));
@@ -1573,7 +1576,7 @@ function order(clientX: number, clientY: number, forceAttack = false, queue = fa
 function board(s: GameState, units: Unit[], ship: Unit, queue: true | undefined): boolean {
   const riders = units.filter((u) => domainOf(u.type) === 'land');
   if (!riders.length) return false;
-  const room = (unitStats('transport', s.players[viewer].epoch).capacity ?? 0) - ship.cargo.length;
+  const room = (unitStats(ship.type, s.players[viewer].epoch).capacity ?? 0) - ship.cargo.length;
   if (room <= 0) {
     hud.toast('That transport is full', 'bad');
     play('error');
@@ -1619,7 +1622,7 @@ function unloadAt(clientX: number, clientY: number, queue: boolean): void {
   const s = game;
   if (!s) return;
   const g = view.groundAt(clientX, clientY);
-  const ships = selectedUnits(s).filter((u) => u.type === 'transport');
+  const ships = selectedUnits(s).filter((u) => isCarrier(u.type));
   if (!g || !ships.length) return;
   issue({ t: 'unload', p: viewer, ids: ships.map((u) => u.id), x: g.x, y: g.y, queue: queue || undefined });
   view.marker(s, g.x, g.y, false);
@@ -1705,7 +1708,7 @@ function garrisonAt(clientX: number, clientY: number, queue: boolean): void {
   if (!s) return;
   const pk = view.pick(clientX, clientY);
   const ship = pk && pk.kind === 'unit' ? s.byId.get(pk.id) : undefined;
-  if (ship && ship.kind === 'unit' && ship.type === 'transport' && ship.owner === viewer) {
+  if (ship && ship.kind === 'unit' && isCarrier(ship.type) && ship.owner === viewer) {
     board(s, selectedUnits(s).filter((u) => !u.inside), ship, queue || undefined);
     return;
   }
@@ -3048,6 +3051,14 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         }
         break;
       }
+      case 'leviathan':
+        // The Age of Leviathans: a seed-bomb in your own town is told to you; your Behemoth kneeling or rising, to its people.
+        if (ev.what === 'bomb' && ev.owner !== viewer && s.players[viewer]?.vis[Math.floor(ev.y) * s.w + Math.floor(ev.x)] === 1 && s.tick - whaleToldAt > 20 * TICK_HZ) {
+          whaleToldAt = s.tick;
+          hud.toast(`A Skywhale of ${s.players[ev.owner]?.name ?? 'a rival'}'s drops a seed-bomb: Thornwall sprouts in your streets. Cut or burn it while it is young, and shoot the whale down`, 'alert');
+        } else if (ev.what === 'kneel' && ev.owner === viewer) hud.toast('Your Behemoth kneels: its Town Center stands, working. Rise (P) to walk on', 'good');
+        else if (ev.what === 'rise' && ev.owner === viewer) hud.toast('Your Behemoth rises with its Town Center on its back: kneel (P) where you want your capital', 'info');
+        break;
       case 'wildwood':
         // The Age of the Wildwood: a tree that wakes beside your people is told once in a while; your own Ent lost with its tree, and the
         // spring's Spreading, are told to its people.
@@ -3300,11 +3311,11 @@ function cursorFor(s: GameState): string {
     if (units.length && t.kind === 'building' && t.owner === viewer && t.built && BUILDINGS[t.type].garrison) return 'cur-garrison';
     if (t.kind === 'building' && t.type === 'temple' && t.owner === viewer && t.built && units.some((u) => u.type === 'priest' && carriedBy(s, u))) return 'cur-gather';
     if (t.kind === 'building' && t.type === 'market' && t.owner === viewer && t.built && units.some((u) => u.type === 'trader')) return 'cur-gather';
-    if (t.kind === 'unit' && t.type === 'transport' && t.owner === viewer && units.some((u) => domainOf(u.type) === 'land')) return 'cur-garrison';
+    if (t.kind === 'unit' && isCarrier(t.type) && t.owner === viewer && units.some((u) => domainOf(u.type) === 'land')) return 'cur-garrison';
     return 'cur-select';
   }
   if (pk.kind === 'resource' && units.some((u) => u.type === 'citizen' || (u.type === 'fisher' && s.res[pk.tile] === R_FISH) || (legionary(s, u) && legionKind(s.res[pk.tile])))) return 'cur-gather';
-  if (pk.kind === 'ground' && units.some((u) => u.type === 'transport' && u.cargo.length) && walkable(s, Math.floor(pk.x), Math.floor(pk.y))) return 'cur-garrison';
+  if (pk.kind === 'ground' && units.some((u) => isCarrier(u.type) && u.cargo.length) && walkable(s, Math.floor(pk.x), Math.floor(pk.y))) return 'cur-garrison';
   return '';
 }
 

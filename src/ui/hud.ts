@@ -9,7 +9,7 @@ import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE, findResource } from '../sim/units';
-import { FIRE, FISSION, HIVE, WILDWOOD, BLOOM, AUTO_WORK, BREACH, CANAL, DAM, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, SALVO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE } from '../sim/data';
+import { FIRE, FISSION, HIVE, WILDWOOD, BLOOM, LEVIATHANS, AUTO_WORK, BREACH, CANAL, DAM, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, SALVO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -49,6 +49,8 @@ import { GROVE_BUILDINGS, grows } from '../sim/grove';
 import { hiveLine, keepsBees } from '../sim/hive';
 import { heartBarred, heartLine, heartOf, rootProblem, wakesForest } from '../sim/wildwood';
 import { greenLeft, inBloom, rooted, slingProblem, spireBarred, spireLine } from '../sim/bloom';
+import { bombIn, kneelProblem, riseProblem, seedBombProblem } from '../sim/leviathans';
+import { isCarrier } from '../sim/units';
 import { KEYS, RARES, RES, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
 import { buildingPicture, unitPicture } from './thumbs';
@@ -208,6 +210,7 @@ function orderWords(s: GameState, u: Unit): string {
       if (u.type === 'trader' && u.carry > 0) return 'Waiting with gold: right-click a Market';
       if (u.type === 'cog' && u.carry > 0) return 'Waiting with gold: right-click a Dock';
       if (u.type === 'wagon') return 'Packed for the road: press P to pitch camp';
+      if (u.type === 'behemoth') return 'Carrying your Town Center: press P to kneel';
       return ACT_WORDS[u.act] ?? 'Standing by';
   }
 }
@@ -1063,7 +1066,7 @@ export class Hud {
     const queued = mine && u.queue.length ? ` <span class="hint">(+${u.queue.length} queued)</span>` : '';
     const status = mine ? orderWords(s, u) + queued : p.name;
     const carry = mine && u.carry > 0 && u.carryRes ? `<span>${icon(u.carryRes)}${u.carry}<em>carried</em></span>` : '';
-    const cargo = u.type === 'transport' ? `<span data-tip="<b>Aboard</b>Soldiers and citizens carried. Right-click a shore (or press U) to land them.">⛵<em>Aboard</em> ${u.cargo.length}/${st.capacity ?? 0}</span>` : '';
+    const cargo = u.type === 'transport' ? `<span data-tip="<b>Aboard</b>Soldiers and citizens carried. Right-click a shore (or press U) to land them.">⛵<em>Aboard</em> ${u.cargo.length}/${st.capacity ?? 0}</span>` : u.type === 'skywhale' ? `<span data-tip="<b>Aboard</b>Soldiers and citizens carried. Right-click ground (or press U) to set them down, over walls and woods.">🐋<em>Aboard</em> ${u.cargo.length}/${st.capacity ?? 0}</span>` : '';
     const stance = st.attack > 0 && u.type !== 'citizen' && mine ? `<span data-tip="<b>Stance</b>Z attack and destroy, X fight if provoked, C hold, N run.">${u.stance === 'stand' ? '⚓ Hold' : u.stance === 'defensive' ? '🛡 Provoked' : u.stance === 'run' ? '🏃 Run' : '🔥 Attack'}</span>` : '';
     const aura = s.tick - u.aura < 5 && u.type !== 'hero' ? `<span data-tip="<b>Inspired</b>A hero nearby: hits harder and heals.">✨<em>Inspired</em></span>` : '';
     const rank = rankOf(u);
@@ -1356,7 +1359,8 @@ export class Hud {
     const builders = units.filter((u) => canRaise(u.type, 'house', p.civ));
     const soldiers = units.filter((u) => u.type !== 'citizen' && u.type !== 'fisher' && u.type !== 'transport' && u.type !== 'trader' && u.type !== 'cog' && u.type !== 'wagon');
     const walkers = units.filter((u) => domainOf(u.type) === 'land');
-    const transports = units.filter((u) => u.type === 'transport');
+    // A Skywhale (the Age of Leviathans) carries people as a transport does, and sets them down anywhere there is ground.
+    const transports = units.filter((u) => isCarrier(u.type));
     const cmds: Cmd[] = [];
     if (!builders.length) this.buildMenu = null;
 
@@ -1489,7 +1493,7 @@ export class Hud {
       if (walkers.length) cmds.push({ key: 'G', pic: '', glyph: '🏰', title: 'Garrison / board', desc: 'Then click a Town Center or tower to shelter inside (safe, and they add arrows), or your transport to go aboard.', ok: true, run: () => this.act.garrisonMode() });
       if (transports.length) {
         const aboard = transports.reduce((n, t) => n + t.cargo.length, 0);
-        cmds.push({ key: 'U', pic: '', glyph: '⚓', title: 'Unload', desc: 'Then click a shore: sail there and put everyone aboard on land. (Right-clicking land does the same.)', ok: aboard > 0, why: 'Nobody is aboard', count: aboard || undefined, run: () => this.act.unloadMode() });
+        cmds.push({ key: 'U', pic: '', glyph: '⚓', title: 'Unload', desc: transports.every((u) => u.type === 'skywhale') ? 'Then click the ground: fly there and set everyone aboard down, over walls and woods. (Right-clicking ground does the same.)' : 'Then click a shore: sail there and put everyone aboard on land. (Right-clicking land does the same.)', ok: aboard > 0, why: 'Nobody is aboard', count: aboard || undefined, run: () => this.act.unloadMode() });
         cmds.push({ key: 'Y', pic: '', glyph: '🏖', title: 'Unload here', desc: 'Land everyone aboard on the nearest shore.', ok: aboard > 0, why: 'Nobody is aboard', run: () => transports.forEach((t) => this.act.issue({ t: 'unload', p: viewer, ids: [t.id], x: t.x, y: t.y })) });
       }
       // The Age of the Wildwood: Ents root where they stand.
@@ -1497,6 +1501,18 @@ export class Hud {
       if (ents.length) {
         const why = ents.map((u) => rootProblem(s, u)).find((w) => w) ?? null;
         cmds.push({ key: 'O', pic: '', glyph: '🌳', title: 'Root', desc: `Root where ${ents.length > 1 ? 'they stand' : 'it stands'} and be a tree again, on bare open ground: it mends ${Math.round(WILDWOOD.mend * 100)}% of its health a second, a rival sees only a tree, and it wakes when a rival comes within ${WILDWOOD.rouse} tiles or an axe bites, while your Heart Tree stands. Fell or burn the tree and the Ent is lost.`, ok: !why || ents.some((u) => !rootProblem(s, u)), why: why ?? undefined, run: () => this.act.issue({ t: 'root', p: viewer, ids: ents.map((u) => u.id) }) });
+      }
+      // The Age of Leviathans: Skywhales drop seed-bombs where they hover; the Behemoth kneels its Town Center.
+      const whales = units.filter((u) => u.type === 'skywhale');
+      if (whales.length) {
+        const why = whales.map((u) => seedBombProblem(s, u)).find((w) => w) ?? null;
+        const wait = Math.min(...whales.map((u) => bombIn(s, u)));
+        cmds.push({ key: 'B', pic: '', glyph: '🌱', title: 'Seed-bomb', cost: LEVIATHANS.bomb, desc: `Drop a seed-bomb from ${whales.length > 1 ? 'each whale' : 'the whale'} where it hovers: ${LEVIATHANS.seeds} Thornwall seedlings of yours sprout on the open ground beneath it, in a rival's streets as well as your own, and grow as any Thornwall does. Lay them across a street to cut a town in pieces. A whale drops one every ${LEVIATHANS.every} seconds.`, ok: !why || whales.some((u) => !seedBombProblem(s, u)), why: why ?? undefined, count: wait > 0 ? wait : undefined, run: () => this.act.issue({ t: 'seedbomb', p: viewer, ids: whales.map((u) => u.id) }) });
+      }
+      const titan = units.find((u) => u.type === 'behemoth');
+      if (titan) {
+        const why = kneelProblem(s, titan);
+        cmds.push({ key: 'P', pic: '', glyph: '🐢', title: 'Kneel', desc: 'Kneel here, on any ground a rival does not hold: the Town Center on its back stands at once, finished and working, with the health the Behemoth has. It trains, takes in every stock and claims the land; select it and Rise (P) to walk on.', ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'pitch', p: viewer, ids: [titan.id] }) });
       }
       const wagons = units.filter((u) => u.type === 'wagon');
       if (wagons.length) {
@@ -1752,6 +1768,11 @@ export class Hud {
           const why = sluiceProblem(s, b);
           const reach = waterLine(s, b).length;
           cmds.push({ key: 'O', pic: '', glyph: b.open ? '⛔' : '🌊', title: b.open ? 'Shut the sluice' : 'Open the sluice', desc: b.open ? `Let the gate down: the flood drains away from its edges in, a ring every ${INUND.every} second${INUND.every === 1 ? '' : 's'}, and the fields under it work again. A boat left on the last wet tile runs aground and is lost.` : `Wind the gate up: the water runs out over the low ground round it, a ring every ${INUND.every} second${INUND.every === 1 ? '' : 's'}, up to ${INUND.reach} tiles (${reach} tiles here). Soldiers wade the flood at ${Math.round(INUND.wade * 100)}% of their pace and siege at ${Math.round(INUND.siege * 100)}%; your gun-barges sail it. Fields under it yield nothing while it lies.${sluiceFed(s, b) ? '' : ' <b>No still water lies beside it</b>: set it on a channel, a lake or the shallows.'}`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'pack', p: viewer, building: b.id }) });
+        }
+        // A Town Center knelt from a Behemoth (the Age of Leviathans) rises onto its back again, in any age.
+        if (b.behemoth) {
+          const why = riseProblem(b);
+          cmds.push({ key: 'P', pic: '', glyph: '🐢', title: 'Rise', desc: 'The Behemoth rises with this Town Center on its back, and everyone sheltering inside steps out. It walks and tramples, and counts as a Town Center while it walks; kneel it (P) where you want your capital next. While it walks it trains no one and takes in nothing.', ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'pack', p: viewer, building: b.id }) });
         }
         if (isMobile(p) && packsOf(p).includes(b.type)) {
           const why = packProblem(s, p, b);

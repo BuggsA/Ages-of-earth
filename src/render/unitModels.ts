@@ -1282,7 +1282,90 @@ function warden(): Kit {
   return k;
 }
 
-const MAKERS: Record<UnitType, (epoch: number) => Kit> = { citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, cog, fighter, bomber, trader, wagon, warwolf, tusker, warmammoth, blowpipe, cavebear, barge, warden };
+/**
+ * A Skywhale (the Age of Leviathans): a whale of the air, long and slow, a pale gas-bladder swelling over its back like a sail of
+ * skin, broad fins held out as wings and a tail fluke that beats as it drifts. Barnacles and moss crust its belly; under it hangs a
+ * woven gondola in its people's colour where those aboard ride. Big: it fills the sky over a street.
+ */
+function skywhale(): Kit {
+  const k = new Kit();
+  const hide = '#5f6f86';
+  const belly = '#c9cbbf';
+  const dark = '#3c475a';
+  // The body, nose to tail, and its pale underside.
+  k.blob(0.5, hide, 0, 0.1, 0.15).scale.set(1, 0.8, 2.1);
+  k.blob(0.4, belly, 0, -0.08, 0.2).scale.set(1.05, 0.55, 1.95);
+  k.blob(0.28, hide, 0, 0.12, -0.95).scale.set(0.8, 0.7, 1.4);
+  // The fluke, which beats with the stride.
+  const tail = k.limb(k.group(0, 0, 0), RIG_LEG_A, 0.12, -1.3);
+  k.box(0.9, 0.04, 0.32, dark, 0, 0.1, -1.42, tail).rotation.x = 0.1;
+  // The gas-bladder: a ribbed pale sack along the back.
+  k.blob(0.42, '#d8d0b8', 0, 0.55, 0.05).scale.set(0.8, 0.7, 1.7);
+  for (const z of [-0.45, -0.1, 0.25, 0.6]) k.cyl(0.33 - Math.abs(z) * 0.18, 0.33 - Math.abs(z) * 0.18, 0.03, 9, '#b8ae94', 0, 0.55, z).rotation.x = Math.PI / 2;
+  // Fins held out like wings, swinging slowly.
+  for (const [side, rig] of [[-1, RIG_ARM], [1, RIG_LEG_B]] as [number, number][]) {
+    const g = k.limb(k.group(0, 0, 0), rig, 0.05, 0.4);
+    const fin = k.box(0.75, 0.04, 0.34, dark, side * 0.72, 0.0, 0.42, g);
+    fin.rotation.z = side * -0.25;
+    fin.rotation.y = side * 0.3;
+  }
+  // The head: a long mouth line and a small dark eye on each side.
+  k.box(0.6, 0.02, 0.5, dark, 0, 0.0, 0.95);
+  for (const x of [-0.36, 0.36]) k.sphere(0.04, '#1c1e22', x, 0.12, 0.85);
+  // Barnacles and moss along the belly.
+  for (const [x, z] of [[-0.2, 0.5], [0.25, 0.1], [-0.15, -0.3], [0.3, -0.6], [0, 0.85]]) k.blob(0.06, z > 0.3 ? '#6b8a4a' : '#9a9682', x, -0.28, z);
+  // The gondola slung under it, in its people's colour, with ropes up to the hide.
+  k.team(k.box(0.36, 0.14, 0.52, TEAM, 0, -0.52, 0.15));
+  k.box(0.38, 0.03, 0.54, WOOD, 0, -0.39, 0.15);
+  for (const [x, z] of [[-0.16, -0.08], [0.16, -0.08], [-0.16, 0.38], [0.16, 0.38]]) k.cyl(0.006, 0.006, 0.2, 3, ROPE, x, -0.39, z);
+  return k;
+}
+
+/**
+ * The Behemoth (the Age of Leviathans): a titan turtle, its domed shell plated in mossy scutes, with a Town Center on its back: a
+ * timber hall under a turf roof, a ring of palisade and a great banner in its people's colour. Pillar legs that lumber, a beaked
+ * head low and forward. Much bigger than anything else that walks.
+ */
+function behemoth(): Kit {
+  const k = new Kit();
+  const skin = '#6d6a4c';
+  const shell = '#4f5a34';
+  const scute = '#6e7a44';
+  const LEG = 0.32;
+  for (const [x, z, rig] of [[-0.55, 0.5, RIG_LEG_A], [0.55, 0.5, RIG_LEG_B], [-0.55, -0.5, RIG_LEG_B], [0.55, -0.5, RIG_LEG_A]] as [number, number, number][]) {
+    const g = k.limb(k.group(0, 0, 0), rig, LEG, z);
+    k.cyl(0.13, 0.16, LEG, 7, skin, x, 0, z, g);
+    k.cyl(0.18, 0.18, 0.05, 7, '#3e3a2a', x, 0, z, g);
+  }
+  // The shell: a broad dome with a rim, plated in scutes.
+  k.lathe([[0, 0], [0.95, 0], [0.98, 0.08], [0.9, 0.28], [0.7, 0.48], [0.4, 0.6], [0, 0.63]], 10, shell, 0, LEG, 0).scale.set(1, 1, 1.2);
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    k.box(0.32, 0.05, 0.32, scute, Math.cos(a) * 0.62, LEG + 0.3, Math.sin(a) * 0.74).rotation.y = -a;
+  }
+  for (const [x, z] of [[-0.6, 0.3], [0.5, -0.5], [0.2, 0.8]]) k.blob(0.1, '#5f8a3a', x, LEG + 0.33, z);
+  // The head and neck, low and forward, and the tail.
+  k.cyl(0.14, 0.18, 0.5, 7, skin, 0, LEG + 0.05, 1.05).rotation.x = 1.2;
+  k.blob(0.2, skin, 0, LEG + 0.2, 1.45).scale.set(1, 0.85, 1.25);
+  k.box(0.2, 0.06, 0.12, '#3e3a2a', 0, LEG + 0.12, 1.66);
+  for (const x of [-0.13, 0.13]) k.sphere(0.035, '#1c1a12', x, LEG + 0.28, 1.52);
+  k.cone(0.1, 0.3, 5, skin, 0, LEG, -1.15).rotation.x = -1.6;
+  // The Town Center on its back: a palisade ring, a hall under a turf roof, and its banner.
+  const top = LEG + 0.6;
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    k.cyl(0.03, 0.03, 0.22, 4, WOOD, Math.cos(a) * 0.48, top - 0.04, Math.sin(a) * 0.48);
+  }
+  k.box(0.55, 0.3, 0.45, '#8a6a44', 0, top, 0);
+  k.prism(0.62, 0.26, 0.55, '#5f7a3a', 0, top + 0.3, 0);
+  k.box(0.12, 0.16, 0.02, '#2a2018', 0, top, 0.23);
+  k.cyl(0.015, 0.015, 0.75, 4, WOOD, 0.22, top, -0.18);
+  k.team(k.box(0.012, 0.18, 0.28, TEAM, 0.22, top + 0.55, -0.33));
+  k.team(k.cyl(0.99, 0.99, 0.05, 10, TEAM, 0, LEG + 0.04, 0)).scale.set(1, 1, 1.2);
+  return k;
+}
+
+const MAKERS: Record<UnitType, (epoch: number) => Kit> = { citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, cog, fighter, bomber, trader, wagon, warwolf, tusker, warmammoth, blowpipe, cavebear, barge, warden, skywhale, behemoth };
 
 /** Epoch + 30 asks for the citizen as a thrall (the same offset trick as the trader's gold and the caravan cart). */
 export const THRALL_MODEL = 30;

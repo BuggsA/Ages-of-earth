@@ -449,16 +449,18 @@ export class UnitsView {
         const hold = a.speed < 0.8;
         a.circle = Math.max(0, Math.min(1, a.circle + (hold ? dt : -dt * 2)));
         const th = time * 0.9 + u.id;
-        const R = 1.3 * a.circle;
+        // A Skywhale (the Age of Leviathans) only drifts in a slow small circle, and hardly banks.
+        const whale = u.type === 'skywhale';
+        const R = (whale ? 0.35 : 1.3) * a.circle;
         dx = x + Math.sin(th) * R;
         dz = y + Math.cos(th) * R;
         const orbitYaw = Math.atan2(Math.cos(th), -Math.sin(th));
         let dy = orbitYaw - a.yaw;
         while (dy > Math.PI) dy -= Math.PI * 2;
         while (dy < -Math.PI) dy += Math.PI * 2;
-        yaw = a.yaw + dy * a.circle;
+        yaw = a.yaw + (whale ? 0 : dy * a.circle);
         a.bank += (Math.max(-0.6, Math.min(0.6, -d * 3)) - a.bank) * Math.min(1, dt * 4);
-        roll = a.bank - 0.4 * a.circle;
+        roll = (a.bank - 0.4 * a.circle) * (whale ? 0.2 : 1);
         pitch = -0.03;
         gy = Math.max(gy, WATER_Y) + AIR_ALT + Math.sin(time * 1.2 + ph) * 0.06;
         leg = 0;

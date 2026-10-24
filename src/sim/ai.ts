@@ -47,7 +47,7 @@ import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
 import { AI_TEMPER, ROUTES, TRUNK, type RouteId } from './data';
-import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS } from './data';
+import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
@@ -59,6 +59,7 @@ import { grows } from './grove';
 import { keepsBees } from './hive';
 import { heartOf, treeToWake, treesRound, wakesForest } from './wildwood';
 import { inBloom, ringOf, ripeIn, rooted, slingProblem, spireOf } from './bloom';
+import { behemothBusy, bombIn, kneelProblem, seedBombProblem } from './leviathans';
 import { DIRS } from './animals';
 
 /**
@@ -154,7 +155,8 @@ function settleLean(s: GameState, p: Player, mem: AiMemory): void {
   const route = open[Math.floor(coin(s, p.id, 0x7e4b) * open.length)];
   mem.lean = route;
   const roads = (mem.roads ??= {});
-  for (const a of leanAges(p, route)) roads[a] ??= true;
+  // The Wild route's fork (the Bloom or Leviathans) is left to its own coin (`wants`): a people leaning wild walks one of them.
+  for (const a of leanAges(p, route)) if (a !== 'bloom' && a !== 'leviathans') roads[a] ??= true;
 }
 
 /** The leaning a computer seat has settled on (#749), or null for a person or a seat with an open mind. */
@@ -205,6 +207,8 @@ interface View {
   claimers: Set<number>;
   /** Its packed Town Centers and Houses on the road (#320): never soldiers. */
   wagons: Unit[];
+  /** Its Skywhales and its Behemoth (the Age of Leviathans): flown and walked by `leviathanWork`, never the army's. */
+  giants: Unit[];
   /** How many citizens may hunt deer, and how far from home: more and further for a people bound for the steppe (#320). */
   hunt: { n: number; r: number };
   /** About to strike camp (#320): the Town Center starts nothing new, so its queue empties and it can pack. */
@@ -255,6 +259,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   const navy: Unit[] = [];
   const planes: Unit[] = [];
   const wagons: Unit[] = [];
+  const giants: Unit[] = [];
   const buildings: Building[] = [];
   let king: Unit | null = null;
   for (const e of s.ents) {
@@ -262,7 +267,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
     if (e.kind === 'unit' && s.kings[p.id] === e.id) king = e;
     else if (e.kind === 'unit') {
       const list =
-        e.type === 'citizen' ? citizens : e.type === 'wagon' ? wagons : e.type === 'priest' ? priests : e.type === 'trader' ? traders : e.type === 'cog' ? cogs : e.type === 'fisher' ? fishers : e.type === 'warship' || e.type === 'transport' || e.type === 'barge' ? navy : e.type === 'fighter' || e.type === 'bomber' ? planes : army;
+        e.type === 'citizen' ? citizens : e.type === 'wagon' ? wagons : e.type === 'skywhale' || e.type === 'behemoth' ? giants : e.type === 'priest' ? priests : e.type === 'trader' ? traders : e.type === 'cog' ? cogs : e.type === 'fisher' ? fishers : e.type === 'warship' || e.type === 'transport' || e.type === 'barge' ? navy : e.type === 'fighter' || e.type === 'bomber' ? planes : army;
       list.push(e);
     } else buildings.push(e);
   }
@@ -272,7 +277,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   // A steppe camp on the move (#320): home is where its Town Center is being driven or pitched.
   const moving = tc ? null : (buildings.find((b) => b.type === 'towncenter' && b.pitch !== undefined) ?? wagons.find((w) => w.packed === 'towncenter') ?? null);
   const home = tc ? { x: tc.x, y: tc.y } : moving ? { x: moving.x, y: moving.y } : { x: p.startX, y: p.startY };
-  const v: View = { p, citizens, army, priests, traders, cogs, fishers, navy, planes, buildings, home, tc, budget: { ...p.res }, plan: NO_PLAN, diggers: new Set(), armyFirst: false, claimers: new Set(), wagons, hunt: { n: 3, r: 16 }, packing: !!mem.steppe?.pack, hands: citizens.length + (isLegion(p) && p.epoch <= LEGION.aiUntil ? army.filter(legionHand).length : 0) };
+  const v: View = { p, citizens, army, priests, traders, cogs, fishers, navy, planes, buildings, home, tc, budget: { ...p.res }, plan: NO_PLAN, diggers: new Set(), armyFirst: false, claimers: new Set(), wagons, giants, hunt: { n: 3, r: 16 }, packing: !!mem.steppe?.pack, hands: citizens.length + (isLegion(p) && p.epoch <= LEGION.aiUntil ? army.filter(legionHand).length : 0) };
   // The Hunters' Way (#463 s1) lives by the chase in the Stone Age: more hunters, ranging farther, with camps pitched at the kill.
   if (p.way === 'hunt' && p.epoch === 0) v.hunt = { n: AI_WAYS.hunters, r: AI_WAYS.huntReach };
   const issue = (c: Command) => applyCommand(s, c);
@@ -303,6 +308,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   hiveWork(s, v, mem, issue);
   wildwoodWork(s, v, mem, issue);
   bloomWork(s, v, mem, issue);
+  leviathanWork(s, v, mem, issue);
   hackSeeds(s, v, issue);
   answerGreening(s, v, issue);
   readYear(s, v);
@@ -633,9 +639,10 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   } else if (roads[to] === undefined && to === 'wildwood') {
     // The Wild route's fourth age: a people that walked the Hive goes on.
     roads[to] = hasWalked(p, 'hive');
-  } else if (roads[to] === undefined && to === 'bloom') {
-    // The Wild route's plants' end: a people that walked the Wildwood goes on.
-    roads[to] = hasWalked(p, 'wildwood');
+  } else if (roads[to] === undefined && (to === 'bloom' || to === 'leviathans')) {
+    // The Wild route's fork: a people that walked the Wildwood goes on, to the beasts or the plants on one coin of its own.
+    const beasts = coin(s, p.id, 0x1e71) < LEVIATHANS.aiTake;
+    roads[to] = hasWalked(p, 'wildwood') && beasts === (to === 'leviathans');
   } else if (roads[to] === undefined && to === 'dykes') {
     // The Water Road (#701): only with a dyke worth raising by home, and on a coin of its own, so no other match's dice shift. A people
     // that walked the Age of Rivers is on the road already, and goes on down it more often.
@@ -816,6 +823,8 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   if (walksWeb(v) && ageOf(p) === 'wildwood' && s.tick - (mem.wildwood ?? s.tick) < secs(WILDWOOD.aiStay)) return null;
   // The Bloom is kept a while, so its Spire slings and its land greens.
   if (walksWeb(v) && ageOf(p) === 'bloom' && s.tick - (mem.bloom ?? s.tick) < secs(BLOOM.aiStay)) return null;
+  // So is the Age of Leviathans, so its giants are bred and flown.
+  if (walksWeb(v) && ageOf(p) === 'leviathans' && s.tick - (mem.leviathans ?? s.tick) < secs(LEVIATHANS.aiStay)) return null;
   // The steppe (#320) is kept a while, so the flock it came for pays.
   if (walksWeb(v) && ageDef(p).mobile && s.tick - (mem.steppe?.since ?? s.tick) < secs(AI_STEPPE.stay)) return null;
   // Bound for a crossing (#585, #555 s12), a sibling doesn't climb on: its way is back to the Middle Ages (`seaTurn`).
@@ -3483,6 +3492,121 @@ function bloomWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   spend(v, { wood: cost });
 }
 
+/**
+ * The Age of Leviathans: a Great Den within `LEVIATHANS.aiFrom` tiles of home; the Behemoth bred first and knelt by the nearest gold
+ * or stone `aiOut` tiles or more from home, a forward capital; then up to `aiWhales` Skywhales, each loaded at home with idle
+ * soldiers and flown to a rival building it has seen (else the rival's home), where it sets them down and seed-bombs the streets.
+ */
+function leviathanWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!walksWeb(v) || !hasWalked(p, 'leviathans') || !v.tc) return;
+  if (ageOf(p) === 'leviathans') mem.leviathans ??= s.tick;
+  const den = v.buildings.find((b) => b.type === 'greatden' && b.built) ?? null;
+  if (!count(v, 'greatden') && s.tick - (mem.ordered.greatden ?? -99999) >= secs(30) && p.epoch >= BUILDINGS.greatden.epoch && afford(v, buildingCostFor(s, p.id, 'greatden'))) {
+    const spot = findSpot(s, 'greatden', v.home.x, v.home.y, 4, LEVIATHANS.aiFrom);
+    if (spot) construct(s, v, mem, 'greatden', spot, 3, issue);
+  }
+  const whales = v.giants.filter((u) => u.type === 'skywhale');
+  if (den && !den.queue.length) {
+    const unit = !behemothBusy(s, p.id) ? 'behemoth' : whales.length < LEVIATHANS.aiWhales ? 'skywhale' : null;
+    const cost = unit ? trainCostFor(s, p.id, unit, 'greatden', den) : null;
+    if (unit && cost && afford(v, cost)) {
+      issue({ t: 'train', p: p.id, building: den.id, unit });
+      spend(v, cost);
+    }
+  }
+  const titan = v.giants.find((u) => u.type === 'behemoth');
+  if (titan && !titan.inside) walkTitan(s, v, titan, issue);
+  // The first whale waits at home to carry soldiers; the rest sow thorn alone.
+  whales.forEach((w, i) => flyWhale(s, v, w, i === 0, issue));
+}
+
+/** The computer's Behemoth: to the nearest gold or stone far enough from home that it has no drop site by it, and kneels there. */
+function walkTitan(s: GameState, v: View, u: Unit, issue: (c: Command) => void): void {
+  const { p } = v;
+  const team = p.team;
+  let best = -1;
+  let bestD = Infinity;
+  const r = LEVIATHANS.aiOut * 2;
+  const hx = Math.floor(v.home.x);
+  const hy = Math.floor(v.home.y);
+  for (let y = Math.max(0, hy - r); y <= Math.min(s.h - 1, hy + r); y++) {
+    for (let x = Math.max(0, hx - r); x <= Math.min(s.w - 1, hx + r); x++) {
+      const i = y * s.w + x;
+      if (s.res[i] !== R_GOLD && s.res[i] !== R_STONE) continue;
+      const d = (x - hx) * (x - hx) + (y - hy) * (y - hy);
+      if (d < LEVIATHANS.aiOut * LEVIATHANS.aiOut || d >= bestD) continue;
+      const owner = landOwnerAt(s, x, y);
+      if (owner >= 0 && s.players[owner].team !== team) continue;
+      if (v.buildings.some((b) => BUILDINGS[b.type].drop.length > 0 && (b.x - x) * (b.x - x) + (b.y - y) * (b.y - y) < 10 * 10)) continue;
+      bestD = d;
+      best = i;
+    }
+  }
+  // No ore far enough out: it kneels beside the town.
+  const tx = best < 0 ? v.home.x : (best % s.w) + 0.5;
+  const ty = best < 0 ? v.home.y : Math.floor(best / s.w) + 0.5;
+  const near = (u.x - tx) * (u.x - tx) + (u.y - ty) * (u.y - ty) <= (best < 0 ? 9 * 9 : 5 * 5);
+  if (near) {
+    if (!kneelProblem(s, u)) issue({ t: 'pitch', p: p.id, ids: [u.id] });
+    else if (u.order.k === 'idle') {
+      // No room right by it: a few steps back toward home, and kneel there.
+      const dx = v.home.x - tx;
+      const dy = v.home.y - ty;
+      const d = Math.sqrt(dx * dx + dy * dy) || 1;
+      issue({ t: 'move', p: p.id, ids: [u.id], x: tx + (dx / d) * 4, y: ty + (dy / d) * 4 });
+    }
+    return;
+  }
+  if (!(u.order.k === 'move' && u.order.x === tx && u.order.y === ty)) issue({ t: 'move', p: p.id, ids: [u.id], x: tx, y: ty });
+}
+
+/**
+ * A Skywhale of the computer's: seed-bombs over a rival's town; loads idle soldiers at home and sets them down by a rival building it
+ * has seen (else the rival's home). The others (not `carrier`), with a seed-bomb ready, fly there alone to sow thorn, and home again.
+ */
+function flyWhale(s: GameState, v: View, w: Unit, carrier: boolean, issue: (c: Command) => void): void {
+  const { p } = v;
+  const r2 = 6 * 6;
+  const overRival = s.ents.some((e) => e.kind === 'building' && e.hp > 0 && isEnemy(s, p.id, e.owner) && (e.x - w.x) * (e.x - w.x) + (e.y - w.y) * (e.y - w.y) < r2);
+  if (overRival && !seedBombProblem(s, w)) issue({ t: 'seedbomb', p: p.id, ids: [w.id] });
+  if (w.order.k !== 'idle') return;
+  const room = (unitStats('skywhale', p.epoch).capacity ?? 0) - w.cargo.length;
+  const boarding = v.army.filter((u) => u.order.k === 'board' && u.order.target === w.id).length;
+  const home = (w.x - v.home.x) * (w.x - v.home.x) + (w.y - v.home.y) * (w.y - v.home.y) < 14 * 14;
+  const idle = v.army.filter((u) => !u.inside && (u.order.k === 'idle' || u.order.k === 'patrol') && domainOf(u.type) === 'land' && (u.x - v.home.x) * (u.x - v.home.x) + (u.y - v.home.y) * (u.y - v.home.y) < 16 * 16);
+  // Where it goes: the rival building it has seen nearest home, else the rival's home.
+  const aim = (): Building | null => {
+    let at: Building | null = null;
+    let bestD = Infinity;
+    for (const e of s.ents) {
+      if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner) || !p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
+      const d = (e.x - v.home.x) * (e.x - v.home.x) + (e.y - v.home.y) * (e.y - v.home.y);
+      if (d < bestD) {
+        bestD = d;
+        at = e;
+      }
+    }
+    return at ?? rivalTownCenter(s, p);
+  };
+  if (w.cargo.length >= LEVIATHANS.aiLoad || (w.cargo.length && !boarding)) {
+    // Loaded: down on open ground beside it.
+    const at = aim();
+    const t = at ? nearestWalkable(s, at.x, at.y + at.size / 2 + 1, 6, p.team) : -1;
+    if (t >= 0) issue({ t: 'unload', p: p.id, ids: [w.id], x: (t % s.w) + 0.5, y: Math.floor(t / s.w) + 0.5 });
+    return;
+  }
+  if (boarding) return;
+  if (carrier && home && room > 0 && idle.length >= LEVIATHANS.aiLoad) {
+    issue({ t: 'board', p: p.id, ids: idle.slice(0, room).map((u) => u.id), target: w.id });
+    return;
+  }
+  // Not the carrier: alone over a rival's streets while its seed-bomb is ready, and home once it has dropped it.
+  const at = !carrier && bombIn(s, w) === 0 && !overRival ? aim() : null;
+  if (at) issue({ t: 'move', p: p.id, ids: [w.id], x: at.x, y: at.y });
+  else if (!home && (carrier || bombIn(s, w) > 0 || overRival)) issue({ t: 'move', p: p.id, ids: [w.id], x: v.home.x, y: v.home.y });
+}
+
 /** Where a Bloom Seed would crack the most: the centre of the rival building it has seen with the most rival buildings in its ring (else the rival's home). */
 function seedAim(s: GameState, p: Player): { x: number; y: number } | null {
   let best: Building | null = null;
@@ -5989,8 +6113,8 @@ function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     let bestScore = 0;
     for (const e of s.ents) {
       if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !isEnemy(s, v.p.id, e.owner)) continue;
-      // Kings, grafts and the sworn (#355 s6) never turn.
-      if (s.kings.includes(e.id) || grafted(s, e) || sworn(s, e)) continue;
+      // Kings, grafts and the sworn (#355 s6) never turn, nor a carrier with people aboard, nor a giant.
+      if (s.kings.includes(e.id) || grafted(s, e) || sworn(s, e) || e.cargo.length || GIANTS.includes(e.type)) continue;
       const dx = e.x - pr.x;
       const dy = e.y - pr.y;
       const d2 = dx * dx + dy * dy;

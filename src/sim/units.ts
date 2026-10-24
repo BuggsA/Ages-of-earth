@@ -1,4 +1,4 @@
-import { AI_LEVELS, AUTO_WORK, BUILDINGS, EXPLORE, FIRE, PATROL, CARRY, CONSECRATE, COPPICE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, LEGION, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TAME, TRADE, domainOf, secs } from './data';
+import { AI_LEVELS, AUTO_WORK, BUILDINGS, GIANTS, EXPLORE, FIRE, PATROL, CARRY, CONSECRATE, COPPICE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, LEGION, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TAME, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
@@ -10,7 +10,7 @@ import { felled, isCoppice } from './coppice';
 import { isNomad } from './nomad';
 import { ageDef, canRaise, inField, prospect } from './ages';
 import { legionKind, legionary } from './legion';
-import type { Act, Animal, Building, Cost, Ent, GameState, Goal, Order, RareId, Res, Unit } from './types';
+import type { Act, Animal, Building, Cost, Ent, GameState, Goal, Order, RareId, Res, Unit, UnitType } from './types';
 import { seasonOf } from './seasons';
 import { catchOf } from './year';
 import { RES, R_BERRY, R_BLOODIRON, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_SALT, R_SALTPETRE, R_STONE, R_TREE } from './types';
@@ -1410,7 +1410,8 @@ function convertStep(s: GameState, u: Unit, o: Extract<Order, { k: 'convert' }>)
   // Kings never turn, nor a grafted soldier (#355 s3) or a sworn one (#355 s6), and a priest's hands are full with a relic. A Blood-rite priest's rites
   // (#355 s4) have their own rules (`riteProblem`): they are worked on anything that bleeds, grafted or not.
   const rite = o.rite;
-  if (!t || t.kind !== 'unit' || t.hp <= 0 || t.inside || !isEnemy(s, u.owner, t.owner) || peace(s) || carriedBy(s, u) || (rite ? riteProblem(s, u.owner, rite, t) !== null : s.kings.includes(t.id) || grafted(s, t) || sworn(s, t))) {
+  // Nor a carrier with people aboard (a transport, a Skywhale): those riding in it are its own people's still; nor a giant (`GIANTS`).
+  if (!t || t.kind !== 'unit' || t.hp <= 0 || t.inside || !isEnemy(s, u.owner, t.owner) || peace(s) || carriedBy(s, u) || (rite ? riteProblem(s, u.owner, rite, t) !== null : s.kings.includes(t.id) || grafted(s, t) || sworn(s, t) || t.cargo.length > 0 || GIANTS.includes(t.type))) {
     setOrder(u, { k: 'idle' });
     return;
   }
@@ -1944,6 +1945,9 @@ function woundedNear(s: GameState, sp: Spatial, u: Unit, r: number): Unit | null
 
 // ---- Transports ------------------------------------------------------------------------------------
 
+/** What carries people on foot: the transport ship, and the Skywhale (the Age of Leviathans), which sets them down anywhere. */
+export const isCarrier = (type: UnitType): boolean => type === 'transport' || type === 'skywhale';
+
 /** Room left aboard a transport. */
 export function cargoRoom(s: GameState, ship: Unit): number {
   return (statsOf(s, ship).capacity ?? 0) - ship.cargo.length;
@@ -1952,7 +1956,7 @@ export function cargoRoom(s: GameState, ship: Unit): number {
 /** Walk to the shore by a transport and step aboard. */
 function boardStep(s: GameState, u: Unit, o: Extract<Order, { k: 'board' }>): void {
   const t = s.byId.get(o.target);
-  if (!t || t.kind !== 'unit' || t.hp <= 0 || t.owner !== u.owner || t.type !== 'transport' || domainOf(u.type) !== 'land' || cargoRoom(s, t) <= 0) {
+  if (!t || t.kind !== 'unit' || t.hp <= 0 || t.owner !== u.owner || !isCarrier(t.type) || domainOf(u.type) !== 'land' || cargoRoom(s, t) <= 0) {
     setOrder(u, { k: 'idle' });
     return;
   }
@@ -1982,9 +1986,9 @@ function boardStep(s: GameState, u: Unit, o: Extract<Order, { k: 'board' }>): vo
   if (near < 1.5 * 1.5 || (!walking(u) && near < 3.5 * 3.5 && u.miss > 0)) {
     if (walking(u)) stopWalking(u);
     face(u, t.x, t.y);
-    // A ship lying idle somewhere else comes in to the meeting place.
+    // A ship lying idle somewhere else comes in to the meeting place; a Skywhale comes down over them.
     if (t.order.k === 'idle' && !walking(t)) {
-      const at = m ? { x: m.wx, y: m.wy } : coastNear(s, u.x, u.y, 8);
+      const at = t.type === 'skywhale' ? { x: u.x, y: u.y } : m ? { x: m.wx, y: m.wy } : coastNear(s, u.x, u.y, 8);
       if (at && (at.x - t.x) * (at.x - t.x) + (at.y - t.y) * (at.y - t.y) > 1) setOrder(t, { k: 'move', x: at.x, y: at.y, amove: false, started: false });
     }
     return;
@@ -2130,10 +2134,19 @@ export function unloadAll(s: GameState, ship: Unit, to?: { x: number; y: number 
   return n;
 }
 
-/** A transport sails to the shore nearest a point and lands everyone there. */
+/** A transport sails to the shore nearest a point and lands everyone there; a Skywhale flies to the point and sets them down below. */
 function unloadStep(s: GameState, u: Unit, o: Extract<Order, { k: 'unload' }>): void {
   if (!u.cargo.length) {
     setOrder(u, { k: 'idle' });
+    return;
+  }
+  if (u.type === 'skywhale') {
+    const near = (o.x - u.x) * (o.x - u.x) + (o.y - u.y) * (o.y - u.y) <= 1.5 * 1.5;
+    if (near || !approach(u, goalForPoint(s, o.x, o.y, AIR))) {
+      if (near) stopWalking(u);
+      unloadAll(s, u);
+      setOrder(u, { k: 'idle' });
+    }
     return;
   }
   const coast = coastNear(s, o.x, o.y, 24);
@@ -2159,7 +2172,7 @@ function unloadStep(s: GameState, u: Unit, o: Extract<Order, { k: 'unload' }>): 
 /** Passengers ride along (so they see what the ship sees, and fall with it). */
 export function carryCargo(s: GameState): void {
   for (const e of s.ents) {
-    if (e.kind !== 'unit' || e.type !== 'transport' || !e.cargo.length) continue;
+    if (e.kind !== 'unit' || !isCarrier(e.type) || !e.cargo.length) continue;
     for (const id of e.cargo) {
       const u = s.byId.get(id);
       if (!u || u.kind !== 'unit') continue;

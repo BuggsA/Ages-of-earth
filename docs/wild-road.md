@@ -1,6 +1,6 @@
 # The Wild route: a people that grows its power
 
-**Status: the owner's idea (2026-10-24), fleshed out here; steps 1, 2, 3 (fire), 4 (the Hive), 5 (the Wildwood) and 6 (the Bloom) built.** The owner: "start a new main branch of ages. Completely new. I was thinking like nature/plant tech. Where you use nature and animals to your advantage." Then: "There should be a way to produce them too, maybe forest wall or tree walls of some kind. Maybe ents later on." "Maybe farms that also yield way more food. Or maybe just more food dense so less area. Be very uniquely creative to fill the gaps, especially the future ages." And: "this goes to 7." Umbrella: #706. Build on it; change it with the reason on the umbrella.
+**Status: the owner's idea (2026-10-24), fleshed out here; steps 1, 2, 3 (fire), 4 (the Hive), 5 (the Wildwood), 6 (the Bloom) and 7 (Leviathans, without the Kraken yet) built.** The owner: "start a new main branch of ages. Completely new. I was thinking like nature/plant tech. Where you use nature and animals to your advantage." Then: "There should be a way to produce them too, maybe forest wall or tree walls of some kind. Maybe ents later on." "Maybe farms that also yield way more food. Or maybe just more food dense so less area. Be very uniquely creative to fill the gaps, especially the future ages." And: "this goes to 7." Umbrella: #706. Build on it; change it with the reason on the umbrella.
 
 ## The idea in one line
 
@@ -22,7 +22,7 @@ Stone ─┬─ 1 Wild ── 2 Grove ──── 3 Hive ── 4 Wildwood ─�
 | 2 | 2 | **Grove** (built) | plant walls that grow; grow dense food in Kitchen Gardens fed by the Den's dung | no stone walls, gates or Watch Towers | a town shut in green on half the ground |
 | 3 | 3 | **Hive** (built) | keep Hives that swarm whoever walks my woods; tip darts in venom; breed dire beasts | no guns or cannon | woods a rival can't walk through |
 | 4 | 4 | **Wildwood** (built) | wake old trees as Ents that walk, crush and root again; let my woods spread each spring | no factories or machines; fire hits living things twice as hard | an army that is also the forest |
-| 5a | 5 | **Leviathans** | breed giants: Skywhales that carry troops over walls, a Kraken in the deep, a Behemoth with my town on its back | the Heart Tree sleeps: no Ents, no spreading | reach: over walls, under the sea, a capital that walks |
+| 5a | 5 | **Leviathans** (built) | breed giants: Skywhales that carry troops over walls, a Kraken in the deep, a Behemoth with my town on its back | the Heart Tree sleeps: no Ents, no spreading | reach: over walls, under the sea, a capital that walks |
 | 5b | 5 | **Bloom** (built) | fire a Bloom Seed that turns a rival's town to forest; win by the Greening | the Dens go quiet: no new beasts | a second way to win, and a warhead that grows |
 | R | 2 | **Mycelium** (rare) | grow a fungus web under my town: every building on it takes in every stock, my units in it are hidden, rival wood rots on it | soldiers cost a quarter more; fire burns the web | a town that can't be starved; the short road to the Bloom |
 | X | 1½ | **Wild Hunt** (crossing) | ride with wolf packs at heel and hawks overhead; my beasts follow the camp's wagons | no walls, no fields (the steppe's) | raids that see everything and outrun everything |
@@ -70,7 +70,14 @@ Every age has a cheap road back and a road to the trunk, like every side age. De
 - **Door:** no factories, rails or machines; fire hits living things twice as hard. An Industrial rival's field guns and fire are the answer, and the war is green against iron.
 - If the Heart Tree falls, every Ent roots where it stands.
 
-### 5a. The Age of Leviathans: the beasts' end
+### 5a. The Age of Leviathans: the beasts' end (built, step 7)
+
+- **As built** (`src/sim/leviathans.ts`, `LEVIATHANS`): clue a Beast Den, deed 20 beasts reared at Dens (the Grove's `bred` stat); roads on to the Atomic Age (cheap, sideways at tier 5) and back to the Wildwood. **It and the Bloom shut each other** (`shuns`, as Hemocraft and the Blood-rite): the fork is who your people becomes, beasts or plants, not a detour to take both; it also keeps a Seed Spire and seed-bombing whales out of one town. Three new things: the **Great Den** (its own building), the **Skywhale** and the **Behemoth**. **The Kraken waits for a later step** (with its Tidal Den and Reef Ships it would be a fourth and fifth thing). The door is the Heart Tree asleep (`heartSleeps` in `wildwood.ts`: no Ent wakes or is woken, walking Ents root, no Spreading) **and the Wildwood's machines door kept**: no rifles, field guns, aircraft, Airfield or Silo, so the giants are this road's air and siege. How each part reads:
+  - The Skywhale is an air unit (`domainOf`) with no weapon, of the bomber class, so fighters, riflemen and towers are its counters. It carries `capacity` people on foot as a transport does (`isCarrier` in `units.ts`): they walk to where it hovers and it comes down over them; it sets them down on any ground within 2 tiles of where it is sent, walls and woods between being nothing to it.
+  - A seed-bomb (B, 60 wood, one a whale every 30 s) sprouts 3 Thornwall seedlings of the whale's people on the open tiles nearest beneath it, in anyone's land: a rival's street becomes a wall that grows to living oak unless it is cut or burnt young, and regrows from its root like any Thornwall.
+  - The Behemoth is bred carrying a Town Center (`Unit.packed`, so the heart rule counts it as the Steppe's wagons are counted), one to a people, a queued one counting. It kneels (`pitch`) where a wagon would pitch but within 6 tiles, never in a rival's land: its Town Center stands **at once, finished**, with the share of health the titan had, and works. That Town Center rises (`pack`) in any age, its queue empty. While it walks it gives no room and takes in nothing, as a wagon; unlike a wagon it fights (siege class: it tramples buildings, spears and riders swarm it) and needs no Steppe age.
+  - **No priest turns a giant**, and no priest turns a carrier with people aboard (a transport too: before this, a converted transport carried its old owner's soldiers).
+  - **The computer:** takes the fork on one coin of its own (`LEVIATHANS.aiTake`, half), a Wild-leaning seat included; stays 600 s; raises a Great Den by home, breeds its Behemoth first and kneels it by the nearest gold or stone at least 14 tiles out with no drop site of its own near, a forward capital; then up to 3 whales: the first waits at home for 4 idle soldiers, carries them to the rival building it has seen nearest home and sets them down; the others fly alone over a rival's streets whenever their seed-bomb is ready, and home again. Every whale drops its seed-bomb over a rival's buildings.
 
 - **Skywhales:** gas-bladdered giants bred at a Great Den. Living airships that drift over walls carrying ten soldiers, and drop **seed-bombs**: a Thornwall that sprouts in a rival's streets, cutting their town into pieces. Fighters and guns bring them down.
 - **The Kraken:** tamed in deep water from a Tidal Den. It drags ships under and shoves your boats along; living **Reef Ships** grow from coral beds you seed by the shore. The navy route's green twin.
@@ -124,6 +131,7 @@ Every age has a cheap road back and a road to the trunk, like every side age. De
 - **Smoke quiets Hives** (step 4, built): a Hive with a fire within `HIVE.smoke` tiles, or burning itself, sleeps `HIVE.quiet` seconds.
 - **The Wildwood's door** (step 5, built): a people standing in it burns twice as hard (`FIRE.wild`, `fireMul`); a rooted Ent burns with its tree.
 - **The Bloom** (step 6, built): the Seed Spire is alive and burns; burning a Bloom people's woods is how a rival stops the Greening.
+- **Leviathans** (step 7, built): the Great Den is alive and burns; a seed-bomb's Thornwall is answered by fire while it is young.
 - **Still to come:** beasts that fear fire.
 
 ## Steps (each one playable)
@@ -134,7 +142,7 @@ Every age has a cheap road back and a road to the trunk, like every side age. De
 4. **Hive** (built): Hives, pollination, venom darts, dire beasts and the Cave Bear.
 5. **Wildwood** (built): the Heart Tree, Ents that root, the Spreading, woodland ways.
 6. **Bloom** (built): the Seed Spire and the Bloom Seed, the Greening victory, pollen storms.
-7. **Leviathans:** Skywhales and seed-bombs, the Kraken and Reef Ships, the Behemoth.
+7. **Leviathans** (built, but for the Kraken): the Great Den, Skywhales and seed-bombs, the Behemoth. **7b:** the Kraken, its Tidal Den and Reef Ships.
 8. **Mycelium** (with the Glowcap hollow key resource) and the **Wild Hunt** crossing.
 9. **The computer plays the whole route**, and campaign sweeps show it can win on any map (rule 0).
 

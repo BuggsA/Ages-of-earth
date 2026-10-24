@@ -485,6 +485,51 @@ function spire(k: Kit): void {
   k.team(k.cyl(0.4, 0.42, 0.14, 9, TEAM, 0, 0.2, 0));
 }
 
+// ---- The Age of Leviathans (`docs/wild-road.md` §5a) ---------------------------------------------------
+
+/**
+ * A Great Den: a hill hollowed out and roofed with living turf, its mouth a great arch held up by a giant's ribs, and a nest of reeds
+ * with a pale egg the size of a cart in it. Its people's colours are the plinth's and the pennant's.
+ */
+function greatden(k: Kit, _e: number, st: Style): void {
+  pad(k, 3, st.base);
+  const turf = '#5c7a38';
+  const earth = '#6a5236';
+  const bone = '#e6dcc4';
+  k.lathe([[0, 0], [1.45, 0], [1.4, 0.3], [1.15, 0.85], [0.7, 1.2], [0, 1.3]], 10, turf, 0, 0, -0.1).scale.set(1, 1, 0.9);
+  for (const [x, z, r] of [[-1.0, 0.5, 0.3], [1.05, 0.3, 0.26], [0.6, -0.9, 0.3], [-0.7, -0.8, 0.24]]) k.blob(r, earth, x, 0.1, z).scale.set(1, 0.6, 1);
+  // The mouth: a dark hollow, framed by three pairs of a giant's ribs leaning in to meet over it.
+  k.box(1.0, 0.75, 0.6, '#20170f', 0, 0, 0.95);
+  for (const [z, s] of [[1.3, 1], [1.12, 0.92], [0.94, 0.84]]) {
+    for (const side of [-1, 1]) {
+      const rib = k.cyl(0.035 * s, 0.06 * s, 1.25 * s, 5, bone, side * 0.6 * s, 0, z);
+      rib.rotation.z = side * 0.5;
+      rib.position.x = side * 0.32 * s;
+    }
+  }
+  // The nest and the egg, lit faintly from within, in the mouth.
+  k.cyl(0.36, 0.42, 0.1, 9, '#b89a5a', 0, 0, 1.05);
+  k.glow(k.blob(0.2, '#f0e8d0', 0, 0.28, 1.05)).scale.set(0.85, 1.2, 0.85);
+}
+
+/**
+ * A Town Center knelt from a Behemoth (the Age of Leviathans): the titan's shell rim under the town's pad, its head resting before
+ * the gate and its four great feet out at the corners, so a rival sees at a glance that this town gets up and walks.
+ */
+function kneltShell(k: Kit): void {
+  const shell = '#4f5a34';
+  const skin = '#6d6a4c';
+  // The shell's rim, a raised ring of scutes round the pad.
+  k.lathe([[1.95, 0], [2.4, 0], [2.42, 0.12], [2.3, 0.32], [2.0, 0.4], [1.95, 0.4]], 14, shell, 0, -0.05, 0);
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    k.box(0.5, 0.08, 0.32, '#6e7a44', Math.cos(a) * 2.2, 0.3, Math.sin(a) * 2.2).rotation.y = -a;
+  }
+  for (const [x, z] of [[-1.9, 1.7], [1.9, 1.7], [-1.9, -1.7], [1.9, -1.7]]) k.blob(0.42, skin, x * 1.1, 0.1, z * 1.1).scale.set(1, 0.6, 1.1);
+  k.blob(0.55, skin, 0, 0.25, 2.75).scale.set(1, 0.7, 1.3);
+  for (const x of [-0.3, 0.3]) k.sphere(0.08, '#1c1a12', x, 0.45, 3.05);
+}
+
 /**
  * An Orchard: four fruit trees in a wattle fence with a picker's basket. Young (`variant` 0) it is whips; grown (1), round crowns;
  * in fruit (2, summer and autumn) the crowns hang red and gold.
@@ -2649,6 +2694,7 @@ const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' |
   sapling: (k, e) => sapling(k, e),
   heart: (k) => heart(k),
   spire: (k) => spire(k),
+  greatden,
   towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, windmill,
   // The Age of Tides (#739), drawn in `tideModels.ts`.
   tidemill: (k: Kit, _e: number, st: Style) => tidemill(k, st.base),
@@ -2869,8 +2915,9 @@ export function buildingGeometry(type: BuildingType, epochIn: number, color: str
     else if (type === 'hive') hive(k, epoch, variant);
     else if (type === 'shaft') shaft(k, epoch, roleStyle(type, epoch, STYLES[Math.min(epoch, 4)]), variant);
     else MAKERS[type](k, epoch, roleStyle(type, epoch, STYLES[Math.min(epoch, 4)]));
-    // A Watch Tower's `variant` is its step on the tower line.
+    // A Watch Tower's `variant` is its step on the tower line; a Town Center's 1, that it was knelt from a Behemoth.
     if (type === 'tower' && variant) towerLevel(k, variant);
+    if (type === 'towncenter' && variant === 1) kneltShell(k);
     if (!BARE.includes(type)) teamMarks(k, type);
     const stack = STACKS[type];
     if (epoch >= 4 && stack) smokestack(k, stack[0], stack[1], stack[2]);

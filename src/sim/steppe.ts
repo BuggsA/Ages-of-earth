@@ -46,15 +46,15 @@ export function packCamp(s: GameState, b: Building): Unit {
 }
 
 /**
- * Where a wagon would pitch: the footprint centred on it, or the nearest that fits within `STEPPE.spot`
- * tiles, ring by ring in a fixed order (so every machine picks the same). Null when nothing fits.
+ * Where a wagon would pitch: the footprint centred on it, or the nearest that fits within `spot` tiles (`STEPPE.spot`
+ * for a wagon), ring by ring in a fixed order (so every machine picks the same). Null when nothing fits.
  */
-export function pitchSpot(s: GameState, w: Unit): { tx: number; ty: number } | null {
+export function pitchSpot(s: GameState, w: Unit, spot = STEPPE.spot): { tx: number; ty: number } | null {
   if (!w.packed) return null;
   const n = BUILDINGS[w.packed].size;
   const bx = Math.round(w.x - n / 2);
   const by = Math.round(w.y - n / 2);
-  for (let d = 0; d <= STEPPE.spot; d++) {
+  for (let d = 0; d <= spot; d++) {
     for (let dy = -d; dy <= d; dy++) {
       for (let dx = -d; dx <= d; dx++) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== d) continue;
