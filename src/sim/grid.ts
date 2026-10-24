@@ -5,7 +5,8 @@ import { isEnemy } from './world';
 import { snareSpot } from './snares';
 import { hiveSpot } from './hive';
 import { bridgeSpot, dykeSpot, isChannel, isDug, isInund, parched } from './water';
-import { bared, causewaySpot } from './tides';
+import { bared, causewaySpot, cocklerSpot } from './tides';
+import { tideGateSpot } from './tides';
 import { adrift, pontoonSpot } from './floating';
 import type { Building, BuildingType, GameState } from './types';
 import { B_BUILDING, B_GATE, B_RES, B_TERRAIN, R_BLOODIRON, R_GOLD, R_NONE, R_SALT, R_SALTPETRE, R_STONE, T_ROCK, T_WATER } from './types';
@@ -97,7 +98,7 @@ export function groundAt(s: GameState, x: number, y: number): number {
   return a * (1 - fx) * (1 - fy) + b * fx * (1 - fy) + c * (1 - fx) * fy + d * fx * fy;
 }
 
-export type PlaceProblem = null | 'edge' | 'water' | 'rock' | 'blocked' | 'slope' | 'shore' | 'foreign' | 'woods' | 'snares' | 'deep' | 'dry' | 'parched' | 'bare' | 'hives' | 'tidal' | 'adrift';
+export type PlaceProblem = null | 'edge' | 'water' | 'rock' | 'blocked' | 'slope' | 'shore' | 'foreign' | 'woods' | 'snares' | 'deep' | 'dry' | 'parched' | 'bare' | 'hives' | 'tidal' | 'adrift' | 'beds' | 'barrage';
 
 /** Whether a building of this type could go with its top-left corner on this tile. */
 export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: number, ignoreUnits = true, owner = -1): PlaceProblem {
@@ -107,6 +108,8 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
   let hi = -Infinity;
   // The computer asks this of hundreds of tiles a search; most are nowhere near a relic, post, ruin or landmark.
   const near = keepClearNear(s, tx, ty, n);
+  // A Tide Gate (#785) goes on a causeway tile of its owner's barrage, beside the pond, and nowhere else.
+  if (type === 'tidegate') return tideGateSpot(s, tx, ty, owner);
   // A dyke (#701) goes on shallow water, or on the shore beside it; so does a sluice (#701 s4), on a channel too, or into its own dyke line.
   // A dam (#701 s5) goes where a sluice does; a bridge over water a people dug, and a channel, in the Age of Locks, over an old channel
   // to dig it deep.
@@ -161,6 +164,11 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
   // A Hive goes only among standing trees, and apart from the others (the Age of the Hive).
   if (type === 'hive') {
     const why = hiveSpot(s, tx, ty);
+    if (why) return why;
+  }
+  // A Cockler's Hut (#779) goes only by the cockle beds.
+  if (type === 'cockler') {
+    const why = cocklerSpot(s, tx, ty, n);
     if (why) return why;
   }
   // The Age of Rivers (#701): its fields go only by water.
@@ -240,7 +248,7 @@ export function stampBuilding(s: GameState, b: Building, on: boolean): void {
   if (!open && on) s.blockVersion++;
   // A dyke (#701) is a gate along its whole length: its own team walks its crown, over water too, and nothing else passes.
   // So is a dam, and a bridge (#701 s5) for those who walk it; a ship passes under a bridge (`sails`). So is a Pontoon's deck (#770).
-  const dyke = b.type === 'dyke' || b.type === 'sluice' || b.type === 'dam' || b.type === 'bridge' || b.type === 'pontoon';
+  const dyke = b.type === 'dyke' || b.type === 'sluice' || b.type === 'dam' || b.type === 'bridge' || b.type === 'pontoon' || b.type === 'tidegate';
   // A Thornwall (the Age of the Grove) parts for its own team as a gate does.
   const gate = b.type === 'gate' || b.type === 'thornwall' || dyke;
   if (dyke) s.blockVersion++;

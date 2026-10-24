@@ -23,6 +23,10 @@ import { aground, millShares, tidalNear, tideClock, tideMillIdle } from '../sim/
 import { isPond } from '../sim/tides';
 import { tideWaitLeft } from '../sim/tides';
 import { ashoreLeft, bedClock } from '../sim/tides';
+import { hutBeds, hutWorks } from '../sim/tides';
+import { gateHead, gateReach, gateWorks, pondBehind, tideGateProblem } from '../sim/tides';
+import { TIDE_GATE } from '../sim/data';
+import { COCKLER } from '../sim/data';
 import { COCKLE } from '../sim/data';
 import { R_COCKLE } from '../sim/types';
 import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
@@ -1312,6 +1316,14 @@ export class Hud {
       const under = waterLine(s, b).filter((t) => isInund(s, t)).length;
       status += ` · <span data-tip="<b>Sluice</b>Open, the water runs out over the low ground within ${INUND.reach} tiles of it: polder, and meadow no higher than a little over its banks. Soldiers wade it at a crawl, siege bogs down, and gun-barges sail it. Shut, it holds the water back as a dyke does.">${b.open ? (lets(s, b) ? `🌊 Open: ${under} tiles under water` : '⚠ Open, but no water to let out') : sleeping ? '💤 Shut' : `🚪 Shut${under ? `: ${under} tiles still draining` : ''}`}</span>`;
     }
+    // A Tide Gate (#785): shut and loaded (and how far it would scour), pouring out, or open with the tide. Rivals read it too.
+    if (b.built && b.type === 'tidegate') {
+      const head = gateHead(s, b).length;
+      const reach = gateReach(s, b).length;
+      const pouring = s.scour?.some((c) => c.gate === b.id);
+      const pond = pondBehind(s, b).length;
+      status += ` · <span data-tip="<b>Tide Gate</b>Shut, the barrage holds its pond (${pond} tiles of flats) at every hour. The head of water is the pond held above the sea outside: with ${TIDE_GATE.least} tiles of head or more, opening the gate sends it out as a scour over up to ${TIDE_GATE.spread} tiles of bared flats a tile of head, within ${TIDE_GATE.reach} tiles of the gate: for ${TIDE_GATE.secs} seconds they are under water, and whoever stands there is swept off, ${TIDE_GATE.hurt} health lost, or drowned with no shore near. Open, the pond runs with the tide.">${!gateWorks(s, b) ? '💤 Shut: it works only in the Age of Tides' : pouring ? '🌊 Scouring: the pond is pouring out' : b.open ? '🚪 Open: the pond runs with the tide' : reach ? `⚠ Loaded: ${head} tiles of head, would scour ${reach} tiles of flats` : head ? `🚪 Shut: ${head} tiles of head, too little to scour` : '🚪 Shut: no head of water above the sea'}</span>`;
+    }
     // A dam (#701 s5): whether its turbines turn, how many of its owner's buildings they drive, and the burst it holds back.
     if (b.built && b.type === 'dam') {
       const still = damIdle(s, b);
@@ -1335,6 +1347,11 @@ export class Hud {
       const still = tideMillIdle(s, b);
       const share = millShares(s).get(b.id) ?? 0;
       status += ` · <span data-tip="<b>Tide Mill</b>Its pond fills on the flood and runs out through the wheel on the ebb: at every turn of the tide it grinds ${TIDE.mill.gold} gold with ${TIDE.mill.most} tiles of tidal ground within ${TIDE.mill.reach} tiles of it, less with fewer. A tile feeds only the first mill raised by it. Causeways count as tidal ground. Flats a causeway line shuts off from the sea are a barrage's pond: ground twice, on the flood and on the ebb.">${still ? `⚠ ${still}` : `🌊 ${Math.round(share)} gold a turn of the tide (${Math.min(TIDE.mill.most, tidalNear(s, b).length)} tiles of tidal ground${tidalNear(s, b).some((t) => isPond(s, t)) ? `, ${tidalNear(s, b).filter((t) => isPond(s, t)).length} of them a barrage's pond, ground twice` : ''})${tideClock(s) ? '' : ': the tide wakes the moment it is raised'}`}</span>`;
+    }
+    // A Cockler's Hut (#779): the beds it tends.
+    if (mine && b.built && b.type === 'cockler') {
+      const n = hutBeds(s, b);
+      status += ` · <span data-tip="<b>Cockler's Hut</b>Your pickers empty their baskets of cockles here (it takes nothing else) when it is nearer than a food store, and wait beside it, on dry ground, for the tide to bare their bed. Each high water brings ${COCKLER.regrow} food back to every bed within ${COCKLER.reach} tiles of it instead of ${COCKLE.regrow}.">${hutWorks(s, b) ? `🐚 Tends ${n} bed${n === 1 ? '' : 's'}` : '⚠ Idle outside the Age of Tides'}</span>`;
     }
     // The missile pool (#753): the store is the owner's alone to read.
     if (mine && b.built && b.type === 'silo') {
@@ -1827,6 +1844,12 @@ export class Hud {
         if (b.behemoth) {
           const why = riseProblem(b);
           cmds.push({ key: 'P', pic: '', glyph: '🐢', title: 'Rise', desc: 'The Behemoth rises with this Town Center on its back, and everyone sheltering inside steps out. It walks and tramples, and counts as a Town Center while it walks; kneel it (P) where you want your capital next. While it walks it trains no one and takes in nothing.', ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'pack', p: viewer, building: b.id }) });
+        }
+        // A Tide Gate (#785): open it, a scour on a loaded pond, or shut it to fill on the next flood.
+        if (b.type === 'tidegate') {
+          const why = tideGateProblem(s, b);
+          const reach = gateReach(s, b).length;
+          cmds.push({ key: 'O', pic: '', glyph: b.open ? '⛔' : '🌊', title: b.open ? 'Shut the gate' : 'Open the gate', desc: b.open ? 'Let the leaves swing to: the pond holds again what the next flood brings in, and its mills grind it twice once it is full.' : reach ? `Let the pond out: it scours ${reach} tiles of flats below the gate for ${TIDE_GATE.secs} seconds, sweeping off whoever stands there (your own people too), ${TIDE_GATE.hurt} health lost or drowned. Then the pond runs with the tide until you shut the gate and the flood fills it.` : `No head of water to scour with (${TIDE_GATE.least} tiles held above the sea at least: open it at low water). Opened, the pond runs with the tide: its flats bare at low water and its cockle beds grow back, and the mills grind it once.`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'pack', p: viewer, building: b.id }) });
         }
         // The Age of Floating Cities (#770): cast the district off into a tow.
         if (b.type === 'pontoon' && (ageDef(p).floats || b.keep === 'floating')) {

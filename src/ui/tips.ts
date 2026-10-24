@@ -1,3 +1,5 @@
+import { COCKLE, COCKLER } from '../sim/data';
+import { TIDE_GATE } from '../sim/data';
 import { AGES, BLOOM, LEVIATHANS, UNITS, HIVE, INTERCEPT, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
 import { battlesFor } from '../sim/battles';
 import { ageDef } from '../sim/ages';
@@ -429,7 +431,7 @@ const TIPS: Tip[] = [
     id: 'tides',
     // The Age of Tides (#739): its first minute.
     when: (s, me) => ageOf(s.players[me]) === 'tides',
-    text: `Your people keeps the sea's hours. Watch the tide clock (🌊, top bar): every ${TIDE.period / 60} minutes the sea falls to low water and back, baring the shallows as flats anyone may cross. Raise <b>${BUILDINGS.tidemill.name}s</b> (<kbd>A</kbd>) on the shore where the most tidal ground lies near: each grinds gold at every turn of the tide. Drag <b>${BUILDINGS.causeway.name}s</b> (<kbd>V</kbd>) over the flats or the shallow sea: a road that only high water covers. Get off the flats before the water comes back, and strike across the bay at low water.`,
+    text: `Your people keeps the sea's hours. Watch the tide clock (🌊, top bar): every ${TIDE.period / 60} minutes the sea falls to low water and back, baring the shallows as flats anyone may cross. Raise <b>${BUILDINGS.tidemill.name}s</b> (<kbd>${BUILDINGS.tidemill.key}</kbd>) on the shore where the most tidal ground lies near: each grinds gold at every turn of the tide. Drag <b>${BUILDINGS.causeway.name}s</b> (<kbd>${BUILDINGS.causeway.key}</kbd>) over the flats or the shallow sea: a road that only high water covers. Get off the flats before the water comes back, and strike across the bay at low water.`,
   },
   {
     id: 'tideAwake',
@@ -450,10 +452,22 @@ const TIPS: Tip[] = [
     text: '<b>Cockle beds</b> lie on the deeper flats (pale shells on the wet sand, 🐚 on its panel), bared only as the tide runs low. Send citizens to pick them while they stand bare: food, and each high water brings some back. Your pickers read the clock themselves: before the flood they come ashore with what they have, and go back at the next low water. A barrage that ponds the flats drowns its beds; a causeway goes over one only once it is picked out.',
   },
   {
+    id: 'cocklerHut',
+    // The Cockler's Hut (#779): the viewer's people picks cockles, and has no hut yet.
+    when: (s, me) => !!s.cockles && !!ageDef(s.players[me]).tides && !has(s, me, 'cockler') && s.ents.some((e) => e.kind === 'unit' && e.owner === me && e.order.k === 'gather' && !!e.order.cockle),
+    text: `<b>A hut by the beds.</b> Your pickers carry every basket of cockles home, a long walk past wolves and the flood. Raise a <b>${BUILDINGS.cockler.name}</b> (<kbd>B</kbd> <kbd>${BUILDINGS.cockler.key}</kbd>, ${BUILDINGS.cockler.cost.wood} wood) within ${COCKLER.reach} tiles of a bed: they empty their baskets there, wait beside it on dry ground for low water, and the beds round it come back richer at each high water (${COCKLER.regrow} food, not ${COCKLE.regrow}). It takes cockles only, and stands where a rival crossing at low water will find it.`,
+  },
+  {
     id: 'barrage',
     // Barrages (#748): a Tide Mill stands, and no pond yet.
     when: (s, me) => ageOf(s.players[me]) === 'tides' && has(s, me, 'tidemill') && !s.pond,
-    text: `<b>Shut a bay.</b> Drag a line of ${BUILDINGS.causeway.name}s (<kbd>V</kbd>) across the mouth of a bay of flats, shore to shore: behind it the bay is a <b>pond</b> whose flats stay wet at every hour, and a Tide Mill by it grinds them twice, on the flood and on the ebb. What it costs: nobody crosses that bay at low water any more, you included, and powder or a warhead on the line lets the pond out.`,
+    text: `<b>Shut a bay.</b> Drag a line of ${BUILDINGS.causeway.name}s (<kbd>${BUILDINGS.causeway.key}</kbd>) across the mouth of a bay of flats, shore to shore: behind it the bay is a <b>pond</b> whose flats stay wet at every hour, and a Tide Mill by it grinds them twice, on the flood and on the ebb. What it costs: nobody crosses that bay at low water any more, you included, and powder or a warhead on the line lets the pond out.`,
+  },
+  {
+    id: 'tideGate',
+    // The Tide Gate (#785): the viewer's people has a barrage's pond, and no gate in it yet.
+    when: (s, me) => ageOf(s.players[me]) === 'tides' && !!s.pond && !!s.causewayBy && s.causewayBy.some((o) => o - 1 === me) && !has(s, me, 'tidegate'),
+    text: `<b>A gate in the barrage.</b> Set a <b>${BUILDINGS.tidegate.name}</b> (<kbd>V</kbd> <kbd>${BUILDINGS.tidegate.key}</kbd>) on a causeway tile of your barrage, beside the pond. Shut, the pond holds and the mills grind it twice. At low water, when a rival army walks the flats below it, open it (<kbd>O</kbd>): the pond rushes out over them for ${TIDE_GATE.secs} seconds and sweeps them off, hurt or drowned. Then shut it again, and the next flood fills it. Rivals can read whether it is loaded, and keep off.`,
   },
   {
     id: 'breachCauseway',

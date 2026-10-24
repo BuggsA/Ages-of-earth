@@ -1,4 +1,4 @@
-import { AUTO_WORK, BUILDINGS, EPOCHS, GIANTS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, RIVERS, SNARE, HIVE, SPREAD, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
+import { AUTO_WORK, BUILDINGS, GIANTS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, RIVERS, SNARE, HIVE, COCKLER, SPREAD, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
 import { peace } from './combat';
 import { findSpot } from './ai';
 import { placeProblem, stampBuilding, walkable } from './grid';
@@ -42,6 +42,7 @@ import { behemothBusy, kneel, kneelProblem, rise, riseProblem, seedBomb, seedBom
 import { isField } from './grove';
 import { answerTiding, tidingProblem } from './tidings';
 import { sluiceProblem } from './water';
+import { tideGateProblem, toggleGate } from './tides';
 import { castOff, castProblem, linkProblem } from './floating';
 
 /**
@@ -197,7 +198,7 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
   }
   const problem = placeProblem(s, type, tx, ty, true, p);
   if (problem) {
-    if (!quiet) refuse(s, p, problem === 'slope' ? 'Too steep to build there' : problem === 'foreign' ? "That's enemy land: only a Tower can be raised there" : problem === 'woods' ? `A snare needs ${SNARE.need} trees standing within ${SNARE.r} tiles` : problem === 'snares' ? `Too near another snare: keep them ${SNARE.apart} tiles apart` : problem === 'parched' ? `In the Age of Rivers a Farm is laid only by water: within ${RIVERS.wet} tiles of a channel, spring, lake or shore` : problem === 'bare' ? `A Hive needs ${HIVE.trees} trees standing within ${SNARE.r} tiles` : problem === 'hives' ? `Too near another Hive: keep them ${HIVE.apart} tiles apart` : problem === 'adrift' ? 'A Pontoon is raised beside the shore or beside another of your pontoons, where its builders can stand: to set one farther out, cast it off and tow it' : type === 'pontoon' && (problem === 'dry' || problem === 'water') ? 'A Pontoon is moored on open water that ships sail' : "Can't build there");
+    if (!quiet) refuse(s, p, problem === 'slope' ? 'Too steep to build there' : problem === 'foreign' ? "That's enemy land: only a Tower can be raised there" : problem === 'woods' ? `A snare needs ${SNARE.need} trees standing within ${SNARE.r} tiles` : problem === 'snares' ? `Too near another snare: keep them ${SNARE.apart} tiles apart` : problem === 'parched' ? `In the Age of Rivers a Farm is laid only by water: within ${RIVERS.wet} tiles of a channel, spring, lake or shore` : problem === 'bare' ? `A Hive needs ${HIVE.trees} trees standing within ${SNARE.r} tiles` : problem === 'hives' ? `Too near another Hive: keep them ${HIVE.apart} tiles apart` : problem === 'adrift' ? 'A Pontoon is raised beside the shore or beside another of your pontoons, where its builders can stand: to set one farther out, cast it off and tow it' : type === 'pontoon' && (problem === 'dry' || problem === 'water') ? 'A Pontoon is moored on open water that ships sail' : problem === 'beds' ? `A Cockler's Hut goes within ${COCKLER.reach} tiles of a cockle bed` : problem === 'barrage' ? 'A Tide Gate goes on a causeway tile of your own barrage, beside its pond' : "Can't build there");
     return null;
   }
   const cost = raiseCost(s, p, type, tx, ty);
@@ -777,6 +778,13 @@ export function applyCommand(s: GameState, c: Command): void {
         const no = riseProblem(b);
         if (no) return refuse(s, c.p, no);
         rise(s, b);
+        break;
+      }
+      // At a Tide Gate (#785) it opens the gate, or shuts it: opened on a loaded pond, the pond scours the flats below.
+      if (b.type === 'tidegate') {
+        const no = tideGateProblem(s, b);
+        if (no) return refuse(s, c.p, no);
+        toggleGate(s, b);
         break;
       }
       // At a Pontoon (#770) it casts the district off into a tow.

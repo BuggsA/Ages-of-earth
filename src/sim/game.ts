@@ -38,7 +38,7 @@ import { cacheStep, dropOre, spillStore } from './caches';
 import { kegStep, millStep } from './powder';
 import { fireStep } from './fire';
 import { burst, ditchStep, floodStep, pumpStep, sluiceStep } from './water';
-import { aground, tideStep } from './tides';
+import { aground, holdShore, tideStep } from './tides';
 import { linkProblem, sink } from './floating';
 import { siloStep } from './silo';
 import { stockPosts } from './oretrade';
@@ -660,6 +660,8 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   for (const e of s.ents) {
     if (e.kind !== 'unit' || e.hp <= 0 || e.inside) continue;
     collide(s, e);
+    // A unit waiting for the tide is never jostled off dry ground onto the flats (#779).
+    holdShore(s, e);
     checkStuck(s, e);
   }
   carryCargo(s);
@@ -776,6 +778,14 @@ export function checksum(s: GameState): number {
   // Barrages (#748): who raised each causeway, and the ponds behind them.
   if (s.causewayBy) for (let i = 0; i < s.causewayBy.length; i++) if (s.causewayBy[i]) mix(i * 16 + s.causewayBy[i]);
   if (s.pond) for (let i = 0; i < s.pond.length; i++) if (s.pond[i]) mix(i + 0xc0000);
+  // Tide Gates (#785): the ponds let out, and the scours running.
+  if (s.pondOut) for (let i = 0; i < s.pondOut.length; i++) if (s.pondOut[i]) mix(i + 0xd0000);
+  for (const c of s.scour ?? []) {
+    mix(c.gate);
+    mix(c.until);
+    for (const t of c.tiles) mix(t);
+    for (const t of c.pond) mix(t);
+  }
   for (const f of s.fallen ?? []) {
     mix(f.owner);
     mix(f.tx);

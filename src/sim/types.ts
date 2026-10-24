@@ -53,6 +53,10 @@ export type BuildingType =
   | 'sluice'
   /** The Age of Tides (#739): a raised road over the flats, which becomes tidal ground and is gone; a mill that grinds on the running tide. */
   | 'causeway' | 'tidemill'
+  /** The Age of Tides (#779): a hut by the cockle beds, a drop for cockles only, where pickers wait for low water. */
+  | 'cockler'
+  /** The Age of Tides (#785): a gate set into a barrage's causeway, that holds the pond or lets it out as a scour over the flats below. */
+  | 'tidegate'
   /** The Age of Locks (#701 s5): a swing bridge its own people cross a canal by and ships pass under, and a dam whose turbines drive the workshops by it. */
   | 'bridge' | 'dam'
   /** The Age of Floating Cities (#770): a district on pontoons, moored on open water, that is cast off, towed and moored again. */
@@ -385,7 +389,7 @@ export interface Building {
   ripe?: number;
   /** A Town Center knelt from a Behemoth (the Age of Leviathans, `leviathans.ts`): it rises onto the titan's back again. */
   behemoth?: boolean;
-  /** A Sluice (#701 s4): standing open, letting the water out over the low ground behind it. Absent: shut. */
+  /** A Sluice (#701 s4): standing open, letting the water out over the low ground behind it. Absent: shut. A Tide Gate (#785): open, its pond running with the tide. */
   open?: boolean;
   /** Where new units go. `kind` is the resource the flag was set on (absent on bare ground), so it outlives its tile (#344). */
   rally: { x: number; y: number; tile: number; kind?: number } | null;
@@ -833,6 +837,8 @@ export interface PlayerStats {
   causeways?: number;
   /** Rival causeway tiles breached by this people's kegs and warheads (#748). */
   breached?: number;
+  /** Land units a people's Tide Gate scours swept off the flats (#785). */
+  scoured?: number;
   /** Fish landed by boats (the Age of Sail's deed); absent in older saves. */
   fished?: number;
   /** Beacons lit on the people's towers, relays included (the Age of Lightning's deed, #231); absent in older saves. */
@@ -1129,7 +1135,7 @@ export type GameEvent =
   /** The tide turned to a new level (#739): `level` 0 is low water, `TIDE.flats.length` high; `rising` while it floods. `bared` tiles came out, `covered` went under. */
   | { k: 'tide'; level: number; rising: boolean; bared: number; covered: number }
   /** A unit caught on the flats by the rising tide (#739) was swept ashore and hurt (`drowned`: no shore near, it was lost). */
-  | { k: 'tideSwept'; id: number; owner: number; x: number; y: number; drowned: boolean }
+  | { k: 'tideSwept'; id: number; owner: number; x: number; y: number; drowned: boolean; /** Swept by this people's Tide Gate scour (#785). */ by?: number }
   /** A land unit stops on the shore to wait for the tide (#755), until tick `until`. */
   | { k: 'tideHold'; id: number; owner: number; x: number; y: number; until: number }
   /** A worker on the flats steps ashore before the flood (#767), until tick `until` (-1: home with its basket first). */
@@ -1144,6 +1150,8 @@ export type GameEvent =
   | { k: 'breached'; owner: number; by: number; tile: number; x: number; y: number; pond: boolean }
   /** A barrage shut a pond off from the sea (#748), or a breach let it drain: `tiles` of tidal ground now behind it. */
   | { k: 'pond'; owner: number; tiles: number; x: number; y: number }
+  /** A Tide Gate (#785) opened or shut; `scour`: opened on a loaded pond, the tiles of flats it sent the water over (0: none). */
+  | { k: 'tideGate'; owner: number; id: number; open: boolean; scour: number; swept: number; x: number; y: number }
   /** A dam fell with water behind it (#701 s5): its surge ran over `tiles` tiles of low ground at once. */
   | { k: 'burst'; owner: number; id: number; x: number; y: number; tiles: number }
   | { k: 'season'; i: number }
@@ -1300,6 +1308,13 @@ export interface GameState {
    * stay wet, and a Tide Mill grinds them twice. Recounted at each turn of the tide and whenever a causeway is raised or breached.
    */
   pond?: Uint8Array;
+  /**
+   * Tide Gates (#785): 1 on each tile of a barrage's pond let out through a gate and not yet filled again: it runs with the tide as the
+   * open flats do, until (with the gate shut) the flood covers it and the pond holds it again. Absent: none.
+   */
+  pondOut?: Uint8Array;
+  /** Tide Gates (#785): scours running, each the flats a gate's pond rushed out over, held under water until `until`; and the pond it let out. */
+  scour?: { gate: number; owner: number; tiles: number[]; pond: number[]; until: number }[];
   /** Cockle beds (#767): 1 on each tile laid as a bed when the tide woke, picked out or not, so a bed grows back where it was. Absent where none were laid. */
   cockles?: Uint8Array;
   /**
@@ -1534,7 +1549,7 @@ export interface AiMemory {
    * a gap in it is mended. `wait` is when a wave across the flats began waiting for low water; `cross` the crossing the wave on the
    * march took at low water (its far shore, the level that covers it, and the wave's goal), to turn back short of before the flood.
    */
-  tide?: { plan?: BarragePlan | null; seen?: number[]; raised?: boolean; wait?: number; cross?: { x: number; y: number; level: number; to: { x: number; y: number } }; cockle?: number };
+  tide?: { plan?: BarragePlan | null; seen?: number[]; raised?: boolean; wait?: number; cross?: { x: number; y: number; level: number; to: { x: number; y: number } }; cockle?: number; /** Tide Gates (#785): when it last looked to fire its gate, and when it opened it. */ gate?: number; opened?: number };
 }
 
 /** Orders that can be given with Shift held to queue them after the current one. */

@@ -1,8 +1,8 @@
-import { AGES, AI_EBB, BARRAGE, COCKLE, KEG, TIDE, TIDE_ROUTE, TIDE_WORK, domainOf, secs } from './data';
+import { AGES, AI_EBB, BARRAGE, COCKLE, COCKLER, KEG, TIDE, TIDE_GATE, TIDE_ROUTE, TIDE_WORK, domainOf, secs } from './data';
 import { ageDef, ageOf, asleep } from './ages';
-import { distToTile, stampBuilding, walkable } from './grid';
+import { distToRect, distToTile, stampBuilding, walkable } from './grid';
 import { isChannel, isInund, isPolder, seaAt } from './water';
-import { goalForPoint, isEnemy, statsOf } from './world';
+import { goalForPoint, isEnemy, passOf, statsOf } from './world';
 import { hash2 } from './rng';
 import { findPath } from './path';
 import { kegsOf, sappers } from './powder';
@@ -171,9 +171,11 @@ function settle(s: GameState, level: number): { bared: number; covered: number; 
   // A barrage's pond (#748) holds its water at every level.
   recountPonds(s);
   const pond = s.pond;
+  // A Tide Gate's scour (#785) holds its flats under until it has run out.
+  const held = scourHeld(s);
   for (let i = 0; i < t.length; i++) {
     if (t[i] === 0 || !free(s, i)) continue;
-    const out = level < tidalLevel(s, i) && !(pond && pond[i]);
+    const out = level < tidalLevel(s, i) && !(pond && pond[i]) && !(held && held.has(i));
     if (out && s.terrain[i] === T_WATER) {
       bare(s, i);
       nb++;
@@ -222,20 +224,23 @@ function shoreFor(s: GameState, x: number, y: number, team: number): number {
   return best >= 0 ? best : any;
 }
 
-/** Sweep a land unit the tide caught to the shore, hurt, and send it on its way again from there (or drown it, with no shore near). */
-function sweep(s: GameState, u: Unit): void {
+/**
+ * Sweep a land unit the tide caught to the shore, hurt, and send it on its way again from there (or drown it, with no shore near). A Tide
+ * Gate's scour (#785) sweeps harder (`hurt`), and says whose gate it was (`by`).
+ */
+function sweep(s: GameState, u: Unit, hurt: number = TIDE.hurt, by?: number): void {
   const to = shoreFor(s, u.x, u.y, s.players[u.owner]?.team ?? -1);
   if (to < 0) {
     u.hp = 0;
-    s.events.push({ k: 'tideSwept', id: u.id, owner: u.owner, x: u.x, y: u.y, drowned: true });
+    s.events.push({ k: 'tideSwept', id: u.id, owner: u.owner, x: u.x, y: u.y, drowned: true, ...(by !== undefined ? { by } : {}) });
     return;
   }
   u.x = (to % s.w) + 0.5;
   u.y = Math.floor(to / s.w) + 0.5;
-  u.hp = Math.max(0, u.hp - TIDE.hurt);
+  u.hp = Math.max(0, u.hp - hurt);
   u.path = null;
   if (u.goal) u.wantPath = true;
-  s.events.push({ k: 'tideSwept', id: u.id, owner: u.owner, x: u.x, y: u.y, drowned: u.hp <= 0 });
+  s.events.push({ k: 'tideSwept', id: u.id, owner: u.owner, x: u.x, y: u.y, drowned: u.hp <= 0, ...(by !== undefined ? { by } : {}) });
 }
 
 // ---- Causeways ---------------------------------------------------------------------------------
@@ -366,6 +371,8 @@ export function tideStep(s: GameState): void {
   }
   if (!s.tidal) return;
   if (s.tick % 10 === 0) raiseCauseways(s);
+  // A Tide Gate's scour (#785) runs out.
+  if (s.scour) endScours(s);
   const level = tideLevel(s);
   const turned = s.tick === s.tideFrom || tideLevel(s, s.tick - 1) !== level;
   if (turned) {
@@ -519,6 +526,8 @@ function recountPonds(s: GameState, tell = false): void {
   if (!s.tidal) return;
   const was = s.pond;
   const now = pondsOf(s);
+  // Tide Gates (#785): a pond let out runs with the tide until the flood fills it again behind a shut gate.
+  letOut(s, now);
   let any = false;
   let moved = 0;
   for (let i = 0; i < now.length; i++) {
@@ -605,6 +614,9 @@ export function breachAt(s: GameState, x: number, y: number, r: number, by: numb
       }
       s.tidal[t] = bedLevel(s, t);
       if (s.causewayBy) s.causewayBy[t] = 0;
+      // A Tide Gate set in it (#785) goes with the road under it.
+      const g = s.bldAt[t] ? s.byId.get(s.bldAt[t]) : undefined;
+      if (g && g.kind === 'building' && g.type === 'tidegate') g.hp = 0;
       const k = s.tidal[t];
       if (k > 0 && level < k && !isPond(s, t)) {
         if (s.terrain[t] !== T_SAND) bare(s, t);
@@ -806,6 +818,7 @@ function passage(
   from: number,
   pace: number,
   t0: number,
+  risk: ((tile: number) => boolean) | null = null,
 ): { flats: Flat[]; doom: number; stop: { x: number; y: number; d: number; n: number } | null; length: number } {
   const w = s.w;
   const here = Math.floor(y) * w + Math.floor(x);
@@ -835,7 +848,7 @@ function passage(
       const at = d + (len * j) / n;
       if (isTidal(s, i) && s.bldAt[i] === 0 && s.terrain[i] !== T_WATER) {
         flats.push({ d: at, tile: i });
-        if (doom < 0 && !safeOver(s, i, t0, at, pace)) doom = at;
+        if (doom < 0 && (!safeOver(s, i, t0, at, pace) || (risk && risk(i)))) doom = at;
       } else if (doom < 0 && !isTidal(s, i)) stop = { x: tx + 0.5, y: ty + 0.5, d: at, n: k };
     }
     d += len;
@@ -859,8 +872,10 @@ const routePace = (s: GameState, u: Unit): number => statsOf(s, u).speed / TIDE_
  * The first tick from `t` (on, at most `TIDE_ROUTE.hold` seconds) a walk from `stop` can set out and find every tidal tile beyond it bare
  * from that moment until it has crossed it (#755), so the way it was laid is open the whole time. -1: none.
  */
-function ebbFrom(s: GameState, flats: Flat[], stop: number, pace: number, t: number, until: number): number {
+function ebbFrom(s: GameState, flats: Flat[], stop: number, pace: number, t: number, until: number, risk: ((tile: number) => boolean) | null = null): number {
   const ahead = flats.filter((f) => f.d > stop);
+  // Below a rival's loaded Tide Gate (#785) no hour is safe.
+  if (risk && ahead.some((f) => risk(f.tile))) return -1;
   for (let at = t; at <= until; at += secs(1)) {
     let ok = true;
     for (const f of ahead) {
@@ -886,23 +901,25 @@ export function tideRoute(s: GameState, u: Unit, team: number, budget: number): 
   const pace = routePace(s, u);
   if (pace <= 0) return 0;
   const t0 = s.tick;
-  const p = passage(s, u.x, u.y, u.path, 0, pace, t0);
+  // The flats below a rival's loaded Tide Gate (#785) count as unsafe at every hour.
+  const risk = gateRisk(s, u.owner);
+  const p = passage(s, u.x, u.y, u.path, 0, pace, t0, risk);
   if (p.doom < 0) return 0;
   let cost = 0;
   // Round: a path that turns down every tidal tile the water would cover before the unit is past it.
   let round: { pts: number[]; time: number } | null = null;
   const limit = Math.min(12000, Math.max(800, budget));
-  const r = findPath(s, u.x, u.y, u.goal, limit, team, (i, g) => isTidal(s, i) && s.bldAt[i] === 0 && !safeOver(s, i, t0, g, pace));
+  const r = findPath(s, u.x, u.y, u.goal, limit, team, (i, g) => isTidal(s, i) && s.bldAt[i] === 0 && (!safeOver(s, i, t0, g, pace) || (!!risk && risk(i))));
   cost += r.cost;
   if (r.complete && r.points.length) {
-    const q = passage(s, u.x, u.y, r.points, 0, pace, t0);
+    const q = passage(s, u.x, u.y, r.points, 0, pace, t0, risk);
     if (q.doom < 0) round = { pts: r.points, time: q.length / pace };
   }
   // Wait: on the last dry ground before the flats, for the first moment the whole crossing stays bare.
   let wait: { at: number; time: number } | null = null;
   if (p.stop) {
     const reach = t0 + Math.ceil(secs(p.stop.d / pace));
-    const at = ebbFrom(s, p.flats, p.stop.d, pace, reach, t0 + secs(TIDE_ROUTE.hold));
+    const at = ebbFrom(s, p.flats, p.stop.d, pace, reach, t0 + secs(TIDE_ROUTE.hold), risk);
     if (at >= 0) wait = { at, time: (at - t0) / secs(1) + (p.length - p.stop.d) / pace };
   }
   if (round && (!wait || round.time <= wait.time)) {
@@ -931,7 +948,7 @@ function rereadRoutes(s: GameState): void {
     if (u.kind !== 'unit' || u.hp <= 0 || u.inside || !u.path || u.wantPath || !u.goal || domainOf(u.type) !== 'land') continue;
     const pace = routePace(s, u);
     if (pace <= 0) continue;
-    if (passage(s, u.x, u.y, u.path, u.pathI, pace, s.tick).doom >= 0) u.wantPath = true;
+    if (passage(s, u.x, u.y, u.path, u.pathI, pace, s.tick, gateRisk(s, u.owner)).doom >= 0) u.wantPath = true;
   }
 }
 
@@ -981,16 +998,17 @@ function layCockles(s: GameState): void {
 export const bedOpen = (s: GameState, tile: number): boolean =>
   !!s.cockles && s.cockles[tile] === 1 && !!s.tidal && s.tidal[tile] !== 0 && s.tidal[tile] !== TIDE_CAUSEWAY && s.bldAt[tile] === 0 && !isPond(s, tile) && (s.res[tile] === R_NONE || s.res[tile] === R_COCKLE);
 
-/** High water brings the cockles back (#767): each open bed, picked out or not, gains `COCKLE.regrow`, up to `COCKLE.amount`. */
+/** High water brings the cockles back (#767): each open bed, picked out or not, gains `COCKLE.regrow` (`COCKLER.regrow` by a hut, #779), up to `COCKLE.amount`. */
 function regrowCockles(s: GameState): void {
   const beds = s.cockles;
   if (!beds) return;
+  const tended = tendedBeds(s);
   let n = 0;
   let food = 0;
   for (let i = 0; i < beds.length; i++) {
     if (!beds[i] || !bedOpen(s, i)) continue;
     const was = s.res[i] === R_COCKLE ? s.amount[i] : 0;
-    const now = Math.min(COCKLE.amount, was + COCKLE.regrow);
+    const now = Math.min(COCKLE.amount, was + (tended?.[i] ? COCKLER.regrow : COCKLE.regrow));
     if (now <= was) continue;
     s.res[i] = R_COCKLE;
     s.amount[i] = now;
@@ -1044,6 +1062,19 @@ export function bedClock(s: GameState, tile: number): { bare: boolean; secs: num
 }
 
 const walkingNow = (u: Unit): boolean => u.path !== null || u.wantPath;
+
+/**
+ * A picker turned for home with its basket (#779): it drops the way it was walking to the bed, and any wait on the shore for crossing to
+ * it (`Unit.tideWait`), so its next step routes it to the drop.
+ */
+function homeward(u: Unit, o: Extract<Order, { k: 'gather' }> | Extract<Order, { k: 'build' }>): void {
+  if (o.k !== 'gather' || o.phase === 'drop') return;
+  o.phase = 'drop';
+  u.path = null;
+  u.wantPath = false;
+  u.tideWait = undefined;
+  u.miss = 0;
+}
 
 /** Send a worker ashore (#767): to `to` (a tile; -1 stays where it stands), there to wait until tick `until`. */
 function goAshore(s: GameState, u: Unit, to: number, until: number): void {
@@ -1099,22 +1130,37 @@ export function tideWorkHold(s: GameState, u: Unit, o: Extract<Order, { k: 'gath
   if (bed >= 0 && !bared(s, bed)) {
     if (isPond(s, bed)) return false;
     const until = baresAt(s, tidalLevel(s, bed), s.tick);
-    const to = shoreFor(s, flats ? u.x : (bed % s.w) + 0.5, flats ? u.y : Math.floor(bed / s.w) + 0.5, team);
+    // By a Cockler's Hut near the bed (#779), on the dry ground beside it; else on the nearest shore.
+    const hut = hutWait(s, u, bed);
+    const to = hut >= 0 ? hut : shoreFor(s, flats ? u.x : (bed % s.w) + 0.5, flats ? u.y : Math.floor(bed / s.w) + 0.5, team);
     const dry = to >= 0 && !isTidal(s, to);
     if (basket && !flats) {
-      o.phase = 'drop';
+      homeward(u, o);
       return false;
     }
     const near = dry && Math.abs((to % s.w) + 0.5 - u.x) + Math.abs(Math.floor(to / s.w) + 0.5 - u.y) < 2;
     if (!dry || near) {
       if (basket) {
-        o.phase = 'drop';
+        homeward(u, o);
         return false;
       }
       goAshore(s, u, -1, until < 0 ? s.tick + secs(TIDE.period) : until);
       return true;
     }
     return ashore(to, until < 0 ? s.tick + secs(TIDE.period) : until);
+  }
+  // Below a rival's loaded Tide Gate (#785): a picker keeps off its bed, and waits ashore by it a while before looking again.
+  const risk = bed >= 0 || flats ? gateRisk(s, u.owner) : null;
+  if (risk && bed >= 0 && !basket && risk(bed)) {
+    const hut = hutWait(s, u, bed);
+    const to = hut >= 0 ? hut : shoreFor(s, flats ? u.x : (bed % s.w) + 0.5, flats ? u.y : Math.floor(bed / s.w) + 0.5, team);
+    const until = s.tick + secs(TIDE_GATE.wary);
+    if (to < 0 || isTidal(s, to) || Math.abs((to % s.w) + 0.5 - u.x) + Math.abs(Math.floor(to / s.w) + 0.5 - u.y) < 2) {
+      if (flats) return false;
+      goAshore(s, u, -1, until);
+      return true;
+    }
+    return ashore(to, until);
   }
   if (!flats || (walkingNow(u) && !drop) || (s.tick + u.id) % TIDE_WORK.check !== 0) return false;
   const go = fleeFlood(s, u, here);
@@ -1131,6 +1177,12 @@ export function tideWorkHold(s: GameState, u: Unit, o: Extract<Order, { k: 'gath
 function fleeFlood(s: GameState, u: Unit, here: number): { to: number; wet: number } | null {
   const pace = routePace(s, u);
   if (pace <= 0) return null;
+  // Standing below a rival's loaded Tide Gate (#785): off the flats now, and a look again in a while.
+  const risk = gateRisk(s, u.owner);
+  if (risk && risk(here)) {
+    const to = shoreFor(s, u.x, u.y, s.players[u.owner]?.team ?? -1);
+    return to < 0 || isTidal(s, to) ? null : { to, wet: s.tick + secs(TIDE_GATE.wary) };
+  }
   const wet = wetAt(s, here);
   // Cheap first: bare long enough to walk the farthest the shore is looked for.
   if (wet < 0 || wet - s.tick > Math.ceil(secs((TIDE.sweep * 1.5) / pace + TIDE_WORK.margin))) return null;
@@ -1161,4 +1213,440 @@ export function idleAshore(s: GameState, u: Unit): void {
 /** Whether a worker stands ashore for the tide (#767), and for how many seconds more (0: not). */
 export function ashoreLeft(s: GameState, u: Unit): number {
   return u.ashore !== undefined && u.ashore > s.tick ? (u.ashore - s.tick) / secs(1) : 0;
+}
+
+// ---- The Cockler's Hut, and shore waits that hold their ground (#779) ----------------------------
+
+/** Whether a Cockler's Hut works (#779): finished, standing, and its people in the Age of Tides (or keeping the hut). */
+export const hutWorks = (s: GameState, b: Building): boolean => b.type === 'cockler' && b.built && b.hp > 0 && !asleep(s, b);
+
+/** Why a Cockler's Hut can't go here, or null where it can (#779): it wants a cockle bed within `COCKLER.reach` tiles. */
+export function cocklerSpot(s: GameState, tx: number, ty: number, n: number): 'beds' | null {
+  const beds = s.cockles;
+  if (!beds) return 'beds';
+  const r = COCKLER.reach;
+  for (let y = Math.max(0, ty - r); y < Math.min(s.h, ty + n + r); y++)
+    for (let x = Math.max(0, tx - r); x < Math.min(s.w, tx + n + r); x++) if (beds[y * s.w + x] && distToRect(x + 0.5, y + 0.5, { tx, ty, size: n }) <= r) return null;
+  return 'beds';
+}
+
+/** The cockle beds a working hut tends (#779): those within `COCKLER.reach` tiles of one, by tile. Null: none. */
+export function tendedBeds(s: GameState): Uint8Array | null {
+  const beds = s.cockles;
+  if (!beds) return null;
+  let out: Uint8Array | null = null;
+  const r = COCKLER.reach;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || !hutWorks(s, e)) continue;
+    for (let y = Math.max(0, e.ty - r); y < Math.min(s.h, e.ty + e.size + r); y++)
+      for (let x = Math.max(0, e.tx - r); x < Math.min(s.w, e.tx + e.size + r); x++) {
+        const i = y * s.w + x;
+        if (beds[i] && distToRect(x + 0.5, y + 0.5, e) <= r) (out ??= new Uint8Array(beds.length))[i] = 1;
+      }
+  }
+  return out;
+}
+
+/** How many cockle beds a hut tends (#779), for its panel. */
+export function hutBeds(s: GameState, b: Building): number {
+  const beds = s.cockles;
+  if (!beds) return 0;
+  let n = 0;
+  const r = COCKLER.reach;
+  for (let y = Math.max(0, b.ty - r); y < Math.min(s.h, b.ty + b.size + r); y++)
+    for (let x = Math.max(0, b.tx - r); x < Math.min(s.w, b.tx + b.size + r); x++) if (beds[y * s.w + x] && distToRect(x + 0.5, y + 0.5, b) <= r) n++;
+  return n;
+}
+
+/**
+ * Where a picker with a basket of cockles empties it (#779): the nearest of its people's working huts, when nearer than `drop` (the
+ * nearest food store), else `drop`. A hut takes cockles only: anyone else, or a basket of other food, keeps to `drop`.
+ */
+export function cocklerDrop(s: GameState, u: Unit, drop: Building | null): Building | null {
+  if (u.order.k !== 'gather' || !u.order.cockle || u.carryRes !== 'food' || u.type !== 'citizen') return drop;
+  let best = drop;
+  let bestD = drop ? distToRect(u.x, u.y, drop) : Infinity;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.owner !== u.owner || !hutWorks(s, e)) continue;
+    const d = distToRect(u.x, u.y, e);
+    if (d < bestD) {
+      bestD = d;
+      best = e;
+    }
+  }
+  return best;
+}
+
+/**
+ * The tile a picker waits on for its bed to bare (#779), by the nearest of its people's working huts within `COCKLER.wait` tiles of the
+ * bed: a dry tile that can be walked on in the ring round the hut, among the three nearest the bed, picked by the picker's id so a crew
+ * stands spread. -1: no hut near.
+ */
+function hutWait(s: GameState, u: Unit, bed: number): number {
+  const bx = (bed % s.w) + 0.5;
+  const by = Math.floor(bed / s.w) + 0.5;
+  let hut: Building | null = null;
+  let hutD = COCKLER.wait;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.owner !== u.owner || !hutWorks(s, e)) continue;
+    const d = distToRect(bx, by, e);
+    if (d <= hutD) {
+      hutD = d;
+      hut = e;
+    }
+  }
+  if (!hut) return -1;
+  const team = s.players[u.owner]?.team ?? -1;
+  const ring: { i: number; d: number }[] = [];
+  for (let y = hut.ty - 1; y <= hut.ty + hut.size; y++)
+    for (let x = hut.tx - 1; x <= hut.tx + hut.size; x++) {
+      if (x >= hut.tx && x < hut.tx + hut.size && y >= hut.ty && y < hut.ty + hut.size) continue;
+      const i = y * s.w + x;
+      if (!walkable(s, x, y, team) || isTidal(s, i)) continue;
+      ring.push({ i, d: (x + 0.5 - bx) * (x + 0.5 - bx) + (y + 0.5 - by) * (y + 0.5 - by) });
+    }
+  if (!ring.length) return -1;
+  ring.sort((a, b) => a.d - b.d || a.i - b.i);
+  return ring[u.id % Math.min(3, ring.length)].i;
+}
+
+/**
+ * The best tile for a Cockler's Hut by a bed (#779), for the computer: the spot within `COCKLER.reach` tiles of the bed, nearest it, that
+ * `fits` (ties by tile order). Null: none.
+ */
+export function cocklerSpotNear(s: GameState, bed: number, fits: (tx: number, ty: number) => boolean): { tx: number; ty: number } | null {
+  const bx = (bed % s.w) + 0.5;
+  const by = Math.floor(bed / s.w) + 0.5;
+  const r = COCKLER.reach;
+  let best: { tx: number; ty: number } | null = null;
+  let bestD = Infinity;
+  for (let ty = Math.max(1, Math.floor(by) - r - 1); ty <= Math.min(s.h - 3, Math.floor(by) + r); ty++)
+    for (let tx = Math.max(1, Math.floor(bx) - r - 1); tx <= Math.min(s.w - 3, Math.floor(bx) + r); tx++) {
+      const d = distToRect(bx, by, { tx, ty, size: 2 });
+      if (d > r - 1 || d >= bestD || !fits(tx, ty)) continue;
+      bestD = d;
+      best = { tx, ty };
+    }
+  return best;
+}
+
+/**
+ * A land unit standing still to wait for the tide (#779): on the shore for a crossing (#755, `Unit.tideWait`), or ashore off its work
+ * (#767, `Unit.ashore`). The crowd round it may jostle it (`separate`), but never off dry ground onto tidal ground, where the flood would
+ * sweep it: called after `collide`, it slides it back along the edge of the flats, or, pushed right over, back onto the dry tile it stood
+ * on. So does one on the last stretch (`1.5` tiles) of its walk to the spot it waits on, crowded by those already there. Ground it chose
+ * to stand on stays its own: one already standing on the flats as the tick began is left to the tide's other rules.
+ */
+export function holdShore(s: GameState, u: Unit): void {
+  if (!s.tidal || u.inside || domainOf(u.type) !== 'land') return;
+  const waits = u.tideWait !== undefined && u.tideWait > s.tick && u.wantPath;
+  if (!waits && !(u.ashore !== undefined && u.ashore > s.tick)) return;
+  // Walking: only on the last stretch to the spot it waits on, so the safe flats it crosses on the way stay its to walk.
+  if (u.path) {
+    const n = u.path.length;
+    const dx = u.path[n - 2] - u.x;
+    const dy = u.path[n - 1] - u.y;
+    if (!waits || dx * dx + dy * dy > 1.5 * 1.5) return;
+  }
+  const wet = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < s.w && y < s.h && isTidal(s, y * s.w + x) && s.bldAt[y * s.w + x] === 0;
+  const fx = Math.floor(u.px);
+  const fy = Math.floor(u.py);
+  if (wet(fx, fy)) return;
+  const r = statsOf(s, u).radius;
+  const team = passOf(s, u);
+  const cx = Math.floor(u.x);
+  const cy = Math.floor(u.y);
+  if (wet(cx, cy)) {
+    // Pushed right over: back to the nearest point of the tile it stood on.
+    u.x = Math.max(fx + r, Math.min(fx + 1 - r, u.x));
+    u.y = Math.max(fy + r, Math.min(fy + 1 - r, u.y));
+    return;
+  }
+  for (let dy = -1; dy <= 1; dy++)
+    for (let dx = -1; dx <= 1; dx++) {
+      if ((!dx && !dy) || !wet(cx + dx, cy + dy)) continue;
+      const qx = Math.max(cx + dx, Math.min(cx + dx + 1, u.x));
+      const qy = Math.max(cy + dy, Math.min(cy + dy + 1, u.y));
+      const ox = u.x - qx;
+      const oy = u.y - qy;
+      const d2 = ox * ox + oy * oy;
+      if (d2 >= r * r || d2 < 1e-10) continue;
+      const d = Math.sqrt(d2);
+      const nx = qx + (ox / d) * r;
+      const ny = qy + (oy / d) * r;
+      if (!walkable(s, Math.floor(nx), Math.floor(ny), team)) continue;
+      u.x = nx;
+      u.y = ny;
+    }
+}
+
+// ---- Tide Gates (#785) ---------------------------------------------------------------------------
+
+/** Whether a Tide Gate works (#785): finished, standing, and its people in the Age of Tides. A sleeping gate stays shut. */
+export const gateWorks = (s: GameState, b: Building): boolean => b.type === 'tidegate' && b.built && b.hp > 0 && !asleep(s, b);
+
+/**
+ * The pond behind a gate (#785): the tidal tiles of every body of water beside the gate, four ways, that is shut off from the sea as
+ * `pondsOf` judges it (touches no map edge, holds no more than `BARRAGE.most` tiles). In the order a walk from the gate finds them.
+ */
+export function pondBehind(s: GameState, b: { tx: number; ty: number }): number[] {
+  const out: number[] = [];
+  if (!s.tidal) return out;
+  const { w, h } = s;
+  const seen = new Set<number>();
+  for (const n of FOUR_OF(s, b.ty * w + b.tx)) {
+    if (seen.has(n) || !holdsWater(s, n)) continue;
+    const body = [n];
+    seen.add(n);
+    let open = false;
+    for (let q = 0; q < body.length && !open; q++) {
+      const i = body[q];
+      const x = i % w;
+      const y = (i - x) / w;
+      if (x === 0 || y === 0 || x === w - 1 || y === h - 1 || body.length > BARRAGE.most) open = true;
+      for (const j of FOUR_OF(s, i)) {
+        if (seen.has(j) || !holdsWater(s, j)) continue;
+        seen.add(j);
+        body.push(j);
+      }
+    }
+    if (open) continue;
+    for (const i of body) if (s.tidal[i] !== 0) out.push(i);
+  }
+  return out;
+}
+
+/** The head of water a gate holds (#785): the tiles of its pond the barrage keeps wet that the sea outside would leave bare now. */
+export function gateHead(s: GameState, b: Building): number[] {
+  const level = tideLevel(s);
+  return pondBehind(s, b).filter((t) => isPond(s, t) && tidalLevel(s, t) > level);
+}
+
+/** Whether a gate's pond would scour if it were opened now (#785): working, shut, and a head of `TIDE_GATE.least` tiles or more. */
+export function gateLoaded(s: GameState, b: Building): boolean {
+  return gateWorks(s, b) && !b.open && !s.scour?.some((c) => c.gate === b.id) && gateHead(s, b).length >= TIDE_GATE.least;
+}
+
+/**
+ * The flats a gate's scour runs over (#785): from the gate's sea side, through open water and bared flats (never the pond, a causeway, a
+ * building or dry land), within `TIDE_GATE.reach` tiles of the gate, the first `most` tiles of bared flats found, nearest first, four ways.
+ */
+function scourTiles(s: GameState, b: Building, most: number): number[] {
+  const out: number[] = [];
+  if (!s.tidal || most <= 0) return out;
+  const pond = new Set(pondBehind(s, b));
+  const gx = b.tx + 0.5;
+  const gy = b.ty + 0.5;
+  const r = TIDE_GATE.reach;
+  const seen = new Set<number>([b.ty * s.w + b.tx]);
+  const queue: number[] = [];
+  const pass = (i: number): boolean => {
+    if (pond.has(i) || isPond(s, i) || s.bldAt[i] !== 0) return false;
+    const k = s.tidal![i];
+    if (k === TIDE_CAUSEWAY) return false;
+    if (k !== 0) return true;
+    return s.terrain[i] === T_WATER && !isPolder(s, i) && !isChannel(s, i) && !isInund(s, i);
+  };
+  for (const n of FOUR_OF(s, b.ty * s.w + b.tx)) {
+    if (seen.has(n) || !pass(n)) continue;
+    seen.add(n);
+    queue.push(n);
+  }
+  for (let q = 0; q < queue.length && out.length < most; q++) {
+    const i = queue[q];
+    if (bared(s, i) && free(s, i)) out.push(i);
+    for (const j of FOUR_OF(s, i)) {
+      if (seen.has(j) || !pass(j)) continue;
+      const dx = (j % s.w) + 0.5 - gx;
+      const dy = Math.floor(j / s.w) + 0.5 - gy;
+      if (dx * dx + dy * dy > r * r) continue;
+      seen.add(j);
+      queue.push(j);
+    }
+  }
+  return out;
+}
+
+/** The flats a gate would scour if it were opened now (#785): none unless it is loaded. Public, as the tide clock is. */
+export function gateReach(s: GameState, b: Building): number[] {
+  if (!gateLoaded(s, b)) return [];
+  return scourTiles(s, b, gateHead(s, b).length * TIDE_GATE.spread);
+}
+
+/** The tiles every running scour holds under water (#785): its flats, and the pond still pouring out behind them. Null: none. */
+function scourHeld(s: GameState): Set<number> | null {
+  if (!s.scour) return null;
+  const out = new Set<number>();
+  for (const c of s.scour) {
+    for (const t of c.tiles) out.add(t);
+    for (const t of c.pond) out.add(t);
+  }
+  return out;
+}
+
+/**
+ * The ponds let out (#785), as `recountPonds` counts them again (`now`, the ponds the barrages shut): a tile let out fills again once the
+ * sea stands over it with no open gate on its pond; every working open gate's pond is let out; and a tile let out is no pond till then.
+ */
+function letOut(s: GameState, now: Uint8Array): void {
+  let out = s.pondOut;
+  const level = tideLevel(s);
+  if (out) for (let i = 0; i < out.length; i++) if (out[i] && (!now[i] || level >= tidalLevel(s, i))) out[i] = 0;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'tidegate' || !e.open || !gateWorks(s, e)) continue;
+    for (const t of pondBehind(s, e)) if (now[t]) (out ??= new Uint8Array(now.length))[t] = 1;
+  }
+  if (!out) return;
+  let any = false;
+  for (let i = 0; i < out.length; i++)
+    if (out[i]) {
+      any = true;
+      now[i] = 0;
+    }
+  if (any) s.pondOut = out;
+  else delete s.pondOut;
+}
+
+/** Why a gate can't be opened or shut now (#785), or null. */
+export function tideGateProblem(s: GameState, b: Building): string | null {
+  if (!b.built) return 'The gate is not finished';
+  if (!s.tidal || !gateWorks(s, b)) return 'A Tide Gate works only in the Age of Tides';
+  if (s.scour?.some((c) => c.gate === b.id)) return 'The pond is still pouring out through the gate';
+  return null;
+}
+
+/**
+ * Open a gate, or shut it (#785). Shut, its pond fills again on the flood. Opened, its pond runs with the tide; opened on a head of
+ * `TIDE_GATE.least` tiles or more, the pond rushes out as a scour: the flats below (`scourTiles`, `TIDE_GATE.spread` for each tile of
+ * head) go under at once and stay under `TIDE_GATE.secs` seconds, the pond pouring out behind them, and whoever stands on them is swept,
+ * `TIDE_GATE.hurt` health lost, or drowned with no shore near. The gate's own people too.
+ */
+export function toggleGate(s: GameState, b: Building): void {
+  if (b.open) {
+    b.open = undefined;
+    s.tideTurns = (s.tideTurns ?? 0) + 1;
+    recountPonds(s);
+    s.events.push({ k: 'tideGate', owner: b.owner, id: b.id, open: false, scour: 0, swept: 0, x: b.x, y: b.y });
+    return;
+  }
+  const level = tideLevel(s);
+  const pond = pondBehind(s, b);
+  const head = pond.filter((t) => isPond(s, t) && tidalLevel(s, t) > level);
+  b.open = true;
+  const tiles = head.length >= TIDE_GATE.least ? scourTiles(s, b, head.length * TIDE_GATE.spread) : [];
+  const wet = new Set<number>();
+  for (const t of tiles) {
+    cover(s, t);
+    wet.add(t);
+  }
+  if (tiles.length) (s.scour ??= []).push({ gate: b.id, owner: b.owner, tiles, pond: head, until: s.tick + secs(TIDE_GATE.secs) });
+  recountPonds(s);
+  // No scour: the pond runs out at once to the level the sea stands at.
+  let n = tiles.length;
+  if (!tiles.length)
+    for (const t of pond)
+      if (free(s, t) && !isPond(s, t) && level < tidalLevel(s, t) && s.terrain[t] === T_WATER) {
+        bare(s, t);
+        n++;
+      }
+  let swept = 0;
+  if (wet.size) {
+    for (const u of s.ents)
+      if (u.kind === 'unit' && u.hp > 0 && !u.inside && domainOf(u.type) === 'land' && wet.has(Math.floor(u.y) * s.w + Math.floor(u.x))) {
+        sweep(s, u, TIDE_GATE.hurt, b.owner);
+        swept++;
+      }
+    drownKegs(s, wet);
+  }
+  const p = s.players[b.owner];
+  if (p && swept) p.stats.scoured = (p.stats.scoured ?? 0) + swept;
+  s.blockVersion++;
+  s.tideTurns = (s.tideTurns ?? 0) + n + 1;
+  s.events.push({ k: 'tideGate', owner: b.owner, id: b.id, open: true, scour: tiles.length, swept, x: b.x, y: b.y });
+  rereadRoutes(s);
+}
+
+/** Scours that have run their time (#785): their flats and the pond behind them settle to the level the sea stands at, in tile order. */
+function endScours(s: GameState): void {
+  const done = s.scour!.filter((c) => c.until <= s.tick);
+  if (!done.length) return;
+  const left = s.scour!.filter((c) => c.until > s.tick);
+  if (left.length) s.scour = left;
+  else delete s.scour;
+  const level = tideLevel(s);
+  const held = scourHeld(s);
+  const tiles = [...new Set(done.flatMap((c) => [...c.tiles, ...c.pond]))].sort((a, b) => a - b);
+  let n = 0;
+  for (const t of tiles) {
+    if (!free(s, t) || (held && held.has(t))) continue;
+    const out = level < tidalLevel(s, t) && !isPond(s, t);
+    if (out && s.terrain[t] === T_WATER) {
+      bare(s, t);
+      n++;
+    }
+  }
+  s.blockVersion++;
+  s.tideTurns = (s.tideTurns ?? 0) + n + 1;
+  rereadRoutes(s);
+}
+
+/** Each working shut gate's scour reach, worked out once a tick (and again whenever the shore moves): what workers and routes read. */
+const reachMemo = new WeakMap<GameState, { tick: number; turns: number; zones: { owner: number; tiles: Set<number> }[] }>();
+
+function gateZones(s: GameState): { owner: number; tiles: Set<number> }[] {
+  const m = reachMemo.get(s);
+  const turns = s.tideTurns ?? 0;
+  if (m && m.tick === s.tick && m.turns === turns) return m.zones;
+  const zones: { owner: number; tiles: Set<number> }[] = [];
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'tidegate') continue;
+    const tiles = gateReach(s, e);
+    if (tiles.length) zones.push({ owner: e.owner, tiles: new Set(tiles) });
+  }
+  reachMemo.set(s, { tick: s.tick, turns, zones });
+  return zones;
+}
+
+/**
+ * The flats below a rival's loaded Tide Gate (#785), as a people's workers and routes read them: a test of a tile, or null where no rival
+ * gate is loaded. The gate's own side walks them as it likes; its owner knows when it will open.
+ */
+export function gateRisk(s: GameState, owner: number): ((tile: number) => boolean) | null {
+  if (!s.tidal || !s.pond) return null;
+  const zones = gateZones(s).filter((z) => isEnemy(s, owner, z.owner));
+  if (!zones.length) return null;
+  return (tile: number) => zones.some((z) => z.tiles.has(tile));
+}
+
+/** Why a Tide Gate can't go on this tile (#785), or null: it goes on a causeway tile of its owner's own, beside a barrage's pond. */
+export function tideGateSpot(s: GameState, tx: number, ty: number, owner: number): 'barrage' | null {
+  const i = ty * s.w + tx;
+  if (!s.tidal || !isCauseway(s, i) || s.bldAt[i] !== 0) return 'barrage';
+  if (owner >= 0 && causewayOwner(s, i) !== owner) return 'barrage';
+  return pondBehind(s, { tx, ty }).length ? null : 'barrage';
+}
+
+/**
+ * Where the computer sets its gate (#785): of its barrage's tiles that would take one, the one nearest the line's middle with the sea on
+ * the other side from the pond (some flats to scour); ties to the first in the line. Null: none.
+ */
+export function tideGateSpotIn(s: GameState, line: readonly number[], owner: number): { tx: number; ty: number } | null {
+  let best: { tx: number; ty: number } | null = null;
+  let bestD = Infinity;
+  const mid = (line.length - 1) / 2;
+  for (let k = 0; k < line.length; k++) {
+    const t = line[k];
+    const tx = t % s.w;
+    const ty = Math.floor(t / s.w);
+    if (tideGateSpot(s, tx, ty, owner)) continue;
+    const pond = new Set(pondBehind(s, { tx, ty }));
+    const sea = FOUR_OF(s, t).some((n) => !pond.has(n) && s.tidal![n] !== 0 && s.tidal![n] !== TIDE_CAUSEWAY && !isPond(s, n));
+    if (!sea) continue;
+    const d = Math.abs(k - mid);
+    if (d < bestD) {
+      bestD = d;
+      best = { tx, ty };
+    }
+  }
+  return best;
 }
