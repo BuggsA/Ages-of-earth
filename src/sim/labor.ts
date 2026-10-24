@@ -6,6 +6,7 @@ import type { Building, GameState, Job, Unit } from './types';
 import { R_BERRY, R_GOLD, R_MEAT, R_STONE, R_TREE } from './types';
 import { RES_OF_TILE, findResource, freeFarm, freeShaft, giveOrder } from './units';
 import { seamOf, seamProblem } from './shafts';
+import { milkable } from './flocks';
 
 /** The jobs a citizen can be sent to by `reassign`; building and shelter are chosen on the map. */
 export const SEND_JOBS: readonly Job[] = ['food', 'wood', 'stone', 'gold', 'build'];
@@ -19,7 +20,9 @@ export function citizenJob(u: Unit): Job {
     case 'gather':
     case 'shaft': return u.order.res;
     case 'farm':
-    case 'hunt': return 'food';
+    case 'hunt':
+    case 'snare':
+    case 'milk': return 'food';
     case 'build':
     case 'dig':
     case 'salvage': return 'build';
@@ -68,6 +71,21 @@ function sites(s: GameState, p: number, moving: readonly Unit[]): Map<Building, 
   return out;
 }
 
+/** The nearest finished snare of `p`'s within `LABOR.reach` tiles that nobody walks and isn't in `taken`, or null (#344). */
+function freeSnare(s: GameState, p: number, x: number, y: number, taken: Set<number>): Building | null {
+  let best: Building | null = null;
+  let bestD = LABOR.reach * LABOR.reach;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'snare' || e.owner !== p || !e.built || e.hp <= 0 || taken.has(e.id)) continue;
+    const d = (e.x - x) * (e.x - x) + (e.y - y) * (e.y - y);
+    if (d < bestD) {
+      bestD = d;
+      best = e;
+    }
+  }
+  return best;
+}
+
 /** The nearest site with room in its crew, else the least crowded one; null when nothing is being built. */
 function nearestSite(u: Unit, crew: Map<Building, number>): Building | null {
   let best: Building | null = null;
@@ -99,25 +117,32 @@ export function reassignProblem(from: Job, to: Job): string | null {
 /**
  * Send up to `n` of a player's citizens from one job to another, wherever they are: each takes the nearest free node
  * of the new kind within `LABOR.reach` tiles (nodes with `SPREAD.perNode` workers are passed over). Food means berries,
- * then a free field, then meat nearby. Returns how many were moved and, if fewer than asked, why.
+ * then a free field, then meat nearby. Returns how many were moved and, if fewer than asked, why, and the citizens
+ * sent for food who found none of it (`stuck`: the caller may lay them a field, #344).
  */
-export function reassign(s: GameState, p: number, from: Job, to: Job, n: number): { moved: number; why: string | null } {
+export function reassign(s: GameState, p: number, from: Job, to: Job, n: number): { moved: number; why: string | null; stuck: Unit[] } {
   const bad = reassignProblem(from, to);
-  if (bad) return { moved: 0, why: bad };
+  if (bad) return { moved: 0, why: bad, stuck: [] };
   const want = Math.max(0, Math.min(LABOR.most, Math.floor(n)));
   const pool = sparest(s, p, from);
-  if (!pool.length) return { moved: 0, why: `No one is ${from === 'idle' ? 'idle' : `working ${from}`}` };
+  if (!pool.length) return { moved: 0, why: `No one is ${from === 'idle' ? 'idle' : `working ${from}`}`, stuck: [] };
   const load = new Map<number, number>();
   const busy = (i: number) => (load.get(i) ?? 0) >= SPREAD.perNode;
   const fields = new Set<number>();
   const pits = new Set<number>();
+  const lines = new Set<number>();
+  const ewes = new Set<number>();
   for (const e of s.ents) {
     if (e.kind === 'unit' && e.owner === p && e.hp > 0 && e.order.k === 'gather' && !pool.includes(e)) load.set(e.order.tile, (load.get(e.order.tile) ?? 0) + 1);
-    if (e.kind === 'unit' && e.owner === p && e.hp > 0 && e.order.k === 'farm' && !pool.includes(e)) fields.add(e.order.target);
+    // A field someone farms, or is still raising (they farm it once it stands, #344), is passed over.
+    if (e.kind === 'unit' && e.owner === p && e.hp > 0 && (e.order.k === 'farm' || e.order.k === 'build') && !pool.includes(e)) fields.add(e.order.target);
+    if (e.kind === 'unit' && e.owner === p && e.hp > 0 && e.order.k === 'snare' && !pool.includes(e)) lines.add(e.order.target);
+    if (e.kind === 'unit' && e.owner === p && e.hp > 0 && e.order.k === 'milk' && !pool.includes(e)) ewes.add(e.order.target);
   }
   const crew = to === 'build' ? sites(s, p, pool) : null;
-  if (crew && !crew.size) return { moved: 0, why: 'Nothing is being built' };
+  if (crew && !crew.size) return { moved: 0, why: 'Nothing is being built', stuck: [] };
   let moved = 0;
+  const stuck: Unit[] = [];
   for (const u of pool) {
     if (moved >= want) break;
     if (crew) {
@@ -125,7 +150,7 @@ export function reassign(s: GameState, p: number, from: Job, to: Job, n: number)
       if (!site || u.thrall || !canRaise(u.type, site.type, s.players[p].civ)) continue;
       const o = u.order;
       // Remember the work they leave, so they go back to it once the building stands (as when a builder is called over).
-      const back = o.k === 'gather' || o.k === 'farm' || o.k === 'snare' || o.k === 'shaft' ? { ...o, phase: 'go' as const } : null;
+      const back = o.k === 'gather' || o.k === 'farm' || o.k === 'snare' || o.k === 'shaft' || o.k === 'milk' ? { ...o, phase: 'go' as const } : null;
       giveOrder(u, { k: 'build', target: site.id });
       u.resume = back ?? u.resume;
       crew.set(site, crew.get(site)! + 1);
@@ -141,7 +166,21 @@ export function reassign(s: GameState, p: number, from: Job, to: Job, n: number)
       } else if (field) {
         fields.add(field.id);
         giveOrder(u, { k: 'farm', target: field.id, phase: 'go' });
-      } else continue;
+      } else {
+        // A people without fields (#344): a snare line nobody walks (the Britons, the Deep Wood), else a sheep in milk (a flock).
+        const snare = freeSnare(s, p, u.x, u.y, lines);
+        const ewe = snare ? null : milkable(s, p, u.x, u.y, LABOR.reach, undefined, ewes);
+        if (snare) {
+          lines.add(snare.id);
+          giveOrder(u, { k: 'snare', target: snare.id, phase: 'go' });
+        } else if (ewe) {
+          ewes.add(ewe.id);
+          giveOrder(u, { k: 'milk', target: ewe.id, phase: 'go' });
+        } else {
+          stuck.push(u);
+          continue;
+        }
+      }
     } else {
       const kind = KIND_OF_JOB[to]!;
       if (!canWork(s, u, kind)) continue;
@@ -162,6 +201,6 @@ export function reassign(s: GameState, p: number, from: Job, to: Job, n: number)
     }
     moved++;
   }
-  if (moved >= Math.min(want, pool.length)) return { moved, why: null };
-  return { moved, why: moved ? `Only ${moved} could reach ${to}` : `No free ${to} within reach` };
+  if (moved >= Math.min(want, pool.length)) return { moved, why: null, stuck };
+  return { moved, why: moved ? `Only ${moved} could reach ${to}` : `No free ${to} within reach`, stuck };
 }

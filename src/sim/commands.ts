@@ -1,5 +1,6 @@
-import { BUILDINGS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, SNARE, SPREAD, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
+import { AUTO_WORK, BUILDINGS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, SNARE, SPREAD, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
 import { peace } from './combat';
+import { findSpot } from './ai';
 import { placeProblem, stampBuilding, walkable } from './grid';
 import { buildingCostFor, raiseProblem, techCostFor, techProblem, trainCostFor } from './stats';
 import { packCamp, packProblem, pitchCamp, pitchProblem } from './steppe';
@@ -333,7 +334,20 @@ export function applyCommand(s: GameState, c: Command): void {
     }
     case 'reassign': {
       const r = reassign(s, c.p, c.from, c.to, c.n);
-      if (r.why) refuse(s, c.p, r.why);
+      // Hands sent for food where there is no bush, field, snare or ewe lay a field and raise it, rather than being refused (#344).
+      let laid = 0;
+      // Not while a field of theirs is still going up: another press waits for it rather than laying more.
+      const raising = s.ents.some((e) => e.kind === 'building' && e.owner === c.p && e.type === 'farm' && !e.built && e.hp > 0);
+      const ask = raising ? [] : r.stuck.slice(0, Math.min(AUTO_WORK.lay, Math.max(0, Math.floor(c.n)) - r.moved));
+      for (const u of ask) {
+        const spot = findSpot(s, 'farm', u.x, u.y, 2, AUTO_WORK.farm);
+        const b = spot && placeSite(s, c.p, 'farm', spot.tx, spot.ty, laid > 0);
+        if (!b) break;
+        assignBuilders(s, [u], b, false);
+        laid++;
+      }
+      if (r.why && !laid) refuse(s, c.p, r.why);
+      else if (r.why && laid < ask.length) refuse(s, c.p, `Laid ${laid} ${laid === 1 ? 'field' : 'fields'}; ${r.why.toLowerCase()}`);
       break;
     }
     case 'hunt': {
@@ -642,6 +656,11 @@ export function applyCommand(s: GameState, c: Command): void {
       s.events.push({ k: 'bell', owner: c.p, ring: c.ring });
       break;
     }
+    case 'shepherd': {
+      if (c.on) p.shepherd = true;
+      else delete p.shepherd;
+      break;
+    }
     case 'flee': {
       if (!c.ids) {
         if (c.on) delete p.noFlee;
@@ -784,7 +803,7 @@ export function applyCommand(s: GameState, c: Command): void {
       }
       break;
     case 'build': {
-      if (c.type === 'wall') return applyCommand(s, { t: 'wall', p: c.p, ids: c.ids, x0: c.tx, y0: c.ty, x1: c.tx, y1: c.ty, queue: c.queue });
+      if (c.type === 'wall' || c.type === 'dyke') return applyCommand(s, { t: 'wall', p: c.p, ids: c.ids, x0: c.tx, y0: c.ty, x1: c.tx, y1: c.ty, queue: c.queue, dyke: c.type === 'dyke' || undefined });
       const b = placeSite(s, c.p, c.type, c.tx, c.ty);
       if (!b) return;
       if (c.type === 'gate') {
@@ -796,12 +815,14 @@ export function applyCommand(s: GameState, c: Command): void {
       break;
     }
     case 'wall': {
+      // A line of wall, or of dykes (#701), laid the same way.
+      const type = c.dyke ? 'dyke' : 'wall';
       const tiles = wallLine(c.x0, c.y0, c.x1, c.y1);
       const placed: Building[] = [];
       for (let i = 0; i < tiles.length; i++) {
         const t = tiles[i];
-        if (placeProblem(s, 'wall', t.x, t.y)) continue;
-        const b = placeSite(s, c.p, 'wall', t.x, t.y, placed.length > 0);
+        if (placeProblem(s, type, t.x, t.y)) continue;
+        const b = placeSite(s, c.p, type, t.x, t.y, placed.length > 0);
         if (!b) break;
         // Which way the line runs here, for the model.
         const next = tiles[i + 1] ?? tiles[i - 1];

@@ -11,6 +11,24 @@ const out = process.argv[2] ?? 'test-results/look';
 const only = process.argv[3];
 mkdirSync(out, { recursive: true });
 
+const propsScene = (close) => ({ g, me }) => {
+    const p = g.players[me];
+    const y0 = p.startY + 4;
+    const x0 = p.startX - 8;
+    let id = 9000;
+    const at = (i, row) => ({ x: Math.floor(x0 + i * 2.2) + 0.5, y: Math.floor(y0 + row * 2.6) + 0.5 });
+    g.ruins = [{ ...at(0, 0), id: id++, find: 'hoard', dug: 0, by: -1 }, { ...at(1, 0), id: id++, find: 'lore', dug: 99, by: me }];
+    g.finds = [];
+    ['wreck', 'cairn', 'lick', 'meteor', 'shrine', 'stash'].forEach((kind, i) => {
+      g.finds.push({ ...at(i, 1), id: id++, kind, key: null, near: me, by: -1 });
+      g.finds.push({ ...at(i, 2), id: id++, kind, key: null, near: me, by: me });
+    });
+    g.relics.push({ id: id++, ...at(2, 0), carrier: 0, temple: 0 });
+    g.posts.push({ id: id++, ...at(4, 0) });
+    if (!close) g.landmarks = ['spring', 'crag', 'cairn', 'flint', 'grove', 'ford'].map((kind, i) => ({ ...at(i, 3), id: id++, kind, owner: i % 2 ? 1 - me : me, claim: 0, by: -1 }));
+    return close ? { x: x0 + 6, y: y0 + 3.6, zoom: 0.45 } : { x: x0 + 6, y: y0 + 4, zoom: 0.9 };
+};
+
 /** Each scene: its name, and a function run in the page against the live game (`g`, `ages`, `me` the player's id, `rv` the rival's). */
 const SCENES = [
   // A first minute: the town, its citizens, the woods and berries round it.
@@ -83,6 +101,9 @@ const SCENES = [
     for (let i = 0; i < 4; i++) ages.spawn(me, 'citizen', wx + 0.5 + (i % 2) * 0.9, wy + 0.5 + Math.floor(i / 2) * 0.9);
     return { x: wx + 1, y: wy + 1, zoom: 0.5 };
   }],
+  // The small props in a row on open ground (#625): ruins (standing and dug), finds (fresh and taken), relics, a trading post, landmarks.
+  ['props', propsScene(false)],
+  ['props-close', propsScene(true)],
   // The same town in the Stone and Bronze Ages (#625): the early silhouettes of houses, stores and barracks.
   ['stone-town', ({ g, ages, me }) => {
     ages.setEpoch(me, 0);

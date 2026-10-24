@@ -1096,6 +1096,40 @@ function tower(k: Kit, e: number, st: Style): void {
   banner(k, 0, 2.6, 0, 0.8, 0.8);
 }
 
+/**
+ * The tower line (`TOWER_LEVELS`): what each step adds round any epoch's tower, so a raised tower reads at a glance.
+ * Guard Tower: a timber gallery (hoarding) braced out from the shaft. Keep: a stone skirt and four corner buttresses.
+ * Bastion: a low, wide, eight-sided gun platform with a cannon at each face.
+ */
+function towerLevel(k: Kit, level: number): void {
+  if (level >= 1) {
+    k.box(1.5, 0.26, 1.5, WOOD, 0, 1.22, 0);
+    k.box(1.56, 0.05, 1.56, '#5e4128', 0, 1.48, 0);
+    for (const [x, z] of [[-0.62, -0.62], [0.62, -0.62], [-0.62, 0.62], [0.62, 0.62]]) {
+      const strut = k.box(0.06, 0.5, 0.06, '#5e4128', x * 0.85, 0.82, z * 0.85);
+      strut.rotation.z = x > 0 ? -0.5 : 0.5;
+    }
+    k.team(k.box(1.52, 0.06, 1.52, TEAM, 0, 1.3, 0));
+  }
+  if (level >= 2) {
+    k.box(1.6, 0.5, 1.6, STONE, 0, 0, 0);
+    k.box(1.68, 0.06, 1.68, '#8f897f', 0, 0.5, 0);
+    // Merlons along the skirt's edge, and a buttress at each corner.
+    for (const t of [-0.5, -0.17, 0.17, 0.5]) for (const [x, z] of [[t, 0.76], [t, -0.76], [0.76, t], [-0.76, t]]) k.box(0.14, 0.16, 0.14, STONE, x, 0.56, z);
+    for (const [x, z] of [[-0.74, -0.74], [0.74, -0.74], [-0.74, 0.74], [0.74, 0.74]]) k.box(0.3, 1.15, 0.3, STONE, x, 0, z);
+  }
+  if (level >= 3) {
+    // Star-fort points: an angled bastion at each corner, a cannon in each looking out along the diagonal.
+    for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      k.box(0.62, 0.42, 0.62, '#7d776d', x * 0.62, 0, z * 0.62).rotation.y = Math.PI / 4;
+      k.box(0.66, 0.05, 0.66, '#a59f94', x * 0.62, 0.42, z * 0.62).rotation.y = Math.PI / 4;
+      const gun = k.cyl(0.05, 0.07, 0.42, 6, IRON_DARK, x * 0.78, 0.55, z * 0.78);
+      gun.rotation.order = 'YXZ';
+      gun.rotation.set(Math.PI / 2, Math.atan2(x, z), 0);
+    }
+  }
+}
+
 // ---- Forge -----------------------------------------------------------------------------------------
 
 function anvil(k: Kit, x: number, z: number): void {
@@ -1555,6 +1589,78 @@ function wall(k: Kit, e: number, st: Style, mask: number): void {
   }
 }
 
+/**
+ * A dyke (#701): a bank of earth rising out of the water, faced with stone at the water line, turfed, with a path along its crown that
+ * runs on to the neighbouring dykes (`mask`, as a wall's). Drawn from well below the water so it stands up out of any depth.
+ */
+function dyke(k: Kit, mask: number): void {
+  const EARTH = '#6e5a3e';
+  const TURF = '#6f8a45';
+  // The bank, battered: broad below, narrower toward the crown.
+  k.box(1.02, 0.95, 1.02, EARTH, 0, -0.95, 0);
+  k.box(1.0, 0.16, 1.0, '#8d877b', 0, -0.13, 0);
+  for (let i = 0; i < 6; i++) k.rock(0.07 + rnd(i, mask, 5) * 0.04, '#9d978d', -0.42 + i * 0.17, 0.0, (i % 2 ? 1 : -1) * 0.46);
+  k.box(0.9, 0.16, 0.9, EARTH, 0, 0.03, 0);
+  k.box(0.72, 0.12, 0.72, TURF, 0, 0.19, 0);
+  // The crown path, out along each arm that meets another dyke (or a stub where it meets none).
+  k.box(0.26, 0.03, 0.26, '#c8b88e', 0, 0.31, 0);
+  for (const [bit, dx, dz] of ARMS) {
+    if (!(mask & bit)) continue;
+    k.box(Math.abs(dx) * 0.5 + Math.abs(dz) * 0.72, 0.12, Math.abs(dz) * 0.5 + Math.abs(dx) * 0.72, TURF, dx * 0.25, 0.19, dz * 0.25);
+    k.box(Math.abs(dx) * 0.5 + 0.02 + Math.abs(dz) * 0.24, 0.03, Math.abs(dz) * 0.5 + 0.02 + Math.abs(dx) * 0.24, '#c8b88e', dx * 0.25, 0.31, dz * 0.25);
+  }
+  // A stone crown post and the owner's colour on it.
+  k.box(0.12, 0.18, 0.12, STONE, 0.28, 0.31, 0.28);
+  k.team(k.box(0.13, 0.05, 0.13, TEAM, 0.28, 0.44, 0.28));
+}
+
+/** A windmill (#701): a thatched smock mill on a brick base with a reefing stage, its cap turned to the wind. The sails turn on their own (`windmillSails`). */
+function windmill(k: Kit, _e: number, st: Style): void {
+  pad(k, 2, st.base);
+  k.cyl(0.78, 0.82, 0.42, 8, '#9a5a42', 0, 0, 0);
+  k.cyl(0.5, 0.72, 1.7, 8, '#6b5a3c', 0, 0.42, 0);
+  // The thatch in courses.
+  for (const y of [0.85, 1.35, 1.8]) k.cyl(0.72 - (y - 0.42) * 0.13, 0.72 - (y - 0.42) * 0.13 + 0.01, 0.04, 8, '#5a4a30', 0, y, 0);
+  // The reefing stage, on brackets.
+  k.cyl(1.0, 1.0, 0.05, 12, '#7a5636', 0, 0.82, 0);
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    k.cyl(0.012, 0.012, 0.24, 3, '#5b4330', Math.cos(a) * 0.97, 0.87, Math.sin(a) * 0.97);
+  }
+  k.ring(0.97, 0.012, '#5b4330', 1.1);
+  k.box(0.28, 0.42, 0.04, '#3a2b20', 0, 0.0, 0.8);
+  window(k, st, 0, 1.35, 0.62, 0.1, 0.13, true);
+  // The cap, boat-shaped, with its tail pole to turn it to the wind.
+  const cap = k.prism(0.8, 0.42, 1.0, '#3d3a36', 0, 2.12, -0.05);
+  cap.rotation.y = Math.PI / 2;
+  k.box(0.06, 0.06, 2.24, '#5b4330', 0, 1.07, -0.95).rotation.x = -1.107;
+  k.cyl(0.1, 0.1, 0.25, 8, '#5b4330', 0, 2.32, 0.42).rotation.x = Math.PI / 2;
+}
+
+/** A windmill's sails (#701): four lattice blades with white cloth, centred on the hub and turning about z. */
+export function windmillSails(): THREE.BufferGeometry {
+  const key = 'windmillSails';
+  let g = cache.get(key);
+  if (!g) {
+    const k = new Kit();
+    k.cyl(0.11, 0.11, 0.16, 8, '#4a3426', 0, -0.08, 0).rotation.x = Math.PI / 2;
+    for (let i = 0; i < 4; i++) {
+      const arm = k.group();
+      arm.rotation.z = (i * Math.PI) / 2;
+      k.box(0.07, 1.55, 0.05, '#5b4330', 0, 0.05, 0.06, arm);
+      k.box(0.3, 1.15, 0.015, '#efe8d8', 0.17, 0.42, 0.08, arm);
+      for (let j = 0; j < 6; j++) k.box(0.34, 0.025, 0.03, '#6b4b2f', 0.17, 0.44 + j * 0.2, 0.09, arm);
+      k.box(0.02, 1.15, 0.03, '#6b4b2f', 0.33, 0.42, 0.09, arm);
+    }
+    g = bake(k.root);
+    cache.set(key, g);
+  }
+  return g;
+}
+
+/** Where a windmill's sails hang, in its model's space. */
+export const SAIL_HUB = { y: 2.32, z: 0.6 };
+
 function gate(k: Kit, e: number, st: Style): void {
   // Two towers either side of a passage along z, with doors standing open for friends.
   const c = e === 0 ? '#7a5636' : e === 1 ? st.wall : STONE;
@@ -1753,7 +1859,7 @@ function ironTower(k: Kit, st: Style): void {
 /** The original four dressed ages, kept as the baseline model regression set. */
 export const LOOK_AGES: AgeId[] = ['merchant', 'iron', 'pilgrim', 'fair'];
 /** All dressed ages; additions get their own model coverage beside the baseline set. */
-export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer', 'sail', 'aeronaut', 'lightning', 'warband', 'ironblood', 'totalwar', 'steppe', 'horde', 'silk', 'hemocraft', 'bloodrite'];
+export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer', 'sail', 'aeronaut', 'lightning', 'warband', 'ironblood', 'totalwar', 'steppe', 'horde', 'silk', 'hemocraft', 'bloodrite', 'golden'];
 
 const SAIL = '#efe8d4';
 const NET = '#b9ad8a';
@@ -1777,6 +1883,9 @@ const CLOTH = ['#d94a3c', '#e8b43a', '#3f8fc4', '#8a4fa8'];
 const RUST = '#8a4a2c';
 const COPPER = '#c27a3e';
 const PALE = '#e9e4d6';
+const GILT = '#e2b440';
+const GILT_DARK = '#a8781e';
+const GLINT = '#fff1b8';
 
 /** A slanted awning over a front: alternate bright strips. */
 function awning(k: Kit, x: number, y: number, z: number, w: number, strips: number, a = 0): void {
@@ -2045,6 +2154,29 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
       }
       break;
     }
+    case 'golden': {
+      // The Golden Age (#703): gilt domes and spires over the great buildings, a gold band and a glowing finial on the rest, so a
+      // rival can see a golden town from across the map, and see the gilt go when it ends.
+      if (['towncenter', 'temple', 'market', 'wonder'].includes(type)) {
+        const r = type === 'wonder' ? 1.1 : big ? 0.85 : 0.6;
+        const h = type === 'wonder' ? 3.6 : big ? 2.75 : 2.15;
+        k.cyl(r * 0.95, r, 0.22, 10, GILT_DARK, 0, h - 0.22, 0);
+        k.dome(r, GILT, 0, h, 0);
+        k.cyl(0.03, 0.05, 0.55, 5, GILT, 0, h + r * 0.85, 0);
+        k.glow(k.octa(0.11, GLINT, 0, h + r * 0.85 + 0.62, 0));
+        for (const x of [-r * 1.6, r * 1.6]) {
+          k.cyl(0.035, 0.035, h * 0.85, 5, GILT_DARK, x, 0, r * 1.4);
+          k.box(0.34, 0.5, 0.025, GILT, x + 0.18, h * 0.6, r * 1.4);
+        }
+      } else if (['house', 'barracks', 'range', 'stable', 'workshop', 'forge', 'storehouse', 'dock', 'mill', 'tower'].includes(type)) {
+        const span = type === 'house' ? 0.62 : type === 'tower' ? 0.5 : 1.05;
+        const h = type === 'tower' ? 2.4 : type === 'house' ? 1.15 : 1.55;
+        k.box(span * 2 + 0.06, 0.08, 0.05, GILT, 0, h * 0.62, span + 0.02);
+        k.cyl(0.02, 0.03, 0.4, 4, GILT_DARK, span * 0.6, h, 0);
+        k.glow(k.octa(0.06, GLINT, span * 0.6, h + 0.45, 0));
+      }
+      break;
+    }
     case 'reclaimer': {
       // Salvaged stone columns and timber braces: old fragments become a working town.
       if (['towncenter', 'storehouse', 'forge', 'house', 'wonder'].includes(type)) {
@@ -2160,9 +2292,9 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
   }
 }
 
-const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft'>, (k: Kit, e: number, st: Style) => void> = {
+const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke'>, (k: Kit, e: number, st: Style) => void> = {
   sapling: (k, e) => sapling(k, e),
-  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo,
+  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, windmill,
 };
 
 const cache = new Map<string, THREE.BufferGeometry>();
@@ -2334,7 +2466,7 @@ const ROOFS: Partial<Record<BuildingType, [string, string]>> = {
 };
 
 /** No plinth or pennant: open or thin pieces, and buildings that already carry their own standards. */
-const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder'];
+const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder', 'dyke'];
 
 function roleStyle(type: BuildingType, epoch: number, st: Style): Style {
   const r = ROOFS[type];
@@ -2367,9 +2499,12 @@ export function buildingGeometry(type: BuildingType, epochIn: number, color: str
   if (!g) {
     const k = new Kit();
     if (type === 'wall') wall(k, epoch, STYLES[Math.min(epoch, 4)], variant);
+    else if (type === 'dyke') dyke(k, variant);
     else if (type === 'snare') snare(k, epoch, variant === 1);
     else if (type === 'shaft') shaft(k, epoch, roleStyle(type, epoch, STYLES[Math.min(epoch, 4)]), variant);
     else MAKERS[type](k, epoch, roleStyle(type, epoch, STYLES[Math.min(epoch, 4)]));
+    // A Watch Tower's `variant` is its step on the tower line.
+    if (type === 'tower' && variant) towerLevel(k, variant);
     if (!BARE.includes(type)) teamMarks(k, type);
     const stack = STACKS[type];
     if (epoch >= 4 && stack) smokestack(k, stack[0], stack[1], stack[2]);

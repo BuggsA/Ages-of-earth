@@ -7,6 +7,7 @@ import { spoilsStep } from './spoils';
 import { missionStep } from './missions';
 import { raiseCamps } from './steppe';
 import { giftFlock, sheepStep } from './flocks';
+import { tendFlocks } from './shepherd';
 import { faithStep } from './consecrate';
 import { turnSeason } from './seasons';
 import { markHomeHerds, turnYear } from './year';
@@ -16,7 +17,7 @@ import { markGoals, scenarioStep, startScenario } from './campaign';
 import { buildingGuns, updateShots } from './combat';
 import { fleeStep } from './flee';
 import { applyCommand } from './commands';
-import { AGES, AURA, AUTO_WORK, unitEpoch, CIV_IDS, HEART, LANDMARKS, RAIDER, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, TOWER_LEVELS, WONDER_SECONDS, secs } from './data';
+import { AGES, AURA, AUTO_WORK, TICK_HZ, unitEpoch, CIV_IDS, HEART, LANDMARKS, RAIDER, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, TOWER_LEVELS, WONDER_SECONDS, secs } from './data';
 import { AIR, NAVAL, stampBuilding } from './grid';
 import { denWolves, generateMap } from './mapgen';
 import { Spatial } from './spatial';
@@ -30,6 +31,7 @@ import { reclaimStep, remember } from './reclaim';
 import { leaveRubble, salvageStep } from './salvage';
 import { cacheStep, dropOre, spillStore } from './caches';
 import { kegStep, millStep } from './powder';
+import { pumpStep } from './water';
 import { siloStep } from './silo';
 import { stockPosts } from './oretrade';
 import { sortieStep } from './sortie';
@@ -47,7 +49,7 @@ import { longbowStep } from './longbow';
 import { seraiStep, tollStep } from './passage';
 import { mercStep } from './merc';
 import { FINDS, KIN, NOMAD } from './data';
-import { ageOf, chartLand, isHire, barred, journeyOf, markKeepsake, noteWalked, trainsAt, workSteps } from './ages';
+import { ageOf, goldenEnds, threadsOf, chartLand, isHire, barred, journeyOf, markKeepsake, noteWalked, trainsAt, workSteps } from './ages';
 import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, HomelandId, MapSize, MapType, Player, UnitType } from './types';
 import { RARES, RES, R_FISH, R_NONE } from './types';
 import { legionKind, legionary } from './legion';
@@ -71,6 +73,8 @@ export interface PlayerSetup {
   team?: number;
   /** A civilization, or left out for one picked by the seed. */
   civ?: CivId;
+  /** The flock tends itself (`SHEPHERD`): lambs, milking and slaughter without a click. For a person's people. */
+  shepherd?: true;
 }
 
 export interface GameSetup {
@@ -155,6 +159,7 @@ export function createGame(setup: GameSetup): GameState {
       color: ps.color ?? PLAYER_COLORS[i % PLAYER_COLORS.length],
       civ: ps.civ ?? CIV_IDS[(setup.seed + i * 7919) % CIV_IDS.length],
       ai: ps.ai,
+      ...(ps.shepherd && !ps.ai ? { shepherd: true as const } : {}),
       team: ps.team ?? i,
       res: mode === 'deathmatch' ? { ...DEATHMATCH_RES } : { food: START_RES.food + extra.food, wood: START_RES.wood + extra.wood, stone: START_RES.stone + extra.stone, gold: START_RES.gold + extra.gold },
       epoch: startEpoch,
@@ -292,6 +297,33 @@ export function enterAge(s: GameState, p: Player, to: AgeId, back = false): void
     e.queue = keep;
   }
   s.events.push({ k: 'epoch', owner: p.id, epoch: p.epoch, age: to, ...(back ? { back: true } : {}) });
+  // The Golden Age (#703): its clock starts, and every people hears of it, with the hour it ends.
+  if (AGES[to].golden && !AGES[from].golden) {
+    p.goldenAt = s.tick;
+    s.events.push({ k: 'golden', owner: p.id, threads: threadsOf(p), ends: goldenEnds(p)! });
+  } else if (AGES[from].golden && !AGES[to].golden) {
+    delete p.goldenAt;
+    s.events.push({ k: 'golden', owner: p.id, threads: [], ends: s.tick, over: true });
+  }
+}
+
+/** Once a second (#703): a Golden Age whose span has run out ends, and its people wakes in the Gunpowder Age. In id order. */
+export function goldenStep(s: GameState): void {
+  if (s.tick % TICK_HZ !== 0) return;
+  for (const p of s.players) {
+    const ends = goldenEnds(p);
+    if (ends === undefined || s.tick < ends) continue;
+    // A journey under way at a Town Center stands down, its price given back: the road it was on is gone.
+    for (const b of s.ents) {
+      if (b.kind !== 'building' || b.owner !== p.id || b.advance < 0) continue;
+      const road = journeyOf(p, b);
+      if (road) refund(p, road.cost);
+      b.advance = -1;
+      delete b.advanceTo;
+      delete b.back;
+    }
+    enterAge(s, p, 'gunpowder');
+  }
 }
 
 function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
@@ -510,7 +542,7 @@ function checkVictory(s: GameState): void {
     // Fields, snares and walls alone don't keep a people alive, nor do unarmed boats (fishing boats, merchant
     // ships): none of them can build or fight, so a people down to them can never come back, and a rival
     // at its population cap with no fleet could never sink them.
-    const alive = s.ents.some((e) => e.owner === p.id && e.hp > 0 && !(e.kind === 'building' && (e.type === 'farm' || e.type === 'wall' || e.type === 'gate' || e.type === 'snare' || e.type === 'sapling')) && !(e.kind === 'unit' && (e.type === 'fisher' || e.type === 'cog')));
+    const alive = s.ents.some((e) => e.owner === p.id && e.hp > 0 && !(e.kind === 'building' && (e.type === 'farm' || e.type === 'wall' || e.type === 'gate' || e.type === 'dyke' || e.type === 'snare' || e.type === 'sapling')) && !(e.kind === 'unit' && (e.type === 'fisher' || e.type === 'cog')));
     if (alive) continue;
     p.defeated = true;
     for (const e of s.ents) if (e.owner === p.id) e.hp = 0;
@@ -573,6 +605,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   routeUnits(s);
   for (const e of s.ents) if (e.kind === 'unit' && e.hp > 0 && !e.inside) walk(s, e);
   updateAnimals(s, sp, (a) => sheepStep(s, sp, a));
+  tendFlocks(s);
   turnSeason(s);
   turnYear(s);
   fillSnares(s);
@@ -595,6 +628,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   cacheStep(s);
   millStep(s);
   kegStep(s);
+  pumpStep(s);
   siloStep(s);
   sortieStep(s);
   fairStep(s);
@@ -609,6 +643,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   seraiStep(s);
   workStep(s);
   beaconStep(s);
+  goldenStep(s);
   warCampStep(s);
   missionStep(s);
   spoilsStep(s);
@@ -669,6 +704,8 @@ export function checksum(s: GameState): number {
     mix(r.dug);
     mix(r.by);
   }
+  // The water layer (#701): every tile pumped out, by where it lies.
+  if (s.polder) for (let i = 0; i < s.polder.length; i++) if (s.polder[i]) mix(i);
   for (const f of s.fallen ?? []) {
     mix(f.owner);
     mix(f.tx);

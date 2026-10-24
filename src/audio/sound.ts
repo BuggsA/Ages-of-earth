@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'tideTurns' | 'tame';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'tideTurns' | 'golden' | 'pump' | 'tame';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -123,7 +123,7 @@ export class Sound {
     'click', 'menuHover', 'open', 'select', 'selectBuilding', 'move', 'attack', 'strike', 'thud', 'hit', 'hitBuilding', 'bow', 'sling', 'musket', 'fall',
     'collapse', 'built', 'place', 'ready', 'readyCitizen', 'chop', 'mine', 'hammer', 'rustle', 'epoch', 'alert', 'victory', 'defeat', 'error', 'coin', 'queue',
     'catapult', 'cannon', 'impact', 'spear', 'chant', 'convert', 'heal', 'townBell', 'allClear', 'research', 'wonder', 'wonderRising', 'shelter',
-    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind', 'thunder', 'owl', 'caw', 'gull', 'cricket', 'frog', 'birdsong', 'greatWork', 'beacon', 'rally', 'mammoth', 'howl', 'snarl', 'landmarkTaken', 'landmarkLost', 'consecrate', 'heirloom', 'zap', 'coilHum', 'heroFall', 'callUp', 'tribute', 'caravanBells', 'toll', 'wayHunters', 'wayHearth', 'wayWarband', 'blood', 'graft', 'crash', 'drain', 'sacrifice', 'curse', 'shackle', 'thrall', 'unshackle', 'sighting', 'dawn',
+    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind', 'thunder', 'owl', 'caw', 'gull', 'cricket', 'frog', 'birdsong', 'greatWork', 'beacon', 'rally', 'mammoth', 'howl', 'snarl', 'landmarkTaken', 'landmarkLost', 'consecrate', 'heirloom', 'zap', 'coilHum', 'heroFall', 'callUp', 'tribute', 'caravanBells', 'toll', 'wayHunters', 'wayHearth', 'wayWarband', 'blood', 'graft', 'crash', 'drain', 'sacrifice', 'curse', 'shackle', 'thrall', 'unshackle', 'sighting', 'dawn', 'golden',
   ];
 
   /**
@@ -475,6 +475,14 @@ export class Sound {
         this.tone(out, t + 1.2, { f: N.E4, dur: 4, peak: 0.04, attack: 1.8, lp: 900 });
         [N.G5, N.C6, N.E6, N.G6].forEach((f, i) => this.bell(out, t + 2.2 + i * 0.22, f, 1.8, 0.04));
         break;
+      case 'golden':
+        // A Golden Age (#703): a warm pad swells under the epoch's brass, climbing a full octave, and a long shower of bells falls through it.
+        this.tone(out, t, { f: N.C3, dur: 4.5, peak: 0.06, attack: 1.2, lp: 700 });
+        this.tone(out, t + 0.2, { f: N.G3, dur: 4.2, peak: 0.05, attack: 1.2, lp: 800 });
+        [N.C4, N.E4, N.G4, N.C5].forEach((f, i) => this.brass(out, t + i * 0.28, f, 1.6 - i * 0.2, 0.065));
+        for (const f of [N.E5, N.G5, N.C5]) this.brass(out, t + 1.2, f, 1.8, 0.05);
+        [N.C6, N.G6, N.E6, N.C6, N.G5, N.E6, N.G6, N.C6].forEach((f, i) => this.bell(out, t + 1.3 + i * 0.13, f, 1.6, 0.045));
+        break;
       case 'heirloom':
         // A slow peal from the new craft: a low bronze bell, then a falling change of three over its hum.
         this.bell(out, t, N.C4, 2.2, 0.08);
@@ -739,6 +747,14 @@ export class Sound {
         this.noise(out, t, { dur: 0.18, filter: 'bandpass', f: 520, q: 1.5, peak: 0.07 });
         for (let i = 0; i < 6; i++) this.tone(out, t + 0.08 + i * 0.055 + (i % 2) * 0.02, { f: 2100 - i * 170, to: 1500 - i * 120, dur: 0.045, peak: 0.045 - i * 0.005 });
         this.noise(out, t + 0.1, { dur: 0.5, filter: 'bandpass', f: 3200, q: 1.1, peak: 0.025, attack: 0.05 });
+        break;
+      case 'pump':
+        // A windmill pumps a tile of the bay dry (#701): the sails' wooden creak as the scoop wheel turns, then the water
+        // running out through the sluice, a rushing hiss that falls away.
+        this.tone(out, t, { f: 92, to: 78, type: 'triangle', dur: 0.55, peak: 0.035, attack: 0.12, lp: 500 });
+        this.noise(out, t + 0.05, { dur: 0.35, filter: 'bandpass', f: 1250, to: 900, q: 6, peak: 0.018, attack: 0.08 });
+        this.noise(out, t + 0.35, { dur: 1.4, filter: 'bandpass', f: 2600, to: 700, q: 0.7, peak: 0.045, attack: 0.25 });
+        this.noise(out, t + 0.4, { dur: 1.1, filter: 'lowpass', f: 420, to: 220, q: 0.9, peak: 0.04, attack: 0.2 });
         break;
       case 'kegGround':
         // A keg ground at the mills (#577): a millstone's rumble, the scrape of the scoop, a bung knocked home with a mallet.

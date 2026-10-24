@@ -4,6 +4,7 @@
  */
 
 import type { ScenarioRun } from './campaign';
+import type { DykePlan } from './water';
 
 export type Res = 'food' | 'wood' | 'stone' | 'gold';
 export const RES: readonly Res[] = ['food', 'wood', 'stone', 'gold'];
@@ -21,7 +22,7 @@ export type UnitType =
 export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
   | 'towncenter' | 'house' | 'storehouse' | 'farm' | 'barracks' | 'range' | 'stable' | 'tower'
-  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai' | 'drainrig' | 'transfusion' | 'bloodtower' | 'snare' | 'prospector' | 'mission' | 'silo' | 'sapling' | 'shaft' | 'den';
+  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai' | 'drainrig' | 'transfusion' | 'bloodtower' | 'snare' | 'prospector' | 'mission' | 'silo' | 'sapling' | 'shaft' | 'dyke' | 'windmill' | 'den';
 /** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
 export type Difficulty = 'gentle' | 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
@@ -41,7 +42,7 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'chart' | 'assay' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'wild';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
 export type PathId = 'blood' | 'steppe' | 'hemocraft' | 'rite';
@@ -306,6 +307,8 @@ export interface Building {
   keep?: AgeId;
   /** A Watch Tower's step on the tower line (`TOWER_LEVELS`): 1 Guard Tower, 2 Keep, 3 Bastion. Absent: a plain Watch Tower (and older saves). */
   level?: number;
+  /** A Windmill (#701): the tick it last pumped a tile dry, so its sails show it at work. Absent: it never has. */
+  pumped?: number;
   /** Where new units go. `kind` is the resource the flag was set on (absent on bare ground), so it outlives its tile (#344). */
   rally: { x: number; y: number; tile: number; kind?: number } | null;
   cool: number;
@@ -640,6 +643,8 @@ export interface PlayerStats {
   relicGold?: number;
   /** Gold paid in tithes by Missions (#555 s12). */
   tithe?: number;
+  /** Tiles of water pumped out into polder (#701). */
+  drained?: number;
   /** Fish landed by boats (the Age of Sail's deed); absent in older saves. */
   fished?: number;
   /** Beacons lit on the people's towers, relays included (the Age of Lightning's deed, #231); absent in older saves. */
@@ -728,6 +733,8 @@ export interface Player {
   left?: true;
   /** Citizens stand their ground instead of running from danger (see `FLEE`); absent means they run. */
   noFlee?: true;
+  /** The flock tends itself (see `SHEPHERD`); set at the start of a game for a person's people, absent means by hand. */
+  shepherd?: true;
   team: number;
   res: Stock;
   /** Blood in store (#355): drawn at Drain Rigs from the enemy dead and by the levy; absent until the first drop. */
@@ -770,6 +777,8 @@ export interface Player {
   told?: TidingId[];
   /** Tick its last step back (#47) landed, for the cooldown; absent if it never stepped back. */
   backAt?: number;
+  /** The tick the people's Golden Age began (#703); gone once it ends. */
+  goldenAt?: number;
   techs: TechId[];
   /**
    * Researched, but above the tier a step back (#47) took the people down to: idle until they climb
@@ -855,6 +864,8 @@ export type GameEvent =
   | { k: 'regrown'; tile: number }
   /** The Shore's spring (#482): the shoals left grew by `grew` fish in all, and `seeded` new shoals were laid. */
   | { k: 'spawned'; grew: number; seeded: number }
+  /** A windmill pumped a tile of water out into polder (#701): `mill` is the windmill, `tile` the new land. */
+  | { k: 'drained'; owner: number; mill: number; tile: number; x: number; y: number }
   | { k: 'season'; i: number }
   /** A payday for hired swords (the Age of Merchants): how many went unpaid, and how many of those walked off. */
   | { k: 'wages'; owner: number; late: number; gone: number }
@@ -876,6 +887,8 @@ export type GameEvent =
   | { k: 'graft'; owner: number; id: number; x: number; y: number; how: 'made' | 'crash' }
   /** A people left an age (#555 s11): this building, its keepsake, keeps that age's work. */
   | { k: 'keepsake'; owner: number; id: number; age: AgeId; x: number; y: number }
+  /** A Golden Age begins (#703), told to every people: the ages it weaves, and the tick it ends. Or it ends (`over`). */
+  | { k: 'golden'; owner: number; threads: AgeId[]; ends: number; over?: boolean }
   /** A War Camp left without its soldiers (#303): it burns after a grace, or at once if its people left the path (`struck`). */
   /** Citizens called up at a War Camp (#313): each became the foot soldier `id` where it stood. */
   | { k: 'callUp'; owner: number; camp: number; ids: number[]; x: number; y: number }
@@ -965,6 +978,11 @@ export interface GameState {
   gateTeam: Int8Array;
   /** Bumped whenever a tile's walkability changes, so cached distance fields know to refresh. */
   blockVersion: number;
+  /**
+   * The water layer (#701, the Water Road): per tile, 1 where water was pumped out into polder (now land, `T_GRASS`). Absent until the
+   * first tile drains (and in older saves); `water.ts` reads and writes it.
+   */
+  polder?: Uint8Array;
   players: Player[];
   /** Every unit and building, in the order they were made (ids rise). */
   ents: Ent[];
@@ -1091,6 +1109,11 @@ export interface AiMemory {
   zap?: number;
   /** When it began holding the Middle Ages to dig saltpetre for Alchemy (#577). */
   powder?: number;
+  /**
+   * The Water Road (#701): the dyke it means to raise by home (null: none worth it), found once; when it began holding the Middle
+   * Ages for the road's Dock, and since when it has stood in the Age of Dykes.
+   */
+  dyke?: { plan: DykePlan | null; looked?: boolean; hold?: number; since?: number };
   /** The first crossing (#585): the age it stands in on the way to the Sea-Raiders, and since when (each sibling, and the age itself). */
   sea?: { at: AgeId; since: number };
   /** Tick it last tried to raise a Mission (#555 s12). */
@@ -1143,7 +1166,7 @@ export type Command =
   | ({ t: 'work'; p: number; ids: number[]; target: number } & Queued)
   | ({ t: 'build'; p: number; ids: number[]; type: BuildingType; tx: number; ty: number } & Queued)
   /** A line of wall from one tile to another (gates go in with `type: 'gate'` one at a time). */
-  | ({ t: 'wall'; p: number; ids: number[]; x0: number; y0: number; x1: number; y1: number } & Queued)
+  | ({ t: 'wall'; p: number; ids: number[]; x0: number; y0: number; x1: number; y1: number; /** A line of dykes (#701) rather than wall. */ dyke?: boolean } & Queued)
   | ({ t: 'hunt'; p: number; ids: number[]; target: number } & Queued)
   | ({ t: 'convert'; p: number; ids: number[]; target: number; rite?: 'sacrifice' | 'curse' } & Queued)
   | ({ t: 'garrison'; p: number; ids: number[]; target: number } & Queued)
@@ -1159,6 +1182,8 @@ export type Command =
   | { t: 'bell'; p: number; ring: boolean }
   /** Citizens run from danger (or not): the named citizens, or all of this player's when `ids` is absent. */
   | { t: 'flee'; p: number; on: boolean; ids?: number[] }
+  /** A person's flock is tended on its own (or not). */
+  | { t: 'shepherd'; p: number; on: boolean }
   | { t: 'beacon'; p: number; building: number }
   /** Choose the seam a Mine Shaft digs (#681). */
   | { t: 'seam'; p: number; building: number; seam: SeamId }

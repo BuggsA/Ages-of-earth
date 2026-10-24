@@ -63,7 +63,7 @@ export interface Selection {
   /** The building whose rally point to show. */
   rallyOf: number | null;
   /** A line of wall being laid out. */
-  wall: { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean } | null;
+  wall: { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean; type: 'wall' | 'dyke' } | null;
   /** Personal notes visible only in this browser. */
   scoutFlags: readonly ScoutFlag[];
 }
@@ -458,6 +458,8 @@ export class View {
     this.hemi.intensity = this.baseHemi + this.flash * 2.2;
     this.sun.intensity = this.baseSun + this.flash * 1.5;
 
+    // The water layer (#701): ground pumped out of the water rises from it, and the shore's foam follows.
+    if (this.terrain.sync(s, dt)) this.water.refreshBed(s, (i) => this.terrain.heightOf(i));
     this.resources.update(s, dt);
     this.buildings.update(s, this.viewer, (b) => this.reveal || seesRect(s, this.viewer, b.tx, b.ty, b.size), dt, this.reveal);
     this.units.update(s, alpha, dt, this.time, this.visibleUnit, this.rig.camera, this.width, this.height, (x, y) => this.sees(x, y));
@@ -699,7 +701,7 @@ export class View {
     this.overlays.setBars(bars, this.rig.camera);
     const p = s.players[this.viewer];
     this.overlays.setGhost(s, sel.ghost ? { ...sel.ghost, epoch: p.epoch, color: p.color } : null);
-    this.overlays.setWallGhost(s, sel.wall?.tiles ?? [], p.epoch, p.color, sel.wall?.alongY ?? false);
+    this.overlays.setWallGhost(s, sel.wall?.tiles ?? [], p.epoch, p.color, sel.wall?.alongY ?? false, sel.wall?.type);
     const rb = sel.rallyOf ? s.byId.get(sel.rallyOf) : undefined;
     this.overlays.setFlag(s, rb && rb.kind === 'building' && rb.rally ? rb.rally : null, p.color, this.time);
     this.overlays.setScoutFlags(s, sel.scoutFlags, this.time);
@@ -995,6 +997,11 @@ export class View {
           this.effects.burst(this.ground(s, ev.x, ev.y, 0.1), { count: 5, speed: 0.6, up: 0.4, life: 0.8, size: 0.05, grow: 1.8, gravity: -0.1, drag: 1.5, soft: true, colors: ['#bba98a', '#d6c7aa'] });
           this.resources.markDirty();
           break;
+        case 'raised':
+          // The tower line: a tower raised a step shakes off a puff of mortar dust as its new walls go up.
+          if (ev.owner === this.viewer) this.onCue?.('research', 0, 1);
+          if (this.sees(ev.x, ev.y)) this.effects.burst(this.ground(s, ev.x, ev.y, 1.2), { count: 14, speed: 1.2, up: 0.6, life: 1, size: 0.08, grow: 1.6, gravity: -0.2, drag: 1.5, soft: true, colors: ['#bdb6a8', '#d8d1c2', '#9d978d'] });
+          break;
         case 'researched':
           if (ev.owner === this.viewer) this.onCue?.('research', 0, 1);
           break;
@@ -1247,6 +1254,14 @@ export class View {
         case 'spawned':
           this.resources.markDirty();
           break;
+        case 'drained': {
+          // A tile of the bay pumped dry (#701): the shoal on it is gone, a spurt of muddy water, the mill's creak and the water running out.
+          this.resources.markDirty();
+          if (!this.sees(ev.x, ev.y)) break;
+          this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.06, ev.y), { count: 6, speed: 0.7, up: 0.9, life: 0.8, size: 0.05, gravity: 3, colors: ['#8a7d5c', '#b8c8c4', '#6f6650'] });
+          this.cue('pump', ev.x, ev.y, 0.3);
+          break;
+        }
         case 'deliver':
           if (ev.owner === this.viewer) this.resources.markDirty();
           break;
@@ -1588,6 +1603,11 @@ function sideAgeAmbient(fx: Effects, age: AgeId, e: Ent, base: number): boolean 
   }
   if (age === 'sail' && e.type === 'dock') {
     fx.burst(new THREE.Vector3(e.x + 0.4, base + 0.3, e.y + 1.7), { count: 1, speed: 0.25, up: 0.4, life: 1.3, size: 0.05, grow: 2, gravity: -0.1, drag: 0.5, soft: true, colors: ['#ffffff', '#cfe9ef'] });
+    return true;
+  }
+  // The Golden Age (#703): gold motes drift up from the great buildings.
+  if (age === 'golden' && (e.type === 'towncenter' || e.type === 'temple' || e.type === 'market' || e.type === 'wonder')) {
+    fx.burst(new THREE.Vector3(e.x + (Math.random() - 0.5) * 1.6, base + 1.2, e.y + (Math.random() - 0.5) * 1.6), { count: 1, speed: 0.12, up: 1, life: 3, size: 0.05, gravity: -0.25, drag: 0.4, soft: true, colors: ['#ffe08a', '#fff4c8', '#e2b440'] });
     return true;
   }
   if (age === 'fair' && e.type === 'market') {

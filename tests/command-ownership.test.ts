@@ -56,6 +56,7 @@ describe('one player never commands another’s people', () => {
       ungarrison: { t: 'ungarrison', p: 1, building: tc.id },
       bell: { t: 'bell', p: 1, ring: true },
       flee: { t: 'flee', p: 1, on: false, ids },
+      shepherd: { t: 'shepherd', p: 1, on: true },
       greatWork: { t: 'greatWork', p: 1 },
       way: { t: 'way', p: 1, way: 'hunt' },
       vow: { t: 'vow', p: 1 },

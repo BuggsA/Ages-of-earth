@@ -1,4 +1,4 @@
-import { AI_LEVELS, AUTO_WORK, BUILDINGS, EXPLORE, PATROL, CARRY, CONSECRATE, COPPICE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, LEGION, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TAME, TRADE, domainOf, secs } from './data';
+import { AI_LEVELS, AUTO_WORK, BUILDINGS, EXPLORE, PATROL, CARRY, CONSECRATE, COPPICE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, LEGION, MILITARY, ORDERS, POLDER, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TAME, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
@@ -19,12 +19,13 @@ import { animalRadius, hitAnimal } from './animals';
 import { milkable } from './flocks';
 import { finishTame, songOf, tames, wildBeast } from './tame';
 import { catchIn, nextSnare } from './snares';
-import { TILE_OF_SEAM, resOfSeam, seamOf, shaftShare } from './shafts';
+import { TILE_OF_SEAM, resOfSeam, seamOf, seamProblem, shaftShare } from './shafts';
 import { dig, ruinAt } from './ruins';
 import { rubbleAt, salvages, strip } from './salvage';
 import { bank, cacheAt, lift } from './caches';
 import { buyLoad } from './oretrade';
 import { atFoot, carriesKegs, kegProblem, layKeg } from './powder';
+import { polderField } from './water';
 import { fordMarch, groveBoost, keptOf, kinBonus } from './landmarks';
 import { chant, chantedOver, consecrateProblem, consecrates, turnBuilding } from './consecrate';
 import { convoyShare } from './convoy';
@@ -338,6 +339,15 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
         if (next >= 0) break;
       }
     }
+    // The player's miner whose seam ran dry takes a Mine Shaft nobody works nearby before standing idle (#344, #681).
+    if (person && next < 0 && !o.rare && !o.bog && u.carry === 0 && (o.res === 'stone' || o.res === 'gold')) {
+      const pit = freeShaft(s, u.owner, fx, fy, AUTO_WORK.shaft);
+      if (pit && !seamProblem(s, pit, o.res)) {
+        if (seamOf(s, pit) !== o.res) pit.seam = o.res;
+        setOrder(u, { k: 'shaft', target: pit.id, res: o.res, phase: 'go' });
+        return;
+      }
+    }
     if (next >= 0) {
       o.tile = next;
       o.phase = 'go';
@@ -450,7 +460,8 @@ function farmStep(s: GameState, u: Unit, o: Extract<Order, { k: 'farm' }>): void
     o.phase = 'work';
     u.miss = 0;
     u.act = 'farm';
-    u.frac += gatherRate(s, u, 'farm') * DT;
+    // A field on polder (#701) works half again as fast: the richest ground there is.
+    u.frac += gatherRate(s, u, 'farm') * (polderField(s, f) ? POLDER.farm : 1) * DT;
     while (u.frac >= 1) {
       u.frac -= 1;
       u.carry++;
@@ -577,6 +588,12 @@ function headedFarms(s: GameState, u: Unit): Set<number> {
   return out;
 }
 
+/** Whether another of the field's people already set out to farm it (a builder who finished it the same tick, #344); checked for the player's people only. */
+function farmClaimed(s: GameState, f: Building, u: Unit): boolean {
+  for (const e of s.ents) if (e.kind === 'unit' && e.id !== u.id && e.owner === f.owner && e.hp > 0 && e.order.k === 'farm' && e.order.target === f.id) return true;
+  return false;
+}
+
 function farmTaken(s: GameState, f: Building): boolean {
   const holder = f.farmer ? s.byId.get(f.farmer) : undefined;
   return !!holder && holder.hp > 0 && holder.kind === 'unit' && holder.order.k === 'farm' && holder.order.target === f.id;
@@ -588,7 +605,7 @@ export function completeBuilding(s: GameState, b: Building): void {
   b.hp = Math.min(b.hp, maxHp(s, b));
   s.players[b.owner].stats.built++;
   // A finished gate opens for its own side.
-  if (b.type === 'gate') stampBuilding(s, b, true);
+  if (b.type === 'gate' || b.type === 'dyke') stampBuilding(s, b, true);
   if (b.type === 'wonder') {
     b.timer = s.wonderTime;
     s.events.push({ k: 'wonder', owner: b.owner, id: b.id, x: b.x, y: b.y, ticks: b.timer });
@@ -599,7 +616,7 @@ export function completeBuilding(s: GameState, b: Building): void {
 
 /** What a builder does once the building is up. */
 function afterBuilding(s: GameState, u: Unit, b: Building): void {
-  if (b.type === 'farm' && u.type === 'citizen' && !farmTaken(s, b) && !u.queue.length) {
+  if (b.type === 'farm' && u.type === 'citizen' && !farmTaken(s, b) && !(farmClaimed(s, b, u) && !s.players[u.owner].ai) && !u.queue.length) {
     setOrder(u, { k: 'farm', target: b.id, phase: 'go' });
     return;
   }
@@ -610,7 +627,7 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
   }
   // Help with other foundations nearby (a wall goes up piece by piece).
   let next: Building | null = null;
-  let bestD = b.type === 'wall' || b.type === 'gate' ? 4 : 14;
+  let bestD = b.type === 'wall' || b.type === 'gate' || b.type === 'dyke' ? 4 : 14;
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.owner !== u.owner || e.built || e.hp <= 0 || !canRaise(u.type, e.type, s.players[u.owner].civ)) continue;
     const d = distToRect(u.x, u.y, e);
@@ -629,7 +646,7 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
   if (u.resume) {
     const back = u.resume;
     u.resume = null;
-    if (back.k === 'gather' || back.k === 'farm' || back.k === 'snare' || back.k === 'shaft') {
+    if (back.k === 'gather' || back.k === 'farm' || back.k === 'snare' || back.k === 'shaft' || back.k === 'milk') {
       setOrder(u, back);
       return;
     }
@@ -734,7 +751,7 @@ function findTarget(s: GameState, sp: Spatial, u: Unit, r: number, buildings: bo
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, u.owner, e.owner)) continue;
     // Walls only matter when they are in the way.
-    const wall = e.type === 'wall' || e.type === 'gate';
+    const wall = e.type === 'wall' || e.type === 'gate' || e.type === 'dyke';
     const d = distToRect(u.x, u.y, e) + (wall ? 3 : 0);
     if (d < bestD) {
       bestD = d;

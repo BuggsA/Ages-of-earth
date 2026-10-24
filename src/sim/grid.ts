@@ -2,6 +2,7 @@ import { BUILDINGS, LANDMARKS, RUINS, TRADE } from './data';
 import { landOwnerAt } from './borders';
 import { isEnemy } from './world';
 import { snareSpot } from './snares';
+import { dykeSpot } from './water';
 import type { Building, BuildingType, GameState } from './types';
 import { B_BUILDING, B_GATE, B_RES, B_TERRAIN, R_BLOODIRON, R_GOLD, R_NONE, R_SALT, R_SALTPETRE, R_STONE, T_ROCK, T_WATER } from './types';
 
@@ -62,7 +63,7 @@ export function groundAt(s: GameState, x: number, y: number): number {
   return a * (1 - fx) * (1 - fy) + b * fx * (1 - fy) + c * (1 - fx) * fy + d * fx * fy;
 }
 
-export type PlaceProblem = null | 'edge' | 'water' | 'rock' | 'blocked' | 'slope' | 'shore' | 'foreign' | 'woods' | 'snares';
+export type PlaceProblem = null | 'edge' | 'water' | 'rock' | 'blocked' | 'slope' | 'shore' | 'foreign' | 'woods' | 'snares' | 'deep' | 'dry';
 
 /** Whether a building of this type could go with its top-left corner on this tile. */
 export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: number, ignoreUnits = true, owner = -1): PlaceProblem {
@@ -72,10 +73,16 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
   let hi = -Infinity;
   // The computer asks this of hundreds of tiles a search; most are nowhere near a relic, post, ruin or landmark.
   const near = keepClearNear(s, tx, ty, n);
+  // A dyke (#701) goes on shallow water, or on the shore beside it.
+  const dyke = type === 'dyke';
+  if (dyke) {
+    const why = dykeSpot(s, tx, ty);
+    if (why) return why;
+  }
   for (let y = ty; y < ty + n; y++) {
     for (let x = tx; x < tx + n; x++) {
       const i = y * s.w + x;
-      if (s.terrain[i] === T_WATER) return 'water';
+      if (s.terrain[i] === T_WATER && !dyke) return 'water';
       if (s.terrain[i] === T_ROCK) return 'rock';
       if (s.res[i] !== R_NONE || (near && (relicOnTile(s, x, y) || postOnTile(s, x, y) || ruinOnTile(s, x, y) || landmarkOnTile(s, x, y)))) return 'blocked';
       // A gate may go into its owner's own wall, replacing the pieces it covers.
@@ -90,7 +97,7 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
     }
   }
   // Walls follow the land (and docks the shore); everything else wants it fairly level.
-  if (hi - lo > (type === 'wall' || type === 'gate' || type === 'dock' ? 2.2 : 1.1)) return 'slope';
+  if (hi - lo > (type === 'wall' || type === 'gate' || type === 'dock' || dyke ? 2.2 : 1.1)) return 'slope';
   if (BUILDINGS[type].shore && shoreWater(s, tx, ty, n) < 3) return 'shore';
   // A Snare goes only among standing trees, and apart from the others (#485).
   if (type === 'snare') {
@@ -160,7 +167,10 @@ export function stampBuilding(s: GameState, b: Building, on: boolean): void {
   const open = BUILDINGS[b.type].open;
   // Only new blockages matter to cached distance fields: an opened tile just leaves a route a little long.
   if (!open && on) s.blockVersion++;
-  const gate = b.type === 'gate';
+  // A dyke (#701) is a gate along its whole length: its own team walks its crown, over water too, and nothing else passes.
+  const dyke = b.type === 'dyke';
+  const gate = b.type === 'gate' || dyke;
+  if (dyke) s.blockVersion++;
   const team = s.players[b.owner]?.team ?? -1;
   for (let y = b.ty; y < b.ty + b.size; y++) {
     for (let x = b.tx; x < b.tx + b.size; x++) {
@@ -174,6 +184,8 @@ export function stampBuilding(s: GameState, b: Building, on: boolean): void {
           s.block[i] |= B_GATE;
           s.gateTeam[i] = team;
         } else if (on) s.block[i] |= B_BUILDING;
+        // Water or rock under a dyke is crossed while it stands, and is water or rock again once it is gone.
+        if (dyke) s.block[i] = on && b.built ? s.block[i] & ~B_TERRAIN : s.terrain[i] === T_WATER || s.terrain[i] === T_ROCK ? s.block[i] | B_TERRAIN : s.block[i];
       } else if (!open) s.block[i] = on ? s.block[i] | B_BUILDING : s.block[i] & ~B_BUILDING;
     }
   }
