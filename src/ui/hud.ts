@@ -297,6 +297,7 @@ export class Hud {
   private epochEl = document.getElementById('epoch-chip')!;
   private clockEl = document.getElementById('clock')!;
   private idleEl = document.getElementById('idle-btn')!;
+  private idleSeen = 0;
   private workforceBtn = document.getElementById('workforce-btn') as HTMLButtonElement;
   private workforcePanel = document.getElementById('workforce-panel')!;
   private wfDrawn = new Map<string, string>();
@@ -749,6 +750,13 @@ export class Hud {
       : `<span data-tip="<b>${age.name}</b>${age.blurb}${age.path ? `<br><i>${PATHS[age.path].name}: step ${pathDepth(p)} of ${pathLine(age.path).length + (PATHS[age.path].planned?.length ?? 0)}.${age.hemocraft || age.rite ? ` Blood drawn: ${Math.floor(p.stats.blood ?? 0)}.${age.rite ? ` Health mended at the altars: ${Math.floor(p.stats.riteMended ?? 0)}.` : ''}` : ''} ${age.path === 'steppe' ? `Tribute taken: ${Math.floor(p.stats.tribute ?? 0)} gold.${age.caravans ? ` Gold the caravans earned on the move: ${p.stats.caravan ?? 0}. Tolls taken from rival traders: ${p.stats.toll ?? 0}.` : ''}` : `Plunder taken: ${p.stats.plunder ?? 0} gold.`}</i>` : ''}${idleTechs.length ? `<br>Suspended until you climb again: ${idleTechs.join(', ')}.` : ''}${mainRoad(p) ? `<br><span class='hint'>Advance at a Town Center.</span>` : ''}">${age.name}</span>`;
     this.idleEl.textContent = `Idle ${idle}`;
     this.idleEl.classList.toggle('alert', idle > 0);
+    if (idle > this.idleSeen) {
+      // One bright flash each time more hands fall idle, so a dry bush or spent seam is noticed.
+      this.idleEl.classList.remove('rise');
+      void this.idleEl.offsetWidth;
+      this.idleEl.classList.add('rise');
+    }
+    this.idleSeen = idle;
     document.getElementById('speed-btn')!.textContent = `${speed}×`;
   }
 
