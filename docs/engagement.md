@@ -34,7 +34,7 @@ The game isn't short of depth: six core loops, a web of ages with crossings, pat
 
 ## Phase 1: the road, both ways
 
-**1. The road planner.** An always-open panel (toggled, remembered per browser) beside the age button:
+**1. The road planner.** A panel beside the age button, opened and closed by a toggle that the browser remembers (chosen 2026-10-24: always on screen would crowd the HUD):
 - every known road from where you stand: climbs, roads back, and the step back, each with its price and `leaving()`'s keep / sleep / wake / lose lines;
 - **pin a goal age** (from the panel or the web map; only ages you have seen). The planner searches the known roads plus step-back edges for the shortest route by time and shows it as steps: "Warband ✓ → step back (200f 100g, 25 s, Drain Rigs sleep) → Sail → Sea-Raiders";
 - half-walked crossings as standing goals, and a warning when you are about to leave an age without its keepsake;
@@ -43,7 +43,7 @@ The game isn't short of depth: six core loops, a web of ages with crossings, pat
 - *Code:* a pure `routeTo(s, p, goal)` beside `roadsFrom` / `roadKnown` in `src/sim/ages.ts` (no rendering, so tests and the computer can share it); the panel in `src/ui/`.
 
 **2. Reading the rival.** When a rival changes age, the toast becomes a card the player can open:
-- what that age is good at and shuts (its `verb` and `door`), the roads it walked before (built from the public age changes), and any crossing it is now half-way to;
+- what that age is good at and shuts (its `verb` and `door`), its whole walked history (chosen 2026-10-24: every age change was announced to all as it happened, so this tells nothing new, it only remembers it), and any crossing it is now half-way to;
 - after a **step back**: the weak window (`STEP_BACK.time`, its units fallen back to their older form) with a countdown, and "a chance to strike";
 - a rival's **keepsake** you have seen (a smithy in a Stone Age town) is marked on the minimap and named: "they have walked the Iron Age".
 - *Decision:* punish the window or race them to the crossing; going back now has a cost a rival can make you pay.
