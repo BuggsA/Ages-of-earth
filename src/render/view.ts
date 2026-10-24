@@ -354,7 +354,7 @@ export class View {
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.sky.setGlare(m.sun, this.sunTint);
     // A full moon lights the night better than a crescent does; by day the phase means nothing.
-    this.baseSun = 2.5 * m.sun * l.sun * (1 - 0.4 * this.phase * l.moon);
+    this.baseSun = 3.0 * m.sun * l.sun * (1 - 0.4 * this.phase * l.moon);
     this.water.setStars(l.moon * (1 - m.grey));
     this.fireflies.setNight(this.weather.day.kind === 'clear' ? l.moon : 0);
     this.bats.setDusk(l.moon, this.weather.day.kind === 'clear');
@@ -366,13 +366,11 @@ export class View {
     this.owlLevel = Owls.level(l.moon, this.weather.day.kind === 'clear');
     // Windows and torches light up as the sun sets: the old strength by day, near double by night.
     glowUniform.uGlow.value = 0.9 + 1.2 * Math.min(1, l.moon + (1 - l.sun) * 0.9 + (1 - m.sky) * 0.3);
-    this.baseHemi = 1.0 * m.sky * l.sky;
-    this.fill.intensity = 0.4 * l.fill;
+    this.baseHemi = 0.75 * m.sky * l.sky;
+    this.fill.intensity = 0.3 * l.fill;
     this.sun.intensity = this.baseSun;
     this.hemi.intensity = this.baseHemi;
     (this.scene.fog as THREE.Fog).color.copy(this.horizon);
-    // The title looks low over the land, out past the map's edge: there the edge melts into the sky.
-    this.terrain.skirtTint(this.titleHour !== null ? this.horizon : null);
   }
 
   /** See the match through another player's eyes, or (with `reveal`) everyone's (replays). */
@@ -442,6 +440,9 @@ export class View {
     cam.updateProjectionMatrix();
     this.sky.mesh.position.copy(this.rig.camera.position);
     const fog = this.scene.fog as THREE.Fog;
+    // The title looks low over the land, out past the map's edge: there the edge melts into the sky. (Every
+    // frame, not only when the hour moves: a fixed hour must not leave the edge as dark unexplored ground.)
+    this.terrain.skirtTint(this.titleHour !== null ? this.horizon : null);
     // The title's low camera looks far across the land: let the haze begin farther off, so a misty day stays a view.
     const far = this.titleHour === null ? 1 : 1.6;
     // Whatever the weather, the ground the player is looking at stays clear: the haze never starts before the camera's target.
@@ -567,7 +568,7 @@ export class View {
     this.bats.update(this.time, this.rig.target, this.rig.distance, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
     this.effects.placeTexts(this.rig.camera, this.width, this.height);
 
-    if (QUALITY[this.quality].post) this.post.render();
+    if (QUALITY[this.quality].post) this.post.render(QUALITY[this.quality].bloom);
     else this.renderer.render(this.scene, this.rig.camera);
   }
 

@@ -136,11 +136,11 @@ export function moodOf(day: WeatherDay): Mood {
   const k = day.strength;
   switch (day.kind) {
     case 'rain':
-      return { grey: 0.55 + 0.3 * k, sun: 0.55 - 0.25 * k, sky: 0.85 - 0.2 * k, reach: 0.8 - 0.3 * k, tint: '#6d7782' };
+      return { grey: 0.55 + 0.3 * k, sun: 0.75 - 0.25 * k, sky: 0.8 - 0.2 * k, reach: 0.8 - 0.3 * k, tint: '#6d7782' };
     case 'snow':
-      return { grey: 0.5 + 0.25 * k, sun: 0.65 - 0.2 * k, sky: 0.95, reach: 0.75 - 0.3 * k, tint: '#b9c4cf' };
+      return { grey: 0.5 + 0.25 * k, sun: 0.78 - 0.2 * k, sky: 0.85, reach: 0.75 - 0.3 * k, tint: '#b9c4cf' };
     case 'mist':
-      return { grey: 0.45 + 0.3 * k, sun: 0.7 - 0.2 * k, sky: 0.95, reach: 0.7 - 0.25 * k, tint: '#cfd8dc' };
+      return { grey: 0.45 + 0.3 * k, sun: 0.78 - 0.2 * k, sky: 0.85, reach: 0.7 - 0.25 * k, tint: '#cfd8dc' };
     default:
       return { grey: 0, sun: 1, sky: 1, reach: 1, tint: '#ffffff' };
   }
@@ -221,9 +221,10 @@ const snowVertex = /* glsl */ `
     vec3 p = vec3(uCenter.x + (wrapped.x - 0.5) * uBox.x + sin(sway) * 0.5, uCenter.y + h * uBox.y, uCenter.z + (wrapped.y - 0.5) * uBox.x + cos(sway * 0.8) * 0.5);
     vec4 mv = viewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * mv;
-    gl_PointSize = clamp(uScale * (0.13 + aSeed.w * 0.12) / max(0.5, -mv.z), 2.0, 22.0);
+    gl_PointSize = clamp(uScale * (0.13 + aSeed.w * 0.12) / max(0.5, -mv.z), 2.0, 9.0);
     float edge = min(1.0 - abs(wrapped.x * 2.0 - 1.0), 1.0 - abs(wrapped.y * 2.0 - 1.0));
-    vAlpha = smoothstep(0.0, 0.25, edge) * smoothstep(0.0, 0.1, h) * smoothstep(1.0, 0.85, h);
+    // Flakes close to the camera fade, so none hangs as a white blob over the fight.
+    vAlpha = smoothstep(0.0, 0.25, edge) * smoothstep(0.0, 0.1, h) * smoothstep(1.0, 0.85, h) * smoothstep(6.0, 16.0, -mv.z);
   }
 `;
 
@@ -269,7 +270,7 @@ export class Weather {
       uWind: { value: new THREE.Vector2(4, 1.5) },
       uLen: { value: 0.045 },
       uColor: { value: new THREE.Color('#c4d8ea') },
-      uOpacity: { value: 0.4 },
+      uOpacity: { value: 0.24 },
     };
     this.rain = new THREE.LineSegments(
       rg,

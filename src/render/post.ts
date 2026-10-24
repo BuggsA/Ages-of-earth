@@ -12,14 +12,16 @@ export interface Quality {
   pixelRatio: number;
   /** Shadow map size, or 0 for no shadows. */
   shadows: number;
-  /** Bloom and vignette. */
+  /** The colour grade and vignette pass. */
   post: boolean;
+  /** Bloom on emissive parts (the dearer half of the pass). */
+  bloom: boolean;
 }
 
 export const QUALITY: Record<QualityName, Quality> = {
-  low: { label: 'Low', pixelRatio: 1, shadows: 0, post: false },
-  medium: { label: 'Medium', pixelRatio: 1.5, shadows: 1024, post: false },
-  high: { label: 'High', pixelRatio: 2, shadows: 2048, post: true },
+  low: { label: 'Low', pixelRatio: 1, shadows: 0, post: false, bloom: false },
+  medium: { label: 'Medium', pixelRatio: 1.5, shadows: 1024, post: true, bloom: false },
+  high: { label: 'High', pixelRatio: 2, shadows: 2048, post: true, bloom: true },
 };
 
 const KEY = 'ages-quality';
@@ -43,7 +45,7 @@ export function saveQuality(q: QualityName): void {
   }
 }
 
-const VignetteShader = {
+const GradeShader = {
   uniforms: { tDiffuse: { value: null } },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -55,22 +57,33 @@ const VignetteShader = {
     void main() {
       vec4 c = texture2D(tDiffuse, vUv);
       float d = distance(vUv, vec2(0.5));
-      c.rgb *= mix(1.0, 0.9, smoothstep(0.45, 0.9, d));
+      // Contrast about mid grey (linear), a little more colour, cool shadows and warm highlights.
+      float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
+      // The contrast fades out in the darks, so a night's shapes aren't crushed to black.
+      c.rgb = max((c.rgb - 0.18) * (1.0 + 0.14 * smoothstep(0.03, 0.2, l)) + 0.18, 0.0);
+      c.rgb = mix(vec3(l), c.rgb, 1.1);
+      c.rgb += vec3(-0.008, 0.0, 0.014) * (1.0 - smoothstep(0.0, 0.35, l));
+      c.rgb *= mix(vec3(1.0), vec3(1.04, 1.0, 0.95), smoothstep(0.5, 1.4, l));
+      c.rgb *= mix(1.0, 0.82, smoothstep(0.45, 0.9, d));
       gl_FragColor = c;
     }
   `,
 };
 
-/** Bloom on bright things (wonders, legends, lights) plus a soft vignette, then tone mapping. */
+/** A colour grade and soft vignette, plus (High) bloom on bright things such as wonders, legends and lights, then tone mapping. */
 export class Post {
   private composer: EffectComposer;
+  private bloom: UnrealBloomPass;
 
   constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) {
-    this.composer = new EffectComposer(renderer);
+    // Multisampled, so edges stay as smooth as when the renderer draws straight to the screen.
+    const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+    this.composer = new EffectComposer(renderer, target);
     this.composer.addPass(new RenderPass(scene, camera));
     // Only truly emissive parts (well above 1.0 before tone mapping) should glow, not sunlit ground.
-    this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(256, 256), 0.4, 0.5, 1.6));
-    this.composer.addPass(new ShaderPass(VignetteShader));
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.4, 0.5, 1.6);
+    this.composer.addPass(this.bloom);
+    this.composer.addPass(new ShaderPass(GradeShader));
     this.composer.addPass(new OutputPass());
   }
 
@@ -79,7 +92,9 @@ export class Post {
     this.composer.setSize(w, h);
   }
 
-  render(): void {
+  /** Bloom is on for High only; Medium takes just the grade. */
+  render(bloom: boolean): void {
+    this.bloom.enabled = bloom;
     this.composer.render();
   }
 }

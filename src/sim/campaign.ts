@@ -195,9 +195,9 @@ export const SCENARIOS: Scenario[] = [
       startEpoch: 4,
       players: [
         { ...you, civ: 'mongols' },
-        // The Tsar plays Easy: one against two Normal rivals, a computer in your seat won 4 maps in 16 (#36).
+        // Both rivals play Easy: against one Easy and one Normal, a computer in your seat won 4 maps in 16 (#36), then 1 in 16 once the Britons drew the full longbow (#501, #615).
         { name: 'The Tsar', ai: 'easy', team: 1, civ: 'chinese' },
-        { name: 'The Kaiser', ai: 'normal', team: 2, civ: 'britons' },
+        { name: 'The Kaiser', ai: 'easy', team: 2, civ: 'britons' },
       ],
     },
     objectives: [

@@ -8,6 +8,8 @@ import { SIGHT_LORE } from './render/sightings';
 import { wallLine } from './sim/commands';
 import { AGES, BUILDINGS, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, SILO, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
 import { crestSvg } from './ui/crests';
+import { unitPicture } from './ui/thumbs';
+import { easeHour, SHOT_SECONDS, titleShot } from './ui/titleShots';
 import { isEnemy } from './sim/world';
 import { carriesKegs, kegProblem } from './sim/powder';
 import { launchProblem } from './sim/silo';
@@ -17,7 +19,7 @@ import { placeProblem, walkable } from './sim/grid';
 import { findDockSpot, findSpot } from './sim/ai';
 import { maxHp, placeBuilding, spawnUnit } from './sim/world';
 import { arrivalText, epochArrivals } from './ui/endReport';
-import type { AgeId, Building, BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, HomelandId, MapSize, MapType, Unit } from './sim/types';
+import type { AgeId, Building, BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, HomelandId, MapSize, MapType, Unit, UnitType } from './sim/types';
 import { KEYS, R_FISH, R_NONE, RES } from './sim/types';
 import { carriedBy, relicAt } from './sim/relics';
 import { RUIN_FINDS, ruinAt } from './sim/ruins';
@@ -123,6 +125,8 @@ let hudTimer = 0;
 let mapTimer = 0;
 let tideTimer = 0;
 let attractT = 0;
+/** The title's hour of day: drifting on through the film, eased to a chosen shot's own hour while it holds. */
+let titleClock = 16;
 let lastSetup: GameSetup | null = null;
 
 const hud = new Hud({
@@ -401,20 +405,21 @@ function startAttract(skipAhead = true): void {
   // Skip ahead so there is a town to look at.
   if (skipAhead) for (let i = 0; i < TICK_HZ * 150; i++) step(game);
   attractT = 0;
+  titleClock = 16;
   playMusic(2);
 }
 
 let captionKey = '';
 /** Names the town the title's camera is visiting, fading it out and in as the camera moves on. */
-function captionTown(who: GameState['players'][number], marching: boolean): void {
-  const key = `${who.id}${marching ? 'a' : 't'}${who.epoch}`;
+function captionTown(who: GameState['players'][number], marching: boolean, note: string | null = null): void {
+  const key = `${who.id}${marching ? 'a' : 't'}${who.epoch}${note ?? ''}`;
   if (key === captionKey) return;
   captionKey = key;
   const el = $('title-caption');
   el.classList.remove('on');
   setTimeout(() => {
     if (mode !== 'title' || captionKey !== key) return;
-    el.innerHTML = `<b>${escHtml(who.name)} of the ${CIVS[who.civ].name}</b>${marching ? 'an army on the march' : `${ageDef(who).name}`}`;
+    el.innerHTML = `<b>${escHtml(who.name)} of the ${CIVS[who.civ].name}</b>${note ?? (marching ? 'an army on the march' : ageDef(who).name)}`;
     el.classList.add('on');
   }, 1200);
 }
@@ -1033,10 +1038,17 @@ const civBlurb = () => {
   $('civ-blurb').innerHTML = `${peopleHtml}<br><b>${m.label}:</b> ${m.blurb}<br>${hl ? `<b>${hl.icon} ${hl.name}:</b> ${hl.blurb}` : '<b>Homeland:</b> the seed decides what lies round every town: the Glade, the Shore, the Herd Plains or the Deep Wood.'}`;
 };
 const civTiles = $('civ-tiles');
+/** The soldier each people's tile shows: the line whose mark (plume, crest, headdress) is theirs, in the bronze age. */
+const TILE_SOLDIER: Record<CivId, UnitType> = { egyptians: 'ranged', greeks: 'infantry', romans: 'infantry', mongols: 'cavalry', chinese: 'infantry', britons: 'ranged' };
+let tileFigures = false;
 const showTiles = () => {
   const color = PLAYER_COLORS[Number(colorSel.value)] ?? PLAYER_COLORS[0];
-  civTiles.innerHTML = (['random', ...CIV_IDS] as (CivId | 'random')[]).map((c) =>
-    `<button class="civ-tile" type="button" role="radio" aria-checked="${civSel.value === c}" data-civ="${c}" title="${c === 'random' ? 'A people chosen at random' : (CIVS[c].verb ?? CIVS[c].name).replace(/"/g, '&quot;')}">${crestSvg(c, color, 40)}${c === 'random' ? 'Random' : CIVS[c].name}</button>`).join('');
+  civTiles.innerHTML = (['random', ...CIV_IDS] as (CivId | 'random')[]).map((c) => {
+    // The soldiers are drawn the first time the sheet opens, not while the title loads.
+    const face = c !== 'random' && tileFigures ? unitPicture(TILE_SOLDIER[c], 1, color, c) : '';
+    const art = face ? `<span class="civ-face"><img src="${face}" alt="">${crestSvg(c, color, 18)}</span>` : crestSvg(c, color, 40);
+    return `<button class="civ-tile" type="button" role="radio" aria-checked="${civSel.value === c}" data-civ="${c}" title="${c === 'random' ? 'A people chosen at random' : (CIVS[c].verb ?? CIVS[c].name).replace(/"/g, '&quot;')}">${art}${c === 'random' ? 'Random' : CIVS[c].name}</button>`;
+  }).join('');
 };
 civTiles.addEventListener('click', (e) => {
   const tile = (e.target as HTMLElement).closest<HTMLElement>('[data-civ]');
@@ -1084,6 +1096,7 @@ function openSheet(id: 'title-setup' | 'title-howto'): void {
   if (open) return;
   sound.play('open');
   $(id).classList.remove('hidden');
+  if (id === 'title-setup' && !tileFigures) { tileFigures = true; showTiles(); }
 }
 function closeSheets(): void {
   $('title-setup').classList.add('hidden');
@@ -2298,20 +2311,6 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           play('error');
         }
         break;
-      case 'sick':
-        // The Sickness (#541): it broke out, ran its course, or took citizens.
-        if (ev.owner === viewer) {
-          if (ev.what === 'broke') hud.toast('🤒 The Sickness has broken out. Your people work slower: keep priests by a Temple to nurse them, and think about closing the roads (quarantine, Town Center, N).', 'bad');
-          else if (ev.what === 'ended') hud.toast('🤒 The Sickness has passed.', 'good');
-          else hud.toast(`🤒 The Sickness has taken ${ev.n} of your people.`, 'bad');
-          play(ev.what === 'ended' ? 'allClear' : 'toll');
-        } else if (ev.what === 'broke' && s.players[ev.owner]?.team !== s.players[viewer]?.team) {
-          hud.toast(`🤒 The Sickness has broken out in ${s.players[ev.owner].name}'s town. Their posts will run foul: a trader of yours loading there brings it home.`, 'info');
-        }
-        break;
-      case 'quarantine':
-        if (ev.owner === viewer) hud.toast(ev.on ? '🚧 Quarantine: your traders stay home.' : '🚧 Quarantine lifted.', 'info');
-        break;
       case 'epoch':
         if (ev.owner === viewer) {
           const age = ev.age ? AGES[ev.age] : EPOCHS[ev.epoch];
@@ -2996,24 +2995,22 @@ function frame(now: number): void {
         n++;
       }
       if (s.over) startAttract();
-      // Look in on each town in turn, circling slowly.
+      // Look in on each town in turn, circling slowly, with a chosen shot now and then (a dock at dusk, an army at a ford).
       attractT += dt;
-      const who = s.players[Math.floor(attractT / 24) % s.players.length];
-      const tc = s.ents.find((e) => e.kind === 'building' && e.owner === who.id && e.type === 'towncenter');
-      const army = s.ents.filter((e) => e.kind === 'unit' && e.type !== 'citizen' && e.owner === who.id && e.order.k !== 'idle');
-      const at = army.length >= 4 ? army[0] : (tc ?? { x: who.startX, y: who.startY });
-      view.rig.focus(at.x, at.y);
-      // Look from the town toward the middle of the map, so the far side is land and sky, not the map's
-      // edge, swaying slowly to either side as a camera on a crane would.
-      const lookX = s.w / 2 - at.x;
-      const lookZ = s.h / 2 - at.y;
-      if (lookX * lookX + lookZ * lookZ > 4) view.rig.aim(Math.atan2(-lookX, -lookZ) + Math.sin(attractT * 0.06) * 0.45);
+      const shot = titleShot(s, Math.floor(attractT / SHOT_SECONDS));
+      view.rig.focus(shot.x, shot.y);
+      view.rig.frame(shot.distance);
+      // Look from the town toward the middle of the map, so the far side is land and sky, not the map's edge,
+      // swaying slowly to either side as a camera on a crane would; a chosen shot holds its framing, drifting less.
+      const sway = shot.kind === 'town' ? 0.45 : 0.15;
+      if (shot.lookX * shot.lookX + shot.lookY * shot.lookY > 4) view.rig.aim(Math.atan2(-shot.lookX, -shot.lookY) + Math.sin(attractT * 0.06) * sway);
       else view.rig.rotate(dt * 0.05);
-      // A whole day in eight minutes, opening at the golden hour.
-      view.titleHour = (16 + attractT / 20) % 24;
+      // A whole day in eight minutes, opening at the golden hour; a chosen shot eases the light to its own hour and back.
+      titleClock = easeHour(titleClock, shot.hour, dt);
+      view.titleHour = titleClock;
       // Low over the land, as a film opens, so the sky and the far woods frame the town.
       view.rig.cinematic = 0.36;
-      captionTown(who, army.length >= 4);
+      captionTown(s.players[shot.who], shot.marching, shot.note);
     } else {
       view.titleHour = null;
       view.rig.cinematic = null;
@@ -3133,6 +3130,10 @@ function frame(now: number): void {
   /** What the interface is doing (testing). */
   get ui() {
     return { placing, targetMode, wallDrag, placeAt, selection: [...selection], buildMenu: hud.buildMenu, pending: pending.length };
+  },
+  /** Jump the title's film to a second of its loop (testing, screenshots). */
+  titleAt(seconds: number) {
+    attractT = seconds;
   },
   /** Run the rules ahead by some seconds (testing); effects are skipped. */
   fast(seconds: number) {
