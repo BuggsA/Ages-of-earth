@@ -1,4 +1,4 @@
-import { AI_LEVELS, AUTO_WORK, BUILDINGS, EXPLORE, PATROL, CARRY, CONSECRATE, COPPICE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, LEGION, MILITARY, ORDERS, POLDER, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TAME, TRADE, domainOf, secs } from './data';
+import { AI_LEVELS, AUTO_WORK, BUILDINGS, EXPLORE, PATROL, CARRY, CONSECRATE, COPPICE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, LEGION, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TAME, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
@@ -25,7 +25,7 @@ import { rubbleAt, salvages, strip } from './salvage';
 import { bank, cacheAt, lift } from './caches';
 import { buyLoad } from './oretrade';
 import { atFoot, carriesKegs, kegProblem, layKeg } from './powder';
-import { polderField } from './water';
+import { fieldBoost, wading } from './water';
 import { gardenMul, isField } from './grove';
 import { fordMarch, groveBoost, keptOf, kinBonus } from './landmarks';
 import { chant, chantedOver, consecrateProblem, consecrates, turnBuilding } from './consecrate';
@@ -461,9 +461,9 @@ function farmStep(s: GameState, u: Unit, o: Extract<Order, { k: 'farm' }>): void
     o.phase = 'work';
     u.miss = 0;
     u.act = 'farm';
-    // A field on polder (#701) works half again as fast: the richest ground there is.
+    // A field on polder (#701) works half again as fast: the richest ground there is. A watered one in the Age of Rivers, faster too.
     // A Kitchen Garden (the Age of the Grove) fed by dung or water works faster.
-    u.frac += gatherRate(s, u, 'farm') * (polderField(s, f) ? POLDER.farm : 1) * gardenMul(f) * DT;
+    u.frac += gatherRate(s, u, 'farm') * fieldBoost(s, f) * gardenMul(f) * DT;
     while (u.frac >= 1) {
       u.frac -= 1;
       u.carry++;
@@ -2257,7 +2257,8 @@ export function routeUnits(s: GameState): void {
 /** Walk the route. */
 export function walk(s: GameState, u: Unit): void {
   if (!u.path) return;
-  let left = statsOf(s, u).speed * fordMarch(s, u) * hemoPace(s, u) * DT;
+  // A channel (#701, the Age of Rivers) is waded: a moat on foot.
+  let left = statsOf(s, u).speed * fordMarch(s, u) * hemoPace(s, u) * (domainOf(u.type) === 'land' ? wading(s, u.x, u.y) : 1) * DT;
   while (left > 1e-9 && u.path) {
     const tx = u.path[u.pathI * 2];
     const ty = u.path[u.pathI * 2 + 1];

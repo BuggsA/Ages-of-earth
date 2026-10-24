@@ -50,7 +50,8 @@ function polderColor(out: THREE.Color, x: number, y: number, t: number, fine: nu
 /** Tiles pumped out so far, by every people: a cheap test that the water layer changed. */
 const drainedIn = (s: GameState): number => {
   let n = 0;
-  for (const p of s.players) n += p.stats.drained ?? 0;
+  // Pumped out (#701), or dug into a channel: either way the shore moved.
+  for (const p of s.players) n += (p.stats.drained ?? 0) + (p.stats.dug ?? 0);
   return n;
 };
 
