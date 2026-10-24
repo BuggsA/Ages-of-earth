@@ -59,7 +59,8 @@ const GradeShader = {
       float d = distance(vUv, vec2(0.5));
       // Contrast about mid grey (linear), a little more colour, cool shadows and warm highlights.
       float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
-      c.rgb = max((c.rgb - 0.18) * 1.14 + 0.18, 0.0);
+      // The contrast fades out in the darks, so a night's shapes aren't crushed to black.
+      c.rgb = max((c.rgb - 0.18) * (1.0 + 0.14 * smoothstep(0.03, 0.2, l)) + 0.18, 0.0);
       c.rgb = mix(vec3(l), c.rgb, 1.1);
       c.rgb += vec3(-0.008, 0.0, 0.014) * (1.0 - smoothstep(0.0, 0.35, l));
       c.rgb *= mix(vec3(1.0), vec3(1.04, 1.0, 0.95), smoothstep(0.5, 1.4, l));
