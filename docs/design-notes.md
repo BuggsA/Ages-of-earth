@@ -1220,3 +1220,12 @@ Seen: headless Chromium (software GL), a lakes map, a dock and an army put in by
 ## Designers' notes: the tower line (2026-10-24)
 
 Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and each tower grows on its own through Guard Tower, Keep and Bastion (the owner asked for per-tower upgrades). Why I like it: a tower rush stays possible but is cheap to answer, and the question becomes which tower is worth the stone: the one at the ford, not the one behind the farms. Next: give each step its own model (a second storey, stone walls, a low angled bastion), and maybe a fork at the Bastion (more arrows for the garrison, or walls that shrug off siege).
+
+## Designers' notes: the Water Road, the Age of Dykes (#701 s1, 2026-10-24, chain 1024-2000 s1, lane rules)
+
+**Built:** the map's water is no longer fixed. A `polder` layer on the grid; dykes on the shallows that are gates along their whole length (your people walk the crown, nothing else passes, ships included); windmills that pump a shut-off basin dry one tile at a time, nearest first; polder fields at half again a farm's pace; the coast as a road's door (`Road.coast`, shallows by home) with a Dock as the clue. The renderer lets each tile rise out of the water over a second, as wet mud that dries to striped field over twenty, and the shore's foam follows. A creak and a rush of water with each tile. The computer plans a dyke from shore to shore near home (`dykePlan`), and plays it through.
+
+**Why I love it:** every other age changes what your units do; this one changes where the land is. The moment I wanted was the bay turning green behind the bank while the mill turns, and then a column walking across where the sea was. Water flows four ways only, so a dyke dragged on a diagonal still holds: the line you draw is the line that holds.
+
+**Next:** s2's breach (a keg or a ram on a dyke, and the water running back in through the polder in id order: the hook is `stampBuilding` restoring water under a fallen dyke, and `drain` is the one place land is made, so a `flood` beside it undoes it); the Water Line's sluices; the land bridge the computer plans on purpose; a windmill keepsake. I'd also like the polder to need its mills: a basin left unpumped for long seeping back.
+

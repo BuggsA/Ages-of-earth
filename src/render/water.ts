@@ -165,6 +165,16 @@ export class WaterView {
     this.mesh.position.set(s.w / 2, WATER_Y, s.h / 2);
   }
 
+  /** The shore moved (#701, land pumped out of the water): re-read the bed from the heights as drawn, so the foam follows the new shore. */
+  refreshBed(s: GameState, heightOf: (corner: number) => number): void {
+    const bed = this.bed;
+    if (!bed) return;
+    const data = bed.image.data as Uint8Array;
+    const n = (s.w + 1) * (s.h + 1);
+    for (let i = 0; i < n; i++) data[i * 4] = Math.round(Math.max(0, Math.min(1, (heightOf(i) + 3) / 4)) * 255);
+    bed.needsUpdate = true;
+  }
+
   /** Stars glinting on the lakes: 0 by day to 1 on a clear night. */
   setStars(k: number): void {
     this.material.uniforms.uStars.value = k;

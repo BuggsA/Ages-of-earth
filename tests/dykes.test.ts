@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { applyCommand, wallLine } from '../src/sim/commands';
 import { AGES, AI_DYKE, BUILDINGS, DT, POLDER, ROADS, secs } from '../src/sim/data';
 import { gatherRate } from '../src/sim/units';
-import { buildBarred, roadProblem } from '../src/sim/ages';
+import { buildBarred, roadKnown, roadProblem } from '../src/sim/ages';
+import { findDockSpot } from '../src/sim/ai';
 import { checksum, createGame, step } from '../src/sim/game';
 import { NAVAL, placeProblem, walkable } from '../src/sim/grid';
 import { findRoute } from '../src/sim/path';
@@ -73,14 +74,19 @@ describe('the road (#701 s1)', () => {
     expect(ROADS.some((r) => r.from === 'dykes' && r.to === 'gunpowder')).toBe(true);
   });
 
-  it('is shut by the coast: open by a lake, closed on dry highland', () => {
+  it('is seen once a Dock stands, and shut by the coast: open by a lake, closed on dry highland', () => {
     const wet = make(1, 'lakes');
     const p = wet.players.find((q) => coastHeld(wet, q))!;
     enter(wet, p.id, 'middle');
+    expect(roadKnown(wet, p, road)).toBe(false);
+    const dock = findDockSpot(wet, p.startX, p.startY, 30)!;
+    placeBuilding(wet, p.id, 'dock', dock.tx, dock.ty, true);
+    expect(roadKnown(wet, p, road)).toBe(true);
     expect(roadProblem(wet, p, road)).toBeNull();
     const dry = make(1, 'highlands');
     const q = dry.players.find((x) => !coastHeld(dry, x))!;
     enter(dry, q.id, 'middle');
+    placeBuilding(dry, q.id, 'dock', 2, 2, true);
     expect(roadProblem(dry, q, road)).toBe(road.coast);
   });
 

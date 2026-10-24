@@ -4,6 +4,7 @@
  */
 
 import type { ScenarioRun } from './campaign';
+import type { DykePlan } from './water';
 
 export type Res = 'food' | 'wood' | 'stone' | 'gold';
 export const RES: readonly Res[] = ['food', 'wood', 'stone', 'gold'];
@@ -1090,6 +1091,11 @@ export interface AiMemory {
   zap?: number;
   /** When it began holding the Middle Ages to dig saltpetre for Alchemy (#577). */
   powder?: number;
+  /**
+   * The Water Road (#701): the dyke it means to raise by home (null: none worth it), found once; when it began holding the Middle
+   * Ages for the road's Dock, and since when it has stood in the Age of Dykes.
+   */
+  dyke?: { plan: DykePlan | null; looked?: boolean; hold?: number; since?: number };
   /** The first crossing (#585): the age it stands in on the way to the Sea-Raiders, and since when (each sibling, and the age itself). */
   sea?: { at: AgeId; since: number };
   /** Tick it last tried to raise a Mission (#555 s12). */

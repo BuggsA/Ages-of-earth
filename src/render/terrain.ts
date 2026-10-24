@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { hash2 } from '../sim/rng';
 import type { GameState } from '../sim/types';
 import { T_GRASS, T_ROCK, T_SAND, T_WATER } from '../sim/types';
+import { isPolder } from '../sim/water';
 import { natureGeometry, type NatureKind } from './natureModels';
 import { bakedMaterial, fogUniforms, inject, swayMaterial } from './materials';
 
@@ -20,6 +21,38 @@ const SAND = [C('#cdbb8c'), C('#bca97a')];
 const ROCK = [C('#7a7267'), C('#877f73'), C('#6c655b')];
 const CLIFF = C('#6a6156');
 const BED = [C('#b9a87a'), C('#8b9378')];
+const SNOWCAP = C('#d6d2ca');
+/**
+ * Polder (#701): land pumped out of the water. Long strips of field in rich dark green and black loam, cut by straight ditches of
+ * still water every few tiles; fresh from the water it is wet grey-brown mud, drying to field over `DRY_TIME` seconds.
+ */
+const POLDER_FIELD = [C('#5d7a3a'), C('#4a6a30'), C('#4c4231')];
+const DITCH = C('#3f6a6a');
+const MUD = C('#5e5848');
+const DRY_TIME = 20;
+const TMP = new THREE.Color();
+const A = new THREE.Vector3();
+const B = new THREE.Vector3();
+const V = new THREE.Vector3();
+
+/** A polder facet's colour: ditch, loam or field by where it lies, wet mud until it has dried (`dried` 0 to 1). */
+function polderColor(out: THREE.Color, x: number, y: number, t: number, fine: number, dried: number): void {
+  // Ditches run straight along every fifth column; one facet of the tile, so the water line is thin.
+  if (x % 5 === 0 && t === 0) out.copy(DITCH);
+  else {
+    // Strips two tiles wide across the ditches: field, field, loam.
+    const strip = Math.floor(y / 2) % 3;
+    out.copy(strip === 2 ? POLDER_FIELD[2] : POLDER_FIELD[strip]).lerp(POLDER_FIELD[1], fine * 0.3);
+  }
+  if (dried < 1) out.lerp(MUD, (1 - dried) * 0.85);
+}
+
+/** Tiles pumped out so far, by every people: a cheap test that the water layer changed. */
+const drainedIn = (s: GameState): number => {
+  let n = 0;
+  for (const p of s.players) n += p.stats.drained ?? 0;
+  return n;
+};
 
 export const terrainMaterial = inject(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.95 }), { season: 'ground' });
 
@@ -44,6 +77,19 @@ export class TerrainView {
   readonly group = new THREE.Group();
   private mesh: THREE.Mesh | null = null;
   private skirt: THREE.Mesh | null = null;
+  /** The heights as drawn: they follow the rules' heights, easing toward them where the land rose out of the water (#701). */
+  private shown = new Float32Array(0);
+  private pos = new Float32Array(0);
+  private col = new Float32Array(0);
+  /** The ground as last drawn, to spot tiles the rules turned from water to land, and how many tiles had been pumped out then. */
+  private drawn = new Uint8Array(0);
+  private drainedSeen = 0;
+  /** Corners easing toward their new height. */
+  private rising = new Set<number>();
+  /** Polder tiles still drying from wet mud to field, and the clock time each came out of the water. */
+  private drying = new Map<number, number>();
+  private clock = 0;
+  private repaintAt = 0;
 
   /** Paint the world's edge: the unexplored slate in play, or a colour given (the title's horizon), so the land fades into the sky. */
   skirtTint(c: THREE.Color | null): void {
@@ -54,73 +100,17 @@ export class TerrainView {
   build(s: GameState): void {
     this.dispose();
     const { w, h } = s;
-    const W = w + 1;
-    const H = (x: number, y: number) => s.height[y * W + x];
-    const pos = new Float32Array(w * h * 6 * 3);
-    const col = new Float32Array(w * h * 6 * 3);
-    let k = 0;
-    const tmp = new THREE.Color();
-    const v = new THREE.Vector3();
-    const a = new THREE.Vector3();
-    const b = new THREE.Vector3();
-    const tri = (pts: [number, number][], tile: number, tx: number, ty: number, t: number) => {
-      // Slope: steep faces show as rock whatever the tile.
-      const p0 = pts[0];
-      const p1 = pts[1];
-      const p2 = pts[2];
-      a.set(p1[0] - p0[0], H(p1[0], p1[1]) - H(p0[0], p0[1]), p1[1] - p0[1]);
-      b.set(p2[0] - p0[0], H(p2[0], p2[1]) - H(p0[0], p0[1]), p2[1] - p0[1]);
-      v.crossVectors(a, b).normalize();
-      const steep = Math.abs(v.y);
-      const n = hash2(tx * 2 + t, ty, 7);
-      const terr = s.terrain[tile];
-      const avgH = (H(p0[0], p0[1]) + H(p1[0], p1[1]) + H(p2[0], p2[1])) / 3;
-      // Broad, soft patches of color rather than speckle: smooth noise picks the shade.
-      const patch = smooth(tx + 0.5, ty + 0.5, 6, 11);
-      const fine = smooth(tx + 0.5, ty + 0.5, 2.5, 12);
-      if (terr === T_WATER) {
-        tmp.copy(BED[0]).lerp(BED[1], Math.min(1, Math.max(0, -avgH * 0.8)));
-      } else if (terr === T_SAND) {
-        tmp.copy(SAND[0]).lerp(SAND[1], fine);
-      } else if (terr === T_ROCK) {
-        tmp.copy(ROCK[0]).lerp(ROCK[1], fine).lerp(ROCK[2], patch * 0.6);
-        if (avgH > 2.6) tmp.lerp(C('#d6d2ca'), Math.min(1, (avgH - 2.6) * 0.45));
-      } else {
-        tmp.copy(GRASS[0]).lerp(GRASS[2], fine * 0.8).lerp(GRASS[1], Math.max(0, 0.6 - patch) * 1.2);
-        // Higher ground dries out; a few worn patches of earth.
-        const dry = Math.max(0, Math.min(1, (avgH - 1.1) * 0.5)) * 0.45 + Math.max(0, patch - 0.72) * 1.2;
-        tmp.lerp(DRY, Math.min(0.6, dry));
-        if (fine < 0.18 && patch > 0.55) tmp.lerp(DIRT, 0.35);
-      }
-      if (terr !== T_WATER && steep < 0.8) tmp.lerp(CLIFF, Math.min(1, (0.8 - steep) * 2.6));
-      // A whisper of light and shade per facet keeps the low-poly look without the noise.
-      tmp.multiplyScalar(0.975 + n * 0.05);
-      for (const [x, y] of pts) {
-        pos[k * 3] = x;
-        pos[k * 3 + 1] = H(x, y);
-        pos[k * 3 + 2] = y;
-        col[k * 3] = tmp.r;
-        col[k * 3 + 1] = tmp.g;
-        col[k * 3 + 2] = tmp.b;
-        k++;
-      }
-    };
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const tile = y * w + x;
-        // Alternate the diagonal for a less gridded look.
-        if (hash2(x, y, 3) < 0.5) {
-          tri([[x, y], [x, y + 1], [x + 1, y]], tile, x, y, 0);
-          tri([[x + 1, y], [x, y + 1], [x + 1, y + 1]], tile, x, y, 1);
-        } else {
-          tri([[x, y], [x, y + 1], [x + 1, y + 1]], tile, x, y, 0);
-          tri([[x, y], [x + 1, y + 1], [x + 1, y]], tile, x, y, 1);
-        }
-      }
-    }
+    this.shown = Float32Array.from(s.height);
+    this.pos = new Float32Array(w * h * 6 * 3);
+    this.col = new Float32Array(w * h * 6 * 3);
+    this.drawn = Uint8Array.from(s.terrain);
+    this.drainedSeen = drainedIn(s);
+    this.rising.clear();
+    this.drying.clear();
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) this.paint(s, x, y);
     const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(this.col, 3));
     geo.computeVertexNormals();
     this.mesh = new THREE.Mesh(geo, terrainMaterial);
     this.mesh.receiveShadow = true;
@@ -134,6 +124,128 @@ export class TerrainView {
     this.group.add(this.skirt);
 
     this.scatter(s);
+  }
+
+  /**
+   * Keep the drawn ground in step with the rules (#701, the Water Road): a tile pumped out of the water rises out of it over a moment,
+   * as wet mud that dries to field. Returns true when the shore moved this frame (the water's bed wants refreshing).
+   */
+  sync(s: GameState, dt: number): boolean {
+    if (!this.mesh) return false;
+    this.clock += dt;
+    const { w, h } = s;
+    const W = w + 1;
+    const touched = new Set<number>();
+    let moved = false;
+    const n = drainedIn(s);
+    if (n !== this.drainedSeen) {
+      this.drainedSeen = n;
+      for (let i = 0; i < w * h; i++) {
+        if (this.drawn[i] === s.terrain[i]) continue;
+        this.drawn[i] = s.terrain[i];
+        if (isPolder(s, i)) this.drying.set(i, this.clock);
+        const x = i % w;
+        const y = (i - x) / w;
+        for (const c of [y * W + x, y * W + x + 1, (y + 1) * W + x, (y + 1) * W + x + 1]) if (this.shown[c] !== s.height[c]) this.rising.add(c);
+        touched.add(i);
+      }
+    }
+    if (this.rising.size) {
+      moved = true;
+      const k = Math.min(1, dt * 2.2);
+      for (const c of [...this.rising]) {
+        const to = s.height[c];
+        const d = to - this.shown[c];
+        this.shown[c] = Math.abs(d) < 0.01 ? to : this.shown[c] + d * k;
+        if (this.shown[c] === to) this.rising.delete(c);
+        const cx = c % W;
+        const cy = (c - cx) / W;
+        for (const [tx, ty] of [[cx - 1, cy - 1], [cx, cy - 1], [cx - 1, cy], [cx, cy]]) if (tx >= 0 && ty >= 0 && tx < w && ty < h) touched.add(ty * w + tx);
+      }
+    }
+    // Drying fields are repainted a few times a second, not every frame.
+    if (this.drying.size && this.clock >= this.repaintAt) {
+      this.repaintAt = this.clock + 0.25;
+      for (const [t, at] of this.drying) {
+        touched.add(t);
+        if (this.clock - at > DRY_TIME) this.drying.delete(t);
+      }
+    }
+    if (!touched.size) return moved;
+    for (const t of touched) this.paint(s, t % w, Math.floor(t / w));
+    const geo = this.mesh.geometry;
+    geo.attributes.position.needsUpdate = true;
+    geo.attributes.color.needsUpdate = true;
+    geo.computeBoundingSphere();
+    return moved;
+  }
+
+  /** The drawn height of a tile corner. */
+  heightOf(i: number): number {
+    return this.shown[i];
+  }
+
+  /** Write one tile's two triangles: their corners at the drawn heights, each colored by the tile (meadow, beach, rock, lake floor, polder). */
+  private paint(s: GameState, x: number, y: number): void {
+    const { w } = s;
+    const W = w + 1;
+    const H = (cx: number, cy: number) => this.shown[cy * W + cx];
+    const tile = y * w + x;
+    let k = tile * 6;
+    const { pos, col } = this;
+    const tmp = TMP;
+    const tri = (pts: readonly (readonly [number, number])[], t: number) => {
+      // Slope: steep faces show as rock whatever the tile.
+      const p0 = pts[0];
+      const p1 = pts[1];
+      const p2 = pts[2];
+      A.set(p1[0] - p0[0], H(p1[0], p1[1]) - H(p0[0], p0[1]), p1[1] - p0[1]);
+      B.set(p2[0] - p0[0], H(p2[0], p2[1]) - H(p0[0], p0[1]), p2[1] - p0[1]);
+      V.crossVectors(A, B).normalize();
+      const steep = Math.abs(V.y);
+      const n = hash2(x * 2 + t, y, 7);
+      const terr = s.terrain[tile];
+      const avgH = (H(p0[0], p0[1]) + H(p1[0], p1[1]) + H(p2[0], p2[1])) / 3;
+      // Broad, soft patches of color rather than speckle: smooth noise picks the shade.
+      const patch = smooth(x + 0.5, y + 0.5, 6, 11);
+      const fine = smooth(x + 0.5, y + 0.5, 2.5, 12);
+      if (terr === T_WATER) {
+        tmp.copy(BED[0]).lerp(BED[1], Math.min(1, Math.max(0, -avgH * 0.8)));
+      } else if (isPolder(s, tile)) {
+        polderColor(tmp, x, y, t, fine, this.drying.has(tile) ? Math.min(1, (this.clock - this.drying.get(tile)!) / DRY_TIME) : 1);
+      } else if (terr === T_SAND) {
+        tmp.copy(SAND[0]).lerp(SAND[1], fine);
+      } else if (terr === T_ROCK) {
+        tmp.copy(ROCK[0]).lerp(ROCK[1], fine).lerp(ROCK[2], patch * 0.6);
+        if (avgH > 2.6) tmp.lerp(SNOWCAP, Math.min(1, (avgH - 2.6) * 0.45));
+      } else {
+        tmp.copy(GRASS[0]).lerp(GRASS[2], fine * 0.8).lerp(GRASS[1], Math.max(0, 0.6 - patch) * 1.2);
+        // Higher ground dries out; a few worn patches of earth.
+        const dry = Math.max(0, Math.min(1, (avgH - 1.1) * 0.5)) * 0.45 + Math.max(0, patch - 0.72) * 1.2;
+        tmp.lerp(DRY, Math.min(0.6, dry));
+        if (fine < 0.18 && patch > 0.55) tmp.lerp(DIRT, 0.35);
+      }
+      if (terr !== T_WATER && steep < 0.8) tmp.lerp(CLIFF, Math.min(1, (0.8 - steep) * 2.6));
+      // A whisper of light and shade per facet keeps the low-poly look without the noise.
+      tmp.multiplyScalar(0.975 + n * 0.05);
+      for (const [px, py] of pts) {
+        pos[k * 3] = px;
+        pos[k * 3 + 1] = H(px, py);
+        pos[k * 3 + 2] = py;
+        col[k * 3] = tmp.r;
+        col[k * 3 + 1] = tmp.g;
+        col[k * 3 + 2] = tmp.b;
+        k++;
+      }
+    };
+    // Alternate the diagonal for a less gridded look.
+    if (hash2(x, y, 3) < 0.5) {
+      tri([[x, y], [x, y + 1], [x + 1, y]], 0);
+      tri([[x + 1, y], [x, y + 1], [x + 1, y + 1]], 1);
+    } else {
+      tri([[x, y], [x, y + 1], [x + 1, y + 1]], 0);
+      tri([[x, y], [x + 1, y + 1], [x + 1, y]], 1);
+    }
   }
 
   /** Grass tufts, flowers and pebbles on the meadows, boulders on the rocks. */

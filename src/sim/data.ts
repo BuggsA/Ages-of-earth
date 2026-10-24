@@ -1081,12 +1081,14 @@ export const ROADS: Road[] = [
   { from: 'missions', to: 'gunpowder', cost: { food: 900, wood: 400, gold: 500, stone: 200 }, time: 65, blurb: 'Climb to the Gunpowder Age: the Missions sleep, their tithe unpaid, and wake if your people turns missionary again.' },
   { from: 'searaider', to: 'middle', cost: { food: 200, wood: 150 }, time: 25, blurb: 'Draw the longships up: the ordinary Middle Ages, with traders, and plunder no longer taken. Gold still in packs and holds is banked where it stands.' },
   { from: 'searaider', to: 'gunpowder', cost: { food: 900, wood: 500, gold: 500, stone: 150 }, time: 65, blurb: 'Climb to the Gunpowder Age: the raids end, traders return, and every pack and hold still laden is banked where it stands (more wood and less gold than from the Middle Ages: the fortune was in the ships).' },
-  // The Water Road (#701 s1): off the Middle Ages, for a people with shallows by its town. The land's shape is the door.
+  // The Water Road (#701 s1): off the Middle Ages, for a people with shallows by its town. The land's shape is the door; a Dock,
+  // a people working its waters, is the clue.
   {
     from: 'middle',
     to: 'dykes',
     cost: { food: 350, wood: 350, stone: 100 },
     time: 40,
+    clue: 'dock',
     coast: 'No shallow water lies near your town: the Age of Dykes wants a bay, a lake or a strait within reach to wall off and drain',
     blurb: 'A turn, not a climb, for a people with shallow water by its town: raise dykes across the shallows and windmills behind them, and pump the sea out into polder, the richest fields there are. Drain a strait and the far shore is a march away. What it gives up: stone walls and gates, for the dykes are the walls, and the best fields lie below the sea.',
   },
