@@ -162,6 +162,11 @@ export interface Age {
    */
   rivers?: boolean;
   /**
+   * The Age of Tides (#739): Tide Mills grind on the running tide and causeways are raised over the flats. The tide itself runs for
+   * everyone once the first people enters the age. See `TIDE` (`tides.ts`).
+   */
+  tides?: boolean;
+  /**
    * The Age of the Water Line (#701 s4): sluices open and shut, letting the water out over the low ground behind them (`INUND`,
    * `water.ts`), and Sluices launch gun-barges that sail the flood.
    */
@@ -689,6 +694,21 @@ export const AGES: Record<AgeId, Age> = {
     blurb: 'As the first towns of Sumer and the Indus did: a people that leads the river where it wants it. Citizens dig Channels (Q) out from any water, a spring, a stream, a lake or the shore, dragged out in a line like a wall; when a stretch is dug the water runs in, a tile at a time, and stays. A Farm within 2 tiles of water works 30% faster, and in this age no Farm is laid away from water, so the fields follow the channels. A channel is a moat: soldiers and citizens wade it at well under half their pace, and no ship sails it. Markets, Temples and the Bronze Age\'s arms are all here. What is dug stays dug on any road.',
     rivers: true,
   },
+  // The Water Road's sixth age (#739, s6 of #701): instead of the Atomic Age, a people that keeps the sea's hours. Reached for now by a
+  // turn off the Atomic Age (the Age of Locks, s5, will lead here too). The tide wakes for the whole world when the first people enters.
+  tides: {
+    verb: 'Time the sea: the tide clock runs for everyone, the flats bare at low water so armies and traders walk where ships sailed, Tide Mills grind gold on the running tide, and causeways carry a road over the sea that only high water drowns',
+    door: 'No Missile Silo, and your town keeps the sea\'s hours: at high water your causeways drown, at low water your harbours ground',
+    good: 'Ground that comes and goes: a march across the bay at low water, and mills that grind on every turn of the tide',
+    routes: ['water'],
+    keepsake: { building: 'tidemill', does: 'grinding gold on the running tide, on any road' },
+    name: 'Age of Tides',
+    short: 'Tides',
+    tier: 5,
+    blurb: 'As the monks of Mont-Saint-Michel and Lindisfarne lived, and the millers of the Rance and the Wash: a people that keeps the sea\'s hours. When the first people enters this age the tide wakes for the whole world, and its clock is on every screen: every three minutes the sea falls through three steps to low water and rises back. Shallow sea bares as it falls, the shallowest first: wet flats that anyone may walk, where ships sat a minute ago and now sit aground. Whoever is on the flats when the water comes back is swept ashore and hurt, or drowned far out. Tide Mills (A), raised on the shore, grind gold every time the tide turns, more the more tidal ground lies near them. Causeways (V), dragged out like a wall over the flats or the shallow sea, raise a road that only high water covers; laid across a bay\'s mouth, a barrage that holds its flats wet as a pond the mills grind twice, until a rival\'s powder breaches it. At low water a Dock with no water beside it launches nothing. No Missile Silo is raised.',
+    noBuild: { buildings: ['silo'], why: 'A people that keeps the sea\'s hours raises no Missile Silo. It waits until it returns to the Atomic Age' },
+    tides: true,
+  },
   // The Water Road's third age (#701 s4): instead of the Gunpowder Age. The Dutch Water Line (1672, the Rampjaar): when an army
   // came, the sluices were opened and the low land between the towns went under knee-deep water, too deep to march, too shallow to
   // sail, and the towns stood as islands. The water is the wall; the guns go on flat boats.
@@ -1159,6 +1179,17 @@ export const ROADS: Road[] = [
   { from: 'atomic', to: 'fission', cost: { food: 1000, gold: 1200, stone: 600 }, time: 60, clue: 'silo', shuns: 'fusion', blurb: 'A turn, not a climb: raw power now. A silo\'s clock is 25 seconds and it refuels in 100, but every launch poisons the ground round your own silo for a minute. Take it, and Fusion is closed for good.' },
   { from: 'fission', to: 'atomic', cost: { food: 300, gold: 300 }, time: 30, blurb: 'Shut the reactor: the ordinary Atomic Age, a 45 second clock and a 240 second refuel, and no poison round your own silos. Fusion stays closed.' },
   { from: 'atomic', to: 'fusion', cost: { food: 2400, gold: 3000, stone: 1500 }, time: 150, clue: 'silo', shuns: 'fission', blurb: 'A turn, not a climb: clean and limitless, and ruinously dear. A silo keeps up to three warheads aloft and never needs refuelling, and nothing it strikes is poisoned, but the clock is 70 seconds and the road costs a fortune and 150 seconds. Take it, and Fission is closed for good.' },
+  // The Water Road's sixth age (#739): a turn off the Atomic Age for a people with a shore, until the Age of Locks (#701 s5) leads in.
+  {
+    from: 'atomic',
+    to: 'tides',
+    cost: { food: 800, gold: 800, stone: 450 },
+    time: 60,
+    clue: 'dock',
+    coast: 'Needs shallow sea within reach of your first town: the tide has nothing to bare on a dry shore',
+    blurb: 'A turn, not a climb, for a people with a shore: keep the sea\'s hours. The tide wakes for the whole world, bares the shallows at low water and drowns them again; Tide Mills grind gold on every turn of it, and causeways carry a road over the sea that only high water covers. What it gives up: the Missile Silo, and harbours that ground at low water.',
+  },
+  { from: 'tides', to: 'atomic', cost: { food: 300, gold: 300 }, time: 30, blurb: 'Back to the ordinary Atomic Age and its Missile Silo. The tide runs on for everyone, the causeways stand, and the mills stop grinding, all but the one you keep.' },
   { from: 'fusion', to: 'atomic', cost: { food: 300, gold: 300 }, time: 30, blurb: 'Quench the plasma: the ordinary Atomic Age, a 45 second clock, one warhead at a time, and fallout where you strike. Fission stays closed.' },
   { from: 'bloodrite', to: 'industrial', cost: { food: 300, gold: 200 }, time: 30, blurb: 'Put out the altar fires: the ordinary Industrial Age, with trade, full fields and siege at its usual price. The plunder ends and the Temples are Temples again. Hemocraft stays closed.' },
   // The first gateway (#577, the age road s5): saltpetre's only door, a turn off the Middle Ages into the Age of Alchemy, and from
@@ -1334,6 +1365,41 @@ export const AI_DYKE = { take: 0.5, line: 9, reach: 18, least: 14, cost: 3, crew
  * of its footprint is watered: in the age it works `farm` times as fast, and in the age no Farm is laid without water so near.
  */
 export const RIVERS = { fill: 0.25, bank: -0.16, bed: -0.45, wade: 0.4, wet: 2, farm: 1.3 };
+
+/**
+ * The tide (#739, the Age of Tides; `tides.ts`). It wakes for the whole world when the first people enters the age, at high water, and
+ * runs on a public clock: every `period` seconds the sea falls through `flats.length` levels to low water and rises back, a step each
+ * `period / (2 × flats.length)` seconds. Open sea whose bed (the mean of its corners) lies at or above `flats[k - 1]` is tidal ground
+ * of level k: bared while the tide stands below k. A Dock with no open water within `harbour` tiles is aground. A bared tile is wet
+ * sand, its corners raised to `dry`. Who is on the flats when the water comes back is swept to the nearest dry tile within `sweep`,
+ * losing `hurt` health, or drowned with none. A causeway may be laid on open
+ * sea down to `causeway` deep, and is tidal ground of the top level. A Tide Mill grinds `mill.gold` gold each turn of the tide with
+ * `mill.most` tiles of tidal ground within `mill.reach` of its footprint (less, pro rata, with fewer), each tile feeding the first mill only.
+ */
+export const TIDE = { period: 180, flats: [-1.0, -0.75, -0.5], harbour: 2, dry: 0.08, sweep: 6, hurt: 15, causeway: -1.6, mill: { reach: 5, most: 24, gold: 60 } };
+/** The computer in the Age of Tides (#739): its odds of taking the road (more for a people already on the Water Road), how many Tide Mills it raises, and how much tidal ground a mill's spot must reach. */
+export const AI_TIDES = { take: 0.35, onward: 0.7, mills: 3, least: 8, reach: 20, wary: 12 };
+/**
+ * Barrages (#748). A causeway line that shuts a body of tidal ground off from the open sea (four ways, through water and tidal ground but
+ * not causeways; closed when it touches no map edge and holds no more than `most` tiles, as a mill judges the open sea) makes it a pond:
+ * its flats stay wet at every level, and a Tide Mill grinds each pond tile `mill` times over (on the flood and on the ebb). A keg's blast
+ * or a warhead breaches every rival causeway tile within its reach: the tile sinks back to the tidal ground (or open sea) it was laid on.
+ */
+export const BARRAGE = { mill: 2, most: 160 };
+/**
+ * The computer and barrages (#748). With a Tide Mill standing it looks once for a straight causeway line within `reach` tiles of the
+ * mill, running to land (or a causeway) on both sides with `line` tiles at most between, that shuts off at least `least` tiles of tidal ground a mill
+ * of its reaches; scored by those tiles less `cost` for each tile of line. It lays it with `crew` citizens once it can pay the whole
+ * line, and mends a breach in a line that once stood whole. Its Sappers carry kegs to a rival's barrage first, as to a dyke.
+ */
+export const AI_BARRAGE = { reach: 9, line: 10, least: 6, cost: 1, crew: 3 };
+/**
+ * The low-water strike (#748). A clever computer whose march on a rival crosses `across` or more tiles of tidal ground (a straight line from
+ * its muster, with no open sea on it) times the wave to the tide: it sets out only when, marching at its slowest soldier's pace (`slack`
+ * times the straight line), it would find the flats bare and cross them with `margin` seconds to spare, waiting at most `hold` seconds
+ * for it. When the flood is `AI_TIDES.wary` seconds off, the soldiers not yet over the far shore turn back to the muster.
+ */
+export const AI_EBB = { across: 3, slack: 1.25, margin: 6, hold: 200 };
 
 /**
  * The breach (#701 s3, the Water Road). Every `every` seconds the sea runs one tile on: each tile of polder four-ways beside water that
@@ -2084,6 +2150,8 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   // The Water Road (#701 s1): a bank of earth across the shallows, and the mill that pumps the water out behind it (`DYKE`, `POLDER`, `water.ts`).
   dyke: { name: 'Dyke', size: 1, hp: 700, cost: { wood: 2, stone: 4 }, time: 7, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, ages: ['dykes'], menu: 'eco', key: 'K', blurb: 'A bank of earth with a stone crown, raised on shallow water or on the shore beside it. Drag to lay out a line. Your own people walk along its crown; rivals and ships can\'t pass. Shut a bay or a strait off from the open sea with dykes, then set a Windmill by it to pump it dry. A dyke that falls (to siege, or a Sapper\'s keg) lets the sea back in: it floods the polder ring by ring until a dyke stands in the gap again. A people that has walked the Age of Dykes raises dykes in any age after, to mend its banks.' },
   channel: { name: 'Channel', size: 1, hp: 150, cost: { wood: 4 }, time: 8, pop: 0, sight: 1, trains: [], drop: [], epoch: 1, ages: ['rivers'], open: true, menu: 'eco', key: 'Q', blurb: 'A ditch dug out from water across the land. Drag to lay out a line from a spring, stream, lake or shore: as each stretch is dug the water runs into it and it stays. Farms within 2 tiles of water work faster in the Age of Rivers. Soldiers wade a channel at well under half their pace, and no ship sails it.' },
+  causeway: { name: 'Causeway', size: 1, hp: 400, cost: { wood: 4, stone: 8 }, time: 6, pop: 0, sight: 1, trains: [], drop: [], epoch: 5, ages: ['tides'], menu: 'eco', key: 'V', blurb: 'A raised road of packed stone over the tidal flats or the shallow sea. Drag to lay out a line from the shore. Once laid it is tidal ground that only high water covers: anyone may walk it, at every hour but the top of the tide, and whoever is on it when the water comes back is swept off. A causeway counts as tidal ground for the mills. A line laid across the mouth of a bay of flats is a barrage: behind it the flats are a pond, wet at every hour, that Tide Mills grind twice. A rival\'s keg or warhead breaches it.' },
+  tidemill: { name: 'Tide Mill', size: 2, hp: 900, cost: { wood: 200, stone: 150 }, time: 35, pop: 0, sight: 5, trains: [], drop: [], epoch: 5, ages: ['tides'], shore: true, menu: 'eco', key: 'A', blurb: 'A mill on the shore whose pond fills on the flood and runs out through its wheel on the ebb. Every time the tide turns it grinds gold, more for every tile of tidal ground within 5 tiles (up to 24), each tile feeding one mill only. Flats a causeway line has shut off from the sea (a barrage\'s pond) are ground twice, on the flood and on the ebb. Only in the Age of Tides, or the one your people kept on leaving it.' },
   windmill: { name: 'Windmill', size: 2, hp: 600, cost: { wood: 120, stone: 40 }, time: 30, pop: 0, sight: 5, trains: [], drop: [], epoch: 2, ages: ['dykes'], menu: 'eco', key: 'W', blurb: 'A post mill whose sails turn a scoop wheel. Raised by water a dyke has shut off from the open sea (or a small lake), it pumps it dry a tile every few seconds, nearest first, into polder: low black ground where a Farm yields half again as much. Two mills drain twice as fast. The open sea is too big to pump.' },
   // The Water Line (#701 s4): a gate in a dyke or a channel that lets the water out over the low ground behind it (`INUND`, `water.ts`).
   sluice: { name: 'Sluice', size: 1, hp: 800, cost: { wood: 60, stone: 80 }, time: 20, pop: 0, sight: 4, trains: ['barge'], drop: [], epoch: 3, ages: ['waterline'], menu: 'mil', key: 'S', blurb: 'A timber gate in a dyke, on a channel or on shallow water, raised on its banks by a winch. Shut, it holds the water back as a dyke does, and your own people walk across it. Open it (O) and the water runs out over the low ground round it, a ring a second, up to 7 tiles: soldiers wade the flood at a crawl, siege can hardly cross it, and your gun-barges sail it. Shut it and the water drains away. It launches Gun-barges onto the water beside it.' },

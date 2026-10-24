@@ -3,6 +3,7 @@ import { ageDef } from './ages';
 import { hurt, peace } from './combat';
 import { distToRect } from './grid';
 import { canAfford, isEnemy, pay } from './world';
+import { breachAt } from './tides';
 import type { Building, Ent, GameState, Player } from './types';
 
 /**
@@ -69,6 +70,8 @@ function strike(s: GameState, owner: number, x: number, y: number, clean = false
     }
   }
   for (const e of hit) hurt(s, e, e.kind === 'building' ? SILO.building : SILO.unit, owner, null);
+  // A warhead tears up a rival's causeways too (#748): the road over the flats is cut, its barrage's pond let out.
+  breachAt(s, x, y, SILO.reach, owner);
   if (!clean) (s.fallout ??= []).push({ id: s.nextId++, owner, x, y, until: s.tick + secs(FALLOUT.time) });
   s.events.push({ k: 'silo', owner, x, y, what: 'struck' });
 }

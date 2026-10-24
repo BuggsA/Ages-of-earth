@@ -16,6 +16,7 @@ import { ruinAt } from './ruins';
 import { rubbleAt, salvages } from './salvage';
 import { cacheAt } from './caches';
 import { carriesKegs, kegProblem } from './powder';
+import { kegTileProblem } from './tides';
 import { carriesTorch, onFire, torchProblem } from './fire';
 import { launch, launchProblem } from './silo';
 import { raise, raiseCost } from './reclaim';
@@ -482,6 +483,18 @@ export function applyCommand(s: GameState, c: Command): void {
       for (const u of units) giveOrder(u, { k: 'keg', target: c.target }, c.queue);
       break;
     }
+    case 'kegTile': {
+      // Barrages (#748): a keg carried to a rival's causeway tile and laid on it, to breach the road.
+      const why = kegTileProblem(s, c.p, c.tile);
+      const units = myUnits(s, c.p, c.ids).filter(carriesKegs);
+      if (!units.length) return;
+      if (why) {
+        refuse(s, c.p, why);
+        return;
+      }
+      for (const u of units) giveOrder(u, { k: 'kegTile', tile: c.tile }, c.queue);
+      break;
+    }
     case 'torch': {
       // Fire (`fire.ts`): citizens and foot soldiers carry torches to a tree, a root or a rival's living building.
       const at = c.target !== undefined ? { target: c.target } : { tile: c.tile };
@@ -841,7 +854,7 @@ export function applyCommand(s: GameState, c: Command): void {
     }
     case 'wall': {
       // A line of wall, or of dykes or a channel (#701) or Thornwall (the Age of the Grove), laid the same way.
-      const type = c.dyke ? 'dyke' : c.thorn ? 'thornwall' : c.channel ? 'channel' : 'wall';
+      const type = c.causeway ? 'causeway' : c.dyke ? 'dyke' : c.thorn ? 'thornwall' : c.channel ? 'channel' : 'wall';
       const tiles = wallLine(c.x0, c.y0, c.x1, c.y1);
       const placed: Building[] = [];
       for (let i = 0; i < tiles.length; i++) {
