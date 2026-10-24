@@ -39,13 +39,14 @@ import { isCoppice } from './coppice';
 import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
-import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS } from './data';
+import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, TAME, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
 import { isRider, standing } from './tribute';
 import { flockCap, flockOf, grassy, grazeRange, milkable } from './flocks';
 import { progress, scenarioById } from './campaign';
+import { tames, wildBeast } from './tame';
 
 /**
  * The computer opponent. It plays by the same rules and through the same commands as a person: it
@@ -246,6 +247,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   fireSilo(s, v, mem, issue);
   fleeWarhead(s, v, issue);
   steppeRoad(s, v, mem, issue);
+  wildRoad(s, v, mem, issue);
   readYear(s, v);
   huntTheYear(s, v, issue);
 
@@ -524,6 +526,8 @@ function fit(p: Player, to: AgeId): number {
   if (age.path === 'blood') return cls === 'infantry' || cls === 'cavalry' ? 0 : -1;
   // The Silk Road (#326) waits until the computer knows how to move its Market with the camp.
   if (to === 'silk') return -1;
+  // The Age of the Wild shuts the Stable and the Siege Workshop: a people whose strength is riders or engines keeps away.
+  if (age.tames) return cls === 'cavalry' || cls === 'siege' ? -1 : 0;
   // The Steppe Road (#320): its first age is judged as any side age; the Horde follows it (#322, see `wants`).
   if (age.no?.units.includes(sig)) return -1;
   return (age.price?.[cls] ?? 1) < 1 ? 1 : 0;
@@ -558,6 +562,9 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   } else if (roads[to] === undefined && to === 'sapper') {
     // The gateway's road on (#577): Alchemy is walked for the Sappers, so a people that turned into it goes on.
     roads[to] = hasWalked(p, 'alchemy');
+  } else if (roads[to] === undefined && to === 'wild') {
+    // The Wild route (`docs/wild-road.md`): a coin of its own, as the steppe's, so asking shifts no other match's dice.
+    roads[to] = fit(p, to) >= 0 && coin(s, p.id, 0x3d17) < TAME.aiTake;
   } else if (roads[to] === undefined && to === 'alchemy') {
     // A coin of its own (as the steppe's): the gateway is asked only where saltpetre lies, and shifts no other match's dice.
     roads[to] = fit(p, to) >= 0 && coin(s, p.id, 0xa1c4) < AI_KEG.take;
@@ -676,6 +683,8 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
     mem.sideHold ??= s.tick;
     if (s.tick - mem.sideHold < secs(AI_SILO.hold)) return null;
   }
+  // The Wild is kept a while, so the beasts it came for are tamed and the Den is breeding.
+  if (walksWeb(v) && ageOf(p) === 'wild' && s.tick - (mem.wild ?? s.tick) < secs(TAME.aiStay)) return null;
   // The steppe (#320) is kept a while, so the flock it came for pays.
   if (walksWeb(v) && ageDef(p).mobile && s.tick - (mem.steppe?.since ?? s.tick) < secs(AI_STEPPE.stay)) return null;
   // Bound for a crossing (#585, #555 s12), a sibling doesn't climb on: its way is back to the Middle Ages (`seaTurn`).
@@ -2368,7 +2377,9 @@ function wilds(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void
     if (home.length) issue({ t: 'move', p: v.p.id, ids: home, x: v.home.x, y: v.home.y });
     mem.huntEscort = out.length ? out : undefined;
   }
-  if (v.citizens.length >= AI_WILD.mammothAt - eager && !v.citizens.some((u) => hunting(u, 'mammoth'))) {
+  // A Wild town (`wildRoad`) tames the beasts it would hunt: mammoths, boars and wolves are spared the spear.
+  const taming = tames(v.p);
+  if (!taming && v.citizens.length >= AI_WILD.mammothAt - eager && !v.citizens.some((u) => hunting(u, 'mammoth'))) {
     let m = nearestBeast(s, 'mammoth', v.home.x, v.home.y, AI_WILD.mammothNear);
     // A clever computer also goes for a far mammoth, with soldiers along to take the charge, if no rival is by it.
     let escort: Unit[] = [];
@@ -2392,7 +2403,7 @@ function wilds(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void
     }
   }
   // A boar guarding berries near home: three citizens spear it together, once the town has six.
-  if (v.citizens.length >= AI_WILD.boarAt - eager && !v.citizens.some((u) => hunting(u, 'boar'))) {
+  if (!taming && v.citizens.length >= AI_WILD.boarAt - eager && !v.citizens.some((u) => hunting(u, 'boar'))) {
     const b = nearestBeast(s, 'boar', v.home.x, v.home.y, AI_WILD.boarNear);
     if (b && b.state !== 'fight') {
       const party = v.citizens
@@ -2403,7 +2414,7 @@ function wilds(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void
     }
   }
   if (mem.attacking || v.army.some((u) => hunting(u, 'wolf') || hunting(u, 'raider'))) return;
-  const wolf = nearestBeast(s, 'wolf', v.home.x, v.home.y, AI_WILD.clear);
+  const wolf = taming ? null : nearestBeast(s, 'wolf', v.home.x, v.home.y, AI_WILD.clear);
   const free = v.army.filter((u) => !u.inside && (u.order.k === 'idle' || atTheAxe(v, u) || (u.order.k === 'move' && !u.order.amove)) && u.type !== 'siege');
   if (wolf) {
     const need = cold && seasonAt(s) === 3 ? AI_WILD.pack - AI_WINTER.pack : AI_WILD.pack;
@@ -2451,6 +2462,60 @@ function steppeRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) =>
   if (!herd) return;
   const spot = findSpot(s, clue, herd.x, herd.y, 2, 5);
   if (spot) construct(s, v, mem, clue, spot, 2, issue);
+}
+
+/**
+ * The Wild route (`docs/wild-road.md`). Bound for it in the Stone Age, the computer raises the Hunting Camp that shows the road.
+ * In the Age of the Wild it tames: one citizen at a time sings to the nearest wild beast within `TAME.aiNear` tiles of home (a boar
+ * or a mammoth alone; a wolf only with `TAME.aiEscort` soldiers sent ahead to take on its pack), and once a kind is tamed it raises
+ * a Beast Den (`pickUnit` then breeds from it like any building that trains).
+ */
+function wildRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!walksWeb(v)) return;
+  if (p.epoch === 0) {
+    const road = roadsFrom(p).find((r) => r.to === 'wild');
+    // The camp that shows the road goes up once the foraging deed is mostly in, so the opening's wood goes where it always went.
+    if (!road?.clue || !road.deed || (p.stats.foraged ?? 0) < road.deed.n * TAME.aiClue || v.citizens.length < AI_STEPPE.at || !wants(s, p, mem, 'wild') || count(v, road.clue) > 0 || s.tick - (mem.ordered[road.clue] ?? -99999) < secs(25)) return;
+    const spot = findSpot(s, road.clue, v.home.x, v.home.y, 6, 14);
+    if (spot) construct(s, v, mem, road.clue, spot, 1, issue);
+    return;
+  }
+  if (!tames(p)) return;
+  mem.wild ??= s.tick;
+  const singers = v.citizens.filter((u) => u.order.k === 'tame');
+  for (const u of singers) v.claimers.add(u.id);
+  if (p.tamed?.length && count(v, 'den') < TAME.aiDen && s.tick - (mem.ordered.den ?? -99999) >= secs(25)) {
+    // The Den is what the Wild was for: it may spend what is set aside for the climb.
+    const spot = findSpot(s, 'den', v.home.x, v.home.y, 6, 14);
+    if (spot) {
+      const kept = v.budget;
+      v.budget = { ...p.res };
+      const raised = construct(s, v, mem, 'den', spot, 2, issue);
+      v.budget = kept;
+      if (raised) spend(v, BUILDINGS.den.cost);
+    }
+  }
+  if (singers.length) return;
+  const escort = v.army.filter((u) => !u.inside && (u.order.k === 'idle' || u.order.k === 'move'));
+  let best: Animal | null = null;
+  let bestD = TAME.aiNear * TAME.aiNear;
+  for (const a of s.animals) {
+    if (!wildBeast(a) || s.tick - a.hurt < secs(TAME.wary) || (a.kind === 'wolf' && escort.length < TAME.aiEscort)) continue;
+    const d = (a.x - v.home.x) * (a.x - v.home.x) + (a.y - v.home.y) * (a.y - v.home.y);
+    if (d < bestD) {
+      bestD = d;
+      best = a;
+    }
+  }
+  if (!best) return;
+  const tamer = v.citizens
+    .filter((u) => !u.inside && !u.queue.length && u.carry <= 2 && !v.diggers.has(u.id) && !v.claimers.has(u.id) && (u.order.k === 'idle' || u.order.k === 'gather'))
+    .sort((a, b) => distTo(a, best!) - distTo(b, best!) || a.id - b.id)[0];
+  if (!tamer) return;
+  if (best.kind === 'wolf') issue({ t: 'move', p: p.id, ids: escort.slice(0, TAME.aiEscort).map((u) => u.id), x: best.x, y: best.y, amove: true });
+  issue({ t: 'tame', p: p.id, ids: [tamer.id], target: best.id });
+  v.claimers.add(tamer.id);
 }
 
 const grownSheep = (s: GameState, owner: number): Animal[] => s.animals.filter((a) => a.kind === 'sheep' && a.owner === owner && a.hp > 0 && a.lamb === undefined);

@@ -148,6 +148,8 @@ function orderWords(s: GameState, u: Unit): string {
       return 'Hunting';
     case 'milk':
       return o.phase === 'drop' ? 'Carrying milk home' : o.phase === 'work' ? 'Milking the flock' : 'Going to milk the flock';
+    case 'tame':
+      return u.act === 'chant' ? 'Singing a wild beast calm' : 'Going to tame a wild beast';
     case 'snare':
       return o.phase === 'drop' ? 'Carrying the catch home' : o.phase === 'work' ? 'Emptying a snare' : u.act === 'idle' ? 'Waiting by the snares for game' : 'Walking the trap line';
     case 'shaft':

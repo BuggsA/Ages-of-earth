@@ -1,4 +1,4 @@
-import { AI_LEVELS, AUTO_WORK, BUILDINGS, EXPLORE, PATROL, CARRY, CONSECRATE, COPPICE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, LEGION, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TRADE, domainOf, secs } from './data';
+import { AI_LEVELS, AUTO_WORK, BUILDINGS, EXPLORE, PATROL, CARRY, CONSECRATE, COPPICE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, LEGION, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TAME, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
@@ -17,6 +17,7 @@ import { RES, R_BERRY, R_BLOODIRON, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_SAL
 import { carriedBy, relicAt } from './relics';
 import { animalRadius, hitAnimal } from './animals';
 import { milkable } from './flocks';
+import { finishTame, songOf, tames, wildBeast } from './tame';
 import { catchIn, nextSnare } from './snares';
 import { TILE_OF_SEAM, resOfSeam, seamOf, shaftShare } from './shafts';
 import { dig, ruinAt } from './ruins';
@@ -378,6 +379,10 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
         // Meat butchered counts toward the Age of the Steppe's deed (#297).
         const st = s.players[u.owner].stats;
         st.hunted = (st.hunted ?? 0) + 1;
+      } else if (kind === R_BERRY) {
+        // Wild bushes foraged count toward the Age of the Wild's deed.
+        const st = s.players[u.owner].stats;
+        st.foraged = (st.foraged ?? 0) + 1;
       }
     }
     workEvent(s, u, u.act, tx, ty);
@@ -1236,6 +1241,42 @@ function milkStep(s: GameState, u: Unit, o: Extract<Order, { k: 'milk' }>): void
     return;
   }
   o.phase = 'go';
+  const g = goalForPoint(s, a.x, a.y, passOf(s, u));
+  const moved = u.goal ? Math.abs(u.goal.px - g.px) + Math.abs(u.goal.py - g.py) : 99;
+  if (walking(u) && moved > 1.5 && s.tick - u.pathTick > 15) {
+    goTo(u, g);
+    return;
+  }
+  if (!approach(u, g)) setOrder(u, { k: 'idle' });
+}
+
+/**
+ * Tame a wild beast (the Age of the Wild, `tame.ts`): walk to it, claiming it as you go so it stands calm for you, then sing
+ * `TAME.secs` seconds beside it. A beast hurt within `TAME.wary` seconds won't take the hand, and a wound mid-song breaks it.
+ */
+function tameStep(s: GameState, u: Unit, o: Extract<Order, { k: 'tame' }>): void {
+  const a = s.animals.find((x) => x.id === o.target);
+  if (!wildBeast(a) || !tames(s.players[u.owner]) || s.tick - a.hurt < secs(TAME.wary)) {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  if (a.tamer === undefined) a.tamer = u.id;
+  const dx = a.x - u.x;
+  const dy = a.y - u.y;
+  const d = Math.sqrt(dx * dx + dy * dy) - statsOf(s, u).radius - animalRadius(a);
+  if (d <= TAME.reach) {
+    if (walking(u)) stopWalking(u);
+    face(u, a.x, a.y);
+    u.miss = 0;
+    u.act = 'chant';
+    a.tamer ??= u.id;
+    if (++o.t >= songOf(a)) {
+      finishTame(s, u, a);
+      setOrder(u, { k: 'idle' });
+    }
+    return;
+  }
+  o.t = 0;
   const g = goalForPoint(s, a.x, a.y, passOf(s, u));
   const moved = u.goal ? Math.abs(u.goal.px - g.px) + Math.abs(u.goal.py - g.py) : 99;
   if (walking(u) && moved > 1.5 && s.tick - u.pathTick > 15) {
@@ -2128,6 +2169,9 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
       break;
     case 'milk':
       milkStep(s, u, o);
+      break;
+    case 'tame':
+      tameStep(s, u, o);
       break;
     case 'snare':
       snareStep(s, u, o);

@@ -977,6 +977,13 @@ export class View {
           // The wild (#171): a mammoth trumpets, a pack howls as it turns to fight.
           if (this.sees(ev.x, ev.y)) this.cue(ev.kind === 'mammoth' ? 'mammoth' : ev.kind === 'boar' ? 'snarl' : ev.kind === 'raider' ? 'rally' : 'howl', ev.x, ev.y, 1);
           break;
+        case 'tamed':
+          // The Age of the Wild: a beast takes the hand; a green ring where it stood, its own cry and the tamer's lullaby.
+          if (!this.sees(ev.x, ev.y)) break;
+          this.effects.ring(this.ground(s, ev.x, ev.y, 0.2), '#7fc46a', 1.4, 0.9);
+          this.cue('tame', ev.x, ev.y, 1);
+          this.cue(ev.kind === 'mammoth' ? 'mammoth' : ev.kind === 'boar' ? 'snarl' : 'howl', ev.x, ev.y, 0.5);
+          break;
         case 'wildStrike':
           if (!this.sees(ev.x, ev.y)) break;
           if (ev.kind === 'raider') this.cue('spear', ev.x, ev.y, 0.8);

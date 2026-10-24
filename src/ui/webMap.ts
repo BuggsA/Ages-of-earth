@@ -103,7 +103,7 @@ export function roadView(d: Discovery, r: Road): 'hidden' | 'faint' | 'known' {
 // The Steppe Road (#318) keeps the right column, as the Path of Blood keeps the left: the Steppe over the Horde.
 // The Silk Road (#326), the crossing where the horde meets the merchants, steps in to lane 4 under the Sail, between its two roads.
 // The first gateway (#577) takes a seventh lane, past the Steppe Road: Alchemy at tier 2 over the Sappers it leads to.
-const LANE: Record<AgeId, number> = { iron: 0, reclaimer: 2, stone: 1, bronze: 1, middle: 1, gunpowder: 1, industrial: 1, atomic: 1, fission: 0, fusion: 2, merchant: 2, pilgrim: 3, fair: 3, sail: 4, aeronaut: 2, lightning: 3, warband: 0, steppe: 5, ironblood: 0, totalwar: 0, horde: 5, silk: 4, chariots: 3, hemocraft: 0, bloodrite: 1, alchemy: 6, sapper: 6, searaider: 2, missions: 3 };
+const LANE: Record<AgeId, number> = { iron: 0, reclaimer: 2, stone: 1, bronze: 1, middle: 1, gunpowder: 1, industrial: 1, atomic: 1, fission: 0, fusion: 2, merchant: 2, pilgrim: 3, fair: 3, sail: 4, aeronaut: 2, lightning: 3, warband: 0, steppe: 5, ironblood: 0, totalwar: 0, horde: 5, silk: 4, chariots: 3, hemocraft: 0, bloodrite: 1, alchemy: 6, sapper: 6, searaider: 2, missions: 3, wild: 4 };
 // The fork at the end of the Path of Blood (#355 s2) stands at Industrial strength, but past Total War: a row of its own under
 // tier 4, Hemocraft below Total War in the path's column and the Blood-rite below the Industrial Age it turns off.
 // The first crossing (#585) sits between its two siblings' tier and the next, under the Merchants: half a row down, off the Middle Ages.

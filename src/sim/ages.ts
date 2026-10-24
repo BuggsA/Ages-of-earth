@@ -296,6 +296,9 @@ export const isHire = (p: Player, at: BuildingType, unit: UnitType): boolean => 
 export function barred(p: Player, unit: UnitType, at?: BuildingType): string | null {
   // The polis (#501): a Greek city trains no foot soldiers; its citizens take up arms. It may still hire foreign foot for gold.
   if (unit === 'infantry' && CIVS[p.civ].polis && !(at && isHire(p, at, unit))) return 'A Greek city trains no foot soldiers: select citizens and take up arms (H)';
+  // The Beast Den (the Age of the Wild): it breeds only the kinds this people has tamed.
+  const kind = unit === 'warwolf' ? 'wolf' : unit === 'tusker' ? 'boar' : unit === 'warmammoth' ? 'mammoth' : null;
+  if (kind && !p.tamed?.includes(kind)) return `Tame a wild ${kind} first: the Den breeds only what your people has tamed`;
   const no = ageDef(p).no;
   return no && no.units.includes(unit) ? no.why : null;
 }
@@ -313,6 +316,8 @@ export function buildBarred(p: Player, type: BuildingType): string | null {
   // The managed wood (#501): the Britons till no fields, and only they plant woods.
   if (type === 'farm' && CIVS[p.civ].coppice) return 'A British town tills no fields: its food is the snares in its woods';
   if (type === 'sapling' && !CIVS[p.civ].coppice) return 'Only the Britons plant and coppice their woods';
+  // The Beast Den (the Age of the Wild): raised by a people that has tamed a beast, in any age after.
+  if (type === 'den' && !p.tamed?.length) return 'Tame a wild beast first: a Den is raised only by a people that has tamed one (the Age of the Wild)';
   const way = p.way ? WAYS[p.way] : undefined;
   if (way?.shuts?.includes(type)) return `${way.name} raises no ${BUILDINGS[type].name}`;
   const only = BUILDINGS[type].ages;

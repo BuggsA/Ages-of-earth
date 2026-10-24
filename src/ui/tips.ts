@@ -1,4 +1,4 @@
-import { AGES, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, secs } from '../sim/data';
+import { AGES, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, secs } from '../sim/data';
 import { battlesFor } from '../sim/battles';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, findsOf, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
@@ -389,6 +389,12 @@ const TIPS: Tip[] = [
       return ageOf(p) === 'steppe' && roadKnown(s, p, HORDE_ROAD) && (p.stats.milked ?? 0) > 0 && !deedsDone(p, HORDE_ROAD, s);
     },
     text: `The camp can grow into a horde. Milk ${HORDE_ROAD.deed!.n} from your flock and butcher ${HORDE_ROAD.also![0].n} meat in all, and the Town Center (🔀) can take your people into the <b>${AGES.horde.name}</b> instead of the Middle Ages: still on wagons, still no fields or walls, and riders who stand in a rival's land take tribute from its treasury.`,
+  },
+  {
+    id: 'wild',
+    // The Age of the Wild (`docs/wild-road.md`): nothing tamed yet.
+    when: (s, me) => ageOf(s.players[me]) === 'wild' && !s.players[me].tamed?.length,
+    text: `Your people keeps company with the wild now. Select a citizen and <b>right-click a wolf, boar or mammoth</b> to sing it calm: ${TAME.secs.wolf} seconds for a wolf, ${TAME.secs.boar} for a boar, ${TAME.secs.mammoth} for a mammoth, and it becomes yours, a beast of war. The beast stands still for its tamer, but its pack bites, so bring an escort. Once a kind is tamed, a <b>${BUILDINGS.den.name}</b> breeds more of it.`,
   },
   {
     id: 'tribute',
