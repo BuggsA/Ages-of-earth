@@ -1,5 +1,6 @@
-import { BUILDINGS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, SNARE, SPREAD, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
+import { AUTO_WORK, BUILDINGS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, SNARE, SPREAD, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
 import { peace } from './combat';
+import { findSpot } from './ai';
 import { placeProblem, stampBuilding, walkable } from './grid';
 import { buildingCostFor, raiseProblem, techCostFor, techProblem, trainCostFor } from './stats';
 import { packCamp, packProblem, pitchCamp, pitchProblem } from './steppe';
@@ -332,7 +333,20 @@ export function applyCommand(s: GameState, c: Command): void {
     }
     case 'reassign': {
       const r = reassign(s, c.p, c.from, c.to, c.n);
-      if (r.why) refuse(s, c.p, r.why);
+      // Hands sent for food where there is no bush, field, snare or ewe lay a field and raise it, rather than being refused (#344).
+      let laid = 0;
+      // Not while a field of theirs is still going up: another press waits for it rather than laying more.
+      const raising = s.ents.some((e) => e.kind === 'building' && e.owner === c.p && e.type === 'farm' && !e.built && e.hp > 0);
+      const ask = raising ? [] : r.stuck.slice(0, Math.min(AUTO_WORK.lay, Math.max(0, Math.floor(c.n)) - r.moved));
+      for (const u of ask) {
+        const spot = findSpot(s, 'farm', u.x, u.y, 2, AUTO_WORK.farm);
+        const b = spot && placeSite(s, c.p, 'farm', spot.tx, spot.ty, laid > 0);
+        if (!b) break;
+        assignBuilders(s, [u], b, false);
+        laid++;
+      }
+      if (r.why && !laid) refuse(s, c.p, r.why);
+      else if (r.why && laid < ask.length) refuse(s, c.p, `Laid ${laid} ${laid === 1 ? 'field' : 'fields'}; ${r.why.toLowerCase()}`);
       break;
     }
     case 'hunt': {

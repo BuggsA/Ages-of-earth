@@ -532,7 +532,7 @@ export class Hud {
         `<div class="wf-move"><div class="wf-line">Move <input id="wf-n" type="number" min="1" max="200" value="5" aria-label="How many"></div>` +
         `<div class="wf-line">from <select id="wf-from" aria-label="From job">${opt(['wood', 'food', 'stone', 'gold', 'build', 'idle'])}</select></div>` +
         `<div class="wf-line">to <select id="wf-to" aria-label="To job">${opt(['food', 'wood', 'stone', 'gold', 'build'])}</select> <button type="button" class="wf-go" data-go>Go</button></div></div>` +
-        '<div class="workforce-note">Choose a row to select its citizens. + sends one (Shift: five) from the idle first, else the biggest job; on Building it joins the nearest unfinished building and goes back to its old work after. Move sends the idle and empty-handed first.</div>';
+        '<div class="workforce-note">Choose a row to select its citizens. + sends one (Shift: five) from the idle first, else the biggest job (on Food, with no bush, field or game in reach, it lays a field for each and they raise it); on Building it joins the nearest unfinished building and goes back to its old work after. Move sends the idle and empty-handed first.</div>';
     }
     // Written only when it changes: rebuilding a button between a press and its release would swallow the click.
     const set = (sel: string, html: string) => {
