@@ -494,6 +494,8 @@ export interface Fire {
 /** A warhead in the air (#605, `silo.ts`): launched from `silo`, it lands at (`x`, `y`) on tick `at`. */
 export interface Launch {
   id: number;
+  /** Which warhead (`WARHEADS`); absent in older saves (atomic). */
+  w?: 'atomic' | 'fission' | 'fusion';
   /** The warhead leaves no fallout where it lands (the Age of Fusion, #605 s3). */
   clean?: boolean;
   owner: number;
@@ -501,6 +503,15 @@ export interface Launch {
   x: number;
   y: number;
   at: number;
+}
+
+/** A blast that lifts the fog for every player over `r` tiles of (`x`, `y`) until tick `until` (#752, `silo.ts`, `vision.ts`). */
+export interface Blast {
+  id: number;
+  x: number;
+  y: number;
+  r: number;
+  until: number;
 }
 
 /** Ground poisoned by a warhead that struck at (`x`, `y`) for `owner`, until tick `until` (#605 s2, `silo.ts`). */
@@ -938,7 +949,7 @@ export type GameEvent =
   /** Fire (`fire.ts`): `lit` by a torch or spreading (`tree` when a tree; `owner` the building's), `out` (beaten out), `ash` (a tree burnt down), `root` (a Thornwall root burnt). `by` set the first flame. */
   | { k: 'fire'; what: 'lit' | 'out' | 'ash' | 'root'; x: number; y: number; by: number; owner?: number; torch?: boolean; tree?: boolean }
   /** A Missile Silo's warhead (#605): `launched` (the clock starts), `scrubbed` (the silo fell) or `struck`. */
-  | { k: 'silo'; owner: number; x: number; y: number; what: 'launched' | 'scrubbed' | 'struck'; fuse?: number }
+  | { k: 'silo'; owner: number; x: number; y: number; what: 'launched' | 'scrubbed' | 'struck'; fuse?: number; w?: 'atomic' | 'fission' | 'fusion' }
   /** A trader bought a load of rare ore at a post (#573). */
   | { k: 'oreBuy'; owner: number; ore: RareId; n: number; gold: number; x: number; y: number }
   | { k: 'ruin'; id: number; owner: number; find: RuinFind; tech?: TechId; x: number; y: number }
@@ -1177,6 +1188,8 @@ export interface GameState {
   launches?: Launch[];
   /** Ground poisoned by warheads that have struck (#605 s2); absent until one does. */
   fallout?: Fallout[];
+  /** Blasts whose fog stays lifted for everyone (#752); absent until a warhead strikes. */
+  blasts?: Blast[];
   /** Contested landmarks; absent in older saves and in campaign chapters (none). */
   landmarks?: Landmark[];
   /** Whether this world holds bog iron (#39), decided by the seed; absent in older saves (none). */

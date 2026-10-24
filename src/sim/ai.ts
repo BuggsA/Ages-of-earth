@@ -1,10 +1,10 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { aiTiding } from './tidings';
-import { AGES, AI_SILO, AI_BREACH, SILO, TICK_HZ, AI_CLIMB, AI_FIND, FINDS, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_SEA, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, SEA_RAID, MISSION, AI_MISSION, AI_CHARIOT, STEP_BACK, stepBackCost, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_SILO, WARHEADS, AI_BREACH, SILO, TICK_HZ, AI_CLIMB, AI_FIND, FINDS, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_SEA, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, SEA_RAID, MISSION, AI_MISSION, AI_CHARIOT, STEP_BACK, stepBackCost, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, raiseProblem, techCostFor, techProblem, trainCostFor } from './stats';
-import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Rubble, Ruin, TechId, TradePost, Unit, UnitType } from './types';
+import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, Fallout, GameState, Launch, Landmark, Player, Res, Rubble, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE, T_WATER } from './types';
 import { backProblem, backTo, ageDef, ageOf, asleep, barred, buildBarred, crossingLeft, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, trainsAt, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadProblem, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
 import { grindersOf, kegsOf, millProblem, mills, sappers } from './powder';
@@ -15,7 +15,7 @@ import { wallLine } from './commands';
 import { AI_BARRAGE, AI_EBB } from './data';
 import { barragePlan, causewayOwner, ebbTiming, isCauseway, isPond, tideAwake, tideLevel } from './tides';
 import { statsOf } from './world';
-import { launchProblem, loaded, rulesOf, silosOf } from './silo';
+import { blastDamage, launchProblem, loaded, rulesOf, silosOf, type WarheadKind } from './silo';
 import { carriedBy } from './relics';
 import { storesOre } from './caches';
 import { loadPrice, sellerNear } from './oretrade';
@@ -1898,17 +1898,21 @@ function siloRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   if (!spot || !construct(s, v, mem, 'silo', spot, 3, issue)) spend(v, cost);
 }
 
-/** Rival buildings and soldiers a warhead landing at (x, y) would catch, as the computer weighs them. */
-function siloWorth(s: GameState, owner: number, x: number, y: number): number {
+/**
+ * What a `w` warhead landing at (x, y) would cost the rivals, as the computer weighs it: each building (a Town Center counts `heart`)
+ * and soldier (counts `soldier`) is worth its weight times the share of its health the blast takes, never more than all of it.
+ */
+function siloWorth(s: GameState, owner: number, x: number, y: number, w: WarheadKind): number {
   let worth = 0;
-  const r2 = SILO.reach * SILO.reach;
+  const R = WARHEADS[w].r;
   for (const e of s.ents) {
     if (e.hp <= 0 || !isEnemy(s, owner, e.owner)) continue;
     if (e.kind === 'building') {
-      if (distToRect(x, y, e) <= SILO.reach) worth += e.type === 'towncenter' ? AI_SILO.heart : 1;
-    } else if (!e.inside && domainOf(e.type) === 'land') {
+      const d = distToRect(x, y, e);
+      if (d < R) worth += (e.type === 'towncenter' ? AI_SILO.heart : 1) * Math.min(1, blastDamage(w, d) / e.hp);
+    } else if (!e.inside && domainOf(e.type) === 'land' && MILITARY.includes(e.type)) {
       const dx = e.x - x, dy = e.y - y;
-      if (dx * dx + dy * dy <= r2) worth += MILITARY.includes(e.type) ? AI_SILO.soldier : 0;
+      if (dx * dx + dy * dy < R * R) worth += AI_SILO.soldier * Math.min(1, blastDamage(w, Math.sqrt(dx * dx + dy * dy)) / e.hp);
     }
   }
   return worth;
@@ -1929,7 +1933,7 @@ function fireSilo(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     let bestWorth = AI_SILO.worth - 1;
     for (const e of s.ents) {
       if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
-      const w = siloWorth(s, p.id, e.x, e.y);
+      const w = siloWorth(s, p.id, e.x, e.y, rulesOf(p).w);
       if (w > bestWorth) {
         bestWorth = w;
         best = { x: e.x, y: e.y, at: s.tick };
@@ -1954,7 +1958,7 @@ function fleeWarhead(s: GameState, v: View, issue: (c: Command) => void): void {
   if (s.tick % (TICK_HZ / 2) !== 0) return;
   const zones = [...(s.launches ?? []).filter((l) => isEnemy(s, v.p.id, l.owner)), ...(s.fallout ?? [])];
   for (const l of zones) {
-    const r = ((l as { r?: number }).r ?? SILO.reach) + AI_SILO.margin;
+    const r = ('silo' in l ? WARHEADS[(l as Launch).w ?? 'atomic'].r : (l as Fallout).r ?? SILO.reach) + AI_SILO.margin;
     const out = [...v.army, ...v.citizens].filter((u) => !u.inside && (u.x - l.x) * (u.x - l.x) + (u.y - l.y) * (u.y - l.y) <= r * r && domainOf(u.type) === 'land');
     if (!out.length) continue;
     const dx = v.home.x - l.x, dy = v.home.y - l.y;

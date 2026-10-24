@@ -1,10 +1,10 @@
-import { FALLOUT, FISSION, FUSION, SILO, TICK_HZ, domainOf, secs } from './data';
+import { FALLOUT, FISSION, FUSION, SILO, TICK_HZ, WARHEADS, domainOf, secs } from './data';
 import { ageDef } from './ages';
 import { hurt, peace } from './combat';
 import { distToRect } from './grid';
 import { canAfford, isEnemy, pay } from './world';
 import { breachAt } from './tides';
-import type { Building, Ent, GameState, Player } from './types';
+import type { Building, Ent, GameState, Launch, Player } from './types';
 
 /**
  * The Missile Silo (#605, the Atomic Age). `launch` names a point on the map; the warhead lands `SILO.fuse` seconds later, a
@@ -13,11 +13,25 @@ import type { Building, Ent, GameState, Player } from './types';
  */
 
 /** How a people works its silos: the plain Atomic Age's rules, or the fork's (Fission: quick and leaky; Fusion: clean, limitless and slow). */
-export function rulesOf(p: Player): { fuse: number; refuel: number; fuel: typeof SILO.fuel; air: number; clean: boolean; leak: number } {
+export function rulesOf(p: Player): { fuse: number; refuel: number; fuel: typeof SILO.fuel; air: number; clean: boolean; leak: number; w: WarheadKind } {
   const a = ageDef(p);
-  if (a.fission) return { fuse: FISSION.fuse, refuel: FISSION.refuel, fuel: SILO.fuel, air: 1, clean: false, leak: FISSION.ownFallout };
-  if (a.fusion) return { fuse: FUSION.fuse, refuel: FUSION.refuel, fuel: FUSION.fuel, air: FUSION.air, clean: true, leak: 0 };
-  return { fuse: SILO.fuse, refuel: SILO.refuel, fuel: SILO.fuel, air: 1, clean: false, leak: 0 };
+  if (a.fission) return { fuse: FISSION.fuse, refuel: FISSION.refuel, fuel: SILO.fuel, air: 1, clean: false, leak: FISSION.ownFallout, w: 'fission' };
+  if (a.fusion) return { fuse: FUSION.fuse, refuel: FUSION.refuel, fuel: FUSION.fuel, air: FUSION.air, clean: true, leak: 0, w: 'fusion' };
+  return { fuse: SILO.fuse, refuel: SILO.refuel, fuel: SILO.fuel, air: 1, clean: false, leak: 0, w: 'atomic' };
+}
+
+export type WarheadKind = 'atomic' | 'fission' | 'fusion';
+
+/**
+ * What a blast does at `d` tiles from its centre (#751 s1): `peak / (1 + (d/2)²)`, tapering to nothing over the last `WARHEADS.taper` tiles
+ * before the blast radius, and nothing at or past it. Only + − × ÷, so it is the same on every machine.
+ */
+export function blastDamage(w: WarheadKind, d: number): number {
+  const { peak, r } = WARHEADS[w];
+  if (d >= r) return 0;
+  const q = d / WARHEADS.half;
+  const dmg = peak / (1 + q * q);
+  return d > r - WARHEADS.taper ? (dmg * (r - d)) / WARHEADS.taper : dmg;
 }
 
 /** The people's finished, standing silos, in id order. */
@@ -51,40 +65,53 @@ export function launch(s: GameState, owner: number, silo: Building, x: number, y
   const r = rulesOf(s.players[owner]);
   pay(s.players[owner], r.fuel);
   silo.rearm = s.tick + secs(r.refuel);
-  (s.launches ??= []).push({ id: s.nextId++, owner, silo: silo.id, x, y, at: s.tick + secs(r.fuse), ...(r.clean ? { clean: true } : {}) });
+  (s.launches ??= []).push({ id: s.nextId++, owner, silo: silo.id, x, y, w: r.w, at: s.tick + secs(r.fuse), ...(r.clean ? { clean: true } : {}) });
   if (r.leak > 0) (s.fallout ??= []).push({ id: s.nextId++, owner, x: silo.x, y: silo.y, r: FISSION.reach, until: s.tick + secs(r.leak) });
-  s.events.push({ k: 'silo', owner, x, y, what: 'launched', fuse: r.fuse });
+  s.events.push({ k: 'silo', owner, x, y, what: 'launched', fuse: r.fuse, w: r.w });
 }
 
-/** The warhead lands: every rival building and rival unit on the ground within `SILO.reach` is hit. */
-function strike(s: GameState, owner: number, x: number, y: number, clean = false): void {
-  const r2 = SILO.reach * SILO.reach;
-  const hit: Ent[] = [];
+/**
+ * The warhead lands: every rival building whose nearest edge is within the blast radius, and every rival land unit not sheltered in a
+ * building, takes `blastDamage` for its distance. The blast clears the fog for everyone for `SILO.lift` seconds; the fallout, if any,
+ * keeps its own radius `SILO.reach`.
+ */
+function strike(s: GameState, l: Launch): void {
+  const { owner, x, y } = l;
+  const w = l.w ?? 'atomic';
+  const R = WARHEADS[w].r;
+  const hit: [Ent, number][] = [];
   for (const e of s.ents) {
     if (e.hp <= 0 || !isEnemy(s, owner, e.owner)) continue;
     if (e.kind === 'building') {
-      if (distToRect(x, y, e) <= SILO.reach) hit.push(e);
+      const d = distToRect(x, y, e);
+      if (d < R) hit.push([e, d]);
     } else if (!e.inside && domainOf(e.type) === 'land') {
       const dx = e.x - x, dy = e.y - y;
-      if (dx * dx + dy * dy <= r2) hit.push(e);
+      if (dx * dx + dy * dy < R * R) hit.push([e, Math.sqrt(dx * dx + dy * dy)]);
     }
   }
-  for (const e of hit) hurt(s, e, e.kind === 'building' ? SILO.building : SILO.unit, owner, null);
+  for (const [e, d] of hit) hurt(s, e, blastDamage(w, d), owner, null);
   // A warhead tears up a rival's causeways too (#748): the road over the flats is cut, its barrage's pond let out.
-  breachAt(s, x, y, SILO.reach, owner);
-  if (!clean) (s.fallout ??= []).push({ id: s.nextId++, owner, x, y, until: s.tick + secs(FALLOUT.time) });
-  s.events.push({ k: 'silo', owner, x, y, what: 'struck' });
+  breachAt(s, x, y, R, owner);
+  (s.blasts ??= []).push({ id: s.nextId++, x, y, r: R, until: s.tick + secs(SILO.lift) });
+  if (!l.clean) (s.fallout ??= []).push({ id: s.nextId++, owner, x, y, until: s.tick + secs(FALLOUT.time) });
+  s.events.push({ k: 'silo', owner, x, y, what: 'struck', w });
 }
 
 /** Every tick, in the order they were launched: a warhead whose silo has fallen is scrubbed; one whose clock has run out lands. */
 export function siloStep(s: GameState): void {
   falloutStep(s);
+  if (s.blasts) {
+    const live = s.blasts.filter((b) => s.tick < b.until);
+    if (live.length) s.blasts = live;
+    else delete s.blasts;
+  }
   if (!s.launches) return;
   const left = [];
   for (const l of s.launches) {
     const b = s.byId.get(l.silo);
     if (!b || b.kind !== 'building' || b.hp <= 0) s.events.push({ k: 'silo', owner: l.owner, x: l.x, y: l.y, what: 'scrubbed' });
-    else if (s.tick >= l.at) strike(s, l.owner, l.x, l.y, l.clean);
+    else if (s.tick >= l.at) strike(s, l);
     else left.push(l);
   }
   if (left.length) s.launches = left;

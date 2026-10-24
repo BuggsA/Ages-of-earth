@@ -2942,6 +2942,8 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           hud.toast(ev.owner === viewer ? 'Your silo fell: the launch is scrubbed' : `${s.players[ev.owner].name}'s silo fell: the launch is scrubbed`, ev.owner === viewer ? 'alert' : 'good');
           play('siloScrub');
         } else {
+          // The blast is seen by everyone, through the fog (#752): a ping on every minimap, and the boom.
+          minimap.ping(ev.x, ev.y, '#ffd25a', true);
           play('siloBlast');
         }
         break;

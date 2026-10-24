@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AGES, EPOCHS, FALLOUT, FISSION, FUSION, LAST_EPOCH, ROADS, SILO, secs } from '../src/sim/data';
+import { AGES, EPOCHS, FALLOUT, FISSION, FUSION, LAST_EPOCH, ROADS, SILO, WARHEADS, secs } from '../src/sim/data';
 import { createGame, step } from '../src/sim/game';
 import { deserialize, serialize } from '../src/sim/save';
 import { inFallout, launchProblem, loaded } from '../src/sim/silo';
@@ -7,7 +7,12 @@ import { placeBuilding, restat, spawnUnit } from '../src/sim/world';
 import { buildingGeometry } from '../src/render/buildingModels';
 import type { Building, GameState } from '../src/sim/types';
 
-const game = (startEpoch = 5) => createGame({ seed: 5, size: 'small', startEpoch, players: [{ name: 'A', ai: null, civ: 'romans' }, { name: 'B', ai: null, civ: 'romans' }] });
+const game = (startEpoch = 5) => {
+  const s = createGame({ seed: 5, size: 'small', startEpoch, players: [{ name: 'A', ai: null, civ: 'romans' }, { name: 'B', ai: null, civ: 'romans' }] });
+  // A rival Town Center far from both towns: a warhead now really breaks the first one, and the match must go on.
+  placeBuilding(s, 1, 'towncenter', s.players[1].startX < s.w / 2 ? s.w - 8 : 8, s.players[1].startY < s.h / 2 ? s.h - 8 : 8, true);
+  return s;
+};
 const tc = (s: GameState, o: number) => s.ents.find((e): e is Building => e.kind === 'building' && e.owner === o && e.type === 'towncenter')!;
 const run = (s: GameState, seconds: number) => { for (let i = 0; i < secs(seconds); i++) step(s); };
 const rich = (s: GameState) => { s.players[0].res = { food: 9000, wood: 9000, gold: 9000, stone: 9000 }; };
@@ -44,7 +49,7 @@ describe('the Atomic Age', () => {
     const own = tc(s, 0), far = tc(s, 1);
     const ownHp = own.hp, farHp = far.hp;
     // Aim just past the ring's edge from the rival Town Center.
-    step(s, [{ t: 'launch', p: 0, silo: silo.id, x: far.x + far.size / 2 + SILO.reach + 2, y: far.y }]);
+    step(s, [{ t: 'launch', p: 0, silo: silo.id, x: far.x + far.size / 2 + WARHEADS.atomic.r + 2, y: far.y }]);
     run(s, SILO.fuse + 2);
     expect(own.hp).toBe(ownHp);
     expect(far.hp).toBeGreaterThanOrEqual(farHp);

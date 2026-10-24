@@ -23,7 +23,7 @@ export const EPOCHS: Epoch[] = [
   { name: 'Middle Ages', short: 'Medieval', cost: { food: 700, gold: 250, stone: 100 }, time: 50, blurb: 'Pikes, crossbows, knights, catapults and stone keeps.' },
   { name: 'Gunpowder Age', short: 'Gunpowder', cost: { food: 1000, gold: 600, stone: 250 }, time: 65, blurb: 'Muskets, cuirassiers, galleons, cannon and brick and tile.' },
   { name: 'Industrial Age', short: 'Industrial', cost: { food: 1400, gold: 900, stone: 400 }, time: 80, blurb: 'Rifles, field guns, ironclads, and the first aeroplanes.' },
-  { name: 'Atomic Age', short: 'Atomic', cost: { food: 1800, gold: 1500, stone: 700 }, time: 95, blurb: 'The Missile Silo: one warhead, a public countdown, and a town that guards it.' },
+  { name: 'Atomic Age', short: 'Atomic', cost: { food: 1800, gold: 1500, stone: 700 }, time: 95, blurb: 'The Missile Silo: one warhead (12,000 at the centre, 8 tiles of blast), a public countdown, and a town that guards it.' },
 ];
 export const LAST_EPOCH = EPOCHS.length - 1;
 /** The Age of the Hive's reach and woods (`HIVE`), named here so the age's and the Hive's words can say them. */
@@ -477,7 +477,7 @@ export const AGES: Record<AgeId, Age> = {
     name: 'Age of Fission',
     short: 'Fission',
     tier: 5,
-    blurb: 'Raw power now. A Missile Silo\'s clock is 25 seconds, not 45, and it refuels in 100, not 240. But the reactor leaks: each launch poisons 3 tiles round your own silo for 60 seconds, as fallout does (4 health a second to every land unit in it, yours too). Lay your silos away from your town and your fields. Take it, and the Age of Fusion is closed for good.',
+    blurb: 'Raw power now. A Missile Silo\'s clock is 25 seconds, not 45, and it refuels in 100, not 240, and its warhead hits harder and farther (20,000 at the centre, 10 tiles of blast). But the reactor leaks: each launch poisons 3 tiles round your own silo for 60 seconds, as fallout does (4 health a second to every land unit in it, yours too). Lay your silos away from your town and your fields. Take it, and the Age of Fusion is closed for good.',
     fission: true,
   },
   fusion: {
@@ -488,7 +488,7 @@ export const AGES: Record<AgeId, Age> = {
     name: 'Age of Fusion',
     short: 'Fusion',
     tier: 5,
-    blurb: 'Clean and limitless, and ruinously dear. A Missile Silo keeps up to three warheads in the air at once and never needs refuelling, a launch costs 450 gold and 120 stone, and nothing it strikes is poisoned, so your army can follow the blast in. But the clock is 70 seconds, long enough for a rival to scatter or to find the silo, and the road here costs a fortune and takes 150 seconds in which the town is exposed. Take it, and the Age of Fission is closed for good.',
+    blurb: 'Clean and limitless, and ruinously dear. A Missile Silo keeps up to three warheads in the air at once and never needs refuelling, each the biggest there is (40,000 at the centre, 12 tiles of blast), a launch costs 450 gold and 120 stone, and nothing it strikes is poisoned, so your army can follow the blast in. But the clock is 70 seconds, long enough for a rival to scatter or to find the silo, and the road here costs a fortune and takes 150 seconds in which the town is exposed. Take it, and the Age of Fission is closed for good.',
     fusion: true,
   },
   steppe: {
@@ -2144,7 +2144,7 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   // The Age of Missions (#555 s12): raised by priests on a shore, in no rival's land; claims land, trains priests, pays a tithe (`MISSION`).
   mission: { name: 'Mission', size: 2, hp: 1000, cost: { wood: 100, gold: 60 }, time: 30, pop: 0, sight: 7, trains: ['priest'], drop: [], epoch: 2, shore: true, ages: ['missions'], builders: ['priest'], only: true, menu: 'eco', key: 'O', blurb: 'A whitewashed chapel and a bell on a far shore, raised by priests. Holds the land round it, trains priests, and pays a tithe that grows with its distance from your Town Center. Nothing in it shoots: a rival who reaches it razes it.' },
   caravanserai: { name: 'Caravanserai', size: 2, hp: 900, cost: { wood: 90, gold: 30 }, time: 25, pop: 0, sight: 6, trains: [], drop: [], epoch: 3, ages: ['silk'], menu: 'eco', key: 'C', blurb: 'A walled courtyard by the road where caravans rest. Raise it by a far trading post, in no one\'s land too: your traders\' trips to a post within 8 tiles of it pay a quarter more, traders and wagons within 4 tiles of it mend, and the land round it is yours, so rival traders crossing it pay your toll.' },
-  silo: { name: 'Missile Silo', size: 3, hp: 3000, cost: { wood: 300, stone: 400, gold: 700 }, time: 80, pop: 0, sight: 8, trains: [], drop: [], epoch: 5, menu: 'mil', key: 'M', blurb: 'A concrete collar round a hatch in the ground. Launch (M) names any point on the map: after a countdown every rival can see, the warhead flattens what stands there. Destroy the silo while it counts and the launch is scrubbed. Emptied by a launch, it must be refuelled before it can fire again.' },
+  silo: { name: 'Missile Silo', size: 3, hp: 3000, cost: { wood: 300, stone: 400, gold: 700 }, time: 80, pop: 0, sight: 8, trains: [], drop: [], epoch: 5, menu: 'mil', key: 'M', blurb: 'A concrete collar round a hatch in the ground. Launch (M) names any point on the map: after a countdown every rival can see, the warhead blasts what stands there, hardest at the centre and less with every tile, and every player sees the blast and the fog lifts over it for a minute. Destroy the silo while it counts and the launch is scrubbed. Emptied by a launch, it must be refuelled before it can fire again.' },
   // Mine Shafts (#681): one miner digs stone or gold (or a rare ore over its old workings) for good, best where a deposit was worked out (`SHAFT`).
   shaft: { name: 'Mine Shaft', size: 2, hp: 700, cost: { wood: 150 }, time: 30, pop: 0, sight: 4, trains: [], drop: [], epoch: 1, menu: 'eco', key: 'H', blurb: 'A timber headframe over a hole in the ground. One citizen digs stone or gold here for good, slower than an open deposit; best sunk where a deposit was worked out, fair beside mountain rock. Choose its seam on the shaft.' },
   // The Water Road (#701 s1): a bank of earth across the shallows, and the mill that pumps the water out behind it (`DYKE`, `POLDER`, `water.ts`).
@@ -3408,7 +3408,23 @@ export const FALLOUT = { time: 90, dps: 4 };
  */
 export const FISSION = { fuse: 25, refuel: 100, ownFallout: 60, reach: 3 };
 export const FUSION = { fuse: 70, refuel: 0, air: 3, fuel: { gold: 450, stone: 120 } };
-export const SILO = { fuse: 45, reach: 5, building: 1500, unit: 400, fuel: { gold: 600, stone: 200 }, refuel: 240, most: 2 };
+/**
+ * The Missile Silo. `reach` is the radius of the fallout a strike leaves at its impact point; how far the blast itself carries is the
+ * warhead's own `r` (`WARHEADS`). `lift` is how many seconds a blast clears the fog for every player over its radius (#752).
+ */
+export const SILO = { fuse: 45, reach: 5, fuel: { gold: 600, stone: 200 }, refuel: 240, most: 2, lift: 60 };
+/**
+ * The three warheads (#751 s1). A blast does `peak / (1 + (d/half)²)` at distance `d` tiles (from a building's nearest edge, or a unit's
+ * position), tapering linearly over the last `taper` tiles to nothing at the blast radius `r`. A people fires its branch's warhead:
+ * plain Atomic, Fission or Fusion.
+ */
+export const WARHEADS = {
+  atomic: { peak: 12000, r: 8 },
+  fission: { peak: 20000, r: 10 },
+  fusion: { peak: 40000, r: 12 },
+  half: 2,
+  taper: 2,
+};
 /**
  * The computer and the silo (#605): in the Atomic Age a clever computer raises one silo once it has `hands` citizens, waits `wait`
  * seconds after it stands, then launches whenever a point would catch `worth` or more of a rival's buildings (a Town Center counts
