@@ -5,19 +5,22 @@ import { heightAt } from './terrain';
 import { WATER_Y } from './water';
 
 const LIFT = 0.07;
-const INSET = 0.08;
+const INSET = 0.1;
+/** Width of the team-colour ribbon and of the dark rim outside it, in tiles. */
+const BAND = 0.1;
+const RIM = 0.05;
 
 /** Each player's land drawn as a coloured line along its edge, only where the viewer has explored. */
 export class BorderView {
-  readonly mesh: THREE.LineSegments;
+  readonly mesh: THREE.Mesh;
   private positions = new THREE.BufferAttribute(new Float32Array(0), 3);
   private colors = new THREE.BufferAttribute(new Float32Array(0), 3);
   private key = '';
   private col: THREE.Color[] = [];
 
   constructor() {
-    this.mesh = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({
-      vertexColors: true, transparent: true, opacity: 0.7, depthWrite: false, fog: false, toneMapped: false,
+    this.mesh = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({
+      vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false, fog: false, toneMapped: false, side: THREE.DoubleSide,
     }));
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 3;
@@ -41,14 +44,20 @@ export class BorderView {
     const shown = (x: number, y: number) => x >= 0 && y >= 0 && x < s.w && y < s.h && (reveal || seen[y * s.w + x] > 0);
     const pos: number[] = [];
     const rgb: number[] = [];
+    // A flat ribbon along each edge: the team colour, with a dark rim outside it so it keeps an edge on any ground.
+    const ribbon = (x0: number, y0: number, x1: number, y1: number, nx: number, ny: number, from: number, to: number, r: number, g: number, b: number) => {
+      const quad = [[x0, y0, from], [x1, y1, from], [x1, y1, to], [x0, y0, from], [x1, y1, to], [x0, y0, to]];
+      for (const [x, y, d] of quad) {
+        const px = x - nx * d;
+        const py = y - ny * d;
+        pos.push(px, Math.max(WATER_Y, heightAt(s, px, py)) + LIFT, py);
+        rgb.push(r, g, b);
+      }
+    };
     const edge = (o: number, x0: number, y0: number, x1: number, y1: number, nx: number, ny: number) => {
       const c = this.col[o] ?? this.col[0];
-      for (const [x, y] of [[x0, y0], [x1, y1]]) {
-        const px = x - nx * INSET;
-        const py = y - ny * INSET;
-        pos.push(px, Math.max(WATER_Y, heightAt(s, px, py)) + LIFT, py);
-        rgb.push(c.r, c.g, c.b);
-      }
+      ribbon(x0, y0, x1, y1, nx, ny, INSET - BAND / 2, INSET + BAND / 2, c.r, c.g, c.b);
+      ribbon(x0, y0, x1, y1, nx, ny, INSET - BAND / 2 - RIM, INSET - BAND / 2, c.r * 0.12, c.g * 0.12, c.b * 0.12);
     };
     for (let y = 0; y < s.h; y++) {
       for (let x = 0; x < s.w; x++) {

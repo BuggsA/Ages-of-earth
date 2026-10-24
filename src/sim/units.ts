@@ -1,12 +1,12 @@
-import { AI_LEVELS, AUTO_WORK, BUILDINGS, EXPLORE, PATROL, CARRY, CONSECRATE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, LEGION, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TRADE, domainOf, secs } from './data';
+import { AI_LEVELS, AUTO_WORK, BUILDINGS, EXPLORE, PATROL, CARRY, CONSECRATE, COPPICE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, LEGION, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TAME, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
 import type { Spatial } from './spatial';
-import { buildTimeFor, buildingCostFor, modsOf } from './stats';
+import { buildTimeFor, buildingCostFor, gunRange, modsOf } from './stats';
 import { flooded } from './flood';
-import { loadAt, workShare } from './sickness';
 import { mineable } from './household';
+import { felled, isCoppice } from './coppice';
 import { isNomad } from './nomad';
 import { ageDef, canRaise, inField, prospect } from './ages';
 import { legionKind, legionary } from './legion';
@@ -17,12 +17,16 @@ import { RES, R_BERRY, R_BLOODIRON, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_SAL
 import { carriedBy, relicAt } from './relics';
 import { animalRadius, hitAnimal } from './animals';
 import { milkable } from './flocks';
+import { finishTame, songOf, tames, wildBeast } from './tame';
 import { catchIn, nextSnare } from './snares';
+import { TILE_OF_SEAM, resOfSeam, seamOf, seamProblem, shaftShare } from './shafts';
 import { dig, ruinAt } from './ruins';
 import { rubbleAt, salvages, strip } from './salvage';
 import { bank, cacheAt, lift } from './caches';
 import { buyLoad } from './oretrade';
 import { atFoot, carriesKegs, kegProblem, layKeg } from './powder';
+import { fieldBoost, wading } from './water';
+import { gardenMul, isField } from './grove';
 import { fordMarch, groveBoost, keptOf, kinBonus } from './landmarks';
 import { chant, chantedOver, consecrateProblem, consecrates, turnBuilding } from './consecrate';
 import { convoyShare } from './convoy';
@@ -121,7 +125,7 @@ export function gatherRate(s: GameState, u: Unit, kind: number | 'farm'): number
   const tools = (kind === R_TREE || kind === R_STONE || kind === R_GOLD || kind === R_BOG) && keptOf(s, u.owner, 'flint') > 0 ? 1 + kinBonus(s, u.owner, 'flint', LANDMARKS.flint.tools - 1) : 1;
   // A legionary (#501) works timber and stone at a fraction of a citizen's pace.
   const legion = legionary(s, u) ? LEGION.rate : 1;
-  return base * mod * (1 + p.epoch * EPOCH_GATHER_BONUS) * ai * season * tools * legion * workShare(s, u.owner);
+  return base * mod * (1 + p.epoch * EPOCH_GATHER_BONUS) * ai * season * tools * legion;
 }
 
 const carryCap = (s: GameState, u: Unit) =>
@@ -336,6 +340,15 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
         if (next >= 0) break;
       }
     }
+    // The player's miner whose seam ran dry takes a Mine Shaft nobody works nearby before standing idle (#344, #681).
+    if (person && next < 0 && !o.rare && !o.bog && u.carry === 0 && (o.res === 'stone' || o.res === 'gold')) {
+      const pit = freeShaft(s, u.owner, fx, fy, AUTO_WORK.shaft);
+      if (pit && !seamProblem(s, pit, o.res)) {
+        if (seamOf(s, pit) !== o.res) pit.seam = o.res;
+        setOrder(u, { k: 'shaft', target: pit.id, res: o.res, phase: 'go' });
+        return;
+      }
+    }
     if (next >= 0) {
       o.tile = next;
       o.phase = 'go';
@@ -377,11 +390,17 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
         // Meat butchered counts toward the Age of the Steppe's deed (#297).
         const st = s.players[u.owner].stats;
         st.hunted = (st.hunted ?? 0) + 1;
+      } else if (kind === R_BERRY) {
+        // Wild bushes foraged count toward the Age of the Wild's deed.
+        const st = s.players[u.owner].stats;
+        st.foraged = (st.foraged ?? 0) + 1;
       }
     }
     workEvent(s, u, u.act, tx, ty);
     if (s.amount[o.tile] <= 0) {
       clearResource(s, o.tile);
+      // The managed wood (#501): a coppice people's stool stays to grow again, near its stores.
+      if (kind === R_TREE) felled(s, u.owner, o.tile);
       s.events.push({ k: 'depleted', tile: o.tile });
     }
     if (u.carry >= cap) {
@@ -406,7 +425,7 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
 
 function farmStep(s: GameState, u: Unit, o: Extract<Order, { k: 'farm' }>): void {
   const f = s.byId.get(o.target);
-  if (!f || f.kind !== 'building' || f.hp <= 0 || f.type !== 'farm' || f.owner !== u.owner) {
+  if (!f || f.kind !== 'building' || f.hp <= 0 || !isField(f.type) || f.owner !== u.owner) {
     if (u.carry > 0) setOrder(u, { k: 'deliver' });
     else setOrder(u, { k: 'idle' });
     return;
@@ -442,7 +461,9 @@ function farmStep(s: GameState, u: Unit, o: Extract<Order, { k: 'farm' }>): void
     o.phase = 'work';
     u.miss = 0;
     u.act = 'farm';
-    u.frac += gatherRate(s, u, 'farm') * DT;
+    // A field on polder (#701) works half again as fast: the richest ground there is. A watered one in the Age of Rivers, faster too.
+    // A Kitchen Garden (the Age of the Grove) fed by dung or water works faster.
+    u.frac += gatherRate(s, u, 'farm') * fieldBoost(s, f) * gardenMul(f) * DT;
     while (u.frac >= 1) {
       u.frac -= 1;
       u.carry++;
@@ -459,11 +480,96 @@ function farmStep(s: GameState, u: Unit, o: Extract<Order, { k: 'farm' }>): void
   if (!approach(u, { ...goalForBuilding(f, true), px: f.tx + 0.9 + spot * 3, py: f.ty + 0.9 + spot * 2 })) setOrder(u, { k: 'idle' });
 }
 
+/** A Mine Shaft's miner (#681): one to a shaft, digging its seam for good and hauling it to a drop site, as a farmer works a field. */
+function shaftStep(s: GameState, u: Unit, o: Extract<Order, { k: 'shaft' }>): void {
+  const b = s.byId.get(o.target);
+  if (!b || b.kind !== 'building' || b.hp <= 0 || b.type !== 'shaft' || b.owner !== u.owner) {
+    if (u.carry > 0) setOrder(u, { k: 'deliver' });
+    else setOrder(u, { k: 'idle' });
+    return;
+  }
+  if (!b.built) {
+    setOrder(u, { k: 'build', target: b.id });
+    return;
+  }
+  const holder = b.farmer ? s.byId.get(b.farmer) : undefined;
+  if (holder && holder !== u && holder.hp > 0 && holder.kind === 'unit' && holder.order.k === 'shaft' && holder.order.target === b.id) {
+    // Someone already works it: another free shaft nearby, or stand by.
+    const other = freeShaft(s, u.owner, b.x, b.y, 12);
+    if (other) setOrder(u, { k: 'shaft', target: other.id, res: resOfSeam(seamOf(s, other) ?? 'stone'), phase: 'go' });
+    else setOrder(u, { k: 'idle' });
+    return;
+  }
+  const seam = seamOf(s, b);
+  if (!seam) {
+    if (u.carry > 0) setOrder(u, { k: 'deliver' });
+    else setOrder(u, { k: 'idle' });
+    return;
+  }
+  b.farmer = u.id;
+  const res = resOfSeam(seam);
+  const rare = seam === 'stone' || seam === 'gold' ? null : seam;
+  o.res = res;
+  if (o.phase === 'drop') {
+    const r = dropOff(s, u);
+    if (r === 'done') {
+      o.phase = 'go';
+      u.miss = 0;
+    } else if (r === 'none') setOrder(u, { k: 'idle' });
+    return;
+  }
+  // A new seam: what was in the basket is set down, as when a gatherer turns to another stock.
+  if (u.carryRes !== res || (u.carryRare ?? null) !== rare) {
+    u.carry = 0;
+    u.frac = 0;
+    u.carryRes = res;
+    u.carryRare = rare;
+  }
+  const r = statsOf(s, u).radius;
+  if (distToRect(u.x, u.y, b) - r <= REACH + 0.3) {
+    if (walking(u)) stopWalking(u);
+    face(u, b.x, b.y);
+    o.phase = 'work';
+    u.miss = 0;
+    u.act = 'mine';
+    u.frac += gatherRate(s, u, TILE_OF_SEAM[seam]) * shaftShare(s, b, seam) * DT;
+    while (u.frac >= 1) {
+      u.frac -= 1;
+      u.carry++;
+    }
+    workEvent(s, u, 'mine', b.x, b.y);
+    if (u.carry >= carryCap(s, u)) {
+      u.frac = 0;
+      o.phase = 'drop';
+    }
+    return;
+  }
+  o.phase = 'go';
+  if (!approach(u, goalForBuilding(b))) setOrder(u, { k: 'idle' });
+}
+
+/** The nearest built shaft of a people's within `r` tiles that no one works, or null. */
+export function freeShaft(s: GameState, owner: number, x: number, y: number, r: number, skip?: Set<number>): Building | null {
+  let best: Building | null = null;
+  let bestD = r;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'shaft' || e.owner !== owner || e.hp <= 0 || !e.built || skip?.has(e.id)) continue;
+    const holder = e.farmer ? s.byId.get(e.farmer) : undefined;
+    if (holder && holder.hp > 0 && holder.kind === 'unit' && holder.order.k === 'shaft' && holder.order.target === e.id) continue;
+    const d = distToRect(x, y, e);
+    if (d < bestD) {
+      bestD = d;
+      best = e;
+    }
+  }
+  return best;
+}
+
 export function freeFarm(s: GameState, owner: number, x: number, y: number, r: number, skip?: Set<number>): Building | null {
   let best: Building | null = null;
   let bestD = r;
   for (const e of s.ents) {
-    if (e.kind !== 'building' || e.type !== 'farm' || e.owner !== owner || e.hp <= 0) continue;
+    if (e.kind !== 'building' || !isField(e.type) || e.owner !== owner || e.hp <= 0) continue;
     if (farmTaken(s, e) || skip?.has(e.id)) continue;
     const d = distToRect(x, y, e);
     if (d < bestD) {
@@ -484,6 +590,12 @@ function headedFarms(s: GameState, u: Unit): Set<number> {
   return out;
 }
 
+/** Whether another of the field's people already set out to farm it (a builder who finished it the same tick, #344); checked for the player's people only. */
+function farmClaimed(s: GameState, f: Building, u: Unit): boolean {
+  for (const e of s.ents) if (e.kind === 'unit' && e.id !== u.id && e.owner === f.owner && e.hp > 0 && e.order.k === 'farm' && e.order.target === f.id) return true;
+  return false;
+}
+
 function farmTaken(s: GameState, f: Building): boolean {
   const holder = f.farmer ? s.byId.get(f.farmer) : undefined;
   return !!holder && holder.hp > 0 && holder.kind === 'unit' && holder.order.k === 'farm' && holder.order.target === f.id;
@@ -495,7 +607,7 @@ export function completeBuilding(s: GameState, b: Building): void {
   b.hp = Math.min(b.hp, maxHp(s, b));
   s.players[b.owner].stats.built++;
   // A finished gate opens for its own side.
-  if (b.type === 'gate') stampBuilding(s, b, true);
+  if (b.type === 'gate' || b.type === 'dyke' || b.type === 'thornwall') stampBuilding(s, b, true);
   if (b.type === 'wonder') {
     b.timer = s.wonderTime;
     s.events.push({ k: 'wonder', owner: b.owner, id: b.id, x: b.x, y: b.y, ticks: b.timer });
@@ -506,7 +618,7 @@ export function completeBuilding(s: GameState, b: Building): void {
 
 /** What a builder does once the building is up. */
 function afterBuilding(s: GameState, u: Unit, b: Building): void {
-  if (b.type === 'farm' && u.type === 'citizen' && !farmTaken(s, b) && !u.queue.length) {
+  if (isField(b.type) && u.type === 'citizen' && !farmTaken(s, b) && !(farmClaimed(s, b, u) && !s.players[u.owner].ai) && !u.queue.length) {
     setOrder(u, { k: 'farm', target: b.id, phase: 'go' });
     return;
   }
@@ -517,7 +629,7 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
   }
   // Help with other foundations nearby (a wall goes up piece by piece).
   let next: Building | null = null;
-  let bestD = b.type === 'wall' || b.type === 'gate' ? 4 : 14;
+  let bestD = b.type === 'wall' || b.type === 'gate' || b.type === 'dyke' || b.type === 'thornwall' ? 4 : 14;
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.owner !== u.owner || e.built || e.hp <= 0 || !canRaise(u.type, e.type, s.players[u.owner].civ)) continue;
     const d = distToRect(u.x, u.y, e);
@@ -536,18 +648,23 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
   if (u.resume) {
     const back = u.resume;
     u.resume = null;
-    if (back.k === 'gather' || back.k === 'farm' || back.k === 'snare') {
+    if (back.k === 'gather' || back.k === 'farm' || back.k === 'snare' || back.k === 'shaft' || back.k === 'milk') {
       setOrder(u, back);
       return;
     }
   }
   // A farm that is already worked: the player's builder takes a free field nearby rather than standing idle (#344).
-  if (b.type === 'farm' && u.type === 'citizen' && !s.players[u.owner].ai) {
+  if (isField(b.type) && u.type === 'citizen' && !s.players[u.owner].ai) {
     const f = freeFarm(s, u.owner, u.x, u.y, 10, headedFarms(s, u));
     if (f) {
       setOrder(u, { k: 'farm', target: f.id, phase: 'go' });
       return;
     }
+  }
+  // A new Mine Shaft (#681): a person's builder goes down it.
+  if (b.type === 'shaft' && u.type === 'citizen' && !s.players[u.owner].ai && freeShaft(s, u.owner, b.x, b.y, 1) === b) {
+    setOrder(u, { k: 'shaft', target: b.id, res: resOfSeam(seamOf(s, b) ?? 'stone'), phase: 'go' });
+    return;
   }
   // A new snare (#485): a person's builder walks the trap line (the computer picks its own tenders).
   if (b.type === 'snare' && !s.players[u.owner].ai) {
@@ -596,7 +713,7 @@ function buildStep(s: GameState, u: Unit, o: Extract<Order, { k: 'build' }>): vo
     // Galvanic Revival: a repair inside a Tower's field is free and quicker.
     const wired = b.built && !!modsOf(s, u.owner).galvanic && inField(s, b);
     // A Hunters' kill camp (#463 s1) goes up in a fraction of the time.
-    const step = (DT / (buildTimeFor(s, u.owner, b.type) * (b.kill && !b.built ? KILL_CAMP.time : 1))) * (wired ? GALVANIC.repair : 1) * workShare(s, u.owner);
+    const step = (DT / (buildTimeFor(s, u.owner, b.type) * (b.kill && !b.built ? KILL_CAMP.time : 1))) * (wired ? GALVANIC.repair : 1);
     const max = maxHp(s, b);
     const hp = Math.min(max, b.hp + max * step);
     if (b.built && !wired) {
@@ -636,7 +753,7 @@ function findTarget(s: GameState, sp: Spatial, u: Unit, r: number, buildings: bo
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, u.owner, e.owner)) continue;
     // Walls only matter when they are in the way.
-    const wall = e.type === 'wall' || e.type === 'gate';
+    const wall = e.type === 'wall' || e.type === 'gate' || e.type === 'dyke';
     const d = distToRect(u.x, u.y, e) + (wall ? 3 : 0);
     if (d < bestD) {
       bestD = d;
@@ -745,7 +862,7 @@ function underGuns(s: GameState, u: Unit, x: number, y: number): boolean {
     if (e.kind !== 'building' || e.hp <= 0 || !e.built || !isEnemy(s, u.owner, e.owner)) continue;
     const g = BUILDINGS[e.type].guns;
     if (!g || !seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
-    const r = g.range + EXPLORE.wary + BUILDINGS[e.type].size / 2;
+    const r = gunRange(s, e.owner, e.type, e.level) + EXPLORE.wary + BUILDINGS[e.type].size / 2;
     if ((e.x - x) * (e.x - x) + (e.y - y) * (e.y - y) <= r * r) return true;
   }
   return false;
@@ -879,8 +996,9 @@ function attackStep(s: GameState, sp: Spatial, u: Unit, o: Extract<Order, { k: '
     else setOrder(u, { k: 'idle' });
   };
   if (!t || t.hp <= 0 || (t.kind === 'unit' && t.inside) || !isEnemy(s, u.owner, t.owner) || peace(s)) {
-    // The target fell (or changed sides): pick the next one close by if this was a fight already joined.
-    const next = u.type !== 'citizen' && u.stance !== 'run' && !peace(s) ? findTarget(s, sp, u, st.sight, !!o.then) : null;
+    // The target fell (or changed sides): pick the next one close by if this was a fight already joined. Attack and destroy
+    // (and an attack-move) carries on to the buildings in sight once no enemy soldier is left.
+    const next = u.type !== 'citizen' && u.stance !== 'run' && !peace(s) ? findTarget(s, sp, u, st.sight, !!o.then || u.stance === 'aggressive') : null;
     if (next) {
       o.target = next.id;
       o.auto = true;
@@ -990,6 +1108,8 @@ function garrisonStep(s: GameState, u: Unit, o: Extract<Order, { k: 'garrison' }
     u.px = u.x;
     u.py = u.y;
     b.garrison.push(u.id);
+    if (o.flee) u.fled = s.tick;
+    else delete u.fled;
     setOrder(u, { k: 'idle' });
     s.events.push({ k: 'garrison', owner: u.owner, building: b.id, inside: true });
     return;
@@ -998,11 +1118,17 @@ function garrisonStep(s: GameState, u: Unit, o: Extract<Order, { k: 'garrison' }
 }
 
 /** Everyone out of a building, beside it, and back to whatever the bell pulled them off. */
-export function ungarrison(s: GameState, b: Building): void {
+export function ungarrison(s: GameState, b: Building, only?: (u: Unit) => boolean): void {
   if (!b.garrison.length) return;
+  const stay: number[] = [];
   for (const id of b.garrison) {
     const u = s.byId.get(id);
     if (!u || u.kind !== 'unit') continue;
+    if (only && !only(u)) {
+      stay.push(id);
+      continue;
+    }
+    delete u.fled;
     const spot = exitSpot(s, b, b.x + (u.id % 3) - 1, b.y + b.size);
     u.inside = 0;
     u.x = spot.x + ((u.id % 5) - 2) * 0.12;
@@ -1015,7 +1141,7 @@ export function ungarrison(s: GameState, b: Building): void {
       setOrder(u, back);
     } else setOrder(u, { k: 'idle' });
   }
-  b.garrison = [];
+  b.garrison = stay;
   s.events.push({ k: 'garrison', owner: b.owner, building: b.id, inside: false });
 }
 
@@ -1144,6 +1270,42 @@ function milkStep(s: GameState, u: Unit, o: Extract<Order, { k: 'milk' }>): void
 }
 
 /**
+ * Tame a wild beast (the Age of the Wild, `tame.ts`): walk to it, claiming it as you go so it stands calm for you, then sing
+ * `TAME.secs` seconds beside it. A beast hurt within `TAME.wary` seconds won't take the hand, and a wound mid-song breaks it.
+ */
+function tameStep(s: GameState, u: Unit, o: Extract<Order, { k: 'tame' }>): void {
+  const a = s.animals.find((x) => x.id === o.target);
+  if (!wildBeast(a) || !tames(s.players[u.owner]) || s.tick - a.hurt < secs(TAME.wary)) {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  if (a.tamer === undefined) a.tamer = u.id;
+  const dx = a.x - u.x;
+  const dy = a.y - u.y;
+  const d = Math.sqrt(dx * dx + dy * dy) - statsOf(s, u).radius - animalRadius(a);
+  if (d <= TAME.reach) {
+    if (walking(u)) stopWalking(u);
+    face(u, a.x, a.y);
+    u.miss = 0;
+    u.act = 'chant';
+    a.tamer ??= u.id;
+    if (++o.t >= songOf(a)) {
+      finishTame(s, u, a);
+      setOrder(u, { k: 'idle' });
+    }
+    return;
+  }
+  o.t = 0;
+  const g = goalForPoint(s, a.x, a.y, passOf(s, u));
+  const moved = u.goal ? Math.abs(u.goal.px - g.px) + Math.abs(u.goal.py - g.py) : 99;
+  if (walking(u) && moved > 1.5 && s.tick - u.pathTick > 15) {
+    goTo(u, g);
+    return;
+  }
+  if (!approach(u, g)) setOrder(u, { k: 'idle' });
+}
+
+/**
  * Walk the trap line (#485): empty this snare into the basket, go on to the next of the people's snares with game in
  * it, and carry the catch home when the basket is full or the line is bare; with nothing anywhere, wait by the snare.
  */
@@ -1179,7 +1341,8 @@ function snareStep(s: GameState, u: Unit, o: Extract<Order, { k: 'snare' }>): vo
     setOrder(u, { k: 'build', target: b.id });
     return;
   }
-  const cap = carryCap(s, u);
+  // A managed wood's tenders (#501) carry a game bag `COPPICE.bag` times a basket: walking the line is their field work.
+  const cap = carryCap(s, u) * (isCoppice(s.players[u.owner]) ? COPPICE.bag : 1);
   if (distToRect(u.x, u.y, b) - statsOf(s, u).radius <= REACH + 0.3) {
     if (walking(u)) stopWalking(u);
     face(u, b.x, b.y);
@@ -1598,7 +1761,7 @@ function seaTradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>):
       return;
     }
     o.market = d.id;
-    const escort = convoyShare(s, u);
+    const escort = convoyShare(s, u, d);
     u.carry = Math.max(1, Math.min(TRADE.max, Math.floor(tripGold(s, u.owner, d, post, true) * escort)));
     u.carryRes = 'gold';
     o.flood = true;
@@ -1676,12 +1839,6 @@ function tradeStep(s: GameState, u: Unit, o: Extract<Order, { k: 'trade' }>): vo
     const m = marketOf(s, u.owner, o.market) ?? caravanOf(s, u.owner, o.market) ?? homeMarket(s, u.owner, post.x, post.y) ?? nearestCaravan(s, u.owner, post.x, post.y);
     if (!m) {
       s.events.push({ k: 'refused', owner: u.owner, why: 'Build a Market to trade from' });
-      setOrder(u, { k: 'idle' });
-      return;
-    }
-    // Quarantine (#541) keeps the trader from loading; at a foul post it would bring the Sickness home.
-    if (!loadAt(s, u.owner, post)) {
-      s.events.push({ k: 'refused', owner: u.owner, why: 'The town is in quarantine: the traders stay home' });
       setOrder(u, { k: 'idle' });
       return;
     }
@@ -2013,6 +2170,9 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
     case 'farm':
       farmStep(s, u, o);
       break;
+    case 'shaft':
+      shaftStep(s, u, o);
+      break;
     case 'build':
       if (legionary(s, u) && sentry(s, sp, u, o)) break;
       buildStep(s, u, o);
@@ -2028,6 +2188,9 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
       break;
     case 'milk':
       milkStep(s, u, o);
+      break;
+    case 'tame':
+      tameStep(s, u, o);
       break;
     case 'snare':
       snareStep(s, u, o);
@@ -2094,7 +2257,8 @@ export function routeUnits(s: GameState): void {
 /** Walk the route. */
 export function walk(s: GameState, u: Unit): void {
   if (!u.path) return;
-  let left = statsOf(s, u).speed * fordMarch(s, u) * hemoPace(s, u) * DT;
+  // A channel (#701, the Age of Rivers) is waded: a moat on foot.
+  let left = statsOf(s, u).speed * fordMarch(s, u) * hemoPace(s, u) * (domainOf(u.type) === 'land' ? wading(s, u.x, u.y) : 1) * DT;
   while (left > 1e-9 && u.path) {
     const tx = u.path[u.pathI * 2];
     const ty = u.path[u.pathI * 2 + 1];

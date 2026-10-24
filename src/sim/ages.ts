@@ -1,5 +1,6 @@
-import { AGES, BUILDINGS, CIVS, LIGHTNING, PATHS, ROADS, STEP_BACK, TECHS, TICK_HZ, TRUNK, WAYS, secs, stepBackCost, type Age, type Deed, type Road } from './data';
+import { AGES, BUILDINGS, CIVS, GOLDEN, LIGHTNING, LOWER_IS_BETTER, PATHS, ROADS, STEP_BACK, TECHS, TICK_HZ, TRUNK, WAYS, secs, stepBackCost, type Age, type Deed, type Mods, type Road, type UnitClass } from './data';
 import { KEYS, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, type AgeId, type CivId, type PathId, type RareId, type Building, type BuildingType, type Cost, type GameState, type KeyId, type Player, type TechId, type UnitType } from './types';
+import { coastHeld } from './water';
 
 /**
  * Ages as a web (#37): which age a people is in, the roads out of it, and what that age lets them
@@ -11,7 +12,72 @@ export function ageOf(p: Player): AgeId {
   return p.age && AGES[p.age] && AGES[p.age].tier === p.epoch ? p.age : TRUNK[Math.min(p.epoch, TRUNK.length - 1)];
 }
 
-export const ageDef = (p: Player): Age => AGES[ageOf(p)];
+export const ageDef = (p: Player): Age => {
+  const a = ageOf(p);
+  return AGES[a].golden ? weave(threadsOf(p)) : AGES[a];
+};
+
+// ---- The Golden Age (#703) -------------------------------------------------------------------------
+
+/** The side ages a people has walked, the Golden Age itself left out: its lives. */
+export const livesOf = (p: Player): AgeId[] => (p.walked ?? []).filter((a) => !AGES[a].golden && !TRUNK.includes(a));
+
+/** The ages a Golden Age weaves together: every life walked, in the order walked. Empty outside one. */
+export const threadsOf = (p: Player): AgeId[] => (AGES[ageOf(p)].golden ? livesOf(p) : []);
+
+/** The ages a people stands in for what they open (buildings, sleep, the Sail's trade): its own, and in a Golden Age every thread. */
+export const standsIn = (p: Player, age: AgeId): boolean => ageOf(p) === age || threadsOf(p).includes(age);
+
+/** Whether this age's gift on `key` is a boon: above 1, or below it for the mods where less is better. */
+const boon = (key: keyof Mods, v: number): boolean => (LOWER_IS_BETTER.includes(key) ? v < 1 : v > 1);
+
+/** What an age's verbs are, beyond its numbers and its doors: carried whole into a Golden Age. */
+const VERB_KEYS = [
+  'hire', 'mobile', 'packs', 'caravans', 'relicTrade', 'ironTrade', 'forge', 'coils', 'callUp', 'haul', 'blood', 'hemocraft', 'rite', 'fission', 'fusion',
+  'reclaim', 'salvage', 'sortie', 'fairs', 'convoys', 'prizes', 'vigils', 'thralls', 'mills', 'sappers', 'raid', 'missions', 'names', 'pumps', 'rivers',
+] as const;
+
+const woven = new Map<string, Age>();
+
+/**
+ * The Golden Age woven from its threads (#703): its own def, every verb of every thread (the first walked wins where two carry the
+ * same one), the best of each gift (`add` above 0, a `mul` boon, a `price` or `training` below 1), and none of the doors (`no`,
+ * `noBuild`, `levy`, surcharges, penalties). Pure and cached, so every machine weaves alike.
+ */
+export function weave(threads: AgeId[]): Age {
+  const key = threads.join(',');
+  const hit = woven.get(key);
+  if (hit) return hit;
+  const g = AGES.golden;
+  const out: Age = { ...g, add: { ...g.add }, mul: { ...g.mul }, price: { ...g.price }, training: { ...g.training } };
+  const rec = out as unknown as Record<string, unknown>;
+  for (const a of threads) {
+    const t = AGES[a];
+    for (const [k, v] of Object.entries(t.add ?? {}) as [keyof Mods, number][]) if (v > 0) out.add![k] = Math.max(out.add![k] ?? 0, v);
+    for (const [k, v] of Object.entries(t.mul ?? {}) as [keyof Mods, number][]) {
+      if (!boon(k, v)) continue;
+      const was = out.mul![k];
+      out.mul![k] = was === undefined ? v : LOWER_IS_BETTER.includes(k) ? Math.min(was, v) : Math.max(was, v);
+    }
+    for (const field of ['price', 'training'] as const) {
+      for (const [c, v] of Object.entries(t[field] ?? {}) as [UnitClass, number][]) if (v < 1) out[field]![c] = Math.min(out[field]![c] ?? 1, v);
+    }
+    const tr = t as unknown as Record<string, unknown>;
+    for (const k of VERB_KEYS) if (tr[k] !== undefined && rec[k] === undefined) rec[k] = tr[k];
+  }
+  woven.set(key, out);
+  return out;
+}
+
+/** The ticks a people's Golden Age burns: the span, more for every life past the road's `n`, at most `most`. */
+export function goldenSpan(p: Player): number {
+  const road = ROADS.find((r) => r.to === 'golden')!;
+  const extra = Math.max(0, livesOf(p).length - road.lives!.n);
+  return secs(Math.min(GOLDEN.most, GOLDEN.span + extra * GOLDEN.more));
+}
+
+/** The tick a people's Golden Age ends, or undefined outside one. */
+export const goldenEnds = (p: Player): number | undefined => (AGES[ageOf(p)].golden && p.goldenAt !== undefined ? p.goldenAt + goldenSpan(p) : undefined);
 
 /** Whether the people has stood in this age at some time in the match, or stands in it now (heirlooms, #224). */
 export function hasWalked(p: Player, age: AgeId): boolean {
@@ -192,6 +258,7 @@ export function lacking(s: GameState, p: Player, age: AgeId): { key: KeyId; only
 export function roadKnown(s: GameState, p: Player, r: Road): boolean {
   if (r.walked && !hasWalked(p, r.walked)) return false;
   if (r.crossing && !r.crossing.some((a) => hasWalked(p, a))) return false;
+  if (r.lives && livesOf(p).length < r.lives.seen) return false;
   if (r.vein && !veinSeen(s, p, r)) return false;
   if (r.ruin && !s.ruins?.some((ruin) => ruin.by === p.id)) return false;
   if (r.found && !((p.techs.includes(r.found) || led(p, TECHS[r.found].survey!)) && surveyFinds(s, r.found))) return false;
@@ -254,6 +321,7 @@ export function roadProblem(s: GameState, p: Player, r: Road): string | null {
   if (!roadKnown(s, p, r)) {
     if (r.walked && !hasWalked(p, r.walked)) return `Only a people that walked the ${AGES[r.walked].name} finds this road`;
     if (r.crossing && !r.crossing.some((a) => hasWalked(p, a))) return `Only a people that walked the ${AGES[r.crossing[0]].name} or the ${AGES[r.crossing[1]].name} finds this road`;
+    if (r.lives && livesOf(p).length < r.lives.seen) return 'Only a people that has lived many lives hears of this road';
     if (r.ruin) return 'Your citizens must finish excavating an ancient ruin';
     if (r.found && !p.techs.includes(r.found)) return `Needs ${TECHS[r.found].name}`;
     if (r.found && !surveyFinds(s, r.found)) return 'There is none in this world';
@@ -261,9 +329,12 @@ export function roadProblem(s: GameState, p: Player, r: Road): string | null {
     if (r.vein && !veinSeen(s, p, r)) return `Raise a Prospector's Lodge, or dig ${r.vein.id}, to learn of this road`;
     return `Needs a ${BUILDINGS[r.clue!].name}`;
   }
+  // A coast door (#701): the land's shape, not an ore, keeps the Age of Dykes from a people with no shallows by its town.
+  if (r.coast && !coastHeld(s, p)) return r.coast;
   if (r.shuns && hasWalked(p, r.shuns)) return `Your people took the ${AGES[r.shuns].name}: this road is closed to it for good`;
   // A crossing (#585): seen with one sibling walked, open only with both. The road back to the age they share, and on into the other, is the price.
   const other = crossingLeft(p, r);
+  if (r.lives && livesOf(p).length < r.lives.n) return `Your people must have walked ${r.lives.n} side ages (${livesOf(p).length}/${r.lives.n}): go back, and take another road`;
   if (other) return `Needs both the ${AGES[r.crossing![0]].name} and the ${AGES[r.crossing![1]].name} walked: come back to the ${AGES[r.from].name} and walk the ${AGES[other].name}`;
   if (!veinDone(p, r)) return `${r.vein!.text} (${Math.floor(p.stats.mined?.[r.vein!.id] ?? 0)}/${r.vein!.n})`;
   if (oreDone(p, r)) return null;
@@ -296,6 +367,9 @@ export const isHire = (p: Player, at: BuildingType, unit: UnitType): boolean => 
 export function barred(p: Player, unit: UnitType, at?: BuildingType): string | null {
   // The polis (#501): a Greek city trains no foot soldiers; its citizens take up arms. It may still hire foreign foot for gold.
   if (unit === 'infantry' && CIVS[p.civ].polis && !(at && isHire(p, at, unit))) return 'A Greek city trains no foot soldiers: select citizens and take up arms (H)';
+  // The Beast Den (the Age of the Wild): it breeds only the kinds this people has tamed.
+  const kind = unit === 'warwolf' ? 'wolf' : unit === 'tusker' ? 'boar' : unit === 'warmammoth' ? 'mammoth' : null;
+  if (kind && !p.tamed?.includes(kind)) return `Tame a wild ${kind} first: the Den breeds only what your people has tamed`;
   const no = ageDef(p).no;
   return no && no.units.includes(unit) ? no.why : null;
 }
@@ -310,10 +384,17 @@ export function buildBarred(p: Player, type: BuildingType): string | null {
   if (no && no.buildings.includes(type)) return no.why;
   // Born on the move (#501): a Mongol camp never tills a field, in any age.
   if (type === 'farm' && CIVS[p.civ].nomad) return 'A Mongol camp tills no fields: its food walks with the flock';
+  // The managed wood (#501): the Britons till no fields, and only they plant woods.
+  if (type === 'farm' && CIVS[p.civ].coppice) return 'A British town tills no fields: its food is the snares in its woods';
+  if (type === 'sapling' && !CIVS[p.civ].coppice) return 'Only the Britons plant and coppice their woods';
+  // The Beast Den (the Age of the Wild): raised by a people that has tamed a beast, in any age after.
+  if (type === 'den' && !p.tamed?.length) return 'Tame a wild beast first: a Den is raised only by a people that has tamed one (the Age of the Wild)';
+  // The Age of the Grove: what it grows is planted by a people that has walked it, in any age after.
+  if ((type === 'thornwall' || type === 'garden' || type === 'orchard') && !hasWalked(p, 'grove')) return `Only a people that has walked the ${AGES.grove.name} plants a ${BUILDINGS[type].name}`;
   const way = p.way ? WAYS[p.way] : undefined;
   if (way?.shuts?.includes(type)) return `${way.name} raises no ${BUILDINGS[type].name}`;
   const only = BUILDINGS[type].ages;
-  return !only || only.includes(ageOf(p)) ? null : `Only in the ${only.map((a) => AGES[a].name).join(' or ')}`;
+  return !only || only.some((a) => standsIn(p, a)) ? null : `Only in the ${only.map((a) => AGES[a].name).join(' or ')}`;
 }
 
 /** How many relics a player keeps in standing Temples. */
@@ -413,7 +494,7 @@ export const suspendedBelow = (p: Player, tier: number): TechId[] => p.techs.fil
 export function asleep(s: GameState, b: Building): boolean {
   const only = BUILDINGS[b.type].ages;
   // A keepsake (#555 s11) never sleeps.
-  return !!only && !b.keep && !only.includes(ageOf(s.players[b.owner]));
+  return !!only && !b.keep && !only.some((a) => standsIn(s.players[b.owner], a));
 }
 
 /**
@@ -551,7 +632,9 @@ export function leaving(s: GameState, p: Player, to: AgeId, back: boolean): Leav
     const def = BUILDINGS[e.type];
     // A keepsake neither sleeps nor wakes: it works on every road.
     if (!def.ages || e.keep || e === out.keepsake) continue;
-    const now = def.ages.includes(from), then = def.ages.includes(to);
+    // A Golden Age (#703) stands in every life walked, the one left now among them.
+    const goldTo = !!AGES[to].golden;
+    const now = def.ages.some((a) => standsIn(p, a)), then = def.ages.some((a) => a === to || (goldTo && (a === from || livesOf(p).includes(a))));
     if (now && !then) add(def.burns ? out.lost : out.sleep, e.type);
     else if (!now && then && !def.burns) add(out.wake, e.type);
   }
@@ -597,7 +680,8 @@ export function workRate(s: GameState, b: Building): number {
   const p = s.players[b.owner];
   // Off Lightning, only the coil kept as its keepsake (#555 s11) still lights a field, and nothing is dark.
   if (!hasCoils(p)) return p.walked?.includes('lightning') && inKeptCoil(s, b) ? LIGHTNING.lit : 100;
-  return inField(s, b) ? LIGHTNING.lit : LIGHTNING.dark;
+  // A Golden Age (#703) keeps the coils' gift and drops their price: nothing outside a field runs dark.
+  return inField(s, b) ? LIGHTNING.lit : ageDef(p).golden ? 100 : LIGHTNING.dark;
 }
 
 /** Whether a building stands in the field of its owner's coil kept from the Age of Lightning (#555 s11). */

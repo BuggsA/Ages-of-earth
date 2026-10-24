@@ -1,20 +1,24 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { aiTiding } from './tidings';
-import { AGES, AI_CLIMB, AI_FIND, FINDS, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_SEA, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, SEA_RAID, MISSION, AI_MISSION, AI_CHARIOT, STEP_BACK, stepBackCost, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_SILO, SILO, TICK_HZ, AI_CLIMB, AI_FIND, FINDS, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_SEA, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, SEA_RAID, MISSION, AI_MISSION, AI_CHARIOT, STEP_BACK, stepBackCost, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
-import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
+import { buildingCostFor, modsOf, raiseProblem, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Rubble, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
-import { backProblem, backTo, ageDef, ageOf, asleep, barred, buildBarred, crossingLeft, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
+import { backProblem, backTo, ageDef, ageOf, asleep, barred, buildBarred, crossingLeft, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadProblem, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
 import { grindersOf, kegsOf, millProblem, mills, sappers } from './powder';
+import { basinOf, channelPlan, coastHeld, dykePlan, isChannel, isPolder, polderField, type ChannelPlan, type DykePlan } from './water';
+import { wallLine } from './commands';
+import { launchProblem, loaded, rulesOf, silosOf } from './silo';
 import { carriedBy } from './relics';
 import { storesOre } from './caches';
 import { loadPrice, sellerNear } from './oretrade';
 import { swordsOf } from './merc';
 import { fairground, feastOpen, nextFeastIn } from './fair';
 import { claimants, favours, landmarkAt } from './landmarks';
-import { cargoRoom, coastNear, findResource, freeFarm, nearestTemple, TILE_OF_RARE } from './units';
+import { cargoRoom, coastNear, findResource, freeFarm, freeShaft, nearestTemple, TILE_OF_RARE } from './units';
+import { seamOf, seamProblem, siteGrade } from './shafts';
 import { goalForPost, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { findPath, findRoute } from './path';
 import { isEnemy, maxHp, townCenters } from './world';
@@ -25,24 +29,27 @@ import { graftCost, stationsOf, waiting } from './hemo';
 import { borderMap, landOwnerAt, suppliedAt } from './borders';
 import { workProblem } from './works';
 import { aiKin, aiVow, aiWay, wayBarred } from './ways';
-import { AI_WAYS, AI_KEG, KEG, KILL_CAMP, KIN, SICKNESS, WAYS } from './data';
+import { AI_TOWER_KEEP, AI_WAYS, AI_KEG, AI_DYKE, AI_RIVERS, KEG, KILL_CAMP, KIN, POLDER, TOWER_LEVELS, WAYS } from './data';
 import { beaconProblem, lit } from './beacon';
 import { rallyProblem } from './rally';
 import { consecrateProblem, consecrates } from './consecrate';
 import { sees } from './vision';
 import { seasonAt } from './seasons';
 import { flooded } from './flood';
-import { isHousehold } from './household';
+import { isHousehold, mineable } from './household';
+import { isCoppice } from './coppice';
 import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
-import { AI_ASSAY, AI_CACHE, CACHE, CIVS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SNARE, SPOILS } from './data';
+import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, TAME, GROVE, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
 import { isRider, standing } from './tribute';
 import { flockCap, flockOf, grassy, grazeRange, milkable } from './flocks';
 import { progress, scenarioById } from './campaign';
+import { tames, wildBeast } from './tame';
+import { grows } from './grove';
 
 /**
  * The computer opponent. It plays by the same rules and through the same commands as a person: it
@@ -98,9 +105,10 @@ const SHARE: Record<Res, number>[] = [
   { food: 0.4, wood: 0.3, gold: 0.23, stone: 0.07 },
   { food: 0.38, wood: 0.3, gold: 0.26, stone: 0.06 },
   { food: 0.36, wood: 0.3, gold: 0.28, stone: 0.06 },
+  { food: 0.3, wood: 0.22, gold: 0.34, stone: 0.14 },
 ];
 /** Citizens wanted before advancing out of each epoch. */
-const ADVANCE_AT = [11, 17, 22, 28];
+const ADVANCE_AT = [11, 17, 22, 28, 32];
 const TILE_OF: Record<Res, number> = { food: R_BERRY, wood: R_TREE, stone: R_STONE, gold: R_GOLD };
 /** Technologies in the order the opponent wants them (economy first). */
 const TECH_ORDER: TechId[] = [
@@ -129,6 +137,8 @@ export function aiStep(s: GameState): void {
 
 interface View {
   p: Player;
+  /** The price held for the engine a Masons' Lodge rival calls for (#242), until the Workshop's turn (`lodgeEngine`). */
+  engine?: Cost | null;
   citizens: Unit[];
   army: Unit[];
   priests: Unit[];
@@ -186,6 +196,13 @@ function spend(v: View, cost: Cost): void {
   for (const r of RES) v.budget[r] -= cost[r] ?? 0;
 }
 
+/** Hands back the price held for a Masons' Lodge rival's engine (#242), once. */
+function release(v: View): void {
+  if (!v.engine) return;
+  for (const r of RES) v.budget[r] += v.engine[r] ?? 0;
+  v.engine = null;
+}
+
 function think(s: GameState, p: Player, mem: AiMemory): void {
   const L = AI_LEVELS[p.ai!];
   const citizens: Unit[] = [];
@@ -229,7 +246,14 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   oreRoad(s, v, mem, issue);
   powderRoad(s, v, mem, issue);
   sapKegs(s, v, mem, issue);
+  dykeWork(s, v, mem, issue);
+  riverWork(s, v, mem, issue);
+  siloRoad(s, v, mem, issue);
+  fireSilo(s, v, mem, issue);
+  fleeWarhead(s, v, issue);
   steppeRoad(s, v, mem, issue);
+  wildRoad(s, v, mem, issue);
+  groveWork(s, v, mem, issue);
   readYear(s, v);
   huntTheYear(s, v, issue);
 
@@ -256,7 +280,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   const queuedCitizens = buildings.reduce((n, b) => n + b.queue.filter((q) => q.unit === 'citizen').length, 0);
   const wantCitizens = Math.min(L.citizens + p.epoch * 3, isLegion(p) ? citizenCap(p) : 60);
   // A climb paid for stops the hands being trained (#555): training on past the hands the climb needs spent its price and kept the Town Center's queue full, till a raid caught the town in the Stone Age (`scripts/route-ab.ts navy 103`).
-  const climbReady = L.climbHold !== false && !advancing && p.epoch < LAST_EPOCH && !!tc && citizens.length >= ADVANCE_AT[p.epoch] && s.tick > secs(150 + p.epoch * 150) && afford(v, mainRoad(p)!.cost);
+  const climbReady = L.climbHold !== false && !advancing && p.epoch < LAST_EPOCH && !!mainRoad(p) && !!tc && citizens.length >= ADVANCE_AT[p.epoch] && s.tick > secs(150 + p.epoch * 150) && afford(v, mainRoad(p)!.cost);
   // The Warband Way (#463 s1) eats by raiding: in the Stone Age, out of a treaty, its first band of foot comes before more hands (once; later bands come as soldiers do).
   if (L.clever && p.way === 'warband' && p.epoch === 0 && s.tick >= s.peaceUntil && !mem.prowl && mem.prowled === undefined && citizens.length >= AI_WAYS.bandAt && army.filter(prowler).length < AI_WAYS.band) {
     const yard = buildings.find((b) => b.type === 'barracks' && b.built && b.queue.length === 0);
@@ -294,7 +318,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   v.plan = chapterGoals(s, v, mem, issue);
 
   // Which road it takes is the web's to say (#50): the trunk, or a side road it has chosen once it opens.
-  const wantEpoch = p.epoch < Math.min(LAST_EPOCH, v.plan.maxEpoch) && !advancing && !armyFirst && citizens.length + (isLegion(p) && p.epoch > 0 ? army.filter(legionHand).length : 0) >= ADVANCE_AT[p.epoch] && s.tick > secs(150 + p.epoch * 150);
+  const wantEpoch = p.epoch < Math.min(LAST_EPOCH, v.plan.maxEpoch) && !!mainRoad(p) && !advancing && !armyFirst && citizens.length + (isLegion(p) && p.epoch > 0 ? army.filter(legionHand).length : 0) >= ADVANCE_AT[p.epoch] && s.tick > secs(150 + p.epoch * 150);
   // Patience for a road's deeds counts only while the Town Center holds for them (#113): army-first
   // kept a town from holding for minutes, and it came back out of patience at once.
   if (!wantEpoch) delete mem.waiting;
@@ -307,7 +331,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
     spend(v, road.cost);
     // A nomad people buys its road's stone (#532): the gold for it is set aside too, or the army spends all but the road's own gold and the stone waits.
     if (isNomad(p)) spend(v, { gold: stoneGold(s, p, road.cost) });
-  } else if (armyFirst && !advancing && !s.scenario && p.epoch < LAST_EPOCH && banked(p) && !armyDeed(s, p, mem)) {
+  } else if (armyFirst && !advancing && !s.scenario && p.epoch < LAST_EPOCH && !!mainRoad(p) && banked(p) && !armyDeed(s, p, mem)) {
     // A climb nearly paid for keeps its savings while the army comes first (#532): a wave that came home short spent the whole price on soldiers, minutes from the next age.
     // Not in a campaign chapter: its goals and its rival's strength were tuned to the old way.
     const road = mainRoad(p)!;
@@ -334,9 +358,13 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   beaconsForLightning(s, v, mem, issue);
   rallyTheLine(s, v, issue);
   research(s, v, v.hands >= wantCitizens - 2, issue);
+  raiseTowers(s, v, issue);
   trade(s, v, issue);
+  // The engine a Masons' Lodge rival calls for (#242) is saved from the town's buildings and soldiers, and handed back at the Workshop.
+  v.engine = lodgeEngine(s, v);
+  if (v.engine) spend(v, v.engine);
   planBuildings(s, v, mem, issue);
-  trapLine(s, v, mem, issue);
+  if (!managedWood(s, v, mem, issue)) trapLine(s, v, mem, issue);
   floodWork(s, v, issue);
   hemoBuild(s, v, mem, issue);
   excavate(s, v, mem, issue);
@@ -354,6 +382,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   polisArms(s, v, mem, issue);
   legionWork(s, v, mem, issue);
   military(s, v, mem, issue);
+  release(v);
   priestly(s, v, mem, issue);
 }
 
@@ -385,6 +414,22 @@ function research(s: GameState, v: View, peopleEnough: boolean, issue: (c: Comma
     spend(v, cost);
     return;
   }
+}
+
+/** A clever computer raises its Watch Towers one step at a time on the tower line, the lowest first, from what it can spare. */
+function raiseTowers(s: GameState, v: View, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!AI_LEVELS[p.ai!].clever) return;
+  let best: Building | null = null;
+  for (const b of v.buildings) {
+    if (b.type !== 'tower' || raiseProblem(s, p.id, b) || b.queue.length) continue;
+    if (!best || (b.level ?? 0) < (best.level ?? 0)) best = b;
+  }
+  if (!best) return;
+  const cost = TOWER_LEVELS[best.level ?? 0].cost;
+  if (!RES.every((r) => !cost[r] || v.budget[r] >= cost[r]! + AI_TOWER_KEEP)) return;
+  issue({ t: 'raiseTower', p: p.id, building: best.id });
+  spend(v, cost);
 }
 
 function trade(s: GameState, v: View, issue: (c: Command) => void): void {
@@ -487,6 +532,8 @@ function fit(p: Player, to: AgeId): number {
   if (age.path === 'blood') return cls === 'infantry' || cls === 'cavalry' ? 0 : -1;
   // The Silk Road (#326) waits until the computer knows how to move its Market with the camp.
   if (to === 'silk') return -1;
+  // The Age of the Wild shuts the Stable and the Siege Workshop: a people whose strength is riders or engines keeps away.
+  if (age.tames) return cls === 'cavalry' || cls === 'siege' ? -1 : 0;
   // The Steppe Road (#320): its first age is judged as any side age; the Horde follows it (#322, see `wants`).
   if (age.no?.units.includes(sig)) return -1;
   return (age.price?.[cls] ?? 1) < 1 ? 1 : 0;
@@ -521,6 +568,19 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   } else if (roads[to] === undefined && to === 'sapper') {
     // The gateway's road on (#577): Alchemy is walked for the Sappers, so a people that turned into it goes on.
     roads[to] = hasWalked(p, 'alchemy');
+  } else if (roads[to] === undefined && to === 'wild') {
+    // The Wild route (`docs/wild-road.md`): a coin of its own, as the steppe's, so asking shifts no other match's dice.
+    roads[to] = fit(p, to) >= 0 && coin(s, p.id, 0x3d17) < TAME.aiTake;
+  } else if (roads[to] === undefined && to === 'grove') {
+    // The Wild route's second age: a people that walked the Wild goes on, as the Horde follows the Steppe.
+    roads[to] = hasWalked(p, 'wild');
+  } else if (roads[to] === undefined && to === 'dykes') {
+    // The Water Road (#701): only with a dyke worth raising by home, and on a coin of its own, so no other match's dice shift. A people
+    // that walked the Age of Rivers is on the road already, and goes on down it more often.
+    roads[to] = coastHeld(s, p) && !!dykeOf(s, p, mem) && coin(s, p.id, 0xd1e5) < (hasWalked(p, 'rivers') ? AI_RIVERS.onward : AI_DYKE.take);
+  } else if (roads[to] === undefined && to === 'rivers') {
+    // The Water Road's first age (#701 s1): with a channel worth digging by home, on a coin of its own.
+    roads[to] = !!riverOf(s, p, mem) && coin(s, p.id, 0x71e5) < AI_RIVERS.take;
   } else if (roads[to] === undefined && to === 'alchemy') {
     // A coin of its own (as the steppe's): the gateway is asked only where saltpetre lies, and shifts no other match's dice.
     roads[to] = fit(p, to) >= 0 && coin(s, p.id, 0xa1c4) < AI_KEG.take;
@@ -582,6 +642,22 @@ function clueRising(s: GameState, p: Player, r: Road): boolean {
 }
 
 /**
+ * The clue building of a side road it has already chosen and not yet raised (#555 s0): the Barracks that shows the Warband, the
+ * Market the merchants'. Left to the town's usual order it lost the wood to cheaper buildings and the road was never seen, so
+ * the town takes the trunk; it is raised first and its wood set aside. Only a road its age leads to (a turn at its own tier too), with no vein, ruin or find to wait on; the steppe's camp has its own order (`steppeRoad`).
+ */
+function clueDue(v: View, mem: AiMemory): BuildingType | null {
+  const { p } = v;
+  if (!walksWeb(v)) return null;
+  for (const r of roadsFrom(p)) {
+    if (!isSideRoad(r) || AGES[r.to].tier < p.epoch || hasWalked(p, r.to) || !r.clue || mem.roads?.[r.to] !== true || r.vein || r.ruin || r.found || AGES[r.to].mobile) continue;
+    if ((r.walked && !hasWalked(p, r.walked)) || (r.crossing && !r.crossing.some((a) => hasWalked(p, a)))) continue;
+    if (count(v, r.clue) === 0 && BUILDINGS[r.clue].epoch <= p.epoch && !buildBarred(p, r.clue)) return r.clue;
+  }
+  return null;
+}
+
+/**
  * A Prospector's Lodge is due (#562): a Stone Age town that walks the web, with the hands (`AI_WEB.survey`, a legion's
  * `LEGION.aiSurvey`) and a Barracks, means to take the iron road and hasn't yet had the lodge's answer.
  */
@@ -621,6 +697,19 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
     if (s.tick - mem.powder <= secs(AI_KEG.hold)) return null;
     mem.roads!.alchemy = false;
   }
+  // Bound for the Age of Dykes (#701), the Middle Ages wait while its Dock goes up and the price is gathered, `AI_DYKE.hold` seconds at
+  // most; and in the age, it stays until the basin is dry (or as long again), for the polder is what it came for.
+  if (walksWeb(v) && ageOf(p) === 'middle' && !hasWalked(p, 'dykes') && mem.roads?.dykes === true) {
+    const d = (mem.dyke ??= { plan: null });
+    d.hold ??= s.tick;
+    if (s.tick - d.hold <= secs(AI_DYKE.hold)) return null;
+    mem.roads.dykes = false;
+  }
+  if (walksWeb(v) && ageOf(p) === 'dykes') {
+    const d = (mem.dyke ??= { plan: null });
+    d.since ??= s.tick;
+    if (!dykeDone(s, mem) && s.tick - d.since < secs(AI_DYKE.hold)) return null;
+  }
   if (walksWeb(v)) {
     for (const r of roadsFrom(p)) {
       if (!isSideRoad(r) || AGES[r.to].tier <= p.epoch || !(roadKnown(s, p, r) || clueRising(s, p, r)) || !wants(s, p, mem, r.to)) continue;
@@ -634,6 +723,17 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
     }
   }
   delete mem.waiting;
+  // In a Golden Age (#703) it rides the span out rather than climb, which would end it.
+  if (AGES[ageOf(p)].golden) return null;
+  // An Industrial town bound for one of the two futures (Aeronauts, Lightning) doesn't climb on to the Atomic Age first (#605): `AI_SILO.hold` seconds at most.
+  if (walksWeb(v) && p.epoch === 4 && roadsFrom(p).some((r) => isSideRoad(r) && AGES[r.to].tier === p.epoch && mem.roads?.[r.to] === true && roadKnown(s, p, r))) {
+    mem.sideHold ??= s.tick;
+    if (s.tick - mem.sideHold < secs(AI_SILO.hold)) return null;
+  }
+  // The Wild is kept a while, so the beasts it came for are tamed and the Den is breeding.
+  if (walksWeb(v) && ageOf(p) === 'wild' && s.tick - (mem.wild ?? s.tick) < secs(TAME.aiStay)) return null;
+  // The Grove is kept a while, so its gardens are fed, its Orchards set and its Thornwall grown.
+  if (walksWeb(v) && ageOf(p) === 'grove' && s.tick - (mem.grove ?? s.tick) < secs(GROVE.aiStay)) return null;
   // The steppe (#320) is kept a while, so the flock it came for pays.
   if (walksWeb(v) && ageDef(p).mobile && s.tick - (mem.steppe?.since ?? s.tick) < secs(AI_STEPPE.stay)) return null;
   // Bound for a crossing (#585, #555 s12), a sibling doesn't climb on: its way is back to the Middle Ages (`seaTurn`).
@@ -718,6 +818,11 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   const toAlchemy = here === 'middle' && mem.roads?.alchemy === true && veinSeen(s, p, ALCHEMY_ROAD);
   for (const r of roadsFrom(p)) {
     if (AGES[r.to].tier !== p.epoch || (forking && r.to === 'totalwar')) continue;
+    // The Golden Age (#703): a people that has lived enough lives takes it the moment its road opens. It is too good to pass by.
+    if (r.to === 'golden') {
+      if (!roadProblem(s, p, r)) return { road: r, wait: false };
+      continue;
+    }
     // Bound for the Sea-Raiders (#585), it doesn't turn again into a sibling it has walked: the other is the plan.
     if (seaBound?.crossing!.includes(r.to) && hasWalked(p, r.to)) continue;
     if (toAlchemy && r.to !== 'alchemy' && isSideRoad(r)) continue;
@@ -736,6 +841,20 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
       mem.roads ??= {};
       mem.roads.lightning = false;
       return { road: r, wait: false };
+    }
+    // The fork past the Atomic Age (#605 s3): a people with a silo, on a coin of its own, takes Fission or Fusion once its silo has stood
+    // `AI_SILO.forkAfter` seconds and the town holds half the road's price (so the price it sets aside is soon paid, and Fusion's dear road starves no one for long).
+    if (r.to === 'fission' || r.to === 'fusion') {
+      const first = silosOf(s, p.id)[0];
+      const held = RES.every((res) => !r.cost[res] || p.res[res] >= r.cost[res]! * 0.5);
+      if (first && s.tick - first.born >= secs(AI_SILO.forkAfter) && held && roadKnown(s, p, r) && coin(s, p.id, 0x5110) < AI_SILO.fork && (coin(s, p.id, 0x5111) < AI_SILO.fusion ? 'fusion' : 'fission') === r.to) return { road: r, wait: false };
+      continue;
+    }
+    // The Water Road (#701): a town with a dyke worth raising by home turns into the Age of Dykes once its Dock shows the road
+    // (`clueDue` raises the Dock). Asked before the road is known, so the Dock is raised for it.
+    if (r.to === 'dykes') {
+      if (wants(s, p, mem, r.to) && roadKnown(s, p, r) && !roadProblem(s, p, r)) return { road: r, wait: false };
+      continue;
     }
     // The gateway (#577): with its saltpetre door open and the store to grind from, it turns into Alchemy.
     if (r.to === 'alchemy') {
@@ -1137,6 +1256,175 @@ function powderRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) =>
   for (const id of ids) v.diggers.add(id);
 }
 
+/** The dyke it means to raise by home (#701), found once and kept: `dykePlan` round its start, or null where none is worth it. */
+function dykeOf(s: GameState, p: Player, mem: AiMemory): DykePlan | null {
+  const d = (mem.dyke ??= { plan: null });
+  if (!d.looked) {
+    d.looked = true;
+    d.plan = dykePlan(s, p.startX, p.startY, AI_DYKE.reach, AI_DYKE, wallLine);
+  }
+  return d.plan;
+}
+
+/** The channel it means to dig by home (#701 s1): `channelPlan` from the water nearest its start, or null; kept until redrawn (`riverWork`). */
+export function riverOf(s: GameState, p: Player, mem: AiMemory): ChannelPlan | null {
+  const r = (mem.river ??= { plan: null });
+  if (!r.looked) {
+    r.looked = true;
+    r.plan = channelPlan(s, p.startX, p.startY, AI_RIVERS, wallLine, (x, y) => !placeProblem(s, 'channel', x, y));
+  }
+  return r.plan;
+}
+
+/**
+ * The Age of Rivers at work (#701 s1): dig the planned channel (tile by tile from the water, `AI_RIVERS.crew` citizens, the price set
+ * aside until it can be paid whole), and send idle hands back to the ditches still being dug. Its fields then follow the water
+ * (`planBuildings` looks for a Farm spot by the people's own rule).
+ */
+function riverWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  // The road is decided in the Stone Age, on its own coin, so its Farm (the clue) is raised in time (`clueDue`).
+  if (p.epoch === 0 && walksWeb(v)) wants(s, p, mem, 'rivers');
+  if (!ageDef(p).rivers) return;
+  // Planned in the Stone Age; the town has grown since, so the line is drawn again on arrival.
+  const r = (mem.river ??= { plan: null });
+  if (!r.fresh) {
+    r.fresh = true;
+    r.looked = false;
+  }
+  const plan = riverOf(s, p, mem);
+  if (!plan) return;
+  const recent = (sec: number) => s.tick - (mem.ordered.channel ?? -99999) < secs(sec);
+  const ditch = (t: number): Building | null => {
+    const b = s.byId.get(s.bldAt[t]);
+    return b && b.kind === 'building' && b.type === 'channel' && b.owner === p.id ? b : null;
+  };
+  // Tiles still to lay out: not dug, not being dug, and free to dig, up to the first a building raised since stands on (the water
+  // would stop there, so nothing is dug past it).
+  const left: number[] = [];
+  for (const t of plan.tiles) {
+    if (isChannel(s, t) || ditch(t)) continue;
+    if (placeProblem(s, 'channel', t % s.w, Math.floor(t / s.w))) break;
+    left.push(t);
+  }
+  if (left.length && !recent(20)) {
+    const cost = buildingCostFor(s, p.id, 'channel');
+    const all: Cost = {};
+    for (const r of RES) if (cost[r]) all[r] = cost[r]! * left.length;
+    if (!afford(v, all)) {
+      spend(v, all);
+      return;
+    }
+    const crew = v.citizens.filter((u) => !u.inside && u.order.k !== 'build' && !(u.order.k === 'farm' && u.order.phase === 'work')).sort((a, b) => a.id - b.id).slice(0, AI_RIVERS.crew);
+    if (!crew.length) return;
+    // Tile by tile, nearest the water first, so the ditch is the line planned (a drag to another end would draw another line).
+    left.forEach((t, i) => issue({ t: 'build', p: p.id, ids: crew.map((u) => u.id), type: 'channel', tx: t % s.w, ty: Math.floor(t / s.w), queue: i > 0 || undefined }));
+    spend(v, all);
+    mem.ordered.channel = s.tick;
+    return;
+  }
+  // Idle hands go back to the ditch still being dug, nearest the water first.
+  const rising = plan.tiles.map(ditch).find((b) => b && !b.built);
+  if (rising && !recent(20)) {
+    const crew = v.citizens.filter((u) => !u.inside && u.order.k === 'idle').slice(0, AI_RIVERS.crew);
+    if (crew.length) issue({ t: 'work', p: p.id, ids: crew.map((u) => u.id), target: rising.id });
+    mem.ordered.channel = s.tick;
+  }
+}
+
+/** Whether its dyke's work is done (#701): the basin it shut off is all polder, or it has no plan. */
+function dykeDone(s: GameState, mem: AiMemory): boolean {
+  const plan = mem.dyke?.plan;
+  return !plan || plan.basin.every((t) => isPolder(s, t) || s.bldAt[t] !== 0);
+}
+
+/**
+ * The Age of Dykes at work (#701): lay the planned line (one drag, `AI_DYKE.crew` citizens, the price set aside until it can be
+ * paid whole), then once every dyke on it is finished, a windmill for every `AI_DYKE.perMill` tiles of the basin (at most
+ * `AI_DYKE.mills`), on the nearest spot to home whose pull reaches the basin; then fields on the polder as it dries, one for every
+ * dozen tiles won.
+ */
+function dykeWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!ageDef(p).pumps) return;
+  const plan = dykeOf(s, p, mem);
+  if (!plan) return;
+  const recent = (type: BuildingType, sec: number) => s.tick - (mem.ordered[type] ?? -99999) < secs(sec);
+  const dykes = plan.line.map((t) => s.byId.get(s.bldAt[t])).filter((b): b is Building => !!b && b.kind === 'building' && b.type === 'dyke' && b.owner === p.id);
+  if (dykes.length < plan.line.length) {
+    const cost = buildingCostFor(s, p.id, 'dyke');
+    const need = plan.line.length - dykes.length;
+    const all: Cost = {};
+    for (const r of RES) if (cost[r]) all[r] = cost[r]! * need;
+    if (recent('dyke', 20) || !afford(v, all)) {
+      spend(v, all);
+      return;
+    }
+    const crew = v.citizens.filter((u) => !u.inside && u.order.k !== 'build' && !(u.order.k === 'farm' && u.order.phase === 'work')).sort((a, b) => a.id - b.id).slice(0, AI_DYKE.crew);
+    if (!crew.length) return;
+    issue({ t: 'wall', p: p.id, ids: crew.map((u) => u.id), x0: plan.from.x, y0: plan.from.y, x1: plan.to.x, y1: plan.to.y, dyke: true });
+    spend(v, all);
+    mem.ordered.dyke = s.tick;
+    return;
+  }
+  // Idle builders are sent back to the dykes still rising.
+  const rising = dykes.find((b) => !b.built);
+  if (rising) {
+    if (!recent('dyke', 20)) {
+      const crew = v.citizens.filter((u) => !u.inside && u.order.k === 'idle').slice(0, AI_DYKE.crew);
+      if (crew.length) issue({ t: 'work', p: p.id, ids: crew.map((u) => u.id), target: rising.id });
+      mem.ordered.dyke = s.tick;
+    }
+    return;
+  }
+  const mills = v.buildings.filter((b) => b.type === 'windmill').length;
+  const want = Math.min(AI_DYKE.mills, Math.ceil(plan.basin.length / AI_DYKE.perMill));
+  if (mills < want && !dykeDone(s, mem)) {
+    const cost = buildingCostFor(s, p.id, 'windmill');
+    if (recent('windmill', 25)) return;
+    const spot = millSpotFor(s, p.id, plan.basin, v.home.x, v.home.y);
+    if (!spot || !construct(s, v, mem, 'windmill', spot, 2, issue)) spend(v, cost);
+    return;
+  }
+  // Fields on the polder: one for every dozen tiles won, while there is room and wood.
+  const won = plan.basin.filter((t) => isPolder(s, t));
+  const fields = v.buildings.filter((b) => b.type === 'farm' && polderField(s, b)).length;
+  if (won.length >= 9 && fields < Math.floor(won.length / 12) && !recent('farm', 15) && !buildBarred(p, 'farm')) {
+    for (const t of won) {
+      const tx = t % s.w;
+      const ty = Math.floor(t / s.w);
+      if (placeProblem(s, 'farm', tx, ty, true, p.id)) continue;
+      if (!polderField(s, { tx, ty, size: 3 } as Building)) continue;
+      construct(s, v, mem, 'farm', { tx, ty }, 1, issue);
+      break;
+    }
+  }
+}
+
+/** The spot nearest home for a windmill whose pull reaches a basin (#701): within `POLDER.reach` of one of its tiles, on land it may raise. */
+export function millSpotFor(s: GameState, owner: number, basin: number[], hx: number, hy: number): { tx: number; ty: number } | null {
+  const near = new Set<number>();
+  const r = POLDER.reach;
+  for (const t of basin) {
+    const bx = t % s.w;
+    const by = Math.floor(t / s.w);
+    for (let ty = by - r - 1; ty <= by + r; ty++) for (let tx = bx - r - 1; tx <= bx + r; tx++) if (tx > 0 && ty > 0 && tx < s.w - 2 && ty < s.h - 2) near.add(ty * s.w + tx);
+  }
+  let best: { tx: number; ty: number } | null = null;
+  let bestD = Infinity;
+  for (const i of [...near].sort((a, b) => a - b)) {
+    const tx = i % s.w;
+    const ty = Math.floor(i / s.w);
+    if (placeProblem(s, 'windmill', tx, ty, true, owner)) continue;
+    const d = (tx + 1 - hx) * (tx + 1 - hx) + (ty + 1 - hy) * (ty + 1 - hy);
+    if (d < bestD && basinOf(s, { tx, ty, size: 2 }).some((t) => basin.includes(t))) {
+      bestD = d;
+      best = { tx, ty };
+    }
+  }
+  return best;
+}
+
 const KEG_FIRST: Partial<Record<BuildingType, number>> = { tower: 0, towncenter: 0, gate: 1, wall: 1 };
 
 /** Whether a rival on the ground stands within `AI_KEG.guard` tiles of a building's foot: a keg laid there would be stamped out. */
@@ -1185,6 +1473,86 @@ export function sapKegs(s: GameState, v: View, mem: AiMemory, issue: (c: Command
   }
 }
 
+/** The Atomic Age (#605): a clever computer with a big enough town raises one Missile Silo near home. */
+function siloRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p, home } = v;
+  if (!AI_LEVELS[p.ai!].clever || p.epoch < 5 || v.hands < AI_SILO.hands || v.buildings.some((b) => b.type === 'silo')) return;
+  if (s.tick - (mem.ordered.silo ?? -99999) < secs(40)) return;
+  const cost = buildingCostFor(s, p.id, 'silo');
+  if (!afford(v, cost)) {
+    spend(v, cost);
+    return;
+  }
+  const spot = findSpot(s, 'silo', home.x, home.y, 6, 22);
+  if (!spot || !construct(s, v, mem, 'silo', spot, 3, issue)) spend(v, cost);
+}
+
+/** Rival buildings and soldiers a warhead landing at (x, y) would catch, as the computer weighs them. */
+function siloWorth(s: GameState, owner: number, x: number, y: number): number {
+  let worth = 0;
+  const r2 = SILO.reach * SILO.reach;
+  for (const e of s.ents) {
+    if (e.hp <= 0 || !isEnemy(s, owner, e.owner)) continue;
+    if (e.kind === 'building') {
+      if (distToRect(x, y, e) <= SILO.reach) worth += e.type === 'towncenter' ? AI_SILO.heart : 1;
+    } else if (!e.inside && domainOf(e.type) === 'land') {
+      const dx = e.x - x, dy = e.y - y;
+      if (dx * dx + dy * dy <= r2) worth += MILITARY.includes(e.type) ? AI_SILO.soldier : 0;
+    }
+  }
+  return worth;
+}
+
+/**
+ * A loaded silo launches at the rival building whose ring catches the most (`siloWorth`), once its worth reaches `AI_SILO.worth`.
+ * The aim is chosen once a second; while it holds and the silo is short only of fuel, the town sets the fuel aside every tick
+ * (it is ruinous, and soldiers would spend the gold first).
+ */
+function fireSilo(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (p.epoch < 5) return;
+  const silo = silosOf(s, p.id).find((b) => s.tick - b.born >= secs(BUILDINGS.silo.time + AI_SILO.wait) && loaded(s, b));
+  if (!silo) return;
+  if (s.tick % TICK_HZ === 0) {
+    let best: { x: number; y: number; at: number } | null = null;
+    let bestWorth = AI_SILO.worth - 1;
+    for (const e of s.ents) {
+      if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
+      const w = siloWorth(s, p.id, e.x, e.y);
+      if (w > bestWorth) {
+        bestWorth = w;
+        best = { x: e.x, y: e.y, at: s.tick };
+      }
+    }
+    mem.siloAim = best ?? undefined;
+  }
+  const aim = mem.siloAim;
+  if (!aim || s.tick - aim.at > TICK_HZ * 2) return;
+  const why = launchProblem(s, p.id, silo, aim.x, aim.y);
+  if (why === null) {
+    issue({ t: 'launch', p: p.id, silo: silo.id, x: aim.x, y: aim.y });
+    mem.siloAim = undefined;
+  } else if (why.startsWith("A warhead's fuel")) spend(v, rulesOf(p).fuel);
+}
+
+/**
+ * Soldiers and citizens inside the ring of a rival warhead in the air, or on poisoned ground (#605 s2), run out of it, away from
+ * its centre toward home (the answer to a public clock, and to the fallout after).
+ */
+function fleeWarhead(s: GameState, v: View, issue: (c: Command) => void): void {
+  if (s.tick % (TICK_HZ / 2) !== 0) return;
+  const zones = [...(s.launches ?? []).filter((l) => isEnemy(s, v.p.id, l.owner)), ...(s.fallout ?? [])];
+  for (const l of zones) {
+    const r = ((l as { r?: number }).r ?? SILO.reach) + AI_SILO.margin;
+    const out = [...v.army, ...v.citizens].filter((u) => !u.inside && (u.x - l.x) * (u.x - l.x) + (u.y - l.y) * (u.y - l.y) <= r * r && domainOf(u.type) === 'land');
+    if (!out.length) continue;
+    const dx = v.home.x - l.x, dy = v.home.y - l.y;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const x = l.x + (dx / len) * (r + 2), y = l.y + (dy / len) * (r + 2);
+    issue({ t: 'move', p: v.p.id, ids: out.map((u) => u.id), x, y });
+  }
+}
+
 /** Citizens still digging bog iron when no deed needs it go to the resource the town is shortest of (#79). */
 function releaseDiggers(s: GameState, v: View, issue: (c: Command) => void): void {
   const bog = v.citizens.filter((u) => u.order.k === 'gather' && (u.order.bog || s.res[u.order.tile] === R_BOG) && u.carry <= 2 && !u.inside);
@@ -1217,6 +1585,20 @@ function rivalIn(s: GameState, p: Player, ages: AgeId[]): boolean {
 }
 
 /** Whether a living rival has learned a craft (#242): an heirloom shows in what a people does, and the clever computer reads it. */
+/**
+ * The price of the extra engine a rival's Masons' Lodge calls for (#242), while a clever computer with a Workshop is short of it,
+ * or null. Its buildings came first, and a town busy building never kept the engine's wood for it.
+ */
+function lodgeEngine(s: GameState, v: View): Cost | null {
+  const { p } = v;
+  if (!AI_LEVELS[p.ai!].clever || AI_LEVELS[p.ai!].lodgeEngine === false || !rivalHas(s, p, 'masonsLodge')) return null;
+  const shop = v.buildings.find((b) => b.type === 'workshop' && b.built);
+  if (!shop || unitEpoch('siege') > p.epoch || barred(p, 'siege', 'workshop')) return null;
+  const siege = v.army.filter((u) => u.type === 'siege').length + v.buildings.reduce((n, b) => n + b.queue.filter((q) => q.unit === 'siege').length, 0);
+  if (siege >= Math.max(v.plan.siege, p.epoch >= 2 ? 3 : 2) + AI_WEB.lodge) return null;
+  return trainCostFor(s, p.id, 'siege', 'workshop', shop);
+}
+
 function rivalHas(s: GameState, p: Player, tech: TechId): boolean {
   return s.players.some((o) => !o.defeated && isEnemy(s, p.id, o.id) && o.techs.includes(tech));
 }
@@ -1536,8 +1918,8 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   if (lodgeHolds && raiseLodge(true)) return;
   // Fields once the berries near home run short of feeding everyone who should be on food.
   const berries = findResource(s, R_BERRY, home.x, home.y, 14);
-  const farms = count(v, 'farm');
-  const freeFields = v.buildings.filter((b) => b.type === 'farm' && !v.citizens.some((u) => u.order.k === 'farm' && u.order.target === b.id)).length;
+  const farms = count(v, 'farm') + count(v, 'garden');
+  const freeFields = v.buildings.filter((b) => (b.type === 'farm' || b.type === 'garden') && !v.citizens.some((u) => u.order.k === 'farm' && u.order.target === b.id)).length;
   // Autumn onward the clever computer plans for winter: berries fail in the cold, so fields go up first, unless in the
   // Stone Age the larder holds the winter's food already (#486): planning anyway, it raised a field a citizen with the
   // wood the Bronze Age wanted. Later a town's stock is no larder: its people eat from the fields.
@@ -1551,8 +1933,14 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   if (L.clever && p.way === 'hunt' && p.epoch === 0 && s.homeland === 'herds' && seasonAt(s) === 1 && farms < AI_WAYS.trekFields && wayBarred(s, p, 'farm')) {
     spend(v, { wood: (buildingCostFor(s, p.id, 'farm').wood ?? 0) * (AI_WAYS.trekFields - farms) });
   }
-  if (farms < foodWanted && freeFields < 2 && !recently('farm', 2) && !buildBarred(p, 'farm') && !wayBarred(s, p, 'farm')) {
-    const spot = findSpot(s, 'farm', home.x, home.y, 3, 16);
+  if (isCoppice(p) && !isMobile(p)) {
+    if (laySnare(s, v, mem, foodWanted, issue)) return;
+  } else if (farms < foodWanted && freeFields < 2 && !recently('farm', 2) && !recently('garden', 2) && grows(p) && plantGarden(s, v, mem, issue)) {
+    return;
+  } else if (farms < foodWanted && freeFields < 2 && !recently('farm', 2) && !buildBarred(p, 'farm') && !wayBarred(s, p, 'farm')) {
+    // In the Age of Rivers (#701) a field goes only by water: the search asks the people's own rule, and looks a little farther.
+    const rivers = !!AGES[ageOf(p)].rivers;
+    const spot = rivers ? findSpot(s, 'farm', home.x, home.y, 3, 20, 1, (tx, ty) => !placeProblem(s, 'farm', tx, ty, true, p.id)) : findSpot(s, 'farm', home.x, home.y, 3, 16);
     if (spot && construct(s, v, mem, 'farm', spot, 1, issue)) return;
   }
 
@@ -1621,6 +2009,20 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     else if (construct(s, v, mem, 'dock', spot, 2, issue)) return;
   }
 
+  // Mine Shafts (#681): once no deposit of a stock it wants lies near a drop of its own, a shaft near home, over old
+  // workings if it finds them, else by rock, else on open ground. Looked at now and then, not every turn.
+  if (p.epoch >= 1 && n >= 12 && count(v, 'shaft') < SHAFT.aiMax && !recently('shaft', 40) && v.budget.wood >= SHAFT.aiWood && s.tick - (mem.shaftLook ?? -99999) > secs(15)) {
+    mem.shaftLook = s.tick;
+    const want = wanted(v);
+    const drops = v.buildings.filter((b) => b.built && BUILDINGS[b.type].drop.length);
+    const dry = (['gold', 'stone'] as const).filter((r) => want[r] >= 1 && mineable(p, TILE_OF[r]) && !drops.some((b) => findResource(s, TILE_OF[r], b.x, b.y, SHAFT.aiNear) >= 0));
+    if (dry.length && !v.buildings.some((b) => b.type === 'shaft' && !b.built) && !freeShaft(s, p.id, home.x, home.y, s.w + s.h)) {
+      const at = (g: 'old' | 'hill' | null) => findSpot(s, 'shaft', home.x, home.y, 4, SHAFT.aiReach, 1, g ? (tx, ty) => siteGrade(s, { tx, ty, size: 2 }) === g : undefined);
+      const spot = at('old') ?? at('hill') ?? at(null);
+      if (spot && construct(s, v, mem, 'shaft', spot, 1, issue)) return;
+    }
+  }
+
   // In the Age of Lightning a coil goes up by a workshop that stands dark (#231), so its training runs fast again.
   if (ageOf(p) === 'lightning' && count(v, 'tower') < AI_LIGHTNING.most && !recently('tower', AI_LIGHTNING.gap)) {
     const dark = v.buildings.find((b) => b.built && b.type !== 'tower' && BUILDINGS[b.type].trains.length > 0 && !inField(s, b));
@@ -1644,8 +2046,6 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     ['forge', p.epoch >= 1 && n >= 16 && count(v, 'forge') === 0],
     // Relics lying loose are worth a Temple early.
     ['temple', clever && p.epoch >= 1 && n >= 16 && count(v, 'temple') === 0 && looseRelics(s) > 0],
-    // The Sickness (#541): a Temple is its clinic, built as soon as the taint builds or the fever breaks.
-    ['temple', clever && p.epoch >= 1 && count(v, 'temple') === 0 && ailing(p)],
     ['tower', p.epoch >= 1 && count(v, 'tower') < L.towers && n >= 16],
     ['market', clever && p.epoch >= 1 && n >= 20 && count(v, 'market') === 0],
     // A nomad people (#501) buys its stone: its Market comes early, at every level of play.
@@ -1656,13 +2056,22 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     ['range', p.epoch >= 2 && n >= 24 && count(v, 'range') < 2],
     ['stable', p.epoch >= 3 && n >= 26 && count(v, 'stable') < 2],
   ];
+  const due = clueDue(v, mem);
+  if (due) want.unshift([due, true]);
   for (const [type, ok] of want) {
     if (!ok || recently(type, 25) || BUILDINGS[type].epoch > p.epoch || buildBarred(p, type)) continue;
-    // Not a building whose every line the age bars (a Stable in the Iron Age).
+    // Not a building whose every line the age bars (a Stable in the Iron Age); a road's clue is raised all the same (a Greek city's Barracks hires foreign foot).
     const lines = BUILDINGS[type].trains;
-    if (lines.length && lines.every((u) => barred(p, u)) && !(type === 'workshop' && mills(p))) continue;
+    if (type !== due && lines.length && lines.every((u) => barred(p, u)) && !(type === 'workshop' && mills(p))) continue;
     const at = type === 'tower' ? towardEnemy(9) : type === 'market' || type === 'temple' ? home : towardEnemy(6);
     const spot = (type !== 'tower' && ageOf(p) === 'lightning' && fieldSpot(s, v, type)) || (type === 'market' && fairSpot(s, v)) || findSpot(s, type, at.x, at.y, type === 'market' || type === 'temple' ? 6 : 0, 18);
+    // The road's clue comes before the climb's savings: what the town holds pays for it, and until it does, nothing cheaper takes the wood (as the Market's, above).
+    if (spot && type === due) {
+      const cost = raiseCost(s, p.id, type, spot.tx, spot.ty);
+      if (RES.every((r) => !cost[r] || p.res[r] >= cost[r]!)) for (const r of RES) v.budget[r] = Math.max(v.budget[r], cost[r] ?? 0);
+      if (!construct(s, v, mem, type, spot, 3, issue)) spend(v, cost);
+      return;
+    }
     if (spot && construct(s, v, mem, type, spot, type === 'tower' ? 2 : 3, issue)) return;
   }
 
@@ -1687,7 +2096,7 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
 
 function jobOf(u: Unit): Res | 'build' | null {
   const o = u.order;
-  if (o.k === 'gather') return o.res;
+  if (o.k === 'gather' || o.k === 'shaft') return o.res;
   if (o.k === 'farm' || o.k === 'hunt' || o.k === 'milk' || o.k === 'snare') return 'food';
   if (o.k === 'build') return 'build';
   return null;
@@ -1841,6 +2250,17 @@ function sendTo(s: GameState, v: View, u: Unit, res: Res, issue: (c: Command) =>
       issue({ t: 'gather', p: v.p.id, ids: [u.id], tile: berry });
       return true;
     }
+    // A managed wood (#501) has no fields: a hand for food walks the snare line, while it has fewer tenders than snares.
+    if (isCoppice(v.p)) {
+      const line = v.buildings.filter((b) => b.type === 'snare' && b.built);
+      let tenders = 0;
+      for (const c of v.citizens) if (c.order.k === 'snare') tenders++;
+      const near = line.length > tenders ? nearestTo(line, u.x, u.y) : null;
+      if (near) {
+        issue({ t: 'work', p: v.p.id, ids: [u.id], target: near.id });
+        return true;
+      }
+    }
     // The Nile flood (#501 s1): no one is sent to a field under the river.
     const farm = flooded(s, v.p.id) ? null : freeFarm(s, v.p.id, v.home.x, v.home.y, 24);
     if (farm) {
@@ -1853,7 +2273,16 @@ function sendTo(s: GameState, v: View, u: Unit, res: Res, issue: (c: Command) =>
   // A nomad people (#501) quarries no stone: it buys it or takes it.
   if (res === 'stone' && isNomad(v.p)) return false;
   const from = nearestDropTo(v, u);
-  let tile = findResource(s, TILE_OF[res], from.x, from.y, 26);
+  let tile = findResource(s, TILE_OF[res], from.x, from.y, SHAFT.aiNear);
+  // No deposit near a drop (#681): a free Mine Shaft of its own, set to this stock, before the long walk to a far one.
+  if (tile < 0 && v.p.epoch >= 1 && res !== 'wood') {
+    const pit = freeShaft(s, v.p.id, v.home.x, v.home.y, SHAFT.aiReach + 10);
+    if (pit && !seamProblem(s, pit, res)) {
+      if (seamOf(s, pit) !== res) issue({ t: 'seam', p: v.p.id, building: pit.id, seam: res });
+      issue({ t: 'work', p: v.p.id, ids: [u.id], target: pit.id });
+      return true;
+    }
+  }
   if (tile < 0) tile = findResource(s, TILE_OF[res], u.x, u.y, 60);
   if (tile < 0) return false;
   issue({ t: 'gather', p: v.p.id, ids: [u.id], tile });
@@ -1916,7 +2345,7 @@ function assignCitizens(s: GameState, v: View, issue: (c: Command) => void): voi
     }
   }
   if (over && under) {
-    const mover = v.citizens.find((u) => jobOf(u) === over && u.carry <= 2 && u.order.k !== 'farm' && u.order.k !== 'hunt' && u.order.k !== 'milk' && u.order.k !== 'snare' && !u.inside && !v.diggers.has(u.id));
+    const mover = v.citizens.find((u) => jobOf(u) === over && u.carry <= 2 && u.order.k !== 'farm' && u.order.k !== 'shaft' && u.order.k !== 'hunt' && u.order.k !== 'milk' && u.order.k !== 'snare' && !u.inside && !v.diggers.has(u.id));
     if (mover) sendTo(s, v, mover, under, issue);
   }
 }
@@ -2045,14 +2474,21 @@ function trapLine(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     const spot = findSpot(s, 'snare', v.home.x, v.home.y, 4, 16, 0, (tx, ty) => treesNear(s, tx, ty) >= SNARE.aiTrees && far(tx, ty) && !placeProblem(s, 'snare', tx, ty, true, v.p.id));
     if (spot) construct(s, v, mem, 'snare', spot, 1, issue);
   }
+  tendLine(s, v, snares, SNARE.aiTenders, false, issue);
+}
+
+/** Keeps `want` citizens walking a trap line, taking one off the berries first, then off other food (and for a managed wood, off the axe). */
+function tendLine(s: GameState, v: View, snares: Building[], want: number, wood: boolean, issue: (c: Command) => void): void {
   const line = snares.find((b) => b.built);
   if (!line) return;
   let tenders = 0;
   for (const u of v.citizens) if (u.order.k === 'snare') tenders++;
-  if (tenders >= SNARE.aiTenders) return;
+  if (tenders >= want) return;
   let best: Unit | null = null;
   let bestD = Infinity;
-  for (const pass of [(u: Unit) => u.order.k === 'gather' && s.res[u.order.tile] === R_BERRY, (u: Unit) => u.order.k === 'gather' && u.order.res === 'food']) {
+  const passes = [(u: Unit) => u.order.k === 'gather' && s.res[u.order.tile] === R_BERRY, (u: Unit) => u.order.k === 'gather' && u.order.res === 'food'];
+  if (wood) passes.push((u: Unit) => u.order.k === 'idle' || (u.order.k === 'gather' && u.order.res === 'wood' && u.carry <= 2));
+  for (const pass of passes) {
     for (const u of v.citizens) {
       if (u.inside || u.queue.length || v.diggers.has(u.id) || !pass(u)) continue;
       const d = (u.x - line.x) * (u.x - line.x) + (u.y - line.y) * (u.y - line.y);
@@ -2064,6 +2500,75 @@ function trapLine(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     if (best) break;
   }
   if (best) issue({ t: 'work', p: v.p.id, ids: [best.id], target: line.id });
+}
+
+// ---- The managed wood (#501, the Britons) -------------------------------------------------------------
+
+/** The building of a list nearest a point, or null for an empty list (ties to the first, in id order). */
+function nearestTo(list: Building[], x: number, y: number): Building | null {
+  let best: Building | null = null;
+  let bestD = Infinity;
+  for (const b of list) {
+    const d = (b.x - x) * (b.x - x) + (b.y - y) * (b.y - y);
+    if (d < bestD) {
+      bestD = d;
+      best = b;
+    }
+  }
+  return best;
+}
+
+/**
+ * A managed wood's fields (#501): where another town would sow a Field, it lays a snare, `COPPICE.aiPerFood` for each field its
+ * food wants (at most `COPPICE.aiMax`; `COPPICE.aiStone` in the Stone Age while berries grow by home, which feed it while its wood
+ * goes to the climb). Asked at the farm's place in `planBuildings`, a snare a think, so its wood comes before the savings as a field's does.
+ */
+function laySnare(s: GameState, v: View, mem: AiMemory, fields: number, issue: (c: Command) => void): boolean {
+  const snares = v.buildings.filter((b) => b.type === 'snare');
+  const berries = v.p.epoch === 0 && findResource(s, R_BERRY, v.home.x, v.home.y, 14) >= 0;
+  const want = Math.min(berries ? COPPICE.aiStone : COPPICE.aiMax, Math.ceil(Math.max(0, fields) * COPPICE.aiPerFood));
+  // Snares go up as fields do, one a think while they're wanted, and food hands are sent to walk them (`sendTo`).
+  if (snares.length < want && snares.filter((b) => !b.built).length < 2 && s.tick - (mem.ordered.snare ?? -99999) > secs(2)) {
+    const felling: number[] = [];
+    for (const u of v.citizens) if (u.order.k === 'gather' && u.order.res === 'wood') felling.push(u.order.tile);
+    const far = (tx: number, ty: number) => felling.every((t) => Math.max(Math.abs((t % s.w) - tx), Math.abs(Math.floor(t / s.w) - ty)) >= SNARE.aiFar);
+    const wood = (n: number) => (tx: number, ty: number) => treesNear(s, tx, ty) >= n && !placeProblem(s, 'snare', tx, ty, true, v.p.id);
+    let spot: { tx: number; ty: number } | null = null;
+    for (const [n, r] of [[COPPICE.aiThick, COPPICE.aiNear], [COPPICE.aiTrees, COPPICE.aiNear], [COPPICE.aiTrees, COPPICE.aiNear + 10], [SNARE.need, COPPICE.aiNear + 10]]) {
+      const ok = wood(n);
+      spot = findSpot(s, 'snare', v.home.x, v.home.y, 3, r, 0, (tx, ty) => ok(tx, ty) && far(tx, ty)) ?? findSpot(s, 'snare', v.home.x, v.home.y, 3, r, 0, ok);
+      if (spot) break;
+    }
+    return !!spot && construct(s, v, mem, 'snare', spot, 1, issue);
+  }
+  return false;
+}
+
+/**
+ * A coppice people's computer (#501) tills no fields: its snares (`laySnare`) feed it. Here it raises a Hunting Camp by a snare far
+ * from a food drop, plants saplings round a snare whose woods run thin, and keeps a tender for every `COPPICE.aiPerTender` snares.
+ * Returns whether it played the wood (so the Deep Wood's own trap line is not laid besides).
+ */
+function managedWood(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): boolean {
+  if (!isCoppice(v.p) || isMobile(v.p)) return false;
+  const snares = v.buildings.filter((b) => b.type === 'snare');
+  // A Hunting Camp by a snare far from any food drop, so the catch isn't walked home across the map.
+  const dropFar = snares.find((b) => b.built && !v.buildings.some((d) => d.built && BUILDINGS[d.type].drop.includes('food') && distToRect(b.x, b.y, d) <= COPPICE.aiDrop));
+  if (dropFar && count(v, 'huntcamp') < COPPICE.aiCamps && !v.buildings.some((d) => d.type === 'huntcamp' && !d.built) && s.tick - (mem.ordered.huntcamp ?? -99999) > secs(20)) {
+    const spot = findSpot(s, 'huntcamp', dropFar.x, dropFar.y, 2, 6);
+    if (spot) construct(s, v, mem, 'huntcamp', spot, 1, issue);
+  }
+  const growing = v.buildings.filter((b) => b.type === 'sapling').length;
+  // Saplings only from wood to spare once the town is armed: in the Stone Age wood is what the Barracks and the climb wait on.
+  if (growing < COPPICE.aiPlant && v.budget.wood >= COPPICE.aiPlantWood && count(v, 'barracks', true) + count(v, 'range', true) > 0 && s.tick - (mem.ordered.sapling ?? -99999) > secs(3)) {
+    const thin = snares.find((b) => b.built && treesNear(s, b.tx, b.ty) < COPPICE.aiThin);
+    const r = SNARE.r;
+    const spot = thin && findSpot(s, 'sapling', thin.x, thin.y, 1, r + 1, 0, (tx, ty) => Math.abs(tx - thin.tx) <= r && Math.abs(ty - thin.ty) <= r && !placeProblem(s, 'sapling', tx, ty, true, v.p.id));
+    if (spot) construct(s, v, mem, 'sapling', spot, 1, issue);
+  }
+  const built = snares.filter((b) => b.built).length;
+  tendLine(s, v, snares, Math.ceil(built / COPPICE.aiPerTender), true, issue);
+  return true;
 }
 
 // ---- The wild (#171) ---------------------------------------------------------------------------------
@@ -2114,7 +2619,9 @@ function wilds(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void
     if (home.length) issue({ t: 'move', p: v.p.id, ids: home, x: v.home.x, y: v.home.y });
     mem.huntEscort = out.length ? out : undefined;
   }
-  if (v.citizens.length >= AI_WILD.mammothAt - eager && !v.citizens.some((u) => hunting(u, 'mammoth'))) {
+  // A Wild town (`wildRoad`) tames the beasts it would hunt: mammoths, boars and wolves are spared the spear.
+  const taming = tames(v.p);
+  if (!taming && v.citizens.length >= AI_WILD.mammothAt - eager && !v.citizens.some((u) => hunting(u, 'mammoth'))) {
     let m = nearestBeast(s, 'mammoth', v.home.x, v.home.y, AI_WILD.mammothNear);
     // A clever computer also goes for a far mammoth, with soldiers along to take the charge, if no rival is by it.
     let escort: Unit[] = [];
@@ -2138,7 +2645,7 @@ function wilds(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void
     }
   }
   // A boar guarding berries near home: three citizens spear it together, once the town has six.
-  if (v.citizens.length >= AI_WILD.boarAt - eager && !v.citizens.some((u) => hunting(u, 'boar'))) {
+  if (!taming && v.citizens.length >= AI_WILD.boarAt - eager && !v.citizens.some((u) => hunting(u, 'boar'))) {
     const b = nearestBeast(s, 'boar', v.home.x, v.home.y, AI_WILD.boarNear);
     if (b && b.state !== 'fight') {
       const party = v.citizens
@@ -2149,7 +2656,7 @@ function wilds(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void
     }
   }
   if (mem.attacking || v.army.some((u) => hunting(u, 'wolf') || hunting(u, 'raider'))) return;
-  const wolf = nearestBeast(s, 'wolf', v.home.x, v.home.y, AI_WILD.clear);
+  const wolf = taming ? null : nearestBeast(s, 'wolf', v.home.x, v.home.y, AI_WILD.clear);
   const free = v.army.filter((u) => !u.inside && (u.order.k === 'idle' || atTheAxe(v, u) || (u.order.k === 'move' && !u.order.amove)) && u.type !== 'siege');
   if (wolf) {
     const need = cold && seasonAt(s) === 3 ? AI_WILD.pack - AI_WINTER.pack : AI_WILD.pack;
@@ -2197,6 +2704,110 @@ function steppeRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) =>
   if (!herd) return;
   const spot = findSpot(s, clue, herd.x, herd.y, 2, 5);
   if (spot) construct(s, v, mem, clue, spot, 2, issue);
+}
+
+/**
+ * The Wild route (`docs/wild-road.md`). Bound for it in the Stone Age, the computer raises the Hunting Camp that shows the road.
+ * In the Age of the Wild it tames: one citizen at a time sings to the nearest wild beast within `TAME.aiNear` tiles of home (a boar
+ * or a mammoth alone; a wolf only with `TAME.aiEscort` soldiers sent ahead to take on its pack), and once a kind is tamed it raises
+ * a Beast Den (`pickUnit` then breeds from it like any building that trains).
+ */
+function wildRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!walksWeb(v)) return;
+  if (p.epoch === 0) {
+    const road = roadsFrom(p).find((r) => r.to === 'wild');
+    // The camp that shows the road goes up once the foraging deed is mostly in, so the opening's wood goes where it always went.
+    if (!road?.clue || !road.deed || (p.stats.foraged ?? 0) < road.deed.n * TAME.aiClue || v.citizens.length < AI_STEPPE.at || !wants(s, p, mem, 'wild') || count(v, road.clue) > 0 || s.tick - (mem.ordered[road.clue] ?? -99999) < secs(25)) return;
+    const spot = findSpot(s, road.clue, v.home.x, v.home.y, 6, 14);
+    if (spot) construct(s, v, mem, road.clue, spot, 1, issue);
+    return;
+  }
+  if (!tames(p)) return;
+  mem.wild ??= s.tick;
+  const singers = v.citizens.filter((u) => u.order.k === 'tame');
+  for (const u of singers) v.claimers.add(u.id);
+  if (p.tamed?.length && count(v, 'den') < TAME.aiDen && s.tick - (mem.ordered.den ?? -99999) >= secs(25)) {
+    // The Den is what the Wild was for: it may spend what is set aside for the climb.
+    const spot = findSpot(s, 'den', v.home.x, v.home.y, 6, 14);
+    if (spot) {
+      const kept = v.budget;
+      v.budget = { ...p.res };
+      const raised = construct(s, v, mem, 'den', spot, 2, issue);
+      v.budget = kept;
+      if (raised) spend(v, BUILDINGS.den.cost);
+    }
+  }
+  if (singers.length) return;
+  const escort = v.army.filter((u) => !u.inside && (u.order.k === 'idle' || u.order.k === 'move'));
+  let best: Animal | null = null;
+  let bestD = TAME.aiNear * TAME.aiNear;
+  for (const a of s.animals) {
+    if (!wildBeast(a) || s.tick - a.hurt < secs(TAME.wary) || (a.kind === 'wolf' && escort.length < TAME.aiEscort)) continue;
+    const d = (a.x - v.home.x) * (a.x - v.home.x) + (a.y - v.home.y) * (a.y - v.home.y);
+    if (d < bestD) {
+      bestD = d;
+      best = a;
+    }
+  }
+  if (!best) return;
+  const tamer = v.citizens
+    .filter((u) => !u.inside && !u.queue.length && u.carry <= 2 && !v.diggers.has(u.id) && !v.claimers.has(u.id) && (u.order.k === 'idle' || u.order.k === 'gather'))
+    .sort((a, b) => distTo(a, best!) - distTo(b, best!) || a.id - b.id)[0];
+  if (!tamer) return;
+  if (best.kind === 'wolf') issue({ t: 'move', p: p.id, ids: escort.slice(0, TAME.aiEscort).map((u) => u.id), x: best.x, y: best.y, amove: true });
+  issue({ t: 'tame', p: p.id, ids: [tamer.id], target: best.id });
+  v.claimers.add(tamer.id);
+}
+
+/**
+ * A Kitchen Garden (the Age of the Grove) where a Den's dung will feed it: beside a finished Den of its own that feeds fewer than
+ * `GROVE.aiGardens` gardens. False where no Den has room, so the town raises a Farm instead.
+ */
+function plantGarden(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): boolean {
+  const gardens = v.buildings.filter((b) => b.type === 'garden');
+  for (const den of v.buildings) {
+    if (den.type !== 'den' || !den.built) continue;
+    const near = (tx: number, ty: number) => Math.max(Math.abs(tx - den.x + 0.5), Math.abs(ty - den.y + 0.5)) <= GROVE.dung;
+    if (gardens.filter((g) => near(g.tx, g.ty)).length >= Math.min(GROVE.aiGardens, GROVE.dungFeeds)) continue;
+    const spot = findSpot(s, 'garden', den.x, den.y, 2, GROVE.dung, 0, near);
+    if (spot) return construct(s, v, mem, 'garden', spot, 1, issue);
+  }
+  return false;
+}
+
+/**
+ * The Age of the Grove: up to `GROVE.aiOrchards` Orchards by the Town Center, and one Thornwall line of `GROVE.aiThorn` pieces across
+ * the way the nearest rival comes, `GROVE.aiThornAt` tiles out (the Grove raises no stone wall). Gardens go up with the fields (`plantGarden`).
+ */
+function groveWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!walksWeb(v) || !grows(p) || !v.tc) return;
+  if (ageOf(p) === 'grove') mem.grove ??= s.tick;
+  const recent = (t: BuildingType, sec: number) => s.tick - (mem.ordered[t] ?? -99999) < secs(sec);
+  if (count(v, 'orchard') < GROVE.aiOrchards && !recent('orchard', 30) && v.budget.wood >= (BUILDINGS.orchard.cost.wood ?? 0) + 50) {
+    const spot = findSpot(s, 'orchard', v.home.x, v.home.y, 4, 10);
+    if (spot) construct(s, v, mem, 'orchard', spot, 1, issue);
+  }
+  if (count(v, 'thornwall') > 0 || recent('thornwall', 60)) return;
+  const rival = rivalTownCenter(s, p);
+  if (!rival) return;
+  const dx = rival.x - v.home.x;
+  const dy = rival.y - v.home.y;
+  const d = Math.sqrt(dx * dx + dy * dy);
+  if (d < GROVE.aiThornAt * 2) return;
+  const fx = dx / d;
+  const fy = dy / d;
+  const cost = buildingCostFor(s, p.id, 'thornwall');
+  if ((cost.wood ?? 0) * GROVE.aiThorn > v.budget.wood) return;
+  const cx = v.home.x + fx * GROVE.aiThornAt;
+  const cy = v.home.y + fy * GROVE.aiThornAt;
+  const half = Math.floor(GROVE.aiThorn / 2);
+  const crew = v.citizens.filter((u) => !u.inside && u.order.k !== 'build' && !(u.order.k === 'farm' && u.order.phase === 'work') && !v.claimers.has(u.id)).sort((a, b) => a.id - b.id).slice(0, 3);
+  if (!crew.length) return;
+  issue({ t: 'wall', p: p.id, ids: crew.map((u) => u.id), x0: Math.floor(cx - fy * half), y0: Math.floor(cy + fx * half), x1: Math.floor(cx + fy * half), y1: Math.floor(cy - fx * half), thorn: true });
+  spend(v, { wood: (cost.wood ?? 0) * GROVE.aiThorn });
+  mem.ordered.thornwall = s.tick;
 }
 
 const grownSheep = (s: GameState, owner: number): Animal[] => s.animals.filter((a) => a.kind === 'sheep' && a.owner === owner && a.hp > 0 && a.lamb === undefined);
@@ -3931,8 +4542,9 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     // The Market hires (#37) only in an age that hires there, after the traders have had first call on its queue.
     if (b.type === 'market' && !hiresAt(p, b.type).length) continue;
     let unit: UnitType | null;
+    if (b.type === 'workshop') release(v);
     if (b.type === 'workshop') unit = siege < Math.max(v.plan.siege, p.epoch >= 2 ? 3 : 2) + lodge + bleeds && (v.army.length >= 6 || siege < v.plan.siege) ? 'siege' : null;
-    else if (b.type === 'temple') unit = v.priests.length < (ailing(p) ? SICKNESS.tendMost : 0) + (v.army.length >= 6 ? Math.max(consecrates(s, p.id) ? AI_FAITH.priests : 2, L.clever && ageDef(p).rite ? AI_FORK.priests : 0) : 0) + (looseRelics(s) > 0 ? 1 : 0) + (vigilPost(s, v) ? VIGIL.most : 0) + (ageDef(p).missions ? 1 : 0) ? 'priest' : null;
+    else if (b.type === 'temple') unit = v.priests.length < (v.army.length >= 6 ? Math.max(consecrates(s, p.id) ? AI_FAITH.priests : 2, L.clever && ageDef(p).rite ? AI_FORK.priests : 0) : 0) + (looseRelics(s) > 0 ? 1 : 0) + (vigilPost(s, v) ? VIGIL.most : 0) + (ageDef(p).missions ? 1 : 0) ? 'priest' : null;
     else {
       unit = counter && trains.includes(counter) && unitEpoch(counter) <= p.epoch && !barred(p, counter, b.type) && roll(s) < counterOdds ? counter : pickUnit(v, mem, b);
       if (unit && unitEpoch(unit) > p.epoch) unit = pickUnit(v, mem, b);
@@ -4496,33 +5108,9 @@ export function breakOath(s: GameState, v: View, fighters: Unit[], issue: (c: Co
   if (go.length) issue({ t: 'attack', p: p.id, ids: go.map((h) => h.id), target: target.id });
 }
 
-// ---- Priests and sickness -------------------------------------------------------------------------
-
-/** Whether the town is sick, or soon will be (#541): fever, or taint past `SICKNESS.aiTemple`. */
-const ailing = (p: Player): boolean => !!p.fever || (p.taint ?? 0) >= SICKNESS.aiTemple;
-
-/**
- * The Sickness (#541): the computer keeps quarantine while the fever runs above `aiQuarantine` and lifts it when the town is well, and
- * while it is sick its priests wait by the Temple (idle ones walk back to it) to nurse the town.
- */
-function nurse(s: GameState, v: View, issue: (c: Command) => void): void {
-  const { p } = v;
-  if (!AI_LEVELS[p.ai!].clever) return;
-  const bad = !!p.fever && p.fever.sev >= SICKNESS.aiQuarantine;
-  if (bad && !p.quarantine && v.traders.length) issue({ t: 'quarantine', p: p.id, on: true });
-  else if (!p.fever && p.quarantine) issue({ t: 'quarantine', p: p.id, on: false });
-  if (!p.fever) return;
-  const temple = v.buildings.find((b) => b.type === 'temple' && b.built && b.hp > 0);
-  if (!temple) return;
-  const near = SICKNESS.aiTend * SICKNESS.aiTend;
-  for (const pr of v.priests) {
-    if (pr.inside || carriedBy(s, pr) || pr.order.k !== 'idle') continue;
-    if ((pr.x - temple.x) * (pr.x - temple.x) + (pr.y - temple.y) * (pr.y - temple.y) > near) issue({ t: 'move', p: p.id, ids: [pr.id], x: temple.x, y: temple.y + 3 });
-  }
-}
+// ---- Priests --------------------------------------------------------------------------------------
 
 function priestly(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
-  nurse(s, v, issue);
   if (!v.priests.length) return;
   chantBand(s, v, issue);
   const army = v.army.filter((u) => !u.inside && u.type !== 'siege');
@@ -4815,7 +5403,7 @@ function roadLength(pts: number[]): number {
  */
 function merchants(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
-  if (!s.posts.length || p.epoch < 1 || v.citizens.length < 18 || p.quarantine) return;
+  if (!s.posts.length || p.epoch < 1 || v.citizens.length < 18) return;
   const market = v.buildings.find((b) => b.type === 'market' && b.built);
   if (!market) return;
   // Traders that were on the road last turn and are gone now were lost on it: keep off that road a while.

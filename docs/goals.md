@@ -28,6 +28,7 @@ Building your strategy should be as fun as beating your rival. Your road through
 - **Basic routes stay first-class:** an army, a navy or an economy route works on every map with no exploring, and a player who sticks to one style stays competitive (the owner, 2026-10-22).
 - **New ages are welcome again** (the 2026-10-17 pause is lifted): every side age now has a verb, so the existing web is fleshed out enough to grow. Each new age still passes `docs/verbs.md`, and says what it's good at, what it's bad at, and what it leads to.
 - **The start shows it** (the owner liked steps 1–3 of the start plan on #555): one Play button and peoples picked by their loop, a first minute only that people has, finds in scouting range that open roads.
+- **The Water Road** (#701, the owner 2026-10-24: a new, uncliché line that feels good to play, "almost as prevalent as the stone, bronze, medieval … not one offs"): a third main trunk of seven ages, Stone → Rivers → Dykes → Water Line → Locks → Tides → Floating Cities (a seventh tier past the Atomic, #391), open on every map as the basic `water` route, crossing to and from the plain road at every tier. Your people move the water. Its chain goes first among new ages.
 - Deepening an existing age stays good work: the Sail and the six peoples (#501, the Britons last) first.
 
 ## Goal 3: every change gives a decision
@@ -39,6 +40,8 @@ Every pull request says, in one line under its summary, **what new decision it g
 Its one copy, with the levers and anti-patterns: **`docs/verbs.md`**. Ask it of any age, path, Way, people or feature, new or existing.
 
 ## Owner asks, in order after Goal 1
+
+**The art (#617), no longer first** (the owner, 2026-10-24: "lower the art pri"): it stays welcome work, but as an ordinary `ready` issue, behind Goal 2 and the Water Road (#701). Each art step still shows before-and-after screenshots.
 
 #454 (patrol and auto-explore), #391 (6–7 epochs), #344 (people management). Open owner notes without the `owner-ask` label (#452, #364) are the owner's thoughts for later, not tasks yet.
 
@@ -58,3 +61,4 @@ Its one copy, with the levers and anti-patterns: **`docs/verbs.md`**. Ask it of 
 - 2026-10-18: the Mongols born on the move (#501): camp on wagons and a flock from minute 1, no fields, no quarry, stone by tribute and the Market. Only the Britons are left in `VERB_GAPS`.
 - 2026-10-22: the owner sets the age deck (Goal 2) and lifts the pause on new ages; `docs/age-roads.md`.
 - 2026-10-22: the owner: ages are what your town becomes, not cards; going back is a move, and some niche ages need it. `docs/age-deck.md` renamed `docs/age-roads.md`, with keepsakes and crossing ages (§5).
+- 2026-10-23: the Britons' managed wood (#501): no fields; woods felled near the stores are coppiced and grow back, saplings are planted, and the snares in the standing wood are the farm. All six peoples now have their own core loop; `VERB_GAPS.civs` is empty.

@@ -6,17 +6,22 @@ import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { SIGHT_LORE } from './render/sightings';
 import { wallLine } from './sim/commands';
-import { AGES, BUILDINGS, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
+import { AGES, AI_DYKE, AI_RIVERS, BUILDINGS, SHAFT, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, SILO, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
+import { siteGrade } from './sim/shafts';
 import { crestSvg } from './ui/crests';
+import { unitPicture } from './ui/thumbs';
+import { easeHour, SHOT_SECONDS, titleShot } from './ui/titleShots';
 import { isEnemy } from './sim/world';
 import { carriesKegs, kegProblem } from './sim/powder';
+import { launchProblem } from './sim/silo';
 import { jumpAge, rush, topUp } from './sim/god';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
 import { placeProblem, walkable } from './sim/grid';
-import { findDockSpot, findSpot } from './sim/ai';
-import { maxHp, placeBuilding, spawnUnit } from './sim/world';
+import { findDockSpot, findSpot, millSpotFor } from './sim/ai';
+import { channelPlan, dykePlan } from './sim/water';
+import { maxHp, placeBuilding, restat, spawnUnit } from './sim/world';
 import { arrivalText, epochArrivals } from './ui/endReport';
-import type { AgeId, BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, HomelandId, MapSize, MapType, Unit } from './sim/types';
+import type { AgeId, Building, BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, HomelandId, MapSize, MapType, Unit, UnitType } from './sim/types';
 import { KEYS, R_FISH, R_NONE, RES } from './sim/types';
 import { carriedBy, relicAt } from './sim/relics';
 import { RUIN_FINDS, ruinAt } from './sim/ruins';
@@ -27,9 +32,10 @@ import { postAt } from './sim/trade';
 import { chantedOver, consecrateProblem, consecrates } from './sim/consecrate';
 import { riteProblem } from './sim/fork';
 import { legionKind, legionary } from './sim/legion';
+import { tames, wildBeast } from './sim/tame';
 import { ageDef, ageOf, canRaise, heirloomsOpened, isSideRoad, opensOf, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
 import { NetClient, newRoomCode, saveName, savedName } from './net/client';
-import { HASH_EVERY, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
+import { HASH_EVERY, ROOM_KEEP_HOURS, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
 import { deserialize, serialize } from './sim/save';
 import { VAULT_SLOTS, formatVaultKey, normalizeVaultKey, type CloudSlot } from './net/vault';
 import { qrSvg } from './ui/qr';
@@ -37,6 +43,7 @@ import { deleteCloud, listCloud, loadCloud, saveCloud, useVaultKey, vaultKey } f
 import { SCENARIOS, scenarioById, starsFor } from './sim/campaign';
 import { loadDiscovery, observe, pushDiscovery, saveDiscovery, syncDiscovery, webMapHtml } from './ui/webMap';
 import { idleCitizens, idleSelection, idleShortcut } from './ui/idle';
+import { NO_TAP, doubleOrder, type Tap } from './ui/doubleOrder';
 import { CameraBookmarks, bookmarkShortcut } from './ui/cameraBookmarks';
 import { ScoutFlags } from './ui/scoutFlags';
 import { briefingHtml, chapterListHtml, recordStars, starRow, syncProgress } from './ui/campaignUi';
@@ -44,6 +51,7 @@ import { Lobby } from './ui/lobby';
 import { Hud, nameOf, planLines } from './ui/hud';
 import { RoadPlanner, loadPlannerPrefs, savePlannerPrefs } from './ui/roadPlanner';
 import { Minimap } from './ui/minimap';
+import { BattleTide } from './ui/battleTide';
 import { Tips } from './ui/tips';
 import { openingFor } from './ui/opening';
 
@@ -99,7 +107,8 @@ let placeAt: { tx: number; ty: number; ok: boolean } | null = null;
 /** A wall being dragged out, from tile to tile. */
 let wallDrag: { x0: number; y0: number; x1: number; y1: number } | null = null;
 /** The next left click picks a target: where to attack-move, or a building to shelter in. */
-let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | 'keg' | null = null;
+let launchSilo = 0;
+let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | 'keg' | 'launch' | null = null;
 let paused = false;
 const SPEEDS = [1, 1.5, 2, 3];
 let speedIdx = 0;
@@ -119,7 +128,10 @@ let acc = 0;
 let lastFrame = performance.now();
 let hudTimer = 0;
 let mapTimer = 0;
+let tideTimer = 0;
 let attractT = 0;
+/** The title's hour of day: drifting on through the film, eased to a chosen shot's own hour while it holds. */
+let titleClock = 16;
 let lastSetup: GameSetup | null = null;
 
 let planner: RoadPlanner | null = null;
@@ -149,6 +161,11 @@ const hud = new Hud({
   },
   kegMode: () => {
     targetMode = 'keg';
+    placing = null;
+  },
+  launchMode: (silo) => {
+    launchSilo = silo;
+    targetMode = 'launch';
     placing = null;
   },
   unloadMode: () => {
@@ -227,7 +244,7 @@ function connectRoom(code: string, name: string, watch = false): void {
     if (net !== n) return;
     net = null;
     if (online && mode !== 'title') {
-      hud.banner('Disconnected', why, 6000);
+      hud.banner('Disconnected', `${why} Reload the page, or join room ${code} again, to pick the match up: the room keeps it for ${ROOM_KEEP_HOURS} hours.`, 9000);
       online = false;
       mode = 'over';
     } else lobby.showEntry(code, why);
@@ -240,7 +257,8 @@ function connectRoom(code: string, name: string, watch = false): void {
 }
 
 function leaveOnline(): void {
-  if (net && online && !spectating && game && !game.over) net.send({ t: 'cmd', c: { t: 'leave', p: viewer } });
+  // Leaving a paused match is stepping away: the room keeps the seat until you come back with its code.
+  if (net && online && !spectating && game && !game.over && !netPaused) net.send({ t: 'cmd', c: { t: 'leave', p: viewer } });
   spectating = false;
   $('replay-bar').classList.add('hidden');
   net?.close();
@@ -258,6 +276,10 @@ function onNet(m: ServerMsg): void {
         $('title').classList.add('hidden');
         lobby.showRoom(m.lobby, m.you);
       }
+      break;
+    case 'open':
+      $('title').classList.add('hidden');
+      lobby.showSeats(m.code, m.seats);
       break;
     case 'start':
       startOnline(m.match, m.you);
@@ -297,6 +319,7 @@ function startOnline(match: MatchStart, you: number): void {
     color: PLAYER_COLORS[seat.color],
     team: seat.team,
     civ: match.civs[i],
+    shepherd: true,
   }));
   netTurns = [];
   netReach = 0;
@@ -368,6 +391,11 @@ view.onSighting = (what) => {
   hud.banner(look.title, look.lore, 4200);
 };
 view.onPing = (x, y, color, heavy) => minimap.ping(x, y, color, heavy);
+// The tide of battle (#606): a click on a fight's bar picks up your fighters there.
+const tide = new BattleTide(view.labelLayer, (ids) => {
+  setSelection(ids);
+  play('select');
+});
 
 // ---- Starting matches ------------------------------------------------------------------------------
 
@@ -389,20 +417,21 @@ function startAttract(skipAhead = true): void {
   // Skip ahead so there is a town to look at.
   if (skipAhead) for (let i = 0; i < TICK_HZ * 150; i++) step(game);
   attractT = 0;
+  titleClock = 16;
   playMusic(2);
 }
 
 let captionKey = '';
 /** Names the town the title's camera is visiting, fading it out and in as the camera moves on. */
-function captionTown(who: GameState['players'][number], marching: boolean): void {
-  const key = `${who.id}${marching ? 'a' : 't'}${who.epoch}`;
+function captionTown(who: GameState['players'][number], marching: boolean, note: string | null = null): void {
+  const key = `${who.id}${marching ? 'a' : 't'}${who.epoch}${note ?? ''}`;
   if (key === captionKey) return;
   captionKey = key;
   const el = $('title-caption');
   el.classList.remove('on');
   setTimeout(() => {
     if (mode !== 'title' || captionKey !== key) return;
-    el.innerHTML = `<b>${escHtml(who.name)} of the ${CIVS[who.civ].name}</b>${marching ? 'an army on the march' : `${ageDef(who).name}`}`;
+    el.innerHTML = `<b>${escHtml(who.name)} of the ${CIVS[who.civ].name}</b>${note ?? (marching ? 'an army on the march' : ageDef(who).name)}`;
     el.classList.add('on');
   }, 1200);
 }
@@ -422,7 +451,7 @@ function setupFromTitle(seed: number): GameSetup {
   const colors = [PLAYER_COLORS[color], ...PLAYER_COLORS.filter((_, i) => i !== color)];
   // Rivals each get a different people where possible.
   const others = CIV_IDS.filter((c) => c !== civ).sort(() => Math.random() - 0.5);
-  const players: PlayerSetup[] = [{ name: 'You', ai: null, color: colors[0], team: 0, civ }];
+  const players: PlayerSetup[] = [{ name: 'You', ai: null, color: colors[0], team: 0, civ, shepherd: true }];
   for (let i = 0; i < foes; i++) {
     const c = others[i % others.length];
     const friend = ally && i === 0;
@@ -486,6 +515,7 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   cameraBookmarks.reset();
   scoutFlags.reset();
   lastAlert = null;
+  tide.clear();
   acc = 0;
   hud.reset();
   view.setGame(game, viewer);
@@ -566,7 +596,7 @@ function toTitle(): void {
 
 const SAVE_KEY = 'ages-save';
 /** Bumped when the state's shape changes, so an older save is set aside instead of loading broken (2: relics; 3: trading posts). */
-const SAVE_V = 3;
+const SAVE_V = 5;
 
 interface SavedMatch {
   setup: GameSetup;
@@ -1020,10 +1050,17 @@ const civBlurb = () => {
   $('civ-blurb').innerHTML = `${peopleHtml}<br><b>${m.label}:</b> ${m.blurb}<br>${hl ? `<b>${hl.icon} ${hl.name}:</b> ${hl.blurb}` : '<b>Homeland:</b> the seed decides what lies round every town: the Glade, the Shore, the Herd Plains or the Deep Wood.'}`;
 };
 const civTiles = $('civ-tiles');
+/** The soldier each people's tile shows: the line whose mark (plume, crest, headdress) is theirs, in the bronze age. */
+const TILE_SOLDIER: Record<CivId, UnitType> = { egyptians: 'ranged', greeks: 'infantry', romans: 'infantry', mongols: 'cavalry', chinese: 'infantry', britons: 'ranged' };
+let tileFigures = false;
 const showTiles = () => {
   const color = PLAYER_COLORS[Number(colorSel.value)] ?? PLAYER_COLORS[0];
-  civTiles.innerHTML = (['random', ...CIV_IDS] as (CivId | 'random')[]).map((c) =>
-    `<button class="civ-tile" type="button" role="radio" aria-checked="${civSel.value === c}" data-civ="${c}" title="${c === 'random' ? 'A people chosen at random' : (CIVS[c].verb ?? CIVS[c].name).replace(/"/g, '&quot;')}">${crestSvg(c, color, 40)}${c === 'random' ? 'Random' : CIVS[c].name}</button>`).join('');
+  civTiles.innerHTML = (['random', ...CIV_IDS] as (CivId | 'random')[]).map((c) => {
+    // The soldiers are drawn the first time the sheet opens, not while the title loads.
+    const face = c !== 'random' && tileFigures ? unitPicture(TILE_SOLDIER[c], 1, color, c) : '';
+    const art = face ? `<span class="civ-face"><img src="${face}" alt="">${crestSvg(c, color, 18)}</span>` : crestSvg(c, color, 40);
+    return `<button class="civ-tile" type="button" role="radio" aria-checked="${civSel.value === c}" data-civ="${c}" title="${c === 'random' ? 'A people chosen at random' : (CIVS[c].verb ?? CIVS[c].name).replace(/"/g, '&quot;')}">${art}${c === 'random' ? 'Random' : CIVS[c].name}</button>`;
+  }).join('');
 };
 civTiles.addEventListener('click', (e) => {
   const tile = (e.target as HTMLElement).closest<HTMLElement>('[data-civ]');
@@ -1071,6 +1108,7 @@ function openSheet(id: 'title-setup' | 'title-howto'): void {
   if (open) return;
   sound.play('open');
   $(id).classList.remove('hidden');
+  if (id === 'title-setup' && !tileFigures) { tileFigures = true; showTiles(); }
 }
 function closeSheets(): void {
   $('title-setup').classList.add('hidden');
@@ -1317,11 +1355,24 @@ function selectArmy(): void {
 
 // ---- Orders ----------------------------------------------------------------------------------------
 
+/**
+ * What an order lands on: a friendly unit (your own transport aside) is looked past to the sheep, stone or tree it
+ * stands at, since a citizen already milking or quarrying there (often one of those selected) would otherwise take
+ * the click and turn the order into a walk to them. On open ground the unit still counts.
+ */
+function orderPick(s: GameState, clientX: number, clientY: number): Pick | null {
+  const pk = view.pick(clientX, clientY, (id) => {
+    const u = s.byId.get(id);
+    return !!u && u.kind === 'unit' && s.players[u.owner].team === s.players[viewer].team && !(u.type === 'transport' && u.owner === viewer);
+  });
+  return pk?.kind === 'ground' ? view.pick(clientX, clientY) : pk;
+}
+
 function order(clientX: number, clientY: number, forceAttack = false, queue = false): void {
   const s = game;
   if (!s || mode !== 'play') return;
   const units = selectedUnits(s).filter((u) => !u.inside);
-  const pk = view.pick(clientX, clientY);
+  const pk = orderPick(s, clientX, clientY);
   if (!pk) return;
   const ids = units.map((u) => u.id);
   const q = queue || undefined;
@@ -1366,6 +1417,14 @@ function order(clientX: number, clientY: number, forceAttack = false, queue = fa
   if (pk.kind === 'animal') {
     const a = s.animals.find((x) => x.id === pk.id);
     if (!a) return;
+    // The Age of the Wild: citizens tame a wild wolf, boar or mammoth; attack-move (A) hunts it instead.
+    if (!forceAttack && tames(s.players[viewer]) && wildBeast(a) && units.some((u) => u.type === 'citizen')) {
+      issue({ t: 'tame', p: viewer, ids, target: a.id, queue: q });
+      view.marker(s, a.x, a.y, false);
+      play('move');
+      ack('move');
+      return;
+    }
     // Your own flock (#308): citizens milk it; attack-move (A) slaughters it.
     if (a.kind === 'sheep' && a.owner === viewer && !forceAttack && units.some((u) => u.type === 'citizen')) {
       issue({ t: 'milk', p: viewer, ids, target: a.id, queue: q });
@@ -1585,17 +1644,21 @@ function gateTurned(s: GameState, tx: number, ty: number): boolean {
   return !(at(tx - 1, ty) || at(tx + 2, ty));
 }
 
-/** The tiles of a planned wall, and whether each can be built. */
-function wallPlan(s: GameState): { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean } | null {
-  if (placing !== 'wall') return null;
+/** Buildings laid out by dragging a line: walls, dykes and channels (#701) and Thornwalls (the Age of the Grove). */
+const lined = (t: BuildingType | null): t is 'wall' | 'dyke' | 'thornwall' | 'channel' => t === 'wall' || t === 'dyke' || t === 'thornwall' || t === 'channel';
+
+/** The tiles of a planned wall (or line of dykes), and whether each can be built. */
+function wallPlan(s: GameState): { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean; type: 'wall' | 'dyke' | 'thornwall' | 'channel' } | null {
+  if (!lined(placing)) return null;
+  const type = placing;
   const d = wallDrag ?? (placeAt ? { x0: placeAt.tx, y0: placeAt.ty, x1: placeAt.tx, y1: placeAt.ty } : null);
   if (!d) return null;
   const seen = s.players[viewer].seen;
   const tiles = wallLine(d.x0, d.y0, d.x1, d.y1).map((t) => ({
     ...t,
-    ok: t.x >= 0 && t.y >= 0 && t.x < s.w && t.y < s.h && !!seen[t.y * s.w + t.x] && !placeProblem(s, 'wall', t.x, t.y),
+    ok: t.x >= 0 && t.y >= 0 && t.x < s.w && t.y < s.h && !!seen[t.y * s.w + t.x] && !placeProblem(s, type, t.x, t.y),
   }));
-  return { tiles, alongY: Math.abs(d.y1 - d.y0) > Math.abs(d.x1 - d.x0) };
+  return { tiles, alongY: Math.abs(d.y1 - d.y0) > Math.abs(d.x1 - d.x0), type };
 }
 
 /** Where the building being placed would go under the pointer. */
@@ -1631,6 +1694,12 @@ function placeHere(shift: boolean): void {
   const kind = placing;
   const ids = selectedUnits(s).filter((u) => canRaise(u.type, kind, s.players[viewer].civ)).map((u) => u.id);
   issue({ t: 'build', p: viewer, ids, type: placing, tx: placeAt.tx, ty: placeAt.ty, queue: shift || undefined });
+  // A Mine Shaft's ground (#681): say how well it will dig here.
+  if (kind === 'shaft') {
+    const site = { tx: placeAt.tx, ty: placeAt.ty, size: BUILDINGS.shaft.size };
+    const g = siteGrade(s, site);
+    hud.toast(`${{ old: 'Old workings', hill: 'Mountain rock', open: 'Open ground' }[g]}: a shaft here digs at ${Math.round(SHAFT.grade[g] * 100)}% of an open deposit's pace`);
+  }
   if (!shift) {
     placing = null;
     placeAt = null;
@@ -1649,6 +1718,7 @@ let spaceDown = false;
 let spaceDragged = false;
 let pointer = { x: 0, y: 0, inside: false };
 let lastClick = { at: 0, id: -1 };
+let lastTap: Tap = NO_TAP;
 
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 // Right-click on the speed button slows the game a step.
@@ -1686,7 +1756,7 @@ canvas.addEventListener('pointerdown', (e) => {
     return;
   }
   if (e.button !== 0) return;
-  if (placing === 'wall') {
+  if (lined(placing)) {
     updatePlacement(e.clientX, e.clientY);
     if (placeAt) wallDrag = { x0: placeAt.tx, y0: placeAt.ty, x1: placeAt.tx, y1: placeAt.ty };
     return;
@@ -1718,6 +1788,22 @@ canvas.addEventListener('pointerdown', (e) => {
   if (targetMode === 'keg') {
     kegAt(e.clientX, e.clientY, e.shiftKey);
     if (!e.shiftKey) targetMode = null;
+    return;
+  }
+  if (targetMode === 'launch') {
+    const g = view.groundAt(e.clientX, e.clientY);
+    const s = game;
+    if (g && s) {
+      const why = launchProblem(s, viewer, s.byId.get(launchSilo) as Building | undefined, g.x, g.y);
+      if (why) {
+        hud.toast(why, 'bad');
+        play('error');
+      } else {
+        issue({ t: 'launch', p: viewer, silo: launchSilo, x: g.x, y: g.y });
+        view.marker(s, g.x, g.y, true);
+      }
+    }
+    targetMode = null;
     return;
   }
   if (targetMode === 'unload') {
@@ -1769,12 +1855,12 @@ canvas.addEventListener('pointerup', (e) => {
     const d = wallDrag;
     wallDrag = null;
     if (!plan || !plan.tiles.some((t) => t.ok)) {
-      hud.toast("Can't build a wall there", 'bad');
+      hud.toast(plan?.type === 'dyke' ? "Can't raise a dyke there: dykes go on shallow water, or on the shore beside it" : plan?.type === 'channel' ? "Can't dig a channel there: channels go across open land, starting beside water" : "Can't build a wall there", 'bad');
       play('error');
       return;
     }
     const ids = selectedUnits(s).filter((u) => u.type === 'citizen' || legionary(s, u)).map((u) => u.id);
-    issue({ t: 'wall', p: viewer, ids, x0: d.x0, y0: d.y0, x1: d.x1, y1: d.y1, queue: e.shiftKey || undefined });
+    issue({ t: 'wall', p: viewer, ids, x0: d.x0, y0: d.y0, x1: d.x1, y1: d.y1, queue: e.shiftKey || undefined, dyke: plan.type === 'dyke' || undefined, thorn: plan.type === 'thornwall' || undefined, channel: plan.type === 'channel' || undefined });
     if (!e.shiftKey) {
       placing = null;
       placeAt = null;
@@ -1793,7 +1879,22 @@ canvas.addEventListener('pointerup', (e) => {
       play('select');
       ack('select');
     }
-  } else clickSelect(e.clientX, e.clientY, e.shiftKey, e.ctrlKey);
+  } else {
+    // A double-click on anything but your own unit is a right-click for the units selected before it (`doubleOrder`).
+    const pk = lastTap.before.length ? orderPick(s, e.clientX, e.clientY) : view.pick(e.clientX, e.clientY);
+    const hit = pk?.kind === 'unit' || pk?.kind === 'building' ? s.byId.get(pk.id) : undefined;
+    const now = performance.now();
+    // Your own building (a pitched camp too) is picked by the first click, so the second can't be its rally order.
+    const again = doubleOrder(lastTap, now, e.clientX, e.clientY, hit?.owner === viewer && (hit.kind === 'unit' || !lastTap.before.some((id) => s.byId.get(id)?.kind === 'unit')));
+    if (again) {
+      lastTap = NO_TAP;
+      setSelection(again);
+      order(e.clientX, e.clientY, false, e.shiftKey);
+    } else {
+      lastTap = { at: now, x: e.clientX, y: e.clientY, before: [...selection].filter((id) => s.byId.get(id)?.owner === viewer) };
+      clickSelect(e.clientX, e.clientY, e.shiftKey, e.ctrlKey);
+    }
+  }
   boxStart = null;
   boxing = false;
   dragbox.classList.add('hidden');
@@ -2278,20 +2379,6 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           play('error');
         }
         break;
-      case 'sick':
-        // The Sickness (#541): it broke out, ran its course, or took citizens.
-        if (ev.owner === viewer) {
-          if (ev.what === 'broke') hud.toast('🤒 The Sickness has broken out. Your people work slower: keep priests by a Temple to nurse them, and think about closing the roads (quarantine, Town Center, N).', 'bad');
-          else if (ev.what === 'ended') hud.toast('🤒 The Sickness has passed.', 'good');
-          else hud.toast(`🤒 The Sickness has taken ${ev.n} of your people.`, 'bad');
-          play(ev.what === 'ended' ? 'allClear' : 'toll');
-        } else if (ev.what === 'broke' && s.players[ev.owner]?.team !== s.players[viewer]?.team) {
-          hud.toast(`🤒 The Sickness has broken out in ${s.players[ev.owner].name}'s town. Their posts will run foul: a trader of yours loading there brings it home.`, 'info');
-        }
-        break;
-      case 'quarantine':
-        if (ev.owner === viewer) hud.toast(ev.on ? '🚧 Quarantine: your traders stay home.' : '🚧 Quarantine lifted.', 'info');
-        break;
       case 'epoch':
         if (ev.owner === viewer) {
           const age = ev.age ? AGES[ev.age] : EPOCHS[ev.epoch];
@@ -2515,6 +2602,24 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         }
         break;
       }
+      case 'golden': {
+        // A Golden Age (#703): told to every people, with the ages it weaves and when it ends.
+        const who = s.players[ev.owner].name;
+        const woven = ev.threads.map((a) => AGES[a].short).join(', ');
+        const mins = Math.round((ev.ends - s.tick) / TICK_HZ / 60);
+        if (ev.over) {
+          if (ev.owner === viewer) hud.banner('The Golden Age ends', 'Your people wakes in the Gunpowder Age. Every thread falls asleep, and the road will not open again.', 5500);
+          else hud.toast(`🌅 The Golden Age of ${who} is over: its threads sleep`, 'good');
+          if (ev.owner === viewer) play('stepBack');
+        } else if (ev.owner === viewer) {
+          setTimeout(() => play('golden'), 1200);
+          hud.toast(`✨ Woven together for ${mins} minutes: ${woven}`, 'good');
+        } else {
+          hud.banner(`${who}: a Golden Age`, `Every way of life ${who} has lived wakes at once (${woven}), with none of their prices, for ${mins} minutes. Hold out, and strike when it ends.`, 6500);
+          play('golden');
+        }
+        break;
+      }
       case 'keepsake':
         // A people left an age (#555 s11): one building keeps its work.
         if (ev.owner === viewer) {
@@ -2672,6 +2777,22 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           if (ev.owner === viewer) hud.toast(`${s.players[ev.by ?? 0].name} stamped out your keg's fuse: cover the next one`, 'alert');
           else if (ev.by === viewer) hud.toast('Your people stamped out a burning keg', 'good');
         } else if (ev.what === 'blown' && ev.owner === viewer) hud.toast('A keg blows: what stood by it is shaken to its footings', 'good');
+        break;
+      case 'silo':
+        // The Atomic Age (#605): the clock is public, so every player is told when a warhead goes up and where it will land.
+        if (ev.what === 'launched') {
+          if (ev.owner === viewer) hud.toast(`Warhead away: it lands in ${ev.fuse ?? SILO.fuse} seconds`, 'good');
+          else if (isEnemy(s, viewer, ev.owner)) {
+            hud.toast(`${s.players[ev.owner].name} has launched a warhead: it lands in ${ev.fuse ?? SILO.fuse} seconds. Clear the ring, or destroy the silo`, 'bad');
+            view.marker(s, ev.x, ev.y, false);
+          }
+          play('siloLaunch');
+        } else if (ev.what === 'scrubbed') {
+          hud.toast(ev.owner === viewer ? 'Your silo fell: the launch is scrubbed' : `${s.players[ev.owner].name}'s silo fell: the launch is scrubbed`, ev.owner === viewer ? 'alert' : 'good');
+          play('siloScrub');
+        } else {
+          play('siloBlast');
+        }
         break;
       case 'oreBuy':
         // A load of rare ore bought at a post (#573).
@@ -2852,10 +2973,10 @@ function cursorFor(s: GameState): string {
   if (targetMode === 'garrison') return 'cur-garrison';
   if (targetMode === 'sacrifice' || targetMode === 'curse') return 'cur-convert';
   if (targetMode === 'unload') return 'cur-garrison';
-  if (targetMode === 'keg') return 'cur-attack';
+  if (targetMode === 'keg' || targetMode === 'launch') return 'cur-attack';
   if (!pointer.inside || boxing) return '';
   const units = selectedUnits(s);
-  const pk: Pick | null = view.pick(pointer.x, pointer.y);
+  const pk: Pick | null = units.length ? orderPick(s, pointer.x, pointer.y) : view.pick(pointer.x, pointer.y);
   if (!pk) return '';
   if (pk.kind === 'animal') {
     const a = s.animals.find((x) => x.id === pk.id);
@@ -2962,24 +3083,22 @@ function frame(now: number): void {
         n++;
       }
       if (s.over) startAttract();
-      // Look in on each town in turn, circling slowly.
+      // Look in on each town in turn, circling slowly, with a chosen shot now and then (a dock at dusk, an army at a ford).
       attractT += dt;
-      const who = s.players[Math.floor(attractT / 24) % s.players.length];
-      const tc = s.ents.find((e) => e.kind === 'building' && e.owner === who.id && e.type === 'towncenter');
-      const army = s.ents.filter((e) => e.kind === 'unit' && e.type !== 'citizen' && e.owner === who.id && e.order.k !== 'idle');
-      const at = army.length >= 4 ? army[0] : (tc ?? { x: who.startX, y: who.startY });
-      view.rig.focus(at.x, at.y);
-      // Look from the town toward the middle of the map, so the far side is land and sky, not the map's
-      // edge, swaying slowly to either side as a camera on a crane would.
-      const lookX = s.w / 2 - at.x;
-      const lookZ = s.h / 2 - at.y;
-      if (lookX * lookX + lookZ * lookZ > 4) view.rig.aim(Math.atan2(-lookX, -lookZ) + Math.sin(attractT * 0.06) * 0.45);
+      const shot = titleShot(s, Math.floor(attractT / SHOT_SECONDS));
+      view.rig.focus(shot.x, shot.y);
+      view.rig.frame(shot.distance);
+      // Look from the town toward the middle of the map, so the far side is land and sky, not the map's edge,
+      // swaying slowly to either side as a camera on a crane would; a chosen shot holds its framing, drifting less.
+      const sway = shot.kind === 'town' ? 0.45 : 0.15;
+      if (shot.lookX * shot.lookX + shot.lookY * shot.lookY > 4) view.rig.aim(Math.atan2(-shot.lookX, -shot.lookY) + Math.sin(attractT * 0.06) * sway);
       else view.rig.rotate(dt * 0.05);
-      // A whole day in eight minutes, opening at the golden hour.
-      view.titleHour = (16 + attractT / 20) % 24;
+      // A whole day in eight minutes, opening at the golden hour; a chosen shot eases the light to its own hour and back.
+      titleClock = easeHour(titleClock, shot.hour, dt);
+      view.titleHour = titleClock;
       // Low over the land, as a film opens, so the sky and the far woods frame the town.
       view.rig.cinematic = 0.36;
-      captionTown(who, army.length >= 4);
+      captionTown(s.players[shot.who], shot.marching, shot.note);
     } else {
       view.titleHour = null;
       view.rig.cinematic = null;
@@ -3036,7 +3155,7 @@ function frame(now: number): void {
     view.frame(s, alpha, dt, {
       ids: selection,
       allBars: altHeld,
-      ghost: placing && placing !== 'wall' && placeAt ? { type: placing, ...placeAt, turn: placing === 'gate' && gateTurned(s, placeAt.tx, placeAt.ty) } : null,
+      ghost: placing && !lined(placing) && placeAt ? { type: placing, ...placeAt, turn: placing === 'gate' && gateTurned(s, placeAt.tx, placeAt.ty) } : null,
       rallyOf: selection.size === 1 ? [...selection][0] : null,
       wall: wallPlan(s),
       scoutFlags: scoutFlags.all,
@@ -3053,6 +3172,21 @@ function frame(now: number): void {
         tips.update(s, viewer, dt);
         autosave();
       }
+      if (mode === 'play' && !watching && !spectating) {
+        tideTimer -= dt;
+        if (tideTimer <= 0) {
+          tideTimer = 0.5;
+          for (const b of tide.read(s, viewer, 0.5)) {
+            // A fight turning against you where you aren't looking: say so, and Space looks.
+            if (tide.onScreen(s, view.rig.camera, b.x, b.y)) continue;
+            lastAlert = { x: b.x, y: b.y };
+            minimap.ping(b.x, b.y, '#ff5a3c', true);
+            hud.toast(`A fight is turning against you: ${b.mine} of yours against ${b.theirs}. (Space to look)`, 'alert');
+            play('tideTurns');
+          }
+        }
+        tide.place(s, view.rig.camera);
+      } else tide.clear();
       mapTimer -= dt;
       if (mapTimer <= 0) {
         mapTimer = 0.2;
@@ -3085,6 +3219,10 @@ function frame(now: number): void {
   get ui() {
     return { placing, targetMode, wallDrag, placeAt, selection: [...selection], buildMenu: hud.buildMenu, pending: pending.length };
   },
+  /** Jump the title's film to a second of its loop (testing, screenshots). */
+  titleAt(seconds: number) {
+    attractT = seconds;
+  },
   /** Run the rules ahead by some seconds (testing); effects are skipped. */
   fast(seconds: number) {
     if (!game) return;
@@ -3109,13 +3247,56 @@ function frame(now: number): void {
     const spot = type === 'dock' ? findDockSpot(game, x ?? p.startX, y ?? p.startY, 30) : findSpot(game, type, x ?? p.startX, y ?? p.startY, minR, 24);
     return spot ? placeBuilding(game, owner, type, spot.tx, spot.ty, true).id : null;
   },
-  /** A finished line of wall (testing). */
-  wall(owner: number, x0: number, y0: number, x1: number, y1: number) {
+  /**
+   * The Water Road (testing, #701): turn a player to the Age of Dykes and raise, finished, the dyke line the computer would plan by its
+   * start, and a windmill behind it. Returns the size of the basin it shuts off, or 0 where there is none.
+   */
+  dykes(owner: number) {
+    if (!game) return 0;
+    const s = game;
+    const p = s.players[owner];
+    const plan = dykePlan(s, p.startX, p.startY, AI_DYKE.reach, AI_DYKE, wallLine);
+    if (!plan) return 0;
+    restat(s, p, () => {
+      p.epoch = AGES.dykes.tier;
+      p.age = 'dykes';
+    });
+    for (const t of plan.line) placeBuilding(s, owner, 'dyke', t % s.w, Math.floor(t / s.w), true);
+    const spot = millSpotFor(s, owner, plan.basin, p.startX, p.startY);
+    if (spot) placeBuilding(s, owner, 'windmill', spot.tx, spot.ty, true);
+    const first = plan.basin[0];
+    view.rig.focus(first % s.w, Math.floor(first / s.w));
+    return plan.basin.length;
+  },
+  /** Point the camera at a spot (testing): a spring head, a dyke line, a fight. */
+  look(x: number, y: number) {
+    view.rig.focus(x, y);
+  },
+  /**
+   * The Age of Rivers (testing, #701 s1): turn a player to the age and dig, finished, the channel the computer would plan from the water
+   * nearest its start; the water runs down it over the next few seconds. Returns the channel's length, or 0 where there is none.
+   */
+  rivers(owner: number) {
+    if (!game) return 0;
+    const s = game;
+    const p = s.players[owner];
+    const plan = channelPlan(s, p.startX, p.startY, AI_RIVERS, wallLine, (x, y) => !placeProblem(s, 'channel', x, y));
+    restat(s, p, () => {
+      p.epoch = AGES.rivers.tier;
+      p.age = 'rivers';
+    });
+    if (!plan) return 0;
+    for (const t of plan.tiles) placeBuilding(s, owner, 'channel', t % s.w, Math.floor(t / s.w), true);
+    view.rig.focus(plan.from.x, plan.from.y);
+    return plan.tiles.length;
+  },
+  /** A finished line of wall, or of Thornwall (testing). */
+  wall(owner: number, x0: number, y0: number, x1: number, y1: number, type: 'wall' | 'thornwall' = 'wall') {
     if (!game) return 0;
     let n = 0;
     for (const t of wallLine(x0, y0, x1, y1)) {
-      if (placeProblem(game, 'wall', t.x, t.y)) continue;
-      placeBuilding(game, owner, 'wall', t.x, t.y, true);
+      if (placeProblem(game, type, t.x, t.y)) continue;
+      placeBuilding(game, owner, type, t.x, t.y, true);
       n++;
     }
     return n;

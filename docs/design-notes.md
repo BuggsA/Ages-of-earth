@@ -1061,6 +1061,14 @@ Why I love it: it is the one people whose map is a calendar. A camp grazes its r
 
 What I'd do next: a yurt camp that packs Houses with the Town Center in one order (the AI only drives its Town Center), the flock following the nearest House as well (it broke the steppe test's "the flock went with it" and I dropped it), horse herds that breed riders, and the computer pitching a second Town Center as a second pasture.
 
+## Designers' notes: the managed wood (#501, 2026-10-23, lane rules)
+
+Built: the British economy, the last of the six. No Farm is ever tilled (`buildBarred`); the forest is the field. A tree a British hand fells within `COPPICE.reach` tiles of one of its wood stores is coppiced: the stool stays in `s.stools` and grows a full tree again `COPPICE.regrow` seconds later (it waits if someone stands on it; a building raised over it grubs it out). Felled far from the stores, or by a rival, the tree is gone. Citizens plant a Sapling, a 1-tile building that roots as a stool the moment it is finished (`src/sim/coppice.ts`). British snares, open to everyone since #485, are the farm: twice the catch, half again the room, full at 12 trees (growing stools count), the farming technologies' gain, and a tender's game bag twice a basket (`snares.ts`, `snareStep`). The computer lays a snare where it would have sown a field (`laySnare`, at the farm's place in `planBuildings`, a short line in the Stone Age while berries last), sends food hands to walk the line, raises up to two Hunting Camps beside it and plants round a thin line once it is armed. It plays the wood weaker than the old farming Britons did (A/B in the pull request); the gap is in its Bronze Age growth.
+
+Why I love it: the same trees are wood and food at once, so every felling is a choice: which stand goes under the axe, and which stays to feed the snares. That is coppice rotation, how English woods were really worked for a thousand years, and it falls out of the rules without a rotation mechanic: you see it on the map as a patchwork of young and old wood round the town. It hooks into what's there (snares, the Deep Wood, Hunting Camps, the Plow) rather than adding a new resource, and the rival's answer is plain on the map too: fell the wood round the snares, and the town starves.
+
+What I'd do next: a rival's raid that *burns* a stand (soldiers firing a wood, the managed wood's real dread); hedgerows the computer plants as walls; a woodward's hut that lets a stool grow faster; the computer choosing which stand to fell by what its snares need.
+
 ## Designers' notes: sow while the herd is away (#529, 2026-10-18, chain 1017-1808 s3, lane ai)
 
 Built: on the Herd Plains a town's own home herd no longer shuts the Hunters' fields while it is out on its autumn trek (`herdAtHome` in `src/sim/ways.ts`); wild game and a rival's herd still do, and the HUD tells a Hunter in spring that the ground opens in autumn. The computer uses it: in summer it puts by the wood for `AI_WAYS.trekFields` fields, and as a Hunter there it spares no wild deer inside the 24-tile ring, since they would keep the fields shut. Its own herd stays spared (`ai-turning-year`).
@@ -1162,3 +1170,90 @@ Built: the owner found the #424 column "reads worse" and asked for research befo
 Why I love it: the first thing a player sees is now the game they're about to play, seen the way a painting would see it: thatched huts by a lake, a mill under rain, a brick town on a hill.
 
 Next: a few chosen camera shots (a dock at dusk, an army crossing a ford) instead of always the town; the theme swelling when the name lands; the peoples' tiles showing a figure of each people's soldier; a "Continue" that shows the saved town's crest.
+
+## Designers' notes: the Atomic Age and the Missile Silo (#391 s1, #605, 2026-10-23, lane rules)
+
+Built: a sixth trunk epoch and one building in it. The Silo's launch names a point on the map, runs a public 45-second clock, then flattens a 5-tile ring (rival buildings and soldiers only). A silo that falls mid-count scrubs the launch; a launch empties it for 240 seconds and costs 600 gold and 200 stone. The computer raises a silo, aims at the best-covered rival spot and runs from rival warheads.
+
+Why I love it: deterrence is a different verb from fighting. Everyone watches the same clock, so the answer is a decision (scatter, guard, or hit their silo first), and the cost (a town that stalls to fuel one blow) is a door. Aeronauts and Lightning stay side roads off the Industrial.
+
+Next: the fission/fusion fork and fallout from seed #533, a seventh epoch (the Information Age: sight as the weapon), and a keepsake for the silo. Not seen: the feel of the clock in a real match, or the sound levels; headless runs only.
+
+## Designers' notes: fallout (#605 s2, grows seed #533, 2026-10-23, lane rules)
+
+Built: the ring a warhead struck stays poisoned for 90 seconds; every land unit in it, whoever's, loses 4 health a second. Buildings are spared, so the strike still pays for itself but the ground it wins can't be walked into at once. The computer pulls its people out of the ring.
+
+Why I love it: a strike now has a second beat. The attacker must choose between pressing in with a follow-up army and waiting out the haze; the defender gets a window to rebuild elsewhere. Next: wind-drift and a hardened unit (seed #533), the fission/fusion fork.
+
+## Designers' notes: the tide of battle (#606, own pitch, 2026-10-23, lane look)
+
+Built: a bar over each fight, your strength against what you can see of the foe's, with a word and a swing arrow; a click on it picks up your fighters there; a fight that turns from even to losing out of sight sounds a sagging horn, pings the minimap and sets Space to look. The read is Lanchester's square law (hit points × damage a second, each side), through the same `damageOf` the blows use, so counters, armour, veterancy and heroes all count; towers count with their garrisons' arrows. Fog holds: unseen foes are left out.
+
+Why I love it: the decisions that make a fight fun (reinforce, hold, fall back) need a read, and until now the first read a player got was the last soldier falling. With two fronts at once, the horn and the bar are what let a player be a general rather than a spectator.
+
+Next: the computer could use the same read to decide when its waves fall back (today each wave has its own rule); a faint line from the bar to the nearest idle soldiers who could join; a tide for sieges that counts the walls' hit points apart.
+
+## Designers' notes: Fission or Fusion (#605 s3, grows seed #533, 2026-10-23, lane rules)
+
+Built: two side ages off the Atomic Age, behind a silo, each shutting the other. Fission works the silo fast (25 s clock, 100 s refuel) and pays in your own ground: every launch poisons 3 tiles round the silo for a minute, so the layout of silos matters. Fusion is the opposite: a 70 s clock, a road that costs the earth and takes 150 s, but then up to three warheads aloft, no refuel, a cheaper shot, and a clean strike your army can follow.
+
+Why I love it: the same building plays two ways. Fission is a town that has to lay itself out around a hazard; Fusion is a patient economy that wins by volume and by walking in behind its own blasts. A rival answers Fusion by scattering from a long clock or by finding the silo during the 150 s the climb leaves the town open.
+
+Next: wind drift, a hardened unit, a deed for each road (seed #533), and a seventh epoch. Not seen: the feel of either branch in a real match.
+
+## Designers' notes: chosen shots on the title (#267, 2026-10-24, chain 1024-0015 s3, lane look)
+
+Built: the title's film used to circle each town in turn. Every 24 s it now picks from a cycle (`src/ui/titleShots.ts`): a town, a dock at dusk (the camera on the land side, the sea beyond, the light eased to 19:12), a town, an army at the Old Ford (from the army's side so the flag lies ahead of the men, the light eased to 7:24). A shot that isn't on offer falls back to a town, so a match with no dock or ford looks as before. The hour now eases to a shot's own and drifts on from there, where it used to be a fixed function of time.
+
+Why I love it: the film becomes a few framed pictures of the world's own story (a quay at sunset, a column reaching a landmark), not a tour of the same town. The match behind it is real, so what it shows is whatever the two computers are doing.
+
+Seen: headless Chromium (software GL), a lakes map, a dock and an army put in by hand: `docs/screenshots/title-dock-dusk.jpg`, `title-ford-morning.jpg`. Not seen: the cuts in motion, or a real computer-vs-computer ford; in 24 matches of 450 s a dock stood in 13 and an army sat near a ford in 5, so about half the loops have a dock shot and a fifth a ford shot. Foreground buildings can crowd the dock shot. Next: a harbour shot with ships, a night shot of a lit town, a camera that waits for the first clash.
+
+### Mine Shafts (#681), 2026-10-24
+
+**Built:** a Bronze Age Mine Shaft that digs stone or gold for good, one miner each, at a pace set by the ground: old workings 75%, rock 50%, plain earth 30% of an open deposit. A worked-out deposit now leaves old workings, so where you dug is where the best seam lies. The computer sinks and staffs shafts when its deposits run dry.
+
+**Why I love it:** the owner kept running out of stone and gold and trading wood for them. Now the choice is where to sink: over a spent vein, beside the hills, or at home on poor ground.
+
+**Next:** more seams are one entry in `SHAFT.seams` (coal, iron, clay); a collapse or flood risk; deeper shafts that dig faster in later ages.
+
+## Designers' notes: the tower line (2026-10-24)
+
+Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and each tower grows on its own through Guard Tower, Keep and Bastion (the owner asked for per-tower upgrades). Why I like it: a tower rush stays possible but is cheap to answer, and the question becomes which tower is worth the stone: the one at the ford, not the one behind the farms. Next: give each step its own model (a second storey, stone walls, a low angled bastion), and maybe a fork at the Bastion (more arrows for the garrison, or walls that shrug off siege).
+
+## Designers' notes: the Golden Age (#703, 2026-10-24, lane rules)
+
+**Built:** at the owner's ask ("make an age that feels almost too good. That makes people wonder what ages are really out there"), the **Golden Age**, a turn off the Gunpowder Age heard of after two side ages walked and open after three. Its whole rule is `weave` in `ages.ts`: `ageDef` returns the Golden Age stitched from every side age walked, every verb flag of each (the first walked wins a clash), the best of each gift (`add` above 0, a `mul` boon, a price or training time below 1), and none of the doors (`no`, `noBuild`, `levy`, surcharges, penalties). `standsIn` lets the buildings of every life wake and be raised; the coils keep their field but nothing runs dark; the forges of the Iron Age and the Chariots both edge; a Sea-Raider's pack banks at home too if the Warband is woven. It burns `GOLDEN.span`, a minute more per life past the third, then `goldenStep` returns the people to the Gunpowder Age; the road `shuns` itself, so it never opens twice. Every people is told when it starts and when it ends, with a banner, a fanfare and a tip on how to answer it; the town is gilded (domes, finials, motes) so it reads from across the map.
+
+**Why I love it:** the web was wide but each age stood alone, so a road walked and left was just a road gone. Now every odd road taken earlier is a thread you get back later, all at once, and the richer the road the richer the gold. And because every rival is told, players who never knew it existed learn it does, and start asking what else there is.
+
+**Two players:** a merchant-pilgrim-steppe people turns golden into hired swords, chanting priests and a town on wagons; a warband-sail-searaider one into plunder by land and sea with traders back. Both want to spend it before the clock runs out; the rival wants to outlast it.
+
+**Next:** the computer planning a third life on purpose when it holds two (today it takes the road only when chance walked it there); a rival computer that turtles through a golden window and strikes at its end; music of its own; the web map showing a golden glow on the node; maybe a keepsake (a gilded Wonder that remembers it).
+
+## Designers' notes: the Water Road, the Age of Dykes (#701 s1, 2026-10-24, chain 1024-2000 s1, lane rules)
+
+**Built:** the map's water is no longer fixed. A `polder` layer on the grid; dykes on the shallows that are gates along their whole length (your people walk the crown, nothing else passes, ships included); windmills that pump a shut-off basin dry one tile at a time, nearest first; polder fields at half again a farm's pace; the coast as a road's door (`Road.coast`, shallows by home) with a Dock as the clue. The renderer lets each tile rise out of the water over a second, as wet mud that dries to striped field over twenty, and the shore's foam follows. A creak and a rush of water with each tile. The computer plans a dyke from shore to shore near home (`dykePlan`), and plays it through.
+
+**Why I love it:** every other age changes what your units do; this one changes where the land is. The moment I wanted was the bay turning green behind the bank while the mill turns, and then a column walking across where the sea was. Water flows four ways only, so a dyke dragged on a diagonal still holds: the line you draw is the line that holds.
+
+**Next:** the owner made the Water Road a third main trunk of seven ages while this was built, so this is its tier-2 age arriving first, reached for now by a turn off the Middle Ages (the crossing the trunk keeps). The Age of Rivers comes next, with mapgen's stream by every start; then the coast door can go, as the trunk must never be shut. Then the breach (a keg or a ram on a dyke, and the water running back in through the polder in id order: the hook is `stampBuilding` restoring water under a fallen dyke, and `drain` is the one place land is made, so a `flood` beside it undoes it); the Water Line's sluices; the land bridge the computer plans on purpose. The windmill is already the keepsake. I'd also like the polder to need its mills: a basin left unpumped for long seeping back.
+
+## Designers' notes: the Wild route and the Age of the Wild (the owner's idea, 2026-10-24)
+
+**Built:** the first of seven ages on a new main branch, the Wild route (`docs/wild-road.md`). Citizens tame wolves, boars and mammoths into War Wolves, Tuskers and War Mammoths; a Beast Den breeds the kinds tamed; a Wild people's Hunting Camps call a beast in each season. The door is the Stable and the Siege Workshop: the beasts are both. **Why I love it:** the wild has been on every map since #171, and until now the only thing you could do with it was kill it. Now a wolf pack is a prize you race a rival for, and the second berry patch's boar is a soldier if you're patient. The call of the wild came from a headless match: by the time a computer reached the Wild it had hunted every beast near home, and a human would have too. So the wild comes back to a Wild town, and what comes to the door must be tamed or fought. **What I'd do next:** the Grove (tree walls that grow and heal, and dense Kitchen Gardens fed by the Den's dung), then a fire rule, which the whole route needs as its answer.
+
+## Designers' notes: the Age of the Grove (Wild route step 2, 2026-10-24)
+
+**Built:** the Wild route's second age (`docs/wild-road.md` §2, `src/sim/grove.ts`). Thornwalls that grow from whips to living oak, part for their own people and sprout again from the root; Kitchen Gardens, one tile each, fed by a Den's dung or by water; Orchards that bear each summer and autumn. The door is the stone wall, the gate and the tower. **Why I love it:** every other wall is finished the moment it's built. This one is weakest the day you plant it and strongest two minutes later, so *when* you plant is the decision: plant in spring, plant before the rival's army comes, and a rival who wants to break in has to come early or build on the roots. The gardens pull a town into a tight knot round its Dens, and the Den is now worth raiding for what it feeds, not only for what it breeds. **What I'd do next:** fire (step 3), which every later age of the route needs as its answer: torches that burn hedges, roots and gardens, and smoke that quiets Hives.
+
+
+## Designers' notes: the Water Road, the Age of Rivers (#701 s1, 2026-10-24, chain 1024-2000 s2, lane rules)
+
+**Built:** the trunk's first age, instead of the Bronze Age. Every town now has water by it: mapgen lays a spring head (one tile, on dice of its own, last of all) where no water lies within 14 tiles. It changes no ground, so every map is exactly as it was; a channel dug beside it fills from it and the spring opens into the channel. Citizens drag **Channels** out from any water; a dug ditch fills when water lies beside it, one tile every quarter second, so you watch the water run down the line you drew. A channel is `T_WATER` with no `B_TERRAIN`: soldiers wade it at 40% pace, no ship sails it (canals for ships are the Age of Locks' verb). Fields within 2 tiles of water work 30% faster, and in the age no field is laid away from water. The roads: Stone → Rivers (a Farm is the clue), Rivers → Dykes (no coast door; `walked: 'rivers'`), Rivers → Bronze, Rivers → Middle. The computer decides in the Stone Age on its own coin, redraws its channel on arrival (sixteen ways from the shore nearest home, the one that waters most ground near home), digs it tile by tile, and farms along it.
+
+**Why I love it:** it's the first time the player draws the land's shape on purpose. The moment is the first tile going dark and the water following your spade down the line toward the town; then fields laid along it like a real river town, and a raider slowed to a crawl in your ditch while your archers shoot. The door is honest: your fields are where the water is, so a rival can read your town from the minimap.
+
+**Choices I made (the owner may revert):** the `middle → dykes` turn keeps its coast door (`tests/dykes.test.ts` pins it), so only the trunk road from Rivers is never shut. There is no `bronze → rivers` crossing: `tests/step-back.test.ts` pins Bronze's roads, so a Bronze people steps back to the Stone Age to take the water road. Springs began as 7-tile pools of real water; that broke five seeded tests (a Dock on a pool with nowhere to sail, "the nearest water is the sea", a town short of room in its coil fields), so a spring is now a single head that changes no ground until a channel is dug from it.
+
+**Next:** watermills (a mill on a channel that grinds faster), houses by water, a keepsake (the channel's head, a sluice), and the breach (s3): channels let a rival's flood in too. The Water Line (s4) can reuse `wading` for flooded low ground.

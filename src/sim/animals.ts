@@ -8,6 +8,7 @@ import { B_RES, R_MEAT, R_NONE } from './types';
 import { seasonOf } from './seasons';
 import { modsOf } from './stats';
 import { statsOf } from './world';
+import { calmFor } from './tame';
 
 /**
  * The wild (#171): mammoths and wolves don't run. A speared mammoth turns on its hunters; a wolf pack
@@ -272,6 +273,14 @@ function scavenge(s: GameState, a: Animal): boolean {
 
 function beastStep(s: GameState, sp: Spatial | undefined, a: Animal): void {
   if (a.cool) a.cool--;
+  // The Age of the Wild: a beast being sung to stands calm for its tamer, whatever its pack does.
+  if (calmFor(s, a)) {
+    a.state = 'graze';
+    a.foe = undefined;
+    a.prey = undefined;
+    a.t = secs(1);
+    return;
+  }
   if (a.state === 'fight') {
     fightStep(s, sp, a);
     return;
@@ -386,6 +395,7 @@ function rouse(s: GameState, a: Animal, u: Unit): void {
   if (a.state !== 'fight') s.events.push({ k: 'wildCry', id: a.id, kind: a.kind, x: a.x, y: a.y });
   for (const b of pack) {
     if (b.state === 'fight' && b !== a) continue;
+    if (b.tamer !== undefined && calmFor(s, b)) continue;
     b.state = 'fight';
     b.foe = u.id;
     if (b.kind === 'mammoth') b.t = secs(MAMMOTH.rage);
@@ -454,14 +464,14 @@ function maul(s: GameState, a: Animal, u: Unit): void {
 export const sheepMeat = (a: Animal): number => (a.lamb !== undefined ? FLOCK.lambMeat : FLOCK.meat + (a.fat ?? 0) * 2);
 
 /** Work an order can be set down for, and picked up again after the fight. */
-const WORK: Order['k'][] = ['idle', 'gather', 'farm', 'build', 'deliver', 'dig', 'salvage', 'milk'];
+const WORK: Order['k'][] = ['idle', 'gather', 'farm', 'shaft', 'build', 'deliver', 'dig', 'salvage', 'milk'];
 
 /** Someone bitten or gored at their work turns on the beast, then goes back to it. */
 function fightBack(u: Unit, a: Animal): void {
   if (!fightsBeasts(u) || !WORK.includes(u.order.k)) return;
   if ((u.stance === 'stand' || u.stance === 'run') && u.type !== 'citizen') return;
   const o = u.order;
-  if (o.k !== 'idle') u.queue.unshift(o.k === 'gather' || o.k === 'farm' || o.k === 'milk' ? { ...o, phase: 'go' } : o);
+  if (o.k !== 'idle') u.queue.unshift(o.k === 'gather' || o.k === 'farm' || o.k === 'shaft' || o.k === 'milk' ? { ...o, phase: 'go' } : o);
   u.order = { k: 'hunt', target: a.id, fight: a.kind === 'wolf' || a.kind === 'raider' };
   u.path = null;
   u.goal = null;
@@ -505,6 +515,8 @@ export function hitAnimal(s: GameState, a: Animal, damage: number, fromX: number
   if (a.hp <= 0) return;
   a.hp -= damage;
   a.hurt = s.tick;
+  // A wound breaks the song (the Age of the Wild).
+  a.tamer = undefined;
   if (a.hp > 0 && a.kind !== 'deer' && a.kind !== 'sheep') {
     if (a.kind === 'mammoth') a.t = secs(MAMMOTH.rage);
     const u = a.state === 'fight' && a.foe !== undefined ? null : thrower(s, fromX, fromY);

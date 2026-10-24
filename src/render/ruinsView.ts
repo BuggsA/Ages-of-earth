@@ -99,7 +99,7 @@ export class RuinsView {
   private q = new THREE.Quaternion();
   private p = new THREE.Vector3();
   /** A touch larger than the tile, so a ruin reads as a place and not a rock. */
-  private one = new THREE.Vector3(1.25, 1.25, 1.25);
+  private one = new THREE.Vector3(1.45, 1.45, 1.45);
   private up = new THREE.Vector3(0, 1, 0);
 
   private mesh(geo: () => THREE.BufferGeometry, have: THREE.InstancedMesh | null, n: number): THREE.InstancedMesh {

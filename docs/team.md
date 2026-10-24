@@ -60,6 +60,7 @@ A lane is a set of files two agents shouldn't edit at once. Steps in one lane ru
 | `online` | `worker/`, `src/net/`, `src/ui/lobby.ts`, `wrangler.toml` | rooms, the lobby, rejoining, replays over the wire |
 | `tooling` | `.github/`, `.claude/`, configs, the docs in this list | CI, checks, the process |
 
+- **Areas: one lane, several chains.** An umbrella may split its lane into *areas*, each with its own hot files, listed on the umbrella, one issue each with `area:<name>` in its title (the art, #617: `docs/art.md`). Areas run side by side like lanes: one claim and one chain per area; a claim names its area. Shared files between areas are add-only, as below.
 - **Gameplay features cut across lanes.** In this codebase a new unit touches `data.ts`, `units.ts`, its model, the HUD and `main.ts` together. Its lane is where its main change is, almost always `rules`; name the other lanes' hot files it edits in the claim, and if another lane's open pull request edits the same functions, wait for it to merge. So in practice: one `rules` step at a time, beside one step in `ai`, `look` or `online`.
 - **Shared files** (`src/sim/data.ts`, `src/sim/types.ts`, `src/ui/hud.ts`, `src/main.ts`, `index.html`, `README.md`, `docs/status.md`): add your own entries and don't reorder or reformat anyone else's, so merges stay clean.
 - **Feature steps.** A feature too big for one session gets an `umbrella` issue with its steps as a checklist, and one issue per step (`Trade ships s1: the trade cog and its route`). A pull request that only writes a plan says `Refs #N`, never `Closes #N`. Keep step issues open for the next two steps; later ones wait on the umbrella's checklist.
@@ -93,7 +94,7 @@ Sessions end without warning, so claims are built for that.
 - **The base is `main`.** Work reaches it only by merged pull request; nobody pushes to it directly, docs included.
 - **One branch per task, one pull request,** named `claude/<issue>-<topic>` (other tools: `<tool>/<issue>-<topic>`). A merged branch is finished: the next task starts a new branch from `main`. Sessions whose branch name is set by their harness keep it.
 - **Needing another agent's unfinished work:** merge their branch into yours and say so on their issue. Merge, never rebase, other people's commits.
-- **Small and often.** One step, one pull request, merged in the same session. Up to 3 steps a session, only related ones (same umbrella or same files), each merged before the next; stop on a failure or escalation. More while related and uncompacted (`docs/successors.md`).
+- **Small and often.** One step, one pull request, merged in the same session, each merged before the next; stop on a failure or escalation. Whether the next step stays in this session or goes to a successor is the token test in `docs/successors.md` ("Continue or spawn?").
 
 ## Merging
 

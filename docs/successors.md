@@ -21,16 +21,15 @@ When a Claude Code session finishes a task, it starts the next session itself, s
 
 Check cheaply (one `list_issues` by label with `minimal_output`, and `main`'s last `ci`), never by rereading the docs.
 - **Don't spawn** if #2 is labelled `paused`, your chain's last two sessions each pushed nothing (a pushed pull request counts, merged or not), `create_session` failed twice, or a cap below stops you. A small last task, or an empty lane, is not a reason: the successor pitches its own idea (AGENTS.md §2).
-- **Don't spawn** from an owner-started chat or one-off, unless asked.
 - **Otherwise spawn, without asking the owner and without waiting to be told** (the owner, 2026-10-17: starting the next session is the default, not a request). Ending the chain is the exception, and the handoff names the rule that stopped it. Its task, in order: a red `ci-periodic` or `ci` on `main`, an `owner-ask`, a `ready` issue in your lane, else its own pitch.
-- **Continue before you spawn** (owner, 2026-10-17: keep work in cache). Next step in the same umbrella or files: do it here, past 3 steps while related and uncompacted. Spawn when it's unrelated, you've compacted, or ~5 pull requests have merged.
+- **Continue or spawn? Tokens decide** (the owner, 2026-10-24). When a task is done, ask: is the next task small, or close to this one (same files, same umbrella)? Then **continue here**: what is already loaded makes it cheaper. Is it unrelated or big, or has this session compacted? Then **spawn**: a long session costs more a step than a fresh one. Who started the session doesn't matter: an owner-started chat spawns too, once its own task is done. The handoff says which you chose and why, in one line.
 
 ## Chains and caps
 
 A chain is the run of sessions that each start the next.
 - **Position:** a session the owner starts by hand is 0; its successor is 1. **Position 8 doesn't spawn:** the platform refuses `create_session` at lineage depth 8 (chain 1016-2001 ended there, 2026-10-16), so the cap is 8, not the 10 the first draft assumed.
 - **The id** is the UTC date and time of the chain's first spawn (`1013-1720`). Position 0 makes it up; later sessions copy it.
-- **One chain per lane** (`docs/team.md`, "Lanes"), and no limit on how many run at once (the owner, 2026-10-15, `docs/rulings.md`). Before spawning, read the recent `Chain` comments on #2 for the chains under two hours old that don't say "ended". One running in your lane: wait.
+- **One chain per lane, or per area** where an umbrella splits its lane into areas (`docs/team.md`, "Lanes"), and no limit on how many run at once (the owner, 2026-10-15, `docs/rulings.md`). Before spawning, read the recent `Chain` comments on #2 for the chains under two hours old that don't say "ended". One running in your lane or area: wait. A chain in an area hands on to the next step of the same area; when its area is done, to any `ready` work.
 - **No daily cap** (the owner, 2026-10-14, `docs/rulings.md`): 8 sessions a chain (the platform's lineage depth) is the only count limit.
 - **Log each spawn on #2, with why:** `Chain 1013-1720, 3 of 8, lane rules: <branch> took #42 (regular), started "<child title>" for #57.` When a chain ends: `Chain 1013-1720 ended at 3 of 8: <reason>.` Don't start a new chain yourself: that's the owner's.
 

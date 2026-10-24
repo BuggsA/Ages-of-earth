@@ -67,7 +67,7 @@ const fragment = /* glsl */ `
     float n = noise(vWorld.xz * 1.6 + vec2(uTime * 0.15, -uTime * 0.11));
     vec3 col = mix(uShallow, uDeep, smoothstep(0.02, 0.9, depth + (n - 0.5) * 0.12));
     float ripple = noise(vWorld.xz * 4.0 + uTime * 0.5) * noise(vWorld.xz * 2.6 - uTime * 0.35);
-    col += vec3(0.05, 0.08, 0.07) * ripple * (1.0 - smoothstep(0.1, 0.6, depth));
+    col += vec3(0.03, 0.05, 0.05) * ripple * (1.0 - smoothstep(0.1, 0.6, depth));
 
     float shore = 1.0 - smoothstep(0.0, 0.07 + n * 0.05, depth);
     float lines = smoothstep(0.82, 1.0, sin(depth * 26.0 - uTime * 1.8 + n * 3.0)) * (1.0 - smoothstep(0.05, 0.45, depth));
@@ -76,7 +76,7 @@ const fragment = /* glsl */ `
     vec3 N = normalize(vNormal + vec3((n - 0.5) * 0.12, 0.0, (ripple - 0.25) * 0.12));
     vec3 V = normalize(cameraPosition - vWorld);
     float fres = pow(1.0 - max(dot(N, V), 0.0), 3.0);
-    col = mix(col, uSky, fres * 0.5);
+    col = mix(col, uSky, fres * 0.3);
     vec3 H = normalize(V + normalize(uSunDir));
     col += uSunColor * pow(max(dot(N, H), 0.0), 160.0) * 0.8;
     if (uStars > 0.01) {
@@ -128,8 +128,8 @@ export class WaterView {
           uSky: { value: new THREE.Color('#bfe6f2') },
           uStars: { value: 0 },
           uFrost: seasonUniforms.uSnow,
-          uShallow: { value: new THREE.Color('#58cfc4') },
-          uDeep: { value: new THREE.Color('#1d7fae') },
+          uShallow: { value: new THREE.Color('#3a8690') },
+          uDeep: { value: new THREE.Color('#2c5b78') },
         },
       ]),
       transparent: true,
@@ -163,6 +163,16 @@ export class WaterView {
     this.mesh.geometry.dispose();
     this.mesh.geometry = geo;
     this.mesh.position.set(s.w / 2, WATER_Y, s.h / 2);
+  }
+
+  /** The shore moved (#701, land pumped out of the water): re-read the bed from the heights as drawn, so the foam follows the new shore. */
+  refreshBed(s: GameState, heightOf: (corner: number) => number): void {
+    const bed = this.bed;
+    if (!bed) return;
+    const data = bed.image.data as Uint8Array;
+    const n = (s.w + 1) * (s.h + 1);
+    for (let i = 0; i < n; i++) data[i * 4] = Math.round(Math.max(0, Math.min(1, (heightOf(i) + 3) / 4)) * 255);
+    bed.needsUpdate = true;
   }
 
   /** Stars glinting on the lakes: 0 by day to 1 on a clear night. */

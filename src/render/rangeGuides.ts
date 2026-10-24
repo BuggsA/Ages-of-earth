@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { BUILDINGS, LIGHTNING, SORTIE, type UnitStats } from '../sim/data';
 import { ageDef, hasCoils } from '../sim/ages';
-import { modsOf, statsFor } from '../sim/stats';
+import { gunRange, statsFor } from '../sim/stats';
 import type { Building, BuildingType, Ent, GameState } from '../sim/types';
 import { heightAt } from './terrain';
 import { WATER_Y } from './water';
@@ -10,6 +10,10 @@ import { WATER_Y } from './water';
 export const MAX_RANGE_GUIDES = 24;
 const SEGMENTS = 128;
 const LIFT = 0.08;
+/** Lines are 1 px in WebGL; two flanking rings (tiles off the reach, dimmer) make each guide a ~3 px band that reads on grass (#626). */
+const FLANK = 0.07;
+const FLANK_DIM = 0.6;
+const RINGS = 3;
 const OUTER = new THREE.Color('#a9e9ff');
 const INNER = new THREE.Color('#ffd166');
 const FIELD = new THREE.Color('#9fb8ff');
@@ -42,8 +46,7 @@ export function selectedRange(s: GameState, viewer: number, e: Ent): RangeGuide 
     return reach ? { x: e.x, y: e.y, ...reach } : null;
   }
   if (!e.built) return null;
-  const guns = BUILDINGS[e.type].guns;
-  return guns ? { x: e.x, y: e.y, reach: guns.range + modsOf(s, viewer).range + e.size / 2, minimum: 0 } : null;
+  return BUILDINGS[e.type].guns ? { x: e.x, y: e.y, reach: gunRange(s, e.owner, e.type, e.level) + e.size / 2, minimum: 0 } : null;
 }
 
 /** A defense's future reach, including this player's researched range. */
@@ -51,7 +54,7 @@ export function placementRange(s: GameState, viewer: number, type: BuildingType,
   const def = BUILDINGS[type];
   return def.guns ? {
     x: tx + def.size / 2, y: ty + def.size / 2,
-    reach: def.guns.range + modsOf(s, viewer).range + def.size / 2, minimum: 0,
+    reach: gunRange(s, viewer, type) + def.size / 2, minimum: 0,
   } : null;
 }
 
@@ -96,8 +99,8 @@ export function placementField(s: GameState, viewer: number, type: BuildingType,
 /** Terrain-following weapon guides: solid outer reach, broken inner dead zone. */
 export class RangeGuides {
   readonly mesh: THREE.LineSegments;
-  private positions = new THREE.BufferAttribute(new Float32Array(MAX_RANGE_GUIDES * SEGMENTS * 4 * 3), 3);
-  private colors = new THREE.BufferAttribute(new Float32Array(MAX_RANGE_GUIDES * SEGMENTS * 4 * 3), 3);
+  private positions = new THREE.BufferAttribute(new Float32Array(MAX_RANGE_GUIDES * SEGMENTS * 2 * RINGS * 2 * 3), 3);
+  private colors = new THREE.BufferAttribute(new Float32Array(MAX_RANGE_GUIDES * SEGMENTS * 2 * RINGS * 2 * 3), 3);
 
   constructor() {
     const geometry = new THREE.BufferGeometry();
@@ -116,22 +119,26 @@ export class RangeGuides {
     const open = (x: number, y: number) => x >= 0 && y >= 0 && x < s.w && y < s.h && visible(x, y);
     for (const g of guides.slice(0, MAX_RANGE_GUIDES)) {
       for (const minimum of [false, true]) {
-        const radius = minimum ? g.minimum : g.reach;
-        if (!(radius > 0)) continue;
+        const base = minimum ? g.minimum : g.reach;
+        if (!(base > 0)) continue;
         const color = g.band ? BANDS[g.band] : g.field ? FIELD : minimum ? INNER : OUTER;
-        for (let i = 0; i < SEGMENTS; i++) {
-          if (minimum && i % 4 >= 2) continue;
-          const a = i * Math.PI * 2 / SEGMENTS;
-          const b = (i + 1) * Math.PI * 2 / SEGMENTS;
-          const x0 = g.x + Math.cos(a) * radius;
-          const y0 = g.y + Math.sin(a) * radius;
-          const x1 = g.x + Math.cos(b) * radius;
-          const y1 = g.y + Math.sin(b) * radius;
-          // Test the midpoint too: don't bridge a hidden tile between two visible endpoints.
-          if (!open(x0, y0) || !open(x1, y1) || !open((x0 + x1) / 2, (y0 + y1) / 2)) continue;
-          for (const [x, y] of [[x0, y0], [x1, y1]]) {
-            this.positions.setXYZ(n, x, Math.max(WATER_Y, heightAt(s, x, y)) + LIFT, y);
-            this.colors.setXYZ(n++, color.r, color.g, color.b);
+        for (let ring = 0; ring < RINGS; ring++) {
+          const radius = Math.max(0.01, base + (ring - 1) * FLANK);
+          const k = ring === 1 ? 1 : FLANK_DIM;
+          for (let i = 0; i < SEGMENTS; i++) {
+            if (minimum && i % 4 >= 2) continue;
+            const a = i * Math.PI * 2 / SEGMENTS;
+            const b = (i + 1) * Math.PI * 2 / SEGMENTS;
+            const x0 = g.x + Math.cos(a) * radius;
+            const y0 = g.y + Math.sin(a) * radius;
+            const x1 = g.x + Math.cos(b) * radius;
+            const y1 = g.y + Math.sin(b) * radius;
+            // Test the midpoint too: don't bridge a hidden tile between two visible endpoints.
+            if (!open(x0, y0) || !open(x1, y1) || !open((x0 + x1) / 2, (y0 + y1) / 2)) continue;
+            for (const [x, y] of [[x0, y0], [x1, y1]]) {
+              this.positions.setXYZ(n, x, Math.max(WATER_Y, heightAt(s, x, y)) + LIFT, y);
+              this.colors.setXYZ(n++, color.r * k, color.g * k, color.b * k);
+            }
           }
         }
       }

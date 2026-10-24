@@ -4,6 +4,12 @@ import type { AgeId, GameState, KeyId } from '../sim/types';
 import type { ScoutFlag } from './scoutFlags';
 import { iceCover, lookFor, mapTint } from '../render/seasonLook';
 import { Waymarks } from './waymarks';
+
+/** Polder on the map (#701): a deep field green. */
+const POLDER_RGB = [86, 128, 62];
+const WATER_RGB = [0x2f, 0x7f, 0xae];
+/** Tiles pumped out of the water so far, by every people. */
+const drained = (s: GameState): number => s.players.reduce((n, p) => n + (p.stats.drained ?? 0) + (p.stats.dug ?? 0), 0);
 import { R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE, T_ROCK, T_SAND, T_WATER } from '../sim/types';
 
 /**
@@ -41,6 +47,9 @@ export class Minimap {
   private green: Uint8Array = new Uint8Array(0);
   /** Lake depth under each water tile (0 on land), for the winter ice. */
   private depth: Float32Array = new Float32Array(0);
+  /** The ground as painted, and the tiles pumped out by then (#701): land won from the water is repainted as it comes. */
+  private terr: Uint8Array = new Uint8Array(0);
+  private drainedSeen = 0;
   private img: ImageData | null = null;
   private pings: Ping[] = [];
   private dragging = false;
@@ -91,15 +100,19 @@ export class Minimap {
     const grass = rgb('#6fa548');
     const grass2 = rgb('#7fb354');
     const sand = rgb('#d9c48a');
-    const water = rgb('#2f7fae');
+    const water = WATER_RGB;
     const rock = rgb('#8d8579');
     for (let i = 0; i < s.w * s.h; i++) {
       const t = s.terrain[i];
       const c = t === T_WATER ? water : t === T_SAND ? sand : t === T_ROCK ? rock : (i * 7) % 5 ? grass : grass2;
       this.land.set(c, i * 3);
       if (t === T_WATER) this.depth[i] = Math.max(0, -0.02 - s.height[Math.floor(i / s.w) * (s.w + 1) + (i % s.w)]);
+      // A spring head (#701 s1) shows as a speck of water.
+      if (s.springs?.includes(i)) this.land.set(water, i * 3);
       this.green[i] = t === T_WATER || t === T_SAND || t === T_ROCK ? 0 : 1;
     }
+    this.terr = Uint8Array.from(s.terrain);
+    this.drainedSeen = drained(s);
     this.pings = [];
     this.waymarks.reset();
     const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -117,13 +130,27 @@ export class Minimap {
     s: GameState,
     viewer: number,
     reveal: boolean,
-    buildings: Iterable<{ owner: number; x: number; y: number; size: number }>,
+    buildings: Iterable<{ owner: number; x: number; y: number; size: number; type?: string }>,
     footprint: { x: number; z: number }[],
     selected: Set<number>,
     scoutFlags: readonly ScoutFlag[] = [],
   ): void {
     if (!this.img) return;
     const p = s.players[viewer];
+    // Polder (#701): water pumped out since the land was painted shows as dark field.
+    const won = drained(s);
+    if (won !== this.drainedSeen) {
+      this.drainedSeen = won;
+      for (let i = 0; i < s.w * s.h; i++) {
+        if (this.terr[i] === s.terrain[i]) continue;
+        this.terr[i] = s.terrain[i];
+        // A channel dug (#701, the Age of Rivers) shows as water; land pumped out, as polder.
+        const wet = s.terrain[i] === T_WATER;
+        this.land.set(wet ? WATER_RGB : POLDER_RGB, i * 3);
+        this.depth[i] = wet ? Math.max(0, -0.02 - s.height[Math.floor(i / s.w) * (s.w + 1) + (i % s.w)]) : 0;
+        this.green[i] = wet ? 0 : 1;
+      }
+    }
     if (!reveal) this.waymarks.update(s, viewer);
     const d = this.img.data;
     // The year on the map: meadow and woods follow the season, snow lies in winter (as in the land's own look).
@@ -213,16 +240,37 @@ export class Minimap {
         }
       }
     }
+    const hearts: { owner: number; x: number; y: number }[] = [];
     for (const b of buildings) {
+      if (b.type === 'towncenter') {
+        hearts.push(b);
+        continue;
+      }
       const pl = s.players[b.owner];
       ctx.fillStyle = pl.color;
       const age = ageOf(pl);
       const mark = AGE_BLIP[age];
       ctx.strokeStyle = mark ?? 'rgba(0,0,0,0.6)';
       ctx.lineWidth = mark ? 1.5 : 1;
-      const half = (b.size / 2) * sx;
+      // At least 1.6 px a side, so a small hut still reads as a block of its people's colour (#626).
+      const half = Math.max((b.size / 2) * sx, 1.6);
       ctx.fillRect(b.x * sx - half, b.y * sy - half, half * 2, half * 2);
       ctx.strokeRect(b.x * sx - half, b.y * sy - half, half * 2, half * 2);
+    }
+    // Every Town Center the viewer knows of, last: a big square in its people's colour with a pale rim and a dark heart, so a found
+    // town reads at a glance among the small buildings, and an enemy one is a target to find.
+    const dpr = this.canvas.width / (this.canvas.clientWidth || 184);
+    for (const h of hearts) {
+      const half = Math.max(4.5 * dpr, 2.2 * sx);
+      const x = h.x * sx;
+      const y = h.y * sy;
+      ctx.fillStyle = s.players[h.owner].color;
+      ctx.fillRect(x - half, y - half, half * 2, half * 2);
+      ctx.lineWidth = 1.5 * dpr;
+      ctx.strokeStyle = '#f5ecd2';
+      ctx.strokeRect(x - half, y - half, half * 2, half * 2);
+      ctx.fillStyle = 'rgba(10,14,20,0.85)';
+      ctx.fillRect(x - half * 0.3, y - half * 0.3, half * 0.6, half * 0.6);
     }
     // Game, where the viewer can see it.
     for (const a of s.animals) {
@@ -375,6 +423,11 @@ export class Minimap {
         ctx.lineTo(e.x * sx - r * 1.2, e.y * sy);
         ctx.fill();
       } else {
+        // A dark edge so a dot reads on any ground, whatever its colour (#626).
+        const dot = ctx.fillStyle;
+        ctx.fillStyle = 'rgba(12,8,4,0.7)';
+        ctx.fillRect(e.x * sx - r - 0.7, e.y * sy - r - 0.7, r * 2 + 1.4, r * 2 + 1.4);
+        ctx.fillStyle = dot;
         ctx.fillRect(e.x * sx - r, e.y * sy - r, r * 2, r * 2);
         // A thrall (#502): the slayer's colour with a dark pip, so a rival can tell the bound from a free citizen.
         if (e.thrall) {

@@ -23,6 +23,7 @@ export const EPOCHS: Epoch[] = [
   { name: 'Middle Ages', short: 'Medieval', cost: { food: 700, gold: 250, stone: 100 }, time: 50, blurb: 'Pikes, crossbows, knights, catapults and stone keeps.' },
   { name: 'Gunpowder Age', short: 'Gunpowder', cost: { food: 1000, gold: 600, stone: 250 }, time: 65, blurb: 'Muskets, cuirassiers, galleons, cannon and brick and tile.' },
   { name: 'Industrial Age', short: 'Industrial', cost: { food: 1400, gold: 900, stone: 400 }, time: 80, blurb: 'Rifles, field guns, ironclads, and the first aeroplanes.' },
+  { name: 'Atomic Age', short: 'Atomic', cost: { food: 1800, gold: 1500, stone: 700 }, time: 95, blurb: 'The Missile Silo: one warhead, a public countdown, and a town that guards it.' },
 ];
 export const LAST_EPOCH = EPOCHS.length - 1;
 
@@ -116,6 +117,9 @@ export interface Age {
    * it, and pays it out to mend the people's own living near it. The numbers are `RITE` (`fork.ts`).
    */
   rite?: boolean;
+  /** The fork past the Atomic Age (#605 s3): fission, raw power now (`FISSION`), or fusion, clean and limitless but slow (`FUSION`), in `silo.ts`. */
+  fission?: boolean;
+  fusion?: boolean;
   /** A people that raises again on the foundations of what fell (the Age of Reclaimers): see `RECLAIM` (`reclaim.ts`). */
   reclaim?: boolean;
   /** Citizens strip the rubble of fallen buildings into stock (the Age of Reclaimers, #503): see `SALVAGE` (`salvage.ts`). */
@@ -143,8 +147,22 @@ export interface Age {
   raid?: boolean;
   /** Priests raise Missions on far shores, and each pays a tithe that grows with its distance from home (the Age of Missions, #555 s12): see `MISSION` (`missions.ts`). */
   missions?: boolean;
+  /** Citizens tame wild wolves, boars and mammoths into beasts of war (the Age of the Wild, `TAME`, `src/sim/tame.ts`). */
+  tames?: boolean;
   /** What a line of soldiers is called here (the Age of Chariots' riders are chariots, #555 s12). */
   names?: Partial<Record<UnitType, string>>;
+  /** Windmills pump the water out from behind the dykes, tile by tile, into polder (the Age of Dykes, #701): see `POLDER` (`water.ts`). */
+  pumps?: boolean;
+  /**
+   * The Age of Rivers (#701): citizens dig channels from any water, the water running in behind them; Farms by water thrive, and
+   * none is laid away from it. See `RIVERS` (`water.ts`).
+   */
+  rivers?: boolean;
+  /**
+   * The Golden Age (#703): every side age the people has walked wakes at once, its verbs and the best of its gifts with none of its
+   * doors (`weave` in `ages.ts`), until `GOLDEN.span` runs out and the people wakes in the Gunpowder Age, for good.
+   */
+  golden?: boolean;
 }
 
 /**
@@ -194,14 +212,14 @@ export const PATHS: Record<PathId, Path> = {
   },
 };
 
-export const TRUNK: AgeId[] = ['stone', 'bronze', 'middle', 'gunpowder', 'industrial'];
+export const TRUNK: AgeId[] = ['stone', 'bronze', 'middle', 'gunpowder', 'industrial', 'atomic'];
 
 /**
  * The basic routes (#555 s0, `docs/age-roads.md` spine §1): a plain style a player can pick and follow to a win on any
  * map, with no prospecting and no rare find. Each age names the routes it stands on (`Age.routes`); the age-up button
  * says which route a road is on. A route may cross the plain road between its own ages.
  */
-export type RouteId = 'plain' | 'army' | 'navy' | 'economy' | 'horse' | 'faith';
+export type RouteId = 'plain' | 'army' | 'navy' | 'economy' | 'horse' | 'faith' | 'wild' | 'water';
 export const ROUTES: Record<RouteId, { name: string; blurb: string }> = {
   plain: { name: 'Plain road', blurb: 'the classic climb, open on every map; every route can fall back to it' },
   army: { name: 'Army route', blurb: 'plunder carried home, camps at the front, a whole people at war' },
@@ -209,6 +227,8 @@ export const ROUTES: Record<RouteId, { name: string; blurb: string }> = {
   economy: { name: 'Economy route', blurb: 'gold that hires swords, feast-day trade, a town laid out round its coils' },
   horse: { name: 'Horse route', blurb: 'a town on wagons, tribute from a rival\'s land, tolls on the trade road' },
   faith: { name: 'Faith route', blurb: 'priests who win a rival\'s towers and Temples over' },
+  wild: { name: 'Wild route', blurb: 'beasts tamed and bred, walls that grow, and one day the forest itself' },
+  water: { name: 'Water road', blurb: 'channels dug from the springs, then dykes and polder: a people that moves the water' },
 };
 
 const trunkAge = (e: number, good: string): Age => ({ name: EPOCHS[e].name, short: EPOCHS[e].short, tier: e, blurb: EPOCHS[e].blurb, good, routes: ['plain'] });
@@ -230,6 +250,7 @@ export const AGES: Record<AgeId, Age> = {
   middle: trunkAge(2, 'The crossroads: most side roads turn off here, and nothing is shut'),
   gunpowder: trunkAge(3, 'Guns and cannon that break any wall, and every road comes back to it'),
   industrial: trunkAge(4, 'The strongest plain arms and the deepest economy, with nothing shut'),
+  atomic: trunkAge(5, 'One warhead the whole map watches fall: a Missile Silo, dear to raise and to refuel'),
   aeronaut: {
     verb: 'Fight from forward Airfields: aircraft fly sorties on fuel, so where you build an Airfield is how far you reach',
     door: 'Foot, ranged, cavalry and siege cost more',
@@ -320,6 +341,7 @@ export const AGES: Record<AgeId, Age> = {
     door: 'No walls or gates: the fleet is the wall',
     good: 'Sea power: convoys carry more, and a rival\'s sunk cogs pay you',
     routes: ['navy'],
+    keepsake: { building: 'dock', does: 'its convoy yard: merchant ships trading from it sail escorted by warships on any road' },
     name: 'Age of Sail',
     short: 'Sail',
     tier: 2,
@@ -432,6 +454,29 @@ export const AGES: Record<AgeId, Age> = {
     no: { units: ['trader'], why: 'A people of the Blood-rite trades with no one: traders wait until it leaves the rite' },
     blood: true,
     rite: true,
+  },
+  // The fork past the Atomic Age (#605 s3, seed #533): two turns off it, each shunning the other, each changing how a silo is worked.
+  fission: {
+    verb: 'Fire the silo in half the time and again soon, and lay your silos far from home: each launch poisons the ground round your own',
+    door: 'Every launch poisons the ground round your own silo for a minute; Fusion is closed for good',
+    good: 'The quickest strike: a short clock and a short refuel, at a price in your own ground',
+    routes: ['army'],
+    name: 'Age of Fission',
+    short: 'Fission',
+    tier: 5,
+    blurb: 'Raw power now. A Missile Silo\'s clock is 25 seconds, not 45, and it refuels in 100, not 240. But the reactor leaks: each launch poisons 3 tiles round your own silo for 60 seconds, as fallout does (4 health a second to every land unit in it, yours too). Lay your silos away from your town and your fields. Take it, and the Age of Fusion is closed for good.',
+    fission: true,
+  },
+  fusion: {
+    verb: 'Keep several warheads in the air at once from one silo, clean: nothing you strike is poisoned, and the silo never needs refuelling',
+    door: 'A road that costs the earth and takes two and a half minutes, leaving the town exposed; a long 70 second clock; Fission is closed for good',
+    good: 'Limitless, clean strikes: up to three warheads aloft from one silo, and your armies may follow them in',
+    routes: ['economy'],
+    name: 'Age of Fusion',
+    short: 'Fusion',
+    tier: 5,
+    blurb: 'Clean and limitless, and ruinously dear. A Missile Silo keeps up to three warheads in the air at once and never needs refuelling, a launch costs 450 gold and 120 stone, and nothing it strikes is poisoned, so your army can follow the blast in. But the clock is 70 seconds, long enough for a rival to scatter or to find the silo, and the road here costs a fortune and takes 150 seconds in which the town is exposed. Take it, and the Age of Fission is closed for good.',
+    fusion: true,
   },
   steppe: {
     verb: 'Pack your Town Centers and Houses onto wagons and pitch them where the herds and the fight are',
@@ -554,6 +599,31 @@ export const AGES: Record<AgeId, Age> = {
     noBuild: { buildings: ['wall', 'gate'], why: 'A chariot people raises no walls or gates: it rides open ground. They wait until it settles in the Bronze Age or climbs on' },
     no: { units: ['ranged'], why: 'No archers behind a chariot\'s dust: bows wait until the people settles in the Bronze Age or climbs on' },
   },
+  // The Wild route (`docs/wild-road.md`), first step: the wild beasts of the map become an army, and the Den breeds more.
+  wild: {
+    verb: 'Tame wolves, boars and mammoths with your citizens, then breed the kinds you tamed at a Beast Den',
+    door: 'No Stables and no Siege Workshop: your beasts are your riders and your rams',
+    good: 'An early army of beasts that costs food rather than gold, and a race for the wild ground',
+    routes: ['wild'],
+    name: 'Age of the Wild',
+    short: 'Wild',
+    tier: 1,
+    blurb: 'Instead of the Bronze Age: a people that keeps company with the wild. Citizens sent at a wolf, a boar or a mammoth sing it calm and lead it home as a beast of war: a War Wolf that runs down archers, a Tusker that breaks riders, a War Mammoth that tramples walls. The beast being tamed stands still for its tamer, but its pack does not, and a wound breaks the song. Once a kind is tamed, a Beast Den breeds more of it for food. No horses are stabled and no rams are built: the beasts are both.',
+    tames: true,
+    noBuild: { buildings: ['stable', 'workshop'], why: 'A people of the Wild keeps no horses and builds no rams: its beasts are both. They wait until it climbs to the Middle Ages or settles in the Bronze Age' },
+  },
+  // The Wild route's second age (`docs/wild-road.md` §2): the town is shut in what it grew, and fed from a ninth of the ground.
+  grove: {
+    verb: 'Plant Thornwalls that grow into living oak, feed one-tile Kitchen Gardens on Den dung or water, and set Orchards that bear each summer',
+    door: 'No stone walls, gates or Watch Towers: the town is defended by what it grew',
+    good: 'A town shut in green on a small footprint: the cheapest wall that heals, and food dense where beasts and water are',
+    routes: ['wild'],
+    name: 'Age of the Grove',
+    short: 'Grove',
+    tier: 2,
+    blurb: 'Instead of the Middle Ages: a people that grows what others build. A Thornwall is planted for a little wood and grows over two minutes from seedling to living oak, tougher than stone and mending itself; it parts for your own people, and a piece cut down sprouts again from its root unless the ground is built on. Kitchen Gardens grow maize, beans and squash together on one tile: fed by a Beast Den\'s dung or a stream beside them, a gardener brings in two or three times a farmer\'s food. Orchards bear fruit in summer and autumn, slow to start, then free for years. No stone walls, gates or towers: what guards the town must grow.',
+    noBuild: { buildings: ['wall', 'gate', 'tower'], why: 'A Grove people raises no stone walls, gates or towers: it plants Thornwalls. They wait until it climbs to the Gunpowder Age or settles in the Middle Ages' },
+  },
   // The second crossing (#555 s12): the Pilgrims' priests and the Sail's ships made one trade. Open only to a people that walked both.
   missions: {
     verb: 'Sail priests to far shores and raise Missions there: each claims land, trains priests, and pays a tithe that grows with its distance from home',
@@ -569,6 +639,47 @@ export const AGES: Record<AgeId, Age> = {
     missions: true,
     noBuild: { buildings: ['wall', 'gate'], why: 'A missionary people raises no walls or gates: its faith goes out unarmed. They wait until it comes home to the Middle Ages or climbs on' },
     no: { units: ['siege'], why: 'A missionary people builds no siege engines: rams and catapults wait until it leaves the missions\' road' },
+  },
+  // The Water Road's first age (#701 s1): a turn off the Middle Ages for a people with shallow water by its town. It moves the
+  // coastline: dykes across the shallows, windmills that pump the water out behind them, polder fields where the sea was.
+  dykes: {
+    verb: 'Wall off the shallows with dykes and set windmills behind them to pump the water out, tile by tile, into polder: rich low fields where the sea was, and a march where a strait was',
+    door: 'No stone walls or gates: the dykes are your walls, and only on the water\'s edge. Your best fields lie below the sea, behind banks a rival can break',
+    good: 'Moving the coast: new land for the best fields in the game, and a land bridge across a strait',
+    routes: ['water'],
+    keepsake: { building: 'windmill', does: 'pumping: it drains the water behind its dykes on any road' },
+    name: 'Age of Dykes',
+    short: 'Dykes',
+    tier: 2,
+    blurb: 'As the Frisians and the Hollanders did from the 1100s: banks of earth crowned with stone across the shallows, and windmills to lift the water out behind them. Dykes (K) are raised on shallow water or on the shore beside it, dragged out in a line like a wall; your own people walk along their crowns, and no rival or ship gets past. A Windmill (W) by water a dyke has shut off from the open sea pumps it dry, a tile every few seconds, nearest first: the bay becomes polder, low black ground where a Farm yields half again as much. Drain a strait and you have made a land bridge, for everyone. Only small water can be pumped: a lake or a dyked-off bay, never the open sea. No stone walls or gates are raised: the dykes are the walls.',
+    noBuild: { buildings: ['wall', 'gate'], why: 'A people of dykes raises no stone walls or gates: the dykes are its walls. They wait until it returns to the Middle Ages or climbs on' },
+    pumps: true,
+  },
+  // The Water Road's first age (#701 s1): instead of the Bronze Age, on every map (a spring lies by every town). Its people digs the
+  // water to where it wants it: channels run from any water across the land, and the town grows along them.
+  rivers: {
+    verb: 'Dig channels from any water across the land and lay your fields along them, so the water goes where you want your town; a channel is a moat that soldiers must wade',
+    door: 'No new Farm away from water: the town grows along its channels, so its shape is plain to see and a raid knows where to cut',
+    good: 'Fields where you choose: dig the water to them, and ring the town with a moat',
+    routes: ['water'],
+    name: 'Age of Rivers',
+    short: 'Rivers',
+    tier: 1,
+    blurb: 'As the first towns of Sumer and the Indus did: a people that leads the river where it wants it. Citizens dig Channels (Q) out from any water, a spring, a stream, a lake or the shore, dragged out in a line like a wall; when a stretch is dug the water runs in, a tile at a time, and stays. A Farm within 2 tiles of water works 30% faster, and in this age no Farm is laid away from water, so the fields follow the channels. A channel is a moat: soldiers and citizens wade it at well under half their pace, and no ship sails it. Markets, Temples and the Bronze Age\'s arms are all here. What is dug stays dug on any road.',
+    rivers: true,
+  },
+  // The Golden Age (#703): the age that feels almost too good. A turn off the Gunpowder Age for a people that has lived many lives.
+  golden: {
+    verb: 'Live every life your people has walked at once: every side age it stood in wakes together, its ways and the best of its gifts, with none of its doors',
+    door: 'It ends: after its span the people wakes in the Gunpowder Age, every thread asleep, and the road never opens again; and every rival is told, with the hour it ends',
+    good: 'Everything at once, for a while: the richer the road you walked, the richer the age',
+    routes: [],
+    name: 'Golden Age',
+    short: 'Golden',
+    tier: 3,
+    blurb: 'Every people tells of one: Pericles\' Athens, the House of Wisdom in Baghdad, the Tang, Mali under Mansa Musa. A people that has lived many lives draws them together: every side age it has walked wakes at once. Hired swords and hauled plunder, chanting priests and a town on wagons, convoys and coils, whatever it learned on the road, all of it, and none of the prices those ages asked. Buildings that slept wake. It burns for 6 minutes, a minute more for every age walked past the third (up to 10), and every rival is told when it began and when it ends. Then it is over for good: the people wakes in the Gunpowder Age with every thread asleep.',
+    mul: { buildSpeed: 1.2 },
+    golden: true,
   },
 };
 
@@ -656,6 +767,13 @@ export const FLOCK = {
   steal: 2,
 };
 
+/**
+ * The self-managed flock: for a person's steppe people, once every `every` seconds the camp raises a lamb while
+ * the flock has room and the larder holds `reserve` food beyond its cost, idle citizens within `reach` tiles of
+ * a camp take to milking, and one slaughters a sheep fattened past breeding once the flock is full.
+ */
+export const SHEPHERD = { every: 2, reserve: 80, reach: 14 };
+
 // ---- Roads between ages ---------------------------------------------------------------------------
 
 /** Something a people must have done before a road opens: a tally from its stats reaching `n`. */
@@ -705,6 +823,11 @@ export interface Road {
   also?: Deed[];
   /** What taking it means, for the tooltip (trunk roads use the age's blurb). */
   blurb?: string;
+  /**
+   * A coast door (#701): the road opens only to a people with at least `DYKE.need` tiles of shallow water (`shallow` in `water.ts`)
+   * within `DYKE.home` tiles of where it began. The land gates it by its shape, not by an ore. The text says why when it is shut.
+   */
+  coast?: string;
   /** Closed for good to a people that has walked this age (#355 s2): the two branches of a fork shut each other. */
   shuns?: AgeId;
   /**
@@ -712,6 +835,10 @@ export interface Road {
    * walked. Seen once either is walked, open only with both. (`walked` stays one age: read-only tests read it as one.)
    */
   crossing?: [AgeId, AgeId];
+  /**
+   * A road for a people that has lived many lives (the Golden Age, #703): seen once it has walked `seen` side ages, open with `n`.
+   */
+  lives?: { seen: number; n: number };
   /**
    * How hard the door is (#348): an easy on-ramp (a small deed, a modest price) invites a people to try the
    * web; a hard gate (a dear price, a long journey) marks the special ages. Most roads carry neither, and
@@ -764,6 +891,32 @@ export const ROADS: Road[] = [
     deed: { stat: 'iron', n: 150, text: 'Your citizens dig 150 bog iron' },
     blurb: 'Instead of the Bronze Age, as many peoples of Africa went from stone straight to iron: foot soldiers cost a quarter less and strike 1 harder, and iron hoes and axes make farms and woodcutters 10% quicker. Bog iron keeps paying double gold as iron bars, so the marsh is worth guarding. What it gives up: the horse. The Stable trains no cavalry until the Middle Ages.',
   },
+  // The Wild route (`docs/wild-road.md`): the third road out of the Stone Age. A Hunting Camp shows it (where a people learns the
+  // beasts, as the Steppe's riders do); foraging the wild bushes opens it.
+  {
+    from: 'stone',
+    to: 'wild',
+    cost: { food: 300, wood: 150 },
+    time: 35,
+    clue: 'huntcamp',
+    deed: { stat: 'foraged', n: 250, text: 'Your gatherers forage 250 food from wild bushes' },
+    blurb: 'Instead of the Bronze Age: keep company with the wild. Citizens tame wolves, boars and mammoths into beasts of war, and a Beast Den breeds the kinds they tamed, for food. No Stables and no Siege Workshop while you stay.',
+  },
+  { from: 'wild', to: 'middle', cost: EPOCHS[2].cost, time: EPOCHS[2].time, blurb: 'Rejoin the main road at the Middle Ages, for the same price as from the Bronze Age. Your beasts and Dens stay, Stables and Siege Workshops return, and no more beasts are tamed.' },
+  { from: 'wild', to: 'bronze', cost: { food: 150, wood: 150 }, time: 20, blurb: 'Settle down: leave the wild for the Bronze Age. Your beasts and Dens stay, Stables and Siege Workshops return, and no more beasts are tamed.' },
+  // The Wild route's second step (`docs/wild-road.md` §2): a Den shows it, and the beasts it rears open it (their dung feeds the gardens).
+  {
+    from: 'wild',
+    to: 'grove',
+    cost: { food: 500, wood: 300, gold: 60 },
+    time: 45,
+    clue: 'den',
+    walked: 'wild',
+    deed: { stat: 'bred', n: 5, text: 'Your Dens rear 5 beasts' },
+    blurb: 'Instead of the Middle Ages: grow the town. Thornwalls that grow into living oak and part for your people, Kitchen Gardens fed on Den dung or water, Orchards that bear each summer. No stone walls, gates or Watch Towers while you stay.',
+  },
+  { from: 'grove', to: 'gunpowder', cost: EPOCHS[3].cost, time: EPOCHS[3].time, blurb: 'Rejoin the main road at the Gunpowder Age for the ordinary price. Your Thornwalls, Gardens and Orchards keep growing, and stone walls, gates and towers return.' },
+  { from: 'grove', to: 'middle', cost: { food: 200, wood: 200 }, time: 25, blurb: 'Settle down in the Middle Ages. Your Thornwalls, Gardens and Orchards keep growing, and stone walls, gates and towers return.' },
   // The other road out of the Stone Age (#297): the hunt, not the bog, opens it.
   {
     from: 'stone',
@@ -952,6 +1105,11 @@ export const ROADS: Road[] = [
     deed: { stat: 'levied', n: 6, text: 'Your people give 6 of their own to the levy' },
     blurb: 'A turn, not a climb: one branch of the fork at the end of the Path of Blood, where blood becomes a sacrament. Every Temple is an altar that takes blood from the enemy who fall near it and mends your own with it; priests come cheaper and work faster. What it gives up: the Transfusion Station, trade, some harvest, and siege at a dearer price. Take it, and Hemocraft is closed to your people for good.',
   },
+  // The fork past the Atomic Age (#605 s3): a Missile Silo is the clue; each branch shuns the other; each has a road back to the Atomic Age.
+  { from: 'atomic', to: 'fission', cost: { food: 1000, gold: 1200, stone: 600 }, time: 60, clue: 'silo', shuns: 'fusion', blurb: 'A turn, not a climb: raw power now. A silo\'s clock is 25 seconds and it refuels in 100, but every launch poisons the ground round your own silo for a minute. Take it, and Fusion is closed for good.' },
+  { from: 'fission', to: 'atomic', cost: { food: 300, gold: 300 }, time: 30, blurb: 'Shut the reactor: the ordinary Atomic Age, a 45 second clock and a 240 second refuel, and no poison round your own silos. Fusion stays closed.' },
+  { from: 'atomic', to: 'fusion', cost: { food: 2400, gold: 3000, stone: 1500 }, time: 150, clue: 'silo', shuns: 'fission', blurb: 'A turn, not a climb: clean and limitless, and ruinously dear. A silo keeps up to three warheads aloft and never needs refuelling, and nothing it strikes is poisoned, but the clock is 70 seconds and the road costs a fortune and 150 seconds. Take it, and Fission is closed for good.' },
+  { from: 'fusion', to: 'atomic', cost: { food: 300, gold: 300 }, time: 30, blurb: 'Quench the plasma: the ordinary Atomic Age, a 45 second clock, one warhead at a time, and fallout where you strike. Fission stays closed.' },
   { from: 'bloodrite', to: 'industrial', cost: { food: 300, gold: 200 }, time: 30, blurb: 'Put out the altar fires: the ordinary Industrial Age, with trade, full fields and siege at its usual price. The plunder ends and the Temples are Temples again. Hemocraft stays closed.' },
   // The first gateway (#577, the age road s5): saltpetre's only door, a turn off the Middle Ages into the Age of Alchemy, and from
   // there the only road to the Age of Sappers. A Siege Workshop is the clue; kegs ground at the mills are the Sappers' deed.
@@ -1019,6 +1177,53 @@ export const ROADS: Road[] = [
   { from: 'missions', to: 'gunpowder', cost: { food: 900, wood: 400, gold: 500, stone: 200 }, time: 65, blurb: 'Climb to the Gunpowder Age: the Missions sleep, their tithe unpaid, and wake if your people turns missionary again.' },
   { from: 'searaider', to: 'middle', cost: { food: 200, wood: 150 }, time: 25, blurb: 'Draw the longships up: the ordinary Middle Ages, with traders, and plunder no longer taken. Gold still in packs and holds is banked where it stands.' },
   { from: 'searaider', to: 'gunpowder', cost: { food: 900, wood: 500, gold: 500, stone: 150 }, time: 65, blurb: 'Climb to the Gunpowder Age: the raids end, traders return, and every pack and hold still laden is banked where it stands (more wood and less gold than from the Middle Ages: the fortune was in the ships).' },
+  // The Water Road (#701 s1): off the Middle Ages, for a people with shallows by its town. The land's shape is the door; a Dock,
+  // a people working its waters, is the clue.
+  {
+    from: 'middle',
+    to: 'dykes',
+    cost: { food: 350, wood: 350, stone: 100 },
+    time: 40,
+    clue: 'dock',
+    coast: 'No shallow water lies near your town: the Age of Dykes wants a bay, a lake or a strait within reach to wall off and drain',
+    blurb: 'A turn, not a climb, for a people with shallow water by its town: raise dykes across the shallows and windmills behind them, and pump the sea out into polder, the richest fields there are. Drain a strait and the far shore is a march away. What it gives up: stone walls and gates, for the dykes are the walls, and the best fields lie below the sea.',
+  },
+  // The Water Road's trunk (#701): the Age of Rivers instead of the Bronze Age, open to everyone (a spring lies by every town), then
+  // on to the Age of Dykes with no coast door: a trunk is never shut. A crossing to the Bronze Age at its own tier, and back onto the
+  // plain road at the Middle Ages. (From the Bronze Age the way in is a step back to the Stone Age: Bronze's own roads stay as they were.)
+  {
+    from: 'stone',
+    to: 'rivers',
+    cost: { food: 350, wood: 250 },
+    time: 35,
+    // A people that has tilled a field learns to lead the water to it: any Farm shows the road, on every map.
+    clue: 'farm',
+    blurb: 'Instead of the Bronze Age, as the first towns on the Tigris, the Nile and the Indus did: lead the water. Citizens dig Channels out from any spring, stream, lake or shore, and the water runs in behind them; Farms by water work faster, and none is laid away from it, so the town grows along its channels. A channel is a moat that soldiers must wade. The same arms and buildings as the Bronze Age.',
+  },
+  { from: 'rivers', to: 'bronze', cost: { food: 100, wood: 100 }, time: 20, blurb: 'Lay down the spades: the ordinary Bronze Age. Fields may go anywhere again; the channels you dug stay, and still water the fields beside them no faster.' },
+  { from: 'rivers', to: 'middle', cost: EPOCHS[2].cost, time: EPOCHS[2].time, blurb: 'Rejoin the main road at the Middle Ages, for the same price as from the Bronze Age: Farms go anywhere again, and the channels stay dug.' },
+  {
+    from: 'rivers',
+    to: 'dykes',
+    cost: { food: 650, wood: 350, stone: 150 },
+    time: 50,
+    walked: 'rivers',
+    blurb: 'Instead of the Middle Ages, on down the Water Road: from leading the water to holding it back. Raise dykes across the shallows and windmills behind them, and pump lakes and dyked-off bays dry into polder, the richest fields there are. Paid in wood and stone, not gold. What it gives up: stone walls and gates, for the dykes are the walls.',
+  },
+  { from: 'dykes', to: 'middle', cost: { food: 150, wood: 100 }, time: 25, blurb: 'Lay down the spades: the ordinary Middle Ages, with walls and gates. The windmills stand still, but the polder stays dry and the dykes stand.' },
+  { from: 'dykes', to: 'gunpowder', cost: EPOCHS[3].cost, time: EPOCHS[3].time, blurb: 'Rejoin the main road at the Gunpowder Age for the ordinary price: walls and gates return, the windmills stand still, and the land you made stays land.' },
+  // The Golden Age (#703): heard of by a people that has walked two side ages, open to one that has walked three. It ends on its own (`GOLDEN.span`).
+  {
+    from: 'gunpowder',
+    to: 'golden',
+    cost: { food: 900, wood: 400, gold: 900, stone: 300 },
+    time: 60,
+    gate: 'hard',
+    lives: { seen: 2, n: 3 },
+    shuns: 'golden',
+    blurb: 'A turn, not a climb, for a people that has lived many lives: every side age it has walked wakes at once, with none of its doors, for a few minutes. Then it ends for good, and every rival knows when.',
+  },
+  { from: 'golden', to: 'industrial', cost: EPOCHS[4].cost, time: EPOCHS[4].time, blurb: 'Climb to the Industrial Age before the gold runs out: the Golden Age ends now, for good, and every thread falls asleep.' },
 ];
 
 /**
@@ -1029,6 +1234,51 @@ export const ROADS: Road[] = [
 export const SEA_RAID = { hold: 400, dock: 6, home: 150 };
 
 /**
+ * Dykes (#701 s1, the Water Road). A dyke goes on a water tile whose every corner lies at `depth` or higher (shallow water), or on a
+ * land tile with water beside it. The Age of Dykes opens only to a people with `need` such shallow tiles within `home` tiles of where
+ * it began (its coast door).
+ */
+export const DYKE = { depth: -1.0, home: 24, need: 10 };
+
+/**
+ * Windmills (#701 s1). A finished Windmill of a people in the Age of Dykes pumps the water within `reach` tiles of its footprint: if
+ * the water there (reached through water and polder, four ways) is a basin of at most `most` water tiles that touches no map edge,
+ * it drains one tile every `every` seconds, the nearest first, skipping one a boat floats on. A drained tile is polder: land, its
+ * corners raised to `ground` (just over the water line), where a Farm (most of its footprint on polder) works `farm` times as fast.
+ */
+export const POLDER = { reach: 3, most: 160, every: 3, ground: 0.07, farm: 1.5 };
+
+/**
+ * The computer in the Age of Dykes (#701 s1). It takes the road on a coin of its own (`take`) when a plan stands near home: a dyke
+ * line of at most `line` water tiles from shore to shore, within `reach` tiles of its start, that shuts off a basin of at least
+ * `least` water tiles a mill can pump (or a lake that needs none), scored by the tiles won less `cost` for each dyke tile. It raises
+ * the line with `crew` citizens, then a mill for every `perMill` tiles of the basin (at most `mills`), and stays in the age until the
+ * basin is dry or `hold` seconds have passed.
+ */
+export const AI_DYKE = { take: 0.5, line: 9, reach: 18, least: 14, cost: 3, crew: 3, perMill: 60, mills: 2, hold: 420 };
+
+/**
+ * The Age of Rivers (#701 s1, the Water Road). A finished Channel (a dug ditch) four-ways beside water fills: the water runs in one
+ * tile every `fill` seconds, so it is seen running down the ditch. A channel tile is `T_WATER` its corners sunk to `bank` (to `bed`
+ * where water lies all round), and land units wade it at `wade` of their pace; no ship sails it. A Farm with water within `wet` tiles
+ * of its footprint is watered: in the age it works `farm` times as fast, and in the age no Farm is laid without water so near.
+ */
+export const RIVERS = { fill: 0.25, bank: -0.16, bed: -0.45, wade: 0.4, wet: 2, farm: 1.3 };
+
+/**
+ * A spring by every town (#701 s1): a start with no water within `near` tiles gets a spring head about `at` tiles away, on dice of
+ * its own and laid after everything else. It changes no ground, so every map is as it was; a channel dug beside it fills from it.
+ */
+export const SPRING = { near: 14, at: 9 };
+
+/**
+ * The computer in the Age of Rivers (#701 s1). It takes the road on a coin of its own (`take`), and digs one channel from the water
+ * nearest home (within `reach` tiles of its start), the line of at most `most` tiles that waters the most ground within `stop` tiles
+ * of home (drawn again when it arrives), with `crew` citizens; its fields then go along the water. A people that walked the Age of Rivers goes on to the Age of Dykes on `onward`.
+ */
+export const AI_RIVERS = { take: 0.4, reach: 18, stop: 8, most: 14, crew: 3, onward: 0.7 };
+
+/**
  * Stepping back an age (#47), at a Town Center: down to the trunk age one tier below, whatever road
  * led here (the Iron Age falls back to the Stone Age, the merchants to the Bronze Age). Every unit
  * falls back to its older form, and technologies above the new tier are suspended, not lost: they
@@ -1037,6 +1287,13 @@ export const SEA_RAID = { hold: 400, dock: 6, home: 150 };
  * under the new order. `time` is seconds at the Town Center; `cooldown` is seconds after a step lands
  * before the next may begin, so a people can't flicker between ages to dodge a counter.
  */
+/**
+ * The Golden Age (#703): it burns `span` seconds, `more` seconds longer for every side age walked past the road's `n`, up to `most`.
+ * Mods that are boons below 1 (the rest are boons above it), so the weave takes the best of each thread.
+ */
+export const GOLDEN = { span: 360, more: 60, most: 600 };
+export const LOWER_IS_BETTER: (keyof Mods)[] = ['militaryTrain', 'rangedTrain', 'techCost', 'wonderCost', 'rot', 'beastWard'];
+
 export const STEP_BACK = { food: 100, gold: 50, time: 25, cooldown: 300 };
 export const stepBackCost = (tier: number): Cost => ({ food: STEP_BACK.food * tier, gold: STEP_BACK.gold * tier });
 
@@ -1083,9 +1340,12 @@ export interface UnitStats {
   blurb: string;
 }
 
+/** A beast of the Wild: the same from the Bronze tier on, for it does not re-arm. */
+const beast = (u: UnitStats): (UnitStats | null)[] => [null, u, u, u, u];
+
 /** Each line has one version per epoch (null where it isn't available yet). Units re-arm when their owner advances. */
 export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
-  citizen: [0, 1, 2, 3, 4].map((e) => ({
+  citizen: [0, 1, 2, 3, 4, 5].map((e) => ({
     name: 'Citizen',
     cls: 'citizen' as const,
     hp: 40 + e * 5,
@@ -1213,14 +1473,19 @@ export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
     { name: 'Covered Wagon', cls: 'trader', hp: 140, attack: 0, armor: 1, parmor: 2, range: 0, reload: 1, speed: 1.45, sight: 7, cost: { wood: 80, gold: 50 }, time: 20, radius: 0.42, blurb: 'Carries goods to a trading post and brings back gold: the farther its Market from the post, the more. Easy prey for cavalry.' },
     { name: 'Traction Engine', cls: 'trader', hp: 180, attack: 0, armor: 2, parmor: 3, range: 0, reload: 1, speed: 1.65, sight: 7, cost: { wood: 60, gold: 60 }, time: 20, radius: 0.45, blurb: 'Steams goods to a trading post and brings back gold: the farther its Market from the post, the more. Easy prey for cavalry.' },
   ],
+  // ---- Beasts of the Age of the Wild (`docs/wild-road.md`) ----
+  // Tamed from the wild (`TAME`) or bred at a Beast Den once the kind is tamed. A beast is a beast: it does not re-arm with the epochs.
+  warwolf: beast({ name: 'War Wolf', cls: 'cavalry', hp: 75, attack: 6, armor: 0, parmor: 1, range: 0, reload: 1.2, speed: 2.8, sight: 8, cost: { food: 65 }, time: 15, radius: 0.26, blurb: 'A wolf of the wild that answers to your people: fast and cheap, it runs down archers, priests and citizens. Spears break it.' }),
+  tusker: beast({ name: 'Tusker', cls: 'infantry', hp: 120, attack: 7, armor: 2, parmor: 1, range: 0, reload: 1.4, speed: 1.9, sight: 5, cost: { food: 80, wood: 20 }, time: 18, radius: 0.32, blurb: 'A tame boar with a hide like bark: it holds a line and breaks riders on its tusks. Archers thin it.' }),
+  warmammoth: beast({ name: 'War Mammoth', cls: 'siege', hp: 420, attack: 16, armor: 2, parmor: 4, range: 0, reload: 2.4, speed: 1.1, sight: 6, cost: { food: 260, gold: 60 }, time: 40, radius: 0.55, blurb: 'A woolly mammoth led to war: it tramples walls and buildings as a ram does, and gores soldiers too. Spearmen and riders swarm it.' }),
 };
 
 const DOMAINS: Partial<Record<UnitType, Domain>> = { fisher: 'water', warship: 'water', transport: 'water', cog: 'water', fighter: 'air', bomber: 'air' };
 /** Where a unit line goes: on foot, on the water or in the air. */
 export const domainOf = (type: UnitType): Domain => DOMAINS[type] ?? 'land';
 
-export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader', 'wagon'];
-export const MILITARY: UnitType[] = ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'warship', 'fighter', 'bomber'];
+export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader', 'wagon', 'warwolf', 'tusker', 'warmammoth'];
+export const MILITARY: UnitType[] = ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'warship', 'fighter', 'bomber', 'warwolf', 'tusker', 'warmammoth'];
 
 type Target = UnitClass | 'building';
 /** The counter triangle (and its friends): damage multiplier by attacker class against target class. */
@@ -1475,6 +1740,112 @@ export interface BuildingStats {
   blurb: string;
 }
 
+/**
+ * The managed wood (#501, the Britons): a coppice people tills no Farm. A tree its citizens fell to the stump within `reach` tiles of
+ * one of its finished wood stores is coppiced: the stool stays and grows a full tree again `regrow` seconds later (if something
+ * stands on it then, `retry` seconds after). A rival's axe, or its own far from a store, clears the tree for good, and a building
+ * raised over a stool grubs it out. Its citizens plant a Sapling (a 1-tile building) on open ground, which roots as a stool and is
+ * a full tree `grow` seconds later. Its snares fill `snare` times as fast (and as much faster again as its farming technologies
+ * make fields), at their fastest with `full` trees round them (growing stools count, for young coppice is cover for game too), and hold `cap` times as much, and its tenders carry a game bag `bag` times a basket: the snare line among the standing wood is its field, and the trees it fells for
+ * timber starve the snares beside them until they grow back.
+ *
+ * The computer: lays `aiPerFood` snares for each field its food wants (at most `aiMax`, `aiStone` in the Stone Age while berries grow by home), within `aiNear` tiles of home in woods of
+ * `aiThick` trees if it can find them, else `aiTrees`, else any wood a snare may stand in, out to `aiNear` + 10 tiles; raises a Hunting Camp by a snare with no food drop within `aiDrop` tiles (while it has fewer than `aiCamps`); keeps
+ * one tender for each `aiPerTender` snares, and once it has a Barracks or a Range and `aiPlantWood` wood to spare, plants up to
+ * `aiPlant` saplings at a time round a snare with fewer than `aiThin` trees standing near it.
+ */
+/**
+ * Taming (the Age of the Wild, `docs/wild-road.md`, `src/sim/tame.ts`): a citizen within `reach` tiles of a wild wolf, boar or mammoth
+ * sings to it for `secs[kind]` seconds and it becomes a beast of war of that people (`unit[kind]`). The beast stands calm for its tamer
+ * while the song lasts and the tamer is within `calm` tiles (from the moment the tamer sets out); a beast hurt within `wary` seconds
+ * won't take the hand. The call of the wild (`callWild`): a Wild people's Hunting Camps draw a beast each season (`call*`).
+ * The computer takes the road on a coin of `aiTake` (raising the Hunting Camp that shows it once `aiClue` of the deed is in), tames within `aiNear` tiles of home (a wolf only with
+ * `aiEscort` soldiers sent ahead at its pack), raises `aiDen` Dens and stays `aiStay` seconds before it climbs on.
+ */
+export const TAME = {
+  reach: 1.1,
+  calm: 6,
+  wary: 8,
+  secs: { wolf: 6, boar: 10, mammoth: 24 } as Record<'wolf' | 'boar' | 'mammoth', number>,
+  unit: { wolf: 'warwolf', boar: 'tusker', mammoth: 'warmammoth' } as Record<'wolf' | 'boar' | 'mammoth', UnitType>,
+  callAt: 20,
+  callFrom: 7,
+  callNear: 10,
+  callCap: 2,
+  aiNear: 40,
+  aiEscort: 4,
+  aiTake: 0.3,
+  aiClue: 0.8,
+  aiDen: 1,
+  aiStay: 150,
+};
+
+/**
+ * The Age of the Grove (`docs/wild-road.md` §2, `src/sim/grove.ts`). A Thornwall grows a stage each `stage` seconds (`spring` times as
+ * fast in spring) from seedling to living oak; its most hit points are `hp[stage]` of a wall's; a living oak mends `mend` hit points a
+ * second once unhurt for `calm` seconds. A Thornwall cut down sprouts again from its root after `regrow` seconds (`retry` while stood on).
+ * A Kitchen Garden works at a Farm's pace, plus `dungMul` if a finished Den stands within `dung` tiles (a Den feeds its `dungFeeds`
+ * oldest gardens in reach) and `waterMul` if water lies within `water` tiles. An Orchard bears after `orchardGrow` seconds and then, in
+ * summer and autumn, pays `orchardFood` food each `orchardEvery` seconds while a food store stands within `orchardReach` tiles.
+ * The computer takes the road on once it walked the Wild, stays `aiStay` seconds, keeps up to `aiGardens` gardens about each Den, sets
+ * `aiOrchards` Orchards, and plants a Thornwall line of `aiThorn` pieces across the way the nearest rival comes, `aiThornAt` tiles out.
+ */
+export const GROVE = {
+  stage: 40,
+  spring: 2,
+  hp: [0.25, 0.6, 1, 1.6],
+  mend: 3,
+  calm: 5,
+  regrow: 45,
+  retry: 5,
+  dung: 6,
+  dungFeeds: 6,
+  dungMul: 1.2,
+  water: 3,
+  waterMul: 0.6,
+  orchardGrow: 120,
+  orchardFood: 3,
+  orchardEvery: 10,
+  orchardReach: 8,
+  aiStay: 180,
+  aiGardens: 6,
+  aiOrchards: 2,
+  aiThorn: 9,
+  aiThornAt: 11,
+};
+
+export const COPPICE = { reach: 8, regrow: 120, retry: 5, grow: 90, snare: 2, cap: 1.5, bag: 2, full: 12, aiPerFood: 1.5, aiMax: 16, aiTrees: 10, aiThick: 14, aiNear: 14, aiDrop: 7, aiPerTender: 2, aiStone: 6, aiCamps: 2, aiPlant: 3, aiThin: 12, aiPlantWood: 120 };
+
+/**
+ * Mine Shafts (#681): stone and gold dug from the ground once the open deposits are gone. A shaft is worked by one miner, like a
+ * field, and never runs out; what it digs is its seam, chosen on the shaft. How well depends on the ground round it (within
+ * `near` tiles of its footprint), its grade, as a share of an open deposit's pace (`GATHER`, with every mining technology):
+ * - `old`: old workings, a deposit of that seam worked out there (the shaft follows the vein down);
+ * - `hill`: mountain rock beside it (stone and gold only);
+ * - `open`: plain ground (stone and gold only).
+ * A rare ore (`RARE`) is dug only over its own old workings, and counts toward its ore gate like any mined. Each seam: its
+ * name, and whether only old workings hold it. A later seam is one more entry here and in `SeamId`.
+ *
+ * The computer: once no deposit of a stock it wants lies within `aiNear` tiles of a drop of its own, it sinks a shaft (from
+ * the Bronze Age, with `aiWood` wood in hand, at most `aiMax`), on old workings or by rock within `aiReach` tiles of home if it
+ * can find them, and sends its hands for that stock to the free shafts, setting the seam it needs.
+ */
+export const SHAFT = {
+  near: 2,
+  grade: { old: 0.75, hill: 0.5, open: 0.3 },
+  seams: {
+    stone: { name: 'Stone', old: false },
+    gold: { name: 'Gold', old: false },
+    salt: { name: 'Salt', old: true },
+    saltpetre: { name: 'Saltpetre', old: true },
+    bloodiron: { name: 'Blood-iron', old: true },
+  } as Record<'stone' | 'gold' | RareId, { name: string; old: boolean }>,
+  aiNear: 26,
+  aiReach: 18,
+  aiWood: 250,
+  aiMax: 3,
+};
+
 export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   towncenter: { name: 'Town Center', size: 4, hp: 2800, cost: { wood: 275, stone: 150 }, time: 110, pop: 10, sight: 8, trains: ['citizen', 'hero'], drop: ['food', 'wood', 'stone', 'gold'], epoch: 0, guns: { damage: 6, range: 7, reload: 2 }, garrison: 15, menu: 'eco', key: 'T', blurb: 'Trains citizens and heroes, takes in every resource and leads your people into the next epoch. Citizens shelter here when the bell rings. Lose your last one and you have 45 seconds to raise another, or your people is lost: build a second far from the first.' },
   house: { name: 'House', size: 2, hp: 600, cost: { wood: 35 }, time: 18, pop: 5, sight: 3, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'E', blurb: 'Room for 5 more people.' },
@@ -1490,11 +1861,19 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   stable: { name: 'Stable', size: 3, hp: 1400, cost: { wood: 150, gold: 50 }, time: 40, pop: 0, sight: 5, trains: ['cavalry'], drop: [], epoch: 1, menu: 'mil', key: 'C', blurb: 'Trains cavalry, who beat archers, priests and siege.' },
   forge: { name: 'Forge', size: 3, hp: 1600, cost: { wood: 175 }, time: 40, pop: 0, sight: 5, trains: [], drop: [], epoch: 1, menu: 'mil', key: 'R', blurb: 'Better weapons and armor for every soldier.' },
   workshop: { name: 'Siege Workshop', size: 3, hp: 1400, cost: { wood: 200 }, time: 40, pop: 0, sight: 5, trains: ['siege'], drop: [], epoch: 1, menu: 'mil', key: 'K', blurb: 'Builds rams, catapults and cannon to break towns.' },
-  tower: { name: 'Watch Tower', size: 2, hp: 1000, cost: { wood: 50, stone: 125 }, time: 45, pop: 0, sight: 9, trains: [], drop: [], epoch: 1, guns: { damage: 8, range: 8, reload: 1.8 }, garrison: 5, menu: 'mil', key: 'W', blurb: 'Sees far and shoots at enemies nearby, aircraft too. Shelter soldiers inside for more arrows.' },
+  tower: { name: 'Watch Tower', size: 2, hp: 250, cost: { wood: 50, stone: 125 }, time: 45, pop: 0, sight: 9, trains: [], drop: [], epoch: 1, guns: { damage: 5, range: 7, reload: 2 }, garrison: 5, menu: 'mil', key: 'W', blurb: 'Sees far and shoots at enemies nearby, aircraft too, but a raw tower is a lookout more than a fort: raise each one to a Guard Tower, a Keep and a Bastion. Shelter soldiers inside for more arrows.' },
   dock: { name: 'Dock', size: 3, hp: 1800, cost: { wood: 150 }, time: 35, pop: 0, sight: 6, trains: ['fisher', 'transport', 'warship', 'cog'], drop: ['food'], epoch: 0, shore: true, menu: 'eco', key: 'D', blurb: 'Builds fishing boats, transports, warships and merchant ships, and takes in fish. Build it on the shore.' },
   huntcamp: { name: 'Hunting Camp', size: 2, hp: 500, cost: { wood: 45 }, time: 14, pop: 0, sight: 5, trains: [], drop: ['food'], epoch: 0, menu: 'eco', key: 'N', blurb: 'A drop-off for food, and a small claim on the land round it. Raise it by the herd or a far kill: meat inside your border is safe from wolves, and Drying Racks keep it.' },
   // Snares in the wood (#485): set among standing trees, they fill with small game by themselves (`SNARE`, `src/sim/snares.ts`).
   snare: { name: 'Snare', size: 1, hp: 60, cost: { wood: 30 }, time: 6, pop: 0, sight: 2, trains: [], drop: [], epoch: 0, open: true, menu: 'eco', key: 'J', blurb: 'A noose on a bent sapling, set among standing trees. It fills with small game by itself, faster the more trees stand round it and fastest in winter, until it is full. A citizen sent to it walks the trap line, emptying each snare in turn. Fell the trees round it and it starves.' },
+  // The managed wood (#501): a coppice people plants it on open ground; it roots as a stool and grows into a tree (`COPPICE`, `src/sim/coppice.ts`).
+  sapling: { name: 'Sapling', size: 1, hp: 30, cost: { wood: 10 }, time: 5, pop: 0, sight: 1, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'I', blurb: `A young tree set in open ground. Once planted it roots and grows into a full tree in ${COPPICE.grow} seconds: wood to fell, and woods for snares. A row of them grows into a hedge no one walks through.` },
+  // The Age of the Wild (`docs/wild-road.md`): raised by a people that has tamed a beast; breeds the kinds it tamed, in any age after.
+  den: { name: 'Beast Den', size: 3, hp: 900, cost: { food: 50, wood: 75 }, time: 35, pop: 0, sight: 6, trains: ['warwolf', 'tusker', 'warmammoth'], drop: [], epoch: 1, menu: 'mil', key: 'D', blurb: 'A ring of earth banks and woven hurdles round a hollow of straw, where tamed beasts whelp and are reared. It breeds only the kinds your people has tamed from the wild: tame one wolf and it raises wolves. Raised only by a people that has tamed a beast, and it keeps breeding after the people leaves the Age of the Wild.' },
+  // The Age of the Grove (`docs/wild-road.md` §2, `GROVE`): raised by a people that has walked it, in any age after.
+  thornwall: { name: 'Thornwall', size: 1, hp: 400, cost: { wood: 5 }, time: 3, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, menu: 'eco', key: 'B', blurb: `Drag to plant a line of thorn. It grows a stage every ${GROVE.stage} seconds (twice as fast in spring): seedling, bramble, thicket, then living oak, tougher than stone and mending itself. It parts for your own people and shuts on everyone else, and a piece cut down sprouts again from its root unless the ground is built on.` },
+  garden: { name: 'Kitchen Garden', size: 1, hp: 120, cost: { wood: 35 }, time: 8, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, open: true, menu: 'eco', key: 'U', blurb: `Maize, beans and squash grown together on one tile, worked by one gardener. Fed by a Beast Den's dung within ${GROVE.dung} tiles it yields ${Math.round((1 + GROVE.dungMul) * 10) / 10} times a farmer's food; by water within ${GROVE.water} tiles, ${Math.round((1 + GROVE.waterMul) * 10) / 10} times; by both, more. Unfed, it grows at a field's pace. A Den feeds its ${GROVE.dungFeeds} oldest gardens.` },
+  orchard: { name: 'Orchard', size: 2, hp: 300, cost: { wood: 100 }, time: 20, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, menu: 'eco', key: 'R', blurb: `Fruit trees set near a food store. After ${GROVE.orchardGrow} seconds they bear, and every summer and autumn they drop food into your stores by themselves while a store stands within ${GROVE.orchardReach} tiles. Slow to start, free for years.` },
   // The age road (#562, `docs/age-roads.md` spine §4): raised in the Stone Age, it answers which key resources this world holds (`PROSPECTOR`).
   prospector: { name: "Prospector's Lodge", size: 2, hp: 500, cost: { food: 50, wood: 75 }, time: 20, pop: 0, sight: 6, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'P', blurb: 'A lodge of prospectors who walk the streams, scrape the rock and dig at old mounds. Once it stands it tells you which key resources this world holds (bog iron, salt, saltpetre, blood-iron, ancient ruins): yes or no for each, never where. Some ages open only with them; a world that lacks one shuts that door.' },
   // The Path of Blood (#303): pitched by foot soldiers where the army stands, enemy land too; burns when left alone (`WARCAMP`).
@@ -1507,6 +1886,13 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   // The Age of Missions (#555 s12): raised by priests on a shore, in no rival's land; claims land, trains priests, pays a tithe (`MISSION`).
   mission: { name: 'Mission', size: 2, hp: 1000, cost: { wood: 100, gold: 60 }, time: 30, pop: 0, sight: 7, trains: ['priest'], drop: [], epoch: 2, shore: true, ages: ['missions'], builders: ['priest'], only: true, menu: 'eco', key: 'O', blurb: 'A whitewashed chapel and a bell on a far shore, raised by priests. Holds the land round it, trains priests, and pays a tithe that grows with its distance from your Town Center. Nothing in it shoots: a rival who reaches it razes it.' },
   caravanserai: { name: 'Caravanserai', size: 2, hp: 900, cost: { wood: 90, gold: 30 }, time: 25, pop: 0, sight: 6, trains: [], drop: [], epoch: 3, ages: ['silk'], menu: 'eco', key: 'C', blurb: 'A walled courtyard by the road where caravans rest. Raise it by a far trading post, in no one\'s land too: your traders\' trips to a post within 8 tiles of it pay a quarter more, traders and wagons within 4 tiles of it mend, and the land round it is yours, so rival traders crossing it pay your toll.' },
+  silo: { name: 'Missile Silo', size: 3, hp: 3000, cost: { wood: 300, stone: 400, gold: 700 }, time: 80, pop: 0, sight: 8, trains: [], drop: [], epoch: 5, menu: 'mil', key: 'M', blurb: 'A concrete collar round a hatch in the ground. Launch (M) names any point on the map: after a countdown every rival can see, the warhead flattens what stands there. Destroy the silo while it counts and the launch is scrubbed. Emptied by a launch, it must be refuelled before it can fire again.' },
+  // Mine Shafts (#681): one miner digs stone or gold (or a rare ore over its old workings) for good, best where a deposit was worked out (`SHAFT`).
+  shaft: { name: 'Mine Shaft', size: 2, hp: 700, cost: { wood: 150 }, time: 30, pop: 0, sight: 4, trains: [], drop: [], epoch: 1, menu: 'eco', key: 'H', blurb: 'A timber headframe over a hole in the ground. One citizen digs stone or gold here for good, slower than an open deposit; best sunk where a deposit was worked out, fair beside mountain rock. Choose its seam on the shaft.' },
+  // The Water Road (#701 s1): a bank of earth across the shallows, and the mill that pumps the water out behind it (`DYKE`, `POLDER`, `water.ts`).
+  dyke: { name: 'Dyke', size: 1, hp: 700, cost: { wood: 2, stone: 4 }, time: 7, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, ages: ['dykes'], menu: 'eco', key: 'K', blurb: 'A bank of earth with a stone crown, raised on shallow water or on the shore beside it. Drag to lay out a line. Your own people walk along its crown; rivals and ships can\'t pass. Shut a bay or a strait off from the open sea with dykes, then set a Windmill by it to pump it dry.' },
+  channel: { name: 'Channel', size: 1, hp: 150, cost: { wood: 4 }, time: 8, pop: 0, sight: 1, trains: [], drop: [], epoch: 1, ages: ['rivers'], open: true, menu: 'eco', key: 'Q', blurb: 'A ditch dug out from water across the land. Drag to lay out a line from a spring, stream, lake or shore: as each stretch is dug the water runs into it and it stays. Farms within 2 tiles of water work faster in the Age of Rivers. Soldiers wade a channel at well under half their pace, and no ship sails it.' },
+  windmill: { name: 'Windmill', size: 2, hp: 600, cost: { wood: 120, stone: 40 }, time: 30, pop: 0, sight: 5, trains: [], drop: [], epoch: 2, ages: ['dykes'], menu: 'eco', key: 'W', blurb: 'A post mill whose sails turn a scoop wheel. Raised by water a dyke has shut off from the open sea (or a small lake), it pumps it dry a tile every few seconds, nearest first, into polder: low black ground where a Farm yields half again as much. Two mills drain twice as fast. The open sea is too big to pump.' },
   airfield: { name: 'Airfield', size: 4, hp: 2200, cost: { wood: 250, stone: 100, gold: 150 }, time: 60, pop: 0, sight: 8, trains: ['fighter', 'bomber'], drop: [], epoch: 4, menu: 'mil', key: 'F', blurb: 'Builds fighters and bombers. Fighters hunt aircraft; bombers wreck towns.' },
 };
 
@@ -1711,7 +2097,12 @@ export interface Civ {
   household?: boolean;
   /** Born on the move (#501, `NOMAD`): the camp is on wagons and the flock walks with it from the first minute; no fields and no quarry. */
   nomad?: boolean;
+  /** The managed wood (#501, `COPPICE`): no farms; its felled trees grow back near its stores, it plants saplings, and its snares feed it. */
+  coppice?: boolean;
+  /** The set line (#501, `LONGBOW`): its bowmen who stand still `LONGBOW.after` seconds draw farther and harder; a step breaks it. */
+  longbow?: boolean;
 }
+
 
 /**
  * Born on the move (#501, the Mongols): the camp packs onto wagons and the flock grazes with it from the first minute, in every age
@@ -1748,6 +2139,13 @@ export const POLIS = { arm: { wood: 20 } as Cost, home: 14, aiShare: 0.2, aiKeep
 export const LEGION = { citizens: 12, perEpoch: 3, rate: 0.8, watch: 0.8, aiCitizenWood: 0.25, aiGuard: 4, aiHands: 10, aiHandsEpoch: 4, aiStone: 0.3, aiUntil: 2, aiSurvey: 14 };
 
 /**
+ * The set line (#501, the Britons): a ranged soldier (not siege) of a longbow people that has not moved for `after` seconds is set,
+ * and shoots `range` tiles farther and `attack` harder until it moves again. The computer needs no new play, for its archers
+ * already stop to shoot, but a rival's cavalry and ranged soldiers can answer it: charge before the line sets, or out-reach it.
+ */
+export const LONGBOW = { after: 3, range: 1.5, attack: 3 };
+
+/**
  * The household tax (#501, the Chinese): a household people's citizens mine no gold or bog iron. Instead every `every` seconds each
  * finished house pays `gold` a second at full occupancy (the people's population over its room), `street` more for each house within
  * `reach` tiles (at most `streetMax`; a finished Market counts as `market` of them), so a built-up ward is worth more than a scatter.
@@ -1755,27 +2153,6 @@ export const LEGION = { citizens: 12, perEpoch: 3, rate: 0.8, watch: 0.8, aiCiti
  * (within `aiStreet` tiles of its others), and wants no gold miners.
  */
 export const HOUSEHOLD = { every: 5, gold: 0.12, street: 0.04, streetMax: 4, reach: 3, market: 2, raid: 25, aiStreet: 4 };
-
-/**
- * The Sickness (#541): from `fromEpoch` a town of at least `minPop` builds taint a second, up to `crowd` at full pressure. Pressure is
- * half how full its houses are (over `crowdAt`), half how big the town is (from `bigFrom` people, full at `bigFrom + bigSpan`), scaled
- * from `loose` (thin streets) up to 1 (houses shoulder to shoulder, the Chinese treasury's layout). `season` sharpens or eases it by
- * season; each finished Temple (at most `templeMost`) takes `temple` off it; a camp on the move (`nomad`) keeps `nomad` of it. Taint
- * left alone drains `calm` a second. At 1 it breaks: fever starts at `start` and `after` of the taint is left. A fever drains `wane` a
- * second, `tend` more for each priest within `tendReach` tiles of a finished Temple (at most `tendMost`), and grows `feed` a second
- * while the pressure is above `feedAt`. It slows every citizen's gathering and building by its severity times `slow`; from severity
- * `deadly` it takes citizens (not those sheltering) every `die` seconds, one more for each `dieStep` of severity above. A trader that
- * loads at a post in fever's month leaves it foul for `foul` seconds, and a trader loading at a foul post brings `import` taint home
- * (none while the town keeps quarantine). Campaign chapters have none. Quarantine drains a fever `quarantineWane` a second more. The computer builds its first Temple
- * by `aiTemple` taint, keeps its priests within `aiTend` tiles of it while sick, and quarantines at severity `aiQuarantine`.
- */
-export const SICKNESS = {
-  every: 2, fromEpoch: 1, minPop: 25, crowdAt: 0.85, bigFrom: 30, bigSpan: 60, loose: 0.25,
-  crowd: 0.01, season: [1, 0.8, 1, 1.5], templeMost: 2, temple: 0.2, nomad: 0.5, calm: 0.0004,
-  start: 0.35, after: 0.25, wane: 0.0006, tend: 0.003, tendReach: 9, tendMost: 4, feed: 0.002, feedAt: 0.3,
-  slow: 0.45, deadly: 0.5, die: 20, dieStep: 0.15, foul: 150, import: 0.35, quarantineWane: 0.0012,
-  aiTemple: 0.5, aiTend: 6, aiQuarantine: 0.45,
-};
 
 /**
  * The Nile flood (#501 s1): in season `season` (summer) the fields of a flood people lie under the river and yield nothing,
@@ -1828,7 +2205,16 @@ export const CIVS: Record<CivId, Civ> = {
     add: { extraCitizens: 2 },
     mul: { techCost: 0.85 },
   },
-  britons: { name: 'Britons', blurb: 'Longbowmen: archers and their heirs reach 1 tile farther, and archery ranges train 25% faster.', add: { range: 1 }, mul: { rangedTrain: 0.75 } },
+  britons: {
+    name: 'Britons',
+    blurb: `The managed wood and the set line. A British town tills no fields: its food is the wood's. Snares among standing trees fill ${COPPICE.snare} times as fast and hold half again as much, and gain from every farming technology; a tree felled near your stores is coppiced, its stool growing a full tree again in ${COPPICE.regrow / 60} minutes, and citizens plant Saplings (I) to grow a wood where you want one. Fell a stand for timber and the snares beside it starve until it grows back; a rival who fells your wood clears it for good. In war, a Briton bowman who has stood still ${LONGBOW.after} seconds is set: he draws the longbow to the full, reaching ${LONGBOW.range} tiles farther and striking ${LONGBOW.attack} harder, until he takes a step. Archers reach 1 tile farther always, and archery ranges train 25% faster.`,
+    verb: 'Work the wood in turns, felling one stand for timber while the snares in the next feed you; and in war pick your ground and plant the line, for bowmen who stand still draw the longbow to the full',
+    door: 'No Farm is ever tilled, so a wood felled or lost is a field lost; and a bowman on the move is plain, so a line caught marching or charged before it sets breaks the longbow',
+    coppice: true,
+    longbow: true,
+    add: { range: 1 },
+    mul: { rangedTrain: 0.75 },
+  },
 };
 
 export const CIV_IDS = Object.keys(CIVS) as CivId[];
@@ -1839,7 +2225,7 @@ export const CIV_IDS = Object.keys(CIVS) as CivId[];
  */
 export const VERB_GAPS: { ages: Partial<Record<AgeId, number>>; civs: Partial<Record<CivId, number>> } = {
   ages: {},
-  civs: { britons: 501 },
+  civs: {},
 };
 
 /**
@@ -1869,7 +2255,8 @@ export const WORK = {
  * The Age of Lightning (#231). `reach`: tiles from a finished Watch (Coil) Tower's centre within which a
  * building's centre is in its field. `lit` and `dark`: how fast a building in a field, and one outside every
  * field, trains and researches, in hundredths. The arc: one bolt strikes at most `strikes` enemies, leaping
- * at most `leap` tiles from one to the next, and keeps `keep` of its strength at each leap.
+ * at most `leap` tiles from one to the next, and keeps `keep` of its strength at each leap. Its first strike is `bolt` times
+ * the tower's arrow, so a coil keeps the bite it had before the tower line weakened raw towers (2026-10-24).
  */
 /** St. Elmo's Fire (#240): soldiers within `reach` tiles of a Temple in a Tower's field mend `heal` of their health every `every` seconds. */
 export const ELMO = { reach: 6, heal: 0.04, every: 2 };
@@ -1883,7 +2270,7 @@ export const TELEGRAPH = { sight: 5 };
 /** Galvanic Revival (#240): repairs in a Tower's field cost nothing and go `repair` times as fast; a dug ruin in a field pays `gold` every `every` seconds. */
 export const GALVANIC = { repair: 1.5, gold: 25, every: 30 };
 
-export const LIGHTNING = { reach: 10, lit: 135, dark: 75, strikes: 4, leap: 2.5, keep: 0.7 };
+export const LIGHTNING = { reach: 10, lit: 135, dark: 75, strikes: 4, leap: 2.5, keep: 0.7, bolt: 2 };
 
 /**
  * Signal beacons (own pitch): a built Watch Tower can light a fire on its roof. While it burns the tower sees
@@ -2008,9 +2395,9 @@ export const SIGNATURES: Record<CivId, Signature> = {
 // ---- Economy ---------------------------------------------------------------------------------------
 
 export const POP_MAX = 150;
-export const CARRY = [10, 12, 14, 16, 18];
+export const CARRY = [10, 12, 14, 16, 18, 18];
 /** What a fishing boat holds, by epoch. */
-export const FISH_CARRY = [15, 18, 21, 24, 30];
+export const FISH_CARRY = [15, 18, 21, 24, 30, 30];
 /** Gathering per second, before the epoch bonus. */
 export const GATHER: Record<'tree' | 'berry' | 'stone' | 'gold' | 'farm' | 'meat' | 'fish' | 'bog', number> = { tree: 0.65, berry: 0.8, stone: 0.55, gold: 0.55, farm: 0.6, meat: 1.0, fish: 0.75, bog: 0.45 };
 export const EPOCH_GATHER_BONUS = 0.1;
@@ -2072,7 +2459,7 @@ export const EXPLORE = { grid: 4, apart: 12, fails: 8, shun: 6, wary: 2, army: 4
  * - `farm`: a food gatherer whose bushes and game are gone takes an unworked field within this many tiles.
  * - `retry`: a laden citizen jammed on the way home tries the road again this often, instead of standing idle.
  */
-export const AUTO_WORK = { trained: 14, rally: 8, herd: 8, farm: 12, retry: secs(4) };
+export const AUTO_WORK = { trained: 14, rally: 8, herd: 8, farm: 12, shaft: 16, lay: 5, retry: secs(4) };
 /**
  * The clever computer plans for winter from season `from` (`coldComing` in `ai.ts`); in the Stone Age it raises no winter fields while its larder holds `larder` food (#486).
  * Its hunters of the turning year (#546) keep `shy` tiles from a rival's soldiers.
@@ -2333,6 +2720,7 @@ export const EPOCH_START_RES = [
   { food: 600, wood: 500, stone: 300, gold: 450 },
   { food: 900, wood: 700, stone: 500, gold: 700 },
   { food: 1200, wood: 900, stone: 650, gold: 950 },
+  { food: 1500, wood: 1000, stone: 800, gold: 1300 },
 ];
 export const START_CITIZENS = 5;
 /** Deathmatch: everyone starts rich. */
@@ -2408,6 +2796,8 @@ export interface AiLevel {
   lodgeHold?: boolean;
   /** Off: the Workshop counts only the engines out, not those in the queues, against the number wanted (#540; only `scripts/ai-ab.ts` turns it off). */
   siegeQueued?: boolean;
+  /** Off: the engine a Masons' Lodge rival calls for is not saved from the town's buildings (#242, #501; only `scripts/ai-ab.ts` turns it off). */
+  lodgeEngine?: boolean;
   /** Off: a Hunters' Way town on the glade or elsewhere spares the wild pair near home, which bars its fields (#555; only `scripts/ai-ab.ts` turns it off). */
   fieldsClear?: boolean;
   /** Off: a Blood-rite computer's priests neither curse nor sacrifice (#355 s4; only `scripts/ai-ab.ts` turns it off). */
@@ -2512,6 +2902,25 @@ export const HEMO_IRON = { cost: 3, last: 2, mend: 1.5, crash: 0.5 };
 
 /** The Blood Tower (#355 s3): its bolts hit the living `living` times as hard as a Watch Tower's arrows, the bloodless `bloodless` times. */
 export const BLOOD_TOWER = { living: 3, bloodless: 0.15 };
+/**
+ * Guns on buildings: a Town Center's (and a Blood Tower's) arrows hit `epoch` harder for each epoch its people has reached.
+ * A Watch Tower gains only `towerEpoch` an epoch by itself; the rest it earns through the tower line (Guard Tower, Keep, Bastion).
+ */
+export const GUNS = { epoch: 0.2, towerEpoch: 0.1 };
+
+/**
+ * The tower line (owner, 2026-10-24: "towers are too strong", and "the towers should be per tower upgrade"): each Watch Tower
+ * is raised on its own, one step at a time, at that tower. Step `i` raises a tower from level `i` to `i + 1`, from `epoch` on:
+ * its arrows hit `attack` harder, it shoots `range` tiles farther, and its hit points are multiplied by `hp`. While it is being
+ * raised the tower still shoots. A tower taken over (priests, reclaim) keeps its level.
+ */
+export const TOWER_LEVELS: { name: string; epoch: number; cost: Cost; time: number; attack: number; range: number; hp: number; icon: string; blurb: string }[] = [
+  { name: 'Guard Tower', epoch: 1, cost: { wood: 100, stone: 50 }, time: 30, attack: 2, range: 0, hp: 1.5, icon: '🗼', blurb: 'A timber gallery braced out from the walls: +2 arrow attack and 50% more hit points, for this tower.' },
+  { name: 'Keep', epoch: 2, cost: { wood: 100, stone: 125 }, time: 40, attack: 2, range: 1, hp: 1.5, icon: '🏰', blurb: 'A stone skirt and buttresses: +2 arrow attack, +1 range and 50% more hit points, for this tower.' },
+  { name: 'Bastion', epoch: 3, cost: { wood: 100, gold: 75, stone: 175 }, time: 50, attack: 2, range: 0, hp: 1.4, icon: '🛡', blurb: 'A low, wide, angled gun platform that shrugs off shot: +2 arrow attack and 40% more hit points, for this tower.' },
+];
+/** A clever computer raises a tower a step only with this much of each resource left over beyond the step's price. */
+export const AI_TOWER_KEEP = 50;
 
 /**
  * The Age of Hemocraft (#355 s2): each second a finished Drain Rig bleeds up to `most` living enemies within `drain` tiles (nearest first,
@@ -2634,7 +3043,7 @@ export const AI_WEB = { lodgeWait: 120, take: 0.6, heir: 1, survey: 22, diggers:
 
 // ---- Colours, names and lookups -------------------------------------------------------------------
 
-export const PLAYER_COLORS = ['#2f7fe0', '#e0473a', '#e8b630', '#3aa35a', '#9b59d0', '#e07a2f'];
+export const PLAYER_COLORS = ['#2f7fe0', '#d9364a', '#f0c828', '#3aa35a', '#9b59d0', '#e8702a'];
 export const PLAYER_NAMES = ['You', 'Rival'];
 
 export const RES_LABEL: Record<Res, string> = { food: 'Food', wood: 'Wood', stone: 'Stone', gold: 'Gold' };
@@ -2662,7 +3071,7 @@ export function unitEpoch(type: UnitType): number {
  * nearest claimant (ties go to the older building). Shown only, so far; attrition and building limits
  * are later steps of the seed.
  */
-export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6, huntcamp: 4, warcamp: 3, caravanserai: 5, mission: 5 };
+export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6, silo: 5, huntcamp: 4, warcamp: 3, caravanserai: 5, mission: 5 };
 
 /**
  * War Camps (#303): a finished camp with none of its people's soldiers (land units that fight) within
@@ -2705,6 +3114,34 @@ export const KEG = { ore: 20, time: 30, most: 20, lay: 1.2, fuse: 8, reach: 2, b
  * campaign with a keg each at the nearest rival building within `near` tiles of them, towers and Town Centers first, passing over
  * any with a rival standing within `guard` tiles of it.
  */
+/**
+ * The Missile Silo (#605, the Atomic Age): `launch` names a point; `fuse` seconds later (a countdown every player sees) the warhead
+ * lands: every rival building within `reach` tiles takes `building`, every rival unit on the ground within `reach` takes `unit`.
+ * Destroying the silo while it counts scrubs the launch. A launch empties the silo; refuelling costs `fuel` and takes `refuel`
+ * seconds, paid when the launch is made. A people may hold `most` standing silos' worth of warheads at once.
+ */
+/**
+ * Fallout (#605 s2, grows seed #533): the ring a warhead struck stays poisoned for `time` seconds. Every second each land unit
+ * standing in it, whoever's it is, takes `dps` damage; buildings are not hurt. A town can be flattened and still not be walked into.
+ */
+export const FALLOUT = { time: 90, dps: 4 };
+/**
+ * The Age of Fission (#605 s3, seed #533): raw power now. A silo's fuse is `fuse` seconds, it refuels in `refuel`, and each launch
+ * poisons `reach` tiles round your own silo for `ownFallout` seconds (`silo.ts`). The Age of Fusion: clean and limitless but slow.
+ * The fuse is `fuse` seconds, a silo refuels at once and keeps up to `air` warheads aloft, a launch costs `fuel`, and nothing it
+ * strikes is poisoned. Its road costs the earth and takes `road` seconds, leaving the town exposed while it builds.
+ */
+export const FISSION = { fuse: 25, refuel: 100, ownFallout: 60, reach: 3 };
+export const FUSION = { fuse: 70, refuel: 0, air: 3, fuel: { gold: 450, stone: 120 } };
+export const SILO = { fuse: 45, reach: 5, building: 1500, unit: 400, fuel: { gold: 600, stone: 200 }, refuel: 240, most: 2 };
+/**
+ * The computer and the silo (#605): in the Atomic Age a clever computer raises one silo once it has `hands` citizens, waits `wait`
+ * seconds after it stands, then launches whenever a point would catch `worth` or more of a rival's buildings (a Town Center counts
+ * `heart`) and soldiers (each counts `soldier`) inside the ring. Its soldiers and citizens run from the ring of a rival warhead
+ * in the air, `margin` tiles past its edge. On a coin of its own it takes the fork (`fork` odds, then `fusion` odds of Fusion over Fission)
+ * once its silo has stood `forkAfter` seconds and it holds half the road's price. An Industrial computer bound for Aeronauts or Lightning holds off the climb `hold` seconds.
+ */
+export const AI_SILO = { fork: 0.7, fusion: 0.4, forkAfter: 120, hold: 300, hands: 20, wait: 20, worth: 6, heart: 4, soldier: 2, margin: 1.5 };
 export const AI_KEG = { take: 0.5, ore: 80, kegs: 6, mills: 2, hold: 180, sappers: 2, near: 12, guard: 4, every: 2 };
 
 /**
@@ -2836,3 +3273,22 @@ export const AI_WILD = { mammothAt: 10, party: 5, mammothNear: 22, pack: 3, clea
 export const AI_HORDE = { milkers: 5, spare: 40, least: 3, hold: 300, stay: 300, cavalry: 0.9, riders: 6, clear: 12, weary: 3, foes: 4, alarm: 9, redo: 150, answer: 2 };
 
 export const AI_STEPPE = { take: 0.35, at: 12, campFrom: 8, campTo: 30, hunters: 6, reach: 26, spare: 100, perMilker: 3, every: 150, hungry: 0.5, bare: 16, move: 10, far: 18, drive: 40, stay: 90 };
+
+/**
+ * The tide of battle (#606), a read of each fight a player can see. A fight is where a unit of theirs or a foe they
+ * see struck or was struck within `recent` seconds with one of the other side within `near` tiles; such units
+ * within `join` tiles of a fight's middle are one fight, and every fighter within `reach` of it is counted. Each
+ * side's strength is its hit points times its damage a second (Lanchester's square law); the share of the two is
+ * the tide. The words: `crushing` and over, `winning`, `even` down to `losing`, then routed. A fight whose tide
+ * falls under `turn` that was at least `even` warns the player, no more often than every `warnEvery` seconds; a
+ * side counts at most `most` fighters' blows against at most `most` targets (a sample, so a huge melee stays cheap).
+ */
+export const BATTLE = { recent: 3, near: 8, join: 9, reach: 10, crushing: 0.8, winning: 0.6, even: 0.4, losing: 0.2, turn: 0.38, warnEvery: 20, most: 48 };
+
+/**
+ * Citizens run from danger on their own (a person's people only; the computer's citizens stand their ground):
+ * struck by a soldier, one makes for the nearest shelter within `shelter` tiles, or runs `run` tiles from it if
+ * none has room; shot by a tower or Town Center, one steps `pad` tiles past its reach. Sheltered, they come out
+ * once nothing armed and hostile is within `clear` tiles of the building and `hold` seconds have passed.
+ */
+export const FLEE = { shelter: 14, run: 8, pad: 3, clear: 10, hold: 6 };

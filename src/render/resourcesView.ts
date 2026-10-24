@@ -26,6 +26,9 @@ export class ResourcesView {
   private dirty = true;
   private since = 0;
   private rottenCount = 0;
+  /** Trees a unit stands among, tile to how far their crowns have drawn in (0 full, 1 thinned), so the unit shows through the wood. */
+  private thin = new Map<number, number>();
+  private thinSince = 0;
 
   markDirty(): void {
     this.dirty = true;
@@ -50,13 +53,53 @@ export class ResourcesView {
     return list ? (list[instance] ?? null) : null;
   }
 
+  /** Crowns thin out near people and grow back once they leave; marks the layout dirty while any is moving. */
+  private thinCrowns(s: GameState, dt: number): void {
+    this.thinSince += dt;
+    if (this.thinSince < 0.1) return;
+    const step = Math.min(1, this.thinSince * 5);
+    this.thinSince = 0;
+    const want = new Set<number>();
+    for (const e of s.ents) {
+      if (e.kind !== 'unit' || e.inside) continue;
+      const cx = Math.floor(e.x);
+      const cy = Math.floor(e.y);
+      for (let ty = cy - 1; ty <= cy + 1; ty++) {
+        for (let tx = cx - 1; tx <= cx + 1; tx++) {
+          if (tx < 0 || ty < 0 || tx >= s.w || ty >= s.h) continue;
+          const i = ty * s.w + tx;
+          if (s.res[i] !== R_TREE) continue;
+          const dx = tx + 0.5 - e.x;
+          const dy = ty + 0.5 - e.y;
+          if (dx * dx + dy * dy < 1.5) want.add(i);
+        }
+      }
+    }
+    for (const i of want) {
+      const k = this.thin.get(i) ?? 0;
+      if (k < 1) {
+        this.thin.set(i, Math.min(1, k + step));
+        this.dirty = true;
+      }
+    }
+    for (const [i, k] of this.thin) {
+      if (want.has(i)) continue;
+      if (k <= step) this.thin.delete(i);
+      else this.thin.set(i, k - step);
+      this.dirty = true;
+    }
+  }
+
   update(s: GameState, dt: number): void {
+    this.thinCrowns(s, dt);
     this.since += dt;
     if (!this.dirty && this.since >= 1) {
       // A carcass turning is slow and raises no event: look for it once a second.
       let n = 0;
       for (const c of s.carcasses ?? []) if (s.tick - c.born >= ROT.grace * TICK_HZ) n++;
       if (n !== this.rottenCount) this.dirty = true;
+      // Coppice stools and saplings (#501) grow slowly: redrawn once a second while any grows.
+      if (s.stools?.length) this.dirty = true;
       this.since = 0;
     }
     if (!this.dirty || this.since < 0.25) return;
@@ -93,7 +136,8 @@ export class ResourcesView {
           }
           const sc = 0.85 + hash2(tx, ty, 34) * 0.55;
           const kind = s.terrain[i] === T_SAND ? 'palm' : TREE_KINDS[Math.floor(hash2(tx, ty, 35) * (hash2(Math.floor(tx / 6), Math.floor(ty / 6), 36) < 0.5 ? 2 : 3))];
-          add(kind, i, new THREE.Matrix4().compose(new THREE.Vector3(x, gy, y), q, new THREE.Vector3(sc, sc * (0.9 + hash2(tx, ty, 37) * 0.3), sc)));
+          const th = this.thin.get(i) ?? 0;
+          add(kind, i, new THREE.Matrix4().compose(new THREE.Vector3(x, gy, y), q, new THREE.Vector3(sc * (1 - 0.4 * th), sc * (0.9 + hash2(tx, ty, 37) * 0.3) * (1 - 0.5 * th), sc * (1 - 0.4 * th))));
         } else if (r === R_FISH) {
           // A shoal thins as it is fished.
           const sc = 1.6 * (0.6 + 0.4 * Math.max(0, Math.min(1, frac)));
@@ -108,6 +152,17 @@ export class ResourcesView {
           add(kind, i, new THREE.Matrix4().compose(new THREE.Vector3(tx + 0.5, gy, ty + 0.5), q, new THREE.Vector3(sc, sc, sc)));
         }
       }
+    }
+    // The managed wood (#501): a coppiced stool or a planted sapling grows from a whip to a young tree, then stands full as a tree.
+    for (const t of s.stools ?? []) {
+      const tx = t.tile % s.w;
+      const ty = Math.floor(t.tile / s.w);
+      const grown = Math.max(0, Math.min(1, (s.tick - t.from) / Math.max(1, t.at - t.from)));
+      const x = tx + 0.5 + (hash2(tx, ty, 31) - 0.5) * 0.3;
+      const y = ty + 0.5 + (hash2(tx, ty, 32) - 0.5) * 0.3;
+      q.setFromAxisAngle(up, hash2(tx, ty, 33) * Math.PI * 2);
+      const sc = 0.2 + 0.6 * grown;
+      add('broadleaf', -1, new THREE.Matrix4().compose(new THREE.Vector3(x, heightAt(s, x, y), y), q, new THREE.Vector3(sc, sc * 0.9, sc)));
     }
     for (const [kind, list] of lists) {
       let mesh = this.meshes.get(kind);

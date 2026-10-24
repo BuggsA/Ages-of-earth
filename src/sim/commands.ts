@@ -1,19 +1,22 @@
-import { BUILDINGS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, SICKNESS, SNARE, SPREAD, TECHS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
+import { AUTO_WORK, BUILDINGS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, RIVERS, SNARE, SPREAD, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
 import { peace } from './combat';
+import { findSpot } from './ai';
 import { placeProblem, stampBuilding, walkable } from './grid';
-import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
+import { buildingCostFor, raiseProblem, techCostFor, techProblem, trainCostFor } from './stats';
 import { packCamp, packProblem, pitchCamp, pitchProblem } from './steppe';
 import { lambProblem, raiseLamb } from './flocks';
 import { backProblem, backTo, barred, buildBarred, canRaise, chooseKeepsake, journeyOf, keepsakeProblem, roadProblem, roadTo, trainsAt } from './ages';
 import type { Building, BuildingType, Command, Ent, Cost, GameState, Order, Player, Res, Unit } from './types';
 import { RES, R_FISH, R_MEAT, R_NONE } from './types';
-import { RES_OF_TILE, cargoRoom, findResource, freeFarm, garrisonRoom, giveOrder, landing, setOrder, ungarrison } from './units';
+import { resOfSeam, seamOf, seamProblem } from './shafts';
+import { RES_OF_TILE, cargoRoom, findResource, freeFarm, freeShaft, garrisonRoom, giveOrder, landing, setOrder, ungarrison } from './units';
 import { carriedBy, letGo, relicAt } from './relics';
 import { caravanOf, dockOf, homeMarket, marketOf, nearestCaravan, nearestDock, portSpot, postAt } from './trade';
 import { ruinAt } from './ruins';
 import { rubbleAt, salvages } from './salvage';
 import { cacheAt } from './caches';
 import { carriesKegs, kegProblem } from './powder';
+import { launch, launchProblem } from './silo';
 import { raise, raiseCost } from './reclaim';
 import { callWork, workProblem } from './works';
 import { callKin, killCamp, kinProblem, takeVow, takeWay, vowProblem, wayBarred, wayProblem } from './ways';
@@ -30,6 +33,8 @@ import { chantedOver, consecrateProblem, consecrates } from './consecrate';
 import { sees } from './vision';
 import { canHit, isEnemy, maxHp, pay, placeBuilding, refund } from './world';
 import { fightsBeasts } from './animals';
+import { tameProblem } from './tame';
+import { isField } from './grove';
 import { answerTiding, tidingProblem } from './tidings';
 
 /**
@@ -185,7 +190,7 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
   }
   const problem = placeProblem(s, type, tx, ty, true, p);
   if (problem) {
-    if (!quiet) refuse(s, p, problem === 'slope' ? 'Too steep to build there' : problem === 'foreign' ? "That's enemy land: only a Tower can be raised there" : problem === 'woods' ? `A snare needs ${SNARE.need} trees standing within ${SNARE.r} tiles` : problem === 'snares' ? `Too near another snare: keep them ${SNARE.apart} tiles apart` : "Can't build there");
+    if (!quiet) refuse(s, p, problem === 'slope' ? 'Too steep to build there' : problem === 'foreign' ? "That's enemy land: only a Tower can be raised there" : problem === 'woods' ? `A snare needs ${SNARE.need} trees standing within ${SNARE.r} tiles` : problem === 'snares' ? `Too near another snare: keep them ${SNARE.apart} tiles apart` : problem === 'parched' ? `In the Age of Rivers a Farm is laid only by water: within ${RIVERS.wet} tiles of a channel, spring, lake or shore` : "Can't build there");
     return null;
   }
   const cost = raiseCost(s, p, type, tx, ty);
@@ -223,7 +228,7 @@ function assignBuilders(s: GameState, units: Unit[], b: Building, queue: boolean
   for (const u of units) {
     if (u.thrall || !canRaise(u.type, b.type, s.players[u.owner].civ)) continue;
     const o = u.order;
-    const back: Order | null = o.k === 'gather' ? { ...o, phase: 'go' } : o.k === 'farm' || o.k === 'snare' ? { ...o, phase: 'go' } : o.k === 'build' ? u.resume : null;
+    const back: Order | null = o.k === 'gather' ? { ...o, phase: 'go' } : o.k === 'farm' || o.k === 'snare' || o.k === 'shaft' ? { ...o, phase: 'go' } : o.k === 'build' ? u.resume : null;
     giveOrder(u, { k: 'build', target: b.id }, queue);
     if (!queue || u.order.k === 'build') u.resume = back ?? u.resume;
   }
@@ -330,7 +335,20 @@ export function applyCommand(s: GameState, c: Command): void {
     }
     case 'reassign': {
       const r = reassign(s, c.p, c.from, c.to, c.n);
-      if (r.why) refuse(s, c.p, r.why);
+      // Hands sent for food where there is no bush, field, snare or ewe lay a field and raise it, rather than being refused (#344).
+      let laid = 0;
+      // Not while a field of theirs is still going up: another press waits for it rather than laying more.
+      const raising = s.ents.some((e) => e.kind === 'building' && e.owner === c.p && e.type === 'farm' && !e.built && e.hp > 0);
+      const ask = raising ? [] : r.stuck.slice(0, Math.min(AUTO_WORK.lay, Math.max(0, Math.floor(c.n)) - r.moved));
+      for (const u of ask) {
+        const spot = findSpot(s, 'farm', u.x, u.y, 2, AUTO_WORK.farm);
+        const b = spot && placeSite(s, c.p, 'farm', spot.tx, spot.ty, laid > 0);
+        if (!b) break;
+        assignBuilders(s, [u], b, false);
+        laid++;
+      }
+      if (r.why && !laid) refuse(s, c.p, r.why);
+      else if (r.why && laid < ask.length) refuse(s, c.p, `Laid ${laid} ${laid === 1 ? 'field' : 'fields'}; ${r.why.toLowerCase()}`);
       break;
     }
     case 'hunt': {
@@ -390,8 +408,7 @@ export function applyCommand(s: GameState, c: Command): void {
       if (!post) return;
       const units = myUnits(s, c.p, c.ids);
       const traders = units.filter((u) => u.type === 'trader');
-      if (traders.length && p.quarantine) refuse(s, c.p, 'The town is in quarantine: the traders stay home');
-      else if (traders.length && c.buy && !post.sells?.includes(c.buy)) refuse(s, c.p, `This post sells no ${RARE[c.buy].name.toLowerCase()}`);
+      if (traders.length && c.buy && !post.sells?.includes(c.buy)) refuse(s, c.p, `This post sells no ${RARE[c.buy].name.toLowerCase()}`);
       else if (traders.length && !homeMarket(s, c.p, post.x, post.y) && !nearestCaravan(s, c.p, post.x, post.y)) refuse(s, c.p, 'Build a Market to trade from');
       else {
         for (const u of traders) {
@@ -438,6 +455,17 @@ export function applyCommand(s: GameState, c: Command): void {
       for (const u of hands) giveOrder(u, { k: 'cache', target: c.target }, c.queue);
       const others = units.filter((u) => u.type !== 'citizen');
       if (k && others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: k.x, y: k.y, queue: c.queue });
+      break;
+    }
+    case 'launch': {
+      // The Atomic Age (#605): a Missile Silo names a point; the warhead lands after its public countdown.
+      const silo = s.byId.get(c.silo);
+      const why = launchProblem(s, c.p, silo as Building | undefined, c.x, c.y);
+      if (why) {
+        refuse(s, c.p, why);
+        return;
+      }
+      launch(s, c.p, silo as Building, c.x, c.y);
       break;
     }
     case 'keg': {
@@ -520,12 +548,22 @@ export function applyCommand(s: GameState, c: Command): void {
             assignBuilders(s, [u], b, !!c.queue);
             continue;
           }
-          if (b.type === 'farm') {
-            // One farmer per field; the rest look for free fields nearby.
+          if (isField(b.type)) {
+            // One farmer per field (a Kitchen Garden too); the rest look for free fields nearby.
             const field = fieldsGiven.size ? freeFarm(s, c.p, b.x, b.y, 12, fieldsGiven) : b;
             if (field) {
               fieldsGiven.add(field.id);
               giveOrder(u, { k: 'farm', target: field.id, phase: 'go' }, c.queue);
+            }
+            continue;
+          }
+          // A Mine Shaft (#681): one miner to a shaft; the rest look for free shafts nearby.
+          if (b.type === 'shaft') {
+            const pit = fieldsGiven.size ? freeShaft(s, c.p, b.x, b.y, 12, fieldsGiven) : b;
+            const seam = pit && seamOf(s, pit);
+            if (pit && seam) {
+              fieldsGiven.add(pit.id);
+              giveOrder(u, { k: 'shaft', target: pit.id, res: resOfSeam(seam), phase: 'go' }, c.queue);
             }
             continue;
           }
@@ -602,7 +640,7 @@ export function applyCommand(s: GameState, c: Command): void {
           if (!best) continue;
           room.set(best.id, room.get(best.id)! - 1);
           const o = u.order;
-          u.resume = o.k === 'gather' || o.k === 'farm' || o.k === 'snare' ? { ...o, phase: 'go' } : o.k === 'build' ? o : null;
+          u.resume = o.k === 'gather' || o.k === 'farm' || o.k === 'snare' || o.k === 'shaft' ? { ...o, phase: 'go' } : o.k === 'build' ? o : null;
           u.queue = [];
           setOrder(u, { k: 'garrison', target: best.id });
         }
@@ -619,12 +657,26 @@ export function applyCommand(s: GameState, c: Command): void {
       s.events.push({ k: 'bell', owner: c.p, ring: c.ring });
       break;
     }
-    case 'quarantine': {
-      if (c.on === !!p.quarantine) return;
-      if (c.on && p.epoch < SICKNESS.fromEpoch) return refuse(s, c.p, 'No sickness yet to quarantine against');
-      if (c.on) p.quarantine = true;
-      else delete p.quarantine;
-      s.events.push({ k: 'quarantine', owner: c.p, on: c.on });
+    case 'shepherd': {
+      if (c.on) p.shepherd = true;
+      else delete p.shepherd;
+      break;
+    }
+    case 'flee': {
+      if (!c.ids) {
+        if (c.on) delete p.noFlee;
+        else p.noFlee = true;
+        break;
+      }
+      for (const u of myUnits(s, c.p, c.ids)) if (u.type === 'citizen') u.flee = c.on;
+      break;
+    }
+    case 'seam': {
+      const b = myBuilding(s, c.p, c.building);
+      if (!b || b.type !== 'shaft') return;
+      const why = seamProblem(s, b, c.seam);
+      if (why) return refuse(s, c.p, why);
+      b.seam = c.seam;
       break;
     }
     case 'beacon': {
@@ -668,6 +720,18 @@ export function applyCommand(s: GameState, c: Command): void {
       for (const u of milkers) giveOrder(u, { k: 'milk', target: a.id, phase: 'go' }, c.queue);
       const others = units.filter((u) => !milkers.includes(u));
       if (others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: a.x, y: a.y, queue: c.queue });
+      break;
+    }
+    case 'tame': {
+      // The Age of the Wild: citizens sing a wild wolf, boar or mammoth calm and lead it home as a beast of war.
+      const a = s.animals.find((x) => x.id === c.target);
+      const why = tameProblem(s, p, a);
+      if (why) return refuse(s, c.p, why);
+      const units = myUnits(s, c.p, c.ids);
+      const tamers = units.filter((u) => u.type === 'citizen');
+      for (const u of tamers) giveOrder(u, { k: 'tame', target: a!.id, t: 0 }, c.queue);
+      const others = units.filter((u) => !tamers.includes(u));
+      if (others.length) applyCommand(s, { t: 'move', p: c.p, ids: others.map((u) => u.id), x: a!.x, y: a!.y, queue: c.queue });
       break;
     }
     case 'lamb': {
@@ -740,7 +804,7 @@ export function applyCommand(s: GameState, c: Command): void {
       }
       break;
     case 'build': {
-      if (c.type === 'wall') return applyCommand(s, { t: 'wall', p: c.p, ids: c.ids, x0: c.tx, y0: c.ty, x1: c.tx, y1: c.ty, queue: c.queue });
+      if (c.type === 'wall' || c.type === 'dyke' || c.type === 'thornwall' || c.type === 'channel') return applyCommand(s, { t: 'wall', p: c.p, ids: c.ids, x0: c.tx, y0: c.ty, x1: c.tx, y1: c.ty, queue: c.queue, dyke: c.type === 'dyke' || undefined, thorn: c.type === 'thornwall' || undefined, channel: c.type === 'channel' || undefined });
       const b = placeSite(s, c.p, c.type, c.tx, c.ty);
       if (!b) return;
       if (c.type === 'gate') {
@@ -752,12 +816,14 @@ export function applyCommand(s: GameState, c: Command): void {
       break;
     }
     case 'wall': {
+      // A line of wall, or of dykes or a channel (#701) or Thornwall (the Age of the Grove), laid the same way.
+      const type = c.dyke ? 'dyke' : c.thorn ? 'thornwall' : c.channel ? 'channel' : 'wall';
       const tiles = wallLine(c.x0, c.y0, c.x1, c.y1);
       const placed: Building[] = [];
       for (let i = 0; i < tiles.length; i++) {
         const t = tiles[i];
-        if (placeProblem(s, 'wall', t.x, t.y)) continue;
-        const b = placeSite(s, c.p, 'wall', t.x, t.y, placed.length > 0);
+        if (placeProblem(s, type, t.x, t.y)) continue;
+        const b = placeSite(s, c.p, type, t.x, t.y, placed.length > 0);
         if (!b) break;
         // Which way the line runs here, for the model.
         const next = tiles[i + 1] ?? tiles[i - 1];
@@ -803,6 +869,19 @@ export function applyCommand(s: GameState, c: Command): void {
       if (short) return refuse(s, c.p, short);
       pay(p, cost);
       b.queue.push({ tech: c.tech, done: 0, paid: { ...cost } });
+      break;
+    }
+    case 'raiseTower': {
+      const b = myBuilding(s, c.p, c.building);
+      if (!b) return;
+      const problem = raiseProblem(s, c.p, b);
+      if (problem) return refuse(s, c.p, problem);
+      if (b.queue.length >= MAX_QUEUE) return refuse(s, c.p, 'The queue is full');
+      const cost = TOWER_LEVELS[b.level ?? 0].cost;
+      const short = shortfall(p, cost);
+      if (short) return refuse(s, c.p, short);
+      pay(p, cost);
+      b.queue.push({ rise: true, done: 0, paid: { ...cost } });
       break;
     }
     case 'cancel': {
@@ -948,6 +1027,8 @@ export function applyCommand(s: GameState, c: Command): void {
           if (!e.kill) refund(p, buildingCostFor(s, c.p, e.type));
           if (BUILDINGS[e.type].blood) p.blood = bloodOf(p) + BUILDINGS[e.type].blood!;
         }
+        // A Thornwall its own people takes down is grubbed out, root and all (`rootThorn`).
+        if (e.kind === 'building' && e.type === 'thornwall') e.grub = true;
         e.hp = 0;
       }
       break;
@@ -955,8 +1036,14 @@ export function applyCommand(s: GameState, c: Command): void {
       for (const e of s.ents) if (e.owner === c.p) e.hp = 0;
       break;
     case 'leave':
-      if (!p.ai && !p.defeated) {
+      if (c.back) {
+        if (p.left) {
+          p.ai = null;
+          delete p.left;
+        }
+      } else if (!p.ai && !p.defeated) {
         p.ai = 'normal';
+        p.left = true;
         s.events.push({ k: 'left', owner: c.p });
       }
       break;

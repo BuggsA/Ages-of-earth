@@ -1,10 +1,12 @@
-import { AGES, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SICKNESS, SILK, STEP_BACK, TRIBUTE, WAY, secs } from '../sim/data';
+import { AGES, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, secs } from '../sim/data';
+import { battlesFor } from '../sim/battles';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, findsOf, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
 import type { AgeId, Building, GameState, Unit } from '../sim/types';
-import { R_FISH } from '../sim/types';
+import { R_FISH, R_GOLD, R_STONE } from '../sim/types';
 import { isIdleCitizen } from './idle';
 import { laterTip, type Opening } from './opening';
+import { findResource } from '../sim/units';
 import { seasonAt } from '../sim/seasons';
 
 /**
@@ -20,6 +22,7 @@ const ALCHEMY_ROAD = ROADS.find((r) => r.to === 'alchemy')!;
 const SAPPER_ROAD = ROADS.find((r) => r.to === 'sapper')!;
 const SEA_ROAD = ROADS.find((r) => r.to === 'searaider')!;
 const CHARIOTS_ROAD = ROADS.find((r) => r.to === 'chariots')!;
+const GOLDEN_ROAD = ROADS.find((r) => r.to === 'golden')!;
 const MISSIONS_ROAD = ROADS.find((r) => r.to === 'missions')!;
 const WARBAND_ROAD = ROADS.find((r) => r.to === 'warband')!;
 const IRONBLOOD_ROAD = ROADS.find((r) => r.to === 'ironblood')!;
@@ -75,6 +78,8 @@ const TIPS: Tip[] = [
   { id: 'wayHunt', when: (s, me) => s.players[me].way === 'hunt' && s.players[me].epoch === 0, text: '<b>The Hunters\' Way:</b> follow the herds. Raise a <b>Hunting Camp</b> (<kbd>B</kbd> <kbd>N</kbd>) within ' + KILL_CAMP.near + ' tiles of game or a fresh kill and it costs nothing and goes up fast. In the Stone Age you raise no Farm while game lives within ' + KILL_CAMP.home + ' tiles of your Town Center: hunt the home herd out to open the fields, or spare it and range farther.' },
   { id: 'wayHearth', when: (s, me) => s.players[me].way === 'hearth', text: '<b>The Hearth Way:</b> select your Town Center and <b>Call the Kin</b> (<kbd>K</kbd>): two citizens come together, three in <b>winter</b>. Lay food by in autumn for the winter call, or spend it on the Bronze Age.' },
   { id: 'wayWarband', when: (s, me) => s.players[me].way === 'warband' && s.players[me].epoch <= 1, text: '<b>The Warband Way:</b> your soldiers eat by raiding. Send a few to strike a rival\'s <b>Storehouse</b>, <b>Farms</b> or <b>Hunting Camp</b>: every blow carries food home. Your bell never rings, so keep soldiers by home too.' },
+  // Mine Shafts (#681): once the open stone and gold near home are gone.
+  { id: 'shaft', when: (s, me) => s.players[me].epoch >= 1 && secsIn(s) > 240 && !has(s, me, 'shaft') && !buildings(s, me).some((b) => BUILDINGS[b.type].drop.length && (findResource(s, R_STONE, b.x, b.y, SHAFT.aiNear) >= 0 || findResource(s, R_GOLD, b.x, b.y, SHAFT.aiNear) >= 0)), text: 'No stone or gold left near home? A <b>Mine Shaft</b> (<kbd>B</kbd> <kbd>H</kbd>, 150 wood) digs it from the ground for good. Best over <b>old workings</b> where a deposit was worked out, then beside mountain rock, then plain ground. Right-click it with a citizen and pick the seam.' },
   { id: 'train', when: (s) => secsIn(s) > 25, text: 'More citizens mean a faster economy. Click your <b>Town Center</b> and press <kbd>Q</kbd> to train one (you can queue several).' },
   { id: 'house', when: (s, me) => s.players[me].pop >= s.players[me].cap - 2, text: 'You are nearly out of room. Select a citizen, press <kbd>B</kbd> then <kbd>E</kbd> to build a <b>house</b> (5 more people each).' },
   { id: 'idle', when: (s, me) => secsIn(s) > 60 && s.ents.some((e) => isIdleCitizen(e, me)), text: 'Someone is standing around: press <kbd>.</kbd> to find an idle citizen, or <kbd>Shift</kbd> + <kbd>.</kbd> to select every idle citizen and put them to work.' },
@@ -90,10 +95,14 @@ const TIPS: Tip[] = [
   { id: 'rustle', when: (s, me) => s.animals.some((a) => a.kind === 'sheep' && a.owner !== undefined && a.owner !== me && s.players[me].team !== s.players[a.owner].team && s.players[me].vis[Math.floor(a.y) * s.w + Math.floor(a.x)]), text: 'A rival\'s <b>flock</b>. Sheep with none of their people near can be <b>driven off</b>: stand a rider or a citizen right beside one and it follows them home to your Town Center.' },
   // The legion (#501): a Roman town keeps few citizens, and its foot soldiers are its hands.
   { id: 'legion', when: (s, me) => !!CIVS[s.players[me].civ].legion && secsIn(s) > 30, text: `🦅 <b>The legion builds.</b> A Roman town keeps only ${LEGION.citizens} citizens (three more each epoch): leave them the food and the gold. Raise a <b>Barracks</b> early, and put your foot soldiers to work: select them and <b>right-click a tree or a stone</b> to fell and quarry, or <b>right-click a building site</b> to raise it. A soldier at work still keeps watch and drops his tools for a foe who comes near, but a wave marched off to war leaves the wood-line empty.` },
+  // The set line (#501): a British bowman who stands still draws the longbow to the full.
+  { id: 'longbow', when: (s, me) => !!CIVS[s.players[me].civ].longbow && secsIn(s) > 60, text: `🏹 <b>The set line.</b> A bowman who stands still ${LONGBOW.after} seconds is <b>set</b>: he reaches ${LONGBOW.range} tiles farther and strikes ${LONGBOW.attack} harder until he takes a step. Pick your ground, plant the line, and let the foe walk onto it. A line that chases is only archers, and horsemen that reach it before it sets ride it down.` },
   // The household tax (#501): a Chinese town's gold is owed by its houses, not dug.
   { id: 'household', when: (s, me) => !!CIVS[s.players[me].civ].household && secsIn(s) > 30, text: `🏮 <b>The household tax.</b> Nobody here mines gold: every <b>house</b> pays it every ${HOUSEHOLD.every} seconds, in proportion to how full your town is, and <b>more for each house on its street</b> (within ${HOUSEHOLD.reach} tiles, a Market counting as two). Build houses in lanes close together and keep the town full of people; hover the gold to see the tax a minute. A rival who <b>burns your houses</b> takes ${HOUSEHOLD.raid} gold from the treasury for each, so guard the streets.` },
   // Born on the move (#501): a Mongol camp is on wagons from the first minute, with no fields and no quarry.
   { id: 'nomad', when: (s, me) => !!CIVS[s.players[me].civ].nomad && secsIn(s) > 20, text: `🐎 <b>Born on the move.</b> Your camp is on wagons: select the Town Center or a House and <b>strike camp</b> (<kbd>J</kbd>), drive the wagon to fresh grass, and <b>pitch</b> it there. Your <b>flock</b> walks with the camp: milk it, raise lambs at the Town Center, and each House keeps ${NOMAD.house} more sheep. You till no fields and quarry no stone, ever: the grass is your field, so move when the flock goes hungry. The <b>Plow</b> and <b>Irrigation</b> speed your milking instead.` },
+  // The tower line (2026-10-24): a raw Watch Tower is a lookout; it is raised at the tower itself.
+  { id: 'towerLine', when: (s, me) => buildings(s, me).some((b) => b.type === 'tower' && b.built && !b.level), text: `🗼 <b>A tower grows.</b> A new Watch Tower is a lookout more than a fort: its arrows are light and its walls thin. Select it and raise it (<kbd>Q</kbd>) to a <b>Guard Tower</b>, then a <b>Keep</b> (Middle Ages) and a <b>Bastion</b> (Gunpowder Age): each step is paid for that tower alone, harder arrows and sturdier walls, so choose which towers are worth the stone. Rams, siege and a crowd of soldiers still bring a tower down, the sooner the less it has learned.` },
   { id: 'nomadStone', when: (s, me) => !!CIVS[s.players[me].civ].nomad && s.players[me].epoch >= 1, text: `🐎 <b>Stone is taken, not cut.</b> A Mongol camp quarries none: buy it at a <b>Market</b>, or ride into a rival's land and <b>hold your riders still</b> there. Each takes ${CIVS.mongols.add!.tribute} gold a second as tribute and ${NOMAD.stone} stone for every gold, up to ${TRIBUTE.most} riders a rival. Spears and towers answer them, so pick the edge of their land they guard least.` },
   { id: 'army', when: (s) => secsIn(s) > 200, text: 'Rivals will come. Build a <b>Barracks</b> (<kbd>V</kbd> <kbd>B</kbd>) and train soldiers. Infantry beat cavalry, archers beat infantry, cavalry beat archers.' },
   { id: 'farm', when: (s, me) => secsIn(s) > 260 && !has(s, me, 'farm') && !CIVS[s.players[me].civ].nomad, text: 'Berries and deer run out. <b>Farms</b> (<kbd>B</kbd> <kbd>F</kbd>) give food forever; build them near your Town Center.' },
@@ -108,10 +117,11 @@ const TIPS: Tip[] = [
     },
     text: 'You can afford the next epoch! Select the Town Center and press <kbd>W</kbd>. New epochs bring stronger units and new buildings.',
   },
-  { id: 'sickness', when: (s, me) => (s.players[me].taint ?? 0) >= 0.4 || !!s.players[me].fever, text: `🤒 <b>The Sickness.</b> A big town with full houses packed close builds taint (the chip by your population); at 100% it breaks out and your people work slower, and some die in a bad fever. Keep <b>priests by a finished Temple</b> to nurse it down, space your houses out, and mind the roads: a sick town's trader leaves its trading post foul for ${SICKNESS.foul} seconds and a trader of yours loading there brings it home. <b>Quarantine</b> (Town Center, <kbd>N</kbd>) keeps your traders at home.` },
   { id: 'bell', when: (s, me) => s.players[me].alert > 0 && s.tick - s.players[me].alert < 40, text: 'Under attack? Ring the <b>town bell</b> (Town Center, <kbd>R</kbd>): citizens shelter inside and the Town Center shoots more arrows. <kbd>T</kbd> sends them back to work.' },
   { id: 'heart', when: (s, me) => !s.scenario && s.mode !== 'regicide' && s.players[me].epoch >= 1 && buildings(s, me).filter((b) => b.type === 'towncenter').length === 1 && secsIn(s) > 300, text: 'Your Town Center is your <b>heart</b>: if the last one falls you have 45 seconds to lay a new foundation, or your people is lost. A second Town Center (<kbd>B</kbd>) is cheap insurance.' },
   { id: 'forge', when: (s, me) => s.players[me].epoch >= 1 && secsIn(s) > 30 && !has(s, me, 'forge'), text: `A <b>Forge</b> (<kbd>V</kbd> <kbd>R</kbd>) makes every soldier hit harder and take less damage. The <b>${BUILDINGS.market.name}</b> trades surplus goods for gold.` },
+  // The tide of battle (#606): the first time a fight's bar shows.
+  { id: 'tide', when: (s, me) => units(s, me).some((u) => s.tick - u.hurt < secs(BATTLE.recent)) && battlesFor(s, me).length > 0, text: 'The bar over a fight is its <b>tide</b>: your strength against what you can see of the foe’s. <b>Click it</b> to pick up your fighters there, to pull back before a rout or push on. If a fight turns against you out of sight, a horn sounds: <kbd>Space</kbd> looks.' },
   { id: 'queue', when: (s) => secsIn(s) > 420, text: 'Hold <kbd>Shift</kbd> while giving orders to queue them: walk here, then there, then attack. <kbd>,</kbd> selects your whole army.' },
   { id: 'cameraBookmarks', when: (s) => secsIn(s) > 300, text: 'Guarding two fronts? Save this camera view with <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>1</kbd>–<kbd>4</kbd>, then jump back with <kbd>Shift</kbd> + <kbd>1</kbd>–<kbd>4</kbd>. Your selected troops keep their orders.' },
   { id: 'scoutFlags', when: (s) => secsIn(s) > 240, text: 'Planning an ambush or revisiting a ruin? <b>Ctrl + right-click</b> explored ground or the minimap to plant a golden Scout Flag. Add <b>Shift</b> for a red danger flag; repeat to remove. Up to six, without ordering your units.' },
@@ -271,6 +281,25 @@ const TIPS: Tip[] = [
     text: `Sea-raiders bank their plunder by ship. A kill fills the killer's pack (💰), and the pack goes into the hold of a transport the soldier comes within ${SPOILS.bank} tiles of, or rides in (up to ${SEA_RAID.hold} gold a ship). The ship banks its hold at a Dock of yours, within ${SEA_RAID.dock} tiles. A Town Center or Barracks banks nothing, and a rival who sinks a laden ship takes the hold: land, raid, re-embark, sail home.`,
   },
   {
+    id: 'golden-heard',
+    // The Golden Age (#703): heard of by a people that has walked two side ages.
+    when: (s, me) => {
+      const p = s.players[me];
+      return roadKnown(s, p, GOLDEN_ROAD) && !hasWalked(p, 'golden');
+    },
+    text: `✨ Your people has lived ${GOLDEN_ROAD.lives!.seen} lives, and hears of a <b>${AGES.golden.name}</b>: walk ${GOLDEN_ROAD.lives!.n} side ages in all (go back a step and take another road), and from the Gunpowder Age every one of them wakes at once, with none of their prices, for a few minutes. Every age you walk is one more thread, and a minute more of gold.`,
+  },
+  {
+    id: 'golden',
+    when: (s, me) => !!ageDef(s.players[me]).golden,
+    text: `✨ <b>The ${AGES.golden.name}.</b> Everything your people learned on its road works at once: build what those ages built, train what they trained, and use what they did, with none of their doors shut. It will not last: spend it. Click empty ground to see the clock. When it ends you wake in the Gunpowder Age, and the road never opens again.`,
+  },
+  {
+    id: 'golden-rival',
+    when: (s, me) => s.players.some((o) => o.id !== me && !!ageDef(o).golden),
+    text: `✨ A rival is in its <b>${AGES.golden.name}</b>: every way of life it has walked, at once, and nothing shut. It ends on its own in a few minutes, and then every thread sleeps: hold your walls, and strike when the gold runs out.`,
+  },
+  {
     id: 'crossing-chariots',
     // The third crossing (#555 s12): a people that has walked the Iron Age or the Steppe, back in the Stone Age.
     when: (s, me) => {
@@ -382,6 +411,18 @@ const TIPS: Tip[] = [
     text: `The camp can grow into a horde. Milk ${HORDE_ROAD.deed!.n} from your flock and butcher ${HORDE_ROAD.also![0].n} meat in all, and the Town Center (🔀) can take your people into the <b>${AGES.horde.name}</b> instead of the Middle Ages: still on wagons, still no fields or walls, and riders who stand in a rival's land take tribute from its treasury.`,
   },
   {
+    id: 'wild',
+    // The Age of the Wild (`docs/wild-road.md`): nothing tamed yet.
+    when: (s, me) => ageOf(s.players[me]) === 'wild' && !s.players[me].tamed?.length,
+    text: `Your people keeps company with the wild now. Select a citizen and <b>right-click a wolf, boar or mammoth</b> to sing it calm: ${TAME.secs.wolf} seconds for a wolf, ${TAME.secs.boar} for a boar, ${TAME.secs.mammoth} for a mammoth, and it becomes yours, a beast of war. The beast stands still for its tamer, but its pack bites, so bring an escort. Once a kind is tamed, a <b>${BUILDINGS.den.name}</b> breeds more of it.`,
+  },
+  {
+    id: 'grove',
+    // The Age of the Grove (`docs/wild-road.md` §2): its first minute.
+    when: (s, me) => ageOf(s.players[me]) === 'grove',
+    text: `Your people grows its town now. Plant a <b>${BUILDINGS.thornwall.name}</b> line (drag, like a wall): it grows from seedling to living oak in about ${GROVE.stage * 3} seconds (twice as fast in spring), parts for your own people, and sprouts again from its root if cut down. Set <b>${BUILDINGS.garden.name}s</b> within ${GROVE.dung} tiles of a ${BUILDINGS.den.name} or ${GROVE.water} of water: fed, a gardener brings in far more than a farmer. <b>${BUILDINGS.orchard.name}s</b> by a store bear food by themselves each summer and autumn.`,
+  },
+  {
     id: 'tribute',
     when: (s, me) => ageOf(s.players[me]) === 'horde',
     text: `Your horde lives on <b>tribute</b>. Ride into a rival's land and <b>hold your riders still</b> there (<kbd>C</kbd>, stand ground): each takes ${AGES.horde.add!.tribute} gold a second from that rival, up to ${TRIBUTE.most} riders a rival. Riders on the move take nothing, spears and towers answer them, and deep past your own land they wear down: pitch a camp near the border to keep them fed.`,
@@ -435,6 +476,8 @@ const TIPS: Tip[] = [
   { id: 'lightning', when: (s, me) => s.players[me].epoch === 4 && buildings(s, me).some((b) => b.type === 'tower' && b.built), text: 'Your Watch Towers point the way to the <b>Age of Lightning</b>: once they have lit 6 beacons (<kbd>F</kbd>; relays count), the Town Center can take it. Every tower becomes a <b>Coil Tower</b>: buildings in its field train and research faster, those outside run slower, and its bolt leaps through crowded armies. No aircraft fly there.' },
   { id: 'cog', when: (s, me) => units(s, me).some((u) => u.type === 'cog'), text: 'A <b>merchant ship</b> sails from your Dock to a trading post with water near it (a <b>port</b>) and brings back gold, 20% more than the land road. Select it and right-click the post. Warships are its enemy.' },
   { id: 'transport', when: (s, me) => units(s, me).some((u) => u.type === 'transport'), text: 'To cross the water, select soldiers and <b>right-click your transport</b> to board. Then select the transport and right-click a far shore to land them.' },
+  { id: 'silo', when: (s, me) => s.players[me].epoch >= 5 && !has(s, me, 'silo'), text: 'The <b>Atomic Age</b> brings the <b>Missile Silo</b> (<kbd>V</kbd> <kbd>M</kbd>), dear to raise. Select it, press <kbd>M</kbd> and click any point on the map: after 45 seconds the warhead lands, and every player sees the clock. Guard your silo: if it falls while the clock runs, the launch is scrubbed. The ring stays poisoned for 90 seconds after, for your own army too.' },
+  { id: 'fork', when: (s, me) => s.players[me].epoch >= 5 && buildings(s, me).some((b) => b.type === 'silo' && b.built), text: 'Your silo reveals a fork at the Town Center: the <b>Age of Fission</b> (a 25 second clock, a quick refuel, but each launch poisons the ground round your own silo) or the <b>Age of Fusion</b> (up to three warheads aloft, no refuel, nothing you strike poisoned, but a 70 second clock and a ruinous road). One shuts the other for good; a paid road leads back to the Atomic Age.' },
   { id: 'airfield', when: (s, me) => s.players[me].epoch >= 4 && !has(s, me, 'airfield'), text: 'The Industrial Age brings flight: an <b>Airfield</b> (<kbd>V</kbd> <kbd>F</kbd>) trains fighters and bombers. Only missiles reach them: fighters, riflemen, towers and warships.' },
 ];
 

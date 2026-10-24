@@ -2,7 +2,7 @@ import { crestSvg } from './crests';
 import type { CivId } from '../sim/types';
 import { AI_LEVELS, CIVS, CIV_IDS, MAP_SIZES, MAP_TYPES, PLAYER_COLORS } from '../sim/data';
 import type { Difficulty, MapSize, MapType } from '../sim/types';
-import { MAX_SEATS, type ClientMsg, type LobbyState } from '../net/protocol';
+import { MAX_SEATS, type ClientMsg, type LobbyState, type OpenSeat } from '../net/protocol';
 
 /**
  * The online screens: first a card to make a room or join one by its code, then the room itself, where
@@ -81,6 +81,21 @@ export class Lobby {
   showConnecting(code: string): void {
     this.el.classList.remove('hidden');
     this.el.innerHTML = `<div class="title-card online-card"><h2>Room ${esc(code)}</h2><p class="tagline">Connecting…</p><button class="btn small" data-lobby="back">Cancel</button></div>`;
+  }
+
+  /** Back at a match under way from a browser that holds no seat in it: pick whose people to lead (their player is away). */
+  showSeats(code: string, seats: OpenSeat[]): void {
+    this.state = null;
+    this.el.classList.remove('hidden');
+    const rows = seats
+      .map((s) => `<button class="btn" data-lobby="claim" data-seat="${s.seat}"><span class="seat-crest">${crestSvg(s.civ, PLAYER_COLORS[s.color], 22)}</span>${esc(s.name)}: ${CIVS[s.civ]?.name ?? ''}, ${COLOR_NAMES[s.color] ?? ''}</button>`)
+      .join('');
+    this.el.innerHTML = `<div class="title-card online-card">
+      <h2>Room <span class="code">${esc(code)}</span></h2>
+      <p class="tagline">This match is under way. Who are you coming back as?</p>
+      <div class="title-buttons seat-pick">${rows}</div>
+      <div class="title-buttons"><button class="btn small" data-lobby="watchRoom" data-code="${esc(code)}">Just watch</button><button class="btn small" data-lobby="back">Leave</button></div>
+    </div>`;
   }
 
   /** The room, as it is now. */
@@ -194,6 +209,12 @@ export class Lobby {
         break;
       case 'back':
         this.act.leave();
+        break;
+      case 'claim':
+        this.act.send({ t: 'claim', seat: Number(b.dataset.seat) });
+        break;
+      case 'watchRoom':
+        this.act.watch(b.dataset.code ?? '', this.name() || 'Player');
         break;
       case 'copy': {
         const input = this.el.querySelector('#room-link') as HTMLInputElement;

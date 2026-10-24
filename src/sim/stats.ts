@@ -1,8 +1,8 @@
-import { AGES, BUILDINGS, CIVS, WAYS, WORKS, SIGNATURES, EPOCHS, FLOOD, NO_MODS, PATHS, RARE, TECHS, WARCAMP, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
+import { AGES, BUILDINGS, CIVS, GUNS, GROVE, TOWER_LEVELS, WAYS, WORKS, SIGNATURES, EPOCHS, FLOOD, NO_MODS, PATHS, RARE, TECHS, WARCAMP, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
 import { fairLevy } from './fair';
 import { flooded } from './flood';
-import { ageDef, ageOf, hasWalked, isHire, isSuspended, pathCarry } from './ages';
-import type { AgeId, BuildingType, Cost, GameState, Player, TechId, UnitType } from './types';
+import { ageDef, ageOf, hasWalked, isHire, isSuspended, pathCarry, threadsOf } from './ages';
+import type { AgeId, Building, BuildingType, Cost, GameState, Player, TechId, UnitType } from './types';
 import { RES } from './types';
 
 /**
@@ -48,7 +48,8 @@ export function computeMods(p: Player): Mods {
   const age = ageDef(p);
   for (const t of p.techs) if (!TECHS[t].only || TECHS[t].only === ageOf(p)) apply(m, TECHS[t].add, TECHS[t].mul);
   apply(m, age.add, age.mul);
-  if (age.forge) m[age.forge.riders ? 'cavalryAttack' : 'infantryAttack'] += age.forge.attack * ironSteps(p, age.forge);
+  // A Golden Age (#703) carries every thread's forge: the Iron Age's spearmen and the Chariots' riders both.
+  for (const f of age.golden ? threadsOf(p).map((a) => AGES[a].forge).filter((x) => !!x) : age.forge ? [age.forge] : []) m[f!.riders ? 'cavalryAttack' : 'infantryAttack'] += f!.attack * ironSteps(p, f!);
   const carry = pathCarry(p);
   if (carry) for (let i = 0; i < carry.times; i++) apply(m, PATHS[carry.path].carry);
   if (p.workEnd !== undefined) apply(m, WORKS[p.civ].add, WORKS[p.civ].mul);
@@ -158,9 +159,51 @@ export function trainTimeFor(s: GameState, owner: number, type: UnitType, at: Bu
   return hire && isHire(p, at, type) ? t * hire.time : t;
 }
 
-export function buildingMaxHp(s: GameState, owner: number, type: BuildingType): number {
+/** What a Watch Tower's steps on the tower line add up to, at `level` (0 for a plain tower or any other building). */
+export function towerBonus(level = 0): { attack: number; range: number; hp: number } {
+  const out = { attack: 0, range: 0, hp: 1 };
+  for (let i = 0; i < Math.min(level, TOWER_LEVELS.length); i++) {
+    out.attack += TOWER_LEVELS[i].attack;
+    out.range += TOWER_LEVELS[i].range;
+    out.hp *= TOWER_LEVELS[i].hp;
+  }
+  return out;
+}
+
+/** A building's full hit points for its owner now; a Watch Tower's `level` on the tower line raises them. */
+export function buildingMaxHp(s: GameState, owner: number, type: BuildingType, level = 0): number {
   const p = s.players[owner];
-  return Math.round(buildingHp(type, p.epoch) * cacheOf(p).mods.buildingHp);
+  // A Thornwall (the Age of the Grove) is as strong as the stage it has grown to.
+  const grown = type === 'thornwall' ? GROVE.hp[Math.min(3, level)] : 1;
+  return Math.round(buildingHp(type, p.epoch) * cacheOf(p).mods.buildingHp * (type === 'tower' ? towerBonus(level).hp : 1) * grown);
+}
+
+/** The strength of one arrow from a building's guns (before armour), for its owner now; 0 if it has none. */
+export function gunPower(s: GameState, owner: number, type: BuildingType, level = 0): number {
+  const g = BUILDINGS[type].guns;
+  if (!g) return 0;
+  const p = s.players[owner];
+  const m = cacheOf(p).mods;
+  const tower = type === 'tower';
+  return (g.damage + m.rangedAttack + (tower ? towerBonus(level).attack : 0)) * (1 + p.epoch * (tower ? GUNS.towerEpoch : GUNS.epoch));
+}
+
+/** How far a building's guns shoot for its owner now, from its edge (add half its size for its centre); 0 if it has none. */
+export function gunRange(s: GameState, owner: number, type: BuildingType, level = 0): number {
+  const g = BUILDINGS[type].guns;
+  if (!g) return 0;
+  return g.range + cacheOf(s.players[owner]).mods.range + (type === 'tower' ? towerBonus(level).range : 0);
+}
+
+/** Why this Watch Tower can't be raised its next step on the tower line now, or null if it can (cost aside). */
+export function raiseProblem(s: GameState, owner: number, b: Building): string | null {
+  if (b.type !== 'tower' || b.owner !== owner) return 'Only a Watch Tower can be raised';
+  if (!b.built) return 'Finish building it first';
+  const next = TOWER_LEVELS[b.level ?? 0];
+  if (!next) return 'Raised as high as a tower goes';
+  if (b.queue.some((q) => q.rise)) return 'Already being raised';
+  if (s.players[owner].epoch < next.epoch) return `Needs the ${EPOCHS[next.epoch].name}`;
+  return null;
 }
 
 /** What a building costs a player now (walls change with the epoch; some civilizations pay less for wonders). */

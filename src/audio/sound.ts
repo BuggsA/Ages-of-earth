@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'flow';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -123,7 +123,7 @@ export class Sound {
     'click', 'menuHover', 'open', 'select', 'selectBuilding', 'move', 'attack', 'strike', 'thud', 'hit', 'hitBuilding', 'bow', 'sling', 'musket', 'fall',
     'collapse', 'built', 'place', 'ready', 'readyCitizen', 'chop', 'mine', 'hammer', 'rustle', 'epoch', 'alert', 'victory', 'defeat', 'error', 'coin', 'queue',
     'catapult', 'cannon', 'impact', 'spear', 'chant', 'convert', 'heal', 'townBell', 'allClear', 'research', 'wonder', 'wonderRising', 'shelter',
-    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind', 'thunder', 'owl', 'caw', 'gull', 'cricket', 'frog', 'birdsong', 'greatWork', 'beacon', 'rally', 'mammoth', 'howl', 'snarl', 'landmarkTaken', 'landmarkLost', 'consecrate', 'heirloom', 'zap', 'coilHum', 'heroFall', 'callUp', 'tribute', 'caravanBells', 'toll', 'wayHunters', 'wayHearth', 'wayWarband', 'blood', 'graft', 'crash', 'drain', 'sacrifice', 'curse', 'shackle', 'thrall', 'unshackle', 'sighting', 'dawn',
+    'relicTake', 'relicKeep', 'tradeLoad', 'tradePaid', 'tradeShare', 'rankUp', 'stepBack', 'ruinFind', 'thunder', 'owl', 'caw', 'gull', 'cricket', 'frog', 'birdsong', 'greatWork', 'beacon', 'rally', 'mammoth', 'howl', 'snarl', 'landmarkTaken', 'landmarkLost', 'consecrate', 'heirloom', 'zap', 'coilHum', 'heroFall', 'callUp', 'tribute', 'caravanBells', 'toll', 'wayHunters', 'wayHearth', 'wayWarband', 'blood', 'graft', 'crash', 'drain', 'sacrifice', 'curse', 'shackle', 'thrall', 'unshackle', 'sighting', 'dawn', 'golden',
   ];
 
   /**
@@ -475,6 +475,14 @@ export class Sound {
         this.tone(out, t + 1.2, { f: N.E4, dur: 4, peak: 0.04, attack: 1.8, lp: 900 });
         [N.G5, N.C6, N.E6, N.G6].forEach((f, i) => this.bell(out, t + 2.2 + i * 0.22, f, 1.8, 0.04));
         break;
+      case 'golden':
+        // A Golden Age (#703): a warm pad swells under the epoch's brass, climbing a full octave, and a long shower of bells falls through it.
+        this.tone(out, t, { f: N.C3, dur: 4.5, peak: 0.06, attack: 1.2, lp: 700 });
+        this.tone(out, t + 0.2, { f: N.G3, dur: 4.2, peak: 0.05, attack: 1.2, lp: 800 });
+        [N.C4, N.E4, N.G4, N.C5].forEach((f, i) => this.brass(out, t + i * 0.28, f, 1.6 - i * 0.2, 0.065));
+        for (const f of [N.E5, N.G5, N.C5]) this.brass(out, t + 1.2, f, 1.8, 0.05);
+        [N.C6, N.G6, N.E6, N.C6, N.G5, N.E6, N.G6, N.C6].forEach((f, i) => this.bell(out, t + 1.3 + i * 0.13, f, 1.6, 0.045));
+        break;
       case 'heirloom':
         // A slow peal from the new craft: a low bronze bell, then a falling change of three over its hum.
         this.bell(out, t, N.C4, 2.2, 0.08);
@@ -491,6 +499,12 @@ export class Sound {
         this.brass(out, t, N.G3, 0.5, 0.11);
         this.brass(out, t + 0.55, N.G3, 0.7, 0.11);
         this.drum(out, t, 0.18);
+        break;
+      case 'tideTurns':
+        // A fight turns against you (#606): one horn call that sags a fourth, over a muffled drum.
+        this.tone(out, t, { f: N.C4, to: N.G3, type: 'sawtooth', dur: 0.9, peak: 0.08, attack: 0.08, lp: 1100 });
+        this.tone(out, t, { f: N.C4 * 1.004, to: N.G3, type: 'sawtooth', dur: 0.9, peak: 0.05, attack: 0.1, lp: 800 });
+        this.drum(out, t + 0.05, 0.12);
         break;
       case 'coin':
         this.tone(out, t, { f: 2093, dur: 0.09, peak: 0.08 });
@@ -648,6 +662,17 @@ export class Sound {
         this.tone(out, t + 1.3, { f: 520, to: 330, dur: 0.6, peak: 0.045, attack: 0.02 });
         this.noise(out, t, { dur: 1.8, filter: 'bandpass', f: 520, q: 4, peak: 0.012, attack: 0.2 });
         break;
+      case 'tame':
+        // A beast tamed (the Age of the Wild): the tamer's low hummed lullaby, three falling notes over a breath, and a wooden knock.
+        [N.G4, N.E4, N.C4].forEach((f, i) => this.tone(out, t + i * 0.22, { f, type: 'triangle', dur: 0.4, peak: 0.05, attack: 0.06, lp: 1200 }));
+        this.noise(out, t, { dur: 0.9, filter: 'bandpass', f: 600, q: 2, peak: 0.01, attack: 0.2 });
+        this.tone(out, t + 0.7, { f: 180, to: 140, dur: 0.12, peak: 0.06, attack: 0.005 });
+        break;
+      case 'sprout':
+        // A Thornwall sprouts from its root (the Age of the Grove): a creak of green wood and a rustle of leaves opening.
+        this.tone(out, t, { f: 140, to: 220, type: 'triangle', dur: 0.35, peak: 0.05, attack: 0.05, lp: 900, glide: 0.3 });
+        this.noise(out, t + 0.1, { dur: 0.6, filter: 'bandpass', f: 2400, q: 1.2, peak: 0.018, attack: 0.15 });
+        break;
       case 'snarl':
         // A snarl and a snap of jaws.
         this.tone(out, t, { f: 110, to: 90, type: 'sawtooth', dur: 0.22, peak: 0.07, lp: 700 });
@@ -728,6 +753,21 @@ export class Sound {
         for (let i = 0; i < 6; i++) this.tone(out, t + 0.08 + i * 0.055 + (i % 2) * 0.02, { f: 2100 - i * 170, to: 1500 - i * 120, dur: 0.045, peak: 0.045 - i * 0.005 });
         this.noise(out, t + 0.1, { dur: 0.5, filter: 'bandpass', f: 3200, q: 1.1, peak: 0.025, attack: 0.05 });
         break;
+      case 'pump':
+        // A windmill pumps a tile of the bay dry (#701): the sails' wooden creak as the scoop wheel turns, then the water
+        // running out through the sluice, a rushing hiss that falls away.
+        this.tone(out, t, { f: 92, to: 78, type: 'triangle', dur: 0.55, peak: 0.035, attack: 0.12, lp: 500 });
+        this.noise(out, t + 0.05, { dur: 0.35, filter: 'bandpass', f: 1250, to: 900, q: 6, peak: 0.018, attack: 0.08 });
+        this.noise(out, t + 0.35, { dur: 1.4, filter: 'bandpass', f: 2600, to: 700, q: 0.7, peak: 0.045, attack: 0.25 });
+        this.noise(out, t + 0.4, { dur: 1.1, filter: 'lowpass', f: 420, to: 220, q: 0.9, peak: 0.04, attack: 0.2 });
+        break;
+      case 'flow':
+        // Water let into a dug channel (#701, the Age of Rivers): a soft gurgle and a run of bright trickles over the low wash of it
+        // filling, quieter than a mill.
+        this.noise(out, t, { dur: 0.9, filter: 'lowpass', f: 520, to: 300, q: 0.8, peak: 0.035, attack: 0.1 });
+        for (let i = 0; i < 4; i++) this.tone(out, t + 0.05 + i * 0.11 + (i % 2) * 0.03, { f: 620 + i * 90, to: 880 + i * 120, type: 'sine', dur: 0.07, peak: 0.018 });
+        this.noise(out, t + 0.2, { dur: 0.7, filter: 'bandpass', f: 1900, to: 1200, q: 1.1, peak: 0.02, attack: 0.15 });
+        break;
       case 'kegGround':
         // A keg ground at the mills (#577): a millstone's rumble, the scrape of the scoop, a bung knocked home with a mallet.
         this.noise(out, t, { dur: 0.7, filter: 'lowpass', f: 260, q: 1, peak: 0.06, attack: 0.15 });
@@ -749,6 +789,28 @@ export class Sound {
         this.tone(out, t, { f: 62, to: 22, dur: 1.8, peak: 0.6 });
         this.tone(out, t + 0.02, { f: 120, to: 40, dur: 0.6, peak: 0.25 });
         for (let i = 0; i < 9; i++) this.noise(out, t + 0.4 + i * 0.13 + (i % 2) * 0.04, { dur: 0.07, filter: 'bandpass', f: 1100 - i * 70, q: 2, peak: 0.07 - i * 0.005 });
+        break;
+      case 'siloLaunch':
+        // A warhead away (#605): a klaxon's two falling notes, then the long roar of the motor lighting.
+        for (let i = 0; i < 3; i++) {
+          this.tone(out, t + i * 0.9, { f: 880, to: 880, type: 'square', dur: 0.4, peak: 0.07 });
+          this.tone(out, t + 0.45 + i * 0.9, { f: 620, to: 620, type: 'square', dur: 0.4, peak: 0.07 });
+        }
+        this.noise(out, t + 2.4, { dur: 2.6, filter: 'lowpass', f: 300, to: 1400, q: 0.8, peak: 0.3, attack: 0.6 });
+        this.tone(out, t + 2.4, { f: 45, to: 90, dur: 2.6, peak: 0.25, attack: 0.5 });
+        break;
+      case 'siloBlast':
+        // The warhead lands (#605): a white crack, then a sub-bass swell that rolls out for seconds.
+        this.noise(out, t, { dur: 0.12, filter: 'highpass', f: 800, peak: 0.9 });
+        this.noise(out, t, { dur: 4, f: 700, to: 30, peak: 0.9, attack: 0.002 });
+        this.tone(out, t, { f: 48, to: 16, dur: 4, peak: 0.8 });
+        this.tone(out, t + 0.05, { f: 96, to: 28, dur: 1.4, peak: 0.3 });
+        break;
+      case 'siloScrub':
+        // A launch scrubbed (#605): the klaxon chokes off and a hollow thud of the hatch giving way.
+        this.tone(out, t, { f: 620, to: 140, type: 'square', dur: 0.5, peak: 0.06 });
+        this.tone(out, t + 0.3, { f: 70, to: 30, dur: 0.9, peak: 0.3 });
+        this.noise(out, t + 0.3, { dur: 0.7, filter: 'lowpass', f: 400, peak: 0.2 });
         break;
       case 'kegDoused':
         // A fuse stamped out (#577): a boot on the cord, the hiss choked off.

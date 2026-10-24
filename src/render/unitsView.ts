@@ -10,6 +10,10 @@ import { WATER_Y } from './water';
 
 /** Units are drawn a little larger than their footprint in the rules, so they read well from above. */
 export const UNIT_SCALE = 1.3;
+/** Fighters stand larger than workers, so a soldier reads as one at the default zoom (#624). */
+const FIGHTER_SCALE: Partial<Record<UnitType, number>> = { infantry: 1.3, ranged: 1.22, cavalry: 1.2, priest: 1.2, hero: 1.3, warwolf: 1.3, tusker: 1.25, warmammoth: 1.1 };
+/** Citizens a little larger too, but still smaller than fighters (#617, #624). */
+const CITIZEN_BOOST = 1.15;
 /** How high aircraft fly above the ground. */
 export const AIR_ALT = 3.2;
 
@@ -117,6 +121,14 @@ function chevronGeometry(rank: number): THREE.BufferGeometry {
   return g;
 }
 
+/** The team ring under every unit on land: the owner's colour at a glance, whatever the model wears. */
+const padMaterial = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.9, depthWrite: false, fog: false, toneMapped: false });
+const padGeometry = (() => {
+  const g = new THREE.RingGeometry(0.78, 1, 18);
+  g.rotateX(-Math.PI / 2);
+  return g;
+})();
+
 const chevronMaterial = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
 
 export interface ScreenUnit {
@@ -138,10 +150,21 @@ export class UnitsView {
     return m;
   });
   private chevronCount = [0, 0, 0];
+  private pads = (() => {
+    const m = new THREE.InstancedMesh(padGeometry, padMaterial, 256);
+    m.frustumCulled = false;
+    m.renderOrder = 2;
+    m.count = 0;
+    m.setColorAt(0, new THREE.Color());
+    this.group.add(m);
+    return m;
+  })();
+  private padCount = 0;
   private anims = new Map<number, Anim>();
   /** Where hooves and wheels kicked up dust this frame, as x, y, ground height, strength: the view turns them into puffs. */
   readonly kicks: number[] = [];
   private corpses: Corpse[] = [];
+  private noRot = new THREE.Quaternion();
   private m = new THREE.Matrix4();
   private q = new THREE.Quaternion();
   private e = new THREE.Euler(0, 0, 0, 'YXZ');
@@ -254,6 +277,25 @@ export class UnitsView {
     }
   }
 
+  /** One team ring on the ground, growing the instance buffer when the army outgrows it. */
+  private pad(x: number, y: number, z: number, r: number, color: THREE.Color): void {
+    if (this.padCount >= this.pads.instanceMatrix.count) {
+      const bigger = new THREE.InstancedMesh(padGeometry, padMaterial, this.pads.instanceMatrix.count * 2);
+      bigger.frustumCulled = false;
+      bigger.renderOrder = 2;
+      bigger.setColorAt(0, new THREE.Color());
+      this.group.remove(this.pads);
+      this.pads.dispose();
+      this.pads = bigger;
+      this.group.add(bigger);
+    }
+    this.p.set(x, y + 0.04, z);
+    this.m.compose(this.p, this.noRot, this.sc.set(r, 1, r));
+    this.pads.setMatrixAt(this.padCount, this.m);
+    this.pads.setColorAt(this.padCount, color);
+    this.padCount++;
+  }
+
   update(
     s: GameState,
     alpha: number,
@@ -268,6 +310,7 @@ export class UnitsView {
     this.animals(s, alpha, dt, time, sees, camera, width, height);
     for (const b of this.batches.values()) b.count = 0;
     this.chevronCount = [0, 0, 0];
+    this.padCount = 0;
     this.screen.length = 0;
     this.kicks.length = 0;
     this.drawn.clear();
@@ -426,12 +469,13 @@ export class UnitsView {
       this.e.set(pitch, yaw, roll);
       this.q.setFromEuler(this.e);
       this.p.set(dx, gy, dz);
-      const k = mounted ? UNIT_SCALE * 0.88 : engine ? UNIT_SCALE * 1.1 : UNIT_SCALE;
+      const k = (mounted ? UNIT_SCALE * 0.88 : engine ? UNIT_SCALE * 1.1 : UNIT_SCALE) * (FIGHTER_SCALE[u.type] ?? (u.type === 'citizen' ? CITIZEN_BOOST : 1));
       this.m.compose(this.p, this.q, this.sc.set(k, k, k));
       b.mesh.setMatrixAt(i, this.m);
       b.mesh.setColorAt(i, this.colors[u.owner]);
       b.anim.setXYZ(i, leg, arm, bob);
       this.drawn.set(u.id, new THREE.Vector3(dx, gy, dz));
+      if (dom === 'land') this.pad(dx, gy, dz, (mounted || engine ? 0.75 : 0.5) * k, this.colors[u.owner]);
 
       // Veterans wear their rank above the head.
       const rank = u.type === 'citizen' ? 0 : rankOf(u);
@@ -492,7 +536,7 @@ export class UnitsView {
         this.q.setFromEuler(this.e);
         this.p.set(c.x, heightAt(s, c.x, c.y) + 0.04 - sink, c.y);
       }
-      const k = c.mounted ? UNIT_SCALE * 0.88 : UNIT_SCALE;
+      const k = (c.mounted ? UNIT_SCALE * 0.88 : UNIT_SCALE) * (FIGHTER_SCALE[c.type] ?? 1);
       this.m.compose(this.p, this.q, this.sc.set(k, k, k));
       b.mesh.setMatrixAt(i, this.m);
       b.mesh.setColorAt(i, c.color);
@@ -500,6 +544,9 @@ export class UnitsView {
     }
     this.corpses = keep;
 
+    this.pads.count = this.padCount;
+    this.pads.instanceMatrix.needsUpdate = true;
+    if (this.pads.instanceColor) this.pads.instanceColor.needsUpdate = true;
     this.chevrons.forEach((cm, i) => {
       cm.count = this.chevronCount[i];
       cm.instanceMatrix.needsUpdate = true;

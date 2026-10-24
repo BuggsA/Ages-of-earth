@@ -3,25 +3,29 @@ import { seasonAt, seasonOf } from '../sim/seasons';
 import { flooded } from '../sim/flood';
 import { armProblem, disarmProblem, isPolis } from '../sim/polis';
 import { scenarioById } from '../sim/campaign';
+import { flees } from '../sim/flee';
 import { objectivesHtml } from './campaignUi';
 import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
-import { RARE_OF_TILE } from '../sim/units';
-import { KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, SNARE, SICKNESS, stepBackCost, VETERANCY, BUILDINGS, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { RARE_OF_TILE, findResource } from '../sim/units';
+import { AUTO_WORK, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
 import { restsAt } from '../sim/passage';
 import { loadPrice, sellerNear } from '../sim/oretrade';
+import { clockOf, launchProblem, loaded, rulesOf } from '../sim/silo';
 import { carriesKegs, kegProblem, kegsOf, millProblem, mills, millsOf, sappers } from '../sim/powder';
+import { basinOf, millIdle, wateredAt } from '../sim/water';
 import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
 import { LANDMARK_KINDS, claimWork, claimants, favours, landmarkAt } from '../sim/landmarks';
 import { workProblem } from '../sim/works';
 import { TIDING_CARDS, tidingCost, tidingProblem } from '../sim/tidings';
 import { kinCount, kinProblem, vowProblem, wayBarred, wayProblem } from '../sim/ways';
-import { catchIn, snareRate, treesNear } from '../sim/snares';
+import { catchIn, snareCap, snareFull, snareRate, snareWoods } from '../sim/snares';
 import { beaconProblem, lit } from '../sim/beacon';
+import { SEAMS, groundAt, seamOf, seamProblem, seamsAt, shaftShare } from '../sim/shafts';
 import { callUpProblem, callUpReach, campGrace, musterWait } from '../sim/warcamp';
 import { bledFlock, bloodOf, bloodShort, captivesOf, cursed, grafted, levyProblem, sworn, levyReach } from '../sim/blood';
 import { feedReach, graftCost, graftLast, graftWait, waiting } from '../sim/hemo';
@@ -29,14 +33,15 @@ import { chantedOver, consecrates, faithOf } from '../sim/consecrate';
 import { rallyProblem } from '../sim/rally';
 import { stirred as stirredNow } from '../sim/combat';
 import { sees } from '../sim/vision';
-import { buildingCostFor, buildingMaxHp, modsOf, statsFor, techCostFor, techProblem, trainCostFor, trainTimeFor } from '../sim/stats';
+import { buildingCostFor, buildingMaxHp, gunPower, gunRange, modsOf, raiseProblem, statsFor, techCostFor, techProblem, trainCostFor, trainTimeFor } from '../sim/stats';
 import { isMobile, packProblem, packsOf, pitchProblem } from '../sim/steppe';
 import { exacting, isRider } from '../sim/tribute';
 import { landOwnerAt } from '../sim/borders';
 import { flockCap, flockOf, grazeRange, lambProblem } from '../sim/flocks';
 import { soldAt } from '../sim/ages';
-import { ageDef, ageOf, asleep, crossingLeft, crossingsAhead, keepsakeProblem, leaving, sleepWhy, type Tally, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, oreClue, oreDone, oreOnly, ironTradeShare, isHire, isSideRoad, journeyOf, mainRoad, pathLine, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, suspendedTechs, assayed, diggersAt, holdingsOf, holds, keyOf, lacking, opensOf, prospected, trainsAt, windowsOf, leadsOn, leadsTo } from '../sim/ages';
+import { ageDef, ageOf, asleep, crossingLeft, goldenEnds, livesOf, threadsOf, crossingsAhead, keepsakeProblem, leaving, sleepWhy, type Tally, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, oreClue, oreDone, oreOnly, ironTradeShare, isHire, isSideRoad, journeyOf, mainRoad, pathLine, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, suspendedTechs, assayed, diggersAt, holdingsOf, holds, keyOf, lacking, opensOf, prospected, trainsAt, windowsOf, leadsOn, leadsTo } from '../sim/ages';
 import type { AgeId, KeyId, RareId, Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Player, Res, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
+import { GROVE_BUILDINGS, grows } from '../sim/grove';
 import { KEYS, RARES, RES, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
 import { buildingPicture, unitPicture } from './thumbs';
@@ -44,7 +49,7 @@ import { idleCitizens } from './idle';
 import { workforce, WORKFORCE_JOBS } from './workforce';
 import { citizenProblem, isLegion } from '../sim/legion';
 import { isHousehold, streetOf, taxRate } from '../sim/household';
-import { pressure, tenders } from '../sim/sickness';
+import { bowman, isSet } from '../sim/longbow';
 import { isNomad } from '../sim/nomad';
 
 /**
@@ -65,6 +70,8 @@ export interface HudActions {
   riteMode(how: 'sacrifice' | 'curse'): void;
   /** Wait for a left click on a rival building, for sappers to lay a powder keg at (#577). */
   kegMode(): void;
+  /** Wait for a left click on the map, for this Missile Silo to launch at (#605). */
+  launchMode(silo: number): void;
   /** Wait for a left click on a building to shelter in (or a transport to board). */
   garrisonMode(): void;
   /** Wait for a left click on a shore to land a transport's passengers. */
@@ -123,6 +130,7 @@ function orderWords(s: GameState, u: Unit): string {
     }
     case 'farm':
       if (flooded(s, u.owner)) return 'Waiting out the flood: the field is under the river';
+      if ((s.byId.get(o.target) as Building | undefined)?.type === 'garden') return o.phase === 'drop' ? 'Carrying the harvest home' : o.phase === 'work' ? 'Tending a Kitchen Garden' : 'Going to the garden';
       return o.phase === 'drop' ? 'Carrying grain home' : o.phase === 'work' ? 'Farming' : 'Going to the fields';
     case 'build': {
       const target = s.byId.get(o.target);
@@ -143,8 +151,12 @@ function orderWords(s: GameState, u: Unit): string {
       return 'Hunting';
     case 'milk':
       return o.phase === 'drop' ? 'Carrying milk home' : o.phase === 'work' ? 'Milking the flock' : 'Going to milk the flock';
+    case 'tame':
+      return u.act === 'chant' ? 'Singing a wild beast calm' : 'Going to tame a wild beast';
     case 'snare':
       return o.phase === 'drop' ? 'Carrying the catch home' : o.phase === 'work' ? 'Emptying a snare' : u.act === 'idle' ? 'Waiting by the snares for game' : 'Walking the trap line';
+    case 'shaft':
+      return o.phase === 'drop' ? `Carrying ${o.res === 'gold' ? 'gold' : 'stone'} up from the shaft` : o.phase === 'work' ? 'Digging the seam' : 'Going down the shaft';
     case 'convert':
       return o.rite === 'sacrifice' ? (u.act === 'chant' ? 'Sacrificing' : 'Going to sacrifice') : o.rite === 'curse' ? (u.act === 'chant' ? 'Cursing' : 'Going to curse') : u.act === 'chant' ? 'Converting' : 'Going to convert';
     case 'heal':
@@ -287,6 +299,7 @@ export class Hud {
   private epochEl = document.getElementById('epoch-chip')!;
   private clockEl = document.getElementById('clock')!;
   private idleEl = document.getElementById('idle-btn')!;
+  private idleSeen = 0;
   private workforceBtn = document.getElementById('workforce-btn') as HTMLButtonElement;
   private workforcePanel = document.getElementById('workforce-panel')!;
   private wfDrawn = new Map<string, string>();
@@ -337,6 +350,30 @@ export class Hud {
       this.workforceBtn.setAttribute('aria-expanded', 'false');
     });
     this.noticeEl.addEventListener('click', (e) => {
+      const f = (e.target as HTMLElement).closest<HTMLElement>('[data-fields]');
+      if (f) {
+        this.moveWorkers('idle', 'food', Number(f.dataset.fields) || 1);
+        f.closest('.notice')?.remove();
+        return;
+      }
+      const m = (e.target as HTMLElement).closest<HTMLElement>('[data-mine]');
+      if (m) {
+        this.moveWorkers('idle', m.dataset.mine as Job, Number(m.dataset.n) || 1);
+        m.closest('.notice')?.remove();
+        return;
+      }
+      const g = (e.target as HTMLElement).closest<HTMLElement>('[data-forage]');
+      if (g) {
+        this.moveWorkers('idle', 'food', Number(g.dataset.forage) || 1);
+        g.closest('.notice')?.remove();
+        return;
+      }
+      const fi = (e.target as HTMLElement).closest<HTMLElement>('[data-fish]');
+      if (fi) {
+        this.findFish(fi.dataset.fish ?? '');
+        fi.closest('.notice')?.remove();
+        return;
+      }
       const b = (e.target as HTMLElement).closest<HTMLElement>('[data-hands]');
       if (!b) return;
       this.sendWorkers(b.dataset.hands as Job, Number(b.dataset.n) || 1);
@@ -443,6 +480,169 @@ export class Hud {
     setTimeout(() => el.remove(), 7200);
   }
 
+  /** Citizens standing idle (bushes picked dry, #344): after a few seconds, one button lays them fields (`reassign` idle→food does it). */
+  private idleSince = new Map<number, number>();
+  private idleCardAt = 0;
+  private foraged = new Set<number>();
+  private idleFieldCard(s: GameState, viewer: number): void {
+    const p = s.players[viewer];
+    const now = performance.now();
+    this.idleMinersCard(s, viewer, now);
+    this.idleHuntersCard(s, viewer, now);
+    this.idleFishersCard(s, viewer, now);
+    this.idleBuildersCard(s, viewer, now);
+    const idle = idleCitizens(s, viewer);
+    const next = new Map<number, number>();
+    for (const u of idle) next.set(u.id, this.idleSince.get(u.id) ?? now);
+    this.idleSince = next;
+    // Only hands that foraged or farmed and ran dry: the starting five stand idle until the player orders them, and no card scolds that.
+    for (const e of s.ents) {
+      if (e.kind !== 'unit' || e.owner !== viewer) continue;
+      if (e.order.k === 'farm' || (e.order.k === 'gather' && e.order.res === 'food')) this.foraged.add(e.id);
+    }
+    const waiting = idle.filter((u) => this.foraged.has(u.id) && now - next.get(u.id)! > 5000).length;
+    if (!p || waiting < 3 || now < this.idleCardAt || buildBarred(p, 'farm')) return;
+    if (s.ents.some((e) => e.kind === 'building' && e.owner === viewer && e.type === 'farm' && !e.built && e.hp > 0)) return;
+    this.idleCardAt = now + 30000;
+    const n = Math.min(waiting, AUTO_WORK.lay);
+    this.noticeEl.querySelector('.idle-fields')?.remove();
+    const el = document.createElement('div');
+    el.className = 'notice alert shortage idle-fields';
+    el.innerHTML = `<span>${waiting} hands stand idle with nothing to forage.</span><button type="button" data-fields="${n}" title="Lay ${n} ${n === 1 ? 'field' : 'fields'} near them, paid in wood, and put them to farm">🌾 Lay ${n} ${n === 1 ? 'field' : 'fields'}</button>`;
+    this.noticeEl.appendChild(el);
+    while (this.noticeEl.children.length > 4) this.noticeEl.firstChild!.remove();
+    setTimeout(() => (el.style.opacity = '0'), 8000);
+    setTimeout(() => el.remove(), 8700);
+  }
+
+  /** Miners whose seam ran dry (#344): remember what each digger last dug; 3+ idle for 5 s offer one button that sends them to the nearest other seam or free shaft. */
+  private mining = new Map<number, 'stone' | 'gold'>();
+  private minersCardAt = 0;
+  private idleMinersCard(s: GameState, viewer: number, now: number): void {
+    const idle = new Set(idleCitizens(s, viewer).map((u) => u.id));
+    const spent: Record<'stone' | 'gold', number> = { stone: 0, gold: 0 };
+    for (const e of s.ents) {
+      if (e.kind !== 'unit' || e.owner !== viewer || e.hp <= 0) continue;
+      const o = e.order;
+      if ((o.k === 'gather' || o.k === 'shaft') && (o.res === 'stone' || o.res === 'gold')) this.mining.set(e.id, o.res);
+      else if (idle.has(e.id) && this.mining.has(e.id)) {
+        if (now - (this.idleSince.get(e.id) ?? now) > 5000) spent[this.mining.get(e.id)!]++;
+      } else this.mining.delete(e.id);
+    }
+    const res = spent.gold > spent.stone ? 'gold' : 'stone';
+    const waiting = spent.stone + spent.gold;
+    if (waiting < 3 || now < this.minersCardAt) return;
+    this.minersCardAt = now + 30000;
+    const n = Math.min(waiting, AUTO_WORK.lay);
+    this.noticeEl.querySelector('.idle-miners')?.remove();
+    const el = document.createElement('div');
+    el.className = 'notice alert shortage idle-miners';
+    el.innerHTML = `<span>${waiting} miners stand idle: their seam is spent.</span><button type="button" data-mine="${res}" data-n="${n}" title="Send ${n} to the nearest ${res} seam, or a free Mine Shaft">⛏ Find more ${res}</button>`;
+    this.noticeEl.appendChild(el);
+    while (this.noticeEl.children.length > 4) this.noticeEl.firstChild!.remove();
+    setTimeout(() => (el.style.opacity = '0'), 8000);
+    setTimeout(() => el.remove(), 8700);
+  }
+
+  /** Hunters whose game is gone (#344): remember who last hunted; 2+ idle for 5 s offer one button that sends them for berries, a field or meat (`reassign` idle→food). */
+  private hunting = new Set<number>();
+  private huntersCardAt = 0;
+  private idleHuntersCard(s: GameState, viewer: number, now: number): void {
+    const idle = new Set(idleCitizens(s, viewer).map((u) => u.id));
+    let waiting = 0;
+    for (const e of s.ents) {
+      if (e.kind !== 'unit' || e.owner !== viewer || e.hp <= 0) continue;
+      if (e.order.k === 'hunt') this.hunting.add(e.id);
+      else if (idle.has(e.id) && this.hunting.has(e.id)) {
+        if (!this.foraged.has(e.id) && now - (this.idleSince.get(e.id) ?? now) > 5000) waiting++;
+      } else this.hunting.delete(e.id);
+    }
+    if (waiting < 2 || now < this.huntersCardAt) return;
+    this.huntersCardAt = now + 30000;
+    const n = Math.min(waiting, AUTO_WORK.lay);
+    this.noticeEl.querySelector('.idle-hunters')?.remove();
+    const el = document.createElement('div');
+    el.className = 'notice alert shortage idle-hunters';
+    el.innerHTML = `<span>${waiting} hunters stand idle: the game is gone.</span><button type="button" data-forage="${n}" title="Send ${n} for berries, a free field or meat nearby; a field is laid if there is none">🍖 Find more food</button>`;
+    this.noticeEl.appendChild(el);
+    while (this.noticeEl.children.length > 4) this.noticeEl.firstChild!.remove();
+    setTimeout(() => (el.style.opacity = '0'), 8000);
+    setTimeout(() => el.remove(), 8700);
+  }
+
+  /** Builders whose work is done (#344): remember who last built; 3+ idle for 5 s offer one button that sends them to the trees (`reassign` idle→wood). */
+  private building = new Set<number>();
+  private buildersCardAt = 0;
+  private idleBuildersCard(s: GameState, viewer: number, now: number): void {
+    const idle = new Set(idleCitizens(s, viewer).map((u) => u.id));
+    let waiting = 0;
+    for (const e of s.ents) {
+      if (e.kind !== 'unit' || e.owner !== viewer || e.hp <= 0) continue;
+      if (e.order.k === 'build') this.building.add(e.id);
+      else if (idle.has(e.id) && this.building.has(e.id)) {
+        if (now - (this.idleSince.get(e.id) ?? now) > 5000) waiting++;
+      } else this.building.delete(e.id);
+    }
+    if (waiting < 3 || now < this.buildersCardAt) return;
+    this.buildersCardAt = now + 30000;
+    const n = Math.min(waiting, AUTO_WORK.lay);
+    this.noticeEl.querySelector('.idle-builders')?.remove();
+    const el = document.createElement('div');
+    el.className = 'notice alert shortage idle-builders';
+    el.innerHTML = `<span>${waiting} builders stand idle: the work is done.</span><button type="button" data-mine="wood" data-n="${n}" title="Send ${n} to the nearest trees">🪓 Fell timber</button>`;
+    this.noticeEl.appendChild(el);
+    while (this.noticeEl.children.length > 4) this.noticeEl.firstChild!.remove();
+    setTimeout(() => (el.style.opacity = '0'), 8000);
+    setTimeout(() => el.remove(), 8700);
+  }
+
+  /** Fishing boats whose shoal is spent (#344): they are not citizens, so they get their own watch; 2+ idle for 5 s offer one button that sends them to the nearest shoal in the sea. */
+  private fishing = new Set<number>();
+  private fishersSince = new Map<number, number>();
+  private fishersCardAt = 0;
+  private idleFishersCard(s: GameState, viewer: number, now: number): void {
+    const next = new Map<number, number>();
+    const spent: number[] = [];
+    for (const e of s.ents) {
+      if (e.kind !== 'unit' || e.owner !== viewer || e.type !== 'fisher' || e.hp <= 0) continue;
+      if (e.order.k === 'gather') this.fishing.add(e.id);
+      else if (e.order.k === 'idle' && !e.queue.length && this.fishing.has(e.id)) {
+        const since = this.fishersSince.get(e.id) ?? now;
+        next.set(e.id, since);
+        if (now - since > 5000) spent.push(e.id);
+      } else this.fishing.delete(e.id);
+    }
+    this.fishersSince = next;
+    if (spent.length < 2 || now < this.fishersCardAt) return;
+    this.fishersCardAt = now + 30000;
+    this.noticeEl.querySelector('.idle-fishers')?.remove();
+    const el = document.createElement('div');
+    el.className = 'notice alert shortage idle-fishers';
+    el.innerHTML = `<span>${spent.length} fishing boats lie idle: their shoal is spent.</span><button type="button" data-fish="${spent.join(',')}" title="Send them to the nearest shoal still in the sea">🐟 Find more fish</button>`;
+    this.noticeEl.appendChild(el);
+    while (this.noticeEl.children.length > 4) this.noticeEl.firstChild!.remove();
+    setTimeout(() => (el.style.opacity = '0'), 8000);
+    setTimeout(() => el.remove(), 8700);
+  }
+
+  /** Send the listed idle boats to the shoal nearest their middle, anywhere on the map; they fan over the shoals near it. */
+  private findFish(list: string): void {
+    const s = this.state;
+    if (!s) return;
+    const boats = list.split(',').map((x) => s.byId.get(Number(x))).filter((e): e is Unit => !!e && e.kind === 'unit' && e.owner === this.viewer && e.type === 'fisher' && e.hp > 0 && e.order.k === 'idle');
+    if (!boats.length) return;
+    const x = boats.reduce((a, b) => a + b.x, 0) / boats.length;
+    const y = boats.reduce((a, b) => a + b.y, 0) / boats.length;
+    const tile = findResource(s, R_FISH, x, y, Math.max(s.w, s.h));
+    if (tile < 0) {
+      this.act.sound('error');
+      this.toast('No shoal is left in the sea', 'bad');
+      return;
+    }
+    this.act.issue({ t: 'gather', p: this.viewer, ids: boats.map((b) => b.id), tile, spread: true });
+    this.act.sound('click');
+  }
+
   banner(title: string, sub = '', ms = 3200): void {
     this.bannerEl.innerHTML = `${title}${sub ? `<small>${sub}</small>` : ''}`;
     this.bannerEl.classList.add('show');
@@ -459,6 +659,7 @@ export class Hud {
     this.lastIds = ids;
     this.top(s, viewer, speed);
     this.tidingCard(s, viewer);
+    this.idleFieldCard(s, viewer);
     if (!this.workforcePanel.classList.contains('hidden')) this.drawWorkforce(s, viewer);
     const ents = ids.map((id) => s.byId.get(id)).filter((e): e is Ent => !!e && e.hp > 0);
     this.selection(s, viewer, ents, selectedTile, selectedRelic, selectedPost, selectedRuin, selectedLandmark);
@@ -525,7 +726,7 @@ export class Hud {
         `<div class="wf-move"><div class="wf-line">Move <input id="wf-n" type="number" min="1" max="200" value="5" aria-label="How many"></div>` +
         `<div class="wf-line">from <select id="wf-from" aria-label="From job">${opt(['wood', 'food', 'stone', 'gold', 'build', 'idle'])}</select></div>` +
         `<div class="wf-line">to <select id="wf-to" aria-label="To job">${opt(['food', 'wood', 'stone', 'gold', 'build'])}</select> <button type="button" class="wf-go" data-go>Go</button></div></div>` +
-        '<div class="workforce-note">Choose a row to select its citizens. + sends one (Shift: five) from the idle first, else the biggest job; on Building it joins the nearest unfinished building and goes back to its old work after. Move sends the idle and empty-handed first.</div>';
+        '<div class="workforce-note">Choose a row to select its citizens. + sends one (Shift: five) from the idle first, else the biggest job (on Food, with no bush, field or game in reach, it lays a field for each and they raise it); on Building it joins the nearest unfinished building and goes back to its old work after. Move sends the idle and empty-handed first.</div>';
     }
     // Written only when it changes: rebuilding a button between a press and its release would swallow the click.
     const set = (sel: string, html: string) => {
@@ -550,7 +751,7 @@ export class Hud {
     const age = ageDef(p);
     const idleTechs = suspendedTechs(p).map((t) => TECHS[t].name);
     const scores = s.players.map((q) => scoreOf(s, q));
-    const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${RARES.map((r) => Math.floor(p.rare?.[r] ?? 0)).join(',')}|${Math.floor(bloodOf(p))}|${p.pop}/${p.cap}|${ageOf(p)}|${adv}|${p.way ?? ''}${p.deep ? '+' : ''}${p.vowed ? 'v' : ''}|${idleTechs.length}|${idle}|${speed}|${scores.join(',')}|${isHousehold(p) ? Math.round(taxRate(s, viewer) * 60) : ''}|${p.fever ? Math.round(p.fever.sev * 50) : ''}|${Math.round((p.taint ?? 0) * 20)}|${p.quarantine ? 'q' : ''}|${p.fever ? tenders(s, viewer) : ''}|${p.kegs ?? ''}`;
+    const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${RARES.map((r) => Math.floor(p.rare?.[r] ?? 0)).join(',')}|${Math.floor(bloodOf(p))}|${p.pop}/${p.cap}|${ageOf(p)}|${adv}|${p.way ?? ''}${p.deep ? '+' : ''}${p.vowed ? 'v' : ''}|${idleTechs.length}|${idle}|${speed}|${scores.join(',')}|${isHousehold(p) ? Math.round(taxRate(s, viewer) * 60) : ''}|${p.kegs ?? ''}|${(s.launches ?? []).map((l) => `${l.id}:${clockOf(s, l)}`).join(',')}`;
     const sn = seasonOf(s);
     this.clockEl.textContent = `${sn.icon} ${fmtTime(s.tick)}`;
     const hl = s.homeland ? HOMELANDS[s.homeland] : undefined;
@@ -565,9 +766,9 @@ export class Hud {
         .map((r) => `<div class="res" data-tip="<b>${RARE[r].name}</b>${RARE[r].blurb} Mined from deep veins that only some worlds hold.">${RARE_ICON[r]}${Math.floor(p.rare![r]!)}</div>`)
         .join('') +
       (p.blood !== undefined ? `<div class="res" data-tip="<b>Blood</b>Drawn at Drain Rigs from the enemy who fall near them, and from citizens given to the levy. Spent to raise Blood Towers, and at Transfusion Stations to graft soldiers. In Hemocraft the rigs also bleed the living enemy who stand near them; in the Blood-rite every Temple draws as a rig does, and spends blood to mend your own.">🩸${Math.floor(bloodOf(p))}</div>` : '') +
+      (s.launches ?? []).map((l) => `<div class="res" data-tip="<b>Warhead in the air</b>${s.players[l.owner].name}'s Missile Silo has launched: it lands in ${clockOf(s, l)} seconds. A silo destroyed before then scrubs the launch.">☢ ${s.players[l.owner].name} ${clockOf(s, l)}s</div>`).join('') +
       (p.kegs !== undefined || mills(p) || sappers(p) ? `<div class="res" data-tip="<b>Powder kegs</b>Ground from saltpetre at the Siege Workshops in the Age of Alchemy, ${KEG.ore} a keg, up to ${KEG.most} in store. In the Age of Sappers citizens and foot soldiers lay them at a rival building (K): ${KEG.fuse} seconds later each blows, wrecking every rival building within ${KEG.reach} tiles, unless a rival reaches it first and stamps it out.${mills(p) ? `<br>${millProblem(s, p) ?? `The mills grind: next keg in ${Math.max(0, Math.ceil((KEG.time - (p.grind ?? 0)) / Math.max(1, millsOf(s, viewer).length)))}s.`}` : ''}">🧨${kegsOf(p)}</div>` : '') +
-      `<div class="res pop ${p.pop >= p.cap ? 'full' : ''}" data-tip="<b>Population</b>People and soldiers you have, and room for. Houses add 5 each, a Town Center 10 (150 at most).">${icon('pop')}${p.pop}/${p.cap}</div>` +
-      sicknessChip(s, viewer);
+      `<div class="res pop ${p.pop >= p.cap ? 'full' : ''}" data-tip="<b>Population</b>People and soldiers you have, and room for. Houses add 5 each, a Town Center 10 (150 at most).">${icon('pop')}${p.pop}/${p.cap}</div>`;
     const civ = CIVS[p.civ];
     const board = s.players
       .map((q, i) => `<div><span class='swatch' style='background:${q.color}'></span>${q.name}${q.defeated ? ' (out)' : ''}: ${q.id === viewer || q.team === p.team ? scores[i] : '?'}</div>`)
@@ -578,6 +779,13 @@ export class Hud {
       : `<span data-tip="<b>${age.name}</b>${age.blurb}${age.path ? `<br><i>${PATHS[age.path].name}: step ${pathDepth(p)} of ${pathLine(age.path).length + (PATHS[age.path].planned?.length ?? 0)}.${age.hemocraft || age.rite ? ` Blood drawn: ${Math.floor(p.stats.blood ?? 0)}.${age.rite ? ` Health mended at the altars: ${Math.floor(p.stats.riteMended ?? 0)}.` : ''}` : ''} ${age.path === 'steppe' ? `Tribute taken: ${Math.floor(p.stats.tribute ?? 0)} gold.${age.caravans ? ` Gold the caravans earned on the move: ${p.stats.caravan ?? 0}. Tolls taken from rival traders: ${p.stats.toll ?? 0}.` : ''}` : `Plunder taken: ${p.stats.plunder ?? 0} gold.`}</i>` : ''}${idleTechs.length ? `<br>Suspended until you climb again: ${idleTechs.join(', ')}.` : ''}${mainRoad(p) ? `<br><span class='hint'>Advance at a Town Center.</span>` : ''}">${age.name}</span>`;
     this.idleEl.textContent = `Idle ${idle}`;
     this.idleEl.classList.toggle('alert', idle > 0);
+    if (idle > this.idleSeen) {
+      // One bright flash each time more hands fall idle, so a dry bush or spent seam is noticed.
+      this.idleEl.classList.remove('rise');
+      void this.idleEl.offsetWidth;
+      this.idleEl.classList.add('rise');
+    }
+    this.idleSeen = idle;
     document.getElementById('speed-btn')!.textContent = `${speed}×`;
   }
 
@@ -662,8 +870,12 @@ export class Hud {
         <div class="blurb">${kind === R_FISH ? 'Select fishing boats (from a Dock) and right-click it to fish.' : RARE_OF_TILE[kind] ? `${RARE[RARE_OF_TILE[kind]].blurb} Only some worlds hold it.${s.caves?.some((c) => c.tile === tile && c.den) ? ' Wolves lair here.' : ''} Select citizens and right-click it to mine; it is kept apart from your other stores.` : kind === R_BOG ? 'Rust-red ore in the wetland mud, smelted into iron bars and paid in as gold. Digging it opens the Iron Age, in the Stone Age, to a people whose Prospector\'s Lodge has found it.' : 'Select citizens and right-click it to gather.'}</div></div>`;
     } else if (!ents.length) {
       const p = s.players[viewer];
-      sig = `none:${ageOf(p)}`;
-      html = `<div class="empty-sel"><div class="sel-name">${ageDef(p).name}</div>
+      // A Golden Age (#703) counts down here, with what it weaves.
+      const ends = goldenEnds(p);
+      const left = ends === undefined ? 0 : Math.max(0, Math.ceil((ends - s.tick) / TICK_HZ));
+      sig = `none:${ageOf(p)}:${left}`;
+      const gold = ends === undefined ? '' : `<div>✨ <b>${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}</b> of gold left. Woven together: ${threadsOf(p).map((a) => AGES[a].name).join(', ')}.</div>`;
+      html = `<div class="empty-sel"><div class="sel-name">${ageDef(p).name}</div>${gold}
         <div>Left-click to select, drag to select many. Right-click to give orders.</div>
         <div><kbd>.</kbd> finds an idle citizen, <kbd>Shift</kbd> + <kbd>.</kbd> selects all idle citizens, <kbd>,</kbd> your army, <kbd>H</kbd> your Town Center; <kbd>B</kbd> and <kbd>V</kbd> build with citizens selected.</div>
         <div>Hold <kbd>Shift</kbd> while giving orders to queue them up.</div></div>`;
@@ -682,7 +894,7 @@ export class Hud {
       const items: string[] = [];
       for (const list of groups.values()) {
         for (const e of list.slice(0, 60)) {
-          const max = e.kind === 'unit' ? statsFor(s, e.owner, e.type).hp : buildingMaxHp(s, e.owner, e.type);
+          const max = e.kind === 'unit' ? statsFor(s, e.owner, e.type).hp : buildingMaxHp(s, e.owner, e.type, e.kind === 'building' ? e.level : 0);
           const pic = e.kind === 'unit' ? unitPicture(e.type, s.players[e.owner].epoch, s.players[e.owner].color) : buildingPicture(e.type, s.players[e.owner].epoch, s.players[e.owner].color);
           items.push(`<div class="mitem" data-pick="${e.id}" data-tip="<b>${nameOf(s, e)}</b>Click to pick only this one; shift-click to drop it."><img src="${pic}" alt=""><div class="mhp"><i style="width:${Math.round((e.hp / max) * 100)}%"></i></div></div>`);
         }
@@ -777,6 +989,10 @@ export class Hud {
     const aura = s.tick - u.aura < 5 && u.type !== 'hero' ? `<span data-tip="<b>Inspired</b>A hero nearby: hits harder and heals.">✨<em>Inspired</em></span>` : '';
     const rank = rankOf(u);
     const vet = rank ? `<span data-tip="<b>${VETERANCY.names[rank - 1]}</b>${u.vet} enemy soldiers defeated: blows ${Math.round((VETERANCY.attack[rank - 1] - 1) * 100)}% harder${VETERANCY.armor[rank - 1] ? `, +${VETERANCY.armor[rank - 1]} armor` : ''}.">${'▲'.repeat(rank)}<em>${VETERANCY.names[rank - 1]}</em></span>` : '';
+    // The set line (#501, the Britons): a bowman who has stood still draws the longbow to the full.
+    const bow = bowman(s, u);
+    const isLine = bow && isSet(s, u);
+    const line = bow ? `<span data-tip="<b>${isLine ? 'Set' : 'Setting'}</b>${isLine ? `Standing still: reaches ${LONGBOW.range} tiles farther and strikes ${LONGBOW.attack} harder. A step breaks it.` : `Stand still ${LONGBOW.after} seconds and the longbow is drawn to the full: ${LONGBOW.range} tiles farther, ${LONGBOW.attack} harder.`}">🏹<em>${isLine ? 'Set' : 'Unset'}</em></span>` : '';
     const o = u.order;
     const route = mine && o.k === 'trade' ? postAt(s, o.post) : undefined;
     const home = route && o.k === 'trade' ? (marketOf(s, u.owner, o.market) ?? caravanOf(s, u.owner, o.market) ?? homeMarket(s, u.owner, route.x, route.y) ?? nearestCaravan(s, u.owner, route.x, route.y)) : null;
@@ -817,7 +1033,7 @@ export class Hud {
     // A thrall (#502): a taken citizen, bound and drab, who works but never builds.
     const bond = u.thrall ? `<span data-tip="<b>Thrall</b>A citizen taken by a Warband people: it works a field for ${mine ? 'you' : p.name} but never builds or repairs. Slay it, or guard your workers so none are taken.">⛓<em>Thrall</em></span>` : '';
     const held = u.type === 'priest' && carriedBy(s, u) ? `<span data-tip="<b>Relic</b>Carried to a Temple, it brings in gold. Hands full: no healing or converting until it is set down (D).">⚱<em>Relic</em></span>` : '';
-    const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}:${u.cargo.length}:${rank}:${taking}:${road}:${u.tolled ?? 0}:${hemoLeft}:${curseLeft}:${u.merc ?? -1}:${isSworn}:${!!u.thrall}:${u.spoils ?? 0}`;
+    const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}:${u.cargo.length}:${rank}:${taking}:${road}:${u.tolled ?? 0}:${hemoLeft}:${curseLeft}:${u.merc ?? -1}:${isSworn}:${!!u.thrall}:${u.spoils ?? 0}:${isLine}`;
     const html = `<div class="sel-portrait"><img src="${unitPicture(u.type, u.type === 'wagon' && u.packed === 'market' ? p.epoch + 20 : p.epoch, p.color)}" alt=""></div>
       <div class="sel-info">
         <div class="sel-name">${s.kings.includes(u.id) ? `👑 King (${st.name})` : u.thrall ? `Thrall (${st.name})` : st.name}</div>
@@ -828,7 +1044,7 @@ export class Hud {
           <span data-tip="<b>Armor</b>Melee / missile armor: taken off every blow or shot.">🛡<em>Armor</em> ${st.armor}/${st.parmor}</span>
           ${st.range ? `<span data-tip="<b>Range</b>How far it shoots, in tiles.">🏹<em>Range</em> ${st.range}</span>` : ''}
           <span data-tip="<b>Speed</b>Tiles per second.">👣<em>Speed</em> ${Math.round(st.speed * 100) / 100}</span>
-          ${carry}${cargo}${load}${stance}${vet}${aura}${graft}${oath}${sword}${pack}${curse}${bond}${held}${trip}${caravan}${tribute}${toll}
+          ${carry}${cargo}${load}${stance}${vet}${line}${aura}${graft}${oath}${sword}${pack}${curse}${bond}${held}${trip}${caravan}${tribute}${toll}
         </div>
         <div class="blurb">${st.blurb}</div>
       </div>`;
@@ -838,7 +1054,7 @@ export class Hud {
   private buildingPanel(s: GameState, viewer: number, b: Building): [string, string] {
     const p = s.players[b.owner];
     const def = BUILDINGS[b.type];
-    const max = buildingMaxHp(s, b.owner, b.type);
+    const max = buildingMaxHp(s, b.owner, b.type, b.level);
     const mine = b.owner === viewer;
     let status = '';
     let queue = '';
@@ -850,27 +1066,43 @@ export class Hud {
       if (mine) queue = `<div class="queue"><div class="qitem" data-cancel="${b.id}:-1" data-tip="<b>${AGES[road.to].name}</b>Click to cancel (full refund)."><span class="qglyph">${road.back ? '⏬' : '⏫'}</span><div class="prog"><i style="width:${pct}%"></i></div></div></div>`;
     } else if (b.queue.length) {
       const it = b.queue[0];
-      const need = it.tech ? secs(TECHS[it.tech].time) : secs(trainTimeFor(s, b.owner, it.unit!, b.type));
+      const step = TOWER_LEVELS[b.level ?? 0];
+      const need = it.rise ? secs(step?.time ?? 1) : it.tech ? secs(TECHS[it.tech].time) : secs(trainTimeFor(s, b.owner, it.unit!, b.type));
       const pct = Math.min(100, Math.floor((it.done / need) * 100));
-      status = it.tech ? `Researching ${TECHS[it.tech].name}: ${pct}%` : it.done > need ? 'Waiting for room: build houses' : `Training ${statsFor(s, b.owner, it.unit!).name}: ${pct}%`;
+      status = it.rise ? `Raising to ${step?.name ?? 'the top'}: ${pct}%` : it.tech ? `Researching ${TECHS[it.tech].name}: ${pct}%` : it.done > need ? 'Waiting for room: build houses' : `Training ${statsFor(s, b.owner, it.unit!).name}: ${pct}%`;
       if (mine)
         queue = `<div class="queue">${b.queue
           .map((q, i) => {
             const qp = i === 0 ? pct : 0;
-            const name = q.tech ? TECHS[q.tech].name : statsFor(s, b.owner, q.unit!).name;
-            const face = q.tech ? `<span class="qglyph">${TECHS[q.tech].icon}</span>` : `<img src="${unitPicture(q.unit!, p.epoch, p.color)}" alt="">`;
+            const name = q.rise ? (step?.name ?? '') : q.tech ? TECHS[q.tech].name : statsFor(s, b.owner, q.unit!).name;
+            const face = q.rise ? `<span class="qglyph">${step?.icon ?? ''}</span>` : q.tech ? `<span class="qglyph">${TECHS[q.tech].icon}</span>` : `<img src="${unitPicture(q.unit!, p.epoch, p.color)}" alt="">`;
             return `<div class="qitem" data-cancel="${b.id}:${i}" data-tip="<b>${name}</b>Click to cancel (full refund).">${face}<div class="prog"><i style="width:${qp}%"></i></div></div>`;
           })
           .join('')}</div>`;
     } else if (b.type === 'farm' && b.built) {
       const f = b.farmer ? s.byId.get(b.farmer) : undefined;
       status = f && f.kind === 'unit' && f.order.k === 'farm' && f.order.target === b.id ? 'Worked by a citizen' : 'Waiting for a farmer';
+      // The Age of Rivers (#701): a field with water near works faster.
+      if (ageDef(s.players[b.owner]).rivers) status += wateredAt(s, b.tx, b.ty, b.size) ? ` · <span data-tip="<b>Watered</b>Water lies within ${RIVERS.wet} tiles: in the Age of Rivers the field works ${Math.round((RIVERS.farm - 1) * 100)}% faster.">💧 Watered</span>` : ` · <span data-tip="<b>Dry</b>No water within ${RIVERS.wet} tiles. Dig a Channel (Q) to it and it works faster.">Dry field</span>`;
+    } else if (b.type === 'channel' && b.built) {
+      // A dug ditch (#701) waiting for the water: it fills once water lies beside it.
+      status = 'Dug, and dry: the water runs in once a channel or water lies beside it. Dig on toward the water.';
     } else if (b.type === 'snare' && b.built) {
       // Snares in the wood (#485): what it holds, how fast its woods fill it, and whether anyone walks the line.
-      const trees = treesNear(s, b.tx, b.ty);
+      const trees = snareWoods(s, b);
+      const full = snareFull(s, b);
       const perMin = Math.round(snareRate(s, b) * 60 * 10) / 10;
       const tended = s.ents.some((e) => e.kind === 'unit' && e.owner === b.owner && e.hp > 0 && e.order.k === 'snare');
-      status = `Caught ${catchIn(b)} / ${SNARE.cap} food${catchIn(b) >= SNARE.cap ? ' (full: it catches no more)' : ''} · ${trees} trees round it: ${perMin} a minute${trees < SNARE.full ? ` (best with ${SNARE.full})` : ''}${seasonAt(s) === 3 ? ', winter-hungry' : ''} · ${tended ? 'the line is walked' : 'nobody walks the line'}`;
+      const cap = snareCap(s, b);
+      status = `Caught ${catchIn(b)} / ${cap} food${catchIn(b) >= cap ? ' (full: it catches no more)' : ''} · ${trees} trees round it: ${perMin} a minute${trees < full ? ` (best with ${full})` : ''}${seasonAt(s) === 3 ? ', winter-hungry' : ''} · ${tended ? 'the line is walked' : 'nobody walks the line'}`;
+    } else if (b.type === 'shaft' && b.built) {
+      // Mine Shaft (#681): the seam it digs, the ground's grade and whether a miner is down it.
+      const seam = seamOf(s, b);
+      const grade = seam ? groundAt(s, b)[seam] : null;
+      const f = b.farmer ? s.byId.get(b.farmer) : undefined;
+      const manned = !!f && f.kind === 'unit' && f.order.k === 'shaft' && f.order.target === b.id;
+      const ground = { old: 'Old workings', hill: 'Mountain rock', open: 'Open ground' };
+      status = seam && grade ? `<span data-tip="<b>${ground[grade]}</b>A shaft digs at ${Math.round(SHAFT.grade[grade] * 100)}% of an open deposit's pace. Old workings (a deposit worked out nearby) are best, then rock beside it, then plain ground.">${ground[grade]}: ${SHAFT.seams[seam].name.toLowerCase()} at ${Math.round(SHAFT.grade[grade] * 100)}%</span> · ${manned ? 'a miner works it' : 'waiting for a miner (right-click it with a citizen)'}` : 'Your people can dig nothing here';
     } else if (b.type === 'wonder' && b.timer >= 0) status = `Stands ${fmtTime(b.timer)} more for victory`;
     else if (b.type === 'market') {
       const traders = s.ents.filter((e) => e.kind === 'unit' && e.owner === b.owner && e.type === 'trader' && e.order.k === 'trade' && e.order.market === b.id).length;
@@ -936,6 +1168,11 @@ export class Hud {
       const still = millProblem(s, p);
       status += ` · <span data-tip="<b>Powder mill</b>In the Age of Alchemy every Siege Workshop grinds: together they make a keg from ${KEG.ore} saltpetre every ${KEG.time} seconds a mill, up to ${KEG.most} in store. Kegs are laid in the Age of Sappers.">${still ? `⚠ ${still}` : `🧨 Grinding powder: ${kegsOf(p)} kegs`}</span>`;
     }
+    // A windmill (#701): how much water is left behind its dykes, or why it stands still.
+    if (mine && b.built && !sleeping && b.type === 'windmill') {
+      const still = millIdle(s, b);
+      status += ` · <span data-tip="<b>Windmill</b>Pumps the water within ${POLDER.reach} tiles of it dry, a tile every ${POLDER.every} seconds, nearest first: a lake, or a bay your dykes have shut off from the open sea (at most ${POLDER.most} tiles of water). The drained ground is polder, where a Farm yields half again as much.">${still ? `⚠ ${still}` : `💧 Pumping: ${basinOf(s, b).length} tiles of water left`}</span>`;
+    }
     // A Transfusion Station (#355 s3): who waits for a graft, and whether there is blood for it.
     if (mine && b.built && !sleeping && b.type === 'transfusion') {
       const cost = graftCost(p);
@@ -972,7 +1209,7 @@ export class Hud {
         ${mine && b.type === 'market' && b.built ? `<div class="blurb">Prices shared by all players. ↑ recovers upward, ↓ downward, → steady. Drift: ${MARKET.recover} gold every ${MARKET.every}s toward the starting quote; trades move it immediately.</div>` : ''}
         ${mine && b.built && b.hp < max ? `<div class="blurb">Select citizens and right-click to repair (a full repair costs ${Math.round(REPAIR_SHARE * 100)}% of its price).${def.garrison ? ' Press G to shelter instead.' : ''}</div>` : ''}
         ${inside}
-        ${queue || `<div class="blurb">${def.blurb}${def.guns ? ` Shoots ${def.guns.range} tiles.` : ''}</div>`}
+        ${queue || `<div class="blurb">${def.blurb}${def.guns ? ` Shoots ${gunRange(s, b.owner, b.type, b.level)} tiles, ${Math.round(gunPower(s, b.owner, b.type, b.level))} an arrow.` : ''}</div>`}
       </div>`;
     return [html, sig];
   }
@@ -997,6 +1234,10 @@ export class Hud {
         // A path's own building (the War Camp, #303) shows only to the people standing on that step.
         if (def.ages && !def.ages.includes(ageOf(p))) continue;
         if (def.only && !builders.some((u) => canRaise(u.type, type, p.civ))) continue;
+        // Only a managed wood's people (#501, the Britons) plants saplings: no one else is shown the button.
+        if (type === 'sapling' && !CIVS[p.civ].coppice) continue;
+        // What the Grove grows shows only to a people that has walked it.
+        if (GROVE_BUILDINGS.includes(type) && !grows(p)) continue;
         const locked = def.epoch > p.epoch;
         const no = buildBarred(p, type) ?? wayBarred(s, p, type);
         const cost = buildingCostFor(s, viewer, type);
@@ -1006,7 +1247,7 @@ export class Hud {
           key: def.key,
           pic: buildingPicture(type, p.epoch, p.color),
           title: def.name,
-          desc: def.blurb + (type === 'wall' ? ' Click and drag to lay out a line.' : '') + (def.blood ? ` Costs 🩸${def.blood} blood besides.` : ''),
+          desc: def.blurb + (type === 'wall' || type === 'thornwall' ? ' Click and drag to lay out a line.' : '') + (def.blood ? ` Costs 🩸${def.blood} blood besides.` : ''),
           cost,
           ok: !locked && !no && !short && !wonderUp,
           why: locked ? `Needs the ${EPOCHS[def.epoch].name}` : no ? no : wonderUp ? 'You already have a wonder' : (short ?? undefined),
@@ -1078,6 +1319,10 @@ export class Hud {
         cmds.push({ key: 'K', pic: '', glyph: '🧨', title: 'Lay a keg', count: kegsOf(p) || undefined, desc: `Then click a rival building: each one carries a keg from your store to its foot and lights it. ${KEG.fuse} seconds later it blows, wrecking every rival building within ${KEG.reach} tiles (${KEG.building} each) and hurting the soldiers near it. A rival who reaches a burning keg stamps it out: get there quietly, or cover it. Kegs left: ${kegsOf(p)}. More are ground only in the Age of Alchemy.`, ok: !why, why: why ?? undefined, run: () => this.act.kegMode() });
       }
       cmds.push({ key: 'S', pic: '', glyph: '✋', title: 'Stop', desc: 'Stop what they are doing (and forget queued orders).', ok: true, run: () => this.act.issue({ t: 'stop', p: viewer, ids: units.map((u) => u.id) }) });
+      if (citizens.length && !p.ai) {
+        const runs = citizens.every((u) => flees(s, u));
+        cmds.push({ key: '', pic: '', glyph: '🏃', title: runs ? 'Runs from danger' : 'Stands ground', desc: `${runs ? 'These citizens run from danger' : 'These citizens stand their ground'}: struck by soldiers they dash into the nearest shelter, and shot at by a tower they step out of its reach. Click to ${runs ? 'make them stand their ground' : 'let them run again'}. The Town Center turns it on or off for every citizen at once.`, ok: true, on: runs, run: () => this.act.issue({ t: 'flee', p: viewer, on: !runs, ids: citizens.map((u) => u.id) }) });
+      }
       // The polis (#501): Greek citizens take up arms where they stand, and their soldiers lay them down at home.
       if (isPolis(p)) {
         if (citizens.length) {
@@ -1117,7 +1362,7 @@ export class Hud {
       }
       if (soldiers.length) {
         const stances: [string, Stance, string, string][] = [
-          ['Z', 'aggressive', '🔥', 'Attack and destroy: seek out and chase any enemy that comes into sight.'],
+          ['Z', 'aggressive', '🔥', 'Attack and destroy: seek out and chase any enemy that comes into sight, and once the fight is won, tear down the buildings in sight.'],
           ['X', 'defensive', '🛡', 'Fight if provoked: fight what is attacking them or comes close, but return to their post.'],
           ['C', 'stand', '⚓', 'Hold: never move from the spot; strike what is in reach.'],
           ['N', 'run', '🏃', 'Run: step away from armed foes in sight and never fight back on their own (a direct attack order still goes ahead).'],
@@ -1191,7 +1436,7 @@ export class Hud {
               pic: '',
               glyph: isMain ? '⏫' : '🔀',
               title: `${toward} the ${to.name}${routeTag(road.to)}`,
-              desc: `${road.gate === 'easy' ? '<i>An easy on-ramp: a small deed and a modest price.</i><br>' : road.gate === 'hard' ? '<i>A hard gate: a dear price and a long journey, for something special.</i><br>' : ''}${road.blurb ?? to.blurb}${isSideRoad(road) ? ` Opens only from ${windowsOf(road.to).map((a) => `the ${AGES[a].name}`).join(' or ')}.` : ''}${(oreOnly(s, road) ? [] : deeds).map((d) => `<br>${oreDone(p, road) || d.have >= d.need ? '✔' : '…'} ${d.deed.text}: ${Math.min(d.have, d.need)}/${d.need}.`).join('')}${(() => { const door = oreClue(s, p, road); return door ? `<br>${oreDone(p, road) ? '✔' : '…'} ${oreOnly(s, road) ? '' : '<i>Or</i> '}${door.text.charAt(0).toLowerCase()}${door.text.slice(1)}: ${Math.min(Math.floor(p.stats.mined?.[door.id] ?? 0), door.n)}/${door.n}.` : ''; })()}${(road.crossing ?? []).map((a) => `<br>${hasWalked(p, a) ? '✔' : '…'} A crossing: walk the ${AGES[a].name}.`).join('')}${back.length ? `<br>Brings back ${back.map((t) => TECHS[t].name).join(', ')}.` : ''}${planLines(s, p, road.to, false)}<br>Takes ${road.time}s. Every unit re-arms and every building is rebuilt in the new style.${agePanel(s, p, road.to)}`,
+              desc: `${road.gate === 'easy' ? '<i>An easy on-ramp: a small deed and a modest price.</i><br>' : road.gate === 'hard' ? '<i>A hard gate: a dear price and a long journey, for something special.</i><br>' : ''}${road.blurb ?? to.blurb}${isSideRoad(road) ? ` Opens only from ${windowsOf(road.to).map((a) => `the ${AGES[a].name}`).join(' or ')}.` : ''}${(oreOnly(s, road) ? [] : deeds).map((d) => `<br>${oreDone(p, road) || d.have >= d.need ? '✔' : '…'} ${d.deed.text}: ${Math.min(d.have, d.need)}/${d.need}.`).join('')}${(() => { const door = oreClue(s, p, road); return door ? `<br>${oreDone(p, road) ? '✔' : '…'} ${oreOnly(s, road) ? '' : '<i>Or</i> '}${door.text.charAt(0).toLowerCase()}${door.text.slice(1)}: ${Math.min(Math.floor(p.stats.mined?.[door.id] ?? 0), door.n)}/${door.n}.` : ''; })()}${(road.crossing ?? []).map((a) => `<br>${hasWalked(p, a) ? '✔' : '…'} A crossing: walk the ${AGES[a].name}.`).join('')}${road.lives ? `<br>${livesOf(p).length >= road.lives.n ? '✔' : '…'} Side ages walked: ${Math.min(livesOf(p).length, road.lives.n)}/${road.lives.n}${livesOf(p).length ? ` (${livesOf(p).map((a) => AGES[a].short).join(', ')})` : ''}. Each one is woven in.` : ''}${back.length ? `<br>Brings back ${back.map((t) => TECHS[t].name).join(', ')}.` : ''}${planLines(s, p, road.to, false)}<br>Takes ${road.time}s. Every unit re-arms and every building is rebuilt in the new style.${agePanel(s, p, road.to)}`,
               cost: road.cost,
               ok: !advancing && !problem && !short && b.queue.length === 0,
               on: b.advance >= 0 && !b.back && journeyOf(p, b)?.to === road.to,
@@ -1326,10 +1571,7 @@ export class Hud {
             const n = kinCount(s);
             cmds.push({ key: 'K', pic: '', glyph: '🔥', title: `Call the Kin (${n})`, cost: KIN.cost, desc: `${n} citizens come to the hearth together after ${KIN.time} seconds in this Town Center's queue${n > KIN.n ? ': it is winter, and the winter call draws more' : `; in winter, ${KIN.winter}`}. They need room under your cap.`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'kin', p: viewer, building: b.id }) });
           }
-          if (p.epoch >= SICKNESS.fromEpoch && !s.scenario) {
-            const q = !!p.quarantine;
-            cmds.push({ key: 'N', pic: '', glyph: '🚧', title: q ? 'Lift quarantine' : 'Quarantine', desc: q ? 'Traders may load at the posts again.' : `Your traders stay home, no taint comes to you by the roads, and a fever drains ${Math.round(SICKNESS.quarantineWane / SICKNESS.wane * 100)}% faster. Costs the caravans' gold.`, ok: true, run: () => this.act.issue({ t: 'quarantine', p: viewer, on: !q }) });
-          }
+          cmds.push({ key: '', pic: '', glyph: '🏃', title: p.noFlee ? 'Citizens stand ground' : 'Citizens run from danger', desc: `${p.noFlee ? 'Your citizens stand their ground when attacked, unless one is told to run.' : 'Your citizens run from danger on their own: struck by soldiers they dash into the nearest shelter, and shot at by a tower they step out of its reach. They come out when it has passed.'} Click to ${p.noFlee ? 'let them run' : 'make them stand'}. Only your own citizens; select one to set it alone.`, ok: true, on: !p.noFlee, run: () => this.act.issue({ t: 'flee', p: viewer, on: !!p.noFlee }) });
           const sheltering = s.ents.some((e) => e.kind === 'unit' && e.owner === viewer && e.type === 'citizen' && (e.inside || e.order.k === 'garrison'));
           cmds.push({ key: 'T', pic: '', glyph: '🕊', title: 'All clear', desc: 'Citizens come out of shelter and go back to work.', ok: sheltering, why: 'Nobody is sheltering', run: () => this.act.issue({ t: 'bell', p: viewer, ring: false }) });
         }
@@ -1365,6 +1607,7 @@ export class Hud {
             const herd = s.animals.filter((a) => a.kind === 'sheep' && a.owner === viewer);
             const hungry = herd.filter((a) => a.hungry).length;
             cmds.push({ key: 'L', pic: '', glyph: '🐑', title: `Raise a lamb (${flockOf(s, viewer)}/${flockCap(s, viewer)})`, cost: FLOCK.cost, desc: `A lamb for the flock, grown in ${FLOCK.lamb} seconds. Sheep graze within ${grazeRange(s, viewer)} tiles of the nearest Town Center and follow it when camp is struck. Right-click one with citizens to <b>milk</b> it (slow food that comes back); a sheep left unmilked fattens and bears lambs; attack-move (A) onto one to <b>slaughter</b> it for meat. Each bite crops the grass bare for a while, so a flock grazes its ground out and must move on.${hungry ? ` <b>${hungry} of your sheep are hungry:</b> the grass here is gone.` : ''} Wolves take sheep near their dens (Hounds keep them off near camp), and rivals drive off sheep left with no one by them. Up to ${FLOCK.cap} sheep for each Town Center${isNomad(p) ? ` and ${NOMAD.house} for each House` : ''}.`, ok: !no, why: no ?? undefined, run: () => this.act.issue({ t: 'lamb', p: viewer, building: b.id }) });
+            cmds.push({ key: '', pic: '', glyph: '🧑‍🌾', title: p.shepherd ? 'Flock tends itself' : 'Flock tended by hand', desc: `${!p.shepherd ? 'Nothing is done for you: raise lambs, send citizens to milk and slaughter by hand.' : `Lambs are raised on their own while there is room and ${SHEPHERD.reserve} food to spare, idle citizens within ${SHEPHERD.reach} tiles of camp take to milking, and a sheep fattened past breeding is slaughtered once the flock is full.`} Click to ${p.shepherd ? 'tend it by hand' : 'let the flock tend itself'}.`, ok: true, on: !!p.shepherd, run: () => this.act.issue({ t: 'shepherd', p: viewer, on: !p.shepherd }) });
           }
           cmds.push({ key: 'J', pic: '', glyph: '🛞', title: 'Strike camp', desc: b.type === 'market' ? `Pack this Market onto a wagon and take it along the road. Your traders come home to it wherever it rolls, and every tile it covers while they are out pays their trip ${Math.round(SILK.each * 100)}% more (up to ${Math.round(SILK.each * SILK.most * 100)}%). While it rolls nobody buys or sells and no trader is trained, and riders run it down.` : `Pack this ${def.name} onto a wagon, with everyone sheltering inside stepping out. Drive it to new ground and pitch it there (P). While it rolls it gives no room, takes in nothing and trains no one, and riders run it down.`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'pack', p: viewer, building: b.id }) });
         }
@@ -1385,7 +1628,40 @@ export class Hud {
           const near = levyReach(s, b).length;
           cmds.push({ key: 'C', pic: '', glyph: '🩸', title: 'Levy', desc: `The nearest ${BLOOD.levyMost === 1 ? 'citizen' : `up to ${BLOOD.levyMost} citizens`} within ${BLOOD.levyReach} tiles of this rig are given to the rig: each is gone for good and pays ${BLOOD.levy} blood. The rig then rests ${BLOOD.rest} seconds for each. Every citizen levied is one less at work.`, ok: !why, why: why ?? undefined, count: near || undefined, run: () => (this.act.issue({ t: 'callUp', p: viewer, building: b.id, n: BLOOD.levyMost }), this.act.sound('queue')) });
         }
+        // The Atomic Age (#605): a Missile Silo names a point and the whole map watches the clock.
+        if (b.type === 'silo') {
+          const why = launchProblem(s, viewer, b, b.x, b.y);
+          cmds.push({ key: 'M', pic: '', glyph: '☢', title: 'Launch', desc: `Then click anywhere on the map: ${rulesOf(p).fuse} seconds later the warhead lands, wrecking every rival building within ${SILO.reach} tiles (${SILO.building} each) and hurting the rival soldiers there; the ground stays poisoned after, hurting every land unit in it. Every player sees the clock, and a silo destroyed before it runs out scrubs the launch. Costs ${Object.entries(rulesOf(p).fuel).map(([r, n]) => `${n} ${r}`).join(' and ')}; the silo needs ${rulesOf(p).refuel} seconds to refuel after${rulesOf(p).air > 1 ? `, and holds up to ${rulesOf(p).air} warheads aloft` : ''}.`, ok: !why, why: why ?? undefined, on: !loaded(s, b), run: () => this.act.launchMode(b.id) });
+        }
+        // The seam a Mine Shaft digs (#681).
+        if (b.type === 'shaft') {
+          const now = seamOf(s, b);
+          const can = seamsAt(s, b);
+          SEAMS.forEach((m, i) => {
+            if (!can.includes(m)) return;
+            const why = seamProblem(s, b, m);
+            const name = SHAFT.seams[m].name;
+            cmds.push({ key: 'QWERT'[i], pic: '', glyph: m === 'gold' ? '🪙' : m === 'stone' ? '🪨' : '💎', title: `Dig ${name.toLowerCase()}`, desc: `Set this shaft to dig ${name.toLowerCase()} at ${Math.round(shaftShare(s, b, m) * 100)}% of an open deposit's pace${m === 'gold' || m === 'stone' ? '' : ', over the old workings of that vein'}. Its miner switches at the next trip.`, ok: !why, why: why ?? undefined, on: now === m, run: () => (this.act.issue({ t: 'seam', p: viewer, building: b.id, seam: m }), this.act.sound('queue')) });
+          });
+        }
         if (b.type === 'tower') {
+          // The tower line: this tower alone climbs a step.
+          const step = TOWER_LEVELS[b.level ?? 0];
+          if (step) {
+            const problem = raiseProblem(s, viewer, b);
+            const short = shortfall(p, step.cost);
+            const raising = b.queue.some((q) => q.rise);
+            cmds.push({
+              key: 'Q', pic: '', glyph: step.icon, title: `Raise to ${step.name}`,
+              desc: `${step.blurb} Takes ${step.time}s; the tower keeps shooting while it is raised.`,
+              cost: step.cost, ok: !problem && !short && !full && !busy, on: raising,
+              why: raising ? 'Being raised' : (problem ?? (full ? 'The queue is full' : (short ?? undefined))),
+              run: () => {
+                this.act.issue({ t: 'raiseTower', p: viewer, building: b.id });
+                this.act.sound('queue');
+              },
+            });
+          }
           const why = beaconProblem(s, p, b);
           cmds.push({ key: 'F', pic: '', glyph: '🔥', title: 'Light the beacon', desc: `A fire on the roof: this tower sees ${BEACON.sight} tiles farther for ${BEACON.duration} seconds, but every rival sees the ground around it. Costs ${BEACON.cost.wood} wood; it can be lit again after ${BEACON.cooldown} seconds.`, ok: !why, why: why ?? undefined, on: lit(s, b), run: () => this.act.issue({ t: 'beacon', p: viewer, building: b.id }) });
         }
@@ -1430,8 +1706,10 @@ export class Hud {
     const r = this.tipEl.getBoundingClientRect();
     let x = e.clientX + 14;
     let y = e.clientY - r.height - 12;
-    if (x + r.width > window.innerWidth - 6) x = window.innerWidth - r.width - 6;
     if (y < 46) y = e.clientY + 18;
+    // Keep the whole tip on screen: smaller windows and zoomed pages push it past an edge.
+    y = Math.max(6, Math.min(y, window.innerHeight - r.height - 6));
+    x = Math.max(6, Math.min(x, window.innerWidth - r.width - 6));
     this.tipEl.style.left = `${x}px`;
     this.tipEl.style.top = `${y}px`;
   }
@@ -1457,18 +1735,6 @@ function hpBar(hp: number, max: number, frac: number): string {
   return `<div class="hp ${frac < 0.3 ? 'low' : frac < 0.6 ? 'mid' : ''}"><i style="width:${Math.max(0, Math.min(100, frac * 100))}%"></i><span>${Math.ceil(hp)} / ${max}</span></div>`;
 }
 
-/** The Sickness (#541) on the top bar: a fever with its severity, or taint building in a crowded town, and quarantine when it is kept. */
-function sicknessChip(s: GameState, viewer: number): string {
-  const p = s.players[viewer];
-  const q = p.quarantine ? '<div class="res" data-tip="<b>Quarantine</b>Your traders stay home and no taint comes by the roads, and a fever drains faster. Lift it at the Town Center (<kbd>N</kbd>).">🚧</div>' : '';
-  if (p.fever) {
-    const n = tenders(s, viewer);
-    return `${q}<div class="res sick" data-tip="<b>The Sickness: ${Math.round(p.fever.sev * 100)}%</b>Your citizens work and build ${Math.round(p.fever.sev * SICKNESS.slow * 100)}% slower${p.fever.sev >= SICKNESS.deadly ? ', and it is taking them' : ''}. ${n ? `${n} priest${n > 1 ? 's are' : ' is'} nursing it at your Temple.` : 'Priests standing by a finished Temple nurse it down: you have none there.'} Thin your streets, and keep your traders home (quarantine) if a road is foul.">🤒${Math.round(p.fever.sev * 100)}%</div>`;
-  }
-  const t = p.taint ?? 0;
-  if (t < 0.25) return q;
-  return `${q}<div class="res" data-tip="<b>Taint ${Math.round(t * 100)}%</b>A big, full town with houses shoulder to shoulder builds the Sickness; at 100% it breaks out (now ${Math.round(pressure(s, p) * 100)}% pressure). A Temple eases it, thin streets and spare room slow it, and winter sharpens it.">☣${Math.round(t * 100)}%</div>`;
-}
 
 const RARE_ICON = { salt: '🧂', saltpetre: '💎', bloodiron: '🩸' } as const;
 
@@ -1492,6 +1758,7 @@ function resHint(r: string): string {
 
 export function nameOf(s: GameState, e: Ent): string {
   if (e.kind === 'unit' && s.kings.includes(e.id)) return 'King';
+  if (e.kind === 'building' && e.type === 'tower' && e.level) return TOWER_LEVELS[e.level - 1].name;
   return e.kind === 'unit' ? statsFor(s, e.owner, e.type).name : BUILDINGS[e.type].name;
 }
 
@@ -1522,7 +1789,7 @@ function nextTechs(p: Player, at: BuildingType): TechId[] {
 }
 
 function plural(name: string): string {
-  return name.endsWith('man') ? `${name.slice(0, -3)}men` : name.endsWith('ry') ? `${name.slice(0, -1)}ies` : `${name}s`;
+  return name.endsWith('man') ? `${name.slice(0, -3)}men` : name.endsWith('olf') ? `${name.slice(0, -1)}ves` : name.endsWith('ry') ? `${name.slice(0, -1)}ies` : `${name}s`;
 }
 
 /** Why a Town Center's other buttons wait while it is busy changing age. */

@@ -31,7 +31,7 @@ function pavilion(k: Kit, x: number, z: number, turn: number, a: string, b: stri
   // A counter, and wares on it and before it.
   k.box(0.7, 0.28, 0.24, '#8a6440', 0, 0, -0.12, g);
   k.box(0.72, 0.03, 0.26, CLOTH, 0, 0.28, -0.12, g);
-  for (const [dx, c] of [[-0.24, '#c8402e'], [-0.08, '#e0a030'], [0.08, '#7a3a8a'], [0.24, '#5a8a3a']] as [number, string][]) {
+  for (const [dx, c] of [[-0.24, '#b05a30'], [-0.08, '#e0a030'], [0.08, '#6e5a3a'], [0.24, '#5a8a3a']] as [number, string][]) {
     k.cyl(0.06, 0.05, 0.05, 7, '#b08a4e', dx, 0.31, -0.12, g);
     k.sphere(0.05, c, dx, 0.37, -0.12, g, 5).scale.set(1, 0.5, 1);
   }
@@ -80,17 +80,17 @@ function postGeometry(): THREE.BufferGeometry {
   k.prism(0.7, 0.2, 0.5, '#8a5a3a', 0, 0.9, 0);
   k.cyl(0.05, 0.04, 0.08, 6, '#8a6440', 0.05, 0.6, 0);
   // Pavilions on three sides, rugs and goods between them.
-  pavilion(k, -0.95, -0.85, 0.3, '#b8402e', CLOTH);
-  pavilion(k, 0.95, -0.8, -0.35, '#2e4a8a', CLOTH);
-  pavilion(k, -1.0, 0.9, Math.PI - 0.4, '#d89a2e', '#7a3a2e');
-  k.box(0.5, 0.03, 0.34, '#8a2e3a', 0.6, 0.05, 0.5).rotation.y = 0.4;
-  k.box(0.46, 0.05, 0.3, '#2e3a6a', 0.62, 0.08, 0.52).rotation.y = 0.5;
+  pavilion(k, -0.95, -0.85, 0.3, '#a8683a', CLOTH);
+  pavilion(k, 0.95, -0.8, -0.35, '#5e6a48', CLOTH);
+  pavilion(k, -1.0, 0.9, Math.PI - 0.4, '#c9a45a', '#6e4a30');
+  k.box(0.5, 0.03, 0.34, '#8a5a3a', 0.6, 0.05, 0.5).rotation.y = 0.4;
+  k.box(0.46, 0.05, 0.3, '#4a4a3a', 0.62, 0.08, 0.52).rotation.y = 0.5;
   for (const [x, z] of [[0.15, 1.15], [0.35, 1.2], [0.25, 1.0]]) k.sphere(0.12, '#d8c08a', x, 0.08, z, undefined, 6).scale.set(1, 0.75, 1);
   k.box(0.26, 0.24, 0.26, '#a07a4a', 1.15, 0.05, 0.1);
   k.box(0.2, 0.18, 0.2, '#8a6440', 1.2, 0.29, 0.12);
   camel(k, 1.05, 1.0, -0.6);
-  pennant(k, 1.35, -1.35, 2.2, '#e0b030');
-  pennant(k, -1.45, 0.0, 1.7, '#3a6aa8');
+  pennant(k, 1.35, -1.35, 3.0, '#e8dcb8');
+  pennant(k, -1.45, 0.0, 2.2, '#8a6a44');
   return bake(k.root);
 }
 

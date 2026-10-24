@@ -82,14 +82,15 @@ function hairOrHat(k: Kit, y: number, hat?: (k: Kit, y: number) => void, at?: TH
 function citizen(epoch: number): Kit {
   const k = new Kit();
   const outfits = [
-    { legs: SKIN, torso: FUR, belt: TEAM },
+    { legs: SKIN, torso: '#c9a47a', belt: TEAM },
     { legs: SKIN, torso: LINEN, belt: TEAM },
-    { legs: '#6b5a48', torso: '#8c7a5a', belt: TEAM },
-    { legs: '#5a5f6b', torso: LINEN, belt: TEAM },
-    { legs: '#454952', torso: '#8a7a64', belt: TEAM },
+    { legs: '#3f342a', torso: '#cdb98a', belt: TEAM },
+    { legs: '#2f333c', torso: LINEN, belt: TEAM },
+    { legs: '#3a3d45', torso: '#c8b898', belt: TEAM },
   ];
   const o = outfits[epoch];
-  const b = person(k, { legs: o.legs, torso: o.torso });
+  // The torso wears the people's colour so a worker reads as theirs from the default camera height.
+  const b = person(k, { legs: o.legs, torso: o.torso, torsoTeam: true });
   k.team(k.box(0.176, 0.035, 0.116, TEAM, 0, HIP + 0.02, 0));
   if (epoch === 2) {
     // A team-colored hood.
@@ -243,7 +244,7 @@ function ranged(epoch: number): Kit {
   }
   if (epoch === 0) {
     // Slinger: furs, team headband, a sling and a pouch of stones.
-    const b = person(k, { legs: SKIN, torso: FUR, belt: TEAM });
+    const b = person(k, { legs: SKIN, torso: '#c9a47a', belt: TEAM });
     k.team(k.box(0.176, 0.035, 0.116, TEAM, 0, HIP + 0.02, 0));
     hairOrHat(k, 0);
     k.team(k.cyl(0.07, 0.07, 0.022, 8, TEAM, 0, 0.53, 0));
@@ -1119,7 +1120,39 @@ function caravanCart(epoch: number): Kit {
   return k;
 }
 
-const MAKERS: Record<UnitType, (epoch: number) => Kit> = { citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, cog, fighter, bomber, trader, wagon };
+/** A War Wolf (the Age of the Wild): the wolf of the den, a size larger for good feeding, in its people's collar and a hide harness. */
+function warwolf(): Kit {
+  const k = wolf();
+  k.team(k.box(0.12, 0.035, 0.05, TEAM, 0, 0.27, 0.15));
+  k.box(0.115, 0.02, 0.18, LEATHER, 0, 0.275, -0.02);
+  return k;
+}
+
+/** A Tusker (the Age of the Wild): the boar of the berry patch under a saddle-cloth of its people's colour, its tusks capped in bone. */
+function tusker(): Kit {
+  const k = boar();
+  k.team(k.box(0.2, 0.025, 0.2, TEAM, 0, 0.36, -0.02));
+  for (const x of [-0.1, 0.1]) k.box(0.02, 0.1, 0.18, LEATHER, x, 0.27, -0.02);
+  return k;
+}
+
+/** A War Mammoth (the Age of the Wild): a howdah of lashed poles on a team blanket, a pennant, and a driver on its neck. */
+function warmammoth(): Kit {
+  const k = mammoth();
+  const top = 0.72;
+  k.team(k.box(0.5, 0.03, 0.55, TEAM, 0, top - 0.04, -0.05));
+  k.box(0.36, 0.14, 0.36, WOOD, 0, top, -0.08);
+  for (const [x, z] of [[-0.17, -0.25], [0.17, -0.25], [-0.17, 0.09], [0.17, 0.09]]) k.cyl(0.012, 0.012, 0.22, 4, WOOD, x, top + 0.1, z);
+  k.cyl(0.01, 0.01, 0.45, 4, WOOD, 0.15, top + 0.1, -0.24);
+  k.team(k.box(0.015, 0.1, 0.16, TEAM, 0.15, top + 0.45, -0.32));
+  // The driver: a hunched figure in furs with a goad.
+  k.box(0.08, 0.12, 0.08, '#7a5a3a', 0, top + 0.02, 0.25);
+  k.blob(0.04, '#c69a74', 0, top + 0.17, 0.26);
+  k.cyl(0.006, 0.006, 0.3, 3, WOOD, 0.06, top + 0.05, 0.3).rotation.x = 0.9;
+  return k;
+}
+
+const MAKERS: Record<UnitType, (epoch: number) => Kit> = { citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, cog, fighter, bomber, trader, wagon, warwolf, tusker, warmammoth };
 
 /** Epoch + 30 asks for the citizen as a thrall (the same offset trick as the trader's gold and the caravan cart). */
 export const THRALL_MODEL = 30;
@@ -1138,9 +1171,38 @@ function legionary(epoch: number): Kit {
   return k;
 }
 
-function makeUnit(type: UnitType, epoch: number): Kit {
-  if (type === 'infantry' && epoch >= LEGION_MODEL) return legionary(epoch - LEGION_MODEL);
-  return type === 'citizen' && epoch >= THRALL_MODEL ? thrall(epoch - THRALL_MODEL) : MAKERS[type](epoch);
+function makeUnit(type: UnitType, epochIn: number): Kit {
+  // The Atomic Age (#605) has no soldiers of its own yet: its people keep their Industrial look.
+  const epoch = epochIn === 5 ? 4 : epochIn;
+  if (type === 'infantry' && epoch >= LEGION_MODEL) return lineMark(legionary(epoch - LEGION_MODEL), type);
+  return type === 'citizen' && epoch >= THRALL_MODEL ? thrall(epoch - THRALL_MODEL) : lineMark(MAKERS[type](epoch), type);
+}
+
+/**
+ * What tells a line apart in a crowd (#624), the same in every epoch: foot soldiers wear a team cape that shows
+ * from behind and above, and infantry also a tall team crest, so a spear block reads taller than the archers
+ * behind it; citizens wear neither, so a soldier never looks like a worker.
+ */
+function lineMark(k: Kit, type: UnitType): Kit {
+  if (type === 'infantry' || type === 'ranged') k.team(k.box(0.21, 0.3, 0.03, TEAM, 0, 0.14, -0.085));
+  if (type === 'infantry') k.team(k.box(0.035, 0.15, 0.12, TEAM, 0, 0.58, -0.01));
+  // Riders, priests and heroes carry a team pennant on a short staff behind the shoulder; a hero's is the tallest.
+  if (type === 'cavalry' || type === 'priest' || type === 'hero') {
+    const top = type === 'hero' ? 0.98 : type === 'cavalry' ? 0.92 : 0.8;
+    k.cyl(0.008, 0.008, top - 0.3, 4, WOOD, 0.07, 0.3 + (top - 0.3) / 2, -0.1);
+    k.team(k.box(0.012, type === 'hero' ? 0.15 : 0.11, type === 'hero' ? 0.2 : 0.15, TEAM, 0.07, top - 0.06, -0.19));
+  }
+  // An engine flies a team flag from its frame, so a siege line is told apart from a cart.
+  if (type === 'siege') {
+    k.cyl(0.01, 0.01, 0.4, 4, WOOD, 0, 0.55, -0.2);
+    k.team(k.box(0.012, 0.13, 0.2, TEAM, 0, 0.7, -0.3));
+  }
+  // A ship flies a team ensign from a stern staff, so a fleet reads by owner from above as well as from the side.
+  if (type === 'warship' || type === 'transport' || type === 'cog') {
+    k.cyl(0.01, 0.01, 0.5, 4, WOOD, 0, 0.35, -0.62);
+    k.team(k.box(0.012, 0.12, 0.2, TEAM, 0, 0.55, -0.72));
+  }
+  return k;
 }
 
 // ---- Deer ------------------------------------------------------------------------------------------
@@ -1369,9 +1431,183 @@ const cache = new Map<string, THREE.BufferGeometry>();
 /** How high a unit line's head (or its banner pole) reaches, where a people's mark sits. */
 const MARK_Y: Partial<Record<UnitType, number>> = { infantry: 0.5, ranged: 0.5, priest: 0.5, cavalry: 0.98, siege: 0.8 };
 
+/** A people's own helmet shell and shield on its foot soldier, so Greek, Roman and Chinese ranks differ in outline and not only in plume. */
+function footGear(k: Kit, civ: CivId): void {
+  const shield = (r: number, col: string, boss: string, rot = 0.25): void => {
+    const s = k.cyl(r, r, 0.03, 10, col, -0.2, 0.24, 0.05);
+    s.rotation.z = Math.PI / 2;
+    s.rotation.y = rot;
+    k.cyl(0.03, 0.03, 0.04, 6, boss, -0.22, 0.24, 0.05).rotation.z = Math.PI / 2;
+  };
+  switch (civ) {
+    case 'greeks': // Corinthian helm with cheek-guards, a big bronze hoplon.
+      k.dome(0.082, BRONZE, 0, 0.5, 0.005);
+      k.box(0.03, 0.07, 0.02, BRONZE, 0, 0.47, 0.075);
+      shield(0.13, '#b88a3c', '#e8d08a');
+      break;
+    case 'romans': // Montefortino helm with a neck-guard, a tall red scutum.
+      k.dome(0.078, '#9aa0a6', 0, 0.5, 0);
+      k.box(0.17, 0.02, 0.05, '#9aa0a6', 0, 0.46, -0.07);
+      k.box(0.02, 0.2, 0.15, '#6e1d22', -0.2, 0.22, 0.05).rotation.y = 0.25;
+      k.box(0.03, 0.05, 0.04, '#e0b13c', -0.22, 0.22, 0.05);
+      break;
+    case 'chinese': // A lacquered cap with ear-flaps, a rectangular lacquered shield.
+      k.cone(0.085, 0.06, 8, '#2b2420', 0, 0.54, 0);
+      k.box(0.17, 0.025, 0.12, '#2b2420', 0, 0.47, 0);
+      k.box(0.02, 0.2, 0.13, '#5a2418', -0.2, 0.24, 0.05).rotation.y = 0.25;
+      k.box(0.03, 0.14, 0.03, '#f0c43a', -0.21, 0.24, 0.05);
+      break;
+    case 'egyptians': // A striped nemes-like cap and a hide shield with a notched top.
+      k.dome(0.08, '#e8e0c8', 0, 0.5, 0);
+      k.box(0.02, 0.1, 0.02, '#2f5fa8', 0, 0.47, 0.07);
+      shield(0.11, '#8a5a30', '#e0b13c');
+      break;
+    case 'mongols': // A fur-rimmed cap and a small round leather buckler.
+      k.cyl(0.085, 0.085, 0.03, 8, '#5a3d28', 0, 0.5, 0);
+      shield(0.08, '#6e5038', '#c9c2b0');
+      break;
+    case 'britons': // Bare-headed with a torque, a long painted oval shield.
+      k.cyl(0.075, 0.075, 0.012, 8, '#e0b13c', 0, 0.44, 0);
+      k.blob(0.1, '#3d6b4a', -0.2, 0.26, 0.05).scale.set(0.2, 1.5, 0.9);
+      break;
+  }
+}
+
+/** Archers and crossbowmen of each people: its own cap or hood, and a mantle across the back, so a bow line reads as Greek, Mongol or Chinese before the plume does. */
+function rangedGear(k: Kit, civ: CivId, epoch: number): void {
+  if (epoch === 1) {
+    switch (civ) {
+      case 'greeks': // A brimmed petasos against the sun.
+        k.cyl(0.11, 0.11, 0.012, 10, '#c9b27a', 0, 0.54, 0);
+        k.cone(0.07, 0.06, 8, '#c9b27a', 0, 0.55, 0);
+        break;
+      case 'romans': // An auxiliary's iron cap with a neck-guard.
+        k.dome(0.075, '#9aa0a6', 0, 0.5, 0);
+        k.box(0.15, 0.02, 0.04, '#9aa0a6', 0, 0.46, -0.07);
+        break;
+      case 'chinese': // A wide conical bamboo hat.
+        k.cone(0.14, 0.09, 10, '#d9c27a', 0, 0.55, 0);
+        break;
+      case 'egyptians': // A linen headcloth with two lappets.
+        k.dome(0.075, '#e8e0c8', 0, 0.5, 0);
+        for (const x of [-1, 1]) k.box(0.025, 0.1, 0.04, '#e8e0c8', x * 0.07, 0.46, 0.02);
+        break;
+      case 'mongols': // A fur-lined cap with ear-flaps.
+        k.cone(0.07, 0.09, 6, '#5a3d28', 0, 0.55, 0);
+        for (const x of [-1, 1]) k.box(0.02, 0.07, 0.05, '#5a3d28', x * 0.07, 0.47, 0);
+        break;
+      case 'britons': // Bare-headed, a woad-blue band across the brow.
+        k.cyl(0.07, 0.07, 0.02, 8, '#2f5fa8', 0, 0.52, 0);
+        break;
+    }
+  } else if (epoch === 2) {
+    const mantle: Record<CivId, string> = { greeks: '#b3282d', romans: '#6e1d22', chinese: '#2f6f62', egyptians: '#e0b13c', mongols: '#2f5fa8', britons: '#3d6b4a' };
+    k.box(0.17, 0.24, 0.02, mantle[civ], 0, 0.24, -0.08);
+  }
+}
+
+/** Priests and holy men of each people: a wreath, sash, cap, collar or fur, one a people's own. */
+function priestGear(k: Kit, civ: CivId, epoch: number): void {
+  if (epoch < 1 || epoch > 3) return;
+  switch (civ) {
+    case 'greeks': // A laurel wreath.
+      k.cyl(0.072, 0.072, 0.014, 10, '#4f7a3a', 0, 0.53, 0);
+      break;
+    case 'romans': // A purple-bordered toga fold over the shoulder.
+      k.box(0.05, 0.3, 0.13, '#6e2a6e', -0.06, 0.27, 0.0).rotation.z = 0.5;
+      break;
+    case 'chinese': // A flat black scholar's cap with two wings.
+      k.box(0.14, 0.02, 0.1, '#2b2420', 0, 0.58, 0);
+      for (const x of [-1, 1]) k.box(0.08, 0.012, 0.02, '#2b2420', x * 0.11, 0.58, 0);
+      break;
+    case 'egyptians': // A broad gold collar.
+      k.cyl(0.115, 0.13, 0.03, 10, '#e0b13c', 0, 0.4, 0);
+      break;
+    case 'mongols': // A fur collar and a blue sash.
+      k.cyl(0.1, 0.12, 0.05, 8, '#5a3d28', 0, 0.4, 0);
+      k.box(0.19, 0.03, 0.17, '#2f5fa8', 0, 0.22, 0);
+      break;
+    case 'britons': // A circlet of oak leaves and a green mantle.
+      k.cyl(0.072, 0.072, 0.014, 8, '#3d6b4a', 0, 0.53, 0);
+      k.box(0.2, 0.2, 0.02, '#3d6b4a', 0, 0.3, -0.1);
+      break;
+  }
+}
+
+/** Riders of each people: its own cap or helm on the horseman and knight, and a saddle blanket in the people's colour with a fringe that shows from the flank, so a cavalry line reads as Greek, Mongol or Briton before the pennant does. */
+function cavalryGear(k: Kit, civ: CivId, epoch: number): void {
+  if (epoch < 1 || epoch > 3) return;
+  const blanket: Record<CivId, [string, string]> = { greeks: ['#b3282d', '#e8d08a'], romans: ['#6e1d22', '#e0b13c'], chinese: ['#2f6f62', '#f0c43a'], egyptians: ['#2f5fa8', '#e0b13c'], mongols: ['#7a2f1f', '#e8e0c8'], britons: ['#3d6b4a', '#2f5fa8'] };
+  const [cloth, trim] = blanket[civ];
+  k.box(0.22, 0.03, 0.28, cloth, 0, 0.495, -0.03);
+  for (const x of [-1, 1]) {
+    k.box(0.012, 0.09, 0.26, cloth, x * 0.112, 0.43, -0.03);
+    k.box(0.014, 0.012, 0.26, trim, x * 0.113, 0.38, -0.03);
+  }
+  const hy = epoch === 2 ? 0.88 : 0.86; // head height of the rider
+  switch (civ) {
+    case 'greeks': // A horseman's petasos.
+      k.cyl(0.1, 0.1, 0.012, 10, '#c9b27a', 0, hy + 0.04, -0.02);
+      k.cone(0.065, 0.05, 8, '#c9b27a', 0, hy + 0.06, -0.02);
+      break;
+    case 'romans': // An iron cap with cheek-guards.
+      k.dome(0.075, '#9aa0a6', 0, hy, -0.02);
+      for (const x of [-1, 1]) k.box(0.02, 0.07, 0.05, '#9aa0a6', x * 0.07, hy - 0.04, -0.02);
+      break;
+    case 'chinese': // A lacquered cavalry cap.
+      k.cone(0.09, 0.07, 8, '#2b2420', 0, hy + 0.05, -0.02);
+      k.box(0.17, 0.02, 0.12, '#2b2420', 0, hy - 0.01, -0.02);
+      break;
+    case 'egyptians': // A linen cloth with two lappets.
+      k.dome(0.075, '#e8e0c8', 0, hy, -0.02);
+      for (const x of [-1, 1]) k.box(0.025, 0.1, 0.04, '#e8e0c8', x * 0.07, hy - 0.04, -0.01);
+      break;
+    case 'mongols': // A fur-rimmed steppe cap.
+      k.cone(0.07, 0.09, 6, '#5a3d28', 0, hy + 0.05, -0.02);
+      k.cyl(0.085, 0.085, 0.025, 8, '#3a2a1c', 0, hy, -0.02);
+      break;
+    case 'britons': // Bare-headed, a torque and braided hair.
+      k.cyl(0.07, 0.07, 0.012, 8, '#e0b13c', 0, hy - 0.06, -0.02);
+      k.box(0.03, 0.12, 0.03, '#b8742a', 0, hy - 0.04, -0.09);
+      break;
+  }
+}
+
+/** A hero's own crest, a rare distinction on the warlord and the mounted champions: a plume, a horsehair brush or a torque of gold, so two heroes of different peoples never read alike. */
+function heroGear(k: Kit, civ: CivId, epoch: number): void {
+  if (epoch < 1 || epoch > 3) return;
+  const hy = epoch === 1 ? 0.56 : 0.98;
+  const z = epoch === 1 ? 0 : -0.02;
+  switch (civ) {
+    case 'greeks': // A horsehair brush from ear to ear.
+      k.box(0.03, 0.07, 0.2, '#b3282d', 0, hy + 0.02, z);
+      break;
+    case 'romans': // A transverse crest of red feathers.
+      k.box(0.22, 0.06, 0.03, '#c0302f', 0, hy + 0.02, z);
+      break;
+    case 'chinese': // Twin pheasant plumes.
+      for (const x of [-1, 1]) k.cone(0.012, 0.18, 4, '#f0c43a', x * 0.04, hy + 0.08, z - 0.02).rotation.z = x * -0.4;
+      break;
+    case 'egyptians': // A rearing gold uraeus on the brow.
+      k.cone(0.025, 0.1, 4, '#e0b13c', 0, hy + 0.02, z + 0.07);
+      break;
+    case 'mongols': // A white horsetail banner behind the head.
+      k.cone(0.03, 0.22, 5, '#f1ece0', 0, hy - 0.04, z - 0.1).rotation.x = -0.9;
+      break;
+    case 'britons': // A pair of golden wings on the helm.
+      for (const x of [-1, 1]) k.box(0.1, 0.012, 0.03, '#e0b13c', x * 0.1, hy + 0.0, z).rotation.z = x * 0.5;
+      break;
+  }
+}
+
 /** A people's mark on its signature line: a crest, plume, headdress or banner, so its army reads at a glance. */
-function signatureMark(k: Kit, civ: CivId, type: UnitType): void {
+function signatureMark(k: Kit, civ: CivId, type: UnitType, epoch = 1): void {
   const y = MARK_Y[type] ?? 0.5;
+  if (type === 'infantry' && epoch >= 1 && epoch <= 3) footGear(k, civ);
+  else if (type === 'ranged') rangedGear(k, civ, epoch);
+  else if (type === 'priest') priestGear(k, civ, epoch);
+  else if (type === 'cavalry') cavalryGear(k, civ, epoch);
+  else if (type === 'hero') heroGear(k, civ, epoch);
   // Foot soldiers wear it on the head; siege and riders carry it on a pole behind.
   const pole = type === 'siege' || type === 'cavalry';
   const z = pole ? -0.2 : -0.01;
@@ -1411,7 +1647,7 @@ export function unitGeometry(type: UnitType, epoch: number, civ?: CivId): THREE.
   let g = cache.get(key);
   if (!g) {
     const kit = makeUnit(type, epoch);
-    if (civ) signatureMark(kit, civ, type);
+    if (civ) signatureMark(kit, civ, type, epoch);
     g = bake(kit.root);
     cache.set(key, g);
   }
@@ -1421,6 +1657,6 @@ export function unitGeometry(type: UnitType, epoch: number, civ?: CivId): THREE.
 /** The same model with the team color baked in (for portraits). */
 export function unitGeometryColored(type: UnitType, epoch: number, color: string, civ?: CivId): THREE.BufferGeometry {
   const kit = makeUnit(type, epoch);
-  if (civ) signatureMark(kit, civ, type);
+  if (civ) signatureMark(kit, civ, type, epoch);
   return bake(kit.root, color);
 }

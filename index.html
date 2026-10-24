@@ -15,7 +15,14 @@
   <body>
     <div id="app">
       <div id="world"></div>
-      <div id="loading" class="loading">Ages of Earth</div>
+      <div id="loading" class="loading" role="status">
+        <div class="loading-card">
+          <div class="loading-ages" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+          <h1>Ages <span>of</span> Earth</h1>
+          <p>From the first fire to the age of steam</p>
+          <div class="loading-bar" aria-hidden="true"><b></b></div>
+        </div>
+      </div>
 
       <div id="title" class="screen hidden">
         <p id="title-caption" class="title-caption" aria-hidden="true"></p>

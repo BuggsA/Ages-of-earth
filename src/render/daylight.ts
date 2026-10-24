@@ -36,16 +36,16 @@ interface Key {
 }
 
 const KEYS: Key[] = [
-  { h: 0, top: '#0c1a3c', horizon: '#1c2c54', sunColor: '#9db4ff', sun: 0.3, sky: 0.5, fill: 1.1, moon: 1 },
-  { h: 5, top: '#16224a', horizon: '#3c3f69', sunColor: '#9db4ff', sun: 0.3, sky: 0.5, fill: 1.1, moon: 1 },
+  { h: 0, top: '#0c1a3c', horizon: '#1c2c54', sunColor: '#9db4ff', sun: 0.3, sky: 0.62, fill: 1.1, moon: 1 },
+  { h: 5, top: '#16224a', horizon: '#3c3f69', sunColor: '#9db4ff', sun: 0.3, sky: 0.62, fill: 1.1, moon: 1 },
   { h: 6.5, top: '#6f8fc9', horizon: '#f2b48a', sunColor: '#ffb27a', sun: 0.95, sky: 0.9, fill: 1, moon: 0 },
   { h: 8, top: '#5aa7e0', horizon: '#cfe8f3', sunColor: '#fff3dc', sun: 1, sky: 1, fill: 1, moon: 0 },
   { h: 15, top: '#5aa7e0', horizon: '#cfe8f3', sunColor: '#fff3dc', sun: 1, sky: 1, fill: 1, moon: 0 },
   { h: 17.5, top: '#5b8fd0', horizon: '#f6c98b', sunColor: '#ffc27a', sun: 0.85, sky: 0.9, fill: 1, moon: 0 },
   { h: 19, top: '#54558f', horizon: '#f08a5d', sunColor: '#ff9a5a', sun: 0.6, sky: 0.7, fill: 1.05, moon: 0 },
   { h: 20.5, top: '#1e2a5a', horizon: '#6a4a7a', sunColor: '#a0a8ff', sun: 0.4, sky: 0.55, fill: 1.1, moon: 0.6 },
-  { h: 22, top: '#0c1a3c', horizon: '#1c2c54', sunColor: '#9db4ff', sun: 0.3, sky: 0.5, fill: 1.1, moon: 1 },
-  { h: 24, top: '#0c1a3c', horizon: '#1c2c54', sunColor: '#9db4ff', sun: 0.3, sky: 0.5, fill: 1.1, moon: 1 },
+  { h: 22, top: '#0c1a3c', horizon: '#1c2c54', sunColor: '#9db4ff', sun: 0.3, sky: 0.62, fill: 1.1, moon: 1 },
+  { h: 24, top: '#0c1a3c', horizon: '#1c2c54', sunColor: '#9db4ff', sun: 0.3, sky: 0.62, fill: 1.1, moon: 1 },
 ];
 
 export interface Light {
@@ -86,7 +86,7 @@ export function lightAt(hour: number): Light {
   const up = Math.max(0, Math.sin(Math.PI * t));
   const moon = num(a.moon, b.moon);
   const x = -Math.cos(Math.PI * t);
-  const y = 0.3 + 0.56 * up + 0.2 * moon;
+  const y = 0.24 + 0.46 * up + 0.2 * moon;
   const z = 0.36;
   const len = Math.sqrt(x * x + y * y + z * z);
   return {

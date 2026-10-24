@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { SoundName } from '../audio/sound';
 import { ageDef, ageOf } from '../sim/ages';
 import { fairground, feastOpen } from '../sim/fair';
-import { AURA, BUILDINGS, KEG, RALLY, RITE, SIGNATURES, TICK_HZ, LANDMARKS, RUINS, TRADE, domainOf } from '../sim/data';
+import { AURA, BUILDINGS, KEG, SILO, RALLY, RITE, SIGNATURES, TICK_HZ, LANDMARKS, RUINS, TRADE, domainOf } from '../sim/data';
 import { buildingMaxHp, statsFor } from '../sim/stats';
 import type { AgeId, BuildingType, CivId, Ent, GameEvent, GameState, Unit } from '../sim/types';
 import type { ScoutFlag } from '../ui/scoutFlags';
@@ -26,6 +26,7 @@ import { FairBannersView } from './fairBannersView';
 import { VigilCandlesView } from './vigilCandlesView';
 import { RuinsView } from './ruinsView';
 import { FindsView } from './findsView';
+import { SpringsView } from './springsView';
 import { RubbleView } from './rubbleView';
 import { CacheView } from './cacheView';
 import { KegView } from './kegView';
@@ -37,7 +38,7 @@ import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, coilField
 import { ResourcesView } from './resourcesView';
 import { Sky } from './sky';
 import { forcedHour, hourAt, lightAt, moonPhase } from './daylight';
-import { Weather, describeWeather, forcedWeather, moodOf, seasonalDay, weatherFor, windFor, type WeatherDay } from './weather';
+import { Weather, breathe, describeWeather, forcedWeather, moodOf, seasonalDay, weatherFor, windFor, type WeatherDay } from './weather';
 import { FogTexture, TerrainView, heightAt } from './terrain';
 import { AIR_ALT, UnitsView } from './unitsView';
 import { WATER_Y, WaterView } from './water';
@@ -63,7 +64,7 @@ export interface Selection {
   /** The building whose rally point to show. */
   rallyOf: number | null;
   /** A line of wall being laid out. */
-  wall: { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean } | null;
+  wall: { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean; type: 'wall' | 'dyke' | 'thornwall' | 'channel' } | null;
   /** Personal notes visible only in this browser. */
   scoutFlags: readonly ScoutFlag[];
 }
@@ -112,9 +113,11 @@ export class View {
   private vigilCandles = new VigilCandlesView();
   readonly ruins = new RuinsView();
   readonly finds = new FindsView();
+  readonly springs = new SpringsView();
   readonly rubble = new RubbleView();
   readonly caches = new CacheView();
   readonly kegs = new KegView();
+  private falloutTick = -1;
   readonly landmarks = new LandmarksView();
   /** When ground relics next sparkle. */
   private relicGlint = 0;
@@ -189,7 +192,7 @@ export class View {
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sky.mesh, this.hemi, this.fill, this.sun, this.sun.target);
-    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.finds.group, this.rubble.group, this.caches.group, this.kegs.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
+    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.finds.group, this.springs.group, this.rubble.group, this.caches.group, this.kegs.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
     this.scene.add(this.rangeGuides.mesh, this.borders.mesh, this.graze.mesh, this.foundations.mesh);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.post = new Post(this.renderer, this.scene, this.rig.camera);
@@ -257,6 +260,7 @@ export class View {
     this.vigilCandles.clear();
     this.ruins.clear();
     this.finds.clear();
+    this.springs.clear();
     this.rubble.clear();
     this.caches.clear();
     this.kegs.clear();
@@ -285,7 +289,8 @@ export class View {
     this.forcedDay = this.baseWeather !== null;
     this.baseWeather ??= weatherFor(s.seed, s.mapType);
     this.weatherSeason = this.currentSeason();
-    this.setWeather(this.forcedDay ? this.baseWeather : seasonalDay(this.baseWeather, this.weatherSeason));
+    this.seasonDay = this.forcedDay ? this.baseWeather : seasonalDay(this.baseWeather, this.weatherSeason);
+    this.setWeather(this.seasonDay);
   }
 
   /** Today's weather, in words for the opening banner ('' on a clear day). */
@@ -297,6 +302,8 @@ export class View {
   private baseWeather: WeatherDay | null = null;
   private forcedDay = false;
   private weatherSeason = 0;
+  /** The day the season sets, before a mist thins or thickens. */
+  private seasonDay: WeatherDay | null = null;
   private heardSeason = -1;
   /** Told when the season turns, so the sound can follow it. */
   /** Called when the viewer's people first see a ruin, relic or landmark (the HUD tells its lore). */
@@ -350,7 +357,7 @@ export class View {
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.sky.setGlare(m.sun, this.sunTint);
     // A full moon lights the night better than a crescent does; by day the phase means nothing.
-    this.baseSun = 2.5 * m.sun * l.sun * (1 - 0.4 * this.phase * l.moon);
+    this.baseSun = 3.0 * m.sun * l.sun * (1 - 0.4 * this.phase * l.moon);
     this.water.setStars(l.moon * (1 - m.grey));
     this.fireflies.setNight(this.weather.day.kind === 'clear' ? l.moon : 0);
     this.bats.setDusk(l.moon, this.weather.day.kind === 'clear');
@@ -362,13 +369,11 @@ export class View {
     this.owlLevel = Owls.level(l.moon, this.weather.day.kind === 'clear');
     // Windows and torches light up as the sun sets: the old strength by day, near double by night.
     glowUniform.uGlow.value = 0.9 + 1.2 * Math.min(1, l.moon + (1 - l.sun) * 0.9 + (1 - m.sky) * 0.3);
-    this.baseHemi = 1.0 * m.sky * l.sky;
-    this.fill.intensity = 0.4 * l.fill;
+    this.baseHemi = 0.75 * m.sky * l.sky;
+    this.fill.intensity = 0.3 * l.fill;
     this.sun.intensity = this.baseSun;
     this.hemi.intensity = this.baseHemi;
     (this.scene.fog as THREE.Fog).color.copy(this.horizon);
-    // The title looks low over the land, out past the map's edge: there the edge melts into the sky.
-    this.terrain.skirtTint(this.titleHour !== null ? this.horizon : null);
   }
 
   /** See the match through another player's eyes, or (with `reveal`) everyone's (replays). */
@@ -407,10 +412,16 @@ export class View {
     if (sn !== this.weatherSeason && this.baseWeather && !this.forcedDay) {
       this.weatherSeason = sn;
       const day = seasonalDay(this.baseWeather, sn);
-      if (day.kind !== this.weather.day.kind || day.strength !== this.weather.day.strength) {
+      if (day.kind !== this.seasonDay?.kind || day.strength !== this.seasonDay?.strength) {
+        this.seasonDay = day;
         this.setWeather(day);
         this.onWeather?.(day);
       }
+    }
+    // A mist thins and thickens over the match (never on a forced day, and not on the title's backdrop).
+    if (this.seasonDay?.kind === 'mist' && !this.forcedDay && this.titleHour === null) {
+      const day = breathe(this.seasonDay, s.tick / TICK_HZ / 60);
+      if (day.strength !== this.weather.day.strength) this.setWeather(day);
     }
     this.rig.update(dt);
     const p = s.players[this.viewer];
@@ -432,9 +443,13 @@ export class View {
     cam.updateProjectionMatrix();
     this.sky.mesh.position.copy(this.rig.camera.position);
     const fog = this.scene.fog as THREE.Fog;
+    // The title looks low over the land, out past the map's edge: there the edge melts into the sky. (Every
+    // frame, not only when the hour moves: a fixed hour must not leave the edge as dark unexplored ground.)
+    this.terrain.skirtTint(this.titleHour !== null ? this.horizon : null);
     // The title's low camera looks far across the land: let the haze begin farther off, so a misty day stays a view.
     const far = this.titleHour === null ? 1 : 1.6;
-    fog.near = this.rig.distance * 2.2 * this.reach * far;
+    // Whatever the weather, the ground the player is looking at stays clear: the haze never starts before the camera's target.
+    fog.near = Math.max(this.rig.distance * 2.2 * this.reach * far, this.rig.distance * 1.25);
     fog.far = (this.rig.distance * 5 + 60) * this.reach * far;
     this.weather.show(this.quality !== 'low');
     const sky = this.weather.update(this.time, dt, this.rig.target, this.rig.distance, this.renderer.getPixelRatio(), this.height);
@@ -446,6 +461,8 @@ export class View {
     this.hemi.intensity = this.baseHemi + this.flash * 2.2;
     this.sun.intensity = this.baseSun + this.flash * 1.5;
 
+    // The water layer (#701): ground pumped out of the water rises from it, and the shore's foam follows.
+    if (this.terrain.sync(s, dt)) this.water.refreshBed(s, (i) => this.terrain.heightOf(i));
     this.resources.update(s, dt);
     this.buildings.update(s, this.viewer, (b) => this.reveal || seesRect(s, this.viewer, b.tx, b.ty, b.size), dt, this.reveal);
     this.units.update(s, alpha, dt, this.time, this.visibleUnit, this.rig.camera, this.width, this.height, (x, y) => this.sees(x, y));
@@ -470,8 +487,20 @@ export class View {
     this.rubble.update(s, !!ageDef(p).salvage, (x, y) => this.reveal || this.sees(x, y));
     this.caches.update(s, (x, y) => this.reveal || this.sees(x, y), (id) => this.units.drawn.get(id) ?? null);
     this.kegs.update(s, (x, y) => this.reveal || this.sees(x, y), (id) => this.units.drawn.get(id) ?? null);
+    // Fallout (#605 s2): poisoned ground breathes a sickly green haze and drifting motes, a few times a second, where the viewer sees.
+    if (s.fallout && s.tick !== this.falloutTick && s.tick % 4 === 0) {
+      this.falloutTick = s.tick;
+      for (const f of s.fallout) {
+        if (!this.reveal && !this.sees(f.x, f.y)) continue;
+        const a = (s.tick * 0.37 + f.id) % 6.283;
+        const r = SILO.reach * (0.3 + ((s.tick / 4 + f.id) % 7) / 10);
+        const at = this.ground(s, f.x + Math.cos(a) * r, f.y + Math.sin(a) * r, 0.2);
+        this.effects.burst(at, { count: 2, speed: 0.25, up: 0.5, life: 2.2, size: 0.4, grow: 1.4, gravity: -0.15, drag: 1, soft: true, colors: ['#8fae3a', '#6f8c2e', '#a6bf4e'] });
+      }
+    }
     this.ruins.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     this.finds.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
+    this.springs.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1);
     this.landmarks.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     if (!this.reveal) {
       for (const f of this.sightings.scan(s, (x, y) => p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1)) {
@@ -545,7 +574,7 @@ export class View {
     this.bats.update(this.time, this.rig.target, this.rig.distance, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
     this.effects.placeTexts(this.rig.camera, this.width, this.height);
 
-    if (QUALITY[this.quality].post) this.post.render();
+    if (QUALITY[this.quality].post) this.post.render(QUALITY[this.quality].bloom);
     else this.renderer.render(this.scene, this.rig.camera);
   }
 
@@ -646,9 +675,12 @@ export class View {
     }
     // Health: the selected, the recently hurt, or everyone while asked.
     const recent = s.tick - TICK_HZ * 4;
+    // With a crowd on screen, "show all" keeps bars for the hurt and the selected only: a full bar says nothing.
+    const crowded = sel.allBars && s.ents.length > 120;
     for (const e of s.ents) {
       if (e.hp <= 0) continue;
-      const show = sel.ids.has(e.id) || sel.allBars || e.hurt > recent;
+      const hurtNow = e.hurt > recent || (e.kind === 'unit' && e.hp < statsFor(s, e.owner, e.type).hp);
+      const show = sel.ids.has(e.id) || (sel.allBars && (!crowded || hurtNow)) || e.hurt > recent;
       if (!show) continue;
       if (e.kind === 'unit') {
         const at = this.units.drawn.get(e.id);
@@ -662,7 +694,7 @@ export class View {
         if (!top) continue;
         if (!(e.owner === this.viewer || this.reveal || seesRect(s, this.viewer, e.tx, e.ty, e.size))) continue;
         top.y += 0.35;
-        bars.push({ at: top, width: Math.min(2.2, Math.max(0.6, e.size * 0.55)), frac: e.hp / buildingMaxHp(s, e.owner, e.type) });
+        bars.push({ at: top, width: Math.min(2.2, Math.max(0.6, e.size * 0.55)), frac: e.hp / buildingMaxHp(s, e.owner, e.type, e.level) });
       }
     }
     this.overlays.setRings(rings);
@@ -673,7 +705,7 @@ export class View {
     this.overlays.setBars(bars, this.rig.camera);
     const p = s.players[this.viewer];
     this.overlays.setGhost(s, sel.ghost ? { ...sel.ghost, epoch: p.epoch, color: p.color } : null);
-    this.overlays.setWallGhost(s, sel.wall?.tiles ?? [], p.epoch, p.color, sel.wall?.alongY ?? false);
+    this.overlays.setWallGhost(s, sel.wall?.tiles ?? [], p.epoch, p.color, sel.wall?.alongY ?? false, sel.wall?.type);
     const rb = sel.rallyOf ? s.byId.get(sel.rallyOf) : undefined;
     this.overlays.setFlag(s, rb && rb.kind === 'building' && rb.rally ? rb.rally : null, p.color, this.time);
     this.overlays.setScoutFlags(s, sel.scoutFlags, this.time);
@@ -701,7 +733,7 @@ export class View {
       if (e.kind !== 'building' || e.hp <= 0 || !e.built) continue;
       if (!(e.owner === this.viewer || this.reveal || seesRect(s, this.viewer, e.tx, e.ty, e.size))) continue;
       const next = (this.chimneys.get(e.id) ?? this.time + (e.id % 7) * 0.3) - dt;
-      const max = buildingMaxHp(s, e.owner, e.type);
+      const max = buildingMaxHp(s, e.owner, e.type, e.level);
       const frac = e.hp / max;
       const base = this.buildings.baseOf(e.id) ?? 0;
       if (next > this.time) {
@@ -846,6 +878,8 @@ export class View {
           this.effects.burst(at, ev.building
             ? { count: 4, speed: 1.2, life: 0.6, size: 0.06, colors: ['#9a8a74', '#c9b79c'], soft: true }
             : { count: 5, speed: 1.4, life: 0.35, size: 0.03, colors: ['#ffe2a8', '#ffffff'] });
+          // A blink of white at the wound, so a blow reads even when the sparks are small (#626).
+          if (!ev.building) this.effects.burst(at, { count: 1, speed: 0, life: 0.12, size: 0.2, grow: 0.3, gravity: 0, drag: 1, colors: ['#ffffff'] });
           this.cue(ev.building ? 'hitBuilding' : 'hit', ev.x, ev.y, 0.7);
           break;
         }
@@ -900,6 +934,18 @@ export class View {
           }
           break;
         }
+        case 'silo': {
+          // The Atomic Age (#605): a ring on the target the moment a warhead goes up, a dome of fire where it lands.
+          const at = this.ground(s, ev.x, ev.y, 0.3);
+          if (ev.what === 'launched') this.effects.ring(at, '#ff4a3a', SILO.reach + 0.5, 1.4);
+          else if (ev.what === 'struck' && this.sees(ev.x, ev.y)) {
+            this.effects.burst(at, { count: 60, speed: 5, up: 1.2, life: 1.2, size: 0.3, grow: 3, gravity: -1.4, drag: 1, colors: ['#fff6d0', '#ffd25a', '#ff7a2a'] });
+            this.effects.burst(at, { count: 50, speed: 2.2, up: 2.6, life: 5, size: 0.5, grow: 5, gravity: -0.6, drag: 0.8, soft: true, colors: ['#3a3430', '#524a44', '#6c625a'] });
+            this.effects.ring(at, '#ffe9a8', SILO.reach + 1, 1.6);
+            this.cue('kegBlow', ev.x, ev.y, 1);
+          }
+          break;
+        }
         case 'splash': {
           if (!this.sees(ev.x, ev.y)) break;
           const at = this.ground(s, ev.x, ev.y, 0.15);
@@ -937,6 +983,19 @@ export class View {
           // The wild (#171): a mammoth trumpets, a pack howls as it turns to fight.
           if (this.sees(ev.x, ev.y)) this.cue(ev.kind === 'mammoth' ? 'mammoth' : ev.kind === 'boar' ? 'snarl' : ev.kind === 'raider' ? 'rally' : 'howl', ev.x, ev.y, 1);
           break;
+        case 'tamed':
+          // The Age of the Wild: a beast takes the hand; a green ring where it stood, its own cry and the tamer's lullaby.
+          if (!this.sees(ev.x, ev.y)) break;
+          this.effects.ring(this.ground(s, ev.x, ev.y, 0.2), '#7fc46a', 1.4, 0.9);
+          this.cue('tame', ev.x, ev.y, 1);
+          this.cue(ev.kind === 'mammoth' ? 'mammoth' : ev.kind === 'boar' ? 'snarl' : 'howl', ev.x, ev.y, 0.5);
+          break;
+        case 'sprout':
+          // The Age of the Grove: a fallen Thornwall springs up again from its root.
+          if (!this.sees(ev.x, ev.y)) break;
+          this.effects.burst(this.ground(s, ev.x, ev.y, 0.1), { count: 10, speed: 0.8, up: 1.2, life: 0.8, size: 0.05, grow: 1.2, gravity: 0.6, drag: 1.5, soft: true, colors: ['#6f8f3e', '#9cc25a'] });
+          this.cue('sprout', ev.x, ev.y, 0.7);
+          break;
         case 'wildStrike':
           if (!this.sees(ev.x, ev.y)) break;
           if (ev.kind === 'raider') this.cue('spear', ev.x, ev.y, 0.8);
@@ -947,6 +1006,11 @@ export class View {
           if (!this.sees(ev.x, ev.y)) break;
           this.effects.burst(this.ground(s, ev.x, ev.y, 0.1), { count: 5, speed: 0.6, up: 0.4, life: 0.8, size: 0.05, grow: 1.8, gravity: -0.1, drag: 1.5, soft: true, colors: ['#bba98a', '#d6c7aa'] });
           this.resources.markDirty();
+          break;
+        case 'raised':
+          // The tower line: a tower raised a step shakes off a puff of mortar dust as its new walls go up.
+          if (ev.owner === this.viewer) this.onCue?.('research', 0, 1);
+          if (this.sees(ev.x, ev.y)) this.effects.burst(this.ground(s, ev.x, ev.y, 1.2), { count: 14, speed: 1.2, up: 0.6, life: 1, size: 0.08, grow: 1.6, gravity: -0.2, drag: 1.5, soft: true, colors: ['#bdb6a8', '#d8d1c2', '#9d978d'] });
           break;
         case 'researched':
           if (ev.owner === this.viewer) this.onCue?.('research', 0, 1);
@@ -1107,7 +1171,10 @@ export class View {
               this.cue('fall', ev.x, ev.y, 0.6);
               this.cue('heroFall', ev.x, ev.y, 0.9);
             } else {
-              this.effects.burst(this.ground(s, ev.x, ev.y, 0.1), { count: 4, speed: 0.5, up: 0.4, life: 0.8, size: 0.05, grow: 1.8, gravity: -0.1, drag: 1.5, soft: true, colors: ['#bba98a', '#d6c7aa'] });
+              const grave = this.ground(s, ev.x, ev.y, 0.1);
+              this.effects.burst(grave, { count: 4, speed: 0.5, up: 0.4, life: 0.8, size: 0.05, grow: 1.8, gravity: -0.1, drag: 1.5, soft: true, colors: ['#bba98a', '#d6c7aa'] });
+              // A ring in the fallen's colour: a battle shows whose people are dying (#626).
+              this.effects.ring(grave, s.players[ev.owner].color, 0.9, 0.6);
               this.cue('fall', ev.x, ev.y, 0.6);
             }
           } else {
@@ -1117,6 +1184,9 @@ export class View {
             this.effects.burst(at, { count: 30, speed: 2.2, up: 0.6, life: 2.2, size: 0.22, grow: 3, gravity: -0.2, drag: 1.4, soft: true, colors: ['#8d8072', '#b3a594', '#5a524a'] });
             this.effects.burst(at, { count: 14, speed: 3, up: 0.8, life: 1.1, size: 0.07, gravity: 5, drag: 0.5, colors: ['#6e4f33', '#9a948a'] });
             this.effects.ring(at, '#d9c7a8', ev.size * 1.2, 1.1);
+            // A flash of the owner's colour over the rubble: whose building fell reads even in a crowd (#626).
+            this.effects.ring(this.ground(s, ev.x, ev.y, 0.12), s.players[ev.owner].color, ev.size * 1.8, 0.7);
+            this.effects.burst(at.clone().setY(at.y + 0.5), { count: 10, speed: 1.6, up: 1.2, life: 0.9, size: 0.06, gravity: 3, colors: [s.players[ev.owner].color, '#fff3c4'] });
             this.cue('collapse', ev.x, ev.y, 1);
             this.onPing?.(ev.x, ev.y, '#ff6a5a');
           }
@@ -1189,10 +1259,26 @@ export class View {
           }
           break;
         }
+        case 'regrown':
         case 'depleted':
         case 'spawned':
           this.resources.markDirty();
           break;
+        case 'drained': {
+          // A tile of the bay pumped dry (#701): the shoal on it is gone, a spurt of muddy water, the mill's creak and the water running out.
+          this.resources.markDirty();
+          if (!this.sees(ev.x, ev.y)) break;
+          this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.06, ev.y), { count: 6, speed: 0.7, up: 0.9, life: 0.8, size: 0.05, gravity: 3, colors: ['#8a7d5c', '#b8c8c4', '#6f6650'] });
+          this.cue('pump', ev.x, ev.y, 0.3);
+          break;
+        }
+        case 'dug': {
+          // Water runs into a dug ditch (#701, the Age of Rivers): a splash at the head of the flow, and a soft gurgle now and then.
+          if (!this.sees(ev.x, ev.y)) break;
+          this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.05, ev.y), { count: 5, speed: 0.6, up: 0.8, life: 0.7, size: 0.045, gravity: 3, colors: ['#9fc4cf', '#d8ecef', '#6f8f86'] });
+          if (ev.tile % 3 === 0) this.cue('flow', ev.x, ev.y, 0.25);
+          break;
+        }
         case 'deliver':
           if (ev.owner === this.viewer) this.resources.markDirty();
           break;
@@ -1411,8 +1497,8 @@ export class View {
     return null;
   }
 
-  /** What is under the pointer: a unit, a building, a resource, or the ground. */
-  pick(clientX: number, clientY: number): Pick | null {
+  /** What is under the pointer: a unit, a building, a resource, or the ground. Units `through` says yes to are looked past, to what they stand at. */
+  pick(clientX: number, clientY: number, through?: (id: number) => boolean): Pick | null {
     const s = this.state;
     if (!s) return null;
     const r = this.renderer.domElement.getBoundingClientRect();
@@ -1421,6 +1507,7 @@ export class View {
     let best: number | null = null;
     let bestD = Infinity;
     for (const u of this.units.screen) {
+      if (through?.(u.id)) continue;
       const d = Math.hypot(u.sx - px, u.sy - py);
       if (d < u.r * 1.3 && d < bestD) {
         bestD = d;
@@ -1495,7 +1582,7 @@ export class View {
   }
 
   /** Whether the viewer knows of this building (to show it on the minimap). */
-  knownBuildings(): Iterable<{ id: number; owner: number; x: number; y: number; size: number }> {
+  knownBuildings(): Iterable<{ id: number; owner: number; x: number; y: number; size: number; type: string }> {
     return this.buildings.known.values();
   }
 
@@ -1533,6 +1620,11 @@ function sideAgeAmbient(fx: Effects, age: AgeId, e: Ent, base: number): boolean 
   }
   if (age === 'sail' && e.type === 'dock') {
     fx.burst(new THREE.Vector3(e.x + 0.4, base + 0.3, e.y + 1.7), { count: 1, speed: 0.25, up: 0.4, life: 1.3, size: 0.05, grow: 2, gravity: -0.1, drag: 0.5, soft: true, colors: ['#ffffff', '#cfe9ef'] });
+    return true;
+  }
+  // The Golden Age (#703): gold motes drift up from the great buildings.
+  if (age === 'golden' && (e.type === 'towncenter' || e.type === 'temple' || e.type === 'market' || e.type === 'wonder')) {
+    fx.burst(new THREE.Vector3(e.x + (Math.random() - 0.5) * 1.6, base + 1.2, e.y + (Math.random() - 0.5) * 1.6), { count: 1, speed: 0.12, up: 1, life: 3, size: 0.05, gravity: -0.25, drag: 0.4, soft: true, colors: ['#ffe08a', '#fff4c8', '#e2b440'] });
     return true;
   }
   if (age === 'fair' && e.type === 'market') {

@@ -4,6 +4,7 @@
  */
 
 import type { ScenarioRun } from './campaign';
+import type { ChannelPlan, DykePlan } from './water';
 
 export type Res = 'food' | 'wood' | 'stone' | 'gold';
 export const RES: readonly Res[] = ['food', 'wood', 'stone', 'gold'];
@@ -14,12 +15,18 @@ export type UnitType =
   | 'citizen' | 'infantry' | 'ranged' | 'cavalry' | 'siege' | 'priest' | 'hero'
   | 'fisher' | 'warship' | 'transport' | 'cog' | 'fighter' | 'bomber' | 'trader'
   /** A packed Town Center or House on the move (the Age of the Steppe, #297). */
-  | 'wagon';
+  | 'wagon'
+  /** Beasts of the Age of the Wild (`docs/wild-road.md`): tamed from the wild, or bred at a Beast Den once a kind is tamed. */
+  | 'warwolf' | 'tusker' | 'warmammoth';
 /** How a unit gets about: on foot, on the water, or in the air. */
 export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
   | 'towncenter' | 'house' | 'storehouse' | 'farm' | 'barracks' | 'range' | 'stable' | 'tower'
-  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai' | 'drainrig' | 'transfusion' | 'bloodtower' | 'snare' | 'prospector' | 'mission';
+  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai' | 'drainrig' | 'transfusion' | 'bloodtower' | 'snare' | 'prospector' | 'mission' | 'silo' | 'sapling' | 'shaft' | 'dyke' | 'windmill' | 'den'
+  /** The Age of the Grove (`docs/wild-road.md`, `grove.ts`): a wall that grows, a one-tile garden, fruit trees. */
+  | 'thornwall' | 'garden' | 'orchard'
+  /** The Age of Rivers (#701): a ditch dug from the water, which fills and is gone. */
+  | 'channel';
 /** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
 export type Difficulty = 'gentle' | 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
@@ -39,7 +46,7 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'chart' | 'assay' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
 export type PathId = 'blood' | 'steppe' | 'hemocraft' | 'rite';
@@ -68,6 +75,8 @@ export const R_SALTPETRE = 9;
 export const R_BLOODIRON = 10;
 export type RareId = 'salt' | 'saltpetre' | 'bloodiron';
 export const RARES: readonly RareId[] = ['salt', 'saltpetre', 'bloodiron'];
+/** What a Mine Shaft can dig (#681): stone or gold anywhere, a rare ore only over its old workings. */
+export type SeamId = 'stone' | 'gold' | RareId;
 /** A key resource (#555 spine §3): something only some worlds place that opens an age or a technology. The Prospector's Lodge answers for each. */
 export type KeyId = 'bogIron' | RareId | 'ruin';
 export const KEYS: readonly KeyId[] = ['bogIron', ...RARES, 'ruin'];
@@ -120,13 +129,18 @@ export type Order =
   /** Carry what is held to a drop site, then go idle. */
   | { k: 'deliver' }
   /** Walk into a building to shelter (and add arrows to its volleys). */
-  | { k: 'garrison'; target: number }
+  /** `flee` when a citizen ran for shelter on its own: it comes out again once the danger has passed. */
+  | { k: 'garrison'; target: number; flee?: true }
   /** Hunt an animal; once it falls, butcher it. With `fight`, a wolf fought off: nothing to butcher. */
   | { k: 'hunt'; target: number; fight?: boolean }
   /** Milk a sheep of the people's flock (#308), carry the milk to a drop site, and back. */
   | { k: 'milk'; target: number; phase: 'go' | 'work' | 'drop' }
+  /** Tame a wild beast (the Age of the Wild, `TAME`): walk to it and sing it calm; `t` counts the ticks sung so far. */
+  | { k: 'tame'; target: number; t: number }
   /** Walk the trap line (#485): empty a snare of its people's, on to the next with game in it, and the catch home. */
   | { k: 'snare'; target: number; phase: 'go' | 'work' | 'drop' }
+  /** Work a Mine Shaft (#681): dig its seam, carry the load to a drop site, and back. `res` is the stock the seam pays into, kept in step with it. */
+  | { k: 'shaft'; target: number; res: Res; phase: 'go' | 'work' | 'drop' }
   /**
    * A priest turning an enemy to your side: `done` ticks of chanting so far. A Blood-rite priest (#355 s4) may instead chant a `rite`
    * over a living enemy: to `sacrifice` it for its blood, or to `curse` it.
@@ -210,6 +224,10 @@ export interface Unit {
   miss: number;
   /** The work a citizen was pulled off (to build, or by the town bell), to go back to afterward. */
   resume: Order | null;
+  /** Whether this citizen runs from danger, overriding its player's setting; absent follows the player. */
+  flee?: boolean;
+  /** Tick this citizen last ran from danger, or took shelter from it; absent if it is not one that fled. */
+  fled?: number;
   act: Act;
   /** Tick of the last swing or shot (for the strike animation). */
   swing: number;
@@ -231,6 +249,8 @@ export interface Unit {
   ore?: { id: RareId; n: number; from: number };
   /** Enemy soldiers it has defeated (older saves lack it). */
   vet?: number;
+  /** The set line (#501): where a longbow people's bowman last stood, and the tick it came to rest there. */
+  rest?: { x: number; y: number; at: number };
   /** A citizen taken captive in the Age of the Warband (#502): it gathers and farms but never builds. */
   thrall?: boolean;
   /** A wagon (#297): the building it carries, and that building's health as a share of its full health. */
@@ -251,6 +271,8 @@ export interface TrainItem {
   tech?: TechId;
   /** The Hearth's kin (#463 s1): this many citizens come out together when the work is done. */
   kin?: number;
+  /** A Watch Tower raised one step (the tower line, `TOWER_LEVELS`): true while this item is that work. */
+  rise?: true;
   /** Ticks of work done. */
   done: number;
   /** What was paid, refunded if it is cancelled. */
@@ -278,6 +300,8 @@ export interface Building {
   advance: number;
   /** The age it is advancing into; absent means the trunk's next epoch (and older saves). */
   advanceTo?: AgeId;
+  /** The tick a Missile Silo is refuelled and can launch again (#605); absent until its first launch. */
+  rearm?: number;
   /** Set while the advance is a step back (#47) to the trunk age one tier down; absent otherwise. */
   back?: boolean;
   /**
@@ -285,6 +309,16 @@ export interface Building {
    * it leaves), it keeps that age's work on any road after. Absent: no keepsake (and older saves).
    */
   keep?: AgeId;
+  /** A Watch Tower's step on the tower line (`TOWER_LEVELS`): 1 Guard Tower, 2 Keep, 3 Bastion. Absent: a plain Watch Tower (and older saves). */
+  level?: number;
+  /** The Age of the Grove (`grove.ts`): seconds a Thornwall or Orchard has grown since it was planted (spring counts double for a Thornwall). Absent: none yet. */
+  grown?: number;
+  /** A Kitchen Garden (`grove.ts`): what feeds it, refreshed each second: 1 a Den's dung, 2 water beside it. Absent: neither. */
+  fed?: number;
+  /** A Thornwall its own people grubbed out (deleted): it leaves no root to regrow. */
+  grub?: boolean;
+  /** A Windmill (#701): the tick it last pumped a tile dry, so its sails show it at work. Absent: it never has. */
+  pumped?: number;
   /** Where new units go. `kind` is the resource the flag was set on (absent on bare ground), so it outlives its tile (#344). */
   rally: { x: number; y: number; tile: number; kind?: number } | null;
   cool: number;
@@ -331,6 +365,8 @@ export interface Building {
   kill?: boolean;
   /** A Snare (#485): the food caught in it so far, waiting for a tender. Absent: none. */
   snared?: number;
+  /** A Mine Shaft (#681): the seam its miner digs (`SHAFT.seams`). Absent: the best its ground holds (`shafts.ts`). */
+  seam?: SeamId;
 }
 
 export type Ent = Unit | Building;
@@ -363,8 +399,6 @@ export interface TradePost {
   /** How flooded its market was at `glutAt` (#493): trips there pay `1 − glut`; healed lazily by `glutNow`. Absent until a trader loads. */
   glut?: number;
   glutAt?: number;
-  /** Tick until which a sick people's trader has left this post foul (#541); absent until one has. */
-  foul?: number;
   /** Rare ores this world lacks that the post sells (#573); absent where it sells none. */
   sells?: RareId[];
 }
@@ -401,6 +435,36 @@ export interface Rubble {
   /** Stripping done so far, in ticks of one citizen's work. */
   done: number;
   /** The tick it is cleared away. */
+  until: number;
+}
+
+/** A tree growing on a tile (#501, the managed wood): from the tick it was cut or planted to the tick it stands full again. */
+export interface Stool {
+  tile: number;
+  from: number;
+  at: number;
+}
+
+/** A warhead in the air (#605, `silo.ts`): launched from `silo`, it lands at (`x`, `y`) on tick `at`. */
+export interface Launch {
+  id: number;
+  /** The warhead leaves no fallout where it lands (the Age of Fusion, #605 s3). */
+  clean?: boolean;
+  owner: number;
+  silo: number;
+  x: number;
+  y: number;
+  at: number;
+}
+
+/** Ground poisoned by a warhead that struck at (`x`, `y`) for `owner`, until tick `until` (#605 s2, `silo.ts`). */
+export interface Fallout {
+  id: number;
+  /** The radius, when it is not `SILO.reach` (the Age of Fission poisons ground round its own silo). */
+  r?: number;
+  owner: number;
+  x: number;
+  y: number;
   until: number;
 }
 
@@ -540,6 +604,8 @@ export interface Animal {
   hungry?: boolean;
   /** The tick a citizen last milked it: it stands still for them. */
   held?: number;
+  /** The citizen singing it tame (the Age of the Wild): it stands calm for them, and a wound breaks the song. */
+  tamer?: number;
 }
 
 export interface Shot {
@@ -587,6 +653,10 @@ export interface PlayerStats {
   relicGold?: number;
   /** Gold paid in tithes by Missions (#555 s12). */
   tithe?: number;
+  /** Tiles of water pumped out into polder (#701). */
+  drained?: number;
+  /** Tiles of land dug out into channels, filled with water (#701, the Age of Rivers). */
+  dug?: number;
   /** Fish landed by boats (the Age of Sail's deed); absent in older saves. */
   fished?: number;
   /** Beacons lit on the people's towers, relays included (the Age of Lightning's deed, #231); absent in older saves. */
@@ -595,6 +665,12 @@ export interface PlayerStats {
   hunted?: number;
   /** Milk drawn from the flock by citizens (the Age of the Horde's deed, #318); absent in older saves. */
   milked?: number;
+  /** Food foraged from wild berry bushes (the Age of the Wild's deed); absent in older saves. */
+  foraged?: number;
+  /** Wild beasts tamed (the Age of the Wild); absent in older saves. */
+  tamed?: number;
+  /** Beasts reared at a Beast Den (the Age of the Grove's deed); absent in older saves. */
+  bred?: number;
   /** Food taken from snares (#485); absent in older saves. */
   snared?: number;
   /** Gold taken as tribute by riders standing in rivals' land (#318); absent in older saves. */
@@ -667,6 +743,12 @@ export interface Player {
   civ: CivId;
   /** Controlled by the computer, at this level; null for a person. */
   ai: Difficulty | null;
+  /** A person who left an online match, whose people the computer leads until they come back; absent otherwise. */
+  left?: true;
+  /** Citizens stand their ground instead of running from danger (see `FLEE`); absent means they run. */
+  noFlee?: true;
+  /** The flock tends itself (see `SHEPHERD`); set at the start of a game for a person's people, absent means by hand. */
+  shepherd?: true;
   team: number;
   res: Stock;
   /** Blood in store (#355): drawn at Drain Rigs from the enemy dead and by the levy; absent until the first drop. */
@@ -682,6 +764,8 @@ export interface Player {
   age?: AgeId;
   /** Side ages this people has stood in, in the order first entered (heirlooms, #224); absent if none. The age it stands in counts too (see `hasWalked`). */
   walked?: AgeId[];
+  /** Kinds of beast this people has tamed (the Age of the Wild): a Beast Den breeds only these. Absent if none. */
+  tamed?: ('wolf' | 'boar' | 'mammoth')[];
   /**
    * The Prospector's Lodge's chart (#565): every key-resource tile in the world as it was when charted, which the
    * minimap marks under fog. A picture of that moment, not sight: a vein dug out since still shows. Absent until charted.
@@ -695,12 +779,6 @@ export interface Player {
   way?: WayId;
   /** The Way was deepened in the Bronze Age (#338). */
   deep?: boolean;
-  /** Taint building in a crowded town (#541), 0 to 1; absent while it is clean. */
-  taint?: number;
-  /** The Sickness now in the town (#541): its severity, 0 to 1, and the tick it broke; absent when there is none. */
-  fever?: { sev: number; since: number };
-  /** The town keeps quarantine (#541): no trader loads, no taint comes by the roads. */
-  quarantine?: boolean;
   /** The Bronze Age vow has been made, deepening or turning (#338). */
   vowed?: boolean;
   /** Tick this people was last told that raiders carried off its food (#463 s1); absent if never. */
@@ -713,6 +791,8 @@ export interface Player {
   told?: TidingId[];
   /** Tick its last step back (#47) landed, for the cooldown; absent if it never stepped back. */
   backAt?: number;
+  /** The tick the people's Golden Age began (#703); gone once it ends. */
+  goldenAt?: number;
   techs: TechId[];
   /**
    * Researched, but above the tier a step back (#47) took the people down to: idle until they climb
@@ -748,12 +828,18 @@ export type GameEvent =
   | { k: 'animalDie'; id: number; x: number; y: number; fx: number; fy: number; kind?: Animal['kind'] }
   /** A mammoth or wolf turns to fight (#171): its cry. */
   | { k: 'wildCry'; id: number; kind: Animal['kind']; x: number; y: number }
+  /** A wild beast tamed (the Age of the Wild). */
+  | { k: 'tamed'; owner: number; kind: Animal['kind']; x: number; y: number }
+  /** A fallen Thornwall sprouts again from its root (the Age of the Grove). */
+  | { k: 'sprout'; owner: number; x: number; y: number }
   /** A mammoth gores, or a wolf bites, someone. */
   | { k: 'wildStrike'; id: number; kind: Animal['kind']; target: number; x: number; y: number }
   /** A raider camp (own pitch) stands empty: whose people cleared it, and the plunder they took. */
   | { k: 'campCleared'; owner: number; x: number; y: number; gold: number; food: number; wood: number }
   | { k: 'trained'; id: number; owner: number; type: UnitType }
   | { k: 'researched'; owner: number; tech: TechId }
+  /** A Watch Tower finished a step on the tower line (`TOWER_LEVELS`). */
+  | { k: 'raised'; owner: number; id: number; level: number; x: number; y: number }
   /** A Prospector's Lodge finished (#562): the key resources this world holds, for the people who raised it. */
   | { k: 'prospect'; owner: number; finds: KeyId[] }
   /** A find claimed (#588): by whom, what it was, the key resource it speaks of, and its reward. */
@@ -775,6 +861,8 @@ export type GameEvent =
   | { k: 'cache'; owner: number; from: number; ore: RareId; n: number; x: number; y: number; what: 'spilled' | 'taken' | 'kept' }
   /** A powder keg (#577): `ground` at the mills, `laid` at a building's foot, `blown`, or `doused` by a rival who reached it. */
   | { k: 'keg'; owner: number; x: number; y: number; what: 'ground' | 'laid' | 'blown' | 'doused'; by?: number }
+  /** A Missile Silo's warhead (#605): `launched` (the clock starts), `scrubbed` (the silo fell) or `struck`. */
+  | { k: 'silo'; owner: number; x: number; y: number; what: 'launched' | 'scrubbed' | 'struck'; fuse?: number }
   /** A trader bought a load of rare ore at a post (#573). */
   | { k: 'oreBuy'; owner: number; ore: RareId; n: number; gold: number; x: number; y: number }
   | { k: 'ruin'; id: number; owner: number; find: RuinFind; tech?: TechId; x: number; y: number }
@@ -788,8 +876,14 @@ export type GameEvent =
   | { k: 'deliver'; owner: number; res: Res; amount: number; x: number; y: number; rare?: RareId }
   | { k: 'work'; id: number; owner: number; act: Act; x: number; y: number }
   | { k: 'depleted'; tile: number }
+  /** A coppice stool or a planted sapling (#501) grew into a full tree on `tile`. */
+  | { k: 'regrown'; tile: number }
   /** The Shore's spring (#482): the shoals left grew by `grew` fish in all, and `seeded` new shoals were laid. */
   | { k: 'spawned'; grew: number; seeded: number }
+  /** A windmill pumped a tile of water out into polder (#701): `mill` is the windmill, `tile` the new land. */
+  | { k: 'drained'; owner: number; mill: number; tile: number; x: number; y: number }
+  /** Water ran into a dug ditch (#701, the Age of Rivers): `tile` is the new channel. */
+  | { k: 'dug'; owner: number; tile: number; x: number; y: number }
   | { k: 'season'; i: number }
   /** A payday for hired swords (the Age of Merchants): how many went unpaid, and how many of those walked off. */
   | { k: 'wages'; owner: number; late: number; gone: number }
@@ -811,15 +905,14 @@ export type GameEvent =
   | { k: 'graft'; owner: number; id: number; x: number; y: number; how: 'made' | 'crash' }
   /** A people left an age (#555 s11): this building, its keepsake, keeps that age's work. */
   | { k: 'keepsake'; owner: number; id: number; age: AgeId; x: number; y: number }
+  /** A Golden Age begins (#703), told to every people: the ages it weaves, and the tick it ends. Or it ends (`over`). */
+  | { k: 'golden'; owner: number; threads: AgeId[]; ends: number; over?: boolean }
   /** A War Camp left without its soldiers (#303): it burns after a grace, or at once if its people left the path (`struck`). */
   /** Citizens called up at a War Camp (#313): each became the foot soldier `id` where it stood. */
   | { k: 'callUp'; owner: number; camp: number; ids: number[]; x: number; y: number }
   /** Riders of a horde (#318) took `gold` in tribute from `from`, standing in its land: `ids` are the riders counted. */
   /** A household people's payday (#501): `gold` came in from the houses `ids`. */
   | { k: 'tax'; owner: number; gold: number; ids: number[] }
-  /** The Sickness (#541): it broke out, ended, or took citizens. */
-  | { k: 'sick'; owner: number; what: 'broke' | 'ended' | 'died'; n?: number }
-  | { k: 'quarantine'; owner: number; on: boolean }
   | { k: 'tribute'; owner: number; from: number; gold: number; stone?: number; ids: number[]; x: number; y: number }
   /** A rival trader of `from`'s paid `owner` a toll of `gold` for safe passage across its land (#334). */
   | { k: 'toll'; owner: number; from: number; gold: number; id: number; x: number; y: number }
@@ -903,6 +996,21 @@ export interface GameState {
   gateTeam: Int8Array;
   /** Bumped whenever a tile's walkability changes, so cached distance fields know to refresh. */
   blockVersion: number;
+  /**
+   * The water layer (#701, the Water Road): per tile, 1 where water was pumped out into polder (now land, `T_GRASS`). Absent until the
+   * first tile drains (and in older saves); `water.ts` reads and writes it.
+   */
+  polder?: Uint8Array;
+  /**
+   * The Age of Rivers' channels (#701): per tile, 1 where land was dug out and the water ran in (now `T_WATER`, but wadeable: no
+   * `B_TERRAIN`). Absent until the first ditch fills (and in older saves); `water.ts` reads and writes it.
+   */
+  channel?: Uint8Array;
+  /**
+   * Spring heads (#701 s1): tiles by the towns that had no water near, laid by mapgen. Nothing is built on one; a channel dug beside
+   * it fills from it, and it opens into the channel (leaving this list); it waters the fields round it. Absent where there are none.
+   */
+  springs?: number[];
   players: Player[];
   /** Every unit and building, in the order they were made (ids rise). */
   ents: Ent[];
@@ -910,6 +1018,12 @@ export interface GameState {
   animals: Animal[];
   /** Carcasses that are spoiling: the tile, the tick it fell, what it held (old saves have none). */
   carcasses?: { tile: number; born: number; full: number }[];
+  /** Coppice stools and planted saplings growing into trees (#501, `coppice.ts`), in the order they were cut or planted; absent until the first. */
+  stools?: Stool[];
+  /** Roots of fallen Thornwalls (the Age of the Grove, `grove.ts`) waiting to sprout again at tick `at`; absent until the first. */
+  roots?: { tile: number; owner: number; at: number }[];
+  /** Per tile: the R_* kind of a stone, gold or rare-ore deposit worked out there, or 0 (#681, old workings for a Mine Shaft); absent until the first. */
+  spent?: Uint8Array;
   /** Per tile: the tick cropped grass grows back (#308), made when the first sheep is; absent until then. */
   grazed?: Int32Array;
   relics: Relic[];
@@ -935,6 +1049,10 @@ export interface GameState {
   caches?: OreCache[];
   /** Powder kegs laid with their fuses burning (#577, `powder.ts`); absent until one is laid. */
   kegs?: Keg[];
+  /** Warheads in the air (#605, `silo.ts`); absent until one is launched. */
+  launches?: Launch[];
+  /** Ground poisoned by warheads that have struck (#605 s2); absent until one does. */
+  fallout?: Fallout[];
   /** Contested landmarks; absent in older saves and in campaign chapters (none). */
   landmarks?: Landmark[];
   /** Whether this world holds bog iron (#39), decided by the seed; absent in older saves (none). */
@@ -981,6 +1099,8 @@ export interface AiMemory {
   bellMoved?: number;
   /** Tick it last looked for a dock site and found none (so it doesn't look every turn). */
   dockless?: number;
+  /** Tick it last looked whether the deposits near home are gone, for a Mine Shaft (#681). */
+  shaftLook?: number;
   /** Its scout (#454 s4): the rider sent exploring, the tick it was last sent, and the pair that patrol its border or trade road. */
   scout?: { id: number; sent: number };
   guards?: number[];
@@ -1019,12 +1139,23 @@ export interface AiMemory {
   zap?: number;
   /** When it began holding the Middle Ages to dig saltpetre for Alchemy (#577). */
   powder?: number;
+  /**
+   * The Water Road (#701): the dyke it means to raise by home (null: none worth it), found once; when it began holding the Middle
+   * Ages for the road's Dock, and since when it has stood in the Age of Dykes.
+   */
+  dyke?: { plan: DykePlan | null; looked?: boolean; hold?: number; since?: number };
+  /** The Age of Rivers (#701): the channel it means to dig from water past home (null: none), found when deciding and again on arrival (`fresh`). */
+  river?: { plan: ChannelPlan | null; looked?: boolean; fresh?: boolean };
   /** The first crossing (#585): the age it stands in on the way to the Sea-Raiders, and since when (each sibling, and the age itself). */
   sea?: { at: AgeId; since: number };
   /** Tick it last tried to raise a Mission (#555 s12). */
   mission?: number;
   /** When it last sent sappers with kegs (#577). */
   kegAt?: number;
+  /** When an Industrial computer bound for a side future began to hold off the Atomic Age (#605). */
+  sideHold?: number;
+  /** Where a loaded silo means to strike, chosen once a second (#605). */
+  siloAim?: { x: number; y: number; at: number };
   /** Tick it began holding its Town Center for a side road's last deeds, so it holds only so long. */
   waiting?: number;
   /**
@@ -1048,6 +1179,10 @@ export interface AiMemory {
    * move to while its Town Center's queue empties (`pack`), and, while the wagon is on the road, where it is
    * driving (with the tick it set out) and the camp it left.
    */
+  /** The tick it entered the Age of the Wild, kept while it tames and breeds there (`TAME.aiStay`). */
+  wild?: number;
+  /** The tick it entered the Age of the Grove, kept while it plants there (`GROVE.aiStay`). */
+  grove?: number;
   steppe?: { band?: number[]; at?: { x: number; y: number }; out?: number; recalled?: number; horde?: number; since?: number; struck?: number; /** When a nomad flock (#501) was first seen grazed out, this time. */ starved?: number; pack?: { x: number; y: number; at: number }; to?: { x: number; y: number; at: number }; from?: { x: number; y: number } };
 }
 
@@ -1065,7 +1200,7 @@ export type Command =
   | ({ t: 'work'; p: number; ids: number[]; target: number } & Queued)
   | ({ t: 'build'; p: number; ids: number[]; type: BuildingType; tx: number; ty: number } & Queued)
   /** A line of wall from one tile to another (gates go in with `type: 'gate'` one at a time). */
-  | ({ t: 'wall'; p: number; ids: number[]; x0: number; y0: number; x1: number; y1: number } & Queued)
+  | ({ t: 'wall'; p: number; ids: number[]; x0: number; y0: number; x1: number; y1: number; /** A line of dykes (#701) rather than wall. */ dyke?: boolean; /** A line of Thornwall (the Age of the Grove) rather than wall. */ thorn?: boolean; /** A channel dug (#701, the Age of Rivers) rather than wall. */ channel?: boolean } & Queued)
   | ({ t: 'hunt'; p: number; ids: number[]; target: number } & Queued)
   | ({ t: 'convert'; p: number; ids: number[]; target: number; rite?: 'sacrifice' | 'curse' } & Queued)
   | ({ t: 'garrison'; p: number; ids: number[]; target: number } & Queued)
@@ -1079,9 +1214,13 @@ export type Command =
   | ({ t: 'unload'; p: number; ids: number[]; x: number; y: number } & Queued)
   | { t: 'ungarrison'; p: number; building: number }
   | { t: 'bell'; p: number; ring: boolean }
-  /** Keep or lift quarantine (#541). */
-  | { t: 'quarantine'; p: number; on: boolean }
+  /** Citizens run from danger (or not): the named citizens, or all of this player's when `ids` is absent. */
+  | { t: 'flee'; p: number; on: boolean; ids?: number[] }
+  /** A person's flock is tended on its own (or not). */
+  | { t: 'shepherd'; p: number; on: boolean }
   | { t: 'beacon'; p: number; building: number }
+  /** Choose the seam a Mine Shaft digs (#681). */
+  | { t: 'seam'; p: number; building: number; seam: SeamId }
   /** Call citizens to arms at a War Camp in the Age of Total War (#313): up to `n`, the nearest first. */
   | { t: 'callUp'; p: number; building: number; n?: number }
   /** Strike camp (#297): pack a Town Center or House onto a wagon. */
@@ -1090,6 +1229,8 @@ export type Command =
   | { t: 'pitch'; p: number; ids: number[] }
   /** Citizens milk a sheep of their flock (#308). */
   | ({ t: 'milk'; p: number; ids: number[]; target: number } & Queued)
+  /** Citizens tame a wild wolf, boar or mammoth (the Age of the Wild). */
+  | ({ t: 'tame'; p: number; ids: number[]; target: number } & Queued)
   /** A Town Center raises a lamb for the flock (#308). */
   | { t: 'lamb'; p: number; building: number }
   /** A hero's Rallying Cry. */
@@ -1104,6 +1245,8 @@ export type Command =
   | { t: 'stance'; p: number; ids: number[]; stance: Stance }
   | { t: 'train'; p: number; building: number; unit: UnitType }
   | { t: 'research'; p: number; building: number; tech: TechId }
+  /** Raise this Watch Tower one step on the tower line (`TOWER_LEVELS`). */
+  | { t: 'raiseTower'; p: number; building: number }
   | { t: 'cancel'; p: number; building: number; index: number }
   /** Into the next age: `to` picks a road (#37); without it, the trunk's next epoch. */
   | { t: 'advance'; p: number; building: number; to?: AgeId }
@@ -1139,8 +1282,11 @@ export type Command =
   | ({ t: 'cache'; p: number; ids: number[]; target: number } & Queued)
   /** Citizens or foot soldiers carry a powder keg to a rival building and lay it there (#577, the Age of Sappers); the target is a building id. */
   | ({ t: 'keg'; p: number; ids: number[]; target: number } & Queued)
+  /** A Missile Silo launches at a point (#605, the Atomic Age). */
+  | { t: 'launch'; p: number; silo: number; x: number; y: number }
   /** Answer the card of tidings waiting at the fire (#443): `take` pays its price, otherwise it is passed by. */
   | { t: 'tiding'; p: number; card: TidingId; take: boolean }
-  /** A player left an online match: the computer takes over their people. */
-  | { t: 'leave'; p: number };
+  /** A player left an online match: the computer takes over their people. With `back` (sent only by the room, never a browser),
+   * a player who left is back in the room, and takes their people back from the computer. */
+  | { t: 'leave'; p: number; back?: true };
 

@@ -7,9 +7,10 @@ import { takeCaptive } from './thralls';
 import { prizeOf } from './convoy';
 import { looted, pack } from './spoils';
 import { raided } from './household';
+import { alarm } from './flee';
 import { distToRect } from './grid';
 import type { Spatial } from './spatial';
-import { modsOf, statsFor } from './stats';
+import { gunPower, gunRange, modsOf, statsFor } from './stats';
 import type { Animal, Building, Ent, GameState, Shot, Unit } from './types';
 import { canHit, isEnemy, radiusOf, statsOf } from './world';
 
@@ -38,7 +39,7 @@ export function damageOf(s: GameState, attacker: Unit | null, st: UnitStats, tar
   const inspired = (attacker && s.tick - attacker.aura < 5 ? AURA.attack : 1) * (attacker && rankOf(attacker) ? VETERANCY.attack[rankOf(attacker) - 1] : 1) * (attacker && stirred(s, attacker) ? RALLY.attack : 1) * hemoBlow(s, attacker);
   if (target.kind === 'building') {
     // Walls shrug off all but siege and heavy blows.
-    const wall = target.type === 'wall' || target.type === 'gate' ? (st.cls === 'siege' ? 1.2 : st.cls === 'infantry' || st.cls === 'hero' ? 0.5 : 0.15) : 1;
+    const wall = target.type === 'wall' || target.type === 'gate' || target.type === 'dyke' ? (st.cls === 'siege' ? 1.2 : st.cls === 'infantry' || st.cls === 'hero' ? 0.5 : 0.15) : 1;
     return Math.max(1, st.attack * BONUS[st.cls].building * inspired * wall);
   }
   const ts = statsOf(s, target);
@@ -102,6 +103,8 @@ export function hurt(s: GameState, target: Ent, damage: number, by: number, atta
   if (attacker && target.kind === 'unit' && target.type !== 'citizen' && target.type !== 'priest' && target.order.k === 'idle' && attacker.hp > 0 && target.stance !== 'stand' && target.stance !== 'run' && canHit(s, target, attacker)) {
     target.order = { k: 'attack', target: attacker.id, auto: true, then: null };
   }
+  // Citizens of a person's people run from whoever strikes them.
+  if (target.kind === 'unit' && target.type === 'citizen' && by !== target.owner) alarm(s, target, credit ?? attacker);
   // The Warband feeds on the raid (#463 s1): blows on a rival's food buildings carry off its food.
   if (target.kind === 'building') raidBlow(s, target, damage, by, attacker);
 }
@@ -267,19 +270,17 @@ export function buildingGuns(s: GameState, sp: Spatial, b: Building): void {
     b.cool--;
     return;
   }
-  const epoch = s.players[b.owner].epoch;
-  const m = modsOf(s, b.owner);
-  const reach = g.range + m.range + b.size / 2;
+  const reach = gunRange(s, b.owner, b.type, b.level) + b.size / 2;
   // A Blood Tower (#355 s3) looks for the living first, and spends its bolts on the bloodless only when nothing else is near.
   const blood = b.type === 'bloodtower';
   const t = (blood ? nearestEnemyUnit(s, sp, b.owner, b.x, b.y, reach, bleeds) : null) ?? nearestEnemyUnit(s, sp, b.owner, b.x, b.y, reach);
   if (!t) return;
   b.cool = secs(g.reload);
-  const power = (g.damage + m.rangedAttack) * (1 + epoch * 0.2);
+  const power = gunPower(s, b.owner, b.type, b.level);
   // A Coil Tower (the Age of Lightning, #231) looses a bolt in place of its own arrow; those sheltering inside still shoot.
   // A tower kept as Lightning's keepsake (#555 s11) is still a coil on any road.
   const coil = b.type === 'tower' && (hasCoils(s.players[b.owner]) || b.keep === 'lightning');
-  if (coil) arc(s, sp, b, t, power);
+  if (coil) arc(s, sp, b, t, power * LIGHTNING.bolt);
   const arrows = 1 + Math.min(10, b.garrison.length);
   // Extra arrows go to others nearby when there are any, so a volley spreads over a crowd.
   const others: Unit[] = [];
