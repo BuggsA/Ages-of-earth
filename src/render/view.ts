@@ -1447,8 +1447,8 @@ export class View {
     return null;
   }
 
-  /** What is under the pointer: a unit, a building, a resource, or the ground. */
-  pick(clientX: number, clientY: number): Pick | null {
+  /** What is under the pointer: a unit, a building, a resource, or the ground. Units `through` says yes to are looked past, to what they stand at. */
+  pick(clientX: number, clientY: number, through?: (id: number) => boolean): Pick | null {
     const s = this.state;
     if (!s) return null;
     const r = this.renderer.domElement.getBoundingClientRect();
@@ -1457,6 +1457,7 @@ export class View {
     let best: number | null = null;
     let bestD = Infinity;
     for (const u of this.units.screen) {
+      if (through?.(u.id)) continue;
       const d = Math.hypot(u.sx - px, u.sy - py);
       if (d < u.r * 1.3 && d < bestD) {
         bestD = d;
