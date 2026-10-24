@@ -367,8 +367,6 @@ export interface TradePost {
   /** How flooded its market was at `glutAt` (#493): trips there pay `1 − glut`; healed lazily by `glutNow`. Absent until a trader loads. */
   glut?: number;
   glutAt?: number;
-  /** Tick until which a sick people's trader has left this post foul (#541); absent until one has. */
-  foul?: number;
   /** Rare ores this world lacks that the post sells (#573); absent where it sells none. */
   sells?: RareId[];
 }
@@ -729,12 +727,6 @@ export interface Player {
   way?: WayId;
   /** The Way was deepened in the Bronze Age (#338). */
   deep?: boolean;
-  /** Taint building in a crowded town (#541), 0 to 1; absent while it is clean. */
-  taint?: number;
-  /** The Sickness now in the town (#541): its severity, 0 to 1, and the tick it broke; absent when there is none. */
-  fever?: { sev: number; since: number };
-  /** The town keeps quarantine (#541): no trader loads, no taint comes by the roads. */
-  quarantine?: boolean;
   /** The Bronze Age vow has been made, deepening or turning (#338). */
   vowed?: boolean;
   /** Tick this people was last told that raiders carried off its food (#463 s1); absent if never. */
@@ -855,9 +847,6 @@ export type GameEvent =
   /** Riders of a horde (#318) took `gold` in tribute from `from`, standing in its land: `ids` are the riders counted. */
   /** A household people's payday (#501): `gold` came in from the houses `ids`. */
   | { k: 'tax'; owner: number; gold: number; ids: number[] }
-  /** The Sickness (#541): it broke out, ended, or took citizens. */
-  | { k: 'sick'; owner: number; what: 'broke' | 'ended' | 'died'; n?: number }
-  | { k: 'quarantine'; owner: number; on: boolean }
   | { k: 'tribute'; owner: number; from: number; gold: number; stone?: number; ids: number[]; x: number; y: number }
   /** A rival trader of `from`'s paid `owner` a toll of `gold` for safe passage across its land (#334). */
   | { k: 'toll'; owner: number; from: number; gold: number; id: number; x: number; y: number }
@@ -1127,8 +1116,6 @@ export type Command =
   | ({ t: 'unload'; p: number; ids: number[]; x: number; y: number } & Queued)
   | { t: 'ungarrison'; p: number; building: number }
   | { t: 'bell'; p: number; ring: boolean }
-  /** Keep or lift quarantine (#541). */
-  | { t: 'quarantine'; p: number; on: boolean }
   | { t: 'beacon'; p: number; building: number }
   /** Call citizens to arms at a War Camp in the Age of Total War (#313): up to `n`, the nearest first. */
   | { t: 'callUp'; p: number; building: number; n?: number }

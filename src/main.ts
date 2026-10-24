@@ -8,6 +8,7 @@ import { SIGHT_LORE } from './render/sightings';
 import { wallLine } from './sim/commands';
 import { AGES, BUILDINGS, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, SILO, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
 import { crestSvg } from './ui/crests';
+import { unitPicture } from './ui/thumbs';
 import { isEnemy } from './sim/world';
 import { carriesKegs, kegProblem } from './sim/powder';
 import { launchProblem } from './sim/silo';
@@ -17,7 +18,7 @@ import { placeProblem, walkable } from './sim/grid';
 import { findDockSpot, findSpot } from './sim/ai';
 import { maxHp, placeBuilding, spawnUnit } from './sim/world';
 import { arrivalText, epochArrivals } from './ui/endReport';
-import type { AgeId, Building, BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, HomelandId, MapSize, MapType, Unit } from './sim/types';
+import type { AgeId, Building, BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, HomelandId, MapSize, MapType, Unit, UnitType } from './sim/types';
 import { KEYS, R_FISH, R_NONE, RES } from './sim/types';
 import { carriedBy, relicAt } from './sim/relics';
 import { RUIN_FINDS, ruinAt } from './sim/ruins';
@@ -1033,10 +1034,17 @@ const civBlurb = () => {
   $('civ-blurb').innerHTML = `${peopleHtml}<br><b>${m.label}:</b> ${m.blurb}<br>${hl ? `<b>${hl.icon} ${hl.name}:</b> ${hl.blurb}` : '<b>Homeland:</b> the seed decides what lies round every town: the Glade, the Shore, the Herd Plains or the Deep Wood.'}`;
 };
 const civTiles = $('civ-tiles');
+/** The soldier each people's tile shows: the line whose mark (plume, crest, headdress) is theirs, in the bronze age. */
+const TILE_SOLDIER: Record<CivId, UnitType> = { egyptians: 'ranged', greeks: 'infantry', romans: 'infantry', mongols: 'cavalry', chinese: 'infantry', britons: 'ranged' };
+let tileFigures = false;
 const showTiles = () => {
   const color = PLAYER_COLORS[Number(colorSel.value)] ?? PLAYER_COLORS[0];
-  civTiles.innerHTML = (['random', ...CIV_IDS] as (CivId | 'random')[]).map((c) =>
-    `<button class="civ-tile" type="button" role="radio" aria-checked="${civSel.value === c}" data-civ="${c}" title="${c === 'random' ? 'A people chosen at random' : (CIVS[c].verb ?? CIVS[c].name).replace(/"/g, '&quot;')}">${crestSvg(c, color, 40)}${c === 'random' ? 'Random' : CIVS[c].name}</button>`).join('');
+  civTiles.innerHTML = (['random', ...CIV_IDS] as (CivId | 'random')[]).map((c) => {
+    // The soldiers are drawn the first time the sheet opens, not while the title loads.
+    const face = c !== 'random' && tileFigures ? unitPicture(TILE_SOLDIER[c], 1, color, c) : '';
+    const art = face ? `<span class="civ-face"><img src="${face}" alt="">${crestSvg(c, color, 18)}</span>` : crestSvg(c, color, 40);
+    return `<button class="civ-tile" type="button" role="radio" aria-checked="${civSel.value === c}" data-civ="${c}" title="${c === 'random' ? 'A people chosen at random' : (CIVS[c].verb ?? CIVS[c].name).replace(/"/g, '&quot;')}">${art}${c === 'random' ? 'Random' : CIVS[c].name}</button>`;
+  }).join('');
 };
 civTiles.addEventListener('click', (e) => {
   const tile = (e.target as HTMLElement).closest<HTMLElement>('[data-civ]');
@@ -1084,6 +1092,7 @@ function openSheet(id: 'title-setup' | 'title-howto'): void {
   if (open) return;
   sound.play('open');
   $(id).classList.remove('hidden');
+  if (id === 'title-setup' && !tileFigures) { tileFigures = true; showTiles(); }
 }
 function closeSheets(): void {
   $('title-setup').classList.add('hidden');
@@ -2297,20 +2306,6 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           hud.toast(ev.why, 'bad');
           play('error');
         }
-        break;
-      case 'sick':
-        // The Sickness (#541): it broke out, ran its course, or took citizens.
-        if (ev.owner === viewer) {
-          if (ev.what === 'broke') hud.toast('🤒 The Sickness has broken out. Your people work slower: keep priests by a Temple to nurse them, and think about closing the roads (quarantine, Town Center, N).', 'bad');
-          else if (ev.what === 'ended') hud.toast('🤒 The Sickness has passed.', 'good');
-          else hud.toast(`🤒 The Sickness has taken ${ev.n} of your people.`, 'bad');
-          play(ev.what === 'ended' ? 'allClear' : 'toll');
-        } else if (ev.what === 'broke' && s.players[ev.owner]?.team !== s.players[viewer]?.team) {
-          hud.toast(`🤒 The Sickness has broken out in ${s.players[ev.owner].name}'s town. Their posts will run foul: a trader of yours loading there brings it home.`, 'info');
-        }
-        break;
-      case 'quarantine':
-        if (ev.owner === viewer) hud.toast(ev.on ? '🚧 Quarantine: your traders stay home.' : '🚧 Quarantine lifted.', 'info');
         break;
       case 'epoch':
         if (ev.owner === viewer) {

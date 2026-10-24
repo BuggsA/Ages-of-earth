@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { AgeId, BuildingType } from '../sim/types';
+import { BUILDINGS } from '../sim/data';
 import { Kit, bake, rnd } from './kit';
 
 /**
@@ -191,10 +192,13 @@ function house(k: Kit, e: number, st: Style): void {
     k.team(k.box(0.34, 0.06, 0.12, TEAM, -0.02, 0.62, 0.7));
     return;
   }
-  k.box(1.4, 0.95, 1.15, st.wall, 0, 0, -0.05);
-  k.box(1.44, 0.06, 1.2, st.trim, 0, 0.95, -0.05);
-  k.prism(1.5, 0.6, 1.3, st.roof, 0, 1.0, -0.05);
-  k.box(0.18, 0.55, 0.18, st.wall, -0.45, 1.05, -0.25);
+  // A timber-framed town house: a jettied upper storey, a steep roof and a tall chimney, so it stands tall and narrow.
+  k.box(1.3, 0.7, 1.05, st.wall, 0, 0, -0.05);
+  k.box(1.44, 0.4, 1.2, st.wall2, 0, 0.7, -0.05);
+  k.box(1.46, 0.06, 1.22, st.trim, 0, 0.7, -0.05);
+  for (const x of [-0.6, -0.2, 0.2, 0.6]) k.box(0.04, 0.4, 1.22, st.trim, x, 0.7, -0.05);
+  k.prism(1.5, 0.85, 1.3, st.roof, 0, 1.1, -0.05);
+  k.box(0.2, 0.95, 0.2, STONE, -0.45, 1.05, -0.25);
   for (const x of [-0.4, 0.4]) for (const y of [0.22, 0.6]) window(k, st, x, y, 0.53, 0.16, 0.2);
   k.box(0.26, 0.45, 0.03, '#3a2b20', 0, 0, 0.53);
   k.team(k.box(0.32, 0.05, 0.12, TEAM, 0, 0.47, 0.6));
@@ -220,6 +224,12 @@ function storehouse(k: Kit, e: number, st: Style): void {
   k.sphere(0.08, '#cfa030', 0.45, 0.07, 0.25);
   k.cyl(0.12, 0.1, 0.25, 7, '#b08a4e', -0.4, 0, 0.6);
   k.team(k.box(1.62, 0.05, 0.06, TEAM, 0, 0.74, 0.55));
+  if (e === 3) {
+    // A warehouse loft: a gabled upper room with a hatch, so the shed rises above the houses' roofs.
+    k.box(1.1, 0.5, 0.9, st.wall, 0, 1.15, -0.1);
+    k.prism(1.25, 0.45, 1.0, st.roof2, 0, 1.65, -0.1);
+    k.box(0.3, 0.3, 0.03, '#3a2b20', 0, 1.2, 0.36);
+  }
   if (e >= 3) {
     // Powder-age yard: a hoist beam with a hanging crate, and stacked cases.
     k.cyl(0.04, 0.05, 1.2, 5, e >= 4 ? '#3a3e44' : st.post, -0.95, 0, 0.75);
@@ -709,9 +719,14 @@ function barracks(k: Kit, e: number, st: Style): void {
     for (const sx of [-1, 1]) k.cyl(0.14, 0.14, 0.05, 8, IRON_DARK, -0.9 + sx * 0.16, 0, 1.0).rotation.z = Math.PI / 2;
     return;
   }
+  // A bastioned barracks: a low flat-topped block with merlons, a pike rack in the yard and a sentry corner turret.
   k.box(2.7, 1.3, 1.6, st.wall, 0, 0, -0.5);
   k.box(2.76, 0.07, 1.66, st.trim, 0, 1.3, -0.5);
-  k.prism(2.8, 0.65, 1.7, st.roof, 0, 1.36, -0.5);
+  k.prism(2.0, 0.5, 1.0, st.roof, 0, 1.36, -0.5);
+  for (let i = 0; i < 8; i++) k.box(0.22, 0.2, 0.12, st.trim, -1.2 + i * 0.34, 1.37, 0.24);
+  k.cyl(0.3, 0.32, 1.9, 8, st.wall, -1.2, 0, -1.0);
+  k.cone(0.38, 0.5, 8, st.roof, -1.2, 1.9, -1.0);
+  for (let i = 0; i < 5; i++) k.cyl(0.015, 0.015, 1.3, 4, WOOD, 0.2 + i * 0.14, 0, 0.95).rotation.z = 0.12;
   for (let i = 0; i < 5; i++) for (const y of [0.25, 0.8]) window(k, st, -1.0 + i * 0.5, y, 0.31, 0.16, 0.24);
   k.box(0.5, 0.7, 0.04, '#3a2b20', 0, 0, 0.31);
   k.cyl(0.04, 0.04, 2.6, 5, '#e8e2d0', 1.2, 0, 1.2);
@@ -2175,6 +2190,36 @@ function wayTouch(k: Kit, way: string, deep = false): void {
   }
 }
 
+/** What a building is for, read from its roof (#625): war under cold slate, faith under pale gold, trade under teal, the land's work under ochre. Houses and the Town Center keep their epoch's own red. The Stone Age keeps its thatch and reads by plinth and pennant. */
+const ROOFS: Partial<Record<BuildingType, [string, string]>> = {
+  barracks: ['#4a5668', '#38424f'], range: ['#4a5668', '#38424f'], stable: ['#4a5668', '#38424f'], workshop: ['#4a5668', '#38424f'], forge: ['#4a5668', '#38424f'],
+  tower: ['#4a5668', '#38424f'], warcamp: ['#4a5668', '#38424f'], bloodtower: ['#4a5668', '#38424f'], airfield: ['#4a5668', '#38424f'], silo: ['#4a5668', '#38424f'],
+  temple: ['#e9e2cf', '#d8b25a'], mission: ['#e9e2cf', '#d8b25a'],
+  market: ['#27808a', '#1d6670'], caravanserai: ['#27808a', '#1d6670'], dock: ['#27808a', '#1d6670'],
+  storehouse: ['#c9993a', '#a97d2c'], huntcamp: ['#c9993a', '#a97d2c'], prospector: ['#c9993a', '#a97d2c'],
+};
+
+/** No plinth or pennant: open or thin pieces, and buildings that already carry their own standards. */
+const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder'];
+
+function roleStyle(type: BuildingType, epoch: number, st: Style): Style {
+  const r = ROOFS[type];
+  return r && epoch >= 1 ? { ...st, roof: r[0], roof2: r[1] } : st;
+}
+
+/** A rim of the owner's colour round the pad and a tall pennant at the front corner, so whose a building is reads from above. */
+function teamMarks(k: Kit, type: BuildingType): void {
+  const n = BUILDINGS[type].size;
+  k.team(k.box(n + 0.08, 0.1, n + 0.08, TEAM, 0, -0.07, 0));
+  banner(k, n / 2 - 0.12, 0, n / 2 - 0.45, 1.1 + n * 0.3, 1.3);
+  // A team-cloth awning over the front: the one big mass of the owner's colour, readable from the default zoom.
+  const w = Math.min(n * 0.5, 1.6);
+  const z = n / 2 - 0.2;
+  for (const x of [-w / 2 + 0.04, w / 2 - 0.04]) k.cyl(0.02, 0.025, 0.42, 4, '#5b4330', x, 0, z);
+  const cloth = k.team(k.box(w, 0.04, 0.34, TEAM, 0, 0.42, z));
+  cloth.rotation.x = 0.28;
+}
+
 /** The baked model of a building in an epoch, in a player's color (`variant`: which way a wall piece joins its neighbors). */
 export function buildingGeometry(type: BuildingType, epochIn: number, color: string, variant = 0, age?: AgeId, heirloom = ''): THREE.BufferGeometry {
   // The Atomic Age (#605) has one building of its own; every other model keeps its Industrial look.
@@ -2189,7 +2234,8 @@ export function buildingGeometry(type: BuildingType, epochIn: number, color: str
     const k = new Kit();
     if (type === 'wall') wall(k, epoch, STYLES[Math.min(epoch, 4)], variant);
     else if (type === 'snare') snare(k, epoch, variant === 1);
-    else MAKERS[type](k, epoch, STYLES[Math.min(epoch, 4)]);
+    else MAKERS[type](k, epoch, roleStyle(type, epoch, STYLES[Math.min(epoch, 4)]));
+    if (!BARE.includes(type)) teamMarks(k, type);
     const stack = STACKS[type];
     if (epoch >= 4 && stack) smokestack(k, stack[0], stack[1], stack[2]);
     if (look) ageTouches(k, type, look);

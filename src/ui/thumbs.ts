@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { buildingGeometry } from '../render/buildingModels';
 import { unitGeometryColored } from '../render/unitModels';
-import type { BuildingType, UnitType } from '../sim/types';
+import type { BuildingType, CivId, UnitType } from '../sim/types';
 
 /**
  * Pictures of the 3D models for the interface (portraits, buttons, the queue), rendered once each with
@@ -54,10 +54,11 @@ function picture(key: string, geo: THREE.BufferGeometry, tilt: number, zoom: num
   return url;
 }
 
-export function unitPicture(type: UnitType, epoch: number, color: string): string {
-  const key = `u:${type}:${epoch}:${color}`;
+/** A unit's picture; with a `civ` it wears that people's mark. */
+export function unitPicture(type: UnitType, epoch: number, color: string, civ?: CivId): string {
+  const key = `u:${type}:${epoch}:${color}${civ ? `:${civ}` : ''}`;
   if (cache.has(key)) return cache.get(key)!;
-  const geo = unitGeometryColored(type, epoch, color);
+  const geo = unitGeometryColored(type, epoch, color, civ);
   const url = picture(key, geo, 0.25, 1.05, -0.55);
   geo.dispose();
   return url;
