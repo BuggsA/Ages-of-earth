@@ -41,7 +41,8 @@ import { CameraBookmarks, bookmarkShortcut } from './ui/cameraBookmarks';
 import { ScoutFlags } from './ui/scoutFlags';
 import { briefingHtml, chapterListHtml, recordStars, starRow, syncProgress } from './ui/campaignUi';
 import { Lobby } from './ui/lobby';
-import { Hud, nameOf } from './ui/hud';
+import { Hud, nameOf, planLines } from './ui/hud';
+import { RoadPlanner, loadPlannerPrefs, savePlannerPrefs } from './ui/roadPlanner';
 import { Minimap } from './ui/minimap';
 import { Tips } from './ui/tips';
 import { openingFor } from './ui/opening';
@@ -121,6 +122,7 @@ let mapTimer = 0;
 let attractT = 0;
 let lastSetup: GameSetup | null = null;
 
+let planner: RoadPlanner | null = null;
 const hud = new Hud({
   issue: (c) => issue(c),
   place: (type) => {
@@ -1187,6 +1189,15 @@ document.addEventListener('click', (e) => {
       closeSheets();
       showCampaign(webMapHtml(loadDiscovery()));
       break;
+    case 'plan-pin': {
+      // The web map pins a goal age for the road planner (#725); it opens in the next match.
+      const goal = el.dataset.age as AgeId;
+      if (planner) planner.pin(goal);
+      else savePlannerPrefs({ ...loadPlannerPrefs(), goal });
+      sound.play('click');
+      hud.toast(`Pinned the ${AGES[goal].name} as your goal: the Roads panel plans the way`, 'info');
+      break;
+    }
     case 'camp-back':
       $('campaign').classList.add('hidden');
       $('title').classList.remove('hidden');
@@ -2830,6 +2841,8 @@ function refreshHud(): void {
   if (!game || mode === 'title') return;
   pruneSelection(game);
   recordDiscovery(game);
+  planner ??= new RoadPlanner($('roads-btn'), $('roads-panel'), (st, v, to, back) => planLines(st, st.players[v], to, back));
+  planner.update(game, viewer, discovery ?? loadDiscovery());
   hud.update(game, viewer, [...selection], SPEEDS[speedIdx], selectedTile, selectedRelic, selectedPost, selectedRuin !== null ? { id: selectedRuin, dug: view.ruins.dugAsSeen(selectedRuin) } : null, selectedLandmark !== null ? { id: selectedLandmark, keeper: view.landmarks.keeperAsSeen(selectedLandmark) } : null);
 }
 
