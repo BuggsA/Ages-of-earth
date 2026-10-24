@@ -327,7 +327,7 @@ function warnTip(s: GameState, l: Launch, viewer: number): string {
   }
   const n = ringsFor(s, l, viewer).length;
   if (revealed(s, l)) return n > 1 ? `${who}'s salvo lands in ${clockOf(s, l)} seconds: all ${n} rings that flash are real.` : `${who}'s warhead lands in ${clockOf(s, l)} seconds, inside the ring that flashes. The decoys are gone.`;
-  return `${who}'s Missile Silo has launched: it lands in ${clockOf(s, l)} seconds. Of the red rings, one is real and the others decoys, unless it is a salvo of three silos firing at once, when all are real. Each ring is set off up to ${SILO.blur} tiles from where it falls. With ${SILO.reveal} seconds left the decoys vanish and the real rings flash. A silo destroyed before then scrubs its warhead.`;
+  return `${who}'s Missile Silo has launched: it lands in ${clockOf(s, l)} seconds. Of the red rings, one is real and the others decoys, unless it is a salvo of three silos firing at once, when all are real. Each ring is set off up to ${SILO.blur} tiles from where it falls. With ${SILO.reveal} seconds left the decoys vanish and the real rings flash. A silo destroyed before then scrubs its warhead.\nWatch the missile: it climbs toward the middle of the rings, then, some seconds before they flash, bends toward where it falls.`;
 }
 
 function tideChip(s: GameState): { text: string; tip: string } | null {

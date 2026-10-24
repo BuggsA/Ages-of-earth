@@ -12,6 +12,7 @@ import { cursed, grafted } from '../sim/blood';
 import { graftLast } from '../sim/hemo';
 import { seesRect } from '../sim/vision';
 import { revealed, ringsFor, shownToAll, warnRadius } from '../sim/silo';
+import { MissileView } from './missileView';
 import { BuildingsView } from './buildingsView';
 import { CameraRig } from './camera';
 import { Birds, Effects } from './effects';
@@ -122,6 +123,7 @@ export class View {
   readonly rubble = new RubbleView();
   readonly caches = new CacheView();
   readonly kegs = new KegView();
+  readonly missiles = new MissileView();
   readonly fires = new FireView();
   private falloutTick = -1;
   /** The tick a breach (#748) was last heard: one sound a blast. */
@@ -202,7 +204,7 @@ export class View {
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sky.mesh, this.hemi, this.fill, this.sun, this.sun.target);
-    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.finds.group, this.springs.group, this.tides.group, this.rubble.group, this.caches.group, this.kegs.group, this.fires.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
+    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.finds.group, this.springs.group, this.tides.group, this.rubble.group, this.caches.group, this.kegs.group, this.missiles.group, this.fires.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
     this.scene.add(this.rangeGuides.mesh, this.borders.mesh, this.graze.mesh, this.foundations.mesh);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.post = new Post(this.renderer, this.scene, this.rig.camera);
@@ -274,6 +276,7 @@ export class View {
     this.rubble.clear();
     this.caches.clear();
     this.kegs.clear();
+    this.missiles.clear();
     this.fires.clear();
     this.landmarks.clear();
     const colors = s.players.map((p) => p.color);
@@ -504,6 +507,8 @@ export class View {
     this.rubble.update(s, !!ageDef(p).salvage, (x, y) => this.reveal || this.sees(x, y));
     this.caches.update(s, (x, y) => this.reveal || this.sees(x, y), (id) => this.units.drawn.get(id) ?? null);
     this.kegs.update(s, (x, y) => this.reveal || this.sees(x, y), (id) => this.units.drawn.get(id) ?? null);
+    // Missiles in the air (#772): seen by every player, through the fog, between the last tick and this one.
+    this.missiles.update(s, s.tick - 1 + alpha, dt, this.effects);
     // Fire (`fire.ts`): flames on what burns, torches in hand, and smoke rising off it all.
     this.fires.update(s, dt, (x, y) => this.reveal || this.sees(x, y), (id) => this.units.drawn.get(id) ?? null, (at, big) =>
       this.effects.burst(at, { count: big ? 3 : 2, speed: 0.25, up: 1, life: big ? 3.4 : 2.6, size: big ? 0.22 : 0.16, grow: 3, gravity: -0.5, drag: 0.8, soft: true, colors: ['#3a3532', '#5a544e', '#7a736a'] }),
@@ -967,6 +972,13 @@ export class View {
           const R = WARHEADS[ev.w ?? 'atomic'].r;
           // The warning ring is the widest its people could send (#753), so it never says which warhead is coming.
           const l = s.launches?.find((k) => k.id === ev.id);
+          if (ev.what === 'launched' && l?.arc) {
+            // The ignition (#772), seen by all as the silo is: a flash in the hatch, a column of white smoke rolling out round its foot.
+            const o = this.ground(s, l.arc.x, l.arc.y, 0.6);
+            this.effects.burst(o, { count: 26, speed: 1.4, up: 1.6, life: 0.9, size: 0.14, grow: 1.8, gravity: -1, drag: 1.2, colors: ['#fff6d0', '#ffd25a', '#ff8a2a'] });
+            this.effects.burst(o, { count: 40, speed: 2.2, up: 0.15, life: 4.5, size: 0.4, grow: 3.2, gravity: -0.15, drag: 1.1, soft: true, colors: ['#f2efe9', '#d8d3cb', '#bdb6ab'] });
+            this.effects.burst(o, { count: 18, speed: 0.6, up: 1, life: 3.5, size: 0.3, grow: 3, gravity: -0.8, drag: 0.9, soft: true, colors: ['#e9e5de', '#cfc9c0'] });
+          }
           if (ev.what === 'launched' || ev.what === 'revealed') {
             // Never at the event's point, which is the attacker's own aim (#762): at the rings this viewer is shown, all alike. At the
             // reveal the real ring flashes where it was drawn; the launcher's own side sees nothing new.
