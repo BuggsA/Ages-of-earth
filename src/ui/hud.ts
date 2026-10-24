@@ -15,7 +15,7 @@ import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
 import { restsAt } from '../sim/passage';
 import { loadPrice, sellerNear } from '../sim/oretrade';
-import { clockOf, fuelOf, launchProblem, loaded, nextNuke, rulesOf, stockOf, warheadsOf, WARHEAD_NAMES, type WarheadKind } from '../sim/silo';
+import { clockOf, fuelOf, launchProblem, loaded, nextNuke, revealed, rulesOf, stockOf, warheadsOf, WARHEAD_NAMES, type WarheadKind } from '../sim/silo';
 import { carriesKegs, kegProblem, kegsOf, millProblem, mills, millsOf, sappers } from '../sim/powder';
 import { carriesTorch, fireOn } from '../sim/fire';
 import { basinOf, drowned, heldBack, isInund, lets, millIdle, sluiceFed, sluiceProblem, waterLine, wateredAt } from '../sim/water';
@@ -43,7 +43,7 @@ import { landOwnerAt } from '../sim/borders';
 import { flockCap, flockOf, grazeRange, lambProblem } from '../sim/flocks';
 import { soldAt } from '../sim/ages';
 import { ageDef, ageOf, asleep, crossingLeft, goldenEnds, livesOf, threadsOf, crossingsAhead, keepsakeProblem, leaving, sleepWhy, type Tally, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, oreClue, oreDone, oreOnly, ironTradeShare, isHire, isSideRoad, journeyOf, mainRoad, pathLine, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, suspendedTechs, assayed, diggersAt, holdingsOf, holds, keyOf, lacking, opensOf, prospected, trainsAt, windowsOf, leadsOn, leadsTo } from '../sim/ages';
-import type { AgeId, KeyId, RareId, Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Player, Res, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
+import type { AgeId, KeyId, RareId, Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Launch, Player, Res, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
 import { GROVE_BUILDINGS, grows } from '../sim/grove';
 import { hiveLine, keepsBees } from '../sim/hive';
 import { KEYS, RARES, RES, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
@@ -312,6 +312,14 @@ const tideSig = (s: GameState): string => {
 };
 
 /** The public tide clock (#739), beside the game clock on every screen once the tide has woken: where the sea stands, which way, and when it turns. */
+/** The ☢ chip's words for a warhead in the air (#762): a rival is told of three rings, one real, and never which until the last seconds. */
+function warnTip(s: GameState, l: Launch, viewer: number): string {
+  const who = s.players[l.owner].name;
+  if (s.players[viewer].team === s.players[l.owner].team) return `${l.owner === viewer ? 'Your' : `${who}'s`} warhead lands on the amber ring in ${clockOf(s, l)} seconds. Rivals see it among two decoys, each ring set off up to ${SILO.blur} tiles from its point, until the last ${SILO.reveal} seconds.`;
+  if (revealed(s, l)) return `${who}'s warhead lands in ${clockOf(s, l)} seconds, inside the ring that flashes. The decoys are gone.`;
+  return `${who}'s Missile Silo has launched: it lands in ${clockOf(s, l)} seconds, inside one of the three red rings; the other two are decoys. Each ring is set off up to ${SILO.blur} tiles from where it falls. With ${SILO.reveal} seconds left the decoys vanish and the real ring flashes.`;
+}
+
 function tideChip(s: GameState): { text: string; tip: string } | null {
   const c = tideClock(s);
   if (!c) return null;
@@ -787,7 +795,7 @@ export class Hud {
     const age = ageDef(p);
     const idleTechs = suspendedTechs(p).map((t) => TECHS[t].name);
     const scores = s.players.map((q) => scoreOf(s, q));
-    const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${RARES.map((r) => Math.floor(p.rare?.[r] ?? 0)).join(',')}|${Math.floor(bloodOf(p))}|${p.pop}/${p.cap}|${ageOf(p)}|${adv}|${p.way ?? ''}${p.deep ? '+' : ''}${p.vowed ? 'v' : ''}|${idleTechs.length}|${idle}|${speed}|${scores.join(',')}|${isHousehold(p) ? Math.round(taxRate(s, viewer) * 60) : ''}|${p.kegs ?? ''}|${(s.launches ?? []).map((l) => `${l.id}:${clockOf(s, l)}`).join(',')}|${tideSig(s)}`;
+    const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${RARES.map((r) => Math.floor(p.rare?.[r] ?? 0)).join(',')}|${Math.floor(bloodOf(p))}|${p.pop}/${p.cap}|${ageOf(p)}|${adv}|${p.way ?? ''}${p.deep ? '+' : ''}${p.vowed ? 'v' : ''}|${idleTechs.length}|${idle}|${speed}|${scores.join(',')}|${isHousehold(p) ? Math.round(taxRate(s, viewer) * 60) : ''}|${p.kegs ?? ''}|${(s.launches ?? []).map((l) => `${l.id}:${clockOf(s, l)}${revealed(s, l) ? '!' : ''}`).join(',')}|${tideSig(s)}`;
     const sn = seasonOf(s);
     const tide = tideChip(s);
     this.clockEl.textContent = `${sn.icon} ${fmtTime(s.tick)}${tide ? `  ${tide.text}` : ''}`;
@@ -803,7 +811,7 @@ export class Hud {
         .map((r) => `<div class="res" data-tip="<b>${RARE[r].name}</b>${RARE[r].blurb} Mined from deep veins that only some worlds hold.">${RARE_ICON[r]}${Math.floor(p.rare![r]!)}</div>`)
         .join('') +
       (p.blood !== undefined ? `<div class="res" data-tip="<b>Blood</b>Drawn at Drain Rigs from the enemy who fall near them, and from citizens given to the levy. Spent to raise Blood Towers, and at Transfusion Stations to graft soldiers. In Hemocraft the rigs also bleed the living enemy who stand near them; in the Blood-rite every Temple draws as a rig does, and spends blood to mend your own.">🩸${Math.floor(bloodOf(p))}</div>` : '') +
-      (s.launches ?? []).map((l) => `<div class="res" data-tip="<b>Warhead in the air</b>${s.players[l.owner].name}'s Missile Silo has launched: it lands in ${clockOf(s, l)} seconds. A silo destroyed before then scrubs the launch.">☢ ${s.players[l.owner].name} ${clockOf(s, l)}s</div>`).join('') +
+      (s.launches ?? []).map((l) => `<div class="res" data-tip="<b>Warhead in the air</b>${warnTip(s, l, viewer)} A silo destroyed before then scrubs the launch.">☢ ${s.players[l.owner].name} ${clockOf(s, l)}s${s.players[viewer].team !== s.players[l.owner].team && !revealed(s, l) ? ' · 1 of 3' : ''}</div>`).join('') +
       (p.kegs !== undefined || mills(p) || sappers(p) ? `<div class="res" data-tip="<b>Powder kegs</b>Ground from saltpetre at the Siege Workshops in the Age of Alchemy, ${KEG.ore} a keg, up to ${KEG.most} in store. In the Age of Sappers citizens and foot soldiers lay them at a rival building (K): ${KEG.fuse} seconds later each blows, wrecking every rival building within ${KEG.reach} tiles, unless a rival reaches it first and stamps it out.${mills(p) ? `<br>${millProblem(s, p) ?? `The mills grind: next keg in ${Math.max(0, Math.ceil((KEG.time - (p.grind ?? 0)) / Math.max(1, millsOf(s, viewer).length)))}s.`}` : ''}">🧨${kegsOf(p)}</div>` : '') +
       `<div class="res pop ${p.pop >= p.cap ? 'full' : ''}" data-tip="<b>Population</b>People and soldiers you have, and room for. Houses add 5 each, a Town Center 10 (150 at most).">${icon('pop')}${p.pop}/${p.cap}</div>`;
     const civ = CIVS[p.civ];

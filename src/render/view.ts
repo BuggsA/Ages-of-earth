@@ -11,7 +11,7 @@ import { stirred } from '../sim/combat';
 import { cursed, grafted } from '../sim/blood';
 import { graftLast } from '../sim/hemo';
 import { seesRect } from '../sim/vision';
-import { shownToAll } from '../sim/silo';
+import { revealed, ringsFor, shownToAll, warnRadius } from '../sim/silo';
 import { BuildingsView } from './buildingsView';
 import { CameraRig } from './camera';
 import { Birds, Effects } from './effects';
@@ -19,7 +19,7 @@ import { Sightings, SIGHT_LORE, type Sighting } from './sightings';
 import { fogUniforms, glowUniform, timeUniform, windUniform } from './materials';
 import { forcedSeason, setSeasonLook } from './seasonLook';
 import { seasonAt } from '../sim/seasons';
-import { Overlays, type BarSpec, type RingSpec } from './overlays';
+import { Overlays, type BarSpec, type RingSpec, type WarnSpec } from './overlays';
 import { Post, QUALITY, loadQuality, saveQuality, type QualityName } from './post';
 import { RelicsView } from './relicsView';
 import { PostsView } from './postsView';
@@ -720,6 +720,7 @@ export class View {
       }
     }
     this.overlays.setRings(rings);
+    this.overlays.setWarnings(s, this.warnings(s), this.time);
     this.borders.update(s, this.viewer, this.reveal, this.showBorders && this.titleHour === null); // the title's film shows no map lines
     this.graze.update(s, this.viewer, this.reveal);
     this.foundations.update(s, this.viewer, (x, y) => this.reveal || s.players[this.viewer].vis[Math.floor(y) * s.w + Math.floor(x)] > 0);
@@ -965,8 +966,17 @@ export class View {
           const at = this.ground(s, ev.x, ev.y, 0.3);
           const R = WARHEADS[ev.w ?? 'atomic'].r;
           // The warning ring is the widest its people could send (#753), so it never says which warhead is coming.
-          if (ev.what === 'launched') this.effects.ring(at, '#ff4a3a', (ev.ring ?? R) + 0.5, 1.4);
-          else if (ev.what === 'struck') {
+          const l = s.launches?.find((k) => k.id === ev.id);
+          if (ev.what === 'launched' || ev.what === 'revealed') {
+            // Never at the event's point, which is the attacker's own aim (#762): at the rings this viewer is shown, all alike. At the
+            // reveal the real ring flashes where it was drawn; the launcher's own side sees nothing new.
+            if (!l || (ev.what === 'revealed' && s.players[this.viewer].team === s.players[l.owner].team)) break;
+            for (const g of ringsFor(s, l, this.viewer)) {
+              const on = this.ground(s, g.x, g.y, 0.3);
+              this.effects.ring(on, ev.what === 'revealed' ? '#ffd0c0' : '#ff4a3a', (ev.ring ?? warnRadius(s, l.owner)) + 0.5, ev.what === 'revealed' ? 0.9 : 1.4);
+              if (ev.what === 'revealed') this.effects.ring(on, '#ff2a1a', (ev.ring ?? warnRadius(s, l.owner)) + 1.5, 1.6);
+            }
+          } else if (ev.what === 'struck') {
             // Every player sees the blast, through the fog (#752); it grows with the warhead (Atomic 1, Fusion 1.5).
             const big = R / WARHEADS.atomic.r;
             this.effects.burst(at, { count: Math.round(60 * big), speed: 5 * big, up: 1.2, life: 1.2, size: 0.3, grow: 3 * big, gravity: -1.4, drag: 1, colors: ev.w === 'fusion' ? ['#ffffff', '#cfe6ff', '#8fc4ff'] : ['#fff6d0', '#ffd25a', '#ff7a2a'] });
@@ -1586,6 +1596,20 @@ export class View {
     const loud = gain * Math.max(0, 1 - Math.max(far - 0.4, off - 1.1) * 1.2) * (1.15 - this.rig.zoomT * 0.45);
     if (loud <= 0.03) return;
     this.onCue(name, Math.max(-1, Math.min(1, this.v.x)), loud);
+  }
+
+  /**
+   * The warning zones of every warhead in the air, as this viewer is shown them (#762, `ringsFor`): a rival's three rings in red, all
+   * alike, then the real one alone, flashing; the launcher's own team sees its aim in amber, at its warhead's own blast.
+   */
+  private warnings(s: GameState): WarnSpec[] {
+    const out: WarnSpec[] = [];
+    for (const l of s.launches ?? []) {
+      const own = s.players[this.viewer].team === s.players[l.owner].team;
+      const r = (own ? WARHEADS[l.w ?? 'atomic'].r : warnRadius(s, l.owner)) + 0.5;
+      for (const g of ringsFor(s, l, this.viewer)) out.push({ x: g.x, y: g.y, r, color: own ? '#ffb03a' : '#ff3a2a', flash: !own && revealed(s, l) });
+    }
+    return out;
   }
 
   /** A ring and spark where an order was given. */

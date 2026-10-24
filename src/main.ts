@@ -14,7 +14,7 @@ import { easeHour, SHOT_SECONDS, titleShot } from './ui/titleShots';
 import { isEnemy } from './sim/world';
 import { carriesKegs, kegProblem } from './sim/powder';
 import { carriesTorch, torchProblem } from './sim/fire';
-import { launchProblem, type WarheadKind } from './sim/silo';
+import { launchProblem, ringsFor, type WarheadKind } from './sim/silo';
 import { jumpAge, rush, topUp } from './sim/god';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
 import { placeProblem, stampBuilding, walkable } from './sim/grid';
@@ -2933,14 +2933,24 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         break;
       }
       case 'silo':
-        // The Atomic Age (#605): the clock is public, so every player is told when a warhead goes up and where it will land.
+        // The Atomic Age (#605): the clock is public, so every player is told when a warhead goes up. A rival is shown three rings, the
+        // real zone and two decoys (#762), never the event's point (the attacker's own aim): no marker, ping or camera jump there.
         if (ev.what === 'launched') {
-          if (ev.owner === viewer) hud.toast(`Warhead away: it lands in ${ev.fuse ?? SILO.fuse} seconds`, 'good');
+          if (ev.owner === viewer) hud.toast(`Warhead away: it lands in ${ev.fuse ?? SILO.fuse} seconds. Rivals see your target among two decoys until the last ${SILO.reveal}`, 'good');
           else if (isEnemy(s, viewer, ev.owner)) {
-            hud.toast(`${s.players[ev.owner].name} has launched a warhead: it lands in ${ev.fuse ?? SILO.fuse} seconds. Clear the ring, or destroy the silo`, 'bad');
-            view.marker(s, ev.x, ev.y, false);
+            hud.toast(`${s.players[ev.owner].name} has launched a warhead: it lands in ${ev.fuse ?? SILO.fuse} seconds, in one of three rings. Clear them, or destroy the silo`, 'bad');
+            const l = s.launches?.find((k) => k.id === ev.id);
+            for (const g of l ? ringsFor(s, l, viewer) : []) minimap.ping(g.x, g.y, '#ff4a3a', true);
           }
           play('siloLaunch');
+        } else if (ev.what === 'revealed') {
+          // Exactly SILO.reveal seconds left (#762): the decoys vanish, the real ring flashes where it was drawn, one alarm.
+          const l = s.launches?.find((k) => k.id === ev.id);
+          if (l && isEnemy(s, viewer, ev.owner)) {
+            hud.toast(`${SILO.reveal} seconds: the decoys are gone. ${s.players[ev.owner].name}'s warhead falls in the ring that flashes`, 'bad');
+            for (const g of ringsFor(s, l, viewer)) minimap.ping(g.x, g.y, '#ff2a1a', true);
+            play('siloAlarm');
+          }
         } else if (ev.what === 'scrubbed') {
           hud.toast(ev.owner === viewer ? 'Your silo fell: the launch is scrubbed' : `${s.players[ev.owner].name}'s silo fell: the launch is scrubbed`, ev.owner === viewer ? 'alert' : 'good');
           play('siloScrub');
