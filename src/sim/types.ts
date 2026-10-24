@@ -369,6 +369,11 @@ export interface Building {
   milled?: number;
   /** An Interceptor Battery (#759 s2): the tick its charge is ready again after firing. Absent: charged. */
   reload?: number;
+  /**
+   * A Missile Silo held in Reserve (#759 s3): the tick it stands ready to answer a rival warhead (`INTERCEPT.arm` seconds after it was set,
+   * and again after each interceptor it fires). While set it launches nothing. Absent: not in Reserve.
+   */
+  reserve?: number;
   /** A Seed Spire (the Age of the Bloom, `bloom.ts`): the tick its Bloom Seed is ripe (pushed on while no Heart Tree stands). Absent: not yet begun. */
   ripe?: number;
   /** A Sluice (#701 s4): standing open, letting the water out over the low ground behind it. Absent: shut. */
@@ -569,6 +574,8 @@ export interface Intercept {
   x: number;
   y: number;
   hit: boolean;
+  /** Fired by a Missile Silo held in Reserve (#759 s3), spending a warhead from its people's store; `battery` is then the silo's id. */
+  silo?: true;
 }
 
 /**
@@ -1077,7 +1084,7 @@ export type GameEvent =
    * Missile defence (#759 s2): a battery of `owner`'s `fired` at launch `id` of `by`'s (at the battery, `x`, `y`), then the interceptor met
    * the warhead (`hit`: it is gone; `missed`: it flies on) where the missile is, `z` tiles up.
    */
-  | { k: 'intercept'; owner: number; by: number; id: number; shot: number; what: 'fired' | 'hit' | 'missed'; x: number; y: number; z?: number }
+  | { k: 'intercept'; owner: number; by: number; id: number; shot: number; what: 'fired' | 'hit' | 'missed'; x: number; y: number; z?: number; silo?: true }
   /** A trader bought a load of rare ore at a post (#573). */
   | { k: 'oreBuy'; owner: number; ore: RareId; n: number; gold: number; x: number; y: number }
   | { k: 'ruin'; id: number; owner: number; find: RuinFind; tech?: TechId; x: number; y: number }
@@ -1469,6 +1476,8 @@ export interface AiMemory {
   salvoPays?: boolean;
   /** The tick the computer last weighed where to send a warhead (`fireSilo`, once a second). */
   siloAt?: number;
+  /** The tick it last weighed holding a silo in Reserve (#759 s3, `reserveSilo`, once every `INTERCEPT.think` seconds). */
+  reserveAt?: number;
   /** Tick it began holding its Town Center for a side road's last deeds, so it holds only so long. */
   waiting?: number;
   /**
@@ -1619,6 +1628,8 @@ export type Command =
   /** A Missile Silo launches at a point (#605, the Atomic Age); `w` picks the warhead (#753), absent for the people's own branch's. */
   /** With `more` (#765, Launch Control), a salvo: this silo and the two in `more` fire one Atomic warhead each, each at its own point. */
   | { t: 'launch'; p: number; silo: number; x: number; y: number; w?: 'atomic' | 'fission' | 'fusion'; more?: { silo: number; x: number; y: number }[] }
+  /** Hold a Missile Silo in Reserve (#759 s3), to answer rival warheads with its people's own, or stand it down to launch again. */
+  | { t: 'reserve'; p: number; silo: number; on: boolean }
   /** Answer the card of tidings waiting at the fire (#443): `take` pays its price, otherwise it is passed by. */
   | { t: 'tiding'; p: number; card: TidingId; take: boolean }
   /** A player left an online match: the computer takes over their people. With `back` (sent only by the room, never a browser),
