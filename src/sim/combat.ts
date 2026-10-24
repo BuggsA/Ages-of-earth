@@ -5,6 +5,7 @@ import { fairPurse } from './fair';
 import { raidBlow, raidSlain } from './ways';
 import { takeCaptive } from './thralls';
 import { prizeOf } from './convoy';
+import { board, cuts } from './beggars';
 import { looted, pack } from './spoils';
 import { raided } from './household';
 import { alarm } from './flee';
@@ -41,9 +42,11 @@ export function damageOf(s: GameState, attacker: Unit | null, st: UnitStats, tar
   if (target.kind === 'building') {
     // Walls shrug off all but siege and heavy blows.
     const wall = target.type === 'wall' || target.type === 'gate' || target.type === 'dyke' || target.type === 'sluice' || target.type === 'dam' ? (st.cls === 'siege' ? 1.2 : st.cls === 'infantry' || st.cls === 'hero' ? 0.5 : 0.15) : 1;
+    // The Sea Beggars (#783) cut a rival's dykes from the sea: their ships strike the water-works as siege does.
+    const cut = attacker && st.cls === 'ship' ? cuts(s, attacker.owner, target) : 0;
     // Ships hole a floating district (#770) as nothing else does.
     const hull = target.type === 'pontoon' && st.cls === 'ship' ? FLOAT.hull : 1;
-    return Math.max(1, st.attack * BONUS[st.cls].building * inspired * wall * hull);
+    return Math.max(1, st.attack * BONUS[st.cls].building * inspired * (cut || wall) * hull);
   }
   const ts = statsOf(s, target);
   const rank = target.kind === 'unit' ? rankOf(target) : 0;
@@ -75,6 +78,8 @@ export function hurt(s: GameState, target: Ent, damage: number, by: number, atta
     p.alert = s.tick;
     s.events.push({ k: 'alert', owner: target.owner, x: target.x, y: target.y, building: target.kind === 'building', ...(target.kind === 'unit' && target.order.k === 'hunt' ? { hunter: true } : {}) });
   }
+  // The Sea Beggars (#783): a rival ship beaten down by theirs is boarded and taken, not sunk.
+  if (target.hp <= 0 && target.kind === 'unit' && board(s, target, by, credit)) return;
   if (target.hp <= 0) {
     s.players[by].stats.kills++;
     if (target.kind === 'unit' && by !== target.owner) plunder(s, target, by, credit);

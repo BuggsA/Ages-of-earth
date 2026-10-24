@@ -2745,6 +2745,13 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           lastAlert = { x: ev.x, y: ev.y };
         }
         break;
+      case 'boarded':
+        if (ev.to === viewer) hud.toast(`⚓ Boarded and taken: a ${unitStats(ev.type, s.players[ev.to].epoch).name} sails for you now, hold and all`, 'good');
+        else if (ev.from === viewer) {
+          hud.toast(`Your ${unitStats(ev.type, s.players[ev.from].epoch).name} has been boarded and taken by ${s.players[ev.to].name}'s Sea Beggars!`, 'alert');
+          lastAlert = { x: ev.x, y: ev.y };
+        }
+        break;
       case 'consecrated':
         if (ev.to === viewer) hud.toast(`✨ Your priests have won over a ${BUILDINGS[ev.type].name}`, 'good');
         else if (ev.from === viewer) {
@@ -3822,6 +3829,39 @@ function frame(now: number): void {
     if (sea >= 0) spawnUnit(s, owner, 'fisher', (sea % s.w) + 0.5, Math.floor(sea / s.w) + 0.5);
     view.rig.focus(town[0].x, town[0].y);
     return town.length;
+  },
+  /**
+   * The Age of the Sea Beggars (testing, #783): turn a player to the age, launch two warships on the water nearest its start and a rival
+   * cog and fishing boat beside them, the cog laden with gold, and send the warships at the cog. Selects the warships and looks at them;
+   * returns the cog's id (0: no water near home). Watch the cog strike its colours and change sides.
+   */
+  beggars(owner: number) {
+    if (!game) return 0;
+    const s = game;
+    const p = s.players[owner];
+    const rival = s.players.find((o) => o.id !== owner && isEnemy(s, owner, o.id));
+    if (!rival) return 0;
+    restat(s, p, () => {
+      p.epoch = AGES.beggars.tier;
+      p.age = 'beggars';
+      p.walked = [...new Set([...(p.walked ?? []), 'dykes' as const, 'sail' as const, 'beggars' as const])];
+    });
+    const sea = nearestWalkable(s, p.startX, p.startY, 30, NAVAL);
+    if (sea < 0) return 0;
+    const x = (sea % s.w) + 0.5;
+    const y = Math.floor(sea / s.w) + 0.5;
+    const ships = [0, 1].map((k) => spawnUnit(s, owner, 'warship', x + k * 0.8, y));
+    const near = nearestWalkable(s, x + 3, y + 1, 6, NAVAL);
+    const at = near >= 0 ? { x: (near % s.w) + 0.5, y: Math.floor(near / s.w) + 0.5 } : { x, y: y + 1 };
+    const cog = spawnUnit(s, rival.id, 'cog', at.x, at.y);
+    cog.carry = 60;
+    cog.carryRes = 'gold';
+    spawnUnit(s, rival.id, 'fisher', at.x + 0.8, at.y);
+    s.peaceUntil = Math.min(s.peaceUntil, s.tick);
+    issue({ t: 'attack', p: owner, ids: ships.map((u) => u.id), target: cog.id });
+    setSelection(ships.map((u) => u.id));
+    view.rig.focus(x, y);
+    return cog.id;
   },
   /**
    * Routes that read the tide (testing, #755): with the tide awake, run the rules on to a few seconds before the flood off low water, put

@@ -71,7 +71,7 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'chart' | 'assay' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged' | 'launchControl' | 'interceptors';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood' | 'locks' | 'floating' | 'bloom';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood' | 'locks' | 'floating' | 'bloom' | 'beggars';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
 export type PathId = 'blood' | 'steppe' | 'hemocraft' | 'rite';
@@ -805,6 +805,8 @@ export interface PlayerStats {
   relicGold?: number;
   /** Gold paid in tithes by Missions (#555 s12). */
   tithe?: number;
+  /** Rival ships boarded and taken (the Sea Beggars, #783). */
+  boarded?: number;
   /** Tiles of water pumped out into polder (#701). */
   drained?: number;
   /** Tiles of land dug out into channels, filled with water (#701, the Age of Rivers). */
@@ -1158,6 +1160,8 @@ export type GameEvent =
   | { k: 'campAlone'; owner: number; id: number; x: number; y: number; struck: boolean }
   | { k: 'alert'; owner: number; x: number; y: number; building: boolean; /** The Town Center is struck. */ heart?: boolean; wild?: Animal['kind']; /** A rival's soldiers fell on a citizen out hunting. */ hunter?: boolean }
   | { k: 'converted'; id: number; from: number; to: number; x: number; y: number }
+  /** A rival ship beaten down and boarded, taken for the Sea Beggars (#783): it sails for `to` now. */
+  | { k: 'boarded'; id: number; from: number; to: number; x: number; y: number; type: UnitType }
   /** A building chanted over to a pilgrim people (#209). */
   | { k: 'consecrated'; id: number; from: number; to: number; x: number; y: number; type: BuildingType; size: number }
   /** Rival priests have begun chanting at one of `owner`'s buildings (#209). */
