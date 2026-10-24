@@ -17,7 +17,9 @@ export type UnitType =
   /** A packed Town Center or House on the move (the Age of the Steppe, #297). */
   | 'wagon'
   /** Beasts of the Age of the Wild (`docs/wild-road.md`): tamed from the wild, or bred at a Beast Den once a kind is tamed. */
-  | 'warwolf' | 'tusker' | 'warmammoth';
+  | 'warwolf' | 'tusker' | 'warmammoth'
+  /** The Age of the Water Line (#701 s4): a flat boat with a gun in its bow, that sails the flood and the channels as well as the sea. */
+  | 'barge';
 /** How a unit gets about: on foot, on the water, or in the air. */
 export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
@@ -26,7 +28,9 @@ export type BuildingType =
   /** The Age of the Grove (`docs/wild-road.md`, `grove.ts`): a wall that grows, a one-tile garden, fruit trees. */
   | 'thornwall' | 'garden' | 'orchard'
   /** The Age of Rivers (#701): a ditch dug from the water, which fills and is gone. */
-  | 'channel';
+  | 'channel'
+  /** The Age of the Water Line (#701 s4): a gate in a dyke that lets the water out over the low ground, and back. */
+  | 'sluice';
 /** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
 export type Difficulty = 'gentle' | 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
@@ -46,7 +50,7 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'chart' | 'assay' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'waterline';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
 export type PathId = 'blood' | 'steppe' | 'hemocraft' | 'rite';
@@ -323,6 +327,8 @@ export interface Building {
   burnt?: boolean;
   /** A Windmill (#701): the tick it last pumped a tile dry, so its sails show it at work. Absent: it never has. */
   pumped?: number;
+  /** A Sluice (#701 s4): standing open, letting the water out over the low ground behind it. Absent: shut. */
+  open?: boolean;
   /** Where new units go. `kind` is the resource the flag was set on (absent on bare ground), so it outlives its tile (#344). */
   rally: { x: number; y: number; tile: number; kind?: number } | null;
   cool: number;
@@ -908,6 +914,10 @@ export type GameEvent =
   | { k: 'drained'; owner: number; mill: number; tile: number; x: number; y: number }
   /** Water ran into a dug ditch (#701, the Age of Rivers): `tile` is the new channel. */
   | { k: 'dug'; owner: number; tile: number; x: number; y: number }
+  /** The Water Line (#701 s4): an open sluice of `owner`'s let the water over a tile of low ground (`wet`), or the water left it again. */
+  | { k: 'inundated'; owner: number; tile: number; x: number; y: number; wet: boolean }
+  /** A sluice was opened or shut (#701 s4). */
+  | { k: 'sluice'; owner: number; id: number; open: boolean; x: number; y: number }
   /** The sea ran back into a tile of polder (#701 s3, the breach): `owner` holds the land there (-1: no one), `drowned` the buildings it took. */
   | { k: 'flooded'; owner: number; tile: number; x: number; y: number; drowned: number }
   | { k: 'season'; i: number }
@@ -1039,6 +1049,13 @@ export interface GameState {
   springs?: number[];
   /** Tiles of polder the sea has taken back (#701 s3, the breach), by any breach: a cheap test for the renderer that the shore moved. Absent until the first. */
   flooded?: number;
+  /**
+   * The Water Line (#701 s4): per tile, where an open sluice let the water out over low ground (now `T_WATER`, waded and not walked dry,
+   * no `B_TERRAIN`): 1 + the terrain it had, to give back when the water goes. Absent until the first sluice opens (and in older saves).
+   */
+  inund?: Uint8Array;
+  /** Tiles the sluices have flooded or given back, all told (#701 s4): a cheap test for the renderer that the water moved. */
+  inundated?: number;
   players: Player[];
   /** Every unit and building, in the order they were made (ids rise). */
   ents: Ent[];
@@ -1174,6 +1191,11 @@ export interface AiMemory {
    * Ages for the road's Dock, and since when it has stood in the Age of Dykes.
    */
   dyke?: { plan: DykePlan | null; looked?: boolean; hold?: number; since?: number; /** Its line once stood whole (#701 s3): from then on a gap in it is a breach to mend, in any age. */ raised?: boolean };
+  /**
+   * The Water Line (#701 s4): since when it has stood in the age, where it means its sluice to go (null: nowhere, once looked), and the
+   * tick an enemy army last stood by the sluice.
+   */
+  line?: { since: number; spot?: { tx: number; ty: number } | null; alarm?: number };
   /** The Age of Rivers (#701): the channel it means to dig from water past home (null: none), found when deciding and again on arrival (`fresh`). */
   river?: { plan: ChannelPlan | null; looked?: boolean; fresh?: boolean };
   /** The first crossing (#585): the age it stands in on the way to the Sea-Raiders, and since when (each sibling, and the age itself). */
@@ -1255,7 +1277,7 @@ export type Command =
   | { t: 'seam'; p: number; building: number; seam: SeamId }
   /** Call citizens to arms at a War Camp in the Age of Total War (#313): up to `n`, the nearest first. */
   | { t: 'callUp'; p: number; building: number; n?: number }
-  /** Strike camp (#297): pack a Town Center or House onto a wagon. */
+  /** Strike camp (#297): pack a Town Center or House onto a wagon. At a Sluice (#701 s4) it opens or shuts the gate instead. */
   | { t: 'pack'; p: number; building: number }
   /** Pitch camp (#297): wagons set down the building they carry where they stand. */
   | { t: 'pitch'; p: number; ids: number[] }

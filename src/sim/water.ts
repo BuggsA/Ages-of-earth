@@ -1,9 +1,9 @@
-import { AGES, BREACH, DYKE, POLDER, RIVERS, domainOf, secs } from './data';
+import { AGES, BREACH, DYKE, INUND, POLDER, RIVERS, domainOf, secs } from './data';
 import { ageDef, ageOf, asleep } from './ages';
 import { landOwnerAt } from './borders';
 import { nearestWalkable, stampBuilding } from './grid';
 import type { Building, GameState, Player } from './types';
-import { B_RES, B_TERRAIN, R_FISH, R_NONE, T_GRASS, T_ROCK, T_WATER } from './types';
+import { B_RES, B_TERRAIN, R_FISH, R_NONE, T_GRASS, T_ROCK, T_SAND, T_WATER } from './types';
 
 /**
  * The water layer (#701, the Water Road). The map's water was fixed at the start of a match until the Age of Dykes: a people raises
@@ -24,6 +24,9 @@ export const isSpring = (s: GameState, tile: number): boolean => !!s.springs && 
 
 /** Whether water lies here, or a spring head that will give it: what a ditch fills from, and what waters a field. */
 const source = (s: GameState, tile: number): boolean => s.terrain[tile] === T_WATER || isSpring(s, tile);
+
+/** Whether an open sluice has let the water over this tile of low ground (#701 s4, the Water Line): water a land unit wades and a boat sails. */
+export const isInund = (s: GameState, tile: number): boolean => !!s.inund && s.inund[tile] !== 0;
 
 /** Whether this tile was pumped out into polder. */
 export const isPolder = (s: GameState, tile: number): boolean => !!s.polder && s.polder[tile] === 1;
@@ -71,10 +74,10 @@ export function shallowsNear(s: GameState, p: Player): number {
 /** Whether a people's coast opens the Age of Dykes: enough shallows by its town. */
 export const coastHeld = (s: GameState, p: Player): boolean => shallowsNear(s, p) >= DYKE.need;
 
-/** Water that flows: open water with no dyke (or any building) on it. */
-const wet = (s: GameState, i: number): boolean => s.terrain[i] === T_WATER && s.bldAt[i] === 0;
-/** What a mill's pull passes through: water, and the polder it has already won. */
-const pull = (s: GameState, i: number): boolean => wet(s, i) || (isPolder(s, i) && s.bldAt[i] === 0);
+/** Water that flows: open water with no dyke (or any building) on it. A sluice's flood is not: it comes and goes with the sluice. */
+const wet = (s: GameState, i: number): boolean => s.terrain[i] === T_WATER && s.bldAt[i] === 0 && !isInund(s, i);
+/** What a mill's pull passes through: water, and the polder it has already won (not while a sluice has it under water). */
+const pull = (s: GameState, i: number): boolean => wet(s, i) || (isPolder(s, i) && s.bldAt[i] === 0 && !isInund(s, i));
 
 const FOUR = [1, 0, -1, 0, 0, 1, 0, -1];
 
@@ -139,6 +142,7 @@ export function drain(s: GameState, tile: number, owner: number, mill: number): 
   const { w } = s;
   s.terrain[tile] = T_GRASS;
   (s.polder ??= new Uint8Array(w * s.h))[tile] = 1;
+  if (s.inund) s.inund[tile] = 0;
   // A channel pumped out is land again, walked at full pace.
   if (s.channel) s.channel[tile] = 0;
   if (s.res[tile] === R_FISH) {
@@ -182,16 +186,20 @@ export function pumpStep(s: GameState): void {
 
 // ---- The breach (#701 s3): the sea taking back the polder ----------
 
-/** Whether a finished, standing dyke holds this tile: the only thing that keeps the sea out (a dyke site does not). */
+/**
+ * Whether a finished, standing dyke holds this tile: the only thing that keeps the sea out (a dyke site does not). A sluice (#701 s4)
+ * holds it too, open or shut, from the moment it is laid out: it is built behind a cofferdam, and open, it lets out only the shallow
+ * flood of the Water Line (`sluiceStep`), never the sea.
+ */
 function banked(s: GameState, i: number): boolean {
   const id = s.bldAt[i];
   if (id === 0) return false;
   const b = s.byId.get(id);
-  return !!b && b.kind === 'building' && b.type === 'dyke' && b.built && b.hp > 0;
+  return !!b && b.kind === 'building' && ((b.type === 'dyke' && b.built) || b.type === 'sluice') && b.hp > 0;
 }
 
-/** Water that runs on: water with no finished dyke on it. */
-const runs = (s: GameState, i: number): boolean => s.terrain[i] === T_WATER && !banked(s, i);
+/** Water that runs on: water with no finished dyke on it (a sluice's flood is not the sea's). */
+const runs = (s: GameState, i: number): boolean => s.terrain[i] === T_WATER && !banked(s, i) && !isInund(s, i);
 
 /**
  * Whether the water on this tile is the open sea, as a mill judges it (`basinOf`): its body (four ways, through water no finished dyke
@@ -259,6 +267,8 @@ export function flood(s: GameState, tile: number): number {
   const { w, h } = s;
   s.terrain[tile] = T_WATER;
   s.polder![tile] = 0;
+  // The sea over a sluice's flood: deep water now, not the Water Line's.
+  if (s.inund) s.inund[tile] = 0;
   s.block[tile] |= B_TERRAIN;
   const x = tile % w;
   const y = (tile - x) / w;
@@ -512,16 +522,22 @@ export function parched(s: GameState, owner: number, tx: number, ty: number, siz
 
 /** How fast a Farm works for where it lies: polder (#701) at `POLDER.farm`, a watered field in the Age of Rivers at `RIVERS.farm`. */
 export function fieldBoost(s: GameState, b: Building): number {
+  // Under a sluice's flood (#701 s4) a field yields nothing until the water goes.
+  if (drowned(s, b)) return 0;
   let k = polderField(s, b) ? POLDER.farm : 1;
   const p = s.players[b.owner];
   if (p && ageDef(p).rivers && wateredAt(s, b.tx, b.ty, b.size)) k = Math.max(k, RIVERS.farm);
   return k;
 }
 
-/** How fast a land unit wades here: `RIVERS.wade` in a channel (a dyke over one is walked as a crown), 1 elsewhere. */
-export function wading(s: GameState, x: number, y: number): number {
-  if (!s.channel) return 1;
+/**
+ * How fast a land unit wades here: `RIVERS.wade` in a channel (a dyke over one is walked as a crown), in a sluice's flood (#701 s4)
+ * `INUND.wade`, or `INUND.siege` for a siege engine; 1 elsewhere.
+ */
+export function wading(s: GameState, x: number, y: number, siege = false): number {
   const i = Math.floor(y) * s.w + Math.floor(x);
+  if (s.inund && s.inund[i] !== 0) return siege ? INUND.siege : INUND.wade;
+  if (!s.channel) return 1;
   return s.channel[i] === 1 && s.bldAt[i] === 0 ? RIVERS.wade : 1;
 }
 
@@ -661,4 +677,201 @@ export function channelPlan(
     }
   }
   return out;
+}
+
+// ---- The Age of the Water Line (#701 s4): sluices that let the water out over the low ground, and back ----------
+
+/** Whether a Farm lies under a sluice's flood: most of its footprint. It yields nothing until the water goes. */
+export function drowned(s: GameState, b: Building): boolean {
+  if (!s.inund || b.type !== 'farm') return false;
+  let n = 0;
+  for (let y = b.ty; y < b.ty + b.size; y++) for (let x = b.tx; x < b.tx + b.size; x++) if (s.inund[y * s.w + x] !== 0) n++;
+  return n * 2 > b.size * b.size;
+}
+
+/**
+ * Whether a sluice can be worked: standing, finished, and its people in the Age of the Water Line (or a Golden Age that wove it in),
+ * or it is the sluice the people kept on leaving (the age's keepsake). Any other sluice sleeps, shut, outside the age.
+ */
+export function sluiceWorks(s: GameState, b: Building): boolean {
+  return b.type === 'sluice' && b.built && b.hp > 0 && (!!ageDef(s.players[b.owner]).sluices || b.keep === 'waterline') && !asleep(s, b);
+}
+
+/** Whether still water (sea, lake or channel, not a flood and nothing built on it) lies four-ways beside a sluice: what it lets out. */
+export function sluiceFed(s: GameState, b: Building): boolean {
+  for (let d = 0; d < 8; d += 2) {
+    const x = b.tx + FOUR[d];
+    const y = b.ty + FOUR[d + 1];
+    if (x >= 0 && y >= 0 && x < s.w && y < s.h && wet(s, y * s.w + x)) return true;
+  }
+  return false;
+}
+
+/** Whether a sluice is letting the water out now: open, working, and with water beside it. */
+export const lets = (s: GameState, b: Building): boolean => !!b.open && sluiceWorks(s, b) && sluiceFed(s, b);
+
+/** Why a people can't open or shut this sluice now, or null. */
+export function sluiceProblem(s: GameState, b: Building): string | null {
+  if (b.type !== 'sluice') return 'Not a sluice';
+  if (!b.built) return 'The sluice is not finished';
+  if (!sluiceWorks(s, b)) return `Sluices open only in the ${AGES.waterline.name}, or the one your people kept on leaving it`;
+  return null;
+}
+
+/** The highest corner of a tile. */
+function topOf(s: GameState, t: number): number {
+  const x = t % s.w;
+  const y = (t - x) / s.w;
+  const W = s.w + 1;
+  const h = s.height;
+  const i = y * W + x;
+  return Math.max(h[i], h[i + 1], h[i + W], h[i + W + 1]);
+}
+
+/**
+ * How high a sluice's water climbs: `INUND.rise` over its lowest bank (the lowest land four-ways beside it), or over `POLDER.ground`
+ * where none is land. The flood runs over the ground up to that line, so a sluice on a channel through high meadow floods the meadow
+ * round it, and a rise in the land stands out of the water.
+ */
+export function waterTop(s: GameState, b: { tx: number; ty: number }): number {
+  let bank = Infinity;
+  for (let d = 0; d < 8; d += 2) {
+    const x = b.tx + FOUR[d];
+    const y = b.ty + FOUR[d + 1];
+    if (x < 0 || y < 0 || x >= s.w || y >= s.h) continue;
+    const n = y * s.w + x;
+    // Ground the flood already lies on is still the bank it was: its heights are as they were.
+    if (s.terrain[n] !== T_WATER || isInund(s, n)) bank = Math.min(bank, topOf(s, n));
+  }
+  return (bank === Infinity ? POLDER.ground : bank) + INUND.rise;
+}
+
+/**
+ * Whether a sluice's flood can run over this tile, its water up to `top`: open meadow or sand (or polder, always) lying no higher, with
+ * no tree, deposit, spring or building on it; a Farm goes under. Rock, woods, rises and towns stand out of the water.
+ */
+export function floodable(s: GameState, t: number, top = POLDER.ground + INUND.rise): boolean {
+  const k = s.terrain[t];
+  if ((k !== T_GRASS && k !== T_SAND) || s.res[t] !== R_NONE || isSpring(s, t)) return false;
+  if (s.bldAt[t] !== 0) {
+    const b = s.byId.get(s.bldAt[t]);
+    if (!b || b.kind !== 'building' || b.type !== 'farm') return false;
+  }
+  return isPolder(s, t) || topOf(s, t) <= top;
+}
+
+/**
+ * The ground a sluice's flood covers when it has run its full course: every tile reached from the sluice, four ways, through low
+ * ground (`floodable`) or water already let out, within `INUND.reach` steps, in the order reached.
+ */
+export function waterLine(s: GameState, b: { tx: number; ty: number }): number[] {
+  const { w, h } = s;
+  const top = waterTop(s, b);
+  const start = b.ty * w + b.tx;
+  const out: number[] = [];
+  let ring = [start];
+  const seen = new Set(ring);
+  for (let r = 0; r < INUND.reach && ring.length; r++) {
+    const next: number[] = [];
+    for (const t of ring) {
+      const tx = t % w;
+      const ty = (t - tx) / w;
+      for (let d = 0; d < 8; d += 2) {
+        const nx = tx + FOUR[d];
+        const ny = ty + FOUR[d + 1];
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const n = ny * w + nx;
+        if (seen.has(n) || !(isInund(s, n) || floodable(s, n, top))) continue;
+        seen.add(n);
+        next.push(n);
+        out.push(n);
+      }
+    }
+    ring = next;
+  }
+  return out;
+}
+
+/**
+ * Let the water over a tile of low ground (#701 s4): `T_WATER` a land unit wades and a gun-barge sails, knee-deep over the ground as it
+ * lies (its heights are not touched: the renderer draws the sheet of water over it).
+ */
+export function inundate(s: GameState, tile: number, owner: number): void {
+  const { w, h } = s;
+  (s.inund ??= new Uint8Array(w * h))[tile] = s.terrain[tile] + 1;
+  s.terrain[tile] = T_WATER;
+  const x = tile % w;
+  const y = (tile - x) / w;
+  // Walkability is unchanged (waded, no B_TERRAIN), but boats may now pass: routes are drawn again.
+  s.blockVersion++;
+  s.inundated = (s.inundated ?? 0) + 1;
+  s.events.push({ k: 'inundated', owner, tile, x: x + 0.5, y: y + 0.5, wet: true });
+}
+
+/** The water leaves a flooded tile (the inverse of `inundate`): the ground it had comes back as it was. */
+export function ebb(s: GameState, tile: number): void {
+  const { w } = s;
+  s.terrain[tile] = s.inund![tile] - 1;
+  s.inund![tile] = 0;
+  const x = tile % w;
+  const y = (tile - x) / w;
+  s.blockVersion++;
+  s.inundated = (s.inundated ?? 0) + 1;
+  s.events.push({ k: 'inundated', owner: landOwnerAt(s, x + 0.5, y + 0.5), tile, x: x + 0.5, y: y + 0.5, wet: false });
+}
+
+/**
+ * Every `INUND.every` seconds the Water Line moves a ring (#701 s4). From each open sluice with water beside it (in id order) the
+ * flood runs one tile on, four ways, over the low ground of its `waterLine`; flooded ground no open sluice reaches drains a ring from
+ * its edges in. A tile a boat floats on stays wet while water lies beside it, so the boat can still get out; once it is the last, it
+ * drains, and the boat runs aground and is lost.
+ */
+export function sluiceStep(s: GameState): void {
+  if (s.tick % secs(INUND.every) !== 0) return;
+  const { w, h } = s;
+  const want = new Map<number, number>();
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'sluice' || !lets(s, e)) continue;
+    for (const t of waterLine(s, e)) if (!want.has(t)) want.set(t, e.owner);
+    // The sluice's own tile seeds the spread.
+    want.set(e.ty * w + e.tx, e.owner);
+  }
+  if (!want.size && !s.inund) return;
+  const near = (t: number, ok: (n: number) => boolean): boolean => {
+    const x = t % w;
+    const y = (t - x) / w;
+    for (let d = 0; d < 8; d += 2) {
+      const nx = x + FOUR[d];
+      const ny = y + FOUR[d + 1];
+      if (nx >= 0 && ny >= 0 && nx < w && ny < h && ok(ny * w + nx)) return true;
+    }
+    return false;
+  };
+  const sluiceAt = (n: number): boolean => {
+    const b = s.byId.get(s.bldAt[n]);
+    return !!b && b.kind === 'building' && b.type === 'sluice' && want.get(n) !== undefined;
+  };
+  // Rise: low ground the water wants, beside water already out or the sluice letting it.
+  const rise: number[] = [];
+  // (Each sluice's `waterLine` judged how high its water climbs; here only what stands on the tile now.)
+  for (const [t, owner] of want) if (floodable(s, t, Infinity) && near(t, (n) => isInund(s, n) || sluiceAt(n))) rise.push(t, owner);
+  // Fall: flooded ground no open sluice reaches, from its edges in.
+  const fall: number[] = [];
+  if (s.inund) {
+    let boats: Set<number> | null = null;
+    for (let t = 0; t < w * h; t++) {
+      if (s.inund[t] === 0 || want.has(t) || !near(t, (n) => !isInund(s, n))) continue;
+      if (!boats) {
+        boats = new Set();
+        for (const u of s.ents) if (u.kind === 'unit' && u.hp > 0 && domainOf(u.type) === 'water') boats.add(Math.floor(u.y) * w + Math.floor(u.x));
+      }
+      if (boats.has(t) && near(t, (n) => s.terrain[n] === T_WATER)) continue;
+      fall.push(t);
+    }
+  }
+  for (let i = 0; i < rise.length; i += 2) inundate(s, rise[i], rise[i + 1]);
+  if (!fall.length) return;
+  const dry = new Set(fall);
+  for (const t of fall) ebb(s, t);
+  for (const u of s.ents) if (u.kind === 'unit' && u.hp > 0 && domainOf(u.type) === 'water' && dry.has(Math.floor(u.y) * w + Math.floor(u.x))) u.hp = 0;
 }

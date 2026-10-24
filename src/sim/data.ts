@@ -159,6 +159,11 @@ export interface Age {
    */
   rivers?: boolean;
   /**
+   * The Age of the Water Line (#701 s4): sluices open and shut, letting the water out over the low ground behind them (`INUND`,
+   * `water.ts`), and Sluices launch gun-barges that sail the flood.
+   */
+  sluices?: boolean;
+  /**
    * The Golden Age (#703): every side age the people has walked wakes at once, its verbs and the best of its gifts with none of its
    * doors (`weave` in `ages.ts`), until `GOLDEN.span` runs out and the people wakes in the Gunpowder Age, for good.
    */
@@ -228,7 +233,7 @@ export const ROUTES: Record<RouteId, { name: string; blurb: string }> = {
   horse: { name: 'Horse route', blurb: 'a town on wagons, tribute from a rival\'s land, tolls on the trade road' },
   faith: { name: 'Faith route', blurb: 'priests who win a rival\'s towers and Temples over' },
   wild: { name: 'Wild route', blurb: 'beasts tamed and bred, walls that grow, and one day the forest itself' },
-  water: { name: 'Water road', blurb: 'channels dug from the springs, then dykes and polder: a people that moves the water' },
+  water: { name: 'Water road', blurb: 'channels dug from the springs, dykes and polder, then sluices that drown your own fields to stop an army: a people that moves the water' },
 };
 
 const trunkAge = (e: number, good: string): Age => ({ name: EPOCHS[e].name, short: EPOCHS[e].short, tier: e, blurb: EPOCHS[e].blurb, good, routes: ['plain'] });
@@ -667,6 +672,22 @@ export const AGES: Record<AgeId, Age> = {
     tier: 1,
     blurb: 'As the first towns of Sumer and the Indus did: a people that leads the river where it wants it. Citizens dig Channels (Q) out from any water, a spring, a stream, a lake or the shore, dragged out in a line like a wall; when a stretch is dug the water runs in, a tile at a time, and stays. A Farm within 2 tiles of water works 30% faster, and in this age no Farm is laid away from water, so the fields follow the channels. A channel is a moat: soldiers and citizens wade it at well under half their pace, and no ship sails it. Markets, Temples and the Bronze Age\'s arms are all here. What is dug stays dug on any road.',
     rivers: true,
+  },
+  // The Water Road's third age (#701 s4): instead of the Gunpowder Age. The Dutch Water Line (1672, the Rampjaar): when an army
+  // came, the sluices were opened and the low land between the towns went under knee-deep water, too deep to march, too shallow to
+  // sail, and the towns stood as islands. The water is the wall; the guns go on flat boats.
+  waterline: {
+    verb: 'Set sluices in your dykes and channels and open them when an army comes: your low ground goes under knee-deep water that soldiers wade at a crawl and siege can hardly cross, while your gun-barges sail it; shut them and the water goes',
+    door: 'No stone walls or gates: the water is your wall, and only low ground floods. Fields under the flood yield nothing, and a rival\'s gun-barges sail it and pass your sluices as well as yours',
+    good: 'Turning your own fields into a moat at the moment an army walks onto them, and shelling it from the water',
+    routes: ['water'],
+    keepsake: { building: 'sluice', does: 'opening and shutting: it lets the water out over its low ground on any road' },
+    name: 'Age of the Water Line',
+    short: 'Water Line',
+    tier: 3,
+    blurb: 'As the Dutch did in 1672, the year of disaster, when three armies marched on Holland: they opened the sluices, and the low land between the towns went under knee-deep water, too deep to march through and too shallow to sail, and the towns stood as islands until the armies went home. A Sluice (S) is raised like a dyke, on shallow water, on a channel, or in your own dyke line in place of a piece of it; while it is shut it holds the water back as a dyke does. Open it and the water runs out over the low ground round it, a ring a second, up to 7 tiles: polder, and any meadow that lies low. Soldiers and citizens wade the flood at under a third of their pace, and siege engines bog down to a crawl. Buildings stand in it as islands; fields under it yield nothing. Shut the sluice and the water drains back, a ring a second. A Sluice also launches Gun-barges: flat boats with a cannon in the bow that sail the sea, the channels and the flood alike, and shell what stands round it. No stone walls or gates are raised: the water is the wall.',
+    noBuild: { buildings: ['wall', 'gate'], why: 'A people of the Water Line raises no stone walls or gates: the water is its wall. They wait until it returns to the Middle Ages or climbs on' },
+    sluices: true,
   },
   // The Golden Age (#703): the age that feels almost too good. A turn off the Gunpowder Age for a people that has lived many lives.
   golden: {
@@ -1212,6 +1233,26 @@ export const ROADS: Road[] = [
   },
   { from: 'dykes', to: 'middle', cost: { food: 150, wood: 100 }, time: 25, blurb: 'Lay down the spades: the ordinary Middle Ages, with walls and gates. The windmills stand still, but the polder stays dry and the dykes stand.' },
   { from: 'dykes', to: 'gunpowder', cost: EPOCHS[3].cost, time: EPOCHS[3].time, blurb: 'Rejoin the main road at the Gunpowder Age for the ordinary price: walls and gates return, the windmills stand still, and the land you made stays land.' },
+  // The Water Road's trunk (#701 s4): the Age of the Water Line instead of the Gunpowder Age, open to every people that walked the
+  // Dykes. A crossing from the Gunpowder Age for a people that walked them before, and back onto the plain road at either tier.
+  {
+    from: 'dykes',
+    to: 'waterline',
+    cost: { food: 900, wood: 500, gold: 300, stone: 300 },
+    time: 60,
+    walked: 'dykes',
+    blurb: 'Instead of the Gunpowder Age, on down the Water Road: from holding the water back to letting it out when you choose. Set sluices in your dykes and channels; open them as an army comes and your low ground goes under water it can barely wade, while gun-barges sail it. Paid in wood and stone more than gold. What it gives up: stone walls and gates, and the fields under the flood.',
+  },
+  {
+    from: 'gunpowder',
+    to: 'waterline',
+    cost: { food: 400, wood: 300, stone: 150 },
+    time: 40,
+    walked: 'dykes',
+    blurb: 'A turn, not a climb, for a people that has walked the Age of Dykes: set sluices in the dykes and open them when an army comes, and send gun-barges over the flood. What it gives up: stone walls and gates, and the fields under the water.',
+  },
+  { from: 'waterline', to: 'gunpowder', cost: { food: 200, gold: 150 }, time: 25, blurb: 'Shut the sluices for good: the ordinary Gunpowder Age, with walls and gates. The flood drains away, the Sluices sleep, and the barges you have keep sailing.' },
+  { from: 'waterline', to: 'industrial', cost: EPOCHS[4].cost, time: EPOCHS[4].time, blurb: 'Rejoin the main road at the Industrial Age for the ordinary price: walls and gates return, and the flood drains away as the Sluices sleep.' },
   // The Golden Age (#703): heard of by a people that has walked two side ages, open to one that has walked three. It ends on its own (`GOLDEN.span`).
   {
     from: 'gunpowder',
@@ -1287,6 +1328,25 @@ export const AI_BREACH = { least: 8, hunt: 12 };
  * its own and laid after everything else. It changes no ground, so every map is as it was; a channel dug beside it fills from it.
  */
 export const SPRING = { near: 14, at: 9 };
+
+/**
+ * The Water Line (#701 s4, the Water Road). Every `every` seconds the water runs one ring on from each open Sluice with still water
+ * four-ways beside it (sea, lake or channel): over low ground, four ways, up to `reach` steps from the Sluice. Low ground is polder,
+ * or open meadow or sand whose highest corner lies no more than `rise` over the Sluice's lowest bank; trees, rock, deposits, rises and
+ * buildings stand out of it, Farms excepted (a Farm under it yields nothing). The ground's heights are not touched: the water lies
+ * knee-deep over them. Land units wade it at `wade` of their pace, siege at `siege`; gun-barges sail it (and pass through any sluice,
+ * as a lock). Water no open Sluice reaches drains back a ring every `every` seconds, from its edges in, but never from under a boat
+ * while water lies beside it: a boat left on the last wet tile runs aground and is lost.
+ */
+export const INUND = { every: 1, reach: 7, rise: 0.4, wade: 0.3, siege: 0.1 };
+
+/**
+ * The computer in the Age of the Water Line (#701 s4). A people that walked the Dykes takes the road on `take` (a coin of its own). It
+ * raises a Sluice on the water nearest home with low ground beside it (within `reach` tiles of its start), keeps `barges` gun-barges,
+ * and opens the sluice while an enemy army of at least `threat` stands within `near` tiles of it, shutting it `calm` seconds after
+ * the last has gone. It stays `stay` seconds in the age before it climbs on.
+ */
+export const AI_WATERLINE = { take: 0.6, reach: 16, barges: 2, threat: 4, near: 14, calm: 20, stay: 360 };
 
 /**
  * The computer in the Age of Rivers (#701 s1). It takes the road on a coin of its own (`take`), and digs one channel from the water
@@ -1450,6 +1510,14 @@ export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
     { name: 'East Indiaman', cls: 'trader', hp: 290, attack: 0, armor: 1, parmor: 4, range: 0, reload: 1, speed: 2.1, sight: 8, cost: { wood: 110, gold: 50 }, time: 22, radius: 0.5, blurb: 'Sails goods from a Dock to a trading post on the coast and brings back gold: the farther the post, the more, and 20% over the land road. Only a post with water within 7 tiles is a port. Warships are its enemy.' },
     { name: 'Steam Freighter', cls: 'trader', hp: 380, attack: 0, armor: 2, parmor: 5, range: 0, reload: 1, speed: 2.5, sight: 8, cost: { wood: 80, gold: 60 }, time: 22, radius: 0.52, blurb: 'Sails goods from a Dock to a trading post on the coast and brings back gold: the farther the post, the more, and 20% over the land road. Only a post with water within 7 tiles is a port. Warships are its enemy.' },
   ],
+  // ---- On the flood (#701 s4, the Age of the Water Line) ----
+  barge: [
+    null,
+    null,
+    null,
+    { name: 'Gun-barge', cls: 'ship', hp: 200, attack: 24, armor: 1, parmor: 3, range: 8, minRange: 2, reload: 5, speed: 1.6, sight: 9, cost: { wood: 130, gold: 70 }, time: 26, radius: 0.45, shot: 'ball', splash: 0.7, blurb: 'A flat boat with a cannon in its bow: it sails the sea, the channels and the flood alike, and shells what stands round it. Thin-sided: a galleon outguns it on open water.' },
+    { name: 'Steam Gunboat', cls: 'ship', hp: 280, attack: 32, armor: 2, parmor: 4, range: 9, minRange: 2, reload: 4.5, speed: 2.0, sight: 10, cost: { wood: 110, gold: 110 }, time: 26, radius: 0.47, shot: 'ball', splash: 0.8, blurb: 'A shallow steam launch with a gun: it sails the sea, the channels and the flood alike, and shells what stands round it.' },
+  ],
   // ---- In the air ----
   fighter: [
     null,
@@ -1497,12 +1565,12 @@ export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
   warmammoth: beast({ name: 'War Mammoth', cls: 'siege', hp: 420, attack: 16, armor: 2, parmor: 4, range: 0, reload: 2.4, speed: 1.1, sight: 6, cost: { food: 260, gold: 60 }, time: 40, radius: 0.55, blurb: 'A woolly mammoth led to war: it tramples walls and buildings as a ram does, and gores soldiers too. Spearmen and riders swarm it.' }),
 };
 
-const DOMAINS: Partial<Record<UnitType, Domain>> = { fisher: 'water', warship: 'water', transport: 'water', cog: 'water', fighter: 'air', bomber: 'air' };
+const DOMAINS: Partial<Record<UnitType, Domain>> = { fisher: 'water', warship: 'water', transport: 'water', cog: 'water', barge: 'water', fighter: 'air', bomber: 'air' };
 /** Where a unit line goes: on foot, on the water or in the air. */
 export const domainOf = (type: UnitType): Domain => DOMAINS[type] ?? 'land';
 
-export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader', 'wagon', 'warwolf', 'tusker', 'warmammoth'];
-export const MILITARY: UnitType[] = ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'warship', 'fighter', 'bomber', 'warwolf', 'tusker', 'warmammoth'];
+export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader', 'wagon', 'warwolf', 'tusker', 'warmammoth', 'barge'];
+export const MILITARY: UnitType[] = ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'warship', 'fighter', 'bomber', 'warwolf', 'tusker', 'warmammoth', 'barge'];
 
 type Target = UnitClass | 'building';
 /** The counter triangle (and its friends): damage multiplier by attacker class against target class. */
@@ -1943,6 +2011,8 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   dyke: { name: 'Dyke', size: 1, hp: 700, cost: { wood: 2, stone: 4 }, time: 7, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, ages: ['dykes'], menu: 'eco', key: 'K', blurb: 'A bank of earth with a stone crown, raised on shallow water or on the shore beside it. Drag to lay out a line. Your own people walk along its crown; rivals and ships can\'t pass. Shut a bay or a strait off from the open sea with dykes, then set a Windmill by it to pump it dry. A dyke that falls (to siege, or a Sapper\'s keg) lets the sea back in: it floods the polder ring by ring until a dyke stands in the gap again. A people that has walked the Age of Dykes raises dykes in any age after, to mend its banks.' },
   channel: { name: 'Channel', size: 1, hp: 150, cost: { wood: 4 }, time: 8, pop: 0, sight: 1, trains: [], drop: [], epoch: 1, ages: ['rivers'], open: true, menu: 'eco', key: 'Q', blurb: 'A ditch dug out from water across the land. Drag to lay out a line from a spring, stream, lake or shore: as each stretch is dug the water runs into it and it stays. Farms within 2 tiles of water work faster in the Age of Rivers. Soldiers wade a channel at well under half their pace, and no ship sails it.' },
   windmill: { name: 'Windmill', size: 2, hp: 600, cost: { wood: 120, stone: 40 }, time: 30, pop: 0, sight: 5, trains: [], drop: [], epoch: 2, ages: ['dykes'], menu: 'eco', key: 'W', blurb: 'A post mill whose sails turn a scoop wheel. Raised by water a dyke has shut off from the open sea (or a small lake), it pumps it dry a tile every few seconds, nearest first, into polder: low black ground where a Farm yields half again as much. Two mills drain twice as fast. The open sea is too big to pump.' },
+  // The Water Line (#701 s4): a gate in a dyke or a channel that lets the water out over the low ground behind it (`INUND`, `water.ts`).
+  sluice: { name: 'Sluice', size: 1, hp: 800, cost: { wood: 60, stone: 80 }, time: 20, pop: 0, sight: 4, trains: ['barge'], drop: [], epoch: 3, ages: ['waterline'], menu: 'mil', key: 'S', blurb: 'A timber gate in a dyke, on a channel or on shallow water, raised on its banks by a winch. Shut, it holds the water back as a dyke does, and your own people walk across it. Open it (O) and the water runs out over the low ground round it, a ring a second, up to 7 tiles: soldiers wade the flood at a crawl, siege can hardly cross it, and your gun-barges sail it. Shut it and the water drains away. It launches Gun-barges onto the water beside it.' },
   airfield: { name: 'Airfield', size: 4, hp: 2200, cost: { wood: 250, stone: 100, gold: 150 }, time: 60, pop: 0, sight: 8, trains: ['fighter', 'bomber'], drop: [], epoch: 4, menu: 'mil', key: 'F', blurb: 'Builds fighters and bombers. Fighters hunt aircraft; bombers wreck towns.' },
 };
 

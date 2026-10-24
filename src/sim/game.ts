@@ -19,7 +19,7 @@ import { buildingGuns, updateShots } from './combat';
 import { fleeStep } from './flee';
 import { applyCommand } from './commands';
 import { AGES, AURA, AUTO_WORK, TICK_HZ, unitEpoch, CIV_IDS, HEART, LANDMARKS, RAIDER, RELIC, DEATHMATCH_RES, EPOCHS, domainOf, EPOCH_START_RES, MARKET, MILITARY, PLAYER_COLORS, START_CITIZENS, START_RES, TECHS, TOWER_LEVELS, WONDER_SECONDS, secs } from './data';
-import { AIR, NAVAL, stampBuilding } from './grid';
+import { AIR, BARGE, NAVAL, stampBuilding } from './grid';
 import { denWolves, generateMap } from './mapgen';
 import { Spatial } from './spatial';
 import { updateRelics } from './relics';
@@ -33,7 +33,7 @@ import { leaveRubble, salvageStep } from './salvage';
 import { cacheStep, dropOre, spillStore } from './caches';
 import { kegStep, millStep } from './powder';
 import { fireStep } from './fire';
-import { ditchStep, floodStep, pumpStep } from './water';
+import { ditchStep, floodStep, pumpStep, sluiceStep } from './water';
 import { siloStep } from './silo';
 import { stockPosts } from './oretrade';
 import { sortieStep } from './sortie';
@@ -413,7 +413,8 @@ function bringOut(s: GameState, p: Player, b: Building, unit: UnitType): void {
   const toward = b.rally ?? { x: s.w / 2, y: s.h / 2 };
   const domain = domainOf(unit);
   // Ships put out onto the water by their dock; aircraft take off from anywhere about the field.
-  const spot = exitSpot(s, b, toward.x, toward.y, domain === 'water' ? NAVAL : domain === 'air' ? AIR : undefined);
+  // A gun-barge (#701 s4) puts out onto any water beside its Sluice: a channel, the flood or the sea.
+  const spot = exitSpot(s, b, toward.x, toward.y, unit === 'barge' ? BARGE : domain === 'water' ? NAVAL : domain === 'air' ? AIR : undefined);
   const u = spawnUnit(s, p.id, unit, spot.x, spot.y);
   p.pop++;
   p.stats.trained++;
@@ -638,6 +639,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   pumpStep(s);
   ditchStep(s);
   floodStep(s);
+  sluiceStep(s);
   siloStep(s);
   sortieStep(s);
   fairStep(s);
@@ -718,6 +720,8 @@ export function checksum(s: GameState): number {
   // The water layer (#701): every tile pumped out, by where it lies.
   if (s.polder) for (let i = 0; i < s.polder.length; i++) if (s.polder[i]) mix(i);
   if (s.channel) for (let i = 0; i < s.channel.length; i++) if (s.channel[i]) mix(i + 0x40000);
+  // The Water Line (#701 s4): every tile under a sluice's flood.
+  if (s.inund) for (let i = 0; i < s.inund.length; i++) if (s.inund[i]) mix(i + 0x80000);
   for (const t of s.springs ?? []) mix(t);
   for (const f of s.fallen ?? []) {
     mix(f.owner);

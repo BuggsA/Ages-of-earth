@@ -1,6 +1,6 @@
 import { kinBonus } from './landmarks';
 import { BUILDINGS, LANDMARKS, POP_MAX, domainOf, type UnitStats } from './data';
-import { AIR, NAVAL, distToRect, nearestWalkable, stampBuilding, walkable } from './grid';
+import { AIR, BARGE, NAVAL, distToRect, nearestWalkable, stampBuilding, walkable } from './grid';
 import { buildingMaxHp, statsFor } from './stats';
 import { isSet, setStats } from './longbow';
 import type { Building, BuildingType, Cost, Ent, GameState, Goal, Player, Unit, UnitType } from './types';
@@ -23,7 +23,7 @@ export const teamOf = (s: GameState, owner: number) => s.players[owner].team;
 /** How a unit passes over tiles, for the tile tests and routes: its team on foot, or NAVAL, or AIR. */
 export function passOf(s: GameState, u: Unit): number {
   const d = domainOf(u.type);
-  return d === 'water' ? NAVAL : d === 'air' ? AIR : s.players[u.owner].team;
+  return u.type === 'barge' ? BARGE : d === 'water' ? NAVAL : d === 'air' ? AIR : s.players[u.owner].team;
 }
 
 /**

@@ -177,7 +177,7 @@ export class BuildingsView {
     const group = new THREE.Group();
     group.userData.building = k.id;
     // A dyke (#701) stands up out of the water: its bank reaches down to the bed, its crown above the water line.
-    const dyke = k.type === 'dyke';
+    const dyke = k.type === 'dyke' || k.type === 'sluice';
     const base = dyke ? Math.max(0.02, this.baseHeight(s, k)) : this.baseHeight(s, k);
     group.position.set(k.x, base, k.y);
     const wall = k.type === 'wall' || k.type === 'thornwall' || dyke || k.type === 'channel';
@@ -269,7 +269,7 @@ const plinthMaterial = inject(new THREE.MeshStandardMaterial({ color: '#8d7a62',
 
 const HEIGHT: Record<BuildingType, number> = {
   towncenter: 2.9, house: 1.5, storehouse: 1.3, farm: 0.4, barracks: 2.0, range: 1.4, stable: 1.4, tower: 3.4,
-  forge: 2.1, workshop: 1.7, temple: 2.6, market: 1.6, wonder: 4.6, wall: 1.3, gate: 1.8, dock: 1.5, airfield: 1.8, dyke: 0.45, windmill: 3.3, channel: 0.2, huntcamp: 1.4, warcamp: 1.7, caravanserai: 1.3, mission: 1.3, drainrig: 1.9, transfusion: 2.1, bloodtower: 2.9, snare: 0.9, prospector: 1.6, sapling: 0.7, silo: 1.4, shaft: 1.8, den: 1.8, thornwall: 1.3, garden: 0.6, orchard: 1.2,
+  forge: 2.1, workshop: 1.7, temple: 2.6, market: 1.6, wonder: 4.6, wall: 1.3, gate: 1.8, dock: 1.5, airfield: 1.8, dyke: 0.45, sluice: 1.4, windmill: 3.3, channel: 0.2, huntcamp: 1.4, warcamp: 1.7, caravanserai: 1.3, mission: 1.3, drainrig: 1.9, transfusion: 2.1, bloodtower: 2.9, snare: 0.9, prospector: 1.6, sapling: 0.7, silo: 1.4, shaft: 1.8, den: 1.8, thornwall: 1.3, garden: 0.6, orchard: 1.2,
 };
 
 /** Which neighboring tiles hold the same owner's wall or gate (for a dyke, #701: its dykes). */
@@ -280,7 +280,7 @@ function wallMask(s: GameState, b: Building): number {
     const o = s.byId.get(s.bldAt[y * s.w + x]);
     // A channel (#701) runs on toward its neighbouring ditches and the water it is dug from.
     if (b.type === 'channel' && s.terrain[y * s.w + x] === T_WATER) m |= bit;
-    if (o && o.kind === 'building' && o.owner === b.owner && (b.type === 'dyke' ? o.type === 'dyke' : b.type === 'thornwall' ? o.type === 'thornwall' : b.type === 'channel' ? o.type === 'channel' : o.type === 'wall' || o.type === 'gate')) m |= bit;
+    if (o && o.kind === 'building' && o.owner === b.owner && (b.type === 'dyke' || b.type === 'sluice' ? o.type === 'dyke' || o.type === 'sluice' : b.type === 'thornwall' ? o.type === 'thornwall' : b.type === 'channel' ? o.type === 'channel' : o.type === 'wall' || o.type === 'gate')) m |= bit;
   };
   join(b.tx + 1, b.ty, 1);
   join(b.tx, b.ty + 1, 2);
@@ -306,7 +306,7 @@ function snapshot(s: GameState, b: Building): Known {
     progress: b.progress,
     // A snare shows a hare in its noose once it holds a tender's worth (#485), to its owner and to a rival who sees it.
     // A Thornwall shows its stage (the Age of the Grove), a Kitchen Garden what feeds it, an Orchard whether it is grown and in fruit.
-    variant: b.type === 'thornwall' ? wallMask(s, b) + 16 * thornStage(b) : b.type === 'garden' ? (b.fed ?? 0) : b.type === 'orchard' ? (bearing(s, b) ? 2 : orchardGrown(b) ? 1 : 0) : b.type === 'wall' || b.type === 'dyke' || b.type === 'channel' ? wallMask(s, b) : b.type === 'gate' || b.type === 'dock' ? b.dir : b.type === 'snare' ? (catchIn(b) >= SNARE.worth ? 1 : 0) : b.type === 'shaft' ? Math.max(0, SEAMS.indexOf(seamOf(s, b) ?? 'stone')) : b.type === 'tower' ? (b.level ?? 0) : 0,
+    variant: b.type === 'thornwall' ? wallMask(s, b) + 16 * thornStage(b) : b.type === 'garden' ? (b.fed ?? 0) : b.type === 'orchard' ? (bearing(s, b) ? 2 : orchardGrown(b) ? 1 : 0) : b.type === 'wall' || b.type === 'dyke' || b.type === 'channel' ? wallMask(s, b) : b.type === 'sluice' ? wallMask(s, b) + (b.open ? 16 : 0) : b.type === 'gate' || b.type === 'dock' ? b.dir : b.type === 'snare' ? (catchIn(b) >= SNARE.worth ? 1 : 0) : b.type === 'shaft' ? Math.max(0, SEAMS.indexOf(seamOf(s, b) ?? 'stone')) : b.type === 'tower' ? (b.level ?? 0) : 0,
   };
 }
 

@@ -608,7 +608,7 @@ export function completeBuilding(s: GameState, b: Building): void {
   b.hp = Math.min(b.hp, maxHp(s, b));
   s.players[b.owner].stats.built++;
   // A finished gate opens for its own side.
-  if (b.type === 'gate' || b.type === 'dyke' || b.type === 'thornwall') stampBuilding(s, b, true);
+  if (b.type === 'gate' || b.type === 'dyke' || b.type === 'sluice' || b.type === 'thornwall') stampBuilding(s, b, true);
   if (b.type === 'wonder') {
     b.timer = s.wonderTime;
     s.events.push({ k: 'wonder', owner: b.owner, id: b.id, x: b.x, y: b.y, ticks: b.timer });
@@ -2293,7 +2293,7 @@ export function routeUnits(s: GameState): void {
 export function walk(s: GameState, u: Unit): void {
   if (!u.path) return;
   // A channel (#701, the Age of Rivers) is waded: a moat on foot.
-  let left = statsOf(s, u).speed * fordMarch(s, u) * hemoPace(s, u) * (domainOf(u.type) === 'land' ? wading(s, u.x, u.y) : 1) * DT;
+  let left = statsOf(s, u).speed * fordMarch(s, u) * hemoPace(s, u) * (domainOf(u.type) === 'land' ? wading(s, u.x, u.y, statsOf(s, u).cls === 'siege') : 1) * DT;
   while (left > 1e-9 && u.path) {
     const tx = u.path[u.pathI * 2];
     const ty = u.path[u.pathI * 2 + 1];

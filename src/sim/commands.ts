@@ -37,6 +37,7 @@ import { fightsBeasts } from './animals';
 import { tameProblem } from './tame';
 import { isField } from './grove';
 import { answerTiding, tidingProblem } from './tidings';
+import { sluiceProblem } from './water';
 
 /**
  * Everything a player can do, as plain data. A person's clicks and the computer opponent both go
@@ -720,6 +721,14 @@ export function applyCommand(s: GameState, c: Command): void {
     case 'pack': {
       const b = myBuilding(s, c.p, c.building);
       if (!b) return;
+      // At a Sluice (#701 s4) the same order opens the gate, or shuts it.
+      if (b.type === 'sluice') {
+        const shut = sluiceProblem(s, b);
+        if (shut) return refuse(s, c.p, shut);
+        b.open = !b.open || undefined;
+        s.events.push({ k: 'sluice', owner: c.p, id: b.id, open: !!b.open, x: b.x, y: b.y });
+        break;
+      }
       const why = packProblem(s, p, b);
       if (why) return refuse(s, c.p, why);
       packCamp(s, b);

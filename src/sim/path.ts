@@ -1,4 +1,4 @@
-import { AIR, NAVAL, lineClear, walkable } from './grid';
+import { AIR, BARGE, NAVAL, lineClear, lock, walkable } from './grid';
 import type { GameState, Goal } from './types';
 import { B_GATE, B_TERRAIN, T_WATER } from './types';
 
@@ -241,6 +241,7 @@ function field(s: GameState, key: string, seeds: number[], team: number): Field 
   // Walkability once, as bytes, for the inner loop.
   const open = new Uint8Array(n);
   if (team === NAVAL) for (let i = 0; i < n; i++) open[i] = s.block[i] === B_TERRAIN && s.terrain[i] === T_WATER ? 1 : 0;
+  else if (team === BARGE) for (let i = 0; i < n; i++) open[i] = s.terrain[i] === T_WATER && (s.block[i] === B_TERRAIN || s.block[i] === 0 || (s.block[i] === B_GATE && lock(s, i))) ? 1 : 0;
   else if (team === AIR) open.fill(1);
   else for (let i = 0; i < n; i++) open[i] = s.block[i] === 0 || (s.block[i] === B_GATE && s.gateTeam[i] === team && team >= 0) ? 1 : 0;
   for (const b of buckets) b.length = 0;
