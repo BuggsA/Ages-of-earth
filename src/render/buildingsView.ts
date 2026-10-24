@@ -3,6 +3,7 @@ import { ageOf } from '../sim/ages';
 import { BUILDINGS, CIVS, SNARE } from '../sim/data';
 import { flooded } from '../sim/flood';
 import { catchIn } from '../sim/snares';
+import { SEAMS, seamOf } from '../sim/shafts';
 import type { AgeId, Building, BuildingType, GameState } from '../sim/types';
 import { buildingGeometry, heirloomsFor, foundationGeometry, rubbleGeometry, scaffoldGeometry } from './buildingModels';
 import { bakedMaterial, inject } from './materials';
@@ -168,7 +169,7 @@ export class BuildingsView {
     const base = this.baseHeight(s, k);
     group.position.set(k.x, base, k.y);
     const wall = k.type === 'wall';
-    const body = new THREE.Mesh(buildingGeometry(k.type, k.epoch, this.colors[k.owner] ?? '#ffffff', wall || k.type === 'snare' ? k.variant : 0, k.age, k.heirloom), buildingMaterial);
+    const body = new THREE.Mesh(buildingGeometry(k.type, k.epoch, this.colors[k.owner] ?? '#ffffff', wall || k.type === 'snare' || k.type === 'shaft' ? k.variant : 0, k.age, k.heirloom), buildingMaterial);
     if (k.type === 'gate' && k.variant) body.rotation.y = Math.PI / 2;
     // A dock's pier reaches out over the water.
     if (k.type === 'dock') body.rotation.y = (k.variant * Math.PI) / 2;
@@ -247,7 +248,7 @@ const plinthMaterial = inject(new THREE.MeshStandardMaterial({ color: '#8d7a62',
 
 const HEIGHT: Record<BuildingType, number> = {
   towncenter: 2.9, house: 1.5, storehouse: 1.3, farm: 0.4, barracks: 2.0, range: 1.4, stable: 1.4, tower: 3.4,
-  forge: 2.1, workshop: 1.7, temple: 2.6, market: 1.6, wonder: 4.6, wall: 1.3, gate: 1.8, dock: 1.5, airfield: 1.8, huntcamp: 1.4, warcamp: 1.7, caravanserai: 1.3, mission: 1.3, drainrig: 1.9, transfusion: 2.1, bloodtower: 2.9, snare: 0.9, prospector: 1.6, sapling: 0.7, silo: 1.4,
+  forge: 2.1, workshop: 1.7, temple: 2.6, market: 1.6, wonder: 4.6, wall: 1.3, gate: 1.8, dock: 1.5, airfield: 1.8, huntcamp: 1.4, warcamp: 1.7, caravanserai: 1.3, mission: 1.3, drainrig: 1.9, transfusion: 2.1, bloodtower: 2.9, snare: 0.9, prospector: 1.6, sapling: 0.7, silo: 1.4, shaft: 1.8,
 };
 
 /** Which neighboring tiles hold the same owner's wall or gate. */
@@ -281,7 +282,7 @@ function snapshot(s: GameState, b: Building): Known {
     built: b.built,
     progress: b.progress,
     // A snare shows a hare in its noose once it holds a tender's worth (#485), to its owner and to a rival who sees it.
-    variant: b.type === 'wall' ? wallMask(s, b) : b.type === 'gate' || b.type === 'dock' ? b.dir : b.type === 'snare' ? (catchIn(b) >= SNARE.worth ? 1 : 0) : 0,
+    variant: b.type === 'wall' ? wallMask(s, b) : b.type === 'gate' || b.type === 'dock' ? b.dir : b.type === 'snare' ? (catchIn(b) >= SNARE.worth ? 1 : 0) : b.type === 'shaft' ? Math.max(0, SEAMS.indexOf(seamOf(s, b) ?? 'stone')) : 0,
   };
 }
 

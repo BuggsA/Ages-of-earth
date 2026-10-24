@@ -4,7 +4,8 @@ import { mineable } from './household';
 import { canRaise } from './ages';
 import type { Building, GameState, Job, Unit } from './types';
 import { R_BERRY, R_GOLD, R_MEAT, R_STONE, R_TREE } from './types';
-import { RES_OF_TILE, findResource, freeFarm, giveOrder } from './units';
+import { RES_OF_TILE, findResource, freeFarm, freeShaft, giveOrder } from './units';
+import { seamOf, seamProblem } from './shafts';
 
 /** The jobs a citizen can be sent to by `reassign`; building and shelter are chosen on the map. */
 export const SEND_JOBS: readonly Job[] = ['food', 'wood', 'stone', 'gold', 'build'];
@@ -15,7 +16,8 @@ export const PULL_JOBS: readonly Job[] = ['food', 'wood', 'stone', 'gold', 'buil
 export function citizenJob(u: Unit): Job {
   if (u.inside) return 'shelter';
   switch (u.order.k) {
-    case 'gather': return u.order.res;
+    case 'gather':
+    case 'shaft': return u.order.res;
     case 'farm':
     case 'hunt': return 'food';
     case 'build':
@@ -108,6 +110,7 @@ export function reassign(s: GameState, p: number, from: Job, to: Job, n: number)
   const load = new Map<number, number>();
   const busy = (i: number) => (load.get(i) ?? 0) >= SPREAD.perNode;
   const fields = new Set<number>();
+  const pits = new Set<number>();
   for (const e of s.ents) {
     if (e.kind === 'unit' && e.owner === p && e.hp > 0 && e.order.k === 'gather' && !pool.includes(e)) load.set(e.order.tile, (load.get(e.order.tile) ?? 0) + 1);
     if (e.kind === 'unit' && e.owner === p && e.hp > 0 && e.order.k === 'farm' && !pool.includes(e)) fields.add(e.order.target);
@@ -122,7 +125,7 @@ export function reassign(s: GameState, p: number, from: Job, to: Job, n: number)
       if (!site || u.thrall || !canRaise(u.type, site.type, s.players[p].civ)) continue;
       const o = u.order;
       // Remember the work they leave, so they go back to it once the building stands (as when a builder is called over).
-      const back = o.k === 'gather' || o.k === 'farm' || o.k === 'snare' ? { ...o, phase: 'go' as const } : null;
+      const back = o.k === 'gather' || o.k === 'farm' || o.k === 'snare' || o.k === 'shaft' ? { ...o, phase: 'go' as const } : null;
       giveOrder(u, { k: 'build', target: site.id });
       u.resume = back ?? u.resume;
       crew.set(site, crew.get(site)! + 1);
@@ -143,6 +146,16 @@ export function reassign(s: GameState, p: number, from: Job, to: Job, n: number)
       const kind = KIND_OF_JOB[to]!;
       if (!canWork(s, u, kind)) continue;
       const tile = findResource(s, kind, u.x, u.y, LABOR.reach, busy);
+      // No deposit in reach: a free Mine Shaft set to (or able to dig) that stock (#681).
+      if (tile < 0 && (to === 'stone' || to === 'gold') && u.type === 'citizen') {
+        const pit = freeShaft(s, p, u.x, u.y, LABOR.reach, pits);
+        if (!pit || seamProblem(s, pit, to)) continue;
+        pits.add(pit.id);
+        if (seamOf(s, pit) !== to) pit.seam = to;
+        giveOrder(u, { k: 'shaft', target: pit.id, res: to, phase: 'go' });
+        moved++;
+        continue;
+      }
       if (tile < 0) continue;
       load.set(tile, (load.get(tile) ?? 0) + 1);
       giveOrder(u, { k: 'gather', tile, res: RES_OF_TILE[kind], phase: 'go' });

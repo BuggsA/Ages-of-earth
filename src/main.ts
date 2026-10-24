@@ -6,7 +6,8 @@ import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { SIGHT_LORE } from './render/sightings';
 import { wallLine } from './sim/commands';
-import { AGES, BUILDINGS, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, SILO, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
+import { AGES, BUILDINGS, SHAFT, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, SILO, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
+import { siteGrade } from './sim/shafts';
 import { crestSvg } from './ui/crests';
 import { unitPicture } from './ui/thumbs';
 import { easeHour, SHOT_SECONDS, titleShot } from './ui/titleShots';
@@ -1340,11 +1341,24 @@ function selectArmy(): void {
 
 // ---- Orders ----------------------------------------------------------------------------------------
 
+/**
+ * What an order lands on: a friendly unit (your own transport aside) is looked past to the sheep, stone or tree it
+ * stands at, since a citizen already milking or quarrying there (often one of those selected) would otherwise take
+ * the click and turn the order into a walk to them. On open ground the unit still counts.
+ */
+function orderPick(s: GameState, clientX: number, clientY: number): Pick | null {
+  const pk = view.pick(clientX, clientY, (id) => {
+    const u = s.byId.get(id);
+    return !!u && u.kind === 'unit' && s.players[u.owner].team === s.players[viewer].team && !(u.type === 'transport' && u.owner === viewer);
+  });
+  return pk?.kind === 'ground' ? view.pick(clientX, clientY) : pk;
+}
+
 function order(clientX: number, clientY: number, forceAttack = false, queue = false): void {
   const s = game;
   if (!s || mode !== 'play') return;
   const units = selectedUnits(s).filter((u) => !u.inside);
-  const pk = view.pick(clientX, clientY);
+  const pk = orderPick(s, clientX, clientY);
   if (!pk) return;
   const ids = units.map((u) => u.id);
   const q = queue || undefined;
@@ -1654,6 +1668,12 @@ function placeHere(shift: boolean): void {
   const kind = placing;
   const ids = selectedUnits(s).filter((u) => canRaise(u.type, kind, s.players[viewer].civ)).map((u) => u.id);
   issue({ t: 'build', p: viewer, ids, type: placing, tx: placeAt.tx, ty: placeAt.ty, queue: shift || undefined });
+  // A Mine Shaft's ground (#681): say how well it will dig here.
+  if (kind === 'shaft') {
+    const site = { tx: placeAt.tx, ty: placeAt.ty, size: BUILDINGS.shaft.size };
+    const g = siteGrade(s, site);
+    hud.toast(`${{ old: 'Old workings', hill: 'Mountain rock', open: 'Open ground' }[g]}: a shaft here digs at ${Math.round(SHAFT.grade[g] * 100)}% of an open deposit's pace`);
+  }
   if (!shift) {
     placing = null;
     placeAt = null;
@@ -1835,7 +1855,7 @@ canvas.addEventListener('pointerup', (e) => {
     }
   } else {
     // A double-click on anything but your own unit is a right-click for the units selected before it (`doubleOrder`).
-    const pk = view.pick(e.clientX, e.clientY);
+    const pk = lastTap.before.length ? orderPick(s, e.clientX, e.clientY) : view.pick(e.clientX, e.clientY);
     const hit = pk?.kind === 'unit' || pk?.kind === 'building' ? s.byId.get(pk.id) : undefined;
     const now = performance.now();
     // Your own building (a pitched camp too) is picked by the first click, so the second can't be its rally order.
@@ -2910,7 +2930,7 @@ function cursorFor(s: GameState): string {
   if (targetMode === 'keg' || targetMode === 'launch') return 'cur-attack';
   if (!pointer.inside || boxing) return '';
   const units = selectedUnits(s);
-  const pk: Pick | null = view.pick(pointer.x, pointer.y);
+  const pk: Pick | null = units.length ? orderPick(s, pointer.x, pointer.y) : view.pick(pointer.x, pointer.y);
   if (!pk) return '';
   if (pk.kind === 'animal') {
     const a = s.animals.find((x) => x.id === pk.id);

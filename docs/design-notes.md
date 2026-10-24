@@ -1208,3 +1208,11 @@ Built: the title's film used to circle each town in turn. Every 24 s it now pick
 Why I love it: the film becomes a few framed pictures of the world's own story (a quay at sunset, a column reaching a landmark), not a tour of the same town. The match behind it is real, so what it shows is whatever the two computers are doing.
 
 Seen: headless Chromium (software GL), a lakes map, a dock and an army put in by hand: `docs/screenshots/title-dock-dusk.jpg`, `title-ford-morning.jpg`. Not seen: the cuts in motion, or a real computer-vs-computer ford; in 24 matches of 450 s a dock stood in 13 and an army sat near a ford in 5, so about half the loops have a dock shot and a fifth a ford shot. Foreground buildings can crowd the dock shot. Next: a harbour shot with ships, a night shot of a lit town, a camera that waits for the first clash.
+
+### Mine Shafts (#681), 2026-10-24
+
+**Built:** a Bronze Age Mine Shaft that digs stone or gold for good, one miner each, at a pace set by the ground: old workings 75%, rock 50%, plain earth 30% of an open deposit. A worked-out deposit now leaves old workings, so where you dug is where the best seam lies. The computer sinks and staffs shafts when its deposits run dry.
+
+**Why I love it:** the owner kept running out of stone and gold and trading wood for them. Now the choice is where to sink: over a spent vein, beside the hills, or at home on poor ground.
+
+**Next:** more seams are one entry in `SHAFT.seams` (coal, iron, clay); a collapse or flood risk; deeper shafts that dig faster in later ages.

@@ -61,6 +61,7 @@ describe('one player never commands another’s people', () => {
       vow: { t: 'vow', p: 1 },
       kin: { t: 'kin', p: 1, building: tc.id },
       beacon: { t: 'beacon', p: 1, building: tc.id },
+      seam: { t: 'seam', p: 1, building: tc.id, seam: 'gold' },
       callUp: { t: 'callUp', p: 1, building: tc.id, n: 5 },
       pack: { t: 'pack', p: 1, building: tc.id },
       pitch: { t: 'pitch', p: 1, ids },
