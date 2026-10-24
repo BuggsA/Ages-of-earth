@@ -1416,6 +1416,12 @@ export class View {
           this.cue('swept', ev.x, ev.y, 0.5);
           break;
         }
+        case 'tideHold': {
+          // Routes that read the tide (#755): one of yours halts at the water's edge, a little lap of foam at its feet.
+          if (ev.owner !== this.viewer || !this.sees(ev.x, ev.y)) break;
+          this.effects.burst(this.ground(s, ev.x, ev.y, 0.05), { count: 5, speed: 0.5, up: 0.4, life: 0.8, size: 0.05, gravity: 1.5, drag: 0.6, colors: ['#ffffff', '#cfe8f5'] });
+          break;
+        }
         case 'milled': {
           // A Tide Mill grinds on the running tide (#739): spray off the wheel, a few coins for its people.
           if (ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;
@@ -1454,6 +1460,12 @@ export class View {
           if (ev.tile % 6 === 0) this.cue('spread', ev.x, ev.y, 0.3);
           break;
         }
+        case 'burst':
+          // A dam bursts (#701 s5): its masonry flung up in a spray of white water, and the roar.
+          if (!this.sees(ev.x, ev.y)) break;
+          this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.3, ev.y), { count: 26, speed: 2.2, up: 2.6, life: 1.3, size: 0.08, gravity: 4, colors: ['#e6f1f2', '#bfd9dc', '#9d978d', '#86807a'] });
+          this.cue('damBurst', ev.x, ev.y, 1);
+          break;
         case 'sluice':
           // A sluice opened or shut (#701 s4): the winch, and the water let out or stilled.
           if (this.sees(ev.x, ev.y)) this.cue(ev.open ? 'sluiceOpen' : 'sluiceShut', ev.x, ev.y, 0.7);

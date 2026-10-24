@@ -43,7 +43,9 @@ export type BuildingType =
   /** The Age of the Water Line (#701 s4): a gate in a dyke that lets the water out over the low ground, and back. */
   | 'sluice'
   /** The Age of Tides (#739): a raised road over the flats, which becomes tidal ground and is gone; a mill that grinds on the running tide. */
-  | 'causeway' | 'tidemill';
+  | 'causeway' | 'tidemill'
+  /** The Age of Locks (#701 s5): a swing bridge its own people cross a canal by and ships pass under, and a dam whose turbines drive the workshops by it. */
+  | 'bridge' | 'dam';
 /** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
 export type Difficulty = 'gentle' | 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
@@ -61,9 +63,9 @@ export type TechId =
   | 'wheelbarrow' | 'handcart' | 'axes' | 'saws' | 'picks' | 'shafts' | 'plow' | 'irrigation' | 'masonry'
   | 'conscription' | 'husbandry' | 'theology' | 'chemistry'
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'chart' | 'assay' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
-  | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged';
+  | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged' | 'launchControl';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood' | 'bloom';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood' | 'locks' | 'bloom';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
 export type PathId = 'blood' | 'steppe' | 'hemocraft' | 'rite';
@@ -292,6 +294,8 @@ export interface Unit {
   venom?: { n: number; end: number; by: number };
   /** Stung by a Hive's swarm (`hive.ts`): the tick the stings wear off, until when it walks slow. Absent: never stung. */
   stung?: number;
+  /** Waiting on the shore for the tide (#755): the tick its route is worked out again. Absent: not waiting. */
+  tideWait?: number;
 }
 
 export interface TrainItem {
@@ -529,6 +533,19 @@ export interface Launch {
    * order), each blurred off its point, and which of them is real. Absent in older saves (the rivals see the true point).
    */
   warn?: Warning[];
+  /**
+   * A salvo (#765): its three warheads, each with its own silo and true point (the first is `silo`, `x`, `y` above). A fallen silo scrubs
+   * its own (`gone`) and the rest fly on. Absent for a single strike.
+   */
+  salvo?: SalvoShot[];
+}
+
+/** One warhead of a salvo (#765). */
+export interface SalvoShot {
+  silo: number;
+  x: number;
+  y: number;
+  gone?: true;
 }
 
 /** One rival team's warning of a launch (#762, `silo.ts`): the rings it sees, and the index of the real one. */
@@ -536,6 +553,8 @@ export interface Warning {
   team: number;
   rings: { x: number; y: number }[];
   real: number;
+  /** A salvo's rings (#765): which of its warheads (`Launch.salvo`) each ring stands for. All are real. Absent for a single strike. */
+  of?: number[];
 }
 
 /** A blast that lifts the fog for every player over `r` tiles of (`x`, `y`) until tick `until` (#752, `silo.ts`, `vision.ts`). */
@@ -1040,6 +1059,8 @@ export type GameEvent =
   | { k: 'tide'; level: number; rising: boolean; bared: number; covered: number }
   /** A unit caught on the flats by the rising tide (#739) was swept ashore and hurt (`drowned`: no shore near, it was lost). */
   | { k: 'tideSwept'; id: number; owner: number; x: number; y: number; drowned: boolean }
+  /** A land unit stops on the shore to wait for the tide (#755), until tick `until`. */
+  | { k: 'tideHold'; id: number; owner: number; x: number; y: number; until: number }
   /** A Tide Mill ground `gold` on the running tide (#739). */
   | { k: 'milled'; id: number; owner: number; gold: number; x: number; y: number }
   /** A causeway was finished (#739): `tile` is tidal ground now, raised. */
@@ -1048,6 +1069,8 @@ export type GameEvent =
   | { k: 'breached'; owner: number; by: number; tile: number; x: number; y: number; pond: boolean }
   /** A barrage shut a pond off from the sea (#748), or a breach let it drain: `tiles` of tidal ground now behind it. */
   | { k: 'pond'; owner: number; tiles: number; x: number; y: number }
+  /** A dam fell with water behind it (#701 s5): its surge ran over `tiles` tiles of low ground at once. */
+  | { k: 'burst'; owner: number; id: number; x: number; y: number; tiles: number }
   | { k: 'season'; i: number }
   /** A payday for hired swords (the Age of Merchants): how many went unpaid, and how many of those walked off. */
   | { k: 'wages'; owner: number; late: number; gone: number }
@@ -1167,7 +1190,8 @@ export interface GameState {
   polder?: Uint8Array;
   /**
    * The Age of Rivers' channels (#701): per tile, 1 where land was dug out and the water ran in (now `T_WATER`, but wadeable: no
-   * `B_TERRAIN`). Absent until the first ditch fills (and in older saves); `water.ts` reads and writes it.
+   * `B_TERRAIN`), 2 where it was dug deep into a canal in the Age of Locks (#701 s5: ships sail it too, and soldiers swim it slower).
+   * Absent until the first ditch fills (and in older saves); `water.ts` reads and writes it.
    */
   channel?: Uint8Array;
   /**
@@ -1362,6 +1386,8 @@ export interface AiMemory {
    * tick an enemy army last stood by the sluice.
    */
   line?: { since: number; spot?: { tx: number; ty: number } | null; alarm?: number };
+  /** The Age of Locks (#701 s5): since when it has stood in the age, and where it means its dam to go (null: nowhere, once looked). */
+  locks?: { since: number; dam?: { tx: number; ty: number } | null };
   /** The Age of Rivers (#701): the channel it means to dig from water past home (null: none), found when deciding and again on arrival (`fresh`). */
   river?: { plan: ChannelPlan | null; looked?: boolean; fresh?: boolean };
   /** The first crossing (#585): the age it stands in on the way to the Sea-Raiders, and since when (each sibling, and the age itself). */
@@ -1375,7 +1401,11 @@ export interface AiMemory {
   /** When an Industrial computer bound for a side future began to hold off the Atomic Age (#605). */
   sideHold?: number;
   /** Where a loaded silo means to strike, chosen once a second (#605). */
-  siloAim?: { x: number; y: number; at: number; w?: 'atomic' | 'fission' | 'fusion' };
+  siloAim?: { x: number; y: number; at: number; w?: 'atomic' | 'fission' | 'fusion'; salvo?: { x: number; y: number }[] };
+  /** Whether three rival targets, far enough apart, are each worth a warhead (#765): the town raises silos and Launch Control for a salvo. */
+  salvoPays?: boolean;
+  /** The tick the computer last weighed where to send a warhead (`fireSilo`, once a second). */
+  siloAt?: number;
   /** Tick it began holding its Town Center for a side road's last deeds, so it holds only so long. */
   waiting?: number;
   /**
@@ -1524,7 +1554,8 @@ export type Command =
   /** Citizens or foot soldiers carry a powder keg to a rival's causeway tile and lay it there (#748, the Age of Sappers): it breaches the road. */
   | ({ t: 'kegTile'; p: number; ids: number[]; tile: number } & Queued)
   /** A Missile Silo launches at a point (#605, the Atomic Age); `w` picks the warhead (#753), absent for the people's own branch's. */
-  | { t: 'launch'; p: number; silo: number; x: number; y: number; w?: 'atomic' | 'fission' | 'fusion' }
+  /** With `more` (#765, Launch Control), a salvo: this silo and the two in `more` fire one Atomic warhead each, each at its own point. */
+  | { t: 'launch'; p: number; silo: number; x: number; y: number; w?: 'atomic' | 'fission' | 'fusion'; more?: { silo: number; x: number; y: number }[] }
   /** Answer the card of tidings waiting at the fire (#443): `take` pays its price, otherwise it is passed by. */
   | { t: 'tiding'; p: number; card: TidingId; take: boolean }
   /** A player left an online match: the computer takes over their people. With `back` (sent only by the room, never a browser),
