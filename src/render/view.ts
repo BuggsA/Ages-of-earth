@@ -630,11 +630,14 @@ export class View {
         rings.push({ x: e.x, y: base, z: e.y, r: (BUILDINGS[e.type].size / 2) * 1.414 + 0.05, color: e.owner === this.viewer ? own : foe, square: true });
       }
     }
-    // Kings wear a crown of light (so you never lose track of your own).
-    for (const id of s.kings) {
-      const k = id ? s.byId.get(id) : undefined;
-      const at = k ? this.units.drawn.get(id) : undefined;
-      if (k && at) rings.push({ x: at.x, y: at.y, z: at.z, r: 0.7, color: aura, thin: true });
+    // In Regicide the kings wear a crown of light (so you never lose track of the one that decides the match);
+    // otherwise people carry no ring until they are selected.
+    if (s.mode === 'regicide') {
+      for (const id of s.kings) {
+        const k = id ? s.byId.get(id) : undefined;
+        const at = k ? this.units.drawn.get(id) : undefined;
+        if (k && at) rings.push({ x: at.x, y: at.y, z: at.z, r: 0.7, color: aura, thin: true });
+      }
     }
     // Soldiers stirred by a Rallying Cry glow with a pulsing gold band, fading as the cry runs out.
     const cheer = new THREE.Color('#ffc94a');
