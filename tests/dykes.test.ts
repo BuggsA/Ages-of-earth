@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { applyCommand, wallLine } from '../src/sim/commands';
 import { AGES, AI_DYKE, BUILDINGS, DT, POLDER, ROADS, secs } from '../src/sim/data';
 import { gatherRate } from '../src/sim/units';
-import { buildBarred, roadKnown, roadProblem } from '../src/sim/ages';
+import { ageDef, buildBarred, roadKnown, roadProblem } from '../src/sim/ages';
 import { findDockSpot } from '../src/sim/ai';
 import { checksum, createGame, step } from '../src/sim/game';
 import { NAVAL, placeProblem, walkable } from '../src/sim/grid';
@@ -295,6 +295,21 @@ describe('determinism (#701 s1)', () => {
       return checksum(s);
     };
     expect(go()).toBe(go());
+  });
+
+  it('a Golden Age that walked the Dykes keeps pumping (#703)', () => {
+    const { s, o, plan } = planned(true);
+    const p = s.players[o];
+    p.walked = ['dykes', 'sail', 'pilgrim'];
+    restat(s, p, () => {
+      p.epoch = AGES.golden.tier;
+      p.age = 'golden';
+    });
+    expect(ageDef(p).pumps).toBe(true);
+    const at = millSpot(s, o, plan.basin);
+    placeBuilding(s, o, 'windmill', at.tx, at.ty, true);
+    run(s, POLDER.every + 0.5);
+    expect(s.players[o].stats.drained).toBe(1);
   });
 
   it('the dyke and windmill are buildings like any other', () => {

@@ -1,7 +1,7 @@
 import { AGES, BUILDINGS, CIVS, GUNS, TOWER_LEVELS, WAYS, WORKS, SIGNATURES, EPOCHS, FLOOD, NO_MODS, PATHS, RARE, TECHS, WARCAMP, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
 import { fairLevy } from './fair';
 import { flooded } from './flood';
-import { ageDef, ageOf, hasWalked, isHire, isSuspended, pathCarry } from './ages';
+import { ageDef, ageOf, hasWalked, isHire, isSuspended, pathCarry, threadsOf } from './ages';
 import type { AgeId, Building, BuildingType, Cost, GameState, Player, TechId, UnitType } from './types';
 import { RES } from './types';
 
@@ -48,7 +48,8 @@ export function computeMods(p: Player): Mods {
   const age = ageDef(p);
   for (const t of p.techs) if (!TECHS[t].only || TECHS[t].only === ageOf(p)) apply(m, TECHS[t].add, TECHS[t].mul);
   apply(m, age.add, age.mul);
-  if (age.forge) m[age.forge.riders ? 'cavalryAttack' : 'infantryAttack'] += age.forge.attack * ironSteps(p, age.forge);
+  // A Golden Age (#703) carries every thread's forge: the Iron Age's spearmen and the Chariots' riders both.
+  for (const f of age.golden ? threadsOf(p).map((a) => AGES[a].forge).filter((x) => !!x) : age.forge ? [age.forge] : []) m[f!.riders ? 'cavalryAttack' : 'infantryAttack'] += f!.attack * ironSteps(p, f!);
   const carry = pathCarry(p);
   if (carry) for (let i = 0; i < carry.times; i++) apply(m, PATHS[carry.path].carry);
   if (p.workEnd !== undefined) apply(m, WORKS[p.civ].add, WORKS[p.civ].mul);

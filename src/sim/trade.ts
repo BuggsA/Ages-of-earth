@@ -1,5 +1,5 @@
 import { fairShare } from './fair';
-import { ageDef, ageOf, asleep, ironTradeShare, relicTradeShare } from './ages';
+import { ageDef, asleep, ironTradeShare, relicTradeShare, standsIn } from './ages';
 import { LAST_EPOCH, SERAI, SILK, TICK_HZ, TRADE } from './data';
 import { NAVAL, distToRect, nearestWalkable } from './grid';
 import { modsOf } from './stats';
@@ -78,7 +78,7 @@ export function nearestMarket(s: GameState, owner: number, x: number, y: number)
 
 /** Whether a finished Dock of the owner's stands near a Market, so the Age of Sail ships its goods by water. */
 export function harborNear(s: GameState, owner: number, market: { x: number; y: number }): boolean {
-  if (ageOf(s.players[owner]) !== 'sail') return false;
+  if (!standsIn(s.players[owner], 'sail')) return false;
   const r = TRADE.harbor.reach;
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.owner !== owner || e.type !== 'dock' || !e.built || e.hp <= 0) continue;

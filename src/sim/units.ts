@@ -574,6 +574,12 @@ function headedFarms(s: GameState, u: Unit): Set<number> {
   return out;
 }
 
+/** Whether another of the field's people already set out to farm it (a builder who finished it the same tick, #344); checked for the player's people only. */
+function farmClaimed(s: GameState, f: Building, u: Unit): boolean {
+  for (const e of s.ents) if (e.kind === 'unit' && e.id !== u.id && e.owner === f.owner && e.hp > 0 && e.order.k === 'farm' && e.order.target === f.id) return true;
+  return false;
+}
+
 function farmTaken(s: GameState, f: Building): boolean {
   const holder = f.farmer ? s.byId.get(f.farmer) : undefined;
   return !!holder && holder.hp > 0 && holder.kind === 'unit' && holder.order.k === 'farm' && holder.order.target === f.id;
@@ -596,7 +602,7 @@ export function completeBuilding(s: GameState, b: Building): void {
 
 /** What a builder does once the building is up. */
 function afterBuilding(s: GameState, u: Unit, b: Building): void {
-  if (b.type === 'farm' && u.type === 'citizen' && !farmTaken(s, b) && !u.queue.length) {
+  if (b.type === 'farm' && u.type === 'citizen' && !farmTaken(s, b) && !(farmClaimed(s, b, u) && !s.players[u.owner].ai) && !u.queue.length) {
     setOrder(u, { k: 'farm', target: b.id, phase: 'go' });
     return;
   }

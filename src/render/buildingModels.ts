@@ -1820,7 +1820,7 @@ function ironTower(k: Kit, st: Style): void {
 /** The original four dressed ages, kept as the baseline model regression set. */
 export const LOOK_AGES: AgeId[] = ['merchant', 'iron', 'pilgrim', 'fair'];
 /** All dressed ages; additions get their own model coverage beside the baseline set. */
-export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer', 'sail', 'aeronaut', 'lightning', 'warband', 'ironblood', 'totalwar', 'steppe', 'horde', 'silk', 'hemocraft', 'bloodrite'];
+export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer', 'sail', 'aeronaut', 'lightning', 'warband', 'ironblood', 'totalwar', 'steppe', 'horde', 'silk', 'hemocraft', 'bloodrite', 'golden'];
 
 const SAIL = '#efe8d4';
 const NET = '#b9ad8a';
@@ -1844,6 +1844,9 @@ const CLOTH = ['#d94a3c', '#e8b43a', '#3f8fc4', '#8a4fa8'];
 const RUST = '#8a4a2c';
 const COPPER = '#c27a3e';
 const PALE = '#e9e4d6';
+const GILT = '#e2b440';
+const GILT_DARK = '#a8781e';
+const GLINT = '#fff1b8';
 
 /** A slanted awning over a front: alternate bright strips. */
 function awning(k: Kit, x: number, y: number, z: number, w: number, strips: number, a = 0): void {
@@ -2109,6 +2112,29 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
         k.cyl(0.025, 0.035, h, 4, IRON_DARK, span, 0, -span * 0.6);
         k.ring(0.12, 0.02, COPPER, 0).position.set(span, h * 0.8, -span * 0.6);
         k.glow(k.octa(0.06, '#bfe6ff', span, h + 0.04, -span * 0.6));
+      }
+      break;
+    }
+    case 'golden': {
+      // The Golden Age (#703): gilt domes and spires over the great buildings, a gold band and a glowing finial on the rest, so a
+      // rival can see a golden town from across the map, and see the gilt go when it ends.
+      if (['towncenter', 'temple', 'market', 'wonder'].includes(type)) {
+        const r = type === 'wonder' ? 1.1 : big ? 0.85 : 0.6;
+        const h = type === 'wonder' ? 3.6 : big ? 2.75 : 2.15;
+        k.cyl(r * 0.95, r, 0.22, 10, GILT_DARK, 0, h - 0.22, 0);
+        k.dome(r, GILT, 0, h, 0);
+        k.cyl(0.03, 0.05, 0.55, 5, GILT, 0, h + r * 0.85, 0);
+        k.glow(k.octa(0.11, GLINT, 0, h + r * 0.85 + 0.62, 0));
+        for (const x of [-r * 1.6, r * 1.6]) {
+          k.cyl(0.035, 0.035, h * 0.85, 5, GILT_DARK, x, 0, r * 1.4);
+          k.box(0.34, 0.5, 0.025, GILT, x + 0.18, h * 0.6, r * 1.4);
+        }
+      } else if (['house', 'barracks', 'range', 'stable', 'workshop', 'forge', 'storehouse', 'dock', 'mill', 'tower'].includes(type)) {
+        const span = type === 'house' ? 0.62 : type === 'tower' ? 0.5 : 1.05;
+        const h = type === 'tower' ? 2.4 : type === 'house' ? 1.15 : 1.55;
+        k.box(span * 2 + 0.06, 0.08, 0.05, GILT, 0, h * 0.62, span + 0.02);
+        k.cyl(0.02, 0.03, 0.4, 4, GILT_DARK, span * 0.6, h, 0);
+        k.glow(k.octa(0.06, GLINT, span * 0.6, h + 0.45, 0));
       }
       break;
     }

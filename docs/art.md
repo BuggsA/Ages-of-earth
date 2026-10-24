@@ -1,6 +1,6 @@
 # Art direction (#617)
 
-The owner, 2026-10-23: "the game looks mushy. Hard to tell things apart … I don't think people would play because it looks good." High priority (`docs/rulings.md`). This file is how several agents fix it at once and still make one game.
+The owner, 2026-10-23: "the game looks mushy. Hard to tell things apart … I don't think people would play because it looks good." High priority until 2026-10-24, when the owner lowered it (`docs/rulings.md`): now ordinary `ready` work. This file is how several agents fix it at once and still make one game.
 
 ## The bar
 
