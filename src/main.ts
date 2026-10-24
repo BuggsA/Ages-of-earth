@@ -1340,11 +1340,24 @@ function selectArmy(): void {
 
 // ---- Orders ----------------------------------------------------------------------------------------
 
+/**
+ * What an order lands on: a friendly unit (your own transport aside) is looked past to the sheep, stone or tree it
+ * stands at, since a citizen already milking or quarrying there (often one of those selected) would otherwise take
+ * the click and turn the order into a walk to them. On open ground the unit still counts.
+ */
+function orderPick(s: GameState, clientX: number, clientY: number): Pick | null {
+  const pk = view.pick(clientX, clientY, (id) => {
+    const u = s.byId.get(id);
+    return !!u && u.kind === 'unit' && s.players[u.owner].team === s.players[viewer].team && !(u.type === 'transport' && u.owner === viewer);
+  });
+  return pk?.kind === 'ground' ? view.pick(clientX, clientY) : pk;
+}
+
 function order(clientX: number, clientY: number, forceAttack = false, queue = false): void {
   const s = game;
   if (!s || mode !== 'play') return;
   const units = selectedUnits(s).filter((u) => !u.inside);
-  const pk = view.pick(clientX, clientY);
+  const pk = orderPick(s, clientX, clientY);
   if (!pk) return;
   const ids = units.map((u) => u.id);
   const q = queue || undefined;
@@ -1835,7 +1848,7 @@ canvas.addEventListener('pointerup', (e) => {
     }
   } else {
     // A double-click on anything but your own unit is a right-click for the units selected before it (`doubleOrder`).
-    const pk = view.pick(e.clientX, e.clientY);
+    const pk = lastTap.before.length ? orderPick(s, e.clientX, e.clientY) : view.pick(e.clientX, e.clientY);
     const hit = pk?.kind === 'unit' || pk?.kind === 'building' ? s.byId.get(pk.id) : undefined;
     const now = performance.now();
     // Your own building (a pitched camp too) is picked by the first click, so the second can't be its rally order.
@@ -2910,7 +2923,7 @@ function cursorFor(s: GameState): string {
   if (targetMode === 'keg' || targetMode === 'launch') return 'cur-attack';
   if (!pointer.inside || boxing) return '';
   const units = selectedUnits(s);
-  const pk: Pick | null = view.pick(pointer.x, pointer.y);
+  const pk: Pick | null = units.length ? orderPick(s, pointer.x, pointer.y) : view.pick(pointer.x, pointer.y);
   if (!pk) return '';
   if (pk.kind === 'animal') {
     const a = s.animals.find((x) => x.id === pk.id);
