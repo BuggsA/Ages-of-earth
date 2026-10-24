@@ -323,7 +323,7 @@ kbd {
 
 /* Tooltip */
 .tooltip {
-  position: absolute; z-index: 20; max-width: 300px; padding: 9px 11px; border-radius: 10px; pointer-events: none;
+  position: absolute; z-index: 20; max-width: min(300px, calc(100vw - 12px)); padding: 9px 11px; border-radius: 10px; pointer-events: none;
   background: rgba(16, 19, 27, 0.97); border: 1px solid var(--edge); box-shadow: var(--shadow); font-size: 13px; font-weight: 700; line-height: 1.35;
 }
 .tooltip b { color: var(--gold-2); font: 800 15px 'Cinzel', serif; display: block; margin-bottom: 3px; }
@@ -338,6 +338,7 @@ kbd {
 .online-card h3 { margin: 0 0 8px; font: 800 15px 'Cinzel', serif; color: var(--gold-2); }
 .online-card.wide { width: min(720px, calc(100% - 32px)); }
 .online-card .code { letter-spacing: 4px; color: var(--ink); }
+.online-card .seat-pick { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
 .online-card .field { display: grid; gap: 4px; text-align: left; font-size: 13px; font-weight: 800; color: var(--muted); margin: 10px 0; }
 .online-card input, .online-card select {
   font: 700 14px 'Nunito', sans-serif; color: var(--ink); background: #1b2030; border: 1px solid var(--edge-soft); border-radius: 8px; padding: 6px 8px; min-width: 0;
@@ -367,7 +368,7 @@ body.online .tip-box { bottom: 330px; }
 
 /* Tips */
 .tip-box {
-  position: absolute; left: 10px; bottom: 214px; width: 290px; padding: 10px 12px; border-radius: 12px; font-size: 14px; font-weight: 700; line-height: 1.4;
+  position: absolute; left: 10px; bottom: 214px; width: 290px; max-width: calc(100% - 20px); max-height: calc(100% - 270px); overflow-y: auto; box-sizing: border-box; padding: 10px 12px; border-radius: 12px; font-size: 14px; font-weight: 700; line-height: 1.4;
   background: linear-gradient(rgba(36, 42, 58, 0.95), rgba(24, 28, 38, 0.95)); border: 1px solid var(--edge); box-shadow: var(--shadow); animation: notice-in 0.3s ease-out;
 }
 .tip-head { font: 800 13px 'Cinzel', serif; color: var(--gold-2); margin-bottom: 4px; }

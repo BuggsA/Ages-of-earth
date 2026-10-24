@@ -6,7 +6,8 @@ import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { SIGHT_LORE } from './render/sightings';
 import { wallLine } from './sim/commands';
-import { AGES, BUILDINGS, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, SILO, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
+import { AGES, BUILDINGS, SHAFT, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, SILO, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
+import { siteGrade } from './sim/shafts';
 import { crestSvg } from './ui/crests';
 import { unitPicture } from './ui/thumbs';
 import { easeHour, SHOT_SECONDS, titleShot } from './ui/titleShots';
@@ -32,7 +33,7 @@ import { riteProblem } from './sim/fork';
 import { legionKind, legionary } from './sim/legion';
 import { ageDef, ageOf, canRaise, heirloomsOpened, isSideRoad, opensOf, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
 import { NetClient, newRoomCode, saveName, savedName } from './net/client';
-import { HASH_EVERY, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
+import { HASH_EVERY, ROOM_KEEP_HOURS, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
 import { deserialize, serialize } from './sim/save';
 import { VAULT_SLOTS, formatVaultKey, normalizeVaultKey, type CloudSlot } from './net/vault';
 import { qrSvg } from './ui/qr';
@@ -40,6 +41,7 @@ import { deleteCloud, listCloud, loadCloud, saveCloud, useVaultKey, vaultKey } f
 import { SCENARIOS, scenarioById, starsFor } from './sim/campaign';
 import { loadDiscovery, observe, pushDiscovery, saveDiscovery, syncDiscovery, webMapHtml } from './ui/webMap';
 import { idleCitizens, idleSelection, idleShortcut } from './ui/idle';
+import { NO_TAP, doubleOrder, type Tap } from './ui/doubleOrder';
 import { CameraBookmarks, bookmarkShortcut } from './ui/cameraBookmarks';
 import { ScoutFlags } from './ui/scoutFlags';
 import { briefingHtml, chapterListHtml, recordStars, starRow, syncProgress } from './ui/campaignUi';
@@ -238,7 +240,7 @@ function connectRoom(code: string, name: string, watch = false): void {
     if (net !== n) return;
     net = null;
     if (online && mode !== 'title') {
-      hud.banner('Disconnected', why, 6000);
+      hud.banner('Disconnected', `${why} Reload the page, or join room ${code} again, to pick the match up: the room keeps it for ${ROOM_KEEP_HOURS} hours.`, 9000);
       online = false;
       mode = 'over';
     } else lobby.showEntry(code, why);
@@ -251,7 +253,8 @@ function connectRoom(code: string, name: string, watch = false): void {
 }
 
 function leaveOnline(): void {
-  if (net && online && !spectating && game && !game.over) net.send({ t: 'cmd', c: { t: 'leave', p: viewer } });
+  // Leaving a paused match is stepping away: the room keeps the seat until you come back with its code.
+  if (net && online && !spectating && game && !game.over && !netPaused) net.send({ t: 'cmd', c: { t: 'leave', p: viewer } });
   spectating = false;
   $('replay-bar').classList.add('hidden');
   net?.close();
@@ -269,6 +272,10 @@ function onNet(m: ServerMsg): void {
         $('title').classList.add('hidden');
         lobby.showRoom(m.lobby, m.you);
       }
+      break;
+    case 'open':
+      $('title').classList.add('hidden');
+      lobby.showSeats(m.code, m.seats);
       break;
     case 'start':
       startOnline(m.match, m.you);
@@ -1334,11 +1341,24 @@ function selectArmy(): void {
 
 // ---- Orders ----------------------------------------------------------------------------------------
 
+/**
+ * What an order lands on: a friendly unit (your own transport aside) is looked past to the sheep, stone or tree it
+ * stands at, since a citizen already milking or quarrying there (often one of those selected) would otherwise take
+ * the click and turn the order into a walk to them. On open ground the unit still counts.
+ */
+function orderPick(s: GameState, clientX: number, clientY: number): Pick | null {
+  const pk = view.pick(clientX, clientY, (id) => {
+    const u = s.byId.get(id);
+    return !!u && u.kind === 'unit' && s.players[u.owner].team === s.players[viewer].team && !(u.type === 'transport' && u.owner === viewer);
+  });
+  return pk?.kind === 'ground' ? view.pick(clientX, clientY) : pk;
+}
+
 function order(clientX: number, clientY: number, forceAttack = false, queue = false): void {
   const s = game;
   if (!s || mode !== 'play') return;
   const units = selectedUnits(s).filter((u) => !u.inside);
-  const pk = view.pick(clientX, clientY);
+  const pk = orderPick(s, clientX, clientY);
   if (!pk) return;
   const ids = units.map((u) => u.id);
   const q = queue || undefined;
@@ -1648,6 +1668,12 @@ function placeHere(shift: boolean): void {
   const kind = placing;
   const ids = selectedUnits(s).filter((u) => canRaise(u.type, kind, s.players[viewer].civ)).map((u) => u.id);
   issue({ t: 'build', p: viewer, ids, type: placing, tx: placeAt.tx, ty: placeAt.ty, queue: shift || undefined });
+  // A Mine Shaft's ground (#681): say how well it will dig here.
+  if (kind === 'shaft') {
+    const site = { tx: placeAt.tx, ty: placeAt.ty, size: BUILDINGS.shaft.size };
+    const g = siteGrade(s, site);
+    hud.toast(`${{ old: 'Old workings', hill: 'Mountain rock', open: 'Open ground' }[g]}: a shaft here digs at ${Math.round(SHAFT.grade[g] * 100)}% of an open deposit's pace`);
+  }
   if (!shift) {
     placing = null;
     placeAt = null;
@@ -1666,6 +1692,7 @@ let spaceDown = false;
 let spaceDragged = false;
 let pointer = { x: 0, y: 0, inside: false };
 let lastClick = { at: 0, id: -1 };
+let lastTap: Tap = NO_TAP;
 
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 // Right-click on the speed button slows the game a step.
@@ -1826,7 +1853,22 @@ canvas.addEventListener('pointerup', (e) => {
       play('select');
       ack('select');
     }
-  } else clickSelect(e.clientX, e.clientY, e.shiftKey, e.ctrlKey);
+  } else {
+    // A double-click on anything but your own unit is a right-click for the units selected before it (`doubleOrder`).
+    const pk = lastTap.before.length ? orderPick(s, e.clientX, e.clientY) : view.pick(e.clientX, e.clientY);
+    const hit = pk?.kind === 'unit' || pk?.kind === 'building' ? s.byId.get(pk.id) : undefined;
+    const now = performance.now();
+    // Your own building (a pitched camp too) is picked by the first click, so the second can't be its rally order.
+    const again = doubleOrder(lastTap, now, e.clientX, e.clientY, hit?.owner === viewer && (hit.kind === 'unit' || !lastTap.before.some((id) => s.byId.get(id)?.kind === 'unit')));
+    if (again) {
+      lastTap = NO_TAP;
+      setSelection(again);
+      order(e.clientX, e.clientY, false, e.shiftKey);
+    } else {
+      lastTap = { at: now, x: e.clientX, y: e.clientY, before: [...selection].filter((id) => s.byId.get(id)?.owner === viewer) };
+      clickSelect(e.clientX, e.clientY, e.shiftKey, e.ctrlKey);
+    }
+  }
   boxStart = null;
   boxing = false;
   dragbox.classList.add('hidden');
@@ -2888,7 +2930,7 @@ function cursorFor(s: GameState): string {
   if (targetMode === 'keg' || targetMode === 'launch') return 'cur-attack';
   if (!pointer.inside || boxing) return '';
   const units = selectedUnits(s);
-  const pk: Pick | null = view.pick(pointer.x, pointer.y);
+  const pk: Pick | null = units.length ? orderPick(s, pointer.x, pointer.y) : view.pick(pointer.x, pointer.y);
   if (!pk) return '';
   if (pk.kind === 'animal') {
     const a = s.animals.find((x) => x.id === pk.id);
