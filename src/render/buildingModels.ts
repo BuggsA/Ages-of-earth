@@ -1575,6 +1575,32 @@ function dyke(k: Kit, mask: number): void {
   k.team(k.box(0.13, 0.05, 0.13, TEAM, 0.28, 0.44, 0.28));
 }
 
+/**
+ * A channel being dug (#701, the Age of Rivers): a raw trench of dark earth with the spoil heaped on its banks, running on toward the
+ * neighbouring ditches and the water (`mask`, as a wall's), a spade left in the heap and a peg in the owner's colour. Once the water
+ * runs in, the ditch is gone and the ground itself shows the channel.
+ */
+function channel(k: Kit, mask: number): void {
+  const MUD = '#4a3826';
+  const SPOIL = '#7a5f3e';
+  // Which way it runs: along z when it meets something only north or south, else along x.
+  const ns = !(mask & 5) && !!(mask & 10);
+  k.box(ns ? 0.5 : 1.0, 0.04, ns ? 1.0 : 0.5, MUD, 0, -0.02, 0);
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < 3; i++) {
+      const t = -0.32 + i * 0.32;
+      const r = 0.12 + rnd(i, mask + side * 7, 9) * 0.05;
+      k.blob(r, SPOIL, ns ? side * 0.38 : t, 0.02, ns ? t : side * 0.38).scale.set(1.3, 0.55, 1.3);
+    }
+  }
+  for (const [bit, dx, dz] of ARMS) if (mask & bit) k.box(Math.abs(dx) * 0.3 + Math.abs(dz) * 0.5, 0.04, Math.abs(dz) * 0.3 + Math.abs(dx) * 0.5, MUD, dx * 0.36, -0.02, dz * 0.36);
+  // A spade in the spoil, and the owner's peg.
+  k.cyl(0.018, 0.018, 0.5, 4, '#6b5232', 0.3, 0.05, 0.3).rotation.z = 0.25;
+  k.box(0.12, 0.14, 0.02, '#8a8f96', 0.24, 0.04, 0.3);
+  k.cyl(0.02, 0.02, 0.3, 4, '#5b4330', -0.34, 0, -0.34);
+  k.team(k.box(0.08, 0.06, 0.04, TEAM, -0.34, 0.26, -0.34));
+}
+
 /** A windmill (#701): a thatched smock mill on a brick base with a reefing stage, its cap turned to the wind. The sails turn on their own (`windmillSails`). */
 function windmill(k: Kit, _e: number, st: Style): void {
   pad(k, 2, st.base);
@@ -2253,7 +2279,7 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
   }
 }
 
-const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke'>, (k: Kit, e: number, st: Style) => void> = {
+const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' | 'channel'>, (k: Kit, e: number, st: Style) => void> = {
   sapling: (k, e) => sapling(k, e),
   towncenter, house, storehouse, huntcamp, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, windmill,
 };
@@ -2427,7 +2453,7 @@ const ROOFS: Partial<Record<BuildingType, [string, string]>> = {
 };
 
 /** No plinth or pennant: open or thin pieces, and buildings that already carry their own standards. */
-const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder', 'dyke'];
+const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder', 'dyke', 'channel'];
 
 function roleStyle(type: BuildingType, epoch: number, st: Style): Style {
   const r = ROOFS[type];
@@ -2461,6 +2487,7 @@ export function buildingGeometry(type: BuildingType, epochIn: number, color: str
     const k = new Kit();
     if (type === 'wall') wall(k, epoch, STYLES[Math.min(epoch, 4)], variant);
     else if (type === 'dyke') dyke(k, variant);
+    else if (type === 'channel') channel(k, variant);
     else if (type === 'snare') snare(k, epoch, variant === 1);
     else if (type === 'shaft') shaft(k, epoch, roleStyle(type, epoch, STYLES[Math.min(epoch, 4)]), variant);
     else MAKERS[type](k, epoch, roleStyle(type, epoch, STYLES[Math.min(epoch, 4)]));

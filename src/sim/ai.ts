@@ -8,7 +8,7 @@ import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, Ga
 import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { backProblem, backTo, ageDef, ageOf, asleep, barred, buildBarred, crossingLeft, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadProblem, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
 import { grindersOf, kegsOf, millProblem, mills, sappers } from './powder';
-import { basinOf, coastHeld, dykePlan, isPolder, polderField, type DykePlan } from './water';
+import { basinOf, channelPlan, coastHeld, dykePlan, isChannel, isPolder, polderField, type ChannelPlan, type DykePlan } from './water';
 import { wallLine } from './commands';
 import { launchProblem, loaded, rulesOf, silosOf } from './silo';
 import { carriedBy } from './relics';
@@ -29,7 +29,7 @@ import { graftCost, stationsOf, waiting } from './hemo';
 import { borderMap, landOwnerAt, suppliedAt } from './borders';
 import { workProblem } from './works';
 import { aiKin, aiVow, aiWay, wayBarred } from './ways';
-import { AI_TOWER_KEEP, AI_WAYS, AI_KEG, AI_DYKE, KEG, KILL_CAMP, KIN, POLDER, TOWER_LEVELS, WAYS } from './data';
+import { AI_TOWER_KEEP, AI_WAYS, AI_KEG, AI_DYKE, AI_RIVERS, KEG, KILL_CAMP, KIN, POLDER, TOWER_LEVELS, WAYS } from './data';
 import { beaconProblem, lit } from './beacon';
 import { rallyProblem } from './rally';
 import { consecrateProblem, consecrates } from './consecrate';
@@ -245,6 +245,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   powderRoad(s, v, mem, issue);
   sapKegs(s, v, mem, issue);
   dykeWork(s, v, mem, issue);
+  riverWork(s, v, mem, issue);
   siloRoad(s, v, mem, issue);
   fireSilo(s, v, mem, issue);
   fleeWarhead(s, v, issue);
@@ -562,8 +563,12 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
     // The gateway's road on (#577): Alchemy is walked for the Sappers, so a people that turned into it goes on.
     roads[to] = hasWalked(p, 'alchemy');
   } else if (roads[to] === undefined && to === 'dykes') {
-    // The Water Road (#701): only with a dyke worth raising by home, and on a coin of its own, so no other match's dice shift.
-    roads[to] = coastHeld(s, p) && !!dykeOf(s, p, mem) && coin(s, p.id, 0xd1e5) < AI_DYKE.take;
+    // The Water Road (#701): only with a dyke worth raising by home, and on a coin of its own, so no other match's dice shift. A people
+    // that walked the Age of Rivers is on the road already, and goes on down it more often.
+    roads[to] = coastHeld(s, p) && !!dykeOf(s, p, mem) && coin(s, p.id, 0xd1e5) < (hasWalked(p, 'rivers') ? AI_RIVERS.onward : AI_DYKE.take);
+  } else if (roads[to] === undefined && to === 'rivers') {
+    // The Water Road's first age (#701 s1): with a channel worth digging by home, on a coin of its own.
+    roads[to] = !!riverOf(s, p, mem) && coin(s, p.id, 0x71e5) < AI_RIVERS.take;
   } else if (roads[to] === undefined && to === 'alchemy') {
     // A coin of its own (as the steppe's): the gateway is asked only where saltpetre lies, and shifts no other match's dice.
     roads[to] = fit(p, to) >= 0 && coin(s, p.id, 0xa1c4) < AI_KEG.take;
@@ -1245,6 +1250,72 @@ function dykeOf(s: GameState, p: Player, mem: AiMemory): DykePlan | null {
   return d.plan;
 }
 
+/** The channel it means to dig by home (#701 s1): `channelPlan` from the water nearest its start, or null; kept until redrawn (`riverWork`). */
+export function riverOf(s: GameState, p: Player, mem: AiMemory): ChannelPlan | null {
+  const r = (mem.river ??= { plan: null });
+  if (!r.looked) {
+    r.looked = true;
+    r.plan = channelPlan(s, p.startX, p.startY, AI_RIVERS, wallLine, (x, y) => !placeProblem(s, 'channel', x, y));
+  }
+  return r.plan;
+}
+
+/**
+ * The Age of Rivers at work (#701 s1): dig the planned channel (tile by tile from the water, `AI_RIVERS.crew` citizens, the price set
+ * aside until it can be paid whole), and send idle hands back to the ditches still being dug. Its fields then follow the water
+ * (`planBuildings` looks for a Farm spot by the people's own rule).
+ */
+function riverWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  // The road is decided in the Stone Age, on its own coin, so its Farm (the clue) is raised in time (`clueDue`).
+  if (p.epoch === 0 && walksWeb(v)) wants(s, p, mem, 'rivers');
+  if (!ageDef(p).rivers) return;
+  // Planned in the Stone Age; the town has grown since, so the line is drawn again on arrival.
+  const r = (mem.river ??= { plan: null });
+  if (!r.fresh) {
+    r.fresh = true;
+    r.looked = false;
+  }
+  const plan = riverOf(s, p, mem);
+  if (!plan) return;
+  const recent = (sec: number) => s.tick - (mem.ordered.channel ?? -99999) < secs(sec);
+  const ditch = (t: number): Building | null => {
+    const b = s.byId.get(s.bldAt[t]);
+    return b && b.kind === 'building' && b.type === 'channel' && b.owner === p.id ? b : null;
+  };
+  // Tiles still to lay out: not dug, not being dug, and free to dig, up to the first a building raised since stands on (the water
+  // would stop there, so nothing is dug past it).
+  const left: number[] = [];
+  for (const t of plan.tiles) {
+    if (isChannel(s, t) || ditch(t)) continue;
+    if (placeProblem(s, 'channel', t % s.w, Math.floor(t / s.w))) break;
+    left.push(t);
+  }
+  if (left.length && !recent(20)) {
+    const cost = buildingCostFor(s, p.id, 'channel');
+    const all: Cost = {};
+    for (const r of RES) if (cost[r]) all[r] = cost[r]! * left.length;
+    if (!afford(v, all)) {
+      spend(v, all);
+      return;
+    }
+    const crew = v.citizens.filter((u) => !u.inside && u.order.k !== 'build' && !(u.order.k === 'farm' && u.order.phase === 'work')).sort((a, b) => a.id - b.id).slice(0, AI_RIVERS.crew);
+    if (!crew.length) return;
+    // Tile by tile, nearest the water first, so the ditch is the line planned (a drag to another end would draw another line).
+    left.forEach((t, i) => issue({ t: 'build', p: p.id, ids: crew.map((u) => u.id), type: 'channel', tx: t % s.w, ty: Math.floor(t / s.w), queue: i > 0 || undefined }));
+    spend(v, all);
+    mem.ordered.channel = s.tick;
+    return;
+  }
+  // Idle hands go back to the ditch still being dug, nearest the water first.
+  const rising = plan.tiles.map(ditch).find((b) => b && !b.built);
+  if (rising && !recent(20)) {
+    const crew = v.citizens.filter((u) => !u.inside && u.order.k === 'idle').slice(0, AI_RIVERS.crew);
+    if (crew.length) issue({ t: 'work', p: p.id, ids: crew.map((u) => u.id), target: rising.id });
+    mem.ordered.channel = s.tick;
+  }
+}
+
 /** Whether its dyke's work is done (#701): the basin it shut off is all polder, or it has no plan. */
 function dykeDone(s: GameState, mem: AiMemory): boolean {
   const plan = mem.dyke?.plan;
@@ -1849,7 +1920,9 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   if (isCoppice(p) && !isMobile(p)) {
     if (laySnare(s, v, mem, foodWanted, issue)) return;
   } else if (farms < foodWanted && freeFields < 2 && !recently('farm', 2) && !buildBarred(p, 'farm') && !wayBarred(s, p, 'farm')) {
-    const spot = findSpot(s, 'farm', home.x, home.y, 3, 16);
+    // In the Age of Rivers (#701) a field goes only by water: the search asks the people's own rule, and looks a little farther.
+    const rivers = !!AGES[ageOf(p)].rivers;
+    const spot = rivers ? findSpot(s, 'farm', home.x, home.y, 3, 20, 1, (tx, ty) => !placeProblem(s, 'farm', tx, ty, true, p.id)) : findSpot(s, 'farm', home.x, home.y, 3, 16);
     if (spot && construct(s, v, mem, 'farm', spot, 1, issue)) return;
   }
 

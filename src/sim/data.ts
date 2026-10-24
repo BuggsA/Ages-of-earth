@@ -152,6 +152,11 @@ export interface Age {
   /** Windmills pump the water out from behind the dykes, tile by tile, into polder (the Age of Dykes, #701): see `POLDER` (`water.ts`). */
   pumps?: boolean;
   /**
+   * The Age of Rivers (#701): citizens dig channels from any water, the water running in behind them; Farms by water thrive, and
+   * none is laid away from it. See `RIVERS` (`water.ts`).
+   */
+  rivers?: boolean;
+  /**
    * The Golden Age (#703): every side age the people has walked wakes at once, its verbs and the best of its gifts with none of its
    * doors (`weave` in `ages.ts`), until `GOLDEN.span` runs out and the people wakes in the Gunpowder Age, for good.
    */
@@ -212,7 +217,7 @@ export const TRUNK: AgeId[] = ['stone', 'bronze', 'middle', 'gunpowder', 'indust
  * map, with no prospecting and no rare find. Each age names the routes it stands on (`Age.routes`); the age-up button
  * says which route a road is on. A route may cross the plain road between its own ages.
  */
-export type RouteId = 'plain' | 'army' | 'navy' | 'economy' | 'horse' | 'faith';
+export type RouteId = 'plain' | 'army' | 'navy' | 'economy' | 'horse' | 'faith' | 'water';
 export const ROUTES: Record<RouteId, { name: string; blurb: string }> = {
   plain: { name: 'Plain road', blurb: 'the classic climb, open on every map; every route can fall back to it' },
   army: { name: 'Army route', blurb: 'plunder carried home, camps at the front, a whole people at war' },
@@ -220,6 +225,7 @@ export const ROUTES: Record<RouteId, { name: string; blurb: string }> = {
   economy: { name: 'Economy route', blurb: 'gold that hires swords, feast-day trade, a town laid out round its coils' },
   horse: { name: 'Horse route', blurb: 'a town on wagons, tribute from a rival\'s land, tolls on the trade road' },
   faith: { name: 'Faith route', blurb: 'priests who win a rival\'s towers and Temples over' },
+  water: { name: 'Water road', blurb: 'channels dug from the springs, then dykes and polder: a people that moves the water' },
 };
 
 const trunkAge = (e: number, good: string): Age => ({ name: EPOCHS[e].name, short: EPOCHS[e].short, tier: e, blurb: EPOCHS[e].blurb, good, routes: ['plain'] });
@@ -612,7 +618,7 @@ export const AGES: Record<AgeId, Age> = {
     verb: 'Wall off the shallows with dykes and set windmills behind them to pump the water out, tile by tile, into polder: rich low fields where the sea was, and a march where a strait was',
     door: 'No stone walls or gates: the dykes are your walls, and only on the water\'s edge. Your best fields lie below the sea, behind banks a rival can break',
     good: 'Moving the coast: new land for the best fields in the game, and a land bridge across a strait',
-    routes: [],
+    routes: ['water'],
     keepsake: { building: 'windmill', does: 'pumping: it drains the water behind its dykes on any road' },
     name: 'Age of Dykes',
     short: 'Dykes',
@@ -620,6 +626,19 @@ export const AGES: Record<AgeId, Age> = {
     blurb: 'As the Frisians and the Hollanders did from the 1100s: banks of earth crowned with stone across the shallows, and windmills to lift the water out behind them. Dykes (K) are raised on shallow water or on the shore beside it, dragged out in a line like a wall; your own people walk along their crowns, and no rival or ship gets past. A Windmill (W) by water a dyke has shut off from the open sea pumps it dry, a tile every few seconds, nearest first: the bay becomes polder, low black ground where a Farm yields half again as much. Drain a strait and you have made a land bridge, for everyone. Only small water can be pumped: a lake or a dyked-off bay, never the open sea. No stone walls or gates are raised: the dykes are the walls.',
     noBuild: { buildings: ['wall', 'gate'], why: 'A people of dykes raises no stone walls or gates: the dykes are its walls. They wait until it returns to the Middle Ages or climbs on' },
     pumps: true,
+  },
+  // The Water Road's first age (#701 s1): instead of the Bronze Age, on every map (a spring lies by every town). Its people digs the
+  // water to where it wants it: channels run from any water across the land, and the town grows along them.
+  rivers: {
+    verb: 'Dig channels from any water across the land and lay your fields along them, so the water goes where you want your town; a channel is a moat that soldiers must wade',
+    door: 'No new Farm away from water: the town grows along its channels, so its shape is plain to see and a raid knows where to cut',
+    good: 'Fields where you choose: dig the water to them, and ring the town with a moat',
+    routes: ['water'],
+    name: 'Age of Rivers',
+    short: 'Rivers',
+    tier: 1,
+    blurb: 'As the first towns of Sumer and the Indus did: a people that leads the river where it wants it. Citizens dig Channels (Q) out from any water, a spring, a stream, a lake or the shore, dragged out in a line like a wall; when a stretch is dug the water runs in, a tile at a time, and stays. A Farm within 2 tiles of water works 30% faster, and in this age no Farm is laid away from water, so the fields follow the channels. A channel is a moat: soldiers and citizens wade it at well under half their pace, and no ship sails it. Markets, Temples and the Bronze Age\'s arms are all here. What is dug stays dug on any road.',
+    rivers: true,
   },
   // The Golden Age (#703): the age that feels almost too good. A turn off the Gunpowder Age for a people that has lived many lives.
   golden: {
@@ -1115,6 +1134,28 @@ export const ROADS: Road[] = [
     coast: 'No shallow water lies near your town: the Age of Dykes wants a bay, a lake or a strait within reach to wall off and drain',
     blurb: 'A turn, not a climb, for a people with shallow water by its town: raise dykes across the shallows and windmills behind them, and pump the sea out into polder, the richest fields there are. Drain a strait and the far shore is a march away. What it gives up: stone walls and gates, for the dykes are the walls, and the best fields lie below the sea.',
   },
+  // The Water Road's trunk (#701): the Age of Rivers instead of the Bronze Age, open to everyone (a spring lies by every town), then
+  // on to the Age of Dykes with no coast door: a trunk is never shut. A crossing to the Bronze Age at its own tier, and back onto the
+  // plain road at the Middle Ages. (From the Bronze Age the way in is a step back to the Stone Age: Bronze's own roads stay as they were.)
+  {
+    from: 'stone',
+    to: 'rivers',
+    cost: { food: 350, wood: 250 },
+    time: 35,
+    // A people that has tilled a field learns to lead the water to it: any Farm shows the road, on every map.
+    clue: 'farm',
+    blurb: 'Instead of the Bronze Age, as the first towns on the Tigris, the Nile and the Indus did: lead the water. Citizens dig Channels out from any spring, stream, lake or shore, and the water runs in behind them; Farms by water work faster, and none is laid away from it, so the town grows along its channels. A channel is a moat that soldiers must wade. The same arms and buildings as the Bronze Age.',
+  },
+  { from: 'rivers', to: 'bronze', cost: { food: 100, wood: 100 }, time: 20, blurb: 'Lay down the spades: the ordinary Bronze Age. Fields may go anywhere again; the channels you dug stay, and still water the fields beside them no faster.' },
+  { from: 'rivers', to: 'middle', cost: EPOCHS[2].cost, time: EPOCHS[2].time, blurb: 'Rejoin the main road at the Middle Ages, for the same price as from the Bronze Age: Farms go anywhere again, and the channels stay dug.' },
+  {
+    from: 'rivers',
+    to: 'dykes',
+    cost: { food: 650, wood: 350, stone: 150 },
+    time: 50,
+    walked: 'rivers',
+    blurb: 'Instead of the Middle Ages, on down the Water Road: from leading the water to holding it back. Raise dykes across the shallows and windmills behind them, and pump lakes and dyked-off bays dry into polder, the richest fields there are. Paid in wood and stone, not gold. What it gives up: stone walls and gates, for the dykes are the walls.',
+  },
   { from: 'dykes', to: 'middle', cost: { food: 150, wood: 100 }, time: 25, blurb: 'Lay down the spades: the ordinary Middle Ages, with walls and gates. The windmills stand still, but the polder stays dry and the dykes stand.' },
   { from: 'dykes', to: 'gunpowder', cost: EPOCHS[3].cost, time: EPOCHS[3].time, blurb: 'Rejoin the main road at the Gunpowder Age for the ordinary price: walls and gates return, the windmills stand still, and the land you made stays land.' },
   // The Golden Age (#703): heard of by a people that has walked two side ages, open to one that has walked three. It ends on its own (`GOLDEN.span`).
@@ -1161,6 +1202,27 @@ export const POLDER = { reach: 3, most: 160, every: 3, ground: 0.07, farm: 1.5 }
  * basin is dry or `hold` seconds have passed.
  */
 export const AI_DYKE = { take: 0.5, line: 9, reach: 18, least: 14, cost: 3, crew: 3, perMill: 60, mills: 2, hold: 420 };
+
+/**
+ * The Age of Rivers (#701 s1, the Water Road). A finished Channel (a dug ditch) four-ways beside water fills: the water runs in one
+ * tile every `fill` seconds, so it is seen running down the ditch. A channel tile is `T_WATER` its corners sunk to `bank` (to `bed`
+ * where water lies all round), and land units wade it at `wade` of their pace; no ship sails it. A Farm with water within `wet` tiles
+ * of its footprint is watered: in the age it works `farm` times as fast, and in the age no Farm is laid without water so near.
+ */
+export const RIVERS = { fill: 0.25, bank: -0.16, bed: -0.45, wade: 0.4, wet: 2, farm: 1.3 };
+
+/**
+ * A spring by every town (#701 s1): a start with no water within `near` tiles gets a spring head about `at` tiles away, on dice of
+ * its own and laid after everything else. It changes no ground, so every map is as it was; a channel dug beside it fills from it.
+ */
+export const SPRING = { near: 14, at: 9 };
+
+/**
+ * The computer in the Age of Rivers (#701 s1). It takes the road on a coin of its own (`take`), and digs one channel from the water
+ * nearest home (within `reach` tiles of its start), the line of at most `most` tiles that waters the most ground within `stop` tiles
+ * of home (drawn again when it arrives), with `crew` citizens; its fields then go along the water. A people that walked the Age of Rivers goes on to the Age of Dykes on `onward`.
+ */
+export const AI_RIVERS = { take: 0.4, reach: 18, stop: 8, most: 14, crew: 3, onward: 0.7 };
 
 /**
  * Stepping back an age (#47), at a Town Center: down to the trunk age one tier below, whatever road
@@ -1701,6 +1763,7 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   shaft: { name: 'Mine Shaft', size: 2, hp: 700, cost: { wood: 150 }, time: 30, pop: 0, sight: 4, trains: [], drop: [], epoch: 1, menu: 'eco', key: 'H', blurb: 'A timber headframe over a hole in the ground. One citizen digs stone or gold here for good, slower than an open deposit; best sunk where a deposit was worked out, fair beside mountain rock. Choose its seam on the shaft.' },
   // The Water Road (#701 s1): a bank of earth across the shallows, and the mill that pumps the water out behind it (`DYKE`, `POLDER`, `water.ts`).
   dyke: { name: 'Dyke', size: 1, hp: 700, cost: { wood: 2, stone: 4 }, time: 7, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, ages: ['dykes'], menu: 'eco', key: 'K', blurb: 'A bank of earth with a stone crown, raised on shallow water or on the shore beside it. Drag to lay out a line. Your own people walk along its crown; rivals and ships can\'t pass. Shut a bay or a strait off from the open sea with dykes, then set a Windmill by it to pump it dry.' },
+  channel: { name: 'Channel', size: 1, hp: 150, cost: { wood: 4 }, time: 8, pop: 0, sight: 1, trains: [], drop: [], epoch: 1, ages: ['rivers'], open: true, menu: 'eco', key: 'Q', blurb: 'A ditch dug out from water across the land. Drag to lay out a line from a spring, stream, lake or shore: as each stretch is dug the water runs into it and it stays. Farms within 2 tiles of water work faster in the Age of Rivers. Soldiers wade a channel at well under half their pace, and no ship sails it.' },
   windmill: { name: 'Windmill', size: 2, hp: 600, cost: { wood: 120, stone: 40 }, time: 30, pop: 0, sight: 5, trains: [], drop: [], epoch: 2, ages: ['dykes'], menu: 'eco', key: 'W', blurb: 'A post mill whose sails turn a scoop wheel. Raised by water a dyke has shut off from the open sea (or a small lake), it pumps it dry a tile every few seconds, nearest first, into polder: low black ground where a Farm yields half again as much. Two mills drain twice as fast. The open sea is too big to pump.' },
   airfield: { name: 'Airfield', size: 4, hp: 2200, cost: { wood: 250, stone: 100, gold: 150 }, time: 60, pop: 0, sight: 8, trains: ['fighter', 'bomber'], drop: [], epoch: 4, menu: 'mil', key: 'F', blurb: 'Builds fighters and bombers. Fighters hunt aircraft; bombers wreck towns.' },
 };

@@ -2,7 +2,7 @@ import { BUILDINGS, LANDMARKS, RUINS, TRADE } from './data';
 import { landOwnerAt } from './borders';
 import { isEnemy } from './world';
 import { snareSpot } from './snares';
-import { dykeSpot } from './water';
+import { dykeSpot, isChannel, parched } from './water';
 import type { Building, BuildingType, GameState } from './types';
 import { B_BUILDING, B_GATE, B_RES, B_TERRAIN, R_BLOODIRON, R_GOLD, R_NONE, R_SALT, R_SALTPETRE, R_STONE, T_ROCK, T_WATER } from './types';
 
@@ -63,7 +63,7 @@ export function groundAt(s: GameState, x: number, y: number): number {
   return a * (1 - fx) * (1 - fy) + b * fx * (1 - fy) + c * (1 - fx) * fy + d * fx * fy;
 }
 
-export type PlaceProblem = null | 'edge' | 'water' | 'rock' | 'blocked' | 'slope' | 'shore' | 'foreign' | 'woods' | 'snares' | 'deep' | 'dry';
+export type PlaceProblem = null | 'edge' | 'water' | 'rock' | 'blocked' | 'slope' | 'shore' | 'foreign' | 'woods' | 'snares' | 'deep' | 'dry' | 'parched';
 
 /** Whether a building of this type could go with its top-left corner on this tile. */
 export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: number, ignoreUnits = true, owner = -1): PlaceProblem {
@@ -97,19 +97,23 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
     }
   }
   // Walls follow the land (and docks the shore); everything else wants it fairly level.
-  if (hi - lo > (type === 'wall' || type === 'gate' || type === 'dock' || dyke ? 2.2 : 1.1)) return 'slope';
+  if (hi - lo > (type === 'wall' || type === 'gate' || type === 'dock' || type === 'channel' || dyke ? 2.2 : 1.1)) return 'slope';
   if (BUILDINGS[type].shore && shoreWater(s, tx, ty, n) < 3) return 'shore';
   // A Snare goes only among standing trees, and apart from the others (#485).
   if (type === 'snare') {
     const why = snareSpot(s, tx, ty);
     if (why) return why;
   }
+  // The Age of Rivers (#701): its fields go only by water.
+  if (type === 'farm' && owner >= 0 && parched(s, owner, tx, ty, n)) return 'parched';
   // Borders (#132 s3): no building in an enemy's land, but a Tower may be raised there as a foothold,
   // and a War Camp pitched where the army stands (#303).
   if (owner >= 0 && type !== 'tower' && type !== 'warcamp') {
     const o = landOwnerAt(s, tx + (n >> 1), ty + (n >> 1));
     if (o >= 0 && isEnemy(s, owner, o)) return 'foreign';
   }
+  // A spring head (#701) is left open, for the channel dug from it.
+  if (s.springs) for (const t of s.springs) if (t % s.w >= tx && t % s.w < tx + n && Math.floor(t / s.w) >= ty && Math.floor(t / s.w) < ty + n) return 'blocked';
   void ignoreUnits;
   return null;
 }
@@ -185,7 +189,7 @@ export function stampBuilding(s: GameState, b: Building, on: boolean): void {
           s.gateTeam[i] = team;
         } else if (on) s.block[i] |= B_BUILDING;
         // Water or rock under a dyke is crossed while it stands, and is water or rock again once it is gone.
-        if (dyke) s.block[i] = on && b.built ? s.block[i] & ~B_TERRAIN : s.terrain[i] === T_WATER || s.terrain[i] === T_ROCK ? s.block[i] | B_TERRAIN : s.block[i];
+        if (dyke) s.block[i] = on && b.built ? s.block[i] & ~B_TERRAIN : (s.terrain[i] === T_WATER && !isChannel(s, i)) || s.terrain[i] === T_ROCK ? s.block[i] | B_TERRAIN : s.block[i];
       } else if (!open) s.block[i] = on ? s.block[i] | B_BUILDING : s.block[i] & ~B_BUILDING;
     }
   }
