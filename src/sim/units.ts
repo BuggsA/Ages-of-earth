@@ -1,4 +1,4 @@
-import { AI_LEVELS, AUTO_WORK, BUILDINGS, EXPLORE, PATROL, CARRY, CONSECRATE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, LEGION, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TRADE, domainOf, secs } from './data';
+import { AI_LEVELS, AUTO_WORK, BUILDINGS, EXPLORE, PATROL, CARRY, CONSECRATE, COPPICE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, LEGION, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
 import { findRoute } from './path';
@@ -6,6 +6,7 @@ import type { Spatial } from './spatial';
 import { buildTimeFor, buildingCostFor, modsOf } from './stats';
 import { flooded } from './flood';
 import { mineable } from './household';
+import { felled, isCoppice } from './coppice';
 import { isNomad } from './nomad';
 import { ageDef, canRaise, inField, prospect } from './ages';
 import { legionKind, legionary } from './legion';
@@ -381,6 +382,8 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
     workEvent(s, u, u.act, tx, ty);
     if (s.amount[o.tile] <= 0) {
       clearResource(s, o.tile);
+      // The managed wood (#501): a coppice people's stool stays to grow again, near its stores.
+      if (kind === R_TREE) felled(s, u.owner, o.tile);
       s.events.push({ k: 'depleted', tile: o.tile });
     }
     if (u.carry >= cap) {
@@ -1179,7 +1182,8 @@ function snareStep(s: GameState, u: Unit, o: Extract<Order, { k: 'snare' }>): vo
     setOrder(u, { k: 'build', target: b.id });
     return;
   }
-  const cap = carryCap(s, u);
+  // A managed wood's tenders (#501) carry a game bag `COPPICE.bag` times a basket: walking the line is their field work.
+  const cap = carryCap(s, u) * (isCoppice(s.players[u.owner]) ? COPPICE.bag : 1);
   if (distToRect(u.x, u.y, b) - statsOf(s, u).radius <= REACH + 0.3) {
     if (walking(u)) stopWalking(u);
     face(u, b.x, b.y);

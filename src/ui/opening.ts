@@ -27,8 +27,8 @@ const FIRST: Record<CivId, { first: string; later: string }> = {
     later: 'A thin or scattered town is poor, and a raid on the houses empties the treasury. Build them close and guard the wards.',
   },
   britons: {
-    first: 'Raise an Archery Range early: your archers reach one tile farther and train faster.',
-    later: 'Keep the bowmen behind foot soldiers or walls: they shoot over the front line and are slow afoot.',
+    first: 'Never farm. Lay <b>Snares</b> (<kbd>J</kbd>) in the thick woods by home and send a citizen to walk the line: your snares are your fields.',
+    later: 'Fell one stand for timber while the snares in the next feed you: trees cut near your stores grow back in two minutes. Plant <b>Saplings</b> (<kbd>I</kbd>) to thicken a thin wood, or grow a hedge. A rival who fells your wood clears it for good.',
   },
 };
 

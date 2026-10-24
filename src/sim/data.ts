@@ -1509,6 +1509,22 @@ export interface BuildingStats {
   blurb: string;
 }
 
+/**
+ * The managed wood (#501, the Britons): a coppice people tills no Farm. A tree its citizens fell to the stump within `reach` tiles of
+ * one of its finished wood stores is coppiced: the stool stays and grows a full tree again `regrow` seconds later (if something
+ * stands on it then, `retry` seconds after). A rival's axe, or its own far from a store, clears the tree for good, and a building
+ * raised over a stool grubs it out. Its citizens plant a Sapling (a 1-tile building) on open ground, which roots as a stool and is
+ * a full tree `grow` seconds later. Its snares fill `snare` times as fast (and as much faster again as its farming technologies
+ * make fields), at their fastest with `full` trees round them (growing stools count, for young coppice is cover for game too), and hold `cap` times as much, and its tenders carry a game bag `bag` times a basket: the snare line among the standing wood is its field, and the trees it fells for
+ * timber starve the snares beside them until they grow back.
+ *
+ * The computer: lays `aiPerFood` snares for each field its food wants (at most `aiMax`, `aiStone` in the Stone Age while berries grow by home), within `aiNear` tiles of home in woods of
+ * `aiThick` trees if it can find them, else `aiTrees`, else any wood a snare may stand in, out to `aiNear` + 10 tiles; raises a Hunting Camp by a snare with no food drop within `aiDrop` tiles (while it has fewer than `aiCamps`); keeps
+ * one tender for each `aiPerTender` snares, and once it has a Barracks or a Range and `aiPlantWood` wood to spare, plants up to
+ * `aiPlant` saplings at a time round a snare with fewer than `aiThin` trees standing near it.
+ */
+export const COPPICE = { reach: 8, regrow: 120, retry: 5, grow: 90, snare: 2, cap: 1.5, bag: 2, full: 12, aiPerFood: 1.5, aiMax: 16, aiTrees: 10, aiThick: 14, aiNear: 14, aiDrop: 7, aiPerTender: 2, aiStone: 6, aiCamps: 2, aiPlant: 3, aiThin: 12, aiPlantWood: 120 };
+
 export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   towncenter: { name: 'Town Center', size: 4, hp: 2800, cost: { wood: 275, stone: 150 }, time: 110, pop: 10, sight: 8, trains: ['citizen', 'hero'], drop: ['food', 'wood', 'stone', 'gold'], epoch: 0, guns: { damage: 6, range: 7, reload: 2 }, garrison: 15, menu: 'eco', key: 'T', blurb: 'Trains citizens and heroes, takes in every resource and leads your people into the next epoch. Citizens shelter here when the bell rings. Lose your last one and you have 45 seconds to raise another, or your people is lost: build a second far from the first.' },
   house: { name: 'House', size: 2, hp: 600, cost: { wood: 35 }, time: 18, pop: 5, sight: 3, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'E', blurb: 'Room for 5 more people.' },
@@ -1529,6 +1545,8 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   huntcamp: { name: 'Hunting Camp', size: 2, hp: 500, cost: { wood: 45 }, time: 14, pop: 0, sight: 5, trains: [], drop: ['food'], epoch: 0, menu: 'eco', key: 'N', blurb: 'A drop-off for food, and a small claim on the land round it. Raise it by the herd or a far kill: meat inside your border is safe from wolves, and Drying Racks keep it.' },
   // Snares in the wood (#485): set among standing trees, they fill with small game by themselves (`SNARE`, `src/sim/snares.ts`).
   snare: { name: 'Snare', size: 1, hp: 60, cost: { wood: 30 }, time: 6, pop: 0, sight: 2, trains: [], drop: [], epoch: 0, open: true, menu: 'eco', key: 'J', blurb: 'A noose on a bent sapling, set among standing trees. It fills with small game by itself, faster the more trees stand round it and fastest in winter, until it is full. A citizen sent to it walks the trap line, emptying each snare in turn. Fell the trees round it and it starves.' },
+  // The managed wood (#501): a coppice people plants it on open ground; it roots as a stool and grows into a tree (`COPPICE`, `src/sim/coppice.ts`).
+  sapling: { name: 'Sapling', size: 1, hp: 30, cost: { wood: 10 }, time: 5, pop: 0, sight: 1, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'I', blurb: `A young tree set in open ground. Once planted it roots and grows into a full tree in ${COPPICE.grow} seconds: wood to fell, and woods for snares. A row of them grows into a hedge no one walks through.` },
   // The age road (#562, `docs/age-roads.md` spine §4): raised in the Stone Age, it answers which key resources this world holds (`PROSPECTOR`).
   prospector: { name: "Prospector's Lodge", size: 2, hp: 500, cost: { food: 50, wood: 75 }, time: 20, pop: 0, sight: 6, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'P', blurb: 'A lodge of prospectors who walk the streams, scrape the rock and dig at old mounds. Once it stands it tells you which key resources this world holds (bog iron, salt, saltpetre, blood-iron, ancient ruins): yes or no for each, never where. Some ages open only with them; a world that lacks one shuts that door.' },
   // The Path of Blood (#303): pitched by foot soldiers where the army stands, enemy land too; burns when left alone (`WARCAMP`).
@@ -1746,9 +1764,12 @@ export interface Civ {
   household?: boolean;
   /** Born on the move (#501, `NOMAD`): the camp is on wagons and the flock walks with it from the first minute; no fields and no quarry. */
   nomad?: boolean;
+  /** The managed wood (#501, `COPPICE`): no farms; its felled trees grow back near its stores, it plants saplings, and its snares feed it. */
+  coppice?: boolean;
   /** The set line (#501, `LONGBOW`): its bowmen who stand still `LONGBOW.after` seconds draw farther and harder; a step breaks it. */
   longbow?: boolean;
 }
+
 
 /**
  * Born on the move (#501, the Mongols): the camp packs onto wagons and the flock grazes with it from the first minute, in every age
@@ -1853,9 +1874,10 @@ export const CIVS: Record<CivId, Civ> = {
   },
   britons: {
     name: 'Britons',
-    blurb: `The set line. A Briton bowman who has stood still ${LONGBOW.after} seconds is set: he draws the longbow to the full, reaching ${LONGBOW.range} tiles farther and striking ${LONGBOW.attack} harder, until he takes a step. Pick the ground, plant the line, let the foe walk onto it; a line that chases is only archers. Archers reach 1 tile farther always, and archery ranges train 25% faster.`,
-    verb: 'Pick your ground and plant the line: bowmen who stand still draw the longbow to the full, so a battle is held, not chased',
-    door: 'A bowman on the move is plain: a line caught marching, a flank charged before it sets, or a foe that stays out of reach and wins, breaks the longbow',
+    blurb: `The managed wood and the set line. A British town tills no fields: its food is the wood's. Snares among standing trees fill ${COPPICE.snare} times as fast and hold half again as much, and gain from every farming technology; a tree felled near your stores is coppiced, its stool growing a full tree again in ${COPPICE.regrow / 60} minutes, and citizens plant Saplings (I) to grow a wood where you want one. Fell a stand for timber and the snares beside it starve until it grows back; a rival who fells your wood clears it for good. In war, a Briton bowman who has stood still ${LONGBOW.after} seconds is set: he draws the longbow to the full, reaching ${LONGBOW.range} tiles farther and striking ${LONGBOW.attack} harder, until he takes a step. Archers reach 1 tile farther always, and archery ranges train 25% faster.`,
+    verb: 'Work the wood in turns, felling one stand for timber while the snares in the next feed you; and in war pick your ground and plant the line, for bowmen who stand still draw the longbow to the full',
+    door: 'No Farm is ever tilled, so a wood felled or lost is a field lost; and a bowman on the move is plain, so a line caught marching or charged before it sets breaks the longbow',
+    coppice: true,
     longbow: true,
     add: { range: 1 },
     mul: { rangedTrain: 0.75 },
@@ -2440,6 +2462,8 @@ export interface AiLevel {
   lodgeHold?: boolean;
   /** Off: the Workshop counts only the engines out, not those in the queues, against the number wanted (#540; only `scripts/ai-ab.ts` turns it off). */
   siegeQueued?: boolean;
+  /** Off: the engine a Masons' Lodge rival calls for is not saved from the town's buildings (#242, #501; only `scripts/ai-ab.ts` turns it off). */
+  lodgeEngine?: boolean;
   /** Off: a Hunters' Way town on the glade or elsewhere spares the wild pair near home, which bars its fields (#555; only `scripts/ai-ab.ts` turns it off). */
   fieldsClear?: boolean;
   /** Off: a Blood-rite computer's priests neither curse nor sacrifice (#355 s4; only `scripts/ai-ab.ts` turns it off). */
