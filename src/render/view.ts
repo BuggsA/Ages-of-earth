@@ -568,7 +568,7 @@ export class View {
     this.bats.update(this.time, this.rig.target, this.rig.distance, this.renderer.getPixelRatio(), this.height, this.quality !== 'low');
     this.effects.placeTexts(this.rig.camera, this.width, this.height);
 
-    if (QUALITY[this.quality].post) this.post.render();
+    if (QUALITY[this.quality].post) this.post.render(QUALITY[this.quality].bloom);
     else this.renderer.render(this.scene, this.rig.camera);
   }
 
