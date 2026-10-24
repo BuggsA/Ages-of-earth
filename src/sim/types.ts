@@ -46,6 +46,8 @@ export type BuildingType =
   | 'sluice'
   /** The Age of Tides (#739): a raised road over the flats, which becomes tidal ground and is gone; a mill that grinds on the running tide. */
   | 'causeway' | 'tidemill'
+  /** The Age of Tides (#779): a hut by the cockle beds, a drop for cockles only, where pickers wait for low water. */
+  | 'cockler'
   /** The Age of Locks (#701 s5): a swing bridge its own people cross a canal by and ships pass under, and a dam whose turbines drive the workshops by it. */
   | 'bridge' | 'dam'
   /** The Age of Floating Cities (#770): a district on pontoons, moored on open water, that is cast off, towed and moored again. */

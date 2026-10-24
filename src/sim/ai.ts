@@ -15,6 +15,9 @@ import { castProblem, mooringSpot, raisesCitizens } from './floating';
 import { pitchProblem } from './steppe';
 import { wallLine } from './commands';
 import { AI_COCKLE } from './data';
+import { AI_COCKLER, COCKLER } from './data';
+import { cocklerSpotNear } from './tides';
+import { nearestDrop } from './world';
 import { ashoreLeft, bared, bedClock } from './tides';
 import { R_COCKLE } from './types';
 import { AI_BARRAGE, AI_EBB, INTERCEPT, SALVO } from './data';
@@ -1850,6 +1853,8 @@ function cockleWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) =>
     const tree = findResource(s, R_TREE, u.x, u.y, 20);
     if (tree >= 0) issue({ t: 'gather', p: p.id, ids: [u.id], tile: tree });
   }
+  // A Cockler's Hut by the busiest bed (#779).
+  if (pickers.length) cocklerHutWork(s, v, mem, pickers, issue);
   if (n >= AI_COCKLE.hands) return;
   const bed = findResource(s, R_COCKLE, v.home.x, v.home.y, AI_COCKLE.reach, (i) => {
     if (!bared(s, i)) return true;
@@ -1865,6 +1870,40 @@ function cockleWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) =>
     .sort((a, b) => d(a) - d(b) || a.id - b.id)
     .slice(0, AI_COCKLE.hands - n);
   if (hands.length) issue({ t: 'gather', p: p.id, ids: hands.map((u) => u.id), tile: bed });
+}
+
+/**
+ * The computer's Cockler's Hut (#779): its busiest bed (the most pickers on it, then the lowest tile) that lies more than
+ * `AI_COCKLER.far` tiles from its nearest food store, with no hut of its within `COCKLER.reach`, gets one raised by it, the nearest spot
+ * that fits (`cocklerSpotNear`), no more often than every `AI_COCKLER.every` seconds.
+ */
+function cocklerHutWork(s: GameState, v: View, mem: AiMemory, pickers: Unit[], issue: (c: Command) => void): void {
+  const { p } = v;
+  if (buildBarred(p, 'cockler') || s.tick - (mem.ordered.cockler ?? -99999) < secs(AI_COCKLER.every)) return;
+  const load = new Map<number, number>();
+  for (const u of pickers) if (u.order.k === 'gather') load.set(u.order.tile, (load.get(u.order.tile) ?? 0) + 1);
+  let bed = -1;
+  let most = 0;
+  for (const [t, k] of load) {
+    if (k > most || (k === most && t < bed)) {
+      most = k;
+      bed = t;
+    }
+  }
+  if (bed < 0 || !s.cockles?.[bed]) return;
+  const bx = (bed % s.w) + 0.5;
+  const by = Math.floor(bed / s.w) + 0.5;
+  if (v.buildings.some((b) => b.type === 'cockler' && distToRect(bx, by, b) <= COCKLER.reach)) return;
+  const store = nearestDrop(s, p.id, 'food', bx, by);
+  if (store && distToRect(bx, by, store) <= AI_COCKLER.far) return;
+  mem.ordered.cockler = s.tick;
+  const cost = buildingCostFor(s, p.id, 'cockler');
+  if (!afford(v, cost)) {
+    spend(v, cost);
+    return;
+  }
+  const spot = cocklerSpotNear(s, bed, (tx, ty) => !placeProblem(s, 'cockler', tx, ty, true, p.id));
+  if (!spot || !construct(s, v, mem, 'cockler', spot, 1, issue)) spend(v, cost);
 }
 
 /**

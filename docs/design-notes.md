@@ -1479,3 +1479,14 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 
 **Next:** s4, the playtest and numbers. In three computer-vs-computer Atomic starts the computers never held Reserve (one silo each, stores never full); the computer could raise a second silo when a rival stands silos. A rising whistle when a silo's interceptor goes up.
 
+## Designers' notes: the Cockler's Hut, and shore waits that hold their ground (#779, s6e of #701, 2026-10-24, chain 1024-1330 s5, lane rules)
+
+**Built:** a **Cockler's Hut** (`cockler`, `COCKLER`, `tides.ts`): 60 wood, raised within 6 tiles of a cockle bed (placement says why if not). It is a drop for cockles only (`cocklerDrop` in `dropOff`: a basket from a bed goes to the nearest working hut when nearer than a food store), the place a picker waits for low water (`hutWait`, the dry ring round it, spread by id), and it tends the beds round it: 40 food back at each high water instead of 25. The computer raises one by its busiest bed when that bed lies more than 12 tiles from a food store (`cocklerHutWork`). And **shore waits hold their ground** (`holdShore`, after `collide`): a unit standing still to wait for the tide, or on the last stretch to its wait spot, is never jostled from dry ground onto tidal ground. A picker turned for home with its basket now drops its old route and shore wait (`homeward`); before, it could stand frozen with its basket until the wait ran out.
+
+**Why I love it:** cockling was a long walk home past the wolves. Now it is a small shore settlement that keeps the sea's hours: a hut, a few pickers waiting by its door at high water, going out as the flats bare. Where you put it is a real choice: by the richest cluster of beds (they grow back richer there), but that is out on the shore a rival crosses at low water, and on the ground a Tide Mill wants too.
+
+**What I chose:** no garrison: the bell and the computer's own garrison rules would pull pickers in and out, so they wait by the door instead. A hut takes cockles only, so it doesn't become a cheap storehouse. The key: every eco letter A–Z is taken, but only within the menu a people sees: in the Age of Tides, C (the Caravanserai's, Silk Road only) is free, so the hut is **C**; and the Causeway moves **V → W** (W is the Windmill's, Age of Dykes only), ending its clash with a Hive-walker's Hive.
+
+**Seen and not:** in Chromium (software GL, `vite preview`, `ages.cocklerHut(0)`): the hut by three bared beds, its panel ("🐚 Tends 3 beds"), no page errors. Not seen: pickers going to and from it over a whole tide (the browser runs too slowly; covered by tests and the probe), the hut's look at night, the sound (none new).
+
+**Next:** the hut's lantern lit at night tides; a rival's hut a raiding target worth a low-water strike; the computer pulling its pickers into the hut when raiders come.

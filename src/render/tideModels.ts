@@ -84,3 +84,42 @@ export function causewaySite(k: Kit, mask: number): void {
   k.cyl(0.02, 0.02, 0.32, 4, '#5b4330', -0.3, 0.05, -0.3);
   k.team(k.box(0.08, 0.06, 0.04, TEAM, -0.3, 0.32, -0.3));
 }
+
+/**
+ * A Cockler's Hut (#779): a low hut of grey driftwood planks with a thatched roof, raised on short posts against the spring tides; a
+ * door toward the beds, baskets of cockles stacked by it (pale shells heaped in them), a long-tined rake leaned on the wall, a net
+ * hung to dry on two poles, a lantern on its post for the night tide, and the owner's colour on a strip of cloth at the ridge.
+ */
+export function cocklerHut(k: Kit, base: string): void {
+  k.box(1.9, 0.06, 1.9, base, 0, -0.02, 0);
+  // Posts and a plank floor.
+  for (const [x, z] of [[-0.55, -0.4], [0.55, -0.4], [-0.55, 0.45], [0.55, 0.45]]) k.cyl(0.05, 0.06, 0.24, 4, '#5d4a37', x, 0.0, z);
+  k.box(1.3, 0.06, 1.0, '#8a7a66', 0, 0.2, 0.02);
+  // Driftwood walls: planks of greys and browns, a door toward the sea (−z) and a small window lit within.
+  for (let i = 0; i < 6; i++) k.box(0.2, 0.6, 0.9, ['#9b968c', '#857e72', '#a8a091'][i % 3], -0.5 + i * 0.2, 0.26, 0.02);
+  k.box(0.26, 0.42, 0.03, '#3d2f24', 0.15, 0.26, -0.45);
+  k.box(0.14, 0.12, 0.03, '#ffc46b', -0.32, 0.52, -0.45);
+  // The thatch, shaggy at the eaves.
+  const roof = k.prism(1.12, 0.5, 1.42, '#b59a5c', 0, 0.86, 0.02);
+  roof.rotation.y = Math.PI / 2;
+  k.box(0.08, 0.05, 1.16, '#8f7845', 0, 1.32, 0.02);
+  // Baskets of cockles by the door, pale shells heaped in them.
+  for (const [x, z] of [[-0.62, -0.72], [-0.36, -0.8], [-0.5, -0.52]]) {
+    k.cyl(0.13, 0.1, 0.16, 6, '#8c6a3c', x, 0.02, z);
+    k.blob(0.1, '#e8e0cc', x, 0.15, z).scale.set(1, 0.45, 1);
+  }
+  // A cockle rake leaned on the wall: a long handle and its tines.
+  const rake = k.group(0.68, 0.0, -0.48);
+  rake.rotation.z = -0.35;
+  k.cyl(0.015, 0.015, 0.9, 3, WOOD, 0, 0.45, 0, rake);
+  k.box(0.22, 0.03, 0.03, '#6f6a62', 0, 0.02, 0, rake);
+  // A net hung to dry between two poles.
+  for (const x of [0.38, 0.86]) k.cyl(0.02, 0.02, 0.7, 3, WOOD, x, 0.3, 0.75);
+  k.box(0.46, 0.34, 0.01, '#6e7b6a', 0.62, 0.42, 0.75);
+  // The lantern for the night tide.
+  k.cyl(0.02, 0.02, 0.8, 3, WOOD, -0.82, 0.38, 0.6);
+  k.box(0.08, 0.1, 0.08, '#ffc46b', -0.82, 0.82, 0.6);
+  // The owner's colour, a strip of cloth at the ridge.
+  k.team(k.box(0.02, 0.12, 0.24, TEAM, 0, 1.36, 0.4));
+  k.team(k.box(1.98, 0.1, 1.98, TEAM, 0, -0.07, 0));
+}

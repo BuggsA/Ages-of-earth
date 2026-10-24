@@ -1,8 +1,8 @@
-import { AGES, AI_EBB, BARRAGE, COCKLE, KEG, TIDE, TIDE_ROUTE, TIDE_WORK, domainOf, secs } from './data';
+import { AGES, AI_EBB, BARRAGE, COCKLE, COCKLER, KEG, TIDE, TIDE_ROUTE, TIDE_WORK, domainOf, secs } from './data';
 import { ageDef, ageOf, asleep } from './ages';
-import { distToTile, stampBuilding, walkable } from './grid';
+import { distToRect, distToTile, stampBuilding, walkable } from './grid';
 import { isChannel, isInund, isPolder, seaAt } from './water';
-import { goalForPoint, isEnemy, statsOf } from './world';
+import { goalForPoint, isEnemy, passOf, statsOf } from './world';
 import { hash2 } from './rng';
 import { findPath } from './path';
 import { kegsOf, sappers } from './powder';
@@ -981,16 +981,17 @@ function layCockles(s: GameState): void {
 export const bedOpen = (s: GameState, tile: number): boolean =>
   !!s.cockles && s.cockles[tile] === 1 && !!s.tidal && s.tidal[tile] !== 0 && s.tidal[tile] !== TIDE_CAUSEWAY && s.bldAt[tile] === 0 && !isPond(s, tile) && (s.res[tile] === R_NONE || s.res[tile] === R_COCKLE);
 
-/** High water brings the cockles back (#767): each open bed, picked out or not, gains `COCKLE.regrow`, up to `COCKLE.amount`. */
+/** High water brings the cockles back (#767): each open bed, picked out or not, gains `COCKLE.regrow` (`COCKLER.regrow` by a hut, #779), up to `COCKLE.amount`. */
 function regrowCockles(s: GameState): void {
   const beds = s.cockles;
   if (!beds) return;
+  const tended = tendedBeds(s);
   let n = 0;
   let food = 0;
   for (let i = 0; i < beds.length; i++) {
     if (!beds[i] || !bedOpen(s, i)) continue;
     const was = s.res[i] === R_COCKLE ? s.amount[i] : 0;
-    const now = Math.min(COCKLE.amount, was + COCKLE.regrow);
+    const now = Math.min(COCKLE.amount, was + (tended?.[i] ? COCKLER.regrow : COCKLE.regrow));
     if (now <= was) continue;
     s.res[i] = R_COCKLE;
     s.amount[i] = now;
@@ -1044,6 +1045,19 @@ export function bedClock(s: GameState, tile: number): { bare: boolean; secs: num
 }
 
 const walkingNow = (u: Unit): boolean => u.path !== null || u.wantPath;
+
+/**
+ * A picker turned for home with its basket (#779): it drops the way it was walking to the bed, and any wait on the shore for crossing to
+ * it (`Unit.tideWait`), so its next step routes it to the drop.
+ */
+function homeward(u: Unit, o: Extract<Order, { k: 'gather' }> | Extract<Order, { k: 'build' }>): void {
+  if (o.k !== 'gather' || o.phase === 'drop') return;
+  o.phase = 'drop';
+  u.path = null;
+  u.wantPath = false;
+  u.tideWait = undefined;
+  u.miss = 0;
+}
 
 /** Send a worker ashore (#767): to `to` (a tile; -1 stays where it stands), there to wait until tick `until`. */
 function goAshore(s: GameState, u: Unit, to: number, until: number): void {
@@ -1099,16 +1113,18 @@ export function tideWorkHold(s: GameState, u: Unit, o: Extract<Order, { k: 'gath
   if (bed >= 0 && !bared(s, bed)) {
     if (isPond(s, bed)) return false;
     const until = baresAt(s, tidalLevel(s, bed), s.tick);
-    const to = shoreFor(s, flats ? u.x : (bed % s.w) + 0.5, flats ? u.y : Math.floor(bed / s.w) + 0.5, team);
+    // By a Cockler's Hut near the bed (#779), on the dry ground beside it; else on the nearest shore.
+    const hut = hutWait(s, u, bed);
+    const to = hut >= 0 ? hut : shoreFor(s, flats ? u.x : (bed % s.w) + 0.5, flats ? u.y : Math.floor(bed / s.w) + 0.5, team);
     const dry = to >= 0 && !isTidal(s, to);
     if (basket && !flats) {
-      o.phase = 'drop';
+      homeward(u, o);
       return false;
     }
     const near = dry && Math.abs((to % s.w) + 0.5 - u.x) + Math.abs(Math.floor(to / s.w) + 0.5 - u.y) < 2;
     if (!dry || near) {
       if (basket) {
-        o.phase = 'drop';
+        homeward(u, o);
         return false;
       }
       goAshore(s, u, -1, until < 0 ? s.tick + secs(TIDE.period) : until);
@@ -1161,4 +1177,169 @@ export function idleAshore(s: GameState, u: Unit): void {
 /** Whether a worker stands ashore for the tide (#767), and for how many seconds more (0: not). */
 export function ashoreLeft(s: GameState, u: Unit): number {
   return u.ashore !== undefined && u.ashore > s.tick ? (u.ashore - s.tick) / secs(1) : 0;
+}
+
+// ---- The Cockler's Hut, and shore waits that hold their ground (#779) ----------------------------
+
+/** Whether a Cockler's Hut works (#779): finished, standing, and its people in the Age of Tides (or keeping the hut). */
+export const hutWorks = (s: GameState, b: Building): boolean => b.type === 'cockler' && b.built && b.hp > 0 && !asleep(s, b);
+
+/** Why a Cockler's Hut can't go here, or null where it can (#779): it wants a cockle bed within `COCKLER.reach` tiles. */
+export function cocklerSpot(s: GameState, tx: number, ty: number, n: number): 'beds' | null {
+  const beds = s.cockles;
+  if (!beds) return 'beds';
+  const r = COCKLER.reach;
+  for (let y = Math.max(0, ty - r); y < Math.min(s.h, ty + n + r); y++)
+    for (let x = Math.max(0, tx - r); x < Math.min(s.w, tx + n + r); x++) if (beds[y * s.w + x] && distToRect(x + 0.5, y + 0.5, { tx, ty, size: n }) <= r) return null;
+  return 'beds';
+}
+
+/** The cockle beds a working hut tends (#779): those within `COCKLER.reach` tiles of one, by tile. Null: none. */
+export function tendedBeds(s: GameState): Uint8Array | null {
+  const beds = s.cockles;
+  if (!beds) return null;
+  let out: Uint8Array | null = null;
+  const r = COCKLER.reach;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || !hutWorks(s, e)) continue;
+    for (let y = Math.max(0, e.ty - r); y < Math.min(s.h, e.ty + e.size + r); y++)
+      for (let x = Math.max(0, e.tx - r); x < Math.min(s.w, e.tx + e.size + r); x++) {
+        const i = y * s.w + x;
+        if (beds[i] && distToRect(x + 0.5, y + 0.5, e) <= r) (out ??= new Uint8Array(beds.length))[i] = 1;
+      }
+  }
+  return out;
+}
+
+/** How many cockle beds a hut tends (#779), for its panel. */
+export function hutBeds(s: GameState, b: Building): number {
+  const beds = s.cockles;
+  if (!beds) return 0;
+  let n = 0;
+  const r = COCKLER.reach;
+  for (let y = Math.max(0, b.ty - r); y < Math.min(s.h, b.ty + b.size + r); y++)
+    for (let x = Math.max(0, b.tx - r); x < Math.min(s.w, b.tx + b.size + r); x++) if (beds[y * s.w + x] && distToRect(x + 0.5, y + 0.5, b) <= r) n++;
+  return n;
+}
+
+/**
+ * Where a picker with a basket of cockles empties it (#779): the nearest of its people's working huts, when nearer than `drop` (the
+ * nearest food store), else `drop`. A hut takes cockles only: anyone else, or a basket of other food, keeps to `drop`.
+ */
+export function cocklerDrop(s: GameState, u: Unit, drop: Building | null): Building | null {
+  if (u.order.k !== 'gather' || !u.order.cockle || u.carryRes !== 'food' || u.type !== 'citizen') return drop;
+  let best = drop;
+  let bestD = drop ? distToRect(u.x, u.y, drop) : Infinity;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.owner !== u.owner || !hutWorks(s, e)) continue;
+    const d = distToRect(u.x, u.y, e);
+    if (d < bestD) {
+      bestD = d;
+      best = e;
+    }
+  }
+  return best;
+}
+
+/**
+ * The tile a picker waits on for its bed to bare (#779), by the nearest of its people's working huts within `COCKLER.wait` tiles of the
+ * bed: a dry tile that can be walked on in the ring round the hut, among the three nearest the bed, picked by the picker's id so a crew
+ * stands spread. -1: no hut near.
+ */
+function hutWait(s: GameState, u: Unit, bed: number): number {
+  const bx = (bed % s.w) + 0.5;
+  const by = Math.floor(bed / s.w) + 0.5;
+  let hut: Building | null = null;
+  let hutD = COCKLER.wait;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.owner !== u.owner || !hutWorks(s, e)) continue;
+    const d = distToRect(bx, by, e);
+    if (d <= hutD) {
+      hutD = d;
+      hut = e;
+    }
+  }
+  if (!hut) return -1;
+  const team = s.players[u.owner]?.team ?? -1;
+  const ring: { i: number; d: number }[] = [];
+  for (let y = hut.ty - 1; y <= hut.ty + hut.size; y++)
+    for (let x = hut.tx - 1; x <= hut.tx + hut.size; x++) {
+      if (x >= hut.tx && x < hut.tx + hut.size && y >= hut.ty && y < hut.ty + hut.size) continue;
+      const i = y * s.w + x;
+      if (!walkable(s, x, y, team) || isTidal(s, i)) continue;
+      ring.push({ i, d: (x + 0.5 - bx) * (x + 0.5 - bx) + (y + 0.5 - by) * (y + 0.5 - by) });
+    }
+  if (!ring.length) return -1;
+  ring.sort((a, b) => a.d - b.d || a.i - b.i);
+  return ring[u.id % Math.min(3, ring.length)].i;
+}
+
+/**
+ * The best tile for a Cockler's Hut by a bed (#779), for the computer: the spot within `COCKLER.reach` tiles of the bed, nearest it, that
+ * `fits` (ties by tile order). Null: none.
+ */
+export function cocklerSpotNear(s: GameState, bed: number, fits: (tx: number, ty: number) => boolean): { tx: number; ty: number } | null {
+  const bx = (bed % s.w) + 0.5;
+  const by = Math.floor(bed / s.w) + 0.5;
+  const r = COCKLER.reach;
+  let best: { tx: number; ty: number } | null = null;
+  let bestD = Infinity;
+  for (let ty = Math.max(1, Math.floor(by) - r - 1); ty <= Math.min(s.h - 3, Math.floor(by) + r); ty++)
+    for (let tx = Math.max(1, Math.floor(bx) - r - 1); tx <= Math.min(s.w - 3, Math.floor(bx) + r); tx++) {
+      const d = distToRect(bx, by, { tx, ty, size: 2 });
+      if (d > r - 1 || d >= bestD || !fits(tx, ty)) continue;
+      bestD = d;
+      best = { tx, ty };
+    }
+  return best;
+}
+
+/**
+ * A land unit standing still to wait for the tide (#779): on the shore for a crossing (#755, `Unit.tideWait`), or ashore off its work
+ * (#767, `Unit.ashore`). The crowd round it may jostle it (`separate`), but never off dry ground onto tidal ground, where the flood would
+ * sweep it: called after `collide`, it slides it back along the edge of the flats, or, pushed right over, back onto the dry tile it stood
+ * on. So does one on the last stretch (`1.5` tiles) of its walk to the spot it waits on, crowded by those already there. Ground it chose
+ * to stand on stays its own: one already standing on the flats as the tick began is left to the tide's other rules.
+ */
+export function holdShore(s: GameState, u: Unit): void {
+  if (!s.tidal || u.inside || domainOf(u.type) !== 'land') return;
+  const waits = u.tideWait !== undefined && u.tideWait > s.tick && u.wantPath;
+  if (!waits && !(u.ashore !== undefined && u.ashore > s.tick)) return;
+  // Walking: only on the last stretch to the spot it waits on, so the safe flats it crosses on the way stay its to walk.
+  if (u.path) {
+    const n = u.path.length;
+    const dx = u.path[n - 2] - u.x;
+    const dy = u.path[n - 1] - u.y;
+    if (!waits || dx * dx + dy * dy > 1.5 * 1.5) return;
+  }
+  const wet = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < s.w && y < s.h && isTidal(s, y * s.w + x) && s.bldAt[y * s.w + x] === 0;
+  const fx = Math.floor(u.px);
+  const fy = Math.floor(u.py);
+  if (wet(fx, fy)) return;
+  const r = statsOf(s, u).radius;
+  const team = passOf(s, u);
+  const cx = Math.floor(u.x);
+  const cy = Math.floor(u.y);
+  if (wet(cx, cy)) {
+    // Pushed right over: back to the nearest point of the tile it stood on.
+    u.x = Math.max(fx + r, Math.min(fx + 1 - r, u.x));
+    u.y = Math.max(fy + r, Math.min(fy + 1 - r, u.y));
+    return;
+  }
+  for (let dy = -1; dy <= 1; dy++)
+    for (let dx = -1; dx <= 1; dx++) {
+      if ((!dx && !dy) || !wet(cx + dx, cy + dy)) continue;
+      const qx = Math.max(cx + dx, Math.min(cx + dx + 1, u.x));
+      const qy = Math.max(cy + dy, Math.min(cy + dy + 1, u.y));
+      const ox = u.x - qx;
+      const oy = u.y - qy;
+      const d2 = ox * ox + oy * oy;
+      if (d2 >= r * r || d2 < 1e-10) continue;
+      const d = Math.sqrt(d2);
+      const nx = qx + (ox / d) * r;
+      const ny = qy + (oy / d) * r;
+      if (!walkable(s, Math.floor(nx), Math.floor(ny), team)) continue;
+      u.x = nx;
+      u.y = ny;
+    }
 }

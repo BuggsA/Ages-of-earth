@@ -37,7 +37,7 @@ import { cacheStep, dropOre, spillStore } from './caches';
 import { kegStep, millStep } from './powder';
 import { fireStep } from './fire';
 import { burst, ditchStep, floodStep, pumpStep, sluiceStep } from './water';
-import { aground, tideStep } from './tides';
+import { aground, holdShore, tideStep } from './tides';
 import { linkProblem, sink } from './floating';
 import { siloStep } from './silo';
 import { stockPosts } from './oretrade';
@@ -657,6 +657,8 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   for (const e of s.ents) {
     if (e.kind !== 'unit' || e.hp <= 0 || e.inside) continue;
     collide(s, e);
+    // A unit waiting for the tide is never jostled off dry ground onto the flats (#779).
+    holdShore(s, e);
     checkStuck(s, e);
   }
   carryCargo(s);

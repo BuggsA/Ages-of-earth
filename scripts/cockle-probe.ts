@@ -46,5 +46,6 @@ for (let seed = 1; seed <= seeds; seed++) {
   let left = 0;
   for (let t = 0; t < s.w * s.h; t++) if (s.res[t] === R_COCKLE) left += s.amount[t];
   const pickers = s.ents.filter((e) => e.kind === 'unit' && e.order.k === 'gather' && e.order.cockle).length;
-  console.log(`seed ${seed}: tidal ${tidal} beds ${beds} picked ${beds * COCKLE.amount + regrown - left} (regrown ${regrown}) pickers now ${pickers} | swept ${swept} by ${JSON.stringify(by)} ashore ${ashore}`);
+  const huts = s.ents.filter((e) => e.kind === 'building' && e.type === 'cockler').length;
+  console.log(`seed ${seed}: tidal ${tidal} beds ${beds} picked ${beds * COCKLE.amount + regrown - left} (regrown ${regrown}) pickers now ${pickers} huts ${huts} | swept ${swept} by ${JSON.stringify(by)} ashore ${ashore}`);
 }
