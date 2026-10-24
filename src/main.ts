@@ -23,6 +23,7 @@ import { channelPlan, dig, dykePlan, heldBack, waterLine } from './sim/water';
 import { bared, tideMillSpot, wakeTide } from './sim/tides';
 import { barragePlan, isCauseway, kegTileProblem } from './sim/tides';
 import { isTidal, tidalLevel, tideClock, tideLevel } from './sim/tides';
+import { R_COCKLE } from './sim/types';
 import { AI_BARRAGE, BLOOM, SALVO, secs } from './sim/data';
 import { rooted, slingProblem } from './sim/bloom';
 import { maxHp, placeBuilding, restat, spawnUnit } from './sim/world';
@@ -145,6 +146,7 @@ let floodToldAt = -99999;
 let tideTold = false;
 let sweptToldAt = -99999;
 let tideHoldToldAt = -99999;
+let tideAshoreToldAt = -99999;
 /** When a breached causeway (#748) was last told: one toast a blast. */
 let breachToldAt = -1;
 /** When the flock last told of a lamb born, or of bare ground (#308), so the toasts don't pile up. */
@@ -2614,6 +2616,13 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           hud.toast(ev.drowned ? '🌊 The tide took some of your people, caught far out on the flats. (Space to look)' : '🌊 The tide swept some of your people off the flats, hurt. (Space to look)', 'bad');
         }
         break;
+      case 'tideAshore':
+        // Work on the flats that reads the tide (#767): your workers leave the flats before the flood, said once in a while.
+        if (ev.owner === viewer && s.tick - tideAshoreToldAt > TICK_HZ * 60) {
+          tideAshoreToldAt = s.tick;
+          hud.toast('🌊 Your workers on the flats come ashore before the flood. They go back to their work when the ground bares.', 'info');
+        }
+        break;
       case 'tideHold':
         // Routes that read the tide (#755): your people stop on the shore rather than walk into the flood, said once in a while.
         if (ev.owner === viewer && s.tick - tideHoldToldAt > TICK_HZ * 30) {
@@ -3693,6 +3702,34 @@ function frame(now: number): void {
         return plan.pond;
       }
     return 0;
+  },
+  /**
+   * Cockle beds (testing, #767): with the tide awake, run the rules on to low water, put two citizens on dry ground by the first bared bed
+   * with land near it, and send them to pick it. Selects them and looks at the bed; returns its tile (-1: no bed by the shore).
+   */
+  cockles(owner: number) {
+    if (!game || !game.tidal) return -1;
+    const s = game;
+    for (let i = 0; i < 400 * TICK_HZ && tideLevel(s) !== 0; i++) {
+      step(s, pending);
+      pending = [];
+    }
+    const team = s.players[owner].team;
+    for (let bed = 0; bed < s.w * s.h; bed++) {
+      if (!s.cockles?.[bed] || s.res[bed] !== R_COCKLE || !bared(s, bed)) continue;
+      const x = bed % s.w;
+      const y = (bed - x) / s.w;
+      for (let r = 2; r <= 5; r++)
+        for (const [dx, dy] of [[r, 0], [-r, 0], [0, r], [0, -r]]) {
+          if (!walkable(s, x + dx, y + dy, team) || isTidal(s, (y + dy) * s.w + x + dx)) continue;
+          const ids = [0, 1].map((k) => spawnUnit(s, owner, 'citizen', x + dx + 0.5, y + dy + 0.3 + k * 0.4).id);
+          issue({ t: 'gather', p: owner, ids, tile: bed });
+          setSelection(ids);
+          view.rig.focus(x + 0.5, y + 0.5);
+          return bed;
+        }
+    }
+    return -1;
   },
   /**
    * The Age of Locks (testing, #701 s5): turn a player to the age, dig the channel the computer would plan by its start deep into a

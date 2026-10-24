@@ -22,6 +22,9 @@ import { basinOf, damIdle, drowned, heldBack, isInund, lets, millIdle, sluiceFed
 import { aground, millShares, tidalNear, tideClock, tideMillIdle } from '../sim/tides';
 import { isPond } from '../sim/tides';
 import { tideWaitLeft } from '../sim/tides';
+import { ashoreLeft, bedClock } from '../sim/tides';
+import { COCKLE } from '../sim/data';
+import { R_COCKLE } from '../sim/types';
 import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
 import { LANDMARK_KINDS, claimWork, claimants, favours, landmarkAt } from '../sim/landmarks';
 import { workProblem } from '../sim/works';
@@ -134,6 +137,9 @@ function orderWords(s: GameState, u: Unit): string {
   switch (o.k) {
     case 'gather': {
       const kind = s.res[o.tile];
+      // Cockle beds (#767): the picker reads the tide.
+      if (ashoreLeft(s, u) > 0) return o.phase === 'drop' ? 'Off the flats with the cockles, before the flood' : 'Waiting ashore for the cockle beds to bare';
+      if (kind === R_COCKLE || o.cockle) return o.phase === 'drop' ? 'Carrying cockles home' : o.phase === 'work' ? 'Picking cockles' : 'Going out to the cockle beds';
       if (kind === R_FISH || u.type === 'fisher') return o.phase === 'drop' ? 'Bringing the catch to the dock' : o.phase === 'work' ? 'Fishing' : 'Sailing to the fishing grounds';
       const what = o.res === 'food' ? (kind === R_MEAT ? 'meat' : 'berries') : o.res === 'wood' ? 'wood' : kind === R_BOG || o.bog ? 'bog iron' : o.res;
       if (o.phase === 'drop') return `Carrying ${what} home`;
@@ -149,6 +155,7 @@ function orderWords(s: GameState, u: Unit): string {
       if ((s.byId.get(o.target) as Building | undefined)?.type === 'garden') return o.phase === 'drop' ? 'Carrying the harvest home' : o.phase === 'work' ? 'Tending a Kitchen Garden' : 'Going to the garden';
       return o.phase === 'drop' ? 'Carrying grain home' : o.phase === 'work' ? 'Farming' : 'Going to the fields';
     case 'build': {
+      if (ashoreLeft(s, u) > 0) return 'Waiting ashore for the tide to go out again';
       const target = s.byId.get(o.target);
       if (target?.kind === 'building' && target.built) return u.act === 'build' ? 'Repairing' : 'Going to repair';
       return u.act === 'build' ? 'Building' : 'Going to build';
@@ -941,12 +948,15 @@ export class Hud {
     else if (post) [html, sig] = this.postPanel(s, viewer, post);
     else if (!ents.length && tile !== null && s.res[tile]) {
       const kind = s.res[tile];
-      const name = kind === R_TREE ? 'Tree' : kind === R_BERRY ? 'Berry bush' : kind === R_MEAT ? (s.amount[tile] > BOAR.meat ? 'Mammoth carcass' : s.amount[tile] > AMOUNT.meat ? 'Boar carcass' : 'Carcass') + (s.carcasses?.some((c) => c.tile === tile && s.tick - c.born >= secs(ROT.grace)) ? ' (spoiling)' : '') : kind === R_FISH ? 'Fish shoal' : kind === R_GOLD ? 'Gold mine' : kind === R_BOG ? 'Bog iron' : kind === R_SALT || kind === R_SALTPETRE || kind === R_BLOODIRON ? (s.caves?.some((c) => c.tile === tile) ? `${RARE[RARE_OF_TILE[kind]].name} cave` : `${RARE[RARE_OF_TILE[kind]].name} vein`) : 'Stone quarry';
-      const res = RARE_OF_TILE[kind] ? 'stone' : kind === R_TREE ? 'wood' : kind === R_BERRY || kind === R_MEAT || kind === R_FISH ? 'food' : kind === R_GOLD || kind === R_BOG ? 'gold' : 'stone';
-      sig = `res:${tile}:${s.amount[tile]}`;
-      html = `<div class="sel-portrait"><span style="font-size:54px">${kind === R_TREE ? '🌳' : kind === R_BERRY ? '🫐' : kind === R_MEAT ? '🍖' : kind === R_FISH ? '🐟' : kind === R_GOLD ? icon('gold', 64) : kind === R_BOG ? '🟤' : RARE_OF_TILE[kind] ? RARE_ICON[RARE_OF_TILE[kind]] : icon('stone', 64)}</span></div>
+      const name = kind === R_COCKLE ? 'Cockle bed' : kind === R_TREE ? 'Tree' : kind === R_BERRY ? 'Berry bush' : kind === R_MEAT ? (s.amount[tile] > BOAR.meat ? 'Mammoth carcass' : s.amount[tile] > AMOUNT.meat ? 'Boar carcass' : 'Carcass') + (s.carcasses?.some((c) => c.tile === tile && s.tick - c.born >= secs(ROT.grace)) ? ' (spoiling)' : '') : kind === R_FISH ? 'Fish shoal' : kind === R_GOLD ? 'Gold mine' : kind === R_BOG ? 'Bog iron' : kind === R_SALT || kind === R_SALTPETRE || kind === R_BLOODIRON ? (s.caves?.some((c) => c.tile === tile) ? `${RARE[RARE_OF_TILE[kind]].name} cave` : `${RARE[RARE_OF_TILE[kind]].name} vein`) : 'Stone quarry';
+      const res = RARE_OF_TILE[kind] ? 'stone' : kind === R_TREE ? 'wood' : kind === R_BERRY || kind === R_MEAT || kind === R_FISH || kind === R_COCKLE ? 'food' : kind === R_GOLD || kind === R_BOG ? 'gold' : 'stone';
+      // A cockle bed (#767) tells its tide: bared for so long, or under water until so long.
+      const bed = kind === R_COCKLE ? bedClock(s, tile) : null;
+      const bedLine = !bed ? '' : bed.pond ? 'Shut in a barrage\'s pond, it stays under water: no one picks it until the barrage is breached.' : bed.bare ? `Bared by the tide for ${Math.ceil(bed.secs)}s more. Select citizens and right-click it to pick; they come ashore before the flood, and go back at the next low water.` : `Under water: the tide bares it in ${Math.ceil(bed.secs)}s. Citizens sent to it wait ashore until then.`;
+      sig = `res:${tile}:${s.amount[tile]}:${bed ? Math.ceil(bed.secs) : ''}`;
+      html = `<div class="sel-portrait"><span style="font-size:54px">${kind === R_COCKLE ? '🐚' : kind === R_TREE ? '🌳' : kind === R_BERRY ? '🫐' : kind === R_MEAT ? '🍖' : kind === R_FISH ? '🐟' : kind === R_GOLD ? icon('gold', 64) : kind === R_BOG ? '🟤' : RARE_OF_TILE[kind] ? RARE_ICON[RARE_OF_TILE[kind]] : icon('stone', 64)}</span></div>
         <div class="sel-info"><div class="sel-name">${name}</div><div class="stats"><span>${icon(res as 'wood')}${s.amount[tile]} left</span></div>
-        <div class="blurb">${kind === R_FISH ? 'Select fishing boats (from a Dock) and right-click it to fish.' : RARE_OF_TILE[kind] ? `${RARE[RARE_OF_TILE[kind]].blurb} Only some worlds hold it.${s.caves?.some((c) => c.tile === tile && c.den) ? ' Wolves lair here.' : ''} Select citizens and right-click it to mine; it is kept apart from your other stores.` : kind === R_BOG ? 'Rust-red ore in the wetland mud, smelted into iron bars and paid in as gold. Digging it opens the Iron Age, in the Stone Age, to a people whose Prospector\'s Lodge has found it.' : 'Select citizens and right-click it to gather.'}</div></div>`;
+        <div class="blurb">${bed ? `Cockles in the wet sand of the deeper flats, picked by hand as the tide runs low. Each high water brings ${COCKLE.regrow} back, up to ${COCKLE.amount}, to a bed open to the sea. ${bedLine}` : kind === R_FISH ? 'Select fishing boats (from a Dock) and right-click it to fish.' : RARE_OF_TILE[kind] ? `${RARE[RARE_OF_TILE[kind]].blurb} Only some worlds hold it.${s.caves?.some((c) => c.tile === tile && c.den) ? ' Wolves lair here.' : ''} Select citizens and right-click it to mine; it is kept apart from your other stores.` : kind === R_BOG ? 'Rust-red ore in the wetland mud, smelted into iron bars and paid in as gold. Digging it opens the Iron Age, in the Stone Age, to a people whose Prospector\'s Lodge has found it.' : 'Select citizens and right-click it to gather.'}</div></div>`;
     } else if (!ents.length) {
       const p = s.players[viewer];
       // A Golden Age (#703) counts down here, with what it weaves.
@@ -1103,6 +1113,9 @@ export class Hud {
         : '';
     // Routes that read the tide (#755): waiting on the shore for the flats to bare.
     const ebbLeft = Math.ceil(tideWaitLeft(s, u));
+    // Work on the flats that reads the tide (#767): stepped ashore before the flood, back when its ground bares.
+    const ashoreSecs = Math.ceil(ashoreLeft(s, u));
+    const ashore = ashoreSecs && !ebbLeft ? `<span data-tip="<b>Ashore for the tide</b>${mine ? 'It' : 'This one'} was working out on the flats and came ashore before the water could cover them. It goes back to its work in ${ashoreSecs}s, when the ground bares again. A new order ends the wait.">🌊<em>Ashore</em> ${ashoreSecs}s</span>` : '';
     const ebb = ebbLeft ? `<span data-tip="<b>Waiting for the tide</b>The way ${mine ? 'you sent it' : 'it was sent'} runs over tidal flats the sea would cover before it was across, and there is no quicker way round. It waits on the shore and sets out in ${ebbLeft}s, when the flats it needs stand bare until it is over.">🌊<em>Tide</em> ${ebbLeft}s</span>` : '';
     // Military Orders (#355 s6): a soldier with one of its priests at hand is sworn.
     const isSworn = sworn(s, u);
@@ -1134,7 +1147,7 @@ export class Hud {
           <span data-tip="<b>Armor</b>Melee / missile armor: taken off every blow or shot.">🛡<em>Armor</em> ${st.armor}/${st.parmor}</span>
           ${st.range ? `<span data-tip="<b>Range</b>How far it shoots, in tiles.">🏹<em>Range</em> ${st.range}</span>` : ''}
           <span data-tip="<b>Speed</b>Tiles per second.">👣<em>Speed</em> ${Math.round(st.speed * 100) / 100}</span>
-          ${carry}${cargo}${load}${stance}${vet}${line}${aura}${graft}${oath}${sword}${pack}${curse}${sting}${bond}${held}${trip}${caravan}${tribute}${toll}${ebb}
+          ${carry}${cargo}${load}${stance}${vet}${line}${aura}${graft}${oath}${sword}${pack}${curse}${sting}${bond}${held}${trip}${caravan}${tribute}${toll}${ebb}${ashore}
         </div>
         <div class="blurb">${st.blurb}</div>
       </div>`;
