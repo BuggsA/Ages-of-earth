@@ -101,6 +101,11 @@ export class CameraRig {
     if (this.cinematic === null) this.camera.lookAt(this.target);
     else {
       // Low over the land: keep clear of the hill under the lens, and lift the gaze a little so the sky shows.
+      // A town by the map's edge would put the lens out over it, showing the bare underside of the world:
+      // hold the lens a little inside the edge instead.
+      const b = this.bounds;
+      this.camera.position.x = Math.max(b.minX + 2, Math.min(b.maxX - 2, this.camera.position.x));
+      this.camera.position.z = Math.max(b.minZ + 2, Math.min(b.maxZ - 2, this.camera.position.z));
       this.camera.position.y = Math.max(this.camera.position.y, this.groundAt(this.camera.position.x, this.camera.position.z) + 3);
       this.camera.lookAt(this.target.x, this.target.y + d * 0.1, this.target.z);
     }
