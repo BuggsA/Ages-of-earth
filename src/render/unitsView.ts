@@ -117,6 +117,14 @@ function chevronGeometry(rank: number): THREE.BufferGeometry {
   return g;
 }
 
+/** The team ring under every unit on land: the owner's colour at a glance, whatever the model wears. */
+const padMaterial = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.9, depthWrite: false, fog: false, toneMapped: false });
+const padGeometry = (() => {
+  const g = new THREE.RingGeometry(0.62, 1, 18);
+  g.rotateX(-Math.PI / 2);
+  return g;
+})();
+
 const chevronMaterial = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
 
 export interface ScreenUnit {
@@ -138,10 +146,21 @@ export class UnitsView {
     return m;
   });
   private chevronCount = [0, 0, 0];
+  private pads = (() => {
+    const m = new THREE.InstancedMesh(padGeometry, padMaterial, 256);
+    m.frustumCulled = false;
+    m.renderOrder = 2;
+    m.count = 0;
+    m.setColorAt(0, new THREE.Color());
+    this.group.add(m);
+    return m;
+  })();
+  private padCount = 0;
   private anims = new Map<number, Anim>();
   /** Where hooves and wheels kicked up dust this frame, as x, y, ground height, strength: the view turns them into puffs. */
   readonly kicks: number[] = [];
   private corpses: Corpse[] = [];
+  private noRot = new THREE.Quaternion();
   private m = new THREE.Matrix4();
   private q = new THREE.Quaternion();
   private e = new THREE.Euler(0, 0, 0, 'YXZ');
@@ -254,6 +273,25 @@ export class UnitsView {
     }
   }
 
+  /** One team ring on the ground, growing the instance buffer when the army outgrows it. */
+  private pad(x: number, y: number, z: number, r: number, color: THREE.Color): void {
+    if (this.padCount >= this.pads.instanceMatrix.count) {
+      const bigger = new THREE.InstancedMesh(padGeometry, padMaterial, this.pads.instanceMatrix.count * 2);
+      bigger.frustumCulled = false;
+      bigger.renderOrder = 2;
+      bigger.setColorAt(0, new THREE.Color());
+      this.group.remove(this.pads);
+      this.pads.dispose();
+      this.pads = bigger;
+      this.group.add(bigger);
+    }
+    this.p.set(x, y + 0.04, z);
+    this.m.compose(this.p, this.noRot, this.sc.set(r, 1, r));
+    this.pads.setMatrixAt(this.padCount, this.m);
+    this.pads.setColorAt(this.padCount, color);
+    this.padCount++;
+  }
+
   update(
     s: GameState,
     alpha: number,
@@ -268,6 +306,7 @@ export class UnitsView {
     this.animals(s, alpha, dt, time, sees, camera, width, height);
     for (const b of this.batches.values()) b.count = 0;
     this.chevronCount = [0, 0, 0];
+    this.padCount = 0;
     this.screen.length = 0;
     this.kicks.length = 0;
     this.drawn.clear();
@@ -432,6 +471,7 @@ export class UnitsView {
       b.mesh.setColorAt(i, this.colors[u.owner]);
       b.anim.setXYZ(i, leg, arm, bob);
       this.drawn.set(u.id, new THREE.Vector3(dx, gy, dz));
+      if (dom === 'land') this.pad(dx, gy, dz, (mounted || engine ? 0.75 : 0.5) * k, this.colors[u.owner]);
 
       // Veterans wear their rank above the head.
       const rank = u.type === 'citizen' ? 0 : rankOf(u);
@@ -500,6 +540,9 @@ export class UnitsView {
     }
     this.corpses = keep;
 
+    this.pads.count = this.padCount;
+    this.pads.instanceMatrix.needsUpdate = true;
+    if (this.pads.instanceColor) this.pads.instanceColor.needsUpdate = true;
     this.chevrons.forEach((cm, i) => {
       cm.count = this.chevronCount[i];
       cm.instanceMatrix.needsUpdate = true;
