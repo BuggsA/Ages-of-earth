@@ -1516,3 +1516,17 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 **Not done, or not seen:** the boarding sound is unheard (software-rendered browser); a full match where a Beggars computer meets a Water Road polder town was not watched; `waterline → locks` still waits on the owner (#701); the Britons and a Hunters' Way people never see Rivers (no Farm, its clue, stands when they climb), so on their seeds the bound computer reaches Dykes by the Middle Ages.
 
 **Next:** a prize court (a taken ship sold at a Dock for gold, or kept: a choice per ship); flat-bottomed boats that sail a breach's flood, as at Leiden; the computer reading a rival's polder from its Prospector's Lodge before it chooses the crossing.
+
+## Designers' notes: the computer answers your Tide Gate (#792, s6g of #701, 2026-10-24, chain 1024-1330 s7, lane rules)
+
+**Built:** the computer reads a rival's loaded gate before it marches. `gateOnWay` (`tides.ts`) asks whether the plain way from its muster to its target steps onto the flats a rival gate would scour (`gateAhead`), with no way round within 1.6 times the length (a fair way round each soldier's route takes by itself). If so, `gateAnswer` (`ai.ts`) holds the wave and answers, in turn: a **keg** (a Sapper people with kegs, the gate unguarded: its nearest foot soldier carries one to the gate, up to 45 s); **bait** (a wave of 7 or more: its 3 weakest walk onto the flats, one tile each, and the wave waits 20 s for the gate to fire); **wait** (90 s at the muster while it stays loaded, then it goes anyway). Fired, wrecked or let down, the wave goes at once, even short its bait (`gateSprung`). A wave on the march whose way ahead runs under a gate that has loaded since turns back to the muster, once a gate (`gateBack`). Numbers: `AI_GATE_ANSWER`.
+
+**Fixed on the way:** a keg laid by a gate never breached the road under it: a carrier lays it 1.2 tiles from the gate's edge, and the blast (2 tiles) was measured to the tile's middle. Now a blast that reaches any part of a gate's tile breaches it (`breachAt`). This helps a human Sapper too.
+
+**Why I love it:** a loaded gate now does its job without firing. It moves the enemy's hour, costs them three soldiers, or draws a keg-carrier you can stamp out. The defender's choice gets sharp: fire on the bait and the gate is spent until the next flood, or hold and face the wave.
+
+**Probe** (`npx tsx scripts/gate-probe.ts 16 1.5`: a computer owns the gate and fires on 3; a wave of 10 marches under it): 8 of 16 seeds have such a march. Losses over 90 s: straight in, 18 dead; answering (bait), 10 dead, bait included; a Sapper people (keg), 4 dead.
+
+**Seen and not:** headless only (tests and the probe). Not watched in a browser: the bait walking out, or a whole match where a computer meets a human's gate.
+
+**Next:** the defender's side of the duel (the computer holding its fire when the "army" on its flats is only bait, and a bigger wave stands at the muster); boats in the scour; a wave that times its march for the hour just after a rival's gate has fired.
