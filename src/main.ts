@@ -50,6 +50,7 @@ import { ScoutFlags } from './ui/scoutFlags';
 import { briefingHtml, chapterListHtml, recordStars, starRow, syncProgress } from './ui/campaignUi';
 import { Lobby } from './ui/lobby';
 import { Hud, nameOf, planLines } from './ui/hud';
+import { RivalLedger, RivalPanel } from './ui/rivalRoad';
 import { RoadPlanner, loadPlannerPrefs, savePlannerPrefs } from './ui/roadPlanner';
 import { Minimap } from './ui/minimap';
 import { BattleTide } from './ui/battleTide';
@@ -140,6 +141,8 @@ let titleClock = 16;
 let lastSetup: GameSetup | null = null;
 
 let planner: RoadPlanner | null = null;
+const rivalLedger = new RivalLedger();
+let rivalPanel: RivalPanel | null = null;
 const hud = new Hud({
   issue: (c) => issue(c),
   place: (type) => {
@@ -2441,7 +2444,11 @@ function onEvents(s: GameState, list: GameEvent[]): void {
             if (opened.length) setTimeout(() => play('heirloom'), 900);
             for (const t of opened) hud.toast(`${TECHS[t].icon} An heirloom opens: ${TECHS[t].name}, at the ${BUILDINGS[TECHS[t].at].name}`, 'good');
           }
-        } else hud.toast(`${s.players[ev.owner].name} has ${ev.back ? 'stepped back to' : 'reached'} the ${ageName(ev)}`, 'info');
+        } else {
+          // A rival's road (#726): remembered, and a click on the notice opens its card.
+          if (ev.age) rivalLedger.note(ev.owner, ev.age, !!ev.back, s.tick);
+          hud.toast(`${s.players[ev.owner].name} has ${ev.back ? 'stepped back to' : 'reached'} the ${ageName(ev)}${ev.back ? ': a chance to strike' : ''} (click to read)`, 'info', () => rivalPanel?.show(true));
+        }
         break;
       case 'wages':
         if (ev.owner === viewer) {
@@ -3018,6 +3025,11 @@ function refreshHud(): void {
   recordDiscovery(game);
   planner ??= new RoadPlanner($('roads-btn'), $('roads-panel'), (st, v, to, back) => planLines(st, st.players[v], to, back));
   planner.update(game, viewer, discovery ?? loadDiscovery());
+  rivalPanel ??= new RivalPanel($('rivals-btn'), $('rivals-panel'), rivalLedger);
+  for (const k of rivalLedger.scan(game, viewer, (x, y) => view.sees(x, y))) {
+    hud.toast(`🏺 You see ${game.players[k.owner].name}'s ${BUILDINGS[(game.ents.find((e) => e.id === k.id) as { type: keyof typeof BUILDINGS }).type].name}: they have walked the ${AGES[k.age].name}`, 'info', () => rivalPanel?.show(true));
+  }
+  rivalPanel.update(game, viewer);
   hud.update(game, viewer, [...selection], SPEEDS[speedIdx], selectedTile, selectedRelic, selectedPost, selectedRuin !== null ? { id: selectedRuin, dug: view.ruins.dugAsSeen(selectedRuin) } : null, selectedLandmark !== null ? { id: selectedLandmark, keeper: view.landmarks.keeperAsSeen(selectedLandmark) } : null);
 }
 
@@ -3244,7 +3256,7 @@ function frame(now: number): void {
       mapTimer -= dt;
       if (mapTimer <= 0) {
         mapTimer = 0.2;
-        minimap.draw(s, viewer, mode === 'over' || !!watching?.all || (spectating && spectateAll), [...view.knownBuildings()], view.rig.footprint(), selection, scoutFlags.all);
+        minimap.draw(s, viewer, mode === 'over' || !!watching?.all || (spectating && spectateAll), [...view.knownBuildings()], view.rig.footprint(), selection, scoutFlags.all, rivalLedger.keepsakes());
       }
       cursorTimer -= dt;
       if (cursorTimer <= 0) {
