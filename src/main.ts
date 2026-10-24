@@ -17,13 +17,13 @@ import { carriesTorch, torchProblem } from './sim/fire';
 import { launchProblem } from './sim/silo';
 import { jumpAge, rush, topUp } from './sim/god';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
-import { placeProblem, walkable } from './sim/grid';
+import { placeProblem, stampBuilding, walkable } from './sim/grid';
 import { findDockSpot, findSpot, millSpotFor } from './sim/ai';
-import { channelPlan, dykePlan, heldBack } from './sim/water';
+import { channelPlan, dig, dykePlan, heldBack, waterLine } from './sim/water';
 import { maxHp, placeBuilding, restat, spawnUnit } from './sim/world';
 import { arrivalText, epochArrivals } from './ui/endReport';
 import type { AgeId, Building, BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, HomelandId, MapSize, MapType, Unit, UnitType } from './sim/types';
-import { KEYS, R_FISH, R_NONE, RES } from './sim/types';
+import { KEYS, R_FISH, R_NONE, RES, T_WATER } from './sim/types';
 import { carriedBy, relicAt } from './sim/relics';
 import { RUIN_FINDS, ruinAt } from './sim/ruins';
 import { salvages } from './sim/salvage';
@@ -123,6 +123,8 @@ const cameraBookmarks = new CameraBookmarks();
 const scoutFlags = new ScoutFlags();
 let lastGroupKey = { key: -1, at: 0 };
 let lastAlert: { x: number; y: number } | null = null;
+/** When a rival's sluice was last told (#701 s4), so a Water Line is told once in a while, not every time it opens. */
+let sluiceToldAt = -Infinity;
 /** When the sea last broke into the viewer's polder (#701 s3), so a flood is told once, not for every tile. */
 let floodToldAt = -99999;
 /** When the flock last told of a lamb born, or of bare ground (#308), so the toasts don't pile up. */
@@ -2476,6 +2478,14 @@ function onEvents(s: GameState, list: GameEvent[]): void {
       case 'hit':
         if (view.sees(ev.x, ev.y)) music.stir(0.012);
         break;
+      case 'sluice':
+        // The Water Line (#701 s4): a rival's sluice opened where the viewer can see it, said once in a while.
+        if (ev.open && ev.owner !== viewer && view.sees(ev.x, ev.y) && s.tick - sluiceToldAt > TICK_HZ * 30) {
+          sluiceToldAt = s.tick;
+          lastAlert = { x: ev.x, y: ev.y };
+          hud.toast(`${s.players[ev.owner].name} has opened a sluice: the low ground round it is going under water. Soldiers wade it at a crawl and siege bogs down; go round, or wait for it to drain. (Space to look)`, 'alert');
+        }
+        break;
       case 'flooded':
         // The breach (#701 s3): the sea in your polder, said once a flood, not for every tile.
         if (ev.owner === viewer && s.tick - floodToldAt > TICK_HZ * 15) {
@@ -3388,6 +3398,47 @@ function frame(now: number): void {
     for (const t of plan.tiles) placeBuilding(s, owner, 'channel', t % s.w, Math.floor(t / s.w), true);
     view.rig.focus(plan.from.x, plan.from.y);
     return plan.tiles.length;
+  },
+  /**
+   * The Water Line (testing, #701 s4): turn a player to the age and open, finished, a sluice: in the middle of its dyke line if it has
+   * one (`ages.dykes` first), else on the channel the computer would dig by its start (dug at once). Returns how many tiles its water
+   * reaches, or 0 where there is nowhere to set one.
+   */
+  waterline(owner: number) {
+    if (!game) return 0;
+    const s = game;
+    const p = s.players[owner];
+    restat(s, p, () => {
+      p.epoch = AGES.waterline.tier;
+      p.age = 'waterline';
+      p.walked = [...new Set([...(p.walked ?? []), 'dykes' as const, 'waterline' as const])];
+    });
+    const line = s.ents.filter((e): e is Building => e.kind === 'building' && e.type === 'dyke' && e.owner === owner && e.built && e.hp > 0 && s.terrain[e.ty * s.w + e.tx] === T_WATER);
+    let at = -1;
+    if (line.length) {
+      // The dyke whose sluice would flood the most.
+      let most = -1;
+      for (const d of line) {
+        const n = waterLine(s, d).length;
+        if (n > most) {
+          most = n;
+          at = d.ty * s.w + d.tx;
+        }
+      }
+      const d = s.byId.get(s.bldAt[at]) as Building;
+      stampBuilding(s, d, false);
+      s.byId.delete(d.id);
+      s.ents = s.ents.filter((e) => e !== d);
+    } else {
+      const plan = channelPlan(s, p.startX, p.startY, AI_RIVERS, wallLine, (x, y) => !placeProblem(s, 'channel', x, y));
+      if (!plan) return 0;
+      for (const t of plan.tiles) dig(s, t, owner);
+      at = plan.tiles.reduce((a, t) => (waterLine(s, { tx: t % s.w, ty: Math.floor(t / s.w) }).length > waterLine(s, { tx: a % s.w, ty: Math.floor(a / s.w) }).length ? t : a));
+    }
+    const b = placeBuilding(s, owner, 'sluice', at % s.w, Math.floor(at / s.w), true);
+    b.open = true;
+    view.rig.focus(b.x, b.y);
+    return waterLine(s, b).length;
   },
   /** A finished line of wall, or of Thornwall (testing). */
   wall(owner: number, x0: number, y0: number, x1: number, y1: number, type: 'wall' | 'thornwall' = 'wall') {

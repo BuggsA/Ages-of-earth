@@ -3,7 +3,7 @@ import { landOwnerAt } from './borders';
 import { isEnemy } from './world';
 import { snareSpot } from './snares';
 import { hiveSpot } from './hive';
-import { dykeSpot, isChannel, parched } from './water';
+import { dykeSpot, isChannel, isInund, parched } from './water';
 import type { Building, BuildingType, GameState } from './types';
 import { B_BUILDING, B_GATE, B_RES, B_TERRAIN, R_BLOODIRON, R_GOLD, R_NONE, R_SALT, R_SALTPETRE, R_STONE, T_ROCK, T_WATER } from './types';
 
@@ -18,6 +18,8 @@ export const inBounds = (s: GameState, x: number, y: number) => x >= 0 && y >= 0
  */
 export const NAVAL = -2;
 export const AIR = -3;
+/** A shallow boat (the gun-barge, #701 s4): open water as a ship sails it, and the wadeable water too (channels, a sluice's flood). */
+export const BARGE = -4;
 
 /**
  * Whether a tile can be crossed: on foot, nothing on it (or a gate of the walker's team); by ship, open
@@ -28,8 +30,15 @@ export function walkable(s: GameState, x: number, y: number, team = -1): boolean
   const i = y * s.w + x;
   const b = s.block[i];
   if (team === NAVAL) return b === B_TERRAIN && s.terrain[i] === T_WATER;
+  if (team === BARGE) return s.terrain[i] === T_WATER && (b === B_TERRAIN || b === 0 || (b === B_GATE && lock(s, i)));
   if (team === AIR) return true;
   return b === 0 || (b === B_GATE && team >= 0 && s.gateTeam[i] === team);
+}
+
+/** Whether a finished sluice stands on this tile (#701 s4): a gun-barge passes through it, as through a lock. */
+export function lock(s: GameState, i: number): boolean {
+  const b = s.byId.get(s.bldAt[i]);
+  return !!b && b.kind === 'building' && b.type === 'sluice' && b.built && b.hp > 0;
 }
 
 /** Open water tiles beside a footprint (a dock needs some). */
@@ -74,8 +83,8 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
   let hi = -Infinity;
   // The computer asks this of hundreds of tiles a search; most are nowhere near a relic, post, ruin or landmark.
   const near = keepClearNear(s, tx, ty, n);
-  // A dyke (#701) goes on shallow water, or on the shore beside it.
-  const dyke = type === 'dyke';
+  // A dyke (#701) goes on shallow water, or on the shore beside it; so does a sluice (#701 s4), on a channel too, or into its own dyke line.
+  const dyke = type === 'dyke' || type === 'sluice';
   if (dyke) {
     const why = dykeSpot(s, tx, ty);
     if (why) return why;
@@ -83,11 +92,11 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
   for (let y = ty; y < ty + n; y++) {
     for (let x = tx; x < tx + n; x++) {
       const i = y * s.w + x;
-      if (s.terrain[i] === T_WATER && !dyke) return 'water';
+      if (s.terrain[i] === T_WATER && (!dyke || isInund(s, i))) return 'water';
       if (s.terrain[i] === T_ROCK) return 'rock';
       if (s.res[i] !== R_NONE || (near && (relicOnTile(s, x, y) || postOnTile(s, x, y) || ruinOnTile(s, x, y) || landmarkOnTile(s, x, y)))) return 'blocked';
       // A gate may go into its owner's own wall, replacing the pieces it covers.
-      if (s.bldAt[i] !== 0 && !(type === 'gate' && ownWall(s, s.bldAt[i], owner))) return 'blocked';
+      if (s.bldAt[i] !== 0 && !(type === 'gate' && ownWall(s, s.bldAt[i], owner)) && !(type === 'sluice' && ownDyke(s, s.bldAt[i], owner))) return 'blocked';
     }
   }
   for (let y = ty; y <= ty + n; y++) {
@@ -167,6 +176,12 @@ export function ruinOnTile(s: GameState, tx: number, ty: number): boolean {
   return false;
 }
 
+/** A finished dyke of this owner's: a sluice may take its place in the line (#701 s4). */
+function ownDyke(s: GameState, id: number, owner: number): boolean {
+  const b = s.byId.get(id);
+  return !!b && b.kind === 'building' && b.type === 'dyke' && b.built && b.owner === owner && owner >= 0;
+}
+
 function ownWall(s: GameState, id: number, owner: number): boolean {
   const b = s.byId.get(id);
   return !!b && b.kind === 'building' && b.type === 'wall' && b.owner === owner && owner >= 0;
@@ -178,7 +193,7 @@ export function stampBuilding(s: GameState, b: Building, on: boolean): void {
   // Only new blockages matter to cached distance fields: an opened tile just leaves a route a little long.
   if (!open && on) s.blockVersion++;
   // A dyke (#701) is a gate along its whole length: its own team walks its crown, over water too, and nothing else passes.
-  const dyke = b.type === 'dyke';
+  const dyke = b.type === 'dyke' || b.type === 'sluice';
   // A Thornwall (the Age of the Grove) parts for its own team as a gate does.
   const gate = b.type === 'gate' || b.type === 'thornwall' || dyke;
   if (dyke) s.blockVersion++;

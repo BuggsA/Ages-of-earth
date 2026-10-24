@@ -1781,6 +1781,49 @@ function channel(k: Kit, mask: number): void {
   k.team(k.box(0.08, 0.06, 0.04, TEAM, -0.34, 0.26, -0.34));
 }
 
+/**
+ * A sluice (#701 s4): a dyke's bank cut through by a timber gate between stone piers, its leaf hung from a beam on a winch. Shut
+ * (`variant` under 16) the leaf stands down in the water; open, it is wound up under the beam and the water pours white through the
+ * gap. The bank runs on to the neighbouring dykes (`variant` & 15, as a wall's).
+ */
+function sluice(k: Kit, variant: number): void {
+  const open = variant >= 16;
+  const mask = variant & 15;
+  const EARTH = '#6e5a3e';
+  const TURF = '#6f8a45';
+  const TIMBER = '#5b4330';
+  // The bank and its arms, as a dyke's.
+  k.box(1.02, 0.95, 1.02, EARTH, 0, -0.95, 0);
+  for (const [bit, dx, dz] of ARMS) {
+    if (!(mask & bit)) continue;
+    k.box(Math.abs(dx) * 0.3 + Math.abs(dz) * 0.72, 0.12, Math.abs(dz) * 0.3 + Math.abs(dx) * 0.72, TURF, dx * 0.35, 0.19, dz * 0.35);
+  }
+  // Across the line the bank runs: the gate faces along x unless the dykes meet it from north or south.
+  const ns = !(mask & 5) && !!(mask & 10);
+  const g = k.group();
+  if (ns) g.rotation.y = Math.PI / 2;
+  // Two stone piers, a walkway beam between them, and the winch on top.
+  for (const side of [-1, 1]) {
+    k.box(0.3, 1.25, 0.6, STONE, side * 0.36, -0.35, 0, g);
+    k.box(0.34, 0.06, 0.64, '#8d877b', side * 0.36, 0.3, 0, g);
+    k.cyl(0.03, 0.03, 0.9, 4, TIMBER, side * 0.36, 0.33, 0.18, g);
+  }
+  k.box(1.0, 0.07, 0.14, TIMBER, 0, 0.78, 0.18, g);
+  k.box(0.9, 0.05, 0.3, '#7a5636', 0, 0.3, -0.12, g);
+  k.cyl(0.06, 0.06, 0.5, 6, TIMBER, 0, 0.88, 0.18, g).rotation.z = Math.PI / 2;
+  for (const side of [-1, 1]) k.box(0.03, 0.22, 0.03, TIMBER, side * 0.27, 0.92, 0.26, g);
+  // The leaf: planks on iron straps, down in the water or wound up under the beam.
+  const up = open ? 0.62 : 0;
+  k.box(0.44, 0.62, 0.06, '#6b4b2f', 0, -0.18 + up, 0.18, g);
+  for (const y of [-0.38, -0.14, 0.1]) k.box(0.46, 0.04, 0.07, '#4a4d52', 0, y + up, 0.18, g);
+  // Open: white water pouring through the gap and spreading below it.
+  if (open) {
+    k.box(0.42, 0.04, 0.7, '#e6f1f2', 0, -0.06, 0.05, g);
+    k.box(0.6, 0.03, 0.3, '#cfe3e6', 0, -0.09, -0.42, g);
+  }
+  k.team(k.box(0.13, 0.08, 0.13, TEAM, 0.36, 0.38, -0.26, g));
+}
+
 /** A windmill (#701): a thatched smock mill on a brick base with a reefing stage, its cap turned to the wind. The sails turn on their own (`windmillSails`). */
 function windmill(k: Kit, _e: number, st: Style): void {
   pad(k, 2, st.base);
@@ -2459,7 +2502,7 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
   }
 }
 
-const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' | 'thornwall' | 'garden' | 'orchard' | 'channel' | 'hive'>, (k: Kit, e: number, st: Style) => void> = {
+const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' | 'thornwall' | 'garden' | 'orchard' | 'channel' | 'hive' | 'sluice'>, (k: Kit, e: number, st: Style) => void> = {
   sapling: (k, e) => sapling(k, e),
   towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, windmill,
 };
@@ -2633,7 +2676,7 @@ const ROOFS: Partial<Record<BuildingType, [string, string]>> = {
 };
 
 /** No plinth or pennant: open or thin pieces, and buildings that already carry their own standards. */
-const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder', 'dyke', 'thornwall', 'garden', 'orchard', 'channel', 'hive'];
+const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder', 'dyke', 'thornwall', 'garden', 'orchard', 'channel', 'hive', 'sluice'];
 
 function roleStyle(type: BuildingType, epoch: number, st: Style): Style {
   const r = ROOFS[type];
@@ -2667,6 +2710,7 @@ export function buildingGeometry(type: BuildingType, epochIn: number, color: str
     const k = new Kit();
     if (type === 'wall') wall(k, epoch, STYLES[Math.min(epoch, 4)], variant);
     else if (type === 'dyke') dyke(k, variant);
+    else if (type === 'sluice') sluice(k, variant);
     else if (type === 'channel') channel(k, variant);
     else if (type === 'snare') snare(k, epoch, variant === 1);
     else if (type === 'thornwall') thornwall(k, variant);

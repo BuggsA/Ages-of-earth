@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { hash2 } from '../sim/rng';
 import type { GameState } from '../sim/types';
 import { T_GRASS, T_ROCK, T_SAND, T_WATER } from '../sim/types';
-import { isPolder } from '../sim/water';
+import { isInund, isPolder } from '../sim/water';
 import { natureGeometry, type NatureKind } from './natureModels';
 import { bakedMaterial, fogUniforms, inject, swayMaterial } from './materials';
 
@@ -30,6 +30,11 @@ const POLDER_FIELD = [C('#7ba34a'), C('#69933f'), C('#86704c')];
 const DITCH = C('#5f9a92');
 const MUD = C('#857a60');
 const DRY_TIME = 20;
+/** The Water Line (#701 s4): meadow drowned under a sluice's flood, seen through the sheet of water over it. */
+const DROWNED = [C('#4f6b4a'), C('#5d7752')];
+/** How far over the ground a sluice's flood lies, knee-deep, as drawn (`floodSheet`); a gun-barge rides on it. */
+export const FLOOD_DEPTH = 0.09;
+const floodMaterial = inject(new THREE.MeshStandardMaterial({ color: '#6fa7b6', transparent: true, opacity: 0.6, roughness: 0.2, metalness: 0.05, depthWrite: false }), {});
 const TMP = new THREE.Color();
 const A = new THREE.Vector3();
 const B = new THREE.Vector3();
@@ -52,8 +57,8 @@ const drainedIn = (s: GameState): number => {
   let n = 0;
   // Pumped out (#701), or dug into a channel: either way the shore moved.
   for (const p of s.players) n += (p.stats.drained ?? 0) + (p.stats.dug ?? 0);
-  // Or taken back by the sea through a breach (#701 s3).
-  return n + (s.flooded ?? 0);
+  // Or taken back by the sea through a breach (#701 s3), or flooded and given back by a sluice (#701 s4).
+  return n + (s.flooded ?? 0) + (s.inundated ?? 0);
 };
 
 export const terrainMaterial = inject(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.95 }), { season: 'ground' });
@@ -78,6 +83,9 @@ function smooth(x: number, y: number, scale: number, salt: number): number {
 export class TerrainView {
   readonly group = new THREE.Group();
   private mesh: THREE.Mesh | null = null;
+  /** The Water Line's flood (#701 s4): a sheet of shallow water over every flooded tile, drawn again when the water moves. */
+  private flood: THREE.Mesh | null = null;
+  private floodSeen = -1;
   private skirt: THREE.Mesh | null = null;
   /** The heights as drawn: they follow the rules' heights, easing toward them where the land rose out of the water (#701). */
   private shown = new Float32Array(0);
@@ -126,6 +134,38 @@ export class TerrainView {
     this.group.add(this.skirt);
 
     this.scatter(s);
+    this.floodSheet(s);
+  }
+
+  /** Lay the sheet of the Water Line's flood (#701 s4) over every flooded tile, `FLOOD_DEPTH` over the ground's corners. */
+  private floodSheet(s: GameState): void {
+    const seen = s.inundated ?? 0;
+    if (seen === this.floodSeen) return;
+    this.floodSeen = seen;
+    if (this.flood) {
+      this.group.remove(this.flood);
+      this.flood.geometry.dispose();
+      this.flood = null;
+    }
+    if (!s.inund) return;
+    const { w } = s;
+    const W = w + 1;
+    const pts: number[] = [];
+    const y = (cx: number, cy: number) => s.height[cy * W + cx] + FLOOD_DEPTH;
+    for (let t = 0; t < s.inund.length; t++) {
+      if (!s.inund[t]) continue;
+      const tx = t % w;
+      const ty = (t - tx) / w;
+      pts.push(tx, y(tx, ty), ty, tx, y(tx, ty + 1), ty + 1, tx + 1, y(tx + 1, ty), ty);
+      pts.push(tx + 1, y(tx + 1, ty), ty, tx, y(tx, ty + 1), ty + 1, tx + 1, y(tx + 1, ty + 1), ty + 1);
+    }
+    if (!pts.length) return;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    geo.computeVertexNormals();
+    this.flood = new THREE.Mesh(geo, floodMaterial);
+    this.flood.renderOrder = 1;
+    this.group.add(this.flood);
   }
 
   /**
@@ -173,6 +213,7 @@ export class TerrainView {
         if (this.clock - at > DRY_TIME) this.drying.delete(t);
       }
     }
+    this.floodSheet(s);
     if (!touched.size) return moved;
     for (const t of touched) this.paint(s, t % w, Math.floor(t / w));
     const geo = this.mesh.geometry;
@@ -211,7 +252,9 @@ export class TerrainView {
       // Broad, soft patches of color rather than speckle: smooth noise picks the shade.
       const patch = smooth(x + 0.5, y + 0.5, 6, 11);
       const fine = smooth(x + 0.5, y + 0.5, 2.5, 12);
-      if (terr === T_WATER) {
+      if (isInund(s, tile)) {
+        tmp.copy(DROWNED[0]).lerp(DROWNED[1], fine);
+      } else if (terr === T_WATER) {
         tmp.copy(BED[0]).lerp(BED[1], Math.min(1, Math.max(0, -avgH * 0.8)));
       } else if (isPolder(s, tile)) {
         polderColor(tmp, x, y, t, fine, this.drying.has(tile) ? Math.min(1, (this.clock - this.drying.get(tile)!) / DRY_TIME) : 1);

@@ -1268,6 +1268,21 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 
 **Next:** the Water Line (s4) is this rule run backwards on purpose: sluices that let the sea into your own low ground while the enemy walks across it, and `wading` for flooded fields. A dyke's "holds back" number would make a good tower-like warning ring on the minimap.
 
+## Designers' notes: the Water Road, the Age of the Water Line (#701 s4, 2026-10-24, chain 1024-2000 s4, lane rules)
+
+**Built:** the Water Road's Gunpowder tier. Sluices (a gate in your own dyke, on a channel, or on the shallows) that you open to let the water out over your low ground, a ring a second, up to 7 tiles, and shut to let it drain away. The flood is knee-deep: soldiers wade it at 30%, siege bogs down to 10%, fields under it yield nothing, and buildings, woods and rises stand out of it as islands. Gun-barges, launched from the sluice, sail the sea, the channels and the flood, and pass through any sluice like a lock. The computer climbs to it from the Dykes, sets a sluice where it floods most, keeps two barges and opens the gate while an army stands by it.
+
+**Why I love it:** it's the one defence in the game you have to *time*. A wall is up or it isn't; a sluice is a gamble you take as the enemy army walks onto your fields: too early and they go round and you've drowned your own harvest for nothing, too late and they're through. And for the attacker it reads instantly: the meadow in front of you goes glassy, your rams slow to a crawl, and flat boats with cannon start nosing across it. It's history I find moving too: the Hollandse Waterlinie, a country that made itself an island on purpose.
+
+**Choices I made (the owner may revert):**
+- The flood doesn't touch the ground's heights: it lies over them, and the renderer draws a sheet of water on top. "Low" is relative to the sluice's lowest bank (`INUND.rise` over it), so a sluice on a channel through high meadow floods that meadow, and the age works on dry maps (continental, highlands) as well as on polder. An absolute height would have shut it on every map but lakes.
+- Siege can still enter the flood, at a tenth of its pace, rather than being barred from it: a per-unit pathing rule would have touched every route in the game. It reads as "can't cross" under fire.
+- Only gun-barges sail the flood; galleons and transports stay on the open sea. A barge passes any finished sluice, anyone's, as a lock, so a rival in the same age can come through yours.
+- Opening a sluice reuses the `pack` order at a Sluice: `tests/command-ownership.test.ts` pins the list of command kinds.
+- A sluice holds the sea back from the moment it is laid out (a cofferdam), so setting one into a dyke line never breaches it.
+
+**Next:** the Age of Locks (s5) can build on the barge's pass (`BARGE` in `grid.ts`): canals that bigger ships use too, and a lock as the sluice's grown-up cousin. I'd like the computer to plan its sluice so the flood covers the way rivals come rather than the most ground, and to bring barges into the attack. A flood that slowly takes the fields' fertility, then gives it back richer (the Nile's gift), would tie in the Egyptians.
+
 ## Designers' notes: fire (Wild route step 3, #723, 2026-10-24, chain 1024-1233 s1, lane rules)
 
 **Built:** a shared rule every people uses from the Bronze Age (`src/sim/fire.ts`, `FIRE`). Torches in the hands of citizens and foot soldiers; trees, Thornwall roots and a rival's living buildings (Thornwall, Kitchen Garden, Orchard, Sapling) catch; fire leaps tile by tile on the match's own dice, as far as the season lets it (a summer fire takes most of a wood, a spring one smoulders out in a few trees); a burnt tree is ash for five minutes, then grows again; a building burns until its people beat it out, and a Thornwall burnt down leaves no root. The computer torches a rival's growth with its campaigning soldiers and beats out its own fires.

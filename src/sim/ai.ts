@@ -5,11 +5,11 @@ import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable 
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, raiseProblem, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Rubble, Ruin, TechId, TradePost, Unit, UnitType } from './types';
-import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
+import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE, T_WATER } from './types';
 import { backProblem, backTo, ageDef, ageOf, asleep, barred, buildBarred, crossingLeft, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, trainsAt, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadProblem, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
 import { grindersOf, kegsOf, millProblem, mills, sappers } from './powder';
 import { beatersAt, burns, onFire } from './fire';
-import { basinOf, channelPlan, coastHeld, dykePlan, heldBack, isChannel, isPolder, polderField, type ChannelPlan, type DykePlan } from './water';
+import { basinOf, channelPlan, coastHeld, dykePlan, heldBack, isChannel, isInund, isPolder, polderField, sluiceFed, sluiceProblem, waterLine, type ChannelPlan, type DykePlan } from './water';
 import { wallLine } from './commands';
 import { launchProblem, loaded, rulesOf, silosOf } from './silo';
 import { carriedBy } from './relics';
@@ -30,7 +30,7 @@ import { graftCost, stationsOf, waiting } from './hemo';
 import { borderMap, landOwnerAt, suppliedAt } from './borders';
 import { workProblem } from './works';
 import { aiKin, aiVow, aiWay, wayBarred } from './ways';
-import { AI_TOWER_KEEP, AI_TOWER_PEACE, AI_WAYS, AI_KEG, AI_DYKE, AI_RIVERS, KEG, KILL_CAMP, KIN, POLDER, TOWER_LEVELS, WAYS } from './data';
+import { AI_TOWER_KEEP, AI_TOWER_PEACE, AI_WAYS, AI_KEG, AI_DYKE, AI_RIVERS, AI_WATERLINE, KEG, KILL_CAMP, KIN, POLDER, TOWER_LEVELS, WAYS } from './data';
 import { beaconProblem, lit } from './beacon';
 import { rallyProblem } from './rally';
 import { consecrateProblem, consecrates } from './consecrate';
@@ -223,7 +223,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
     if (e.kind === 'unit' && s.kings[p.id] === e.id) king = e;
     else if (e.kind === 'unit') {
       const list =
-        e.type === 'citizen' ? citizens : e.type === 'wagon' ? wagons : e.type === 'priest' ? priests : e.type === 'trader' ? traders : e.type === 'cog' ? cogs : e.type === 'fisher' ? fishers : e.type === 'warship' || e.type === 'transport' ? navy : e.type === 'fighter' || e.type === 'bomber' ? planes : army;
+        e.type === 'citizen' ? citizens : e.type === 'wagon' ? wagons : e.type === 'priest' ? priests : e.type === 'trader' ? traders : e.type === 'cog' ? cogs : e.type === 'fisher' ? fishers : e.type === 'warship' || e.type === 'transport' || e.type === 'barge' ? navy : e.type === 'fighter' || e.type === 'bomber' ? planes : army;
       list.push(e);
     } else buildings.push(e);
   }
@@ -252,6 +252,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   beatFires(s, v, issue);
   dykeWork(s, v, mem, issue);
   riverWork(s, v, mem, issue);
+  waterLineWork(s, v, mem, issue);
   siloRoad(s, v, mem, issue);
   fireSilo(s, v, mem, issue);
   fleeWarhead(s, v, issue);
@@ -589,6 +590,9 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
     // that walked the Age of Rivers is on the road already, and goes on down it more often.
     // A town that has set its heart on the Sail waits on its catch instead: one water plan at a time (#720).
     roads[to] = roads.sail !== true && coastHeld(s, p) && !!dykeOf(s, p, mem) && coin(s, p.id, 0xd1e5) < (hasWalked(p, 'rivers') ? AI_RIVERS.onward : AI_DYKE.take);
+  } else if (roads[to] === undefined && to === 'waterline') {
+    // The Water Road's third age (#701 s4): a people that walked the Dykes goes on down it on a coin of its own, so no other match's dice shift.
+    roads[to] = hasWalked(p, 'dykes') && coin(s, p.id, 0x5a1c) < AI_WATERLINE.take;
   } else if (roads[to] === undefined && to === 'rivers') {
     // The Water Road's first age (#701 s1): with a channel worth digging by home, on a coin of its own.
     roads[to] = !!riverOf(s, p, mem) && coin(s, p.id, 0x71e5) < AI_RIVERS.take;
@@ -741,6 +745,8 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
     mem.sideHold ??= s.tick;
     if (s.tick - mem.sideHold < secs(AI_SILO.hold)) return null;
   }
+  // The Water Line (#701 s4) is kept a while, so its sluice stands and its barges are out before it climbs on.
+  if (walksWeb(v) && ageOf(p) === 'waterline' && s.tick - (mem.line?.since ?? s.tick) < secs(AI_WATERLINE.stay)) return null;
   // The Wild is kept a while, so the beasts it came for are tamed and the Den is breeding.
   if (walksWeb(v) && ageOf(p) === 'wild' && s.tick - (mem.wild ?? s.tick) < secs(TAME.aiStay)) return null;
   // The Grove is kept a while, so its gardens are fed, its Orchards set and its Thornwall grown.
@@ -1345,6 +1351,87 @@ function riverWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   }
 }
 
+/**
+ * Where it sets its sluice (#701 s4): within `AI_WATERLINE.reach` tiles of its start, on a dyke of its own line or on water a sluice
+ * may stand on, with still water beside it; the spot whose flood would cover the most ground, the nearest home on a tie. Found once.
+ */
+function sluiceSpot(s: GameState, p: Player, mem: AiMemory): { tx: number; ty: number } | null {
+  const line = (mem.line ??= { since: s.tick });
+  if (line.spot !== undefined) return line.spot;
+  const r = AI_WATERLINE.reach;
+  const cx = Math.floor(p.startX);
+  const cy = Math.floor(p.startY);
+  let best: { tx: number; ty: number } | null = null;
+  let top = 0;
+  let bestD = Infinity;
+  for (let ty = Math.max(1, cy - r); ty <= Math.min(s.h - 2, cy + r); ty++)
+    for (let tx = Math.max(1, cx - r); tx <= Math.min(s.w - 2, cx + r); tx++) {
+      const t = ty * s.w + tx;
+      if (s.terrain[t] !== T_WATER || isInund(s, t)) continue;
+      const d = (tx - cx) * (tx - cx) + (ty - cy) * (ty - cy);
+      if (d > r * r || placeProblem(s, 'sluice', tx, ty, true, p.id)) continue;
+      const spot = { tx, ty, size: 1 } as Building;
+      if (!sluiceFed(s, spot)) continue;
+      const n = waterLine(s, spot).length;
+      if (n > top || (n === top && d < bestD)) {
+        top = n;
+        bestD = d;
+        best = { tx, ty };
+      }
+    }
+  line.spot = top >= 8 ? best : null;
+  return line.spot;
+}
+
+/**
+ * The Age of the Water Line at work (#701 s4): set one sluice where its flood covers the most ground (`sluiceSpot`), keep
+ * `AI_WATERLINE.barges` gun-barges, and open the sluice while an enemy army of `threat` or more stands within `near` tiles of it,
+ * shutting it `calm` seconds after the last has gone. With the water out, idle barges shell the nearest enemy by the sluice.
+ */
+function waterLineWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!ageDef(p).sluices) return;
+  const line = (mem.line ??= { since: s.tick });
+  const sluice = v.buildings.find((b) => b.type === 'sluice');
+  if (!sluice) {
+    if (s.tick - (mem.ordered.sluice ?? -99999) < secs(25)) return;
+    const spot = sluiceSpot(s, p, mem);
+    if (!spot) return;
+    if (!construct(s, v, mem, 'sluice', spot, 2, issue)) spend(v, buildingCostFor(s, p.id, 'sluice'));
+    return;
+  }
+  if (!sluice.built) return;
+  if (s.tick % secs(1) !== (p.id * 3) % secs(1)) return;
+  // The alarm: an enemy army by the sluice.
+  const r2 = AI_WATERLINE.near * AI_WATERLINE.near;
+  const foes: Unit[] = [];
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !MILITARY.includes(e.type) || domainOf(e.type) !== 'land' || !isEnemy(s, p.id, e.owner)) continue;
+    const dx = e.x - sluice.x;
+    const dy = e.y - sluice.y;
+    if (dx * dx + dy * dy <= r2) foes.push(e);
+  }
+  if (foes.length >= AI_WATERLINE.threat) line.alarm = s.tick;
+  const alarmed = line.alarm !== undefined && s.tick - line.alarm < secs(AI_WATERLINE.calm);
+  if (alarmed !== !!sluice.open && !sluiceProblem(s, sluice)) issue({ t: 'pack', p: p.id, building: sluice.id });
+  // The barges: kept up at the sluice, and sent at the nearest foe while the water is out.
+  const barges = v.navy.filter((u) => u.type === 'barge');
+  const queued = sluice.queue.filter((q) => q.unit === 'barge').length;
+  if (barges.length + queued < AI_WATERLINE.barges && !queued) {
+    const cost = unitStats('barge', p.epoch).cost;
+    if (afford(v, cost)) issue({ t: 'train', p: p.id, building: sluice.id, unit: 'barge' });
+    else spend(v, cost);
+  }
+  if (sluice.open && foes.length) {
+    const idle = barges.filter((u) => u.order.k === 'idle');
+    if (idle.length) {
+      const d2 = (u: Unit) => (u.x - sluice.x) * (u.x - sluice.x) + (u.y - sluice.y) * (u.y - sluice.y);
+      const near = foes.reduce((a, b) => (d2(a) <= d2(b) ? a : b));
+      issue({ t: 'attack', p: p.id, ids: idle.map((u) => u.id), target: near.id });
+    }
+  }
+}
+
 /** Whether its dyke's work is done (#701): the basin it shut off is all polder, or it has no plan. */
 function dykeDone(s: GameState, mem: AiMemory): boolean {
   const plan = mem.dyke?.plan;
@@ -1365,7 +1452,8 @@ function dykeWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const plan = dykeOf(s, p, mem);
   if (!plan) return;
   const recent = (type: BuildingType, sec: number) => s.tick - (mem.ordered[type] ?? -99999) < secs(sec);
-  const dykes = plan.line.map((t) => s.byId.get(s.bldAt[t])).filter((b): b is Building => !!b && b.kind === 'building' && b.type === 'dyke' && b.owner === p.id);
+  // A sluice set in the line (#701 s4) holds it as a dyke does.
+  const dykes = plan.line.map((t) => s.byId.get(s.bldAt[t])).filter((b): b is Building => !!b && b.kind === 'building' && (b.type === 'dyke' || b.type === 'sluice') && b.owner === p.id);
   if (dykes.length === plan.line.length && dykes.every((b) => b.built)) mem.dyke!.raised = true;
   if (dykes.length < plan.line.length) {
     // A breach is mended at once, whatever else waits (the sea will not).

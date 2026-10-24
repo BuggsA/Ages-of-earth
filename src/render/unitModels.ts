@@ -1153,6 +1153,40 @@ function warmammoth(): Kit {
 }
 
 /**
+ * A gun-barge (#701 s4, the Age of the Water Line): a flat, square-ended pram low in the water, a long cannon on a slide in its bow
+ * behind a timber breastwork, a stubby mast with a furled lugsail and a sweep at each side. The Industrial form is a steam gunboat:
+ * an iron launch with a funnel amidships and a gun shield.
+ */
+function barge(epoch: number): Kit {
+  const k = new Kit();
+  const steam = epoch >= 4;
+  // The flat hull: a low box, its ends raked.
+  k.box(0.52, 0.16, 1.2, steam ? '#4a4d52' : '#5a4430', 0, -0.04, 0);
+  k.box(0.46, 0.03, 1.14, steam ? '#6b6f75' : '#9a7a52', 0, 0.12, 0);
+  for (const z of [0.66, -0.66]) k.box(0.5, 0.1, 0.14, steam ? '#3d4045' : '#4a3426', 0, -0.02, z).rotation.x = z > 0 ? 0.5 : -0.5;
+  // The gun on its slide, muzzle over the bow, and the breastwork (or shield) before it.
+  k.box(0.18, 0.06, 0.4, '#3a2b20', 0, 0.15, 0.3);
+  k.cyl(0.05, 0.065, 0.62, 8, '#2a2a2c', 0, 0.26, 0.42).rotation.x = Math.PI / 2;
+  k.box(0.44, 0.14, 0.05, steam ? '#5b5f66' : '#6e4f33', 0, 0.15, 0.62);
+  for (const x of [-0.12, 0.12]) k.cyl(0.05, 0.05, 0.03, 8, '#3a2b20', x, 0.18, 0.2).rotation.z = Math.PI / 2;
+  if (steam) {
+    // The funnel and a wheelhouse.
+    k.cyl(0.07, 0.07, 0.42, 8, '#2f3135', 0, 0.15, -0.15);
+    k.cyl(0.075, 0.075, 0.05, 8, '#c9a64a', 0, 0.5, -0.15);
+    k.box(0.3, 0.2, 0.22, '#7c6a52', 0, 0.15, -0.42);
+    k.team(k.box(0.31, 0.04, 0.23, TEAM, 0, 0.35, -0.42));
+  } else {
+    // A stubby mast with its lugsail furled on the yard, and a sweep over each side.
+    k.cyl(0.025, 0.03, 0.75, 5, '#5b4330', 0, 0.15, -0.2);
+    k.box(0.5, 0.05, 0.05, '#e8e0c8', 0, 0.72, -0.2);
+    for (const side of [-1, 1]) k.box(0.03, 0.03, 0.8, '#6e4f33', side * 0.34, 0.12, -0.3).rotation.y = side * 0.3;
+    k.team(k.box(0.012, 0.14, 0.2, TEAM, 0, 0.82, -0.12));
+    k.team(k.box(0.53, 0.04, 0.2, TEAM, 0, 0.1, -0.5));
+  }
+  return k;
+}
+
+/**
  * A Blowpipe Hunter (the Age of the Hive): bare-armed, in a bark-cloth kilt of its people's colour and a band of three feathers, a
  * bamboo quiver of darts at the hip, and a long cane blowpipe raised level to the lips.
  */
@@ -1202,7 +1236,7 @@ function cavebear(): Kit {
   return k;
 }
 
-const MAKERS: Record<UnitType, (epoch: number) => Kit> = { citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, cog, fighter, bomber, trader, wagon, warwolf, tusker, warmammoth, blowpipe, cavebear };
+const MAKERS: Record<UnitType, (epoch: number) => Kit> = { citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, cog, fighter, bomber, trader, wagon, warwolf, tusker, warmammoth, blowpipe, cavebear, barge };
 
 /** Epoch + 30 asks for the citizen as a thrall (the same offset trick as the trader's gold and the caravan cart). */
 export const THRALL_MODEL = 30;
