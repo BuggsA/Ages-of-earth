@@ -13,7 +13,7 @@ export type SoundName =
   | 'fall' | 'collapse' | 'built' | 'place' | 'ready' | 'readyCitizen' | 'chop' | 'mine' | 'hammer' | 'rustle' | 'epoch' | 'alert'
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
-  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'siloAlarm' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'fireLit' | 'fireCatch' | 'fireOut' | 'fireAsh' | 'flow' | 'rush' | 'groan' | 'dart' | 'swarm' | 'hiveHush' | 'sluiceOpen' | 'sluiceShut' | 'spread' | 'tideWash' | 'tideMill' | 'swept' | 'pondShut' | 'breach' | 'entWake' | 'entRoot' | 'spreading' | 'damBurst';
+  | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'siloAlarm' | 'interceptLaunch' | 'interceptHit' | 'interceptMiss' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'fireLit' | 'fireCatch' | 'fireOut' | 'fireAsh' | 'flow' | 'rush' | 'groan' | 'dart' | 'swarm' | 'hiveHush' | 'sluiceOpen' | 'sluiceShut' | 'spread' | 'tideWash' | 'tideMill' | 'swept' | 'pondShut' | 'breach' | 'entWake' | 'entRoot' | 'spreading' | 'damBurst';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -950,6 +950,26 @@ export class Sound {
           this.tone(out, t + i * 0.24, { f: 1040, to: 2360, type: 'square', dur: 0.12, peak: 0.02 });
         }
         this.tone(out, t, { f: 55, to: 55, dur: 1.5, peak: 0.22, attack: 0.02 });
+        break;
+      case 'interceptLaunch':
+        // An interceptor away (#759 s2): a sharp ignition crack, then a quick rising hiss, thinner and faster than a warhead's roar.
+        this.noise(out, t, { dur: 0.06, filter: 'highpass', f: 2000, peak: 0.25 });
+        this.noise(out, t + 0.02, { dur: 1.1, filter: 'bandpass', f: 900, to: 4200, q: 0.9, peak: 0.16, attack: 0.04 });
+        this.tone(out, t + 0.02, { f: 180, to: 520, type: 'sawtooth', dur: 0.9, peak: 0.04, attack: 0.05 });
+        break;
+      case 'interceptHit':
+        // A warhead stopped high overhead (#759 s2): a bright, clean crack and a high flat bang that rolls off, with no deep ground swell
+        // under it, so the ear tells it from a blast; then a soft rain of debris.
+        this.noise(out, t, { dur: 0.1, filter: 'highpass', f: 1500, peak: 0.6 });
+        this.noise(out, t, { dur: 1.6, filter: 'bandpass', f: 1400, to: 300, q: 0.7, peak: 0.35, attack: 0.003 });
+        this.tone(out, t, { f: 220, to: 70, dur: 0.8, peak: 0.25 });
+        this.bell(out, t + 0.05, N.A4, 1.4, 0.03);
+        for (let i = 0; i < 6; i++) this.noise(out, t + 0.6 + i * 0.17, { dur: 0.05, filter: 'highpass', f: 3000 - i * 200, peak: 0.03 });
+        break;
+      case 'interceptMiss':
+        // A near miss (#759 s2): a dull pop off to the side and a sour falling note, then nothing: the warhead flies on.
+        this.noise(out, t, { dur: 0.25, filter: 'bandpass', f: 600, q: 1.2, peak: 0.12 });
+        this.tone(out, t + 0.05, { f: 440, to: 300, type: 'triangle', dur: 0.5, peak: 0.06 });
         break;
       case 'siloScrub':
         // A launch scrubbed (#605): the klaxon chokes off and a hollow thud of the hatch giving way.

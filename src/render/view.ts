@@ -38,7 +38,7 @@ import { LandmarksView } from './landmarksView';
 import { GrazeView } from './grazeView';
 import { BorderView } from './borderView';
 import { FoundationView } from './foundationView';
-import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, coilFields, placementField, sortieRings, type RangeGuide } from './rangeGuides';
+import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, coilFields, placementField, sortieRings, coverRings, type RangeGuide } from './rangeGuides';
 import { ResourcesView } from './resourcesView';
 import { Sky } from './sky';
 import { forcedHour, hourAt, lightAt, moonPhase } from './daylight';
@@ -478,9 +478,10 @@ export class View {
     // The water layer (#701): ground pumped out of the water rises from it, and the shore's foam follows.
     if (this.terrain.sync(s, dt)) this.water.refreshBed(s, (i) => this.terrain.heightOf(i));
     this.resources.update(s, dt);
-    // A finished Missile Silo is seen by every player through the fog (#753), and one that falls is forgotten wherever it stood.
+    // A finished Missile Silo is seen by every player through the fog (#753), and one that falls is forgotten wherever it stood. So is an
+    // Interceptor Battery (#759 s2): its cover is public.
     const silo = (b: { id?: number; type?: string }): boolean => {
-      if (b.type !== 'silo' || b.id === undefined) return false;
+      if ((b.type !== 'silo' && b.type !== 'battery') || b.id === undefined) return false;
       const e = s.byId.get(b.id);
       return !e || e.hp <= 0 || shownToAll(e);
     };
@@ -620,6 +621,13 @@ export class View {
       const f = placementField(s, this.viewer, sel.ghost.type, sel.ghost.tx, sel.ghost.ty);
       if (f) guides.push(f);
     }
+    // Missile defence (#759 s2): every battery's cover, whoever's, while a warhead is in the air, while placing a battery, or while a silo
+    // or a battery is selected (aiming a launch: read the rival's cover first).
+    const covering = !!s.launches?.length || sel.ghost?.type === 'battery' || [...sel.ids].some((id) => {
+      const e = s.byId.get(id);
+      return !!e && e.kind === 'building' && (e.type === 'battery' || (e.type === 'silo' && e.owner === this.viewer));
+    });
+    if (covering) for (const g of coverRings(s, sel.ghost?.type === 'battery' ? sel.ghost : null)) if (guides.length < MAX_RANGE_GUIDES) guides.push(g);
     // In the Age of Lightning every finished coil shows its field.
     for (const f of coilFields(s, this.viewer)) if (guides.length < MAX_RANGE_GUIDES) guides.push(f);
     // Selecting your own aircraft in the Age of Aeronauts shows the fuel bands round the nearest Airfields.
@@ -963,6 +971,25 @@ export class View {
             this.effects.burst(at, { count: 22, speed: 4, up: 1.2, life: 1.4, size: 0.07, gravity: 7, drag: 0.3, colors: ['#7d7468', '#5a4a3a', '#9a8a74'] });
             this.effects.ring(at, '#ffcf7a', KEG.reach + 0.5, 0.9);
             this.cue('kegBlow', ev.x, ev.y, 1);
+          }
+          break;
+        }
+        case 'intercept': {
+          // Missile defence (#759 s2), seen by every player as the missile is: the battery's flash and smoke as it fires, then where the two
+          // meet a clean white burst high overhead on a hit, or a small dark puff beside the missile on a miss.
+          if (ev.what === 'fired') {
+            const o = this.ground(s, ev.x, ev.y, 0.8);
+            this.effects.burst(o, { count: 14, speed: 1, up: 1.4, life: 0.5, size: 0.1, grow: 1.5, gravity: -1, drag: 1.2, colors: ['#ffffff', '#cfe9ff', '#ffd25a'] });
+            this.effects.burst(o, { count: 22, speed: 1.4, up: 0.3, life: 2.6, size: 0.26, grow: 2.6, gravity: -0.2, drag: 1.1, soft: true, colors: ['#f2efe9', '#d8d3cb'] });
+          } else {
+            const at = this.ground(s, ev.x, ev.y, ev.z ?? 0);
+            if (ev.what === 'hit') {
+              this.effects.burst(at, { count: 40, speed: 3.2, up: 0.4, life: 0.7, size: 0.12, grow: 1.6, gravity: 0, drag: 1.4, colors: ['#ffffff', '#fff6d0', '#cfe9ff'] });
+              this.effects.burst(at, { count: 24, speed: 1.4, up: 0.2, life: 3.2, size: 0.3, grow: 3, gravity: -0.1, drag: 1, soft: true, colors: ['#eeeae4', '#cfcac2', '#a9a39a'] });
+              this.effects.burst(at, { count: 18, speed: 2.4, up: 0.6, life: 1.6, size: 0.05, gravity: 4, drag: 0.4, colors: ['#ffd25a', '#ff9a3c', '#5a5450'] });
+            } else {
+              this.effects.burst(at.clone().add(new THREE.Vector3(0.6, 0.3, 0.4)), { count: 12, speed: 0.8, up: 0.3, life: 1.6, size: 0.18, grow: 2.2, gravity: -0.1, drag: 1, soft: true, colors: ['#5a5450', '#7a736a'] });
+            }
           }
           break;
         }

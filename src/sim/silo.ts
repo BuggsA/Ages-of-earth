@@ -1,4 +1,4 @@
-import { BUILDINGS, FALLOUT, FISSION, FLIGHT, FUSION, SALVO, SILO, TICK_HZ, WARHEADS, domainOf, secs } from './data';
+import { BUILDINGS, FALLOUT, FISSION, FLIGHT, FUSION, INTERCEPT, SALVO, SILO, TICK_HZ, WARHEADS, domainOf, secs } from './data';
 import { ageDef } from './ages';
 import { DIRS, roll } from './animals';
 import { hurt, peace } from './combat';
@@ -28,6 +28,11 @@ import type { Arc, Building, BuildingType, Cost, Ent, GameState, Launch, Player,
  *
  * The flight (#772): every launch carries a course (`Launch.arc`, `flightOf`) that every player watches: a missile climbing toward the
  * middle of a rival's rings, then bending onto its true point in the last seconds before the reveal (`missilesAt`).
+ *
+ * Missile defence (#759 s2): after Interceptors a people raises Interceptor Batteries, seen by every player, each covering `INTERCEPT.reach`
+ * tiles. In a launch's last seconds (`interceptStep`): at `INTERCEPT.fire` seconds left the nearest charged battery covering each warhead's
+ * ring (as its team is shown it) fires, and the roll is drawn and stored on the launch; at `INTERCEPT.meet` seconds left a hit takes that
+ * warhead out of the sky, so it neither blasts nor poisons the ground.
  */
 
 /** How a people works its silos: the plain Atomic Age's rules, or the fork's (Fission: quick and leaky; Fusion: clean, limitless and slow). */
@@ -79,6 +84,9 @@ export const stockOf = (p: Player): number => p.nukes?.n ?? SILO.stock;
 /** A launch's warheads still flying: one for a single strike, a salvo's unscrubbed ones (#765). */
 const liveOf = (l: Launch): SalvoShot[] => l.salvo?.filter((sh) => !sh.gone) ?? [{ silo: l.silo, x: l.x, y: l.y }];
 
+/** The places of a launch's warheads still flying (#759 s2): 0 for a single strike, a salvo's unscrubbed ones. */
+const shotsOf = (l: Launch): number[] => (l.salvo ? l.salvo.flatMap((sh, i) => (sh.gone ? [] : [i])) : [0]);
+
 /** Warheads of this people's in the air now (a salvo's count one each). */
 export const aloftOf = (s: GameState, owner: number): number => (s.launches ?? []).reduce((n, l) => n + (l.owner === owner ? liveOf(l).length : 0), 0);
 
@@ -95,7 +103,31 @@ export function nextNuke(s: GameState, p: Player): number | null {
 }
 
 /** Whether this finished silo is drawn for every player through the fog (#753): standing silos are no secret. */
-export const shownToAll = (b: { kind: string; type?: string; built?: boolean; hp: number }): boolean => b.kind === 'building' && b.type === 'silo' && !!b.built && b.hp > 0;
+export const shownToAll = (b: { kind: string; type?: string; built?: boolean; hp: number }): boolean =>
+  b.kind === 'building' && (b.type === 'silo' || b.type === 'battery') && !!b.built && b.hp > 0;
+
+/** Whether this Interceptor Battery holds its charge now (#759 s2): finished, standing, and not reloading. */
+export const charged = (s: GameState, b: Building): boolean => b.type === 'battery' && b.built && b.hp > 0 && (b.reload ?? 0) <= s.tick;
+
+/** A launch's warhead `shot` (0 for a single strike, else its place in the salvo): its true point. */
+const aimOf = (l: Launch, shot: number): { x: number; y: number } => (l.salvo ? l.salvo[shot] : { x: l.x, y: l.y });
+
+/**
+ * The ring a team is shown for a launch's warhead `shot` (#759 s2, the owner's "rings are blurred" ruling): where it was drawn, not the
+ * true point. A team with no set (the launcher's own, or a launch from an older save) has the true point.
+ */
+export function ringOf(l: Launch, team: number, shot: number): { x: number; y: number } {
+  const set = l.warn?.find((w) => w.team === team);
+  if (!set) return aimOf(l, shot);
+  return set.rings[set.of ? set.of.indexOf(shot) : set.real] ?? aimOf(l, shot);
+}
+
+/** Whether a battery covers a launch's warhead `shot` (#759 s2): it stands for a rival of the launcher, and the ring its team is shown lies within reach. */
+export function covers(s: GameState, b: Building, l: Launch, shot: number): boolean {
+  if (!isEnemy(s, l.owner, b.owner)) return false;
+  const g = ringOf(l, s.players[b.owner].team, shot);
+  return (g.x - b.x) * (g.x - b.x) + (g.y - b.y) * (g.y - b.y) <= INTERCEPT.reach * INTERCEPT.reach;
+}
 
 /** The people's finished, standing silos, in id order. */
 export function silosOf(s: GameState, owner: number): Building[] {
@@ -471,12 +503,25 @@ function bendAt(f: Flight, to: { x: number; y: number }, t: number): { x: number
 export function missilesAt(l: Launch, t: number): { x: number; y: number; z: number }[] {
   const f = flightOf(l);
   if (!f || t > f.at) return [];
-  if (t < f.tk) {
-    const u = Math.max(0, (t - f.t0) / (f.tk - f.t0));
-    const p = quad(f.o, f.m, f.k, u);
-    return [{ x: p.x, y: p.y, z: f.h * (1 - (1 - u) * (1 - u)) }];
-  }
+  if (t < f.tk) return [climbAt(f, t)];
   return aimsOf(l).map((to) => bendAt(f, to, t));
+}
+
+/** Where a missile on the climb is at tick `t` (#772). */
+function climbAt(f: Flight, t: number): { x: number; y: number; z: number } {
+  const u = Math.max(0, (t - f.t0) / (f.tk - f.t0));
+  const p = quad(f.o, f.m, f.k, u);
+  return { x: p.x, y: p.y, z: f.h * (1 - (1 - u) * (1 - u)) };
+}
+
+/**
+ * Where the missile carrying a launch's warhead `shot` is at tick `t` (#759 s2: where an interceptor meets it), or null for a launch from an
+ * older save. On the climb a salvo is one missile, so every shot reads the same point.
+ */
+export function missileOf(l: Launch, shot: number, t: number): { x: number; y: number; z: number } | null {
+  const f = flightOf(l);
+  if (!f) return null;
+  return t < f.tk ? climbAt(f, t) : bendAt(f, aimOf(l, shot), Math.min(t, f.at));
 }
 
 /**
@@ -583,8 +628,12 @@ export function siloStep(s: GameState): void {
       lost = true;
     }
     if (lost) continue;
-    if (s.tick >= l.at) for (const p of aimsOf(l)) strike(s, l, p.x, p.y);
-    else {
+    if (s.tick === l.at - secs(INTERCEPT.fire)) fire(s, l);
+    if (s.tick === l.at - secs(INTERCEPT.meet) && meet(s, l)) continue;
+    // A warhead its interceptor hit never lands (a belt to `meet`'s braces: the stored roll decides, whatever happened between).
+    if (s.tick >= l.at) {
+      for (const i of shotsOf(l)) if (!l.icpt?.some((c) => c.shot === i && c.hit)) strike(s, l, aimOf(l, i).x, aimOf(l, i).y);
+    } else {
       // Exactly `SILO.reveal` seconds left (#762): the decoys vanish, the real ring flashes where it was drawn, one alarm sounds.
       if (s.tick === l.at - secs(SILO.reveal)) s.events.push({ k: 'silo', owner: l.owner, x: l.x, y: l.y, id: l.id, what: 'revealed' });
       left.push(l);
@@ -592,6 +641,47 @@ export function siloStep(s: GameState): void {
   }
   if (left.length) s.launches = left;
   else delete s.launches;
+}
+
+/**
+ * `INTERCEPT.fire` seconds before a launch lands (#759 s2): each of its live warheads, in order, draws one attempt from the nearest charged
+ * battery that covers it (`covers`; the lower id on a tie), whoever's it is among the launcher's rivals. The charge is spent and the roll
+ * drawn now, from the match's dice, and stored on the launch: a save, a load or a replay never draws it again. Stacked batteries do not
+ * raise the odds; a warhead no charged battery covers draws none.
+ */
+function fire(s: GameState, l: Launch): void {
+  for (const i of shotsOf(l)) {
+    let by: Building | undefined;
+    let near = Infinity;
+    for (const e of s.ents) {
+      if (e.kind !== 'building' || !charged(s, e) || !covers(s, e, l, i)) continue;
+      const g = ringOf(l, s.players[e.owner].team, i);
+      const d = (g.x - e.x) * (g.x - e.x) + (g.y - e.y) * (g.y - e.y);
+      if (d < near) [by, near] = [e, d];
+    }
+    if (!by) continue;
+    by.reload = s.tick + secs(INTERCEPT.reload);
+    const hit = roll(s) < INTERCEPT.chance;
+    (l.icpt ??= []).push({ shot: i, battery: by.id, owner: by.owner, x: by.x, y: by.y, hit });
+    s.events.push({ k: 'intercept', owner: by.owner, by: l.owner, id: l.id, shot: i, what: 'fired', x: by.x, y: by.y });
+  }
+}
+
+/**
+ * `INTERCEPT.meet` seconds before a launch lands (#759 s2): each interceptor reaches its missile and its stored roll plays out where the
+ * missile is. A hit takes that warhead out (a salvo's is marked gone, its ring with it). True when none of the launch is left.
+ */
+function meet(s: GameState, l: Launch): boolean {
+  let left = true;
+  for (const c of l.icpt ?? []) {
+    if (l.salvo?.[c.shot]?.gone) continue;
+    const m = missileOf(l, c.shot, s.tick) ?? { ...aimOf(l, c.shot), z: 0 };
+    s.events.push({ k: 'intercept', owner: c.owner, by: l.owner, id: l.id, shot: c.shot, what: c.hit ? 'hit' : 'missed', x: m.x, y: m.y, z: m.z });
+    if (!c.hit) continue;
+    if (l.salvo) l.salvo[c.shot].gone = true;
+    else left = false;
+  }
+  return !left || (!!l.salvo && l.salvo.every((sh) => sh.gone));
 }
 
 /** Whether (x, y) stands in poisoned ground. */
