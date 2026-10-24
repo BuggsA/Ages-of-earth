@@ -1360,6 +1360,16 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 
 **Next:** s3, the three-zone warning with seeded decoys and blurred rings; s4, the salvo and the third silo.
 
+## Designers' notes: three rings, one real (#762, s3 of #751, 2026-10-24, chain 1024-1610 s3, lane rules)
+
+**What I built:** a rival never sees a warhead's target, only three red rings on the ground and the minimap: the real zone and two decoys, drawn at launch from the match's own dice and frozen on the launch (`warningsOf`, `Launch.warn`). Decoys are drawn where a real attacker might aim: every rival building the attacker's eyes have ever seen and every rival soldier or citizen they see now is a candidate tile, weighted by what the people's widest warhead would take there (replacement cost × the share of health the curve takes, capped at health). Each ring, the real one too, sits on a tile centre moved up to `SILO.blur` (2) tiles on each axis. One set per rival team. With exactly `SILO.reveal` (3) seconds left the decoys vanish, the real ring flashes where it was drawn (it never snaps), one alarm sounds; the blast lands on the true point. The attacker's side sees its own aim in amber. The computer defender runs from the three rings it is shown.
+
+**Why I love it:** the public clock used to have one answer, step out of the circle. Now a town under a warhead has to decide what to save, and a lone Town Center sits in a ring whose centre may be two tiles off.
+
+**Choices I made (the owner may revert):** decoys are at least `SILO.apart` (8) tiles from the target and each other, before the blur, so in a small town the rings overlap; a town too sparse to draw from falls back to any known asset, then to points within `SILO.spread` (24) tiles of the target, then to compass points, then a map corner (documented on `decoy` in `silo.ts`); every ring centre is snapped to a tile centre so a click's fractions can't single out the real one; the attacker's own allies see its aim, not the decoys; no save bump (a launch from an older save shows its true point).
+
+**Next:** s4, the salvo: three silos, three real zones blurred the same way, scrubbing per silo. Then #759, missile defence, which reads the displayed rings.
+
 ## Designers' notes: the Age of the Wildwood (Wild route step 5, 2026-10-24)
 
 **Built:** the Wildwood (`AGES.wildwood`, `WILDWOOD`, `src/sim/wildwood.ts`), instead of the Industrial Age for a Hive people whose Hives have paid 250 honey. One **Heart Tree** to a people; at it, an **Ent** is woken from the nearest old tree, a slow siege giant that flings boulders. An Ent can **root**: it becomes a real tree on the map, mends, and wakes when a rival walks within 3 tiles or an axe bites. If the Heart Tree falls, every Ent roots and sleeps. **The Spreading** seeds the bare ground beside its woods each spring and thickens its Thornwalls. Its people run through those woods; a rival wades. The door: no rifles, guns or aircraft, and fire hits its living things twice as hard.

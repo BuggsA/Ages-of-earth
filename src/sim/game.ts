@@ -758,6 +758,11 @@ export function checksum(s: GameState): number {
   for (const l of s.launches ?? []) {
     mix(l.id);
     mix(l.at);
+    // The rings each rival team is shown (#762): every centre is a tile's centre, so twice it is whole.
+    for (const w of l.warn ?? []) {
+      mix(w.team * 4 + w.real);
+      for (const r of w.rings) mix(r.x * 2 * 0x10000 + r.y * 2);
+    }
   }
   for (const b of s.blasts ?? []) {
     mix(b.id);

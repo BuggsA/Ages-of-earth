@@ -3478,7 +3478,12 @@ export const FUSION = { fuse: 70, refuel: 0, fuel: { gold: 450, stone: 120 } };
  * stands, and makes one more every `refuel` seconds (the plain Atomic Age's; Fission and Fusion have their own) while the warheads in
  * store and in the air number under `cap`. `fuel` is an Atomic warhead's. A people raises at most `most` silos; every player sees a finished one.
  */
-export const SILO = { fuse: 45, reach: 5, fuel: { gold: 600, stone: 200 }, refuel: 240, most: 2, lift: 60, stock: 1, cap: 3 };
+/**
+ * The three-zone warning (#762): a rival is shown the real zone and two decoys `apart` tiles or more from it and each other, each ring's
+ * centre moved by a whole number of tiles up to `blur` on each axis; at `reveal` seconds left the decoys vanish. A town too sparse to
+ * draw decoys from falls back to points within `spread` tiles of the target.
+ */
+export const SILO = { fuse: 45, reach: 5, fuel: { gold: 600, stone: 200 }, refuel: 240, most: 2, lift: 60, stock: 1, cap: 3, blur: 2, reveal: 3, apart: 8, spread: 24 };
 /**
  * The three warheads (#751 s1). A blast does `peak / (1 + (d/half)²)` at distance `d` tiles (from a building's nearest edge, or a unit's
  * position), tapering linearly over the last `taper` tiles to nothing at the blast radius `r`. A people fires its branch's warhead:

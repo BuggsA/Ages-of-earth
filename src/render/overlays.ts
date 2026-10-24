@@ -27,6 +27,18 @@ export interface RingSpec {
   thin?: boolean;
 }
 
+/** A warhead's warning zone (#762): a band hugging the ground at radius `r`, pulsing slowly, or flashing once `flash` is set. */
+export interface WarnSpec {
+  x: number;
+  y: number;
+  r: number;
+  color: THREE.ColorRepresentation;
+  flash?: boolean;
+}
+
+const WARN_SEG = 96;
+const MAX_WARN = 12;
+
 export interface BarSpec {
   at: THREE.Vector3;
   width: number;
@@ -56,6 +68,9 @@ export class Overlays {
   private scoutMasts: THREE.InstancedMesh;
   private scoutCloths: THREE.InstancedMesh;
   private scoutBases: THREE.InstancedMesh;
+  /** Warning bands (#762), one mesh each, laid over the ground again only when the set of zones changes. */
+  private warns: THREE.Mesh[] = [];
+  private warnKey = '';
   private m = new THREE.Matrix4();
   private q = new THREE.Quaternion();
   private e = new THREE.Euler();
@@ -209,6 +224,50 @@ export class Overlays {
       m.instanceMatrix.needsUpdate = true;
       if (m.instanceColor) m.instanceColor.needsUpdate = true;
     }
+  }
+
+  /**
+   * The warning zones of warheads in the air (#762): every ring drawn the same, a band half a tile wide that follows hills and water, so a
+   * ring over a ridge is not cut off. All pulse together; a revealed ring flashes fast.
+   */
+  setWarnings(s: GameState, list: WarnSpec[], time: number): void {
+    const key = list.map((w) => `${w.x},${w.y},${w.r}`).join('|');
+    if (key !== this.warnKey) {
+      this.warnKey = key;
+      list.slice(0, MAX_WARN).forEach((w, i) => {
+        let mesh = this.warns[i];
+        if (!mesh) {
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array((WARN_SEG + 1) * 2 * 3), 3));
+          const index: number[] = [];
+          for (let k = 0; k < WARN_SEG; k++) index.push(2 * k, 2 * k + 1, 2 * k + 2, 2 * k + 1, 2 * k + 3, 2 * k + 2);
+          geo.setIndex(index);
+          mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, fog: false, toneMapped: false, side: THREE.DoubleSide }));
+          mesh.renderOrder = 2;
+          mesh.frustumCulled = false;
+          this.warns.push(mesh);
+          this.group.add(mesh);
+        }
+        const pos = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+        for (let k = 0; k <= WARN_SEG; k++) {
+          const a = (k / WARN_SEG) * Math.PI * 2;
+          const c = Math.cos(a), sn = Math.sin(a);
+          for (const [j, r] of [[0, w.r - 0.5], [1, w.r]] as const) {
+            const x = w.x + c * r, y = w.y + sn * r;
+            pos.setXYZ(2 * k + j, x, Math.max(WATER_Y, heightAt(s, x, y)) + 0.12, y);
+          }
+        }
+        pos.needsUpdate = true;
+      });
+    }
+    this.warns.forEach((mesh, i) => {
+      const w = list[i];
+      mesh.visible = !!w && i < MAX_WARN;
+      if (!w) return;
+      const mat = mesh.material as THREE.MeshBasicMaterial;
+      mat.color.set(w.color);
+      mat.opacity = w.flash ? 0.45 + 0.5 * Math.max(0, Math.sin(time * 16)) : 0.5 + 0.25 * Math.sin(time * 2.4);
+    });
   }
 
   setBars(list: BarSpec[], camera: THREE.Camera): void {
