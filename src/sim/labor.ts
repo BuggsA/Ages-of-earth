@@ -113,7 +113,8 @@ export function reassign(s: GameState, p: number, from: Job, to: Job, n: number)
   const pits = new Set<number>();
   for (const e of s.ents) {
     if (e.kind === 'unit' && e.owner === p && e.hp > 0 && e.order.k === 'gather' && !pool.includes(e)) load.set(e.order.tile, (load.get(e.order.tile) ?? 0) + 1);
-    if (e.kind === 'unit' && e.owner === p && e.hp > 0 && e.order.k === 'farm' && !pool.includes(e)) fields.add(e.order.target);
+    // A field someone farms, or is still raising (they farm it once it stands, #344), is passed over.
+    if (e.kind === 'unit' && e.owner === p && e.hp > 0 && (e.order.k === 'farm' || e.order.k === 'build') && !pool.includes(e)) fields.add(e.order.target);
   }
   const crew = to === 'build' ? sites(s, p, pool) : null;
   if (crew && !crew.size) return { moved: 0, why: 'Nothing is being built' };
