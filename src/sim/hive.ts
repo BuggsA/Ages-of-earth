@@ -58,8 +58,8 @@ export function brewsMead(s: GameState, b: Building): boolean {
   return false;
 }
 
-/** Whether a unit stands in a wood: `HIVE.wood` trees in the 3-by-3 round its tile. */
-function inWood(s: GameState, u: Unit): boolean {
+/** Whether a unit stands in a wood: `HIVE.wood` trees in the 3-by-3 round its tile (the Wildwood's woodland ways ask it too). */
+export function inWood(s: GameState, u: Unit): boolean {
   const tx = Math.floor(u.x);
   const ty = Math.floor(u.y);
   let n = 0;

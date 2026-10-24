@@ -52,7 +52,9 @@ describe('the Age of Locks in the data (#701 s5)', () => {
     expect(AGES.locks.routes).toEqual(['water']);
     expect(AGES.locks.keepsake!.building).toBe('dam');
     expect(ROADS.some((r) => r.from === 'industrial' && r.to === 'locks' && r.walked === 'waterline')).toBe(true);
-    expect(ROADS.filter((r) => r.from === 'locks').map((r) => r.to).sort()).toEqual(['atomic', 'industrial']);
+    expect(ROADS.filter((r) => r.from === 'locks').map((r) => r.to).sort()).toEqual(['atomic', 'industrial', 'tides']);
+    // On down the trunk to the Age of Tides (#739), behind the tide's own coast door.
+    expect(ROADS.find((r) => r.from === 'locks' && r.to === 'tides')!.coast).toBeDefined();
   });
 
   it('opens the Bridge and the Dam and digs channels again, and shuts stone walls and gates', () => {

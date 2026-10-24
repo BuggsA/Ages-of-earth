@@ -1,6 +1,7 @@
 import { callWild } from './tame';
 import { groveStep, rootThorn } from './grove';
 import { hiveStep } from './hive';
+import { treeToWake, wakeTree, wildwoodStep, WAKE_NONE } from './wildwood';
 import { aiStep } from './ai';
 import { workStep } from './works';
 import { beaconStep } from './beacon';
@@ -35,6 +36,7 @@ import { cacheStep, dropOre, spillStore } from './caches';
 import { kegStep, millStep } from './powder';
 import { fireStep } from './fire';
 import { burst, ditchStep, floodStep, pumpStep, sluiceStep } from './water';
+import { aground, tideStep } from './tides';
 import { siloStep } from './silo';
 import { stockPosts } from './oretrade';
 import { sortieStep } from './sortie';
@@ -51,7 +53,7 @@ import { coppiceStep } from './coppice';
 import { longbowStep } from './longbow';
 import { seraiStep, tollStep } from './passage';
 import { mercStep } from './merc';
-import { FINDS, KIN, NOMAD } from './data';
+import { FINDS, KIN, NOMAD, STEP_BACK } from './data';
 import { ageOf, goldenEnds, threadsOf, chartLand, isHire, barred, journeyOf, markKeepsake, noteWalked, trainsAt, workSteps } from './ages';
 import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, HomelandId, MapSize, MapType, Player, UnitType } from './types';
 import { RARES, RES, R_FISH, R_NONE } from './types';
@@ -286,6 +288,7 @@ export function enterAge(s: GameState, p: Player, to: AgeId, back = false): void
     else delete p.suspended;
   });
   if (back) p.backAt = s.tick;
+  (p.journey ??= []).push({ tick: s.tick, from, to, ...(back ? { back: true as const } : {}) });
   if (herds) giftFlock(s, p);
   // The age left keeps one building at its work (#555 s11).
   if (from !== to) {
@@ -397,10 +400,20 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
     item.done = Math.min(need, item.done + steps);
     if (item.done < need) return;
   }
+  // A harbour aground at low water (#739) launches nothing until the tide comes back.
+  if (domainOf(unit) === 'water' && aground(s, b)) return;
   if (p.pop + kin > p.cap) {
     if (item.done === need) {
       item.done = need + 1;
       s.events.push({ k: 'refused', owner: p.id, why: 'Build more houses' });
+    }
+    return;
+  }
+  // An Ent (the Age of the Wildwood) wakes from a tree by the Heart Tree: with none standing, it waits for one.
+  if (unit === 'warden' && treeToWake(s, b) < 0) {
+    if (item.done === need) {
+      item.done = need + 1;
+      s.events.push({ k: 'refused', owner: p.id, why: WAKE_NONE });
     }
     return;
   }
@@ -416,7 +429,8 @@ function bringOut(s: GameState, p: Player, b: Building, unit: UnitType): void {
   // Ships put out onto the water by their dock; aircraft take off from anywhere about the field.
   // A gun-barge (#701 s4) puts out onto any water beside its Sluice: a channel, the flood or the sea.
   const spot = exitSpot(s, b, toward.x, toward.y, unit === 'barge' ? BARGE : domain === 'water' ? NAVAL : domain === 'air' ? AIR : undefined);
-  const u = spawnUnit(s, p.id, unit, spot.x, spot.y);
+  // An Ent steps out of the tree it was (the Age of the Wildwood), not out of the Heart Tree.
+  const u = (unit === 'warden' && wakeTree(s, b)) || spawnUnit(s, p.id, unit, spot.x, spot.y);
   p.pop++;
   p.stats.trained++;
   // A soldier hired for gold at the Market is a sword for hire (`MERC`): it draws wages from now on.
@@ -471,6 +485,9 @@ function removeDead(s: GameState): void {
     any = true;
     const p = s.players[e.owner];
     p.stats.losses++;
+    // A loss inside the weak window after a step back (#743): the end screen says whether a rival struck it.
+    const leg = p.journey?.[p.journey.length - 1];
+    if (leg?.back && s.tick - leg.tick < secs(STEP_BACK.time)) leg.lost = (leg.lost ?? 0) + 1;
     if (e.kind === 'building') {
       // Those inside run out before it falls, and its captives (#355) go free.
       ungarrison(s, e);
@@ -642,6 +659,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   pumpStep(s);
   ditchStep(s);
   floodStep(s);
+  tideStep(s);
   sluiceStep(s);
   siloStep(s);
   sortieStep(s);
@@ -654,6 +672,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   callWild(s);
   groveStep(s);
   hiveStep(s);
+  wildwoodStep(s);
   longbowStep(s);
   tollStep(s);
   mercStep(s);
@@ -727,11 +746,29 @@ export function checksum(s: GameState): number {
   // The Water Line (#701 s4): every tile under a sluice's flood.
   if (s.inund) for (let i = 0; i < s.inund.length; i++) if (s.inund[i]) mix(i + 0x80000);
   for (const t of s.springs ?? []) mix(t);
+  // The tide (#739): the tidal ground and where it stands bared.
+  if (s.tidal) for (let i = 0; i < s.tidal.length; i++) if (s.tidal[i]) mix(i * 4 + s.terrain[i] + s.tidal[i] * 0x100000);
+  // Barrages (#748): who raised each causeway, and the ponds behind them.
+  if (s.causewayBy) for (let i = 0; i < s.causewayBy.length; i++) if (s.causewayBy[i]) mix(i * 16 + s.causewayBy[i]);
+  if (s.pond) for (let i = 0; i < s.pond.length; i++) if (s.pond[i]) mix(i + 0xc0000);
   for (const f of s.fallen ?? []) {
     mix(f.owner);
     mix(f.tx);
     mix(f.ty);
     mix(f.until);
+  }
+  for (const l of s.launches ?? []) {
+    mix(l.id);
+    mix(l.at);
+    // The rings each rival team is shown (#762): every centre is a tile's centre, so twice it is whole.
+    for (const w of l.warn ?? []) {
+      mix(w.team * 4 + w.real);
+      for (const r of w.rings) mix(r.x * 2 * 0x10000 + r.y * 2);
+    }
+  }
+  for (const b of s.blasts ?? []) {
+    mix(b.id);
+    mix(b.until);
   }
   for (const r of s.rubble ?? []) {
     mix(r.id);

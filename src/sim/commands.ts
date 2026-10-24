@@ -16,8 +16,9 @@ import { ruinAt } from './ruins';
 import { rubbleAt, salvages } from './salvage';
 import { cacheAt } from './caches';
 import { carriesKegs, kegProblem } from './powder';
+import { kegTileProblem } from './tides';
 import { carriesTorch, onFire, torchProblem } from './fire';
-import { launch, launchProblem } from './silo';
+import { launch, launchProblem, siloLimit } from './silo';
 import { raise, raiseCost } from './reclaim';
 import { callWork, workProblem } from './works';
 import { callKin, killCamp, kinProblem, takeVow, takeWay, vowProblem, wayBarred, wayProblem } from './ways';
@@ -35,6 +36,7 @@ import { sees } from './vision';
 import { canHit, isEnemy, maxHp, pay, placeBuilding, refund } from './world';
 import { fightsBeasts } from './animals';
 import { tameProblem } from './tame';
+import { heartBarred, rootEnt, rootProblem } from './wildwood';
 import { isField } from './grove';
 import { answerTiding, tidingProblem } from './tidings';
 import { sluiceProblem } from './water';
@@ -185,7 +187,7 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
     if (!quiet) refuse(s, p, `Needs the ${EPOCHS[def.epoch].name}`);
     return null;
   }
-  const no = buildBarred(player, type) ?? wayBarred(s, player, type);
+  const no = buildBarred(player, type) ?? wayBarred(s, player, type) ?? siloLimit(s, p, type) ?? heartBarred(s, p, type);
   if (no) {
     if (!quiet) refuse(s, p, no);
     return null;
@@ -462,12 +464,12 @@ export function applyCommand(s: GameState, c: Command): void {
     case 'launch': {
       // The Atomic Age (#605): a Missile Silo names a point; the warhead lands after its public countdown.
       const silo = s.byId.get(c.silo);
-      const why = launchProblem(s, c.p, silo as Building | undefined, c.x, c.y);
+      const why = launchProblem(s, c.p, silo as Building | undefined, c.x, c.y, c.w);
       if (why) {
         refuse(s, c.p, why);
         return;
       }
-      launch(s, c.p, silo as Building, c.x, c.y);
+      launch(s, c.p, silo as Building, c.x, c.y, c.w);
       break;
     }
     case 'keg': {
@@ -480,6 +482,18 @@ export function applyCommand(s: GameState, c: Command): void {
         return;
       }
       for (const u of units) giveOrder(u, { k: 'keg', target: c.target }, c.queue);
+      break;
+    }
+    case 'kegTile': {
+      // Barrages (#748): a keg carried to a rival's causeway tile and laid on it, to breach the road.
+      const why = kegTileProblem(s, c.p, c.tile);
+      const units = myUnits(s, c.p, c.ids).filter(carriesKegs);
+      if (!units.length) return;
+      if (why) {
+        refuse(s, c.p, why);
+        return;
+      }
+      for (const u of units) giveOrder(u, { k: 'kegTile', tile: c.tile }, c.queue);
       break;
     }
     case 'torch': {
@@ -766,6 +780,16 @@ export function applyCommand(s: GameState, c: Command): void {
       raiseLamb(s, b);
       break;
     }
+    case 'root': {
+      // The Age of the Wildwood: Ents root where they stand, and are trees again.
+      let why: string | null = null;
+      for (const u of myUnits(s, c.p, c.ids).filter((x) => x.type === 'warden')) {
+        why = rootProblem(s, u);
+        if (!why) rootEnt(s, u);
+      }
+      if (why) refuse(s, c.p, why);
+      break;
+    }
     case 'pitch': {
       const wagons = myUnits(s, c.p, c.ids).filter((u) => u.type === 'wagon');
       let why: string | null = null;
@@ -841,7 +865,7 @@ export function applyCommand(s: GameState, c: Command): void {
     }
     case 'wall': {
       // A line of wall, or of dykes or a channel (#701) or Thornwall (the Age of the Grove), laid the same way.
-      const type = c.dyke ? 'dyke' : c.thorn ? 'thornwall' : c.channel ? 'channel' : 'wall';
+      const type = c.causeway ? 'causeway' : c.dyke ? 'dyke' : c.thorn ? 'thornwall' : c.channel ? 'channel' : 'wall';
       const tiles = wallLine(c.x0, c.y0, c.x1, c.y1);
       const placed: Building[] = [];
       for (let i = 0; i < tiles.length; i++) {

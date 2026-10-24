@@ -5,6 +5,7 @@ import { isEnemy } from './world';
 import { snareSpot } from './snares';
 import { hiveSpot } from './hive';
 import { bridgeSpot, dykeSpot, isChannel, isDug, isInund, parched } from './water';
+import { bared, causewaySpot } from './tides';
 import type { Building, BuildingType, GameState } from './types';
 import { B_BUILDING, B_GATE, B_RES, B_TERRAIN, R_BLOODIRON, R_GOLD, R_NONE, R_SALT, R_SALTPETRE, R_STONE, T_ROCK, T_WATER } from './types';
 
@@ -95,7 +96,7 @@ export function groundAt(s: GameState, x: number, y: number): number {
   return a * (1 - fx) * (1 - fy) + b * fx * (1 - fy) + c * (1 - fx) * fy + d * fx * fy;
 }
 
-export type PlaceProblem = null | 'edge' | 'water' | 'rock' | 'blocked' | 'slope' | 'shore' | 'foreign' | 'woods' | 'snares' | 'deep' | 'dry' | 'parched' | 'bare' | 'hives';
+export type PlaceProblem = null | 'edge' | 'water' | 'rock' | 'blocked' | 'slope' | 'shore' | 'foreign' | 'woods' | 'snares' | 'deep' | 'dry' | 'parched' | 'bare' | 'hives' | 'tidal';
 
 /** Whether a building of this type could go with its top-left corner on this tile. */
 export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: number, ignoreUnits = true, owner = -1): PlaceProblem {
@@ -118,10 +119,17 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
     if (why) return why;
   }
   const deepen = type === 'channel' && owner >= 0 && !!s.players[owner] && !!ageDef(s.players[owner]).canals;
+  // A causeway (#739) goes on the shallow sea or the tidal flats; nothing else is raised on ground the tide comes back to.
+  const cause = type === 'causeway';
+  if (cause) {
+    const why = causewaySpot(s, tx, ty);
+    if (why) return why;
+  }
   for (let y = ty; y < ty + n; y++) {
     for (let x = tx; x < tx + n; x++) {
       const i = y * s.w + x;
-      if (s.terrain[i] === T_WATER && ((!dyke && type !== 'bridge' && !(deepen && isChannel(s, i))) || isInund(s, i))) return 'water';
+      if (!cause && !dyke && bared(s, i)) return 'tidal';
+      if (s.terrain[i] === T_WATER && !cause && ((!dyke && type !== 'bridge' && !(deepen && isChannel(s, i))) || isInund(s, i))) return 'water';
       if (s.terrain[i] === T_ROCK) return 'rock';
       if (s.res[i] !== R_NONE || (near && (relicOnTile(s, x, y) || postOnTile(s, x, y) || ruinOnTile(s, x, y) || landmarkOnTile(s, x, y)))) return 'blocked';
       // A gate may go into its owner's own wall, replacing the pieces it covers.
@@ -136,7 +144,7 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
     }
   }
   // Walls follow the land (and docks the shore); everything else wants it fairly level.
-  if (hi - lo > (type === 'wall' || type === 'gate' || type === 'dock' || type === 'channel' || type === 'bridge' || dyke ? 2.2 : 1.1)) return 'slope';
+  if (hi - lo > (type === 'wall' || type === 'gate' || type === 'dock' || type === 'channel' || type === 'bridge' || dyke || cause ? 2.2 : 1.1)) return 'slope';
   if (BUILDINGS[type].shore && shoreWater(s, tx, ty, n) < 3) return 'shore';
   // A Snare goes only among standing trees, and apart from the others (#485).
   if (type === 'snare') {
