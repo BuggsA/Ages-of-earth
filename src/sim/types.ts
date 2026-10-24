@@ -1457,6 +1457,8 @@ export interface AiMemory {
   river?: { plan: ChannelPlan | null; looked?: boolean; fresh?: boolean };
   /** The first crossing (#585): the age it stands in on the way to the Sea-Raiders, and since when (each sibling, and the age itself). */
   sea?: { at: AgeId; since: number };
+  /** The Sea Beggars (#783): the tile of its fleet's water nearest the rival's town, where it hunts when no rival ship or Dock is seen. */
+  beggarSea?: number;
   /** Tick it last tried to raise a Mission (#555 s12). */
   mission?: number;
   /** When it last sent sappers with kegs (#577). */

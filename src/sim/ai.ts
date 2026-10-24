@@ -4437,7 +4437,7 @@ function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
     return;
   }
   // A Beggars fleet (#783) goes looking: ships to board lie at a rival's Dock, or on the water nearest its town if no Dock is seen.
-  const prey = enemyShips[0] ?? (mem.attacking ? enemyDock(s, p) : ageDef(p).boards ? (enemyDock(s, p) ?? seaBy(s, enemyHome(s, p))) : null);
+  const prey = enemyShips[0] ?? (mem.attacking ? enemyDock(s, p) : ageDef(p).boards ? (enemyDock(s, p) ?? prowlFor(s, mem, idle[0], enemyHome(s, p))) : null);
   if (prey && idle.length >= Math.min(2, warships.length)) issue({ t: 'move', p: p.id, ids: idle.map((u) => u.id), x: prey.x, y: prey.y, amove: true });
   else {
     const far = idle.filter((u) => (u.x - dock.x) * (u.x - dock.x) + (u.y - dock.y) * (u.y - dock.y) > 100);
@@ -4445,10 +4445,38 @@ function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   }
 }
 
-/** The water a ship can sail nearest a point, within `AI_BEGGARS.hunt` tiles of it, or null. */
-function seaBy(s: GameState, at: { x: number; y: number }): { x: number; y: number } | null {
-  const t = nearestWalkable(s, at.x, at.y, AI_BEGGARS.hunt, NAVAL);
-  return t < 0 ? null : { x: (t % s.w) + 0.5, y: Math.floor(t / s.w) + 0.5 };
+/**
+ * Where a Beggars fleet hunts when it sees no rival ship or Dock (#783): the tile of the water `ship` sails nearest the rival's town,
+ * found once (a flood over that water, four ways) and kept in `mem.beggarSea`. Null when that water comes no nearer than it is.
+ */
+function prowlFor(s: GameState, mem: AiMemory, ship: Unit, at: { x: number; y: number }): { x: number; y: number } | null {
+  const spot = (t: number) => ({ x: (t % s.w) + 0.5, y: Math.floor(t / s.w) + 0.5 });
+  if (mem.beggarSea !== undefined) return mem.beggarSea < 0 ? null : spot(mem.beggarSea);
+  const start = Math.floor(ship.y) * s.w + Math.floor(ship.x);
+  const seen = new Set<number>([start]);
+  const queue = [start];
+  let best = start;
+  let bestD = Infinity;
+  for (let q = 0; q < queue.length; q++) {
+    const i = queue[q];
+    const x = i % s.w;
+    const y = (i - x) / s.w;
+    const d = (x + 0.5 - at.x) * (x + 0.5 - at.x) + (y + 0.5 - at.y) * (y + 0.5 - at.y);
+    if (d < bestD) {
+      bestD = d;
+      best = i;
+    }
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx;
+      const ny = y + dy;
+      const ni = ny * s.w + nx;
+      if (seen.has(ni) || !walkable(s, nx, ny, NAVAL)) continue;
+      seen.add(ni);
+      queue.push(ni);
+    }
+  }
+  mem.beggarSea = best === start ? -1 : best;
+  return best === start ? null : spot(best);
 }
 
 /** The rival dyke seen within `AI_BEGGARS.hunt` tiles of a Dock, nearest it, that holds back polder worth flooding (#783), or null. */
