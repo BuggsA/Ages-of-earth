@@ -117,14 +117,15 @@ export function reassignProblem(from: Job, to: Job): string | null {
 /**
  * Send up to `n` of a player's citizens from one job to another, wherever they are: each takes the nearest free node
  * of the new kind within `LABOR.reach` tiles (nodes with `SPREAD.perNode` workers are passed over). Food means berries,
- * then a free field, then meat nearby. Returns how many were moved and, if fewer than asked, why.
+ * then a free field, then meat nearby. Returns how many were moved and, if fewer than asked, why, and the citizens
+ * sent for food who found none of it (`stuck`: the caller may lay them a field, #344).
  */
-export function reassign(s: GameState, p: number, from: Job, to: Job, n: number): { moved: number; why: string | null } {
+export function reassign(s: GameState, p: number, from: Job, to: Job, n: number): { moved: number; why: string | null; stuck: Unit[] } {
   const bad = reassignProblem(from, to);
-  if (bad) return { moved: 0, why: bad };
+  if (bad) return { moved: 0, why: bad, stuck: [] };
   const want = Math.max(0, Math.min(LABOR.most, Math.floor(n)));
   const pool = sparest(s, p, from);
-  if (!pool.length) return { moved: 0, why: `No one is ${from === 'idle' ? 'idle' : `working ${from}`}` };
+  if (!pool.length) return { moved: 0, why: `No one is ${from === 'idle' ? 'idle' : `working ${from}`}`, stuck: [] };
   const load = new Map<number, number>();
   const busy = (i: number) => (load.get(i) ?? 0) >= SPREAD.perNode;
   const fields = new Set<number>();
@@ -139,8 +140,9 @@ export function reassign(s: GameState, p: number, from: Job, to: Job, n: number)
     if (e.kind === 'unit' && e.owner === p && e.hp > 0 && e.order.k === 'milk' && !pool.includes(e)) ewes.add(e.order.target);
   }
   const crew = to === 'build' ? sites(s, p, pool) : null;
-  if (crew && !crew.size) return { moved: 0, why: 'Nothing is being built' };
+  if (crew && !crew.size) return { moved: 0, why: 'Nothing is being built', stuck: [] };
   let moved = 0;
+  const stuck: Unit[] = [];
   for (const u of pool) {
     if (moved >= want) break;
     if (crew) {
@@ -174,7 +176,10 @@ export function reassign(s: GameState, p: number, from: Job, to: Job, n: number)
         } else if (ewe) {
           ewes.add(ewe.id);
           giveOrder(u, { k: 'milk', target: ewe.id, phase: 'go' });
-        } else continue;
+        } else {
+          stuck.push(u);
+          continue;
+        }
       }
     } else {
       const kind = KIND_OF_JOB[to]!;
@@ -196,6 +201,6 @@ export function reassign(s: GameState, p: number, from: Job, to: Job, n: number)
     }
     moved++;
   }
-  if (moved >= Math.min(want, pool.length)) return { moved, why: null };
-  return { moved, why: moved ? `Only ${moved} could reach ${to}` : `No free ${to} within reach` };
+  if (moved >= Math.min(want, pool.length)) return { moved, why: null, stuck };
+  return { moved, why: moved ? `Only ${moved} could reach ${to}` : `No free ${to} within reach`, stuck };
 }

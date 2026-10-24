@@ -2268,7 +2268,7 @@ export const EXPLORE = { grid: 4, apart: 12, fails: 8, shun: 6, wary: 2, army: 4
  * - `farm`: a food gatherer whose bushes and game are gone takes an unworked field within this many tiles.
  * - `retry`: a laden citizen jammed on the way home tries the road again this often, instead of standing idle.
  */
-export const AUTO_WORK = { trained: 14, rally: 8, herd: 8, farm: 12, shaft: 16, retry: secs(4) };
+export const AUTO_WORK = { trained: 14, rally: 8, herd: 8, farm: 12, shaft: 16, lay: 5, retry: secs(4) };
 /**
  * The clever computer plans for winter from season `from` (`coldComing` in `ai.ts`); in the Stone Age it raises no winter fields while its larder holds `larder` food (#486).
  * Its hunters of the turning year (#546) keep `shy` tiles from a rival's soldiers.
