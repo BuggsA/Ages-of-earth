@@ -53,9 +53,9 @@ function waterNear(s: GameState, b: Building, r: number): boolean {
   return false;
 }
 
-/** A fallen Thornwall leaves its root, unless its own people grubbed it out or its people is gone. */
+/** A fallen Thornwall leaves its root, unless its own people grubbed it out, fire took it (`fire.ts`), or its people is gone. */
 export function rootThorn(s: GameState, b: Building): void {
-  if (b.type !== 'thornwall' || !b.built || b.grub || s.players[b.owner]?.defeated) return;
+  if (b.type !== 'thornwall' || !b.built || b.grub || b.burnt || s.players[b.owner]?.defeated) return;
   (s.roots ??= []).push({ tile: b.ty * s.w + b.tx, owner: b.owner, at: s.tick + secs(GROVE.regrow) });
 }
 

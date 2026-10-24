@@ -13,6 +13,7 @@ import { unitPicture } from './ui/thumbs';
 import { easeHour, SHOT_SECONDS, titleShot } from './ui/titleShots';
 import { isEnemy } from './sim/world';
 import { carriesKegs, kegProblem } from './sim/powder';
+import { carriesTorch, torchProblem } from './sim/fire';
 import { launchProblem } from './sim/silo';
 import { jumpAge, rush, topUp } from './sim/god';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
@@ -107,7 +108,9 @@ let placeAt: { tx: number; ty: number; ok: boolean } | null = null;
 let wallDrag: { x0: number; y0: number; x1: number; y1: number } | null = null;
 /** The next left click picks a target: where to attack-move, or a building to shelter in. */
 let launchSilo = 0;
-let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | 'keg' | 'launch' | null = null;
+let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | 'keg' | 'torch' | 'launch' | null = null;
+/** When the viewer was last told one of its living buildings caught fire, so a spreading fire tells once. */
+let fireToldAt = -9999;
 let paused = false;
 const SPEEDS = [1, 1.5, 2, 3];
 let speedIdx = 0;
@@ -161,6 +164,10 @@ const hud = new Hud({
   },
   kegMode: () => {
     targetMode = 'keg';
+    placing = null;
+  },
+  torchMode: () => {
+    targetMode = 'torch';
     placing = null;
   },
   launchMode: (silo) => {
@@ -1610,6 +1617,27 @@ function kegAt(clientX: number, clientY: number, queue: boolean): void {
   play('move');
 }
 
+/** Fire (`fire.ts`): the selected citizens and foot soldiers carry torches to the rival's living building, tree or root clicked. */
+function torchAt(clientX: number, clientY: number, queue: boolean): void {
+  const s = game;
+  if (!s) return;
+  const pk = view.pick(clientX, clientY);
+  const b = pk && pk.kind === 'building' ? s.byId.get(pk.id) : undefined;
+  const g = b ? null : view.groundAt(clientX, clientY);
+  const at = b ? { target: b.id } : g ? { tile: Math.floor(g.y) * s.w + Math.floor(g.x) } : null;
+  const why = at ? torchProblem(s, viewer, at) : "Pick a tree, a rival's Thornwall root, or a rival's living building";
+  if (!at || why) {
+    hud.toast(why ?? 'Pick something to burn', 'bad');
+    play('error');
+    return;
+  }
+  const ids = selectedUnits(s).filter((u) => !u.inside && carriesTorch(u)).map((u) => u.id);
+  issue({ t: 'torch', p: viewer, ids, ...at, queue: queue || undefined });
+  const t = at.tile ?? -1;
+  view.marker(s, b ? b.x : (t % s.w) + 0.5, b ? b.y : Math.floor(t / s.w) + 0.5, true);
+  play('move');
+}
+
 function garrisonAt(clientX: number, clientY: number, queue: boolean): void {
   const s = game;
   if (!s) return;
@@ -1779,6 +1807,11 @@ canvas.addEventListener('pointerdown', (e) => {
   }
   if (targetMode === 'keg') {
     kegAt(e.clientX, e.clientY, e.shiftKey);
+    if (!e.shiftKey) targetMode = null;
+    return;
+  }
+  if (targetMode === 'torch') {
+    torchAt(e.clientX, e.clientY, e.shiftKey);
     if (!e.shiftKey) targetMode = null;
     return;
   }
@@ -2780,6 +2813,14 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           else if (ev.by === viewer) hud.toast('Your people stamped out a burning keg', 'good');
         } else if (ev.what === 'blown' && ev.owner === viewer) hud.toast('A keg blows: what stood by it is shaken to its footings', 'good');
         break;
+      case 'fire':
+        // Fire (`fire.ts`): told once when a living building of yours catches (a spreading fire would tell every second), and when one is beaten out.
+        if (ev.what === 'lit' && ev.owner === viewer && s.tick - fireToldAt > 15 * TICK_HZ) {
+          fireToldAt = s.tick;
+          hud.toast(`${ev.by !== viewer && s.players[ev.by] ? `${s.players[ev.by].name} has set your` : 'Your'} ${ev.tree ? 'woods' : 'living buildings'} alight: send citizens to beat it out before it spreads`, 'alert');
+        } else if (ev.what === 'out' && ev.owner === viewer) hud.toast('The fire is beaten out', 'good');
+        else if (ev.what === 'root' && ev.owner === viewer) hud.toast('Fire took a Thornwall root: it will not grow again', 'bad');
+        break;
       case 'silo':
         // The Atomic Age (#605): the clock is public, so every player is told when a warhead goes up and where it will land.
         if (ev.what === 'launched') {
@@ -2973,7 +3014,7 @@ function cursorFor(s: GameState): string {
   if (targetMode === 'garrison') return 'cur-garrison';
   if (targetMode === 'sacrifice' || targetMode === 'curse') return 'cur-convert';
   if (targetMode === 'unload') return 'cur-garrison';
-  if (targetMode === 'keg' || targetMode === 'launch') return 'cur-attack';
+  if (targetMode === 'keg' || targetMode === 'torch' || targetMode === 'launch') return 'cur-attack';
   if (!pointer.inside || boxing) return '';
   const units = selectedUnits(s);
   const pk: Pick | null = units.length ? orderPick(s, pointer.x, pointer.y) : view.pick(pointer.x, pointer.y);

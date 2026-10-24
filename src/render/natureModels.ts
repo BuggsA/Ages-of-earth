@@ -56,6 +56,20 @@ function felled(): Kit {
   return k;
 }
 
+/** Where fire took a tree (`fire.ts`): a charred stump on a scatter of grey ash and embers gone dark. */
+function ash(): Kit {
+  const k = new Kit();
+  k.cyl(0.36, 0.42, 0.015, 7, '#4a4541').scale.set(1, 1, 0.8);
+  k.cyl(0.22, 0.26, 0.02, 6, '#77706a', 0.06, 0.008, -0.04);
+  k.cyl(0.065, 0.08, 0.2, 6, '#231c17');
+  k.cyl(0.05, 0.065, 0.02, 6, '#120d0a', 0, 0.2);
+  const snag = k.cyl(0.02, 0.03, 0.16, 4, '#2c221b', 0.03, 0.18, 0);
+  snag.rotation.z = -0.5;
+  k.octa(0.025, '#7a3a1c', -0.12, 0.02, 0.1);
+  k.octa(0.02, '#5a2a16', 0.16, 0.02, -0.08);
+  return k;
+}
+
 function berryBush(): Kit {
   const k = new Kit();
   k.blob(0.26, '#2d6230', 0, 0.18).scale.set(1.1, 0.8, 1.1);
@@ -248,7 +262,7 @@ function fish(): Kit {
   return k;
 }
 
-const MAKERS = { pine, broadleaf, birch, palm, felled, berryBush, stoneDeposit, goldDeposit, bogIron, saltVein, caveMouth, saltpetreVein, bloodIronVein, carcass, carcassRotten, tuft, flowers, pebbles, boulder, fish };
+const MAKERS = { pine, broadleaf, birch, palm, felled, ash, berryBush, stoneDeposit, goldDeposit, bogIron, saltVein, caveMouth, saltpetreVein, bloodIronVein, carcass, carcassRotten, tuft, flowers, pebbles, boulder, fish };
 export type NatureKind = keyof typeof MAKERS;
 
 const cache = new Map<NatureKind, THREE.BufferGeometry>();

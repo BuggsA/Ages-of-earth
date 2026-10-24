@@ -1,4 +1,4 @@
-import { AGES, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, secs } from '../sim/data';
+import { AGES, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs } from '../sim/data';
 import { battlesFor } from '../sim/battles';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, findsOf, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
@@ -421,6 +421,20 @@ const TIPS: Tip[] = [
     // The Age of the Grove (`docs/wild-road.md` §2): its first minute.
     when: (s, me) => ageOf(s.players[me]) === 'grove',
     text: `Your people grows its town now. Plant a <b>${BUILDINGS.thornwall.name}</b> line (drag, like a wall): it grows from seedling to living oak in about ${GROVE.stage * 3} seconds (twice as fast in spring), parts for your own people, and sprouts again from its root if cut down. Set <b>${BUILDINGS.garden.name}s</b> within ${GROVE.dung} tiles of a ${BUILDINGS.den.name} or ${GROVE.water} of water: fed, a gardener brings in far more than a farmer. <b>${BUILDINGS.orchard.name}s</b> by a store bear food by themselves each summer and autumn.`,
+  },
+  {
+    id: 'torch',
+    // Fire (`fire.ts`): a rival's living town is in sight, and torches are in hand.
+    when: (s, me) =>
+      s.players[me].epoch >= FIRE.epoch &&
+      s.ents.some((e) => e.kind === 'building' && e.hp > 0 && FIRE.burns.includes(e.type) && e.owner !== me && s.players[e.owner].team !== s.players[me].team && s.players[me].vis[e.ty * s.w + e.tx] === 1),
+    text: `A rival grows its town: Thornwalls, Kitchen Gardens and Orchards burn. Select citizens or foot soldiers and press <kbd>F</kbd>, then click one: each stands ${FIRE.light} seconds to set it alight, and unless its people beat it out it burns down. A Thornwall that burns leaves no root, and in a dry summer the fire runs along the hedge and through the woods beside it.`,
+  },
+  {
+    id: 'burning',
+    // Fire (`fire.ts`): something of yours burns.
+    when: (s, me) => !!s.fires?.some((f) => f.b !== undefined && s.byId.get(f.b)?.owner === me),
+    text: `Your living buildings are burning. Right-click a burning one with citizens: they beat the flames before they mend it, and ${FIRE.beat} seconds of beating put it out (two citizens, half the time). A gardener at work in a Garden beats at it already. Fell the trees beside your hedges for a firebreak: fire leaps only to what grows.`,
   },
   {
     id: 'tribute',

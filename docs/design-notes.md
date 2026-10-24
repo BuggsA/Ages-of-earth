@@ -1267,3 +1267,13 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 **Choices I made (the owner may revert):** a keg does double to a dyke, so one keg is one breach. Drowned buildings give no kill credit (the sea did it). Mending in any age is broad (any dyke, not just in a gap); it's the Grove's rule, and dykes only go on the water's edge anyway.
 
 **Next:** the Water Line (s4) is this rule run backwards on purpose: sluices that let the sea into your own low ground while the enemy walks across it, and `wading` for flooded fields. A dyke's "holds back" number would make a good tower-like warning ring on the minimap.
+
+## Designers' notes: fire (Wild route step 3, #723, 2026-10-24, chain 1024-1233 s1, lane rules)
+
+**Built:** a shared rule every people uses from the Bronze Age (`src/sim/fire.ts`, `FIRE`). Torches in the hands of citizens and foot soldiers; trees, Thornwall roots and a rival's living buildings (Thornwall, Kitchen Garden, Orchard, Sapling) catch; fire leaps tile by tile on the match's own dice, as far as the season lets it (a summer fire takes most of a wood, a spring one smoulders out in a few trees); a burnt tree is ash for five minutes, then grows again; a building burns until its people beat it out, and a Thornwall burnt down leaves no root. The computer torches a rival's growth with its campaigning soldiers and beats out its own fires.
+
+**Why I love it:** the Grove made a town you couldn't answer except by out-fighting it. Now the answer is a verb a rival can see coming, and it's a race both ways: the torchbearer must stand three seconds at a hedge under the archers, and the gardener who sees the smoke runs to beat it. The year matters again: a Wild town is safest in the wet spring and most exposed in high summer, and it learns to fell a firebreak behind its hedges. And it's only living things that burn, so a stone town shrugs and a green one trembles: green against iron.
+
+**What I chose:** fire takes only what grows (no houses or farms), so the trunk's balance stays as it was; anyone's woods burn, so a torched woodline is a raid on wood too. Torches are free: their cost is the three seconds standing at the target, and the scorch for whoever lingers.
+
+**Next:** smoke that quiets Hives (step 4); the Wildwood's door ("fire hits living things twice as hard"); beasts that fear fire; the computer felling a firebreak in summer, or burning a rival's woodline before a long war; farms as dry grain in autumn, maybe.

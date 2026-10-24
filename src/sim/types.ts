@@ -168,7 +168,9 @@ export type Order =
   /** A citizen lifting key ore from a cache (#570) and carrying it to the nearest Town Center or Storehouse. */
   | { k: 'cache'; target: number }
   /** A sapper carrying a powder keg to a rival building to lay it at its foot (#577, `powder.ts`). */
-  | { k: 'keg'; target: number };
+  | { k: 'keg'; target: number }
+  /** A torchbearer setting a rival's living building (`target`) or a tree or root (`tile`) alight (`fire.ts`); `t` ticks stood lighting it. */
+  | { k: 'torch'; target?: number; tile?: number; t?: number };
 
 /** What a unit is visibly doing, for the renderer's animation. */
 export type Act = 'idle' | 'walk' | 'attack' | 'chop' | 'mine' | 'forage' | 'farm' | 'build' | 'chant' | 'fish';
@@ -317,6 +319,8 @@ export interface Building {
   fed?: number;
   /** A Thornwall its own people grubbed out (deleted): it leaves no root to regrow. */
   grub?: boolean;
+  /** Burnt down (`fire.ts`): a Thornwall that burns leaves no root. */
+  burnt?: boolean;
   /** A Windmill (#701): the tick it last pumped a tile dry, so its sails show it at work. Absent: it never has. */
   pumped?: number;
   /** Where new units go. `kind` is the resource the flag was set on (absent on bare ground), so it outlives its tile (#344). */
@@ -443,6 +447,22 @@ export interface Stool {
   tile: number;
   from: number;
   at: number;
+  /** Ash of a burnt tree (`fire.ts`): it grows back slowly. */
+  ash?: boolean;
+}
+
+/** A fire burning on a tile (`fire.ts`): a tree, or a living building (`b`, its id; `tile` its corner). */
+export interface Fire {
+  tile: number;
+  b?: number;
+  /** Tiles from where the torch set it: it runs no further than `FIRE.run`. */
+  gen: number;
+  /** Who set the first flame. */
+  by: number;
+  /** A tree: the tick it falls to ash. */
+  end?: number;
+  /** A building: seconds of fire beaten out so far. */
+  out?: number;
 }
 
 /** A warhead in the air (#605, `silo.ts`): launched from `silo`, it lands at (`x`, `y`) on tick `at`. */
@@ -693,6 +713,8 @@ export interface PlayerStats {
   ground?: number;
   /** Kegs that blew at a rival's building (#577); absent in older saves. */
   blown?: number;
+  /** Fires this player's torches set (`fire.ts`); absent in older saves. */
+  torched?: number;
   /** Rare ore bought at the trading posts (#573); absent in older saves. */
   bought?: number;
   /** Food a Warband's soldiers carried off from rivals (#463 s1); absent in older saves. */
@@ -861,6 +883,8 @@ export type GameEvent =
   | { k: 'cache'; owner: number; from: number; ore: RareId; n: number; x: number; y: number; what: 'spilled' | 'taken' | 'kept' }
   /** A powder keg (#577): `ground` at the mills, `laid` at a building's foot, `blown`, or `doused` by a rival who reached it. */
   | { k: 'keg'; owner: number; x: number; y: number; what: 'ground' | 'laid' | 'blown' | 'doused'; by?: number }
+  /** Fire (`fire.ts`): `lit` by a torch or spreading (`tree` when a tree; `owner` the building's), `out` (beaten out), `ash` (a tree burnt down), `root` (a Thornwall root burnt). `by` set the first flame. */
+  | { k: 'fire'; what: 'lit' | 'out' | 'ash' | 'root'; x: number; y: number; by: number; owner?: number; torch?: boolean; tree?: boolean }
   /** A Missile Silo's warhead (#605): `launched` (the clock starts), `scrubbed` (the silo fell) or `struck`. */
   | { k: 'silo'; owner: number; x: number; y: number; what: 'launched' | 'scrubbed' | 'struck'; fuse?: number }
   /** A trader bought a load of rare ore at a post (#573). */
@@ -1053,6 +1077,8 @@ export interface GameState {
   caches?: OreCache[];
   /** Powder kegs laid with their fuses burning (#577, `powder.ts`); absent until one is laid. */
   kegs?: Keg[];
+  /** Fires burning, in the order they were lit (`fire.ts`); absent while nothing burns. */
+  fires?: Fire[];
   /** Warheads in the air (#605, `silo.ts`); absent until one is launched. */
   launches?: Launch[];
   /** Ground poisoned by warheads that have struck (#605 s2); absent until one does. */
@@ -1156,6 +1182,8 @@ export interface AiMemory {
   mission?: number;
   /** When it last sent sappers with kegs (#577). */
   kegAt?: number;
+  /** When it last sent torchbearers (`fire.ts`). */
+  torchAt?: number;
   /** When an Industrial computer bound for a side future began to hold off the Atomic Age (#605). */
   sideHold?: number;
   /** Where a loaded silo means to strike, chosen once a second (#605). */
@@ -1286,6 +1314,8 @@ export type Command =
   | ({ t: 'cache'; p: number; ids: number[]; target: number } & Queued)
   /** Citizens or foot soldiers carry a powder keg to a rival building and lay it there (#577, the Age of Sappers); the target is a building id. */
   | ({ t: 'keg'; p: number; ids: number[]; target: number } & Queued)
+  /** Citizens or foot soldiers carry torches to a rival's living building (`target`) or to a tree or root (`tile`) and set it alight (`fire.ts`). */
+  | ({ t: 'torch'; p: number; ids: number[]; target?: number; tile?: number } & Queued)
   /** A Missile Silo launches at a point (#605, the Atomic Age). */
   | { t: 'launch'; p: number; silo: number; x: number; y: number }
   /** Answer the card of tidings waiting at the fire (#443): `take` pays its price, otherwise it is passed by. */
