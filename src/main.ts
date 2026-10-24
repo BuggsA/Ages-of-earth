@@ -6,7 +6,8 @@ import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { SIGHT_LORE } from './render/sightings';
 import { wallLine } from './sim/commands';
-import { AGES, BUILDINGS, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, SILO, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
+import { AGES, BUILDINGS, SHAFT, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, SILO, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
+import { siteGrade } from './sim/shafts';
 import { crestSvg } from './ui/crests';
 import { unitPicture } from './ui/thumbs';
 import { easeHour, SHOT_SECONDS, titleShot } from './ui/titleShots';
@@ -1649,6 +1650,12 @@ function placeHere(shift: boolean): void {
   const kind = placing;
   const ids = selectedUnits(s).filter((u) => canRaise(u.type, kind, s.players[viewer].civ)).map((u) => u.id);
   issue({ t: 'build', p: viewer, ids, type: placing, tx: placeAt.tx, ty: placeAt.ty, queue: shift || undefined });
+  // A Mine Shaft's ground (#681): say how well it will dig here.
+  if (kind === 'shaft') {
+    const site = { tx: placeAt.tx, ty: placeAt.ty, size: BUILDINGS.shaft.size };
+    const g = siteGrade(s, site);
+    hud.toast(`${{ old: 'Old workings', hill: 'Mountain rock', open: 'Open ground' }[g]}: a shaft here digs at ${Math.round(SHAFT.grade[g] * 100)}% of an open deposit's pace`);
+  }
   if (!shift) {
     placing = null;
     placeAt = null;
