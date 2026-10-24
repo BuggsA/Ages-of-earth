@@ -18,7 +18,7 @@ import { carriedBy, relicAt } from './relics';
 import { animalRadius, hitAnimal } from './animals';
 import { milkable } from './flocks';
 import { catchIn, nextSnare } from './snares';
-import { TILE_OF_SEAM, resOfSeam, seamOf, shaftShare } from './shafts';
+import { TILE_OF_SEAM, resOfSeam, seamOf, seamProblem, shaftShare } from './shafts';
 import { dig, ruinAt } from './ruins';
 import { rubbleAt, salvages, strip } from './salvage';
 import { bank, cacheAt, lift } from './caches';
@@ -335,6 +335,15 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
         if (want === R_MEAT || want === R_FISH) continue;
         next = findResource(s, want, (o.tile % s.w) + 0.5, Math.floor(o.tile / s.w) + 0.5, SPREAD.far);
         if (next >= 0) break;
+      }
+    }
+    // The player's miner whose seam ran dry takes a Mine Shaft nobody works nearby before standing idle (#344, #681).
+    if (person && next < 0 && !o.rare && !o.bog && u.carry === 0 && (o.res === 'stone' || o.res === 'gold')) {
+      const pit = freeShaft(s, u.owner, fx, fy, AUTO_WORK.shaft);
+      if (pit && !seamProblem(s, pit, o.res)) {
+        if (seamOf(s, pit) !== o.res) pit.seam = o.res;
+        setOrder(u, { k: 'shaft', target: pit.id, res: o.res, phase: 'go' });
+        return;
       }
     }
     if (next >= 0) {
