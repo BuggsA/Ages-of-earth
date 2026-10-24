@@ -9,7 +9,7 @@ import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE } from '../sim/units';
-import { SHEPHERD, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -32,7 +32,7 @@ import { chantedOver, consecrates, faithOf } from '../sim/consecrate';
 import { rallyProblem } from '../sim/rally';
 import { stirred as stirredNow } from '../sim/combat';
 import { sees } from '../sim/vision';
-import { buildingCostFor, buildingMaxHp, modsOf, statsFor, techCostFor, techProblem, trainCostFor, trainTimeFor } from '../sim/stats';
+import { buildingCostFor, buildingMaxHp, gunPower, gunRange, modsOf, raiseProblem, statsFor, techCostFor, techProblem, trainCostFor, trainTimeFor } from '../sim/stats';
 import { isMobile, packProblem, packsOf, pitchProblem } from '../sim/steppe';
 import { exacting, isRider } from '../sim/tribute';
 import { landOwnerAt } from '../sim/borders';
@@ -689,7 +689,7 @@ export class Hud {
       const items: string[] = [];
       for (const list of groups.values()) {
         for (const e of list.slice(0, 60)) {
-          const max = e.kind === 'unit' ? statsFor(s, e.owner, e.type).hp : buildingMaxHp(s, e.owner, e.type);
+          const max = e.kind === 'unit' ? statsFor(s, e.owner, e.type).hp : buildingMaxHp(s, e.owner, e.type, e.kind === 'building' ? e.level : 0);
           const pic = e.kind === 'unit' ? unitPicture(e.type, s.players[e.owner].epoch, s.players[e.owner].color) : buildingPicture(e.type, s.players[e.owner].epoch, s.players[e.owner].color);
           items.push(`<div class="mitem" data-pick="${e.id}" data-tip="<b>${nameOf(s, e)}</b>Click to pick only this one; shift-click to drop it."><img src="${pic}" alt=""><div class="mhp"><i style="width:${Math.round((e.hp / max) * 100)}%"></i></div></div>`);
         }
@@ -849,7 +849,7 @@ export class Hud {
   private buildingPanel(s: GameState, viewer: number, b: Building): [string, string] {
     const p = s.players[b.owner];
     const def = BUILDINGS[b.type];
-    const max = buildingMaxHp(s, b.owner, b.type);
+    const max = buildingMaxHp(s, b.owner, b.type, b.level);
     const mine = b.owner === viewer;
     let status = '';
     let queue = '';
@@ -861,15 +861,16 @@ export class Hud {
       if (mine) queue = `<div class="queue"><div class="qitem" data-cancel="${b.id}:-1" data-tip="<b>${AGES[road.to].name}</b>Click to cancel (full refund)."><span class="qglyph">${road.back ? '⏬' : '⏫'}</span><div class="prog"><i style="width:${pct}%"></i></div></div></div>`;
     } else if (b.queue.length) {
       const it = b.queue[0];
-      const need = it.tech ? secs(TECHS[it.tech].time) : secs(trainTimeFor(s, b.owner, it.unit!, b.type));
+      const step = TOWER_LEVELS[b.level ?? 0];
+      const need = it.rise ? secs(step?.time ?? 1) : it.tech ? secs(TECHS[it.tech].time) : secs(trainTimeFor(s, b.owner, it.unit!, b.type));
       const pct = Math.min(100, Math.floor((it.done / need) * 100));
-      status = it.tech ? `Researching ${TECHS[it.tech].name}: ${pct}%` : it.done > need ? 'Waiting for room: build houses' : `Training ${statsFor(s, b.owner, it.unit!).name}: ${pct}%`;
+      status = it.rise ? `Raising to ${step?.name ?? 'the top'}: ${pct}%` : it.tech ? `Researching ${TECHS[it.tech].name}: ${pct}%` : it.done > need ? 'Waiting for room: build houses' : `Training ${statsFor(s, b.owner, it.unit!).name}: ${pct}%`;
       if (mine)
         queue = `<div class="queue">${b.queue
           .map((q, i) => {
             const qp = i === 0 ? pct : 0;
-            const name = q.tech ? TECHS[q.tech].name : statsFor(s, b.owner, q.unit!).name;
-            const face = q.tech ? `<span class="qglyph">${TECHS[q.tech].icon}</span>` : `<img src="${unitPicture(q.unit!, p.epoch, p.color)}" alt="">`;
+            const name = q.rise ? (step?.name ?? '') : q.tech ? TECHS[q.tech].name : statsFor(s, b.owner, q.unit!).name;
+            const face = q.rise ? `<span class="qglyph">${step?.icon ?? ''}</span>` : q.tech ? `<span class="qglyph">${TECHS[q.tech].icon}</span>` : `<img src="${unitPicture(q.unit!, p.epoch, p.color)}" alt="">`;
             return `<div class="qitem" data-cancel="${b.id}:${i}" data-tip="<b>${name}</b>Click to cancel (full refund).">${face}<div class="prog"><i style="width:${qp}%"></i></div></div>`;
           })
           .join('')}</div>`;
@@ -993,7 +994,7 @@ export class Hud {
         ${mine && b.type === 'market' && b.built ? `<div class="blurb">Prices shared by all players. ↑ recovers upward, ↓ downward, → steady. Drift: ${MARKET.recover} gold every ${MARKET.every}s toward the starting quote; trades move it immediately.</div>` : ''}
         ${mine && b.built && b.hp < max ? `<div class="blurb">Select citizens and right-click to repair (a full repair costs ${Math.round(REPAIR_SHARE * 100)}% of its price).${def.garrison ? ' Press G to shelter instead.' : ''}</div>` : ''}
         ${inside}
-        ${queue || `<div class="blurb">${def.blurb}${def.guns ? ` Shoots ${def.guns.range} tiles.` : ''}</div>`}
+        ${queue || `<div class="blurb">${def.blurb}${def.guns ? ` Shoots ${gunRange(s, b.owner, b.type, b.level)} tiles, ${Math.round(gunPower(s, b.owner, b.type, b.level))} an arrow.` : ''}</div>`}
       </div>`;
     return [html, sig];
   }
@@ -1427,6 +1428,23 @@ export class Hud {
           });
         }
         if (b.type === 'tower') {
+          // The tower line: this tower alone climbs a step.
+          const step = TOWER_LEVELS[b.level ?? 0];
+          if (step) {
+            const problem = raiseProblem(s, viewer, b);
+            const short = shortfall(p, step.cost);
+            const raising = b.queue.some((q) => q.rise);
+            cmds.push({
+              key: 'Q', pic: '', glyph: step.icon, title: `Raise to ${step.name}`,
+              desc: `${step.blurb} Takes ${step.time}s; the tower keeps shooting while it is raised.`,
+              cost: step.cost, ok: !problem && !short && !full && !busy, on: raising,
+              why: raising ? 'Being raised' : (problem ?? (full ? 'The queue is full' : (short ?? undefined))),
+              run: () => {
+                this.act.issue({ t: 'raiseTower', p: viewer, building: b.id });
+                this.act.sound('queue');
+              },
+            });
+          }
           const why = beaconProblem(s, p, b);
           cmds.push({ key: 'F', pic: '', glyph: '🔥', title: 'Light the beacon', desc: `A fire on the roof: this tower sees ${BEACON.sight} tiles farther for ${BEACON.duration} seconds, but every rival sees the ground around it. Costs ${BEACON.cost.wood} wood; it can be lit again after ${BEACON.cooldown} seconds.`, ok: !why, why: why ?? undefined, on: lit(s, b), run: () => this.act.issue({ t: 'beacon', p: viewer, building: b.id }) });
         }
@@ -1523,6 +1541,7 @@ function resHint(r: string): string {
 
 export function nameOf(s: GameState, e: Ent): string {
   if (e.kind === 'unit' && s.kings.includes(e.id)) return 'King';
+  if (e.kind === 'building' && e.type === 'tower' && e.level) return TOWER_LEVELS[e.level - 1].name;
   return e.kind === 'unit' ? statsFor(s, e.owner, e.type).name : BUILDINGS[e.type].name;
 }
 

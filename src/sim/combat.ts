@@ -10,7 +10,7 @@ import { raided } from './household';
 import { alarm } from './flee';
 import { distToRect } from './grid';
 import type { Spatial } from './spatial';
-import { modsOf, statsFor } from './stats';
+import { gunPower, gunRange, modsOf, statsFor } from './stats';
 import type { Animal, Building, Ent, GameState, Shot, Unit } from './types';
 import { canHit, isEnemy, radiusOf, statsOf } from './world';
 
@@ -270,19 +270,17 @@ export function buildingGuns(s: GameState, sp: Spatial, b: Building): void {
     b.cool--;
     return;
   }
-  const epoch = s.players[b.owner].epoch;
-  const m = modsOf(s, b.owner);
-  const reach = g.range + m.range + b.size / 2;
+  const reach = gunRange(s, b.owner, b.type, b.level) + b.size / 2;
   // A Blood Tower (#355 s3) looks for the living first, and spends its bolts on the bloodless only when nothing else is near.
   const blood = b.type === 'bloodtower';
   const t = (blood ? nearestEnemyUnit(s, sp, b.owner, b.x, b.y, reach, bleeds) : null) ?? nearestEnemyUnit(s, sp, b.owner, b.x, b.y, reach);
   if (!t) return;
   b.cool = secs(g.reload);
-  const power = (g.damage + m.rangedAttack) * (1 + epoch * 0.2);
+  const power = gunPower(s, b.owner, b.type, b.level);
   // A Coil Tower (the Age of Lightning, #231) looses a bolt in place of its own arrow; those sheltering inside still shoot.
   // A tower kept as Lightning's keepsake (#555 s11) is still a coil on any road.
   const coil = b.type === 'tower' && (hasCoils(s.players[b.owner]) || b.keep === 'lightning');
-  if (coil) arc(s, sp, b, t, power);
+  if (coil) arc(s, sp, b, t, power * LIGHTNING.bolt);
   const arrows = 1 + Math.min(10, b.garrison.length);
   // Extra arrows go to others nearby when there are any, so a volley spreads over a crowd.
   const others: Unit[] = [];

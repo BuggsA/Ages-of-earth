@@ -1216,3 +1216,7 @@ Seen: headless Chromium (software GL), a lakes map, a dock and an army put in by
 **Why I love it:** the owner kept running out of stone and gold and trading wood for them. Now the choice is where to sink: over a spent vein, beside the hills, or at home on poor ground.
 
 **Next:** more seams are one entry in `SHAFT.seams` (coal, iron, clay); a collapse or flood risk; deeper shafts that dig faster in later ages.
+
+## Designers' notes: the tower line (2026-10-24)
+
+Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and each tower grows on its own through Guard Tower, Keep and Bastion (the owner asked for per-tower upgrades). Why I like it: a tower rush stays possible but is cheap to answer, and the question becomes which tower is worth the stone: the one at the ford, not the one behind the farms. Next: give each step its own model (a second storey, stone walls, a low angled bastion), and maybe a fork at the Bastion (more arrows for the garrison, or walls that shrug off siege).

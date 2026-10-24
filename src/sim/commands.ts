@@ -1,7 +1,7 @@
-import { BUILDINGS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, SNARE, SPREAD, TECHS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
+import { BUILDINGS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, SNARE, SPREAD, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
 import { peace } from './combat';
 import { placeProblem, stampBuilding, walkable } from './grid';
-import { buildingCostFor, techCostFor, techProblem, trainCostFor } from './stats';
+import { buildingCostFor, raiseProblem, techCostFor, techProblem, trainCostFor } from './stats';
 import { packCamp, packProblem, pitchCamp, pitchProblem } from './steppe';
 import { lambProblem, raiseLamb } from './flocks';
 import { backProblem, backTo, barred, buildBarred, canRaise, chooseKeepsake, journeyOf, keepsakeProblem, roadProblem, roadTo, trainsAt } from './ages';
@@ -839,6 +839,19 @@ export function applyCommand(s: GameState, c: Command): void {
       if (short) return refuse(s, c.p, short);
       pay(p, cost);
       b.queue.push({ tech: c.tech, done: 0, paid: { ...cost } });
+      break;
+    }
+    case 'raiseTower': {
+      const b = myBuilding(s, c.p, c.building);
+      if (!b) return;
+      const problem = raiseProblem(s, c.p, b);
+      if (problem) return refuse(s, c.p, problem);
+      if (b.queue.length >= MAX_QUEUE) return refuse(s, c.p, 'The queue is full');
+      const cost = TOWER_LEVELS[b.level ?? 0].cost;
+      const short = shortfall(p, cost);
+      if (short) return refuse(s, c.p, short);
+      pay(p, cost);
+      b.queue.push({ rise: true, done: 0, paid: { ...cost } });
       break;
     }
     case 'cancel': {

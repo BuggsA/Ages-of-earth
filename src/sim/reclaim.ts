@@ -45,7 +45,7 @@ export function raise(s: GameState, b: Building): boolean {
   if (i < 0) return false;
   s.fallen!.splice(i, 1);
   b.progress = RECLAIM.head;
-  b.hp = Math.max(1, Math.round(buildingMaxHp(s, b.owner, b.type) * RECLAIM.head));
+  b.hp = Math.max(1, Math.round(buildingMaxHp(s, b.owner, b.type, b.level) * RECLAIM.head));
   s.events.push({ k: 'foundation', owner: b.owner, type: b.type, x: b.x, y: b.y, what: 'raised' });
   return true;
 }

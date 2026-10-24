@@ -1,7 +1,7 @@
 import { BATTLE, BUILDINGS, secs } from './data';
 import { asleep } from './ages';
 import { damageOf, peace } from './combat';
-import { modsOf } from './stats';
+import { gunPower } from './stats';
 import type { Building, GameState, Unit } from './types';
 import { canHit, isEnemy, statsOf } from './world';
 import { sees, seesRect } from './vision';
@@ -45,8 +45,7 @@ function dps(s: GameState, a: Fighter, t: Fighter): number {
   }
   const g = BUILDINGS[a.type].guns;
   if (!g || t.kind !== 'unit' || asleep(s, a)) return 0;
-  const m = modsOf(s, a.owner);
-  const power = (g.damage + m.rangedAttack) * (1 + s.players[a.owner].epoch * 0.2);
+  const power = gunPower(s, a.owner, a.type, a.level);
   return (Math.max(1, power - statsOf(s, t).parmor) * (1 + Math.min(10, a.garrison.length))) / g.reload;
 }
 

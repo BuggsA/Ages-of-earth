@@ -3,7 +3,7 @@ import { aiTiding } from './tidings';
 import { AGES, AI_SILO, SILO, TICK_HZ, AI_CLIMB, AI_FIND, FINDS, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_SEA, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, SEA_RAID, MISSION, AI_MISSION, AI_CHARIOT, STEP_BACK, stepBackCost, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
-import { buildingCostFor, modsOf, techCostFor, techProblem, trainCostFor } from './stats';
+import { buildingCostFor, modsOf, raiseProblem, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Rubble, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
 import { backProblem, backTo, ageDef, ageOf, asleep, barred, buildBarred, crossingLeft, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
@@ -27,7 +27,7 @@ import { graftCost, stationsOf, waiting } from './hemo';
 import { borderMap, landOwnerAt, suppliedAt } from './borders';
 import { workProblem } from './works';
 import { aiKin, aiVow, aiWay, wayBarred } from './ways';
-import { AI_WAYS, AI_KEG, KEG, KILL_CAMP, KIN, WAYS } from './data';
+import { AI_TOWER_KEEP, AI_WAYS, AI_KEG, KEG, KILL_CAMP, KIN, TOWER_LEVELS, WAYS } from './data';
 import { beaconProblem, lit } from './beacon';
 import { rallyProblem } from './rally';
 import { consecrateProblem, consecrates } from './consecrate';
@@ -350,6 +350,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   beaconsForLightning(s, v, mem, issue);
   rallyTheLine(s, v, issue);
   research(s, v, v.hands >= wantCitizens - 2, issue);
+  raiseTowers(s, v, issue);
   trade(s, v, issue);
   // The engine a Masons' Lodge rival calls for (#242) is saved from the town's buildings and soldiers, and handed back at the Workshop.
   v.engine = lodgeEngine(s, v);
@@ -405,6 +406,22 @@ function research(s: GameState, v: View, peopleEnough: boolean, issue: (c: Comma
     spend(v, cost);
     return;
   }
+}
+
+/** A clever computer raises its Watch Towers one step at a time on the tower line, the lowest first, from what it can spare. */
+function raiseTowers(s: GameState, v: View, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!AI_LEVELS[p.ai!].clever) return;
+  let best: Building | null = null;
+  for (const b of v.buildings) {
+    if (b.type !== 'tower' || raiseProblem(s, p.id, b) || b.queue.length) continue;
+    if (!best || (b.level ?? 0) < (best.level ?? 0)) best = b;
+  }
+  if (!best) return;
+  const cost = TOWER_LEVELS[best.level ?? 0].cost;
+  if (!RES.every((r) => !cost[r] || v.budget[r] >= cost[r]! + AI_TOWER_KEEP)) return;
+  issue({ t: 'raiseTower', p: p.id, building: best.id });
+  spend(v, cost);
 }
 
 function trade(s: GameState, v: View, issue: (c: Command) => void): void {

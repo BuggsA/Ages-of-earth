@@ -688,7 +688,7 @@ export class View {
         if (!top) continue;
         if (!(e.owner === this.viewer || this.reveal || seesRect(s, this.viewer, e.tx, e.ty, e.size))) continue;
         top.y += 0.35;
-        bars.push({ at: top, width: Math.min(2.2, Math.max(0.6, e.size * 0.55)), frac: e.hp / buildingMaxHp(s, e.owner, e.type) });
+        bars.push({ at: top, width: Math.min(2.2, Math.max(0.6, e.size * 0.55)), frac: e.hp / buildingMaxHp(s, e.owner, e.type, e.level) });
       }
     }
     this.overlays.setRings(rings);
@@ -727,7 +727,7 @@ export class View {
       if (e.kind !== 'building' || e.hp <= 0 || !e.built) continue;
       if (!(e.owner === this.viewer || this.reveal || seesRect(s, this.viewer, e.tx, e.ty, e.size))) continue;
       const next = (this.chimneys.get(e.id) ?? this.time + (e.id % 7) * 0.3) - dt;
-      const max = buildingMaxHp(s, e.owner, e.type);
+      const max = buildingMaxHp(s, e.owner, e.type, e.level);
       const frac = e.hp / max;
       const base = this.buildings.baseOf(e.id) ?? 0;
       if (next > this.time) {
