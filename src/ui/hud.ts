@@ -9,7 +9,7 @@ import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE, findResource } from '../sim/units';
-import { AUTO_WORK, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { FIRE, AUTO_WORK, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -17,6 +17,7 @@ import { restsAt } from '../sim/passage';
 import { loadPrice, sellerNear } from '../sim/oretrade';
 import { clockOf, launchProblem, loaded, rulesOf } from '../sim/silo';
 import { carriesKegs, kegProblem, kegsOf, millProblem, mills, millsOf, sappers } from '../sim/powder';
+import { carriesTorch, fireOn } from '../sim/fire';
 import { basinOf, millIdle, wateredAt } from '../sim/water';
 import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
 import { LANDMARK_KINDS, claimWork, claimants, favours, landmarkAt } from '../sim/landmarks';
@@ -70,6 +71,8 @@ export interface HudActions {
   riteMode(how: 'sacrifice' | 'curse'): void;
   /** Wait for a left click on a rival building, for sappers to lay a powder keg at (#577). */
   kegMode(): void;
+  /** Wait for a left click on a tree, a root or a rival's living building, for torchbearers to set alight (`fire.ts`). */
+  torchMode(): void;
   /** Wait for a left click on the map, for this Missile Silo to launch at (#605). */
   launchMode(silo: number): void;
   /** Wait for a left click on a building to shelter in (or a transport to board). */
@@ -171,6 +174,8 @@ function orderWords(s: GameState, u: Unit): string {
       return carriedBy(s, u) ? 'Carrying a relic to the Temple' : 'Going for a relic';
     case 'keg':
       return 'Carrying a powder keg to lay';
+    case 'torch':
+      return 'Carrying a torch to set alight';
     case 'cache':
       return u.ore ? `Carrying ${u.ore.n} ${RARE[u.ore.id].name.toLowerCase()} home` : 'Going for the spilled ore';
     case 'salvage':
@@ -1058,7 +1063,9 @@ export class Hud {
     const mine = b.owner === viewer;
     let status = '';
     let queue = '';
-    if (!b.built) status = `Under construction: ${Math.floor(b.progress * 100)}%`;
+    const fire = fireOn(s, b);
+    if (fire) status = `🔥 Burning: ${mine ? `send citizens to beat it out (${Math.max(0, FIRE.beat - (fire.out ?? 0))} seconds of beating left)` : `${s.players[b.owner].name} must beat it out`}`;
+    else if (!b.built) status = `Under construction: ${Math.floor(b.progress * 100)}%`;
     else if (b.advance >= 0 && journeyOf(p, b)) {
       const road = journeyOf(p, b)!;
       const pct = Math.floor((b.advance / secs(road.time)) * 100);
@@ -1317,6 +1324,11 @@ export class Hud {
       if (sappersHere.length && sappers(p)) {
         const why = kegsOf(p) < 1 ? kegProblem(s, viewer, undefined) : null;
         cmds.push({ key: 'K', pic: '', glyph: '🧨', title: 'Lay a keg', count: kegsOf(p) || undefined, desc: `Then click a rival building: each one carries a keg from your store to its foot and lights it. ${KEG.fuse} seconds later it blows, wrecking every rival building within ${KEG.reach} tiles (${KEG.building} each) and hurting the soldiers near it. A rival who reaches a burning keg stamps it out: get there quietly, or cover it. Kegs left: ${kegsOf(p)}. More are ground only in the Age of Alchemy.`, ok: !why, why: why ?? undefined, run: () => this.act.kegMode() });
+      }
+      // Fire (`fire.ts`): citizens and foot soldiers carry torches, from the Bronze Age.
+      if (units.some(carriesTorch)) {
+        const why = p.epoch < FIRE.epoch ? `Torches are carried from the ${EPOCHS[FIRE.epoch].name}` : null;
+        cmds.push({ key: 'F', pic: '', glyph: '🔥', title: 'Torch', desc: `Then click a tree, a rival's Thornwall root, or a rival's living building (a Thornwall, Kitchen Garden, Orchard or Sapling): each one walks to it and stands ${FIRE.light} seconds to set it alight. A living building burns down unless its people beat it out (${FIRE.beat} citizen-seconds standing by it); a Thornwall that burns leaves no root. Fire leaps from tree to tree and on to what grows beside: far in a dry summer (up to ${FIRE.run[1]} tiles), hardly at all in a wet spring or winter (${FIRE.run[0]}). A burnt tree is ash for ${Math.round(FIRE.ash / 60)} minutes, then grows again. Mind your own people: the flames scorch whoever stands in them.`, ok: !why, why: why ?? undefined, run: () => this.act.torchMode() });
       }
       cmds.push({ key: 'S', pic: '', glyph: '✋', title: 'Stop', desc: 'Stop what they are doing (and forget queued orders).', ok: true, run: () => this.act.issue({ t: 'stop', p: viewer, ids: units.map((u) => u.id) }) });
       if (citizens.length && !p.ai) {

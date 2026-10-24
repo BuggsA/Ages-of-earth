@@ -161,7 +161,12 @@ export class ResourcesView {
       const x = tx + 0.5 + (hash2(tx, ty, 31) - 0.5) * 0.3;
       const y = ty + 0.5 + (hash2(tx, ty, 32) - 0.5) * 0.3;
       q.setFromAxisAngle(up, hash2(tx, ty, 33) * Math.PI * 2);
-      const sc = 0.2 + 0.6 * grown;
+      // Ash (`fire.ts`): the charred stump stands alone a while before a shoot comes up through it.
+      if (t.ash) {
+        add('ash', -1, new THREE.Matrix4().compose(new THREE.Vector3(x, heightAt(s, x, y), y), q, new THREE.Vector3(1, 1, 1)));
+        if (grown < 0.4) continue;
+      }
+      const sc = t.ash ? 0.2 + 0.6 * ((grown - 0.4) / 0.6) : 0.2 + 0.6 * grown;
       add('broadleaf', -1, new THREE.Matrix4().compose(new THREE.Vector3(x, heightAt(s, x, y), y), q, new THREE.Vector3(sc, sc * 0.9, sc)));
     }
     for (const [kind, list] of lists) {
@@ -171,7 +176,7 @@ export class ResourcesView {
           this.group.remove(mesh);
           mesh.dispose();
         }
-        const sway = kind !== 'felled' && kind !== 'stoneDeposit' && kind !== 'goldDeposit' && kind !== 'bogIron' && kind !== 'saltVein' && kind !== 'caveMouth' && kind !== 'saltpetreVein' && kind !== 'bloodIronVein' && kind !== 'carcass';
+        const sway = kind !== 'felled' && kind !== 'ash' && kind !== 'stoneDeposit' && kind !== 'goldDeposit' && kind !== 'bogIron' && kind !== 'saltVein' && kind !== 'caveMouth' && kind !== 'saltpetreVein' && kind !== 'bloodIronVein' && kind !== 'carcass';
         mesh = new THREE.InstancedMesh(natureGeometry(kind), sway ? swayMaterial : bakedMaterial, Math.ceil(list.length * 1.2) + 8);
         // Shoals cast no shadow on the water.
         mesh.castShadow = kind !== 'fish';
