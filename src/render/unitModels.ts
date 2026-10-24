@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { CivId, UnitType } from '../sim/types';
 import { Kit, RIG_ARM, RIG_LEG_A, RIG_LEG_B, bake } from './kit';
+import { towKit } from './floatModels';
 
 /**
  * Every unit, in every epoch, built from primitives. Models face +z, stand on y = 0 and are about
@@ -1152,7 +1153,138 @@ function warmammoth(): Kit {
   return k;
 }
 
-const MAKERS: Record<UnitType, (epoch: number) => Kit> = { citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, cog, fighter, bomber, trader, wagon, warwolf, tusker, warmammoth };
+/**
+ * A gun-barge (#701 s4, the Age of the Water Line): a flat, square-ended pram low in the water, a long cannon on a slide in its bow
+ * behind a timber breastwork, a stubby mast with a furled lugsail and a sweep at each side. The Industrial form is a steam gunboat:
+ * an iron launch with a funnel amidships and a gun shield.
+ */
+function barge(epoch: number): Kit {
+  const k = new Kit();
+  const steam = epoch >= 4;
+  // The flat hull: a low box, its ends raked.
+  k.box(0.52, 0.16, 1.2, steam ? '#4a4d52' : '#5a4430', 0, -0.04, 0);
+  k.box(0.46, 0.03, 1.14, steam ? '#6b6f75' : '#9a7a52', 0, 0.12, 0);
+  for (const z of [0.66, -0.66]) k.box(0.5, 0.1, 0.14, steam ? '#3d4045' : '#4a3426', 0, -0.02, z).rotation.x = z > 0 ? 0.5 : -0.5;
+  // The gun on its slide, muzzle over the bow, and the breastwork (or shield) before it.
+  k.box(0.18, 0.06, 0.4, '#3a2b20', 0, 0.15, 0.3);
+  k.cyl(0.05, 0.065, 0.62, 8, '#2a2a2c', 0, 0.26, 0.42).rotation.x = Math.PI / 2;
+  k.box(0.44, 0.14, 0.05, steam ? '#5b5f66' : '#6e4f33', 0, 0.15, 0.62);
+  for (const x of [-0.12, 0.12]) k.cyl(0.05, 0.05, 0.03, 8, '#3a2b20', x, 0.18, 0.2).rotation.z = Math.PI / 2;
+  if (steam) {
+    // The funnel and a wheelhouse.
+    k.cyl(0.07, 0.07, 0.42, 8, '#2f3135', 0, 0.15, -0.15);
+    k.cyl(0.075, 0.075, 0.05, 8, '#c9a64a', 0, 0.5, -0.15);
+    k.box(0.3, 0.2, 0.22, '#7c6a52', 0, 0.15, -0.42);
+    k.team(k.box(0.31, 0.04, 0.23, TEAM, 0, 0.35, -0.42));
+  } else {
+    // A stubby mast with its lugsail furled on the yard, and a sweep over each side.
+    k.cyl(0.025, 0.03, 0.75, 5, '#5b4330', 0, 0.15, -0.2);
+    k.box(0.5, 0.05, 0.05, '#e8e0c8', 0, 0.72, -0.2);
+    for (const side of [-1, 1]) k.box(0.03, 0.03, 0.8, '#6e4f33', side * 0.34, 0.12, -0.3).rotation.y = side * 0.3;
+    k.team(k.box(0.012, 0.14, 0.2, TEAM, 0, 0.82, -0.12));
+    k.team(k.box(0.53, 0.04, 0.2, TEAM, 0, 0.1, -0.5));
+  }
+  return k;
+}
+
+/**
+ * A Blowpipe Hunter (the Age of the Hive): bare-armed, in a bark-cloth kilt of its people's colour and a band of three feathers, a
+ * bamboo quiver of darts at the hip, and a long cane blowpipe raised level to the lips.
+ */
+function blowpipe(): Kit {
+  const k = new Kit();
+  const skin = '#a8754e';
+  const b = person(k, { legs: skin, torso: skin, belt: '#5a3f2a', boots: '#6a4a30' });
+  k.team(k.box(0.18, 0.09, 0.12, TEAM, 0, HIP - 0.02, 0));
+  k.box(0.17, 0.02, 0.11, '#5a3f2a', 0, 0.36, 0.0).rotation.z = 0.7;
+  k.team(k.cyl(0.07, 0.07, 0.025, 8, TEAM, 0, 0.52, 0));
+  k.sphere(0.064, '#2a2018', 0, 0.535, -0.015).scale.set(1, 0.65, 1);
+  for (const [x, c] of [[-0.03, '#d8b23a'], [0, '#2f6a3a'], [0.03, '#b23a2a']] as [number, string][]) k.box(0.014, 0.1, 0.01, c, x, 0.6, -0.06);
+  // The quiver: a joint of bamboo with a gourd of kapok tied to it, and the dart tails showing.
+  k.cyl(0.022, 0.022, 0.18, 6, '#c8b070', 0.1, 0.17, -0.05);
+  k.sphere(0.03, '#b88a4a', 0.1, 0.09, -0.02);
+  for (const dx of [-0.008, 0.008]) k.box(0.01, 0.03, 0.01, '#efe6d2', 0.1 + dx, 0.27, -0.05);
+  held(b, (kk, g) => {
+    kk.cyl(0.009, 0.012, 0.82, 6, '#b59a5a', 0, 0.04, 0.3, g).rotation.x = Math.PI / 2;
+    kk.cyl(0.016, 0.016, 0.03, 6, '#5a3f2a', 0, 0.04, -0.08, g).rotation.x = Math.PI / 2;
+  }, SHOULDER - 0.1, 1.55);
+  return k;
+}
+
+/**
+ * A Cave Bear (the Age of the Hive): bred at the Den, a great humped bear of dark fur with a pale muzzle, short ears and a hide
+ * collar in its people's colour. A slow wall of fur.
+ */
+function cavebear(): Kit {
+  const k = new Kit();
+  const fur = '#4a3626';
+  const dark = '#2c2016';
+  const LEG = 0.17;
+  for (const [x, z, rig] of [[-0.09, 0.14, RIG_LEG_A], [0.09, 0.14, RIG_LEG_B], [-0.09, -0.14, RIG_LEG_B], [0.09, -0.14, RIG_LEG_A]] as [number, number, number][]) {
+    const g = k.limb(k.group(0, 0, 0), rig, LEG, z);
+    k.box(0.08, LEG, 0.08, fur, x, 0, z, g);
+    k.box(0.09, 0.03, 0.1, dark, x, 0, z + 0.01, g);
+  }
+  k.blob(0.24, fur, 0, LEG + 0.15, -0.02).scale.set(0.95, 0.85, 1.45);
+  // The hump over the shoulders, the mark of a cave bear.
+  k.blob(0.16, fur, 0, LEG + 0.28, 0.1).scale.set(0.9, 0.75, 1);
+  const head = k.limb(k.group(0, 0, 0), RIG_ARM, LEG + 0.18, 0.28);
+  k.blob(0.12, fur, 0, LEG + 0.2, 0.33, head).scale.set(1, 0.9, 1.05);
+  k.box(0.09, 0.08, 0.1, '#8a6a4a', 0, LEG + 0.16, 0.44, head);
+  k.box(0.04, 0.03, 0.02, '#1a1410', 0, LEG + 0.19, 0.5, head);
+  for (const x of [-0.07, 0.07]) k.sphere(0.03, dark, x, LEG + 0.3, 0.3, head);
+  k.team(k.box(0.24, 0.04, 0.06, TEAM, 0, LEG + 0.2, 0.22));
+  return k;
+}
+
+/**
+ * An Ent (the Age of the Wildwood): an old tree woken, walking on two root-legs. A trunk of dark furrowed bark with a lighter heartwood
+ * face, two eyes of amber sap that glow, branch arms that swing as it walks with twigs at their ends, a heavy crown of leaves, and a
+ * sash of moss-woven cloth in its people's colour. Tall: half again a man.
+ */
+function warden(): Kit {
+  const k = new Kit();
+  const bark = '#4b3a28';
+  const furrow = '#33271b';
+  const heart = '#8a6a44';
+  const leaf = ['#3f6a2e', '#4f7d36', '#355a28'];
+  const LEG = 0.34;
+  for (const [x, rig] of [[-0.11, RIG_LEG_A], [0.11, RIG_LEG_B]] as [number, number][]) {
+    const g = k.limb(k.group(0, 0, 0), rig, LEG, 0);
+    k.cyl(0.07, 0.1, LEG, 6, bark, x, LEG / 2, 0, g);
+    // Root toes splayed on the ground.
+    for (const a of [-0.6, 0, 0.6]) {
+      const toe = k.box(0.035, 0.035, 0.16, furrow, x + Math.sin(a) * 0.06, 0.02, Math.cos(a) * 0.07, g);
+      toe.rotation.y = a;
+    }
+  }
+  // The trunk, a little bent, its bark in long furrows.
+  k.cyl(0.15, 0.19, 0.62, 7, bark, 0, LEG + 0.3, 0);
+  for (const a of [0.4, 1.6, 2.8, 4.1, 5.3]) k.box(0.025, 0.5, 0.03, furrow, Math.cos(a) * 0.17, LEG + 0.3, Math.sin(a) * 0.17).rotation.y = -a;
+  // The face: a pale scar of heartwood, a knot of a nose, and eyes of glowing sap.
+  k.box(0.16, 0.16, 0.04, heart, 0, LEG + 0.5, 0.15);
+  k.box(0.04, 0.06, 0.05, furrow, 0, LEG + 0.48, 0.18);
+  for (const x of [-0.045, 0.045]) k.glow(k.sphere(0.022, '#ffc24a', x, LEG + 0.54, 0.175));
+  k.team(k.box(0.36, 0.05, 0.36, TEAM, 0, LEG + 0.12, 0)).rotation.y = 0.785;
+  // Branch arms, long and crooked, with twigs and a few leaves at the ends.
+  for (const side of [-1, 1]) {
+    const g = k.limb(k.group(0, 0, 0), RIG_ARM, LEG + 0.52, 0);
+    const arm = k.cyl(0.035, 0.05, 0.5, 5, bark, side * 0.22, LEG + 0.32, 0.04, g);
+    arm.rotation.z = side * 0.25;
+    for (const dz of [-0.04, 0.05]) k.box(0.02, 0.12, 0.02, furrow, side * 0.3, LEG + 0.06, dz, g).rotation.z = side * 0.6;
+    k.blob(0.07, leaf[side > 0 ? 1 : 2], side * 0.29, LEG + 0.08, 0.02, g);
+  }
+  // The crown: heaped leaves over the brow, a branch or two through them.
+  k.blob(0.26, leaf[0], 0, LEG + 0.78, -0.02).scale.set(1.15, 0.8, 1);
+  k.blob(0.17, leaf[1], -0.15, LEG + 0.9, 0.04);
+  k.blob(0.16, leaf[2], 0.14, LEG + 0.92, -0.06);
+  k.blob(0.12, leaf[1], 0.02, LEG + 1.04, 0.02);
+  k.cyl(0.02, 0.03, 0.3, 4, bark, 0.12, LEG + 0.82, 0.08).rotation.z = -0.6;
+  return k;
+}
+
+const MAKERS: Record<UnitType, (epoch: number) => Kit> = {
+  tow: () => towKit(), citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, cog, fighter, bomber, trader, wagon, warwolf, tusker, warmammoth, blowpipe, cavebear, barge, warden };
 
 /** Epoch + 30 asks for the citizen as a thrall (the same offset trick as the trader's gold and the caravan cart). */
 export const THRALL_MODEL = 30;

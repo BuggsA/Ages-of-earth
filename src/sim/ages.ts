@@ -1,6 +1,6 @@
-import { AGES, BUILDINGS, CIVS, GOLDEN, LIGHTNING, LOWER_IS_BETTER, PATHS, ROADS, STEP_BACK, TECHS, TICK_HZ, TRUNK, WAYS, secs, stepBackCost, type Age, type Deed, type Mods, type Road, type UnitClass } from './data';
+import { AGES, BUILDINGS, CIVS, DAM, GOLDEN, LIGHTNING, LOWER_IS_BETTER, PATHS, ROADS, STEP_BACK, TECHS, TICK_HZ, TRUNK, WAYS, secs, stepBackCost, type Age, type Deed, type Mods, type Road, type UnitClass } from './data';
 import { KEYS, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, type AgeId, type CivId, type PathId, type RareId, type Building, type BuildingType, type Cost, type GameState, type KeyId, type Player, type TechId, type UnitType } from './types';
-import { coastHeld } from './water';
+import { coastHeld, driven } from './water';
 
 /**
  * Ages as a web (#37): which age a people is in, the roads out of it, and what that age lets them
@@ -34,7 +34,7 @@ const boon = (key: keyof Mods, v: number): boolean => (LOWER_IS_BETTER.includes(
 /** What an age's verbs are, beyond its numbers and its doors: carried whole into a Golden Age. */
 const VERB_KEYS = [
   'hire', 'mobile', 'packs', 'caravans', 'relicTrade', 'ironTrade', 'forge', 'coils', 'callUp', 'haul', 'blood', 'hemocraft', 'rite', 'fission', 'fusion',
-  'reclaim', 'salvage', 'sortie', 'fairs', 'convoys', 'prizes', 'vigils', 'thralls', 'mills', 'sappers', 'raid', 'missions', 'names', 'pumps',
+  'reclaim', 'salvage', 'sortie', 'fairs', 'convoys', 'prizes', 'vigils', 'thralls', 'mills', 'sappers', 'raid', 'missions', 'names', 'pumps', 'rivers', 'sluices', 'canals', 'turbines', 'boards',
 ] as const;
 
 const woven = new Map<string, Age>();
@@ -355,10 +355,14 @@ export function hiresAt(p: Player, at: BuildingType): UnitType[] {
   return h && h.at === at ? h.units.filter((u) => !BUILDINGS[at].trains.includes(u)) : [];
 }
 
+/** What a people's past adds to a building's lines: a Den breeds Cave Bears for a people that has walked the Age of the Hive. */
+const BRED: UnitType[] = ['cavebear'];
+
 /** Everything a player can train at a building now. */
 export function trainsAt(p: Player, at: BuildingType): UnitType[] {
   const hires = hiresAt(p, at);
-  return hires.length ? [...BUILDINGS[at].trains, ...hires] : BUILDINGS[at].trains;
+  const own = at === 'den' && hasWalked(p, 'hive') ? [...BUILDINGS[at].trains, ...BRED] : BUILDINGS[at].trains;
+  return hires.length ? [...own, ...hires] : own;
 }
 
 export const isHire = (p: Player, at: BuildingType, unit: UnitType): boolean => hiresAt(p, at).includes(unit);
@@ -370,6 +374,10 @@ export function barred(p: Player, unit: UnitType, at?: BuildingType): string | n
   // The Beast Den (the Age of the Wild): it breeds only the kinds this people has tamed.
   const kind = unit === 'warwolf' ? 'wolf' : unit === 'tusker' ? 'boar' : unit === 'warmammoth' ? 'mammoth' : null;
   if (kind && !p.tamed?.includes(kind)) return `Tame a wild ${kind} first: the Den breeds only what your people has tamed`;
+  // The Age of the Hive: its darts and its bears belong to a people that has walked it, in any age after.
+  if ((unit === 'blowpipe' || unit === 'cavebear') && !hasWalked(p, 'hive')) return `Only a people that has walked the ${AGES.hive.name} ${unit === 'blowpipe' ? 'trains Blowpipe Hunters' : 'breeds Cave Bears'}`;
+  // The Age of the Wildwood: its Ents wake for a people that has walked it, in any age after.
+  if (unit === 'warden' && !hasWalked(p, 'wildwood')) return `Only a people that has walked the ${AGES.wildwood.name} wakes Ents`;
   const no = ageDef(p).no;
   return no && no.units.includes(unit) ? no.why : null;
 }
@@ -391,8 +399,15 @@ export function buildBarred(p: Player, type: BuildingType): string | null {
   if (type === 'den' && !p.tamed?.length) return 'Tame a wild beast first: a Den is raised only by a people that has tamed one (the Age of the Wild)';
   // The Age of the Grove: what it grows is planted by a people that has walked it, in any age after.
   if ((type === 'thornwall' || type === 'garden' || type === 'orchard') && !hasWalked(p, 'grove')) return `Only a people that has walked the ${AGES.grove.name} plants a ${BUILDINGS[type].name}`;
+  if (type === 'hive' && !hasWalked(p, 'hive')) return `Only a people that has walked the ${AGES.hive.name} keeps bees`;
+  if (type === 'heart' && !hasWalked(p, 'wildwood')) return `Only a people that has walked the ${AGES.wildwood.name} plants a Heart Tree`;
+  // Missile defence (#759 s2): a battery is raised only after Interceptors.
+  if (type === 'battery' && !p.techs.includes('interceptors')) return `Learn ${TECHS.interceptors.name} at a ${BUILDINGS.workshop.name} first`;
+  if (type === 'spire' && !hasWalked(p, 'bloom')) return `Only a people that has walked the ${AGES.bloom.name} raises a Seed Spire`;
   const way = p.way ? WAYS[p.way] : undefined;
   if (way?.shuts?.includes(type)) return `${way.name} raises no ${BUILDINGS[type].name}`;
+  // The breach (#701 s3): a people that has walked the Age of Dykes raises dykes in any age after, to mend its banks.
+  if (type === 'dyke' && hasWalked(p, 'dykes')) return null;
   const only = BUILDINGS[type].ages;
   return !only || only.some((a) => standsIn(p, a)) ? null : `Only in the ${only.map((a) => AGES[a].name).join(' or ')}`;
 }
@@ -538,6 +553,63 @@ export function chooseKeepsake(s: GameState, p: Player, b: Building): void {
   b.keep = age;
 }
 
+/** One leg of a planned journey (#725): a road, or a step back. */
+export interface RouteStep {
+  from: AgeId;
+  to: AgeId;
+  back: boolean;
+  cost: Cost;
+  /** Seconds on the road, plus any wait for the step-back cooldown. */
+  time: number;
+  /** What, besides its price, still keeps the people off this leg, in `roadProblem`'s words; null when nothing does. */
+  problem: string | null;
+}
+
+/**
+ * The shortest journey by time from the player's age to `goal` (#725), over the roads they know (`roadKnown`, so it shows no
+ * more than the Town Center would) and the step back (`backTo`'s trunk age one tier down, with its cooldown). Empty when already
+ * there, null when no known road leads there. Ties go to the earlier road in `ROADS`, so every machine plans alike.
+ * Roads that only open mid-journey (a window walked on the way) appear once the people is there and the plan is made again.
+ */
+export function routeTo(s: GameState, p: Player, goal: AgeId): RouteStep[] | null {
+  const start = ageOf(p);
+  if (start === goal) return [];
+  // States are (age, whether a step back is already spent); the second step back waits out the whole cooldown.
+  const ages = Object.keys(AGES) as AgeId[];
+  const id = (a: AgeId, used: number) => ages.indexOf(a) * 2 + used;
+  const dist = new Map<number, number>([[id(start, 0), 0]]);
+  const prev = new Map<number, { from: number; step: RouteStep }>();
+  const done = new Set<number>();
+  for (;;) {
+    let cur = -1;
+    for (const [k, d] of dist) if (!done.has(k) && (cur < 0 || d < dist.get(cur)! || (d === dist.get(cur)! && k < cur))) cur = k;
+    if (cur < 0) return null;
+    done.add(cur);
+    const age = ages[cur >> 1], used = cur & 1;
+    if (age === goal) {
+      const out: RouteStep[] = [];
+      for (let k = cur; prev.has(k); k = prev.get(k)!.from) out.unshift(prev.get(k)!.step);
+      return out;
+    }
+    const relax = (step: RouteStep, nextUsed: number) => {
+      const k = id(step.to, nextUsed);
+      const d = dist.get(cur)! + step.time;
+      if (done.has(k) || (dist.has(k) && dist.get(k)! <= d)) return;
+      dist.set(k, d);
+      prev.set(k, { from: cur, step });
+    };
+    for (const r of ROADS) {
+      if (r.from !== age || !roadKnown(s, p, r) || (r.shuns && hasWalked(p, r.shuns))) continue;
+      relax({ from: age, to: r.to, back: false, cost: r.cost, time: r.time, problem: roadProblem(s, p, r) }, used);
+    }
+    const tier = AGES[age].tier;
+    if (tier > 0) {
+      const wait = used ? STEP_BACK.cooldown : age === start ? backWait(s, p) : 0;
+      relax({ from: age, to: TRUNK[Math.min(tier, TRUNK.length) - 1], back: true, cost: stepBackCost(tier), time: STEP_BACK.time + wait, problem: age === start ? backProblem(s, p) : null }, 1);
+    }
+  }
+}
+
 /** Why a sleeping building stands idle, for refusals and the HUD. */
 export const sleepWhy = (b: Building): string => `It sleeps until your people returns to the ${(BUILDINGS[b.type].ages ?? []).map((a) => AGES[a].name).join(' or ')}`;
 
@@ -620,6 +692,14 @@ export function inField(s: GameState, b: { x: number; y: number; owner: number }
  * in a coil's field works at `LIGHTNING.lit` and one outside every field at `LIGHTNING.dark` (elsewhere, `lit` in a kept coil's field).
  */
 export function workRate(s: GameState, b: Building): number {
+  const p = s.players[b.owner];
+  // A dam's turbines (#701 s5, the Age of Locks) drive the work beside it, on top of the coils: only a people that has walked the age has one.
+  const dam = (ageDef(p).turbines || p.walked?.includes('locks')) && driven(s, b) ? DAM.drive : 100;
+  return dam === 100 ? coilRate(s, b) : Math.round((coilRate(s, b) * dam) / 100);
+}
+
+/** The coils' part of `workRate` (the Age of Lightning, #231). */
+function coilRate(s: GameState, b: Building): number {
   const p = s.players[b.owner];
   // Off Lightning, only the coil kept as its keepsake (#555 s11) still lights a field, and nothing is dark.
   if (!hasCoils(p)) return p.walked?.includes('lightning') && inKeptCoil(s, b) ? LIGHTNING.lit : 100;

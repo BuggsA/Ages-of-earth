@@ -2,7 +2,9 @@ import * as THREE from 'three';
 import { hash2 } from '../sim/rng';
 import type { GameState } from '../sim/types';
 import { T_GRASS, T_ROCK, T_SAND, T_WATER } from '../sim/types';
-import { isPolder } from '../sim/water';
+import { isCanal, isInund, isPolder } from '../sim/water';
+import { bared, isCauseway } from '../sim/tides';
+import { isPond } from '../sim/tides';
 import { natureGeometry, type NatureKind } from './natureModels';
 import { bakedMaterial, fogUniforms, inject, swayMaterial } from './materials';
 
@@ -28,8 +30,21 @@ const SNOWCAP = C('#d6d2ca');
  */
 const POLDER_FIELD = [C('#7ba34a'), C('#69933f'), C('#86704c')];
 const DITCH = C('#5f9a92');
+/** Tidal flats the falling tide bared (#739): wet grey-brown sand with a sheen, ribbed; a causeway's packed pale stone. */
+const WET = [C('#8f8670'), C('#a39878'), C('#6f7466')];
+/** A barrage's pond bed (#748): still water silts green with weed. */
+const POND = [C('#7f8a62'), C('#6c7a5a')];
+const PAVING = [C('#b8ad96'), C('#9e9482')];
 const MUD = C('#857a60');
 const DRY_TIME = 20;
+/** The Water Line (#701 s4): meadow drowned under a sluice's flood, seen through the sheet of water over it. */
+const DROWNED = [C('#4f6b4a'), C('#5d7752')];
+/** A canal (#701 s5): a bed of cut stone under the water, and the trodden towpath along its banks. */
+const CANAL_BED = [C('#7d7a72'), C('#6a6862')];
+const TOWPATH = C('#a8977a');
+/** How far over the ground a sluice's flood lies, knee-deep, as drawn (`floodSheet`); a gun-barge rides on it. */
+export const FLOOD_DEPTH = 0.09;
+const floodMaterial = inject(new THREE.MeshStandardMaterial({ color: '#6fa7b6', transparent: true, opacity: 0.6, roughness: 0.2, metalness: 0.05, depthWrite: false }), {});
 const TMP = new THREE.Color();
 const A = new THREE.Vector3();
 const B = new THREE.Vector3();
@@ -47,11 +62,18 @@ function polderColor(out: THREE.Color, x: number, y: number, t: number, fine: nu
   if (dried < 1) out.lerp(MUD, (1 - dried) * 0.8);
 }
 
+/** Whether a canal (#701 s5) lies four-ways beside a tile: its bank is a towpath. */
+function besideCanal(s: GameState, x: number, y: number): boolean {
+  return (x > 0 && isCanal(s, y * s.w + x - 1)) || (x < s.w - 1 && isCanal(s, y * s.w + x + 1)) || (y > 0 && isCanal(s, (y - 1) * s.w + x)) || (y < s.h - 1 && isCanal(s, (y + 1) * s.w + x));
+}
+
 /** Tiles pumped out so far, by every people: a cheap test that the water layer changed. */
 const drainedIn = (s: GameState): number => {
   let n = 0;
-  for (const p of s.players) n += p.stats.drained ?? 0;
-  return n;
+  // Pumped out (#701), or dug into a channel: either way the shore moved.
+  for (const p of s.players) n += (p.stats.drained ?? 0) + (p.stats.dug ?? 0);
+  // Or taken back by the sea through a breach (#701 s3), flooded and given back by a sluice (#701 s4), or bared or covered by the tide (#739).
+  return n + (s.flooded ?? 0) + (s.inundated ?? 0) + (s.tideTurns ?? 0);
 };
 
 export const terrainMaterial = inject(new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.95 }), { season: 'ground' });
@@ -76,6 +98,9 @@ function smooth(x: number, y: number, scale: number, salt: number): number {
 export class TerrainView {
   readonly group = new THREE.Group();
   private mesh: THREE.Mesh | null = null;
+  /** The Water Line's flood (#701 s4): a sheet of shallow water over every flooded tile, drawn again when the water moves. */
+  private flood: THREE.Mesh | null = null;
+  private floodSeen = -1;
   private skirt: THREE.Mesh | null = null;
   /** The heights as drawn: they follow the rules' heights, easing toward them where the land rose out of the water (#701). */
   private shown = new Float32Array(0);
@@ -83,6 +108,8 @@ export class TerrainView {
   private col = new Float32Array(0);
   /** The ground as last drawn, to spot tiles the rules turned from water to land, and how many tiles had been pumped out then. */
   private drawn = new Uint8Array(0);
+  /** The channels and canals as last drawn (#701 s5: a channel dug deep stays water, but its bed and banks change). */
+  private dug = new Uint8Array(0);
   private drainedSeen = 0;
   /** Corners easing toward their new height. */
   private rising = new Set<number>();
@@ -104,6 +131,7 @@ export class TerrainView {
     this.pos = new Float32Array(w * h * 6 * 3);
     this.col = new Float32Array(w * h * 6 * 3);
     this.drawn = Uint8Array.from(s.terrain);
+    this.dug = s.channel ? Uint8Array.from(s.channel) : new Uint8Array(w * h);
     this.drainedSeen = drainedIn(s);
     this.rising.clear();
     this.drying.clear();
@@ -124,6 +152,38 @@ export class TerrainView {
     this.group.add(this.skirt);
 
     this.scatter(s);
+    this.floodSheet(s);
+  }
+
+  /** Lay the sheet of the Water Line's flood (#701 s4) over every flooded tile, `FLOOD_DEPTH` over the ground's corners. */
+  private floodSheet(s: GameState): void {
+    const seen = s.inundated ?? 0;
+    if (seen === this.floodSeen) return;
+    this.floodSeen = seen;
+    if (this.flood) {
+      this.group.remove(this.flood);
+      this.flood.geometry.dispose();
+      this.flood = null;
+    }
+    if (!s.inund) return;
+    const { w } = s;
+    const W = w + 1;
+    const pts: number[] = [];
+    const y = (cx: number, cy: number) => s.height[cy * W + cx] + FLOOD_DEPTH;
+    for (let t = 0; t < s.inund.length; t++) {
+      if (!s.inund[t]) continue;
+      const tx = t % w;
+      const ty = (t - tx) / w;
+      pts.push(tx, y(tx, ty), ty, tx, y(tx, ty + 1), ty + 1, tx + 1, y(tx + 1, ty), ty);
+      pts.push(tx + 1, y(tx + 1, ty), ty, tx, y(tx, ty + 1), ty + 1, tx + 1, y(tx + 1, ty + 1), ty + 1);
+    }
+    if (!pts.length) return;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    geo.computeVertexNormals();
+    this.flood = new THREE.Mesh(geo, floodMaterial);
+    this.flood.renderOrder = 1;
+    this.group.add(this.flood);
   }
 
   /**
@@ -141,8 +201,10 @@ export class TerrainView {
     if (n !== this.drainedSeen) {
       this.drainedSeen = n;
       for (let i = 0; i < w * h; i++) {
-        if (this.drawn[i] === s.terrain[i]) continue;
+        const dug = s.channel ? s.channel[i] : 0;
+        if (this.drawn[i] === s.terrain[i] && this.dug[i] === dug) continue;
         this.drawn[i] = s.terrain[i];
+        this.dug[i] = dug;
         if (isPolder(s, i)) this.drying.set(i, this.clock);
         const x = i % w;
         const y = (i - x) / w;
@@ -171,6 +233,7 @@ export class TerrainView {
         if (this.clock - at > DRY_TIME) this.drying.delete(t);
       }
     }
+    this.floodSheet(s);
     if (!touched.size) return moved;
     for (const t of touched) this.paint(s, t % w, Math.floor(t / w));
     const geo = this.mesh.geometry;
@@ -209,8 +272,18 @@ export class TerrainView {
       // Broad, soft patches of color rather than speckle: smooth noise picks the shade.
       const patch = smooth(x + 0.5, y + 0.5, 6, 11);
       const fine = smooth(x + 0.5, y + 0.5, 2.5, 12);
-      if (terr === T_WATER) {
+      if (isInund(s, tile)) {
+        tmp.copy(DROWNED[0]).lerp(DROWNED[1], fine);
+      } else if (terr === T_WATER && isCanal(s, tile)) {
+        tmp.copy(CANAL_BED[0]).lerp(CANAL_BED[1], fine);
+      } else if (terr === T_WATER && isPond(s, tile)) {
+        tmp.copy(POND[0]).lerp(POND[1], fine);
+      } else if (terr === T_WATER) {
         tmp.copy(BED[0]).lerp(BED[1], Math.min(1, Math.max(0, -avgH * 0.8)));
+      } else if (bared(s, tile)) {
+        // Ribs of wet sand across the flats, darker in the runnels where the water lingers; a causeway's stone is drier and paler.
+        if (isCauseway(s, tile)) tmp.copy(PAVING[0]).lerp(PAVING[1], (x + y) % 2 === 0 ? 0.2 : 0.6 * fine);
+        else tmp.copy(WET[0]).lerp(WET[1], fine).lerp(WET[2], ((x * 3 + y) % 5 === 0 ? 0.5 : 0) + patch * 0.15);
       } else if (isPolder(s, tile)) {
         polderColor(tmp, x, y, t, fine, this.drying.has(tile) ? Math.min(1, (this.clock - this.drying.get(tile)!) / DRY_TIME) : 1);
       } else if (terr === T_SAND) {
@@ -225,6 +298,7 @@ export class TerrainView {
         tmp.lerp(DRY, Math.min(0.6, dry));
         if (fine < 0.18 && patch > 0.55) tmp.lerp(DIRT, 0.35);
       }
+      if (terr !== T_WATER && s.channel && besideCanal(s, x, y)) tmp.lerp(TOWPATH, 0.45);
       if (terr !== T_WATER && steep < 0.8) tmp.lerp(CLIFF, Math.min(1, (0.8 - steep) * 2.6));
       // A whisper of light and shade per facet keeps the low-poly look without the noise.
       tmp.multiplyScalar(0.975 + n * 0.05);

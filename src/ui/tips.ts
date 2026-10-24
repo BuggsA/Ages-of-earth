@@ -1,4 +1,6 @@
-import { AGES, BLOOMERY, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, secs } from '../sim/data';
+import { COCKLE, COCKLER } from '../sim/data';
+import { TIDE_GATE } from '../sim/data';
+import { AGES, BLOOM, BLOOMERY, HIVE, INTERCEPT, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, BEGGARS, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
 import { battlesFor } from '../sim/battles';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, findsOf, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
@@ -8,6 +10,9 @@ import { isIdleCitizen } from './idle';
 import { laterTip, type Opening } from './opening';
 import { findResource } from '../sim/units';
 import { seasonAt } from '../sim/seasons';
+import { tideWaitLeft } from '../sim/tides';
+import { bared } from '../sim/tides';
+import { R_COCKLE } from '../sim/types';
 
 /**
  * Advice for a first game, one tip at a time in a corner: what to do next, given how the match is
@@ -24,6 +29,7 @@ const SEA_ROAD = ROADS.find((r) => r.to === 'searaider')!;
 const CHARIOTS_ROAD = ROADS.find((r) => r.to === 'chariots')!;
 const GOLDEN_ROAD = ROADS.find((r) => r.to === 'golden')!;
 const MISSIONS_ROAD = ROADS.find((r) => r.to === 'missions')!;
+const BEGGARS_ROAD = ROADS.find((r) => r.to === 'beggars')!;
 const WARBAND_ROAD = ROADS.find((r) => r.to === 'warband')!;
 const IRONBLOOD_ROAD = ROADS.find((r) => r.to === 'ironblood')!;
 const TOTALWAR_ROAD = ROADS.find((r) => r.to === 'totalwar')!;
@@ -333,6 +339,20 @@ const TIPS: Tip[] = [
     text: `Raise a <b>${BUILDINGS.bloomery.name}</b> (<b>I</b>) beside the bog. Bog iron your diggers drop there is smelted hard: every bar counts ${BLOOMERY.smelt} times toward your spearmen's edge, and the hearth arms foot soldiers on the spot. Press <b>J</b> on it before you leave the Iron Age and it goes on arming spearmen at the Iron Age's price on any road. A rival who wants your iron must come to the marsh.`,
   },
   {
+    id: 'crossing-beggars',
+    // The fourth crossing (#783): a people that has walked the Dykes or the Sail, back in the Middle Ages.
+    when: (s, me) => {
+      const p = s.players[me];
+      return ageOf(p) === 'middle' && roadKnown(s, p, BEGGARS_ROAD) && !BEGGARS_ROAD.crossing!.every((a) => hasWalked(p, a));
+    },
+    text: `A crossing: your people has walked one of the <b>${AGES.dykes.name}</b> and the <b>${AGES.sail.name}</b>. Walk the other too, then come back to the Middle Ages, and the Town Center (🔀) can turn your people into the <b>${AGES.beggars.name}</b>: your warships board a rival's ships instead of sinking them, and cut its dykes from the sea.`,
+  },
+  {
+    id: 'beggars',
+    when: (s, me) => ageOf(s.players[me]) === 'beggars',
+    text: `Send your warships at a rival's cogs, fishing boats, barges and warships: one beaten down strikes its colours and <b>sails for you</b>, with ${Math.round(BEGGARS.left * 100)}% of its timbers and whatever it carries (a transport with soldiers aboard sinks instead). Your ships also strike a rival's <b>dykes</b> and sluices as hard as siege does: cut a bank that holds back polder and the sea takes the fields behind it. Keep a Dock as you leave, and ships beaten down within ${BEGGARS.haven} tiles of it are still taken.`,
+  },
+  {
     id: 'ironblood',
     // The Path of Blood goes on (#303): a people that walked the Warband, now in the Gunpowder Age.
     when: (s, me) => {
@@ -428,6 +448,86 @@ const TIPS: Tip[] = [
     text: `Your people grows its town now. Plant a <b>${BUILDINGS.thornwall.name}</b> line (drag, like a wall): it grows from seedling to living oak in about ${GROVE.stage * 3} seconds (twice as fast in spring), parts for your own people, and sprouts again from its root if cut down. Set <b>${BUILDINGS.garden.name}s</b> within ${GROVE.dung} tiles of a ${BUILDINGS.den.name} or ${GROVE.water} of water: fed, a gardener brings in far more than a farmer. <b>${BUILDINGS.orchard.name}s</b> by a store bear food by themselves each summer and autumn.`,
   },
   {
+    id: 'tides',
+    // The Age of Tides (#739): its first minute.
+    when: (s, me) => ageOf(s.players[me]) === 'tides',
+    text: `Your people keeps the sea's hours. Watch the tide clock (🌊, top bar): every ${TIDE.period / 60} minutes the sea falls to low water and back, baring the shallows as flats anyone may cross. Raise <b>${BUILDINGS.tidemill.name}s</b> (<kbd>${BUILDINGS.tidemill.key}</kbd>) on the shore where the most tidal ground lies near: each grinds gold at every turn of the tide. Drag <b>${BUILDINGS.causeway.name}s</b> (<kbd>${BUILDINGS.causeway.key}</kbd>) over the flats or the shallow sea: a road that only high water covers. Get off the flats before the water comes back, and strike across the bay at low water.`,
+  },
+  {
+    id: 'tideAwake',
+    // The tide (#739) woke for a people that is not in the age: it runs for everyone.
+    when: (s, me) => s.tideFrom !== undefined && ageOf(s.players[me]) !== 'tides',
+    text: 'A rival keeps the sea\'s hours, and the <b>tide</b> has woken for everyone: watch its clock (🌊, top bar). At low water the shallows bare as flats an army can cross, toward you or from you; ships on them sit aground, and a Dock with only flats beside it launches nothing. Whoever stands on the flats when the water comes back is swept ashore, hurt.',
+  },
+  {
+    id: 'tideRoute',
+    // Routes that read the tide (#755): one of the viewer's people stands on the shore waiting for the flats to bare.
+    when: (s, me) => s.tideFrom !== undefined && s.ents.some((e) => e.kind === 'unit' && e.owner === me && tideWaitLeft(s, e) > 0),
+    text: '<b>Your people read the tide.</b> Sent over the flats, a soldier, citizen or trader crosses only if it will be over before the water comes back. Otherwise it goes round by dry ground, or waits on the shore (🌊 and the seconds left, on its panel) for the next low water, whichever is quicker. To be across sooner, send it earlier in the ebb, or lay a causeway: high water alone covers that road.',
+  },
+  {
+    id: 'cockles',
+    // Cockle beds (#767): the viewer's people keeps the sea's hours, and the tide has bared a bed.
+    when: (s, me) => !!s.cockles && !!ageDef(s.players[me]).tides && s.cockles.some((b, i) => b === 1 && s.res[i] === R_COCKLE && bared(s, i)),
+    text: '<b>Cockle beds</b> lie on the deeper flats (pale shells on the wet sand, 🐚 on its panel), bared only as the tide runs low. Send citizens to pick them while they stand bare: food, and each high water brings some back. Your pickers read the clock themselves: before the flood they come ashore with what they have, and go back at the next low water. A barrage that ponds the flats drowns its beds; a causeway goes over one only once it is picked out.',
+  },
+  {
+    id: 'cocklerHut',
+    // The Cockler's Hut (#779): the viewer's people picks cockles, and has no hut yet.
+    when: (s, me) => !!s.cockles && !!ageDef(s.players[me]).tides && !has(s, me, 'cockler') && s.ents.some((e) => e.kind === 'unit' && e.owner === me && e.order.k === 'gather' && !!e.order.cockle),
+    text: `<b>A hut by the beds.</b> Your pickers carry every basket of cockles home, a long walk past wolves and the flood. Raise a <b>${BUILDINGS.cockler.name}</b> (<kbd>B</kbd> <kbd>${BUILDINGS.cockler.key}</kbd>, ${BUILDINGS.cockler.cost.wood} wood) within ${COCKLER.reach} tiles of a bed: they empty their baskets there, wait beside it on dry ground for low water, and the beds round it come back richer at each high water (${COCKLER.regrow} food, not ${COCKLE.regrow}). It takes cockles only, and stands where a rival crossing at low water will find it.`,
+  },
+  {
+    id: 'barrage',
+    // Barrages (#748): a Tide Mill stands, and no pond yet.
+    when: (s, me) => ageOf(s.players[me]) === 'tides' && has(s, me, 'tidemill') && !s.pond,
+    text: `<b>Shut a bay.</b> Drag a line of ${BUILDINGS.causeway.name}s (<kbd>${BUILDINGS.causeway.key}</kbd>) across the mouth of a bay of flats, shore to shore: behind it the bay is a <b>pond</b> whose flats stay wet at every hour, and a Tide Mill by it grinds them twice, on the flood and on the ebb. What it costs: nobody crosses that bay at low water any more, you included, and powder or a warhead on the line lets the pond out.`,
+  },
+  {
+    id: 'tideGate',
+    // The Tide Gate (#785): the viewer's people has a barrage's pond, and no gate in it yet.
+    when: (s, me) => ageOf(s.players[me]) === 'tides' && !!s.pond && !!s.causewayBy && s.causewayBy.some((o) => o - 1 === me) && !has(s, me, 'tidegate'),
+    text: `<b>A gate in the barrage.</b> Set a <b>${BUILDINGS.tidegate.name}</b> (<kbd>V</kbd> <kbd>${BUILDINGS.tidegate.key}</kbd>) on a causeway tile of your barrage, beside the pond. Shut, the pond holds and the mills grind it twice. At low water, when a rival army walks the flats below it, open it (<kbd>O</kbd>): the pond rushes out over them for ${TIDE_GATE.secs} seconds and sweeps them off, hurt or drowned. Then shut it again, and the next flood fills it. Rivals can read whether it is loaded, and keep off.`,
+  },
+  {
+    id: 'breachCauseway',
+    // Barrages (#748): a Sapper people with kegs, and a rival's causeway on the map.
+    when: (s, me) => ageOf(s.players[me]) === 'sapper' && (s.players[me].kegs ?? 0) > 0 && !!s.causewayBy && s.causewayBy.some((o) => o > 0 && o - 1 !== me),
+    text: 'A rival has laid <b>causeways</b> over the flats. Select citizens or foot soldiers, choose <b>Lay a keg</b> (<kbd>K</kbd>), and click a stretch of the causeway: the blast breaches it, cutting the road, and a barrage breached lets its pond drain. Lay it at low water, with time to spare: the flood drowns a burning fuse.',
+  },
+  {
+    id: 'hive',
+    // The Age of the Hive (`docs/wild-road.md` §3): its first minute.
+    when: (s, me) => ageOf(s.players[me]) === 'hive',
+    text: `Your people keeps bees now. Set a <b>${BUILDINGS.hive.name}</b> (${BUILDINGS.hive.key}) among standing trees (${HIVE.trees} within 3 tiles): its bees sting any rival who walks the woods within ${HIVE.reach} tiles, past armour, and slow them, so a wood by a Hive is a wall. It pays honey, or mead for gold if a Market stands within ${HIVE.market} tiles, and in summer doubles your <b>${BUILDINGS.garden.name}s</b> within ${HIVE.bloom} tiles. Bees sleep in winter, and smoke quiets them: that is when a rival comes, with torches. No muskets or cannon: train <b>Blowpipe Hunters</b> at the Archery Range, whose venom stacks and cuts down riders and beasts, and breed <b>Cave Bears</b> at the Den; your wolves are Dire Wolves now.`,
+  },
+  {
+    id: 'wildwood',
+    // The Age of the Wildwood (`docs/wild-road.md` §4): its first minute.
+    when: (s, me) => ageOf(s.players[me]) === 'wildwood',
+    text: `The forest wakes for your people now. Plant your one <b>${BUILDINGS.heart.name}</b> (${BUILDINGS.heart.key}) by old woods: at it, train an <b>Ent</b> and the tree nearest it within ${WILDWOOD.wake} tiles wakes, a slow giant that flings boulders and breaks buildings, so it is your siege now. Select Ents and press <kbd>O</kbd> to <b>root</b> them on bare ground: they are trees again, mend, and wake when a rival comes near, an ambush no one sees. Each spring your woods spread round the Heart Tree, and your people run through those woods while a rival's are slowed. No rifles, field guns or aircraft, and fire hits your living things twice as hard: guard the Heart Tree, for if it falls every Ent roots and sleeps.`,
+  },
+  {
+    id: 'bloom',
+    // The Age of the Bloom (`docs/wild-road.md` §5b): its first minute.
+    when: (s, me) => ageOf(s.players[me]) === 'bloom',
+    text: `The plants' end: your people outgrows its rivals now. Raise your one <b>${BUILDINGS.spire.name}</b> (${BUILDINGS.spire.key}): while your Heart Tree stands it ripens a <b>Bloom Seed</b> every ${BLOOM.ripen} seconds. Sling it (G) at a rival town and send your army after it: once it roots, ${BLOOM.grow} seconds later every rival building within ${BLOOM.r} tiles cracks into forest, unless their citizens hack out its heart-root first. Or win by <b>the Greening</b>: keep your Heart Tree while trees, Orchards and Thornwalls grown to living oak cover ${BLOOM.green * 100}% of your land for ${BLOOM.hold / 60} minutes. Your woods spread every season now, and each season opens with a pollen storm that half-blinds rival soldiers and towers near your Heart Tree. Your Dens are quiet and you raise no Missile Silo; rivals will come with fire.`,
+  },
+  {
+    id: 'torch',
+    // Fire (`fire.ts`): a rival's living town is in sight, and torches are in hand.
+    when: (s, me) =>
+      s.players[me].epoch >= FIRE.epoch &&
+      s.ents.some((e) => e.kind === 'building' && e.hp > 0 && FIRE.burns.includes(e.type) && e.owner !== me && s.players[e.owner].team !== s.players[me].team && s.players[me].vis[e.ty * s.w + e.tx] === 1),
+    text: `A rival grows its town: Thornwalls, Kitchen Gardens, Orchards, Hives and Heart Trees burn. Select citizens or foot soldiers and press <kbd>F</kbd>, then click one: each stands ${FIRE.light} seconds to set it alight, and unless its people beat it out it burns down. A Thornwall that burns leaves no root, and in a dry summer the fire runs along the hedge and through the woods beside it.`,
+  },
+  {
+    id: 'burning',
+    // Fire (`fire.ts`): something of yours burns.
+    when: (s, me) => !!s.fires?.some((f) => f.b !== undefined && s.byId.get(f.b)?.owner === me),
+    text: `Your living buildings are burning. Right-click a burning one with citizens: they beat the flames before they mend it, and ${FIRE.beat} seconds of beating put it out (two citizens, half the time). A gardener at work in a Garden beats at it already. Fell the trees beside your hedges for a firebreak: fire leaps only to what grows.`,
+  },
+  {
     id: 'tribute',
     when: (s, me) => ageOf(s.players[me]) === 'horde',
     text: `Your horde lives on <b>tribute</b>. Ride into a rival's land and <b>hold your riders still</b> there (<kbd>C</kbd>, stand ground): each takes ${AGES.horde.add!.tribute} gold a second from that rival, up to ${TRIBUTE.most} riders a rival. Riders on the move take nothing, spears and towers answer them, and deep past your own land they wear down: pitch a camp near the border to keep them fed.`,
@@ -479,10 +579,23 @@ const TIPS: Tip[] = [
   { id: 'dock', when: (s, me) => secsIn(s) > 150 && !has(s, me, 'dock') && waterNear(s, me), text: 'Water nearby! A <b>Dock</b> (<kbd>B</kbd> <kbd>D</kbd>) on the shore trains <b>fishing boats</b>: fish shoals feed you for a long time. Later, warships and transports.' },
   { id: 'aeronaut', when: (s, me) => s.players[me].epoch === 4 && buildings(s, me).some((b) => b.type === 'airfield' && b.built), text: 'Your Airfield reveals the <b>Age of Aeronauts</b> at the Town Center: aircraft cost and training time fall by 25%, but foot, ranged, cavalry and siege units cost 20% more. Riflemen and towers still shoot them down. A paid road returns to Industrial.' },
   { id: 'lightning', when: (s, me) => s.players[me].epoch === 4 && buildings(s, me).some((b) => b.type === 'tower' && b.built), text: 'Your Watch Towers point the way to the <b>Age of Lightning</b>: once they have lit 6 beacons (<kbd>F</kbd>; relays count), the Town Center can take it. Every tower becomes a <b>Coil Tower</b>: buildings in its field train and research faster, those outside run slower, and its bolt leaps through crowded armies. No aircraft fly there.' },
+  // The Water Line (#701 s4): its first minute is a sluice, and the first time the water is let out.
+  { id: 'waterline', when: (s, me) => ageOf(s.players[me]) === 'waterline' && !has(s, me, 'sluice'), text: 'The <b>Age of the Water Line</b>: raise a <b>Sluice</b> (<kbd>V</kbd> <kbd>S</kbd>) in your dyke line, on a channel, or on shallow water. Open it (<kbd>O</kbd>) when an army comes: the low ground round it goes under knee-deep water that soldiers wade at a crawl and siege can hardly cross. Shut it and the water goes. Fields under the flood yield nothing, so open it only when it pays.' },
+  { id: 'locks', when: (s, me) => ageOf(s.players[me]) === 'locks' && !has(s, me, 'dam'), text: 'The <b>Age of Locks</b>: a <b>Canal</b> (<kbd>B</kbd> <kbd>Q</kbd>) dug from the shore or a lake now fills deep enough for ships, so a Dock on it launches a fleet in the heart of your land; an old channel can be dug deep the same way. Raise a <b>Dam</b> (<kbd>V</kbd> <kbd>N</kbd>) on water beside your Barracks and workshops: its turbines make them train and research two fifths faster. Guard it: a dam that falls bursts over the low ground below it.' },
+  { id: 'bridge', when: (s, me) => ageOf(s.players[me]) === 'locks' && !!s.channel && s.channel.some((v) => v === 2) && !has(s, me, 'bridge'), text: 'Your canals cut your own roads too: soldiers swim a canal at a quarter of their pace. Lay a <b>Bridge</b> (<kbd>B</kbd> <kbd>Z</kbd>) over it where your people cross: they walk it at full pace, rivals can\'t, and ships pass under it.' },
+  { id: 'floating', when: (s, me) => ageOf(s.players[me]) === 'floating' && !has(s, me, 'pontoon'), text: 'The <b>Age of Floating Cities</b>: your town goes onto the water. Raise a <b>Pontoon</b> (<kbd>B</kbd> <kbd>E</kbd>, where the House was) on open water beside your shore: room for 10, a drop for every kind of goods, fishing boats, and a deck your people walk. Moor <b>three side by side</b> and they link into a floating town that raises citizens. No Houses go up on land now, and no Missile Silo.' },
+  { id: 'towing', when: (s, me) => ageOf(s.players[me]) === 'floating' && buildings(s, me).filter((b) => b.type === 'pontoon' && b.built).length >= 2, text: 'A floating town can leave. Select a Pontoon and <b>Cast off</b> (<kbd>O</kbd>): it goes under tow with up to 10 of those on its deck aboard. Sail it to the fish, to a rival\'s shore, or out of a warhead\'s reach, and <b>Moor</b> it (<kbd>P</kbd>) on any open water. Warships hole pontoons three times as fast as anything else: keep a fleet by your town.' },
+  { id: 'barge', when: (s, me) => ageOf(s.players[me]) === 'waterline' && buildings(s, me).some((b) => b.type === 'sluice' && b.built), text: 'Your Sluice launches <b>Gun-barges</b>: flat boats with a cannon that sail the sea, the channels and the flood alike. With the sluice open they shell an army wading your fields; they pass through any sluice, as through a lock. Shut the sluice with a barge far out on the flood and it may be left aground.' },
   { id: 'cog', when: (s, me) => units(s, me).some((u) => u.type === 'cog'), text: 'A <b>merchant ship</b> sails from your Dock to a trading post with water near it (a <b>port</b>) and brings back gold, 20% more than the land road. Select it and right-click the post. Warships are its enemy.' },
   { id: 'transport', when: (s, me) => units(s, me).some((u) => u.type === 'transport'), text: 'To cross the water, select soldiers and <b>right-click your transport</b> to board. Then select the transport and right-click a far shore to land them.' },
-  { id: 'silo', when: (s, me) => s.players[me].epoch >= 5 && !has(s, me, 'silo'), text: 'The <b>Atomic Age</b> brings the <b>Missile Silo</b> (<kbd>V</kbd> <kbd>M</kbd>), dear to raise. Select it, press <kbd>M</kbd> and click any point on the map: after 45 seconds the warhead lands, and every player sees the clock. Guard your silo: if it falls while the clock runs, the launch is scrubbed. The ring stays poisoned for 90 seconds after, for your own army too.' },
-  { id: 'fork', when: (s, me) => s.players[me].epoch >= 5 && buildings(s, me).some((b) => b.type === 'silo' && b.built), text: 'Your silo reveals a fork at the Town Center: the <b>Age of Fission</b> (a 25 second clock, a quick refuel, but each launch poisons the ground round your own silo) or the <b>Age of Fusion</b> (up to three warheads aloft, no refuel, nothing you strike poisoned, but a 70 second clock and a ruinous road). One shuts the other for good; a paid road leads back to the Atomic Age.' },
+  { id: 'silo', when: (s, me) => s.players[me].epoch >= 5 && !has(s, me, 'silo'), text: 'The <b>Atomic Age</b> brings the <b>Missile Silo</b> (<kbd>V</kbd> <kbd>M</kbd>), dear to raise. Select it, press <kbd>M</kbd> and click any point on the map: after 45 seconds the warhead lands (12,000 at the centre, less with every tile, to nothing 8 tiles out), and every player sees the clock and the blast, and the fog lifts over it for a minute. Warheads come from your people\'s store (one at first, one more every 240 seconds, up to 3), fired from any silo; you may raise 2 (3 with Launch Control), and every rival sees them on the map. A rival is warned with <b>three rings</b>, your target and two decoys drawn where you might have aimed, each set off up to 2 tiles; only in the last 3 seconds do the decoys vanish. Guard them: if the silo falls while the clock runs, the launch is scrubbed and that warhead lost. The 5 tiles round the point stay poisoned for 90 seconds after, for your own army too.' },
+  { id: 'fork', when: (s, me) => s.players[me].epoch >= 5 && buildings(s, me).some((b) => b.type === 'silo' && b.built), text: 'Your silo reveals a fork at the Town Center: the <b>Age of Fission</b> (a 25 second clock, a warhead every 100 seconds, a 20,000 warhead with a 10 tile blast, but each launch poisons the ground round your own silo) or the <b>Age of Fusion</b> (up to three warheads aloft, each 40,000 with a 12 tile blast, made again at once, nothing you strike poisoned, but a 70 second clock and a ruinous road). Either way you choose at each launch between an Atomic warhead (<kbd>N</kbd>) and your own (<kbd>M</kbd>), on the same clock. One shuts the other for good; a paid road leads back to the Atomic Age.' },
+  { id: 'salvo', when: (s, me) => s.players[me].epoch >= 5 && s.players[me].techs.includes('launchControl'), text: '<b>Launch Control</b> ties your silos to one clock: raise a third, then select one and press <kbd>B</kbd> to fire a <b>salvo</b>, three Atomic warheads at three points at least 8 tiles apart, all from your store at once. Rivals see three rings, just as for one warhead and two decoys, and learn that all three are real only in the last 3 seconds. Each silo they destroy before then scrubs its own warhead; the others fly on.' },
+  { id: 'salvoThreat', when: (s, me) => s.players.some((p) => p.team !== s.players[me].team && !p.defeated && s.ents.filter((e) => e.kind === 'building' && e.owner === p.id && e.type === 'silo' && e.built && e.hp > 0).length >= 3), text: 'A rival stands <b>three Missile Silos</b>: enough for a <b>salvo</b>. When it launches, all three warning rings may be real, not one and two decoys, and you will know only in the last 3 seconds. Spread out, or break a silo: each one that falls scrubs its own warhead.' },
+  { id: 'missile', when: (s, me) => (s.launches ?? []).some((l) => !!l.arc && s.players[l.owner].team !== s.players[me].team), text: 'A rival <b>missile</b> is in the air. It climbs toward the middle of the warning rings, so for most of its flight it tells you only the district. Some seconds before the rings flash it <b>bends toward where it falls</b>: watch which way it turns and you can clear the right ring early, or trust it and stay.' },
+  // Missile defence (#759 s3): once you stand a silo and a rival does too, hold one back.
+  { id: 'reserve', when: (s, me) => s.players[me].epoch >= 5 && buildings(s, me).some((b) => b.type === 'silo' && b.built) && s.players.some((p) => p.team !== s.players[me].team && !p.defeated && s.ents.some((e) => e.kind === 'building' && e.owner === p.id && e.type === 'silo' && e.built && e.hp > 0)), text: `A rival stands a <b>Missile Silo</b> too. Select one of yours and press <kbd>R</kbd> to <b>hold it in Reserve</b>: it launches nothing, and after ${INTERCEPT.arm} seconds it stands ready to fire a warhead of your store at any rival warhead no Interceptor Battery answers, anywhere on the map, stopping it ${Math.round(INTERCEPT.chance * 100)}% of the time. Each answer costs a warhead and a launch's fuel. Every player sees the teal band of a silo held back; a quick Fission clock can land before a late Reserve stands ready.` },
+  { id: 'interceptors', when: (s, me) => s.players[me].epoch >= 4 && !has(s, me, 'battery') && s.players.some((p) => p.team !== s.players[me].team && !p.defeated && p.epoch >= 5), text: `A rival stands in the <b>Atomic Age</b>. Learn <b>Interceptors</b> at a Siege Workshop, then raise <b>Interceptor Batteries</b> (<kbd>V</kbd> <kbd>I</kbd>) by your towns. Each covers ${INTERCEPT.reach} tiles: when a warhead's ring falls inside that circle, the battery fires by itself ${INTERCEPT.fire} seconds before it lands and stops it ${Math.round(INTERCEPT.chance * 100)}% of the time, blast and fallout both. One charge, then a ${INTERCEPT.reload} second reload: a salvo of three can still get through.` },
   { id: 'airfield', when: (s, me) => s.players[me].epoch >= 4 && !has(s, me, 'airfield'), text: 'The Industrial Age brings flight: an <b>Airfield</b> (<kbd>V</kbd> <kbd>F</kbd>) trains fighters and bombers. Only missiles reach them: fighters, riflemen, towers and warships.' },
 ];
 

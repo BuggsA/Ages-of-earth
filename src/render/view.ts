@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { SoundName } from '../audio/sound';
 import { ageDef, ageOf } from '../sim/ages';
 import { fairground, feastOpen } from '../sim/fair';
-import { AURA, BUILDINGS, KEG, SILO, RALLY, RITE, SIGNATURES, TICK_HZ, LANDMARKS, RUINS, TRADE, domainOf } from '../sim/data';
+import { AURA, BLOOM, BUILDINGS, KEG, SILO, WARHEADS, RALLY, RITE, SIGNATURES, TICK_HZ, LANDMARKS, RUINS, TRADE, domainOf, secs } from '../sim/data';
 import { buildingMaxHp, statsFor } from '../sim/stats';
 import type { AgeId, BuildingType, CivId, Ent, GameEvent, GameState, Unit } from '../sim/types';
 import type { ScoutFlag } from '../ui/scoutFlags';
@@ -11,6 +11,9 @@ import { stirred } from '../sim/combat';
 import { cursed, grafted } from '../sim/blood';
 import { graftLast } from '../sim/hemo';
 import { seesRect } from '../sim/vision';
+import { revealed, ringsFor, shownToAll, warnRadius } from '../sim/silo';
+import { MissileView } from './missileView';
+import { rooted } from '../sim/bloom';
 import { BuildingsView } from './buildingsView';
 import { CameraRig } from './camera';
 import { Birds, Effects } from './effects';
@@ -18,7 +21,7 @@ import { Sightings, SIGHT_LORE, type Sighting } from './sightings';
 import { fogUniforms, glowUniform, timeUniform, windUniform } from './materials';
 import { forcedSeason, setSeasonLook } from './seasonLook';
 import { seasonAt } from '../sim/seasons';
-import { Overlays, type BarSpec, type RingSpec } from './overlays';
+import { Overlays, type BarSpec, type RingSpec, type WarnSpec } from './overlays';
 import { Post, QUALITY, loadQuality, saveQuality, type QualityName } from './post';
 import { RelicsView } from './relicsView';
 import { PostsView } from './postsView';
@@ -26,14 +29,17 @@ import { FairBannersView } from './fairBannersView';
 import { VigilCandlesView } from './vigilCandlesView';
 import { RuinsView } from './ruinsView';
 import { FindsView } from './findsView';
+import { TidesView } from './tidesView';
+import { SpringsView } from './springsView';
 import { RubbleView } from './rubbleView';
 import { CacheView } from './cacheView';
 import { KegView } from './kegView';
+import { FireView } from './fireView';
 import { LandmarksView } from './landmarksView';
 import { GrazeView } from './grazeView';
 import { BorderView } from './borderView';
 import { FoundationView } from './foundationView';
-import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, coilFields, placementField, sortieRings, type RangeGuide } from './rangeGuides';
+import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, coilFields, placementField, sortieRings, coverRings, type RangeGuide } from './rangeGuides';
 import { ResourcesView } from './resourcesView';
 import { Sky } from './sky';
 import { forcedHour, hourAt, lightAt, moonPhase } from './daylight';
@@ -63,7 +69,7 @@ export interface Selection {
   /** The building whose rally point to show. */
   rallyOf: number | null;
   /** A line of wall being laid out. */
-  wall: { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean; type: 'wall' | 'dyke' | 'thornwall' } | null;
+  wall: { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean; type: 'wall' | 'dyke' | 'thornwall' | 'channel' | 'causeway' } | null;
   /** Personal notes visible only in this browser. */
   scoutFlags: readonly ScoutFlag[];
 }
@@ -112,10 +118,17 @@ export class View {
   private vigilCandles = new VigilCandlesView();
   readonly ruins = new RuinsView();
   readonly finds = new FindsView();
+  readonly springs = new SpringsView();
+  /** Causeways under the tide (#739). */
+  readonly tides = new TidesView();
   readonly rubble = new RubbleView();
   readonly caches = new CacheView();
   readonly kegs = new KegView();
+  readonly missiles = new MissileView();
+  readonly fires = new FireView();
   private falloutTick = -1;
+  /** The tick a breach (#748) was last heard: one sound a blast. */
+  private breachHeard = -1;
   readonly landmarks = new LandmarksView();
   /** When ground relics next sparkle. */
   private relicGlint = 0;
@@ -168,6 +181,8 @@ export class View {
   private chimneys = new Map<number, number>();
   /** When each ship last left foam or smoke behind. */
   private wakes = new Map<number, number>();
+  /** The tick each Hive last buzzed (the Age of the Hive), so a swarm on many rivals is one drone, not a din. */
+  private buzzed = new Map<number, number>();
   /** The next time an aircraft's drone may be heard. */
   private droneAt = 0;
   /** Things to show a moment from now (an aircraft hitting the ground). */
@@ -190,7 +205,7 @@ export class View {
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sky.mesh, this.hemi, this.fill, this.sun, this.sun.target);
-    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.finds.group, this.rubble.group, this.caches.group, this.kegs.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
+    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.finds.group, this.springs.group, this.tides.group, this.rubble.group, this.caches.group, this.kegs.group, this.missiles.group, this.fires.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
     this.scene.add(this.rangeGuides.mesh, this.borders.mesh, this.graze.mesh, this.foundations.mesh);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.post = new Post(this.renderer, this.scene, this.rig.camera);
@@ -258,9 +273,12 @@ export class View {
     this.vigilCandles.clear();
     this.ruins.clear();
     this.finds.clear();
+    this.springs.clear();
     this.rubble.clear();
     this.caches.clear();
     this.kegs.clear();
+    this.missiles.clear();
+    this.fires.clear();
     this.landmarks.clear();
     const colors = s.players.map((p) => p.color);
     this.units.setColors(colors);
@@ -461,7 +479,14 @@ export class View {
     // The water layer (#701): ground pumped out of the water rises from it, and the shore's foam follows.
     if (this.terrain.sync(s, dt)) this.water.refreshBed(s, (i) => this.terrain.heightOf(i));
     this.resources.update(s, dt);
-    this.buildings.update(s, this.viewer, (b) => this.reveal || seesRect(s, this.viewer, b.tx, b.ty, b.size), dt, this.reveal);
+    // A finished Missile Silo is seen by every player through the fog (#753), and one that falls is forgotten wherever it stood. So is an
+    // Interceptor Battery (#759 s2): its cover is public.
+    const silo = (b: { id?: number; type?: string }): boolean => {
+      if ((b.type !== 'silo' && b.type !== 'battery') || b.id === undefined) return false;
+      const e = s.byId.get(b.id);
+      return !e || e.hp <= 0 || shownToAll(e);
+    };
+    this.buildings.update(s, this.viewer, (b) => this.reveal || seesRect(s, this.viewer, b.tx, b.ty, b.size) || silo(b as { id?: number; type?: string }), dt, this.reveal);
     this.units.update(s, alpha, dt, this.time, this.visibleUnit, this.rig.camera, this.width, this.height, (x, y) => this.sees(x, y));
     this.relics.update(
       s,
@@ -473,7 +498,7 @@ export class View {
       (id) => this.units.drawn.get(id) ?? null,
       (id) => {
         const b = s.byId.get(id);
-        if (!b || b.kind !== 'building' || !(b.owner === this.viewer || this.reveal || seesRect(s, this.viewer, b.tx, b.ty, b.size))) return null;
+        if (!b || b.kind !== 'building' || !(b.owner === this.viewer || this.reveal || seesRect(s, this.viewer, b.tx, b.ty, b.size) || shownToAll(b))) return null;
         return this.buildings.topOf(id);
       },
     );
@@ -484,6 +509,12 @@ export class View {
     this.rubble.update(s, !!ageDef(p).salvage, (x, y) => this.reveal || this.sees(x, y));
     this.caches.update(s, (x, y) => this.reveal || this.sees(x, y), (id) => this.units.drawn.get(id) ?? null);
     this.kegs.update(s, (x, y) => this.reveal || this.sees(x, y), (id) => this.units.drawn.get(id) ?? null);
+    // Missiles in the air (#772): seen by every player, through the fog, between the last tick and this one.
+    this.missiles.update(s, s.tick - 1 + alpha, dt, this.effects);
+    // Fire (`fire.ts`): flames on what burns, torches in hand, and smoke rising off it all.
+    this.fires.update(s, dt, (x, y) => this.reveal || this.sees(x, y), (id) => this.units.drawn.get(id) ?? null, (at, big) =>
+      this.effects.burst(at, { count: big ? 3 : 2, speed: 0.25, up: 1, life: big ? 3.4 : 2.6, size: big ? 0.22 : 0.16, grow: 3, gravity: -0.5, drag: 0.8, soft: true, colors: ['#3a3532', '#5a544e', '#7a736a'] }),
+    );
     // Fallout (#605 s2): poisoned ground breathes a sickly green haze and drifting motes, a few times a second, where the viewer sees.
     if (s.fallout && s.tick !== this.falloutTick && s.tick % 4 === 0) {
       this.falloutTick = s.tick;
@@ -497,6 +528,8 @@ export class View {
     }
     this.ruins.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     this.finds.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
+    this.springs.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1);
+    this.tides.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1);
     this.landmarks.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     if (!this.reveal) {
       for (const f of this.sightings.scan(s, (x, y) => p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1)) {
@@ -589,6 +622,13 @@ export class View {
       const f = placementField(s, this.viewer, sel.ghost.type, sel.ghost.tx, sel.ghost.ty);
       if (f) guides.push(f);
     }
+    // Missile defence (#759 s2): every battery's cover, whoever's, while a warhead is in the air, while placing a battery, or while a silo
+    // or a battery is selected (aiming a launch: read the rival's cover first).
+    const covering = !!s.launches?.length || sel.ghost?.type === 'battery' || [...sel.ids].some((id) => {
+      const e = s.byId.get(id);
+      return !!e && e.kind === 'building' && (e.type === 'battery' || (e.type === 'silo' && e.owner === this.viewer));
+    });
+    if (covering) for (const g of coverRings(s, sel.ghost?.type === 'battery' ? sel.ghost : null)) if (guides.length < MAX_RANGE_GUIDES) guides.push(g);
     // In the Age of Lightning every finished coil shows its field.
     for (const f of coilFields(s, this.viewer)) if (guides.length < MAX_RANGE_GUIDES) guides.push(f);
     // Selecting your own aircraft in the Age of Aeronauts shows the fuel bands round the nearest Airfields.
@@ -694,6 +734,7 @@ export class View {
       }
     }
     this.overlays.setRings(rings);
+    this.overlays.setWarnings(s, this.warnings(s), this.time);
     this.borders.update(s, this.viewer, this.reveal, this.showBorders && this.titleHour === null); // the title's film shows no map lines
     this.graze.update(s, this.viewer, this.reveal);
     this.foundations.update(s, this.viewer, (x, y) => this.reveal || s.players[this.viewer].vis[Math.floor(y) * s.w + Math.floor(x)] > 0);
@@ -890,7 +931,7 @@ export class View {
             this.cue(k === 'bomb' ? 'bombDrop' : 'mg', ev.x, ev.y, 0.6);
             break;
           }
-          this.cue(k === 'bullet' ? 'musket' : k === 'ball' ? 'cannon' : k === 'boulder' ? 'catapult' : k === 'spear' ? 'spear' : k === 'stone' ? 'sling' : 'bow', ev.x, ev.y, k === 'ball' ? 0.9 : 0.6);
+          this.cue(k === 'bullet' ? 'musket' : k === 'ball' ? 'cannon' : k === 'boulder' ? 'catapult' : k === 'spear' ? 'spear' : k === 'stone' ? 'sling' : k === 'dart' ? 'dart' : 'bow', ev.x, ev.y, k === 'ball' ? 0.9 : 0.6);
           if (k === 'bullet' || k === 'ball') {
             const big = k === 'ball';
             this.effects.burst(this.ground(s, ev.x, ev.y, 0.5), { count: big ? 10 : 3, speed: big ? 0.9 : 0.4, up: 0.6, life: big ? 2.4 : 1.4, size: big ? 0.16 : 0.08, grow: 3, gravity: -0.2, drag: 1, soft: true, colors: ['#e6e2dc', '#cfcac2'] });
@@ -920,6 +961,10 @@ export class View {
           } else if (ev.what === 'doused') {
             this.effects.burst(at, { count: 8, speed: 0.6, up: 1, life: 1.4, size: 0.1, grow: 2, gravity: -0.6, drag: 1, soft: true, colors: ['#bdb6a8', '#8f887c'] });
             this.cue('kegDoused', ev.x, ev.y, 0.8);
+          } else if (ev.what === 'drowned') {
+            // The tide came over a burning keg (#748): a hiss of steam off the water, and it is gone.
+            this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.05, ev.y), { count: 7, speed: 0.4, up: 1.1, life: 1.2, size: 0.08, grow: 2, gravity: -0.5, drag: 1, soft: true, colors: ['#e8eef0', '#c9d3d6'] });
+            this.cue('kegDoused', ev.x, ev.y, 0.6);
           } else {
             // The blast: a fireball low and wide, a black pall, stone and timber thrown, a ring out to its reach.
             this.effects.burst(at, { count: 30, speed: 3, up: 0.6, life: 0.8, size: 0.14, grow: 2.2, gravity: -1, drag: 1.2, colors: ['#ffe08a', '#ff9a3c', '#e0471f'] });
@@ -930,14 +975,53 @@ export class View {
           }
           break;
         }
+        case 'intercept': {
+          // Missile defence (#759 s2), seen by every player as the missile is: the battery's flash and smoke as it fires, then where the two
+          // meet a clean white burst high overhead on a hit, or a small dark puff beside the missile on a miss.
+          if (ev.what === 'fired') {
+            const o = this.ground(s, ev.x, ev.y, 0.8);
+            this.effects.burst(o, { count: 14, speed: 1, up: 1.4, life: 0.5, size: 0.1, grow: 1.5, gravity: -1, drag: 1.2, colors: ['#ffffff', '#cfe9ff', '#ffd25a'] });
+            this.effects.burst(o, { count: 22, speed: 1.4, up: 0.3, life: 2.6, size: 0.26, grow: 2.6, gravity: -0.2, drag: 1.1, soft: true, colors: ['#f2efe9', '#d8d3cb'] });
+          } else {
+            const at = this.ground(s, ev.x, ev.y, ev.z ?? 0);
+            if (ev.what === 'hit') {
+              this.effects.burst(at, { count: 40, speed: 3.2, up: 0.4, life: 0.7, size: 0.12, grow: 1.6, gravity: 0, drag: 1.4, colors: ['#ffffff', '#fff6d0', '#cfe9ff'] });
+              this.effects.burst(at, { count: 24, speed: 1.4, up: 0.2, life: 3.2, size: 0.3, grow: 3, gravity: -0.1, drag: 1, soft: true, colors: ['#eeeae4', '#cfcac2', '#a9a39a'] });
+              this.effects.burst(at, { count: 18, speed: 2.4, up: 0.6, life: 1.6, size: 0.05, gravity: 4, drag: 0.4, colors: ['#ffd25a', '#ff9a3c', '#5a5450'] });
+            } else {
+              this.effects.burst(at.clone().add(new THREE.Vector3(0.6, 0.3, 0.4)), { count: 12, speed: 0.8, up: 0.3, life: 1.6, size: 0.18, grow: 2.2, gravity: -0.1, drag: 1, soft: true, colors: ['#5a5450', '#7a736a'] });
+            }
+          }
+          break;
+        }
         case 'silo': {
           // The Atomic Age (#605): a ring on the target the moment a warhead goes up, a dome of fire where it lands.
           const at = this.ground(s, ev.x, ev.y, 0.3);
-          if (ev.what === 'launched') this.effects.ring(at, '#ff4a3a', SILO.reach + 0.5, 1.4);
-          else if (ev.what === 'struck' && this.sees(ev.x, ev.y)) {
-            this.effects.burst(at, { count: 60, speed: 5, up: 1.2, life: 1.2, size: 0.3, grow: 3, gravity: -1.4, drag: 1, colors: ['#fff6d0', '#ffd25a', '#ff7a2a'] });
-            this.effects.burst(at, { count: 50, speed: 2.2, up: 2.6, life: 5, size: 0.5, grow: 5, gravity: -0.6, drag: 0.8, soft: true, colors: ['#3a3430', '#524a44', '#6c625a'] });
-            this.effects.ring(at, '#ffe9a8', SILO.reach + 1, 1.6);
+          const R = WARHEADS[ev.w ?? 'atomic'].r;
+          // The warning ring is the widest its people could send (#753), so it never says which warhead is coming.
+          const l = s.launches?.find((k) => k.id === ev.id);
+          if (ev.what === 'launched' && l?.arc) {
+            // The ignition (#772), seen by all as the silo is: a flash in the hatch, a column of white smoke rolling out round its foot.
+            const o = this.ground(s, l.arc.x, l.arc.y, 0.6);
+            this.effects.burst(o, { count: 26, speed: 1.4, up: 1.6, life: 0.9, size: 0.14, grow: 1.8, gravity: -1, drag: 1.2, colors: ['#fff6d0', '#ffd25a', '#ff8a2a'] });
+            this.effects.burst(o, { count: 40, speed: 2.2, up: 0.15, life: 4.5, size: 0.4, grow: 3.2, gravity: -0.15, drag: 1.1, soft: true, colors: ['#f2efe9', '#d8d3cb', '#bdb6ab'] });
+            this.effects.burst(o, { count: 18, speed: 0.6, up: 1, life: 3.5, size: 0.3, grow: 3, gravity: -0.8, drag: 0.9, soft: true, colors: ['#e9e5de', '#cfc9c0'] });
+          }
+          if (ev.what === 'launched' || ev.what === 'revealed') {
+            // Never at the event's point, which is the attacker's own aim (#762): at the rings this viewer is shown, all alike. At the
+            // reveal the real ring flashes where it was drawn; the launcher's own side sees nothing new.
+            if (!l || (ev.what === 'revealed' && s.players[this.viewer].team === s.players[l.owner].team)) break;
+            for (const g of ringsFor(s, l, this.viewer)) {
+              const on = this.ground(s, g.x, g.y, 0.3);
+              this.effects.ring(on, ev.what === 'revealed' ? '#ffd0c0' : '#ff4a3a', (ev.ring ?? warnRadius(s, l.owner)) + 0.5, ev.what === 'revealed' ? 0.9 : 1.4);
+              if (ev.what === 'revealed') this.effects.ring(on, '#ff2a1a', (ev.ring ?? warnRadius(s, l.owner)) + 1.5, 1.6);
+            }
+          } else if (ev.what === 'struck') {
+            // Every player sees the blast, through the fog (#752); it grows with the warhead (Atomic 1, Fusion 1.5).
+            const big = R / WARHEADS.atomic.r;
+            this.effects.burst(at, { count: Math.round(60 * big), speed: 5 * big, up: 1.2, life: 1.2, size: 0.3, grow: 3 * big, gravity: -1.4, drag: 1, colors: ev.w === 'fusion' ? ['#ffffff', '#cfe6ff', '#8fc4ff'] : ['#fff6d0', '#ffd25a', '#ff7a2a'] });
+            this.effects.burst(at, { count: Math.round(50 * big), speed: 2.2 * big, up: 2.6 * big, life: 5, size: 0.5, grow: 5 * big, gravity: -0.6, drag: 0.8, soft: true, colors: ['#3a3430', '#524a44', '#6c625a'] });
+            this.effects.ring(at, '#ffe9a8', R + 1, 1.6);
             this.cue('kegBlow', ev.x, ev.y, 1);
           }
           break;
@@ -986,6 +1070,82 @@ export class View {
           this.cue('tame', ev.x, ev.y, 1);
           this.cue(ev.kind === 'mammoth' ? 'mammoth' : ev.kind === 'boar' ? 'snarl' : 'howl', ev.x, ev.y, 0.5);
           break;
+        case 'fire': {
+          // Fire (`fire.ts`): a torch put to wood roars up; a tree catching from its neighbour crackles; beaten out, it hisses to steam;
+          // a tree falling to ash throws sparks; a root burnt away smoulders.
+          if (!this.sees(ev.x, ev.y)) break;
+          const at = this.ground(s, ev.x, ev.y, ev.tree ? 0.8 : 0.3);
+          if (ev.what === 'lit') {
+            this.effects.burst(at, { count: ev.torch ? 14 : 6, speed: 1, up: 1.2, life: 0.7, size: 0.04, gravity: -1, drag: 1, colors: ['#fff2a8', '#ffc94a', '#ff7a2a'] });
+            if (ev.torch) this.cue('fireLit', ev.x, ev.y, 0.9);
+            else this.cue('fireCatch', ev.x, ev.y, 0.35);
+          } else if (ev.what === 'out') {
+            this.effects.burst(at, { count: 10, speed: 0.5, up: 1, life: 1.8, size: 0.14, grow: 2.5, gravity: -0.6, drag: 1, soft: true, colors: ['#d8d4cc', '#aaa49a', '#8a847a'] });
+            this.cue('fireOut', ev.x, ev.y, 0.8);
+          } else if (ev.what === 'ash') {
+            this.effects.burst(at, { count: 16, speed: 1.6, up: 1.4, life: 1.1, size: 0.035, gravity: 1.5, drag: 0.6, colors: ['#ffd27a', '#ff8a3a', '#c2451a'] });
+            this.effects.burst(at, { count: 6, speed: 0.6, up: 0.6, life: 2, size: 0.18, grow: 2, gravity: -0.3, drag: 1, soft: true, colors: ['#4a4541', '#6a645e'] });
+            this.cue('fireAsh', ev.x, ev.y, 0.5);
+          } else {
+            this.effects.burst(at, { count: 8, speed: 0.4, up: 1, life: 1.6, size: 0.12, grow: 2, gravity: -0.5, drag: 1, soft: true, colors: ['#4a4541', '#6a645e'] });
+            this.cue('fireCatch', ev.x, ev.y, 0.5);
+          }
+          break;
+        }
+        case 'hive': {
+          // The Age of the Hive: a swarm boils round the rival it stings, with one drone a Hive at a time; smoke hushes a Hive in a
+          // grey puff; a Hive waking throws a little ring of amber.
+          if (!this.sees(ev.x, ev.y)) break;
+          if (ev.what === 'swarm') {
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.7), { count: 12, speed: 1.4, up: 0.3, life: 0.9, size: 0.022, gravity: 0, drag: 0.2, colors: ['#1e1a12', '#3a2e14', '#e0a526'] });
+            if (s.tick - (this.buzzed.get(ev.id) ?? -9999) >= TICK_HZ * 2) {
+              this.buzzed.set(ev.id, s.tick);
+              this.cue('swarm', ev.x, ev.y, 0.8);
+            }
+          } else if (ev.what === 'smoked') {
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.6), { count: 10, speed: 0.4, up: 0.8, life: 2, size: 0.14, grow: 2.2, gravity: -0.4, drag: 1, soft: true, colors: ['#cfcac2', '#a8a298'] });
+            this.cue('hiveHush', ev.x, ev.y, 0.7);
+          } else this.effects.ring(this.ground(s, ev.x, ev.y, 0.15), '#e0a526', 0.9, 0.7);
+          break;
+        }
+        case 'bloom':
+          // The Age of the Bloom: a puff of seed where a Seed comes down, a burst of bark where it is hacked out, and where it cracks a
+          // town, a great green bloom and splinters, seen through the fog; a pollen storm is a gold haze rising round the Heart Tree.
+          if (ev.what === 'rooted') {
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.2), { count: 24, speed: 1.6, up: 1.2, life: 1.6, size: 0.08, grow: 1.5, gravity: 0.6, drag: 1.1, colors: ['#6b5a40', '#8fc24a', '#d6f07a'] });
+            this.effects.ring(this.ground(s, ev.x, ev.y, 0.15), '#9be05a', BLOOM.r, 1.2);
+            this.cue('bloomRoot', ev.x, ev.y, 1);
+          } else if (ev.what === 'hacked') {
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.4), { count: 20, speed: 1.8, up: 1.4, life: 1.2, size: 0.07, gravity: 1.2, drag: 1, colors: ['#5a4630', '#c8e27a', '#8a6a44'] });
+            this.cue('bloomCut', ev.x, ev.y, 1);
+          } else if (ev.what === 'cracked') {
+            const at = this.ground(s, ev.x, ev.y, 0.5);
+            this.effects.burst(at, { count: 70, speed: 3.4, up: 2.4, life: 2.6, size: 0.12, grow: 2.4, gravity: 0.4, drag: 0.9, colors: ['#3f7a2e', '#7fd84a', '#d6f07a', '#f4f0d8'] });
+            this.effects.burst(at, { count: 40, speed: 2, up: 1, life: 1.6, size: 0.1, gravity: 1.6, drag: 1, colors: ['#8a7a66', '#5a4630', '#b8a890'] });
+            this.effects.ring(at, '#d6f07a', BLOOM.r + 1, 1.8);
+            this.cue('bloomCrack', ev.x, ev.y, 1);
+          } else if (ev.what === 'storm' && this.sees(ev.x, ev.y)) {
+            this.effects.burst(this.ground(s, ev.x, ev.y, 3), { count: 60, speed: 3, up: 0.6, life: 4, size: 0.09, grow: 3, gravity: -0.15, drag: 0.4, soft: true, colors: ['#f4e04a', '#e8d27a', '#fff2a8'] });
+          }
+          break;
+        case 'wildwood':
+          // The Age of the Wildwood: an Ent tears free of its tree in a burst of bark and leaves, or sinks back into the ground and
+          // roots in a puff of earth; a rooted Ent felled drops leaves; the Spreading is a rising swirl of seed round the Heart Tree.
+          if (!this.sees(ev.x, ev.y)) break;
+          if (ev.what === 'wake') {
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.6), { count: 18, speed: 1.4, up: 1.6, life: 1.2, size: 0.06, gravity: 1, drag: 1.2, colors: ['#4b3a28', '#3f6a2e', '#6f8f3e', '#8a6a44'] });
+            this.cue('entWake', ev.x, ev.y, 0.9);
+          } else if (ev.what === 'root') {
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.1), { count: 12, speed: 0.7, up: 0.6, life: 1.4, size: 0.12, grow: 1.8, gravity: 0.2, drag: 1.2, soft: true, colors: ['#6b5a40', '#56763a'] });
+            this.cue('entRoot', ev.x, ev.y, 0.8);
+          } else if (ev.what === 'felled') {
+            this.effects.burst(this.ground(s, ev.x, ev.y, 1.2), { count: 14, speed: 0.6, up: 0.2, life: 2, size: 0.05, gravity: 0.5, drag: 1.5, colors: ['#6a5a2e', '#3f6a2e'] });
+            this.cue('fall', ev.x, ev.y, 0.8);
+          } else if (ev.n) {
+            this.effects.burst(this.ground(s, ev.x, ev.y, 2), { count: 30, speed: 2.2, up: 0.8, life: 2.4, size: 0.035, gravity: -0.1, drag: 0.6, soft: true, colors: ['#e8e2b8', '#9cc25a', '#f4f0d8'] });
+            this.cue('spreading', ev.x, ev.y, 0.7);
+          }
+          break;
         case 'sprout':
           // The Age of the Grove: a fallen Thornwall springs up again from its root.
           if (!this.sees(ev.x, ev.y)) break;
@@ -1017,6 +1177,16 @@ export class View {
           this.effects.ring(at, '#fff3c4', 1.4, 1.2);
           this.effects.burst(at.clone().setY(at.y + 0.6), { count: 24, speed: 1.2, up: 1, life: 1.4, size: 0.05, gravity: -0.8, colors: ['#fff3c4', '#ffd166', '#ffffff'] });
           this.cue('convert', ev.x, ev.y, 1);
+          break;
+        }
+        case 'boarded': {
+          // A ship taken by the Sea Beggars (#783): a splash of white water at its side and the old colours drifting down in smoke.
+          if (!this.sees(ev.x, ev.y) && ev.from !== this.viewer && ev.to !== this.viewer) break;
+          const at = this.ground(s, ev.x, ev.y, 0.2);
+          this.effects.ring(at, '#e8f4ff', 1.3, 1);
+          this.effects.burst(at.clone().setY(at.y + 0.5), { count: 18, speed: 1.4, up: 0.9, life: 1.1, size: 0.06, gravity: 0.6, colors: ['#ffffff', '#cfe6f7', '#9bb8cc'] });
+          this.effects.burst(at.clone().setY(at.y + 1.4), { count: 10, speed: 0.5, up: 0.4, life: 1.8, size: 0.08, grow: 1.5, gravity: -0.2, drag: 1.5, soft: true, colors: ['#8a8a8a', '#b0aca4'] });
+          this.cue('boarded', ev.x, ev.y, 1);
           break;
         }
         case 'consecrated': {
@@ -1184,6 +1354,11 @@ export class View {
             this.effects.ring(this.ground(s, ev.x, ev.y, 0.12), s.players[ev.owner].color, ev.size * 1.8, 0.7);
             this.effects.burst(at.clone().setY(at.y + 0.5), { count: 10, speed: 1.6, up: 1.2, life: 0.9, size: 0.06, gravity: 3, colors: [s.players[ev.owner].color, '#fff3c4'] });
             this.cue('collapse', ev.x, ev.y, 1);
+            // A dyke gives way (#701 s3): the bank's long groan, and the first of the sea through the gap.
+            if (ev.type === 'dyke' && this.wet(s, ev.x, ev.y)) {
+              this.effects.burst(this.ground(s, ev.x, ev.y, 0.2), { count: 24, speed: 1.6, up: 1.1, life: 1.3, size: 0.08, grow: 1.4, gravity: 4, drag: 0.4, colors: ['#ffffff', '#dcefff', '#8a7d5c'] });
+              this.cue('groan', ev.x, ev.y, 0.9);
+            }
             this.onPing?.(ev.x, ev.y, '#ff6a5a');
           }
           break;
@@ -1266,6 +1441,118 @@ export class View {
           if (!this.sees(ev.x, ev.y)) break;
           this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.06, ev.y), { count: 6, speed: 0.7, up: 0.9, life: 0.8, size: 0.05, gravity: 3, colors: ['#8a7d5c', '#b8c8c4', '#6f6650'] });
           this.cue('pump', ev.x, ev.y, 0.3);
+          break;
+        }
+        case 'flooded': {
+          // The sea runs back into a tile of polder (#701 s3): white water over the mud, a rush every few tiles, a ping for the land's people.
+          this.resources.markDirty();
+          if (ev.owner === this.viewer && ev.tile % 5 === 0) this.onPing?.(ev.x, ev.y, '#7fb3c9');
+          if (!this.sees(ev.x, ev.y)) break;
+          this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.08, ev.y), { count: 9, speed: 1.1, up: 0.9, life: 0.9, size: 0.06, gravity: 3, drag: 0.4, colors: ['#ffffff', '#dcefff', '#8a7d5c'] });
+          if (ev.drowned) this.cue('splashWater', ev.x, ev.y, 0.7);
+          if (ev.tile % 4 === 0) this.cue('rush', ev.x, ev.y, 0.35);
+          break;
+        }
+        case 'tide':
+          // The tide turns a step (#739): its slow wash, heard by everyone, a little louder on the turn at low and high water.
+          this.cue('tideWash', this.rig.target.x, this.rig.target.z, ev.level === 0 || ev.bared === 0 ? 0.45 : 0.3);
+          this.resources.markDirty();
+          break;
+        case 'tideSwept': {
+          // Caught on the flats (#739): a wave breaking over them where they stood.
+          if (!this.sees(ev.x, ev.y)) break;
+          this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.1, ev.y), { count: 10, speed: 1.2, up: 1, life: 0.9, size: 0.06, gravity: 3, drag: 0.4, colors: ['#ffffff', '#dcefff', '#8f8670'] });
+          this.cue('swept', ev.x, ev.y, 0.5);
+          break;
+        }
+        case 'tideGate': {
+          // A Tide Gate (#785): opened on a loaded pond, white water bursts through it and a ring runs out over the flats; shut, the
+          // leaves knock to.
+          if (!this.sees(ev.x, ev.y)) break;
+          if (ev.open && ev.scour) {
+            const at = new THREE.Vector3(ev.x, WATER_Y + 0.12, ev.y);
+            this.effects.burst(at, { count: 22, speed: 2.2, up: 1.4, life: 1.4, size: 0.08, gravity: 4, drag: 0.3, colors: ['#ffffff', '#e6f1f2', '#cfe3e6'] });
+            this.effects.ring(new THREE.Vector3(ev.x, WATER_Y + 0.03, ev.y), '#e6f1f2', 4, 1.6);
+            this.effects.ring(new THREE.Vector3(ev.x, WATER_Y + 0.03, ev.y), '#ffffff', 7, 2.4);
+            this.cue('scour', ev.x, ev.y, 0.8);
+          } else {
+            this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.1, ev.y), { count: 6, speed: 0.7, up: 0.6, life: 0.8, size: 0.05, gravity: 3, colors: ['#dcefff', '#ffffff'] });
+            this.cue('pondShut', ev.x, ev.y, 0.35);
+          }
+          break;
+        }
+        case 'tideHold': {
+          // Routes that read the tide (#755): one of yours halts at the water's edge, a little lap of foam at its feet.
+          if (ev.owner !== this.viewer || !this.sees(ev.x, ev.y)) break;
+          this.effects.burst(this.ground(s, ev.x, ev.y, 0.05), { count: 5, speed: 0.5, up: 0.4, life: 0.8, size: 0.05, gravity: 1.5, drag: 0.6, colors: ['#ffffff', '#cfe8f5'] });
+          break;
+        }
+        case 'tideAshore': {
+          // Work on the flats that reads the tide (#767): one of yours leaves its work for the shore, a splash of wet sand at its heels.
+          if (ev.owner !== this.viewer || !this.sees(ev.x, ev.y)) break;
+          this.effects.burst(this.ground(s, ev.x, ev.y, 0.05), { count: 4, speed: 0.4, up: 0.35, life: 0.7, size: 0.045, gravity: 1.5, drag: 0.6, colors: ['#cfe8f5', '#a8996f'] });
+          break;
+        }
+        case 'milled': {
+          // A Tide Mill grinds on the running tide (#739): spray off the wheel, a few coins for its people.
+          if (ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;
+          this.effects.burst(this.ground(s, ev.x, ev.y, 0.6), { count: 7, speed: 0.7, up: 1.2, life: 0.9, size: 0.05, gravity: 2.4, colors: ['#dcefff', '#ffd166', '#f2cf4a'] });
+          if (ev.owner === this.viewer) this.cue('tideMill', ev.x, ev.y, 0.4);
+          break;
+        }
+        case 'breached': {
+          // A causeway breached (#748): packed stone thrown up and the sea through the gap; one sound a blast, from its first tile.
+          if (!this.sees(ev.x, ev.y)) break;
+          this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.1, ev.y), { count: 10, speed: 1.6, up: 1.2, life: 1.1, size: 0.07, gravity: 6, drag: 0.3, colors: ['#b8ad96', '#9e9482', '#7d7468'] });
+          this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.05, ev.y), { count: 8, speed: 0.9, up: 0.8, life: 0.9, size: 0.06, gravity: 3, drag: 0.4, colors: ['#ffffff', '#dcefff'] });
+          if (s.tick !== this.breachHeard) {
+            this.breachHeard = s.tick;
+            this.cue('breach', ev.x, ev.y, 0.7);
+          }
+          break;
+        }
+        case 'pond': {
+          // A barrage shuts its pond (#748): the water stills behind it.
+          if (!this.sees(ev.x, ev.y)) break;
+          this.effects.ring(new THREE.Vector3(ev.x, WATER_Y + 0.03, ev.y), '#dcefff', 3, 1.6);
+          if (ev.owner !== this.viewer) this.cue('pondShut', ev.x, ev.y, 0.4);
+          break;
+        }
+        case 'causeway': {
+          // A stretch of causeway laid (#739): grit thrown up off the packed stone.
+          if (!this.sees(ev.x, ev.y)) break;
+          this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.08, ev.y), { count: 6, speed: 0.6, up: 0.8, life: 0.7, size: 0.05, gravity: 3, colors: ['#b8ad96', '#9e9482', '#dcefff'] });
+          break;
+        }
+        case 'inundated': {
+          // The Water Line (#701 s4): the flood runs over a tile of meadow (a low spurt of water, a hiss now and then), or leaves it.
+          if (!ev.wet || !this.sees(ev.x, ev.y)) break;
+          this.effects.burst(new THREE.Vector3(ev.x, heightAt(this.state!, ev.x, ev.y) + 0.1, ev.y), { count: 4, speed: 0.5, up: 0.5, life: 0.7, size: 0.045, gravity: 3, colors: ['#bfd9dc', '#e6f1f2', '#7d9a86'] });
+          if (ev.tile % 6 === 0) this.cue('spread', ev.x, ev.y, 0.3);
+          break;
+        }
+        case 'burst':
+          // A dam bursts (#701 s5): its masonry flung up in a spray of white water, and the roar.
+          if (!this.sees(ev.x, ev.y)) break;
+          this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.3, ev.y), { count: 26, speed: 2.2, up: 2.6, life: 1.3, size: 0.08, gravity: 4, colors: ['#e6f1f2', '#bfd9dc', '#9d978d', '#86807a'] });
+          this.cue('damBurst', ev.x, ev.y, 1);
+          break;
+        case 'pontoon':
+          // A floating district (#770): cast off with a churn at the tug's stern, moored with a bump of the floats, or holed and gone
+          // under in a boil of white water and timber.
+          if (!this.sees(ev.x, ev.y)) break;
+          this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.1, ev.y), ev.act === 'sink' ? { count: 30, speed: 1.6, up: 1.8, life: 1.4, size: 0.08, gravity: 3.5, colors: ['#e6f1f2', '#bfd9dc', '#8a6a46', '#c9b06a'] } : { count: 10, speed: 0.9, up: 0.6, life: 0.9, size: 0.06, gravity: 3, colors: ['#e6f1f2', '#bfd9dc', '#9fc4cf'] });
+          this.cue(ev.act === 'sink' ? 'founder' : ev.act === 'cast' ? 'castOff' : 'moor', ev.x, ev.y, ev.act === 'sink' ? 1 : 0.7);
+          break;
+        case 'sluice':
+          // A sluice opened or shut (#701 s4): the winch, and the water let out or stilled.
+          if (this.sees(ev.x, ev.y)) this.cue(ev.open ? 'sluiceOpen' : 'sluiceShut', ev.x, ev.y, 0.7);
+          break;
+        case 'dug': {
+          // Water runs into a dug ditch (#701, the Age of Rivers): a splash at the head of the flow, and a soft gurgle now and then.
+          if (!this.sees(ev.x, ev.y)) break;
+          this.effects.burst(new THREE.Vector3(ev.x, WATER_Y + 0.05, ev.y), { count: 5, speed: 0.6, up: 0.8, life: 0.7, size: 0.045, gravity: 3, colors: ['#9fc4cf', '#d8ecef', '#6f8f86'] });
+          if (ev.tile % 3 === 0) this.cue('flow', ev.x, ev.y, 0.25);
           break;
         }
         case 'deliver':
@@ -1438,6 +1725,28 @@ export class View {
     const loud = gain * Math.max(0, 1 - Math.max(far - 0.4, off - 1.1) * 1.2) * (1.15 - this.rig.zoomT * 0.45);
     if (loud <= 0.03) return;
     this.onCue(name, Math.max(-1, Math.min(1, this.v.x)), loud);
+  }
+
+  /**
+   * The warning zones of every warhead in the air, as this viewer is shown them (#762, `ringsFor`): a rival's three rings in red, all
+   * alike, then the real one alone, flashing; the launcher's own team sees its aim in amber, at its warhead's own blast.
+   */
+  private warnings(s: GameState): WarnSpec[] {
+    const out: WarnSpec[] = [];
+    for (const l of s.launches ?? []) {
+      const own = s.players[this.viewer].team === s.players[l.owner].team;
+      const r = (own ? WARHEADS[l.w ?? 'atomic'].r : warnRadius(s, l.owner)) + 0.5;
+      for (const g of ringsFor(s, l, this.viewer)) out.push({ x: g.x, y: g.y, r, color: own ? '#ffb03a' : '#ff3a2a', flash: !own && revealed(s, l) });
+    }
+    // Bloom Seeds (the Age of the Bloom) are seen by all: the ring they crack, and once rooted, the heart-root's own small ring to hack
+    // at. Leaf green, pale for the Seed's own side; both flash for its last ten seconds.
+    for (const l of s.blooms ?? []) {
+      const own = s.players[this.viewer].team === s.players[l.owner].team;
+      const flash = s.tick > l.at - secs(10);
+      out.push({ x: l.x, y: l.y, r: BLOOM.r + 0.5, color: own ? '#d6f07a' : '#7fd84a', flash });
+      if (rooted(s, l)) out.push({ x: l.x, y: l.y, r: BLOOM.reach + 0.5, color: '#f4e04a', flash });
+    }
+    return out;
   }
 
   /** A ring and spark where an order was given. */

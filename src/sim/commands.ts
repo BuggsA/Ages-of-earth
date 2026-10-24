@@ -1,4 +1,4 @@
-import { AUTO_WORK, BUILDINGS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, SNARE, SPREAD, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
+import { AUTO_WORK, BUILDINGS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, RIVERS, SNARE, HIVE, COCKLER, SPREAD, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
 import { peace } from './combat';
 import { findSpot } from './ai';
 import { placeProblem, stampBuilding, walkable } from './grid';
@@ -16,7 +16,9 @@ import { ruinAt } from './ruins';
 import { rubbleAt, salvages } from './salvage';
 import { cacheAt } from './caches';
 import { carriesKegs, kegProblem } from './powder';
-import { launch, launchProblem } from './silo';
+import { kegTileProblem } from './tides';
+import { carriesTorch, onFire, torchProblem } from './fire';
+import { launch, launchProblem, reserveProblem, salvo, salvoProblem, setReserve, siloLimit } from './silo';
 import { raise, raiseCost } from './reclaim';
 import { callWork, workProblem } from './works';
 import { callKin, killCamp, kinProblem, takeVow, takeWay, vowProblem, wayBarred, wayProblem } from './ways';
@@ -34,8 +36,13 @@ import { sees } from './vision';
 import { canHit, isEnemy, maxHp, pay, placeBuilding, refund } from './world';
 import { fightsBeasts } from './animals';
 import { tameProblem } from './tame';
+import { heartBarred, rootEnt, rootProblem } from './wildwood';
+import { sling, slingProblem, spireBarred } from './bloom';
 import { isField } from './grove';
 import { answerTiding, tidingProblem } from './tidings';
+import { sluiceProblem } from './water';
+import { tideGateProblem, toggleGate } from './tides';
+import { castOff, castProblem, linkProblem } from './floating';
 
 /**
  * Everything a player can do, as plain data. A person's clicks and the computer opponent both go
@@ -183,14 +190,14 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
     if (!quiet) refuse(s, p, `Needs the ${EPOCHS[def.epoch].name}`);
     return null;
   }
-  const no = buildBarred(player, type) ?? wayBarred(s, player, type);
+  const no = buildBarred(player, type) ?? wayBarred(s, player, type) ?? siloLimit(s, p, type) ?? heartBarred(s, p, type) ?? spireBarred(s, p, type);
   if (no) {
     if (!quiet) refuse(s, p, no);
     return null;
   }
   const problem = placeProblem(s, type, tx, ty, true, p);
   if (problem) {
-    if (!quiet) refuse(s, p, problem === 'slope' ? 'Too steep to build there' : problem === 'foreign' ? "That's enemy land: only a Tower can be raised there" : problem === 'woods' ? `A snare needs ${SNARE.need} trees standing within ${SNARE.r} tiles` : problem === 'snares' ? `Too near another snare: keep them ${SNARE.apart} tiles apart` : "Can't build there");
+    if (!quiet) refuse(s, p, problem === 'slope' ? 'Too steep to build there' : problem === 'foreign' ? "That's enemy land: only a Tower can be raised there" : problem === 'woods' ? `A snare needs ${SNARE.need} trees standing within ${SNARE.r} tiles` : problem === 'snares' ? `Too near another snare: keep them ${SNARE.apart} tiles apart` : problem === 'parched' ? `In the Age of Rivers a Farm is laid only by water: within ${RIVERS.wet} tiles of a channel, spring, lake or shore` : problem === 'bare' ? `A Hive needs ${HIVE.trees} trees standing within ${SNARE.r} tiles` : problem === 'hives' ? `Too near another Hive: keep them ${HIVE.apart} tiles apart` : problem === 'adrift' ? 'A Pontoon is raised beside the shore or beside another of your pontoons, where its builders can stand: to set one farther out, cast it off and tow it' : type === 'pontoon' && (problem === 'dry' || problem === 'water') ? 'A Pontoon is moored on open water that ships sail' : problem === 'beds' ? `A Cockler's Hut goes within ${COCKLER.reach} tiles of a cockle bed` : problem === 'barrage' ? 'A Tide Gate goes on a causeway tile of your own barrage, beside its pond' : "Can't build there");
     return null;
   }
   const cost = raiseCost(s, p, type, tx, ty);
@@ -458,14 +465,33 @@ export function applyCommand(s: GameState, c: Command): void {
       break;
     }
     case 'launch': {
+      if (c.more) {
+        // Launch Control (#765): three silos fire one salvo, one warhead each, on the people's one clock.
+        const shots = Array.isArray(c.more) ? [{ silo: c.silo, x: c.x, y: c.y }, ...c.more] : [];
+        const why = salvoProblem(s, c.p, shots);
+        if (why) {
+          refuse(s, c.p, why);
+          return;
+        }
+        salvo(s, c.p, shots);
+        break;
+      }
       // The Atomic Age (#605): a Missile Silo names a point; the warhead lands after its public countdown.
       const silo = s.byId.get(c.silo);
-      const why = launchProblem(s, c.p, silo as Building | undefined, c.x, c.y);
+      const why = launchProblem(s, c.p, silo as Building | undefined, c.x, c.y, c.w);
       if (why) {
         refuse(s, c.p, why);
         return;
       }
-      launch(s, c.p, silo as Building, c.x, c.y);
+      launch(s, c.p, silo as Building, c.x, c.y, c.w);
+      break;
+    }
+    case 'reserve': {
+      // Missile defence (#759 s3): hold a silo back to answer rival warheads, or stand it down. Only its owner may.
+      const silo = s.byId.get(c.silo);
+      const why = reserveProblem(s, c.p, silo as Building | undefined, c.on === true);
+      if (why) return refuse(s, c.p, why);
+      setReserve(s, silo as Building, c.on === true);
       break;
     }
     case 'keg': {
@@ -478,6 +504,31 @@ export function applyCommand(s: GameState, c: Command): void {
         return;
       }
       for (const u of units) giveOrder(u, { k: 'keg', target: c.target }, c.queue);
+      break;
+    }
+    case 'kegTile': {
+      // Barrages (#748): a keg carried to a rival's causeway tile and laid on it, to breach the road.
+      const why = kegTileProblem(s, c.p, c.tile);
+      const units = myUnits(s, c.p, c.ids).filter(carriesKegs);
+      if (!units.length) return;
+      if (why) {
+        refuse(s, c.p, why);
+        return;
+      }
+      for (const u of units) giveOrder(u, { k: 'kegTile', tile: c.tile }, c.queue);
+      break;
+    }
+    case 'torch': {
+      // Fire (`fire.ts`): citizens and foot soldiers carry torches to a tree, a root or a rival's living building.
+      const at = c.target !== undefined ? { target: c.target } : { tile: c.tile };
+      const units = myUnits(s, c.p, c.ids).filter(carriesTorch);
+      if (!units.length) return;
+      const why = torchProblem(s, c.p, at);
+      if (why) {
+        refuse(s, c.p, why);
+        return;
+      }
+      for (const u of units) giveOrder(u, { k: 'torch', ...at }, c.queue);
       break;
     }
     case 'dig': {
@@ -544,7 +595,8 @@ export function applyCommand(s: GameState, c: Command): void {
           continue;
         }
         if (u.type === 'citizen') {
-          if (!b.built || b.hp < maxHp(s, b)) {
+          // A burning building is beaten out by those sent to mend it (`fire.ts`).
+          if (!b.built || b.hp < maxHp(s, b) || onFire(s, b)) {
             assignBuilders(s, [u], b, !!c.queue);
             continue;
           }
@@ -705,6 +757,28 @@ export function applyCommand(s: GameState, c: Command): void {
     case 'pack': {
       const b = myBuilding(s, c.p, c.building);
       if (!b) return;
+      // At a Sluice (#701 s4) the same order opens the gate, or shuts it.
+      if (b.type === 'sluice') {
+        const shut = sluiceProblem(s, b);
+        if (shut) return refuse(s, c.p, shut);
+        b.open = !b.open || undefined;
+        s.events.push({ k: 'sluice', owner: c.p, id: b.id, open: !!b.open, x: b.x, y: b.y });
+        break;
+      }
+      // At a Tide Gate (#785) it opens the gate, or shuts it: opened on a loaded pond, the pond scours the flats below.
+      if (b.type === 'tidegate') {
+        const no = tideGateProblem(s, b);
+        if (no) return refuse(s, c.p, no);
+        toggleGate(s, b);
+        break;
+      }
+      // At a Pontoon (#770) it casts the district off into a tow.
+      if (b.type === 'pontoon') {
+        const no = castProblem(s, p, b);
+        if (no) return refuse(s, c.p, no);
+        castOff(s, b);
+        break;
+      }
       const why = packProblem(s, p, b);
       if (why) return refuse(s, c.p, why);
       packCamp(s, b);
@@ -742,8 +816,27 @@ export function applyCommand(s: GameState, c: Command): void {
       raiseLamb(s, b);
       break;
     }
+    case 'root': {
+      // The Age of the Wildwood: Ents root where they stand, and are trees again.
+      let why: string | null = null;
+      for (const u of myUnits(s, c.p, c.ids).filter((x) => x.type === 'warden')) {
+        why = rootProblem(s, u);
+        if (!why) rootEnt(s, u);
+      }
+      if (why) refuse(s, c.p, why);
+      break;
+    }
+    case 'sling': {
+      // The Age of the Bloom: a Seed Spire slings its ripe Seed at a point.
+      const b = s.byId.get(c.spire);
+      const why = slingProblem(s, c.p, b, c.x, c.y);
+      if (why) refuse(s, c.p, why);
+      else sling(s, c.p, b as Building, c.x, c.y);
+      break;
+    }
     case 'pitch': {
-      const wagons = myUnits(s, c.p, c.ids).filter((u) => u.type === 'wagon');
+      // Wagons pitch camp; tows (#770) moor their districts.
+      const wagons = myUnits(s, c.p, c.ids).filter((u) => u.type === 'wagon' || u.type === 'tow');
       let why: string | null = null;
       for (const w of wagons) {
         why = pitchProblem(s, w);
@@ -804,7 +897,7 @@ export function applyCommand(s: GameState, c: Command): void {
       }
       break;
     case 'build': {
-      if (c.type === 'wall' || c.type === 'dyke' || c.type === 'thornwall') return applyCommand(s, { t: 'wall', p: c.p, ids: c.ids, x0: c.tx, y0: c.ty, x1: c.tx, y1: c.ty, queue: c.queue, dyke: c.type === 'dyke' || undefined, thorn: c.type === 'thornwall' || undefined });
+      if (c.type === 'wall' || c.type === 'dyke' || c.type === 'thornwall' || c.type === 'channel') return applyCommand(s, { t: 'wall', p: c.p, ids: c.ids, x0: c.tx, y0: c.ty, x1: c.tx, y1: c.ty, queue: c.queue, dyke: c.type === 'dyke' || undefined, thorn: c.type === 'thornwall' || undefined, channel: c.type === 'channel' || undefined });
       const b = placeSite(s, c.p, c.type, c.tx, c.ty);
       if (!b) return;
       if (c.type === 'gate') {
@@ -816,8 +909,8 @@ export function applyCommand(s: GameState, c: Command): void {
       break;
     }
     case 'wall': {
-      // A line of wall, or of dykes (#701) or Thornwall (the Age of the Grove), laid the same way.
-      const type = c.dyke ? 'dyke' : c.thorn ? 'thornwall' : 'wall';
+      // A line of wall, or of dykes or a channel (#701) or Thornwall (the Age of the Grove), laid the same way.
+      const type = c.causeway ? 'causeway' : c.dyke ? 'dyke' : c.thorn ? 'thornwall' : c.channel ? 'channel' : 'wall';
       const tiles = wallLine(c.x0, c.y0, c.x1, c.y1);
       const placed: Building[] = [];
       for (let i = 0; i < tiles.length; i++) {
@@ -848,7 +941,7 @@ export function applyCommand(s: GameState, c: Command): void {
       if (b.queue.length >= MAX_QUEUE) return refuse(s, c.p, 'The queue is full');
       if (c.unit === 'hero' && heroBusy(s, c.p)) return refuse(s, c.p, 'You can lead with one hero at a time');
       // The legion (#501): a Roman town keeps few citizens.
-      const full = c.unit === 'citizen' ? citizenProblem(s, p) : null;
+      const full = c.unit === 'citizen' ? citizenProblem(s, p) ?? linkProblem(s, b) : null;
       if (full) return refuse(s, c.p, full);
       const cost = trainCostFor(s, c.p, c.unit, b.type, b);
       const short = shortfall(p, cost);

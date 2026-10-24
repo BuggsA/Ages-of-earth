@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import type { AgeId, BuildingType } from '../sim/types';
 import { BUILDINGS } from '../sim/data';
 import { Kit, bake, rnd } from './kit';
+import { causewaySite, cocklerHut, tidemill } from './tideModels';
+import { tideGate } from './tideModels';
+import { pontoon } from './floatModels';
 
 /**
  * Every building in every epoch: Stone Age thatch, hide and wattle; Bronze Age mudbrick and terracotta;
@@ -371,8 +374,117 @@ function garden(k: Kit, e: number, variant: number): void {
     k.cyl(0.07, 0.09, 0.2, 7, '#b0643a', -0.36, 0.04, 0.36);
     k.box(0.04, 0.02, 0.7, '#4a7ab0', -0.42, 0.06, -0.02);
   }
+  // Pollinated by a Hive in summer (`fed & 4`, the Age of the Hive): squash flowers open gold and the bean vines bloom white.
+  if (fed & 4) for (const [x, z] of [[-0.12, 0.3], [0.3, -0.05], [-0.3, -0.08], [0.08, -0.3], [0.05, 0.05]]) {
+    k.cone(0.045, 0.05, 5, '#f2c43a', x, 0.12, z).rotation.x = Math.PI;
+    k.sphere(0.02, '#fff6dc', x + 0.05, 0.34, z - 0.04);
+  }
   k.cyl(0.012, 0.012, 0.36, 3, WOOD, -0.4, 0, -0.4);
   k.team(k.box(0.08, 0.06, 0.02, TEAM, -0.4, 0.3, -0.4));
+}
+
+// ---- The Age of the Hive (`docs/wild-road.md` §3) ------------------------------------------------------
+
+/**
+ * A Hive: a coiled straw skep, banded where its coils were bound, on a plank stand under a little bark roof, its people's cloth
+ * hung from the stand. Awake (`variant` 0) a few bees hang at the door; quiet (1: winter or smoke) the door is stopped with clay.
+ */
+function hive(k: Kit, e: number, variant: number): void {
+  k.box(0.7, 0.04, 0.7, '#5f7a3a', 0, -0.02, 0);
+  for (const [x, z] of [[-0.22, -0.2], [0.22, -0.2], [-0.22, 0.2], [0.22, 0.2]]) k.cyl(0.025, 0.03, 0.3, 4, BARK, x, 0, z);
+  k.box(0.58, 0.04, 0.52, e >= 3 ? '#8a6a42' : WOOD, 0, 0.3, 0);
+  const straw = '#d9b45a';
+  k.lathe([[0, 0], [0.22, 0], [0.24, 0.08], [0.23, 0.18], [0.19, 0.28], [0.12, 0.36], [0.04, 0.4], [0, 0.41]], 10, straw, 0, 0.32, 0);
+  for (const [y, r] of [[0.09, 0.245], [0.19, 0.23], [0.28, 0.195]] as [number, number][]) k.cyl(r, r, 0.022, 10, '#a8843a', 0, 0.32 + y, 0);
+  // The door at the foot of the skep, facing out; open and busy when awake, stopped with clay when quiet.
+  k.box(0.08, 0.05, 0.03, variant ? '#8a6a4a' : '#1e1810', 0, 0.35, 0.225);
+  if (!variant) for (const [x, y, z] of [[0.08, 0.5, 0.32], [-0.1, 0.62, 0.28], [0.02, 0.74, 0.18], [0.16, 0.42, 0.26]]) k.sphere(0.018, '#2a2010', x, y, z);
+  // A little roof of bark against the rain.
+  for (const s of [-1, 1]) k.box(0.36, 0.025, 0.6, '#5a4228', s * 0.15, 0.8, 0).rotation.z = s * -0.55;
+  k.team(k.box(0.5, 0.12, 0.015, TEAM, 0, 0.22, 0.265));
+}
+
+// ---- The Age of the Wildwood (`docs/wild-road.md` §4) --------------------------------------------------
+
+/**
+ * A Heart Tree: a vast old tree on a mound of moss, its roots flung out as buttresses over the whole plot, a hollow at its foot
+ * lit amber from within, and a crown of leaves wider than a house, heaped in three tiers. Ribbons of its people's cloth hang from
+ * the lowest bough. It stands taller than a Wonder: the town's soul, seen from anywhere.
+ */
+function heart(k: Kit): void {
+  const bark = '#4a3826';
+  const furrow = '#2f2419';
+  const moss = '#56763a';
+  const leaf = ['#2f5a26', '#3d6c2c', '#4c7d34', '#36612a'];
+  k.lathe([[0, 0.06], [1.45, 0], [1.4, 0.05], [1.05, 0.14], [0.6, 0.2], [0, 0.22]], 10, moss, 0, -0.03, 0);
+  // Buttress roots running out to the plot's edge.
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 7) * Math.PI * 2 + 0.3;
+    const r = k.box(0.16, 0.22, 1.0, i % 2 ? bark : furrow, Math.cos(a) * 0.7, 0.08, Math.sin(a) * 0.7);
+    r.rotation.y = -a + Math.PI / 2;
+    r.rotation.x = 0.18;
+  }
+  // The trunk: flared at the foot, a slight twist of furrows up it.
+  k.lathe([[0, 0], [0.62, 0], [0.5, 0.35], [0.42, 1.0], [0.38, 1.8], [0.33, 2.6], [0, 2.7]], 9, bark, 0, 0.1, 0);
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    k.box(0.06, 2.2, 0.08, furrow, Math.cos(a) * 0.43, 1.25, Math.sin(a) * 0.43).rotation.y = -a;
+  }
+  // The hollow at its foot, glowing.
+  k.box(0.32, 0.5, 0.1, '#1a120b', 0, 0.45, 0.5);
+  k.glow(k.box(0.2, 0.34, 0.06, '#ffb43e', 0, 0.42, 0.53));
+  // Great boughs out from the trunk into the crown.
+  for (const [a, y, len] of [[0.4, 2.0, 1.1], [2.3, 2.2, 1.0], [4.2, 1.9, 1.2], [5.5, 2.5, 0.8]] as [number, number, number][]) {
+    const b = k.cyl(0.07, 0.13, len, 5, bark, Math.cos(a) * len * 0.45, y + 0.25, Math.sin(a) * len * 0.45);
+    b.rotation.z = Math.cos(a) * -1.0;
+    b.rotation.x = Math.sin(a) * 1.0;
+  }
+  // The crown in three tiers.
+  for (const [x, y, z, r, c] of [
+    [0, 2.9, 0, 1.15, 0], [-0.85, 2.55, 0.3, 0.75, 1], [0.8, 2.6, -0.35, 0.8, 2], [0.2, 2.5, 0.9, 0.7, 3], [-0.3, 2.6, -0.9, 0.7, 1],
+    [0.4, 3.55, 0.2, 0.8, 2], [-0.45, 3.5, -0.25, 0.7, 3], [0, 4.15, 0, 0.6, 0],
+  ] as [number, number, number, number, number][]) k.blob(r, leaf[c], x, y, z).scale.set(1, 0.72, 1);
+  // Its people's ribbons from the lowest bough.
+  for (const x of [-0.25, 0.05, 0.3]) k.team(k.box(0.09, 0.6, 0.02, TEAM, 0.6 + x * 0.3, 1.65, 0.55 + x));
+  // A ring of its people's cloth tied round the trunk, the mark a rival reads from afar.
+  k.team(k.cyl(0.47, 0.49, 0.14, 9, TEAM, 0, 1.2, 0));
+}
+
+// ---- The Age of the Bloom (`docs/wild-road.md` §5b) ---------------------------------------------------
+
+/**
+ * A Seed Spire: three young trunks grown round one another into a tall twisted tower, bound with living withies, rising from a
+ * ring of moss. At the top they open like fingers round a great seed pod, pale green and lit gold from within: the Bloom Seed
+ * ripening. Leaves sprout from the twists all the way up. Its people's cloth is a band round the base.
+ */
+function spire(k: Kit): void {
+  const bark = '#5a4630';
+  const dark = '#3a2c1d';
+  const leaf = ['#3f7a2e', '#5a9238', '#4a8534'];
+  k.lathe([[0, 0.05], [0.95, 0], [0.9, 0.05], [0.6, 0.12], [0, 0.14]], 9, '#5c7c3c', 0, -0.03, 0);
+  // Three trunks wound round the axis, each a stack of short leaning segments.
+  for (let t = 0; t < 3; t++) {
+    for (let i = 0; i < 9; i++) {
+      const a = (t / 3) * Math.PI * 2 + i * 0.55;
+      const r = 0.34 - i * 0.022;
+      const seg = k.cyl(0.07 - i * 0.004, 0.09 - i * 0.004, 0.46, 5, t % 2 ? bark : dark, Math.cos(a) * r, 0.25 + i * 0.4, Math.sin(a) * r);
+      seg.rotation.z = Math.cos(a + 1.2) * 0.35;
+      seg.rotation.x = Math.sin(a + 1.2) * 0.35;
+      if (i % 3 === 1) k.blob(0.13, leaf[(t + i) % 3], Math.cos(a) * (r + 0.12), 0.35 + i * 0.4, Math.sin(a) * (r + 0.12)).scale.set(1, 0.6, 1);
+    }
+  }
+  // The withies binding them, three bands up the tower.
+  for (const y of [0.9, 1.9, 2.9]) k.cyl(0.3 - y * 0.03, 0.31 - y * 0.03, 0.05, 8, '#7a6440', 0, y, 0);
+  // The fingers opening round the pod, and the pod itself, glowing.
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    const f = k.cyl(0.025, 0.05, 0.6, 4, bark, Math.cos(a) * 0.22, 3.85, Math.sin(a) * 0.22);
+    f.rotation.z = Math.cos(a) * -0.5;
+    f.rotation.x = Math.sin(a) * 0.5;
+  }
+  k.glow(k.blob(0.26, '#c8e27a', 0, 4.05, 0)).scale.set(0.8, 1.25, 0.8);
+  k.glow(k.blob(0.12, '#ffd65a', 0, 4.0, 0.12));
+  k.team(k.cyl(0.4, 0.42, 0.14, 9, TEAM, 0, 0.2, 0));
 }
 
 /**
@@ -1750,6 +1862,134 @@ function bloomery(k: Kit, _e: number, st: Style): void {
   banner(k, 0.95, 0, -0.85, 1.2);
 }
 
+/**
+ * A channel being dug (#701, the Age of Rivers): a raw trench of dark earth with the spoil heaped on its banks, running on toward the
+ * neighbouring ditches and the water (`mask`, as a wall's), a spade left in the heap and a peg in the owner's colour. Once the water
+ * runs in, the ditch is gone and the ground itself shows the channel.
+ */
+function channel(k: Kit, mask: number): void {
+  const MUD = '#4a3826';
+  const SPOIL = '#7a5f3e';
+  // Which way it runs: along z when it meets something only north or south, else along x.
+  const ns = !(mask & 5) && !!(mask & 10);
+  k.box(ns ? 0.5 : 1.0, 0.04, ns ? 1.0 : 0.5, MUD, 0, -0.02, 0);
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < 3; i++) {
+      const t = -0.32 + i * 0.32;
+      const r = 0.12 + rnd(i, mask + side * 7, 9) * 0.05;
+      k.blob(r, SPOIL, ns ? side * 0.38 : t, 0.02, ns ? t : side * 0.38).scale.set(1.3, 0.55, 1.3);
+    }
+  }
+  for (const [bit, dx, dz] of ARMS) if (mask & bit) k.box(Math.abs(dx) * 0.3 + Math.abs(dz) * 0.5, 0.04, Math.abs(dz) * 0.3 + Math.abs(dx) * 0.5, MUD, dx * 0.36, -0.02, dz * 0.36);
+  // A spade in the spoil, and the owner's peg.
+  k.cyl(0.018, 0.018, 0.5, 4, '#6b5232', 0.3, 0.05, 0.3).rotation.z = 0.25;
+  k.box(0.12, 0.14, 0.02, '#8a8f96', 0.24, 0.04, 0.3);
+  k.cyl(0.02, 0.02, 0.3, 4, '#5b4330', -0.34, 0, -0.34);
+  k.team(k.box(0.08, 0.06, 0.04, TEAM, -0.34, 0.26, -0.34));
+}
+
+/**
+ * A sluice (#701 s4): a dyke's bank cut through by a timber gate between stone piers, its leaf hung from a beam on a winch. Shut
+ * (`variant` under 16) the leaf stands down in the water; open, it is wound up under the beam and the water pours white through the
+ * gap. The bank runs on to the neighbouring dykes (`variant` & 15, as a wall's).
+ */
+function sluice(k: Kit, variant: number): void {
+  const open = variant >= 16;
+  const mask = variant & 15;
+  const EARTH = '#6e5a3e';
+  const TURF = '#6f8a45';
+  const TIMBER = '#5b4330';
+  // The bank and its arms, as a dyke's.
+  k.box(1.02, 0.95, 1.02, EARTH, 0, -0.95, 0);
+  for (const [bit, dx, dz] of ARMS) {
+    if (!(mask & bit)) continue;
+    k.box(Math.abs(dx) * 0.3 + Math.abs(dz) * 0.72, 0.12, Math.abs(dz) * 0.3 + Math.abs(dx) * 0.72, TURF, dx * 0.35, 0.19, dz * 0.35);
+  }
+  // Across the line the bank runs: the gate faces along x unless the dykes meet it from north or south.
+  const ns = !(mask & 5) && !!(mask & 10);
+  const g = k.group();
+  if (ns) g.rotation.y = Math.PI / 2;
+  // Two stone piers, a walkway beam between them, and the winch on top.
+  for (const side of [-1, 1]) {
+    k.box(0.3, 1.25, 0.6, STONE, side * 0.36, -0.35, 0, g);
+    k.box(0.34, 0.06, 0.64, '#8d877b', side * 0.36, 0.3, 0, g);
+    k.cyl(0.03, 0.03, 0.9, 4, TIMBER, side * 0.36, 0.33, 0.18, g);
+  }
+  k.box(1.0, 0.07, 0.14, TIMBER, 0, 0.78, 0.18, g);
+  k.box(0.9, 0.05, 0.3, '#7a5636', 0, 0.3, -0.12, g);
+  k.cyl(0.06, 0.06, 0.5, 6, TIMBER, 0, 0.88, 0.18, g).rotation.z = Math.PI / 2;
+  for (const side of [-1, 1]) k.box(0.03, 0.22, 0.03, TIMBER, side * 0.27, 0.92, 0.26, g);
+  // The leaf: planks on iron straps, down in the water or wound up under the beam.
+  const up = open ? 0.62 : 0;
+  k.box(0.44, 0.62, 0.06, '#6b4b2f', 0, -0.18 + up, 0.18, g);
+  for (const y of [-0.38, -0.14, 0.1]) k.box(0.46, 0.04, 0.07, '#4a4d52', 0, y + up, 0.18, g);
+  // Open: white water pouring through the gap and spreading below it.
+  if (open) {
+    k.box(0.42, 0.04, 0.7, '#e6f1f2', 0, -0.06, 0.05, g);
+    k.box(0.6, 0.03, 0.3, '#cfe3e6', 0, -0.09, -0.42, g);
+  }
+  k.team(k.box(0.13, 0.08, 0.13, TEAM, 0.36, 0.38, -0.26, g));
+}
+
+/**
+ * A swing bridge (#701 s5, the Age of Locks): a timber deck on iron girders over a canal, resting on a stone pier at each bank and
+ * turning on a drum in the middle, with railings and a lamp post in the owner's colour. It spans toward the land (`variant`: which of the
+ * four neighbours are land, as a wall's mask): along x unless the banks lie only north and south.
+ */
+function bridge(k: Kit, variant: number): void {
+  const TIMBER = '#7a5636';
+  const IRON = '#4a4d52';
+  const g = k.group();
+  if (!(variant & 5) && variant & 10) g.rotation.y = Math.PI / 2;
+  // The piers at the banks, down into the water.
+  for (const side of [-1, 1]) {
+    k.box(0.2, 0.9, 0.7, STONE, side * 0.42, -0.75, 0, g);
+    k.box(0.24, 0.05, 0.74, '#8d877b', side * 0.42, 0.15, 0, g);
+  }
+  // The pivot drum, girders and the deck.
+  k.cyl(0.14, 0.16, 0.8, 8, '#6f6a62', 0, -0.62, 0, g);
+  for (const z of [-0.24, 0.24]) k.box(1.04, 0.08, 0.06, IRON, 0, 0.12, z, g);
+  k.box(1.02, 0.05, 0.56, TIMBER, 0, 0.2, 0, g);
+  for (let i = 0; i < 6; i++) k.box(0.02, 0.051, 0.56, '#5b4330', -0.42 + i * 0.17, 0.2, 0, g);
+  // Railings, and the lamp on its post.
+  for (const z of [-0.27, 0.27]) {
+    k.box(1.0, 0.03, 0.03, IRON, 0, 0.42, z, g);
+    for (const x of [-0.45, -0.15, 0.15, 0.45]) k.box(0.025, 0.2, 0.025, IRON, x, 0.25, z, g);
+  }
+  k.cyl(0.02, 0.02, 0.5, 4, IRON, 0.45, 0.25, 0.27, g);
+  k.team(k.box(0.08, 0.08, 0.08, TEAM, 0.45, 0.75, 0.27, g));
+}
+
+/**
+ * A dam (#701 s5, the Age of Locks): a battered stone wall across the water between its banks (`variant` & 15, the land round it as a
+ * bridge's), a brick turbine house on its crown with a slate roof, and a spillway. Turning (`variant` 16 and up), white water pours
+ * from the spillway and a little steam rises from the house.
+ */
+function dam(k: Kit, variant: number): void {
+  const turning = variant >= 16;
+  const mask = variant & 15;
+  const BRICK = '#8f4a36';
+  const g = k.group();
+  if (!(mask & 5) && mask & 10) g.rotation.y = Math.PI / 2;
+  // The wall: broad below, a cut-stone crown.
+  k.box(1.04, 1.0, 0.86, '#86807a', 0, -1.0, 0, g);
+  k.box(1.04, 0.24, 0.62, STONE, 0, 0.0, 0, g);
+  for (let i = 0; i < 5; i++) k.box(0.18, 0.04, 0.64, '#b0aaa0', -0.4 + i * 0.2, 0.22, 0, g);
+  // The turbine house.
+  k.box(0.48, 0.36, 0.4, BRICK, -0.16, 0.24, -0.04, g);
+  k.prism(0.52, 0.18, 0.44, '#4c5560', -0.16, 0.6, -0.04, g);
+  k.box(0.08, 0.26, 0.08, BRICK, -0.3, 0.62, 0.08, g);
+  for (const x of [-0.28, -0.04]) k.box(0.08, 0.12, 0.01, '#e8d9a0', x, 0.36, 0.165, g);
+  // The spillway on the low side, and the race below it.
+  k.box(0.26, 0.06, 0.3, '#6f6a62', 0.3, 0.18, 0.4, g);
+  if (turning) {
+    k.box(0.22, 0.32, 0.06, '#e6f1f2', 0.3, -0.12, 0.56, g);
+    k.box(0.5, 0.03, 0.34, '#cfe3e6', 0.3, -0.14, 0.72, g);
+    k.blob(0.07, '#dfe4e6', -0.3, 0.98, 0.08, g);
+  }
+  k.team(k.box(0.12, 0.08, 0.12, TEAM, 0.36, 0.24, -0.2, g));
+}
+
 /** A windmill (#701): a thatched smock mill on a brick base with a reefing stage, its cap turned to the wind. The sails turn on their own (`windmillSails`). */
 function windmill(k: Kit, _e: number, st: Style): void {
   pad(k, 2, st.base);
@@ -1888,21 +2128,53 @@ function dock(k: Kit, e: number, st: Style): void {
 
 // ---- Airfield --------------------------------------------------------------------------------------
 
-function silo(k: Kit, _e: number, st: Style): void {
+function silo(k: Kit, _e: number, st: Style, variant = 0): void {
   // The Missile Silo (#605): a concrete collar round a hatch, the two doors thrown back on a pale warhead nose, hazard stripes and a red beacon.
+  // Held in Reserve (#759 s3, `variant` 1 arming, 2 ready): the doors stand up on guard, a teal band (the colour of missile defence) rings
+  // the collar, and the beacon burns amber while it arms, teal once it stands ready, so every player can read it from afar.
+  const kept = variant > 0;
   k.box(2.9, 0.12, 2.9, '#6e6d66', 0, -0.02, 0);
   k.cyl(1.25, 1.35, 0.35, 16, '#9b9a92', 0, 0, 0);
   k.cyl(0.95, 0.95, 0.04, 16, '#17181c', 0, 0.35, 0);
   k.cone(0.34, 1.3, 10, '#d9d9d2', 0, 0.2, 0);
-  k.cyl(0.35, 0.35, 0.08, 10, '#c0382c', 0, 1.0, 0);
-  const l = k.box(0.9, 0.06, 1.6, '#4a4d54', -0.75, 0.58, 0);
-  l.rotation.z = 0.9;
-  const r = k.box(0.9, 0.06, 1.6, '#4a4d54', 0.75, 0.58, 0);
-  r.rotation.z = -0.9;
+  k.cyl(0.35, 0.35, 0.08, 10, kept ? '#2fa8a2' : '#c0382c', 0, 1.0, 0);
+  const l = k.box(0.9, 0.06, 1.6, '#4a4d54', kept ? -1.0 : -0.75, kept ? 0.78 : 0.58, 0);
+  l.rotation.z = kept ? 1.35 : 0.9;
+  const r = k.box(0.9, 0.06, 1.6, '#4a4d54', kept ? 1.0 : 0.75, kept ? 0.78 : 0.58, 0);
+  r.rotation.z = kept ? -1.35 : -0.9;
   for (let i = 0; i < 8; i++) k.box(0.18, 0.02, 0.1, i % 2 ? '#e6c22a' : '#1d1e24', -1.1 + i * 0.3, 0.37, 1.25);
+  if (kept) k.cyl(1.37, 1.37, 0.08, 16, '#3fc6c0', 0, 0.2, 0);
   k.team(k.box(0.7, 0.14, 0.04, TEAM, 0, 0.1, 1.38));
   k.box(0.35, 0.9, 0.35, st.wall, 1.2, 0, -1.2);
-  k.glow(k.sphere(0.07, '#ff3a2a', 1.2, 1.0, -1.2));
+  k.glow(k.sphere(kept ? 0.09 : 0.07, variant === 2 ? '#5affe8' : kept ? '#ffb02a' : '#ff3a2a', 1.2, 1.0, -1.2));
+}
+
+function battery(k: Kit, _e: number, st: Style): void {
+  // The Interceptor Battery (#759 s2): a concrete pad, a slim pale interceptor on a rail raised steeply skyward, a radar dish on a mast
+  // turned to the sky, a low bunker with a team band, and a green lamp (it watches; it does not threaten).
+  k.box(1.9, 0.1, 1.9, '#6e6d66', 0, -0.02, 0);
+  k.box(1.5, 0.05, 1.5, '#8b8a82', 0, 0.08, 0);
+  // The launcher: a turntable, a trunnion, and the rail leaning back toward the sky with its rocket on it.
+  k.cyl(0.38, 0.42, 0.14, 10, '#4a4d54', -0.2, 0.1, 0.15);
+  k.box(0.32, 0.3, 0.3, '#3e4148', -0.2, 0.22, 0.15);
+  const rail = k.group(-0.2, 0.48, 0.15);
+  rail.rotation.x = -0.45;
+  k.box(0.12, 1.25, 0.12, '#55585f', 0, 0, 0, rail);
+  k.cyl(0.07, 0.07, 1.0, 8, '#e8e4dc', 0, 0.14, 0.13, rail);
+  k.cone(0.07, 0.24, 8, '#b8322a', 0, 1.14, 0.13, rail);
+  k.team(k.cyl(0.075, 0.075, 0.08, 8, TEAM, 0, 0.82, 0.13, rail));
+  for (const x of [-1, 1]) k.box(0.02, 0.2, 0.14, '#4a4640', x * 0.08, 0.14, 0.13, rail);
+  // The radar: a mast and a dish turned up and out.
+  k.cyl(0.05, 0.06, 0.95, 6, '#55585f', 0.55, 0.1, -0.5);
+  const dish = k.dome(0.32, '#d8d8d2', 0.55, 1.0, -0.5);
+  dish.rotation.x = 2.3;
+  dish.scale.set(1, 0.45, 1);
+  k.cyl(0.02, 0.02, 0.28, 4, '#3a3632', 0.55, 1.0, -0.38);
+  // The bunker and its team band.
+  k.box(0.75, 0.42, 0.55, st.wall, 0.45, 0.1, 0.5);
+  k.box(0.82, 0.06, 0.62, '#5a5c60', 0.45, 0.52, 0.5);
+  k.team(k.box(0.77, 0.1, 0.04, TEAM, 0.45, 0.3, 0.79));
+  k.glow(k.sphere(0.05, '#5aff7a', 0.75, 0.62, 0.3));
 }
 
 function airfield(k: Kit, _e: number, st: Style): void {
@@ -2428,9 +2700,16 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
   }
 }
 
-const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' | 'thornwall' | 'garden' | 'orchard'>, (k: Kit, e: number, st: Style) => void> = {
+const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' | 'thornwall' | 'garden' | 'orchard' | 'channel' | 'hive' | 'sluice' | 'causeway' | 'bridge' | 'dam' | 'tidegate'>, (k: Kit, e: number, st: Style) => void> = {
   sapling: (k, e) => sapling(k, e),
-  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, windmill, bloomery,
+  heart: (k) => heart(k),
+  spire: (k) => spire(k),
+  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, battery, windmill, bloomery,
+  // The Age of Tides (#739), drawn in `tideModels.ts`.
+  tidemill: (k: Kit, _e: number, st: Style) => tidemill(k, st.base),
+  cockler: (k: Kit, _e: number, st: Style) => cocklerHut(k, st.base),
+  // The Age of Floating Cities (#770), drawn in `floatModels.ts`.
+  pontoon: (k: Kit) => pontoon(k),
 };
 
 const cache = new Map<string, THREE.BufferGeometry>();
@@ -2595,14 +2874,14 @@ function wayTouch(k: Kit, way: string, deep = false): void {
 /** What a building is for, read from its roof (#625): war under cold slate, faith under pale gold, trade under teal, the land's work under ochre. Houses and the Town Center keep their epoch's own red. The Stone Age keeps its thatch and reads by plinth and pennant. */
 const ROOFS: Partial<Record<BuildingType, [string, string]>> = {
   barracks: ['#3e4858', '#2e3641'], range: ['#3e4858', '#2e3641'], stable: ['#3e4858', '#2e3641'], workshop: ['#3e4858', '#2e3641'], forge: ['#3e4858', '#2e3641'],
-  tower: ['#3e4858', '#2e3641'], warcamp: ['#3e4858', '#2e3641'], bloodtower: ['#3e4858', '#2e3641'], airfield: ['#3e4858', '#2e3641'], silo: ['#3e4858', '#2e3641'],
+  tower: ['#3e4858', '#2e3641'], warcamp: ['#3e4858', '#2e3641'], bloodtower: ['#3e4858', '#2e3641'], airfield: ['#3e4858', '#2e3641'], silo: ['#3e4858', '#2e3641'], battery: ['#3e4858', '#2e3641'],
   temple: ['#e9e2cf', '#d8b25a'], mission: ['#e9e2cf', '#d8b25a'],
   market: ['#1a5961', '#133f46'], caravanserai: ['#1a5961', '#133f46'], dock: ['#1a5961', '#133f46'],
   storehouse: ['#e2b855', '#d4a642'], huntcamp: ['#e2b855', '#d4a642'], prospector: ['#e2b855', '#d4a642'], shaft: ['#e2b855', '#d4a642'],
 };
 
 /** No plinth or pennant: open or thin pieces, and buildings that already carry their own standards. */
-const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder', 'dyke', 'thornwall', 'garden', 'orchard'];
+const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder', 'dyke', 'thornwall', 'garden', 'orchard', 'channel', 'hive', 'sluice', 'causeway', 'tidemill', 'cockler', 'tidegate', 'heart', 'bridge', 'dam', 'pontoon', 'spire'];
 
 function roleStyle(type: BuildingType, epoch: number, st: Style): Style {
   const r = ROOFS[type];
@@ -2636,11 +2915,19 @@ export function buildingGeometry(type: BuildingType, epochIn: number, color: str
     const k = new Kit();
     if (type === 'wall') wall(k, epoch, STYLES[Math.min(epoch, 4)], variant);
     else if (type === 'dyke') dyke(k, variant);
+    else if (type === 'sluice') sluice(k, variant);
+    else if (type === 'bridge') bridge(k, variant);
+    else if (type === 'dam') dam(k, variant);
+    else if (type === 'channel') channel(k, variant);
+    else if (type === 'causeway') causewaySite(k, variant);
+    else if (type === 'tidegate') tideGate(k, variant);
     else if (type === 'snare') snare(k, epoch, variant === 1);
     else if (type === 'thornwall') thornwall(k, variant);
     else if (type === 'garden') garden(k, epoch, variant);
     else if (type === 'orchard') orchard(k, epoch, variant);
+    else if (type === 'hive') hive(k, epoch, variant);
     else if (type === 'shaft') shaft(k, epoch, roleStyle(type, epoch, STYLES[Math.min(epoch, 4)]), variant);
+    else if (type === 'silo') silo(k, epoch, roleStyle(type, epoch, STYLES[Math.min(epoch, 4)]), variant);
     else MAKERS[type](k, epoch, roleStyle(type, epoch, STYLES[Math.min(epoch, 4)]));
     // A Watch Tower's `variant` is its step on the tower line.
     if (type === 'tower' && variant) towerLevel(k, variant);

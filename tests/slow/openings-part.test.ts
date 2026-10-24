@@ -16,20 +16,25 @@ import type { HomelandId, WayId } from '../../src/sim/types';
  * The seeds seat only peoples who open by their Way: the Romans, Greeks and Mongols (#501) open by their own economy
  * (fish for the legion, no foot for the polis, no fields for the camp), so seats of theirs test the people, not the
  * Way (the owner's ruling on #535, 2026-10-23). Seed 5 seats Britons and Chinese, seed 6 Egyptians and Britons.
+ * The Britons keep no fields since the managed wood (#614), so the Hunters-and-Hearth claims count only the Chinese
+ * and Egyptian seats, on seeds 4 to 7 (the owner's ruling on #720, 2026-10-24): four comparisons a homeland still.
  * The spared herd's claim is the land's, not a Way's, and keeps the seeds it was written on.
  */
 
 const SEEDS = [5, 6];
 const HERD_SEEDS = [3, 8];
 const MIN = 10;
+/** [seed, seat] of each Chinese or Egyptian town on seeds 4-7 (`createGame` seats peoples by seed): the towns that open by their Way. */
+const WAY_SEATS: [number, number][] = [[4, 0], [5, 1], [6, 0], [7, 1]];
 
 /** Seat-matched comparisons: [the town under `a`, the same seat under `b`], two per seed. */
-function pairs(homeland: HomelandId, a: Pick, b: Pick, minutes = MIN, seeds = SEEDS): [Opening, Opening][] {
+function pairs(homeland: HomelandId, a: Pick, b: Pick, minutes = MIN, seeds = SEEDS, seats?: [number, number][]): [Opening, Opening][] {
   const out: [Opening, Opening][] = [];
-  for (const seed of seeds) {
+  for (const seed of seats ? [...new Set(seats.map(([sd]) => sd))] : seeds) {
     const ab = playOpening({ seed, picks: [a, b], minutes, size: 'small', homeland }).towns;
     const ba = playOpening({ seed, picks: [b, a], minutes, size: 'small', homeland }).towns;
-    out.push([ab[0], ba[0]], [ba[1], ab[1]]);
+    if (!seats || seats.some(([sd, st]) => sd === seed && st === 0)) out.push([ab[0], ba[0]]);
+    if (!seats || seats.some(([sd, st]) => sd === seed && st === 1)) out.push([ba[1], ab[1]]);
   }
   for (const [x, y] of out) {
     for (const t of [x, y]) console.log(`${homeland} ${t.name.padEnd(18)} first ${firstBuilt(t).join(', ')} | food ${mix(over(t.foodBy, FOODS, 0, MIN), FOODS)}${t.raided ? ` +${t.raided} raided` : ''}${t.kin ? `, ${t.kin} kin` : ''} | work ${mix(t.work, JOBS)} | food workers ${t.reach.toFixed(1)} tiles out`);
@@ -46,7 +51,7 @@ const way = (w: WayId): Pick => ({ way: w });
 describe('two openings part ways by minute 15 (#481)', () => {
   for (const homeland of ['glade', 'shore', 'herds'] as HomelandId[]) {
     it(`${homeland}: the Hunters camp by the kill and eat meat; the Hearth calls its kin and eats from berries and fields`, () => {
-      const ps = pairs(homeland, way('hunt'), way('hearth'));
+      const ps = pairs(homeland, way('hunt'), way('hearth'), MIN, SEEDS, WAY_SEATS);
       for (const [hunt, hearth] of ps) {
         // Different buildings first: the Hunters' camp stands among their first four; the Hearth raises none.
         expect(firstBuilt(hunt)).not.toEqual(firstBuilt(hearth));

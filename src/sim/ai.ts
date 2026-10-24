@@ -1,16 +1,31 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { aiTiding } from './tidings';
-import { AGES, AI_SILO, SILO, TICK_HZ, AI_CLIMB, AI_FIND, FINDS, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_SEA, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, SEA_RAID, MISSION, AI_MISSION, AI_CHARIOT, STEP_BACK, stepBackCost, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_SILO, WARHEADS, AI_BREACH, SILO, TICK_HZ, AI_CLIMB, AI_FIND, FINDS, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_SEA, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, SEA_RAID, MISSION, AI_MISSION, AI_CHARIOT, AI_BEGGARS, STEP_BACK, stepBackCost, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, raiseProblem, techCostFor, techProblem, trainCostFor } from './stats';
-import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Player, Res, Rubble, Ruin, TechId, TradePost, Unit, UnitType } from './types';
-import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE } from './types';
-import { backProblem, backTo, ageDef, ageOf, asleep, barred, buildBarred, crossingLeft, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadProblem, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
+import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Launch, Player, Res, Rubble, Ruin, TechId, TradePost, Unit, UnitType } from './types';
+import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE, T_WATER } from './types';
+import { backProblem, backTo, ageDef, ageOf, asleep, barred, buildBarred, crossingLeft, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, trainsAt, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadProblem, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
 import { grindersOf, kegsOf, millProblem, mills, sappers } from './powder';
-import { basinOf, coastHeld, dykePlan, isPolder, polderField, type DykePlan } from './water';
+import { beatersAt, burns, onFire } from './fire';
+import { basinOf, channelPlan, coastHeld, dykePlan, heldBack, isCanal, isChannel, isInund, isPolder, polderField, sluiceFed, sluiceProblem, waterLine, type ChannelPlan, type DykePlan } from './water';
+import { coveredNext, shoreNear, tideClock, tideMillSpot } from './tides';
+import { castProblem, mooringSpot, raisesCitizens } from './floating';
+import { pitchProblem } from './steppe';
 import { wallLine } from './commands';
-import { launchProblem, loaded, rulesOf, silosOf } from './silo';
+import { AI_COCKLE } from './data';
+import { AI_COCKLER, COCKLER } from './data';
+import { cocklerSpotNear } from './tides';
+import { AI_GATE } from './data';
+import { gateReach, gateRisk, tideGateProblem, tideGateSpotIn } from './tides';
+import { nearestDrop } from './world';
+import { ashoreLeft, bared, bedClock } from './tides';
+import { R_COCKLE } from './types';
+import { AI_BARRAGE, AI_EBB, INTERCEPT, SALVO } from './data';
+import { barragePlan, causewayOwner, ebbTiming, isCauseway, isPond, tideAwake, tideLevel } from './tides';
+import { statsOf } from './world';
+import { aimsOf, blastDamage, charged, flightOf, fuelOf, held, launchProblem, loaded, missilesAt, revealed, ringsFor, rulesOf, salvoFuel, salvoPeople, salvoProblem, salvoSilos, siloLimit, silosOf, stockOf, warheadsOf, warnRadius, type WarheadKind } from './silo';
 import { carriedBy } from './relics';
 import { storesOre } from './caches';
 import { loadPrice, sellerNear } from './oretrade';
@@ -29,7 +44,7 @@ import { graftCost, stationsOf, waiting } from './hemo';
 import { borderMap, landOwnerAt, suppliedAt } from './borders';
 import { workProblem } from './works';
 import { aiKin, aiVow, aiWay, wayBarred } from './ways';
-import { AI_TOWER_KEEP, AI_WAYS, AI_KEG, AI_DYKE, KEG, KILL_CAMP, KIN, POLDER, TOWER_LEVELS, WAYS } from './data';
+import { AI_TOWER_KEEP, AI_TOWER_PEACE, AI_WAYS, AI_KEG, AI_DYKE, AI_RIVERS, AI_WATERLINE, AI_LOCKS, AI_FLOAT, FLOAT, DAM, KEG, KILL_CAMP, KIN, POLDER, TOWER_LEVELS, WAYS, AI_TIDES } from './data';
 import { beaconProblem, lit } from './beacon';
 import { rallyProblem } from './rally';
 import { consecrateProblem, consecrates } from './consecrate';
@@ -41,7 +56,8 @@ import { isCoppice } from './coppice';
 import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
-import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, TAME, GROVE, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS } from './data';
+import { AI_TEMPER, ROUTES, TRUNK, type RouteId } from './data';
+import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
@@ -50,6 +66,10 @@ import { flockCap, flockOf, grassy, grazeRange, milkable } from './flocks';
 import { progress, scenarioById } from './campaign';
 import { tames, wildBeast } from './tame';
 import { grows } from './grove';
+import { keepsBees } from './hive';
+import { heartOf, treeToWake, treesRound, wakesForest } from './wildwood';
+import { inBloom, ringOf, ripeIn, rooted, slingProblem, spireOf } from './bloom';
+import { DIRS } from './animals';
 
 /**
  * The computer opponent. It plays by the same rules and through the same commands as a person: it
@@ -123,6 +143,36 @@ const TECH_ORDER: TechId[] = [
 const TRADER_WARY = 240;
 const ECONOMY: TechId[] = ['plow', 'axes', 'wheelbarrow', 'picks', 'irrigation', 'saws', 'shafts', 'handcart', 'gillnets', 'steamEngine'];
 
+// ---- A leaning (#749) -----------------------------------------------------------------------------
+
+/** The side ages standing on a route that suit this people (`fit`), oldest tier first. */
+function leanAges(p: Player, route: RouteId): AgeId[] {
+  return (Object.keys(AGES) as AgeId[]).filter((a) => !TRUNK.includes(a) && AGES[a].routes?.includes(route) && fit(p, a) >= 0).sort((a, b) => AGES[a].tier - AGES[b].tier);
+}
+
+/**
+ * Settled once, on a seat's first turn (#749): a clever computer in a skirmish favours a route `AI_TEMPER.lean` of the time, on
+ * coins of its own so no other choice's dice shift, and chooses that route's side ages from the start, as the route sweeps do
+ * (`src/sim/routePlay.ts`). The rest of the web is left to its usual coins, so it still turns off where the land says to.
+ */
+function settleLean(s: GameState, p: Player, mem: AiMemory): void {
+  mem.lean = 'none';
+  if (s.scenario || !AI_LEVELS[p.ai!].clever || AI_LEVELS[p.ai!].lean === false || coin(s, p.id, 0x7e4a) >= AI_TEMPER.lean) return;
+  const wet = s.mapType === 'lakes' || s.mapType === 'sea';
+  const open = (Object.keys(ROUTES) as RouteId[]).filter((r) => r !== 'plain' && (wet || (r !== 'navy' && r !== 'water')) && leanAges(p, r).length > 0);
+  if (!open.length) return;
+  const route = open[Math.floor(coin(s, p.id, 0x7e4b) * open.length)];
+  mem.lean = route;
+  const roads = (mem.roads ??= {});
+  for (const a of leanAges(p, route)) roads[a] ??= true;
+}
+
+/** The leaning a computer seat has settled on (#749), or null for a person or a seat with an open mind. */
+export function leanOf(s: GameState, owner: number): RouteId | null {
+  const l = s.ai[owner]?.lean;
+  return l && l !== 'none' ? l : null;
+}
+
 // ---- The turn -------------------------------------------------------------------------------------
 
 export function aiStep(s: GameState): void {
@@ -131,6 +181,7 @@ export function aiStep(s: GameState): void {
     const mem = memory(s, p.id);
     if (s.tick < mem.next) continue;
     mem.next = s.tick + secs(AI_LEVELS[p.ai].think);
+    if (mem.lean === undefined) settleLean(s, p, mem);
     think(s, p, mem);
   }
 }
@@ -221,7 +272,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
     if (e.kind === 'unit' && s.kings[p.id] === e.id) king = e;
     else if (e.kind === 'unit') {
       const list =
-        e.type === 'citizen' ? citizens : e.type === 'wagon' ? wagons : e.type === 'priest' ? priests : e.type === 'trader' ? traders : e.type === 'cog' ? cogs : e.type === 'fisher' ? fishers : e.type === 'warship' || e.type === 'transport' ? navy : e.type === 'fighter' || e.type === 'bomber' ? planes : army;
+        e.type === 'citizen' ? citizens : e.type === 'wagon' || e.type === 'tow' ? wagons : e.type === 'priest' ? priests : e.type === 'trader' ? traders : e.type === 'cog' ? cogs : e.type === 'fisher' ? fishers : e.type === 'warship' || e.type === 'transport' || e.type === 'barge' ? navy : e.type === 'fighter' || e.type === 'bomber' ? planes : army;
       list.push(e);
     } else buildings.push(e);
   }
@@ -246,13 +297,27 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   oreRoad(s, v, mem, issue);
   powderRoad(s, v, mem, issue);
   sapKegs(s, v, mem, issue);
+  torchGrowth(s, v, mem, issue);
+  beatFires(s, v, issue);
   dykeWork(s, v, mem, issue);
+  riverWork(s, v, mem, issue);
+  tideWork(s, v, mem, issue);
+  waterLineWork(s, v, mem, issue);
+  locksWork(s, v, mem, issue);
+  floatWork(s, v, mem, issue);
   siloRoad(s, v, mem, issue);
+  interceptorRoad(s, v, mem, issue);
+  reserveSilo(s, v, mem, issue);
   fireSilo(s, v, mem, issue);
   fleeWarhead(s, v, issue);
   steppeRoad(s, v, mem, issue);
   wildRoad(s, v, mem, issue);
   groveWork(s, v, mem, issue);
+  hiveWork(s, v, mem, issue);
+  wildwoodWork(s, v, mem, issue);
+  bloomWork(s, v, mem, issue);
+  hackSeeds(s, v, issue);
+  answerGreening(s, v, issue);
   readYear(s, v);
   huntTheYear(s, v, issue);
 
@@ -420,6 +485,8 @@ function research(s: GameState, v: View, peopleEnough: boolean, issue: (c: Comma
 function raiseTowers(s: GameState, v: View, issue: (c: Command) => void): void {
   const { p } = v;
   if (!AI_LEVELS[p.ai!].clever) return;
+  // Under a long peace no one can strike: the wood goes to the town (a Market, a farm) until the peace is nearly out (#720).
+  if (s.tick + secs(AI_TOWER_PEACE) < s.peaceUntil) return;
   let best: Building | null = null;
   for (const b of v.buildings) {
     if (b.type !== 'tower' || raiseProblem(s, p.id, b) || b.queue.length) continue;
@@ -574,9 +641,35 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   } else if (roads[to] === undefined && to === 'grove') {
     // The Wild route's second age: a people that walked the Wild goes on, as the Horde follows the Steppe.
     roads[to] = hasWalked(p, 'wild');
+  } else if (roads[to] === undefined && to === 'hive') {
+    // The Wild route's third age: a people that walked the Grove goes on.
+    roads[to] = hasWalked(p, 'grove');
+  } else if (roads[to] === undefined && to === 'wildwood') {
+    // The Wild route's fourth age: a people that walked the Hive goes on.
+    roads[to] = hasWalked(p, 'hive');
+  } else if (roads[to] === undefined && to === 'bloom') {
+    // The Wild route's plants' end: a people that walked the Wildwood goes on.
+    roads[to] = hasWalked(p, 'wildwood');
   } else if (roads[to] === undefined && to === 'dykes') {
-    // The Water Road (#701): only with a dyke worth raising by home, and on a coin of its own, so no other match's dice shift.
-    roads[to] = coastHeld(s, p) && !!dykeOf(s, p, mem) && coin(s, p.id, 0xd1e5) < AI_DYKE.take;
+    // The Water Road (#701): only with a dyke worth raising by home, and on a coin of its own, so no other match's dice shift. A people
+    // that walked the Age of Rivers is on the road already, and goes on down it more often.
+    // A town that has set its heart on the Sail waits on its catch instead: one water plan at a time (#720).
+    roads[to] = roads.sail !== true && coastHeld(s, p) && !!dykeOf(s, p, mem) && coin(s, p.id, 0xd1e5) < (hasWalked(p, 'rivers') ? AI_RIVERS.onward : AI_DYKE.take);
+  } else if (roads[to] === undefined && to === 'tides') {
+    // The Water Road's sixth age (#739): a people with a shore, on a coin of its own; one already on the Water Road goes on more often.
+    roads[to] = coastHeld(s, p) && coin(s, p.id, 0x71de) < (hasWalked(p, 'rivers') || hasWalked(p, 'dykes') ? AI_TIDES.onward : AI_TIDES.take);
+  } else if (roads[to] === undefined && to === 'floating') {
+    // The Water Road's seventh age (#770): a people with open water by home, on a coin of its own; one that came down the Water Road goes on more often.
+    roads[to] = coastHeld(s, p) && coin(s, p.id, 0xf10a) < (hasWalked(p, 'locks') || hasWalked(p, 'waterline') ? AI_FLOAT.onward : AI_FLOAT.take);
+  } else if (roads[to] === undefined && to === 'waterline') {
+    // The Water Road's third age (#701 s4): a people that walked the Dykes goes on down it on a coin of its own, so no other match's dice shift.
+    roads[to] = hasWalked(p, 'dykes') && coin(s, p.id, 0x5a1c) < AI_WATERLINE.take;
+  } else if (roads[to] === undefined && to === 'locks') {
+    // The Water Road's fifth age (#701 s5): a people that walked the Water Line turns into it on a coin of its own.
+    roads[to] = hasWalked(p, 'waterline') && coin(s, p.id, 0x10c5) < AI_LOCKS.take;
+  } else if (roads[to] === undefined && to === 'rivers') {
+    // The Water Road's first age (#701 s1): with a channel worth digging by home, on a coin of its own.
+    roads[to] = !!riverOf(s, p, mem) && coin(s, p.id, 0x71e5) < AI_RIVERS.take;
   } else if (roads[to] === undefined && to === 'alchemy') {
     // A coin of its own (as the steppe's): the gateway is asked only where saltpetre lies, and shifts no other match's dice.
     roads[to] = fit(p, to) >= 0 && coin(s, p.id, 0xa1c4) < AI_KEG.take;
@@ -726,10 +819,22 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
     mem.sideHold ??= s.tick;
     if (s.tick - mem.sideHold < secs(AI_SILO.hold)) return null;
   }
+  // The Water Line (#701 s4) is kept a while, so its sluice stands and its barges are out before it climbs on.
+  if (walksWeb(v) && ageOf(p) === 'waterline' && s.tick - (mem.line?.since ?? s.tick) < secs(AI_WATERLINE.stay)) return null;
+  // The Age of Floating Cities (#770) is the road's end: its town is kept on the water, and it goes back only to the Atomic's silo late.
+  if (walksWeb(v) && ageOf(p) === 'floating' && (!mem.float || mem.float.since < 0 || s.tick - mem.float.since < secs(AI_FLOAT.stay))) return null;
+  // So is the Age of Locks (#701 s5), so its canal is dug and its dam turns.
+  if (walksWeb(v) && ageOf(p) === 'locks' && s.tick - (mem.locks?.since ?? s.tick) < secs(AI_LOCKS.stay)) return null;
   // The Wild is kept a while, so the beasts it came for are tamed and the Den is breeding.
   if (walksWeb(v) && ageOf(p) === 'wild' && s.tick - (mem.wild ?? s.tick) < secs(TAME.aiStay)) return null;
   // The Grove is kept a while, so its gardens are fed, its Orchards set and its Thornwall grown.
   if (walksWeb(v) && ageOf(p) === 'grove' && s.tick - (mem.grove ?? s.tick) < secs(GROVE.aiStay)) return null;
+  // The Hive is kept a while, so its Hives are set and swarming.
+  if (walksWeb(v) && ageOf(p) === 'hive' && s.tick - (mem.hive ?? s.tick) < secs(HIVE.aiStay)) return null;
+  // The Wildwood is kept a while, so its Heart Tree is planted and its Ents woken.
+  if (walksWeb(v) && ageOf(p) === 'wildwood' && s.tick - (mem.wildwood ?? s.tick) < secs(WILDWOOD.aiStay)) return null;
+  // The Bloom is kept a while, so its Spire slings and its land greens.
+  if (walksWeb(v) && ageOf(p) === 'bloom' && s.tick - (mem.bloom ?? s.tick) < secs(BLOOM.aiStay)) return null;
   // The steppe (#320) is kept a while, so the flock it came for pays.
   if (walksWeb(v) && ageDef(p).mobile && s.tick - (mem.steppe?.since ?? s.tick) < secs(AI_STEPPE.stay)) return null;
   // Bound for a crossing (#585, #555 s12), a sibling doesn't climb on: its way is back to the Middle Ages (`seaTurn`).
@@ -744,6 +849,11 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   if (walksWeb(v) && ageOf(p) === 'missions') {
     if (mem.sea?.at !== 'missions') mem.sea = { at: 'missions', since: s.tick };
     if (s.tick - mem.sea.since < secs(AI_MISSION.hold)) return null;
+  }
+  // The Sea Beggars stay `AI_BEGGARS.hold` seconds (#783): the ships taken and the dykes cut are what the crossing was for.
+  if (walksWeb(v) && ageOf(p) === 'beggars') {
+    if (mem.sea?.at !== 'beggars') mem.sea = { at: 'beggars', since: s.tick };
+    if (s.tick - mem.sea.since < secs(AI_BEGGARS.hold)) return null;
   }
   // The Horde stays `stay` seconds before it climbs on: tribute is what it came for (#322).
   if (walksWeb(v) && ageOf(p) === 'horde') {
@@ -852,6 +962,13 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
       if (wants(s, p, mem, r.to) && roadKnown(s, p, r) && !roadProblem(s, p, r)) return { road: r, wait: false };
       continue;
     }
+    // The Water Road's fifth age (#701 s5): a people that walked the Water Line turns from the Industrial Age into the Age of Locks.
+    // The Age of Tides (#739): a town with a shore turns into it once its Dock shows the road (`clueDue` raises the Dock), asked
+    // before the road is known so the Dock goes up for it, and only with the road's price in hand.
+    if (r.to === 'locks' || r.to === 'tides') {
+      if (wants(s, p, mem, r.to) && roadKnown(s, p, r) && !roadProblem(s, p, r)) return { road: r, wait: false };
+      continue;
+    }
     // The gateway (#577): with its saltpetre door open and the store to grind from, it turns into Alchemy.
     if (r.to === 'alchemy') {
       if (roadKnown(s, p, r) && deedsDone(p, r, s) && (p.rare?.saltpetre ?? 0) >= AI_KEG.ore && wants(s, p, mem, r.to)) return { road: r, wait: false };
@@ -891,6 +1008,7 @@ const CROSS_PLAN: Partial<Record<AgeId, { salt: number; keeps: BuildingType[]; t
   searaider: { salt: 0x5ea7, keeps: ['dock'], take: AI_SEA.take, stay: AI_SEA.stay },
   missions: { salt: 0x4d15, keeps: ['dock', 'temple'], take: AI_MISSION.take, stay: AI_MISSION.stay },
   chariots: { salt: 0xc4a1, keeps: ['forge'], take: AI_CHARIOT.take, stay: AI_CHARIOT.stay },
+  beggars: { salt: 0xbe66, keeps: ['dock'], take: AI_BEGGARS.take, stay: AI_BEGGARS.stay },
 };
 
 /**
@@ -910,6 +1028,8 @@ function crossPlanned(s: GameState, v: View, mem: AiMemory, road: Road): boolean
     const other = left ? ROADS.find((r) => r.from === road.from && r.to === left) : undefined;
     if (!road.crossing!.some((a) => hasWalked(p, a)) || plan.keeps.some((b) => count(v, b, true) === 0)) return false;
     if (other && !(roadKnown(s, p, other) && deedsDone(p, other, s))) return false;
+    // A sibling behind a coast door (the Dykes, #783) is a plan only for a town with the shallows to take it.
+    if (other?.coast && !coastHeld(s, p)) return false;
     roads[road.to] = coin(s, p.id, plan.salt) < plan.take;
     // The plan is the other sibling's road too, whatever the coin once said of it; giving that road up gives the crossing up.
     if (roads[road.to]) for (const a of road.crossing!) if (!hasWalked(p, a)) roads[a] = true;
@@ -1262,6 +1382,225 @@ function dykeOf(s: GameState, p: Player, mem: AiMemory): DykePlan | null {
   return d.plan;
 }
 
+/** The channel it means to dig by home (#701 s1): `channelPlan` from the water nearest its start, or null; kept until redrawn (`riverWork`). */
+export function riverOf(s: GameState, p: Player, mem: AiMemory): ChannelPlan | null {
+  const r = (mem.river ??= { plan: null });
+  if (!r.looked) {
+    r.looked = true;
+    r.plan = channelPlan(s, p.startX, p.startY, AI_RIVERS, wallLine, (x, y) => !placeProblem(s, 'channel', x, y));
+  }
+  return r.plan;
+}
+
+/**
+ * The Age of Rivers at work (#701 s1): dig the planned channel (tile by tile from the water, `AI_RIVERS.crew` citizens, the price set
+ * aside until it can be paid whole), and send idle hands back to the ditches still being dug. Its fields then follow the water
+ * (`planBuildings` looks for a Farm spot by the people's own rule).
+ */
+function riverWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  // The road is decided in the Stone Age, on its own coin, so its Farm (the clue) is raised in time (`clueDue`).
+  if (p.epoch === 0 && walksWeb(v)) wants(s, p, mem, 'rivers');
+  // In the Age of Locks (#701 s5) the same line is dug deep, into a canal: an old channel along it is dug again.
+  const deep = !!ageDef(p).canals;
+  if (!ageDef(p).rivers && !deep) return;
+  // Planned in the Stone Age; the town has grown since, so the line is drawn again on arrival.
+  const r = (mem.river ??= { plan: null });
+  if (!r.fresh) {
+    r.fresh = true;
+    r.looked = false;
+  }
+  const plan = riverOf(s, p, mem);
+  if (!plan) return;
+  const recent = (sec: number) => s.tick - (mem.ordered.channel ?? -99999) < secs(sec);
+  const ditch = (t: number): Building | null => {
+    const b = s.byId.get(s.bldAt[t]);
+    return b && b.kind === 'building' && b.type === 'channel' && b.owner === p.id ? b : null;
+  };
+  // Tiles still to lay out: not dug, not being dug, and free to dig, up to the first a building raised since stands on (the water
+  // would stop there, so nothing is dug past it).
+  const left: number[] = [];
+  for (const t of plan.tiles) {
+    if ((deep ? isCanal(s, t) : isChannel(s, t)) || ditch(t)) continue;
+    if (placeProblem(s, 'channel', t % s.w, Math.floor(t / s.w), true, deep ? p.id : -1)) break;
+    left.push(t);
+  }
+  if (left.length && !recent(20)) {
+    const cost = buildingCostFor(s, p.id, 'channel');
+    const all: Cost = {};
+    for (const r of RES) if (cost[r]) all[r] = cost[r]! * left.length;
+    if (!afford(v, all)) {
+      spend(v, all);
+      return;
+    }
+    const crew = v.citizens.filter((u) => !u.inside && u.order.k !== 'build' && !(u.order.k === 'farm' && u.order.phase === 'work')).sort((a, b) => a.id - b.id).slice(0, AI_RIVERS.crew);
+    if (!crew.length) return;
+    // Tile by tile, nearest the water first, so the ditch is the line planned (a drag to another end would draw another line).
+    left.forEach((t, i) => issue({ t: 'build', p: p.id, ids: crew.map((u) => u.id), type: 'channel', tx: t % s.w, ty: Math.floor(t / s.w), queue: i > 0 || undefined }));
+    spend(v, all);
+    mem.ordered.channel = s.tick;
+    return;
+  }
+  // Idle hands go back to the ditch still being dug, nearest the water first.
+  const rising = plan.tiles.map(ditch).find((b) => b && !b.built);
+  if (rising && !recent(20)) {
+    const crew = v.citizens.filter((u) => !u.inside && u.order.k === 'idle').slice(0, AI_RIVERS.crew);
+    if (crew.length) issue({ t: 'work', p: p.id, ids: crew.map((u) => u.id), target: rising.id });
+    mem.ordered.channel = s.tick;
+  }
+}
+
+/**
+ * Where it sets its sluice (#701 s4): within `AI_WATERLINE.reach` tiles of its start, on a dyke of its own line or on water a sluice
+ * may stand on, with still water beside it; the spot whose flood would cover the most ground, the nearest home on a tie. Found once.
+ */
+function sluiceSpot(s: GameState, p: Player, mem: AiMemory): { tx: number; ty: number } | null {
+  const line = (mem.line ??= { since: s.tick });
+  if (line.spot !== undefined) return line.spot;
+  const r = AI_WATERLINE.reach;
+  const cx = Math.floor(p.startX);
+  const cy = Math.floor(p.startY);
+  let best: { tx: number; ty: number } | null = null;
+  let top = 0;
+  let bestD = Infinity;
+  for (let ty = Math.max(1, cy - r); ty <= Math.min(s.h - 2, cy + r); ty++)
+    for (let tx = Math.max(1, cx - r); tx <= Math.min(s.w - 2, cx + r); tx++) {
+      const t = ty * s.w + tx;
+      if (s.terrain[t] !== T_WATER || isInund(s, t)) continue;
+      const d = (tx - cx) * (tx - cx) + (ty - cy) * (ty - cy);
+      if (d > r * r || placeProblem(s, 'sluice', tx, ty, true, p.id)) continue;
+      const spot = { tx, ty, size: 1 } as Building;
+      if (!sluiceFed(s, spot)) continue;
+      const n = waterLine(s, spot).length;
+      if (n > top || (n === top && d < bestD)) {
+        top = n;
+        bestD = d;
+        best = { tx, ty };
+      }
+    }
+  line.spot = top >= 8 ? best : null;
+  return line.spot;
+}
+
+/**
+ * The Age of the Water Line at work (#701 s4): set one sluice where its flood covers the most ground (`sluiceSpot`), keep
+ * `AI_WATERLINE.barges` gun-barges, and open the sluice while an enemy army of `threat` or more stands within `near` tiles of it,
+ * shutting it `calm` seconds after the last has gone. With the water out, idle barges shell the nearest enemy by the sluice.
+ */
+function waterLineWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!ageDef(p).sluices) return;
+  const line = (mem.line ??= { since: s.tick });
+  const sluice = v.buildings.find((b) => b.type === 'sluice');
+  if (!sluice) {
+    if (s.tick - (mem.ordered.sluice ?? -99999) < secs(25)) return;
+    const spot = sluiceSpot(s, p, mem);
+    if (!spot) return;
+    if (!construct(s, v, mem, 'sluice', spot, 2, issue)) spend(v, buildingCostFor(s, p.id, 'sluice'));
+    return;
+  }
+  if (!sluice.built) return;
+  if (s.tick % secs(1) !== (p.id * 3) % secs(1)) return;
+  // The alarm: an enemy army by the sluice.
+  const r2 = AI_WATERLINE.near * AI_WATERLINE.near;
+  const foes: Unit[] = [];
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !MILITARY.includes(e.type) || domainOf(e.type) !== 'land' || !isEnemy(s, p.id, e.owner)) continue;
+    const dx = e.x - sluice.x;
+    const dy = e.y - sluice.y;
+    if (dx * dx + dy * dy <= r2) foes.push(e);
+  }
+  if (foes.length >= AI_WATERLINE.threat) line.alarm = s.tick;
+  const alarmed = line.alarm !== undefined && s.tick - line.alarm < secs(AI_WATERLINE.calm);
+  if (alarmed !== !!sluice.open && !sluiceProblem(s, sluice)) issue({ t: 'pack', p: p.id, building: sluice.id });
+  // The barges: kept up at the sluice, and sent at the nearest foe while the water is out.
+  const barges = v.navy.filter((u) => u.type === 'barge');
+  const queued = sluice.queue.filter((q) => q.unit === 'barge').length;
+  if (barges.length + queued < AI_WATERLINE.barges && !queued) {
+    const cost = unitStats('barge', p.epoch).cost;
+    if (afford(v, cost)) issue({ t: 'train', p: p.id, building: sluice.id, unit: 'barge' });
+    else spend(v, cost);
+  }
+  if (sluice.open && foes.length) {
+    const idle = barges.filter((u) => u.order.k === 'idle');
+    if (idle.length) {
+      const d2 = (u: Unit) => (u.x - sluice.x) * (u.x - sluice.x) + (u.y - sluice.y) * (u.y - sluice.y);
+      const near = foes.reduce((a, b) => (d2(a) <= d2(b) ? a : b));
+      issue({ t: 'attack', p: p.id, ids: idle.map((u) => u.id), target: near.id });
+    }
+  }
+}
+
+/**
+ * Where it raises its dam (#701 s5): within `AI_LOCKS.reach` tiles of its start, on water a dam may stand on (not its canal, which its
+ * ships may want) with still water beside it; the spot with the most of its training buildings within `DAM.reach`, the nearest home on a
+ * tie. Looked for again while none is found, or once the spot is taken.
+ */
+function damSpot(s: GameState, v: View, mem: AiMemory): { tx: number; ty: number } | null {
+  const { p } = v;
+  const locks = (mem.locks ??= { since: s.tick });
+  if (locks.dam && !placeProblem(s, 'dam', locks.dam.tx, locks.dam.ty, true, p.id)) return locks.dam;
+  const r = AI_LOCKS.reach;
+  const cx = Math.floor(p.startX);
+  const cy = Math.floor(p.startY);
+  const shops = v.buildings.filter((b) => b.built && BUILDINGS[b.type].trains.length > 0);
+  let best: { tx: number; ty: number } | null = null;
+  let top = -1;
+  let bestD = Infinity;
+  for (let ty = Math.max(1, cy - r); ty <= Math.min(s.h - 2, cy + r); ty++)
+    for (let tx = Math.max(1, cx - r); tx <= Math.min(s.w - 2, cx + r); tx++) {
+      const t = ty * s.w + tx;
+      if (isCanal(s, t) || isInund(s, t)) continue;
+      const d = (tx - cx) * (tx - cx) + (ty - cy) * (ty - cy);
+      if (d > r * r || placeProblem(s, 'dam', tx, ty, true, p.id)) continue;
+      const spot = { tx, ty, size: 1 } as Building;
+      if (!sluiceFed(s, spot)) continue;
+      let n = 0;
+      for (const b of shops) {
+        const dx = b.x - tx - 0.5;
+        const dy = b.y - ty - 0.5;
+        if (dx * dx + dy * dy <= DAM.reach * DAM.reach) n++;
+      }
+      if (n > top || (n === top && d < bestD)) {
+        top = n;
+        bestD = d;
+        best = { tx, ty };
+      }
+    }
+  locks.dam = best;
+  return best;
+}
+
+/**
+ * The Age of Locks at work (#701 s5): its channel line is dug deep into a canal (`riverWork`), a Dam is raised where its turbines drive
+ * the most of its training buildings (`damSpot`), and a Bridge is laid over the canal tile nearest home once the water is in.
+ */
+function locksWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!ageDef(p).turbines) return;
+  mem.locks ??= { since: s.tick };
+  if (!v.buildings.some((b) => b.type === 'dam') && s.tick - (mem.ordered.dam ?? -99999) >= secs(25)) {
+    const spot = damSpot(s, v, mem);
+    if (spot && !construct(s, v, mem, 'dam', spot, 2, issue)) spend(v, buildingCostFor(s, p.id, 'dam'));
+    return;
+  }
+  if (v.buildings.some((b) => b.type === 'bridge') || s.tick - (mem.ordered.bridge ?? -99999) < secs(25)) return;
+  const plan = mem.river?.plan;
+  if (!plan) return;
+  let near = -1;
+  let nearD = Infinity;
+  for (const t of plan.tiles) {
+    if (!isCanal(s, t) || placeProblem(s, 'bridge', t % s.w, Math.floor(t / s.w), true, p.id)) continue;
+    const dx = (t % s.w) + 0.5 - p.startX;
+    const dy = Math.floor(t / s.w) + 0.5 - p.startY;
+    if (dx * dx + dy * dy < nearD) {
+      nearD = dx * dx + dy * dy;
+      near = t;
+    }
+  }
+  if (near >= 0 && !construct(s, v, mem, 'bridge', { tx: near % s.w, ty: Math.floor(near / s.w) }, 1, issue)) spend(v, buildingCostFor(s, p.id, 'bridge'));
+}
+
 /** Whether its dyke's work is done (#701): the basin it shut off is all polder, or it has no plan. */
 function dykeDone(s: GameState, mem: AiMemory): boolean {
   const plan = mem.dyke?.plan;
@@ -1276,12 +1615,26 @@ function dykeDone(s: GameState, mem: AiMemory): boolean {
  */
 function dykeWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
-  if (!ageDef(p).pumps) return;
+  // Out of the age, only a line that once stood whole is kept: a gap in it is a breach to mend (#701 s3), while dykes may be raised.
+  const pumping = !!ageDef(p).pumps;
+  if (!pumping && (!mem.dyke?.raised || buildBarred(p, 'dyke'))) return;
   const plan = dykeOf(s, p, mem);
   if (!plan) return;
   const recent = (type: BuildingType, sec: number) => s.tick - (mem.ordered[type] ?? -99999) < secs(sec);
-  const dykes = plan.line.map((t) => s.byId.get(s.bldAt[t])).filter((b): b is Building => !!b && b.kind === 'building' && b.type === 'dyke' && b.owner === p.id);
+  // A sluice set in the line (#701 s4) holds it as a dyke does.
+  const dykes = plan.line.map((t) => s.byId.get(s.bldAt[t])).filter((b): b is Building => !!b && b.kind === 'building' && (b.type === 'dyke' || b.type === 'sluice') && b.owner === p.id);
+  if (dykes.length === plan.line.length && dykes.every((b) => b.built)) mem.dyke!.raised = true;
   if (dykes.length < plan.line.length) {
+    // A breach is mended at once, whatever else waits (the sea will not).
+    if (mem.dyke!.raised) {
+      if (recent('dyke', 6)) return;
+      const crew = v.citizens.filter((u) => !u.inside && u.order.k !== 'build').sort((a, b) => a.id - b.id).slice(0, AI_DYKE.crew);
+      const gaps = plan.line.filter((t) => s.bldAt[t] === 0 && !placeProblem(s, 'dyke', t % s.w, Math.floor(t / s.w), true, p.id));
+      if (!crew.length || !gaps.length || !afford(v, buildingCostFor(s, p.id, 'dyke'))) return;
+      gaps.forEach((t, i) => issue({ t: 'build', p: p.id, ids: crew.map((u) => u.id), type: 'dyke', tx: t % s.w, ty: Math.floor(t / s.w), queue: i > 0 || undefined }));
+      mem.ordered.dyke = s.tick;
+      return;
+    }
     const cost = buildingCostFor(s, p.id, 'dyke');
     const need = plan.line.length - dykes.length;
     const all: Cost = {};
@@ -1307,6 +1660,7 @@ function dykeWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     }
     return;
   }
+  if (!pumping) return;
   const mills = v.buildings.filter((b) => b.type === 'windmill').length;
   const want = Math.min(AI_DYKE.mills, Math.ceil(plan.basin.length / AI_DYKE.perMill));
   if (mills < want && !dykeDone(s, mem)) {
@@ -1329,6 +1683,418 @@ function dykeWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
       break;
     }
   }
+}
+
+const TIDES_ROAD = ROADS.find((r) => r.from === 'atomic' && r.to === 'tides')!;
+const FLOAT_ROAD = ROADS.find((r) => r.from === 'tides' && r.to === 'floating')!;
+
+/**
+ * The Age of Floating Cities at work (#770). From the Age of Tides, a town bound for it (`wants`) saves for the road and turns once the
+ * Town Center is free (at the last epoch it would train hands for ever). In the age: Pontoons moored off the shore nearest home, each
+ * beside the last (`mooringSpot`), `AI_FLOAT.most` of them and more as the people outgrows its room; fishing boats from them; a district
+ * a rival's warhead is aimed at (within `AI_FLOAT.blast` tiles of where the computer reads it will fall) cast off and towed `flee` tiles
+ * away; and a district past the floating town's first `FLOAT.city` with no fish beside it towed to the nearest shoal. A tow moors where it
+ * was sent, once there.
+ */
+function floatWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  // The Tides are kept a while first, so their mills grind and their barrage is laid before the town saves for the water.
+  if (ageOf(p) === 'tides') (mem.float ??= { since: -1 }).tides ??= s.tick;
+  const kept = ageOf(p) === 'tides' && s.tick - (mem.float?.tides ?? s.tick) >= secs(AI_FLOAT.after);
+  if (kept && walksWeb(v) && v.tc && !v.buildings.some((b) => b.advance >= 0) && wants(s, p, mem, 'floating') && roadKnown(s, p, FLOAT_ROAD) && !roadProblem(s, p, FLOAT_ROAD)) {
+    if (v.tc.queue.length === 0 && afford(v, FLOAT_ROAD.cost)) issue({ t: 'advance', p: p.id, building: v.tc.id, to: 'floating' });
+    spend(v, FLOAT_ROAD.cost);
+  }
+  if (!ageDef(p).floats) return;
+  const fm = (mem.float ??= { since: s.tick });
+  if (fm.since < 0) fm.since = s.tick;
+  const tows = (fm.tows ??= {});
+  // Tows under way: moored once they lie where they were sent, or as near as the water lets them.
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.type !== 'tow' || e.owner !== p.id || e.hp <= 0) continue;
+    const to = tows[e.id];
+    const there = !to || (e.x - to.x) * (e.x - to.x) + (e.y - to.y) * (e.y - to.y) <= 2 * 2 || (e.order.k === 'idle' && !e.path);
+    if (there && !pitchProblem(s, e)) {
+      issue({ t: 'pitch', p: p.id, ids: [e.id] });
+      delete tows[e.id];
+    } else if (to && e.order.k === 'idle' && !e.path) issue({ t: 'move', p: p.id, ids: [e.id], x: to.x, y: to.y });
+  }
+  for (const id of Object.keys(tows)) if (!s.byId.has(+id)) delete tows[+id];
+  const pontoons = v.buildings.filter((b) => b.type === 'pontoon');
+  const moored = pontoons.filter((b) => b.built);
+  // Every second: cast off what a warhead is aimed at, or (every 15) a fishing district with nothing left to fish.
+  if (s.tick - (fm.looked ?? -99999) >= secs(1)) {
+    fm.looked = s.tick;
+    const tow = (b: Building, x: number, y: number) => {
+      const t = nearestWalkable(s, x, y, 6, NAVAL);
+      if (t < 0) return false;
+      // What it was training is given up (and paid back): the district can't leave with a queue.
+      for (let i = b.queue.length - 1; i >= 0; i--) issue({ t: 'cancel', p: p.id, building: b.id, index: i });
+      if (castProblem(s, p, b)) return false;
+      issue({ t: 'pack', p: p.id, building: b.id });
+      if (s.byId.has(b.id)) return false;
+      // The tow is the newest of its people's, made this moment.
+      let w: Unit | null = null;
+      for (const e of s.ents) if (e.kind === 'unit' && e.type === 'tow' && e.owner === p.id && (!w || e.id > w.id)) w = e;
+      if (!w) return false;
+      const to = { x: (t % s.w) + 0.5, y: Math.floor(t / s.w) + 0.5 };
+      tows[w.id] = to;
+      issue({ t: 'move', p: p.id, ids: [w.id], x: to.x, y: to.y });
+      return true;
+    };
+    const aimed: { x: number; y: number }[] = [];
+    for (const l of s.launches ?? []) if (isEnemy(s, p.id, l.owner)) aimed.push(...ringsFor(s, l, p.id));
+    for (const b of moored) {
+      const at = aimed.find((g) => (g.x - b.x) * (g.x - b.x) + (g.y - b.y) * (g.y - b.y) <= AI_FLOAT.blast * AI_FLOAT.blast);
+      if (!at) continue;
+      // Away from where it will fall; struck dead on, out from home, away from the shore.
+      const dead = (b.x - at.x) * (b.x - at.x) + (b.y - at.y) * (b.y - at.y) < 1;
+      const dx = dead ? b.x - v.home.x : b.x - at.x;
+      const dy = dead ? b.y - v.home.y : b.y - at.y;
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      if (tow(b, at.x + (dx / len) * AI_FLOAT.flee, at.y + (dy / len) * AI_FLOAT.flee)) return;
+    }
+    if (s.tick - (fm.fished ?? -99999) >= secs(15) && moored.length > FLOAT.city) {
+      fm.fished = s.tick;
+      // The outermost district (the last moored), if no shoal lies within its boats' easy reach.
+      const b = moored[moored.length - 1];
+      if (findResource(s, R_FISH, b.x, b.y, 6) < 0) {
+        const fish = findResource(s, R_FISH, v.home.x, v.home.y, AI_FLOAT.reach + 12);
+        if (fish >= 0 && tow(b, (fish % s.w) + 0.5, Math.floor(fish / s.w) + 0.5)) return;
+      }
+    }
+  }
+  // Fishing boats from the town, while it has none of its own Dock's.
+  const boatsAt = moored.find((b) => b.queue.length === 0);
+  if (boatsAt && v.fishers.length < AI_FLOAT.fishers && !v.buildings.some((b) => b.type === 'dock' && b.built) && findResource(s, R_FISH, boatsAt.x, boatsAt.y, 14) >= 0) {
+    const cost = unitStats('fisher', p.epoch).cost;
+    if (afford(v, cost)) {
+      issue({ t: 'train', p: p.id, building: boatsAt.id, unit: 'fisher' });
+      spend(v, cost);
+    }
+  }
+  if (!v.buildings.some((b) => b.type === 'dock' && b.built))
+    for (const f of v.fishers) {
+      if (f.order.k !== 'idle') continue;
+      const t = findResource(s, R_FISH, f.x, f.y, 18);
+      if (t >= 0) issue({ t: 'gather', p: p.id, ids: [f.id], tile: t });
+    }
+  // Citizens from the floating town, once it is linked.
+  const town = moored.find((b) => b.queue.length === 0 && raisesCitizens(s, b));
+  if (town && p.pop < p.cap && v.citizens.length < AI_FLOAT.hands) {
+    const cost = unitStats('citizen', p.epoch).cost;
+    if (afford(v, cost)) {
+      issue({ t: 'train', p: p.id, building: town.id, unit: 'citizen' });
+      spend(v, cost);
+    }
+  }
+  // More districts: the first few, then one more whenever the people runs short of room.
+  const rising = pontoons.length - moored.length;
+  const want = pontoons.length < AI_FLOAT.most || (p.cap < POP_MAX && p.cap - p.pop <= 8);
+  if (!want || rising > 0 || s.tick - (mem.ordered.pontoon ?? -99999) < secs(20) || buildBarred(p, 'pontoon')) return;
+  const cost = buildingCostFor(s, p.id, 'pontoon');
+  if (!afford(v, cost)) {
+    spend(v, cost);
+    return;
+  }
+  const spot = mooringSpot(s, p.id, v.home.x, v.home.y, AI_FLOAT.reach);
+  mem.ordered.pontoon = s.tick;
+  if (!spot || !construct(s, v, mem, 'pontoon', spot, 2, issue)) spend(v, cost);
+}
+
+/**
+ * The computer and the tide (#739). From the Atomic Age, a town bound for the age saves for it and turns. Any people, once the tide is awake: with the flood a step off (`AI_TIDES.wary` seconds), its people
+ * standing on flats the water will cover step ashore first. In the Age of Tides (or holding a kept mill): Tide Mills, up to
+ * `AI_TIDES.mills`, each where it reaches the most tidal ground no mill reaches yet (`tideMillSpot`).
+ */
+function tideWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  // Bound for the age from the Atomic (`wants`): its price is set aside before anything else spends it (the Town Center would train
+  // hands for ever, at the last epoch), and the turn is taken once the Town Center is free.
+  if (ageOf(p) === 'atomic' && walksWeb(v) && v.tc && !v.buildings.some((b) => b.advance >= 0) && wants(s, p, mem, 'tides') && roadKnown(s, p, TIDES_ROAD) && !roadProblem(s, p, TIDES_ROAD)) {
+    if (v.tc.queue.length === 0 && afford(v, TIDES_ROAD.cost)) issue({ t: 'advance', p: p.id, building: v.tc.id, to: 'tides' });
+    spend(v, TIDES_ROAD.cost);
+  }
+  const clock = tideClock(s);
+  if (!clock) return;
+  if (s.tick % secs(1) === p.id % secs(1)) turnBack(s, v, mem, issue);
+  if (s.tick % secs(1) === p.id % secs(1) && clock.next <= AI_TIDES.wary) {
+    const wet = coveredNext(s);
+    if (wet) {
+      const team = p.team;
+      for (const u of [...v.citizens, ...v.army, ...v.priests, ...v.traders]) {
+        // Pickers and builders read the tide themselves (#767), and keep their work.
+        if (u.inside || u.order.k === 'gather' || u.order.k === 'build' || !wet(Math.floor(u.y) * s.w + Math.floor(u.x))) continue;
+        const to = shoreNear(s, u.x, u.y, team);
+        if (to >= 0) issue({ t: 'move', p: p.id, ids: [u.id], x: (to % s.w) + 0.5, y: Math.floor(to / s.w) + 0.5 });
+      }
+    }
+  }
+  if (ageDef(p).tides) barrageWork(s, v, mem, issue);
+  if (ageDef(p).tides) gateWork(s, v, mem, issue);
+  if (ageDef(p).tides) cockleWork(s, v, mem, issue);
+  if (!ageDef(p).tides || buildBarred(p, 'tidemill')) return;
+  if (v.buildings.filter((b) => b.type === 'tidemill').length >= AI_TIDES.mills) return;
+  if (s.tick - (mem.ordered.tidemill ?? -99999) < secs(25)) return;
+  const cost = buildingCostFor(s, p.id, 'tidemill');
+  if (!afford(v, cost)) {
+    spend(v, cost);
+    return;
+  }
+  const spot = tideMillSpot(s, p.id, v.home.x, v.home.y, AI_TIDES.reach, AI_TIDES.least, (tx, ty) => !placeProblem(s, 'tidemill', tx, ty, true, p.id));
+  mem.ordered.tidemill = s.tick;
+  if (!spot || !construct(s, v, mem, 'tidemill', spot, 2, issue)) spend(v, cost);
+}
+
+/**
+ * Cockle beds (#767), every `AI_COCKLE.every` seconds: a picker waiting ashore longer than `AI_COCKLE.idle` seconds goes back to the woods;
+ * with fewer than `AI_COCKLE.hands` picking, the nearest bed to home within `AI_COCKLE.reach` that the tide has bared, and keeps bare at
+ * least `AI_COCKLE.least` seconds more, takes the wood and berry gatherers nearest it (ties by id). The pickers read the tide themselves.
+ */
+function cockleWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!s.cockles || s.tick - (mem.tide?.cockle ?? -99999) < secs(AI_COCKLE.every)) return;
+  (mem.tide ??= {}).cockle = s.tick;
+  const pickers = v.citizens.filter((u) => !u.inside && u.order.k === 'gather' && (u.order.cockle || s.res[u.order.tile] === R_COCKLE));
+  let n = 0;
+  for (const u of pickers) {
+    if (ashoreLeft(s, u) <= AI_COCKLE.idle) {
+      n++;
+      continue;
+    }
+    const tree = findResource(s, R_TREE, u.x, u.y, 20);
+    if (tree >= 0) issue({ t: 'gather', p: p.id, ids: [u.id], tile: tree });
+  }
+  // A Cockler's Hut by the busiest bed (#779).
+  if (pickers.length) cocklerHutWork(s, v, mem, pickers, issue);
+  if (n >= AI_COCKLE.hands) return;
+  const risk = gateRisk(s, p.id);
+  const bed = findResource(s, R_COCKLE, v.home.x, v.home.y, AI_COCKLE.reach, (i) => {
+    if (!bared(s, i) || (risk && risk(i))) return true;
+    const c = bedClock(s, i);
+    return !c || !c.bare || c.secs < AI_COCKLE.least;
+  });
+  if (bed < 0) return;
+  const bx = (bed % s.w) + 0.5;
+  const by = Math.floor(bed / s.w) + 0.5;
+  const d = (u: Unit) => (u.x - bx) * (u.x - bx) + (u.y - by) * (u.y - by);
+  const hands = v.citizens
+    .filter((u) => !u.inside && u.order.k === 'gather' && u.order.phase !== 'drop' && (u.order.res === 'wood' || s.res[u.order.tile] === R_BERRY))
+    .sort((a, b) => d(a) - d(b) || a.id - b.id)
+    .slice(0, AI_COCKLE.hands - n);
+  if (hands.length) issue({ t: 'gather', p: p.id, ids: hands.map((u) => u.id), tile: bed });
+}
+
+/**
+ * The computer's Cockler's Hut (#779): its busiest bed (the most pickers on it, then the lowest tile) that lies more than
+ * `AI_COCKLER.far` tiles from its nearest food store, with no hut of its within `COCKLER.reach`, gets one raised by it, the nearest spot
+ * that fits (`cocklerSpotNear`), no more often than every `AI_COCKLER.every` seconds.
+ */
+function cocklerHutWork(s: GameState, v: View, mem: AiMemory, pickers: Unit[], issue: (c: Command) => void): void {
+  const { p } = v;
+  if (buildBarred(p, 'cockler') || s.tick - (mem.ordered.cockler ?? -99999) < secs(AI_COCKLER.every)) return;
+  const load = new Map<number, number>();
+  for (const u of pickers) if (u.order.k === 'gather') load.set(u.order.tile, (load.get(u.order.tile) ?? 0) + 1);
+  let bed = -1;
+  let most = 0;
+  for (const [t, k] of load) {
+    if (k > most || (k === most && t < bed)) {
+      most = k;
+      bed = t;
+    }
+  }
+  if (bed < 0 || !s.cockles?.[bed]) return;
+  const bx = (bed % s.w) + 0.5;
+  const by = Math.floor(bed / s.w) + 0.5;
+  if (v.buildings.some((b) => b.type === 'cockler' && distToRect(bx, by, b) <= COCKLER.reach)) return;
+  const store = nearestDrop(s, p.id, 'food', bx, by);
+  if (store && distToRect(bx, by, store) <= AI_COCKLER.far) return;
+  mem.ordered.cockler = s.tick;
+  const cost = buildingCostFor(s, p.id, 'cockler');
+  if (!afford(v, cost)) {
+    spend(v, cost);
+    return;
+  }
+  const spot = cocklerSpotNear(s, bed, (tx, ty) => !placeProblem(s, 'cockler', tx, ty, true, p.id));
+  if (!spot || !construct(s, v, mem, 'cockler', spot, 1, issue)) spend(v, cost);
+}
+
+/**
+ * A barrage by its mills (#748): the line `barragePlan` finds by the first of its finished Tide Mills that has one (each mill looked at
+ * once), laid in one drag by `AI_BARRAGE.crew` citizens once the whole line can be paid for; idle builders go back to a site still rising,
+ * and once the line stood whole a breach in it is mended at once.
+ */
+function barrageWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (buildBarred(p, 'causeway')) return;
+  const m = (mem.tide ??= {});
+  if (!m.plan) {
+    const seen = (m.seen ??= []);
+    const mill = v.buildings.find((b) => b.type === 'tidemill' && b.built && !seen.includes(b.id));
+    if (!mill) return;
+    seen.push(mill.id);
+    m.plan = barragePlan(s, mill, AI_BARRAGE, wallLine);
+    if (!m.plan) return;
+  }
+  const plan = m.plan;
+  const gaps = plan.line.filter((t) => !isCauseway(s, t) && s.bldAt[t] === 0);
+  if (!gaps.length) {
+    if (plan.line.every((t) => isCauseway(s, t))) {
+      m.raised = true;
+      return;
+    }
+    // Idle builders are sent back to the causeway still rising.
+    const rising = plan.line.map((t) => s.byId.get(s.bldAt[t])).find((b): b is Building => !!b && b.kind === 'building' && b.type === 'causeway' && b.owner === p.id && !b.built);
+    if (!rising || s.tick - (mem.ordered.causeway ?? -99999) < secs(20)) return;
+    const crew = v.citizens.filter((u) => !u.inside && u.order.k === 'idle').slice(0, AI_BARRAGE.crew);
+    if (crew.length) issue({ t: 'work', p: p.id, ids: crew.map((u) => u.id), target: rising.id });
+    mem.ordered.causeway = s.tick;
+    return;
+  }
+  if (s.tick - (mem.ordered.causeway ?? -99999) < secs(m.raised ? 6 : 20)) return;
+  const cost = buildingCostFor(s, p.id, 'causeway');
+  const all: Cost = {};
+  for (const r of RES) if (cost[r]) all[r] = cost[r]! * gaps.length;
+  if (!afford(v, all)) {
+    // A breach is mended before anything else spends; a new line waits its turn.
+    if (m.raised) spend(v, all);
+    return;
+  }
+  const crew = v.citizens
+    .filter((u) => !u.inside && u.order.k !== 'build' && !(u.order.k === 'farm' && u.order.phase === 'work'))
+    .sort((a, b) => a.id - b.id)
+    .slice(0, AI_BARRAGE.crew);
+  if (!crew.length) return;
+  issue({ t: 'wall', p: p.id, ids: crew.map((u) => u.id), x0: plan.from.x, y0: plan.from.y, x1: plan.to.x, y1: plan.to.y, causeway: true });
+  spend(v, all);
+  mem.ordered.causeway = s.tick;
+}
+
+/**
+ * The computer's Tide Gate (#785). With a barrage of its own standing and no gate, every `AI_GATE.every` seconds it sets one in it
+ * (`tideGateSpotIn`: of its causeway tiles by a pond, in tile order, the one nearest the middle with the sea on the far side). Every
+ * `AI_GATE.look` seconds after: with the gate shut and loaded, it opens it when `AI_GATE.threat` or more enemy land units stand on the
+ * flats it would scour, more than its own side's there; an open gate it shuts again `AI_GATE.shut` seconds on, to fill on the next flood.
+ */
+function gateWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!s.pond || !s.causewayBy || buildBarred(p, 'tidegate')) return;
+  const gate = v.buildings.find((b) => b.type === 'tidegate');
+  if (!gate) {
+    if (s.tick - (mem.ordered.tidegate ?? -99999) < secs(AI_GATE.every)) return;
+    mem.ordered.tidegate = s.tick;
+    const own: number[] = [];
+    for (let i = 0; i < s.causewayBy.length; i++) if (s.causewayBy[i] === p.id + 1) own.push(i);
+    if (!own.length) return;
+    const cost = buildingCostFor(s, p.id, 'tidegate');
+    if (!afford(v, cost)) {
+      spend(v, cost);
+      return;
+    }
+    const spot = tideGateSpotIn(s, own, p.id);
+    if (!spot || !construct(s, v, mem, 'tidegate', spot, 2, issue)) spend(v, cost);
+    return;
+  }
+  const m = (mem.tide ??= {});
+  if (!gate.built || s.tick - (m.gate ?? -99999) < secs(AI_GATE.look)) return;
+  m.gate = s.tick;
+  if (gate.open) {
+    if (s.tick - (m.opened ?? -99999) >= secs(AI_GATE.shut) && !tideGateProblem(s, gate)) issue({ t: 'pack', p: p.id, building: gate.id });
+    return;
+  }
+  const reach = gateReach(s, gate);
+  if (!reach.length) return;
+  const below = new Set(reach);
+  let foes = 0;
+  let ours = 0;
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || domainOf(e.type) !== 'land' || !below.has(Math.floor(e.y) * s.w + Math.floor(e.x))) continue;
+    if (isEnemy(s, p.id, e.owner)) foes++;
+    else ours++;
+  }
+  if (foes < AI_GATE.threat || foes <= ours) return;
+  issue({ t: 'pack', p: p.id, building: gate.id });
+  m.opened = s.tick;
+}
+
+/**
+ * The low-water strike (#748): whether a wave marching from the muster on `to` should wait for the tide. Where the march crosses the
+ * flats (`ebbTiming`, at the slowest soldier's pace) it sets out only when it would cross them bare, waiting at most `AI_EBB.hold`
+ * seconds; the crossing it takes is kept, so the wave can turn back short of it before the flood (`turnBack`).
+ */
+function ebbWait(s: GameState, mem: AiMemory, wave: Unit[], to: { x: number; y: number }): boolean {
+  const m = mem.tide;
+  if (!tideAwake(s) || !wave.length || !mem.muster) {
+    if (m) delete m.wait;
+    return false;
+  }
+  let pace = Infinity;
+  for (const u of wave) pace = Math.min(pace, statsOf(s, u).speed);
+  const e = ebbTiming(s, mem.muster, to, pace);
+  const t = (mem.tide ??= {});
+  if (!e) {
+    delete t.wait;
+    delete t.cross;
+    return false;
+  }
+  if (e.go) {
+    delete t.wait;
+    t.cross = { x: e.far.x, y: e.far.y, level: e.level, to: { x: to.x, y: to.y } };
+    return false;
+  }
+  t.wait ??= s.tick;
+  if (s.tick - t.wait <= secs(AI_EBB.hold)) return true;
+  // Waited long enough: it goes the long way round, or across as it can.
+  delete t.wait;
+  delete t.cross;
+  return false;
+}
+
+/**
+ * Turn back before the flood (#748): with the water `AI_TIDES.wary` seconds off the level that covers the crossing its wave took at low
+ * water, every soldier of the wave not yet over the far shore turns back to the muster (those standing on the flats step ashore after,
+ * as anyone does). The soldiers over it fight on.
+ */
+function turnBack(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const c = mem.tide?.cross;
+  if (!c || !mem.attacking || !mem.muster) return;
+  const now = tideLevel(s);
+  if (now >= c.level) {
+    // Still falling to it, the wave marches on; risen past it, the window is gone.
+    if (tideClock(s)?.rising) delete mem.tide!.cross;
+    return;
+  }
+  if (tideLevel(s, s.tick + secs(AI_TIDES.wary)) < c.level) return;
+  delete mem.tide!.cross;
+  const far = (c.x - c.to.x) * (c.x - c.to.x) + (c.y - c.to.y) * (c.y - c.to.y);
+  const marching = v.army.filter((u) => !u.inside && (u.order.k === 'attack' || (u.order.k === 'move' && u.order.amove)));
+  const back = marching.filter((u) => (u.x - c.to.x) * (u.x - c.to.x) + (u.y - c.to.y) * (u.y - c.to.y) > far);
+  if (!back.length) return;
+  issue({ t: 'move', p: v.p.id, ids: back.map((u) => u.id), x: mem.muster.x, y: mem.muster.y });
+  if (back.length === marching.length) mem.attacking = false;
+}
+
+/** A rival's barrage tile within `r` tiles of a point (#748), the nearest first (ties in tile order), none with a rival on the ground within `AI_KEG.guard` of it. -1: none. */
+export function rivalBarrage(s: GameState, owner: number, x: number, y: number, r: number): number {
+  if (!s.pond || !s.causewayBy) return -1;
+  let best = -1;
+  let bestD = Infinity;
+  for (let ty = Math.max(1, Math.floor(y - r)); ty <= Math.min(s.h - 2, Math.floor(y + r)); ty++)
+    for (let tx = Math.max(1, Math.floor(x - r)); tx <= Math.min(s.w - 2, Math.floor(x + r)); tx++) {
+      const t = ty * s.w + tx;
+      if (!isCauseway(s, t)) continue;
+      const by = causewayOwner(s, t);
+      if (by < 0 || !isEnemy(s, owner, by)) continue;
+      if (!isPond(s, t + 1) && !isPond(s, t - 1) && !isPond(s, t + s.w) && !isPond(s, t - s.w)) continue;
+      const dx = tx + 0.5 - x, dy = ty + 0.5 - y;
+      const d = dx * dx + dy * dy;
+      if (d > r * r || d >= bestD) continue;
+      const g2 = AI_KEG.guard * AI_KEG.guard;
+      if (s.ents.some((e) => e.kind === 'unit' && e.hp > 0 && !e.inside && isEnemy(s, owner, e.owner) && domainOf(e.type) === 'land' && (e.x - tx - 0.5) * (e.x - tx - 0.5) + (e.y - ty - 0.5) * (e.y - ty - 0.5) <= g2)) continue;
+      bestD = d;
+      best = t;
+    }
+  return best;
 }
 
 /** The spot nearest home for a windmill whose pull reaches a basin (#701): within `POLDER.reach` of one of its tiles, on land it may raise. */
@@ -1357,6 +2123,12 @@ export function millSpotFor(s: GameState, owner: number, basin: number[], hx: nu
 
 const KEG_FIRST: Partial<Record<BuildingType, number>> = { tower: 0, towncenter: 0, gate: 1, wall: 1 };
 
+/** Which rival buildings the Sappers carry kegs to first (lowest first): a dyke holding back polder (#701 s3) before all, for one keg there drowns a town's best fields; then towers and Town Centers, then gates and walls, then the rest. */
+export function kegFirst(s: GameState, b: Building): number {
+  if (b.type === 'dyke' && heldBack(s, b) >= AI_BREACH.least) return -1;
+  return KEG_FIRST[b.type] ?? 2;
+}
+
 /** Whether a rival on the ground stands within `AI_KEG.guard` tiles of a building's foot: a keg laid there would be stamped out. */
 function guarded(s: GameState, owner: number, b: Building): boolean {
   for (const e of s.ents) {
@@ -1368,15 +2140,15 @@ function guarded(s: GameState, owner: number, b: Building): boolean {
 
 /**
  * The Sappers lay their kegs (#577): every `AI_KEG.every` seconds, foot soldiers out on campaign (far from home) who stand within
- * `AI_KEG.near` tiles of a rival building carry a keg to it, up to `AI_KEG.sappers` at a time: towers and Town Centers first, then
- * gates and walls, then the nearest, and never one a rival stands guard by (`guarded`).
+ * `AI_KEG.near` tiles of a rival building carry a keg to it, up to `AI_KEG.sappers` at a time, in `kegFirst`'s order (a dyke holding
+ * back polder, towers and Town Centers, gates and walls), then the nearest, and never one a rival stands guard by (`guarded`).
  */
 export function sapKegs(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
   if (!sappers(p) || kegsOf(p) < 1 || s.tick - (mem.kegAt ?? -99999) < secs(AI_KEG.every)) return;
   mem.kegAt = s.tick;
-  const out = v.army.filter((u) => u.type === 'infantry' && !u.inside && u.order.k !== 'keg');
-  let busy = v.army.filter((u) => u.order.k === 'keg').length;
+  const out = v.army.filter((u) => u.type === 'infantry' && !u.inside && u.order.k !== 'keg' && u.order.k !== 'kegTile');
+  let busy = v.army.filter((u) => u.order.k === 'keg' || u.order.k === 'kegTile').length;
   let left = kegsOf(p) - busy;
   const near2 = AI_KEG.near * AI_KEG.near;
   for (const u of out) {
@@ -1390,11 +2162,19 @@ export function sapKegs(s: GameState, v: View, mem: AiMemory, issue: (c: Command
       const dx = e.x - u.x, dy = e.y - u.y;
       const d2 = dx * dx + dy * dy;
       if (d2 > near2 || guarded(s, p.id, e)) continue;
-      const score = (KEG_FIRST[e.type] ?? 2) * 10000 + d2;
+      const score = kegFirst(s, e) * 10000 + d2;
       if (score < bestScore) {
         bestScore = score;
         best = e;
       }
+    }
+    // A rival's barrage (#748) comes before all but a dyke holding back polder (scored below 0): one keg lets its pond out.
+    const dam = bestScore >= 0 ? rivalBarrage(s, p.id, u.x, u.y, AI_KEG.near) : -1;
+    if (dam >= 0) {
+      issue({ t: 'kegTile', p: p.id, ids: [u.id], tile: dam });
+      busy++;
+      left--;
+      continue;
     }
     if (!best) continue;
     issue({ t: 'keg', p: p.id, ids: [u.id], target: best.id });
@@ -1403,11 +2183,86 @@ export function sapKegs(s: GameState, v: View, mem: AiMemory, issue: (c: Command
   }
 }
 
-/** The Atomic Age (#605): a clever computer with a big enough town raises one Missile Silo near home. */
+/**
+ * Fire (`fire.ts`): every `FIRE.aiEvery` seconds, foot soldiers out on campaign (far from home) who stand within `FIRE.aiNear` tiles
+ * of a rival's living building (a Thornwall, a Kitchen Garden, an Orchard) carry a torch to the nearest, up to `FIRE.aiBearers` at a time.
+ */
+export function torchGrowth(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (p.epoch < FIRE.epoch || s.tick < s.peaceUntil || s.tick - (mem.torchAt ?? -99999) < secs(FIRE.aiEvery)) return;
+  mem.torchAt = s.tick;
+  let busy = v.army.filter((u) => u.order.k === 'torch').length;
+  if (busy >= FIRE.aiBearers) return;
+  let growth: Building[] | null = null;
+  for (const e of s.ents) if (e.kind === 'building' && e.hp > 0 && burns(e) && isEnemy(s, p.id, e.owner) && !onFire(s, e)) (growth ??= []).push(e);
+  if (!growth) return;
+  const near2 = FIRE.aiNear * FIRE.aiNear;
+  const taken = new Set<number>();
+  for (const u of v.army) {
+    if (busy >= FIRE.aiBearers) return;
+    if (u.type !== 'infantry' || u.inside || u.order.k === 'torch') continue;
+    const hx = u.x - v.home.x, hy = u.y - v.home.y;
+    if (hx * hx + hy * hy < near2 * 4) continue;
+    let best: Building | null = null;
+    let bestD = near2;
+    for (const e of growth) {
+      if (taken.has(e.id)) continue;
+      const dx = e.x - u.x, dy = e.y - u.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bestD) {
+        bestD = d2;
+        best = e;
+      }
+    }
+    if (!best) continue;
+    taken.add(best.id);
+    issue({ t: 'torch', p: p.id, ids: [u.id], target: best.id });
+    busy++;
+  }
+}
+
+/** Fire (`fire.ts`): a burning building of its own with nobody beating at it gets the nearest citizen within `FIRE.aiBeatFrom` tiles, sent to mend it (and so to beat the flames first). */
+function beatFires(s: GameState, v: View, issue: (c: Command) => void): void {
+  if (!s.fires) return;
+  const far2 = FIRE.aiBeatFrom * FIRE.aiBeatFrom;
+  for (const f of s.fires) {
+    if (f.b === undefined) continue;
+    const b = s.byId.get(f.b);
+    if (!b || b.kind !== 'building' || b.owner !== v.p.id || b.hp <= 0 || beatersAt(s, b) > 0) continue;
+    if (v.citizens.some((c) => c.order.k === 'build' && c.order.target === b.id)) continue;
+    let best: Unit | null = null;
+    let bestD = far2;
+    for (const c of v.citizens) {
+      if (c.inside || c.order.k === 'build') continue;
+      const dx = c.x - b.x, dy = c.y - b.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bestD) {
+        bestD = d2;
+        best = c;
+      }
+    }
+    if (best) issue({ t: 'work', p: v.p.id, ids: [best.id], target: b.id });
+  }
+}
+
+/**
+ * The Atomic Age (#605): a clever computer with a big enough town raises one Missile Silo near home. Once a salvo would pay (#765,
+ * `mem.salvoPays`, weighed in `fireSilo`) it learns Launch Control at a silo and raises silos up to three.
+ */
 function siloRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p, home } = v;
-  if (!AI_LEVELS[p.ai!].clever || p.epoch < 5 || v.hands < AI_SILO.hands || v.buildings.some((b) => b.type === 'silo')) return;
-  if (s.tick - (mem.ordered.silo ?? -99999) < secs(40)) return;
+  if (!AI_LEVELS[p.ai!].clever || p.epoch < 5 || v.hands < AI_SILO.hands || buildBarred(p, 'silo')) return;
+  const silos = v.buildings.filter((b) => b.type === 'silo');
+  if (silos.length && !mem.salvoPays) return;
+  if (silos.length && !salvoPeople(p)) {
+    const at = silos.find((b) => b.built && !b.queue.length);
+    const cost = techCostFor(s, p.id, 'launchControl');
+    if (!at || techProblem(s, p.id, 'launchControl')) return;
+    if (afford(v, cost)) issue({ t: 'research', p: p.id, building: at.id, tech: 'launchControl' });
+    spend(v, cost);
+    return;
+  }
+  if (siloLimit(s, p.id, 'silo') || s.tick - (mem.ordered.silo ?? -99999) < secs(40)) return;
   const cost = buildingCostFor(s, p.id, 'silo');
   if (!afford(v, cost)) {
     spend(v, cost);
@@ -1417,63 +2272,194 @@ function siloRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   if (!spot || !construct(s, v, mem, 'silo', spot, 3, issue)) spend(v, cost);
 }
 
-/** Rival buildings and soldiers a warhead landing at (x, y) would catch, as the computer weighs them. */
-function siloWorth(s: GameState, owner: number, x: number, y: number): number {
+/** Whether (x, y) lies in the cover of a charged Interceptor Battery of a rival of `owner`'s (#759 s2). */
+function shielded(s: GameState, owner: number, x: number, y: number): boolean {
+  const R = INTERCEPT.reach * INTERCEPT.reach;
+  return s.ents.some((e) => e.kind === 'building' && e.type === 'battery' && isEnemy(s, owner, e.owner) && charged(s, e) && (e.x - x) * (e.x - x) + (e.y - y) * (e.y - y) <= R);
+}
+
+/**
+ * Missile defence (#759 s2): once a rival stands in the Industrial Age or later, a clever Industrial computer learns Interceptors at a Siege
+ * Workshop and raises Interceptor Batteries, one beside each of its Town Centers not yet in a battery's cover, nearest home first, up to
+ * `INTERCEPT.most`, one every `INTERCEPT.gap` seconds. They fire by themselves.
+ */
+function interceptorRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p, home } = v;
+  if (!AI_LEVELS[p.ai!].clever || p.epoch < 4) return;
+  if (!s.players.some((o) => !o.defeated && isEnemy(s, p.id, o.id) && o.epoch >= 4)) return;
+  if (!p.techs.includes('interceptors')) {
+    const at = v.buildings.find((b) => b.type === 'workshop' && b.built && !b.queue.length);
+    const cost = techCostFor(s, p.id, 'interceptors');
+    if (!at || techProblem(s, p.id, 'interceptors') || v.buildings.some((b) => b.queue.some((q) => q.tech === 'interceptors'))) return;
+    if (afford(v, cost)) issue({ t: 'research', p: p.id, building: at.id, tech: 'interceptors' });
+    spend(v, cost);
+    return;
+  }
+  const batteries = v.buildings.filter((b) => b.type === 'battery');
+  if (batteries.length >= INTERCEPT.most || buildBarred(p, 'battery') || s.tick - (mem.ordered.battery ?? -99999) < secs(INTERCEPT.gap)) return;
+  const near = (a: { x: number; y: number }) => (a.x - home.x) * (a.x - home.x) + (a.y - home.y) * (a.y - home.y);
+  const r2 = (INTERCEPT.reach - 3) * (INTERCEPT.reach - 3);
+  const bare = townCenters(s, p.id)
+    .filter((t) => !batteries.some((b) => (b.x - t.x) * (b.x - t.x) + (b.y - t.y) * (b.y - t.y) <= r2))
+    .sort((a, b) => near(a) - near(b) || a.id - b.id)[0];
+  if (!bare) return;
+  const cost = buildingCostFor(s, p.id, 'battery');
+  if (!afford(v, cost)) {
+    spend(v, cost);
+    return;
+  }
+  const spot = findSpot(s, 'battery', bare.x, bare.y, 3, 9);
+  mem.ordered.battery = s.tick;
+  if (!spot || !construct(s, v, mem, 'battery', spot, 2, issue)) spend(v, cost);
+}
+
+/**
+ * What a `w` warhead landing at (x, y) would cost the rivals, as the computer weighs it: each building (a Town Center counts `heart`)
+ * and soldier (counts `soldier`) is worth its weight times the share of its health the blast takes, never more than all of it.
+ */
+function siloWorth(s: GameState, owner: number, x: number, y: number, w: WarheadKind): number {
   let worth = 0;
-  const r2 = SILO.reach * SILO.reach;
+  const R = WARHEADS[w].r;
   for (const e of s.ents) {
     if (e.hp <= 0 || !isEnemy(s, owner, e.owner)) continue;
     if (e.kind === 'building') {
-      if (distToRect(x, y, e) <= SILO.reach) worth += e.type === 'towncenter' ? AI_SILO.heart : 1;
-    } else if (!e.inside && domainOf(e.type) === 'land') {
+      const d = distToRect(x, y, e);
+      if (d < R) worth += (e.type === 'towncenter' ? AI_SILO.heart : 1) * Math.min(1, blastDamage(w, d) / e.hp);
+    } else if (!e.inside && domainOf(e.type) === 'land' && MILITARY.includes(e.type)) {
       const dx = e.x - x, dy = e.y - y;
-      if (dx * dx + dy * dy <= r2) worth += MILITARY.includes(e.type) ? AI_SILO.soldier : 0;
+      if (dx * dx + dy * dy < R * R) worth += AI_SILO.soldier * Math.min(1, blastDamage(w, Math.sqrt(dx * dx + dy * dy)) / e.hp);
     }
   }
   return worth;
 }
 
 /**
+ * Which warhead the computer would send at (x, y) (#753): of those its people may fire, the one with the most worth (`siloWorth`) for
+ * each gold of its fuel, if any reaches `AI_SILO.worth`; ties go to the cheaper Atomic. Null when none is worth a launch.
+ */
+export function warheadFor(s: GameState, p: Player, x: number, y: number): { w: WarheadKind; worth: number; rate: number } | null {
+  let best: { w: WarheadKind; worth: number; rate: number } | null = null;
+  for (const w of warheadsOf(p)) {
+    const worth = siloWorth(s, p.id, x, y, w);
+    const rate = worth / (fuelOf(w).gold ?? 1);
+    if (worth >= AI_SILO.worth && (!best || rate > best.rate)) best = { w, worth, rate };
+  }
+  return best;
+}
+
+/**
  * A loaded silo launches at the rival building whose ring catches the most (`siloWorth`), once its worth reaches `AI_SILO.worth`.
- * The aim is chosen once a second; while it holds and the silo is short only of fuel, the town sets the fuel aside every tick
- * (it is ruinous, and soldiers would spend the gold first).
+ * Past the fork it weighs both warheads it may fire (#753) and takes the one with the most worth for its gold, so a Fission town
+ * sends a cheap Atomic warhead at a lone Town Center and its own at a crowd. The aim is chosen once a second; while it holds and the
+ * people is short only of fuel, the town sets the fuel aside every tick (it is ruinous, and soldiers would spend the gold first).
  */
 function fireSilo(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
   if (p.epoch < 5) return;
-  const silo = silosOf(s, p.id).find((b) => s.tick - b.born >= secs(BUILDINGS.silo.time + AI_SILO.wait) && loaded(s, b));
+  const ready = silosOf(s, p.id).filter((b) => s.tick - b.born >= secs(BUILDINGS.silo.time + AI_SILO.wait));
+  // A silo held in Reserve (#759 s3) launches only when none other can: it is stood down first, so Reserve never stops the attack.
+  const silo = ready.find((b) => loaded(s, b) && !held(b)) ?? ready.find((b) => loaded(s, b));
   if (!silo) return;
-  if (s.tick % TICK_HZ === 0) {
-    let best: { x: number; y: number; at: number } | null = null;
-    let bestWorth = AI_SILO.worth - 1;
+  // Once a second, kept by the clock in memory: a computer thinks on ticks of its own (`memory`), which a tick count need never meet.
+  if (s.tick - (mem.siloAt ?? -TICK_HZ) >= TICK_HZ) {
+    mem.siloAt = s.tick;
+    let best: { x: number; y: number; at: number; w: WarheadKind } | null = null;
+    let bestRate = 0;
+    let bestWorth = 0;
+    const spots: { x: number; y: number; worth: number }[] = [];
+    // A town one of its own warheads already falls on is left to it (Fusion keeps three aloft: they go to three towns, not one).
+    const aloft = (s.launches ?? []).filter((l) => l.owner === p.id).flatMap((l) => aimsOf(l).map((a) => ({ ...a, r: WARHEADS[l.w ?? 'atomic'].r })));
     for (const e of s.ents) {
       if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
-      const w = siloWorth(s, p.id, e.x, e.y);
-      if (w > bestWorth) {
-        bestWorth = w;
-        best = { x: e.x, y: e.y, at: s.tick };
+      if (aloft.some((a) => (a.x - e.x) * (a.x - e.x) + (a.y - e.y) * (a.y - e.y) < a.r * a.r)) continue;
+      const pick = warheadFor(s, p, e.x, e.y);
+      if (!pick) continue;
+      // A point in a charged rival battery's cover (#759 s2, public as the battery is) is worth only what gets through.
+      const through = shielded(s, p.id, e.x, e.y) ? 1 - INTERCEPT.chance : 1;
+      if (pick.rate * through > bestRate) {
+        bestRate = pick.rate * through;
+        bestWorth = pick.worth * through;
+        best = { x: e.x, y: e.y, at: s.tick, w: pick.w };
       }
+      const worth = pick.w === 'atomic' ? pick.worth : siloWorth(s, p.id, e.x, e.y, 'atomic');
+      if (worth >= AI_SILO.worth) spots.push({ x: e.x, y: e.y, worth });
     }
-    mem.siloAim = best ?? undefined;
+    // The salvo (#765): three targets, each worth a warhead, together worth well more than the best single strike.
+    const trio = salvoAims(spots);
+    const sum = trio ? trio.reduce((n, a) => n + a.worth, 0) : 0;
+    mem.salvoPays = !!trio && sum >= (rulesOf(p).w === 'atomic' ? AI_SILO.salvoPlain : AI_SILO.salvo) * bestWorth;
+    mem.siloAim = mem.salvoPays && ready.length >= SALVO.trio && salvoPeople(p) ? { x: trio![0].x, y: trio![0].y, at: s.tick, salvo: trio!.map(({ x, y }) => ({ x, y })) } : (best ?? undefined);
   }
   const aim = mem.siloAim;
   if (!aim || s.tick - aim.at > TICK_HZ * 2) return;
-  const why = launchProblem(s, p.id, silo, aim.x, aim.y);
+  if (aim.salvo) {
+    // A salvo planned holds the single strikes until the store holds three (and the fuel is set aside), and stands down a Reserve silo it needs.
+    const from = salvoSilos(s, p.id, silo.id);
+    if (from.length < SALVO.trio) {
+      for (const b of ready) if (held(b)) issue({ t: 'reserve', p: p.id, silo: b.id, on: false });
+      return;
+    }
+    const shots = aim.salvo.map((a, i) => ({ silo: from[i]?.id ?? -1, x: a.x, y: a.y }));
+    const why = salvoProblem(s, p.id, shots);
+    if (why === null) {
+      issue({ t: 'launch', p: p.id, silo: shots[0].silo, x: shots[0].x, y: shots[0].y, more: shots.slice(1) });
+      mem.siloAim = undefined;
+    } else if (why.startsWith("A salvo's fuel")) spend(v, salvoFuel(p));
+    return;
+  }
+  const w = aim.w ?? rulesOf(p).w;
+  const why = launchProblem(s, p.id, held(silo) ? { ...silo, reserve: undefined } : silo, aim.x, aim.y, w);
   if (why === null) {
-    issue({ t: 'launch', p: p.id, silo: silo.id, x: aim.x, y: aim.y });
+    if (held(silo)) issue({ t: 'reserve', p: p.id, silo: silo.id, on: false });
+    issue({ t: 'launch', p: p.id, silo: silo.id, x: aim.x, y: aim.y, w });
     mem.siloAim = undefined;
-  } else if (why.startsWith("A warhead's fuel")) spend(v, rulesOf(p).fuel);
+  } else if (why.startsWith("A warhead's fuel")) spend(v, fuelOf(w));
 }
 
 /**
- * Soldiers and citizens inside the ring of a rival warhead in the air, or on poisoned ground (#605 s2), run out of it, away from
- * its centre toward home (the answer to a public clock, and to the fallout after).
+ * A silo held in Reserve (#759 s3): while a rival stands a silo, the computer holds its last silo (in id order) back to answer a warhead, if
+ * it stands two (the first keeps attacking) or its store is full (none is made while it waits), and not while a salvo pays (it needs all three).
+ * Otherwise it stands its Reserve down. It weighs this once every `INTERCEPT.think` seconds, by a clock in memory; `fireSilo` stands the
+ * silo down at once when it is the only one that can launch.
+ */
+function reserveSilo(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (p.epoch < 5 || s.tick - (mem.reserveAt ?? -99999) < secs(INTERCEPT.think)) return;
+  mem.reserveAt = s.tick;
+  const mine = silosOf(s, p.id);
+  const threat = s.players.some((o) => !o.defeated && isEnemy(s, p.id, o.id) && silosOf(s, o.id).length > 0);
+  const want = threat && mine.length > 0 && (mine.length >= 2 || stockOf(p) >= SILO.cap) && !(mem.salvoPays && salvoPeople(p));
+  const kept = mine.filter(held);
+  if (want && !kept.length) issue({ t: 'reserve', p: p.id, silo: mine[mine.length - 1].id, on: true });
+  else if (!want) for (const b of kept) issue({ t: 'reserve', p: p.id, silo: b.id, on: false });
+}
+
+/**
+ * A salvo's three aims (#765): the worthiest target, then the worthiest at least `SILO.apart` tiles from those taken, and once more (ties
+ * in the order found, which is id order); null when there are not three.
+ */
+function salvoAims(spots: { x: number; y: number; worth: number }[]): { x: number; y: number; worth: number }[] | null {
+  const A = SILO.apart * SILO.apart;
+  const out: { x: number; y: number; worth: number }[] = [];
+  for (const c of [...spots].sort((a, b) => b.worth - a.worth)) {
+    if (out.every((o) => (o.x - c.x) * (o.x - c.x) + (o.y - c.y) * (o.y - c.y) >= A)) out.push(c);
+    if (out.length === SALVO.trio) return out;
+  }
+  return null;
+}
+
+/**
+ * Soldiers and citizens inside a ring of a rival warhead in the air, or on poisoned ground (#605 s2), run out of it, away from
+ * its centre toward home (the answer to a public clock, and to the fallout after). A warhead's rings are the three its team is shown
+ * (#762, `ringsFor`: the real zone and two decoys, blurred, then the real one alone for the last seconds), each as wide as every rival is
+ * warned of (`warnRadius`): never the hidden point or its real blast, so the computer knows no more than a person would.
  */
 function fleeWarhead(s: GameState, v: View, issue: (c: Command) => void): void {
-  if (s.tick % (TICK_HZ / 2) !== 0) return;
-  const zones = [...(s.launches ?? []).filter((l) => isEnemy(s, v.p.id, l.owner)), ...(s.fallout ?? [])];
+  const zones: { x: number; y: number; r: number }[] = [];
+  for (const l of s.launches ?? []) if (isEnemy(s, v.p.id, l.owner)) for (const g of ringsToClear(s, l, v.p.id)) zones.push({ ...g, r: warnRadius(s, l.owner) });
+  for (const f of s.fallout ?? []) zones.push({ x: f.x, y: f.y, r: f.r ?? SILO.reach });
   for (const l of zones) {
-    const r = ((l as { r?: number }).r ?? SILO.reach) + AI_SILO.margin;
+    const r = l.r + AI_SILO.margin;
     const out = [...v.army, ...v.citizens].filter((u) => !u.inside && (u.x - l.x) * (u.x - l.x) + (u.y - l.y) * (u.y - l.y) <= r * r && domainOf(u.type) === 'land');
     if (!out.length) continue;
     const dx = v.home.x - l.x, dy = v.home.y - l.y;
@@ -1481,6 +2467,34 @@ function fleeWarhead(s: GameState, v: View, issue: (c: Command) => void): void {
     const x = l.x + (dx / len) * (r + 2), y = l.y + (dy / len) * (r + 2);
     issue({ t: 'move', p: v.p.id, ids: out.map((u) => u.id), x, y });
   }
+}
+
+/**
+ * The rings a computer still clears for a rival launch (#772): every ring it is shown, until `AI_SILO.read` seconds into the missile's
+ * bend; then only those the course points at, read as a player reads it (never the stored target): where each missile is drawn now and
+ * was a half and a whole second ago, carried on, turning as it turns, to the end of the public clock. The ring nearest each guess stays,
+ * and any ring a guess falls in. While the missiles split (a salvo), or after the reveal, it clears all it is shown.
+ */
+function ringsToClear(s: GameState, l: Launch, viewer: number): { x: number; y: number }[] {
+  const rings = ringsFor(s, l, viewer);
+  const f = flightOf(l);
+  if (!f || rings.length < 2 || revealed(s, l) || s.tick < f.tk + AI_SILO.read * TICK_HZ) return rings;
+  const dt = TICK_HZ / 2;
+  const [a, b, c] = [s.tick - 2 * dt, s.tick - dt, s.tick].map((t) => missilesAt(l, t));
+  if (a.length !== c.length || b.length !== c.length) return rings;
+  const left = l.at - s.tick;
+  const r = warnRadius(s, l.owner);
+  const keep = new Set<number>();
+  c.forEach((p, i) => {
+    const vx = (p.x - b[i].x) / dt, vy = (p.y - b[i].y) / dt;
+    const ax = (p.x - 2 * b[i].x + a[i].x) / (dt * dt), ay = (p.y - 2 * b[i].y + a[i].y) / (dt * dt);
+    const gx = p.x + vx * left + 0.5 * ax * left * left, gy = p.y + vy * left + 0.5 * ay * left * left;
+    const d = rings.map((g) => (g.x - gx) * (g.x - gx) + (g.y - gy) * (g.y - gy));
+    d.forEach((n, j) => {
+      if (n <= r * r || n === Math.min(...d)) keep.add(j);
+    });
+  });
+  return rings.filter((_, j) => keep.has(j));
 }
 
 /** Citizens still digging bog iron when no deed needs it go to the resource the town is shortest of (#79). */
@@ -1798,10 +2812,10 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     if (construct(s, v, mem, f.type, { tx: f.tx, ty: f.ty }, 3, issue)) return;
   }
 
-  // Houses ahead of need (two at once later on).
+  // Houses ahead of need (two at once later on). A floating people's homes are its Pontoons (#770): `floatWork` moors them.
   const housesBuilding = pending.filter((b) => b.type === 'house').length;
   const room = p.cap - p.pop;
-  if (p.cap < POP_MAX && room <= 3 + p.epoch * 2 && housesBuilding < (p.pop > 40 ? 2 : 1) && !recently('house', 4)) {
+  if (p.cap < POP_MAX && room <= 3 + p.epoch * 2 && housesBuilding < (p.pop > 40 ? 2 : 1) && !recently('house', 4) && !buildBarred(p, 'house')) {
     // A household people (#501) lays its houses in streets: beside its others, a lane apart, for the tax is paid by the street.
     const street = isHousehold(p) && v.buildings.some((b) => b.type === 'house')
       ? (tx: number, ty: number) => v.buildings.some((b) => b.type === 'house' && Math.abs(b.tx - tx) <= HOUSEHOLD.aiStreet && Math.abs(b.ty - ty) <= HOUSEHOLD.aiStreet)
@@ -1868,7 +2882,9 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   } else if (farms < foodWanted && freeFields < 2 && !recently('farm', 2) && !recently('garden', 2) && grows(p) && plantGarden(s, v, mem, issue)) {
     return;
   } else if (farms < foodWanted && freeFields < 2 && !recently('farm', 2) && !buildBarred(p, 'farm') && !wayBarred(s, p, 'farm')) {
-    const spot = findSpot(s, 'farm', home.x, home.y, 3, 16);
+    // In the Age of Rivers (#701) a field goes only by water: the search asks the people's own rule, and looks a little farther.
+    const rivers = !!AGES[ageOf(p)].rivers;
+    const spot = rivers ? findSpot(s, 'farm', home.x, home.y, 3, 20, 1, (tx, ty) => !placeProblem(s, 'farm', tx, ty, true, p.id)) : findSpot(s, 'farm', home.x, home.y, 3, 16);
     if (spot && construct(s, v, mem, 'farm', spot, 1, issue)) return;
   }
 
@@ -2738,6 +3754,159 @@ function groveWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   mem.ordered.thornwall = s.tick;
 }
 
+/**
+ * The Age of the Hive: up to `HIVE.aiHives` Hives in the woods within `HIVE.aiFrom` tiles of home, by a Kitchen Garden where one
+ * has room (so the bees pollinate it), else by the Town Center. Its Range and Den train darts and bears in turn (`pickUnit`).
+ */
+function hiveWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!walksWeb(v) || !keepsBees(p) || !v.tc) return;
+  if (ageOf(p) === 'hive') mem.hive ??= s.tick;
+  if (count(v, 'hive') >= HIVE.aiHives || s.tick - (mem.ordered.hive ?? -99999) < secs(30)) return;
+  const cost = buildingCostFor(s, p.id, 'hive');
+  if (v.budget.wood < (cost.wood ?? 0) + 50 || v.budget.gold < (cost.gold ?? 0)) return;
+  const near = (tx: number, ty: number) => Math.abs(tx - v.home.x) <= HIVE.aiFrom && Math.abs(ty - v.home.y) <= HIVE.aiFrom;
+  const garden = v.buildings.find((b) => b.type === 'garden' && !v.buildings.some((h) => h.type === 'hive' && Math.abs(h.tx - b.tx) <= HIVE.bloom && Math.abs(h.ty - b.ty) <= HIVE.bloom));
+  const spot = (garden && findSpot(s, 'hive', garden.x, garden.y, 1, HIVE.bloom, 0, near)) || findSpot(s, 'hive', v.home.x, v.home.y, 3, HIVE.aiFrom, 0, near);
+  if (spot) construct(s, v, mem, 'hive', spot, 1, issue);
+}
+
+/**
+ * The Age of the Wildwood: one Heart Tree within `WILDWOOD.aiFrom` tiles of home, by a wood with at least `aiTrees` old trees round
+ * it to wake where one has room (else anywhere it fits, and the Spreading brings the trees). Its Ents are trained at it with the rest of the army (`military`).
+ */
+function wildwoodWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!walksWeb(v) || !wakesForest(p) || !v.tc) return;
+  if (ageOf(p) === 'wildwood') mem.wildwood ??= s.tick;
+  if (count(v, 'heart') || s.tick - (mem.ordered.heart ?? -99999) < secs(30) || p.epoch < BUILDINGS.heart.epoch) return;
+  const cost = buildingCostFor(s, p.id, 'heart');
+  if (!afford(v, cost)) return;
+  const near = (tx: number, ty: number) => treesRound(s, tx, ty, BUILDINGS.heart.size, WILDWOOD.wake) >= WILDWOOD.aiTrees;
+  const spot = findSpot(s, 'heart', v.home.x, v.home.y, 5, WILDWOOD.aiFrom, 0, near) ?? findSpot(s, 'heart', v.home.x, v.home.y, 5, WILDWOOD.aiFrom, 0);
+  if (spot) construct(s, v, mem, 'heart', spot, 3, issue);
+}
+
+/**
+ * The Age of the Bloom: a Seed Spire within `BLOOM.aiFrom` tiles of home; each ripe Seed slung at the rival building it has seen
+ * whose ring would crack the most, and its army sent to stand over the heart-root; and while its land is short of green, an Orchard
+ * every `BLOOM.aiOrchard` seconds.
+ */
+function bloomWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!walksWeb(v) || !hasWalked(p, 'bloom') || !v.tc) return;
+  if (ageOf(p) === 'bloom') mem.bloom ??= s.tick;
+  if (!count(v, 'spire') && s.tick - (mem.ordered.spire ?? -99999) >= secs(30) && p.epoch >= BUILDINGS.spire.epoch && afford(v, buildingCostFor(s, p.id, 'spire'))) {
+    const spot = findSpot(s, 'spire', v.home.x, v.home.y, 4, BLOOM.aiFrom);
+    if (spot) construct(s, v, mem, 'spire', spot, 2, issue);
+  }
+  const spire = spireOf(s, p.id);
+  const left = spire && heartOf(s, p.id) ? ripeIn(s, spire) : null;
+  if (spire && left !== null && left <= BLOOM.aiSave) {
+    const aim = !slingProblem(s, p.id, spire, spire.x, spire.y) ? seedAim(s, p) : null;
+    if (aim) issue({ t: 'sling', p: p.id, spire: spire.id, x: aim.x, y: aim.y });
+    // Its fuel is kept back from the rest of the town's spending as the Seed comes ripe, as the silo's is.
+    else spend(v, BLOOM.fuel);
+  }
+  // A Seed of its own rooted: the army stands over the heart-root until it cracks, to cut down the citizens who come to hack it.
+  for (const l of s.blooms ?? []) {
+    if (l.owner !== p.id || !rooted(s, l)) continue;
+    const r2 = (BLOOM.r - 2) * (BLOOM.r - 2);
+    const guard = v.army.filter((u) => !u.inside && domainOf(u.type) === 'land' && (u.x - l.x) * (u.x - l.x) + (u.y - l.y) * (u.y - l.y) > r2 && !(u.order.k === 'move' && u.order.x === l.x && u.order.y === l.y));
+    if (guard.length) issue({ t: 'move', p: p.id, ids: guard.map((u) => u.id), x: l.x, y: l.y, amove: true });
+    break;
+  }
+  if (!inBloom(p) || (p.green ?? 0) >= BLOOM.green * 1000 || s.tick - (mem.orchardAt ?? -99999) < secs(BLOOM.aiOrchard)) return;
+  // Short of green: an Orchard while it has fewer than one for every `aiThorns` pieces of Thornwall, else a line of Thornwall that
+  // grows to living oak, each line a compass point further round home and a ring further out every eight.
+  const thorns = count(v, 'thornwall');
+  if (count(v, 'orchard') * BLOOM.aiThorns < thorns) {
+    if (v.budget.wood < (BUILDINGS.orchard.cost.wood ?? 0) + 100) return;
+    mem.orchardAt = s.tick;
+    const spot = findSpot(s, 'orchard', v.home.x, v.home.y, 5, 16);
+    if (spot) construct(s, v, mem, 'orchard', spot, 1, issue);
+    return;
+  }
+  const len = BLOOM.aiLine;
+  const cost = (buildingCostFor(s, p.id, 'thornwall').wood ?? 0) * len;
+  if (v.budget.wood < cost + 100) return;
+  const crew = v.citizens.filter((u) => !u.inside && u.order.k !== 'build' && !(u.order.k === 'farm' && u.order.phase === 'work') && !v.claimers.has(u.id)).sort((a, b) => a.id - b.id).slice(0, 2);
+  if (!crew.length) return;
+  mem.orchardAt = s.tick;
+  const k = Math.floor(thorns / len);
+  const [dx, dy] = DIRS[(k * 3) % DIRS.length];
+  const r = BLOOM.aiRing + 3 * (Math.floor(k / DIRS.length) % 3);
+  const cx = v.home.x + dx * r;
+  const cy = v.home.y + dy * r;
+  const half = Math.floor(len / 2);
+  issue({ t: 'wall', p: p.id, ids: crew.map((u) => u.id), x0: Math.floor(cx - dy * half), y0: Math.floor(cy + dx * half), x1: Math.floor(cx + dy * half), y1: Math.floor(cy - dx * half), thorn: true });
+  spend(v, { wood: cost });
+}
+
+/** Where a Bloom Seed would crack the most: the centre of the rival building it has seen with the most rival buildings in its ring (else the rival's home). */
+function seedAim(s: GameState, p: Player): { x: number; y: number } | null {
+  let best: Building | null = null;
+  let most = 0;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner) || !p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
+    if ((s.blooms ?? []).some((l) => l.owner === p.id && (l.x - e.x) * (l.x - e.x) + (l.y - e.y) * (l.y - e.y) < BLOOM.r * BLOOM.r)) continue;
+    const n = ringOf(s, { owner: p.id, x: e.x, y: e.y }).length + (e.type === 'towncenter' ? 3 : 0);
+    if (n > most) {
+      most = n;
+      best = e;
+    }
+  }
+  // Nothing seen yet: the rival's home Town Center, where its armies march anyway.
+  const at = best ?? rivalTownCenter(s, p);
+  return at ? { x: at.x, y: at.y } : null;
+}
+
+/**
+ * A rival's Bloom Seed falling or rooted within `BLOOM.r + BLOOM.aiNear` tiles of one of its buildings: up to `BLOOM.aiHack` citizens
+ * (the nearest, counting those already there or on their way) run to its heart-root to hack it out. Every computer, whatever its road.
+ */
+function hackSeeds(s: GameState, v: View, issue: (c: Command) => void): void {
+  if (!s.blooms) return;
+  const reach = BLOOM.r + BLOOM.aiNear;
+  for (const l of s.blooms) {
+    if (!isEnemy(s, v.p.id, l.owner)) continue;
+    let threat = false;
+    for (const e of s.ents) {
+      if (e.kind === 'building' && e.owner === v.p.id && e.hp > 0 && (e.x - l.x) * (e.x - l.x) + (e.y - l.y) * (e.y - l.y) < reach * reach) {
+        threat = true;
+        break;
+      }
+    }
+    if (!threat) continue;
+    const at = (u: Unit) => (u.x - l.x) * (u.x - l.x) + (u.y - l.y) * (u.y - l.y) <= (BLOOM.reach + 1) * (BLOOM.reach + 1) || (u.order.k === 'move' && (u.order.x - l.x) * (u.order.x - l.x) + (u.order.y - l.y) * (u.order.y - l.y) < 1);
+    const free = v.citizens.filter((u) => !u.inside);
+    const going = free.filter(at).length;
+    if (going >= BLOOM.aiHack) continue;
+    const send = free
+      .filter((u) => !at(u))
+      .sort((a, b) => (a.x - l.x) * (a.x - l.x) + (a.y - l.y) * (a.y - l.y) - ((b.x - l.x) * (b.x - l.x) + (b.y - l.y) * (b.y - l.y)) || a.id - b.id)
+      .slice(0, BLOOM.aiHack - going);
+    // Before it comes down they run to the aim; it roots within a few tiles of it, and they are sent on to the root itself.
+    if (send.length) issue({ t: 'move', p: v.p.id, ids: send.map((u) => u.id), x: l.x, y: l.y });
+  }
+}
+
+/** A rival holding the Greening (public, on every screen): the army goes for its Heart Tree, and a foot soldier torches it. */
+function answerGreening(s: GameState, v: View, issue: (c: Command) => void): void {
+  for (const q of s.players) {
+    if (q.greenSince === undefined || !isEnemy(s, v.p.id, q.id)) continue;
+    const heart = heartOf(s, q.id);
+    if (!heart) continue;
+    const army = v.army.filter((u) => !u.inside && domainOf(u.type) === 'land');
+    const torching = army.some((u) => u.order.k === 'torch');
+    const torch = !torching && v.p.epoch >= FIRE.epoch ? army.find((u) => u.type === 'infantry') : undefined;
+    if (torch) issue({ t: 'torch', p: v.p.id, ids: [torch.id], target: heart.id });
+    const go = army.filter((u) => u !== torch && u.order.k !== 'torch' && !(u.order.k === 'attack' && u.order.target === heart.id));
+    if (go.length) issue({ t: 'attack', p: v.p.id, ids: go.map((u) => u.id), target: heart.id });
+    return;
+  }
+}
+
 const grownSheep = (s: GameState, owner: number): Animal[] => s.animals.filter((a) => a.kind === 'sheep' && a.owner === owner && a.hp > 0 && a.lamb === undefined);
 
 /** The road from the steppe into the Horde (#322), while the computer wants it and its deeds are not yet done; null otherwise. */
@@ -3269,6 +4438,16 @@ function nearestDropTo(v: View, u: Unit): { x: number; y: number } {
 // ---- Army ------------------------------------------------------------------------------------------
 
 /** Where to strike: an enemy wonder first (it must fall), then a King (or where one shelters), then the nearest Town Center. */
+/** A rival whose weak window after a step back is open now (#749), and where its Town Center stands; in id order, the first. */
+function windowOpen(s: GameState, p: Player): { x: number; y: number } | null {
+  for (const q of s.players) {
+    if (q.defeated || !isEnemy(s, p.id, q.id) || q.backAt === undefined || s.tick - q.backAt >= secs(STEP_BACK.time)) continue;
+    const tc = townCenters(s, q.id)[0];
+    if (tc) return { x: tc.x, y: tc.y };
+  }
+  return null;
+}
+
 function enemyHome(s: GameState, p: Player): { x: number; y: number } {
   let best: { x: number; y: number } | null = null;
   let bestD = Infinity;
@@ -3318,7 +4497,7 @@ function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   const shore = s.homeland === 'shore' ? AI_SHORE.boats : 0;
   const wantBoats = Math.min(shoals, 2 + p.epoch + shore, (L.clever ? 6 : 4) + shore);
   const queued = (u: UnitType) => dock.queue.filter((q) => q.unit === u).length;
-  if (v.fishers.length + queued('fisher') < wantBoats && dock.queue.length < 2) {
+  if (v.fishers.length + queued('fisher') < wantBoats && dock.queue.length < 2 && !barred(p, 'fisher', 'dock')) {
     const cost = unitStats('fisher', p.epoch).cost;
     if (afford(v, cost)) {
       issue({ t: 'train', p: p.id, building: dock.id, unit: 'fisher' });
@@ -3338,7 +4517,7 @@ function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   if (!L.clever || p.epoch < 1) return;
   seaLanding(s, v, mem, dock, issue);
   // A sailor keeps a small fleet and hunts rival merchant ships, since its ships are cheap and sturdy.
-  const sailor = ageOf(p) === 'sail';
+  const sailor = ageOf(p) === 'sail' || !!ageDef(p).boards;
   const enemyShips = s.ents.filter((e): e is Unit => e.kind === 'unit' && e.hp > 0 && isEnemy(s, p.id, e.owner) && (e.type === 'warship' || e.type === 'fisher' || e.type === 'transport' || (sailor && e.type === 'cog')) && p.vis[Math.floor(e.y) * s.w + Math.floor(e.x)] === 1);
   const warships = v.navy.filter((u) => u.type === 'warship');
   const baseShips = s.mapType === 'sea' ? Math.min(2 + p.epoch, 6) : enemyShips.length ? Math.min(2 + Math.floor(enemyShips.length / 2), 5) : sailor ? 2 : 0;
@@ -3367,12 +4546,71 @@ function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
     issue({ t: 'attack', p: p.id, ids: idle.map((u) => u.id), target: works.id });
     return;
   }
-  const prey = enemyShips[0] ?? (mem.attacking ? enemyDock(s, p) : null);
+  // The Sea Beggars (#783) cut a rival's banks from the sea when there is no fleet to board: a dyke that holds back polder.
+  const bank = !enemyShips.length && ageDef(p).boards ? dykeToCut(s, p, dock) : null;
+  if (bank && idle.length >= Math.min(2, warships.length)) {
+    issue({ t: 'attack', p: p.id, ids: idle.map((u) => u.id), target: bank.id });
+    return;
+  }
+  // A Beggars fleet (#783) goes looking: ships to board lie at a rival's Dock, or on the water nearest its town if no Dock is seen.
+  const boards = !!ageDef(p).boards;
+  const prey = enemyShips[0] ?? (mem.attacking || boards ? enemyDock(s, p) : null) ?? (boards ? prowlFor(s, mem, idle[0], enemyHome(s, p)) : null);
   if (prey && idle.length >= Math.min(2, warships.length)) issue({ t: 'move', p: p.id, ids: idle.map((u) => u.id), x: prey.x, y: prey.y, amove: true });
   else {
     const far = idle.filter((u) => (u.x - dock.x) * (u.x - dock.x) + (u.y - dock.y) * (u.y - dock.y) > 100);
     if (far.length) issue({ t: 'move', p: p.id, ids: far.map((u) => u.id), x: dock.x, y: dock.y });
   }
+}
+
+/**
+ * Where a Beggars fleet hunts when it sees no rival ship or Dock (#783): the tile of the water `ship` sails nearest the rival's town,
+ * found once (a flood over that water, four ways) and kept in `mem.beggarSea`. Null when that water comes no nearer than it is.
+ */
+function prowlFor(s: GameState, mem: AiMemory, ship: Unit, at: { x: number; y: number }): { x: number; y: number } | null {
+  const spot = (t: number) => ({ x: (t % s.w) + 0.5, y: Math.floor(t / s.w) + 0.5 });
+  if (mem.beggarSea !== undefined) return mem.beggarSea < 0 ? null : spot(mem.beggarSea);
+  const start = Math.floor(ship.y) * s.w + Math.floor(ship.x);
+  const seen = new Set<number>([start]);
+  const queue = [start];
+  let best = start;
+  let bestD = Infinity;
+  for (let q = 0; q < queue.length; q++) {
+    const i = queue[q];
+    const x = i % s.w;
+    const y = (i - x) / s.w;
+    const d = (x + 0.5 - at.x) * (x + 0.5 - at.x) + (y + 0.5 - at.y) * (y + 0.5 - at.y);
+    if (d < bestD) {
+      bestD = d;
+      best = i;
+    }
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx;
+      const ny = y + dy;
+      const ni = ny * s.w + nx;
+      if (seen.has(ni) || !walkable(s, nx, ny, NAVAL)) continue;
+      seen.add(ni);
+      queue.push(ni);
+    }
+  }
+  mem.beggarSea = best === start ? -1 : best;
+  return best === start ? null : spot(best);
+}
+
+/** The rival dyke seen within `AI_BEGGARS.hunt` tiles of a Dock, nearest it, that holds back polder worth flooding (#783), or null. */
+function dykeToCut(s: GameState, p: Player, dock: Building): Building | null {
+  let best: Building | null = null;
+  let bestD = AI_BEGGARS.hunt * AI_BEGGARS.hunt;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'dyke' || !e.built || e.hp <= 0 || !isEnemy(s, p.id, e.owner) || !p.seen[e.ty * s.w + e.tx]) continue;
+    const dx = e.x - dock.x;
+    const dy = e.y - dock.y;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < bestD && heldBack(s, e) >= AI_BREACH.least) {
+      best = e;
+      bestD = d2;
+    }
+  }
+  return best;
 }
 
 /**
@@ -3599,7 +4837,7 @@ function bestAllowed(p: Player, arm: 'infantry' | 'ranged' | 'cavalry'): UnitTyp
 /** The soldiers a building gives an army: its own lines, or at a hiring building (the merchants' Market, #37) the hired ones. */
 function lines(p: Player, b: Building): UnitType[] {
   const hires = hiresAt(p, b.type);
-  return hires.length ? hires : BUILDINGS[b.type].trains;
+  return hires.length ? hires : trainsAt(p, b.type);
 }
 
 /** What the enemy fields most of, to counter it. */
@@ -4309,6 +5547,48 @@ function machinesAtBlood(s: GameState, v: View, onAttack: Unit[], issue: (c: Com
   for (const [target, ids] of [...by].sort((a, b) => a[0] - b[0])) issue({ t: 'attack', p: v.p.id, ids, target });
 }
 
+/**
+ * The breach (#701 s3): siege marching with a wave goes for the rival dyke seen nearest it, within `AI_BREACH.hunt` tiles, that holds
+ * back `AI_BREACH.least` tiles of polder or more (`heldBack`). Breaking a bank is worth more than a house: the sea does the rest.
+ */
+function machinesAtDykes(s: GameState, v: View, onAttack: Unit[], issue: (c: Command) => void): void {
+  const { p } = v;
+  const dykes: Building[] = [];
+  for (const e of s.ents) if (e.kind === 'building' && e.type === 'dyke' && e.built && e.hp > 0 && isEnemy(s, p.id, e.owner) && p.seen[e.ty * s.w + e.tx]) dykes.push(e);
+  if (!dykes.length) return;
+  const worth = new Map<number, boolean>();
+  const holds = (b: Building): boolean => {
+    let w = worth.get(b.id);
+    if (w === undefined) worth.set(b.id, (w = heldBack(s, b) >= AI_BREACH.least));
+    return w;
+  };
+  const r2 = AI_BREACH.hunt * AI_BREACH.hunt;
+  const by = new Map<number, number[]>();
+  for (const u of onAttack) {
+    if (u.type !== 'siege') continue;
+    if (u.order.k === 'attack') {
+      const t = s.byId.get(u.order.target);
+      if (t && t.kind === 'building' && t.type === 'dyke') continue;
+    }
+    let best: Building | null = null;
+    let bestD = r2;
+    for (const e of dykes) {
+      const dx = e.x - u.x;
+      const dy = e.y - u.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 <= bestD && (!best || d2 < bestD) && holds(e)) {
+        best = e;
+        bestD = d2;
+      }
+    }
+    if (!best) continue;
+    const ids = by.get(best.id) ?? [];
+    ids.push(u.id);
+    by.set(best.id, ids);
+  }
+  for (const [target, ids] of [...by].sort((a, b) => a[0] - b[0])) issue({ t: 'attack', p: p.id, ids, target });
+}
+
 // ---- The Horde (#322) ----------------------------------------------------------------------------------
 
 /** Rival soldiers (no citizens, priests or traders; no ships) standing within `r` tiles of a point. */
@@ -4455,6 +5735,8 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   // An age that bars the answer (the horse, in the Iron Age) answers with the best line it keeps (#79):
   // archers against archers, rather than foot that archers cut down twice as fast.
   if (counter && mix[main] >= 3 && barred(p, counter)) counter = bestAllowed(p, main);
+  // A Hive people's bowmen are its Blowpipe Hunters (the Age of the Hive): the answer to foot is darts.
+  if (counter === 'ranged' && barred(p, 'ranged') && !barred(p, 'blowpipe') && unitEpoch('blowpipe') <= p.epoch) counter = 'blowpipe';
   const counterOdds = ironRival && counter === COUNTER.infantry ? AI_WEB.read : 0.7;
   const answer = { archers: 0, others: 0 };
   const tally = (u: UnitType) => {
@@ -4486,6 +5768,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     let unit: UnitType | null;
     if (b.type === 'workshop') release(v);
     if (b.type === 'workshop') unit = siege < Math.max(v.plan.siege, p.epoch >= 2 ? 3 : 2) + lodge + bleeds && (v.army.length >= 6 || siege < v.plan.siege) ? 'siege' : null;
+    else if (b.type === 'heart') unit = v.army.filter((u) => u.type === 'warden').length + b.queue.length < WILDWOOD.aiEnts && treeToWake(s, b) >= 0 ? 'warden' : null;
     else if (b.type === 'temple') unit = v.priests.length < (v.army.length >= 6 ? Math.max(consecrates(s, p.id) ? AI_FAITH.priests : 2, L.clever && ageDef(p).rite ? AI_FORK.priests : 0) : 0) + (looseRelics(s) > 0 ? 1 : 0) + (vigilPost(s, v) ? VIGIL.most : 0) + (ageDef(p).missions ? 1 : 0) ? 'priest' : null;
     else {
       unit = counter && trains.includes(counter) && unitEpoch(counter) <= p.epoch && !barred(p, counter, b.type) && roll(s) < counterOdds ? counter : pickUnit(v, mem, b);
@@ -4580,6 +5863,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     return;
   }
   if (L.clever && L.hemo !== false && mem.attacking) machinesAtBlood(s, v, onAttack, issue);
+  if (L.clever && mem.attacking) machinesAtDykes(s, v, onAttack, issue);
   if (L.clever && !mem.attacking) pitchHomeCamp(s, v, mem, issue);
   if (L.clever && mem.attacking) pitchCamp(s, v, mem, onAttack, enemy, issue);
   if (L.clever && mem.attacking) pitchStation(s, v, mem, onAttack, issue);
@@ -4592,15 +5876,33 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
       return;
     }
   }
+  // A rival's weak window after a step back (#749): it was announced to all, and a smaller wave than usual strikes while it is open.
+  // Not in a campaign chapter, whose play stays as its proof found it.
+  if (L.clever && L.strike !== false && !s.scenario && !mem.attacking && !plan.hold && s.tick >= s.peaceUntil) {
+    const weak = windowOpen(s, p);
+    if (weak && fighters.length >= Math.max(AI_TEMPER.least, Math.ceil(waveSize * AI_TEMPER.strike))) {
+      issue({ t: 'move', p: p.id, ids: fighters.map((u) => u.id), x: weak.x, y: weak.y, amove: true });
+      mem.attacking = true;
+      mem.wave++;
+      delete mem.prowl;
+      return;
+    }
+  }
   const due = !plan.hold && !polisHarvest(s, v) && (plan.wave ? true : s.tick >= secs(L.firstAttack)) && s.tick >= s.peaceUntil;
-  if (due && !mem.attacking && (fighters.length >= waveSize || (wonderRace && fighters.length >= 4) || (plan.allIn && fighters.length >= 12))) {
+  // The low-water strike (#748): a wave (or its reinforcements) ready to march over the flats waits for the tide to bare them.
+  const launch = due && !mem.attacking && (fighters.length >= waveSize || (wonderRace && fighters.length >= 4) || (plan.allIn && fighters.length >= 12));
+  const reinforce = mem.attacking && ready.length >= (plan.allIn ? 1 : 4);
+  const ebb = L.clever && !plan.allIn && !wonderRace && (launch || reinforce) && ebbWait(s, mem, launch ? fighters : ready, enemy);
+  // The wait is counted from when the wave stood ready: one that broke up to do other work starts again.
+  if (!launch && !reinforce && mem.tide) delete mem.tide.wait;
+  if (launch && !ebb) {
     issue({ t: 'move', p: p.id, ids: fighters.map((u) => u.id), x: enemy.x, y: enemy.y, amove: true });
     mem.attacking = true;
     mem.wave++;
     delete mem.prowl; // the band marches with the wave
     return;
   }
-  if (mem.attacking && ready.length >= (plan.allIn ? 1 : 4)) {
+  if (reinforce && !ebb) {
     // Reinforcements join the attack.
     issue({ t: 'move', p: p.id, ids: ready.map((u) => u.id), x: enemy.x, y: enemy.y, amove: true });
     return;

@@ -448,6 +448,20 @@ body.online .tip-box { bottom: 330px; }
 .end-stats th, .end-stats td { padding: 5px 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
 .end-stats th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
 .end-stats td:first-child, .end-stats th:first-child { text-align: left; white-space: nowrap; }
+/* Your road at the end (#743): every player's journey through the web. */
+.jr { margin: 10px 0 4px; text-align: left; }
+.jr summary { cursor: pointer; font-weight: 900; color: var(--muted); text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px; }
+.jr-map { width: 100%; max-width: 420px; max-height: 300px; height: auto; margin: 6px auto; display: block; }
+.jr-node rect { fill: #1b2030; stroke: var(--edge-soft); stroke-width: 1.5; }
+.jr-node text { fill: var(--ink); font: 800 12px 'Nunito', sans-serif; }
+.jr-node.untaken { opacity: 0.45; }
+.jr-node.untaken rect { stroke-dasharray: 4 3; }
+.jr-leg { stroke-width: 3; stroke-linecap: round; }
+.jr-leg.back { stroke-dasharray: 5 4; }
+.jr-untaken { stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 3 4; opacity: 0.5; }
+.jr-list { list-style: none; padding: 0; margin: 4px 0; font-size: 13px; }
+.jr-list li { margin: 3px 0; }
+.jr-sub { color: var(--muted); font-size: 12px; margin: 2px 0 0 18px; }
 .modal .card.wide { width: min(640px, calc(100% - 32px)); }
 .civ-tag { font-size: 11px; color: var(--muted); font-weight: 700; margin-left: 18px; }
 .chart-tabs { display: flex; gap: 4px; justify-content: center; margin: 12px 0 6px; }
@@ -560,6 +574,18 @@ body.online .tip-box { bottom: 330px; }
 .civ-more { margin-top: 4px; font-weight: 600; font-size: 12px; }
 .civ-more summary { cursor: pointer; color: var(--gold-2); }
 
+/* Road planner (#725): reuses the workforce panel's frame, wider. */
+.roads-panel { width: 300px; max-height: 70vh; overflow-y: auto; color: var(--ink); font: 600 12px 'Nunito', sans-serif; }
+.roads-panel ul, .roads-panel ol { margin: 0 0 6px; padding-left: 18px; }
+.roads-panel li { margin: 4px 0; }
+.roads-panel .rp-head { font: 800 13px 'Cinzel', serif; color: var(--gold-2); padding: 2px 4px 6px; }
+.roads-panel .rp-sub { color: var(--gold-2); font-weight: 800; margin: 8px 0 2px; }
+.roads-panel .rp-cost { color: var(--muted); white-space: nowrap; }
+.roads-panel .rp-problem { color: #ff9a8a; }
+.roads-panel .rp-dim { color: var(--muted); margin: 4px 0; }
+.roads-panel .rp-goal select { margin-left: 6px; background: #0f1420; color: var(--ink); border: 1px solid var(--edge); border-radius: 6px; padding: 2px 4px; }
+.roads-panel li button { width: auto; display: inline; padding: 0 4px; margin-left: 4px; }
+
 /* The tide of battle (#606) */
 .tide { position: absolute; left: 0; top: 0; pointer-events: auto; cursor: pointer; display: grid; justify-items: center; gap: 2px; transition: opacity 0.3s; }
 .tide-word { font: 900 11px 'Nunito', sans-serif; letter-spacing: 0.04em; text-transform: uppercase; color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); white-space: nowrap; }
@@ -570,3 +596,15 @@ body.online .tip-box { bottom: 330px; }
 .tide[data-tide='losing'] .tide-word { color: #ffb08a; }
 .tide[data-tide='routed'] .tide-word { color: #ff6a5a; animation: tide-pulse 0.9s ease-in-out infinite alternate; }
 @keyframes tide-pulse { from { opacity: 1; } to { opacity: 0.55; } }
+
+/* Reading the rival's road (#726): cards in the roads panel's frame. */
+.roads-panel .rv-card { padding: 4px 0 8px; border-bottom: 1px solid var(--edge); }
+.roads-panel .rv-card:last-child { border-bottom: 0; }
+.roads-panel .rv-head { font: 800 13px 'Cinzel', serif; color: var(--gold-2); }
+.roads-panel .rv-head i { display: inline-block; width: 9px; height: 9px; margin-right: 6px; border-radius: 2px; }
+.roads-panel .rv-head span { color: var(--muted); font: 700 11px 'Nunito', sans-serif; margin-left: 6px; }
+.roads-panel .rv-card p { margin: 3px 0; }
+.roads-panel .rv-door, .roads-panel .rv-dim { color: var(--muted); }
+.roads-panel .rv-window { color: #ff9a8a; font-weight: 800; }
+.roads-panel .rv-road { color: var(--gold-2); }
+.notice.clickable { pointer-events: auto; cursor: pointer; text-decoration: underline dotted; }

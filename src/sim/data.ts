@@ -23,9 +23,21 @@ export const EPOCHS: Epoch[] = [
   { name: 'Middle Ages', short: 'Medieval', cost: { food: 700, gold: 250, stone: 100 }, time: 50, blurb: 'Pikes, crossbows, knights, catapults and stone keeps.' },
   { name: 'Gunpowder Age', short: 'Gunpowder', cost: { food: 1000, gold: 600, stone: 250 }, time: 65, blurb: 'Muskets, cuirassiers, galleons, cannon and brick and tile.' },
   { name: 'Industrial Age', short: 'Industrial', cost: { food: 1400, gold: 900, stone: 400 }, time: 80, blurb: 'Rifles, field guns, ironclads, and the first aeroplanes.' },
-  { name: 'Atomic Age', short: 'Atomic', cost: { food: 1800, gold: 1500, stone: 700 }, time: 95, blurb: 'The Missile Silo: one warhead, a public countdown, and a town that guards it.' },
+  { name: 'Atomic Age', short: 'Atomic', cost: { food: 1800, gold: 1500, stone: 700 }, time: 95, blurb: 'The Missile Silo: one warhead (12,000 at the centre, 8 tiles of blast), a public countdown, and a town that guards it.' },
 ];
 export const LAST_EPOCH = EPOCHS.length - 1;
+/** The Age of the Hive's reach and woods (`HIVE`), named here so the age's and the Hive's words can say them. */
+const HIVE_REACH = 6;
+const HIVE_TREES = 8;
+/** How far round the Heart Tree an old tree can be woken (`WILDWOOD.wake`), named here so the age's and the tree's words can say it. */
+const HEART_WAKE = 8;
+/** The Bloom's clocks and ring (`BLOOM`), named here so the age's and the Spire's words can say them. */
+const BLOOM_RIPEN = 150;
+const BLOOM_GROW = 60;
+const BLOOM_RING = 6;
+const BLOOM_GREEN = 35;
+const BLOOM_LEAST = 1000;
+const BLOOM_HOLD = 180;
 
 // ---- Ages and paths -------------------------------------------------------------------------------
 
@@ -154,6 +166,38 @@ export interface Age {
   /** Windmills pump the water out from behind the dykes, tile by tile, into polder (the Age of Dykes, #701): see `POLDER` (`water.ts`). */
   pumps?: boolean;
   /**
+   * The Age of Rivers (#701): citizens dig channels from any water, the water running in behind them; Farms by water thrive, and
+   * none is laid away from it. See `RIVERS` (`water.ts`).
+   */
+  rivers?: boolean;
+  /**
+   * The Age of Tides (#739): Tide Mills grind on the running tide and causeways are raised over the flats. The tide itself runs for
+   * everyone once the first people enters the age. See `TIDE` (`tides.ts`).
+   */
+  tides?: boolean;
+  /**
+   * The Age of the Water Line (#701 s4): sluices open and shut, letting the water out over the low ground behind them (`INUND`,
+   * `water.ts`), and Sluices launch gun-barges that sail the flood.
+   */
+  sluices?: boolean;
+  /**
+   * The Age of Locks (#701 s5): a Channel dug in it is a canal (`CANAL`, `water.ts`), deep water every ship sails and soldiers swim
+   * slowly; a channel already dug may be dug deep. Bridges carry its own people over.
+   */
+  canals?: boolean;
+  /** The Age of Locks (#701 s5): a Dam with water beside it turns turbines that drive its people's buildings within `DAM.reach` (`damDrives`). */
+  turbines?: boolean;
+  /**
+   * The Age of Floating Cities (#770): Pontoons moored on open water are cast off into a tow and moored again elsewhere (the `pack` and
+   * `pitch` orders, the Steppe's wagons on the water), and three or more linked side by side raise citizens. See `FLOAT` (`floating.ts`).
+   */
+  floats?: boolean;
+  /**
+   * The Age of the Sea Beggars (#783): a rival ship this people's ships beat down is boarded and taken rather than sunk, and its ships
+   * strike dykes, sluices, dams and causeways as siege does. See `BEGGARS` (`beggars.ts`).
+   */
+  boards?: boolean;
+  /**
    * The Golden Age (#703): every side age the people has walked wakes at once, its verbs and the best of its gifts with none of its
    * doors (`weave` in `ages.ts`), until `GOLDEN.span` runs out and the people wakes in the Gunpowder Age, for good.
    */
@@ -214,7 +258,7 @@ export const TRUNK: AgeId[] = ['stone', 'bronze', 'middle', 'gunpowder', 'indust
  * map, with no prospecting and no rare find. Each age names the routes it stands on (`Age.routes`); the age-up button
  * says which route a road is on. A route may cross the plain road between its own ages.
  */
-export type RouteId = 'plain' | 'army' | 'navy' | 'economy' | 'horse' | 'faith' | 'wild';
+export type RouteId = 'plain' | 'army' | 'navy' | 'economy' | 'horse' | 'faith' | 'wild' | 'water';
 export const ROUTES: Record<RouteId, { name: string; blurb: string }> = {
   plain: { name: 'Plain road', blurb: 'the classic climb, open on every map; every route can fall back to it' },
   army: { name: 'Army route', blurb: 'plunder carried home, camps at the front, a whole people at war' },
@@ -223,6 +267,7 @@ export const ROUTES: Record<RouteId, { name: string; blurb: string }> = {
   horse: { name: 'Horse route', blurb: 'a town on wagons, tribute from a rival\'s land, tolls on the trade road' },
   faith: { name: 'Faith route', blurb: 'priests who win a rival\'s towers and Temples over' },
   wild: { name: 'Wild route', blurb: 'beasts tamed and bred, walls that grow, and one day the forest itself' },
+  water: { name: 'Water road', blurb: 'channels dug from the springs, dykes and polder, then sluices that drown your own fields to stop an army, then canals that carry ships inland and dams that turn turbines, then the tide\'s hours, and at last a town afloat that tows itself where it likes: a people that moves the water' },
 };
 
 const trunkAge = (e: number, good: string): Age => ({ name: EPOCHS[e].name, short: EPOCHS[e].short, tier: e, blurb: EPOCHS[e].blurb, good, routes: ['plain'] });
@@ -244,7 +289,7 @@ export const AGES: Record<AgeId, Age> = {
   middle: trunkAge(2, 'The crossroads: most side roads turn off here, and nothing is shut'),
   gunpowder: trunkAge(3, 'Guns and cannon that break any wall, and every road comes back to it'),
   industrial: trunkAge(4, 'The strongest plain arms and the deepest economy, with nothing shut'),
-  atomic: trunkAge(5, 'One warhead the whole map watches fall: a Missile Silo, dear to raise and to refuel'),
+  atomic: trunkAge(5, 'One warhead the whole map watches fall: a Missile Silo, dear to raise and seen by all, and a store of warheads slow to fill'),
   aeronaut: {
     verb: 'Fight from forward Airfields: aircraft fly sorties on fuel, so where you build an Airfield is how far you reach',
     door: 'Foot, ranged, cavalry and siege cost more',
@@ -452,25 +497,25 @@ export const AGES: Record<AgeId, Age> = {
   },
   // The fork past the Atomic Age (#605 s3, seed #533): two turns off it, each shunning the other, each changing how a silo is worked.
   fission: {
-    verb: 'Fire the silo in half the time and again soon, and lay your silos far from home: each launch poisons the ground round your own',
+    verb: 'Strike in half the time and make warheads again soon, choosing a cheap Atomic or your own heavy Fission at each launch, and lay your silos far from home: each launch poisons the ground round your own',
     door: 'Every launch poisons the ground round your own silo for a minute; Fusion is closed for good',
-    good: 'The quickest strike: a short clock and a short refuel, at a price in your own ground',
+    good: 'The quickest strike: a short clock and warheads made quickly, at a price in your own ground',
     routes: ['army'],
     name: 'Age of Fission',
     short: 'Fission',
     tier: 5,
-    blurb: 'Raw power now. A Missile Silo\'s clock is 25 seconds, not 45, and it refuels in 100, not 240. But the reactor leaks: each launch poisons 3 tiles round your own silo for 60 seconds, as fallout does (4 health a second to every land unit in it, yours too). Lay your silos away from your town and your fields. Take it, and the Age of Fusion is closed for good.',
+    blurb: 'Raw power now. Every launch\'s clock is 25 seconds, not 45, your people makes a warhead every 100 seconds, not 240, and at each launch you choose an Atomic warhead (600 gold, 200 stone) or your own Fission one, dearer (800 gold, 250 stone) but harder and farther (20,000 at the centre, 10 tiles of blast). But the reactor leaks: each launch poisons 3 tiles round your own silo for 60 seconds, as fallout does (4 health a second to every land unit in it, yours too). Lay your silos away from your town and your fields. Take it, and the Age of Fusion is closed for good.',
     fission: true,
   },
   fusion: {
-    verb: 'Keep several warheads in the air at once from one silo, clean: nothing you strike is poisoned, and the silo never needs refuelling',
+    verb: 'Keep three warheads in the air at once, clean: nothing a Fusion warhead strikes is poisoned, and a new one is made the moment one lands; or send an Atomic one to poison the ground',
     door: 'A road that costs the earth and takes two and a half minutes, leaving the town exposed; a long 70 second clock; Fission is closed for good',
-    good: 'Limitless, clean strikes: up to three warheads aloft from one silo, and your armies may follow them in',
+    good: 'Limitless, clean strikes: up to three warheads aloft, made again at once, and your armies may follow them in',
     routes: ['economy'],
     name: 'Age of Fusion',
     short: 'Fusion',
     tier: 5,
-    blurb: 'Clean and limitless, and ruinously dear. A Missile Silo keeps up to three warheads in the air at once and never needs refuelling, a launch costs 450 gold and 120 stone, and nothing it strikes is poisoned, so your army can follow the blast in. But the clock is 70 seconds, long enough for a rival to scatter or to find the silo, and the road here costs a fortune and takes 150 seconds in which the town is exposed. Take it, and the Age of Fission is closed for good.',
+    blurb: 'Clean and limitless, and ruinously dear. Your people keeps up to three warheads in the air at once and makes a new one the moment one lands, each the biggest there is (40,000 at the centre, 12 tiles of blast), a Fusion launch costs 450 gold and 120 stone, and nothing it strikes is poisoned (an Atomic one may still be sent, for 600 gold and 200 stone, to poison the ground), so your army can follow the blast in. But the clock is 70 seconds, long enough for a rival to scatter or to find the silo, and the road here costs a fortune and takes 150 seconds in which the town is exposed. Take it, and the Age of Fission is closed for good.',
     fusion: true,
   },
   steppe: {
@@ -619,6 +664,45 @@ export const AGES: Record<AgeId, Age> = {
     blurb: 'Instead of the Middle Ages: a people that grows what others build. A Thornwall is planted for a little wood and grows over two minutes from seedling to living oak, tougher than stone and mending itself; it parts for your own people, and a piece cut down sprouts again from its root unless the ground is built on. Kitchen Gardens grow maize, beans and squash together on one tile: fed by a Beast Den\'s dung or a stream beside them, a gardener brings in two or three times a farmer\'s food. Orchards bear fruit in summer and autumn, slow to start, then free for years. No stone walls, gates or towers: what guards the town must grow.',
     noBuild: { buildings: ['wall', 'gate', 'tower'], why: 'A Grove people raises no stone walls, gates or towers: it plants Thornwalls. They wait until it climbs to the Gunpowder Age or settles in the Middle Ages' },
   },
+  // The Wild route's third age (`docs/wild-road.md` §3, `hive.ts`): woods a rival can't walk through, and Gardens the bees double.
+  hive: {
+    verb: 'Set Hives among your trees, so that any rival who walks your woods is swarmed; take their honey as food, or as mead by a Market for gold; and tip your darts in venom',
+    door: 'No guns or cannon: no Musketeers and no Bombards, so your ranged line is the Blowpipe Hunter, short of reach, and your walls are broken by beasts',
+    good: 'Woods a rival cannot walk through, Gardens that double in summer, and venom that cuts down heavy riders and beasts',
+    routes: ['wild'],
+    name: 'Age of the Hive',
+    short: 'Hive',
+    tier: 3,
+    blurb: `Instead of the Gunpowder Age: a people that keeps bees. A Hive is set among standing trees, and its bees swarm any rival who walks the woods within ${HIVE_REACH} tiles of it, stinging past armour and slowing them; bees sleep in winter, and smoke from any fire near a Hive quiets it a while. A Hive pays honey into your stores, or mead for gold when a Market of yours stands near, and in summer it doubles the yield of the Kitchen Gardens beside it. Your ranged soldiers are Blowpipe Hunters, whose darts stack venom that ignores armour and slows; your Den breeds the Cave Bear, and your War Wolves grow dire. No guns and no cannon.`,
+    names: { warwolf: 'Dire Wolf' },
+    no: { units: ['ranged', 'siege'], why: 'A Hive people carries no guns and casts no cannon: its bowmen are Blowpipe Hunters, and its beasts break walls. Muskets and cannon wait until it climbs to the Industrial Age or settles in the Gunpowder Age' },
+  },
+  // The Wild route's fourth age (`docs/wild-road.md` §4, `wildwood.ts`): an army that is also the forest, and green against iron.
+  wildwood: {
+    verb: 'Plant a Heart Tree and wake the old trees round it as Ents that walk, crush and root again; let your woods spread each spring',
+    door: 'No factories or machines: no rifles, field guns or aircraft, so your Ents are your siege; and fire hits your living things twice as hard',
+    good: 'A forest that fights: Ents that break towns and hide as trees, woods that grow back each spring, and an army that runs through its own trees',
+    routes: ['wild'],
+    name: 'Age of the Wildwood',
+    short: 'Wildwood',
+    tier: 4,
+    blurb: `Instead of the Industrial Age: the forest wakes. Plant one Heart Tree, your town's soul; at it, an old tree within ${HEART_WAKE} tiles is woken as an Ent that walks slowly, flings boulders and breaks buildings. An Ent can root where it stands and be a tree again: it mends, it looks like any other tree, and it wakes when a rival comes near. Each spring your woods seed outward round the Heart Tree into your own land, and your Thornwalls thicken. Your people run through the woods round the Heart Tree, and a rival's are slowed there. No rifles, field guns or aircraft; and fire hits your living things twice as hard. If the Heart Tree falls, every Ent roots where it stands and sleeps.`,
+    no: { units: ['ranged', 'siege', 'fighter', 'bomber'], why: 'A Wildwood people builds no machines: no rifles, field guns or aircraft. Its Ents break walls and its Blowpipe Hunters shoot. They wait until it climbs to the Atomic Age or settles in the Industrial Age' },
+    noBuild: { buildings: ['airfield'], why: 'A Wildwood people builds no machines: no Airfield until it climbs to the Atomic Age or settles in the Industrial Age' },
+  },
+  // The Wild route's plants' end (`docs/wild-road.md` §5b, `bloom.ts`): the green answer to the warhead, and a second way to win.
+  bloom: {
+    verb: 'Raise a Seed Spire and sling Bloom Seeds that crack a rival\'s town into forest unless their citizens hack the root out; win by the Greening, your land kept green',
+    door: 'The Dens go quiet: no new beasts; and no Missile Silo, for the Seed is your warhead',
+    good: 'Outgrowing a rival instead of razing them: a warhead that grows, a forest that wins, and pollen that blinds their towers in your woods',
+    routes: ['wild'],
+    name: 'Age of the Bloom',
+    short: 'Bloom',
+    tier: 5,
+    blurb: `Instead of the Atomic Age: the plants' end. Raise one Seed Spire (G); while your Heart Tree stands it ripens a Bloom Seed every ${BLOOM_RIPEN} seconds. Sling it at any point on the map: everyone sees where it falls, and once it roots, ${BLOOM_GROW} seconds later every rival building within ${BLOOM_RING} tiles of its heart-root cracks into forest, unless their citizens reach the root and hack it out first. The Greening: keep your Heart Tree while trees, Orchards and grown Thornwalls cover ${BLOOM_GREEN}% of your land (counted as at least ${BLOOM_LEAST} tiles) for ${BLOOM_HOLD / 60} minutes, and you win. Your woods spread at the start of every season, not only in spring, and each season opens with a pollen storm that halves the sight of every rival soldier and tower near your Heart Tree. Your Dens go quiet, and you raise no Missile Silo.`,
+    no: { units: ['warwolf', 'tusker', 'warmammoth', 'cavebear'], why: 'A Bloom people breeds no new beasts: its Dens are quiet. They wake if it goes back to the Wildwood or rejoins the Atomic Age' },
+    noBuild: { buildings: ['silo'], why: 'A Bloom people raises no Missile Silo: its warhead is the Bloom Seed. Silos wait until it rejoins the Atomic Age' },
+  },
   // The second crossing (#555 s12): the Pilgrims' priests and the Sail's ships made one trade. Open only to a people that walked both.
   missions: {
     verb: 'Sail priests to far shores and raise Missions there: each claims land, trains priests, and pays a tithe that grows with its distance from home',
@@ -641,14 +725,107 @@ export const AGES: Record<AgeId, Age> = {
     verb: 'Wall off the shallows with dykes and set windmills behind them to pump the water out, tile by tile, into polder: rich low fields where the sea was, and a march where a strait was',
     door: 'No stone walls or gates: the dykes are your walls, and only on the water\'s edge. Your best fields lie below the sea, behind banks a rival can break',
     good: 'Moving the coast: new land for the best fields in the game, and a land bridge across a strait',
-    routes: [],
+    routes: ['water'],
     keepsake: { building: 'windmill', does: 'pumping: it drains the water behind its dykes on any road' },
     name: 'Age of Dykes',
     short: 'Dykes',
     tier: 2,
-    blurb: 'As the Frisians and the Hollanders did from the 1100s: banks of earth crowned with stone across the shallows, and windmills to lift the water out behind them. Dykes (K) are raised on shallow water or on the shore beside it, dragged out in a line like a wall; your own people walk along their crowns, and no rival or ship gets past. A Windmill (W) by water a dyke has shut off from the open sea pumps it dry, a tile every few seconds, nearest first: the bay becomes polder, low black ground where a Farm yields half again as much. Drain a strait and you have made a land bridge, for everyone. Only small water can be pumped: a lake or a dyked-off bay, never the open sea. No stone walls or gates are raised: the dykes are the walls.',
+    blurb: 'As the Frisians and the Hollanders did from the 1100s: banks of earth crowned with stone across the shallows, and windmills to lift the water out behind them. Dykes (K) are raised on shallow water or on the shore beside it, dragged out in a line like a wall; your own people walk along their crowns, and no rival or ship gets past. A Windmill (W) by water a dyke has shut off from the open sea pumps it dry, a tile every few seconds, nearest first: the bay becomes polder, low black ground where a Farm yields half again as much. Drain a strait and you have made a land bridge, for everyone. Only small water can be pumped: a lake or a dyked-off bay, never the open sea. No stone walls or gates are raised: the dykes are the walls. And a wall here guards more than a gate: breach a dyke and the sea pours back into the polder behind it, drowning fields and all, until the gap is closed and the mills pump it out again.',
     noBuild: { buildings: ['wall', 'gate'], why: 'A people of dykes raises no stone walls or gates: the dykes are its walls. They wait until it returns to the Middle Ages or climbs on' },
     pumps: true,
+  },
+  // The Water Road's first age (#701 s1): instead of the Bronze Age, on every map (a spring lies by every town). Its people digs the
+  // water to where it wants it: channels run from any water across the land, and the town grows along them.
+  rivers: {
+    verb: 'Dig channels from any water across the land and lay your fields along them, so the water goes where you want your town; a channel is a moat that soldiers must wade',
+    door: 'No new Farm away from water: the town grows along its channels, so its shape is plain to see and a raid knows where to cut',
+    good: 'Fields where you choose: dig the water to them, and ring the town with a moat',
+    routes: ['water'],
+    keepsake: { building: 'farm', does: 'its watering: by water, it works 30% faster on any road' },
+    name: 'Age of Rivers',
+    short: 'Rivers',
+    tier: 1,
+    blurb: 'As the first towns of Sumer and the Indus did: a people that leads the river where it wants it. Citizens dig Channels (Q) out from any water, a spring, a stream, a lake or the shore, dragged out in a line like a wall; when a stretch is dug the water runs in, a tile at a time, and stays. A Farm within 2 tiles of water works 30% faster, and in this age no Farm is laid away from water, so the fields follow the channels. A channel is a moat: soldiers and citizens wade it at well under half their pace, and no ship sails it. Markets, Temples and the Bronze Age\'s arms are all here. What is dug stays dug on any road.',
+    rivers: true,
+  },
+  // The Water Road's sixth age (#739, s6 of #701): instead of the Atomic Age, a people that keeps the sea's hours. Reached for now by a
+  // turn off the Atomic Age (the Age of Locks, s5, will lead here too). The tide wakes for the whole world when the first people enters.
+  tides: {
+    verb: 'Time the sea: the tide clock runs for everyone, the flats bare at low water so armies and traders walk where ships sailed, Tide Mills grind gold on the running tide, and causeways carry a road over the sea that only high water drowns',
+    door: 'No Missile Silo, and your town keeps the sea\'s hours: at high water your causeways drown, at low water your harbours ground',
+    good: 'Ground that comes and goes: a march across the bay at low water, and mills that grind on every turn of the tide',
+    routes: ['water'],
+    keepsake: { building: 'tidemill', does: 'grinding gold on the running tide, on any road' },
+    name: 'Age of Tides',
+    short: 'Tides',
+    tier: 5,
+    blurb: 'As the monks of Mont-Saint-Michel and Lindisfarne lived, and the millers of the Rance and the Wash: a people that keeps the sea\'s hours. When the first people enters this age the tide wakes for the whole world, and its clock is on every screen: every three minutes the sea falls through three steps to low water and rises back. Shallow sea bares as it falls, the shallowest first: wet flats that anyone may walk, where ships sat a minute ago and now sit aground. Whoever is on the flats when the water comes back is swept ashore and hurt, or drowned far out. Tide Mills (A), raised on the shore, grind gold every time the tide turns, more the more tidal ground lies near them. Causeways (V), dragged out like a wall over the flats or the shallow sea, raise a road that only high water covers; laid across a bay\'s mouth, a barrage that holds its flats wet as a pond the mills grind twice, until a rival\'s powder breaches it. At low water a Dock with no water beside it launches nothing. No Missile Silo is raised.',
+    noBuild: { buildings: ['silo'], why: 'A people that keeps the sea\'s hours raises no Missile Silo. It waits until it returns to the Atomic Age' },
+    tides: true,
+  },
+  // The Water Road's third age (#701 s4): instead of the Gunpowder Age. The Dutch Water Line (1672, the Rampjaar): when an army
+  // came, the sluices were opened and the low land between the towns went under knee-deep water, too deep to march, too shallow to
+  // sail, and the towns stood as islands. The water is the wall; the guns go on flat boats.
+  waterline: {
+    verb: 'Set sluices in your dykes and channels and open them when an army comes: your low ground goes under knee-deep water that soldiers wade at a crawl and siege can hardly cross, while your gun-barges sail it; shut them and the water goes',
+    door: 'No stone walls or gates: the water is your wall, and only low ground floods. Fields under the flood yield nothing, and a rival\'s gun-barges sail it and pass your sluices as well as yours',
+    good: 'Turning your own fields into a moat at the moment an army walks onto them, and shelling it from the water',
+    routes: ['water'],
+    keepsake: { building: 'sluice', does: 'opening and shutting: it lets the water out over its low ground on any road' },
+    name: 'Age of the Water Line',
+    short: 'Water Line',
+    tier: 3,
+    blurb: 'As the Dutch did in 1672, the year of disaster, when three armies marched on Holland: they opened the sluices, and the low land between the towns went under knee-deep water, too deep to march through and too shallow to sail, and the towns stood as islands until the armies went home. A Sluice (S) is raised like a dyke, on shallow water, on a channel, or in your own dyke line in place of a piece of it; while it is shut it holds the water back as a dyke does. Open it and the water runs out over the low ground round it, a ring a second, up to 7 tiles: polder, and any meadow that lies low. Soldiers and citizens wade the flood at under a third of their pace, and siege engines bog down to a crawl. Buildings stand in it as islands; fields under it yield nothing. Shut the sluice and the water drains back, a ring a second. A Sluice also launches Gun-barges: flat boats with a cannon in the bow that sail the sea, the channels and the flood alike, and shell what stands round it. No stone walls or gates are raised: the water is the wall.',
+    noBuild: { buildings: ['wall', 'gate'], why: 'A people of the Water Line raises no stone walls or gates: the water is its wall. They wait until it returns to the Middle Ages or climbs on' },
+    sluices: true,
+  },
+  // The Water Road's fifth age (#701 s5): instead of the Industrial Age. The canal age, from the Bridgewater Canal (1761) to the locks of
+  // the Erie and the Göta: water dug deep enough for ships, carried inland and over the hills, and dams whose turbines drove the mills.
+  locks: {
+    verb: 'Dig canals deep enough for ships, so your Docks and fleets go inland; carry your people over them on swing bridges; and dam the water to turn turbines that drive every workshop beside it',
+    door: 'No stone walls or gates: the canals are your moat and the bridges your gates. A canal cuts your own roads as well as a rival\'s, and a dam that falls bursts over the low ground below it',
+    good: 'A fleet in the heart of your land, and a town that trains and researches fastest along its water',
+    routes: ['water'],
+    keepsake: { building: 'dam', does: 'turning: its turbines drive the buildings beside it on any road' },
+    name: 'Age of Locks',
+    short: 'Locks',
+    tier: 4,
+    blurb: 'As the canal age did, from the Bridgewater Canal of 1761 to the Erie and the Göta: water dug deep enough for barges and ships, stepped up the hills through locks, and the first dams whose turbines drove the mills. In this age a Channel (Q) is dug as a canal: when the water runs in, every ship sails it, so a Dock on a canal launches a fleet in the heart of your land, and soldiers swim it at a quarter of their pace. A channel already dug may be dug deep the same way. A Bridge (Z) over a canal or channel carries your own people across at full pace while ships pass under it; rivals must swim. A Dam (N) raised on a channel, a canal, the shallows or the shore, with still water beside it, turns turbines: your buildings within 8 tiles of it train and research two fifths faster. A dam stops ships, and if it falls with water behind it, it bursts: the water runs over the low ground below it all at once, hurting all who stand there. No stone walls or gates are raised.',
+    noBuild: { buildings: ['wall', 'gate'], why: 'A people of the locks raises no stone walls or gates: its canals are the moat and its bridges the gates. They wait until it returns to the Industrial Age or climbs on' },
+    canals: true,
+    turbines: true,
+  },
+  // The Water Road's seventh age (#770, s7 of #701): past the Age of Tides, the trunk's last tier, a town that floats. Its tier is the
+  // Atomic's (every epoch-based number reads it); it lies a row past the Atomic on the web map only (the reason is on #770).
+  floating: {
+    verb: 'Build your town on the water: moor pontoon districts off the shore, link three or more into a floating town that raises its own citizens, and cast them off to tow a district, people and all, to new water',
+    door: 'Solid ground: no House is raised on land and no Missile Silo, and ships hole a pontoon three times as fast as anything else; those on its deck when it sinks swim for it, or drown',
+    good: 'A town that moves: tow your districts to the fish, to the fight, or out of a warhead\'s reach',
+    routes: ['water'],
+    keepsake: { building: 'pontoon', does: 'casting off and mooring again: one district you can still tow on any road' },
+    name: 'Age of Floating Cities',
+    short: 'Floating',
+    tier: 5,
+    blurb: 'As the Uros have lived for centuries on their reed islands in Lake Titicaca, and the Tanka in their boat towns on the Pearl River: a people whose town floats. Pontoons (E) are moored on open water, beside the shore or beside another of your pontoons: each is a district with room for 10, where every kind of goods is taken in and fishing boats are launched, and your people walk its deck. Moor three or more side by side and they link into a floating town, whose every pontoon raises citizens. Cast a pontoon off (O) and it is taken in tow with up to 10 of those on its deck aboard; moor it again (P) on any open water and it raises itself in a few seconds. A town that floats can leave: for the fishing grounds, for a rival\'s shore, or out of a warhead\'s reach. But no House is raised on land and no Missile Silo at all, and ships hole a pontoon three times as fast as anything else does: those on its deck when it sinks swim for the nearest deck or shore, and drown if it lies too far.',
+    noBuild: { buildings: ['house', 'silo'], why: 'A floating people raises no House on land and no Missile Silo: its homes are its pontoons. It waits until it returns to the Age of Tides or the Atomic Age' },
+    floats: true,
+  },
+  // The fourth crossing (#783, s8 of the Water Road #701): the Dykes' banks and the Sail's ships made one war. Open only to a people
+  // that walked both, off the Middle Ages they share. The Water Road's predator: polder towns and merchant fleets are its prey.
+  beggars: {
+    verb: 'Board a rival\'s ships instead of sinking them: a ship your warships beat down strikes its colours and sails for you, hold and all; and cut a rival\'s dykes from the sea, so the water takes back its polder',
+    door: 'No walls or gates, no fishing boats launched, and every ship a fifth dearer: the fleet grows by what it takes, and a people at war on the sea lands no herring',
+    good: 'Hunting a rival\'s fleet and its polder: its cogs, barges and warships become yours, and its dykes are your road in',
+    routes: [],
+    keepsake: { building: 'dock', does: 'its haven: rival ships beaten down within 12 tiles of it are boarded and taken, on any road' },
+    name: 'Age of the Sea Beggars',
+    short: 'Sea Beggars',
+    tier: 2,
+    blurb: 'As the Watergeuzen did, the Dutch rebels who sailed under letters of marque from 1568: they took Brielle from the sea in 1572, and in 1574 they cut the dykes round besieged Leiden and sailed their flat boats over the drowned fields to its walls. A rival ship your warships beat down is boarded instead of sunk: it strikes its colours and sails for you with a third of its timbers whole, with whatever it carries, gold, catch or plunder (a transport with soldiers aboard fights to the last and goes down). Your ships strike dykes, sluices, dams and causeways as hard as siege does, so a polder town\'s banks are a fleet\'s to cut, and the sea does the rest. What it gives up: walls and gates, every ship costs a fifth more, and no fishing boats are launched while the people is at war on the sea.',
+    price: { ship: 1.2 },
+    boards: true,
+    noBuild: { buildings: ['wall', 'gate'], why: 'A people of sea beggars raises no walls or gates: its fleet is its wall. They wait until it comes home to the Middle Ages or climbs on' },
+    no: { units: ['fisher'], why: 'A people at war on the sea lands no herring: fishing boats wait until it comes home to the Middle Ages or climbs on' },
   },
   // The Golden Age (#703): the age that feels almost too good. A turn off the Gunpowder Age for a people that has lived many lives.
   golden: {
@@ -899,6 +1076,45 @@ export const ROADS: Road[] = [
   },
   { from: 'grove', to: 'gunpowder', cost: EPOCHS[3].cost, time: EPOCHS[3].time, blurb: 'Rejoin the main road at the Gunpowder Age for the ordinary price. Your Thornwalls, Gardens and Orchards keep growing, and stone walls, gates and towers return.' },
   { from: 'grove', to: 'middle', cost: { food: 200, wood: 200 }, time: 25, blurb: 'Settle down in the Middle Ages. Your Thornwalls, Gardens and Orchards keep growing, and stone walls, gates and towers return.' },
+  // The Wild route's third step (`docs/wild-road.md` §3): a Kitchen Garden shows it (the bees come to its flowers), and its harvest opens it.
+  {
+    from: 'grove',
+    to: 'hive',
+    cost: { food: 900, wood: 400, gold: 400 },
+    time: 60,
+    clue: 'garden',
+    walked: 'grove',
+    deed: { stat: 'gardened', n: 600, text: 'Your Kitchen Gardens bring in 600 food' },
+    blurb: 'Instead of the Gunpowder Age: keep bees. Hives set among your trees swarm any rival who walks your woods, pay honey or mead, and double your Gardens in summer. Blowpipe Hunters, the Cave Bear and Dire Wolves. No guns or cannon while you stay.',
+  },
+  { from: 'hive', to: 'industrial', cost: EPOCHS[4].cost, time: EPOCHS[4].time, blurb: 'Rejoin the main road at the Industrial Age for the ordinary price. Your Hives keep swarming and your Den keeps its bears; rifles and field guns arrive.' },
+  { from: 'hive', to: 'gunpowder', cost: { food: 250, wood: 250 }, time: 30, blurb: 'Settle down in the Gunpowder Age. Your Hives keep swarming and your Den keeps its bears; muskets and cannon return.' },
+  // The Wild route's fourth step (`docs/wild-road.md` §4): a Hive shows it (an old wood humming), and the honey it pays opens it.
+  {
+    from: 'hive',
+    to: 'wildwood',
+    cost: { food: 1200, wood: 900, gold: 600 },
+    time: 75,
+    clue: 'hive',
+    walked: 'hive',
+    deed: { stat: 'honey', n: 250, text: 'Your Hives pay 250 honey or mead' },
+    blurb: 'Instead of the Industrial Age: the forest wakes. A Heart Tree wakes the old trees round it as Ents that walk, break towns and root again as trees; your woods spread each spring. No rifles, field guns or aircraft, and fire hits your living things twice as hard while you stay.',
+  },
+  { from: 'wildwood', to: 'atomic', cost: EPOCHS[5].cost, time: EPOCHS[5].time, blurb: 'Rejoin the main road at the Atomic Age for the ordinary price. Your Heart Tree keeps waking Ents and your woods keep spreading; machines return, and fire burns as it does for anyone.' },
+  { from: 'wildwood', to: 'industrial', cost: { food: 300, wood: 300 }, time: 30, blurb: 'Settle down in the Industrial Age. Your Heart Tree keeps waking Ents and your woods keep spreading; rifles, field guns and aircraft return.' },
+  // The Wild route's fifth step, the plants' end (`docs/wild-road.md` §5b): the Heart Tree shows it, and a spring's Spreading opens it.
+  {
+    from: 'wildwood',
+    to: 'bloom',
+    cost: { food: 1600, wood: 1400, gold: 1200 },
+    time: 90,
+    clue: 'heart',
+    walked: 'wildwood',
+    deed: { stat: 'spread', n: 12, text: 'Your woods spread 12 seedlings round the Heart Tree' },
+    blurb: 'Instead of the Atomic Age: the plants\' end. A Seed Spire slings Bloom Seeds that crack a rival\'s town into forest unless they hack the root out, and the Greening wins the match for a people whose land stays green. No new beasts and no Missile Silo while you stay.',
+  },
+  { from: 'bloom', to: 'atomic', cost: { food: 300, gold: 300 }, time: 30, blurb: 'Rejoin the Atomic Age and its Missile Silo. Your Spire keeps its Seeds and your Dens wake again; the Greening, the pollen storms and the Spreading every season end.' },
+  { from: 'bloom', to: 'wildwood', cost: { food: 300, wood: 300 }, time: 30, blurb: 'Go back into the Wildwood: the Dens wake and fire burns twice as hard again. Your Spire keeps its Seeds; the Greening ends.' },
   // The other road out of the Stone Age (#297): the hunt, not the bog, opens it.
   {
     from: 'stone',
@@ -1088,9 +1304,20 @@ export const ROADS: Road[] = [
     blurb: 'A turn, not a climb: one branch of the fork at the end of the Path of Blood, where blood becomes a sacrament. Every Temple is an altar that takes blood from the enemy who fall near it and mends your own with it; priests come cheaper and work faster. What it gives up: the Transfusion Station, trade, some harvest, and siege at a dearer price. Take it, and Hemocraft is closed to your people for good.',
   },
   // The fork past the Atomic Age (#605 s3): a Missile Silo is the clue; each branch shuns the other; each has a road back to the Atomic Age.
-  { from: 'atomic', to: 'fission', cost: { food: 1000, gold: 1200, stone: 600 }, time: 60, clue: 'silo', shuns: 'fusion', blurb: 'A turn, not a climb: raw power now. A silo\'s clock is 25 seconds and it refuels in 100, but every launch poisons the ground round your own silo for a minute. Take it, and Fusion is closed for good.' },
-  { from: 'fission', to: 'atomic', cost: { food: 300, gold: 300 }, time: 30, blurb: 'Shut the reactor: the ordinary Atomic Age, a 45 second clock and a 240 second refuel, and no poison round your own silos. Fusion stays closed.' },
-  { from: 'atomic', to: 'fusion', cost: { food: 2400, gold: 3000, stone: 1500 }, time: 150, clue: 'silo', shuns: 'fission', blurb: 'A turn, not a climb: clean and limitless, and ruinously dear. A silo keeps up to three warheads aloft and never needs refuelling, and nothing it strikes is poisoned, but the clock is 70 seconds and the road costs a fortune and 150 seconds. Take it, and Fission is closed for good.' },
+  { from: 'atomic', to: 'fission', cost: { food: 1000, gold: 1200, stone: 600 }, time: 60, clue: 'silo', shuns: 'fusion', blurb: 'A turn, not a climb: raw power now. Every clock is 25 seconds and a warhead is made every 100, but every launch poisons the ground round your own silo for a minute. Take it, and Fusion is closed for good.' },
+  { from: 'fission', to: 'atomic', cost: { food: 300, gold: 300 }, time: 30, blurb: 'Shut the reactor: the ordinary Atomic Age, a 45 second clock and a warhead every 240 seconds, and no poison round your own silos. Fusion stays closed.' },
+  { from: 'atomic', to: 'fusion', cost: { food: 2400, gold: 3000, stone: 1500 }, time: 150, clue: 'silo', shuns: 'fission', blurb: 'A turn, not a climb: clean and limitless, and ruinously dear. Up to three warheads aloft, each made again the moment one lands, and nothing a Fusion warhead strikes is poisoned, but the clock is 70 seconds and the road costs a fortune and 150 seconds. Take it, and Fission is closed for good.' },
+  // The Water Road's sixth age (#739): a turn off the Atomic Age for a people with a shore, until the Age of Locks (#701 s5) leads in.
+  {
+    from: 'atomic',
+    to: 'tides',
+    cost: { food: 800, gold: 800, stone: 450 },
+    time: 60,
+    clue: 'dock',
+    coast: 'Needs shallow sea within reach of your first town: the tide has nothing to bare on a dry shore',
+    blurb: 'A turn, not a climb, for a people with a shore: keep the sea\'s hours. The tide wakes for the whole world, bares the shallows at low water and drowns them again; Tide Mills grind gold on every turn of it, and causeways carry a road over the sea that only high water covers. What it gives up: the Missile Silo, and harbours that ground at low water.',
+  },
+  { from: 'tides', to: 'atomic', cost: { food: 300, gold: 300 }, time: 30, blurb: 'Back to the ordinary Atomic Age and its Missile Silo. The tide runs on for everyone, the causeways stand, and the mills stop grinding, all but the one you keep.' },
   { from: 'fusion', to: 'atomic', cost: { food: 300, gold: 300 }, time: 30, blurb: 'Quench the plasma: the ordinary Atomic Age, a 45 second clock, one warhead at a time, and fallout where you strike. Fission stays closed.' },
   { from: 'bloodrite', to: 'industrial', cost: { food: 300, gold: 200 }, time: 30, blurb: 'Put out the altar fires: the ordinary Industrial Age, with trade, full fields and siege at its usual price. The plunder ends and the Temples are Temples again. Hemocraft stays closed.' },
   // The first gateway (#577, the age road s5): saltpetre's only door, a turn off the Middle Ages into the Age of Alchemy, and from
@@ -1170,8 +1397,97 @@ export const ROADS: Road[] = [
     coast: 'No shallow water lies near your town: the Age of Dykes wants a bay, a lake or a strait within reach to wall off and drain',
     blurb: 'A turn, not a climb, for a people with shallow water by its town: raise dykes across the shallows and windmills behind them, and pump the sea out into polder, the richest fields there are. Drain a strait and the far shore is a march away. What it gives up: stone walls and gates, for the dykes are the walls, and the best fields lie below the sea.',
   },
+  // The Water Road's trunk (#701): the Age of Rivers instead of the Bronze Age, open to everyone (a spring lies by every town), then
+  // on to the Age of Dykes with no coast door: a trunk is never shut. A crossing to the Bronze Age at its own tier, and back onto the
+  // plain road at the Middle Ages. (From the Bronze Age the way in is a step back to the Stone Age: Bronze's own roads stay as they were.)
+  {
+    from: 'stone',
+    to: 'rivers',
+    cost: { food: 350, wood: 250 },
+    time: 35,
+    // A people that has tilled a field learns to lead the water to it: any Farm shows the road, on every map.
+    clue: 'farm',
+    blurb: 'Instead of the Bronze Age, as the first towns on the Tigris, the Nile and the Indus did: lead the water. Citizens dig Channels out from any spring, stream, lake or shore, and the water runs in behind them; Farms by water work faster, and none is laid away from it, so the town grows along its channels. A channel is a moat that soldiers must wade. The same arms and buildings as the Bronze Age.',
+  },
+  { from: 'rivers', to: 'bronze', cost: { food: 100, wood: 100 }, time: 20, blurb: 'Lay down the spades: the ordinary Bronze Age. Fields may go anywhere again; the channels you dug stay, and still water the fields beside them no faster.' },
+  { from: 'rivers', to: 'middle', cost: EPOCHS[2].cost, time: EPOCHS[2].time, blurb: 'Rejoin the main road at the Middle Ages, for the same price as from the Bronze Age: Farms go anywhere again, and the channels stay dug.' },
+  {
+    from: 'rivers',
+    to: 'dykes',
+    cost: { food: 650, wood: 350, stone: 150 },
+    time: 50,
+    walked: 'rivers',
+    blurb: 'Instead of the Middle Ages, on down the Water Road: from leading the water to holding it back. Raise dykes across the shallows and windmills behind them, and pump lakes and dyked-off bays dry into polder, the richest fields there are. Paid in wood and stone, not gold. What it gives up: stone walls and gates, for the dykes are the walls.',
+  },
   { from: 'dykes', to: 'middle', cost: { food: 150, wood: 100 }, time: 25, blurb: 'Lay down the spades: the ordinary Middle Ages, with walls and gates. The windmills stand still, but the polder stays dry and the dykes stand.' },
   { from: 'dykes', to: 'gunpowder', cost: EPOCHS[3].cost, time: EPOCHS[3].time, blurb: 'Rejoin the main road at the Gunpowder Age for the ordinary price: walls and gates return, the windmills stand still, and the land you made stays land.' },
+  // The Water Road's trunk (#701 s4): the Age of the Water Line instead of the Gunpowder Age, open to every people that walked the
+  // Dykes. A crossing from the Gunpowder Age for a people that walked them before, and back onto the plain road at either tier.
+  {
+    from: 'dykes',
+    to: 'waterline',
+    cost: { food: 900, wood: 500, gold: 300, stone: 300 },
+    time: 60,
+    walked: 'dykes',
+    blurb: 'Instead of the Gunpowder Age, on down the Water Road: from holding the water back to letting it out when you choose. Set sluices in your dykes and channels; open them as an army comes and your low ground goes under water it can barely wade, while gun-barges sail it. Paid in wood and stone more than gold. What it gives up: stone walls and gates, and the fields under the flood.',
+  },
+  {
+    from: 'gunpowder',
+    to: 'waterline',
+    cost: { food: 400, wood: 300, stone: 150 },
+    time: 40,
+    walked: 'dykes',
+    blurb: 'A turn, not a climb, for a people that has walked the Age of Dykes: set sluices in the dykes and open them when an army comes, and send gun-barges over the flood. What it gives up: stone walls and gates, and the fields under the water.',
+  },
+  { from: 'waterline', to: 'gunpowder', cost: { food: 200, gold: 150 }, time: 25, blurb: 'Shut the sluices for good: the ordinary Gunpowder Age, with walls and gates. The flood drains away, the Sluices sleep, and the barges you have keep sailing.' },
+  { from: 'waterline', to: 'industrial', cost: EPOCHS[4].cost, time: EPOCHS[4].time, blurb: 'Rejoin the main road at the Industrial Age for the ordinary price: walls and gates return, and the flood drains away as the Sluices sleep.' },
+  // The Water Road (#701 s5): the Age of Locks instead of the Industrial Age, a turn off it for a people that walked the Water Line, and
+  // back onto the plain road at either tier. (The trunk road straight from the Water Line waits on the owner: `tests/waterline.test.ts`
+  // pins the roads out of it, #701.)
+  {
+    from: 'industrial',
+    to: 'locks',
+    cost: { food: 500, wood: 400, stone: 250 },
+    time: 45,
+    walked: 'waterline',
+    blurb: 'Instead of the Industrial Age, a turn on down the Water Road for a people that has walked the Water Line: dig canals deep enough for ships, bridge them, and dam the water for turbines. What it gives up: stone walls and gates, and roads your own canals cut.',
+  },
+  { from: 'locks', to: 'industrial', cost: { food: 250, gold: 200 }, time: 30, blurb: 'Fill in the lock-keepers\' books: the ordinary Industrial Age, with walls and gates. The canals stay dug and the ships keep sailing them, but the Dams stand still, all but the one you keep.' },
+  // The Water Road's trunk (#701 s5, with #739): on from the Age of Locks to the Age of Tides, for a people with a shore, instead of the Atomic Age.
+  {
+    from: 'locks',
+    to: 'tides',
+    cost: { food: 1600, wood: 900, gold: 900, stone: 600 },
+    time: 90,
+    coast: 'Needs shallow sea within reach of your first town: the tide has nothing to bare on a dry shore',
+    blurb: 'Instead of the Atomic Age, on down the Water Road: from carrying ships inland to keeping the sea\'s hours. The tide wakes for the whole world; Tide Mills grind gold on every turn of it, and causeways carry a road over the sea that only high water covers. Paid in wood and stone as well as gold. What it gives up: the Missile Silo, and harbours that ground at low water.',
+  },
+  { from: 'locks', to: 'atomic', cost: EPOCHS[5].cost, time: EPOCHS[5].time, blurb: 'Rejoin the main road at the Atomic Age for the ordinary price: walls and gates return, the canals stay dug, and the Dams stand still, all but the one you keep.' },
+  // The Water Road's seventh age (#770): on from the Age of Tides only, for a people with open water by home; back to the Tides, or across to the Atomic.
+  {
+    from: 'tides',
+    to: 'floating',
+    cost: { food: 1800, wood: 1600, gold: 1000, stone: 300 },
+    time: 100,
+    coast: 'Needs sea within reach of your first town: a town that floats needs open water to moor on',
+    blurb: 'The Water Road\'s last age, past the Atomic: from keeping the sea\'s hours to living on the sea. Moor pontoon districts on open water, link them into a floating town that raises its own citizens, and cast them off to tow a district, people and all, wherever the water goes. Paid mostly in timber. What it gives up: Houses on land and the Missile Silo, and districts that ships hole fast.',
+  },
+  { from: 'floating', to: 'tides', cost: { food: 300, gold: 300 }, time: 30, blurb: 'Back to the Age of Tides: Houses go up on land again, and the pontoons stay moored and keep their room, but only the one you keep is ever cast off again.' },
+  { from: 'floating', to: 'atomic', cost: { food: 500, gold: 400, stone: 200 }, time: 40, blurb: 'Cross to the ordinary Atomic Age and its Missile Silo: Houses go up on land again, and the pontoons stay moored and keep their room, but only the one you keep is ever cast off again.' },
+  // The fourth crossing (#783, the Water Road's s8): off the Middle Ages, for a people that walked the Age of Dykes and the Age of Sail,
+  // the two turns off it. A Dock is the clue; the journey is the price.
+  {
+    from: 'middle',
+    to: 'beggars',
+    cost: { food: 400, wood: 450, gold: 150 },
+    time: 45,
+    clue: 'dock',
+    gate: 'hard',
+    crossing: ['dykes', 'sail'],
+    blurb: 'A turn, not a climb, for a people that has walked both the Age of Dykes and the Age of Sail: the dyke-builders take to the sea against their rivals. A rival ship your warships beat down is boarded and taken, hold and all, and your ships cut a rival\'s dykes as siege does. What it gives up: walls and gates, fishing boats, and a fifth more for every ship.',
+  },
+  { from: 'beggars', to: 'middle', cost: { food: 200, wood: 150 }, time: 25, blurb: 'Lay up the beggar fleet: the ordinary Middle Ages, with walls, gates and fishing boats. The ships you took are yours to keep.' },
+  { from: 'beggars', to: 'gunpowder', cost: { food: 900, wood: 500, gold: 450, stone: 150 }, time: 65, blurb: 'Climb to the Gunpowder Age: the boarding ends, walls, gates and fishing boats return, and the ships you took sail on as your own (more wood and less gold than from the Middle Ages: the fortune was in the ships).' },
   // The Golden Age (#703): heard of by a people that has walked two side ages, open to one that has walked three. It ends on its own (`GOLDEN.span`).
   {
     from: 'gunpowder',
@@ -1216,6 +1532,194 @@ export const POLDER = { reach: 3, most: 160, every: 3, ground: 0.07, farm: 1.5 }
  * basin is dry or `hold` seconds have passed.
  */
 export const AI_DYKE = { take: 0.5, line: 9, reach: 18, least: 14, cost: 3, crew: 3, perMill: 60, mills: 2, hold: 420 };
+
+/**
+ * The Age of Rivers (#701 s1, the Water Road). A finished Channel (a dug ditch) four-ways beside water fills: the water runs in one
+ * tile every `fill` seconds, so it is seen running down the ditch. A channel tile is `T_WATER` its corners sunk to `bank` (to `bed`
+ * where water lies all round), and land units wade it at `wade` of their pace; no ship sails it. A Farm with water within `wet` tiles
+ * of its footprint is watered: in the age it works `farm` times as fast, and in the age no Farm is laid without water so near.
+ */
+export const RIVERS = { fill: 0.25, bank: -0.16, bed: -0.45, wade: 0.4, wet: 2, farm: 1.3 };
+
+/**
+ * The tide (#739, the Age of Tides; `tides.ts`). It wakes for the whole world when the first people enters the age, at high water, and
+ * runs on a public clock: every `period` seconds the sea falls through `flats.length` levels to low water and rises back, a step each
+ * `period / (2 × flats.length)` seconds. Open sea whose bed (the mean of its corners) lies at or above `flats[k - 1]` is tidal ground
+ * of level k: bared while the tide stands below k. A Dock with no open water within `harbour` tiles is aground. A bared tile is wet
+ * sand, its corners raised to `dry`. Who is on the flats when the water comes back is swept to the nearest dry tile within `sweep`,
+ * losing `hurt` health, or drowned with none. A causeway may be laid on open
+ * sea down to `causeway` deep, and is tidal ground of the top level. A Tide Mill grinds `mill.gold` gold each turn of the tide with
+ * `mill.most` tiles of tidal ground within `mill.reach` of its footprint (less, pro rata, with fewer), each tile feeding the first mill only.
+ */
+export const TIDE = { period: 180, flats: [-1.0, -0.75, -0.5], harbour: 2, dry: 0.08, sweep: 6, hurt: 15, causeway: -1.6, mill: { reach: 5, most: 24, gold: 60 } };
+/** The computer in the Age of Tides (#739): its odds of taking the road (more for a people already on the Water Road), how many Tide Mills it raises, and how much tidal ground a mill's spot must reach. */
+export const AI_TIDES = { take: 0.35, onward: 0.7, mills: 3, least: 8, reach: 20, wary: 12 };
+/**
+ * Barrages (#748). A causeway line that shuts a body of tidal ground off from the open sea (four ways, through water and tidal ground but
+ * not causeways; closed when it touches no map edge and holds no more than `most` tiles, as a mill judges the open sea) makes it a pond:
+ * its flats stay wet at every level, and a Tide Mill grinds each pond tile `mill` times over (on the flood and on the ebb). A keg's blast
+ * or a warhead breaches every rival causeway tile within its reach: the tile sinks back to the tidal ground (or open sea) it was laid on.
+ */
+export const BARRAGE = { mill: 2, most: 160 };
+/**
+ * The computer and barrages (#748). With a Tide Mill standing it looks once for a straight causeway line within `reach` tiles of the
+ * mill, running to land (or a causeway) on both sides with `line` tiles at most between, that shuts off at least `least` tiles of tidal ground a mill
+ * of its reaches; scored by those tiles less `cost` for each tile of line. It lays it with `crew` citizens once it can pay the whole
+ * line, and mends a breach in a line that once stood whole. Its Sappers carry kegs to a rival's barrage first, as to a dyke.
+ */
+export const AI_BARRAGE = { reach: 9, line: 10, least: 6, cost: 1, crew: 3 };
+/**
+ * The low-water strike (#748). A clever computer whose march on a rival crosses `across` or more tiles of tidal ground (a straight line from
+ * its muster, with no open sea on it) times the wave to the tide: it sets out only when, marching at its slowest soldier's pace (`slack`
+ * times the straight line), it would find the flats bare and cross them with `margin` seconds to spare, waiting at most `hold` seconds
+ * for it. When the flood is `AI_TIDES.wary` seconds off, the soldiers not yet over the far shore turn back to the muster.
+ */
+export const AI_EBB = { across: 3, slack: 1.25, margin: 6, hold: 200 };
+
+/**
+ * Routes that read the tide (#755). A land unit's route over the flats is timed against the public tide clock: walking at its pace less
+ * `slack` (its route's length times `slack`), it must find each tidal tile bare from the moment it reaches it until `margin` seconds after
+ * it has crossed it. A route that fails goes round, by a path the tide lets it walk, or waits on the last dry ground before the flats for
+ * the first moment within `hold` seconds it can cross, whichever reaches the goal sooner; with neither, it goes as ordered.
+ */
+export const TIDE_ROUTE = { slack: 1.25, margin: 4, hold: 180 };
+
+/**
+ * Cockle beds (#767). When the tide wakes, a patch of beds is laid round each tile of the deeper flats (tidal ground of level `deep` or
+ * lower: bared only as the tide runs low) that the map's seed picks, one in `chance`: the tile and those beside it four ways on ground as
+ * deep. A bed holds `amount` food, picked by citizens at `rate` a second only while the tide has bared it, and each high water brings
+ * `regrow` more back, up to `amount`, to a bed that stands open to the sea: not in a barrage's pond, not under a site or causeway.
+ */
+export const COCKLE = { deep: 2, chance: 0.006, amount: 60, regrow: 25, rate: 1.0 };
+/**
+ * Work on the flats that reads the tide (#767). A citizen picking a cockle bed or building out on the flats looks at the clock every
+ * `check` ticks: when the water would cover the ground it stands on before it could walk to the shore (its route's pace, `TIDE_ROUTE.slack`)
+ * with `margin` seconds to spare, it steps ashore, a gatherer with its basket going home first, and goes back once the ground bares again.
+ */
+export const TIDE_WORK = { check: 5, margin: 6 };
+/**
+ * The computer and cockle beds (#767). Every `every` seconds a people in the Age of Tides with a bed bared within `reach` tiles of home,
+ * staying bare at least `least` seconds more, sends up to `hands` of its wood or berry gatherers to pick it; one that waits ashore longer
+ * than `idle` seconds goes back to the woods.
+ */
+export const AI_COCKLE = { every: 5, reach: 26, least: 25, hands: 3, idle: 25 };
+/**
+ * The Cockler's Hut (#779). It goes within `reach` tiles of a cockle bed, and takes in cockles only: a picker with a basket of them
+ * empties it at the nearest of its people's huts, if that is nearer than a food store. A picker whose bed is under water waits for low
+ * water by a hut within `wait` tiles of the bed, on the dry ground beside it. Beds within `reach` tiles of a hut are tended: each high
+ * water brings back `regrow` food to them instead of `COCKLE.regrow`.
+ */
+export const COCKLER = { reach: 6, wait: 10, regrow: 40 };
+/**
+ * The computer's Cockler's Hut (#779): when its busiest bed (the most pickers on it, then the lowest tile) lies more than `far` tiles
+ * from its nearest food store and has no hut of its within `COCKLER.reach`, it raises one by it, no more often than every `every` seconds.
+ */
+export const AI_COCKLER = { far: 12, every: 30 };
+/**
+ * The Tide Gate (#785), set into a causeway tile of its owner's barrage. Shut, the pond holds as ever. Opened while the pond holds water the
+ * sea outside has left (`least` tiles of it or more, its head), the pond rushes out through the gate as a scour: up to `spread` tiles of
+ * bared flats for each tile of head, the nearest first, within `reach` tiles of the gate on its sea side, go under for `secs` seconds;
+ * whoever stands there is swept off, `hurt` health lost (or drowned with no shore near). An open gate's pond runs with the tide like
+ * the open flats; shut again, it holds what the next flood brings in. Workers keep off the flats below a rival's loaded gate, looking
+ * again every `wary` seconds, and a route over them counts as unsafe.
+ */
+export const TIDE_GATE = { least: 4, spread: 2, reach: 7, secs: 5, hurt: 40, wary: 8 };
+/**
+ * The computer's Tide Gate (#785): once its barrage stands whole it sets a gate in it (looked for every `every` seconds), the line's tile
+ * nearest its middle with the pond on one side and the sea on the other. Every `look` seconds, with the gate shut and loaded, it opens it
+ * when at least `threat` enemy land units stand on the flats it would scour, more than its own there; it shuts it again `shut` seconds on.
+ */
+export const AI_GATE = { every: 20, look: 1, threat: 3, shut: 8 };
+
+/**
+ * The breach (#701 s3, the Water Road). Every `every` seconds the sea runs one tile on: each tile of polder four-ways beside water that
+ * flows from the open sea (as a mill judges it: a body touching a map edge, or more than `POLDER.most` tiles; a finished dyke holds it,
+ * a dyke site does not) floods, all at once, so water let in this step runs on only at the next. A flooded tile is sea again, its corners
+ * sunk to `bank` (to `bed` where water lies all round them). A building on it is drowned; a land unit on it is swept to the nearest dry
+ * ground within `sweep` tiles and hurt `unit`, or drowned where there is none. A keg's blast harms a dyke `keg` times as much as any
+ * other building. A people that has walked the Age of Dykes may raise dykes in any age after, to mend its banks.
+ */
+export const BREACH = { every: 0.5, bank: -0.16, bed: -0.4, sweep: 16, unit: 15, keg: 2 };
+
+/**
+ * The computer and the breach (#701 s3). A dyke is worth breaching when its fall would flood `least` tiles of polder or more
+ * (`heldBack`). On campaign, siege goes for such a dyke within `hunt` tiles of it, and Sappers carry their kegs to one first. A people
+ * whose line once stood whole mends any gap in it, in any age, before anything else on the water.
+ */
+export const AI_BREACH = { least: 8, hunt: 12 };
+
+/**
+ * A spring by every town (#701 s1): a start with no water within `near` tiles gets a spring head about `at` tiles away, on dice of
+ * its own and laid after everything else. It changes no ground, so every map is as it was; a channel dug beside it fills from it.
+ */
+export const SPRING = { near: 14, at: 9 };
+
+/**
+ * The Water Line (#701 s4, the Water Road). Every `every` seconds the water runs one ring on from each open Sluice with still water
+ * four-ways beside it (sea, lake or channel): over low ground, four ways, up to `reach` steps from the Sluice. Low ground is polder,
+ * or open meadow or sand whose highest corner lies no more than `rise` over the Sluice's lowest bank; trees, rock, deposits, rises and
+ * buildings stand out of it, Farms excepted (a Farm under it yields nothing). The ground's heights are not touched: the water lies
+ * knee-deep over them. Land units wade it at `wade` of their pace, siege at `siege`; gun-barges sail it (and pass through any sluice,
+ * as a lock). Water no open Sluice reaches drains back a ring every `every` seconds, from its edges in, but never from under a boat
+ * while water lies beside it: a boat left on the last wet tile runs aground and is lost.
+ */
+export const INUND = { every: 1, reach: 7, rise: 0.4, wade: 0.3, siege: 0.1 };
+
+/**
+ * The computer in the Age of the Water Line (#701 s4). A people that walked the Dykes takes the road on `take` (a coin of its own). It
+ * raises a Sluice on the water nearest home with low ground beside it (within `reach` tiles of its start), keeps `barges` gun-barges,
+ * and opens the sluice while an enemy army of at least `threat` stands within `near` tiles of it, shutting it `calm` seconds after
+ * the last has gone. It stays `stay` seconds in the age before it climbs on.
+ */
+export const AI_WATERLINE = { take: 0.6, reach: 16, barges: 2, threat: 4, near: 14, calm: 20, stay: 360 };
+
+/**
+ * The computer in the Age of Rivers (#701 s1). It takes the road on a coin of its own (`take`), and digs one channel from the water
+ * nearest home (within `reach` tiles of its start), the line of at most `most` tiles that waters the most ground within `stop` tiles
+ * of home (drawn again when it arrives), with `crew` citizens; its fields then go along the water. A people that walked the Age of Rivers goes on to the Age of Dykes on `onward`.
+ */
+export const AI_RIVERS = { take: 0.4, reach: 18, stop: 8, most: 14, crew: 3, onward: 0.7 };
+
+/**
+ * Canals (#701 s5, the Age of Locks). A Channel that fills in the Age of Locks is a canal (`GameState.channel` 2): `T_WATER` its corners
+ * sunk to `bank` (to `bed` where water lies all round), that every ship sails and land units swim at `wade` of their pace. A Channel
+ * laid on an old channel in the age digs it deep. A Bridge over a canal or channel carries its own people across at full pace, and
+ * ships pass under it.
+ */
+export const CANAL = { bank: -0.3, bed: -0.75, wade: 0.25 };
+
+/**
+ * Dams (#701 s5, the Age of Locks). A finished, standing Dam with still water four-ways beside it turns: its owner's buildings within
+ * `reach` tiles (centre to centre) train and research at `drive` hundredths of their pace, one dam's worth however many stand near (it
+ * multiplies the coils' rate in the Age of Lightning). Outside the age only the dam kept as its keepsake turns. A dam that falls with
+ * water beside it bursts: the water runs over the low ground round it (as a sluice's flood would, `INUND.rise` over its lowest bank)
+ * up to `surge` steps at once, and land units standing there lose `hurt`; then it drains as any flood does.
+ */
+export const DAM = { reach: 8, drive: 140, surge: 6, hurt: 40 };
+
+/**
+ * The computer in the Age of Locks (#701 s5). A people that walked the Water Line takes the road on `take` (a coin of its own). It
+ * digs its channel line deep into a canal (`AI_RIVERS`), raises a Dam on the water within `reach` tiles of its start where the most of
+ * its training buildings stand within `DAM.reach`, and lays a Bridge over the canal tile nearest home once the water is in. It stays
+ * `stay` seconds in the age before it climbs on.
+ */
+export const AI_LOCKS = { take: 0.6, reach: 14, stay: 360 };
+
+/**
+ * The Age of Floating Cities (#770). A Pontoon is moored on open water a ship sails (`sails`), raised beside the shore or another of its
+ * people's pontoons so its builders can reach it. Pontoons whose sides touch link; a district of `city` or more linked finished pontoons
+ * raises citizens at each. Cast off (the `pack` order), a pontoon is a tow carrying up to `hold` of the people on its deck; the rest
+ * swim to the nearest deck or shore within `swim` tiles, losing `hurt`, or drown. Moored again (the `pitch` order) within `spot` tiles of
+ * where the tow lies, it raises itself as a pitched camp does (`STEPPE.pitch`). Ships do `hull` times their usual damage to a pontoon.
+ */
+export const FLOAT = { city: 3, hold: 10, swim: 4, hurt: 25, spot: 3, hull: 3 };
+/**
+ * The computer in the Age of Floating Cities (#770): it turns from the Age of Tides on its own coin (`take`, `onward` for a Water Road
+ * people) once it has kept the Tides `after` seconds (its mills grinding, its barrage laid), moors at least `most` pontoons in a linked row off the shore nearest home (within `reach` tiles), keeps `fishers` fishing
+ * boats on them and raises citizens at the linked town up to `hands`, and casts a pontoon off and tows it to `flee` tiles from where a
+ * warhead is aimed, when that is within `blast` tiles of it. It stays `stay` seconds.
+ */
+export const AI_FLOAT = { take: 0.5, onward: 0.8, most: 4, reach: 18, fishers: 4, hands: 50, blast: 12, flee: 16, after: 480, stay: 420 };
 
 /**
  * Stepping back an age (#47), at a Town Center: down to the trunk age one tier below, whatever road
@@ -1267,7 +1771,7 @@ export interface UnitStats {
   /** Seconds to train. */
   time: number;
   radius: number;
-  shot?: 'stone' | 'arrow' | 'bolt' | 'bullet' | 'boulder' | 'ball' | 'bomb';
+  shot?: 'stone' | 'arrow' | 'bolt' | 'bullet' | 'boulder' | 'ball' | 'bomb' | 'dart';
   /** Damage spread over this radius where a shot lands. */
   splash?: number;
   /** Only attacks buildings (and other siege), like a ram. */
@@ -1281,6 +1785,7 @@ export interface UnitStats {
 
 /** A beast of the Wild: the same from the Bronze tier on, for it does not re-arm. */
 const beast = (u: UnitStats): (UnitStats | null)[] => [null, u, u, u, u];
+const BLOWPIPE: UnitStats = { name: 'Blowpipe Hunter', cls: 'ranged', hp: 50, attack: 3, armor: 0, parmor: 1, range: 4, reload: 1.6, speed: 1.7, sight: 7, cost: { food: 35, wood: 40 }, time: 14, radius: 0.24, shot: 'dart', blurb: 'A hunter with a long cane blowpipe and darts tipped in venom. Short of reach, but every dart adds venom that burns past armour and slows: death to heavy riders, bears and mammoths. Riders who reach it first cut it down.' };
 
 /** Each line has one version per epoch (null where it isn't available yet). Units re-arm when their owner advances. */
 export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
@@ -1372,6 +1877,14 @@ export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
     { name: 'East Indiaman', cls: 'trader', hp: 290, attack: 0, armor: 1, parmor: 4, range: 0, reload: 1, speed: 2.1, sight: 8, cost: { wood: 110, gold: 50 }, time: 22, radius: 0.5, blurb: 'Sails goods from a Dock to a trading post on the coast and brings back gold: the farther the post, the more, and 20% over the land road. Only a post with water within 7 tiles is a port. Warships are its enemy.' },
     { name: 'Steam Freighter', cls: 'trader', hp: 380, attack: 0, armor: 2, parmor: 5, range: 0, reload: 1, speed: 2.5, sight: 8, cost: { wood: 80, gold: 60 }, time: 22, radius: 0.52, blurb: 'Sails goods from a Dock to a trading post on the coast and brings back gold: the farther the post, the more, and 20% over the land road. Only a post with water within 7 tiles is a port. Warships are its enemy.' },
   ],
+  // ---- On the flood (#701 s4, the Age of the Water Line) ----
+  barge: [
+    null,
+    null,
+    null,
+    { name: 'Gun-barge', cls: 'ship', hp: 200, attack: 24, armor: 1, parmor: 3, range: 8, minRange: 2, reload: 5, speed: 1.6, sight: 9, cost: { wood: 130, gold: 70 }, time: 26, radius: 0.45, shot: 'ball', splash: 0.7, blurb: 'A flat boat with a cannon in its bow: it sails the sea, the channels and the flood alike, and shells what stands round it. Thin-sided: a galleon outguns it on open water.' },
+    { name: 'Steam Gunboat', cls: 'ship', hp: 280, attack: 32, armor: 2, parmor: 4, range: 9, minRange: 2, reload: 4.5, speed: 2.0, sight: 10, cost: { wood: 110, gold: 110 }, time: 26, radius: 0.47, shot: 'ball', splash: 0.8, blurb: 'A shallow steam launch with a gun: it sails the sea, the channels and the flood alike, and shells what stands round it.' },
+  ],
   // ---- In the air ----
   fighter: [
     null,
@@ -1405,6 +1918,24 @@ export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
     radius: 0.5,
     blurb: 'A Town Center or House packed onto an ox cart: drive it to new ground and pitch it there (P). It shelters, trains and takes in nothing while it rolls, and riders run it down.',
   })),
+  // A pontoon cast off (#770, the Age of Floating Cities): never trained, only made by casting a Pontoon off. Ships hole it as they hole a pontoon.
+  tow: [0, 1, 2, 3, 4, 5].map(() => ({
+    name: 'Pontoon in tow',
+    cls: 'ship' as const,
+    hp: 600,
+    attack: 0,
+    armor: 2,
+    parmor: 8,
+    range: 0,
+    reload: 1,
+    speed: 1.1,
+    sight: 6,
+    cost: {},
+    time: 1,
+    radius: 0.7,
+    capacity: FLOAT.hold,
+    blurb: 'A Pontoon cast off and under tow, with those of its deck aboard: take it to open water and moor it there (P). It shelters, trains and takes in nothing while it is towed, and ships sink it fast.',
+  })),
   trader: [
     null,
     { name: 'Pack Donkey', cls: 'trader', hp: 80, attack: 0, armor: 0, parmor: 1, range: 0, reload: 1, speed: 1.3, sight: 6, cost: { wood: 60, gold: 40 }, time: 20, radius: 0.32, blurb: 'Carries goods to a trading post and brings back gold: the farther its Market from the post, the more. Easy prey for cavalry.' },
@@ -1416,15 +1947,21 @@ export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
   // Tamed from the wild (`TAME`) or bred at a Beast Den once the kind is tamed. A beast is a beast: it does not re-arm with the epochs.
   warwolf: beast({ name: 'War Wolf', cls: 'cavalry', hp: 75, attack: 6, armor: 0, parmor: 1, range: 0, reload: 1.2, speed: 2.8, sight: 8, cost: { food: 65 }, time: 15, radius: 0.26, blurb: 'A wolf of the wild that answers to your people: fast and cheap, it runs down archers, priests and citizens. Spears break it.' }),
   tusker: beast({ name: 'Tusker', cls: 'infantry', hp: 120, attack: 7, armor: 2, parmor: 1, range: 0, reload: 1.4, speed: 1.9, sight: 5, cost: { food: 80, wood: 20 }, time: 18, radius: 0.32, blurb: 'A tame boar with a hide like bark: it holds a line and breaks riders on its tusks. Archers thin it.' }),
+  // The Age of the Hive (`HIVE`): the Cave Bear is bred at the Den (`trainsAt`) by a people that has walked the Hive, no taming needed.
+  cavebear: beast({ name: 'Cave Bear', cls: 'infantry', hp: 340, attack: 12, armor: 3, parmor: 6, range: 0, reload: 1.8, speed: 1.35, sight: 5, cost: { food: 180, gold: 40 }, time: 32, radius: 0.46, blurb: 'A great bear of the caves raised at your Den: a slow wall of fur that shrugs off arrows and mauls whatever stands before it. Swords, spears and guns bring it down; arrows barely do.' }),
+  // The Age of the Hive: its bowmen, trained at the Archery Range by a people that has walked it, from the Gunpowder Age's tier.
+  blowpipe: [null, null, null, BLOWPIPE, BLOWPIPE],
+  // The Age of the Wildwood (`WILDWOOD`): an Ent, woken from an old tree at the Heart Tree by a people that has walked the Wildwood.
+  warden: [null, null, null, null, { name: 'Ent', cls: 'siege', hp: 650, attack: 22, armor: 3, parmor: 8, range: 4, reload: 3.2, speed: 0.85, sight: 7, cost: { food: 150, wood: 200, gold: 80 }, time: 40, radius: 0.6, shot: 'boulder', splash: 0.8, blurb: 'An old tree of your woods, woken at the Heart Tree: it walks slowly, tears boulders from the ground and flings them, and breaks buildings and engines. Arrows barely mark its bark, but swords, riders and fire bring it down. Root it (O) and it is a tree again: it mends, and wakes when a rival comes near.' }],
   warmammoth: beast({ name: 'War Mammoth', cls: 'siege', hp: 420, attack: 16, armor: 2, parmor: 4, range: 0, reload: 2.4, speed: 1.1, sight: 6, cost: { food: 260, gold: 60 }, time: 40, radius: 0.55, blurb: 'A woolly mammoth led to war: it tramples walls and buildings as a ram does, and gores soldiers too. Spearmen and riders swarm it.' }),
 };
 
-const DOMAINS: Partial<Record<UnitType, Domain>> = { fisher: 'water', warship: 'water', transport: 'water', cog: 'water', fighter: 'air', bomber: 'air' };
+const DOMAINS: Partial<Record<UnitType, Domain>> = { fisher: 'water', warship: 'water', transport: 'water', cog: 'water', barge: 'water', tow: 'water', fighter: 'air', bomber: 'air' };
 /** Where a unit line goes: on foot, on the water or in the air. */
 export const domainOf = (type: UnitType): Domain => DOMAINS[type] ?? 'land';
 
-export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader', 'wagon', 'warwolf', 'tusker', 'warmammoth'];
-export const MILITARY: UnitType[] = ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'warship', 'fighter', 'bomber', 'warwolf', 'tusker', 'warmammoth'];
+export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader', 'wagon', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge', 'warden', 'tow'];
+export const MILITARY: UnitType[] = ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'warship', 'fighter', 'bomber', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge', 'warden'];
 
 type Target = UnitClass | 'building';
 /** The counter triangle (and its friends): damage multiplier by attacker class against target class. */
@@ -1753,6 +2290,151 @@ export const GROVE = {
   aiThornAt: 11,
 };
 
+/**
+ * Fire (`src/sim/fire.ts`, the Wild route's step 3, `docs/wild-road.md`): the answer to a living town, open to every people from
+ * the `epoch`. Citizens and foot soldiers carry torches: one stands `light` seconds within `reach` tiles of a tree, a root, or a
+ * rival's living building (`burns`) to set it alight. A tree burns `tree` seconds and falls to ash, which grows a tree again after
+ * `ash` seconds. A living building loses `bld` of its most hit points a second until it falls (a Thornwall burnt down leaves no
+ * root) or is beaten out: each citizen or foot soldier of its own team within `beatReach` tiles beats a second of fire a second, and
+ * `beat` of them put it out (one sent to mend it beats rather than mends). Once a second each fire lights each living neighbour
+ * on a roll of `spread[season]` (spring, summer, autumn, winter), no more than `run[season]` tiles from where the torch set it,
+ * so a dry summer fire runs and a wet spring one smoulders out. Anyone standing within `scorchReach` of a burning tile loses
+ * `scorch` hit points a second.
+ * The computer sends up to `aiBearers` foot soldiers out on campaign within `aiNear` tiles of a rival's living building to torch
+ * it (every `aiEvery` seconds), and a citizen to beat out any fire on its own, from up to `aiBeatFrom` tiles.
+ */
+export const FIRE = {
+  epoch: 1,
+  light: 3,
+  reach: 1.2,
+  tree: 10,
+  ash: 300,
+  bld: 0.06,
+  beat: 4,
+  beatReach: 1.6,
+  spread: [0.06, 0.2, 0.12, 0.04],
+  run: [2, 6, 4, 2],
+  scorch: 2,
+  scorchReach: 0.4,
+  burns: ['thornwall', 'garden', 'orchard', 'sapling', 'hive', 'heart', 'spire'] as BuildingType[],
+  wild: 2,
+  aiBearers: 2,
+  aiNear: 12,
+  aiEvery: 4,
+  aiBeatFrom: 24,
+};
+
+/**
+ * The Age of the Hive (`docs/wild-road.md` §3, `src/sim/hive.ts`). A Hive goes where `trees` trees stand within `SNARE.r` tiles,
+ * `apart` tiles from any other Hive, and works while they stand. Awake (not winter, not smoked, not burning), its bees sting each
+ * rival land unit within `reach` tiles of it that stands in a wood (`wood` trees in the 3-by-3 round it), `sting` hit points a
+ * second past armour, and slow it to `slow` of its pace for `stingFor` seconds. Every `every` seconds it pays `honey` food, or
+ * `mead` gold while a finished Market of its people stands within `market` tiles. In summer it doubles (`pollen`) the yield of its
+ * people's Kitchen Gardens within `bloom` tiles. A fire within `smoke` tiles quiets it for `quiet` seconds.
+ * A Blowpipe Hunter's dart adds a dose of venom (up to `doses`), each dose `dose` hit points a second past armour, lasting `venomFor`
+ * seconds after the last dart; a unit with venom in it also walks at `slow`. A people that has walked the Hive breeds Cave Bears
+ * at its Den and its War Wolves are Dire Wolves: `dire.hp` times the hit points, `dire.attack` more attack.
+ * The computer takes the road on from the Grove, stays `aiStay` seconds, and sets up to `aiHives` Hives in the woods within `aiFrom`
+ * tiles of home, by its Kitchen Gardens where it can; its Range and Den train darts and bears in turn with the rest.
+ */
+export const HIVE = {
+  trees: HIVE_TREES,
+  apart: 4,
+  reach: HIVE_REACH,
+  wood: 2,
+  sting: 3,
+  stingFor: 3,
+  slow: 0.6,
+  every: 10,
+  honey: 3,
+  mead: 2,
+  market: 10,
+  pollen: 2,
+  bloom: 5,
+  smoke: 4,
+  quiet: 40,
+  doses: 5,
+  dose: 1,
+  venomFor: 5,
+  dire: { hp: 1.35, attack: 2 },
+  aiStay: 240,
+  aiHives: 3,
+  aiFrom: 14,
+};
+
+/**
+ * The Age of the Wildwood (`docs/wild-road.md` §4, `src/sim/wildwood.ts`). A people raises one Heart Tree. There it wakes an Ent
+ * (`warden`) from the standing tree nearest the Heart Tree within `wake` tiles, which gives way to it. An Ent roots on bare ground
+ * (`root`): it is a tree there, mending `mend` of its hit points a second, and it wakes when a rival on the ground comes within
+ * `rouse` tiles, or its tree is cut into; fell or burn the tree and the Ent is gone. While its people has no Heart Tree standing,
+ * every Ent roots where it stands and none wakes.
+ * The Spreading: `spreadAt` seconds into each spring, round each Heart Tree, every bare tile within `spread` tiles that lies in its
+ * people's land, beside a tree and clear of buildings by a tile, takes a seedling on a roll of `seed`, up to `seeds` of them, and it is
+ * a tree `grow` seconds later (a `Stool`). Its people's Thornwalls each grow a stage.
+ * Woodland ways: while a people stands in the Wildwood, its units in a wood (`HIVE.wood`) within `ways.reach` tiles of its Heart Tree
+ * walk at `ways.own` pace, and a rival's at `ways.rival`. Fire burns its living buildings and scorches its units `FIRE.wild` times as hard.
+ * The computer takes the road on from the Hive, stays `aiStay` seconds, plants its Heart Tree by the thickest wood within `aiFrom`
+ * tiles of home (at least `aiTrees` trees to wake), and wakes up to `aiEnts` Ents.
+ */
+export const WILDWOOD = {
+  wake: HEART_WAKE,
+  rouse: 3,
+  mend: 0.02,
+  spreadAt: 20,
+  spread: 10,
+  seed: 0.3,
+  seeds: 18,
+  grow: 60,
+  ways: { reach: 14, own: 1.25, rival: 0.75 },
+  aiStay: 300,
+  aiFrom: 22,
+  aiTrees: 10,
+  aiEnts: 4,
+};
+
+/**
+ * The Age of the Bloom (`docs/wild-road.md` §5b, `src/sim/bloom.ts`). A people raises one Seed Spire, which ripens a Bloom Seed over
+ * `ripen` seconds while its Heart Tree stands (one held at a time). Slung (`fuel` paid) at any point, the Seed flies `flight` seconds,
+ * then roots on the open tile nearest its point within `land` tiles (none: it withers). Rooted, it grows `grow` seconds; each rival citizen
+ * within `reach` tiles of its heart-root hacks one stroke a second, and `root` strokes cut it out. If it isn't cut out, every rival
+ * building whose nearest edge lies within `r` tiles cracks, and its ground grows forest `sprout` seconds later (`Stool`s).
+ * The Greening: a people standing in the Bloom with its Heart Tree, whose green tiles (trees, Orchards, its Heart Tree, Thornwalls grown to
+ * living oak) cover `green` of its land's open tiles (counted as at least `least`) for `hold` seconds, wins. Measured once a second.
+ * Pollen: the first `storm` seconds of each season, rival land units and Watch Towers within `pollen` tiles of a Bloom people's Heart
+ * Tree see `blind` as far. The Spreading comes at the start of every season, not only spring (`WILDWOOD.spreadAt`).
+ * The computer takes the road on from the Wildwood, stays `aiStay` seconds, raises its Spire within `aiFrom` tiles of home, slings at
+ * the rival building it has seen whose ring would crack the most * (keeping the fuel back from `aiSave` seconds before the Seed is ripe),
+ * and while its land is short of green, every `aiOrchard` seconds plants an Orchard (one to every `aiThorns` Thornwall pieces) or a
+ * line of `aiLine` Thornwall, at the compass points round home `aiRing` tiles out and further. Against a rooted
+ * Seed in its town (within `aiNear` tiles of a building of its own) it sends up to `aiHack` citizens to hack it.
+ */
+export const BLOOM = {
+  ripen: BLOOM_RIPEN,
+  fuel: { food: 300, wood: 300, gold: 200 } as Cost,
+  flight: 10,
+  land: 6,
+  grow: BLOOM_GROW,
+  reach: 1.6,
+  root: 90,
+  r: BLOOM_RING,
+  sprout: 8,
+  green: BLOOM_GREEN / 100,
+  least: BLOOM_LEAST,
+  hold: BLOOM_HOLD,
+  storm: 30,
+  pollen: 14,
+  blind: 0.5,
+  aiStay: 600,
+  aiFrom: 14,
+  aiOrchard: 15,
+  aiThorns: 16,
+  aiLine: 7,
+  aiRing: 9,
+  aiNear: 6,
+  aiHack: 7,
+  aiSave: 40,
+};
+
 export const COPPICE = { reach: 8, regrow: 120, retry: 5, grow: 90, snare: 2, cap: 1.5, bag: 2, full: 12, aiPerFood: 1.5, aiMax: 16, aiTrees: 10, aiThick: 14, aiNear: 14, aiDrop: 7, aiPerTender: 2, aiStone: 6, aiCamps: 2, aiPlant: 3, aiThin: 12, aiPlantWood: 120 };
 
 /**
@@ -1785,6 +2467,12 @@ export const SHAFT = {
   aiMax: 3,
 };
 
+/** The interceptor's numbers (`INTERCEPT`), named here so the battery's words can say them. */
+const INTERCEPT_REACH = 12;
+const INTERCEPT_FIRE = 2;
+const INTERCEPT_PCT = 60;
+const INTERCEPT_RELOAD = 90;
+
 export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   towncenter: { name: 'Town Center', size: 4, hp: 2800, cost: { wood: 275, stone: 150 }, time: 110, pop: 10, sight: 8, trains: ['citizen', 'hero'], drop: ['food', 'wood', 'stone', 'gold'], epoch: 0, guns: { damage: 6, range: 7, reload: 2 }, garrison: 15, menu: 'eco', key: 'T', blurb: 'Trains citizens and heroes, takes in every resource and leads your people into the next epoch. Citizens shelter here when the bell rings. Lose your last one and you have 45 seconds to raise another, or your people is lost: build a second far from the first.' },
   house: { name: 'House', size: 2, hp: 600, cost: { wood: 35 }, time: 18, pop: 5, sight: 3, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'E', blurb: 'Room for 5 more people.' },
@@ -1796,7 +2484,7 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   wall: { name: 'Wall', size: 1, hp: 500, cost: { wood: 3 }, costByEpoch: [{ wood: 3 }, { stone: 4 }, { stone: 4 }, { stone: 5 }, { stone: 5 }], time: 5, pop: 0, sight: 2, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'L', blurb: 'Drag to raise a line of wall: a palisade of logs in the Stone Age, stone after.' },
   gate: { name: 'Gate', size: 2, hp: 1200, cost: { stone: 30 }, costByEpoch: [{ wood: 30 }, { stone: 30 }, { stone: 30 }, { stone: 40 }, { stone: 40 }], time: 20, pop: 0, sight: 3, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'G', blurb: 'Opens for your people and allies only. Put it in a wall.' },
   barracks: { name: 'Barracks', size: 3, hp: 1400, cost: { wood: 150 }, time: 35, pop: 0, sight: 5, trains: ['infantry'], drop: [], epoch: 0, menu: 'mil', key: 'B', blurb: 'Trains foot soldiers, who beat cavalry and siege.' },
-  range: { name: 'Archery Range', size: 3, hp: 1400, cost: { wood: 150 }, time: 35, pop: 0, sight: 5, trains: ['ranged'], drop: [], epoch: 0, menu: 'mil', key: 'A', blurb: 'Trains slingers, archers and their heirs, who beat infantry.' },
+  range: { name: 'Archery Range', size: 3, hp: 1400, cost: { wood: 150 }, time: 35, pop: 0, sight: 5, trains: ['ranged', 'blowpipe'], drop: [], epoch: 0, menu: 'mil', key: 'A', blurb: 'Trains slingers, archers and their heirs, who beat infantry.' },
   stable: { name: 'Stable', size: 3, hp: 1400, cost: { wood: 150, gold: 50 }, time: 40, pop: 0, sight: 5, trains: ['cavalry'], drop: [], epoch: 1, menu: 'mil', key: 'C', blurb: 'Trains cavalry, who beat archers, priests and siege.' },
   forge: { name: 'Forge', size: 3, hp: 1600, cost: { wood: 175 }, time: 40, pop: 0, sight: 5, trains: [], drop: [], epoch: 1, menu: 'mil', key: 'R', blurb: 'Better weapons and armor for every soldier.' },
   workshop: { name: 'Siege Workshop', size: 3, hp: 1400, cost: { wood: 200 }, time: 40, pop: 0, sight: 5, trains: ['siege'], drop: [], epoch: 1, menu: 'mil', key: 'K', blurb: 'Builds rams, catapults and cannon to break towns.' },
@@ -1808,11 +2496,17 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   // The managed wood (#501): a coppice people plants it on open ground; it roots as a stool and grows into a tree (`COPPICE`, `src/sim/coppice.ts`).
   sapling: { name: 'Sapling', size: 1, hp: 30, cost: { wood: 10 }, time: 5, pop: 0, sight: 1, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'I', blurb: `A young tree set in open ground. Once planted it roots and grows into a full tree in ${COPPICE.grow} seconds: wood to fell, and woods for snares. A row of them grows into a hedge no one walks through.` },
   // The Age of the Wild (`docs/wild-road.md`): raised by a people that has tamed a beast; breeds the kinds it tamed, in any age after.
-  den: { name: 'Beast Den', size: 3, hp: 900, cost: { food: 50, wood: 75 }, time: 35, pop: 0, sight: 6, trains: ['warwolf', 'tusker', 'warmammoth'], drop: [], epoch: 1, menu: 'mil', key: 'D', blurb: 'A ring of earth banks and woven hurdles round a hollow of straw, where tamed beasts whelp and are reared. It breeds only the kinds your people has tamed from the wild: tame one wolf and it raises wolves. Raised only by a people that has tamed a beast, and it keeps breeding after the people leaves the Age of the Wild.' },
+  den: { name: 'Beast Den', size: 3, hp: 900, cost: { food: 50, wood: 75 }, time: 35, pop: 0, sight: 6, trains: ['warwolf', 'tusker', 'warmammoth'], drop: [], epoch: 1, menu: 'mil', key: 'D', blurb: 'A ring of earth banks and woven hurdles round a hollow of straw, where tamed beasts whelp and are reared. It breeds only the kinds your people has tamed from the wild: tame one wolf and it raises wolves. Raised only by a people that has tamed a beast, and it keeps breeding after the people leaves the Age of the Wild. A people that has walked the Age of the Hive breeds Cave Bears here too.' },
   // The Age of the Grove (`docs/wild-road.md` §2, `GROVE`): raised by a people that has walked it, in any age after.
-  thornwall: { name: 'Thornwall', size: 1, hp: 400, cost: { wood: 5 }, time: 3, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, menu: 'eco', key: 'B', blurb: `Drag to plant a line of thorn. It grows a stage every ${GROVE.stage} seconds (twice as fast in spring): seedling, bramble, thicket, then living oak, tougher than stone and mending itself. It parts for your own people and shuts on everyone else, and a piece cut down sprouts again from its root unless the ground is built on.` },
+  thornwall: { name: 'Thornwall', size: 1, hp: 400, cost: { wood: 5 }, time: 3, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, menu: 'eco', key: 'B', blurb: `Drag to plant a line of thorn. It grows a stage every ${GROVE.stage} seconds (twice as fast in spring): seedling, bramble, thicket, then living oak, tougher than stone and mending itself. It parts for your own people and shuts on everyone else, and a piece cut down sprouts again from its root unless the ground is built on. Fire is its bane: a piece that burns down leaves no root.` },
   garden: { name: 'Kitchen Garden', size: 1, hp: 120, cost: { wood: 35 }, time: 8, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, open: true, menu: 'eco', key: 'U', blurb: `Maize, beans and squash grown together on one tile, worked by one gardener. Fed by a Beast Den's dung within ${GROVE.dung} tiles it yields ${Math.round((1 + GROVE.dungMul) * 10) / 10} times a farmer's food; by water within ${GROVE.water} tiles, ${Math.round((1 + GROVE.waterMul) * 10) / 10} times; by both, more. Unfed, it grows at a field's pace. A Den feeds its ${GROVE.dungFeeds} oldest gardens.` },
   orchard: { name: 'Orchard', size: 2, hp: 300, cost: { wood: 100 }, time: 20, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, menu: 'eco', key: 'R', blurb: `Fruit trees set near a food store. After ${GROVE.orchardGrow} seconds they bear, and every summer and autumn they drop food into your stores by themselves while a store stands within ${GROVE.orchardReach} tiles. Slow to start, free for years.` },
+  // The Age of the Hive (`docs/wild-road.md` §3, `HIVE`): raised by a people that has walked it, in any age after.
+  hive: { name: 'Hive', size: 1, hp: 160, cost: { wood: 60, gold: 30 }, time: 15, pop: 0, sight: 4, trains: [], drop: [], epoch: 3, menu: 'eco', key: 'V', blurb: `A straw skep on a stand, set among standing trees (${HIVE_TREES} within 3 tiles). Its bees swarm any rival who walks the woods within ${HIVE_REACH} tiles, stinging past armour and slowing them. It pays honey into your stores, or mead for gold while a Market of yours stands near, and in summer it doubles the Kitchen Gardens beside it. Bees sleep in winter, smoke quiets them, and fire takes the skep. Fell its woods and the bees leave.` },
+  // The Age of the Wildwood (`docs/wild-road.md` §4, `WILDWOOD`): one to a people that has walked it, in any age after.
+  heart: { name: 'Heart Tree', size: 3, hp: 2500, cost: { food: 300, wood: 400, gold: 200 }, time: 90, pop: 0, sight: 8, trains: ['warden'], drop: [], epoch: 4, menu: 'mil', key: 'E', blurb: `A vast old tree planted once, the soul of your town: one to a people. At it an old tree within ${HEART_WAKE} tiles is woken as an Ent. While it stands your woods spread round it each spring and your rooted Ents wake when a rival comes near; if it falls, every Ent roots where it stands and sleeps. It is alive, so fire takes it.` },
+  // The Age of the Bloom (`docs/wild-road.md` §5b, `BLOOM`): one to a people that has walked it, in any age after.
+  spire: { name: 'Seed Spire', size: 2, hp: 1800, cost: { wood: 600, stone: 200, gold: 400 }, time: 80, pop: 0, sight: 8, trains: [], drop: [], epoch: 5, menu: 'mil', key: 'G', blurb: `A living tower of woven trunks, one to a people. While your Heart Tree stands it ripens a Bloom Seed every ${BLOOM_RIPEN} seconds, one at a time. Sling it (G) at any point on the map: it roots there, and ${BLOOM_GROW} seconds later every rival building within ${BLOOM_RING} tiles of its heart-root cracks into forest, unless their citizens hack the root out first. It is alive, so fire takes it.` },
   // The age road (#562, `docs/age-roads.md` spine §4): raised in the Stone Age, it answers which key resources this world holds (`PROSPECTOR`).
   prospector: { name: "Prospector's Lodge", size: 2, hp: 500, cost: { food: 50, wood: 75 }, time: 20, pop: 0, sight: 6, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'P', blurb: 'A lodge of prospectors who walk the streams, scrape the rock and dig at old mounds. Once it stands it tells you which key resources this world holds (bog iron, salt, saltpetre, blood-iron, ancient ruins): yes or no for each, never where. Some ages open only with them; a world that lacks one shuts that door.' },
   // The Path of Blood (#303): pitched by foot soldiers where the army stands, enemy land too; burns when left alone (`WARCAMP`).
@@ -1825,13 +2519,28 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   // The Age of Missions (#555 s12): raised by priests on a shore, in no rival's land; claims land, trains priests, pays a tithe (`MISSION`).
   mission: { name: 'Mission', size: 2, hp: 1000, cost: { wood: 100, gold: 60 }, time: 30, pop: 0, sight: 7, trains: ['priest'], drop: [], epoch: 2, shore: true, ages: ['missions'], builders: ['priest'], only: true, menu: 'eco', key: 'O', blurb: 'A whitewashed chapel and a bell on a far shore, raised by priests. Holds the land round it, trains priests, and pays a tithe that grows with its distance from your Town Center. Nothing in it shoots: a rival who reaches it razes it.' },
   caravanserai: { name: 'Caravanserai', size: 2, hp: 900, cost: { wood: 90, gold: 30 }, time: 25, pop: 0, sight: 6, trains: [], drop: [], epoch: 3, ages: ['silk'], menu: 'eco', key: 'C', blurb: 'A walled courtyard by the road where caravans rest. Raise it by a far trading post, in no one\'s land too: your traders\' trips to a post within 8 tiles of it pay a quarter more, traders and wagons within 4 tiles of it mend, and the land round it is yours, so rival traders crossing it pay your toll.' },
-  silo: { name: 'Missile Silo', size: 3, hp: 3000, cost: { wood: 300, stone: 400, gold: 700 }, time: 80, pop: 0, sight: 8, trains: [], drop: [], epoch: 5, menu: 'mil', key: 'M', blurb: 'A concrete collar round a hatch in the ground. Launch (M) names any point on the map: after a countdown every rival can see, the warhead flattens what stands there. Destroy the silo while it counts and the launch is scrubbed. Emptied by a launch, it must be refuelled before it can fire again.' },
+  silo: { name: 'Missile Silo', size: 3, hp: 3000, cost: { wood: 300, stone: 400, gold: 700 }, time: 80, pop: 0, sight: 8, trains: [], drop: [], epoch: 5, menu: 'mil', key: 'M', blurb: 'A concrete collar round a hatch in the ground. Launch (M) names any point on the map: after a countdown every rival can see, the warhead blasts what stands there, hardest at the centre and less with every tile, and every player sees the blast and the fog lifts over it for a minute. Destroy the silo while it counts and the launch is scrubbed, its warhead lost. Warheads come from the people\'s store, not the silo: one at first, one more every 240 seconds, up to 3 counting those in the air, fired from any silo. At most 2 silos (3 with Launch Control, researched here, which opens the salvo (B): three silos firing at once), and every player sees a finished one on the map.' },
   // Mine Shafts (#681): one miner digs stone or gold (or a rare ore over its old workings) for good, best where a deposit was worked out (`SHAFT`).
   shaft: { name: 'Mine Shaft', size: 2, hp: 700, cost: { wood: 150 }, time: 30, pop: 0, sight: 4, trains: [], drop: [], epoch: 1, menu: 'eco', key: 'H', blurb: 'A timber headframe over a hole in the ground. One citizen digs stone or gold here for good, slower than an open deposit; best sunk where a deposit was worked out, fair beside mountain rock. Choose its seam on the shaft.' },
   // The Water Road (#701 s1): a bank of earth across the shallows, and the mill that pumps the water out behind it (`DYKE`, `POLDER`, `water.ts`).
-  dyke: { name: 'Dyke', size: 1, hp: 700, cost: { wood: 2, stone: 4 }, time: 7, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, ages: ['dykes'], menu: 'eco', key: 'K', blurb: 'A bank of earth with a stone crown, raised on shallow water or on the shore beside it. Drag to lay out a line. Your own people walk along its crown; rivals and ships can\'t pass. Shut a bay or a strait off from the open sea with dykes, then set a Windmill by it to pump it dry.' },
+  dyke: { name: 'Dyke', size: 1, hp: 700, cost: { wood: 2, stone: 4 }, time: 7, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, ages: ['dykes'], menu: 'eco', key: 'K', blurb: 'A bank of earth with a stone crown, raised on shallow water or on the shore beside it. Drag to lay out a line. Your own people walk along its crown; rivals and ships can\'t pass. Shut a bay or a strait off from the open sea with dykes, then set a Windmill by it to pump it dry. A dyke that falls (to siege, or a Sapper\'s keg) lets the sea back in: it floods the polder ring by ring until a dyke stands in the gap again. A people that has walked the Age of Dykes raises dykes in any age after, to mend its banks.' },
+  channel: { name: 'Channel', size: 1, hp: 150, cost: { wood: 4 }, time: 8, pop: 0, sight: 1, trains: [], drop: [], epoch: 1, ages: ['rivers', 'locks'], open: true, menu: 'eco', key: 'Q', blurb: 'A ditch dug out from water across the land. Drag to lay out a line from a spring, stream, lake or shore: as each stretch is dug the water runs into it and it stays. Farms within 2 tiles of water work faster in the Age of Rivers. Soldiers wade a channel at well under half their pace, and no ship sails it. In the Age of Locks it is dug deep, as a canal: every ship sails it and soldiers swim it at a quarter of their pace; an old channel may be dug deep too.' },
+  causeway: { name: 'Causeway', size: 1, hp: 400, cost: { wood: 4, stone: 8 }, time: 6, pop: 0, sight: 1, trains: [], drop: [], epoch: 5, ages: ['tides'], menu: 'eco', key: 'W', blurb: 'A raised road of packed stone over the tidal flats or the shallow sea. Drag to lay out a line from the shore. Once laid it is tidal ground that only high water covers: anyone may walk it, at every hour but the top of the tide, and whoever is on it when the water comes back is swept off. A causeway counts as tidal ground for the mills. A line laid across the mouth of a bay of flats is a barrage: behind it the flats are a pond, wet at every hour, that Tide Mills grind twice. A rival\'s keg or warhead breaches it.' },
+  tidemill: { name: 'Tide Mill', size: 2, hp: 900, cost: { wood: 200, stone: 150 }, time: 35, pop: 0, sight: 5, trains: [], drop: [], epoch: 5, ages: ['tides'], shore: true, menu: 'eco', key: 'A', blurb: 'A mill on the shore whose pond fills on the flood and runs out through its wheel on the ebb. Every time the tide turns it grinds gold, more for every tile of tidal ground within 5 tiles (up to 24), each tile feeding one mill only. Flats a causeway line has shut off from the sea (a barrage\'s pond) are ground twice, on the flood and on the ebb. Only in the Age of Tides, or the one your people kept on leaving it.' },
+  // The Cockler's Hut (#779): a drop for cockles by the beds, where pickers wait for low water (`COCKLER`, `tides.ts`).
+  cockler: { name: "Cockler's Hut", size: 2, hp: 350, cost: { wood: 60 }, time: 15, pop: 0, sight: 6, trains: [], drop: [], epoch: 5, ages: ['tides'], menu: 'eco', key: 'C', blurb: `A hut of driftwood and thatch on the shore by the cockle beds, raised within ${COCKLER.reach} tiles of one. Pickers empty their baskets of cockles here instead of walking them home (it takes nothing else), and wait beside it, on dry ground, for the tide to bare their bed again. The beds within ${COCKLER.reach} tiles of it are tended: each high water brings back ${COCKLER.regrow} food to them instead of ${COCKLE.regrow}. Only in the Age of Tides.` },
+  // The Tide Gate (#785): a gate in a barrage that holds the pond, or lets it out over the flats below as a scour (`TIDE_GATE`, `tides.ts`).
+  tidegate: { name: 'Tide Gate', size: 1, hp: 600, cost: { wood: 80, stone: 120 }, time: 20, pop: 0, sight: 5, trains: [], drop: [], epoch: 5, ages: ['tides'], menu: 'mil', key: 'U', blurb: `A timber gate between stone piers, set into a causeway tile of your own barrage, beside its pond. Shut, the barrage holds as ever: the pond stays wet at every hour and the Tide Mills by it grind it twice. Open it (O) at low water and the pond rushes out through it as a scour: the flats below the gate, up to ${TIDE_GATE.reach} tiles out, go under for ${TIDE_GATE.secs} seconds, and whoever stands there is swept off, hurt (${TIDE_GATE.hurt}), or drowned with no shore near. The bigger the head of water held above the sea, the farther it runs. Then the pond runs with the tide (its mills grind it once) until you shut the gate and the next flood fills it again. Your own people walk across it at every hour; a rival's must go round it, or break it. Everyone can see whether it is loaded. Only in the Age of Tides.` },
   bloomery: { name: 'Bloom Hearth', size: 2, hp: 900, cost: { wood: 100, stone: 40 }, time: 30, pop: 0, sight: 5, trains: ['infantry'], drop: ['gold'], epoch: 1, ages: ['iron'], menu: 'mil', key: 'I', blurb: 'A clay hearth and bellows raised beside the marsh. Bog iron dropped here is smelted hard: every bar counts twice toward your spearmen\'s edge, and the hearth arms foot soldiers on the spot. Raise it by the bog and a rival who wants the iron must come to it. Kept (J) when your people leaves the Iron Age, it goes on arming spearmen at the Iron Age\'s price.' },
   windmill: { name: 'Windmill', size: 2, hp: 600, cost: { wood: 120, stone: 40 }, time: 30, pop: 0, sight: 5, trains: [], drop: [], epoch: 2, ages: ['dykes'], menu: 'eco', key: 'W', blurb: 'A post mill whose sails turn a scoop wheel. Raised by water a dyke has shut off from the open sea (or a small lake), it pumps it dry a tile every few seconds, nearest first, into polder: low black ground where a Farm yields half again as much. Two mills drain twice as fast. The open sea is too big to pump.' },
+  // The Water Line (#701 s4): a gate in a dyke or a channel that lets the water out over the low ground behind it (`INUND`, `water.ts`).
+  sluice: { name: 'Sluice', size: 1, hp: 800, cost: { wood: 60, stone: 80 }, time: 20, pop: 0, sight: 4, trains: ['barge'], drop: [], epoch: 3, ages: ['waterline'], menu: 'mil', key: 'S', blurb: 'A timber gate in a dyke, on a channel or on shallow water, raised on its banks by a winch. Shut, it holds the water back as a dyke does, and your own people walk across it. Open it (O) and the water runs out over the low ground round it, a ring a second, up to 7 tiles: soldiers wade the flood at a crawl, siege can hardly cross it, and your gun-barges sail it. Shut it and the water drains away. It launches Gun-barges onto the water beside it.' },
+  // The Age of Locks (#701 s5): a swing bridge over a canal, and a dam whose turbines drive the buildings by it (`CANAL`, `DAM`, `water.ts`).
+  bridge: { name: 'Bridge', size: 1, hp: 500, cost: { wood: 50, stone: 30 }, time: 12, pop: 0, sight: 2, trains: [], drop: [], epoch: 4, ages: ['locks'], menu: 'eco', key: 'Z', blurb: 'A timber swing bridge on stone piers, laid over a canal or a channel. Your own people cross on it at full pace; rivals can\'t, and must swim the water round it. It swings for ships: every ship and barge passes under it.' },
+  pontoon: { name: 'Pontoon', size: 3, hp: 1500, cost: { wood: 150, gold: 40 }, time: 30, pop: 10, sight: 5, trains: ['citizen', 'fisher'], drop: ['food', 'wood', 'stone', 'gold'], epoch: 5, ages: ['floating'], garrison: 10, menu: 'eco', key: 'E', blurb: 'A district on pontoons, moored on open water beside the shore or beside another of your pontoons: room for 10, every kind of goods taken in, fishing boats launched, and a deck your own people walk. Three or more moored side by side link into a floating town, and each of its pontoons raises citizens. Cast it off (O) to tow it, with up to 10 of those on its deck aboard, and moor it again (P) on any open water. Ships hole it three times as fast as anything else.' },
+  dam: { name: 'Dam', size: 1, hp: 1200, cost: { wood: 100, stone: 150 }, time: 30, pop: 0, sight: 4, trains: [], drop: [], epoch: 4, ages: ['locks'], menu: 'mil', key: 'N', blurb: 'A stone dam with a turbine house, raised on a channel, a canal, the shallows or the shore. With still water beside it, its turbines drive every building of yours within 8 tiles: they train and research two fifths faster (one dam\'s worth, however many stand near). Your own people walk across its crown; ships can\'t pass it. If it falls with water behind it, it bursts: the water runs over the low ground below it all at once, up to 6 tiles, hurting all who stand there.' },
+  // Missile defence (#759 s2): after Interceptors, a battery that fires one interceptor at a warhead whose ring falls in its cover (`INTERCEPT`, `silo.ts`).
+  battery: { name: 'Interceptor Battery', size: 2, hp: 1400, cost: { wood: 150, stone: 250, gold: 300 }, time: 50, pop: 0, sight: 8, trains: [], drop: [], epoch: 4, menu: 'mil', key: 'I', blurb: `A concrete pad with a radar dish and one interceptor on its rail, raised after Interceptors. It covers ${INTERCEPT_REACH} tiles round it, a circle every player sees. When a rival warhead's ring as you are shown it lies inside that cover, it fires on its own ${INTERCEPT_FIRE} seconds before the warhead lands and stops it ${INTERCEPT_PCT}% of the time: no blast and no fallout. One attempt for each warhead, however many batteries cover it, and the charge is spent hit or miss: it reloads in ${INTERCEPT_RELOAD} seconds. Every player sees a finished battery.` },
   airfield: { name: 'Airfield', size: 4, hp: 2200, cost: { wood: 250, stone: 100, gold: 150 }, time: 60, pop: 0, sight: 8, trains: ['fighter', 'bomber'], drop: [], epoch: 4, menu: 'mil', key: 'F', blurb: 'Builds fighters and bombers. Fighters hunt aircraft; bombers wreck towns.' },
 };
 
@@ -1980,6 +2689,8 @@ export const TECHS: Record<TechId, Tech> = {
   chemistry: { name: 'Chemistry', at: 'workshop', epoch: 3, cost: { food: 300, gold: 200 }, time: 45, add: { siegeRange: 1 }, mul: { siegeAttack: 1.2 }, blurb: 'Siege hits 20% harder and reaches 1 tile farther.', icon: '🧪' },
   blackPowder: { name: 'Black Powder', at: 'workshop', epoch: 3, ore: { id: 'saltpetre', n: 40 }, cost: { food: 250, gold: 150 }, time: 45, add: { rangedAttack: 1 }, mul: { siegeAttack: 1.15 }, blurb: 'Only where saltpetre lies: once your citizens have mined 40, the powder-makers grind it fine. Musketeers and all ranged soldiers hit for 1 more and siege 15% harder, on top of Chemistry. Where there is none, the plain road stays open.', icon: '💥' },
   bloodForged: { name: 'Blood-Forged Blades', at: 'forge', epoch: 3, ore: { id: 'bloodiron', n: 30 }, cost: { food: 250, gold: 175 }, time: 45, needs: 'ironCasting', add: { meleeAttack: 1, armor: 1 }, blurb: 'Only where blood-iron lies: once your citizens have mined 30, the smiths quench blades and plates in it. Foot soldiers, riders and heroes hit for 1 more and wear 1 more melee armor, on top of the plain forge. Where there is none, the plain road stays open.', icon: '🩸' },
+  interceptors: { name: 'Interceptors', at: 'workshop', epoch: 4, cost: { food: 500, gold: 700, stone: 250 }, time: 60, blurb: `Rockets that climb to meet a falling warhead. Raise Interceptor Batteries (I): each covers ${INTERCEPT_REACH} tiles and stops a warhead whose ring lies in its cover ${INTERCEPT_PCT}% of the time, blast and fallout both.`, icon: '🛡' },
+  launchControl: { name: 'Launch Control', at: 'silo', epoch: 5, cost: { food: 600, gold: 900, stone: 400 }, time: 60, blurb: 'A bunker that ties every silo of your people to one clock. You may raise a third Missile Silo, and three standing silos may fire a salvo (B): three Atomic warheads at once, on three points at least 8 tiles apart, on your one clock. A rival sees three rings as for any launch, and cannot tell a salvo from one warhead and two decoys until the last 3 seconds, when all three stay. Each silo that falls scrubs its own warhead. Rivals can count your silos, so three of them is warning enough.', icon: '🎯' },
   saltCuring: { name: 'Salt Curing', at: 'storehouse', epoch: 1, ore: { id: 'salt', n: 30 }, cost: { food: 100, wood: 60 }, time: 30, add: { carry: 2 }, mul: { hunt: 1.25, forage: 1.15 }, blurb: 'Only where salt lies: once your citizens have mined 30, meat keeps and berries dry. Game is butchered 25% faster and berries gathered 15% faster, and every citizen carries 2 more. Where there is none, hunting stays as it was.', icon: '🧂' },
   gillnets: { name: 'Gillnets', at: 'dock', epoch: 1, cost: { food: 100, wood: 100 }, time: 30, mul: { fish: 1.25 }, blurb: 'Fishing boats fish 25% faster.', icon: '🐟' },
   lighthouse: { name: 'Lighthouse', at: 'dock', epoch: 2, cost: { wood: 200, gold: 120 }, time: 35, needs: 'gillnets', add: { portReach: 4 }, blurb: 'A beacon on the headland: trading posts up to 4 tiles farther from the water become ports for your merchant ships.', icon: '🗼' },
@@ -2729,6 +3440,10 @@ export interface AiLevel {
   hemo?: boolean;
   /** Off: the computer never takes the fork past Total War (#355 s5; only `scripts/ai-ab.ts` turns it off). */
   fork?: boolean;
+  /** Off: no leaning toward a route (#749; only to judge it with `scripts/ai-ab.ts`). */
+  lean?: boolean;
+  /** Off: no wave sent at a rival's weak window after a step back (#749; only to judge it). */
+  strike?: boolean;
   /** Off: the town trains hands on while a climb is paid for (#555; only `scripts/ai-ab.ts` turns it off). */
   climbHold?: boolean;
   /** Off: the Stone Age climb neither waits on a Prospector's Lodge that is due nor saves its price (#540; only `scripts/ai-ab.ts` turns it off). */
@@ -2860,6 +3575,8 @@ export const TOWER_LEVELS: { name: string; epoch: number; cost: Cost; time: numb
 ];
 /** A clever computer raises a tower a step only with this much of each resource left over beyond the step's price. */
 export const AI_TOWER_KEEP = 50;
+/** Nor while the peace has more than this many seconds to run: no one can strike, and the wood is wanted for the town (#720). */
+export const AI_TOWER_PEACE = 90;
 
 /**
  * The Age of Hemocraft (#355 s2): each second a finished Drain Rig bleeds up to `most` living enemies within `drain` tiles (nearest first,
@@ -2978,6 +3695,13 @@ export const AI_CLIMB = { banked: 0.6 };
  */
 export const AI_ASSAY = { reach: 36, riders: 3 };
 /** `lodgeWait`: seconds at most the Stone Age climb is held while a Prospector's Lodge it means to raise is due (#540). */
+/**
+ * Rivals with a leaning (#749, `docs/engagement.md` Phase 3): a clever computer in a skirmish favours a route a `lean` share of the
+ * time, choosing that route's side ages from its first turn (the navy and the water road only on a map with water). And while a
+ * rival's weak window after a step back is open, it strikes with `strike` of a full wave (at least `least` soldiers).
+ */
+export const AI_TEMPER = { lean: 0.6, strike: 0.5, least: 6 };
+
 export const AI_WEB = { lodgeWait: 120, take: 0.6, heir: 1, survey: 22, diggers: 3, nearly: 0.5, patience: 90, close: 0.75, relics: 2, raid: 18, raidNear: 30, riders: 4, read: 0.85, lodge: 1, hulls: 1, bell: 900 };
 
 // ---- Colours, names and lookups -------------------------------------------------------------------
@@ -3010,7 +3734,7 @@ export function unitEpoch(type: UnitType): number {
  * nearest claimant (ties go to the older building). Shown only, so far; attrition and building limits
  * are later steps of the seed.
  */
-export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6, silo: 5, huntcamp: 4, warcamp: 3, caravanserai: 5, mission: 5 };
+export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6, silo: 5, huntcamp: 4, warcamp: 3, caravanserai: 5, mission: 5, heart: 8 };
 
 /**
  * War Camps (#303): a finished camp with none of its people's soldiers (land units that fight) within
@@ -3056,8 +3780,8 @@ export const KEG = { ore: 20, time: 30, most: 20, lay: 1.2, fuse: 8, reach: 2, b
 /**
  * The Missile Silo (#605, the Atomic Age): `launch` names a point; `fuse` seconds later (a countdown every player sees) the warhead
  * lands: every rival building within `reach` tiles takes `building`, every rival unit on the ground within `reach` takes `unit`.
- * Destroying the silo while it counts scrubs the launch. A launch empties the silo; refuelling costs `fuel` and takes `refuel`
- * seconds, paid when the launch is made. A people may hold `most` standing silos' worth of warheads at once.
+ * Destroying the silo while it counts scrubs the launch. A launch spends a warhead from the people's pool (#753) and costs `fuel`,
+ * paid when the launch is made.
  */
 /**
  * Fallout (#605 s2, grows seed #533): the ring a warhead struck stays poisoned for `time` seconds. Every second each land unit
@@ -3065,22 +3789,82 @@ export const KEG = { ore: 20, time: 30, most: 20, lay: 1.2, fuse: 8, reach: 2, b
  */
 export const FALLOUT = { time: 90, dps: 4 };
 /**
- * The Age of Fission (#605 s3, seed #533): raw power now. A silo's fuse is `fuse` seconds, it refuels in `refuel`, and each launch
- * poisons `reach` tiles round your own silo for `ownFallout` seconds (`silo.ts`). The Age of Fusion: clean and limitless but slow.
- * The fuse is `fuse` seconds, a silo refuels at once and keeps up to `air` warheads aloft, a launch costs `fuel`, and nothing it
- * strikes is poisoned. Its road costs the earth and takes `road` seconds, leaving the town exposed while it builds.
+ * The Age of Fission (#605 s3, seed #533): raw power now. Every launch's clock is `fuse` seconds, the pool makes a warhead every
+ * `refuel`, a Fission warhead's fuel is `fuel`, and each launch, whatever the warhead, poisons `reach` tiles round your own silo for
+ * `ownFallout` seconds (`silo.ts`). The Age of Fusion: clean and limitless but slow. Every clock is `fuse` seconds, the pool refills
+ * at once, a Fusion warhead's fuel is `fuel`, and nothing it strikes is poisoned. Its road costs the earth, leaving the town exposed while it builds.
  */
-export const FISSION = { fuse: 25, refuel: 100, ownFallout: 60, reach: 3 };
-export const FUSION = { fuse: 70, refuel: 0, air: 3, fuel: { gold: 450, stone: 120 } };
-export const SILO = { fuse: 45, reach: 5, building: 1500, unit: 400, fuel: { gold: 600, stone: 200 }, refuel: 240, most: 2 };
+export const FISSION = { fuse: 25, refuel: 100, ownFallout: 60, reach: 3, fuel: { gold: 800, stone: 250 } };
+export const FUSION = { fuse: 70, refuel: 0, fuel: { gold: 450, stone: 120 } };
+/**
+ * The Missile Silo. `reach` is the radius of the fallout a strike leaves at its impact point; how far the blast itself carries is the
+ * warhead's own `r` (`WARHEADS`). `lift` is how many seconds a blast clears the fog for every player over its radius (#752).
+ * The missile pool (#753): a people keeps one store of warheads, fired from any of its silos. It holds `stock` when its first silo
+ * stands, and makes one more every `refuel` seconds (the plain Atomic Age's; Fission and Fusion have their own) while the warheads in
+ * store and in the air number under `cap`. `fuel` is an Atomic warhead's. A people raises at most `most` silos; every player sees a finished one.
+ */
+/**
+ * The three-zone warning (#762): a rival is shown the real zone and two decoys `apart` tiles or more from it and each other, each ring's
+ * centre moved by a whole number of tiles up to `blur` on each axis; at `reveal` seconds left the decoys vanish. A town too sparse to
+ * draw decoys from falls back to points within `spread` tiles of the target.
+ */
+export const SILO = { fuse: 45, reach: 5, fuel: { gold: 600, stone: 200 }, refuel: 240, most: 2, lift: 60, stock: 1, cap: 3, blur: 2, reveal: 3, apart: 8, spread: 24 };
+/**
+ * The salvo (#765): three Atomic warheads from the store at once, one from each of `trio` standing silos, on the people's one clock. Only a
+ * people with Launch Control fires one, and only it may raise a third silo (`trio`). A plain Atomic people pays `surcharge` more fuel for
+ * each of the three (a Fission or Fusion people's silos are built to share a clock).
+ */
+export const SALVO = { trio: 3, surcharge: 0.5 };
+/**
+ * Missile defence (#759 s2): a finished Interceptor Battery holds one charge. Exactly `fire` seconds before a rival warhead lands, each of its
+ * live warheads whose ring, as the battery's team is shown it, lies within `reach` tiles of a charged battery draws one attempt: the nearest
+ * such battery fires, its charge spent hit or miss, and the roll (`chance`) is drawn then from the match's dice and stored on the launch.
+ * Exactly `meet` seconds before it lands the interceptor meets it: a hit and that warhead is gone, with no blast and no fallout; a miss and it
+ * flies on. A spent battery reloads in `reload` seconds. The computer learns Interceptors once a rival stands in the Industrial Age or later
+ * and raises `most` batteries, one to cover each of its Town Centers, nearest home first, `gap` seconds apart.
+ *
+ * A silo held in Reserve (#759 s3): a warhead no battery answered draws one attempt from a rival's Reserve silo instead, anywhere on the map,
+ * at the same chance; it spends a warhead from that people's store and its own warhead's launch fuel. A silo set to Reserve stands ready
+ * `arm` seconds later, and again `arm` seconds after each interceptor it fires; it may stand down at once, but launches nothing while set.
+ * The computer holds a silo in Reserve while a rival stands a silo and it stands two (or its store is full), deciding once every `think` seconds.
+ */
+export const INTERCEPT = { chance: INTERCEPT_PCT / 100, reach: INTERCEPT_REACH, fire: INTERCEPT_FIRE, meet: 1, reload: INTERCEPT_RELOAD, most: 2, gap: 40, arm: 30, think: 10 };
+/**
+ * A missile's flight (#772): the course every player watches inside the fuse. It climbs toward the middle of a rival's rings (the lure,
+ * moved up to `jitter` tiles by the seed) and covers `knee` of the way there, bowing sideways by up to `bow` of that stretch, so the first
+ * part reads as a district, not a point. Then it bends onto its true point (`lead`: how far past the bend's start the curve leans on along
+ * its old heading) and dives. The bend starts `read` seconds before the reveal, scaled by the lure's distance over `ref` tiles (between `lo`
+ * and `hi` of it): a sharp eye reads the target in that window. The arc peaks at `rise` of the lure's distance, between `low` and `high`
+ * tiles, at the bend. A lure nearer the silo than `near` tiles is replaced by the target.
+ */
+export const FLIGHT = { knee: 0.55, bow: 0.3, jitter: 3, lead: 0.5, read: 8, ref: 40, lo: 0.6, hi: 1.5, rise: 0.18, low: 4, high: 9, near: 6 };
+/**
+ * The three warheads (#751 s1). A blast does `peak / (1 + (d/half)²)` at distance `d` tiles (from a building's nearest edge, or a unit's
+ * position), tapering linearly over the last `taper` tiles to nothing at the blast radius `r`. A people fires its branch's warhead:
+ * plain Atomic, Fission or Fusion, and from #753 chooses at launch between Atomic and its branch's own.
+ */
+export const WARHEADS = {
+  atomic: { peak: 12000, r: 8 },
+  fission: { peak: 20000, r: 10 },
+  fusion: { peak: 40000, r: 12 },
+  half: 2,
+  taper: 2,
+};
 /**
  * The computer and the silo (#605): in the Atomic Age a clever computer raises one silo once it has `hands` citizens, waits `wait`
  * seconds after it stands, then launches whenever a point would catch `worth` or more of a rival's buildings (a Town Center counts
  * `heart`) and soldiers (each counts `soldier`) inside the ring. Its soldiers and citizens run from the ring of a rival warhead
  * in the air, `margin` tiles past its edge. On a coin of its own it takes the fork (`fork` odds, then `fusion` odds of Fusion over Fission)
  * once its silo has stood `forkAfter` seconds and it holds half the road's price. An Industrial computer bound for Aeronauts or Lightning holds off the climb `hold` seconds.
+ *
+ * The salvo (#765): when three rival targets at least `SILO.apart` apart are each worth a launch and together worth `salvo` times the best
+ * single strike (`salvoPlain` times for a plain Atomic people, who pays the surcharge), the computer raises silos to three, learns Launch
+ * Control, and holds its single strikes until the store holds three.
+ *
+ * The flight (#772): `read` seconds after a rival missile starts to bend, the computer reads its course as a player would (where it is,
+ * where it is going, how it turns) and stops clearing the rings the course has ruled out.
  */
-export const AI_SILO = { fork: 0.7, fusion: 0.4, forkAfter: 120, hold: 300, hands: 20, wait: 20, worth: 6, heart: 4, soldier: 2, margin: 1.5 };
+export const AI_SILO = { fork: 0.7, fusion: 0.4, forkAfter: 120, hold: 300, hands: 20, wait: 20, worth: 6, heart: 4, soldier: 2, margin: 1.5, salvo: 1.8, salvoPlain: 2.4, read: 5 };
 export const AI_KEG = { take: 0.5, ore: 80, kegs: 6, mills: 2, hold: 180, sappers: 2, near: 12, guard: 4, every: 2 };
 
 /**
@@ -3100,6 +3884,18 @@ export const AI_MISSION = { far: 18, search: 10, take: 0.6, stay: 120, hold: 240
 /** The computer and the Age of Chariots (#555 s12): the odds it plans the crossing once it has walked one sibling, and its stay in each. */
 export const AI_CHARIOT = { take: 0.6, stay: 120 };
 export const AI_SEA = { take: 0.6, stay: 120, raid: 300 };
+
+/**
+ * The Age of the Sea Beggars (#783). A rival ship (a district under tow aside) that a ship of a boarding people would sink is taken
+ * instead, with `left` of its full health, unless it carries soldiers. A Dock kept as the age's keepsake boards ships beaten down within
+ * `haven` tiles of it on any road. A boarding people's ships strike dykes, sluices, dams and causeways with `cut` of their blow, as siege does.
+ */
+export const BEGGARS = { left: 0.35, haven: 12, cut: 1.2 };
+/**
+ * The computer and the Sea Beggars (#783): the odds it plans the crossing once it has walked one sibling (`take`), its stay in each
+ * (`stay`) and in the age itself (`hold`); there its idle warships cut the rival dyke seen within `hunt` tiles of its Dock that holds back polder.
+ */
+export const AI_BEGGARS = { take: 0.5, stay: 120, hold: 300, hunt: 30 };
 
 export const WARCAMP = { watch: 8, grace: 10, burn: 0.05, train: 1.2 };
 

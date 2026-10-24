@@ -7,9 +7,14 @@ import { Waymarks } from './waymarks';
 
 /** Polder on the map (#701): a deep field green. */
 const POLDER_RGB = [86, 128, 62];
+/** Tidal flats bared by the falling tide (#739): wet grey sand. */
+const FLATS_RGB = [143, 134, 112];
+const WATER_RGB = [0x2f, 0x7f, 0xae];
 /** Tiles pumped out of the water so far, by every people. */
-const drained = (s: GameState): number => s.players.reduce((n, p) => n + (p.stats.drained ?? 0), 0);
+const drained = (s: GameState): number => s.players.reduce((n, p) => n + (p.stats.drained ?? 0) + (p.stats.dug ?? 0), (s.flooded ?? 0) + (s.inundated ?? 0) + (s.tideTurns ?? 0));
 import { R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE, T_ROCK, T_SAND, T_WATER } from '../sim/types';
+import { R_COCKLE } from '../sim/types';
+import { revealed, ringsFor, warnRadius } from '../sim/silo';
 
 /**
  * The overview map: the land through the player's fog, woods and mines, the buildings they know of,
@@ -99,13 +104,15 @@ export class Minimap {
     const grass = rgb('#6fa548');
     const grass2 = rgb('#7fb354');
     const sand = rgb('#d9c48a');
-    const water = rgb('#2f7fae');
+    const water = WATER_RGB;
     const rock = rgb('#8d8579');
     for (let i = 0; i < s.w * s.h; i++) {
       const t = s.terrain[i];
       const c = t === T_WATER ? water : t === T_SAND ? sand : t === T_ROCK ? rock : (i * 7) % 5 ? grass : grass2;
       this.land.set(c, i * 3);
       if (t === T_WATER) this.depth[i] = Math.max(0, -0.02 - s.height[Math.floor(i / s.w) * (s.w + 1) + (i % s.w)]);
+      // A spring head (#701 s1) shows as a speck of water.
+      if (s.springs?.includes(i)) this.land.set(water, i * 3);
       this.green[i] = t === T_WATER || t === T_SAND || t === T_ROCK ? 0 : 1;
     }
     this.terr = Uint8Array.from(s.terrain);
@@ -131,6 +138,7 @@ export class Minimap {
     footprint: { x: number; z: number }[],
     selected: Set<number>,
     scoutFlags: readonly ScoutFlag[] = [],
+    keepsakes: readonly { owner: number; x: number; y: number }[] = [],
   ): void {
     if (!this.img) return;
     const p = s.players[viewer];
@@ -141,9 +149,12 @@ export class Minimap {
       for (let i = 0; i < s.w * s.h; i++) {
         if (this.terr[i] === s.terrain[i]) continue;
         this.terr[i] = s.terrain[i];
-        this.land.set(POLDER_RGB, i * 3);
-        this.depth[i] = 0;
-        this.green[i] = 1;
+        // A channel dug (#701, the Age of Rivers) shows as water; land pumped out, as polder.
+        const wet = s.terrain[i] === T_WATER;
+        // Flats the tide bared (#739) show as wet sand.
+        this.land.set(wet ? WATER_RGB : s.terrain[i] === T_SAND ? FLATS_RGB : POLDER_RGB, i * 3);
+        this.depth[i] = wet ? Math.max(0, -0.02 - s.height[Math.floor(i / s.w) * (s.w + 1) + (i % s.w)]) : 0;
+        this.green[i] = wet || s.terrain[i] === T_SAND ? 0 : 1;
       }
     }
     if (!reveal) this.waymarks.update(s, viewer);
@@ -157,6 +168,8 @@ export class Minimap {
     const stone = rgb('#d8d3c8');
     const berry = rgb('#e0405a');
     const fish = rgb('#8fe3f2');
+    // Cockle beds (#767), while the tide has bared them.
+    const cockle = rgb('#f0dcb8');
     const bog = rgb('#c0622a');
     const salt = rgb('#f4f1e8');
     const petre = rgb('#d8d27a');
@@ -184,6 +197,7 @@ export class Minimap {
       else if (res === R_STONE) [r, g, b] = stone;
       else if (res === R_BERRY || res === R_MEAT) [r, g, b] = berry;
       else if (res === R_FISH) [r, g, b] = fish;
+      else if (res === R_COCKLE && s.terrain[i] === T_SAND) [r, g, b] = cockle;
       else if (res === R_BOG) [r, g, b] = bog;
       else if (res === R_SALT) [r, g, b] = salt;
       else if (res === R_SALTPETRE) [r, g, b] = petre;
@@ -432,6 +446,32 @@ export class Minimap {
       }
     }
 
+    // Your own rooted Ents (the Age of the Wildwood): your colour round a leaf-green core, so you know which trees are yours to wake.
+    // A rival sees only a tree.
+    for (const w of s.wardens ?? []) {
+      if (w.owner !== viewer && !reveal) continue;
+      const x = ((w.tile % s.w) + 0.5) * sx;
+      const y = (Math.floor(w.tile / s.w) + 0.5) * sy;
+      const r = Math.max(1.6, sx * 0.8);
+      ctx.fillStyle = s.players[w.owner].color;
+      ctx.fillRect(x - r - 0.7, y - r - 0.7, r * 2 + 1.4, r * 2 + 1.4);
+      ctx.fillStyle = '#5f9a3a';
+      ctx.fillRect(x - r * 0.6, y - r * 0.6, r * 1.2, r * 1.2);
+    }
+
+    // A rival's keepsake the viewer has seen (#726): a ring in its people's colour with a pale core, over its building.
+    for (const k of keepsakes) {
+      const x = k.x * sx, y = k.y * sy, r = Math.max(4.5, cw / 46);
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = s.players[k.owner].color;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x, y, r * 0.35, 0, Math.PI * 2);
+      ctx.fillStyle = '#f5ecd2';
+      ctx.fill();
+    }
     // Personal notes stay visible on ground the player has already explored.
     for (const f of scoutFlags) {
       const x = f.x * sx, y = f.y * sy;
@@ -458,6 +498,22 @@ export class Minimap {
       footprint.forEach((f, i) => (i ? ctx.lineTo(f.x * sx, f.z * sy) : ctx.moveTo(f.x * sx, f.z * sy)));
       ctx.closePath();
       ctx.stroke();
+    }
+
+    // Warheads in the air (#762): the rings this viewer is shown, all alike (a rival's three, or the real one flashing once revealed;
+    // the launcher's own side its aim, in amber). Never the hidden point.
+    for (const l of s.launches ?? []) {
+      const own = s.players[viewer].team === s.players[l.owner].team;
+      const flash = !own && revealed(s, l);
+      ctx.strokeStyle = own ? '#ffb03a' : '#ff3a2a';
+      ctx.globalAlpha = flash ? 0.5 + 0.5 * Math.abs(Math.sin(performance.now() / 70)) : 0.85;
+      ctx.lineWidth = Math.max(1.5, cw / 120);
+      for (const g of ringsFor(s, l, viewer)) {
+        ctx.beginPath();
+        ctx.arc(g.x * sx, g.y * sy, warnRadius(s, l.owner) * sx, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
     }
 
     const now = performance.now();

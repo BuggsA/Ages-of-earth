@@ -1,9 +1,10 @@
 import * as THREE from 'three';
-import { AMOUNT, RARE, ROT, TICK_HZ } from '../sim/data';
+import { AMOUNT, COCKLE, RARE, ROT, TICK_HZ } from '../sim/data';
 import { RARE_OF_TILE } from '../sim/units';
 import { hash2 } from '../sim/rng';
 import type { GameState } from '../sim/types';
 import { R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_MEAT, R_STONE, R_TREE, T_SAND } from '../sim/types';
+import { R_COCKLE } from '../sim/types';
 import { bakedMaterial, swayMaterial } from './materials';
 import { natureGeometry, type NatureKind } from './natureModels';
 import { heightAt } from './terrain';
@@ -121,6 +122,14 @@ export class ResourcesView {
         const i = ty * s.w + tx;
         const r = s.res[i];
         if (!r) continue;
+        // A cockle bed (#767) shows only while the tide has bared it, its shells thinning as it is picked.
+        if (r === R_COCKLE) {
+          if (s.terrain[i] !== T_SAND) continue;
+          const sc = 0.7 + 0.35 * Math.max(0, Math.min(1, s.amount[i] / COCKLE.amount));
+          q.setFromAxisAngle(up, hash2(tx, ty, 33) * Math.PI * 2);
+          add('cockleBed', i, new THREE.Matrix4().compose(new THREE.Vector3(tx + 0.5, heightAt(s, tx + 0.5, ty + 0.5) + 0.004, ty + 0.5), q, new THREE.Vector3(sc * 1.15, 1, sc * 1.15)));
+          continue;
+        }
         const jx = (hash2(tx, ty, 31) - 0.5) * 0.3;
         const jy = (hash2(tx, ty, 32) - 0.5) * 0.3;
         const x = tx + 0.5 + jx;
@@ -161,7 +170,12 @@ export class ResourcesView {
       const x = tx + 0.5 + (hash2(tx, ty, 31) - 0.5) * 0.3;
       const y = ty + 0.5 + (hash2(tx, ty, 32) - 0.5) * 0.3;
       q.setFromAxisAngle(up, hash2(tx, ty, 33) * Math.PI * 2);
-      const sc = 0.2 + 0.6 * grown;
+      // Ash (`fire.ts`): the charred stump stands alone a while before a shoot comes up through it.
+      if (t.ash) {
+        add('ash', -1, new THREE.Matrix4().compose(new THREE.Vector3(x, heightAt(s, x, y), y), q, new THREE.Vector3(1, 1, 1)));
+        if (grown < 0.4) continue;
+      }
+      const sc = t.ash ? 0.2 + 0.6 * ((grown - 0.4) / 0.6) : 0.2 + 0.6 * grown;
       add('broadleaf', -1, new THREE.Matrix4().compose(new THREE.Vector3(x, heightAt(s, x, y), y), q, new THREE.Vector3(sc, sc * 0.9, sc)));
     }
     for (const [kind, list] of lists) {
@@ -171,7 +185,7 @@ export class ResourcesView {
           this.group.remove(mesh);
           mesh.dispose();
         }
-        const sway = kind !== 'felled' && kind !== 'stoneDeposit' && kind !== 'goldDeposit' && kind !== 'bogIron' && kind !== 'saltVein' && kind !== 'caveMouth' && kind !== 'saltpetreVein' && kind !== 'bloodIronVein' && kind !== 'carcass';
+        const sway = kind !== 'felled' && kind !== 'ash' && kind !== 'cockleBed' && kind !== 'stoneDeposit' && kind !== 'goldDeposit' && kind !== 'bogIron' && kind !== 'saltVein' && kind !== 'caveMouth' && kind !== 'saltpetreVein' && kind !== 'bloodIronVein' && kind !== 'carcass';
         mesh = new THREE.InstancedMesh(natureGeometry(kind), sway ? swayMaterial : bakedMaterial, Math.ceil(list.length * 1.2) + 8);
         // Shoals cast no shadow on the water.
         mesh.castShadow = kind !== 'fish';

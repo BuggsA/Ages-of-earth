@@ -27,6 +27,18 @@ export interface RingSpec {
   thin?: boolean;
 }
 
+/** A warhead's warning zone (#762): a band hugging the ground at radius `r`, pulsing slowly, or flashing once `flash` is set. */
+export interface WarnSpec {
+  x: number;
+  y: number;
+  r: number;
+  color: THREE.ColorRepresentation;
+  flash?: boolean;
+}
+
+const WARN_SEG = 96;
+const MAX_WARN = 12;
+
 export interface BarSpec {
   at: THREE.Vector3;
   width: number;
@@ -56,6 +68,9 @@ export class Overlays {
   private scoutMasts: THREE.InstancedMesh;
   private scoutCloths: THREE.InstancedMesh;
   private scoutBases: THREE.InstancedMesh;
+  /** Warning bands (#762), one mesh each, laid over the ground again only when the set of zones changes. */
+  private warns: THREE.Mesh[] = [];
+  private warnKey = '';
   private m = new THREE.Matrix4();
   private q = new THREE.Quaternion();
   private e = new THREE.Euler();
@@ -118,9 +133,13 @@ export class Overlays {
     const bomb = new Kit();
     bomb.sphere(0.06, '#3a3e36', 0, 0, 0).scale.set(1, 1, 2.4);
     for (const r of [0, Math.PI / 2]) bomb.box(0.13, 0.008, 0.06, '#2b2b2e', 0, 0, -0.15).rotation.z = r;
+    // A Blowpipe Hunter's dart (the Age of the Hive): a thin dark thorn with a tuft of kapok at its tail.
+    const dart = new Kit();
+    dart.box(0.012, 0.012, 0.26, '#3b2f22', 0, -0.006, 0);
+    dart.box(0.04, 0.04, 0.05, '#efe6d2', 0, -0.006, -0.12);
     const shotMat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.8 });
     const bulletMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 2.0, 1.2), toneMapped: false });
-    for (const [kind, k] of [['arrow', arrow], ['bolt', bolt], ['stone', stone], ['bullet', bullet], ['spear', spear], ['boulder', boulder], ['ball', ball], ['bomb', bomb]] as const) {
+    for (const [kind, k] of [['arrow', arrow], ['bolt', bolt], ['stone', stone], ['bullet', bullet], ['spear', spear], ['boulder', boulder], ['ball', ball], ['bomb', bomb], ['dart', dart]] as const) {
       const big = kind === 'boulder' || kind === 'ball' || kind === 'bomb';
       const mesh = new THREE.InstancedMesh(bake(k.root), kind === 'bullet' ? bulletMat : shotMat, big ? 64 : 256);
       mesh.castShadow = big;
@@ -205,6 +224,50 @@ export class Overlays {
       m.instanceMatrix.needsUpdate = true;
       if (m.instanceColor) m.instanceColor.needsUpdate = true;
     }
+  }
+
+  /**
+   * The warning zones of warheads in the air (#762): every ring drawn the same, a band half a tile wide that follows hills and water, so a
+   * ring over a ridge is not cut off. All pulse together; a revealed ring flashes fast.
+   */
+  setWarnings(s: GameState, list: WarnSpec[], time: number): void {
+    const key = list.map((w) => `${w.x},${w.y},${w.r}`).join('|');
+    if (key !== this.warnKey) {
+      this.warnKey = key;
+      list.slice(0, MAX_WARN).forEach((w, i) => {
+        let mesh = this.warns[i];
+        if (!mesh) {
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array((WARN_SEG + 1) * 2 * 3), 3));
+          const index: number[] = [];
+          for (let k = 0; k < WARN_SEG; k++) index.push(2 * k, 2 * k + 1, 2 * k + 2, 2 * k + 1, 2 * k + 3, 2 * k + 2);
+          geo.setIndex(index);
+          mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, fog: false, toneMapped: false, side: THREE.DoubleSide }));
+          mesh.renderOrder = 2;
+          mesh.frustumCulled = false;
+          this.warns.push(mesh);
+          this.group.add(mesh);
+        }
+        const pos = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+        for (let k = 0; k <= WARN_SEG; k++) {
+          const a = (k / WARN_SEG) * Math.PI * 2;
+          const c = Math.cos(a), sn = Math.sin(a);
+          for (const [j, r] of [[0, w.r - 0.5], [1, w.r]] as const) {
+            const x = w.x + c * r, y = w.y + sn * r;
+            pos.setXYZ(2 * k + j, x, Math.max(WATER_Y, heightAt(s, x, y)) + 0.12, y);
+          }
+        }
+        pos.needsUpdate = true;
+      });
+    }
+    this.warns.forEach((mesh, i) => {
+      const w = list[i];
+      mesh.visible = !!w && i < MAX_WARN;
+      if (!w) return;
+      const mat = mesh.material as THREE.MeshBasicMaterial;
+      mat.color.set(w.color);
+      mat.opacity = w.flash ? 0.45 + 0.5 * Math.max(0, Math.sin(time * 16)) : 0.5 + 0.25 * Math.sin(time * 2.4);
+    });
   }
 
   setBars(list: BarSpec[], camera: THREE.Camera): void {
@@ -306,8 +369,8 @@ export class Overlays {
     this.ghost.visible = true;
   }
 
-  /** Show a planned line of wall, or of dykes (#701) (an empty list hides it). */
-  setWallGhost(s: GameState, tiles: { x: number; y: number; ok: boolean }[], epoch: number, color: string, alongY: boolean, type: 'wall' | 'dyke' | 'thornwall' = 'wall'): void {
+  /** Show a planned line of wall, or of dykes or a channel (#701), or of Thornwall (an empty list hides it). */
+  setWallGhost(s: GameState, tiles: { x: number; y: number; ok: boolean }[], epoch: number, color: string, alongY: boolean, type: 'wall' | 'dyke' | 'thornwall' | 'channel' | 'causeway' = 'wall'): void {
     const key = `${type}:${epoch}:${color}:${alongY ? 1 : 0}`;
     if (key !== this.wallKey) {
       this.wallKey = key;
@@ -317,7 +380,7 @@ export class Overlays {
     for (let i = 0; i < n; i++) {
       const t = tiles[i];
       // A dyke's ghost floats on the water it would stand in.
-      const hgt = type === 'dyke' ? Math.max(0.02, heightAt(s, t.x + 0.5, t.y + 0.5)) : heightAt(s, t.x + 0.5, t.y + 0.5);
+      const hgt = type === 'dyke' || type === 'causeway' ? Math.max(0.02, heightAt(s, t.x + 0.5, t.y + 0.5)) : heightAt(s, t.x + 0.5, t.y + 0.5);
       this.m.compose(this.p.set(t.x + 0.5, hgt + 0.04, t.y + 0.5), this.q.identity(), this.sc.set(0.96, 1, 0.96));
       this.wallPads.setMatrixAt(i, this.m);
       this.wallPads.setColorAt(i, this.c.set(t.ok ? '#5cff7a' : '#ff5050'));

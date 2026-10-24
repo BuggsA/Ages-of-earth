@@ -56,6 +56,20 @@ function felled(): Kit {
   return k;
 }
 
+/** Where fire took a tree (`fire.ts`): a charred stump on a scatter of grey ash and embers gone dark. */
+function ash(): Kit {
+  const k = new Kit();
+  k.cyl(0.36, 0.42, 0.015, 7, '#4a4541').scale.set(1, 1, 0.8);
+  k.cyl(0.22, 0.26, 0.02, 6, '#77706a', 0.06, 0.008, -0.04);
+  k.cyl(0.065, 0.08, 0.2, 6, '#231c17');
+  k.cyl(0.05, 0.065, 0.02, 6, '#120d0a', 0, 0.2);
+  const snag = k.cyl(0.02, 0.03, 0.16, 4, '#2c221b', 0.03, 0.18, 0);
+  snag.rotation.z = -0.5;
+  k.octa(0.025, '#7a3a1c', -0.12, 0.02, 0.1);
+  k.octa(0.02, '#5a2a16', 0.16, 0.02, -0.08);
+  return k;
+}
+
 function berryBush(): Kit {
   const k = new Kit();
   k.blob(0.26, '#2d6230', 0, 0.18).scale.set(1.1, 0.8, 1.1);
@@ -248,7 +262,32 @@ function fish(): Kit {
   return k;
 }
 
-const MAKERS = { pine, broadleaf, birch, palm, felled, berryBush, stoneDeposit, goldDeposit, bogIron, saltVein, caveMouth, saltpetreVein, bloodIronVein, carcass, carcassRotten, tuft, flowers, pebbles, boulder, fish };
+/**
+ * A cockle bed on the bared flats (#767): a darker, rippled patch of wet sand with a pool in it, and cockles lying half-buried in it,
+ * ridged shells in cream, buff and pink, a few open and white inside, and a bird's three-toed print.
+ */
+function cockleBed(): Kit {
+  const k = new Kit();
+  k.cyl(0.44, 0.47, 0.012, 11, '#8f7f5c', 0, 0.0).scale.set(1, 1, 0.82);
+  k.cyl(0.13, 0.13, 0.008, 9, '#6f8f98', 0.18, 0.012, -0.12).scale.set(1.3, 1, 0.8);
+  for (let r = 0; r < 3; r++) k.box(0.6 - r * 0.12, 0.006, 0.025, '#a8996f', -0.05, 0.012, -0.22 + r * 0.16).rotation.y = 0.25;
+  const shells = ['#e9dcc0', '#d8c39a', '#e6c2b4', '#cdb48a', '#f1e6d0'];
+  for (let i = 0; i < 13; i++) {
+    const a = i * 2.39;
+    const r = 0.08 + ((i * 7) % 5) * 0.065;
+    const g = k.group(Math.cos(a) * r, 0.012, Math.sin(a) * r * 0.82);
+    g.rotation.y = a * 1.7;
+    const shell = k.sphere(0.034, shells[i % shells.length], 0, 0, 0, g, 6);
+    shell.scale.set(1, 0.55, 0.9);
+    // The ridges, and an open one showing white.
+    k.box(0.006, 0.02, 0.062, '#b29c74', 0, 0.012, 0, g);
+    if (i % 4 === 0) k.sphere(0.026, '#fbf7ef', 0.03, 0.006, 0.01, g, 5).scale.set(1, 0.3, 0.85);
+  }
+  for (let t = 0; t < 3; t++) k.box(0.05, 0.004, 0.008, '#6e6248', -0.26, 0.014, 0.16).rotation.y = -0.6 + t * 0.6;
+  return k;
+}
+
+const MAKERS = { pine, broadleaf, birch, palm, felled, ash, berryBush, cockleBed, stoneDeposit, goldDeposit, bogIron, saltVein, caveMouth, saltpetreVein, bloodIronVein, carcass, carcassRotten, tuft, flowers, pebbles, boulder, fish };
 export type NatureKind = keyof typeof MAKERS;
 
 const cache = new Map<NatureKind, THREE.BufferGeometry>();

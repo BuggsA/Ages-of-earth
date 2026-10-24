@@ -1,14 +1,16 @@
-import { AURA, RALLY, BONUS, BLOOD_TOWER, BUILDINGS, DEER, LIGHTNING, VETERANCY, TICK_HZ, domainOf, secs, HEART, type UnitStats } from './data';
+import { AURA, FLOAT, RALLY, BONUS, BLOOD_TOWER, BUILDINGS, DEER, LIGHTNING, VETERANCY, TICK_HZ, domainOf, secs, HEART, type UnitStats } from './data';
 import { asleep, hasCoils } from './ages';
 import { bleeds, curseTaken, drawBlood, hemoBlow, hemoTaken } from './blood';
 import { fairPurse } from './fair';
 import { raidBlow, raidSlain } from './ways';
 import { takeCaptive } from './thralls';
 import { prizeOf } from './convoy';
+import { board, boarder, cuts } from './beggars';
 import { looted, pack } from './spoils';
 import { raided } from './household';
 import { alarm } from './flee';
 import { distToRect } from './grid';
+import { envenom } from './hive';
 import type { Spatial } from './spatial';
 import { gunPower, gunRange, modsOf, statsFor } from './stats';
 import type { Animal, Building, Ent, GameState, Shot, Unit } from './types';
@@ -16,7 +18,7 @@ import { canHit, isEnemy, radiusOf, statsOf } from './world';
 
 /** Blows, shots, towers, the damage triangle, splash and the hunt. */
 
-const SHOT_SPEED: Record<Shot['kind'], number> = { stone: 10, arrow: 13, bolt: 15, bullet: 32, spear: 9, boulder: 8, ball: 20, bomb: 6 };
+const SHOT_SPEED: Record<Shot['kind'], number> = { stone: 10, arrow: 13, bolt: 15, bullet: 32, spear: 9, boulder: 8, ball: 20, bomb: 6, dart: 16 };
 
 /** Whether a peace treaty still holds (no fighting between players). */
 export const peace = (s: GameState) => s.tick < s.peaceUntil;
@@ -39,8 +41,12 @@ export function damageOf(s: GameState, attacker: Unit | null, st: UnitStats, tar
   const inspired = (attacker && s.tick - attacker.aura < 5 ? AURA.attack : 1) * (attacker && rankOf(attacker) ? VETERANCY.attack[rankOf(attacker) - 1] : 1) * (attacker && stirred(s, attacker) ? RALLY.attack : 1) * hemoBlow(s, attacker);
   if (target.kind === 'building') {
     // Walls shrug off all but siege and heavy blows.
-    const wall = target.type === 'wall' || target.type === 'gate' || target.type === 'dyke' ? (st.cls === 'siege' ? 1.2 : st.cls === 'infantry' || st.cls === 'hero' ? 0.5 : 0.15) : 1;
-    return Math.max(1, st.attack * BONUS[st.cls].building * inspired * wall);
+    const wall = target.type === 'wall' || target.type === 'gate' || target.type === 'dyke' || target.type === 'sluice' || target.type === 'dam' ? (st.cls === 'siege' ? 1.2 : st.cls === 'infantry' || st.cls === 'hero' ? 0.5 : 0.15) : 1;
+    // The Sea Beggars (#783) cut a rival's dykes from the sea: their ships strike the water-works as siege does.
+    const cut = attacker && st.cls === 'ship' ? cuts(s, attacker.owner, target) : 0;
+    // Ships hole a floating district (#770) as nothing else does.
+    const hull = target.type === 'pontoon' && st.cls === 'ship' ? FLOAT.hull : 1;
+    return Math.max(1, st.attack * BONUS[st.cls].building * inspired * (cut || wall) * hull);
   }
   const ts = statsOf(s, target);
   const rank = target.kind === 'unit' ? rankOf(target) : 0;
@@ -72,6 +78,8 @@ export function hurt(s: GameState, target: Ent, damage: number, by: number, atta
     p.alert = s.tick;
     s.events.push({ k: 'alert', owner: target.owner, x: target.x, y: target.y, building: target.kind === 'building', ...(target.kind === 'unit' && target.order.k === 'hunt' ? { hunter: true } : {}) });
   }
+  // The Sea Beggars (#783): a rival ship beaten down by theirs is boarded and taken, not sunk.
+  if (target.hp <= 0 && target.kind === 'unit' && board(s, target, by, credit)) return;
   if (target.hp <= 0) {
     s.players[by].stats.kills++;
     if (target.kind === 'unit' && by !== target.owner) plunder(s, target, by, credit);
@@ -228,6 +236,8 @@ export function updateShots(s: GameState, sp: Spatial, hitAnimal: (a: Animal, da
     }
     const shooter = sh.src ? s.byId.get(sh.src) : undefined;
     if (t && t.hp > 0) hurt(s, t, sh.damage, sh.owner, null, shooter && shooter.kind === 'unit' ? shooter : null);
+    // A Blowpipe Hunter's dart leaves venom in what it hits (the Age of the Hive).
+    if (sh.kind === 'dart' && t && t.kind === 'unit' && t.hp > 0) envenom(s, t, sh.owner);
     if (sh.splash > 0) {
       s.events.push({ k: 'splash', x: sh.tx, y: sh.ty, owner: sh.owner, kind: sh.kind });
       const st = sh.from ? statsFor(s, sh.owner, sh.from) : null;
@@ -237,7 +247,7 @@ export function updateShots(s: GameState, sp: Spatial, hitAnimal: (a: Animal, da
         const dx = o.x - sh.tx;
         const dy = o.y - sh.ty;
         if (dx * dx + dy * dy > sh.splash * sh.splash) return;
-        hurt(s, o, st ? damageOf(s, null, st, o, true) * 0.6 : sh.damage * 0.5, sh.owner, null);
+        hurt(s, o, st ? damageOf(s, null, st, o, true) * 0.6 : sh.damage * 0.5, sh.owner, null, boarder(s, shooter && shooter.kind === 'unit' ? shooter : null));
       });
     }
   }

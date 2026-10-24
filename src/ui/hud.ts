@@ -9,15 +9,26 @@ import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE, findResource } from '../sim/units';
-import { AUTO_WORK, POLDER, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch } from '../sim/data';
+import { FIRE, FISSION, HIVE, INTERCEPT, WILDWOOD, BLOOM, AUTO_WORK, BREACH, CANAL, DAM, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, SALVO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE, FLOAT } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
 import { restsAt } from '../sim/passage';
 import { loadPrice, sellerNear } from '../sim/oretrade';
-import { clockOf, launchProblem, loaded, rulesOf } from '../sim/silo';
+import { armingOf, charged, clockOf, fuelOf, held as inReserve, launchProblem, loaded, nextNuke, reserveProblem, revealed, ringsFor, rulesOf, salvoFuel, salvoProblem, stockOf, warheadsOf, WARHEAD_NAMES, type WarheadKind } from '../sim/silo';
 import { carriesKegs, kegProblem, kegsOf, millProblem, mills, millsOf, sappers } from '../sim/powder';
-import { basinOf, millIdle } from '../sim/water';
+import { carriesTorch, fireOn } from '../sim/fire';
+import { basinOf, damIdle, drowned, heldBack, isInund, lets, millIdle, sluiceFed, sluiceProblem, waterLine, wateredAt } from '../sim/water';
+import { aground, millShares, tidalNear, tideClock, tideMillIdle } from '../sim/tides';
+import { isPond } from '../sim/tides';
+import { tideWaitLeft } from '../sim/tides';
+import { ashoreLeft, bedClock } from '../sim/tides';
+import { hutBeds, hutWorks } from '../sim/tides';
+import { gateHead, gateReach, gateWorks, pondBehind, tideGateProblem } from '../sim/tides';
+import { TIDE_GATE } from '../sim/data';
+import { COCKLER } from '../sim/data';
+import { COCKLE } from '../sim/data';
+import { R_COCKLE } from '../sim/types';
 import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
 import { LANDMARK_KINDS, claimWork, claimants, favours, landmarkAt } from '../sim/landmarks';
 import { workProblem } from '../sim/works';
@@ -35,13 +46,17 @@ import { stirred as stirredNow } from '../sim/combat';
 import { sees } from '../sim/vision';
 import { buildingCostFor, buildingMaxHp, gunPower, gunRange, modsOf, raiseProblem, statsFor, techCostFor, techProblem, trainCostFor, trainTimeFor } from '../sim/stats';
 import { isMobile, packProblem, packsOf, pitchProblem } from '../sim/steppe';
+import { castProblem, districtOf } from '../sim/floating';
 import { exacting, isRider } from '../sim/tribute';
 import { landOwnerAt } from '../sim/borders';
 import { flockCap, flockOf, grazeRange, lambProblem } from '../sim/flocks';
 import { soldAt } from '../sim/ages';
 import { ageDef, ageOf, asleep, crossingLeft, goldenEnds, livesOf, threadsOf, crossingsAhead, keepsakeProblem, leaving, sleepWhy, type Tally, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, oreClue, oreDone, oreOnly, ironTradeShare, isHire, isSideRoad, journeyOf, mainRoad, pathLine, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, suspendedTechs, assayed, diggersAt, holdingsOf, holds, keyOf, lacking, opensOf, prospected, trainsAt, windowsOf, leadsOn, leadsTo } from '../sim/ages';
-import type { AgeId, KeyId, RareId, Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Player, Res, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
+import type { AgeId, BloomSeed, KeyId, RareId, Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Launch, Player, Res, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
 import { GROVE_BUILDINGS, grows } from '../sim/grove';
+import { hiveLine, keepsBees } from '../sim/hive';
+import { heartBarred, heartLine, heartOf, rootProblem, wakesForest } from '../sim/wildwood';
+import { greenLeft, inBloom, rooted, slingProblem, spireBarred, spireLine } from '../sim/bloom';
 import { KEYS, RARES, RES, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
 import { buildingPicture, unitPicture } from './thumbs';
@@ -70,8 +85,13 @@ export interface HudActions {
   riteMode(how: 'sacrifice' | 'curse'): void;
   /** Wait for a left click on a rival building, for sappers to lay a powder keg at (#577). */
   kegMode(): void;
+  /** Wait for a left click on a tree, a root or a rival's living building, for torchbearers to set alight (`fire.ts`). */
+  torchMode(): void;
   /** Wait for a left click on the map, for this Missile Silo to launch at (#605). */
-  launchMode(silo: number): void;
+  /** Aim a launch from this silo: one warhead (`w`, the people's own if absent), or a salvo's three points (#765). */
+  launchMode(silo: number, w?: WarheadKind | 'salvo'): void;
+  /** Wait for a left click on the map, for this Seed Spire to sling its Bloom Seed at (the Age of the Bloom). */
+  slingMode(spire: number): void;
   /** Wait for a left click on a building to shelter in (or a transport to board). */
   garrisonMode(): void;
   /** Wait for a left click on a shore to land a transport's passengers. */
@@ -122,6 +142,9 @@ function orderWords(s: GameState, u: Unit): string {
   switch (o.k) {
     case 'gather': {
       const kind = s.res[o.tile];
+      // Cockle beds (#767): the picker reads the tide.
+      if (ashoreLeft(s, u) > 0) return o.phase === 'drop' ? 'Off the flats with the cockles, before the flood' : 'Waiting ashore for the cockle beds to bare';
+      if (kind === R_COCKLE || o.cockle) return o.phase === 'drop' ? 'Carrying cockles home' : o.phase === 'work' ? 'Picking cockles' : 'Going out to the cockle beds';
       if (kind === R_FISH || u.type === 'fisher') return o.phase === 'drop' ? 'Bringing the catch to the dock' : o.phase === 'work' ? 'Fishing' : 'Sailing to the fishing grounds';
       const what = o.res === 'food' ? (kind === R_MEAT ? 'meat' : 'berries') : o.res === 'wood' ? 'wood' : kind === R_BOG || o.bog ? 'bog iron' : o.res;
       if (o.phase === 'drop') return `Carrying ${what} home`;
@@ -130,9 +153,14 @@ function orderWords(s: GameState, u: Unit): string {
     }
     case 'farm':
       if (flooded(s, u.owner)) return 'Waiting out the flood: the field is under the river';
+      {
+        const f = s.byId.get(o.target);
+        if (f && f.kind === 'building' && drowned(s, f)) return 'Waiting for the water to go: the field is under the sluice\'s flood';
+      }
       if ((s.byId.get(o.target) as Building | undefined)?.type === 'garden') return o.phase === 'drop' ? 'Carrying the harvest home' : o.phase === 'work' ? 'Tending a Kitchen Garden' : 'Going to the garden';
       return o.phase === 'drop' ? 'Carrying grain home' : o.phase === 'work' ? 'Farming' : 'Going to the fields';
     case 'build': {
+      if (ashoreLeft(s, u) > 0) return 'Waiting ashore for the tide to go out again';
       const target = s.byId.get(o.target);
       if (target?.kind === 'building' && target.built) return u.act === 'build' ? 'Repairing' : 'Going to repair';
       return u.act === 'build' ? 'Building' : 'Going to build';
@@ -171,6 +199,10 @@ function orderWords(s: GameState, u: Unit): string {
       return carriedBy(s, u) ? 'Carrying a relic to the Temple' : 'Going for a relic';
     case 'keg':
       return 'Carrying a powder keg to lay';
+    case 'kegTile':
+      return 'Carrying a powder keg to a causeway';
+    case 'torch':
+      return 'Carrying a torch to set alight';
     case 'cache':
       return u.ore ? `Carrying ${u.ore.n} ${RARE[u.ore.id].name.toLowerCase()} home` : 'Going for the spilled ore';
     case 'salvage':
@@ -188,6 +220,7 @@ function orderWords(s: GameState, u: Unit): string {
       if (u.type === 'trader' && u.carry > 0) return 'Waiting with gold: right-click a Market';
       if (u.type === 'cog' && u.carry > 0) return 'Waiting with gold: right-click a Dock';
       if (u.type === 'wagon') return 'Packed for the road: press P to pitch camp';
+      if (u.type === 'tow') return `Under tow with ${u.cargo.length} aboard: press P to moor`;
       return ACT_WORDS[u.act] ?? 'Standing by';
   }
 }
@@ -261,7 +294,7 @@ const routeTag = (id: AgeId) => {
  * Going back as a plan (#555 s10, `docs/age-roads.md` §5): what leaving this age for `to` keeps, puts to sleep, wakes and loses,
  * for the step-back button and the roads. What is kept for good shows on a step back only.
  */
-const planLines = (s: GameState, p: Player, to: AgeId, back: boolean): string => {
+export const planLines = (s: GameState, p: Player, to: AgeId, back: boolean): string => {
   const l = leaving(s, p, to, back);
   const tally = (t: Tally) => t.map(([type, n]) => `${n} ${BUILDINGS[type].name}${n > 1 ? 's' : ''}`).join(', ');
   const lines: string[] = [];
@@ -290,6 +323,68 @@ const fmtTime = (ticks: number) => {
   const ss = sec % 60;
   return h ? `${h}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}` : `${m}:${String(ss).padStart(2, '0')}`;
 };
+
+/** The tide clock's state, for the top bar's signature (#739): it redraws each second the clock moves. */
+const tideSig = (s: GameState): string => {
+  const c = tideClock(s);
+  return c ? `${c.level}:${Math.ceil(c.next)}` : '';
+};
+
+/** Seconds on a Bloom Seed's clock: until it roots while in the air, then until it cracks. */
+const bloomClock = (s: GameState, l: BloomSeed): number => Math.max(0, Math.ceil(((rooted(s, l) ? l.at : l.lands) - s.tick) / TICK_HZ));
+
+/** What a Bloom Seed in the bar says to this viewer. */
+function seedTip(s: GameState, l: BloomSeed, viewer: number): string {
+  const who = l.owner === viewer ? 'Your' : `${s.players[l.owner].name}'s`;
+  if (!rooted(s, l)) return `${who} Seed is in the air: it roots in ${bloomClock(s, l)} seconds on the open ground nearest the green ring's heart.`;
+  const left = Math.max(0, BLOOM.root - l.cut);
+  return `${who} Seed has rooted: in ${bloomClock(s, l)} seconds every ${l.owner === viewer ? 'rival ' : ''}building within ${BLOOM.r} tiles of its heart-root cracks into forest. ${left} strokes are left to hack it out: each rival citizen beside the root (the yellow ring) strikes once a second.`;
+}
+
+/** The public tide clock (#739), beside the game clock on every screen once the tide has woken: where the sea stands, which way, and when it turns. */
+/**
+ * The ☢ chip's words for a warhead in the air (#762): a rival is told of three rings and never which are real until the last seconds. The
+ * words are the same for a salvo (#765) as for one warhead, so the chip never tells them apart before the reveal.
+ */
+function warnTip(s: GameState, l: Launch, viewer: number): string {
+  const who = s.players[l.owner].name;
+  if (s.players[viewer].team === s.players[l.owner].team) {
+    if (l.salvo) return `${l.owner === viewer ? 'Your' : `${who}'s`} salvo lands on the amber rings in ${clockOf(s, l)} seconds. Rivals see three rings, as for one warhead and two decoys, each set off up to ${SILO.blur} tiles from its point; all three stay at the last ${SILO.reveal} seconds. A silo destroyed before then scrubs its own warhead.`;
+    return `${l.owner === viewer ? 'Your' : `${who}'s`} warhead lands on the amber ring in ${clockOf(s, l)} seconds. Rivals see it among two decoys, each ring set off up to ${SILO.blur} tiles from its point, until the last ${SILO.reveal} seconds. A silo destroyed before then scrubs the launch.`;
+  }
+  const n = ringsFor(s, l, viewer).length;
+  if (revealed(s, l)) return n > 1 ? `${who}'s salvo lands in ${clockOf(s, l)} seconds: all ${n} rings that flash are real.` : `${who}'s warhead lands in ${clockOf(s, l)} seconds, inside the ring that flashes. The decoys are gone.`;
+  return `${who}'s Missile Silo has launched: it lands in ${clockOf(s, l)} seconds. Of the red rings, one is real and the others decoys, unless it is a salvo of three silos firing at once, when all are real. Each ring is set off up to ${SILO.blur} tiles from where it falls. With ${SILO.reveal} seconds left the decoys vanish and the real rings flash. A silo destroyed before then scrubs its warhead.\nWatch the missile: it climbs toward the middle of the rings, then, some seconds before they flash, bends toward where it falls.${coverLine(s, l, viewer)}`;
+}
+
+/**
+ * Missile defence (#759 s2): how many of the rings this viewer is shown lie in their team's charged batteries' cover. A battery fires at a
+ * warhead whose ring it covers, so a ring in cover is one an interceptor will try to stop. And (s3) whether the team holds a silo in Reserve.
+ */
+function coverLine(s: GameState, l: Launch, viewer: number): string {
+  const team = s.players[viewer].team;
+  // A silo of the team held in Reserve (#759 s3) answers what no battery takes, wherever it falls.
+  const kept = s.ents.filter((e): e is Building => e.kind === 'building' && e.type === 'silo' && s.players[e.owner].team === team && e.built && e.hp > 0 && inReserve(e));
+  const ready = kept.filter((e) => !armingOf(s, e)).length;
+  const back = !kept.length ? '' : `\n${ready ? `${ready === 1 ? 'A silo' : `${ready} silos`} held in Reserve stand${ready === 1 ? 's' : ''} ready: each fires a warhead of its store at one warhead no battery answers, wherever it falls, and stops it ${Math.round(INTERCEPT.chance * 100)}% of the time.` : `Your silos held in Reserve are not ready yet: ${Math.min(...kept.map((e) => armingOf(s, e)))}s.`}`;
+  const mine = s.ents.filter((e): e is Building => e.kind === 'building' && e.type === 'battery' && s.players[e.owner].team === team && charged(s, e));
+  if (!mine.length) return back;
+  const R = INTERCEPT.reach * INTERCEPT.reach;
+  const rings = ringsFor(s, l, viewer);
+  const n = rings.filter((g) => mine.some((b) => (b.x - g.x) * (b.x - g.x) + (b.y - g.y) * (b.y - g.y) <= R)).length;
+  return back + `\n${n ? `${n} of the ${rings.length} rings lie in your Interceptor Batteries' cover: ${INTERCEPT.fire} seconds before it lands, a battery fires at a warhead falling in a ring it covers, and stops it ${Math.round(INTERCEPT.chance * 100)}% of the time.` : `None of the rings lies in your Interceptor Batteries' cover (the teal circles).`}`;
+}
+
+function tideChip(s: GameState): { text: string; tip: string } | null {
+  const c = tideClock(s);
+  if (!c) return null;
+  const top = TIDE.flats.length;
+  const name = c.level === top ? 'High water' : c.level === 0 ? 'Low water' : c.rising ? 'Flooding' : 'Ebbing';
+  const arrow = c.level === top ? '▲' : c.level === 0 ? '▼' : c.rising ? '↑' : '↓';
+  const bars = '▮'.repeat(c.level) + '▯'.repeat(top - c.level);
+  const tip = `The tide: ${name.toLowerCase()}. Next turn in ${Math.ceil(c.next)} s.${c.level === 0 ? '' : ` Low water in ${Math.ceil(c.toLow)} s.`}${c.level === top ? '' : ` High water in ${Math.ceil(c.toHigh)} s.`}\nEvery ${TIDE.period / 60} minutes the sea falls through ${top} steps to low water and rises back. As it falls the shallow sea bares, the shallowest first: wet flats anyone may walk, where ships sit aground and a Dock with only flats beside it launches nothing. Whoever stands on the flats when the water comes back is swept ashore and hurt, or drowned far out. Causeways drown only at high water. Tide Mills grind gold at every turn.`;
+  return { text: `🌊${arrow}${bars} ${Math.ceil(c.next)}s`, tip };
+}
 
 export class Hud {
   /** Showing a build menu for citizens. */
@@ -445,23 +540,28 @@ export class Hud {
   /** Press a command's hotkey. Returns whether one was found. */
   hotkey(key: string): boolean {
     const k = key.toUpperCase();
-    const c = this.cmds.find((x) => x.key === k);
+    // Two buttons may share a key where one is shut (the Pontoon takes the House's E in the Age of Floating Cities, #770): the open one wins.
+    const c = this.cmds.find((x) => x.key === k && x.ok) ?? this.cmds.find((x) => x.key === k);
     if (!c) return false;
     this.runCmd(c);
     return true;
   }
 
-  toast(msg: string, kind: 'bad' | 'good' | 'info' | 'alert' = 'info'): void {
+  toast(msg: string, kind: 'bad' | 'good' | 'info' | 'alert' = 'info', onClick?: () => void): void {
     const now = performance.now();
     if ((this.recent.get(msg) ?? 0) > now - 2500) return;
     this.recent.set(msg, now);
     const el = document.createElement('div');
     el.className = `notice ${kind}`;
     el.textContent = msg;
+    if (onClick) {
+      el.classList.add('clickable');
+      el.addEventListener('click', () => (onClick(), el.remove()));
+    }
     this.noticeEl.appendChild(el);
     while (this.noticeEl.children.length > 4) this.noticeEl.firstChild!.remove();
-    setTimeout(() => (el.style.opacity = '0'), 2600);
-    setTimeout(() => el.remove(), 3200);
+    setTimeout(() => (el.style.opacity = '0'), onClick ? 5600 : 2600);
+    setTimeout(() => el.remove(), onClick ? 6200 : 3200);
   }
 
   /** A notice for a button you can't pay for: what is missing, and one button per resource to send the hands it takes. */
@@ -751,11 +851,12 @@ export class Hud {
     const age = ageDef(p);
     const idleTechs = suspendedTechs(p).map((t) => TECHS[t].name);
     const scores = s.players.map((q) => scoreOf(s, q));
-    const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${RARES.map((r) => Math.floor(p.rare?.[r] ?? 0)).join(',')}|${Math.floor(bloodOf(p))}|${p.pop}/${p.cap}|${ageOf(p)}|${adv}|${p.way ?? ''}${p.deep ? '+' : ''}${p.vowed ? 'v' : ''}|${idleTechs.length}|${idle}|${speed}|${scores.join(',')}|${isHousehold(p) ? Math.round(taxRate(s, viewer) * 60) : ''}|${p.kegs ?? ''}|${(s.launches ?? []).map((l) => `${l.id}:${clockOf(s, l)}`).join(',')}`;
+    const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${RARES.map((r) => Math.floor(p.rare?.[r] ?? 0)).join(',')}|${Math.floor(bloodOf(p))}|${p.pop}/${p.cap}|${ageOf(p)}|${adv}|${p.way ?? ''}${p.deep ? '+' : ''}${p.vowed ? 'v' : ''}|${idleTechs.length}|${idle}|${speed}|${scores.join(',')}|${isHousehold(p) ? Math.round(taxRate(s, viewer) * 60) : ''}|${p.kegs ?? ''}|${(s.launches ?? []).map((l) => `${l.id}:${clockOf(s, l)}${revealed(s, l) ? '!' : ''}${ringsFor(s, l, viewer).length}`).join(',')}|${(s.blooms ?? []).map((l) => `${l.id}:${bloomClock(s, l)}:${l.cut}`).join(',')}|${tideSig(s)}`;
     const sn = seasonOf(s);
-    this.clockEl.textContent = `${sn.icon} ${fmtTime(s.tick)}`;
+    const tide = tideChip(s);
+    this.clockEl.textContent = `${sn.icon} ${fmtTime(s.tick)}${tide ? `  ${tide.text}` : ''}`;
     const hl = s.homeland ? HOMELANDS[s.homeland] : undefined;
-    this.clockEl.title = `${sn.name}: ${sn.blurb}${hl ? `\n${hl.icon} ${hl.name}: ${hl.blurb}${hl.year[seasonAt(s)] ? `\nThis season: ${hl.year[seasonAt(s)]}` : ''}` : ''}`;
+    this.clockEl.title = `${sn.name}: ${sn.blurb}${hl ? `\n${hl.icon} ${hl.name}: ${hl.blurb}${hl.year[seasonAt(s)] ? `\nThis season: ${hl.year[seasonAt(s)]}` : ''}` : ''}${tide ? `\n${tide.tip}` : ''}`;
     this.timers(s, viewer);
     this.objectives(s);
     if (sig === this.topSig) return;
@@ -766,7 +867,8 @@ export class Hud {
         .map((r) => `<div class="res" data-tip="<b>${RARE[r].name}</b>${RARE[r].blurb} Mined from deep veins that only some worlds hold.">${RARE_ICON[r]}${Math.floor(p.rare![r]!)}</div>`)
         .join('') +
       (p.blood !== undefined ? `<div class="res" data-tip="<b>Blood</b>Drawn at Drain Rigs from the enemy who fall near them, and from citizens given to the levy. Spent to raise Blood Towers, and at Transfusion Stations to graft soldiers. In Hemocraft the rigs also bleed the living enemy who stand near them; in the Blood-rite every Temple draws as a rig does, and spends blood to mend your own.">🩸${Math.floor(bloodOf(p))}</div>` : '') +
-      (s.launches ?? []).map((l) => `<div class="res" data-tip="<b>Warhead in the air</b>${s.players[l.owner].name}'s Missile Silo has launched: it lands in ${clockOf(s, l)} seconds. A silo destroyed before then scrubs the launch.">☢ ${s.players[l.owner].name} ${clockOf(s, l)}s</div>`).join('') +
+      (s.blooms ?? []).map((l) => `<div class="res" data-tip="<b>Bloom Seed</b>${seedTip(s, l, viewer)}">🌱 ${s.players[l.owner].name} ${bloomClock(s, l)}s</div>`).join('') +
+      (s.launches ?? []).map((l) => `<div class="res" data-tip="<b>Warhead in the air</b>${warnTip(s, l, viewer)}">☢ ${s.players[l.owner].name} ${clockOf(s, l)}s${s.players[viewer].team !== s.players[l.owner].team && !revealed(s, l) ? ` · ${ringsFor(s, l, viewer).length} rings` : ''}</div>`).join('') +
       (p.kegs !== undefined || mills(p) || sappers(p) ? `<div class="res" data-tip="<b>Powder kegs</b>Ground from saltpetre at the Siege Workshops in the Age of Alchemy, ${KEG.ore} a keg, up to ${KEG.most} in store. In the Age of Sappers citizens and foot soldiers lay them at a rival building (K): ${KEG.fuse} seconds later each blows, wrecking every rival building within ${KEG.reach} tiles, unless a rival reaches it first and stamps it out.${mills(p) ? `<br>${millProblem(s, p) ?? `The mills grind: next keg in ${Math.max(0, Math.ceil((KEG.time - (p.grind ?? 0)) / Math.max(1, millsOf(s, viewer).length)))}s.`}` : ''}">🧨${kegsOf(p)}</div>` : '') +
       `<div class="res pop ${p.pop >= p.cap ? 'full' : ''}" data-tip="<b>Population</b>People and soldiers you have, and room for. Houses add 5 each, a Town Center 10 (150 at most).">${icon('pop')}${p.pop}/${p.cap}</div>`;
     const civ = CIVS[p.civ];
@@ -834,6 +936,15 @@ export class Hud {
       const focus = shrine ? ` data-focus="${shrine.x},${shrine.y}"` : '';
       parts.push(`<div class="timer ${ours ? 'good' : 'bad'}"${focus}>⚱ ${who} every relic: ${fmtTime(s.relicTimer)}${ours ? '' : ' (take one back!)'}</div>`);
     }
+    // The Greening (the Age of the Bloom): a people holding its land green has this long left, on every screen, as a Wonder's clock.
+    for (const q of s.players) {
+      const left = greenLeft(s, q);
+      if (left === null || q.defeated) continue;
+      const ours = q.team === s.players[viewer].team;
+      const heart = heartOf(s, q.id);
+      const focus = heart ? ` data-focus="${heart.x},${heart.y}"` : '';
+      parts.push(`<div class="timer ${ours ? 'good' : 'bad'}"${focus} data-tip="<b>The Greening</b>${q.id === viewer ? 'Your' : `${q.name}'s`} land is ${((q.green ?? 0) / 10).toFixed(1)}% green (trees, Orchards, the Heart Tree and Thornwalls grown to living oak), over the ${BLOOM.green * 100}% needed. Held for ${BLOOM.hold / 60} minutes with the Heart Tree standing, it wins the match. Fell and burn the woods in that land, or fell the Heart Tree, to stop it."><span class="swatch" style="background:${q.color}"></span>🌿 ${q.id === viewer ? 'Your' : `${q.name}'s`} Greening: ${fmtTime(secs(left))}${ours ? '' : ' (burn their woods!)'}</div>`);
+    }
     if ((s.landTeam ?? -1) >= 0 && (s.landTimer ?? -1) >= 0) {
       const ours = s.landTeam === s.players[viewer].team;
       const keepers = s.players.filter((q) => q.team === s.landTeam);
@@ -862,12 +973,15 @@ export class Hud {
     else if (post) [html, sig] = this.postPanel(s, viewer, post);
     else if (!ents.length && tile !== null && s.res[tile]) {
       const kind = s.res[tile];
-      const name = kind === R_TREE ? 'Tree' : kind === R_BERRY ? 'Berry bush' : kind === R_MEAT ? (s.amount[tile] > BOAR.meat ? 'Mammoth carcass' : s.amount[tile] > AMOUNT.meat ? 'Boar carcass' : 'Carcass') + (s.carcasses?.some((c) => c.tile === tile && s.tick - c.born >= secs(ROT.grace)) ? ' (spoiling)' : '') : kind === R_FISH ? 'Fish shoal' : kind === R_GOLD ? 'Gold mine' : kind === R_BOG ? 'Bog iron' : kind === R_SALT || kind === R_SALTPETRE || kind === R_BLOODIRON ? (s.caves?.some((c) => c.tile === tile) ? `${RARE[RARE_OF_TILE[kind]].name} cave` : `${RARE[RARE_OF_TILE[kind]].name} vein`) : 'Stone quarry';
-      const res = RARE_OF_TILE[kind] ? 'stone' : kind === R_TREE ? 'wood' : kind === R_BERRY || kind === R_MEAT || kind === R_FISH ? 'food' : kind === R_GOLD || kind === R_BOG ? 'gold' : 'stone';
-      sig = `res:${tile}:${s.amount[tile]}`;
-      html = `<div class="sel-portrait"><span style="font-size:54px">${kind === R_TREE ? '🌳' : kind === R_BERRY ? '🫐' : kind === R_MEAT ? '🍖' : kind === R_FISH ? '🐟' : kind === R_GOLD ? icon('gold', 64) : kind === R_BOG ? '🟤' : RARE_OF_TILE[kind] ? RARE_ICON[RARE_OF_TILE[kind]] : icon('stone', 64)}</span></div>
+      const name = kind === R_COCKLE ? 'Cockle bed' : kind === R_TREE ? 'Tree' : kind === R_BERRY ? 'Berry bush' : kind === R_MEAT ? (s.amount[tile] > BOAR.meat ? 'Mammoth carcass' : s.amount[tile] > AMOUNT.meat ? 'Boar carcass' : 'Carcass') + (s.carcasses?.some((c) => c.tile === tile && s.tick - c.born >= secs(ROT.grace)) ? ' (spoiling)' : '') : kind === R_FISH ? 'Fish shoal' : kind === R_GOLD ? 'Gold mine' : kind === R_BOG ? 'Bog iron' : kind === R_SALT || kind === R_SALTPETRE || kind === R_BLOODIRON ? (s.caves?.some((c) => c.tile === tile) ? `${RARE[RARE_OF_TILE[kind]].name} cave` : `${RARE[RARE_OF_TILE[kind]].name} vein`) : 'Stone quarry';
+      const res = RARE_OF_TILE[kind] ? 'stone' : kind === R_TREE ? 'wood' : kind === R_BERRY || kind === R_MEAT || kind === R_FISH || kind === R_COCKLE ? 'food' : kind === R_GOLD || kind === R_BOG ? 'gold' : 'stone';
+      // A cockle bed (#767) tells its tide: bared for so long, or under water until so long.
+      const bed = kind === R_COCKLE ? bedClock(s, tile) : null;
+      const bedLine = !bed ? '' : bed.pond ? 'Shut in a barrage\'s pond, it stays under water: no one picks it until the barrage is breached.' : bed.bare ? `Bared by the tide for ${Math.ceil(bed.secs)}s more. Select citizens and right-click it to pick; they come ashore before the flood, and go back at the next low water.` : `Under water: the tide bares it in ${Math.ceil(bed.secs)}s. Citizens sent to it wait ashore until then.`;
+      sig = `res:${tile}:${s.amount[tile]}:${bed ? Math.ceil(bed.secs) : ''}`;
+      html = `<div class="sel-portrait"><span style="font-size:54px">${kind === R_COCKLE ? '🐚' : kind === R_TREE ? '🌳' : kind === R_BERRY ? '🫐' : kind === R_MEAT ? '🍖' : kind === R_FISH ? '🐟' : kind === R_GOLD ? icon('gold', 64) : kind === R_BOG ? '🟤' : RARE_OF_TILE[kind] ? RARE_ICON[RARE_OF_TILE[kind]] : icon('stone', 64)}</span></div>
         <div class="sel-info"><div class="sel-name">${name}</div><div class="stats"><span>${icon(res as 'wood')}${s.amount[tile]} left</span></div>
-        <div class="blurb">${kind === R_FISH ? 'Select fishing boats (from a Dock) and right-click it to fish.' : RARE_OF_TILE[kind] ? `${RARE[RARE_OF_TILE[kind]].blurb} Only some worlds hold it.${s.caves?.some((c) => c.tile === tile && c.den) ? ' Wolves lair here.' : ''} Select citizens and right-click it to mine; it is kept apart from your other stores.` : kind === R_BOG ? 'Rust-red ore in the wetland mud, smelted into iron bars and paid in as gold. Digging it opens the Iron Age, in the Stone Age, to a people whose Prospector\'s Lodge has found it.' : 'Select citizens and right-click it to gather.'}</div></div>`;
+        <div class="blurb">${bed ? `Cockles in the wet sand of the deeper flats, picked by hand as the tide runs low. Each high water brings ${COCKLE.regrow} back, up to ${COCKLE.amount}, to a bed open to the sea. ${bedLine}` : kind === R_FISH ? 'Select fishing boats (from a Dock) and right-click it to fish.' : RARE_OF_TILE[kind] ? `${RARE[RARE_OF_TILE[kind]].blurb} Only some worlds hold it.${s.caves?.some((c) => c.tile === tile && c.den) ? ' Wolves lair here.' : ''} Select citizens and right-click it to mine; it is kept apart from your other stores.` : kind === R_BOG ? 'Rust-red ore in the wetland mud, smelted into iron bars and paid in as gold. Digging it opens the Iron Age, in the Stone Age, to a people whose Prospector\'s Lodge has found it.' : 'Select citizens and right-click it to gather.'}</div></div>`;
     } else if (!ents.length) {
       const p = s.players[viewer];
       // A Golden Age (#703) counts down here, with what it weaves.
@@ -1014,6 +1128,20 @@ export class Hud {
     // The Blood-rite (#355 s4): a cursed enemy takes every blow harder until the curse lifts.
     const curseLeft = cursed(s, u) ? Math.ceil((u.cursed! - s.tick) / TICK_HZ) : 0;
     const curse = curseLeft ? `<span data-tip="<b>Cursed</b>A Blood-rite priest has cursed this one: every blow on it lands ${Math.round((RITE.taken - 1) * 100)}% harder for ${curseLeft} more seconds.">☠<em>Cursed</em> ${curseLeft}s</span>` : '';
+    // The Age of the Hive: venom from Blowpipe darts, or a swarm's stings, slow it, and venom burns past armour.
+    const venomed = u.venom && s.tick < u.venom.end ? u.venom.n : 0;
+    const stingLeft = u.stung !== undefined && s.tick < u.stung;
+    const sting = venomed
+      ? `<span data-tip="<b>Venom</b>${venomed} dose${venomed > 1 ? 's' : ''} of Blowpipe venom: ${HIVE.dose * venomed} hit points a second past armour, and it walks at ${Math.round(HIVE.slow * 100)}% pace, until ${HIVE.venomFor} seconds after the last dart.">🐍<em>Venom ×${venomed}</em></span>`
+      : stingLeft
+        ? `<span data-tip="<b>Stung</b>A Hive's bees swarm whoever walks its people's woods: ${HIVE.sting} hit points a second past armour, and a slow walk. Keep out of the trees by a Hive, or smoke it quiet with a fire.">🐝<em>Stung</em></span>`
+        : '';
+    // Routes that read the tide (#755): waiting on the shore for the flats to bare.
+    const ebbLeft = Math.ceil(tideWaitLeft(s, u));
+    // Work on the flats that reads the tide (#767): stepped ashore before the flood, back when its ground bares.
+    const ashoreSecs = Math.ceil(ashoreLeft(s, u));
+    const ashore = ashoreSecs && !ebbLeft ? `<span data-tip="<b>Ashore for the tide</b>${mine ? 'It' : 'This one'} was working out on the flats and came ashore before the water could cover them. It goes back to its work in ${ashoreSecs}s, when the ground bares again. A new order ends the wait.">🌊<em>Ashore</em> ${ashoreSecs}s</span>` : '';
+    const ebb = ebbLeft ? `<span data-tip="<b>Waiting for the tide</b>The way ${mine ? 'you sent it' : 'it was sent'} runs over tidal flats the sea would cover before it was across, and there is no quicker way round. It waits on the shore and sets out in ${ebbLeft}s, when the flats it needs stand bare until it is over.">🌊<em>Tide</em> ${ebbLeft}s</span>` : '';
     // Military Orders (#355 s6): a soldier with one of its priests at hand is sworn.
     const isSworn = sworn(s, u);
     const oath = isSworn ? `<span data-tip="<b>Sworn</b>Military Orders: one of ${mine ? 'your' : 'its people\'s'} priests stands within ${ORDERS.reach} tiles, so no rival's priest can turn it, offer it up or curse it, and ${mine ? 'your' : 'their'} priests mend it ${Math.round((ORDERS.mend - 1) * 100)}% faster. Leave it without a priest near and the oath no longer holds it.">⚜<em>Sworn</em></span>` : '';
@@ -1033,7 +1161,7 @@ export class Hud {
     // A thrall (#502): a taken citizen, bound and drab, who works but never builds.
     const bond = u.thrall ? `<span data-tip="<b>Thrall</b>A citizen taken by a Warband people: it works a field for ${mine ? 'you' : p.name} but never builds or repairs. Slay it, or guard your workers so none are taken.">⛓<em>Thrall</em></span>` : '';
     const held = u.type === 'priest' && carriedBy(s, u) ? `<span data-tip="<b>Relic</b>Carried to a Temple, it brings in gold. Hands full: no healing or converting until it is set down (D).">⚱<em>Relic</em></span>` : '';
-    const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}:${u.cargo.length}:${rank}:${taking}:${road}:${u.tolled ?? 0}:${hemoLeft}:${curseLeft}:${u.merc ?? -1}:${isSworn}:${!!u.thrall}:${u.spoils ?? 0}:${isLine}`;
+    const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}:${u.cargo.length}:${rank}:${taking}:${road}:${u.tolled ?? 0}:${hemoLeft}:${curseLeft}:${u.merc ?? -1}:${isSworn}:${!!u.thrall}:${u.spoils ?? 0}:${isLine}:${ebbLeft}`;
     const html = `<div class="sel-portrait"><img src="${unitPicture(u.type, u.type === 'wagon' && u.packed === 'market' ? p.epoch + 20 : p.epoch, p.color)}" alt=""></div>
       <div class="sel-info">
         <div class="sel-name">${s.kings.includes(u.id) ? `👑 King (${st.name})` : u.thrall ? `Thrall (${st.name})` : st.name}</div>
@@ -1044,7 +1172,7 @@ export class Hud {
           <span data-tip="<b>Armor</b>Melee / missile armor: taken off every blow or shot.">🛡<em>Armor</em> ${st.armor}/${st.parmor}</span>
           ${st.range ? `<span data-tip="<b>Range</b>How far it shoots, in tiles.">🏹<em>Range</em> ${st.range}</span>` : ''}
           <span data-tip="<b>Speed</b>Tiles per second.">👣<em>Speed</em> ${Math.round(st.speed * 100) / 100}</span>
-          ${carry}${cargo}${load}${stance}${vet}${line}${aura}${graft}${oath}${sword}${pack}${curse}${bond}${held}${trip}${caravan}${tribute}${toll}
+          ${carry}${cargo}${load}${stance}${vet}${line}${aura}${graft}${oath}${sword}${pack}${curse}${sting}${bond}${held}${trip}${caravan}${tribute}${toll}${ebb}${ashore}
         </div>
         <div class="blurb">${st.blurb}</div>
       </div>`;
@@ -1058,7 +1186,9 @@ export class Hud {
     const mine = b.owner === viewer;
     let status = '';
     let queue = '';
-    if (!b.built) status = `Under construction: ${Math.floor(b.progress * 100)}%`;
+    const fire = fireOn(s, b);
+    if (fire) status = `🔥 Burning: ${mine ? `send citizens to beat it out (${Math.max(0, FIRE.beat - (fire.out ?? 0))} seconds of beating left)` : `${s.players[b.owner].name} must beat it out`}`;
+    else if (!b.built) status = `Under construction: ${Math.floor(b.progress * 100)}%`;
     else if (b.advance >= 0 && journeyOf(p, b)) {
       const road = journeyOf(p, b)!;
       const pct = Math.floor((b.advance / secs(road.time)) * 100);
@@ -1082,6 +1212,11 @@ export class Hud {
     } else if (b.type === 'farm' && b.built) {
       const f = b.farmer ? s.byId.get(b.farmer) : undefined;
       status = f && f.kind === 'unit' && f.order.k === 'farm' && f.order.target === b.id ? 'Worked by a citizen' : 'Waiting for a farmer';
+      // The Age of Rivers (#701): a field with water near works faster.
+      if (ageDef(s.players[b.owner]).rivers) status += wateredAt(s, b.tx, b.ty, b.size) ? ` · <span data-tip="<b>Watered</b>Water lies within ${RIVERS.wet} tiles: in the Age of Rivers the field works ${Math.round((RIVERS.farm - 1) * 100)}% faster.">💧 Watered</span>` : ` · <span data-tip="<b>Dry</b>No water within ${RIVERS.wet} tiles. Dig a Channel (Q) to it and it works faster.">Dry field</span>`;
+    } else if (b.type === 'channel' && b.built) {
+      // A dug ditch (#701) waiting for the water: it fills once water lies beside it.
+      status = ageDef(s.players[b.owner]).canals ? 'Dug, and dry: the water runs in once water lies beside it, deep enough for ships. Dig on toward the water.' : 'Dug, and dry: the water runs in once a channel or water lies beside it. Dig on toward the water.';
     } else if (b.type === 'snare' && b.built) {
       // Snares in the wood (#485): what it holds, how fast its woods fill it, and whether anyone walks the line.
       const trees = snareWoods(s, b);
@@ -1090,6 +1225,16 @@ export class Hud {
       const tended = s.ents.some((e) => e.kind === 'unit' && e.owner === b.owner && e.hp > 0 && e.order.k === 'snare');
       const cap = snareCap(s, b);
       status = `Caught ${catchIn(b)} / ${cap} food${catchIn(b) >= cap ? ' (full: it catches no more)' : ''} · ${trees} trees round it: ${perMin} a minute${trees < full ? ` (best with ${full})` : ''}${seasonAt(s) === 3 ? ', winter-hungry' : ''} · ${tended ? 'the line is walked' : 'nobody walks the line'}`;
+    } else if (b.type === 'heart' && b.built) {
+      // The Age of the Wildwood: its Ents awake and rooted, and whether a tree stands near to wake.
+      const greening = b.owner === viewer && inBloom(p) ? ` · <span data-tip="<b>The Greening</b>Trees, Orchards, this Heart Tree and Thornwalls grown to living oak count green, as a share of your land's open ground (counted as at least ${BLOOM.least} tiles). At ${BLOOM.green * 100}% with the Heart Tree standing, a ${BLOOM.hold / 60} minute clock starts that every player sees; when it runs out, you win.">🌿 ${((p.green ?? 0) / 10).toFixed(1)}% of ${BLOOM.green * 100}% green</span>` : '';
+      status = `<span data-tip="<b>${BUILDINGS.heart.name}</b>Train an Ent here and the old tree nearest it within ${WILDWOOD.wake} tiles wakes. While it stands, your rooted Ents wake when a rival comes within ${WILDWOOD.rouse} tiles, and ${WILDWOOD.spreadAt} seconds into each spring your woods within ${WILDWOOD.spread} tiles seed the bare ground beside them in your land. If it falls, every Ent roots where it stands and sleeps.">🌳 ${heartLine(s, b)}</span>${greening}`;
+    } else if (b.type === 'spire' && b.built) {
+      // The Age of the Bloom: how long until its Seed is ripe, and whether the Heart Tree feeds it.
+      status = `<span data-tip="<b>${BUILDINGS.spire.name}</b>While your Heart Tree stands it ripens a Bloom Seed every ${BLOOM.ripen} seconds, one at a time. Sling it (G) at any point on the map for ${Object.entries(BLOOM.fuel).map(([r, n]) => `${n} ${r}`).join(', ')}: ${BLOOM.flight} seconds later it roots on open ground there, and ${BLOOM.grow} seconds after that every rival building within ${BLOOM.r} tiles of its heart-root cracks into forest, unless their citizens hack the root out (${BLOOM.root} strokes, one a second for each citizen beside it).">🌱 ${spireLine(s, b)}</span>`;
+    } else if (b.type === 'hive' && b.built) {
+      // The Age of the Hive: whether its bees are awake, what it pays, and whether it pollinates.
+      status = `<span data-tip="<b>${BUILDINGS.hive.name}</b>Awake, its bees sting any rival standing in a wood within ${HIVE.reach} tiles. It pays honey (food), or mead (gold) while one of your Markets stands within ${HIVE.market} tiles, and in summer doubles your Kitchen Gardens within ${HIVE.bloom} tiles. Bees sleep in winter; a fire within ${HIVE.smoke} tiles smokes them quiet for ${HIVE.quiet} seconds.">🐝 ${hiveLine(s, b)}</span>`;
     } else if (b.type === 'shaft' && b.built) {
       // Mine Shaft (#681): the seam it digs, the ground's grade and whether a miner is down it.
       const seam = seamOf(s, b);
@@ -1163,10 +1308,69 @@ export class Hud {
       const still = millProblem(s, p);
       status += ` · <span data-tip="<b>Powder mill</b>In the Age of Alchemy every Siege Workshop grinds: together they make a keg from ${KEG.ore} saltpetre every ${KEG.time} seconds a mill, up to ${KEG.most} in store. Kegs are laid in the Age of Sappers.">${still ? `⚠ ${still}` : `🧨 Grinding powder: ${kegsOf(p)} kegs`}</span>`;
     }
+    // A sluice (#701 s4): open or shut, and how far its water reaches.
+    if (b.built && b.type === 'sluice') {
+      const under = waterLine(s, b).filter((t) => isInund(s, t)).length;
+      status += ` · <span data-tip="<b>Sluice</b>Open, the water runs out over the low ground within ${INUND.reach} tiles of it: polder, and meadow no higher than a little over its banks. Soldiers wade it at a crawl, siege bogs down, and gun-barges sail it. Shut, it holds the water back as a dyke does.">${b.open ? (lets(s, b) ? `🌊 Open: ${under} tiles under water` : '⚠ Open, but no water to let out') : sleeping ? '💤 Shut' : `🚪 Shut${under ? `: ${under} tiles still draining` : ''}`}</span>`;
+    }
+    // A Tide Gate (#785): shut and loaded (and how far it would scour), pouring out, or open with the tide. Rivals read it too.
+    if (b.built && b.type === 'tidegate') {
+      const head = gateHead(s, b).length;
+      const reach = gateReach(s, b).length;
+      const pouring = s.scour?.some((c) => c.gate === b.id);
+      const pond = pondBehind(s, b).length;
+      status += ` · <span data-tip="<b>Tide Gate</b>Shut, the barrage holds its pond (${pond} tiles of flats) at every hour. The head of water is the pond held above the sea outside: with ${TIDE_GATE.least} tiles of head or more, opening the gate sends it out as a scour over up to ${TIDE_GATE.spread} tiles of bared flats a tile of head, within ${TIDE_GATE.reach} tiles of the gate: for ${TIDE_GATE.secs} seconds they are under water, and whoever stands there is swept off, ${TIDE_GATE.hurt} health lost, or drowned with no shore near. Open, the pond runs with the tide.">${!gateWorks(s, b) ? '💤 Shut: it works only in the Age of Tides' : pouring ? '🌊 Scouring: the pond is pouring out' : b.open ? '🚪 Open: the pond runs with the tide' : reach ? `⚠ Loaded: ${head} tiles of head, would scour ${reach} tiles of flats` : head ? `🚪 Shut: ${head} tiles of head, too little to scour` : '🚪 Shut: no head of water above the sea'}</span>`;
+    }
+    // A dam (#701 s5): whether its turbines turn, how many of its owner's buildings they drive, and the burst it holds back.
+    if (b.built && b.type === 'dam') {
+      const still = damIdle(s, b);
+      const r2 = DAM.reach * DAM.reach;
+      const driven = s.ents.filter((e) => e.kind === 'building' && e.owner === b.owner && e.built && e.hp > 0 && BUILDINGS[e.type].trains.length > 0 && (e.x - b.x) * (e.x - b.x) + (e.y - b.y) * (e.y - b.y) <= r2).length;
+      status += ` · <span data-tip="<b>Dam</b>With still water beside it, its turbines drive every building of yours within ${DAM.reach} tiles: they train and research ${DAM.drive - 100}% faster (one dam's worth, however many stand near). If it falls with water behind it, it bursts over the low ground round it, up to ${DAM.surge} tiles, and all who stand there lose ${DAM.hurt} health.">${still ? `⚠ ${still}` : `⚙ Turning: drives ${driven} building${driven === 1 ? ' that trains' : 's that train'}`}</span>`;
+    }
+    // A floating district (#770): how many lie linked with it, and whether they raise citizens.
+    if (mine && b.built && b.type === 'pontoon') {
+      const n = districtOf(s, b).length;
+      status += ` · <span data-tip="<b>Floating town</b>Pontoons moored side by side link into one town, and a town of ${FLOAT.city} or more raises citizens at each of its pontoons. Corners alone don't link. Ships hole a pontoon ${FLOAT.hull} times as fast as anything else does, and those on its deck when it sinks swim for the nearest deck or shore within ${FLOAT.swim} tiles, or drown.">${n >= FLOAT.city ? `⛵ A floating town of ${n}: raises citizens` : `⚓ ${n === 1 ? 'Alone' : `Linked to ${n - 1}`}: moor ${FLOAT.city - n} more beside it to raise citizens`}</span>`;
+    }
+    if (b.built && b.type === 'bridge') status += ` · <span data-tip="<b>Bridge</b>Your own people cross here at full pace; rivals can't, and swim the water round it at ${Math.round(CANAL.wade * 100)}% of their pace in a canal. Every ship and barge passes under it.">🌉 Swings for ships</span>`;
     // A windmill (#701): how much water is left behind its dykes, or why it stands still.
     if (mine && b.built && !sleeping && b.type === 'windmill') {
       const still = millIdle(s, b);
       status += ` · <span data-tip="<b>Windmill</b>Pumps the water within ${POLDER.reach} tiles of it dry, a tile every ${POLDER.every} seconds, nearest first: a lake, or a bay your dykes have shut off from the open sea (at most ${POLDER.most} tiles of water). The drained ground is polder, where a Farm yields half again as much.">${still ? `⚠ ${still}` : `💧 Pumping: ${basinOf(s, b).length} tiles of water left`}</span>`;
+    }
+    // A Tide Mill (#739): what it grinds at each turn of the tide, or why it stands still.
+    if (mine && b.built && !sleeping && b.type === 'tidemill') {
+      const still = tideMillIdle(s, b);
+      const share = millShares(s).get(b.id) ?? 0;
+      status += ` · <span data-tip="<b>Tide Mill</b>Its pond fills on the flood and runs out through the wheel on the ebb: at every turn of the tide it grinds ${TIDE.mill.gold} gold with ${TIDE.mill.most} tiles of tidal ground within ${TIDE.mill.reach} tiles of it, less with fewer. A tile feeds only the first mill raised by it. Causeways count as tidal ground. Flats a causeway line shuts off from the sea are a barrage's pond: ground twice, on the flood and on the ebb.">${still ? `⚠ ${still}` : `🌊 ${Math.round(share)} gold a turn of the tide (${Math.min(TIDE.mill.most, tidalNear(s, b).length)} tiles of tidal ground${tidalNear(s, b).some((t) => isPond(s, t)) ? `, ${tidalNear(s, b).filter((t) => isPond(s, t)).length} of them a barrage's pond, ground twice` : ''})${tideClock(s) ? '' : ': the tide wakes the moment it is raised'}`}</span>`;
+    }
+    // A Cockler's Hut (#779): the beds it tends.
+    if (mine && b.built && b.type === 'cockler') {
+      const n = hutBeds(s, b);
+      status += ` · <span data-tip="<b>Cockler's Hut</b>Your pickers empty their baskets of cockles here (it takes nothing else) when it is nearer than a food store, and wait beside it, on dry ground, for the tide to bare their bed. Each high water brings ${COCKLER.regrow} food back to every bed within ${COCKLER.reach} tiles of it instead of ${COCKLE.regrow}.">${hutWorks(s, b) ? `🐚 Tends ${n} bed${n === 1 ? '' : 's'}` : '⚠ Idle outside the Age of Tides'}</span>`;
+    }
+    // The missile pool (#753): the store is the owner's alone to read.
+    if (mine && b.built && b.type === 'silo') {
+      const next = nextNuke(s, p);
+      status += ` · <span data-tip="<b>Warhead store</b>Your people's warheads, fired from any of your silos. One more is made every ${rulesOf(p).refuel} seconds while the store and the warheads in the air number under ${SILO.cap}. Rivals can't see it.">☢ ${stockOf(p)} in store${next === null ? '' : `, next in ${next}s`}</span>`;
+    }
+    // A silo held in Reserve (#759 s3), read by either side as the silo is public: whether it stands ready to answer a warhead.
+    if (b.built && b.type === 'silo' && inReserve(b)) {
+      const left = armingOf(s, b);
+      status += ` · <span data-tip="<b>Held in Reserve</b>This silo launches nothing while held. ${INTERCEPT.fire} seconds before any rival warhead lands that no Interceptor Battery answered, wherever it falls, a ready Reserve silo fires its own warhead at it and stops it ${Math.round(INTERCEPT.chance * 100)}% of the time, spending a warhead from its people's store and the fuel of a launch. It stands ready ${INTERCEPT.arm} seconds after it was held, and again ${INTERCEPT.arm} seconds after each it fires.">${left ? `⏳ Reserve: ready in ${left}s` : '🛡 Reserve: ready'}</span>`;
+    }
+    // An Interceptor Battery (#759 s2): its charge, read by either side, as the battery and its cover are public.
+    if (b.built && b.type === 'battery') {
+      const left = Math.max(0, Math.ceil(((b.reload ?? 0) - s.tick) / TICK_HZ));
+      status += ` · <span data-tip="<b>Interceptor</b>It covers ${INTERCEPT.reach} tiles round it (the teal circle, shown while a warhead is in the air). ${INTERCEPT.fire} seconds before a rival warhead lands in a ring it covers, it fires by itself and stops it ${Math.round(INTERCEPT.chance * 100)}% of the time: no blast, no fallout. One attempt for each warhead, from the nearest battery; the charge is spent hit or miss and reloads in ${INTERCEPT.reload} seconds.">${left ? `⏳ Reloading: ${left}s` : '🛡 Charged'}</span>`;
+    }
+    // A harbour aground at low water (#739).
+    if (mine && b.built && b.type === 'dock' && aground(s, b)) status += ` · <span data-tip="<b>Aground</b>The tide has bared all the water beside this Dock: it launches nothing until the water comes back.">⚓ Aground at low water</span>`;
+    // A dyke (#701 s3): what it holds back, read by either side: the rival's eye for a breach, its owner's for a weak bank.
+    if (b.built && b.type === 'dyke') {
+      const held = heldBack(s, b);
+      if (held > 0) status += ` · <span data-tip="<b>The breach</b>Should this dyke fall (to siege, or a Sapper's keg, which tears a dyke open in one blast) the sea runs back into the polder behind it, a ring of tiles every ${BREACH.every} seconds, drowning what stands there. A finished dyke in the gap stops it; a windmill pumps it out again.">🌊 Holds back ${held} tiles of polder</span>`;
     }
     // A Transfusion Station (#355 s3): who waits for a graft, and whether there is blood for it.
     if (mine && b.built && !sleeping && b.type === 'transfusion') {
@@ -1216,7 +1420,7 @@ export class Hud {
     const citizens = units.filter((u) => u.type === 'citizen');
     // Who may raise buildings: citizens, and a legion's foot soldiers too (#501).
     const builders = units.filter((u) => canRaise(u.type, 'house', p.civ));
-    const soldiers = units.filter((u) => u.type !== 'citizen' && u.type !== 'fisher' && u.type !== 'transport' && u.type !== 'trader' && u.type !== 'cog' && u.type !== 'wagon');
+    const soldiers = units.filter((u) => u.type !== 'citizen' && u.type !== 'fisher' && u.type !== 'transport' && u.type !== 'trader' && u.type !== 'cog' && u.type !== 'wagon' && u.type !== 'tow');
     const walkers = units.filter((u) => domainOf(u.type) === 'land');
     const transports = units.filter((u) => u.type === 'transport');
     const cmds: Cmd[] = [];
@@ -1233,15 +1437,19 @@ export class Hud {
         if (type === 'sapling' && !CIVS[p.civ].coppice) continue;
         // What the Grove grows shows only to a people that has walked it.
         if (GROVE_BUILDINGS.includes(type) && !grows(p)) continue;
+        if (type === 'hive' && !keepsBees(p)) continue;
+        if (type === 'heart' && !wakesForest(p)) continue;
+        if (type === 'spire' && !hasWalked(p, 'bloom')) continue;
         const locked = def.epoch > p.epoch;
-        const no = buildBarred(p, type) ?? wayBarred(s, p, type);
+        const no = buildBarred(p, type) ?? wayBarred(s, p, type) ?? heartBarred(s, viewer, type) ?? spireBarred(s, viewer, type);
         const cost = buildingCostFor(s, viewer, type);
         const short = shortfall(p, cost) ?? bloodShort(p, type);
         const wonderUp = type === 'wonder' && s.ents.some((e) => e.kind === 'building' && e.owner === viewer && e.type === 'wonder');
         cmds.push({
           key: def.key,
           pic: buildingPicture(type, p.epoch, p.color),
-          title: def.name,
+          // In the Age of Locks (#701 s5) a channel is dug deep, as a canal.
+          title: type === 'channel' && ageDef(p).canals ? 'Canal' : def.name,
           desc: def.blurb + (type === 'wall' || type === 'thornwall' ? ' Click and drag to lay out a line.' : '') + (def.blood ? ` Costs 🩸${def.blood} blood besides.` : ''),
           cost,
           ok: !locked && !no && !short && !wonderUp,
@@ -1311,7 +1519,12 @@ export class Hud {
       const sappersHere = units.filter(carriesKegs);
       if (sappersHere.length && sappers(p)) {
         const why = kegsOf(p) < 1 ? kegProblem(s, viewer, undefined) : null;
-        cmds.push({ key: 'K', pic: '', glyph: '🧨', title: 'Lay a keg', count: kegsOf(p) || undefined, desc: `Then click a rival building: each one carries a keg from your store to its foot and lights it. ${KEG.fuse} seconds later it blows, wrecking every rival building within ${KEG.reach} tiles (${KEG.building} each) and hurting the soldiers near it. A rival who reaches a burning keg stamps it out: get there quietly, or cover it. Kegs left: ${kegsOf(p)}. More are ground only in the Age of Alchemy.`, ok: !why, why: why ?? undefined, run: () => this.act.kegMode() });
+        cmds.push({ key: 'K', pic: '', glyph: '🧨', title: 'Lay a keg', count: kegsOf(p) || undefined, desc: `Then click a rival building, or a stretch of a rival's causeway: each one carries a keg from your store to its foot and lights it. ${KEG.fuse} seconds later it blows, wrecking every rival building within ${KEG.reach} tiles (${KEG.building} each) and hurting the soldiers near it; a causeway or barrage within reach is breached. A rival who reaches a burning keg stamps it out: get there quietly, or cover it. Kegs left: ${kegsOf(p)}. More are ground only in the Age of Alchemy.`, ok: !why, why: why ?? undefined, run: () => this.act.kegMode() });
+      }
+      // Fire (`fire.ts`): citizens and foot soldiers carry torches, from the Bronze Age.
+      if (units.some(carriesTorch)) {
+        const why = p.epoch < FIRE.epoch ? `Torches are carried from the ${EPOCHS[FIRE.epoch].name}` : null;
+        cmds.push({ key: 'F', pic: '', glyph: '🔥', title: 'Torch', desc: `Then click a tree, a rival's Thornwall root, or a rival's living building (a Thornwall, Kitchen Garden, Orchard or Sapling): each one walks to it and stands ${FIRE.light} seconds to set it alight. A living building burns down unless its people beat it out (${FIRE.beat} citizen-seconds standing by it); a Thornwall that burns leaves no root. Fire leaps from tree to tree and on to what grows beside: far in a dry summer (up to ${FIRE.run[1]} tiles), hardly at all in a wet spring or winter (${FIRE.run[0]}). A burnt tree is ash for ${Math.round(FIRE.ash / 60)} minutes, then grows again. Mind your own people: the flames scorch whoever stands in them.`, ok: !why, why: why ?? undefined, run: () => this.act.torchMode() });
       }
       cmds.push({ key: 'S', pic: '', glyph: '✋', title: 'Stop', desc: 'Stop what they are doing (and forget queued orders).', ok: true, run: () => this.act.issue({ t: 'stop', p: viewer, ids: units.map((u) => u.id) }) });
       if (citizens.length && !p.ai) {
@@ -1344,6 +1557,17 @@ export class Hud {
         const aboard = transports.reduce((n, t) => n + t.cargo.length, 0);
         cmds.push({ key: 'U', pic: '', glyph: '⚓', title: 'Unload', desc: 'Then click a shore: sail there and put everyone aboard on land. (Right-clicking land does the same.)', ok: aboard > 0, why: 'Nobody is aboard', count: aboard || undefined, run: () => this.act.unloadMode() });
         cmds.push({ key: 'Y', pic: '', glyph: '🏖', title: 'Unload here', desc: 'Land everyone aboard on the nearest shore.', ok: aboard > 0, why: 'Nobody is aboard', run: () => transports.forEach((t) => this.act.issue({ t: 'unload', p: viewer, ids: [t.id], x: t.x, y: t.y })) });
+      }
+      // The Age of the Wildwood: Ents root where they stand.
+      const ents = units.filter((u) => u.type === 'warden');
+      if (ents.length) {
+        const why = ents.map((u) => rootProblem(s, u)).find((w) => w) ?? null;
+        cmds.push({ key: 'O', pic: '', glyph: '🌳', title: 'Root', desc: `Root where ${ents.length > 1 ? 'they stand' : 'it stands'} and be a tree again, on bare open ground: it mends ${Math.round(WILDWOOD.mend * 100)}% of its health a second, a rival sees only a tree, and it wakes when a rival comes within ${WILDWOOD.rouse} tiles or an axe bites, while your Heart Tree stands. Fell or burn the tree and the Ent is lost.`, ok: !why || ents.some((u) => !rootProblem(s, u)), why: why ?? undefined, run: () => this.act.issue({ t: 'root', p: viewer, ids: ents.map((u) => u.id) }) });
+      }
+      const tows = units.filter((u) => u.type === 'tow');
+      if (tows.length) {
+        const why = tows.map((w) => pitchProblem(s, w)).find((w) => w) ?? null;
+        cmds.push({ key: 'P', pic: '', glyph: '⚓', title: 'Moor', desc: `Moor the ${tows.length > 1 ? 'districts' : 'district'} here, on open water within ${FLOAT.spot} tiles that no rival holds. It raises itself in ${STEPPE.pitch} seconds with the health it had, and those aboard step out onto its deck. Moored side by side with ${FLOAT.city - 1} more of your pontoons, it raises citizens again.`, ok: !why || tows.some((w) => !pitchProblem(s, w)), why: why ?? undefined, run: () => this.act.issue({ t: 'pitch', p: viewer, ids: tows.map((w) => w.id) }) });
       }
       const wagons = units.filter((u) => u.type === 'wagon');
       if (wagons.length) {
@@ -1594,6 +1818,23 @@ export class Hud {
           const why = workProblem(s, p);
           cmds.push({ key: 'V', pic: '', glyph: w.icon, title: w.name, desc: `${w.blurb} Free; lasts ${WORK.duration} seconds, once in each epoch.`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'greatWork', p: viewer }) });
         }
+        // The Water Line (#701 s4): open the sluice, or shut it.
+        if (b.type === 'sluice') {
+          const why = sluiceProblem(s, b);
+          const reach = waterLine(s, b).length;
+          cmds.push({ key: 'O', pic: '', glyph: b.open ? '⛔' : '🌊', title: b.open ? 'Shut the sluice' : 'Open the sluice', desc: b.open ? `Let the gate down: the flood drains away from its edges in, a ring every ${INUND.every} second${INUND.every === 1 ? '' : 's'}, and the fields under it work again. A boat left on the last wet tile runs aground and is lost.` : `Wind the gate up: the water runs out over the low ground round it, a ring every ${INUND.every} second${INUND.every === 1 ? '' : 's'}, up to ${INUND.reach} tiles (${reach} tiles here). Soldiers wade the flood at ${Math.round(INUND.wade * 100)}% of their pace and siege at ${Math.round(INUND.siege * 100)}%; your gun-barges sail it. Fields under it yield nothing while it lies.${sluiceFed(s, b) ? '' : ' <b>No still water lies beside it</b>: set it on a channel, a lake or the shallows.'}`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'pack', p: viewer, building: b.id }) });
+        }
+        // A Tide Gate (#785): open it, a scour on a loaded pond, or shut it to fill on the next flood.
+        if (b.type === 'tidegate') {
+          const why = tideGateProblem(s, b);
+          const reach = gateReach(s, b).length;
+          cmds.push({ key: 'O', pic: '', glyph: b.open ? '⛔' : '🌊', title: b.open ? 'Shut the gate' : 'Open the gate', desc: b.open ? 'Let the leaves swing to: the pond holds again what the next flood brings in, and its mills grind it twice once it is full.' : reach ? `Let the pond out: it scours ${reach} tiles of flats below the gate for ${TIDE_GATE.secs} seconds, sweeping off whoever stands there (your own people too), ${TIDE_GATE.hurt} health lost or drowned. Then the pond runs with the tide until you shut the gate and the flood fills it.` : `No head of water to scour with (${TIDE_GATE.least} tiles held above the sea at least: open it at low water). Opened, the pond runs with the tide: its flats bare at low water and its cockle beds grow back, and the mills grind it once.`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'pack', p: viewer, building: b.id }) });
+        }
+        // The Age of Floating Cities (#770): cast the district off into a tow.
+        if (b.type === 'pontoon' && (ageDef(p).floats || b.keep === 'floating')) {
+          const why = castProblem(s, p, b);
+          cmds.push({ key: 'O', pic: '', glyph: '⛵', title: 'Cast off', desc: `Slip this district's moorings and take it in tow, with those sheltering in it and then those of your people on its deck aboard, up to ${FLOAT.hold}; anyone else on the deck swims for the nearest deck or shore within ${FLOAT.swim} tiles. Tow it over open water and moor it again (P) wherever you like, out of any builder's reach too. While it is towed it gives no room, takes in nothing and raises no one, and ships sink it fast. A floating town split up raises no citizens until ${FLOAT.city} pontoons lie side by side again.`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'pack', p: viewer, building: b.id }) });
+        }
         if (isMobile(p) && packsOf(p).includes(b.type)) {
           const why = packProblem(s, p, b);
           // Flocks (#308): the Town Center raises lambs.
@@ -1625,8 +1866,32 @@ export class Hud {
         }
         // The Atomic Age (#605): a Missile Silo names a point and the whole map watches the clock.
         if (b.type === 'silo') {
-          const why = launchProblem(s, viewer, b, b.x, b.y);
-          cmds.push({ key: 'M', pic: '', glyph: '☢', title: 'Launch', desc: `Then click anywhere on the map: ${rulesOf(p).fuse} seconds later the warhead lands, wrecking every rival building within ${SILO.reach} tiles (${SILO.building} each) and hurting the rival soldiers there; the ground stays poisoned after, hurting every land unit in it. Every player sees the clock, and a silo destroyed before it runs out scrubs the launch. Costs ${Object.entries(rulesOf(p).fuel).map(([r, n]) => `${n} ${r}`).join(' and ')}; the silo needs ${rulesOf(p).refuel} seconds to refuel after${rulesOf(p).air > 1 ? `, and holds up to ${rulesOf(p).air} warheads aloft` : ''}.`, ok: !why, why: why ?? undefined, on: !loaded(s, b), run: () => this.act.launchMode(b.id) });
+          // The warhead is chosen at launch (#753): the branch's own on M, and past the fork an Atomic one on N. One clock either way.
+          const r = rulesOf(p);
+          const kinds = warheadsOf(p);
+          for (const w of [...kinds].reverse()) {
+            const why = launchProblem(s, viewer, b, b.x, b.y, w);
+            const own = w === r.w;
+            const { peak, r: R } = WARHEADS[w];
+            const poison = w === 'fusion' ? '; nothing it strikes is poisoned' : `; the ground within ${SILO.reach} tiles of the point stays poisoned after, hurting every land unit in it`;
+            const leak = r.leak > 0 ? ` Every launch of your people's poisons ${FISSION.reach} tiles round the silo for ${FISSION.ownFallout} seconds.` : '';
+            const pool = ` Warheads come from your people's store, fired from any of your silos: ${stockOf(p)} now, one more every ${r.refuel ? `${r.refuel} seconds` : 'moment a slot frees'} while store and flight number under ${SILO.cap}. A silo that falls takes no stored warhead with it; only the one it is counting down is lost.`;
+            cmds.push({ key: own ? 'M' : 'N', pic: '', glyph: w === 'fission' ? '⚛' : w === 'fusion' ? '☀' : '☢', title: kinds.length > 1 ? `Launch ${WARHEAD_NAMES[w]}` : 'Launch', desc: `Then click anywhere on the map: ${r.fuse} seconds later the ${WARHEAD_NAMES[w]} warhead lands, blasting every rival building and soldier within ${R} tiles: ${peak.toLocaleString('en')} damage at the centre, falling off with distance to nothing at the edge (distance is measured to a building's nearest edge)${poison}. Every player sees the clock and the blast, but not which warhead it is: your clock is ${r.fuse} seconds whatever you fire. The fog lifts over the blast for ${SILO.lift} seconds, and a silo destroyed before the clock runs out scrubs the launch.${leak}${pool}`, cost: fuelOf(w), ok: !why, why: why ?? undefined, on: !loaded(s, b), run: () => this.act.launchMode(b.id, w) });
+          }
+          // Missile defence (#759 s3): hold the silo back to answer rival warheads with the store's own, or stand it down to launch.
+          const on = inReserve(b);
+          const no = reserveProblem(s, viewer, b, !on);
+          const fuel = Object.entries(fuelOf(r.w)).map(([k, n]) => `${n} ${k}`).join(' and ');
+          cmds.push({ key: 'R', pic: '', glyph: '🛡', title: on ? 'Stand down' : 'Hold in Reserve', desc: on ? `Stand this silo down: it may launch again at once, and answers no warhead. Holding it again takes ${INTERCEPT.arm} seconds to stand ready.` : `Hold this silo back to defend: it launches nothing while held, and ${INTERCEPT.arm} seconds from now it stands ready. ${INTERCEPT.fire} seconds before a rival warhead lands that no Interceptor Battery answered, anywhere on the map, it fires a warhead of your store at it and stops it ${Math.round(INTERCEPT.chance * 100)}% of the time: no blast, no fallout. Each answer spends a warhead and ${fuel} of fuel, hit or miss, and the silo stands ready again ${INTERCEPT.arm} seconds later. Batteries answer first, as they are cheaper; one attempt for each warhead. Every player sees which silos you hold, so a rival may wait, or fire a salvo, or strike the silo.`, ok: !no, why: no ?? undefined, on, run: () => (this.act.issue({ t: 'reserve', p: viewer, silo: b.id, on: !on }), this.act.sound('queue')) });
+          // The salvo (#765): three silos, three Atomic warheads, three points, one clock. Launch Control opens it.
+          const why = salvoProblem(s, viewer);
+          const plain = r.w === 'atomic' ? ` A plain Atomic people pays ${Math.round(SALVO.surcharge * 100)}% more fuel on each; past the fork the silos share a clock for the plain price.` : '';
+          cmds.push({ key: 'B', pic: '', glyph: '☄', title: 'Salvo', desc: `Then click ${SALVO.trio} points on the map, at least ${SILO.apart} tiles apart: this silo and your next ${SALVO.trio - 1} standing silos fire one Atomic warhead each, ${SALVO.trio} from your store, on your ${r.fuse} second clock. Each point takes the Atomic blast (${WARHEADS.atomic.peak.toLocaleString('en')} at the centre, ${WARHEADS.atomic.r} tiles out) and its fallout. Rivals see three rings, as for one warhead and two decoys, and learn all three are real only in the last ${SILO.reveal} seconds. Each silo destroyed before then scrubs its own warhead and its ring; the others fly on. Needs Launch Control and ${SALVO.trio} standing silos.${plain}`, cost: salvoFuel(p), ok: !why, why: why ?? undefined, run: () => this.act.launchMode(b.id, 'salvo') });
+        }
+        // The Age of the Bloom: a Seed Spire slings its ripe Seed at a point, and the whole map watches it root.
+        if (b.type === 'spire') {
+          const why = slingProblem(s, viewer, b, b.x, b.y);
+          cmds.push({ key: 'G', pic: '', glyph: '🌱', title: 'Sling Seed', desc: `Then click anywhere on the map: the Bloom Seed flies ${BLOOM.flight} seconds, every player seeing where it falls, and roots on the open ground nearest that point. ${BLOOM.grow} seconds later every rival building within ${BLOOM.r} tiles of its heart-root cracks, and forest grows where they stood, unless rival citizens beside the root hack it out first (${BLOOM.root} strokes, one a second for each). Guard it. The next Seed ripens ${BLOOM.ripen} seconds after, while your Heart Tree stands.`, cost: BLOOM.fuel, ok: !why, why: why ?? undefined, run: () => this.act.slingMode(b.id) });
         }
         // The seam a Mine Shaft digs (#681).
         if (b.type === 'shaft') {

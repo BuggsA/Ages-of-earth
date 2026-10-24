@@ -13,6 +13,7 @@ Full list, in the owner's words: `docs/rulings.md`.
 - **Goals** (2026-10-17): branch the opening (#463), every PR names the decision it adds (`docs/goals.md`).
 - **The age road** (2026-10-22): build your empire through ages the land unlocks, going back when it helps; new ages welcome again (#555, `docs/age-roads.md`).
 - **Engagement** (2026-10-24): show the road both ways, every side age a building of its own, at most three new things an age, and distance is difference: far enough out is a whole new strategy (`docs/engagement.md`).
+- **Uneven roads** (2026-10-24): roads may differ in strength, and the nuclear arsenal may lead for now, but none stays the best for good; give other roads late-game powers that match or top it (#756).
 - **Save tokens** (2026-10-16): short docs, focused tests while building, spawn successors only when worth it.
 
 ## Checks
@@ -31,6 +32,7 @@ Claims and open PRs live on the board (`claimed`, `in-review`). List here only w
 
 ## Waiting on the owner
 
+- **The Water Road's trunk into the Age of Locks** (#701, [comment](https://github.com/BuggsA/Ages-of-earth/issues/701#issuecomment-6387177804)): may `tests/waterline.test.ts:79` list `locks` among the Water Line's roads, so `waterline → locks` can be added? Until then the way in is the Industrial turn.
 - **`periodic` never fired on its schedule** (by 2026-10-14). Check Settings → Actions allows scheduled workflows.
 - Optional: Settings → General → "Automatically delete head branches".
 - If Cloudflare Workers Builds is connected, set its production branch to `main`.

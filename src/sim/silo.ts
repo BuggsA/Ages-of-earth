@@ -1,22 +1,161 @@
-import { FALLOUT, FISSION, FUSION, SILO, TICK_HZ, domainOf, secs } from './data';
+import { BUILDINGS, FALLOUT, FISSION, FLIGHT, FUSION, INTERCEPT, SALVO, SILO, TICK_HZ, WARHEADS, domainOf, secs } from './data';
 import { ageDef } from './ages';
+import { DIRS, roll } from './animals';
 import { hurt, peace } from './combat';
 import { distToRect } from './grid';
-import { canAfford, isEnemy, pay } from './world';
-import type { Building, Ent, GameState, Player } from './types';
+import { canAfford, isEnemy, maxHp, pay, statsOf } from './world';
+import { breachAt } from './tides';
+import type { Arc, Building, BuildingType, Cost, Ent, GameState, Launch, Player, SalvoShot, Warning } from './types';
 
 /**
- * The Missile Silo (#605, the Atomic Age). `launch` names a point on the map; the warhead lands `SILO.fuse` seconds later, a
- * countdown every player sees. A silo destroyed while it counts scrubs the launch. A launch empties the silo, which is refuelled
- * (paid when the launch is made) over `SILO.refuel` seconds before it can fire again. The numbers are `SILO`.
+ * The Missile Silo (#605, the Atomic Age). `launch` names a point on the map; the warhead lands after its people's clock, a
+ * countdown every player sees. A silo destroyed while it counts scrubs the launch, and that warhead is lost. The numbers are `SILO`.
+ *
+ * The missile pool (#753): a people keeps one store of warheads (`Player.nukes`), not tied to any silo. A launch spends one when it is
+ * ordered, from any standing silo; a fallen silo takes no stored warhead with it. The store holds `SILO.stock` when the first silo
+ * stands and makes one more every branch `refuel` seconds while store and flight together are under `SILO.cap` (Fusion's `refuel`
+ * is 0: a warhead is made the tick a slot frees, so at most `cap` are ever aloft). At launch the people picks Atomic or its branch's
+ * own warhead (`warheadsOf`); the clock is the people's whatever it fires, so the clock never says which is coming. Finished silos are
+ * seen by every player (`shownToAll`), with no alert.
+ *
+ * The three-zone warning (#762): each rival team is shown three rings, the real zone and two decoys, and cannot tell which is real until
+ * `SILO.reveal` seconds before it lands (`warningsOf`, `ringsFor`). The attacker's team sees only its own aim.
+ *
+ * The salvo (#765): a people with Launch Control may raise a third silo, and three standing silos may fire together (`salvo`): three
+ * Atomic warheads from the store, one from each silo, each at its own point, all on one launch and the people's one clock. A rival sees
+ * three rings drawn by the same rule as a single strike's, but all three are real; at the reveal all three stay. A fallen silo scrubs its
+ * own warhead and its ring; the others fly on.
+ *
+ * The flight (#772): every launch carries a course (`Launch.arc`, `flightOf`) that every player watches: a missile climbing toward the
+ * middle of a rival's rings, then bending onto its true point in the last seconds before the reveal (`missilesAt`).
+ *
+ * Missile defence (#759 s2): after Interceptors a people raises Interceptor Batteries, seen by every player, each covering `INTERCEPT.reach`
+ * tiles. In a launch's last seconds (`interceptStep`): at `INTERCEPT.fire` seconds left the nearest charged battery covering each warhead's
+ * ring (as its team is shown it) fires, and the roll is drawn and stored on the launch; at `INTERCEPT.meet` seconds left a hit takes that
+ * warhead out of the sky, so it neither blasts nor poisons the ground.
+ *
+ * The silo held in Reserve (#759 s3): a people may hold a standing silo in Reserve (`reserveProblem`, `setReserve`). It launches nothing
+ * while set, and stands ready `INTERCEPT.arm` seconds after it was set (`armed`). Batteries answer first, being cheaper: a warhead no battery
+ * answered draws its one attempt from the nearest armed Reserve silo of any rival of the launcher, whose cover is the whole map. It spends a
+ * warhead from that people's store and its own warhead's launch fuel, and the silo stands ready again `INTERCEPT.arm` seconds later.
  */
 
 /** How a people works its silos: the plain Atomic Age's rules, or the fork's (Fission: quick and leaky; Fusion: clean, limitless and slow). */
-export function rulesOf(p: Player): { fuse: number; refuel: number; fuel: typeof SILO.fuel; air: number; clean: boolean; leak: number } {
+export function rulesOf(p: Player): { fuse: number; refuel: number; leak: number; w: WarheadKind } {
   const a = ageDef(p);
-  if (a.fission) return { fuse: FISSION.fuse, refuel: FISSION.refuel, fuel: SILO.fuel, air: 1, clean: false, leak: FISSION.ownFallout };
-  if (a.fusion) return { fuse: FUSION.fuse, refuel: FUSION.refuel, fuel: FUSION.fuel, air: FUSION.air, clean: true, leak: 0 };
-  return { fuse: SILO.fuse, refuel: SILO.refuel, fuel: SILO.fuel, air: 1, clean: false, leak: 0 };
+  if (a.fission) return { fuse: FISSION.fuse, refuel: FISSION.refuel, leak: FISSION.ownFallout, w: 'fission' };
+  if (a.fusion) return { fuse: FUSION.fuse, refuel: FUSION.refuel, leak: 0, w: 'fusion' };
+  return { fuse: SILO.fuse, refuel: SILO.refuel, leak: 0, w: 'atomic' };
+}
+
+export type WarheadKind = 'atomic' | 'fission' | 'fusion';
+
+/**
+ * What a blast does at `d` tiles from its centre (#751 s1): `peak / (1 + (d/2)²)`, tapering to nothing over the last `WARHEADS.taper` tiles
+ * before the blast radius, and nothing at or past it. Only + − × ÷, so it is the same on every machine.
+ */
+export function blastDamage(w: WarheadKind, d: number): number {
+  const { peak, r } = WARHEADS[w];
+  if (d >= r) return 0;
+  const q = d / WARHEADS.half;
+  const dmg = peak / (1 + q * q);
+  return d > r - WARHEADS.taper ? (dmg * (r - d)) / WARHEADS.taper : dmg;
+}
+
+/** The warheads a people may fire (#753): Atomic, and its branch's own past the fork. */
+export const warheadsOf = (p: Player): WarheadKind[] => (rulesOf(p).w === 'atomic' ? ['atomic'] : ['atomic', rulesOf(p).w]);
+
+/** A warhead's fuel, paid at launch: Atomic `SILO.fuel`, Fission `FISSION.fuel`, Fusion `FUSION.fuel`. */
+export const fuelOf = (w: WarheadKind): Cost => (w === 'fission' ? FISSION.fuel : w === 'fusion' ? FUSION.fuel : SILO.fuel);
+
+/** A Fusion warhead leaves no fallout where it lands. */
+const cleanOf = (w: WarheadKind): boolean => w === 'fusion';
+
+/**
+ * The ring a rival is warned of for a launch: the widest blast its people could have sent, never the warhead's own (#753), so neither
+ * the ring nor the clock gives the warhead away. The computer runs from this ring too.
+ */
+export const warnRadius = (s: GameState, owner: number): number => Math.max(...warheadsOf(s.players[owner]).map((w) => WARHEADS[w].r));
+
+/** The warhead whose ring the rivals are warned of: the widest its people could send. */
+const widestOf = (s: GameState, owner: number): WarheadKind => warheadsOf(s.players[owner]).reduce((a, b) => (WARHEADS[b].r > WARHEADS[a].r ? b : a));
+
+/** The warhead a launch carries (absent in older saves: atomic). */
+const kindOf = (l: Launch): WarheadKind => l.w ?? 'atomic';
+
+/** Warheads of this people's in store now (`SILO.stock` before its first silo has stood a second). Hidden from rivals. */
+export const stockOf = (p: Player): number => p.nukes?.n ?? SILO.stock;
+
+/** A launch's warheads still flying: one for a single strike, a salvo's unscrubbed ones (#765). */
+const liveOf = (l: Launch): SalvoShot[] => l.salvo?.filter((sh) => !sh.gone) ?? [{ silo: l.silo, x: l.x, y: l.y }];
+
+/** The places of a launch's warheads still flying (#759 s2): 0 for a single strike, a salvo's unscrubbed ones. */
+const shotsOf = (l: Launch): number[] => (l.salvo ? l.salvo.flatMap((sh, i) => (sh.gone ? [] : [i])) : [0]);
+
+/** Warheads of this people's in the air now (a salvo's count one each). */
+export const aloftOf = (s: GameState, owner: number): number => (s.launches ?? []).reduce((n, l) => n + (l.owner === owner ? liveOf(l).length : 0), 0);
+
+/** The true points a launch will still strike, in its own order: the attacker's aims, never shown to a rival (#765). */
+export const aimsOf = (l: Launch): { x: number; y: number }[] => liveOf(l).map(({ x, y }) => ({ x, y }));
+
+/** Whether this people may fire salvos and raise a third silo (#765): it has learned Launch Control. */
+export const salvoPeople = (p: Player): boolean => p.techs.includes('launchControl');
+
+/** Seconds until this people's next warhead is made, or null when none is being made (the store and the air are full). */
+export function nextNuke(s: GameState, p: Player): number | null {
+  const at = p.nukes?.next;
+  return at === undefined ? null : Math.max(0, Math.ceil((at - s.tick) / TICK_HZ));
+}
+
+/** Whether this finished silo is drawn for every player through the fog (#753): standing silos are no secret. */
+export const shownToAll = (b: { kind: string; type?: string; built?: boolean; hp: number }): boolean =>
+  b.kind === 'building' && (b.type === 'silo' || b.type === 'battery') && !!b.built && b.hp > 0;
+
+/** Whether this Interceptor Battery holds its charge now (#759 s2): finished, standing, and not reloading. */
+export const charged = (s: GameState, b: Building): boolean => b.type === 'battery' && b.built && b.hp > 0 && (b.reload ?? 0) <= s.tick;
+
+/** Whether this silo is held in Reserve (#759 s3): set, ready or not, it launches nothing. */
+export const held = (b: Building): boolean => b.type === 'silo' && b.reserve !== undefined;
+
+/** Whether this silo, held in Reserve, stands ready to fire an interceptor now (#759 s3): finished, standing, and armed. */
+export const armed = (s: GameState, b: Building): boolean => held(b) && b.built && b.hp > 0 && b.reserve! <= s.tick;
+
+/** Seconds until a Reserve silo stands ready (#759 s3); 0 when it does. */
+export const armingOf = (s: GameState, b: Building): number => Math.max(0, Math.ceil(((b.reserve ?? 0) - s.tick) / TICK_HZ));
+
+/** Why this people can't set (`on`) or lift Reserve on this silo (#759 s3), or null. */
+export function reserveProblem(s: GameState, owner: number, silo: Building | undefined, on: boolean): string | null {
+  if (!silo || silo.kind !== 'building' || silo.type !== 'silo' || silo.owner !== owner) return 'Pick one of your Missile Silos';
+  if (!silo.built || silo.hp <= 0) return 'The silo is not finished';
+  if (on === held(silo)) return on ? 'This silo is already held in Reserve' : 'This silo is not held in Reserve';
+  if (on && s.players[owner].epoch < 5) return 'Silos fire only in the Atomic Age';
+  return null;
+}
+
+/** Hold a silo in Reserve (#759 s3), ready `INTERCEPT.arm` seconds from now, or stand it down at once (checked by `reserveProblem`). */
+export function setReserve(s: GameState, silo: Building, on: boolean): void {
+  if (on) silo.reserve = s.tick + secs(INTERCEPT.arm);
+  else delete silo.reserve;
+}
+
+/** A launch's warhead `shot` (0 for a single strike, else its place in the salvo): its true point. */
+const aimOf = (l: Launch, shot: number): { x: number; y: number } => (l.salvo ? l.salvo[shot] : { x: l.x, y: l.y });
+
+/**
+ * The ring a team is shown for a launch's warhead `shot` (#759 s2, the owner's "rings are blurred" ruling): where it was drawn, not the
+ * true point. A team with no set (the launcher's own, or a launch from an older save) has the true point.
+ */
+export function ringOf(l: Launch, team: number, shot: number): { x: number; y: number } {
+  const set = l.warn?.find((w) => w.team === team);
+  if (!set) return aimOf(l, shot);
+  return set.rings[set.of ? set.of.indexOf(shot) : set.real] ?? aimOf(l, shot);
+}
+
+/** Whether a battery covers a launch's warhead `shot` (#759 s2): it stands for a rival of the launcher, and the ring its team is shown lies within reach. */
+export function covers(s: GameState, b: Building, l: Launch, shot: number): boolean {
+  if (!isEnemy(s, l.owner, b.owner)) return false;
+  const g = ringOf(l, s.players[b.owner].team, shot);
+  return (g.x - b.x) * (g.x - b.x) + (g.y - b.y) * (g.y - b.y) <= INTERCEPT.reach * INTERCEPT.reach;
 }
 
 /** The people's finished, standing silos, in id order. */
@@ -26,66 +165,588 @@ export function silosOf(s: GameState, owner: number): Building[] {
   return out;
 }
 
-/** Whether a silo has fuel for a launch now: no warhead in the air from it, and refuelling done. */
-export const loaded = (s: GameState, b: Building): boolean => s.tick >= (b.rearm ?? 0) && (s.launches ?? []).filter((l) => l.silo === b.id).length < rulesOf(s.players[b.owner]).air;
+/**
+ * Why this people can raise no more silos (#753: at most `SILO.most`, finished or rising; #765: `SALVO.trio` with Launch Control), or null.
+ */
+export function siloLimit(s: GameState, owner: number, type: BuildingType): string | null {
+  if (type !== 'silo') return null;
+  let n = 0;
+  for (const e of s.ents) if (e.kind === 'building' && e.owner === owner && e.type === 'silo' && e.hp > 0) n++;
+  const most = salvoPeople(s.players[owner]) ? SALVO.trio : SILO.most;
+  if (n < most) return null;
+  return most < SALVO.trio ? `A people raises at most ${most} Missile Silos; Launch Control allows a third` : `A people raises at most ${most} Missile Silos`;
+}
 
-/** Why this silo can't launch at this point, or null. */
-export function launchProblem(s: GameState, owner: number, silo: Building | undefined, x: number, y: number): string | null {
+/** Whether this silo can fire now: it stands and its people has a warhead in store. */
+export const loaded = (s: GameState, b: Building): boolean => b.built && b.hp > 0 && stockOf(s.players[b.owner]) > 0;
+
+/** Why this silo can't launch this warhead (the people's own by default) at this point, or null. */
+export function launchProblem(s: GameState, owner: number, silo: Building | undefined, x: number, y: number, w?: WarheadKind): string | null {
   const p = s.players[owner];
   if (!silo || silo.kind !== 'building' || silo.type !== 'silo' || silo.owner !== owner) return 'Pick one of your Missile Silos';
   if (!silo.built || silo.hp <= 0) return 'The silo is not finished';
+  if (held(silo)) return 'This silo is held in Reserve: stand it down to launch';
   if (p.epoch < 5) return 'Silos fire only in the Atomic Age';
   if (peace(s)) return 'Not while the peace holds';
-  if ((s.launches ?? []).filter((l) => l.silo === silo.id).length >= rulesOf(p).air) return 'A warhead from this silo is already in the air';
-  if (s.tick < (silo.rearm ?? 0)) return `Refuelling: ${Math.ceil(((silo.rearm ?? 0) - s.tick) / TICK_HZ)}s to go`;
+  const kind = w ?? rulesOf(p).w;
+  if (!warheadsOf(p).includes(kind)) return 'Your people cannot make that warhead';
+  if (stockOf(p) <= 0) {
+    const next = nextNuke(s, p);
+    return next === null ? `All ${SILO.cap} of your warheads are already in the air` : `Refuelling: the next warhead is ready in ${Math.max(1, next)}s`;
+  }
   if (!(x >= 0 && y >= 0 && x < s.w && y < s.h)) return 'Pick a point on the map';
-  if (!canAfford(p, rulesOf(p).fuel)) return `A warhead's fuel takes ${costText(rulesOf(p).fuel)}`;
+  if (!canAfford(p, fuelOf(kind))) return `A warhead's fuel takes ${costText(fuelOf(kind))}`;
   return null;
 }
 
-const costText = (fuel: typeof SILO.fuel): string => Object.entries(fuel).map(([r, n]) => `${n} ${r}`).join(' and ');
+/** The warheads' names, for the HUD and refusals. */
+export const WARHEAD_NAMES: Record<WarheadKind, string> = { atomic: 'Atomic', fission: 'Fission', fusion: 'Fusion' };
 
-/** Fire: pay the fuel, start the clock, tell the map. Fission also poisons the ground round the silo. */
-export function launch(s: GameState, owner: number, silo: Building, x: number, y: number): void {
-  const r = rulesOf(s.players[owner]);
-  pay(s.players[owner], r.fuel);
-  silo.rearm = s.tick + secs(r.refuel);
-  (s.launches ??= []).push({ id: s.nextId++, owner, silo: silo.id, x, y, at: s.tick + secs(r.fuse), ...(r.clean ? { clean: true } : {}) });
-  if (r.leak > 0) (s.fallout ??= []).push({ id: s.nextId++, owner, x: silo.x, y: silo.y, r: FISSION.reach, until: s.tick + secs(r.leak) });
-  s.events.push({ k: 'silo', owner, x, y, what: 'launched', fuse: r.fuse });
+const costText = (fuel: Cost): string => Object.entries(fuel).map(([r, n]) => `${n} ${r}`).join(' and ');
+
+/** Spend `n` warheads from the people's store; the next starts being made if none was. */
+function spend(s: GameState, p: Player, n = 1): void {
+  const pool = (p.nukes ??= { n: SILO.stock });
+  pool.n -= n;
+  pool.next ??= s.tick + secs(rulesOf(p).refuel);
 }
 
-/** The warhead lands: every rival building and rival unit on the ground within `SILO.reach` is hit. */
-function strike(s: GameState, owner: number, x: number, y: number, clean = false): void {
-  const r2 = SILO.reach * SILO.reach;
-  const hit: Ent[] = [];
+/**
+ * Fire: spend a warhead from the pool, pay its fuel, start the people's clock, tell the map. A Fission people also poisons the ground
+ * round the silo, whatever it fires (so the poison never says which warhead went up).
+ */
+export function launch(s: GameState, owner: number, silo: Building, x: number, y: number, w?: WarheadKind): void {
+  const p = s.players[owner];
+  const r = rulesOf(p);
+  const kind = w ?? r.w;
+  spend(s, p);
+  pay(p, fuelOf(kind));
+  const id = s.nextId++;
+  const warn = warningsOf(s, owner, [{ x, y }]);
+  (s.launches ??= []).push({ id, owner, silo: silo.id, x, y, w: kind, at: s.tick + secs(r.fuse), ...(cleanOf(kind) ? { clean: true } : {}), warn, arc: arcOf(s, id, silo, warn, [{ x, y }]) });
+  if (r.leak > 0) (s.fallout ??= []).push({ id: s.nextId++, owner, x: silo.x, y: silo.y, r: FISSION.reach, until: s.tick + secs(r.leak) });
+  // The event names no warhead: every player is warned of the same ring whatever was sent (`warnRadius`). Its point is the attacker's
+  // own aim; a rival's screen draws the launch's rings for its team instead (`ringsFor`).
+  s.events.push({ k: 'silo', owner, x, y, id, what: 'launched', fuse: r.fuse, ring: warnRadius(s, owner) });
+}
+
+/** A salvo's fuel (#765): three Atomic warheads' worth, and `SALVO.surcharge` more on each for a plain Atomic people. */
+export function salvoFuel(p: Player): Cost {
+  const k = SALVO.trio * (rulesOf(p).w === 'atomic' ? 1 + SALVO.surcharge : 1);
+  const out: Cost = {};
+  for (const [r, n] of Object.entries(SILO.fuel) as [keyof Cost, number][]) out[r] = Math.round(n * k);
+  return out;
+}
+
+/**
+ * The silos a salvo ordered from `first` fires from (#765): that one, then the people's other standing silos in id order, `SALVO.trio`
+ * in all; fewer when it stands fewer. A silo held in Reserve (#759 s3) fires none.
+ */
+export function salvoSilos(s: GameState, owner: number, first?: number): Building[] {
+  const all = silosOf(s, owner).filter((b) => !held(b));
+  const lead = all.find((b) => b.id === first);
+  return (lead ? [lead, ...all.filter((b) => b !== lead)] : all).slice(0, SALVO.trio);
+}
+
+/**
+ * Why this people can't fire a salvo now (#765), or null; with `shots`, also whether those silos and points will do: `SALVO.trio` of the
+ * people's own standing silos, each once, and as many points, each on the map and at least `SILO.apart` tiles from the others (the same
+ * spacing a single strike's decoys keep, so the rings look alike).
+ */
+export function salvoProblem(s: GameState, owner: number, shots?: { silo: number; x: number; y: number }[]): string | null {
+  const p = s.players[owner];
+  if (p.epoch < 5) return 'Silos fire only in the Atomic Age';
+  if (!salvoPeople(p)) return 'A salvo needs Launch Control, learned at a Missile Silo';
+  if (peace(s)) return 'Not while the peace holds';
+  const all = silosOf(s, owner);
+  const standing = all.filter((b) => !held(b)).length;
+  if (standing < SALVO.trio) return `A salvo needs ${SALVO.trio} standing Missile Silos: you have ${standing}${standing < all.length ? ` not held in Reserve (and ${all.length - standing} held)` : ''}`;
+  if (stockOf(p) < SALVO.trio) {
+    const next = nextNuke(s, p);
+    return `A salvo takes ${SALVO.trio} warheads from your store: you have ${Math.max(0, stockOf(p))}${next === null ? ', and the rest are in the air' : `, the next in ${Math.max(1, next)}s`}`;
+  }
+  const fuel = salvoFuel(p);
+  if (!canAfford(p, fuel)) return `A salvo's fuel takes ${costText(fuel)}${rulesOf(p).w === 'atomic' ? ` (a plain Atomic people pays ${Math.round(SALVO.surcharge * 100)}% more on each warhead)` : ''}`;
+  if (!shots) return null;
+  if (!Array.isArray(shots) || shots.length !== SALVO.trio) return `Pick ${SALVO.trio} points`;
+  const used = new Set<number>();
+  for (const sh of shots) {
+    const b = s.byId.get(sh?.silo);
+    if (!b || b.kind !== 'building' || b.type !== 'silo' || b.owner !== owner || !b.built || b.hp <= 0 || used.has(b.id) || held(b)) return `A salvo fires from ${SALVO.trio} of your standing silos not held in Reserve, one warhead each`;
+    used.add(b.id);
+    if (!(sh.x >= 0 && sh.y >= 0 && sh.x < s.w && sh.y < s.h)) return 'Pick points on the map';
+  }
+  return apartProblem(shots);
+}
+
+/** Whether these points keep `SILO.apart` tiles from each other (#765), or why not. */
+export function apartProblem(pts: { x: number; y: number }[]): string | null {
+  const A = SILO.apart * SILO.apart;
+  for (let i = 0; i < pts.length; i++)
+    for (let j = 0; j < i; j++) if ((pts[i].x - pts[j].x) * (pts[i].x - pts[j].x) + (pts[i].y - pts[j].y) * (pts[i].y - pts[j].y) < A) return `A salvo's points must lie at least ${SILO.apart} tiles apart`;
+  return null;
+}
+
+/**
+ * Fire a salvo (#765, checked by `salvoProblem`): spend `SALVO.trio` warheads and the salvo's fuel, start the people's one clock, tell the
+ * map. To every rival it is one launch, as a single strike is: one record, one event of the same shape (its point the first aim), one
+ * clock, three rings. A Fission people poisons the ground round the first silo only, as for any launch, so the poison never counts silos.
+ */
+export function salvo(s: GameState, owner: number, shots: { silo: number; x: number; y: number }[]): void {
+  const p = s.players[owner];
+  const r = rulesOf(p);
+  spend(s, p, SALVO.trio);
+  pay(p, salvoFuel(p));
+  const id = s.nextId++;
+  const [{ silo, x, y }] = shots;
+  const salvo = shots.map((sh) => ({ silo: sh.silo, x: sh.x, y: sh.y }));
+  const warn = warningsOf(s, owner, salvo);
+  (s.launches ??= []).push({ id, owner, silo, x, y, w: 'atomic', at: s.tick + secs(r.fuse), warn, salvo, arc: arcOf(s, id, s.byId.get(silo)!, warn, salvo) });
+  if (r.leak > 0) {
+    const b = s.byId.get(silo)!;
+    (s.fallout ??= []).push({ id: s.nextId++, owner, x: b.x, y: b.y, r: FISSION.reach, until: s.tick + secs(r.leak) });
+  }
+  s.events.push({ k: 'silo', owner, x, y, id, what: 'launched', fuse: r.fuse, ring: warnRadius(s, owner) });
+}
+
+/**
+ * The rivals' assets the attacker's team knew of at launch (#762), in id order: a building any tile of which its eyes have ever seen,
+ * and a land unit out in the open that they see now. Each carries its worth per point of health (its replacement cost over its full
+ * health), so what a blast takes is `per × min(health, damage)`: likely losses, overkill not counted.
+ */
+function scouted(s: GameState, owner: number): { e: Ent; per: number }[] {
+  const { seen, vis } = s.players[owner];
+  const known = (x: number, y: number, m: Uint8Array): boolean => x >= 0 && y >= 0 && x < s.w && y < s.h && m[y * s.w + x] === 1;
+  const out: { e: Ent; per: number }[] = [];
+  for (const e of s.ents) {
+    if (e.hp <= 0 || !isEnemy(s, owner, e.owner)) continue;
+    let cost: Cost;
+    if (e.kind === 'building') {
+      let saw = false;
+      for (let y = e.ty; y < e.ty + e.size && !saw; y++) for (let x = e.tx; x < e.tx + e.size && !saw; x++) saw = known(x, y, seen);
+      if (!saw) continue;
+      cost = BUILDINGS[e.type].cost;
+    } else {
+      if (e.inside || domainOf(e.type) !== 'land' || !known(Math.floor(e.x), Math.floor(e.y), vis)) continue;
+      cost = statsOf(s, e).cost;
+    }
+    const worth = Object.values(cost).reduce((n: number, v) => n + (v ?? 0), 0);
+    if (worth > 0) out.push({ e, per: worth / maxHp(s, e) });
+  }
+  return out;
+}
+
+/** What a `w` warhead at (x, y) would take from these assets, in replacement cost (#762). */
+function lossAt(assets: { e: Ent; per: number }[], w: WarheadKind, x: number, y: number): number {
+  let loss = 0;
+  const R = WARHEADS[w].r;
+  for (const { e, per } of assets) {
+    // Far off on either axis (past the blast and a building's half-width): nothing to take.
+    const reach = R + (e.kind === 'building' ? e.size / 2 : 0);
+    if (e.x - x > reach || x - e.x > reach || e.y - y > reach || y - e.y > reach) continue;
+    const d = e.kind === 'building' ? distToRect(x, y, e) : Math.sqrt((e.x - x) * (e.x - x) + (e.y - y) * (e.y - y));
+    if (d < R) loss += per * Math.min(e.hp, blastDamage(w, d));
+  }
+  return loss;
+}
+
+/** The centre of the tile (x, y) stands on: every ring sits on one, so a click's fractions never single out the real ring. */
+const tileOf = (v: number): number => Math.floor(v) + 0.5;
+
+/**
+ * One decoy point (#762), at least `SILO.apart` tiles from every point already taken. In order, until one is found:
+ * 1. a point drawn from `pool` (the tiles of the rival assets the attacker knew of, with what a strike there would take), weighted by that
+ *    loss, so a decoy falls where a real attacker might aim: rarely the same two, never always the richest;
+ * 2. any tile of an asset it knew of that a strike would take nothing from (a sparse town: drawn evenly);
+ * 3. up to 12 even draws within `SILO.spread` tiles of the target, kept on the map;
+ * 4. the first compass point `SILO.apart` tiles off the target, from a drawn start, that lies on the map and clear of the others;
+ * 5. the corner of the map (inset by `SILO.apart` / 2) farthest from the points taken. Never off the map.
+ */
+function decoy(s: GameState, pool: { x: number; y: number; v: number }[], taken: { x: number; y: number }[]): { x: number; y: number } {
+  const A = SILO.apart * SILO.apart;
+  const clear = (x: number, y: number): boolean => taken.every((t) => (t.x - x) * (t.x - x) + (t.y - y) * (t.y - y) >= A);
+  const free = pool.filter((c) => clear(c.x, c.y));
+  const total = free.reduce((n, c) => n + c.v, 0);
+  if (total > 0) {
+    let r = roll(s) * total;
+    for (const c of free) {
+      if (c.v <= 0) continue;
+      r -= c.v;
+      if (r < 0) return c;
+    }
+    return free.filter((c) => c.v > 0).pop()!;
+  }
+  if (free.length) return free[Math.min(free.length - 1, Math.floor(roll(s) * free.length))];
+  const [t] = taken;
+  const onMap = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < s.w && y < s.h;
+  for (let k = 0; k < 12; k++) {
+    const x = tileOf(t.x + (roll(s) * 2 - 1) * SILO.spread), y = tileOf(t.y + (roll(s) * 2 - 1) * SILO.spread);
+    if (onMap(x, y) && clear(x, y)) return { x, y };
+  }
+  const start = Math.floor(roll(s) * DIRS.length);
+  for (let k = 0; k < DIRS.length; k++) {
+    const [dx, dy] = DIRS[(start + k) % DIRS.length];
+    const x = tileOf(t.x + dx * SILO.apart * 1.5), y = tileOf(t.y + dy * SILO.apart * 1.5);
+    if (onMap(x, y) && clear(x, y)) return { x, y };
+  }
+  const m = Math.floor(SILO.apart / 2);
+  const corners = [[m, m], [s.w - 1 - m, m], [m, s.h - 1 - m], [s.w - 1 - m, s.h - 1 - m]].map(([x, y]) => ({ x: tileOf(Math.max(0, Math.min(s.w - 1, x))), y: tileOf(Math.max(0, Math.min(s.h - 1, y))) }));
+  const near = (c: { x: number; y: number }): number => Math.min(...taken.map((p) => (p.x - c.x) * (p.x - c.x) + (p.y - c.y) * (p.y - c.y)));
+  return corners.reduce((a, b) => (near(b) > near(a) ? b : a));
+}
+
+/** A ring's centre: the point's tile moved a whole number of tiles, up to `SILO.blur`, on each axis, kept on the map (#762). */
+function blur(s: GameState, p: { x: number; y: number }): { x: number; y: number } {
+  const b = SILO.blur;
+  const ox = Math.floor(roll(s) * (2 * b + 1)) - b, oy = Math.floor(roll(s) * (2 * b + 1)) - b;
+  return { x: Math.max(0.5, Math.min(s.w - 0.5, tileOf(p.x) + ox)), y: Math.max(0.5, Math.min(s.h - 0.5, tileOf(p.y) + oy)) };
+}
+
+/**
+ * The warnings for a launch at `aims` (#762), drawn once, at launch, from the match's own dice, and frozen on the launch. Each rival team,
+ * in team order, gets its own set so allies cannot lay theirs side by side: for a single strike two decoys (`decoy`, from every rival
+ * asset the attacker had scouted, valued with the people's widest warhead so the draw never says which is coming), then all three rings
+ * blurred alike (the real one first, then the decoys in the order drawn), then shuffled. Every ring follows one rule, so none stands out.
+ * A salvo (#765) has three aims and no decoys: its three rings are blurred and shuffled by the same rule, each remembering its warhead.
+ */
+export function warningsOf(s: GameState, owner: number, aims: { x: number; y: number }[]): Warning[] {
+  const w = widestOf(s, owner);
+  const assets = scouted(s, owner);
+  const pool: { x: number; y: number; v: number }[] = [];
+  const at = new Set<number>();
+  for (const { e } of assets) {
+    const px = tileOf(e.x), py = tileOf(e.y);
+    const key = Math.floor(py) * s.w + Math.floor(px);
+    if (at.has(key)) continue;
+    at.add(key);
+    pool.push({ x: px, y: py, v: lossAt(assets, w, px, py) });
+  }
+  const teams = [...new Set(s.players.filter((p) => isEnemy(s, owner, p.id)).map((p) => p.team))].sort((a, b) => a - b);
+  return teams.map((team) => {
+    const taken = aims.map(({ x, y }) => ({ x, y }));
+    while (taken.length < SALVO.trio) taken.push(decoy(s, pool, taken));
+    const rings = taken.map((p) => blur(s, p));
+    // `of[i]` is the point ring i was drawn from: the aims first, then the decoys.
+    const of = rings.map((_, i) => i);
+    for (let i = rings.length - 1; i > 0; i--) {
+      const j = Math.floor(roll(s) * (i + 1));
+      [rings[i], rings[j]] = [rings[j], rings[i]];
+      [of[i], of[j]] = [of[j], of[i]];
+    }
+    return { team, rings, real: of.indexOf(0), ...(aims.length > 1 ? { of } : {}) };
+  });
+}
+
+/**
+ * The course of a launch (#772), drawn once at launch from its own seed (the match's dice state and the launch id, so no die is spent and
+ * older replays keep their draws): it starts at the silo, and its lure is the middle of one rival team's rings (the team picked by the seed),
+ * moved up to `FLIGHT.jitter` tiles, so the early heading points at a district that holds every ring, not at the real one. With no rival
+ * set the lure is the middle of the aims. A lure too near the silo gives way to the first aim. The bow is drawn too.
+ */
+function arcOf(s: GameState, id: number, silo: { x: number; y: number }, warn: Warning[], aims: { x: number; y: number }[]): Arc {
+  let h = (s.rng ^ Math.imul(id + 1, 0x9e3779b1)) >>> 0;
+  const draw = (): number => {
+    h = (h + 0x6d2b79f5) >>> 0;
+    let t = h;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const set = warn.length ? warn[Math.min(warn.length - 1, Math.floor(draw() * warn.length))].rings : aims;
+  let lx = set.reduce((n, p) => n + p.x, 0) / set.length + (draw() * 2 - 1) * FLIGHT.jitter;
+  let ly = set.reduce((n, p) => n + p.y, 0) / set.length + (draw() * 2 - 1) * FLIGHT.jitter;
+  const bow = (draw() * 2 - 1) * FLIGHT.bow;
+  if ((lx - silo.x) * (lx - silo.x) + (ly - silo.y) * (ly - silo.y) < FLIGHT.near * FLIGHT.near) [lx, ly] = [aims[0].x, aims[0].y];
+  lx = Math.max(0.5, Math.min(s.w - 0.5, lx));
+  ly = Math.max(0.5, Math.min(s.h - 0.5, ly));
+  return { x: silo.x, y: silo.y, t0: s.tick, lx, ly, bow };
+}
+
+/** A launch's course worked out (#772, `flightOf`): the climb from `o` through `m` to the bend `k`, on ticks `t0` to `tk`; heading `d` there. */
+export interface Flight {
+  o: { x: number; y: number };
+  m: { x: number; y: number };
+  k: { x: number; y: number };
+  d: { x: number; y: number };
+  t0: number;
+  tk: number;
+  at: number;
+  /** The arc's peak, in tiles, reached at the bend. */
+  h: number;
+}
+
+/**
+ * A launch's course (#772), or null for one from an older save. Only + − × ÷ and square roots, so it is the same on every machine.
+ * - The climb (ticks `t0` to `tk`): a parabola from the silo `o` through the bowed control `m` to `k`, `FLIGHT.knee` of the way to the lure;
+ *   none of it depends on the true point, so it reads as a district.
+ * - The bend (`tk` to `at`, `bendAt`): from `k`, still on the climb's heading `d`, onto the true point.
+ * - The bend starts `FLIGHT.read` seconds before the reveal, scaled by the lure's distance (not the target's, so the climb's pace says
+ *   nothing of where it falls), and never in the first two-fifths of the fuse.
+ */
+export function flightOf(l: Launch): Flight | null {
+  const a = l.arc;
+  if (!a) return null;
+  const o = { x: a.x, y: a.y };
+  const lx = a.lx - a.x, ly = a.ly - a.y;
+  const far = Math.sqrt(lx * lx + ly * ly);
+  const k = { x: a.x + lx * FLIGHT.knee, y: a.y + ly * FLIGHT.knee };
+  // The bow: the climb's control point stands off its middle, square to it, by `bow` of its length.
+  const m = { x: (o.x + k.x) / 2 - ly * FLIGHT.knee * a.bow, y: (o.y + k.y) / 2 + lx * FLIGHT.knee * a.bow };
+  const dx = k.x - m.x, dy = k.y - m.y;
+  const dl = Math.sqrt(dx * dx + dy * dy);
+  const d = dl > 0 ? { x: dx / dl, y: dy / dl } : { x: 0, y: 0 };
+  const read = FLIGHT.read * Math.max(FLIGHT.lo, Math.min(FLIGHT.hi, far / FLIGHT.ref));
+  const fuse = l.at - a.t0;
+  const tk = Math.max(a.t0 + fuse * 0.4, l.at - (SILO.reveal + read) * TICK_HZ);
+  return { o, m, k, d, t0: a.t0, tk, at: l.at, h: Math.max(FLIGHT.low, Math.min(FLIGHT.high, far * FLIGHT.rise)) };
+}
+
+/** A quadratic curve from `a` through control `c` to `b`, at `u` (0 to 1). */
+const quad = (a: { x: number; y: number }, c: { x: number; y: number }, b: { x: number; y: number }, u: number): { x: number; y: number } => ({
+  x: (1 - u) * (1 - u) * a.x + 2 * u * (1 - u) * c.x + u * u * b.x,
+  y: (1 - u) * (1 - u) * a.y + 2 * u * (1 - u) * c.y + u * u * b.y,
+});
+
+/**
+ * Where a missile on the bend toward `to` is at tick `t` (`tk` ≤ t ≤ `at`, #772): a parabola from `k`, leaning on along the climb's heading
+ * (its control `FLIGHT.lead` of the way to the target out ahead), ending exactly on `to` at `at`. Its pace starts at the climb's and changes
+ * evenly (a polynomial in time), so the turn never jumps. The height falls on a parabola from the peak to the ground.
+ */
+function bendAt(f: Flight, to: { x: number; y: number }, t: number): { x: number; y: number; z: number } {
+  const rx = to.x - f.k.x, ry = to.y - f.k.y;
+  const rest = Math.sqrt(rx * rx + ry * ry);
+  const c = { x: f.k.x + f.d.x * FLIGHT.lead * rest, y: f.k.y + f.d.y * FLIGHT.lead * rest };
+  // The climb ends at 2|k − m| tiles per unit of its time; the bend starts at 2·lead·rest per unit of its own, times `a`.
+  const kx = f.k.x - f.m.x, ky = f.k.y - f.m.y;
+  const climb = Math.sqrt(kx * kx + ky * ky) / (f.tk - f.t0);
+  const pace = rest > 0 ? (climb * (f.at - f.tk)) / (FLIGHT.lead * rest) : 1;
+  const a = Math.max(0.2, Math.min(1.8, pace));
+  const g = Math.max(0, Math.min(1, (t - f.tk) / (f.at - f.tk)));
+  const p = quad(f.k, c, to, a * g + (1 - a) * g * g);
+  return { x: p.x, y: p.y, z: f.h * (1 - g * g) };
+}
+
+/**
+ * The missiles drawn for a launch at tick `t` (a fraction of a tick is fine, for drawing), as every player sees them (#772): one on the
+ * climb, then one per live warhead on the bend. Each is a ground point and a height in tiles. A salvo climbs as one missile from its first
+ * silo and splits at the bend. Empty for a launch from an older save, or once it has landed.
+ */
+export function missilesAt(l: Launch, t: number): { x: number; y: number; z: number }[] {
+  const f = flightOf(l);
+  if (!f || t > f.at) return [];
+  if (t < f.tk) return [climbAt(f, t)];
+  return aimsOf(l).map((to) => bendAt(f, to, t));
+}
+
+/** Where a missile on the climb is at tick `t` (#772). */
+function climbAt(f: Flight, t: number): { x: number; y: number; z: number } {
+  const u = Math.max(0, (t - f.t0) / (f.tk - f.t0));
+  const p = quad(f.o, f.m, f.k, u);
+  return { x: p.x, y: p.y, z: f.h * (1 - (1 - u) * (1 - u)) };
+}
+
+/**
+ * Where the missile carrying a launch's warhead `shot` is at tick `t` (#759 s2: where an interceptor meets it), or null for a launch from an
+ * older save. On the climb a salvo is one missile, so every shot reads the same point.
+ */
+export function missileOf(l: Launch, shot: number, t: number): { x: number; y: number; z: number } | null {
+  const f = flightOf(l);
+  if (!f) return null;
+  return t < f.tk ? climbAt(f, t) : bendAt(f, aimOf(l, shot), Math.min(t, f.at));
+}
+
+/**
+ * Whether a launch has reached its last `SILO.reveal` seconds, when its decoys vanish (#762): true from the end of the tick `siloStep`
+ * runs with exactly that much left (the tick of the `revealed` event), as a warhead strikes on the tick its clock reaches `at`.
+ */
+export const revealed = (s: GameState, l: { at: number }): boolean => s.tick > l.at - secs(SILO.reveal);
+
+/**
+ * The rings `viewer` is shown for a launch (#762): its own team's aim (a salvo's live aims), unblurred; a rival team's three rings, or after
+ * the reveal only the real one, where it was drawn (it never snaps to the true point). A salvo's rings (#765) are all real: each stays at
+ * the reveal, and each goes the moment its silo falls. A launch from an older save shows the true point to all.
+ */
+export function ringsFor(s: GameState, l: Launch, viewer: number): { x: number; y: number }[] {
+  const set = s.players[viewer].team === s.players[l.owner].team ? undefined : l.warn?.find((w) => w.team === s.players[viewer].team);
+  if (!set) return aimsOf(l);
+  if (set.of && l.salvo) return set.rings.filter((_, i) => !l.salvo![set.of![i]]?.gone);
+  return revealed(s, l) ? [set.rings[set.real]] : set.rings;
+}
+
+/**
+ * Every tick, in id order: a people whose first silo has stood gets its pool (`SILO.stock`), and a pool under its cap (store and
+ * flight together) makes its next warhead when the clock comes due. Fusion's clock is 0, so a freed slot fills the same tick.
+ */
+function poolStep(s: GameState): void {
+  for (const p of s.players) {
+    if (p.epoch < 5) continue;
+    if (!p.nukes) {
+      if (s.tick % TICK_HZ !== 0 || !silosOf(s, p.id).length) continue;
+      p.nukes = { n: SILO.stock };
+    }
+    const pool = p.nukes;
+    const refuel = secs(rulesOf(p).refuel);
+    if (pool.n + aloftOf(s, p.id) >= SILO.cap) {
+      delete pool.next;
+      continue;
+    }
+    pool.next ??= s.tick + refuel;
+    while (s.tick >= pool.next && pool.n + aloftOf(s, p.id) < SILO.cap) {
+      pool.n++;
+      pool.next += refuel;
+    }
+    if (pool.n + aloftOf(s, p.id) >= SILO.cap) delete pool.next;
+  }
+}
+
+/**
+ * The warhead lands: every rival building whose nearest edge is within the blast radius, and every rival land unit not sheltered in a
+ * building, takes `blastDamage` for its distance. The blast clears the fog for everyone for `SILO.lift` seconds; the fallout, if any,
+ * keeps its own radius `SILO.reach`.
+ */
+function strike(s: GameState, l: Launch, x: number, y: number): void {
+  const { owner } = l;
+  const w = kindOf(l);
+  const R = WARHEADS[w].r;
+  const hit: [Ent, number][] = [];
   for (const e of s.ents) {
     if (e.hp <= 0 || !isEnemy(s, owner, e.owner)) continue;
     if (e.kind === 'building') {
-      if (distToRect(x, y, e) <= SILO.reach) hit.push(e);
+      const d = distToRect(x, y, e);
+      if (d < R) hit.push([e, d]);
     } else if (!e.inside && domainOf(e.type) === 'land') {
       const dx = e.x - x, dy = e.y - y;
-      if (dx * dx + dy * dy <= r2) hit.push(e);
+      if (dx * dx + dy * dy < R * R) hit.push([e, Math.sqrt(dx * dx + dy * dy)]);
     }
   }
-  for (const e of hit) hurt(s, e, e.kind === 'building' ? SILO.building : SILO.unit, owner, null);
-  if (!clean) (s.fallout ??= []).push({ id: s.nextId++, owner, x, y, until: s.tick + secs(FALLOUT.time) });
-  s.events.push({ k: 'silo', owner, x, y, what: 'struck' });
+  for (const [e, d] of hit) hurt(s, e, blastDamage(w, d), owner, null);
+  // A warhead tears up a rival's causeways too (#748): the road over the flats is cut, its barrage's pond let out.
+  breachAt(s, x, y, R, owner);
+  (s.blasts ??= []).push({ id: s.nextId++, x, y, r: R, until: s.tick + secs(SILO.lift) });
+  if (!l.clean) (s.fallout ??= []).push({ id: s.nextId++, owner, x, y, until: s.tick + secs(FALLOUT.time) });
+  s.events.push({ k: 'silo', owner, x, y, what: 'struck', w });
 }
 
-/** Every tick, in the order they were launched: a warhead whose silo has fallen is scrubbed; one whose clock has run out lands. */
+/**
+ * Every tick, in the order they were launched: a warhead whose silo has fallen is scrubbed (a salvo's one at a time, in its order: the rest
+ * fly on, #765); one whose clock has run out lands, a salvo's on each of its true points.
+ */
 export function siloStep(s: GameState): void {
   falloutStep(s);
+  poolStep(s);
+  if (s.blasts) {
+    const live = s.blasts.filter((b) => s.tick < b.until);
+    if (live.length) s.blasts = live;
+    else delete s.blasts;
+  }
   if (!s.launches) return;
   const left = [];
+  const fallen = (id: number): boolean => {
+    const b = s.byId.get(id);
+    return !b || b.kind !== 'building' || b.hp <= 0;
+  };
   for (const l of s.launches) {
-    const b = s.byId.get(l.silo);
-    if (!b || b.kind !== 'building' || b.hp <= 0) s.events.push({ k: 'silo', owner: l.owner, x: l.x, y: l.y, what: 'scrubbed' });
-    else if (s.tick >= l.at) strike(s, l.owner, l.x, l.y, l.clean);
-    else left.push(l);
+    let lost = false;
+    if (l.salvo) {
+      for (const sh of l.salvo) {
+        if (sh.gone || !fallen(sh.silo)) continue;
+        sh.gone = true;
+        s.events.push({ k: 'silo', owner: l.owner, x: sh.x, y: sh.y, id: l.id, what: 'scrubbed' });
+      }
+      lost = l.salvo.every((sh) => sh.gone);
+    } else if (fallen(l.silo)) {
+      s.events.push({ k: 'silo', owner: l.owner, x: l.x, y: l.y, id: l.id, what: 'scrubbed' });
+      lost = true;
+    }
+    if (lost) continue;
+    if (s.tick === l.at - secs(INTERCEPT.fire)) fire(s, l);
+    if (s.tick === l.at - secs(INTERCEPT.meet) && meet(s, l)) continue;
+    // A warhead its interceptor hit never lands (a belt to `meet`'s braces: the stored roll decides, whatever happened between).
+    if (s.tick >= l.at) {
+      for (const i of shotsOf(l)) if (!l.icpt?.some((c) => c.shot === i && c.hit)) strike(s, l, aimOf(l, i).x, aimOf(l, i).y);
+    } else {
+      // Exactly `SILO.reveal` seconds left (#762): the decoys vanish, the real ring flashes where it was drawn, one alarm sounds.
+      if (s.tick === l.at - secs(SILO.reveal)) s.events.push({ k: 'silo', owner: l.owner, x: l.x, y: l.y, id: l.id, what: 'revealed' });
+      left.push(l);
+    }
   }
   if (left.length) s.launches = left;
   else delete s.launches;
+}
+
+/**
+ * `INTERCEPT.fire` seconds before a launch lands (#759 s2): each of its live warheads, in order, draws one attempt from the nearest charged
+ * battery that covers it (`covers`; the lower id on a tie), whoever's it is among the launcher's rivals. The charge is spent and the roll
+ * drawn now, from the match's dice, and stored on the launch: a save, a load or a replay never draws it again. Stacked batteries do not
+ * raise the odds; a warhead no charged battery covers draws none from a battery.
+ *
+ * Batteries go first, being cheaper (#759 s3): a warhead none answered draws its one attempt from the nearest armed Reserve silo of a rival
+ * (`reserveFor`), which spends a warhead from its people's store and the launch fuel, and stands ready again `INTERCEPT.arm` seconds on.
+ */
+function fire(s: GameState, l: Launch): void {
+  for (const i of shotsOf(l)) {
+    let by: Building | undefined;
+    let near = Infinity;
+    for (const e of s.ents) {
+      if (e.kind !== 'building' || !charged(s, e) || !covers(s, e, l, i)) continue;
+      const g = ringOf(l, s.players[e.owner].team, i);
+      const d = (g.x - e.x) * (g.x - e.x) + (g.y - e.y) * (g.y - e.y);
+      if (d < near) [by, near] = [e, d];
+    }
+    let silo: true | undefined;
+    if (by) by.reload = s.tick + secs(INTERCEPT.reload);
+    else {
+      by = reserveFor(s, l, i);
+      if (!by) continue;
+      silo = true;
+      const p = s.players[by.owner];
+      spend(s, p);
+      pay(p, fuelOf(rulesOf(p).w));
+      by.reserve = s.tick + secs(INTERCEPT.arm);
+    }
+    const hit = roll(s) < INTERCEPT.chance;
+    (l.icpt ??= []).push({ shot: i, battery: by.id, owner: by.owner, x: by.x, y: by.y, hit, ...(silo ? { silo } : {}) });
+    s.events.push({ k: 'intercept', owner: by.owner, by: l.owner, id: l.id, shot: i, what: 'fired', x: by.x, y: by.y, ...(silo ? { silo } : {}) });
+  }
+}
+
+/** Whether this armed Reserve silo's people can pay for an interceptor now (#759 s3): a warhead in store and its launch fuel. */
+export const canAnswer = (s: GameState, b: Building): boolean => {
+  const p = s.players[b.owner];
+  return armed(s, b) && p.epoch >= 5 && stockOf(p) > 0 && canAfford(p, fuelOf(rulesOf(p).w));
+};
+
+/**
+ * The Reserve silo that answers a launch's warhead `shot` no battery took (#759 s3): of the rivals' armed silos whose people can pay
+ * (`canAnswer`), the nearest to the ring its team is shown (the lower id on a tie). Its cover is the whole map.
+ */
+function reserveFor(s: GameState, l: Launch, shot: number): Building | undefined {
+  let by: Building | undefined;
+  let near = Infinity;
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.type !== 'silo' || !isEnemy(s, l.owner, e.owner) || !canAnswer(s, e)) continue;
+    const g = ringOf(l, s.players[e.owner].team, shot);
+    const d = (g.x - e.x) * (g.x - e.x) + (g.y - e.y) * (g.y - e.y);
+    if (d < near) [by, near] = [e, d];
+  }
+  return by;
+}
+
+/**
+ * `INTERCEPT.meet` seconds before a launch lands (#759 s2): each interceptor reaches its missile and its stored roll plays out where the
+ * missile is. A hit takes that warhead out (a salvo's is marked gone, its ring with it). True when none of the launch is left.
+ */
+function meet(s: GameState, l: Launch): boolean {
+  let left = true;
+  for (const c of l.icpt ?? []) {
+    if (l.salvo?.[c.shot]?.gone) continue;
+    const m = missileOf(l, c.shot, s.tick) ?? { ...aimOf(l, c.shot), z: 0 };
+    s.events.push({ k: 'intercept', owner: c.owner, by: l.owner, id: l.id, shot: c.shot, what: c.hit ? 'hit' : 'missed', x: m.x, y: m.y, z: m.z, ...(c.silo ? { silo: c.silo } : {}) });
+    if (!c.hit) continue;
+    if (l.salvo) l.salvo[c.shot].gone = true;
+    else left = false;
+  }
+  return !left || (!!l.salvo && l.salvo.every((sh) => sh.gone));
 }
 
 /** Whether (x, y) stands in poisoned ground. */

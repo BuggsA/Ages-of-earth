@@ -6,23 +6,35 @@ import { QUALITY, type QualityName } from './render/post';
 import { View, type Pick } from './render/view';
 import { SIGHT_LORE } from './render/sightings';
 import { wallLine } from './sim/commands';
-import { AGES, AI_DYKE, BUILDINGS, SHAFT, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, SILO, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
+import { AGES, AI_DYKE, AI_RIVERS, AI_TIDES, TIDE, BUILDINGS, SHAFT, CIVS, PROSPECTOR, FLOOD, HOMELANDS, HOMELAND_IDS, ORE_TRADE, RARE, CIV_IDS, DT, CONVOY, VIGIL, EPOCHS, FAIR, FINDS, MAP_TYPES, MILITARY, PLAYER_COLORS, RECLAIM, RELIC, RUINS, SALVAGE, SEASONS, STEPPE, TECHS, TICK_HZ, TIDINGS, SILO, TRIBUTE, TRUNK, WARCAMP, WAYS, KIN, WORKS, domainOf, unitStats } from './sim/data';
 import { siteGrade } from './sim/shafts';
 import { crestSvg } from './ui/crests';
 import { unitPicture } from './ui/thumbs';
 import { easeHour, SHOT_SECONDS, titleShot } from './ui/titleShots';
 import { isEnemy } from './sim/world';
 import { carriesKegs, kegProblem } from './sim/powder';
-import { launchProblem } from './sim/silo';
+import { carriesTorch, torchProblem } from './sim/fire';
+import { apartProblem, launchProblem, ringsFor, salvoProblem, salvoSilos, type WarheadKind } from './sim/silo';
 import { jumpAge, rush, topUp } from './sim/god';
 import { checksum, createGame, scoreOf, step, type GameSetup, type PlayerSetup } from './sim/game';
-import { placeProblem, walkable } from './sim/grid';
+import { NAVAL, nearestWalkable, placeProblem, stampBuilding, walkable } from './sim/grid';
 import { findDockSpot, findSpot, millSpotFor } from './sim/ai';
-import { dykePlan } from './sim/water';
+import { channelPlan, dig, dykePlan, heldBack, waterLine } from './sim/water';
+import { bared, tideMillSpot, wakeTide } from './sim/tides';
+import { cocklerSpotNear } from './sim/tides';
+import { gateReach, tideGateSpotIn } from './sim/tides';
+import { barragePlan, isCauseway, kegTileProblem } from './sim/tides';
+import { isTidal, tidalLevel, tideClock, tideLevel } from './sim/tides';
+import { AI_FLOAT, FLOAT } from './sim/data';
+import { mooringSpot } from './sim/floating';
+import { R_COCKLE } from './sim/types';
+import { AI_BARRAGE, BLOOM, INTERCEPT, SALVO, secs } from './sim/data';
+import { rooted, slingProblem } from './sim/bloom';
 import { maxHp, placeBuilding, restat, spawnUnit } from './sim/world';
 import { arrivalText, epochArrivals } from './ui/endReport';
+import { journeyHtml } from './ui/journeyReport';
 import type { AgeId, Building, BuildingType, CivId, Command, Difficulty, Ent, GameEvent, GameMode, GameState, HistoryPoint, HomelandId, MapSize, MapType, Unit, UnitType } from './sim/types';
-import { KEYS, R_FISH, R_NONE, RES } from './sim/types';
+import { KEYS, R_FISH, R_NONE, RES, T_WATER } from './sim/types';
 import { carriedBy, relicAt } from './sim/relics';
 import { RUIN_FINDS, ruinAt } from './sim/ruins';
 import { salvages } from './sim/salvage';
@@ -48,7 +60,9 @@ import { CameraBookmarks, bookmarkShortcut } from './ui/cameraBookmarks';
 import { ScoutFlags } from './ui/scoutFlags';
 import { briefingHtml, chapterListHtml, recordStars, starRow, syncProgress } from './ui/campaignUi';
 import { Lobby } from './ui/lobby';
-import { Hud, nameOf } from './ui/hud';
+import { Hud, nameOf, planLines } from './ui/hud';
+import { RivalLedger, RivalPanel } from './ui/rivalRoad';
+import { RoadPlanner, loadPlannerPrefs, savePlannerPrefs } from './ui/roadPlanner';
 import { Minimap } from './ui/minimap';
 import { BattleTide } from './ui/battleTide';
 import { Tips } from './ui/tips';
@@ -107,7 +121,19 @@ let placeAt: { tx: number; ty: number; ok: boolean } | null = null;
 let wallDrag: { x0: number; y0: number; x1: number; y1: number } | null = null;
 /** The next left click picks a target: where to attack-move, or a building to shelter in. */
 let launchSilo = 0;
-let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | 'keg' | 'launch' | null = null;
+/** The Seed Spire whose Bloom Seed is being aimed (the Age of the Bloom). */
+let slingSpire = 0;
+/** The warhead chosen for the launch being aimed (#753); absent for the people's own. */
+let launchWarhead: WarheadKind | undefined;
+/** A salvo being aimed (#765): the points clicked so far, until there are `SALVO.trio`; null for a single launch. */
+let salvoAims: { x: number; y: number }[] | null = null;
+let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | 'keg' | 'torch' | 'launch' | 'sling' | null = null;
+/** When the viewer was last told one of its living buildings caught fire, so a spreading fire tells once. */
+let fireToldAt = -9999;
+/** When a swarm on your people was last told (the Age of the Hive), so a fight in the woods tells it once. */
+let hiveToldAt = -9999;
+/** When a waking Ent was last told (the Age of the Wildwood), so a forest rising round an army tells it once. */
+let entToldAt = -9999;
 let paused = false;
 const SPEEDS = [1, 1.5, 2, 3];
 let speedIdx = 0;
@@ -116,6 +142,17 @@ const cameraBookmarks = new CameraBookmarks();
 const scoutFlags = new ScoutFlags();
 let lastGroupKey = { key: -1, at: 0 };
 let lastAlert: { x: number; y: number } | null = null;
+/** When a rival's sluice was last told (#701 s4), so a Water Line is told once in a while, not every time it opens. */
+let sluiceToldAt = -Infinity;
+/** When the sea last broke into the viewer's polder (#701 s3), so a flood is told once, not for every tile. */
+let floodToldAt = -99999;
+/** The tide (#739): whether its waking was told, and when the viewer's people were last told they were swept off the flats. */
+let tideTold = false;
+let sweptToldAt = -99999;
+let tideHoldToldAt = -99999;
+let tideAshoreToldAt = -99999;
+/** When a breached causeway (#748) was last told: one toast a blast. */
+let breachToldAt = -1;
 /** When the flock last told of a lamb born, or of bare ground (#308), so the toasts don't pile up. */
 const flockToast = { born: -1e9, hungry: -1e9 };
 /** When tribute was last told of (#318), taken by the viewer's riders or from the viewer's land. */
@@ -133,6 +170,9 @@ let attractT = 0;
 let titleClock = 16;
 let lastSetup: GameSetup | null = null;
 
+let planner: RoadPlanner | null = null;
+const rivalLedger = new RivalLedger();
+let rivalPanel: RivalPanel | null = null;
 const hud = new Hud({
   issue: (c) => issue(c),
   place: (type) => {
@@ -161,9 +201,21 @@ const hud = new Hud({
     targetMode = 'keg';
     placing = null;
   },
-  launchMode: (silo) => {
+  torchMode: () => {
+    targetMode = 'torch';
+    placing = null;
+  },
+  launchMode: (silo, w) => {
     launchSilo = silo;
+    launchWarhead = w === 'salvo' ? undefined : w;
+    salvoAims = w === 'salvo' ? [] : null;
+    if (w === 'salvo') hud.toast(`Salvo: click ${SALVO.trio} points, at least ${SILO.apart} tiles apart`, 'info');
     targetMode = 'launch';
+    placing = null;
+  },
+  slingMode: (spire) => {
+    slingSpire = spire;
+    targetMode = 'sling';
     placing = null;
   },
   unloadMode: () => {
@@ -513,6 +565,7 @@ function startMatch(setup: GameSetup, saved?: GameState, seat = 0): void {
   cameraBookmarks.reset();
   scoutFlags.reset();
   lastAlert = null;
+  floodToldAt = -99999;
   tide.clear();
   acc = 0;
   hud.reset();
@@ -594,7 +647,7 @@ function toTitle(): void {
 
 const SAVE_KEY = 'ages-save';
 /** Bumped when the state's shape changes, so an older save is set aside instead of loading broken (2: relics; 3: trading posts). */
-const SAVE_V = 4;
+const SAVE_V = 6;
 
 interface SavedMatch {
   setup: GameSetup;
@@ -1225,6 +1278,15 @@ document.addEventListener('click', (e) => {
       closeSheets();
       showCampaign(webMapHtml(loadDiscovery()));
       break;
+    case 'plan-pin': {
+      // The web map pins a goal age for the road planner (#725); it opens in the next match.
+      const goal = el.dataset.age as AgeId;
+      if (planner) planner.pin(goal);
+      else savePlannerPrefs({ ...loadPlannerPrefs(), goal });
+      sound.play('click');
+      hud.toast(`Pinned the ${AGES[goal].name} as your goal: the Roads panel plans the way`, 'info');
+      break;
+    }
     case 'camp-back':
       $('campaign').classList.add('hidden');
       $('title').classList.remove('hidden');
@@ -1595,6 +1657,22 @@ function kegAt(clientX: number, clientY: number, queue: boolean): void {
   if (!s) return;
   const pk = view.pick(clientX, clientY);
   const b = pk && pk.kind === 'building' ? s.byId.get(pk.id) : undefined;
+  // A rival's causeway or barrage (#748): the keg is laid on the tile itself, to breach the road.
+  const g = b ? null : view.groundAt(clientX, clientY);
+  const tile = g ? Math.floor(g.y) * s.w + Math.floor(g.x) : -1;
+  if (!b && tile >= 0 && isCauseway(s, tile)) {
+    const no = kegTileProblem(s, viewer, tile);
+    if (no) {
+      hud.toast(no, 'bad');
+      play('error');
+      return;
+    }
+    const ids = selectedUnits(s).filter((u) => !u.inside && carriesKegs(u)).map((u) => u.id);
+    issue({ t: 'kegTile', p: viewer, ids, tile, queue: queue || undefined });
+    view.marker(s, (tile % s.w) + 0.5, Math.floor(tile / s.w) + 0.5, true);
+    play('move');
+    return;
+  }
   const why = kegProblem(s, viewer, b);
   if (!b || why) {
     hud.toast(why ?? 'Pick a rival building', 'bad');
@@ -1604,6 +1682,27 @@ function kegAt(clientX: number, clientY: number, queue: boolean): void {
   const ids = selectedUnits(s).filter((u) => !u.inside && carriesKegs(u)).map((u) => u.id);
   issue({ t: 'keg', p: viewer, ids, target: b.id, queue: queue || undefined });
   view.marker(s, b.x, b.y, true);
+  play('move');
+}
+
+/** Fire (`fire.ts`): the selected citizens and foot soldiers carry torches to the rival's living building, tree or root clicked. */
+function torchAt(clientX: number, clientY: number, queue: boolean): void {
+  const s = game;
+  if (!s) return;
+  const pk = view.pick(clientX, clientY);
+  const b = pk && pk.kind === 'building' ? s.byId.get(pk.id) : undefined;
+  const g = b ? null : view.groundAt(clientX, clientY);
+  const at = b ? { target: b.id } : g ? { tile: Math.floor(g.y) * s.w + Math.floor(g.x) } : null;
+  const why = at ? torchProblem(s, viewer, at) : "Pick a tree, a rival's Thornwall root, or a rival's living building";
+  if (!at || why) {
+    hud.toast(why ?? 'Pick something to burn', 'bad');
+    play('error');
+    return;
+  }
+  const ids = selectedUnits(s).filter((u) => !u.inside && carriesTorch(u)).map((u) => u.id);
+  issue({ t: 'torch', p: viewer, ids, ...at, queue: queue || undefined });
+  const t = at.tile ?? -1;
+  view.marker(s, b ? b.x : (t % s.w) + 0.5, b ? b.y : Math.floor(t / s.w) + 0.5, true);
   play('move');
 }
 
@@ -1633,11 +1732,11 @@ function gateTurned(s: GameState, tx: number, ty: number): boolean {
   return !(at(tx - 1, ty) || at(tx + 2, ty));
 }
 
-/** Buildings laid out by dragging a line: walls, dykes (#701) and Thornwalls (the Age of the Grove). */
-const lined = (t: BuildingType | null): t is 'wall' | 'dyke' | 'thornwall' => t === 'wall' || t === 'dyke' || t === 'thornwall';
+/** Buildings laid out by dragging a line: walls, dykes and channels (#701) and Thornwalls (the Age of the Grove). */
+const lined = (t: BuildingType | null): t is 'wall' | 'dyke' | 'thornwall' | 'channel' | 'causeway' => t === 'wall' || t === 'dyke' || t === 'thornwall' || t === 'channel' || t === 'causeway';
 
 /** The tiles of a planned wall (or line of dykes), and whether each can be built. */
-function wallPlan(s: GameState): { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean; type: 'wall' | 'dyke' | 'thornwall' } | null {
+function wallPlan(s: GameState): { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean; type: 'wall' | 'dyke' | 'thornwall' | 'channel' | 'causeway' } | null {
   if (!lined(placing)) return null;
   const type = placing;
   const d = wallDrag ?? (placeAt ? { x0: placeAt.tx, y0: placeAt.ty, x1: placeAt.tx, y1: placeAt.ty } : null);
@@ -1675,7 +1774,8 @@ function placeHere(shift: boolean): void {
   const s = game;
   if (!s || !placing || !placeAt) return;
   if (!placeAt.ok) {
-    hud.toast("Can't build there", 'bad');
+    // Ground the tide comes back to (#739) is said as such: it looks like land at low water.
+    hud.toast(placeProblem(s, placing, placeAt.tx, placeAt.ty, true, viewer) === 'tidal' ? "Can't build on the tidal flats: the sea comes back over them" : "Can't build there", 'bad');
     play('error');
     return;
   }
@@ -1779,16 +1879,66 @@ canvas.addEventListener('pointerdown', (e) => {
     if (!e.shiftKey) targetMode = null;
     return;
   }
+  if (targetMode === 'torch') {
+    torchAt(e.clientX, e.clientY, e.shiftKey);
+    if (!e.shiftKey) targetMode = null;
+    return;
+  }
+  if (targetMode === 'launch' && salvoAims) {
+    // A salvo (#765): three clicks, each checked as it comes; the third fires from this silo and the next two.
+    const g = view.groundAt(e.clientX, e.clientY);
+    const s = game;
+    if (!g || !s) return;
+    const pts = [...salvoAims, { x: g.x, y: g.y }];
+    const near = !(g.x >= 0 && g.y >= 0 && g.x < s.w && g.y < s.h) ? 'Pick points on the map' : apartProblem(pts);
+    if (near) {
+      hud.toast(near, 'bad');
+      play('error');
+      return;
+    }
+    view.marker(s, g.x, g.y, true);
+    if (pts.length < SALVO.trio) {
+      salvoAims = pts;
+      hud.toast(`Salvo: point ${pts.length} of ${SALVO.trio}`, 'info');
+      return;
+    }
+    const from = salvoSilos(s, viewer, launchSilo);
+    const shots = pts.map((a, i) => ({ silo: from[i]?.id ?? -1, x: a.x, y: a.y }));
+    const why = salvoProblem(s, viewer, shots);
+    if (why) {
+      hud.toast(why, 'bad');
+      play('error');
+    } else issue({ t: 'launch', p: viewer, silo: shots[0].silo, x: shots[0].x, y: shots[0].y, more: shots.slice(1) });
+    salvoAims = null;
+    targetMode = null;
+    return;
+  }
   if (targetMode === 'launch') {
     const g = view.groundAt(e.clientX, e.clientY);
     const s = game;
     if (g && s) {
-      const why = launchProblem(s, viewer, s.byId.get(launchSilo) as Building | undefined, g.x, g.y);
+      const why = launchProblem(s, viewer, s.byId.get(launchSilo) as Building | undefined, g.x, g.y, launchWarhead);
       if (why) {
         hud.toast(why, 'bad');
         play('error');
       } else {
-        issue({ t: 'launch', p: viewer, silo: launchSilo, x: g.x, y: g.y });
+        issue({ t: 'launch', p: viewer, silo: launchSilo, x: g.x, y: g.y, ...(launchWarhead ? { w: launchWarhead } : {}) });
+        view.marker(s, g.x, g.y, true);
+      }
+    }
+    targetMode = null;
+    return;
+  }
+  if (targetMode === 'sling') {
+    const g = view.groundAt(e.clientX, e.clientY);
+    const s = game;
+    if (g && s) {
+      const why = slingProblem(s, viewer, s.byId.get(slingSpire), g.x, g.y);
+      if (why) {
+        hud.toast(why, 'bad');
+        play('error');
+      } else {
+        issue({ t: 'sling', p: viewer, spire: slingSpire, x: g.x, y: g.y });
         view.marker(s, g.x, g.y, true);
       }
     }
@@ -1844,12 +1994,12 @@ canvas.addEventListener('pointerup', (e) => {
     const d = wallDrag;
     wallDrag = null;
     if (!plan || !plan.tiles.some((t) => t.ok)) {
-      hud.toast(plan?.type === 'dyke' ? "Can't raise a dyke there: dykes go on shallow water, or on the shore beside it" : "Can't build a wall there", 'bad');
+      hud.toast(plan?.type === 'causeway' ? "Can't lay a causeway there: causeways go over the tidal flats or the shallow open sea" : plan?.type === 'dyke' ? "Can't raise a dyke there: dykes go on shallow water, or on the shore beside it" : plan?.type === 'channel' ? "Can't dig a channel there: channels go across open land, starting beside water" : "Can't build a wall there", 'bad');
       play('error');
       return;
     }
     const ids = selectedUnits(s).filter((u) => u.type === 'citizen' || legionary(s, u)).map((u) => u.id);
-    issue({ t: 'wall', p: viewer, ids, x0: d.x0, y0: d.y0, x1: d.x1, y1: d.y1, queue: e.shiftKey || undefined, dyke: plan.type === 'dyke' || undefined, thorn: plan.type === 'thornwall' || undefined });
+    issue({ t: 'wall', p: viewer, ids, x0: d.x0, y0: d.y0, x1: d.x1, y1: d.y1, queue: e.shiftKey || undefined, dyke: plan.type === 'dyke' || undefined, thorn: plan.type === 'thornwall' || undefined, channel: plan.type === 'channel' || undefined, causeway: plan.type === 'causeway' || undefined });
     if (!e.shiftKey) {
       placing = null;
       placeAt = null;
@@ -2296,7 +2446,7 @@ function timeline(s: GameState, metric: Metric): string {
   return `<svg class="timeline" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${grid}${lines}</svg>`;
 }
 
-type EndHow = 'conquest' | 'wonder' | 'relics' | 'lands' | 'resign' | 'time' | 'scenario';
+type EndHow = 'conquest' | 'wonder' | 'relics' | 'lands' | 'greening' | 'resign' | 'time' | 'scenario';
 /** How the viewer's match ended, so the menu can bring the results back after a look around. */
 let lastEnd: { won: boolean; how: EndHow; tick: number } | null = null;
 
@@ -2327,6 +2477,8 @@ function showEnd(s: GameState, won: boolean, how: EndHow = 'conquest', again = f
       ? won ? 'Your Wonder stood the test of time.' : 'A rival Wonder stood the test of time.'
       : how === 'lands'
         ? won ? 'Every landmark in the land is yours: you are its lord.' : 'A rival became lord of every landmark in the land.'
+      : how === 'greening'
+        ? won ? 'Your land stayed green: the Greening is complete, and the world is a forest again.' : 'A rival kept its land green until the Greening was complete.'
       : how === 'relics'
         ? won ? 'Every relic in the world rests in your temples.' : 'A rival kept every relic in the world.'
         : won ? 'Your rivals have fallen.' : 'Your people are no more.';
@@ -2336,11 +2488,12 @@ function showEnd(s: GameState, won: boolean, how: EndHow = 'conquest', again = f
     ${extra}
     <div class="chart-tabs">${(Object.keys(METRICS) as Metric[]).map((k) => `<button class="tab ${k === 'score' ? 'on' : ''}" data-metric="${k}">${METRICS[k]}</button>`).join('')}</div>
     <div id="chart">${timeline(s, 'score')}</div>
+    ${journeyHtml(s, viewer, lastEnd?.tick ?? s.tick)}
     <table class="end-stats"><tr><th></th><th>Score</th><th>Epoch</th><th>Gathered</th><th>Traded</th><th>Trained</th><th>Built</th><th>Techs</th><th>Kills</th><th>Lost</th></tr>${rows}</table>
     <div class="row">
       <button class="btn wide" data-act="watch">Look around</button>
       <button class="btn wide" data-act="replay-save">Download the replay</button>
-      ${sc ? (won && nextCh ? `<button class="btn wide primary" data-act="camp-next" data-id="${sc.id}">Next chapter: ${nextCh.title}</button>` : '') + '<button class="btn wide' + (won && nextCh ? '' : ' primary') + '" data-act="restart">Play the chapter again</button>' : online ? '' : '<button class="btn wide primary" data-act="new-map">Play again</button>'}
+      ${sc ? (won && nextCh ? `<button class="btn wide primary" data-act="camp-next" data-id="${sc.id}">Next chapter: ${nextCh.title}</button>` : '') + '<button class="btn wide' + (won && nextCh ? '' : ' primary') + '" data-act="restart">Play the chapter again</button>' : online ? '' : '<button class="btn wide" data-act="restart" title="The same map, peoples and rivals">Play this seed again</button><button class="btn wide primary" data-act="new-map">Play again</button>'}
       <button class="btn wide" data-act="quit">Quit to title</button>
     </div></div>`;
   m.querySelector('.chart-tabs')!.addEventListener('click', (e) => {
@@ -2360,6 +2513,8 @@ function showEnd(s: GameState, won: boolean, how: EndHow = 'conquest', again = f
 function onEvents(s: GameState, list: GameEvent[]): void {
   view.events(s, list);
   if (mode !== 'play') return;
+  // A rooted Bloom Seed is heard growing on every screen, a slow wooden heartbeat every ten seconds (the Age of the Bloom).
+  if (s.tick % secs(10) === 0 && s.blooms?.some((l) => rooted(s, l))) play('bloomGrow');
   for (const ev of list) {
     switch (ev.k) {
       case 'refused':
@@ -2394,7 +2549,11 @@ function onEvents(s: GameState, list: GameEvent[]): void {
             if (opened.length) setTimeout(() => play('heirloom'), 900);
             for (const t of opened) hud.toast(`${TECHS[t].icon} An heirloom opens: ${TECHS[t].name}, at the ${BUILDINGS[TECHS[t].at].name}`, 'good');
           }
-        } else hud.toast(`${s.players[ev.owner].name} has ${ev.back ? 'stepped back to' : 'reached'} the ${ageName(ev)}`, 'info');
+        } else {
+          // A rival's road (#726): remembered, and a click on the notice opens its card.
+          if (ev.age) rivalLedger.note(ev.owner, ev.age, !!ev.back, s.tick);
+          hud.toast(`${s.players[ev.owner].name} has ${ev.back ? 'stepped back to' : 'reached'} the ${ageName(ev)}${ev.back ? ': a chance to strike' : ''} (click to read)`, 'info', () => rivalPanel?.show(true));
+        }
         break;
       case 'wages':
         if (ev.owner === viewer) {
@@ -2419,6 +2578,112 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         break;
       case 'hit':
         if (view.sees(ev.x, ev.y)) music.stir(0.012);
+        break;
+      case 'tide': {
+        // The tide (#739): its waking told once, and the flood told to a people with feet on the flats.
+        if (!tideTold) {
+          tideTold = true;
+          const who = s.players.find((q) => AGES[ageOf(q)].tides);
+          hud.toast(`🌊 The tide has woken${who ? `: ${who.id === viewer ? 'your people keeps' : `${who.name} keeps`} the sea's hours` : ''}. Every ${TIDE.period / 60} minutes the sea falls to low water and back: the shallows bare as wet flats anyone may cross, and drown again. The clock is at the top of the screen.`, 'info');
+          break;
+        }
+        if (ev.level === 0) hud.toast('🌊 Low water: the flats are bare. Ships on them sit aground until the water comes back.', 'info');
+        else if (ev.rising && ev.level === 1) {
+          const caught = s.ents.some((u) => u.kind === 'unit' && u.owner === viewer && u.hp > 0 && !u.inside && bared(s, Math.floor(u.y) * s.w + Math.floor(u.x)));
+          if (caught) {
+            hud.toast('🌊 The tide is coming in! Get your people off the flats before the water reaches them.', 'alert');
+            play('alert');
+          }
+        }
+        break;
+      }
+      case 'breached':
+        // Barrages (#748): a causeway of yours torn up, told once a blast; a rival's, once too.
+        if (s.tick !== breachToldAt && (ev.owner === viewer || ev.by === viewer)) {
+          breachToldAt = s.tick;
+          if (ev.owner === viewer) {
+            lastAlert = { x: ev.x, y: ev.y };
+            hud.toast(`${s.players[ev.by]?.name ?? 'A rival'} has breached your causeway${ev.pond ? ': the barrage is open, and its pond drains at the next turn of the tide. Lay causeways in the gap to shut it again' : ': the road over the flats is cut'}. (Space to look)`, 'bad');
+          } else hud.toast(ev.pond ? 'The barrage is breached: its pond drains at the next turn of the tide, and its mills grind half as much' : 'The causeway is breached: the road over the flats is cut', 'good');
+        }
+        break;
+      case 'pond':
+        if (ev.owner === viewer) {
+          hud.toast(`🌊 The barrage holds: ${ev.tiles} tiles of tidal flats are a pond now, wet at every hour. Tide Mills by it grind its flats twice, on the flood and on the ebb.`, 'good');
+          play('pondShut');
+        }
+        break;
+      case 'tideSwept':
+        // A rival's Tide Gate scoured the flats your people stood on (#785).
+        if (ev.by !== undefined && ev.by !== viewer && ev.owner === viewer && s.tick - sweptToldAt > TICK_HZ * 10) {
+          sweptToldAt = s.tick;
+          lastAlert = { x: ev.x, y: ev.y };
+          hud.toast(`🌊 ${s.players[ev.by]?.name ?? 'A rival'} opened a tide gate on your people on the flats: the pond scoured them off${ev.drowned ? ', and some drowned' : ', hurt'}. Read a rival's gate before you cross below it: loaded, it is a weapon. (Space to look)`, 'bad');
+          break;
+        }
+        if (ev.owner === viewer && s.tick - sweptToldAt > TICK_HZ * 10) {
+          sweptToldAt = s.tick;
+          lastAlert = { x: ev.x, y: ev.y };
+          hud.toast(ev.drowned ? '🌊 The tide took some of your people, caught far out on the flats. (Space to look)' : '🌊 The tide swept some of your people off the flats, hurt. (Space to look)', 'bad');
+        }
+        break;
+      case 'tideGate':
+        // A Tide Gate (#785): your own scour, said with what it caught.
+        if (ev.owner === viewer && ev.open) hud.toast(ev.scour ? `🌊 The gate is open: the pond scours ${ev.scour} tiles of flats below it${ev.swept ? `, sweeping ${ev.swept} off them` : ''}. Shut it (O) to fill the pond on the next flood.` : '🚪 The gate is open: the pond runs with the tide. Shut it (O) to hold the next flood.', ev.swept ? 'good' : 'info');
+        break;
+      case 'tideAshore':
+        // Work on the flats that reads the tide (#767): your workers leave the flats before the flood, said once in a while.
+        if (ev.owner === viewer && s.tick - tideAshoreToldAt > TICK_HZ * 60) {
+          tideAshoreToldAt = s.tick;
+          hud.toast('🌊 Your workers on the flats come ashore before the flood. They go back to their work when the ground bares.', 'info');
+        }
+        break;
+      case 'tideHold':
+        // Routes that read the tide (#755): your people stop on the shore rather than walk into the flood, said once in a while.
+        if (ev.owner === viewer && s.tick - tideHoldToldAt > TICK_HZ * 30) {
+          tideHoldToldAt = s.tick;
+          lastAlert = { x: ev.x, y: ev.y };
+          hud.toast(`🌊 Some of your people wait on the shore: the flats ahead go under before they'd be across. They set out in ${Math.ceil((ev.until - s.tick) / TICK_HZ)}s, when the way stands bare. (Space to look)`, 'info');
+        }
+        break;
+      case 'sluice':
+        // The Water Line (#701 s4): a rival's sluice opened where the viewer can see it, said once in a while.
+        if (ev.open && ev.owner !== viewer && view.sees(ev.x, ev.y) && s.tick - sluiceToldAt > TICK_HZ * 30) {
+          sluiceToldAt = s.tick;
+          lastAlert = { x: ev.x, y: ev.y };
+          hud.toast(`${s.players[ev.owner].name} has opened a sluice: the low ground round it is going under water. Soldiers wade it at a crawl and siege bogs down; go round, or wait for it to drain. (Space to look)`, 'alert');
+        }
+        break;
+      case 'pontoon':
+        // A floating district (#770): its owner hears where it went and who went with it; a sinking is told to a rival who sees it too.
+        if (ev.act === 'sink' && (ev.owner === viewer || view.sees(ev.x, ev.y))) {
+          lastAlert = { x: ev.x, y: ev.y };
+          const lost = ev.swum ? ` ${ev.swum} on its deck drowned.` : ev.aboard ? ' Those on its deck swam for it.' : '';
+          hud.toast(ev.owner === viewer ? `A pontoon of yours is holed and sunk!${lost} (Space to look)` : `${s.players[ev.owner].name}'s pontoon is holed and sunk.${lost} (Space to look)`, ev.owner === viewer ? 'alert' : 'good');
+          if (ev.owner === viewer) music.stir(0.3);
+        } else if (ev.owner === viewer && ev.act === 'cast') {
+          hud.toast(`⛵ Cast off: the district is under tow with ${ev.aboard} aboard${ev.swum ? `, and ${ev.swum} left to swim for it` : ''}. Take it to open water and moor it there (P).`, 'info');
+        } else if (ev.owner === viewer && ev.act === 'moor') {
+          hud.toast(`⚓ Moored: the district raises itself in ${STEPPE.pitch}s${ev.aboard ? `, and the ${ev.aboard} aboard step out onto its deck` : ''}.`, 'info');
+        }
+        break;
+      case 'burst':
+        // A dam bursts (#701 s5): told to its owner, and to a rival who sees it.
+        if (ev.owner === viewer || view.sees(ev.x, ev.y)) {
+          lastAlert = { x: ev.x, y: ev.y };
+          hud.toast(ev.owner === viewer ? `Your dam has burst! The water is over ${ev.tiles} tiles of low ground below it, and all who stood there are hurt. It drains away; raise a new Dam (N) for the turbines. (Space to look)` : `${s.players[ev.owner].name}'s dam has burst: the water is over the low ground below it. (Space to look)`, 'alert');
+          if (ev.owner === viewer) music.stir(0.4);
+        }
+        break;
+      case 'flooded':
+        // The breach (#701 s3): the sea in your polder, said once a flood, not for every tile.
+        if (ev.owner === viewer && s.tick - floodToldAt > TICK_HZ * 15) {
+          floodToldAt = s.tick;
+          music.stir(0.4);
+          lastAlert = { x: ev.x, y: ev.y };
+          hud.toast('The sea is in your polder! A dyke has given way: raise it again (K) to stop the flood, and a windmill will pump it out. (Space to look)', 'alert');
+          play('alert');
+        }
         break;
       case 'alert':
         if (ev.owner === viewer) {
@@ -2490,6 +2755,13 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         if (ev.to === viewer) hud.toast('A priest has won an enemy over to your side', 'good');
         else if (ev.from === viewer) {
           hud.toast('One of yours has been converted by an enemy priest!', 'alert');
+          lastAlert = { x: ev.x, y: ev.y };
+        }
+        break;
+      case 'boarded':
+        if (ev.to === viewer) hud.toast(`⚓ Boarded and taken: a ${unitStats(ev.type, s.players[ev.to].epoch).name} sails for you now, hold and all`, 'good');
+        else if (ev.from === viewer) {
+          hud.toast(`Your ${unitStats(ev.type, s.players[ev.from].epoch).name} has been boarded and taken by ${s.players[ev.to].name}'s Sea Beggars!`, 'alert');
           lastAlert = { x: ev.x, y: ev.y };
         }
         break;
@@ -2766,23 +3038,125 @@ function onEvents(s: GameState, list: GameEvent[]): void {
           if (ev.owner === viewer) hud.toast(`${s.players[ev.by ?? 0].name} stamped out your keg's fuse: cover the next one`, 'alert');
           else if (ev.by === viewer) hud.toast('Your people stamped out a burning keg', 'good');
         } else if (ev.what === 'blown' && ev.owner === viewer) hud.toast('A keg blows: what stood by it is shaken to its footings', 'good');
+        else if (ev.what === 'drowned' && ev.owner === viewer) hud.toast('🌊 The tide came over your keg and drowned its fuse: lay powder on the flats only with time to spare', 'alert');
+        break;
+      case 'fire':
+        // Fire (`fire.ts`): told once when a living building of yours catches (a spreading fire would tell every second), and when one is beaten out.
+        if (ev.what === 'lit' && ev.owner === viewer && s.tick - fireToldAt > 15 * TICK_HZ) {
+          fireToldAt = s.tick;
+          hud.toast(`${ev.by !== viewer && s.players[ev.by] ? `${s.players[ev.by].name} has set your` : 'Your'} ${ev.tree ? 'woods' : 'living buildings'} alight: send citizens to beat it out before it spreads`, 'alert');
+        } else if (ev.what === 'out' && ev.owner === viewer) hud.toast('The fire is beaten out', 'good');
+        else if (ev.what === 'root' && ev.owner === viewer) hud.toast('Fire took a Thornwall root: it will not grow again', 'bad');
+        break;
+      case 'hive': {
+        // The Age of the Hive: told once in a while when a swarm finds your people in a rival's woods, and when your Hive is smoked quiet.
+        const victim = ev.what === 'swarm' ? s.byId.get(ev.target ?? 0) : undefined;
+        if (victim && victim.owner === viewer && s.tick - hiveToldAt > 20 * TICK_HZ) {
+          hiveToldAt = s.tick;
+          hud.toast(`Bees! ${s.players[ev.owner]?.name ?? 'A rival'}'s Hive swarms your people in its woods: keep out of the trees there, or smoke it quiet with a fire`, 'alert');
+        } else if (ev.what === 'smoked' && ev.owner === viewer) hud.toast('Smoke has quieted one of your Hives: its bees will wake when it clears', 'alert');
+        break;
+      }
+      case 'bloom': {
+        // The Age of the Bloom: every Seed is public, so every player is told when one is slung, where it roots, and how it ends; the
+        // Greening's hold is told to all, as a Wonder's is.
+        const who = s.players[ev.owner]?.name ?? 'A rival';
+        const mine = ev.owner === viewer;
+        const foe = isEnemy(s, viewer, ev.owner);
+        if (ev.what === 'slung') {
+          hud.toast(mine ? `Seed away: it roots in ${BLOOM.flight} seconds, and its ring cracks ${BLOOM.grow} seconds after unless their citizens hack it out. Guard the root` : `${who} has slung a Bloom Seed${foe ? ': it comes down inside the green ring' : ''}`, mine ? 'good' : foe ? 'bad' : 'info');
+          if (foe) minimap.ping(ev.x, ev.y, '#7fd84a', true);
+          play('bloomSling');
+        } else if (ev.what === 'rooted') {
+          if (foe) hud.toast(`${who}'s Bloom Seed has rooted: in ${BLOOM.grow} seconds every building of yours within ${BLOOM.r} tiles turns to forest. Send citizens to hack out its heart-root (the yellow ring)`, 'alert');
+          else if (mine) hud.toast(`Your Seed has rooted: ${BLOOM.grow} seconds to the Bloom`, 'good');
+          minimap.ping(ev.x, ev.y, '#d6f07a', true);
+          play('bloomRoot');
+        } else if (ev.what === 'withered') {
+          if (mine) hud.toast('Your Seed found no open ground to root in and withered', 'bad');
+        } else if (ev.what === 'hacked') {
+          hud.toast(mine ? 'Your Seed was hacked out before it bloomed' : foe ? `The heart-root is cut: ${who}'s Bloom fails` : `${who}'s Seed was hacked out`, mine ? 'bad' : 'good');
+          play('bloomCut');
+        } else if (ev.what === 'cracked') {
+          hud.toast(mine ? `The Bloom! ${ev.n ?? 0} of their buildings crack into forest` : foe ? `${who}'s Bloom cracks ${ev.n ?? 0} of your buildings into forest` : `${who}'s Seed has bloomed`, mine ? 'good' : foe ? 'bad' : 'info');
+          minimap.ping(ev.x, ev.y, '#7fd84a', true);
+          play('bloomCrack');
+        } else if (ev.what === 'held') {
+          hud.toast(mine ? `The Greening: keep your Heart Tree and your land green for ${BLOOM.hold / 60} minutes and you win` : `${who} has begun the Greening: fell and burn their woods, or fell their Heart Tree, within ${BLOOM.hold / 60} minutes`, mine ? 'good' : foe ? 'alert' : 'info');
+          play('bloomGreen');
+        } else if (ev.what === 'faded') {
+          hud.toast(mine ? 'Your Greening has faded: green your land again' : `${who}'s Greening has faded`, mine ? 'bad' : 'good');
+        } else if (ev.what === 'storm' && (mine || s.players[viewer]?.vis[Math.floor(ev.y) * s.w + Math.floor(ev.x)] === 1)) {
+          if (foe) hud.toast(`A pollen storm blows from ${who}'s woods: your soldiers and towers near their Heart Tree see half as far`, 'alert');
+          play('bloomStorm');
+        }
+        break;
+      }
+      case 'wildwood':
+        // The Age of the Wildwood: a tree that wakes beside your people is told once in a while; your own Ent lost with its tree, and the
+        // spring's Spreading, are told to its people.
+        if (ev.what === 'wake' && ev.owner !== viewer && s.players[viewer]?.vis[Math.floor(ev.y) * s.w + Math.floor(ev.x)] === 1 && s.tick - entToldAt > 20 * TICK_HZ) {
+          entToldAt = s.tick;
+          hud.toast(`A tree wakes! ${s.players[ev.owner]?.name ?? 'A rival'}'s Ent was rooted there: in a Wildwood people's woods, any tree may be one. Fire takes them`, 'alert');
+        } else if (ev.what === 'felled' && ev.owner === viewer) hud.toast('One of your rooted Ents was felled with its tree', 'bad');
+        else if (ev.what === 'spread' && ev.owner === viewer && ev.n) hud.toast(`Spring: your woods spread round the Heart Tree, ${ev.n} seedlings`, 'good');
         break;
       case 'silo':
-        // The Atomic Age (#605): the clock is public, so every player is told when a warhead goes up and where it will land.
+        // The Atomic Age (#605): the clock is public, so every player is told when a warhead goes up. A rival is shown three rings, the
+        // real zone and two decoys (#762), never the event's point (the attacker's own aim): no marker, ping or camera jump there.
         if (ev.what === 'launched') {
-          if (ev.owner === viewer) hud.toast(`Warhead away: it lands in ${ev.fuse ?? SILO.fuse} seconds`, 'good');
-          else if (isEnemy(s, viewer, ev.owner)) {
-            hud.toast(`${s.players[ev.owner].name} has launched a warhead: it lands in ${ev.fuse ?? SILO.fuse} seconds. Clear the ring, or destroy the silo`, 'bad');
-            view.marker(s, ev.x, ev.y, false);
+          // A salvo (#765) is told to its rivals in the same words as one warhead: they learn which only at the reveal.
+          if (ev.owner === viewer) {
+            const many = !!s.launches?.find((k) => k.id === ev.id)?.salvo;
+            hud.toast(many ? `Salvo away: ${SALVO.trio} warheads land in ${ev.fuse ?? SILO.fuse} seconds. Rivals see three rings, as for one warhead and two decoys, until the last ${SILO.reveal}` : `Warhead away: it lands in ${ev.fuse ?? SILO.fuse} seconds. Rivals see your target among two decoys until the last ${SILO.reveal}`, 'good');
+          } else if (isEnemy(s, viewer, ev.owner)) {
+            hud.toast(`${s.players[ev.owner].name} has launched: it lands in ${ev.fuse ?? SILO.fuse} seconds, in three rings, one real and two decoys, or all three real if three silos fired a salvo. Clear them, or destroy the silos. Watch the missile: late in its flight it bends toward where it falls`, 'bad');
+            const l = s.launches?.find((k) => k.id === ev.id);
+            for (const g of l ? ringsFor(s, l, viewer) : []) minimap.ping(g.x, g.y, '#ff4a3a', true);
           }
           play('siloLaunch');
+        } else if (ev.what === 'revealed') {
+          // Exactly SILO.reveal seconds left (#762): the decoys vanish, the real ring flashes where it was drawn, one alarm.
+          const l = s.launches?.find((k) => k.id === ev.id);
+          if (l && isEnemy(s, viewer, ev.owner)) {
+            const n = ringsFor(s, l, viewer).length;
+            hud.toast(n > 1 ? `${SILO.reveal} seconds: it is a salvo. ${s.players[ev.owner].name}'s warheads fall in all ${n} rings that flash` : `${SILO.reveal} seconds: the decoys are gone. ${s.players[ev.owner].name}'s warhead falls in the ring that flashes`, 'bad');
+            for (const g of ringsFor(s, l, viewer)) minimap.ping(g.x, g.y, '#ff2a1a', true);
+            play('siloAlarm');
+          }
         } else if (ev.what === 'scrubbed') {
-          hud.toast(ev.owner === viewer ? 'Your silo fell: the launch is scrubbed' : `${s.players[ev.owner].name}'s silo fell: the launch is scrubbed`, ev.owner === viewer ? 'alert' : 'good');
+          // A salvo's silo (#765) scrubs only its own warhead: the launch flies on while any of its silos stands.
+          const rest = s.launches?.some((k) => k.id === ev.id);
+          if (rest) hud.toast(ev.owner === viewer ? 'A silo of your salvo fell: its warhead is scrubbed, the others fly on' : `A silo of ${s.players[ev.owner].name}'s salvo fell: its warhead and its ring are gone, the others fly on`, ev.owner === viewer ? 'alert' : 'good');
+          else hud.toast(ev.owner === viewer ? 'Your silo fell: the launch is scrubbed' : `${s.players[ev.owner].name}'s silo fell: the launch is scrubbed`, ev.owner === viewer ? 'alert' : 'good');
           play('siloScrub');
         } else {
+          // The blast is seen by everyone, through the fog (#752): a ping on every minimap, and the boom.
+          minimap.ping(ev.x, ev.y, '#ffd25a', true);
           play('siloBlast');
         }
         break;
+      case 'intercept': {
+        // Missile defence (#759 s2): every player hears an interceptor go up and meet its warhead, as they hear a launch; the two sides are told.
+        const ours = s.players[viewer].team === s.players[ev.owner].team, theirs = s.players[viewer].team === s.players[ev.by].team;
+        const who = s.players[ev.by].name;
+        if (ev.what === 'fired') {
+          // A silo held in Reserve (#759 s3) fires a warhead of its store as the interceptor.
+          if (ours) hud.toast(`${ev.owner === viewer ? 'Your' : `${s.players[ev.owner].name}'s`} ${ev.silo ? 'Missile Silo, held in Reserve,' : 'Interceptor Battery'} fires at ${who}'s warhead: ${Math.round(INTERCEPT.chance * 100)}% to stop it${ev.silo && ev.owner === viewer ? ' (a warhead of your store spent)' : ''}`, 'alert');
+          else if (theirs) hud.toast(`${ev.silo ? 'A silo held in Reserve fires' : 'An interceptor rises'} to meet ${ev.by === viewer ? 'your' : `${who}'s`} warhead`, 'alert');
+          play('interceptLaunch');
+        } else if (ev.what === 'hit') {
+          if (ours) hud.toast(`Intercepted! ${who}'s warhead is stopped in the sky: no blast, no fallout`, 'good');
+          else if (theirs) hud.toast(`${ev.by === viewer ? 'Your' : `${who}'s`} warhead was intercepted: no blast`, 'bad');
+          minimap.ping(ev.x, ev.y, '#e8f6ff', true);
+          play('interceptHit');
+        } else {
+          if (ours) hud.toast(`The interceptor missed: ${who}'s warhead flies on`, 'bad');
+          else if (theirs) hud.toast(`Their interceptor missed: ${ev.by === viewer ? 'your' : `${who}'s`} warhead flies on`, 'good');
+          play('interceptMiss');
+        }
+        break;
+      }
       case 'oreBuy':
         // A load of rare ore bought at a post (#573).
         if (ev.owner === viewer) {
@@ -2951,6 +3325,13 @@ function refreshHud(): void {
   if (!game || mode === 'title') return;
   pruneSelection(game);
   recordDiscovery(game);
+  planner ??= new RoadPlanner($('roads-btn'), $('roads-panel'), (st, v, to, back) => planLines(st, st.players[v], to, back));
+  planner.update(game, viewer, discovery ?? loadDiscovery());
+  rivalPanel ??= new RivalPanel($('rivals-btn'), $('rivals-panel'), rivalLedger);
+  for (const k of rivalLedger.scan(game, viewer, (x, y) => view.sees(x, y))) {
+    hud.toast(`🏺 You see ${game.players[k.owner].name}'s ${BUILDINGS[(game.ents.find((e) => e.id === k.id) as { type: keyof typeof BUILDINGS }).type].name}: they have walked the ${AGES[k.age].name}`, 'info', () => rivalPanel?.show(true));
+  }
+  rivalPanel.update(game, viewer);
   hud.update(game, viewer, [...selection], SPEEDS[speedIdx], selectedTile, selectedRelic, selectedPost, selectedRuin !== null ? { id: selectedRuin, dug: view.ruins.dugAsSeen(selectedRuin) } : null, selectedLandmark !== null ? { id: selectedLandmark, keeper: view.landmarks.keeperAsSeen(selectedLandmark) } : null);
 }
 
@@ -2960,7 +3341,7 @@ function cursorFor(s: GameState): string {
   if (targetMode === 'garrison') return 'cur-garrison';
   if (targetMode === 'sacrifice' || targetMode === 'curse') return 'cur-convert';
   if (targetMode === 'unload') return 'cur-garrison';
-  if (targetMode === 'keg' || targetMode === 'launch') return 'cur-attack';
+  if (targetMode === 'keg' || targetMode === 'torch' || targetMode === 'launch' || targetMode === 'sling') return 'cur-attack';
   if (!pointer.inside || boxing) return '';
   const units = selectedUnits(s);
   const pk: Pick | null = units.length ? orderPick(s, pointer.x, pointer.y) : view.pick(pointer.x, pointer.y);
@@ -3177,7 +3558,7 @@ function frame(now: number): void {
       mapTimer -= dt;
       if (mapTimer <= 0) {
         mapTimer = 0.2;
-        minimap.draw(s, viewer, mode === 'over' || !!watching?.all || (spectating && spectateAll), [...view.knownBuildings()], view.rig.footprint(), selection, scoutFlags.all);
+        minimap.draw(s, viewer, mode === 'over' || !!watching?.all || (spectating && spectateAll), [...view.knownBuildings()], view.rig.footprint(), selection, scoutFlags.all, rivalLedger.keepsakes());
       }
       cursorTimer -= dt;
       if (cursorTimer <= 0) {
@@ -3254,6 +3635,313 @@ function frame(now: number): void {
     const first = plan.basin[0];
     view.rig.focus(first % s.w, Math.floor(first / s.w));
     return plan.basin.length;
+  },
+  /**
+   * The breach (testing, #701 s3): bring down the dyke of a player's that holds back the most polder, and watch the sea run back in.
+   * Returns how many tiles it held back (0: none of its dykes holds any; pump some out first with `ages.dykes`).
+   */
+  breach(owner: number) {
+    if (!game) return 0;
+    const s = game;
+    let best: Building | null = null;
+    let most = 0;
+    for (const e of s.ents) {
+      if (e.kind !== 'building' || e.type !== 'dyke' || e.owner !== owner || e.hp <= 0) continue;
+      const n = heldBack(s, e);
+      if (n > most) {
+        most = n;
+        best = e;
+      }
+    }
+    if (!best) return 0;
+    best.hp = 0;
+    view.rig.focus(best.x, best.y);
+    return most;
+  },
+  /** Point the camera at a spot (testing): a spring head, a dyke line, a fight. */
+  look(x: number, y: number) {
+    view.rig.focus(x, y);
+  },
+  /**
+   * The Age of Rivers (testing, #701 s1): turn a player to the age and dig, finished, the channel the computer would plan from the water
+   * nearest its start; the water runs down it over the next few seconds. Returns the channel's length, or 0 where there is none.
+   */
+  rivers(owner: number) {
+    if (!game) return 0;
+    const s = game;
+    const p = s.players[owner];
+    const plan = channelPlan(s, p.startX, p.startY, AI_RIVERS, wallLine, (x, y) => !placeProblem(s, 'channel', x, y));
+    restat(s, p, () => {
+      p.epoch = AGES.rivers.tier;
+      p.age = 'rivers';
+    });
+    if (!plan) return 0;
+    for (const t of plan.tiles) placeBuilding(s, owner, 'channel', t % s.w, Math.floor(t / s.w), true);
+    view.rig.focus(plan.from.x, plan.from.y);
+    return plan.tiles.length;
+  },
+  /**
+   * The Water Line (testing, #701 s4): turn a player to the age and open, finished, a sluice: in the middle of its dyke line if it has
+   * one (`ages.dykes` first), else on the channel the computer would dig by its start (dug at once). Returns how many tiles its water
+   * reaches, or 0 where there is nowhere to set one.
+   */
+  waterline(owner: number) {
+    if (!game) return 0;
+    const s = game;
+    const p = s.players[owner];
+    restat(s, p, () => {
+      p.epoch = AGES.waterline.tier;
+      p.age = 'waterline';
+      p.walked = [...new Set([...(p.walked ?? []), 'dykes' as const, 'waterline' as const])];
+    });
+    const line = s.ents.filter((e): e is Building => e.kind === 'building' && e.type === 'dyke' && e.owner === owner && e.built && e.hp > 0 && s.terrain[e.ty * s.w + e.tx] === T_WATER);
+    let at = -1;
+    if (line.length) {
+      // The dyke whose sluice would flood the most.
+      let most = -1;
+      for (const d of line) {
+        const n = waterLine(s, d).length;
+        if (n > most) {
+          most = n;
+          at = d.ty * s.w + d.tx;
+        }
+      }
+      const d = s.byId.get(s.bldAt[at]) as Building;
+      stampBuilding(s, d, false);
+      s.byId.delete(d.id);
+      s.ents = s.ents.filter((e) => e !== d);
+    } else {
+      const plan = channelPlan(s, p.startX, p.startY, AI_RIVERS, wallLine, (x, y) => !placeProblem(s, 'channel', x, y));
+      if (!plan) return 0;
+      for (const t of plan.tiles) dig(s, t, owner);
+      at = plan.tiles.reduce((a, t) => (waterLine(s, { tx: t % s.w, ty: Math.floor(t / s.w) }).length > waterLine(s, { tx: a % s.w, ty: Math.floor(a / s.w) }).length ? t : a));
+    }
+    const b = placeBuilding(s, owner, 'sluice', at % s.w, Math.floor(at / s.w), true);
+    b.open = true;
+    view.rig.focus(b.x, b.y);
+    return waterLine(s, b).length;
+  },
+  /**
+   * The Age of Tides (testing, #739): turn a player to the age (the tide wakes on the next tick), stock it, and raise, finished, a Tide
+   * Mill where the computer would. Returns the mill's id, or 0 where there is no tidal ground near home. Look at it with the camera.
+   */
+  tides(owner: number) {
+    if (!game) return 0;
+    const s = game;
+    const p = s.players[owner];
+    restat(s, p, () => {
+      p.epoch = AGES.tides.tier;
+      p.age = 'tides';
+    });
+    p.res = { food: 5000, wood: 5000, stone: 5000, gold: 5000 };
+    wakeTide(s);
+    const spot = tideMillSpot(s, owner, p.startX, p.startY, AI_TIDES.reach, AI_TIDES.least, (x, y) => !placeProblem(s, 'tidemill', x, y, true, owner));
+    if (!spot) return 0;
+    view.rig.focus(spot.tx + 1, spot.ty + 1);
+    return placeBuilding(s, owner, 'tidemill', spot.tx, spot.ty, true).id;
+  },
+  /**
+   * Barrages (testing, #748): with the tide awake, find the first bay on the map a barrage would shut (scanning for a mill's spot, as the
+   * computer looks by its own), and raise a Tide Mill there and the barrage's whole line, finished. Returns the pond's tidal tiles once
+   * the line settles (0: no bay found). Look at it with the camera.
+   */
+  barrage(owner: number) {
+    if (!game || !game.tidal) return 0;
+    const s = game;
+    for (let y = 4; y < s.h - 4; y += 6)
+      for (let x = 4; x < s.w - 4; x += 6) {
+        const plan = barragePlan(s, { tx: x, ty: y, size: 2 }, AI_BARRAGE, wallLine);
+        if (!plan) continue;
+        for (const t of plan.line) placeBuilding(s, owner, 'causeway', t % s.w, Math.floor(t / s.w), true);
+        if (!placeProblem(s, 'tidemill', x, y, true, owner)) placeBuilding(s, owner, 'tidemill', x, y, true);
+        view.rig.focus(x + 1, y + 1);
+        return plan.pond;
+      }
+    return 0;
+  },
+  /**
+   * Cockle beds (testing, #767): with the tide awake, run the rules on to low water, put two citizens on dry ground by the first bared bed
+   * with land near it, and send them to pick it. Selects them and looks at the bed; returns its tile (-1: no bed by the shore).
+   */
+  cockles(owner: number) {
+    if (!game || !game.tidal) return -1;
+    const s = game;
+    for (let i = 0; i < 400 * TICK_HZ && tideLevel(s) !== 0; i++) {
+      step(s, pending);
+      pending = [];
+    }
+    const team = s.players[owner].team;
+    for (let bed = 0; bed < s.w * s.h; bed++) {
+      if (!s.cockles?.[bed] || s.res[bed] !== R_COCKLE || !bared(s, bed)) continue;
+      const x = bed % s.w;
+      const y = (bed - x) / s.w;
+      for (let r = 2; r <= 5; r++)
+        for (const [dx, dy] of [[r, 0], [-r, 0], [0, r], [0, -r]]) {
+          if (!walkable(s, x + dx, y + dy, team) || isTidal(s, (y + dy) * s.w + x + dx)) continue;
+          const ids = [0, 1].map((k) => spawnUnit(s, owner, 'citizen', x + dx + 0.5, y + dy + 0.3 + k * 0.4).id);
+          issue({ t: 'gather', p: owner, ids, tile: bed });
+          setSelection(ids);
+          view.rig.focus(x + 0.5, y + 0.5);
+          return bed;
+        }
+    }
+    return -1;
+  },
+  /**
+   * The Cockler's Hut (testing, #779): after `cockles(owner)` (the tide awake, two pickers on a bared bed), raise a finished hut by that
+   * bed and look at it. Returns the hut's id (0: no bed, or no room by it).
+   */
+  /**
+   * The Tide Gate (testing, #785): a second or so after `barrage(owner)` (once its causeways have settled into the flats), set a finished
+   * gate in the barrage where the computer would, select it and look at it. Open it with O at low water to see the scour. Called again at
+   * low water with `foes`, it puts that many of a rival's soldiers on the flats the gate would scour. Returns its id (0: none).
+   */
+  tideGate(owner: number, foes = 0) {
+    if (!game || !game.causewayBy) return 0;
+    const s = game;
+    const own: number[] = [];
+    const by = s.causewayBy!;
+    for (let i = 0; i < by.length; i++) if (by[i] === owner + 1) own.push(i);
+    const had = s.ents.find((e) => e.kind === 'building' && e.owner === owner && e.type === 'tidegate') as Building | undefined;
+    const spot = had ? null : tideGateSpotIn(s, own, owner);
+    if (!had && !spot) return 0;
+    const gate = had ?? placeBuilding(s, owner, 'tidegate', spot!.tx, spot!.ty, true);
+    const rival = s.players.find((q) => q.id !== owner && isEnemy(s, owner, q.id));
+    const below = gateReach(s, gate);
+    for (let k = 0; k < foes && rival && below.length; k++) spawnUnit(s, rival.id, 'infantry', (below[k % below.length] % s.w) + 0.5, Math.floor(below[k % below.length] / s.w) + 0.5);
+    setSelection([gate.id]);
+    view.rig.focus(gate.x, gate.y);
+    return gate.id;
+  },
+  cocklerHut(owner: number) {
+    if (!game) return 0;
+    const s = game;
+    const bed = (window as unknown as { ages: { cockles(o: number): number } }).ages.cockles(owner);
+    if (bed < 0) return 0;
+    const spot = cocklerSpotNear(s, bed, (x, y) => !placeProblem(s, 'cockler', x, y, true, owner));
+    if (!spot) return 0;
+    view.rig.focus(spot.tx + 1, spot.ty + 1);
+    return placeBuilding(s, owner, 'cockler', spot.tx, spot.ty, true).id;
+  },
+  /**
+   * The Age of Locks (testing, #701 s5): turn a player to the age, dig the channel the computer would plan by its start deep into a
+   * canal (at once), raise a finished Dam on its middle and a Bridge nearer home, and launch a warship onto it. Returns the canal's length,
+   * or 0 where there is none.
+   */
+  locks(owner: number) {
+    if (!game) return 0;
+    const s = game;
+    const p = s.players[owner];
+    restat(s, p, () => {
+      p.epoch = AGES.locks.tier;
+      p.age = 'locks';
+      p.walked = [...new Set([...(p.walked ?? []), 'waterline' as const, 'locks' as const])];
+    });
+    const plan = channelPlan(s, p.startX, p.startY, AI_RIVERS, wallLine, (x, y) => !placeProblem(s, 'channel', x, y));
+    if (!plan) return 0;
+    for (const t of plan.tiles) dig(s, t, owner, true);
+    const n = plan.tiles.length;
+    const at = (t: number) => ({ tx: t % s.w, ty: Math.floor(t / s.w) });
+    const mid = plan.tiles[n >> 1];
+    if (!placeProblem(s, 'dam', at(mid).tx, at(mid).ty, true, owner)) placeBuilding(s, owner, 'dam', at(mid).tx, at(mid).ty, true);
+    const near = plan.tiles[Math.max(0, n - 2)];
+    if (near !== mid && !placeProblem(s, 'bridge', at(near).tx, at(near).ty, true, owner)) placeBuilding(s, owner, 'bridge', at(near).tx, at(near).ty, true);
+    const head = plan.tiles[0];
+    const sea = [1, -1, s.w, -s.w].map((d) => head + d).find((t) => walkable(s, t % s.w, Math.floor(t / s.w), NAVAL));
+    if (sea !== undefined) spawnUnit(s, owner, 'warship', (sea % s.w) + 0.5, Math.floor(sea / s.w) + 0.5);
+    view.rig.focus(at(mid).tx + 0.5, at(mid).ty + 0.5);
+    return n;
+  },
+  /**
+   * The Age of Floating Cities (testing, #770): turn a player to the age, stock it, moor three finished Pontoons in a linked town where
+   * the computer would, put a few citizens on their decks, and launch a fishing boat. Returns how many were moored (0: no open water near
+   * home). Look at it with the camera; select a Pontoon and cast it off (J), then moor the tow (P).
+   */
+  floating(owner: number) {
+    if (!game) return 0;
+    const s = game;
+    const p = s.players[owner];
+    restat(s, p, () => {
+      p.epoch = AGES.floating.tier;
+      p.age = 'floating';
+      p.walked = [...new Set([...(p.walked ?? []), 'tides' as const, 'floating' as const])];
+    });
+    p.res = { food: 5000, wood: 5000, stone: 5000, gold: 5000 };
+    const town: Building[] = [];
+    for (let i = 0; i < FLOAT.city; i++) {
+      const spot = mooringSpot(s, owner, p.startX, p.startY, AI_FLOAT.reach);
+      if (!spot) break;
+      town.push(placeBuilding(s, owner, 'pontoon', spot.tx, spot.ty, true));
+    }
+    if (!town.length) return 0;
+    for (const b of town) spawnUnit(s, owner, 'citizen', b.x, b.y);
+    const sea = nearestWalkable(s, town[0].x, town[0].y + 2, 6, NAVAL);
+    if (sea >= 0) spawnUnit(s, owner, 'fisher', (sea % s.w) + 0.5, Math.floor(sea / s.w) + 0.5);
+    view.rig.focus(town[0].x, town[0].y);
+    return town.length;
+  },
+  /**
+   * The Age of the Sea Beggars (testing, #783): turn a player to the age, launch two warships on the water nearest its start and a rival
+   * cog and fishing boat beside them, the cog laden with gold, and send the warships at the cog. Selects the warships and looks at them;
+   * returns the cog's id (0: no water near home). Watch the cog strike its colours and change sides.
+   */
+  beggars(owner: number) {
+    if (!game) return 0;
+    const s = game;
+    const p = s.players[owner];
+    const rival = s.players.find((o) => o.id !== owner && isEnemy(s, owner, o.id));
+    if (!rival) return 0;
+    restat(s, p, () => {
+      p.epoch = AGES.beggars.tier;
+      p.age = 'beggars';
+      p.walked = [...new Set([...(p.walked ?? []), 'dykes' as const, 'sail' as const, 'beggars' as const])];
+    });
+    const sea = nearestWalkable(s, p.startX, p.startY, 30, NAVAL);
+    if (sea < 0) return 0;
+    const x = (sea % s.w) + 0.5;
+    const y = Math.floor(sea / s.w) + 0.5;
+    const ships = [0, 1].map((k) => spawnUnit(s, owner, 'warship', x + k * 0.8, y));
+    const near = nearestWalkable(s, x + 3, y + 1, 6, NAVAL);
+    const at = near >= 0 ? { x: (near % s.w) + 0.5, y: Math.floor(near / s.w) + 0.5 } : { x, y: y + 1 };
+    const cog = spawnUnit(s, rival.id, 'cog', at.x, at.y);
+    cog.carry = 60;
+    cog.carryRes = 'gold';
+    spawnUnit(s, rival.id, 'fisher', at.x + 0.8, at.y);
+    s.peaceUntil = Math.min(s.peaceUntil, s.tick);
+    issue({ t: 'attack', p: owner, ids: ships.map((u) => u.id), target: cog.id });
+    setSelection(ships.map((u) => u.id));
+    view.rig.focus(x, y);
+    return cog.id;
+  },
+  /**
+   * Routes that read the tide (testing, #755): with the tide awake, run the rules on to a few seconds before the flood off low water, put
+   * a soldier on the shore five tiles from the deepest flats and send it out to them. Its route can't beat the water, so it waits on the
+   * shore (its panel shows 🌊). Selects it and looks at it; returns its id (0: no such shore on this map).
+   */
+  tideWait(owner: number) {
+    if (!game || !game.tidal) return 0;
+    const s = game;
+    for (let i = 0; i < 400 * TICK_HZ && !(tideLevel(s) === 0 && (tideClock(s)?.next ?? 99) <= 3); i++) {
+      step(s, pending);
+      pending = [];
+    }
+    for (let i = 0; i < s.w * s.h; i++) {
+      const x = i % s.w;
+      const y = (i - x) / s.w;
+      if (x < 8 || y < 8 || x >= s.w - 8 || y >= s.h - 8 || !isTidal(s, i) || tidalLevel(s, i) !== 1 || !bared(s, i)) continue;
+      for (const dx of [-5, 5]) {
+        if (!walkable(s, x + dx, y, s.players[owner].team) || isTidal(s, i + dx)) continue;
+        let open = true;
+        for (let k = x + dx; k !== x; k -= Math.sign(dx)) if (!walkable(s, k, y, s.players[owner].team)) open = false;
+        if (!open) continue;
+        const u = spawnUnit(s, owner, 'infantry', x + dx + 0.5, y + 0.5);
+        issue({ t: 'move', p: owner, ids: [u.id], x: x + 0.5, y: y + 0.5 });
+        setSelection([u.id]);
+        view.rig.focus(x + dx / 2, y);
+        return u.id;
+      }
+    }
+    return 0;
   },
   /** A finished line of wall, or of Thornwall (testing). */
   wall(owner: number, x0: number, y0: number, x1: number, y1: number, type: 'wall' | 'thornwall' = 'wall') {
