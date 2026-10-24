@@ -22,7 +22,9 @@ export type UnitType =
 export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
   | 'towncenter' | 'house' | 'storehouse' | 'farm' | 'barracks' | 'range' | 'stable' | 'tower'
-  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai' | 'drainrig' | 'transfusion' | 'bloodtower' | 'snare' | 'prospector' | 'mission' | 'silo' | 'sapling' | 'shaft' | 'dyke' | 'windmill' | 'den';
+  | 'forge' | 'workshop' | 'temple' | 'market' | 'wonder' | 'wall' | 'gate' | 'dock' | 'airfield' | 'huntcamp' | 'warcamp' | 'caravanserai' | 'drainrig' | 'transfusion' | 'bloodtower' | 'snare' | 'prospector' | 'mission' | 'silo' | 'sapling' | 'shaft' | 'dyke' | 'windmill' | 'den'
+  /** The Age of the Grove (`docs/wild-road.md`, `grove.ts`): a wall that grows, a one-tile garden, fruit trees. */
+  | 'thornwall' | 'garden' | 'orchard';
 /** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
 export type Difficulty = 'gentle' | 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
@@ -42,7 +44,7 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'chart' | 'assay' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
 export type PathId = 'blood' | 'steppe' | 'hemocraft' | 'rite';
@@ -307,6 +309,12 @@ export interface Building {
   keep?: AgeId;
   /** A Watch Tower's step on the tower line (`TOWER_LEVELS`): 1 Guard Tower, 2 Keep, 3 Bastion. Absent: a plain Watch Tower (and older saves). */
   level?: number;
+  /** The Age of the Grove (`grove.ts`): seconds a Thornwall or Orchard has grown since it was planted (spring counts double for a Thornwall). Absent: none yet. */
+  grown?: number;
+  /** A Kitchen Garden (`grove.ts`): what feeds it, refreshed each second: 1 a Den's dung, 2 water beside it. Absent: neither. */
+  fed?: number;
+  /** A Thornwall its own people grubbed out (deleted): it leaves no root to regrow. */
+  grub?: boolean;
   /** A Windmill (#701): the tick it last pumped a tile dry, so its sails show it at work. Absent: it never has. */
   pumped?: number;
   /** Where new units go. `kind` is the resource the flag was set on (absent on bare ground), so it outlives its tile (#344). */
@@ -657,6 +665,8 @@ export interface PlayerStats {
   foraged?: number;
   /** Wild beasts tamed (the Age of the Wild); absent in older saves. */
   tamed?: number;
+  /** Beasts reared at a Beast Den (the Age of the Grove's deed); absent in older saves. */
+  bred?: number;
   /** Food taken from snares (#485); absent in older saves. */
   snared?: number;
   /** Gold taken as tribute by riders standing in rivals' land (#318); absent in older saves. */
@@ -816,6 +826,8 @@ export type GameEvent =
   | { k: 'wildCry'; id: number; kind: Animal['kind']; x: number; y: number }
   /** A wild beast tamed (the Age of the Wild). */
   | { k: 'tamed'; owner: number; kind: Animal['kind']; x: number; y: number }
+  /** A fallen Thornwall sprouts again from its root (the Age of the Grove). */
+  | { k: 'sprout'; owner: number; x: number; y: number }
   /** A mammoth gores, or a wolf bites, someone. */
   | { k: 'wildStrike'; id: number; kind: Animal['kind']; target: number; x: number; y: number }
   /** A raider camp (own pitch) stands empty: whose people cleared it, and the plunder they took. */
@@ -992,6 +1004,8 @@ export interface GameState {
   carcasses?: { tile: number; born: number; full: number }[];
   /** Coppice stools and planted saplings growing into trees (#501, `coppice.ts`), in the order they were cut or planted; absent until the first. */
   stools?: Stool[];
+  /** Roots of fallen Thornwalls (the Age of the Grove, `grove.ts`) waiting to sprout again at tick `at`; absent until the first. */
+  roots?: { tile: number; owner: number; at: number }[];
   /** Per tile: the R_* kind of a stone, gold or rare-ore deposit worked out there, or 0 (#681, old workings for a Mine Shaft); absent until the first. */
   spent?: Uint8Array;
   /** Per tile: the tick cropped grass grows back (#308), made when the first sheep is; absent until then. */
@@ -1149,6 +1163,8 @@ export interface AiMemory {
    */
   /** The tick it entered the Age of the Wild, kept while it tames and breeds there (`TAME.aiStay`). */
   wild?: number;
+  /** The tick it entered the Age of the Grove, kept while it plants there (`GROVE.aiStay`). */
+  grove?: number;
   steppe?: { band?: number[]; at?: { x: number; y: number }; out?: number; recalled?: number; horde?: number; since?: number; struck?: number; /** When a nomad flock (#501) was first seen grazed out, this time. */ starved?: number; pack?: { x: number; y: number; at: number }; to?: { x: number; y: number; at: number }; from?: { x: number; y: number } };
 }
 
@@ -1166,7 +1182,7 @@ export type Command =
   | ({ t: 'work'; p: number; ids: number[]; target: number } & Queued)
   | ({ t: 'build'; p: number; ids: number[]; type: BuildingType; tx: number; ty: number } & Queued)
   /** A line of wall from one tile to another (gates go in with `type: 'gate'` one at a time). */
-  | ({ t: 'wall'; p: number; ids: number[]; x0: number; y0: number; x1: number; y1: number; /** A line of dykes (#701) rather than wall. */ dyke?: boolean } & Queued)
+  | ({ t: 'wall'; p: number; ids: number[]; x0: number; y0: number; x1: number; y1: number; /** A line of dykes (#701) rather than wall. */ dyke?: boolean; /** A line of Thornwall (the Age of the Grove) rather than wall. */ thorn?: boolean } & Queued)
   | ({ t: 'hunt'; p: number; ids: number[]; target: number } & Queued)
   | ({ t: 'convert'; p: number; ids: number[]; target: number; rite?: 'sacrifice' | 'curse' } & Queued)
   | ({ t: 'garrison'; p: number; ids: number[]; target: number } & Queued)

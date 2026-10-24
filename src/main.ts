@@ -1633,11 +1633,11 @@ function gateTurned(s: GameState, tx: number, ty: number): boolean {
   return !(at(tx - 1, ty) || at(tx + 2, ty));
 }
 
-/** Buildings laid out by dragging a line: walls, and dykes (#701). */
-const lined = (t: BuildingType | null): t is 'wall' | 'dyke' => t === 'wall' || t === 'dyke';
+/** Buildings laid out by dragging a line: walls, dykes (#701) and Thornwalls (the Age of the Grove). */
+const lined = (t: BuildingType | null): t is 'wall' | 'dyke' | 'thornwall' => t === 'wall' || t === 'dyke' || t === 'thornwall';
 
 /** The tiles of a planned wall (or line of dykes), and whether each can be built. */
-function wallPlan(s: GameState): { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean; type: 'wall' | 'dyke' } | null {
+function wallPlan(s: GameState): { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean; type: 'wall' | 'dyke' | 'thornwall' } | null {
   if (!lined(placing)) return null;
   const type = placing;
   const d = wallDrag ?? (placeAt ? { x0: placeAt.tx, y0: placeAt.ty, x1: placeAt.tx, y1: placeAt.ty } : null);
@@ -1849,7 +1849,7 @@ canvas.addEventListener('pointerup', (e) => {
       return;
     }
     const ids = selectedUnits(s).filter((u) => u.type === 'citizen' || legionary(s, u)).map((u) => u.id);
-    issue({ t: 'wall', p: viewer, ids, x0: d.x0, y0: d.y0, x1: d.x1, y1: d.y1, queue: e.shiftKey || undefined, dyke: plan.type === 'dyke' || undefined });
+    issue({ t: 'wall', p: viewer, ids, x0: d.x0, y0: d.y0, x1: d.x1, y1: d.y1, queue: e.shiftKey || undefined, dyke: plan.type === 'dyke' || undefined, thorn: plan.type === 'thornwall' || undefined });
     if (!e.shiftKey) {
       placing = null;
       placeAt = null;
@@ -3255,13 +3255,13 @@ function frame(now: number): void {
     view.rig.focus(first % s.w, Math.floor(first / s.w));
     return plan.basin.length;
   },
-  /** A finished line of wall (testing). */
-  wall(owner: number, x0: number, y0: number, x1: number, y1: number) {
+  /** A finished line of wall, or of Thornwall (testing). */
+  wall(owner: number, x0: number, y0: number, x1: number, y1: number, type: 'wall' | 'thornwall' = 'wall') {
     if (!game) return 0;
     let n = 0;
     for (const t of wallLine(x0, y0, x1, y1)) {
-      if (placeProblem(game, 'wall', t.x, t.y)) continue;
-      placeBuilding(game, owner, 'wall', t.x, t.y, true);
+      if (placeProblem(game, type, t.x, t.y)) continue;
+      placeBuilding(game, owner, type, t.x, t.y, true);
       n++;
     }
     return n;

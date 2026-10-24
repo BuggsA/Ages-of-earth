@@ -41,6 +41,7 @@ import { flockCap, flockOf, grazeRange, lambProblem } from '../sim/flocks';
 import { soldAt } from '../sim/ages';
 import { ageDef, ageOf, asleep, crossingLeft, goldenEnds, livesOf, threadsOf, crossingsAhead, keepsakeProblem, leaving, sleepWhy, type Tally, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, oreClue, oreDone, oreOnly, ironTradeShare, isHire, isSideRoad, journeyOf, mainRoad, pathLine, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, suspendedTechs, assayed, diggersAt, holdingsOf, holds, keyOf, lacking, opensOf, prospected, trainsAt, windowsOf, leadsOn, leadsTo } from '../sim/ages';
 import type { AgeId, KeyId, RareId, Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Player, Res, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
+import { GROVE_BUILDINGS, grows } from '../sim/grove';
 import { KEYS, RARES, RES, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
 import { buildingPicture, unitPicture } from './thumbs';
@@ -129,6 +130,7 @@ function orderWords(s: GameState, u: Unit): string {
     }
     case 'farm':
       if (flooded(s, u.owner)) return 'Waiting out the flood: the field is under the river';
+      if ((s.byId.get(o.target) as Building | undefined)?.type === 'garden') return o.phase === 'drop' ? 'Carrying the harvest home' : o.phase === 'work' ? 'Tending a Kitchen Garden' : 'Going to the garden';
       return o.phase === 'drop' ? 'Carrying grain home' : o.phase === 'work' ? 'Farming' : 'Going to the fields';
     case 'build': {
       const target = s.byId.get(o.target);
@@ -1229,6 +1231,8 @@ export class Hud {
         if (def.only && !builders.some((u) => canRaise(u.type, type, p.civ))) continue;
         // Only a managed wood's people (#501, the Britons) plants saplings: no one else is shown the button.
         if (type === 'sapling' && !CIVS[p.civ].coppice) continue;
+        // What the Grove grows shows only to a people that has walked it.
+        if (GROVE_BUILDINGS.includes(type) && !grows(p)) continue;
         const locked = def.epoch > p.epoch;
         const no = buildBarred(p, type) ?? wayBarred(s, p, type);
         const cost = buildingCostFor(s, viewer, type);
@@ -1238,7 +1242,7 @@ export class Hud {
           key: def.key,
           pic: buildingPicture(type, p.epoch, p.color),
           title: def.name,
-          desc: def.blurb + (type === 'wall' ? ' Click and drag to lay out a line.' : '') + (def.blood ? ` Costs 🩸${def.blood} blood besides.` : ''),
+          desc: def.blurb + (type === 'wall' || type === 'thornwall' ? ' Click and drag to lay out a line.' : '') + (def.blood ? ` Costs 🩸${def.blood} blood besides.` : ''),
           cost,
           ok: !locked && !no && !short && !wonderUp,
           why: locked ? `Needs the ${EPOCHS[def.epoch].name}` : no ? no : wonderUp ? 'You already have a wonder' : (short ?? undefined),

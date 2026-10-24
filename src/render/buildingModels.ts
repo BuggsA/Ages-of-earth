@@ -292,6 +292,121 @@ function den(k: Kit, e: number, st: Style): void {
   banner(k, 1.2, 0, -0.9, 0.9);
 }
 
+// ---- The Age of the Grove (`docs/wild-road.md` §2) ---------------------------------------------------
+
+const THORN = ['#6f8f3e', '#4f7432', '#3d6129', '#2f5422'];
+const BARK = '#5a4228';
+
+/**
+ * A Thornwall piece at its stage (`variant >> 4`: 0 seedling, 1 bramble, 2 thicket, 3 living oak), reaching toward the pieces it
+ * joins (`variant & 15`, as a wall's mask). It reads by height and darkness: whips in a furrow, a low tangle, a thicket, an oak.
+ */
+function thornwall(k: Kit, variant: number): void {
+  const stage = Math.min(3, variant >> 4);
+  const mask = variant & 15;
+  const leaf = THORN[stage];
+  // A strip of turned earth under the hedge, reaching to the pieces it joins.
+  k.box(0.42, 0.04, 0.42, '#5b4630', 0, -0.01, 0);
+  for (const [bit, dx, dz] of ARMS) if (mask & bit) k.box(Math.abs(dx) * 0.3 + 0.42 * Math.abs(dz), 0.04, Math.abs(dz) * 0.3 + 0.42 * Math.abs(dx), '#5b4630', dx * 0.35, -0.01, dz * 0.35);
+  const tuft = (x: number, z: number, h: number) => {
+    const j = rnd(x * 9, z * 9, stage) * 0.15;
+    if (stage === 0) {
+      // Whips of thorn in a turned furrow.
+      k.cyl(0.012, 0.018, h, 3, '#6b5232', x, 0, z);
+      k.cone(0.07, 0.16, 4, leaf, x, h - 0.06, z);
+    } else if (stage === 1) {
+      // A low, knee-high tangle of bramble: arching canes, and a few dark berries.
+      k.blob(0.14 + j * 0.5, leaf, x, 0.08, z).scale.set(1.3, 0.6, 1.3);
+      for (const a of [0.6, 2.4, 4.3]) k.cyl(0.01, 0.014, 0.34, 3, '#6b3e3a', x + Math.cos(a) * 0.08, 0, z + Math.sin(a) * 0.08).rotation.z = Math.cos(a) * 0.6;
+      for (const [bx, bz] of [[0.1, 0.06], [-0.08, 0.1], [0.02, -0.11]]) k.sphere(0.028, '#3a1e3a', x + bx, 0.17, z + bz);
+    } else {
+      // A thicket: interwoven stems under a dense head; an oak's are thicker and darker.
+      const r = stage === 3 ? 0.06 : 0.035;
+      k.cyl(r * 0.8, r, h * 0.6, 5, BARK, x, 0, z);
+      k.blob((stage === 3 ? 0.3 : 0.24) + j, leaf, x, h * 0.62, z).scale.set(1.1, 0.9, 1.1);
+    }
+  };
+  const h = [0.35, 0.4, 0.95, 1.3][stage];
+  if (stage === 3) {
+    // The living oak: a gnarled trunk on spread roots, its crown high above the hedge.
+    k.cyl(0.11, 0.17, 1.15, 7, BARK, 0, 0, 0);
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2 + 0.4;
+      k.cyl(0.03, 0.06, 0.32, 4, BARK, Math.cos(a) * 0.16, 0, Math.sin(a) * 0.16).rotation.z = Math.cos(a) * 0.9;
+    }
+    k.blob(0.44, leaf, 0, 1.35, 0).scale.set(1.15, 0.85, 1.15);
+    k.blob(0.28, '#3b6a2a', 0.18, 1.2, 0.15);
+  } else tuft(0, 0, h);
+  for (const [bit, dx, dz] of ARMS) {
+    if (!(mask & bit)) continue;
+    tuft(dx * 0.3, dz * 0.3, h * 0.9);
+    // Stems woven across the gap, so a grown line reads as one hedge.
+    if (stage >= 2) k.box(Math.abs(dx) * 0.5 + 0.05, 0.05, Math.abs(dz) * 0.5 + 0.05, BARK, dx * 0.25, h * 0.35, dz * 0.25);
+  }
+  if (!mask) for (const [dx, dz] of [[0.25, 0.1], [-0.22, -0.12]]) tuft(dx, dz, h * 0.8);
+  // A strip of the people's cloth tied into the hedge.
+  k.team(k.box(0.12, 0.08, 0.12, TEAM, 0, Math.min(0.5, h * 0.5), 0.2));
+}
+
+/**
+ * A Kitchen Garden: the Three Sisters on one raised bed, maize standing over climbing beans with squash on the ground. What feeds
+ * it shows (`variant`: 1 a dung heap at its corner, 2 a clay water jar and a channel), so a rival can tell which gardens the Den feeds.
+ */
+function garden(k: Kit, e: number, variant: number): void {
+  const fed = variant;
+  k.box(0.92, 0.05, 0.92, fed ? '#4a3524' : '#6b5238', 0, -0.01, 0);
+  k.box(0.78, 0.07, 0.78, fed ? '#3d2c1e' : '#5e4630', 0, 0.02, 0);
+  for (const [x, z] of [[-0.22, -0.22], [0.22, -0.22], [-0.22, 0.22], [0.22, 0.22]]) {
+    // A hill of maize, a bean vine wound up the stalk, a squash at its foot.
+    k.cyl(0.015, 0.02, 0.62, 3, '#9aa846', x, 0.05, z);
+    k.cone(0.06, 0.18, 4, '#7c9a3a', x, 0.55, z);
+    k.box(0.04, 0.09, 0.03, '#e2c35a', x + 0.03, 0.42, z);
+    k.sphere(0.035, '#4f8a36', x - 0.03, 0.28, z + 0.02);
+    k.sphere(0.04, '#4f8a36', x + 0.02, 0.18, z - 0.03);
+    k.sphere(0.075, e >= 3 ? '#d98a2b' : '#c7782a', x + 0.09, 0.09, z + 0.08).scale.set(1.2, 0.8, 1);
+  }
+  k.blob(0.07, '#5f8f3c', 0, 0.1, 0).scale.set(1.6, 0.6, 1.6);
+  if (fed & 1) k.blob(0.12, '#4a3a22', 0.36, 0.06, 0.36).scale.set(1.2, 0.6, 1.2);
+  if (fed & 2) {
+    k.cyl(0.07, 0.09, 0.2, 7, '#b0643a', -0.36, 0.04, 0.36);
+    k.box(0.04, 0.02, 0.7, '#4a7ab0', -0.42, 0.06, -0.02);
+  }
+  k.cyl(0.012, 0.012, 0.36, 3, WOOD, -0.4, 0, -0.4);
+  k.team(k.box(0.08, 0.06, 0.02, TEAM, -0.4, 0.3, -0.4));
+}
+
+/**
+ * An Orchard: four fruit trees in a wattle fence with a picker's basket. Young (`variant` 0) it is whips; grown (1), round crowns;
+ * in fruit (2, summer and autumn) the crowns hang red and gold.
+ */
+function orchard(k: Kit, e: number, variant: number): void {
+  k.box(1.9, 0.05, 1.9, '#5f7a3a', 0, -0.02, 0);
+  // The fence: posts and a woven rail on three sides, open at the front.
+  const fence = e >= 3 ? '#8a7a66' : '#8a6a3e';
+  for (let i = 0; i < 5; i++) {
+    const t = -0.85 + i * 0.425;
+    for (const [x, z] of [[t, -0.88], [-0.88, t], [0.88, t]]) k.cyl(0.02, 0.025, 0.32, 4, fence, x, 0, z);
+  }
+  k.box(1.76, 0.05, 0.03, fence, 0, 0.22, -0.88);
+  for (const x of [-0.88, 0.88]) k.box(0.03, 0.05, 1.76, fence, x, 0.22, 0);
+  for (const [x, z] of [[-0.45, -0.4], [0.45, -0.4], [-0.45, 0.42], [0.45, 0.42]]) {
+    if (variant === 0) {
+      k.cyl(0.018, 0.025, 0.55, 4, BARK, x, 0, z);
+      k.cone(0.12, 0.22, 5, '#6f9a44', x, 0.48, z);
+      continue;
+    }
+    k.cyl(0.05, 0.07, 0.6, 6, BARK, x, 0, z);
+    k.blob(0.36, '#4d7d36', x, 0.82, z).scale.set(1.1, 0.85, 1.1);
+    if (variant === 2) for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 + x;
+      k.sphere(0.045, i % 2 ? '#c8402e' : '#e2a83a', x + Math.cos(a) * 0.3, 0.72 + (i % 3) * 0.08, z + Math.sin(a) * 0.3);
+    }
+  }
+  k.cyl(0.13, 0.1, 0.16, 8, '#a8844e', 0.1, 0, 0.82);
+  if (variant === 2) for (const dx of [0.05, 0.14]) k.sphere(0.04, '#c8402e', dx, 0.17, 0.82);
+  k.team(k.box(0.06, 0.1, 0.06, TEAM, 0.88, 0.32, 0.88));
+}
+
 function huntcamp(k: Kit, e: number, st: Style): void {
   pad(k, 2, st.base);
   // A lean-to of hide on poles, a drying rack of meat beside it, a pile of antlers and a fire ring.
@@ -2292,7 +2407,7 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
   }
 }
 
-const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke'>, (k: Kit, e: number, st: Style) => void> = {
+const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' | 'thornwall' | 'garden' | 'orchard'>, (k: Kit, e: number, st: Style) => void> = {
   sapling: (k, e) => sapling(k, e),
   towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, windmill,
 };
@@ -2466,7 +2581,7 @@ const ROOFS: Partial<Record<BuildingType, [string, string]>> = {
 };
 
 /** No plinth or pennant: open or thin pieces, and buildings that already carry their own standards. */
-const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder', 'dyke'];
+const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder', 'dyke', 'thornwall', 'garden', 'orchard'];
 
 function roleStyle(type: BuildingType, epoch: number, st: Style): Style {
   const r = ROOFS[type];
@@ -2501,6 +2616,9 @@ export function buildingGeometry(type: BuildingType, epochIn: number, color: str
     if (type === 'wall') wall(k, epoch, STYLES[Math.min(epoch, 4)], variant);
     else if (type === 'dyke') dyke(k, variant);
     else if (type === 'snare') snare(k, epoch, variant === 1);
+    else if (type === 'thornwall') thornwall(k, variant);
+    else if (type === 'garden') garden(k, epoch, variant);
+    else if (type === 'orchard') orchard(k, epoch, variant);
     else if (type === 'shaft') shaft(k, epoch, roleStyle(type, epoch, STYLES[Math.min(epoch, 4)]), variant);
     else MAKERS[type](k, epoch, roleStyle(type, epoch, STYLES[Math.min(epoch, 4)]));
     // A Watch Tower's `variant` is its step on the tower line.

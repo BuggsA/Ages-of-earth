@@ -1,4 +1,4 @@
-import { AGES, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, secs } from '../sim/data';
+import { AGES, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, secs } from '../sim/data';
 import { battlesFor } from '../sim/battles';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, findsOf, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
@@ -415,6 +415,12 @@ const TIPS: Tip[] = [
     // The Age of the Wild (`docs/wild-road.md`): nothing tamed yet.
     when: (s, me) => ageOf(s.players[me]) === 'wild' && !s.players[me].tamed?.length,
     text: `Your people keeps company with the wild now. Select a citizen and <b>right-click a wolf, boar or mammoth</b> to sing it calm: ${TAME.secs.wolf} seconds for a wolf, ${TAME.secs.boar} for a boar, ${TAME.secs.mammoth} for a mammoth, and it becomes yours, a beast of war. The beast stands still for its tamer, but its pack bites, so bring an escort. Once a kind is tamed, a <b>${BUILDINGS.den.name}</b> breeds more of it.`,
+  },
+  {
+    id: 'grove',
+    // The Age of the Grove (`docs/wild-road.md` §2): its first minute.
+    when: (s, me) => ageOf(s.players[me]) === 'grove',
+    text: `Your people grows its town now. Plant a <b>${BUILDINGS.thornwall.name}</b> line (drag, like a wall): it grows from seedling to living oak in about ${GROVE.stage * 3} seconds (twice as fast in spring), parts for your own people, and sprouts again from its root if cut down. Set <b>${BUILDINGS.garden.name}s</b> within ${GROVE.dung} tiles of a ${BUILDINGS.den.name} or ${GROVE.water} of water: fed, a gardener brings in far more than a farmer. <b>${BUILDINGS.orchard.name}s</b> by a store bear food by themselves each summer and autumn.`,
   },
   {
     id: 'tribute',

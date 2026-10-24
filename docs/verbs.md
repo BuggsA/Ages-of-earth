@@ -15,7 +15,7 @@ Pass all four, or say in the pull request which one fails and why that's fine. O
 
 ## The levers, most proven first
 
-1. **Production and income verbs differ per branch** (StarCraft's warp-in, creep and repair; Age of Mythology's favour from prayer, monuments or combat). The first minutes of a branch need different hands. *Here:* the Steppe's town on wagons, Hemocraft's drains.
+1. **Production and income verbs differ per branch** (StarCraft's warp-in, creep and repair; Age of Mythology's favour from prayer, monuments or combat). The first minutes of a branch need different hands. *Here:* the Steppe's town on wagons, Hemocraft's drains. **Distance is difference** (the owner, 2026-10-24): the farther an age lies from the plain road, the more of this changes, until the far end is a whole new strategy (`docs/engagement.md`).
 2. **Exclusive identities with powers that create a strategy** (AoM god powers, Slay the Spire relics), each paired with a door that shuts. *Here:* the Blood fork, the Ways.
 3. **A restricted tool pool per run** (Against the Storm deals a few buildings a game): the "best" build can't exist when the pieces differ.
 4. **Land that rewrites the economy** (no wood, only stone): variety without complexity. *Here:* Homelands.

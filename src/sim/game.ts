@@ -1,4 +1,5 @@
 import { callWild } from './tame';
+import { groveStep, rootThorn } from './grove';
 import { aiStep } from './ai';
 import { workStep } from './works';
 import { beaconStep } from './beacon';
@@ -417,6 +418,8 @@ function bringOut(s: GameState, p: Player, b: Building, unit: UnitType): void {
   if (isHire(p, b.type, unit)) u.merc = 0;
   // The deed of the Age of Total War (#313): foot soldiers trained at the front.
   if (b.type === 'warcamp') p.stats.campTrained = (p.stats.campTrained ?? 0) + 1;
+  // The deed of the Age of the Grove: beasts reared at a Den.
+  if (b.type === 'den') p.stats.bred = (p.stats.bred ?? 0) + 1;
   s.events.push({ k: 'trained', id: u.id, owner: p.id, type: unit });
   const fishing = (t: number) => u.type === 'fisher' && t >= 0 && s.res[t] === R_FISH;
   const working = (t: number) => t >= 0 && s.res[t] !== R_NONE && s.res[t] !== R_FISH && ((u.type === 'citizen' && mineable(p, s.res[t])) || (legionary(s, u) && legionKind(s.res[t])));
@@ -471,6 +474,7 @@ function removeDead(s: GameState): void {
       remember(s, e);
       leaveRubble(s, e);
       spillStore(s, e);
+      rootThorn(s, e);
       s.events.push({ k: 'die', id: e.id, owner: e.owner, type: e.type, x: e.x, y: e.y, building: true, size: e.size, epoch: p.epoch, fx: e.dir, fy: 1 });
     } else {
       dropOre(s, e);
@@ -542,7 +546,7 @@ function checkVictory(s: GameState): void {
     // Fields, snares and walls alone don't keep a people alive, nor do unarmed boats (fishing boats, merchant
     // ships): none of them can build or fight, so a people down to them can never come back, and a rival
     // at its population cap with no fleet could never sink them.
-    const alive = s.ents.some((e) => e.owner === p.id && e.hp > 0 && !(e.kind === 'building' && (e.type === 'farm' || e.type === 'wall' || e.type === 'gate' || e.type === 'dyke' || e.type === 'snare' || e.type === 'sapling')) && !(e.kind === 'unit' && (e.type === 'fisher' || e.type === 'cog')));
+    const alive = s.ents.some((e) => e.owner === p.id && e.hp > 0 && !(e.kind === 'building' && (e.type === 'farm' || e.type === 'wall' || e.type === 'gate' || e.type === 'dyke' || e.type === 'snare' || e.type === 'sapling' || e.type === 'thornwall' || e.type === 'garden' || e.type === 'orchard')) && !(e.kind === 'unit' && (e.type === 'fisher' || e.type === 'cog')));
     if (alive) continue;
     p.defeated = true;
     for (const e of s.ents) if (e.owner === p.id) e.hp = 0;
@@ -637,6 +641,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   householdStep(s);
   coppiceStep(s);
   callWild(s);
+  groveStep(s);
   longbowStep(s);
   tollStep(s);
   mercStep(s);
