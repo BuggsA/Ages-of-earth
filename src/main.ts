@@ -1831,15 +1831,16 @@ canvas.addEventListener('pointerup', (e) => {
   } else {
     // A double-click on anything but your own unit is a right-click for the units selected before it (`doubleOrder`).
     const pk = view.pick(e.clientX, e.clientY);
-    const hit = pk?.kind === 'unit' ? s.byId.get(pk.id) : undefined;
+    const hit = pk?.kind === 'unit' || pk?.kind === 'building' ? s.byId.get(pk.id) : undefined;
     const now = performance.now();
-    const again = doubleOrder(lastTap, now, e.clientX, e.clientY, hit?.owner === viewer);
+    // Your own building (a pitched camp too) is picked by the first click, so the second can't be its rally order.
+    const again = doubleOrder(lastTap, now, e.clientX, e.clientY, hit?.owner === viewer && (hit.kind === 'unit' || !lastTap.before.some((id) => s.byId.get(id)?.kind === 'unit')));
     if (again) {
       lastTap = NO_TAP;
       setSelection(again);
       order(e.clientX, e.clientY, false, e.shiftKey);
     } else {
-      lastTap = { at: now, x: e.clientX, y: e.clientY, before: selectedUnits(s).map((u) => u.id) };
+      lastTap = { at: now, x: e.clientX, y: e.clientY, before: [...selection].filter((id) => s.byId.get(id)?.owner === viewer) };
       clickSelect(e.clientX, e.clientY, e.shiftKey, e.ctrlKey);
     }
   }

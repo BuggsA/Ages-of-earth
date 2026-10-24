@@ -9,7 +9,7 @@ export interface Tap {
   at: number;
   x: number;
   y: number;
-  /** Your units selected before this click. */
+  /** Your units (or building) selected before this click. */
   before: number[];
 }
 
