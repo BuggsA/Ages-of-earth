@@ -79,11 +79,11 @@ function stoneDeposit(): Kit {
 
 function goldDeposit(): Kit {
   const k = new Kit();
-  k.rock(0.3, '#8a7b5c', 0, 0.15);
-  k.rock(0.2, '#7d6f52', 0.24, 0.1, 0.1);
+  k.rock(0.3, '#4f4536', 0, 0.15);
+  k.rock(0.2, '#463d2f', 0.24, 0.1, 0.1);
   for (let i = 0; i < 6; i++) {
     const a = i * 1.7;
-    k.glow(k.octa(0.06 + (i % 3) * 0.02, i % 2 ? '#ffd24a' : '#f2b830', Math.cos(a) * 0.2, 0.22 + (i % 3) * 0.08, Math.sin(a) * 0.2));
+    k.glow(k.octa(0.06 + (i % 3) * 0.02, i % 2 ? '#ffe066' : '#ffc82e', Math.cos(a) * 0.2, 0.22 + (i % 3) * 0.08, Math.sin(a) * 0.2));
   }
   return k;
 }
@@ -118,9 +118,9 @@ function saltVein(): Kit {
 /** A cave mouth (#356): a hump of rock with a dark opening, a glint of ore at the lip. */
 function caveMouth(): Kit {
   const k = new Kit();
-  k.rock(0.46, '#6e6a62', 0, 0.2).scale.set(1.15, 0.9, 1);
-  k.rock(0.3, '#7d786e', -0.3, 0.12, 0.12);
-  k.rock(0.26, '#625e57', 0.32, 0.1, -0.1);
+  k.rock(0.46, '#8a867c', 0, 0.2).scale.set(1.15, 0.9, 1);
+  k.rock(0.3, '#9a958a', -0.3, 0.12, 0.12);
+  k.rock(0.26, '#767269', 0.32, 0.1, -0.1);
   k.box(0.3, 0.26, 0.2, '#0d0b0a', 0, 0.13, 0.36);
   k.rock(0.09, '#e8e2c8', 0.18, 0.05, 0.5);
   k.rock(0.07, '#d8cf9a', -0.16, 0.04, 0.52);
