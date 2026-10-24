@@ -9,7 +9,7 @@ import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE, findResource } from '../sim/units';
-import { FIRE, FISSION, HIVE, INTERCEPT, WILDWOOD, BLOOM, AUTO_WORK, BREACH, CANAL, DAM, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, SALVO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE } from '../sim/data';
+import { FIRE, FISSION, HIVE, INTERCEPT, WILDWOOD, BLOOM, AUTO_WORK, BREACH, CANAL, DAM, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, SALVO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE, FLOAT } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -42,6 +42,7 @@ import { stirred as stirredNow } from '../sim/combat';
 import { sees } from '../sim/vision';
 import { buildingCostFor, buildingMaxHp, gunPower, gunRange, modsOf, raiseProblem, statsFor, techCostFor, techProblem, trainCostFor, trainTimeFor } from '../sim/stats';
 import { isMobile, packProblem, packsOf, pitchProblem } from '../sim/steppe';
+import { castProblem, districtOf } from '../sim/floating';
 import { exacting, isRider } from '../sim/tribute';
 import { landOwnerAt } from '../sim/borders';
 import { flockCap, flockOf, grazeRange, lambProblem } from '../sim/flocks';
@@ -215,6 +216,7 @@ function orderWords(s: GameState, u: Unit): string {
       if (u.type === 'trader' && u.carry > 0) return 'Waiting with gold: right-click a Market';
       if (u.type === 'cog' && u.carry > 0) return 'Waiting with gold: right-click a Dock';
       if (u.type === 'wagon') return 'Packed for the road: press P to pitch camp';
+      if (u.type === 'tow') return `Under tow with ${u.cargo.length} aboard: press P to moor`;
       return ACT_WORDS[u.act] ?? 'Standing by';
   }
 }
@@ -530,7 +532,8 @@ export class Hud {
   /** Press a command's hotkey. Returns whether one was found. */
   hotkey(key: string): boolean {
     const k = key.toUpperCase();
-    const c = this.cmds.find((x) => x.key === k);
+    // Two buttons may share a key where one is shut (the Pontoon takes the House's E in the Age of Floating Cities, #770): the open one wins.
+    const c = this.cmds.find((x) => x.key === k && x.ok) ?? this.cmds.find((x) => x.key === k);
     if (!c) return false;
     this.runCmd(c);
     return true;
@@ -1309,6 +1312,11 @@ export class Hud {
       const driven = s.ents.filter((e) => e.kind === 'building' && e.owner === b.owner && e.built && e.hp > 0 && BUILDINGS[e.type].trains.length > 0 && (e.x - b.x) * (e.x - b.x) + (e.y - b.y) * (e.y - b.y) <= r2).length;
       status += ` · <span data-tip="<b>Dam</b>With still water beside it, its turbines drive every building of yours within ${DAM.reach} tiles: they train and research ${DAM.drive - 100}% faster (one dam's worth, however many stand near). If it falls with water behind it, it bursts over the low ground round it, up to ${DAM.surge} tiles, and all who stand there lose ${DAM.hurt} health.">${still ? `⚠ ${still}` : `⚙ Turning: drives ${driven} building${driven === 1 ? ' that trains' : 's that train'}`}</span>`;
     }
+    // A floating district (#770): how many lie linked with it, and whether they raise citizens.
+    if (mine && b.built && b.type === 'pontoon') {
+      const n = districtOf(s, b).length;
+      status += ` · <span data-tip="<b>Floating town</b>Pontoons moored side by side link into one town, and a town of ${FLOAT.city} or more raises citizens at each of its pontoons. Corners alone don't link. Ships hole a pontoon ${FLOAT.hull} times as fast as anything else does, and those on its deck when it sinks swim for the nearest deck or shore within ${FLOAT.swim} tiles, or drown.">${n >= FLOAT.city ? `⛵ A floating town of ${n}: raises citizens` : `⚓ ${n === 1 ? 'Alone' : `Linked to ${n - 1}`}: moor ${FLOAT.city - n} more beside it to raise citizens`}</span>`;
+    }
     if (b.built && b.type === 'bridge') status += ` · <span data-tip="<b>Bridge</b>Your own people cross here at full pace; rivals can't, and swim the water round it at ${Math.round(CANAL.wade * 100)}% of their pace in a canal. Every ship and barge passes under it.">🌉 Swings for ships</span>`;
     // A windmill (#701): how much water is left behind its dykes, or why it stands still.
     if (mine && b.built && !sleeping && b.type === 'windmill') {
@@ -1386,7 +1394,7 @@ export class Hud {
     const citizens = units.filter((u) => u.type === 'citizen');
     // Who may raise buildings: citizens, and a legion's foot soldiers too (#501).
     const builders = units.filter((u) => canRaise(u.type, 'house', p.civ));
-    const soldiers = units.filter((u) => u.type !== 'citizen' && u.type !== 'fisher' && u.type !== 'transport' && u.type !== 'trader' && u.type !== 'cog' && u.type !== 'wagon');
+    const soldiers = units.filter((u) => u.type !== 'citizen' && u.type !== 'fisher' && u.type !== 'transport' && u.type !== 'trader' && u.type !== 'cog' && u.type !== 'wagon' && u.type !== 'tow');
     const walkers = units.filter((u) => domainOf(u.type) === 'land');
     const transports = units.filter((u) => u.type === 'transport');
     const cmds: Cmd[] = [];
@@ -1529,6 +1537,11 @@ export class Hud {
       if (ents.length) {
         const why = ents.map((u) => rootProblem(s, u)).find((w) => w) ?? null;
         cmds.push({ key: 'O', pic: '', glyph: '🌳', title: 'Root', desc: `Root where ${ents.length > 1 ? 'they stand' : 'it stands'} and be a tree again, on bare open ground: it mends ${Math.round(WILDWOOD.mend * 100)}% of its health a second, a rival sees only a tree, and it wakes when a rival comes within ${WILDWOOD.rouse} tiles or an axe bites, while your Heart Tree stands. Fell or burn the tree and the Ent is lost.`, ok: !why || ents.some((u) => !rootProblem(s, u)), why: why ?? undefined, run: () => this.act.issue({ t: 'root', p: viewer, ids: ents.map((u) => u.id) }) });
+      }
+      const tows = units.filter((u) => u.type === 'tow');
+      if (tows.length) {
+        const why = tows.map((w) => pitchProblem(s, w)).find((w) => w) ?? null;
+        cmds.push({ key: 'P', pic: '', glyph: '⚓', title: 'Moor', desc: `Moor the ${tows.length > 1 ? 'districts' : 'district'} here, on open water within ${FLOAT.spot} tiles that no rival holds. It raises itself in ${STEPPE.pitch} seconds with the health it had, and those aboard step out onto its deck. Moored side by side with ${FLOAT.city - 1} more of your pontoons, it raises citizens again.`, ok: !why || tows.some((w) => !pitchProblem(s, w)), why: why ?? undefined, run: () => this.act.issue({ t: 'pitch', p: viewer, ids: tows.map((w) => w.id) }) });
       }
       const wagons = units.filter((u) => u.type === 'wagon');
       if (wagons.length) {
@@ -1784,6 +1797,11 @@ export class Hud {
           const why = sluiceProblem(s, b);
           const reach = waterLine(s, b).length;
           cmds.push({ key: 'O', pic: '', glyph: b.open ? '⛔' : '🌊', title: b.open ? 'Shut the sluice' : 'Open the sluice', desc: b.open ? `Let the gate down: the flood drains away from its edges in, a ring every ${INUND.every} second${INUND.every === 1 ? '' : 's'}, and the fields under it work again. A boat left on the last wet tile runs aground and is lost.` : `Wind the gate up: the water runs out over the low ground round it, a ring every ${INUND.every} second${INUND.every === 1 ? '' : 's'}, up to ${INUND.reach} tiles (${reach} tiles here). Soldiers wade the flood at ${Math.round(INUND.wade * 100)}% of their pace and siege at ${Math.round(INUND.siege * 100)}%; your gun-barges sail it. Fields under it yield nothing while it lies.${sluiceFed(s, b) ? '' : ' <b>No still water lies beside it</b>: set it on a channel, a lake or the shallows.'}`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'pack', p: viewer, building: b.id }) });
+        }
+        // The Age of Floating Cities (#770): cast the district off into a tow.
+        if (b.type === 'pontoon' && (ageDef(p).floats || b.keep === 'floating')) {
+          const why = castProblem(s, p, b);
+          cmds.push({ key: 'O', pic: '', glyph: '⛵', title: 'Cast off', desc: `Slip this district's moorings and take it in tow, with those sheltering in it and then those of your people on its deck aboard, up to ${FLOAT.hold}; anyone else on the deck swims for the nearest deck or shore within ${FLOAT.swim} tiles. Tow it over open water and moor it again (P) wherever you like, out of any builder's reach too. While it is towed it gives no room, takes in nothing and raises no one, and ships sink it fast. A floating town split up raises no citizens until ${FLOAT.city} pontoons lie side by side again.`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'pack', p: viewer, building: b.id }) });
         }
         if (isMobile(p) && packsOf(p).includes(b.type)) {
           const why = packProblem(s, p, b);

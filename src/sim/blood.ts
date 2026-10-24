@@ -14,7 +14,7 @@ import type { Animal, Building, BuildingType, Ent, GameState, Player, Unit, Unit
  */
 
 /** Machines and ships bleed nothing. */
-const BLOODLESS: readonly UnitType[] = ['siege', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'wagon'];
+const BLOODLESS: readonly UnitType[] = ['siege', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'wagon', 'tow'];
 
 /** Whether a unit bleeds: everything but machines and ships. */
 export function bleeds(u: Unit): boolean {

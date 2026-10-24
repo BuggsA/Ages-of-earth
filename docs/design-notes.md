@@ -1454,3 +1454,18 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 **Choices I made (the owner may revert):** a battery's charge and reload are public, so "launch while it reloads" is a real play; the reload costs time, not resources (90 s, shorter than a warhead's 240 s refuel); the nearest covering battery fires, lowest id on a tie; a battery destroyed after it fired still lets its interceptor fly. The computer's defender still clears a covered ring, since 60% is no shelter; its attacker discounts a covered point by the odds.
 
 **Next:** s3, the silo held in Reserve (#759). A battery model whose rail stands empty while it reloads; a whistle on the dive.
+
+## Designers' notes: the Age of Floating Cities (the Water Road s7, #770, 2026-10-24, chain 1024-2000 s6, lane rules)
+
+**Built:** the Water Road's last age (`AGES.floating`), past the Age of Tides. Three new things: the **Pontoon** (a 3×3 district moored on open water, stamped as a gate so its people walk its deck), **towing** (the Steppe's `pack` and `pitch` orders on the water: a pontoon cast off is a `tow` unit carrying its deck's people, moored again anywhere a ship goes), and **linking** (three pontoons side by side are a floating town that raises citizens). It swaps rather than piles on: the Pontoon takes the House's place and key, since no House is raised on land in this age.
+
+**Tier 6 on the road only:** its tier is the Atomic's (5); it sits a row past the Atomic on the web map, as Fission and Fusion do. Growing `EPOCHS` and `TRUNK` would move `LAST_EPOCH`, which every climb, unit form, technology and the campaign read, and read-only tests pin the trunk at six (`tests/ages.test.ts`, `tests/web-map.test.ts`). A plain-road seventh epoch is #391's to build; this age can move onto it then.
+
+**Why I love it:** every age of this road moved the water; this one moves the town. The far end of the road should feel like another game (`docs/engagement.md`), and it does: you stop guarding a place and start choosing one. The moment I built it for is the warhead's public countdown, when a floating people casts its districts off and tows them out of the ring while a land town can only scatter. That is the road's answer to the silo it gave up (the owner's "uneven roads" ruling). It hooks into what's there: navies (ships hole pontoons three times as fast, so a fleet is the floating town's wall), fishing (pontoons take in the catch, so you tow the town to the shoals), the tide (a district on the flats at low water is aground and can't leave), the Steppe's wagons (same orders, same pitch time), and the silo's rings, which the computer reads to tow away.
+
+**What I chose:** a pontoon is built only beside the shore or your own deck (builders need a foothold), but a tow moors anywhere, so a district far out at sea is something you get by towing. A district can't leave with a queue or with no open water beside it. Linking is side to side, not corner to corner, so the town's shape is a choice. Ten aboard, the rest swim four tiles: a crowded deck costs lives when it sinks or leaves in a hurry.
+
+**Not done, or not seen:** sounds unheard (software-rendered browser); the floats don't bob yet; a rival's fleet hunting pontoons was not watched in a full match. The computer keeps the Tides 8 minutes before it saves for the road: saving at once cut its Tides play short and made the tide catch more of its builders.
+
+**Next:** a pontoon that is a whole wharf (a Dock that floats, so the navy is built where the town is); a floating market that pays more the farther it has been towed (the Silk Road's moving market, at sea); the computer towing its town toward a rival's shore to raid.
+
