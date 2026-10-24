@@ -668,9 +668,12 @@ export class View {
     }
     // Health: the selected, the recently hurt, or everyone while asked.
     const recent = s.tick - TICK_HZ * 4;
+    // With a crowd on screen, "show all" keeps bars for the hurt and the selected only: a full bar says nothing.
+    const crowded = sel.allBars && s.ents.length > 120;
     for (const e of s.ents) {
       if (e.hp <= 0) continue;
-      const show = sel.ids.has(e.id) || sel.allBars || e.hurt > recent;
+      const hurtNow = e.hurt > recent || (e.kind === 'unit' && e.hp < statsFor(s, e.owner, e.type).hp);
+      const show = sel.ids.has(e.id) || (sel.allBars && (!crowded || hurtNow)) || e.hurt > recent;
       if (!show) continue;
       if (e.kind === 'unit') {
         const at = this.units.drawn.get(e.id);
