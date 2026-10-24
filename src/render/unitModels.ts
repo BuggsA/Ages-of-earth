@@ -1502,12 +1502,80 @@ function priestGear(k: Kit, civ: CivId, epoch: number): void {
   }
 }
 
+/** Riders of each people: its own cap or helm on the horseman and knight, and a saddle blanket in the people's colour with a fringe that shows from the flank, so a cavalry line reads as Greek, Mongol or Briton before the pennant does. */
+function cavalryGear(k: Kit, civ: CivId, epoch: number): void {
+  if (epoch < 1 || epoch > 3) return;
+  const blanket: Record<CivId, [string, string]> = { greeks: ['#b3282d', '#e8d08a'], romans: ['#6e1d22', '#e0b13c'], chinese: ['#2f6f62', '#f0c43a'], egyptians: ['#2f5fa8', '#e0b13c'], mongols: ['#7a2f1f', '#e8e0c8'], britons: ['#3d6b4a', '#2f5fa8'] };
+  const [cloth, trim] = blanket[civ];
+  k.box(0.22, 0.03, 0.28, cloth, 0, 0.495, -0.03);
+  for (const x of [-1, 1]) {
+    k.box(0.012, 0.09, 0.26, cloth, x * 0.112, 0.43, -0.03);
+    k.box(0.014, 0.012, 0.26, trim, x * 0.113, 0.38, -0.03);
+  }
+  const hy = epoch === 2 ? 0.88 : 0.86; // head height of the rider
+  switch (civ) {
+    case 'greeks': // A horseman's petasos.
+      k.cyl(0.1, 0.1, 0.012, 10, '#c9b27a', 0, hy + 0.04, -0.02);
+      k.cone(0.065, 0.05, 8, '#c9b27a', 0, hy + 0.06, -0.02);
+      break;
+    case 'romans': // An iron cap with cheek-guards.
+      k.dome(0.075, '#9aa0a6', 0, hy, -0.02);
+      for (const x of [-1, 1]) k.box(0.02, 0.07, 0.05, '#9aa0a6', x * 0.07, hy - 0.04, -0.02);
+      break;
+    case 'chinese': // A lacquered cavalry cap.
+      k.cone(0.09, 0.07, 8, '#2b2420', 0, hy + 0.05, -0.02);
+      k.box(0.17, 0.02, 0.12, '#2b2420', 0, hy - 0.01, -0.02);
+      break;
+    case 'egyptians': // A linen cloth with two lappets.
+      k.dome(0.075, '#e8e0c8', 0, hy, -0.02);
+      for (const x of [-1, 1]) k.box(0.025, 0.1, 0.04, '#e8e0c8', x * 0.07, hy - 0.04, -0.01);
+      break;
+    case 'mongols': // A fur-rimmed steppe cap.
+      k.cone(0.07, 0.09, 6, '#5a3d28', 0, hy + 0.05, -0.02);
+      k.cyl(0.085, 0.085, 0.025, 8, '#3a2a1c', 0, hy, -0.02);
+      break;
+    case 'britons': // Bare-headed, a torque and braided hair.
+      k.cyl(0.07, 0.07, 0.012, 8, '#e0b13c', 0, hy - 0.06, -0.02);
+      k.box(0.03, 0.12, 0.03, '#b8742a', 0, hy - 0.04, -0.09);
+      break;
+  }
+}
+
+/** A hero's own crest, a rare distinction on the warlord and the mounted champions: a plume, a horsehair brush or a torque of gold, so two heroes of different peoples never read alike. */
+function heroGear(k: Kit, civ: CivId, epoch: number): void {
+  if (epoch < 1 || epoch > 3) return;
+  const hy = epoch === 1 ? 0.56 : 0.98;
+  const z = epoch === 1 ? 0 : -0.02;
+  switch (civ) {
+    case 'greeks': // A horsehair brush from ear to ear.
+      k.box(0.03, 0.07, 0.2, '#b3282d', 0, hy + 0.02, z);
+      break;
+    case 'romans': // A transverse crest of red feathers.
+      k.box(0.22, 0.06, 0.03, '#c0302f', 0, hy + 0.02, z);
+      break;
+    case 'chinese': // Twin pheasant plumes.
+      for (const x of [-1, 1]) k.cone(0.012, 0.18, 4, '#f0c43a', x * 0.04, hy + 0.08, z - 0.02).rotation.z = x * -0.4;
+      break;
+    case 'egyptians': // A rearing gold uraeus on the brow.
+      k.cone(0.025, 0.1, 4, '#e0b13c', 0, hy + 0.02, z + 0.07);
+      break;
+    case 'mongols': // A white horsetail banner behind the head.
+      k.cone(0.03, 0.22, 5, '#f1ece0', 0, hy - 0.04, z - 0.1).rotation.x = -0.9;
+      break;
+    case 'britons': // A pair of golden wings on the helm.
+      for (const x of [-1, 1]) k.box(0.1, 0.012, 0.03, '#e0b13c', x * 0.1, hy + 0.0, z).rotation.z = x * 0.5;
+      break;
+  }
+}
+
 /** A people's mark on its signature line: a crest, plume, headdress or banner, so its army reads at a glance. */
 function signatureMark(k: Kit, civ: CivId, type: UnitType, epoch = 1): void {
   const y = MARK_Y[type] ?? 0.5;
   if (type === 'infantry' && epoch >= 1 && epoch <= 3) footGear(k, civ);
   else if (type === 'ranged') rangedGear(k, civ, epoch);
   else if (type === 'priest') priestGear(k, civ, epoch);
+  else if (type === 'cavalry') cavalryGear(k, civ, epoch);
+  else if (type === 'hero') heroGear(k, civ, epoch);
   // Foot soldiers wear it on the head; siege and riders carry it on a pole behind.
   const pole = type === 'siege' || type === 'cavalry';
   const z = pole ? -0.2 : -0.01;

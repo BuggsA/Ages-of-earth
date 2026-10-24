@@ -7,7 +7,7 @@ const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH ?? '
 const p = await b.newPage({ viewport: { width: 1600, height: 1000 } });
 p.on('pageerror', (e) => console.log('ERR', e.message));
 const gear = process.argv[3] === 'gear';
-for (const g of gear ? ['gear', 'gear&k=ranged', 'gear&k=priest'] : ['land', 'sea']) {
+for (const g of gear ? ['gear', 'gear&k=ranged', 'gear&k=priest', 'gear&k=cavalry', 'gear&k=hero'] : ['land', 'sea']) {
   await p.goto(`http://localhost:5199/scripts/gallery/units.html?g=${g}${gear ? '' : civ}`);
   await p.waitForFunction('window.done', null, { timeout: 60000 });
   await p.screenshot({ path: `${dir}/gallery-units-${g.replace('&k=', '-')}.jpg`, type: 'jpeg', quality: 80 });
