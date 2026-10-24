@@ -225,7 +225,8 @@ export class Minimap {
       const mark = AGE_BLIP[age];
       ctx.strokeStyle = mark ?? 'rgba(0,0,0,0.6)';
       ctx.lineWidth = mark ? 1.5 : 1;
-      const half = (b.size / 2) * sx;
+      // At least 1.6 px a side, so a small hut still reads as a block of its people's colour (#626).
+      const half = Math.max((b.size / 2) * sx, 1.6);
       ctx.fillRect(b.x * sx - half, b.y * sy - half, half * 2, half * 2);
       ctx.strokeRect(b.x * sx - half, b.y * sy - half, half * 2, half * 2);
     }
@@ -395,6 +396,11 @@ export class Minimap {
         ctx.lineTo(e.x * sx - r * 1.2, e.y * sy);
         ctx.fill();
       } else {
+        // A dark edge so a dot reads on any ground, whatever its colour (#626).
+        const dot = ctx.fillStyle;
+        ctx.fillStyle = 'rgba(12,8,4,0.7)';
+        ctx.fillRect(e.x * sx - r - 0.7, e.y * sy - r - 0.7, r * 2 + 1.4, r * 2 + 1.4);
+        ctx.fillStyle = dot;
         ctx.fillRect(e.x * sx - r, e.y * sy - r, r * 2, r * 2);
         // A thrall (#502): the slayer's colour with a dark pip, so a rival can tell the bound from a free citizen.
         if (e.thrall) {
