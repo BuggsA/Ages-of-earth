@@ -126,7 +126,8 @@ const SEASON_COLOR = (leaf: boolean) => /* glsl */ `
 
 /**
  * Snow on whatever faces the sky, patchy as it settles and melts. On the ground some patches stay bare even in
- * deep winter; on models only the flattest tops take it, so stone and ore still read by their sides.
+ * deep winter, and the snow is a dusky blue-grey, so roofs and walls (brighter snow) stand off it; on models only
+ * the flattest tops take it, so stone and ore still read by their sides.
  */
 const SEASON_SNOW = (ground: boolean) => /* glsl */ `
   if (uSnow > 0.0) {
@@ -134,7 +135,7 @@ const SEASON_SNOW = (ground: boolean) => /* glsl */ `
     float up = dot(normal, upV);
     float n = seasonHash(floor(vSeasonPos * 1.5)) * 0.6 + seasonHash(floor(vSeasonPos * 4.0)) * 0.4;
     float cover = ${ground ? 'smoothstep(0.35, 0.75, up) * smoothstep(n - 0.05, n + 0.05, uSnow * 0.85)' : 'smoothstep(0.6, 0.9, up) * smoothstep(n - 0.05, n + 0.05, uSnow) * 0.85'};
-    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.74, 0.78, 0.86), cover * (1.0 - vSeasonBare));
+    diffuseColor.rgb = mix(diffuseColor.rgb, ${ground ? 'vec3(0.40, 0.45, 0.56)' : 'vec3(0.74, 0.78, 0.86)'}, cover * (1.0 - vSeasonBare));
   }
 `;
 
