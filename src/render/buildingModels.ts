@@ -21,9 +21,9 @@ interface Style {
 }
 
 const STYLES: Style[] = [
-  { wall: '#a8865e', wall2: '#8f6f4a', roof: '#d1ae62', roof2: '#b8954d', trim: '#6e4f33', base: '#8d7a62', post: '#6b4b2f', window: '#3a2b20' },
-  { wall: '#dbb07e', wall2: '#c99a66', roof: '#bb5f37', roof2: '#a24c2a', trim: '#f0e4c8', base: '#b9a58a', post: '#8a6a44', window: '#3a2b20' },
-  { wall: '#ece4d2', wall2: '#a9a397', roof: '#56616f', roof2: '#47515d', trim: '#4a3426', base: '#9a948a', post: '#4a3426', window: '#2c3440' },
+  { wall: '#a8865e', wall2: '#8f6f4a', roof: '#d6b868', roof2: '#c9a857', trim: '#6e4f33', base: '#8d7a62', post: '#6b4b2f', window: '#3a2b20' },
+  { wall: '#dbb07e', wall2: '#c99a66', roof: '#6a3220', roof2: '#55291a', trim: '#f0e4c8', base: '#b9a58a', post: '#8a6a44', window: '#3a2b20' },
+  { wall: '#ece4d2', wall2: '#a9a397', roof: '#444e5b', roof2: '#38414c', trim: '#4a3426', base: '#9a948a', post: '#4a3426', window: '#2c3440' },
   { wall: '#b45c42', wall2: '#efe8da', roof: '#713c2d', roof2: '#5c3024', trim: '#f2ece0', base: '#8d8579', post: '#4a3426', window: '#3b4a5a' },
   { wall: '#8a3c2c', wall2: '#d8d0c0', roof: '#4a5058', roof2: '#3a4048', trim: '#e8e2d4', base: '#7a756c', post: '#3a3a3e', window: '#2c3440' },
 ];
@@ -2216,11 +2216,11 @@ function wayTouch(k: Kit, way: string, deep = false): void {
 
 /** What a building is for, read from its roof (#625): war under cold slate, faith under pale gold, trade under teal, the land's work under ochre. Houses and the Town Center keep their epoch's own red. The Stone Age keeps its thatch and reads by plinth and pennant. */
 const ROOFS: Partial<Record<BuildingType, [string, string]>> = {
-  barracks: ['#4a5668', '#38424f'], range: ['#4a5668', '#38424f'], stable: ['#4a5668', '#38424f'], workshop: ['#4a5668', '#38424f'], forge: ['#4a5668', '#38424f'],
-  tower: ['#4a5668', '#38424f'], warcamp: ['#4a5668', '#38424f'], bloodtower: ['#4a5668', '#38424f'], airfield: ['#4a5668', '#38424f'], silo: ['#4a5668', '#38424f'],
+  barracks: ['#3e4858', '#2e3641'], range: ['#3e4858', '#2e3641'], stable: ['#3e4858', '#2e3641'], workshop: ['#3e4858', '#2e3641'], forge: ['#3e4858', '#2e3641'],
+  tower: ['#3e4858', '#2e3641'], warcamp: ['#3e4858', '#2e3641'], bloodtower: ['#3e4858', '#2e3641'], airfield: ['#3e4858', '#2e3641'], silo: ['#3e4858', '#2e3641'],
   temple: ['#e9e2cf', '#d8b25a'], mission: ['#e9e2cf', '#d8b25a'],
   market: ['#1a5961', '#133f46'], caravanserai: ['#1a5961', '#133f46'], dock: ['#1a5961', '#133f46'],
-  storehouse: ['#c9993a', '#a97d2c'], huntcamp: ['#c9993a', '#a97d2c'], prospector: ['#c9993a', '#a97d2c'],
+  storehouse: ['#e2b855', '#d4a642'], huntcamp: ['#e2b855', '#d4a642'], prospector: ['#e2b855', '#d4a642'],
 };
 
 /** No plinth or pennant: open or thin pieces, and buildings that already carry their own standards. */
