@@ -31,6 +31,7 @@ Claims and open PRs live on the board (`claimed`, `in-review`). List here only w
 
 ## Waiting on the owner
 
+- **The Water Road's trunk into the Age of Locks** (#701, [comment](https://github.com/BuggsA/Ages-of-earth/issues/701#issuecomment-6387177804)): may `tests/waterline.test.ts:79` list `locks` among the Water Line's roads, so `waterline → locks` can be added? Until then the way in is the Industrial turn.
 - **`periodic` never fired on its schedule** (by 2026-10-14). Check Settings → Actions allows scheduled workflows.
 - Optional: Settings → General → "Automatically delete head branches".
 - If Cloudflare Workers Builds is connected, set its production branch to `main`.

@@ -1304,3 +1304,15 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 **Not seen:** none of it in a browser yet (models, the swarm cloud, the dart, the drone and hush, the HUD lines are unit-tested or compiled only). Sound levels want an ear.
 
 **Next:** the Wildwood (step 5): the Heart Tree and Ents that root, the Spreading (which feeds new Hive ground), and "fire hits living things twice as hard"; beasts that fear fire; the computer reading a rival's Hives and raiding in winter or smoking them first.
+
+## Designers' notes: the Age of Locks (the Water Road s5, #701, 2026-10-24, chain 1024-2000 s5, lane rules)
+
+**Built:** the Water Road's tier-4 age (`AGES.locks`), instead of the Industrial Age. Three new things, as the engagement rule asks: the **canal** (the Channel dug deep: `GameState.channel` 2, `sails` in `grid.ts`), the **Bridge** (a gate over dug water that ships pass under), and the **Dam** (turbines that drive training and research within 8 tiles, `workRate`; and the burst when it falls, `burst` in `water.ts`). The Channel swaps rather than piles on: in this age the same button digs a canal. No walls or gates, as down the whole trunk: the canals are the moat, the bridges the gates.
+
+**Why I love it:** every Water Road age so far moved the land under armies; this one moves the *navy* onto the land. A Dock three canals inland is a fleet a rival can't see from the shore, and a canal ring is a moat soldiers swim at a crawl unless they hold your bridges. The dam is the age's gamble: the town wants its barracks and university packed beside it, and that packing is exactly what a burst drowns. It hooks into what's there: the Sappers' kegs (twice as hard on a dam), siege, the Water Line's flood machinery (the burst is a sluice's flood all at once), the coils (a dam multiplies a lit field), docks and every ship.
+
+**What I chose:** a canal is swum, not impassable, so a canal ring is never an unbreakable wall (a rival who wants in swims or takes a bridge). Ships pass under any finished bridge but never a dam, so a dam across your own canal is a choice you can see. The Bridge is the owner's own crossing (a gate, `B_GATE`), so it is the gate this age has instead of the stone one.
+
+**Not done, or not seen:** the trunk road straight from the Water Line (`waterline → locks`): `tests/waterline.test.ts` pins the roads out of the Water Line, so it waits on the owner (asked on #701); until then the way in is the Industrial turn. Sounds unheard; the canal's look seen only in a software-rendered browser.
+
+**Next:** locks proper (a canal stepping up a hill, the boat raised in a chamber you watch fill); a barge that hauls goods inland as a trade route; the computer sending its fleet up a rival's canal; `locks → tides` when #739 lands.
