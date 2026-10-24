@@ -442,7 +442,9 @@ function heart(k: Kit): void {
     [0.4, 3.55, 0.2, 0.8, 2], [-0.45, 3.5, -0.25, 0.7, 3], [0, 4.15, 0, 0.6, 0],
   ] as [number, number, number, number, number][]) k.blob(r, leaf[c], x, y, z).scale.set(1, 0.72, 1);
   // Its people's ribbons from the lowest bough.
-  for (const x of [-0.25, 0.05, 0.3]) k.team(k.box(0.06, 0.45, 0.015, TEAM, 0.6 + x * 0.3, 1.75, 0.55 + x));
+  for (const x of [-0.25, 0.05, 0.3]) k.team(k.box(0.09, 0.6, 0.02, TEAM, 0.6 + x * 0.3, 1.65, 0.55 + x));
+  // A ring of its people's cloth tied round the trunk, the mark a rival reads from afar.
+  k.team(k.cyl(0.47, 0.49, 0.14, 9, TEAM, 0, 1.2, 0));
 }
 
 /**
@@ -2678,7 +2680,7 @@ const ROOFS: Partial<Record<BuildingType, [string, string]>> = {
 };
 
 /** No plinth or pennant: open or thin pieces, and buildings that already carry their own standards. */
-const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder', 'dyke', 'thornwall', 'garden', 'orchard', 'channel', 'hive'];
+const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder', 'dyke', 'thornwall', 'garden', 'orchard', 'channel', 'hive', 'heart'];
 
 function roleStyle(type: BuildingType, epoch: number, st: Style): Style {
   const r = ROOFS[type];

@@ -46,7 +46,7 @@ export const rootedAt = (s: GameState, tile: number): boolean => !!s.wardens?.so
 /** Whether a tree burns on this tile. */
 const burning = (s: GameState, tile: number): boolean => !!s.fires?.some((f) => f.b === undefined && f.tile === tile);
 
-/** The standing tree nearest a Heart Tree within `WILDWOOD.wake` tiles of it, not burning and not an Ent already, or -1. */
+/** The standing tree nearest a Heart Tree within `WILDWOOD.wake` tiles of it, on a wood's edge, not burning and not an Ent already, or -1. */
 export function treeToWake(s: GameState, b: Building): number {
   const r = WILDWOOD.wake;
   const cx = b.tx + b.size / 2;
@@ -57,6 +57,8 @@ export function treeToWake(s: GameState, b: Building): number {
     for (let x = Math.max(0, b.tx - r); x < Math.min(s.w, b.tx + b.size + r); x++) {
       const i = y * s.w + x;
       if (s.res[i] !== R_TREE || burning(s, i) || rootedAt(s, i)) continue;
+      // Only a tree on a wood's edge, with open ground beside it, so the Ent can walk out.
+      if (!walkable(s, x - 1, y) && !walkable(s, x + 1, y) && !walkable(s, x, y - 1) && !walkable(s, x, y + 1)) continue;
       const dx = x + 0.5 - cx;
       const dy = y + 0.5 - cy;
       const d = dx * dx + dy * dy;
@@ -219,7 +221,7 @@ function spread(s: GameState): void {
         if (s.res[i] !== R_NONE || s.bldAt[i] !== 0 || !walkable(s, x, y)) continue;
         if (s.res[i - 1] !== R_TREE && s.res[i + 1] !== R_TREE && s.res[i - s.w] !== R_TREE && s.res[i + s.w] !== R_TREE) continue;
         if (byBuilding(s, x, y) || s.stools?.some((t) => t.tile === i) || s.roots?.some((t) => t.tile === i)) continue;
-        if (landOwnerAt(s, x + 0.5, y + 0.5) !== b.owner || roll(s) >= WILDWOOD.seed) continue;
+        if (landOwnerAt(s, x, y) !== b.owner || roll(s) >= WILDWOOD.seed) continue;
         (s.stools ??= []).push({ tile: i, from: s.tick, at: s.tick + secs(WILDWOOD.grow) });
         n++;
       }
