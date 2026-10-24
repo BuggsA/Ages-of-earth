@@ -958,8 +958,14 @@ export function applyCommand(s: GameState, c: Command): void {
       for (const e of s.ents) if (e.owner === c.p) e.hp = 0;
       break;
     case 'leave':
-      if (!p.ai && !p.defeated) {
+      if (c.back) {
+        if (p.left) {
+          p.ai = null;
+          delete p.left;
+        }
+      } else if (!p.ai && !p.defeated) {
         p.ai = 'normal';
+        p.left = true;
         s.events.push({ k: 'left', owner: c.p });
       }
       break;
