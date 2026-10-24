@@ -24,6 +24,8 @@ import { isPond } from '../sim/tides';
 import { tideWaitLeft } from '../sim/tides';
 import { ashoreLeft, bedClock } from '../sim/tides';
 import { hutBeds, hutWorks } from '../sim/tides';
+import { gateHead, gateReach, gateWorks, pondBehind, tideGateProblem } from '../sim/tides';
+import { TIDE_GATE } from '../sim/data';
 import { COCKLER } from '../sim/data';
 import { COCKLE } from '../sim/data';
 import { R_COCKLE } from '../sim/types';
@@ -1311,6 +1313,14 @@ export class Hud {
       const under = waterLine(s, b).filter((t) => isInund(s, t)).length;
       status += ` · <span data-tip="<b>Sluice</b>Open, the water runs out over the low ground within ${INUND.reach} tiles of it: polder, and meadow no higher than a little over its banks. Soldiers wade it at a crawl, siege bogs down, and gun-barges sail it. Shut, it holds the water back as a dyke does.">${b.open ? (lets(s, b) ? `🌊 Open: ${under} tiles under water` : '⚠ Open, but no water to let out') : sleeping ? '💤 Shut' : `🚪 Shut${under ? `: ${under} tiles still draining` : ''}`}</span>`;
     }
+    // A Tide Gate (#785): shut and loaded (and how far it would scour), pouring out, or open with the tide. Rivals read it too.
+    if (b.built && b.type === 'tidegate') {
+      const head = gateHead(s, b).length;
+      const reach = gateReach(s, b).length;
+      const pouring = s.scour?.some((c) => c.gate === b.id);
+      const pond = pondBehind(s, b).length;
+      status += ` · <span data-tip="<b>Tide Gate</b>Shut, the barrage holds its pond (${pond} tiles of flats) at every hour. The head of water is the pond held above the sea outside: with ${TIDE_GATE.least} tiles of head or more, opening the gate sends it out as a scour over up to ${TIDE_GATE.spread} tiles of bared flats a tile of head, within ${TIDE_GATE.reach} tiles of the gate: for ${TIDE_GATE.secs} seconds they are under water, and whoever stands there is swept off, ${TIDE_GATE.hurt} health lost, or drowned with no shore near. Open, the pond runs with the tide.">${!gateWorks(s, b) ? '💤 Shut: it works only in the Age of Tides' : pouring ? '🌊 Scouring: the pond is pouring out' : b.open ? '🚪 Open: the pond runs with the tide' : reach ? `⚠ Loaded: ${head} tiles of head, would scour ${reach} tiles of flats` : head ? `🚪 Shut: ${head} tiles of head, too little to scour` : '🚪 Shut: no head of water above the sea'}</span>`;
+    }
     // A dam (#701 s5): whether its turbines turn, how many of its owner's buildings they drive, and the burst it holds back.
     if (b.built && b.type === 'dam') {
       const still = damIdle(s, b);
@@ -1813,6 +1823,12 @@ export class Hud {
           const why = sluiceProblem(s, b);
           const reach = waterLine(s, b).length;
           cmds.push({ key: 'O', pic: '', glyph: b.open ? '⛔' : '🌊', title: b.open ? 'Shut the sluice' : 'Open the sluice', desc: b.open ? `Let the gate down: the flood drains away from its edges in, a ring every ${INUND.every} second${INUND.every === 1 ? '' : 's'}, and the fields under it work again. A boat left on the last wet tile runs aground and is lost.` : `Wind the gate up: the water runs out over the low ground round it, a ring every ${INUND.every} second${INUND.every === 1 ? '' : 's'}, up to ${INUND.reach} tiles (${reach} tiles here). Soldiers wade the flood at ${Math.round(INUND.wade * 100)}% of their pace and siege at ${Math.round(INUND.siege * 100)}%; your gun-barges sail it. Fields under it yield nothing while it lies.${sluiceFed(s, b) ? '' : ' <b>No still water lies beside it</b>: set it on a channel, a lake or the shallows.'}`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'pack', p: viewer, building: b.id }) });
+        }
+        // A Tide Gate (#785): open it, a scour on a loaded pond, or shut it to fill on the next flood.
+        if (b.type === 'tidegate') {
+          const why = tideGateProblem(s, b);
+          const reach = gateReach(s, b).length;
+          cmds.push({ key: 'O', pic: '', glyph: b.open ? '⛔' : '🌊', title: b.open ? 'Shut the gate' : 'Open the gate', desc: b.open ? 'Let the leaves swing to: the pond holds again what the next flood brings in, and its mills grind it twice once it is full.' : reach ? `Let the pond out: it scours ${reach} tiles of flats below the gate for ${TIDE_GATE.secs} seconds, sweeping off whoever stands there (your own people too), ${TIDE_GATE.hurt} health lost or drowned. Then the pond runs with the tide until you shut the gate and the flood fills it.` : `No head of water to scour with (${TIDE_GATE.least} tiles held above the sea at least: open it at low water). Opened, the pond runs with the tide: its flats bare at low water and its cockle beds grow back, and the mills grind it once.`, ok: !why, why: why ?? undefined, run: () => this.act.issue({ t: 'pack', p: viewer, building: b.id }) });
         }
         // The Age of Floating Cities (#770): cast the district off into a tow.
         if (b.type === 'pontoon' && (ageDef(p).floats || b.keep === 'floating')) {

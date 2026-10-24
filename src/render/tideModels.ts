@@ -123,3 +123,51 @@ export function cocklerHut(k: Kit, base: string): void {
   k.team(k.box(0.02, 0.12, 0.24, TEAM, 0, 1.36, 0.4));
   k.team(k.box(1.98, 0.1, 1.98, TEAM, 0, -0.07, 0));
 }
+
+/**
+ * A Tide Gate (#785), set in a barrage's causeway: two stone piers on a paved sill, a lintel walkway between them, and a pair of mitred
+ * timber leaves that meet in a V pointing out to sea, as a tide mill's pond gates do; a capstan on the walkway, a tide gauge board on the
+ * pond side painted in bands, and the owner's colour on a pennant. Open (`variant` ≥ 16): the leaves swung back flat to the piers and
+ * white water pouring through. The low bits are the causeway's arms (as a wall's): the gate faces across the line it is set in.
+ */
+export function tideGate(k: Kit, variant: number): void {
+  const open = variant >= 16;
+  const mask = variant & 15;
+  const g = k.group();
+  // Across the line the causeway runs: along x unless it meets the gate from north or south.
+  if (!(mask & 5) && mask & 10) g.rotation.y = Math.PI / 2;
+  const PAVE = '#b8ad96';
+  // The sill and the causeway's paving running on to either side.
+  k.box(1.0, 0.5, 1.0, '#8f8574', 0, -0.28, 0, g);
+  for (const side of [-1, 1]) k.box(0.2, 0.06, 0.8, PAVE, side * 0.42, 0.0, 0, g);
+  // Two stone piers, cut-waters toward the sea (−z), and the lintel walkway on top.
+  for (const side of [-1, 1]) {
+    k.box(0.26, 1.15, 0.7, STONE, side * 0.36, 0.3, 0, g);
+    k.prism(0.26, 0.3, 0.26, STONE, side * 0.36, 0.3, -0.45, g).rotation.x = Math.PI / 2;
+    k.box(0.3, 0.06, 0.74, '#8d877b', side * 0.36, 0.9, 0, g);
+  }
+  k.box(1.0, 0.08, 0.34, WOOD, 0, 0.94, 0.12, g);
+  for (const side of [-1, 1]) k.box(1.0, 0.12, 0.03, '#5b4330', 0, 1.04, 0.12 + side * 0.16, g);
+  // The capstan that winds the leaves.
+  k.cyl(0.07, 0.09, 0.22, 6, '#5b4330', 0, 1.08, 0.12, g);
+  for (const a of [0, Math.PI / 2]) k.box(0.42, 0.03, 0.03, WOOD, 0, 1.18, 0.12, g).rotation.y = a;
+  // The leaves: shut, they meet in a V out to sea; open, they lie back against the piers.
+  for (const side of [-1, 1]) {
+    const leaf = k.group(side * 0.23, 0.18, 0.02, g);
+    leaf.rotation.y = open ? side * 1.45 : side * -0.35;
+    k.box(0.26, 0.6, 0.06, '#6b4b2f', -side * 0.13, 0, 0, leaf);
+    for (const y of [-0.2, 0.05, 0.25]) k.box(0.27, 0.04, 0.07, '#4a4d52', -side * 0.13, y, 0, leaf);
+  }
+  // The tide gauge on the pond side (+z): bands of white and red to read the head of water by.
+  k.box(0.08, 0.7, 0.03, '#f2efe6', 0.3, 0.28, 0.38, g);
+  for (const y of [0.05, 0.25, 0.45]) k.box(0.085, 0.07, 0.035, '#a8372f', 0.3, y, 0.38, g);
+  // Open: the pond pouring through the gap, white water spreading out below it.
+  if (open) {
+    k.box(0.42, 0.05, 0.9, '#e6f1f2', 0, 0.02, -0.1, g);
+    k.box(0.8, 0.04, 0.4, '#cfe3e6', 0, -0.01, -0.62, g);
+    for (let i = 0; i < 4; i++) k.blob(0.07, '#ffffff', -0.24 + i * 0.16, 0.07, -0.55 - (i % 2) * 0.12, g).scale.set(1, 0.5, 1);
+  }
+  // The owner's colour on a pennant over the walkway.
+  k.cyl(0.015, 0.015, 0.5, 3, WOOD, -0.36, 1.18, 0.3, g);
+  k.team(k.box(0.02, 0.1, 0.2, TEAM, -0.36, 1.36, 0.4, g));
+}

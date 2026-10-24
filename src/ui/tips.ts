@@ -1,4 +1,5 @@
 import { COCKLE, COCKLER } from '../sim/data';
+import { TIDE_GATE } from '../sim/data';
 import { AGES, BLOOM, HIVE, INTERCEPT, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
 import { battlesFor } from '../sim/battles';
 import { ageDef } from '../sim/ages';
@@ -461,6 +462,12 @@ const TIPS: Tip[] = [
     // Barrages (#748): a Tide Mill stands, and no pond yet.
     when: (s, me) => ageOf(s.players[me]) === 'tides' && has(s, me, 'tidemill') && !s.pond,
     text: `<b>Shut a bay.</b> Drag a line of ${BUILDINGS.causeway.name}s (<kbd>${BUILDINGS.causeway.key}</kbd>) across the mouth of a bay of flats, shore to shore: behind it the bay is a <b>pond</b> whose flats stay wet at every hour, and a Tide Mill by it grinds them twice, on the flood and on the ebb. What it costs: nobody crosses that bay at low water any more, you included, and powder or a warhead on the line lets the pond out.`,
+  },
+  {
+    id: 'tideGate',
+    // The Tide Gate (#785): the viewer's people has a barrage's pond, and no gate in it yet.
+    when: (s, me) => ageOf(s.players[me]) === 'tides' && !!s.pond && !!s.causewayBy && s.causewayBy.some((o) => o - 1 === me) && !has(s, me, 'tidegate'),
+    text: `<b>A gate in the barrage.</b> Set a <b>${BUILDINGS.tidegate.name}</b> (<kbd>V</kbd> <kbd>${BUILDINGS.tidegate.key}</kbd>) on a causeway tile of your barrage, beside the pond. Shut, the pond holds and the mills grind it twice. At low water, when a rival army walks the flats below it, open it (<kbd>O</kbd>): the pond rushes out over them for ${TIDE_GATE.secs} seconds and sweeps them off, hurt or drowned. Then shut it again, and the next flood fills it. Rivals can read whether it is loaded, and keep off.`,
   },
   {
     id: 'breachCauseway',

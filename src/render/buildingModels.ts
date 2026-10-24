@@ -3,6 +3,7 @@ import type { AgeId, BuildingType } from '../sim/types';
 import { BUILDINGS } from '../sim/data';
 import { Kit, bake, rnd } from './kit';
 import { causewaySite, cocklerHut, tidemill } from './tideModels';
+import { tideGate } from './tideModels';
 import { pontoon } from './floatModels';
 
 /**
@@ -2678,7 +2679,7 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
   }
 }
 
-const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' | 'thornwall' | 'garden' | 'orchard' | 'channel' | 'hive' | 'sluice' | 'causeway' | 'bridge' | 'dam'>, (k: Kit, e: number, st: Style) => void> = {
+const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' | 'thornwall' | 'garden' | 'orchard' | 'channel' | 'hive' | 'sluice' | 'causeway' | 'bridge' | 'dam' | 'tidegate'>, (k: Kit, e: number, st: Style) => void> = {
   sapling: (k, e) => sapling(k, e),
   heart: (k) => heart(k),
   spire: (k) => spire(k),
@@ -2859,7 +2860,7 @@ const ROOFS: Partial<Record<BuildingType, [string, string]>> = {
 };
 
 /** No plinth or pennant: open or thin pieces, and buildings that already carry their own standards. */
-const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder', 'dyke', 'thornwall', 'garden', 'orchard', 'channel', 'hive', 'sluice', 'causeway', 'tidemill', 'cockler', 'heart', 'bridge', 'dam', 'pontoon', 'spire'];
+const BARE: BuildingType[] = ['wall', 'gate', 'snare', 'sapling', 'farm', 'towncenter', 'wonder', 'dyke', 'thornwall', 'garden', 'orchard', 'channel', 'hive', 'sluice', 'causeway', 'tidemill', 'cockler', 'tidegate', 'heart', 'bridge', 'dam', 'pontoon', 'spire'];
 
 function roleStyle(type: BuildingType, epoch: number, st: Style): Style {
   const r = ROOFS[type];
@@ -2898,6 +2899,7 @@ export function buildingGeometry(type: BuildingType, epochIn: number, color: str
     else if (type === 'dam') dam(k, variant);
     else if (type === 'channel') channel(k, variant);
     else if (type === 'causeway') causewaySite(k, variant);
+    else if (type === 'tidegate') tideGate(k, variant);
     else if (type === 'snare') snare(k, epoch, variant === 1);
     else if (type === 'thornwall') thornwall(k, variant);
     else if (type === 'garden') garden(k, epoch, variant);
