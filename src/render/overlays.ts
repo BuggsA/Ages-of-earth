@@ -217,13 +217,13 @@ export class Overlays {
     const cells = new Map<number, number>();
     for (let i = 0; i < n; i++) {
       const b = list[i];
-      const h = 0.1;
+      const h = 0.07;
       this.p.copy(b.at).project(camera);
       const key = Math.round(this.p.x * 28) * 4096 + Math.round(this.p.y * 40);
       const stack = cells.get(key) ?? 0;
       cells.set(key, stack + 1);
       if (stack) b.at = b.at.clone().addScaledVector(up, Math.min(stack, 4) * (h + 0.05));
-      this.m.compose(b.at, this.q, this.sc.set(b.width + 0.06, h + 0.05, 1));
+      this.m.compose(b.at, this.q, this.sc.set(b.width + 0.07, h + 0.07, 1));
       this.barBack.setMatrixAt(i, this.m);
       this.barBack.setColorAt(i, this.c.set('#141414'));
       const f = Math.max(0, Math.min(1, b.frac));
