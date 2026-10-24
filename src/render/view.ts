@@ -63,7 +63,7 @@ export interface Selection {
   /** The building whose rally point to show. */
   rallyOf: number | null;
   /** A line of wall being laid out. */
-  wall: { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean; type: 'wall' | 'dyke' } | null;
+  wall: { tiles: { x: number; y: number; ok: boolean }[]; alongY: boolean; type: 'wall' | 'dyke' | 'thornwall' } | null;
   /** Personal notes visible only in this browser. */
   scoutFlags: readonly ScoutFlag[];
 }
@@ -985,6 +985,12 @@ export class View {
           this.effects.ring(this.ground(s, ev.x, ev.y, 0.2), '#7fc46a', 1.4, 0.9);
           this.cue('tame', ev.x, ev.y, 1);
           this.cue(ev.kind === 'mammoth' ? 'mammoth' : ev.kind === 'boar' ? 'snarl' : 'howl', ev.x, ev.y, 0.5);
+          break;
+        case 'sprout':
+          // The Age of the Grove: a fallen Thornwall springs up again from its root.
+          if (!this.sees(ev.x, ev.y)) break;
+          this.effects.burst(this.ground(s, ev.x, ev.y, 0.1), { count: 10, speed: 0.8, up: 1.2, life: 0.8, size: 0.05, grow: 1.2, gravity: 0.6, drag: 1.5, soft: true, colors: ['#6f8f3e', '#9cc25a'] });
+          this.cue('sprout', ev.x, ev.y, 0.7);
           break;
         case 'wildStrike':
           if (!this.sees(ev.x, ev.y)) break;

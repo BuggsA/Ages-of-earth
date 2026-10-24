@@ -3,6 +3,7 @@ import { ageOf } from '../sim/ages';
 import { BUILDINGS, CIVS, POLDER, SNARE, secs } from '../sim/data';
 import { flooded } from '../sim/flood';
 import { catchIn } from '../sim/snares';
+import { bearing, orchardGrown, thornStage } from '../sim/grove';
 import { SEAMS, seamOf } from '../sim/shafts';
 import type { AgeId, Building, BuildingType, GameState } from '../sim/types';
 import { SAIL_HUB, buildingGeometry, heirloomsFor, foundationGeometry, rubbleGeometry, scaffoldGeometry, windmillSails } from './buildingModels';
@@ -178,8 +179,8 @@ export class BuildingsView {
     const dyke = k.type === 'dyke';
     const base = dyke ? Math.max(0.02, this.baseHeight(s, k)) : this.baseHeight(s, k);
     group.position.set(k.x, base, k.y);
-    const wall = k.type === 'wall' || dyke;
-    const body = new THREE.Mesh(buildingGeometry(k.type, k.epoch, this.colors[k.owner] ?? '#ffffff', wall || k.type === 'snare' || k.type === 'shaft' || k.type === 'tower' ? k.variant : 0, k.age, k.heirloom), buildingMaterial);
+    const wall = k.type === 'wall' || k.type === 'thornwall' || dyke;
+    const body = new THREE.Mesh(buildingGeometry(k.type, k.epoch, this.colors[k.owner] ?? '#ffffff', wall || k.type === 'snare' || k.type === 'shaft' || k.type === 'tower' || k.type === 'garden' || k.type === 'orchard' ? k.variant : 0, k.age, k.heirloom), buildingMaterial);
     if (k.type === 'gate' && k.variant) body.rotation.y = Math.PI / 2;
     // A dock's pier reaches out over the water.
     if (k.type === 'dock') body.rotation.y = (k.variant * Math.PI) / 2;
@@ -199,7 +200,8 @@ export class BuildingsView {
       }
     }
     // A plinth so a level building doesn't float over the low side of a slope.
-    if (k.type !== 'farm' && !dyke) {
+    // Fields and hedges (a Kitchen Garden, a Thornwall) lie on the ground as it falls.
+    if (k.type !== 'farm' && k.type !== 'garden' && k.type !== 'thornwall' && !dyke) {
       let lo = Infinity;
       for (let y = k.ty; y <= k.ty + k.size; y++) for (let x = k.tx; x <= k.tx + k.size; x++) lo = Math.min(lo, s.height[y * (s.w + 1) + x]);
       const drop = base - lo;
@@ -266,7 +268,7 @@ const plinthMaterial = inject(new THREE.MeshStandardMaterial({ color: '#8d7a62',
 
 const HEIGHT: Record<BuildingType, number> = {
   towncenter: 2.9, house: 1.5, storehouse: 1.3, farm: 0.4, barracks: 2.0, range: 1.4, stable: 1.4, tower: 3.4,
-  forge: 2.1, workshop: 1.7, temple: 2.6, market: 1.6, wonder: 4.6, wall: 1.3, gate: 1.8, dock: 1.5, airfield: 1.8, dyke: 0.45, windmill: 3.3, huntcamp: 1.4, warcamp: 1.7, caravanserai: 1.3, mission: 1.3, drainrig: 1.9, transfusion: 2.1, bloodtower: 2.9, snare: 0.9, prospector: 1.6, sapling: 0.7, silo: 1.4, shaft: 1.8, den: 1.8,
+  forge: 2.1, workshop: 1.7, temple: 2.6, market: 1.6, wonder: 4.6, wall: 1.3, gate: 1.8, dock: 1.5, airfield: 1.8, dyke: 0.45, windmill: 3.3, huntcamp: 1.4, warcamp: 1.7, caravanserai: 1.3, mission: 1.3, drainrig: 1.9, transfusion: 2.1, bloodtower: 2.9, snare: 0.9, prospector: 1.6, sapling: 0.7, silo: 1.4, shaft: 1.8, den: 1.8, thornwall: 1.3, garden: 0.6, orchard: 1.2,
 };
 
 /** Which neighboring tiles hold the same owner's wall or gate (for a dyke, #701: its dykes). */
@@ -275,7 +277,7 @@ function wallMask(s: GameState, b: Building): number {
   const join = (x: number, y: number, bit: number) => {
     if (x < 0 || y < 0 || x >= s.w || y >= s.h) return;
     const o = s.byId.get(s.bldAt[y * s.w + x]);
-    if (o && o.kind === 'building' && o.owner === b.owner && (b.type === 'dyke' ? o.type === 'dyke' : o.type === 'wall' || o.type === 'gate')) m |= bit;
+    if (o && o.kind === 'building' && o.owner === b.owner && (b.type === 'dyke' ? o.type === 'dyke' : b.type === 'thornwall' ? o.type === 'thornwall' : o.type === 'wall' || o.type === 'gate')) m |= bit;
   };
   join(b.tx + 1, b.ty, 1);
   join(b.tx, b.ty + 1, 2);
@@ -300,7 +302,8 @@ function snapshot(s: GameState, b: Building): Known {
     built: b.built,
     progress: b.progress,
     // A snare shows a hare in its noose once it holds a tender's worth (#485), to its owner and to a rival who sees it.
-    variant: b.type === 'wall' || b.type === 'dyke' ? wallMask(s, b) : b.type === 'gate' || b.type === 'dock' ? b.dir : b.type === 'snare' ? (catchIn(b) >= SNARE.worth ? 1 : 0) : b.type === 'shaft' ? Math.max(0, SEAMS.indexOf(seamOf(s, b) ?? 'stone')) : b.type === 'tower' ? (b.level ?? 0) : 0,
+    // A Thornwall shows its stage (the Age of the Grove), a Kitchen Garden what feeds it, an Orchard whether it is grown and in fruit.
+    variant: b.type === 'thornwall' ? wallMask(s, b) + 16 * thornStage(b) : b.type === 'garden' ? (b.fed ?? 0) : b.type === 'orchard' ? (bearing(s, b) ? 2 : orchardGrown(b) ? 1 : 0) : b.type === 'wall' || b.type === 'dyke' ? wallMask(s, b) : b.type === 'gate' || b.type === 'dock' ? b.dir : b.type === 'snare' ? (catchIn(b) >= SNARE.worth ? 1 : 0) : b.type === 'shaft' ? Math.max(0, SEAMS.indexOf(seamOf(s, b) ?? 'stone')) : b.type === 'tower' ? (b.level ?? 0) : 0,
   };
 }
 

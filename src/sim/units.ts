@@ -26,6 +26,7 @@ import { bank, cacheAt, lift } from './caches';
 import { buyLoad } from './oretrade';
 import { atFoot, carriesKegs, kegProblem, layKeg } from './powder';
 import { polderField } from './water';
+import { gardenMul, isField } from './grove';
 import { fordMarch, groveBoost, keptOf, kinBonus } from './landmarks';
 import { chant, chantedOver, consecrateProblem, consecrates, turnBuilding } from './consecrate';
 import { convoyShare } from './convoy';
@@ -424,7 +425,7 @@ function gatherStep(s: GameState, u: Unit, o: Extract<Order, { k: 'gather' }>): 
 
 function farmStep(s: GameState, u: Unit, o: Extract<Order, { k: 'farm' }>): void {
   const f = s.byId.get(o.target);
-  if (!f || f.kind !== 'building' || f.hp <= 0 || f.type !== 'farm' || f.owner !== u.owner) {
+  if (!f || f.kind !== 'building' || f.hp <= 0 || !isField(f.type) || f.owner !== u.owner) {
     if (u.carry > 0) setOrder(u, { k: 'deliver' });
     else setOrder(u, { k: 'idle' });
     return;
@@ -461,7 +462,8 @@ function farmStep(s: GameState, u: Unit, o: Extract<Order, { k: 'farm' }>): void
     u.miss = 0;
     u.act = 'farm';
     // A field on polder (#701) works half again as fast: the richest ground there is.
-    u.frac += gatherRate(s, u, 'farm') * (polderField(s, f) ? POLDER.farm : 1) * DT;
+    // A Kitchen Garden (the Age of the Grove) fed by dung or water works faster.
+    u.frac += gatherRate(s, u, 'farm') * (polderField(s, f) ? POLDER.farm : 1) * gardenMul(f) * DT;
     while (u.frac >= 1) {
       u.frac -= 1;
       u.carry++;
@@ -567,7 +569,7 @@ export function freeFarm(s: GameState, owner: number, x: number, y: number, r: n
   let best: Building | null = null;
   let bestD = r;
   for (const e of s.ents) {
-    if (e.kind !== 'building' || e.type !== 'farm' || e.owner !== owner || e.hp <= 0) continue;
+    if (e.kind !== 'building' || !isField(e.type) || e.owner !== owner || e.hp <= 0) continue;
     if (farmTaken(s, e) || skip?.has(e.id)) continue;
     const d = distToRect(x, y, e);
     if (d < bestD) {
@@ -605,7 +607,7 @@ export function completeBuilding(s: GameState, b: Building): void {
   b.hp = Math.min(b.hp, maxHp(s, b));
   s.players[b.owner].stats.built++;
   // A finished gate opens for its own side.
-  if (b.type === 'gate' || b.type === 'dyke') stampBuilding(s, b, true);
+  if (b.type === 'gate' || b.type === 'dyke' || b.type === 'thornwall') stampBuilding(s, b, true);
   if (b.type === 'wonder') {
     b.timer = s.wonderTime;
     s.events.push({ k: 'wonder', owner: b.owner, id: b.id, x: b.x, y: b.y, ticks: b.timer });
@@ -616,7 +618,7 @@ export function completeBuilding(s: GameState, b: Building): void {
 
 /** What a builder does once the building is up. */
 function afterBuilding(s: GameState, u: Unit, b: Building): void {
-  if (b.type === 'farm' && u.type === 'citizen' && !farmTaken(s, b) && !(farmClaimed(s, b, u) && !s.players[u.owner].ai) && !u.queue.length) {
+  if (isField(b.type) && u.type === 'citizen' && !farmTaken(s, b) && !(farmClaimed(s, b, u) && !s.players[u.owner].ai) && !u.queue.length) {
     setOrder(u, { k: 'farm', target: b.id, phase: 'go' });
     return;
   }
@@ -627,7 +629,7 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
   }
   // Help with other foundations nearby (a wall goes up piece by piece).
   let next: Building | null = null;
-  let bestD = b.type === 'wall' || b.type === 'gate' || b.type === 'dyke' ? 4 : 14;
+  let bestD = b.type === 'wall' || b.type === 'gate' || b.type === 'dyke' || b.type === 'thornwall' ? 4 : 14;
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.owner !== u.owner || e.built || e.hp <= 0 || !canRaise(u.type, e.type, s.players[u.owner].civ)) continue;
     const d = distToRect(u.x, u.y, e);
@@ -652,7 +654,7 @@ function afterBuilding(s: GameState, u: Unit, b: Building): void {
     }
   }
   // A farm that is already worked: the player's builder takes a free field nearby rather than standing idle (#344).
-  if (b.type === 'farm' && u.type === 'citizen' && !s.players[u.owner].ai) {
+  if (isField(b.type) && u.type === 'citizen' && !s.players[u.owner].ai) {
     const f = freeFarm(s, u.owner, u.x, u.y, 10, headedFarms(s, u));
     if (f) {
       setOrder(u, { k: 'farm', target: f.id, phase: 'go' });

@@ -1,4 +1,4 @@
-import { AGES, BUILDINGS, CIVS, GUNS, TOWER_LEVELS, WAYS, WORKS, SIGNATURES, EPOCHS, FLOOD, NO_MODS, PATHS, RARE, TECHS, WARCAMP, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
+import { AGES, BUILDINGS, CIVS, GUNS, GROVE, TOWER_LEVELS, WAYS, WORKS, SIGNATURES, EPOCHS, FLOOD, NO_MODS, PATHS, RARE, TECHS, WARCAMP, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
 import { fairLevy } from './fair';
 import { flooded } from './flood';
 import { ageDef, ageOf, hasWalked, isHire, isSuspended, pathCarry, threadsOf } from './ages';
@@ -173,7 +173,9 @@ export function towerBonus(level = 0): { attack: number; range: number; hp: numb
 /** A building's full hit points for its owner now; a Watch Tower's `level` on the tower line raises them. */
 export function buildingMaxHp(s: GameState, owner: number, type: BuildingType, level = 0): number {
   const p = s.players[owner];
-  return Math.round(buildingHp(type, p.epoch) * cacheOf(p).mods.buildingHp * (type === 'tower' ? towerBonus(level).hp : 1));
+  // A Thornwall (the Age of the Grove) is as strong as the stage it has grown to.
+  const grown = type === 'thornwall' ? GROVE.hp[Math.min(3, level)] : 1;
+  return Math.round(buildingHp(type, p.epoch) * cacheOf(p).mods.buildingHp * (type === 'tower' ? towerBonus(level).hp : 1) * grown);
 }
 
 /** The strength of one arrow from a building's guns (before armour), for its owner now; 0 if it has none. */

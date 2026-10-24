@@ -1,6 +1,6 @@
 # The Wild route: a people that grows its power
 
-**Status: the owner's idea (2026-10-24), fleshed out here; step 1 built.** The owner: "start a new main branch of ages. Completely new. I was thinking like nature/plant tech. Where you use nature and animals to your advantage." Then: "There should be a way to produce them too, maybe forest wall or tree walls of some kind. Maybe ents later on." "Maybe farms that also yield way more food. Or maybe just more food dense so less area. Be very uniquely creative to fill the gaps, especially the future ages." And: "this goes to 7." Umbrella: #706. Build on it; change it with the reason on the umbrella.
+**Status: the owner's idea (2026-10-24), fleshed out here; steps 1 and 2 built.** The owner: "start a new main branch of ages. Completely new. I was thinking like nature/plant tech. Where you use nature and animals to your advantage." Then: "There should be a way to produce them too, maybe forest wall or tree walls of some kind. Maybe ents later on." "Maybe farms that also yield way more food. Or maybe just more food dense so less area. Be very uniquely creative to fill the gaps, especially the future ages." And: "this goes to 7." Umbrella: #706. Build on it; change it with the reason on the umbrella.
 
 ## The idea in one line
 
@@ -19,7 +19,7 @@ Stone ─┬─ 1 Wild ── 2 Grove ──── 3 Hive ── 4 Wildwood ─�
 | # | Tier | Age | After it, I now… (verb) | It shuts… (door) | Good at |
 | --- | --- | --- | --- | --- | --- |
 | 1 | 1 | **Wild** (built) | tame wolves, boars and mammoths; breed the tamed kinds at a Beast Den; my Hunting Camps call the wild in | no Stables, no Siege Workshop | an early army that costs food, not gold |
-| 2 | 2 | **Grove** | plant walls that grow; grow dense food in Kitchen Gardens fed by the Den's dung | no stone walls, gates or Watch Towers | a town shut in green on half the ground |
+| 2 | 2 | **Grove** (built) | plant walls that grow; grow dense food in Kitchen Gardens fed by the Den's dung | no stone walls, gates or Watch Towers | a town shut in green on half the ground |
 | 3 | 3 | **Hive** | keep Hives that swarm whoever walks my woods; tip darts in venom; breed dire beasts | no guns or cannon | woods a rival can't walk through |
 | 4 | 4 | **Wildwood** | wake old trees as Ents that walk, crush and root again; let my woods spread each spring | no factories or machines; fire hits living things twice as hard | an army that is also the forest |
 | 5a | 5 | **Leviathans** | breed giants: Skywhales that carry troops over walls, a Kraken in the deep, a Behemoth with my town on its back | the Heart Tree sleeps: no Ents, no spreading | reach: over walls, under the sea, a capital that walks |
@@ -40,7 +40,9 @@ Every age has a cheap road back and a road to the trunk, like every side age. De
 - **Door:** no Stables and no Siege Workshop while you stay.
 - **Clue and deed:** a Hunting Camp shows the road; foraging 250 food from wild bushes opens it.
 
-### 2. The Age of the Grove: tree walls and dense food
+### 2. The Age of the Grove: tree walls and dense food (built, step 2)
+
+- **As built** (`src/sim/grove.ts`, `GROVE`): clue a Beast Den, deed 5 beasts reared at Dens (a new `bred` stat); roads on to the Gunpowder Age and back to the Middle Ages. Two changes from the sketch below, both to keep it simple and readable: the **Thornwall parts for its own team as a gate does**, so there is no Hollow Oak gate (the Grove raises no gates); and there is no **Rain Barrel** yet, only water within 3 tiles. A **Den feeds its 6 oldest gardens** in reach, so a town needs a Den for every half-dozen gardens and a raid on one starves exactly those. Grubbing a stump out is the owner's delete for now; a rival's answer is to build on the root or, in step 3, burn it.
 
 - **Thornwall (the tree wall).** Planted like a wall line, for wood alone. Each piece grows through four stages over about two minutes: seedling (weak, but already blocks), bramble, thicket, then **living oak** (tougher than stone, and it mends itself slowly). It grows faster in spring. A piece cut down regrows from its root unless a citizen grubs the stump out or fire takes it. A **Hollow Oak** gate lets your people through. So a green wall can't go up in a hurry, but once grown it's the toughest, cheapest wall in the game, and it heals.
 - **Kitchen Gardens (dense food).** A one-tile plot (a Farm takes nine) of the Three Sisters: maize, beans and squash grown together. With a gardener tending it, a Garden yields about three times a Farm's food per worker, from a ninth of the ground. Its catch: it needs **feeding**. A Garden within reach of a Den grows on its dung; one beside a stream or a Rain Barrel grows on water; one with neither withers to a Farm's pace. Dens, Gardens and water then pull the town into a tight, rich heart, and a raid on the Den starves the gardens.
@@ -105,7 +107,7 @@ Every age has a cheap road back and a road to the trunk, like every side age. De
 ## Steps (each one playable)
 
 1. **Wild** (built): taming, the Den, the call of the wild, the computer using it.
-2. **Grove:** Thornwall, Kitchen Gardens fed by Den dung or water, Orchards.
+2. **Grove** (built): Thornwall, Kitchen Gardens fed by Den dung or water, Orchards.
 3. **Fire** (shared rule, needed by everything after): torchbearers, burning woods and buildings, smoke.
 4. **Hive:** Hives, pollination, venom darts, dire beasts and the Cave Bear.
 5. **Wildwood:** the Heart Tree, Ents that root, the Spreading, woodland ways.
@@ -118,4 +120,5 @@ Every age has a cheap road back and a road to the trunk, like every side age. De
 
 - How fire works in the sim (step 3).
 - Whether a rival can tame your beasts back (step 1 tames only wild ones).
-- The computer is weak in the Wild on Normal: it tames and raises a Den, but its economy is thin while it stays (seed 8 at 20 minutes). Teach it Gardens in step 2.
+- The computer is weak in the Wild on Normal: it tames and raises a Den, but its economy is thin while it stays (seed 8 at 25 minutes, still in the Wild, its Den lost). Gardens help only once it reaches the Grove; the Wild itself may want an earlier Den or a cheaper one.
+- A rival's citizens can't yet grub out a Thornwall root; fire (step 3) should take roots and gardens both.
