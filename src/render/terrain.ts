@@ -4,6 +4,7 @@ import type { GameState } from '../sim/types';
 import { T_GRASS, T_ROCK, T_SAND, T_WATER } from '../sim/types';
 import { isInund, isPolder } from '../sim/water';
 import { bared, isCauseway } from '../sim/tides';
+import { isPond } from '../sim/tides';
 import { natureGeometry, type NatureKind } from './natureModels';
 import { bakedMaterial, fogUniforms, inject, swayMaterial } from './materials';
 
@@ -31,6 +32,8 @@ const POLDER_FIELD = [C('#7ba34a'), C('#69933f'), C('#86704c')];
 const DITCH = C('#5f9a92');
 /** Tidal flats the falling tide bared (#739): wet grey-brown sand with a sheen, ribbed; a causeway's packed pale stone. */
 const WET = [C('#8f8670'), C('#a39878'), C('#6f7466')];
+/** A barrage's pond bed (#748): still water silts green with weed. */
+const POND = [C('#7f8a62'), C('#6c7a5a')];
 const PAVING = [C('#b8ad96'), C('#9e9482')];
 const MUD = C('#857a60');
 const DRY_TIME = 20;
@@ -258,6 +261,8 @@ export class TerrainView {
       const fine = smooth(x + 0.5, y + 0.5, 2.5, 12);
       if (isInund(s, tile)) {
         tmp.copy(DROWNED[0]).lerp(DROWNED[1], fine);
+      } else if (terr === T_WATER && isPond(s, tile)) {
+        tmp.copy(POND[0]).lerp(POND[1], fine);
       } else if (terr === T_WATER) {
         tmp.copy(BED[0]).lerp(BED[1], Math.min(1, Math.max(0, -avgH * 0.8)));
       } else if (bared(s, tile)) {

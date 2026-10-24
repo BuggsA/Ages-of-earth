@@ -25,6 +25,7 @@ import { rubbleAt, salvages, strip } from './salvage';
 import { bank, cacheAt, lift } from './caches';
 import { buyLoad } from './oretrade';
 import { atFoot, carriesKegs, kegProblem, layKeg } from './powder';
+import { atTile, kegTileProblem } from './tides';
 import { carriesTorch, ignite, onFire, torchProblem } from './fire';
 import { fieldBoost, wading } from './water';
 import { gardenMul, isField } from './grove';
@@ -1691,6 +1692,25 @@ function kegOrderStep(s: GameState, u: Unit, o: Extract<Order, { k: 'keg' }>): v
 }
 
 /**
+ * Lay a powder keg on a rival's causeway (#748): walk to the tile (or the nearest ground to it, at high water) and lay a keg from the
+ * store there, its fuse lit. Gives up if the causeway is breached first, the age is left or the store runs dry on the way.
+ */
+function kegTileStep(s: GameState, u: Unit, o: Extract<Order, { k: 'kegTile' }>): void {
+  const why = carriesKegs(u) ? kegTileProblem(s, u.owner, o.tile) : 'Only citizens and foot soldiers carry kegs';
+  if (why) {
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  if (atTile(s, u, o.tile, statsOf(s, u).radius)) {
+    stopWalking(u);
+    layKeg(s, u);
+    setOrder(u, { k: 'idle' });
+    return;
+  }
+  if (!approach(u, goalForPoint(s, (o.tile % s.w) + 0.5, Math.floor(o.tile / s.w) + 0.5, passOf(s, u)))) setOrder(u, { k: 'idle' });
+}
+
+/**
  * Carry a torch (`fire.ts`): walk to the tree, root or rival's living building, stand `FIRE.light` seconds within `FIRE.reach` tiles
  * of it to set it alight, then stand free. Gives up if it catches from elsewhere first, falls, or the peace comes down.
  */
@@ -2263,6 +2283,9 @@ export function think(s: GameState, sp: Spatial, u: Unit): void {
       break;
     case 'torch':
       torchStep(s, u, o);
+      break;
+    case 'kegTile':
+      kegTileStep(s, u, o);
       break;
     case 'salvage':
       salvageStep(s, u, o);

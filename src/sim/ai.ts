@@ -12,6 +12,9 @@ import { beatersAt, burns, onFire } from './fire';
 import { basinOf, channelPlan, coastHeld, dykePlan, heldBack, isChannel, isInund, isPolder, polderField, sluiceFed, sluiceProblem, waterLine, type ChannelPlan, type DykePlan } from './water';
 import { coveredNext, shoreNear, tideClock, tideMillSpot } from './tides';
 import { wallLine } from './commands';
+import { AI_BARRAGE, AI_EBB } from './data';
+import { barragePlan, causewayOwner, ebbTiming, isCauseway, isPond, tideAwake, tideLevel } from './tides';
+import { statsOf } from './world';
 import { launchProblem, loaded, rulesOf, silosOf } from './silo';
 import { carriedBy } from './relics';
 import { storesOre } from './caches';
@@ -1544,6 +1547,7 @@ function tideWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   }
   const clock = tideClock(s);
   if (!clock) return;
+  if (s.tick % secs(1) === p.id % secs(1)) turnBack(s, v, mem, issue);
   if (s.tick % secs(1) === p.id % secs(1) && clock.next <= AI_TIDES.wary) {
     const wet = coveredNext(s);
     if (wet) {
@@ -1555,6 +1559,7 @@ function tideWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
       }
     }
   }
+  if (ageDef(p).tides) barrageWork(s, v, mem, issue);
   if (!ageDef(p).tides || buildBarred(p, 'tidemill')) return;
   if (v.buildings.filter((b) => b.type === 'tidemill').length >= AI_TIDES.mills) return;
   if (s.tick - (mem.ordered.tidemill ?? -99999) < secs(25)) return;
@@ -1566,6 +1571,137 @@ function tideWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   const spot = tideMillSpot(s, p.id, v.home.x, v.home.y, AI_TIDES.reach, AI_TIDES.least, (tx, ty) => !placeProblem(s, 'tidemill', tx, ty, true, p.id));
   mem.ordered.tidemill = s.tick;
   if (!spot || !construct(s, v, mem, 'tidemill', spot, 2, issue)) spend(v, cost);
+}
+
+/**
+ * A barrage by its mills (#748): the line `barragePlan` finds by the first of its finished Tide Mills that has one (each mill looked at
+ * once), laid in one drag by `AI_BARRAGE.crew` citizens once the whole line can be paid for; idle builders go back to a site still rising,
+ * and once the line stood whole a breach in it is mended at once.
+ */
+function barrageWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (buildBarred(p, 'causeway')) return;
+  const m = (mem.tide ??= {});
+  if (!m.plan) {
+    const seen = (m.seen ??= []);
+    const mill = v.buildings.find((b) => b.type === 'tidemill' && b.built && !seen.includes(b.id));
+    if (!mill) return;
+    seen.push(mill.id);
+    m.plan = barragePlan(s, mill, AI_BARRAGE, wallLine);
+    if (!m.plan) return;
+  }
+  const plan = m.plan;
+  const gaps = plan.line.filter((t) => !isCauseway(s, t) && s.bldAt[t] === 0);
+  if (!gaps.length) {
+    if (plan.line.every((t) => isCauseway(s, t))) {
+      m.raised = true;
+      return;
+    }
+    // Idle builders are sent back to the causeway still rising.
+    const rising = plan.line.map((t) => s.byId.get(s.bldAt[t])).find((b): b is Building => !!b && b.kind === 'building' && b.type === 'causeway' && b.owner === p.id && !b.built);
+    if (!rising || s.tick - (mem.ordered.causeway ?? -99999) < secs(20)) return;
+    const crew = v.citizens.filter((u) => !u.inside && u.order.k === 'idle').slice(0, AI_BARRAGE.crew);
+    if (crew.length) issue({ t: 'work', p: p.id, ids: crew.map((u) => u.id), target: rising.id });
+    mem.ordered.causeway = s.tick;
+    return;
+  }
+  if (s.tick - (mem.ordered.causeway ?? -99999) < secs(m.raised ? 6 : 20)) return;
+  const cost = buildingCostFor(s, p.id, 'causeway');
+  const all: Cost = {};
+  for (const r of RES) if (cost[r]) all[r] = cost[r]! * gaps.length;
+  if (!afford(v, all)) {
+    // A breach is mended before anything else spends; a new line waits its turn.
+    if (m.raised) spend(v, all);
+    return;
+  }
+  const crew = v.citizens
+    .filter((u) => !u.inside && u.order.k !== 'build' && !(u.order.k === 'farm' && u.order.phase === 'work'))
+    .sort((a, b) => a.id - b.id)
+    .slice(0, AI_BARRAGE.crew);
+  if (!crew.length) return;
+  issue({ t: 'wall', p: p.id, ids: crew.map((u) => u.id), x0: plan.from.x, y0: plan.from.y, x1: plan.to.x, y1: plan.to.y, causeway: true });
+  spend(v, all);
+  mem.ordered.causeway = s.tick;
+}
+
+/**
+ * The low-water strike (#748): whether a wave marching from the muster on `to` should wait for the tide. Where the march crosses the
+ * flats (`ebbTiming`, at the slowest soldier's pace) it sets out only when it would cross them bare, waiting at most `AI_EBB.hold`
+ * seconds; the crossing it takes is kept, so the wave can turn back short of it before the flood (`turnBack`).
+ */
+function ebbWait(s: GameState, mem: AiMemory, wave: Unit[], to: { x: number; y: number }): boolean {
+  const m = mem.tide;
+  if (!tideAwake(s) || !wave.length || !mem.muster) {
+    if (m) delete m.wait;
+    return false;
+  }
+  let pace = Infinity;
+  for (const u of wave) pace = Math.min(pace, statsOf(s, u).speed);
+  const e = ebbTiming(s, mem.muster, to, pace);
+  const t = (mem.tide ??= {});
+  if (!e) {
+    delete t.wait;
+    delete t.cross;
+    return false;
+  }
+  if (e.go) {
+    delete t.wait;
+    t.cross = { x: e.far.x, y: e.far.y, level: e.level, to: { x: to.x, y: to.y } };
+    return false;
+  }
+  t.wait ??= s.tick;
+  if (s.tick - t.wait <= secs(AI_EBB.hold)) return true;
+  // Waited long enough: it goes the long way round, or across as it can.
+  delete t.wait;
+  delete t.cross;
+  return false;
+}
+
+/**
+ * Turn back before the flood (#748): with the water `AI_TIDES.wary` seconds off the level that covers the crossing its wave took at low
+ * water, every soldier of the wave not yet over the far shore turns back to the muster (those standing on the flats step ashore after,
+ * as anyone does). The soldiers over it fight on.
+ */
+function turnBack(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const c = mem.tide?.cross;
+  if (!c || !mem.attacking || !mem.muster) return;
+  const now = tideLevel(s);
+  if (now >= c.level) {
+    // Still falling to it, the wave marches on; risen past it, the window is gone.
+    if (tideClock(s)?.rising) delete mem.tide!.cross;
+    return;
+  }
+  if (tideLevel(s, s.tick + secs(AI_TIDES.wary)) < c.level) return;
+  delete mem.tide!.cross;
+  const far = (c.x - c.to.x) * (c.x - c.to.x) + (c.y - c.to.y) * (c.y - c.to.y);
+  const marching = v.army.filter((u) => !u.inside && (u.order.k === 'attack' || (u.order.k === 'move' && u.order.amove)));
+  const back = marching.filter((u) => (u.x - c.to.x) * (u.x - c.to.x) + (u.y - c.to.y) * (u.y - c.to.y) > far);
+  if (!back.length) return;
+  issue({ t: 'move', p: v.p.id, ids: back.map((u) => u.id), x: mem.muster.x, y: mem.muster.y });
+  if (back.length === marching.length) mem.attacking = false;
+}
+
+/** A rival's barrage tile within `r` tiles of a point (#748), the nearest first (ties in tile order), none with a rival on the ground within `AI_KEG.guard` of it. -1: none. */
+export function rivalBarrage(s: GameState, owner: number, x: number, y: number, r: number): number {
+  if (!s.pond || !s.causewayBy) return -1;
+  let best = -1;
+  let bestD = Infinity;
+  for (let ty = Math.max(1, Math.floor(y - r)); ty <= Math.min(s.h - 2, Math.floor(y + r)); ty++)
+    for (let tx = Math.max(1, Math.floor(x - r)); tx <= Math.min(s.w - 2, Math.floor(x + r)); tx++) {
+      const t = ty * s.w + tx;
+      if (!isCauseway(s, t)) continue;
+      const by = causewayOwner(s, t);
+      if (by < 0 || !isEnemy(s, owner, by)) continue;
+      if (!isPond(s, t + 1) && !isPond(s, t - 1) && !isPond(s, t + s.w) && !isPond(s, t - s.w)) continue;
+      const dx = tx + 0.5 - x, dy = ty + 0.5 - y;
+      const d = dx * dx + dy * dy;
+      if (d > r * r || d >= bestD) continue;
+      const g2 = AI_KEG.guard * AI_KEG.guard;
+      if (s.ents.some((e) => e.kind === 'unit' && e.hp > 0 && !e.inside && isEnemy(s, owner, e.owner) && domainOf(e.type) === 'land' && (e.x - tx - 0.5) * (e.x - tx - 0.5) + (e.y - ty - 0.5) * (e.y - ty - 0.5) <= g2)) continue;
+      bestD = d;
+      best = t;
+    }
+  return best;
 }
 
 /** The spot nearest home for a windmill whose pull reaches a basin (#701): within `POLDER.reach` of one of its tiles, on land it may raise. */
@@ -1618,8 +1754,8 @@ export function sapKegs(s: GameState, v: View, mem: AiMemory, issue: (c: Command
   const { p } = v;
   if (!sappers(p) || kegsOf(p) < 1 || s.tick - (mem.kegAt ?? -99999) < secs(AI_KEG.every)) return;
   mem.kegAt = s.tick;
-  const out = v.army.filter((u) => u.type === 'infantry' && !u.inside && u.order.k !== 'keg');
-  let busy = v.army.filter((u) => u.order.k === 'keg').length;
+  const out = v.army.filter((u) => u.type === 'infantry' && !u.inside && u.order.k !== 'keg' && u.order.k !== 'kegTile');
+  let busy = v.army.filter((u) => u.order.k === 'keg' || u.order.k === 'kegTile').length;
   let left = kegsOf(p) - busy;
   const near2 = AI_KEG.near * AI_KEG.near;
   for (const u of out) {
@@ -1638,6 +1774,14 @@ export function sapKegs(s: GameState, v: View, mem: AiMemory, issue: (c: Command
         bestScore = score;
         best = e;
       }
+    }
+    // A rival's barrage (#748) comes before all but a dyke holding back polder (scored below 0): one keg lets its pond out.
+    const dam = bestScore >= 0 ? rivalBarrage(s, p.id, u.x, u.y, AI_KEG.near) : -1;
+    if (dam >= 0) {
+      issue({ t: 'kegTile', p: p.id, ids: [u.id], tile: dam });
+      busy++;
+      left--;
+      continue;
     }
     if (!best) continue;
     issue({ t: 'keg', p: p.id, ids: [u.id], target: best.id });
@@ -4948,14 +5092,20 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     }
   }
   const due = !plan.hold && !polisHarvest(s, v) && (plan.wave ? true : s.tick >= secs(L.firstAttack)) && s.tick >= s.peaceUntil;
-  if (due && !mem.attacking && (fighters.length >= waveSize || (wonderRace && fighters.length >= 4) || (plan.allIn && fighters.length >= 12))) {
+  // The low-water strike (#748): a wave (or its reinforcements) ready to march over the flats waits for the tide to bare them.
+  const launch = due && !mem.attacking && (fighters.length >= waveSize || (wonderRace && fighters.length >= 4) || (plan.allIn && fighters.length >= 12));
+  const reinforce = mem.attacking && ready.length >= (plan.allIn ? 1 : 4);
+  const ebb = L.clever && !plan.allIn && !wonderRace && (launch || reinforce) && ebbWait(s, mem, launch ? fighters : ready, enemy);
+  // The wait is counted from when the wave stood ready: one that broke up to do other work starts again.
+  if (!launch && !reinforce && mem.tide) delete mem.tide.wait;
+  if (launch && !ebb) {
     issue({ t: 'move', p: p.id, ids: fighters.map((u) => u.id), x: enemy.x, y: enemy.y, amove: true });
     mem.attacking = true;
     mem.wave++;
     delete mem.prowl; // the band marches with the wave
     return;
   }
-  if (mem.attacking && ready.length >= (plan.allIn ? 1 : 4)) {
+  if (reinforce && !ebb) {
     // Reinforcements join the attack.
     issue({ t: 'move', p: p.id, ids: ready.map((u) => u.id), x: enemy.x, y: enemy.y, amove: true });
     return;

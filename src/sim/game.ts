@@ -735,6 +735,9 @@ export function checksum(s: GameState): number {
   for (const t of s.springs ?? []) mix(t);
   // The tide (#739): the tidal ground and where it stands bared.
   if (s.tidal) for (let i = 0; i < s.tidal.length; i++) if (s.tidal[i]) mix(i * 4 + s.terrain[i] + s.tidal[i] * 0x100000);
+  // Barrages (#748): who raised each causeway, and the ponds behind them.
+  if (s.causewayBy) for (let i = 0; i < s.causewayBy.length; i++) if (s.causewayBy[i]) mix(i * 16 + s.causewayBy[i]);
+  if (s.pond) for (let i = 0; i < s.pond.length; i++) if (s.pond[i]) mix(i + 0xc0000);
   for (const f of s.fallen ?? []) {
     mix(f.owner);
     mix(f.tx);

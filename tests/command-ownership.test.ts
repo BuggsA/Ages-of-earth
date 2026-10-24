@@ -90,6 +90,7 @@ describe('one player never commands another’s people', () => {
       cache: { t: 'cache', p: 1, ids, target: 0 },
       keg: { t: 'keg', p: 1, ids, target: tc.id },
       torch: { t: 'torch', p: 1, ids, tile },
+      kegTile: { t: 'kegTile', p: 1, ids, tile },
       launch: { t: 'launch', p: 1, silo: tc.id, x, y },
       reassign: { t: 'reassign', p: 1, from: 'idle', to: 'wood', n: 5 },
       tiding: { t: 'tiding', p: 1, card: 'traveller', take: true },
