@@ -25,7 +25,7 @@ import { rubbleAt, salvages, strip } from './salvage';
 import { bank, cacheAt, lift } from './caches';
 import { buyLoad } from './oretrade';
 import { atFoot, carriesKegs, kegProblem, layKeg } from './powder';
-import { atTile, kegTileProblem } from './tides';
+import { atTile, kegTileProblem, tideRoute } from './tides';
 import { carriesTorch, ignite, onFire, torchProblem } from './fire';
 import { fieldBoost, wading } from './water';
 import { gardenMul, isField } from './grove';
@@ -81,6 +81,7 @@ export function giveOrder(u: Unit, order: Order, queue = false): void {
 
 export function goTo(u: Unit, goal: Goal): void {
   u.goal = goal;
+  u.tideWait = undefined;
   u.wantPath = true;
   u.path = null;
   u.stuck = 0;
@@ -2298,6 +2299,11 @@ export function routeUnits(s: GameState): void {
   let budget = PATH_BUDGET;
   for (const e of s.ents) {
     if (e.kind !== 'unit' || !e.wantPath || e.hp <= 0 || !e.goal || e.inside) continue;
+    // Waiting on the shore for the tide (#755): its route is worked out again when the wait is up.
+    if (e.tideWait !== undefined) {
+      if (e.tideWait > s.tick) continue;
+      e.tideWait = undefined;
+    }
     if (budget <= 0) break;
     const g = e.goal;
     const team = passOf(s, e);
@@ -2308,11 +2314,13 @@ export function routeUnits(s: GameState): void {
     if (inGoal(Math.floor(g.px), Math.floor(g.py)) && walkable(s, Math.floor(g.px), Math.floor(g.py), team) && lineClear(s, e.x, e.y, g.px, g.py, team)) {
       e.path = [g.px, g.py];
       budget -= 4;
+      budget -= tideRoute(s, e, team, budget);
       continue;
     }
     const r = findRoute(s, e.x, e.y, g, Math.min(12000, Math.max(800, budget)), team);
     budget -= r.cost;
     e.path = r.points.length ? r.points : null;
+    budget -= tideRoute(s, e, team, budget);
   }
 }
 

@@ -1402,6 +1402,14 @@ export const AI_BARRAGE = { reach: 9, line: 10, least: 6, cost: 1, crew: 3 };
 export const AI_EBB = { across: 3, slack: 1.25, margin: 6, hold: 200 };
 
 /**
+ * Routes that read the tide (#755). A land unit's route over the flats is timed against the public tide clock: walking at its pace less
+ * `slack` (its route's length times `slack`), it must find each tidal tile bare from the moment it reaches it until `margin` seconds after
+ * it has crossed it. A route that fails goes round, by a path the tide lets it walk, or waits on the last dry ground before the flats for
+ * the first moment within `hold` seconds it can cross, whichever reaches the goal sooner; with neither, it goes as ordered.
+ */
+export const TIDE_ROUTE = { slack: 1.25, margin: 4, hold: 180 };
+
+/**
  * The breach (#701 s3, the Water Road). Every `every` seconds the sea runs one tile on: each tile of polder four-ways beside water that
  * flows from the open sea (as a mill judges it: a body touching a map edge, or more than `POLDER.most` tiles; a finished dyke holds it,
  * a dyke site does not) floods, all at once, so water let in this step runs on only at the next. A flooded tile is sea again, its corners
