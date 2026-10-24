@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { SoundName } from '../audio/sound';
 import { ageDef, ageOf } from '../sim/ages';
 import { fairground, feastOpen } from '../sim/fair';
-import { AURA, BUILDINGS, KEG, SILO, WARHEADS, RALLY, RITE, SIGNATURES, TICK_HZ, LANDMARKS, RUINS, TRADE, domainOf } from '../sim/data';
+import { AURA, BLOOM, BUILDINGS, KEG, SILO, WARHEADS, RALLY, RITE, SIGNATURES, TICK_HZ, LANDMARKS, RUINS, TRADE, domainOf, secs } from '../sim/data';
 import { buildingMaxHp, statsFor } from '../sim/stats';
 import type { AgeId, BuildingType, CivId, Ent, GameEvent, GameState, Unit } from '../sim/types';
 import type { ScoutFlag } from '../ui/scoutFlags';
@@ -13,6 +13,7 @@ import { graftLast } from '../sim/hemo';
 import { seesRect } from '../sim/vision';
 import { revealed, ringsFor, shownToAll, warnRadius } from '../sim/silo';
 import { MissileView } from './missileView';
+import { rooted } from '../sim/bloom';
 import { BuildingsView } from './buildingsView';
 import { CameraRig } from './camera';
 import { Birds, Effects } from './effects';
@@ -1107,6 +1108,26 @@ export class View {
           } else this.effects.ring(this.ground(s, ev.x, ev.y, 0.15), '#e0a526', 0.9, 0.7);
           break;
         }
+        case 'bloom':
+          // The Age of the Bloom: a puff of seed where a Seed comes down, a burst of bark where it is hacked out, and where it cracks a
+          // town, a great green bloom and splinters, seen through the fog; a pollen storm is a gold haze rising round the Heart Tree.
+          if (ev.what === 'rooted') {
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.2), { count: 24, speed: 1.6, up: 1.2, life: 1.6, size: 0.08, grow: 1.5, gravity: 0.6, drag: 1.1, colors: ['#6b5a40', '#8fc24a', '#d6f07a'] });
+            this.effects.ring(this.ground(s, ev.x, ev.y, 0.15), '#9be05a', BLOOM.r, 1.2);
+            this.cue('bloomRoot', ev.x, ev.y, 1);
+          } else if (ev.what === 'hacked') {
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.4), { count: 20, speed: 1.8, up: 1.4, life: 1.2, size: 0.07, gravity: 1.2, drag: 1, colors: ['#5a4630', '#c8e27a', '#8a6a44'] });
+            this.cue('bloomCut', ev.x, ev.y, 1);
+          } else if (ev.what === 'cracked') {
+            const at = this.ground(s, ev.x, ev.y, 0.5);
+            this.effects.burst(at, { count: 70, speed: 3.4, up: 2.4, life: 2.6, size: 0.12, grow: 2.4, gravity: 0.4, drag: 0.9, colors: ['#3f7a2e', '#7fd84a', '#d6f07a', '#f4f0d8'] });
+            this.effects.burst(at, { count: 40, speed: 2, up: 1, life: 1.6, size: 0.1, gravity: 1.6, drag: 1, colors: ['#8a7a66', '#5a4630', '#b8a890'] });
+            this.effects.ring(at, '#d6f07a', BLOOM.r + 1, 1.8);
+            this.cue('bloomCrack', ev.x, ev.y, 1);
+          } else if (ev.what === 'storm' && this.sees(ev.x, ev.y)) {
+            this.effects.burst(this.ground(s, ev.x, ev.y, 3), { count: 60, speed: 3, up: 0.6, life: 4, size: 0.09, grow: 3, gravity: -0.15, drag: 0.4, soft: true, colors: ['#f4e04a', '#e8d27a', '#fff2a8'] });
+          }
+          break;
         case 'wildwood':
           // The Age of the Wildwood: an Ent tears free of its tree in a burst of bark and leaves, or sinks back into the ground and
           // roots in a puff of earth; a rooted Ent felled drops leaves; the Spreading is a rising swirl of seed round the Heart Tree.
@@ -1440,6 +1461,12 @@ export class View {
           this.effects.burst(this.ground(s, ev.x, ev.y, 0.05), { count: 5, speed: 0.5, up: 0.4, life: 0.8, size: 0.05, gravity: 1.5, drag: 0.6, colors: ['#ffffff', '#cfe8f5'] });
           break;
         }
+        case 'tideAshore': {
+          // Work on the flats that reads the tide (#767): one of yours leaves its work for the shore, a splash of wet sand at its heels.
+          if (ev.owner !== this.viewer || !this.sees(ev.x, ev.y)) break;
+          this.effects.burst(this.ground(s, ev.x, ev.y, 0.05), { count: 4, speed: 0.4, up: 0.35, life: 0.7, size: 0.045, gravity: 1.5, drag: 0.6, colors: ['#cfe8f5', '#a8996f'] });
+          break;
+        }
         case 'milled': {
           // A Tide Mill grinds on the running tide (#739): spray off the wheel, a few coins for its people.
           if (ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;
@@ -1677,6 +1704,14 @@ export class View {
       const own = s.players[this.viewer].team === s.players[l.owner].team;
       const r = (own ? WARHEADS[l.w ?? 'atomic'].r : warnRadius(s, l.owner)) + 0.5;
       for (const g of ringsFor(s, l, this.viewer)) out.push({ x: g.x, y: g.y, r, color: own ? '#ffb03a' : '#ff3a2a', flash: !own && revealed(s, l) });
+    }
+    // Bloom Seeds (the Age of the Bloom) are seen by all: the ring they crack, and once rooted, the heart-root's own small ring to hack
+    // at. Leaf green, pale for the Seed's own side; both flash for its last ten seconds.
+    for (const l of s.blooms ?? []) {
+      const own = s.players[this.viewer].team === s.players[l.owner].team;
+      const flash = s.tick > l.at - secs(10);
+      out.push({ x: l.x, y: l.y, r: BLOOM.r + 0.5, color: own ? '#d6f07a' : '#7fd84a', flash });
+      if (rooted(s, l)) out.push({ x: l.x, y: l.y, r: BLOOM.reach + 0.5, color: '#f4e04a', flash });
     }
     return out;
   }

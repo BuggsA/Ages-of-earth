@@ -9,7 +9,7 @@ import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE, findResource } from '../sim/units';
-import { FIRE, FISSION, HIVE, INTERCEPT, WILDWOOD, AUTO_WORK, BREACH, CANAL, DAM, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, SALVO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE } from '../sim/data';
+import { FIRE, FISSION, HIVE, INTERCEPT, WILDWOOD, BLOOM, AUTO_WORK, BREACH, CANAL, DAM, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, SALVO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -22,6 +22,9 @@ import { basinOf, damIdle, drowned, heldBack, isInund, lets, millIdle, sluiceFed
 import { aground, millShares, tidalNear, tideClock, tideMillIdle } from '../sim/tides';
 import { isPond } from '../sim/tides';
 import { tideWaitLeft } from '../sim/tides';
+import { ashoreLeft, bedClock } from '../sim/tides';
+import { COCKLE } from '../sim/data';
+import { R_COCKLE } from '../sim/types';
 import { RUIN_FINDS, digWork, ruinAt } from '../sim/ruins';
 import { LANDMARK_KINDS, claimWork, claimants, favours, landmarkAt } from '../sim/landmarks';
 import { workProblem } from '../sim/works';
@@ -44,10 +47,11 @@ import { landOwnerAt } from '../sim/borders';
 import { flockCap, flockOf, grazeRange, lambProblem } from '../sim/flocks';
 import { soldAt } from '../sim/ages';
 import { ageDef, ageOf, asleep, crossingLeft, goldenEnds, livesOf, threadsOf, crossingsAhead, keepsakeProblem, leaving, sleepWhy, type Tally, backProblem, buildBarred, canRaise, hasCoils, hasWalked, inField, backTo, barred, deedsProgress, oreClue, oreDone, oreOnly, ironTradeShare, isHire, isSideRoad, journeyOf, mainRoad, pathLine, pathDepth, relicTradeShare, roadKnown, roadProblem, roadsFrom, shutRoads, suspendedTechs, assayed, diggersAt, holdingsOf, holds, keyOf, lacking, opensOf, prospected, trainsAt, windowsOf, leadsOn, leadsTo } from '../sim/ages';
-import type { AgeId, KeyId, RareId, Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Launch, Player, Res, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
+import type { AgeId, BloomSeed, KeyId, RareId, Building, BuildingType, Command, Cost, Ent, GameState, Job, Landmark, Launch, Player, Res, Ruin, Stance, TechId, TradePost, Unit } from '../sim/types';
 import { GROVE_BUILDINGS, grows } from '../sim/grove';
 import { hiveLine, keepsBees } from '../sim/hive';
-import { heartBarred, heartLine, rootProblem, wakesForest } from '../sim/wildwood';
+import { heartBarred, heartLine, heartOf, rootProblem, wakesForest } from '../sim/wildwood';
+import { greenLeft, inBloom, rooted, slingProblem, spireBarred, spireLine } from '../sim/bloom';
 import { KEYS, RARES, RES, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
 import { buildingPicture, unitPicture } from './thumbs';
@@ -81,6 +85,8 @@ export interface HudActions {
   /** Wait for a left click on the map, for this Missile Silo to launch at (#605). */
   /** Aim a launch from this silo: one warhead (`w`, the people's own if absent), or a salvo's three points (#765). */
   launchMode(silo: number, w?: WarheadKind | 'salvo'): void;
+  /** Wait for a left click on the map, for this Seed Spire to sling its Bloom Seed at (the Age of the Bloom). */
+  slingMode(spire: number): void;
   /** Wait for a left click on a building to shelter in (or a transport to board). */
   garrisonMode(): void;
   /** Wait for a left click on a shore to land a transport's passengers. */
@@ -131,6 +137,9 @@ function orderWords(s: GameState, u: Unit): string {
   switch (o.k) {
     case 'gather': {
       const kind = s.res[o.tile];
+      // Cockle beds (#767): the picker reads the tide.
+      if (ashoreLeft(s, u) > 0) return o.phase === 'drop' ? 'Off the flats with the cockles, before the flood' : 'Waiting ashore for the cockle beds to bare';
+      if (kind === R_COCKLE || o.cockle) return o.phase === 'drop' ? 'Carrying cockles home' : o.phase === 'work' ? 'Picking cockles' : 'Going out to the cockle beds';
       if (kind === R_FISH || u.type === 'fisher') return o.phase === 'drop' ? 'Bringing the catch to the dock' : o.phase === 'work' ? 'Fishing' : 'Sailing to the fishing grounds';
       const what = o.res === 'food' ? (kind === R_MEAT ? 'meat' : 'berries') : o.res === 'wood' ? 'wood' : kind === R_BOG || o.bog ? 'bog iron' : o.res;
       if (o.phase === 'drop') return `Carrying ${what} home`;
@@ -146,6 +155,7 @@ function orderWords(s: GameState, u: Unit): string {
       if ((s.byId.get(o.target) as Building | undefined)?.type === 'garden') return o.phase === 'drop' ? 'Carrying the harvest home' : o.phase === 'work' ? 'Tending a Kitchen Garden' : 'Going to the garden';
       return o.phase === 'drop' ? 'Carrying grain home' : o.phase === 'work' ? 'Farming' : 'Going to the fields';
     case 'build': {
+      if (ashoreLeft(s, u) > 0) return 'Waiting ashore for the tide to go out again';
       const target = s.byId.get(o.target);
       if (target?.kind === 'building' && target.built) return u.act === 'build' ? 'Repairing' : 'Going to repair';
       return u.act === 'build' ? 'Building' : 'Going to build';
@@ -313,6 +323,17 @@ const tideSig = (s: GameState): string => {
   const c = tideClock(s);
   return c ? `${c.level}:${Math.ceil(c.next)}` : '';
 };
+
+/** Seconds on a Bloom Seed's clock: until it roots while in the air, then until it cracks. */
+const bloomClock = (s: GameState, l: BloomSeed): number => Math.max(0, Math.ceil(((rooted(s, l) ? l.at : l.lands) - s.tick) / TICK_HZ));
+
+/** What a Bloom Seed in the bar says to this viewer. */
+function seedTip(s: GameState, l: BloomSeed, viewer: number): string {
+  const who = l.owner === viewer ? 'Your' : `${s.players[l.owner].name}'s`;
+  if (!rooted(s, l)) return `${who} Seed is in the air: it roots in ${bloomClock(s, l)} seconds on the open ground nearest the green ring's heart.`;
+  const left = Math.max(0, BLOOM.root - l.cut);
+  return `${who} Seed has rooted: in ${bloomClock(s, l)} seconds every ${l.owner === viewer ? 'rival ' : ''}building within ${BLOOM.r} tiles of its heart-root cracks into forest. ${left} strokes are left to hack it out: each rival citizen beside the root (the yellow ring) strikes once a second.`;
+}
 
 /** The public tide clock (#739), beside the game clock on every screen once the tide has woken: where the sea stands, which way, and when it turns. */
 /**
@@ -819,7 +840,7 @@ export class Hud {
     const age = ageDef(p);
     const idleTechs = suspendedTechs(p).map((t) => TECHS[t].name);
     const scores = s.players.map((q) => scoreOf(s, q));
-    const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${RARES.map((r) => Math.floor(p.rare?.[r] ?? 0)).join(',')}|${Math.floor(bloodOf(p))}|${p.pop}/${p.cap}|${ageOf(p)}|${adv}|${p.way ?? ''}${p.deep ? '+' : ''}${p.vowed ? 'v' : ''}|${idleTechs.length}|${idle}|${speed}|${scores.join(',')}|${isHousehold(p) ? Math.round(taxRate(s, viewer) * 60) : ''}|${p.kegs ?? ''}|${(s.launches ?? []).map((l) => `${l.id}:${clockOf(s, l)}${revealed(s, l) ? '!' : ''}${ringsFor(s, l, viewer).length}`).join(',')}|${tideSig(s)}`;
+    const sig = `${RES.map((r) => Math.floor(p.res[r])).join(',')}|${RARES.map((r) => Math.floor(p.rare?.[r] ?? 0)).join(',')}|${Math.floor(bloodOf(p))}|${p.pop}/${p.cap}|${ageOf(p)}|${adv}|${p.way ?? ''}${p.deep ? '+' : ''}${p.vowed ? 'v' : ''}|${idleTechs.length}|${idle}|${speed}|${scores.join(',')}|${isHousehold(p) ? Math.round(taxRate(s, viewer) * 60) : ''}|${p.kegs ?? ''}|${(s.launches ?? []).map((l) => `${l.id}:${clockOf(s, l)}${revealed(s, l) ? '!' : ''}${ringsFor(s, l, viewer).length}`).join(',')}|${(s.blooms ?? []).map((l) => `${l.id}:${bloomClock(s, l)}:${l.cut}`).join(',')}|${tideSig(s)}`;
     const sn = seasonOf(s);
     const tide = tideChip(s);
     this.clockEl.textContent = `${sn.icon} ${fmtTime(s.tick)}${tide ? `  ${tide.text}` : ''}`;
@@ -835,6 +856,7 @@ export class Hud {
         .map((r) => `<div class="res" data-tip="<b>${RARE[r].name}</b>${RARE[r].blurb} Mined from deep veins that only some worlds hold.">${RARE_ICON[r]}${Math.floor(p.rare![r]!)}</div>`)
         .join('') +
       (p.blood !== undefined ? `<div class="res" data-tip="<b>Blood</b>Drawn at Drain Rigs from the enemy who fall near them, and from citizens given to the levy. Spent to raise Blood Towers, and at Transfusion Stations to graft soldiers. In Hemocraft the rigs also bleed the living enemy who stand near them; in the Blood-rite every Temple draws as a rig does, and spends blood to mend your own.">🩸${Math.floor(bloodOf(p))}</div>` : '') +
+      (s.blooms ?? []).map((l) => `<div class="res" data-tip="<b>Bloom Seed</b>${seedTip(s, l, viewer)}">🌱 ${s.players[l.owner].name} ${bloomClock(s, l)}s</div>`).join('') +
       (s.launches ?? []).map((l) => `<div class="res" data-tip="<b>Warhead in the air</b>${warnTip(s, l, viewer)}">☢ ${s.players[l.owner].name} ${clockOf(s, l)}s${s.players[viewer].team !== s.players[l.owner].team && !revealed(s, l) ? ` · ${ringsFor(s, l, viewer).length} rings` : ''}</div>`).join('') +
       (p.kegs !== undefined || mills(p) || sappers(p) ? `<div class="res" data-tip="<b>Powder kegs</b>Ground from saltpetre at the Siege Workshops in the Age of Alchemy, ${KEG.ore} a keg, up to ${KEG.most} in store. In the Age of Sappers citizens and foot soldiers lay them at a rival building (K): ${KEG.fuse} seconds later each blows, wrecking every rival building within ${KEG.reach} tiles, unless a rival reaches it first and stamps it out.${mills(p) ? `<br>${millProblem(s, p) ?? `The mills grind: next keg in ${Math.max(0, Math.ceil((KEG.time - (p.grind ?? 0)) / Math.max(1, millsOf(s, viewer).length)))}s.`}` : ''}">🧨${kegsOf(p)}</div>` : '') +
       `<div class="res pop ${p.pop >= p.cap ? 'full' : ''}" data-tip="<b>Population</b>People and soldiers you have, and room for. Houses add 5 each, a Town Center 10 (150 at most).">${icon('pop')}${p.pop}/${p.cap}</div>`;
@@ -903,6 +925,15 @@ export class Hud {
       const focus = shrine ? ` data-focus="${shrine.x},${shrine.y}"` : '';
       parts.push(`<div class="timer ${ours ? 'good' : 'bad'}"${focus}>⚱ ${who} every relic: ${fmtTime(s.relicTimer)}${ours ? '' : ' (take one back!)'}</div>`);
     }
+    // The Greening (the Age of the Bloom): a people holding its land green has this long left, on every screen, as a Wonder's clock.
+    for (const q of s.players) {
+      const left = greenLeft(s, q);
+      if (left === null || q.defeated) continue;
+      const ours = q.team === s.players[viewer].team;
+      const heart = heartOf(s, q.id);
+      const focus = heart ? ` data-focus="${heart.x},${heart.y}"` : '';
+      parts.push(`<div class="timer ${ours ? 'good' : 'bad'}"${focus} data-tip="<b>The Greening</b>${q.id === viewer ? 'Your' : `${q.name}'s`} land is ${((q.green ?? 0) / 10).toFixed(1)}% green (trees, Orchards, the Heart Tree and Thornwalls grown to living oak), over the ${BLOOM.green * 100}% needed. Held for ${BLOOM.hold / 60} minutes with the Heart Tree standing, it wins the match. Fell and burn the woods in that land, or fell the Heart Tree, to stop it."><span class="swatch" style="background:${q.color}"></span>🌿 ${q.id === viewer ? 'Your' : `${q.name}'s`} Greening: ${fmtTime(secs(left))}${ours ? '' : ' (burn their woods!)'}</div>`);
+    }
     if ((s.landTeam ?? -1) >= 0 && (s.landTimer ?? -1) >= 0) {
       const ours = s.landTeam === s.players[viewer].team;
       const keepers = s.players.filter((q) => q.team === s.landTeam);
@@ -931,12 +962,15 @@ export class Hud {
     else if (post) [html, sig] = this.postPanel(s, viewer, post);
     else if (!ents.length && tile !== null && s.res[tile]) {
       const kind = s.res[tile];
-      const name = kind === R_TREE ? 'Tree' : kind === R_BERRY ? 'Berry bush' : kind === R_MEAT ? (s.amount[tile] > BOAR.meat ? 'Mammoth carcass' : s.amount[tile] > AMOUNT.meat ? 'Boar carcass' : 'Carcass') + (s.carcasses?.some((c) => c.tile === tile && s.tick - c.born >= secs(ROT.grace)) ? ' (spoiling)' : '') : kind === R_FISH ? 'Fish shoal' : kind === R_GOLD ? 'Gold mine' : kind === R_BOG ? 'Bog iron' : kind === R_SALT || kind === R_SALTPETRE || kind === R_BLOODIRON ? (s.caves?.some((c) => c.tile === tile) ? `${RARE[RARE_OF_TILE[kind]].name} cave` : `${RARE[RARE_OF_TILE[kind]].name} vein`) : 'Stone quarry';
-      const res = RARE_OF_TILE[kind] ? 'stone' : kind === R_TREE ? 'wood' : kind === R_BERRY || kind === R_MEAT || kind === R_FISH ? 'food' : kind === R_GOLD || kind === R_BOG ? 'gold' : 'stone';
-      sig = `res:${tile}:${s.amount[tile]}`;
-      html = `<div class="sel-portrait"><span style="font-size:54px">${kind === R_TREE ? '🌳' : kind === R_BERRY ? '🫐' : kind === R_MEAT ? '🍖' : kind === R_FISH ? '🐟' : kind === R_GOLD ? icon('gold', 64) : kind === R_BOG ? '🟤' : RARE_OF_TILE[kind] ? RARE_ICON[RARE_OF_TILE[kind]] : icon('stone', 64)}</span></div>
+      const name = kind === R_COCKLE ? 'Cockle bed' : kind === R_TREE ? 'Tree' : kind === R_BERRY ? 'Berry bush' : kind === R_MEAT ? (s.amount[tile] > BOAR.meat ? 'Mammoth carcass' : s.amount[tile] > AMOUNT.meat ? 'Boar carcass' : 'Carcass') + (s.carcasses?.some((c) => c.tile === tile && s.tick - c.born >= secs(ROT.grace)) ? ' (spoiling)' : '') : kind === R_FISH ? 'Fish shoal' : kind === R_GOLD ? 'Gold mine' : kind === R_BOG ? 'Bog iron' : kind === R_SALT || kind === R_SALTPETRE || kind === R_BLOODIRON ? (s.caves?.some((c) => c.tile === tile) ? `${RARE[RARE_OF_TILE[kind]].name} cave` : `${RARE[RARE_OF_TILE[kind]].name} vein`) : 'Stone quarry';
+      const res = RARE_OF_TILE[kind] ? 'stone' : kind === R_TREE ? 'wood' : kind === R_BERRY || kind === R_MEAT || kind === R_FISH || kind === R_COCKLE ? 'food' : kind === R_GOLD || kind === R_BOG ? 'gold' : 'stone';
+      // A cockle bed (#767) tells its tide: bared for so long, or under water until so long.
+      const bed = kind === R_COCKLE ? bedClock(s, tile) : null;
+      const bedLine = !bed ? '' : bed.pond ? 'Shut in a barrage\'s pond, it stays under water: no one picks it until the barrage is breached.' : bed.bare ? `Bared by the tide for ${Math.ceil(bed.secs)}s more. Select citizens and right-click it to pick; they come ashore before the flood, and go back at the next low water.` : `Under water: the tide bares it in ${Math.ceil(bed.secs)}s. Citizens sent to it wait ashore until then.`;
+      sig = `res:${tile}:${s.amount[tile]}:${bed ? Math.ceil(bed.secs) : ''}`;
+      html = `<div class="sel-portrait"><span style="font-size:54px">${kind === R_COCKLE ? '🐚' : kind === R_TREE ? '🌳' : kind === R_BERRY ? '🫐' : kind === R_MEAT ? '🍖' : kind === R_FISH ? '🐟' : kind === R_GOLD ? icon('gold', 64) : kind === R_BOG ? '🟤' : RARE_OF_TILE[kind] ? RARE_ICON[RARE_OF_TILE[kind]] : icon('stone', 64)}</span></div>
         <div class="sel-info"><div class="sel-name">${name}</div><div class="stats"><span>${icon(res as 'wood')}${s.amount[tile]} left</span></div>
-        <div class="blurb">${kind === R_FISH ? 'Select fishing boats (from a Dock) and right-click it to fish.' : RARE_OF_TILE[kind] ? `${RARE[RARE_OF_TILE[kind]].blurb} Only some worlds hold it.${s.caves?.some((c) => c.tile === tile && c.den) ? ' Wolves lair here.' : ''} Select citizens and right-click it to mine; it is kept apart from your other stores.` : kind === R_BOG ? 'Rust-red ore in the wetland mud, smelted into iron bars and paid in as gold. Digging it opens the Iron Age, in the Stone Age, to a people whose Prospector\'s Lodge has found it.' : 'Select citizens and right-click it to gather.'}</div></div>`;
+        <div class="blurb">${bed ? `Cockles in the wet sand of the deeper flats, picked by hand as the tide runs low. Each high water brings ${COCKLE.regrow} back, up to ${COCKLE.amount}, to a bed open to the sea. ${bedLine}` : kind === R_FISH ? 'Select fishing boats (from a Dock) and right-click it to fish.' : RARE_OF_TILE[kind] ? `${RARE[RARE_OF_TILE[kind]].blurb} Only some worlds hold it.${s.caves?.some((c) => c.tile === tile && c.den) ? ' Wolves lair here.' : ''} Select citizens and right-click it to mine; it is kept apart from your other stores.` : kind === R_BOG ? 'Rust-red ore in the wetland mud, smelted into iron bars and paid in as gold. Digging it opens the Iron Age, in the Stone Age, to a people whose Prospector\'s Lodge has found it.' : 'Select citizens and right-click it to gather.'}</div></div>`;
     } else if (!ents.length) {
       const p = s.players[viewer];
       // A Golden Age (#703) counts down here, with what it weaves.
@@ -1093,6 +1127,9 @@ export class Hud {
         : '';
     // Routes that read the tide (#755): waiting on the shore for the flats to bare.
     const ebbLeft = Math.ceil(tideWaitLeft(s, u));
+    // Work on the flats that reads the tide (#767): stepped ashore before the flood, back when its ground bares.
+    const ashoreSecs = Math.ceil(ashoreLeft(s, u));
+    const ashore = ashoreSecs && !ebbLeft ? `<span data-tip="<b>Ashore for the tide</b>${mine ? 'It' : 'This one'} was working out on the flats and came ashore before the water could cover them. It goes back to its work in ${ashoreSecs}s, when the ground bares again. A new order ends the wait.">🌊<em>Ashore</em> ${ashoreSecs}s</span>` : '';
     const ebb = ebbLeft ? `<span data-tip="<b>Waiting for the tide</b>The way ${mine ? 'you sent it' : 'it was sent'} runs over tidal flats the sea would cover before it was across, and there is no quicker way round. It waits on the shore and sets out in ${ebbLeft}s, when the flats it needs stand bare until it is over.">🌊<em>Tide</em> ${ebbLeft}s</span>` : '';
     // Military Orders (#355 s6): a soldier with one of its priests at hand is sworn.
     const isSworn = sworn(s, u);
@@ -1124,7 +1161,7 @@ export class Hud {
           <span data-tip="<b>Armor</b>Melee / missile armor: taken off every blow or shot.">🛡<em>Armor</em> ${st.armor}/${st.parmor}</span>
           ${st.range ? `<span data-tip="<b>Range</b>How far it shoots, in tiles.">🏹<em>Range</em> ${st.range}</span>` : ''}
           <span data-tip="<b>Speed</b>Tiles per second.">👣<em>Speed</em> ${Math.round(st.speed * 100) / 100}</span>
-          ${carry}${cargo}${load}${stance}${vet}${line}${aura}${graft}${oath}${sword}${pack}${curse}${sting}${bond}${held}${trip}${caravan}${tribute}${toll}${ebb}
+          ${carry}${cargo}${load}${stance}${vet}${line}${aura}${graft}${oath}${sword}${pack}${curse}${sting}${bond}${held}${trip}${caravan}${tribute}${toll}${ebb}${ashore}
         </div>
         <div class="blurb">${st.blurb}</div>
       </div>`;
@@ -1179,7 +1216,11 @@ export class Hud {
       status = `Caught ${catchIn(b)} / ${cap} food${catchIn(b) >= cap ? ' (full: it catches no more)' : ''} · ${trees} trees round it: ${perMin} a minute${trees < full ? ` (best with ${full})` : ''}${seasonAt(s) === 3 ? ', winter-hungry' : ''} · ${tended ? 'the line is walked' : 'nobody walks the line'}`;
     } else if (b.type === 'heart' && b.built) {
       // The Age of the Wildwood: its Ents awake and rooted, and whether a tree stands near to wake.
-      status = `<span data-tip="<b>${BUILDINGS.heart.name}</b>Train an Ent here and the old tree nearest it within ${WILDWOOD.wake} tiles wakes. While it stands, your rooted Ents wake when a rival comes within ${WILDWOOD.rouse} tiles, and ${WILDWOOD.spreadAt} seconds into each spring your woods within ${WILDWOOD.spread} tiles seed the bare ground beside them in your land. If it falls, every Ent roots where it stands and sleeps.">🌳 ${heartLine(s, b)}</span>`;
+      const greening = b.owner === viewer && inBloom(p) ? ` · <span data-tip="<b>The Greening</b>Trees, Orchards, this Heart Tree and Thornwalls grown to living oak count green, as a share of your land's open ground (counted as at least ${BLOOM.least} tiles). At ${BLOOM.green * 100}% with the Heart Tree standing, a ${BLOOM.hold / 60} minute clock starts that every player sees; when it runs out, you win.">🌿 ${((p.green ?? 0) / 10).toFixed(1)}% of ${BLOOM.green * 100}% green</span>` : '';
+      status = `<span data-tip="<b>${BUILDINGS.heart.name}</b>Train an Ent here and the old tree nearest it within ${WILDWOOD.wake} tiles wakes. While it stands, your rooted Ents wake when a rival comes within ${WILDWOOD.rouse} tiles, and ${WILDWOOD.spreadAt} seconds into each spring your woods within ${WILDWOOD.spread} tiles seed the bare ground beside them in your land. If it falls, every Ent roots where it stands and sleeps.">🌳 ${heartLine(s, b)}</span>${greening}`;
+    } else if (b.type === 'spire' && b.built) {
+      // The Age of the Bloom: how long until its Seed is ripe, and whether the Heart Tree feeds it.
+      status = `<span data-tip="<b>${BUILDINGS.spire.name}</b>While your Heart Tree stands it ripens a Bloom Seed every ${BLOOM.ripen} seconds, one at a time. Sling it (G) at any point on the map for ${Object.entries(BLOOM.fuel).map(([r, n]) => `${n} ${r}`).join(', ')}: ${BLOOM.flight} seconds later it roots on open ground there, and ${BLOOM.grow} seconds after that every rival building within ${BLOOM.r} tiles of its heart-root cracks into forest, unless their citizens hack the root out (${BLOOM.root} strokes, one a second for each citizen beside it).">🌱 ${spireLine(s, b)}</span>`;
     } else if (b.type === 'hive' && b.built) {
       // The Age of the Hive: whether its bees are awake, what it pays, and whether it pollinates.
       status = `<span data-tip="<b>${BUILDINGS.hive.name}</b>Awake, its bees sting any rival standing in a wood within ${HIVE.reach} tiles. It pays honey (food), or mead (gold) while one of your Markets stands within ${HIVE.market} tiles, and in summer doubles your Kitchen Gardens within ${HIVE.bloom} tiles. Bees sleep in winter; a fire within ${HIVE.smoke} tiles smokes them quiet for ${HIVE.quiet} seconds.">🐝 ${hiveLine(s, b)}</span>`;
@@ -1364,8 +1405,9 @@ export class Hud {
         if (GROVE_BUILDINGS.includes(type) && !grows(p)) continue;
         if (type === 'hive' && !keepsBees(p)) continue;
         if (type === 'heart' && !wakesForest(p)) continue;
+        if (type === 'spire' && !hasWalked(p, 'bloom')) continue;
         const locked = def.epoch > p.epoch;
-        const no = buildBarred(p, type) ?? wayBarred(s, p, type) ?? heartBarred(s, viewer, type);
+        const no = buildBarred(p, type) ?? wayBarred(s, p, type) ?? heartBarred(s, viewer, type) ?? spireBarred(s, viewer, type);
         const cost = buildingCostFor(s, viewer, type);
         const short = shortfall(p, cost) ?? bloodShort(p, type);
         const wonderUp = type === 'wonder' && s.ents.some((e) => e.kind === 'building' && e.owner === viewer && e.type === 'wonder');
@@ -1790,6 +1832,11 @@ export class Hud {
           const why = salvoProblem(s, viewer);
           const plain = r.w === 'atomic' ? ` A plain Atomic people pays ${Math.round(SALVO.surcharge * 100)}% more fuel on each; past the fork the silos share a clock for the plain price.` : '';
           cmds.push({ key: 'B', pic: '', glyph: '☄', title: 'Salvo', desc: `Then click ${SALVO.trio} points on the map, at least ${SILO.apart} tiles apart: this silo and your next ${SALVO.trio - 1} standing silos fire one Atomic warhead each, ${SALVO.trio} from your store, on your ${r.fuse} second clock. Each point takes the Atomic blast (${WARHEADS.atomic.peak.toLocaleString('en')} at the centre, ${WARHEADS.atomic.r} tiles out) and its fallout. Rivals see three rings, as for one warhead and two decoys, and learn all three are real only in the last ${SILO.reveal} seconds. Each silo destroyed before then scrubs its own warhead and its ring; the others fly on. Needs Launch Control and ${SALVO.trio} standing silos.${plain}`, cost: salvoFuel(p), ok: !why, why: why ?? undefined, run: () => this.act.launchMode(b.id, 'salvo') });
+        }
+        // The Age of the Bloom: a Seed Spire slings its ripe Seed at a point, and the whole map watches it root.
+        if (b.type === 'spire') {
+          const why = slingProblem(s, viewer, b, b.x, b.y);
+          cmds.push({ key: 'G', pic: '', glyph: '🌱', title: 'Sling Seed', desc: `Then click anywhere on the map: the Bloom Seed flies ${BLOOM.flight} seconds, every player seeing where it falls, and roots on the open ground nearest that point. ${BLOOM.grow} seconds later every rival building within ${BLOOM.r} tiles of its heart-root cracks, and forest grows where they stood, unless rival citizens beside the root hack it out first (${BLOOM.root} strokes, one a second for each). Guard it. The next Seed ripens ${BLOOM.ripen} seconds after, while your Heart Tree stands.`, cost: BLOOM.fuel, ok: !why, why: why ?? undefined, run: () => this.act.slingMode(b.id) });
         }
         // The seam a Mine Shaft digs (#681).
         if (b.type === 'shaft') {

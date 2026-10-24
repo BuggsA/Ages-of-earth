@@ -37,6 +37,7 @@ import { canHit, isEnemy, maxHp, pay, placeBuilding, refund } from './world';
 import { fightsBeasts } from './animals';
 import { tameProblem } from './tame';
 import { heartBarred, rootEnt, rootProblem } from './wildwood';
+import { sling, slingProblem, spireBarred } from './bloom';
 import { isField } from './grove';
 import { answerTiding, tidingProblem } from './tidings';
 import { sluiceProblem } from './water';
@@ -187,7 +188,7 @@ function placeSite(s: GameState, p: number, type: BuildingType, tx: number, ty: 
     if (!quiet) refuse(s, p, `Needs the ${EPOCHS[def.epoch].name}`);
     return null;
   }
-  const no = buildBarred(player, type) ?? wayBarred(s, player, type) ?? siloLimit(s, p, type) ?? heartBarred(s, p, type);
+  const no = buildBarred(player, type) ?? wayBarred(s, player, type) ?? siloLimit(s, p, type) ?? heartBarred(s, p, type) ?? spireBarred(s, p, type);
   if (no) {
     if (!quiet) refuse(s, p, no);
     return null;
@@ -799,6 +800,14 @@ export function applyCommand(s: GameState, c: Command): void {
         if (!why) rootEnt(s, u);
       }
       if (why) refuse(s, c.p, why);
+      break;
+    }
+    case 'sling': {
+      // The Age of the Bloom: a Seed Spire slings its ripe Seed at a point.
+      const b = s.byId.get(c.spire);
+      const why = slingProblem(s, c.p, b, c.x, c.y);
+      if (why) refuse(s, c.p, why);
+      else sling(s, c.p, b as Building, c.x, c.y);
       break;
     }
     case 'pitch': {
