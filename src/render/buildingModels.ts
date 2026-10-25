@@ -2054,8 +2054,8 @@ function wheelyard(k: Kit, _e: number, st: Style): void {
   k.cyl(0.2, 0.2, 0.06, 10, IRON, 0.7, 0.11, -0.3);
 }
 
-/** A Lighthouse (#727, the Age of Sail): a tall banded tower on a rocky headland, a railed gallery under a fire basket, a keeper's hut, a coil of rope and an anchor. */
-function lighthouse(k: Kit, _e: number, st: Style): void {
+/** A Pharos (#727, the Age of Sail): a tall banded tower on a rocky headland, a railed gallery under a fire basket, a keeper's hut, a coil of rope and an anchor. */
+function pharos(k: Kit, _e: number, st: Style): void {
   const STONE = '#c9c2b0';
   const BAND = '#a8403a';
   const DARK = '#4a3322';
@@ -2973,7 +2973,7 @@ const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' |
   heart: (k) => heart(k),
   spire: (k) => spire(k),
   greatden,
-  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, battery, windmill, bloomery, stockade, gallery, hirehall, standard, strand, wheelyard, lighthouse,
+  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, battery, windmill, bloomery, stockade, gallery, hirehall, standard, strand, wheelyard, pharos,
   // The Age of Tides (#739), drawn in `tideModels.ts`.
   tidemill: (k: Kit, _e: number, st: Style) => tidemill(k, st.base),
   cockler: (k: Kit, _e: number, st: Style) => cocklerHut(k, st.base),

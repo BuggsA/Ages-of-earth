@@ -1626,8 +1626,8 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 **Why I love it:** it gives the wall-less age a place to *be*, and a thing to burn.
 **Next:** the computer pulling hurt riders back to it, a chariot mended faster with bog iron, a drawn button glyph.
 
-## Designers' notes: the Lighthouse (#727, 2026-10-25, chain 1025-1752 s6)
+## Designers' notes: the Pharos (#727, 2026-10-25, chain 1025-1752 s6)
 
-**Built:** the Age of Sail's own building. Convoys needed a warship tied to every cog; a lit Lighthouse by the far port escorts for it (+20% gold within 8 tiles), so the fleet can go hunting prizes instead. The computer lights one by its busiest port.
+**Built:** the Age of Sail's own building. Convoys needed a warship tied to every cog; a lit Pharos by the far port escorts for it (+20% gold within 8 tiles), so the fleet can go hunting prizes instead. The computer lights one by its busiest port.
 **Why I love it:** it turns "the fleet is the wall" into a choice: stand a tower on the headland, or keep ships beside the cogs. And a rival raider has a fixed target to burn.
 **Next:** the beacon revealing rival ships through fog at night, the computer sending its fleet raiding once the lamp is lit, a drawn button glyph.

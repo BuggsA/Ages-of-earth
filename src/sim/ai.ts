@@ -63,7 +63,7 @@ import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
 import { AI_TEMPER, ROUTES, TRUNK, type RouteId } from './data';
-import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS, STOCKADE, AI_STOCKADE, GALLERY, AI_STANDARD, BORDERS, STRAND, AI_YARD, AI_LIGHT } from './data';
+import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS, STOCKADE, AI_STOCKADE, GALLERY, AI_STANDARD, BORDERS, STRAND, AI_YARD, AI_PHAROS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
@@ -144,7 +144,7 @@ const TECH_ORDER: TechId[] = [
   'bellFoundry', 'ironHulls', 'jointStock', 'masonsLodge', 'stElmo', 'telegraphy', 'galvanic', 'galvanicBlood', 'militaryOrders',
   'plow', 'drying', 'hounds', 'axes', 'wheelbarrow', 'picks', 'forging', 'bloomery', 'scaleArmor', 'fletching', 'husbandry', 'irrigation', 'saws', 'shafts', 'handcart',
   'ironCasting', 'chainMail', 'bodkin', 'masonry', 'theology', 'conscription', 'blastFurnace', 'plateArmor', 'chemistry', 'blackPowder', 'saltCuring', 'bloodForged',
-  'gillnets', 'shipwright', 'lighthouse', 'steamEngine', 'rifling', 'aviation', 'caravan', 'banking', 'pilgrimage', 'credit', 'ropewalk', 'litany',
+  'gillnets', 'shipwright', 'pharos', 'steamEngine', 'rifling', 'aviation', 'caravan', 'banking', 'pilgrimage', 'credit', 'ropewalk', 'litany',
 ];
 /** Seconds a computer keeps its traders off a road after losing one on it. */
 const TRADER_WARY = 240;
@@ -461,7 +461,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   raiseStandard(s, v, mem, issue);
   raiseStrand(s, v, mem, issue);
   raiseYard(s, v, mem, issue);
-  raiseLighthouse(s, v, mem, issue);
+  raisePharos(s, v, mem, issue);
   salvage(s, v, mem, issue);
   claimWalk(s, v, mem, issue);
   findWalk(s, v, mem, issue);
@@ -3495,7 +3495,9 @@ function huntTheYear(s: GameState, v: View, issue: (c: Command) => void): void {
   // back to the woodpile until the field is clear, and no hunter is sent after such game.
   const foes: Unit[] = [];
   for (const e of s.ents) if (e.kind === 'unit' && e.hp > 0 && !e.inside && e.type !== 'citizen' && e.type !== 'trader' && isEnemy(s, v.p.id, e.owner)) foes.push(e);
-  const shy = AI_WINTER.shy * AI_WINTER.shy;
+  // A starving town takes its chances: the siege at the yard's edge is no reason to let the people starve (#851).
+  const reach = v.p.res.food < AI_WINTER.hungry ? AI_WINTER.shyHungry : AI_WINTER.shy;
+  const shy = reach * reach;
   const unsafe = (x: number, y: number) => foes.some((f) => (f.x - x) * (f.x - x) + (f.y - y) * (f.y - y) < shy);
   let hunting = 0;
   for (const u of v.citizens) {
@@ -5842,17 +5844,17 @@ function raiseYard(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
 }
 
 /**
- * The Age of Sail's Lighthouse (#727): a computer with cogs at sea raises one on the shore within `AI_LIGHT.shore` tiles of the port
+ * The Age of Sail's Pharos (#727): a computer with cogs at sea raises one on the shore within `AI_PHAROS.shore` tiles of the port
  * where most of its cogs load, one at a time, so they sail in convoy even when the escort is away.
  */
-function raiseLighthouse(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+function raisePharos(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
-  if (!ageDef(p).convoys || buildBarred(p, 'lighthouse') || count(v, 'lighthouse') > 0 || count(v, 'dock') === 0) return;
-  if (s.tick - (mem.ordered.lighthouse ?? -99999) < secs(60)) return;
+  if (!ageDef(p).convoys || buildBarred(p, 'pharos') || count(v, 'pharos') > 0 || count(v, 'dock') === 0) return;
+  if (s.tick - (mem.ordered.pharos ?? -99999) < secs(60)) return;
   const port = convoyPort(s, v);
   if (!port) return;
-  const spot = findSpot(s, 'lighthouse', port.x, port.y, 0, AI_LIGHT.shore, 0);
-  if (spot) construct(s, v, mem, 'lighthouse', spot, 2, issue);
+  const spot = findSpot(s, 'pharos', port.x, port.y, 0, AI_PHAROS.shore, 0);
+  if (spot) construct(s, v, mem, 'pharos', spot, 2, issue);
 }
 
 function raidShips(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {

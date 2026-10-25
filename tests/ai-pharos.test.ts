@@ -4,9 +4,9 @@ import { createGame, step } from '../src/sim/game';
 import { placeProblem } from '../src/sim/grid';
 import { placeBuilding, spawnUnit } from '../src/sim/world';
 
-/** The computer in the Age of Sail raises a Lighthouse by the port its cogs load at (#727). */
+/** The computer in the Age of Sail raises a Pharos by the port its cogs load at (#727). */
 
-describe('the computer and the Lighthouse (#727)', () => {
+describe('the computer and the Pharos (#727)', () => {
   it('raises one by the port its cogs load at, and only one', () => {
     const s = createGame({ seed: 2, size: 'small', mapType: 'lakes', players: [{ name: 'A', ai: 'hard', civ: 'britons' }, { name: 'B', ai: null, civ: 'britons' }] });
     s.peaceUntil = 1e9;
@@ -28,7 +28,7 @@ describe('the computer and the Lighthouse (#727)', () => {
     spawnUnit(s, 0, 'cog', dock.x, dock.y + 2);
     for (let i = 0; i < 20; i++) spawnUnit(s, 0, 'citizen', p.startX - 3 + (i % 6), p.startY + 4 + Math.floor(i / 6));
     for (let i = 0; i < secs(120); i++) step(s);
-    const lamps = () => s.ents.filter((e) => e.kind === 'building' && e.type === 'lighthouse' && e.owner === 0);
+    const lamps = () => s.ents.filter((e) => e.kind === 'building' && e.type === 'pharos' && e.owner === 0);
     expect(lamps().length).toBe(1);
     for (let i = 0; i < secs(120); i++) step(s);
     expect(lamps().length).toBe(1);

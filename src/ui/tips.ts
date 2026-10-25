@@ -4,7 +4,7 @@ import { AI_GATE_ANSWER } from '../sim/data';
 import { AI_GATE_READ } from '../sim/data';
 import { gateReach } from '../sim/tides';
 import { isEnemy } from '../sim/world';
-import { AGES, BLOOM, LEVIATHANS, MYCELIUM, UNITS, BLOOMERY, HIREHALL, HIVE, INTERCEPT, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, BEGGARS, SEA_RAID, SPOILS, GALLERY, STANDARD, STRAND, WHEELYARD, LIGHTHOUSE, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
+import { AGES, BLOOM, LEVIATHANS, MYCELIUM, UNITS, BLOOMERY, HIREHALL, HIVE, INTERCEPT, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, BEGGARS, SEA_RAID, SPOILS, GALLERY, STANDARD, STRAND, WHEELYARD, PHAROS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
 import { battlesFor } from '../sim/battles';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, findsOf, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
@@ -363,9 +363,9 @@ const TIPS: Tip[] = [
     text: `A ship must sail home to a Dock to bank its hold. Raise a <b>${BUILDINGS.strand.name}</b> (<b>Y</b>) on a far shore instead: a ship within ${SEA_RAID.dock} tiles of it banks there at once, but the jarl keeps a quarter (${Math.round(STRAND.cut * 100)}% reaches you). It also musters foot soldiers on the spot. A rival can raze it, so guard the beach.`,
   },
   {
-    id: 'lighthouse',
+    id: 'pharos',
     when: (s, me) => ageOf(s.players[me]) === 'sail',
-    text: `A merchant ship needs a warship beside it to sail in convoy. Raise a <b>${BUILDINGS.lighthouse.name}</b> (<b>L</b>) on the shore by the port where your cogs load: any ship loading within ${LIGHTHOUSE.reach} tiles of it sails escorted (+${Math.round((LIGHTHOUSE.pay - 1) * 100)}% gold), so the fleet can go hunting prizes. A rival raider will look for it, so guard the headland.`,
+    text: `A merchant ship needs a warship beside it to sail in convoy. Raise a <b>${BUILDINGS.pharos.name}</b> (<b>L</b>) on the shore by the port where your cogs load: any ship loading within ${PHAROS.reach} tiles of it sails escorted (+${Math.round((PHAROS.pay - 1) * 100)}% gold), so the fleet can go hunting prizes. A rival raider will look for it, so guard the headland.`,
   },
   {
     id: 'wheelyard',

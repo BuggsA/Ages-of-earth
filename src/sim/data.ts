@@ -2259,12 +2259,12 @@ export const FAIR = { every: 240, open: 60, reach: 12, pay: 1.5, purse: 150, lis
  */
 export const CONVOY = { reach: 6, pay: 1.4 };
 /**
- * The Lighthouse (#727, the Age of Sail): a merchant ship that loads within `reach` tiles of a finished one of its team's, with no
+ * The Pharos (#727, the Age of Sail): a merchant ship that loads within `reach` tiles of a finished one of its team's, with no
  * warship beside it, still sails in convoy at `pay` times the gold (a warship's escort, `CONVOY`, pays more and the better applies).
- * The computer raises one on the shore within `shore` tiles of the port where most of its cogs load (`AI_LIGHT`).
+ * The computer raises one on the shore within `shore` tiles of the port where most of its cogs load (`AI_PHAROS`).
  */
-export const LIGHTHOUSE = { reach: 8, pay: 1.2 };
-export const AI_LIGHT = { shore: 8 };
+export const PHAROS = { reach: 8, pay: 1.2 };
+export const AI_PHAROS = { shore: 8 };
 /** Prize money (the Age of Sail): a merchant ship sunk by a people in the Age of Sail gives the sinker `share` of the gold it carried. */
 export const PRIZE = { share: 0.5 };
 /**
@@ -2790,7 +2790,7 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   standard: { name: 'Horsetail Standard', size: 1, hp: 500, cost: { wood: 80, stone: 30 }, time: 20, pop: 0, sight: 7, trains: [], drop: [], epoch: 2, ages: ['horde'], menu: 'mil', key: 'Z', blurb: 'A tall pole hung with horse-tails and the khan\'s banner, planted where the horde means to be paid. Riders who stand within 5 tiles of it take tribute from the nearest rival whose land lies within 8 tiles of it, as though they stood in that land: the horde can wait at the border, out of reach of the Town Center\'s arrows, and still be paid. Only in the Age of the Horde. Kept (J) when your people leaves it, it goes on drawing tribute from a rival\'s border, on any road. Cut it down and the horde must ride into the rival\'s land again.' },
   strand: { name: 'Raiders\' Strand', size: 2, hp: 700, cost: { wood: 100, stone: 30 }, time: 25, pop: 0, sight: 7, trains: ['infantry'], drop: [], epoch: 2, shore: true, ages: ['searaider'], menu: 'mil', key: 'Y', blurb: 'A longship hauled up on a far beach, roofed over with sailcloth and ringed with stakes: the raiders\' camp ashore. A ship that comes within 6 tiles of it banks its hold on the spot, so the fleet need not sail home to a Dock between raids, but the jarl keeps a quarter (75% reaches your coffers, against the whole hold at a Dock). Foot soldiers can be mustered here, on the shore where they are wanted. Only in the Age of Sea-Raiders, on a shore in your own land or no one\'s. It sleeps when your people leaves the age, and a rival who razes it ends the shortcut.' },
   wheelyard: { name: 'Wheelwright\'s Yard', size: 2, hp: 700, cost: { wood: 90, stone: 30 }, time: 22, pop: 0, sight: 6, trains: [], drop: [], epoch: 1, ages: ['chariots'], menu: 'mil', key: 'N', blurb: 'A trampled yard of spare wheels, axles and harness, raised where the chariots mean to fight. Riders (cavalry) within 5 tiles of it have their wheels and harness mended on the spot, 4 health a second, so a people with no walls to shelter behind fights out at a forward yard and falls back to it between charges. Only in the Age of Chariots. Kept (J) when your people leaves it, it goes on mending riders, on any road. A rival who burns it leaves your chariots to limp home.' },
-  lighthouse: { name: 'Lighthouse', size: 2, hp: 900, cost: { wood: 100, stone: 60 }, time: 28, pop: 0, sight: 12, trains: [], drop: [], epoch: 2, shore: true, ages: ['sail'], menu: 'mil', key: 'L', blurb: `A squat stone tower on a headland, a fire basket blazing at its top. Raised on the shore by a far trading port, it is a standing escort: a merchant ship that loads within ${LIGHTHOUSE.reach} tiles of it sails in convoy (+${Math.round((LIGHTHOUSE.pay - 1) * 100)}% gold) with no warship beside it, so the fleet is free to hunt prizes (a warship's own escort pays more, +${Math.round((CONVOY.pay - 1) * 100)}%). It sees 12 tiles out over the water. It stays where it is: put it where the cogs load and a rival raider will find it. Only in the Age of Sail. It sleeps when your people leaves, and a rival who razes it ends the shortcut.` },
+  pharos: { name: 'Pharos', size: 2, hp: 900, cost: { wood: 100, stone: 60 }, time: 28, pop: 0, sight: 12, trains: [], drop: [], epoch: 2, shore: true, ages: ['sail'], menu: 'mil', key: 'L', blurb: `A squat stone tower on a headland, a fire basket blazing at its top. Raised on the shore by a far trading port, it is a standing escort: a merchant ship that loads within ${PHAROS.reach} tiles of it sails in convoy (+${Math.round((PHAROS.pay - 1) * 100)}% gold) with no warship beside it, so the fleet is free to hunt prizes (a warship's own escort pays more, +${Math.round((CONVOY.pay - 1) * 100)}%). It sees 12 tiles out over the water. It stays where it is: put it where the cogs load and a rival raider will find it. Only in the Age of Sail. It sleeps when your people leaves, and a rival who razes it ends the shortcut.` },
   gallery: { name: 'Mine Gallery', size: 2, hp: 800, cost: { wood: 100, stone: 80 }, time: 30, pop: 0, sight: 5, trains: [], drop: [], epoch: 3, ages: ['sapper'], menu: 'mil', key: 'P', blurb: 'A timbered shaft and spoil heap raised near a rival\'s walls, the sappers\' way into the ground. A keg laid within 6 tiles of it is mined: the fuse burns underground, and no rival can stamp it out. And a gallery listens: a rival keg laid within 6 tiles of one is countermined and lost. Only in the Age of Sappers. Kept (J) when your people leaves it, it goes on listening for rival kegs, on any road.' },
   windmill: { name: 'Windmill', size: 2, hp: 600, cost: { wood: 120, stone: 40 }, time: 30, pop: 0, sight: 5, trains: [], drop: [], epoch: 2, ages: ['dykes'], menu: 'eco', key: 'W', blurb: 'A post mill whose sails turn a scoop wheel. Raised by water a dyke has shut off from the open sea (or a small lake), it pumps it dry a tile every few seconds, nearest first, into polder: low black ground where a Farm yields half again as much. Two mills drain twice as fast. The open sea is too big to pump.' },
   // The Water Line (#701 s4): a gate in a dyke or a channel that lets the water out over the low ground behind it (`INUND`, `water.ts`).
@@ -3372,9 +3372,10 @@ export const EXPLORE = { grid: 4, apart: 12, fails: 8, shun: 6, wary: 2, army: 4
 export const AUTO_WORK = { trained: 14, rally: 8, herd: 8, farm: 12, shaft: 16, lay: 5, retry: secs(4) };
 /**
  * The clever computer plans for winter from season `from` (`coldComing` in `ai.ts`); in the Stone Age it raises no winter fields while its larder holds `larder` food (#486).
- * Its hunters of the turning year (#546) keep `shy` tiles from a rival's soldiers.
+ * Its hunters of the turning year (#546) keep `shy` tiles from a rival's soldiers; with the larder under `hungry` food they
+ * keep only `shyHungry` (#851), since a town besieged beside its yard starves if nobody hunts.
  */
-export const AI_WINTER = { from: 2, fields: 2, hunters: 3, pack: 1, food: 0.3, larder: 500, shy: 8 };
+export const AI_WINTER = { from: 2, fields: 2, hunters: 3, pack: 1, food: 0.3, larder: 500, shy: 8, hungry: 60, shyHungry: 3 };
 
 /**
  * Faith takes the walls (#209), for the computer: a pilgrim computer keeps `priests` priests once its army
