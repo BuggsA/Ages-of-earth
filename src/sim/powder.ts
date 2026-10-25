@@ -1,4 +1,4 @@
-import { BREACH, KEG, TICK_HZ, domainOf, secs } from './data';
+import { BREACH, GALLERY, KEG, TICK_HZ, domainOf, secs } from './data';
 import { ageDef } from './ages';
 import { hurt, peace } from './combat';
 import { distToRect } from './grid';
@@ -81,11 +81,25 @@ export function kegProblem(s: GameState, owner: number, target: Ent | undefined)
 /** Whether a carrier stands close enough to a building to lay its keg. */
 export const atFoot = (u: Unit, b: Building, radius: number): boolean => distToRect(u.x, u.y, b) - radius <= KEG.lay;
 
-/** A carrier lays a keg from its people's store where it stands, the fuse lit. */
+/** Whether a Mine Gallery works now (#727): finished and standing, in its people's Age of Sappers or kept from it. */
+const digs = (s: GameState, b: Building): boolean => b.type === 'gallery' && b.built && b.hp > 0 && (sappers(s.players[b.owner]) || b.keep === 'sapper');
+
+/** Whether a working Mine Gallery of `owner`'s (or, with `rival`, of any of its rivals) stands within `reach` tiles of a point. */
+function galleryNear(s: GameState, owner: number, x: number, y: number, reach: number, rival: boolean): Building | null {
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || (e.owner === owner) === rival || (rival && !isEnemy(s, owner, e.owner)) || !digs(s, e)) continue;
+    if (distToRect(x, y, e) <= reach) return e;
+  }
+  return null;
+}
+
+/** A carrier lays a keg from its people's store where it stands, the fuse lit; near its own Mine Gallery the keg is mined (#727). */
 export function layKeg(s: GameState, u: Unit): void {
   const p = s.players[u.owner];
   p.kegs = kegsOf(p) - 1;
-  (s.kegs ??= []).push({ id: s.nextId++, x: u.x, y: u.y, owner: u.owner, at: s.tick + secs(KEG.fuse) });
+  const keg: Keg = { id: s.nextId++, x: u.x, y: u.y, owner: u.owner, at: s.tick + secs(KEG.fuse) };
+  if (galleryNear(s, u.owner, u.x, u.y, GALLERY.mine, false)) keg.mined = true;
+  (s.kegs ??= []).push(keg);
   s.events.push({ k: 'keg', owner: u.owner, x: u.x, y: u.y, what: 'laid' });
 }
 
@@ -127,8 +141,11 @@ export function kegStep(s: GameState): void {
   if (!s.kegs) return;
   const left: Keg[] = [];
   for (const k of s.kegs) {
-    const by = douser(s, k);
-    if (by) s.events.push({ k: 'keg', owner: k.owner, x: k.x, y: k.y, what: 'doused', by: by.owner });
+    // A rival's Mine Gallery listening nearby countermines the keg; else a rival on foot stamps it out, unless it is mined (#727).
+    const listener = galleryNear(s, k.owner, k.x, k.y, GALLERY.listen, true);
+    const by = listener ? null : k.mined ? null : douser(s, k);
+    if (listener) s.events.push({ k: 'keg', owner: k.owner, x: k.x, y: k.y, what: 'doused', by: listener.owner });
+    else if (by) s.events.push({ k: 'keg', owner: k.owner, x: k.x, y: k.y, what: 'doused', by: by.owner });
     else if (s.tick >= k.at) blow(s, k);
     else left.push(k);
   }

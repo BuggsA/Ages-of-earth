@@ -1888,6 +1888,74 @@ function dyke(k: Kit, mask: number): void {
 }
 
 /** A Bloom Hearth (#727, the Iron Age): a squat clay furnace with a glowing mouth, bellows, a slag heap and a rack of grey bars. */
+function stockade(k: Kit, _e: number, st: Style): void {
+  pad(k, 2, st.base);
+  // Its own silhouette, whatever the age it is kept in: a ring of sharpened stakes, a gate arch of crossed spears with a skull
+  // lintel, trophy poles hung with pelts, and a heap of loot under a blood-red hide. The colours are the war-host's, not the town's.
+  const POST = '#5a3d28';
+  const BONE = '#e6dcc4';
+  const BLOOD = '#8a2420';
+  for (let i = 0; i < 10; i++) {
+    const a = -1.0 + i * 0.222;
+    if (i === 4 || i === 5) continue;
+    k.cone(0.07, 0.95 + (i % 3) * 0.14, 5, POST, a, 0, 0.9);
+    k.cone(0.07, 0.95 + (i % 3) * 0.14, 5, POST, a, 0, -0.9);
+  }
+  for (let i = 0; i < 7; i++) {
+    const z = -0.7 + i * 0.24;
+    k.cone(0.07, 0.9 + (i % 3) * 0.14, 5, POST, -1.0, 0, z);
+    k.cone(0.07, 0.9 + (i % 3) * 0.14, 5, POST, 1.0, 0, z);
+  }
+  // The gate: two tall posts, crossed spears above and a skull on the lintel.
+  for (const x of [-0.22, 0.22]) k.cyl(0.06, 0.07, 1.5, 6, POST, x, 0, 0.9);
+  k.box(0.6, 0.07, 0.07, POST, 0, 1.3, 0.9);
+  for (const r of [-0.5, 0.5]) k.cone(0.05, 0.9, 4, '#c8ccd0', 0, 1.3, 0.9).rotation.z = r;
+  k.sphere(0.1, BONE, 0, 1.45, 0.95);
+  // Trophy poles at the front corners, a pelt hung from each.
+  for (const x of [-0.95, 0.95]) {
+    k.cyl(0.04, 0.04, 1.6, 5, POST, x, 0, 0.95);
+    k.box(0.3, 0.4, 0.04, BLOOD, x + (x < 0 ? 0.17 : -0.17), 1.05, 0.95);
+    k.sphere(0.08, BONE, x, 1.65, 0.95);
+  }
+  // A lookout platform behind and the loot under a hide.
+  k.box(0.7, 0.07, 0.7, '#7a5a3a', 0.35, 1.25, -0.4);
+  for (const [x, z] of [[0, -0.7], [0.7, -0.7], [0, -0.1], [0.7, -0.1]]) k.cyl(0.04, 0.04, 1.25, 5, POST, x, 0, z);
+  k.box(0.44, 0.3, 0.36, '#7a5c3a', -0.45, 0.02, 0.0);
+  k.box(0.5, 0.16, 0.42, BLOOD, -0.45, 0.32, 0.0).rotation.z = 0.12;
+  k.sphere(0.12, '#e0b030', -0.6, 0.36, 0.25);
+  k.team(k.box(0.5, 0.18, 0.04, TEAM, 0.35, 1.5, -0.4));
+}
+
+/** A Mine Gallery (#727, the Age of Sappers): a timbered shaft mouth in a spoil heap, a windlass over it, a cart of spoil and a powder keg. */
+function gallery(k: Kit, _e: number, st: Style): void {
+  pad(k, 2, st.base);
+  const SPOIL = '#7d6a52';
+  const TIMBER = '#5a3d28';
+  const KEG = '#6a4a2c';
+  // The spoil heap: stacked earth mounds round a dark pit, a ring of low humps.
+  for (let i = 0; i < 8; i++) {
+    const a = i * 0.785;
+    k.cone(0.34, 0.5 + (i % 3) * 0.1, 6, SPOIL, Math.cos(a) * 0.78, 0, Math.sin(a) * 0.78);
+  }
+  k.cyl(0.42, 0.42, 0.05, 10, '#17120e', 0, 0.02, 0);
+  // The shoring: a timber frame round the shaft mouth with a cross-beam, and a sloped ramp of planks down into it.
+  for (const x of [-0.42, 0.42]) k.box(0.1, 0.9, 0.1, TIMBER, x, 0, 0.05);
+  k.box(1.0, 0.1, 0.12, TIMBER, 0, 0.9, 0.05);
+  k.box(0.7, 0.05, 0.5, '#7a5a3a', 0, 0.05, 0.62).rotation.x = -0.25;
+  // A windlass: two uprights, a spindle, a rope and a bucket down the shaft.
+  for (const z of [-0.2, 0.3]) k.box(0.07, 1.3, 0.07, TIMBER, 0.95, 0, z);
+  k.cyl(0.07, 0.07, 0.6, 6, '#3a2a1c', 0.95, 1.15, 0.05).rotation.x = Math.PI / 2;
+  k.cyl(0.015, 0.015, 0.9, 4, '#c9b48a', 0.7, 0.7, 0.05).rotation.z = 0.9;
+  // A cart of spoil, and a keg waiting by the mouth with a fuse stub.
+  k.box(0.5, 0.25, 0.36, TIMBER, -0.95, 0.18, 0.55);
+  k.box(0.46, 0.12, 0.32, SPOIL, -0.95, 0.43, 0.55);
+  for (const z of [0.36, 0.74]) k.cyl(0.14, 0.14, 0.05, 8, '#2a2018', -0.95, 0.14, z).rotation.x = Math.PI / 2;
+  k.cyl(0.16, 0.16, 0.34, 8, KEG, -0.15, 0, 0.9);
+  k.box(0.34, 0.03, 0.03, '#c0b8a0', -0.15, 0.2, 0.9);
+  k.cyl(0.015, 0.015, 0.16, 4, '#e8c860', -0.15, 0.34, 0.9);
+  k.team(k.box(0.5, 0.18, 0.04, TEAM, 0.95, 1.55, 0.05));
+}
+
 function bloomery(k: Kit, _e: number, st: Style): void {
   pad(k, 2, st.base);
   // The furnace stack: a clay drum that tapers to a smoking top, with a fire door and a team band.
@@ -2776,7 +2844,7 @@ const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' |
   heart: (k) => heart(k),
   spire: (k) => spire(k),
   greatden,
-  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, battery, windmill, bloomery, hirehall,
+  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, battery, windmill, bloomery, stockade, gallery, hirehall,
   // The Age of Tides (#739), drawn in `tideModels.ts`.
   tidemill: (k: Kit, _e: number, st: Style) => tidemill(k, st.base),
   cockler: (k: Kit, _e: number, st: Style) => cocklerHut(k, st.base),

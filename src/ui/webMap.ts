@@ -1,4 +1,4 @@
-import { ageOf, deedsOf, isSideRoad, roadKnown } from '../sim/ages';
+import { ageOf, cluesOf, deedsOf, isSideRoad, roadKnown } from '../sim/ages';
 import { AGES, BUILDINGS, PROSPECTOR, ROADS, TECHS, TRUNK, type Road } from '../sim/data';
 import type { AgeId, GameState } from '../sim/types';
 import { getCloudWeb, putCloudWeb, vaultKey } from '../net/cloud';
@@ -143,7 +143,7 @@ export function roadLabel(r: Road): string {
   if (r.ruin) bits.push('after your citizens finish excavating an ancient ruin');
   // A crossing (#585): both sibling ages walked.
   if (r.crossing) bits.push(`for a people that walked both the ${AGES[r.crossing[0]].name} and the ${AGES[r.crossing[1]].name}`);
-  if (r.clue) bits.push(`seen once you have a ${BUILDINGS[r.clue].name}`);
+  if (r.clue) bits.push(`seen once you have a ${cluesOf(r).map((b) => BUILDINGS[b].name).join(' or a ')}`);
   const deeds = deedsOf(r).map((x) => x.text);
   return bits.join(', ') + (deeds.length ? `. Deeds: ${deeds.join('; ')}` : '');
 }

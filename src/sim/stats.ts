@@ -1,4 +1,4 @@
-import { AGES, BUILDINGS, HIREHALL, CIVS, GUNS, GROVE, HIVE, TOWER_LEVELS, WAYS, WORKS, SIGNATURES, EPOCHS, FLOOD, NO_MODS, PATHS, RARE, TECHS, WARCAMP, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
+import { AGES, BUILDINGS, HIREHALL, CIVS, GUNS, GROVE, HIVE, TOWER_LEVELS, WAYS, WORKS, SIGNATURES, EPOCHS, FLOOD, NO_MODS, PATHS, RARE, STOCKADE, TECHS, WARCAMP, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
 import { fairLevy } from './fair';
 import { flooded } from './flood';
 import { ageDef, ageOf, hasWalked, isHire, isSuspended, pathCarry, threadsOf } from './ages';
@@ -158,7 +158,7 @@ export function trainCostFor(s: GameState, owner: number, type: UnitType, at: Bu
   const cls = unitStats(type, p.epoch).cls;
   const levied = age.levy && LEVIED.has(cls) ? scale(base, age.levy) : base;
   // A Dock kept as the Sea-Raiders' keepsake (#555 s12) still launches ships at the longship yard's price, on any road.
-  const price = age.price?.[cls] ?? (at === 'dock' && where?.keep === 'searaider' ? AGES.searaider.price?.[cls] : at === 'bloomery' && where?.keep === 'iron' ? AGES.iron.price?.[cls] : undefined);
+  const price = age.price?.[cls] ?? (at === 'dock' && where?.keep === 'searaider' ? AGES.searaider.price?.[cls] : at === 'bloomery' && where?.keep === 'iron' ? AGES.iron.price?.[cls] : at === 'stockade' ? { infantry: STOCKADE.price }[cls as 'infantry'] : undefined);
   const priced = price ? scale(levied, price) : levied;
   return scale(priced, fairLevy(s, owner, type, where));
 }

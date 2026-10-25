@@ -62,6 +62,8 @@ import { isCarrier } from '../sim/units';
 import { KEYS, RARES, RES, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
 import { buildingPicture, unitPicture } from './thumbs';
+import { plateColors, plateIsDark, plateUrl, stampOf } from './ageIcons';
+import { drawnGlyph } from './ageArt';
 import { idleCitizens } from './idle';
 import { workforce, WORKFORCE_JOBS } from './workforce';
 import { citizenProblem, isLegion } from '../sim/legion';
@@ -107,6 +109,8 @@ interface Cmd {
   key: string;
   pic: string;
   glyph?: string;
+  /** Which hand-drawn glyph stands in for the emoji (`ageArt/index.ts`): `tech:<id>`, or `age:<id>` on a button that leads to an age. */
+  gid?: string;
   title: string;
   desc: string;
   cost?: Cost;
@@ -1015,7 +1019,7 @@ export class Hud {
       for (const list of groups.values()) {
         for (const e of list.slice(0, 60)) {
           const max = e.kind === 'unit' ? statsFor(s, e.owner, e.type).hp : buildingMaxHp(s, e.owner, e.type, e.kind === 'building' ? e.level : 0);
-          const pic = e.kind === 'unit' ? unitPicture(e.type, s.players[e.owner].epoch, s.players[e.owner].color) : buildingPicture(e.type, s.players[e.owner].epoch, s.players[e.owner].color);
+          const pic = e.kind === 'unit' ? unitPicture(e.type, s.players[e.owner].epoch, s.players[e.owner].color, undefined, ageOf(s.players[e.owner])) : buildingPicture(e.type, s.players[e.owner].epoch, s.players[e.owner].color, ageOf(s.players[e.owner]));
           items.push(`<div class="mitem" data-pick="${e.id}" data-tip="<b>${nameOf(s, e)}</b>Click to pick only this one; shift-click to drop it."><img src="${pic}" alt=""><div class="mhp"><i style="width:${Math.round((e.hp / max) * 100)}%"></i></div></div>`);
         }
       }
@@ -1170,7 +1174,7 @@ export class Hud {
     const bond = u.thrall ? `<span data-tip="<b>Thrall</b>A citizen taken by a Warband people: it works a field for ${mine ? 'you' : p.name} but never builds or repairs. Slay it, or guard your workers so none are taken.">⛓<em>Thrall</em></span>` : '';
     const held = u.type === 'priest' && carriedBy(s, u) ? `<span data-tip="<b>Relic</b>Carried to a Temple, it brings in gold. Hands full: no healing or converting until it is set down (D).">⚱<em>Relic</em></span>` : '';
     const sig = `u:${u.id}:${Math.ceil(u.hp)}:${status}:${u.carry}:${p.epoch}:${p.statsVersion}:${u.stance}:${s.tick - u.aura < 5}:${u.cargo.length}:${rank}:${taking}:${road}:${u.tolled ?? 0}:${hemoLeft}:${curseLeft}:${u.merc ?? -1}:${isSworn}:${!!u.thrall}:${u.spoils ?? 0}:${isLine}:${ebbLeft}`;
-    const html = `<div class="sel-portrait"><img src="${unitPicture(u.type, u.type === 'wagon' && u.packed === 'market' ? p.epoch + 20 : p.epoch, p.color)}" alt=""></div>
+    const html = `<div class="sel-portrait"><img src="${unitPicture(u.type, u.type === 'wagon' && u.packed === 'market' ? p.epoch + 20 : p.epoch, p.color, undefined, ageOf(p))}" alt=""></div>
       <div class="sel-info">
         <div class="sel-name">${s.kings.includes(u.id) ? `👑 King (${st.name})` : u.thrall ? `Thrall (${st.name})` : st.name}</div>
         <div class="sel-sub">${mine ? status : `<span class="swatch" style="background:${p.color}"></span>${p.name}`}</div>
@@ -1213,7 +1217,7 @@ export class Hud {
           .map((q, i) => {
             const qp = i === 0 ? pct : 0;
             const name = q.rise ? (step?.name ?? '') : q.tech ? TECHS[q.tech].name : statsFor(s, b.owner, q.unit!).name;
-            const face = q.rise ? `<span class="qglyph">${step?.icon ?? ''}</span>` : q.tech ? `<span class="qglyph">${TECHS[q.tech].icon}</span>` : `<img src="${unitPicture(q.unit!, p.epoch, p.color)}" alt="">`;
+            const face = q.rise ? `<span class="qglyph">${step?.icon ?? ''}</span>` : q.tech ? `<span class="qglyph">${TECHS[q.tech].icon}</span>` : `<img src="${unitPicture(q.unit!, p.epoch, p.color, undefined, ageOf(p))}" alt="">`;
             return `<div class="qitem" data-cancel="${b.id}:${i}" data-tip="<b>${name}</b>Click to cancel (full refund).">${face}<div class="prog"><i style="width:${qp}%"></i></div></div>`;
           })
           .join('')}</div>`;
@@ -1408,7 +1412,7 @@ export class Hud {
       status += ` · <span data-tip="<b>Altar</b>Enemies who fall within ${BLOOD.reach} tiles give up their blood, as at a Drain Rig. Each second the altar mends up to ${RITE.most} of your hurt living within ${RITE.reach} tiles, ${RITE.mend} health each, for ${RITE.price} blood a point, while the store lasts.">${bloodOf(p) > 0 ? '🩸 Altar: mending with blood' : '⚠ Altar: no blood to mend with'}</span>`;
     const inside = def.garrison && b.built ? `<div class="stats"><span data-tip="<b>Sheltering</b>Units inside are safe, heal slowly and add arrows.">🏰<em>Inside</em> ${b.garrison.length}/${def.garrison}</span></div>` : '';
     const sig = `b:${b.id}:${Math.ceil(b.hp)}:${status}:${b.queue.length}:${p.epoch}:${queue.length}:${b.garrison.length}`;
-    const html = `<div class="sel-portrait"><img src="${buildingPicture(b.type, p.epoch, p.color)}" alt=""></div>
+    const html = `<div class="sel-portrait"><img src="${buildingPicture(b.type, p.epoch, p.color, ageOf(p))}" alt=""></div>
       <div class="sel-info">
         <div class="sel-name">${def.name}</div>
         <div class="sel-sub">${status}</div>
@@ -1456,7 +1460,7 @@ export class Hud {
         const wonderUp = type === 'wonder' && s.ents.some((e) => e.kind === 'building' && e.owner === viewer && e.type === 'wonder');
         cmds.push({
           key: def.key,
-          pic: buildingPicture(type, p.epoch, p.color),
+          pic: buildingPicture(type, p.epoch, p.color, ageOf(p)),
           // In the Age of Locks (#701 s5) a channel is dug deep, as a canal.
           title: type === 'channel' && ageDef(p).canals ? 'Canal' : def.name,
           desc: def.blurb + (type === 'wall' || type === 'thornwall' ? ' Click and drag to lay out a line.' : '') + (def.blood ? ` Costs 🩸${def.blood} blood besides.` : ''),
@@ -1479,7 +1483,7 @@ export class Hud {
         const short = shortfall(p, cost);
         cmds.push({
           key: 'B',
-          pic: buildingPicture('warcamp', p.epoch, p.color),
+          pic: buildingPicture('warcamp', p.epoch, p.color, ageOf(p)),
           title: 'Pitch a War Camp',
           desc: `${BUILDINGS.warcamp.blurb} Then click where to pitch it: in your own land, no one's, or the enemy's.`,
           cost,
@@ -1495,7 +1499,7 @@ export class Hud {
         const short = shortfall(p, cost);
         cmds.push({
           key: 'O',
-          pic: buildingPicture('mission', p.epoch, p.color),
+          pic: buildingPicture('mission', p.epoch, p.color, ageOf(p)),
           title: 'Raise a Mission',
           desc: `${BUILDINGS.mission.blurb} Then click a shore, in your own land or no one's: the farther from home, the bigger the tithe.`,
           cost,
@@ -1544,7 +1548,7 @@ export class Hud {
       if (isPolis(p)) {
         if (citizens.length) {
           const why = armProblem(p, citizens[0]);
-          cmds.push({ key: 'H', pic: unitPicture('infantry', p.epoch, p.color), title: citizens.length > 1 ? `Take up arms (${citizens.length})` : 'Take up arms', desc: `Each citizen becomes a hoplite where it stands, paying its own shield and spear; what it carries is dropped. A Greek city trains no foot soldiers: its citizens are its army. Lay the arms down within ${POLIS.home} tiles of a Town Center (L) to go back to work.`, cost: POLIS.arm, ok: !why, why: why ?? undefined, run: () => (this.act.issue({ t: 'arm', p: viewer, ids: citizens.map((u) => u.id) }), this.act.sound('queue')) });
+          cmds.push({ key: 'H', pic: unitPicture('infantry', p.epoch, p.color, undefined, ageOf(p)), title: citizens.length > 1 ? `Take up arms (${citizens.length})` : 'Take up arms', desc: `Each citizen becomes a hoplite where it stands, paying its own shield and spear; what it carries is dropped. A Greek city trains no foot soldiers: its citizens are its army. Lay the arms down within ${POLIS.home} tiles of a Town Center (L) to go back to work.`, cost: POLIS.arm, ok: !why, why: why ?? undefined, run: () => (this.act.issue({ t: 'arm', p: viewer, ids: citizens.map((u) => u.id) }), this.act.sound('queue')) });
         }
         const hoplites = units.filter((u) => u.type === 'infantry');
         if (hoplites.length) {
@@ -1636,7 +1640,7 @@ export class Hud {
           const hero = unit === 'hero' && (heroBusy(s, viewer) || b.queue.some((q) => q.unit === 'hero'));
           cmds.push({
             key: unitKeys[i] ?? '',
-            pic: unitPicture(unit, Math.max(p.epoch, unitEpoch(unit)), p.color),
+            pic: unitPicture(unit, Math.max(p.epoch, unitEpoch(unit)), p.color, undefined, ageOf(p)),
             title: `${hired ? 'Hire' : 'Train'} ${st.name}`,
             desc: hired
               ? `A mercenary, paid in gold alone and ready in ${Math.round(time)}s. After its first ${MERC.first}s he draws ${MERC.wage} gold every ${MERC.every}s from the treasury, and walks off if left unpaid ${MERC.patience} paydays. ${st.blurb}`
@@ -1675,6 +1679,7 @@ export class Hud {
               key: isMain ? 'W' : (sideKeys.shift() ?? ''),
               pic: '',
               glyph: isMain ? '⏫' : '🔀',
+              gid: `age:${road.to}`,
               title: `${toward} the ${to.name}${routeTag(road.to)}`,
               desc: `${road.gate === 'easy' ? '<i>An easy on-ramp: a small deed and a modest price.</i><br>' : road.gate === 'hard' ? '<i>A hard gate: a dear price and a long journey, for something special.</i><br>' : ''}${road.blurb ?? to.blurb}${isSideRoad(road) ? ` Opens only from ${windowsOf(road.to).map((a) => `the ${AGES[a].name}`).join(' or ')}.` : ''}${(oreOnly(s, road) ? [] : deeds).map((d) => `<br>${oreDone(p, road) || d.have >= d.need ? '✔' : '…'} ${d.deed.text}: ${Math.min(d.have, d.need)}/${d.need}.`).join('')}${(() => { const door = oreClue(s, p, road); return door ? `<br>${oreDone(p, road) ? '✔' : '…'} ${oreOnly(s, road) ? '' : '<i>Or</i> '}${door.text.charAt(0).toLowerCase()}${door.text.slice(1)}: ${Math.min(Math.floor(p.stats.mined?.[door.id] ?? 0), door.n)}/${door.n}.` : ''; })()}${(road.crossing ?? []).map((a) => `<br>${hasWalked(p, a) ? '✔' : '…'} A crossing: walk the ${AGES[a].name}.`).join('')}${road.lives ? `<br>${livesOf(p).length >= road.lives.n ? '✔' : '…'} Side ages walked: ${Math.min(livesOf(p).length, road.lives.n)}/${road.lives.n}${livesOf(p).length ? ` (${livesOf(p).map((a) => AGES[a].short).join(', ')})` : ''}. Each one is woven in.` : ''}${back.length ? `<br>Brings back ${back.map((t) => TECHS[t].name).join(', ')}.` : ''}${planLines(s, p, road.to, false)}<br>Takes ${road.time}s. Every unit re-arms and every building is rebuilt in the new style.${agePanel(s, p, road.to)}`,
               cost: road.cost,
@@ -1745,6 +1750,7 @@ export class Hud {
             key: techKeys[ti++] ?? '',
             pic: '',
             glyph: t.icon,
+            gid: `tech:${tech}`,
             title: `Research ${t.name}`,
             desc: `${t.blurb} Takes ${Math.round(t.time)}s.`,
             cost,
@@ -1879,7 +1885,7 @@ export class Hud {
           const near = callUpReach(s, b).length;
           const soldier = statsFor(s, viewer, 'infantry').name;
           const desc = (n: number) => `${n === 1 ? 'The nearest citizen' : `Up to the ${n} nearest citizens`} within ${CALL_UP.reach} tiles of this camp ${n === 1 ? 'takes' : 'take'} up arms: each becomes a ${soldier} where it stands, with the health it had, and drops what it carried. The camp then rests ${CALL_UP.rest} seconds for each one called. Every citizen called is one less at work.`;
-          cmds.push({ key: 'C', pic: unitPicture('infantry', p.epoch, p.color), title: 'Call to arms', desc: desc(1), cost: CALL_UP.cost, ok: !why, why: why ?? undefined, count: near || undefined, run: () => (this.act.issue({ t: 'callUp', p: viewer, building: b.id, n: 1 }), this.act.sound('queue')) });
+          cmds.push({ key: 'C', pic: unitPicture('infantry', p.epoch, p.color, undefined, ageOf(p)), title: 'Call to arms', desc: desc(1), cost: CALL_UP.cost, ok: !why, why: why ?? undefined, count: near || undefined, run: () => (this.act.issue({ t: 'callUp', p: viewer, building: b.id, n: 1 }), this.act.sound('queue')) });
           const five: Cost = {};
           for (const [r, v] of Object.entries(CALL_UP.cost) as [keyof Cost, number][]) five[r] = v * CALL_UP.most;
           cmds.push({ key: 'V', pic: '', glyph: '📯', title: `Call ${CALL_UP.most} to arms`, desc: `${desc(CALL_UP.most)} Each costs its own arms.`, cost: five, ok: !why, why: why ?? undefined, run: () => (this.act.issue({ t: 'callUp', p: viewer, building: b.id, n: CALL_UP.most }), this.act.sound('queue')) });
@@ -1966,16 +1972,34 @@ export class Hud {
       cmds.push({ key: 'DELETE', pic: '', glyph: '💀', title: 'Delete', desc: 'Tear these buildings down (Del).', ok: true, run: () => this.act.issue({ t: 'delete', p: viewer, ids: mine.map((e) => e.id) }) });
     }
     this.cmds = cmds;
-    const sig = cmds.map((c) => `${c.key}${c.ok ? 1 : 0}${c.count ?? ''}${c.on ? 1 : 0}${c.pic.length}${c.title}${c.desc}${JSON.stringify(c.cost)}${c.why}`).join('|');
+    const age = ageOf(p);
+    this.plateFor(age);
+    const sig = `${age}|` + cmds.map((c) => `${c.key}${c.ok ? 1 : 0}${c.count ?? ''}${c.on ? 1 : 0}${c.pic.length}${c.title}${c.desc}${JSON.stringify(c.cost)}${c.why}`).join('|');
     if (sig === this.cmdSig) return;
     this.cmdSig = sig;
     this.cmdEl.innerHTML = cmds
       .map((c, i) => {
         const key = c.key === 'ESCAPE' ? 'Esc' : c.key === 'DELETE' ? 'Del' : c.key;
+        const drawn = c.pic ? null : drawnGlyph(age, c.gid);
         const tip = `<b>${c.title}</b>${c.cost ? `<div class='cost'>${costHtml(c.cost, s.players[viewer].res).replace(/"/g, "'")}</div>` : ''}${c.desc}${!c.ok && c.why ? `<br><span style='color:#ff9a8a'>${c.why}</span>` : ''}${key ? `<br><span class='hint'>Hotkey: ${key}</span>` : ''}`;
-        return `<button class="cmd ${c.ok ? '' : 'off'} ${c.on ? 'on' : ''}" data-i="${i}" data-tip="${tip.replace(/"/g, '&quot;')}">${c.pic ? `<img src="${c.pic}" alt="">` : `<span class="glyph">${c.glyph ?? ''}</span>`}<span class="key">${key}</span>${c.count ? `<span class="count">${c.count}</span>` : ''}</button>`;
+        return `<button class="cmd ${c.ok ? '' : 'off'} ${c.on ? 'on' : ''}" data-i="${i}" data-tip="${tip.replace(/"/g, '&quot;')}">${c.pic ? `<img src="${c.pic}" alt="">` : `<span class="glyph ${drawn ? 'drawn' : ''}">${drawn ?? c.glyph ?? ''}</span>`}<span class="key">${key}</span>${c.count ? `<span class="count">${c.count}</span>` : ''}</button>`;
       })
       .join('');
+  }
+
+  private plateAge: AgeId | null = null;
+
+  /** The command buttons wear the age's plate and stamp (`ageIcons.ts`); set again only when the age changes. */
+  private plateFor(age: AgeId): void {
+    if (this.plateAge === age) return;
+    this.plateAge = age;
+    this.cmdEl.classList.remove(...[...this.cmdEl.classList].filter((c) => c.startsWith('stamp-')));
+    this.cmdEl.classList.add('plated', `stamp-${stampOf(age)}`);
+    this.cmdEl.style.setProperty('--plate', plateUrl(age));
+    this.cmdEl.style.setProperty('--ink', plateColors(age).ink);
+    this.cmdEl.dataset.age = age;
+    if (plateIsDark(age)) this.cmdEl.dataset.dark = '1';
+    else delete this.cmdEl.dataset.dark;
   }
 
   private hover(e: MouseEvent): void {

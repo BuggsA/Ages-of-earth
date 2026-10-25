@@ -11,7 +11,7 @@ import { stirred } from '../sim/combat';
 import { cursed, grafted } from '../sim/blood';
 import { graftLast } from '../sim/hemo';
 import { seesRect } from '../sim/vision';
-import { revealed, ringsFor, shownToAll, warnRadius } from '../sim/silo';
+import { decoysFor, revealed, ringsFor, shownToAll, warnRadius } from '../sim/silo';
 import { MissileView } from './missileView';
 import { rooted } from '../sim/bloom';
 import { BuildingsView } from './buildingsView';
@@ -43,10 +43,12 @@ import { FoundationView } from './foundationView';
 import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, coilFields, placementField, sortieRings, coverRings, type RangeGuide } from './rangeGuides';
 import { ResourcesView } from './resourcesView';
 import { Sky } from './sky';
+import { airOf } from './ageAir';
 import { forcedHour, hourAt, lightAt, moonPhase } from './daylight';
 import { Weather, breathe, describeWeather, forcedWeather, moodOf, seasonalDay, weatherFor, windFor, type WeatherDay } from './weather';
 import { FogTexture, TerrainView, heightAt } from './terrain';
 import { AIR_ALT, UnitsView, wearOf } from './unitsView';
+import { ageSparks } from './ageGrounds';
 import { WATER_Y, WaterView } from './water';
 import { Fireflies } from './fireflies';
 import { Bats } from './bats';
@@ -164,6 +166,8 @@ export class View {
   /** How far the haze lets the view reach today (1 on a clear day). */
   private reach = 1;
   private flash = 0;
+  /** Seconds until the ground round the towns is looked over again (#815). */
+  private groundTimer = 0;
   private baseSun = 2.5;
   private baseHemi = 1.0;
   private mood = moodOf({ kind: 'clear', strength: 0 });
@@ -355,6 +359,23 @@ export class View {
   /** The title's backdrop sets its own hour, so the town turns through dusk and night while it plays. */
   titleHour: number | null = null;
 
+  /** The air the viewer's age leans to, eased so a change of age turns the sky over a few seconds. */
+  private airColor = new THREE.Color('#ffffff');
+  private airK = 0;
+  private airTo = new THREE.Color();
+
+  private easeAir(age: AgeId, dt: number): void {
+    const a = airOf(age);
+    this.airTo.set(a.tint);
+    const step = Math.min(1, dt * 0.7);
+    const dk = a.k - this.airK;
+    const before = this.airColor.getHex();
+    this.airColor.lerp(this.airTo, step);
+    this.airK += dk * step;
+    if (Math.abs(dk) < 0.001) this.airK = a.k;
+    if (this.airColor.getHex() !== before || Math.abs(dk) >= 0.001) this.litHour = -1;
+  }
+
   private hourNow(): number {
     return forcedHour() ?? this.titleHour ?? (this.state ? hourAt(this.state.seed, this.state.tick / TICK_HZ) : 9);
   }
@@ -368,10 +389,12 @@ export class View {
     const grey = this.tint.set(m.tint);
     // A grey day takes its tint down with the dusk too, so rain at night is dark and not pale.
     const dim = (l.sky * 0.5 + 0.5);
-    this.skyTop.set(l.top).lerp(grey.clone().multiplyScalar(dim), m.grey);
-    this.horizon.set(l.horizon).lerp(grey.clone().multiplyScalar(dim), m.grey);
+    // The viewer's age leans the sky, the haze and the sun's colour its way (`ageAir.ts`), dimmed with the dusk like the grey.
+    const lean = this.airColor.clone().multiplyScalar(dim);
+    this.skyTop.set(l.top).lerp(lean, this.airK).lerp(grey.clone().multiplyScalar(dim), m.grey);
+    this.horizon.set(l.horizon).lerp(lean, this.airK * 1.3).lerp(grey.clone().multiplyScalar(dim), m.grey);
     SUN_DIR.set(l.dir[0], l.dir[1], l.dir[2]);
-    this.sunTint.set(l.sunColor);
+    this.sunTint.set(l.sunColor).lerp(this.airColor, this.airK * 0.5);
     this.sun.color.copy(this.sunTint);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.sky.setGlare(m.sun, this.sunTint);
@@ -392,6 +415,9 @@ export class View {
     this.fill.intensity = 0.3 * l.fill;
     this.sun.intensity = this.baseSun;
     this.hemi.intensity = this.baseHemi;
+    // The age's air also colours the sky light the whole land is lit by, so it reads from the default camera, where the sky is off-screen.
+    this.hemi.color.set('#dcefff').lerp(this.airColor, this.airK * 1.2);
+    this.hemi.groundColor.set('#b9a77a').lerp(this.airColor, this.airK * 0.6);
     (this.scene.fog as THREE.Fog).color.copy(this.horizon);
   }
 
@@ -448,6 +474,7 @@ export class View {
     const p = s.players[this.viewer];
     if (!this.reveal) this.fog?.update(p.vis, p.seen, dt);
 
+    this.easeAir(ageOf(p), dt);
     this.light(this.hourNow());
     // Light follows the view so shadows stay crisp where the player looks.
     const t = this.rig.target;
@@ -482,6 +509,12 @@ export class View {
     this.hemi.intensity = this.baseHemi + this.flash * 2.2;
     this.sun.intensity = this.baseSun + this.flash * 1.5;
 
+    // The ground round each known building wears its owner's age (#815), looked over a few times a second.
+    this.groundTimer -= dt;
+    if (this.groundTimer <= 0) {
+      this.groundTimer = 0.4;
+      this.terrain.wearTowns(s, this.buildings.known.values());
+    }
     // The water layer (#701): ground pumped out of the water rises from it, and the shore's foam follows.
     if (this.terrain.sync(s, dt)) this.water.refreshBed(s, (i) => this.terrain.heightOf(i));
     this.resources.update(s, dt);
@@ -1433,8 +1466,10 @@ export class View {
           const tc = s.ents.find((e) => e.kind === 'building' && e.owner === ev.owner && e.type === 'towncenter');
           if (tc && (ev.owner === this.viewer || this.sees(tc.x, tc.y))) {
             const at = this.ground(s, tc.x, tc.y, 0.2);
-            // A step back (#47) glows dusk-blue instead of gold, and its sparks fall rather than rise.
-            const c = ev.back ? ['#8fa8d8', '#d8e2f4', '#6a7fb0'] : ['#ffd166', '#fff3c4', '#ffb347'];
+            // A step back (#47) glows dusk-blue instead of gold, and its sparks fall rather than rise. A side age lights in its own
+            // colours (#815), and its new ground spreads out over the town from here.
+            const c = ev.back ? ['#8fa8d8', '#d8e2f4', '#6a7fb0'] : ageSparks(ev.age) ?? ['#ffd166', '#fff3c4', '#ffb347'];
+            this.terrain.sweepFrom(tc.x, tc.y);
             this.effects.ring(at, c[0], 5, 1.6);
             this.effects.ring(at, c[1], 3.5, 1.2);
             this.effects.burst(at.clone().setY(at.y + 1.5), { count: 60, speed: 3, up: ev.back ? 0.2 : 0.9, life: 1.8, size: 0.07, gravity: 2, colors: c });
@@ -1778,6 +1813,8 @@ export class View {
       const own = s.players[this.viewer].team === s.players[l.owner].team;
       const r = (own ? WARHEADS[l.w ?? 'atomic'].r : warnRadius(s, l.owner)) + 0.5;
       for (const g of ringsFor(s, l, this.viewer)) out.push({ x: g.x, y: g.y, r, color: own ? '#ffb03a' : '#ff3a2a', flash: !own && revealed(s, l) });
+      // The launcher sees the fake points its rivals are shown too, paler, so it knows what they are chasing.
+      for (const g of decoysFor(s, l, this.viewer)) out.push({ x: g.x, y: g.y, r: warnRadius(s, l.owner) + 0.5, color: '#c9a77a' });
     }
     // Bloom Seeds (the Age of the Bloom) are seen by all: the ring they crack, and once rooted, the heart-root's own small ring to hack
     // at. Leaf green, pale for the Seed's own side; both flash for its last ten seconds.

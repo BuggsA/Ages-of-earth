@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { buildingGeometry } from '../render/buildingModels';
 import { unitGeometryColored } from '../render/unitModels';
-import type { BuildingType, CivId, UnitType } from '../sim/types';
+import type { AgeId, BuildingType, CivId, UnitType } from '../sim/types';
 
 /**
  * Pictures of the 3D models for the interface (portraits, buttons, the queue), rendered once each with
@@ -55,15 +55,18 @@ function picture(key: string, geo: THREE.BufferGeometry, tilt: number, zoom: num
 }
 
 /** A unit's picture; with a `civ` it wears that people's mark. */
-export function unitPicture(type: UnitType, epoch: number, color: string, civ?: CivId): string {
-  const key = `u:${type}:${epoch}:${color}${civ ? `:${civ}` : ''}`;
+export function unitPicture(type: UnitType, epoch: number, color: string, civ?: CivId, age?: AgeId): string {
+  const key = `u:${type}:${epoch}:${color}${civ ? `:${civ}` : ''}${age ? `@${age}` : ''}`;
   if (cache.has(key)) return cache.get(key)!;
-  const geo = unitGeometryColored(type, epoch, color, civ);
+  const geo = unitGeometryColored(type, epoch, color, civ, age);
   const url = picture(key, geo, 0.25, 1.05, -0.55);
   geo.dispose();
   return url;
 }
 
-export function buildingPicture(type: BuildingType, epoch: number, color: string): string {
-  return picture(`b:${type}:${epoch}:${color}`, buildingGeometry(type, epoch, color), 0.75, 1.0, -0.6);
+/** A building's picture; with an `age` it is the building as that age's people raise it (#803). */
+export function buildingPicture(type: BuildingType, epoch: number, color: string, age?: AgeId): string {
+  const key = `b:${type}:${epoch}:${color}${age ? `@${age}` : ''}`;
+  if (cache.has(key)) return cache.get(key)!;
+  return picture(key, buildingGeometry(type, epoch, color, 0, age), 0.75, 1.0, -0.6);
 }

@@ -46,7 +46,7 @@ import { chantedOver, consecrateProblem, consecrates } from './sim/consecrate';
 import { riteProblem } from './sim/fork';
 import { legionKind, legionary } from './sim/legion';
 import { tames, wildBeast } from './sim/tame';
-import { ageDef, ageOf, canRaise, heirloomsOpened, isSideRoad, opensOf, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
+import { ageDef, ageOf, canRaise, cluesOf, heirloomsOpened, isSideRoad, opensOf, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
 import { NetClient, newRoomCode, saveName, savedName } from './net/client';
 import { HASH_EVERY, ROOM_KEEP_HOURS, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
 import { deserialize, serialize } from './sim/save';
@@ -2730,7 +2730,7 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         // The first sign of a side road (#37): its clue goes up while the road is open.
         if (ev.owner === viewer)
           for (const road of roadsFrom(s.players[viewer]))
-            if (road.clue === ev.type && !s.ents.some((e) => e.kind === 'building' && e.owner === viewer && e.type === ev.type && e.built && e.id !== ev.id))
+            if (cluesOf(road).includes(ev.type) && !s.ents.some((e) => e.kind === 'building' && e.owner === viewer && e.type === ev.type && e.built && e.id !== ev.id))
               hud.banner('Another road', `${CIVS[s.players[viewer].civ].name} talk of the ${AGES[road.to].name}. Select a Town Center to see what it takes.`, 5000);
         break;
       case 'defeated':
@@ -3060,7 +3060,7 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         } else if (ev.what === 'laid' && ev.owner !== viewer && s.players[ev.owner] && isEnemy(s, viewer, ev.owner) && view.sees(ev.x, ev.y)) {
           hud.toast(`${s.players[ev.owner].name}'s sappers have lit a powder keg by your walls: reach it before it blows`, 'bad');
         } else if (ev.what === 'doused') {
-          if (ev.owner === viewer) hud.toast(`${s.players[ev.by ?? 0].name} stamped out your keg's fuse: cover the next one`, 'alert');
+          if (ev.owner === viewer) hud.toast(`${s.players[ev.by ?? 0].name} stamped out your keg's fuse (or a gallery of theirs heard it): cover the next one, or mine it`, 'alert');
           else if (ev.by === viewer) hud.toast('Your people stamped out a burning keg', 'good');
         } else if (ev.what === 'blown' && ev.owner === viewer) hud.toast('A keg blows: what stood by it is shaken to its footings', 'good');
         else if (ev.what === 'drowned' && ev.owner === viewer) hud.toast('🌊 The tide came over your keg and drowned its fuse: lay powder on the flats only with time to spare', 'alert');
@@ -3486,6 +3486,12 @@ function frame(now: number): void {
   const dt = Math.max(0, Math.min(0.1, (now - lastFrame) / 1000));
   lastFrame = now;
   const s = game;
+  // Behind the campaign and the Web of Ages (a full-screen sheet) the title's match holds still and isn't drawn (#810): its last
+  // frame stays on the canvas under the dimmed sheet, and a slow machine keeps the sheet itself responsive.
+  if (s && mode === 'title' && !$('campaign').classList.contains('hidden')) {
+    requestAnimationFrame(frame);
+    return;
+  }
   if (s) {
     if (mode === 'title') {
       // The title's match plays on; the camera drifts over it.

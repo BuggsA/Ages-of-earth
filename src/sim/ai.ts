@@ -6,7 +6,7 @@ import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, raiseProblem, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Launch, Player, Res, Rubble, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE, T_WATER } from './types';
-import { backProblem, backTo, ageDef, ageOf, asleep, barred, buildBarred, crossingLeft, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, trainsAt, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadProblem, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
+import { backProblem, backTo, cluesOf, ageDef, ageOf, asleep, barred, buildBarred, crossingLeft, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, trainsAt, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadProblem, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
 import { grindersOf, kegsOf, millProblem, mills, sappers } from './powder';
 import { beatersAt, burns, onFire, torchProblem } from './fire';
 import { inMycelium } from './mycelium';
@@ -63,7 +63,7 @@ import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
 import { AI_TEMPER, ROUTES, TRUNK, type RouteId } from './data';
-import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS } from './data';
+import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS, STOCKADE, AI_STOCKADE, GALLERY } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
@@ -161,10 +161,13 @@ function leanAges(p: Player, route: RouteId): AgeId[] {
  * Settled once, on a seat's first turn (#749): a clever computer in a skirmish favours a route `AI_TEMPER.lean` of the time, on
  * coins of its own so no other choice's dice shift, and chooses that route's side ages from the start, as the route sweeps do
  * (`src/sim/routePlay.ts`). The rest of the web is left to its usual coins, so it still turns off where the land says to.
+ * Never in a Lords of the Land match.
  */
 function settleLean(s: GameState, p: Player, mem: AiMemory): void {
   mem.lean = 'none';
-  if (s.scenario || !AI_LEVELS[p.ai!].clever || AI_LEVELS[p.ai!].lean === false || coin(s, p.id, 0x7e4a) >= AI_TEMPER.lean) return;
+  // Not in Lords of the Land (#810): that match names its own aim, every landmark, and a route chosen on a coin (the Wild's
+  // tamed beasts for a legion) could leave a town with no soldiers to take one back.
+  if (s.scenario || s.mode === 'lords' || !AI_LEVELS[p.ai!].clever || AI_LEVELS[p.ai!].lean === false || coin(s, p.id, 0x7e4a) >= AI_TEMPER.lean) return;
   const wet = s.mapType === 'lakes' || s.mapType === 'sea';
   const open = (Object.keys(ROUTES) as RouteId[]).filter((r) => r !== 'plain' && (wet || (r !== 'navy' && r !== 'water')) && leanAges(p, r).length > 0);
   if (!open.length) return;
@@ -453,6 +456,8 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   if (AI_LEVELS[v.p.ai!].clever) raiseMission(s, v, mem, issue);
   raiseBloomery(s, v, mem, issue);
   raiseHireHall(s, v, mem, issue);
+  raiseStockade(s, v, mem, issue);
+  raiseGallery(s, v, mem, issue);
   salvage(s, v, mem, issue);
   claimWalk(s, v, mem, issue);
   findWalk(s, v, mem, issue);
@@ -751,7 +756,7 @@ function worthWaiting(s: GameState, v: View, mem: AiMemory, r: Road): boolean {
 /** Whether a road's clue building is under construction and nothing else hides the road (#555). */
 function clueRising(s: GameState, p: Player, r: Road): boolean {
   if (!r.clue || r.vein || r.ruin || r.found || (r.walked && !hasWalked(p, r.walked)) || (r.crossing && !r.crossing.some((a) => hasWalked(p, a)))) return false;
-  return s.ents.some((e) => e.kind === 'building' && e.owner === p.id && e.type === r.clue && !e.built);
+  return s.ents.some((e) => e.kind === 'building' && e.owner === p.id && !e.built && cluesOf(r).includes(e.type));
 }
 
 /**
@@ -759,13 +764,17 @@ function clueRising(s: GameState, p: Player, r: Road): boolean {
  * Market the merchants'. Left to the town's usual order it lost the wood to cheaper buildings and the road was never seen, so
  * the town takes the trunk; it is raised first and its wood set aside. Only a road its age leads to (a turn at its own tier too), with no vein, ruin or find to wait on; the steppe's camp has its own order (`steppeRoad`).
  */
-function clueDue(v: View, mem: AiMemory): BuildingType | null {
+function clueDue(s: GameState, v: View, mem: AiMemory): BuildingType | null {
   const { p } = v;
   if (!walksWeb(v)) return null;
   for (const r of roadsFrom(p)) {
     if (!isSideRoad(r) || AGES[r.to].tier < p.epoch || hasWalked(p, r.to) || !r.clue || mem.roads?.[r.to] !== true || r.vein || r.ruin || r.found || AGES[r.to].mobile) continue;
     if ((r.walked && !hasWalked(p, r.walked)) || (r.crossing && !r.crossing.some((a) => hasWalked(p, a)))) continue;
-    if (count(v, r.clue) === 0 && BUILDINGS[r.clue].epoch <= p.epoch && !buildBarred(p, r.clue)) return r.clue;
+    // One of a road's clues standing is enough; else the first the people can raise now (a Briton's town tills no Farm, so Rivers shows at a Dock, #794).
+    const clues = cluesOf(r);
+    if (clues.some((c) => count(v, c) > 0)) continue;
+    const pick = clues.find((c) => BUILDINGS[c].epoch <= p.epoch && !buildBarred(p, c) && !wayBarred(s, p, c));
+    if (pick) return pick;
   }
   return null;
 }
@@ -3396,8 +3405,9 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     ['range', p.epoch >= 2 && n >= 24 && count(v, 'range') < 2],
     ['stable', p.epoch >= 3 && n >= 26 && count(v, 'stable') < 2],
   ];
-  const due = clueDue(v, mem);
-  if (due) want.unshift([due, true]);
+  const due = clueDue(s, v, mem);
+  // A Warband's Barracks still comes first (#810): a leaning (#749) must not put a road's clue ahead of how it eats.
+  if (due && !(p.way === 'warband' && count(v, 'barracks') === 0)) want.unshift([due, true]);
   for (const [type, ok] of want) {
     if (!ok || recently(type, 25) || BUILDINGS[type].epoch > p.epoch || buildBarred(p, type)) continue;
     // Not a building whose every line the age bars (a Stable in the Iron Age); a road's clue is raised all the same (a Greek city's Barracks hires foreign foot).
@@ -5632,7 +5642,22 @@ function haulHome(v: View, fighters: Unit[], issue: (c: Command) => void): Unit[
   const laden = fighters.filter((u) => (u.spoils ?? 0) >= SPOILS.home && u.order.k !== 'attack');
   if (!laden.length) return fighters;
   const fresh = laden.filter((u) => !(u.order.k === 'move' && !u.order.amove)).map((u) => u.id);
-  if (fresh.length) issue({ t: 'move', p: p.id, ids: fresh, x: ship ? ship.x : v.home.x, y: ship ? ship.y : v.home.y });
+  // A Spoils Stockade (#727) nearer than home takes the pack too (at a quarter's cut), so a host in the field banks at the front.
+  const bank = (u: Unit): { x: number; y: number } => {
+    if (ship) return ship;
+    let at: { x: number; y: number } = v.home;
+    let best = far(u);
+    for (const b of v.buildings) {
+      const d = (u.x - b.x) * (u.x - b.x) + (u.y - b.y) * (u.y - b.y);
+      if (b.type === 'stockade' && b.built && b.hp > 0 && d < best) { at = b; best = d; }
+    }
+    return at;
+  };
+  for (const id of fresh) {
+    const u = laden.find((l) => l.id === id)!;
+    const to = bank(u);
+    issue({ t: 'move', p: p.id, ids: [id], x: to.x, y: to.y });
+  }
   const going = new Set(laden.map((u) => u.id));
   return fighters.filter((u) => !going.has(u.id));
 }
@@ -5675,6 +5700,37 @@ function raiseBloomery(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   const spot = findSpot(s, 'bloomery', (bog % s.w) + 0.5, Math.floor(bog / s.w) + 0.5, 2, 8);
   if (spot) construct(s, v, mem, 'bloomery', spot, 2, issue);
 }
+
+/**
+ * The Warband's Spoils Stockade (#727): a computer in the age with a Barracks and a host of at least `AI_STOCKADE.army` raises one
+ * `STOCKADE.away` tiles out from home toward the middle of the map, one at a time, so the host banks near the front.
+ */
+function raiseStockade(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (ageOf(p) !== 'warband' || buildBarred(p, 'stockade') || count(v, 'stockade') > 0 || count(v, 'barracks') === 0) return;
+  if (v.army.length < AI_STOCKADE.army || s.tick - (mem.ordered.stockade ?? -99999) < secs(60)) return;
+  const dx = s.w / 2 - v.home.x;
+  const dy = s.h / 2 - v.home.y;
+  const d = Math.sqrt(dx * dx + dy * dy) || 1;
+  const spot = findSpot(s, 'stockade', v.home.x + (dx / d) * STOCKADE.away, v.home.y + (dy / d) * STOCKADE.away, 0, 8);
+  if (spot) construct(s, v, mem, 'stockade', spot, 2, issue);
+}
+
+/**
+ * The Sappers' Mine Gallery (#727): a computer in the age with a keg in store and a Barracks raises one `GALLERY.away` tiles out from
+ * home toward the middle of the map, one at a time, so its kegs are laid mined and a rival's are heard.
+ */
+function raiseGallery(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (ageOf(p) !== 'sapper' || buildBarred(p, 'gallery') || count(v, 'gallery') > 0 || count(v, 'barracks') === 0 || kegsOf(p) < 1) return;
+  if (s.tick - (mem.ordered.gallery ?? -99999) < secs(60)) return;
+  const dx = s.w / 2 - v.home.x;
+  const dy = s.h / 2 - v.home.y;
+  const d = Math.sqrt(dx * dx + dy * dy) || 1;
+  const spot = findSpot(s, 'gallery', v.home.x + (dx / d) * GALLERY.away, v.home.y + (dy / d) * GALLERY.away, 0, 8);
+  if (spot) construct(s, v, mem, 'gallery', spot, 2, issue);
+}
+
 
 /**
  * The Merchants' Hire Hall (#727): a computer in the age with a Market standing and gold to spare raises one by its Town Center, then signs its
