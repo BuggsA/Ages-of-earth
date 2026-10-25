@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { applyCommand } from '../../src/sim/commands';
-import { AMOUNT, COPPICE, SNARE, secs } from '../../src/sim/data';
-import { buildBarred } from '../../src/sim/ages';
-import { createGame, step } from '../../src/sim/game';
-import { growthAt } from '../../src/sim/coppice';
-import { fillSnares, snareCap, snareRate } from '../../src/sim/snares';
-import { B_RES, R_NONE, R_TREE } from '../../src/sim/types';
-import type { Building, GameState, Unit } from '../../src/sim/types';
-import { placeBuilding } from '../../src/sim/world';
+import { applyCommand } from '../src/sim/commands';
+import { AMOUNT, COPPICE, SNARE, secs } from '../src/sim/data';
+import { buildBarred } from '../src/sim/ages';
+import { createGame, step } from '../src/sim/game';
+import { growthAt } from '../src/sim/coppice';
+import { fillSnares, snareCap, snareRate } from '../src/sim/snares';
+import { B_RES, R_NONE, R_TREE } from '../src/sim/types';
+import type { Building, GameState, Unit } from '../src/sim/types';
+import { placeBuilding } from '../src/sim/world';
 
 // The managed wood (#501, the Britons): no fields; woods felled near the stores grow back, saplings are planted, and the snares feed the town.
 const game = () => createGame({ seed: 5, size: 'small', players: [{ name: 'A', ai: null, civ: 'britons' }, { name: 'B', ai: null, civ: 'greeks' }] });
