@@ -4,7 +4,7 @@ import { AI_GATE_ANSWER } from '../sim/data';
 import { AI_GATE_READ } from '../sim/data';
 import { gateReach } from '../sim/tides';
 import { isEnemy } from '../sim/world';
-import { AGES, BLOOM, LEVIATHANS, MYCELIUM, UNITS, BLOOMERY, HIREHALL, HIVE, INTERCEPT, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, BEGGARS, SEA_RAID, SPOILS, GALLERY, STANDARD, STRAND, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
+import { AGES, BLOOM, LEVIATHANS, MYCELIUM, UNITS, BLOOMERY, HIREHALL, HIVE, INTERCEPT, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, BEGGARS, SEA_RAID, SPOILS, GALLERY, STANDARD, STRAND, WHEELYARD, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
 import { battlesFor } from '../sim/battles';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, findsOf, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
@@ -361,6 +361,11 @@ const TIPS: Tip[] = [
     id: 'strand',
     when: (s, me) => ageOf(s.players[me]) === 'searaider',
     text: `A ship must sail home to a Dock to bank its hold. Raise a <b>${BUILDINGS.strand.name}</b> (<b>Y</b>) on a far shore instead: a ship within ${SEA_RAID.dock} tiles of it banks there at once, but the jarl keeps a quarter (${Math.round(STRAND.cut * 100)}% reaches you). It also musters foot soldiers on the spot. A rival can raze it, so guard the beach.`,
+  },
+  {
+    id: 'wheelyard',
+    when: (s, me) => ageOf(s.players[me]) === 'chariots',
+    text: `Chariots have no walls to fall back behind. Raise a <b>${BUILDINGS.wheelyard.name}</b> (<b>N</b>) near the front: riders within ${WHEELYARD.rest} tiles of it are mended ${WHEELYARD.heal} health a second, so strike, pull back to the yard and strike again. A rival can burn it, so guard it. Press <b>J</b> on it before you leave the Age of Chariots to keep it.`,
   },
   {
     id: 'gallery',
