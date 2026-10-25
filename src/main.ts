@@ -3661,6 +3661,21 @@ function frame(now: number): void {
   setEpoch(owner: number, epoch: number) {
     if (game) game.players[owner].epoch = epoch;
   },
+  /**
+   * Take a player to any age (testing, screenshots): `ages.goto(0, 'sapper')`. `ages.list()` names them all. The age's tier is the epoch;
+   * no road, price or door is checked, so it also reaches ages no road leads to.
+   */
+  goto(owner: number, age: string) {
+    if (!game || !(age in AGES)) return false;
+    const p = game.players[owner];
+    restat(game, p, () => {
+      p.epoch = AGES[age as keyof typeof AGES].tier;
+      p.age = age as typeof p.age;
+    });
+    return true;
+  },
+  /** Every age's id (testing). */
+  list: () => Object.keys(AGES),
   /** Put up a finished building near a point, or near the player's start (testing). */
   build(owner: number, type: BuildingType, x?: number, y?: number, minR = 4) {
     if (!game) return null;
