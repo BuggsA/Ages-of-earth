@@ -1981,6 +1981,44 @@ function standard(k: Kit, _e: number, _st: Style): void {
   k.box(0.84, 0.015, 0.015, '#c9b48a', 0, 0.2, 0.35);
 }
 
+/** A Raiders' Strand (#727, the Age of Sea-Raiders): a longship hauled up on rollers, its dragon prow high, a striped sail slung over it as a tent and a row of round shields along the gunwale. */
+function strand(k: Kit, _e: number, _st: Style): void {
+  const PLANK = '#7a5a3a';
+  const DARK = '#4a3322';
+  const SAIL = ['#d8cfb4', '#9a2a24'];
+  // Sand and trampled turf where the keel rests, and the rollers it was hauled up on.
+  k.cyl(1.05, 1.15, 0.05, 12, '#c8b58a', 0, 0, 0);
+  for (const x of [-0.5, 0, 0.5]) k.cyl(0.07, 0.07, 1.1, 6, DARK, x, 0.05, 0).rotation.x = Math.PI / 2;
+  // The hull, a keel of planks that rise toward bow and stern: nine ribs along the length, the middle lowest.
+  for (let i = 0; i < 9; i++) {
+    const x = -0.96 + i * 0.24;
+    const rise = ((i - 4) * (i - 4)) / 16 * 0.55;
+    k.box(0.26, 0.2 + rise, 0.62 - Math.abs(i - 4) * 0.045, i % 2 ? PLANK : '#8a6a46', x, 0.12, 0);
+  }
+  // Stem and stern posts curl up; the bow carries a carved head with a gilt eye.
+  k.cyl(0.05, 0.07, 0.8, 5, DARK, -1.1, 0.6, 0).rotation.z = -0.35;
+  k.cyl(0.05, 0.07, 0.7, 5, DARK, 1.1, 0.6, 0).rotation.z = 0.35;
+  k.sphere(0.12, PLANK, -1.25, 1.05, 0);
+  k.cone(0.06, 0.2, 4, PLANK, -1.38, 1.02, 0).rotation.z = Math.PI / 2;
+  k.sphere(0.03, '#e2b23c', -1.3, 1.1, 0.07);
+  k.sphere(0.03, '#e2b23c', -1.3, 1.1, -0.07);
+  // A row of round shields hung along the gunwale, alternating red and cream.
+  for (let i = 0; i < 6; i++) {
+    const x = -0.6 + i * 0.24;
+    k.cyl(0.11, 0.11, 0.03, 8, i % 2 ? '#9a2a24' : '#e6dcc4', x, 0.5, 0.33).rotation.x = Math.PI / 2;
+  }
+  // The sail is slung over a ridge pole as a tent, striped, with the team's colour on its gable.
+  k.cyl(0.04, 0.04, 1.6, 5, DARK, 0, 0.9, 0).rotation.z = Math.PI / 2;
+  for (const x of [-0.8, 0.8]) k.cyl(0.04, 0.05, 0.8, 5, DARK, x, 0.4, 0);
+  for (let i = 0; i < 4; i++) k.prism(0.4, 0.5, 0.86, SAIL[i % 2], -0.6 + i * 0.4, 0.7, 0);
+  k.team(k.box(0.04, 0.22, 0.4, TEAM, 0.85, 0.7, 0));
+  // A cookfire and a pile of loot on the sand before it.
+  k.cyl(0.14, 0.16, 0.06, 6, '#5a5650', 0.5, 0, 0.75);
+  k.cone(0.09, 0.22, 5, '#e08a30', 0.5, 0.05, 0.75);
+  k.box(0.3, 0.2, 0.22, '#8a6a46', -0.45, 0, 0.8);
+  k.sphere(0.09, '#e0b030', -0.4, 0.22, 0.8);
+}
+
 function bloomery(k: Kit, _e: number, st: Style): void {
   pad(k, 2, st.base);
   // The furnace stack: a clay drum that tapers to a smoking top, with a fire door and a team band.
@@ -2869,7 +2907,7 @@ const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' |
   heart: (k) => heart(k),
   spire: (k) => spire(k),
   greatden,
-  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, battery, windmill, bloomery, stockade, gallery, hirehall, standard,
+  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, battery, windmill, bloomery, stockade, gallery, hirehall, standard, strand,
   // The Age of Tides (#739), drawn in `tideModels.ts`.
   tidemill: (k: Kit, _e: number, st: Style) => tidemill(k, st.base),
   cockler: (k: Kit, _e: number, st: Style) => cocklerHut(k, st.base),
