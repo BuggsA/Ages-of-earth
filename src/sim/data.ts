@@ -572,6 +572,7 @@ export const AGES: Record<AgeId, Age> = {
     mul: { hunt: 1.15 },
     price: { cavalry: 0.8 },
     training: { cavalry: 0.75 },
+    keepsake: { building: 'standard', does: 'its horsetail pole: riders standing within 5 tiles of it take tribute from a rival whose land lies within 8, on any road' },
     mobile: true,
     noBuild: { buildings: ['farm', 'wall', 'gate'], why: 'A horde tills no fields and raises no walls: they wait until it settles in the Middle Ages' },
   },
@@ -2764,6 +2765,7 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   bloomery: { name: 'Bloom Hearth', size: 2, hp: 900, cost: { wood: 100, stone: 40 }, time: 30, pop: 0, sight: 5, trains: ['infantry'], drop: ['gold'], epoch: 1, ages: ['iron'], menu: 'mil', key: 'I', blurb: 'A clay hearth and bellows raised beside the marsh. Bog iron dropped here is smelted hard: every bar counts twice toward your spearmen\'s edge, and the hearth arms foot soldiers on the spot. Raise it by the bog and a rival who wants the iron must come to it. Kept (J) when your people leaves the Iron Age, it goes on arming spearmen at the Iron Age\'s price.' },
   stockade: { name: 'Spoils Stockade', size: 2, hp: 700, cost: { wood: 120, stone: 40 }, time: 25, pop: 0, sight: 6, trains: ['infantry'], drop: [], epoch: 2, ages: ['warband'], menu: 'mil', key: 'X', blurb: 'A palisade of sharpened stakes raised wherever the host fights, even far from home. A laden soldier within 5 tiles banks its pack here at once, but the quartermaster keeps a quarter: 75% reaches your coffers, against the whole of it at a Town Center or Barracks. It arms foot soldiers a tenth cheaper. Only in the Age of the Warband. Kept (J) when your people leaves it, it goes on arming foot soldiers at that price.' },
   hirehall: { name: 'Hire Hall', size: 2, hp: 800, cost: { wood: 120, gold: 60 }, time: 30, pop: 0, sight: 5, trains: ['infantry', 'ranged', 'cavalry'], drop: [], epoch: 2, ages: ['merchant'], menu: 'mil', key: 'V', blurb: 'A counting-house with a muster yard, where a captain signs his company for a term. Swords signed here cost gold alone, 1.6 times the Market\'s hire price, but they are paid once, up front: no wages, no payday behind, none walks off the field. Cavalry too, when the Stable is barred. Pick the Market for a cheap sword you must keep paying, or the Hall for one that is yours. Kept (J) when your people leaves the Age of Merchants, it goes on signing swords at that price on any road.' },
+  standard: { name: 'Horsetail Standard', size: 1, hp: 500, cost: { wood: 80, stone: 30 }, time: 20, pop: 0, sight: 7, trains: [], drop: [], epoch: 2, ages: ['horde'], menu: 'mil', key: 'Z', blurb: 'A tall pole hung with horse-tails and the khan\'s banner, planted where the horde means to be paid. Riders who stand within 5 tiles of it take tribute from the nearest rival whose land lies within 8 tiles of it, as though they stood in that land: the horde can wait at the border, out of reach of the Town Center\'s arrows, and still be paid. Only in the Age of the Horde. Kept (J) when your people leaves it, it goes on drawing tribute from a rival\'s border, on any road. Cut it down and the horde must ride into the rival\'s land again.' },
   gallery: { name: 'Mine Gallery', size: 2, hp: 800, cost: { wood: 100, stone: 80 }, time: 30, pop: 0, sight: 5, trains: [], drop: [], epoch: 3, ages: ['sapper'], menu: 'mil', key: 'P', blurb: 'A timbered shaft and spoil heap raised near a rival\'s walls, the sappers\' way into the ground. A keg laid within 6 tiles of it is mined: the fuse burns underground, and no rival can stamp it out. And a gallery listens: a rival keg laid within 6 tiles of one is countermined and lost. Only in the Age of Sappers. Kept (J) when your people leaves it, it goes on listening for rival kegs, on any road.' },
   windmill: { name: 'Windmill', size: 2, hp: 600, cost: { wood: 120, stone: 40 }, time: 30, pop: 0, sight: 5, trains: [], drop: [], epoch: 2, ages: ['dykes'], menu: 'eco', key: 'W', blurb: 'A post mill whose sails turn a scoop wheel. Raised by water a dyke has shut off from the open sea (or a small lake), it pumps it dry a tile every few seconds, nearest first, into polder: low black ground where a Farm yields half again as much. Two mills drain twice as fast. The open sea is too big to pump.' },
   // The Water Line (#701 s4): a gate in a dyke or a channel that lets the water out over the low ground behind it (`INUND`, `water.ts`).
@@ -4010,6 +4012,11 @@ export const AI_CACHE = { near: 20, hands: 3, safe: 6, worth: 30 };
  * a burning keg stamps it out (the keg is lost).
  */
 export const KEG = { ore: 20, time: 30, most: 20, lay: 1.2, fuse: 8, reach: 2, building: 600, unit: 30, douse: 1 };
+/**
+ * The Horde's Horsetail Standard (#727): riders standing within `reach` tiles of one take tribute at `rate` a second from the nearest
+ * rival whose land lies within `border` tiles of it, as though they stood in that land (the same `TRIBUTE.most` riders a rival).
+ */
+export const STANDARD = { reach: 5, border: 8, rate: 0.3 };
 /** The Mine Gallery (#727): a keg laid within `mine` tiles of its own gallery can't be stamped out; a rival keg within `listen` tiles of one is countermined. */
 export const GALLERY = { mine: 6, listen: 6, away: 14 };
 /**
@@ -4265,6 +4272,9 @@ export const AI_WILD = { mammothAt: 10, party: 5, mammothNear: 22, pack: 3, clea
  * by standing riders sends its army against them once `answer` of them stand in its land.
  */
 export const AI_HORDE = { milkers: 5, spare: 40, least: 3, hold: 300, stay: 300, cavalry: 0.9, riders: 6, clear: 12, weary: 3, foes: 4, alarm: 9, redo: 150, answer: 2 };
+
+/** The computer and the Horsetail Standard (#727): it plants one `past` tiles outside a rival Town Center's border. */
+export const AI_STANDARD = { past: 4 };
 
 export const AI_STEPPE = { take: 0.35, at: 12, campFrom: 8, campTo: 30, hunters: 6, reach: 26, spare: 100, perMilker: 3, every: 150, hungry: 0.5, bare: 16, move: 10, far: 18, drive: 40, stay: 90 };
 

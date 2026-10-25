@@ -1956,6 +1956,31 @@ function gallery(k: Kit, _e: number, st: Style): void {
   k.team(k.box(0.5, 0.18, 0.04, TEAM, 0.95, 1.55, 0.05));
 }
 
+/** A Horsetail Standard (#727, the Age of the Horde): a tall pole on a cairn, a crossbar hung with a fringe of horse-tails and a team pennant under a gilt crescent. */
+function standard(k: Kit, _e: number, _st: Style): void {
+  const POLE = '#5a3d28';
+  const TAIL = ['#e8e2d2', '#3a2a22', '#c9a35c', '#7a4a2a'];
+  // The cairn: a ring of fieldstones banked round the foot of the pole, and a felt mat laid before it.
+  for (let i = 0; i < 7; i++) {
+    const a = i * 0.9;
+    k.sphere(0.12 + (i % 2) * 0.03, i % 2 ? '#8d887c' : '#76726a', Math.cos(a) * 0.3, 0.06, Math.sin(a) * 0.3);
+  }
+  k.cyl(0.06, 0.08, 2.0, 6, POLE, 0, 0, 0);
+  // The crossbar and its fringe of tails, hanging in a row and shorter toward the ends.
+  k.box(0.7, 0.05, 0.05, POLE, 0, 1.75, 0);
+  for (let i = 0; i < 5; i++) {
+    const x = -0.3 + i * 0.15;
+    k.cone(0.06, 0.45 - Math.abs(i - 2) * 0.07, 5, TAIL[i % 4], x, 1.3 + Math.abs(i - 2) * 0.07, 0.04).rotation.x = Math.PI;
+  }
+  // The finial: a gilt disc and a crescent over it, and a pennant of the team's colour streaming from the pole.
+  k.cyl(0.1, 0.1, 0.03, 10, '#e2b23c', 0, 2.02, 0).rotation.x = Math.PI / 2;
+  k.ring(0.13, 0.02, '#e2b23c', 2.2).rotation.x = 0;
+  k.cloth(k.team(k.box(0.012, 0.26, 0.5, TEAM, 0, 1.45, 0.3)), 0.5, 0.05);
+  // Tethered horses' tack: a hitching rope and two stakes at the foot.
+  for (const x of [-0.42, 0.42]) k.cyl(0.02, 0.025, 0.28, 4, POLE, x, 0, 0.35);
+  k.box(0.84, 0.015, 0.015, '#c9b48a', 0, 0.2, 0.35);
+}
+
 function bloomery(k: Kit, _e: number, st: Style): void {
   pad(k, 2, st.base);
   // The furnace stack: a clay drum that tapers to a smoking top, with a fire door and a team band.
@@ -2844,7 +2869,7 @@ const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' |
   heart: (k) => heart(k),
   spire: (k) => spire(k),
   greatden,
-  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, battery, windmill, bloomery, stockade, gallery, hirehall,
+  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, battery, windmill, bloomery, stockade, gallery, hirehall, standard,
   // The Age of Tides (#739), drawn in `tideModels.ts`.
   tidemill: (k: Kit, _e: number, st: Style) => tidemill(k, st.base),
   cockler: (k: Kit, _e: number, st: Style) => cocklerHut(k, st.base),

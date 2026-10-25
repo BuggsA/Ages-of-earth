@@ -63,11 +63,11 @@ import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
 import { AI_TEMPER, ROUTES, TRUNK, type RouteId } from './data';
-import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS, STOCKADE, AI_STOCKADE, GALLERY } from './data';
+import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS, STOCKADE, AI_STOCKADE, GALLERY, AI_STANDARD, BORDERS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
-import { isRider, standing } from './tribute';
+import { flies, isRider, standardRival, standing } from './tribute';
 import { flockCap, flockOf, grassy, grazeRange, milkable } from './flocks';
 import { progress, scenarioById } from './campaign';
 import { tames, wildBeast } from './tame';
@@ -458,6 +458,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   raiseHireHall(s, v, mem, issue);
   raiseStockade(s, v, mem, issue);
   raiseGallery(s, v, mem, issue);
+  raiseStandard(s, v, mem, issue);
   salvage(s, v, mem, issue);
   claimWalk(s, v, mem, issue);
   findWalk(s, v, mem, issue);
@@ -5745,6 +5746,28 @@ function raiseHireHall(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   if (spot) construct(s, v, mem, 'hirehall', spot, 2, issue);
 }
 
+/**
+ * The Horde's Horsetail Standard (#727): a computer in the age with a Stable and a band's worth of riders raises one on its side of the
+ * nearest rival Town Center that holds gold, `AI_STANDARD.past` tiles beyond that rival's border, so its band can stand by it and be paid.
+ */
+function raiseStandard(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (ageOf(p) !== 'horde' || buildBarred(p, 'standard') || count(v, 'standard') > 0 || count(v, 'stable') === 0 || !v.tc) return;
+  if (s.tick - (mem.ordered.standard ?? -99999) < secs(60) || v.army.filter((u) => isRider(u)).length < AI_HORDE.riders) return;
+  let best: Building | null = null;
+  let bestD = Infinity;
+  for (const b of s.ents) {
+    if (b.kind !== 'building' || b.type !== 'towncenter' || !b.built || b.hp <= 0 || !isEnemy(s, p.id, b.owner) || s.players[b.owner].res.gold < 50) continue;
+    const d = (b.x - v.home.x) * (b.x - v.home.x) + (b.y - v.home.y) * (b.y - v.home.y);
+    if (d < bestD) { best = b; bestD = d; }
+  }
+  if (!best) return;
+  const dl = Math.sqrt(bestD) || 1;
+  const r = (BORDERS.towncenter ?? 14) + BUILDINGS.towncenter.size / 2 + AI_STANDARD.past;
+  const spot = findSpot(s, 'standard', best.x + ((v.home.x - best.x) / dl) * r, best.y + ((v.home.y - best.y) / dl) * r, 0, 4);
+  if (spot) construct(s, v, mem, 'standard', spot, 2, issue);
+}
+
 function raidShips(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
   if (!ageDef(p).raid) return;
@@ -6258,7 +6281,17 @@ function exactTribute(s: GameState, v: View, mem: AiMemory, issue: (c: Command) 
   const own = borderMap(s);
   let best: { x: number; y: number } | null = null;
   let bestD = Infinity;
+  // A Horsetail Standard (#727) of ours with a rival's land in reach of it: the band stands by it instead, outside the Town Center's arrows.
   for (const b of s.ents) {
+    if (b.kind !== 'building' || b.owner !== p.id || !flies(s, b) || standardRival(s, own, b) < 0) continue;
+    const x = b.tx + b.size / 2, y = b.ty + b.size / 2 + 1;
+    if (foesWithin(s, p, x, y, AI_HORDE.alarm).length >= AI_HORDE.foes) continue;
+    best = { x, y };
+    bestD = 0;
+    break;
+  }
+  for (const b of s.ents) {
+    if (bestD === 0) break;
     if (b.kind !== 'building' || b.type !== 'towncenter' || !b.built || b.hp <= 0 || !isEnemy(s, p.id, b.owner) || (s.players[b.owner].res.gold < 50 && !(nomad && s.players[b.owner].res.stone >= 50))) continue;
     const dx = v.home.x - b.x;
     const dy = v.home.y - b.y;
