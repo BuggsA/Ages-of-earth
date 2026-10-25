@@ -1,6 +1,6 @@
 import { applyCommand, heroBusy, MAX_QUEUE } from './commands';
 import { aiTiding } from './tidings';
-import { AGES, AI_SILO, WARHEADS, AI_BREACH, SILO, TICK_HZ, AI_CLIMB, AI_FIND, FINDS, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_SEA, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, SEA_RAID, MISSION, AI_MISSION, AI_CHARIOT, AI_BEGGARS, STEP_BACK, stepBackCost, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
+import { AGES, AI_SILO, WARHEADS, AI_BREACH, SILO, TICK_HZ, AI_CLIMB, AI_FIND, FINDS, AI_SHORE, YEAR, ROADS, AI_MERC, MERC, AI_FAITH, AI_LIGHTNING, LIGHTNING, CONSECRATE, AI_LEVELS, AI_BELL, AI_MARK, AI_BLOOD, AI_HEMO, AI_FORK, AI_RITE, AI_CURSE, AI_ORDERS, AI_HEART, ORDERS, RITE, BLOOD, CALL_UP, AI_PROWL, AI_SCOUT, WARCAMP, AI_RAID, AI_SEA, AI_STEPPE, AI_HORDE, AI_WEB, AI_WONDER, AI_FAIR, AI_SORTIE, AI_VIGIL, AI_CONVOY, AI_ORE, ORE_TRADE, AI_WILD, AI_WINTER, BONUS, BUILDINGS, COUNTER, FLOCK, SIGNATURES, TRIBUTE, LAST_EPOCH, MARKET, POP_MAX, RALLY, TECHS, VIGIL, WORKS, AMOUNT, SALVAGE, SEA_RAID, MISSION, AI_MISSION, AI_CHARIOT, AI_BEGGARS, AI_HUNT, HUNT, STEP_BACK, stepBackCost, domainOf, secs, unitEpoch, unitStats, type Road } from './data';
 import { NAVAL, distToRect, nearestWalkable, placeProblem, shoreWater, walkable } from './grid';
 import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, raiseProblem, techCostFor, techProblem, trainCostFor } from './stats';
@@ -226,6 +226,8 @@ interface View {
   wagons: Unit[];
   /** Its Skywhales and its Behemoth (the Age of Leviathans): flown and walked by `leviathanWork`, never the army's. */
   giants: Unit[];
+  /** Its Hawks (the Age of the Wild Hunt): sent exploring by `hawkWork`, never the army's. */
+  hawks: Unit[];
   /** How many citizens may hunt deer, and how far from home: more and further for a people bound for the steppe (#320). */
   hunt: { n: number; r: number };
   /** About to strike camp (#320): the Town Center starts nothing new, so its queue empties and it can pack. */
@@ -277,6 +279,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   const planes: Unit[] = [];
   const wagons: Unit[] = [];
   const giants: Unit[] = [];
+  const hawks: Unit[] = [];
   const buildings: Building[] = [];
   let king: Unit | null = null;
   for (const e of s.ents) {
@@ -284,7 +287,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
     if (e.kind === 'unit' && s.kings[p.id] === e.id) king = e;
     else if (e.kind === 'unit') {
       const list =
-        e.type === 'citizen' ? citizens : e.type === 'wagon' || e.type === 'tow' ? wagons : e.type === 'skywhale' || e.type === 'behemoth' ? giants : e.type === 'priest' ? priests : e.type === 'trader' ? traders : e.type === 'cog' ? cogs : e.type === 'fisher' ? fishers : e.type === 'warship' || e.type === 'transport' || e.type === 'barge' || e.type === 'reefship' || e.type === 'kraken' ? navy : e.type === 'fighter' || e.type === 'bomber' ? planes : army;
+        e.type === 'citizen' ? citizens : e.type === 'wagon' || e.type === 'tow' ? wagons : e.type === 'skywhale' || e.type === 'behemoth' ? giants : e.type === 'hawk' ? hawks : e.type === 'priest' ? priests : e.type === 'trader' ? traders : e.type === 'cog' ? cogs : e.type === 'fisher' ? fishers : e.type === 'warship' || e.type === 'transport' || e.type === 'barge' || e.type === 'reefship' || e.type === 'kraken' ? navy : e.type === 'fighter' || e.type === 'bomber' ? planes : army;
       list.push(e);
     } else buildings.push(e);
   }
@@ -294,7 +297,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   // A steppe camp on the move (#320): home is where its Town Center is being driven or pitched.
   const moving = tc ? null : (buildings.find((b) => b.type === 'towncenter' && b.pitch !== undefined) ?? wagons.find((w) => w.packed === 'towncenter') ?? null);
   const home = tc ? { x: tc.x, y: tc.y } : moving ? { x: moving.x, y: moving.y } : { x: p.startX, y: p.startY };
-  const v: View = { p, citizens, army, priests, traders, cogs, fishers, navy, planes, buildings, home, tc, budget: { ...p.res }, plan: NO_PLAN, diggers: new Set(), armyFirst: false, claimers: new Set(), wagons, giants, hunt: { n: 3, r: 16 }, packing: !!mem.steppe?.pack, hands: citizens.length + (isLegion(p) && p.epoch <= LEGION.aiUntil ? army.filter(legionHand).length : 0) };
+  const v: View = { p, citizens, army, priests, traders, cogs, fishers, navy, planes, buildings, home, tc, budget: { ...p.res }, plan: NO_PLAN, diggers: new Set(), armyFirst: false, claimers: new Set(), wagons, giants, hawks, hunt: { n: 3, r: 16 }, packing: !!mem.steppe?.pack, hands: citizens.length + (isLegion(p) && p.epoch <= LEGION.aiUntil ? army.filter(legionHand).length : 0) };
   // The Hunters' Way (#463 s1) lives by the chase in the Stone Age: more hunters, ranging farther, with camps pitched at the kill.
   if (p.way === 'hunt' && p.epoch === 0) v.hunt = { n: AI_WAYS.hunters, r: AI_WAYS.huntReach };
   const issue = (c: Command) => applyCommand(s, c);
@@ -330,6 +333,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   wildwoodWork(s, v, mem, issue);
   bloomWork(s, v, mem, issue);
   leviathanWork(s, v, mem, issue);
+  hawkWork(s, v, issue);
   hackSeeds(s, v, issue);
   answerGreening(s, v, issue);
   readYear(s, v);
@@ -892,6 +896,11 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
     if (mem.sea?.at !== 'beggars') mem.sea = { at: 'beggars', since: s.tick };
     if (s.tick - mem.sea.since < secs(AI_BEGGARS.hold)) return null;
   }
+  // The Wild Hunt stays `AI_HUNT.hold` seconds (#801): the raids with a pack at every rider's heel are what the crossing was for.
+  if (walksWeb(v) && ageOf(p) === 'hunt') {
+    if (mem.sea?.at !== 'hunt') mem.sea = { at: 'hunt', since: s.tick };
+    if (s.tick - mem.sea.since < secs(AI_HUNT.hold)) return null;
+  }
   // The Horde stays `stay` seconds before it climbs on: tribute is what it came for (#322).
   if (walksWeb(v) && ageOf(p) === 'horde') {
     const st = (mem.steppe ??= {});
@@ -1046,6 +1055,7 @@ const CROSS_PLAN: Partial<Record<AgeId, { salt: number; keeps: BuildingType[]; t
   missions: { salt: 0x4d15, keeps: ['dock', 'temple'], take: AI_MISSION.take, stay: AI_MISSION.stay },
   chariots: { salt: 0xc4a1, keeps: ['forge'], take: AI_CHARIOT.take, stay: AI_CHARIOT.stay },
   beggars: { salt: 0xbe66, keeps: ['dock'], take: AI_BEGGARS.take, stay: AI_BEGGARS.stay },
+  hunt: { salt: 0x4a77, keeps: ['huntcamp'], take: AI_HUNT.take, stay: AI_HUNT.stay },
 };
 
 /**
@@ -4231,6 +4241,25 @@ function bloomWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
 }
 
 /**
+ * The Age of the Wild Hunt (#801): a clever computer standing in it keeps `HUNT.hawks` Hawk aloft, trained at a Hunting Camp of its own, and
+ * sends it exploring, so the pack sees what it will run down. An idle hawk is sent again; nothing is issued while one is on its way.
+ */
+function hawkWork(s: GameState, v: View, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!ageDef(p).heel || !AI_LEVELS[p.ai!].clever) return;
+  for (const h of v.hawks) if (h.order.k === 'idle' && !h.inside) issue({ t: 'explore', p: p.id, ids: [h.id] });
+  if (v.hawks.length >= HUNT.hawks) return;
+  const camps = v.buildings.filter((b) => b.type === 'huntcamp' && b.built && b.queue.length < MAX_QUEUE);
+  const camp = camps.reduce<Building | null>((best, b) => (!best || b.queue.length < best.queue.length ? b : best), null);
+  if (!camp || v.buildings.some((b) => b.type === 'huntcamp' && b.queue.some((q) => q.unit === 'hawk'))) return;
+  const cost = trainCostFor(s, p.id, 'hawk', 'huntcamp', camp);
+  if (afford(v, cost)) {
+    issue({ t: 'train', p: p.id, building: camp.id, unit: 'hawk' });
+    spend(v, cost);
+  }
+}
+
+/**
  * The Age of Leviathans: a Great Den within `LEVIATHANS.aiFrom` tiles of home; the Behemoth bred first and knelt by the nearest gold
  * or stone `aiOut` tiles or more from home, a forward capital; then up to `aiWhales` Skywhales, each loaded at home with idle
  * soldiers and flown to a rival building it has seen (else the rival's home), where it sets them down and seed-bombs the streets.
@@ -6271,7 +6300,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     if (!b.built || b.queue.length >= Math.min(2, MAX_QUEUE) || keepCitizensGrowing) continue;
     const trains = lines(p, b);
     // The Great Den's giants are bred by `leviathanWork`, to their own counts: not here, by turns, as soldiers.
-    if (!trains.length || trains.includes('citizen') || b.type === 'dock' || b.type === 'airfield' || b.type === 'greatden') continue;
+    if (!trains.length || trains.includes('citizen') || b.type === 'dock' || b.type === 'airfield' || b.type === 'greatden' || b.type === 'huntcamp') continue;
     // Against a people of iron, archers come first (#50): the lines that don't answer its foot train only
     // while they number under half the archers.
     if (ironRival && b.type !== 'workshop' && b.type !== 'temple' && !trains.includes(COUNTER.infantry) && answer.others * 2 >= answer.archers) continue;

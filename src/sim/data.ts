@@ -102,6 +102,11 @@ export interface Age {
   noBuild?: { buildings: BuildingType[]; why: string };
   /** A town on wheels (#297): Town Centers and Houses can be packed onto wagons and pitched again elsewhere (`STEPPE`). */
   mobile?: boolean;
+  /**
+   * The Age of the Wild Hunt (#801): every rider trained at a Stable comes with a War Wolf running beside it, the people's wolves follow
+   * its wagons when the camp moves, and its Hunting Camps send hawks aloft. See `HUNT` (`hunt.ts`).
+   */
+  heel?: boolean;
   /** Buildings a mobile age packs onto wagons besides `STEPPE.packs` (the Silk Road's Market, #326). */
   packs?: BuildingType[];
   /**
@@ -654,6 +659,22 @@ export const AGES: Record<AgeId, Age> = {
     names: { cavalry: 'Chariot' },
     noBuild: { buildings: ['wall', 'gate'], why: 'A chariot people raises no walls or gates: it rides open ground. They wait until it settles in the Bronze Age or climbs on' },
     no: { units: ['ranged'], why: 'No archers behind a chariot\'s dust: bows wait until the people settles in the Bronze Age or climbs on' },
+  },
+  // The fifth crossing (#801, step 8b of the Wild route, `docs/wild-road.md` §X): the Wild's beasts and the Steppe's camp on wheels made one
+  // hunt. Open only to a people that walked both, off the Stone Age they share. Raids that see everything and outrun everything.
+  hunt: {
+    verb: 'Ride with a War Wolf running at every rider\'s heel, and let the pack follow the wagons when the camp moves; loose hawks over the map to see what the pack will run down',
+    door: 'No fields, walls or gates, the steppe\'s door, and every rider a fifth dearer: the wolf at its heel is fed from your stores',
+    good: 'Raids that see everything and outrun everything: a rider and a wolf for the price of a rider, hawks for eyes, and a camp that moves',
+    routes: [],
+    name: 'Age of the Wild Hunt',
+    short: 'Wild Hunt',
+    tier: 1,
+    blurb: 'As the Scythian and the Mongol hunted with dogs and hawks and drove the game before them: the Wild\'s beasts met the Steppe\'s camp on wheels. Every rider trained at a Stable comes out with a War Wolf running beside it, tamed or not, and the wolves follow your wagons when the camp moves, so a pack is always at the wagon\'s heel. A Hunting Camp trains Hawks, cheap birds that fly over walls, woods and water and see farther than any scout, but cannot fight (an archer or a tower can still shoot one down). Town Centers and Houses pack onto wagons as on the Steppe. What it gives up: fields, walls and gates, and every rider costs a fifth more, for the wolf.',
+    price: { cavalry: 1.2 },
+    mobile: true,
+    heel: true,
+    noBuild: { buildings: ['farm', 'wall', 'gate'], why: 'A people of the Wild Hunt tills no fields and raises no walls: they wait for the Middle Ages, or until it settles in the Bronze Age' },
   },
   // The Wild route (`docs/wild-road.md`), first step: the wild beasts of the map become an army, and the Den breeds more.
   wild: {
@@ -1570,6 +1591,20 @@ export const ROADS: Road[] = [
   },
   { from: 'beggars', to: 'middle', cost: { food: 200, wood: 150 }, time: 25, blurb: 'Lay up the beggar fleet: the ordinary Middle Ages, with walls, gates and fishing boats. The ships you took are yours to keep.' },
   { from: 'beggars', to: 'gunpowder', cost: { food: 900, wood: 500, gold: 450, stone: 150 }, time: 65, blurb: 'Climb to the Gunpowder Age: the boarding ends, walls, gates and fishing boats return, and the ships you took sail on as your own (more wood and less gold than from the Middle Ages: the fortune was in the ships).' },
+  // The fifth crossing (#801): off the Stone Age, for a people that walked the Wild and the Steppe, the two turns off it. The way back to the
+  // Stone Age is a step back (`STEP_BACK`). A Hunting Camp is the clue, as on both; the journey is the price.
+  {
+    from: 'stone',
+    to: 'hunt',
+    cost: { food: 350, wood: 200, gold: 100 },
+    time: 40,
+    clue: 'huntcamp',
+    gate: 'hard',
+    crossing: ['wild', 'steppe'],
+    blurb: 'A turn, not a climb, for a people that has walked both the Wild and the Steppe: the pack and the camp ride as one. Every rider trained at a Stable comes with a War Wolf running at its heel, the wolves follow the wagons when the camp moves, and a Hunting Camp trains Hawks that see far and cannot fight. What it gives up: fields, walls and gates, and riders cost a fifth more.',
+  },
+  { from: 'hunt', to: 'bronze', cost: { food: 150, wood: 150 }, time: 20, blurb: 'Settle down: the Bronze Age, with fields, walls and gates, and riders at their usual price. The wolves and hawks you have stay, but no wolf comes at a rider\'s heel.' },
+  { from: 'hunt', to: 'middle', cost: EPOCHS[2].cost, time: EPOCHS[2].time, blurb: 'Rejoin the main road at the Middle Ages, for the same price as from the Bronze Age: fields, walls and gates return. The wolves and hawks you have stay, but no wolf comes at a rider\'s heel.' },
   // The Golden Age (#703): heard of by a people that has walked two side ages, open to one that has walked three. It ends on its own (`GOLDEN.span`).
   {
     from: 'gunpowder',
@@ -1884,6 +1919,7 @@ export interface UnitStats {
 
 /** A beast of the Wild: the same from the Bronze tier on, for it does not re-arm. */
 const beast = (u: UnitStats): (UnitStats | null)[] => [null, u, u, u, u];
+const HAWK: UnitStats = { name: 'Hawk', cls: 'bomber', hp: 26, attack: 0, armor: 0, parmor: 0, range: 0, reload: 1, speed: 3.6, sight: 15, cost: { food: 40 }, time: 12, radius: 0.18, blurb: 'A hunter\'s bird, trained at a Hunting Camp: it flies over walls, woods and water and sees farther than any scout, but it has no weapon and a hawk is soon dead if it lingers in range of an archer or a tower. Right-click ground to send it there.' };
 const BLOWPIPE: UnitStats = { name: 'Blowpipe Hunter', cls: 'ranged', hp: 50, attack: 3, armor: 0, parmor: 1, range: 4, reload: 1.6, speed: 1.7, sight: 7, cost: { food: 35, wood: 40 }, time: 14, radius: 0.24, shot: 'dart', blurb: 'A hunter with a long cane blowpipe and darts tipped in venom. Short of reach, but every dart adds venom that burns past armour and slows: death to heavy riders, bears and mammoths. Riders who reach it first cut it down.' };
 
 /** Each line has one version per epoch (null where it isn't available yet). Units re-arm when their owner advances. */
@@ -2058,14 +2094,16 @@ export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
   kraken: [null, null, null, null, null, { name: 'Kraken', cls: 'ship', hp: 1400, attack: 34, armor: 3, parmor: 5, range: 1.5, reload: 2.5, speed: 2.4, sight: 9, cost: { food: 500, wood: 100, gold: 300 }, time: 60, radius: 0.5, blurb: `A giant of the deep, bred at a Great Den that stands within ${KRAKEN_SEA} tiles of the sea, ${KRAKEN_MOST} to a people. Its arms reach a tile and a half: every blow on a ship grips it ${KRAKEN_GRIP} seconds, so it can't sail away, and it drags at anything on the shore beside it. Your own ships near it are shoved along a third faster. It outruns warships and tears them apart, but warships and towers that shoot first wear it down, and it never leaves the water.` }],
   reefship: [null, null, null, null, null, { name: 'Reef Ship', cls: 'ship', hp: 420, attack: 14, armor: 2, parmor: 4, range: 6, reload: 2.5, speed: 2.0, sight: 9, cost: { food: 140, wood: 60 }, time: 30, radius: 0.5, shot: 'bolt', blurb: `A living ship of coral and kelp, grown at a Dock in the warship's place while your people stands in the Age of Leviathans, for food and wood, not gold. It is launched at ${REEF_BORN}% of its strength and grows to full on the water, ${REEF_MEND} a second, and mends itself the same way once ${LEVIATHANS_CALM} seconds pass without a blow: weaker than an ironclad, but a fleet that grows back between fights.` }],
   behemoth: [null, null, null, null, null, { name: 'Behemoth', cls: 'siege', hp: 3200, attack: 28, armor: 5, parmor: 12, range: 0, reload: 3, speed: 0.75, sight: 9, cost: { food: 1000, wood: 500, stone: 200, gold: 500 }, time: 120, radius: 0.5, blurb: 'A titan turtle with a Town Center on its back, one to a people: a capital that walks. It tramples walls and buildings, and arrows and bullets barely mark its shell; spears and riders swarm it. Kneel it (P) on ground no rival holds and its Town Center stands there at once, working: it trains, takes in every stock and claims the land. Rise (P) and it walks on. It counts as a Town Center while it walks, and losing it loses one.' }],
+  // The Age of the Wild Hunt (`HUNT`): a hunter's bird, trained at a Hunting Camp by a people standing in the age. It has no weapon.
+  hawk: [null, HAWK, HAWK, HAWK, HAWK, HAWK],
   warmammoth: beast({ name: 'War Mammoth', cls: 'siege', hp: 420, attack: 16, armor: 2, parmor: 4, range: 0, reload: 2.4, speed: 1.1, sight: 6, cost: { food: 260, gold: 60 }, time: 40, radius: 0.55, blurb: 'A woolly mammoth led to war: it tramples walls and buildings as a ram does, and gores soldiers too. Spearmen and riders swarm it.' }),
 };
 
-const DOMAINS: Partial<Record<UnitType, Domain>> = { fisher: 'water', warship: 'water', transport: 'water', cog: 'water', barge: 'water', tow: 'water', fighter: 'air', bomber: 'air', skywhale: 'air', kraken: 'water', reefship: 'water' };
+const DOMAINS: Partial<Record<UnitType, Domain>> = { hawk: 'air', fisher: 'water', warship: 'water', transport: 'water', cog: 'water', barge: 'water', tow: 'water', fighter: 'air', bomber: 'air', skywhale: 'air', kraken: 'water', reefship: 'water' };
 /** Where a unit line goes: on foot, on the water or in the air. */
 export const domainOf = (type: UnitType): Domain => DOMAINS[type] ?? 'land';
 
-export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader', 'wagon', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge', 'warden', 'tow', 'skywhale', 'behemoth', 'kraken', 'reefship'];
+export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader', 'wagon', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge', 'warden', 'tow', 'skywhale', 'behemoth', 'kraken', 'reefship', 'hawk'];
 export const MILITARY: UnitType[] = ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'warship', 'fighter', 'bomber', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge', 'warden', 'behemoth', 'kraken', 'reefship'];
 
 type Target = UnitClass | 'building';
@@ -4085,6 +4123,18 @@ export const BEGGARS = { left: 0.35, haven: 12, cut: 1.2 };
  * (`stay`) and in the age itself (`hold`); there its idle warships cut the rival dyke seen within `hunt` tiles of its Dock that holds back polder.
  */
 export const AI_BEGGARS = { take: 0.5, stay: 120, hold: 300, hunt: 30 };
+/**
+ * The Age of the Wild Hunt (#801, `hunt.ts`). A War Wolf of a people with the pack at heel that stands idle within `follow` tiles of one
+ * of its wagons, and farther than `heel` from it, runs to it (looked at every `every` seconds). The computer keeps `hawks` Hawks aloft, sent
+ * exploring, from the moment it walks the age.
+ */
+export const HUNT = { follow: 18, heel: 2.5, every: 2, hawks: 1 };
+/**
+ * The computer and the Wild Hunt (#801): the odds it plans the crossing once it has walked one sibling (`take`), its stay in each (`stay`)
+ * and in the age itself (`hold`).
+ */
+export const AI_HUNT = { take: 0.5, stay: 120, hold: 240 };
+
 
 export const WARCAMP = { watch: 8, grace: 10, burn: 0.05, train: 1.2 };
 

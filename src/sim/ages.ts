@@ -34,7 +34,7 @@ const boon = (key: keyof Mods, v: number): boolean => (LOWER_IS_BETTER.includes(
 /** What an age's verbs are, beyond its numbers and its doors: carried whole into a Golden Age. */
 const VERB_KEYS = [
   'hire', 'mobile', 'packs', 'caravans', 'relicTrade', 'ironTrade', 'forge', 'coils', 'callUp', 'haul', 'blood', 'hemocraft', 'rite', 'fission', 'fusion',
-  'reclaim', 'salvage', 'sortie', 'fairs', 'convoys', 'prizes', 'vigils', 'thralls', 'mills', 'sappers', 'raid', 'missions', 'names', 'pumps', 'rivers', 'sluices', 'canals', 'turbines', 'boards',
+  'reclaim', 'salvage', 'sortie', 'fairs', 'convoys', 'prizes', 'vigils', 'thralls', 'mills', 'sappers', 'raid', 'missions', 'names', 'pumps', 'rivers', 'sluices', 'canals', 'turbines', 'boards', 'heel',
 ] as const;
 
 const woven = new Map<string, Age>();
@@ -365,7 +365,8 @@ const BRED: UnitType[] = ['cavebear'];
 export function trainsAt(p: Player, at: BuildingType): UnitType[] {
   const hires = hiresAt(p, at);
   // A Leviathan people's Docks grow Reef Ships in the warships' place (#789), while it stands in the age.
-  const own = at === 'den' && hasWalked(p, 'hive') ? [...BUILDINGS[at].trains, ...BRED] : at === 'dock' && ageOf(p) === 'leviathans' ? BUILDINGS[at].trains.map((u) => (u === 'warship' ? 'reefship' : u)) : BUILDINGS[at].trains;
+  // A Wild Hunt people's Hunting Camps send hawks aloft (#801), while it stands in the age.
+  const own = at === 'huntcamp' && ageDef(p).heel ? [...BUILDINGS[at].trains, 'hawk' as const] : at === 'den' && hasWalked(p, 'hive') ? [...BUILDINGS[at].trains, ...BRED] : at === 'dock' && ageOf(p) === 'leviathans' ? BUILDINGS[at].trains.map((u) => (u === 'warship' ? 'reefship' : u)) : BUILDINGS[at].trains;
   return hires.length ? [...own, ...hires] : own;
 }
 
@@ -385,6 +386,8 @@ export function barred(p: Player, unit: UnitType, at?: BuildingType): string | n
   // The Age of Leviathans: its giants are bred for a people that has walked it, in any age after.
   if ((unit === 'skywhale' || unit === 'behemoth' || unit === 'kraken') && !hasWalked(p, 'leviathans')) return `Only a people that has walked the ${AGES.leviathans.name} breeds giants`;
   if (unit === 'reefship' && ageOf(p) !== 'leviathans') return `Reef Ships grow only for a people standing in the ${AGES.leviathans.name}`;
+  // The Wild Hunt's hawks fly for a people standing in the age (#801).
+  if (unit === 'hawk' && !ageDef(p).heel) return `Hawks fly only for a people standing in the ${AGES.hunt.name}`;
   const no = ageDef(p).no;
   return no && no.units.includes(unit) ? no.why : null;
 }
