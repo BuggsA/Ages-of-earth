@@ -1,50 +1,78 @@
 import { describe, expect, it } from 'vitest';
-import { TECHS, TRADE } from '../src/sim/data';
+import { AGES, BUILDINGS, CONVOY, LIGHTHOUSE } from '../src/sim/data';
+import { buildBarred } from '../src/sim/ages';
+import { convoyShare } from '../src/sim/convoy';
 import { createGame } from '../src/sim/game';
-import { portSpot } from '../src/sim/trade';
+import type { AgeId, Building, GameState } from '../src/sim/types';
+import { placeProblem } from '../src/sim/grid';
+import { placeBuilding, spawnUnit } from '../src/sim/world';
 
-const game = (seed: number) =>
-  createGame({
-    seed,
-    size: 'small',
-    mapType: 'lakes',
-    startEpoch: 2,
-    players: [
-      { name: 'A', ai: null, civ: 'romans' },
-      { name: 'B', ai: null, civ: 'romans' },
-    ],
+/** The Age of Sail's Lighthouse (#727): a standing escort for the cogs that load beside it. */
+
+const game = (age: AgeId = 'sail'): GameState => {
+  const s = createGame({ seed: 2, size: 'small', mapType: 'lakes', players: [{ name: 'A', ai: null }, { name: 'B', ai: null }] });
+  s.peaceUntil = 1e9;
+  const p = s.players[0];
+  p.epoch = AGES[age].tier;
+  p.age = age;
+  p.walked = age === 'sail' ? ['sail'] : [];
+  p.res = { food: 9000, wood: 9000, stone: 9000, gold: 0 };
+  return s;
+};
+const shore = (s: GameState): Building => {
+  const p = s.players[0];
+  const spots: { tx: number; ty: number; d: number }[] = [];
+  for (let ty = 1; ty < s.h; ty++) for (let tx = 1; tx < s.w; tx++) if (!placeProblem(s, 'lighthouse', tx, ty)) spots.push({ tx, ty, d: (tx - p.startX) ** 2 + (ty - p.startY) ** 2 });
+  spots.sort((a, b) => a.d - b.d);
+  const at = spots[0];
+  if (!at) throw new Error('no shore');
+  const b = placeBuilding(s, 0, 'lighthouse', at.tx, at.ty, true);
+  b.built = true;
+  b.hp = BUILDINGS.lighthouse.hp;
+  return b;
+};
+
+describe('the Lighthouse (#727)', () => {
+  it('stands on a shore, in the Age of Sail only', () => {
+    expect(BUILDINGS.lighthouse.shore).toBe(true);
+    expect(BUILDINGS.lighthouse.ages).toEqual(['sail']);
+    expect(buildBarred(game('sail').players[0], 'lighthouse')).toBeNull();
+    expect(buildBarred(game('iron').players[0], 'lighthouse')).not.toBeNull();
   });
 
-describe('Lighthouse', () => {
-  it('is a Dock technology that widens the port reach', () => {
-    expect(TECHS.lighthouse.at).toBe('dock');
-    expect(TECHS.lighthouse.needs).toBe('gillnets');
-    expect(TECHS.lighthouse.add?.portReach).toBeGreaterThan(0);
+  it('escorts a cog that loads within its reach, with no warship beside it', () => {
+    const s = game();
+    const l = shore(s);
+    const near = spawnUnit(s, 0, 'cog', l.x + LIGHTHOUSE.reach - 1, l.y);
+    const far = spawnUnit(s, 0, 'cog', l.x + LIGHTHOUSE.reach + 2, l.y);
+    expect(convoyShare(s, near)).toBe(LIGHTHOUSE.pay);
+    expect(convoyShare(s, far)).toBe(1);
   });
 
-  it('makes posts farther from the water ports, for its owner only', () => {
-    let found = false;
-    for (let seed = 1; seed < 60 && !found; seed++) {
-      const s = game(seed);
-      for (const post of s.posts) {
-        if (portSpot(s, post, 0)) continue;
-        const p = s.players[0];
-        p.techs.push('lighthouse');
-        p.statsVersion++;
-        const wide = portSpot(s, post, 0);
-        if (wide) {
-          const dx = wide.x - post.x;
-          const dy = wide.y - post.y;
-          expect(dx * dx + dy * dy).toBeGreaterThan(TRADE.sea.reach * TRADE.sea.reach);
-          expect(portSpot(s, post, 1)).toBeNull();
-          expect(portSpot(s, post)).toBeNull();
-          found = true;
-          break;
-        }
-        p.techs.pop();
-        p.statsVersion++;
-      }
-    }
-    expect(found).toBe(true);
+  it('pays less than a warship, and the better of the two applies', () => {
+    const s = game();
+    const l = shore(s);
+    const cog = spawnUnit(s, 0, 'cog', l.x + 3, l.y);
+    expect(LIGHTHOUSE.pay).toBeLessThan(CONVOY.pay);
+    spawnUnit(s, 0, 'warship', cog.x + 1, cog.y);
+    expect(convoyShare(s, cog)).toBe(CONVOY.pay);
+  });
+
+  it('goes dark when razed, or unfinished, or when the people leaves the age', () => {
+    const s = game();
+    const l = shore(s);
+    const cog = spawnUnit(s, 0, 'cog', l.x + 2, l.y);
+    l.built = false;
+    expect(convoyShare(s, cog)).toBe(1);
+    l.built = true;
+    l.hp = 0;
+    expect(convoyShare(s, cog)).toBe(1);
+    l.hp = BUILDINGS.lighthouse.hp;
+    expect(convoyShare(s, cog)).toBe(LIGHTHOUSE.pay);
+    // Out of the age (a Sail Dock's keepsake keeps the convoy rule alive on any road), the lamp sleeps.
+    const t = game('iron');
+    const d = shore(t);
+    t.players[0].walked = ['sail'];
+    expect(convoyShare(t, spawnUnit(t, 0, 'cog', d.x + 2, d.y), { keep: 'sail' })).toBe(1);
   });
 });

@@ -63,7 +63,7 @@ import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
 import { AI_TEMPER, ROUTES, TRUNK, type RouteId } from './data';
-import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS, STOCKADE, AI_STOCKADE, GALLERY, AI_STANDARD, BORDERS, STRAND, AI_YARD } from './data';
+import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS, STOCKADE, AI_STOCKADE, GALLERY, AI_STANDARD, BORDERS, STRAND, AI_YARD, AI_LIGHT } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
@@ -461,6 +461,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   raiseStandard(s, v, mem, issue);
   raiseStrand(s, v, mem, issue);
   raiseYard(s, v, mem, issue);
+  raiseLighthouse(s, v, mem, issue);
   salvage(s, v, mem, issue);
   claimWalk(s, v, mem, issue);
   findWalk(s, v, mem, issue);
@@ -5838,6 +5839,20 @@ function raiseYard(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   const r = Math.min(AI_YARD.out, dl / 2);
   const spot = findSpot(s, 'wheelyard', v.home.x + ((best.x - v.home.x) / dl) * r, v.home.y + ((best.y - v.home.y) / dl) * r, 0, 6);
   if (spot) construct(s, v, mem, 'wheelyard', spot, 2, issue);
+}
+
+/**
+ * The Age of Sail's Lighthouse (#727): a computer with cogs at sea raises one on the shore within `AI_LIGHT.shore` tiles of the port
+ * where most of its cogs load, one at a time, so they sail in convoy even when the escort is away.
+ */
+function raiseLighthouse(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!ageDef(p).convoys || buildBarred(p, 'lighthouse') || count(v, 'lighthouse') > 0 || count(v, 'dock') === 0) return;
+  if (s.tick - (mem.ordered.lighthouse ?? -99999) < secs(60)) return;
+  const port = convoyPort(s, v);
+  if (!port) return;
+  const spot = findSpot(s, 'lighthouse', port.x, port.y, 0, AI_LIGHT.shore, 0);
+  if (spot) construct(s, v, mem, 'lighthouse', spot, 2, issue);
 }
 
 function raidShips(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {

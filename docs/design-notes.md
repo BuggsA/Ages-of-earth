@@ -1625,3 +1625,9 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 **Built:** the Age of Chariots' own building. No walls means no shelter, so the yard is where chariots are mended, 4 health a second within 5 tiles: a forward yard turns a raid into strike, fall back, strike. The computer plants one toward its nearest rival once it has riders.
 **Why I love it:** it gives the wall-less age a place to *be*, and a thing to burn.
 **Next:** the computer pulling hurt riders back to it, a chariot mended faster with bog iron, a drawn button glyph.
+
+## Designers' notes: the Lighthouse (#727, 2026-10-25, chain 1025-1752 s6)
+
+**Built:** the Age of Sail's own building. Convoys needed a warship tied to every cog; a lit Lighthouse by the far port escorts for it (+20% gold within 8 tiles), so the fleet can go hunting prizes instead. The computer lights one by its busiest port.
+**Why I love it:** it turns "the fleet is the wall" into a choice: stand a tower on the headland, or keep ships beside the cogs. And a rival raider has a fixed target to burn.
+**Next:** the beacon revealing rival ships through fog at night, the computer sending its fleet raiding once the lamp is lit, a drawn button glyph.
