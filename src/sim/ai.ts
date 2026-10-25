@@ -63,7 +63,7 @@ import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
 import { AI_TEMPER, ROUTES, TRUNK, type RouteId } from './data';
-import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS, STOCKADE, AI_STOCKADE, GALLERY, AI_STANDARD, BORDERS } from './data';
+import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS, STOCKADE, AI_STOCKADE, GALLERY, AI_STANDARD, BORDERS, STRAND } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
@@ -459,6 +459,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   raiseStockade(s, v, mem, issue);
   raiseGallery(s, v, mem, issue);
   raiseStandard(s, v, mem, issue);
+  raiseStrand(s, v, mem, issue);
   salvage(s, v, mem, issue);
   claimWalk(s, v, mem, issue);
   findWalk(s, v, mem, issue);
@@ -2721,19 +2722,21 @@ function interceptorRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Comman
 
 /**
  * What a `w` warhead landing at (x, y) would cost the rivals, as the computer weighs it: each building (a Town Center counts `heart`)
- * and soldier (counts `soldier`) is worth its weight times the share of its health the blast takes, never more than all of it.
+ * and soldier (counts `soldier`) is worth its weight times the share of its health the blast takes, never more than all of it. A blast
+ * hurts anyone, so what it would take from the computer's own people and its allies is taken off, at `AI_SILO.own` times the weight.
  */
 function siloWorth(s: GameState, owner: number, x: number, y: number, w: WarheadKind): number {
   let worth = 0;
   const R = WARHEADS[w].r;
   for (const e of s.ents) {
-    if (e.hp <= 0 || !isEnemy(s, owner, e.owner)) continue;
+    if (e.hp <= 0) continue;
+    const weight = isEnemy(s, owner, e.owner) ? 1 : -AI_SILO.own;
     if (e.kind === 'building') {
       const d = distToRect(x, y, e);
-      if (d < R) worth += (e.type === 'towncenter' ? AI_SILO.heart : 1) * Math.min(1, blastDamage(w, d) / e.hp);
+      if (d < R) worth += weight * (e.type === 'towncenter' ? AI_SILO.heart : 1) * Math.min(1, blastDamage(w, d) / e.hp);
     } else if (!e.inside && domainOf(e.type) === 'land' && MILITARY.includes(e.type)) {
       const dx = e.x - x, dy = e.y - y;
-      if (dx * dx + dy * dy < R * R) worth += AI_SILO.soldier * Math.min(1, blastDamage(w, Math.sqrt(dx * dx + dy * dy)) / e.hp);
+      if (dx * dx + dy * dy < R * R) worth += weight * AI_SILO.soldier * Math.min(1, blastDamage(w, Math.sqrt(dx * dx + dy * dy)) / e.hp);
     }
   }
   return worth;
@@ -5768,11 +5771,29 @@ function raiseStandard(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   if (spot) construct(s, v, mem, 'standard', spot, 2, issue);
 }
 
+/**
+ * The Sea-Raiders' Raiders' Strand (#727): a computer in the age with a Dock and a ship raises one `STRAND.away` tiles out from home
+ * toward the middle of the map, one at a time, so a laden ship banks near the raid instead of sailing home.
+ */
+function raiseStrand(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!ageDef(p).raid || buildBarred(p, 'strand') || count(v, 'strand') > 0 || count(v, 'dock') === 0 || !v.navy.some((u) => u.type === 'transport')) return;
+  if (s.tick - (mem.ordered.strand ?? -99999) < secs(60)) return;
+  const dx = s.w / 2 - v.home.x;
+  const dy = s.h / 2 - v.home.y;
+  const d = Math.sqrt(dx * dx + dy * dy) || 1;
+  // A shore is rare: look about the mark, then widen the search from home.
+  const spot = findSpot(s, 'strand', v.home.x + (dx / d) * STRAND.away, v.home.y + (dy / d) * STRAND.away, 0, 10, 0) ?? findSpot(s, 'strand', v.home.x, v.home.y, 8, 40, 0);
+  if (spot) construct(s, v, mem, 'strand', spot, 2, issue);
+}
+
 function raidShips(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
   if (!ageDef(p).raid) return;
   const docks = v.buildings.filter((b) => b.type === 'dock' && b.built);
   if (!docks.length) return;
+  // A Raiders' Strand (#727) takes the hold too, at a cut: a ship far from every Dock sails to the nearer bank.
+  const banks = [...docks, ...v.buildings.filter((b) => b.type === 'strand' && b.built && b.hp > 0)];
   const ships = v.navy.filter((u) => u.type === 'transport');
   if (!ships.length && !docks.some((d) => d.queue.some((q) => q.unit === 'transport'))) {
     const dock = docks.slice().sort((a, b) => a.queue.length - b.queue.length || a.id - b.id).find((d) => d.queue.length < MAX_QUEUE);
@@ -5784,7 +5805,7 @@ function raidShips(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   }
   for (const u of ships) {
     if (u.id === mem.landing?.ship || u.order.k !== 'idle' || (u.spoils ?? 0) < SEA_RAID.home) continue;
-    const dock = docks.slice().sort((a, b) => distToRect(u.x, u.y, a) - distToRect(u.x, u.y, b) || a.id - b.id)[0];
+    const dock = banks.slice().sort((a, b) => distToRect(u.x, u.y, a) - distToRect(u.x, u.y, b) || a.id - b.id)[0];
     if (distToRect(u.x, u.y, dock) > SEA_RAID.dock - 1) issue({ t: 'move', p: p.id, ids: [u.id], x: dock.x, y: dock.y });
   }
 }
