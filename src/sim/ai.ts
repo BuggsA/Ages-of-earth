@@ -455,6 +455,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   excavate(s, v, mem, issue);
   if (AI_LEVELS[v.p.ai!].clever) raiseMission(s, v, mem, issue);
   raiseBloomery(s, v, mem, issue);
+  raiseHireHall(s, v, mem, issue);
   raiseStockade(s, v, mem, issue);
   raiseGallery(s, v, mem, issue);
   salvage(s, v, mem, issue);
@@ -5728,6 +5729,20 @@ function raiseGallery(s: GameState, v: View, mem: AiMemory, issue: (c: Command) 
   const d = Math.sqrt(dx * dx + dy * dy) || 1;
   const spot = findSpot(s, 'gallery', v.home.x + (dx / d) * GALLERY.away, v.home.y + (dy / d) * GALLERY.away, 0, 8);
   if (spot) construct(s, v, mem, 'gallery', spot, 2, issue);
+}
+
+
+/**
+ * The Merchants' Hire Hall (#727): a computer in the age with a Market standing and gold to spare raises one by its Town Center, then signs its
+ * swords there (the training loop treats it as any soldier yard). One at a time, and not again for 30 seconds.
+ */
+function raiseHireHall(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (ageOf(p) !== 'merchant' || buildBarred(p, 'hirehall') || count(v, 'hirehall') > 0 || count(v, 'market', true) === 0) return;
+  if (s.tick - (mem.ordered.hirehall ?? -99999) < secs(30)) return;
+  if (v.budget.gold < (BUILDINGS.hirehall.cost.gold ?? 0) + 100) return;
+  const spot = findSpot(s, 'hirehall', v.home.x, v.home.y, 5, 14);
+  if (spot) construct(s, v, mem, 'hirehall', spot, 2, issue);
 }
 
 function raidShips(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {

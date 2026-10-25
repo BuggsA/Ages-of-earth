@@ -1,4 +1,4 @@
-import { AGES, BUILDINGS, CIVS, GUNS, GROVE, HIVE, TOWER_LEVELS, WAYS, WORKS, SIGNATURES, EPOCHS, FLOOD, NO_MODS, PATHS, RARE, STOCKADE, TECHS, WARCAMP, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
+import { AGES, BUILDINGS, HIREHALL, CIVS, GUNS, GROVE, HIVE, TOWER_LEVELS, WAYS, WORKS, SIGNATURES, EPOCHS, FLOOD, NO_MODS, PATHS, RARE, STOCKADE, TECHS, WARCAMP, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
 import { fairLevy } from './fair';
 import { flooded } from './flood';
 import { ageDef, ageOf, hasWalked, isHire, isSuspended, pathCarry, threadsOf } from './ages';
@@ -143,6 +143,13 @@ export function trainCostFor(s: GameState, owner: number, type: UnitType, at: Bu
   const p = s.players[owner];
   const base = unitStats(type, p.epoch).cost;
   const age = ageDef(p);
+  // The Hire Hall (#727) signs a sword for gold alone at a dearer, once-paid price, in the Age of Merchants or kept on any road.
+  const hall = at === 'hirehall' && (age.hire || where?.keep === 'merchant') ? AGES.merchant.hire : undefined;
+  if (hall) {
+    let sum = 0;
+    for (const r of RES) sum += base[r] ?? 0;
+    return scale({ gold: Math.round((sum * hall.gold * HIREHALL.dear) / 5) * 5 }, fairLevy(s, owner, type, where));
+  }
   if (age.hire && isHire(p, at, type)) {
     let sum = 0;
     for (const r of RES) sum += base[r] ?? 0;
@@ -163,6 +170,7 @@ export function trainTimeFor(s: GameState, owner: number, type: UnitType, at: Bu
   const hire = ageDef(p).hire;
   // A War Camp's tents train slower than a Barracks' drill yard (#303).
   if (at === 'warcamp') return t * WARCAMP.train;
+  if (at === 'hirehall') return t * AGES.merchant.hire!.time;
   return hire && isHire(p, at, type) ? t * hire.time : t;
 }
 
