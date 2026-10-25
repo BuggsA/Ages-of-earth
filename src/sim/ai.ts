@@ -63,7 +63,7 @@ import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
 import { AI_TEMPER, ROUTES, TRUNK, type RouteId } from './data';
-import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS, STOCKADE, AI_STOCKADE, GALLERY, AI_STANDARD, BORDERS, STRAND, AI_YARD, AI_PHAROS, AI_CHANTRY } from './data';
+import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS, STOCKADE, AI_STOCKADE, GALLERY, AI_STANDARD, BORDERS, STRAND, AI_YARD, AI_PHAROS, AI_CHANTRY, AI_MEWS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
@@ -463,6 +463,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   raiseYard(s, v, mem, issue);
   raisePharos(s, v, mem, issue);
   raiseChantry(s, v, mem, issue);
+  raiseMews(s, v, mem, issue);
   salvage(s, v, mem, issue);
   claimWalk(s, v, mem, issue);
   findWalk(s, v, mem, issue);
@@ -5845,6 +5846,41 @@ function raiseYard(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
 }
 
 /**
+ * The Wild Hunt's Falconer's Mews (#727): a clever computer standing in the age raises one `AI_MEWS.out` tiles from home toward the nearest
+ * rival Town Center, one at a time, and breeds a War Wolf there while it has fewer than `AI_MEWS.wolves` and the food, so the pack is
+ * reinforced at the border and not at the Stables at home.
+ */
+function raiseMews(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!ageDef(p).heel || !AI_LEVELS[p.ai!].clever || !v.tc) return;
+  const mews = v.buildings.find((b) => b.type === 'mews' && b.built && b.hp > 0);
+  if (mews) {
+    const wolves = v.army.filter((u) => u.type === 'warwolf').length + mews.queue.length;
+    const cost = trainCostFor(s, p.id, 'warwolf', 'mews', mews);
+    if (wolves < AI_MEWS.wolves && mews.queue.length < MAX_QUEUE && p.pop < p.cap && afford(v, cost)) {
+      issue({ t: 'train', p: p.id, building: mews.id, unit: 'warwolf' });
+      spend(v, cost);
+    }
+    return;
+  }
+  if (buildBarred(p, 'mews') || count(v, 'mews') > 0 || v.army.length < 4 || s.tick - (mem.ordered.mews ?? -99999) < secs(60)) return;
+  if (!afford(v, buildingCostFor(s, p.id, 'mews'))) return;
+  let best: Building | null = null;
+  let bestD = Infinity;
+  for (const b of s.ents) {
+    if (b.kind !== 'building' || b.type !== 'towncenter' || !b.built || b.hp <= 0 || !isEnemy(s, p.id, b.owner)) continue;
+    const d = (b.x - v.home.x) * (b.x - v.home.x) + (b.y - v.home.y) * (b.y - v.home.y);
+    if (d < bestD) { best = b; bestD = d; }
+  }
+  if (!best) return;
+  const dl = Math.sqrt(bestD) || 1;
+  const r = Math.min(AI_MEWS.out, dl / 2);
+  const spot = findSpot(s, 'mews', v.home.x + ((best.x - v.home.x) / dl) * r, v.home.y + ((best.y - v.home.y) / dl) * r, 0, 6);
+  mem.ordered.mews = s.tick;
+  if (spot) construct(s, v, mem, 'mews', spot, 2, issue);
+}
+
+/**
  * The Pilgrims' Wayside Chantry (#727): a computer in the Age of Pilgrims with a priest to spare (past the ones keeping vigil) sends it to raise a chantry
  * `AI_CHANTRY.out` tiles from home toward the nearest rival Town Center, one at a time, so its chanting band can stand at the border.
  */
@@ -6524,7 +6560,7 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     if (!b.built || b.queue.length >= Math.min(2, MAX_QUEUE) || keepCitizensGrowing) continue;
     const trains = lines(p, b);
     // The Great Den's giants are bred by `leviathanWork`, to their own counts: not here, by turns, as soldiers.
-    if (!trains.length || trains.includes('citizen') || b.type === 'dock' || b.type === 'airfield' || b.type === 'greatden' || b.type === 'huntcamp') continue;
+    if (!trains.length || trains.includes('citizen') || b.type === 'dock' || b.type === 'airfield' || b.type === 'greatden' || b.type === 'huntcamp' || b.type === 'mews') continue;
     // Against a people of iron, archers come first (#50): the lines that don't answer its foot train only
     // while they number under half the archers.
     if (ironRival && b.type !== 'workshop' && b.type !== 'temple' && !trains.includes(COUNTER.infantry) && answer.others * 2 >= answer.archers) continue;

@@ -369,7 +369,7 @@ export function trainsAt(p: Player, at: BuildingType): UnitType[] {
   const hires = hiresAt(p, at);
   // A Leviathan people's Docks grow Reef Ships in the warships' place (#789), while it stands in the age.
   // A Wild Hunt people's Hunting Camps send hawks aloft (#801), while it stands in the age.
-  const own = at === 'huntcamp' && ageDef(p).heel ? [...BUILDINGS[at].trains, 'hawk' as const] : at === 'den' && hasWalked(p, 'hive') ? [...BUILDINGS[at].trains, ...BRED] : at === 'dock' && ageOf(p) === 'leviathans' ? BUILDINGS[at].trains.map((u) => (u === 'warship' ? 'reefship' : u)) : BUILDINGS[at].trains;
+  const own = (at === 'huntcamp' || at === 'mews') && ageDef(p).heel ? [...BUILDINGS[at].trains, 'hawk' as const] : at === 'den' && hasWalked(p, 'hive') ? [...BUILDINGS[at].trains, ...BRED] : at === 'dock' && ageOf(p) === 'leviathans' ? BUILDINGS[at].trains.map((u) => (u === 'warship' ? 'reefship' : u)) : BUILDINGS[at].trains;
   return hires.length ? [...own, ...hires] : own;
 }
 
@@ -380,7 +380,7 @@ export function barred(p: Player, unit: UnitType, at?: BuildingType): string | n
   // The polis (#501): a Greek city trains no foot soldiers; its citizens take up arms. It may still hire foreign foot for gold.
   if (unit === 'infantry' && CIVS[p.civ].polis && !(at && isHire(p, at, unit))) return 'A Greek city trains no foot soldiers: select citizens and take up arms (H)';
   // The Beast Den (the Age of the Wild): it breeds only the kinds this people has tamed.
-  const kind = unit === 'warwolf' ? 'wolf' : unit === 'tusker' ? 'boar' : unit === 'warmammoth' ? 'mammoth' : null;
+  const kind = at === 'mews' ? null : unit === 'warwolf' ? 'wolf' : unit === 'tusker' ? 'boar' : unit === 'warmammoth' ? 'mammoth' : null;
   if (kind && !p.tamed?.includes(kind)) return `Tame a wild ${kind} first: the Den breeds only what your people has tamed`;
   // The Age of the Hive: its darts and its bears belong to a people that has walked it, in any age after.
   if ((unit === 'blowpipe' || unit === 'cavebear') && !hasWalked(p, 'hive')) return `Only a people that has walked the ${AGES.hive.name} ${unit === 'blowpipe' ? 'trains Blowpipe Hunters' : 'breeds Cave Bears'}`;

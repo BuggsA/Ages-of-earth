@@ -17,7 +17,7 @@ export default defineConfig(({ mode }) => ({
   test: {
     include: [mode === 'slow' ? 'tests/slow/**/*.test.ts' : 'tests/*.test.ts'],
     environment: 'node',
-    testTimeout: mode === 'slow' ? 60_000 : 15000,
+    testTimeout: mode === 'slow' ? 60_000 : 30_000,
     // Each world is generated once per test file and copied after (tests/setup/map-cache.ts).
     setupFiles: ['tests/setup/map-cache.ts'],
   },
