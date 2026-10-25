@@ -3,6 +3,7 @@ import { groveStep, rootThorn } from './grove';
 import { hiveStep } from './hive';
 import { treeToWake, wakeTree, wildwoodStep, WAKE_NONE } from './wildwood';
 import { bloomStep } from './bloom';
+import { bornBehemoth } from './leviathans';
 import { aiStep } from './ai';
 import { workStep } from './works';
 import { beaconStep } from './beacon';
@@ -435,6 +436,8 @@ function bringOut(s: GameState, p: Player, b: Building, unit: UnitType): void {
   const spot = exitSpot(s, b, toward.x, toward.y, unit === 'barge' ? BARGE : domain === 'water' ? NAVAL : domain === 'air' ? AIR : undefined);
   // An Ent steps out of the tree it was (the Age of the Wildwood), not out of the Heart Tree.
   const u = (unit === 'warden' && wakeTree(s, b)) || spawnUnit(s, p.id, unit, spot.x, spot.y);
+  // A Behemoth (the Age of Leviathans) is born with its Town Center on its back.
+  if (unit === 'behemoth') bornBehemoth(u);
   p.pop++;
   p.stats.trained++;
   // A soldier hired for gold at the Market is a sword for hire (`MERC`): it draws wages from now on.

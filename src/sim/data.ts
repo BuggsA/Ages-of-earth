@@ -38,6 +38,10 @@ const BLOOM_RING = 6;
 const BLOOM_GREEN = 35;
 const BLOOM_LEAST = 1000;
 const BLOOM_HOLD = 180;
+/** The Age of Leviathans' giants (`LEVIATHANS`), named here so the age's, the Den's and the giants' words can say them. */
+const WHALE_HOLD = 10;
+const WHALE_BOMB = 30;
+const WHALE_SEEDS = 3;
 
 // ---- Ages and paths -------------------------------------------------------------------------------
 
@@ -703,6 +707,19 @@ export const AGES: Record<AgeId, Age> = {
     no: { units: ['warwolf', 'tusker', 'warmammoth', 'cavebear'], why: 'A Bloom people breeds no new beasts: its Dens are quiet. They wake if it goes back to the Wildwood or rejoins the Atomic Age' },
     noBuild: { buildings: ['silo'], why: 'A Bloom people raises no Missile Silo: its warhead is the Bloom Seed. Silos wait until it rejoins the Atomic Age' },
   },
+  // The Wild route's beasts' end (`docs/wild-road.md` §5a, `leviathans.ts`): the Bloom's sibling at the fork, and reach over walls.
+  leviathans: {
+    verb: 'Breed giants at a Great Den: Skywhales that carry soldiers over walls and drop seed-bombs of Thornwall in a rival\'s streets, and one Behemoth with a Town Center on its back, a capital that walks and kneels where you need it',
+    door: 'The Heart Tree sleeps: no new Ents, no Spreading, and your Ents root; and still no machines: no rifles, field guns, aircraft or Missile Silo',
+    good: 'Reach: soldiers dropped behind a rival\'s walls, a rival\'s town cut into pieces by thorn, and a capital that walks to the wood, the gold or the front',
+    routes: ['wild'],
+    name: 'Age of Leviathans',
+    short: 'Leviathans',
+    tier: 5,
+    blurb: `Instead of the Atomic Age: the beasts' end. Raise a Great Den (J) and breed giants there. A Skywhale is a living airship: it drifts over walls, woods and water carrying ${WHALE_HOLD} soldiers or citizens, sets them down wherever there is ground, and every ${WHALE_BOMB} seconds drops a seed-bomb (B) that sprouts ${WHALE_SEEDS} Thornwall seedlings on the ground beneath it, in a rival's streets as well as your own. Fighters, riflemen and towers bring it down. The Behemoth is one titan turtle to a people, with a Town Center on its back: it walks, tramples walls, and kneels (P) wherever the land is not a rival's, a working Town Center at once, then rises (P) and walks on. Lose it and you lose a Town Center. The Heart Tree sleeps while you stay: no new Ents, no Spreading, and every Ent roots. No rifles, field guns, aircraft or Missile Silo.`,
+    no: { units: ['warden', 'ranged', 'siege', 'fighter', 'bomber'], why: 'A Leviathan people wakes no Ents while its Heart Tree sleeps, and builds no machines: no rifles, field guns or aircraft. Its giants are its air and its siege. They wait until it goes back to the Wildwood or rejoins the Atomic Age' },
+    noBuild: { buildings: ['airfield', 'silo'], why: 'A Leviathan people builds no machines: no Airfield or Missile Silo until it rejoins the Atomic Age' },
+  },
   // The second crossing (#555 s12): the Pilgrims' priests and the Sail's ships made one trade. Open only to a people that walked both.
   missions: {
     verb: 'Sail priests to far shores and raise Missions there: each claims land, trains priests, and pays a tithe that grows with its distance from home',
@@ -1111,10 +1128,26 @@ export const ROADS: Road[] = [
     clue: 'heart',
     walked: 'wildwood',
     deed: { stat: 'spread', n: 12, text: 'Your woods spread 12 seedlings round the Heart Tree' },
+    shuns: 'leviathans',
     blurb: 'Instead of the Atomic Age: the plants\' end. A Seed Spire slings Bloom Seeds that crack a rival\'s town into forest unless they hack the root out, and the Greening wins the match for a people whose land stays green. No new beasts and no Missile Silo while you stay.',
   },
   { from: 'bloom', to: 'atomic', cost: { food: 300, gold: 300 }, time: 30, blurb: 'Rejoin the Atomic Age and its Missile Silo. Your Spire keeps its Seeds and your Dens wake again; the Greening, the pollen storms and the Spreading every season end.' },
   { from: 'bloom', to: 'wildwood', cost: { food: 300, wood: 300 }, time: 30, blurb: 'Go back into the Wildwood: the Dens wake and fire burns twice as hard again. Your Spire keeps its Seeds; the Greening ends.' },
+  // The Wild route's fifth step, the beasts' end (`docs/wild-road.md` §5a): a Den shows it, and a town that has bred its beasts opens it.
+  // It and the Bloom shut each other: a people chooses the beasts or the plants for good.
+  {
+    from: 'wildwood',
+    to: 'leviathans',
+    cost: { food: 1800, wood: 1000, gold: 1200 },
+    time: 90,
+    clue: 'den',
+    walked: 'wildwood',
+    deed: { stat: 'bred', n: 20, text: 'Your Dens rear 20 beasts' },
+    shuns: 'bloom',
+    blurb: 'Instead of the Atomic Age: the beasts\' end. A Great Den breeds Skywhales that carry soldiers over walls and drop seed-bombs of Thornwall, and one Behemoth with a Town Center on its back. The Heart Tree sleeps, machines stay away, and the Bloom is closed to you for good.',
+  },
+  { from: 'leviathans', to: 'atomic', cost: { food: 300, gold: 300 }, time: 30, blurb: 'Rejoin the Atomic Age: machines and the Missile Silo return, and the Heart Tree wakes. Your Great Den keeps breeding its giants.' },
+  { from: 'leviathans', to: 'wildwood', cost: { food: 300, wood: 300 }, time: 30, blurb: 'Go back into the Wildwood: the Heart Tree wakes, Ents walk again and the woods spread each spring. Your Great Den keeps breeding its giants.' },
   // The other road out of the Stone Age (#297): the hunt, not the bog, opens it.
   {
     from: 'stone',
@@ -1970,15 +2003,18 @@ export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
   blowpipe: [null, null, null, BLOWPIPE, BLOWPIPE],
   // The Age of the Wildwood (`WILDWOOD`): an Ent, woken from an old tree at the Heart Tree by a people that has walked the Wildwood.
   warden: [null, null, null, null, { name: 'Ent', cls: 'siege', hp: 650, attack: 22, armor: 3, parmor: 8, range: 4, reload: 3.2, speed: 0.85, sight: 7, cost: { food: 150, wood: 200, gold: 80 }, time: 40, radius: 0.6, shot: 'boulder', splash: 0.8, blurb: 'An old tree of your woods, woken at the Heart Tree: it walks slowly, tears boulders from the ground and flings them, and breaks buildings and engines. Arrows barely mark its bark, but swords, riders and fire bring it down. Root it (O) and it is a tree again: it mends, and wakes when a rival comes near.' }],
+  // The Age of Leviathans (`LEVIATHANS`): giants bred at the Great Den by a people that has walked it. They don't re-arm either.
+  skywhale: [null, null, null, null, null, { name: 'Skywhale', cls: 'bomber', hp: 800, attack: 0, armor: 2, parmor: 4, range: 0, reload: 1, speed: 1.9, sight: 10, cost: { food: 400, wood: 100, gold: 150 }, time: 45, radius: 0.8, capacity: WHALE_HOLD, blurb: `A whale of the air, bred at the Great Den: its great gas-bladder carries it slowly over walls, woods and water with ${WHALE_HOLD} soldiers or citizens aboard (right-click it to board, then right-click ground to set them down). Every ${WHALE_BOMB} seconds it drops a seed-bomb (B): ${WHALE_SEEDS} Thornwall seedlings sprout on the ground beneath it, in a rival's streets as well as your own. It has no weapon; fighters, riflemen and towers bring it down, and those aboard fall with it.` }],
+  behemoth: [null, null, null, null, null, { name: 'Behemoth', cls: 'siege', hp: 3200, attack: 28, armor: 5, parmor: 12, range: 0, reload: 3, speed: 0.75, sight: 9, cost: { food: 1000, wood: 500, stone: 200, gold: 500 }, time: 120, radius: 0.5, blurb: 'A titan turtle with a Town Center on its back, one to a people: a capital that walks. It tramples walls and buildings, and arrows and bullets barely mark its shell; spears and riders swarm it. Kneel it (P) on ground no rival holds and its Town Center stands there at once, working: it trains, takes in every stock and claims the land. Rise (P) and it walks on. It counts as a Town Center while it walks, and losing it loses one.' }],
   warmammoth: beast({ name: 'War Mammoth', cls: 'siege', hp: 420, attack: 16, armor: 2, parmor: 4, range: 0, reload: 2.4, speed: 1.1, sight: 6, cost: { food: 260, gold: 60 }, time: 40, radius: 0.55, blurb: 'A woolly mammoth led to war: it tramples walls and buildings as a ram does, and gores soldiers too. Spearmen and riders swarm it.' }),
 };
 
-const DOMAINS: Partial<Record<UnitType, Domain>> = { fisher: 'water', warship: 'water', transport: 'water', cog: 'water', barge: 'water', tow: 'water', fighter: 'air', bomber: 'air' };
+const DOMAINS: Partial<Record<UnitType, Domain>> = { fisher: 'water', warship: 'water', transport: 'water', cog: 'water', barge: 'water', tow: 'water', fighter: 'air', bomber: 'air', skywhale: 'air' };
 /** Where a unit line goes: on foot, on the water or in the air. */
 export const domainOf = (type: UnitType): Domain => DOMAINS[type] ?? 'land';
 
-export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader', 'wagon', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge', 'warden', 'tow'];
-export const MILITARY: UnitType[] = ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'warship', 'fighter', 'bomber', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge', 'warden'];
+export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader', 'wagon', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge', 'warden', 'tow', 'skywhale', 'behemoth'];
+export const MILITARY: UnitType[] = ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'warship', 'fighter', 'bomber', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge', 'warden', 'behemoth'];
 
 type Target = UnitClass | 'building';
 /** The counter triangle (and its friends): damage multiplier by attacker class against target class. */
@@ -2333,7 +2369,7 @@ export const FIRE = {
   run: [2, 6, 4, 2],
   scorch: 2,
   scorchReach: 0.4,
-  burns: ['thornwall', 'garden', 'orchard', 'sapling', 'hive', 'heart', 'spire'] as BuildingType[],
+  burns: ['thornwall', 'garden', 'orchard', 'sapling', 'hive', 'heart', 'spire', 'greatden'] as BuildingType[],
   wild: 2,
   aiBearers: 2,
   aiNear: 12,
@@ -2452,6 +2488,35 @@ export const BLOOM = {
   aiSave: 40,
 };
 
+/**
+ * The Age of Leviathans (`docs/wild-road.md` §5a, `src/sim/leviathans.ts`). A Great Den breeds Skywhales and one Behemoth a people.
+ * A Skywhale carries `capacity` (`WHALE_HOLD`) of its people on foot, boarding and alighting where there is ground within `reach`
+ * tiles of it; every `every` seconds it may drop a seed-bomb, paying `bomb`: up to `seeds` Thornwall seedlings on the open tiles
+ * nearest beneath it within `reach`, any people's land. The Behemoth is bred carrying a Town Center (`Unit.packed`): it kneels
+ * (`pitch`) where a wagon would pitch, but within `kneel` tiles, its Town Center standing at once at the health it carries, and
+ * rises (`pack`) again from a Town Center it knelt, its queue empty.
+ * The computer takes the road on from the Wildwood when its coin (`aiTake`) says the beasts rather than the Bloom, stays `aiStay`
+ * seconds, raises a Great Den within `aiFrom` tiles of home, breeds its Behemoth and up to `aiWhales` Skywhales, kneels the Behemoth
+ * by the nearest gold or stone at least `aiOut` tiles from home, loads up to `aiLoad` of its soldiers into each whale once `aiLoad`
+ * stand idle at home, sets them down by a rival building it has seen (else the rival's home) and seed-bombs it there.
+ */
+/** The giants of the Age of Leviathans: bred for their people alone, so no priest turns them. */
+export const GIANTS: UnitType[] = ['skywhale', 'behemoth'];
+
+export const LEVIATHANS = {
+  every: WHALE_BOMB,
+  seeds: WHALE_SEEDS,
+  bomb: { wood: 60 } as Cost,
+  reach: 2,
+  kneel: 6,
+  aiTake: 0.5,
+  aiStay: 600,
+  aiFrom: 12,
+  aiWhales: 3,
+  aiLoad: 4,
+  aiOut: 14,
+};
+
 export const COPPICE = { reach: 8, regrow: 120, retry: 5, grow: 90, snare: 2, cap: 1.5, bag: 2, full: 12, aiPerFood: 1.5, aiMax: 16, aiTrees: 10, aiThick: 14, aiNear: 14, aiDrop: 7, aiPerTender: 2, aiStone: 6, aiCamps: 2, aiPlant: 3, aiThin: 12, aiPlantWood: 120 };
 
 /**
@@ -2524,6 +2589,8 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   heart: { name: 'Heart Tree', size: 3, hp: 2500, cost: { food: 300, wood: 400, gold: 200 }, time: 90, pop: 0, sight: 8, trains: ['warden'], drop: [], epoch: 4, menu: 'mil', key: 'E', blurb: `A vast old tree planted once, the soul of your town: one to a people. At it an old tree within ${HEART_WAKE} tiles is woken as an Ent. While it stands your woods spread round it each spring and your rooted Ents wake when a rival comes near; if it falls, every Ent roots where it stands and sleeps. It is alive, so fire takes it.` },
   // The Age of the Bloom (`docs/wild-road.md` §5b, `BLOOM`): one to a people that has walked it, in any age after.
   spire: { name: 'Seed Spire', size: 2, hp: 1800, cost: { wood: 600, stone: 200, gold: 400 }, time: 80, pop: 0, sight: 8, trains: [], drop: [], epoch: 5, menu: 'mil', key: 'G', blurb: `A living tower of woven trunks, one to a people. While your Heart Tree stands it ripens a Bloom Seed every ${BLOOM_RIPEN} seconds, one at a time. Sling it (G) at any point on the map: it roots there, and ${BLOOM_GROW} seconds later every rival building within ${BLOOM_RING} tiles of its heart-root cracks into forest, unless their citizens hack the root out first. It is alive, so fire takes it.` },
+  // The Age of Leviathans (`docs/wild-road.md` §5a, `LEVIATHANS`): raised by a people that has walked it, in any age after.
+  greatden: { name: 'Great Den', size: 3, hp: 2400, cost: { food: 300, wood: 500, stone: 200, gold: 200 }, time: 80, pop: 0, sight: 8, trains: ['skywhale', 'behemoth'], drop: [], epoch: 5, menu: 'mil', key: 'J', blurb: `A hill hollowed out and roofed with living turf, where giants are bred: Skywhales that carry ${WHALE_HOLD} over walls and drop seed-bombs of Thornwall, and one Behemoth, a titan turtle with a Town Center on its back. It is alive, so fire takes it.` },
   // The age road (#562, `docs/age-roads.md` spine §4): raised in the Stone Age, it answers which key resources this world holds (`PROSPECTOR`).
   prospector: { name: "Prospector's Lodge", size: 2, hp: 500, cost: { food: 50, wood: 75 }, time: 20, pop: 0, sight: 6, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'P', blurb: 'A lodge of prospectors who walk the streams, scrape the rock and dig at old mounds. Once it stands it tells you which key resources this world holds (bog iron, salt, saltpetre, blood-iron, ancient ruins): yes or no for each, never where. Some ages open only with them; a world that lacks one shuts that door.' },
   // The Path of Blood (#303): pitched by foot soldiers where the army stands, enemy land too; burns when left alone (`WARCAMP`).

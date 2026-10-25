@@ -3,8 +3,11 @@ import { ageOf, hasWalked } from './ages';
 import { createGame, step } from './game';
 import type { AgeId, Difficulty, GameState, MapType } from './types';
 
-/** The fork's two roads are left to the computer's own choice (`forkRoad` in ai.ts): a route walks one of them. */
-const FORK: AgeId[] = ['hemocraft', 'bloodrite'];
+/**
+ * The forks' two roads are left to the computer's own choice (`forkRoad` in ai.ts; the Wild route's beasts or plants, `wants`): a
+ * route walks one of them.
+ */
+const FORK: AgeId[] = ['hemocraft', 'bloodrite', 'bloom', 'leviathans'];
 
 /** The side ages standing on a route, oldest tier first (the plain road has none: it is the trunk). */
 export function routeAges(route: RouteId): AgeId[] {

@@ -4,7 +4,7 @@ import { AI_GATE_ANSWER } from '../sim/data';
 import { AI_GATE_READ } from '../sim/data';
 import { gateReach } from '../sim/tides';
 import { isEnemy } from '../sim/world';
-import { AGES, BLOOM, BLOOMERY, HIVE, INTERCEPT, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, BEGGARS, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
+import { AGES, BLOOM, LEVIATHANS, UNITS, BLOOMERY, HIVE, INTERCEPT, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, BEGGARS, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
 import { battlesFor } from '../sim/battles';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, findsOf, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
@@ -534,6 +534,12 @@ const TIPS: Tip[] = [
     // The Age of the Bloom (`docs/wild-road.md` §5b): its first minute.
     when: (s, me) => ageOf(s.players[me]) === 'bloom',
     text: `The plants' end: your people outgrows its rivals now. Raise your one <b>${BUILDINGS.spire.name}</b> (${BUILDINGS.spire.key}): while your Heart Tree stands it ripens a <b>Bloom Seed</b> every ${BLOOM.ripen} seconds. Sling it (G) at a rival town and send your army after it: once it roots, ${BLOOM.grow} seconds later every rival building within ${BLOOM.r} tiles cracks into forest, unless their citizens hack out its heart-root first. Or win by <b>the Greening</b>: keep your Heart Tree while trees, Orchards and Thornwalls grown to living oak cover ${BLOOM.green * 100}% of your land for ${BLOOM.hold / 60} minutes. Your woods spread every season now, and each season opens with a pollen storm that half-blinds rival soldiers and towers near your Heart Tree. Your Dens are quiet and you raise no Missile Silo; rivals will come with fire.`,
+  },
+  {
+    id: 'leviathans',
+    // The Age of Leviathans (`docs/wild-road.md` §5a): its first minute.
+    when: (s, me) => ageOf(s.players[me]) === 'leviathans',
+    text: `The beasts' end: your people breeds giants now. Raise a <b>${BUILDINGS.greatden.name}</b> (${BUILDINGS.greatden.key}). Its <b>Skywhales</b> fly over walls, woods and water: right-click one with soldiers to board (up to ${UNITS.skywhale[5]?.capacity}), then right-click ground behind a rival's walls to set them down. Over a rival's street, press <kbd>B</kbd> to drop a seed-bomb: ${LEVIATHANS.seeds} Thornwall seedlings sprout beneath it and grow, cutting their town in pieces. Fighters and riflemen bring whales down, with all aboard. Breed your one <b>Behemoth</b>: a titan with a Town Center on its back. Walk it to the wood, the gold or the front and press <kbd>P</kbd> to kneel: the Town Center stands there at once, working. Select it and press <kbd>P</kbd> to rise and walk on. Your Heart Tree sleeps: no new Ents and no Spreading, and the Bloom is closed to you for good.`,
   },
   {
     id: 'torch',

@@ -27,6 +27,9 @@ import { B_RES, R_NONE, R_TREE } from './types';
 /** Whether a people keeps what the Wildwood gave it: it stands in the Wildwood, or has stood there. */
 export const wakesForest = (p: Player): boolean => hasWalked(p, 'wildwood');
 
+/** Whether a people's Heart Tree sleeps (the Age of Leviathans' door): no Ent wakes or is woken, its Ents root, and its woods don't spread. */
+export const heartSleeps = (p: Player | undefined): boolean => !!p && ageOf(p) === 'leviathans';
+
 /** A people's standing Heart Tree, finished, or null. */
 export function heartOf(s: GameState, owner: number): Building | null {
   for (const e of s.ents) if (e.kind === 'building' && e.type === 'heart' && e.owner === owner && e.built && e.hp > 0) return e;
@@ -176,19 +179,19 @@ export function wildwoodStep(s: GameState): void {
       if (!p || p.defeated) continue;
       const most = statsFor(s, w.owner, 'warden').hp;
       w.hp = Math.min(most, w.hp + most * WILDWOOD.mend);
-      if (heartOf(s, w.owner) && (s.amount[w.tile] < AMOUNT.tree || rivalNear(s, w.owner, w.tile))) wake(s, w);
+      if (heartOf(s, w.owner) && !heartSleeps(p) && (s.amount[w.tile] < AMOUNT.tree || rivalNear(s, w.owner, w.tile))) wake(s, w);
       else keep.push(w);
     }
     if (keep.length) s.wardens = keep;
     else delete s.wardens;
   }
-  // The Heart Tree fell: every Ent of its people roots where it can.
+  // The Heart Tree fell, or sleeps (the Age of Leviathans): every Ent of its people roots where it can.
   let homeless: Set<number> | null = null;
   for (const e of s.ents) {
     if (e.kind !== 'unit' || e.type !== 'warden' || e.hp <= 0 || e.inside) continue;
     if (!homeless) {
       homeless = new Set();
-      for (const p of s.players) if (wakesForest(p) && !heartOf(s, p.id)) homeless.add(p.id);
+      for (const p of s.players) if (wakesForest(p) && (!heartOf(s, p.id) || heartSleeps(p))) homeless.add(p.id);
     }
     if (homeless.has(e.owner) && !rootProblem(s, e)) rootEnt(s, e);
   }
@@ -217,7 +220,7 @@ function spread(s: GameState, spring: boolean): void {
   for (const b of s.ents) {
     if (b.kind !== 'building' || b.type !== 'heart' || !b.built || b.hp <= 0) continue;
     const p = s.players[b.owner];
-    if (!p || p.defeated || !wakesForest(p) || (!spring && ageOf(p) !== 'bloom')) continue;
+    if (!p || p.defeated || !wakesForest(p) || heartSleeps(p) || (!spring && ageOf(p) !== 'bloom')) continue;
     let n = 0;
     for (let y = Math.max(1, b.ty - r); y < Math.min(s.h - 1, b.ty + b.size + r) && n < WILDWOOD.seeds; y++) {
       for (let x = Math.max(1, b.tx - r); x < Math.min(s.w - 1, b.tx + b.size + r) && n < WILDWOOD.seeds; x++) {

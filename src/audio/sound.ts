@@ -14,7 +14,7 @@ export type SoundName =
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
   | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'siloAlarm' | 'interceptLaunch' | 'interceptHit' | 'interceptMiss' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'fireLit' | 'fireCatch' | 'fireOut' | 'fireAsh' | 'flow' | 'rush' | 'groan' | 'dart' | 'swarm' | 'hiveHush' | 'sluiceOpen' | 'sluiceShut' | 'spread' | 'tideWash' | 'tideMill' | 'swept' | 'pondShut' | 'breach' | 'entWake' | 'entRoot' | 'spreading' | 'damBurst' | 'castOff' | 'moor' | 'founder' | 'bloomSling' | 'bloomRoot' | 'bloomGrow' | 'bloomCut' | 'bloomCrack' | 'bloomGreen' | 'bloomStorm'
-  | 'scour' | 'boarded';
+  | 'scour' | 'boarded' | 'whaleSong' | 'seedBomb' | 'behemothKneel' | 'behemothRise';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -872,6 +872,34 @@ export class Sound {
         this.tone(out, t + 0.7, { f: 60, to: 38, type: 'sine', dur: 0.35, peak: 0.16, attack: 0.01 });
         this.noise(out, t + 0.7, { dur: 0.25, filter: 'lowpass', f: 300, peak: 0.08 });
         this.noise(out, t + 0.9, { dur: 1.2, filter: 'bandpass', f: 2200, to: 1400, q: 0.6, peak: 0.03, attack: 0.3 });
+        break;
+      case 'whaleSong':
+        // A Skywhale bred (the Age of Leviathans): a long low moan that bends up and falls away, a second voice answering a fifth above.
+        this.tone(out, t, { f: 120, to: 175, type: 'sine', dur: 1.4, peak: 0.07, attack: 0.4, glide: 0.9 });
+        this.tone(out, t + 1.2, { f: 175, to: 95, type: 'sine', dur: 1.2, peak: 0.05, attack: 0.1 });
+        this.tone(out, t + 0.6, { f: 260, to: 300, type: 'triangle', dur: 1.1, peak: 0.02, attack: 0.5, lp: 900 });
+        this.noise(out, t, { dur: 2.2, filter: 'bandpass', f: 400, to: 250, q: 0.6, peak: 0.02, attack: 0.8 });
+        break;
+      case 'seedBomb':
+        // A seed-bomb: a whistle falling from the sky, a soft husky thump, then thorns crackling up out of the ground.
+        this.tone(out, t, { f: 1800, to: 500, type: 'sine', dur: 0.7, peak: 0.03, attack: 0.05 });
+        this.tone(out, t + 0.7, { f: 90, to: 50, type: 'triangle', dur: 0.3, peak: 0.14, attack: 0.005 });
+        this.noise(out, t + 0.7, { dur: 0.25, filter: 'lowpass', f: 500, peak: 0.08 });
+        for (let i = 0; i < 6; i++) this.noise(out, t + 0.85 + i * 0.07, { dur: 0.05, filter: 'highpass', f: 2400 + i * 200, peak: 0.04 });
+        break;
+      case 'behemothKneel':
+        // A Behemoth kneels: a groan out of a deep chest, and the ground taking its weight in two heavy thuds.
+        this.tone(out, t, { f: 70, to: 45, type: 'sawtooth', dur: 1.1, peak: 0.05, attack: 0.2, lp: 400 });
+        for (const d of [0.8, 1.15]) {
+          this.tone(out, t + d, { f: 55, to: 30, type: 'sine', dur: 0.4, peak: 0.2, attack: 0.005 });
+          this.noise(out, t + d, { dur: 0.3, filter: 'lowpass', f: 260, peak: 0.1 });
+        }
+        break;
+      case 'behemothRise':
+        // A Behemoth rises: timbers creak as the town is lifted, the shell scrapes, and a low bellow climbs.
+        this.noise(out, t, { dur: 0.6, filter: 'bandpass', f: 700, to: 400, q: 1.2, peak: 0.05, attack: 0.1 });
+        this.tone(out, t + 0.3, { f: 48, to: 82, type: 'sawtooth', dur: 1.3, peak: 0.06, attack: 0.4, lp: 450 });
+        this.tone(out, t + 0.3, { f: 96, to: 150, type: 'sine', dur: 1.1, peak: 0.03, attack: 0.5 });
         break;
       case 'spreading':
         // The Spreading (the Wildwood, spring): a soft swell of wind in new leaves, and two high notes of a woodland bird.
