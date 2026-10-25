@@ -161,10 +161,13 @@ function leanAges(p: Player, route: RouteId): AgeId[] {
  * Settled once, on a seat's first turn (#749): a clever computer in a skirmish favours a route `AI_TEMPER.lean` of the time, on
  * coins of its own so no other choice's dice shift, and chooses that route's side ages from the start, as the route sweeps do
  * (`src/sim/routePlay.ts`). The rest of the web is left to its usual coins, so it still turns off where the land says to.
+ * Never in a Lords of the Land match.
  */
 function settleLean(s: GameState, p: Player, mem: AiMemory): void {
   mem.lean = 'none';
-  if (s.scenario || !AI_LEVELS[p.ai!].clever || AI_LEVELS[p.ai!].lean === false || coin(s, p.id, 0x7e4a) >= AI_TEMPER.lean) return;
+  // Not in Lords of the Land (#810): that match names its own aim, every landmark, and a route chosen on a coin (the Wild's
+  // tamed beasts for a legion) could leave a town with no soldiers to take one back.
+  if (s.scenario || s.mode === 'lords' || !AI_LEVELS[p.ai!].clever || AI_LEVELS[p.ai!].lean === false || coin(s, p.id, 0x7e4a) >= AI_TEMPER.lean) return;
   const wet = s.mapType === 'lakes' || s.mapType === 'sea';
   const open = (Object.keys(ROUTES) as RouteId[]).filter((r) => r !== 'plain' && (wet || (r !== 'navy' && r !== 'water')) && leanAges(p, r).length > 0);
   if (!open.length) return;
@@ -3400,7 +3403,8 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     ['stable', p.epoch >= 3 && n >= 26 && count(v, 'stable') < 2],
   ];
   const due = clueDue(s, v, mem);
-  if (due) want.unshift([due, true]);
+  // A Warband's Barracks still comes first (#810): a leaning (#749) must not put a road's clue ahead of how it eats.
+  if (due && !(p.way === 'warband' && count(v, 'barracks') === 0)) want.unshift([due, true]);
   for (const [type, ok] of want) {
     if (!ok || recently(type, 25) || BUILDINGS[type].epoch > p.epoch || buildBarred(p, type)) continue;
     // Not a building whose every line the age bars (a Stable in the Iron Age); a road's clue is raised all the same (a Greek city's Barracks hires foreign foot).
