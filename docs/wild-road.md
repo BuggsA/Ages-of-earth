@@ -127,6 +127,12 @@ Every age has a cheap road back and a road to the trunk, like every side age. De
 - **Packs at heel:** riders trained at a camp come with a War Wolf running beside them, and wolves follow the wagons when the camp moves.
 - **Hawks:** a cheap scouting bird, the first living flyer, that sees far and can't fight.
 - **Door:** no walls and no fields, the steppe's door.
+- **As built** (#801, `src/sim/hunt.ts`, `HUNT`, `AI_HUNT`): a crossing off the **Stone Age** (the two siblings, the Wild and the Steppe, both leave it; the way back to the Stone Age between them is a step back, as for Chariots), tier 1, a Hunting Camp the clue, a hard gate, 350 food, 200 wood, 100 gold, 40 s; roads back to the Bronze Age and to the Middle Ages. It stands on no basic route. Three new things, as the engagement rule asks:
+  - **Packs at heel** (`Age.heel`, `bringOut` in `game.ts`): a rider trained at a Stable brings a War Wolf out beside it, tamed or not, if the houses have room for one more (pop is counted as for any unit; a full town gets the rider alone). The rider costs a fifth more (`price.cavalry` 1.2), so the wolf is bought, not free: a rider and a wolf cost about as much as a rider and a Den's wolf, with no Den and no taming. Only Stables, only riders; the Den and the taming still work as ever.
+  - **Followers** (`huntStep`, every `HUNT.every` = 2 s): a War Wolf that stands idle within `HUNT.follow` (18) tiles of a wagon of its people that is on the move (a packed camp with somewhere to go), and farther than `HUNT.heel` (2.5) from it, runs to it. A wagon that stands still pulls no one, so a wolf posted at a front or a rally stays there; the pack goes where the camp goes. The age is `mobile` (the Steppe's wagons), and `fields, walls and gates` are barred (the steppe's door).
+  - **Hawks** (`hawk` in `UNITS`, `domainOf` air, class `bomber` with no attack): trained at a Hunting Camp while the people stands in the age (`trainsAt`, `barred`), 40 food, 12 s, speed 3.6, sight 15 (a rider sees 8). They fly over walls, woods and water. **Arrows can hit one:** `canHit` already lets ranged units that are not siege or bombers shoot at the air, so archers, towers and fighters can bring a hawk down (26 health), and a spearman can't. It cannot hurt anyone. Existing hawks stay when the people leaves the age; no new ones are trained. The Golden Age carries `heel` whole (`VERB_KEYS`).
+  - **The computer** (`CROSS_PLAN.hunt`, `hawkWork`, `AI_HUNT`): it plans the crossing like the other four, on a coin of its own (`0x4a77`, half), keeps a Hunting Camp, stays `stay` seconds in each sibling and `hold` (240 s) in the age before it climbs on, and a clever computer trains one hawk at its emptiest Hunting Camp and sends it exploring (idempotent: an idle hawk is sent again, nothing is issued while one flies). The general army loop skips the Hunting Camp as it skips the Great Den. It does not yet use the wolves at its wagons beyond the rule above, nor shoot at rival hawks on purpose (its archers and towers do it by themselves).
+  - Not yet: a keepsake building; wings that beat; a hawk that marks what it sees for the pack; a rival's answer to a hawk beyond the arrow.
 
 ## How it hooks into what's there
 
@@ -158,7 +164,7 @@ Every age has a cheap road back and a road to the trunk, like every side age. De
 5. **Wildwood** (built): the Heart Tree, Ents that root, the Spreading, woodland ways.
 6. **Bloom** (built): the Seed Spire and the Bloom Seed, the Greening victory, pollen storms.
 7. **Leviathans** (built): the Great Den, Skywhales and seed-bombs, the Behemoth. **7b** (built): the Kraken, bred at a Great Den by the sea, and Reef Ships.
-8. **Mycelium** (built, 8a: with the Glowcap hollow key resource) and the **Wild Hunt** crossing (8b).
+8. **Mycelium** (built, 8a: with the Glowcap hollow key resource) and the **Wild Hunt** crossing (built, 8b).
 9. **The computer plays the whole route**, and campaign sweeps show it can win on any map (rule 0).
 
 ## Still open (decide by building, then note it here)

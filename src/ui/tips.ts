@@ -31,6 +31,7 @@ const ALCHEMY_ROAD = ROADS.find((r) => r.to === 'alchemy')!;
 const SAPPER_ROAD = ROADS.find((r) => r.to === 'sapper')!;
 const SEA_ROAD = ROADS.find((r) => r.to === 'searaider')!;
 const CHARIOTS_ROAD = ROADS.find((r) => r.to === 'chariots')!;
+const HUNT_ROAD = ROADS.find((r) => r.to === 'hunt')!;
 const GOLDEN_ROAD = ROADS.find((r) => r.to === 'golden')!;
 const MISSIONS_ROAD = ROADS.find((r) => r.to === 'missions')!;
 const BEGGARS_ROAD = ROADS.find((r) => r.to === 'beggars')!;
@@ -322,6 +323,20 @@ const TIPS: Tip[] = [
     id: 'chariots',
     when: (s, me) => ageOf(s.players[me]) === 'chariots',
     text: `Your riders are <b>chariots</b>. Every ${CHARIOT_FORGE.per} bars of bog iron dug past the first ${CHARIOT_FORGE.base} sharpen each one by ${CHARIOT_FORGE.attack}, up to ${CHARIOT_FORGE.most}: keep citizens in the marsh. They beat archers and men on foot with no spears, but a firm line of spearmen beats them, and you have no archers, walls or gates to answer with.`,
+  },
+  {
+    id: 'crossing-hunt',
+    // The fifth crossing (#801): a people that has walked the Wild or the Steppe, back in the Stone Age.
+    when: (s, me) => {
+      const p = s.players[me];
+      return ageOf(p) === 'stone' && roadKnown(s, p, HUNT_ROAD) && !HUNT_ROAD.crossing!.every((a) => hasWalked(p, a));
+    },
+    text: `A crossing: your people has walked one of the <b>${AGES.wild.name}</b> and the <b>${AGES.steppe.name}</b>. Walk the other too, then come back to the Stone Age (a step back), and the Town Center (🔀) can turn your people into the <b>${AGES.hunt.name}</b>: the pack and the camp ride as one.`,
+  },
+  {
+    id: 'hunt',
+    when: (s, me) => ageOf(s.players[me]) === 'hunt',
+    text: `Every rider from a Stable comes out with a <b>War Wolf</b> at its heel (if there is room for it in your houses), and the wolves follow your wagons when the camp moves (<b>J</b> packs a Town Center or House). Raise a <b>${BUILDINGS.huntcamp.name}</b> (${BUILDINGS.huntcamp.key}) and train <b>Hawks</b> there: cheap birds that fly over walls, woods and water and see far, with no weapon. Right-click ground to send one. Archers and towers can still shoot a hawk down. You till no fields and raise no walls, and riders cost a fifth more.`,
   },
   {
     id: 'crossing-missions',

@@ -1426,7 +1426,7 @@ export class View {
           if (!u || ev.owner !== this.viewer) break;
           this.effects.ring(this.ground(s, u.x, u.y, 0.05), '#ffffff', 0.8, 0.6);
           const dom = domainOf(ev.type);
-          this.cue(ev.type === 'skywhale' ? 'whaleSong' : ev.type === 'behemoth' ? 'behemothRise' : ev.type === 'kraken' ? 'krakenRise' : dom === 'water' ? 'shipHorn' : dom === 'air' ? 'engine' : ev.type === 'citizen' ? 'readyCitizen' : 'ready', u.x, u.y, 0.9);
+          this.cue(ev.type === 'hawk' ? 'hawkCry' : ev.type === 'skywhale' ? 'whaleSong' : ev.type === 'behemoth' ? 'behemothRise' : ev.type === 'kraken' ? 'krakenRise' : dom === 'water' ? 'shipHorn' : dom === 'air' ? 'engine' : ev.type === 'citizen' ? 'readyCitizen' : 'ready', u.x, u.y, 0.9);
           break;
         }
         case 'epoch': {

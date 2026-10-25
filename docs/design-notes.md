@@ -1580,3 +1580,15 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 **Seen and not:** in Chromium (software GL, Vite dev server, `window.ages`): a Mycelium town with its webs grown to 5 tiles round every hall, a Glowcap hollow beside it, and a Pikeman on the web selected with "🍄 Hidden" on its card; no page errors. The first threads were bright white lines that drowned the town; now they are faint, and only the caps glow. The three sounds I haven't heard. Trials (`scripts/mycelium-trial.ts`): where a hollow lies, the computer turns in at 6–7 minutes and its web banks 5,000–14,000 stock. It reaches the Bloom on some seeds (15 and 27 minutes). On others its weak window is punished.
 
 **Next:** rot drawn on the rotting building; the web remembered under fog; the computer building tighter round its web, and luring rival archers into it.
+
+## Designers' notes: the Age of the Wild Hunt (Wild route step 8b, #801, 2026-10-25, chain 1024-1233 s8)
+
+**Built:** the fifth crossing, the Wild and the Steppe made one hunt. Every rider from a Stable comes out with a War Wolf at its heel; wolves left standing near a rolling camp run after its wagons; a Hunting Camp trains Hawks, the game's first living flyer, which see farther than any scout and can't fight. Door: the steppe's (no fields, walls or gates), and riders a fifth dearer.
+
+**Why I love it:** it is the first age where an army is a *pair*. A rider and a wolf are one purchase and two bodies in two different counter classes (the wolf runs down archers, the rider is the usual horse), so a raid arrives as a mixed force with no Den and no taming; and a camp that moves takes its dogs with it, which is how the steppe hunted. The hawk makes scouting a thing you buy and lose: a bird that sees 15 tiles shows the raid what to run down, and it is shot out of the sky by any archer who spots it, so scouting a town costs the bird.
+
+**What I chose:** the wolf takes pop (a full town gets the rider alone) and is paid for by the rider's price (1.2×), so it can't be a free army by the back door. Followers pull only from a wagon that is moving, so a wolf posted at a front stays posted. Arrows hit the hawk (the question the issue left open): `canHit` already lets non-siege ranged units shoot the air, and a hawk with no way to die would be a free map hack. I left it fragile (26 health) and fast (3.6) rather than armoured.
+
+**Seen and not:** headless only (the tests, `scripts/sim.ts` for the unchanged checksum); the hawk model and cry were not looked at or listened to in a browser.
+
+**Next:** a keepsake building (a kennel that keeps the heel on any road); wings that beat; a hawk that marks what it sees so the pack runs to it; a rival's answer to a hawk beyond the arrow (a falconer's net, or a tower that favours the sky).
