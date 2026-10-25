@@ -2019,6 +2019,41 @@ function strand(k: Kit, _e: number, _st: Style): void {
   k.sphere(0.09, '#e0b030', -0.4, 0.22, 0.8);
 }
 
+/** A Wheelwright's Yard (#727, the Age of Chariots): a trampled yard with a wheel-rack, a chariot on trestles with a wheel off, spare spokes leaning on a post, a harness pole and an iron-tyre pile. */
+function wheelyard(k: Kit, _e: number, st: Style): void {
+  const WOOD = '#8a6a46';
+  const DARK = '#4a3322';
+  const IRON = '#4a4e56';
+  pad(k, 2, st.base);
+  // A wheel stands upright by its rim: spokes, a hub and an iron tyre.
+  const wheel = (x: number, y: number, z: number, r: number): void => {
+    k.cyl(r, r, 0.07, 14, IRON, x, y, z).rotation.x = Math.PI / 2;
+    k.cyl(r * 0.82, r * 0.82, 0.09, 14, WOOD, x, y, z).rotation.x = Math.PI / 2;
+    for (let i = 0; i < 3; i++) {
+      const b = k.box(r * 1.9, 0.05, 0.1, DARK, x, y, z);
+      b.rotation.z = (i * Math.PI) / 3;
+    }
+    k.cyl(0.08, 0.08, 0.14, 6, DARK, x, y, z).rotation.x = Math.PI / 2;
+  };
+  // The chariot on trestles: a floor, a curved front rail, a pole, one wheel on and one off.
+  for (const x of [-0.45, 0.2]) k.box(0.06, 0.34, 0.5, DARK, x, 0.05, -0.1);
+  k.box(0.7, 0.07, 0.46, WOOD, -0.12, 0.39, -0.1);
+  k.box(0.7, 0.18, 0.04, WOOD, -0.12, 0.46, -0.32);
+  k.box(0.05, 0.18, 0.46, WOOD, 0.22, 0.46, -0.1);
+  k.box(0.9, 0.05, 0.05, DARK, 0.78, 0.4, -0.1);
+  k.team(k.box(0.05, 0.2, 0.24, TEAM, -0.46, 0.46, -0.1));
+  wheel(-0.12, 0.34, -0.4, 0.3);
+  // The off wheel leans on the rack; a rack of three spare wheels stands on edge behind.
+  for (let i = 0; i < 3; i++) wheel(-0.6 + i * 0.32, 0.3, 0.62, 0.26);
+  k.box(1.1, 0.06, 0.06, DARK, -0.3, 0.6, 0.78);
+  // Spare spokes and axles stacked beside it, a post with harness straps, and a stack of iron tyres.
+  for (let i = 0; i < 4; i++) k.box(0.6, 0.05, 0.05, WOOD, 0.62, 0.05 + i * 0.06, 0.55 + (i % 2) * 0.04);
+  k.cyl(0.04, 0.05, 0.9, 5, DARK, 0.9, 0.05, -0.55);
+  k.box(0.04, 0.3, 0.03, '#c9a23c', 0.9, 0.5, -0.5);
+  k.cyl(0.2, 0.2, 0.06, 10, IRON, 0.7, 0.05, -0.3);
+  k.cyl(0.2, 0.2, 0.06, 10, IRON, 0.7, 0.11, -0.3);
+}
+
 function bloomery(k: Kit, _e: number, st: Style): void {
   pad(k, 2, st.base);
   // The furnace stack: a clay drum that tapers to a smoking top, with a fire door and a team band.
@@ -2907,7 +2942,7 @@ const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' |
   heart: (k) => heart(k),
   spire: (k) => spire(k),
   greatden,
-  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, battery, windmill, bloomery, stockade, gallery, hirehall, standard, strand,
+  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, battery, windmill, bloomery, stockade, gallery, hirehall, standard, strand, wheelyard,
   // The Age of Tides (#739), drawn in `tideModels.ts`.
   tidemill: (k: Kit, _e: number, st: Style) => tidemill(k, st.base),
   cockler: (k: Kit, _e: number, st: Style) => cocklerHut(k, st.base),

@@ -419,11 +419,13 @@ body.online .tip-box { bottom: 330px; }
 #hud.has-tiding > #notices { top: 210px; }
 @keyframes tiding-in { from { transform: translate(-50%, -12px); opacity: 0; } }
 .banner {
-  position: absolute; top: 22%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; text-align: center; opacity: 0; transition: opacity 0.6s;
+  position: absolute; top: max(22%, 250px); left: 50%; transform: translate(-50%, -50%); pointer-events: none; text-align: center; opacity: 0; transition: opacity 0.6s;
   font: 800 44px 'Cinzel', serif; color: var(--gold); text-shadow: 0 3px 0 #3a2a08, 0 8px 40px rgba(255, 210, 120, 0.5);
 }
 .banner small { display: block; font: 700 17px 'Nunito', sans-serif; color: var(--ink); text-shadow: 0 2px 6px #000; margin-top: 4px; }
 .banner.show { opacity: 1; }
+/* Below the tiding card and the four notices stacked under it, never on top of them. */
+#hud.has-tiding > .banner { top: 420px; font-size: 32px; }
 .paused { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); font: 800 46px 'Cinzel', serif; color: var(--gold); pointer-events: none; text-shadow: 0 3px 12px #000; }
 
 .dragbox { position: absolute; border: 1.5px solid #bfffb8; background: rgba(140, 255, 130, 0.1); pointer-events: none; z-index: 5; }

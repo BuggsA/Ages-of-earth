@@ -63,7 +63,7 @@ import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
 import { AI_TEMPER, ROUTES, TRUNK, type RouteId } from './data';
-import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS, STOCKADE, AI_STOCKADE, GALLERY, AI_STANDARD, BORDERS, STRAND } from './data';
+import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS, STOCKADE, AI_STOCKADE, GALLERY, AI_STANDARD, BORDERS, STRAND, AI_YARD } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
@@ -460,6 +460,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   raiseGallery(s, v, mem, issue);
   raiseStandard(s, v, mem, issue);
   raiseStrand(s, v, mem, issue);
+  raiseYard(s, v, mem, issue);
   salvage(s, v, mem, issue);
   claimWalk(s, v, mem, issue);
   findWalk(s, v, mem, issue);
@@ -5817,6 +5818,28 @@ function raiseStrand(s: GameState, v: View, mem: AiMemory, issue: (c: Command) =
   // A shore is rare: look about the mark, then widen the search from home.
   const spot = findSpot(s, 'strand', v.home.x + (dx / d) * STRAND.away, v.home.y + (dy / d) * STRAND.away, 0, 10, 0) ?? findSpot(s, 'strand', v.home.x, v.home.y, 8, 40, 0);
   if (spot) construct(s, v, mem, 'strand', spot, 2, issue);
+}
+
+/**
+ * The Chariots' Wheelwright's Yard (#727): a computer in the age with a Stable and `AI_YARD.riders` riders raises one `AI_YARD.out` tiles
+ * from home toward the nearest rival Town Center, one at a time, so its chariots can be mended near the front.
+ */
+function raiseYard(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (ageOf(p) !== 'chariots' || buildBarred(p, 'wheelyard') || count(v, 'wheelyard') > 0 || count(v, 'stable') === 0 || !v.tc) return;
+  if (s.tick - (mem.ordered.wheelyard ?? -99999) < secs(60) || v.army.filter((u) => isRider(u)).length < AI_YARD.riders) return;
+  let best: Building | null = null;
+  let bestD = Infinity;
+  for (const b of s.ents) {
+    if (b.kind !== 'building' || b.type !== 'towncenter' || !b.built || b.hp <= 0 || !isEnemy(s, p.id, b.owner)) continue;
+    const d = (b.x - v.home.x) * (b.x - v.home.x) + (b.y - v.home.y) * (b.y - v.home.y);
+    if (d < bestD) { best = b; bestD = d; }
+  }
+  if (!best) return;
+  const dl = Math.sqrt(bestD) || 1;
+  const r = Math.min(AI_YARD.out, dl / 2);
+  const spot = findSpot(s, 'wheelyard', v.home.x + ((best.x - v.home.x) / dl) * r, v.home.y + ((best.y - v.home.y) / dl) * r, 0, 6);
+  if (spot) construct(s, v, mem, 'wheelyard', spot, 2, issue);
 }
 
 function raidShips(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {

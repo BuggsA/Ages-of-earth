@@ -1619,3 +1619,9 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 **Why I love it:** from high up, where roofs are specks, a town is mostly ground. Brick lanes say Dykes, shell-sand says Tides, mauve says Mycelium, before you can make out a single house. And the age-up has a moment now: you watch your town turn over.
 
 **Next:** paths that run between buildings rather than pads round each (the Stone Age's foot-worn tracks to the berries, the Industrial's rails); the ground under a town that steps back keeping a trace of the age it left (a keepsake in the soil); seasons on the town ground (snow swept off the Middle Ages' cobbles).
+
+## Designers' notes: the Wheelwright's Yard (#727, 2026-10-25, chain 1025-1752 s5)
+
+**Built:** the Age of Chariots' own building. No walls means no shelter, so the yard is where chariots are mended, 4 health a second within 5 tiles: a forward yard turns a raid into strike, fall back, strike. The computer plants one toward its nearest rival once it has riders.
+**Why I love it:** it gives the wall-less age a place to *be*, and a thing to burn.
+**Next:** the computer pulling hurt riders back to it, a chariot mended faster with bog iron, a drawn button glyph.

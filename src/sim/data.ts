@@ -660,6 +660,7 @@ export const AGES: Record<AgeId, Age> = {
     price: { cavalry: 0.9 },
     training: { cavalry: 0.8 },
     forge: CHARIOT_FORGE,
+    keepsake: { building: 'wheelyard', does: 'its wheel-store: riders within 5 tiles of it are mended 4 health a second, on any road' },
     names: { cavalry: 'Chariot' },
     noBuild: { buildings: ['wall', 'gate'], why: 'A chariot people raises no walls or gates: it rides open ground. They wait until it settles in the Bronze Age or climbs on' },
     no: { units: ['ranged'], why: 'No archers behind a chariot\'s dust: bows wait until the people settles in the Bronze Age or climbs on' },
@@ -1638,6 +1639,13 @@ export const SEA_RAID = { hold: 400, dock: 6, home: 150 };
  * (a Dock banks all). The computer raises one `away` tiles out from home toward the middle of the map, once it has a Dock and a ship.
  */
 export const STRAND = { cut: 0.75, away: 18 };
+/**
+ * The Chariots' Wheelwright's Yard (#727): a rider (cavalry) of its owner's team within `rest` tiles of a finished one has its wheels and
+ * harness mended, `heal` health every `every` seconds, so a chariot people with no walls to shelter behind fights out at a forward yard
+ * and falls back to it. The computer raises one `out` tiles from home toward the nearest rival Town Center, once it has riders.
+ */
+export const WHEELYARD = { rest: 5, heal: 4, every: 1 };
+export const AI_YARD = { out: 22, riders: 4 };
 
 /**
  * Dykes (#701 s1, the Water Road). A dyke goes on a water tile whose every corner lies at `depth` or higher (shallow water), or on a
@@ -2774,6 +2782,7 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   hirehall: { name: 'Hire Hall', size: 2, hp: 800, cost: { wood: 120, gold: 60 }, time: 30, pop: 0, sight: 5, trains: ['infantry', 'ranged', 'cavalry'], drop: [], epoch: 2, ages: ['merchant'], menu: 'mil', key: 'V', blurb: 'A counting-house with a muster yard, where a captain signs his company for a term. Swords signed here cost gold alone, 1.6 times the Market\'s hire price, but they are paid once, up front: no wages, no payday behind, none walks off the field. Cavalry too, when the Stable is barred. Pick the Market for a cheap sword you must keep paying, or the Hall for one that is yours. Kept (J) when your people leaves the Age of Merchants, it goes on signing swords at that price on any road.' },
   standard: { name: 'Horsetail Standard', size: 1, hp: 500, cost: { wood: 80, stone: 30 }, time: 20, pop: 0, sight: 7, trains: [], drop: [], epoch: 2, ages: ['horde'], menu: 'mil', key: 'Z', blurb: 'A tall pole hung with horse-tails and the khan\'s banner, planted where the horde means to be paid. Riders who stand within 5 tiles of it take tribute from the nearest rival whose land lies within 8 tiles of it, as though they stood in that land: the horde can wait at the border, out of reach of the Town Center\'s arrows, and still be paid. Only in the Age of the Horde. Kept (J) when your people leaves it, it goes on drawing tribute from a rival\'s border, on any road. Cut it down and the horde must ride into the rival\'s land again.' },
   strand: { name: 'Raiders\' Strand', size: 2, hp: 700, cost: { wood: 100, stone: 30 }, time: 25, pop: 0, sight: 7, trains: ['infantry'], drop: [], epoch: 2, shore: true, ages: ['searaider'], menu: 'mil', key: 'Y', blurb: 'A longship hauled up on a far beach, roofed over with sailcloth and ringed with stakes: the raiders\' camp ashore. A ship that comes within 6 tiles of it banks its hold on the spot, so the fleet need not sail home to a Dock between raids, but the jarl keeps a quarter (75% reaches your coffers, against the whole hold at a Dock). Foot soldiers can be mustered here, on the shore where they are wanted. Only in the Age of Sea-Raiders, on a shore in your own land or no one\'s. It sleeps when your people leaves the age, and a rival who razes it ends the shortcut.' },
+  wheelyard: { name: 'Wheelwright\'s Yard', size: 2, hp: 700, cost: { wood: 90, stone: 30 }, time: 22, pop: 0, sight: 6, trains: [], drop: [], epoch: 1, ages: ['chariots'], menu: 'mil', key: 'N', blurb: 'A trampled yard of spare wheels, axles and harness, raised where the chariots mean to fight. Riders (cavalry) within 5 tiles of it have their wheels and harness mended on the spot, 4 health a second, so a people with no walls to shelter behind fights out at a forward yard and falls back to it between charges. Only in the Age of Chariots. Kept (J) when your people leaves it, it goes on mending riders, on any road. A rival who burns it leaves your chariots to limp home.' },
   gallery: { name: 'Mine Gallery', size: 2, hp: 800, cost: { wood: 100, stone: 80 }, time: 30, pop: 0, sight: 5, trains: [], drop: [], epoch: 3, ages: ['sapper'], menu: 'mil', key: 'P', blurb: 'A timbered shaft and spoil heap raised near a rival\'s walls, the sappers\' way into the ground. A keg laid within 6 tiles of it is mined: the fuse burns underground, and no rival can stamp it out. And a gallery listens: a rival keg laid within 6 tiles of one is countermined and lost. Only in the Age of Sappers. Kept (J) when your people leaves it, it goes on listening for rival kegs, on any road.' },
   windmill: { name: 'Windmill', size: 2, hp: 600, cost: { wood: 120, stone: 40 }, time: 30, pop: 0, sight: 5, trains: [], drop: [], epoch: 2, ages: ['dykes'], menu: 'eco', key: 'W', blurb: 'A post mill whose sails turn a scoop wheel. Raised by water a dyke has shut off from the open sea (or a small lake), it pumps it dry a tile every few seconds, nearest first, into polder: low black ground where a Farm yields half again as much. Two mills drain twice as fast. The open sea is too big to pump.' },
   // The Water Line (#701 s4): a gate in a dyke or a channel that lets the water out over the low ground behind it (`INUND`, `water.ts`).

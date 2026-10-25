@@ -25,7 +25,7 @@ for (const id of ids) {
   const ink = plateColors(id).ink;
   const dark = plateIsDark(id) ? 'data-dark="1"' : '';
   const style = `--plate:${plateUrl(id)};--ink:${ink}`;
-  const techs = Object.entries(art.glyphs ?? {}).map(([k, g]) => `<div class="cmd" title="${k}"><span class="glyph drawn">${drawing(g, 34)}</span><span class="key">${k.replace(/^tech:/, '').slice(0, 8)}</span></div>`).join('');
+  const techs = Object.entries(art.glyphs ?? {}).map(([k, g]) => `<div class="cmd" title="${k}"><span class="glyph drawn">${drawing(g, Number(process.env.GLYPH ?? 34))}</span><span class="key">${k.replace(/^tech:/, '').slice(0, 8)}</span></div>`).join('');
   h += `<div class="row"><div class="n">${AGES[id].name}<br><small>${i.plate}/${i.motif}/${art.stamp ?? i.stamp}</small></div>
 <div class="pl plated stamp-${art.stamp ?? i.stamp}" ${dark} style="${style}">${sample.map((g, k) => `<button class="cmd ${k === 1 ? 'on' : ''}"><span class="glyph">${g}</span><span class="key">${'QWERT'[k]}</span></button>`).join('')}</div>
 <div class="pl plated stamp-${art.stamp ?? i.stamp}" ${dark} style="${style}"><div class="cmd">${art.emblem ? `<span class="glyph drawn">${drawing(art.emblem, 40)}</span>` : '<small>none</small>'}</div>${techs}</div></div>`;
