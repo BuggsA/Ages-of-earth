@@ -1637,3 +1637,9 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 **Built:** the Age of Pilgrims' own building. Its priests chant towers over, but they are frail and the chant is slow where arrows fall. A priest raises a chantry just outside a rival's border: priests by it sing 50% louder and are mended, so the siege can stand there. The computer sends a priest to plant one toward its nearest rival.
 **Why I love it:** the pilgrims' conquest becomes a march of shrines, a cross planted at the front instead of an army; and a raiding party has a stone to knock over.
 **Next:** the computer's chant band rallying to its chantry, a chantry that counts as holy ground (no arrows within), a drawn button glyph.
+
+## Designers' notes: the Falconer's Mews (#727, 2026-10-25, chain 1025-1752 s8)
+
+**Built:** the Wild Hunt's own building. Its pack comes only with riders trained at home. A mews raised at the front breeds wolves and flies hawks there, so the hunt reinforces where the fight is, and a rival has a kennel to burn.
+**Why I love it:** the camp on wheels finally has a forward kennel: you hunt, breed, and strike from the same ground.
+**Next:** wolves that guard the mews, a mews that packs onto a wagon, a drawn button glyph.

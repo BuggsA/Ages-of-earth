@@ -2118,6 +2118,30 @@ function chantry(k: Kit, _e: number, st: Style): void {
   }
 }
 
+/** A Falconer's Mews (#727, the Age of the Wild Hunt): a low round mud kennel with a hide roof, a tall perch pole with a hawk on it, and a wattle yard with antlers on the post. */
+function mews(k: Kit, _e: number, st: Style): void {
+  const MUD = '#9a7b55';
+  const HIDE = '#6b4a30';
+  const DARK = '#3d2a1a';
+  pad(k, 2, st.base);
+  // The kennel: a squat round hut under a hide cone, with a dark doorway and a team flap.
+  k.cyl(0.62, 0.7, 0.62, 10, MUD, -0.45, 0, -0.3);
+  k.cone(0.84, 0.7, 10, HIDE, -0.45, 0.62, -0.3);
+  k.box(0.28, 0.4, 0.06, DARK, -0.45, 0, 0.36);
+  k.team(k.box(0.34, 0.12, 0.04, TEAM, -0.45, 0.46, 0.4));
+  // The perch: a tall pole with a crossbar and a hawk with its wings half-spread on top: the silhouette from afar.
+  k.cyl(0.05, 0.07, 2.3, 6, DARK, 0.65, 0, -0.45);
+  k.box(0.7, 0.06, 0.06, DARK, 0.65, 1.85, -0.45);
+  k.box(0.2, 0.2, 0.34, '#5a4630', 0.65, 2.3, -0.45);
+  k.box(0.8, 0.05, 0.22, '#7a6040', 0.65, 2.42, -0.45);
+  k.cone(0.07, 0.14, 5, '#d4a93c', 0.65, 2.5, -0.65);
+  // The yard: a wattle fence of stakes along the front, one post hung with antlers.
+  for (const x of [-0.2, 0.1, 0.4, 0.7, 1.0]) k.cyl(0.04, 0.04, 0.45, 5, HIDE, x, 0, 0.8);
+  k.box(1.3, 0.05, 0.05, DARK, 0.4, 0.36, 0.8);
+  k.cone(0.05, 0.35, 4, '#e0d6bd', 1.0, 0.45, 0.8);
+  k.cone(0.05, 0.3, 4, '#e0d6bd', 0.85, 0.45, 0.8);
+}
+
 function bloomery(k: Kit, _e: number, st: Style): void {
   pad(k, 2, st.base);
   // The furnace stack: a clay drum that tapers to a smoking top, with a fire door and a team band.
@@ -3006,7 +3030,7 @@ const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' |
   heart: (k) => heart(k),
   spire: (k) => spire(k),
   greatden,
-  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, battery, windmill, bloomery, stockade, gallery, hirehall, standard, strand, wheelyard, pharos, chantry,
+  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, battery, windmill, bloomery, stockade, gallery, hirehall, standard, strand, wheelyard, pharos, chantry, mews,
   // The Age of Tides (#739), drawn in `tideModels.ts`.
   tidemill: (k: Kit, _e: number, st: Style) => tidemill(k, st.base),
   cockler: (k: Kit, _e: number, st: Style) => cocklerHut(k, st.base),

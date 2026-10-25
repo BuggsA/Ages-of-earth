@@ -373,6 +373,11 @@ const TIPS: Tip[] = [
     text: `Priests chant a rival's tower over, but they are frail and a Town Center's arrows reach far. Have a priest raise a <b>${BUILDINGS.chantry.name}</b> (<b>O</b>, in the military menu) just outside the rival's border: priests within ${CHANTRY.reach} tiles of it sing ${Math.round(CHANTRY.voice * 100)}% louder and are mended ${CHANTRY.mend} health a second. A rival can raze it, so guard the band.`,
   },
   {
+    id: 'mews',
+    when: (s, me) => ageOf(s.players[me]) === 'hunt',
+    text: `Wolves come only with riders from the Stable at home. Raise a <b>${BUILDINGS.mews.name}</b> (<b>U</b>, in the military menu) near a rival's border: it breeds War Wolves from food and flies Hawks right there, with no rider to train first, so the pack is reinforced at the front. A rival can raze it, so keep the pack beside it.`,
+  },
+  {
     id: 'wheelyard',
     when: (s, me) => ageOf(s.players[me]) === 'chariots',
     text: `Chariots have no walls to fall back behind. Raise a <b>${BUILDINGS.wheelyard.name}</b> (<b>N</b>) near the front: riders within ${WHEELYARD.rest} tiles of it are mended ${WHEELYARD.heal} health a second, so strike, pull back to the yard and strike again. A rival can burn it, so guard it. Press <b>J</b> on it before you leave the Age of Chariots to keep it.`,
