@@ -54,7 +54,7 @@ Luminance `L` is WCAG relative luminance of the sRGB value (0 black, 1 white); `
 
 ## Every age has a look (#803)
 
-The owner, 2026-10-25: "each age should have a distinct or unique look." Each age past the five trunk epochs has a palette and touches in `src/render/ageLooks.ts` (the 17 older ages keep theirs in `buildingModels.ts`, `ageTouches`). A new age adds both; `tests/age-palettes.test.ts` fails an age without them, or two ages whose house or Town Center match. Palettes keep to the bands above, and trim stays muted (≤ 0.45 S): a trunk model may lay trim over whole walls.
+The owner, 2026-10-25: "each age should have a distinct or unique look." Each age past the five trunk epochs has a palette and touches in `src/render/ageLooks.ts` (the 17 older ages keep theirs in `buildingModels.ts`, `ageTouches`). A new age adds both; `tests/age-palettes.test.ts` fails an age without them, or two ages whose house or Town Center match. Palettes keep to the bands above, and trim stays muted (≤ 0.45 S): a trunk model may lay trim over whole walls. Each age also has a ground (`AGE_GROUNDS`, `src/render/ageGrounds.ts`, #815), laid round its buildings: main colour L ≤ 0.30 and S ≤ 0.50, an accent fleck L ≤ 0.42 and S ≤ 0.66, no two alike (`tests/age-grounds.test.ts`).
 
 ## How each step works
 
