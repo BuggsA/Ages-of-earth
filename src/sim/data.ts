@@ -2402,6 +2402,8 @@ export const TAME = {
   aiClue: 0.8,
   aiDen: 1,
   aiStay: 150,
+  // Bound for the Grove (#742): the Wild is held up to `aiBreed` seconds while the Den rears the deed's beasts.
+  aiBreed: 240,
 };
 
 /**

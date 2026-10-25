@@ -828,6 +828,13 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
     if (s.tick - mem.glow <= secs(MYCELIUM.aiHold * (s.rares?.includes('glowcap') ? 1 : 2))) return { road: MYCELIUM_ROAD, wait: true };
     mem.roads!.mycelium = false;
   }
+  // Bound for the Grove (#742), the Wild holds while the Den rears its beasts, `TAME.aiBreed` seconds at most from the first beast
+  // tamed: held only by the stay, it climbed to the Middle Ages with one beast of five reared.
+  if ((p.tamed?.length ?? 0) > 0 && groveBound(s, v, mem)) {
+    mem.breed ??= s.tick;
+    if (s.tick - mem.breed <= secs(TAME.aiBreed)) return { road: GROVE_ROAD, wait: true };
+    mem.roads!.grove = false;
+  }
   // Bound for the Age of Dykes (#701), the Middle Ages wait while its Dock goes up and the price is gathered, `AI_DYKE.hold` seconds at
   // most; and in the age, it stays until the basin is dry (or as long again), for the polder is what it came for.
   if (walksWeb(v) && ageOf(p) === 'middle' && !hasWalked(p, 'dykes') && mem.roads?.dykes === true) {
@@ -1432,6 +1439,13 @@ function powderRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) =>
 const costSum = (c: Cost): number => (c.food ?? 0) + (c.wood ?? 0) + (c.gold ?? 0) + (c.stone ?? 0);
 
 const MYCELIUM_ROAD = ROADS.find((r) => r.from === 'wild' && r.to === 'mycelium')!;
+const GROVE_ROAD = ROADS.find((r) => r.from === 'wild' && r.to === 'grove')!;
+
+/** Whether it is in the Wild bound for the Grove (#742), its deed (the beasts its Dens rear) not yet in. */
+function groveBound(s: GameState, v: View, mem: AiMemory): boolean {
+  const { p } = v;
+  return walksWeb(v) && ageOf(p) === 'wild' && mem.roads?.grove !== false && wants(s, p, mem, 'grove') && !deedsDone(p, GROVE_ROAD, s);
+}
 
 /**
  * Whether it means to turn into the Mycelium (#800): in the Wild, of a mind to walk it (its own coin), and knowing of the road
@@ -4085,6 +4099,22 @@ function wildRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
       const raised = construct(s, v, mem, 'den', spot, 2, issue);
       v.budget = kept;
       if (raised) spend(v, BUILDINGS.den.cost);
+    }
+  }
+  // Bound for the Grove (#742), each Den rears the cheapest kind it breeds toward the deed, before the climb's price is set aside: left
+  // to the army's turns, out of what the climb left, a Den reared one beast in four minutes.
+  if (groveBound(s, v, mem)) {
+    const dens = v.buildings.filter((b) => b.type === 'den' && b.built);
+    let due = (GROVE_ROAD.deed?.n ?? 0) - (p.stats.bred ?? 0) - dens.reduce((n, b) => n + b.queue.length, 0);
+    for (const den of dens) {
+      if (due <= 0 || den.queue.length) continue;
+      const kinds = lines(p, den).filter((t) => unitEpoch(t) <= p.epoch && !barred(p, t, den.type));
+      const kind = kinds.sort((a, b) => costSum(trainCostFor(s, p.id, a, den.type, den)) - costSum(trainCostFor(s, p.id, b, den.type, den)) || (a < b ? -1 : 1))[0];
+      const cost = kind && trainCostFor(s, p.id, kind, den.type, den);
+      if (!kind || !afford(v, cost)) continue;
+      issue({ t: 'train', p: p.id, building: den.id, unit: kind });
+      spend(v, cost);
+      due--;
     }
   }
   if (singers.length) return;

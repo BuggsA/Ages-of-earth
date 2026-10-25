@@ -1566,6 +1566,8 @@ export interface AiMemory {
   /** The Age of the Mycelium (#800): the tick it began holding the Wild for the glowcaps, and the tick it entered the age. */
   glow?: number;
   mycelium?: number;
+  /** The Wild → Grove step (#742): the tick it began holding the Wild for the Den's beasts. */
+  breed?: number;
   orchardAt?: number;
   /** The tick it entered the Age of Leviathans, kept while it breeds and flies its giants there (`LEVIATHANS.aiStay`). */
   leviathans?: number;
