@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { AGE_PALETTES, NEW_LOOK_AGES, ageLookTouches } from './ageLooks';
 import type { AgeId, BuildingType } from '../sim/types';
 import { BUILDINGS } from '../sim/data';
 import { Kit, bake, rnd } from './kit';
@@ -2312,7 +2313,7 @@ function ironTower(k: Kit, st: Style): void {
 /** The original four dressed ages, kept as the baseline model regression set. */
 export const LOOK_AGES: AgeId[] = ['merchant', 'iron', 'pilgrim', 'fair'];
 /** All dressed ages; additions get their own model coverage beside the baseline set. */
-export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer', 'sail', 'aeronaut', 'lightning', 'warband', 'ironblood', 'totalwar', 'steppe', 'horde', 'silk', 'hemocraft', 'bloodrite', 'golden'];
+export const DRESSED_AGES: AgeId[] = [...LOOK_AGES, 'reclaimer', 'sail', 'aeronaut', 'lightning', 'warband', 'ironblood', 'totalwar', 'steppe', 'horde', 'silk', 'hemocraft', 'bloodrite', 'golden', ...NEW_LOOK_AGES];
 
 const SAIL = '#efe8d4';
 const NET = '#b9ad8a';
@@ -2554,6 +2555,8 @@ function silkTouches(k: Kit, type: BuildingType): void {
 }
 
 function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
+  // The 21 ages dressed for #803 keep their touches in `ageLooks.ts`.
+  if (ageLookTouches(k, type, age)) return;
   const big = type === 'towncenter';
   switch (age) {
     case 'warband':
@@ -2949,7 +2952,7 @@ function teamMarks(k: Kit, type: BuildingType): void {
 
 /** The baked model of a building in an epoch, in a player's color (`variant`: which way a wall piece joins its neighbors). */
 export function buildingGeometry(type: BuildingType, epochIn: number, color: string, variant = 0, age?: AgeId, heirloom = ''): THREE.BufferGeometry {
-  // The Atomic Age (#605) has one building of its own; every other model keeps its Industrial look.
+  // The Atomic Age (#605) has one building of its own; every other model keeps its Industrial shape, in the Atomic palette (#803).
   const epoch = type === 'silo' ? epochIn : Math.min(epochIn, 4);
   const look = age && DRESSED_AGES.includes(age) && type !== 'wall' ? age : undefined;
   const held = heirloom.split(',');
@@ -2959,6 +2962,9 @@ export function buildingGeometry(type: BuildingType, epochIn: number, color: str
   let g = cache.get(key);
   if (!g) {
     const k = new Kit();
+    // Every age past the trunk paints its town in its own palette (#803); role roofs still win, so a building's job reads.
+    const palette = look ? AGE_PALETTES[look] : undefined;
+    const style = roleStyle(type, epoch, palette ? { ...STYLES[Math.min(epoch, 4)], ...palette } : STYLES[Math.min(epoch, 4)]);
     if (type === 'wall') wall(k, epoch, STYLES[Math.min(epoch, 4)], variant);
     else if (type === 'dyke') dyke(k, variant);
     else if (type === 'sluice') sluice(k, variant);
@@ -2972,9 +2978,9 @@ export function buildingGeometry(type: BuildingType, epochIn: number, color: str
     else if (type === 'garden') garden(k, epoch, variant);
     else if (type === 'orchard') orchard(k, epoch, variant);
     else if (type === 'hive') hive(k, epoch, variant);
-    else if (type === 'shaft') shaft(k, epoch, roleStyle(type, epoch, STYLES[Math.min(epoch, 4)]), variant);
-    else if (type === 'silo') silo(k, epoch, roleStyle(type, epoch, STYLES[Math.min(epoch, 4)]), variant);
-    else MAKERS[type](k, epoch, roleStyle(type, epoch, STYLES[Math.min(epoch, 4)]));
+    else if (type === 'shaft') shaft(k, epoch, style, variant);
+    else if (type === 'silo') silo(k, epoch, style, variant);
+    else MAKERS[type](k, epoch, style);
     // A Watch Tower's `variant` is its step on the tower line; a Town Center's 1, that it was knelt from a Behemoth.
     if (type === 'tower' && variant) towerLevel(k, variant);
     if (type === 'towncenter' && variant === 1) kneltShell(k);

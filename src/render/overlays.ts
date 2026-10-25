@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { BUILDINGS, domainOf } from '../sim/data';
-import type { BuildingType, GameState, Shot } from '../sim/types';
+import type { AgeId, BuildingType, GameState, Shot } from '../sim/types';
 import type { ScoutFlag } from '../ui/scoutFlags';
 import { buildingGeometry } from './buildingModels';
 import { Kit, bake } from './kit';
@@ -346,15 +346,16 @@ export class Overlays {
   }
 
   /** Show (or hide, with null) the building about to be placed. */
-  setGhost(s: GameState, g: { type: BuildingType; tx: number; ty: number; ok: boolean; epoch: number; color: string; turn?: boolean } | null): void {
+  setGhost(s: GameState, g: { type: BuildingType; tx: number; ty: number; ok: boolean; epoch: number; color: string; turn?: boolean; age?: AgeId } | null): void {
     if (!g) {
       this.ghost.visible = false;
       return;
     }
-    const key = `${g.type}:${g.epoch}:${g.color}`;
+    // The ghost wears the player's age (#803), so what is placed looks like what will stand.
+    const key = `${g.type}:${g.epoch}:${g.color}:${g.age ?? ''}`;
     if (key !== this.ghostKey) {
       this.ghostKey = key;
-      this.ghostBody.geometry = buildingGeometry(g.type, g.epoch, g.color);
+      this.ghostBody.geometry = buildingGeometry(g.type, g.epoch, g.color, 0, g.age);
     }
     const n = BUILDINGS[g.type].size;
     const cx = g.tx + n / 2;

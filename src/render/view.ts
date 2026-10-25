@@ -46,7 +46,7 @@ import { Sky } from './sky';
 import { forcedHour, hourAt, lightAt, moonPhase } from './daylight';
 import { Weather, breathe, describeWeather, forcedWeather, moodOf, seasonalDay, weatherFor, windFor, type WeatherDay } from './weather';
 import { FogTexture, TerrainView, heightAt } from './terrain';
-import { AIR_ALT, UnitsView } from './unitsView';
+import { AIR_ALT, UnitsView, wearOf } from './unitsView';
 import { WATER_Y, WaterView } from './water';
 import { Fireflies } from './fireflies';
 import { Bats } from './bats';
@@ -748,7 +748,7 @@ export class View {
     this.rangeGuides.update(s, guides, (x, y) => this.reveal || s.players[this.viewer].vis[Math.floor(y) * s.w + Math.floor(x)] > 0);
     this.overlays.setBars(bars, this.rig.camera);
     const p = s.players[this.viewer];
-    this.overlays.setGhost(s, sel.ghost ? { ...sel.ghost, epoch: p.epoch, color: p.color } : null);
+    this.overlays.setGhost(s, sel.ghost ? { ...sel.ghost, epoch: p.epoch, color: p.color, age: ageOf(p) } : null);
     this.overlays.setWallGhost(s, sel.wall?.tiles ?? [], p.epoch, p.color, sel.wall?.alongY ?? false, sel.wall?.type);
     const rb = sel.rallyOf ? s.byId.get(sel.rallyOf) : undefined;
     this.overlays.setFlag(s, rb && rb.kind === 'building' && rb.rally ? rb.rally : null, p.color, this.time);
@@ -1335,7 +1335,7 @@ export class View {
             if (!this.sees(ev.x, ev.y) && ev.owner !== this.viewer) break;
             const type = ev.type as Unit['type'];
             const drawnAt = this.units.drawn.get(ev.id);
-            this.units.fall(type, ev.epoch, ev.owner, ev.x, ev.y, ev.fx, ev.fy, ev.id, SIGNATURES[s.players[ev.owner].civ].type === type ? s.players[ev.owner].civ : undefined);
+            this.units.fall(type, ev.epoch, ev.owner, ev.x, ev.y, ev.fx, ev.fy, ev.id, SIGNATURES[s.players[ev.owner].civ].type === type ? s.players[ev.owner].civ : undefined, wearOf(s, type, ev.owner));
             const dom = domainOf(type);
             if (dom === 'water') {
               // A ship breaks up: spray, splinters, a slick of smoke.

@@ -1592,3 +1592,18 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 **Seen and not:** headless only (the tests, `scripts/sim.ts` for the unchanged checksum); the hawk model and cry were not looked at or listened to in a browser.
 
 **Next:** a keepsake building (a kennel that keeps the heel on any road); wings that beat; a hawk that marks what it sees so the pack runs to it; a rival's answer to a hawk beyond the arrow (a falconer's net, or a tower that favours the sky).
+
+## Designers' notes: every age has a look of its own (#803, 2026-10-25)
+
+**Built:** the owner asked that each age look distinct. 21 of the 43 ages (the whole Water Road, the Wild route, the Atomic trio, Alchemy, Sappers, Sea-Raiders, Chariots, Missions) still borrowed their parent epoch's buildings unchanged. Now every age past the trunk has a **palette** (walls, roofs, trim: `AGE_PALETTES` in `src/render/ageLooks.ts`) and **touches** drawn from its own story, all baked into the one geometry per building, so no age costs a draw. The 17 ages dressed before keep their touches and gain a palette.
+
+**Why I love it:** an age is something your town *becomes* (`docs/age-roads.md`), and now you can see it become it. A scout who crests a hill and sees reed-gold roofs on the water, or white stepped gables behind a dyke, knows the road that town took and what it can do before a single unit shows. It is Goal 2's "show the road" made visible, and it costs the player nothing to read.
+
+**Choices:** role roofs (war slate, trade teal, faith gold, work ochre) still win over the palette, so what a building is for keeps reading (#625). Trims stay muted, because trunk models may lay trim over whole walls: my first Rivers palette had a lapis trim, and the town came out in the blue player's colour. The test now holds every trim, wall and base under the team colours' saturation. Walls keep their epoch look (an existing test asks it).
+
+**Seen and not:** shot in Chromium (software GL, `vite preview`, the age set on the live game) for 42 of the 43 ages side by side (all but the Stone Age, unchanged); each town read as its own. Not seen: Fusion's ring and Bloom's crown at night, the touches on rarer buildings (Den, Great Den, Caravanserai, Airfield), or any of it on a phone.
+
+**People too (s2):** citizens wear their age's hat in place of the epoch's (a team band kept round it), and foot soldiers, archers and priests a scarf in the town's colours; a thrall wears nothing of its taker's age. Riders, heroes, siege and ships are untouched: a rider's head sits on a horse's frame, and heroes and ships have their own gear. The Wild Hunt and the Mycelium, merged the same morning, are dressed too; the test fails any new age that isn't.
+
+**Next:** riders and ships that wear their age (a reed-boat ferry, felt-clad riders); the ground round a town (channels' green banks, the Wildwood's moss); and an age-up moment that repaints the town in a sweep from the Town Center outward instead of all at once.
+
