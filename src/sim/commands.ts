@@ -38,7 +38,7 @@ import { fightsBeasts } from './animals';
 import { tameProblem } from './tame';
 import { heartBarred, rootEnt, rootProblem } from './wildwood';
 import { sling, slingProblem, spireBarred } from './bloom';
-import { behemothBusy, kneel, kneelProblem, rise, riseProblem, seedBomb, seedBombProblem } from './leviathans';
+import { behemothBusy, krakenProblem, kneel, kneelProblem, rise, riseProblem, seedBomb, seedBombProblem } from './leviathans';
 import { isField } from './grove';
 import { answerTiding, tidingProblem } from './tidings';
 import { sluiceProblem } from './water';
@@ -977,6 +977,8 @@ export function applyCommand(s: GameState, c: Command): void {
       if (b.queue.length >= MAX_QUEUE) return refuse(s, c.p, 'The queue is full');
       if (c.unit === 'hero' && heroBusy(s, c.p)) return refuse(s, c.p, 'You can lead with one hero at a time');
       if (c.unit === 'behemoth' && behemothBusy(s, c.p)) return refuse(s, c.p, 'Your people has its Behemoth: one to a people');
+      const deep = c.unit === 'kraken' ? krakenProblem(s, b) : null;
+      if (deep) return refuse(s, c.p, deep);
       // The legion (#501): a Roman town keeps few citizens.
       const full = c.unit === 'citizen' ? citizenProblem(s, p) ?? linkProblem(s, b) : null;
       if (full) return refuse(s, c.p, full);

@@ -30,6 +30,7 @@ import { carriesTorch, ignite, onFire, torchProblem } from './fire';
 import { fieldBoost, wading } from './water';
 import { gardenMul, isField } from './grove';
 import { stungPace } from './hive';
+import { seaPace } from './leviathans';
 import { woodPace } from './wildwood';
 import { fordMarch, groveBoost, keptOf, kinBonus } from './landmarks';
 import { chant, chantedOver, consecrateProblem, consecrates, turnBuilding } from './consecrate';
@@ -2358,7 +2359,9 @@ export function walk(s: GameState, u: Unit): void {
   if (!u.path) return;
   // A channel (#701, the Age of Rivers) is waded: a moat on foot.
   // Venom and stings slow it (the Age of the Hive); the woods round a Heart Tree speed its own people and hold back a rival (the Wildwood).
-  let left = statsOf(s, u).speed * fordMarch(s, u) * hemoPace(s, u) * stungPace(s, u) * woodPace(s, u) * (domainOf(u.type) === 'land' ? wading(s, u.x, u.y, statsOf(s, u).cls === 'siege') : 1) * DT;
+  // A Kraken's grip holds a ship still, and its own people's Kraken shoves it along (#789, the Age of Leviathans).
+  const dom = domainOf(u.type);
+  let left = statsOf(s, u).speed * fordMarch(s, u) * hemoPace(s, u) * stungPace(s, u) * woodPace(s, u) * (dom === 'land' ? wading(s, u.x, u.y, statsOf(s, u).cls === 'siege') : dom === 'water' ? seaPace(s, u) : 1) * DT;
   while (left > 1e-9 && u.path) {
     const tx = u.path[u.pathI * 2];
     const ty = u.path[u.pathI * 2 + 1];

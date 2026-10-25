@@ -57,7 +57,7 @@ import { GROVE_BUILDINGS, grows } from '../sim/grove';
 import { hiveLine, keepsBees } from '../sim/hive';
 import { heartBarred, heartLine, heartOf, rootProblem, wakesForest } from '../sim/wildwood';
 import { greenLeft, inBloom, rooted, slingProblem, spireBarred, spireLine } from '../sim/bloom';
-import { bombIn, kneelProblem, riseProblem, seedBombProblem } from '../sim/leviathans';
+import { bombIn, gripped, kneelProblem, riseProblem, seedBombProblem } from '../sim/leviathans';
 import { isCarrier } from '../sim/units';
 import { KEYS, RARES, RES, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
@@ -141,6 +141,9 @@ const ACT_WORDS: Record<string, string> = {
 function orderWords(s: GameState, u: Unit): string {
   const o = u.order;
   if (u.inside && s.byId.get(u.inside)?.kind === 'unit') return 'Aboard a ship';
+  // A Kraken's grip holds a ship still (#789); its own Kraken shoves it along.
+  if (gripped(s, u)) return 'Gripped by a Kraken: it can\'t sail until the Kraken lets go';
+  if (u.type === 'reefship' && u.hp < statsFor(s, u.owner, u.type).hp && s.tick - u.hurt >= secs(LEVIATHANS.reefCalm)) return 'Growing: the coral mends on the water';
   switch (o.k) {
     case 'gather': {
       const kind = s.res[o.tile];

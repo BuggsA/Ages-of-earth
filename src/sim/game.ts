@@ -3,7 +3,7 @@ import { groveStep, rootThorn } from './grove';
 import { hiveStep } from './hive';
 import { treeToWake, wakeTree, wildwoodStep, WAKE_NONE } from './wildwood';
 import { bloomStep } from './bloom';
-import { bornBehemoth } from './leviathans';
+import { bornBehemoth, bornReef, seaBy, seaStep } from './leviathans';
 import { aiStep } from './ai';
 import { workStep } from './works';
 import { beaconStep } from './beacon';
@@ -56,7 +56,7 @@ import { coppiceStep } from './coppice';
 import { longbowStep } from './longbow';
 import { seraiStep, tollStep } from './passage';
 import { mercStep } from './merc';
-import { BLOOM, FINDS, KIN, NOMAD, STEP_BACK } from './data';
+import { BLOOM, FINDS, KIN, LEVIATHANS, NOMAD, STEP_BACK } from './data';
 import { ageOf, goldenEnds, threadsOf, chartLand, isHire, barred, journeyOf, markKeepsake, noteWalked, trainsAt, workSteps } from './ages';
 import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, HomelandId, MapSize, MapType, Player, UnitType } from './types';
 import { RARES, RES, R_FISH, R_NONE } from './types';
@@ -422,6 +422,14 @@ function updateBuilding(s: GameState, sp: Spatial, b: Building): void {
     }
     return;
   }
+  // A Kraken (the Age of Leviathans) goes out into the sea by its Great Den: with the sea gone from it (drained, dyked off), it waits.
+  if (unit === 'kraken' && !seaBy(s, b.tx, b.ty, b.size)) {
+    if (item.done === need) {
+      item.done = need + 1;
+      s.events.push({ k: 'refused', owner: p.id, why: `No sea within ${LEVIATHANS.sea} tiles of this Great Den for the Kraken` });
+    }
+    return;
+  }
   b.queue.shift();
   for (let i = 0; i < kin; i++) bringOut(s, p, b, unit);
   if (item.kin) s.events.push({ k: 'kin', owner: p.id, n: kin, x: b.x, y: b.y });
@@ -436,8 +444,9 @@ function bringOut(s: GameState, p: Player, b: Building, unit: UnitType): void {
   const spot = exitSpot(s, b, toward.x, toward.y, unit === 'barge' ? BARGE : domain === 'water' ? NAVAL : domain === 'air' ? AIR : undefined);
   // An Ent steps out of the tree it was (the Age of the Wildwood), not out of the Heart Tree.
   const u = (unit === 'warden' && wakeTree(s, b)) || spawnUnit(s, p.id, unit, spot.x, spot.y);
-  // A Behemoth (the Age of Leviathans) is born with its Town Center on its back.
+  // A Behemoth (the Age of Leviathans) is born with its Town Center on its back; a Reef Ship puts out young, to grow on the water.
   if (unit === 'behemoth') bornBehemoth(u);
+  if (unit === 'reefship') bornReef(s, u);
   p.pop++;
   p.stats.trained++;
   // A soldier hired for gold at the Market is a sword for hire (`MERC`): it draws wages from now on.
@@ -694,6 +703,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   hiveStep(s);
   wildwoodStep(s);
   bloomStep(s);
+  seaStep(s);
   longbowStep(s);
   tollStep(s);
   mercStep(s);

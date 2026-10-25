@@ -11,6 +11,7 @@ import { raided } from './household';
 import { alarm } from './flee';
 import { distToRect } from './grid';
 import { envenom } from './hive';
+import { grip } from './leviathans';
 import type { Spatial } from './spatial';
 import { gunPower, gunRange, modsOf, statsFor } from './stats';
 import type { Animal, Building, Ent, GameState, Shot, Unit } from './types';
@@ -185,6 +186,8 @@ export function strike(s: GameState, u: Unit, t: Ent): void {
   }
   s.events.push({ k: 'swing', id: u.id, target: t.id, x: u.x, y: u.y, owner: u.owner, ranged: false, type: u.type });
   hurt(s, t, damageOf(s, u, st, t, false), u.owner, u);
+  // A Kraken's arms hold the ship they strike (#789, the Age of Leviathans).
+  if (u.type === 'kraken' && t.kind === 'unit') grip(s, u, t);
 }
 
 /** A hunter's spear at an animal (or a soldier's arrow, stone or shot, with its own `kind` and `damage`). */

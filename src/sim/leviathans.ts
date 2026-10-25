@@ -1,6 +1,6 @@
 import { LEVIATHANS, TICK_HZ, domainOf, secs } from './data';
 import { ageOf } from './ages';
-import { placeProblem, stampBuilding } from './grid';
+import { NAVAL, placeProblem, stampBuilding, walkable } from './grid';
 import { pitchSpot } from './steppe';
 import { ungarrison } from './units';
 import { canAfford, maxHp, pay, placeBuilding, spawnUnit } from './world';
@@ -15,6 +15,10 @@ import type { Building, GameState, Player, Unit } from './types';
  * - The Behemoth, one to a people, is bred carrying a Town Center (`Unit.packed`, so the heart rule counts it as the Steppe's wagons
  *   are counted). It kneels where a wagon would pitch (`kneel`): its Town Center stands at once, built, with the share of health the
  *   titan had; and that Town Center rises onto its back again (`rise`) whenever its queue is empty.
+ * - At sea (#789): a Great Den raised by the sea (`seaBy`) breeds the Kraken too, `LEVIATHANS.krakens` to a people. Each blow it
+ *   lands on a ship grips that ship (`grip`: it can't move), and its people's ships near it are shoved along (`seaStep`, `seaPace`).
+ *   A Dock grows Reef Ships in the warship's place while the people stands in the age (`trainsAt`): launched weak (`bornReef`),
+ *   they grow to full on the water and mend after a fight.
  * Great Dens and their giants belong to any people that has walked the age, in every age after (`buildBarred`, `barred`).
  */
 
@@ -129,3 +133,64 @@ export function seedBomb(s: GameState, u: Unit): void {
   for (const i of tiles) placeBuilding(s, u.owner, 'thornwall', i % s.w, Math.floor(i / s.w), true);
   s.events.push({ k: 'leviathan', what: 'bomb', owner: u.owner, id: u.id, x: u.x, y: u.y, n: tiles.length });
 }
+
+/** Whether a footprint at (tx, ty) of `size` tiles has navigable water within `LEVIATHANS.sea` tiles of it: a Great Den there breeds Krakens. */
+export function seaBy(s: GameState, tx: number, ty: number, size: number): boolean {
+  const r = LEVIATHANS.sea;
+  for (let y = ty - r; y < ty + size + r; y++) for (let x = tx - r; x < tx + size + r; x++) if (walkable(s, x, y, NAVAL)) return true;
+  return false;
+}
+
+/** Why this Great Den can't breed a Kraken now, or null: it stands too far from the sea, or the people has its Krakens. */
+export function krakenProblem(s: GameState, b: Building): string | null {
+  if (!seaBy(s, b.tx, b.ty, b.size)) return `A Kraken is bred only at a Great Den within ${LEVIATHANS.sea} tiles of the sea`;
+  let n = 0;
+  for (const e of s.ents) {
+    if (e.owner !== b.owner || e.hp <= 0) continue;
+    n += e.kind === 'unit' ? (e.type === 'kraken' ? 1 : 0) : e.queue.filter((q) => q.unit === 'kraken').length;
+  }
+  return n >= LEVIATHANS.krakens ? `Your people has its ${LEVIATHANS.krakens} Krakens` : null;
+}
+
+/** A Reef Ship just grown: it puts out at a share of its strength, and grows the rest on the water (`seaStep`). */
+export function bornReef(s: GameState, u: Unit): void {
+  u.hp = Math.max(1, Math.round(maxHp(s, u) * LEVIATHANS.reefBorn));
+}
+
+/** A Kraken's blow lands on a ship: the ship is gripped and can't move until `LEVIATHANS.grip` seconds after the last blow. */
+export function grip(s: GameState, u: Unit, t: Unit): void {
+  if (t.hp <= 0 || domainOf(t.type) !== 'water') return;
+  if (t.gripped === undefined || s.tick >= t.gripped) s.events.push({ k: 'leviathan', what: 'grip', owner: u.owner, id: t.id, x: t.x, y: t.y });
+  t.gripped = s.tick + secs(LEVIATHANS.grip);
+}
+
+/** What a Kraken leaves of a ship's pace: nothing while it is gripped, `LEVIATHANS.shoveMul` while its own Kraken shoves it, else 1. */
+export function seaPace(s: GameState, u: Unit): number {
+  if (u.gripped !== undefined && s.tick < u.gripped) return 0;
+  return u.shoved !== undefined && s.tick < u.shoved ? LEVIATHANS.shoveMul : 1;
+}
+
+/**
+ * Once a second: each Kraken shoves its people's other ships within `LEVIATHANS.shove` tiles of it along for the next second and a
+ * bit; and each Reef Ship grows, or mends once no blow has landed on it for `LEVIATHANS.reefCalm` seconds.
+ */
+export function seaStep(s: GameState): void {
+  if (s.tick % TICK_HZ !== 0) return;
+  const r2 = LEVIATHANS.shove * LEVIATHANS.shove;
+  for (const k of s.ents) {
+    if (k.kind !== 'unit' || k.hp <= 0 || k.inside) continue;
+    if (k.type === 'reefship') {
+      const full = maxHp(s, k);
+      if (k.hp < full && s.tick - k.hurt >= secs(LEVIATHANS.reefCalm)) k.hp = Math.min(full, k.hp + LEVIATHANS.reefMend);
+      continue;
+    }
+    if (k.type !== 'kraken') continue;
+    for (const e of s.ents) {
+      if (e === k || e.kind !== 'unit' || e.owner !== k.owner || e.hp <= 0 || e.inside || e.type === 'kraken' || domainOf(e.type) !== 'water') continue;
+      if ((e.x - k.x) * (e.x - k.x) + (e.y - k.y) * (e.y - k.y) <= r2) e.shoved = s.tick + secs(1.2);
+    }
+  }
+}
+
+/** Whether a rival Kraken grips this ship now (for the HUD's words). */
+export const gripped = (s: GameState, u: Unit): boolean => u.gripped !== undefined && s.tick < u.gripped;
