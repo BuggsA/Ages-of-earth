@@ -48,6 +48,7 @@ import { forcedHour, hourAt, lightAt, moonPhase } from './daylight';
 import { Weather, breathe, describeWeather, forcedWeather, moodOf, seasonalDay, weatherFor, windFor, type WeatherDay } from './weather';
 import { FogTexture, TerrainView, heightAt } from './terrain';
 import { AIR_ALT, UnitsView, wearOf } from './unitsView';
+import { ageSparks } from './ageGrounds';
 import { WATER_Y, WaterView } from './water';
 import { Fireflies } from './fireflies';
 import { Bats } from './bats';
@@ -165,6 +166,8 @@ export class View {
   /** How far the haze lets the view reach today (1 on a clear day). */
   private reach = 1;
   private flash = 0;
+  /** Seconds until the ground round the towns is looked over again (#815). */
+  private groundTimer = 0;
   private baseSun = 2.5;
   private baseHemi = 1.0;
   private mood = moodOf({ kind: 'clear', strength: 0 });
@@ -506,6 +509,12 @@ export class View {
     this.hemi.intensity = this.baseHemi + this.flash * 2.2;
     this.sun.intensity = this.baseSun + this.flash * 1.5;
 
+    // The ground round each known building wears its owner's age (#815), looked over a few times a second.
+    this.groundTimer -= dt;
+    if (this.groundTimer <= 0) {
+      this.groundTimer = 0.4;
+      this.terrain.wearTowns(s, this.buildings.known.values());
+    }
     // The water layer (#701): ground pumped out of the water rises from it, and the shore's foam follows.
     if (this.terrain.sync(s, dt)) this.water.refreshBed(s, (i) => this.terrain.heightOf(i));
     this.resources.update(s, dt);
@@ -1457,8 +1466,10 @@ export class View {
           const tc = s.ents.find((e) => e.kind === 'building' && e.owner === ev.owner && e.type === 'towncenter');
           if (tc && (ev.owner === this.viewer || this.sees(tc.x, tc.y))) {
             const at = this.ground(s, tc.x, tc.y, 0.2);
-            // A step back (#47) glows dusk-blue instead of gold, and its sparks fall rather than rise.
-            const c = ev.back ? ['#8fa8d8', '#d8e2f4', '#6a7fb0'] : ['#ffd166', '#fff3c4', '#ffb347'];
+            // A step back (#47) glows dusk-blue instead of gold, and its sparks fall rather than rise. A side age lights in its own
+            // colours (#815), and its new ground spreads out over the town from here.
+            const c = ev.back ? ['#8fa8d8', '#d8e2f4', '#6a7fb0'] : ageSparks(ev.age) ?? ['#ffd166', '#fff3c4', '#ffb347'];
+            this.terrain.sweepFrom(tc.x, tc.y);
             this.effects.ring(at, c[0], 5, 1.6);
             this.effects.ring(at, c[1], 3.5, 1.2);
             this.effects.burst(at.clone().setY(at.y + 1.5), { count: 60, speed: 3, up: ev.back ? 0.2 : 0.9, life: 1.8, size: 0.07, gravity: 2, colors: c });

@@ -6,6 +6,8 @@ import { isCanal, isInund, isPolder } from '../sim/water';
 import { bared, isCauseway } from '../sim/tides';
 import { isPond } from '../sim/tides';
 import { natureGeometry, type NatureKind } from './natureModels';
+import { GROUND_AGES, GROUND_REACH, GROUND_STRENGTH, groundColor } from './ageGrounds';
+import type { AgeId, BuildingType } from '../sim/types';
 import { bakedMaterial, fogUniforms, inject, swayMaterial } from './materials';
 
 /**
@@ -46,6 +48,19 @@ const TOWPATH = C('#a8977a');
 export const FLOOD_DEPTH = 0.09;
 const floodMaterial = inject(new THREE.MeshStandardMaterial({ color: '#6fa7b6', transparent: true, opacity: 0.6, roughness: 0.2, metalness: 0.05, depthWrite: false }), {});
 const TMP = new THREE.Color();
+const TMP2 = new THREE.Color();
+/** Pieces that run in lines or lie in the water: their ground stays the land's (#815). */
+const UNTRODDEN = new Set<BuildingType>(['wall', 'gate', 'dyke', 'channel', 'causeway', 'bridge', 'dam', 'sluice', 'tidegate', 'snare', 'farm', 'sapling', 'thornwall', 'garden', 'orchard']);
+/** How fast an age-up's new ground spreads out from its Town Center, in tiles a second (#815). */
+const SWEEP_SPEED = 6;
+/** What `wearTowns` needs of a building the viewer knows. */
+export interface TownPiece {
+  type: BuildingType;
+  tx: number;
+  ty: number;
+  size: number;
+  age: AgeId;
+}
 const A = new THREE.Vector3();
 const B = new THREE.Vector3();
 const V = new THREE.Vector3();
@@ -117,6 +132,17 @@ export class TerrainView {
   private drying = new Map<number, number>();
   private clock = 0;
   private repaintAt = 0;
+  /**
+   * The ground each tile wears for a town's age (#815): the age as drawn (an index in `GROUND_AGES`, -1 for the open land) and
+   * its weight in quarters (0 to 4). Changes wait in `pendingGround` for an age-up's wave to reach them: tile → [when, age, weight].
+   */
+  private townAge = new Int16Array(0);
+  private townW = new Uint8Array(0);
+  private wantAge = new Int16Array(0);
+  private wantW = new Uint8Array(0);
+  private pendingGround = new Map<number, [number, number, number]>();
+  /** Recent age-ups: where the Town Center stood and when, so the new ground spreads out from it. */
+  private sweeps: { x: number; y: number; at: number }[] = [];
 
   /** Paint the world's edge: the unexplored slate in play, or a colour given (the title's horizon), so the land fades into the sky. */
   skirtTint(c: THREE.Color | null): void {
@@ -135,6 +161,12 @@ export class TerrainView {
     this.drainedSeen = drainedIn(s);
     this.rising.clear();
     this.drying.clear();
+    this.townAge = new Int16Array(w * h).fill(-1);
+    this.townW = new Uint8Array(w * h);
+    this.wantAge = new Int16Array(w * h);
+    this.wantW = new Uint8Array(w * h);
+    this.pendingGround.clear();
+    this.sweeps = [];
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) this.paint(s, x, y);
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
@@ -233,6 +265,15 @@ export class TerrainView {
         if (this.clock - at > DRY_TIME) this.drying.delete(t);
       }
     }
+    if (this.pendingGround.size) {
+      for (const [t, [at, age, wt]] of this.pendingGround) {
+        if (at > this.clock) continue;
+        this.pendingGround.delete(t);
+        this.townAge[t] = age;
+        this.townW[t] = wt;
+        touched.add(t);
+      }
+    }
     this.floodSheet(s);
     if (!touched.size) return moved;
     for (const t of touched) this.paint(s, t % w, Math.floor(t / w));
@@ -241,6 +282,69 @@ export class TerrainView {
     geo.attributes.color.needsUpdate = true;
     geo.computeBoundingSphere();
     return moved;
+  }
+
+  /** An age-up at (x, y), a Town Center (#815): the ground it changes spreads out from there instead of all at once. */
+  sweepFrom(x: number, y: number): void {
+    this.sweeps = this.sweeps.filter((w) => this.clock - w.at < 8);
+    this.sweeps.push({ x, y, at: this.clock });
+  }
+
+  /**
+   * Lay each known building's age on the ground round it (#815): full under its footprint, fading over `GROUND_REACH` tiles;
+   * where two towns' grounds meet, the nearer building's wins. Tiles that change wait for a recent age-up's wave, if one is
+   * near; otherwise they change on the next frame.
+   */
+  wearTowns(s: GameState, pieces: Iterable<TownPiece>): void {
+    if (!this.mesh) return;
+    const { w, h } = s;
+    const { wantAge, wantW } = this;
+    wantAge.fill(-1);
+    wantW.fill(0);
+    const R = GROUND_REACH;
+    for (const b of pieces) {
+      if (UNTRODDEN.has(b.type)) continue;
+      const age = GROUND_AGES.indexOf(b.age);
+      if (age < 0) continue;
+      const x0 = Math.max(0, b.tx - R);
+      const y0 = Math.max(0, b.ty - R);
+      const x1 = Math.min(w - 1, b.tx + b.size - 1 + R);
+      const y1 = Math.min(h - 1, b.ty + b.size - 1 + R);
+      for (let y = y0; y <= y1; y++) {
+        const dy = y < b.ty ? b.ty - y : y > b.ty + b.size - 1 ? y - (b.ty + b.size - 1) : 0;
+        for (let x = x0; x <= x1; x++) {
+          const dx = x < b.tx ? b.tx - x : x > b.tx + b.size - 1 ? x - (b.tx + b.size - 1) : 0;
+          const d = Math.max(dx, dy);
+          // Quarters: 4 under the building and the tile round it, then 3, 2, 1 out to the reach; ragged at the edge.
+          const q = d <= 1 ? 4 : Math.max(0, Math.min(4, Math.round(4 * (1 - (d - 1) / R) + (hash2(x, y, 41) - 0.5))));
+          const t = y * w + x;
+          if (q > wantW[t]) {
+            wantW[t] = q;
+            wantAge[t] = age;
+          }
+        }
+      }
+    }
+    const recent = this.sweeps.filter((sw) => this.clock - sw.at < 8);
+    for (let t = 0; t < w * h; t++) {
+      const age = wantW[t] ? wantAge[t] : -1;
+      const wt = wantW[t];
+      if (age === this.townAge[t] && wt === this.townW[t]) {
+        this.pendingGround.delete(t);
+        continue;
+      }
+      const was = this.pendingGround.get(t);
+      if (was && was[1] === age && was[2] === wt) continue;
+      // An age-up's wave reaches this tile `distance / SWEEP_SPEED` seconds after it began; ground away from any wave changes now.
+      let at = this.clock;
+      const x = t % w;
+      const y = (t - x) / w;
+      for (const sw of recent) {
+        const d = Math.sqrt((x + 0.5 - sw.x) * (x + 0.5 - sw.x) + (y + 0.5 - sw.y) * (y + 0.5 - sw.y));
+        if (d < 48) at = Math.max(at, sw.at + d / SWEEP_SPEED);
+      }
+      this.pendingGround.set(t, [at, age, wt]);
+    }
   }
 
   /** The drawn height of a tile corner. */
@@ -272,6 +376,7 @@ export class TerrainView {
       // Broad, soft patches of color rather than speckle: smooth noise picks the shade.
       const patch = smooth(x + 0.5, y + 0.5, 6, 11);
       const fine = smooth(x + 0.5, y + 0.5, 2.5, 12);
+      let trodden = false;
       if (isInund(s, tile)) {
         tmp.copy(DROWNED[0]).lerp(DROWNED[1], fine);
       } else if (terr === T_WATER && isCanal(s, tile)) {
@@ -288,6 +393,7 @@ export class TerrainView {
         polderColor(tmp, x, y, t, fine, this.drying.has(tile) ? Math.min(1, (this.clock - this.drying.get(tile)!) / DRY_TIME) : 1);
       } else if (terr === T_SAND) {
         tmp.copy(SAND[0]).lerp(SAND[1], fine);
+        trodden = true;
       } else if (terr === T_ROCK) {
         tmp.copy(ROCK[0]).lerp(ROCK[1], fine).lerp(ROCK[2], patch * 0.6);
         if (avgH > 2.6) tmp.lerp(SNOWCAP, Math.min(1, (avgH - 2.6) * 0.45));
@@ -297,7 +403,10 @@ export class TerrainView {
         const dry = Math.max(0, Math.min(1, (avgH - 1.1) * 0.5)) * 0.45 + Math.max(0, patch - 0.72) * 1.2;
         tmp.lerp(DRY, Math.min(0.6, dry));
         if (fine < 0.18 && patch > 0.55) tmp.lerp(DIRT, 0.35);
+        trodden = true;
       }
+      // A town's ground wears its age (#815).
+      if (trodden && this.townW[tile]) tmp.lerp(groundColor(TMP2, GROUND_AGES[this.townAge[tile]], x, y, t, fine), (GROUND_STRENGTH * this.townW[tile]) / 4);
       if (terr !== T_WATER && s.channel && besideCanal(s, x, y)) tmp.lerp(TOWPATH, 0.45);
       if (terr !== T_WATER && steep < 0.8) tmp.lerp(CLIFF, Math.min(1, (0.8 - steep) * 2.6));
       // A whisper of light and shade per facet keeps the low-poly look without the noise.
