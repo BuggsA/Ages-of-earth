@@ -3880,7 +3880,8 @@ function wilds(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void
     let escort: Unit[] = [];
     if (!m && AI_LEVELS[v.p.ai!].clever && v.p.epoch <= 2 && s.tick >= s.peaceUntil) {
       const far = nearestBeast(s, 'mammoth', v.home.x, v.home.y, AI_WILD.far);
-      const idle = v.army.filter((u) => !u.inside && (u.order.k === 'idle' || atTheAxe(v, u)) && u.type !== 'siege' && u.type !== 'hero');
+      // Spare soldiers as the wolf hunt below counts them: idle, at the legion's axe, or on a plain walk (a muster, not an attack).
+      const idle = v.army.filter((u) => !u.inside && (u.order.k === 'idle' || atTheAxe(v, u) || (u.order.k === 'move' && !u.order.amove)) && u.type !== 'siege' && u.type !== 'hero');
       if (far && far.state !== 'fight' && idle.length >= AI_WILD.escort + AI_WILD.guard && !ruinDanger(s, v.p, far, AI_WILD.safe)) {
         m = far;
         escort = idle.sort((a, b) => (a.x - far.x) * (a.x - far.x) + (a.y - far.y) * (a.y - far.y) - ((b.x - far.x) * (b.x - far.x) + (b.y - far.y) * (b.y - far.y)) || a.id - b.id).slice(0, AI_WILD.escort);
