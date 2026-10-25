@@ -1189,7 +1189,7 @@ export const ROADS: Road[] = [
   {
     from: 'mycelium',
     to: 'bloom',
-    cost: { food: 2400, wood: 1800, gold: 1800, stone: 300 },
+    cost: { food: 1800, wood: 1400, gold: 1400, stone: 200 },
     time: 120,
     walked: 'mycelium',
     gate: 'hard',
@@ -2597,8 +2597,9 @@ export const LEVIATHANS = {
  * - Fire: once a second any fire within a web cuts that web back to the fire's distance less one tile; a torch may be set to bare
  *   ground on a rival's web (it burns the web back at once).
  * The web withers the moment its people leaves the age.
- * The computer: turns into it from the Wild on a coin of its own (`aiTake`) where glowcaps are to be had, digs or buys them, stays
- * `aiStay` seconds, and takes the road on to the Bloom on a coin of its own (`aiBloom`) when the deed is done and the price in hand.
+ * The computer: turns into it from the Wild on a coin of its own (`aiTake`) where glowcaps are to be had, raising a Prospector's Lodge
+ * to learn so, holds the Wild up to `aiHold` seconds while it digs or buys them, stays `aiStay` seconds, and takes the road on to the Bloom on a coin of its own (`aiBloom`) once the deed is done and `aiBanked` of the
+ * price is in store (saving the rest from there).
  */
 export const MYCELIUM = {
   reach: WEB_REACH,
@@ -2610,8 +2611,10 @@ export const MYCELIUM = {
   halls: ['towncenter', 'house', 'storehouse', 'barracks', 'range', 'stable', 'forge', 'workshop', 'temple', 'market', 'huntcamp', 'prospector', 'den', 'windmill', 'tower', 'wonder', 'shaft'] as BuildingType[],
   deed: WEB_DEED,
   aiTake: 0.5,
+  aiHold: 360,
   aiStay: 420,
   aiBloom: 0.6,
+  aiBanked: 0.25,
 };
 
 export const COPPICE = { reach: 8, regrow: 120, retry: 5, grow: 90, snare: 2, cap: 1.5, bag: 2, full: 12, aiPerFood: 1.5, aiMax: 16, aiTrees: 10, aiThick: 14, aiNear: 14, aiDrop: 7, aiPerTender: 2, aiStone: 6, aiCamps: 2, aiPlant: 3, aiThin: 12, aiPlantWood: 120 };
@@ -3461,7 +3464,6 @@ export const FINDS = {
     cairn: { key: 'bloodiron', name: 'A battlefield cairn', icon: '🗿', reward: { stone: 60 }, hint: 'Spear-heads piled under stones, dark as dried blood. Blood-iron lies in this land.' },
     lick: { key: 'salt', name: 'A salt lick', icon: '🧂', reward: { food: 100 }, hint: 'Every game trail runs to this white crust. Salt lies in this land.' },
     meteor: { key: 'saltpetre', name: 'A fallen star', icon: '☄️', reward: { stone: 60 }, hint: 'A black stone in a scorched hollow, pale crystals on the grass round it. Saltpetre lies in this land.' },
-    ring: { key: 'glowcap', name: 'A fairy ring', icon: '🍄', reward: { food: 80 }, hint: 'A ring of pale mushrooms that glow faintly after dark, and the grass inside it never grows. A Glowcap hollow lies in this land.' },
     stash: { key: null, name: "A hunters' stash", icon: '🧺', reward: { food: 100 }, hint: 'A cache the first hunters left: dried meat and bone needles, and nothing else. No hidden roads lie in this land: the plain ones are the ones to take.' },
     shrine: { key: 'ruin', name: "A hermit's shrine", icon: '🛖', reward: { gold: 40 }, hint: 'A hermit tends stones older than any town and tells you where they stand. Ancient ruins lie in this land.' },
   } as Record<FindKind, { key: KeyId | null; name: string; icon: string; reward: Cost; hint: string }>,

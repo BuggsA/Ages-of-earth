@@ -1317,7 +1317,8 @@ function placeFinds(
   // Deal what each speaks of from a fresh shuffled hand of what this world holds.
   const held: KeyId[] = [];
   if (bogIron) held.push('bogIron');
-  for (const r of rares) held.push(r);
+  // The Glowcap hollow (#800) has no find: it glows where it lies, and the finds are a fixed six (`tests/models.test.ts`).
+  for (const r of rares) if (r !== 'glowcap') held.push(r);
   if (ruins) held.push('ruin');
   const kindOf = (key: KeyId): FindKind => (Object.keys(FINDS.kinds) as FindKind[]).find((k) => FINDS.kinds[k].key === key)!;
   if (!held.length) return placed.map((f) => ({ ...f, key: null, kind: 'stash' as FindKind }));

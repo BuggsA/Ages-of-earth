@@ -203,8 +203,10 @@ export function diggersAt(s: GameState): Map<number, number> {
 }
 
 /** What a people holds of each key resource (#568): its stock of each rare ore, and the bog iron it has dug (paid in as gold). */
-export function holdingsOf(p: Player): Record<Exclude<KeyId, 'ruin'>, number> {
-  return { bogIron: Math.floor(p.stats.iron ?? 0), salt: Math.floor(p.rare?.salt ?? 0), saltpetre: Math.floor(p.rare?.saltpetre ?? 0), bloodiron: Math.floor(p.rare?.bloodiron ?? 0), glowcap: Math.floor(p.rare?.glowcap ?? 0) };
+export function holdingsOf(p: Player): Record<Exclude<KeyId, 'ruin' | 'glowcap'>, number> & { glowcap?: number } {
+  // Glowcaps (#800) are named only once held: the older keys are always listed.
+  const caps = Math.floor(p.rare?.glowcap ?? 0);
+  return { bogIron: Math.floor(p.stats.iron ?? 0), salt: Math.floor(p.rare?.salt ?? 0), saltpetre: Math.floor(p.rare?.saltpetre ?? 0), bloodiron: Math.floor(p.rare?.bloodiron ?? 0), ...(caps ? { glowcap: caps } : {}) };
 }
 
 /** The key resources this world holds, in the lodge's order: what a lodge reports when it is raised. */

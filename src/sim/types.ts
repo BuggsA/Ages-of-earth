@@ -677,7 +677,7 @@ export interface OreCache {
 }
 
 /** What a find is (#588): a mark of the land near home that names one key resource this world holds. */
-export type FindKind = 'wreck' | 'cairn' | 'lick' | 'meteor' | 'ring' | 'shrine' | 'stash';
+export type FindKind = 'wreck' | 'cairn' | 'lick' | 'meteor' | 'shrine' | 'stash';
 
 /**
  * A find (#588): one stands near each town, the same distance out for every town. The first people to put a unit on it
@@ -1561,6 +1561,9 @@ export interface AiMemory {
   wildwood?: number;
   /** The tick it entered the Age of the Bloom, kept while it slings its Seeds there (`BLOOM.aiStay`); and when it last planted an Orchard for the Greening. */
   bloom?: number;
+  /** The Age of the Mycelium (#800): the tick it began holding the Wild for the glowcaps, and the tick it entered the age. */
+  glow?: number;
+  mycelium?: number;
   orchardAt?: number;
   /** The tick it entered the Age of Leviathans, kept while it breeds and flies its giants there (`LEVIATHANS.aiStay`). */
   leviathans?: number;

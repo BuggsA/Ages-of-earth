@@ -8,7 +8,8 @@ import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, Ga
 import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE, T_WATER } from './types';
 import { backProblem, backTo, ageDef, ageOf, asleep, barred, buildBarred, crossingLeft, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, trainsAt, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadProblem, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
 import { grindersOf, kegsOf, millProblem, mills, sappers } from './powder';
-import { beatersAt, burns, onFire } from './fire';
+import { beatersAt, burns, onFire, torchProblem } from './fire';
+import { inMycelium } from './mycelium';
 import { basinOf, channelPlan, coastHeld, dykePlan, heldBack, isCanal, isChannel, isInund, isPolder, polderField, sluiceFed, sluiceProblem, waterLine, type ChannelPlan, type DykePlan } from './water';
 import { coveredNext, shoreNear, tideClock, tideMillSpot } from './tides';
 import { castProblem, mooringSpot, raisesCitizens } from './floating';
@@ -62,7 +63,7 @@ import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
 import { AI_TEMPER, ROUTES, TRUNK, type RouteId } from './data';
-import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS } from './data';
+import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
@@ -171,7 +172,8 @@ function settleLean(s: GameState, p: Player, mem: AiMemory): void {
   mem.lean = route;
   const roads = (mem.roads ??= {});
   // The Wild route's fork (the Bloom or Leviathans) is left to its own coin (`wants`): a people leaning wild walks one of them.
-  for (const a of leanAges(p, route)) if (a !== 'bloom' && a !== 'leviathans') roads[a] ??= true;
+  // So is the rare Mycelium (#800), on a coin of its own where glowcaps are to be had.
+  for (const a of leanAges(p, route)) if (a !== 'bloom' && a !== 'leviathans' && a !== 'mycelium') roads[a] ??= true;
 }
 
 /** The leaning a computer seat has settled on (#749), or null for a person or a seat with an open mind. */
@@ -306,6 +308,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   carryCaches(s, v, issue);
   oreRoad(s, v, mem, issue);
   powderRoad(s, v, mem, issue);
+  glowRoad(s, v, mem, issue);
   sapKegs(s, v, mem, issue);
   torchGrowth(s, v, mem, issue);
   beatFires(s, v, issue);
@@ -658,10 +661,14 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   } else if (roads[to] === undefined && to === 'wildwood') {
     // The Wild route's fourth age: a people that walked the Hive goes on.
     roads[to] = hasWalked(p, 'hive');
+  } else if (roads[to] === undefined && to === 'mycelium') {
+    // The Wild route's rare gateway (#800): a people that walked the Wild turns into it on a coin of its own, so no other match's dice shift.
+    roads[to] = hasWalked(p, 'wild') && coin(s, p.id, 0x3c1e) < MYCELIUM.aiTake;
   } else if (roads[to] === undefined && (to === 'bloom' || to === 'leviathans')) {
     // The Wild route's fork: a people that walked the Wildwood goes on, to the beasts or the plants on one coin of its own.
+    // A people in the Mycelium (#800) takes its short road to the Bloom on a coin of its own.
     const beasts = coin(s, p.id, 0x1e71) < LEVIATHANS.aiTake;
-    roads[to] = hasWalked(p, 'wildwood') && beasts === (to === 'leviathans');
+    roads[to] = (hasWalked(p, 'wildwood') && beasts === (to === 'leviathans')) || (to === 'bloom' && ageOf(p) === 'mycelium' && coin(s, p.id, 0xb10e) < MYCELIUM.aiBloom);
   } else if (roads[to] === undefined && to === 'dykes') {
     // The Water Road (#701): only with a dyke worth raising by home, and on a coin of its own, so no other match's dice shift. A people
     // that walked the Age of Rivers is on the road already, and goes on down it more often.
@@ -764,7 +771,10 @@ function clueDue(v: View, mem: AiMemory): BuildingType | null {
  */
 function lodgeDue(s: GameState, v: View, mem: AiMemory): boolean {
   const { p } = v;
-  return p.epoch === 0 && walksWeb(v) && v.hands >= (isLegion(p) ? LEGION.aiSurvey : AI_WEB.survey) && count(v, 'barracks', true) > 0 && !prospected(p) && wants(s, p, mem, 'iron');
+  if (!walksWeb(v) || prospected(p)) return false;
+  // In the Wild, a town of a mind to walk the Mycelium (#800) raises one to learn where glowcaps are to be had.
+  if (ageOf(p) === 'wild' && v.hands >= AI_WEB.survey && wants(s, p, mem, 'mycelium')) return true;
+  return p.epoch === 0 && v.hands >= (isLegion(p) ? LEGION.aiSurvey : AI_WEB.survey) && count(v, 'barracks', true) > 0 && wants(s, p, mem, 'iron');
 }
 
 /** Whether the climb is waiting on the lodge (#540): from the first turn it was due when the town would climb, `AI_WEB.lodgeWait` seconds. */
@@ -798,6 +808,14 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
     if (s.tick - mem.powder <= secs(AI_KEG.hold)) return null;
     mem.roads!.alchemy = false;
   }
+  // Bound for the Mycelium (#800), the Wild holds while its crew picks the caps, `MYCELIUM.aiHold` seconds at most (twice that where
+  // its traders must buy them at a post), with the price set aside so the turn is paid for the moment the caps are in.
+  if (ageOf(p) === 'wild' && myceliumBound(s, v, mem)) {
+    if (deedsDone(p, MYCELIUM_ROAD, s)) return { road: MYCELIUM_ROAD, wait: false };
+    mem.glow ??= s.tick;
+    if (s.tick - mem.glow <= secs(MYCELIUM.aiHold * (s.rares?.includes('glowcap') ? 1 : 2))) return { road: MYCELIUM_ROAD, wait: true };
+    mem.roads!.mycelium = false;
+  }
   // Bound for the Age of Dykes (#701), the Middle Ages wait while its Dock goes up and the price is gathered, `AI_DYKE.hold` seconds at
   // most; and in the age, it stays until the basin is dry (or as long again), for the polder is what it came for.
   if (walksWeb(v) && ageOf(p) === 'middle' && !hasWalked(p, 'dykes') && mem.roads?.dykes === true) {
@@ -814,6 +832,9 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   if (walksWeb(v)) {
     for (const r of roadsFrom(p)) {
       if (!isSideRoad(r) || AGES[r.to].tier <= p.epoch || !(roadKnown(s, p, r) || clueRising(s, p, r)) || !wants(s, p, mem, r.to)) continue;
+      // The Mycelium's long road to the Bloom (#800) is no road to save for until the web's harvest has opened it and half its price is
+      // in store: held back for minutes, it left the weak gateway no army. The age's stay keeps the town there meanwhile.
+      if (r.from === 'mycelium' && (!deedsDone(p, r, s) || costSum(p.res) < costSum(r.cost) * MYCELIUM.aiBanked)) continue;
       // Its clue is going up (#555): the trunk waits for the Market, as it waits for a road's deeds, rather than leaving the tick before the road is seen.
       if (!roadKnown(s, p, r)) return { road: r, wait: true };
       if (deedsDone(p, r, s)) {
@@ -845,6 +866,8 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   if (walksWeb(v) && ageOf(p) === 'hive' && s.tick - (mem.hive ?? s.tick) < secs(HIVE.aiStay)) return null;
   // The Wildwood is kept a while, so its Heart Tree is planted and its Ents woken.
   if (walksWeb(v) && ageOf(p) === 'wildwood' && s.tick - (mem.wildwood ?? s.tick) < secs(WILDWOOD.aiStay)) return null;
+  // The Mycelium is kept a while, so its web spreads and its harvest opens the road on.
+  if (walksWeb(v) && ageOf(p) === 'mycelium' && s.tick - (mem.mycelium ?? s.tick) < secs(MYCELIUM.aiStay)) return null;
   // The Bloom is kept a while, so its Spire slings and its land greens.
   if (walksWeb(v) && ageOf(p) === 'bloom' && s.tick - (mem.bloom ?? s.tick) < secs(BLOOM.aiStay)) return null;
   // So is the Age of Leviathans, so its giants are bred and flown.
@@ -1298,7 +1321,8 @@ function oreRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => vo
   const road = roadsFrom(p).find((r) => r.ore && s.rares!.includes(r.ore.id)) ?? (ageOf(p) === 'warband' ? ROADS.find((r) => r.from === 'gunpowder' && r.to === 'ironblood' && r.ore && s.rares!.includes(r.ore.id)) : undefined);
   // Saltpetre dug for the gateway (#577) is `powderRoad`'s crew, not this one's.
   const powder = powderBound(s, v, mem);
-  const crew = v.citizens.filter((u) => u.order.k === 'gather' && u.order.rare !== undefined && !(powder && u.order.rare === 'saltpetre'));
+  // Glowcaps picked for the Mycelium (#800) are `glowRoad`'s crew.
+  const crew = v.citizens.filter((u) => u.order.k === 'gather' && u.order.rare !== undefined && u.order.rare !== 'glowcap' && !(powder && u.order.rare === 'saltpetre'));
   for (const u of crew) v.diggers.add(u.id);
   const open = !road || oreDone(p, road) || deedsDone(p, road, s) || mem.roads?.[road.to] === false || !roadKnown(s, p, road);
   if (open) {
@@ -1374,6 +1398,50 @@ function powderRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) =>
   for (const u of crew) v.diggers.add(u.id);
   if (crew.length >= AI_ORE.crew) return;
   const vein = findResource(s, TILE_OF_RARE.saltpetre, v.home.x, v.home.y, AI_ORE.reach);
+  if (vein < 0) return;
+  const bx = (vein % s.w) + 0.5;
+  const by = Math.floor(vein / s.w) + 0.5;
+  const free = v.citizens
+    .filter((u) => !u.inside && !v.diggers.has(u.id) && u.carry <= 2 && (u.order.k === 'idle' || (u.order.k === 'gather' && (u.order.res === 'wood' || u.order.res === 'gold'))))
+    .sort((a, c) => (a.x - bx) * (a.x - bx) + (a.y - by) * (a.y - by) - ((c.x - bx) * (c.x - bx) + (c.y - by) * (c.y - by)) || a.id - c.id);
+  const ids = free.slice(0, AI_ORE.crew - crew.length).map((u) => u.id);
+  if (!ids.length) return;
+  issue({ t: 'gather', p: p.id, ids, tile: vein });
+  for (const id of ids) v.diggers.add(id);
+}
+
+/** A price, or a stock, summed over the four kinds. */
+const costSum = (c: Cost): number => (c.food ?? 0) + (c.wood ?? 0) + (c.gold ?? 0) + (c.stone ?? 0);
+
+const MYCELIUM_ROAD = ROADS.find((r) => r.from === 'wild' && r.to === 'mycelium')!;
+
+/**
+ * Whether it means to turn into the Mycelium (#800): in the Wild, of a mind to walk it (its own coin), and knowing of the road
+ * (a lodge raised, or caps picked) and able to get them (a hollow in the world, or a Market to buy through), until the hold runs out (`nextRoad`).
+ */
+function myceliumBound(s: GameState, v: View, mem: AiMemory): boolean {
+  const { p } = v;
+  // Where the world has no hollow the caps are bought, and a town with no Market has no trader to buy them.
+  const caps = !!s.rares?.includes('glowcap') || count(v, 'market', true) > 0;
+  return walksWeb(v) && ageOf(p) === 'wild' && mem.roads?.mycelium !== false && caps && wants(s, p, mem, 'mycelium') && veinSeen(s, p, MYCELIUM_ROAD);
+}
+
+/**
+ * The Mycelium's pickers (#800): a crew of `AI_ORE.crew` on the nearest Glowcap hollow while it is bound there and short of caps, as
+ * `powderRoad` digs. Where the world has none, `buyOre` sends a trader to the post that sells them.
+ */
+function glowRoad(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  const crew = v.citizens.filter((u) => u.order.k === 'gather' && u.order.rare === 'glowcap');
+  const bound = myceliumBound(s, v, mem) && !veinDone(p, MYCELIUM_ROAD) && !!s.rares?.includes('glowcap');
+  if (!bound) {
+    // Done or given up: the crew goes back to the town's work.
+    for (const u of crew) if (u.carry <= 2 && !u.inside && !sendTo(s, v, u, 'wood', issue)) issue({ t: 'stop', p: p.id, ids: [u.id] });
+    return;
+  }
+  for (const u of crew) v.diggers.add(u.id);
+  if (crew.length >= AI_ORE.crew) return;
+  const vein = findResource(s, TILE_OF_RARE.glowcap, v.home.x, v.home.y, AI_ORE.reach);
   if (vein < 0) return;
   const bx = (vein % s.w) + 0.5;
   const by = Math.floor(vein / s.w) + 0.5;
@@ -2504,7 +2572,9 @@ export function torchGrowth(s: GameState, v: View, mem: AiMemory, issue: (c: Com
   if (busy >= FIRE.aiBearers) return;
   let growth: Building[] | null = null;
   for (const e of s.ents) if (e.kind === 'building' && e.hp > 0 && burns(e) && isEnemy(s, p.id, e.owner) && !onFire(s, e)) (growth ??= []).push(e);
-  if (!growth) return;
+  // A rival's fungus web (#800) is burnt back from the ground a soldier stands on.
+  const webs = s.players.some((o) => isEnemy(s, p.id, o.id) && inMycelium(o));
+  if (!growth && !webs) return;
   const near2 = FIRE.aiNear * FIRE.aiNear;
   const taken = new Set<number>();
   for (const u of v.army) {
@@ -2514,7 +2584,7 @@ export function torchGrowth(s: GameState, v: View, mem: AiMemory, issue: (c: Com
     if (hx * hx + hy * hy < near2 * 4) continue;
     let best: Building | null = null;
     let bestD = near2;
-    for (const e of growth) {
+    for (const e of growth ?? []) {
       if (taken.has(e.id)) continue;
       const dx = e.x - u.x, dy = e.y - u.y;
       const d2 = dx * dx + dy * dy;
@@ -2522,6 +2592,12 @@ export function torchGrowth(s: GameState, v: View, mem: AiMemory, issue: (c: Com
         bestD = d2;
         best = e;
       }
+    }
+    const tile = Math.floor(u.y) * s.w + Math.floor(u.x);
+    if (!best && webs && !torchProblem(s, p.id, { tile })) {
+      issue({ t: 'torch', p: p.id, ids: [u.id], tile });
+      busy++;
+      continue;
     }
     if (!best) continue;
     taken.add(best.id);
@@ -4086,7 +4162,8 @@ function hiveWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
  */
 function wildwoodWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
   const { p } = v;
-  if (!walksWeb(v) || !wakesForest(p) || !v.tc) return;
+  // A Bloom people that came by the Mycelium (#800) plants its Heart Tree in the Bloom: the Spire ripens only while one stands.
+  if (!walksWeb(v) || !(wakesForest(p) || inBloom(p)) || !v.tc) return;
   if (ageOf(p) === 'wildwood') mem.wildwood ??= s.tick;
   if (count(v, 'heart') || s.tick - (mem.ordered.heart ?? -99999) < secs(30) || p.epoch < BUILDINGS.heart.epoch) return;
   const cost = buildingCostFor(s, p.id, 'heart');
@@ -5310,7 +5387,8 @@ function threatNear(s: GameState, v: View): { unit: Unit | null; count: number; 
   let threatD = Infinity;
   let n = 0;
   for (const e of s.ents) {
-    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !isEnemy(s, v.p.id, e.owner) || e.type === 'citizen' || e.type === 'trader') continue;
+    // A rival hidden by its spores (#800) rings no bell: the town can't see it.
+    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || e.cloak || !isEnemy(s, v.p.id, e.owner) || e.type === 'citizen' || e.type === 'trader') continue;
     let near = Infinity;
     // Snares out in the woods (#485) are not the town: foes by them don't ring its bell.
     for (const b of v.buildings) if (b.type !== 'snare') near = Math.min(near, distToRect(e.x, e.y, b));
@@ -7150,13 +7228,15 @@ function merchants(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
  */
 function buyOre(s: GameState, v: View, mem: AiMemory, market: Building, issue: (c: Command) => void): void {
   const { p } = v;
-  const road = roadsFrom(p).find((r) => r.ore && !s.rares?.includes(r.ore.id) && soldAt(s, r.ore.id) && roadKnown(s, p, r) && mem.roads?.[r.to] === true && !deedsDone(p, r, s));
+  // A vein door whose ore a post sells (glowcaps, #800) is bought for the same way.
+  const keyOf = (r: Road) => r.ore ?? r.vein;
+  const road = roadsFrom(p).find((r) => { const k = keyOf(r); return !!k && !s.rares?.includes(k.id) && soldAt(s, k.id) && roadKnown(s, p, r) && mem.roads?.[r.to] === true && !deedsDone(p, r, s); });
   const buyers = v.traders.filter((u) => u.order.k === 'trade' && u.order.buy);
   if (!road) {
     for (const u of buyers) if (u.order.k === 'trade') issue({ t: 'route', p: p.id, ids: [u.id], post: u.order.post });
     return;
   }
-  const ore = road.ore!.id;
+  const ore = keyOf(road)!.id;
   if (buyers.length >= ORE_POST.traders || p.res.gold < 2 * loadPrice(s, ore)) return;
   const post = sellerNear(s, ore, market.x, market.y);
   if (!post) return;

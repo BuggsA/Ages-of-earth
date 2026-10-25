@@ -220,7 +220,8 @@ function spread(s: GameState, spring: boolean): void {
   for (const b of s.ents) {
     if (b.kind !== 'building' || b.type !== 'heart' || !b.built || b.hp <= 0) continue;
     const p = s.players[b.owner];
-    if (!p || p.defeated || !wakesForest(p) || heartSleeps(p) || (!spring && ageOf(p) !== 'bloom')) continue;
+    // A Bloom people that came by the Mycelium's short road (#800) has its Spreading too, round the Heart Tree it planted there.
+    if (!p || p.defeated || !(wakesForest(p) || ageOf(p) === 'bloom') || heartSleeps(p) || (!spring && ageOf(p) !== 'bloom')) continue;
     let n = 0;
     for (let y = Math.max(1, b.ty - r); y < Math.min(s.h - 1, b.ty + b.size + r) && n < WILDWOOD.seeds; y++) {
       for (let x = Math.max(1, b.tx - r); x < Math.min(s.w - 1, b.tx + b.size + r) && n < WILDWOOD.seeds; x++) {

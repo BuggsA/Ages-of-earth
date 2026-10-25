@@ -73,18 +73,6 @@ function meteor(k: Kit, taken: boolean): void {
   }
 }
 
-/** A fairy ring (#800): pale caps in a circle on darker grass that glow faintly; claimed, the caps are picked and only stalks stand. */
-function ring(k: Kit, taken: boolean): void {
-  k.cyl(0.62, 0.62, 0.02, 12, '#3f5a2c', 0, 0, 0);
-  for (let i = 0; i < 9; i++) {
-    const a = (i / 9) * Math.PI * 2;
-    const x = Math.cos(a) * 0.5;
-    const z = Math.sin(a) * 0.5;
-    k.cyl(0.025, 0.03, 0.1, 4, '#e8e2d2', x, 0.02, z);
-    if (!taken) k.glow(k.dome(0.08, '#8fe0ee', x, 0.12, z)).scale.y = 0.55;
-  }
-}
-
 /** A hermit's hut of branches and turf beside standing stones; claimed, the door is shut and the smoke is out. */
 function shrine(k: Kit, taken: boolean): void {
   k.pyramid(0.7, 0.45, 0.6, '#7b6a46', -0.2, 0.2, 0);
@@ -106,7 +94,7 @@ function stash(k: Kit, taken: boolean): void {
   for (let i = 0; i < 5; i++) k.rock(0.09 + (i % 2) * 0.03, STONE, -0.4 + i * 0.2, 0, 0.3);
 }
 
-const BUILD: Record<FindKind, (k: Kit, taken: boolean) => void> = { wreck, cairn, lick, meteor, ring, shrine, stash };
+const BUILD: Record<FindKind, (k: Kit, taken: boolean) => void> = { wreck, cairn, lick, meteor, shrine, stash };
 
 export function findGeometry(kind: FindKind, taken: boolean): THREE.BufferGeometry {
   const k = new Kit();
