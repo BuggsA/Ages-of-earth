@@ -63,7 +63,7 @@ import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
 import { AI_TEMPER, ROUTES, TRUNK, type RouteId } from './data';
-import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS, STOCKADE, AI_STOCKADE } from './data';
+import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS, STOCKADE, AI_STOCKADE, GALLERY } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
@@ -456,6 +456,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   if (AI_LEVELS[v.p.ai!].clever) raiseMission(s, v, mem, issue);
   raiseBloomery(s, v, mem, issue);
   raiseStockade(s, v, mem, issue);
+  raiseGallery(s, v, mem, issue);
   salvage(s, v, mem, issue);
   claimWalk(s, v, mem, issue);
   findWalk(s, v, mem, issue);
@@ -5712,6 +5713,21 @@ function raiseStockade(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   const d = Math.sqrt(dx * dx + dy * dy) || 1;
   const spot = findSpot(s, 'stockade', v.home.x + (dx / d) * STOCKADE.away, v.home.y + (dy / d) * STOCKADE.away, 0, 8);
   if (spot) construct(s, v, mem, 'stockade', spot, 2, issue);
+}
+
+/**
+ * The Sappers' Mine Gallery (#727): a computer in the age with a keg in store and a Barracks raises one `GALLERY.away` tiles out from
+ * home toward the middle of the map, one at a time, so its kegs are laid mined and a rival's are heard.
+ */
+function raiseGallery(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (ageOf(p) !== 'sapper' || buildBarred(p, 'gallery') || count(v, 'gallery') > 0 || count(v, 'barracks') === 0 || kegsOf(p) < 1) return;
+  if (s.tick - (mem.ordered.gallery ?? -99999) < secs(60)) return;
+  const dx = s.w / 2 - v.home.x;
+  const dy = s.h / 2 - v.home.y;
+  const d = Math.sqrt(dx * dx + dy * dy) || 1;
+  const spot = findSpot(s, 'gallery', v.home.x + (dx / d) * GALLERY.away, v.home.y + (dy / d) * GALLERY.away, 0, 8);
+  if (spot) construct(s, v, mem, 'gallery', spot, 2, issue);
 }
 
 function raidShips(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
