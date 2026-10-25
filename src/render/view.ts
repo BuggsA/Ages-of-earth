@@ -43,6 +43,7 @@ import { FoundationView } from './foundationView';
 import { RangeGuides, MAX_RANGE_GUIDES, selectedRange, placementRange, coilFields, placementField, sortieRings, coverRings, type RangeGuide } from './rangeGuides';
 import { ResourcesView } from './resourcesView';
 import { Sky } from './sky';
+import { airOf } from './ageAir';
 import { forcedHour, hourAt, lightAt, moonPhase } from './daylight';
 import { Weather, breathe, describeWeather, forcedWeather, moodOf, seasonalDay, weatherFor, windFor, type WeatherDay } from './weather';
 import { FogTexture, TerrainView, heightAt } from './terrain';
@@ -355,6 +356,23 @@ export class View {
   /** The title's backdrop sets its own hour, so the town turns through dusk and night while it plays. */
   titleHour: number | null = null;
 
+  /** The air the viewer's age leans to, eased so a change of age turns the sky over a few seconds. */
+  private airColor = new THREE.Color('#ffffff');
+  private airK = 0;
+  private airTo = new THREE.Color();
+
+  private easeAir(age: AgeId, dt: number): void {
+    const a = airOf(age);
+    this.airTo.set(a.tint);
+    const step = Math.min(1, dt * 0.7);
+    const dk = a.k - this.airK;
+    const before = this.airColor.getHex();
+    this.airColor.lerp(this.airTo, step);
+    this.airK += dk * step;
+    if (Math.abs(dk) < 0.001) this.airK = a.k;
+    if (this.airColor.getHex() !== before || Math.abs(dk) >= 0.001) this.litHour = -1;
+  }
+
   private hourNow(): number {
     return forcedHour() ?? this.titleHour ?? (this.state ? hourAt(this.state.seed, this.state.tick / TICK_HZ) : 9);
   }
@@ -368,10 +386,12 @@ export class View {
     const grey = this.tint.set(m.tint);
     // A grey day takes its tint down with the dusk too, so rain at night is dark and not pale.
     const dim = (l.sky * 0.5 + 0.5);
-    this.skyTop.set(l.top).lerp(grey.clone().multiplyScalar(dim), m.grey);
-    this.horizon.set(l.horizon).lerp(grey.clone().multiplyScalar(dim), m.grey);
+    // The viewer's age leans the sky, the haze and the sun's colour its way (`ageAir.ts`), dimmed with the dusk like the grey.
+    const lean = this.airColor.clone().multiplyScalar(dim);
+    this.skyTop.set(l.top).lerp(lean, this.airK).lerp(grey.clone().multiplyScalar(dim), m.grey);
+    this.horizon.set(l.horizon).lerp(lean, this.airK * 1.3).lerp(grey.clone().multiplyScalar(dim), m.grey);
     SUN_DIR.set(l.dir[0], l.dir[1], l.dir[2]);
-    this.sunTint.set(l.sunColor);
+    this.sunTint.set(l.sunColor).lerp(this.airColor, this.airK * 0.5);
     this.sun.color.copy(this.sunTint);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.sky.setGlare(m.sun, this.sunTint);
@@ -448,6 +468,7 @@ export class View {
     const p = s.players[this.viewer];
     if (!this.reveal) this.fog?.update(p.vis, p.seen, dt);
 
+    this.easeAir(ageOf(p), dt);
     this.light(this.hourNow());
     // Light follows the view so shadows stay crisp where the player looks.
     const t = this.rig.target;
