@@ -80,6 +80,8 @@ export class Room {
   /** Browsers back at a match under way, picking which seat to take (`offerSeats`). */
   private choosing: Conn[] = [];
   private gone = new Set<number>();
+  /** Seats whose players have asked for a rematch; the match starts over when every person connected is in it. */
+  private rematchVotes = new Set<number>();
   /** The room's storage; absent in tests, where the room lives in memory only. */
   private store: Store | null;
   private ready: Promise<void>;
@@ -131,6 +133,7 @@ export class Room {
     Object.assign(this, { conns: [], watchers: [], choosing: [], code: '', build: '', seats: [], holders: [], host: 0, setup: { ...this.setup, seed: 1 + Math.floor(Math.random() * 999999) }, started: false, civs: [], turns: [], buffer: [], timer: null, paused: false, desynced: false, emptySince: 0, flushed: 0 });
     this.hashes.clear();
     this.gone.clear();
+    this.rematchVotes.clear();
     for (const d of this.dropTimers.values()) clearTimeout(d);
     this.dropTimers.clear();
   }
@@ -263,6 +266,7 @@ export class Room {
       this.send(conn, { t: 'catchup', turns: this.turns });
       this.send(conn, { t: 'paused', on: this.paused, by: '' });
       this.chatSystem(`${this.seats[seat].name} is back`);
+      this.tallyRematch();
     }
     this.sendLobby();
   }
@@ -312,6 +316,7 @@ export class Room {
       return;
     }
     this.seats[seat].online = false;
+    this.rematchVotes.delete(seat);
     this.chatSystem(`${this.seats[seat].name} lost connection`);
     if (!this.conns.length) {
       // Everyone gone: the match waits for them as it is, and nobody is handed to the computer.
@@ -321,6 +326,8 @@ export class Room {
     } else {
       this.armDrops();
       this.save();
+      // Those left may all have voted already: the one who went was the last to be waited for.
+      this.tallyRematch();
     }
     this.sendLobby();
   }
@@ -448,6 +455,12 @@ export class Room {
         this.save();
         this.broadcast({ t: 'paused', on: this.paused, by: this.seats[conn.seat].name });
         break;
+      case 'rematch':
+        if (!this.started) return;
+        if (m.on === false) this.rematchVotes.delete(conn.seat);
+        else this.rematchVotes.add(conn.seat);
+        this.tallyRematch();
+        break;
       case 'chat': {
         const text = clean(String(m.text ?? ''), 200);
         if (!text) return;
@@ -490,6 +503,38 @@ export class Room {
     for (const c of this.conns) this.send(c, { t: 'start', match: { seats: this.seats, setup: this.setup, civs: this.civs }, you: c.seat });
     this.sendLobby();
     this.timer = setInterval(() => this.tick(), TURN_MS);
+    this.save(true);
+  }
+
+  /**
+   * Count the rematch votes of the people connected (a player away is not waited for) and, when every one has voted, start the match
+   * over. A vote only ever counts in the room whose seat it came from, and the room needs every person in it, so one player cannot
+   * throw the others out of a match under way.
+   */
+  private tallyRematch(): void {
+    if (!this.rematchVotes.size) return;
+    const here = new Set(this.conns.map((c) => c.seat));
+    const voted = [...this.rematchVotes].filter((s) => here.has(s)).length;
+    if (here.size && voted === here.size) return this.rematch();
+    for (const c of this.conns) this.send(c, { t: 'rematch', voted, need: here.size, mine: this.rematchVotes.has(c.seat) });
+  }
+
+  /** The same seats, peoples and seed, from the first turn: the record is wiped, so a player coming back later replays only this match. */
+  private rematch(): void {
+    this.clearDrops();
+    this.rematchVotes.clear();
+    this.turns = [];
+    this.buffer = [];
+    this.flushed = 0;
+    this.hashes.clear();
+    this.desynced = false;
+    this.paused = false;
+    this.gone.clear();
+    for (const c of this.conns) c.sent = 0;
+    this.chatSystem('Rematch: the same land and peoples, from the start');
+    for (const c of this.conns) this.send(c, { t: 'start', match: { seats: this.seats, setup: this.setup, civs: this.civs }, you: c.seat });
+    for (const c of this.watchers) this.send(c, { t: 'start', match: { seats: this.seats, setup: this.setup, civs: this.civs }, you: -1 });
+    this.armDrops();
     this.save(true);
   }
 

@@ -60,7 +60,9 @@ export type ClientMsg =
   | { t: 'chat'; text: string }
   | { t: 'ping'; at: number }
   /** Come back into a match under way as the player of this seat (one of the `open` seats). */
-  | { t: 'claim'; seat: number };
+  | { t: 'claim'; seat: number }
+  /** Vote for another match on the same seed with the same seats (`on: false` takes the vote back). The room restarts when every person connected has voted. */
+  | { t: 'rematch'; on: boolean };
 
 export interface MatchStart {
   /** Seat order is player order. */
@@ -83,7 +85,9 @@ export type ServerMsg =
   | { t: 'error'; why: string }
   | { t: 'pong'; at: number }
   /** A match under way that this browser holds no seat in: the seats whose players are away, for it to pick one (`claim`). */
-  | { t: 'open'; code: string; seats: OpenSeat[] };
+  | { t: 'open'; code: string; seats: OpenSeat[] }
+  /** How many of the people connected want a rematch, and whether this seat is one of them. When all do, the room sends a fresh `start`. */
+  | { t: 'rematch'; voted: number; need: number; mine: boolean };
 
 /** A seat a returning player may take: its player is not connected (the owner's ruling, 2026-10-24: a free pick). */
 export interface OpenSeat {
