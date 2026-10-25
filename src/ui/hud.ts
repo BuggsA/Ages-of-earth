@@ -279,7 +279,7 @@ const prospectLine = (s: GameState, p: Player) => {
           const h = holdingsOf(o);
           const n = [...dig.values()].filter((w) => w === o.id).length;
           // Names come from players online: nothing in one may become markup in the tip.
-          return `<br>${o.name.replace(/[<>&"']/g, '')}: ${(['salt', 'saltpetre', 'bloodiron'] as const).map((k) => `${h[k]} ${PROSPECTOR.keys[k].name.toLowerCase()}`).join(', ')}; ${h.bogIron} bog iron dug${n ? `; digging ${n} key tile${n > 1 ? 's' : ''} now` : ''}${o.stats.bought ? `; ${o.stats.bought} key ore bought at the posts` : ''}.`;
+          return `<br>${o.name.replace(/[<>&"']/g, '')}: ${(['salt', 'saltpetre', 'bloodiron', 'glowcap'] as const).map((k) => `${h[k]} ${k === 'glowcap' ? 'glowcaps' : PROSPECTOR.keys[k].name.toLowerCase()}`).join(', ')}; ${h.bogIron} bog iron dug${n ? `; digging ${n} key tile${n > 1 ? 's' : ''} now` : ''}${o.stats.bought ? `; ${o.stats.bought} key ore bought at the posts` : ''}.`;
         })
         .join('')
     : '';
@@ -2020,7 +2020,7 @@ function hpBar(hp: number, max: number, frac: number): string {
 }
 
 
-const RARE_ICON = { salt: '🧂', saltpetre: '💎', bloodiron: '🩸' } as const;
+const RARE_ICON = { salt: '🧂', saltpetre: '💎', bloodiron: '🩸', glowcap: '🍄' } as const;
 
 function householdHint(s: GameState, viewer: number): string {
   const rate = Math.round(taxRate(s, viewer) * 60);

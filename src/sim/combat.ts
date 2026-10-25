@@ -262,7 +262,8 @@ export function nearestEnemyUnit(s: GameState, sp: Spatial, owner: number, x: nu
   let best: Unit | null = null;
   let bestD = r * r;
   sp.near(x, y, r, (o) => {
-    if (o.hp <= 0 || !isEnemy(s, owner, o.owner) || (filter && !filter(o))) return;
+    // A unit hidden by the Mycelium's spores (#800) is no one's nearest enemy.
+    if (o.hp <= 0 || o.cloak || !isEnemy(s, owner, o.owner) || (filter && !filter(o))) return;
     const dx = o.x - x;
     const dy = o.y - y;
     const d = dx * dx + dy * dy;

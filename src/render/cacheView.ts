@@ -15,8 +15,9 @@ const LOOK: Record<RareId, { lump: 'cube' | 'crystal' | 'rock'; colors: string[]
   salt: { lump: 'cube', colors: ['#f4f1e8', '#e6e1d2', '#fbfaf4'] },
   saltpetre: { lump: 'crystal', colors: ['#e2dc8e', '#d8d27a', '#efe9b0'] },
   bloodiron: { lump: 'rock', colors: ['#7a1a22', '#a01c2c', '#5a1418'] },
+  glowcap: { lump: 'rock', colors: ['#8fe0ee', '#cfe6e8', '#6fb8c8'] },
 };
-const ORES: RareId[] = ['salt', 'saltpetre', 'bloodiron'];
+const ORES: RareId[] = ['salt', 'saltpetre', 'bloodiron', 'glowcap'];
 
 function cacheGeometry(ore: RareId): THREE.BufferGeometry {
   const k = new Kit();

@@ -49,6 +49,11 @@ const KRAKEN_MOST = 2;
 const REEF_BORN = 40;
 const REEF_MEND = 3;
 const LEVIATHANS_CALM = 8;
+/** The Age of the Mycelium's web, spores and rot (#800, `MYCELIUM`), named here so the age's words can say them. */
+const WEB_REACH = 5;
+const WEB_GROW = 100;
+const SPORE_REVEAL = 2;
+const WEB_DEED = 3000;
 
 // ---- Ages and paths -------------------------------------------------------------------------------
 
@@ -727,6 +732,19 @@ export const AGES: Record<AgeId, Age> = {
     no: { units: ['warden', 'ranged', 'siege', 'fighter', 'bomber', 'warship'], why: 'A Leviathan people wakes no Ents while its Heart Tree sleeps, and builds no machines: no rifles, field guns, ironclads or aircraft. Its giants are its air and its siege, and its Docks grow Reef Ships. They wait until it goes back to the Wildwood or rejoins the Atomic Age' },
     noBuild: { buildings: ['airfield', 'silo'], why: 'A Leviathan people builds no machines: no Airfield or Missile Silo until it rejoins the Atomic Age' },
   },
+  // The Wild route's rare gateway (#800, `docs/wild-road.md` §R, `mycelium.ts`): a web under the town, and the short road to the Bloom.
+  mycelium: {
+    verb: 'Grow a fungus web under your town: every hall on it takes in every stock, stock is banked the moment it is carried onto it, your people on it are hidden by spores, and a rival building touching it rots',
+    door: 'Soldiers cost a quarter more, and fire burns the web back',
+    good: 'A town that cannot be starved or cut off, unseen people in its streets, and the only short road to the Bloom',
+    routes: ['wild'],
+    gateway: true,
+    name: 'Age of the Mycelium',
+    short: 'Mycelium',
+    tier: 2,
+    blurb: `Instead of the Middle Ages, and only where a Glowcap hollow lies or a post sells its caps: a people that lives on the fungus under its feet. Pale threads spread from each of your halls, ${WEB_REACH} tiles out over ${WEB_GROW} seconds. Every hall on the web takes in every stock, and a load carried onto the web is banked at once, so no one walks home. Your people standing on the web are hidden by spores: no rival sees them or aims at them unless it stands within ${SPORE_REVEAL} tiles, or they have just struck. A rival building touching your web slowly rots, timber twice as fast as stone. What it costs: soldiers cost a quarter more, and any fire on or near the web burns it back to that point, to grow again. Weak in a fight; but it holds the only road from the second tier straight to the Age of the Bloom.`,
+    price: { infantry: 1.25, ranged: 1.25, cavalry: 1.25, siege: 1.25 },
+  },
   // The second crossing (#555 s12): the Pilgrims' priests and the Sail's ships made one trade. Open only to a people that walked both.
   missions: {
     verb: 'Sail priests to far shores and raise Missions there: each claims land, trains priests, and pays a tithe that grows with its distance from home',
@@ -1155,6 +1173,30 @@ export const ROADS: Road[] = [
   },
   { from: 'leviathans', to: 'atomic', cost: { food: 300, gold: 300 }, time: 30, blurb: 'Rejoin the Atomic Age: machines and the Missile Silo return, and the Heart Tree wakes. Your Great Den keeps breeding its giants.' },
   { from: 'leviathans', to: 'wildwood', cost: { food: 300, wood: 300 }, time: 30, blurb: 'Go back into the Wildwood: the Heart Tree wakes, Ents walk again and the woods spread each spring. Your Great Den keeps breeding its giants.' },
+  // The Wild route's rare gateway (#800, `docs/wild-road.md` §R): a turn off the Wild at tier 2, open only on glowcaps picked from a
+  // Glowcap hollow (or bought at a post where the world has none). From it, the only road straight to the Bloom: the web's harvest opens it.
+  {
+    from: 'wild',
+    to: 'mycelium',
+    cost: { food: 400, wood: 250, gold: 100 },
+    time: 40,
+    walked: 'wild',
+    vein: { id: 'glowcap', n: 40, text: 'Your citizens pick 40 glowcaps from a Glowcap hollow, or traders buy them at a post' },
+    blurb: 'Instead of the Middle Ages, and only where glowcaps are to be had: grow a fungus web under the town. Every hall on it takes in every stock, your people on it are hidden by spores, and rival buildings touching it rot. Soldiers cost a quarter more and fire burns the web back. Weak in a fight; it is the only short road to the Bloom.',
+  },
+  { from: 'mycelium', to: 'gunpowder', cost: EPOCHS[3].cost, time: EPOCHS[3].time, blurb: 'Rejoin the main road at the Gunpowder Age for the ordinary price. The web withers, the spores settle and soldiers cost what they always did.' },
+  { from: 'mycelium', to: 'middle', cost: { food: 200, wood: 200 }, time: 25, blurb: 'Settle down in the Middle Ages. The web withers, the spores settle and soldiers cost what they always did.' },
+  {
+    from: 'mycelium',
+    to: 'bloom',
+    cost: { food: 2400, wood: 1800, gold: 1800, stone: 300 },
+    time: 120,
+    walked: 'mycelium',
+    gate: 'hard',
+    deed: { stat: 'webbed', n: WEB_DEED, text: `Your web takes in ${WEB_DEED} stock` },
+    shuns: 'leviathans',
+    blurb: 'Skip the Hive and the Wildwood: the web flowers into the plants\' end, three tiers in one long, dear step. A Seed Spire slings Bloom Seeds once you have planted a Heart Tree, and the Greening wins the match for a people whose land stays green. The web withers, no new beasts and no Missile Silo while you stay, and Leviathans are closed to you for good.',
+  },
   // The other road out of the Stone Age (#297): the hunt, not the bog, opens it.
   {
     from: 'stone',
@@ -2543,6 +2585,35 @@ export const LEVIATHANS = {
   aiKrakens: 1,
 };
 
+/**
+ * The Age of the Mycelium (#800, `docs/wild-road.md` §R, `src/sim/mycelium.ts`). While a people stands in it, each of its finished
+ * `halls` grows a web `grow` tiles a second (`WEB_GROW` seconds to full), out to `reach` tiles from its footprint.
+ * - Every hall with a web takes in every stock (`nearestDrop`), and a load carried onto the web is banked at once at the nearest hall
+ *   whose web covers it. What is banked through the web counts as `webbed`, the deed of the road on to the Bloom.
+ * - Spores: its units standing on its web are hidden (`Unit.cloak`) unless a rival unit or building is within `reveal` tiles or the
+ *   unit struck in the last `shown` seconds. Read every `cloakEvery` ticks.
+ * - Rot: once a second (not in a peace) a rival building whose footprint lies within a web loses `rot.wood` of its health, or
+ *   `rot.stone` if stone went into it, each web counting once.
+ * - Fire: once a second any fire within a web cuts that web back to the fire's distance less one tile; a torch may be set to bare
+ *   ground on a rival's web (it burns the web back at once).
+ * The web withers the moment its people leaves the age.
+ * The computer: turns into it from the Wild on a coin of its own (`aiTake`) where glowcaps are to be had, digs or buys them, stays
+ * `aiStay` seconds, and takes the road on to the Bloom on a coin of its own (`aiBloom`) when the deed is done and the price in hand.
+ */
+export const MYCELIUM = {
+  reach: WEB_REACH,
+  grow: WEB_REACH / WEB_GROW,
+  reveal: SPORE_REVEAL,
+  shown: 3,
+  cloakEvery: 4,
+  rot: { wood: 0.004, stone: 0.002 },
+  halls: ['towncenter', 'house', 'storehouse', 'barracks', 'range', 'stable', 'forge', 'workshop', 'temple', 'market', 'huntcamp', 'prospector', 'den', 'windmill', 'tower', 'wonder', 'shaft'] as BuildingType[],
+  deed: WEB_DEED,
+  aiTake: 0.5,
+  aiStay: 420,
+  aiBloom: 0.6,
+};
+
 export const COPPICE = { reach: 8, regrow: 120, retry: 5, grow: 90, snare: 2, cap: 1.5, bag: 2, full: 12, aiPerFood: 1.5, aiMax: 16, aiTrees: 10, aiThick: 14, aiNear: 14, aiDrop: 7, aiPerTender: 2, aiStone: 6, aiCamps: 2, aiPlant: 3, aiThin: 12, aiPlantWood: 120 };
 
 /**
@@ -2568,6 +2639,7 @@ export const SHAFT = {
     salt: { name: 'Salt', old: true },
     saltpetre: { name: 'Saltpetre', old: true },
     bloodiron: { name: 'Blood-iron', old: true },
+    glowcap: { name: 'Glowcaps', old: true },
   } as Record<'stone' | 'gold' | RareId, { name: string; old: boolean }>,
   aiNear: 26,
   aiReach: 18,
@@ -3362,6 +3434,7 @@ export const PROSPECTOR: { keys: Record<KeyId, { name: string; icon: string }> }
     salt: { name: 'Salt', icon: '🧂' },
     saltpetre: { name: 'Saltpetre', icon: '⚗️' },
     bloodiron: { name: 'Blood-iron', icon: '🩸' },
+    glowcap: { name: 'Glowcap hollow', icon: '🍄' },
     ruin: { name: 'Ancient ruins', icon: '🏛️' },
   },
 };
@@ -3388,6 +3461,7 @@ export const FINDS = {
     cairn: { key: 'bloodiron', name: 'A battlefield cairn', icon: '🗿', reward: { stone: 60 }, hint: 'Spear-heads piled under stones, dark as dried blood. Blood-iron lies in this land.' },
     lick: { key: 'salt', name: 'A salt lick', icon: '🧂', reward: { food: 100 }, hint: 'Every game trail runs to this white crust. Salt lies in this land.' },
     meteor: { key: 'saltpetre', name: 'A fallen star', icon: '☄️', reward: { stone: 60 }, hint: 'A black stone in a scorched hollow, pale crystals on the grass round it. Saltpetre lies in this land.' },
+    ring: { key: 'glowcap', name: 'A fairy ring', icon: '🍄', reward: { food: 80 }, hint: 'A ring of pale mushrooms that glow faintly after dark, and the grass inside it never grows. A Glowcap hollow lies in this land.' },
     stash: { key: null, name: "A hunters' stash", icon: '🧺', reward: { food: 100 }, hint: 'A cache the first hunters left: dried meat and bone needles, and nothing else. No hidden roads lie in this land: the plain ones are the ones to take.' },
     shrine: { key: 'ruin', name: "A hermit's shrine", icon: '🛖', reward: { gold: 40 }, hint: 'A hermit tends stones older than any town and tells you where they stand. Ancient ruins lie in this land.' },
   } as Record<FindKind, { key: KeyId | null; name: string; icon: string; reward: Cost; hint: string }>,
@@ -3398,10 +3472,12 @@ export const FINDS = {
  * any town, `apart` from each other), where every town can walk to them. `rate` is how fast a citizen mines one.
  * The ore is paid into `Player.rare`; a later step makes the ages and roads that want it.
  */
-export const RARE: Record<'salt' | 'saltpetre' | 'bloodiron', { name: string; chance: number; veins: number; tiles: number; amount: number; rate: number; away: number; apart: number; blurb: string }> = {
+export const RARE: Record<RareId, { name: string; chance: number; veins: number; tiles: number; amount: number; rate: number; away: number; apart: number; blurb: string }> = {
   salt: { name: 'Salt', chance: 0.7, veins: 2, tiles: 3, amount: 200, rate: 0.5, away: 14, apart: 10, blurb: 'White crust on bare ground. Cures meat, tans hides and keeps a long march fed.' },
   saltpetre: { name: 'Saltpetre', chance: 0.5, veins: 2, tiles: 2, amount: 160, rate: 0.45, away: 16, apart: 12, blurb: 'Pale, bitter crystal scraped from damp rock. The black of powder is made from it.' },
   bloodiron: { name: 'Blood-iron', chance: 0.35, veins: 1, tiles: 3, amount: 140, rate: 0.35, away: 18, apart: 12, blurb: 'Dark ore veined like flesh that is never quite dry. Whatever works it learns that it is warm.' },
+  // The Glowcap hollow (#800): one damp hollow of pale fungus, the Age of the Mycelium's only door. Picked like an ore.
+  glowcap: { name: 'Glowcaps', chance: 0.4, veins: 1, tiles: 4, amount: 120, rate: 0.45, away: 16, apart: 12, blurb: 'Pale caps crowding a damp hollow, glowing faintly blue after dark. Their threads run under the soil for a mile, and whatever is planted over them is fed.' },
 };
 /** Deer: health, speeds, and how far a hunter throws a spear. */
 export const DEER = { hp: 8, walk: 0.8, flee: 2.3, spear: 3.5, spearDamage: 4,
@@ -3772,16 +3848,17 @@ export const AI_ORDERS = { reach: 14, riders: 2 };
 // ---- Rare ore and mercenaries ---------------------------------------------------------------------
 
 /** Selling rare ore at a Market (#356 s5): a lot of `lot` pays `gold[ore]` gold at a flat price. Ore mined still counts toward its doors; only the stock in hand is spent. */
-export const ORE_TRADE = { lot: 20, gold: { salt: 40, saltpetre: 55, bloodiron: 90 } as Record<'salt' | 'saltpetre' | 'bloodiron', number> };
+export const ORE_TRADE = { lot: 20, gold: { salt: 40, saltpetre: 55, bloodiron: 90, glowcap: 70 } as Record<RareId, number> };
 /**
  * Posts that sell what the map lacks (#573, the age road s13): on a world without one of the `ores` a road's ore door asks
  * for, a trading post sells it (one lacking ore to a post, in post order; none in campaign chapters). A trader told to buy
  * pays for a load of `lot` there, at `markup` times what the Market pays for that ore, dearer by `rise` with every load anyone
  * has bought, and carries it home to its Market: bought ore opens the road's door as mined ore does. Saltpetre opens no road
- * yet, and the ore technologies stay open only where the world holds their ore, so it is not sold. The computer keeps
- * `traders` buying for a road it has planned whose ore this world lacks.
+ * yet, and the ore technologies stay open only where the world holds their ore, so it is not sold. Glowcaps (#800) are: on a
+ * world with no Glowcap hollow, the Age of the Mycelium's vein door opens on glowcaps bought here, so the rare age is a dearer
+ * road there, not a shut one. The computer keeps `traders` buying for a road it has planned whose ore this world lacks.
  */
-export const ORE_POST = { lot: 10, markup: 1.5, rise: 0.1, traders: 1, ores: ['salt', 'bloodiron'] as RareId[] };
+export const ORE_POST = { lot: 10, markup: 1.5, rise: 0.1, traders: 1, ores: ['salt', 'bloodiron', 'glowcap'] as RareId[] };
 
 /** The computer and the rare ores (#356 s5): the crew it sends to dig the ore a road's door asks for, and how far from home it will look for the vein. */
 export const AI_ORE = { crew: 3, reach: 70 };

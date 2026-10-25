@@ -10,7 +10,7 @@ import type { Building, GameState, OreCache, RareId, Unit } from './types';
  * their own store. What spills is taken off the loser's ore door; what is carried home counts toward the taker's.
  */
 
-const ORES: RareId[] = ['salt', 'saltpetre', 'bloodiron'];
+const ORES: RareId[] = ['salt', 'saltpetre', 'bloodiron', 'glowcap'];
 
 export const cacheAt = (s: GameState, id: number): OreCache | undefined => s.caches?.find((c) => c.id === id);
 

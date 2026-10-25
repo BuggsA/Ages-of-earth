@@ -84,7 +84,7 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'chart' | 'assay' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged' | 'launchControl' | 'interceptors';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood' | 'locks' | 'floating' | 'bloom' | 'beggars' | 'leviathans';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood' | 'locks' | 'floating' | 'bloom' | 'beggars' | 'leviathans' | 'mycelium';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
 export type PathId = 'blood' | 'steppe' | 'hemocraft' | 'rite';
@@ -113,8 +113,10 @@ export const R_SALTPETRE = 9;
 export const R_BLOODIRON = 10;
 /** A cockle bed (#767) on the deeper tidal flats: food picked by citizens only while the tide has bared it, back each high water. */
 export const R_COCKLE = 11;
-export type RareId = 'salt' | 'saltpetre' | 'bloodiron';
-export const RARES: readonly RareId[] = ['salt', 'saltpetre', 'bloodiron'];
+/** A Glowcap hollow (#800): pale fungus in a damp hollow, the Age of the Mycelium's key. Picked like a rare ore. */
+export const R_GLOWCAP = 12;
+export type RareId = 'salt' | 'saltpetre' | 'bloodiron' | 'glowcap';
+export const RARES: readonly RareId[] = ['salt', 'saltpetre', 'bloodiron', 'glowcap'];
 /** What a Mine Shaft can dig (#681): stone or gold anywhere, a rare ore only over its old workings. */
 export type SeamId = 'stone' | 'gold' | RareId;
 /** A key resource (#555 spine §3): something only some worlds place that opens an age or a technology. The Prospector's Lodge answers for each. */
@@ -304,6 +306,8 @@ export interface Unit {
   bombAt?: number;
   /** Gripped by a Kraken (#789, `leviathans.ts`): the tick the grip lets go. Until then it can't move. Absent: never gripped. */
   gripped?: number;
+  /** Hidden by spores (#800, `mycelium.ts`): it stands on its people's web, no rival is within `MYCELIUM.reveal` tiles and it has not struck lately. Rivals neither see nor target it. */
+  cloak?: true;
   /** Shoved along by its people's Kraken (#789): the tick the push fades. Until then it sails faster. Absent: never shoved. */
   shoved?: number;
   /** A hemo-engineered soldier (#355 s3): the tick its graft runs dry unless a Transfusion Station tops it up; absent when ungrafted. */
@@ -356,6 +360,8 @@ export interface Building {
   built: boolean;
   /** Construction progress, 0 to 1. */
   progress: number;
+  /** The Age of the Mycelium (#800): how far, in tiles from its footprint, the fungus web under it has spread. Absent: none. */
+  web?: number;
   queue: TrainItem[];
   /** Ticks into advancing to the next epoch (Town Center), or -1. */
   advance: number;
@@ -671,7 +677,7 @@ export interface OreCache {
 }
 
 /** What a find is (#588): a mark of the land near home that names one key resource this world holds. */
-export type FindKind = 'wreck' | 'cairn' | 'lick' | 'meteor' | 'shrine' | 'stash';
+export type FindKind = 'wreck' | 'cairn' | 'lick' | 'meteor' | 'ring' | 'shrine' | 'stash';
 
 /**
  * A find (#588): one stands near each town, the same distance out for every town. The first people to put a unit on it
@@ -867,6 +873,8 @@ export interface PlayerStats {
   honey?: number;
   /** Seedlings its woods put out round its Heart Tree in the Spreading (the Age of the Wildwood, the Bloom's deed); absent in older saves. */
   spread?: number;
+  /** Stock banked at a building its fungus web runs under, or dropped on the web (the Age of the Mycelium, the Bloom's deed from there); absent in older saves. */
+  webbed?: number;
   /** Food taken from snares (#485); absent in older saves. */
   snared?: number;
   /** Gold taken as tribute by riders standing in rivals' land (#318); absent in older saves. */
@@ -1066,6 +1074,7 @@ export type GameEvent =
    * The Age of the Bloom (`bloom.ts`): a Seed `slung` (aimed at x, y), `rooted` where it came down, `withered` with no open ground, `hacked`
    * out by rival citizens, or `cracked` (`n` buildings turned to forest); a people's `storm` of pollen, its Greening `held` or `faded`.
    */
+  | { k: 'web'; what: 'rot' | 'burnt' | 'grown'; owner: number; x: number; y: number }
   | { k: 'bloom'; what: 'slung' | 'rooted' | 'withered' | 'hacked' | 'cracked' | 'storm' | 'held' | 'faded'; owner: number; x: number; y: number; id?: number; n?: number }
   /**
    * The Age of Leviathans (`leviathans.ts`): a Skywhale's seed-bomb (`n` Thornwall seedlings sprouting under it), or a Behemoth that

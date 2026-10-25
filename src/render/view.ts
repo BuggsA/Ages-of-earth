@@ -412,7 +412,9 @@ export class View {
     return this.fog.visibleAt(x, y) > 0.45;
   }
 
-  private visibleUnit = (u: Unit): boolean => u.owner === this.viewer || this.sees(u.x, u.y);
+  // A rival's unit hidden by the Mycelium's spores (#800) is not drawn, wherever the fog stands.
+  private visibleUnit = (u: Unit): boolean =>
+    u.owner === this.viewer || (this.sees(u.x, u.y) && (this.reveal || !u.cloak || !this.state || this.state.players[u.owner].team === this.state.players[this.viewer].team));
 
   /** Draw a frame. `alpha` is how far into the next tick we are (0..1). */
   frame(s: GameState, alpha: number, dt: number, sel: Selection): void {

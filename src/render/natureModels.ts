@@ -167,6 +167,20 @@ function bloodIronVein(): Kit {
   return k;
 }
 
+/** A Glowcap hollow (#800): a damp dip of dark earth crowded with pale caps that glow blue, their threads showing in the mud. */
+function glowcapVein(): Kit {
+  const k = new Kit();
+  k.cyl(0.42, 0.48, 0.05, 8, '#2c2a26', 0, 0, 0);
+  k.rock(0.14, '#4a4038', -0.3, 0.04, 0.22);
+  for (let i = 0; i < 4; i++) k.box(0.36, 0.012, 0.02, '#cfe6e8', Math.cos(i * 1.6) * 0.12, 0.05, Math.sin(i * 1.6) * 0.12).rotation.y = i * 1.6;
+  const caps: [number, number, number, number][] = [[0, 0, 0.22, 0.17], [0.2, 0.12, 0.15, 0.12], [-0.18, -0.1, 0.13, 0.11], [0.08, -0.24, 0.1, 0.09], [-0.22, 0.16, 0.09, 0.08], [0.26, -0.12, 0.07, 0.07]];
+  for (const [x, z, h, r] of caps) {
+    k.cyl(r * 0.28, r * 0.36, h, 5, '#e8e2d2', x, 0.04, z);
+    k.glow(k.dome(r, '#8fe0ee', x, 0.04 + h, z)).scale.y = 0.55;
+  }
+  return k;
+}
+
 function tuft(): Kit {
   const k = new Kit();
   for (let i = 0; i < 4; i++) {
@@ -287,7 +301,7 @@ function cockleBed(): Kit {
   return k;
 }
 
-const MAKERS = { pine, broadleaf, birch, palm, felled, ash, berryBush, cockleBed, stoneDeposit, goldDeposit, bogIron, saltVein, caveMouth, saltpetreVein, bloodIronVein, carcass, carcassRotten, tuft, flowers, pebbles, boulder, fish };
+const MAKERS = { pine, broadleaf, birch, palm, felled, ash, berryBush, cockleBed, stoneDeposit, goldDeposit, bogIron, saltVein, caveMouth, saltpetreVein, bloodIronVein, glowcapVein, carcass, carcassRotten, tuft, flowers, pebbles, boulder, fish };
 export type NatureKind = keyof typeof MAKERS;
 
 const cache = new Map<NatureKind, THREE.BufferGeometry>();

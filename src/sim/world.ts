@@ -6,6 +6,7 @@ import { isSet, setStats } from './longbow';
 import { deckSpot } from './floating';
 import type { Building, BuildingType, Cost, Ent, GameState, Goal, Player, Unit, UnitType } from './types';
 import { RES } from './types';
+import { webTakes } from './mycelium';
 
 /** Making, finding and removing units and buildings. */
 
@@ -35,6 +36,8 @@ export function canHit(s: GameState, u: Unit, t: Ent): boolean {
   const st = statsOf(s, u);
   if (st.attack <= 0) return false;
   if (t.kind === 'building') return true;
+  // Hidden by the Mycelium's spores (#800): nobody aims at what it can't see.
+  if (t.cloak) return false;
   if (st.buildingsOnly) return t.type === 'siege';
   const d = domainOf(t.type);
   if (d === 'air') return st.range > 0 && st.cls !== 'siege' && st.cls !== 'bomber';
@@ -208,7 +211,8 @@ export function nearestDrop(s: GameState, owner: number, res: string, x: number,
     if (e.kind !== 'building' || e.owner !== owner || !e.built || e.hp <= 0) continue;
     // A Pontoon (#770) takes in the catch from its fishing boats as well as every kind of goods its people carry onto its deck.
     if (naval ? e.type !== 'dock' && e.type !== 'pontoon' : e.type === 'dock') continue;
-    if (!BUILDINGS[e.type].drop.includes(res as never)) continue;
+    // The Age of the Mycelium (#800): a hall with the fungus web under it takes in every stock.
+    if (!BUILDINGS[e.type].drop.includes(res as never) && (naval || !webTakes(s, e))) continue;
     const d = distToRect(x, y, e);
     if (d < bestD) {
       bestD = d;
