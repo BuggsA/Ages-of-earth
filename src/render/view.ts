@@ -412,6 +412,9 @@ export class View {
     this.fill.intensity = 0.3 * l.fill;
     this.sun.intensity = this.baseSun;
     this.hemi.intensity = this.baseHemi;
+    // The age's air also colours the sky light the whole land is lit by, so it reads from the default camera, where the sky is off-screen.
+    this.hemi.color.set('#dcefff').lerp(this.airColor, this.airK * 1.2);
+    this.hemi.groundColor.set('#b9a77a').lerp(this.airColor, this.airK * 0.6);
     (this.scene.fog as THREE.Fog).color.copy(this.horizon);
   }
 
