@@ -1608,6 +1608,10 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 **Next:** riders and ships that wear their age (a reed-boat ferry, felt-clad riders); the ground round a town (channels' green banks, the Wildwood's moss); and an age-up moment that repaints the town in a sweep from the Town Center outward instead of all at once.
 
 
+## Designers' notes: the age wears the interface (2026-10-25)
+
+**Built:** each of the 45 ages has a button plate (19 shapes, 35 motifs, 8 glyph stamps) and its pictures show the age's own models. **Why I love it:** the owner said a palette swap isn't a look; the first thing you touch every second is the button row, so that's where "this is the Age of Sail" should land. **Next:** hand-drawn glyphs per age (a Farm drawn as a carved relief in Stone, a blueprint in Industry), the research queue and the age-up preview, and plates for the minimap and top bar.
+
 ### The ground wears your age (#815), Claude Code, 2026-10-25
 
 **Built:** after #803 dressed the buildings and people, and #812 the air, the ground still said nothing: a Fusion town stood on the same meadow as a Stone Age camp. Now the trodden ground round every building takes its owner's age (`AGE_GROUNDS`, `src/render/ageGrounds.ts`): a colour, an accent and one of ten patterns at the terrain's own grain (cobbles alternate tiles, flags pair them, brick runs in courses, ruts and causeways stripe, a meadow flecks with flowers, shingle speckles). It follows the buildings the viewer has seen, in the age it saw them, so it tells nothing through the fog. An age-up now spreads the new ground out from the Town Center at six tiles a second, and its sparks light in the new age's own colours (the main road keeps its gold; a step back its dusk blue).
