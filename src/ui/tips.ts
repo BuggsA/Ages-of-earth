@@ -1,6 +1,9 @@
 import { COCKLE, COCKLER } from '../sim/data';
 import { TIDE_GATE } from '../sim/data';
 import { AI_GATE_ANSWER } from '../sim/data';
+import { AI_GATE_READ } from '../sim/data';
+import { gateReach } from '../sim/tides';
+import { isEnemy } from '../sim/world';
 import { AGES, BLOOM, LEVIATHANS, UNITS, BLOOMERY, HIVE, INTERCEPT, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, BEGGARS, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
 import { battlesFor } from '../sim/battles';
 import { ageDef } from '../sim/ages';
@@ -497,6 +500,18 @@ const TIPS: Tip[] = [
     text: `<b>Your gate is read.</b> A loaded ${BUILDINGS.tidegate.name} shapes when a rival crosses, even shut: the computer holds its army back at the muster, sends ${AI_GATE_ANSWER.bait} of its weakest onto the flats below to draw your scour (fire on them and the gate is spent until the next flood fills it), or, a Sapper people, carries a keg to the gate. A guard by the gate stamps a keg out. Letting the bait walk is a choice too.`,
   },
   {
+    id: 'gateHolds',
+    // The computer's gate reads bait (#796): the viewer has soldiers on the flats below a computer rival's loaded gate.
+    when: (s, me) => s.ents.some((g) => {
+      if (g.kind !== 'building' || g.type !== 'tidegate' || !s.players[g.owner]?.ai || !isEnemy(s, me, g.owner)) return false;
+      const below = gateReach(s, g);
+      if (!below.length) return false;
+      const flats = new Set(below);
+      return s.ents.some((e) => e.kind === 'unit' && e.owner === me && e.hp > 0 && !e.inside && flats.has(Math.floor(e.y) * s.w + Math.floor(e.x)));
+    }),
+    text: `<b>The gate is watching.</b> Your soldiers stand on the flats below a computer's loaded ${BUILDINGS.tidegate.name}. Bait it with a few while your army waits close on the shore and it <b>holds</b> its scour for the army: it fires once ${AI_GATE_READ.rise} more step onto the flats, once your army starts across, or just before the flood takes its head. Keep the army out of sight (over ${AI_GATE_READ.near} tiles back) and the bait looks like all there is. A Sapper's keg-carrier near the gate draws a guard who runs to stamp the fuse out.`,
+  },
+  {
     id: 'breachCauseway',
     // Barrages (#748): a Sapper people with kegs, and a rival's causeway on the map.
     when: (s, me) => ageOf(s.players[me]) === 'sapper' && (s.players[me].kegs ?? 0) > 0 && !!s.causewayBy && s.causewayBy.some((o) => o > 0 && o - 1 !== me),
@@ -703,3 +718,6 @@ export class Tips {
 }
 
 
+
+/** When a tip is due (by its id), for tests that check a tip's moment headlessly (#796). */
+export const tipWhen = (id: string): Tip['when'] | undefined => TIPS.find((t) => t.id === id)?.when;

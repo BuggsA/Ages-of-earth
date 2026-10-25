@@ -1671,6 +1671,15 @@ export const AI_GATE = { every: 20, look: 1, threat: 3, shut: 8 };
  * after) it holds at the muster `wait` seconds while the gate stays loaded, then goes anyway.
  */
 export const AI_GATE_ANSWER = { look: 2, search: 12000, round: 1.6, keg: 45, bait: 3, spare: 4, baitWait: 20, wait: 90 };
+/**
+ * The computer's gate reads bait (#796). With rivals enough on its flats to fire on (`AI_GATE.threat`), it still holds the scour while
+ * they number under `full` and a rival army stands on the shore within `near` tiles of the flats with `army` times their health or more
+ * (soldiers only, not on the flats). Holding, it fires late: once `rise` more rivals have stepped onto the flats than stood there when it began to hold, once the
+ * army's share falls short (it has started across), or `lose` seconds before the tide would leave its head too low to scour. And a
+ * rival who could carry a keg (a Sapper people's citizens and foot soldiers) within `watch` tiles of the gate draws a guard: its nearest
+ * soldier within `call` tiles goes to stand by the gate, sent again no sooner than `again` seconds on, and runs to stamp out a keg lit there.
+ */
+export const AI_GATE_READ = { full: 6, near: 9, army: 2, rise: 2, lose: 2, watch: 14, call: 40, again: 15 };
 
 /**
  * The breach (#701 s3, the Water Road). Every `every` seconds the sea runs one tile on: each tile of polder four-ways beside water that
