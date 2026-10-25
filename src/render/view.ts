@@ -11,7 +11,7 @@ import { stirred } from '../sim/combat';
 import { cursed, grafted } from '../sim/blood';
 import { graftLast } from '../sim/hemo';
 import { seesRect } from '../sim/vision';
-import { revealed, ringsFor, shownToAll, warnRadius } from '../sim/silo';
+import { decoysFor, revealed, ringsFor, shownToAll, warnRadius } from '../sim/silo';
 import { MissileView } from './missileView';
 import { rooted } from '../sim/bloom';
 import { BuildingsView } from './buildingsView';
@@ -1813,6 +1813,8 @@ export class View {
       const own = s.players[this.viewer].team === s.players[l.owner].team;
       const r = (own ? WARHEADS[l.w ?? 'atomic'].r : warnRadius(s, l.owner)) + 0.5;
       for (const g of ringsFor(s, l, this.viewer)) out.push({ x: g.x, y: g.y, r, color: own ? '#ffb03a' : '#ff3a2a', flash: !own && revealed(s, l) });
+      // The launcher sees the fake points its rivals are shown too, paler, so it knows what they are chasing.
+      for (const g of decoysFor(s, l, this.viewer)) out.push({ x: g.x, y: g.y, r: warnRadius(s, l.owner) + 0.5, color: '#c9a77a' });
     }
     // Bloom Seeds (the Age of the Bloom) are seen by all: the ring they crack, and once rooted, the heart-root's own small ring to hack
     // at. Leaf green, pale for the Seed's own side; both flash for its last ten seconds.

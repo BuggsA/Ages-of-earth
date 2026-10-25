@@ -3060,7 +3060,7 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         } else if (ev.what === 'laid' && ev.owner !== viewer && s.players[ev.owner] && isEnemy(s, viewer, ev.owner) && view.sees(ev.x, ev.y)) {
           hud.toast(`${s.players[ev.owner].name}'s sappers have lit a powder keg by your walls: reach it before it blows`, 'bad');
         } else if (ev.what === 'doused') {
-          if (ev.owner === viewer) hud.toast(`${s.players[ev.by ?? 0].name} stamped out your keg's fuse: cover the next one`, 'alert');
+          if (ev.owner === viewer) hud.toast(`${s.players[ev.by ?? 0].name} stamped out your keg's fuse (or a gallery of theirs heard it): cover the next one, or mine it`, 'alert');
           else if (ev.by === viewer) hud.toast('Your people stamped out a burning keg', 'good');
         } else if (ev.what === 'blown' && ev.owner === viewer) hud.toast('A keg blows: what stood by it is shaken to its footings', 'good');
         else if (ev.what === 'drowned' && ev.owner === viewer) hud.toast('🌊 The tide came over your keg and drowned its fuse: lay powder on the flats only with time to spare', 'alert');
