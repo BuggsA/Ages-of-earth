@@ -23,3 +23,19 @@ describe('a warhead and friendly fire', () => {
     expect(man.hp).toBeLessThan(mh);
   });
 });
+
+describe('the launcher and the decoy rings', () => {
+  it('sees the fake points its rivals are shown, until the reveal, and a rival sees none extra', async () => {
+    const { decoysFor, revealed } = await import('../src/sim/silo');
+    const s = game();
+    s.players[0].res = { food: 9000, wood: 9000, gold: 9000, stone: 9000 };
+    const silo = placeBuilding(s, 0, 'silo', s.players[0].startX + 8, s.players[0].startY + 8, true);
+    const t = s.ents.find((e): e is Building => e.kind === 'building' && e.owner === 1 && e.type === 'towncenter')!;
+    step(s, [{ t: 'launch', p: 0, silo: silo.id, x: t.x, y: t.y }]);
+    const l = s.launches![0];
+    expect(decoysFor(s, l, 0).length).toBe(2);
+    expect(decoysFor(s, l, 1)).toEqual([]);
+    while (!revealed(s, l)) step(s);
+    expect(decoysFor(s, l, 0)).toEqual([]);
+  });
+});

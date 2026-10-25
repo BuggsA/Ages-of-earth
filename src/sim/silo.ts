@@ -574,6 +574,18 @@ export function ringsFor(s: GameState, l: Launch, viewer: number): { x: number; 
 }
 
 /**
+ * The decoy rings the launcher's own team sees too (the owner, 2026-10-25): the fake points a rival is shown beside the real one, drawn
+ * from the first rival team's set, until they vanish at the reveal. Empty for a rival's screen, a launch with no rival, or after the reveal.
+ */
+export function decoysFor(s: GameState, l: Launch, viewer: number): { x: number; y: number }[] {
+  if (s.players[viewer].team !== s.players[l.owner].team || revealed(s, l)) return [];
+  const set = l.warn?.[0];
+  if (!set) return [];
+  const aims = l.salvo ? l.salvo.length : 1;
+  return set.rings.filter((_, i) => (set.of ? set.of[i] >= aims : i !== set.real));
+}
+
+/**
  * Every tick, in id order: a people whose first silo has stood gets its pool (`SILO.stock`), and a pool under its cap (store and
  * flight together) makes its next warhead when the clock comes due. Fusion's clock is 0, so a freed slot fills the same tick.
  */
