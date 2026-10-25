@@ -32,6 +32,7 @@ Most research glyphs are shared by every age (a Farm tech looks the same in Ston
 ## The bar: what "iconic" means here
 
 - **It is recognisable at 26 pixels,** in one glance, as a thing of that age: a silhouette, not detail. Squint. If you could swap it with another age's and nobody would notice, it isn't done.
+- **Legible first** (the owner, 2026-10-25: many icons are not). Check every icon at its real size (26 px, and on its plate) before you call it done: strong contrast with its plate, one bold shape with no hairlines or tiny parts, and a clear gap between near-identical glyphs. If you must squint to tell what it is, redraw it simpler. Look at the existing ones too, and fix or flag the ones that fail on #816.
 - **Not a recolour, not a rotation.** The plate colours and the stamp are the starting point, not the work. A building or person must differ in shape.
 - **From the age's own story:** its verb and door in `AGES[<age>]` (`src/sim/data.ts`), `docs/age-roads.md`, and the real history or myth it draws on. Real peoples and faiths are drawn with respect (`AGENTS.md` §2).
 - **Of a piece:** low-poly, a few flat shapes, colours baked into vertices for models; SVG with `currentColor` (the age's ink) for glyphs, plus at most two or three colours of your own.
