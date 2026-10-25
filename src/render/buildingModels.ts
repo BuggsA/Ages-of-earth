@@ -1890,26 +1890,40 @@ function dyke(k: Kit, mask: number): void {
 /** A Bloom Hearth (#727, the Iron Age): a squat clay furnace with a glowing mouth, bellows, a slag heap and a rack of grey bars. */
 function stockade(k: Kit, _e: number, st: Style): void {
   pad(k, 2, st.base);
-  // A ring of sharpened stakes with a gate gap in front, a lookout platform behind, and a heap of loot under a hide.
-  const POST = st.wall2;
-  for (let i = 0; i < 9; i++) {
-    const a = -0.95 + i * 0.24;
-    if (i === 4) continue;
-    k.cone(0.07, 0.95 + (i % 2) * 0.12, 5, POST, a, 0, 0.9);
-    k.cone(0.07, 0.95 + (i % 2) * 0.12, 5, POST, a, 0, -0.9);
+  // Its own silhouette, whatever the age it is kept in: a ring of sharpened stakes, a gate arch of crossed spears with a skull
+  // lintel, trophy poles hung with pelts, and a heap of loot under a blood-red hide. The colours are the war-host's, not the town's.
+  const POST = '#5a3d28';
+  const BONE = '#e6dcc4';
+  const BLOOD = '#8a2420';
+  for (let i = 0; i < 10; i++) {
+    const a = -1.0 + i * 0.222;
+    if (i === 4 || i === 5) continue;
+    k.cone(0.07, 0.95 + (i % 3) * 0.14, 5, POST, a, 0, 0.9);
+    k.cone(0.07, 0.95 + (i % 3) * 0.14, 5, POST, a, 0, -0.9);
   }
   for (let i = 0; i < 7; i++) {
     const z = -0.7 + i * 0.24;
-    k.cone(0.07, 0.9 + (i % 2) * 0.12, 5, POST, -1.0, 0, z);
-    k.cone(0.07, 0.9 + (i % 2) * 0.12, 5, POST, 1.0, 0, z);
+    k.cone(0.07, 0.9 + (i % 3) * 0.14, 5, POST, -1.0, 0, z);
+    k.cone(0.07, 0.9 + (i % 3) * 0.14, 5, POST, 1.0, 0, z);
   }
-  k.box(0.7, 0.07, 0.7, st.wall, 0.35, 1.25, -0.4);
+  // The gate: two tall posts, crossed spears above and a skull on the lintel.
+  for (const x of [-0.22, 0.22]) k.cyl(0.06, 0.07, 1.5, 6, POST, x, 0, 0.9);
+  k.box(0.6, 0.07, 0.07, POST, 0, 1.3, 0.9);
+  for (const r of [-0.5, 0.5]) k.cone(0.05, 0.9, 4, '#c8ccd0', 0, 1.3, 0.9).rotation.z = r;
+  k.sphere(0.1, BONE, 0, 1.45, 0.95);
+  // Trophy poles at the front corners, a pelt hung from each.
+  for (const x of [-0.95, 0.95]) {
+    k.cyl(0.04, 0.04, 1.6, 5, POST, x, 0, 0.95);
+    k.box(0.3, 0.4, 0.04, BLOOD, x + (x < 0 ? 0.17 : -0.17), 1.05, 0.95);
+    k.sphere(0.08, BONE, x, 1.65, 0.95);
+  }
+  // A lookout platform behind and the loot under a hide.
+  k.box(0.7, 0.07, 0.7, '#7a5a3a', 0.35, 1.25, -0.4);
   for (const [x, z] of [[0, -0.7], [0.7, -0.7], [0, -0.1], [0.7, -0.1]]) k.cyl(0.04, 0.04, 1.25, 5, POST, x, 0, z);
   k.box(0.44, 0.3, 0.36, '#7a5c3a', -0.45, 0.02, 0.0);
-  k.box(0.5, 0.16, 0.42, st.roof, -0.45, 0.32, 0.0).rotation.z = 0.12;
+  k.box(0.5, 0.16, 0.42, BLOOD, -0.45, 0.32, 0.0).rotation.z = 0.12;
   k.sphere(0.12, '#e0b030', -0.6, 0.36, 0.25);
   k.team(k.box(0.5, 0.18, 0.04, TEAM, 0.35, 1.5, -0.4));
-  banner(k, 0.95, 0, -0.85, 1.4);
 }
 
 function bloomery(k: Kit, _e: number, st: Style): void {
