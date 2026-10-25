@@ -1631,3 +1631,9 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 **Built:** the Age of Sail's own building. Convoys needed a warship tied to every cog; a lit Pharos by the far port escorts for it (+20% gold within 8 tiles), so the fleet can go hunting prizes instead. The computer lights one by its busiest port.
 **Why I love it:** it turns "the fleet is the wall" into a choice: stand a tower on the headland, or keep ships beside the cogs. And a rival raider has a fixed target to burn.
 **Next:** the beacon revealing rival ships through fog at night, the computer sending its fleet raiding once the lamp is lit, a drawn button glyph.
+
+## Designers' notes: the Wayside Chantry (#727, 2026-10-25, chain 1025-1752 s7)
+
+**Built:** the Age of Pilgrims' own building. Its priests chant towers over, but they are frail and the chant is slow where arrows fall. A priest raises a chantry just outside a rival's border: priests by it sing 50% louder and are mended, so the siege can stand there. The computer sends a priest to plant one toward its nearest rival.
+**Why I love it:** the pilgrims' conquest becomes a march of shrines, a cross planted at the front instead of an army; and a raiding party has a stone to knock over.
+**Next:** the computer's chant band rallying to its chantry, a chantry that counts as holy ground (no arrows within), a drawn button glyph.

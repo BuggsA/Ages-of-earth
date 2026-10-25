@@ -4,7 +4,7 @@ import { AI_GATE_ANSWER } from '../sim/data';
 import { AI_GATE_READ } from '../sim/data';
 import { gateReach } from '../sim/tides';
 import { isEnemy } from '../sim/world';
-import { AGES, BLOOM, LEVIATHANS, MYCELIUM, UNITS, BLOOMERY, HIREHALL, HIVE, INTERCEPT, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, BEGGARS, SEA_RAID, SPOILS, GALLERY, STANDARD, STRAND, WHEELYARD, PHAROS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
+import { AGES, BLOOM, LEVIATHANS, MYCELIUM, UNITS, BLOOMERY, HIREHALL, HIVE, INTERCEPT, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, BEGGARS, SEA_RAID, SPOILS, GALLERY, STANDARD, STRAND, WHEELYARD, PHAROS, CHANTRY, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
 import { battlesFor } from '../sim/battles';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, findsOf, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
@@ -366,6 +366,11 @@ const TIPS: Tip[] = [
     id: 'pharos',
     when: (s, me) => ageOf(s.players[me]) === 'sail',
     text: `A merchant ship needs a warship beside it to sail in convoy. Raise a <b>${BUILDINGS.pharos.name}</b> (<b>L</b>) on the shore by the port where your cogs load: any ship loading within ${PHAROS.reach} tiles of it sails escorted (+${Math.round((PHAROS.pay - 1) * 100)}% gold), so the fleet can go hunting prizes. A rival raider will look for it, so guard the headland.`,
+  },
+  {
+    id: 'chantry',
+    when: (s, me) => ageOf(s.players[me]) === 'pilgrim',
+    text: `Priests chant a rival's tower over, but they are frail and a Town Center's arrows reach far. Have a priest raise a <b>${BUILDINGS.chantry.name}</b> (<b>O</b>, in the military menu) just outside the rival's border: priests within ${CHANTRY.reach} tiles of it sing ${Math.round(CHANTRY.voice * 100)}% louder and are mended ${CHANTRY.mend} health a second. A rival can raze it, so guard the band.`,
   },
   {
     id: 'wheelyard',

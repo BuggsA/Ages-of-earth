@@ -63,7 +63,7 @@ import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
 import { AI_TEMPER, ROUTES, TRUNK, type RouteId } from './data';
-import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS, STOCKADE, AI_STOCKADE, GALLERY, AI_STANDARD, BORDERS, STRAND, AI_YARD, AI_PHAROS } from './data';
+import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS, STOCKADE, AI_STOCKADE, GALLERY, AI_STANDARD, BORDERS, STRAND, AI_YARD, AI_PHAROS, AI_CHANTRY } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
@@ -462,6 +462,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   raiseStrand(s, v, mem, issue);
   raiseYard(s, v, mem, issue);
   raisePharos(s, v, mem, issue);
+  raiseChantry(s, v, mem, issue);
   salvage(s, v, mem, issue);
   claimWalk(s, v, mem, issue);
   findWalk(s, v, mem, issue);
@@ -5841,6 +5842,35 @@ function raiseYard(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   const r = Math.min(AI_YARD.out, dl / 2);
   const spot = findSpot(s, 'wheelyard', v.home.x + ((best.x - v.home.x) / dl) * r, v.home.y + ((best.y - v.home.y) / dl) * r, 0, 6);
   if (spot) construct(s, v, mem, 'wheelyard', spot, 2, issue);
+}
+
+/**
+ * The Pilgrims' Wayside Chantry (#727): a computer in the Age of Pilgrims with a priest to spare (past the ones keeping vigil) sends it to raise a chantry
+ * `AI_CHANTRY.out` tiles from home toward the nearest rival Town Center, one at a time, so its chanting band can stand at the border.
+ */
+function raiseChantry(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (ageOf(p) !== 'pilgrim' || buildBarred(p, 'chantry') || count(v, 'chantry') > 0 || !v.tc || v.priests.length <= VIGIL.most) return;
+  if (s.tick - (mem.ordered.chantry ?? -99999) < secs(60)) return;
+  // The first priests (in id order) keep vigil at the shrine: a spare one goes.
+  const priest = v.priests.slice(VIGIL.most).find((u) => !u.inside && !carriedBy(s, u) && (u.order.k === 'idle' || u.order.k === 'heal'));
+  const cost = buildingCostFor(s, p.id, 'chantry');
+  if (!priest || !afford(v, cost)) return;
+  let best: Building | null = null;
+  let bestD = Infinity;
+  for (const b of s.ents) {
+    if (b.kind !== 'building' || b.type !== 'towncenter' || !b.built || b.hp <= 0 || !isEnemy(s, p.id, b.owner)) continue;
+    const d = (b.x - v.home.x) * (b.x - v.home.x) + (b.y - v.home.y) * (b.y - v.home.y);
+    if (d < bestD) { best = b; bestD = d; }
+  }
+  if (!best) return;
+  const dl = Math.sqrt(bestD) || 1;
+  const r = Math.min(AI_CHANTRY.out, dl / 2);
+  const spot = findSpot(s, 'chantry', v.home.x + ((best.x - v.home.x) / dl) * r, v.home.y + ((best.y - v.home.y) / dl) * r, 0, 6);
+  mem.ordered.chantry = s.tick;
+  if (!spot || !findPath(s, priest.x, priest.y, { x0: spot.tx, y0: spot.ty, x1: spot.tx + 1, y1: spot.ty + 1, px: spot.tx + 1, py: spot.ty + 1 }, 6000).complete) return;
+  issue({ t: 'build', p: p.id, ids: [priest.id], type: 'chantry', tx: spot.tx, ty: spot.ty });
+  spend(v, cost);
 }
 
 /**
