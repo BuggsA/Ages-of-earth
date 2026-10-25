@@ -1430,6 +1430,12 @@ export function gateLoaded(s: GameState, b: Building): boolean {
   return gateWorks(s, b) && !b.open && !s.scour?.some((c) => c.gate === b.id) && gateHead(s, b).length >= TIDE_GATE.least;
 }
 
+/** Whether a loaded gate's head would fall short of `TIDE_GATE.least` tiles within `sec` seconds as the tide comes in (#796): fire now or lose the shot. */
+export function gateFading(s: GameState, b: Building, sec: number): boolean {
+  const level = tideLevel(s, s.tick + secs(sec));
+  return pondBehind(s, b).filter((t) => isPond(s, t) && tidalLevel(s, t) > level).length < TIDE_GATE.least;
+}
+
 /**
  * The flats a gate's scour runs over (#785): from the gate's sea side, through open water and bared flats (never the pond, a causeway, a
  * building or dry land), within `TIDE_GATE.reach` tiles of the gate, the first `most` tiles of bared flats found, nearest first, four ways.

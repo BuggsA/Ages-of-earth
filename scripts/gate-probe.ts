@@ -1,5 +1,7 @@
-// Headless probe for #792: a wave against a computer's loaded Tide Gate on its way, marching straight in or answering it first.
-// For each seed with a march under a gate: the wave's losses (dead, and health lost) over the next `minutes`, and how each answer went.
+// Headless probe for #792 and #796: a wave against a computer's loaded Tide Gate on its way, marching straight in or answering it first
+// as the computer does (the bait, the keg). Since #796 the gate reads bait; `guard` adds three of the gate owner's soldiers a walk off,
+// for the gate to send against a keg. For each seed with a march under a gate: the wave's losses (dead, and health lost) over the next
+// `minutes`, how each answer went, how many the scour swept, and (keg trials) whether the gate still stands.
 // npx tsx scripts/gate-probe.ts [seeds=16] [minutes=1.5]
 import { gateAnswer } from '../src/sim/ai';
 import { applyCommand, wallLine } from '../src/sim/commands';
@@ -51,10 +53,20 @@ function setup(seed: number): { s: GameState; gate: Building; from: Pt; to: Pt }
 }
 
 /** One trial: `answer` false marches straight in; true answers the gate first (as a Sapper people with `kegs`). */
-function trial(seed: number, answer: boolean, kegs: number): { dead: number; hurt: number; how: string; scoured: number; held: number } | null {
+function trial(seed: number, answer: boolean, kegs: number, guard = false): { dead: number; hurt: number; how: string; scoured: number; held: number; stood: boolean; blown: number; doused: number } | null {
   const g = setup(seed);
   if (!g) return null;
   const { s, from, to } = g;
+  if (guard) {
+    // Three of the gate owner's soldiers on dry ground 4 to 8 tiles off, close at hand (the first such tile, in tile order).
+    for (let i = s.w; i < s.w * (s.h - 1); i++) {
+      const p = mid(s, i);
+      const d = Math.hypot(p.x - g.gate.x, p.y - g.gate.y);
+      if (d < 4 || d > 8 || isTidal(s, i) || s.terrain[i] === T_WATER || !walkable(s, i % s.w, Math.floor(i / s.w), -1)) continue;
+      for (let k = 0; k < 3; k++) spawnUnit(s, 0, 'infantry', p.x + k * 0.3, p.y);
+      break;
+    }
+  }
   if (kegs) {
     enter(s, 1, 'sapper');
     s.players[1].kegs = kegs;
@@ -68,6 +80,8 @@ function trial(seed: number, answer: boolean, kegs: number): { dead: number; hur
   let how = 'none';
   let held = 0;
   let scoured = 0;
+  let blown = 0;
+  let doused = 0;
   if (marched) applyCommand(s, { t: 'move', p: 1, ids: wave.map((u) => u.id), x: to.x, y: to.y, amove: true });
   for (let i = 0; i < secs(minutes * 60); i++) {
     if (!marched) {
@@ -81,15 +95,19 @@ function trial(seed: number, answer: boolean, kegs: number): { dead: number; hur
       }
     }
     step(s);
-    for (const e of s.events) if (e.k === 'tideGate' && e.open && e.scour > 0) scoured += e.swept;
+    for (const e of s.events) {
+      if (e.k === 'tideGate' && e.open && e.scour > 0) scoured += e.swept;
+      if (e.k === 'keg' && e.owner === 1 && e.what === 'blown') blown++;
+      if (e.k === 'keg' && e.owner === 1 && e.what === 'doused') doused++;
+    }
   }
   const dead = wave.filter((u) => u.hp <= 0 || !s.byId.has(u.id)).length;
   const left = wave.reduce((n, u) => n + (s.byId.has(u.id) ? Math.max(0, u.hp) : 0), 0);
-  return { dead, hurt: full - left, how, scoured, held: Math.round(held / secs(1)) };
+  return { dead, hurt: full - left, how, scoured, held: Math.round(held / secs(1)), stood: s.byId.has(g.gate.id), blown, doused };
 }
 
 let n = 0;
-const sum = { straight: { dead: 0, hurt: 0 }, answer: { dead: 0, hurt: 0 }, keg: { dead: 0, hurt: 0 } };
+const sum = { straight: { dead: 0, hurt: 0 }, answer: { dead: 0, hurt: 0 }, keg: { dead: 0, hurt: 0, stood: 0, blown: 0, doused: 0 }, guarded: { dead: 0, hurt: 0, stood: 0, blown: 0, doused: 0 } };
 for (let seed = 1; seed <= seeds; seed++) {
   const a = trial(seed, false, 0);
   if (!a) {
@@ -98,11 +116,22 @@ for (let seed = 1; seed <= seeds; seed++) {
   }
   const b = trial(seed, true, 0)!;
   const c = trial(seed, true, 3)!;
+  const d = trial(seed, true, 3, true)!;
   n++;
-  for (const [k, r] of [['straight', a], ['answer', b], ['keg', c]] as const) {
+  for (const [k, r] of [['straight', a], ['answer', b], ['keg', c], ['guarded', d]] as const) {
     sum[k].dead += r.dead;
     sum[k].hurt += r.hurt;
   }
-  console.log(`seed ${seed}: straight dead ${a.dead} hurt ${Math.round(a.hurt)} swept ${a.scoured} | answer (${b.how}, held ${b.held}s) dead ${b.dead} hurt ${Math.round(b.hurt)} swept ${b.scoured} | sapper (${c.how}, held ${c.held}s) dead ${c.dead} hurt ${Math.round(c.hurt)} swept ${c.scoured}`);
+  sum.keg.stood += c.stood ? 1 : 0;
+  sum.guarded.stood += d.stood ? 1 : 0;
+  for (const [k, r] of [['keg', c], ['guarded', d]] as const) {
+    sum[k].blown += r.blown;
+    sum[k].doused += r.doused;
+  }
+  const line = (r: NonNullable<ReturnType<typeof trial>>, keg = false) => `(${r.how}, held ${r.held}s) dead ${r.dead} hurt ${Math.round(r.hurt)} swept ${r.scoured}${keg ? `, kegs blown ${r.blown} stamped out ${r.doused}, gate ${r.stood ? 'stood' : 'down'}` : ''}`;
+  console.log(`seed ${seed}: straight dead ${a.dead} hurt ${Math.round(a.hurt)} swept ${a.scoured} | answer ${line(b)} | sapper ${line(c, true)} | sapper, gate guarded ${line(d, true)}`);
 }
-console.log(`${n} seeds. Totals: straight dead ${sum.straight.dead} hurt ${Math.round(sum.straight.hurt)}; answer dead ${sum.answer.dead} hurt ${Math.round(sum.answer.hurt)}; sapper dead ${sum.keg.dead} hurt ${Math.round(sum.keg.hurt)}`);
+console.log(
+  `${n} seeds. Totals: straight dead ${sum.straight.dead} hurt ${Math.round(sum.straight.hurt)}; answer dead ${sum.answer.dead} hurt ${Math.round(sum.answer.hurt)}; ` +
+    `sapper dead ${sum.keg.dead} hurt ${Math.round(sum.keg.hurt)}, kegs blown ${sum.keg.blown} stamped out ${sum.keg.doused}, gate stood ${sum.keg.stood}; guarded dead ${sum.guarded.dead} hurt ${Math.round(sum.guarded.hurt)}, kegs blown ${sum.guarded.blown} stamped out ${sum.guarded.doused}, gate stood ${sum.guarded.stood}`,
+);

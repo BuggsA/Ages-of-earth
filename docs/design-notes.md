@@ -1543,6 +1543,20 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 
 **Next:** the Kraken and Reef Ships (7b); the computer answering a seed-bomb in its own town (it doesn't cut or burn the thorn yet); the computer flying its whale with an attack wave rather than waiting for idle soldiers; a Behemoth that rises and moves on when its ore runs out.
 
+## Designers' notes: the computer's gate reads bait (#796, s6h of #701, 2026-10-24, chain 1024-1330 s8, lane rules)
+
+**Built:** the defender's half of the gate duel. `gateRead` (`ai.ts`) weighs who stands on the flats a loaded gate would scour against the rival soldiers on the shore within 9 tiles of them. Fewer than 6 on the flats, with twice their health or more waiting ashore, is bait: the gate **holds**. It **fires late** once 2 more rivals than it held for have stepped onto the flats (it remembers every one it has seen there, so an army streaming across counts even as the first step off the far side), once the shore's share falls short (the army is crossing, or has gone), or 2 s before the rising tide would leave its head too low to scour (`gateFading`, `tides.ts`). And a **guard** (`gateGuard`): a rival of a Sapper people within 14 tiles of the gate draws its nearest foot soldier (within 40) to stand beside it, kept out of the army's orders for 15 s at a time (`gatePost`), and a lit keg by the gate sends it running to stamp the fuse out. Numbers: `AI_GATE_READ`. Tip `gateHolds`.
+
+**Why I love it:** a gate that always takes the bait is a puzzle solved once. Now the moment the sea is let out is a bluff from both ends: the human who baits a computer must keep the army out of sight (over 9 tiles back) for the bait to look like all there is, and must time a keg for when no guard stands by.
+
+**Probe** (`npx tsx scripts/gate-probe.ts 16 4`, 8 of 16 seeds; a computer owns the gate, a wave of 10 answers it as the computer does). Before → after, 4 minutes: straight in, 19 → 19 dead; the computer's bait, 14 → 26 dead (the gate holds, the wave waits and crosses late, often into the flood); the keg with 3 of the gate's soldiers 4–8 tiles off, kegs blown 7 → 2, stamped out 0 → 4. A guard 12–20 tiles off is too late for a carrier that starts 4 tiles from the gate (8 s fuse).
+
+**Gave up on:** "a lone carrier" only. A Sapper wave mustering by the gate is exactly when a guard is needed, so any number draws one.
+
+**Seen and not:** headless only (tests, the probe). Not watched in a browser; the tip is tested headlessly, not seen on screen.
+
+**Next:** the attacker reading the hold (pull the muster back past 9 tiles, or send the bait from far off); a guard posted before any Sapper comes near; boats in the scour.
+
 ## Designers' notes: Leviathans at sea, the Kraken and Reef Ships (Wild route step 7b, #789, 2026-10-25, chain 1024-1233 s6)
 
 **Built:** the Wild route's navy. A Great Den raised within 5 tiles of the sea breeds the **Kraken** (two to a people): a sea beast whose every blow **grips** the ship it strikes so it can't sail, and whose own people's ships near it are **shoved along** a third faster. A Leviathan people's Docks grow **Reef Ships** in the warships' place: living coral launched at 40% strength that grows to full on the water and mends after a fight. The computer raises its Great Den on the shore, breeds a Kraken when it sees rival ships, and sails Reef Ships.
