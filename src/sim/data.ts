@@ -1013,6 +1013,8 @@ export interface Road {
   time: number;
   /** Shown at the Town Center only once the player has one of these, the clue that the road is there. */
   clue?: BuildingType;
+  /** A second building that shows the road as well as `clue` (#794): for a people that raises no Farm, a Dock at the water. */
+  clueAlt?: BuildingType;
   /** Revealed only to the people who completed an ancient ruin's excavation. */
   ruin?: boolean;
   /**
@@ -1510,6 +1512,8 @@ export const ROADS: Road[] = [
     time: 35,
     // A people that has tilled a field learns to lead the water to it: any Farm shows the road, on every map.
     clue: 'farm',
+    // A people that tills no field (the Britons, a camp on the move, the Hunters' Way) sees it at a Dock instead (#794).
+    clueAlt: 'dock',
     blurb: 'Instead of the Bronze Age, as the first towns on the Tigris, the Nile and the Indus did: lead the water. Citizens dig Channels out from any spring, stream, lake or shore, and the water runs in behind them; Farms by water work faster, and none is laid away from it, so the town grows along its channels. A channel is a moat that soldiers must wade. The same arms and buildings as the Bronze Age.',
   },
   { from: 'rivers', to: 'bronze', cost: { food: 100, wood: 100 }, time: 20, blurb: 'Lay down the spades: the ordinary Bronze Age. Fields may go anywhere again; the channels you dug stay, and still water the fields beside them no faster.' },

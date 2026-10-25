@@ -265,8 +265,11 @@ export function roadKnown(s: GameState, p: Player, r: Road): boolean {
   if (r.vein && !veinSeen(s, p, r)) return false;
   if (r.ruin && !s.ruins?.some((ruin) => ruin.by === p.id)) return false;
   if (r.found && !((p.techs.includes(r.found) || led(p, TECHS[r.found].survey!)) && surveyFinds(s, r.found))) return false;
-  return !r.clue || s.ents.some((e) => e.kind === 'building' && e.owner === p.id && e.type === r.clue && e.built);
+  return !r.clue || s.ents.some((e) => e.kind === 'building' && e.owner === p.id && e.built && cluesOf(r).includes(e.type));
 }
+
+/** The buildings that show a road: its clue, and the second it may name (#794). */
+export const cluesOf = (r: Road): BuildingType[] => (r.clue ? (r.clueAlt ? [r.clue, r.clueAlt] : [r.clue]) : []);
 
 /** Every deed a road needs: its own, then any it asks for `also` (#49). */
 export const deedsOf = (r: Road): Deed[] => (r.deed ? (r.also ? [r.deed, ...r.also] : [r.deed]) : (r.also ?? []));
@@ -330,7 +333,7 @@ export function roadProblem(s: GameState, p: Player, r: Road): string | null {
     if (r.found && !surveyFinds(s, r.found)) return 'There is none in this world';
     if (r.vein && !s.rares?.includes(r.vein.id) && !soldAt(s, r.vein.id)) return `There is no ${r.vein.id} in this world`;
     if (r.vein && !veinSeen(s, p, r)) return `Raise a Prospector's Lodge, or dig ${r.vein.id}, to learn of this road`;
-    return `Needs a ${BUILDINGS[r.clue!].name}`;
+    return `Needs a ${cluesOf(r).map((b) => BUILDINGS[b].name).join(' or a ')}`;
   }
   // A coast door (#701): the land's shape, not an ore, keeps the Age of Dykes from a people with no shallows by its town.
   if (r.coast && !coastHeld(s, p)) return r.coast;

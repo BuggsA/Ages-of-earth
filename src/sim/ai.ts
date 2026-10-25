@@ -6,7 +6,7 @@ import { raiseCost } from './reclaim';
 import { buildingCostFor, modsOf, raiseProblem, techCostFor, techProblem, trainCostFor } from './stats';
 import type { AgeId, AiMemory, Animal, Building, BuildingType, Command, Cost, GameState, Landmark, Launch, Player, Res, Rubble, Ruin, TechId, TradePost, Unit, UnitType } from './types';
 import { RARES, RES, R_BERRY, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_STONE, R_TREE, T_WATER } from './types';
-import { backProblem, backTo, ageDef, ageOf, asleep, barred, buildBarred, crossingLeft, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, trainsAt, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadProblem, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
+import { backProblem, backTo, cluesOf, ageDef, ageOf, asleep, barred, buildBarred, crossingLeft, deedsDone, oreDone, oreOnly, hasCoils, hasWalked, deedsProgress, hiresAt, isHire, trainsAt, inField, type DeedProgress, isSideRoad, mainRoad, assayed, charted, holds, keyAt, keyOf, prospected, relicsKept, roadKnown, roadProblem, roadsFrom, soldAt, veinDone, veinSeen } from './ages';
 import { grindersOf, kegsOf, millProblem, mills, sappers } from './powder';
 import { beatersAt, burns, onFire, torchProblem } from './fire';
 import { inMycelium } from './mycelium';
@@ -750,7 +750,7 @@ function worthWaiting(s: GameState, v: View, mem: AiMemory, r: Road): boolean {
 /** Whether a road's clue building is under construction and nothing else hides the road (#555). */
 function clueRising(s: GameState, p: Player, r: Road): boolean {
   if (!r.clue || r.vein || r.ruin || r.found || (r.walked && !hasWalked(p, r.walked)) || (r.crossing && !r.crossing.some((a) => hasWalked(p, a)))) return false;
-  return s.ents.some((e) => e.kind === 'building' && e.owner === p.id && e.type === r.clue && !e.built);
+  return s.ents.some((e) => e.kind === 'building' && e.owner === p.id && !e.built && cluesOf(r).includes(e.type));
 }
 
 /**
@@ -758,13 +758,17 @@ function clueRising(s: GameState, p: Player, r: Road): boolean {
  * Market the merchants'. Left to the town's usual order it lost the wood to cheaper buildings and the road was never seen, so
  * the town takes the trunk; it is raised first and its wood set aside. Only a road its age leads to (a turn at its own tier too), with no vein, ruin or find to wait on; the steppe's camp has its own order (`steppeRoad`).
  */
-function clueDue(v: View, mem: AiMemory): BuildingType | null {
+function clueDue(s: GameState, v: View, mem: AiMemory): BuildingType | null {
   const { p } = v;
   if (!walksWeb(v)) return null;
   for (const r of roadsFrom(p)) {
     if (!isSideRoad(r) || AGES[r.to].tier < p.epoch || hasWalked(p, r.to) || !r.clue || mem.roads?.[r.to] !== true || r.vein || r.ruin || r.found || AGES[r.to].mobile) continue;
     if ((r.walked && !hasWalked(p, r.walked)) || (r.crossing && !r.crossing.some((a) => hasWalked(p, a)))) continue;
-    if (count(v, r.clue) === 0 && BUILDINGS[r.clue].epoch <= p.epoch && !buildBarred(p, r.clue)) return r.clue;
+    // One of a road's clues standing is enough; else the first the people can raise now (a Briton's town tills no Farm, so Rivers shows at a Dock, #794).
+    const clues = cluesOf(r);
+    if (clues.some((c) => count(v, c) > 0)) continue;
+    const pick = clues.find((c) => BUILDINGS[c].epoch <= p.epoch && !buildBarred(p, c) && !wayBarred(s, p, c));
+    if (pick) return pick;
   }
   return null;
 }
@@ -3395,7 +3399,7 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     ['range', p.epoch >= 2 && n >= 24 && count(v, 'range') < 2],
     ['stable', p.epoch >= 3 && n >= 26 && count(v, 'stable') < 2],
   ];
-  const due = clueDue(v, mem);
+  const due = clueDue(s, v, mem);
   if (due) want.unshift([due, true]);
   for (const [type, ok] of want) {
     if (!ok || recently(type, 25) || BUILDINGS[type].epoch > p.epoch || buildBarred(p, type)) continue;
