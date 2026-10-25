@@ -1366,8 +1366,74 @@ function behemoth(): Kit {
   return k;
 }
 
+/**
+ * The Kraken (the Age of Leviathans at sea): a great mantle humped out of the water, mottled red-brown over a pale underside, two
+ * big gold eyes, and eight arms spread on the water round it. The two long fore-arms rise to strike, the rest ripple in turns as
+ * it swims. A woven collar of kelp in its people's colour rings the mantle, as the Great Den's beasts wear.
+ */
+function kraken(): Kit {
+  const k = new Kit();
+  const skin = '#8a3f32';
+  const dark = '#5e2a24';
+  const pale = '#d9a58e';
+  // The mantle, humped high behind, and the head low in front with its eyes.
+  k.blob(0.42, skin, 0, 0.32, -0.25).scale.set(0.9, 1.2, 1.15);
+  for (const [x, y, z] of [[-0.18, 0.55, -0.3], [0.2, 0.42, -0.5], [0.05, 0.7, -0.1], [-0.25, 0.3, 0.0]]) k.blob(0.06, dark, x, y, z);
+  k.blob(0.3, pale, 0, 0.1, 0.18).scale.set(1.1, 0.6, 1);
+  for (const x of [-0.2, 0.2]) {
+    k.sphere(0.075, '#e0b23a', x, 0.24, 0.28);
+    k.sphere(0.035, '#1a1410', x * 1.05, 0.25, 0.34);
+  }
+  k.team(k.cyl(0.36, 0.4, 0.06, 9, TEAM, 0, 0.12, -0.15));
+  // Six arms on the water, rippling in two sets.
+  for (let i = 0; i < 6; i++) {
+    const side = i < 3 ? -1 : 1;
+    const j = i % 3;
+    const z = 0.15 - j * 0.32;
+    const g = k.limb(k.group(0, 0, 0), j === 1 ? RIG_LEG_B : RIG_LEG_A, 0.06, z);
+    for (let n = 0; n < 3; n++) {
+      const r = 0.07 - n * 0.018;
+      const arm = k.cyl(r * 0.8, r, 0.32, 5, n === 2 ? dark : skin, side * (0.35 + n * 0.27), 0.04 + (n === 2 ? 0.06 : 0), z - j * n * 0.08, g);
+      arm.rotation.z = side * (Math.PI / 2 - 0.15 * n);
+    }
+  }
+  // The two long fore-arms, raised to strike, with pale suckers.
+  for (const side of [-1, 1]) {
+    const g = k.limb(k.group(0, 0, 0), RIG_ARM, 0.1, 0.35);
+    const arm = k.cyl(0.04, 0.07, 0.75, 5, skin, side * 0.18, 0.1, 0.5, g);
+    arm.rotation.x = 0.7;
+    arm.rotation.z = side * -0.2;
+    for (const t of [0.25, 0.45, 0.62]) k.sphere(0.022, pale, side * (0.18 + t * 0.12), 0.1 + t * 0.55, 0.5 + t * 0.45, g, 5);
+  }
+  return k;
+}
+
+/**
+ * A Reef Ship (the Age of Leviathans at sea): a living hull of pink and amber coral grown into a ship's shape, branching coral where
+ * the masts would be, and a great kelp-leaf sail in its people's colour. Sea-green weed trails over its sides; spines of white coral
+ * along the rail are what it shoots.
+ */
+function reefship(): Kit {
+  const k = new Kit();
+  hull(k, 1.5, 0.48, 0.18, '#c4626a', '#d98a5c');
+  // Knobs and ridges of coral along the hull, and weed trailing down its sides.
+  for (const [x, z, c] of [[-0.22, 0.4, '#e89a6c'], [0.22, 0.1, '#f2c27a'], [-0.2, -0.25, '#e07d86'], [0.24, -0.5, '#e89a6c'], [0, 0.66, '#f2c27a']] as [number, number, string][]) k.blob(0.07, c, x, 0.14, z);
+  for (const side of [-1, 1]) for (const z of [-0.4, 0.05, 0.45]) k.box(0.02, 0.14, 0.08, '#3f7a5a', side * 0.25, 0.0, z);
+  // White coral spines along the rail.
+  for (let i = 0; i < 5; i++) for (const side of [-1, 1]) k.cone(0.02, 0.12, 4, '#efe6d2', side * 0.2, 0.18, -0.45 + i * 0.22);
+  // Branching coral for masts, and the kelp sail.
+  for (const [z, h] of [[0.2, 0.95], [-0.35, 0.7]]) {
+    k.cyl(0.03, 0.05, h, 5, '#d4707a', 0, 0.12, z);
+    for (const side of [-1, 1]) k.cyl(0.015, 0.025, h * 0.4, 4, '#e89a6c', side * 0.08, 0.12 + h * 0.5, z).rotation.z = side * -0.6;
+  }
+  const sail = k.sail(k.box(0.5, 0.48, 0.015, TEAM, 0, 0.45, 0.215), 0.25, 0.2, 0.48);
+  k.team(sail);
+  k.box(0.08, 0.3, 0.012, '#4f8a5a', 0.22, 0.5, 0.21);
+  return k;
+}
+
 const MAKERS: Record<UnitType, (epoch: number) => Kit> = {
-  tow: () => towKit(), citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, cog, fighter, bomber, trader, wagon, warwolf, tusker, warmammoth, blowpipe, cavebear, barge, warden, skywhale, behemoth };
+  tow: () => towKit(), citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, cog, fighter, bomber, trader, wagon, warwolf, tusker, warmammoth, blowpipe, cavebear, barge, warden, skywhale, behemoth, kraken, reefship };
 
 /** Epoch + 30 asks for the citizen as a thrall (the same offset trick as the trader's gold and the caravan cart). */
 export const THRALL_MODEL = 30;

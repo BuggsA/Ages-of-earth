@@ -110,7 +110,8 @@ export function statsFor(s: GameState, owner: number, type: UnitType): UnitStats
     st.attack *= m.siegeAttack;
     if (st.range > 0) st.range += m.siegeRange;
   }
-  if (base.cls === 'ship') {
+  // A Kraken (#789) is a beast of the sea, not a hull: no shipwright's craft reaches it.
+  if (base.cls === 'ship' && type !== 'kraken') {
     st.hp = Math.round(st.hp * m.shipHp);
     if (st.range > 0) {
       st.range += m.shipRange;

@@ -361,7 +361,8 @@ const BRED: UnitType[] = ['cavebear'];
 /** Everything a player can train at a building now. */
 export function trainsAt(p: Player, at: BuildingType): UnitType[] {
   const hires = hiresAt(p, at);
-  const own = at === 'den' && hasWalked(p, 'hive') ? [...BUILDINGS[at].trains, ...BRED] : BUILDINGS[at].trains;
+  // A Leviathan people's Docks grow Reef Ships in the warships' place (#789), while it stands in the age.
+  const own = at === 'den' && hasWalked(p, 'hive') ? [...BUILDINGS[at].trains, ...BRED] : at === 'dock' && ageOf(p) === 'leviathans' ? BUILDINGS[at].trains.map((u) => (u === 'warship' ? 'reefship' : u)) : BUILDINGS[at].trains;
   return hires.length ? [...own, ...hires] : own;
 }
 
@@ -379,7 +380,8 @@ export function barred(p: Player, unit: UnitType, at?: BuildingType): string | n
   // The Age of the Wildwood: its Ents wake for a people that has walked it, in any age after.
   if (unit === 'warden' && !hasWalked(p, 'wildwood')) return `Only a people that has walked the ${AGES.wildwood.name} wakes Ents`;
   // The Age of Leviathans: its giants are bred for a people that has walked it, in any age after.
-  if ((unit === 'skywhale' || unit === 'behemoth') && !hasWalked(p, 'leviathans')) return `Only a people that has walked the ${AGES.leviathans.name} breeds giants`;
+  if ((unit === 'skywhale' || unit === 'behemoth' || unit === 'kraken') && !hasWalked(p, 'leviathans')) return `Only a people that has walked the ${AGES.leviathans.name} breeds giants`;
+  if (unit === 'reefship' && ageOf(p) !== 'leviathans') return `Reef Ships grow only for a people standing in the ${AGES.leviathans.name}`;
   const no = ageDef(p).no;
   return no && no.units.includes(unit) ? no.why : null;
 }

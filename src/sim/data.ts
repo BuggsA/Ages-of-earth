@@ -42,6 +42,13 @@ const BLOOM_HOLD = 180;
 const WHALE_HOLD = 10;
 const WHALE_BOMB = 30;
 const WHALE_SEEDS = 3;
+/** The Kraken's and the Reef Ship's numbers (#789, `LEVIATHANS`), named here so their words can say them. */
+const KRAKEN_SEA = 5;
+const KRAKEN_GRIP = 2;
+const KRAKEN_MOST = 2;
+const REEF_BORN = 40;
+const REEF_MEND = 3;
+const LEVIATHANS_CALM = 8;
 
 // ---- Ages and paths -------------------------------------------------------------------------------
 
@@ -716,8 +723,8 @@ export const AGES: Record<AgeId, Age> = {
     name: 'Age of Leviathans',
     short: 'Leviathans',
     tier: 5,
-    blurb: `Instead of the Atomic Age: the beasts' end. Raise a Great Den (J) and breed giants there. A Skywhale is a living airship: it drifts over walls, woods and water carrying ${WHALE_HOLD} soldiers or citizens, sets them down wherever there is ground, and every ${WHALE_BOMB} seconds drops a seed-bomb (B) that sprouts ${WHALE_SEEDS} Thornwall seedlings on the ground beneath it, in a rival's streets as well as your own. Fighters, riflemen and towers bring it down. The Behemoth is one titan turtle to a people, with a Town Center on its back: it walks, tramples walls, and kneels (P) wherever the land is not a rival's, a working Town Center at once, then rises (P) and walks on. Lose it and you lose a Town Center. The Heart Tree sleeps while you stay: no new Ents, no Spreading, and every Ent roots. No rifles, field guns, aircraft or Missile Silo.`,
-    no: { units: ['warden', 'ranged', 'siege', 'fighter', 'bomber'], why: 'A Leviathan people wakes no Ents while its Heart Tree sleeps, and builds no machines: no rifles, field guns or aircraft. Its giants are its air and its siege. They wait until it goes back to the Wildwood or rejoins the Atomic Age' },
+    blurb: `Instead of the Atomic Age: the beasts' end. Raise a Great Den (J) and breed giants there; raise it within ${KRAKEN_SEA} tiles of the sea and it breeds the Kraken too, up to ${KRAKEN_MOST} to a people, which grips ships so they can't move and shoves your own along. Your Docks grow Reef Ships in the warships' place: living coral, launched at ${REEF_BORN}% of its strength, that grows to full on the water and mends itself after. A Skywhale is a living airship: it drifts over walls, woods and water carrying ${WHALE_HOLD} soldiers or citizens, sets them down wherever there is ground, and every ${WHALE_BOMB} seconds drops a seed-bomb (B) that sprouts ${WHALE_SEEDS} Thornwall seedlings on the ground beneath it, in a rival's streets as well as your own. Fighters, riflemen and towers bring it down. The Behemoth is one titan turtle to a people, with a Town Center on its back: it walks, tramples walls, and kneels (P) wherever the land is not a rival's, a working Town Center at once, then rises (P) and walks on. Lose it and you lose a Town Center. The Heart Tree sleeps while you stay: no new Ents, no Spreading, and every Ent roots. No rifles, field guns, aircraft or Missile Silo.`,
+    no: { units: ['warden', 'ranged', 'siege', 'fighter', 'bomber', 'warship'], why: 'A Leviathan people wakes no Ents while its Heart Tree sleeps, and builds no machines: no rifles, field guns, ironclads or aircraft. Its giants are its air and its siege, and its Docks grow Reef Ships. They wait until it goes back to the Wildwood or rejoins the Atomic Age' },
     noBuild: { buildings: ['airfield', 'silo'], why: 'A Leviathan people builds no machines: no Airfield or Missile Silo until it rejoins the Atomic Age' },
   },
   // The second crossing (#555 s12): the Pilgrims' priests and the Sail's ships made one trade. Open only to a people that walked both.
@@ -2005,16 +2012,19 @@ export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
   warden: [null, null, null, null, { name: 'Ent', cls: 'siege', hp: 650, attack: 22, armor: 3, parmor: 8, range: 4, reload: 3.2, speed: 0.85, sight: 7, cost: { food: 150, wood: 200, gold: 80 }, time: 40, radius: 0.6, shot: 'boulder', splash: 0.8, blurb: 'An old tree of your woods, woken at the Heart Tree: it walks slowly, tears boulders from the ground and flings them, and breaks buildings and engines. Arrows barely mark its bark, but swords, riders and fire bring it down. Root it (O) and it is a tree again: it mends, and wakes when a rival comes near.' }],
   // The Age of Leviathans (`LEVIATHANS`): giants bred at the Great Den by a people that has walked it. They don't re-arm either.
   skywhale: [null, null, null, null, null, { name: 'Skywhale', cls: 'bomber', hp: 800, attack: 0, armor: 2, parmor: 4, range: 0, reload: 1, speed: 1.9, sight: 10, cost: { food: 400, wood: 100, gold: 150 }, time: 45, radius: 0.8, capacity: WHALE_HOLD, blurb: `A whale of the air, bred at the Great Den: its great gas-bladder carries it slowly over walls, woods and water with ${WHALE_HOLD} soldiers or citizens aboard (right-click it to board, then right-click ground to set them down). Every ${WHALE_BOMB} seconds it drops a seed-bomb (B): ${WHALE_SEEDS} Thornwall seedlings sprout on the ground beneath it, in a rival's streets as well as your own. It has no weapon; fighters, riflemen and towers bring it down, and those aboard fall with it.` }],
+  // The Age of Leviathans at sea (#789): the Kraken, bred at a Great Den by the sea, and the Reef Ship, grown at a Dock in the age.
+  kraken: [null, null, null, null, null, { name: 'Kraken', cls: 'ship', hp: 1400, attack: 34, armor: 3, parmor: 5, range: 1.5, reload: 2.5, speed: 2.4, sight: 9, cost: { food: 500, wood: 100, gold: 300 }, time: 60, radius: 0.5, blurb: `A giant of the deep, bred at a Great Den that stands within ${KRAKEN_SEA} tiles of the sea, ${KRAKEN_MOST} to a people. Its arms reach a tile and a half: every blow on a ship grips it ${KRAKEN_GRIP} seconds, so it can't sail away, and it drags at anything on the shore beside it. Your own ships near it are shoved along a third faster. It outruns warships and tears them apart, but warships and towers that shoot first wear it down, and it never leaves the water.` }],
+  reefship: [null, null, null, null, null, { name: 'Reef Ship', cls: 'ship', hp: 420, attack: 14, armor: 2, parmor: 4, range: 6, reload: 2.5, speed: 2.0, sight: 9, cost: { food: 140, wood: 60 }, time: 30, radius: 0.5, shot: 'bolt', blurb: `A living ship of coral and kelp, grown at a Dock in the warship's place while your people stands in the Age of Leviathans, for food and wood, not gold. It is launched at ${REEF_BORN}% of its strength and grows to full on the water, ${REEF_MEND} a second, and mends itself the same way once ${LEVIATHANS_CALM} seconds pass without a blow: weaker than an ironclad, but a fleet that grows back between fights.` }],
   behemoth: [null, null, null, null, null, { name: 'Behemoth', cls: 'siege', hp: 3200, attack: 28, armor: 5, parmor: 12, range: 0, reload: 3, speed: 0.75, sight: 9, cost: { food: 1000, wood: 500, stone: 200, gold: 500 }, time: 120, radius: 0.5, blurb: 'A titan turtle with a Town Center on its back, one to a people: a capital that walks. It tramples walls and buildings, and arrows and bullets barely mark its shell; spears and riders swarm it. Kneel it (P) on ground no rival holds and its Town Center stands there at once, working: it trains, takes in every stock and claims the land. Rise (P) and it walks on. It counts as a Town Center while it walks, and losing it loses one.' }],
   warmammoth: beast({ name: 'War Mammoth', cls: 'siege', hp: 420, attack: 16, armor: 2, parmor: 4, range: 0, reload: 2.4, speed: 1.1, sight: 6, cost: { food: 260, gold: 60 }, time: 40, radius: 0.55, blurb: 'A woolly mammoth led to war: it tramples walls and buildings as a ram does, and gores soldiers too. Spearmen and riders swarm it.' }),
 };
 
-const DOMAINS: Partial<Record<UnitType, Domain>> = { fisher: 'water', warship: 'water', transport: 'water', cog: 'water', barge: 'water', tow: 'water', fighter: 'air', bomber: 'air', skywhale: 'air' };
+const DOMAINS: Partial<Record<UnitType, Domain>> = { fisher: 'water', warship: 'water', transport: 'water', cog: 'water', barge: 'water', tow: 'water', fighter: 'air', bomber: 'air', skywhale: 'air', kraken: 'water', reefship: 'water' };
 /** Where a unit line goes: on foot, on the water or in the air. */
 export const domainOf = (type: UnitType): Domain => DOMAINS[type] ?? 'land';
 
-export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader', 'wagon', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge', 'warden', 'tow', 'skywhale', 'behemoth'];
-export const MILITARY: UnitType[] = ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'warship', 'fighter', 'bomber', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge', 'warden', 'behemoth'];
+export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader', 'wagon', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge', 'warden', 'tow', 'skywhale', 'behemoth', 'kraken', 'reefship'];
+export const MILITARY: UnitType[] = ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'warship', 'fighter', 'bomber', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge', 'warden', 'behemoth', 'kraken', 'reefship'];
 
 type Target = UnitClass | 'building';
 /** The counter triangle (and its friends): damage multiplier by attacker class against target class. */
@@ -2499,9 +2509,15 @@ export const BLOOM = {
  * seconds, raises a Great Den within `aiFrom` tiles of home, breeds its Behemoth and up to `aiWhales` Skywhales, kneels the Behemoth
  * by the nearest gold or stone at least `aiOut` tiles from home, loads up to `aiLoad` of its soldiers into each whale once `aiLoad`
  * stand idle at home, sets them down by a rival building it has seen (else the rival's home) and seed-bombs it there.
+ * At sea (#789): a Great Den with navigable water within `sea` tiles of its footprint breeds the Kraken, at most `krakens` a people
+ * (a queued one counting). Each blow a Kraken lands on a ship grips it `grip` seconds (it can't move); its people's other ships
+ * within `shove` tiles of it sail `shoveMul` times as fast. A Dock grows Reef Ships in the warship's place while its people stands
+ * in the age: launched at `reefBorn` of their health, they mend `reefMend` a second while no blow has landed for `reefCalm` seconds
+ * (a newborn one grows at once). The computer raises its Great Den by the sea if a spot within `aiShore` tiles of home has it, and breeds
+ * up to `aiKrakens` once the Behemoth is bred, if the map is mostly sea or it has seen a rival ship.
  */
 /** The giants of the Age of Leviathans: bred for their people alone, so no priest turns them. */
-export const GIANTS: UnitType[] = ['skywhale', 'behemoth'];
+export const GIANTS: UnitType[] = ['skywhale', 'behemoth', 'kraken'];
 
 export const LEVIATHANS = {
   every: WHALE_BOMB,
@@ -2515,6 +2531,16 @@ export const LEVIATHANS = {
   aiWhales: 3,
   aiLoad: 4,
   aiOut: 14,
+  sea: KRAKEN_SEA,
+  krakens: KRAKEN_MOST,
+  grip: KRAKEN_GRIP,
+  shove: 4,
+  shoveMul: 1.33,
+  reefBorn: REEF_BORN / 100,
+  reefMend: REEF_MEND,
+  reefCalm: LEVIATHANS_CALM,
+  aiShore: 16,
+  aiKrakens: 1,
 };
 
 export const COPPICE = { reach: 8, regrow: 120, retry: 5, grow: 90, snare: 2, cap: 1.5, bag: 2, full: 12, aiPerFood: 1.5, aiMax: 16, aiTrees: 10, aiThick: 14, aiNear: 14, aiDrop: 7, aiPerTender: 2, aiStone: 6, aiCamps: 2, aiPlant: 3, aiThin: 12, aiPlantWood: 120 };
@@ -2590,7 +2616,7 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   // The Age of the Bloom (`docs/wild-road.md` §5b, `BLOOM`): one to a people that has walked it, in any age after.
   spire: { name: 'Seed Spire', size: 2, hp: 1800, cost: { wood: 600, stone: 200, gold: 400 }, time: 80, pop: 0, sight: 8, trains: [], drop: [], epoch: 5, menu: 'mil', key: 'G', blurb: `A living tower of woven trunks, one to a people. While your Heart Tree stands it ripens a Bloom Seed every ${BLOOM_RIPEN} seconds, one at a time. Sling it (G) at any point on the map: it roots there, and ${BLOOM_GROW} seconds later every rival building within ${BLOOM_RING} tiles of its heart-root cracks into forest, unless their citizens hack the root out first. It is alive, so fire takes it.` },
   // The Age of Leviathans (`docs/wild-road.md` §5a, `LEVIATHANS`): raised by a people that has walked it, in any age after.
-  greatden: { name: 'Great Den', size: 3, hp: 2400, cost: { food: 300, wood: 500, stone: 200, gold: 200 }, time: 80, pop: 0, sight: 8, trains: ['skywhale', 'behemoth'], drop: [], epoch: 5, menu: 'mil', key: 'J', blurb: `A hill hollowed out and roofed with living turf, where giants are bred: Skywhales that carry ${WHALE_HOLD} over walls and drop seed-bombs of Thornwall, and one Behemoth, a titan turtle with a Town Center on its back. It is alive, so fire takes it.` },
+  greatden: { name: 'Great Den', size: 3, hp: 2400, cost: { food: 300, wood: 500, stone: 200, gold: 200 }, time: 80, pop: 0, sight: 8, trains: ['skywhale', 'behemoth', 'kraken'], drop: [], epoch: 5, menu: 'mil', key: 'J', blurb: `A hill hollowed out and roofed with living turf, where giants are bred: Skywhales that carry ${WHALE_HOLD} over walls and drop seed-bombs of Thornwall, and one Behemoth, a titan turtle with a Town Center on its back. Raised within ${KRAKEN_SEA} tiles of the sea, it breeds the Kraken too. It is alive, so fire takes it.` },
   // The age road (#562, `docs/age-roads.md` spine §4): raised in the Stone Age, it answers which key resources this world holds (`PROSPECTOR`).
   prospector: { name: "Prospector's Lodge", size: 2, hp: 500, cost: { food: 50, wood: 75 }, time: 20, pop: 0, sight: 6, trains: [], drop: [], epoch: 0, menu: 'eco', key: 'P', blurb: 'A lodge of prospectors who walk the streams, scrape the rock and dig at old mounds. Once it stands it tells you which key resources this world holds (bog iron, salt, saltpetre, blood-iron, ancient ruins): yes or no for each, never where. Some ages open only with them; a world that lacks one shuts that door.' },
   // The Path of Blood (#303): pitched by foot soldiers where the army stands, enemy land too; burns when left alone (`WARCAMP`).

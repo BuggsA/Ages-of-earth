@@ -29,9 +29,11 @@ export type UnitType =
   | 'tow'
   /**
    * The Age of Leviathans (`docs/wild-road.md` §5a, `leviathans.ts`): bred at a Great Den. A Skywhale, a living airship that carries
-   * soldiers over walls and drops seed-bombs; a Behemoth, one titan turtle a people with a Town Center on its back.
+   * soldiers over walls and drops seed-bombs; a Behemoth, one titan turtle a people with a Town Center on its back; a Kraken (#789),
+   * bred where the Great Den stands by the sea, that grips ships and shoves its own along. A Reef Ship, living coral launched at a
+   * Dock in the warship's place, that grows to its full strength on the water.
    */
-  | 'skywhale' | 'behemoth';
+  | 'skywhale' | 'behemoth' | 'kraken' | 'reefship';
 /** How a unit gets about: on foot, on the water, or in the air. */
 export type Domain = 'land' | 'water' | 'air';
 export type BuildingType =
@@ -300,6 +302,10 @@ export interface Unit {
   packedHp?: number;
   /** A Skywhale (the Age of Leviathans): the tick its next seed-bomb is ready. Absent: ready now. */
   bombAt?: number;
+  /** Gripped by a Kraken (#789, `leviathans.ts`): the tick the grip lets go. Until then it can't move. Absent: never gripped. */
+  gripped?: number;
+  /** Shoved along by its people's Kraken (#789): the tick the push fades. Until then it sails faster. Absent: never shoved. */
+  shoved?: number;
   /** A hemo-engineered soldier (#355 s3): the tick its graft runs dry unless a Transfusion Station tops it up; absent when ungrafted. */
   hemo?: number;
   /** Quenched in blood-iron (#356): the graft lasts longer, mends faster and crashes softer; cleared when it runs dry. */
@@ -1065,7 +1071,7 @@ export type GameEvent =
    * The Age of Leviathans (`leviathans.ts`): a Skywhale's seed-bomb (`n` Thornwall seedlings sprouting under it), or a Behemoth that
    * `kneel`s (its Town Center set down) or `rise`s (taken up again); `id` is what it became.
    */
-  | { k: 'leviathan'; what: 'bomb' | 'kneel' | 'rise'; owner: number; x: number; y: number; id: number; n?: number }
+  | { k: 'leviathan'; what: 'bomb' | 'kneel' | 'rise' | 'grip'; owner: number; x: number; y: number; id: number; n?: number }
   /** A mammoth gores, or a wolf bites, someone. */
   | { k: 'wildStrike'; id: number; kind: Animal['kind']; target: number; x: number; y: number }
   /** A raider camp (own pitch) stands empty: whose people cleared it, and the plunder they took. */

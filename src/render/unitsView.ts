@@ -395,8 +395,8 @@ export class UnitsView {
               // The ram draws back and swings into the wall.
               arm = since >= 0 && since < 1.2 ? (since < 0.8 ? -0.45 * (since / 0.8) : -0.45 + 0.75 * ((since - 0.8) / 0.4)) : 0;
             }
-          } else if (st.range > 0) {
-            // Aim, with a kick when the shot goes.
+          } else if (st.range > 0 && st.shot) {
+            // Aim, with a kick when the shot goes. (A Kraken's reach is its arms: it strikes, below.)
             arm = -1.45 + (since >= 0 && since < 0.2 ? (0.2 - since) * 2.5 : 0);
           } else if (since >= 0 && since < 0.55) {
             // Raise, strike, recover.

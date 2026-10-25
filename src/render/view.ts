@@ -1150,7 +1150,12 @@ export class View {
           // The Age of Leviathans: a seed-bomb falls from a Skywhale as a spray of husks and green, and the ground bursts with thorn
           // where it lands; a Behemoth kneeling or rising throws up a ring of dust round its feet.
           if (!this.sees(ev.x, ev.y)) break;
-          if (ev.what === 'bomb') {
+          if (ev.what === 'grip') {
+            // A Kraken's arms close on a ship (#789): the sea boils white and dark round the hull.
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.1), { count: 24, speed: 1.4, up: 1.6, life: 1.0, size: 0.08, gravity: 2.2, drag: 0.8, colors: ['#e8f2f4', '#9cc3cf', '#3a5f6e'] });
+            this.effects.ring(this.ground(s, ev.x, ev.y, 0.08), '#cfe6ea', 1.6, 0.8);
+            this.cue('krakenGrip', ev.x, ev.y, 1);
+          } else if (ev.what === 'bomb') {
             this.effects.burst(this.ground(s, ev.x, ev.y, 3), { count: 26, speed: 0.8, up: -1.2, life: 1.2, size: 0.07, gravity: 2.4, drag: 0.6, colors: ['#6b5a40', '#8fc24a', '#4a7a2e'] });
             this.effects.burst(this.ground(s, ev.x, ev.y, 0.2), { count: 22, speed: 1.6, up: 1.4, life: 1.4, size: 0.07, grow: 1.4, gravity: 0.8, drag: 1.1, colors: ['#3f6a2e', '#6f8f3e', '#9cc25a'] });
             this.cue('seedBomb', ev.x, ev.y, 1);
@@ -1399,7 +1404,7 @@ export class View {
           if (!u || ev.owner !== this.viewer) break;
           this.effects.ring(this.ground(s, u.x, u.y, 0.05), '#ffffff', 0.8, 0.6);
           const dom = domainOf(ev.type);
-          this.cue(ev.type === 'skywhale' ? 'whaleSong' : ev.type === 'behemoth' ? 'behemothRise' : dom === 'water' ? 'shipHorn' : dom === 'air' ? 'engine' : ev.type === 'citizen' ? 'readyCitizen' : 'ready', u.x, u.y, 0.9);
+          this.cue(ev.type === 'skywhale' ? 'whaleSong' : ev.type === 'behemoth' ? 'behemothRise' : ev.type === 'kraken' ? 'krakenRise' : dom === 'water' ? 'shipHorn' : dom === 'air' ? 'engine' : ev.type === 'citizen' ? 'readyCitizen' : 'ready', u.x, u.y, 0.9);
           break;
         }
         case 'epoch': {

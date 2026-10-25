@@ -74,7 +74,7 @@ import { grows } from './grove';
 import { keepsBees } from './hive';
 import { heartOf, treeToWake, treesRound, wakesForest } from './wildwood';
 import { inBloom, ringOf, ripeIn, rooted, slingProblem, spireOf } from './bloom';
-import { behemothBusy, bombIn, kneelProblem, seedBombProblem } from './leviathans';
+import { behemothBusy, bombIn, krakenProblem, kneelProblem, seaBy, seedBombProblem } from './leviathans';
 import { DIRS } from './animals';
 
 /**
@@ -282,7 +282,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
     if (e.kind === 'unit' && s.kings[p.id] === e.id) king = e;
     else if (e.kind === 'unit') {
       const list =
-        e.type === 'citizen' ? citizens : e.type === 'wagon' || e.type === 'tow' ? wagons : e.type === 'skywhale' || e.type === 'behemoth' ? giants : e.type === 'priest' ? priests : e.type === 'trader' ? traders : e.type === 'cog' ? cogs : e.type === 'fisher' ? fishers : e.type === 'warship' || e.type === 'transport' || e.type === 'barge' ? navy : e.type === 'fighter' || e.type === 'bomber' ? planes : army;
+        e.type === 'citizen' ? citizens : e.type === 'wagon' || e.type === 'tow' ? wagons : e.type === 'skywhale' || e.type === 'behemoth' ? giants : e.type === 'priest' ? priests : e.type === 'trader' ? traders : e.type === 'cog' ? cogs : e.type === 'fisher' ? fishers : e.type === 'warship' || e.type === 'transport' || e.type === 'barge' || e.type === 'reefship' || e.type === 'kraken' ? navy : e.type === 'fighter' || e.type === 'bomber' ? planes : army;
       list.push(e);
     } else buildings.push(e);
   }
@@ -4163,12 +4163,18 @@ function leviathanWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   if (ageOf(p) === 'leviathans') mem.leviathans ??= s.tick;
   const den = v.buildings.find((b) => b.type === 'greatden' && b.built) ?? null;
   if (!count(v, 'greatden') && s.tick - (mem.ordered.greatden ?? -99999) >= secs(30) && p.epoch >= BUILDINGS.greatden.epoch && afford(v, buildingCostFor(s, p.id, 'greatden'))) {
-    const spot = findSpot(s, 'greatden', v.home.x, v.home.y, 4, LEVIATHANS.aiFrom);
+    // By the sea, where one breeds the Kraken too (#789), if there is sea that near home; else by home.
+    const shore = findSpot(s, 'greatden', v.home.x, v.home.y, 4, LEVIATHANS.aiShore, 1, (tx, ty) => seaBy(s, tx, ty, BUILDINGS.greatden.size));
+    const spot = shore ?? findSpot(s, 'greatden', v.home.x, v.home.y, 4, LEVIATHANS.aiFrom);
     if (spot) construct(s, v, mem, 'greatden', spot, 3, issue);
   }
   const whales = v.giants.filter((u) => u.type === 'skywhale');
   if (den && !den.queue.length) {
-    const unit = !behemothBusy(s, p.id) ? 'behemoth' : whales.length < LEVIATHANS.aiWhales ? 'skywhale' : null;
+    // A Kraken once the Behemoth is bred, by the sea on a sea map or while a rival's ship is in sight.
+    const rivalSail = s.mapType === 'sea' || s.ents.some((e) => e.kind === 'unit' && e.hp > 0 && domainOf(e.type) === 'water' && isEnemy(s, p.id, e.owner) && p.vis[Math.floor(e.y) * s.w + Math.floor(e.x)] === 1);
+    const krakens = v.navy.filter((u) => u.type === 'kraken').length;
+    const deep = behemothBusy(s, p.id) && krakens < LEVIATHANS.aiKrakens && rivalSail && !krakenProblem(s, den);
+    const unit = !behemothBusy(s, p.id) ? 'behemoth' : deep ? 'kraken' : whales.length < LEVIATHANS.aiWhales ? 'skywhale' : null;
     const cost = unit ? trainCostFor(s, p.id, unit, 'greatden', den) : null;
     if (unit && cost && afford(v, cost)) {
       issue({ t: 'train', p: p.id, building: den.id, unit });
@@ -4942,14 +4948,16 @@ function seafaring(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   seaLanding(s, v, mem, dock, issue);
   // A sailor keeps a small fleet and hunts rival merchant ships, since its ships are cheap and sturdy.
   const sailor = ageOf(p) === 'sail' || !!ageDef(p).boards;
-  const enemyShips = s.ents.filter((e): e is Unit => e.kind === 'unit' && e.hp > 0 && isEnemy(s, p.id, e.owner) && (e.type === 'warship' || e.type === 'fisher' || e.type === 'transport' || (sailor && e.type === 'cog')) && p.vis[Math.floor(e.y) * s.w + Math.floor(e.x)] === 1);
-  const warships = v.navy.filter((u) => u.type === 'warship');
+  const enemyShips = s.ents.filter((e): e is Unit => e.kind === 'unit' && e.hp > 0 && isEnemy(s, p.id, e.owner) && (e.type === 'warship' || e.type === 'fisher' || e.type === 'transport' || e.type === 'reefship' || e.type === 'kraken' || (sailor && e.type === 'cog')) && p.vis[Math.floor(e.y) * s.w + Math.floor(e.x)] === 1);
+  // A Leviathan people's fighting ships (#789): the Reef Ships its Docks grow in the warships' place, and its Krakens.
+  const line: UnitType = trainsAt(p, 'dock').includes('reefship') ? 'reefship' : 'warship';
+  const warships = v.navy.filter((u) => u.type === 'warship' || u.type === 'reefship' || u.type === 'kraken');
   const baseShips = s.mapType === 'sea' ? Math.min(2 + p.epoch, 6) : enemyShips.length ? Math.min(2 + Math.floor(enemyShips.length / 2), 5) : sailor ? 2 : 0;
   const wantShips = fleetWanted(s, p, baseShips);
-  if (warships.length + queued('warship') < wantShips && dock.queue.length < 2 && v.army.length >= 3) {
-    const cost = unitStats('warship', p.epoch).cost;
+  if (warships.length + queued(line) < wantShips && dock.queue.length < 2 && v.army.length >= 3) {
+    const cost = unitStats(line, p.epoch).cost;
     if (afford(v, cost)) {
-      issue({ t: 'train', p: p.id, building: dock.id, unit: 'warship' });
+      issue({ t: 'train', p: p.id, building: dock.id, unit: line });
       spend(v, cost);
     } else if (warships.length < 2) spend(v, cost);
   }
@@ -6183,7 +6191,8 @@ function military(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
   for (const b of v.buildings) {
     if (!b.built || b.queue.length >= Math.min(2, MAX_QUEUE) || keepCitizensGrowing) continue;
     const trains = lines(p, b);
-    if (!trains.length || trains.includes('citizen') || b.type === 'dock' || b.type === 'airfield') continue;
+    // The Great Den's giants are bred by `leviathanWork`, to their own counts: not here, by turns, as soldiers.
+    if (!trains.length || trains.includes('citizen') || b.type === 'dock' || b.type === 'airfield' || b.type === 'greatden') continue;
     // Against a people of iron, archers come first (#50): the lines that don't answer its foot train only
     // while they number under half the archers.
     if (ironRival && b.type !== 'workshop' && b.type !== 'temple' && !trains.includes(COUNTER.infantry) && answer.others * 2 >= answer.archers) continue;
