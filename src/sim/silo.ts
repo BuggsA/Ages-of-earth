@@ -610,7 +610,8 @@ function strike(s: GameState, l: Launch, x: number, y: number): void {
   const R = WARHEADS[w].r;
   const hit: [Ent, number][] = [];
   for (const e of s.ents) {
-    if (e.hp <= 0 || !isEnemy(s, owner, e.owner)) continue;
+    // Friendly fire (the owner, 2026-10-25): the blast hurts anyone in it, the launcher's own people and allies too.
+    if (e.hp <= 0) continue;
     if (e.kind === 'building') {
       const d = distToRect(x, y, e);
       if (d < R) hit.push([e, d]);
