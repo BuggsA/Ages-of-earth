@@ -1460,6 +1460,10 @@ export interface AiMemory {
   scout?: { id: number; sent: number };
   /** The route this seat favours (#749): its side ages chosen from the start; 'none' for a seat that keeps an open mind. Settled on its first turn. */
   lean?: RouteId | 'none';
+  /** Its habit with going back (#758): settled on its first turn with the leaning. `seen`: the tick the habit first showed in play (a step back, or an open crossing declined), and `baited` the tick it last stepped back to bait. */
+  habit?: 'hoard' | 'hold' | 'bait' | 'none';
+  habitSeen?: number;
+  baited?: number;
   guards?: number[];
   /** Tick its bombers last set out. */
   sortie?: number;

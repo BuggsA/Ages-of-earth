@@ -1319,7 +1319,7 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 
 **Why I love it:** the step back was a free move against the computer; now it is a gamble you take with its army in mind. And a rival with a character gives you something to read: once you see the Steppe in its road, you know the wagons are coming again next age.
 
-**Next:** the second half of step 4, a habit with going back (one that hoards crossings, one that never retreats, one that steps back to bait you onto its walls); a rival name that says its leaning before the road does, for players who'd like it said.
+**Next:** (the habit with going back is built, see below); a rival name that says its leaning before the road does, for players who'd like it said.
 
 ## Designers' notes: the Water Road, the Age of Tides (#739, s6 of #701, 2026-10-24, chain 1024-1330 s1, lane rules)
 
@@ -1619,3 +1619,11 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 **Why I love it:** from high up, where roofs are specks, a town is mostly ground. Brick lanes say Dykes, shell-sand says Tides, mauve says Mycelium, before you can make out a single house. And the age-up has a moment now: you watch your town turn over.
 
 **Next:** paths that run between buildings rather than pads round each (the Stone Age's foot-worn tracks to the berries, the Industrial's rails); the ground under a town that steps back keeping a trace of the age it left (a keepsake in the soil); seasons on the town ground (snow swept off the Middle Ages' cobbles).
+
+## Designers' notes: a rival's habit with going back (2026-10-25, #758, s4b of #724)
+
+**Built:** beside the leaning, 60% of clever skirmish seats settle on a habit on coins of their own, in thirds. A hoarder takes a crossing more often (+30 points) and stays 40% as long in the first sibling. A seat that never retreats declines every open crossing and never steps back. A baiter, in a side age with eight soldiers at home and no foe at its walls, steps back to the trunk (once in 15 minutes, never before minute 15), which opens the weak window the other computers already strike. The Rivals card names the habit once it shows: a step back, or a crossing left open for four minutes.
+
+**Why I love it:** the window was a sure thing. Now a step back from a rival with a baiter's temper is a trap, and the player must scout the army before taking the free hit, or read the card and let it pass.
+
+**Next:** a stray step back in the hold seat's road is still its choice only for crossings; heirloom detours (a road, not a step back) are untouched. A baiter that also fortifies, or a hoarder that crosses twice in a match.

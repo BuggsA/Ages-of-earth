@@ -1,5 +1,5 @@
 import { AGES, BUILDINGS, ROADS, ROUTES, STEP_BACK, TICK_HZ, TRUNK, secs, type RouteId } from '../sim/data';
-import { leanOf } from '../sim/ai';
+import { habitOf, leanOf } from '../sim/ai';
 import { ageOf, hasWalked } from '../sim/ages';
 import type { AgeId, GameState } from '../sim/types';
 
@@ -97,6 +97,13 @@ export function shownLean(s: GameState, owner: number): RouteId | null {
   return lean && (Object.keys(AGES) as AgeId[]).some((a) => !TRUNK.includes(a) && AGES[a].routes?.includes(lean) && hasWalked(p, a)) ? lean : null;
 }
 
+/** What each habit with going back (#758) tells the viewer once it has shown. */
+const HABITS = {
+  hoard: 'Hoards crossings: it steps back readily to finish a half-walked crossing. Expect it to turn again.',
+  hold: 'Never retreats: it keeps its age to the end, even with a crossing open. Its soldiers do not fall back.',
+  bait: 'Steps back to bait: it falls back with its army waiting on its walls. A window may be a trap; strike it, or read it.',
+};
+
 const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 /** One rival's card. */
@@ -113,6 +120,8 @@ export function rivalCardHtml(s: GameState, owner: number, ledger: RivalLedger):
   out.push(`<p class="rv-road">${road}</p>`);
   const lean = shownLean(s, owner);
   if (lean) out.push(`<p class="rv-lean">🧭 Favours the ${esc(ROUTES[lean].name.toLowerCase())}: ${esc(ROUTES[lean].blurb)}. Expect it to keep to it.</p>`);
+  const habit = habitOf(s, owner);
+  if (habit) out.push(`<p class="rv-habit">↩ ${esc(HABITS[habit])}</p>`);
   for (const c of halfCrossings(s, owner)) out.push(`<p class="rv-cross">🔀 Half-way to the ${esc(AGES[c.to].name)}: it still needs the ${esc(AGES[c.missing].name)}.</p>`);
   for (const k of ledger.keepsakes(owner)) {
     const b = s.ents.find((e) => e.id === k.id);

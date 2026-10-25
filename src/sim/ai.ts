@@ -179,6 +179,25 @@ function settleLean(s: GameState, p: Player, mem: AiMemory): void {
   for (const a of leanAges(p, route)) if (a !== 'bloom' && a !== 'leviathans' && a !== 'mycelium') roads[a] ??= true;
 }
 
+/**
+ * A habit with going back (#758), settled once beside the leaning on coins of its own: `AI_TEMPER.habit` of clever skirmish seats have one,
+ * in thirds. A hoarder takes a crossing readily and stays short in each sibling; a seat that never retreats declines a crossing and
+ * never steps back; a baiter steps back while its army waits at home, so a rival who strikes the window meets the army.
+ */
+function settleHabit(s: GameState, p: Player, mem: AiMemory): void {
+  mem.habit = 'none';
+  if (s.scenario || s.mode === 'lords' || !AI_LEVELS[p.ai!].clever || AI_LEVELS[p.ai!].habit === false || coin(s, p.id, 0x7e4c) >= AI_TEMPER.habit) return;
+  const c = coin(s, p.id, 0x7e4d);
+  mem.habit = c < 1 / 3 ? 'hoard' : c < 2 / 3 ? 'hold' : 'bait';
+}
+
+/** The habit a computer seat has settled on (#758), once it has shown in play (a step back, or an open crossing declined a while); null before, and for a person. */
+export function habitOf(s: GameState, owner: number): 'hoard' | 'hold' | 'bait' | null {
+  const m = s.ai[owner];
+  if (!m?.habit || m.habit === 'none' || m.habitSeen === undefined) return null;
+  return m.habit === 'hold' && s.tick - m.habitSeen < secs(AI_TEMPER.holdShown) ? null : m.habit;
+}
+
 /** The leaning a computer seat has settled on (#749), or null for a person or a seat with an open mind. */
 export function leanOf(s: GameState, owner: number): RouteId | null {
   const l = s.ai[owner]?.lean;
@@ -194,6 +213,7 @@ export function aiStep(s: GameState): void {
     if (s.tick < mem.next) continue;
     mem.next = s.tick + secs(AI_LEVELS[p.ai].think);
     if (mem.lean === undefined) settleLean(s, p, mem);
+    if (mem.habit === undefined) settleHabit(s, p, mem);
     think(s, p, mem);
   }
 }
@@ -407,11 +427,15 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   // Patience for a road's deeds counts only while the Town Center holds for them (#113): army-first
   // kept a town from holding for minutes, and it came back out of patience at once.
   if (!wantEpoch) delete mem.waiting;
-  const journey = advancing ? null : (!armyFirst && turnRoad(s, v, mem)) || (wantEpoch ? nextRoad(s, v, mem) : null);
+  const journey = advancing ? null : baitBack(s, v, mem) || (!armyFirst && turnRoad(s, v, mem)) || (wantEpoch ? nextRoad(s, v, mem) : null);
   if (journey) {
     const { road, wait } = journey;
     // The main road forward goes without a target, as it always has; any other road is named.
-    if (!wait && tc && tc.queue.length === 0 && afford(v, road.cost) && journey.back) issue({ t: 'stepBack', p: p.id, building: tc.id });
+    if (!wait && tc && (tc.queue.length === 0 || journey.bait) && afford(v, road.cost) && journey.back) {
+      issue({ t: 'stepBack', p: p.id, building: tc.id });
+      if (mem.habit === 'hoard' || mem.habit === 'bait') mem.habitSeen ??= s.tick;
+      if (mem.habit === 'bait') mem.baited = s.tick;
+    }
     else if (!wait && tc && tc.queue.length === 0 && afford(v, road.cost)) issue({ t: 'advance', p: p.id, building: tc.id, ...(road === mainRoad(p) ? {} : { to: road.to }) });
     spend(v, road.cost);
     // A nomad people buys its road's stone (#532): the gold for it is set aside too, or the army spends all but the road's own gold and the stone waits.
@@ -801,6 +825,8 @@ interface Journey {
   wait: boolean;
   /** A step back to an older age (#47), the way between siblings off the Stone Age (#555 s12): `road` only names where it leads and what it costs. */
   back?: boolean;
+  /** A baiter's step back (#758): it goes at once, whatever the Town Center has queued. */
+  bait?: boolean;
 }
 
 /**
@@ -1065,6 +1091,23 @@ function turnRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   return null;
 }
 
+/**
+ * A baiter's step back (#758): out of a side age, while its army waits at home and no rival stands at its walls, it steps back to the
+ * trunk age below, which opens the weak window (#749) and the town's guard of soldiers stands ready for whoever comes to strike it.
+ * Not before `baitFrom` seconds, not within `baitEvery` seconds of the last, and only with the price in hand.
+ */
+function baitBack(s: GameState, v: View, mem: AiMemory): Journey | null {
+  const { p, tc } = v;
+  const L = AI_LEVELS[p.ai!];
+  if (mem.habit !== 'bait' || !L.clever || s.scenario || !tc || mem.attacking || mem.baited !== undefined && s.tick - mem.baited < secs(AI_TEMPER.baitEvery)) return null;
+  if (s.tick < Math.max(s.peaceUntil, secs(AI_TEMPER.baitFrom)) || TRUNK.includes(ageOf(p)) || backProblem(s, p) || !s.players.some((q) => q.id !== p.id && !q.defeated && isEnemy(s, p.id, q.id))) return null;
+  const road = { from: ageOf(p), to: backTo(p)!, cost: stepBackCost(p.epoch), time: STEP_BACK.time };
+  if (!afford(v, road.cost) || threatNear(s, v).count > 0) return null;
+  const reach = AI_TEMPER.baitNear * AI_TEMPER.baitNear;
+  const home = v.army.filter((u) => !u.inside && (u.x - v.home.x) * (u.x - v.home.x) + (u.y - v.home.y) * (u.y - v.home.y) <= reach);
+  return home.length >= AI_TEMPER.baitArmy ? { road, wait: false, back: true, bait: true } : null;
+}
+
 const CROSSINGS = ROADS.filter((r) => r.crossing);
 
 /** What each crossing wants and how often the computer takes it: its salt for the coin, the building its people must keep, its odds and its stay in a sibling. */
@@ -1095,7 +1138,12 @@ function crossPlanned(s: GameState, v: View, mem: AiMemory, road: Road): boolean
     if (other && !(roadKnown(s, p, other) && deedsDone(p, other, s))) return false;
     // A sibling behind a coast door (the Dykes, #783) is a plan only for a town with the shallows to take it.
     if (other?.coast && !coastHeld(s, p)) return false;
-    roads[road.to] = coin(s, p.id, plan.salt) < plan.take;
+    roads[road.to] = coin(s, p.id, plan.salt) < plan.take + (mem.habit === 'hoard' ? AI_TEMPER.hoardTake : 0);
+    // A seat that never retreats (#758) leaves the crossing open: the other sibling is not worth a step back.
+    if (roads[road.to] && mem.habit === 'hold') {
+      roads[road.to] = false;
+      mem.habitSeen ??= s.tick;
+    }
     // The plan is the other sibling's road too, whatever the coin once said of it; giving that road up gives the crossing up.
     if (roads[road.to]) for (const a of road.crossing!) if (!hasWalked(p, a)) roads[a] = true;
   }
@@ -1132,11 +1180,12 @@ function seaTurn(s: GameState, v: View, mem: AiMemory): Journey | null {
   }
   if (!cross.crossing!.includes(here)) return null;
   if (mem.sea?.at !== here) mem.sea = { at: here, since: s.tick };
-  if (s.tick - mem.sea.since < secs(CROSS_PLAN[cross.to]!.stay)) return null;
+  if (s.tick - mem.sea.since < secs(CROSS_PLAN[cross.to]!.stay) * (mem.habit === 'hoard' ? AI_TEMPER.hoardStay : 1)) return null;
   const back = roadsFrom(p).find((r) => r.to === cross.from);
   if (back) return { road: back, wait: false };
   // Off the Stone Age there is no road back, only a step back (#555 s12).
   if (backTo(p) !== cross.from || backProblem(s, p)) return null;
+  if (mem.habit === 'hold') return null;
   return { road: { from: here, to: cross.from, cost: stepBackCost(p.epoch), time: STEP_BACK.time }, wait: false, back: true };
 }
 
