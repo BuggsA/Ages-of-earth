@@ -2054,6 +2054,37 @@ function wheelyard(k: Kit, _e: number, st: Style): void {
   k.cyl(0.2, 0.2, 0.06, 10, IRON, 0.7, 0.11, -0.3);
 }
 
+/** A Pharos (#727, the Age of Sail): a tall banded tower on a rocky headland, a railed gallery under a fire basket, a keeper's hut, a coil of rope and an anchor. */
+function pharos(k: Kit, _e: number, st: Style): void {
+  const STONE = '#c9c2b0';
+  const BAND = '#a8403a';
+  const DARK = '#4a3322';
+  pad(k, 2, st.base);
+  // Rocks about the foot.
+  for (const [x, z, r] of [[-0.7, 0.5, 0.26], [0.65, 0.6, 0.2], [0.75, -0.4, 0.24], [-0.6, -0.65, 0.2]]) k.sphere(r, '#7d7a72', x, 0.05, z);
+  // The tower tapers in three drums, the middle one banded red.
+  k.cyl(0.52, 0.64, 1.0, 10, STONE, 0, 0, 0);
+  k.cyl(0.42, 0.52, 0.9, 10, BAND, 0, 1.0, 0);
+  k.cyl(0.34, 0.42, 0.8, 10, STONE, 0, 1.9, 0);
+  // The gallery: a wide deck with a rail, and the lantern room above it.
+  k.cyl(0.5, 0.42, 0.08, 10, DARK, 0, 2.7, 0);
+  k.ring(0.5, 0.025, DARK, 2.9);
+  k.cyl(0.26, 0.28, 0.4, 8, '#8fb8c8', 0, 2.78, 0);
+  k.cone(0.34, 0.3, 8, BAND, 0, 3.18, 0);
+  // The fire basket blazes on top, with the team's pennant above it.
+  k.cone(0.12, 0.3, 5, '#e8902c', 0, 3.4, 0);
+  k.cone(0.07, 0.2, 5, '#f4d060', 0, 3.42, 0);
+  k.cyl(0.015, 0.015, 0.5, 4, DARK, 0.1, 3.4, 0);
+  k.team(k.box(0.28, 0.14, 0.02, TEAM, 0.24, 3.78, 0));
+  // The keeper's hut, a coil of rope, and an anchor leaning on the wall.
+  k.box(0.5, 0.35, 0.4, '#8a6a46', 0.7, 0, 0.1);
+  k.prism(0.6, 0.22, 0.5, '#5a3a2a', 0.7, 0.35, 0.1);
+  k.cyl(0.14, 0.14, 0.08, 8, '#b09060', -0.7, 0.05, 0.1);
+  k.cyl(0.03, 0.03, 0.6, 5, '#4a4e56', -0.4, 0.05, 0.62);
+  k.box(0.3, 0.04, 0.04, '#4a4e56', -0.4, 0.55, 0.62);
+  k.box(0.04, 0.04, 0.2, '#4a4e56', -0.4, 0.05, 0.62);
+}
+
 function bloomery(k: Kit, _e: number, st: Style): void {
   pad(k, 2, st.base);
   // The furnace stack: a clay drum that tapers to a smoking top, with a fire door and a team band.
@@ -2942,7 +2973,7 @@ const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' |
   heart: (k) => heart(k),
   spire: (k) => spire(k),
   greatden,
-  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, battery, windmill, bloomery, stockade, gallery, hirehall, standard, strand, wheelyard,
+  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, battery, windmill, bloomery, stockade, gallery, hirehall, standard, strand, wheelyard, pharos,
   // The Age of Tides (#739), drawn in `tideModels.ts`.
   tidemill: (k: Kit, _e: number, st: Style) => tidemill(k, st.base),
   cockler: (k: Kit, _e: number, st: Style) => cocklerHut(k, st.base),
