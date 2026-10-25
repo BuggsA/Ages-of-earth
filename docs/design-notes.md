@@ -1610,4 +1610,4 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 
 ## Designers' notes: the age wears the interface (2026-10-25)
 
-**Built:** each of the 44 ages has a button plate (19 shapes, 35 motifs, 8 glyph stamps) and its pictures show the age's own models. **Why I love it:** the owner said a palette swap isn't a look; the first thing you touch every second is the button row, so that's where "this is the Age of Sail" should land. **Next:** hand-drawn glyphs per age (a Farm drawn as a carved relief in Stone, a blueprint in Industry), the research queue and the age-up preview, and plates for the minimap and top bar.
+**Built:** each of the 45 ages has a button plate (19 shapes, 35 motifs, 8 glyph stamps) and its pictures show the age's own models. **Why I love it:** the owner said a palette swap isn't a look; the first thing you touch every second is the button row, so that's where "this is the Age of Sail" should land. **Next:** hand-drawn glyphs per age (a Farm drawn as a carved relief in Stone, a blueprint in Industry), the research queue and the age-up preview, and plates for the minimap and top bar.
