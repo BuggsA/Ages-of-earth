@@ -351,6 +351,10 @@ function onNet(m: ServerMsg): void {
       $('pause-btn').innerHTML = m.on ? PLAY_ICON : PAUSE_ICON;
       if (m.by) hud.toast(`${m.by} ${m.on ? 'paused' : 'resumed'} the game`, 'info');
       break;
+    case 'rematch':
+      rematch = { voted: m.voted, need: m.need, mine: m.mine };
+      paintRematch();
+      break;
     case 'chat':
       if (online && mode !== 'title') chatLine(m.from, m.color, m.text);
       else lobby.addChat(m.from, m.color, m.text);
@@ -365,7 +369,20 @@ function onNet(m: ServerMsg): void {
   }
 }
 
+/** Who wants another match in this room (the end screen's Rematch button reads it). */
+let rematch = { voted: 0, need: 0, mine: false };
+
+function rematchLabel(): string {
+  return rematch.mine ? `Waiting for the others (${rematch.voted} of ${rematch.need})` : rematch.voted ? `Rematch (${rematch.voted} of ${rematch.need} ready)` : 'Rematch';
+}
+
+function paintRematch(): void {
+  const b = document.querySelector<HTMLElement>('[data-act="rematch"]');
+  if (b) b.textContent = rematchLabel();
+}
+
 function startOnline(match: MatchStart, you: number): void {
+  rematch = { voted: 0, need: 0, mine: false };
   const players: PlayerSetup[] = match.seats.map((seat, i) => ({
     name: seat.kind === 'ai' ? `${LEADERS[match.civs[i]]}` : seat.name,
     ai: seat.kind === 'ai' ? (seat.level ?? 'normal') : null,
@@ -1250,6 +1267,9 @@ document.addEventListener('click', (e) => {
       break;
     case 'restart':
       if (lastSetup) startMatch(lastSetup);
+      break;
+    case 'rematch':
+      if (online && net) net.send({ t: 'rematch', on: !rematch.mine });
       break;
     case 'new-map':
       if (lastSetup) startMatch({ ...lastSetup, seed: newSeed() });
@@ -2496,7 +2516,7 @@ function showEnd(s: GameState, won: boolean, how: EndHow = 'conquest', again = f
     <div class="row">
       <button class="btn wide" data-act="watch">Look around</button>
       <button class="btn wide" data-act="replay-save">Download the replay</button>
-      ${sc ? (won && nextCh ? `<button class="btn wide primary" data-act="camp-next" data-id="${sc.id}">Next chapter: ${nextCh.title}</button>` : '') + '<button class="btn wide' + (won && nextCh ? '' : ' primary') + '" data-act="restart">Play the chapter again</button>' : online ? '' : '<button class="btn wide" data-act="restart" title="The same map, peoples and rivals">Play this seed again</button><button class="btn wide primary" data-act="new-map">Play again</button>'}
+      ${sc ? (won && nextCh ? `<button class="btn wide primary" data-act="camp-next" data-id="${sc.id}">Next chapter: ${nextCh.title}</button>` : '') + '<button class="btn wide' + (won && nextCh ? '' : ' primary') + '" data-act="restart">Play the chapter again</button>' : online ? (spectating ? '' : `<button class="btn wide primary" data-act="rematch" title="The same land, seats and peoples, from the start. Starts when everyone in the room asks; click again to take it back.">${rematchLabel()}</button>`) : '<button class="btn wide" data-act="restart" title="The same map, peoples and rivals">Play this seed again</button><button class="btn wide primary" data-act="new-map">Play again</button>'}
       <button class="btn wide" data-act="quit">Quit to title</button>
     </div></div>`;
   m.querySelector('.chart-tabs')!.addEventListener('click', (e) => {
