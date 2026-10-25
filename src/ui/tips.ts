@@ -353,6 +353,11 @@ const TIPS: Tip[] = [
     text: `Select a priest and press <b>O</b> to raise a <b>Mission</b> on a shore in your own land or no one's. It holds the land round it, trains priests, and every ${MISSION.every} seconds pays a tithe that grows with its distance from your Town Center (up to ${MISSION.cap} gold, for your ${MISSION.most} farthest). It is only a chapel: nothing in it shoots, and a rival who reaches it razes it. Carry a priest across the water in a transport.`,
   },
   {
+    id: 'stockade',
+    when: (s, me) => ageOf(s.players[me]) === 'warband',
+    text: `Raise a <b>${BUILDINGS.stockade.name}</b> (<b>X</b>) where the host fights. A laden soldier within ${SPOILS.bank} tiles banks its pack there at once, so it need not walk home with it and is not felled with it, but the quartermaster keeps a quarter (${Math.round(SPOILS.stockadeCut * 100)}% reaches you). It arms foot soldiers a tenth cheaper, and kept (<b>J</b>) it goes on doing so on any road. A rival can raze it.`,
+  },
+  {
     id: 'bloomery',
     when: (s, me) => ageOf(s.players[me]) === 'iron' && s.bogIron === true,
     text: `Raise a <b>${BUILDINGS.bloomery.name}</b> (<b>I</b>) beside the bog. Bog iron your diggers drop there is smelted hard: every bar counts ${BLOOMERY.smelt} times toward your spearmen's edge, and the hearth arms foot soldiers on the spot. Press <b>J</b> on it before you leave the Iron Age and it goes on arming spearmen at the Iron Age's price on any road. A rival who wants your iron must come to the marsh.`,

@@ -437,6 +437,7 @@ export const AGES: Record<AgeId, Age> = {
     thralls: true,
     add: { plunder: 0.15 },
     haul: true,
+    keepsake: { building: 'stockade', does: 'its palisade: foot soldiers trained there cost a tenth less, on any road' },
     verb: 'Carry the plunder home: the soldier who makes a kill packs the gold and must walk it back to a Town Center or Barracks to bank it, so raids are timed, convoys guarded, and the war-host comes home between blows',
     door: 'A laden soldier felled in the field hands its pack to the rival, and no pack holds more than a few kills: a host that never turns home banks nothing, and a host that hurries home gives up the front',
     good: 'Raids that pay: plunder carried home, and captives to work your fields',
@@ -2759,6 +2760,7 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   // The Tide Gate (#785): a gate in a barrage that holds the pond, or lets it out over the flats below as a scour (`TIDE_GATE`, `tides.ts`).
   tidegate: { name: 'Tide Gate', size: 1, hp: 600, cost: { wood: 80, stone: 120 }, time: 20, pop: 0, sight: 5, trains: [], drop: [], epoch: 5, ages: ['tides'], menu: 'mil', key: 'U', blurb: `A timber gate between stone piers, set into a causeway tile of your own barrage, beside its pond. Shut, the barrage holds as ever: the pond stays wet at every hour and the Tide Mills by it grind it twice. Open it (O) at low water and the pond rushes out through it as a scour: the flats below the gate, up to ${TIDE_GATE.reach} tiles out, go under for ${TIDE_GATE.secs} seconds, and whoever stands there is swept off, hurt (${TIDE_GATE.hurt}), or drowned with no shore near. The bigger the head of water held above the sea, the farther it runs. Then the pond runs with the tide (its mills grind it once) until you shut the gate and the next flood fills it again. Your own people walk across it at every hour; a rival's must go round it, or break it. Everyone can see whether it is loaded. Only in the Age of Tides.` },
   bloomery: { name: 'Bloom Hearth', size: 2, hp: 900, cost: { wood: 100, stone: 40 }, time: 30, pop: 0, sight: 5, trains: ['infantry'], drop: ['gold'], epoch: 1, ages: ['iron'], menu: 'mil', key: 'I', blurb: 'A clay hearth and bellows raised beside the marsh. Bog iron dropped here is smelted hard: every bar counts twice toward your spearmen\'s edge, and the hearth arms foot soldiers on the spot. Raise it by the bog and a rival who wants the iron must come to it. Kept (J) when your people leaves the Iron Age, it goes on arming spearmen at the Iron Age\'s price.' },
+  stockade: { name: 'Spoils Stockade', size: 2, hp: 700, cost: { wood: 120, stone: 40 }, time: 25, pop: 0, sight: 6, trains: ['infantry'], drop: [], epoch: 2, ages: ['warband'], menu: 'mil', key: 'X', blurb: 'A palisade of sharpened stakes raised wherever the host fights, even far from home. A laden soldier within 5 tiles banks its pack here at once, but the quartermaster keeps a quarter: 75% reaches your coffers, against the whole of it at a Town Center or Barracks. It arms foot soldiers a tenth cheaper. Only in the Age of the Warband. Kept (J) when your people leaves it, it goes on arming foot soldiers at that price.' },
   windmill: { name: 'Windmill', size: 2, hp: 600, cost: { wood: 120, stone: 40 }, time: 30, pop: 0, sight: 5, trains: [], drop: [], epoch: 2, ages: ['dykes'], menu: 'eco', key: 'W', blurb: 'A post mill whose sails turn a scoop wheel. Raised by water a dyke has shut off from the open sea (or a small lake), it pumps it dry a tile every few seconds, nearest first, into polder: low black ground where a Farm yields half again as much. Two mills drain twice as fast. The open sea is too big to pump.' },
   // The Water Line (#701 s4): a gate in a dyke or a channel that lets the water out over the low ground behind it (`INUND`, `water.ts`).
   sluice: { name: 'Sluice', size: 1, hp: 800, cost: { wood: 60, stone: 80 }, time: 20, pop: 0, sight: 4, trains: ['barge'], drop: [], epoch: 3, ages: ['waterline'], menu: 'mil', key: 'S', blurb: 'A timber gate in a dyke, on a channel or on shallow water, raised on its banks by a winch. Shut, it holds the water back as a dyke does, and your own people walk across it. Open it (O) and the water runs out over the low ground round it, a ring a second, up to 7 tiles: soldiers wade the flood at a crawl, siege can hardly cross it, and your gun-barges sail it. Shut it and the water drains away. It launches Gun-barges onto the water beside it.' },
@@ -3979,7 +3981,11 @@ export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, 
  * on the field), and banked at the first of the people's `homes` it comes within `bank` tiles of. Fell a laden soldier and its
  * spoils pay you in full. The computer sends a soldier home once it carries `home` gold.
  */
-export const SPOILS = { cap: 90, bank: 5, homes: ['towncenter', 'barracks'] as BuildingType[], home: 45 };
+export const SPOILS = { cap: 90, bank: 5, homes: ['towncenter', 'barracks'] as BuildingType[], home: 45, stockadeCut: 0.75 };
+/** The Warband's Spoils Stockade (#727): a forward bank paying `SPOILS.stockadeCut` of a pack, and arming foot soldiers at `price` of the usual cost. */
+export const STOCKADE = { price: 0.9, away: 15 };
+/** The computer's Spoils Stockade: the host it needs before it raises one. */
+export const AI_STOCKADE = { army: 8 };
 
 /**
  * Take it back (#570, the age road s3): a people's mined key ore (salt, saltpetre, blood-iron) is kept in its ore stores, the

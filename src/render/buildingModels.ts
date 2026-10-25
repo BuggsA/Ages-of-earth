@@ -1888,6 +1888,30 @@ function dyke(k: Kit, mask: number): void {
 }
 
 /** A Bloom Hearth (#727, the Iron Age): a squat clay furnace with a glowing mouth, bellows, a slag heap and a rack of grey bars. */
+function stockade(k: Kit, _e: number, st: Style): void {
+  pad(k, 2, st.base);
+  // A ring of sharpened stakes with a gate gap in front, a lookout platform behind, and a heap of loot under a hide.
+  const POST = st.wall2;
+  for (let i = 0; i < 9; i++) {
+    const a = -0.95 + i * 0.24;
+    if (i === 4) continue;
+    k.cone(0.07, 0.95 + (i % 2) * 0.12, 5, POST, a, 0, 0.9);
+    k.cone(0.07, 0.95 + (i % 2) * 0.12, 5, POST, a, 0, -0.9);
+  }
+  for (let i = 0; i < 7; i++) {
+    const z = -0.7 + i * 0.24;
+    k.cone(0.07, 0.9 + (i % 2) * 0.12, 5, POST, -1.0, 0, z);
+    k.cone(0.07, 0.9 + (i % 2) * 0.12, 5, POST, 1.0, 0, z);
+  }
+  k.box(0.7, 0.07, 0.7, st.wall, 0.35, 1.25, -0.4);
+  for (const [x, z] of [[0, -0.7], [0.7, -0.7], [0, -0.1], [0.7, -0.1]]) k.cyl(0.04, 0.04, 1.25, 5, POST, x, 0, z);
+  k.box(0.44, 0.3, 0.36, '#7a5c3a', -0.45, 0.02, 0.0);
+  k.box(0.5, 0.16, 0.42, st.roof, -0.45, 0.32, 0.0).rotation.z = 0.12;
+  k.sphere(0.12, '#e0b030', -0.6, 0.36, 0.25);
+  k.team(k.box(0.5, 0.18, 0.04, TEAM, 0.35, 1.5, -0.4));
+  banner(k, 0.95, 0, -0.85, 1.4);
+}
+
 function bloomery(k: Kit, _e: number, st: Style): void {
   pad(k, 2, st.base);
   // The furnace stack: a clay drum that tapers to a smoking top, with a fire door and a team band.
@@ -2753,7 +2777,7 @@ const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' |
   heart: (k) => heart(k),
   spire: (k) => spire(k),
   greatden,
-  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, battery, windmill, bloomery,
+  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, battery, windmill, bloomery, stockade,
   // The Age of Tides (#739), drawn in `tideModels.ts`.
   tidemill: (k: Kit, _e: number, st: Style) => tidemill(k, st.base),
   cockler: (k: Kit, _e: number, st: Style) => cocklerHut(k, st.base),

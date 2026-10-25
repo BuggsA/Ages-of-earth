@@ -43,6 +43,15 @@ function homeNear(s: GameState, u: Unit): Building | null {
   return null;
 }
 
+/** A finished Spoils Stockade (#727) of the unit's people within `SPOILS.bank` tiles of it, if any: a forward bank that keeps a quarter. */
+function stockadeNear(s: GameState, u: Unit): Building | null {
+  for (const e of s.ents) {
+    if (e.kind !== 'building' || e.owner !== u.owner || !e.built || e.hp <= 0 || e.type !== 'stockade') continue;
+    if (distToRect(u.x, u.y, e) <= SPOILS.bank) return e;
+  }
+  return null;
+}
+
 /** A finished Dock of the ship's people within `SEA_RAID.dock` tiles of it (#585), if any. */
 function dockNear(s: GameState, u: Unit): Building | null {
   for (const e of s.ents) {
@@ -74,11 +83,12 @@ export function holdFor(s: GameState, u: Unit): Unit | null {
 }
 
 /** Banks a unit's pack or hold where it stands. */
-function bank(s: GameState, u: Unit): void {
+function bank(s: GameState, u: Unit, cut = 1): void {
   const p = s.players[u.owner];
-  p.res.gold += u.spoils!;
-  p.stats.plunder = (p.stats.plunder ?? 0) + u.spoils!;
-  s.events.push({ k: 'plunder', owner: u.owner, x: u.x, y: u.y, gold: u.spoils! });
+  const gold = Math.round(u.spoils! * cut);
+  p.res.gold += gold;
+  p.stats.plunder = (p.stats.plunder ?? 0) + gold;
+  s.events.push({ k: 'plunder', owner: u.owner, x: u.x, y: u.y, gold });
   delete u.spoils;
 }
 
@@ -115,7 +125,11 @@ export function spoilsStep(s: GameState): void {
       // A Golden Age (#703) that weaves the Warband too banks a pack at home as well as by ship.
       if (!u.spoils || !ageDef(s.players[u.owner]).haul || !homeNear(s, u)) continue;
     }
-    if (hauls(s, u.owner) && !homeNear(s, u)) continue;
+    if (hauls(s, u.owner)) {
+      if (homeNear(s, u)) bank(s, u);
+      else if (stockadeNear(s, u)) bank(s, u, SPOILS.stockadeCut);
+      continue;
+    }
     bank(s, u);
   }
 }
