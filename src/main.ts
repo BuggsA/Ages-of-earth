@@ -46,7 +46,7 @@ import { chantedOver, consecrateProblem, consecrates } from './sim/consecrate';
 import { riteProblem } from './sim/fork';
 import { legionKind, legionary } from './sim/legion';
 import { tames, wildBeast } from './sim/tame';
-import { ageDef, ageOf, canRaise, heirloomsOpened, isSideRoad, opensOf, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
+import { ageDef, ageOf, canRaise, cluesOf, heirloomsOpened, isSideRoad, opensOf, roadKnown, roadsFrom, suspendedTechs } from './sim/ages';
 import { NetClient, newRoomCode, saveName, savedName } from './net/client';
 import { HASH_EVERY, ROOM_KEEP_HOURS, TURN_TICKS, type MatchStart, type ServerMsg } from './net/protocol';
 import { deserialize, serialize } from './sim/save';
@@ -2730,7 +2730,7 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         // The first sign of a side road (#37): its clue goes up while the road is open.
         if (ev.owner === viewer)
           for (const road of roadsFrom(s.players[viewer]))
-            if (road.clue === ev.type && !s.ents.some((e) => e.kind === 'building' && e.owner === viewer && e.type === ev.type && e.built && e.id !== ev.id))
+            if (cluesOf(road).includes(ev.type) && !s.ents.some((e) => e.kind === 'building' && e.owner === viewer && e.type === ev.type && e.built && e.id !== ev.id))
               hud.banner('Another road', `${CIVS[s.players[viewer].civ].name} talk of the ${AGES[road.to].name}. Select a Town Center to see what it takes.`, 5000);
         break;
       case 'defeated':
