@@ -2085,6 +2085,39 @@ function pharos(k: Kit, _e: number, st: Style): void {
   k.box(0.04, 0.04, 0.2, '#4a4e56', -0.4, 0.05, 0.62);
 }
 
+/** A Wayside Chantry (#727, the Age of Pilgrims): a tall carved stone cross on stepped plinths, a bell frame, a travellers' shelter and votive lamps. */
+function chantry(k: Kit, _e: number, st: Style): void {
+  const STONE = '#c9c2b0';
+  const DARK = '#4a3322';
+  const GOLD = '#d4a93c';
+  pad(k, 2, st.base);
+  // Three steps of plinth, a tapering shaft, and a cross with a ring at the crossing: the silhouette from afar.
+  k.box(1.1, 0.12, 1.1, '#9d9585', -0.2, 0, -0.1);
+  k.box(0.8, 0.12, 0.8, '#b3ab9a', -0.2, 0.12, -0.1);
+  k.box(0.5, 0.12, 0.5, STONE, -0.2, 0.24, -0.1);
+  k.cyl(0.1, 0.16, 1.7, 6, STONE, -0.2, 0.36, -0.1);
+  k.box(0.7, 0.14, 0.14, STONE, -0.2, 1.62, -0.1);
+  k.box(0.14, 0.4, 0.14, STONE, -0.2, 2.06, -0.1);
+  const halo = k.ring(0.24, 0.035, GOLD, 1.69);
+  halo.rotation.x = 0;
+  halo.position.set(-0.2, 1.69, -0.1);
+  k.team(k.box(0.3, 0.14, 0.03, TEAM, 0.1, 2.1, -0.1));
+  // A bell frame with its bell, to the right.
+  k.box(0.07, 0.9, 0.07, DARK, 0.5, 0, -0.5);
+  k.box(0.07, 0.9, 0.07, DARK, 0.9, 0, -0.5);
+  k.box(0.52, 0.07, 0.09, DARK, 0.7, 0.9, -0.5);
+  k.cone(0.13, 0.22, 8, GOLD, 0.7, 0.58, -0.5);
+  // The travellers' shelter: open-fronted, thatched, with a bench.
+  k.box(0.9, 0.5, 0.45, '#8a6a46', 0.1, 0, 0.7);
+  k.prism(1.0, 0.3, 0.6, '#b0925a', 0.1, 0.5, 0.7);
+  k.box(0.7, 0.07, 0.16, DARK, 0.1, 0.18, 0.48);
+  // Votive lamps on the plinth: two small flames.
+  for (const x of [-0.55, 0.15]) {
+    k.cyl(0.05, 0.05, 0.12, 6, '#7d7a72', x, 0.24, 0.3);
+    k.cone(0.04, 0.12, 5, '#f4d060', x, 0.36, 0.3);
+  }
+}
+
 function bloomery(k: Kit, _e: number, st: Style): void {
   pad(k, 2, st.base);
   // The furnace stack: a clay drum that tapers to a smoking top, with a fire door and a team band.
@@ -2973,7 +3006,7 @@ const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' |
   heart: (k) => heart(k),
   spire: (k) => spire(k),
   greatden,
-  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, battery, windmill, bloomery, stockade, gallery, hirehall, standard, strand, wheelyard, pharos,
+  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, battery, windmill, bloomery, stockade, gallery, hirehall, standard, strand, wheelyard, pharos, chantry,
   // The Age of Tides (#739), drawn in `tideModels.ts`.
   tidemill: (k: Kit, _e: number, st: Style) => tidemill(k, st.base),
   cockler: (k: Kit, _e: number, st: Style) => cocklerHut(k, st.base),

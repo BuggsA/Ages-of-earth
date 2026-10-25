@@ -57,6 +57,7 @@ import { coppiceStep } from './coppice';
 import { longbowStep } from './longbow';
 import { seraiStep, tollStep } from './passage';
 import { wheelyardStep } from './wheelyard';
+import { chantryStep } from './chantry';
 import { mercStep } from './merc';
 import { BLOOM, FINDS, KIN, LEVIATHANS, NOMAD, STEP_BACK } from './data';
 import { ageDef, ageOf, goldenEnds, threadsOf, chartLand, isHire, barred, journeyOf, markKeepsake, noteWalked, trainsAt, workSteps } from './ages';
@@ -716,6 +717,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   mercStep(s);
   seraiStep(s);
   wheelyardStep(s);
+  chantryStep(s);
   workStep(s);
   beaconStep(s);
   goldenStep(s);

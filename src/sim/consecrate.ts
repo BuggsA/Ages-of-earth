@@ -1,6 +1,7 @@
 import { BUILDINGS, CONSECRATE, DT, secs } from './data';
 import { peace } from './combat';
 import { stampBuilding } from './grid';
+import { chantryBoost } from './chantry';
 import { groveBoost } from './landmarks';
 import { modsOf } from './stats';
 import type { Building, GameState, Unit } from './types';
@@ -44,7 +45,7 @@ export function counterChant(s: GameState, b: Building): number {
 /** What one priest's chant adds to a building's tally each tick (as a share of the whole). */
 export function chantShare(s: GameState, u: Unit, b: Building): number {
   const need = maxHp(s, b) * (CONSECRATE.hard[b.type] ?? 1);
-  const voice = CONSECRATE.rate * modsOf(s, u.owner).priest * modsOf(s, u.owner).chant * groveBoost(s, u);
+  const voice = CONSECRATE.rate * modsOf(s, u.owner).priest * modsOf(s, u.owner).chant * groveBoost(s, u) * chantryBoost(s, u);
   return (voice * DT) / (need * (1 + CONSECRATE.guard * b.garrison.length + counterChant(s, b)));
 }
 
@@ -125,7 +126,7 @@ export function answerChant(s: GameState, b: Building): number {
     if (e.kind !== 'unit' || e.owner !== b.owner || e.type !== 'priest' || e.hp <= 0 || e.inside || e.cool > 0) continue;
     const dx = e.x - b.x;
     const dy = e.y - b.y;
-    if (dx * dx + dy * dy <= r2) n += m.priest * m.chant * groveBoost(s, e) * (e.order.k === 'answer' && e.order.target === b.id && e.act === 'chant' ? 1 + CONSECRATE.counter.stand : 1);
+    if (dx * dx + dy * dy <= r2) n += m.priest * m.chant * groveBoost(s, e) * chantryBoost(s, e) * (e.order.k === 'answer' && e.order.target === b.id && e.act === 'chant' ? 1 + CONSECRATE.counter.stand : 1);
   }
   return n * CONSECRATE.counter.answer * DT;
 }
