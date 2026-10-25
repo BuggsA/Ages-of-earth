@@ -1977,8 +1977,8 @@ export function unitGeometry(type: UnitType, epoch: number, civ?: CivId, age?: A
 }
 
 /** The same model with the team color baked in (for portraits). */
-export function unitGeometryColored(type: UnitType, epoch: number, color: string, civ?: CivId): THREE.BufferGeometry {
-  const kit = makeUnit(type, epoch);
+export function unitGeometryColored(type: UnitType, epoch: number, color: string, civ?: CivId, age?: AgeId): THREE.BufferGeometry {
+  const kit = makeUnit(type, epoch, age);
   if (civ) signatureMark(kit, civ, type, epoch);
   return bake(kit.root, color);
 }
