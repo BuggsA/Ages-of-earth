@@ -13,7 +13,7 @@ import { legionKind, legionary } from './legion';
 import type { Act, Animal, Building, Cost, Ent, GameState, Goal, Order, RareId, Res, Unit, UnitType } from './types';
 import { seasonOf } from './seasons';
 import { catchOf } from './year';
-import { RES, R_BERRY, R_BLOODIRON, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_SALT, R_SALTPETRE, R_STONE, R_TREE, R_COCKLE } from './types';
+import { RES, R_BERRY, R_BLOODIRON, R_GLOWCAP, R_BOG, R_FISH, R_GOLD, R_MEAT, R_NONE, R_SALT, R_SALTPETRE, R_STONE, R_TREE, R_COCKLE } from './types';
 import { carriedBy, relicAt } from './relics';
 import { animalRadius, hitAnimal } from './animals';
 import { milkable } from './flocks';
@@ -39,6 +39,7 @@ import { GRAFTABLE, grafted, hemoPace, sworn } from './blood';
 import { curse, riteProblem, sacrifice } from './fork';
 import { atPost, caravanBonus, caravanOf, dockOf, floodPost, goalForPost, homeMarket, marketOf, nearestCaravan, nearestDock, nearestMarket, portSpot, postAt, tripGold } from './trade';
 import { canHit, exitSpot, goalForBuilding, goalForPoint, goalForTile, isEnemy, maxHp, nearestDrop, passOf, pay, radiusOf, statsOf, teamOf } from './world';
+import { webDrop, webTakes } from './mycelium';
 
 /**
  * What units do each tick: follow their order (walk, gather and carry, farm, build, hunt, fight, heal,
@@ -55,12 +56,12 @@ const PATH_BUDGET = 60000;
 const LEASH = 7;
 
 /** Bog iron is paid in as gold: iron bars were money across much of West Africa. */
-export const RES_OF_TILE: Record<number, Res> = { [R_TREE]: 'wood', [R_BERRY]: 'food', [R_STONE]: 'stone', [R_GOLD]: 'gold', [R_MEAT]: 'food', [R_FISH]: 'food', [R_BOG]: 'gold', [R_SALT]: 'stone', [R_SALTPETRE]: 'stone', [R_BLOODIRON]: 'stone', [R_COCKLE]: 'food' };
+export const RES_OF_TILE: Record<number, Res> = { [R_TREE]: 'wood', [R_BERRY]: 'food', [R_STONE]: 'stone', [R_GOLD]: 'gold', [R_MEAT]: 'food', [R_FISH]: 'food', [R_BOG]: 'gold', [R_SALT]: 'stone', [R_SALTPETRE]: 'stone', [R_BLOODIRON]: 'stone', [R_GLOWCAP]: 'stone', [R_COCKLE]: 'food' };
 /** The rare ore a tile holds, if any (#356). */
-export const RARE_OF_TILE: Record<number, RareId> = { [R_SALT]: 'salt', [R_SALTPETRE]: 'saltpetre', [R_BLOODIRON]: 'bloodiron' };
-export const TILE_OF_RARE: Record<RareId, number> = { salt: R_SALT, saltpetre: R_SALTPETRE, bloodiron: R_BLOODIRON };
+export const RARE_OF_TILE: Record<number, RareId> = { [R_SALT]: 'salt', [R_SALTPETRE]: 'saltpetre', [R_BLOODIRON]: 'bloodiron', [R_GLOWCAP]: 'glowcap' };
+export const TILE_OF_RARE: Record<RareId, number> = { salt: R_SALT, saltpetre: R_SALTPETRE, bloodiron: R_BLOODIRON, glowcap: R_GLOWCAP };
 const ACT_OF_TILE: Record<number, Act> = { [R_TREE]: 'chop', [R_BERRY]: 'forage', [R_STONE]: 'mine', [R_GOLD]: 'mine', [R_MEAT]: 'forage', [R_FISH]: 'fish', [R_BOG]: 'mine', [R_SALT]: 'mine', [R_SALTPETRE]: 'mine', [R_BLOODIRON]: 'mine', [R_COCKLE]: 'forage' };
-const RATE_OF_TILE: Record<number, number> = { [R_TREE]: GATHER.tree, [R_BERRY]: GATHER.berry, [R_STONE]: GATHER.stone, [R_GOLD]: GATHER.gold, [R_MEAT]: GATHER.meat, [R_FISH]: GATHER.fish, [R_BOG]: GATHER.bog, [R_SALT]: RARE.salt.rate, [R_SALTPETRE]: RARE.saltpetre.rate, [R_BLOODIRON]: RARE.bloodiron.rate, [R_COCKLE]: COCKLE.rate };
+const RATE_OF_TILE: Record<number, number> = { [R_TREE]: GATHER.tree, [R_BERRY]: GATHER.berry, [R_STONE]: GATHER.stone, [R_GOLD]: GATHER.gold, [R_MEAT]: GATHER.meat, [R_FISH]: GATHER.fish, [R_BOG]: GATHER.bog, [R_SALT]: RARE.salt.rate, [R_SALTPETRE]: RARE.saltpetre.rate, [R_BLOODIRON]: RARE.bloodiron.rate, [R_GLOWCAP]: RARE.glowcap.rate, [R_COCKLE]: COCKLE.rate };
 
 export function setOrder(u: Unit, order: Order): void {
   u.order = order;
@@ -173,6 +174,8 @@ export function findResource(s: GameState, kind: number, x: number, y: number, m
 }
 
 function deposit(s: GameState, u: Unit, at: Building): void {
+  // What the Mycelium's web takes in (#800) is the deed of its road on to the Bloom.
+  if (u.carry > 0 && webTakes(s, at)) s.players[u.owner].stats.webbed = (s.players[u.owner].stats.webbed ?? 0) + u.carry;
   if (u.carry > 0 && u.carryRes === 'stone' && u.carryRare) {
     const p = s.players[u.owner];
     const stock = (p.rare ??= {});
@@ -202,6 +205,13 @@ function dropOff(s: GameState, u: Unit): 'done' | 'going' | 'none' {
   if (!u.carryRes || u.carry <= 0) return 'done';
   // On the way: the route ends beside the drop site, so look again only now and then (in case it fell).
   if (walking(u) && (s.tick + u.id) % 20 !== 0) return 'going';
+  // On the Mycelium's web (#800) a load is banked where it stands, at the hall whose web it is.
+  const web = webDrop(s, u);
+  if (web) {
+    if (walking(u)) stopWalking(u);
+    deposit(s, u, web);
+    return 'done';
+  }
   // A basket of cockles goes to a Cockler's Hut if one stands nearer (#779).
   const drop = cocklerDrop(s, u, nearestDrop(s, u.owner, u.carryRes, u.x, u.y, u.type === 'fisher'));
   if (!drop) return 'none';

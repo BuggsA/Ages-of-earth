@@ -150,10 +150,10 @@ export function scan(q: Query): { hits: Hit[]; looked: number } {
 }
 
 /** How often each feature occurs over `count` seeds on every map type: percent of worlds with it, and mean counts. */
-export function survey(q: Pick<Query, 'from' | 'count' | 'size' | 'players'>): Record<string, { bog: number; posts: number; relics: number; ruins: number; hoard: number; lore: number; map: number; relic: number; salt: number; saltpetre: number; bloodiron: number; caves: number; dens: number }> {
+export function survey(q: Pick<Query, 'from' | 'count' | 'size' | 'players'>): Record<string, { bog: number; posts: number; relics: number; ruins: number; hoard: number; lore: number; map: number; relic: number; salt: number; saltpetre: number; bloodiron: number; glowcap: number; caves: number; dens: number }> {
   const out: ReturnType<typeof survey> = {};
   for (const type of Object.keys(MAP_TYPES) as MapType[]) {
-    const t = { bog: 0, posts: 0, relics: 0, ruins: 0, hoard: 0, lore: 0, map: 0, relic: 0, salt: 0, saltpetre: 0, bloodiron: 0, caves: 0, dens: 0 };
+    const t = { bog: 0, posts: 0, relics: 0, ruins: 0, hoard: 0, lore: 0, map: 0, relic: 0, salt: 0, saltpetre: 0, bloodiron: 0, glowcap: 0, caves: 0, dens: 0 };
     for (let seed = q.from; seed < q.from + q.count; seed++) {
       const h = inspect(seed, { size: q.size, players: q.players, type });
       if (h.bog) t.bog++;
@@ -167,7 +167,7 @@ export function survey(q: Pick<Query, 'from' | 'count' | 'size' | 'players'>): R
     }
     const pct = (n: number): number => Math.round((n * 100) / q.count);
     const avg = (n: number): number => Math.round((n * 10) / q.count) / 10;
-    out[type] = { salt: pct(t.salt), saltpetre: pct(t.saltpetre), bloodiron: pct(t.bloodiron), caves: avg(t.caves), dens: avg(t.dens), bog: pct(t.bog), posts: avg(t.posts), relics: avg(t.relics), ruins: avg(t.ruins), hoard: pct(t.hoard), lore: pct(t.lore), map: pct(t.map), relic: pct(t.relic) };
+    out[type] = { salt: pct(t.salt), saltpetre: pct(t.saltpetre), bloodiron: pct(t.bloodiron), glowcap: pct(t.glowcap), caves: avg(t.caves), dens: avg(t.dens), bog: pct(t.bog), posts: avg(t.posts), relics: avg(t.relics), ruins: avg(t.ruins), hoard: pct(t.hoard), lore: pct(t.lore), map: pct(t.map), relic: pct(t.relic) };
   }
   return out;
 }

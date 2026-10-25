@@ -9,7 +9,7 @@ import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE, findResource } from '../sim/units';
-import { FIRE, FISSION, HIVE, INTERCEPT, WILDWOOD, BLOOM, LEVIATHANS, AUTO_WORK, BREACH, CANAL, DAM, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, SALVO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE, FLOAT } from '../sim/data';
+import { FIRE, FISSION, HIVE, INTERCEPT, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, AUTO_WORK, BREACH, CANAL, DAM, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, SALVO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE, FLOAT } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -279,7 +279,7 @@ const prospectLine = (s: GameState, p: Player) => {
           const h = holdingsOf(o);
           const n = [...dig.values()].filter((w) => w === o.id).length;
           // Names come from players online: nothing in one may become markup in the tip.
-          return `<br>${o.name.replace(/[<>&"']/g, '')}: ${(['salt', 'saltpetre', 'bloodiron'] as const).map((k) => `${h[k]} ${PROSPECTOR.keys[k].name.toLowerCase()}`).join(', ')}; ${h.bogIron} bog iron dug${n ? `; digging ${n} key tile${n > 1 ? 's' : ''} now` : ''}${o.stats.bought ? `; ${o.stats.bought} key ore bought at the posts` : ''}.`;
+          return `<br>${o.name.replace(/[<>&"']/g, '')}: ${(['salt', 'saltpetre', 'bloodiron', 'glowcap'] as const).map((k) => `${h[k] ?? 0} ${k === 'glowcap' ? 'glowcaps' : PROSPECTOR.keys[k].name.toLowerCase()}`).join(', ')}; ${h.bogIron} bog iron dug${n ? `; digging ${n} key tile${n > 1 ? 's' : ''} now` : ''}${o.stats.bought ? `; ${o.stats.bought} key ore bought at the posts` : ''}.`;
         })
         .join('')
     : '';
@@ -1142,6 +1142,8 @@ export class Hud {
       : stingLeft
         ? `<span data-tip="<b>Stung</b>A Hive's bees swarm whoever walks its people's woods: ${HIVE.sting} hit points a second past armour, and a slow walk. Keep out of the trees by a Hive, or smoke it quiet with a fire.">🐝<em>Stung</em></span>`
         : '';
+    // The Age of the Mycelium (#800): hidden by its people's spores.
+    const spores = u.cloak ? `<span data-tip="<b>Hidden by spores</b>${mine ? 'It stands on your web' : 'It stands on its people\'s web'}: no rival sees it or aims at it unless one comes within ${MYCELIUM.reveal} tiles, and it shows for ${MYCELIUM.shown} seconds after it strikes.">🍄<em>Hidden</em></span>` : '';
     // Routes that read the tide (#755): waiting on the shore for the flats to bare.
     const ebbLeft = Math.ceil(tideWaitLeft(s, u));
     // Work on the flats that reads the tide (#767): stepped ashore before the flood, back when its ground bares.
@@ -1178,7 +1180,7 @@ export class Hud {
           <span data-tip="<b>Armor</b>Melee / missile armor: taken off every blow or shot.">🛡<em>Armor</em> ${st.armor}/${st.parmor}</span>
           ${st.range ? `<span data-tip="<b>Range</b>How far it shoots, in tiles.">🏹<em>Range</em> ${st.range}</span>` : ''}
           <span data-tip="<b>Speed</b>Tiles per second.">👣<em>Speed</em> ${Math.round(st.speed * 100) / 100}</span>
-          ${carry}${cargo}${load}${stance}${vet}${line}${aura}${graft}${oath}${sword}${pack}${curse}${sting}${bond}${held}${trip}${caravan}${tribute}${toll}${ebb}${ashore}
+          ${carry}${cargo}${load}${stance}${vet}${line}${aura}${graft}${oath}${sword}${pack}${curse}${sting}${spores}${bond}${held}${trip}${caravan}${tribute}${toll}${ebb}${ashore}
         </div>
         <div class="blurb">${st.blurb}</div>
       </div>`;
@@ -2020,7 +2022,7 @@ function hpBar(hp: number, max: number, frac: number): string {
 }
 
 
-const RARE_ICON = { salt: '🧂', saltpetre: '💎', bloodiron: '🩸' } as const;
+const RARE_ICON = { salt: '🧂', saltpetre: '💎', bloodiron: '🩸', glowcap: '🍄' } as const;
 
 function householdHint(s: GameState, viewer: number): string {
   const rate = Math.round(taxRate(s, viewer) * 60);

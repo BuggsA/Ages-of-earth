@@ -5,6 +5,7 @@ import { clearResource, distToRect, distToTile } from './grid';
 import { seasonAt } from './seasons';
 import { isEnemy, maxHp } from './world';
 import { fireMul } from './wildwood';
+import { burnWeb, rivalWebAt } from './mycelium';
 import type { Building, Fire, GameState, Unit } from './types';
 import { R_TREE } from './types';
 
@@ -54,7 +55,7 @@ export function torchProblem(s: GameState, owner: number, at: { target?: number;
   const p = s.players[owner];
   if (p.epoch < FIRE.epoch) return `Torches are carried from the ${EPOCHS[FIRE.epoch].name}`;
   if (peace(s)) return 'Not while the peace holds';
-  const pick = "Pick a tree, a rival's Thornwall root, or a rival's living building";
+  const pick = "Pick a tree, a rival's Thornwall root, a rival's living building, or a rival's fungus web";
   if (at.target !== undefined) {
     const b = s.byId.get(at.target);
     if (!b || b.kind !== 'building' || b.hp <= 0) return pick;
@@ -67,6 +68,8 @@ export function torchProblem(s: GameState, owner: number, at: { target?: number;
   if (s.res[tile] === R_TREE) return treeBurning(s, tile) ? 'It is already burning' : null;
   const r = rootAt(s, tile);
   if (r >= 0 && isEnemy(s, owner, s.roots![r].owner)) return null;
+  // The Mycelium's web (#800) burns back from bare ground a torch is set to.
+  if (rivalWebAt(s, owner, tile)) return null;
   return pick;
 }
 
@@ -75,6 +78,12 @@ export function torchProblem(s: GameState, owner: number, at: { target?: number;
  * `by` who set the first flame. Returns whether anything caught.
  */
 export function ignite(s: GameState, tile: number, gen: number, by: number, torch = false): boolean {
+  // A torch on bare ground over a rival's web (#800) burns the web back at once, as a root burns away.
+  if (torch && !catchable(s, tile) && rivalWebAt(s, by, tile)) {
+    burnWeb(s, tile);
+    s.events.push({ k: 'fire', what: 'root', x: (tile % s.w) + 0.5, y: Math.floor(tile / s.w) + 0.5, by, owner: -1 });
+    return true;
+  }
   if (!catchable(s, tile)) return false;
   const x = (tile % s.w) + 0.5;
   const y = Math.floor(tile / s.w) + 0.5;

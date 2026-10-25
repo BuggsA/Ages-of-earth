@@ -34,6 +34,7 @@ import { SpringsView } from './springsView';
 import { RubbleView } from './rubbleView';
 import { CacheView } from './cacheView';
 import { KegView } from './kegView';
+import { WebView } from './webView';
 import { FireView } from './fireView';
 import { LandmarksView } from './landmarksView';
 import { GrazeView } from './grazeView';
@@ -124,6 +125,8 @@ export class View {
   readonly rubble = new RubbleView();
   readonly caches = new CacheView();
   readonly kegs = new KegView();
+  /** The Age of the Mycelium's fungus web (#800). */
+  readonly webs = new WebView();
   readonly missiles = new MissileView();
   readonly fires = new FireView();
   private falloutTick = -1;
@@ -205,7 +208,7 @@ export class View {
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sky.mesh, this.hemi, this.fill, this.sun, this.sun.target);
-    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.finds.group, this.springs.group, this.tides.group, this.rubble.group, this.caches.group, this.kegs.group, this.missiles.group, this.fires.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
+    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.finds.group, this.springs.group, this.tides.group, this.rubble.group, this.caches.group, this.kegs.group, this.webs.group, this.missiles.group, this.fires.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
     this.scene.add(this.rangeGuides.mesh, this.borders.mesh, this.graze.mesh, this.foundations.mesh);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.post = new Post(this.renderer, this.scene, this.rig.camera);
@@ -277,6 +280,7 @@ export class View {
     this.rubble.clear();
     this.caches.clear();
     this.kegs.clear();
+    this.webs.clear();
     this.missiles.clear();
     this.fires.clear();
     this.landmarks.clear();
@@ -412,7 +416,9 @@ export class View {
     return this.fog.visibleAt(x, y) > 0.45;
   }
 
-  private visibleUnit = (u: Unit): boolean => u.owner === this.viewer || this.sees(u.x, u.y);
+  // A rival's unit hidden by the Mycelium's spores (#800) is not drawn, wherever the fog stands.
+  private visibleUnit = (u: Unit): boolean =>
+    u.owner === this.viewer || (this.sees(u.x, u.y) && (this.reveal || !u.cloak || !this.state || this.state.players[u.owner].team === this.state.players[this.viewer].team));
 
   /** Draw a frame. `alpha` is how far into the next tick we are (0..1). */
   frame(s: GameState, alpha: number, dt: number, sel: Selection): void {
@@ -509,6 +515,7 @@ export class View {
     this.rubble.update(s, !!ageDef(p).salvage, (x, y) => this.reveal || this.sees(x, y));
     this.caches.update(s, (x, y) => this.reveal || this.sees(x, y), (id) => this.units.drawn.get(id) ?? null);
     this.kegs.update(s, (x, y) => this.reveal || this.sees(x, y), (id) => this.units.drawn.get(id) ?? null);
+    this.webs.update(s, (b) => this.reveal || b.owner === this.viewer || this.sees(b.x, b.y), this.time);
     // Missiles in the air (#772): seen by every player, through the fog, between the last tick and this one.
     this.missiles.update(s, s.tick - 1 + alpha, dt, this.effects);
     // Fire (`fire.ts`): flames on what burns, torches in hand, and smoke rising off it all.
@@ -1163,6 +1170,21 @@ export class View {
             this.effects.burst(this.ground(s, ev.x, ev.y, 0.2), { count: 36, speed: 2.4, up: 0.5, life: 1.8, size: 0.14, grow: 2.2, gravity: 0.2, drag: 1.2, soft: true, colors: ['#8a7a5a', '#a8946c', '#6d6a4c'] });
             this.effects.ring(this.ground(s, ev.x, ev.y, 0.15), '#a8946c', 3, 1.1);
             this.cue(ev.what === 'kneel' ? 'behemothKneel' : 'behemothRise', ev.x, ev.y, 1);
+          }
+          break;
+        case 'web':
+          // The Age of the Mycelium (#800): rot puffs pale spores off a rival's wall; fire on the web flashes blue as it shrivels; a
+          // Town Center's web grown full breathes a soft glow out round it.
+          if (!this.reveal && ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;
+          if (ev.what === 'rot') {
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.6), { count: 12, speed: 0.4, up: 0.6, life: 2.2, size: 0.05, grow: 1.6, gravity: -0.05, drag: 1.4, soft: true, colors: ['#cfe6e8', '#a6d6e0', '#8f9a7a'] });
+            this.cue('webRot', ev.x, ev.y, 0.6);
+          } else if (ev.what === 'burnt') {
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.1), { count: 16, speed: 1.2, up: 1.0, life: 0.9, size: 0.05, gravity: 0.4, drag: 1.2, colors: ['#8fe0ee', '#ffd8a0', '#5a5a5a'] });
+            this.cue('webBurn', ev.x, ev.y, 0.8);
+          } else {
+            this.effects.ring(this.ground(s, ev.x, ev.y, 0.05), '#8fe0ee', 6, 2.2);
+            this.cue('webGrown', ev.x, ev.y, 0.7);
           }
           break;
         case 'sprout':

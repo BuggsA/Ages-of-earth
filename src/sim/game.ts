@@ -65,6 +65,7 @@ import { mineable } from './household';
 import { isNomad } from './nomad';
 import { RES_OF_TILE, autoWork, rallyNode, carryCargo, checkStuck, collide, findResource, routeUnits, separate, setOrder, think, ungarrison, walk } from './units';
 import { updateVision } from './vision';
+import { myceliumStep } from './mycelium';
 import { countPop, exitSpot, maxHp, placeBuilding, refund, restat, spawnUnit } from './world';
 
 /**
@@ -703,6 +704,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   hiveStep(s);
   wildwoodStep(s);
   bloomStep(s);
+  myceliumStep(s, sp);
   seaStep(s);
   longbowStep(s);
   tollStep(s);

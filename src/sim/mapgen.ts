@@ -1,7 +1,7 @@
 import { AMOUNT, BOAR, BOG_IRON, CAVE, FINDS, HOMELAND, HOMELAND_IDS, HOMELANDS, LANDMARKS, RARE, MAMMOTH, MAP_SIZES, RAIDER, RELIC, RUINS, SPRING, TRADE, WOLF } from './data';
 import { fbm, mulberry32, type Rng } from './rng';
 import type { Cave, FindKind, HomelandId, KeyId, LandmarkKind, MapSize, MapType, RareId, RuinFind } from './types';
-import { B_RES, B_TERRAIN, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_NONE, R_STONE, R_TREE, T_GRASS, T_ROCK, T_SAND, T_WATER } from './types';
+import { B_RES, B_TERRAIN, R_BERRY, R_BLOODIRON, R_GLOWCAP, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_NONE, R_STONE, R_TREE, T_GRASS, T_ROCK, T_SAND, T_WATER } from './types';
 
 /**
  * World generation: rolling grassland with lakes, rocky ridges and woods (more or less of each by map
@@ -1086,7 +1086,7 @@ function placeBogIron(
   return true;
 }
 
-const RARE_TILE: Record<RareId, number> = { salt: R_SALT, saltpetre: R_SALTPETRE, bloodiron: R_BLOODIRON };
+const RARE_TILE: Record<RareId, number> = { salt: R_SALT, saltpetre: R_SALTPETRE, bloodiron: R_BLOODIRON, glowcap: R_GLOWCAP };
 
 /**
  * Deep veins (#356): for each rare ore the seed's own dice say whether this world holds it at all, then its veins are
@@ -1139,7 +1139,7 @@ function placeRares(
   });
   return found;
 }
-const RARES_ORDER: RareId[] = ['salt', 'saltpetre', 'bloodiron'];
+const RARES_ORDER: RareId[] = ['salt', 'saltpetre', 'bloodiron', 'glowcap'];
 
 /** Where a den cave's wolves start (#356): the pack lies at the mouth. `createGame` spawns them after everything else, so a cave moves no other id. */
 export function denWolves(tile: number, w: number): { x: number; y: number }[] {
@@ -1317,7 +1317,8 @@ function placeFinds(
   // Deal what each speaks of from a fresh shuffled hand of what this world holds.
   const held: KeyId[] = [];
   if (bogIron) held.push('bogIron');
-  for (const r of rares) held.push(r);
+  // The Glowcap hollow (#800) has no find: it glows where it lies, and the finds are a fixed six (`tests/models.test.ts`).
+  for (const r of rares) if (r !== 'glowcap') held.push(r);
   if (ruins) held.push('ruin');
   const kindOf = (key: KeyId): FindKind => (Object.keys(FINDS.kinds) as FindKind[]).find((k) => FINDS.kinds[k].key === key)!;
   if (!held.length) return placed.map((f) => ({ ...f, key: null, kind: 'stash' as FindKind }));
