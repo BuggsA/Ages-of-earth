@@ -46,7 +46,7 @@ import { Sky } from './sky';
 import { forcedHour, hourAt, lightAt, moonPhase } from './daylight';
 import { Weather, breathe, describeWeather, forcedWeather, moodOf, seasonalDay, weatherFor, windFor, type WeatherDay } from './weather';
 import { FogTexture, TerrainView, heightAt } from './terrain';
-import { AIR_ALT, UnitsView } from './unitsView';
+import { AIR_ALT, UnitsView, wearOf } from './unitsView';
 import { WATER_Y, WaterView } from './water';
 import { Fireflies } from './fireflies';
 import { Bats } from './bats';
@@ -1335,7 +1335,7 @@ export class View {
             if (!this.sees(ev.x, ev.y) && ev.owner !== this.viewer) break;
             const type = ev.type as Unit['type'];
             const drawnAt = this.units.drawn.get(ev.id);
-            this.units.fall(type, ev.epoch, ev.owner, ev.x, ev.y, ev.fx, ev.fy, ev.id, SIGNATURES[s.players[ev.owner].civ].type === type ? s.players[ev.owner].civ : undefined);
+            this.units.fall(type, ev.epoch, ev.owner, ev.x, ev.y, ev.fx, ev.fy, ev.id, SIGNATURES[s.players[ev.owner].civ].type === type ? s.players[ev.owner].civ : undefined, wearOf(s, type, ev.owner));
             const dom = domainOf(type);
             if (dom === 'water') {
               // A ship breaks up: spray, splinters, a slick of smoke.

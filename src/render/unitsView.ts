@@ -2,7 +2,9 @@ import * as THREE from 'three';
 import { rankOf } from '../sim/combat';
 import { legionary } from '../sim/legion';
 import { BOAR, MAMMOTH, RAIDER, SIGNATURES, TICK_HZ, WOLF, domainOf, unitStats } from '../sim/data';
-import type { Animal, CivId, GameState, Unit, UnitType } from '../sim/types';
+import type { AgeId, Animal, CivId, GameState, Unit, UnitType } from '../sim/types';
+import { ageOf } from '../sim/ages';
+import { AGE_PALETTES, WEAR_LINES } from './ageLooks';
 import { unitMaterial } from './materials';
 import { FLOOD_DEPTH, heightAt } from './terrain';
 import { isInund } from '../sim/water';
@@ -50,6 +52,8 @@ interface Corpse {
   mounted: boolean;
   epoch: number;
   civ?: CivId;
+  /** The age it wore (#803). */
+  wear?: AgeId;
   color: THREE.Color;
   x: number;
   y: number;
@@ -190,21 +194,21 @@ export class UnitsView {
     this.colors = colors.map((c) => new THREE.Color(c));
   }
 
-  private batch(type: UnitType, epoch: number, civ?: CivId): Batch {
-    const key = `${type}:${epoch}:${civ ?? ''}`;
+  private batch(type: UnitType, epoch: number, civ?: CivId, wear?: AgeId): Batch {
+    const key = `${type}:${epoch}:${civ ?? ''}:${wear ?? ''}`;
     let b = this.batches.get(key);
     if (!b) {
-      b = new Batch(unitGeometry(type, epoch, civ), 64, this.group);
+      b = new Batch(unitGeometry(type, epoch, civ, wear), 64, this.group);
       this.batches.set(key, b);
     }
     return b;
   }
 
   /** A unit died: it falls where it stood. */
-  fall(type: UnitType, epoch: number, owner: number, x: number, y: number, fx: number, fy: number, id: number, civ?: CivId): void {
+  fall(type: UnitType, epoch: number, owner: number, x: number, y: number, fx: number, fy: number, id: number, civ?: CivId, wear?: AgeId): void {
     const a = this.anims.get(id);
     this.anims.delete(id);
-    this.corpses.push({ type, epoch, civ, mounted: !!unitStats(type, epoch).mounted, color: this.colors[owner] ?? new THREE.Color('#ffffff'), x, y, yaw: a ? a.yaw : Math.atan2(fx, fy), age: 0, side: id % 2 ? 1 : -1 });
+    this.corpses.push({ type, epoch, civ, wear, mounted: !!unitStats(type, epoch).mounted, color: this.colors[owner] ?? new THREE.Color('#ffffff'), x, y, yaw: a ? a.yaw : Math.atan2(fx, fy), age: 0, side: id % 2 ? 1 : -1 });
     if (this.corpses.length > 160) this.corpses.shift();
   }
 
@@ -328,16 +332,16 @@ export class UnitsView {
       // Those sheltering inside a building aren't drawn.
       if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !visible(e)) continue;
       show.push(e);
-      const key = `${e.type}:${modelEpoch(s, e, s.players[e.owner].epoch)}:${markOf(s, e.type, e.owner) ?? ''}`;
+      const key = `${e.type}:${modelEpoch(s, e, s.players[e.owner].epoch)}:${markOf(s, e.type, e.owner) ?? ''}:${wearOf(s, e.type, e.owner) ?? ''}`;
       need.set(key, (need.get(key) ?? 0) + 1);
     }
     for (const c of this.corpses) {
-      const key = `${c.type}:${c.epoch}:${c.civ ?? ''}`;
+      const key = `${c.type}:${c.epoch}:${c.civ ?? ''}:${c.wear ?? ''}`;
       need.set(key, (need.get(key) ?? 0) + 1);
     }
     for (const [key, n] of need) {
-      const [type, epoch, civ] = key.split(':');
-      this.batch(type as UnitType, Number(epoch), (civ || undefined) as CivId | undefined).reserve(n);
+      const [type, epoch, civ, wear] = key.split(':');
+      this.batch(type as UnitType, Number(epoch), (civ || undefined) as CivId | undefined, (wear || undefined) as AgeId | undefined).reserve(n);
     }
 
     const seen = new Set<number>();
@@ -474,7 +478,7 @@ export class UnitsView {
         bob = 0;
         lift = 0;
       }
-      const b = this.batch(u.type, modelEpoch(s, u, epoch), markOf(s, u.type, u.owner));
+      const b = this.batch(u.type, modelEpoch(s, u, epoch), markOf(s, u.type, u.owner), wearOf(s, u.type, u.owner));
       const i = b.count++;
       this.e.set(pitch, yaw, roll);
       this.q.setFromEuler(this.e);
@@ -525,7 +529,7 @@ export class UnitsView {
       const fall = Math.min(1, c.age / 0.45);
       const ease = fall * fall;
       const sink = c.age > 7 ? (c.age - 7) * 0.2 : 0;
-      const b = this.batch(c.type, c.epoch, c.civ);
+      const b = this.batch(c.type, c.epoch, c.civ, c.wear);
       const i = b.count++;
       const dom = domainOf(c.type);
       if (dom === 'water') {
@@ -571,6 +575,13 @@ export class UnitsView {
 }
 
 /** The people whose mark a unit wears: only a signature line carries one. */
+/** The age a unit wears (#803): its people's, when that age has a look and the line wears it. */
+export function wearOf(s: GameState, type: UnitType, owner: number): AgeId | undefined {
+  if (!WEAR_LINES.includes(type)) return undefined;
+  const age = ageOf(s.players[owner]);
+  return AGE_PALETTES[age] ? age : undefined;
+}
+
 function markOf(s: GameState, type: UnitType, owner: number): CivId | undefined {
   const civ = s.players[owner].civ;
   return SIGNATURES[civ].type === type ? civ : undefined;

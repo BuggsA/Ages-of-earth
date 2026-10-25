@@ -37,8 +37,10 @@ export const AGE_PALETTES: Partial<Record<AgeId, AgePalette>> = {
   iron: pal('#c5b9a4', '#6f6458', '#2e2c2a', '#252321', '#6e5a4e', '#7a7268'), // bog-iron grey
   wild: pal('#d2c09e', '#b49f7a', '#3e2416', '#321c10', '#ede3cc', '#8f7a5c'), // hide walls, bracken roofs, bone
   rivers: pal('#dccaa0', '#c4af84', '#d5c58e', '#c2b07a', '#cdb88a', '#b5a37e'), // sun-dried mud, reed roofs
+  hunt: pal('#4a3626', '#3a2a1e', '#d8ccb0', '#c6b99c', '#a89068', '#7a6a52'), // stained leather under pale felt
   steppe: pal('#ece4cf', '#d4c8ac', '#c9b48a', '#b8a27a', '#5a3a30', '#a59878'), // white felt
   // Tier 2, beside the Middle Ages' white plaster and slate.
+  mycelium: pal('#d9d2d8', '#bfb6bd', '#c9a9bb', '#bea0b1', '#7a6a72', '#8a8086'), // pale fungus-grey under mauve caps
   merchant: pal('#e9c7a0', '#d4c3a0', '#4a2a12', '#3c220e', '#bfa878', '#a89880'), // warm ochre fronts
   pilgrim: pal('#efebe0', '#d7d1c2', '#36324c', '#2b2840', '#bfae86', '#aaa496'), // pale stone, dusk-violet slate
   sail: pal('#e8e2d2', '#b7ae98', '#1e2e44', '#17253a', '#f2ece0', '#958e80'), // whitewash, navy roofs
@@ -80,7 +82,7 @@ export const AGE_PALETTES: Partial<Record<AgeId, AgePalette>> = {
 /** The ages whose touches live in this file. */
 export const NEW_LOOK_AGES: AgeId[] = [
   'atomic', 'fission', 'fusion', 'alchemy', 'sapper', 'searaider', 'chariots', 'wild', 'grove', 'hive', 'wildwood', 'bloom', 'leviathans',
-  'missions', 'dykes', 'rivers', 'tides', 'waterline', 'locks', 'floating', 'beggars',
+  'missions', 'dykes', 'rivers', 'tides', 'waterline', 'locks', 'floating', 'beggars', 'hunt', 'mycelium',
 ];
 
 /** Buildings that take touches: the town's own halls and houses. Water works, walls, fields and one-tile pieces keep their shape. */
@@ -467,6 +469,37 @@ export function ageLookTouches(k: Kit, type: BuildingType, age: AgeId): boolean 
       }
       break;
     }
+    case 'hunt': {
+      // Hounds and hawks: a T-perch with a hooded hawk by the door, a wolf pelt over the side, a tether stake and its ring.
+      const px = l + 0.1;
+      k.cyl(0.02, 0.025, e + 0.2, 5, '#4a3626', px, 0, f);
+      k.box(0.3, 0.03, 0.03, '#4a3626', px, e + 0.2, f);
+      k.blob(0.07, '#7a5a3a', px + 0.06, e + 0.29, f).scale.set(0.8, 1.2, 0.9);
+      k.sphere(0.035, '#3a2a1e', px + 0.06, e + 0.39, f + 0.01);
+      k.box(0.04, 0.5, 0.5, '#8a8478', h + 0.12, e * 0.35, 0);
+      k.box(0.05, 0.1, 0.16, '#8a8478', h + 0.12, e * 0.35 + 0.45, 0.2);
+      k.cyl(0.02, 0.02, 0.3, 4, WOOD, -h * 0.3, 0, f + 0.3);
+      const ring = k.ring(0.05, 0.012, '#5a5a5a', 0.28);
+      ring.position.set(-h * 0.3, 0.28, f + 0.3);
+      if (great || type === 'stable') bandFlag(k, -h - 0.1, -h + 0.1, e + 1.0, ['#d8ccb0', '#4a3626'], 0.36);
+      break;
+    }
+    case 'mycelium': {
+      // A people that lives on the fungus: shelf fungi up the walls, glowcaps at the foot, pale threads out over the ground.
+      for (const [x, y] of [[-h + 0.1, e * 0.35], [-h + 0.35, e * 0.6], [h - 0.45, e * 0.45]] as const) {
+        const b = k.cyl(0.13, 0.15, 0.05, 9, '#d8c8b0', x, y, f + 0.02);
+        b.scale.set(1, 1, 0.55);
+      }
+      for (const [x, z, r] of [[l + 0.05, f + 0.1, 0.07], [l + 0.22, f + 0.18, 0.05], [l + 0.4, f + 0.08, 0.06], [h - 0.2, -h + 0.1, 0.07]] as const) {
+        k.cyl(0.015, 0.02, r * 1.4, 5, '#ece6dc', x, 0, z);
+        k.glow(k.dome(r, '#9af0d0', x, r * 1.4, z)).scale.set(1, 0.6, 1);
+      }
+      for (let i = 0; i < 5; i++) {
+        const t = k.box(0.02, 0.012, 0.6 + (i % 2) * 0.3, '#eee8e0', -h + i * (h / 2), 0.005, f + 0.35);
+        t.rotation.y = (i - 2) * 0.35;
+      }
+      break;
+    }
     case 'beggars': {
       // The Watergeuzen: the Prince's flag of orange, white and blue at the back corner, a grapnel and its coil by the door.
       bandFlag(k, -h - 0.1, -h + 0.1, e + (big ? 1.6 : 1.1), ['#d8782a', '#f2ece0', '#2f4f8a'], big ? 0.55 : 0.42);
@@ -479,4 +512,79 @@ export function ageLookTouches(k: Kit, type: BuildingType, age: AgeId): boolean 
     }
   }
   return true;
+}
+
+// ---- People who wear their age (#803 s2) ----------------------------------------------------------
+// A town's people dress for its age too, so an army or a work crew reads like the town it came from. Citizens wear the age's
+// hat in place of their epoch's (a team band kept round it, so whose worker it is still reads); foot soldiers, archers and
+// priests keep their helmets and hoods and wear a scarf in the town's colours. Heads sit at y 0.5 (radius 0.066), facing +z.
+
+/** The lines that wear their age: a hat for citizens, a scarf for the rest. */
+export const WEAR_LINES: string[] = ['citizen', 'infantry', 'ranged', 'priest'];
+
+const TEAM_WHITE = '#f4f4f4';
+
+const brim = (k: Kit, r: number, col: string, y = 0.545) => k.cyl(r, r, 0.012, 12, col, 0, y, 0);
+const crown = (k: Kit, r: number, h: number, col: string, y = 0.55) => k.cyl(r * 0.88, r, h, 10, col, 0, y, 0);
+const cap = (k: Kit, col: string, r = 0.071) => k.sphere(r, col, 0, 0.53, -0.008).scale.set(1, 0.78, 1.02);
+const band = (k: Kit, y = 0.545, r = 0.072) => k.team(k.cyl(r, r, 0.016, 10, TEAM_WHITE, 0, y, 0));
+
+/** Each age's hat for its citizens. */
+const HATS: Partial<Record<AgeId, (k: Kit) => void>> = {
+  chariots: (k) => { cap(k, '#a8783a'); band(k); },
+  iron: (k) => { cap(k, '#4a4a4e'); band(k); },
+  wild: (k) => {
+    band(k, 0.53);
+    for (const d of [-1, 1]) for (let i = 0; i < 2; i++) k.cyl(0.006, 0.01, 0.1 - i * 0.03, 4, BONE, d * (0.04 + i * 0.025), 0.56 + i * 0.03, 0).rotation.z = -d * (0.35 + i * 0.5);
+  },
+  rivers: (k) => { k.cone(0.14, 0.07, 10, REED, 0, 0.55, 0); band(k, 0.54, 0.07); },
+  hunt: (k) => { crown(k, 0.074, 0.05, '#6a5038'); k.cone(0.01, 0.12, 4, '#8a7a62', 0.05, 0.56, -0.04).rotation.z = -0.6; band(k, 0.55, 0.075); },
+  mycelium: (k) => { k.dome(0.11, '#c9a9bb', 0, 0.535, 0).scale.set(1, 0.55, 1); for (const [x, z] of [[0.04, 0.04], [-0.05, 0.02], [0.0, -0.06]]) k.sphere(0.014, '#efe8dc', x, 0.585, z); band(k, 0.527, 0.07); },
+  steppe: (k) => { crown(k, 0.07, 0.07, '#ece4cf'); k.cyl(0.078, 0.078, 0.025, 10, '#6a4a32', 0, 0.54, 0); band(k, 0.565, 0.066); },
+  merchant: (k) => { cap(k, '#7a3a2a', 0.074); band(k); },
+  pilgrim: (k) => { brim(k, 0.13, '#3a3430'); crown(k, 0.06, 0.045, '#3a3430'); k.sphere(0.022, '#efe6d2', 0, 0.575, 0.05); band(k, 0.556, 0.062); },
+  sail: (k) => { cap(k, '#24344c'); band(k); },
+  warband: (k) => { cap(k, '#6a5038', 0.075); band(k); k.box(0.2, 0.05, 0.13, '#6a5038', 0, 0.4, -0.01); },
+  horde: (k) => { crown(k, 0.075, 0.06, '#3a2e26'); k.cone(0.06, 0.06, 8, '#c9a43c', 0, 0.61, 0); band(k, 0.552, 0.077); },
+  searaider: (k) => { k.cone(0.074, 0.1, 8, '#7a7c80', 0, 0.53, 0); k.box(0.015, 0.06, 0.012, '#7a7c80', 0, 0.48, 0.07); band(k, 0.53, 0.074); },
+  alchemy: (k) => { k.box(0.11, 0.07, 0.11, '#1e1e22', 0, 0.54, -0.005); for (const d of [-1, 1]) k.box(0.07, 0.012, 0.012, '#1e1e22', d * 0.08, 0.58, -0.05); band(k, 0.535, 0.072); },
+  grove: (k) => { k.ring(0.07, 0.014, '#4e7a3a', 0.56); for (let i = 0; i < 5; i++) k.sphere(0.016, '#6a9a48', Math.cos(i * 1.26) * 0.07, 0.565, Math.sin(i * 1.26) * 0.07); band(k, 0.53, 0.07); },
+  missions: (k) => { brim(k, 0.12, '#2a2622'); crown(k, 0.065, 0.035, '#2a2622'); band(k, 0.556, 0.062); },
+  dykes: (k) => { brim(k, 0.1, '#1e1e22'); crown(k, 0.062, 0.07, '#1e1e22'); band(k, 0.556, 0.063); k.box(0.19, 0.035, 0.13, '#f1ece0', 0, 0.42, 0); },
+  beggars: (k) => { cap(k, '#3a4650'); band(k); k.cyl(0.035, 0.03, 0.025, 8, '#b8a27a', 0.09, 0.2, 0.04); },
+  golden: (k) => { band(k, 0.55, 0.07); k.ring(0.07, 0.012, '#e2b440', 0.57); for (let i = 0; i < 5; i++) k.cone(0.012, 0.04, 4, '#e2b440', Math.cos(i * 1.26) * 0.07, 0.575, Math.sin(i * 1.26) * 0.07); },
+  fair: (k) => { cap(k, '#5a2436'); band(k); k.cone(0.012, 0.13, 4, '#e8c54a', 0.04, 0.58, -0.03).rotation.z = -0.5; },
+  silk: (k) => { k.cyl(0.078, 0.074, 0.065, 10, '#efe2c4', 0, 0.53, 0); k.sphere(0.02, '#b8462e', 0, 0.565, 0.07); band(k, 0.527, 0.079); },
+  ironblood: (k) => { cap(k, '#2a2a2e', 0.074); band(k); k.box(0.12, 0.012, 0.075, '#9b1c2c', 0, 0.582, 0); },
+  reclaimer: (k) => { cap(k, '#8a6a4e', 0.073); band(k); },
+  hive: (k) => { brim(k, 0.12, '#d8b860'); crown(k, 0.06, 0.05, '#d8b860'); k.cyl(0.085, 0.085, 0.09, 10, '#ece6d4', 0, 0.455, 0); band(k, 0.556, 0.062); },
+  sapper: (k) => { cap(k, '#5a4430'); band(k); },
+  waterline: (k) => { brim(k, 0.11, '#1e1e22'); for (const a of [0, 2.1, 4.2]) k.box(0.1, 0.05, 0.02, '#1e1e22', Math.sin(a) * 0.075, 0.555, Math.cos(a) * 0.075).rotation.y = a; band(k, 0.553, 0.065); },
+  aeronaut: (k) => { cap(k, '#6a4a32'); band(k); for (const d of [-1, 1]) k.cyl(0.02, 0.02, 0.012, 8, '#9ad0dc', d * 0.03, 0.545, 0.062).rotation.x = Math.PI / 2; },
+  lightning: (k) => { band(k, 0.53); k.ring(0.072, 0.012, '#c27a3e', 0.56); k.glow(k.octa(0.018, '#bfe6ff', 0, 0.6, 0)); },
+  totalwar: (k) => { brim(k, 0.1, '#5a5e58', 0.555); cap(k, '#5a5e58', 0.07); band(k, 0.54); },
+  hemocraft: (k) => { cap(k, '#e6dcd6'); band(k); k.box(0.085, 0.045, 0.02, '#e6dcd6', 0, 0.465, 0.06); },
+  bloodrite: (k) => { band(k, 0.53); for (let i = 0; i < 6; i++) k.cone(0.012, 0.055, 4, BONE, Math.cos(i * 1.05) * 0.066, 0.555, Math.sin(i * 1.05) * 0.066); },
+  wildwood: (k) => { cap(k, '#4e6a36', 0.078); band(k, 0.53, 0.079); },
+  locks: (k) => { cap(k, '#5a5650'); k.box(0.09, 0.012, 0.06, '#5a5650', 0, 0.54, 0.06); band(k); },
+  atomic: (k) => { cap(k, '#7a7c70'); band(k); k.box(0.08, 0.055, 0.03, '#9a9c96', 0, 0.47, 0.06); k.cyl(0.022, 0.022, 0.035, 6, '#5a5c58', 0, 0.44, 0.08).rotation.x = Math.PI / 2; },
+  fission: (k) => { brim(k, 0.09, '#d8b850', 0.545); cap(k, '#d8b850', 0.072); band(k, 0.538, 0.073); },
+  fusion: (k) => { cap(k, '#eef1f3'); band(k); k.glow(k.box(0.11, 0.02, 0.02, '#7fe6ff', 0, 0.51, 0.06)); },
+  bloom: (k) => { band(k, 0.53); for (let i = 0; i < 5; i++) k.sphere(0.018, '#f2b8c8', 0.04 + Math.cos(i * 1.26) * 0.022, 0.575, Math.sin(i * 1.26) * 0.022); k.sphere(0.012, '#ffe28a', 0.04, 0.58, 0); },
+  leviathans: (k) => { band(k, 0.53); k.ring(0.072, 0.014, BONE, 0.555); k.box(0.012, 0.06, 0.012, BONE, 0, 0.56, 0.072); },
+  tides: (k) => { cap(k, '#c8a848', 0.075); k.box(0.12, 0.012, 0.09, '#c8a848', 0, 0.5, -0.07).rotation.x = 0.4; band(k); },
+  floating: (k) => { k.cone(0.12, 0.09, 10, '#cfb76e', 0, 0.545, 0); band(k, 0.54, 0.07); },
+};
+
+/** The hat an age's citizens wear in place of their epoch's, if it has one. */
+export function ageHat(age: AgeId | undefined): ((k: Kit) => void) | undefined {
+  return age ? HATS[age] : undefined;
+}
+
+/** A scarf in the town's colours on a soldier, archer or priest of the age, over its shoulders. */
+export function ageScarf(k: Kit, age: AgeId): void {
+  const p = AGE_PALETTES[age];
+  if (!p) return;
+  k.box(0.19, 0.04, 0.128, p.roof, 0, 0.415, 0);
+  k.box(0.04, 0.09, 0.02, p.roof, 0.04, 0.33, 0.062);
 }

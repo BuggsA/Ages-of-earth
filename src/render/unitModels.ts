@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import type { CivId, UnitType } from '../sim/types';
+import type { AgeId, CivId, UnitType } from '../sim/types';
 import { Kit, RIG_ARM, RIG_LEG_A, RIG_LEG_B, bake } from './kit';
 import { towKit } from './floatModels';
+import { WEAR_LINES, ageHat, ageScarf } from './ageLooks';
 
 /**
  * Every unit, in every epoch, built from primitives. Models face +z, stand on y = 0 and are about
@@ -80,7 +81,7 @@ function hairOrHat(k: Kit, y: number, hat?: (k: Kit, y: number) => void, at?: TH
 
 // ---- Citizens --------------------------------------------------------------------------------------
 
-function citizen(epoch: number): Kit {
+function citizen(epoch: number, hat?: (k: Kit) => void): Kit {
   const k = new Kit();
   const outfits = [
     { legs: SKIN, torso: '#c9a47a', belt: TEAM },
@@ -93,7 +94,17 @@ function citizen(epoch: number): Kit {
   // The torso wears the people's colour so a worker reads as theirs from the default camera height.
   const b = person(k, { legs: o.legs, torso: o.torso, torsoTeam: true });
   k.team(k.box(0.176, 0.035, 0.116, TEAM, 0, HIP + 0.02, 0));
-  if (epoch === 2) {
+  // An age of its own (#803) puts its own hat on its people in place of the epoch's.
+  if (hat) hat(k);
+  if (hat && epoch >= 4) {
+    // The Industrial dress below the cap still holds: the neckerchief, braces and pail.
+    k.team(k.box(0.12, 0.03, 0.08, TEAM, 0, 0.41, 0.02));
+    for (const x of [-0.045, 0.045]) k.box(0.02, 0.2, 0.125, '#5a3e2c', x, 0.23, 0.0);
+    k.cyl(0.035, 0.035, 0.06, 8, '#7d8791', 0.13, 0.12, 0.02);
+  } else if (hat) {
+    // Hair under the hat.
+    k.sphere(0.067, HAIR, 0, 0.51, -0.014).scale.set(1, 0.62, 1);
+  } else if (epoch === 2) {
     // A team-colored hood.
     k.team(k.sphere(0.075, TEAM, 0, 0.52, -0.015)).scale.set(1, 0.85, 1.05);
   } else if (epoch === 3) {
@@ -1474,11 +1485,19 @@ function legionary(epoch: number): Kit {
   return k;
 }
 
-function makeUnit(type: UnitType, epochIn: number): Kit {
-  // The Atomic Age (#605) has no soldiers of its own yet: its people keep their Industrial look.
+function makeUnit(type: UnitType, epochIn: number, age?: AgeId): Kit {
+  // The Atomic Age (#605) has no soldiers of its own yet: its people keep their Industrial shapes (and wear the age, #803).
   const epoch = epochIn === 5 ? 4 : epochIn;
-  if (type === 'infantry' && epoch >= LEGION_MODEL) return lineMark(legionary(epoch - LEGION_MODEL), type);
-  return type === 'citizen' && epoch >= THRALL_MODEL ? thrall(epoch - THRALL_MODEL) : lineMark(MAKERS[type](epoch), type);
+  if (type === 'infantry' && epoch >= LEGION_MODEL) return wearAge(lineMark(legionary(epoch - LEGION_MODEL), type), type, age);
+  if (type === 'citizen' && epoch >= THRALL_MODEL) return thrall(epoch - THRALL_MODEL);
+  if (type === 'citizen' && epoch < 5 && ageHat(age)) return lineMark(citizen(epoch, ageHat(age)), type);
+  return wearAge(lineMark(MAKERS[type](epoch), type), type, age);
+}
+
+/** A soldier, archer or priest of an age of its own wears a scarf in its town's colours (#803); a thrall wears nothing of it. */
+function wearAge(k: Kit, type: UnitType, age?: AgeId): Kit {
+  if (age && type !== 'citizen' && WEAR_LINES.includes(type)) ageScarf(k, age);
+  return k;
 }
 
 /**
@@ -1945,11 +1964,11 @@ function signatureMark(k: Kit, civ: CivId, type: UnitType, epoch = 1): void {
 }
 
 /** The baked geometry of a unit line in an epoch (team parts left white for tinting), with a people's mark when given. */
-export function unitGeometry(type: UnitType, epoch: number, civ?: CivId): THREE.BufferGeometry {
-  const key = `${type}:${epoch}:${civ ?? ''}`;
+export function unitGeometry(type: UnitType, epoch: number, civ?: CivId, age?: AgeId): THREE.BufferGeometry {
+  const key = `${type}:${epoch}:${civ ?? ''}${age ? ':' + age : ''}`;
   let g = cache.get(key);
   if (!g) {
-    const kit = makeUnit(type, epoch);
+    const kit = makeUnit(type, epoch, age);
     if (civ) signatureMark(kit, civ, type, epoch);
     g = bake(kit.root);
     cache.set(key, g);

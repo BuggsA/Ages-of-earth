@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { DRESSED_AGES, buildingGeometry } from '../src/render/buildingModels';
+import { THRALL_MODEL, unitGeometry } from '../src/render/unitModels';
 import { AGE_PALETTES, NEW_LOOK_AGES } from '../src/render/ageLooks';
 import { AGES } from '../src/sim/data';
 import type { AgeId, BuildingType } from '../src/sim/types';
@@ -94,6 +95,25 @@ describe('every age has a look of its own', () => {
       const p = AGE_PALETTES[a]!;
       if (AGES[a].tier >= 1) expect(hasColor(buildingGeometry('barracks', AGES[a].tier, '#cc3333', 0, a), '#3e4858'), a).toBe(true);
       expect(hasColor(buildingGeometry('house', AGES[a].tier, '#cc3333', 0, a), p.wall) || hasColor(buildingGeometry('house', AGES[a].tier, '#cc3333', 0, a), p.roof), a).toBe(true);
+    }
+  });
+
+  it('a people wears its age: no two ages dress a citizen alike, and soldiers wear the town\'s colours', () => {
+    const seen = new Map<string, string>();
+    for (const a of ALL) {
+      const sig = signature(unitGeometry('citizen', AGES[a].tier, undefined, AGE_PALETTES[a] ? a : undefined));
+      expect(seen.get(sig), `citizen: ${a} looks like ${seen.get(sig)}`).toBeUndefined();
+      seen.set(sig, a);
+    }
+    for (const a of SIDE) {
+      for (const type of ['infantry', 'ranged', 'priest'] as const) {
+        const plain = unitGeometry(type, AGES[a].tier);
+        const worn = unitGeometry(type, AGES[a].tier, undefined, a);
+        expect(worn.getAttribute('position').count, `${a} ${type}`).toBeGreaterThan(plain.getAttribute('position').count);
+        expect(hasColor(worn, AGE_PALETTES[a]!.roof), `${a} ${type}`).toBe(true);
+      }
+      // A thrall is a taken citizen: it wears nothing of its taker's age.
+      expect(signature(unitGeometry('citizen', AGES[a].tier + THRALL_MODEL, undefined, a))).toBe(signature(unitGeometry('citizen', AGES[a].tier + THRALL_MODEL)));
     }
   });
 });

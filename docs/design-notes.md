@@ -1603,5 +1603,7 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 
 **Seen and not:** shot in Chromium (software GL, `vite preview`, the age set on the live game) for 42 of the 43 ages side by side (all but the Stone Age, unchanged); each town read as its own. Not seen: Fusion's ring and Bloom's crown at night, the touches on rarer buildings (Den, Great Den, Caravanserai, Airfield), or any of it on a phone.
 
-**Next:** units that wear their age (a reed-boat ferry, felt-clad riders); the ground round a town (channels' green banks, the Wildwood's moss); and an age-up moment that repaints the town in a sweep from the Town Center outward instead of all at once.
+**People too (s2):** citizens wear their age's hat in place of the epoch's (a team band kept round it), and foot soldiers, archers and priests a scarf in the town's colours; a thrall wears nothing of its taker's age. Riders, heroes, siege and ships are untouched: a rider's head sits on a horse's frame, and heroes and ships have their own gear. The Wild Hunt and the Mycelium, merged the same morning, are dressed too; the test fails any new age that isn't.
+
+**Next:** riders and ships that wear their age (a reed-boat ferry, felt-clad riders); the ground round a town (channels' green banks, the Wildwood's moss); and an age-up moment that repaints the town in a sweep from the Town Center outward instead of all at once.
 
