@@ -52,6 +52,7 @@ import { atPost } from './trade';
 import { modsOf, trainTimeFor } from './stats';
 import { attrition } from './borders';
 import { tributeStep } from './tribute';
+import { agoraStep } from './agora';
 import { householdStep } from './household';
 import { coppiceStep } from './coppice';
 import { longbowStep } from './longbow';
@@ -700,6 +701,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   attrition(s);
   tributeStep(s);
   householdStep(s);
+  agoraStep(s);
   fireStep(s);
   coppiceStep(s);
   callWild(s);

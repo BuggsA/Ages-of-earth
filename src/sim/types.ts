@@ -887,6 +887,8 @@ export interface PlayerStats {
   tributeStone?: number;
   /** Gold a household people's houses paid it (#501). */
   taxed?: number;
+  /** Gold a Greek Market's agora drew in trade (#729); absent in older saves. */
+  agora?: number;
   /** Gold the Silk Road's caravans earned for the ground the camp covered while they were out (#326); absent in older saves. */
   caravan?: number;
   /** Gold taken in tolls from rival traders crossing the people's land (#334); absent in older saves. */

@@ -63,6 +63,7 @@ import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
 import { AI_TEMPER, ROUTES, TRUNK, type RouteId } from './data';
+import { inAgora } from './agora';
 import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS, STOCKADE, AI_STOCKADE, GALLERY } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
@@ -2989,6 +2990,7 @@ export function findSpot(s: GameState, type: BuildingType, x: number, y: number,
       if (placeProblem(s, type, tx, ty)) continue;
       if (margin && !laneClear(s, tx, ty, n, type === 'farm')) continue;
       if (ok && !ok(tx, ty)) continue;
+      if (type !== 'market' && inAgora(s, tx, ty, n)) continue;
       return { tx, ty };
     }
   }

@@ -2976,6 +2976,8 @@ export interface Civ {
   legion?: boolean;
   /** The household tax (#501, `HOUSEHOLD`): its citizens mine no gold; every house pays it, more on a built-up street. */
   household?: boolean;
+  /** The agora (`AGORA`): a finished Market with an open square round it, and a town round the square, trades for gold. */
+  agora?: boolean;
   /** Born on the move (#501, `NOMAD`): the camp is on wagons and the flock walks with it from the first minute; no fields and no quarry. */
   nomad?: boolean;
   /** The managed wood (#501, `COPPICE`): no farms; its felled trees grow back near its stores, it plants saplings, and its snares feed it. */
@@ -3036,6 +3038,15 @@ export const LONGBOW = { after: 3, range: 1.5, attack: 3 };
 export const HOUSEHOLD = { every: 5, gold: 0.12, street: 0.04, streetMax: 4, reach: 3, market: 2, raid: 25, aiStreet: 4 };
 
 /**
+ * The agora (the Greeks, #729): every `every` seconds each finished Market of a people that keeps one trades for gold. The square is
+ * the ground within `inner` tiles of the Market's footprint; the share of it left open (no building, tree, rock or water) is
+ * the share of the trade it draws: `gold` a second, and `rim` more for each of the people's own buildings standing beyond the
+ * square and within `outer` tiles (at most `rimMax`), for an empty square in a town of nobody trades with nobody. The computer
+ * raises nothing of its own in a square, wherever it stands.
+ */
+export const AGORA = { every: 5, gold: 0.1, rim: 0.08, rimMax: 6, inner: 2, outer: 7 };
+
+/**
  * The Nile flood (#501 s1): in season `season` (summer) the fields of a flood people lie under the river and yield nothing,
  * and the corvée makes its builders work `build` times as fast. The computer moves up to `move` farmers a think to other work,
  * and once the river falls sends up to `back` berry pickers a think to the fields it left empty (#517).
@@ -3057,6 +3068,7 @@ export const CIVS: Record<CivId, Civ> = {
     verb: 'Arm your citizens where they stand when war comes, and send them home to lay their arms down and work again',
     door: 'No foot soldiers are trained: the army is the workforce, so a long campaign starves the town',
     polis: true,
+    agora: true,
     add: { infantryArmor: 1 },
     mul: { infantryHp: 1.15 },
   },

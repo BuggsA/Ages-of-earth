@@ -67,6 +67,7 @@ import { drawnGlyph } from './ageArt';
 import { idleCitizens } from './idle';
 import { workforce, WORKFORCE_JOBS } from './workforce';
 import { citizenProblem, isLegion } from '../sim/legion';
+import { keepsAgora, rim, square, tradeOf } from '../sim/agora';
 import { isHousehold, streetOf, taxRate } from '../sim/household';
 import { bowman, isSet } from '../sim/longbow';
 import { isNomad } from '../sim/nomad';
@@ -1261,6 +1262,10 @@ export class Hud {
       const fair = relicTradeShare(s, b.owner);
       const wares = ironTradeShare(s, b.owner);
       status = `Prices: ${(['food', 'wood', 'stone'] as const).map((r) => `${icon(r, 14)}${s.market[r]} ${s.market[r] < MARKET.start[r] ? '↑' : s.market[r] > MARKET.start[r] ? '↓' : '→'}`).join(' ')}${traders ? ` · 🐪 ${traders} on the road` : ''}${fair > 1 ? ` · ⚱ trade +${Math.round((fair - 1) * 100)}% for relics kept` : ''}${wares > 1 ? ` · ⛓ trade +${Math.round((wares - 1) * 100)}% for iron dug` : ''}`;
+      if (b.built && keepsAgora(p)) {
+        const q = square(s, b);
+        status += ` · <span data-tip="<b>The agora</b>A Market trades in proportion to the ground round it left open (two tiles out) and to the buildings of yours standing beyond that. Build in the square and it pays less.">🏛 square ${q.open}/${q.total} open, ${rim(s, b)} round it: ${Math.round(tradeOf(s, b) * 60)} gold a minute</span>`;
+      }
     }
     else if (b.type === 'caravanserai' && b.built) {
       // The Silk Road's waystation (#334): the posts it serves and the caravans resting in it.
