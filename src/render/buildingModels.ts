@@ -1908,6 +1908,29 @@ function bloomery(k: Kit, _e: number, st: Style): void {
   banner(k, 0.95, 0, -0.85, 1.2);
 }
 
+/** A Hire Hall (#727, the Merchants): a counting-house under an ochre roof with a muster yard: a ledger desk, a strongbox, a pay window, a rack of spears and a drilling post. */
+function hirehall(k: Kit, _e: number, st: Style): void {
+  pad(k, 2, st.base);
+  // The hall: plastered walls, a tiled roof, a lit pay window and a door with a team lintel.
+  k.box(1.5, 0.95, 1.0, st.wall, -0.3, 0, -0.55);
+  k.box(1.6, 0.08, 1.1, st.trim, -0.3, 0.95, -0.55);
+  k.prism(1.7, 0.55, 1.2, st.roof, -0.3, 1.03, -0.55);
+  window(k, st, -0.75, 0.55, -0.04);
+  k.glow(k.box(0.3, 0.22, 0.04, '#ffd890', -0.75, 0.42, -0.03));
+  k.box(0.34, 0.6, 0.06, '#3a2b20', 0.05, 0, -0.04);
+  k.team(k.box(0.46, 0.07, 0.07, TEAM, 0.05, 0.62, -0.02));
+  // A strongbox bound in brass, with a stack of coin on the ledger desk.
+  k.box(0.4, 0.28, 0.28, '#5b4330', 0.75, 0, -0.5);
+  k.box(0.42, 0.05, 0.3, '#c9a24a', 0.75, 0.28, -0.5);
+  k.cyl(0.07, 0.07, 0.16, 8, '#e2c060', 0.62, 0.3, -0.5);
+  // The muster yard: a spear rack and a drilling post with a straw dummy.
+  k.box(0.7, 0.05, 0.12, '#6b4b2f', 0.35, 0.55, 0.7);
+  for (const x of [0.05, 0.2, 0.35, 0.5, 0.65]) k.cyl(0.015, 0.015, 0.9, 4, '#8a6a44', x, 0, 0.7).rotation.z = 0.06;
+  k.cyl(0.05, 0.06, 0.8, 5, '#6b4b2f', -0.7, 0, 0.7);
+  k.sphere(0.13, '#d8c9a0', -0.7, 0.9, 0.7);
+  banner(k, 0.95, 0, 0.9, 1.2);
+}
+
 /**
  * A channel being dug (#701, the Age of Rivers): a raw trench of dark earth with the spoil heaped on its banks, running on toward the
  * neighbouring ditches and the water (`mask`, as a wall's), a spade left in the heap and a peg in the owner's colour. Once the water
@@ -2753,7 +2776,7 @@ const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' |
   heart: (k) => heart(k),
   spire: (k) => spire(k),
   greatden,
-  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, battery, windmill, bloomery,
+  towncenter, house, storehouse, huntcamp, den, prospector, warcamp, drainrig, transfusion, bloodtower, caravanserai, mission, farm, barracks, range, stable, tower, forge, workshop, temple, market, wonder, gate, dock, airfield, silo, battery, windmill, bloomery, hirehall,
   // The Age of Tides (#739), drawn in `tideModels.ts`.
   tidemill: (k: Kit, _e: number, st: Style) => tidemill(k, st.base),
   cockler: (k: Kit, _e: number, st: Style) => cocklerHut(k, st.base),

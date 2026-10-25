@@ -4,7 +4,7 @@ import { AI_GATE_ANSWER } from '../sim/data';
 import { AI_GATE_READ } from '../sim/data';
 import { gateReach } from '../sim/tides';
 import { isEnemy } from '../sim/world';
-import { AGES, BLOOM, LEVIATHANS, MYCELIUM, UNITS, BLOOMERY, HIVE, INTERCEPT, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, BEGGARS, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
+import { AGES, BLOOM, LEVIATHANS, MYCELIUM, UNITS, BLOOMERY, HIREHALL, HIVE, INTERCEPT, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, BEGGARS, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
 import { battlesFor } from '../sim/battles';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, findsOf, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
@@ -356,6 +356,11 @@ const TIPS: Tip[] = [
     id: 'bloomery',
     when: (s, me) => ageOf(s.players[me]) === 'iron' && s.bogIron === true,
     text: `Raise a <b>${BUILDINGS.bloomery.name}</b> (<b>I</b>) beside the bog. Bog iron your diggers drop there is smelted hard: every bar counts ${BLOOMERY.smelt} times toward your spearmen's edge, and the hearth arms foot soldiers on the spot. Press <b>J</b> on it before you leave the Iron Age and it goes on arming spearmen at the Iron Age's price on any road. A rival who wants your iron must come to the marsh.`,
+  },
+  {
+    id: 'hirehall',
+    when: (s, me) => ageOf(s.players[me]) === 'merchant' && s.players[me].epoch >= 2,
+    text: `Hired swords draw wages. A <b>${BUILDINGS.hirehall.name}</b> (<b>V</b>, ${BUILDINGS.hirehall.cost.wood} wood ${BUILDINGS.hirehall.cost.gold} gold) signs them instead for a one-off price, ${HIREHALL.dear} times the Market's: no payday, none walks off, and it signs cavalry too. Cheap and paid by the day, or dear and yours. Press <b>J</b> on it before you leave the age and it goes on signing swords at that price.`,
   },
   {
     id: 'crossing-beggars',
