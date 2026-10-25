@@ -63,7 +63,7 @@ import { isNomad } from './nomad';
 import { disarmProblem, isPolis } from './polis';
 import { catchOf, herdsOut, yarding } from './year';
 import { AI_TEMPER, ROUTES, TRUNK, type RouteId } from './data';
-import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS } from './data';
+import { AI_ASSAY, AI_CACHE, CACHE, CIVS, COPPICE, FIRE, TAME, GROVE, HIVE, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, GIANTS, DEER, MILITARY, ORE_POST, FLOOD, HOUSEHOLD, LEGION, NOMAD, POLIS, SHAFT, SNARE, SPOILS, STOCKADE, AI_STOCKADE } from './data';
 import { citizenCap, isLegion, legionary } from './legion';
 import { treesNear } from './snares';
 import { isMobile } from './steppe';
@@ -455,6 +455,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   excavate(s, v, mem, issue);
   if (AI_LEVELS[v.p.ai!].clever) raiseMission(s, v, mem, issue);
   raiseBloomery(s, v, mem, issue);
+  raiseStockade(s, v, mem, issue);
   salvage(s, v, mem, issue);
   claimWalk(s, v, mem, issue);
   findWalk(s, v, mem, issue);
@@ -5639,7 +5640,22 @@ function haulHome(v: View, fighters: Unit[], issue: (c: Command) => void): Unit[
   const laden = fighters.filter((u) => (u.spoils ?? 0) >= SPOILS.home && u.order.k !== 'attack');
   if (!laden.length) return fighters;
   const fresh = laden.filter((u) => !(u.order.k === 'move' && !u.order.amove)).map((u) => u.id);
-  if (fresh.length) issue({ t: 'move', p: p.id, ids: fresh, x: ship ? ship.x : v.home.x, y: ship ? ship.y : v.home.y });
+  // A Spoils Stockade (#727) nearer than home takes the pack too (at a quarter's cut), so a host in the field banks at the front.
+  const bank = (u: Unit): { x: number; y: number } => {
+    if (ship) return ship;
+    let at: { x: number; y: number } = v.home;
+    let best = far(u);
+    for (const b of v.buildings) {
+      const d = (u.x - b.x) * (u.x - b.x) + (u.y - b.y) * (u.y - b.y);
+      if (b.type === 'stockade' && b.built && b.hp > 0 && d < best) { at = b; best = d; }
+    }
+    return at;
+  };
+  for (const id of fresh) {
+    const u = laden.find((l) => l.id === id)!;
+    const to = bank(u);
+    issue({ t: 'move', p: p.id, ids: [id], x: to.x, y: to.y });
+  }
   const going = new Set(laden.map((u) => u.id));
   return fighters.filter((u) => !going.has(u.id));
 }
@@ -5681,6 +5697,21 @@ function raiseBloomery(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
   if (bog < 0) return;
   const spot = findSpot(s, 'bloomery', (bog % s.w) + 0.5, Math.floor(bog / s.w) + 0.5, 2, 8);
   if (spot) construct(s, v, mem, 'bloomery', spot, 2, issue);
+}
+
+/**
+ * The Warband's Spoils Stockade (#727): a computer in the age with a Barracks and a host of at least `AI_STOCKADE.army` raises one
+ * `STOCKADE.away` tiles out from home toward the middle of the map, one at a time, so the host banks near the front.
+ */
+function raiseStockade(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (ageOf(p) !== 'warband' || buildBarred(p, 'stockade') || count(v, 'stockade') > 0 || count(v, 'barracks') === 0) return;
+  if (v.army.length < AI_STOCKADE.army || s.tick - (mem.ordered.stockade ?? -99999) < secs(60)) return;
+  const dx = s.w / 2 - v.home.x;
+  const dy = s.h / 2 - v.home.y;
+  const d = Math.sqrt(dx * dx + dy * dy) || 1;
+  const spot = findSpot(s, 'stockade', v.home.x + (dx / d) * STOCKADE.away, v.home.y + (dy / d) * STOCKADE.away, 0, 8);
+  if (spot) construct(s, v, mem, 'stockade', spot, 2, issue);
 }
 
 function raidShips(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
