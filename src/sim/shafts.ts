@@ -5,7 +5,7 @@
 import { SHAFT } from './data';
 import { mineable } from './household';
 import type { Building, GameState, Res, SeamId } from './types';
-import { R_BLOODIRON, R_GOLD, R_SALT, R_SALTPETRE, R_STONE, T_ROCK } from './types';
+import { R_BLOODIRON, R_GLOWCAP, R_GOLD, R_SALT, R_SALTPETRE, R_STONE, T_ROCK } from './types';
 
 export type Grade = keyof typeof SHAFT.grade;
 
@@ -13,7 +13,7 @@ export type Grade = keyof typeof SHAFT.grade;
 export const SEAMS = Object.keys(SHAFT.seams) as SeamId[];
 
 /** The tile kind a seam is dug as (its pace and its mining technologies are that deposit's). */
-export const TILE_OF_SEAM: Record<SeamId, number> = { stone: R_STONE, gold: R_GOLD, salt: R_SALT, saltpetre: R_SALTPETRE, bloodiron: R_BLOODIRON };
+export const TILE_OF_SEAM: Record<SeamId, number> = { stone: R_STONE, gold: R_GOLD, salt: R_SALT, saltpetre: R_SALTPETRE, bloodiron: R_BLOODIRON, glowcap: R_GLOWCAP };
 
 /** The stock a seam pays into: a rare ore is carried as stone and kept apart at the drop, as from its vein. */
 export const resOfSeam = (seam: SeamId): Res => (seam === 'gold' ? 'gold' : 'stone');

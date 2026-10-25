@@ -1323,6 +1323,28 @@ function skywhale(): Kit {
 }
 
 /**
+ * A Hawk (the Age of the Wild Hunt): a hunter's bird, brown-backed and pale-breasted, broad wings held out, a hooked beak and a
+ * fanned tail. A band of its people's colour on one leg, as a falconer ties one.
+ */
+function hawk(): Kit {
+  const k = new Kit();
+  const back = '#6b4f33';
+  const breast = '#d8cdb4';
+  k.blob(0.11, back, 0, 0, 0).scale.set(0.8, 0.7, 1.7);
+  k.blob(0.08, breast, 0, -0.05, 0.02).scale.set(0.8, 0.6, 1.5);
+  k.sphere(0.06, back, 0, 0.03, 0.2);
+  k.box(0.02, 0.025, 0.05, '#e0b13a', 0, 0.0, 0.27).rotation.x = 0.4;
+  for (const x of [-0.03, 0.03]) k.sphere(0.012, '#1c1e22', x, 0.05, 0.23);
+  k.box(0.12, 0.012, 0.14, '#4a3822', 0, 0.0, -0.22);
+  for (const side of [-1, 1]) {
+    k.box(0.36, 0.014, 0.17, back, side * 0.2, 0.01, 0.0).rotation.z = side * -0.12;
+    k.box(0.24, 0.012, 0.12, '#4a3822', side * 0.5, 0.0, -0.03);
+  }
+  k.team(k.box(0.024, 0.02, 0.024, TEAM, 0.03, -0.1, 0.02));
+  return k;
+}
+
+/**
  * The Behemoth (the Age of Leviathans): a titan turtle, its domed shell plated in mossy scutes, with a Town Center on its back: a
  * timber hall under a turf roof, a ring of palisade and a great banner in its people's colour. Pillar legs that lumber, a beaked
  * head low and forward. Much bigger than anything else that walks.
@@ -1433,7 +1455,7 @@ function reefship(): Kit {
 }
 
 const MAKERS: Record<UnitType, (epoch: number) => Kit> = {
-  tow: () => towKit(), citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, cog, fighter, bomber, trader, wagon, warwolf, tusker, warmammoth, blowpipe, cavebear, barge, warden, skywhale, behemoth, kraken, reefship };
+  tow: () => towKit(), citizen, infantry, ranged, cavalry, siege, priest, hero, fisher, warship, transport, cog, fighter, bomber, trader, wagon, warwolf, tusker, warmammoth, blowpipe, cavebear, barge, warden, skywhale, behemoth, kraken, reefship, hawk };
 
 /** Epoch + 30 asks for the citizen as a thrall (the same offset trick as the trader's gold and the caravan cart). */
 export const THRALL_MODEL = 30;

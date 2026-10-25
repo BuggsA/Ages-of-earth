@@ -1569,6 +1569,30 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 
 **Next:** reefs bared at low tide (`tides.ts`) that Reef Ships mend faster on; a Kraken that drags a gripped transport's soldiers under; the computer sending its Kraken at a rival's transports when they carry an army.
 
+## Designers' notes: the Age of the Mycelium and the Glowcap hollow (Wild route step 8a, #800, 2026-10-25, chain 1024-1233 s7)
+
+**Built:** the Wild route's rare gateway. A Glowcap hollow (a fifth rare ore, one hollow on about two seeds in five, or caps bought at a post) opens a turn off the Wild at tier 2. There a **web** grows under every hall: halls on it take every stock and a load carried onto it is banked where it stands. **Spores** hide your people on it from rival eyes and aim unless one comes within 2 tiles. **Rot** eats rival buildings that touch it. Soldiers cost a quarter more, fire burns the web back, and a torch can be set to the bare threads. From it runs the only road from tier 2 straight to the Bloom, opened by 3,000 stock banked through the web.
+
+**Why I love it:** it is the first age whose economy is about *shape*. The web makes you build tight and gather close, and it changes what a raid means: a cut-off camp means nothing to a town that banks wherever it stands, but a torch on the threads hurts. Spores turn your own streets into a place a rival can't read. Their archers can't see what they're shooting at, so they have to walk in, and walking in is what your hidden spearmen want. And because the threads glow for anyone who scouts them, the gateway is a tell: a web means the Bloom may come early, so rush it now.
+
+**What I chose:** no building of its own. The three new things are the web, spores and rot; a fourth (a "spore hall") would break the cap, and the web already changes every hall. "Right beside them" is 2 tiles, so melee finds what it bumps into but archers can't snipe into the web. Hiding stops for 3 seconds after a blow, so an ambush shows itself once sprung. A Bloom people that came this way may plant a Heart Tree (the Spire needs one) but wakes no Ents: it skipped the Wildwood and arrives without Ents, Hives or Blowpipes.
+
+**Seen and not:** in Chromium (software GL, Vite dev server, `window.ages`): a Mycelium town with its webs grown to 5 tiles round every hall, a Glowcap hollow beside it, and a Pikeman on the web selected with "🍄 Hidden" on its card; no page errors. The first threads were bright white lines that drowned the town; now they are faint, and only the caps glow. The three sounds I haven't heard. Trials (`scripts/mycelium-trial.ts`): where a hollow lies, the computer turns in at 6–7 minutes and its web banks 5,000–14,000 stock. It reaches the Bloom on some seeds (15 and 27 minutes). On others its weak window is punished.
+
+**Next:** rot drawn on the rotting building; the web remembered under fog; the computer building tighter round its web, and luring rival archers into it.
+
+## Designers' notes: the Age of the Wild Hunt (Wild route step 8b, #801, 2026-10-25, chain 1024-1233 s8)
+
+**Built:** the fifth crossing, the Wild and the Steppe made one hunt. Every rider from a Stable comes out with a War Wolf at its heel; wolves left standing near a rolling camp run after its wagons; a Hunting Camp trains Hawks, the game's first living flyer, which see farther than any scout and can't fight. Door: the steppe's (no fields, walls or gates), and riders a fifth dearer.
+
+**Why I love it:** it is the first age where an army is a *pair*. A rider and a wolf are one purchase and two bodies in two different counter classes (the wolf runs down archers, the rider is the usual horse), so a raid arrives as a mixed force with no Den and no taming; and a camp that moves takes its dogs with it, which is how the steppe hunted. The hawk makes scouting a thing you buy and lose: a bird that sees 15 tiles shows the raid what to run down, and it is shot out of the sky by any archer who spots it, so scouting a town costs the bird.
+
+**What I chose:** the wolf takes pop (a full town gets the rider alone) and is paid for by the rider's price (1.2×), so it can't be a free army by the back door. Followers pull only from a wagon that is moving, so a wolf posted at a front stays posted. Arrows hit the hawk (the question the issue left open): `canHit` already lets non-siege ranged units shoot the air, and a hawk with no way to die would be a free map hack. I left it fragile (26 health) and fast (3.6) rather than armoured.
+
+**Seen and not:** headless only (the tests, `scripts/sim.ts` for the unchanged checksum); the hawk model and cry were not looked at or listened to in a browser.
+
+**Next:** a keepsake building (a kennel that keeps the heel on any road); wings that beat; a hawk that marks what it sees so the pack runs to it; a rival's answer to a hawk beyond the arrow (a falconer's net, or a tower that favours the sky).
+
 ## Designers' notes: every age has a look of its own (#803, 2026-10-25)
 
 **Built:** the owner asked that each age look distinct. 21 of the 43 ages (the whole Water Road, the Wild route, the Atomic trio, Alchemy, Sappers, Sea-Raiders, Chariots, Missions) still borrowed their parent epoch's buildings unchanged. Now every age past the trunk has a **palette** (walls, roofs, trim: `AGE_PALETTES` in `src/render/ageLooks.ts`) and **touches** drawn from its own story, all baked into the one geometry per building, so no age costs a draw. The 17 ages dressed before keep their touches and gain a palette.

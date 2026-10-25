@@ -4,7 +4,7 @@ import { AI_GATE_ANSWER } from '../sim/data';
 import { AI_GATE_READ } from '../sim/data';
 import { gateReach } from '../sim/tides';
 import { isEnemy } from '../sim/world';
-import { AGES, BLOOM, LEVIATHANS, UNITS, BLOOMERY, HIVE, INTERCEPT, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, BEGGARS, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
+import { AGES, BLOOM, LEVIATHANS, MYCELIUM, UNITS, BLOOMERY, HIVE, INTERCEPT, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, BEGGARS, SEA_RAID, SPOILS, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
 import { battlesFor } from '../sim/battles';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, findsOf, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
@@ -31,6 +31,7 @@ const ALCHEMY_ROAD = ROADS.find((r) => r.to === 'alchemy')!;
 const SAPPER_ROAD = ROADS.find((r) => r.to === 'sapper')!;
 const SEA_ROAD = ROADS.find((r) => r.to === 'searaider')!;
 const CHARIOTS_ROAD = ROADS.find((r) => r.to === 'chariots')!;
+const HUNT_ROAD = ROADS.find((r) => r.to === 'hunt')!;
 const GOLDEN_ROAD = ROADS.find((r) => r.to === 'golden')!;
 const MISSIONS_ROAD = ROADS.find((r) => r.to === 'missions')!;
 const BEGGARS_ROAD = ROADS.find((r) => r.to === 'beggars')!;
@@ -324,6 +325,20 @@ const TIPS: Tip[] = [
     text: `Your riders are <b>chariots</b>. Every ${CHARIOT_FORGE.per} bars of bog iron dug past the first ${CHARIOT_FORGE.base} sharpen each one by ${CHARIOT_FORGE.attack}, up to ${CHARIOT_FORGE.most}: keep citizens in the marsh. They beat archers and men on foot with no spears, but a firm line of spearmen beats them, and you have no archers, walls or gates to answer with.`,
   },
   {
+    id: 'crossing-hunt',
+    // The fifth crossing (#801): a people that has walked the Wild or the Steppe, back in the Stone Age.
+    when: (s, me) => {
+      const p = s.players[me];
+      return ageOf(p) === 'stone' && roadKnown(s, p, HUNT_ROAD) && !HUNT_ROAD.crossing!.every((a) => hasWalked(p, a));
+    },
+    text: `A crossing: your people has walked one of the <b>${AGES.wild.name}</b> and the <b>${AGES.steppe.name}</b>. Walk the other too, then come back to the Stone Age (a step back), and the Town Center (🔀) can turn your people into the <b>${AGES.hunt.name}</b>: the pack and the camp ride as one.`,
+  },
+  {
+    id: 'hunt',
+    when: (s, me) => ageOf(s.players[me]) === 'hunt',
+    text: `Every rider from a Stable comes out with a <b>War Wolf</b> at its heel (if there is room for it in your houses), and the wolves follow your wagons when the camp moves (<b>J</b> packs a Town Center or House). Raise a <b>${BUILDINGS.huntcamp.name}</b> (${BUILDINGS.huntcamp.key}) and train <b>Hawks</b> there: cheap birds that fly over walls, woods and water and see far, with no weapon. Right-click ground to send one. Archers and towers can still shoot a hawk down. You till no fields and raise no walls, and riders cost a fifth more.`,
+  },
+  {
     id: 'crossing-missions',
     // The second crossing (#555 s12): a people that has walked the Pilgrims or the Sail, back in the Middle Ages.
     when: (s, me) => {
@@ -540,6 +555,18 @@ const TIPS: Tip[] = [
     // The Age of Leviathans (`docs/wild-road.md` §5a): its first minute.
     when: (s, me) => ageOf(s.players[me]) === 'leviathans',
     text: `The beasts' end: your people breeds giants now. Raise a <b>${BUILDINGS.greatden.name}</b> (${BUILDINGS.greatden.key}). Its <b>Skywhales</b> fly over walls, woods and water: right-click one with soldiers to board (up to ${UNITS.skywhale[5]?.capacity}), then right-click ground behind a rival's walls to set them down. Over a rival's street, press <kbd>B</kbd> to drop a seed-bomb: ${LEVIATHANS.seeds} Thornwall seedlings sprout beneath it and grow, cutting their town in pieces. Fighters and riflemen bring whales down, with all aboard. Breed your one <b>Behemoth</b>: a titan with a Town Center on its back. Walk it to the wood, the gold or the front and press <kbd>P</kbd> to kneel: the Town Center stands there at once, working. Select it and press <kbd>P</kbd> to rise and walk on. At sea: a Great Den raised within ${LEVIATHANS.sea} tiles of the water breeds the <b>Kraken</b>, which grips the ships it strikes so they can't sail and shoves yours along, and your Docks grow <b>Reef Ships</b> in the warships' place, launched young and mending themselves after a fight. Your Heart Tree sleeps: no new Ents and no Spreading, and the Bloom is closed to you for good.`,
+  },
+  {
+    id: 'mycelium',
+    // The Age of the Mycelium (#800, `docs/wild-road.md` §R): its first minute.
+    when: (s, me) => ageOf(s.players[me]) === 'mycelium',
+    text: `A web grows under your town now: pale threads spread from each of your halls, ${MYCELIUM.reach} tiles out over ${Math.round(MYCELIUM.reach / MYCELIUM.grow)} seconds. Build close and work close: every hall on the web takes in every stock, and a load carried onto the web is banked the moment it gets there, so gatherers in the web never walk home. Your people standing on the web are <b>hidden</b>: no rival sees them or aims at them unless it comes within ${MYCELIUM.reveal} tiles, or they have just struck, so fight at home and let them come to you. A rival building touching your web rots. Soldiers cost a quarter more, and fire burns the web back: a rival's torch (F) on your threads, or a burning tree near them. Bank ${MYCELIUM.deed} stock through the web and the long road to the Bloom opens, skipping two ages.`,
+  },
+  {
+    id: 'web',
+    // A rival's fungus web (#800) in sight.
+    when: (s, me) => s.ents.some((e) => e.kind === 'building' && !!e.web && e.web > 2 && e.hp > 0 && s.players[e.owner].team !== s.players[me].team && s.players[me].vis[e.ty * s.w + e.tx] === 1),
+    text: `Pale threads glow round a rival's halls: a fungus web. Their people on it are hidden from you until you come within ${MYCELIUM.reveal} tiles, their halls take every stock, and any building of yours that touches it rots. Burn it back: select citizens or foot soldiers, press <kbd>F</kbd> and click bare ground on the threads. And they may be bound for the Bloom: the web is its short road.`,
   },
   {
     id: 'torch',

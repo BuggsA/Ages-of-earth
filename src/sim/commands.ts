@@ -1083,7 +1083,7 @@ export function applyCommand(s: GameState, c: Command): void {
     }
     case 'trade': {
       if (!s.ents.some((e) => e.kind === 'building' && e.owner === c.p && e.type === 'market' && e.built && e.hp > 0)) return refuse(s, c.p, 'Needs a Market');
-      if (c.res === 'salt' || c.res === 'saltpetre' || c.res === 'bloodiron') {
+      if (c.res === 'salt' || c.res === 'saltpetre' || c.res === 'bloodiron' || c.res === 'glowcap') {
         const have = p.rare?.[c.res] ?? 0;
         if (c.buy || have < ORE_TRADE.lot) return refuse(s, c.p, c.buy ? `${RARE[c.res].name} cannot be bought` : `Need ${ORE_TRADE.lot} ${RARE[c.res].name.toLowerCase()} to sell`);
         p.rare![c.res] = have - ORE_TRADE.lot;

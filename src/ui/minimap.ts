@@ -12,7 +12,7 @@ const FLATS_RGB = [143, 134, 112];
 const WATER_RGB = [0x2f, 0x7f, 0xae];
 /** Tiles pumped out of the water so far, by every people. */
 const drained = (s: GameState): number => s.players.reduce((n, p) => n + (p.stats.drained ?? 0) + (p.stats.dug ?? 0), (s.flooded ?? 0) + (s.inundated ?? 0) + (s.tideTurns ?? 0));
-import { R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE, T_ROCK, T_SAND, T_WATER } from '../sim/types';
+import { R_BERRY, R_BLOODIRON, R_GLOWCAP, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE, T_ROCK, T_SAND, T_WATER } from '../sim/types';
 import { R_COCKLE } from '../sim/types';
 import { revealed, ringsFor, warnRadius } from '../sim/silo';
 
@@ -23,7 +23,7 @@ import { revealed, ringsFor, warnRadius } from '../sim/silo';
  */
 
 /** The chart's marks (#565): each key resource in the colour its ground shows on this map. */
-const CHART_COLOR: Record<KeyId, string> = { bogIron: '#c0622a', salt: '#f4f1e8', saltpetre: '#d8d27a', bloodiron: '#a01c2c', ruin: '#d8cfb8' };
+const CHART_COLOR: Record<KeyId, string> = { bogIron: '#c0622a', salt: '#f4f1e8', saltpetre: '#d8d27a', bloodiron: '#a01c2c', glowcap: '#8fe0ee', ruin: '#d8cfb8' };
 
 /** A side age rings its owner's buildings on the map, so a rival's road shows at a glance (#55). */
 const AGE_BLIP: Partial<Record<AgeId, string>> = { merchant: '#ffd166', iron: '#ff7a2a', pilgrim: '#f4efe4', fair: '#e0524a', sail: '#3fb8c8', lightning: '#8fd8ff', warband: '#9b1c2c', ironblood: '#6e0f1c', totalwar: '#4a0a12', hemocraft: '#b0182c', bloodrite: '#5e1a4a', horde: '#c8a24a', silk: '#b8462e' };
@@ -174,6 +174,7 @@ export class Minimap {
     const salt = rgb('#f4f1e8');
     const petre = rgb('#d8d27a');
     const bloodiron = rgb('#a01c2c');
+    const glowcap = rgb('#8fe0ee');
     for (let i = 0; i < s.w * s.h; i++) {
       const seen = reveal || p.seen[i];
       const vis = reveal || p.vis[i];
@@ -202,6 +203,7 @@ export class Minimap {
       else if (res === R_SALT) [r, g, b] = salt;
       else if (res === R_SALTPETRE) [r, g, b] = petre;
       else if (res === R_BLOODIRON) [r, g, b] = bloodiron;
+      else if (res === R_GLOWCAP) [r, g, b] = glowcap;
       const k = seen ? (vis ? 1 : 0.55) : 0;
       d[i * 4] = seen ? r * k : 14;
       d[i * 4 + 1] = seen ? g * k : 22;
@@ -420,6 +422,8 @@ export class Minimap {
     for (const e of s.ents) {
       if (e.kind !== 'unit' || e.hp <= 0 || e.inside) continue;
       if (e.owner !== viewer && !reveal && !p.vis[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
+      // Hidden by a rival's spores (#800).
+      if (e.cloak && !reveal && s.players[e.owner].team !== p.team) continue;
       ctx.fillStyle = selected.has(e.id) ? '#ffffff' : s.players[e.owner].color;
       const dom = domainOf(e.type);
       const r = Math.max(1.6, sx * 0.8) * (dom === 'land' ? 1 : 1.35);

@@ -14,7 +14,7 @@ export type SoundName =
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
   | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'siloAlarm' | 'interceptLaunch' | 'interceptHit' | 'interceptMiss' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'fireLit' | 'fireCatch' | 'fireOut' | 'fireAsh' | 'flow' | 'rush' | 'groan' | 'dart' | 'swarm' | 'hiveHush' | 'sluiceOpen' | 'sluiceShut' | 'spread' | 'tideWash' | 'tideMill' | 'swept' | 'pondShut' | 'breach' | 'entWake' | 'entRoot' | 'spreading' | 'damBurst' | 'castOff' | 'moor' | 'founder' | 'bloomSling' | 'bloomRoot' | 'bloomGrow' | 'bloomCut' | 'bloomCrack' | 'bloomGreen' | 'bloomStorm'
-  | 'scour' | 'boarded' | 'whaleSong' | 'seedBomb' | 'behemothKneel' | 'behemothRise' | 'krakenGrip' | 'krakenRise';
+  | 'scour' | 'boarded' | 'whaleSong' | 'seedBomb' | 'behemothKneel' | 'behemothRise' | 'krakenGrip' | 'krakenRise' | 'webRot' | 'webBurn' | 'webGrown' | 'hawkCry';
 
 export interface SoundSettings {
   /** Effects volume, 0 to 1. */
@@ -873,6 +873,13 @@ export class Sound {
         this.noise(out, t + 0.7, { dur: 0.25, filter: 'lowpass', f: 300, peak: 0.08 });
         this.noise(out, t + 0.9, { dur: 1.2, filter: 'bandpass', f: 2200, to: 1400, q: 0.6, peak: 0.03, attack: 0.3 });
         break;
+      case 'hawkCry':
+        // A Hawk trained (the Age of the Wild Hunt): a thin keening scream that slides down, twice, high over the camp.
+        for (const d of [0, 0.34]) {
+          this.tone(out, t + d, { f: 3200, to: 2100, type: 'sawtooth', dur: 0.3, peak: 0.025, attack: 0.02, lp: 4200 });
+          this.noise(out, t + d, { dur: 0.25, filter: 'bandpass', f: 3000, to: 2200, q: 2, peak: 0.02, attack: 0.03 });
+        }
+        break;
       case 'whaleSong':
         // A Skywhale bred (the Age of Leviathans): a long low moan that bends up and falls away, a second voice answering a fifth above.
         this.tone(out, t, { f: 120, to: 175, type: 'sine', dur: 1.4, peak: 0.07, attack: 0.4, glide: 0.9 });
@@ -913,6 +920,22 @@ export class Sound {
         for (let i = 0; i < 7; i++) this.tone(out, t + i * 0.12, { f: 300 + i * 70, to: 600 + i * 90, type: 'sine', dur: 0.08, peak: 0.02, attack: 0.01 });
         this.noise(out, t, { dur: 1.4, filter: 'lowpass', f: 400, to: 800, peak: 0.05, attack: 0.5 });
         this.tone(out, t + 0.4, { f: 40, to: 62, type: 'sawtooth', dur: 1.5, peak: 0.05, attack: 0.5, lp: 350 });
+        break;
+      case 'webRot':
+        // Rot from the Mycelium's web (#800): a soft wet crumble of timber, and a breath of spores.
+        this.noise(out, t, { dur: 0.5, filter: 'bandpass', f: 380, to: 220, q: 2, peak: 0.04, attack: 0.08 });
+        this.noise(out, t + 0.15, { dur: 0.9, filter: 'highpass', f: 3000, to: 4200, peak: 0.012, attack: 0.3 });
+        break;
+      case 'webBurn':
+        // Fire takes the web (#800): a quick dry sizzle, threads popping, and a falling glassy note as the glow goes out.
+        this.noise(out, t, { dur: 0.4, filter: 'highpass', f: 2600, peak: 0.05, attack: 0.01 });
+        for (let i = 0; i < 4; i++) this.noise(out, t + 0.05 + i * 0.06, { dur: 0.03, filter: 'bandpass', f: 1800 + i * 300, q: 4, peak: 0.03 });
+        this.tone(out, t + 0.1, { f: 1400, to: 700, type: 'sine', dur: 0.5, peak: 0.015, attack: 0.02 });
+        break;
+      case 'webGrown':
+        // The web grown full under a Town Center (#800): a low hum under the ground and a shimmer of soft high glass, rising.
+        this.tone(out, t, { f: 65, to: 72, type: 'sine', dur: 1.8, peak: 0.04, attack: 0.6 });
+        for (const [d, f] of [[0.3, 1320], [0.55, 1760], [0.8, 1980], [1.05, 2640]] as const) this.tone(out, t + d, { f, to: f * 1.01, type: 'sine', dur: 0.7, peak: 0.012, attack: 0.15 });
         break;
       case 'spreading':
         // The Spreading (the Wildwood, spring): a soft swell of wind in new leaves, and two high notes of a woodland bird.

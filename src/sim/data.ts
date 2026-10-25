@@ -49,6 +49,11 @@ const KRAKEN_MOST = 2;
 const REEF_BORN = 40;
 const REEF_MEND = 3;
 const LEVIATHANS_CALM = 8;
+/** The Age of the Mycelium's web, spores and rot (#800, `MYCELIUM`), named here so the age's words can say them. */
+const WEB_REACH = 5;
+const WEB_GROW = 100;
+const SPORE_REVEAL = 2;
+const WEB_DEED = 3000;
 
 // ---- Ages and paths -------------------------------------------------------------------------------
 
@@ -97,6 +102,11 @@ export interface Age {
   noBuild?: { buildings: BuildingType[]; why: string };
   /** A town on wheels (#297): Town Centers and Houses can be packed onto wagons and pitched again elsewhere (`STEPPE`). */
   mobile?: boolean;
+  /**
+   * The Age of the Wild Hunt (#801): every rider trained at a Stable comes with a War Wolf running beside it, the people's wolves follow
+   * its wagons when the camp moves, and its Hunting Camps send hawks aloft. See `HUNT` (`hunt.ts`).
+   */
+  heel?: boolean;
   /** Buildings a mobile age packs onto wagons besides `STEPPE.packs` (the Silk Road's Market, #326). */
   packs?: BuildingType[];
   /**
@@ -650,6 +660,22 @@ export const AGES: Record<AgeId, Age> = {
     noBuild: { buildings: ['wall', 'gate'], why: 'A chariot people raises no walls or gates: it rides open ground. They wait until it settles in the Bronze Age or climbs on' },
     no: { units: ['ranged'], why: 'No archers behind a chariot\'s dust: bows wait until the people settles in the Bronze Age or climbs on' },
   },
+  // The fifth crossing (#801, step 8b of the Wild route, `docs/wild-road.md` §X): the Wild's beasts and the Steppe's camp on wheels made one
+  // hunt. Open only to a people that walked both, off the Stone Age they share. Raids that see everything and outrun everything.
+  hunt: {
+    verb: 'Ride with a War Wolf running at every rider\'s heel, and let the pack follow the wagons when the camp moves; loose hawks over the map to see what the pack will run down',
+    door: 'No fields, walls or gates, the steppe\'s door, and every rider a fifth dearer: the wolf at its heel is fed from your stores',
+    good: 'Raids that see everything and outrun everything: a rider and a wolf for the price of a rider, hawks for eyes, and a camp that moves',
+    routes: [],
+    name: 'Age of the Wild Hunt',
+    short: 'Wild Hunt',
+    tier: 1,
+    blurb: 'As the Scythian and the Mongol hunted with dogs and hawks and drove the game before them: the Wild\'s beasts met the Steppe\'s camp on wheels. Every rider trained at a Stable comes out with a War Wolf running beside it, tamed or not, and the wolves follow your wagons when the camp moves, so a pack is always at the wagon\'s heel. A Hunting Camp trains Hawks, cheap birds that fly over walls, woods and water and see farther than any scout, but cannot fight (an archer or a tower can still shoot one down). Town Centers and Houses pack onto wagons as on the Steppe. What it gives up: fields, walls and gates, and every rider costs a fifth more, for the wolf.',
+    price: { cavalry: 1.2 },
+    mobile: true,
+    heel: true,
+    noBuild: { buildings: ['farm', 'wall', 'gate'], why: 'A people of the Wild Hunt tills no fields and raises no walls: they wait for the Middle Ages, or until it settles in the Bronze Age' },
+  },
   // The Wild route (`docs/wild-road.md`), first step: the wild beasts of the map become an army, and the Den breeds more.
   wild: {
     verb: 'Tame wolves, boars and mammoths with your citizens, then breed the kinds you tamed at a Beast Den',
@@ -726,6 +752,19 @@ export const AGES: Record<AgeId, Age> = {
     blurb: `Instead of the Atomic Age: the beasts' end. Raise a Great Den (J) and breed giants there; raise it within ${KRAKEN_SEA} tiles of the sea and it breeds the Kraken too, up to ${KRAKEN_MOST} to a people, which grips ships so they can't move and shoves your own along. Your Docks grow Reef Ships in the warships' place: living coral, launched at ${REEF_BORN}% of its strength, that grows to full on the water and mends itself after. A Skywhale is a living airship: it drifts over walls, woods and water carrying ${WHALE_HOLD} soldiers or citizens, sets them down wherever there is ground, and every ${WHALE_BOMB} seconds drops a seed-bomb (B) that sprouts ${WHALE_SEEDS} Thornwall seedlings on the ground beneath it, in a rival's streets as well as your own. Fighters, riflemen and towers bring it down. The Behemoth is one titan turtle to a people, with a Town Center on its back: it walks, tramples walls, and kneels (P) wherever the land is not a rival's, a working Town Center at once, then rises (P) and walks on. Lose it and you lose a Town Center. The Heart Tree sleeps while you stay: no new Ents, no Spreading, and every Ent roots. No rifles, field guns, aircraft or Missile Silo.`,
     no: { units: ['warden', 'ranged', 'siege', 'fighter', 'bomber', 'warship'], why: 'A Leviathan people wakes no Ents while its Heart Tree sleeps, and builds no machines: no rifles, field guns, ironclads or aircraft. Its giants are its air and its siege, and its Docks grow Reef Ships. They wait until it goes back to the Wildwood or rejoins the Atomic Age' },
     noBuild: { buildings: ['airfield', 'silo'], why: 'A Leviathan people builds no machines: no Airfield or Missile Silo until it rejoins the Atomic Age' },
+  },
+  // The Wild route's rare gateway (#800, `docs/wild-road.md` §R, `mycelium.ts`): a web under the town, and the short road to the Bloom.
+  mycelium: {
+    verb: 'Grow a fungus web under your town: every hall on it takes in every stock, stock is banked the moment it is carried onto it, your people on it are hidden by spores, and a rival building touching it rots',
+    door: 'Soldiers cost a quarter more, and fire burns the web back',
+    good: 'A town that cannot be starved or cut off, unseen people in its streets, and the only short road to the Bloom',
+    routes: ['wild'],
+    gateway: true,
+    name: 'Age of the Mycelium',
+    short: 'Mycelium',
+    tier: 2,
+    blurb: `Instead of the Middle Ages, and only where a Glowcap hollow lies or a post sells its caps: a people that lives on the fungus under its feet. Pale threads spread from each of your halls, ${WEB_REACH} tiles out over ${WEB_GROW} seconds. Every hall on the web takes in every stock, and a load carried onto the web is banked at once, so no one walks home. Your people standing on the web are hidden by spores: no rival sees them or aims at them unless it stands within ${SPORE_REVEAL} tiles, or they have just struck. A rival building touching your web slowly rots, timber twice as fast as stone. What it costs: soldiers cost a quarter more, and any fire on or near the web burns it back to that point, to grow again. Weak in a fight; but it holds the only road from the second tier straight to the Age of the Bloom.`,
+    price: { infantry: 1.25, ranged: 1.25, cavalry: 1.25, siege: 1.25 },
   },
   // The second crossing (#555 s12): the Pilgrims' priests and the Sail's ships made one trade. Open only to a people that walked both.
   missions: {
@@ -1155,6 +1194,30 @@ export const ROADS: Road[] = [
   },
   { from: 'leviathans', to: 'atomic', cost: { food: 300, gold: 300 }, time: 30, blurb: 'Rejoin the Atomic Age: machines and the Missile Silo return, and the Heart Tree wakes. Your Great Den keeps breeding its giants.' },
   { from: 'leviathans', to: 'wildwood', cost: { food: 300, wood: 300 }, time: 30, blurb: 'Go back into the Wildwood: the Heart Tree wakes, Ents walk again and the woods spread each spring. Your Great Den keeps breeding its giants.' },
+  // The Wild route's rare gateway (#800, `docs/wild-road.md` §R): a turn off the Wild at tier 2, open only on glowcaps picked from a
+  // Glowcap hollow (or bought at a post where the world has none). From it, the only road straight to the Bloom: the web's harvest opens it.
+  {
+    from: 'wild',
+    to: 'mycelium',
+    cost: { food: 400, wood: 250, gold: 100 },
+    time: 40,
+    walked: 'wild',
+    vein: { id: 'glowcap', n: 40, text: 'Your citizens pick 40 glowcaps from a Glowcap hollow, or traders buy them at a post' },
+    blurb: 'Instead of the Middle Ages, and only where glowcaps are to be had: grow a fungus web under the town. Every hall on it takes in every stock, your people on it are hidden by spores, and rival buildings touching it rot. Soldiers cost a quarter more and fire burns the web back. Weak in a fight; it is the only short road to the Bloom.',
+  },
+  { from: 'mycelium', to: 'gunpowder', cost: EPOCHS[3].cost, time: EPOCHS[3].time, blurb: 'Rejoin the main road at the Gunpowder Age for the ordinary price. The web withers, the spores settle and soldiers cost what they always did.' },
+  { from: 'mycelium', to: 'middle', cost: { food: 200, wood: 200 }, time: 25, blurb: 'Settle down in the Middle Ages. The web withers, the spores settle and soldiers cost what they always did.' },
+  {
+    from: 'mycelium',
+    to: 'bloom',
+    cost: { food: 1800, wood: 1400, gold: 1400, stone: 200 },
+    time: 120,
+    walked: 'mycelium',
+    gate: 'hard',
+    deed: { stat: 'webbed', n: WEB_DEED, text: `Your web takes in ${WEB_DEED} stock` },
+    shuns: 'leviathans',
+    blurb: 'Skip the Hive and the Wildwood: the web flowers into the plants\' end, three tiers in one long, dear step. A Seed Spire slings Bloom Seeds once you have planted a Heart Tree, and the Greening wins the match for a people whose land stays green. The web withers, no new beasts and no Missile Silo while you stay, and Leviathans are closed to you for good.',
+  },
   // The other road out of the Stone Age (#297): the hunt, not the bog, opens it.
   {
     from: 'stone',
@@ -1528,6 +1591,20 @@ export const ROADS: Road[] = [
   },
   { from: 'beggars', to: 'middle', cost: { food: 200, wood: 150 }, time: 25, blurb: 'Lay up the beggar fleet: the ordinary Middle Ages, with walls, gates and fishing boats. The ships you took are yours to keep.' },
   { from: 'beggars', to: 'gunpowder', cost: { food: 900, wood: 500, gold: 450, stone: 150 }, time: 65, blurb: 'Climb to the Gunpowder Age: the boarding ends, walls, gates and fishing boats return, and the ships you took sail on as your own (more wood and less gold than from the Middle Ages: the fortune was in the ships).' },
+  // The fifth crossing (#801): off the Stone Age, for a people that walked the Wild and the Steppe, the two turns off it. The way back to the
+  // Stone Age is a step back (`STEP_BACK`). A Hunting Camp is the clue, as on both; the journey is the price.
+  {
+    from: 'stone',
+    to: 'hunt',
+    cost: { food: 350, wood: 200, gold: 100 },
+    time: 40,
+    clue: 'huntcamp',
+    gate: 'hard',
+    crossing: ['wild', 'steppe'],
+    blurb: 'A turn, not a climb, for a people that has walked both the Wild and the Steppe: the pack and the camp ride as one. Every rider trained at a Stable comes with a War Wolf running at its heel, the wolves follow the wagons when the camp moves, and a Hunting Camp trains Hawks that see far and cannot fight. What it gives up: fields, walls and gates, and riders cost a fifth more.',
+  },
+  { from: 'hunt', to: 'bronze', cost: { food: 150, wood: 150 }, time: 20, blurb: 'Settle down: the Bronze Age, with fields, walls and gates, and riders at their usual price. The wolves and hawks you have stay, but no wolf comes at a rider\'s heel.' },
+  { from: 'hunt', to: 'middle', cost: EPOCHS[2].cost, time: EPOCHS[2].time, blurb: 'Rejoin the main road at the Middle Ages, for the same price as from the Bronze Age: fields, walls and gates return. The wolves and hawks you have stay, but no wolf comes at a rider\'s heel.' },
   // The Golden Age (#703): heard of by a people that has walked two side ages, open to one that has walked three. It ends on its own (`GOLDEN.span`).
   {
     from: 'gunpowder',
@@ -1842,6 +1919,7 @@ export interface UnitStats {
 
 /** A beast of the Wild: the same from the Bronze tier on, for it does not re-arm. */
 const beast = (u: UnitStats): (UnitStats | null)[] => [null, u, u, u, u];
+const HAWK: UnitStats = { name: 'Hawk', cls: 'bomber', hp: 26, attack: 0, armor: 0, parmor: 0, range: 0, reload: 1, speed: 3.6, sight: 15, cost: { food: 40 }, time: 12, radius: 0.18, blurb: 'A hunter\'s bird, trained at a Hunting Camp: it flies over walls, woods and water and sees farther than any scout, but it has no weapon and a hawk is soon dead if it lingers in range of an archer or a tower. Right-click ground to send it there.' };
 const BLOWPIPE: UnitStats = { name: 'Blowpipe Hunter', cls: 'ranged', hp: 50, attack: 3, armor: 0, parmor: 1, range: 4, reload: 1.6, speed: 1.7, sight: 7, cost: { food: 35, wood: 40 }, time: 14, radius: 0.24, shot: 'dart', blurb: 'A hunter with a long cane blowpipe and darts tipped in venom. Short of reach, but every dart adds venom that burns past armour and slows: death to heavy riders, bears and mammoths. Riders who reach it first cut it down.' };
 
 /** Each line has one version per epoch (null where it isn't available yet). Units re-arm when their owner advances. */
@@ -2016,14 +2094,16 @@ export const UNITS: Record<UnitType, (UnitStats | null)[]> = {
   kraken: [null, null, null, null, null, { name: 'Kraken', cls: 'ship', hp: 1400, attack: 34, armor: 3, parmor: 5, range: 1.5, reload: 2.5, speed: 2.4, sight: 9, cost: { food: 500, wood: 100, gold: 300 }, time: 60, radius: 0.5, blurb: `A giant of the deep, bred at a Great Den that stands within ${KRAKEN_SEA} tiles of the sea, ${KRAKEN_MOST} to a people. Its arms reach a tile and a half: every blow on a ship grips it ${KRAKEN_GRIP} seconds, so it can't sail away, and it drags at anything on the shore beside it. Your own ships near it are shoved along a third faster. It outruns warships and tears them apart, but warships and towers that shoot first wear it down, and it never leaves the water.` }],
   reefship: [null, null, null, null, null, { name: 'Reef Ship', cls: 'ship', hp: 420, attack: 14, armor: 2, parmor: 4, range: 6, reload: 2.5, speed: 2.0, sight: 9, cost: { food: 140, wood: 60 }, time: 30, radius: 0.5, shot: 'bolt', blurb: `A living ship of coral and kelp, grown at a Dock in the warship's place while your people stands in the Age of Leviathans, for food and wood, not gold. It is launched at ${REEF_BORN}% of its strength and grows to full on the water, ${REEF_MEND} a second, and mends itself the same way once ${LEVIATHANS_CALM} seconds pass without a blow: weaker than an ironclad, but a fleet that grows back between fights.` }],
   behemoth: [null, null, null, null, null, { name: 'Behemoth', cls: 'siege', hp: 3200, attack: 28, armor: 5, parmor: 12, range: 0, reload: 3, speed: 0.75, sight: 9, cost: { food: 1000, wood: 500, stone: 200, gold: 500 }, time: 120, radius: 0.5, blurb: 'A titan turtle with a Town Center on its back, one to a people: a capital that walks. It tramples walls and buildings, and arrows and bullets barely mark its shell; spears and riders swarm it. Kneel it (P) on ground no rival holds and its Town Center stands there at once, working: it trains, takes in every stock and claims the land. Rise (P) and it walks on. It counts as a Town Center while it walks, and losing it loses one.' }],
+  // The Age of the Wild Hunt (`HUNT`): a hunter's bird, trained at a Hunting Camp by a people standing in the age. It has no weapon.
+  hawk: [null, HAWK, HAWK, HAWK, HAWK, HAWK],
   warmammoth: beast({ name: 'War Mammoth', cls: 'siege', hp: 420, attack: 16, armor: 2, parmor: 4, range: 0, reload: 2.4, speed: 1.1, sight: 6, cost: { food: 260, gold: 60 }, time: 40, radius: 0.55, blurb: 'A woolly mammoth led to war: it tramples walls and buildings as a ram does, and gores soldiers too. Spearmen and riders swarm it.' }),
 };
 
-const DOMAINS: Partial<Record<UnitType, Domain>> = { fisher: 'water', warship: 'water', transport: 'water', cog: 'water', barge: 'water', tow: 'water', fighter: 'air', bomber: 'air', skywhale: 'air', kraken: 'water', reefship: 'water' };
+const DOMAINS: Partial<Record<UnitType, Domain>> = { hawk: 'air', fisher: 'water', warship: 'water', transport: 'water', cog: 'water', barge: 'water', tow: 'water', fighter: 'air', bomber: 'air', skywhale: 'air', kraken: 'water', reefship: 'water' };
 /** Where a unit line goes: on foot, on the water or in the air. */
 export const domainOf = (type: UnitType): Domain => DOMAINS[type] ?? 'land';
 
-export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader', 'wagon', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge', 'warden', 'tow', 'skywhale', 'behemoth', 'kraken', 'reefship'];
+export const UNIT_TYPES: UnitType[] = ['citizen', 'infantry', 'ranged', 'cavalry', 'siege', 'priest', 'hero', 'fisher', 'warship', 'transport', 'cog', 'fighter', 'bomber', 'trader', 'wagon', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge', 'warden', 'tow', 'skywhale', 'behemoth', 'kraken', 'reefship', 'hawk'];
 export const MILITARY: UnitType[] = ['infantry', 'ranged', 'cavalry', 'siege', 'hero', 'warship', 'fighter', 'bomber', 'warwolf', 'tusker', 'warmammoth', 'blowpipe', 'cavebear', 'barge', 'warden', 'behemoth', 'kraken', 'reefship'];
 
 type Target = UnitClass | 'building';
@@ -2543,6 +2623,38 @@ export const LEVIATHANS = {
   aiKrakens: 1,
 };
 
+/**
+ * The Age of the Mycelium (#800, `docs/wild-road.md` §R, `src/sim/mycelium.ts`). While a people stands in it, each of its finished
+ * `halls` grows a web `grow` tiles a second (`WEB_GROW` seconds to full), out to `reach` tiles from its footprint.
+ * - Every hall with a web takes in every stock (`nearestDrop`), and a load carried onto the web is banked at once at the nearest hall
+ *   whose web covers it. What is banked through the web counts as `webbed`, the deed of the road on to the Bloom.
+ * - Spores: its units standing on its web are hidden (`Unit.cloak`) unless a rival unit or building is within `reveal` tiles or the
+ *   unit struck in the last `shown` seconds. Read every `cloakEvery` ticks.
+ * - Rot: once a second (not in a peace) a rival building whose footprint lies within a web loses `rot.wood` of its health, or
+ *   `rot.stone` if stone went into it, each web counting once.
+ * - Fire: once a second any fire within a web cuts that web back to the fire's distance less one tile; a torch may be set to bare
+ *   ground on a rival's web (it burns the web back at once).
+ * The web withers the moment its people leaves the age.
+ * The computer: turns into it from the Wild on a coin of its own (`aiTake`) where glowcaps are to be had, raising a Prospector's Lodge
+ * to learn so, holds the Wild up to `aiHold` seconds while it digs or buys them, stays `aiStay` seconds, and takes the road on to the Bloom on a coin of its own (`aiBloom`) once the deed is done and `aiBanked` of the
+ * price is in store (saving the rest from there).
+ */
+export const MYCELIUM = {
+  reach: WEB_REACH,
+  grow: WEB_REACH / WEB_GROW,
+  reveal: SPORE_REVEAL,
+  shown: 3,
+  cloakEvery: 4,
+  rot: { wood: 0.004, stone: 0.002 },
+  halls: ['towncenter', 'house', 'storehouse', 'barracks', 'range', 'stable', 'forge', 'workshop', 'temple', 'market', 'huntcamp', 'prospector', 'den', 'windmill', 'tower', 'wonder', 'shaft'] as BuildingType[],
+  deed: WEB_DEED,
+  aiTake: 0.5,
+  aiHold: 360,
+  aiStay: 420,
+  aiBloom: 0.6,
+  aiBanked: 0.25,
+};
+
 export const COPPICE = { reach: 8, regrow: 120, retry: 5, grow: 90, snare: 2, cap: 1.5, bag: 2, full: 12, aiPerFood: 1.5, aiMax: 16, aiTrees: 10, aiThick: 14, aiNear: 14, aiDrop: 7, aiPerTender: 2, aiStone: 6, aiCamps: 2, aiPlant: 3, aiThin: 12, aiPlantWood: 120 };
 
 /**
@@ -2568,6 +2680,7 @@ export const SHAFT = {
     salt: { name: 'Salt', old: true },
     saltpetre: { name: 'Saltpetre', old: true },
     bloodiron: { name: 'Blood-iron', old: true },
+    glowcap: { name: 'Glowcaps', old: true },
   } as Record<'stone' | 'gold' | RareId, { name: string; old: boolean }>,
   aiNear: 26,
   aiReach: 18,
@@ -3362,6 +3475,7 @@ export const PROSPECTOR: { keys: Record<KeyId, { name: string; icon: string }> }
     salt: { name: 'Salt', icon: '🧂' },
     saltpetre: { name: 'Saltpetre', icon: '⚗️' },
     bloodiron: { name: 'Blood-iron', icon: '🩸' },
+    glowcap: { name: 'Glowcap hollow', icon: '🍄' },
     ruin: { name: 'Ancient ruins', icon: '🏛️' },
   },
 };
@@ -3398,10 +3512,12 @@ export const FINDS = {
  * any town, `apart` from each other), where every town can walk to them. `rate` is how fast a citizen mines one.
  * The ore is paid into `Player.rare`; a later step makes the ages and roads that want it.
  */
-export const RARE: Record<'salt' | 'saltpetre' | 'bloodiron', { name: string; chance: number; veins: number; tiles: number; amount: number; rate: number; away: number; apart: number; blurb: string }> = {
+export const RARE: Record<RareId, { name: string; chance: number; veins: number; tiles: number; amount: number; rate: number; away: number; apart: number; blurb: string }> = {
   salt: { name: 'Salt', chance: 0.7, veins: 2, tiles: 3, amount: 200, rate: 0.5, away: 14, apart: 10, blurb: 'White crust on bare ground. Cures meat, tans hides and keeps a long march fed.' },
   saltpetre: { name: 'Saltpetre', chance: 0.5, veins: 2, tiles: 2, amount: 160, rate: 0.45, away: 16, apart: 12, blurb: 'Pale, bitter crystal scraped from damp rock. The black of powder is made from it.' },
   bloodiron: { name: 'Blood-iron', chance: 0.35, veins: 1, tiles: 3, amount: 140, rate: 0.35, away: 18, apart: 12, blurb: 'Dark ore veined like flesh that is never quite dry. Whatever works it learns that it is warm.' },
+  // The Glowcap hollow (#800): one damp hollow of pale fungus, the Age of the Mycelium's only door. Picked like an ore.
+  glowcap: { name: 'Glowcaps', chance: 0.4, veins: 1, tiles: 4, amount: 120, rate: 0.45, away: 16, apart: 12, blurb: 'Pale caps crowding a damp hollow, glowing faintly blue after dark. Their threads run under the soil for a mile, and whatever is planted over them is fed.' },
 };
 /** Deer: health, speeds, and how far a hunter throws a spear. */
 export const DEER = { hp: 8, walk: 0.8, flee: 2.3, spear: 3.5, spearDamage: 4,
@@ -3772,16 +3888,17 @@ export const AI_ORDERS = { reach: 14, riders: 2 };
 // ---- Rare ore and mercenaries ---------------------------------------------------------------------
 
 /** Selling rare ore at a Market (#356 s5): a lot of `lot` pays `gold[ore]` gold at a flat price. Ore mined still counts toward its doors; only the stock in hand is spent. */
-export const ORE_TRADE = { lot: 20, gold: { salt: 40, saltpetre: 55, bloodiron: 90 } as Record<'salt' | 'saltpetre' | 'bloodiron', number> };
+export const ORE_TRADE = { lot: 20, gold: { salt: 40, saltpetre: 55, bloodiron: 90, glowcap: 70 } as Record<RareId, number> };
 /**
  * Posts that sell what the map lacks (#573, the age road s13): on a world without one of the `ores` a road's ore door asks
  * for, a trading post sells it (one lacking ore to a post, in post order; none in campaign chapters). A trader told to buy
  * pays for a load of `lot` there, at `markup` times what the Market pays for that ore, dearer by `rise` with every load anyone
  * has bought, and carries it home to its Market: bought ore opens the road's door as mined ore does. Saltpetre opens no road
- * yet, and the ore technologies stay open only where the world holds their ore, so it is not sold. The computer keeps
- * `traders` buying for a road it has planned whose ore this world lacks.
+ * yet, and the ore technologies stay open only where the world holds their ore, so it is not sold. Glowcaps (#800) are: on a
+ * world with no Glowcap hollow, the Age of the Mycelium's vein door opens on glowcaps bought here, so the rare age is a dearer
+ * road there, not a shut one. The computer keeps `traders` buying for a road it has planned whose ore this world lacks.
  */
-export const ORE_POST = { lot: 10, markup: 1.5, rise: 0.1, traders: 1, ores: ['salt', 'bloodiron'] as RareId[] };
+export const ORE_POST = { lot: 10, markup: 1.5, rise: 0.1, traders: 1, ores: ['salt', 'bloodiron', 'glowcap'] as RareId[] };
 
 /** The computer and the rare ores (#356 s5): the crew it sends to dig the ore a road's door asks for, and how far from home it will look for the vein. */
 export const AI_ORE = { crew: 3, reach: 70 };
@@ -4006,6 +4123,18 @@ export const BEGGARS = { left: 0.35, haven: 12, cut: 1.2 };
  * (`stay`) and in the age itself (`hold`); there its idle warships cut the rival dyke seen within `hunt` tiles of its Dock that holds back polder.
  */
 export const AI_BEGGARS = { take: 0.5, stay: 120, hold: 300, hunt: 30 };
+/**
+ * The Age of the Wild Hunt (#801, `hunt.ts`). A War Wolf of a people with the pack at heel that stands idle within `follow` tiles of one
+ * of its wagons, and farther than `heel` from it, runs to it (looked at every `every` seconds). The computer keeps `hawks` Hawks aloft, sent
+ * exploring, from the moment it walks the age.
+ */
+export const HUNT = { follow: 18, heel: 2.5, every: 2, hawks: 1 };
+/**
+ * The computer and the Wild Hunt (#801): the odds it plans the crossing once it has walked one sibling (`take`), its stay in each (`stay`)
+ * and in the age itself (`hold`).
+ */
+export const AI_HUNT = { take: 0.5, stay: 120, hold: 240 };
+
 
 export const WARCAMP = { watch: 8, grace: 10, burn: 0.05, train: 1.2 };
 

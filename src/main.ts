@@ -137,6 +137,8 @@ let hiveToldAt = -9999;
 let entToldAt = -9999;
 /** When a rival seed-bomb was last told (the Age of Leviathans), so a whale working a street tells it once. */
 let whaleToldAt = -9999;
+let webToldAt = -9999;
+let rotToldAt = -9999;
 let paused = false;
 const SPEEDS = [1, 1.5, 2, 3];
 let speedIdx = 0;
@@ -3115,6 +3117,20 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         }
         break;
       }
+      case 'web':
+        // The Age of the Mycelium (#800): your web burnt back, and your first web grown full, are told to its people; rot on your
+        // buildings once in a while.
+        if (ev.what === 'burnt' && ev.owner === viewer && s.tick - webToldAt > 20 * TICK_HZ) {
+          webToldAt = s.tick;
+          hud.toast('Fire burns your web back: it grows again from your halls once the flames are out', 'alert');
+        } else if (ev.what === 'grown' && ev.owner === viewer && s.tick - webToldAt > 60 * TICK_HZ) {
+          webToldAt = s.tick;
+          hud.toast('Your web has grown out round the Town Center: halls on it take every stock, and your people on it are hidden', 'good');
+        } else if (ev.what === 'rot' && ev.owner !== viewer && isEnemy(s, viewer, ev.owner) && s.players[viewer]?.vis[Math.floor(ev.y) * s.w + Math.floor(ev.x)] === 1 && s.tick - rotToldAt > 30 * TICK_HZ) {
+          rotToldAt = s.tick;
+          hud.toast(`${s.players[ev.owner]?.name ?? 'A rival'}'s fungus web is rotting your buildings: burn it back with a torch (F) on the threads`, 'alert');
+        }
+        break;
       case 'leviathan':
         // The Age of Leviathans: a seed-bomb in your own town is told to you; your Behemoth kneeling or rising, to its people.
         if (ev.what === 'bomb' && ev.owner !== viewer && s.players[viewer]?.vis[Math.floor(ev.y) * s.w + Math.floor(ev.x)] === 1 && s.tick - whaleToldAt > 20 * TICK_HZ) {

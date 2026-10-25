@@ -11,6 +11,7 @@ import { warCampStep } from './warcamp';
 import { spoilsStep } from './spoils';
 import { missionStep } from './missions';
 import { raiseCamps } from './steppe';
+import { huntStep } from './hunt';
 import { giftFlock, sheepStep } from './flocks';
 import { tendFlocks } from './shepherd';
 import { faithStep } from './consecrate';
@@ -57,7 +58,7 @@ import { longbowStep } from './longbow';
 import { seraiStep, tollStep } from './passage';
 import { mercStep } from './merc';
 import { BLOOM, FINDS, KIN, LEVIATHANS, NOMAD, STEP_BACK } from './data';
-import { ageOf, goldenEnds, threadsOf, chartLand, isHire, barred, journeyOf, markKeepsake, noteWalked, trainsAt, workSteps } from './ages';
+import { ageDef, ageOf, goldenEnds, threadsOf, chartLand, isHire, barred, journeyOf, markKeepsake, noteWalked, trainsAt, workSteps } from './ages';
 import type { AgeId, Building, CivId, Command, Difficulty, GameMode, GameState, HomelandId, MapSize, MapType, Player, UnitType } from './types';
 import { RARES, RES, R_FISH, R_NONE } from './types';
 import { legionKind, legionary } from './legion';
@@ -65,6 +66,7 @@ import { mineable } from './household';
 import { isNomad } from './nomad';
 import { RES_OF_TILE, autoWork, rallyNode, carryCargo, checkStuck, collide, findResource, routeUnits, separate, setOrder, think, ungarrison, walk } from './units';
 import { updateVision } from './vision';
+import { myceliumStep } from './mycelium';
 import { countPop, exitSpot, maxHp, placeBuilding, refund, restat, spawnUnit } from './world';
 
 /**
@@ -471,6 +473,8 @@ function bringOut(s: GameState, p: Player, b: Building, unit: UnitType): void {
     const t = findResource(s, R_FISH, b.x, b.y, 16);
     if (t >= 0) setOrder(u, { k: 'gather', tile: t, res: 'food', phase: 'go' });
   } else autoWork(s, u, b.x, b.y, AUTO_WORK.trained);
+  // The pack at heel (the Age of the Wild Hunt, #801): a rider trained at a Stable brings a War Wolf out beside it, if there is room.
+  if (unit === 'cavalry' && b.type === 'stable' && ageDef(p).heel && p.pop < p.cap) bringOut(s, p, b, 'warwolf');
 }
 
 /** Heroes inspire soldiers near them: they strike harder and slowly heal. */
@@ -703,6 +707,8 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   hiveStep(s);
   wildwoodStep(s);
   bloomStep(s);
+  myceliumStep(s, sp);
+  huntStep(s);
   seaStep(s);
   longbowStep(s);
   tollStep(s);

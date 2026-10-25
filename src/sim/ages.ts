@@ -1,5 +1,5 @@
 import { AGES, BUILDINGS, CIVS, DAM, GOLDEN, LIGHTNING, LOWER_IS_BETTER, PATHS, ROADS, STEP_BACK, TECHS, TICK_HZ, TRUNK, WAYS, secs, stepBackCost, type Age, type Deed, type Mods, type Road, type UnitClass } from './data';
-import { KEYS, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, type AgeId, type CivId, type PathId, type RareId, type Building, type BuildingType, type Cost, type GameState, type KeyId, type Player, type TechId, type UnitType } from './types';
+import { KEYS, R_BLOODIRON, R_GLOWCAP, R_BOG, R_SALT, R_SALTPETRE, type AgeId, type CivId, type PathId, type RareId, type Building, type BuildingType, type Cost, type GameState, type KeyId, type Player, type TechId, type UnitType } from './types';
 import { coastHeld, driven } from './water';
 
 /**
@@ -34,7 +34,7 @@ const boon = (key: keyof Mods, v: number): boolean => (LOWER_IS_BETTER.includes(
 /** What an age's verbs are, beyond its numbers and its doors: carried whole into a Golden Age. */
 const VERB_KEYS = [
   'hire', 'mobile', 'packs', 'caravans', 'relicTrade', 'ironTrade', 'forge', 'coils', 'callUp', 'haul', 'blood', 'hemocraft', 'rite', 'fission', 'fusion',
-  'reclaim', 'salvage', 'sortie', 'fairs', 'convoys', 'prizes', 'vigils', 'thralls', 'mills', 'sappers', 'raid', 'missions', 'names', 'pumps', 'rivers', 'sluices', 'canals', 'turbines', 'boards',
+  'reclaim', 'salvage', 'sortie', 'fairs', 'convoys', 'prizes', 'vigils', 'thralls', 'mills', 'sappers', 'raid', 'missions', 'names', 'pumps', 'rivers', 'sluices', 'canals', 'turbines', 'boards', 'heel',
 ] as const;
 
 const woven = new Map<string, Age>();
@@ -167,7 +167,7 @@ export function prospect(s: GameState, owner: number): void {
 /** The key resource a tile holds (#565), or null: bog iron and the rare ores. Ruins aren't tiles; the chart reads `s.ruins`. */
 export function keyAt(s: GameState, tile: number): KeyId | null {
   const r = s.res[tile];
-  return r === R_BOG ? 'bogIron' : r === R_SALT ? 'salt' : r === R_SALTPETRE ? 'saltpetre' : r === R_BLOODIRON ? 'bloodiron' : null;
+  return r === R_BOG ? 'bogIron' : r === R_SALT ? 'salt' : r === R_SALTPETRE ? 'saltpetre' : r === R_BLOODIRON ? 'bloodiron' : r === R_GLOWCAP ? 'glowcap' : null;
 }
 
 /** Whether the people has charted the land (#565): Chart the Veins learned at its Prospector's Lodge. */
@@ -203,8 +203,10 @@ export function diggersAt(s: GameState): Map<number, number> {
 }
 
 /** What a people holds of each key resource (#568): its stock of each rare ore, and the bog iron it has dug (paid in as gold). */
-export function holdingsOf(p: Player): Record<Exclude<KeyId, 'ruin'>, number> {
-  return { bogIron: Math.floor(p.stats.iron ?? 0), salt: Math.floor(p.rare?.salt ?? 0), saltpetre: Math.floor(p.rare?.saltpetre ?? 0), bloodiron: Math.floor(p.rare?.bloodiron ?? 0) };
+export function holdingsOf(p: Player): Record<Exclude<KeyId, 'ruin' | 'glowcap'>, number> & { glowcap?: number } {
+  // Glowcaps (#800) are named only once held: the older keys are always listed.
+  const caps = Math.floor(p.rare?.glowcap ?? 0);
+  return { bogIron: Math.floor(p.stats.iron ?? 0), salt: Math.floor(p.rare?.salt ?? 0), saltpetre: Math.floor(p.rare?.saltpetre ?? 0), bloodiron: Math.floor(p.rare?.bloodiron ?? 0), ...(caps ? { glowcap: caps } : {}) };
 }
 
 /** The key resources this world holds, in the lodge's order: what a lodge reports when it is raised. */
@@ -246,7 +248,8 @@ export function lacking(s: GameState, p: Player, age: AgeId): { key: KeyId; only
   for (const r of ROADS) {
     if (r.to !== age) continue;
     const door = keyOf(r);
-    if (door && !holds(s, door.key) && !out.some((d) => d.key === door.key)) out.push(door);
+    // A vein door whose ore a post sells (glowcaps, #800) is a dearer road, not a shut one.
+    if (door && !holds(s, door.key) && !out.some((d) => d.key === door.key)) out.push(door.only && r.vein && soldAt(s, r.vein.id) ? { key: door.key, only: false } : door);
   }
   return out;
 }
@@ -288,10 +291,10 @@ export const oreDone = (p: Player, r: Road): boolean => !!r.ore && (p.stats.mine
 
 /**
  * A vein door (#577): the world holds the ore, and the people has learned it (a Prospector's Lodge stands, or it has dug some).
- * Where the world holds none, the road is never seen.
+ * Where the world holds none, the road is never seen, unless a post sells the ore (glowcaps, #800): then it is a dearer road.
  */
 export const veinSeen = (s: GameState, p: Player, r: Road): boolean =>
-  !!r.vein && !!s.rares?.includes(r.vein.id) && (prospected(p) || (p.stats.mined?.[r.vein.id] ?? 0) > 0);
+  !!r.vein && (!!s.rares?.includes(r.vein.id) || soldAt(s, r.vein.id)) && (prospected(p) || (p.stats.mined?.[r.vein.id] ?? 0) > 0);
 
 /** Whether a vein door is open (#577): enough of its ore mined. True for a road with none. */
 export const veinDone = (p: Player, r: Road): boolean => !r.vein || (p.stats.mined?.[r.vein.id] ?? 0) >= r.vein.n;
@@ -325,7 +328,7 @@ export function roadProblem(s: GameState, p: Player, r: Road): string | null {
     if (r.ruin) return 'Your citizens must finish excavating an ancient ruin';
     if (r.found && !p.techs.includes(r.found)) return `Needs ${TECHS[r.found].name}`;
     if (r.found && !surveyFinds(s, r.found)) return 'There is none in this world';
-    if (r.vein && !s.rares?.includes(r.vein.id)) return `There is no ${r.vein.id} in this world`;
+    if (r.vein && !s.rares?.includes(r.vein.id) && !soldAt(s, r.vein.id)) return `There is no ${r.vein.id} in this world`;
     if (r.vein && !veinSeen(s, p, r)) return `Raise a Prospector's Lodge, or dig ${r.vein.id}, to learn of this road`;
     return `Needs a ${BUILDINGS[r.clue!].name}`;
   }
@@ -362,7 +365,8 @@ const BRED: UnitType[] = ['cavebear'];
 export function trainsAt(p: Player, at: BuildingType): UnitType[] {
   const hires = hiresAt(p, at);
   // A Leviathan people's Docks grow Reef Ships in the warships' place (#789), while it stands in the age.
-  const own = at === 'den' && hasWalked(p, 'hive') ? [...BUILDINGS[at].trains, ...BRED] : at === 'dock' && ageOf(p) === 'leviathans' ? BUILDINGS[at].trains.map((u) => (u === 'warship' ? 'reefship' : u)) : BUILDINGS[at].trains;
+  // A Wild Hunt people's Hunting Camps send hawks aloft (#801), while it stands in the age.
+  const own = at === 'huntcamp' && ageDef(p).heel ? [...BUILDINGS[at].trains, 'hawk' as const] : at === 'den' && hasWalked(p, 'hive') ? [...BUILDINGS[at].trains, ...BRED] : at === 'dock' && ageOf(p) === 'leviathans' ? BUILDINGS[at].trains.map((u) => (u === 'warship' ? 'reefship' : u)) : BUILDINGS[at].trains;
   return hires.length ? [...own, ...hires] : own;
 }
 
@@ -382,6 +386,8 @@ export function barred(p: Player, unit: UnitType, at?: BuildingType): string | n
   // The Age of Leviathans: its giants are bred for a people that has walked it, in any age after.
   if ((unit === 'skywhale' || unit === 'behemoth' || unit === 'kraken') && !hasWalked(p, 'leviathans')) return `Only a people that has walked the ${AGES.leviathans.name} breeds giants`;
   if (unit === 'reefship' && ageOf(p) !== 'leviathans') return `Reef Ships grow only for a people standing in the ${AGES.leviathans.name}`;
+  // The Wild Hunt's hawks fly for a people standing in the age (#801).
+  if (unit === 'hawk' && !ageDef(p).heel) return `Hawks fly only for a people standing in the ${AGES.hunt.name}`;
   const no = ageDef(p).no;
   return no && no.units.includes(unit) ? no.why : null;
 }
@@ -404,7 +410,8 @@ export function buildBarred(p: Player, type: BuildingType): string | null {
   // The Age of the Grove: what it grows is planted by a people that has walked it, in any age after.
   if ((type === 'thornwall' || type === 'garden' || type === 'orchard') && !hasWalked(p, 'grove')) return `Only a people that has walked the ${AGES.grove.name} plants a ${BUILDINGS[type].name}`;
   if (type === 'hive' && !hasWalked(p, 'hive')) return `Only a people that has walked the ${AGES.hive.name} keeps bees`;
-  if (type === 'heart' && !hasWalked(p, 'wildwood')) return `Only a people that has walked the ${AGES.wildwood.name} plants a Heart Tree`;
+  // A people that came to the Bloom by the Mycelium's short road (#800) plants one too: the Spire ripens only while one stands. It wakes no Ents.
+  if (type === 'heart' && !hasWalked(p, 'wildwood') && !hasWalked(p, 'bloom')) return `Only a people that has walked the ${AGES.wildwood.name} or the ${AGES.bloom.name} plants a Heart Tree`;
   // Missile defence (#759 s2): a battery is raised only after Interceptors.
   if (type === 'battery' && !p.techs.includes('interceptors')) return `Learn ${TECHS.interceptors.name} at a ${BUILDINGS.workshop.name} first`;
   if (type === 'spire' && !hasWalked(p, 'bloom')) return `Only a people that has walked the ${AGES.bloom.name} raises a Seed Spire`;

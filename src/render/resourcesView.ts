@@ -3,7 +3,7 @@ import { AMOUNT, COCKLE, RARE, ROT, TICK_HZ } from '../sim/data';
 import { RARE_OF_TILE } from '../sim/units';
 import { hash2 } from '../sim/rng';
 import type { GameState } from '../sim/types';
-import { R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_MEAT, R_STONE, R_TREE, T_SAND } from '../sim/types';
+import { R_BERRY, R_BLOODIRON, R_GLOWCAP, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_MEAT, R_STONE, R_TREE, T_SAND } from '../sim/types';
 import { R_COCKLE } from '../sim/types';
 import { bakedMaterial, swayMaterial } from './materials';
 import { natureGeometry, type NatureKind } from './natureModels';
@@ -156,7 +156,7 @@ export class ResourcesView {
           const sc = UNIT_SCALE * (0.6 + 0.4 * Math.max(0, Math.min(1, frac))) * Math.min(2, Math.max(1, Math.sqrt(frac)));
           add(rotten.has(i) ? 'carcassRotten' : 'carcass', i, new THREE.Matrix4().compose(new THREE.Vector3(tx + 0.5, gy, ty + 0.5), q, new THREE.Vector3(sc, sc, sc)));
         } else {
-          const kind: NatureKind = s.caves?.some((c) => c.tile === i) ? 'caveMouth' : r === R_BERRY ? 'berryBush' : r === R_STONE ? 'stoneDeposit' : r === R_BOG ? 'bogIron' : r === R_SALT ? 'saltVein' : r === R_SALTPETRE ? 'saltpetreVein' : r === R_BLOODIRON ? 'bloodIronVein' : 'goldDeposit';
+          const kind: NatureKind = s.caves?.some((c) => c.tile === i) ? 'caveMouth' : r === R_BERRY ? 'berryBush' : r === R_STONE ? 'stoneDeposit' : r === R_BOG ? 'bogIron' : r === R_SALT ? 'saltVein' : r === R_SALTPETRE ? 'saltpetreVein' : r === R_BLOODIRON ? 'bloodIronVein' : r === R_GLOWCAP ? 'glowcapVein' : 'goldDeposit';
           const sc = (0.55 + 0.5 * Math.max(0, Math.min(1, frac))) * (r === R_BERRY ? 1 : 1.25);
           add(kind, i, new THREE.Matrix4().compose(new THREE.Vector3(tx + 0.5, gy, ty + 0.5), q, new THREE.Vector3(sc, sc, sc)));
         }
@@ -185,7 +185,7 @@ export class ResourcesView {
           this.group.remove(mesh);
           mesh.dispose();
         }
-        const sway = kind !== 'felled' && kind !== 'ash' && kind !== 'cockleBed' && kind !== 'stoneDeposit' && kind !== 'goldDeposit' && kind !== 'bogIron' && kind !== 'saltVein' && kind !== 'caveMouth' && kind !== 'saltpetreVein' && kind !== 'bloodIronVein' && kind !== 'carcass';
+        const sway = kind !== 'felled' && kind !== 'ash' && kind !== 'cockleBed' && kind !== 'stoneDeposit' && kind !== 'goldDeposit' && kind !== 'bogIron' && kind !== 'saltVein' && kind !== 'caveMouth' && kind !== 'saltpetreVein' && kind !== 'bloodIronVein' && kind !== 'glowcapVein' && kind !== 'carcass';
         mesh = new THREE.InstancedMesh(natureGeometry(kind), sway ? swayMaterial : bakedMaterial, Math.ceil(list.length * 1.2) + 8);
         // Shoals cast no shadow on the water.
         mesh.castShadow = kind !== 'fish';
