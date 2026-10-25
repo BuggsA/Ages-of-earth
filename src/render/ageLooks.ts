@@ -88,7 +88,7 @@ export const NEW_LOOK_AGES: AgeId[] = [
 /** Buildings that take touches: the town's own halls and houses. Water works, walls, fields and one-tile pieces keep their shape. */
 const TOWN: BuildingType[] = [
   'towncenter', 'house', 'storehouse', 'barracks', 'range', 'stable', 'forge', 'workshop', 'temple', 'market', 'dock', 'wonder', 'huntcamp',
-  'prospector', 'den', 'mission', 'caravanserai', 'windmill', 'bloomery', 'stockade', 'gallery', 'tidemill', 'cockler', 'battery', 'warcamp', 'greatden', 'airfield', 'tower',
+  'prospector', 'den', 'mission', 'caravanserai', 'windmill', 'bloomery', 'stockade', 'gallery', 'strand', 'tidemill', 'cockler', 'battery', 'warcamp', 'greatden', 'airfield', 'tower',
 ];
 const GREAT: BuildingType[] = ['towncenter', 'wonder', 'temple', 'market'];
 

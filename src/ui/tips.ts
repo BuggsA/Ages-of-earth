@@ -4,7 +4,7 @@ import { AI_GATE_ANSWER } from '../sim/data';
 import { AI_GATE_READ } from '../sim/data';
 import { gateReach } from '../sim/tides';
 import { isEnemy } from '../sim/world';
-import { AGES, BLOOM, LEVIATHANS, MYCELIUM, UNITS, BLOOMERY, HIREHALL, HIVE, INTERCEPT, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, BEGGARS, SEA_RAID, SPOILS, GALLERY, STANDARD, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
+import { AGES, BLOOM, LEVIATHANS, MYCELIUM, UNITS, BLOOMERY, HIREHALL, HIVE, INTERCEPT, WILDWOOD, CIVS, CIV_IDS, CHARIOT_FORGE, KEG, MISSION, BEGGARS, SEA_RAID, SPOILS, GALLERY, STANDARD, STRAND, HOMELANDS, HOUSEHOLD, LONGBOW, NOMAD, LEGION, BLOOD, BUILDINGS, HEMO, HEMOCRAFT, RITE, CALL_UP, KILL_CAMP, ROADS, ROT, SERAI, SILK, STEP_BACK, TRIBUTE, WAY, BATTLE, SHAFT, TAME, GROVE, FIRE, secs, TIDE } from '../sim/data';
 import { battlesFor } from '../sim/battles';
 import { ageDef } from '../sim/ages';
 import { ageOf, backTo, hasWalked, deedProgress, deedsDone, findsOf, mainRoad, prospected, roadKnown, roadsFrom, shutRoads } from '../sim/ages';
@@ -356,6 +356,11 @@ const TIPS: Tip[] = [
     id: 'standard',
     when: (s, me) => ageOf(s.players[me]) === 'horde',
     text: `Plant a <b>${BUILDINGS.standard.name}</b> (<b>Z</b>) just outside a rival's border. Riders who stand within ${STANDARD.reach} tiles of it are paid tribute as though they stood in the rival's land, so the horde can wait out of the Town Center's arrows. Cut down, it pays nothing: guard it. Press <b>J</b> on it before you leave the Age of the Horde to keep it.`,
+  },
+  {
+    id: 'strand',
+    when: (s, me) => ageOf(s.players[me]) === 'searaider',
+    text: `A ship must sail home to a Dock to bank its hold. Raise a <b>${BUILDINGS.strand.name}</b> (<b>Y</b>) on a far shore instead: a ship within ${SEA_RAID.dock} tiles of it banks there at once, but the jarl keeps a quarter (${Math.round(STRAND.cut * 100)}% reaches you). It also musters foot soldiers on the spot. A rival can raze it, so guard the beach.`,
   },
   {
     id: 'gallery',

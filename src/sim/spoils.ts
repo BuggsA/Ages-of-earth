@@ -1,4 +1,4 @@
-import { SEA_RAID, SPOILS, TICK_HZ, domainOf } from './data';
+import { SEA_RAID, SPOILS, STRAND, TICK_HZ, domainOf } from './data';
 import { ageDef } from './ages';
 import { distToRect } from './grid';
 import type { Building, GameState, Unit } from './types';
@@ -10,7 +10,7 @@ import type { Building, GameState, Unit } from './types';
  *
  * The Age of Sea-Raiders (#585) hauls to the ships instead: a soldier's pack goes into the hold of a transport of its people it comes
  * within `SPOILS.bank` tiles of (or rides in), and a ship's hold (its own `spoils`, up to `SEA_RAID.hold`) is banked within `SEA_RAID.dock`
- * tiles of a Dock. Town Centers and Barracks bank nothing. A ship sunk pays its hold to the one who sank it, as a felled soldier does.
+ * tiles of a Dock (or, for `STRAND.cut` of it, of a Raiders' Strand, #727). Town Centers and Barracks bank nothing. A ship sunk pays its hold to the one who sank it, as a felled soldier does.
  */
 
 /** Whether `owner`'s age hauls its plunder rather than paying it at once: the Warband home, the Sea-Raiders to their ships. */
@@ -52,13 +52,19 @@ function stockadeNear(s: GameState, u: Unit): Building | null {
   return null;
 }
 
-/** A finished Dock of the ship's people within `SEA_RAID.dock` tiles of it (#585), if any. */
-function dockNear(s: GameState, u: Unit): Building | null {
+/**
+ * A finished Dock of the ship's people within `SEA_RAID.dock` tiles of it (#585), if any, else a Raiders' Strand (#727) within the same
+ * reach, which banks only `STRAND.cut` of the hold.
+ */
+function dockNear(s: GameState, u: Unit): { b: Building; cut: number } | null {
+  let strand: Building | null = null;
   for (const e of s.ents) {
-    if (e.kind !== 'building' || e.owner !== u.owner || !e.built || e.hp <= 0 || e.type !== 'dock') continue;
-    if (distToRect(u.x, u.y, e) <= SEA_RAID.dock) return e;
+    if (e.kind !== 'building' || e.owner !== u.owner || !e.built || e.hp <= 0 || (e.type !== 'dock' && e.type !== 'strand')) continue;
+    if (distToRect(u.x, u.y, e) > SEA_RAID.dock) continue;
+    if (e.type === 'dock') return { b: e, cut: 1 };
+    strand ??= e;
   }
-  return null;
+  return strand ? { b: strand, cut: STRAND.cut } : null;
 }
 
 /**
@@ -95,7 +101,8 @@ function bank(s: GameState, u: Unit, cut = 1): void {
 /** A Sea-Raider's plunder, once a second (#585): a ship at a Dock banks its hold; a soldier by a ship (or aboard) hands its pack in. */
 function raidStep(s: GameState, u: Unit): void {
   if (domainOf(u.type) === 'water') {
-    if (dockNear(s, u)) bank(s, u);
+    const at = dockNear(s, u);
+    if (at) bank(s, u, at.cut);
     return;
   }
   const ship = holdFor(s, u);
