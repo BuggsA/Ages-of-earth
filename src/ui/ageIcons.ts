@@ -1,5 +1,6 @@
 import { AGE_PALETTES } from '../render/ageLooks';
 import type { AgeId } from '../sim/types';
+import { AGE_ART } from './ageArt';
 
 /**
  * The interface wears the age (the owner, 2026-10-25: "a real different look. Not a color change, the button icons for
@@ -262,14 +263,15 @@ export function plateSvg(age: AgeId): string {
   const hit = svgCache.get(age);
   if (hit) return hit;
   const { plate, motif } = AGE_ICONS[age];
+  const own = AGE_ART[age].plate;
   const c = plateColors(age);
-  const d = PLATES[plate];
+  const d = own?.path ?? PLATES[plate];
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56" preserveAspectRatio="none">` +
     `<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c.top}"/><stop offset="1" stop-color="${c.bottom}"/></linearGradient>` +
     `<clipPath id="c"><path d="${d}"/></clipPath></defs>` +
     `<path d="${d}" fill="url(#g)"/>` +
-    `<g clip-path="url(#c)" fill="${c.ink}" stroke="${c.ink}" stroke-width="1.4" opacity="${c.inkOpacity}">${MOTIFS[motif]}</g>` +
+    `<g clip-path="url(#c)" fill="${c.ink}" stroke="${c.ink}" stroke-width="1.4" opacity="${c.inkOpacity}">${own?.motif ?? MOTIFS[motif]}</g>` +
     `<path d="${d}" fill="none" stroke="${c.edge}" stroke-width="3" stroke-linejoin="round"/>` +
     `<path d="${d}" fill="none" stroke="#ffffff" stroke-opacity=".28" stroke-width="1" transform="translate(28 28) scale(.88) translate(-28 -28)"/>` +
     `</svg>`;
@@ -282,4 +284,4 @@ export function plateUrl(age: AgeId): string {
   return `url('data:image/svg+xml;base64,${btoa(plateSvg(age))}')`;
 }
 
-export const stampOf = (age: AgeId): StampId => AGE_ICONS[age].stamp;
+export const stampOf = (age: AgeId): StampId => AGE_ART[age].stamp ?? AGE_ICONS[age].stamp;

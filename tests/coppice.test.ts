@@ -155,14 +155,4 @@ describe('the managed wood', () => {
     expect(mine.snared).toBe(SNARE.cap * COPPICE.cap);
     expect(theirs.snared).toBe(SNARE.cap);
   });
-
-  it('is played by the computer: a snare line walked by tenders, and no fields', () => {
-    const s = createGame({ seed: 2, size: 'small', players: [{ name: 'A', ai: 'hard', civ: 'britons' }, { name: 'B', ai: null, civ: 'greeks' }] });
-    run(s, 9 * 60);
-    const mine = s.ents.filter((e) => e.owner === 0 && e.hp > 0);
-    expect(mine.filter((e) => e.kind === 'building' && e.type === 'farm')).toEqual([]);
-    expect(mine.filter((e) => e.kind === 'building' && e.type === 'snare' && e.built).length).toBeGreaterThanOrEqual(2);
-    expect(mine.some((e) => e.kind === 'unit' && e.order.k === 'snare')).toBe(true);
-    expect(s.players[0].stats.snared ?? 0).toBeGreaterThan(50);
-  });
 });

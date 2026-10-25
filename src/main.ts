@@ -3486,6 +3486,12 @@ function frame(now: number): void {
   const dt = Math.max(0, Math.min(0.1, (now - lastFrame) / 1000));
   lastFrame = now;
   const s = game;
+  // Behind the campaign and the Web of Ages (a full-screen sheet) the title's match holds still and isn't drawn (#810): its last
+  // frame stays on the canvas under the dimmed sheet, and a slow machine keeps the sheet itself responsive.
+  if (s && mode === 'title' && !$('campaign').classList.contains('hidden')) {
+    requestAnimationFrame(frame);
+    return;
+  }
   if (s) {
     if (mode === 'title') {
       // The title's match plays on; the camera drifts over it.

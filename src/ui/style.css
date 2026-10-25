@@ -627,3 +627,5 @@ body.online .tip-box { bottom: 330px; }
 #commands.stamp-verdant .glyph { filter: sepia(1) hue-rotate(60deg) saturate(3) brightness(0.4) drop-shadow(0 1px 0 rgba(255, 255, 255, 0.4)); }
 #commands.stamp-tidal .glyph { filter: sepia(1) hue-rotate(160deg) saturate(3) brightness(0.45) drop-shadow(0 1px 0 rgba(255, 255, 255, 0.45)); }
 #commands[data-dark] .glyph { filter: grayscale(1) brightness(2.4) drop-shadow(0 1px 1px #000); }
+/* A hand-drawn glyph (src/ui/ageArt/) is struck by its own drawing: no stamp filter, the age's ink as its colour. */
+#commands.plated .cmd .glyph.drawn { filter: none; color: var(--ink); display: grid; place-items: center; }

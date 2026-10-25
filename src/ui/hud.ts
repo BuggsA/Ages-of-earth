@@ -62,7 +62,8 @@ import { isCarrier } from '../sim/units';
 import { KEYS, RARES, RES, R_BERRY, R_BLOODIRON, R_BOG, R_SALT, R_SALTPETRE, R_FISH, R_GOLD, R_MEAT, R_STONE, R_TREE } from '../sim/types';
 import { costHtml, icon } from './icons';
 import { buildingPicture, unitPicture } from './thumbs';
-import { plateIsDark, plateUrl, stampOf } from './ageIcons';
+import { plateColors, plateIsDark, plateUrl, stampOf } from './ageIcons';
+import { drawnGlyph } from './ageArt';
 import { idleCitizens } from './idle';
 import { workforce, WORKFORCE_JOBS } from './workforce';
 import { citizenProblem, isLegion } from '../sim/legion';
@@ -108,6 +109,8 @@ interface Cmd {
   key: string;
   pic: string;
   glyph?: string;
+  /** Which hand-drawn glyph stands in for the emoji (`ageArt/index.ts`): `tech:<id>`, or `age:<id>` on a button that leads to an age. */
+  gid?: string;
   title: string;
   desc: string;
   cost?: Cost;
@@ -1676,6 +1679,7 @@ export class Hud {
               key: isMain ? 'W' : (sideKeys.shift() ?? ''),
               pic: '',
               glyph: isMain ? '⏫' : '🔀',
+              gid: `age:${road.to}`,
               title: `${toward} the ${to.name}${routeTag(road.to)}`,
               desc: `${road.gate === 'easy' ? '<i>An easy on-ramp: a small deed and a modest price.</i><br>' : road.gate === 'hard' ? '<i>A hard gate: a dear price and a long journey, for something special.</i><br>' : ''}${road.blurb ?? to.blurb}${isSideRoad(road) ? ` Opens only from ${windowsOf(road.to).map((a) => `the ${AGES[a].name}`).join(' or ')}.` : ''}${(oreOnly(s, road) ? [] : deeds).map((d) => `<br>${oreDone(p, road) || d.have >= d.need ? '✔' : '…'} ${d.deed.text}: ${Math.min(d.have, d.need)}/${d.need}.`).join('')}${(() => { const door = oreClue(s, p, road); return door ? `<br>${oreDone(p, road) ? '✔' : '…'} ${oreOnly(s, road) ? '' : '<i>Or</i> '}${door.text.charAt(0).toLowerCase()}${door.text.slice(1)}: ${Math.min(Math.floor(p.stats.mined?.[door.id] ?? 0), door.n)}/${door.n}.` : ''; })()}${(road.crossing ?? []).map((a) => `<br>${hasWalked(p, a) ? '✔' : '…'} A crossing: walk the ${AGES[a].name}.`).join('')}${road.lives ? `<br>${livesOf(p).length >= road.lives.n ? '✔' : '…'} Side ages walked: ${Math.min(livesOf(p).length, road.lives.n)}/${road.lives.n}${livesOf(p).length ? ` (${livesOf(p).map((a) => AGES[a].short).join(', ')})` : ''}. Each one is woven in.` : ''}${back.length ? `<br>Brings back ${back.map((t) => TECHS[t].name).join(', ')}.` : ''}${planLines(s, p, road.to, false)}<br>Takes ${road.time}s. Every unit re-arms and every building is rebuilt in the new style.${agePanel(s, p, road.to)}`,
               cost: road.cost,
@@ -1746,6 +1750,7 @@ export class Hud {
             key: techKeys[ti++] ?? '',
             pic: '',
             glyph: t.icon,
+            gid: `tech:${tech}`,
             title: `Research ${t.name}`,
             desc: `${t.blurb} Takes ${Math.round(t.time)}s.`,
             cost,
@@ -1967,15 +1972,17 @@ export class Hud {
       cmds.push({ key: 'DELETE', pic: '', glyph: '💀', title: 'Delete', desc: 'Tear these buildings down (Del).', ok: true, run: () => this.act.issue({ t: 'delete', p: viewer, ids: mine.map((e) => e.id) }) });
     }
     this.cmds = cmds;
-    this.plateFor(ageOf(p));
-    const sig = cmds.map((c) => `${c.key}${c.ok ? 1 : 0}${c.count ?? ''}${c.on ? 1 : 0}${c.pic.length}${c.title}${c.desc}${JSON.stringify(c.cost)}${c.why}`).join('|');
+    const age = ageOf(p);
+    this.plateFor(age);
+    const sig = `${age}|` + cmds.map((c) => `${c.key}${c.ok ? 1 : 0}${c.count ?? ''}${c.on ? 1 : 0}${c.pic.length}${c.title}${c.desc}${JSON.stringify(c.cost)}${c.why}`).join('|');
     if (sig === this.cmdSig) return;
     this.cmdSig = sig;
     this.cmdEl.innerHTML = cmds
       .map((c, i) => {
         const key = c.key === 'ESCAPE' ? 'Esc' : c.key === 'DELETE' ? 'Del' : c.key;
+        const drawn = c.pic ? null : drawnGlyph(age, c.gid);
         const tip = `<b>${c.title}</b>${c.cost ? `<div class='cost'>${costHtml(c.cost, s.players[viewer].res).replace(/"/g, "'")}</div>` : ''}${c.desc}${!c.ok && c.why ? `<br><span style='color:#ff9a8a'>${c.why}</span>` : ''}${key ? `<br><span class='hint'>Hotkey: ${key}</span>` : ''}`;
-        return `<button class="cmd ${c.ok ? '' : 'off'} ${c.on ? 'on' : ''}" data-i="${i}" data-tip="${tip.replace(/"/g, '&quot;')}">${c.pic ? `<img src="${c.pic}" alt="">` : `<span class="glyph">${c.glyph ?? ''}</span>`}<span class="key">${key}</span>${c.count ? `<span class="count">${c.count}</span>` : ''}</button>`;
+        return `<button class="cmd ${c.ok ? '' : 'off'} ${c.on ? 'on' : ''}" data-i="${i}" data-tip="${tip.replace(/"/g, '&quot;')}">${c.pic ? `<img src="${c.pic}" alt="">` : `<span class="glyph ${drawn ? 'drawn' : ''}">${drawn ?? c.glyph ?? ''}</span>`}<span class="key">${key}</span>${c.count ? `<span class="count">${c.count}</span>` : ''}</button>`;
       })
       .join('');
   }
@@ -1989,6 +1996,7 @@ export class Hud {
     this.cmdEl.classList.remove(...[...this.cmdEl.classList].filter((c) => c.startsWith('stamp-')));
     this.cmdEl.classList.add('plated', `stamp-${stampOf(age)}`);
     this.cmdEl.style.setProperty('--plate', plateUrl(age));
+    this.cmdEl.style.setProperty('--ink', plateColors(age).ink);
     this.cmdEl.dataset.age = age;
     if (plateIsDark(age)) this.cmdEl.dataset.dark = '1';
     else delete this.cmdEl.dataset.dark;
