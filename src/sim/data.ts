@@ -3345,9 +3345,10 @@ export const EXPLORE = { grid: 4, apart: 12, fails: 8, shun: 6, wary: 2, army: 4
 export const AUTO_WORK = { trained: 14, rally: 8, herd: 8, farm: 12, shaft: 16, lay: 5, retry: secs(4) };
 /**
  * The clever computer plans for winter from season `from` (`coldComing` in `ai.ts`); in the Stone Age it raises no winter fields while its larder holds `larder` food (#486).
- * Its hunters of the turning year (#546) keep `shy` tiles from a rival's soldiers.
+ * Its hunters of the turning year (#546) keep `shy` tiles from a rival's soldiers; with the larder under `hungry` food they
+ * keep only `shyHungry` (#851), since a town besieged beside its yard starves if nobody hunts.
  */
-export const AI_WINTER = { from: 2, fields: 2, hunters: 3, pack: 1, food: 0.3, larder: 500, shy: 8 };
+export const AI_WINTER = { from: 2, fields: 2, hunters: 3, pack: 1, food: 0.3, larder: 500, shy: 8, hungry: 60, shyHungry: 3 };
 
 /**
  * Faith takes the walls (#209), for the computer: a pilgrim computer keeps `priests` priests once its army

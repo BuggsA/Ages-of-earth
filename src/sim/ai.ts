@@ -3475,7 +3475,9 @@ function huntTheYear(s: GameState, v: View, issue: (c: Command) => void): void {
   // back to the woodpile until the field is clear, and no hunter is sent after such game.
   const foes: Unit[] = [];
   for (const e of s.ents) if (e.kind === 'unit' && e.hp > 0 && !e.inside && e.type !== 'citizen' && e.type !== 'trader' && isEnemy(s, v.p.id, e.owner)) foes.push(e);
-  const shy = AI_WINTER.shy * AI_WINTER.shy;
+  // A starving town takes its chances: the siege at the yard's edge is no reason to let the people starve (#851).
+  const reach = v.p.res.food < AI_WINTER.hungry ? AI_WINTER.shyHungry : AI_WINTER.shy;
+  const shy = reach * reach;
   const unsafe = (x: number, y: number) => foes.some((f) => (f.x - x) * (f.x - x) + (f.y - y) * (f.y - y) < shy);
   let hunting = 0;
   for (const u of v.citizens) {
