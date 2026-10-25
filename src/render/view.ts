@@ -741,7 +741,7 @@ export class View {
     this.rangeGuides.update(s, guides, (x, y) => this.reveal || s.players[this.viewer].vis[Math.floor(y) * s.w + Math.floor(x)] > 0);
     this.overlays.setBars(bars, this.rig.camera);
     const p = s.players[this.viewer];
-    this.overlays.setGhost(s, sel.ghost ? { ...sel.ghost, epoch: p.epoch, color: p.color } : null);
+    this.overlays.setGhost(s, sel.ghost ? { ...sel.ghost, epoch: p.epoch, color: p.color, age: ageOf(p) } : null);
     this.overlays.setWallGhost(s, sel.wall?.tiles ?? [], p.epoch, p.color, sel.wall?.alongY ?? false, sel.wall?.type);
     const rb = sel.rallyOf ? s.byId.get(sel.rallyOf) : undefined;
     this.overlays.setFlag(s, rb && rb.kind === 'building' && rb.rally ? rb.rally : null, p.color, this.time);

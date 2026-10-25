@@ -52,6 +52,10 @@ Luminance `L` is WCAG relative luminance of the sRGB value (0 black, 1 white); `
 
 **Checking a change:** colours are linear in the shader, so measure the *screenshot*: the ground and an object beside it should differ by 0.15 L or more at the default zoom.
 
+## Every age has a look (#803)
+
+The owner, 2026-10-25: "each age should have a distinct or unique look." Each age past the five trunk epochs has a palette and touches in `src/render/ageLooks.ts` (the 17 older ages keep theirs in `buildingModels.ts`, `ageTouches`). A new age adds both; `tests/age-palettes.test.ts` fails an age without them, or two ages whose house or Town Center match. Palettes keep to the bands above, and trim stays muted (≤ 0.45 S): a trunk model may lay trim over whole walls.
+
 ## How each step works
 
 1. **Research first, if you like** (the owner invites it): how the genre's best stay readable (AoE II DE and IV, Northgard, Against the Storm, Bad North, Townscaper, Kingdom Two Crowns). Short findings on your area's issue, and anything every area needs goes in this file.
