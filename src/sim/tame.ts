@@ -76,7 +76,8 @@ export const songOf = (a: Animal & { kind: BeastKind }): number => secs(TAME.sec
 /**
  * The call of the wild: `TAME.callAt` seconds into every season, each finished Hunting Camp of a Wild people draws one wild beast
  * to it from `TAME.callFrom` tiles out (a boar in spring and summer, a lone wolf in autumn and winter), unless `TAME.callCap`
- * wild beasts already stand within `TAME.callNear` tiles. So the wild near a Wild town never runs dry, and what comes to the
+ * wild boars and wolves already stand within `TAME.callNear` tiles. In autumn it also draws a mammoth from `TAME.mammothFrom`
+ * tiles out, unless one stands within `TAME.mammothNear`. So the wild near a Wild town never runs dry, and what comes to the
  * door must be tamed or fought: a called boar guards where it stands.
  */
 export function callWild(s: GameState): void {
@@ -87,19 +88,30 @@ export function callWild(s: GameState): void {
     const cx = e.x;
     const cy = e.y;
     let near = 0;
-    for (const a of s.animals) if (wildBeast(a) && (a.x - cx) * (a.x - cx) + (a.y - cy) * (a.y - cy) <= TAME.callNear * TAME.callNear) near++;
-    if (near >= TAME.callCap) continue;
-    // The beast comes from a side that turns with the seasons, the first open ground found going round.
-    const turn = Math.floor(s.tick / secs(SEASON.len)) + e.id;
-    for (let i = 0; i < 8; i++) {
-      const d = CALL_DIRS[(turn + i) % 8];
-      const x = Math.floor(cx + d[0] * TAME.callFrom);
-      const y = Math.floor(cy + d[1] * TAME.callFrom);
-      if (!walkable(s, x, y) || s.res[y * s.w + x] !== R_NONE || s.bldAt[y * s.w + x] !== 0) continue;
-      const a = spawnAnimal(s, x + 0.5, y + 0.5, kind);
-      s.events.push({ k: 'wildCry', id: a.id, kind, x: a.x, y: a.y });
-      break;
+    let mammoth = false;
+    for (const a of s.animals) {
+      if (!wildBeast(a)) continue;
+      const d2 = (a.x - cx) * (a.x - cx) + (a.y - cy) * (a.y - cy);
+      if (a.kind !== 'mammoth' && d2 <= TAME.callNear * TAME.callNear) near++;
+      if (a.kind === 'mammoth' && d2 <= TAME.mammothNear * TAME.mammothNear) mammoth = true;
     }
+    if (near < TAME.callCap) callOne(s, e.id, cx, cy, TAME.callFrom, kind);
+    // Once a year, in autumn, a mammoth too, if none lives in the camp's wider country.
+    if (seasonAt(s) === 2 && !mammoth) callOne(s, e.id, cx, cy, TAME.mammothFrom, 'mammoth');
+  }
+}
+
+/** One beast called to the camp at (cx, cy): from `from` tiles out, on a side that turns with the seasons, the first open ground found going round. */
+function callOne(s: GameState, camp: number, cx: number, cy: number, from: number, kind: BeastKind): void {
+  const turn = Math.floor(s.tick / secs(SEASON.len)) + camp;
+  for (let i = 0; i < 8; i++) {
+    const d = CALL_DIRS[(turn + i) % 8];
+    const x = Math.floor(cx + d[0] * from);
+    const y = Math.floor(cy + d[1] * from);
+    if (!walkable(s, x, y) || s.res[y * s.w + x] !== R_NONE || s.bldAt[y * s.w + x] !== 0) continue;
+    const a = spawnAnimal(s, x + 0.5, y + 0.5, kind);
+    s.events.push({ k: 'wildCry', id: a.id, kind, x: a.x, y: a.y });
+    return;
   }
 }
 
