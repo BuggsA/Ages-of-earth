@@ -1721,7 +1721,9 @@ export class Hud {
             });
           }
           // Side roads whose window this age is outside of (#47): shown shut, with the way to them.
-          for (const road of shutRoads(s, p)) {
+          // Only those within a step of here: a window one step back (where Z leads) or a sibling at this tier.
+          // Roads whose windows lie further off stay out of the list so they don't crowd it (they show again once near).
+          for (const road of shutRoads(s, p).filter((r) => windowsOf(r.to).some((a) => a === down || AGES[a].tier === p.epoch))) {
             const from = AGES[road.from];
             const windows = windowsOf(road.to).map((a) => `the ${AGES[a].name}`).join(' or ');
             cmds.push({
