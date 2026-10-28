@@ -2,7 +2,9 @@ import type { AgeArt } from './types';
 
 /** The `stone` age's own interface art. Claim a chunk on its issue first (`docs/age-art.md`). */
 export const art: AgeArt = {
-  glyphs: {
+  // The first hearth: a flame over crossed logs in a ring of stones, the fire a band gathers round.
+  emblem:
+    '<path d="M16 2 C17 7 23 10.4 23 17.4 C23 21.4 20 24 16 24 C12 24 9 21.4 9 17.4 C9 14.4 10.6 12.6 12 11 C12.4 13 13.4 14 14.6 14.4 C13.6 9.6 14.6 5.4 16 2z"/><path d="M16 12.6 C17 15.4 19.4 16.6 19.4 19.6 C19.4 21.6 18 22.8 16 22.8 C14 22.8 12.6 21.6 12.6 19.6 C12.6 17.4 14.8 16 16 12.6z" fill="#e8a21c"/><path d="M5 26.6 L25.6 21.4 M26.6 26.6 L6 21.4" stroke="#6b4a2a" stroke-width="3.4" stroke-linecap="round" fill="none"/><path d="M2.4 29.6 a3.4 2.6 0 0 1 6.8 0z M9.6 29.8 a3.4 2.6 0 0 1 6.8 0z M16.6 29.8 a3.4 2.6 0 0 1 6.8 0z M23.4 29.6 a3.4 2.6 0 0 1 6.4 0z"/>',  glyphs: {
     // An ard, the first plow: a wooden beam and stilt, a flint share biting the ground, a furrow behind it.
     'tech:plow':
       '<path d="M2 29.6 H30" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none" opacity=".5"/><path d="M5 21 L29 12 l1.2 3.4 L8 25.6z"/><path d="M20 16 L24 2.6 l3.6 1 -4.2 13.6z"/><path d="M2.4 29.6 L5.2 18.4 L14 24 L11.6 29.6z"/><path d="M5.8 22.4 L7 26" stroke="#fff" stroke-opacity=".6" stroke-width="1.4" stroke-linecap="round" fill="none"/><path d="M16 29.6 q3-5 6 0 M23 29.6 q3-5 6 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
