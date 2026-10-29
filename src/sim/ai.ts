@@ -15,7 +15,8 @@ import { coveredNext, shoreNear, tideClock, tideMillSpot } from './tides';
 import { castProblem, mooringSpot, raisesCitizens } from './floating';
 import { pitchProblem } from './steppe';
 import { wallLine } from './commands';
-import { AI_COCKLE, HENGE, MEGALITH } from './data';
+import { AI_COCKLE, DELVE, HENGE, MEGALITH } from './data';
+import { canDelve, delveProblem, delvers } from './delve';
 import { AI_COCKLER, COCKLER } from './data';
 import { cocklerSpotNear } from './tides';
 import { AI_GATE } from './data';
@@ -336,6 +337,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   groveWork(s, v, mem, issue);
   hiveWork(s, v, mem, issue);
   megalithWork(s, v, mem, issue);
+  delveWork(s, v, mem, issue);
   wildwoodWork(s, v, mem, issue);
   bloomWork(s, v, mem, issue);
   leviathanWork(s, v, mem, issue);
@@ -711,6 +713,9 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
     // would have gone the plain way to the Bronze Age, never one set on another turn.
     const taken = (Object.keys(roads) as AgeId[]).some((a) => a !== 'megaliths' && roads[a] === true && AGES[a].tier === 1 && ROADS.some((r) => r.from === 'stone' && r.to === a));
     roads[to] = !isNomad(p) && !taken && coin(s, p.id, 0xde11) < MEGALITH.take;
+  } else if (roads[to] === undefined && to === 'delvings') {
+    // The Deep Road's second age (#881): a people that built in stone goes on below, on a coin of its own.
+    roads[to] = hasWalked(p, 'megaliths') && coin(s, p.id, 0xde12) < DELVE.take;
   } else if (roads[to] === undefined && to === 'rivers') {
     // The Water Road's first age (#701 s1): with a channel worth digging by home, on a coin of its own.
     roads[to] = !!riverOf(s, p, mem) && coin(s, p.id, 0x71e5) < AI_RIVERS.take;
@@ -4240,6 +4245,53 @@ function megalithWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) 
   // A crowded town looks farther out, up to `MEGALITH.far`, rather than go without.
   const spot = (field && findSpot(s, 'henge', field.x, field.y, 2, HENGE.reach, 1, near)) || findSpot(s, 'henge', v.home.x, v.home.y, 4, MEGALITH.from, 1, near) || findSpot(s, 'henge', v.home.x, v.home.y, 4, MEGALITH.far, 1);
   if (spot) construct(s, v, mem, 'henge', spot, 1, issue);
+}
+
+/**
+ * The Age of Delvings (#881): a Barrow by home and one `DELVE.toward` of the way to its rival's nearest building, in land it may build
+ * on; then, every so often, its idle foot soldiers by home shelter in the home Barrow and go below to the forward one, where they come
+ * up and the army's usual orders take them on.
+ */
+function delveWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!v.tc || !ageDef(p).delves) return;
+  const barrows = v.buildings.filter((b) => b.type === 'barrow');
+  // Its rival's nearest building known, or before it has scouted one, where its rival started.
+  const target = enemyTarget(s, p) ?? enemyHome(s, p);
+  const homeOf = (b: Building) => (b.x - v.home.x) * (b.x - v.home.x) + (b.y - v.home.y) * (b.y - v.home.y) <= DELVE.home * DELVE.home * 4;
+  const home = barrows.find(homeOf);
+  const far2 = (b: Building) => (b.x - target!.x) * (b.x - target!.x) + (b.y - target!.y) * (b.y - target!.y);
+  const fwd = target ? barrows.filter((b) => !homeOf(b)).sort((a, b) => far2(a) - far2(b) || a.id - b.id)[0] : undefined;
+  if (s.tick - (mem.ordered.barrow ?? -99999) >= secs(30) && !barrows.some((b) => !b.built)) {
+    const cost = buildingCostFor(s, p.id, 'barrow');
+    if (afford(v, cost)) {
+      let spot: { tx: number; ty: number } | null = null;
+      if (!home) spot = findSpot(s, 'barrow', v.home.x, v.home.y, 4, DELVE.home + 4);
+      else if (!fwd && target) {
+        // Along the line to the rival, nearest `toward` first, wherever its people may build (water, woods or a rival's land in the way).
+        for (const k of [DELVE.toward, DELVE.toward - 0.1, DELVE.toward + 0.1, DELVE.toward - 0.2, DELVE.toward - 0.3]) {
+          const at = { x: v.home.x + (target.x - v.home.x) * k, y: v.home.y + (target.y - v.home.y) * k };
+          spot = findSpot(s, 'barrow', at.x, at.y, 0, 14, 1, (tx, ty) => !placeProblem(s, 'barrow', tx, ty, true, p.id));
+          if (spot) break;
+        }
+      }
+      if (spot && construct(s, v, mem, 'barrow', spot, 2, issue)) return;
+    }
+  }
+  if (!home?.built || !fwd?.built) return;
+  // Those already sheltering at home go below once a wave of them is in.
+  const ready = delvers(s, home);
+  if (ready.length >= DELVE.wave && !delveProblem(s, p.id, home, fwd)) {
+    issue({ t: 'delve', p: p.id, from: home.id, to: fwd.id });
+    mem.delveAt = s.tick;
+    return;
+  }
+  if (s.tick - (mem.delveAt ?? -99999) < secs(45)) return;
+  const idle = v.army.filter((u) => !u.inside && u.order.k === 'idle' && canDelve(u) && (u.x - home.x) * (u.x - home.x) + (u.y - home.y) * (u.y - home.y) <= 15 * 15);
+  if (idle.length >= DELVE.wave) {
+    issue({ t: 'garrison', p: p.id, ids: idle.slice(0, BUILDINGS.barrow.garrison ?? 12).map((u) => u.id), target: home.id });
+    mem.delveAt = s.tick;
+  }
 }
 
 /**

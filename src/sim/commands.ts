@@ -1,3 +1,4 @@
+import { delve, delveProblem } from './delve';
 import { AUTO_WORK, BUILDINGS, HENGE, GIANTS, EPOCHS, MARKET, ORE_TRADE, RARE, PATROL, RES_LABEL, RIVERS, SNARE, HIVE, COCKLER, SPREAD, TECHS, TOWER_LEVELS, UNITS, WAYS, domainOf, stepBackCost, unitEpoch, unitStats } from './data';
 import { peace } from './combat';
 import { findSpot } from './ai';
@@ -675,6 +676,15 @@ export function applyCommand(s: GameState, c: Command): void {
     case 'ungarrison': {
       const b = myBuilding(s, c.p, c.building);
       if (b) ungarrison(s, b);
+      break;
+    }
+    case 'delve': {
+      // The Age of Delvings (#881): those sheltering in one mouth go below to another.
+      const from = myBuilding(s, c.p, c.from);
+      const to = myBuilding(s, c.p, c.to);
+      const why = delveProblem(s, c.p, from ?? undefined, to ?? undefined);
+      if (why) return refuse(s, c.p, why);
+      delve(s, from!, to!);
       break;
     }
     case 'bell': {

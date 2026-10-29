@@ -233,6 +233,11 @@ export interface Age {
    * and a Mine Shaft digs stone from plain earth at `MEGALITH.grade`, so the road is never starved of it (`henge.ts`).
    */
   stonework?: boolean;
+  /**
+   * The Age of Delvings (#881, the Deep Road's second age): every Barrow and Town Center of the people is a mouth of one tunnel; units
+   * sheltering in one are sent below to another and come up there (`DELVE`, `delve.ts`). A verb, carried into a Golden Age.
+   */
+  delves?: boolean;
 }
 
 /**
@@ -843,6 +848,22 @@ export const AGES: Record<AgeId, Age> = {
     mul: { buildingHp: 1.3, buildSpeed: 0.8 },
     henges: true,
     stonework: true,
+  },
+  // The Deep Road's second age (#876 s2, #881): instead of the Middle Ages, a people that went into the ground. Every Barrow and Town
+  // Center is a mouth of one tunnel; what shelters in one is sent below and comes up at another.
+  delvings: {
+    verb: 'Dig Barrows joined underground to each other and to your Town Centers: soldiers and citizens sheltering in one are sent below and come up at another, unseen on the way and far faster than they could march',
+    door: 'No Stable and no riders: horses don\'t go below, so the army fights on foot and must surface to fight at all',
+    good: 'An army that comes up where it is least expected: a Barrow raised near a rival is a door into its land',
+    routes: ['deep'],
+    keepsake: { building: 'barrow', does: 'its tunnel to every Town Center of yours, on any road' },
+    name: 'Age of Delvings',
+    short: 'Delvings',
+    tier: 2,
+    blurb: 'As the flint miners of Grimes Graves dug, and the builders of Maeshowe and the souterrains of Ireland and Brittany: a people that goes into the ground. Barrows (C) are turf-roofed stone mouths that shelter twelve. Every Barrow and every Town Center of yours is a mouth of one tunnel: select one with people sheltering inside and Delve (D) to another, and they go below, unseen and untouchable, at five tiles a second, and come up there when they arrive. A Barrow that falls while people are bound for it spills them out where it stood. No Stable is raised and no rider trained, and riders can\'t go below. The Middle Ages\' arms and buildings are here otherwise.',
+    no: { units: ['cavalry'], why: 'Horses don\'t go below: a people of the Delvings trains no riders until it climbs out' },
+    noBuild: { buildings: ['stable'], why: 'Horses don\'t go below: a people of the Delvings raises no Stable until it climbs out' },
+    delves: true,
   },
   // The Water Road's sixth age (#739, s6 of #701): instead of the Atomic Age, a people that keeps the sea's hours. Reached for now by a
   // turn off the Atomic Age (the Age of Locks, s5, will lead here too). The tide wakes for the whole world when the first people enters.
@@ -1670,6 +1691,26 @@ export const ROADS: Road[] = [
   },
   { from: 'megaliths', to: 'bronze', cost: { food: 100, wood: 100 }, time: 20, blurb: 'Put down the rollers: the ordinary Bronze Age. Buildings are paid in timber again; the Henges stand, asleep, but for the one kept.' },
   { from: 'megaliths', to: 'middle', cost: EPOCHS[2].cost, time: EPOCHS[2].time, blurb: 'Rejoin the main road at the Middle Ages, for the same price as from the Bronze Age: buildings are paid in timber again, and the Henges sleep but for the one kept.' },
+  // The Deep Road's trunk (#876 s2): the Age of Delvings instead of the Middle Ages, a climb from Megaliths; a crossing from the Middle
+  // Ages for a people that walked Megaliths before; back onto the plain road at the Middle or the Gunpowder Age.
+  {
+    from: 'megaliths',
+    to: 'delvings',
+    cost: { food: 650, stone: 250, gold: 150 },
+    time: 50,
+    walked: 'megaliths',
+    blurb: 'Instead of the Middle Ages, on down the Deep Road: from building on the land to building under it. Barrows joined underground to every Town Center, so an army goes in at home and comes up far away. Paid in stone more than gold. What it gives up: Stables and riders.',
+  },
+  {
+    from: 'middle',
+    to: 'delvings',
+    cost: { food: 300, wood: 150, stone: 200 },
+    time: 35,
+    walked: 'megaliths',
+    blurb: 'A turn, not a climb, for a people that built in stone before: go below. Barrows joined underground to every Town Center. What it gives up: Stables and riders.',
+  },
+  { from: 'delvings', to: 'middle', cost: { food: 150, wood: 150 }, time: 25, blurb: 'Come up into the daylight: the ordinary Middle Ages, with Stables and riders. The Barrows sleep but for the one kept, whose tunnel still runs to your Town Centers.' },
+  { from: 'delvings', to: 'gunpowder', cost: EPOCHS[3].cost, time: EPOCHS[3].time, blurb: 'Rejoin the main road at the Gunpowder Age for the ordinary price: Stables and riders return, and the Barrows sleep but for the one kept.' },
 ];
 
 /**
@@ -2836,6 +2877,7 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   shaft: { name: 'Mine Shaft', size: 2, hp: 700, cost: { wood: 150 }, time: 30, pop: 0, sight: 4, trains: [], drop: [], epoch: 1, menu: 'eco', key: 'H', blurb: 'A timber headframe over a hole in the ground. One citizen digs stone or gold here for good, slower than an open deposit; best sunk where a deposit was worked out, fair beside mountain rock. Choose its seam on the shaft.' },
   // The Water Road (#701 s1): a bank of earth across the shallows, and the mill that pumps the water out behind it (`DYKE`, `POLDER`, `water.ts`).
   dyke: { name: 'Dyke', size: 1, hp: 700, cost: { wood: 2, stone: 4 }, time: 7, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, ages: ['dykes'], menu: 'eco', key: 'K', blurb: 'A bank of earth with a stone crown, raised on shallow water or on the shore beside it. Drag to lay out a line. Your own people walk along its crown; rivals and ships can\'t pass. Shut a bay or a strait off from the open sea with dykes, then set a Windmill by it to pump it dry. A dyke that falls (to siege, or a Sapper\'s keg) lets the sea back in: it floods the polder ring by ring until a dyke stands in the gap again. A people that has walked the Age of Dykes raises dykes in any age after, to mend its banks.' },
+  barrow: { name: 'Barrow', size: 2, hp: 1400, cost: { stone: 120, wood: 40 }, time: 35, pop: 0, sight: 5, trains: [], drop: [], epoch: 2, ages: ['delvings'], garrison: 12, menu: 'mil', key: 'C', blurb: 'A turf-roofed mouth of dressed stone into the earth. Shelters twelve (no riders), and joins the tunnel that runs to every Barrow and Town Center of yours: select it with people inside and Delve (D) to another mouth, and they go below and come up there, five tiles a second. One that falls spills those bound for it out where it stood.' },
   henge: { name: 'Henge', size: 3, hp: 1600, cost: { stone: 180 }, time: 40, pop: 0, sight: 6, trains: [], drop: [], epoch: 1, ages: ['megaliths'], menu: 'eco', key: 'R', blurb: 'A ring of standing stones round a turf bank. The ground within 7 tiles is your land, and no rival raises anything inside it, not even a Tower or a War Camp. Every time the season turns, each of your citizens standing within 6 tiles brings in food and gold (up to 12 counted), twice as much at midsummer and midwinter.' },
   channel: { name: 'Channel', size: 1, hp: 150, cost: { wood: 4 }, time: 8, pop: 0, sight: 1, trains: [], drop: [], epoch: 1, ages: ['rivers', 'locks'], open: true, menu: 'eco', key: 'Q', blurb: 'A ditch dug out from water across the land. Drag to lay out a line from a spring, stream, lake or shore: as each stretch is dug the water runs into it and it stays. Farms within 2 tiles of water work faster in the Age of Rivers. Soldiers wade a channel at well under half their pace, and no ship sails it. In the Age of Locks it is dug deep, as a canal: every ship sails it and soldiers swim it at a quarter of their pace; an old channel may be dug deep too.' },
   causeway: { name: 'Causeway', size: 1, hp: 400, cost: { wood: 4, stone: 8 }, time: 6, pop: 0, sight: 1, trains: [], drop: [], epoch: 5, ages: ['tides'], menu: 'eco', key: 'W', blurb: 'A raised road of packed stone over the tidal flats or the shallow sea. Drag to lay out a line from the shore. Once laid it is tidal ground that only high water covers: anyone may walk it, at every hour but the top of the tide, and whoever is on it when the water comes back is swept off. A causeway counts as tidal ground for the mills. A line laid across the mouth of a bay of flats is a barrage: behind it the flats are a pond, wet at every hour, that Tide Mills grind twice. A rival\'s keg or warhead breaches it.' },
@@ -3399,6 +3441,13 @@ export const MEGALITH = { timber: ['farm', 'dock', 'snare', 'sapling', 'shaft'] 
  * the same ring). At each turn of the season every finished Henge counts its people's citizens within `reach` tiles (at most `most`)
  * and banks `gift` for each, `solstice` times as much when the year turns into summer or winter.
  */
+/**
+ * The Age of Delvings (#881, `delve.ts`): a delve takes `pace` tiles a second from mouth to mouth, `least` seconds at the least. The
+ * computer: `take` the coin it climbs on from Megaliths, a forward Barrow `toward` of the way to its nearest rival, and a wave of at
+ * least `wave` soldiers sent below from the Barrow at home.
+ */
+export const DELVE = { pace: 5, least: 3, take: 0.7, toward: 0.55, wave: 6, home: 6 };
+
 export const HENGE = { hold: 7, reach: 6, most: 12, gift: { food: 8, gold: 5 } as Cost, solstice: 2 };
 export const SEASONS = [
   { name: 'Spring', icon: '🌱', plant: 1, field: 1, rot: 1, bold: 1, grass: 1.2, blurb: 'The thaw: berries and herds return.' },

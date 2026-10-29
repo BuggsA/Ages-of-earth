@@ -34,6 +34,7 @@ export const AGE_AIR: Record<AgeId, Air> = {
   wild: air('#9ab87a', 0.24), // green forest light
   rivers: air('#c8d890', 0.26), // river-mist, reed green
   megaliths: air('#e6bfae', 0.24), // a solstice dawn on the stones
+  delvings: air('#9a7a5a', 0.34), // lamp smoke and earth-dust from the shafts
   hunt: air('#b8905e', 0.24), // woodsmoke at dawn
   steppe: air('#d8d8b0', 0.2), // pale wind-dust
   // Tier 2

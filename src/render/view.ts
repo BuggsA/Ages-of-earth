@@ -1569,6 +1569,20 @@ export class View {
           this.effects.burst(this.ground(s, ev.x, ev.y, 0.05), { count: 4, speed: 0.4, up: 0.35, life: 0.7, size: 0.045, gravity: 1.5, drag: 0.6, colors: ['#cfe8f5', '#a8996f'] });
           break;
         }
+        case 'delve': {
+          // Going below (#881): a puff of dust from the mouth, seen only by its people (the tunnel is theirs to know).
+          if (ev.owner !== this.viewer) break;
+          this.effects.burst(this.ground(s, ev.x, ev.y, 0.2), { count: 6, speed: 0.4, up: 0.5, life: 0.9, size: 0.05, gravity: 0.8, drag: 0.6, colors: ['#6a5a44', '#8a7a62', '#e2ddcc'] });
+          this.cue('delve', ev.x, ev.y, 0.45);
+          break;
+        }
+        case 'surface': {
+          // Coming up (#881): earth thrown up at the mouth, for anyone who can see it: a rival watching a Barrow sees an army arrive.
+          if (ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;
+          this.effects.burst(this.ground(s, ev.x, ev.y, 0.2), { count: 8 + Math.min(ev.n, 12), speed: 0.9, up: 1.1, life: 1.1, size: 0.06, gravity: 2.2, drag: 0.4, colors: ['#5e4e3e', '#7e6650', '#a08a5a'] });
+          this.cue('surface', ev.x, ev.y, 0.5);
+          break;
+        }
         case 'gathering': {
           // The year's gathering at a Henge (#877): chalk dust off the bank and sparks from the fire at its altar; its people hear the
           // drum and the ringing stones, the solstice louder.

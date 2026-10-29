@@ -18,7 +18,7 @@ import { AGE_ART } from './ageArt';
 
 export type PlateId =
   | 'slab' | 'disc' | 'arch' | 'bastion' | 'cog' | 'hex' | 'wing' | 'octagon' | 'scroll' | 'banner'
-  | 'tent' | 'shell' | 'star' | 'shield' | 'claw' | 'lozenge' | 'leaf' | 'cloud' | 'drop' | 'trilithon';
+  | 'tent' | 'shell' | 'star' | 'shield' | 'claw' | 'lozenge' | 'leaf' | 'cloud' | 'drop' | 'trilithon' | 'mound';
 
 export type MotifId =
   | 'cracks' | 'rivets' | 'bricks' | 'dots' | 'pipes' | 'orbits' | 'chevrons' | 'patches' | 'coins' | 'grain'
@@ -78,6 +78,7 @@ export const AGE_ICONS: Record<AgeId, AgeIcon> = {
   dykes: ic('octagon', 'bricks', 'tidal'),
   rivers: ic('drop', 'ripples', 'tidal'),
   megaliths: ic('trilithon', 'spiral', 'carved'),
+  delvings: ic('mound', 'planks', 'inked'),
   tides: ic('drop', 'waves', 'neon'),
   waterline: ic('octagon', 'lines', 'tidal'),
   locks: ic('cog', 'planks', 'cast'),
@@ -190,6 +191,8 @@ export const PLATES: Record<PlateId, string> = {
   drop: 'M28 3 C40 20 52 30 52 38 C52 47 41 53 28 53 C15 53 4 47 4 38 C4 30 16 20 28 3 Z',
   // Two uprights and a lintel laid across them, a little rough at the edges (the Age of Megaliths, #877).
   trilithon: 'M3 53 L5 17 L3 15 L4 4 L28 6 L52 4 L53 15 L51 17 L53 53 L37 53 L38 22 L28 21 L18 22 L19 53 Z',
+  // A barrow mound with its stone-framed mouth at the foot (the Age of Delvings, #881).
+  mound: 'M2 53 C3 28 14 9 28 9 C42 9 53 28 54 53 H35 V39 Q28 32 21 39 V53 Z',
 };
 
 // ---- Motifs: worked into the plate, in the plate's ink -----------------------------------------------------

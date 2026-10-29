@@ -29,7 +29,10 @@ The game is *Ages of Earth*: on this road a people stops building **on** the lan
 
 - **s1, the Age of Megaliths** (#877): `src/sim/henge.ts` (`inStone`, `hallowed`, `gathered`, `hengeStep`), `MEGALITH` and `HENGE` in `data.ts`, the Henge model in `src/render/deepModels.ts`, its look in `ageLooks.ts`, `ageGrounds.ts`, `ageAir.ts`, the `trilithon` plate in `src/ui/ageIcons.ts`, the emblem in `src/ui/ageArt/megaliths.ts`, the web map's eighth lane, tips, the gathering's sound (`gathering`, `solstice`).
 
+- **s2, the Age of Delvings** (#881): `src/sim/delve.ts` (`isMouth`, `delveProblem`, `delve`, `delveStep`; `Unit.below`), the `delve` command, `DELVE` in `data.ts`, `ungarrison` leaving those still below until they arrive (or the mouth falls), Barrows refusing riders, the Barrow model, the `mound` plate, its emblem, palette and touches, the Delve button and its target mode, sounds `delve` and `surface`, `delveWork` in `ai.ts`.
+
 ## Next
 
-- **s2, the Age of Delvings:** a Barrow-mouth building; units garrisoned in one leave from any other of the people's (`unload` at a chosen mouth). Counter: a mouth falls and those inside are lost; scouting a mouth shows a rival where the army can surface. Keepsake: one mouth keeps its tunnel to the Town Center.
-- Then s3 to s6 as the table says; s7 the sweeps (`npx tsx scripts/routes.ts --seeds 6 deep`).
+- **s3, the Age of the Undercity** (Gunpowder): sink a building (a command on it): sunk, it can't be seen by rivals or hit by arrows and shot, takes no part in the town's work but sheltering and storing, and surfaces (a slow command) to train or fight; walls and towers above ground are shut. Hooks: the tunnel (a sunk Barrow is a hidden mouth), the warheads to come (a sunk building rides a blast out at s6's deep vaults).
+- **s4, the Age of Deep Forges** (Industrial): vents laid by every town in `mapgen.ts` (as spring heads are, with a test across seeds), vent forges that drive the buildings in reach as dams do (`damDrives`).
+- **s5, the Age of Faults** (Atomic), **s6, the Living Earth** (past Faults), **s7** the sweeps (`npx tsx scripts/routes.ts --seeds 6 deep`) and the `deep` route joining the computer's leanings.

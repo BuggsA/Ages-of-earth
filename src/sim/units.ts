@@ -1,3 +1,4 @@
+import { canDelve } from './delve';
 import { COCKLE, BLOOMERY, AI_LEVELS, AUTO_WORK, BUILDINGS, GIANTS, EXPLORE, FIRE, PATROL, CARRY, CONSECRATE, COPPICE, DEER, DT, FLOCK, GALVANIC, KILL_CAMP, EPOCH_GATHER_BONUS, FISH_CARRY, LANDMARKS, GATHER, LEGION, MILITARY, ORDERS, PRIEST, RITE, RARE, REPAIR_SHARE, RUINS, SALVAGE, SNARE, SPREAD, TAME, TRADE, domainOf, secs } from './data';
 import { gap, nearestEnemyUnit, peace, strike, throwSpear } from './combat';
 import { AIR, NAVAL, clearResource, distToRect, distToTile, lineClear, nearestWalkable, stampBuilding, walkable } from './grid';
@@ -1131,7 +1132,8 @@ export function garrisonRoom(b: Building): number {
 
 function garrisonStep(s: GameState, u: Unit, o: Extract<Order, { k: 'garrison' }>): void {
   const b = s.byId.get(o.target);
-  if (!b || b.kind !== 'building' || b.hp <= 0 || !b.built || b.owner !== u.owner || garrisonRoom(b) <= 0 || u.type === 'siege' || domainOf(u.type) !== 'land') {
+  // A Barrow (#881) takes no rider: horses don't go below.
+  if (!b || b.kind !== 'building' || b.hp <= 0 || !b.built || b.owner !== u.owner || garrisonRoom(b) <= 0 || u.type === 'siege' || domainOf(u.type) !== 'land' || (b.type === 'barrow' && !canDelve(u))) {
     setOrder(u, { k: 'idle' });
     return;
   }
@@ -1159,10 +1161,12 @@ export function ungarrison(s: GameState, b: Building, only?: (u: Unit) => boolea
   for (const id of b.garrison) {
     const u = s.byId.get(id);
     if (!u || u.kind !== 'unit') continue;
-    if (only && !only(u)) {
+    // Those still below on a delve (#881) come up when they arrive, unless the mouth is falling: then they dig out where it stood.
+    if ((only && !only(u)) || (b.hp > 0 && (u.below ?? 0) > s.tick)) {
       stay.push(id);
       continue;
     }
+    delete u.below;
     delete u.fled;
     const spot = exitSpot(s, b, b.x + (u.id % 3) - 1, b.y + b.size);
     u.inside = 0;

@@ -46,3 +46,30 @@ export function henge(k: Kit, base: string): void {
   k.team(k.box(0.28, 0.18, 0.02, TEAM, 0.56, 1.1, 1.15));
   k.team(k.box(2.98, 0.08, 2.98, TEAM, 0, -0.06, 0));
 }
+
+const EARTH = '#5e5a3e';
+const PROP = '#6b4b2f';
+
+/**
+ * A Barrow (the Age of Delvings, #881): a long turfed mound with a kerb of stones, and at its foot a stone-framed mouth with a timber
+ * lintel and a lamp hung inside, a heap of chalk spoil beside it, and the owner's banner on a post.
+ */
+export function barrow(k: Kit, base: string): void {
+  k.box(1.9, 0.05, 1.9, base, 0, -0.02, 0);
+  const m = k.dome(0.85, EARTH, 0, 0, -0.15);
+  m.scale.set(1.05, 0.62, 1.15);
+  for (let i = 0; i < 9; i++) {
+    const a = Math.PI * 0.15 + (i / 8) * Math.PI * 1.7;
+    k.rock(0.07 + rnd(i, 2, 9) * 0.03, i % 2 ? SARSEN : SARSEN_DARK, Math.cos(a) * 0.86, 0, -0.15 + Math.sin(a) * 0.95);
+  }
+  // The mouth: two uprights and a capstone, the dark way in, the timber lintel within and the lamp.
+  for (const x of [-0.2, 0.2]) k.box(0.12, 0.46, 0.14, SARSEN_DARK, x, 0, 0.62);
+  k.box(0.56, 0.12, 0.18, SARSEN, 0, 0.46, 0.62);
+  k.box(0.28, 0.42, 0.04, '#1a1612', 0, 0, 0.66);
+  k.box(0.3, 0.05, 0.06, PROP, 0, 0.36, 0.6);
+  k.glow(k.box(0.06, 0.08, 0.06, '#ffb24a', 0, 0.24, 0.62));
+  k.blob(0.2, CHALK, 0.62, 0, 0.62).scale.set(1.2, 0.5, 1);
+  k.cyl(0.02, 0.02, 1.1, 4, PROP, -0.6, 0, 0.6);
+  k.team(k.box(0.26, 0.16, 0.02, TEAM, -0.47, 0.92, 0.6));
+  k.team(k.box(1.98, 0.08, 1.98, TEAM, 0, -0.06, 0));
+}

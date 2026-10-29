@@ -14,7 +14,7 @@ export type SoundName =
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
   | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'siloAlarm' | 'interceptLaunch' | 'interceptHit' | 'interceptMiss' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'fireLit' | 'fireCatch' | 'fireOut' | 'fireAsh' | 'flow' | 'rush' | 'groan' | 'dart' | 'swarm' | 'hiveHush' | 'sluiceOpen' | 'sluiceShut' | 'spread' | 'tideWash' | 'tideMill' | 'swept' | 'pondShut' | 'breach' | 'entWake' | 'entRoot' | 'spreading' | 'damBurst' | 'castOff' | 'moor' | 'founder' | 'bloomSling' | 'bloomRoot' | 'bloomGrow' | 'bloomCut' | 'bloomCrack' | 'bloomGreen' | 'bloomStorm'
-  | 'gathering' | 'solstice'
+  | 'gathering' | 'solstice' | 'delve' | 'surface'
   | 'scour' | 'boarded' | 'whaleSong' | 'seedBomb' | 'behemothKneel' | 'behemothRise' | 'krakenGrip' | 'krakenRise' | 'webRot' | 'webBurn' | 'webGrown' | 'hawkCry';
 
 export interface SoundSettings {
@@ -801,6 +801,19 @@ export class Sound {
         this.tone(out, t + 0.1, { f: N.C3, dur: 1.9, peak: 0.028, attack: 0.5, lp: 500 });
         this.tone(out, t + 0.1, { f: N.G3, dur: 1.9, peak: 0.02, attack: 0.6, lp: 600 });
         for (const [dt, f] of [[0.9, 1180], [1.32, 1410]]) this.tone(out, t + dt, { f, to: f * 0.985, type: 'sine', dur: 0.5, peak: 0.022, attack: 0.002 });
+        break;
+      case 'delve':
+        // Going below (#881): boots on a timber stair, the earth closing over them in a long low rumble, a lamp's chain chinking.
+        for (let i = 0; i < 4; i++) this.noise(out, t + i * 0.13, { dur: 0.06, filter: 'bandpass', f: 520 - i * 40, q: 2, peak: 0.035 });
+        this.noise(out, t + 0.4, { dur: 1.4, filter: 'lowpass', f: 240, to: 120, q: 0.8, peak: 0.06, attack: 0.3 });
+        this.tone(out, t + 0.35, { f: 48, to: 38, type: 'triangle', dur: 1.2, peak: 0.05, attack: 0.25, lp: 200 });
+        this.tone(out, t + 0.2, { f: 2600, to: 2500, type: 'sine', dur: 0.08, peak: 0.008, attack: 0.002 });
+        break;
+      case 'surface':
+        // Coming up (#881): earth and chalk breaking away from the mouth, then the tramp of many feet out into the open.
+        this.noise(out, t, { dur: 0.5, filter: 'bandpass', f: 900, to: 400, q: 0.9, peak: 0.06, attack: 0.01 });
+        this.tone(out, t, { f: 70, to: 44, type: 'triangle', dur: 0.4, peak: 0.06, attack: 0.005, lp: 300 });
+        for (let i = 0; i < 6; i++) this.noise(out, t + 0.35 + i * 0.16, { dur: 0.05, filter: 'bandpass', f: 380 + (i % 2) * 90, q: 2.4, peak: 0.03 });
         break;
       case 'solstice':
         // Midsummer or midwinter at the stones (#877): the gathering's drum, louder and slower, under a long rising horn of the people
