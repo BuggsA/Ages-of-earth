@@ -1,6 +1,7 @@
 import { AGES, BUILDINGS, HIREHALL, CIVS, GUNS, GROVE, HIVE, TOWER_LEVELS, WAYS, WORKS, SIGNATURES, EPOCHS, FLOOD, NO_MODS, PATHS, RARE, STOCKADE, TECHS, WARCAMP, buildingCost, buildingHp, unitStats, type Mods, type UnitStats } from './data';
 import { fairLevy } from './fair';
 import { flooded } from './flood';
+import { buildsInStone, inStone } from './henge';
 import { ageDef, ageOf, hasWalked, isHire, isSuspended, pathCarry, threadsOf } from './ages';
 import type { AgeId, Building, BuildingType, Cost, GameState, Player, TechId, UnitType } from './types';
 import { RES } from './types';
@@ -224,7 +225,8 @@ export function raiseProblem(s: GameState, owner: number, b: Building): string |
 /** What a building costs a player now (walls change with the epoch; some civilizations pay less for wonders). */
 export function buildingCostFor(s: GameState, owner: number, type: BuildingType): Cost {
   const p = s.players[owner];
-  const base = buildingCost(type, p.epoch);
+  // The Age of Megaliths (#877): a town raised in stone pays its timber in stone.
+  const base = buildsInStone(s, owner) ? inStone(type, buildingCost(type, p.epoch)) : buildingCost(type, p.epoch);
   if (type !== 'wonder') return base;
   return scale(base, cacheOf(p).mods.wonderCost);
 }

@@ -2,7 +2,8 @@
  * Mine Shafts (#681): stone and gold dug from the ground once the open deposits are gone. What the ground round a shaft holds
  * (old workings, mountain rock or plain earth) sets which seams it may dig and how fast; the numbers are `SHAFT` in `data.ts`.
  */
-import { SHAFT } from './data';
+import { MEGALITH, SHAFT } from './data';
+import { deepQuarry } from './henge';
 import { mineable } from './household';
 import type { Building, GameState, Res, SeamId } from './types';
 import { R_BLOODIRON, R_GLOWCAP, R_GOLD, R_SALT, R_SALTPETRE, R_STONE, T_ROCK } from './types';
@@ -55,7 +56,9 @@ export function bestSeam(s: GameState, b: { tx: number; ty: number; size: number
   const g = groundAt(s, b);
   const can = seamsAt(s, b);
   let best: SeamId | null = null;
-  for (const m of ['gold', 'stone', ...SEAMS.filter((x) => x !== 'gold' && x !== 'stone')] as SeamId[]) {
+  // A people building in stone (#877) starts a shaft on stone on a tie: it is what the town waits on.
+  const first: SeamId[] = deepQuarry(s, b.owner) ? ['stone', 'gold'] : ['gold', 'stone'];
+  for (const m of [...first, ...SEAMS.filter((x) => x !== 'gold' && x !== 'stone')] as SeamId[]) {
     if (can.includes(m) && (!best || RANK[g[m]!] > RANK[g[best]!])) best = m;
   }
   return best;
@@ -67,9 +70,12 @@ export function seamOf(s: GameState, b: Building): SeamId | null {
 }
 
 /** The share of an open deposit's pace a shaft digs a seam at. */
-export function shaftShare(s: GameState, b: { tx: number; ty: number; size: number }, seam: SeamId): number {
+export function shaftShare(s: GameState, b: { tx: number; ty: number; size: number; owner?: number }, seam: SeamId): number {
   const g = groundAt(s, b)[seam];
-  return g ? SHAFT.grade[g] : 0;
+  if (!g) return 0;
+  // The Age of Megaliths (#877) digs stone from any ground at `MEGALITH.grade` at the least: the road's stone never runs out.
+  if (seam === 'stone' && b.owner !== undefined && b.owner >= 0 && deepQuarry(s, b.owner)) return Math.max(SHAFT.grade[g], MEGALITH.grade);
+  return SHAFT.grade[g];
 }
 
 /** Why a shaft can't be set to dig this seam, or null. */

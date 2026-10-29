@@ -1,3 +1,5 @@
+import { quarries } from './nomad';
+import { R_STONE } from './types';
 import { AGES, BUILDINGS, CIVS, DAM, GOLDEN, LIGHTNING, LOWER_IS_BETTER, PATHS, ROADS, STEP_BACK, TECHS, TICK_HZ, TRUNK, WAYS, secs, stepBackCost, type Age, type Deed, type Mods, type Road, type UnitClass } from './data';
 import { KEYS, R_BLOODIRON, R_GLOWCAP, R_BOG, R_SALT, R_SALTPETRE, type AgeId, type CivId, type PathId, type RareId, type Building, type BuildingType, type Cost, type GameState, type KeyId, type Player, type TechId, type UnitType } from './types';
 import { coastHeld, driven } from './water';
@@ -34,7 +36,7 @@ const boon = (key: keyof Mods, v: number): boolean => (LOWER_IS_BETTER.includes(
 /** What an age's verbs are, beyond its numbers and its doors: carried whole into a Golden Age. */
 const VERB_KEYS = [
   'hire', 'mobile', 'packs', 'caravans', 'relicTrade', 'ironTrade', 'forge', 'coils', 'callUp', 'haul', 'blood', 'hemocraft', 'rite', 'fission', 'fusion',
-  'reclaim', 'salvage', 'sortie', 'fairs', 'convoys', 'prizes', 'vigils', 'thralls', 'mills', 'sappers', 'raid', 'missions', 'names', 'pumps', 'rivers', 'sluices', 'canals', 'turbines', 'boards', 'heel',
+  'reclaim', 'salvage', 'sortie', 'fairs', 'convoys', 'prizes', 'vigils', 'thralls', 'mills', 'sappers', 'raid', 'missions', 'names', 'pumps', 'rivers', 'sluices', 'canals', 'turbines', 'boards', 'heel', 'henges',
 ] as const;
 
 const woven = new Map<string, Age>();
@@ -337,6 +339,8 @@ export function roadProblem(s: GameState, p: Player, r: Road): string | null {
   }
   // A coast door (#701): the land's shape, not an ore, keeps the Age of Dykes from a people with no shallows by its town.
   if (r.coast && !coastHeld(s, p)) return r.coast;
+  // A town raised in stone (#877) is no town for a people that quarries none: its every building would wait on tribute.
+  if (AGES[r.to].stonework && !quarries(p, R_STONE)) return 'A people born on the move quarries no stone, and raises no town in it';
   if (r.shuns && hasWalked(p, r.shuns)) return `Your people took the ${AGES[r.shuns].name}: this road is closed to it for good`;
   // A crossing (#585): seen with one sibling walked, open only with both. The road back to the age they share, and on into the other, is the price.
   const other = crossingLeft(p, r);

@@ -1,3 +1,4 @@
+import { gathered, solstice } from '../sim/henge';
 import { crestSvg } from './crests';
 import { seasonAt, seasonOf } from '../sim/seasons';
 import { flooded } from '../sim/flood';
@@ -9,7 +10,7 @@ import { rankOf } from '../sim/combat';
 import { heroBusy, shortfall, shortages, MAX_QUEUE } from '../sim/commands';
 import { handsFor } from '../sim/labor';
 import { RARE_OF_TILE, findResource } from '../sim/units';
-import { FIRE, FISSION, HIVE, INTERCEPT, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, AUTO_WORK, BREACH, CANAL, DAM, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, SALVO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE, FLOAT } from '../sim/data';
+import { HENGE, SEASON, FIRE, FISSION, HIVE, INTERCEPT, WILDWOOD, BLOOM, LEVIATHANS, MYCELIUM, AUTO_WORK, BREACH, CANAL, DAM, INUND, POLDER, RIVERS, SHEPHERD, TOWER_LEVELS, LONGBOW, KEG, ORE_POST, PROSPECTOR, SEA_RAID, ROADS, ROUTES, LABOR, SPOILS, POLIS, HOMELANDS, MILITARY, RARE, MERC, ORDERS, BLOOD, HEMO, HEMO_IRON, HEMOCRAFT, RITE, AGES, WAY, WAYS, WAY_IDS, KIN, CALL_UP, PATHS, WARCAMP, FLOCK, NOMAD, AMOUNT, LIGHTNING, CONSECRATE, BEACON, BOAR, RALLY, STEP_BACK, STEPPE, SILK, SERAI, TRIBUTE, stepBackCost, VETERANCY, BUILDINGS, SHAFT, BUILDING_TYPES, WARHEADS, CIVS, WORK, WORKS, SIGNATURES, EPOCHS, SILO, SALVO, MARKET, ORE_TRADE, RELIC, ROT, REPAIR_SHARE, RUINS, LANDMARKS, TRADE, TIDINGS, RES_LABEL, TECHS, TECH_IDS, TICK_HZ, domainOf, secs, unitEpoch, TIDE, FLOAT } from '../sim/data';
 import { scoreOf } from '../sim/game';
 import { carriedBy, keptIn, relicAt } from '../sim/relics';
 import { caravanBonus, caravanOf, glutNow, homeMarket, marketOf, nearestCaravan, postAt, seraiNear, tripGold } from '../sim/trade';
@@ -1356,6 +1357,15 @@ export class Hud {
       const still = tideMillIdle(s, b);
       const share = millShares(s).get(b.id) ?? 0;
       status += ` · <span data-tip="<b>Tide Mill</b>Its pond fills on the flood and runs out through the wheel on the ebb: at every turn of the tide it grinds ${TIDE.mill.gold} gold with ${TIDE.mill.most} tiles of tidal ground within ${TIDE.mill.reach} tiles of it, less with fewer. A tile feeds only the first mill raised by it. Causeways count as tidal ground. Flats a causeway line shuts off from the sea are a barrage's pond: ground twice, on the flood and on the ebb.">${still ? `⚠ ${still}` : `🌊 ${Math.round(share)} gold a turn of the tide (${Math.min(TIDE.mill.most, tidalNear(s, b).length)} tiles of tidal ground${tidalNear(s, b).some((t) => isPond(s, t)) ? `, ${tidalNear(s, b).filter((t) => isPond(s, t)).length} of them a barrage's pond, ground twice` : ''})${tideClock(s) ? '' : ': the tide wakes the moment it is raised'}`}</span>`;
+    }
+    // A Henge (#877): who stands in its ring, and when the year turns; a rival's reads as ground held.
+    if (b.built && !sleeping && b.type === 'henge') {
+      const left = SEASON.len - (Math.floor(s.tick / TICK_HZ) % SEASON.len);
+      const next = (seasonAt(s) + 1) % 4;
+      const tip = `<b>Henge</b>The ground within ${HENGE.hold} tiles is ${mine ? 'yours' : 'its people\'s'}: no rival raises anything inside the ring, not even a Tower or a War Camp. Every time the season turns, each citizen of its people standing within ${HENGE.reach} tiles (at most ${HENGE.most}) brings in ${HENGE.gift.food} food and ${HENGE.gift.gold} gold, twice that at midsummer and midwinter.`;
+      status += mine
+        ? ` · <span data-tip="${tip}">🪨 ${gathered(s, b)} gathered · ${solstice(next) ? 'solstice' : 'year turns'} in ${left}s</span>`
+        : ` · <span data-tip="${tip}">🪨 Holds the ground</span>`;
     }
     // A Cockler's Hut (#779): the beds it tends.
     if (mine && b.built && b.type === 'cockler') {

@@ -66,7 +66,9 @@ export type BuildingType =
   /** The Age of Floating Cities (#770): a district on pontoons, moored on open water, that is cast off, towed and moored again. */
   | 'pontoon'
   /** Missile defence (#759 s2): a battery that fires one interceptor at a warhead falling in its cover. */
-  | 'battery';
+  | 'battery'
+  /** The Age of Megaliths (#877, the Deep Road): a ring of standing stones that holds the ground and gathers the people at the turn of the year. */
+  | 'henge';
 /** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
 export type Difficulty = 'gentle' | 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
@@ -86,7 +88,7 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'chart' | 'assay' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged' | 'launchControl' | 'interceptors';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood' | 'locks' | 'floating' | 'bloom' | 'beggars' | 'leviathans' | 'mycelium' | 'hunt';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood' | 'locks' | 'floating' | 'bloom' | 'beggars' | 'leviathans' | 'mycelium' | 'hunt' | 'megaliths';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
 export type PathId = 'blood' | 'steppe' | 'hemocraft' | 'rite';
@@ -851,6 +853,8 @@ export interface PlayerStats {
   dug?: number;
   /** Gold ground by Tide Mills on the running tide (#739, the Age of Tides). */
   milled?: number;
+  /** Food and gold banked at Henges' gatherings as the year turned (#877, the Age of Megaliths). */
+  gathering?: number;
   /** Causeway tiles raised over the flats (#739, the Age of Tides). */
   causeways?: number;
   /** Rival causeway tiles breached by this people's kegs and warheads (#748). */
@@ -1165,6 +1169,8 @@ export type GameEvent =
   | { k: 'cockles'; beds: number; food: number }
   /** A Tide Mill ground `gold` on the running tide (#739). */
   | { k: 'milled'; id: number; owner: number; gold: number; x: number; y: number }
+  /** The year's gathering at a Henge (#877): `n` citizens counted as the season turned, twice the gift at a solstice. */
+  | { k: 'gathering'; id: number; owner: number; n: number; solstice: boolean; x: number; y: number }
   /** A causeway was finished (#739): `tile` is tidal ground now, raised. */
   | { k: 'causeway'; owner: number; tile: number; x: number; y: number }
   /** A causeway tile was breached (#748) by `by`'s keg or warhead: it is plain tidal ground again (or open sea), `owner`'s road cut. */
@@ -1561,6 +1567,8 @@ export interface AiMemory {
   grove?: number;
   /** The tick it entered the Age of the Hive, kept while it sets its Hives there (`HIVE.aiStay`). */
   hive?: number;
+  /** When it entered the Age of Megaliths (#877), so it keeps the age a while. */
+  megaliths?: number;
   /** The tick it entered the Age of the Wildwood, kept while it wakes its forest there (`WILDWOOD.aiStay`). */
   wildwood?: number;
   /** The tick it entered the Age of the Bloom, kept while it slings its Seeds there (`BLOOM.aiStay`); and when it last planted an Orchard for the Greening. */

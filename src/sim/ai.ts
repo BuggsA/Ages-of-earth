@@ -15,7 +15,7 @@ import { coveredNext, shoreNear, tideClock, tideMillSpot } from './tides';
 import { castProblem, mooringSpot, raisesCitizens } from './floating';
 import { pitchProblem } from './steppe';
 import { wallLine } from './commands';
-import { AI_COCKLE } from './data';
+import { AI_COCKLE, HENGE, MEGALITH } from './data';
 import { AI_COCKLER, COCKLER } from './data';
 import { cocklerSpotNear } from './tides';
 import { AI_GATE } from './data';
@@ -169,7 +169,9 @@ function settleLean(s: GameState, p: Player, mem: AiMemory): void {
   // tamed beasts for a legion) could leave a town with no soldiers to take one back.
   if (s.scenario || s.mode === 'lords' || !AI_LEVELS[p.ai!].clever || AI_LEVELS[p.ai!].lean === false || coin(s, p.id, 0x7e4a) >= AI_TEMPER.lean) return;
   const wet = s.mapType === 'lakes' || s.mapType === 'sea';
-  const open = (Object.keys(ROUTES) as RouteId[]).filter((r) => r !== 'plain' && (wet || (r !== 'navy' && r !== 'water')) && leanAges(p, r).length > 0);
+  // The Deep Road (#876) is not leaned to yet: its first age is taken on a coin of its own (`wants`), and leaving it out keeps every
+  // other leaning's dice where they were. It joins the leanings with its sweeps (#876 s7).
+  const open = (Object.keys(ROUTES) as RouteId[]).filter((r) => r !== 'plain' && r !== 'deep' && (wet || (r !== 'navy' && r !== 'water')) && leanAges(p, r).length > 0);
   if (!open.length) return;
   const route = open[Math.floor(coin(s, p.id, 0x7e4b) * open.length)];
   mem.lean = route;
@@ -333,6 +335,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   wildRoad(s, v, mem, issue);
   groveWork(s, v, mem, issue);
   hiveWork(s, v, mem, issue);
+  megalithWork(s, v, mem, issue);
   wildwoodWork(s, v, mem, issue);
   bloomWork(s, v, mem, issue);
   leviathanWork(s, v, mem, issue);
@@ -702,6 +705,12 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   } else if (roads[to] === undefined && to === 'locks') {
     // The Water Road's fifth age (#701 s5): a people that walked the Water Line turns into it on a coin of its own.
     roads[to] = hasWalked(p, 'waterline') && coin(s, p.id, 0x10c5) < AI_LOCKS.take;
+  } else if (roads[to] === undefined && to === 'megaliths') {
+    // The Deep Road's first age (#877): open on every map, so a coin of its own decides, and no other match's dice shift. It is the last
+    // road off the Stone Age (`ROADS`), so it is asked only once every other turn the town knows of was passed by: it takes a town that
+    // would have gone the plain way to the Bronze Age, never one set on another turn.
+    const taken = (Object.keys(roads) as AgeId[]).some((a) => a !== 'megaliths' && roads[a] === true && AGES[a].tier === 1 && ROADS.some((r) => r.from === 'stone' && r.to === a));
+    roads[to] = !isNomad(p) && !taken && coin(s, p.id, 0xde11) < MEGALITH.take;
   } else if (roads[to] === undefined && to === 'rivers') {
     // The Water Road's first age (#701 s1): with a channel worth digging by home, on a coin of its own.
     roads[to] = !!riverOf(s, p, mem) && coin(s, p.id, 0x71e5) < AI_RIVERS.take;
@@ -885,6 +894,8 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   if (walksWeb(v) && ageOf(p) === 'floating' && (!mem.float || mem.float.since < 0 || s.tick - mem.float.since < secs(AI_FLOAT.stay))) return null;
   // So is the Age of Locks (#701 s5), so its canal is dug and its dam turns.
   if (walksWeb(v) && ageOf(p) === 'locks' && s.tick - (mem.locks?.since ?? s.tick) < secs(AI_LOCKS.stay)) return null;
+  // The Age of Megaliths (#877) is kept until its first Henge stands, `MEGALITH.stay` seconds at most; then it climbs as it would anyway.
+  if (walksWeb(v) && ageOf(p) === 'megaliths' && !count(v, 'henge', true) && s.tick - (mem.megaliths ?? s.tick) < secs(MEGALITH.stay)) return null;
   // The Wild is kept a while, so the beasts it came for are tamed and the Den is breeding.
   if (walksWeb(v) && ageOf(p) === 'wild' && s.tick - (mem.wild ?? s.tick) < secs(TAME.aiStay)) return null;
   // The Grove is kept a while, so its gardens are fed, its Orchards set and its Thornwall grown.
@@ -3567,12 +3578,14 @@ const nomadShare = (r: Res, share: Record<Res, number>): number => (r === 'stone
 /** How many citizens each resource should have now: the epoch's shares, leaning away from what piles up. */
 function wanted(v: View, cold = false): Record<Res, number> {
   const share = SHARE[v.p.epoch];
+  // A town raised in stone (#877) pays its timber in stone: hands move from the woods to the quarries.
+  const stonework = !!AGES[ageOf(v.p)].stonework;
   const weight: Record<Res, number> = { food: 0, wood: 0, gold: 0, stone: 0 };
   let total = 0;
   for (const r of RES) {
     const stock = v.p.res[r];
     const lean = stock > 1200 ? 0.15 : stock > 700 ? 0.4 : stock > 400 ? 0.7 : stock < 80 ? 1.4 : 1;
-    weight[r] = share[r] * lean * (cold && r === 'food' ? 1 + AI_WINTER.food : 1) * (legionAtWork(v) && (r === 'wood' || r === 'stone') ? LEGION.aiCitizenWood : 1) * (r === 'gold' && isHousehold(v.p) ? 0 : 1) * (isNomad(v.p) ? nomadShare(r, share) : 1);
+    weight[r] = share[r] * lean * (stonework && r === 'wood' ? MEGALITH.aiWood : stonework && r === 'stone' ? MEGALITH.aiStone : 1) * (cold && r === 'food' ? 1 + AI_WINTER.food : 1) * (legionAtWork(v) && (r === 'wood' || r === 'stone') ? LEGION.aiCitizenWood : 1) * (r === 'gold' && isHousehold(v.p) ? 0 : 1) * (isNomad(v.p) ? nomadShare(r, share) : 1);
     total += weight[r];
   }
   const n = v.citizens.filter((u) => u.order.k !== 'build' && !u.inside).length;
@@ -4199,6 +4212,34 @@ function groveWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   issue({ t: 'wall', p: p.id, ids: crew.map((u) => u.id), x0: Math.floor(cx - fy * half), y0: Math.floor(cy + fx * half), x1: Math.floor(cx + fy * half), y1: Math.floor(cy - fx * half), thorn: true });
   spend(v, { wood: (cost.wood ?? 0) * GROVE.aiThorn });
   mem.ordered.thornwall = s.tick;
+}
+
+/**
+ * The Age of Megaliths (#877): up to `MEGALITH.henges` Henges within `MEGALITH.from` tiles of home, among the fields where it can (so the
+ * farmers stand in the ring when the year turns), else by the Town Center, the first as soon as the stone is in store.
+ */
+function megalithWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!v.tc || ageOf(p) !== 'megaliths') return;
+  mem.megaliths ??= s.tick;
+  // Its buildings wait on stone: once the store runs low a Mine Shaft goes down by home (timber, which it has), up to `aiShafts`, and digs
+  // stone (`bestSeam` starts it there in this age) for as long as the town stands.
+  if (p.res.stone < MEGALITH.aiLow && count(v, 'shaft') < MEGALITH.aiShafts && !v.buildings.some((b) => b.type === 'shaft' && !b.built) && s.tick - (mem.ordered.shaft ?? -99999) >= secs(20) && v.budget.wood >= (buildingCostFor(s, p.id, 'shaft').wood ?? 0)) {
+    const spot = findSpot(s, 'shaft', v.home.x, v.home.y, 4, SHAFT.aiReach, 1);
+    if (spot && construct(s, v, mem, 'shaft', spot, 1, issue)) return;
+  }
+  if (count(v, 'henge') >= MEGALITH.henges || s.tick - (mem.ordered.henge ?? -99999) < secs(30)) return;
+  const cost = buildingCostFor(s, p.id, 'henge');
+  // The first Henge is the age's point: its stone is set aside before houses and halls take it, as a channel's price is (`riverWork`).
+  if (!afford(v, cost)) {
+    if (count(v, 'henge') === 0) spend(v, cost);
+    return;
+  }
+  const near = (tx: number, ty: number) => Math.abs(tx - v.home.x) <= MEGALITH.from && Math.abs(ty - v.home.y) <= MEGALITH.from;
+  const field = v.buildings.find((b) => b.type === 'farm' && !v.buildings.some((h) => h.type === 'henge' && Math.abs(h.tx - b.tx) <= HENGE.reach && Math.abs(h.ty - b.ty) <= HENGE.reach));
+  // A crowded town looks farther out, up to `MEGALITH.far`, rather than go without.
+  const spot = (field && findSpot(s, 'henge', field.x, field.y, 2, HENGE.reach, 1, near)) || findSpot(s, 'henge', v.home.x, v.home.y, 4, MEGALITH.from, 1, near) || findSpot(s, 'henge', v.home.x, v.home.y, 4, MEGALITH.far, 1);
+  if (spot) construct(s, v, mem, 'henge', spot, 1, issue);
 }
 
 /**

@@ -37,6 +37,7 @@ export const AGE_PALETTES: Partial<Record<AgeId, AgePalette>> = {
   iron: pal('#c5b9a4', '#6f6458', '#2e2c2a', '#252321', '#6e5a4e', '#7a7268'), // bog-iron grey
   wild: pal('#d2c09e', '#b49f7a', '#3e2416', '#321c10', '#ede3cc', '#8f7a5c'), // hide walls, bracken roofs, bone
   rivers: pal('#dccaa0', '#c4af84', '#d5c58e', '#c2b07a', '#cdb88a', '#b5a37e'), // sun-dried mud, reed roofs
+  megaliths: pal('#a3a7a8', '#878c8f', '#26221e', '#1d1a17', '#b4aa8c', '#6a6e70'), // dressed granite, peat-turf roofs, chalk and lichen
   hunt: pal('#4a3626', '#3a2a1e', '#d8ccb0', '#c6b99c', '#a89068', '#7a6a52'), // stained leather under pale felt
   steppe: pal('#ece4cf', '#d4c8ac', '#c9b48a', '#b8a27a', '#5a3a30', '#a59878'), // white felt
   // Tier 2, beside the Middle Ages' white plaster and slate.
@@ -82,7 +83,7 @@ export const AGE_PALETTES: Partial<Record<AgeId, AgePalette>> = {
 /** The ages whose touches live in this file. */
 export const NEW_LOOK_AGES: AgeId[] = [
   'atomic', 'fission', 'fusion', 'alchemy', 'sapper', 'searaider', 'chariots', 'wild', 'grove', 'hive', 'wildwood', 'bloom', 'leviathans',
-  'missions', 'dykes', 'rivers', 'tides', 'waterline', 'locks', 'floating', 'beggars', 'hunt', 'mycelium',
+  'missions', 'dykes', 'rivers', 'tides', 'waterline', 'locks', 'floating', 'beggars', 'hunt', 'mycelium', 'megaliths',
 ];
 
 /** Buildings that take touches: the town's own halls and houses. Water works, walls, fields and one-tile pieces keep their shape. */
@@ -113,6 +114,10 @@ const CYAN = '#7fe6ff';
 const AMBER = '#ffb24a';
 const LEAF = '#4f7a3a';
 const WHITE = '#efeae0';
+const GRANITE = '#9a9a92';
+const GRANITE_DARK = '#76766f';
+const LICHEN_STONE = '#b3a874';
+const CHALK_CUT = '#e2ddcc';
 
 /** A barrel on its end: a keg, a water butt or a tar barrel. */
 function keg(k: Kit, x: number, z: number, r = 0.11, color = '#6a4a2e'): void {
@@ -386,6 +391,20 @@ export function ageLookTouches(k: Kit, type: BuildingType, age: AgeId): boolean 
       k.glow(k.box(0.12, 0.14, 0.02, '#ffd68a', 0, e + 0.3, f - 0.19));
       break;
     }
+    case 'megaliths': {
+      // Carnac and Newgrange: a standing stone by the door, a kerb of boulders along the front, a spiral cut in the lintel stone,
+      // and a dolmen (two uprights and a capstone) behind the great halls.
+      k.box(0.16, e + 0.35, 0.12, GRANITE, l + 0.12, 0, f + 0.08).rotation.z = 0.06;
+      k.box(0.12, 0.06, 0.125, LICHEN_STONE, l + 0.12, e * 0.7, f + 0.08);
+      for (let i = 0; i < 4; i++) k.rock(0.07 + (i % 2) * 0.02, i % 2 ? GRANITE : GRANITE_DARK, -h * 0.75 + i * 0.22, 0, f + 0.12);
+      k.box(0.5, 0.12, 0.05, GRANITE_DARK, 0, e + 0.02, f + 0.03);
+      k.ring(0.04, 0.008, CHALK_CUT, e + 0.08).position.z = f + 0.06;
+      if (great || big) {
+        for (const x of [-0.25, 0.25]) k.box(0.16, 0.6, 0.16, GRANITE_DARK, -h * 0.4 + x, 0, -h - 0.25);
+        k.box(0.75, 0.13, 0.4, GRANITE, -h * 0.4, 0.6, -h - 0.25).rotation.z = 0.05;
+      }
+      break;
+    }
     case 'rivers': {
       // The first river towns: bound-reed columns flanking the door, a water jar and a little blue trough fed from the channel.
       for (const x of [-0.42, 0.42]) {
@@ -538,6 +557,8 @@ const HATS: Partial<Record<AgeId, (k: Kit) => void>> = {
     for (const d of [-1, 1]) for (let i = 0; i < 2; i++) k.cyl(0.006, 0.01, 0.1 - i * 0.03, 4, BONE, d * (0.04 + i * 0.025), 0.56 + i * 0.03, 0).rotation.z = -d * (0.35 + i * 0.5);
   },
   rivers: (k) => { k.cone(0.14, 0.07, 10, REED, 0, 0.55, 0); band(k, 0.54, 0.07); },
+  // An undyed wool hood with a chalk bead on its point, as a quarrier wears against the grit.
+  megaliths: (k) => { cap(k, '#7d766a', 0.077); k.cone(0.03, 0.07, 5, '#6a6458', 0, 0.6, -0.04).rotation.x = -0.5; k.sphere(0.018, CHALK_CUT, 0, 0.63, -0.07); band(k, 0.535, 0.072); },
   hunt: (k) => { crown(k, 0.074, 0.05, '#6a5038'); k.cone(0.01, 0.12, 4, '#8a7a62', 0.05, 0.56, -0.04).rotation.z = -0.6; band(k, 0.55, 0.075); },
   mycelium: (k) => { k.dome(0.11, '#c9a9bb', 0, 0.535, 0).scale.set(1, 0.55, 1); for (const [x, z] of [[0.04, 0.04], [-0.05, 0.02], [0.0, -0.06]]) k.sphere(0.014, '#efe8dc', x, 0.585, z); band(k, 0.527, 0.07); },
   steppe: (k) => { crown(k, 0.07, 0.07, '#ece4cf'); k.cyl(0.078, 0.078, 0.025, 10, '#6a4a32', 0, 0.54, 0); band(k, 0.565, 0.066); },

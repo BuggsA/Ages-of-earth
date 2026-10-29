@@ -40,6 +40,7 @@ export const AGE_GROUNDS: Record<AgeId, AgeGround> = {
   iron: g('#6e5a48', '#7e4a32', 'earth'), // red-brown bog earth
   wild: g('#5e7a3e', '#b8a45c', 'meadow'), // deep meadow in flower
   rivers: g('#7a7058', '#5e6a5a', 'earth'), // river silt
+  megaliths: g('#6c6c64', '#8a877a', 'flags'), // granite flags, chalk in the joints
   hunt: g('#6a6a44', '#7e5236', 'meadow'), // trampled grass, hides pegged out
   steppe: g('#8c8a5c', '#77744e', 'earth'), // dry steppe grass
   // Tier 2.

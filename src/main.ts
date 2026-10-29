@@ -3734,6 +3734,24 @@ function frame(now: number): void {
     return plan.tiles.length;
   },
   /**
+   * The Age of Megaliths (testing, #877): turn a player to the age and raise, finished, a Henge where the computer would set one by its
+   * start. Returns the Henge's id, or 0 where none fits.
+   */
+  megaliths(owner: number) {
+    if (!game) return 0;
+    const s = game;
+    const p = s.players[owner];
+    restat(s, p, () => {
+      p.epoch = AGES.megaliths.tier;
+      p.age = 'megaliths';
+    });
+    const spot = findSpot(s, 'henge', p.startX, p.startY, 5, 14, 1, (tx, ty) => !placeProblem(s, 'henge', tx, ty, true, owner));
+    if (!spot) return 0;
+    const b = placeBuilding(s, owner, 'henge', spot.tx, spot.ty, true);
+    view.rig.focus(b.x, b.y);
+    return b.id;
+  },
+  /**
    * The Water Line (testing, #701 s4): turn a player to the age and open, finished, a sluice: in the middle of its dyke line if it has
    * one (`ages.dykes` first), else on the channel the computer would dig by its start (dug at once). Returns how many tiles its water
    * reaches, or 0 where there is nowhere to set one.
