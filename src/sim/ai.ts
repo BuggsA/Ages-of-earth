@@ -4260,7 +4260,8 @@ function delveWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   const target = enemyTarget(s, p) ?? enemyHome(s, p);
   const homeOf = (b: Building) => (b.x - v.home.x) * (b.x - v.home.x) + (b.y - v.home.y) * (b.y - v.home.y) <= DELVE.home * DELVE.home * 4;
   const home = barrows.find(homeOf);
-  const fwd = target ? barrows.filter((b) => !homeOf(b)).sort((a, b) => (a.x - target.x) ** 2 + (a.y - target.y) ** 2 - ((b.x - target.x) ** 2 + (b.y - target.y) ** 2))[0] : undefined;
+  const far2 = (b: Building) => (b.x - target!.x) * (b.x - target!.x) + (b.y - target!.y) * (b.y - target!.y);
+  const fwd = target ? barrows.filter((b) => !homeOf(b)).sort((a, b) => far2(a) - far2(b) || a.id - b.id)[0] : undefined;
   if (s.tick - (mem.ordered.barrow ?? -99999) >= secs(30) && !barrows.some((b) => !b.built)) {
     const cost = buildingCostFor(s, p.id, 'barrow');
     if (afford(v, cost)) {
