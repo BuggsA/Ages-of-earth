@@ -1,4 +1,4 @@
-import { COCKLE, COCKLER, HENGE, SEASON, TICK_HZ } from '../sim/data';
+import { COCKLE, COCKLER, DELVE, HENGE, SEASON, TICK_HZ } from '../sim/data';
 import { TIDE_GATE } from '../sim/data';
 import { AI_GATE_ANSWER } from '../sim/data';
 import { AI_GATE_READ } from '../sim/data';
@@ -528,6 +528,18 @@ const TIPS: Tip[] = [
     // The year's gathering (#877): a Henge stands, and the season turns within 20 seconds.
     when: (s, me) => has(s, me, 'henge') && SEASON.len - (Math.floor(s.tick / TICK_HZ) % SEASON.len) <= 20,
     text: `<b>The year is turning.</b> When the season changes, every citizen standing within ${HENGE.reach} tiles of a Henge (up to ${HENGE.most} a Henge) brings in ${HENGE.gift.food} food and ${HENGE.gift.gold} gold, and twice that when the year turns into summer or winter. Fields and woods inside the ring count as gathered: lay out your work round the stones, or call your people in for the solstice.`,
+  },
+  {
+    id: 'delvings',
+    // The Age of Delvings (#881): its first minute.
+    when: (s, me) => ageOf(s.players[me]) === 'delvings',
+    text: `Your people goes below now. Raise <b>${BUILDINGS.barrow.name}s</b> (<kbd>${BUILDINGS.barrow.key}</kbd>): every Barrow and Town Center of yours is a mouth of one tunnel. Shelter soldiers in one (<kbd>G</kbd>), select it and <b>Delve</b> (<kbd>D</kbd>), then click another mouth: they go below, unseen and out of reach, at ${DELVE.pace} tiles a second, and come up there. A Barrow raised near a rival is a door into its land. No riders go below, and no Stable is raised.`,
+  },
+  {
+    id: 'rivalBarrow',
+    // A rival's Barrow (#881) the viewer can see: an army can come up out of it.
+    when: (s, me) => s.ents.some((e) => e.kind === 'building' && e.type === 'barrow' && e.built && isEnemy(s, me, e.owner) && s.players[me].vis[Math.floor(e.y) * s.w + Math.floor(e.x)]),
+    text: 'A rival has dug a <b>Barrow</b>. Its people can send an army below from any of their Barrows or Town Centers and bring it up here, unseen on the way: watch for the earth thrown up at its mouth. Pull it down, and anyone bound for it comes up where it stood, alone.',
   },
   {
     id: 'rivalHenge',

@@ -68,7 +68,9 @@ export type BuildingType =
   /** Missile defence (#759 s2): a battery that fires one interceptor at a warhead falling in its cover. */
   | 'battery'
   /** The Age of Megaliths (#877, the Deep Road): a ring of standing stones that holds the ground and gathers the people at the turn of the year. */
-  | 'henge';
+  | 'henge'
+  /** The Age of Delvings (#881, the Deep Road): a stone mouth into the earth, one end of the people's tunnel. */
+  | 'barrow';
 /** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
 export type Difficulty = 'gentle' | 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
@@ -88,7 +90,7 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'chart' | 'assay' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged' | 'launchControl' | 'interceptors';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood' | 'locks' | 'floating' | 'bloom' | 'beggars' | 'leviathans' | 'mycelium' | 'hunt' | 'megaliths';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood' | 'locks' | 'floating' | 'bloom' | 'beggars' | 'leviathans' | 'mycelium' | 'hunt' | 'megaliths' | 'delvings';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
 export type PathId = 'blood' | 'steppe' | 'hemocraft' | 'rite';
@@ -248,6 +250,8 @@ export interface Unit {
   guardY: number;
   /** The building it is sheltering in (or the transport it rides), or 0. */
   inside: number;
+  /** Below ground on a delve (#881): the tick it comes up at the mouth it is inside. */
+  below?: number;
   /** A transport's passengers. */
   cargo: number[];
   /** Waypoints as [x0, y0, x1, y1, ...], or null when not walking a route. */
@@ -855,6 +859,8 @@ export interface PlayerStats {
   milled?: number;
   /** Food and gold banked at Henges' gatherings as the year turned (#877, the Age of Megaliths). */
   gathering?: number;
+  /** Units sent below from one mouth to another (#881, the Age of Delvings). */
+  delved?: number;
   /** Causeway tiles raised over the flats (#739, the Age of Tides). */
   causeways?: number;
   /** Rival causeway tiles breached by this people's kegs and warheads (#748). */
@@ -1171,6 +1177,9 @@ export type GameEvent =
   | { k: 'milled'; id: number; owner: number; gold: number; x: number; y: number }
   /** The year's gathering at a Henge (#877): `n` citizens counted as the season turned, twice the gift at a solstice. */
   | { k: 'gathering'; id: number; owner: number; n: number; solstice: boolean; x: number; y: number }
+  /** A delve (#881): `n` units of `owner` went below at mouth `from`, bound for mouth `to`; and came up at a mouth. */
+  | { k: 'delve'; owner: number; from: number; to: number; n: number; x: number; y: number }
+  | { k: 'surface'; owner: number; building: number; n: number; x: number; y: number }
   /** A causeway was finished (#739): `tile` is tidal ground now, raised. */
   | { k: 'causeway'; owner: number; tile: number; x: number; y: number }
   /** A causeway tile was breached (#748) by `by`'s keg or warhead: it is plain tidal ground again (or open sea), `owner`'s road cut. */
@@ -1569,6 +1578,8 @@ export interface AiMemory {
   hive?: number;
   /** When it entered the Age of Megaliths (#877), so it keeps the age a while. */
   megaliths?: number;
+  /** When it last sent a wave below or into its home Barrow (#881, the Age of Delvings). */
+  delveAt?: number;
   /** The tick it entered the Age of the Wildwood, kept while it wakes its forest there (`WILDWOOD.aiStay`). */
   wildwood?: number;
   /** The tick it entered the Age of the Bloom, kept while it slings its Seeds there (`BLOOM.aiStay`); and when it last planted an Orchard for the Greening. */
@@ -1617,6 +1628,8 @@ export type Command =
   /** Transports: sail to the shore nearest a point and put everyone ashore. */
   | ({ t: 'unload'; p: number; ids: number[]; x: number; y: number } & Queued)
   | { t: 'ungarrison'; p: number; building: number }
+  /** Send those sheltering in one mouth below to another (#881, the Age of Delvings). */
+  | { t: 'delve'; p: number; from: number; to: number }
   | { t: 'bell'; p: number; ring: boolean }
   /** Citizens run from danger (or not): the named citizens, or all of this player's when `ids` is absent. */
   | { t: 'flee'; p: number; on: boolean; ids?: number[] }

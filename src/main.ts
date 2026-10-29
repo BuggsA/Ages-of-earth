@@ -1,3 +1,4 @@
+import { delveProblem } from './sim/delve';
 import './ui/style.css';
 import { Music } from './audio/music';
 import { sound, type SoundName } from './audio/sound';
@@ -128,7 +129,9 @@ let slingSpire = 0;
 let launchWarhead: WarheadKind | undefined;
 /** A salvo being aimed (#765): the points clicked so far, until there are `SALVO.trio`; null for a single launch. */
 let salvoAims: { x: number; y: number }[] | null = null;
-let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | 'keg' | 'torch' | 'launch' | 'sling' | null = null;
+let targetMode: 'amove' | 'patrol' | 'garrison' | 'unload' | 'sacrifice' | 'curse' | 'keg' | 'torch' | 'launch' | 'sling' | 'delve' | null = null;
+/** The mouth a delve (#881) goes below from, while `targetMode` is 'delve'. */
+let delveFrom = 0;
 /** When the viewer was last told one of its living buildings caught fire, so a spreading fire tells once. */
 let fireToldAt = -9999;
 /** When a swarm on your people was last told (the Age of the Hive), so a fight in the woods tells it once. */
@@ -226,6 +229,12 @@ const hud = new Hud({
   unloadMode: () => {
     targetMode = 'unload';
     placing = null;
+  },
+  delveMode: (from) => {
+    delveFrom = from;
+    targetMode = 'delve';
+    placing = null;
+    hud.toast('Delve: click another of your Barrows or Town Centers', 'info');
   },
   select: (ids) => setSelection(ids),
   focus: (x, y) => view.rig.focus(x, y),
@@ -1894,6 +1903,19 @@ canvas.addEventListener('pointerdown', (e) => {
     targetMode = null;
     return;
   }
+  if (targetMode === 'delve') {
+    // The tunnel (#881): the mouth clicked, if it is one of ours.
+    const s = game;
+    const pk = view.pick(e.clientX, e.clientY);
+    const to = pk && pk.kind === 'building' && s ? (s.byId.get(pk.id) as Building | undefined) : undefined;
+    const why = s ? delveProblem(s, viewer, s.byId.get(delveFrom) as Building | undefined, to?.kind === 'building' ? to : undefined) : 'No match';
+    if (why) {
+      hud.toast(why, 'bad');
+      play('error');
+    } else issue({ t: 'delve', p: viewer, from: delveFrom, to: to!.id });
+    targetMode = null;
+    return;
+  }
   if (targetMode === 'sacrifice' || targetMode === 'curse') {
     riteAt(e.clientX, e.clientY, targetMode, e.shiftKey);
     if (!e.shiftKey) targetMode = null;
@@ -3387,7 +3409,7 @@ function cursorFor(s: GameState): string {
   if (targetMode === 'amove' || targetMode === 'patrol') return 'cur-amove';
   if (targetMode === 'garrison') return 'cur-garrison';
   if (targetMode === 'sacrifice' || targetMode === 'curse') return 'cur-convert';
-  if (targetMode === 'unload') return 'cur-garrison';
+  if (targetMode === 'unload' || targetMode === 'delve') return 'cur-garrison';
   if (targetMode === 'keg' || targetMode === 'torch' || targetMode === 'launch' || targetMode === 'sling') return 'cur-attack';
   if (!pointer.inside || boxing) return '';
   const units = selectedUnits(s);
@@ -3750,6 +3772,34 @@ function frame(now: number): void {
     const b = placeBuilding(s, owner, 'henge', spot.tx, spot.ty, true);
     view.rig.focus(b.x, b.y);
     return b.id;
+  },
+  /**
+   * The Age of Delvings (testing, #881): turn a player to the age, raise two finished Barrows (one by its start, one `far` tiles out
+   * toward the map's middle) and shelter six foot soldiers in the first. Returns the two Barrows' ids.
+   */
+  delvings(owner: number, far = 24) {
+    if (!game) return [];
+    const s = game;
+    const p = s.players[owner];
+    restat(s, p, () => {
+      p.epoch = AGES.delvings.tier;
+      p.age = 'delvings';
+    });
+    const ok = (tx: number, ty: number) => !placeProblem(s, 'barrow', tx, ty, true, owner);
+    const mx = s.w / 2 - p.startX, my = s.h / 2 - p.startY;
+    const l = Math.max(1, Math.sqrt(mx * mx + my * my));
+    const a = findSpot(s, 'barrow', p.startX, p.startY, 4, 12, 1, ok);
+    const b = findSpot(s, 'barrow', p.startX + (mx / l) * far, p.startY + (my / l) * far, 0, 12, 1, ok);
+    if (!a || !b) return [];
+    const home = placeBuilding(s, owner, 'barrow', a.tx, a.ty, true);
+    const fwd = placeBuilding(s, owner, 'barrow', b.tx, b.ty, true);
+    for (let i = 0; i < 6; i++) {
+      const u = spawnUnit(s, owner, 'infantry', home.x, home.y + 2);
+      u.inside = home.id;
+      home.garrison.push(u.id);
+    }
+    view.rig.focus(home.x, home.y);
+    return [home.id, fwd.id];
   },
   /**
    * The Water Line (testing, #701 s4): turn a player to the age and open, finished, a sluice: in the middle of its dyke line if it has

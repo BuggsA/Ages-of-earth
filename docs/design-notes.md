@@ -1649,3 +1649,9 @@ Built at the owner's word: a raw Watch Tower is now a lookout, not a fort, and e
 **Built:** a fourth trunk for a game called *Ages of Earth*, on the owner's ask for one that ends stronger than the warheads: a people that builds into the land and at last moves it (`docs/deep-road.md`). Its first age is open from the first minute. The town is raised in stone, so the stone run, not the woodline, is what a raid cuts; and Henges make two choices that come back every season: where to set the ring (it holds the ground, so a rival's forward tower can't go there) and whether to call your people in for the solstice.
 **Why I love it:** a stone circle is the oldest calendar there is, and here it is literally one: the year's turn is a moment to plan for, on both sides of the map. And a whole road has a spine the land can't refuse it: stone lies by every town, and a shaft digs it anywhere.
 **Next:** the Delvings' barrow-mouths (an army that goes in at home and comes up at a rival's door), a drawn glyph for the Henge's button, a ring drawn round the Henge when placing it.
+
+## Designers' notes: the Age of Delvings (#876 s2, #881, 2026-10-29), Claude Code
+
+**Built:** Barrows joined underground to each other and to the Town Centers: an army goes in at home and comes up at a forward mouth, unseen on the way. The door is the horse: no riders go below, so the age fights on foot.
+**Why I love it:** it turns the map's distances into a choice of where to dig, and gives the defender something to read: a rival's Barrow near your town is a promise, and the earth thrown up at its mouth is the warning. Pulling it down mid-delve strands a whole wave.
+**Next:** the Undercity's sunk buildings (a sunk Barrow as a hidden mouth), a drawn glyph for the Delve button, the computer reading a rival's Barrow and guarding it.

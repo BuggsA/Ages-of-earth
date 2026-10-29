@@ -37,6 +37,7 @@ export const AGE_PALETTES: Partial<Record<AgeId, AgePalette>> = {
   iron: pal('#c5b9a4', '#6f6458', '#2e2c2a', '#252321', '#6e5a4e', '#7a7268'), // bog-iron grey
   wild: pal('#d2c09e', '#b49f7a', '#3e2416', '#321c10', '#ede3cc', '#8f7a5c'), // hide walls, bracken roofs, bone
   rivers: pal('#dccaa0', '#c4af84', '#d5c58e', '#c2b07a', '#cdb88a', '#b5a37e'), // sun-dried mud, reed roofs
+  delvings: pal('#9c8064', '#7e6650', '#3b2a1c', '#2e2116', '#a08a5a', '#4e4236'), // timber-shored earth, peat roofs, lamp brass
   megaliths: pal('#a3a7a8', '#878c8f', '#26221e', '#1d1a17', '#b4aa8c', '#6a6e70'), // dressed granite, peat-turf roofs, chalk and lichen
   hunt: pal('#4a3626', '#3a2a1e', '#d8ccb0', '#c6b99c', '#a89068', '#7a6a52'), // stained leather under pale felt
   steppe: pal('#ece4cf', '#d4c8ac', '#c9b48a', '#b8a27a', '#5a3a30', '#a59878'), // white felt
@@ -83,7 +84,7 @@ export const AGE_PALETTES: Partial<Record<AgeId, AgePalette>> = {
 /** The ages whose touches live in this file. */
 export const NEW_LOOK_AGES: AgeId[] = [
   'atomic', 'fission', 'fusion', 'alchemy', 'sapper', 'searaider', 'chariots', 'wild', 'grove', 'hive', 'wildwood', 'bloom', 'leviathans',
-  'missions', 'dykes', 'rivers', 'tides', 'waterline', 'locks', 'floating', 'beggars', 'hunt', 'mycelium', 'megaliths',
+  'missions', 'dykes', 'rivers', 'tides', 'waterline', 'locks', 'floating', 'beggars', 'hunt', 'mycelium', 'megaliths', 'delvings',
 ];
 
 /** Buildings that take touches: the town's own halls and houses. Water works, walls, fields and one-tile pieces keep their shape. */
@@ -391,6 +392,25 @@ export function ageLookTouches(k: Kit, type: BuildingType, age: AgeId): boolean 
       k.glow(k.box(0.12, 0.14, 0.02, '#ffd68a', 0, e + 0.3, f - 0.19));
       break;
     }
+    case 'delvings': {
+      // Grimes Graves and the souterrains: a timber-propped way down by the door with a lamp hung in it, a heap of chalk spoil and a
+      // pick against the wall, and a turfed barrow mound with its dark mouth behind the great halls.
+      for (const x of [-0.16, 0.16]) k.box(0.06, 0.5, 0.06, WOOD, l + 0.2 + x, 0, f + 0.1);
+      k.box(0.42, 0.06, 0.08, WOOD, l + 0.2, 0.5, f + 0.1);
+      k.box(0.26, 0.42, 0.02, DARK, l + 0.2, 0, f + 0.09);
+      k.glow(k.box(0.06, 0.08, 0.06, AMBER, l + 0.2, 0.36, f + 0.14));
+      k.blob(0.16, CHALK_CUT, h * 0.55, 0, f + 0.18).scale.set(1.3, 0.6, 1);
+      k.cyl(0.012, 0.012, 0.42, 4, WOOD, h * 0.8, 0.2, f + 0.04).rotation.z = 0.35;
+      k.box(0.16, 0.03, 0.03, '#5e5a54', h * 0.8 + 0.07, 0.4, f + 0.04);
+      if (great || big) {
+        const m = k.dome(0.6, '#5e5a3e', -h * 0.35, 0, -h - 0.35);
+        m.scale.set(1.2, 0.55, 1);
+        for (const x of [-0.12, 0.12]) k.box(0.08, 0.3, 0.1, GRANITE, -h * 0.35 + x, 0, -h + 0.18);
+        k.box(0.34, 0.08, 0.12, GRANITE, -h * 0.35, 0.3, -h + 0.18);
+        k.box(0.16, 0.28, 0.02, DARK, -h * 0.35, 0, -h + 0.24);
+      }
+      break;
+    }
     case 'megaliths': {
       // Carnac and Newgrange: a standing stone by the door, a kerb of boulders along the front, a spiral cut in the lintel stone,
       // and a dolmen (two uprights and a capstone) behind the great halls.
@@ -557,6 +577,8 @@ const HATS: Partial<Record<AgeId, (k: Kit) => void>> = {
     for (const d of [-1, 1]) for (let i = 0; i < 2; i++) k.cyl(0.006, 0.01, 0.1 - i * 0.03, 4, BONE, d * (0.04 + i * 0.025), 0.56 + i * 0.03, 0).rotation.z = -d * (0.35 + i * 0.5);
   },
   rivers: (k) => { k.cone(0.14, 0.07, 10, REED, 0, 0.55, 0); band(k, 0.54, 0.07); },
+  // A miner's leather skullcap with a little brass lamp at the brow, as the flint diggers wore below.
+  delvings: (k) => { cap(k, '#5a4030', 0.075); k.glow(k.box(0.03, 0.025, 0.02, AMBER, 0, 0.57, 0.07)); band(k, 0.53, 0.071); },
   // An undyed wool hood with a chalk bead on its point, as a quarrier wears against the grit.
   megaliths: (k) => { cap(k, '#7d766a', 0.077); k.cone(0.03, 0.07, 5, '#6a6458', 0, 0.6, -0.04).rotation.x = -0.5; k.sphere(0.018, CHALK_CUT, 0, 0.63, -0.07); band(k, 0.535, 0.072); },
   hunt: (k) => { crown(k, 0.074, 0.05, '#6a5038'); k.cone(0.01, 0.12, 4, '#8a7a62', 0.05, 0.56, -0.04).rotation.z = -0.6; band(k, 0.55, 0.075); },
