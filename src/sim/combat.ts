@@ -1,3 +1,4 @@
+import { inert, isSunk } from './undercity';
 import { AURA, FLOAT, RALLY, BONUS, BLOOD_TOWER, BUILDINGS, DEER, LIGHTNING, VETERANCY, TICK_HZ, domainOf, secs, HEART, type UnitStats } from './data';
 import { asleep, hasCoils } from './ages';
 import { bleeds, curseTaken, drawBlood, hemoBlow, hemoTaken } from './blood';
@@ -238,7 +239,8 @@ export function updateShots(s: GameState, sp: Spatial, hitAnimal: (a: Animal, da
       continue;
     }
     const shooter = sh.src ? s.byId.get(sh.src) : undefined;
-    if (t && t.hp > 0) hurt(s, t, sh.damage, sh.owner, null, shooter && shooter.kind === 'unit' ? shooter : null);
+    // A building that went below while the shot flew (#883) is out of its reach.
+    if (t && t.hp > 0 && !isSunk(t)) hurt(s, t, sh.damage, sh.owner, null, shooter && shooter.kind === 'unit' ? shooter : null);
     // A Blowpipe Hunter's dart leaves venom in what it hits (the Age of the Hive).
     if (sh.kind === 'dart' && t && t.kind === 'unit' && t.hp > 0) envenom(s, t, sh.owner);
     if (sh.splash > 0) {
@@ -279,7 +281,8 @@ export function nearestEnemyUnit(s: GameState, sp: Spatial, owner: number, x: nu
 export function buildingGuns(s: GameState, sp: Spatial, b: Building): void {
   const g = BUILDINGS[b.type].guns;
   // A tower raised only in some ages (the Blood Tower) holds its fire while its people stands outside them (#555 s10).
-  if (!g || !b.built || peace(s) || asleep(s, b)) return;
+  // A building sunk, or on its way down or up (#883), shoots nothing.
+  if (!g || !b.built || peace(s) || asleep(s, b) || inert(b)) return;
   if (b.cool > 0) {
     b.cool--;
     return;

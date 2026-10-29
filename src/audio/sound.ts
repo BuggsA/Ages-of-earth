@@ -14,7 +14,7 @@ export type SoundName =
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
   | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'siloAlarm' | 'interceptLaunch' | 'interceptHit' | 'interceptMiss' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'fireLit' | 'fireCatch' | 'fireOut' | 'fireAsh' | 'flow' | 'rush' | 'groan' | 'dart' | 'swarm' | 'hiveHush' | 'sluiceOpen' | 'sluiceShut' | 'spread' | 'tideWash' | 'tideMill' | 'swept' | 'pondShut' | 'breach' | 'entWake' | 'entRoot' | 'spreading' | 'damBurst' | 'castOff' | 'moor' | 'founder' | 'bloomSling' | 'bloomRoot' | 'bloomGrow' | 'bloomCut' | 'bloomCrack' | 'bloomGreen' | 'bloomStorm'
-  | 'gathering' | 'solstice' | 'delve' | 'surface'
+  | 'gathering' | 'solstice' | 'delve' | 'surface' | 'sinkDown' | 'sinkUp' | 'unearthed'
   | 'scour' | 'boarded' | 'whaleSong' | 'seedBomb' | 'behemothKneel' | 'behemothRise' | 'krakenGrip' | 'krakenRise' | 'webRot' | 'webBurn' | 'webGrown' | 'hawkCry';
 
 export interface SoundSettings {
@@ -808,6 +808,27 @@ export class Sound {
         this.noise(out, t + 0.4, { dur: 1.4, filter: 'lowpass', f: 240, to: 120, q: 0.8, peak: 0.06, attack: 0.3 });
         this.tone(out, t + 0.35, { f: 48, to: 38, type: 'triangle', dur: 1.2, peak: 0.05, attack: 0.25, lp: 200 });
         this.tone(out, t + 0.2, { f: 2600, to: 2500, type: 'sine', dur: 0.08, peak: 0.008, attack: 0.002 });
+        break;
+      case 'sinkDown':
+        // A building goes below (#883): the millstone door rolled across the stair, stone on stone, then the long settle of the earth.
+        this.noise(out, t, { dur: 1.1, filter: 'bandpass', f: 300, to: 180, q: 1.4, peak: 0.05, attack: 0.15 });
+        this.tone(out, t, { f: 62, to: 50, type: 'triangle', dur: 1.0, peak: 0.045, attack: 0.1, lp: 260 });
+        this.tone(out, t + 1.05, { f: 90, to: 60, type: 'triangle', dur: 0.18, peak: 0.06, attack: 0.004, lp: 400 });
+        this.noise(out, t + 1.2, { dur: 1.3, filter: 'lowpass', f: 200, to: 90, q: 0.7, peak: 0.04, attack: 0.3 });
+        break;
+      case 'sinkUp':
+        // A building comes up (#883): the stone door rolled back the other way, rising in pitch, and dry tuff crumbling off the heave.
+        this.noise(out, t, { dur: 1.0, filter: 'bandpass', f: 180, to: 320, q: 1.4, peak: 0.05, attack: 0.15 });
+        this.tone(out, t, { f: 48, to: 64, type: 'triangle', dur: 1.0, peak: 0.045, attack: 0.1, lp: 260 });
+        for (let i = 0; i < 5; i++) this.noise(out, t + 0.9 + i * 0.11, { dur: 0.05, filter: 'bandpass', f: 1400 - i * 120, q: 2, peak: 0.022 });
+        break;
+      case 'unearthed':
+        // A sunk building found (#883): a spear-butt knocking on hollow ground, twice, and the hollow answering.
+        for (const dt of [0, 0.28]) {
+          this.tone(out, t + dt, { f: 140, to: 110, type: 'sine', dur: 0.35, peak: 0.06, attack: 0.003, lp: 700 });
+          this.noise(out, t + dt, { dur: 0.04, filter: 'bandpass', f: 900, q: 2, peak: 0.04 });
+        }
+        this.tone(out, t + 0.62, { f: 220, to: 196, type: 'triangle', dur: 0.6, peak: 0.025, attack: 0.02, lp: 900 });
         break;
       case 'surface':
         // Coming up (#881): earth and chalk breaking away from the mouth, then the tramp of many feet out into the open.

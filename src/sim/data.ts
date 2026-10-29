@@ -26,6 +26,8 @@ export const EPOCHS: Epoch[] = [
   { name: 'Atomic Age', short: 'Atomic', cost: { food: 1800, gold: 1500, stone: 700 }, time: 95, blurb: 'The Missile Silo: one warhead (12,000 at the centre, 8 tiles of blast), a public countdown, and a town that guards it.' },
 ];
 export const LAST_EPOCH = EPOCHS.length - 1;
+/** The Undercity's clocks and price (#883, `UNDER`), named here so the age's words can say them. */
+const UNDER_SINK = { cost: 10, sink: 15, rise: 25, find: 5 };
 /** The Age of the Hive's reach and woods (`HIVE`), named here so the age's and the Hive's words can say them. */
 const HIVE_REACH = 6;
 const HIVE_TREES = 8;
@@ -238,6 +240,13 @@ export interface Age {
    * sheltering in one are sent below to another and come up there (`DELVE`, `delve.ts`). A verb, carried into a Golden Age.
    */
   delves?: boolean;
+  /**
+   * The Age of the Undercity (#883, the Deep Road's third age): the people's houses, stores, halls and Barrows may be sunk below the
+   * ground and surfaced again (`UNDER`, `undercity.ts`). A verb, carried into a Golden Age.
+   */
+  sinks?: boolean;
+  /** Buildings of an earlier age on its road that it raises and works as its own, awake (the Undercity raises the Delvings' Barrows, #883). */
+  carries?: BuildingType[];
 }
 
 /**
@@ -864,6 +873,24 @@ export const AGES: Record<AgeId, Age> = {
     no: { units: ['cavalry'], why: 'Horses don\'t go below: a people of the Delvings trains no riders until it climbs out' },
     noBuild: { buildings: ['stable'], why: 'Horses don\'t go below: a people of the Delvings raises no Stable until it climbs out' },
     delves: true,
+  },
+  // The Deep Road's third age (#876 s3, #883): instead of the Gunpowder Age, a people that lives below. Derinkuyu and Kaymakli in
+  // Cappadocia, the muches of Naours: whole towns cut into the rock, eight storeys down, sealed with rolling stone doors.
+  undercity: {
+    verb: 'Sink your houses, stores, halls and Barrows below the ground: sunk, rivals see bare earth and no arrow, gun, ship, plane or siege engine can touch them, and they still house, store and shelter; surface one to train or fight again',
+    door: 'No walls, gates or Watch Towers above ground, and still no Stable or riders: a sunk hall trains and researches nothing, and a rival\'s foot soldiers who stand on one find it, and their kegs bring it down',
+    good: 'A town a raid can\'t find: an army marches in to bare ground, and has to walk it, foot by foot, to know where you are',
+    routes: ['deep'],
+    keepsake: { building: 'storehouse', does: 'sinking and surfacing: a hidden store on any road' },
+    name: 'Age of the Undercity',
+    short: 'Undercity',
+    tier: 3,
+    blurb: `As the people of Cappadocia cut Derinkuyu and Kaymakli into the soft tuff, eight storeys down with wells, stables and chapels, and rolled stone doors across the stair when raiders came; as the villagers of Naours hid in their muches. Select a House, Storehouse, Barracks, Archery Range, Forge, Siege Workshop or Barrow and Sink it (N, ${UNDER_SINK.cost} stone a tile of it): in ${UNDER_SINK.sink} seconds it is under the ground. Sunk, it is a low mound and a rock-cut door to you and bare earth to a rival who hasn't found it; no arrow, gun, ship, aeroplane or siege engine can touch it. It still houses its people, takes in what is gathered and shelters those inside, and a sunk Barrow is a hidden mouth of the tunnel. It trains, researches and shoots nothing: Surface it (N again, ${UNDER_SINK.rise} seconds) to work it. A rival's foot soldiers who stand on it ${UNDER_SINK.find} seconds find it, and may then hack at it; a keg laid on it caves it in. No walls, gates or Watch Towers are raised, and no Stable or riders: the town is under the earth, not behind it. The Gunpowder Age's arms are here otherwise.`,
+    no: { units: ['cavalry'], why: 'Horses don\'t go below: a people of the Undercity trains no riders until it climbs out' },
+    noBuild: { buildings: ['stable', 'wall', 'gate', 'tower'], why: 'A people of the Undercity lives under the earth, not behind walls: no Stable, walls, gates or Watch Towers until it climbs out' },
+    delves: true,
+    sinks: true,
+    carries: ['barrow'],
   },
   // The Water Road's sixth age (#739, s6 of #701): instead of the Atomic Age, a people that keeps the sea's hours. Reached for now by a
   // turn off the Atomic Age (the Age of Locks, s5, will lead here too). The tide wakes for the whole world when the first people enters.
@@ -1711,6 +1738,26 @@ export const ROADS: Road[] = [
   },
   { from: 'delvings', to: 'middle', cost: { food: 150, wood: 150 }, time: 25, blurb: 'Come up into the daylight: the ordinary Middle Ages, with Stables and riders. The Barrows sleep but for the one kept, whose tunnel still runs to your Town Centers.' },
   { from: 'delvings', to: 'gunpowder', cost: EPOCHS[3].cost, time: EPOCHS[3].time, blurb: 'Rejoin the main road at the Gunpowder Age for the ordinary price: Stables and riders return, and the Barrows sleep but for the one kept.' },
+  // The Deep Road's trunk (#876 s3, #883): the Age of the Undercity instead of the Gunpowder Age, a climb from the Delvings; a turn off
+  // the Gunpowder Age for a people that walked the Delvings; back onto the plain road at the Gunpowder or the Industrial Age.
+  {
+    from: 'delvings',
+    to: 'undercity',
+    cost: { food: 900, stone: 400, gold: 400 },
+    time: 60,
+    walked: 'delvings',
+    blurb: 'Instead of the Gunpowder Age, on down the Deep Road: cut the town itself into the rock. Houses, stores, halls and Barrows sink below the ground, where no gun or siege engine reaches them, and surface to work. Paid in stone more than gold. What it gives up: walls, gates and Watch Towers, and still no riders.',
+  },
+  {
+    from: 'gunpowder',
+    to: 'undercity',
+    cost: { food: 400, wood: 200, stone: 300 },
+    time: 40,
+    walked: 'delvings',
+    blurb: 'A turn, not a climb, for a people that went below before: cut the town into the rock. Houses, stores, halls and Barrows sink below the ground and surface to work. What it gives up: walls, gates and Watch Towers, Stables and riders.',
+  },
+  { from: 'undercity', to: 'gunpowder', cost: { food: 200, wood: 200 }, time: 25, blurb: 'Come up into the daylight: the ordinary Gunpowder Age, with walls, towers and riders. What is sunk stays sunk until you surface it, and only the kept Storehouse goes down again.' },
+  { from: 'undercity', to: 'industrial', cost: EPOCHS[4].cost, time: EPOCHS[4].time, blurb: 'Rejoin the main road at the Industrial Age for the ordinary price: walls, towers and riders return. What is sunk stays sunk until you surface it, and only the kept Storehouse goes down again.' },
 ];
 
 /**
@@ -3447,6 +3494,26 @@ export const MEGALITH = { timber: ['farm', 'dock', 'snare', 'sapling', 'shaft'] 
  * least `wave` soldiers sent below from the Barrow at home.
  */
 export const DELVE = { pace: 5, least: 3, take: 0.7, toward: 0.55, wave: 6, home: 6 };
+
+/**
+ * The Age of the Undercity (#883, `undercity.ts`): what may be sunk (`kinds`), for `cost` stone a tile of its footprint; it goes down in
+ * `sink` seconds and comes up in `rise`, doing nothing meanwhile. Sunk, it sees `sight` tiles past its edge. A rival's foot soldier
+ * within `feel` tiles of its footprint for `find` seconds finds it for its people; a keg blown on it strikes `keg` times as hard. The
+ * computer: `take` the coin it climbs on from the Delvings, sinks its houses and stores when `army` rival soldiers come within `near`
+ * tiles, surfaces them `calm` seconds after the last has gone, and keeps the age `stay` seconds at least.
+ */
+export const UNDER = {
+  ...UNDER_SINK,
+  kinds: ['house', 'storehouse', 'barracks', 'range', 'stable', 'forge', 'workshop', 'barrow'] as BuildingType[],
+  sight: 2,
+  feel: 1,
+  keg: 3,
+  take: 0.7,
+  near: 14,
+  army: 3,
+  calm: 45,
+  stay: 240,
+};
 
 export const HENGE = { hold: 7, reach: 6, most: 12, gift: { food: 8, gold: 5 } as Cost, solstice: 2 };
 export const SEASONS = [

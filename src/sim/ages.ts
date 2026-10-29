@@ -36,7 +36,7 @@ const boon = (key: keyof Mods, v: number): boolean => (LOWER_IS_BETTER.includes(
 /** What an age's verbs are, beyond its numbers and its doors: carried whole into a Golden Age. */
 const VERB_KEYS = [
   'hire', 'mobile', 'packs', 'caravans', 'relicTrade', 'ironTrade', 'forge', 'coils', 'callUp', 'haul', 'blood', 'hemocraft', 'rite', 'fission', 'fusion',
-  'reclaim', 'salvage', 'sortie', 'fairs', 'convoys', 'prizes', 'vigils', 'thralls', 'mills', 'sappers', 'raid', 'missions', 'names', 'pumps', 'rivers', 'sluices', 'canals', 'turbines', 'boards', 'heel', 'henges', 'delves',
+  'reclaim', 'salvage', 'sortie', 'fairs', 'convoys', 'prizes', 'vigils', 'thralls', 'mills', 'sappers', 'raid', 'missions', 'names', 'pumps', 'rivers', 'sluices', 'canals', 'turbines', 'boards', 'heel', 'henges', 'delves', 'sinks',
 ] as const;
 
 const woven = new Map<string, Age>();
@@ -428,6 +428,8 @@ export function buildBarred(p: Player, type: BuildingType): string | null {
   // The breach (#701 s3): a people that has walked the Age of Dykes raises dykes in any age after, to mend its banks.
   if (type === 'dyke' && hasWalked(p, 'dykes')) return null;
   const only = BUILDINGS[type].ages;
+  // An age that carries on an earlier age's building raises it as its own (the Undercity's Barrows, #883).
+  if (ageDef(p).carries?.includes(type)) return null;
   return !only || only.some((a) => standsIn(p, a)) ? null : `Only in the ${only.map((a) => AGES[a].name).join(' or ')}`;
 }
 
@@ -528,7 +530,7 @@ export const suspendedBelow = (p: Player, tier: number): TechId[] => p.techs.fil
 export function asleep(s: GameState, b: Building): boolean {
   const only = BUILDINGS[b.type].ages;
   // A keepsake (#555 s11) never sleeps.
-  return !!only && !b.keep && !only.some((a) => standsIn(s.players[b.owner], a));
+  return !!only && !b.keep && !only.some((a) => standsIn(s.players[b.owner], a)) && !ageDef(s.players[b.owner]).carries?.includes(b.type);
 }
 
 /**

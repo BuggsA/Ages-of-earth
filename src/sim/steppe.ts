@@ -1,3 +1,4 @@
+import { inert } from './undercity';
 import { BUILDINGS, DT, FLOAT, STEPPE } from './data';
 import { ageDef } from './ages';
 import { isNomad } from './nomad';
@@ -27,6 +28,7 @@ export function packProblem(s: GameState, p: Player, b: Building): string | null
   if (!b.built || b.hp <= 0) return 'It must stand finished first';
   if (b.advance >= 0) return 'Not while the people is changing its age';
   if (b.queue.length) return 'Finish or cancel the training here first';
+  if (inert(b)) return 'Not while it is below the ground, or going down or coming up';
   void s;
   return null;
 }

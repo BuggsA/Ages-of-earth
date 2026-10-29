@@ -1,3 +1,4 @@
+import { digsAt, hiddenFrom } from './undercity';
 import { kinBonus } from './landmarks';
 import { BUILDINGS, LANDMARKS, POP_MAX, domainOf, type UnitStats } from './data';
 import { AIR, BARGE, NAVAL, distToRect, nearestWalkable, stampBuilding, walkable } from './grid';
@@ -35,7 +36,8 @@ export function passOf(s: GameState, u: Unit): number {
 export function canHit(s: GameState, u: Unit, t: Ent): boolean {
   const st = statsOf(s, u);
   if (st.attack <= 0) return false;
-  if (t.kind === 'building') return true;
+  // A sunk building (#883): out of reach of shot, ships, aircraft and siege; a foot soldier's blade reaches it once its people found it.
+  if (t.kind === 'building') return !t.sunk || (!hiddenFrom(s, t, u.owner) && digsAt(st));
   // Hidden by the Mycelium's spores (#800): nobody aims at what it can't see.
   if (t.cloak) return false;
   if (st.buildingsOnly) return t.type === 'siege';

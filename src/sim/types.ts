@@ -90,7 +90,7 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'chart' | 'assay' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged' | 'launchControl' | 'interceptors';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood' | 'locks' | 'floating' | 'bloom' | 'beggars' | 'leviathans' | 'mycelium' | 'hunt' | 'megaliths' | 'delvings';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood' | 'locks' | 'floating' | 'bloom' | 'beggars' | 'leviathans' | 'mycelium' | 'hunt' | 'megaliths' | 'delvings' | 'undercity';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
 export type PathId = 'blood' | 'steppe' | 'hemocraft' | 'rite';
@@ -411,6 +411,19 @@ export interface Building {
   behemoth?: boolean;
   /** A Sluice (#701 s4): standing open, letting the water out over the low ground behind it. Absent: shut. A Tide Gate (#785): open, its pond running with the tide. */
   open?: boolean;
+  /**
+   * The Age of the Undercity (#883, `undercity.ts`): below the ground. Hidden from rivals who haven't found it, out of reach of shot and
+   * siege, it trains, researches and shoots nothing, but still houses, stores and shelters. Absent: on the surface.
+   */
+  sunk?: true;
+  /** Going down (#883): the tick it is sunk. While set it does nothing, and can still be seen and struck. */
+  sinking?: number;
+  /** Coming up (#883): the tick it is at work again. While set it does nothing; it can be seen and struck from the start. */
+  rising?: number;
+  /** The players whose foot soldiers found it while it was sunk (#883), in the order they did: it shows to their teams for good. */
+  found?: number[];
+  /** Seconds each player's foot soldiers have stood on it unbroken while it is sunk (#883), by player id. */
+  feel?: number[];
   /** Where new units go. `kind` is the resource the flag was set on (absent on bare ground), so it outlives its tile (#344). */
   rally: { x: number; y: number; tile: number; kind?: number } | null;
   cool: number;
@@ -861,6 +874,10 @@ export interface PlayerStats {
   gathering?: number;
   /** Units sent below from one mouth to another (#881, the Age of Delvings). */
   delved?: number;
+  /** Buildings sunk below the ground (#883, the Age of the Undercity). */
+  sunk?: number;
+  /** A rival's sunk buildings this people's foot soldiers found (#883). */
+  unearthed?: number;
   /** Causeway tiles raised over the flats (#739, the Age of Tides). */
   causeways?: number;
   /** Rival causeway tiles breached by this people's kegs and warheads (#748). */
@@ -1180,6 +1197,11 @@ export type GameEvent =
   /** A delve (#881): `n` units of `owner` went below at mouth `from`, bound for mouth `to`; and came up at a mouth. */
   | { k: 'delve'; owner: number; from: number; to: number; n: number; x: number; y: number }
   | { k: 'surface'; owner: number; building: number; n: number; x: number; y: number }
+  /**
+   * The Undercity (#883): building `id` began to go down, was sunk, began to come up, or was found by `by`'s foot soldiers (seen by
+   * `owner` and by `by` only; `x`, `y` its centre).
+   */
+  | { k: 'sink'; owner: number; id: number; what: 'sinking' | 'sunk' | 'rising' | 'found' | 'caved'; by?: number; x: number; y: number }
   /** A causeway was finished (#739): `tile` is tidal ground now, raised. */
   | { k: 'causeway'; owner: number; tile: number; x: number; y: number }
   /** A causeway tile was breached (#748) by `by`'s keg or warhead: it is plain tidal ground again (or open sea), `owner`'s road cut. */
@@ -1580,6 +1602,8 @@ export interface AiMemory {
   megaliths?: number;
   /** When it last sent a wave below or into its home Barrow (#881, the Age of Delvings). */
   delveAt?: number;
+  /** The Undercity (#883): when it entered the age, and when it last saw a rival army near its town. */
+  under?: { since: number; threat: number };
   /** The tick it entered the Age of the Wildwood, kept while it wakes its forest there (`WILDWOOD.aiStay`). */
   wildwood?: number;
   /** The tick it entered the Age of the Bloom, kept while it slings its Seeds there (`BLOOM.aiStay`); and when it last planted an Orchard for the Greening. */
@@ -1630,6 +1654,8 @@ export type Command =
   | { t: 'ungarrison'; p: number; building: number }
   /** Send those sheltering in one mouth below to another (#881, the Age of Delvings). */
   | { t: 'delve'; p: number; from: number; to: number }
+  /** Sink a building below the ground, or with `up` bring a sunk one back to the surface (#883, the Age of the Undercity). */
+  | { t: 'sink'; p: number; building: number; up?: boolean }
   | { t: 'bell'; p: number; ring: boolean }
   /** Citizens run from danger (or not): the named citizens, or all of this player's when `ids` is absent. */
   | { t: 'flee'; p: number; on: boolean; ids?: number[] }

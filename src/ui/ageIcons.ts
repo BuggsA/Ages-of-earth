@@ -18,7 +18,7 @@ import { AGE_ART } from './ageArt';
 
 export type PlateId =
   | 'slab' | 'disc' | 'arch' | 'bastion' | 'cog' | 'hex' | 'wing' | 'octagon' | 'scroll' | 'banner'
-  | 'tent' | 'shell' | 'star' | 'shield' | 'claw' | 'lozenge' | 'leaf' | 'cloud' | 'drop' | 'trilithon' | 'mound';
+  | 'tent' | 'shell' | 'star' | 'shield' | 'claw' | 'lozenge' | 'leaf' | 'cloud' | 'drop' | 'trilithon' | 'mound' | 'chimney';
 
 export type MotifId =
   | 'cracks' | 'rivets' | 'bricks' | 'dots' | 'pipes' | 'orbits' | 'chevrons' | 'patches' | 'coins' | 'grain'
@@ -79,6 +79,7 @@ export const AGE_ICONS: Record<AgeId, AgeIcon> = {
   rivers: ic('drop', 'ripples', 'tidal'),
   megaliths: ic('trilithon', 'spiral', 'carved'),
   delvings: ic('mound', 'planks', 'inked'),
+  undercity: ic('chimney', 'dots', 'carved'),
   tides: ic('drop', 'waves', 'neon'),
   waterline: ic('octagon', 'lines', 'tidal'),
   locks: ic('cog', 'planks', 'cast'),
@@ -193,6 +194,8 @@ export const PLATES: Record<PlateId, string> = {
   trilithon: 'M3 53 L5 17 L3 15 L4 4 L28 6 L52 4 L53 15 L51 17 L53 53 L37 53 L38 22 L28 21 L18 22 L19 53 Z',
   // A barrow mound with its stone-framed mouth at the foot (the Age of Delvings, #881).
   mound: 'M2 53 C3 28 14 9 28 9 C42 9 53 28 54 53 H35 V39 Q28 32 21 39 V53 Z',
+  // A fairy chimney of Cappadocia: a cone of soft tuff under its cap of hard rock, a rock-cut door at its foot (the Undercity, #883).
+  chimney: 'M6 53 L19 19 C10 18 6 14 7 10 C12 4 20 3 28 3 C36 3 44 4 49 10 C50 14 46 18 37 19 L50 53 H34 V42 Q28 35 22 42 V53 Z',
 };
 
 // ---- Motifs: worked into the plate, in the plate's ink -----------------------------------------------------

@@ -15,8 +15,9 @@ import { coveredNext, shoreNear, tideClock, tideMillSpot } from './tides';
 import { castProblem, mooringSpot, raisesCitizens } from './floating';
 import { pitchProblem } from './steppe';
 import { wallLine } from './commands';
-import { AI_COCKLE, DELVE, HENGE, MEGALITH } from './data';
+import { AI_COCKLE, DELVE, HENGE, MEGALITH, UNDER } from './data';
 import { canDelve, delveProblem, delvers } from './delve';
+import { hiddenFrom, sinkProblem, surfaceProblem } from './undercity';
 import { AI_COCKLER, COCKLER } from './data';
 import { cocklerSpotNear } from './tides';
 import { AI_GATE } from './data';
@@ -338,6 +339,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   hiveWork(s, v, mem, issue);
   megalithWork(s, v, mem, issue);
   delveWork(s, v, mem, issue);
+  underWork(s, v, mem, issue);
   wildwoodWork(s, v, mem, issue);
   bloomWork(s, v, mem, issue);
   leviathanWork(s, v, mem, issue);
@@ -716,6 +718,9 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   } else if (roads[to] === undefined && to === 'delvings') {
     // The Deep Road's second age (#881): a people that built in stone goes on below, on a coin of its own.
     roads[to] = hasWalked(p, 'megaliths') && coin(s, p.id, 0xde12) < DELVE.take;
+  } else if (roads[to] === undefined && to === 'undercity') {
+    // The Deep Road's third age (#883): a people that went below goes on down and cuts its town into the rock, on a coin of its own.
+    roads[to] = hasWalked(p, 'delvings') && coin(s, p.id, 0xde13) < UNDER.take;
   } else if (roads[to] === undefined && to === 'rivers') {
     // The Water Road's first age (#701 s1): with a channel worth digging by home, on a coin of its own.
     roads[to] = !!riverOf(s, p, mem) && coin(s, p.id, 0x71e5) < AI_RIVERS.take;
@@ -901,6 +906,8 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   if (walksWeb(v) && ageOf(p) === 'locks' && s.tick - (mem.locks?.since ?? s.tick) < secs(AI_LOCKS.stay)) return null;
   // The Age of Megaliths (#877) is kept until its first Henge stands, `MEGALITH.stay` seconds at most; then it climbs as it would anyway.
   if (walksWeb(v) && ageOf(p) === 'megaliths' && !count(v, 'henge', true) && s.tick - (mem.megaliths ?? s.tick) < secs(MEGALITH.stay)) return null;
+  // The Undercity (#883) is kept a while, so its town has gone below and come up again at least once.
+  if (walksWeb(v) && ageOf(p) === 'undercity' && s.tick - (mem.under?.since ?? s.tick) < secs(UNDER.stay)) return null;
   // The Wild is kept a while, so the beasts it came for are tamed and the Den is breeding.
   if (walksWeb(v) && ageOf(p) === 'wild' && s.tick - (mem.wild ?? s.tick) < secs(TAME.aiStay)) return null;
   // The Grove is kept a while, so its gardens are fed, its Orchards set and its Thornwall grown.
@@ -2591,7 +2598,7 @@ export function sapKegs(s: GameState, v: View, mem: AiMemory, issue: (c: Command
     let best: Building | null = null;
     let bestScore = Infinity;
     for (const e of s.ents) {
-      if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
+      if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner) || hiddenFrom(s, e, p.id)) continue;
       const dx = e.x - u.x, dy = e.y - u.y;
       const d2 = dx * dx + dy * dy;
       if (d2 > near2 || guarded(s, p.id, e)) continue;
@@ -2813,7 +2820,7 @@ function fireSilo(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => v
     // A town one of its own warheads already falls on is left to it (Fusion keeps three aloft: they go to three towns, not one).
     const aloft = (s.launches ?? []).filter((l) => l.owner === p.id).flatMap((l) => aimsOf(l).map((a) => ({ ...a, r: WARHEADS[l.w ?? 'atomic'].r })));
     for (const e of s.ents) {
-      if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
+      if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner) || hiddenFrom(s, e, p.id)) continue;
       if (aloft.some((a) => (a.x - e.x) * (a.x - e.x) + (a.y - e.y) * (a.y - e.y) < a.r * a.r)) continue;
       const pick = warheadFor(s, p, e.x, e.y);
       if (!pick) continue;
@@ -4295,6 +4302,39 @@ function delveWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
 }
 
 /**
+ * The Age of the Undercity (#883): while `UNDER.army` rival soldiers it can see stand within `UNDER.near` tiles of its town, its Houses
+ * and Storehouses there go below; `UNDER.calm` seconds after the last has gone, they come up again. Its forward Barrow, the tunnel's far
+ * door, goes below as soon as it stands, so its rival can't find the door it is coming through. Its halls stay up: they train the army.
+ */
+function underWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!v.tc) return;
+  const here = !!ageDef(p).sinks;
+  if (!here && !v.buildings.some((b) => b.sunk)) return;
+  const u = (mem.under ??= { since: s.tick, threat: -99999 });
+  const r2 = UNDER.near * UNDER.near;
+  const near = (x: number, y: number) => (x - v.home.x) * (x - v.home.x) + (y - v.home.y) * (y - v.home.y) <= r2;
+  let foes = 0;
+  for (const e of s.ents) {
+    if (e.kind !== 'unit' || e.hp <= 0 || e.inside || !MILITARY.includes(e.type) || domainOf(e.type) === 'air' || !isEnemy(s, p.id, e.owner)) continue;
+    if (near(e.x, e.y) && p.vis[Math.floor(e.y) * s.w + Math.floor(e.x)]) foes++;
+  }
+  if (foes >= UNDER.army) u.threat = s.tick;
+  const homely = (b: Building) => (b.type === 'house' || b.type === 'storehouse') && near(b.x, b.y);
+  if (s.tick - u.threat < secs(2)) {
+    // An army is at the door: the town goes below, the nearest first, while the stone lasts.
+    for (const b of v.buildings) if (homely(b) && !sinkProblem(s, p.id, b)) issue({ t: 'sink', p: p.id, building: b.id });
+    return;
+  }
+  if (s.tick - u.threat >= secs(UNDER.calm)) {
+    for (const b of v.buildings) if (homely(b) && !surfaceProblem(s, p.id, b)) issue({ t: 'sink', p: p.id, building: b.id, up: true });
+  }
+  if (!here) return;
+  const fwd = v.buildings.find((b) => b.type === 'barrow' && b.built && !b.sunk && b.sinking === undefined && !near(b.x, b.y) && b.garrison.length === 0);
+  if (fwd && !sinkProblem(s, p.id, fwd)) issue({ t: 'sink', p: p.id, building: fwd.id });
+}
+
+/**
  * The Age of the Hive: up to `HIVE.aiHives` Hives in the woods within `HIVE.aiFrom` tiles of home, by a Kitchen Garden where one
  * has room (so the bees pollinate it), else by the Town Center. Its Range and Den train darts and bears in turn (`pickUnit`).
  */
@@ -4497,7 +4537,7 @@ function flyWhale(s: GameState, v: View, w: Unit, carrier: boolean, issue: (c: C
     let at: Building | null = null;
     let bestD = Infinity;
     for (const e of s.ents) {
-      if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner) || !p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
+      if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner) || hiddenFrom(s, e, p.id) || !p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
       const d = (e.x - v.home.x) * (e.x - v.home.x) + (e.y - v.home.y) * (e.y - v.home.y);
       if (d < bestD) {
         bestD = d;
@@ -4529,7 +4569,7 @@ function seedAim(s: GameState, p: Player): { x: number; y: number } | null {
   let best: Building | null = null;
   let most = 0;
   for (const e of s.ents) {
-    if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner) || !p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
+    if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner) || hiddenFrom(s, e, p.id) || !p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
     if ((s.blooms ?? []).some((l) => l.owner === p.id && (l.x - e.x) * (l.x - e.x) + (l.y - e.y) * (l.y - e.y) < BLOOM.r * BLOOM.r)) continue;
     const n = ringOf(s, { owner: p.id, x: e.x, y: e.y }).length + (e.type === 'towncenter' ? 3 : 0);
     if (n > most) {
@@ -5144,7 +5184,7 @@ function enemyHome(s: GameState, p: Player): { x: number; y: number } {
     }
   }
   for (const e of s.ents) {
-    if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner)) continue;
+    if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner) || hiddenFrom(s, e, p.id)) continue;
     const dx = e.x - p.startX;
     const dy = e.y - p.startY;
     const shelter = s.mode === 'regicide' && e.garrison.some((id) => s.kings.includes(id));
@@ -5474,7 +5514,7 @@ export function enemyTarget(s: GameState, p: Player): Building | null {
   let bestD = Infinity;
   const hemo = !p.ai || AI_LEVELS[p.ai].hemo !== false;
   for (const e of s.ents) {
-    if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner) || !p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
+    if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, p.id, e.owner) || hiddenFrom(s, e, p.id) || !p.seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
     if (e.type === 'wall' || e.type === 'gate' || e.type === 'farm') continue;
     const dx = e.x - p.startX;
     const dy = e.y - p.startY;

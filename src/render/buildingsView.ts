@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { ageOf } from '../sim/ages';
-import { BUILDINGS, CIVS, POLDER, SNARE, TIDE, secs } from '../sim/data';
+import { BUILDINGS, CIVS, POLDER, SNARE, TIDE, UNDER, secs } from '../sim/data';
 import { flooded } from '../sim/flood';
 import { catchIn } from '../sim/snares';
 import { bearing, orchardGrown, thornStage } from '../sim/grove';
@@ -10,12 +10,13 @@ import { armed, held } from '../sim/silo';
 import type { AgeId, Building, BuildingType, GameState } from '../sim/types';
 import { T_WATER } from '../sim/types';
 import { WHEEL_HUB, tideWheel } from './tideModels';
-import { SAIL_HUB, buildingGeometry, heirloomsFor, foundationGeometry, rubbleGeometry, scaffoldGeometry, windmillSails } from './buildingModels';
+import { SAIL_HUB, sunkGeometry, buildingGeometry, heirloomsFor, foundationGeometry, rubbleGeometry, scaffoldGeometry, windmillSails } from './buildingModels';
 import { bakedMaterial, inject } from './materials';
 import { heightAt } from './terrain';
 import { WATER_Y } from './water';
 import { damTurns } from '../sim/water';
 import { isCauseway } from '../sim/tides';
+import { hiddenFrom } from '../sim/undercity';
 
 /**
  * Buildings on the map, drawn as the viewer knows them: their own always, others' while in sight or,
@@ -46,6 +47,9 @@ export interface Known {
   progress: number;
   /** Walls: which neighbors a piece joins (1 east, 2 south, 4 west, 8 north). Gates: 1 if the wall runs along y. */
   variant: number;
+  /** The Undercity (#883): sunk (drawn as its mound), and how far into the ground it stands while going down or coming up (0 to 1). */
+  sunk: boolean;
+  depth: number;
 }
 
 interface View {
@@ -126,6 +130,11 @@ export class BuildingsView {
     // Refresh memory from what is in sight.
     for (const e of s.ents) {
       if (e.kind !== 'building' || e.hp <= 0) continue;
+      // A rival's sunk building the viewer hasn't found (#883) is bare ground: once the viewer looks there, it forgets what stood.
+      if (!reveal && hiddenFrom(s, e, viewer)) {
+        if (sees(e)) this.known.delete(e.id);
+        continue;
+      }
       if (e.owner === viewer || reveal || sees(e)) this.known.set(e.id, snapshot(s, e));
     }
     // Forget what is gone, once the viewer sees the empty ground (their own vanish at once).
@@ -136,7 +145,7 @@ export class BuildingsView {
 
     for (const [id, k] of this.known) {
       // The owner too, so a building won over (#209) is redrawn in its new colours.
-      const key = `${k.type}:${k.epoch}:${k.age}:${k.built ? 1 : 0}:${k.variant}:${k.owner}:${k.heirloom}`;
+      const key = `${k.type}:${k.epoch}:${k.age}:${k.built ? 1 : 0}:${k.variant}:${k.owner}:${k.heirloom}:${k.sunk ? 1 : 0}`;
       let v = this.views.get(id);
       if (v && v.key !== key) {
         this.group.remove(v.group);
@@ -151,6 +160,8 @@ export class BuildingsView {
       const p = k.built ? 1 : k.progress;
       v.body.visible = p > 0.02 || k.type === 'farm';
       v.body.scale.set(1, k.built ? 1 : 0.12 + 0.88 * p, 1);
+      // Going down or coming up (#883): the building stands that far into the ground.
+      if (!k.sunk) v.body.position.y = -k.depth * HEIGHT[k.type] * 0.9;
       if (v.site) v.site.visible = !k.built;
       if (v.scaffold) v.scaffold.visible = !k.built && p > 0.02 && k.type !== 'farm';
       if (v.flood) v.flood.visible = flooded(s, k.owner);
@@ -194,7 +205,7 @@ export class BuildingsView {
     const base = k.type === 'pontoon' ? WATER_Y : dyke || k.type === 'causeway' ? Math.max(0.02, this.baseHeight(s, k)) : this.baseHeight(s, k);
     group.position.set(k.x, base, k.y);
     const wall = k.type === 'wall' || k.type === 'thornwall' || dyke || k.type === 'channel' || k.type === 'causeway';
-    const body = new THREE.Mesh(buildingGeometry(k.type, k.epoch, this.colors[k.owner] ?? '#ffffff', wall || k.type === 'snare' || k.type === 'shaft' || k.type === 'silo' || k.type === 'tower' || k.type === 'garden' || k.type === 'orchard' || k.type === 'towncenter' ? k.variant : 0, k.age, k.heirloom), buildingMaterial);
+    const body = new THREE.Mesh(k.sunk ? sunkGeometry(k.size, this.colors[k.owner] ?? '#ffffff') : buildingGeometry(k.type, k.epoch, this.colors[k.owner] ?? '#ffffff', wall || k.type === 'snare' || k.type === 'shaft' || k.type === 'silo' || k.type === 'tower' || k.type === 'garden' || k.type === 'orchard' || k.type === 'towncenter' ? k.variant : 0, k.age, k.heirloom), buildingMaterial);
     if (k.type === 'gate' && k.variant) body.rotation.y = Math.PI / 2;
     // A dock's pier reaches out over the water.
     if (k.type === 'dock') body.rotation.y = (k.variant * Math.PI) / 2;
@@ -272,7 +283,7 @@ export class BuildingsView {
     const v = this.views.get(id);
     if (!v) return null;
     const k = this.known.get(id)!;
-    const h = HEIGHT[k.type];
+    const h = k.sunk ? 0.45 : HEIGHT[k.type] * (1 - k.depth * 0.9);
     return new THREE.Vector3(k.x, v.base + h * v.body.scale.y, k.y);
   }
 
@@ -352,6 +363,8 @@ function snapshot(s: GameState, b: Building): Known {
     // A snare shows a hare in its noose once it holds a tender's worth (#485), to its owner and to a rival who sees it.
     // A Thornwall shows its stage (the Age of the Grove), a Kitchen Garden what feeds it, an Orchard whether it is grown and in fruit.
     // A Hive shows whether its bees are awake (the Age of the Hive). A Missile Silo held in Reserve shows it, arming (1) or ready (2) (#759 s3).
+    sunk: !!b.sunk,
+    depth: b.sunk ? 1 : b.sinking !== undefined ? Math.min(1, Math.max(0, 1 - (b.sinking - s.tick) / secs(UNDER.sink))) : b.rising !== undefined ? Math.min(1, Math.max(0, (b.rising - s.tick) / secs(UNDER.rise))) : 0,
     variant: b.type === 'silo' ? (held(b) ? (armed(s, b) ? 2 : 1) : 0) : b.type === 'thornwall' ? wallMask(s, b) + 16 * thornStage(b) : b.type === 'garden' ? (b.fed ?? 0) : b.type === 'hive' ? (hiveQuiet(s, b) ? 1 : 0) : b.type === 'orchard' ? (bearing(s, b) ? 2 : orchardGrown(b) ? 1 : 0) : b.type === 'wall' || b.type === 'dyke' || b.type === 'channel' || b.type === 'causeway' ? wallMask(s, b) : b.type === 'sluice' ? wallMask(s, b) + (b.open ? 16 : 0) : b.type === 'tidegate' ? causewayMask(s, b) + (b.open ? 16 : 0) : b.type === 'bridge' ? landMask(s, b) : b.type === 'dam' ? landMask(s, b) + (damTurns(s, b) ? 16 : 0) : b.type === 'gate' || b.type === 'dock' ? b.dir : b.type === 'snare' ? (catchIn(b) >= SNARE.worth ? 1 : 0) : b.type === 'shaft' ? Math.max(0, SEAMS.indexOf(seamOf(s, b) ?? 'stone')) : b.type === 'tower' ? (b.level ?? 0) : b.type === 'towncenter' ? (b.behemoth ? 1 : 0) : 0,
   };
 }

@@ -31,8 +31,11 @@ The game is *Ages of Earth*: on this road a people stops building **on** the lan
 
 - **s2, the Age of Delvings** (#881): `src/sim/delve.ts` (`isMouth`, `delveProblem`, `delve`, `delveStep`; `Unit.below`), the `delve` command, `DELVE` in `data.ts`, `ungarrison` leaving those still below until they arrive (or the mouth falls), Barrows refusing riders, the Barrow model, the `mound` plate, its emblem, palette and touches, the Delve button and its target mode, sounds `delve` and `surface`, `delveWork` in `ai.ts`.
 
-## Next
+- **s3, the Age of the Undercity** (#883): `src/sim/undercity.ts` (`sinkProblem`, `sink`, `surface`, `hiddenFrom`, `inert`, `caveIn`, `underStep`; `Building.sunk`, `sinking`, `rising`, `found`, `feel`), the `sink` command (`up` to surface), `UNDER` in `data.ts`, `Age.carries` (the Undercity raises the Delvings' Barrows awake), the sunk mound (`sunken` in `deepModels.ts`), its palette, touches, hat, ground, air, the `chimney` plate, its emblem, sounds `sinkDown`, `sinkUp`, `unearthed`, `underWork` in `ai.ts`.
+  - **Hidden means hidden:** a rival's sunk building its team hasn't found is skipped by drawing and picking (`buildingsView.ts`), aiming (`canHit`), auto-targeting (`findTarget`), the attack, convert and keg commands (dropped as for an id it can't see) and the computer's targeting. Its footprint is open ground while sunk (`bldAt` keeps it, so nothing is built on it), so feet can stand on it.
+  - **Warheads still burn what is sunk** until s6's deep vaults: `silo.ts` is untouched.
+  - **Saves:** the new fields are optional, so older saves load as all-surface; no `v` bump.
 
-- **s3, the Age of the Undercity** (Gunpowder): sink a building (a command on it): sunk, it can't be seen by rivals or hit by arrows and shot, takes no part in the town's work but sheltering and storing, and surfaces (a slow command) to train or fight; walls and towers above ground are shut. Hooks: the tunnel (a sunk Barrow is a hidden mouth), the warheads to come (a sunk building rides a blast out at s6's deep vaults).
+## Next
 - **s4, the Age of Deep Forges** (Industrial): vents laid by every town in `mapgen.ts` (as spring heads are, with a test across seeds), vent forges that drive the buildings in reach as dams do (`damDrives`).
 - **s5, the Age of Faults** (Atomic), **s6, the Living Earth** (past Faults), **s7** the sweeps (`npx tsx scripts/routes.ts --seeds 6 deep`) and the `deep` route joining the computer's leanings.

@@ -1,3 +1,4 @@
+import { sink, sinkProblem } from './sim/undercity';
 import { delveProblem } from './sim/delve';
 import './ui/style.css';
 import { Music } from './audio/music';
@@ -2928,6 +2929,20 @@ function onEvents(s: GameState, list: GameEvent[]): void {
         }
         break;
       }
+      case 'sink': {
+        // The Undercity (#883): a sunk building found by rival feet or a keg, told to both sides.
+        if (ev.what !== 'found' && ev.what !== 'caved') break;
+        const b = s.byId.get(ev.id);
+        const name = b && b.kind === 'building' ? BUILDINGS[b.type].name : 'building';
+        if (ev.owner === viewer) {
+          hud.toast(`🕳 ${s.players[ev.by!]?.name ?? 'A rival'} ${ev.what === 'caved' ? 'blew open' : 'found'} your sunk ${name}: their soldiers can strike it now`, 'alert');
+          lastAlert = { x: ev.x, y: ev.y };
+        } else if (ev.by === viewer) {
+          hud.toast(`🕳 ${ev.what === 'caved' ? 'The keg caved in' : 'Your soldiers found'} a sunk ${name} of ${s.players[ev.owner].name}'s: foot soldiers can strike it now`, 'good');
+          lastAlert = { x: ev.x, y: ev.y };
+        }
+        break;
+      }
       case 'keepsake':
         // A people left an age (#555 s11): one building keeps its work.
         if (ev.owner === viewer) {
@@ -3772,6 +3787,33 @@ function frame(now: number): void {
     const b = placeBuilding(s, owner, 'henge', spot.tx, spot.ty, true);
     view.rig.focus(b.x, b.y);
     return b.id;
+  },
+  /**
+   * The Age of the Undercity (testing, #883): turn a player to the age (having walked the Delvings), give it stone, and sink its Houses
+   * and Storehouses at once. Returns the ids of those sunk.
+   */
+  undercity(owner: number) {
+    if (!game) return [];
+    const s = game;
+    const p = s.players[owner];
+    restat(s, p, () => {
+      p.epoch = AGES.undercity.tier;
+      p.age = 'undercity';
+    });
+    p.walked = [...new Set([...(p.walked ?? []), 'megaliths', 'delvings'] as AgeId[])];
+    p.res.stone += 1000;
+    // A House and a Storehouse by its start, finished, for it to sink.
+    for (const type of ['house', 'storehouse'] as const) {
+      const at = findSpot(s, type, p.startX, p.startY, 4, 12, 1, (tx, ty) => !placeProblem(s, type, tx, ty, true, owner));
+      if (at) placeBuilding(s, owner, type, at.tx, at.ty, true);
+    }
+    const out: number[] = [];
+    for (const e of s.ents) {
+      if (e.kind !== 'building' || e.owner !== owner || (e.type !== 'house' && e.type !== 'storehouse') || sinkProblem(s, owner, e)) continue;
+      sink(s, e);
+      out.push(e.id);
+    }
+    return out;
   },
   /**
    * The Age of Delvings (testing, #881): turn a player to the age, raise two finished Barrows (one by its start, one `far` tiles out

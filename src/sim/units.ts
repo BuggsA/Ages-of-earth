@@ -788,6 +788,8 @@ function findTarget(s: GameState, sp: Spatial, u: Unit, r: number, buildings: bo
   let bestD = r;
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.hp <= 0 || !isEnemy(s, u.owner, e.owner)) continue;
+    // A sunk building (#883) is no one's target but a found one's, and that only for a blade.
+    if (e.sunk && !canHit(s, u, e)) continue;
     // Walls only matter when they are in the way.
     const wall = e.type === 'wall' || e.type === 'gate' || e.type === 'dyke';
     const d = distToRect(u.x, u.y, e) + (wall ? 3 : 0);
@@ -897,7 +899,7 @@ function underGuns(s: GameState, u: Unit, x: number, y: number): boolean {
   for (const e of s.ents) {
     if (e.kind !== 'building' || e.hp <= 0 || !e.built || !isEnemy(s, u.owner, e.owner)) continue;
     const g = BUILDINGS[e.type].guns;
-    if (!g || !seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
+    if (!g || e.sunk || !seen[Math.floor(e.y) * s.w + Math.floor(e.x)]) continue;
     const r = gunRange(s, e.owner, e.type, e.level) + EXPLORE.wary + BUILDINGS[e.type].size / 2;
     if ((e.x - x) * (e.x - x) + (e.y - y) * (e.y - y) <= r * r) return true;
   }
