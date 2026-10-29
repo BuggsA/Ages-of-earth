@@ -711,7 +711,9 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
     roads[to] = hasWalked(p, 'waterline') && coin(s, p.id, 0x10c5) < AI_LOCKS.take;
   } else if (roads[to] === undefined && to === 'megaliths') {
     // The Deep Road's first age (#877): open on every map, so a coin of its own decides, and no other match's dice shift.
-    roads[to] = !isNomad(p) && coin(s, p.id, 0xde11) < MEGALITH.take;
+    // A town already set on another turn off the Stone Age (a route it leans to, or one chosen for it) keeps to that one.
+    const taken = (Object.keys(roads) as AgeId[]).some((a) => a !== 'megaliths' && roads[a] === true && AGES[a].tier === 1 && ROADS.some((r) => r.from === 'stone' && r.to === a));
+    roads[to] = !isNomad(p) && !taken && coin(s, p.id, 0xde11) < MEGALITH.take;
   } else if (roads[to] === undefined && to === 'rivers') {
     // The Water Road's first age (#701 s1): with a channel worth digging by home, on a coin of its own.
     roads[to] = !!riverOf(s, p, mem) && coin(s, p.id, 0x71e5) < AI_RIVERS.take;
