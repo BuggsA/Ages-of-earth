@@ -1,3 +1,4 @@
+import { henge } from './deepModels';
 import * as THREE from 'three';
 import { AGE_PALETTES, NEW_LOOK_AGES, ageLookTouches } from './ageLooks';
 import type { AgeId, BuildingType } from '../sim/types';
@@ -3036,6 +3037,8 @@ const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' |
   cockler: (k: Kit, _e: number, st: Style) => cocklerHut(k, st.base),
   // The Age of Floating Cities (#770), drawn in `floatModels.ts`.
   pontoon: (k: Kit) => pontoon(k),
+  // The Deep Road (#876), drawn in `deepModels.ts`.
+  henge: (k: Kit, _e: number, st: Style) => henge(k, st.base),
 };
 
 const cache = new Map<string, THREE.BufferGeometry>();

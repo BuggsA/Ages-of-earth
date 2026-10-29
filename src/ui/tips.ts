@@ -1,4 +1,4 @@
-import { COCKLE, COCKLER } from '../sim/data';
+import { COCKLE, COCKLER, HENGE, SEASON, TICK_HZ } from '../sim/data';
 import { TIDE_GATE } from '../sim/data';
 import { AI_GATE_ANSWER } from '../sim/data';
 import { AI_GATE_READ } from '../sim/data';
@@ -516,6 +516,24 @@ const TIPS: Tip[] = [
     // The Age of Tides (#739): its first minute.
     when: (s, me) => ageOf(s.players[me]) === 'tides',
     text: `Your people keeps the sea's hours. Watch the tide clock (🌊, top bar): every ${TIDE.period / 60} minutes the sea falls to low water and back, baring the shallows as flats anyone may cross. Raise <b>${BUILDINGS.tidemill.name}s</b> (<kbd>${BUILDINGS.tidemill.key}</kbd>) on the shore where the most tidal ground lies near: each grinds gold at every turn of the tide. Drag <b>${BUILDINGS.causeway.name}s</b> (<kbd>${BUILDINGS.causeway.key}</kbd>) over the flats or the shallow sea: a road that only high water covers. Get off the flats before the water comes back, and strike across the bay at low water.`,
+  },
+  {
+    id: 'megaliths',
+    // The Age of Megaliths (#877): its first minute.
+    when: (s, me) => ageOf(s.players[me]) === 'megaliths',
+    text: `Your people builds in stone now: every building's timber is paid in stone (Farms, Docks, Snares, Saplings and Mine Shafts are still wood), and it stands sturdier. Keep stone coming in: when the open stone runs low, sink a <b>${BUILDINGS.shaft.name}</b> (<kbd>${BUILDINGS.shaft.key}</kbd>, timber) anywhere and it digs stone from plain earth twice as fast as in other ages. Raise a <b>${BUILDINGS.henge.name}</b> (<kbd>${BUILDINGS.henge.key}</kbd>) where your people work: the ground within ${HENGE.hold} tiles is yours, where no rival may raise even a Tower or a War Camp.`,
+  },
+  {
+    id: 'hengeGather',
+    // The year's gathering (#877): a Henge stands, and the season turns within 20 seconds.
+    when: (s, me) => has(s, me, 'henge') && SEASON.len - (Math.floor(s.tick / TICK_HZ) % SEASON.len) <= 20,
+    text: `<b>The year is turning.</b> When the season changes, every citizen standing within ${HENGE.reach} tiles of a Henge (up to ${HENGE.most} a Henge) brings in ${HENGE.gift.food} food and ${HENGE.gift.gold} gold, and twice that when the year turns into summer or winter. Fields and woods inside the ring count as gathered: lay out your work round the stones, or call your people in for the solstice.`,
+  },
+  {
+    id: 'rivalHenge',
+    // A rival's Henge (#877) the viewer can see: its ring is shut to every building of theirs.
+    when: (s, me) => s.ents.some((e) => e.kind === 'building' && e.type === 'henge' && e.built && isEnemy(s, me, e.owner) && s.players[me].vis[Math.floor(e.y) * s.w + Math.floor(e.x)]),
+    text: `A rival has raised a <b>Henge</b>. Nothing of yours, not even a Tower or a War Camp, can be raised within ${HENGE.hold} tiles of it while it stands, and at every turn of the season its people gather in the ring for food and gold. Pull it down to open the ground, or raid it at the solstice, when their citizens crowd inside.`,
   },
   {
     id: 'tideAwake',

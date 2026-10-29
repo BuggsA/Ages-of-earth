@@ -1,3 +1,4 @@
+import { hallowed } from './henge';
 import { BUILDINGS, LANDMARKS, RUINS, TRADE } from './data';
 import { ageDef } from './ages';
 import { landOwnerAt } from './borders';
@@ -98,7 +99,7 @@ export function groundAt(s: GameState, x: number, y: number): number {
   return a * (1 - fx) * (1 - fy) + b * fx * (1 - fy) + c * (1 - fx) * fy + d * fx * fy;
 }
 
-export type PlaceProblem = null | 'edge' | 'water' | 'rock' | 'blocked' | 'slope' | 'shore' | 'foreign' | 'woods' | 'snares' | 'deep' | 'dry' | 'parched' | 'bare' | 'hives' | 'tidal' | 'adrift' | 'beds' | 'barrage';
+export type PlaceProblem = null | 'hallowed' | 'edge' | 'water' | 'rock' | 'blocked' | 'slope' | 'shore' | 'foreign' | 'woods' | 'snares' | 'deep' | 'dry' | 'parched' | 'bare' | 'hives' | 'tidal' | 'adrift' | 'beds' | 'barrage';
 
 /** Whether a building of this type could go with its top-left corner on this tile. */
 export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: number, ignoreUnits = true, owner = -1): PlaceProblem {
@@ -173,6 +174,8 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
   }
   // The Age of Rivers (#701): its fields go only by water.
   if (type === 'farm' && owner >= 0 && parched(s, owner, tx, ty, n)) return 'parched';
+  // A rival's Henge (#877) holds its ring: nothing at all is raised in it, not even a Tower or a War Camp.
+  if (owner >= 0 && hallowed(s, owner, tx, ty, n)) return 'hallowed';
   // Borders (#132 s3): no building in an enemy's land, but a Tower may be raised there as a foothold,
   // and a War Camp pitched where the army stands (#303).
   if (owner >= 0 && type !== 'tower' && type !== 'warcamp') {

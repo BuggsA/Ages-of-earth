@@ -1,3 +1,4 @@
+import { hengeStep } from './henge';
 import { callWild } from './tame';
 import { groveStep, rootThorn } from './grove';
 import { hiveStep } from './hive';
@@ -695,6 +696,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   ditchStep(s);
   floodStep(s);
   tideStep(s);
+  hengeStep(s);
   sluiceStep(s);
   siloStep(s);
   sortieStep(s);

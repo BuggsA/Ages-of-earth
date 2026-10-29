@@ -1569,6 +1569,14 @@ export class View {
           this.effects.burst(this.ground(s, ev.x, ev.y, 0.05), { count: 4, speed: 0.4, up: 0.35, life: 0.7, size: 0.045, gravity: 1.5, drag: 0.6, colors: ['#cfe8f5', '#a8996f'] });
           break;
         }
+        case 'gathering': {
+          // The year's gathering at a Henge (#877): chalk dust off the bank and sparks from the fire at its altar; its people hear the
+          // drum and the ringing stones, the solstice louder.
+          if (ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;
+          this.effects.burst(this.ground(s, ev.x, ev.y, 0.3), { count: 6 + Math.min(ev.n, 12), speed: 0.6, up: 1.0, life: 1.2, size: 0.05, gravity: 1.2, drag: 0.5, colors: ev.solstice ? ['#ffd166', '#ffb24a', '#e2ddcc'] : ['#e2ddcc', '#b4aa8c', '#ffb24a'] });
+          if (ev.owner === this.viewer) this.cue(ev.solstice ? 'solstice' : 'gathering', ev.x, ev.y, 0.5);
+          break;
+        }
         case 'milled': {
           // A Tide Mill grinds on the running tide (#739): spray off the wheel, a few coins for its people.
           if (ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;

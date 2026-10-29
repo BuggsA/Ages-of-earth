@@ -223,6 +223,16 @@ export interface Age {
    * doors (`weave` in `ages.ts`), until `GOLDEN.span` runs out and the people wakes in the Gunpowder Age, for good.
    */
   golden?: boolean;
+  /**
+   * The Age of Megaliths (#877, the Deep Road's first age): Henges hold the ground round them and gather the people at each turn of the
+   * year (`HENGE`, `henge.ts`). A verb, carried into a Golden Age.
+   */
+  henges?: boolean;
+  /**
+   * The Age of Megaliths' door (#877): every building's timber is paid in stone, but for the few that must be wood (`MEGALITH.timber`),
+   * and a Mine Shaft digs stone from plain earth at `MEGALITH.grade`, so the road is never starved of it (`henge.ts`).
+   */
+  stonework?: boolean;
 }
 
 /**
@@ -279,7 +289,7 @@ export const TRUNK: AgeId[] = ['stone', 'bronze', 'middle', 'gunpowder', 'indust
  * map, with no prospecting and no rare find. Each age names the routes it stands on (`Age.routes`); the age-up button
  * says which route a road is on. A route may cross the plain road between its own ages.
  */
-export type RouteId = 'plain' | 'army' | 'navy' | 'economy' | 'horse' | 'faith' | 'wild' | 'water';
+export type RouteId = 'plain' | 'army' | 'navy' | 'economy' | 'horse' | 'faith' | 'wild' | 'water' | 'deep';
 export const ROUTES: Record<RouteId, { name: string; blurb: string }> = {
   plain: { name: 'Plain road', blurb: 'the classic climb, open on every map; every route can fall back to it' },
   army: { name: 'Army route', blurb: 'plunder carried home, camps at the front, a whole people at war' },
@@ -289,6 +299,7 @@ export const ROUTES: Record<RouteId, { name: string; blurb: string }> = {
   faith: { name: 'Faith route', blurb: 'priests who win a rival\'s towers and Temples over' },
   wild: { name: 'Wild route', blurb: 'beasts tamed and bred, walls that grow, and one day the forest itself' },
   water: { name: 'Water road', blurb: 'channels dug from the springs, dykes and polder, then sluices that drown your own fields to stop an army, then canals that carry ships inland and dams that turn turbines, then the tide\'s hours, and at last a town afloat that tows itself where it likes: a people that moves the water' },
+  deep: { name: 'Deep road', blurb: 'a town built in stone, then into the earth: henges that hold the ground, tunnels under it, a city sunk below it, the earth\'s own heat, faults cracked open, and at last the land itself raised and sunk' },
 };
 
 const trunkAge = (e: number, good: string): Age => ({ name: EPOCHS[e].name, short: EPOCHS[e].short, tier: e, blurb: EPOCHS[e].blurb, good, routes: ['plain'] });
@@ -815,6 +826,23 @@ export const AGES: Record<AgeId, Age> = {
     tier: 1,
     blurb: 'As the first towns of Sumer and the Indus did: a people that leads the river where it wants it. Citizens dig Channels (Q) out from any water, a spring, a stream, a lake or the shore, dragged out in a line like a wall; when a stretch is dug the water runs in, a tile at a time, and stays. A Farm within 2 tiles of water works 30% faster, and in this age no Farm is laid away from water, so the fields follow the channels. A channel is a moat: soldiers and citizens wade it at well under half their pace, and no ship sails it. Markets, Temples and the Bronze Age\'s arms are all here. What is dug stays dug on any road.',
     rivers: true,
+  },
+  // The Deep Road's first age (#876, #877): instead of the Bronze Age, on every map, seen once the first House stands. A people that builds in
+  // stone, not timber, and raises henges that hold its ground and gather it at each turn of the year. Stone never runs short: a Mine
+  // Shaft (still paid in timber) digs it from plain earth.
+  megaliths: {
+    verb: 'Build in stone, not timber, and raise Henges that hold the ground round them: no rival builds inside the ring, and at every turn of the year your citizens gathered there bring in food and gold',
+    door: 'Every building\'s timber is paid in stone and goes up slower: when the quarries are raided or run dry, the town stops growing until a shaft is sunk',
+    good: 'Ground you hold: a sturdy stone town, and rings no rival tower or camp may be raised in',
+    routes: ['deep'],
+    keepsake: { building: 'henge', does: 'its ring and its gathering at the turn of the year, on any road' },
+    name: 'Age of Megaliths',
+    short: 'Megaliths',
+    tier: 1,
+    blurb: 'As the builders of Carnac, Newgrange and Stonehenge did: a people that raises its town in stone. Every building\'s timber is paid in stone instead (Farms, Docks, Snares, Saplings and Mine Shafts are still wood), buildings stand a third sturdier and go up a fifth slower. Henges (R) are rings of standing stones: the ground round one is your land, where no rival raises anything at all, not even a Tower or a War Camp; and every time the season turns, each of your citizens standing in the ring brings in food and gold, twice as much at midsummer and midwinter. A Mine Shaft digs stone from plain earth twice as fast here, so a map without much open stone never stops the road. Markets, Temples and the Bronze Age\'s arms are all here.',
+    mul: { buildingHp: 1.3, buildSpeed: 0.8 },
+    henges: true,
+    stonework: true,
   },
   // The Water Road's sixth age (#739, s6 of #701): instead of the Atomic Age, a people that keeps the sea's hours. Reached for now by a
   // turn off the Atomic Age (the Age of Locks, s5, will lead here too). The tide wakes for the whole world when the first people enters.
@@ -1521,6 +1549,22 @@ export const ROADS: Road[] = [
     clueAlt: 'dock',
     blurb: 'Instead of the Bronze Age, as the first towns on the Tigris, the Nile and the Indus did: lead the water. Citizens dig Channels out from any spring, stream, lake or shore, and the water runs in behind them; Farms by water work faster, and none is laid away from it, so the town grows along its channels. A channel is a moat that soldiers must wade. The same arms and buildings as the Bronze Age.',
   },
+  // The Deep Road's trunk (#876 s1): the Age of Megaliths instead of the Bronze Age, open to everyone in the first minutes (no ore, no
+  // deed: a trunk is never shut), back to the Bronze Age at its own tier and on to the plain road at the Middle Ages. Paid in food and
+  // stone, the road's own stuff; stone lies by every town, and the Stone Age's Storehouse banks it.
+  {
+    from: 'stone',
+    to: 'megaliths',
+    cost: { food: 400, stone: 150 },
+    time: 35,
+    // A people that has raised its first House learns to raise in stone: every town builds one in its first minutes. A camp that
+    // raises none sees it at a Storehouse instead.
+    clue: 'house',
+    clueAlt: 'storehouse',
+    blurb: 'Instead of the Bronze Age, as the first farmers of Brittany, Ireland and Wessex did: raise your town in stone. Every building\'s timber is paid in stone and stands sturdier; Henges hold the ground round them, so no rival builds inside the ring, and gather your people at every turn of the year for food and gold. The same arms and buildings as the Bronze Age.',
+  },
+  { from: 'megaliths', to: 'bronze', cost: { food: 100, wood: 100 }, time: 20, blurb: 'Put down the rollers: the ordinary Bronze Age. Buildings are paid in timber again; the Henges stand, asleep, but for the one kept.' },
+  { from: 'megaliths', to: 'middle', cost: EPOCHS[2].cost, time: EPOCHS[2].time, blurb: 'Rejoin the main road at the Middle Ages, for the same price as from the Bronze Age: buildings are paid in timber again, and the Henges sleep but for the one kept.' },
   { from: 'rivers', to: 'bronze', cost: { food: 100, wood: 100 }, time: 20, blurb: 'Lay down the spades: the ordinary Bronze Age. Fields may go anywhere again; the channels you dug stay, and still water the fields beside them no faster.' },
   { from: 'rivers', to: 'middle', cost: EPOCHS[2].cost, time: EPOCHS[2].time, blurb: 'Rejoin the main road at the Middle Ages, for the same price as from the Bronze Age: Farms go anywhere again, and the channels stay dug.' },
   {
@@ -2792,6 +2836,7 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   shaft: { name: 'Mine Shaft', size: 2, hp: 700, cost: { wood: 150 }, time: 30, pop: 0, sight: 4, trains: [], drop: [], epoch: 1, menu: 'eco', key: 'H', blurb: 'A timber headframe over a hole in the ground. One citizen digs stone or gold here for good, slower than an open deposit; best sunk where a deposit was worked out, fair beside mountain rock. Choose its seam on the shaft.' },
   // The Water Road (#701 s1): a bank of earth across the shallows, and the mill that pumps the water out behind it (`DYKE`, `POLDER`, `water.ts`).
   dyke: { name: 'Dyke', size: 1, hp: 700, cost: { wood: 2, stone: 4 }, time: 7, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, ages: ['dykes'], menu: 'eco', key: 'K', blurb: 'A bank of earth with a stone crown, raised on shallow water or on the shore beside it. Drag to lay out a line. Your own people walk along its crown; rivals and ships can\'t pass. Shut a bay or a strait off from the open sea with dykes, then set a Windmill by it to pump it dry. A dyke that falls (to siege, or a Sapper\'s keg) lets the sea back in: it floods the polder ring by ring until a dyke stands in the gap again. A people that has walked the Age of Dykes raises dykes in any age after, to mend its banks.' },
+  henge: { name: 'Henge', size: 3, hp: 1600, cost: { stone: 180 }, time: 40, pop: 0, sight: 6, trains: [], drop: [], epoch: 1, ages: ['megaliths'], menu: 'eco', key: 'R', blurb: 'A ring of standing stones round a turf bank. The ground within 7 tiles is your land, and no rival raises anything inside it, not even a Tower or a War Camp. Every time the season turns, each of your citizens standing within 6 tiles brings in food and gold (up to 12 counted), twice as much at midsummer and midwinter.' },
   channel: { name: 'Channel', size: 1, hp: 150, cost: { wood: 4 }, time: 8, pop: 0, sight: 1, trains: [], drop: [], epoch: 1, ages: ['rivers', 'locks'], open: true, menu: 'eco', key: 'Q', blurb: 'A ditch dug out from water across the land. Drag to lay out a line from a spring, stream, lake or shore: as each stretch is dug the water runs into it and it stays. Farms within 2 tiles of water work faster in the Age of Rivers. Soldiers wade a channel at well under half their pace, and no ship sails it. In the Age of Locks it is dug deep, as a canal: every ship sails it and soldiers swim it at a quarter of their pace; an old channel may be dug deep too.' },
   causeway: { name: 'Causeway', size: 1, hp: 400, cost: { wood: 4, stone: 8 }, time: 6, pop: 0, sight: 1, trains: [], drop: [], epoch: 5, ages: ['tides'], menu: 'eco', key: 'W', blurb: 'A raised road of packed stone over the tidal flats or the shallow sea. Drag to lay out a line from the shore. Once laid it is tidal ground that only high water covers: anyone may walk it, at every hour but the top of the tide, and whoever is on it when the water comes back is swept off. A causeway counts as tidal ground for the mills. A line laid across the mouth of a bay of flats is a barrage: behind it the flats are a pond, wet at every hour, that Tide Mills grind twice. A rival\'s keg or warhead breaches it.' },
   tidemill: { name: 'Tide Mill', size: 2, hp: 900, cost: { wood: 200, stone: 150 }, time: 35, pop: 0, sight: 5, trains: [], drop: [], epoch: 5, ages: ['tides'], shore: true, menu: 'eco', key: 'A', blurb: 'A mill on the shore whose pond fills on the flood and runs out through its wheel on the ebb. Every time the tide turns it grinds gold, more for every tile of tidal ground within 5 tiles (up to 24), each tile feeding one mill only. Flats a causeway line has shut off from the sea (a barrage\'s pond) are ground twice, on the flood and on the ebb. Only in the Age of Tides, or the one your people kept on leaving it.' },
@@ -3340,6 +3385,21 @@ export const ROT = { grace: 40, rate: 1 / 160 };
  * `bold` scales how far wolves and boars notice your people. Summer is for foraging, winter for the hunt.
  */
 export const SEASON = { len: 150 };
+
+/**
+ * The Age of Megaliths (#877, `henge.ts`). `timber`: buildings still paid in wood (a Mine Shaft among them, so a people with no stone
+ * can always sink one and dig more); `stone`: stone paid for each wood of the rest. `grade`: the least a Mine Shaft digs stone at in the
+ * age, on any ground (plain earth is `SHAFT.grade.open` elsewhere). The computer: `take` the coin it takes the road on, `henges` it
+ * raises within `from` tiles of home (`far` in a crowded town), `stay` seconds at most it keeps the age while its first Henge goes up, how it weighs wood (`aiWood`) and stone (`aiStone`) in it, and the Mine Shafts it sinks (`aiShafts`) once its stone falls under `aiLow`.
+ */
+export const MEGALITH = { timber: ['farm', 'dock', 'snare', 'sapling', 'shaft'] as BuildingType[], stone: 0.8, grade: 0.6, take: 0.3, henges: 2, from: 12, far: 16, stay: 120, aiWood: 0.45, aiStone: 2.2, aiLow: 120, aiShafts: 2 };
+
+/**
+ * Henges (#877, `henge.ts`): `hold` tiles round a finished one are its people's land where a rival raises nothing (`BORDERS.henge` is
+ * the same ring). At each turn of the season every finished Henge counts its people's citizens within `reach` tiles (at most `most`)
+ * and banks `gift` for each, `solstice` times as much when the year turns into summer or winter.
+ */
+export const HENGE = { hold: 7, reach: 6, most: 12, gift: { food: 8, gold: 5 } as Cost, solstice: 2 };
 export const SEASONS = [
   { name: 'Spring', icon: '🌱', plant: 1, field: 1, rot: 1, bold: 1, grass: 1.2, blurb: 'The thaw: berries and herds return.' },
   { name: 'Summer', icon: '☀️', plant: 1.25, field: 1.1, rot: 1.5, bold: 0.85, grass: 1, blurb: 'Berries are heavy, but meat spoils fast.' },
@@ -4016,7 +4076,7 @@ export function unitEpoch(type: UnitType): number {
  * nearest claimant (ties go to the older building). Shown only, so far; attrition and building limits
  * are later steps of the seed.
  */
-export const BORDERS: Partial<Record<BuildingType, number>> = { towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6, silo: 5, huntcamp: 4, warcamp: 3, caravanserai: 5, mission: 5, heart: 8 };
+export const BORDERS: Partial<Record<BuildingType, number>> = { henge: 7, towncenter: 14, tower: 6, wonder: 9, dock: 5, airfield: 6, silo: 5, huntcamp: 4, warcamp: 3, caravanserai: 5, mission: 5, heart: 8 };
 
 /**
  * War Camps (#303): a finished camp with none of its people's soldiers (land units that fight) within

@@ -33,6 +33,7 @@ export const AGE_AIR: Record<AgeId, Air> = {
   iron: air('#8a8e98', 0.28), // forge grey
   wild: air('#9ab87a', 0.24), // green forest light
   rivers: air('#c8d890', 0.26), // river-mist, reed green
+  megaliths: air('#e6bfae', 0.24), // a solstice dawn on the stones
   hunt: air('#b8905e', 0.24), // woodsmoke at dawn
   steppe: air('#d8d8b0', 0.2), // pale wind-dust
   // Tier 2
