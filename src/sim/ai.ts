@@ -169,7 +169,9 @@ function settleLean(s: GameState, p: Player, mem: AiMemory): void {
   // tamed beasts for a legion) could leave a town with no soldiers to take one back.
   if (s.scenario || s.mode === 'lords' || !AI_LEVELS[p.ai!].clever || AI_LEVELS[p.ai!].lean === false || coin(s, p.id, 0x7e4a) >= AI_TEMPER.lean) return;
   const wet = s.mapType === 'lakes' || s.mapType === 'sea';
-  const open = (Object.keys(ROUTES) as RouteId[]).filter((r) => r !== 'plain' && (wet || (r !== 'navy' && r !== 'water')) && leanAges(p, r).length > 0);
+  // The Deep Road (#876) is not leaned to yet: its first age is taken on a coin of its own (`wants`), and leaving it out keeps every
+  // other leaning's dice where they were. It joins the leanings with its sweeps (#876 s7).
+  const open = (Object.keys(ROUTES) as RouteId[]).filter((r) => r !== 'plain' && r !== 'deep' && (wet || (r !== 'navy' && r !== 'water')) && leanAges(p, r).length > 0);
   if (!open.length) return;
   const route = open[Math.floor(coin(s, p.id, 0x7e4b) * open.length)];
   mem.lean = route;
