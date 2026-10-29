@@ -1549,22 +1549,6 @@ export const ROADS: Road[] = [
     clueAlt: 'dock',
     blurb: 'Instead of the Bronze Age, as the first towns on the Tigris, the Nile and the Indus did: lead the water. Citizens dig Channels out from any spring, stream, lake or shore, and the water runs in behind them; Farms by water work faster, and none is laid away from it, so the town grows along its channels. A channel is a moat that soldiers must wade. The same arms and buildings as the Bronze Age.',
   },
-  // The Deep Road's trunk (#876 s1): the Age of Megaliths instead of the Bronze Age, open to everyone in the first minutes (no ore, no
-  // deed: a trunk is never shut), back to the Bronze Age at its own tier and on to the plain road at the Middle Ages. Paid in food and
-  // stone, the road's own stuff; stone lies by every town, and the Stone Age's Storehouse banks it.
-  {
-    from: 'stone',
-    to: 'megaliths',
-    cost: { food: 400, stone: 150 },
-    time: 35,
-    // A people that has raised its first House learns to raise in stone: every town builds one in its first minutes. A camp that
-    // raises none sees it at a Storehouse instead.
-    clue: 'house',
-    clueAlt: 'storehouse',
-    blurb: 'Instead of the Bronze Age, as the first farmers of Brittany, Ireland and Wessex did: raise your town in stone. Every building\'s timber is paid in stone and stands sturdier; Henges hold the ground round them, so no rival builds inside the ring, and gather your people at every turn of the year for food and gold. The same arms and buildings as the Bronze Age.',
-  },
-  { from: 'megaliths', to: 'bronze', cost: { food: 100, wood: 100 }, time: 20, blurb: 'Put down the rollers: the ordinary Bronze Age. Buildings are paid in timber again; the Henges stand, asleep, but for the one kept.' },
-  { from: 'megaliths', to: 'middle', cost: EPOCHS[2].cost, time: EPOCHS[2].time, blurb: 'Rejoin the main road at the Middle Ages, for the same price as from the Bronze Age: buildings are paid in timber again, and the Henges sleep but for the one kept.' },
   { from: 'rivers', to: 'bronze', cost: { food: 100, wood: 100 }, time: 20, blurb: 'Lay down the spades: the ordinary Bronze Age. Fields may go anywhere again; the channels you dug stay, and still water the fields beside them no faster.' },
   { from: 'rivers', to: 'middle', cost: EPOCHS[2].cost, time: EPOCHS[2].time, blurb: 'Rejoin the main road at the Middle Ages, for the same price as from the Bronze Age: Farms go anywhere again, and the channels stay dug.' },
   {
@@ -1670,6 +1654,22 @@ export const ROADS: Road[] = [
     blurb: 'A turn, not a climb, for a people that has lived many lives: every side age it has walked wakes at once, with none of its doors, for a few minutes. Then it ends for good, and every rival knows when.',
   },
   { from: 'golden', to: 'industrial', cost: EPOCHS[4].cost, time: EPOCHS[4].time, blurb: 'Climb to the Industrial Age before the gold runs out: the Golden Age ends now, for good, and every thread falls asleep.' },
+  // The Deep Road's trunk (#876 s1), last of the roads so the computer asks it after every other turn off the Stone Age (`wants`): the Age of Megaliths instead of the Bronze Age, open to everyone in the first minutes (no ore, no
+  // deed: a trunk is never shut), back to the Bronze Age at its own tier and on to the plain road at the Middle Ages. Paid in food and
+  // stone, the road's own stuff; stone lies by every town, and the Stone Age's Storehouse banks it.
+  {
+    from: 'stone',
+    to: 'megaliths',
+    cost: { food: 400, stone: 150 },
+    time: 35,
+    // A people that has raised its first House learns to raise in stone: every town builds one in its first minutes. A camp that
+    // raises none sees it at a Storehouse instead.
+    clue: 'house',
+    clueAlt: 'storehouse',
+    blurb: 'Instead of the Bronze Age, as the first farmers of Brittany, Ireland and Wessex did: raise your town in stone. Every building\'s timber is paid in stone and stands sturdier; Henges hold the ground round them, so no rival builds inside the ring, and gather your people at every turn of the year for food and gold. The same arms and buildings as the Bronze Age.',
+  },
+  { from: 'megaliths', to: 'bronze', cost: { food: 100, wood: 100 }, time: 20, blurb: 'Put down the rollers: the ordinary Bronze Age. Buildings are paid in timber again; the Henges stand, asleep, but for the one kept.' },
+  { from: 'megaliths', to: 'middle', cost: EPOCHS[2].cost, time: EPOCHS[2].time, blurb: 'Rejoin the main road at the Middle Ages, for the same price as from the Bronze Age: buildings are paid in timber again, and the Henges sleep but for the one kept.' },
 ];
 
 /**
@@ -3392,7 +3392,7 @@ export const SEASON = { len: 150 };
  * age, on any ground (plain earth is `SHAFT.grade.open` elsewhere). The computer: `take` the coin it takes the road on, `henges` it
  * raises within `from` tiles of home (`far` in a crowded town), `stay` seconds at most it keeps the age while its first Henge goes up, how it weighs wood (`aiWood`) and stone (`aiStone`) in it, and the Mine Shafts it sinks (`aiShafts`) once its stone falls under `aiLow`.
  */
-export const MEGALITH = { timber: ['farm', 'dock', 'snare', 'sapling', 'shaft'] as BuildingType[], stone: 0.8, grade: 0.6, take: 0.3, henges: 2, from: 12, far: 16, stay: 120, aiWood: 0.45, aiStone: 2.2, aiLow: 120, aiShafts: 2 };
+export const MEGALITH = { timber: ['farm', 'dock', 'snare', 'sapling', 'shaft'] as BuildingType[], stone: 0.8, grade: 0.6, take: 0.7, henges: 2, from: 12, far: 16, stay: 120, aiWood: 0.45, aiStone: 2.2, aiLow: 120, aiShafts: 2 };
 
 /**
  * Henges (#877, `henge.ts`): `hold` tiles round a finished one are its people's land where a rival raises nothing (`BORDERS.henge` is

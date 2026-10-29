@@ -660,10 +660,6 @@ export function heirloomAhead(p: Player, to: AgeId): TechId | null {
  */
 function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   const roads = (mem.roads ??= {});
-  // The Deep Road (#877) is decided before any other turn off the Stone Age, on its own coin: a town that means to build in stone
-  // takes no other side road at tier 1 (unless its people's strength calls for one, as the iron road for foot soldiers). The other
-  // road is still asked as before, so the match's dice roll exactly as they would, and only then set aside.
-  const deepFirst = roads[to] === undefined && to !== 'megaliths' && p.epoch === 0 && AGES[to].tier === 1 && fit(p, to) <= 0 && wants(s, p, mem, 'megaliths');
   // The Hunters' Way (#463 s1) keeps no fields and little food in store: the steppe's flocks start from a store it lacks.
   if (roads[to] === undefined && AGES[to].mobile && p.way === 'hunt') roads[to] = false;
   if (roads[to] === undefined && to === 'horde') {
@@ -710,8 +706,9 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
     // The Water Road's fifth age (#701 s5): a people that walked the Water Line turns into it on a coin of its own.
     roads[to] = hasWalked(p, 'waterline') && coin(s, p.id, 0x10c5) < AI_LOCKS.take;
   } else if (roads[to] === undefined && to === 'megaliths') {
-    // The Deep Road's first age (#877): open on every map, so a coin of its own decides, and no other match's dice shift.
-    // A town already set on another turn off the Stone Age (a route it leans to, or one chosen for it) keeps to that one.
+    // The Deep Road's first age (#877): open on every map, so a coin of its own decides, and no other match's dice shift. It is the last
+    // road off the Stone Age (`ROADS`), so it is asked only once every other turn the town knows of was passed by: it takes a town that
+    // would have gone the plain way to the Bronze Age, never one set on another turn.
     const taken = (Object.keys(roads) as AgeId[]).some((a) => a !== 'megaliths' && roads[a] === true && AGES[a].tier === 1 && ROADS.some((r) => r.from === 'stone' && r.to === a));
     roads[to] = !isNomad(p) && !taken && coin(s, p.id, 0xde11) < MEGALITH.take;
   } else if (roads[to] === undefined && to === 'rivers') {
@@ -738,7 +735,6 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
     else if (isNomad(p) && to === 'merchant') roads[to] = false;
     else roads[to] = f > 0 || (f === 0 && roll(s) < (AGES[to].path === 'blood' ? AI_BLOOD.take : heirloomAhead(p, to) ? AI_WEB.heir : AI_WEB.take));
   }
-  if (deepFirst) roads[to] = false;
   return roads[to]!;
 }
 
