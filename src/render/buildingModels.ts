@@ -2949,7 +2949,7 @@ function ageTouches(k: Kit, type: BuildingType, age: AgeId): void {
       break;
     case 'aeronaut': {
       // Sky blue navigation bands and a rooftop windsock mark the aviation towns.
-      if (['towncenter', 'house', 'forge', 'wonder'].includes(type)) {
+      if (['house', 'forge', 'wonder'].includes(type)) {
         const span = type === 'wonder' ? 1.8 : big ? 1.4 : 0.7;
         k.box(span * 2, 0.12, 0.04, '#76c6d6', 0, 0.55, span);
         const h = type === 'wonder' ? 3.3 : big ? 2.5 : 1.6;
@@ -3224,11 +3224,72 @@ function aeroAirfield(k: Kit, st: Style): void {
   for (const [x, z] of [[0.5, 1.2], [0.7, 1.4]]) k.cyl(0.1, 0.1, 0.26, 8, '#5a6450', x, 0, z);
 }
 
+/** The Aeronauts' Town Center (#816): an air terminal, a long glazed concourse with a barrel roof, a round control tower with a beacon lamp, a windsock and a luggage apron. */
+function aeroTerminal(k: Kit, st: Style): void {
+  const SKY = '#76c6d6';
+  const STEEL = '#d7e4e8';
+  const NAVY = '#2b3a48';
+  k.box(3.9, 0.05, 3.9, '#aeb2a8', 0, -0.02, 0);
+  for (const x of [-1.3, -0.65, 0, 0.65, 1.3]) k.box(0.06, 0.02, 0.5, '#f4efe4', x, 0.04, 1.5);
+  // The concourse: a cream hall with a row of tall glass bays and a barrel roof of sky-blue ribs.
+  k.box(3.0, 0.9, 1.5, st.wall, -0.2, 0, -0.5);
+  k.box(3.08, 0.07, 1.58, st.trim, -0.2, 0.9, -0.5);
+  for (let i = 0; i < 6; i++) {
+    const x = -1.45 + i * 0.5;
+    k.box(0.34, 0.55, 0.03, '#2a3f4f', x, 0.15, 0.26);
+    window(k, st, x, 0.2, 0.275, 0.26, 0.45);
+    k.box(0.04, 0.55, 0.04, STEEL, x - 0.2, 0.15, 0.27);
+  }
+  k.box(3.0, 0.5, 1.5, SKY, -0.2, 0.97, -0.5).scale.set(1, 0.5, 1);
+  for (let i = 0; i < 7; i++) {
+    const x = -1.6 + i * 0.5;
+    k.box(0.05, 0.22, 1.55, STEEL, x, 1.1, -0.5);
+    k.box(0.05, 0.12, 1.55, STEEL, x, 1.3, -0.5).scale.x = 0.9;
+  }
+  k.box(3.0, 0.07, 1.5, SKY, -0.2, 1.4, -0.5);
+  // The entrance canopy and the team's pennant over the doors.
+  k.box(1.1, 0.06, 0.55, st.roof, -0.2, 0.7, 0.55);
+  for (const x of [-0.7, 0.3]) k.cyl(0.03, 0.03, 0.7, 5, STEEL, x, 0, 0.8);
+  k.box(0.5, 0.45, 0.03, '#1d1e24', -0.2, 0, 0.27);
+  k.team(k.box(0.9, 0.18, 0.03, TEAM, -0.2, 0.9, 0.82));
+  // The control tower: a round shaft, a glazed cab, a lamp room and a mast with a beacon.
+  const tx = 1.45;
+  const tz = -0.9;
+  k.cyl(0.36, 0.42, 1.9, 12, st.wall2, tx, 0, tz);
+  k.ring(0.4, 0.03, SKY, 0.5).position.set(tx, 0.5, tz);
+  k.cyl(0.58, 0.46, 0.2, 12, st.trim, tx, 1.9, tz);
+  k.cyl(0.5, 0.5, 0.34, 12, '#2a3f4f', tx, 2.1, tz);
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * 2 * Math.PI;
+    window(k, st, tx + Math.sin(a) * 0.5, 2.15, tz + Math.cos(a) * 0.5, 0.2, 0.22, true, Math.abs(Math.sin(a)) > 0.7);
+  }
+  k.cyl(0.6, 0.6, 0.06, 12, NAVY, tx, 2.44, tz);
+  k.cone(0.6, 0.3, 12, SKY, tx, 2.5, tz);
+  k.cyl(0.02, 0.03, 0.9, 5, STEEL, tx, 2.8, tz);
+  k.glow(k.sphere(0.09, '#fff2b0', tx, 3.75, tz));
+  for (const a of [0, 2.1, 4.2]) k.box(0.3, 0.02, 0.02, NAVY, tx + Math.sin(a) * 0.15, 3.45, tz + Math.cos(a) * 0.15).rotation.y = a;
+  // A windsock on the hall roof, caught by the breeze.
+  k.cyl(0.02, 0.025, 0.7, 5, STEEL, -1.4, 1.4, -0.9);
+  k.box(0.5, 0.12, 0.1, '#f4a04a', -1.15, 2.0, -0.9);
+  k.box(0.12, 0.12, 0.11, '#f4efe4', -1.2, 2.0, -0.9);
+  // The apron: a luggage cart, crates and a fuel drum, mooring bollards and a lamp post each side.
+  k.box(0.5, 0.12, 0.3, NAVY, 1.2, 0.04, 1.2);
+  k.box(0.34, 0.2, 0.22, '#9a7a52', 1.18, 0.16, 1.2);
+  for (const x of [1.0, 1.4]) k.cyl(0.05, 0.05, 0.05, 6, '#1d1e24', x, 0, 1.38);
+  k.cyl(0.1, 0.1, 0.26, 8, '#5a6450', 1.6, 0, 0.6);
+  for (const x of [-1.7, 1.7]) {
+    k.cyl(0.02, 0.03, 0.8, 5, STEEL, x, 0, 1.6);
+    k.glow(k.sphere(0.06, '#ffd890', x, 0.84, 1.6));
+  }
+  for (const z of [-1.6, 0.4]) k.cyl(0.07, 0.08, 0.14, 6, '#5a6450', -1.85, 0, z);
+  banner(k, -1.0, 0, 1.45, 1.2);
+}
+
 /** Buildings an age raises in a shape of its own (#816), in place of the trunk's model; its touches still follow. */
 const AGE_SHAPES: Partial<Record<AgeId, Partial<Record<BuildingType, (k: Kit, st: Style) => void>>>> = {
   iron: { house: ironHouse, towncenter: ironHillfort },
   merchant: { market: merchantMarket },
-  aeronaut: { airfield: aeroAirfield },
+  aeronaut: { airfield: aeroAirfield, towncenter: aeroTerminal },
 };
 
 const cache = new Map<string, THREE.BufferGeometry>();
