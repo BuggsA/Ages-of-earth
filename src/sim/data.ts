@@ -2681,7 +2681,8 @@ export interface BuildingStats {
  * Taming (the Age of the Wild, `docs/wild-road.md`, `src/sim/tame.ts`): a citizen within `reach` tiles of a wild wolf, boar or mammoth
  * sings to it for `secs[kind]` seconds and it becomes a beast of war of that people (`unit[kind]`). The beast stands calm for its tamer
  * while the song lasts and the tamer is within `calm` tiles (from the moment the tamer sets out); a beast hurt within `wary` seconds
- * won't take the hand. The call of the wild (`callWild`): a Wild people's Hunting Camps draw a beast each season (`call*`).
+ * won't take the hand. The call of the wild (`callWild`): a Wild people's Hunting Camps draw a beast every `callEvery` seconds, the kind
+ * not yet tamed first, up to `callCap` wolves and boars near each, and a mammoth while none is tamed (then each winter), `callMammoths` near (`call*`).
  * The computer takes the road on a coin of `aiTake` (raising the Hunting Camp that shows it once `aiClue` of the deed is in), tames within `aiNear` tiles of home (a wolf only with
  * `aiEscort` soldiers sent ahead at its pack), raises `aiDen` Dens and stays `aiStay` seconds before it climbs on.
  */
@@ -2692,9 +2693,11 @@ export const TAME = {
   secs: { wolf: 6, boar: 10, mammoth: 24 } as Record<'wolf' | 'boar' | 'mammoth', number>,
   unit: { wolf: 'warwolf', boar: 'tusker', mammoth: 'warmammoth' } as Record<'wolf' | 'boar' | 'mammoth', UnitType>,
   callAt: 20,
+  callEvery: 50,
   callFrom: 7,
   callNear: 10,
-  callCap: 2,
+  callCap: 3,
+  callMammoths: 1,
   aiNear: 40,
   aiEscort: 4,
   aiTake: 0.3,
