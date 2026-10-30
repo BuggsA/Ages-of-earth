@@ -1,4 +1,4 @@
-import { barrow, henge, sunken } from './deepModels';
+import { barrow, henge, sunken, ventforge } from './deepModels';
 import * as THREE from 'three';
 import { AGE_PALETTES, NEW_LOOK_AGES, ageLookTouches } from './ageLooks';
 import type { AgeId, BuildingType } from '../sim/types';
@@ -3040,6 +3040,7 @@ const MAKERS: Record<Exclude<BuildingType, 'wall' | 'snare' | 'shaft' | 'dyke' |
   // The Deep Road (#876), drawn in `deepModels.ts`.
   henge: (k: Kit, _e: number, st: Style) => henge(k, st.base),
   barrow: (k: Kit, _e: number, st: Style) => barrow(k, st.base),
+  ventforge: (k: Kit, _e: number, st: Style) => ventforge(k, st.base),
 };
 
 const cache = new Map<string, THREE.BufferGeometry>();

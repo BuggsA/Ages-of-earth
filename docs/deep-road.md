@@ -36,6 +36,10 @@ The game is *Ages of Earth*: on this road a people stops building **on** the lan
   - **Warheads still burn what is sunk** until s6's deep vaults: `silo.ts` is untouched.
   - **Saves:** the new fields are optional, so older saves load as all-surface; no `v` bump.
 
+- **s4, the Age of Deep Forges** (#884): vents laid by every town in `mapgen.ts` (`placeVents`, after the springs on dice of their own: one by every start whose 3 by 3 is open, level and in reach, and one out on the map for every two towns; `GameState.vents`, tiles, so no entity id shifts), `src/sim/forge.ts` (`ventSpot`, `forgeHot`, `ventRate` in `workRate`, `holder`, `scald`, `forgeStep`; `Building.held`, `scaldAt`, `spent`), the `scald` command, `VENT` in `data.ts`, the Vent Forge and vent models (`deepModels.ts`, `ventsView.ts`), the `anvil` plate, emblem, palette, touches, hat, ground, air, sounds `scald`, `forgeCold`, `forgeWarm`, `forgeWork` and `forgeSpot` in `ai.ts`.
+  - **Never starved:** `tests/deep-forges.test.ts` raises a forge over every seat's vent on all six map types; a 324-map sweep (3 sizes, 2 to 4 players, 6 seeds) found none missing. A start with no bare ground in reach has the nearest level land cleared for its vent.
+  - **No unit:** the issue allowed one at most; the age's arms are the forge's own steam instead (Scald), which answers the rival holding its vent.
+  - **Seeded matches stay put:** only the vent tile itself is closed to every people; the eight round it are kept clear only by a people that has walked the Megaliths, so its own town never shuts its forge out. Closing all nine for everyone moved the computer's town layouts and broke two seeded tests (`ai-coil-layout`, `ai-hunt`). In 18 long hard-vs-hard matches with both seats marked as on the road from the start, every home vent still took a forge at the end; with neither marked, 3 of 18 were built over.
+
 ## Next
-- **s4, the Age of Deep Forges** (Industrial): vents laid by every town in `mapgen.ts` (as spring heads are, with a test across seeds), vent forges that drive the buildings in reach as dams do (`damDrives`).
 - **s5, the Age of Faults** (Atomic), **s6, the Living Earth** (past Faults), **s7** the sweeps (`npx tsx scripts/routes.ts --seeds 6 deep`) and the `deep` route joining the computer's leanings.

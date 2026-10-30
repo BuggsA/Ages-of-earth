@@ -28,6 +28,8 @@ export const EPOCHS: Epoch[] = [
 export const LAST_EPOCH = EPOCHS.length - 1;
 /** The Undercity's clocks and price (#883, `UNDER`), named here so the age's words can say them. */
 const UNDER_SINK = { cost: 10, sink: 15, rise: 25, find: 5 };
+/** The Deep Forges' heat (#884, `VENT`), named here so the age's and the forge's words can say them. */
+const VENT_HEAT = { reach: 9, drive: 150, cold: 75, hold: 4, scald: 5, burn: 60, spent: 20, again: 45 };
 /** The Age of the Hive's reach and woods (`HIVE`), named here so the age's and the Hive's words can say them. */
 const HIVE_REACH = 6;
 const HIVE_TREES = 8;
@@ -247,6 +249,11 @@ export interface Age {
   sinks?: boolean;
   /** Buildings of an earlier age on its road that it raises and works as its own, awake (the Undercity raises the Delvings' Barrows, #883). */
   carries?: BuildingType[];
+  /**
+   * The Age of Deep Forges (#884, the Deep Road's fourth age): Vent Forges over the vents drive the buildings round them, and a building
+   * out of every forge's reach works slow (`VENT`, `forge.ts`). A verb, carried into a Golden Age.
+   */
+  vents?: boolean;
 }
 
 /**
@@ -890,6 +897,24 @@ export const AGES: Record<AgeId, Age> = {
     noBuild: { buildings: ['stable', 'wall', 'gate', 'tower'], why: 'A people of the Undercity lives under the earth, not behind walls: no Stable, walls, gates or Watch Towers until it climbs out' },
     delves: true,
     sinks: true,
+    carries: ['barrow'],
+  },
+  // The Deep Road's fourth age (#876 s4, #884): instead of the Industrial Age, a people that works on the earth's own heat. The boracic
+  // works of Larderello in Tuscany, driven by the steam of the ground from the 1820s, which lit the first geothermal lamps in 1904; the
+  // hot springs Iceland heats its towns by; the old tales that put the smith's forge under Etna.
+  forges: {
+    verb: 'Raise Vent Forges over the vents of the earth\'s heat: each drives every building of yours round it half again as fast, burns no wood, and lets its steam out over its vent to scald the rival soldiers round it',
+    door: 'The town is bound to its vents: a building out of every forge\'s reach trains and researches at three quarters pace, a forge whose vent a rival\'s soldiers hold goes cold, and no Airfield is raised: the people looks down into the earth, not up',
+    good: 'A town on a fixed hearth: armies and learning come fast round the vents, if you hold them',
+    routes: ['deep'],
+    keepsake: { building: 'ventforge', does: 'driving the buildings round its vent, on any road' },
+    name: 'Age of Deep Forges',
+    short: 'Deep Forges',
+    tier: 4,
+    blurb: `As the boracic works of Larderello in Tuscany were driven by the steam of the ground from the 1820s, and lit the first lamps from it in 1904; as Iceland heats its towns from its hot springs; as the old tales put the smith's forge under Etna. Vents of the earth's heat breathe by every town, and a few more out on the map. Raise a Vent Forge (V, stone and gold, no wood) over one: while it stands hot, every building of yours within ${VENT_HEAT.reach} tiles trains and researches half again as fast. The town is bound to its vents: a building out of every forge's reach works at three quarters pace. A forge goes cold while a rival's soldiers stand within ${VENT_HEAT.hold} tiles of its vent and none of yours do. Let its steam out (Scald, X) and every rival soldier within ${VENT_HEAT.scald} tiles of the vent takes ${VENT_HEAT.burn}; the forge then lies cold ${VENT_HEAT.spent} seconds, and breathes again after ${VENT_HEAT.again}. The tunnel still runs, and Barrows are still dug. No Airfield is raised. The Industrial Age's arms are here otherwise.`,
+    noBuild: { buildings: ['airfield'], why: 'A people of the Deep Forges looks down into the earth, not up: no Airfield until it climbs out' },
+    delves: true,
+    vents: true,
     carries: ['barrow'],
   },
   // The Water Road's sixth age (#739, s6 of #701): instead of the Atomic Age, a people that keeps the sea's hours. Reached for now by a
@@ -1758,6 +1783,26 @@ export const ROADS: Road[] = [
   },
   { from: 'undercity', to: 'gunpowder', cost: { food: 200, wood: 200 }, time: 25, blurb: 'Come up into the daylight: the ordinary Gunpowder Age, with walls, towers and riders. What is sunk stays sunk until you surface it, and only the kept Storehouse goes down again.' },
   { from: 'undercity', to: 'industrial', cost: EPOCHS[4].cost, time: EPOCHS[4].time, blurb: 'Rejoin the main road at the Industrial Age for the ordinary price: walls, towers and riders return. What is sunk stays sunk until you surface it, and only the kept Storehouse goes down again.' },
+  // The Deep Road's trunk (#876 s4, #884): the Age of Deep Forges instead of the Industrial Age, a climb from the Undercity; a turn off
+  // the Industrial Age for a people that walked the Undercity; back onto the plain road at the Industrial or the Atomic Age.
+  {
+    from: 'undercity',
+    to: 'forges',
+    cost: { food: 1200, stone: 700, gold: 500 },
+    time: 70,
+    walked: 'undercity',
+    blurb: 'Instead of the Industrial Age, on down the Deep Road: work on the earth\'s own heat. Vent Forges raised over the vents by your town drive every building round them half again as fast, and burn no wood. Paid in stone more than gold. What it gives up: a building out of every forge\'s reach works slow, a forge whose vent a rival holds goes cold, and no Airfield.',
+  },
+  {
+    from: 'industrial',
+    to: 'forges',
+    cost: { food: 500, stone: 400, gold: 200 },
+    time: 45,
+    walked: 'undercity',
+    blurb: 'A turn, not a climb, for a people that lived below before: work on the earth\'s own heat. Vent Forges over the vents drive the buildings round them half again as fast. What it gives up: a building out of every forge\'s reach works slow, a forge whose vent a rival holds goes cold, and no Airfield.',
+  },
+  { from: 'forges', to: 'industrial', cost: { food: 200, wood: 200 }, time: 25, blurb: 'Climb out into the smoke: the ordinary Industrial Age, with Airfields, and nothing slowed far from a vent. The forges go cold but for the one kept.' },
+  { from: 'forges', to: 'atomic', cost: EPOCHS[5].cost, time: EPOCHS[5].time, blurb: 'Rejoin the main road at the Atomic Age for the ordinary price: Airfields return, and nothing is slowed far from a vent. The forges go cold but for the one kept.' },
 ];
 
 /**
@@ -2924,6 +2969,8 @@ export const BUILDINGS: Record<BuildingType, BuildingStats> = {
   shaft: { name: 'Mine Shaft', size: 2, hp: 700, cost: { wood: 150 }, time: 30, pop: 0, sight: 4, trains: [], drop: [], epoch: 1, menu: 'eco', key: 'H', blurb: 'A timber headframe over a hole in the ground. One citizen digs stone or gold here for good, slower than an open deposit; best sunk where a deposit was worked out, fair beside mountain rock. Choose its seam on the shaft.' },
   // The Water Road (#701 s1): a bank of earth across the shallows, and the mill that pumps the water out behind it (`DYKE`, `POLDER`, `water.ts`).
   dyke: { name: 'Dyke', size: 1, hp: 700, cost: { wood: 2, stone: 4 }, time: 7, pop: 0, sight: 2, trains: [], drop: [], epoch: 2, ages: ['dykes'], menu: 'eco', key: 'K', blurb: 'A bank of earth with a stone crown, raised on shallow water or on the shore beside it. Drag to lay out a line. Your own people walk along its crown; rivals and ships can\'t pass. Shut a bay or a strait off from the open sea with dykes, then set a Windmill by it to pump it dry. A dyke that falls (to siege, or a Sapper\'s keg) lets the sea back in: it floods the polder ring by ring until a dyke stands in the gap again. A people that has walked the Age of Dykes raises dykes in any age after, to mend its banks.' },
+  // The Age of Deep Forges (#884, the Deep Road): raised over a vent, it drives the buildings round it (`VENT`, `forge.ts`).
+  ventforge: { name: 'Vent Forge', size: 3, hp: 2000, cost: { stone: 250, gold: 100 }, time: 45, pop: 0, sight: 6, trains: [], drop: [], epoch: 4, ages: ['forges'], menu: 'mil', key: 'V', blurb: `A forge of black basalt raised over a vent of the earth's heat, and over nothing else: one to a vent, and nothing else is built on a vent. It burns no wood. While it stands hot, every building of yours within ${VENT_HEAT.reach} tiles trains and researches half again as fast. It goes cold while a rival's soldiers stand within ${VENT_HEAT.hold} tiles of its vent and none of yours do. Scald (X) lets its steam out: every rival soldier within ${VENT_HEAT.scald} tiles of the vent takes ${VENT_HEAT.burn}, and the forge lies cold ${VENT_HEAT.spent} seconds.` },
   barrow: { name: 'Barrow', size: 2, hp: 1400, cost: { stone: 120, wood: 40 }, time: 35, pop: 0, sight: 5, trains: [], drop: [], epoch: 2, ages: ['delvings'], garrison: 12, menu: 'mil', key: 'C', blurb: 'A turf-roofed mouth of dressed stone into the earth. Shelters twelve (no riders), and joins the tunnel that runs to every Barrow and Town Center of yours: select it with people inside and Delve (D) to another mouth, and they go below and come up there, five tiles a second. One that falls spills those bound for it out where it stood.' },
   henge: { name: 'Henge', size: 3, hp: 1600, cost: { stone: 180 }, time: 40, pop: 0, sight: 6, trains: [], drop: [], epoch: 1, ages: ['megaliths'], menu: 'eco', key: 'R', blurb: 'A ring of standing stones round a turf bank. The ground within 7 tiles is your land, and no rival raises anything inside it, not even a Tower or a War Camp. Every time the season turns, each of your citizens standing within 6 tiles brings in food and gold (up to 12 counted), twice as much at midsummer and midwinter.' },
   channel: { name: 'Channel', size: 1, hp: 150, cost: { wood: 4 }, time: 8, pop: 0, sight: 1, trains: [], drop: [], epoch: 1, ages: ['rivers', 'locks'], open: true, menu: 'eco', key: 'Q', blurb: 'A ditch dug out from water across the land. Drag to lay out a line from a spring, stream, lake or shore: as each stretch is dug the water runs into it and it stays. Farms within 2 tiles of water work faster in the Age of Rivers. Soldiers wade a channel at well under half their pace, and no ship sails it. In the Age of Locks it is dug deep, as a canal: every ship sails it and soldiers swim it at a quarter of their pace; an old channel may be dug deep too.' },
@@ -3514,6 +3561,17 @@ export const UNDER = {
   calm: 45,
   stay: 240,
 };
+
+/**
+ * The Age of Deep Forges (#884, `forge.ts`). Vents: one by every town about `at` tiles from its start (out to `wide`), its 3 by 3 open
+ * and level, and one more out on the map for every `per` towns, at least `apart` tiles from every start and `spread` from each other.
+ * A hot Vent Forge drives its people's buildings within `reach` tiles (centre to centre) at `drive` hundredths; in the age, one out of
+ * every hot forge's reach works at `cold`. A forge is cold while a rival's soldiers stand within `hold` tiles of its vent and none of its
+ * people's do. Scald: rival soldiers within `scald` tiles of the vent lose `burn`; the forge is cold `spent` seconds, and scalds again
+ * after `again`. The computer: `take` the coin it climbs on from the Undercity, keeps the age `stay` seconds at least, raises forges at
+ * vents within `aiFrom` tiles of home, `aiMost` at most, and scalds when `aiScald` rival soldiers stand round a vent.
+ */
+export const VENT = { ...VENT_HEAT, at: 8, wide: 14, per: 2, apart: 18, spread: 14, take: 0.7, stay: 240, aiFrom: 30, aiMost: 2, aiScald: 2 };
 
 export const HENGE = { hold: 7, reach: 6, most: 12, gift: { food: 8, gold: 5 } as Cost, solstice: 2 };
 export const SEASONS = [

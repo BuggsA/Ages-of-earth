@@ -1,4 +1,5 @@
 import { inert, underStep } from './undercity';
+import { forgeStep } from './forge';
 import { delveStep } from './delve';
 import { hengeStep } from './henge';
 import { callWild } from './tame';
@@ -139,6 +140,8 @@ export function createGame(setup: GameSetup): GameState {
     block: map.block,
     // Spring heads by the towns (#701 s1): where the Age of Rivers digs from on a dry map.
     ...(map.springs.length ? { springs: [...map.springs] } : {}),
+    // Vents of the earth's heat (#884): where the Deep Forges raise their forges.
+    ...(map.vents.length ? { vents: [...map.vents] } : {}),
     bldAt: new Int32Array(n),
     gateTeam: new Int8Array(n).fill(-1),
     blockVersion: 0,
@@ -702,6 +705,7 @@ export function step(s: GameState, cmds: readonly Command[] = []): void {
   hengeStep(s);
   delveStep(s, ungarrison);
   underStep(s);
+  forgeStep(s);
   sluiceStep(s);
   siloStep(s);
   sortieStep(s);

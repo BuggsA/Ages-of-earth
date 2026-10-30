@@ -31,6 +31,7 @@ import { RuinsView } from './ruinsView';
 import { FindsView } from './findsView';
 import { TidesView } from './tidesView';
 import { SpringsView } from './springsView';
+import { VentsView } from './ventsView';
 import { RubbleView } from './rubbleView';
 import { CacheView } from './cacheView';
 import { KegView } from './kegView';
@@ -122,6 +123,7 @@ export class View {
   readonly ruins = new RuinsView();
   readonly finds = new FindsView();
   readonly springs = new SpringsView();
+  readonly vents = new VentsView();
   /** Causeways under the tide (#739). */
   readonly tides = new TidesView();
   readonly rubble = new RubbleView();
@@ -212,7 +214,7 @@ export class View {
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sky.mesh, this.hemi, this.fill, this.sun, this.sun.target);
-    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.finds.group, this.springs.group, this.tides.group, this.rubble.group, this.caches.group, this.kegs.group, this.webs.group, this.missiles.group, this.fires.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
+    this.scene.add(this.terrain.group, this.water.mesh, this.resources.group, this.buildings.group, this.units.group, this.relics.group, this.posts.group, this.fairBanners.group, this.vigilCandles.group, this.ruins.group, this.finds.group, this.springs.group, this.vents.group, this.tides.group, this.rubble.group, this.caches.group, this.kegs.group, this.webs.group, this.missiles.group, this.fires.group, this.landmarks.group, this.sightings.group, this.overlays.group, this.effects.group, this.birds.mesh, this.weather.group, this.fireflies.points, this.bats.points, this.owls.points, this.roosts.points, this.perches.points, this.crows.points);
     this.scene.add(this.rangeGuides.mesh, this.borders.mesh, this.graze.mesh, this.foundations.mesh);
     this.sky.apply(this.skyTop, this.horizon, SUN_DIR);
     this.post = new Post(this.renderer, this.scene, this.rig.camera);
@@ -281,6 +283,7 @@ export class View {
     this.ruins.clear();
     this.finds.clear();
     this.springs.clear();
+    this.vents.clear();
     this.rubble.clear();
     this.caches.clear();
     this.kegs.clear();
@@ -569,6 +572,7 @@ export class View {
     this.ruins.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     this.finds.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     this.springs.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1);
+    this.vents.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1);
     this.tides.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1);
     this.landmarks.update(s, (x, y) => this.reveal || p.seen[Math.floor(y) * s.w + Math.floor(x)] === 1, (x, y) => this.reveal || this.sees(x, y));
     if (!this.reveal) {
@@ -1581,6 +1585,23 @@ export class View {
           if (ev.owner !== this.viewer && !this.sees(ev.x, ev.y)) break;
           this.effects.burst(this.ground(s, ev.x, ev.y, 0.2), { count: 8 + Math.min(ev.n, 12), speed: 0.9, up: 1.1, life: 1.1, size: 0.06, gravity: 2.2, drag: 0.4, colors: ['#5e4e3e', '#7e6650', '#a08a5a'] });
           this.cue('surface', ev.x, ev.y, 0.5);
+          break;
+        }
+        case 'vent': {
+          // A Vent Forge (#884): its steam let out in a white burst over the vent, seen and heard by anyone near; going cold or hot
+          // again, only by its people: a last puff of ash, or sparks up the stack.
+          const mine = ev.owner === this.viewer;
+          if (ev.what === 'scald') {
+            if (!mine && !this.sees(ev.x, ev.y)) break;
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.3), { count: 26, speed: 1.6, up: 1.4, life: 1.6, size: 0.16, gravity: -0.4, drag: 0.6, colors: ['#f2f0ec', '#dcd8d2', '#c8c4be'] });
+            this.effects.burst(this.ground(s, ev.x, ev.y, 0.2), { count: 8, speed: 0.6, up: 1.0, life: 0.8, size: 0.05, gravity: 1.2, drag: 0.4, colors: ['#ff6a1a', '#ffb24a'] });
+            this.cue('scald', ev.x, ev.y, 0.6);
+            break;
+          }
+          if (!mine) break;
+          if (ev.what === 'cold') this.effects.burst(this.ground(s, ev.x, ev.y, 1.2), { count: 6, speed: 0.2, up: 0.4, life: 1.6, size: 0.1, gravity: -0.1, drag: 0.7, colors: ['#5a5650', '#3a3632'] });
+          else this.effects.burst(this.ground(s, ev.x, ev.y, 1.6), { count: 10, speed: 0.4, up: 1.2, life: 1.0, size: 0.05, gravity: 0.6, drag: 0.5, colors: ['#ff6a1a', '#ffb24a', '#ffd27a'] });
+          this.cue(ev.what === 'cold' ? 'forgeCold' : 'forgeWarm', ev.x, ev.y, 0.45);
           break;
         }
         case 'sink': {

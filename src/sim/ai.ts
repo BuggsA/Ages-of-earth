@@ -15,9 +15,10 @@ import { coveredNext, shoreNear, tideClock, tideMillSpot } from './tides';
 import { castProblem, mooringSpot, raisesCitizens } from './floating';
 import { pitchProblem } from './steppe';
 import { wallLine } from './commands';
-import { AI_COCKLE, DELVE, HENGE, MEGALITH, UNDER } from './data';
+import { AI_COCKLE, DELVE, HENGE, MEGALITH, UNDER, VENT } from './data';
 import { canDelve, delveProblem, delvers } from './delve';
 import { hiddenFrom, sinkProblem, surfaceProblem } from './undercity';
+import { forgeAt, forgeHot, forgeOver, scaldProblem, ventOf } from './forge';
 import { AI_COCKLER, COCKLER } from './data';
 import { cocklerSpotNear } from './tides';
 import { AI_GATE } from './data';
@@ -340,6 +341,7 @@ function think(s: GameState, p: Player, mem: AiMemory): void {
   megalithWork(s, v, mem, issue);
   delveWork(s, v, mem, issue);
   underWork(s, v, mem, issue);
+  forgeWork(s, v, mem, issue);
   wildwoodWork(s, v, mem, issue);
   bloomWork(s, v, mem, issue);
   leviathanWork(s, v, mem, issue);
@@ -721,6 +723,9 @@ function wants(s: GameState, p: Player, mem: AiMemory, to: AgeId): boolean {
   } else if (roads[to] === undefined && to === 'undercity') {
     // The Deep Road's third age (#883): a people that went below goes on down and cuts its town into the rock, on a coin of its own.
     roads[to] = hasWalked(p, 'delvings') && coin(s, p.id, 0xde13) < UNDER.take;
+  } else if (roads[to] === undefined && to === 'forges') {
+    // The Deep Road's fourth age (#884): a people that lived below goes on down to the earth's heat, on a coin of its own.
+    roads[to] = hasWalked(p, 'undercity') && coin(s, p.id, 0xde14) < VENT.take;
   } else if (roads[to] === undefined && to === 'rivers') {
     // The Water Road's first age (#701 s1): with a channel worth digging by home, on a coin of its own.
     roads[to] = !!riverOf(s, p, mem) && coin(s, p.id, 0x71e5) < AI_RIVERS.take;
@@ -908,6 +913,8 @@ function nextRoad(s: GameState, v: View, mem: AiMemory): Journey | null {
   if (walksWeb(v) && ageOf(p) === 'megaliths' && !count(v, 'henge', true) && s.tick - (mem.megaliths ?? s.tick) < secs(MEGALITH.stay)) return null;
   // The Undercity (#883) is kept a while, so its town has gone below and come up again at least once.
   if (walksWeb(v) && ageOf(p) === 'undercity' && s.tick - (mem.under?.since ?? s.tick) < secs(UNDER.stay)) return null;
+  // The Deep Forges (#884) are kept a while, so its forges are raised and drive the town.
+  if (walksWeb(v) && ageOf(p) === 'forges' && s.tick - (mem.forges?.since ?? s.tick) < secs(VENT.stay)) return null;
   // The Wild is kept a while, so the beasts it came for are tamed and the Den is breeding.
   if (walksWeb(v) && ageOf(p) === 'wild' && s.tick - (mem.wild ?? s.tick) < secs(TAME.aiStay)) return null;
   // The Grove is kept a while, so its gardens are fed, its Orchards set and its Thornwall grown.
@@ -3060,6 +3067,22 @@ function fieldSpot(s: GameState, v: View, type: BuildingType): { tx: number; ty:
   return null;
 }
 
+/** A spot in the reach of one of our hot Vent Forges (#884), so a hall raised in the Deep Forges works driven; null when none has room. */
+function forgeSpot(s: GameState, v: View, type: BuildingType): { tx: number; ty: number } | null {
+  const n = BUILDINGS[type].size;
+  const r2 = VENT.reach * VENT.reach;
+  for (const t of v.buildings) {
+    if (!forgeHot(s, t)) continue;
+    const inside = (tx: number, ty: number): boolean => {
+      const dx = tx + n / 2 - t.x, dy = ty + n / 2 - t.y;
+      return dx * dx + dy * dy <= r2;
+    };
+    const spot = findSpot(s, type, t.x, t.y, 2, VENT.reach, 1, inside);
+    if (spot) return spot;
+  }
+  return null;
+}
+
 /** How much open water joins a tile (counted up to `cap`). */
 function waterReach(s: GameState, start: number, cap: number): number {
   const seen = new Set<number>([start]);
@@ -3459,7 +3482,7 @@ function planBuildings(s: GameState, v: View, mem: AiMemory, issue: (c: Command)
     const lines = BUILDINGS[type].trains;
     if (type !== due && lines.length && lines.every((u) => barred(p, u)) && !(type === 'workshop' && mills(p))) continue;
     const at = type === 'tower' ? towardEnemy(9) : type === 'market' || type === 'temple' ? home : towardEnemy(6);
-    const spot = (type !== 'tower' && ageOf(p) === 'lightning' && fieldSpot(s, v, type)) || (type === 'market' && fairSpot(s, v)) || findSpot(s, type, at.x, at.y, type === 'market' || type === 'temple' ? 6 : 0, 18);
+    const spot = (type !== 'tower' && ageOf(p) === 'lightning' && fieldSpot(s, v, type)) || (type !== 'tower' && !!ageDef(p).vents && forgeSpot(s, v, type)) || (type === 'market' && fairSpot(s, v)) || findSpot(s, type, at.x, at.y, type === 'market' || type === 'temple' ? 6 : 0, 18);
     // The road's clue comes before the climb's savings: what the town holds pays for it, and until it does, nothing cheaper takes the wood (as the Market's, above).
     if (spot && type === due) {
       const cost = raiseCost(s, p.id, type, spot.tx, spot.ty);
@@ -4332,6 +4355,45 @@ function underWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => 
   if (!here) return;
   const fwd = v.buildings.find((b) => b.type === 'barrow' && b.built && !b.sunk && b.sinking === undefined && !near(b.x, b.y) && b.garrison.length === 0);
   if (fwd && !sinkProblem(s, p.id, fwd)) issue({ t: 'sink', p: p.id, building: fwd.id });
+}
+
+/**
+ * The Age of Deep Forges (#884): a Vent Forge over the free vent nearest home, then over the next within `VENT.aiFrom` tiles (an open
+ * vent out on the map, if it lies that near), `VENT.aiMost` in all; and a forge's steam let out once `VENT.aiScald` rivals stand round
+ * its vent, or any while they hold it.
+ */
+function forgeWork(s: GameState, v: View, mem: AiMemory, issue: (c: Command) => void): void {
+  const { p } = v;
+  if (!v.tc || !ageDef(p).vents || !s.vents) return;
+  const f = (mem.forges ??= { since: s.tick, scald: -99999 });
+  const r2 = VENT.scald * VENT.scald;
+  for (const b of v.buildings) {
+    if (b.type !== 'ventforge' || scaldProblem(s, p.id, b)) continue;
+    const vent = ventOf(s, b);
+    const cx = (vent % s.w) + 0.5;
+    const cy = Math.floor(vent / s.w) + 0.5;
+    let n = 0;
+    for (const e of s.ents) {
+      if (e.kind !== 'unit' || e.hp <= 0 || e.inside || domainOf(e.type) !== 'land' || !isEnemy(s, p.id, e.owner)) continue;
+      if ((e.x - cx) * (e.x - cx) + (e.y - cy) * (e.y - cy) <= r2) n++;
+    }
+    if (n >= VENT.aiScald || (b.held && n > 0)) {
+      issue({ t: 'scald', p: p.id, building: b.id });
+      f.scald = s.tick;
+    }
+  }
+  const forges = v.buildings.filter((b) => b.type === 'ventforge');
+  if (forges.length >= VENT.aiMost || forges.some((b) => !b.built) || s.tick - (mem.ordered.ventforge ?? -99999) < secs(30)) return;
+  const d2 = (t: number) => ((t % s.w) + 0.5 - v.home.x) * ((t % s.w) + 0.5 - v.home.x) + (Math.floor(t / s.w) + 0.5 - v.home.y) * (Math.floor(t / s.w) + 0.5 - v.home.y);
+  const free = s.vents.filter((t) => !forgeOver(s, t) && d2(t) <= VENT.aiFrom * VENT.aiFrom).sort((a, b) => d2(a) - d2(b) || a - b);
+  for (const t of free) {
+    // Centred over the vent (its ground kept open from the start), else any square over it that is free.
+    const c = forgeAt(s, t);
+    const at = [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]].map(([dx, dy]) => ({ tx: c.tx + dx, ty: c.ty + dy })).find((o) => !placeProblem(s, 'ventforge', o.tx, o.ty, true, p.id));
+    if (!at) continue;
+    if (!construct(s, v, mem, 'ventforge', at, 3, issue)) spend(v, buildingCostFor(s, p.id, 'ventforge'));
+    return;
+  }
 }
 
 /**

@@ -70,7 +70,9 @@ export type BuildingType =
   /** The Age of Megaliths (#877, the Deep Road): a ring of standing stones that holds the ground and gathers the people at the turn of the year. */
   | 'henge'
   /** The Age of Delvings (#881, the Deep Road): a stone mouth into the earth, one end of the people's tunnel. */
-  | 'barrow';
+  | 'barrow'
+  /** The Age of Deep Forges (#884, the Deep Road): a forge raised over a vent of the earth's heat, that drives the buildings round it. */
+  | 'ventforge';
 /** Ids keep their behaviour; the names the player sees moved down a step when `gentle` came in (#258): see `AI_LEVELS`. */
 export type Difficulty = 'gentle' | 'easy' | 'normal' | 'hard';
 export type MapSize = 'small' | 'medium' | 'large';
@@ -90,7 +92,7 @@ export type TechId =
   | 'gillnets' | 'shipwright' | 'lighthouse' | 'rifling' | 'steamEngine' | 'aviation' | 'caravan' | 'banking' | 'pilgrimage' | 'drying' | 'hounds' | 'survey' | 'chart' | 'assay' | 'bloomery' | 'ropewalk' | 'credit' | 'litany'
   | 'bellFoundry' | 'ironHulls' | 'jointStock' | 'masonsLodge' | 'stElmo' | 'telegraphy' | 'galvanic' | 'galvanicBlood' | 'militaryOrders' | 'blackPowder' | 'saltCuring' | 'bloodForged' | 'launchControl' | 'interceptors';
 /** Where a people stands in the web of ages (#37): the five trunk epochs, and the side ages beside them. */
-export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood' | 'locks' | 'floating' | 'bloom' | 'beggars' | 'leviathans' | 'mycelium' | 'hunt' | 'megaliths' | 'delvings' | 'undercity';
+export type AgeId = 'stone' | 'bronze' | 'middle' | 'gunpowder' | 'industrial' | 'atomic' | 'merchant' | 'iron' | 'pilgrim' | 'fair' | 'reclaimer' | 'sail' | 'aeronaut' | 'lightning' | 'warband' | 'steppe' | 'ironblood' | 'totalwar' | 'horde' | 'silk' | 'hemocraft' | 'bloodrite' | 'fission' | 'fusion' | 'alchemy' | 'sapper' | 'searaider' | 'missions' | 'chariots' | 'golden' | 'dykes' | 'wild' | 'grove' | 'rivers' | 'hive' | 'waterline' | 'tides' | 'wildwood' | 'locks' | 'floating' | 'bloom' | 'beggars' | 'leviathans' | 'mycelium' | 'hunt' | 'megaliths' | 'delvings' | 'undercity' | 'forges';
 
 /** A path (#299): side ages chained one per tier, walked as one road across several epochs. */
 export type PathId = 'blood' | 'steppe' | 'hemocraft' | 'rite';
@@ -424,6 +426,11 @@ export interface Building {
   found?: number[];
   /** Seconds each player's foot soldiers have stood on it unbroken while it is sunk (#883), by player id. */
   feel?: number[];
+  /** A Vent Forge (#884, `forge.ts`) whose vent a rival holds: cold, it drives nothing. Absent: its vent is its own. */
+  held?: true;
+  /** A Vent Forge that scalded (#884): the tick it last did, and the tick it is hot again (it drives nothing until then). */
+  scaldAt?: number;
+  spent?: number;
   /** Where new units go. `kind` is the resource the flag was set on (absent on bare ground), so it outlives its tile (#344). */
   rally: { x: number; y: number; tile: number; kind?: number } | null;
   cool: number;
@@ -878,6 +885,8 @@ export interface PlayerStats {
   sunk?: number;
   /** A rival's sunk buildings this people's foot soldiers found (#883). */
   unearthed?: number;
+  /** Rival soldiers struck by this people's Vent Forges' steam (#884, the Age of Deep Forges). */
+  scalded?: number;
   /** Causeway tiles raised over the flats (#739, the Age of Tides). */
   causeways?: number;
   /** Rival causeway tiles breached by this people's kegs and warheads (#748). */
@@ -1202,6 +1211,11 @@ export type GameEvent =
    * `owner` and by `by` only; `x`, `y` its centre).
    */
   | { k: 'sink'; owner: number; id: number; what: 'sinking' | 'sunk' | 'rising' | 'found' | 'caved'; by?: number; x: number; y: number }
+  /**
+   * A Vent Forge (#884): gone cold (its vent held by `by`'s soldiers), hot again (its vent freed, or its steam back), or scalding `n` rival
+   * soldiers round its vent. `x`, `y` its centre.
+   */
+  | { k: 'vent'; owner: number; id: number; what: 'cold' | 'warm' | 'scald'; by?: number; n?: number; x: number; y: number }
   /** A causeway was finished (#739): `tile` is tidal ground now, raised. */
   | { k: 'causeway'; owner: number; tile: number; x: number; y: number }
   /** A causeway tile was breached (#748) by `by`'s keg or warhead: it is plain tidal ground again (or open sea), `owner`'s road cut. */
@@ -1347,6 +1361,11 @@ export interface GameState {
    * it fills from it, and it opens into the channel (leaving this list); it waters the fields round it. Absent where there are none.
    */
   springs?: number[];
+  /**
+   * Vents of the earth's heat (#884, the Age of Deep Forges): one tile each, one by every town and a few out on the map, laid by mapgen.
+   * Nothing is built on a vent or the tiles round it but a Vent Forge over it (`forge.ts`). Absent where there are none.
+   */
+  vents?: number[];
   /** Tiles of polder the sea has taken back (#701 s3, the breach), by any breach: a cheap test for the renderer that the shore moved. Absent until the first. */
   flooded?: number;
   /**
@@ -1604,6 +1623,8 @@ export interface AiMemory {
   delveAt?: number;
   /** The Undercity (#883): when it entered the age, and when it last saw a rival army near its town. */
   under?: { since: number; threat: number };
+  /** The Age of Deep Forges (#884): when it entered the age, and when it last let off a forge's steam. */
+  forges?: { since: number; scald: number };
   /** The tick it entered the Age of the Wildwood, kept while it wakes its forest there (`WILDWOOD.aiStay`). */
   wildwood?: number;
   /** The tick it entered the Age of the Bloom, kept while it slings its Seeds there (`BLOOM.aiStay`); and when it last planted an Orchard for the Greening. */
@@ -1656,6 +1677,8 @@ export type Command =
   | { t: 'delve'; p: number; from: number; to: number }
   /** Sink a building below the ground, or with `up` bring a sunk one back to the surface (#883, the Age of the Undercity). */
   | { t: 'sink'; p: number; building: number; up?: boolean }
+  /** Let a Vent Forge's steam out over its vent, scalding the rival soldiers round it (#884, the Age of Deep Forges). */
+  | { t: 'scald'; p: number; building: number }
   | { t: 'bell'; p: number; ring: boolean }
   /** Citizens run from danger (or not): the named citizens, or all of this player's when `ids` is absent. */
   | { t: 'flee'; p: number; on: boolean; ids?: number[] }

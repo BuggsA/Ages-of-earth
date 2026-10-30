@@ -14,7 +14,7 @@ export type SoundName =
   | 'rankUp' | 'victory' | 'defeat' | 'error' | 'coin' | 'queue' | 'catapult' | 'cannon' | 'impact' | 'spear' | 'chant' | 'convert' | 'heal'
   | 'townBell' | 'allClear' | 'research' | 'wonder' | 'wonderRising' | 'shelter' | 'bombDrop' | 'explosion' | 'mg' | 'engine' | 'shipHorn' | 'splashWater'
   | 'board' | 'relicTake' | 'relicKeep' | 'tradeLoad' | 'tradePaid' | 'tradeShare' | 'stepBack' | 'ruinFind' | 'thunder' | 'owl' | 'caw' | 'gull' | 'cricket' | 'frog' | 'birdsong' | 'greatWork' | 'beacon' | 'rally' | 'mammoth' | 'howl' | 'snarl' | 'landmarkTaken' | 'landmarkLost' | 'consecrate' | 'heirloom' | 'zap' | 'coilHum' | 'heroFall' | 'strikeCamp' | 'pitchCamp' | 'callUp' | 'bleat' | 'lambBleat' | 'tribute' | 'caravanBells' | 'toll' | 'wayHunters' | 'wayHearth' | 'wayWarband' | 'blood' | 'graft' | 'crash' | 'drain' | 'sacrifice' | 'curse' | 'shackle' | 'thrall' | 'unshackle' | 'sighting' | 'tidingCome' | 'tidingTook' | 'tidingStorm' | 'dawn' | 'prospect' | 'oreSpill' | 'oreHome' | 'kegGround' | 'kegLit' | 'kegBlow' | 'kegDoused' | 'siloLaunch' | 'siloBlast' | 'siloScrub' | 'siloAlarm' | 'interceptLaunch' | 'interceptHit' | 'interceptMiss' | 'tideTurns' | 'golden' | 'pump' | 'tame' | 'sprout' | 'fireLit' | 'fireCatch' | 'fireOut' | 'fireAsh' | 'flow' | 'rush' | 'groan' | 'dart' | 'swarm' | 'hiveHush' | 'sluiceOpen' | 'sluiceShut' | 'spread' | 'tideWash' | 'tideMill' | 'swept' | 'pondShut' | 'breach' | 'entWake' | 'entRoot' | 'spreading' | 'damBurst' | 'castOff' | 'moor' | 'founder' | 'bloomSling' | 'bloomRoot' | 'bloomGrow' | 'bloomCut' | 'bloomCrack' | 'bloomGreen' | 'bloomStorm'
-  | 'gathering' | 'solstice' | 'delve' | 'surface' | 'sinkDown' | 'sinkUp' | 'unearthed'
+  | 'gathering' | 'solstice' | 'delve' | 'surface' | 'sinkDown' | 'sinkUp' | 'unearthed' | 'scald' | 'forgeCold' | 'forgeWarm'
   | 'scour' | 'boarded' | 'whaleSong' | 'seedBomb' | 'behemothKneel' | 'behemothRise' | 'krakenGrip' | 'krakenRise' | 'webRot' | 'webBurn' | 'webGrown' | 'hawkCry';
 
 export interface SoundSettings {
@@ -808,6 +808,24 @@ export class Sound {
         this.noise(out, t + 0.4, { dur: 1.4, filter: 'lowpass', f: 240, to: 120, q: 0.8, peak: 0.06, attack: 0.3 });
         this.tone(out, t + 0.35, { f: 48, to: 38, type: 'triangle', dur: 1.2, peak: 0.05, attack: 0.25, lp: 200 });
         this.tone(out, t + 0.2, { f: 2600, to: 2500, type: 'sine', dur: 0.08, peak: 0.008, attack: 0.002 });
+        break;
+      case 'scald':
+        // A Vent Forge lets its steam out (#884): the grate's iron clank, a roar of steam out of the ground that hisses away, and a low
+        // rumble of the vent under it.
+        this.tone(out, t, { f: 320, to: 260, type: 'square', dur: 0.06, peak: 0.03, attack: 0.002, lp: 1600 });
+        this.noise(out, t + 0.04, { dur: 1.5, filter: 'highpass', f: 1800, to: 3200, q: 0.7, peak: 0.08, attack: 0.05 });
+        this.noise(out, t + 0.04, { dur: 1.1, filter: 'bandpass', f: 700, to: 400, q: 0.8, peak: 0.05, attack: 0.03 });
+        this.tone(out, t, { f: 46, to: 38, type: 'triangle', dur: 1.3, peak: 0.05, attack: 0.08, lp: 180 });
+        break;
+      case 'forgeCold':
+        // A forge goes cold (#884): the roar of the vent sinking away, and the tick of cooling iron.
+        this.noise(out, t, { dur: 0.9, filter: 'lowpass', f: 600, to: 120, q: 0.7, peak: 0.04, attack: 0.02 });
+        for (let i = 0; i < 3; i++) this.tone(out, t + 0.5 + i * 0.22, { f: 2400 - i * 300, type: 'sine', dur: 0.04, peak: 0.012, attack: 0.002 });
+        break;
+      case 'forgeWarm':
+        // A forge hot again (#884): the vent catching with a soft whump, and the bellows of the earth breathing up.
+        this.tone(out, t, { f: 70, to: 110, type: 'triangle', dur: 0.4, peak: 0.05, attack: 0.01, lp: 400 });
+        this.noise(out, t + 0.05, { dur: 0.8, filter: 'bandpass', f: 300, to: 900, q: 0.8, peak: 0.04, attack: 0.15 });
         break;
       case 'sinkDown':
         // A building goes below (#883): the millstone door rolled across the stair, stone on stone, then the long settle of the earth.

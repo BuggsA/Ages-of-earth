@@ -106,6 +106,7 @@ export class Minimap {
     const sand = rgb('#d9c48a');
     const water = WATER_RGB;
     const rock = rgb('#8d8579');
+    const ember = rgb('#e0602a');
     for (let i = 0; i < s.w * s.h; i++) {
       const t = s.terrain[i];
       const c = t === T_WATER ? water : t === T_SAND ? sand : t === T_ROCK ? rock : (i * 7) % 5 ? grass : grass2;
@@ -113,6 +114,8 @@ export class Minimap {
       if (t === T_WATER) this.depth[i] = Math.max(0, -0.02 - s.height[Math.floor(i / s.w) * (s.w + 1) + (i % s.w)]);
       // A spring head (#701 s1) shows as a speck of water.
       if (s.springs?.includes(i)) this.land.set(water, i * 3);
+      // A vent (#884) as a speck of ember.
+      if (s.vents?.includes(i)) this.land.set(ember, i * 3);
       this.green[i] = t === T_WATER || t === T_SAND || t === T_ROCK ? 0 : 1;
     }
     this.terr = Uint8Array.from(s.terrain);

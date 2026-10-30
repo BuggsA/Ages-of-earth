@@ -1,3 +1,4 @@
+import { ventSpot } from './forge';
 import { hallowed } from './henge';
 import { BUILDINGS, LANDMARKS, RUINS, TRADE } from './data';
 import { ageDef } from './ages';
@@ -99,7 +100,7 @@ export function groundAt(s: GameState, x: number, y: number): number {
   return a * (1 - fx) * (1 - fy) + b * fx * (1 - fy) + c * (1 - fx) * fy + d * fx * fy;
 }
 
-export type PlaceProblem = null | 'hallowed' | 'edge' | 'water' | 'rock' | 'blocked' | 'slope' | 'shore' | 'foreign' | 'woods' | 'snares' | 'deep' | 'dry' | 'parched' | 'bare' | 'hives' | 'tidal' | 'adrift' | 'beds' | 'barrage';
+export type PlaceProblem = null | 'hallowed' | 'edge' | 'water' | 'rock' | 'blocked' | 'slope' | 'shore' | 'foreign' | 'woods' | 'snares' | 'deep' | 'dry' | 'parched' | 'bare' | 'hives' | 'tidal' | 'adrift' | 'beds' | 'barrage' | 'vent' | 'hot';
 
 /** Whether a building of this type could go with its top-left corner on this tile. */
 export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: number, ignoreUnits = true, owner = -1): PlaceProblem {
@@ -182,6 +183,9 @@ export function placeProblem(s: GameState, type: BuildingType, tx: number, ty: n
     const o = landOwnerAt(s, tx + (n >> 1), ty + (n >> 1));
     if (o >= 0 && isEnemy(s, owner, o)) return 'foreign';
   }
+  // A vent (#884) takes a Vent Forge over it, and nothing else; a people on the Deep Road keeps the ground round it clear too.
+  const hot = ventSpot(s, type, tx, ty, n, owner);
+  if (hot) return hot;
   // A spring head (#701) is left open, for the channel dug from it.
   if (s.springs) for (const t of s.springs) if (t % s.w >= tx && t % s.w < tx + n && Math.floor(t / s.w) >= ty && Math.floor(t / s.w) < ty + n) return 'blocked';
   // Its builders need a foothold beside it, the shore or a deck of their own; a tow moors anywhere (`pitchSpot` lets this one pass).
